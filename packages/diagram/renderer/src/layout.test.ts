@@ -112,7 +112,10 @@ function readerFindings(scene: ReturnType<typeof renderIntermediateDiagram>): nu
 	);
 }
 
-/** Flow and band axes: a TB flow runs down `y` and wraps into columns along `x`. */
+/**
+ * Flow and band axes: a TB flow runs down `y` and wraps into columns along `x`,
+ * each band past the last, toward its `next` side and away from its `previous`.
+ */
 function axes(direction: Direction) {
 	const vertical = direction === "TB" || direction === "BT";
 	return {
@@ -120,8 +123,40 @@ function axes(direction: Direction) {
 		across: vertical ? ("x" as const) : ("y" as const),
 		sign: direction === "TB" || direction === "LR" ? 1 : -1,
 		forward: { TB: "bottom", BT: "top", LR: "right", RL: "left" }[direction],
-		back: { TB: "top", BT: "bottom", LR: "left", RL: "right" }[direction],
+		next: vertical ? "right" : "bottom",
+		previous: vertical ? "left" : "top",
 	};
+}
+
+/** Runs of an arrow beyond every node along the flow: around the outer margins. */
+function marginRuns(
+	scene: ReturnType<typeof renderIntermediateDiagram>,
+	arrow: { points: readonly ScenePoint[] },
+	direction: Direction,
+): ScenePoint[][] {
+	const { along } = axes(direction);
+	const size = along === "x" ? "width" : "height";
+	const nodes = nodesOf(scene);
+	const low = Math.min(...nodes.map((node) => node[along]));
+	const high = Math.max(...nodes.map((node) => node[along] + node[size]));
+	return arrow.points.slice(1).flatMap((point, index) => {
+		const previous = arrow.points[index]!;
+		return (point[along] > high && previous[along] > high) ||
+			(point[along] < low && previous[along] < low)
+			? [[previous, point]]
+			: [];
+	});
+}
+
+/** Direction changes along a route. */
+function turns(points: readonly ScenePoint[]): number {
+	const runs = points
+		.slice(1)
+		.map((point, index) =>
+			point.x !== points[index]!.x ? "x" : point.y !== points[index]!.y ? "y" : undefined,
+		)
+		.filter((axis) => axis !== undefined);
+	return runs.slice(1).filter((axis, index) => axis !== runs[index]).length;
 }
 
 function side(node: NodeSceneElement, point: ScenePoint) {
@@ -136,7 +171,7 @@ describe("long flows wrap into bands that read in the requested direction", () =
 
 	it.each(directions)("wraps the seven-stage chain in %s", (direction) => {
 		const scene = rendered("package-chain", direction);
-		const { along, across, sign, forward, back } = axes(direction);
+		const { along, across, sign, next, previous } = axes(direction);
 		const nodes = new Map(nodesOf(scene).map((node) => [node.nodeId, node]));
 		const arrows = arrowsOf(scene).flatMap((a) => (a.type === "arrow" ? [a] : []));
 
@@ -170,15 +205,19 @@ describe("long flows wrap into bands that read in the requested direction", () =
 				center(nodes.get(bands[index]!.at(-1)!)!)[across],
 			);
 
-		// A continuation leaves forward, crosses the gap between bands and arrives forward.
+		// A continuation steps through the gap between bands, as a line of text
+		// wraps: it leaves by the side facing the next band, runs along the gap and
+		// enters by the side facing back, with two turns and none around the ends.
 		for (const [index, band] of bands.slice(1).entries()) {
 			const from = nodes.get(bands[index]!.at(-1)!)!;
 			const to = nodes.get(band[0]!)!;
 			const arrow = arrows.find(
 				(a) => a.sourceNodeId === from.nodeId && a.targetNodeId === to.nodeId,
 			)!;
-			expect(side(from, arrow.points[0])).toBe(forward);
-			expect(side(to, arrow.points.at(-1)!)).toBe(back);
+			expect(side(from, arrow.points[0])).toBe(next);
+			expect(side(to, arrow.points.at(-1)!)).toBe(previous);
+			expect(turns(arrow.points)).toBe(2);
+			expect(marginRuns(scene, arrow, direction)).toEqual([]);
 			const size = across === "x" ? "width" : "height";
 			const gapStart = Math.max(
 				...bands[index]!.map((id) => nodes.get(id)![across] + nodes.get(id)![size]),
@@ -261,6 +300,113 @@ describe("long flows wrap into bands that read in the requested direction", () =
 				sign * (center(nodes.get(id)!)[along] - center(nodes.get(ids[index]!)!)[along]),
 			).toBeGreaterThan(0);
 	});
+});
+
+/** A recorded expense flow, designed top to bottom, drawn as rows. */
+const expenseRows = parseFlowchartDiagram({
+	...flowchartFixture,
+	type: "flowchart",
+	id: "expense-reimbursement",
+	nodes: [
+		["submitted", "An expense is submitted", "start"],
+		["receipt", "Receipt missing?", "decision"],
+		["request", "Request a receipt", "process"],
+		["policycheck", "Run a policy check", "process"],
+		["policy", "Within policy?", "decision"],
+		["manager", "Manager approval", "process"],
+		["payment", "Payment", "end"],
+		["finance", "Finance exception review", "process"],
+		["exception", "Exception approved?", "decision"],
+		["reject", "Reject the expense", "end"],
+	].map(([id, label, kind]) => ({ id: id!, label: label!, kind })),
+	edges: [
+		["submitted", "receipt"],
+		["receipt", "request", "Missing"],
+		["request", "receipt", "Receipt requested"],
+		["receipt", "policycheck", "Attached"],
+		["policycheck", "policy"],
+		["policy", "manager", "Within policy"],
+		["policy", "finance", "Out of policy"],
+		["finance", "exception"],
+		["exception", "manager", "Approved"],
+		["exception", "reject", "Rejected"],
+		["manager", "payment"],
+	].map(([source, target, label], index) => ({
+		id: `edge-${index + 1}`,
+		source: source!,
+		target: target!,
+		...(label ? { label } : {}),
+	})),
+});
+
+describe("continuations step through the gap between bands", () => {
+	const arrowsIn = (scene: ReturnType<typeof renderIntermediateDiagram>) =>
+		arrowsOf(scene).flatMap((a) => (a.type === "arrow" ? [a] : []));
+
+	it.each(directions)(
+		"runs no continuation of a loop-free flow around the bands in %s",
+		(direction) => {
+			const scene = rendered("cache-lookup", direction);
+			const { along, sign, next, previous } = axes(direction);
+			const nodes = new Map(nodesOf(scene).map((node) => [node.nodeId, node]));
+			// Nothing loops back, so every line running back along the flow is a continuation.
+			const continuations = arrowsIn(scene).filter(
+				(arrow) =>
+					sign *
+						(center(nodes.get(arrow.targetNodeId)!)[along] -
+							center(nodes.get(arrow.sourceNodeId)!)[along]) <
+					0,
+			);
+			expect(continuations.length).toBeGreaterThan(0);
+			for (const arrow of continuations) {
+				expect(side(nodes.get(arrow.sourceNodeId)!, arrow.points[0])).toBe(next);
+				expect(side(nodes.get(arrow.targetNodeId)!, arrow.points.at(-1)!)).toBe(previous);
+				expect(marginRuns(scene, arrow, direction)).toEqual([]);
+			}
+			expect(crossings(scene)).toEqual([]);
+			expect(readerFindings(scene)).toBe(0);
+			expect(getCanvasValidationIssues(scene)).toEqual([]);
+		},
+	);
+
+	it.each(["TB", "BT"] as const)(
+		"sends the branches of a decision it enters by other vertices in %s",
+		(direction) => {
+			// The flow enters the decision opening the second column by its side
+			// vertex facing back; its branches leave on along the flow and toward
+			// the next column.
+			const scene = rendered("cache-lookup", direction);
+			const { forward, next, previous } = axes(direction);
+			const decision = nodesOf(scene).find((node) => node.nodeId === "hit")!;
+			const arrow = (id: string) => arrowsIn(scene).find((a) => a.edgeId === id)!;
+			expect(side(decision, arrow("check").points.at(-1)!)).toBe(previous);
+			expect(side(decision, arrow("hit-yes").points[0])).toBe(forward);
+			expect(side(decision, arrow("hit-no").points[0])).toBe(next);
+		},
+	);
+
+	it.each(["LR", "RL"] as const)(
+		"runs continuations around the rows where the gap route stays crossed after repairs in %s",
+		(direction) => {
+			// An expense flow drawn as rows: through the gap, one crossing survives the
+			// crossing repairs; around the ends of the rows they untangle every one.
+			const scene = render(expenseRows, direction);
+			expect(crossings(scene)).toEqual([]);
+			expect(exportAspect(scene)).toBeLessThan(2.5);
+		},
+	);
+
+	it.each(["LR", "RL"] as const)(
+		"keeps a row wrapped where stepping through the gap would route worse in %s",
+		(direction) => {
+			// The second row opens with a decision branching three ways, so the flow
+			// enters it forward; the rows the gap route draws shift a branch into a
+			// jog, and the continuations run around the ends of the rows instead.
+			const scene = rendered("incident-escalation", direction);
+			expect(exportAspect(scene)).toBeLessThan(2.5);
+			expect(readerFindings(scene)).toBe(0);
+		},
+	);
 });
 
 /** A column of approval gates, each with a stop branch: four gates run about 3.2:1, five about 3.9:1. */

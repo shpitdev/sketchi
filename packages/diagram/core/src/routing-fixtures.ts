@@ -22,6 +22,7 @@ import cancellationConvergence from "./fixtures/routing/cancellation-convergence
 import packageChain from "./fixtures/routing/package-chain.js";
 import scopeBypass from "./fixtures/routing/scope-bypass.js";
 import rolloutFailures from "./fixtures/routing/rollout-failures.js";
+import cacheLookup from "./fixtures/routing/cache-lookup.js";
 
 /** Readability regressions from normalized flowchart specs. */
 export const routingFixtures = {
@@ -37,6 +38,11 @@ export const routingFixtures = {
 	}),
 	"rollout-failures": parseFlowchartDiagram({
 		...rolloutFailures,
+		type: "flowchart",
+		layout: { direction: "TB", edgeRouting: "orthogonal" },
+	}),
+	"cache-lookup": parseFlowchartDiagram({
+		...cacheLookup,
 		type: "flowchart",
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
 	}),

@@ -102,8 +102,11 @@ type ConnectionEdge = "top" | "right" | "bottom" | "left";
 interface RoutedEdge {
 	edge: DiagramEdge;
 	index: number;
-	/** A wrap continuation's lane between its bands, across the flow. */
-	lane?: number;
+	/**
+	 * A wrap continuation's lane between its bands: a line along the flow at `at`
+	 * across it, `vertical` when the flow runs down the page.
+	 */
+	lane?: { readonly at: number; readonly vertical: boolean };
 	/**
 	 * One line of a paired transition and its return: -1 runs on the low side of
 	 * the pair (left or above) and +1 on the high side, its label beside it there.
@@ -1369,11 +1372,20 @@ function rankLayout(
 /**
  * Where a long flow wraps into further rows (LR and RL) or columns (TB and BT).
  * Bands are runs of whole ranks; each reads in the requested direction, and one
- * continuation edge carries the flow from a band's last rank to the next band.
+ * continuation edge carries the flow from a band's last rank to the next band,
+ * through the gap between them (see assignGutterSides).
  */
 interface Wrap {
 	readonly bandOf: ReadonlyMap<string, number>;
 	readonly continuations: ReadonlySet<string>;
+	/**
+	 * Continuations that leave forward, around the end of the band they leave,
+	 * where a line reaching their source from the gap makes stepping through it
+	 * route worse.
+	 */
+	readonly leaveForward?: ReadonlySet<string>;
+	/** Every continuation leaves and arrives forward, around the ends of the bands like a line break. */
+	readonly lineBreaks?: boolean;
 	/**
 	 * Each band ends along the flow under the rank that leads into it, as far as
 	 * the longest band allows, so a short band hangs under the steps that reach
@@ -3418,7 +3430,10 @@ function assignLaneContinuations(
 			(other) => (wrap.bandOf.get(other.source.nodeId) ?? 0) === pool,
 		);
 		const middle = (before[across] + before[size] + after[across]) / 2;
-		route.lane = middle + (sharing.indexOf(route) - (sharing.length - 1) / 2) * PORT_SPACING;
+		route.lane = {
+			at: middle + (sharing.indexOf(route) - (sharing.length - 1) / 2) * PORT_SPACING,
+			vertical: lanes.vertical,
+		};
 	}
 }
 
@@ -5645,6 +5660,16 @@ function boxOverlapsShape(box: LabelBox, shape: NodeSceneElement): boolean {
 	return u < 1 && v < 1;
 }
 
+/** Whether a label box lies within a region. */
+function boxWithin(box: LabelBox, region: Box): boolean {
+	return (
+		box.x >= region.x - AXIS_ALIGNED_EPSILON &&
+		box.y >= region.y - AXIS_ALIGNED_EPSILON &&
+		box.x + box.width <= region.x + region.width + AXIS_ALIGNED_EPSILON &&
+		box.y + box.height <= region.y + region.height + AXIS_ALIGNED_EPSILON
+	);
+}
+
 function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
 	return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
@@ -5845,6 +5870,13 @@ function placedBranchLabels(
 		...(groups?.frames ?? []).flatMap((frame) => frameOutline(frame.box)),
 		...(lanes ? laneBoundaries(lanes) : []),
 	];
+	// What the nodes, frames, lanes and lines span, without the labels.
+	const drawing = boundsOf([
+		...shapes,
+		...groupBlocks(groups),
+		...laneBlocks(lanes),
+		...arrows.flatMap((arrow) => arrow.points.map((point) => ({ ...point, width: 0, height: 0 }))),
+	]);
 	const placed: { box: LabelBox; index: number }[] = [];
 	const sizes = arrows.map((arrow, index) =>
 		arrow.label ? branchLabelMetrics(arrow.label, branches(routes[index]?.source.kind)) : undefined,
@@ -5878,10 +5910,19 @@ function placedBranchLabels(
 		else if (unambiguous && labelAmbiguous(labelBox(stub, size), segments[index]!, lines)) {
 			// A clear label that could belong to another line moves to a spot that is
 			// plainly its own and clear of everything with room to spare, or else to
-			// the clear spot that sits least near another line.
+			// the clear spot that sits least near another line. One that only a frame
+			// or lane boundary crowds, no other arrow, stays within the drawing rather
+			// than widen it.
 			const shortfall = (candidate: ScenePoint) =>
 				labelShortfall(labelBox(candidate, size), segments[index]!, lines);
-			const slides = labelSlidePositions(arrow.points, size, labelRuns(routes[index]));
+			const detached = labelAmbiguous(
+				labelBox(stub, size),
+				segments[index]!,
+				segments.flatMap((other, at) => (at === index ? [] : other)),
+			);
+			const slides = labelSlidePositions(arrow.points, size, labelRuns(routes[index])).filter(
+				(candidate) => detached || boxWithin(labelBox(candidate, size), drawing),
+			);
 			position =
 				slides.find(
 					(candidate) =>
@@ -6435,14 +6476,14 @@ function exteriorLaneRoute(
 		route.targetEdge,
 		targetStubLength(route, end, ROUTE_STUB_LENGTH),
 	);
-	const continuation =
-		route.lane === undefined
-			? []
-			: stubDistances.map((distance) =>
-					route.sourceEdge === "top" || route.sourceEdge === "bottom"
-						? routeForVerticalLane(route.lane!, distance)
-						: routeForHorizontalLane(route.lane!, distance),
-				);
+	const bandLane = route.lane;
+	const continuation = bandLane
+		? stubDistances.map((distance) =>
+				bandLane.vertical
+					? routeForVerticalLane(bandLane.at, distance)
+					: routeForHorizontalLane(bandLane.at, distance),
+			)
+		: [];
 	// A pinned line, or a handoff straight across a lane boundary, between facing
 	// sides may step across midway, a bend clear of both ports rather than a jog
 	// beside one, or on the boundary.
@@ -7016,22 +7057,110 @@ function zoneCutEdges(
 	);
 }
 
-/** Each continuation runs midway between the bands it joins. */
+/**
+ * A continuation steps through the gap between its bands, as a line of text
+ * wraps: it leaves its band's last step by the side facing the next band and
+ * enters the next band's first step by the side facing back, never around the
+ * outer margins. A decision it enters that way sends its two branches by its
+ * forward vertex and the one facing the next band, when the second branch's
+ * target lies that way. An end whose side another step of its rank covers, or
+ * a branch still leaves by, keeps its forward side.
+ */
+function assignGutterSides(
+	routes: readonly RoutedEdge[],
+	nodes: readonly NodeSceneElement[],
+	wrap: Wrap,
+	direction: LayoutDirection,
+): void {
+	// Bands follow each other down the page (rows) or across it (columns).
+	const toward = FORWARD_SIDE[ACROSS_DIRECTION[direction]];
+	const back = OPPOSITE_EDGE[toward];
+	const [along, length, across] =
+		direction === "TB" || direction === "BT"
+			? (["y", "height", "x"] as const)
+			: (["x", "width", "y"] as const);
+	const bandOf = (node: NodeSceneElement) => wrap.bandOf.get(node.nodeId) ?? 0;
+	// Whether another step of the node's band shares its stretch of the flow,
+	// further toward the next band (+1) or back toward the previous one (-1).
+	const covered = (node: NodeSceneElement, sign: 1 | -1) =>
+		nodes.some(
+			(other) =>
+				other.nodeId !== node.nodeId &&
+				bandOf(other) === bandOf(node) &&
+				Math.min(other[along] + other[length], node[along] + node[length]) -
+					Math.max(other[along], node[along]) >
+					AXIS_ALIGNED_EPSILON &&
+				sign * (center(other)[across] - center(node)[across]) > 0,
+		);
+	for (const route of routes) {
+		if (!wrap.continuations.has(route.edge.id)) continue;
+		if (!covered(route.source, 1) && !wrap.leaveForward?.has(route.edge.id))
+			route.sourceEdge = toward;
+		const { target } = route;
+		if (covered(target, -1)) continue;
+		const departures = routes.filter((other) => other.source.nodeId === target.nodeId);
+		if (departures.some((other) => other.sourceEdge === back) && branches(target.kind)) {
+			const [low, high] = [...departures].sort(
+				(a, b) => center(a.target)[across] - center(b.target)[across],
+			);
+			if (departures.length !== 2 || center(high!.target)[across] - center(target)[across] < 1)
+				continue;
+			low!.sourceEdge = FORWARD_SIDE[direction];
+			high!.sourceEdge = toward;
+		}
+		if (departures.every((other) => other.sourceEdge !== back)) route.targetEdge = back;
+	}
+}
+
+/**
+ * Continuations leaving toward the next band from a source that another line
+ * reaches from that side: one of its last runs passes beyond the source there.
+ */
+function contendedContinuations(
+	layout: DiagramLayout,
+	wrap: Wrap,
+	direction: LayoutDirection,
+): Set<string> {
+	const toward = FORWARD_SIDE[ACROSS_DIRECTION[direction]];
+	const [across, size] =
+		direction === "TB" || direction === "BT"
+			? (["x", "width"] as const)
+			: (["y", "height"] as const);
+	const contended = new Set<string>();
+	for (const route of layout.routedEdges) {
+		if (!wrap.continuations.has(route.edge.id) || route.sourceEdge !== toward) continue;
+		const { source } = route;
+		const side = source[across] + source[size];
+		if (
+			layout.edgeArrows.some(
+				(arrow) =>
+					arrow.targetNodeId === source.nodeId &&
+					arrow.edgeId !== route.edge.id &&
+					arrow.points.slice(-3).some((point) => point[across] > side + AXIS_ALIGNED_EPSILON),
+			)
+		)
+			contended.add(route.edge.id);
+	}
+	return contended;
+}
+
+/** Each continuation runs midway between the bands it joins, along the flow. */
 function assignContinuationLanes(
 	routes: readonly RoutedEdge[],
 	nodes: readonly NodeSceneElement[],
 	wrap: Wrap,
+	direction: LayoutDirection,
 ): void {
+	const vertical = direction === "TB" || direction === "BT";
+	const [across, size] = vertical ? (["x", "width"] as const) : (["y", "height"] as const);
 	for (const route of routes) {
 		if (!wrap.continuations.has(route.edge.id)) continue;
 		const band = wrap.bandOf.get(route.source.nodeId) ?? 0;
-		const across = route.sourceEdge === "top" || route.sourceEdge === "bottom" ? "x" : "y";
-		const size = across === "x" ? "width" : "height";
 		const inBand = (index: number) =>
 			nodes.filter((node) => (wrap.bandOf.get(node.nodeId) ?? 0) === index);
 		const end = Math.max(...inBand(band).map((node) => node[across] + node[size]));
 		const start = Math.min(...inBand(band + 1).map((node) => node[across]));
-		route.lane = (end + start) / 2;
+		route.lane = { at: (end + start) / 2, vertical };
 	}
 }
 
@@ -7240,6 +7369,8 @@ function layoutDiagramOnce(
 	const mirrored = orthogonal && polish.ports;
 	assignSides(routedEdges, mirrored);
 	if (lanes && orthogonal) assignLaneBranchSides(routedEdges, lanes, direction);
+	else if (orthogonal && !wrap.lineBreaks)
+		assignGutterSides(routedEdges, nodeShapes, wrap, direction);
 	let portOffsets: Map<string, number>;
 	let capacity: Map<string, { width: number; height: number }>;
 	if (orthogonal) {
@@ -7310,7 +7441,7 @@ function layoutDiagramOnce(
 	}
 	nodeShapes = alignMarkers(routedEdges, nodeShapes, groups, portOffsets);
 	if (lanes) assignLaneContinuations(routedEdges, lanes, wrap);
-	else assignContinuationLanes(routedEdges, nodeShapes, wrap);
+	else assignContinuationLanes(routedEdges, nodeShapes, wrap, direction);
 
 	// Judge jogs and corridors at the size a reader sees the exported diagram.
 	const drawn = [...nodeShapes, ...groupBlocks(groups), ...laneBlocks(lanes)];
@@ -8452,11 +8583,34 @@ export function renderGraphDiagram(
 	const arranged = options.placement === undefined;
 	// Another arrangement is tried at full polish only, and kept when it has no more
 	// defects and routes no worse (or, `fewerCrossings`, with strictly fewer crossings).
-	const consider = (arrangement: Arrangement, fewerCrossings: boolean) => {
+	// Crossings, then reader findings, as the layout guards count them.
+	const routed = (layout: DiagramLayout, runs: boolean) => [
+		arrowCrossings(layout.edgeArrows, runs),
+		readerFindingCount(layout.edgeArrows, [
+			...layout.nodeShapes,
+			...groupBlocks(layout.groups),
+			...laneBlocks(layout.lanes),
+		]),
+	];
+	// Routes no worse, and with strictly fewer crossings or reader findings.
+	const cleaner = (layout: DiagramLayout, current: DiagramLayout, runs: boolean) => {
+		const [counts, currentCounts] = [layout, current].map((candidate) => routed(candidate, runs));
+		return (
+			routesNoWorse(layout, current, false, runs) &&
+			counts!.some((count, index) => count < currentCounts![index]!)
+		);
+	};
+	const consider = (arrangement: Arrangement, fewerCrossings: boolean, cleanerOnly = false) => {
 		const layout = layoutDiagram(diagram, levels[0]!, arrangement);
 		const defects = defectsOf(layout);
-		if (!fewer(best.defects, defects) && routesNoWorse(layout, best.layout, fewerCrossings, false))
+		if (
+			!fewer(best.defects, defects) &&
+			(cleanerOnly
+				? cleaner(layout, best.layout, false)
+				: routesNoWorse(layout, best.layout, fewerCrossings, false))
+		)
 			best = { arrangement, defects, layout };
+		return layout;
 	};
 	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
 	// Crossing repairs are tried only where the polished router crossed: arrival
@@ -8514,11 +8668,31 @@ export function renderGraphDiagram(
 				: planWrap(diagram, best.arrangement.reorder, balance)
 			: NO_WRAP;
 	// A wrapped layout may need crossing repairs of its own; it tries them first.
-	for (const crossingRepair of repairable && !best.arrangement.crossingRepair
-		? [true, false]
-		: [best.arrangement.crossingRepair]) {
-		if (wrap.continuations.size === 0 || best.arrangement.wrap === wrap) break;
-		consider({ ...best.arrangement, crossingRepair, wrap }, false);
+	const considerWrap = (next: Wrap, cleanerOnly = false) => {
+		let tried: DiagramLayout | undefined;
+		for (const crossingRepair of repairable && !best.arrangement.crossingRepair
+			? [true, false]
+			: [best.arrangement.crossingRepair]) {
+			if (next.continuations.size === 0 || best.arrangement.wrap === next) break;
+			tried = consider({ ...best.arrangement, crossingRepair, wrap: next }, false, cleanerOnly);
+		}
+		return tried;
+	};
+	const tried = considerWrap(wrap);
+	// Where continuations through the gap between bands route worse, or still
+	// cross a line or draw a reader finding, those whose source a line reaches
+	// from the gap may leave forward, around the end of their band, and failing
+	// that all may run around the ends of the bands like line breaks. In place of
+	// a kept gap route, either must route no worse and draw strictly fewer
+	// crossings or reader findings.
+	if (tried && !laned(diagram)) {
+		const gap = best.arrangement.wrap === wrap;
+		if (!gap || routed(best.layout, false).some((count) => count > 0)) {
+			const leaveForward = contendedContinuations(tried, wrap, diagram.layout.direction);
+			if (leaveForward.size > 0) considerWrap({ ...wrap, leaveForward }, gap);
+			if (best.arrangement.wrap === wrap || best.arrangement.wrap.continuations.size === 0)
+				considerWrap({ ...wrap, lineBreaks: true }, gap);
+		}
 	}
 	// A grouped flow never wraps, since a band cut would split a group; a long one
 	// lays its groups across the flow instead, when that routes no worse.
@@ -8589,9 +8763,32 @@ export function renderGraphDiagram(
 	if (arranged && orthogonal && laned(diagram))
 		consider({ ...best.arrangement, separateRoles: true }, false);
 	// Crossings the arrangements leave are repaired where few enough to untangle.
-	const crossings = arrowCrossings(best.layout.edgeArrows);
-	if (repairable && crossings > 0 && crossings <= CROSSING_REPAIR_MAX_CROSSINGS)
-		best = repairCrossings(diagram, levels[0]!, best, defectsOf, fewer);
+	const repaired = (settled: SettledLayout) => {
+		const crossings = arrowCrossings(settled.layout.edgeArrows);
+		return repairable && crossings > 0 && crossings <= CROSSING_REPAIR_MAX_CROSSINGS
+			? repairCrossings(diagram, levels[0]!, settled, defectsOf, fewer)
+			: settled;
+	};
+	const unrepaired = best;
+	best = repaired(best);
+	// Continuations through the gap between bands that still cross after the
+	// repairs give way to continuations around the ends of the bands, repaired
+	// the same way, where those route no worse and end with strictly fewer
+	// crossings or reader findings.
+	const { wrap: gapWrap } = unrepaired.arrangement;
+	if (
+		repairable &&
+		!laned(diagram) &&
+		gapWrap.continuations.size > 0 &&
+		!gapWrap.lineBreaks &&
+		arrowCrossings(best.layout.edgeArrows) > 0
+	) {
+		const arrangement = { ...unrepaired.arrangement, wrap: { ...gapWrap, lineBreaks: true } };
+		const layout = layoutDiagram(diagram, levels[0]!, arrangement);
+		const around = repaired({ arrangement, defects: defectsOf(layout), layout });
+		if (!fewer(best.defects, around.defects) && cleaner(around.layout, best.layout, true))
+			best = around;
+	}
 	// Only pairs still crossing after the normal repairs may leave their lanes.
 	// One extra ordinary-routing layout is screened by the same export/reader
 	// admission as other candidates. Preserve every unrelated paired lane.

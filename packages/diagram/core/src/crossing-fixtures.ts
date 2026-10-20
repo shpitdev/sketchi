@@ -1,6 +1,7 @@
 import { parseFlowchartDiagram } from "./types/flowchart.js";
 import { parseStateMachineDiagram, stateMachineDiagramType } from "./types/state-machine.js";
 import connectionRetry from "./fixtures/crossings/connection-retry.js";
+import connectionRetryDisconnect from "./fixtures/crossings/connection-retry-disconnect.js";
 import contentModeration from "./fixtures/crossings/content-moderation.js";
 import groupedExpenseApproval from "./fixtures/crossings/grouped-expense-approval.js";
 import incidentEscalation from "./fixtures/crossings/incident-escalation.js";
@@ -53,13 +54,15 @@ function stateMachine(fixture: object) {
 
 /**
  * Generated state machines whose layouts drew avoidable crossings, a guard
- * label between two lines or a return label nearer another line than its own,
- * each laid out in whichever direction reads better.
+ * label between two lines, a return label nearer another line than its own or
+ * a label moved out past the drawing, each laid out in whichever direction
+ * reads better.
  */
 export const crossingStateMachines = {
 	"media-player": stateMachine(mediaPlayer),
 	"media-player-ended": stateMachine(mediaPlayerEnded),
 	"connection-retry": stateMachine(connectionRetry),
+	"connection-retry-disconnect": stateMachine(connectionRetryDisconnect),
 	"order-lifecycle": stateMachine(orderLifecycle),
 	"order-lifecycle-ended": stateMachine(orderLifecycleEnded),
 	"named-final-retry": stateMachine(namedFinalRetry),

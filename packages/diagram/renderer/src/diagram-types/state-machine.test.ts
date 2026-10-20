@@ -63,6 +63,25 @@ describe("StateMachine renderer", () => {
 		},
 	);
 
+	it("keeps a label its own line holds nearest within the drawing", () => {
+		// Disconnect sits 10 px from the Connected frame, inside the berth an
+		// ambiguous label keeps, but no other arrow comes nearer than its own line:
+		// it stays above its exit rather than sliding out past its return run.
+		const scene = renderDiagram(crossingStateMachines["connection-retry-disconnect"]);
+		const label = scene.elements.find(
+			(element) => element.type === "text" && element.text === "Disconnect",
+		)!;
+		const own = arrows(scene).find((arrow) => arrow.label === "Disconnect")!;
+		if (label.type !== "text") throw new Error("expected the Disconnect label");
+		const width = wrappedLabelWidth(label.text, label.fontSize, label.maxWidth ?? 160);
+		const right = Math.max(
+			...arrows(scene).flatMap((arrow) => arrow.points.map((point) => point.x)),
+			...nodes(scene).map((node) => node.x + node.width),
+		);
+		expect(label.x + width / 2).toBeLessThanOrEqual(right);
+		expect(label.y).toBeLessThan(own.points[0].y);
+	});
+
 	it("keeps the captured media-player ended marker anonymous", () => {
 		const scene = renderDiagram(crossingStateMachines["media-player"]);
 		expect(nodes(scene).find((node) => node.nodeId === "ended")).toMatchObject({

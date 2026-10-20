@@ -209,6 +209,98 @@ function diagonalRuns(scene: ReturnType<typeof renderIntermediateDiagram>): stri
 	);
 }
 
+/**
+ * Continuations of a wrapped long flow (spine edges running back along it) that
+ * run around the ends of the bands where they could step through the gap
+ * between them: beyond every node along the flow at the source's end, unless a
+ * step of the source's band and rank lies toward the next band or another line
+ * reaches the source from the gap, or at the target's end, unless a step lies
+ * before the target or a branch leaves it by the side facing back.
+ */
+function aroundTheBands(
+	scene: ReturnType<typeof renderIntermediateDiagram>,
+	direction: "TB" | "BT" | "LR" | "RL",
+	spine: readonly { id: string; source: string; target: string }[],
+	continuations: ReadonlySet<string>,
+): string[] {
+	const vertical = direction === "TB" || direction === "BT";
+	const [along, length, across] = vertical
+		? (["y", "height", "x"] as const)
+		: (["x", "width", "y"] as const);
+	const nodes = scene.elements.flatMap((e) => (e.type === "node" ? [e] : []));
+	const arrows = scene.elements.flatMap((e) => (e.type === "arrow" ? [e] : []));
+	type Node = (typeof nodes)[number];
+	const node = (id: string) => nodes.find((n) => n.nodeId === id)!;
+	const middle = (n: Node) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
+	// Bands follow the spine, each continuation opening the next; a branch's stop
+	// sits in its decision's band.
+	const bandOf = new Map<string, number>();
+	let band = 0;
+	for (const edge of spine) {
+		bandOf.set(edge.source, band);
+		if (continuations.has(edge.id)) band += 1;
+		bandOf.set(edge.target, band);
+	}
+	for (const arrow of arrows)
+		if (!bandOf.has(arrow.targetNodeId))
+			bandOf.set(arrow.targetNodeId, bandOf.get(arrow.sourceNodeId)!);
+	const side = (n: Node, point: Point) => {
+		const x = (point.x - middle(n).x) / (n.width / 2);
+		const y = (point.y - middle(n).y) / (n.height / 2);
+		return Math.abs(x) > Math.abs(y) ? (x < 0 ? "left" : "right") : y < 0 ? "top" : "bottom";
+	};
+	// Whether another step of the node's band and rank lies further across (+1) or before it (-1).
+	const covered = (n: Node, sign: 1 | -1) =>
+		nodes.some(
+			(other) =>
+				other !== n &&
+				bandOf.get(other.nodeId) === bandOf.get(n.nodeId) &&
+				Math.min(other[along] + other[length], n[along] + n[length]) -
+					Math.max(other[along], n[along]) >
+					0.5 &&
+				sign * (middle(other)[across] - middle(n)[across]) > 0,
+		);
+	// Whether another line's last runs reach the node from beyond its side facing the next band.
+	const reachedFromGap = (n: Node, arrow: (typeof arrows)[number]) =>
+		arrows.some(
+			(other) =>
+				other !== arrow &&
+				other.targetNodeId === n.nodeId &&
+				other.points
+					.slice(-3)
+					.some((p) => p[across] > n[across] + n[vertical ? "width" : "height"] + 0.5),
+		);
+	const low = Math.min(...nodes.map((n) => n[along]));
+	const high = Math.max(...nodes.map((n) => n[along] + n[length]));
+	const forward = direction === "TB" || direction === "LR" ? 1 : -1;
+	return arrows
+		.filter((arrow) => continuations.has(arrow.edgeId))
+		.flatMap((arrow) => {
+			const [source, target] = [node(arrow.sourceNodeId), node(arrow.targetNodeId)];
+			const beyond = (end: number) =>
+				arrow.points
+					.slice(1)
+					.some((point, index) =>
+						[point, arrow.points[index]!].every((p) =>
+							end > 0 ? p[along] > high + 0.5 : p[along] < low - 0.5,
+						),
+					);
+			const branchBack = arrows.some(
+				(other) =>
+					other.sourceNodeId === target.nodeId &&
+					side(target, other.points[0]) === (vertical ? "left" : "top"),
+			);
+			return [
+				...(beyond(forward) && !covered(source, 1) && !reachedFromGap(source, arrow)
+					? [`${arrow.edgeId} runs around the bands past its source`]
+					: []),
+				...(beyond(-forward) && !covered(target, -1) && !branchBack
+					? [`${arrow.edgeId} runs around the bands before its target`]
+					: []),
+			];
+		});
+}
+
 /** A route's corners alone, so a line crossing it where it runs straight on counts once. */
 function corners(points: readonly Point[]): Point[] {
 	return points.filter((p, i) => {
@@ -532,6 +624,19 @@ const KNOWN_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly s
  * between labels, and labels a crossing line already marks above. Main set 143
  * here. Never more than these.
  */
+/**
+ * Long flows whose continuations still run around the ends of the bands, by
+ * index: stepping through the gap draws another crossing. In 9 the decision
+ * opening the second row already takes its other three sides for two branches
+ * and a loop back into it, so the loop crosses the continuation's drop.
+ */
+const KNOWN_AROUND_THE_BANDS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly number[]>> = {
+	TB: [],
+	BT: [],
+	LR: [9],
+	RL: [9],
+};
+
 const KNOWN_DETACHED_LABELS: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
 	TB: "4:e12>e10 11:e11>e15 16:e26>e13 16:e33>e20 19:e11>e7 19:e11>e16 19:e14>e5 19:e15>e7 19:e17>e5 19:e17>e14 24:e7>e6",
 	BT: "11:e11>e15 16:e27>e13 16:e27>e22 16:e33>e22 16:e33>e27",
@@ -913,13 +1018,16 @@ describe("routing fuzz", () => {
 				const value = vertical ? node.y + node.height / 2 : node.x + node.width / 2;
 				return direction === "TB" || direction === "LR" ? value : -value;
 			};
+			const spine = spec.edges.filter((edge) => edge.id.startsWith("s"));
+			const continuations = new Set(
+				spine.filter((edge) => along(edge.target) < along(edge.source)).map((edge) => edge.id),
+			);
 			return {
+				around: aroundTheBands(scene, direction, spine, continuations),
 				issues:
 					validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues.length +
 					diagonalRuns(scene).length,
-				wrapped: spec.edges.some(
-					(edge) => edge.id.startsWith("s") && along(edge.target) < along(edge.source),
-				),
+				wrapped: continuations.size > 0,
 			};
 		});
 
@@ -980,6 +1088,26 @@ describe("routing fuzz", () => {
 		expect(findings).toBeLessThanOrEqual(3);
 	});
 
+	it.each(["LR", "RL"] as const)(
+		"routes the review's wrapped long flow without reader findings in %s",
+		(direction) => {
+			// Long flow 39 of a longer run: through the gap between rows a branch
+			// arrived with a 63.5-unit jog; its contended continuation leaving forward
+			// draws it clean, as main does.
+			const { crossings, findings } = routingCounts(
+				renderIntermediateDiagram(
+					parseFlowchartDiagram({
+						...randomLongFlows(39)[38]!,
+						type: "flowchart",
+						layout: { direction, edgeRouting: "orthogonal" },
+					}),
+				),
+			);
+			expect(crossings).toBe(0);
+			expect(findings).toBe(0);
+		},
+	);
+
 	describe.each(["TB", "BT", "LR", "RL"] as const)("%s", (direction) => {
 		it("draws no flowchart with more crossings or reader-scale findings than main", () => {
 			expect(worseThanMain(direction)).toEqual([]);
@@ -989,10 +1117,17 @@ describe("routing fuzz", () => {
 			expect(failures(direction, "orthogonal")).toEqual([]);
 		}, 60_000);
 
-		it("exports every random long flow without validator issues, wrapped or not", () => {
+		it("exports every random long flow without validator issues, wrapped or not, stepping through the gap between bands", () => {
 			const exports = longFlowExports(direction);
 			expect(exports.filter((result) => result.issues > 0)).toEqual([]);
 			expect(exports.filter((result) => result.wrapped).length).toBeGreaterThan(5);
+			expect(
+				exports.flatMap((result, index) =>
+					KNOWN_AROUND_THE_BANDS[direction].includes(index)
+						? []
+						: result.around.map((failure) => `${index}: ${failure}`),
+				),
+			).toEqual([]);
 		}, 60_000);
 
 		it.each(["straight", "curved"] as const)(
