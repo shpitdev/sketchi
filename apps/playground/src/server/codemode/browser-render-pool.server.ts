@@ -4,6 +4,7 @@ import type { Browser, BrowserWorker, Page } from "@cloudflare/playwright";
 import { recordMetric } from "@sketchi/observability";
 import {
 	Cause,
+	Clock,
 	Context,
 	Duration,
 	Effect,
@@ -15,6 +16,7 @@ import {
 	RcMap,
 	Schedule,
 	Schema,
+	Semaphore,
 } from "effect";
 
 export type CloudflareBrowserRunBinding = BrowserWorker;
@@ -31,7 +33,13 @@ export const HARNESS_PAGE_IDLE_TTL = Duration.seconds(60);
  */
 export const BROWSER_KEEP_ALIVE_MS = 150_000;
 /** Browser Run admits three new browsers per second per account. */
-export const MAX_HARNESS_PAGES = 4;
+export const BROWSER_LAUNCHES_PER_SECOND = 3;
+/**
+ * Each page is its own Browser Run browser; the account allows 200 at once.
+ * About 40 builds in flight keep up to 11-14 exports running together, and a
+ * page opens only while every open page is busy.
+ */
+export const MAX_HARNESS_PAGES = 16;
 export const HARNESS_OPEN_TIMEOUT_MS = 45_000;
 export const PNG_EXPORT_TIMEOUT_MS = 30_000;
 const EXPORT_SCALE = 2;
@@ -152,6 +160,8 @@ interface HarnessPage {
 	readonly page: Page;
 	/** Pool sequence number taken when the page finished opening. */
 	openedAt: number;
+	/** How long the page took to open, launch pacing and retries included. */
+	openMs: number;
 	/** Set when an export hung, so the page is not reused. */
 	abandoned: boolean;
 }
@@ -182,13 +192,24 @@ const prepareHarnessPage = Effect.fnUntraced(function* (browser: Browser, harnes
 	return page;
 });
 
+let playwright: Promise<typeof import("@cloudflare/playwright")> | undefined;
+/**
+ * Loaded on first launch and shared, so launches opening together load it once.
+ * A failed load is dropped, so the next launch tries again.
+ */
+const loadPlaywright = () =>
+	(playwright ??= import("@cloudflare/playwright").catch((cause: unknown) => {
+		playwright = undefined;
+		throw cause;
+	}));
+
 /** One launch attempt; a browser that fails to prepare closes before any retry. */
 const launchHarnessPage = Effect.fnUntraced(function* (
 	binding: CloudflareBrowserRunBinding,
 	harnessUrl: string,
 ) {
 	const browser = yield* tryBrowserPromise("launch", async (signal) => {
-		const { launch } = await import("@cloudflare/playwright");
+		const { launch } = await loadPlaywright();
 		return launch(browserBindingWithSignal(binding, signal), {
 			keep_alive: BROWSER_KEEP_ALIVE_MS,
 		});
@@ -196,12 +217,18 @@ const launchHarnessPage = Effect.fnUntraced(function* (
 	const page = yield* prepareHarnessPage(browser, harnessUrl).pipe(
 		Effect.onExit((exit) => (Exit.isSuccess(exit) ? Effect.void : closeBrowser(browser, exit))),
 	);
-	return { browser, page, openedAt: 0, abandoned: false } satisfies HarnessPage;
+	return { browser, page, openedAt: 0, openMs: 0, abandoned: false } satisfies HarnessPage;
 });
 
-function openHarnessPage(binding: CloudflareBrowserRunBinding, harnessUrl: string) {
+function openHarnessPage(
+	binding: CloudflareBrowserRunBinding,
+	harnessUrl: string,
+	paceLaunch: Effect.Effect<void>,
+) {
 	return Effect.acquireRelease(
-		launchHarnessPage(binding, harnessUrl).pipe(
+		// Every attempt, retries included, waits its turn against the account launch rate.
+		paceLaunch.pipe(
+			Effect.andThen(launchHarnessPage(binding, harnessUrl)),
 			Effect.retry(browserRenderingRetrySchedule),
 			// Waiting renders queue behind this page, so a stuck launch must end.
 			Effect.timeoutOrElse({
@@ -227,10 +254,21 @@ export interface PngRenderRequest {
 	readonly excalidraw: unknown;
 }
 
+/** Where one export spent its time in the pool, in milliseconds. */
+export interface PngRenderTiming {
+	/** Waiting for a free page, and any stale-page retries. */
+	readonly queueMs: number;
+	/** Waiting for the page this export got to open; 0 when one was ready. */
+	readonly openMs: number;
+	/** The browser export and the PNG decode. */
+	readonly exportMs: number;
+}
+
 export interface RenderedPng {
 	readonly png: ArrayBuffer;
 	/** True when this export waited for a page to open rather than finding one ready. */
 	readonly coldStart: boolean;
+	readonly timing: PngRenderTiming;
 }
 
 const exportHarnessPng = Effect.fnUntraced(function* (
@@ -309,6 +347,8 @@ export interface BrowserRenderPoolShape {
  * Keeps Browser Run pages with the export harness loaded, per harness URL, so
  * an export skips the browser launch and the Excalidraw load. Pages grow on
  * demand up to MAX_HARNESS_PAGES and close after HARNESS_PAGE_IDLE_TTL idle.
+ * Launches start no faster than BROWSER_LAUNCHES_PER_SECOND, so a pool growing
+ * under a burst does not run into the account's launch limit.
  */
 export class BrowserRenderPool extends Context.Service<BrowserRenderPool, BrowserRenderPoolShape>()(
 	"@sketchi/playground/BrowserRenderPool",
@@ -326,6 +366,23 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 					Effect.sync(() => {
 						pageCounts.set(harnessUrl, (pageCounts.get(harnessUrl) ?? 0) + delta);
 					});
+				// Start times of the latest launches, oldest first.
+				const launchStarts: number[] = [];
+				const launchGate = yield* Semaphore.make(1);
+				const paceLaunch = launchGate.withPermits(1)(
+					Effect.gen(function* () {
+						const windowStart = launchStarts.at(-BROWSER_LAUNCHES_PER_SECOND);
+						const wait =
+							windowStart === undefined
+								? 0
+								: windowStart + 1_000 - (yield* Clock.currentTimeMillis);
+						if (wait > 0) {
+							yield* Effect.sleep(wait);
+						}
+						launchStarts.push(yield* Clock.currentTimeMillis);
+						launchStarts.splice(0, launchStarts.length - BROWSER_LAUNCHES_PER_SECOND);
+					}),
+				);
 
 				const pagesByHarness = yield* RcMap.make({
 					lookup: (harnessUrl: string) =>
@@ -333,12 +390,12 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 							acquire: Effect.acquireRelease(countPages(harnessUrl, 1), () =>
 								countPages(harnessUrl, -1),
 							).pipe(
-								Effect.andThen(openHarnessPage(binding, harnessUrl)),
-								Effect.tap((harness) =>
-									Effect.sync(() => {
-										harness.openedAt = ++sequence;
-									}),
-								),
+								Effect.andThen(Effect.timed(openHarnessPage(binding, harnessUrl, paceLaunch))),
+								Effect.map(([openDuration, harness]) => {
+									harness.openedAt = ++sequence;
+									harness.openMs = Duration.toMillis(openDuration);
+									return harness;
+								}),
 							),
 							min: 0,
 							max: MAX_HARNESS_PAGES,
@@ -351,8 +408,10 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 					Effect.scoped(
 						Effect.gen(function* () {
 							const requestedAt = ++sequence;
+							const startedAt = yield* Clock.currentTimeMillis;
 							const pages = yield* RcMap.get(pagesByHarness, request.harnessUrl);
 							const harness = yield* Pool.get(pages);
+							const acquiredAt = yield* Clock.currentTimeMillis;
 							// Browser Run may have closed an idle session; replace it.
 							if (!isLive(harness)) {
 								yield* Pool.invalidate(pages, harness);
@@ -375,13 +434,17 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 									},
 								),
 							);
-							return { png, coldStart } satisfies RenderedPng;
+							const exportedAt = yield* Clock.currentTimeMillis;
+							// A page another caller started opening may finish within a shorter wait.
+							const openMs = coldStart ? Math.min(harness.openMs, acquiredAt - startedAt) : 0;
+							return { png, coldStart, openMs, exportMs: exportedAt - acquiredAt };
 						}),
 					);
 
 				return BrowserRenderPool.of({
 					renderPng: Effect.fn("playground.browserRendering.renderPool")(function* (request) {
-						return yield* renderOnce(request).pipe(
+						const startedAt = yield* Clock.currentTimeMillis;
+						const { png, coldStart, openMs, exportMs } = yield* renderOnce(request).pipe(
 							Effect.retry({
 								times: 2,
 								while: (error) => error._tag === "StaleHarnessPage",
@@ -390,6 +453,20 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 								Effect.fail(browserFailure("evaluate")(error.cause)),
 							),
 						);
+						const finishedAt = yield* Clock.currentTimeMillis;
+						// Queue time is everything else: waiting for a page, and any stale-page retries.
+						const timing: PngRenderTiming = {
+							queueMs: finishedAt - startedAt - openMs - exportMs,
+							openMs,
+							exportMs,
+						};
+						yield* Effect.annotateCurrentSpan({
+							cache_mode: coldStart ? "cold" : "warm",
+							queue_ms: timing.queueMs,
+							open_ms: timing.openMs,
+							export_ms: timing.exportMs,
+						});
+						return { png, coldStart, timing } satisfies RenderedPng;
 					}),
 					prewarm: Effect.fn("playground.browserRendering.prewarm")(function* (harnessUrl) {
 						if (prewarming.has(harnessUrl) || (pageCounts.get(harnessUrl) ?? 0) > 0) {

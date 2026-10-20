@@ -45,7 +45,12 @@ function renderInput(): {
 }
 
 function rendered(coldStart = false): PngRenderResult {
-	return { _tag: "Rendered", coldStart, png: new Uint8Array([80, 78, 71]).buffer };
+	return {
+		_tag: "Rendered",
+		coldStart,
+		png: new Uint8Array([80, 78, 71]).buffer,
+		timing: { queueMs: 40, openMs: coldStart ? 900 : 0, exportMs: 250 },
+	};
 }
 
 function fakeRenderers(renderPng: (request: PngRenderRequest) => Promise<PngRenderResult>) {
@@ -85,7 +90,12 @@ describe("Cloudflare Browser Run Code Mode renderer", () => {
 				(event): event is TelemetrySpanEvent =>
 					event.event === "effect.span" && event.name === "playground.browserRendering.renderPng",
 			);
-			expect(span?.attributes["cache_mode"]).toBe("cold");
+			expect(span?.attributes).toMatchObject({
+				cache_mode: "cold",
+				queue_ms: 40,
+				open_ms: 900,
+				export_ms: 250,
+			});
 			const metrics = probe.events.filter(
 				(event): event is TelemetryMetricEvent => event.event === "effect.metric",
 			);

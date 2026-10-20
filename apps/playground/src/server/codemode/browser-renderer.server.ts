@@ -126,7 +126,12 @@ export function createCloudflareBrowserRunArtifactRenderer(
 							),
 				),
 				Effect.tap((result) =>
-					Effect.annotateCurrentSpan({ cache_mode: result.coldStart ? "cold" : "warm" }),
+					Effect.annotateCurrentSpan({
+						cache_mode: result.coldStart ? "cold" : "warm",
+						queue_ms: result.timing.queueMs,
+						open_ms: result.timing.openMs,
+						export_ms: result.timing.exportMs,
+					}),
 				),
 				Effect.map((result) => result.png),
 				Effect.timeout(BROWSER_RENDER_TIMEOUT_MS),

@@ -9,6 +9,7 @@ import {
 	type BrowserRenderingOperation,
 	type CloudflareBrowserRunBinding,
 	type PngRenderRequest,
+	type PngRenderTiming,
 } from "./browser-render-pool.server";
 
 export interface CodeModePngRendererEnv {
@@ -17,7 +18,12 @@ export interface CodeModePngRendererEnv {
 
 /** Plain data so it crosses Durable Object RPC intact. */
 export type PngRenderResult =
-	| { readonly _tag: "Rendered"; readonly png: ArrayBuffer; readonly coldStart: boolean }
+	| {
+			readonly _tag: "Rendered";
+			readonly png: ArrayBuffer;
+			readonly coldStart: boolean;
+			readonly timing: PngRenderTiming;
+	  }
 	| {
 			readonly _tag: "Failed";
 			readonly message: string;
@@ -63,10 +69,11 @@ export class CodeModePngRenderer extends DurableObject<CodeModePngRendererEnv> {
 						message: error.message,
 						operation: error.operation,
 					}),
-					onSuccess: ({ coldStart, png }): PngRenderResult => ({
+					onSuccess: ({ coldStart, png, timing }): PngRenderResult => ({
 						_tag: "Rendered",
 						coldStart,
 						png,
+						timing,
 					}),
 				}),
 			),

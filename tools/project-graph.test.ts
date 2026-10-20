@@ -185,7 +185,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/playground/src/server/ai/model.server.ts": 2,
 	"apps/playground/src/server/bindings/studio-env.server.ts": 1,
 	"apps/playground/src/server/chat/agent.server.ts": 6,
-	"apps/playground/src/server/codemode/browser-render-pool.server.ts": 22,
+	"apps/playground/src/server/codemode/browser-render-pool.server.ts": 25,
 	"apps/playground/src/server/codemode/browser-renderer.server.ts": 6,
 	"apps/playground/src/server/codemode/effect-mcp-adapter.server.ts": 11,
 	"apps/playground/src/server/codemode/icon-catalog.server.ts": 5,
