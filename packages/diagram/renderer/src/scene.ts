@@ -1422,6 +1422,13 @@ const WRAP_TARGET_ASPECT = 2;
 const MAX_BANDS = 6;
 /** Bands sit farther apart than ranks so each reads as its own row or column. */
 const BAND_GAP = 144;
+/** A column at least this tall for its breadth that cannot wrap tightens its rank gaps... */
+const COMPACT_ASPECT = 2.3;
+/**
+ * ...those only straight lines cross to this, room for a label beside an
+ * arrowhead, and those lines turn in to the stubs either side of each turn.
+ */
+const COMPACT_GAP = 56;
 
 /**
  * Whole-layout choices, each kept only if it routes no worse than the layout
@@ -1454,6 +1461,8 @@ interface Arrangement {
 	readonly unpairedReturns?: ReadonlySet<string>;
 	/** Sides edges leave or arrive by in place of the assigned ones, chosen to remove crossings. */
 	readonly sides?: SideOverrides;
+	/** Gaps after these ranks, by index along the flow, shrink to at most these lengths. */
+	readonly compactGaps?: ReadonlyMap<number, number>;
 	readonly wrap: Wrap;
 	/** Bands of a zoned flow's levels, by group id or TOP_LEVEL (see planZoneWraps). */
 	readonly zoneWraps?: ReadonlyMap<string, Wrap>;
@@ -1835,7 +1844,7 @@ function positionNodes(
 	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }> = new Map(),
 	stubReach: ReadonlyMap<string, number> = new Map(),
-	{ reorder, wrap }: Arrangement = PLAIN_ARRANGEMENT,
+	{ compactGaps, reorder, wrap }: Arrangement = PLAIN_ARRANGEMENT,
 	centers: ReadonlyMap<string, number> = new Map(),
 ): NodeSceneElement[] {
 	const { gapAfter, gapBetween, highSide, lowSide, rankMetrics, reachOf, vertical } = rankLayout(
@@ -1881,7 +1890,7 @@ function positionNodes(
 				}
 				if (next) breadthOffset += gapBetween(shape, next);
 			}
-			rankOffset += metric.depth + gapAfter[index]!;
+			rankOffset += metric.depth + Math.min(compactGaps?.get(index) ?? Infinity, gapAfter[index]!);
 		}
 		// The next band leaves a lane for the continuation clear of both bands' stubs.
 		const next = bands[bandIndex + 1];
@@ -7256,6 +7265,51 @@ function crowdedGroups(layout: DiagramLayout): Set<string> {
 }
 
 /**
+ * How short each gap between consecutive ranks of a column can draw: one that
+ * lines only cross straight, COMPACT_GAP; one that lines turn in, a stub either
+ * side of the turns, which keep a port's spacing apart. With `straight`, only
+ * the gaps lines cross straight.
+ */
+function compactGaps(
+	diagram: IntermediateDiagram,
+	layout: DiagramLayout,
+	reorder: boolean,
+	straight = false,
+): Map<number, number> {
+	const { rankMetrics } = rankLayout(diagram, new Map(), new Map(), reorder);
+	const placed = new Map(layout.nodeShapes.map((shape) => [shape.nodeId, shape]));
+	const spans = rankMetrics.map(({ shapes }) => {
+		const boxes = shapes.map((shape) => placed.get(shape.nodeId)!);
+		return {
+			top: Math.min(...boxes.map((box) => box.y)),
+			bottom: Math.max(...boxes.map((box) => box.y + box.height)),
+		};
+	});
+	const turns = layout.edgeArrows.flatMap((arrow) =>
+		arrow.points.slice(1).flatMap((point, index) => {
+			const previous = arrow.points[index]!;
+			return Math.abs(point.y - previous.y) <= AXIS_ALIGNED_EPSILON &&
+				Math.abs(point.x - previous.x) > AXIS_ALIGNED_EPSILON
+				? [point.y]
+				: [];
+		}),
+	);
+	const gaps = new Map<number, number>();
+	for (let index = 0; index < spans.length - 1; index += 1) {
+		const [upper, lower] = [spans[index]!, spans[index + 1]!];
+		// Ranks run down the page in TB and up it in BT.
+		const [from, to] =
+			upper.bottom <= lower.top ? [upper.bottom, lower.top] : [lower.bottom, upper.top];
+		const levels = new Set(
+			turns.filter((y) => y > from + AXIS_ALIGNED_EPSILON && y < to - AXIS_ALIGNED_EPSILON),
+		).size;
+		if (levels === 0) gaps.set(index, COMPACT_GAP);
+		else if (!straight) gaps.set(index, 2 * ROUTE_STUB_LENGTH + (levels - 1) * PORT_SPACING);
+	}
+	return gaps;
+}
+
+/**
  * Lay out and route, then give each crowded group more room and try again,
  * keeping a retry only when it draws fewer export and group defects.
  */
@@ -8909,14 +8963,7 @@ export function renderGraphDiagram(
 	const finished = (settled: DiagramLayout) =>
 		orthogonal ? clearLabels(clearOutlines(settled)) : settled;
 	let layout = finished(best.layout);
-	// A line through another line's arrowhead reads as pointing into that head's
-	// target. Where one is left, the lines through a head are routed again after
-	// all the others, clear of heads first, and, in a graph few enough edges to
-	// repair, every line is. Of these, the clearest is kept that draws fewer
-	// lines through a head, no more export defects, crossings, reader findings,
-	// detours or crowded labels, and no longer a drawing: a narrower one may read
-	// past 2.45:1, but a longer one would shrink all its text.
-	const labelsOf = ({ edgeArrows, groups, lanes, nodeShapes, routedEdges }: DiagramLayout) => {
+	const crowding = ({ edgeArrows, groups, lanes, nodeShapes, routedEdges }: DiagramLayout) => {
 		const { shortfalls, touches } = placedBranchLabels(
 			[...edgeArrows],
 			routedEdges,
@@ -8927,6 +8974,52 @@ export function renderGraphDiagram(
 		);
 		return [touches, shortfalls.reduce((total, label) => total + label.shortfall, 0)];
 	};
+	// A plain column still too tall for its breadth, which no wrap shortened,
+	// draws its rank gaps as short as the lines in them allow (compactGaps), or,
+	// failing that, only those lines cross straight. Either is kept when it
+	// routes no worse, lengthens, hooks or detours no line and crowds no label
+	// more.
+	const compactable =
+		arranged &&
+		orthogonal &&
+		vertical &&
+		!structure &&
+		!laned(diagram) &&
+		best.arrangement.wrap.continuations.size === 0 &&
+		lengthOf(layout).aspect >= COMPACT_ASPECT;
+	for (const straight of compactable ? [false, true] : []) {
+		const gaps = compactGaps(diagram, layout, best.arrangement.reorder, straight);
+		if (gaps.size === 0) continue;
+		const arrangement = { ...best.arrangement, compactGaps: gaps };
+		const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
+		const compact = repaired({ arrangement, defects: defectsOf(attempt), layout: attempt });
+		const candidate = finished(compact.layout);
+		const lengths = new Map(
+			layout.edgeArrows.map((arrow) => [arrow.id, routeLength(arrow.points)]),
+		);
+		if (
+			!fewer(best.defects, compact.defects) &&
+			routesNoWorse(candidate, layout, false, true) &&
+			candidate.edgeArrows.every(
+				(arrow) => routeLength(arrow.points) <= lengths.get(arrow.id)! + AXIS_ALIGNED_EPSILON,
+			) &&
+			hookedRoutes(candidate) <= hookedRoutes(layout) &&
+			detouredLines(candidate.edgeArrows) <= detouredLines(layout.edgeArrows) &&
+			crowding(candidate).every((count, index) => count <= crowding(layout)[index]!) &&
+			lengthOf(candidate).aspect < lengthOf(layout).aspect
+		) {
+			best = compact;
+			layout = candidate;
+			break;
+		}
+	}
+	// A line through another line's arrowhead reads as pointing into that head's
+	// target. Where one is left, the lines through a head are routed again after
+	// all the others, clear of heads first, and, in a graph few enough edges to
+	// repair, every line is. Of these, the clearest is kept that draws fewer
+	// lines through a head, no more export defects, crossings, reader findings,
+	// detours or crowded labels, and no longer a drawing: a narrower one may read
+	// past 2.45:1, but a longer one would shrink all its text.
 	// The drawing's long side, labels included: a longer one shrinks all its text.
 	const longSide = (settled: DiagramLayout) => {
 		const { width, height } = drawnSize(
@@ -8945,7 +9038,7 @@ export function renderGraphDiagram(
 	};
 	const clearer = (candidate: DiagramLayout) => {
 		const [defects, current] = [candidate, layout].map(defectsOf);
-		const [labels, currentLabels] = [candidate, layout].map(labelsOf);
+		const [labels, currentLabels] = [candidate, layout].map(crowding);
 		return (
 			!fewer(current!, defects!) &&
 			headCrossers(candidate).size < headCrossers(layout).size &&

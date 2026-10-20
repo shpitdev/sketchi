@@ -38,6 +38,13 @@ const BAR_TRACK_GAP = 4;
 const MIN_BAR_WIDTH = 12;
 /** Distance from the axis to the nearest label edge. */
 const LABEL_BASE = 22;
+/**
+ * A single row wider than this lengthens its stems, moving every label out
+ * from the axis, until it reads this wide or its labels stand this far out.
+ */
+const STEM_ASPECT = 2.3;
+const MAX_LABEL_BASE = 140;
+const LABEL_BASE_STEP = 6;
 const BLOCK_GAP_X = 16;
 const BLOCK_GAP_Y = 10;
 const STEM_CLEARANCE = 6;
@@ -615,7 +622,7 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 					: [];
 			}),
 		);
-		const layout = (rows: readonly Row[]) => {
+		const layout = (rows: readonly Row[], labelBase = LABEL_BASE) => {
 			const laneCount = Math.max(1, laneNames.length);
 			const rowLayouts = rows.map((row, rowIndex) => {
 				const offset = row.start - (rowIndex > 0 ? CONTINUATION_LENGTH : 0);
@@ -633,6 +640,7 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 						localX,
 						todayX,
 						belowAxis.has(lane) ? 1 : 0,
+						labelBase,
 					),
 				);
 				return {
@@ -964,14 +972,25 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 	};
 
 	type Arrangement = NonNullable<ReturnType<typeof arrange>>;
-	const arrange = (plan: AxisPlan, count: number) => {
+	const arrange = (plan: AxisPlan, count: number, labelBase = LABEL_BASE) => {
 		const rows = plan.rowsFor(count);
 		if (rows.length < count) return undefined;
-		const composed = compose(plan.breaks, plan.layout(rows));
+		const rowLayouts = plan.layout(rows, labelBase);
+		const composed = compose(plan.breaks, rowLayouts);
 		const box = bounds(composed.elements);
 		const aspect = (box.maxX - box.minX + PADDING * 2) / (box.maxY - box.minY + PADDING * 2);
 		const score = Math.abs(Math.log(aspect / TARGET_ASPECT)) + ROW_PENALTY * (count - 1);
-		return { count, composed, box, score };
+		// Lane sides holding a label, each of which a longer stem moves out.
+		const labeled = rowLayouts
+			.flatMap(({ lanes }) => lanes)
+			.reduce(
+				(sum, { placements }) =>
+					sum +
+					(placements.some(({ side }) => side < 0) ? 1 : 0) +
+					(placements.some(({ side }) => side > 0) ? 1 : 0),
+				0,
+			);
+		return { count, composed, box, score, labeled };
 	};
 	const closest = (options: readonly Arrangement[]) =>
 		options.reduce<Arrangement | undefined>(
@@ -1002,9 +1021,9 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 	let best = closest(arrangements)!;
 	// A single row past the cap breaks its widest gaps first, one at a time, so
 	// each continuous stretch stays to scale. If that can't fit, it wraps.
+	let plan = natural;
 	if (dated && best.count === 1 && exportAspect(best) > MAX_ASPECT) {
 		const forced = new Set<number>();
-		let plan = natural;
 		let single = best;
 		for (
 			let widest = compressible(plan);
@@ -1017,6 +1036,32 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 		}
 		// With no wrap to fall back on, the broken row is still the narrowest.
 		best = exportAspect(single) <= MAX_ASPECT ? single : (closest(arrangements.slice(1)) ?? single);
+		if (best !== single) plan = natural;
+	}
+	// A single row still too wide stands its labels farther out on longer stems:
+	// the fewest LABEL_BASE_STEP steps, up to MAX_LABEL_BASE, that bring it within
+	// STEM_ASPECT, or all of them. Each step moves every label out by the step,
+	// so the row grows by the step on each labeled lane side: that predicts the
+	// count, and its neighbor confirms it, without laying out every step.
+	if (best.count === 1 && exportAspect(best) > STEM_ASPECT) {
+		const steps = Math.floor((MAX_LABEL_BASE - LABEL_BASE) / LABEL_BASE_STEP);
+		const stepped = new Map<number, Arrangement>([[0, best]]);
+		const at = (step: number) => {
+			const known = stepped.get(step);
+			if (known) return known;
+			const arrangement = arrange(plan, 1, LABEL_BASE + step * LABEL_BASE_STEP)!;
+			stepped.set(step, arrangement);
+			return arrangement;
+		};
+		const fits = (step: number) => exportAspect(at(step)) <= STEM_ASPECT;
+		const height = ({ box }: Arrangement) => box.maxY - box.minY;
+		const width = best.box.maxX - best.box.minX;
+		const growth = LABEL_BASE_STEP * best.labeled;
+		const needed = (width + 2 * EXPORT_PADDING) / STEM_ASPECT - 2 * EXPORT_PADDING - height(best);
+		let step = growth > 0 ? Math.min(steps, Math.max(1, Math.ceil(needed / growth))) : steps;
+		if (fits(step)) while (step > 1 && fits(step - 1)) step -= 1;
+		else while (step < steps && !fits(step)) step += 1;
+		best = at(step);
 	}
 	const { composed, box } = best;
 	const dx = PADDING - box.minX;
@@ -1082,10 +1127,11 @@ function placeLane(
 	localX: (key: number) => number,
 	todayX: number | undefined,
 	lowest: number,
+	labelBase = LABEL_BASE,
 ): LaneRowLayout {
 	let best: LaneRowLayout | undefined;
 	for (const strategy of PLACEMENT_STRATEGIES) {
-		const layout = placeLaneWith(items, localX, todayX, lowest, strategy);
+		const layout = placeLaneWith(items, localX, todayX, lowest, strategy, labelBase);
 		if (!best || layout.above + layout.below < best.above + best.below) best = layout;
 	}
 	return best!;
@@ -1103,6 +1149,7 @@ function placeLaneWith(
 	todayX: number | undefined,
 	lowest: number,
 	strategy: PlacementStrategy,
+	labelBase = LABEL_BASE,
 ): LaneRowLayout {
 	// Overlapping spans stack into tracks below the axis line, from `lowest` down.
 	const trackEnds: number[] = [];
@@ -1117,7 +1164,7 @@ function placeLaneWith(
 		trackOf.set(item, track);
 	}
 	const tracks = trackEnds.length;
-	const belowBase = LABEL_BASE + Math.max(0, tracks - 1) * (BAR_HEIGHT + BAR_TRACK_GAP);
+	const belowBase = labelBase + Math.max(0, tracks - 1) * (BAR_HEIGHT + BAR_TRACK_GAP);
 	const stemOf = (item: Item) => localX(item.stemKey);
 	const sorted = items.toSorted((a, b) => stemOf(b) - stemOf(a) || b.index - a.index);
 	const blocks: Record<"-1" | "1", Block[]> = { "-1": [], "1": [] };
@@ -1141,7 +1188,7 @@ function placeLaneWith(
 		const lowest = stemX - item.width + item.inset;
 		const highest = stemX - item.inset;
 		const options = (side: -1 | 1, honorToday: boolean) => {
-			const base = side < 0 ? LABEL_BASE : belowBase;
+			const base = side < 0 ? labelBase : belowBase;
 			const placed = blocks[side];
 			const opposite = blocks[-side as -1 | 1];
 			const placedStems = [
@@ -1245,7 +1292,7 @@ function placeLaneWith(
 	return {
 		placements,
 		above: extent(-1, DIAMOND_SIZE / 2 + 6),
-		below: extent(1, Math.max(DIAMOND_SIZE / 2, belowBase - LABEL_BASE + BAR_HEIGHT / 2) + 6),
+		below: extent(1, Math.max(DIAMOND_SIZE / 2, belowBase - labelBase + BAR_HEIGHT / 2) + 6),
 		tracks,
 	};
 }

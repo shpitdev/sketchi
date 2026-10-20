@@ -180,6 +180,55 @@ function randomLongFlows(count: number) {
 }
 
 /**
+ * Deterministic tall columns, like a release gate: a spine of steps whose
+ * decisions send their failures to one shared end further down, and a last
+ * decision with two ends. The long branches span every cut, so the column
+ * cannot wrap; its rank gaps draw as short as its lines allow.
+ */
+function randomTallColumns(count: number) {
+	let seed = 20261020;
+	const random = () => {
+		seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+		return seed / 2_147_483_648;
+	};
+	const pick = <T>(values: readonly T[]) => values[Math.floor(random() * values.length)]!;
+	const steps = ["Run tests", "Build artifact", "Scan image", "Review request", "Verify income"];
+	return Array.from({ length: count }, (_, index) => {
+		const size = 5 + Math.floor(random() * 6);
+		const nodes: { id: string; label: string; kind: "start" | "process" | "decision" | "end" }[] =
+			Array.from({ length: size }, (_, i) => ({
+				id: `n${i}`,
+				label: i === 0 ? "Request arrives" : `${pick(steps)} ${i}`,
+				kind: i === 0 ? "start" : "process",
+			}));
+		nodes.push(
+			{ id: "blocked", label: "Release blocked", kind: "end" },
+			{ id: "done", label: "Promote to production", kind: "end" },
+			{ id: "undo", label: "Roll back", kind: "end" },
+		);
+		const edges: { id: string; source: string; target: string; label?: string }[] = [];
+		for (let i = 1; i < size; i += 1)
+			edges.push({ id: `s${i}`, source: `n${i - 1}`, target: `n${i}` });
+		const last = nodes[size - 1]!;
+		last.kind = "decision";
+		last.label = "Healthy?";
+		edges.push(
+			{ id: "yes", source: last.id, target: "done", label: "Yes" },
+			{ id: "no", source: last.id, target: "undo", label: "No" },
+		);
+		for (let i = 1; i < size - 1; i += 1) {
+			if (i > 1 && random() > 0.4) continue;
+			const node = nodes[i]!;
+			node.kind = "decision";
+			node.label = `Check ${i} passes?`;
+			edges.find((edge) => edge.source === node.id)!.label = "Passed";
+			edges.push({ id: `f${i}`, source: node.id, target: "blocked", label: "Failed" });
+		}
+		return { id: `tall-${index}`, title: `Tall ${index}`, nodes, edges };
+	});
+}
+
+/**
  * Flowcharts in this set that main (d050809c) already exports with validator
  * issues under straight and curved routing: a single straight segment cannot
  * leave the column or row of nodes between its ends. Never more than these.
@@ -1020,6 +1069,76 @@ describe("text fit fuzz", () => {
 		});
 		expect(failures).toEqual([]);
 	});
+});
+
+/**
+ * Crossings and reader-scale findings ("crossings/findings") main (9bcd213e)
+ * draws for each tall column, in order, and the aspect of each in the hosted
+ * PNG. Tightening a column's rank gaps is kept only where it routes no worse,
+ * so none may draw more of either, or read wider than main.
+ */
+const TALL_ROUTING: Readonly<Record<"TB" | "BT", string>> = {
+	TB: "0/0 0/0 0/0 13/0 0/0 0/0 0/0 0/0 0/0 0/0 10/0 0/0 0/0 13/0 0/0 8/0 8/0 8/0 1/0 10/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 20/0 17/0 0/0 10/0 0/0 8/0 8/0 0/0 0/0 20/0 1/0 0/0 7/0 1/0 0/0 0/0 0/0 0/0 0/0 0/0 8/0 7/0 1/0 1/0 7/0 0/0 0/0 17/0 0/0 0/0 0/0 0/0 0/0",
+	BT: "0/0 0/0 0/0 13/0 0/0 0/0 0/0 0/0 0/0 0/0 10/0 0/0 0/0 13/0 0/0 8/0 8/0 8/0 1/0 10/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 20/0 17/0 0/0 10/0 0/0 8/0 8/0 0/0 0/0 20/0 1/0 0/0 7/0 1/0 0/0 0/0 0/0 0/0 0/0 0/0 8/0 7/0 1/0 1/0 7/0 0/0 0/0 17/0 0/0 0/0 0/0 0/0 0/0",
+};
+const TALL_ASPECTS: Readonly<Record<"TB" | "BT", string>> = {
+	TB: "1.84 1.93 1.78 2.99 2.90 2.25 1.23 3.27 1.88 3.22 2.59 2.25 2.58 2.99 2.32 2.11 2.72 2.11 1.85 2.59 2.03 1.74 1.93 2.95 1.93 1.49 2.94 2.10 2.27 3.59 2.36 2.95 2.72 2.72 1.84 1.49 2.10 1.67 1.46 3.24 1.85 2.95 2.03 1.84 1.78 3.59 1.93 2.11 3.24 1.78 1.59 3.24 1.88 2.20 2.13 2.20 1.78 3.27 1.35 1.93",
+	BT: "1.84 1.93 1.78 2.99 2.90 2.25 1.23 3.27 1.88 3.22 2.59 2.25 2.58 2.99 2.32 2.11 2.72 2.11 1.85 2.59 2.03 1.74 1.93 2.95 1.93 1.49 2.94 2.10 2.27 3.59 2.36 2.95 2.72 2.72 1.84 1.49 2.10 1.67 1.46 3.24 1.85 2.95 2.03 1.84 1.78 3.59 1.93 2.11 3.24 1.78 1.59 3.24 1.88 2.20 2.13 2.20 1.78 3.27 1.35 1.93",
+};
+
+describe("tall column fuzz", () => {
+	const columns = randomTallColumns(FULL ? 60 : 6);
+	// Full proof: 60 columns each way; main draws 21 of them past 2.45:1.
+	it.each(["TB", "BT"] as const)(
+		"draws %s columns valid, no wider and no worse routed than main",
+		(direction) => {
+			const scenes = columns.map((spec) =>
+				renderIntermediateDiagram(
+					parseFlowchartDiagram({
+						...spec,
+						type: "flowchart",
+						layout: { direction, edgeRouting: "orthogonal" },
+					}),
+				),
+			);
+			const counts = scenes.map((scene) => routingCounts(scene));
+			// The hosted PNG frames the drawing in 20 units, in place of its 48-unit padding.
+			const aspects = scenes.map(
+				({ width, height }) => (Math.max(width, height) - 56) / (Math.min(width, height) - 56),
+			);
+			if (process.env.PRINT_ROUTING)
+				console.log(
+					"PIN tall",
+					direction,
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
+					"ASPECTS",
+					aspects.map((aspect) => aspect.toFixed(2)).join(" "),
+				);
+			expect(
+				scenes.flatMap((scene, index) =>
+					[
+						...validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues.map(
+							(issue) => issue.message,
+						),
+						...diagonalRuns(scene),
+					].map((issue) => `${index}: ${issue}`),
+				),
+			).toEqual([]);
+			expect(worseThanPinned("tall", counts, TALL_ROUTING[direction], false)).toEqual([]);
+			expect(moreHeadsThanPinned("tall", direction, counts)).toEqual([]);
+			const pinned = TALL_ASPECTS[direction].split(" ").map(Number);
+			expect(
+				aspects.flatMap((aspect, index) =>
+					aspect > pinned[index]! + 0.005
+						? [`${index}: ${pinned[index]} -> ${aspect.toFixed(2)}`]
+						: [],
+				),
+			).toEqual([]);
+			// Main draws 21 of the 60 past 2.45:1 each way.
+			if (FULL) expect(aspects.filter((aspect) => aspect > 2.45).length).toBeLessThan(21);
+		},
+		60_000,
+	);
 });
 
 describe("routing fuzz", () => {

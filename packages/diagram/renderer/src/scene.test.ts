@@ -50,7 +50,9 @@ describe("geometry bounds regressions", () => {
 			if (!node || node.type !== "node") throw new Error(`Missing node ${id}`);
 			return node.y;
 		});
-		expect(ys).toEqual([48, 216, 384, 552]);
+		// Four 72-unit steps in one column read 2.75:1 at the full 96-unit rank gap;
+		// lines that only run straight down draw their gaps at 56.
+		expect(ys).toEqual([48, 176, 304, 432]);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 	});
 
