@@ -1463,6 +1463,11 @@ interface Arrangement {
 	readonly sides?: SideOverrides;
 	/** Gaps after these ranks, by index along the flow, shrink to at most these lengths. */
 	readonly compactGaps?: ReadonlyMap<number, number>;
+	/**
+	 * A line into a hanging zone band whose target stands behind another step of
+	 * its rank, straight across the flow from the source, goes around that step.
+	 */
+	readonly aroundRanks?: boolean;
 	readonly wrap: Wrap;
 	/** Bands of a zoned flow's levels, by group id or TOP_LEVEL (see planZoneWraps). */
 	readonly zoneWraps?: ReadonlyMap<string, Wrap>;
@@ -7310,6 +7315,41 @@ function compactGaps(
 }
 
 /**
+ * Whether another step of the target's rank stands straight across the flow
+ * between the source and the target, so a line between them must go around it.
+ */
+function behindRankStep(
+	source: NodeSceneElement,
+	target: NodeSceneElement,
+	shapes: readonly NodeSceneElement[],
+	direction: LayoutDirection,
+): boolean {
+	const vertical = direction === "TB" || direction === "BT";
+	const across = (shape: NodeSceneElement) =>
+		vertical
+			? { low: shape.x, high: shape.x + shape.width }
+			: { low: shape.y, high: shape.y + shape.height };
+	const along = (shape: NodeSceneElement) =>
+		vertical
+			? { low: shape.y, high: shape.y + shape.height }
+			: { low: shape.x, high: shape.x + shape.width };
+	const [from, to, span, start] = [across(source), across(target), along(target), along(source)];
+	return shapes.some((shape) => {
+		if (shape.nodeId === source.nodeId || shape.nodeId === target.nodeId) return false;
+		const rank = along(shape);
+		const { low, high } = across(shape);
+		return (
+			rank.low < span.high &&
+			span.low < rank.high &&
+			rank.low < start.high &&
+			start.low < rank.high &&
+			low > Math.min(from.high, to.high) - AXIS_ALIGNED_EPSILON &&
+			high < Math.max(from.low, to.low) + AXIS_ALIGNED_EPSILON
+		);
+	});
+}
+
+/**
  * Lay out and route, then give each crowded group more room and try again,
  * keeping a retry only when it draws fewer export and group defects.
  */
@@ -7437,7 +7477,10 @@ function layoutDiagramOnce(
 	);
 	// A zoned level's band hangs under the steps that reach it: an edge into it
 	// leaves forward when its target lies ahead, else toward the band, and turns
-	// into it from the side it hangs from.
+	// into it from the side it hangs from. Around ranks, a target behind another
+	// step of its rank, which stands straight across the flow from the source, is
+	// reached around that step instead: leaving forward and turning back into the
+	// target's forward side.
 	for (const route of routedEdges)
 		if (zoneCuts.has(route.edge.id)) {
 			const { source, target } = route;
@@ -7448,8 +7491,12 @@ function layoutDiagramOnce(
 				BT: target.y + target.height <= source.y,
 			}[direction];
 			const toward = FORWARD_SIDE[ACROSS_DIRECTION[direction]];
-			route.sourceEdge = ahead ? FORWARD_SIDE[direction] : toward;
-			route.targetEdge = OPPOSITE_EDGE[toward];
+			const behind =
+				arrangement.aroundRanks === true &&
+				!ahead &&
+				behindRankStep(source, target, nodeShapes, direction);
+			route.sourceEdge = ahead || behind ? FORWARD_SIDE[direction] : toward;
+			route.targetEdge = behind ? FORWARD_SIDE[direction] : OPPOSITE_EDGE[toward];
 		}
 	if (endRun) for (const route of routedEdges) route.endRun = endRun;
 	if (lanes) assignLaneSides(routedEdges, lanes);
@@ -8857,12 +8904,20 @@ export function renderGraphDiagram(
 			length.balance,
 			length.size,
 		)) {
-			const arrangement = {
+			const planned = {
 				...kept.arrangement,
 				crossingRepair: repairable || kept.arrangement.crossingRepair,
 				zoneWraps,
 			};
-			const layout = layoutDiagram(diagram, levels[0]!, arrangement);
+			const drawn = layoutDiagram(diagram, levels[0]!, planned);
+			// A plan that crosses more than the layout it replaces routes each line
+			// across the fewest lines before it, so a crossing the plain router draws
+			// does not alone push sibling zones apart.
+			const crossed =
+				!planned.avoidCrossings &&
+				arrowCrossings(drawn.edgeArrows, false) > arrowCrossings(kept.layout.edgeArrows, false);
+			const arrangement = crossed ? { ...planned, avoidCrossings: true } : planned;
+			const layout = crossed ? layoutDiagram(diagram, levels[0]!, arrangement) : drawn;
 			const defects = defectsOf(layout);
 			if (
 				fewer(kept.defects, defects) ||
@@ -8877,6 +8932,33 @@ export function renderGraphDiagram(
 		}
 		if (!chosen) break;
 		best = chosen;
+	}
+	// A line into a hanging band that runs around a step of the target's rank
+	// to reach it is kept when that routes no worse, hooks or detours no line
+	// more, and draws the lines shorter in total.
+	const cuts = zoneCutEdges(diagram, best.arrangement.zoneWraps);
+	if (
+		best.arrangement.zoneWraps &&
+		!best.arrangement.aroundRanks &&
+		best.layout.routedEdges.some(
+			({ edge, source, target }) =>
+				cuts.has(edge.id) &&
+				behindRankStep(source, target, best.layout.nodeShapes, diagram.layout.direction),
+		)
+	) {
+		const arrangement = { ...best.arrangement, aroundRanks: true };
+		const layout = layoutDiagram(diagram, levels[0]!, arrangement);
+		const defects = defectsOf(layout);
+		const total = ({ edgeArrows }: DiagramLayout) =>
+			edgeArrows.reduce((sum, arrow) => sum + routeLength(arrow.points), 0);
+		if (
+			!fewer(best.defects, defects) &&
+			routesNoWorse(layout, best.layout, false, false) &&
+			hookedRoutes(layout) <= hookedRoutes(best.layout) &&
+			detouredLines(layout.edgeArrows) <= detouredLines(best.layout.edgeArrows) &&
+			total(layout) < total(best.layout) - AXIS_ALIGNED_EPSILON
+		)
+			best = { arrangement, defects, layout };
 	}
 	// In lanes a step takes lines in and sends them out by different sides, when
 	// that routes no worse.

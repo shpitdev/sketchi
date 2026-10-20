@@ -3,6 +3,8 @@ import { parseFlowchartDiagram } from "./types/flowchart.js";
 import awsThreeTier from "./fixtures/zones/aws-three-tier.js";
 import awsThreeTierDescribed from "./fixtures/zones/aws-three-tier-described.js";
 import hybridCloud from "./fixtures/zones/hybrid-cloud.js";
+import hybridCloudDescribed from "./fixtures/zones/hybrid-cloud-described.js";
+import hybridCloudLabeled from "./fixtures/zones/hybrid-cloud-labeled.js";
 import kindedFlat from "./fixtures/zones/kinded-flat.js";
 import kubernetesCluster from "./fixtures/zones/kubernetes-cluster.js";
 
@@ -26,7 +28,15 @@ export const zoneFixtures = {
 	"kubernetes-cluster": flowchart(kubernetesCluster, "TB"),
 	"hybrid-cloud": flowchart(hybridCloud),
 	"kinded-flat": flowchart(kindedFlat, "TB"),
+	"hybrid-cloud-labeled": flowchart(hybridCloudLabeled),
 };
+
+/**
+ * The hybrid setup with descriptions and an Oracle logo, whose region wraps
+ * beside the data center only when its lines route across as few others as
+ * they can. Its logo needs an embedded asset to export.
+ */
+export const describedHybridFlowchart = flowchart(hybridCloudDescribed);
 
 /**
  * The AWS three-tier app with short labels and each technology in a node

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	CANVAS_SHAPE_CURVE,
+	describedHybridFlowchart,
 	canvasBoundTextBox,
 	canvasShapeOutline,
 	isCanvasComposedShape,
@@ -351,5 +352,46 @@ describe("zone layout", () => {
 		const scene = renderIntermediateDiagram(groupFixtures["grouped-approval"]);
 		expect(scene.elements.some((e) => e.type === "frame")).toBe(true);
 		expect(zonesOf(scene)).toEqual([]);
+	});
+});
+
+describe("lines into a hanging zone band", () => {
+	const arrowOf = (scene: RenderedDiagramScene, edgeId: string) =>
+		scene.elements.find((e) => e.type === "arrow" && e.edgeId === edgeId)!;
+	// Corners only: a point where a run continues straight on is no turn.
+	const turns = (scene: RenderedDiagramScene, edgeId: string) => {
+		const arrow = arrowOf(scene, edgeId);
+		if (arrow.type !== "arrow") return -1;
+		const horizontal = arrow.points
+			.slice(1)
+			.map((point, index) => Math.abs(point.y - arrow.points[index]!.y) < 0.01);
+		return horizontal.slice(1).filter((run, index) => run !== horizontal[index]).length;
+	};
+
+	it("reaches a step behind another of its rank around that step", () => {
+		// Round 19, Sonnet: the orders table hangs straight under the sync
+		// function and the invoice archive under the table. Both lines hooked
+		// around the region's margin, four turns each.
+		const scene = rendered("hybrid-cloud-labeled", "LR");
+		expect(turns(scene, "edge-7")).toBe(0);
+		expect(turns(scene, "edge-8")).toBeLessThanOrEqual(2);
+		const sync = nodeOf(scene, "sync");
+		const archive = nodeOf(scene, "arc");
+		const toArchive = arrowOf(scene, "edge-8");
+		// The archive's line leaves forward and turns back into its forward side.
+		expect(toArchive.type === "arrow" && toArchive.points[0].x).toBe(sync.x + sync.width);
+		expect(toArchive.type === "arrow" && toArchive.points.at(-1)!.x).toBe(
+			archive.x + archive.width,
+		);
+	});
+
+	it("keeps the data center beside the cloud when its region wraps clear of crossings", () => {
+		// A Sol sample stacked the cloud under the data center: its region's
+		// side-by-side wrap crossed the ERP's two lines over the Oracle database.
+		const scene = renderIntermediateDiagram(describedHybridFlowchart);
+		const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
+		const [dc, aws] = [zones.get("group:dc")!, zones.get("group:aws")!];
+		expect(aws.x).toBeGreaterThan(dc.x + dc.width);
+		expect(dc.y).toBeLessThan(aws.y + aws.height);
 	});
 });
