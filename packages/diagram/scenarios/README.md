@@ -116,6 +116,16 @@ Next.js page receives the question` is the stated `Next.js page on Vercel
 receives the question`. A fixture `entry` lists the fixture nodes that draw
 such a first event. All canonical graph validation and exclusive ownership
 checks remain.
+
+The `ai-app-stack-logos` scenario explicitly opts its cached-answer outcome into
+`sharedEnds: { cached: "answer" }`. Only a matching branch from the stated cache
+decision directly into the stated terminal answer node may stand for this
+outcome. A bare `yes`/`hit` uses the decision's cache condition; longer captions
+must name the cached-answer outcome without negation. Other decisions, wrong
+branches, intermediate work, and other targets still fail. Matching splits this
+edge into a distinct semantic outcome witness, inheriting the decision's lane
+and group without padding drawn node/edge minimums. No other outcome is opted in.
+
 Case, punctuation, hyphens, and whitespace are normalized. Every content-word
 lemma in an alternative must appear in a single label clause, in any order.
 Unnegated qualifier segments may combine across parentheses, colons, and commas:

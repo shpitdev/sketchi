@@ -23,8 +23,8 @@ export interface FlowchartStepMatches {
 	readonly matchedNodes: Map<string, Set<string>>;
 	/** The model diagram with merged check-decisions split into their two steps. */
 	readonly graph: FlowchartDiagram;
-	/** Loop witnesses are semantic steps, not additional drawn nodes or edges. */
-	readonly loopSplitCount: number;
+	/** Edge-step witnesses are semantic steps, not additional drawn nodes or edges. */
+	readonly edgeStepCount: number;
 	readonly branchMatches: BranchMatcher;
 }
 
@@ -346,6 +346,20 @@ export function matchFlowchartSteps(
 			);
 		}
 		if (flowchartLabelMatches(label, expected.labels)) return true;
+		// For the opted-in cache outcome, the matched positive cache decision
+		// supplies "hit" even when it asks "Cached in Redis?" rather than "Cache hit?".
+		// Require that positive predicate and a restatement without added conditions;
+		// merely matching the broad "Redis cache" alias does not establish polarity.
+		if (
+			expected.label === "hit" &&
+			steps.get(expected.targetId)?.sharedEndId &&
+			matchedNodes.get(expected.sourceId)?.has(edge.source) &&
+			/\bcached\b/iu.test(source) &&
+			flowchartBranchRestates(source, steps.get(expected.sourceId)!.label, "yes") &&
+			flowchartLabelMatches(label, ["yes"])
+		)
+			return true;
+
 		const decision = steps.get(expected.sourceId);
 		if (!label || decision?.kind !== "decision") return false;
 		if (!isYesNo(expected.label)) {
@@ -372,10 +386,6 @@ export function matchFlowchartSteps(
 			? completes
 			: !completes && !flowchartLabelMatches(label, ["yes"]);
 	};
-	// A named waiting/retrying action may be the caption on a back-edge instead
-	// of a box. Split only a scenario-stated return to its preceding decision or
-	// check, on the right branch, with a cycle in both the scenario and model.
-	// Synthetic ownership keeps all existing distinct-step/path checks intact.
 	const isCheck = (step: RequiredStep | undefined) =>
 		step?.kind === "decision" ||
 		(step?.kind === "process" && flowchartLabelWords(step.label)[0] === "check");
@@ -386,6 +396,75 @@ export function matchFlowchartSteps(
 		taken.add(id);
 		return id;
 	};
+	const splitEdgeStep = (
+		edge: FlowchartDiagram["edges"][number],
+		edgeSteps: readonly RequiredStep[],
+		kind: "process" | "end",
+		suffix: "loop" | "outcome",
+	) => {
+		const id = fresh(`${edge.id}#${suffix}-step`);
+		const source = byId.get(edge.source);
+		const node: FlowchartNode = {
+			id,
+			kind,
+			label: edge.label!,
+			metadata: {},
+			...(source?.lane === undefined ? {} : { lane: source.lane }),
+			...(source?.group === undefined ? {} : { group: source.group }),
+		};
+		byId.set(id, node);
+		graph = {
+			...graph,
+			nodes: [...graph.nodes, node],
+			edges: [
+				...graph.edges.map((candidate) =>
+					candidate.id === edge.id ? { ...candidate, target: id } : candidate,
+				),
+				{ id: fresh(`${edge.id}#${suffix}-return`), source: id, target: edge.target, metadata: {} },
+			],
+		};
+		for (const step of edgeSteps) matchedNodes.get(step.id)!.add(id);
+	};
+	// Only opted-in outcomes may share an end. The stated decision supplies
+	// the condition for a bare yes/hit; a longer caption must name the outcome.
+	// The matching graph keeps the outcome distinct without adding drawn counts.
+	for (const edge of graph.edges) {
+		if (!edge.label) continue;
+		const outcomes = requiredNodes.filter((step) => {
+			if (step.kind !== "end" || !step.sharedEndId || step.sharedEndId === step.id) return false;
+			const shared = steps.get(step.sharedEndId);
+			const previous = requiredEdges.filter((expected) => expected.targetId === step.id);
+			if (
+				previous.length !== 1 ||
+				shared?.kind !== "end" ||
+				matchedNodes.get(step.id)?.has(edge.target)
+			)
+				return false;
+			const before = previous[0]!;
+			const target = byId.get(edge.target);
+			const words = flowchartLabelWords(edge.label!);
+			const bareAnswer = words.length === 1 && (words[0] === "yes" || words[0] === "hit");
+			return (
+				steps.get(before.sourceId)?.kind === "decision" &&
+				byId.get(edge.source)?.kind === "decision" &&
+				matchedNodes.get(before.sourceId)?.has(edge.source) &&
+				matchedNodes.get(shared.id)?.has(edge.target) &&
+				target?.kind === "end" &&
+				outgoing(target.id).length === 0 &&
+				!requiredEdges.some(
+					(expected) => expected.sourceId === step.id || expected.sourceId === shared.id,
+				) &&
+				branchMatches(edge, before) &&
+				(bareAnswer || namesStepLabel(edge.label!, step))
+			);
+		});
+		if (outcomes.length > 0) splitEdgeStep(edge, outcomes, "end", "outcome");
+	}
+
+	// A named waiting/retrying action may be the caption on a back-edge instead
+	// of a box. Split only a scenario-stated return to its preceding decision or
+	// check, on the right branch, with a cycle in both the scenario and model.
+	// Synthetic ownership keeps all existing distinct-step/path checks intact.
 	for (const edge of graph.edges) {
 		if (!edge.label || !reaches(edge.target, edge.source)) continue;
 		const loopSteps = requiredNodes.filter((step) => {
@@ -414,33 +493,12 @@ export function matchFlowchartSteps(
 			return reachable.has(before.sourceId);
 		});
 		if (loopSteps.length === 0) continue;
-		const id = fresh(`${edge.id}#loop-step`);
-		const source = byId.get(edge.source);
-		const node: FlowchartNode = {
-			id,
-			kind: "process",
-			label: edge.label,
-			metadata: {},
-			...(source?.lane === undefined ? {} : { lane: source.lane }),
-			...(source?.group === undefined ? {} : { group: source.group }),
-		};
-		byId.set(id, node);
-		graph = {
-			...graph,
-			nodes: [...graph.nodes, node],
-			edges: [
-				...graph.edges.map((candidate) =>
-					candidate.id === edge.id ? { ...candidate, target: id } : candidate,
-				),
-				{ id: fresh(`${edge.id}#loop-return`), source: id, target: edge.target, metadata: {} },
-			],
-		};
-		for (const step of loopSteps) matchedNodes.get(step.id)!.add(id);
+		splitEdgeStep(edge, loopSteps, "process", "loop");
 	}
 	return {
 		matchedNodes,
 		graph,
 		branchMatches,
-		loopSplitCount: graph.nodes.length - splitChecks.graph.nodes.length,
+		edgeStepCount: graph.nodes.length - splitChecks.graph.nodes.length,
 	};
 }

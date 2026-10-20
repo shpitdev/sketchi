@@ -57,6 +57,8 @@ export interface FlowchartScenarioRequiredNode {
 	kind: FlowchartNodeKind;
 	label: string;
 	labels: readonly string[];
+	/** Explicit opt-in: this outcome may be the decision branch into this shared end step. */
+	sharedEndId?: string;
 	/** Prompt-grounded alternatives for a yes/no decision asked by its opposite condition. */
 	inverseLabels?: readonly string[];
 	/** The infrastructure shape the prompt makes this step: a database, queue or document. */
@@ -165,6 +167,8 @@ interface FlowchartScenarioDefinition {
 	 * model may ask that opposite question; its yes answers the decision's no.
 	 */
 	inverse?: Readonly<Record<string, readonly [string, ...string[]]>>;
+	/** Outcome step id to shared end step id; no other outcome may fold into a branch. */
+	sharedEnds?: Readonly<Record<string, string>>;
 	logos?: readonly DiagramScenarioLogo[];
 	nodes: readonly FlowchartNodeDefinition[];
 	/**
@@ -306,6 +310,7 @@ function buildAssertions(
 				kind,
 				labels,
 				...(inverseLabels ? { inverseLabels } : {}),
+				...(definition.sharedEnds?.[id] ? { sharedEndId: definition.sharedEnds[id] } : {}),
 				...(shaped ? { shape: shaped[0], shapes: shaped } : {}),
 			},
 		];
@@ -1746,6 +1751,7 @@ const flowchartScenarioDefinitions = [
 	},
 	{
 		id: "ai-app-stack-logos",
+		sharedEnds: { cached: "answer" },
 		title: "AI app request path with logos",
 		difficulty: "standard",
 		tags: ["logos", "ai", "cache", "two-branch"],

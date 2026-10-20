@@ -675,8 +675,8 @@ function flowchartLaneChecks(
 }
 
 function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram): ScenarioCheck[] {
-	// Preserve merged-check accounting, but never pad counts with loop witnesses.
-	const { matchedNodes, graph, branchMatches, loopSplitCount } = matchFlowchartSteps(
+	// Preserve merged-check accounting, but never pad counts with edge-step witnesses.
+	const { matchedNodes, graph, branchMatches, edgeStepCount } = matchFlowchartSteps(
 		scenario,
 		diagram,
 	);
@@ -728,12 +728,12 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 	return [
 		{
 			id: "min-node-count",
-			passed: graph.nodes.length - loopSplitCount >= scenario.assertions.minNodeCount,
+			passed: graph.nodes.length - edgeStepCount >= scenario.assertions.minNodeCount,
 			message: `Expected at least ${scenario.assertions.minNodeCount} nodes.`,
 		},
 		{
 			id: "min-edge-count",
-			passed: graph.edges.length - loopSplitCount >= scenario.assertions.minEdgeCount,
+			passed: graph.edges.length - edgeStepCount >= scenario.assertions.minEdgeCount,
 			message: `Expected at least ${scenario.assertions.minEdgeCount} edges.`,
 		},
 		...scenario.assertions.requiredNodeKinds.map((kind) => ({
