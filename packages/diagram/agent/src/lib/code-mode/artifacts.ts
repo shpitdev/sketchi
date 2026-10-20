@@ -316,6 +316,31 @@ function readBinaryArtifact(
 	});
 }
 
+
+// PROBE ONLY (do not merge): R2 write timings, read back into execute logs.
+type R2Probe = { writeMs: number; puts: { format: string; bytes: number; startMs: number; ms: number }[] };
+const r2Probes = ((globalThis as { __sketchiR2Probe?: Map<string, R2Probe> }).__sketchiR2Probe ??=
+	new Map<string, R2Probe>());
+function probedPut(
+	probe: R2Probe,
+	t0: number,
+	format: string,
+	bytes: number,
+	put: () => Promise<unknown>,
+): () => Promise<unknown> {
+	return async () => {
+		const startedAt = Date.now();
+		try {
+			return await put();
+		} finally {
+			probe.puts.push({ format, bytes, startMs: startedAt - t0, ms: Date.now() - startedAt });
+		}
+	};
+}
+function probeBytes(body: CodeModeObjectBucketBody): number {
+	return typeof body === "string" ? new TextEncoder().encode(body).byteLength : body.byteLength;
+}
+
 export function makeObjectBucketArtifactStorage(
 	bucket: CodeModeObjectBucket,
 	options: ObjectBucketArtifactStorageOptions = {},
@@ -383,30 +408,35 @@ export function makeObjectBucketArtifactStorage(
 				createdAt: new Date(now).toISOString(),
 			};
 
+			const probe: R2Probe = { writeMs: 0, puts: [] };
+			const t0 = Date.now();
 			yield* Effect.forEach(
 				input.formats,
 				(artifact) =>
 					Effect.gen(function* () {
 						const body = yield* bodyForArtifact(artifact);
 						yield* Effect.tryPromise({
-							try: () =>
+							try: probedPut(probe, t0, artifact.format, probeBytes(body), () =>
 								bucket.put(keyForArtifact(prefix, input.artifactId, artifact.format), body, {
 									httpMetadata: { contentType: artifact.mimeType },
 								}),
+							),
 							catch: storageError("write"),
 						});
 					}),
 				{ concurrency: 3, discard: true },
 			);
+			const manifestBody = JSON.stringify(manifest);
 			yield* Effect.tryPromise({
-				try: () =>
-					bucket.put(
-						keyForArtifact(prefix, input.artifactId, MANIFEST_FORMAT),
-						JSON.stringify(manifest),
-						{ httpMetadata: { contentType: "application/json" } },
-					),
+				try: probedPut(probe, t0, MANIFEST_FORMAT, probeBytes(manifestBody), () =>
+					bucket.put(keyForArtifact(prefix, input.artifactId, MANIFEST_FORMAT), manifestBody, {
+						httpMetadata: { contentType: "application/json" },
+					}),
+				),
 				catch: storageError("write"),
 			});
+			probe.writeMs = Date.now() - t0;
+			r2Probes.set(input.artifactId, probe);
 
 			const formats = input.formats.map((artifact) => artifactRef(artifact, input.inlineFormats));
 			return bundleFromFormats({

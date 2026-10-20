@@ -634,6 +634,14 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 			}),
 	);
 	const finishedAt = yield* clock.nowMillis;
+	// PROBE ONLY (do not merge): hand this request's R2 write timings back to the client.
+	const r2Probes = (globalThis as { __sketchiR2Probe?: Map<string, unknown> }).__sketchiR2Probe;
+	const probedIds = [...new Set(JSON.stringify(executed).match(/artifact_[0-9a-f]{32}/g) ?? [])];
+	const r2Probe = probedIds.flatMap((id) => {
+		const probe = r2Probes?.get(id);
+		r2Probes?.delete(id);
+		return probe ? [{ artifactId: id, ...probe }] : [];
+	});
 	yield* usage.capture({
 		context: usageContext,
 		durationMs: finishedAt - startedAt,
@@ -642,7 +650,15 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 		responseBody: executed,
 		surface: "mcp",
 	});
-	return executed;
+	return r2Probe.length > 0
+		? {
+				...executed,
+				logs: [
+					...(executed.logs ?? []),
+					`R2PROBE ${JSON.stringify({ executeMs: finishedAt - startedAt, artifacts: r2Probe })}`,
+				],
+			}
+		: executed;
 });
 
 function withTrailingOptions(request: unknown, options: unknown): unknown {
