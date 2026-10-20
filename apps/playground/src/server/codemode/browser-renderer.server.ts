@@ -2,7 +2,9 @@ import "@tanstack/react-start/server-only";
 
 import type { CodeModeArtifactRenderer } from "@sketchi/diagram-agent";
 import { recordMetric } from "@sketchi/observability";
-import { Clock, Context, Effect, Layer, Metric, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Metric, Option, Schema } from "effect";
+
+import { PlaygroundRequestMetadata } from "../runtime/context.server";
 
 import {
 	BrowserRenderingFailure,
@@ -13,6 +15,8 @@ import {
 import type { PngRenderResult } from "./png-renderer-object.server";
 
 export const BROWSER_RENDER_TIMEOUT_MS = 60_000;
+/** PERF PROBE ONLY (never merged): PNG timings per attempt id, read back by execute. */
+export const pngProbeTimings = new Map<string, unknown[]>();
 /**
  * Browser Rendering loads the export harness over the public internet, so this
  * fallback origin must be the public product host rather than the Worker
@@ -104,6 +108,7 @@ export function createCloudflareBrowserRunArtifactRenderer(
 			Effect.ignore,
 		),
 		renderPng: Effect.fn("playground.browserRendering.renderPng")((input) => {
+			let probeTiming: Record<string, unknown> = {};
 			const render = Effect.tryPromise({
 				try: () =>
 					renderers.getByName(harnessUrl).renderPng({
@@ -125,14 +130,19 @@ export function createCloudflareBrowserRunArtifactRenderer(
 								}),
 							),
 				),
-				Effect.tap((result) =>
-					Effect.annotateCurrentSpan({
+				Effect.tap((result) => {
+					probeTiming = {
+						...result.timing,
+						coldStart: result.coldStart,
+						...("shard" in result ? { shard: result.shard } : {}),
+					};
+					return Effect.annotateCurrentSpan({
 						cache_mode: result.coldStart ? "cold" : "warm",
 						queue_ms: result.timing.queueMs,
 						open_ms: result.timing.openMs,
 						export_ms: result.timing.exportMs,
-					}),
-				),
+					});
+				}),
 				Effect.map((result) => result.png),
 				Effect.timeout(BROWSER_RENDER_TIMEOUT_MS),
 				Effect.catchTag("TimeoutError", () =>
@@ -151,6 +161,14 @@ export function createCloudflareBrowserRunArtifactRenderer(
 					Effect.tap(() =>
 						Effect.gen(function* () {
 							const finishedAt = yield* Clock.currentTimeMillis;
+							const metadata = yield* Effect.serviceOption(PlaygroundRequestMetadata);
+							const attemptId =
+								Option.getOrUndefined(metadata)?.request.headers.get("x-sketchi-attempt-id");
+							if (attemptId) {
+								const list = pngProbeTimings.get(attemptId) ?? [];
+								list.push({ ...probeTiming, rpcMs: finishedAt - startedAt });
+								pngProbeTimings.set(attemptId, list);
+							}
 							yield* recordMetric(browserRenderingRequests, 1, {
 								operation: "renderPng",
 								outcome: "success",
