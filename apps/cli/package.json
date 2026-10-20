@@ -1,6 +1,6 @@
 {
 	"name": "@sketchi/cli",
-	"version": "0.25.11",
+	"version": "0.25.12",
 	"private": true,
 	"type": "module",
 	"bin": {
