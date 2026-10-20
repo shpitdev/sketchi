@@ -117,6 +117,12 @@ export const PlaygroundDefaultPngDelivery = Context.Reference<CodeModeRuntimeOpt
 	{ defaultValue: () => undefined },
 );
 
+/** MCP builds fill the logo a node's label names; see CodeModeRuntimeOptions.fillNamedLogos. */
+export const PlaygroundNamedLogoFill = Context.Reference<boolean>(
+	"@sketchi/playground/NamedLogoFill",
+	{ defaultValue: () => false },
+);
+
 export class PlaygroundCodeMode extends Context.Service<
 	PlaygroundCodeMode,
 	PlaygroundCodeModeShape
@@ -185,9 +191,11 @@ export const PlaygroundCodeModeLive = Layer.effect(
 				const metadata = yield* PlaygroundRequestMetadata;
 				const storage = artifactStoreForBindings(env, localStorage);
 				const defaultPng = yield* PlaygroundDefaultPngDelivery;
+				const fillNamedLogos = yield* PlaygroundNamedLogoFill;
 				const runtimeEnvironment: Context.Service.Shape<typeof CodeModeRuntimeEnvironment> = {
 					createId: ids.create,
 					...(defaultPng ? { defaultPng } : {}),
+					...(fillNamedLogos ? { fillNamedLogos } : {}),
 					artifactUrl: (input) => artifactUrl(metadata.origin, input),
 					...(env.ASSETS ? { icons: playgroundIconCatalog(env.ASSETS, metadata.origin) } : {}),
 					...(env.CODEMODE_PNG_RENDERER

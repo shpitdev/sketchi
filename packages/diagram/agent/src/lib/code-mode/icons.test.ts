@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { SketchiIcon } from "@sketchi/icon-catalog";
+import { iconManifest } from "@sketchi/icon-catalog/catalog";
 
 import { makeMemoryArtifactStorage, CodeModeArtifactStorage } from "./artifacts";
 import { RenderedDiagramSceneSchema } from "./contract";
@@ -80,6 +81,7 @@ function fixtureCatalog(): CodeModeIconCatalog {
 function runtime(
 	icons: CodeModeIconCatalog | null = fixtureCatalog(),
 	renderer?: CodeModeArtifactRenderer,
+	policy: { readonly fillNamedLogos?: boolean } = {},
 ) {
 	const storage = makeMemoryArtifactStorage();
 	let id = 0;
@@ -87,6 +89,7 @@ function runtime(
 		createId: (prefix) => `${prefix}-${(id += 1)}`,
 		...(icons ? { icons } : {}),
 		...(renderer ? { renderer } : {}),
+		...policy,
 	});
 	const provide = <A>(
 		program: Effect.Effect<A, never, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
@@ -411,6 +414,175 @@ describe("vendor logos", () => {
 				code: "icon_dropped",
 				ref: { kind: "node", id: "queue", path: "participants.icon.slug" },
 				message: expect.stringContaining('participant "queue"'),
+			}),
+		]);
+	});
+});
+
+describe("named logo fill", () => {
+	const productionCatalog = makeCodeModeIconCatalog({
+		icons: iconManifest.icons,
+		slugLookup: "sketchi.searchIcons({ q })",
+		loadSvg: () => Effect.succeed(SOURCES["docker"] ?? ""),
+	});
+	const filling = () => runtime(productionCatalog, undefined, { fillNamedLogos: true });
+
+	// Frontierclimb r20 deploy-pipeline-logos s1: the model drew GitHub and
+	// Docker but left Cloudflare off "Ship to Cloudflare Workers".
+	const r20DeploySpec = {
+		title: "Deploy pipeline",
+		nodes: [
+			{ id: "push", label: "Push to GitHub", kind: "start", icon: { slug: "github" } },
+			{ id: "build", label: "Docker builds the image", kind: "process", icon: { slug: "docker" } },
+			{ id: "tests", label: "Test suite runs", kind: "process" },
+			{ id: "pass", label: "Tests pass?", kind: "decision" },
+			{ id: "deploy", label: "Ship to Cloudflare Workers", kind: "end" },
+			{ id: "notify", label: "Notify the team and stop", kind: "end" },
+		],
+		edges: [
+			{ source: "push", target: "build" },
+			{ source: "build", target: "tests" },
+			{ source: "tests", target: "pass" },
+			{ source: "pass", target: "deploy", label: "Yes" },
+			{ source: "pass", target: "notify", label: "No" },
+		],
+		layout: { direction: "TB" },
+	};
+
+	function chain(nodes: ReadonlyArray<readonly [string, string, string?]>) {
+		return {
+			title: "Stack",
+			nodes: nodes.map(([id, label, slug], index) => ({
+				id,
+				label,
+				kind: index === 0 ? "start" : index === nodes.length - 1 ? "end" : "process",
+				...(slug ? { icon: { slug } } : {}),
+			})),
+			edges: nodes.slice(1).map(([id], index) => ({ source: nodes[index]?.[0], target: id })),
+		};
+	}
+
+	const slugs = (result: Awaited<ReturnType<ReturnType<typeof runtime>["buildFlowchart"]>>) => {
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+		return result.normalizedSpec.nodes.map((node) => node.icon?.slug);
+	};
+
+	it("gives a logo-less node the vendor logo its label names when the diagram draws logos", async () => {
+		const result = await filling().buildFlowchart({ spec: r20DeploySpec });
+
+		expect(slugs(result)).toEqual([
+			"github",
+			"docker",
+			undefined,
+			undefined,
+			"cloudflare",
+			undefined,
+		]);
+		expect(result.issues).toEqual([
+			{
+				code: "icon_filled",
+				severity: "info",
+				stage: "input",
+				ref: { kind: "node", id: "deploy", path: "nodes.icon.slug" },
+				message:
+					'Node "deploy" draws the "cloudflare" logo because its label "Ship to Cloudflare Workers" names Cloudflare.',
+				hint: "No action needed.",
+			},
+		]);
+	});
+
+	it("leaves a diagram without logos without logos", async () => {
+		const spec = {
+			...r20DeploySpec,
+			nodes: r20DeploySpec.nodes.map(({ icon: _icon, ...node }) => node),
+		};
+		const result = await filling().buildFlowchart({ spec });
+
+		expect(slugs(result).filter(Boolean)).toEqual([]);
+		expect(result.issues).toEqual([]);
+	});
+
+	it("does not count a dropped logo as one the diagram draws", async () => {
+		const result = await filling().buildFlowchart({
+			spec: chain([
+				["push", "Push to GitHub", "not-a-logo"],
+				["ship", "Ship to Cloudflare Workers"],
+			]),
+		});
+
+		expect(slugs(result)).toEqual([undefined, undefined]);
+		expect(result.issues.map((issue) => issue.code)).toEqual(["unknown_icon"]);
+	});
+
+	it("keeps the logo the model chose, and fills no node it gave a logo", async () => {
+		const result = await filling().buildFlowchart({
+			spec: chain([
+				["push", "Push to GitHub", "github"],
+				["build", "Build with Docker", "github"],
+				["ship", "Ship to Cloudflare Workers", "not-a-logo"],
+			]),
+		});
+
+		expect(slugs(result)).toEqual(["github", "github", undefined]);
+		expect(result.issues.map((issue) => issue.code)).toEqual(["unknown_icon"]);
+	});
+
+	it("never fills ambiguous, everyday-word, or unnamed labels", async () => {
+		const result = await filling().buildFlowchart({
+			spec: chain([
+				["push", "Push to GitHub", "github"],
+				["page", "Next.js page (Vercel) receives the question"],
+				["image", "Docker image pushed to GitHub"],
+				["go", "Go to checkout"],
+				["rust", "Rust service"],
+				["mail", "Send Mail"],
+				["stream", "Stream events"],
+				["notion", "Notion of done"],
+				["sentry", "Log errors to Sentry"],
+				["tests", "Test suite runs"],
+			]),
+		});
+
+		expect(slugs(result)).toEqual(["github", ...Array.from({ length: 9 }, () => undefined)]);
+		expect(result.issues).toEqual([]);
+	});
+
+	it("only fills when the host asks, as MCP builds do", async () => {
+		const result = await runtime(productionCatalog).buildFlowchart({ spec: r20DeploySpec });
+
+		expect(slugs(result)[4]).toBeUndefined();
+		expect(result.issues).toEqual([]);
+	});
+
+	it("fills sequence participants the same way", async () => {
+		const result = await filling().buildSequenceDiagram({
+			spec: {
+				title: "Deploy webhook",
+				participants: [
+					{ id: "developer", label: "Developer" },
+					{ id: "github", label: "GitHub", icon: { slug: "github" } },
+					{ id: "worker", label: "Cloudflare Worker" },
+					{ id: "docker", label: "Docker", icon: { slug: "docker" } },
+				],
+				messages: [
+					{ source: "developer", target: "github", label: "Push commit" },
+					{ source: "github", target: "worker", label: "Push webhook" },
+					{ source: "worker", target: "docker", label: "Build image" },
+				],
+			},
+		});
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+
+		expect(result.normalizedSpec.participants.map((participant) => participant.icon?.slug)).toEqual(
+			[undefined, "github", "cloudflare", "docker"],
+		);
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "icon_filled",
+				severity: "info",
+				ref: { kind: "node", id: "worker", path: "participants.icon.slug" },
+				message:
+					'Participant "worker" draws the "cloudflare" logo because its label "Cloudflare Worker" names Cloudflare.',
 			}),
 		]);
 	});

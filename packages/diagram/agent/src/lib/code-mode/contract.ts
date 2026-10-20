@@ -475,6 +475,7 @@ export const CODE_MODE_ISSUE_CODES = [
 	"unknown_icon",
 	"invalid_canvas_icon",
 	"icon_dropped",
+	"icon_filled",
 ] as const;
 
 export const CodeModeIssueCodeSchema = Object.assign(literals(CODE_MODE_ISSUE_CODES), {
@@ -517,7 +518,8 @@ export const CodeModeIssueRefSchema = CodeModeIssueRef;
 export class CodeModeIssue extends Schema.Class<CodeModeIssue>("CodeModeIssue")(
 	{
 		code: CodeModeIssueCodeSchema,
-		severity: literals(["error", "warning"]),
+		/** info notes report what a build did for the caller; nothing to fix. */
+		severity: literals(["error", "warning", "info"]),
 		stage: CodeModeIssueStageSchema,
 		ref: optionalContract(CodeModeIssueRef),
 		message: RequiredNonEmptyString,

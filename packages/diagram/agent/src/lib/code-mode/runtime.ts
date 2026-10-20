@@ -223,13 +223,22 @@ export interface CodeModeRuntimeOptions {
 		deadlineMillis: number;
 		onUnavailable: (message: string) => void;
 	};
+	/**
+	 * Internal per-call policy for MCP builds: in a diagram that draws logos, a
+	 * node without one gets the logo its label unmistakably names (see
+	 * resolveNodeIcons). Generation grounds logos in the prompt instead.
+	 */
+	fillNamedLogos?: boolean;
 	artifactUrl?: (input: { artifactId: string; format: ArtifactFormat }) => string;
 }
 
 export class CodeModeRuntimeEnvironment extends Context.Service<
 	CodeModeRuntimeEnvironment,
 	Required<Pick<CodeModeRuntimeOptions, "createId">> &
-		Pick<CodeModeRuntimeOptions, "artifactUrl" | "icons" | "renderer" | "defaultPng">
+		Pick<
+			CodeModeRuntimeOptions,
+			"artifactUrl" | "icons" | "renderer" | "defaultPng" | "fillNamedLogos"
+		>
 >()("@sketchi/diagram-agent/CodeModeRuntimeEnvironment") {}
 
 export const CodeModeRuntimeEnvironmentLive = Layer.succeed(CodeModeRuntimeEnvironment, {
@@ -243,6 +252,7 @@ export function makeCodeModeRuntimeEnvironmentLayer(options: CodeModeRuntimeOpti
 		...(options.renderer ? { renderer: options.renderer } : {}),
 		...(options.defaultPng ? { defaultPng: options.defaultPng } : {}),
 		...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
+		...(options.fillNamedLogos ? { fillNamedLogos: true } : {}),
 	});
 }
 
@@ -3002,10 +3012,12 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	const request = parsed.success;
 	const buildId = yield* Effect.sync(() => environment.createId("build"));
 	const authoredSpec = normalizeSequenceDiagramSpec(request.spec);
-	const resolvedIcons = resolveNodeIcons(authoredSpec.participants, environment.icons, {
-		noun: "participant",
-		path: "participants",
-	});
+	const resolvedIcons = resolveNodeIcons(
+		authoredSpec.participants,
+		environment.icons,
+		{ noun: "participant", path: "participants" },
+		{ fillNamedLogos: environment.fillNamedLogos === true },
+	);
 	const normalizedSpec = { ...authoredSpec, participants: resolvedIcons.nodes };
 	const baseContext = {
 		buildId,
@@ -4060,7 +4072,9 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 
 	const buildId = yield* Effect.sync(() => environment.createId("build"));
 	const authoredSpec = normalizeFlowchartSpec(request.spec);
-	const resolvedIcons = resolveNodeIcons(authoredSpec.nodes, environment.icons);
+	const resolvedIcons = resolveNodeIcons(authoredSpec.nodes, environment.icons, undefined, {
+		fillNamedLogos: environment.fillNamedLogos === true,
+	});
 	const normalizedSpec = { ...authoredSpec, nodes: resolvedIcons.nodes };
 	const baseContext = {
 		buildId,

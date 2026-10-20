@@ -61,7 +61,12 @@ function isCasedAsName(token: TextToken): boolean {
 	return !token.initial && !token.titleCase && isCapitalized(token.raw);
 }
 
+const termIndexes = new WeakMap<readonly SearchableIcon[], Map<string, SearchableIcon[]>>();
+
+/** Icons by tokenized slug, name, and alias, built once per icon list. */
 function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): Map<string, Icon[]> {
+	const cached = termIndexes.get(icons);
+	if (cached) return cached as Map<string, Icon[]>;
 	const index = new Map<string, Icon[]>();
 	const add = (term: string, icon: Icon) => {
 		const key = termTokens(term).join(" ");
@@ -75,6 +80,7 @@ function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): Map<str
 		add(icon.name, icon);
 		for (const alias of icon.aliases) add(alias, icon);
 	}
+	termIndexes.set(icons, index);
 	return index;
 }
 
@@ -129,6 +135,20 @@ export function matchIconsInText<Icon extends SearchableIcon>(
 	limit = MAX_TEXT_ICON_MATCHES,
 ): Icon[] {
 	return matchIconMentions(text, icons, limit).map(({ icon }) => icon);
+}
+
+/**
+ * The one catalog logo a node label unmistakably names ("Ship to Cloudflare
+ * Workers" names cloudflare), or nothing when it names no product, several
+ * ("Next.js page (Vercel)"), or one only by an everyday word ("Go to
+ * checkout", "Log errors to Sentry").
+ */
+export function logoNamedByLabel<Icon extends SearchableIcon>(
+	label: string,
+	icons: readonly Icon[],
+): Icon | undefined {
+	const [mention, ...others] = matchIconMentions(label, icons, 2);
+	return mention?.distinctive && others.length === 0 ? mention.icon : undefined;
 }
 
 /** A logo a text names, as generation offers it to a model. */

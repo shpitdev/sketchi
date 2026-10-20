@@ -1482,6 +1482,26 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(count(text, needle)).toBe(2);
 			expect(count(text, "<svg") + count(text, "data:image/")).toBe(2);
 		});
+
+		it("fills the logo a label names in a diagram that draws logos, with an info note", async () => {
+			const { text } = await executeText(`async () => sketchi.buildFlowchart({
+  spec: {
+    title: "Deploy pipeline",
+    nodes: [
+      { id: "push", label: "Push to GitHub", kind: "start", icon: { slug: "github" } },
+      { id: "build", label: "Docker builds the image", kind: "process", icon: { slug: "docker" } },
+      { id: "deploy", label: "Ship to Cloudflare Workers", kind: "end" }
+    ],
+    edges: [{ source: "push", target: "build" }, { source: "build", target: "deploy" }]
+  },
+  options: { artifactFormats: ["scene"] }
+})`);
+
+			expect(text).toContain(
+				'{"id":"deploy","label":"Ship to Cloudflare Workers","kind":"end","icon":{"slug":"cloudflare"}}',
+			);
+			expect(text).toContain('"code":"icon_filled","severity":"info"');
+		});
 	});
 
 	it("serves docs, search, and execute over the streamable HTTP MCP route", async () => {

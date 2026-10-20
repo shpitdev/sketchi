@@ -119,6 +119,8 @@ const NODE_ICON_ISSUE_CODE_ADDITIONS = new Set([
 	"unknown_icon",
 	"invalid_canvas_icon",
 	"icon_dropped",
+	// MCP logo fill adds an info note; frozen captures predate it.
+	"icon_filled",
 ]);
 // Sequence size limits (#280) add one issue code; frozen captures predate it.
 const TIMELINE_ISSUE_CODE_ADDITIONS = new Set([
@@ -339,6 +341,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		ORG_CHART_ISSUE_CODE_ADDITIONS.has(value) ||
 		// MCP best-effort PNG delivery (#499) adds one warning; frozen APIs remain strict.
 		value === "png_unavailable" ||
+		// MCP logo fill reports icon_filled with a new info severity.
+		value === "info" ||
 		CANVAS_ARROWHEAD_ADDITIONS.has(value)
 	);
 }

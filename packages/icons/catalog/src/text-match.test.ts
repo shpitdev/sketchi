@@ -5,7 +5,12 @@ import { describe, expect, it } from "vitest";
 import { iconManifest, nodeLogoIcons } from "./catalog";
 import { catalogCommonWords, loadCommonEnglishWords } from "./common-words-generation";
 import { GENERIC_PROMPTS } from "./generic-prompts";
-import { logosNamedInText, matchIconMentions, matchIconsInText } from "./text-match";
+import {
+	logoNamedByLabel,
+	logosNamedInText,
+	matchIconMentions,
+	matchIconsInText,
+} from "./text-match";
 
 function slugs(text: string, limit?: number) {
 	return matchIconsInText(text, nodeLogoIcons, limit).map((icon) => icon.slug);
@@ -84,6 +89,46 @@ describe("matchIconsInText", () => {
 
 	it("offers only node-logo marks when given node-logo icons", () => {
 		expect(slugs("TanStack Query and Zustand on Linux")).toEqual([]);
+	});
+});
+
+describe("logoNamedByLabel", () => {
+	const named = (label: string) => logoNamedByLabel(label, nodeLogoIcons)?.slug;
+
+	it("names the one logo a label unmistakably names", () => {
+		expect(named("Ship to Cloudflare Workers")).toBe("cloudflare");
+		expect(named("Cloudflare Worker")).toBe("cloudflare");
+		expect(named("Store the answer in Redis")).toBe("redis");
+		expect(named("Next.js page")).toBe("nextjs");
+		expect(named("AWS ECS web service")).toBe("aws");
+	});
+
+	it("names nothing for labels that name no product", () => {
+		for (const label of ["Test suite runs", "Tests pass?", "Notify the team and stop", "Stop"]) {
+			expect(named(label), label).toBeUndefined();
+		}
+	});
+
+	it("names nothing for everyday words that are also products", () => {
+		for (const label of [
+			"Go to checkout",
+			"Write the service in Rust",
+			"Rust service",
+			"Send Mail",
+			"Stream events",
+			"Notion of done",
+			"Ticket moves to Linear",
+			"Log errors to Sentry",
+		]) {
+			expect(named(label), label).toBeUndefined();
+		}
+	});
+
+	it("names nothing when a label names several products", () => {
+		expect(named("Next.js page (Vercel) receives the question")).toBeUndefined();
+		expect(named("Docker image pushed to GitHub")).toBeUndefined();
+		// An everyday-word product beside a distinctive one is still ambiguous.
+		expect(named("Docker build tickets in Linear")).toBeUndefined();
 	});
 });
 

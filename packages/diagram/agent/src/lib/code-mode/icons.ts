@@ -10,6 +10,7 @@ import {
 	iconMatch,
 	isNodeLogoEligible,
 	isStrayVendorLogo,
+	logoNamedByLabel,
 	normalizeNodeLogoSvg,
 	searchIcons,
 	type IconMatch,
@@ -58,6 +59,12 @@ export interface CodeModeIconCatalog {
 	 * product's own mark never is.
 	 */
 	readonly isStrayVendorLogo: (slug: string, label: string) => boolean;
+	/**
+	 * The one mark a label unmistakably names ("Ship to Cloudflare Workers"
+	 * names cloudflare); none for labels naming no product, several, or one
+	 * only by an everyday word ("Go to checkout").
+	 */
+	readonly logoNamedByLabel: (label: string) => CodeModeCatalogIcon | undefined;
 	/** Raw SVG source for an eligible mark. */
 	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
 	/**
@@ -84,6 +91,10 @@ export function makeCodeModeIconCatalog(options: {
 		isStrayVendorLogo: (slug, label) => {
 			const icon = icons.get(slug);
 			return icon !== undefined && isStrayVendorLogo(icon, label);
+		},
+		logoNamedByLabel: (label) => {
+			const icon = logoNamedByLabel(label, eligible);
+			return icon ? bySlug.get(icon.slug) : undefined;
 		},
 		search: (query, limit) =>
 			searchIcons(eligible, { limit, query }).map(({ icon }) => ({
@@ -154,7 +165,11 @@ function unknownIconIssue(input: {
  * Keep only icons whose slug names an eligible catalog mark, and vendor marks
  * only on labels naming their vendor. Unknown slugs are dropped with an
  * unknown_icon warning and stray vendor marks with icon_dropped, so the
- * diagram still builds.
+ * diagram still builds. With fillNamedLogos, once the diagram draws a logo,
+ * each node given none gets the one its label unmistakably names ("Ship to
+ * Cloudflare Workers" draws cloudflare), reported as an icon_filled note:
+ * models often leave one named product bare among logos, and a retry to add
+ * it costs a turn.
  */
 export function resolveNodeIcons<
 	Node extends {
@@ -167,6 +182,7 @@ export function resolveNodeIcons<
 	catalog: CodeModeIconCatalog | undefined,
 	/** Sequence diagrams draw logos on participants rather than nodes. */
 	owner: { readonly noun: string; readonly path: string } = { noun: "node", path: "nodes" },
+	policy: { readonly fillNamedLogos?: boolean } = {},
 ): { readonly issues: CodeModeIssue[]; readonly nodes: Node[] } {
 	const issues: CodeModeIssue[] = [];
 	const resolved = nodes.map((node) => {
@@ -197,7 +213,25 @@ export function resolveNodeIcons<
 		const { icon: _icon, ...withoutIcon } = node;
 		return withoutIcon as Node;
 	});
-	return { issues, nodes: resolved };
+	if (!policy.fillNamedLogos || !catalog || !resolved.some((node) => node.icon)) {
+		return { issues, nodes: resolved };
+	}
+	const filled = resolved.map((node, index) => {
+		// A node the model gave a logo keeps its choice, even a dropped one.
+		if (nodes[index]?.icon) return node;
+		const icon = catalog.logoNamedByLabel(node.label);
+		if (!icon) return node;
+		issues.push({
+			code: "icon_filled",
+			severity: "info",
+			stage: "input",
+			ref: { kind: "node", id: node.id, path: `${owner.path}.icon.slug` },
+			message: `${owner.noun[0]?.toUpperCase()}${owner.noun.slice(1)} "${node.id}" draws the "${icon.slug}" logo because its label "${node.label}" names ${icon.name}.`,
+			hint: "No action needed.",
+		});
+		return { ...node, icon: { slug: icon.slug } };
+	});
+	return { issues, nodes: filled };
 }
 
 function droppedIconIssue(input: {

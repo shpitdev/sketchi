@@ -38,6 +38,7 @@ import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.ser
 import {
 	PlaygroundCodeMode,
 	PlaygroundDefaultPngDelivery,
+	PlaygroundNamedLogoFill,
 	type CodeModeRequestContext,
 } from "./service.server";
 import {
@@ -709,6 +710,7 @@ export function makeSketchiCodeModeProvider(
 						}
 					: undefined,
 			),
+			Effect.provideService(PlaygroundNamedLogoFill, true),
 		);
 		if (result.ok) {
 			if (warnings.length)
