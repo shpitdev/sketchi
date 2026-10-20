@@ -110,6 +110,8 @@ export function validatePreviewConfig(config, projectId) {
 		"observability",
 		"r2_buckets",
 		"pipelines",
+		// PROBE ONLY (do not merge): placement A/B.
+		"placement",
 	]);
 	for (const field of Object.keys(previews)) {
 		if (!allowed.has(field))
