@@ -60,6 +60,13 @@ const READABLE_ASPECT = 2.5;
 const NAME_FILL = "#efe6ec";
 const KEYWORD_COLOR = "#6a4e5c";
 const PADDING = 48;
+/** The PNG export's padding per side, in place of the scene's. */
+const EXPORT_PADDING = 20;
+/**
+ * An export longer than this for its breadth reads too wide or too tall: a
+ * placement within it that routes no worse takes its place.
+ */
+const LONG_EXPORT = 2.4;
 
 /** Each kind's line: dashed or solid, and the heads at its `from` and `to` ends. */
 const LINE_STYLES: Readonly<
@@ -276,16 +283,30 @@ const PLACEMENTS: readonly ClassPlacementOptions[] = [
 	{ aspect: 1.1 },
 	{ between: 1 },
 ];
+/**
+ * Tried only while the best placement's export reads too long: whole
+ * hierarchies may step down a row, so one stands beside another's subclasses
+ * instead of beside it.
+ */
+const SQUARER: ClassPlacementOptions = { aspect: 1.1, hierarchies: true };
 const LARGE_MODEL = 20;
 const PLACEMENT_MARGIN = 0.75;
 
-/** Crossings plus reader-scale findings at the scene's export size, any too-long side, and detours. */
-function routedCost(scene: RenderedDiagramScene): number {
+/** What a routed placement draws that trips a reader. */
+interface RoutedCounts {
+	readonly crossings: number;
+	/** Reader-scale findings at the scene's export size. */
+	readonly findings: number;
+	/** How far lines run past their way between ends, summed (detour). */
+	readonly detours: number;
+	readonly hugging: number;
+}
+
+function routedCounts(scene: RenderedDiagramScene): RoutedCounts {
 	const arrows = scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
-	const aspect = Math.max(scene.width / scene.height, scene.height / scene.width);
-	return (
-		arrowCrossings(arrows) +
-		routingQualityFindings(
+	return {
+		crossings: arrowCrossings(arrows),
+		findings: routingQualityFindings(
 			arrows.map((arrow) => ({
 				id: arrow.id,
 				points: arrow.points,
@@ -293,11 +314,30 @@ function routedCost(scene: RenderedDiagramScene): number {
 				targetId: arrow.targetNodeId,
 			})),
 			routingQualityScale({ width: scene.width, height: scene.height }),
-		).length +
+		).length,
+		detours: arrows.reduce((sum, arrow) => sum + detour(arrow), 0),
+		hugging: huggingRuns(arrows),
+	};
+}
+
+/** Crossings plus reader-scale findings at the scene's export size, any too-long side, and detours. */
+function routedCost(scene: RenderedDiagramScene, counts: RoutedCounts): number {
+	const aspect = Math.max(scene.width / scene.height, scene.height / scene.width);
+	return (
+		counts.crossings +
+		counts.findings +
 		(aspect > READABLE_ASPECT ? 4 * (aspect - READABLE_ASPECT) : 0) +
-		arrows.reduce((sum, arrow) => sum + detour(arrow), 0) +
-		HUGGING * huggingRuns(arrows)
+		counts.detours +
+		HUGGING * counts.hugging
 	);
+}
+
+/** Width over height, either way up, of the scene as the PNG export pads it. */
+function exportAspect(scene: RenderedDiagramScene): number {
+	const [width, height] = [scene.width, scene.height].map(
+		(side) => side - 2 * PADDING + 2 * EXPORT_PADDING,
+	) as [number, number];
+	return Math.max(width / height, height / width);
 }
 
 /** Two lines running side by side this close read as one. */
@@ -359,17 +399,38 @@ function bestScene(diagram: ClassDiagram, boxes: ReadonlyMap<string, Box>): Rend
 	});
 	const options = diagram.classes.length > LARGE_MODEL ? PLACEMENTS.slice(0, 2) : PLACEMENTS;
 	const tried = new Set<string>();
-	let best: { cost: number; scene: RenderedDiagramScene } | undefined;
-	for (const option of options) {
+	type Routed = { cost: number; counts: RoutedCounts; scene: RenderedDiagramScene };
+	let best: Routed | undefined;
+	const long = ({ scene }: Routed) => exportAspect(scene) > LONG_EXPORT;
+	const longSide = ({ scene }: Routed) => Math.max(scene.width, scene.height);
+	// Where the best export reads too long, one within the aspect takes its place
+	// when it draws no more of anything a reader trips on, and no longer a side, so
+	// no text shrinks to fit.
+	const squarer = (candidate: Routed, current: Routed) =>
+		long(current) &&
+		!long(candidate) &&
+		longSide(candidate) <= longSide(current) &&
+		(Object.keys(candidate.counts) as (keyof RoutedCounts)[]).every(
+			(key) => candidate.counts[key] <= current.counts[key],
+		);
+	for (const option of [...options, SQUARER]) {
+		if (option === SQUARER && (options !== PLACEMENTS || !long(best!))) break;
 		const placement = placeClasses(layoutBoxes, links, option);
 		const key = JSON.stringify([...placement.boxes, ...placement.anchors]);
 		if (tried.has(key)) continue;
 		tried.add(key);
 		const scene = routedScene(diagram, boxes, placement);
-		const cost = routedCost(scene);
-		// Another placement must beat the default rows clearly, not by a fraction.
-		if (!best || cost < best.cost - PLACEMENT_MARGIN) best = { cost, scene };
-		if (cost === 0) break;
+		const counts = routedCounts(scene);
+		const routed = { cost: routedCost(scene, counts), counts, scene };
+		// Another placement must beat the default rows clearly, not by a fraction; the
+		// squarer one only reading within the aspect.
+		if (
+			!best ||
+			(option !== SQUARER && routed.cost < best.cost - PLACEMENT_MARGIN) ||
+			squarer(routed, best)
+		)
+			best = routed;
+		if (routed.cost === 0 && !long(best)) break;
 	}
 	return best!.scene;
 }

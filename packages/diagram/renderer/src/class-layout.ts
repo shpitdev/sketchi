@@ -45,6 +45,11 @@ export interface ClassPlacementOptions {
 	readonly between?: number;
 	/** Cost of a composition or aggregation whose whole stands below its part; none when omitted. */
 	readonly wholeBelow?: number;
+	/**
+	 * Also move each superclass together with every class under it, so a whole
+	 * hierarchy can step a row down beside another instead of sharing its rows.
+	 */
+	readonly hierarchies?: boolean;
 }
 
 export interface ClassPlacement {
@@ -282,8 +287,27 @@ function assignRows(graph: Graph, options: ClassPlacementOptions): number[] {
 		.map((_, node) => node)
 		.sort((a, b) => neighbors[b]!.size - neighbors[a]!.size || a - b);
 	let cost = rowCost(graph, row, target, between, wholeBelow);
+	const children = graph.boxes.map(() => [] as number[]);
+	for (const { parent, child } of graph.generalizations) children[parent]!.push(child);
+	const hierarchies = options.hierarchies
+		? visitOrder.flatMap((node) => {
+				if (children[node]!.length === 0) return [];
+				const members = new Set([node]);
+				for (const member of members) for (const child of children[member]!) members.add(child);
+				return [[...members]];
+			})
+		: [];
 	for (let round = 0; round < MAX_ROUNDS; round += 1) {
 		let improved = false;
+		for (const members of hierarchies)
+			for (const delta of [-1, 1]) {
+				for (const member of members) row[member]! += delta;
+				const next = rowCost(graph, row, target, between, wholeBelow);
+				if (next < cost - 1e-9) {
+					cost = next;
+					improved = true;
+				} else for (const member of members) row[member]! -= delta;
+			}
 		for (const node of visitOrder) {
 			const current = row[node]!;
 			const candidates = new Set([current - 1, current + 1, current + 2]);
@@ -636,6 +660,20 @@ function alignColumns(
 			for (const [index, item] of items.entries())
 				center[item] = fitted[index]! + offsets[index]! + layers.width[item]! / 2;
 		}
+	}
+	// Boxes at either end of a row with no line to another row close up on the
+	// nearest box that has one, so a row never trails off past a gap it doesn't need.
+	for (const items of rows) {
+		const offsets = packOffsets(layers, room, items);
+		const slack = (index: number) =>
+			center[items[index]!]! - layers.width[items[index]!]! / 2 - offsets[index]!;
+		const first = items.findIndex((item) => around[item]!.length > 0);
+		const last = items.findLastIndex((item) => around[item]!.length > 0);
+		if (first < 0) continue;
+		for (const [index, item] of items.entries())
+			if (index < first || index > last)
+				center[item] =
+					slack(index < first ? first : last) + offsets[index]! + layers.width[item]! / 2;
 	}
 	// Whole-unit left edges, so ports and their partners meet exactly.
 	return center.map((value, item) => {
