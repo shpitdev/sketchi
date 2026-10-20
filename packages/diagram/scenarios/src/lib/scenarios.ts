@@ -24,6 +24,8 @@ export interface FlowchartScenarioAssertions {
 	requiredGroups: FlowchartScenarioRequiredGroup[];
 	/** Steps the prompt keeps outside every group. */
 	ungroupedSteps: string[];
+	/** Steps excluded only from the stated group and its descendants, not all groups. */
+	outsideGroupSteps: { stepId: string; groupId: string }[];
 	/** Lanes the prompt states, in its order, each with the steps it holds. */
 	requiredLanes: FlowchartScenarioRequiredLane[];
 }
@@ -194,6 +196,8 @@ interface FlowchartScenarioDefinition {
 	title: string;
 	/** Fixture nodes the prompt keeps outside every group. */
 	ungrouped?: readonly string[];
+	/** Stated group id to fixture nodes the prompt keeps outside that group. */
+	outsideGroups?: Readonly<Record<string, readonly string[]>>;
 }
 
 const DEFAULT_STYLE = SKETCHI_DIAGRAM_STYLE;
@@ -412,6 +416,9 @@ function buildAssertions(
 			};
 		}),
 		ungroupedSteps: [...new Set((definition.ungrouped ?? []).map(stepOf))],
+		outsideGroupSteps: Object.entries(definition.outsideGroups ?? {}).flatMap(([groupId, nodes]) =>
+			[...new Set(nodes.map(stepOf))].map((stepId) => ({ stepId, groupId })),
+		),
 		requiredLanes: (definition.lanes ?? []).map(([id, label, labels, members]) => {
 			for (const alternative of labels) {
 				const words = flowchartLabelWords(alternative);
@@ -2222,7 +2229,7 @@ const flowchartScenarioDefinitions = [
 				{ parent: "vpc", kinds: ["subnet"] },
 			],
 		],
-		ungrouped: ["users"],
+		outsideGroups: { region: ["users"] },
 		shapes: { rds: "database", s3: "storage" },
 	},
 	{
@@ -2291,7 +2298,7 @@ const flowchartScenarioDefinitions = [
 				{ parent: "cluster", kinds: ["namespace"] },
 			],
 		],
-		ungrouped: ["browser", "queue", "db"],
+		outsideGroups: { cluster: ["browser", "queue", "db"] },
 		shapes: { queue: "queue", db: "database" },
 	},
 	{

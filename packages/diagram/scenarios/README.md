@@ -38,6 +38,10 @@ and the eval harness use it.
 - Flowchart scenarios check prompt-grounded steps, node kinds, branches, bounded
   connections, and logos. Group scenarios also check that each stated group holds
   its steps and that steps the prompt keeps outside every group stay ungrouped.
+  `outsideGroups` scopes an exclusion to a stated group, checking each step's
+  full group ancestry. Kubernetes' browser, database and queue may share external
+  wrappers, but cannot sit in the cluster or any descendant. AWS users may sit
+  in an Internet wrapper, but not in us-east-1, its VPC or any nested subnet.
   Role/team groups accept either frames or swimlanes (`roleGroups` in the scenario
   definition); explicit zones and regions still require groups. A helper's
   purpose is not a performed step:

@@ -141,7 +141,7 @@ describe("zone scenarios", () => {
 					node.id === "queue" ? { ...node, group: "backend" } : node,
 				),
 			}),
-		).toEqual(["ungrouped:RabbitMQ queue"]);
+		).toEqual(["outside-group:RabbitMQ queue:GKE cluster"]);
 	});
 
 	it("accepts the browser named as the entry component of the request it starts", () => {

@@ -418,8 +418,9 @@ export function scenarioLogoChecks(
  * Group checks on the model's own groups: each group the prompt states exists
  * under one of its prompt-grounded labels and holds every node of every step
  * the prompt puts in it (directly or in a group nested in it), stated groups
- * stay distinct, and steps the prompt keeps outside every group belong to
- * none. A stated zone also sits inside the zone the prompt puts it in and is
+ * stay distinct. Steps outside every group belong to none; steps outside a
+ * stated group may belong to other groups, but not its descendants. A stated
+ * zone also sits inside the zone the prompt puts it in and is
  * of a kind that reads as what the prompt calls it, and a step the prompt
  * makes a database, queue or document draws as one.
  */
@@ -428,9 +429,15 @@ function flowchartGroupChecks(
 	graph: FlowchartDiagram,
 	ownedNodes: ReadonlyMap<string, ReadonlySet<string>>,
 ): ScenarioCheck[] {
-	const { requiredGroups, requiredNodes, ungroupedSteps } = scenario.assertions;
+	const { requiredGroups, requiredNodes, ungroupedSteps, outsideGroupSteps } = scenario.assertions;
 	const shaped = requiredNodes.filter((step) => step.shape !== undefined);
-	if (requiredGroups.length === 0 && ungroupedSteps.length === 0 && shaped.length === 0) return [];
+	if (
+		requiredGroups.length === 0 &&
+		ungroupedSteps.length === 0 &&
+		outsideGroupSteps.length === 0 &&
+		shaped.length === 0
+	)
+		return [];
 	// The canonical schema makes groups and lanes mutually exclusive.
 	const groups = [
 		...(graph.groups ?? []).map((group) => ({
@@ -545,6 +552,18 @@ function flowchartGroupChecks(
 				),
 			message: `Expected "${stepLabel(step)}" outside every group.`,
 		})),
+		...outsideGroupSteps.map(({ stepId, groupId }) => {
+			const excluded = matchedId(groupId);
+			const label = requiredGroups.find((group) => group.id === groupId)?.label ?? groupId;
+			return {
+				id: `outside-group:${stepLabel(stepId)}:${label}`,
+				passed:
+					excluded !== undefined &&
+					owned(stepId).length > 0 &&
+					owned(stepId).every((node) => !chain(groupOf.get(node)).includes(excluded)),
+				message: `Expected "${stepLabel(stepId)}" outside "${label}" and every group nested in it.`,
+			};
+		}),
 		...shaped.map((step) => {
 			const shapes = step.shapes ?? [step.shape!];
 			return {
