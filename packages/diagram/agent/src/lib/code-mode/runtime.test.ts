@@ -1773,7 +1773,7 @@ describe("Code Mode runtime", () => {
 		expect(png).not.toHaveProperty("inline");
 	});
 
-	it("does not publish an object-bucket manifest when a format write fails", async () => {
+	it("fails the build without exposing the artifact id when a format write fails", async () => {
 		const bucket = new FailingPngBucket();
 		let id = 0;
 		const runtime = makeTestRuntime({
@@ -1793,7 +1793,10 @@ describe("Code Mode runtime", () => {
 
 		expectBuildFailure(built);
 		expect(built.status).toBe("storage_failed");
-		expect([...bucket.objects.keys()].sort()).toEqual(["codemode/artifact-2/scene.json"]);
+		expect(bucket.objects.has("codemode/artifact-2/png.png")).toBe(false);
+		// The manifest goes up with its formats, so it can land beside a failed
+		// format; the id never reaches a caller, so no reader can resolve it.
+		expect(JSON.stringify(built)).not.toContain("artifact-2");
 	});
 
 	it("builds a native sequence scene and exports every requested artifact", async () => {
