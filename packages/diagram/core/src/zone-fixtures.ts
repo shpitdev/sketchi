@@ -1,6 +1,7 @@
 import { parseIntermediateDiagram, type IntermediateDiagram } from "./intermediate.js";
 import { parseFlowchartDiagram } from "./types/flowchart.js";
 import awsThreeTier from "./fixtures/zones/aws-three-tier.js";
+import awsThreeTierDescribed from "./fixtures/zones/aws-three-tier-described.js";
 import hybridCloud from "./fixtures/zones/hybrid-cloud.js";
 import kindedFlat from "./fixtures/zones/kinded-flat.js";
 import kubernetesCluster from "./fixtures/zones/kubernetes-cluster.js";
@@ -26,6 +27,13 @@ export const zoneFixtures = {
 	"hybrid-cloud": flowchart(hybridCloud),
 	"kinded-flat": flowchart(kindedFlat, "TB"),
 };
+
+/**
+ * The AWS three-tier app with short labels and each technology in a node
+ * description, which draws as a subtitle under the label; its database carries
+ * a logo too.
+ */
+export const describedArchitectureFlowchart = flowchart(awsThreeTierDescribed);
 
 /** Zones of the thirty-node stress case, each with its parent and kind. */
 const STRESS_ZONES = [

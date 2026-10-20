@@ -55,6 +55,8 @@ import {
 	validateExcalidrawScene,
 } from "@sketchi/diagram-excalidraw";
 import {
+	longNodeDescriptions,
+	NODE_DESCRIPTION_MAX_LINES,
 	renderIntermediateDiagram,
 	renderMindmapDiagram,
 	renderSequenceDiagram,
@@ -1358,6 +1360,20 @@ function issue(input: {
 		message: input.message,
 		hint: input.hint,
 	};
+}
+
+/** A description past its line limit still draws in full; the build warns so it can be shortened. */
+function longDescriptionIssues(scene: RenderedDiagramScene): CodeModeIssue[] {
+	return longNodeDescriptions(scene).map((id) =>
+		issue({
+			code: "label_too_long",
+			severity: "warning",
+			stage: "render",
+			ref: { kind: "node", id, path: "spec.nodes.description" },
+			message: `Node "${id}" has a description longer than ${NODE_DESCRIPTION_MAX_LINES} lines; it draws in full under the label.`,
+			hint: "Keep a description to a short subtitle, and name technologies in the label.",
+		}),
+	);
 }
 
 function pathForContractIssue(path: readonly PropertyKey[]): string {
@@ -4096,7 +4112,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 		normalizedSpec,
 		quality,
 		artifact,
-		issues: [...resolvedIcons.issues, ...embedded.issues],
+		issues: [...resolvedIcons.issues, ...embedded.issues, ...longDescriptionIssues(scene)],
 	} satisfies Extract<BuildFlowchartResult, { ok: true }>;
 });
 

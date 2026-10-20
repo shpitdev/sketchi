@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
+	describedArchitectureFlowchart,
 	flowchartFixture,
 	groupFixtures,
 	laneFixtures,
@@ -59,6 +60,11 @@ export const SwimlaneIncidentResponse: Story = {
 
 export const ZonesAwsThreeTier: Story = {
 	args: { diagram: zoneFixtures["aws-three-tier"] },
+};
+
+/** Short labels with each technology in a subtitle under the label. */
+export const ZonesAwsThreeTierDescribed: Story = {
+	args: { diagram: describedArchitectureFlowchart },
 };
 
 export const ZonesKubernetesCluster: Story = {

@@ -94,6 +94,38 @@ const diagram = parseFlowchartDiagram({
 	layout: { direction: "TB", edgeRouting: "orthogonal" },
 });
 
+/** Architecture nodes with subtitles: a plain step, a database and a decision. */
+const described = parseFlowchartDiagram({
+	id: "described-nodes",
+	title: "Described nodes",
+	type: "flowchart",
+	nodes: [
+		{ id: "users", label: "Users", kind: "start", description: "Send requests" },
+		{ id: "web", label: "Web service", kind: "process", description: "ECS Fargate" },
+		{
+			id: "healthy",
+			label: "Healthy?",
+			kind: "decision",
+			description: "Two passing probes",
+		},
+		{
+			id: "db",
+			label: "Orders database",
+			kind: "end",
+			shape: "database",
+			description: "RDS PostgreSQL, Multi-AZ primary with a read replica",
+		},
+		{ id: "page", label: "Page on-call", kind: "end" },
+	],
+	edges: [
+		{ id: "users-web", source: "users", target: "web" },
+		{ id: "web-healthy", source: "web", target: "healthy" },
+		{ id: "healthy-db", source: "healthy", target: "db", label: "yes" },
+		{ id: "healthy-page", source: "healthy", target: "page", label: "no" },
+	],
+	layout: { direction: "LR", edgeRouting: "orthogonal" },
+});
+
 /** An agent-authored canvas: fixed node geometry and an unbound line label. */
 const agentCanvas: CanvasSpec = {
 	kind: "canvas",
@@ -390,6 +422,13 @@ describe("Excalidraw labels", () => {
 		await expectLabelsPaintFully(convertSceneToExcalidraw(renderIntermediateDiagram(diagram)), 15);
 	}, 60_000);
 
+	it("paint node descriptions fully under their labels", async () => {
+		await expectLabelsPaintFully(
+			convertSceneToExcalidraw(renderIntermediateDiagram(described)),
+			11,
+		);
+	}, 60_000);
+
 	it("paint agent canvas node and line labels fully", async () => {
 		expect(getCanvasValidationIssues(agentCanvas)).toEqual([]);
 		await expectLabelsPaintFully(convertSceneToExcalidraw(agentCanvas), 4);
@@ -442,6 +481,81 @@ it("keeps sequence self-message loops bound through reload and inside the export
 		const right = label.x + label.width;
 		expect(Number(svg.getAttribute("width")), id).toBeGreaterThanOrEqual(right - left);
 	}
+}, 30_000);
+
+it("keeps node descriptions grouped and in place through reload, drag and export", async () => {
+	const scene = convertSceneToExcalidraw(renderIntermediateDiagram(described));
+	const file = JSON.parse(JSON.stringify(createExcalidrawFile(scene))) as {
+		elements: ExcalidrawElement[];
+	};
+	const restored = restoreElements(file.elements, null, { repairBindings: true });
+	const byId = new Map(restored.map((element) => [element.id, element]));
+	const ids = ["users", "web", "healthy", "db"];
+	for (const id of ids) {
+		const emitted = scene.elements.find((element) => element.id === `description:${id}`);
+		const description = byId.get(`description:${id}`);
+		if (!emitted || description?.type !== "text") throw new Error(`Missing ${id}.`);
+		// Reload keeps the subtitle where it was drawn, unbound, in its node's group.
+		expect({ x: description.x, y: description.y, text: description.text }, id).toEqual({
+			x: emitted.x,
+			y: emitted.y,
+			text: emitted.text,
+		});
+		expect(description.containerId, id).toBeNull();
+		expect(description.groupIds.at(-1), id).toBe(byId.get(`node:${id}`)?.groupIds.at(-1));
+	}
+
+	// The export paints every subtitle.
+	const svg = await exportToSvg({
+		elements: restored,
+		appState: { exportBackground: true, exportPadding: 0, viewBackgroundColor: "#ffffff" },
+		files: null,
+	});
+	const painted = [...svg.querySelectorAll("text")].map((text) => text.textContent).join(" ");
+	for (const word of ["ECS", "Fargate", "probes", "Multi-AZ", "replica"])
+		expect(painted, word).toContain(word);
+
+	// Dragging a node on the real canvas moves its subtitle with it.
+	await page.viewport(1280, 960);
+	let editorApi: ExcalidrawImperativeAPI | undefined;
+	const view = render(
+		<div style={{ height: 960, width: 1280 }}>
+			<ExcalidrawSceneCanvas
+				scene={scene}
+				title="Drag descriptions"
+				onApiChange={(api) => {
+					editorApi = api;
+				}}
+				viewModeEnabled={false}
+			/>
+		</div>,
+	);
+	const api = await waitFor(() => {
+		expect(editorApi).toBeDefined();
+		return editorApi!;
+	});
+	await nextFrames(4);
+	const source = api.getSceneElements().find((e) => e.id === "node:web")!;
+	const subtitle = api.getSceneElements().find((e) => e.id === "description:web")!;
+	const before = { x: source.x, y: source.y, subX: subtitle.x, subY: subtitle.y };
+	const canvas = view.container.querySelector<HTMLCanvasElement>(
+		"canvas.excalidraw__canvas.interactive",
+	)!;
+	const { scrollX, scrollY, zoom } = api.getAppState();
+	const position = {
+		x: (source.x + source.width / 2 + scrollX) * zoom.value,
+		y: (source.y + 8 + scrollY) * zoom.value,
+	};
+	await userEvent.dragAndDrop(canvas, canvas, {
+		sourcePosition: position,
+		targetPosition: { x: position.x + 80, y: position.y + 30 },
+	});
+	await nextFrames(4);
+	const moved = api.getSceneElements().find((e) => e.id === source.id)!;
+	const movedSubtitle = api.getSceneElements().find((e) => e.id === subtitle.id)!;
+	expect(moved.x - before.x).toBeGreaterThan(20);
+	expect(movedSubtitle.x - before.subX).toBeCloseTo(moved.x - before.x, 0);
+	expect(movedSubtitle.y - before.subY).toBeCloseTo(moved.y - before.y, 0);
 }, 30_000);
 
 it("moves authored branch labels with a source node dragged on the real canvas", async () => {

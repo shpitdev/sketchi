@@ -2,8 +2,8 @@ import { Schema } from "effect";
 
 import {
 	DiagramEdge,
-	DiagramNode,
 	DiagramValidationError,
+	GraphNode,
 	IntermediateDiagram,
 } from "../intermediate.js";
 
@@ -68,9 +68,8 @@ export const FlowchartValidationIssueSchema = FlowchartValidationIssue;
 
 export const FlowchartNodeKindSchema = Schema.Literals(["start", "process", "decision", "end"]);
 
-export class FlowchartNode extends DiagramNode.extend<FlowchartNode>("FlowchartNode")({
+export class FlowchartNode extends GraphNode.extend<FlowchartNode>("FlowchartNode")({
 	kind: FlowchartNodeKindSchema,
-	description: Schema.optional(Schema.NonEmptyString),
 }) {}
 export const FlowchartNodeSchema = FlowchartNode;
 

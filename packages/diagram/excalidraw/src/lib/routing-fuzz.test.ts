@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
 	candidateRouteQuality,
+	canvasBoundTextBox,
+	canvasBoundTextInset,
+	embedCanvasIcons,
 	getCanvasValidationIssues,
 	groupFixtures,
 	groupRegionIssues,
@@ -433,8 +436,13 @@ function labelDefects(
 			)
 				defects.push(`${label.id} crossed by ${arrow.id}`);
 		}
+		// A node's description is a subtitle inside that node.
+		const owner = label.id.startsWith("description:")
+			? `node:${label.id.slice("description:".length)}`
+			: undefined;
 		for (const shape of shapes)
-			if (overlapsShape(bounds, shape)) defects.push(`${label.id} on ${shape.id}`);
+			if (shape.id !== owner && overlapsShape(bounds, shape))
+				defects.push(`${label.id} on ${shape.id}`);
 		for (const other of labels.slice(index + 1))
 			if (overlaps(bounds, box(other))) defects.push(`${label.id} on ${other.id}`);
 	}
@@ -727,7 +735,76 @@ function longTokenDiagrams(count: number) {
 				{ id: "done", source: ids.at(-1)!, target: "end" },
 			],
 		};
-		return { flowchart, mindmap, timeline, sequence, "state-machine": stateMachine };
+		// Drawn last, so the families above keep their seeded text.
+		const looks = [
+			{},
+			{ shape: "database" },
+			{ shape: "queue" },
+			{ shape: "storage" },
+			{ icon: { slug: "github" } },
+		] as const;
+		const described = {
+			...flowchart,
+			id: `described-${index}`,
+			nodes: flowchart.nodes.map((node) => ({
+				...node,
+				...(random() < 0.75 ? { description: label() } : {}),
+				...(node.kind === "process" ? looks[Math.floor(random() * looks.length)] : {}),
+			})),
+		};
+		return {
+			flowchart,
+			mindmap,
+			timeline,
+			sequence,
+			"state-machine": stateMachine,
+			"described-flowchart": described,
+		};
+	});
+}
+
+/**
+ * Where a node description must sit in the export: inside its node's
+ * Excalidraw text box, under its centered label and clear of its logo, grouped
+ * with all three.
+ */
+function descriptionDefects(elements: readonly ExportedElement[]): string[] {
+	const byId = new Map(elements.map((element) => [element.id, element]));
+	return elements.flatMap((description) => {
+		if (description.type !== "text" || !description.id.startsWith("description:")) return [];
+		const id = description.id.slice("description:".length);
+		const shape = byId.get(`node:${id}`)!;
+		const label = byId.get(`label:${id}`)!;
+		const geometry = {
+			shape: shape.type === "diamond" || shape.type === "ellipse" ? shape.type : "rectangle",
+			width: shape.width as number,
+			height: shape.height as number,
+		} as const;
+		const composed = (shape.customData as { sketchiShape?: string } | undefined)?.sketchiShape;
+		const node = { ...geometry, ...(composed ? { shape: composed as "cylinder" } : {}) };
+		const inset = canvasBoundTextInset(node);
+		const box = canvasBoundTextBox(node);
+		const [left, top] = [(shape.x as number) + inset.x, (shape.y as number) + inset.y];
+		const [x, y, width, height] = [
+			description.x as number,
+			description.y as number,
+			description.width as number,
+			description.height as number,
+		];
+		const defects: string[] = [];
+		// Its box may reach into the half-font canvas padding, as a label's does.
+		const pad = (description.fontSize as number) / 2;
+		if (x < left - pad || x + width > left + box.width + pad) defects.push("too wide");
+		if (y + height > top + box.height + 0.5) defects.push("below its node's text box");
+		if (y < (label.y as number) + (label.height as number) - 0.5) defects.push("on its label");
+		const logo = elements.find((element) => element.id.startsWith(`node-${id}-icon`));
+		if (logo && (label.y as number) < (logo.y as number) + (logo.height as number))
+			defects.push("label on its logo");
+		const outerGroup = (element: ExportedElement) => (element.groupIds as string[]).at(-1);
+		const outer = outerGroup(shape);
+		if (!outer || outerGroup(label) !== outer || outerGroup(description) !== outer)
+			defects.push("ungrouped");
+		return defects.map((defect) => `${description.id} ${defect}`);
 	});
 }
 
@@ -735,42 +812,60 @@ describe("text fit fuzz", () => {
 	// Every family sizes its containers to whole words: no validator issue and no
 	// word broken across lines in the export.
 	const diagrams = longTokenDiagrams(FULL ? 24 : 4);
-	it.each(["flowchart", "mindmap", "timeline", "sequence", "state-machine"] as const)(
-		"fits long words and identifiers in every %s",
-		(family) => {
-			const failures = diagrams.flatMap((specs, index) => {
-				const diagram = parseCanonicalDiagram(specs[family]);
-				const scene = renderDiagram(diagram);
-				const elements = convertSceneToExcalidraw(scene).elements;
-				const authored = new Map(
-					[
-						...("nodes" in diagram ? diagram.nodes : []),
-						...("participants" in diagram ? diagram.participants : []),
-						...("states" in diagram
-							? diagram.states.flatMap((state) =>
-									state.label ? [{ id: state.id, label: state.label }] : [],
-								)
-							: []),
-					].map((node) => [`node:${node.id}`, node.label]),
-				);
-				return [
-					...getCanvasValidationIssues(scene).map((issue) => issue.code),
-					...validateExcalidrawScene({ ...convertSceneToExcalidraw(scene) }).issues.map(
-						(issue) => issue.code,
-					),
-					...elements.flatMap((text) =>
-						text.type === "text"
-							? midWordBreaks(
-									authored.get(String(text.containerId)) ?? String(text.originalText),
-									String(text.text),
-								)
-							: [],
-					),
-				].map((failure) => `${index}: ${failure}`);
-			});
-			expect(failures).toEqual([]);
-		},
-	);
+	it.each([
+		"flowchart",
+		"mindmap",
+		"timeline",
+		"sequence",
+		"state-machine",
+		"described-flowchart",
+	] as const)("fits long words and identifiers in every %s", (family) => {
+		const failures = diagrams.flatMap((specs, index) => {
+			const diagram = parseCanonicalDiagram(specs[family]);
+			const scene = embedCanvasIcons(renderDiagram(diagram), (slug) => ({
+				name: slug,
+				svg: '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"/>',
+			})).scene;
+			const elements = convertSceneToExcalidraw(scene).elements;
+			const authored = new Map(
+				[
+					...("nodes" in diagram ? diagram.nodes : []),
+					...("participants" in diagram ? diagram.participants : []),
+					...("states" in diagram
+						? diagram.states.flatMap((state) =>
+								state.label ? [{ id: state.id, label: state.label }] : [],
+							)
+						: []),
+				].map((node) => [`node:${node.id}`, node.label]),
+			);
+			for (const node of "nodes" in diagram ? diagram.nodes : [])
+				if ("description" in node && node.description)
+					authored.set(`description:${node.id}`, node.description);
+			return [
+				// A timeline draws its event descriptions its own way.
+				...(diagram.type === "flowchart" ? descriptionDefects(elements) : []),
+				...(family === "described-flowchart" &&
+				!elements.some((element) => element.id.startsWith("description:"))
+					? ["no description drawn"]
+					: []),
+				...getCanvasValidationIssues(scene).map((issue) => issue.code),
+				...validateExcalidrawScene({ ...convertSceneToExcalidraw(scene) }).issues.map(
+					(issue) => issue.code,
+				),
+				...elements.flatMap((text) =>
+					text.type === "text"
+						? midWordBreaks(
+								authored.get(String(text.containerId)) ??
+									authored.get(text.id) ??
+									String(text.originalText),
+								String(text.text),
+							)
+						: [],
+				),
+			].map((failure) => `${index}: ${failure}`);
+		});
+		expect(failures).toEqual([]);
+	});
 });
 
 describe("routing fuzz", () => {

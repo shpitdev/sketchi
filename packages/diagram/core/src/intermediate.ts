@@ -118,6 +118,15 @@ export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
 }) {}
 export const DiagramNodeSchema = DiagramNode;
 
+/**
+ * A node of a laid-out graph. Its description draws as a smaller, muted
+ * subtitle under its label, inside the node.
+ */
+export class GraphNode extends DiagramNode.extend<GraphNode>("GraphNode")({
+	description: Schema.optional(NonEmptyString),
+}) {}
+export const GraphNodeSchema = GraphNode;
+
 export class DiagramEdge extends Schema.Class<DiagramEdge>("DiagramEdge")({
 	id: NonEmptyString,
 	source: NonEmptyString,
@@ -145,7 +154,7 @@ export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>("Inte
 	id: NonEmptyString,
 	title: NonEmptyString,
 	type: withDefault(GraphDiagramTypeSchema, "flowchart"),
-	nodes: Schema.Array(DiagramNode).pipe(Schema.mutable).check(Schema.isMinLength(1)),
+	nodes: Schema.Array(GraphNode).pipe(Schema.mutable).check(Schema.isMinLength(1)),
 	edges: withDefault(Schema.Array(DiagramEdge).pipe(Schema.mutable), []),
 	groups: Schema.optional(Schema.Array(DiagramGroup).pipe(Schema.mutable)),
 	lanes: Schema.optional(Schema.Array(DiagramLane).pipe(Schema.mutable)),

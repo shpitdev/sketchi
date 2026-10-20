@@ -33,6 +33,7 @@ import {
 	type DiagramGroup,
 	type DiagramNode,
 	type DiagramZoneKind,
+	type GraphNode,
 	boundLabelWidth,
 	estimateTextWidth,
 	wrapTextToWidth,
@@ -162,31 +163,113 @@ function measureLabel(label: string, maxLineUnits: number): LabelMetrics {
 }
 
 /**
- * Smallest container whose Excalidraw bound-text box holds the label and any
- * logo band. Excalidraw re-wraps an edited label to this box (half the width of
- * a diamond, the inscribed rectangle of an ellipse), so sizing to it keeps the
- * stored wrap and the logo clear after editing.
+ * Smallest container whose Excalidraw bound-text box holds text of this size:
+ * a label and any logo band, or a label centered between its description and
+ * logo bands. Excalidraw re-wraps an edited label to this box (half the width
+ * of a diamond, the inscribed rectangle of an ellipse), so sizing to it keeps
+ * the stored wrap and the logo clear after editing.
  */
 function boundTextContainerSize(
 	shape: NodeSceneShape,
-	label: LabelMetrics,
-	icon: CanvasNodeIcon | undefined,
+	textWidth: number,
+	textHeight: number,
 ): { readonly height: number; readonly width: number } {
 	const padding = CANVAS_NODE_ICON.boundTextPadding * 2;
-	const textHeight = label.textHeight + canvasNodeIconBand(icon);
 	const scale =
 		shape === "diamond" ? 2 : shape === "ellipse" || shape === "circle" ? Math.SQRT2 : 1;
-	let width = Math.ceil((label.textWidth + padding) * scale);
+	let width = Math.ceil((textWidth + padding) * scale);
 	let height = Math.ceil((textHeight + padding) * scale);
 	// Excalidraw rounds its text box, which can land just under the closed-form
 	// size; grow until the rounded box itself holds the text.
-	while (canvasBoundTextBox({ height, shape, width }).width < label.textWidth) {
+	while (canvasBoundTextBox({ height, shape, width }).width < textWidth) {
 		width += 1;
 	}
 	while (canvasBoundTextBox({ height, shape, width }).height < textHeight) {
 		height += 1;
 	}
 	return { width, height };
+}
+
+/**
+ * A node's description draws as a smaller, muted subtitle under its label. The
+ * label stays centered, as Excalidraw keeps a bound label, so the node holds a
+ * band as deep as the description's (or its logo's, if deeper) on both sides.
+ */
+const NODE_DESCRIPTION_FONT_SIZE = 12;
+const NODE_DESCRIPTION_LINE_HEIGHT = 1.25;
+const NODE_DESCRIPTION_COLOR = "#5f574c";
+/** Space between a label and its description, and under the description. */
+const NODE_DESCRIPTION_GAP = 2;
+const NODE_DESCRIPTION_CLEARANCE = 4;
+/**
+ * Lines a description wraps in before its node widens, up to its shape's
+ * limit: two in a box, one in a diamond or an ellipse, which pay for a line in
+ * width as well as height.
+ */
+function descriptionLines(shape: NodeSceneShape): number {
+	return shape === "diamond" || shape === "ellipse" || shape === "circle" ? 1 : 2;
+}
+/** At the widest a description may run to this many lines before its build warns. */
+export const NODE_DESCRIPTION_MAX_LINES = 3;
+/**
+ * Widest description text per shape: a box keeps its node within 300 px. A
+ * diamond holds its text in half its width and height, and an ellipse in its
+ * inscribed box, so every extra line costs them two or three times its height;
+ * they widen further, to about 500 and 380 px, before wrapping another line.
+ */
+const NODE_DESCRIPTION_MAX_WIDTH: Readonly<Record<NodeSceneShape, number>> = {
+	bucket: 220,
+	circle: 260,
+	cylinder: 264,
+	diamond: 240,
+	document: 264,
+	ellipse: 260,
+	pipe: 240,
+	polygon: 264,
+	rectangle: 264,
+};
+
+interface DescriptionMetrics {
+	readonly text: string;
+	readonly lines: number;
+	readonly width: number;
+	readonly height: number;
+}
+
+function descriptionUnits(width: number): number {
+	return Math.floor((width * 100) / NODE_DESCRIPTION_FONT_SIZE);
+}
+
+/**
+ * Wrap a description at whole words to its node's label width, or wider, up to
+ * its shape's limit, when that keeps it to its shape's lines. It depends only on the
+ * text and the shape, so layout and drawing wrap it alike.
+ */
+function measureDescription(description: string, shape: NodeSceneShape): DescriptionMetrics {
+	const labelUnits = shape === "diamond" ? MAX_DIAMOND_LABEL_LINE_UNITS : MAX_LABEL_LINE_UNITS;
+	const base = descriptionUnits((labelUnits * NODE_LABEL_FONT_SIZE) / 100);
+	const limit = descriptionUnits(NODE_DESCRIPTION_MAX_WIDTH[shape]);
+	const lineCount = (text: string) => text.split("\n").length;
+	let text = wrapTextToUnits(description, base);
+	for (let units = base; lineCount(text) > descriptionLines(shape) && units < limit;) {
+		units = Math.min(limit, units + DEFAULT_GLYPH_UNITS);
+		text = wrapTextToUnits(description, units);
+	}
+	const lines = lineCount(text);
+	return {
+		text,
+		lines,
+		width: estimateTextWidth(text, NODE_DESCRIPTION_FONT_SIZE),
+		height: Math.ceil(lines * NODE_DESCRIPTION_FONT_SIZE * NODE_DESCRIPTION_LINE_HEIGHT),
+	};
+}
+
+/** Depth of the band on each side of a described node's centered label. */
+function descriptionBand(description: DescriptionMetrics, icon: CanvasNodeIcon | undefined) {
+	return Math.max(
+		canvasNodeIconBand(icon),
+		NODE_DESCRIPTION_GAP + description.height + NODE_DESCRIPTION_CLEARANCE,
+	);
 }
 
 /**
@@ -231,7 +314,7 @@ function shapeForNode(node: DiagramNode): NodeSceneShape {
 }
 
 function createNodeShape(
-	node: DiagramNode,
+	node: GraphNode,
 	minimumWidth = MIN_NODE_WIDTH,
 	lineUnits = MAX_LABEL_LINE_UNITS,
 ): NodeSceneElement {
@@ -252,10 +335,8 @@ function createNodeShape(
 			label: "",
 		};
 	}
-	const labelMetrics = measureLabel(
-		node.label,
-		shape === "diamond" ? MAX_DIAMOND_LABEL_LINE_UNITS : lineUnits,
-	);
+	const labelUnits = shape === "diamond" ? MAX_DIAMOND_LABEL_LINE_UNITS : lineUnits;
+	const labelMetrics = measureLabel(node.label, labelUnits);
 	const icon = node.icon ? { slug: node.icon.slug, size: NODE_ICON_SIZE[shape] } : undefined;
 	// A composed shape keeps its label's padding clear of the curves at its ends.
 	const curve = isCanvasComposedShape(shape) ? CANVAS_SHAPE_CURVE[shape] : 0;
@@ -267,15 +348,52 @@ function createNodeShape(
 			: shape === "cylinder" || shape === "document" || shape === "bucket"
 				? 3 * curve
 				: 0;
+	const [minWidth, minHeight] =
+		node.kind === "state" ? [STATE_MIN_WIDTH, STATE_MIN_HEIGHT] : [minimumWidth, MIN_NODE_HEIGHT];
+	if (node.description) {
+		// Every described node fits Excalidraw's edit-time text box: its centered
+		// label between two bands, the lower holding the description.
+		const description = measureDescription(node.description, shape);
+		// The node is as wide as its description, so its label wraps no narrower.
+		const label = measureLabel(
+			node.label,
+			Math.max(labelUnits, Math.floor((description.width * 100) / NODE_LABEL_FONT_SIZE)),
+		);
+		const textWidth = Math.max(label.textWidth, description.width);
+		const boundText = boundTextContainerSize(
+			shape,
+			textWidth,
+			label.textHeight + 2 * descriptionBand(description, icon),
+		);
+		return {
+			type: "node",
+			id: `node:${node.id}`,
+			nodeId: node.id,
+			...(node.kind ? { kind: node.kind } : {}),
+			...(icon ? { icon } : {}),
+			shape,
+			x: 0,
+			y: 0,
+			width: Math.max(
+				minWidth,
+				Math.ceil(textWidth + NODE_LABEL_HORIZONTAL_PADDING) + shapeWidthPad,
+				boundText.width,
+			),
+			height: Math.max(minHeight, boundText.height),
+			label: label.text,
+		};
+	}
 	// Logo nodes, diamonds and composed shapes must fit Excalidraw's edit-time
 	// text box; other plain nodes keep their padded label box, which already
 	// contains it.
 	const boundText =
 		icon || shape === "diamond" || curve > 0
-			? boundTextContainerSize(shape, labelMetrics, icon)
+			? boundTextContainerSize(
+					shape,
+					labelMetrics.textWidth,
+					labelMetrics.textHeight + canvasNodeIconBand(icon),
+				)
 			: { height: 0, width: 0 };
-	const [minWidth, minHeight] =
-		node.kind === "state" ? [STATE_MIN_WIDTH, STATE_MIN_HEIGHT] : [minimumWidth, MIN_NODE_HEIGHT];
 
 	return {
 		type: "node",
@@ -3354,19 +3472,82 @@ function assignLaneSides(routes: readonly RoutedEdge[], lanes: LaneLayout): void
 	}
 }
 
-function textForNode(shape: NodeSceneElement): TextSceneElement {
+function textForNode(shape: NodeSceneElement, described = false): TextSceneElement {
 	return {
 		type: "text",
 		id: `label:${shape.nodeId}`,
 		containerId: shape.id,
+		...(described && shape.groupIds ? { groupIds: [...shape.groupIds] } : {}),
 		x: shape.x + shape.width / 2,
 		y: shape.y + shape.height / 2,
 		text: shape.label,
 		fontSize: NODE_LABEL_FONT_SIZE,
 		maxWidth: Math.max(1, shape.width - NODE_LABEL_HORIZONTAL_PADDING),
-		// The logo sits at the top of the text box; the label stacks beneath it.
-		...(shape.icon ? { verticalAlign: "bottom" as const } : {}),
+		// The logo sits at the top of the text box; the label stacks beneath it,
+		// or stays centered above a description.
+		...(shape.icon && !described ? { verticalAlign: "bottom" as const } : {}),
 	};
+}
+
+/** Group that moves a described node, its label and its description together. */
+function describedGroupId(shape: NodeSceneElement): string {
+	return `${shape.id}:described`;
+}
+
+/** A node's description, under its centered label and grouped with it. */
+function descriptionForNode(shape: NodeSceneElement, description: string): TextSceneElement {
+	const metrics = measureDescription(description, shape.shape);
+	const labelHeight = Math.ceil(
+		shape.label.split("\n").length * NODE_LABEL_FONT_SIZE * NODE_LABEL_LINE_HEIGHT,
+	);
+	return {
+		type: "text",
+		id: `description:${shape.nodeId}`,
+		...(shape.groupIds ? { groupIds: [...shape.groupIds] } : {}),
+		textColor: NODE_DESCRIPTION_COLOR,
+		x: shape.x + shape.width / 2,
+		y: shape.y + shape.height / 2 + labelHeight / 2 + NODE_DESCRIPTION_GAP + metrics.height / 2,
+		text: metrics.text,
+		fontSize: NODE_DESCRIPTION_FONT_SIZE,
+		lineHeight: NODE_DESCRIPTION_LINE_HEIGHT,
+		maxWidth: Math.ceil(metrics.width),
+	};
+}
+
+/** Labels and descriptions of drawn nodes; a described node joins a group with both. */
+function nodeTexts(
+	shapes: readonly NodeSceneElement[],
+	descriptions: ReadonlyMap<string, string>,
+): { nodes: NodeSceneElement[]; texts: TextSceneElement[] } {
+	const nodes = shapes.map((shape) =>
+		descriptions.has(shape.nodeId)
+			? { ...shape, groupIds: [describedGroupId(shape), ...(shape.groupIds ?? [])] }
+			: shape,
+	);
+	// Pseudostates draw no label.
+	const texts = nodes
+		.filter((shape) => shape.label)
+		.flatMap((shape) => {
+			const description = descriptions.get(shape.nodeId);
+			return description
+				? [textForNode(shape, true), descriptionForNode(shape, description)]
+				: [textForNode(shape)];
+		});
+	return { nodes, texts };
+}
+
+/**
+ * Nodes whose description runs past NODE_DESCRIPTION_MAX_LINES at its shape's
+ * widest. They draw in full; a build warns so the author can shorten them.
+ */
+export function longNodeDescriptions(scene: RenderedDiagramScene): string[] {
+	return scene.elements.flatMap((element) =>
+		element.type === "text" &&
+		element.id.startsWith("description:") &&
+		element.text.split("\n").length > NODE_DESCRIPTION_MAX_LINES
+			? [element.id.slice("description:".length)]
+			: [],
+	);
 }
 
 function center(shape: NodeSceneElement): ScenePoint {
@@ -8175,7 +8356,9 @@ function withGroupFrames(
 		labels: drawn.labels.map((label) => {
 			const frameId = label.containerId
 				? nodeFrames.get(label.containerId)
-				: arrowFrames.get(label.id.slice(0, -":label".length));
+				: label.id.startsWith("description:")
+					? nodeFrames.get(`node:${label.id.slice("description:".length)}`)
+					: arrowFrames.get(label.id.slice(0, -":label".length));
 			return frameId ? { ...label, frameId } : label;
 		}),
 		nodes: drawn.nodes.map((node) => {
@@ -8463,15 +8646,20 @@ export function renderGraphDiagram(
 	const layout = orthogonal ? clearLabels(clearOutlines(best.layout)) : best.layout;
 	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];
+	const descriptions = new Map(
+		diagram.nodes.flatMap((node) =>
+			node.description ? [[node.id, node.description] as const] : [],
+		),
+	);
+	const drawnNodes = nodeTexts(layout.nodeShapes, descriptions);
 	const drawn = {
 		arrows: routedArrows,
 		frames: [] as FrameSceneElement[],
 		labels: [
-			// Pseudostates draw no label.
-			...layout.nodeShapes.filter((shape) => shape.label).map(textForNode),
+			...drawnNodes.texts,
 			...branchLabels(routedArrows, routedEdges, layout.nodeShapes, groups, true, lanes),
 		],
-		nodes: layout.nodeShapes,
+		nodes: drawnNodes.nodes,
 	};
 	const framed = groups && !groups.zoned ? withGroupFrames(groups, drawn) : drawn;
 	const { arrows: edgeArrows, frames, labels } = framed;
