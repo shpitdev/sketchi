@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.7
+
+### Patch Changes
+
+- [#506](https://github.com/shpitdev/sketchi/pull/506) [`7460cf2`](https://github.com/shpitdev/sketchi/commit/7460cf29433ddc557a6165c6f5941278e373391f) Thanks [@anandpant](https://github.com/anandpant)! - Gantt dependency arrows no longer hook back where a straight route exists. An arrow passing a bar that ends just short of a milestone drops straight onto the diamond's edge. A second arrival that would loop around its successor shares the first arrival's last run into one arrowhead. An arrow forced around a bar clears it by half a bar height instead of tracing its edge, then runs back to its successor's start. A chart keeps these routes only when they cross no more often and read no worse than the earlier routing.
+
 ## 0.25.6
 
 ### Patch Changes
