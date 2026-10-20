@@ -44,6 +44,7 @@ const SOURCES: Record<string, string> = {
 	kubernetes:
 		'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 3h1"/></svg>',
 	github: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><circle r="1"/></svg>',
+	postgresql: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><circle r="2"/></svg>',
 };
 
 function fixtureCatalog(): CodeModeIconCatalog {
@@ -51,6 +52,7 @@ function fixtureCatalog(): CodeModeIconCatalog {
 		icons: [
 			catalogIcon("docker", "Docker"),
 			catalogIcon("github", "GitHub"),
+			catalogIcon("postgresql", "PostgreSQL", { aliases: ["postgres", "psql"] }),
 			catalogIcon("broken", "Broken"),
 			catalogIcon("github-text", "GitHub Wordmark", { variant: "text" }),
 			catalogIcon("tanstack", "TanStack", { bytes: 498_897 }),
@@ -58,8 +60,12 @@ function fixtureCatalog(): CodeModeIconCatalog {
 			catalogIcon("aws", "AWS", {
 				aliases: ["AWS", "amazon", "amazon web services"],
 				collection: "cloud-vendors",
+				keywords: ["s3", "bucket"],
 			}),
-			catalogIcon("kubernetes", "Kubernetes", { aliases: ["Kubernetes", "k8s", "kube"] }),
+			catalogIcon("kubernetes", "Kubernetes", {
+				aliases: ["Kubernetes", "k8s", "kube"],
+				keywords: ["ingress", "controller"],
+			}),
 		],
 		slugLookup: "sketchi.searchIcons({ q })",
 		loadSvg: (icon) => {
@@ -587,6 +593,58 @@ describe("applyDiagramPatch icons", () => {
 });
 
 describe("searchIcons", () => {
+	it.each([
+		["Cloudflare Workers", "cloudflare", "vendor", true],
+		["Ingress controller", "kubernetes", "weak", false],
+		["S3 bucket", "aws", "weak", false],
+		["AWS Lambda", "aws", "vendor", true],
+		["Amazon S3", "aws", "vendor", true],
+		["k8s ingress", "kubernetes", "vendor", true],
+		["PostgreSQL", "postgresql", "exact", true],
+		["psql database", "postgresql", "exact", true],
+		["git", "github", "weak", false],
+	] as const)("reports whether %s may attach %s", async (q, slug, match, attach) => {
+		const result = await runtime().searchIcons({ q });
+		expect(result).toMatchObject({
+			ok: true,
+			icons: [expect.objectContaining({ slug, match, attach })],
+		});
+	});
+
+	it("agrees with build-time vendor drops for the searched label", async () => {
+		const icons = runtime();
+		for (const label of [
+			"Cloudflare Workers",
+			"Ingress controller",
+			"S3 bucket",
+			"AWS Lambda",
+			"Amazon S3",
+			"k8s ingress",
+			"PostgreSQL",
+		]) {
+			const searched = await icons.searchIcons({ q: label, limit: 1 });
+			if (!searched.ok || !searched.icons[0]) throw new Error(`No result for ${label}.`);
+			const { slug, attach } = searched.icons[0];
+			const built = await icons.buildFlowchart({
+				spec: {
+					title: "Logo eligibility",
+					nodes: [
+						{ id: "start", label, kind: "start", icon: { slug } },
+						{ id: "end", label: "Done", kind: "end" },
+					],
+					edges: [{ source: "start", target: "end" }],
+				},
+			});
+			if (!built.ok) throw new Error(JSON.stringify(built.issues));
+			const retained = built.normalizedSpec.nodes[0]?.icon?.slug === slug;
+			expect(retained, label).toBe(attach);
+			expect(
+				built.issues.some((issue) => issue.code === "icon_dropped"),
+				label,
+			).toBe(!attach);
+		}
+	});
+
 	it("returns ranked node logos for a query", async () => {
 		const result = await runtime().searchIcons({ q: "  Git ", limit: 5 });
 
@@ -594,7 +652,9 @@ describe("searchIcons", () => {
 			ok: true,
 			status: "accepted",
 			query: "Git",
-			icons: [{ collection: "devtools-ci", name: "GitHub", slug: "github", match: "weak" }],
+			icons: [
+				{ collection: "devtools-ci", name: "GitHub", slug: "github", match: "weak", attach: false },
+			],
 			issues: [],
 		});
 	});

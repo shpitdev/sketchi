@@ -98,4 +98,4 @@ type ApplyDiagramPatchResult = { ok: true; status: "accepted"; patchId: string; 
 
 type SearchIconsRequest = { q: string; limit?: number; };
 
-type SearchIconsResult = { ok: true; status: "accepted"; query: string; icons: Array<{ slug: string; name: string; collection: string; match: "exact" | "vendor" | "weak"; }>; issues: Array<Issue>; } | { ok: false; status: "invalid_input"; issues: Array<Issue>; };
+type SearchIconsResult = { ok: true; status: "accepted"; query: string; icons: Array<{ slug: string; name: string; collection: string; match: "exact" | "vendor" | "weak"; attach: boolean; }>; issues: Array<Issue>; } | { ok: false; status: "invalid_input"; issues: Array<Issue>; };

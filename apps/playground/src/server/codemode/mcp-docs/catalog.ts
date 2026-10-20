@@ -38,7 +38,7 @@ const BUILDERS = {
 };
 const HELPERS = {
 	searchIcons:
-		"searchIcons({ q, limit? }) resolves to { icons: [{ slug, name, collection, match }] }: exact logo slugs for named technologies",
+		"searchIcons({ q, limit? }) resolves to { icons: [{ slug, name, collection, match, attach }] }: exact logo slugs for named technologies",
 	getArtifact: "getArtifact({ artifactId, format?, inline? }) reads a stored artifact",
 	applyDiagramPatch:
 		'applyDiagramPatch applies deterministic style, shape, text, move or structural edits to an accepted artifact; docs({ topic: "applyDiagramPatch" })',
@@ -150,8 +150,8 @@ const FLOWCHART_DOCS = [
 	"Name technologies in node labels; a description draws as a small subtitle under the label, for detail.",
 	`Only when the prompt groups steps (teams, zones, phases), declare groups: [{ id, label }] and set each member's group to its innermost group id; others stay ungrouped. Nested zones set parent (subnet in VPC) and kind. Set shape, even on a start or end: "database" databases; "document" files, archives, reports; "queue" queues, streams, topics; "storage" buckets, object stores. Only users stay ellipses. An architecture starts at its entry and ends at each sink.`,
 	"For swimlanes, a process across actors or roles, declare lanes: [{ id, label }] in the prompt's order and set each node's lane to its actor; lanes take no groups.",
-	'Brand logos: when a node is about a named technology (GitHub, Docker, Postgres), call sketchi.searchIcons({ q: "docker" }) and set that node\'s icon to { slug } with an exact returned slug. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
-	`Logo guidance applies only to technologies named in the prompt. Attach match: "exact" to the node naming that product and "vendor" only to a node whose label names the vendor (Cloudflare Workers takes cloudflare, Ingress controller no kubernetes); never "weak". Each node holds one icon. For X on Y, preserve both technologies as separate meaningful steps and attach each logo to its own node. Do not hide the host only in the title or combine both brands under one icon. Keep the requested step order and stay within graph limits.`,
+	'Brand logos: when a node is about a named technology (GitHub, Docker, Postgres), call sketchi.searchIcons({ q: "docker" }) and set that node\'s icon to { slug } from a result marked attach: true. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
+	`Logo guidance applies only to technologies named in the prompt. Search with the intended node label; attach results marked attach: true to the node you searched for. Each node holds one icon. For X on Y, preserve both technologies as separate meaningful steps and attach each logo to its own node. Do not hide the host only in the title or combine both brands under one icon. Keep the requested step order and stay within graph limits.`,
 	"Before building, compare the named technologies with the icons assigned to nodes. A label or successful search alone does not attach a logo; omitted icons produce no warning. If no matching logo exists, keep the technology label and report the unavailable logo instead of substituting another brand.",
 	`Flowcharts are bounded to ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges. Larger graphs fail with flowchart_too_large before render or persistence.`,
 	"Every node must be reachable from the single start, and every reachable node must be able to reach an end. Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
@@ -163,7 +163,7 @@ const FLOWCHART_DOCS = [
 ].join("\n");
 
 const LOGO_RULE =
-	"When the prompt names technologies, call sketchi.searchIcons({ q }) for each and set node.icon or sequence participant.icon to { slug } from a matching slug. One icon per node, so 'X on Y' is two steps; labels alone add no logo.";
+	"When the prompt names technologies, search each node or sequence participant label with sketchi.searchIcons({ q }); set node.icon or sequence participant.icon to { slug } from a result marked attach: true. One icon per node, so 'X on Y' is two steps; labels alone add no logo.";
 
 /** Fits EXECUTE_DESCRIPTION_LEGACY_WINDOW, so every Claude Code version reads all of it. */
 export const EXECUTE_TOOL_DESCRIPTION = [
@@ -190,7 +190,7 @@ export const EXECUTE_CODE_DESCRIPTION = [
 	"Other builders:",
 	...Object.entries(FAST_PATH).map(([operation, line]) => `- ${operation}: ${line}`),
 	"",
-	"- Run logo searches and the build in one execute script: await the searches, then set each icon from a returned slug.",
+	"- Run logo searches and the build in one execute script: await the searches, then set each icon from an attach: true result.",
 	'- structuredContent.builds records every build attempt in call order, whatever the script returns. docs({ topic: "execute" }) has every generated declaration, including results.',
 ].join("\n");
 
@@ -541,7 +541,7 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Find exact logo slugs for nodes and sequence participants before building.",
 		content: [
 			"searchIcons({ q, limit? }) ranks the Sketchi logo catalog by exact slug, name prefix, alias, then substring. Aliases such as k8s and psql work.",
-			"It returns { ok: true, query, icons: [{ slug, name, collection }] }. limit defaults to 10 and is capped at 25.",
+			"It returns { ok: true, query, icons: [{ slug, name, collection, match, attach }] }. Attach results marked attach: true to the node you searched for. limit defaults to 10 and is capped at 25.",
 			'Use a returned slug as a FlowchartSpec node icon ({ icon: { slug: "docker" } }), a SequenceDiagramSpec participant icon ({ icon: { slug: "docker" } }), or a CanvasSpec node icon ({ icon: { slug: "docker", size: 28 } }).',
 			"Only compact brand marks are searchable: wordmarks and very large SVGs are excluded because they cannot be drawn inside a node.",
 			"Search once per technology, then build. Do not invent slugs; a slug that searchIcons did not return is dropped with an unknown_icon warning.",

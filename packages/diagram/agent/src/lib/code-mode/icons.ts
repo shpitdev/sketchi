@@ -46,12 +46,12 @@ export interface CodeModeIconCatalog {
 	readonly get: (slug: string) => CodeModeCatalogIcon | undefined;
 	/**
 	 * Ranked node-logo search, shared with icons.sketchi.app, each result with
-	 * how it answers the query: the product's own mark, its vendor's, or weak.
+	 * how it answers the query and whether to attach it to the searched label.
 	 */
 	readonly search: (
 		query: string,
 		limit: number,
-	) => readonly (CodeModeCatalogIcon & { readonly match: IconMatch })[];
+	) => readonly (CodeModeCatalogIcon & { readonly match: IconMatch; readonly attach: boolean })[];
 	/**
 	 * Whether a label leaves a vendor or platform mark unexplained: kubernetes
 	 * on "Ingress controller", not cloudflare on "Cloudflare Workers". A
@@ -86,10 +86,14 @@ export function makeCodeModeIconCatalog(options: {
 			return icon !== undefined && isStrayVendorLogo(icon, label);
 		},
 		search: (query, limit) =>
-			searchIcons(eligible, { limit, query }).map(({ icon }) => ({
-				...catalogIcon(icon),
-				match: iconMatch(icon, query),
-			})),
+			searchIcons(eligible, { limit, query }).map(({ icon }) => {
+				const match = iconMatch(icon, query);
+				return {
+					...catalogIcon(icon),
+					match,
+					attach: match !== "weak" && !isStrayVendorLogo(icon, query),
+				};
+			}),
 		loadSvg: options.loadSvg,
 		slugLookup: options.slugLookup,
 	};

@@ -2777,6 +2777,8 @@ export class SearchIconsMatch extends Schema.Class<SearchIconsMatch>("SearchIcon
 		collection: Schema.String,
 		/** exact: the product's own mark; vendor: its vendor's or platform's; weak: fuzzier. */
 		match: literals(["exact", "vendor", "weak"]),
+		/** Whether this logo may be attached to the node whose label was searched. */
+		attach: Schema.Boolean,
 	},
 	{ identifier: undefined },
 ) {}
