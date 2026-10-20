@@ -1457,11 +1457,19 @@ interface Arrangement {
 	readonly clearHeads?: boolean;
 	/** In lanes, move a departure off a side that lines arrive by. */
 	readonly separateRoles?: boolean;
+	/**
+	 * In lanes, a handoff to a lane further than the next may stay in its
+	 * source's column, straight across the lanes between (laneColumns).
+	 */
+	readonly throughHandoffs?: boolean;
 	/** Only these crossed return pairs may leave their parallel lanes. */
 	readonly unpairedReturns?: ReadonlySet<string>;
 	/** Sides edges leave or arrive by in place of the assigned ones, chosen to remove crossings. */
 	readonly sides?: SideOverrides;
-	/** Gaps after these ranks, by index along the flow, shrink to at most these lengths. */
+	/**
+	 * Gaps after these ranks, or a laned diagram's columns, by index along the
+	 * flow, shrink to at most these lengths.
+	 */
 	readonly compactGaps?: ReadonlyMap<number, number>;
 	/**
 	 * A line into a hanging zone band whose target stands behind another step of
@@ -1949,7 +1957,7 @@ function positionLayout(
 	arrangement: Arrangement = PLAIN_ARRANGEMENT,
 	slack: ReadonlyMap<string, number> = new Map(),
 ): PositionedLayout {
-	if (laned(diagram)) return positionLanedNodes(diagram, minimumSizes, stubReach, arrangement.wrap);
+	if (laned(diagram)) return positionLanedNodes(diagram, minimumSizes, stubReach, arrangement);
 	const structure = groupStructure(diagram);
 	return structure
 		? positionGroupedNodes(diagram, structure, minimumSizes, stubReach, arrangement, slack)
@@ -2457,8 +2465,12 @@ function laned(diagram: IntermediateDiagram): boolean {
  * from a lane further than the next one. A step reached from the neighboring
  * lane may share that step's column, so the handoff runs straight across the
  * boundary between them; a source hands off straight to one step per lane.
+ *
+ * With `through`, a handoff to a lane further away may share its source's
+ * column too, running straight across the lanes between, where none of their
+ * steps stands in that column.
  */
-function laneColumns(diagram: IntermediateDiagram): Map<string, number> {
+function laneColumns(diagram: IntermediateDiagram, through = false): Map<string, number> {
 	const lanes = diagram.lanes ?? [];
 	const laneIndex = new Map(lanes.map((lane, index) => [lane.id, index]));
 	const laneOf = new Map(
@@ -2468,15 +2480,18 @@ function laneColumns(diagram: IntermediateDiagram): Map<string, number> {
 	const forward = diagram.edges.filter(
 		(edge) => !feedback.has(edge.id) && edge.source !== edge.target,
 	);
-	// A source's first forward edge into each neighboring lane may stay in its column.
+	// A source's first forward edge into each neighboring lane may stay in its
+	// column, and with `through` into each lane further away.
 	const straight = new Set<string>();
+	const far = new Set<string>();
 	const handedOff = new Set<string>();
 	for (const edge of forward) {
 		const [from, to] = [laneOf.get(edge.source)!, laneOf.get(edge.target)!];
 		const key = `${edge.source}\u0000${to}`;
-		if (Math.abs(from - to) !== 1 || handedOff.has(key)) continue;
+		const skips = Math.abs(from - to) > 1;
+		if (from === to || (skips && !through) || handedOff.has(key)) continue;
 		handedOff.add(key);
-		straight.add(edge.id);
+		(skips ? far : straight).add(edge.id);
 	}
 	const incoming = new Map(diagram.nodes.map((node) => [node.id, [] as DiagramEdge[]]));
 	const outgoing = new Map(diagram.nodes.map((node) => [node.id, [] as DiagramEdge[]]));
@@ -2486,31 +2501,51 @@ function laneColumns(diagram: IntermediateDiagram): Map<string, number> {
 	}
 	// Steps in flow order, earliest declared first among those ready.
 	const nodeOrder = nodeOrderMap(diagram.nodes);
-	const waiting = new Map(diagram.nodes.map((node) => [node.id, incoming.get(node.id)!.length]));
-	const ready = diagram.nodes.filter((node) => waiting.get(node.id) === 0).map((node) => node.id);
-	const column = new Map<string, number>();
-	// The latest column each lane reaches on the way to each step, the step's own included.
-	const reached = new Map<string, number[]>();
-	while (ready.length > 0) {
-		ready.sort((a, b) => nodeOrder.get(a)! - nodeOrder.get(b)!);
-		const id = ready.shift()!;
-		const lane = laneOf.get(id)!;
-		const before = lanes.map((_, index) =>
-			Math.max(-1, ...incoming.get(id)!.map((edge) => reached.get(edge.source)![index]!)),
-		);
-		let at = before[lane]! + 1;
-		for (const edge of incoming.get(id)!)
-			at = Math.max(at, column.get(edge.source)! + (straight.has(edge.id) ? 0 : 1));
-		column.set(id, at);
-		before[lane] = at;
-		reached.set(id, before);
-		for (const edge of outgoing.get(id)!) {
-			const left = waiting.get(edge.target)! - 1;
-			waiting.set(edge.target, left);
-			if (left === 0) ready.push(edge.target);
+	const place = (stay: ReadonlySet<string>) => {
+		const waiting = new Map(diagram.nodes.map((node) => [node.id, incoming.get(node.id)!.length]));
+		const ready = diagram.nodes.filter((node) => waiting.get(node.id) === 0).map((node) => node.id);
+		const column = new Map<string, number>();
+		// The latest column each lane reaches on the way to each step, the step's own included.
+		const reached = new Map<string, number[]>();
+		while (ready.length > 0) {
+			ready.sort((a, b) => nodeOrder.get(a)! - nodeOrder.get(b)!);
+			const id = ready.shift()!;
+			const lane = laneOf.get(id)!;
+			const before = lanes.map((_, index) =>
+				Math.max(-1, ...incoming.get(id)!.map((edge) => reached.get(edge.source)![index]!)),
+			);
+			let at = before[lane]! + 1;
+			for (const edge of incoming.get(id)!)
+				at = Math.max(at, column.get(edge.source)! + (stay.has(edge.id) ? 0 : 1));
+			column.set(id, at);
+			before[lane] = at;
+			reached.set(id, before);
+			for (const edge of outgoing.get(id)!) {
+				const left = waiting.get(edge.target)! - 1;
+				waiting.set(edge.target, left);
+				if (left === 0) ready.push(edge.target);
+			}
 		}
+		return column;
+	};
+	// A far handoff that a step of a lane between would stand in the way of
+	// moves on a column after all, until none does.
+	const edges = new Map(forward.map((edge) => [edge.id, edge]));
+	for (;;) {
+		const column = place(new Set([...straight, ...far]));
+		const blocked = [...far].filter((id) => {
+			const { source, target } = edges.get(id)!;
+			const at = column.get(source)!;
+			if (column.get(target) !== at) return false;
+			const [low, high] = [laneOf.get(source)!, laneOf.get(target)!].sort((a, b) => a - b);
+			return diagram.nodes.some((node) => {
+				const lane = laneOf.get(node.id)!;
+				return lane > low! && lane < high! && column.get(node.id) === at;
+			});
+		});
+		if (blocked.length === 0) return column;
+		for (const id of blocked) far.delete(id);
 	}
-	return column;
 }
 
 /**
@@ -2525,6 +2560,7 @@ function laneGeometry(
 	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
 	stubReach: ReadonlyMap<string, number>,
+	through = false,
 ) {
 	const lanes = diagram.lanes!;
 	const { direction } = diagram.layout;
@@ -2553,7 +2589,7 @@ function laneGeometry(
 				LANE_MIN_NODE_WIDTH,
 				MAX_DIAMOND_LABEL_LINE_UNITS,
 			);
-	const columns = laneColumns(diagram);
+	const columns = laneColumns(diagram, through);
 	const laneIndex = new Map(lanes.map((lane, index) => [lane.id, index]));
 	const laneOf = new Map(diagram.nodes.map((node) => [node.id, node.lane!]));
 	const columnCount = Math.max(0, ...columns.values()) + 1;
@@ -2832,8 +2868,9 @@ function positionLanedNodes(
 	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
 	stubReach: ReadonlyMap<string, number>,
-	wrap: Wrap = NO_WRAP,
+	arrangement: Arrangement = PLAIN_ARRANGEMENT,
 ): PositionedLayout {
+	const { compactGaps, wrap } = arrangement;
 	const lanes = diagram.lanes!;
 	const { direction } = diagram.layout;
 	const {
@@ -2859,7 +2896,7 @@ function positionLanedNodes(
 		shapes,
 		vertical,
 		wrapped,
-	} = laneGeometry(diagram, minimumSizes, stubReach);
+	} = laneGeometry(diagram, minimumSizes, stubReach, arrangement.throughHandoffs);
 	// Each column's pool; a wrap cuts between whole columns.
 	const poolOf = columnOf.map((column) => wrap.bandOf.get(column[0]?.nodeId ?? "") ?? 0);
 	const poolCount = Math.max(0, ...poolOf) + 1;
@@ -2888,7 +2925,8 @@ function positionLanedNodes(
 		columnStart.push(cursor);
 		cursor += columnDepth;
 		bodyLength = Math.max(bodyLength, cursor - bodyStart);
-		if (index < columnCount - 1 && poolOf[index + 1] === poolOf[index]) cursor += gapAfter[index]!;
+		if (index < columnCount - 1 && poolOf[index + 1] === poolOf[index])
+			cursor += Math.min(compactGaps?.get(index) ?? Infinity, gapAfter[index]!);
 	}
 	const bodyEnd = bodyStart + bodyLength;
 	const poolEnd = bodyEnd + trailing;
@@ -7270,43 +7308,58 @@ function crowdedGroups(layout: DiagramLayout): Set<string> {
 }
 
 /**
- * How short each gap between consecutive ranks of a column can draw: one that
- * lines only cross straight, COMPACT_GAP; one that lines turn in, a stub either
- * side of the turns, which keep a port's spacing apart. With `straight`, only
- * the gaps lines cross straight.
+ * How short each gap between consecutive ranks of a column, or columns of
+ * lanes, can draw: one that lines only cross straight, COMPACT_GAP; one that
+ * lines turn in, a stub either side of the turns, which keep a port's spacing
+ * apart. With `straight`, only the gaps lines cross straight.
  */
 function compactGaps(
 	diagram: IntermediateDiagram,
 	layout: DiagramLayout,
-	reorder: boolean,
+	arrangement: Arrangement,
 	straight = false,
 ): Map<number, number> {
-	const { rankMetrics } = rankLayout(diagram, new Map(), new Map(), reorder);
 	const placed = new Map(layout.nodeShapes.map((shape) => [shape.nodeId, shape]));
-	const spans = rankMetrics.map(({ shapes }) => {
-		const boxes = shapes.map((shape) => placed.get(shape.nodeId)!);
+	// Ranks or columns, each as the ids of its steps, in order along the flow.
+	const columns = laned(diagram)
+		? [...laneColumns(diagram, arrangement.throughHandoffs)].reduce<string[][]>(
+				(list, [id, column]) => {
+					(list[column] ??= []).push(id);
+					return list;
+				},
+				[],
+			)
+		: rankLayout(diagram, new Map(), new Map(), arrangement.reorder).rankMetrics.map(({ shapes }) =>
+				shapes.map((shape) => shape.nodeId),
+			);
+	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
+	const [along, size] = vertical ? (["y", "height"] as const) : (["x", "width"] as const);
+	const spans = columns.map((ids) => {
+		const boxes = ids.map((id) => placed.get(id)!);
 		return {
-			top: Math.min(...boxes.map((box) => box.y)),
-			bottom: Math.max(...boxes.map((box) => box.y + box.height)),
+			top: Math.min(...boxes.map((box) => box[along])),
+			bottom: Math.max(...boxes.map((box) => box[along] + box[size])),
 		};
 	});
+	// Where along the flow lines run across it.
+	const across = vertical ? "x" : "y";
 	const turns = layout.edgeArrows.flatMap((arrow) =>
 		arrow.points.slice(1).flatMap((point, index) => {
 			const previous = arrow.points[index]!;
-			return Math.abs(point.y - previous.y) <= AXIS_ALIGNED_EPSILON &&
-				Math.abs(point.x - previous.x) > AXIS_ALIGNED_EPSILON
-				? [point.y]
+			return Math.abs(point[along] - previous[along]) <= AXIS_ALIGNED_EPSILON &&
+				Math.abs(point[across] - previous[across]) > AXIS_ALIGNED_EPSILON
+				? [point[along]]
 				: [];
 		}),
 	);
 	const gaps = new Map<number, number>();
 	for (let index = 0; index < spans.length - 1; index += 1) {
 		const [upper, lower] = [spans[index]!, spans[index + 1]!];
-		// Ranks run down the page in TB and up it in BT.
+		// Ranks run down the page in TB and up it in BT, columns right in LR and left in RL.
 		const [from, to] =
 			upper.bottom <= lower.top ? [upper.bottom, lower.top] : [lower.bottom, upper.top];
 		const levels = new Set(
-			turns.filter((y) => y > from + AXIS_ALIGNED_EPSILON && y < to - AXIS_ALIGNED_EPSILON),
+			turns.filter((at) => at > from + AXIS_ALIGNED_EPSILON && at < to - AXIS_ALIGNED_EPSILON),
 		).size;
 		if (levels === 0) gaps.set(index, COMPACT_GAP);
 		else if (!straight) gaps.set(index, 2 * ROUTE_STUB_LENGTH + (levels - 1) * PORT_SPACING);
@@ -9056,23 +9109,24 @@ export function renderGraphDiagram(
 		);
 		return [touches, shortfalls.reduce((total, label) => total + label.shortfall, 0)];
 	};
-	// A plain column still too tall for its breadth, which no wrap shortened,
-	// draws its rank gaps as short as the lines in them allow (compactGaps), or,
-	// failing that, only those lines cross straight. Either is kept when it
-	// routes no worse, lengthens, hooks or detours no line and crowds no label
-	// more.
-	const compactable =
+	// A plain column, or a laned flow, still too long for its breadth, which no
+	// wrap shortened, tightens along the flow. In lanes, a handoff to a lane
+	// further than the next first stays in its source's column where the lanes
+	// between are empty there (laneColumns). Then rank or column gaps draw as
+	// short as the lines in them allow (compactGaps), or, failing that, only
+	// those lines cross straight. Each is kept when it reads shorter, routes no
+	// worse, lengthens, hooks or detours no line and crowds no label more. Lanes
+	// tighten only while no line runs through an arrowhead, before or after: the
+	// head repair below reroutes such a line, and closed-up lanes leave it less
+	// room to.
+	const tightenable = () =>
 		arranged &&
 		orthogonal &&
-		vertical &&
-		!structure &&
-		!laned(diagram) &&
+		(laned(diagram) || (vertical && !structure)) &&
 		best.arrangement.wrap.continuations.size === 0 &&
-		lengthOf(layout).aspect >= COMPACT_ASPECT;
-	for (const straight of compactable ? [false, true] : []) {
-		const gaps = compactGaps(diagram, layout, best.arrangement.reorder, straight);
-		if (gaps.size === 0) continue;
-		const arrangement = { ...best.arrangement, compactGaps: gaps };
+		lengthOf(layout).aspect >= COMPACT_ASPECT &&
+		(!laned(diagram) || headCrossers(layout).size === 0);
+	const tighten = (arrangement: Arrangement) => {
 		const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
 		const compact = repaired({ arrangement, defects: defectsOf(attempt), layout: attempt });
 		const candidate = finished(compact.layout);
@@ -9085,6 +9139,7 @@ export function renderGraphDiagram(
 			candidate.edgeArrows.every(
 				(arrow) => routeLength(arrow.points) <= lengths.get(arrow.id)! + AXIS_ALIGNED_EPSILON,
 			) &&
+			(!laned(diagram) || headCrossers(candidate).size === 0) &&
 			hookedRoutes(candidate) <= hookedRoutes(layout) &&
 			detouredLines(candidate.edgeArrows) <= detouredLines(layout.edgeArrows) &&
 			crowding(candidate).every((count, index) => count <= crowding(layout)[index]!) &&
@@ -9092,8 +9147,18 @@ export function renderGraphDiagram(
 		) {
 			best = compact;
 			layout = candidate;
-			break;
+			return true;
 		}
+		return false;
+	};
+	if (laned(diagram) && tightenable()) {
+		const through = laneColumns(diagram, true);
+		if ([...laneColumns(diagram)].some(([id, column]) => through.get(id) !== column))
+			tighten({ ...best.arrangement, throughHandoffs: true });
+	}
+	for (const straight of tightenable() ? [false, true] : []) {
+		const gaps = compactGaps(diagram, layout, best.arrangement, straight);
+		if (gaps.size > 0 && tighten({ ...best.arrangement, compactGaps: gaps })) break;
 	}
 	// A line through another line's arrowhead reads as pointing into that head's
 	// target. Where one is left, the lines through a head are routed again after

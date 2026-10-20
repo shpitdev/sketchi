@@ -188,9 +188,10 @@ describe("class diagram routing work", () => {
 });
 
 describe("swimlane routing work", () => {
-	// Measured: 1.65M checks for the five lane fixtures in LR and TB, and 4.07M
-	// for the two stress cases (six lanes and thirty steps, wrapped into two pools
-	// in LR, and loops across four lanes).
+	// Measured: 1.86M checks for the five lane fixtures in LR and TB, and 6.18M
+	// for the two stress cases (six lanes and thirty steps, and loops across four
+	// lanes). Rows of lanes past 2.3:1 lay out again to tighten: the six-lane row
+	// three times (2.56M, from 0.96M), incident response and the single lane twice.
 	it("bounds segment checks for the lane fixtures and stress cases", () => {
 		const render = (fixtures: Record<string, diagramCore.IntermediateDiagram>) => {
 			work.checks = 0;
@@ -206,7 +207,7 @@ describe("swimlane routing work", () => {
 		const large = render(laneStressFixtures);
 		expect(small).toBeGreaterThan(0);
 		expect(small).toBeLessThan(2_500_000);
-		expect(large).toBeLessThan(6_000_000);
+		expect(large).toBeLessThan(7_000_000);
 	});
 });
 

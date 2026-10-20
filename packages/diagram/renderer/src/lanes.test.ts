@@ -10,6 +10,7 @@ import {
 	routingQualityScale,
 } from "@sketchi/diagram-core";
 import {
+	arrowCrossings,
 	renderIntermediateDiagram,
 	type ArrowSceneElement,
 	type NodeSceneElement,
@@ -250,5 +251,126 @@ describe("swimlane layout", () => {
 				nodes: fixture.nodes.map(({ lane: _lane, ...n }) => n),
 			}),
 		).toThrow('Node "apply" has no lane.');
+	});
+});
+
+/** Width over height, either way up, of a scene in the hosted PNG's 20-unit frame. */
+const exportAspect = ({ width, height }: RenderedDiagramScene) =>
+	(Math.max(width, height) - 96 + 40) / (Math.min(width, height) - 96 + 40);
+
+/** Round 19's swimlane-incident-response (Sol s2): 2.61:1 before its columns closed up. */
+const INCIDENT = {
+	id: "incident-response",
+	title: "Incident response",
+	lanes: [
+		{ id: "oncall", label: "On-call" },
+		{ id: "sre", label: "SRE" },
+		{ id: "comms", label: "Comms" },
+	],
+	nodes: [
+		{ id: "alert", label: "Alert fires", kind: "start", lane: "oncall" },
+		{ id: "triage", label: "Triages the alert", kind: "process", lane: "oncall" },
+		{ id: "page", label: "Pages the SRE", kind: "process", lane: "oncall" },
+		{ id: "investigate", label: "Investigates the incident", kind: "process", lane: "sre" },
+		{ id: "mitigate", label: "Applies a mitigation", kind: "process", lane: "sre" },
+		{ id: "update", label: "Posts a status update", kind: "process", lane: "comms" },
+		{ id: "resolved", label: "Is the incident resolved?", kind: "decision", lane: "oncall" },
+		{ id: "publish", label: "Publishes the resolution", kind: "end", lane: "comms" },
+	],
+	edges: [
+		{ id: "edge-1", source: "alert", target: "triage" },
+		{ id: "edge-2", source: "triage", target: "page" },
+		{ id: "edge-3", source: "page", target: "investigate" },
+		{ id: "edge-4", source: "investigate", target: "mitigate" },
+		{ id: "edge-5", source: "mitigate", target: "update" },
+		{ id: "edge-6", source: "update", target: "resolved" },
+		{ id: "edge-7", source: "resolved", target: "investigate", label: "No" },
+		{ id: "edge-8", source: "resolved", target: "publish", label: "Yes" },
+	],
+	layout: { direction: "LR", edgeRouting: "orthogonal" },
+} as const;
+
+/** An Oct 19 order-fulfilment run: Pay invoice hands off to Record payment two lanes down. */
+const ORDER = {
+	id: "order-fulfilment",
+	title: "Order Fulfilment",
+	lanes: [
+		{ id: "customer", label: "Customer" },
+		{ id: "sales", label: "Sales" },
+		{ id: "warehouse", label: "Warehouse" },
+		{ id: "finance", label: "Finance" },
+	],
+	nodes: [
+		{ id: "place", label: "Place order", kind: "start", lane: "customer" },
+		{ id: "review", label: "Review order", kind: "process", lane: "sales" },
+		{ id: "stock", label: "Are items in stock?", kind: "decision", lane: "sales" },
+		{ id: "backorder", label: "Notify customer of backorder", kind: "end", lane: "sales" },
+		{ id: "pick", label: "Pick items", kind: "process", lane: "warehouse" },
+		{ id: "pack", label: "Pack order", kind: "process", lane: "warehouse" },
+		{ id: "ship", label: "Ship order", kind: "process", lane: "warehouse" },
+		{ id: "invoice", label: "Send invoice", kind: "process", lane: "finance" },
+		{ id: "pay", label: "Pay invoice", kind: "process", lane: "customer" },
+		{ id: "record", label: "Record payment", kind: "end", lane: "finance" },
+	],
+	edges: [
+		{ id: "edge-1", source: "place", target: "review" },
+		{ id: "edge-2", source: "review", target: "stock" },
+		{ id: "edge-3", source: "stock", target: "backorder", label: "No" },
+		{ id: "edge-4", source: "stock", target: "pick", label: "Yes" },
+		{ id: "edge-5", source: "pick", target: "pack" },
+		{ id: "edge-6", source: "pack", target: "ship" },
+		{ id: "edge-7", source: "ship", target: "invoice" },
+		{ id: "edge-8", source: "invoice", target: "pay" },
+		{ id: "edge-9", source: "pay", target: "record" },
+	],
+	layout: { direction: "LR", edgeRouting: "orthogonal" },
+} as const;
+
+/** Lanes stay intact: every step in its band, every band the pool's full length, and clean lines. */
+function expectIntactLanes(scene: RenderedDiagramScene, fixture: typeof INCIDENT | typeof ORDER) {
+	expect(laneRegionIssues(scene, fixture)).toEqual([]);
+	expect(getCanvasValidationIssues(scene)).toEqual([]);
+	const bands = nodesOf(scene).filter((shape) => shape.rendererRole === "swimlane");
+	expect(bands).toHaveLength(fixture.lanes.length);
+	for (const band of bands) expect([band.x, band.width]).toEqual([bands[0]!.x, bands[0]!.width]);
+	const routes = arrowsOf(scene);
+	expect(arrowCrossings(routes)).toBe(0);
+	expect(
+		routingQualityFindings(
+			routes.map((route) => ({ id: route.edgeId, points: route.points })),
+			routingQualityScale(scene),
+		),
+	).toEqual([]);
+}
+
+describe("long rows of lanes", () => {
+	it("closes up round 19's incident response to within 2.4:1", () => {
+		const scene = renderIntermediateDiagram(INCIDENT);
+		expect(exportAspect(scene)).toBeLessThanOrEqual(2.4);
+		expectIntactLanes(scene, INCIDENT);
+	});
+
+	it("hands a step off straight across lanes that stand empty in its column", () => {
+		const scene = renderIntermediateDiagram(ORDER);
+		// Pay invoice (Customer) to Record payment (Finance), past Sales and Warehouse.
+		expect(arrow(scene, "edge-9").points).toHaveLength(2);
+		const middle = (id: string) => node(scene, id).x + node(scene, id).width / 2;
+		expect(middle("record")).toBe(middle("pay"));
+		expectIntactLanes(scene, ORDER);
+	});
+
+	it("keeps a row of lanes within 2.3:1 as it was", () => {
+		// Without its last two steps the order reads short enough to keep its columns.
+		const short = {
+			...ORDER,
+			nodes: ORDER.nodes.filter((step) => step.id !== "pay" && step.id !== "record"),
+			edges: ORDER.edges.filter((edge) => edge.id !== "edge-8" && edge.id !== "edge-9"),
+		};
+		const scene = renderIntermediateDiagram(short);
+		expect(exportAspect(scene)).toBeLessThan(2.3);
+		// Pack and ship keep two stubs and a port's spacing between them, not a compacted 56.
+		expect(
+			node(scene, "ship").x - node(scene, "pack").x - node(scene, "pack").width,
+		).toBeGreaterThanOrEqual(90);
 	});
 });

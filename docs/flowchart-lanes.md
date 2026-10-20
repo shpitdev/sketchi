@@ -23,6 +23,10 @@ Builds reject a node with no lane or an undeclared one (`unknown_node_lane`, wit
 - A handoff to the neighboring lane may stay in its column, so it runs straight across the boundary. A source hands off straight to one step per lane; the rest move on a column.
 - Steps that share a lane and a column stack across the lane, in the order that crosses the fewest edges. Each lane is as broad as its busiest column needs, and holds its steps' stubs with room to turn; every lane runs the same length, so lanes may have empty stretches.
 - Edges stay inside the lanes, never cross a header, and never run along or hard beside a boundary. Crossing a boundary is fine.
+- Lanes still longer than 2.3:1 for their breadth (as the hosted PNG frames them) tighten along the flow, each step kept only when it reads shorter, routes no worse, lengthens, hooks or detours no line and crowds no label more:
+  - a handoff to a lane further than the next stays in its source's column where none of the lanes between holds a step there, so it runs straight down across them. In order fulfilment, Pay invoice drops straight into Record payment, two lanes down;
+  - then each gap between columns draws as short as the lines in it allow: 56 units where lines only cross it straight, two 36-unit stubs where they turn in it, and 18 more for each further turn. Incident response goes from 2.6:1 to 2.35:1.
+- Pools still wrap only past 4:1: a pool split off at the only cut a loop leaves reads worse than one long, tightened pool.
 
 ## Excalidraw
 
