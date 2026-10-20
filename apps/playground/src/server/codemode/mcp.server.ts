@@ -52,6 +52,7 @@ import {
 	SKETCHI_EXECUTE_CODE_DESCRIPTION,
 	SKETCHI_EXECUTE_DESCRIPTION,
 } from "./mcp-docs.server";
+import { pngProbeTimings } from "./browser-renderer.server";
 import { createEffectMcpServer, makeEffectMcpTool } from "./effect-mcp-adapter.server";
 import { prewarmPngRendererOnSessionStart } from "./mcp-session-prewarm.server";
 import { PlaygroundCodeModeUsage } from "./usage-events.server";
@@ -641,7 +642,11 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 		responseBody: executed,
 		surface: "mcp",
 	});
-	return executed;
+	const probe = pngProbeTimings.get(usageContext.attemptId);
+	pngProbeTimings.delete(usageContext.attemptId);
+	return probe
+		? { ...executed, logs: [...(executed.logs ?? []), `PNGPROBE ${JSON.stringify(probe)}`] }
+		: executed;
 });
 
 function withTrailingOptions(request: unknown, options: unknown): unknown {
