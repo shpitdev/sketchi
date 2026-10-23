@@ -10,7 +10,7 @@ import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
 import { ExcalidrawSceneCanvas } from "./excalidraw-scene-canvas";
-import { nodeLogoScene, participantLogoScene } from "./node-logo-scene.fixtures";
+import { groupLogoScene, nodeLogoScene, participantLogoScene } from "./node-logo-scene.fixtures";
 
 const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
 
@@ -88,6 +88,28 @@ export const EditableNodeLogosLeftToRight: Story = {
 		title: "Editable left-to-right deploy pipeline with node logos",
 		viewModeEnabled: false,
 		zenModeEnabled: false,
+	},
+	tags: ["test"],
+};
+
+/** The Vercel mark before its group's name, among node logos. */
+export const GroupLogo: Story = {
+	args: {
+		scene: convertSceneToExcalidraw(groupLogoScene()),
+		title: "Request flow with a group logo",
+		viewModeEnabled: true,
+		zenModeEnabled: true,
+	},
+	tags: ["test"],
+};
+
+/** The Vercel mark at the start of a cloud zone's header. */
+export const ZoneLogo: Story = {
+	args: {
+		scene: convertSceneToExcalidraw(groupLogoScene(true)),
+		title: "Request flow with a zone logo",
+		viewModeEnabled: true,
+		zenModeEnabled: true,
 	},
 	tags: ["test"],
 };

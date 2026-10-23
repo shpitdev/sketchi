@@ -586,6 +586,263 @@ describe("named logo fill", () => {
 			}),
 		]);
 	});
+
+	describe("flowchart groups", () => {
+		// Frontierclimb r23 ai-app-stack-logos s4 (Sonnet): the model drew Next.js,
+		// Redis, OpenAI and Sentry logos but left its "Vercel" group a bare name.
+		const r23AppSpec = {
+			title: "Request flow",
+			nodes: [
+				{
+					id: "page",
+					label: "Next.js page receives the question",
+					kind: "start",
+					icon: { slug: "nextjs" },
+					group: "vercel",
+				},
+				{
+					id: "check",
+					label: "Check Redis cache",
+					kind: "process",
+					icon: { slug: "redis" },
+					group: "vercel",
+				},
+				{ id: "hit", label: "Cache hit?", kind: "decision", group: "vercel" },
+				{ id: "call", label: "Call OpenAI model", kind: "process", icon: { slug: "openai" } },
+				{ id: "store", label: "Store answer in Redis", kind: "process", icon: { slug: "redis" } },
+				{ id: "log", label: "Log any errors to Sentry", kind: "process", icon: { slug: "sentry" } },
+				{ id: "ret", label: "Return the answer", kind: "end" },
+				{ id: "cached", label: "Return cached answer", kind: "end" },
+			],
+			edges: [
+				{ source: "page", target: "check" },
+				{ source: "check", target: "hit" },
+				{ source: "hit", target: "cached", label: "yes" },
+				{ source: "hit", target: "call", label: "no" },
+				{ source: "call", target: "store" },
+				{ source: "store", target: "log" },
+				{ source: "log", target: "ret" },
+			],
+			groups: [{ id: "vercel", label: "Vercel" }],
+			layout: { direction: "TB" },
+		};
+		const options = {
+			artifactFormats: ["scene", "excalidraw"],
+			inlineArtifacts: ["scene", "excalidraw"],
+		};
+
+		/** Each drawn group's logo slug by group id, from the scene's frames and zones. */
+		function groupLogos(result: Awaited<ReturnType<ReturnType<typeof runtime>["buildFlowchart"]>>) {
+			if (!result.ok) throw new Error(JSON.stringify(result.issues));
+			const scene = inlineScene(result);
+			return Object.fromEntries(
+				scene.elements.flatMap((element) =>
+					(element.type === "frame" ||
+						(element.type === "node" && element.rendererRole === "zone")) &&
+					element.icon
+						? [[element.id.slice("group:".length), element.icon.slug]]
+						: [],
+				),
+			);
+		}
+
+		/** A logo-drawing chain of nodes inside the given groups. */
+		function grouped(
+			groups: ReadonlyArray<{ id: string; label: string; parent?: string; kind?: string }>,
+			nodes: ReadonlyArray<readonly [string, string, string | undefined, string?]>,
+		) {
+			const spec = chain(
+				nodes.map(([id, label, slug]) => (slug ? ([id, label, slug] as const) : [id, label])),
+			);
+			return {
+				...spec,
+				nodes: spec.nodes.map((node, index) => {
+					const group = nodes[index]?.[3];
+					return group ? { ...node, group } : node;
+				}),
+				groups,
+			};
+		}
+
+		it("draws the logo a group's label names before its name, with an info note", async () => {
+			const result = await filling().buildFlowchart({ spec: r23AppSpec, options });
+
+			expect(groupLogos(result)).toEqual({ vercel: "vercel" });
+			expect(result.issues).toEqual([
+				{
+					code: "icon_filled",
+					severity: "info",
+					stage: "input",
+					ref: { kind: "group", id: "vercel" },
+					message:
+						'Group "vercel" draws the "vercel" logo because its label "Vercel" names Vercel.',
+					hint: "No action needed.",
+				},
+			]);
+			if (!result.ok) return;
+			// The spec the model wrote stays as written: groups take no authored logo.
+			expect(result.normalizedSpec.groups).toEqual([{ id: "vercel", label: "Vercel" }]);
+			const scene = inlineScene(result);
+			expect(Object.keys(scene.icons ?? {})).toContain("vercel");
+			const frame = scene.elements.find((element) => element.id === "group:vercel");
+			const excalidraw = result.artifact.formats.find((format) => format.format === "excalidraw")
+				?.inline as {
+				elements: Array<{
+					customData?: Record<string, unknown>;
+					frameId: string | null;
+					groupIds: string[];
+					type: string;
+					x: number;
+					y: number;
+					width: number;
+				}>;
+			};
+			const logo = excalidraw.elements.find(
+				(element) => element.customData?.["sketchiGroupIcon"] === "vercel",
+			);
+			// Inside the frame's top-left corner, one of its children, so it moves with the frame.
+			expect(frame?.type).toBe("frame");
+			if (frame?.type !== "frame") return;
+			expect(logo).toMatchObject({
+				type: "image",
+				frameId: "group:vercel",
+				groupIds: [],
+				x: frame.x + 10,
+				y: frame.y + 10,
+				width: 18,
+			});
+			// Members and routes keep clear of it.
+			const keepOut = { x: frame.x + 6, y: frame.y + 6, width: 26, height: 26 };
+			for (const element of scene.elements) {
+				if (element.type === "node")
+					expect(
+						element.x >= keepOut.x + keepOut.width || element.y >= keepOut.y + keepOut.height,
+					).toBe(true);
+				if (element.type === "arrow")
+					for (const point of element.points)
+						expect(
+							point.x >= keepOut.x + keepOut.width ||
+								point.y >= keepOut.y + keepOut.height ||
+								point.x <= keepOut.x ||
+								point.y <= keepOut.y,
+						).toBe(true);
+			}
+		});
+
+		it("draws a zone's logo in its header, its label after it", async () => {
+			const spec = {
+				...r23AppSpec,
+				groups: [{ id: "vercel", label: "Vercel", kind: "cloud" }],
+			};
+			const result = await filling().buildFlowchart({ spec, options });
+
+			expect(groupLogos(result)).toEqual({ vercel: "vercel" });
+			if (!result.ok) return;
+			const scene = inlineScene(result);
+			const zone = scene.elements.find((element) => element.id === "group:vercel");
+			const label = scene.elements.find((element) => element.id === "zone-label:vercel");
+			if (zone?.type !== "node" || label?.type !== "text") throw new Error("Expected a zone.");
+			const excalidraw = result.artifact.formats.find((format) => format.format === "excalidraw")
+				?.inline as {
+				elements: Array<{
+					customData?: Record<string, unknown>;
+					groupIds: string[];
+					id: string;
+					x: number;
+					y: number;
+				}>;
+			};
+			const logo = excalidraw.elements.find(
+				(element) => element.customData?.["sketchiGroupIcon"] === "vercel",
+			);
+			expect(logo).toMatchObject({ x: zone.x + 12, y: zone.y + 9 });
+			// It shares the zone's group, so the two move together.
+			const outline = excalidraw.elements.find((element) => element.id === "group:vercel");
+			expect(outline?.groupIds[0]).toBeDefined();
+			expect(logo?.groupIds).toEqual(outline?.groupIds);
+			// The label starts after the logo and its gap.
+			const plain = await filling().buildFlowchart({
+				spec: { ...spec, nodes: spec.nodes.map(({ icon: _icon, ...node }) => node) },
+				options,
+			});
+			if (!plain.ok) throw new Error(JSON.stringify(plain.issues));
+			const plainLabel = inlineScene(plain).elements.find(
+				(element) => element.id === "zone-label:vercel",
+			);
+			const plainZone = inlineScene(plain).elements.find(
+				(element) => element.id === "group:vercel",
+			);
+			if (plainLabel?.type !== "text" || plainZone?.type !== "node") throw new Error("No zone.");
+			expect(label.x - zone.x - (plainLabel.x - plainZone.x)).toBe(24);
+		});
+
+		it("never fills a group in a diagram that draws no logo", async () => {
+			const spec = {
+				...r23AppSpec,
+				nodes: r23AppSpec.nodes.map(({ icon: _icon, ...node }) => node),
+			};
+			const result = await filling().buildFlowchart({ spec, options });
+
+			expect(groupLogos(result)).toEqual({});
+			expect(result.issues).toEqual([]);
+		});
+
+		it("never fills a group whose label names several products or an everyday word", async () => {
+			const result = await filling().buildFlowchart({
+				spec: grouped(
+					[
+						{ id: "both", label: "Vercel and Cloudflare" },
+						{ id: "front", label: "Frontend" },
+						{ id: "edge", label: "Edge" },
+						{ id: "stream", label: "Stream processing" },
+					],
+					[
+						["push", "Push to GitHub", "github", "both"],
+						["page", "Render the page", undefined, "front"],
+						["route", "Route the request", undefined, "edge"],
+						["events", "Process events", undefined, "stream"],
+					],
+				),
+				options,
+			});
+
+			expect(groupLogos(result)).toEqual({});
+			expect(result.issues).toEqual([]);
+		});
+
+		it("never repeats a logo a node inside the group, or a group around it, already draws", async () => {
+			const result = await filling().buildFlowchart({
+				spec: grouped(
+					[
+						{ id: "cf", label: "Cloudflare", kind: "cloud" },
+						{ id: "aws", label: "AWS", kind: "cloud" },
+						{ id: "region", label: "AWS us-east-1", parent: "aws", kind: "region" },
+					],
+					[
+						["push", "Push to GitHub", "github"],
+						["worker", "Cloudflare Workers", "cloudflare", "cf"],
+						["queue", "Enqueue the job", undefined, "region"],
+					],
+				),
+				options,
+			});
+
+			expect(groupLogos(result)).toEqual({ aws: "aws" });
+			expect(result.issues.map((issue) => [issue.code, issue.ref?.id])).toEqual([
+				["icon_filled", "aws"],
+			]);
+		});
+
+		it("only fills when the host asks, as MCP builds do", async () => {
+			const result = await runtime(productionCatalog).buildFlowchart({
+				spec: r23AppSpec,
+				options,
+			});
+
+			expect(groupLogos(result)).toEqual({});
+			expect(result.issues).toEqual([]);
+		});
+	});
 });
 
 describe("createCanvas icons", () => {

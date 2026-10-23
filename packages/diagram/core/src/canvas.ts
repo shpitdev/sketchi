@@ -364,8 +364,8 @@ export interface CanvasIconAsset {
  * band) and optional-end rings, class boxes (a class's outline, name band
  * and methods compartment), swimlanes (a lane's band and its header), and
  * architecture zones (a region, VPC, subnet or cluster outline).
- * They carry no icon, and only a table's or a class's name band and a lane's
- * header carry a bound label.
+ * Only a zone carries an icon, drawn in its header, and only a table's or a
+ * class's name band and a lane's header carry a bound label.
  */
 export const CANVAS_RENDERER_ROLES = [
 	"zone",
@@ -537,6 +537,8 @@ export interface CanvasFrameElement extends CanvasElementComposition, CanvasStro
 	 */
 	readonly nodeId?: string;
 	readonly name?: string;
+	/** A logo drawn before its name (see canvasGroupIconBox). */
+	readonly icon?: CanvasNodeIcon;
 	readonly x: number;
 	readonly y: number;
 	readonly width: number;
@@ -823,9 +825,11 @@ export interface CanvasIconEmbedding {
 	readonly scene: CanvasSpec;
 }
 
-function withoutIcon(element: CanvasShapeElement): CanvasShapeElement {
+function withoutIcon<Element extends CanvasShapeElement | CanvasFrameElement>(
+	element: Element,
+): Element {
 	const { icon: _icon, ...rest } = element;
-	return rest;
+	return rest as Element;
 }
 
 function canvasLayerVisibility(canvas: CanvasSpec): (element: CanvasElement) => boolean {
@@ -897,9 +901,9 @@ export function embedCanvasIcons(
 	const boundLabels = visibleBoundLabels(canvas, isVisible);
 	let totalBytes = 0;
 	const elements = canvas.elements.map((element, index): CanvasElement => {
-		if (element.type !== "node" || !element.icon) return element;
+		if ((element.type !== "node" && element.type !== "frame") || !element.icon) return element;
 		const icon = element.icon;
-		const drop = (reason: DroppedCanvasIcon["reason"]): CanvasShapeElement => {
+		const drop = (reason: DroppedCanvasIcon["reason"]): CanvasElement => {
 			dropped.push({ elementId: element.id, index, reason, slug: icon.slug });
 			return withoutIcon(element);
 		};
@@ -911,8 +915,15 @@ export function embedCanvasIcons(
 		) {
 			return drop("unavailable");
 		}
-		if (element.rendererRole) return drop("lifeline");
-		if (element.shape !== "polygon" && isVisible(element)) {
+		if (element.type === "node" && element.rendererRole && element.rendererRole !== "zone")
+			return drop("lifeline");
+		// A group's logo sits beside its name, which its renderer sized to hold both.
+		if (
+			element.type === "node" &&
+			!element.rendererRole &&
+			element.shape !== "polygon" &&
+			isVisible(element)
+		) {
 			const label = boundLabels.get(element.id)?.element;
 			if (
 				nodeLabelOverflows(element, label, icon) &&
@@ -941,16 +952,17 @@ export function embedCanvasIcons(
 	};
 }
 
-function validateNodeIcon(
+function validateIcon(
 	canvas: CanvasSpec,
-	element: CanvasShapeElement,
+	element: CanvasShapeElement | CanvasFrameElement,
 	index: number,
 ): CanvasValidationIssue[] {
 	const icon = element.icon;
 	if (!icon) return [];
 	const path = `elements[${index}].icon`;
+	const noun = element.type === "frame" ? "Frame" : "Node";
 	const issues: CanvasValidationIssue[] = [];
-	if (element.rendererRole) {
+	if (element.type === "node" && element.rendererRole && element.rendererRole !== "zone") {
 		issues.push({
 			code: "invalid_icon",
 			elementId: element.id,
@@ -962,14 +974,14 @@ function validateNodeIcon(
 		issues.push({
 			code: "invalid_icon",
 			elementId: element.id,
-			message: `Node "${element.id}" has an invalid icon slug "${icon.slug}".`,
+			message: `${noun} "${element.id}" has an invalid icon slug "${icon.slug}".`,
 			path: `${path}.slug`,
 		});
 	} else if (!canvas.icons || !Object.hasOwn(canvas.icons, icon.slug)) {
 		issues.push({
 			code: "invalid_icon",
 			elementId: element.id,
-			message: `Node "${element.id}" references icon "${icon.slug}" without an embedded asset.`,
+			message: `${noun} "${element.id}" references icon "${icon.slug}" without an embedded asset.`,
 			path: `${path}.slug`,
 		});
 	}
@@ -981,7 +993,7 @@ function validateNodeIcon(
 		issues.push({
 			code: "invalid_icon",
 			elementId: element.id,
-			message: `Node "${element.id}" icon size must be ${CANVAS_NODE_ICON.minSize}-${CANVAS_NODE_ICON.maxSize}.`,
+			message: `${noun} "${element.id}" icon size must be ${CANVAS_NODE_ICON.minSize}-${CANVAS_NODE_ICON.maxSize}.`,
 			path: `${path}.size`,
 		});
 	}
@@ -1132,8 +1144,8 @@ export function getCanvasValidationIssues(canvas: CanvasSpec): CanvasValidationI
 	issues.push(...validateIconAssets(canvas));
 	canvas.elements.forEach((element, index) => {
 		issues.push(...validateElementLimits(element, index));
-		if (element.type === "node") {
-			issues.push(...validateNodeIcon(canvas, element, index));
+		if (element.type === "node" || element.type === "frame") {
+			issues.push(...validateIcon(canvas, element, index));
 		}
 		if (element.type === "node" && element.shape !== "polygon" && isLayerVisible(element)) {
 			const boundLabel = nodeLabelsByContainerId.get(element.id);

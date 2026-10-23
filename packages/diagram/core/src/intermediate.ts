@@ -81,6 +81,8 @@ export class DiagramGroup extends Schema.Class<DiagramGroup>("DiagramGroup")({
 	/** The id of the declared group this group sits inside. */
 	parent: Schema.optional(NonEmptyString),
 	kind: Schema.optional(DiagramZoneKindSchema),
+	/** A catalog mark drawn before the group's label, such as its platform's logo. */
+	icon: Schema.optional(DiagramIconRef),
 }) {}
 export const DiagramGroupSchema = DiagramGroup;
 

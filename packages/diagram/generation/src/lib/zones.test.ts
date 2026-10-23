@@ -41,4 +41,25 @@ describe("zone generation", () => {
 		);
 		expect(diagram.nodes.map((node) => node.shape)).toEqual(nodes.map((node) => node.shape));
 	});
+
+	it("draws no logo a model puts on a group, well-formed or not", () => {
+		const parsed = candidate({
+			id: "edge",
+			title: "Edge",
+			type: "flowchart",
+			groups: [
+				{ id: "vercel", label: "Vercel", icon: { slug: "vercel" } },
+				{ id: "cloud", label: "Cloud", icon: "not an icon" },
+			],
+			nodes: [
+				{ id: "page", label: "Page", kind: "start", group: "vercel" },
+				{ id: "api", label: "API", kind: "end", group: "cloud" },
+			],
+			edges: [{ id: "a", source: "page", target: "api" }],
+		});
+		expect(parsed.error).toBeUndefined();
+		const diagram = parsed.diagram;
+		if (diagram?.type !== "flowchart") throw new Error("Expected a flowchart.");
+		expect(diagram.groups?.map((group) => group.icon)).toEqual([undefined, undefined]);
+	});
 });

@@ -1,4 +1,10 @@
-import type { CanvasFrameElement, CanvasSpec } from "./canvas.js";
+import type {
+	CanvasElementBounds,
+	CanvasFrameElement,
+	CanvasNodeIcon,
+	CanvasShapeElement,
+	CanvasSpec,
+} from "./canvas.js";
 import {
 	AXIS_ALIGNED_EPSILON,
 	segmentCrossesBoundsInterior,
@@ -17,6 +23,52 @@ export const CANVAS_FRAME_NAME = Object.freeze({
 	fontSize: 14,
 	height: 21,
 });
+
+/**
+ * A group's logo, as tall as its name's line: a zone's sits this gap before
+ * its label, and a frame's this far inside its top-left corner, within the
+ * padding that keeps members and their routes off the frame's sides.
+ */
+export const CANVAS_GROUP_ICON = Object.freeze({ gap: 6, inset: 10, size: 18 });
+
+/**
+ * A zone's header strip across its top, which holds its label this far in from
+ * the zone's left side, after its logo when it has one.
+ */
+export const CANVAS_ZONE_HEADER = Object.freeze({ height: 36, labelInset: 12 });
+
+/** How far a group's logo pushes its name along: the logo and its gap. */
+export function canvasGroupIconRun(icon: CanvasNodeIcon | undefined): number {
+	return icon ? icon.size + CANVAS_GROUP_ICON.gap : 0;
+}
+
+/**
+ * Absolute box of a group's logo. A zone draws it at the start of its header,
+ * its label after it. A frame draws it inside its top-left corner, under its
+ * name, so the logo is one of the frame's children and moves with it; outside
+ * the frame, Excalidraw would clip it.
+ */
+export function canvasGroupIconBox(
+	element:
+		| Pick<CanvasFrameElement, "icon" | "type" | "x" | "y">
+		| Pick<CanvasShapeElement, "icon" | "type" | "x" | "y">,
+): CanvasElementBounds | undefined {
+	const { icon } = element;
+	if (!icon) return undefined;
+	return element.type === "frame"
+		? {
+				x: element.x + CANVAS_GROUP_ICON.inset,
+				y: element.y + CANVAS_GROUP_ICON.inset,
+				width: icon.size,
+				height: icon.size,
+			}
+		: {
+				x: element.x + CANVAS_ZONE_HEADER.labelInset,
+				y: element.y + (CANVAS_ZONE_HEADER.height - icon.size) / 2,
+				width: icon.size,
+				height: icon.size,
+			};
+}
 
 /** Glyphs wider than an em in Helvetica (W, M, @, %) and in Excalifont (%). */
 const WIDEST_NAME_GLYPHS = /[@%MW]/u;

@@ -9,6 +9,7 @@ import {
 	canvasNodeIconBox,
 	embedCanvasIcons,
 	getCanvasValidationIssues,
+	type CanvasFrameElement,
 	type CanvasIconAsset,
 	type CanvasShapeElement,
 	type CanvasSpec,
@@ -34,7 +35,10 @@ function node(id: string, overrides: Partial<CanvasShapeElement> = {}): CanvasSh
 	};
 }
 
-function canvas(elements: CanvasShapeElement[], overrides: Partial<CanvasSpec> = {}): CanvasSpec {
+function canvas(
+	elements: (CanvasShapeElement | CanvasFrameElement)[],
+	overrides: Partial<CanvasSpec> = {},
+): CanvasSpec {
 	return {
 		kind: "canvas",
 		version: CANVAS_SPEC_VERSION,
@@ -250,6 +254,38 @@ describe("embedCanvasIcons safety", () => {
 			{ elementId: "line", index: 0, reason: "lifeline", slug: "docker" },
 		]);
 		expect(result.scene.icons).toBeUndefined();
+	});
+
+	it("keeps a group's logo on its frame or zone, whatever its name's length", () => {
+		const icon = { slug: "docker", size: 18 };
+		const zone = node("group:cloud", {
+			icon,
+			label: "A zone named at a length no header strip could hold beside a logo",
+			rendererRole: "zone",
+			width: 40,
+			height: 40,
+		});
+		const frame: CanvasFrameElement = {
+			type: "frame",
+			id: "group:vercel",
+			name: "Vercel",
+			icon,
+			x: 0,
+			y: 0,
+			width: 200,
+			height: 100,
+		};
+		const result = embedCanvasIcons(canvas([zone, frame]), () => DOCKER);
+
+		expect(result.dropped).toEqual([]);
+		expect(result.scene.elements).toEqual([zone, frame]);
+		expect(Object.keys(result.scene.icons ?? {})).toEqual(["docker"]);
+		expect(getCanvasValidationIssues(result.scene)).toEqual([]);
+		expect(
+			embedCanvasIcons(canvas([zone, frame]), () => undefined).dropped.map(
+				(dropped) => dropped.reason,
+			),
+		).toEqual(["unavailable", "unavailable"]);
 	});
 });
 

@@ -671,4 +671,50 @@ export const deployPipelineLogoFlowchart = parseFlowchartDiagram({
 	},
 });
 
+/**
+ * A request flow whose Vercel group draws its platform's logo before its name,
+ * among node logos (Frontierclimb r23 ai-app-stack-logos s4).
+ */
+export const requestFlowGroupLogoFlowchart = parseFlowchartDiagram({
+	id: "request-flow-group-logo",
+	title: "Request flow",
+	type: flowchartDiagramType,
+	groups: [{ id: "vercel", label: "Vercel", icon: { slug: "vercel" } }],
+	nodes: [
+		{
+			id: "page",
+			label: "Next.js page receives the question",
+			kind: "start",
+			icon: { slug: "nextjs" },
+			group: "vercel",
+		},
+		{
+			id: "check",
+			label: "Check Redis cache",
+			kind: "process",
+			icon: { slug: "redis" },
+			group: "vercel",
+		},
+		{ id: "hit", label: "Cache hit?", kind: "decision", group: "vercel" },
+		{ id: "call", label: "Call OpenAI model", kind: "process", icon: { slug: "openai" } },
+		{ id: "store", label: "Store answer in Redis", kind: "process", icon: { slug: "redis" } },
+		{ id: "log", label: "Log any errors to Sentry", kind: "process", icon: { slug: "sentry" } },
+		{ id: "ret", label: "Return the answer", kind: "end" },
+		{ id: "cached", label: "Return cached answer", kind: "end" },
+	],
+	edges: [
+		{ id: "page-check", source: "page", target: "check" },
+		{ id: "check-hit", source: "check", target: "hit" },
+		{ id: "hit-cached", source: "hit", target: "cached", label: "yes" },
+		{ id: "hit-call", source: "hit", target: "call", label: "no" },
+		{ id: "call-store", source: "call", target: "store" },
+		{ id: "store-log", source: "store", target: "log" },
+		{ id: "log-ret", source: "log", target: "ret" },
+	],
+	layout: {
+		direction: "TB",
+		edgeRouting: "orthogonal",
+	},
+});
+
 export const flowchartEvaluationFixtures = [flowchartFixture, pharmaBatchDispositionFlowchart];

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { CANVAS_FRAME_NAME, canvasFrameNameBox, canvasFrameNameWidth } from "./group-regions";
+import {
+	CANVAS_FRAME_NAME,
+	canvasFrameNameBox,
+	canvasFrameNameWidth,
+	canvasGroupIconBox,
+} from "./group-regions";
 
 /** Helvetica advance widths, in thousandths of an em (Adobe AFM). */
 const HELVETICA: Readonly<Record<string, number>> = {
@@ -48,6 +53,25 @@ describe("frame names", () => {
 		expect(canvasFrameNameBox({ x: 0, y: 0, width: 1, height: 1, name }).width).toBe(
 			width + 2 * CANVAS_FRAME_NAME.clearance,
 		);
+	});
+
+	it("puts a frame's logo inside its top-left corner", () => {
+		const icon = { slug: "vercel", size: 18 };
+		const bare = { type: "frame" as const, x: 100, y: 80, width: 300, height: 200 };
+
+		expect(canvasGroupIconBox({ ...bare, icon })).toEqual({ x: 110, y: 90, width: 18, height: 18 });
+		expect(canvasGroupIconBox(bare)).toBeUndefined();
+	});
+
+	it("puts a zone's logo at the start of its header strip", () => {
+		const icon = { slug: "aws", size: 18 };
+
+		expect(canvasGroupIconBox({ type: "node", x: 100, y: 80, icon })).toEqual({
+			x: 112,
+			y: 89,
+			width: 18,
+			height: 18,
+		});
 	});
 
 	it("keeps a lowercase name close to its painted width", () => {

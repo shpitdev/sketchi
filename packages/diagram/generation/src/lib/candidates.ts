@@ -192,9 +192,20 @@ function sanitizeGeneratedNodeIcons(
 function normalizeGeneratedFlowchartInput(input: unknown, diagnostics: string[]): unknown {
 	const styled = withSketchiDiagramStyle(input);
 	if (!isUnknownRecord(styled)) return styled;
+	const groups = styled["groups"];
 	const withIcons: Record<string, unknown> = {
 		...styled,
 		nodes: sanitizeGeneratedNodeIcons(styled["nodes"], diagnostics),
+		// Group logos are filled by Code Mode builds only; generation draws none.
+		...(Array.isArray(groups)
+			? {
+					groups: groups.map((group) => {
+						if (!isUnknownRecord(group)) return group;
+						const { icon: _icon, ...withoutIcon } = group;
+						return withoutIcon;
+					}),
+				}
+			: {}),
 	};
 	const edges = withIcons["edges"];
 	if (!Array.isArray(edges)) {

@@ -13,6 +13,7 @@ import {
 	CANVAS_CROSSABLE_RENDERER_ROLES,
 	canvasBoundTextBox,
 	canvasBoundTextInset,
+	canvasGroupIconBox,
 	canvasNodeIconBox,
 	canvasComposedOnOutline,
 	canvasShapeOutline,
@@ -349,13 +350,19 @@ function shapeStrokeElements(input: {
 function iconImageElement(input: {
 	fileId: string;
 	id: string;
-	node: NodeSceneElement;
+	node: NodeSceneElement | FrameSceneElement;
 }): ExcalidrawElement | null {
-	const box = canvasNodeIconBox(input.node);
-	if (!box || !input.node.icon) return null;
+	const { node } = input;
+	const group = node.type === "frame" || node.rendererRole === "zone";
+	const box = group ? canvasGroupIconBox(node) : canvasNodeIconBox(node);
+	if (!box || !node.icon) return null;
 	return {
-		...elementBase(input.id, input.node),
-		groupIds: [logoGroupId(input.node), ...(input.node.groupIds ?? [])],
+		...elementBase(input.id, node),
+		// A frame's logo is one of its children, so it moves with the frame;
+		// Excalidraw cannot group a frame. Other logos share their shape's group.
+		...(node.type === "frame"
+			? { frameId: node.id, groupIds: [] }
+			: { groupIds: [logoGroupId(node), ...(node.groupIds ?? [])] }),
 		type: "image",
 		x: box.x,
 		y: box.y,
@@ -364,7 +371,7 @@ function iconImageElement(input: {
 		backgroundColor: "transparent",
 		boundElements: null,
 		crop: null,
-		customData: { sketchiNodeIcon: input.node.icon.slug },
+		customData: group ? { sketchiGroupIcon: node.icon.slug } : { sketchiNodeIcon: node.icon.slug },
 		fileId: input.fileId,
 		roundness: null,
 		scale: [1, 1],
@@ -753,7 +760,10 @@ function synthesizeNodeLabels(sourceElements: readonly SceneElement[]): {
 	return { textElements, generatedLabelSourceIds };
 }
 
-function iconElementId(node: NodeSceneElement, usedElementIds: Set<string>): string {
+function iconElementId(
+	node: NodeSceneElement | FrameSceneElement,
+	usedElementIds: Set<string>,
+): string {
 	// Excalidraw's SVG export selects per-element image symbols by id, so the
 	// id must be a valid CSS identifier fragment (node ids contain colons).
 	const baseId = `${node.id.replace(/[^\w-]/gu, "-")}-icon`;
@@ -861,6 +871,18 @@ function buildElements(
 		// A composite state's transitions bind to its frame.
 		if (frame.nodeId !== undefined) shapeElementsByNodeId.set(frame.nodeId, renderedFrame);
 		elements.push(renderedFrame);
+		const asset =
+			frame.icon && scene.icons && Object.hasOwn(scene.icons, frame.icon.slug)
+				? scene.icons[frame.icon.slug]
+				: undefined;
+		if (!frame.icon || typeof asset?.svg !== "string") continue;
+		const fileId = iconFileId(frame.icon.slug, asset.svg);
+		const id = iconElementId(frame, usedElementIds);
+		const image = iconImageElement({ fileId, id, node: frame });
+		if (!image) continue;
+		files[fileId] ??= iconFile(fileId, asset.svg);
+		generatedSourceIds.set(id, frame.id);
+		elements.push(image);
 	}
 
 	for (const text of textElements) {

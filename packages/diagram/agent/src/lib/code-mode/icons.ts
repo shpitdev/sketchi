@@ -234,6 +234,68 @@ export function resolveNodeIcons<
 	return { issues, nodes: filled };
 }
 
+/**
+ * With fillNamedLogos, once a flowchart's nodes draw a logo, each group whose
+ * label unmistakably names one ("Vercel") draws it before that label, reported
+ * as an icon_filled note, on the same terms as resolveNodeIcons fills a node.
+ * Groups take no authored logo, so this is the only way one gets a logo. A
+ * group skips a logo a node inside it already draws, or a group around it:
+ * the group's header would only repeat it. Only groups that hold nodes draw.
+ */
+export function fillGroupLogos(
+	groups:
+		| readonly { readonly id: string; readonly label: string; readonly parent?: string }[]
+		| undefined,
+	/** Nodes as resolveNodeIcons left them. */
+	nodes: readonly { readonly group?: string; readonly icon?: { readonly slug: string } }[],
+	catalog: CodeModeIconCatalog | undefined,
+	policy: { readonly fillNamedLogos?: boolean } = {},
+): { readonly issues: CodeModeIssue[]; readonly logos: ReadonlyMap<string, string> } {
+	const logos = new Map<string, string>();
+	const issues: CodeModeIssue[] = [];
+	if (!groups?.length || !policy.fillNamedLogos || !catalog || !nodes.some((node) => node.icon)) {
+		return { issues, logos };
+	}
+	const parentOf = new Map(
+		groups.flatMap((group) => (group.parent === undefined ? [] : [[group.id, group.parent]])),
+	);
+	// A group and every group around it, innermost first.
+	const chain = (id: string | undefined) => {
+		const ids: string[] = [];
+		for (let group = id; group !== undefined && !ids.includes(group); group = parentOf.get(group))
+			ids.push(group);
+		return ids;
+	};
+	// The logos the nodes in each group draw, nested groups' nodes included.
+	const inside = new Map<string, Set<string>>();
+	for (const node of nodes) {
+		for (const id of chain(node.group)) {
+			const slugs = inside.get(id) ?? new Set<string>();
+			if (node.icon) slugs.add(node.icon.slug);
+			inside.set(id, slugs);
+		}
+	}
+	// Outermost first, so a group around another keeps the logo they share.
+	const depth = (id: string) => chain(id).length;
+	for (const group of [...groups].sort((left, right) => depth(left.id) - depth(right.id))) {
+		const held = inside.get(group.id);
+		if (!held) continue;
+		const icon = catalog.logoNamedByLabel(group.label);
+		if (!icon || held.has(icon.slug)) continue;
+		if (chain(group.parent).some((id) => logos.get(id) === icon.slug)) continue;
+		logos.set(group.id, icon.slug);
+		issues.push({
+			code: "icon_filled",
+			severity: "info",
+			stage: "input",
+			ref: { kind: "group", id: group.id },
+			message: `Group "${group.id}" draws the "${icon.slug}" logo because its label "${group.label}" names ${icon.name}.`,
+			hint: "No action needed.",
+		});
+	}
+	return { issues, logos };
+}
+
 function droppedIconIssue(input: {
 	readonly catalog: CodeModeIconCatalog | undefined;
 	readonly dropped: DroppedCanvasIcon;
@@ -246,11 +308,16 @@ function droppedIconIssue(input: {
 		id: dropped.elementId,
 		path: `elements[${dropped.index}].icon${dropped.reason === "unavailable" ? ".slug" : ""}`,
 	};
-	const subject = `Icon "${dropped.slug}" on node "${dropped.elementId}"`;
+	const { element } = input;
+	const owner =
+		element?.type === "frame" || (element?.type === "node" && element.rendererRole === "zone")
+			? "group"
+			: "node";
+	const subject = `Icon "${dropped.slug}" on ${owner} "${dropped.elementId}"`;
 	if (dropped.reason === "unavailable" && !input.known) {
 		return unknownIconIssue({
 			catalog: input.catalog,
-			message: `${subject} is not a Sketchi node logo; the node renders without a logo.`,
+			message: `${subject} is not a Sketchi node logo; the ${owner} renders without a logo.`,
 			ref,
 			slug: dropped.slug,
 		});
@@ -258,7 +325,7 @@ function droppedIconIssue(input: {
 	const band = input.element?.type === "node" ? canvasNodeIconBand(input.element.icon) : 0;
 	const details = {
 		budget: {
-			message: `${subject} exceeds the per-diagram logo budget; the node renders without a logo.`,
+			message: `${subject} exceeds the per-diagram logo budget; the ${owner} renders without a logo.`,
 			hint: "Use fewer distinct logos in one diagram.",
 		},
 		lifeline: {
@@ -270,7 +337,7 @@ function droppedIconIssue(input: {
 			hint: `Make node "${dropped.elementId}" about ${band}px taller or shorten its label to keep the logo.`,
 		},
 		unavailable: {
-			message: `${subject} could not be loaded; the node renders without a logo.`,
+			message: `${subject} could not be loaded; the ${owner} renders without a logo.`,
 			hint: "Retry the request; if the logo stays unavailable, omit icon.",
 		},
 	}[dropped.reason];
@@ -296,7 +363,7 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 	catalog: CodeModeIconCatalog | undefined,
 ) {
 	const elements = scene.elements.map((element) =>
-		element.type === "node" && element.icon
+		(element.type === "node" || element.type === "frame") && element.icon
 			? {
 					...element,
 					icon: {
@@ -309,7 +376,9 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 	const slugs = [
 		...new Set(
 			elements.flatMap((element) =>
-				element.type === "node" && element.icon ? [element.icon.slug] : [],
+				(element.type === "node" || element.type === "frame") && element.icon
+					? [element.icon.slug]
+					: [],
 			),
 		),
 	];

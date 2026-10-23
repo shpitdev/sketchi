@@ -7,7 +7,11 @@ import {
 	canvasNodeIconBand,
 	type AxisAlignedSegment,
 	CANVAS_FRAME_NAME,
+	CANVAS_GROUP_ICON,
 	CANVAS_SHAPE_CURVE,
+	CANVAS_ZONE_HEADER,
+	canvasGroupIconBox,
+	canvasGroupIconRun,
 	canvasComposedOutlinePoint,
 	canvasFrameNameBox,
 	type CanvasComposedShapeKind,
@@ -557,8 +561,8 @@ const GROUP_UNIT_PREFIX = "\u0000group:";
  * far in from the zone's left side.
  */
 const ZONE_PADDING = 24;
-const ZONE_HEADER = 36;
-const ZONE_LABEL_INSET = 12;
+const ZONE_HEADER = CANVAS_ZONE_HEADER.height;
+const ZONE_LABEL_INSET = CANVAS_ZONE_HEADER.labelInset;
 const ZONE_LABEL_FONT_SIZE = CANVAS_FRAME_NAME.fontSize;
 
 interface Box {
@@ -572,11 +576,25 @@ interface Box {
 interface GroupFrame {
 	readonly box: Box;
 	readonly elementId: string;
+	/** The logo drawn before its label. */
+	readonly icon?: CanvasNodeIcon;
 	readonly id: string;
 	/** A zone's kind, which sets its outline and fill. */
 	readonly kind?: DiagramZoneKind;
 	readonly label: string;
 	readonly labelBox: Box;
+	/** A frame's logo inside its top-left corner, padded by the name's clearance. */
+	readonly logoBox?: Box;
+}
+
+/** What routes and labels keep off for a group: its name, and a frame's logo. */
+function groupKeepOuts(frame: GroupFrame): Box[] {
+	return frame.logoBox ? [frame.labelBox, frame.logoBox] : [frame.labelBox];
+}
+
+/** The logo a group draws before its label. */
+function groupIcon(group: DiagramGroup): CanvasNodeIcon | undefined {
+	return group.icon ? { slug: group.icon.slug, size: CANVAS_GROUP_ICON.size } : undefined;
 }
 
 interface GroupLayout {
@@ -2044,9 +2062,13 @@ function positionGroupedNodes(
 				),
 			) + (slack.get(group.id) ?? 0);
 		const labelWidth = canvasFrameNameWidth(group.label);
-		// Where the name ends, measured from the frame's left side.
+		// Where the name ends, measured from the frame's left side; a frame's logo
+		// sits left of that side, a zone's before its label.
 		const nameEnd = zoned
-			? ZONE_LABEL_INSET + labelWidth + CANVAS_FRAME_NAME.clearance
+			? ZONE_LABEL_INSET +
+				canvasGroupIconRun(groupIcon(group)) +
+				labelWidth +
+				CANVAS_FRAME_NAME.clearance
 			: labelWidth + 2 * CANVAS_FRAME_NAME.clearance;
 		const ports = nodes
 			.filter((node) => crossing.has(node.nodeId) && inset(node, "top") <= AXIS_ALIGNED_EPSILON)
@@ -2199,15 +2221,19 @@ function positionGroupedNodes(
 			: structure.groups
 	).map(({ group }): GroupFrame => {
 		const box = boxes.get(group.id)!;
+		const icon = groupIcon(group);
+		const logo = !zoned && icon ? canvasGroupIconBox({ type: "frame", ...box, icon }) : undefined;
 		return {
 			box,
 			elementId: `group:${group.id}`,
+			...(icon ? { icon } : {}),
 			id: group.id,
 			...(zoned && group.kind !== undefined ? { kind: group.kind } : {}),
 			label: group.label,
 			labelBox: zoned
-				? zoneLabelBox(box, group.label)
+				? zoneLabelBox(box, group.label, icon)
 				: canvasFrameNameBox({ ...box, name: group.label }),
+			...(logo ? { logoBox: padBox(logo, CANVAS_FRAME_NAME.clearance) } : {}),
 		};
 	});
 	return {
@@ -2258,13 +2284,13 @@ function groupRoot(structure: GroupStructure, groupId: string): string {
 	return groupRoots(structure, groupId).at(-1)!;
 }
 
-/** Where a zone's label is painted in its header strip, padded by its clearance. */
-function zoneLabelBox(box: Box, label: string): Box {
+/** Where a zone's label, and the logo before it, are painted in its header strip, padded by its clearance. */
+function zoneLabelBox(box: Box, label: string, icon: CanvasNodeIcon | undefined): Box {
 	const { clearance, height } = CANVAS_FRAME_NAME;
 	return {
 		x: box.x + ZONE_LABEL_INSET - clearance,
 		y: box.y + (ZONE_HEADER - height) / 2 - clearance,
-		width: canvasFrameNameWidth(label) + 2 * clearance,
+		width: canvasGroupIconRun(icon) + canvasFrameNameWidth(label) + 2 * clearance,
 		height: height + 2 * clearance,
 	};
 }
@@ -3076,11 +3102,13 @@ function groupObstacles(groups: GroupLayout | undefined, route: RoutedEdge): Nod
 	const shared = sharedGroup(groups, route.source.nodeId, route.target.nodeId);
 	return groups.frames.flatMap((frame) => {
 		const label = obstacleBox(`group-label:${frame.id}`, frame.labelBox);
+		const logo = frame.logoBox ? [obstacleBox(`group-logo:${frame.id}`, frame.logoBox)] : [];
 		if (frame.id === shared) {
 			const { x, y, width, height } = frame.box;
 			const wall = GROUP_WALL;
 			return [
 				label,
+				...logo,
 				obstacleBox(`group-wall:${frame.id}:top`, {
 					x: x - wall,
 					y: y - wall,
@@ -3107,7 +3135,7 @@ function groupObstacles(groups: GroupLayout | undefined, route: RoutedEdge): Nod
 				}),
 			];
 		}
-		return ends.has(frame.id) ? [label] : [label, obstacleBox(frame.elementId, frame.box)];
+		return ends.has(frame.id) ? [label, ...logo] : [label, obstacleBox(frame.elementId, frame.box)];
 	});
 }
 
@@ -3195,7 +3223,7 @@ function groupRouteDefects(
 			if (
 				segments.some(
 					(segment) =>
-						segmentCrossesBoundsInterior(segment, frame.labelBox) ||
+						groupKeepOuts(frame).some((box) => segmentCrossesBoundsInterior(segment, box)) ||
 						(!own && segmentCrossesBoundsInterior(segment, frame.box)) ||
 						outlines[index]!.some(
 							(edge) =>
@@ -5988,9 +6016,10 @@ function placedBranchLabels(
 	// boundaries are lines a label keeps clear of.
 	const nodes = [
 		...shapes,
-		...(groups?.frames ?? []).map((frame) =>
+		...(groups?.frames ?? []).flatMap((frame) => [
 			obstacleBox(`group-label:${frame.id}`, frame.labelBox),
-		),
+			...(frame.logoBox ? [obstacleBox(`group-logo:${frame.id}`, frame.logoBox)] : []),
+		]),
 		...(lanes?.frames ?? []).map((frame) =>
 			obstacleBox(`lane-header:${laneElementId(frame)}`, frame.header),
 		),
@@ -7190,7 +7219,8 @@ function alignMarkers(
 			(groups?.frames ?? []).every(
 				(candidate) =>
 					around.has(candidate.id) ||
-					(!boxesOverlap(room, candidate.box) && !boxesOverlap(room, candidate.labelBox)),
+					(!boxesOverlap(room, candidate.box) &&
+						groupKeepOuts(candidate).every((box) => !boxesOverlap(room, box))),
 			) &&
 			(!frame ||
 				(room.x >= frame.box.x &&
@@ -7383,13 +7413,15 @@ function crowdedGroups(layout: DiagramLayout): Set<string> {
 			for (const frame of groups.frames)
 				if (
 					frameOutline(frame.box).some((edge) => segmentCrossesBoundsInterior(edge, box)) ||
-					boxesOverlap(box, frame.labelBox)
+					groupKeepOuts(frame).some((keepOut) => boxesOverlap(box, keepOut))
 				)
 					crowded.add(frame.id);
 		if (group === undefined) continue;
 		if (
 			outlines.some((edge) => segmentCrossesBoundsInterior(edge, box)) ||
-			groups.frames.some((frame) => boxesOverlap(box, frame.labelBox))
+			groups.frames.some((frame) =>
+				groupKeepOuts(frame).some((keepOut) => boxesOverlap(box, keepOut)),
+			)
 		)
 			crowded.add(group);
 	}
@@ -9401,13 +9433,15 @@ function zoneElements(
 	accent: string,
 ): (NodeSceneElement | TextSceneElement)[] {
 	return groups.frames.flatMap((frame): (NodeSceneElement | TextSceneElement)[] => {
-		const maxWidth = Math.max(1, frame.box.width - 2 * ZONE_LABEL_INSET);
+		const logo = canvasGroupIconRun(frame.icon);
+		const maxWidth = Math.max(1, frame.box.width - 2 * ZONE_LABEL_INSET - logo);
 		return [
 			{
 				type: "node",
 				id: frame.elementId,
 				nodeId: frame.elementId,
 				kind: frame.kind ?? "zone",
+				...(frame.icon ? { icon: frame.icon } : {}),
 				rendererRole: "zone",
 				shape: "rectangle",
 				...frame.box,
@@ -9422,6 +9456,7 @@ function zoneElements(
 				x:
 					frame.box.x +
 					ZONE_LABEL_INSET +
+					logo +
 					boundLabelWidth(frame.label, ZONE_LABEL_FONT_SIZE, maxWidth) / 2,
 				y: frame.box.y + ZONE_HEADER / 2,
 				text: frame.label,
@@ -9491,6 +9526,7 @@ function withGroupFrames(
 			type: "frame",
 			id: frame.elementId,
 			name: frame.label,
+			...(frame.icon ? { icon: frame.icon } : {}),
 			// Edges into and out of a composite bind to its frame.
 			...(groups.composites.has(frame.id) ? { nodeId: frame.id } : {}),
 			...frame.box,

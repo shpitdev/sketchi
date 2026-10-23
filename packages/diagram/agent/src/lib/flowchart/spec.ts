@@ -76,14 +76,24 @@ export function normalizeFlowchartSpec(spec: FlowchartSpec): NormalizedFlowchart
 	};
 }
 
-export function flowchartDiagramInput(spec: NormalizedFlowchartSpec) {
+/** The core diagram input for a spec, each group drawing the logo `groupLogos` gives it by id. */
+export function flowchartDiagramInput(
+	spec: NormalizedFlowchartSpec,
+	groupLogos: ReadonlyMap<string, string> = new Map(),
+) {
+	const groupIcon = (id: string) => {
+		const slug = groupLogos.get(id);
+		return slug ? { icon: { slug } } : {};
+	};
 	return {
 		id: spec.id,
 		title: spec.title,
 		type: FLOWCHART_TYPE,
 		nodes: spec.nodes.map((node) => ({ ...node, metadata: {} })),
 		edges: spec.edges.map((edge) => ({ ...edge, metadata: {} })),
-		...(spec.groups ? { groups: spec.groups.map((group) => ({ ...group })) } : {}),
+		...(spec.groups
+			? { groups: spec.groups.map((group) => ({ ...group, ...groupIcon(group.id) })) }
+			: {}),
 		...(spec.lanes ? { lanes: spec.lanes.map((lane) => ({ ...lane })) } : {}),
 		layout: {
 			direction: spec.layout.direction,

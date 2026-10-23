@@ -42,3 +42,8 @@ The node's shape, bound label, and logo share one group so they move together.
 Bottom- and top-aligned bound labels use Excalidraw's own position rules, so a
 logo node's label stays put when it is edited. Pass `files` through to
 Excalidraw's `initialData` so logos paint on the first frame.
+
+A group's logo (an `icon` on a frame or a zone) is placed with
+`canvasGroupIconBox`: at the start of a zone's header, before its label, and
+shares the zone's group; or inside a frame's top-left corner, under its name,
+as one of the frame's children (`frameId`), so it moves with the frame.

@@ -180,7 +180,12 @@ import {
 	type PatchableScene,
 	type QualityReport,
 } from "./contract.js";
-import { embedSceneIcons, resolveNodeIcons, type CodeModeIconCatalog } from "./icons.js";
+import {
+	embedSceneIcons,
+	fillGroupLogos,
+	resolveNodeIcons,
+	type CodeModeIconCatalog,
+} from "./icons.js";
 import { cleanToolString } from "../clean-tool-string.js";
 import { assessFlowchartQuality } from "../flowchart/quality.js";
 import { flowchartDiagramInput, normalizeFlowchartSpec } from "../flowchart/spec.js";
@@ -225,8 +230,9 @@ export interface CodeModeRuntimeOptions {
 	};
 	/**
 	 * Internal per-call policy for MCP builds: in a diagram that draws logos, a
-	 * node without one gets the logo its label unmistakably names (see
-	 * resolveNodeIcons). Generation grounds logos in the prompt instead.
+	 * node without one, or a flowchart group, gets the logo its label
+	 * unmistakably names (see resolveNodeIcons and fillGroupLogos). Generation
+	 * grounds logos in the prompt instead.
 	 */
 	fillNamedLogos?: boolean;
 	artifactUrl?: (input: { artifactId: string; format: ArtifactFormat }) => string;
@@ -1878,11 +1884,11 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				(element.rendererRole === "er-table" && isStructurallyValidErTable(element)) ||
 				(element.rendererRole === "er-optional" && isStructurallyValidErOptional(element)) ||
 				(element.rendererRole === "class-box" && isStructurallyValidClassBox(element)) ||
-				((element.rendererRole === "swimlane" ||
-					element.rendererRole === "swimlane-header" ||
-					element.rendererRole === "zone") &&
+				((element.rendererRole === "swimlane" || element.rendererRole === "swimlane-header") &&
 					element.shape === "rectangle" &&
-					!element.icon)
+					!element.icon) ||
+				// A zone's logo sits in its header.
+				(element.rendererRole === "zone" && element.shape === "rectangle")
 					? { rendererRole: element.rendererRole }
 					: {}),
 				...(element.textColor ? { textColor: element.textColor } : {}),
@@ -4075,6 +4081,9 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	const resolvedIcons = resolveNodeIcons(authoredSpec.nodes, environment.icons, undefined, {
 		fillNamedLogos: environment.fillNamedLogos === true,
 	});
+	const groupLogos = fillGroupLogos(authoredSpec.groups, resolvedIcons.nodes, environment.icons, {
+		fillNamedLogos: environment.fillNamedLogos === true,
+	});
 	const normalizedSpec = { ...authoredSpec, nodes: resolvedIcons.nodes };
 	const baseContext = {
 		buildId,
@@ -4084,7 +4093,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	const parsedDiagram = Schema.decodeUnknownResult(FlowchartDiagramSchema, {
 		errors: "all",
 		reportInput: true,
-	})(flowchartDiagramInput(normalizedSpec));
+	})(flowchartDiagramInput(normalizedSpec, groupLogos.logos));
 	if (!Result.isSuccess(parsedDiagram)) {
 		return yield* new BuildFlowchartFailure({
 			status: "invalid_flowchart",
@@ -4168,7 +4177,12 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 		normalizedSpec,
 		quality,
 		artifact,
-		issues: [...resolvedIcons.issues, ...embedded.issues, ...longDescriptionIssues(scene)],
+		issues: [
+			...resolvedIcons.issues,
+			...groupLogos.issues,
+			...embedded.issues,
+			...longDescriptionIssues(scene),
+		],
 	} satisfies Extract<BuildFlowchartResult, { ok: true }>;
 });
 
