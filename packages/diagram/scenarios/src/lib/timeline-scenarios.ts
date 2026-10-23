@@ -240,6 +240,24 @@ const normalize = (label: string) =>
 		.replace(/[^\p{L}\p{N}]+/gu, " ")
 		.trim();
 
+/** Keep field matching; inline text must be exactly name + separator + description. */
+function matchesTimelineDescription(
+	event: TimelineEvent,
+	expected: TimelineScenarioEvent,
+): boolean {
+	if (expected.description === undefined) return true;
+	const description = normalize(expected.description);
+	if (normalize(event.description ?? "").includes(description)) return true;
+	// Require punctuation or a line break, not just the name somewhere in the label.
+	for (const separator of event.label.matchAll(/[^\p{L}\p{N}\s]|\n/gu)) {
+		const name = normalize(event.label.slice(0, separator.index));
+		const detail = normalize(event.label.slice(separator.index + separator[0].length));
+		if (expected.labels.some((label) => normalize(label) === name) && detail === description)
+			return true;
+	}
+	return false;
+}
+
 /** Each prompt event's distinct model event, in prompt order, matched by label. */
 function matchTimelineEvents(
 	scenario: TimelineScenario,
@@ -286,8 +304,7 @@ export function timelineScenarioChecks(
 				(expected.kind === "milestone") === (event.kind === "milestone")) &&
 			(expected.lane === undefined ||
 				normalize(event.lane ?? "").includes(normalize(expected.lane))) &&
-			(expected.description === undefined ||
-				normalize(event.description ?? "").includes(normalize(expected.description)));
+			matchesTimelineDescription(event, expected);
 		return {
 			id: `timeline-event:${index + 1}`,
 			passed: Boolean(event && chronology && details),
