@@ -1,5 +1,13 @@
 # @sketchi/cli
 
+## 0.25.15
+
+### Patch Changes
+
+- [#532](https://github.com/shpitdev/sketchi/pull/532) [`5d10605`](https://github.com/shpitdev/sketchi/commit/5d10605ab2226b6a2c28ef4dfe546442404f0c5b) Thanks [@anandpant](https://github.com/anandpant)! - Flowcharts render faster, and draw exactly as before. The router measured a branch label's size again on every route it tried; it now measures each label once. And where the crossing repair had moved a decision's branches, the branch-side choice laid out and completed the arrangement the diagram started from, which always drew the same layout again; it now skips it.
+
+- [#533](https://github.com/shpitdev/sketchi/pull/533) [`9940367`](https://github.com/shpitdev/sketchi/commit/994036768bee8e2ff13f4a33e0faa25d2d79340c) Thanks [@anandpant](https://github.com/anandpant)! - A line no longer meets a rounded box inside its corner's curve. Where a line's end sat nearer a corner than the corner's radius, which reads as the line aiming at the corner rather than the side, it moves along the side onto the straight part, kept only when the drawing reads no worse. In a media player's state machine, the seek self-loop left and re-entered Playing on its rounded lower-left corner; it now leaves and enters on its straight sides.
+
 ## 0.25.14
 
 ### Patch Changes
