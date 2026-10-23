@@ -1,4 +1,9 @@
 import { assert, expect, it, layer } from "@effect/vitest";
+import {
+	makeTelemetryTestSink,
+	makeWorkersTelemetryLayer,
+	type TelemetrySpanEvent,
+} from "@sketchi/observability";
 import { Cause, Context, Effect, Exit, Fiber, Layer } from "effect";
 
 import {
@@ -43,6 +48,39 @@ class MemoryBucket implements CodeModeObjectBucket {
 class FailingBucket extends MemoryBucket {
 	override async put(): Promise<unknown> {
 		throw new Error("R2 write denied");
+	}
+}
+
+class FailingKeyBucket extends MemoryBucket {
+	constructor(private readonly failingKey: string) {
+		super();
+	}
+
+	override async put(key: string, value: CodeModeObjectBucketBody): Promise<unknown> {
+		if (key === this.failingKey) throw new Error("R2 write denied");
+		return super.put(key, value);
+	}
+}
+
+/** Holds every PUT until released, recording which keys were in flight together. */
+class GatedBucket extends MemoryBucket {
+	readonly started: string[] = [];
+	readonly allStarted = Promise.withResolvers<void>();
+	readonly #release = Promise.withResolvers<void>();
+
+	constructor(private readonly expectedPuts: number) {
+		super();
+	}
+
+	release() {
+		this.#release.resolve();
+	}
+
+	override async put(key: string, value: CodeModeObjectBucketBody): Promise<unknown> {
+		this.started.push(key);
+		if (this.started.length === this.expectedPuts) this.allStarted.resolve();
+		await this.#release.promise;
+		return super.put(key, value);
 	}
 }
 
@@ -170,6 +208,82 @@ layer(Layer.succeed(CodeModeArtifactStorage, makeObjectBucketArtifactStorage(new
 	},
 );
 
+it.effect("writes the manifest and its formats in one concurrent batch", () =>
+	Effect.gen(function* () {
+		const bucket = new GatedBucket(4);
+		const storage = makeObjectBucketArtifactStorage(bucket, { prefix: "codemode" });
+		const fiber = yield* Effect.forkChild(storage.write(writeInput()));
+		yield* Effect.promise(() => bucket.allStarted.promise);
+
+		assert.deepStrictEqual([...bucket.started].sort(), [
+			"codemode/artifact-child/excalidraw.json",
+			"codemode/artifact-child/manifest.json",
+			"codemode/artifact-child/png.png",
+			"codemode/artifact-child/scene.json",
+		]);
+		assert.strictEqual(bucket.objects.size, 0);
+
+		bucket.release();
+		const bundle = yield* Fiber.join(fiber);
+		assert.strictEqual(bundle.artifactId, "artifact-child");
+		assert.strictEqual(bucket.objects.size, 4);
+	}),
+);
+
+for (const failingKey of ["artifact-child/png.png", "artifact-child/manifest.json"]) {
+	it.effect(`fails the write when only ${failingKey} fails to store`, () =>
+		Effect.gen(function* () {
+			const storage = makeObjectBucketArtifactStorage(new FailingKeyBucket(failingKey));
+			const error = yield* Effect.flip(storage.write(writeInput()));
+			assert.strictEqual(error._tag, "CodeModeArtifactStorageError");
+			assert.strictEqual(error.operation, "write");
+			assert.strictEqual(error.message, "R2 write denied");
+		}),
+	);
+}
+
+it.effect("records one span per stored object with its format and bytes", () => {
+	const { probe, sink } = makeTelemetryTestSink();
+	const storage = makeObjectBucketArtifactStorage(new MemoryBucket());
+
+	return Effect.gen(function* () {
+		yield* storage.write(writeInput());
+
+		const spans = probe.events.filter(
+			(event): event is TelemetrySpanEvent => event.event === "effect.span",
+		);
+		const write = spans.find((span) => span.name === "codeMode.artifacts.r2.write");
+		const puts = spans.filter((span) => span.name === "codeMode.artifacts.r2.put");
+		const pngBytes = storedFormats().find((format) => format.format === "png")?.sizeBytes;
+
+		assert.deepInclude(write?.attributes, { object_count: 4 });
+		assert.isNumber(write?.attributes["body_ms"]);
+		assert.deepStrictEqual(puts.map((span) => String(span.attributes["artifact_format"])).sort(), [
+			"excalidraw",
+			"manifest",
+			"png",
+			"scene",
+		]);
+		for (const put of puts) {
+			assert.strictEqual(put.parent_span_id, write?.span_id);
+			assert.isNumber(put.attributes["body_ms"]);
+			assert.isAbove(Number(put.attributes["body_bytes"]), 0);
+		}
+		assert.deepInclude(
+			puts.find((span) => span.attributes["artifact_format"] === "png")?.attributes,
+			{ body_bytes: pngBytes },
+		);
+		assert.strictEqual(
+			write?.attributes["body_bytes"],
+			puts.reduce((total, span) => total + Number(span.attributes["body_bytes"]), 0),
+		);
+	}).pipe(
+		Effect.provide(
+			makeWorkersTelemetryLayer({ resource: { serviceName: "sketchi-artifacts-test" }, sink }),
+		),
+	);
+});
+
 it.effect("rejects non-binary PNG data without publishing its manifest", () =>
 	Effect.gen(function* () {
 		const bucket = new MemoryBucket();
@@ -195,7 +309,7 @@ const hangingBucket = new HangingBucket();
 layer(Layer.succeed(CodeModeArtifactStorage, makeObjectBucketArtifactStorage(hangingBucket)))(
 	"artifact storage interruption",
 	(it) => {
-		it.effect("preserves interruption and does not publish a manifest", () =>
+		it.effect("preserves interruption and returns no bundle", () =>
 			Effect.gen(function* () {
 				const storage = yield* CodeModeArtifactStorage;
 				const fiber = yield* Effect.forkChild(storage.write(writeInput()));
@@ -207,7 +321,6 @@ layer(Layer.succeed(CodeModeArtifactStorage, makeObjectBucketArtifactStorage(han
 					return assert.fail("Interrupted storage write unexpectedly succeeded.");
 				}
 				assert.isTrue(Cause.hasInterrupts(exit.cause));
-				assert.isFalse(hangingBucket.objects.has("artifact-child/manifest.json"));
 			}),
 		);
 	},

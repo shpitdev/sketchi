@@ -297,6 +297,37 @@ function bodyForArtifact(
 	return Effect.fail(storageError("write")(new Error("PNG artifact data must be binary.")));
 }
 
+interface PreparedArtifactObject {
+	readonly body: CodeModeObjectBucketBody;
+	readonly bodyBytes: number;
+	readonly bodyMs: number;
+	readonly contentType: string;
+	readonly format: ArtifactFormat | typeof MANIFEST_FORMAT;
+}
+
+const bodyEncoder = new TextEncoder();
+
+function bodyByteLength(body: CodeModeObjectBucketBody): number {
+	return typeof body === "string" ? bodyEncoder.encode(body).byteLength : body.byteLength;
+}
+
+const prepareArtifactObject = Effect.fnUntraced(function* (
+	format: ArtifactFormat | typeof MANIFEST_FORMAT,
+	contentType: string,
+	body: Effect.Effect<CodeModeObjectBucketBody, CodeModeArtifactStorageError>,
+) {
+	const startedAt = yield* Clock.currentTimeMillis;
+	const prepared = yield* body;
+	const preparedAt = yield* Clock.currentTimeMillis;
+	return {
+		body: prepared,
+		bodyBytes: bodyByteLength(prepared),
+		bodyMs: preparedAt - startedAt,
+		contentType,
+		format,
+	} satisfies PreparedArtifactObject;
+});
+
 function readBinaryArtifact(
 	object: CodeModeObjectBucketObject,
 ): Effect.Effect<ArrayBuffer, CodeModeArtifactStorageError> {
@@ -383,30 +414,48 @@ export function makeObjectBucketArtifactStorage(
 				createdAt: new Date(now).toISOString(),
 			};
 
-			yield* Effect.forEach(
-				input.formats,
-				(artifact) =>
-					Effect.gen(function* () {
-						const body = yield* bodyForArtifact(artifact);
-						yield* Effect.tryPromise({
-							try: () =>
-								bucket.put(keyForArtifact(prefix, input.artifactId, artifact.format), body, {
-									httpMetadata: { contentType: artifact.mimeType },
-								}),
-							catch: storageError("write"),
-						});
-					}),
-				{ concurrency: 3, discard: true },
-			);
-			yield* Effect.tryPromise({
-				try: () =>
-					bucket.put(
-						keyForArtifact(prefix, input.artifactId, MANIFEST_FORMAT),
-						JSON.stringify(manifest),
-						{ httpMetadata: { contentType: "application/json" } },
-					),
-				catch: storageError("write"),
+			// Prepare every body before the first PUT, so a body that fails to serialize
+			// publishes nothing.
+			const objects = [
+				...(yield* Effect.forEach(input.formats, (artifact) =>
+					prepareArtifactObject(artifact.format, artifact.mimeType, bodyForArtifact(artifact)),
+				)),
+				yield* prepareArtifactObject(
+					MANIFEST_FORMAT,
+					"application/json",
+					Effect.try({ try: () => JSON.stringify(manifest), catch: storageError("write") }),
+				),
+			];
+			yield* Effect.annotateCurrentSpan({
+				body_bytes: objects.reduce((total, object) => total + object.bodyBytes, 0),
+				body_ms: objects.reduce((total, object) => total + object.bodyMs, 0),
+				object_count: objects.length,
 			});
+
+			// One round trip: the manifest goes up with its formats. The artifact id is
+			// fresh and reaches no caller until this write succeeds, so no reader can
+			// fetch the manifest before every format it lists has landed. A failed PUT
+			// fails the write and the id is never returned.
+			yield* Effect.forEach(
+				objects,
+				(object) =>
+					Effect.tryPromise({
+						try: () =>
+							bucket.put(keyForArtifact(prefix, input.artifactId, object.format), object.body, {
+								httpMetadata: { contentType: object.contentType },
+							}),
+						catch: storageError("write"),
+					}).pipe(
+						Effect.withSpan("codeMode.artifacts.r2.put", {
+							attributes: {
+								artifact_format: object.format,
+								body_bytes: object.bodyBytes,
+								body_ms: object.bodyMs,
+							},
+						}),
+					),
+				{ concurrency: "unbounded", discard: true },
+			);
 
 			const formats = input.formats.map((artifact) => artifactRef(artifact, input.inlineFormats));
 			return bundleFromFormats({
