@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.14
+
+### Patch Changes
+
+- [#531](https://github.com/shpitdev/sketchi/pull/531) [`41807e1`](https://github.com/shpitdev/sketchi/commit/41807e1cf0b2efa2a4051e4d4a5f4c971173df8b) Thanks [@anandpant](https://github.com/anandpant)! - A line that passes a node it neither leaves nor enters now keeps clear of it on every run, not only the first one that came too close. In hybrid setups, the ERP's line to the VPN gateway cleared the Oracle database's side, then ran along its foot, where it read as connected to the database; it now passes under the database at the clearance lines keep from every node.
+
 ## 0.25.13
 
 ### Patch Changes
