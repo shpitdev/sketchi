@@ -3,11 +3,13 @@ import { parseFlowchartDiagram } from "./types/flowchart.js";
 import awsThreeTier from "./fixtures/zones/aws-three-tier.js";
 import awsThreeTierDescribed from "./fixtures/zones/aws-three-tier-described.js";
 import awsThreeTierQueries from "./fixtures/zones/aws-three-tier-queries.js";
+import awsThreeTierRequests from "./fixtures/zones/aws-three-tier-requests.js";
 import hybridCloud from "./fixtures/zones/hybrid-cloud.js";
 import hybridCloudBypass from "./fixtures/zones/hybrid-cloud-bypass.js";
 import hybridCloudBypassArchive from "./fixtures/zones/hybrid-cloud-bypass-archive.js";
 import hybridCloudDescribed from "./fixtures/zones/hybrid-cloud-described.js";
 import hybridCloudLabeled from "./fixtures/zones/hybrid-cloud-labeled.js";
+import hybridCloudSync from "./fixtures/zones/hybrid-cloud-sync.js";
 import kindedFlat from "./fixtures/zones/kinded-flat.js";
 import kubernetesCluster from "./fixtures/zones/kubernetes-cluster.js";
 
@@ -62,6 +64,18 @@ export const describedArchitectureFlowchart = flowchart(awsThreeTierDescribed);
  * database and the users above the region, as a generated sample drew it.
  */
 export const queriedArchitectureFlowchart = flowchart(awsThreeTierQueries);
+
+/**
+ * The AWS three-tier app whose users' requests drop into the load balancer
+ * past the public subnet's name, as a generated sample drew it.
+ */
+export const requestedArchitectureFlowchart = flowchart(awsThreeTierRequests);
+
+/**
+ * The hybrid setup whose sync function's labeled lines step sideways to a
+ * table above and an archive below, as a generated sample drew it.
+ */
+export const syncedHybridFlowchart = flowchart(hybridCloudSync);
 
 /** Zones of the thirty-node stress case, each with its parent and kind. */
 const STRESS_ZONES = [

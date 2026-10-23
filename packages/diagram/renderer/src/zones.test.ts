@@ -10,6 +10,11 @@ import {
 	getCanvasValidationIssues,
 	groupFixtures,
 	parseFlowchartDiagram,
+	requestedArchitectureFlowchart,
+	routingJogReach,
+	routingQualityScale,
+	routingWideBend,
+	syncedHybridFlowchart,
 	zoneFixtures,
 	zoneRegionIssues,
 	zoneStressFixtures,
@@ -470,4 +475,78 @@ describe("lines past an infrastructure shape", () => {
 			expect(close).toEqual([]);
 		},
 	);
+});
+
+describe("line ends from generated samples", () => {
+	type Point = { readonly x: number; readonly y: number };
+	const arrow = (scene: RenderedDiagramScene, edgeId: string) => {
+		const found = scene.elements.find((e) => e.type === "arrow" && e.edgeId === edgeId);
+		if (found?.type !== "arrow") throw new Error(`No arrow for ${edgeId}`);
+		return found;
+	};
+	const node = (scene: RenderedDiagramScene, nodeId: string) => {
+		const found = scene.elements.find((e) => e.type === "node" && e.nodeId === nodeId);
+		if (found?.type !== "node") throw new Error(`No node ${nodeId}`);
+		return found;
+	};
+	// The points where a line turns.
+	const turns = (points: readonly Point[]) =>
+		points.filter((point, index) => {
+			const [before, after] = [points[index - 1], points[index + 1]];
+			return (
+				!before ||
+				!after ||
+				!(
+					(before.x === point.x && point.x === after.x) ||
+					(before.y === point.y && point.y === after.y)
+				)
+			);
+		});
+
+	it("lands the users' requests away from the load balancer's corner, past the subnet's name", () => {
+		// The drop into the middle meets the public subnet's name, so the line
+		// once took the far end of the top instead, beside the rounded corner.
+		const scene = renderIntermediateDiagram(requestedArchitectureFlowchart);
+		const alb = node(scene, "alb");
+		const end = arrow(scene, "edge-1").points.at(-1)!;
+		expect(end.y).toBe(alb.y);
+		expect(Math.abs(end.x - alb.x - alb.width / 2)).toBeLessThanOrEqual((3 / 4) * (alb.width / 2));
+	});
+
+	it("runs each of the hybrid sample's lines straight past a jog's reach of either end", () => {
+		// The sync function's lines to the table and the archive held their
+		// labels' room on the first run and stepped sideways just before the head.
+		const scene = renderIntermediateDiagram(syncedHybridFlowchart);
+		// Judged at the size of what is drawn: nodes, zones and lines.
+		const [xs, ys] = (["x", "y"] as const).map((axis) =>
+			scene.elements.flatMap((e) =>
+				e.type === "arrow"
+					? e.points.map((point) => point[axis])
+					: e.type === "node"
+						? [e[axis], e[axis] + (axis === "x" ? e.width : e.height)]
+						: [],
+			),
+		);
+		const scale = routingQualityScale({
+			width: Math.max(...xs!) - Math.min(...xs!),
+			height: Math.max(...ys!) - Math.min(...ys!),
+		});
+		const [reach, wide] = [routingJogReach(scale), routingWideBend(scale)];
+		const jogs = scene.elements.flatMap((element) => {
+			if (element.type !== "arrow" || element.sourceNodeId === element.targetNodeId) return [];
+			const points = turns(element.points);
+			const [start, end] = [points[0]!, points.at(-1)!];
+			return points.slice(1, -2).flatMap((from, index) => {
+				const [before, to, after] = [points[index]!, points[index + 2]!, points[index + 3]!];
+				const heading = (a: Point, b: Point) => [Math.sign(b.x - a.x), Math.sign(b.y - a.y)].join();
+				return heading(before, from) === heading(to, after) &&
+					Math.hypot(to.x - from.x, to.y - from.y) < wide &&
+					(Math.hypot(end.x - to.x, end.y - to.y) <= reach ||
+						Math.hypot(from.x - start.x, from.y - start.y) <= reach)
+					? [element.edgeId]
+					: [];
+			});
+		});
+		expect(jogs).toEqual([]);
+	});
 });

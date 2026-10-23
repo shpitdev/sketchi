@@ -48,8 +48,10 @@ import {
 	arrowheadsNear,
 	candidateRouteQuality,
 	routingCorridorGap,
+	routingJogReach,
 	routingQualityFindings,
 	routingQualityScale,
+	routingWideBend,
 	wrapTextToUnits,
 } from "@sketchi/diagram-core";
 
@@ -9197,6 +9199,309 @@ function endsOffCorners(
 	return current;
 }
 
+/** Ports a lone arrival tries nearer its side's middle, nearest the middle first. */
+const CENTERED_PORT_TRIES = 3;
+
+/**
+ * The drawn layout with each bent line that alone meets its target's flat
+ * side, in the outer quarter of that side, moved along it to the port nearest
+ * the middle from which it routes with no more bends and no longer than the
+ * move: the middle, else just past what blocks its last run there, such as a
+ * group's name, where nothing else does. A line that lands by a corner reads
+ * as aimed at it. One line at a time routes again, around the others as they
+ * lie, its step moved clear of its ends where the new port brings one near
+ * (withStepMoved), kept when the layout draws no worse and passes no nearer a
+ * node.
+ */
+function centerLoneArrivals(
+	diagram: IntermediateDiagram,
+	layout: DiagramLayout,
+	finished: (layout: DiagramLayout) => DiagramLayout,
+	defectsOf: (layout: DiagramLayout) => readonly [number, number],
+	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
+): DiagramLayout {
+	const { groups, lanes, nodeShapes, polish, routeOptions, routedEdges } = layout;
+	if (
+		!polish?.sides ||
+		!layout.portOffsets ||
+		!routeOptions ||
+		lanes ||
+		graphOptions.get(diagram)?.placement
+	)
+		return layout;
+	const scale = routingQualityScale(
+		drawnSize([...nodeShapes, ...groupBlocks(groups)], layout.edgeArrows),
+	);
+	let current = layout;
+	for (const [index, route] of routedEdges.entries()) {
+		const line = current.edgeArrows[index]!;
+		const { source, target, targetEdge: side } = route;
+		if (
+			isSelfLoop(route) ||
+			route.pinned?.target !== undefined ||
+			routeBendCount(line.points) === 0 ||
+			curvedSide(target, side) ||
+			routedEdges.some(
+				(other) =>
+					other !== route &&
+					((other.target === target && other.targetEdge === side) ||
+						(other.source === target && other.sourceEdge === side)),
+			)
+		)
+			continue;
+		const [axis, across] = slotAxis(side) === "x" ? (["x", "y"] as const) : (["y", "x"] as const);
+		const middle = center(target)[axis];
+		const half = (axis === "x" ? target.width : target.height) / 2;
+		const end = line.points.at(-1)!;
+		const along = end[axis] - middle;
+		if (Math.abs(along) <= (3 / 4) * half) continue;
+		const radius = target.id.startsWith("node:") ? canvasCornerRadius(target) : 0;
+		const limit = Math.min(half - Math.max(PORT_PADDING, radius), (3 / 4) * half);
+		// Just past each thing that stands across the last run's way into the side.
+		const last = straightRuns(line.points).at(-2)!;
+		const [near, far] = [Math.min(last[across], end[across]), Math.max(last[across], end[across])];
+		const [size, depth] =
+			axis === "x" ? (["width", "height"] as const) : (["height", "width"] as const);
+		const blockers = [
+			...current.nodeShapes.filter(
+				(node) => node.nodeId !== target.nodeId && node.nodeId !== source.nodeId,
+			),
+			...groupObstacles(groups, route),
+			...branchLabelObstacles(routedEdges, current.portOffsets!).filter(
+				(label) => label.nodeId !== `branch-label:${route.edge.id}`,
+			),
+		].filter(
+			(box) =>
+				box[across] < far &&
+				box[across] + box[depth] > near &&
+				box[axis] < middle + half &&
+				box[axis] + box[size] > middle - half,
+		);
+		const ports = [
+			...new Set([
+				0,
+				...blockers.flatMap((box) => [
+					box[axis] - PORT_SPACING - middle,
+					box[axis] + box[size] + PORT_SPACING - middle,
+				]),
+			]),
+		]
+			.filter(
+				(offset) =>
+					Math.abs(offset) <= limit + AXIS_ALIGNED_EPSILON &&
+					Math.abs(offset) < Math.abs(along) - AXIS_ALIGNED_EPSILON &&
+					!blockers.some(
+						(box) => box[axis] < middle + offset && box[axis] + box[size] > middle + offset,
+					),
+			)
+			.sort((a, b) => Math.abs(a) - Math.abs(b))
+			.slice(0, CENTERED_PORT_TRIES);
+		const key = connectionKey({ edgeId: route.edge.id, endpoint: "target" });
+		const fixed = new Map(
+			current.edgeArrows.filter((arrow) => arrow !== line).map((arrow) => [arrow.edgeId, arrow]),
+		);
+		const order = routedEdges
+			.map((_, at) => at)
+			.sort((a, b) => Number(a === index) - Number(b === index));
+		for (const offset of ports) {
+			const offsets = new Map(current.portOffsets).set(key, offset);
+			const arrows = routeAllEdges(
+				routedEdges,
+				"orthogonal",
+				offsets,
+				current.nodeShapes,
+				{ ...routeOptions, midway: true },
+				order,
+				fixed,
+			);
+			const points = arrows[index]!.points;
+			if (
+				routeBendCount(points) > routeBendCount(line.points) ||
+				routeLength(points) >
+					routeLength(line.points) + Math.abs(offset - along) + AXIS_ALIGNED_EPSILON
+			)
+				continue;
+			const kept = withStepMoved(
+				{ ...current, edgeArrows: arrows, portOffsets: offsets },
+				index,
+				current,
+				scale,
+				defectsOf,
+				fewer,
+				finished,
+			);
+			if (kept) {
+				current = kept;
+				break;
+			}
+		}
+	}
+	return current;
+}
+
+/**
+ * The sideways steps of a line's corners, by the index of the corner each
+ * starts at, that read as port jogs: between two runs heading the same way,
+ * narrower than a deliberate bend, with a turn within a jog's reach of either
+ * end of the line, counted once per end.
+ */
+function portJogSteps(corners: readonly ScenePoint[], reach: number, wide: number): number[] {
+	const [start, end] = [corners[0]!, corners.at(-1)!];
+	const steps: number[] = [];
+	for (let index = 1; index < corners.length - 2; index += 1) {
+		const [before, from, to, after] = corners.slice(index - 1, index + 3) as [
+			ScenePoint,
+			ScenePoint,
+			ScenePoint,
+			ScenePoint,
+		];
+		const axis = Math.abs(before.y - from.y) <= AXIS_ALIGNED_EPSILON ? "x" : "y";
+		const heading = Math.sign(from[axis] - before[axis]);
+		if (
+			heading !== 0 &&
+			Math.sign(after[axis] - to[axis]) === heading &&
+			Math.hypot(to.x - from.x, to.y - from.y) < wide
+		) {
+			if (Math.hypot(end.x - to.x, end.y - to.y) <= reach) steps.push(index);
+			if (Math.hypot(from.x - start.x, from.y - start.y) <= reach) steps.push(index);
+		}
+	}
+	return steps;
+}
+
+/**
+ * A line's corners with its first sideways step that reads as a port jog
+ * (portJogSteps) moved along the runs either side of it: midway between the
+ * turns those runs start and end at, else just past the reach of the end it
+ * sits within, away from that end, each a port's spacing or more from where
+ * it was. Each keeps the line's stubs and jogs less as a whole.
+ * A step beside an arrowhead or a port reads as a jog into it.
+ */
+function movedSteps(
+	points: readonly ScenePoint[],
+	reach: number,
+	wide: number,
+): [ScenePoint, ...ScenePoint[]][] {
+	const corners = straightRuns(points);
+	const jogs = portJogSteps(corners, reach, wide);
+	const index = jogs[0];
+	if (index === undefined) return [];
+	const [before, from, to, after] = corners.slice(index - 1, index + 3) as [
+		ScenePoint,
+		ScenePoint,
+		ScenePoint,
+		ScenePoint,
+	];
+	const [axis, across] =
+		Math.abs(before.y - from.y) <= AXIS_ALIGNED_EPSILON
+			? (["x", "y"] as const)
+			: (["y", "x"] as const);
+	const heading = Math.sign(from[axis] - before[axis]);
+	// Just past the reach of each end it sits within, away from that end.
+	const [start, end] = [corners[0]!, corners.at(-1)!];
+	const past = (point: ScenePoint, turn: ScenePoint, away: number) => {
+		const room = reach ** 2 - (point[across] - turn[across]) ** 2;
+		return Math.hypot(point.x - turn.x, point.y - turn.y) > reach || room < 0
+			? []
+			: [point[axis] + away * (Math.sqrt(room) + 1)];
+	};
+	const nearest = [...past(end, to, -heading), ...past(start, from, heading)].sort(
+		(a, b) => Math.abs(a - from[axis]) - Math.abs(b - from[axis]),
+	);
+	return [...new Set([(before[axis] + after[axis]) / 2, ...nearest].map(Math.round))].flatMap(
+		(at) => {
+			// A step moved less than a port's spacing reads where it was.
+			if (
+				Math.abs(at - from[axis]) < PORT_SPACING ||
+				Math.sign(at - before[axis]) !== heading ||
+				Math.sign(after[axis] - at) !== heading
+			)
+				return [];
+			const moved = corners.map((point, turn) =>
+				turn === index || turn === index + 1 ? { ...point, [axis]: at } : point,
+			);
+			return keepsStubs(corners, moved) && portJogSteps(moved, reach, wide).length < jogs.length
+				? [compactPoints(moved)]
+				: [];
+		},
+	);
+}
+
+/**
+ * The first of a layout's variants with one line's step moved clear of its
+ * ends (movedSteps), then, when `finished` is given, the layout itself, each
+ * finished, that crosses no more lines than `current`, draws no worse and
+ * passes no nearer a node. A step moved within a finished layout keeps it
+ * finished enough: the last clearance pass follows every polish.
+ */
+function withStepMoved(
+	layout: DiagramLayout,
+	index: number,
+	current: DiagramLayout,
+	scale: number,
+	defectsOf: (layout: DiagramLayout) => readonly [number, number],
+	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
+	finished?: (layout: DiagramLayout) => DiagramLayout,
+): DiagramLayout | undefined {
+	const { edgeArrows } = layout;
+	const variants = [
+		...movedSteps(edgeArrows[index]!.points, routingJogReach(scale), routingWideBend(scale)).map(
+			(points) => edgeArrows.map((arrow, at) => (at === index ? { ...arrow, points } : arrow)),
+		),
+		...(finished ? [edgeArrows] : []),
+	];
+	for (const arrows of variants) {
+		if (arrowCrossings(arrows) > arrowCrossings(current.edgeArrows)) continue;
+		const candidate = finished
+			? finished({ ...layout, edgeArrows: arrows })
+			: { ...layout, edgeArrows: arrows };
+		if (
+			drawsNoWorse(candidate, current, defectsOf, fewer) &&
+			nearOutlines(candidate) <= nearOutlines(current)
+		)
+			return candidate;
+	}
+	return undefined;
+}
+
+/**
+ * The drawn layout with each line's sideways step that sits within a port
+ * jog's reach of either end moved clear of both (withStepMoved), a line at a
+ * time, its other runs and every other line as they lie. A family that
+ * places its own boxes keeps its lines.
+ */
+function stepsClearOfEnds(
+	diagram: IntermediateDiagram,
+	layout: DiagramLayout,
+	defectsOf: (layout: DiagramLayout) => readonly [number, number],
+	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
+): DiagramLayout {
+	const { groups, lanes, nodeShapes, polish, routedEdges } = layout;
+	if (!polish?.sides || lanes || graphOptions.get(diagram)?.placement) return layout;
+	const scale = routingQualityScale(
+		drawnSize([...nodeShapes, ...groupBlocks(groups)], layout.edgeArrows),
+	);
+	let current = layout;
+	for (const [index, route] of routedEdges.entries())
+		if (!isSelfLoop(route))
+			current = withStepMoved(current, index, current, scale, defectsOf, fewer) ?? current;
+	return current;
+}
+
+/** Runs that pass within the clearance of a node neither of their line's ends is. */
+function nearOutlines({ edgeArrows, nodeShapes }: DiagramLayout): number {
+	return edgeArrows.reduce(
+		(total, arrow) =>
+			total +
+			routeClearanceCount(
+				arrow.points,
+				nodeShapes,
+				new Set([arrow.sourceNodeId, arrow.targetNodeId]),
+			),
+		0,
+	);
+}
+
 /**
  * No more export defects, and no more crossings, reader findings, lines
  * through a head, hooks, detours, dips or crowded labels, and no newly
@@ -10057,18 +10362,30 @@ export function renderGraphDiagram(
 			fewer,
 		));
 	// Last, lines that turn over a corner into a crowded side, dip into their
-	// target, jog beside a port or meet a rounded node within its corner's curve
-	// are polished where that draws no worse.
+	// target, jog beside a port, meet a rounded node within its corner's curve,
+	// land alone by a side's corner or step sideways beside an end are polished
+	// where that draws no worse.
 	if (orthogonal)
-		layout = endsOffCorners(
+		layout = stepsClearOfEnds(
 			diagram,
-			straightenArrivals(
-				polishArrivals(diagram, layout, finished, defectsOf, fewer),
+			centerLoneArrivals(
+				diagram,
+				endsOffCorners(
+					diagram,
+					straightenArrivals(
+						polishArrivals(diagram, layout, finished, defectsOf, fewer),
+						finished,
+						defectsOf,
+						fewer,
+					),
+					finished,
+					defectsOf,
+					fewer,
+				),
 				finished,
 				defectsOf,
 				fewer,
 			),
-			finished,
 			defectsOf,
 			fewer,
 		);

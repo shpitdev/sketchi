@@ -62,6 +62,16 @@ export function routingCorridorGap(scale: number): number {
 	return CORRIDOR_GAP_PX / scale;
 }
 
+/** Scene-unit reach from an end within which a kink reads as a port jog at this scale. */
+export function routingJogReach(scale: number): number {
+	return JOG_WINDOW_PX / scale;
+}
+
+/** Scene-unit width from which a sideways step reads as a deliberate bend at this scale. */
+export function routingWideBend(scale: number): number {
+	return WIDE_BEND_PX / scale;
+}
+
 /** Drop repeated points and pass-through points so each remaining point is a real turn. */
 function corners(points: readonly Point[]): Point[] {
 	const result: Point[] = [];
