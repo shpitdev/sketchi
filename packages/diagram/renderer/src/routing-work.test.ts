@@ -20,9 +20,10 @@ import { renderErDiagram } from "./er";
 import { renderClassDiagram } from "./class-diagram";
 import { renderStateMachineDiagram } from "./state-machine";
 
-// Count the segment geometry checks the router makes through diagram-core. The
-// count is deterministic, so it bounds routing work without a wall-clock timer.
-const work = vi.hoisted(() => ({ checks: 0 }));
+// Count the segment geometry checks the router makes through diagram-core, and
+// the node labels it measures: every layout sizes each node from its label. Both
+// counts are deterministic, so they bound routing work without a wall-clock timer.
+const work = vi.hoisted(() => ({ checks: 0, measures: 0 }));
 vi.mock("@sketchi/diagram-core", async (importOriginal) => {
 	const core = await importOriginal<typeof diagramCore>();
 	const counted =
@@ -36,6 +37,10 @@ vi.mock("@sketchi/diagram-core", async (importOriginal) => {
 		segmentCrossesBoundsInterior: counted(core.segmentCrossesBoundsInterior),
 		segmentsFromPoints: counted(core.segmentsFromPoints),
 		segmentsOverlapInterior: counted(core.segmentsOverlapInterior),
+		wrapTextToUnits: (...args: Parameters<typeof core.wrapTextToUnits>) => {
+			work.measures += 1;
+			return core.wrapTextToUnits(...args);
+		},
 	};
 });
 
@@ -126,13 +131,87 @@ describe("routing work", () => {
 	});
 });
 
+/**
+ * A dense incident response: 16 nodes, 19 edges, four decisions, one with three
+ * severity branches, and two returns. From the Code Mode runtime's dense export.
+ */
+const denseIncident = parseIntermediateDiagram({
+	...flowchartFixture,
+	id: "incident-escalation-ops",
+	nodes: [
+		["alert_received", "Alert Received", "start"],
+		["triage", "Triage & Deduplicate", "process"],
+		["is_actionable", "Actionable Signal?", "decision"],
+		["auto_close", "Auto-Close / Suppress", "end"],
+		["severity", "Assess Severity", "decision"],
+		["sev1_page", "Page On-Call (SEV1)", "process"],
+		["sev2_assign", "Assign Owner (SEV2)", "process"],
+		["sev3_queue", "Queue Backlog (SEV3)", "process"],
+		["incident_bridge", "Open Incident Bridge", "process"],
+		["investigate", "Investigate Root Cause", "process"],
+		["mitigated", "Mitigated?", "decision"],
+		["reassess", "Reassess Severity", "process"],
+		["comms", "Notify Stakeholders", "process"],
+		["monitor", "Stable After Monitoring?", "decision"],
+		["postmortem", "Write Postmortem", "process"],
+		["resolved", "Incident Resolved", "end"],
+	].map(([id, label, kind]) => ({ id, label, kind })),
+	edges: [
+		["alert_received", "triage"],
+		["triage", "is_actionable"],
+		["is_actionable", "auto_close", "no"],
+		["is_actionable", "severity", "yes"],
+		["severity", "sev1_page", "SEV1"],
+		["severity", "sev2_assign", "SEV2"],
+		["severity", "sev3_queue", "SEV3"],
+		["sev1_page", "incident_bridge"],
+		["sev2_assign", "incident_bridge"],
+		["incident_bridge", "investigate"],
+		["sev3_queue", "investigate"],
+		["investigate", "mitigated"],
+		["mitigated", "comms", "yes"],
+		["mitigated", "reassess", "no"],
+		["reassess", "severity", "re-triage"],
+		["comms", "monitor"],
+		["monitor", "postmortem", "stable"],
+		["monitor", "investigate", "regressed"],
+		["postmortem", "resolved"],
+	].map(([source, target, label], index) => ({
+		id: `edge-${index + 1}`,
+		source,
+		target,
+		...(label ? { label } : {}),
+	})),
+	layout: { direction: "TB", edgeRouting: "orthogonal" },
+});
+
+describe("branch side work", () => {
+	// Every layout sizes each of the 16 nodes from its label twice, and the
+	// render sizes them once before laying out: 7 sizings (224 measurements)
+	// on db5ae02e and here, 2.52M and 2.56M checks. On 9b76e52f the crossing
+	// repair had moved the severity check's branches, so the branch-side pass
+	// laid out the arranged layout's own assignment again and completed it
+	// through three repair layouts, back to the drawn layout: 11 sizings (352)
+	// and 4.81M checks for the same drawing.
+	it("completes no branch assignment the arranged layout already makes", () => {
+		work.checks = 0;
+		work.measures = 0;
+		const scene = renderIntermediateDiagram(denseIncident);
+		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(19);
+		expect(work.measures).toBeLessThanOrEqual(7 * 2 * 16);
+		expect(work.checks).toBeLessThan(3_000_000);
+	});
+});
+
 describe("crossing repair work", () => {
 	// The generated corpus includes the named-final retry case. Side changes are
 	// screened by rerouting only the edges they touch before laying the diagram
-	// out in full. Measured 14.46M: 8.88M as before, the rest to choose decision
+	// out in full. Measured 13.98M: 8.88M as before, the rest to choose decision
 	// branch vertices (each candidate completed through the arrowhead repair, and
 	// tried wherever a decision's branches were flawed before the crossing repair
 	// moved them), screen moves onto a decision's free vertex and polish arrivals.
+	// 14.46M while the branch-side pass also completed the arranged layout's own
+	// assignment again.
 	it("bounds segment checks for the generated diagrams it repairs", () => {
 		work.checks = 0;
 		for (const fixture of Object.values(crossingFixtures)) renderIntermediateDiagram(fixture);

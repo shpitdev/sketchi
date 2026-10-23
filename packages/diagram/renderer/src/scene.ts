@@ -5598,12 +5598,30 @@ function assignPairedReturns(
 	}
 }
 
-function freeLabelSize(label: string, maxWidth: number): { width: number; height: number } {
-	const text = wrapTextToWidth(label, maxWidth, 13);
-	return {
-		width: wrappedLabelWidth(text, 13, maxWidth),
-		height: Math.ceil(text.split("\n").length * 13 * 1.35),
-	};
+/**
+ * Free labels measured, by wrap width and text: the router asks for a branch
+ * label's size on every stub it tries, and wrapping segments the text anew.
+ */
+const freeLabelSizes = new Map<string, Readonly<{ width: number; height: number }>>();
+/** Labels measured before the cache starts over, so a long-lived worker stays small. */
+const FREE_LABEL_SIZES = 4_096;
+
+function freeLabelSize(
+	label: string,
+	maxWidth: number,
+): Readonly<{ width: number; height: number }> {
+	const key = `${maxWidth}\u0000${label}`;
+	let size = freeLabelSizes.get(key);
+	if (!size) {
+		const text = wrapTextToWidth(label, maxWidth, 13);
+		size = {
+			width: wrappedLabelWidth(text, 13, maxWidth),
+			height: Math.ceil(text.split("\n").length * 13 * 1.35),
+		};
+		if (freeLabelSizes.size >= FREE_LABEL_SIZES) freeLabelSizes.clear();
+		freeLabelSizes.set(key, size);
+	}
+	return size;
 }
 
 /** Decision branch labels wrap narrow to stay compact beside their vertex. */
@@ -8708,7 +8726,6 @@ function chooseBranchSides(
 		const looping = (order: readonly ConnectionEdge[]) =>
 			own.filter((route, index) => leavesAway(route, order[index]!)).length;
 		// As drawn, or as arranged before a crossing repair moved them.
-		// As drawn, or as arranged before a crossing repair moved them.
 		const [loops, flawed] = [best.layout, base.layout]
 			.map((layout) => {
 				const lines = layout.edgeArrows.filter((arrow) => ids.has(arrow.edgeId));
@@ -8733,6 +8750,13 @@ function chooseBranchSides(
 		// Only the assignments that reach their targets most directly are laid out.
 		const reach = (order: readonly ConnectionEdge[]) =>
 			own.reduce((sum, route, index) => sum + branchReach(route, order[index]!), 0);
+		// Where a crossing repair moved the branches, the arranged layout's own
+		// assignment is one of the others: it lays out as the arranged layout, and
+		// completes to the drawn layout, so it is neither laid out nor completed again.
+		const arrangedSides = own.map(
+			(route) =>
+				base.layout.routedEdges.find((other) => other.edge.id === route.edge.id)?.sourceEdge,
+		);
 		const arrangedCandidates = sideAssignments(vertices, own.length)
 			.filter(
 				(order) =>
@@ -8741,6 +8765,8 @@ function chooseBranchSides(
 			.sort((a, b) => reach(a) - reach(b))
 			.slice(0, BRANCH_SCREENS)
 			.map((order) => {
+				if (order.every((side, index) => side === arrangedSides[index]))
+					return { ...base, score: arrangedScore };
 				const sides = new Map(base.arrangement.sides);
 				own.forEach((route, index) =>
 					sides.set(route.edge.id, { ...sides.get(route.edge.id), sourceEdge: order[index]! }),
@@ -8755,6 +8781,7 @@ function chooseBranchSides(
 			.slice(0, BRANCH_COMPLETIONS);
 		let chosen: { base: SettledLayout; drawn: CompletedLayout; score: number[] } | undefined;
 		for (const { score: _, ...settled } of arrangedCandidates) {
+			if (settled.layout === base.layout) continue;
 			const candidate = complete(settled, (layout) =>
 				lowerScore((chosen?.score ?? bestScore).slice(0, 2), score(layout).slice(0, 2)),
 			);

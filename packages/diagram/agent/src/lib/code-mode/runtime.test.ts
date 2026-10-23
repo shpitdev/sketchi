@@ -927,7 +927,6 @@ describe("Code Mode runtime", () => {
 		});
 	});
 
-	// Hang guard for the dense render, not a speed budget.
 	it("exports dense incident feedback flows without edge-through-node routes", async () => {
 		const runtime = createTestRuntime();
 		const built = await runtime.buildFlowchart({
@@ -941,7 +940,7 @@ describe("Code Mode runtime", () => {
 		expectBuildOk(built);
 		expect(built.quality.summary).toEqual({ nodeCount: 16, edgeCount: 19 });
 		expect(built.artifact.formats.map((format) => format.format)).toEqual(["scene", "excalidraw"]);
-	}, 60_000);
+	});
 
 	it("exports production release rollback flows without dense route collisions", async () => {
 		const runtime = createTestRuntime();
