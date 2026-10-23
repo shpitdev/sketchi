@@ -4,6 +4,8 @@ import awsThreeTier from "./fixtures/zones/aws-three-tier.js";
 import awsThreeTierDescribed from "./fixtures/zones/aws-three-tier-described.js";
 import awsThreeTierQueries from "./fixtures/zones/aws-three-tier-queries.js";
 import hybridCloud from "./fixtures/zones/hybrid-cloud.js";
+import hybridCloudBypass from "./fixtures/zones/hybrid-cloud-bypass.js";
+import hybridCloudBypassArchive from "./fixtures/zones/hybrid-cloud-bypass-archive.js";
 import hybridCloudDescribed from "./fixtures/zones/hybrid-cloud-described.js";
 import hybridCloudLabeled from "./fixtures/zones/hybrid-cloud-labeled.js";
 import kindedFlat from "./fixtures/zones/kinded-flat.js";
@@ -38,6 +40,15 @@ export const zoneFixtures = {
  * they can. Its logo needs an embedded asset to export.
  */
 export const describedHybridFlowchart = flowchart(hybridCloudDescribed);
+
+/**
+ * Hybrid setups whose ERP line to the VPN gateway passes under the Oracle
+ * database it does not enter, as two generated samples drew them.
+ */
+export const bypassingHybridFlowcharts = {
+	"hybrid-cloud-bypass": flowchart(hybridCloudBypass),
+	"hybrid-cloud-bypass-archive": flowchart(hybridCloudBypassArchive),
+};
 
 /**
  * The AWS three-tier app with short labels and each technology in a node

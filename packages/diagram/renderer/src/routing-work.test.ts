@@ -106,10 +106,11 @@ const denseRelease = parseIntermediateDiagram({
 });
 
 describe("routing work", () => {
-	// Measured: 3.65M checks TB and 5.07M LR with A* grid search, aligned ports,
-	// corridor-aware fallbacks and the drawn layout's arrival polish (3.40M and
-	// 3.19M before it). Rescanning every routed segment on each grid-search step
-	// (aa01b3f1) took 29.4M TB.
+	// Measured: 3.65M checks TB and 5.71M LR with A* grid search, aligned ports,
+	// corridor-aware fallbacks, the drawn layout's arrival polish (3.40M and 3.19M
+	// before it) and a last pass moving lines clear of every node they still pass
+	// too closely (5.07M LR before it). Rescanning every routed segment on each
+	// grid-search step (aa01b3f1) took 29.4M TB.
 	it.each([
 		["TB", 6_000_000],
 		["LR", 9_000_000],

@@ -8010,9 +8010,11 @@ function routesNoWorse(
  * moved just clear of it, where the route stays orthogonal and the move draws
  * no more export defects, crossings, reader-scale findings, inward endpoints
  * or labels touching anything. Runs only after every other choice, so no
- * other route moves.
+ * other route moves. In the `last` pass, after every choice, a line moves
+ * again from where its last move left it until no run is near, and no move
+ * may run a line through a head: no head repair follows.
  */
-function clearOutlines(layout: DiagramLayout): DiagramLayout {
+function clearOutlines(layout: DiagramLayout, last = false): DiagramLayout {
 	const { groups, lanes, nodeShapes, routedEdges } = layout;
 	let arrows = layout.edgeArrows;
 	const drawn = [...nodeShapes, ...groupBlocks(groups), ...laneBlocks(lanes)];
@@ -8020,6 +8022,7 @@ function clearOutlines(layout: DiagramLayout): DiagramLayout {
 		crossings: arrowCrossings(candidate),
 		defects: exportRouteDefects(candidate, nodeShapes, groups, lanes).length,
 		findings: readerFindingCount(candidate, drawn),
+		heads: last ? headCrossers({ ...layout, edgeArrows: [...candidate] }).size : 0,
 		inward: inwardEndpoints(candidate, nodeShapes),
 		labels: placedBranchLabels([...candidate], routedEdges, nodeShapes, groups, true, lanes)
 			.touches,
@@ -8027,24 +8030,29 @@ function clearOutlines(layout: DiagramLayout): DiagramLayout {
 	let current: ReturnType<typeof score> | undefined;
 	for (const [index, arrow] of layout.edgeArrows.entries()) {
 		const ends = new Set([arrow.sourceNodeId, arrow.targetNodeId]);
-		const near = routeClearanceCount(arrow.points, nodeShapes, ends);
-		if (near === 0) continue;
-		current ??= score(arrows);
-		for (const points of runsClearOfOutlines(arrow.points, nodeShapes, ends)) {
-			if (!orthogonalRoute(points) || routeClearanceCount(points, nodeShapes, ends) >= near)
-				continue;
-			const candidate = arrows.map((other, at) => (at === index ? { ...other, points } : other));
-			const next = score(candidate);
-			if (
-				next.defects <= current.defects &&
-				next.crossings <= current.crossings &&
-				next.findings <= current.findings &&
-				next.inward <= current.inward &&
-				next.labels <= current.labels
-			) {
-				[arrows, current] = [candidate, next];
-				break;
+		let near = routeClearanceCount(arrow.points, nodeShapes, ends);
+		// Each move clears at least one run, so a line stops once none is near.
+		for (let moves = 0; near > 0 && (last || moves === 0); moves += 1) {
+			current ??= score(arrows);
+			let moved = false;
+			for (const points of runsClearOfOutlines(arrows[index]!.points, nodeShapes, ends)) {
+				const nearer = routeClearanceCount(points, nodeShapes, ends);
+				if (!orthogonalRoute(points) || nearer >= near) continue;
+				const candidate = arrows.map((other, at) => (at === index ? { ...other, points } : other));
+				const next = score(candidate);
+				if (
+					next.defects <= current.defects &&
+					next.crossings <= current.crossings &&
+					next.findings <= current.findings &&
+					next.heads <= current.heads &&
+					next.inward <= current.inward &&
+					next.labels <= current.labels
+				) {
+					[arrows, current, near, moved] = [candidate, next, nearer, true];
+					break;
+				}
 			}
+			if (!moved) break;
 		}
 	}
 	return arrows === layout.edgeArrows ? layout : { ...layout, edgeArrows: arrows };
@@ -9894,6 +9902,14 @@ export function renderGraphDiagram(
 			defectsOf,
 			fewer,
 		);
+	// A line the finished layout moved clear of one node it passed too closely,
+	// or by one run, moves clear of every other it still passes. Only now, after
+	// every choice: a crossing it removes on the way would otherwise bar the
+	// rivals that clear lines out of arrowheads.
+	if (orthogonal) {
+		const cleared = clearOutlines(layout, true);
+		if (cleared !== layout) layout = clearLabels(cleared);
+	}
 	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];
 	const descriptions = new Map(

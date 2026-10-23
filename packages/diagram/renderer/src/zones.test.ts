@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	CANVAS_SHAPE_CURVE,
+	bypassingHybridFlowcharts,
 	describedHybridFlowchart,
 	canvasBoundTextBox,
 	canvasShapeOutline,
@@ -394,4 +395,79 @@ describe("lines into a hanging zone band", () => {
 		expect(aws.x).toBeGreaterThan(dc.x + dc.width);
 		expect(dc.y).toBeLessThan(aws.y + aws.height);
 	});
+});
+
+describe("lines past an infrastructure shape", () => {
+	/** Room every line keeps from the drawn outline of a node it neither leaves nor enters. */
+	const NODE_CLEARANCE = 12;
+	type Point = { readonly x: number; readonly y: number };
+	// A composed shape's curves and sides, an ellipse finely sampled, or a box.
+	const outline = (node: NodeSceneElement): Point[] => {
+		if (isCanvasComposedShape(node.shape))
+			return canvasShapeOutline({ ...node, shape: node.shape });
+		const [cx, cy, rx, ry] = [node.width / 2, node.height / 2, node.width / 2, node.height / 2];
+		if (node.shape === "ellipse" || node.shape === "circle")
+			return Array.from({ length: 361 }, (_, i) => ({
+				x: node.x + cx + rx * Math.cos((i * Math.PI) / 180),
+				y: node.y + cy + ry * Math.sin((i * Math.PI) / 180),
+			}));
+		return [
+			{ x: node.x, y: node.y },
+			{ x: node.x + node.width, y: node.y },
+			{ x: node.x + node.width, y: node.y + node.height },
+			{ x: node.x, y: node.y + node.height },
+			{ x: node.x, y: node.y },
+		];
+	};
+	const toSegment = (p: Point, a: Point, b: Point) => {
+		const [dx, dy] = [b.x - a.x, b.y - a.y];
+		const t = Math.max(
+			0,
+			Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)),
+		);
+		return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+	};
+	const gap = (a: Point, b: Point, c: Point, d: Point) => {
+		const side = (o: Point, p: Point, q: Point) =>
+			(p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+		if (side(c, d, a) * side(c, d, b) < 0 && side(a, b, c) * side(a, b, d) < 0) return 0;
+		return Math.min(toSegment(a, c, d), toSegment(b, c, d), toSegment(c, a, b), toSegment(d, a, b));
+	};
+
+	it.each(Object.keys(bypassingHybridFlowcharts))(
+		"keeps each line of %s clear of the shapes it passes",
+		(name) => {
+			// Two Sonnet samples ran the ERP's line to the VPN gateway along the
+			// Oracle database's foot: the line cleared the database's side by the
+			// node clearance, then ran on just under its foot.
+			const scene = renderIntermediateDiagram(
+				bypassingHybridFlowcharts[name as keyof typeof bypassingHybridFlowcharts],
+			);
+			const nodes = scene.elements.filter(
+				(e): e is NodeSceneElement => e.type === "node" && e.rendererRole === undefined,
+			);
+			const close = scene.elements.flatMap((arrow) =>
+				arrow.type !== "arrow"
+					? []
+					: nodes.flatMap((node) => {
+							if (node.nodeId === arrow.sourceNodeId || node.nodeId === arrow.targetNodeId)
+								return [];
+							const polygon = outline(node);
+							const least = Math.min(
+								...arrow.points
+									.slice(1)
+									.flatMap((to, index) =>
+										polygon
+											.slice(1)
+											.map((end, at) => gap(arrow.points[index]!, to, polygon[at]!, end)),
+									),
+							);
+							return least < NODE_CLEARANCE
+								? [`${arrow.edgeId} ${least.toFixed(1)} px from ${node.nodeId}`]
+								: [];
+						}),
+			);
+			expect(close).toEqual([]);
+		},
+	);
 });
