@@ -401,6 +401,48 @@ export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 	"zone",
 ];
 
+/**
+ * Roles whose rectangles keep square corners: chart and Gantt bars, so their
+ * ends sit exactly at their values and dates; a table's or class's outline and
+ * name band, so the band fills its top; and lanes and zones, so neighbors share
+ * one boundary.
+ */
+const SQUARE_CORNER_ROLES: ReadonlySet<CanvasRendererRole> = new Set([
+	"chart-mark",
+	"gantt-mark",
+	"er-table",
+	"class-box",
+	"swimlane",
+	"swimlane-header",
+	"zone",
+]);
+
+/** Whether a shape draws as a rectangle with Excalidraw's adaptive rounded corners. */
+export function canvasRoundsCorners(
+	shape: Pick<CanvasShapeElement, "rendererRole" | "shape">,
+): boolean {
+	return (
+		shape.shape === "rectangle" &&
+		(shape.rendererRole === undefined || !SQUARE_CORNER_ROLES.has(shape.rendererRole))
+	);
+}
+
+/** Excalidraw's adaptive corner radius at most, reached once the shorter side is 128. */
+const CANVAS_CORNER_RADIUS = 32;
+
+/**
+ * The radius a rounded rectangle's corners draw with: a quarter of its shorter
+ * side, up to 32 (Excalidraw's adaptive radius). A line meeting a side nearer a
+ * corner than this meets the curve, not the straight side. Square shapes have none.
+ */
+export function canvasCornerRadius(
+	shape: Pick<CanvasShapeElement, "height" | "rendererRole" | "shape" | "width">,
+): number {
+	return canvasRoundsCorners(shape)
+		? Math.min(Math.min(shape.width, shape.height) / 4, CANVAS_CORNER_RADIUS)
+		: 0;
+}
+
 const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"chart-mark": "Chart mark",
 	"class-box": "Class box",

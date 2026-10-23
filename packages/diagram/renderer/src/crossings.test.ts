@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	candidateRouteQuality,
+	canvasCornerRadius,
 	crossingFixtures,
 	crossingStateMachines,
 	routingFixtures,
@@ -131,6 +132,33 @@ function outlineGaps(scene: RenderedDiagramScene): { edge: string; gap: number; 
 }
 
 /**
+ * Line ends that meet a rounded box within a corner's curve rather than on the
+ * straight part of a side: nearer the corner, along the side, than its radius.
+ */
+function cornerEnds(scene: RenderedDiagramScene): string[] {
+	const nodes = new Map(nodesOf(scene).map((node) => [node.nodeId, node]));
+	return arrowsOf(scene).flatMap((arrow) =>
+		(
+			[
+				[arrow.sourceNodeId, arrow.points[0]],
+				[arrow.targetNodeId, arrow.points.at(-1)!],
+			] as const
+		).flatMap(([id, end]) => {
+			const node = id === undefined ? undefined : nodes.get(id);
+			const radius = node ? canvasCornerRadius(node) : 0;
+			if (!node || radius === 0) return [];
+			const upright = Math.abs(end.x - node.x) < 0.5 || Math.abs(end.x - node.x - node.width) < 0.5;
+			const along = upright
+				? Math.min(end.y - node.y, node.y + node.height - end.y)
+				: Math.min(end.x - node.x, node.x + node.width - end.x);
+			return along < radius - 0.01
+				? [`${arrow.edgeId} ${along.toFixed(1)} px along ${id} from its corner (radius ${radius})`]
+				: [];
+		}),
+	);
+}
+
+/**
  * Lines that pass through or touch another line's arrowhead at the size a
  * reader sees the export: a head a line runs through reads as pointing that
  * line into the head's target.
@@ -205,6 +233,10 @@ describe("avoidable crossings in generated flowcharts", () => {
 			expect(crossed).toEqual([]);
 		},
 	);
+
+	it.each(flowcharts)("meets every rounded node of %s on the straight part of a side", (name) => {
+		expect(cornerEnds(scenes.get(name)!)).toEqual([]);
+	});
 
 	it("keeps each line clear of every node it passes, rounded and pointed nodes included", () => {
 		const close = flowcharts.flatMap((name) =>
@@ -303,6 +335,15 @@ describe("avoidable crossings in generated state machines", () => {
 		"sets each of $name's ($direction) labels clearly nearer its own line than any other",
 		({ scene }) => {
 			expect(ambiguousLabels(scene)).toEqual([]);
+		},
+	);
+
+	it.each(layouts)(
+		"meets each of $name's ($direction) states on the straight part of a side",
+		({ scene }) => {
+			// Round 22, Sol: seek's self-loop left Playing's foot and came back into
+			// its side 16 px from the corner, inside the 27.5 px curve.
+			expect(cornerEnds(scene)).toEqual([]);
 		},
 	);
 });

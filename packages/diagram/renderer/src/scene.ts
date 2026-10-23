@@ -3,6 +3,7 @@ import {
 	CANVAS_SPEC_VERSION,
 	AXIS_ALIGNED_EPSILON,
 	canvasBoundTextBox,
+	canvasCornerRadius,
 	canvasNodeIconBand,
 	type AxisAlignedSegment,
 	CANVAS_FRAME_NAME,
@@ -9066,6 +9067,105 @@ function straightenArrivals(
 }
 
 /**
+ * The drawn layout with each line that meets a rounded node within a corner's
+ * curve, nearer the corner along its side than the radius, moved along that
+ * side onto its straight part: a line into the curve reads as aimed at the
+ * corner. One line at a time routes again, around the others as they lie,
+ * kept when the layout draws no worse. A family that draws its own boxes
+ * (placed, square) keeps its lines.
+ */
+function endsOffCorners(
+	diagram: IntermediateDiagram,
+	layout: DiagramLayout,
+	finished: (layout: DiagramLayout) => DiagramLayout,
+	defectsOf: (layout: DiagramLayout) => readonly [number, number],
+	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
+): DiagramLayout {
+	const { lanes, routeOptions, routedEdges } = layout;
+	if (!layout.portOffsets || !routeOptions || lanes || graphOptions.get(diagram)?.placement)
+		return layout;
+	let current = layout;
+	// Where each other line meets a node's side, along it from the node's middle.
+	const besides = (node: NodeSceneElement, side: ConnectionEdge, except: string) =>
+		routedEdges.flatMap((other, at) =>
+			(["source", "target"] as const).flatMap((endpoint) => {
+				const otherSide = endpoint === "source" ? other.sourceEdge : other.targetEdge;
+				if (
+					other.edge.id === except ||
+					other[endpoint].nodeId !== node.nodeId ||
+					otherSide !== side
+				)
+					return [];
+				const points = current.edgeArrows[at]!.points;
+				const point = endpoint === "source" ? points[0] : points.at(-1)!;
+				return [point[slotAxis(side)] - center(node)[slotAxis(side)]];
+			}),
+		);
+	for (const [index, route] of routedEdges.entries()) {
+		const line = current.edgeArrows[index]!;
+		const ends = (["source", "target"] as const).map((endpoint) => {
+			const node = route[endpoint];
+			const side = endpoint === "source" ? route.sourceEdge : route.targetEdge;
+			const axis = slotAxis(side);
+			const point = endpoint === "source" ? line.points[0] : line.points.at(-1)!;
+			const radius = node.id.startsWith("node:") ? canvasCornerRadius(node) : 0;
+			const half = (axis === "x" ? node.width : node.height) / 2;
+			return {
+				along: point[axis] - center(node)[axis],
+				curved: radius > PORT_PADDING,
+				key: connectionKey({ edgeId: route.edge.id, endpoint }),
+				limit: Math.max(0, half - Math.max(PORT_PADDING, radius)),
+				others: besides(node, side, route.edge.id),
+			};
+		});
+		const cornered = ends.filter(
+			(end) => end.curved && Math.abs(end.along) > end.limit + AXIS_ALIGNED_EPSILON,
+		);
+		// An end moves in only as far as it keeps a port's room from the other lines on its side.
+		const roomy = (end: (typeof ends)[number], along: number) =>
+			end.others.every(
+				(other) =>
+					Math.abs(along - other) >=
+					Math.min(Math.abs(end.along - other), PORT_SPACING) - AXIS_ALIGNED_EPSILON,
+			);
+		if (
+			cornered.length === 0 ||
+			!cornered.every((end) => roomy(end, Math.sign(end.along) * end.limit))
+		)
+			continue;
+		const offsets = new Map(current.portOffsets);
+		for (const end of cornered) offsets.set(end.key, Math.sign(end.along) * end.limit);
+		// A straight line moves both its ends, so it stays straight.
+		if (line.points.length === 2 && cornered.length === 1) {
+			const [moved] = cornered;
+			const other = ends.find((end) => end !== moved)!;
+			const along = other.along + Math.sign(moved!.along) * moved!.limit - moved!.along;
+			if (Math.abs(along) <= other.limit + AXIS_ALIGNED_EPSILON && roomy(other, along))
+				offsets.set(other.key, along);
+		}
+		const order = routedEdges
+			.map((_, at) => at)
+			.sort((a, b) => Number(a === index) - Number(b === index));
+		const arrows = routeAllEdges(
+			routedEdges,
+			"orthogonal",
+			offsets,
+			current.nodeShapes,
+			{ ...routeOptions, midway: true },
+			order,
+			new Map(
+				current.edgeArrows.filter((arrow) => arrow !== line).map((arrow) => [arrow.edgeId, arrow]),
+			),
+		);
+		// A line that crosses more is no better for its straight end: it is not finished.
+		if (arrowCrossings(arrows) > arrowCrossings(current.edgeArrows)) continue;
+		const candidate = finished({ ...current, edgeArrows: arrows, portOffsets: offsets });
+		if (drawsNoWorse(candidate, current, defectsOf, fewer)) current = candidate;
+	}
+	return current;
+}
+
+/**
  * No more export defects, and no more crossings, reader findings, lines
  * through a head, hooks, detours, dips or crowded labels, and no newly
  * extreme aspect or longer a drawing.
@@ -9921,10 +10021,17 @@ export function renderGraphDiagram(
 			fewer,
 		));
 	// Last, lines that turn over a corner into a crowded side, dip into their
-	// target or jog beside a port are polished where that draws no worse.
+	// target, jog beside a port or meet a rounded node within its corner's curve
+	// are polished where that draws no worse.
 	if (orthogonal)
-		layout = straightenArrivals(
-			polishArrivals(diagram, layout, finished, defectsOf, fewer),
+		layout = endsOffCorners(
+			diagram,
+			straightenArrivals(
+				polishArrivals(diagram, layout, finished, defectsOf, fewer),
+				finished,
+				defectsOf,
+				fewer,
+			),
 			finished,
 			defectsOf,
 			fewer,

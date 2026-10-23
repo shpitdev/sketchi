@@ -111,11 +111,12 @@ const denseRelease = parseIntermediateDiagram({
 });
 
 describe("routing work", () => {
-	// Measured: 3.65M checks TB and 5.71M LR with A* grid search, aligned ports,
+	// Measured: 3.65M checks TB and 6.57M LR with A* grid search, aligned ports,
 	// corridor-aware fallbacks, the drawn layout's arrival polish (3.40M and 3.19M
-	// before it) and a last pass moving lines clear of every node they still pass
-	// too closely (5.07M LR before it). Rescanning every routed segment on each
-	// grid-search step (aa01b3f1) took 29.4M TB.
+	// before it), a last pass moving lines clear of every node they still pass
+	// too closely (5.07M LR before it) and ends moved off rounded corners (5.71M
+	// LR before). Rescanning every routed segment on each grid-search step
+	// (aa01b3f1) took 29.4M TB.
 	it.each([
 		["TB", 6_000_000],
 		["LR", 9_000_000],
@@ -206,10 +207,11 @@ describe("branch side work", () => {
 describe("crossing repair work", () => {
 	// The generated corpus includes the named-final retry case. Side changes are
 	// screened by rerouting only the edges they touch before laying the diagram
-	// out in full. Measured 13.98M: 8.88M as before, the rest to choose decision
+	// out in full. Measured 14.05M: 8.88M as before, the rest to choose decision
 	// branch vertices (each candidate completed through the arrowhead repair, and
 	// tried wherever a decision's branches were flawed before the crossing repair
-	// moved them), screen moves onto a decision's free vertex and polish arrivals.
+	// moved them), screen moves onto a decision's free vertex, polish arrivals and
+	// move ends off rounded corners (13.98M before).
 	// 14.46M while the branch-side pass also completed the arranged layout's own
 	// assignment again.
 	it("bounds segment checks for the generated diagrams it repairs", () => {
@@ -294,10 +296,11 @@ describe("swimlane routing work", () => {
 });
 
 describe("zone routing work", () => {
-	// Measured: 2.08M checks for the four zone fixtures in LR and TB, and 16.3M for
+	// Measured: 2.12M checks for the four zone fixtures in LR and TB, and 16.4M for
 	// the two stress cases (zones four deep across two availability zones, and
 	// thirty services in eight zones), each wrapped where too long for one row or
-	// column; 1.96M and 14.6M before the drawn layout's arrival polish. Testing
+	// column; 2.08M and 16.3M before ends moved off rounded corners, 1.96M and
+	// 14.6M before the drawn layout's arrival polish. Testing
 	// each grid step only against the shapes its line runs through took the
 	// stress cases from 27.5M.
 	it("bounds segment checks for the zone fixtures and stress cases", () => {

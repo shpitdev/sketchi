@@ -18,6 +18,7 @@ import {
 	canvasShapeOutline,
 	canvasShapeStrokes,
 	fnv1a32,
+	canvasRoundsCorners,
 	isCanvasComposedShape,
 	type AxisAlignedSegment,
 	isSharedBoundStem,
@@ -442,21 +443,7 @@ function shapeElement(input: {
 		height,
 		backgroundColor: input.shape.fillColor ?? "transparent",
 		boundElements: boundElements.length > 0 ? boundElements : null,
-		// Chart and Gantt bars keep square corners, so their ends sit exactly at their
-		// values and dates, a table's or class's outline and name band keep theirs,
-		// so the band fills its top, and lanes keep theirs, so neighbors share one
-		// boundary.
-		roundness:
-			shapeType === "rectangle" &&
-			input.shape.rendererRole !== "chart-mark" &&
-			input.shape.rendererRole !== "gantt-mark" &&
-			input.shape.rendererRole !== "er-table" &&
-			input.shape.rendererRole !== "class-box" &&
-			input.shape.rendererRole !== "swimlane" &&
-			input.shape.rendererRole !== "swimlane-header" &&
-			input.shape.rendererRole !== "zone"
-				? { type: 3 }
-				: null,
+		roundness: canvasRoundsCorners(input.shape) ? { type: 3 } : null,
 		strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
 		...(input.shape.rendererRole
 			? { customData: { sketchiRendererRole: input.shape.rendererRole } }
