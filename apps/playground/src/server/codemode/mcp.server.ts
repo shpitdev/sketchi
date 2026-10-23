@@ -518,6 +518,9 @@ function createDefaultCodeModeExecutor() {
 	});
 }
 
+// PROBE ONLY (do not merge): the colo this isolate runs in, from its own egress.
+let probeColo: Promise<string> | undefined;
+
 export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode")(function* (
 	input: unknown,
 	runToolEffect: PlaygroundRequestRunner,
@@ -637,6 +640,13 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 	// PROBE ONLY (do not merge): hand this request's R2 write timings back to the client.
 	const r2Probes = (globalThis as { __sketchiR2Probe?: Map<string, unknown> }).__sketchiR2Probe;
 	const probedIds = [...new Set(JSON.stringify(executed).match(/artifact_[0-9a-f]{32}/g) ?? [])];
+	const colo = yield* Effect.promise(
+		() =>
+			(probeColo ??= fetch("https://www.cloudflare.com/cdn-cgi/trace")
+				.then((response) => response.text())
+				.then((text) => /colo=(\w+)/.exec(text)?.[1] ?? "unknown")
+				.catch(() => "unknown")),
+	);
 	const r2Probe = probedIds.flatMap((id) => {
 		const probe = r2Probes?.get(id);
 		r2Probes?.delete(id);
@@ -655,7 +665,7 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 				...executed,
 				logs: [
 					...(executed.logs ?? []),
-					`R2PROBE ${JSON.stringify({ executeMs: finishedAt - startedAt, artifacts: r2Probe })}`,
+					`R2PROBE ${JSON.stringify({ executeMs: finishedAt - startedAt, colo, artifacts: r2Probe })}`,
 				],
 			}
 		: executed;
