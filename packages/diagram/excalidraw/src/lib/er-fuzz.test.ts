@@ -185,9 +185,9 @@ function routingCounts(scene: RenderedDiagramScene) {
 /**
  * Ends whose bar or foot another line runs through, other than a neighbor's
  * on the same row of the same table: Excalidraw draws each head min(20, run / 2)
- * long and 20 sin 25° either side of its line. A row holding more ends than
- * its band spaces a mark apart may bunch them, but no line from another row,
- * or passing by, may cross a mark.
+ * long and 20 sin 25° either side of its line. A row whose growth would draw
+ * worse may still bunch its ends, but no line from another row, or passing by,
+ * may cross a mark.
  */
 function foreignMarks(scene: RenderedDiagramScene): string[] {
 	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
@@ -251,6 +251,29 @@ function foreignMarks(scene: RenderedDiagramScene): string[] {
 	);
 }
 
+/**
+ * Neighboring ends on one side of a table whose heads run together: Excalidraw
+ * draws a bar or foot 17 across, so two ports nearer than 20 read as one end.
+ */
+function bunchedEnds(scene: RenderedDiagramScene): number {
+	const sides = new Map<string, number[]>();
+	for (const arrow of scene.elements)
+		if (arrow.type === "arrow")
+			for (const [node, point] of [
+				[arrow.sourceNodeId, arrow.points[0]],
+				[arrow.targetNodeId, arrow.points.at(-1)!],
+			] as const) {
+				const key = `${node}:${Math.round(point.x)}`;
+				sides.set(key, [...(sides.get(key) ?? []), point.y]);
+			}
+	let bunched = 0;
+	for (const ports of sides.values()) {
+		ports.sort((a, b) => a - b);
+		bunched += ports.slice(1).filter((port, index) => port - ports[index]! < 20).length;
+	}
+	return bunched;
+}
+
 /** Everything the export validator, the canvas validator or the layout guards would flag. */
 function defects(diagram: ErDiagram): string[] {
 	const scene = renderDiagram(diagram);
@@ -310,6 +333,12 @@ function defects(diagram: ErDiagram): string[] {
  * together they may draw no more of either.
  */
 const ER_ROUTING = "1/2 0/0 0/0 0/0 0/0 1/0 0/0 0/1 0/0 0/0 0/0 1/0 0/0 0/0 0/0 0/0";
+/**
+ * Neighboring ends that bunch across the schemas checked: a row holding more
+ * than two ends on a side grows to give each a port of its own, except where
+ * growing would draw worse (99 and 3 before rows grew).
+ */
+const ER_BUNCHED = { ci: 0, full: 18 };
 
 /** Schemas checked in CI; the full fuzz runs locally with ER_FUZZ=full (and any ER_FUZZ_SEED). */
 const CI_SCHEMAS = 16;
@@ -347,5 +376,11 @@ describe("ER routing fuzz", () => {
 		expect(worse).toEqual([]);
 		expect(total(drawn, 0)).toBeLessThanOrEqual(total(pinned, 0));
 		expect(total(drawn, 1)).toBeLessThanOrEqual(total(pinned, 1));
+	});
+
+	it("bunches no more ends than pinned, each crowded row grown for its ends", () => {
+		const bunched = schemas.reduce((sum, schema) => sum + bunchedEnds(renderDiagram(schema)), 0);
+		if (process.env["PRINT_ROUTING"]) console.log("PIN er bunched", bunched);
+		expect(bunched).toBeLessThanOrEqual(FULL ? ER_BUNCHED.full : ER_BUNCHED.ci);
 	});
 });

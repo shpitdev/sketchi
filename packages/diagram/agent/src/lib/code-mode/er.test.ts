@@ -5,7 +5,7 @@ import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildErDiagramResultSchema } from "./contract.js";
+import { BuildErDiagramResultSchema, RenderedDiagramSceneSchema } from "./contract.js";
 import { canonicalDocumentFromDiagram } from "./documents.js";
 import { applyDiagramPatch, buildErDiagram, CodeModeRuntimeEnvironment } from "./runtime.js";
 
@@ -91,6 +91,39 @@ describe("Code Mode native ER diagram", () => {
 			"text:orders:keys",
 			"text:orders:types",
 		]);
+	});
+
+	it("builds a key row five tables reference into valid artifacts, its row a text per cell", async () => {
+		const children = ["projects", "labels", "api_keys", "memberships", "subscriptions"];
+		const built = await build({
+			title: "Workspace",
+			entities: [
+				{ id: "organizations", fields: ["id uuid PK", "name text"] },
+				...children.map((id) => ({ id, fields: ["id uuid PK", "organization_id uuid FK"] })),
+			],
+			relationships: children.map((id) => ({
+				from: `${id}.organization_id`,
+				to: "organizations.id",
+				fromCardinality: "zero-or-many",
+				toCardinality: "one",
+			})),
+		});
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		const formats = new Map(built.artifact.formats.map((format) => [format.format, format.inline]));
+		// The scene decodes as the CLI and MCP read it: no empty text where a row has no key or type.
+		const scene = Schema.decodeUnknownSync(RenderedDiagramSceneSchema)(formats.get("scene"));
+		const cells = scene.elements.flatMap((element) =>
+			element.type === "text" && element.id.startsWith("text:organizations:") ? [element.id] : [],
+		);
+		expect(cells.sort()).toEqual([
+			"text:organizations:fields:0",
+			"text:organizations:fields:1",
+			"text:organizations:keys:0",
+			"text:organizations:types:0",
+			"text:organizations:types:1",
+		]);
+		const excalidraw = formats.get("excalidraw") as Parameters<typeof validateExcalidrawScene>[0];
+		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
 	});
 
 	it("reads cardinality aliases, source/target and a combined cardinality", async () => {

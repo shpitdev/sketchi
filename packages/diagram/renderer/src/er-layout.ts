@@ -26,6 +26,12 @@ export interface ErLayoutLink {
 	readonly child: string;
 	readonly parentY: number;
 	readonly childY: number;
+	/**
+	 * Where the line meets each end's row, from its table's top, where that is
+	 * not the row's middle: rows align on these, so the line runs level.
+	 */
+	readonly parentPort?: number;
+	readonly childPort?: number;
 	/** Width of the label beside the parent's end; 0 without one. */
 	readonly labelWidth: number;
 }
@@ -44,6 +50,17 @@ export interface ErPlacementOptions {
 	readonly sameColumn?: number;
 	/** Width over height to aim for; 1.6 when omitted. */
 	readonly aspect?: number;
+	/**
+	 * Columns and the order within them, kept as an earlier placement of these
+	 * tables and links arranged them; only rows realign, for changed heights.
+	 */
+	readonly arrangement?: ErArrangement;
+}
+
+/** Where a placement put each table: its column, and every item's order within each column. */
+export interface ErArrangement {
+	readonly column: readonly number[];
+	readonly stacks: readonly (readonly number[])[];
 }
 
 export interface ErPlacement {
@@ -53,6 +70,7 @@ export interface ErPlacement {
 	>;
 	/** The side each link leaves its parent and reaches its child by. */
 	readonly sides: ReadonlyMap<string, { readonly parent: ErSide; readonly child: ErSide }>;
+	readonly arrangement: ErArrangement;
 }
 
 /** Room between stacked tables, wide enough for a line to pass between them. */
@@ -380,21 +398,22 @@ function layersOf(graph: Graph, column: readonly number[]): Layers {
 	const segments: { a: number; b: number; aY: number; bY: number }[] = [];
 	for (const { parent, child, link } of graph.pairs) {
 		const [from, to] = [column[parent]!, column[child]!];
+		const [parentY, childY] = [link.parentPort ?? link.parentY, link.childPort ?? link.childY];
 		if (Math.abs(to - from) <= 1) {
-			segments.push({ a: parent, b: child, aY: link.parentY, bY: link.childY });
+			segments.push({ a: parent, b: child, aY: parentY, bY: childY });
 			continue;
 		}
 		const step = Math.sign(to - from);
-		let previous = { item: parent, y: link.parentY };
+		let previous = { item: parent, y: parentY };
 		for (let at = from + step; at !== to; at += step) {
 			const item = columns.length;
 			columns.push(at);
 			height.push(CORRIDOR_HEIGHT);
-			corridor.push({ parent, y: link.parentY });
+			corridor.push({ parent, y: parentY });
 			segments.push({ a: previous.item, b: item, aY: previous.y, bY: CORRIDOR_HEIGHT / 2 });
 			previous = { item, y: CORRIDOR_HEIGHT / 2 };
 		}
-		segments.push({ a: previous.item, b: child, aY: previous.y, bY: link.childY });
+		segments.push({ a: previous.item, b: child, aY: previous.y, bY: childY });
 	}
 	return { column: columns, height, corridor, segments };
 }
@@ -821,10 +840,11 @@ export function placeErTables(
 	options: ErPlacementOptions = {},
 ): ErPlacement {
 	const graph = graphOf(tables, links);
-	const column = assignColumns(graph, options);
+	const given = options.arrangement;
+	const column = given ? [...given.column] : assignColumns(graph, options);
 	const columns = Math.max(...column) + 1;
 	const layers = layersOf(graph, column);
-	const stack = orderColumns(layers);
+	const stack = given ? arranged(layers, given) : orderColumns(layers);
 	const top = alignRows(layers, stack);
 	const sides = linkSides(graph, column, columns, top);
 	const gaps = columnGaps(graph, column, sides, columns, endRun);
@@ -862,5 +882,15 @@ export function placeErTables(
 			] as const;
 		}),
 	);
-	return { boxes, sides };
+	return { boxes, sides, arrangement: { column, stacks: stack.columns } };
+}
+
+/** The stack an earlier placement ordered, each column's items stacked afresh. */
+function arranged(layers: Layers, arrangement: ErArrangement): Stack {
+	const columns = arrangement.stacks.map((items) => [...items]);
+	return {
+		columns,
+		top: stacked(layers, columns),
+		crossings: orderCrossings(layers, stacked(layers, columns)),
+	};
 }

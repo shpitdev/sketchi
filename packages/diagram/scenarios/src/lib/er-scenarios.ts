@@ -263,9 +263,11 @@ export function erDrawnCheck(diagram: ErDiagram, scene: RenderedDiagramScene): S
 		if (texts.get(`label:${entity.id}:header`) !== erEntityName(entity))
 			problems.push(`${entity.id} name band`);
 		if (entity.fields.length === 0) continue;
-		const fields = (texts.get(`text:${entity.id}:fields`) ?? "").split("\n");
-		const keys = (texts.get(`text:${entity.id}:keys`) ?? "").split("\n");
-		const types = (texts.get(`text:${entity.id}:types`) ?? "").split("\n");
+		// A column is one text of a line per row, or, where a row grew, a text per row with text.
+		const column = (suffix: string) =>
+			texts.get(`text:${entity.id}:${suffix}`)?.split("\n") ??
+			entity.fields.map((_, row) => texts.get(`text:${entity.id}:${suffix}:${row}`) ?? "");
+		const [fields, keys, types] = [column("fields"), column("keys"), column("types")];
 		entity.fields.forEach((field, row) => {
 			if (fields[row]?.replace(/\?$/u, "") !== field.name)
 				problems.push(`${entity.id}.${field.name} row`);

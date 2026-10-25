@@ -7,6 +7,7 @@ import {
 	getCanvasValidationIssues,
 	orgChartEr,
 	parseErDiagram,
+	parseErFieldShorthand,
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
 } from "@sketchi/diagram-core";
@@ -170,6 +171,96 @@ function foreignMarks(scene: RenderedDiagramScene): string[] {
 
 const aspectOf = (scene: RenderedDiagramScene) =>
 	Math.max(scene.width / scene.height, scene.height / scene.width);
+
+/**
+ * Each field row's middle and height from its table's top, read off the drawn
+ * field names: one text per column holds every row 28 apart, or, where a row
+ * grows, one text per row stands at that row's middle.
+ */
+function drawnRows(
+	scene: RenderedDiagramScene,
+	id: string,
+): readonly { readonly middle: number; readonly height: number }[] {
+	const box = table(scene, id);
+	const column = text(scene, `text:${id}:fields`);
+	if (column?.type === "text")
+		return column.text
+			.split("\n")
+			.map((_, row) => ({ middle: rowY(box, row) - box.y, height: 28 }));
+	const middles: number[] = [];
+	for (let row = 0; ; row += 1) {
+		const cell = text(scene, `text:${id}:fields:${row}`);
+		if (cell?.type !== "text") break;
+		middles.push(cell.y - box.y);
+	}
+	let top = 46;
+	return middles.map((middle) => {
+		const height = 2 * (middle - top);
+		top += height;
+		return { middle, height };
+	});
+}
+
+/** Sonnet's saas-workspace-er s5 in round 24, as the model wrote it: five lines end on organizations.id. */
+const saasWorkspaceS5 = parseErDiagram({
+	id: "saas-workspace-database",
+	title: "SaaS Workspace Database",
+	type: "er",
+	entities: (
+		[
+			["organizations", ["id uuid PK", "name text"]],
+			["users", ["id uuid PK", "email text UK", "name text"]],
+			["memberships", ["organization_id uuid PK FK", "user_id uuid PK FK", "role text"]],
+			["projects", ["id uuid PK", "organization_id uuid FK", "name text"]],
+			[
+				"tasks",
+				["id uuid PK", "project_id uuid FK", "assignee_id uuid? FK", "title text", "due_on date?"],
+			],
+			["comments", ["id uuid PK", "task_id uuid FK", "author_id uuid FK", "body text"]],
+			["labels", ["id uuid PK", "organization_id uuid FK", "name text"]],
+			["task_labels", ["task_id uuid PK FK", "label_id uuid PK FK"]],
+			["plans", ["id uuid PK", "name text UK", "monthly_price numeric"]],
+			[
+				"subscriptions",
+				["id uuid PK", "organization_id uuid FK UK", "plan_id uuid FK", "renews_on date"],
+			],
+			[
+				"invoices",
+				["id uuid PK", "subscription_id uuid FK", "amount numeric", "paid_at timestamptz?"],
+			],
+			[
+				"api_keys",
+				["id uuid PK", "organization_id uuid FK", "created_by uuid FK", "token_hash text UK"],
+			],
+		] as const
+	).map(([id, fields]) => ({ id, fields: fields.map(parseErFieldShorthand) })),
+	relationships: (
+		[
+			["memberships.organization_id", "organizations.id", "one-or-many", "one"],
+			["memberships.user_id", "users.id", "zero-or-many", "one"],
+			["projects.organization_id", "organizations.id", "zero-or-many", "one"],
+			["labels.organization_id", "organizations.id", "zero-or-many", "one"],
+			["api_keys.organization_id", "organizations.id", "zero-or-many", "one"],
+			["tasks.project_id", "projects.id", "zero-or-many", "one"],
+			["tasks.assignee_id", "users.id", "zero-or-many", "zero-or-one"],
+			["comments.task_id", "tasks.id", "zero-or-many", "one"],
+			["comments.author_id", "users.id", "zero-or-many", "one"],
+			["task_labels.task_id", "tasks.id", "zero-or-many", "one"],
+			["task_labels.label_id", "labels.id", "zero-or-many", "one"],
+			["subscriptions.organization_id", "organizations.id", "zero-or-one", "one"],
+			["subscriptions.plan_id", "plans.id", "zero-or-many", "one"],
+			["invoices.subscription_id", "subscriptions.id", "zero-or-many", "one"],
+			["api_keys.created_by", "users.id", "zero-or-many", "one"],
+		] as const
+	).map(([from, to, fromCardinality, toCardinality], index) => ({
+		id: `relationship-${index + 1}`,
+		from,
+		to,
+		fromCardinality,
+		toCardinality,
+	})),
+	style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
+});
 
 describe("ER renderer", () => {
 	it("renders every fixture into a valid deterministic scene", () => {
@@ -454,14 +545,82 @@ describe("ER renderer", () => {
 		}
 	});
 
-	it("places a workspace's two hubs so its lines cross once at most, apart at their ends", () => {
+	it("places a workspace's two hubs so no lines cross, apart at their ends", () => {
 		const scene = renderDiagram(erStressFixtures.saasWorkspace);
 		// The organization holds five ends on its id row and users four: spread
-		// over both sides, two to a side stand clear and only a third bunches.
-		expect(crossings(arrows(scene))).toBeLessThanOrEqual(1);
-		expect(bunchedEnds(scene)).toBeLessThanOrEqual(2);
+		// over both sides, two to a side stand clear, and the row holding a third
+		// grows to give it a port of its own.
+		expect(crossings(arrows(scene))).toBe(0);
+		expect(bunchedEnds(scene)).toBe(0);
 		expect(wraps(scene)).toBe(0);
 		expect(aspectOf(scene)).toBeLessThanOrEqual(2);
+	});
+
+	it("gives each of five lines on one key its own end, on that key's row", () => {
+		const scene = renderDiagram(saasWorkspaceS5);
+		// Two ends to a side stand clear in a row's band; the third on a side has
+		// its row grow, so no two bars or feet run together.
+		expect(bunchedEnds(scene)).toBe(0);
+		const organizations = table(scene, "organizations");
+		const ends = arrows(scene).flatMap((line) =>
+			[
+				[line.sourceNodeId, line.points[0]],
+				[line.targetNodeId, line.points.at(-1)!],
+			].flatMap(([node, point]) => (node === "organizations" ? [point as { y: number }] : [])),
+		);
+		expect(ends).toHaveLength(5);
+		// Each still meets the id row, inside its band, and reads as id's: no
+		// further from id's middle than two thirds of its way to name's, as
+		// either of two ends on a plain row.
+		const [id, name] = drawnRows(scene, "organizations");
+		for (const end of ends) {
+			const y = end.y - organizations.y;
+			expect(Math.abs(y - id!.middle)).toBeLessThanOrEqual(id!.height / 2 - 3);
+			expect(Math.abs(y - id!.middle)).toBeLessThanOrEqual((2 / 3) * Math.abs(y - name!.middle));
+		}
+		// labels' row lines up with the port its line takes on the grown row, so it runs straight.
+		expect(arrow(scene, "relationship-4").points).toHaveLength(2);
+		expect(foreignMarks(scene)).toEqual([]);
+		// Its loop from api_keys takes the upper port, inside the line from
+		// projects, so the two no longer cross.
+		expect(crossings(arrows(scene))).toBe(0);
+		expect(wraps(scene)).toBe(0);
+		expect(aspectOf(scene)).toBeLessThanOrEqual(2);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
+	it("keeps two ends on a one-row table's side a port step apart, clear of its corner", () => {
+		const diagram = parseErDiagram({
+			id: "single-row",
+			title: "Single row",
+			type: "er",
+			entities: [
+				{ id: "accounts", fields: [{ name: "id", type: "int", pk: true }] },
+				...["orders", "invoices"].map((id) => ({
+					id,
+					fields: [
+						{ name: "id", type: "int", pk: true },
+						{ name: "account_id", type: "int", fk: true },
+					],
+				})),
+			],
+			relationships: ["orders", "invoices"].map((id) => ({
+				id,
+				from: "accounts.id",
+				to: `${id}.account_id`,
+				fromCardinality: "one" as const,
+				toCardinality: "zero-or-many" as const,
+			})),
+		});
+		const scene = renderDiagram(diagram);
+		const accounts = table(scene, "accounts");
+		const starts = arrows(scene)
+			.map((line) => line.points[0].y)
+			.sort((a, b) => a - b);
+		expect(starts).toHaveLength(2);
+		expect(starts[1]! - starts[0]!).toBeGreaterThanOrEqual(20);
+		expect(accounts.y + accounts.height - starts[1]!).toBeGreaterThanOrEqual(16);
+		expect(bunchedEnds(scene)).toBe(0);
 	});
 
 	it("keeps a small schema within two to one, stacking tables where a row runs wide", () => {

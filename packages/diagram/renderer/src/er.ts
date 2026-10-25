@@ -75,6 +75,22 @@ function single(cardinality: ErCardinality): boolean {
 	return cardinality === "one" || cardinality === "zero-or-one";
 }
 
+/** A field's row: its place among the fields, its middle from the table's top and its height. */
+interface Row {
+	readonly index: number;
+	readonly middle: number;
+	readonly height: number;
+}
+
+/**
+ * Room a table makes for the ends on its rows: extra height for each row,
+ * by its place among the fields, and room below the last row.
+ */
+interface Growth {
+	readonly rows: readonly number[];
+	readonly foot: number;
+}
+
 /** A table's size and the text of its three columns: keys, field names and types. */
 interface Table {
 	readonly entity: ErEntity;
@@ -87,18 +103,17 @@ interface Table {
 	readonly keyWidth: number;
 	readonly nameWidth: number;
 	readonly typeWidth: number;
-	/** Each field's row middle from the table's top, by its name's key. */
-	readonly rows: ReadonlyMap<string, number>;
+	/** Each field's row, by its name's key. */
+	readonly rows: ReadonlyMap<string, Row>;
+	readonly growth: Growth;
 }
 
 const columnWidth = (lines: readonly string[]) =>
 	Math.ceil(Math.max(0, ...lines.map((line) => estimateTextWidth(line, FIELD_FONT_SIZE))));
 
-function rowMiddle(index: number): number {
-	return HEADER_HEIGHT + BODY_PADDING + (index + 0.5) * ROW_HEIGHT;
-}
+const NO_GROWTH: Growth = { rows: [], foot: 0 };
 
-function tableOf(entity: ErEntity): Table {
+function tableOf(entity: ErEntity, growth: Growth = NO_GROWTH): Table {
 	const name = erEntityName(entity);
 	const keys = entity.fields.map((field) => erFieldKeys(field).join(" "));
 	// A nullable field reads `type?`, or `name?` when it has no type.
@@ -121,28 +136,37 @@ function tableOf(entity: ErEntity): Table {
 		(typeWidth > 0 ? TYPE_GAP + typeWidth : 0) +
 		CELL_PADDING;
 	const header = Math.ceil(estimateTextWidth(name, NAME_FONT_SIZE)) + 2 * CELL_PADDING;
+	let top = HEADER_HEIGHT + BODY_PADDING;
+	const rows = entity.fields.map((field, index): readonly [string, Row] => {
+		const height = ROW_HEIGHT + (growth.rows[index] ?? 0);
+		top += height;
+		return [erNameKey(field.name), { index, middle: top - height / 2, height }];
+	});
 	return {
 		entity,
 		name,
 		width: Math.max(MIN_TABLE_WIDTH, body, header),
-		height:
-			entity.fields.length > 0
-				? HEADER_HEIGHT + 2 * BODY_PADDING + entity.fields.length * ROW_HEIGHT
-				: HEADER_HEIGHT,
+		height: entity.fields.length > 0 ? top + BODY_PADDING + growth.foot : HEADER_HEIGHT,
 		keys,
 		names,
 		types,
 		keyWidth,
 		nameWidth,
 		typeWidth,
-		rows: new Map(entity.fields.map((field, index) => [erNameKey(field.name), rowMiddle(index)])),
+		rows: new Map(rows),
+		growth,
 	};
 }
 
-/** One end of a relationship as drawn: its table, the height it attaches at and its head. */
+/**
+ * One end of a relationship as drawn: its table, the row it attaches to (none
+ * for the name band), the middle and height of that row or band, and its head.
+ */
 interface End {
 	readonly entity: string;
+	readonly row: Row | undefined;
 	readonly y: number;
+	readonly band: number;
 	readonly cardinality: ErCardinality;
 }
 
@@ -166,17 +190,27 @@ function linkOf(relationship: ErRelationship, tables: ReadonlyMap<string, Table>
 					.get(end.entity)!
 					.entity.fields.find((candidate) => erNameKey(candidate.name) === erNameKey(end.field!));
 	// An end without a field, opposite one with a field, attaches at its table's single primary key.
-	const y = (end: typeof from, other: typeof from) => {
+	const rowOf = (end: typeof from, other: typeof from) => {
 		const table = tables.get(end.entity)!;
 		if (end.field !== undefined) return table.rows.get(erNameKey(end.field))!;
 		const keys = table.entity.fields.filter((candidate) => candidate.pk);
 		if (other.field !== undefined && keys.length === 1)
 			return table.rows.get(erNameKey(keys[0]!.name))!;
-		return HEADER_HEIGHT / 2;
+		return undefined;
+	};
+	const endOf = (end: typeof from, other: typeof from, cardinality: ErCardinality): End => {
+		const row = rowOf(end, other);
+		return {
+			entity: end.entity,
+			row,
+			y: row?.middle ?? HEADER_HEIGHT / 2,
+			band: row?.height ?? HEADER_HEIGHT,
+			cardinality,
+		};
 	};
 	const ends = {
-		from: { entity: from.entity, y: y(from, to), cardinality: relationship.fromCardinality },
-		to: { entity: to.entity, y: y(to, from), cardinality: relationship.toCardinality },
+		from: endOf(from, to, relationship.fromCardinality),
+		to: endOf(to, from, relationship.toCardinality),
 	};
 	const plainKey = (end: typeof from) => {
 		const found = field(end);
@@ -197,6 +231,8 @@ interface PinnedEnd {
 	side: GraphAnchor["side"];
 	/** The middle of the row or name band the end attaches to, from its table's top. */
 	readonly row: number;
+	/** That row's or band's height. */
+	readonly band: number;
 	/** Its port on that row. */
 	y: number;
 }
@@ -312,23 +348,28 @@ function spillCrowdedRows(ends: readonly PinnedEnd[], boxes: Boxes): boolean {
 /**
  * Every end has a port of its own, so no two lines share a run or a head.
  * Ends on one side of a row spread across its band: lines climbing take the
- * upper ports, the farthest topmost, and lines dropping the lower ones, so
- * none crosses another. Lines climbing turn at runs of their own from the
- * column's edge, the farthest first so the nearer nest inside it; so do
- * lines dropping. An end alone on its row then meets its partner's port
- * level where that port lies within its row, so a line between level rows
- * runs straight.
+ * upper ports, loops within the column (which turn nearest) then the farthest
+ * topmost, and lines dropping the lower ones, so none crosses another. Lines
+ * climbing turn at runs of their own from the column's edge, the farthest
+ * first so the nearer nest inside it; so do lines dropping. An end alone on
+ * its row then meets its partner's port level where that port lies within
+ * its row, so a line between level rows runs straight.
  */
 function spreadPorts(ends: readonly PinnedEnd[], boxes: Boxes): Map<PinnedEnd, number> {
 	const rows = rowGroups(ends);
-	const half = (end: PinnedEnd) =>
-		(end.row === HEADER_HEIGHT / 2 ? HEADER_HEIGHT : ROW_HEIGHT) / 2 - PORT_MARGIN;
+	const half = (end: PinnedEnd) => end.band / 2 - PORT_MARGIN;
 	const runs = new Map<PinnedEnd, number>();
 	for (const row of rows) {
 		if (row.length < 2) continue;
 		const rise = (end: PinnedEnd) => rowOf(partnerOf(ends, end), boxes) - rowOf(end, boxes);
-		const ups = row.filter((end) => rise(end) < 0).sort((a, b) => rise(a) - rise(b));
-		const downs = row.filter((end) => rise(end) > 0).sort((a, b) => rise(a) - rise(b));
+		// A loop within the column turns nearer than a line out to another column.
+		const loop = (end: PinnedEnd) => (sameColumn(boxes, end, partnerOf(ends, end)) ? 1 : 0);
+		const ups = row
+			.filter((end) => rise(end) < 0)
+			.sort((a, b) => loop(b) - loop(a) || rise(a) - rise(b));
+		const downs = row
+			.filter((end) => rise(end) > 0)
+			.sort((a, b) => loop(a) - loop(b) || rise(a) - rise(b));
 		const order = [...ups, ...row.filter((end) => rise(end) === 0), ...downs];
 		const step = Math.min(PORT_STEP, (2 * half(row[0]!)) / (order.length - 1));
 		order.forEach((end, slot) => {
@@ -422,6 +463,7 @@ function pinnedEnds(links: readonly Link[], placement: ErPlacement): PinnedEnd[]
 			end,
 			side: sides[end],
 			row: link[end].y,
+			band: link[end].band,
 			y: link[end].y,
 		}));
 	});
@@ -619,52 +661,295 @@ function detour(arrow: ArrowSceneElement): number {
 	return Math.max(0, length / (direct + 2 * END_RUN + 200) - 1);
 }
 
-/** Route each distinct candidate placement and keep the one that crosses least. */
+/**
+ * A placement, the tables and links it was made for and the option it was made
+ * with, and whether its crowded rows spill to their free sides.
+ */
+interface Candidate {
+	readonly tables: ReadonlyMap<string, Table>;
+	readonly links: readonly Link[];
+	readonly placement: ErPlacement;
+	readonly option: ErPlacementOptions;
+	readonly spill: boolean;
+}
+
+/** A candidate's ends, on the sides its placement gives them, spilled if it spills. */
+function endsOf(candidate: Candidate): PinnedEnd[] {
+	const ends = pinnedEnds(candidate.links, candidate.placement);
+	if (candidate.spill) spillCrowdedRows(ends, candidate.placement.boxes);
+	return ends;
+}
+
+function sceneOf(diagram: ErDiagram, candidate: Candidate): RenderedDiagramScene {
+	return routedScene(
+		diagram,
+		candidate.tables,
+		candidate.links,
+		candidate.placement,
+		endsOf(candidate),
+	);
+}
+
+/**
+ * Extra height a row takes for each end past the second on its fuller side:
+ * two lines, so its outermost port, a further port step out, stays as much
+ * nearer its own field than its neighbor's as either of two ends on a plain row.
+ */
+const ROW_GROWTH = 2 * ROW_HEIGHT;
+/** Times a placement is made again, its tables grown to fit the ends the last one gave them. */
+const GROWTH_PASSES = 2;
+
+/**
+ * Tables with room for the ends a placement gives their rows, a port step
+ * apart: a row holding more than two ends on a side grows for each further
+ * end, and a last row makes room below its lowest port, clear of the table's
+ * corner. A table keeps any room it already has. Undefined when every table
+ * has enough.
+ */
+function grownTables(
+	tables: ReadonlyMap<string, Table>,
+	ends: readonly PinnedEnd[],
+): Map<string, Table> | undefined {
+	const counts = new Map<string, number>();
+	for (const end of ends) {
+		const { entity, row } = end.link[end.end];
+		if (row === undefined || end.side === "top") continue;
+		const key = `${entity}\u0000${end.side}\u0000${row.index}`;
+		counts.set(key, (counts.get(key) ?? 0) + 1);
+	}
+	let grown: Map<string, Table> | undefined;
+	for (const table of tables.values()) {
+		const { entity, growth } = table;
+		const most = (index: number) =>
+			Math.max(
+				...(["left", "right"] as const).map(
+					(side) => counts.get(`${entity.id}\u0000${side}\u0000${index}`) ?? 0,
+				),
+			);
+		const rows = entity.fields.map((_, index) =>
+			Math.max(growth.rows[index] ?? 0, ROW_GROWTH * Math.max(0, most(index) - 2)),
+		);
+		// The last row's lowest port sits half its ends' spread below its middle.
+		const last = entity.fields.length - 1;
+		const reach = ((Math.max(1, most(last)) - 1) * PORT_STEP) / 2;
+		const below = (ROW_HEIGHT + (rows[last] ?? 0)) / 2 + BODY_PADDING;
+		const foot = Math.max(
+			growth.foot,
+			last < 0 ? 0 : 2 * Math.ceil(Math.max(0, reach + CORNER_CLEARANCE - below) / 2),
+		);
+		if (foot === growth.foot && rows.every((extra, index) => extra === (growth.rows[index] ?? 0)))
+			continue;
+		grown ??= new Map(tables);
+		grown.set(entity.id, tableOf(entity, { rows, foot }));
+	}
+	return grown;
+}
+
+/**
+ * Place the tables as the layout sees them: boxes, and links between rows with
+ * any label, each meeting its rows at the given ports, by end, or their middles.
+ */
+function placeTables(
+	tables: ReadonlyMap<string, Table>,
+	links: readonly Link[],
+	option: ErPlacementOptions,
+	ports: ReadonlyMap<string, number> = new Map(),
+): ErPlacement {
+	return placeErTables(
+		[...tables.values()].map((table) => ({
+			id: table.entity.id,
+			width: table.width,
+			height: table.height,
+		})),
+		links.map((link): ErLayoutLink => ({
+			id: link.relationship.id,
+			parent: link.parent.entity,
+			child: link.child.entity,
+			parentY: link.parent.y,
+			childY: link.child.y,
+			...(ports.has(`${link.relationship.id}:parent`)
+				? { parentPort: link.parent.y + ports.get(`${link.relationship.id}:parent`)! }
+				: {}),
+			...(ports.has(`${link.relationship.id}:child`)
+				? { childPort: link.child.y + ports.get(`${link.relationship.id}:child`)! }
+				: {}),
+			labelWidth: link.relationship.label
+				? Math.min(160, Math.ceil(estimateTextWidth(link.relationship.label, 13)))
+				: 0,
+		})),
+		END_RUN,
+		option,
+	);
+}
+
+/**
+ * The candidate placed again, in the columns it chose, with its tables grown
+ * to fit the ends each placement gives their rows, until they fit.
+ */
+function grownCandidate(diagram: ErDiagram, start: Candidate): Candidate {
+	let candidate = start;
+	for (let pass = 0; pass < GROWTH_PASSES; pass += 1) {
+		const ends = endsOf(candidate);
+		const tables = grownTables(candidate.tables, ends);
+		if (!tables) break;
+		const links = diagram.relationships.map((relationship) => linkOf(relationship, tables));
+		const option = { ...start.option, arrangement: start.placement.arrangement };
+		const ports = crowdedPorts(ends, candidate.placement.boxes);
+		candidate = { ...start, tables, links, placement: placeTables(tables, links, option, ports) };
+	}
+	return candidate;
+}
+
+/**
+ * Where each end on a row side holding more than two will meet its grown row,
+ * from the row's middle, by `<relationship>:<parent|child>`: in the order the
+ * ports run down the side now, a port step apart around the middle.
+ */
+function crowdedPorts(ends: readonly PinnedEnd[], boxes: Boxes): Map<string, number> {
+	spreadPorts(ends, boxes);
+	const ports = new Map<string, number>();
+	for (const row of rowGroups(ends)) {
+		if (row.length <= 2) continue;
+		row
+			.toSorted((a, b) => a.y - b.y)
+			.forEach((end, slot) =>
+				ports.set(
+					`${end.link.relationship.id}:${end.end}`,
+					(slot - (row.length - 1) / 2) * PORT_STEP,
+				),
+			);
+	}
+	return ports;
+}
+
+/**
+ * What a reader counts against a scene, which a placement grown for its ends
+ * must not worsen: crossings, reader-scale findings, detours, ends wrapping
+ * their own table, tables a line runs past, marks on labels and the drawing's
+ * long side.
+ */
+function flaws(scene: RenderedDiagramScene) {
+	const arrows = scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow");
+	return {
+		crossings: arrowCrossings(arrows),
+		findings: routingQualityFindings(
+			arrows.map((arrow) => ({
+				id: arrow.id,
+				points: arrow.points,
+				sourceId: arrow.sourceNodeId,
+				targetId: arrow.targetNodeId,
+			})),
+			routingQualityScale({ width: scene.width, height: scene.height }),
+		).length,
+		// A line more than twice the way between its ends, past a little slack, reads as a detour.
+		detours: arrows.filter((arrow) => {
+			const [start, end] = [arrow.points[0], arrow.points.at(-1)!];
+			let length = 0;
+			for (const [index, point] of arrow.points.slice(1).entries())
+				length +=
+					Math.abs(point.x - arrow.points[index]!.x) + Math.abs(point.y - arrow.points[index]!.y);
+			return length > 2 * (Math.abs(end.x - start.x) + Math.abs(end.y - start.y)) + 120;
+		}).length,
+		wraps: wraps(scene, arrows),
+		passed: passedTables(scene, arrows),
+		marksOnLabels: marksOnLabels(scene, arrows),
+		length: Math.max(scene.width, scene.height),
+	};
+}
+
+/**
+ * Ends whose bar or foot, past its tip as Excalidraw draws it, overlaps a
+ * relationship's label.
+ */
+function marksOnLabels(scene: RenderedDiagramScene, arrows: readonly ArrowSceneElement[]): number {
+	const labels = scene.elements.flatMap((element) =>
+		element.type === "text" && element.containerId === undefined
+			? [
+					{
+						x: element.x,
+						y: element.y,
+						half:
+							Math.min(
+								element.maxWidth ?? Infinity,
+								estimateTextWidth(element.text, element.fontSize),
+							) / 2,
+						height: (element.fontSize * 1.25) / 2,
+					},
+				]
+			: [],
+	);
+	let count = 0;
+	for (const arrow of arrows)
+		for (const [tip, next] of [
+			[arrow.points[0], arrow.points[1]!],
+			[arrow.points.at(-1)!, arrow.points.at(-2)!],
+		] as const) {
+			const run = Math.hypot(next.x - tip.x, next.y - tip.y) || 1;
+			const size = Math.min(20, run / 2);
+			const [dx, dy] = [(next.x - tip.x) / run, (next.y - tip.y) / run];
+			const [x0, x1] = [Math.min(tip.x, tip.x + dx * size), Math.max(tip.x, tip.x + dx * size)];
+			const [y0, y1] = [Math.min(tip.y, tip.y + dy * size), Math.max(tip.y, tip.y + dy * size)];
+			if (
+				labels.some(
+					(label) =>
+						x0 - Math.abs(dy) * MARK_REACH < label.x + label.half &&
+						label.x - label.half < x1 + Math.abs(dy) * MARK_REACH &&
+						y0 - Math.abs(dx) * MARK_REACH < label.y + label.height &&
+						label.y - label.height < y1 + Math.abs(dx) * MARK_REACH,
+				)
+			)
+				count += 1;
+		}
+	return count;
+}
+
+/** Whether a scene draws no more of any flaw than another. */
+function drawsNoWorse(after: RenderedDiagramScene, before: RenderedDiagramScene): boolean {
+	const [next, current] = [flaws(after), flaws(before)];
+	return (Object.keys(next) as (keyof typeof next)[]).every(
+		(key) => next[key] <= current[key] + 1e-9,
+	);
+}
+
+/**
+ * Route each distinct candidate placement and keep the one that crosses least,
+ * then give the ends on its crowded rows room of their own where that draws
+ * no worse.
+ */
 function bestScene(
 	diagram: ErDiagram,
 	tables: ReadonlyMap<string, Table>,
 	links: readonly Link[],
-): RenderedDiagramScene {
-	const labelWidth = (label: string | undefined) =>
-		label ? Math.min(160, Math.ceil(estimateTextWidth(label, 13))) : 0;
-	const layoutLinks: ErLayoutLink[] = links.map((link) => ({
-		id: link.relationship.id,
-		parent: link.parent.entity,
-		child: link.child.entity,
-		parentY: link.parent.y,
-		childY: link.child.y,
-		labelWidth: labelWidth(link.relationship.label),
-	}));
-	const layoutTables = [...tables.values()].map((table) => ({
-		id: table.entity.id,
-		width: table.width,
-		height: table.height,
-	}));
+): { readonly scene: RenderedDiagramScene; readonly candidate: Candidate } {
 	const options = diagram.entities.length > LARGE_SCHEMA ? PLACEMENTS.slice(0, 2) : PLACEMENTS;
 	const tried = new Set<string>();
 	let best:
-		| { cost: number; score: number; scene: RenderedDiagramScene; placement: ErPlacement }
+		| { cost: number; score: number; scene: RenderedDiagramScene; candidate: Candidate }
 		| undefined;
 	for (const option of options) {
-		const placement = placeErTables(layoutTables, layoutLinks, END_RUN, option);
+		const placement = placeTables(tables, links, option);
 		const key = JSON.stringify([...placement.boxes, ...placement.sides]);
 		if (tried.has(key)) continue;
 		tried.add(key);
-		const scene = routedScene(diagram, tables, links, placement, pinnedEnds(links, placement));
+		const candidate = { tables, links, placement, option, spill: false };
+		const scene = sceneOf(diagram, candidate);
 		const cost = routedCost(scene);
 		// Another placement must beat the first, layered one clearly, not by a fraction.
 		const score = best ? cost : cost - PLACEMENT_MARGIN;
-		if (!best || score < best.score) best = { cost, score, scene, placement };
+		if (!best || score < best.score) best = { cost, score, scene, candidate };
 		if (cost === 0) break;
 	}
 	// The chosen placement also tries its crowded rows spilled to their free sides.
-	const { placement } = best!;
-	const ends = pinnedEnds(links, placement);
-	if (spillCrowdedRows(ends, placement.boxes)) {
-		const scene = routedScene(diagram, tables, links, placement, ends);
-		if (routedCost(scene) < best!.cost) return scene;
+	let chosen: { scene: RenderedDiagramScene; candidate: Candidate } = best!;
+	const spilled = { ...best!.candidate, spill: true };
+	if (spillCrowdedRows(pinnedEnds(spilled.links, spilled.placement), spilled.placement.boxes)) {
+		const scene = sceneOf(diagram, spilled);
+		if (routedCost(scene) < best!.cost) chosen = { scene, candidate: spilled };
 	}
-	return best!.scene;
+	const grown = grownCandidate(diagram, chosen.candidate);
+	if (grown === chosen.candidate) return chosen;
+	const scene = sceneOf(diagram, grown);
+	return drawsNoWorse(scene, chosen.scene) ? { scene, candidate: grown } : chosen;
 }
 
 /**
@@ -791,35 +1076,47 @@ function tableElements(
 	if (table.entity.fields.length > 0) {
 		const top = box.y + HEADER_HEIGHT + BODY_PADDING;
 		const height = table.entity.fields.length * ROW_HEIGHT;
+		const rows = [...table.rows.values()];
 		// Converted text is centered on its point; each column starts at its left edge.
+		// Rows of one height share a text per column; where a row grew, each row with
+		// text has its own.
 		const column = (
 			suffix: string,
 			lines: readonly string[],
 			left: number,
 			width: number,
 			textColor?: string,
-		): TextSceneElement => ({
-			type: "text",
-			id: `text:${id}:${suffix}`,
-			x: left + width / 2,
-			y: top + height / 2,
-			text: lines.join("\n"),
-			fontSize: FIELD_FONT_SIZE,
-			lineHeight: ROW_HEIGHT / FIELD_FONT_SIZE,
-			maxWidth: width,
-			textAlign: "left",
-			...(textColor ? { textColor } : {}),
-			groupIds,
-		});
+		): TextSceneElement[] => {
+			const cell = (id: string, text: string, y: number): TextSceneElement => ({
+				type: "text",
+				id,
+				x: left + width / 2,
+				y,
+				text,
+				fontSize: FIELD_FONT_SIZE,
+				lineHeight: ROW_HEIGHT / FIELD_FONT_SIZE,
+				maxWidth: width,
+				textAlign: "left",
+				...(textColor ? { textColor } : {}),
+				groupIds,
+			});
+			return table.growth.rows.some((extra) => extra > 0)
+				? rows.flatMap((row) =>
+						lines[row.index]
+							? [cell(`text:${id}:${suffix}:${row.index}`, lines[row.index]!, box.y + row.middle)]
+							: [],
+					)
+				: [cell(`text:${id}:${suffix}`, lines.join("\n"), top + height / 2)];
+		};
 		let left = box.x + CELL_PADDING;
 		if (table.keyWidth > 0) {
-			texts.push(column("keys", table.keys, left, table.keyWidth, KEY_COLOR));
+			texts.push(...column("keys", table.keys, left, table.keyWidth, KEY_COLOR));
 			left += table.keyWidth + KEY_GAP;
 		}
-		texts.push(column("fields", table.names, left, table.nameWidth));
+		texts.push(...column("fields", table.names, left, table.nameWidth));
 		if (table.typeWidth > 0)
 			texts.push(
-				column(
+				...column(
 					"types",
 					table.types,
 					left + table.nameWidth + TYPE_GAP,
@@ -870,9 +1167,15 @@ function ring(
  * orthogonal line from row to row with a crow's-foot end at each table.
  */
 export function renderErDiagram(diagram: ErDiagram): RenderedDiagramScene {
-	const tables = new Map(diagram.entities.map((entity) => [entity.id, tableOf(entity)]));
-	const links = diagram.relationships.map((relationship) => linkOf(relationship, tables));
-	const scene = bestScene(diagram, tables, links);
+	const start = new Map(diagram.entities.map((entity) => [entity.id, tableOf(entity)]));
+	const {
+		scene,
+		candidate: { tables, links },
+	} = bestScene(
+		diagram,
+		start,
+		diagram.relationships.map((relationship) => linkOf(relationship, start)),
+	);
 	const boxes = new Map(
 		scene.elements.flatMap((element) =>
 			element.type === "node" ? [[element.nodeId, element] as const] : [],

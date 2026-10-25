@@ -167,4 +167,23 @@ describe("prompt-grounded ER scenarios", () => {
 		expect(erDrawnCheck(shop, tampered)).toMatchObject({ passed: false });
 		expect(erDrawnCheck(shop, tampered).message).toContain("r2 one-or-many end");
 	});
+
+	it("reads a table whose crowded key row grew, a text per row, as drawn", () => {
+		const saas = scenario("saas-workspace-er").expectedDiagram;
+		const scene = renderDiagram(saas);
+		const cells = scene.elements.filter(
+			(element) => element.type === "text" && element.id.startsWith("text:organizations:fields:"),
+		);
+		expect(cells.length).toBeGreaterThan(0);
+		expect(erDrawnCheck(saas, scene)).toMatchObject({ passed: true });
+		const renamed = {
+			...scene,
+			elements: scene.elements.map((element) =>
+				element.type === "text" && element.id === "text:organizations:fields:0"
+					? { ...element, text: "uuid" }
+					: element,
+			),
+		};
+		expect(erDrawnCheck(saas, renamed).message).toContain("organizations.id row");
+	});
 });
