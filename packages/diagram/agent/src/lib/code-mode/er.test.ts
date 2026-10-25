@@ -129,8 +129,8 @@ describe("Code Mode native ER diagram", () => {
 			excalidraw.elements.find((element) => element.id === "node:organizations:row:0"),
 		).toMatchObject({
 			type: "rectangle",
-			backgroundColor: "#f6eff2",
-			strokeColor: "#f6eff2",
+			backgroundColor: "#f3ebef",
+			strokeColor: "#f3ebef",
 			groupIds: ["table:organizations"],
 		});
 	});

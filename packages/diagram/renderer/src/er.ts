@@ -57,9 +57,10 @@ const READABLE_ASPECT = 2;
 const HEADER_FILL = "#efe6ec";
 /**
  * A grown key row's tint, a lighter shade of the name band's, and how far it
- * stands inside the table's outline so it never covers the outline's stroke.
+ * stands inside the table's outline and the name band's rule so it never
+ * covers their strokes.
  */
-const KEY_BAND_FILL = "#f6eff2";
+const KEY_BAND_FILL = "#f3ebef";
 const KEY_BAND_INSET = 2;
 const KEY_COLOR = "#6a4e5c";
 const TYPE_COLOR = "#6f6656";
@@ -1213,32 +1214,37 @@ function tableElements(
 			);
 	}
 	// A grown row reads as one key row, tinted across the table behind its text
-	// and every end it holds, clear of the outline's stroke.
-	const keyBands = [...table.rows.values()].flatMap((row): NodeSceneElement[] =>
-		(table.growth.rows[row.index] ?? 0) > 0
-			? [
-					{
-						type: "node",
-						id: `node:${id}:row:${row.index}`,
-						nodeId: `${id}:row:${row.index}`,
-						kind: "entity-key-row",
-						rendererRole: "er-table",
-						shape: "rectangle",
-						x: box.x + KEY_BAND_INSET,
-						y: box.y + row.top,
-						width: table.width - 2 * KEY_BAND_INSET,
-						height: row.height,
-						label: table.names[row.index]!,
-						fillColor: KEY_BAND_FILL,
-						fillStyle: "solid",
-						strokeColor: KEY_BAND_FILL,
-						strokeWidth: 1,
-						roughness: 0,
-						groupIds,
-					},
-				]
-			: [],
-	);
+	// and every end it holds. The tint meets its neighbors: the name band's rule
+	// above a first row, the outline below a last, the rows beside any other.
+	const keyBands = [...table.rows.values()].flatMap((row): NodeSceneElement[] => {
+		if ((table.growth.rows[row.index] ?? 0) === 0) return [];
+		const top = row.index === 0 ? HEADER_HEIGHT + KEY_BAND_INSET : row.top;
+		const bottom =
+			row.index === table.entity.fields.length - 1
+				? table.height - KEY_BAND_INSET
+				: row.top + row.height;
+		return [
+			{
+				type: "node",
+				id: `node:${id}:row:${row.index}`,
+				nodeId: `${id}:row:${row.index}`,
+				kind: "entity-key-row",
+				rendererRole: "er-table",
+				shape: "rectangle",
+				x: box.x + KEY_BAND_INSET,
+				y: box.y + top,
+				width: table.width - 2 * KEY_BAND_INSET,
+				height: bottom - top,
+				label: table.names[row.index]!,
+				fillColor: KEY_BAND_FILL,
+				fillStyle: "solid",
+				strokeColor: KEY_BAND_FILL,
+				strokeWidth: 1,
+				roughness: 0,
+				groupIds,
+			},
+		];
+	});
 	return { nodes: [outline, band, ...keyBands], texts };
 }
 

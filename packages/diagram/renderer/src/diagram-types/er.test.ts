@@ -588,15 +588,16 @@ describe("ER renderer", () => {
 		);
 		expect(ends).toHaveLength(5);
 		// id's row grows a line for each end on its fuller side, 28 × 2 past a
-		// plain row, and reads as one key row: a tinted band spans it, its text
-		// centred, and each end meets a line of it, inside the band.
+		// plain row, and reads as one key row: a tinted band spans it, from the
+		// name band's rule, its text centred, and each end meets a line of it,
+		// inside the band.
 		const [id, name] = fieldLines(scene, "organizations");
 		expect(keyBand(scene, "organizations", 0)).toEqual({
 			left: 2,
 			right: 2,
-			top: 46,
+			top: 40 + 2,
 			bottom: 46 + 28 + 2 * 28,
-			fill: "#f6eff2",
+			fill: "#f3ebef",
 		});
 		expect(id).toBe(46 + 42);
 		expect(name).toBe(46 + 84 + 14);
