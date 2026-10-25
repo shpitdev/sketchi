@@ -173,32 +173,36 @@ const aspectOf = (scene: RenderedDiagramScene) =>
 	Math.max(scene.width / scene.height, scene.height / scene.width);
 
 /**
- * Each field row's middle and height from its table's top, read off the drawn
- * field names: one text per column holds every row 28 apart, or, where a row
- * grows, one text per row stands at that row's middle.
+ * Each field's text line from its table's top, read off the drawn field
+ * names: one text per column holds every row 28 apart, or, where a row grew,
+ * one text per row stands at that row's middle.
  */
-function drawnRows(
-	scene: RenderedDiagramScene,
-	id: string,
-): readonly { readonly middle: number; readonly height: number }[] {
+function fieldLines(scene: RenderedDiagramScene, id: string): number[] {
 	const box = table(scene, id);
 	const column = text(scene, `text:${id}:fields`);
 	if (column?.type === "text")
-		return column.text
-			.split("\n")
-			.map((_, row) => ({ middle: rowY(box, row) - box.y, height: 28 }));
-	const middles: number[] = [];
+		return column.text.split("\n").map((_, row) => rowY(box, row) - box.y);
+	const lines: number[] = [];
 	for (let row = 0; ; row += 1) {
 		const cell = text(scene, `text:${id}:fields:${row}`);
-		if (cell?.type !== "text") break;
-		middles.push(cell.y - box.y);
+		if (cell?.type !== "text") return lines;
+		lines.push(cell.y - box.y);
 	}
-	let top = 46;
-	return middles.map((middle) => {
-		const height = 2 * (middle - top);
-		top += height;
-		return { middle, height };
-	});
+}
+
+/** The tinted band behind a grown row, from its table's top and sides. */
+function keyBand(scene: RenderedDiagramScene, id: string, row: number) {
+	const box = table(scene, id);
+	const band = nodes(scene).find((node) => node.id === `node:${id}:row:${row}`);
+	return band
+		? {
+				left: band.x - box.x,
+				right: box.x + box.width - (band.x + band.width),
+				top: band.y - box.y,
+				bottom: band.y + band.height - box.y,
+				fill: band.fillColor,
+			}
+		: undefined;
 }
 
 /** Sonnet's saas-workspace-er s5 in round 24, as the model wrote it: five lines end on organizations.id. */
@@ -260,6 +264,20 @@ const saasWorkspaceS5 = parseErDiagram({
 		toCardinality,
 	})),
 	style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
+});
+
+/** Sol's preview s4 in the #540 A/B: s5's schema, titled anew, with three relationships labeled. */
+const saasWorkspaceLabeled = parseErDiagram({
+	...saasWorkspaceS5,
+	title: "SaaS workspace database",
+	relationships: saasWorkspaceS5.relationships.map((relationship) => {
+		const label = {
+			"relationship-7": "assignee",
+			"relationship-9": "author",
+			"relationship-15": "created by",
+		}[relationship.id];
+		return label ? { ...relationship, label } : relationship;
+	}),
 });
 
 describe("ER renderer", () => {
@@ -558,8 +576,8 @@ describe("ER renderer", () => {
 
 	it("gives each of five lines on one key its own end, on that key's row", () => {
 		const scene = renderDiagram(saasWorkspaceS5);
-		// Two ends to a side stand clear in a row's band; the third on a side has
-		// its row grow, so no two bars or feet run together.
+		// Two ends to a side stand clear in a row's band; a side holding a third
+		// grows its row a line for each end, so no two bars or feet run together.
 		expect(bunchedEnds(scene)).toBe(0);
 		const organizations = table(scene, "organizations");
 		const ends = arrows(scene).flatMap((line) =>
@@ -569,15 +587,24 @@ describe("ER renderer", () => {
 			].flatMap(([node, point]) => (node === "organizations" ? [point as { y: number }] : [])),
 		);
 		expect(ends).toHaveLength(5);
-		// Each still meets the id row, inside its band, and reads as id's: no
-		// further from id's middle than two thirds of its way to name's, as
-		// either of two ends on a plain row.
-		const [id, name] = drawnRows(scene, "organizations");
+		// id's row grows a line for each end on its fuller side, 28 × 2 past a
+		// plain row, and reads as one key row: a tinted band spans it, its text
+		// centred, and each end meets a line of it, inside the band.
+		const [id, name] = fieldLines(scene, "organizations");
+		expect(keyBand(scene, "organizations", 0)).toEqual({
+			left: 2,
+			right: 2,
+			top: 46,
+			bottom: 46 + 28 + 2 * 28,
+			fill: "#f6eff2",
+		});
+		expect(id).toBe(46 + 42);
+		expect(name).toBe(46 + 84 + 14);
 		for (const end of ends) {
 			const y = end.y - organizations.y;
-			expect(Math.abs(y - id!.middle)).toBeLessThanOrEqual(id!.height / 2 - 3);
-			expect(Math.abs(y - id!.middle)).toBeLessThanOrEqual((2 / 3) * Math.abs(y - name!.middle));
+			expect([id! - 28, id, id! + 28]).toContain(y);
 		}
+		expect(keyBand(scene, "organizations", 1)).toBeUndefined();
 		// labels' row lines up with the port its line takes on the grown row, so it runs straight.
 		expect(arrow(scene, "relationship-4").points).toHaveLength(2);
 		expect(foreignMarks(scene)).toEqual([]);
@@ -586,6 +613,70 @@ describe("ER renderer", () => {
 		expect(crossings(arrows(scene))).toBe(0);
 		expect(wraps(scene)).toBe(0);
 		expect(aspectOf(scene)).toBeLessThanOrEqual(2);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
+	it("runs a line between level ports on a grown row straight, clear of the lines climbing beside it", () => {
+		const scene = renderDiagram(saasWorkspaceLabeled);
+		// organizations.id holds three ends on its right: two climbing to projects
+		// and labels, one level with subscriptions. Its line ran beside the climbing
+		// ones closer than a reader tells apart, so the router dropped it 140 below
+		// both rows and back; a line apart, it runs straight.
+		expect(arrow(scene, "relationship-12").points).toHaveLength(2);
+		expect(bunchedEnds(scene)).toBe(0);
+		expect(crossings(arrows(scene))).toBeLessThanOrEqual(1);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
+	it("tints a grown row in a table's middle as one band, its text centred, every end inside", () => {
+		const children = ["a", "b", "c", "d", "e", "f"];
+		const diagram = parseErDiagram({
+			id: "middle-key",
+			title: "Middle key",
+			type: "er",
+			entities: [
+				{
+					id: "accounts",
+					fields: [
+						{ name: "region", type: "text" },
+						{ name: "id", type: "int", pk: true },
+						{ name: "name", type: "text" },
+					],
+				},
+				...children.map((id) => ({
+					id,
+					fields: [
+						{ name: "id", type: "int", pk: true },
+						{ name: "account_id", type: "int", fk: true },
+					],
+				})),
+			],
+			relationships: children.map((id) => ({
+				id,
+				from: "accounts.id",
+				to: `${id}.account_id`,
+				fromCardinality: "one" as const,
+				toCardinality: "zero-or-many" as const,
+			})),
+		});
+		const scene = renderDiagram(diagram);
+		const accounts = table(scene, "accounts");
+		const [region, id, name] = fieldLines(scene, "accounts");
+		// region keeps its plain row; id's grown row starts below it, its text centred in its band.
+		expect(region).toBe(60);
+		const band = keyBand(scene, "accounts", 1)!;
+		expect(band.top).toBe(46 + 28);
+		expect(id).toBe((band.top + band.bottom) / 2);
+		expect(name).toBe(band.bottom + 14);
+		expect(keyBand(scene, "accounts", 0)).toBeUndefined();
+		const starts = arrows(scene).map((line) => line.points[0].y - accounts.y);
+		expect(starts).toHaveLength(6);
+		for (const start of starts) {
+			expect(start).toBeGreaterThan(band.top);
+			expect(start).toBeLessThan(band.bottom);
+			expect(Math.abs(start - id!) % 28).toBe(0);
+		}
+		expect(bunchedEnds(scene)).toBe(0);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 	});
 
@@ -634,7 +725,7 @@ describe("ER renderer", () => {
 	it("arranges a twenty-table schema as a grid of columns, no line through a table", () => {
 		const scene = renderDiagram(erStressFixtures.marketplace);
 		const tables = nodes(scene).filter(
-			(node) => node.rendererRole === "er-table" && !node.id.endsWith(":header"),
+			(node) => node.rendererRole === "er-table" && node.kind === "entity",
 		);
 		expect(tables).toHaveLength(20);
 		// Columns of a few tables each, not one long row or column.

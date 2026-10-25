@@ -55,6 +55,12 @@ const RING_DISTANCE = 32;
 /** Past this, a layout's export reads as a strip; a candidate pays for any excess. */
 const READABLE_ASPECT = 2;
 const HEADER_FILL = "#efe6ec";
+/**
+ * A grown key row's tint, a lighter shade of the name band's, and how far it
+ * stands inside the table's outline so it never covers the outline's stroke.
+ */
+const KEY_BAND_FILL = "#f6eff2";
+const KEY_BAND_INSET = 2;
 const KEY_COLOR = "#6a4e5c";
 const TYPE_COLOR = "#6f6656";
 
@@ -75,11 +81,12 @@ function single(cardinality: ErCardinality): boolean {
 	return cardinality === "one" || cardinality === "zero-or-one";
 }
 
-/** A field's row: its place among the fields, its middle from the table's top and its height. */
+/** A field's row: its place among the fields, and its top, height and middle from the table's top. */
 interface Row {
 	readonly index: number;
-	readonly middle: number;
+	readonly top: number;
 	readonly height: number;
+	readonly middle: number;
 }
 
 /**
@@ -140,7 +147,7 @@ function tableOf(entity: ErEntity, growth: Growth = NO_GROWTH): Table {
 	const rows = entity.fields.map((field, index): readonly [string, Row] => {
 		const height = ROW_HEIGHT + (growth.rows[index] ?? 0);
 		top += height;
-		return [erNameKey(field.name), { index, middle: top - height / 2, height }];
+		return [erNameKey(field.name), { index, top: top - height, height, middle: top - height / 2 }];
 	});
 	return {
 		entity,
@@ -160,13 +167,16 @@ function tableOf(entity: ErEntity, growth: Growth = NO_GROWTH): Table {
 
 /**
  * One end of a relationship as drawn: its table, the row it attaches to (none
- * for the name band), the middle and height of that row or band, and its head.
+ * for the name band), that row's or band's middle, top and bottom, all from
+ * the table's top, the lines a grown row holds, and its head.
  */
 interface End {
 	readonly entity: string;
 	readonly row: Row | undefined;
 	readonly y: number;
-	readonly band: number;
+	readonly top: number;
+	readonly bottom: number;
+	readonly lines: number;
 	readonly cardinality: ErCardinality;
 }
 
@@ -204,7 +214,9 @@ function linkOf(relationship: ErRelationship, tables: ReadonlyMap<string, Table>
 			entity: end.entity,
 			row,
 			y: row?.middle ?? HEADER_HEIGHT / 2,
-			band: row?.height ?? HEADER_HEIGHT,
+			top: row?.top ?? 0,
+			bottom: row ? row.top + row.height : HEADER_HEIGHT,
+			lines: row ? row.height / ROW_HEIGHT : 1,
 			cardinality,
 		};
 	};
@@ -229,10 +241,12 @@ interface PinnedEnd {
 	readonly link: Link;
 	readonly end: "parent" | "child";
 	side: GraphAnchor["side"];
-	/** The middle of the row or name band the end attaches to, from its table's top. */
+	/** The line of the row or name band the end attaches to, from its table's top. */
 	readonly row: number;
-	/** That row's or band's height. */
-	readonly band: number;
+	/** That row's or band's top and bottom, and the lines a grown row holds. */
+	readonly top: number;
+	readonly bottom: number;
+	readonly lines: number;
 	/** Its port on that row. */
 	y: number;
 }
@@ -346,35 +360,77 @@ function spillCrowdedRows(ends: readonly PinnedEnd[], boxes: Boxes): boolean {
 }
 
 /**
- * Every end has a port of its own, so no two lines share a run or a head.
- * Ends on one side of a row spread across its band: lines climbing take the
- * upper ports, loops within the column (which turn nearest) then the farthest
- * topmost, and lines dropping the lower ones, so none crosses another. Lines
- * climbing turn at runs of their own from the column's edge, the farthest
- * first so the nearer nest inside it; so do lines dropping. An end alone on
- * its row then meets its partner's port level where that port lies within
- * its row, so a line between level rows runs straight.
+ * One side of a row's ends in port order: lines climbing, loops within the
+ * column (which turn nearest) then the farthest first, lines level with their
+ * partners, then lines dropping, so none crosses another.
  */
-function spreadPorts(ends: readonly PinnedEnd[], boxes: Boxes): Map<PinnedEnd, number> {
+function portOrder(
+	row: readonly PinnedEnd[],
+	ends: readonly PinnedEnd[],
+	boxes: Boxes,
+): { readonly ups: PinnedEnd[]; readonly levels: PinnedEnd[]; readonly downs: PinnedEnd[] } {
+	const rise = (end: PinnedEnd) => rowOf(partnerOf(ends, end), boxes) - rowOf(end, boxes);
+	const loop = (end: PinnedEnd) => (sameColumn(boxes, end, partnerOf(ends, end)) ? 1 : 0);
+	return {
+		ups: row.filter((end) => rise(end) < 0).sort((a, b) => loop(b) - loop(a) || rise(a) - rise(b)),
+		levels: row.filter((end) => rise(end) === 0),
+		downs: row
+			.filter((end) => rise(end) > 0)
+			.sort((a, b) => loop(a) - loop(b) || rise(a) - rise(b)),
+	};
+}
+
+/**
+ * Each end's line on a row grown to `lines` lines, from its first: lines
+ * climbing take the top ones, lines level with their partners the next, and
+ * lines dropping the bottom ones.
+ */
+function lineSlots(order: ReturnType<typeof portOrder>, lines: number): Map<PinnedEnd, number> {
+	const { ups, levels, downs } = order;
+	return new Map([
+		...ups.map((end, slot) => [end, slot] as const),
+		...levels.map((end, slot) => [end, ups.length + slot] as const),
+		...downs.map((end, slot) => [end, lines - downs.length + slot] as const),
+	]);
+}
+
+/**
+ * Every end has a port of its own, so no two lines share a run or a head.
+ * Ends on one side of a plain row spread a port step apart around its middle
+ * in port order; on a grown row each takes a line of its own, a line apart
+ * around its middle, so lines beside each other stay as far apart as rows of
+ * text, or, `packed`, they spread as on a plain row. Lines climbing turn at
+ * runs of their own from the column's edge, the farthest first so the nearer
+ * nest inside it; so do lines dropping. An end alone on its row then meets
+ * its partner's port level where that port lies within its row, so a line
+ * between level rows runs straight.
+ */
+function spreadPorts(
+	ends: readonly PinnedEnd[],
+	boxes: Boxes,
+	packed = false,
+): Map<PinnedEnd, number> {
 	const rows = rowGroups(ends);
-	const half = (end: PinnedEnd) => end.band / 2 - PORT_MARGIN;
+	const [lowest, highest] = [
+		(end: PinnedEnd) => end.top + PORT_MARGIN,
+		(end: PinnedEnd) => end.bottom - PORT_MARGIN,
+	];
 	const runs = new Map<PinnedEnd, number>();
 	for (const row of rows) {
 		if (row.length < 2) continue;
-		const rise = (end: PinnedEnd) => rowOf(partnerOf(ends, end), boxes) - rowOf(end, boxes);
-		// A loop within the column turns nearer than a line out to another column.
-		const loop = (end: PinnedEnd) => (sameColumn(boxes, end, partnerOf(ends, end)) ? 1 : 0);
-		const ups = row
-			.filter((end) => rise(end) < 0)
-			.sort((a, b) => loop(b) - loop(a) || rise(a) - rise(b));
-		const downs = row
-			.filter((end) => rise(end) > 0)
-			.sort((a, b) => loop(a) - loop(b) || rise(a) - rise(b));
-		const order = [...ups, ...row.filter((end) => rise(end) === 0), ...downs];
-		const step = Math.min(PORT_STEP, (2 * half(row[0]!)) / (order.length - 1));
-		order.forEach((end, slot) => {
-			end.y = end.row + (slot - (order.length - 1) / 2) * step;
-		});
+		const order = portOrder(row, ends, boxes);
+		const { ups, downs } = order;
+		const { lines } = row[0]!;
+		if (lines > 1 && !packed)
+			for (const [end, slot] of lineSlots(order, lines))
+				end.y = end.row + (slot - (lines - 1) / 2) * ROW_HEIGHT;
+		else {
+			const ordered = [...ups, ...order.levels, ...downs];
+			const step = Math.min(PORT_STEP, (highest(row[0]!) - lowest(row[0]!)) / (ordered.length - 1));
+			ordered.forEach((end, slot) => {
+				end.y = end.row + (slot - (ordered.length - 1) / 2) * step;
+			});
+		}
 		const run = (end: PinnedEnd, slot: number) =>
 			runs.set(end, insetOf(end, boxes) + END_RUN + slot * ER_FAN_STEP);
 		ups.forEach(run);
@@ -386,7 +442,7 @@ function spreadPorts(ends: readonly PinnedEnd[], boxes: Boxes): Map<PinnedEnd, n
 		const partner = partnerOf(ends, end);
 		if (partner.side === end.side || partner.side === "top") continue;
 		const port = portOf(partner, boxes) - (rowOf(end, boxes) - end.row);
-		if (Math.abs(port - end.row) <= half(end)) end.y = port;
+		if (port >= lowest(end) && port <= highest(end)) end.y = port;
 	}
 	// An end alone on its row turns at the end run from its column's edge too,
 	// clear of the marks on any wider table's side in that column.
@@ -403,8 +459,8 @@ function spreadPorts(ends: readonly PinnedEnd[], boxes: Boxes): Map<PinnedEnd, n
 		const { height } = boxes.get(side[0]!.link[side[0]!.end].entity)!;
 		keepClear(
 			side.sort((a, b) => a.row - b.row || a.y - b.y),
-			(end) => Math.max(end.row - half(end), CORNER_CLEARANCE),
-			(end) => Math.min(end.row + half(end), height - CORNER_CLEARANCE),
+			(end) => Math.max(lowest(end), CORNER_CLEARANCE),
+			(end) => Math.min(highest(end), height - CORNER_CLEARANCE),
 		);
 	}
 	return runs;
@@ -454,18 +510,17 @@ function keepClear(
 	}
 }
 
-/** Each end of a placement's links, on the side the placement gives it. */
+/**
+ * Each end of a placement's links, on the side the placement gives it, at its
+ * row's middle.
+ */
 function pinnedEnds(links: readonly Link[], placement: ErPlacement): PinnedEnd[] {
 	const ends: PinnedEnd[] = links.flatMap((link) => {
 		const sides = placement.sides.get(link.relationship.id)!;
-		return (["parent", "child"] as const).map((end) => ({
-			link,
-			end,
-			side: sides[end],
-			row: link[end].y,
-			band: link[end].band,
-			y: link[end].y,
-		}));
+		return (["parent", "child"] as const).map((end) => {
+			const { y, top, bottom, lines } = link[end];
+			return { link, end, side: sides[end], row: y, top, bottom, lines, y };
+		});
 	});
 	// A loop whose two ends would meet leaves its table's side and returns over its top.
 	for (const link of links) {
@@ -483,8 +538,9 @@ function routedScene(
 	links: readonly Link[],
 	placement: ErPlacement,
 	ends: readonly PinnedEnd[],
+	packed = false,
 ): RenderedDiagramScene {
-	const runs = spreadPorts(ends, placement.boxes);
+	const runs = spreadPorts(ends, placement.boxes, packed);
 	loopRuns(ends, placement.boxes, runs);
 	const anchors = new Map<string, GraphAnchor>(
 		ends.map((end) => {
@@ -671,6 +727,8 @@ interface Candidate {
 	readonly placement: ErPlacement;
 	readonly option: ErPlacementOptions;
 	readonly spill: boolean;
+	/** Whether the ends on its grown rows pack around each row's middle instead of a line apart. */
+	readonly packed: boolean;
 }
 
 /** A candidate's ends, on the sides its placement gives them, spilled if it spills. */
@@ -687,22 +745,22 @@ function sceneOf(diagram: ErDiagram, candidate: Candidate): RenderedDiagramScene
 		candidate.links,
 		candidate.placement,
 		endsOf(candidate),
+		candidate.packed,
 	);
 }
 
 /**
- * Extra height a row takes for each end past the second on its fuller side:
- * two lines, so its outermost port, a further port step out, stays as much
- * nearer its own field than its neighbor's as either of two ends on a plain row.
+ * A row holding more ends on a side than this grows to a line for each end on
+ * its fuller side, its field's text on the first, as a plain row draws it.
  */
-const ROW_GROWTH = 2 * ROW_HEIGHT;
+const PLAIN_ROW_ENDS = 2;
 /** Times a placement is made again, its tables grown to fit the ends the last one gave them. */
 const GROWTH_PASSES = 2;
 
 /**
- * Tables with room for the ends a placement gives their rows, a port step
- * apart: a row holding more than two ends on a side grows for each further
- * end, and a last row makes room below its lowest port, clear of the table's
+ * Tables with room for the ends a placement gives their rows: a row holding
+ * more than two ends on a side grows a line for each end on its fuller side,
+ * and a last row makes room below its lowest port, clear of the table's
  * corner. A table keeps any room it already has. Undefined when every table
  * has enough.
  */
@@ -727,12 +785,17 @@ function grownTables(
 				),
 			);
 		const rows = entity.fields.map((_, index) =>
-			Math.max(growth.rows[index] ?? 0, ROW_GROWTH * Math.max(0, most(index) - 2)),
+			Math.max(
+				growth.rows[index] ?? 0,
+				most(index) > PLAIN_ROW_ENDS ? (most(index) - 1) * ROW_HEIGHT : 0,
+			),
 		);
-		// The last row's lowest port sits half its ends' spread below its middle.
+		// The last row's lowest port: on its last line once grown, else half its
+		// ends' spread below its middle.
 		const last = entity.fields.length - 1;
-		const reach = ((Math.max(1, most(last)) - 1) * PORT_STEP) / 2;
-		const below = (ROW_HEIGHT + (rows[last] ?? 0)) / 2 + BODY_PADDING;
+		const extra = rows[last] ?? 0;
+		const reach = extra > 0 ? extra / 2 : ((Math.max(1, most(last)) - 1) * PORT_STEP) / 2;
+		const below = (ROW_HEIGHT + extra) / 2 + BODY_PADDING;
 		const foot = Math.max(
 			growth.foot,
 			last < 0 ? 0 : 2 * Math.ceil(Math.max(0, reach + CORNER_CLEARANCE - below) / 2),
@@ -794,30 +857,46 @@ function grownCandidate(diagram: ErDiagram, start: Candidate): Candidate {
 		if (!tables) break;
 		const links = diagram.relationships.map((relationship) => linkOf(relationship, tables));
 		const option = { ...start.option, arrangement: start.placement.arrangement };
-		const ports = crowdedPorts(ends, candidate.placement.boxes);
+		const ports = crowdedPorts(ends, candidate.placement.boxes, start.packed);
 		candidate = { ...start, tables, links, placement: placeTables(tables, links, option, ports) };
 	}
 	return candidate;
 }
 
 /**
- * Where each end on a row side holding more than two will meet its grown row,
- * from the row's middle, by `<relationship>:<parent|child>`: in the order the
- * ports run down the side now, a port step apart around the middle.
+ * Where each end on a row that will grow meets it, from the row's middle, by
+ * `<relationship>:<parent|child>`: on the line its port order gives it, or,
+ * `packed`, a port step from the next.
  */
-function crowdedPorts(ends: readonly PinnedEnd[], boxes: Boxes): Map<string, number> {
-	spreadPorts(ends, boxes);
+function crowdedPorts(
+	ends: readonly PinnedEnd[],
+	boxes: Boxes,
+	packed: boolean,
+): Map<string, number> {
+	const groups = rowGroups(ends);
+	const rowKey = (end: PinnedEnd) => `${end.link[end.end].entity}\u0000${end.row}`;
+	const lines = new Map<string, number>();
+	for (const row of groups)
+		lines.set(
+			rowKey(row[0]!),
+			Math.max(lines.get(rowKey(row[0]!)) ?? 0, row.length, row[0]!.lines),
+		);
 	const ports = new Map<string, number>();
-	for (const row of rowGroups(ends)) {
-		if (row.length <= 2) continue;
-		row
-			.toSorted((a, b) => a.y - b.y)
-			.forEach((end, slot) =>
-				ports.set(
-					`${end.link.relationship.id}:${end.end}`,
-					(slot - (row.length - 1) / 2) * PORT_STEP,
-				),
-			);
+	for (const row of groups) {
+		const count = lines.get(rowKey(row[0]!))!;
+		if (count <= PLAIN_ROW_ENDS || row.length < 2) continue;
+		const order = portOrder(row, ends, boxes);
+		const port = (end: PinnedEnd, offset: number) =>
+			ports.set(`${end.link.relationship.id}:${end.end}`, offset);
+		// Packed, two ends stand around the middle as on a plain row, which the row aligns on.
+		if (packed) {
+			if (row.length > PLAIN_ROW_ENDS)
+				[...order.ups, ...order.levels, ...order.downs].forEach((end, slot) =>
+					port(end, (slot - (row.length - 1) / 2) * PORT_STEP),
+				);
+		} else
+			for (const [end, slot] of lineSlots(order, count))
+				port(end, (slot - (count - 1) / 2) * ROW_HEIGHT);
 	}
 	return ports;
 }
@@ -931,7 +1010,7 @@ function bestScene(
 		const key = JSON.stringify([...placement.boxes, ...placement.sides]);
 		if (tried.has(key)) continue;
 		tried.add(key);
-		const candidate = { tables, links, placement, option, spill: false };
+		const candidate = { tables, links, placement, option, spill: false, packed: false };
 		const scene = sceneOf(diagram, candidate);
 		const cost = routedCost(scene);
 		// Another placement must beat the first, layered one clearly, not by a fraction.
@@ -946,10 +1025,15 @@ function bestScene(
 		const scene = sceneOf(diagram, spilled);
 		if (routedCost(scene) < best!.cost) chosen = { scene, candidate: spilled };
 	}
-	const grown = grownCandidate(diagram, chosen.candidate);
-	if (grown === chosen.candidate) return chosen;
-	const scene = sceneOf(diagram, grown);
-	return drawsNoWorse(scene, chosen.scene) ? { scene, candidate: grown } : chosen;
+	// Then its crowded rows grow, a line to each end, or, where that draws worse,
+	// with their ends packed around each row's middle.
+	for (const packed of [false, true]) {
+		const grown = grownCandidate(diagram, { ...chosen.candidate, packed });
+		if (grown.tables === chosen.candidate.tables) return chosen;
+		const scene = sceneOf(diagram, grown);
+		if (drawsNoWorse(scene, chosen.scene)) return { scene, candidate: grown };
+	}
+	return chosen;
 }
 
 /**
@@ -1020,7 +1104,10 @@ function parentSide(ends: readonly PinnedEnd[], link: Link): GraphAnchor["side"]
 	return ends.find((end) => end.link === link && end.end === "parent")?.side ?? "right";
 }
 
-/** A table's elements: its outline, its name band, and a text per column of its rows. */
+/**
+ * A table's elements: its outline, its name band, a tinted band behind each
+ * grown row, and a text per column of its rows.
+ */
 function tableElements(
 	table: Table,
 	box: NodeSceneElement,
@@ -1079,7 +1166,7 @@ function tableElements(
 		const rows = [...table.rows.values()];
 		// Converted text is centered on its point; each column starts at its left edge.
 		// Rows of one height share a text per column; where a row grew, each row with
-		// text has its own.
+		// text has its own, at the row's middle.
 		const column = (
 			suffix: string,
 			lines: readonly string[],
@@ -1125,7 +1212,34 @@ function tableElements(
 				),
 			);
 	}
-	return { nodes: [outline, band], texts };
+	// A grown row reads as one key row, tinted across the table behind its text
+	// and every end it holds, clear of the outline's stroke.
+	const keyBands = [...table.rows.values()].flatMap((row): NodeSceneElement[] =>
+		(table.growth.rows[row.index] ?? 0) > 0
+			? [
+					{
+						type: "node",
+						id: `node:${id}:row:${row.index}`,
+						nodeId: `${id}:row:${row.index}`,
+						kind: "entity-key-row",
+						rendererRole: "er-table",
+						shape: "rectangle",
+						x: box.x + KEY_BAND_INSET,
+						y: box.y + row.top,
+						width: table.width - 2 * KEY_BAND_INSET,
+						height: row.height,
+						label: table.names[row.index]!,
+						fillColor: KEY_BAND_FILL,
+						fillStyle: "solid",
+						strokeColor: KEY_BAND_FILL,
+						strokeWidth: 1,
+						roughness: 0,
+						groupIds,
+					},
+				]
+			: [],
+	);
+	return { nodes: [outline, band, ...keyBands], texts };
 }
 
 /** The ring an optional end draws on its line, past its bar or foot, grouped with its table. */

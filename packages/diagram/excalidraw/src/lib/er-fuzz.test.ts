@@ -279,9 +279,7 @@ function defects(diagram: ErDiagram): string[] {
 	const scene = renderDiagram(diagram);
 	const exported = convertSceneToExcalidraw(scene);
 	const tables = scene.elements.flatMap((element) =>
-		element.type === "node" &&
-		element.rendererRole === "er-table" &&
-		!element.id.endsWith(":header")
+		element.type === "node" && element.rendererRole === "er-table" && element.kind === "entity"
 			? [element]
 			: [],
 	);
@@ -336,9 +334,10 @@ const ER_ROUTING = "1/2 0/0 0/0 0/0 0/0 1/0 0/0 0/1 0/0 0/0 0/0 1/0 0/0 0/0 0/0 
 /**
  * Neighboring ends that bunch across the schemas checked: a row holding more
  * than two ends on a side grows to give each a port of its own, except where
- * growing would draw worse (99 and 3 before rows grew).
+ * growing would draw worse (99 and 3 before rows grew, 18 and 0 before a
+ * grown row gave each end a line of its own).
  */
-const ER_BUNCHED = { ci: 0, full: 18 };
+const ER_BUNCHED = { ci: 0, full: 12 };
 
 /** Schemas checked in CI; the full fuzz runs locally with ER_FUZZ=full (and any ER_FUZZ_SEED). */
 const CI_SCHEMAS = 16;

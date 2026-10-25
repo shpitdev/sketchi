@@ -124,6 +124,15 @@ describe("Code Mode native ER diagram", () => {
 		]);
 		const excalidraw = formats.get("excalidraw") as Parameters<typeof validateExcalidrawScene>[0];
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
+		// The grown id row exports as one tinted band behind its text, grouped with its table.
+		expect(
+			excalidraw.elements.find((element) => element.id === "node:organizations:row:0"),
+		).toMatchObject({
+			type: "rectangle",
+			backgroundColor: "#f6eff2",
+			strokeColor: "#f6eff2",
+			groupIds: ["table:organizations"],
+		});
 	});
 
 	it("reads cardinality aliases, source/target and a combined cardinality", async () => {
