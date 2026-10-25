@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.25.19
+
+### Patch Changes
+
+- [#545](https://github.com/shpitdev/sketchi/pull/545) [`46117b7`](https://github.com/shpitdev/sketchi/commit/46117b7e7c08de8781f95e2136a20ee57e835101) Thanks [@anandpant](https://github.com/anandpant)! - The tint behind an ER key row that many relationships share is a step darker, so it still reads on low-contrast displays and at full-diagram zoom. It now meets the name band's rule, with no blank strip between them, and reaches the table's edge when the row is the last.
+
 ## 0.25.18
 
 ### Patch Changes
