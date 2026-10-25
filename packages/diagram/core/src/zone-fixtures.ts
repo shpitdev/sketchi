@@ -5,10 +5,12 @@ import awsThreeTierDescribed from "./fixtures/zones/aws-three-tier-described.js"
 import awsThreeTierQueries from "./fixtures/zones/aws-three-tier-queries.js";
 import awsThreeTierRequests from "./fixtures/zones/aws-three-tier-requests.js";
 import hybridCloud from "./fixtures/zones/hybrid-cloud.js";
+import hybridCloudArchiveCorridor from "./fixtures/zones/hybrid-cloud-archive-corridor.js";
 import hybridCloudBypass from "./fixtures/zones/hybrid-cloud-bypass.js";
 import hybridCloudBypassArchive from "./fixtures/zones/hybrid-cloud-bypass-archive.js";
 import hybridCloudDescribed from "./fixtures/zones/hybrid-cloud-described.js";
 import hybridCloudLabeled from "./fixtures/zones/hybrid-cloud-labeled.js";
+import hybridCloudStacked from "./fixtures/zones/hybrid-cloud-stacked.js";
 import hybridCloudSync from "./fixtures/zones/hybrid-cloud-sync.js";
 import kindedFlat from "./fixtures/zones/kinded-flat.js";
 import kubernetesCluster from "./fixtures/zones/kubernetes-cluster.js";
@@ -76,6 +78,19 @@ export const requestedArchitectureFlowchart = flowchart(awsThreeTierRequests);
  * table above and an archive below, as a generated sample drew it.
  */
 export const syncedHybridFlowchart = flowchart(hybridCloudSync);
+
+/**
+ * The ten-node hybrid setup whose region wraps beside the data center with
+ * one crossing that a line's side change removes, as a generated sample drew
+ * it. Its logo needs an embedded asset to export.
+ */
+export const stackedHybridFlowchart = flowchart(hybridCloudStacked);
+
+/**
+ * The hybrid setup whose archive stands ahead of the sync function, its side
+ * facing it across a free corridor, as a generated sample drew it.
+ */
+export const corridorHybridFlowchart = flowchart(hybridCloudArchiveCorridor);
 
 /** Zones of the thirty-node stress case, each with its parent and kind. */
 const STRESS_ZONES = [

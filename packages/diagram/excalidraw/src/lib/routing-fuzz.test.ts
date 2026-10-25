@@ -1272,6 +1272,22 @@ describe("routing fuzz", () => {
 		expect(findings).toBeLessThanOrEqual(3);
 	});
 
+	it("grows a rank gap only where the drawing still reads no worse once its lines are cleared at last", () => {
+		// Seed 20261026, case 44 in BT: judged before the last clearance pass, a
+		// grown gap kept 80 crossings where the drawing without it cleared to 78.
+		const { crossings, findings } = routingCounts(
+			renderIntermediateDiagram(
+				parseFlowchartDiagram({
+					...randomFlowcharts(45, 20261026)[44]!,
+					type: "flowchart",
+					layout: { direction: "BT", edgeRouting: "orthogonal" },
+				}),
+			),
+		);
+		expect(crossings).toBeLessThanOrEqual(78);
+		expect(findings).toBeLessThanOrEqual(13);
+	});
+
 	it.each(["LR", "RL"] as const)(
 		"routes the review's wrapped long flow without reader findings in %s",
 		(direction) => {

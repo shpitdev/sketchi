@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
+	rankGapFlowchart,
 	routingFixtures,
 	segmentsFromPoints,
 	segmentCrossesBoundsInterior,
@@ -11,8 +12,10 @@ import {
 	parseFlowchartDiagram,
 	parseIntermediateDiagram,
 	candidateRouteQuality,
+	routingJogReach,
 	routingQualityFindings,
 	routingQualityScale,
+	routingWideBend,
 } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram, type NodeSceneElement, type ScenePoint } from "./scene";
 
@@ -664,4 +667,48 @@ describe.each(["LR", "RL", "TB", "BT"] as const)("direct decision ports: %s", (d
 			expect(inward).toEqual([]);
 		},
 	);
+});
+
+describe("rank gaps", () => {
+	it("grows the gap a line steps sideways across until the step clears both its ends", () => {
+		// Monitoring led to the resolution through a 96-unit gap with a 148-unit
+		// step: wherever the step sat, it read as a jog into the arrowhead.
+		const scene = renderIntermediateDiagram(rankGapFlowchart);
+		const [xs, ys] = (["x", "y"] as const).map((axis) =>
+			scene.elements.flatMap((e) =>
+				e.type === "arrow"
+					? e.points.map((point) => point[axis])
+					: e.type === "node"
+						? [e[axis], e[axis] + (axis === "x" ? e.width : e.height)]
+						: [],
+			),
+		);
+		const [width, height] = [
+			Math.max(...xs!) - Math.min(...xs!),
+			Math.max(...ys!) - Math.min(...ys!),
+		];
+		const scale = routingQualityScale({ width, height });
+		const [reach, wide] = [routingJogReach(scale), routingWideBend(scale)];
+		const line = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "edge-14");
+		if (line?.type !== "arrow") throw new Error("No line for edge-14");
+		const turns = line.points.filter((point, index) => {
+			const [before, after] = [line.points[index - 1], line.points[index + 1]];
+			return (
+				!before ||
+				!after ||
+				!(
+					(before.x === point.x && point.x === after.x) ||
+					(before.y === point.y && point.y === after.y)
+				)
+			);
+		});
+		const [start, end] = [turns[0]!, turns.at(-1)!];
+		// A step narrower than a deliberate bend, each of its turns past a jog's reach of the end beside it.
+		expect(turns).toHaveLength(4);
+		expect(Math.abs(turns[2]!.x - turns[1]!.x)).toBeLessThan(wide);
+		expect(turns[1]!.y - start.y).toBeGreaterThan(reach);
+		expect(end.y - turns[2]!.y).toBeGreaterThan(reach);
+		// It grows no further than tightening allows.
+		expect((height + 40) / (width + 40)).toBeLessThan(2.3);
+	});
 });

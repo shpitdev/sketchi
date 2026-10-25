@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	CANVAS_SHAPE_CURVE,
 	bypassingHybridFlowcharts,
+	corridorHybridFlowchart,
 	describedHybridFlowchart,
 	canvasBoundTextBox,
 	canvasShapeOutline,
@@ -14,6 +15,7 @@ import {
 	routingJogReach,
 	routingQualityScale,
 	routingWideBend,
+	stackedHybridFlowchart,
 	syncedHybridFlowchart,
 	zoneFixtures,
 	zoneRegionIssues,
@@ -21,6 +23,7 @@ import {
 	type IntermediateDiagram,
 } from "@sketchi/diagram-core";
 import {
+	arrowCrossings,
 	renderIntermediateDiagram,
 	type NodeSceneElement,
 	type RenderedDiagramScene,
@@ -400,6 +403,18 @@ describe("lines into a hanging zone band", () => {
 		expect(aws.x).toBeGreaterThan(dc.x + dc.width);
 		expect(dc.y).toBeLessThan(aws.y + aws.height);
 	});
+
+	it("keeps the data center beside the cloud when a side change clears its region's wrap of crossings", () => {
+		// A Sol sample stacked the cloud under the data center: beside it, its
+		// region's wrap crossed the sync function's lines to the table and the
+		// PDF once, which the crossing repairs remove.
+		const scene = renderIntermediateDiagram(stackedHybridFlowchart);
+		const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
+		const [dc, aws] = [zones.get("group:dc")!, zones.get("group:aws")!];
+		expect(aws.x).toBeGreaterThan(dc.x + dc.width);
+		expect(dc.y).toBeLessThan(aws.y + aws.height);
+		expect(arrowCrossings(scene.elements.flatMap((e) => (e.type === "arrow" ? [e] : [])))).toBe(0);
+	});
 });
 
 describe("lines past an infrastructure shape", () => {
@@ -511,6 +526,18 @@ describe("line ends from generated samples", () => {
 		const end = arrow(scene, "edge-1").points.at(-1)!;
 		expect(end.y).toBe(alb.y);
 		expect(Math.abs(end.x - alb.x - alb.width / 2)).toBeLessThanOrEqual((3 / 4) * (alb.width / 2));
+	});
+
+	it("runs the sync function's line straight into the archive's side across the free corridor", () => {
+		// The line left the sync function just above the archive's span, rose
+		// over its corner and hooked down into its top.
+		const scene = renderIntermediateDiagram(corridorHybridFlowchart);
+		const archive = node(scene, "archive");
+		const { points } = arrow(scene, "edge-8");
+		expect(turns(points)).toHaveLength(2);
+		expect(points.at(-1)!.y).toBeGreaterThan(archive.y);
+		expect(points.at(-1)!.y).toBeLessThan(archive.y + archive.height);
+		expect(points.at(-1)!.x).toBeLessThan(archive.x + archive.width / 2);
 	});
 
 	it("runs each of the hybrid sample's lines straight past a jog's reach of either end", () => {

@@ -194,13 +194,15 @@ describe("branch side work", () => {
 	// repair had moved the severity check's branches, so the branch-side pass
 	// laid out the arranged layout's own assignment again and completed it
 	// through three repair layouts, back to the drawn layout: 11 sizings (352)
-	// and 4.81M checks for the same drawing.
+	// and 4.81M checks for the same drawing. Its escalation's step across a
+	// rank gap too narrow to clear both ends now grows that gap: one more
+	// layout, finished and polished, 8 sizings (256) and 2.89M checks.
 	it("completes no branch assignment the arranged layout already makes", () => {
 		work.checks = 0;
 		work.measures = 0;
 		const scene = renderIntermediateDiagram(denseIncident);
 		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(19);
-		expect(work.measures).toBeLessThanOrEqual(7 * 2 * 16);
+		expect(work.measures).toBeLessThanOrEqual(8 * 2 * 16);
 		expect(work.checks).toBeLessThan(3_000_000);
 	});
 });

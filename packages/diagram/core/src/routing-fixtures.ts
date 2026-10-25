@@ -23,6 +23,8 @@ import packageChain from "./fixtures/routing/package-chain.js";
 import scopeBypass from "./fixtures/routing/scope-bypass.js";
 import rolloutFailures from "./fixtures/routing/rollout-failures.js";
 import cacheLookup from "./fixtures/routing/cache-lookup.js";
+import expenseReceiptReturn from "./fixtures/routing/expense-receipt-return.js";
+import incidentResponseRankGap from "./fixtures/routing/incident-response-rank-gap.js";
 
 /** Readability regressions from normalized flowchart specs. */
 export const routingFixtures = {
@@ -147,3 +149,23 @@ export const routingFixtures = {
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
 	}),
 };
+
+/**
+ * The expense flow whose receipt request returns to a check that sends its
+ * branches out by its side vertices, as a generated sample drew it.
+ */
+export const receiptReturnFlowchart = parseFlowchartDiagram({
+	...expenseReceiptReturn,
+	type: "flowchart",
+	layout: { direction: "TB", edgeRouting: "orthogonal" },
+});
+
+/**
+ * The incident response flow whose monitoring step steps sideways to the
+ * resolution across a narrow rank gap, as a generated sample drew it.
+ */
+export const rankGapFlowchart = parseFlowchartDiagram({
+	...incidentResponseRankGap,
+	type: "flowchart",
+	layout: { direction: "TB", edgeRouting: "orthogonal" },
+});

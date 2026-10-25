@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	crossingFixtures,
 	queriedArchitectureFlowchart,
+	receiptReturnFlowchart,
 	routingFixtures,
 	sideFixtures,
 	wrappedLabelWidth,
@@ -74,6 +75,22 @@ describe("decision branch sides", () => {
 			expect(bends(line(scene, edgeId).points)).toBe(1);
 		},
 	);
+});
+
+describe("returns into a decision", () => {
+	it("raises the receipt request's return into the check's free bottom vertex, not round to its far side", () => {
+		// The check sends its branches out by its side vertices; the return once
+		// wound right, up and back left into the far face, beside the right branch.
+		const scene = renderIntermediateDiagram(receiptReturnFlowchart);
+		const check = scene.elements.find(
+			(element) => element.type === "node" && element.nodeId === "receipt",
+		);
+		if (check?.type !== "node") throw new Error("No receipt check");
+		const { points } = line(scene, "edge-3");
+		expect(sides(scene, "edge-3")[1]).toBe("bottom");
+		expect(points.at(-1)!.x).toBe(check.x + check.width / 2);
+		expect(bends(points)).toBeLessThanOrEqual(1);
+	});
 });
 
 describe("arrival sides", () => {
