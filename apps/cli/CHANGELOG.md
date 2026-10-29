@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.29.0
+
+### Minor Changes
+
+- [#561](https://github.com/shpitdev/sketchi/pull/561) [`f3b6715`](https://github.com/shpitdev/sketchi/commit/f3b6715607fe51a616037858e2085369548e7b33) Thanks [@anandpant](https://github.com/anandpant)! - Add native wireframes: `sketchi create` builds `{ "type": "wireframe", "spec": { "title", "screens": [{ "name", "device", "children" }] } }` documents offline, and `sketchi generate --type wireframe` generates them. Each screen draws as an Excalidraw frame the size of its device (desktop, tablet or phone), with its header, footer and sidebars in place and every component laid out for you: headings, text, buttons, form fields, toggles, tabs, navigation, tables, lists and image and chart placeholders, each a group that moves as one.
+
 ## 0.28.0
 
 ### Minor Changes
