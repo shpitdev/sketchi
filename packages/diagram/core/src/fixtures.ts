@@ -12,6 +12,7 @@ import { vennFixture } from "./types/venn.js";
 import { journeyFixture } from "./types/journey.js";
 import { sankeyFixture } from "./types/sankey.js";
 import { wireframeFixture } from "./types/wireframe.js";
+import { quadrantFixture } from "./types/quadrant.js";
 import type { CanonicalDiagram } from "./diagram.js";
 
 /** One maintained fixture per canonical family. */
@@ -30,4 +31,5 @@ export const diagramFixtures: readonly CanonicalDiagram[] = [
 	journeyFixture,
 	sankeyFixture,
 	wireframeFixture,
+	quadrantFixture,
 ];

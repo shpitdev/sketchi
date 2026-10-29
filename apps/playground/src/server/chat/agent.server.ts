@@ -111,6 +111,13 @@ import {
 	StudioBuildWireframeInputSchema,
 	StudioBuildWireframeOutputSchema,
 } from "./studio-wireframe-tool.server";
+import {
+	makeStudioQuadrantChartToolExecutor,
+	STUDIO_BUILD_QUADRANT_CHART_TOOL_DESCRIPTION,
+	STUDIO_BUILD_QUADRANT_CHART_TOOL_NAME,
+	StudioBuildQuadrantChartInputSchema,
+	StudioBuildQuadrantChartOutputSchema,
+} from "./studio-quadrant-chart-tool.server";
 
 export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
 	"StudioAgentRequestError",
@@ -239,6 +246,10 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	const wireframeExecutor = yield* makeStudioWireframeToolExecutor(codeMode.buildWireframe, {
 		turn,
 	});
+	const quadrantChartExecutor = yield* makeStudioQuadrantChartToolExecutor(
+		codeMode.buildQuadrantChart,
+		{ turn },
+	);
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -317,6 +328,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildWireframeInputSchema,
 						outputSchema: StudioBuildWireframeOutputSchema,
 						execute: makeStudioBuildToolCallback(wireframeExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_QUADRANT_CHART_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_QUADRANT_CHART_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildQuadrantChartInputSchema,
+						outputSchema: StudioBuildQuadrantChartOutputSchema,
+						execute: makeStudioBuildToolCallback(quadrantChartExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,

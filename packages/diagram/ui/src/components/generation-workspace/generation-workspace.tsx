@@ -74,6 +74,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			edgeCount: diagram.links.length,
 			edgeNoun: "flows",
 		};
+	if (diagram.type === "quadrant")
+		return {
+			nodeCount: diagram.points.length,
+			nodeNoun: "points",
+			edgeCount: new Set(diagram.points.flatMap((point) => point.group ?? [])).size,
+			edgeNoun: "groups",
+		};
 	if (diagram.type === "org-chart")
 		return {
 			nodeCount: diagram.people.length,

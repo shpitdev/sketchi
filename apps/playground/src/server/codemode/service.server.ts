@@ -14,6 +14,7 @@ import {
 	buildJourneyMap,
 	buildSankey,
 	buildWireframe,
+	buildQuadrantChart,
 	buildTimeline,
 	buildChart,
 	CodeModeArtifactStorage,
@@ -37,6 +38,7 @@ import {
 	type BuildJourneyMapResult,
 	type BuildSankeyResult,
 	type BuildWireframeResult,
+	type BuildQuadrantChartResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CodeModeArtifactStorageError,
@@ -110,6 +112,9 @@ export interface PlaygroundCodeModeShape {
 	readonly buildWireframe: (
 		input: unknown,
 	) => Effect.Effect<BuildWireframeResult, never, CodeModeRequestContext>;
+	readonly buildQuadrantChart: (
+		input: unknown,
+	) => Effect.Effect<BuildQuadrantChartResult, never, CodeModeRequestContext>;
 	readonly createCanvas: (
 		input: unknown,
 	) => Effect.Effect<CreateCanvasResult, never, CodeModeRequestContext>;
@@ -280,6 +285,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
 			),
 			buildWireframe: Effect.fn("playground.codeMode.buildWireframe")((input) =>
 				provideRequestCodeMode(buildWireframe(input)),
+			),
+			buildQuadrantChart: Effect.fn("playground.codeMode.buildQuadrantChart")((input) =>
+				provideRequestCodeMode(buildQuadrantChart(input)),
 			),
 			createCanvas: Effect.fn("playground.codeMode.createCanvas")((input) =>
 				provideRequestCodeMode(createCanvas(input)),

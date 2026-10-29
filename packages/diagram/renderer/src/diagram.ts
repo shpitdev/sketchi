@@ -14,6 +14,7 @@ import { renderVennDiagram } from "./venn.js";
 import { renderJourneyDiagram } from "./journey.js";
 import { renderSankeyDiagram } from "./sankey.js";
 import { renderWireframeDiagram } from "./wireframe.js";
+import { renderQuadrantDiagram } from "./quadrant.js";
 
 /** Render any canonical diagram with its family's renderer. */
 export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
@@ -46,5 +47,7 @@ export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
 			return renderSankeyDiagram(diagram);
 		case "wireframe":
 			return renderWireframeDiagram(diagram);
+		case "quadrant":
+			return renderQuadrantDiagram(diagram);
 	}
 }

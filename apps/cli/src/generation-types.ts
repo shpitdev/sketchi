@@ -18,6 +18,7 @@ const GENERATION_TYPE_CHOICES = {
 	journey: { label: "Journey map", hint: "best for stages, steps and how each one feels" },
 	sankey: { label: "Sankey diagram", hint: "best for budgets, traffic and funnels that flow" },
 	wireframe: { label: "Wireframe", hint: "best for low-fidelity screens, forms and app layouts" },
+	quadrant: { label: "Quadrant chart", hint: "best for 2×2 matrices of items scored on two axes" },
 } as const satisfies Record<GenerationType, { readonly hint: string; readonly label: string }>;
 
 /** Wizard options in registry order, one per canonical family. */

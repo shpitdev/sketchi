@@ -411,6 +411,15 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		const wireframeDocs = getCodeModeDocs({ topic: "buildWireframe" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(wireframeDocs.split("\n\n")[0]);
 		expect(wireframeDocs.split("Request type:")[0]).toContain("A nav inside a sidebar stacks");
+		// Quadrant charts add a builder name to the head and one compact line here (+508 characters).
+		expect(codeLine("buildQuadrantChart")).toBe(
+			"- buildQuadrantChart: spec: { title, xAxis: { title, low, high }, yAxis: same, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }. low and high are the axis end labels as stated (x left to right, y bottom up); name each quadrant by the corner its conditions describe; x and y run 0 (low end) to 1 (high end), so a score out of 100 is score / 100. Copy every item and name stated.",
+		);
+		const quadrantDocs = getCodeModeDocs({ topic: "buildQuadrantChart" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(quadrantDocs.split("\n\n")[0]);
+		expect(quadrantDocs.split("Request type:")[0]).toContain(
+			"An axis may run from Urgent to Not urgent when the prompt draws it that way",
+		);
 		expect(codeLine("createCanvas")).toBeUndefined();
 		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
 			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
@@ -461,8 +470,9 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// Nested zones, infrastructure shapes and their logo rule add spec fields and docs (#476).
 		// Venn diagrams add a summary and one compact line (+336 characters).
 		// Journey maps add an index line and a compact spec line (+367 characters).
-		// Sankey diagrams add their compact line (+304 characters), wireframes theirs (+807).
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(12_400);
+		// Sankey diagrams add their compact line (+304 characters), wireframes theirs (+807),
+		// quadrant charts theirs (+508).
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(12_920);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const line of overview
 			.split("\n")
@@ -486,6 +496,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			["buildVennDiagram", ["BuildVennDiagramRequest"]],
 			["buildJourneyMap", ["BuildJourneyMapRequest"]],
 			["buildSankey", ["BuildSankeyRequest"]],
+			["buildQuadrantChart", ["BuildQuadrantChartRequest"]],
 			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
 			["getArtifact", ["GetArtifactRequest"]],
 			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],

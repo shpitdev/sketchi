@@ -49,7 +49,7 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "people", "sets", "items", "relationships", "links", "screens", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "people", "sets", "items", "points", "relationships", "links", "screens", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
 	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", "member", "person", "set", "item", "screen", or "component".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
@@ -209,6 +209,17 @@ const IR_INSTRUCTIONS = {
 			"Widgets: heading (text, level 1-3), text (text, or lines for placeholder copy), link, badge and button (text; variant primary or secondary; target: the id of the screen it opens), input, textarea, select and search (label?, placeholder or value), checkbox, radio and toggle (label, checked), tabs, nav and breadcrumbs (items, active), list (items), avatar, icon, image and chart (label?), table (columns: headers, rows?), divider.",
 			"State: variant primary on the screen's main button, checked: true on what is on or selected, active on the selected tab or nav item, value on a field showing one.",
 			"Copy every screen, component, text and state the source states, in order; invent no controls or copy.",
+		],
+	},
+	quadrant: {
+		title: "Quadrant chart IR rules",
+		rules: [
+			'Use diagram type "quadrant".',
+			"Use it for quadrant charts and 2×2 matrices that place items by two measures (effort vs impact, Eisenhower, positioning); never supply coordinates.",
+			"Return xAxis and yAxis: { title, low, high }, where low and high label the axis ends (left or bottom, then right or top) as the source words them.",
+			"Return quadrants: { topLeft, topRight, bottomLeft, bottomRight }, each name in the corner its two conditions describe through those end labels.",
+			"Return points: [{ label, x, y, group? }] with x and y from 0 (low end) to 1 (high end): a score out of 100 is score / 100, and 0.5 sits on a middle line. Place an item given only its quadrant well inside it (0.25 or 0.75).",
+			"group colors points the source sets apart and adds a legend. Copy every item, axis label and quadrant name the source states; invent none. At most 30 points.",
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
@@ -523,6 +534,28 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "screens", comparator: "exact", value: 1 },
 			{ kind: "label", target: "component", value: "Sign in" },
+		],
+	},
+	quadrant: {
+		diagram: {
+			id: "effort-impact",
+			type: "quadrant",
+			xAxis: { title: "Effort", low: "Low effort", high: "High effort" },
+			yAxis: { title: "Impact", low: "Low impact", high: "High impact" },
+			quadrants: {
+				topLeft: "Quick wins",
+				topRight: "Major projects",
+				bottomLeft: "Fill-ins",
+				bottomRight: "Thankless tasks",
+			},
+			points: [
+				{ label: "Dark mode", x: 0.2, y: 0.75 },
+				{ label: "Billing rewrite", x: 0.9, y: 0.3 },
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "points", comparator: "exact", value: 2 },
+			{ kind: "label", target: "point", value: "Dark mode" },
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;

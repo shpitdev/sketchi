@@ -18,6 +18,7 @@ export const DIAGRAM_TYPES = [
 	"journey",
 	"sankey",
 	"wireframe",
+	"quadrant",
 ] as const;
 
 export type DiagramTypeValue = (typeof DIAGRAM_TYPES)[number];

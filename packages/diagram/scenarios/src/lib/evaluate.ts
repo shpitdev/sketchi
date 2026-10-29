@@ -32,6 +32,11 @@ import {
 	wireframeScenarioChecks,
 } from "./wireframe-scenarios.js";
 import {
+	quadrantDrawnCheck,
+	quadrantLayoutCheck,
+	quadrantScenarioChecks,
+} from "./quadrant-scenarios.js";
+import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,
 	ganttGeometryCheck,
@@ -53,6 +58,7 @@ import {
 	parseJourneyDiagram,
 	parseSankeyDiagram,
 	parseWireframeDiagram,
+	parseQuadrantDiagram,
 	parseTimelineDiagram,
 	parseChartDiagram,
 	parseGanttDiagram,
@@ -1132,6 +1138,18 @@ export function evaluateScenarioDiagram(
 			diagram,
 			classScenarioChecks(scenario, modelDiagram),
 			(scene) => [classDrawnCheck(diagram, scene), classClearanceCheck(scene)],
+		);
+	}
+	if (scenario.diagramType === "quadrant") {
+		const diagram = parseQuadrantDiagram(candidate);
+		const modelDiagram =
+			modelCandidate === candidate ? diagram : parseQuadrantDiagram(modelCandidate);
+		// The drawing and its layout read the scene, so they score the returned diagram.
+		return evaluation(
+			scenario.id,
+			diagram,
+			quadrantScenarioChecks(scenario, modelDiagram),
+			(scene) => [quadrantDrawnCheck(diagram, scene), quadrantLayoutCheck(diagram, scene)],
 		);
 	}
 	if (scenario.diagramType === "org-chart") {

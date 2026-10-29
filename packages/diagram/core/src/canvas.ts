@@ -366,7 +366,8 @@ export interface CanvasIconAsset {
  * architecture zones (a region, VPC, subnet or cluster outline), Venn
  * sets (a set's translucent fill and its outline), a journey map's faces
  * (a face and its eyes on the experience curve), Sankey marks (a node's bar
- * and each flow's band), and wireframe components: a widget's own shapes (a
+ * and each flow's band), quadrant chart marks (a quadrant's tint, a point's
+ * dot and a legend key), and wireframe components: a widget's own shapes (a
  * card, control or pill) and a region of a screen (a header, sidebar, table or
  * image placeholder).
  * Only a zone carries an icon, drawn in its header, and only a table's or a
@@ -391,6 +392,7 @@ export const CANVAS_RENDERER_ROLES = [
 	"sankey-mark",
 	"wireframe-widget",
 	"wireframe-region",
+	"quadrant-mark",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
@@ -415,9 +417,9 @@ export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 /**
  * Roles whose rectangles keep square corners: chart, Gantt and Sankey bars, so
  * their ends sit exactly at their values and dates and bands meet them flush; a
- * table's or class's outline and name band, so the band fills its top; lanes
- * and zones, so neighbors share one boundary; and a wireframe's regions, which
- * run to their screen's edges.
+ * table's or class's outline and name band, so the band fills its top; lanes,
+ * zones and quadrant tints, so neighbors share one boundary; and a wireframe's
+ * regions, which run to their screen's edges.
  */
 const SQUARE_CORNER_ROLES: ReadonlySet<CanvasRendererRole> = new Set([
 	"chart-mark",
@@ -429,6 +431,7 @@ const SQUARE_CORNER_ROLES: ReadonlySet<CanvasRendererRole> = new Set([
 	"swimlane-header",
 	"zone",
 	"wireframe-region",
+	"quadrant-mark",
 ]);
 
 /** Whether a shape draws as a rectangle with Excalidraw's adaptive rounded corners. */
@@ -475,6 +478,7 @@ const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"er-table": "Entity table",
 	"gantt-mark": "Gantt mark",
 	"journey-mark": "Journey mark",
+	"quadrant-mark": "Quadrant mark",
 	"sequence-activation": "Sequence activation",
 	"sequence-lifeline": "Sequence lifeline",
 	"state-marker": "State marker",

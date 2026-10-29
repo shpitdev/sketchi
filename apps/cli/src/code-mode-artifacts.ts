@@ -69,6 +69,7 @@ export function codeModeFailure(
 					"invalid_journey",
 					"invalid_sankey",
 					"invalid_wireframe",
+					"invalid_quadrant_chart",
 					"quality_failed",
 				];
 	if (validationStatuses.includes(result.status))

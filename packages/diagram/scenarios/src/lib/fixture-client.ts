@@ -142,6 +142,20 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: node.label,
 			})),
 		];
+	if (scenario.diagramType === "quadrant")
+		return [
+			{
+				kind: "count",
+				target: "points",
+				comparator: "exact",
+				value: scenario.expectedDiagram.points.length,
+			},
+			...scenario.expectedDiagram.points.map((point) => ({
+				kind: "label",
+				target: "point",
+				value: point.label,
+			})),
+		];
 	if (scenario.diagramType === "org-chart")
 		return [
 			{

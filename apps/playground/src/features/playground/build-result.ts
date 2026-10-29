@@ -21,6 +21,8 @@ import {
 	BuildSankeyToolInputSchema,
 	BuildWireframeResultSchema,
 	BuildWireframeToolInputSchema,
+	BuildQuadrantChartResultSchema,
+	BuildQuadrantChartToolInputSchema,
 	BuildTimelineResultSchema,
 	BuildTimelineToolInputSchema,
 	BuildChartResultSchema,
@@ -38,6 +40,7 @@ import {
 	type BuildJourneyMapResult,
 	type BuildSankeyResult,
 	type BuildWireframeResult,
+	type BuildQuadrantChartResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagram-agent";
@@ -62,7 +65,8 @@ export type StudioBuildResult =
 	| BuildVennDiagramResult
 	| BuildJourneyMapResult
 	| BuildSankeyResult
-	| BuildWireframeResult;
+	| BuildWireframeResult
+	| BuildQuadrantChartResult;
 
 const BUILD_TOOLS = {
 	"tool-build_chart": {
@@ -194,6 +198,16 @@ const BUILD_TOOLS = {
 			return Result.isSuccess(decoded) ? decoded.success.spec.nodes.map((node) => node.label) : [];
 		},
 	},
+	"tool-build_quadrant_chart": {
+		family: "quadrant",
+		decodeResult: Schema.decodeUnknownResult(BuildQuadrantChartResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildQuadrantChartToolInputSchema)(input);
+			return Result.isSuccess(decoded)
+				? decoded.success.spec.points.map((point) => point.label)
+				: [];
+		},
+	},
 } as const;
 
 export type DiagramToolPartType = keyof typeof BUILD_TOOLS;
@@ -230,6 +244,7 @@ const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 	journey: "journey map",
 	sankey: "Sankey diagram",
 	wireframe: "wireframe",
+	quadrant: "quadrant chart",
 };
 
 /**

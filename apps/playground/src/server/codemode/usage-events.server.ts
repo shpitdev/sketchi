@@ -45,6 +45,7 @@ export type CodeModeUsageOperation =
 	| "buildJourneyMap"
 	| "buildSankey"
 	| "buildWireframe"
+	| "buildQuadrantChart"
 	| "createCanvas"
 	| "execute"
 	| "generateDiagram";

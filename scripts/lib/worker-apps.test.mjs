@@ -40,6 +40,7 @@ const tanstackFullPathSnapshot = [
 	"/api/v1/journey-maps/build",
 	"/api/v1/mindmaps/build",
 	"/api/v1/org-charts/build",
+	"/api/v1/quadrant-charts/build",
 	"/api/v1/sankey-diagrams/build",
 	"/api/v1/sequences/build",
 	"/api/v1/state-machines/build",

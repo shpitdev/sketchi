@@ -16,6 +16,7 @@ export * from "./lib/venn-scenarios.js";
 export * from "./lib/journey-scenarios.js";
 export * from "./lib/sankey-scenarios.js";
 export * from "./lib/wireframe-scenarios.js";
+export * from "./lib/quadrant-scenarios.js";
 
 export * from "./lib/timeline-scenarios.js";
 export * from "./lib/chart-scenarios.js";

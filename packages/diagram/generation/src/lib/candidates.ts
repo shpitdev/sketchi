@@ -12,6 +12,9 @@ import {
 	isDiagramIconSlug,
 	OrgChartDiagramSchema,
 	OrgChartValidationError,
+	QuadrantDiagramSchema,
+	QuadrantValidationError,
+	validateQuadrantDiagram,
 	resolveOrgChartShorthand,
 	validateOrgChartDiagram,
 	VennDiagramSchema,
@@ -420,7 +423,8 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof VennValidationError ||
 		error instanceof JourneyValidationError ||
 		error instanceof SankeyValidationError ||
-		error instanceof WireframeValidationError
+		error instanceof WireframeValidationError ||
+		error instanceof QuadrantValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
@@ -447,7 +451,9 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 														? "sankey"
 														: error instanceof WireframeValidationError
 															? "wireframe"
-															: "sequence";
+															: error instanceof QuadrantValidationError
+																? "quadrant"
+																: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -644,6 +650,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 				WireframeDiagramSchema,
 				resolveWireframeShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateWireframeDiagram,
+				intent,
+			),
+		quadrant: () =>
+			decodeAndValidate(
+				QuadrantDiagramSchema,
+				withSketchiDiagramStyle(titledDiagram),
+				validateQuadrantDiagram,
 				intent,
 			),
 		sequence: () => {
@@ -857,6 +870,12 @@ function labelsForRequirement(
 						wireframeComponentWords(component),
 					)
 				: undefined;
+	if (diagram.type === "quadrant")
+		return requirement.target === "point"
+			? diagram.points.map((point) => point.label)
+			: requirement.target === "quadrant"
+				? Object.values(diagram.quadrants)
+				: undefined;
 	if (diagram.type === "er") {
 		if (requirement.target === "entity") return diagram.entities.map(erEntityName);
 		if (requirement.target === "field")
@@ -930,6 +949,7 @@ function countForRequirement(
 				: undefined;
 	if (diagram.type === "wireframe")
 		return target === "screens" ? diagram.screens.length : undefined;
+	if (diagram.type === "quadrant") return target === "points" ? diagram.points.length : undefined;
 	if (diagram.type === "er")
 		return target === "entities"
 			? diagram.entities.length

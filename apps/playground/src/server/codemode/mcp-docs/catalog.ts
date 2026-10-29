@@ -38,6 +38,7 @@ const BUILDERS = {
 	buildJourneyMap: "user journey maps: stages of steps scored for sentiment",
 	buildSankey: "Sankey diagrams of weighted flows between stages",
 	buildWireframe: "UI wireframes and mockups: screens of components",
+	buildQuadrantChart: "quadrant charts: 2×2 matrices of items placed by two measures",
 	createCanvas: "hand-placed CanvasSpec, only for layouts no builder covers (illustration)",
 };
 const HELPERS = {
@@ -91,6 +92,9 @@ const JOURNEY_SCORE_RULE =
 /** Shared by the buildSankey topic and its compact line in the execute description. */
 const SANKEY_RULE =
 	"value is the stated amount (> 0); links run one way. Copy every node, flow and value stated; add no balancing node.";
+/** Shared by the buildQuadrantChart topic and its compact line in the execute description. */
+const QUADRANT_RULE =
+	"low and high are the axis end labels as stated (x left to right, y bottom up); name each quadrant by the corner its conditions describe; x and y run 0 (low end) to 1 (high end), so a score out of 100 is score / 100.";
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 /**
@@ -115,6 +119,7 @@ const FAST_PATH = {
 	buildJourneyMap: `spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. ${JOURNEY_SCORE_RULE} Copy every stage, step, score, actor, touchpoint and note stated.`,
 	buildSankey: `spec: { title, nodes: [{ id, label }], links: [{ source, target, value, label? }], unit? ("$k", "visits") }. ${SANKEY_RULE}`,
 	buildWireframe: `spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, row (align?: "between" | "center" | "end"), column, grid (columns: n). Widgets: heading (text, level?), text (text or lines), link, badge, button (text, variant?, target?: screen id), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav, breadcrumbs, list (items, active?), avatar, icon, image, chart (label?), table (columns: string[]), divider. ${WIREFRAME_RULE}`,
+	buildQuadrantChart: `spec: { title, xAxis: { title, low, high }, yAxis: same, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }. ${QUADRANT_RULE} Copy every item and name stated.`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 const EXECUTE_HELPERS = [
 	HELPERS.searchIcons,
@@ -193,7 +198,7 @@ export const EXECUTE_TOOL_DESCRIPTION = [
 	"Helpers:",
 	...EXECUTE_HELPERS.map((summary) => `- ${summary}`),
 	`- ${LOGO_RULE}`,
-	"- Builds resolve to { ok: true, artifact, normalizedSpec, issues } or { ok: false, issues: [{ code, message, hint }] }; on ok: false, fix the spec from each hint and build again.",
+	"- Builds resolve to { ok: true, artifact, normalizedSpec, issues } or { ok: false, issues: [{ code, message, hint }] }; on ok: false, fix the spec per hint and rebuild.",
 	"- Return the accepted result: execute adds artifactDelivery.finalResponseText; copy it verbatim as the final answer and stop, never recreating the diagram as Markdown, Mermaid, a file or an Antigravity artifact.",
 ].join("\n");
 
@@ -782,6 +787,37 @@ export const catalog: CatalogEntry[] = [
 		],
 	},
 	{
+		id: "buildQuadrantChart",
+		kind: "operation",
+		title: "buildQuadrantChart",
+		topic: "buildQuadrantChart",
+		keywords: [
+			"quadrant chart",
+			"2x2 matrix",
+			"Eisenhower matrix",
+			"effort vs impact",
+			"prioritization matrix",
+			"positioning map",
+			"magic quadrant",
+		],
+		snippet:
+			"Create a native quadrant chart of items placed by two measures in four named quadrants.",
+		content: [
+			"buildQuadrantChart accepts { spec: { id?, title, xAxis: { title, low, high }, yAxis: { title, low, high }, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }, options? }. The renderer draws a square plot split into four tinted quadrants with their names in their corners, axis arrows carrying the titles and end labels, and each point as a dot at its exact position with its label beside it, or on a leader line where the plot is crowded.",
+			`${QUADRANT_RULE.charAt(0).toUpperCase()}${QUADRANT_RULE.slice(1)} An axis may run from Urgent to Not urgent when the prompt draws it that way; topLeft is low x and high y as labeled. 0.5 sits on a middle line; an item given only its quadrant sits well inside it (0.25 or 0.75).`,
+			'group colors the points the prompt sets apart ("our product" against competitors) and adds a legend. At most 30 points, each label unique.',
+			"Copy every item, axis label and quadrant name the prompt states; invent none.",
+			operationTypes("buildQuadrantChart"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "Effort vs impact with scores out of 100",
+				language: "js",
+				code: `async () => sketchi.buildQuadrantChart({ spec: { title: "Backlog: effort vs impact", xAxis: { title: "Effort", low: "Low effort", high: "High effort" }, yAxis: { title: "Impact", low: "Low impact", high: "High impact" }, quadrants: { topLeft: "Quick wins", topRight: "Major projects", bottomLeft: "Fill-ins", bottomRight: "Thankless tasks" }, points: [{ label: "Single sign-on", x: 0.3, y: 0.85 }, { label: "Dark mode", x: 0.2, y: 0.4 }, { label: "Usage-based billing", x: 0.8, y: 0.9 }] }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
 		id: "buildOrgChart",
 		kind: "operation",
 		title: "buildOrgChart",
@@ -963,7 +999,7 @@ export const catalog: CatalogEntry[] = [
 		keywords: ["canvas", "arbitrary", "erd", "dashboard", "grid", "layers", "groups", "polygon"],
 		snippet: "Hand-place a layout no builder covers (an illustration) as a versioned CanvasSpec.",
 		content: [
-			"Use createCanvas only for layouts no builder covers, such as illustrations. UI screens and mockups are wireframes (buildWireframe). Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); overlapping sets are Venn diagrams (buildVennDiagram); weighted flows are Sankey diagrams (buildSankey); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
+			"Use createCanvas only for layouts no builder covers, such as illustrations. UI screens and mockups are wireframes (buildWireframe). Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); overlapping sets are Venn diagrams (buildVennDiagram); weighted flows are Sankey diagrams (buildSankey); 2×2 matrices are quadrant charts (buildQuadrantChart); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
 			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",

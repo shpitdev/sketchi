@@ -46,6 +46,11 @@ import {
 	WireframeDiagramSchema,
 	validateWireframeDiagram,
 } from "./types/wireframe.js";
+import {
+	type QuadrantDiagram,
+	QuadrantDiagramSchema,
+	validateQuadrantDiagram,
+} from "./types/quadrant.js";
 import type { DiagramTypeValue } from "./types.js";
 
 /** One diagram of any canonical family, discriminated by `type`. */
@@ -63,7 +68,8 @@ export type CanonicalDiagram =
 	| VennDiagram
 	| JourneyDiagram
 	| SankeyDiagram
-	| WireframeDiagram;
+	| WireframeDiagram
+	| QuadrantDiagram;
 
 // A family added to DIAGRAM_TYPES without a contract here fails to compile.
 const familySchemas = {
@@ -81,6 +87,7 @@ const familySchemas = {
 	journey: JourneyDiagramSchema,
 	sankey: SankeyDiagramSchema,
 	wireframe: WireframeDiagramSchema,
+	quadrant: QuadrantDiagramSchema,
 } satisfies Record<DiagramTypeValue, Schema.Top>;
 
 export const CanonicalDiagramSchema = Schema.Union([
@@ -98,6 +105,7 @@ export const CanonicalDiagramSchema = Schema.Union([
 	familySchemas.journey,
 	familySchemas.sankey,
 	familySchemas.wireframe,
+	familySchemas.quadrant,
 ]);
 
 /** Apply the family's semantic validation to an already decoded diagram. */
@@ -131,6 +139,8 @@ export function validateCanonicalDiagram(diagram: CanonicalDiagram): CanonicalDi
 			return validateSankeyDiagram(diagram);
 		case "wireframe":
 			return validateWireframeDiagram(diagram);
+		case "quadrant":
+			return validateQuadrantDiagram(diagram);
 	}
 }
 

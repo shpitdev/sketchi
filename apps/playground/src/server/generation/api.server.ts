@@ -231,6 +231,7 @@ function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFail
 		case "invalid_journey":
 		case "invalid_sankey":
 		case "invalid_wireframe":
+		case "invalid_quadrant_chart":
 			return failure("invalid_generated_document", issues);
 		case "quality_failed":
 			return failure("quality_failed", issues);
@@ -284,6 +285,8 @@ function buildWithCodeMode(
 			return codeMode.buildSankey(request);
 		case "wireframe":
 			return codeMode.buildWireframe(request);
+		case "quadrant":
+			return codeMode.buildQuadrantChart(request);
 	}
 }
 

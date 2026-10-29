@@ -531,6 +531,23 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			},
 		],
 		[
+			"buildQuadrantChart",
+			{
+				spec: {
+					title: "Backlog",
+					xAxis: { title: "Effort", low: "Low effort", high: "High effort" },
+					yAxis: { title: "Impact", low: "Low impact", high: "High impact" },
+					quadrants: {
+						topLeft: "Quick wins",
+						topRight: "Major projects",
+						bottomLeft: "Fill-ins",
+						bottomRight: "Thankless tasks",
+					},
+					points: [{ label: "Dark mode", x: 0.2, y: 0.7 }],
+				},
+			},
+		],
+		[
 			"createCanvas",
 			{
 				spec: {
@@ -1179,6 +1196,9 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toMatch(
 				/^- buildWireframe: .*device: "desktop" \| "tablet" \| "mobile"/m,
 			);
+			expect(codeDescription).toMatch(
+				/^- buildQuadrantChart: .*a score out of 100 is score \/ 100/m,
+			);
 			// The head retains builder names; summaries ride on the code parameter. Nested zones
 			// and infrastructure shapes add three spec fields and their shape and logo rules. Venn
 			// diagrams and wireframes each add a builder name, a summary and one compact line.
@@ -1190,7 +1210,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(15_450);
+			).toBeLessThan(16_030);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

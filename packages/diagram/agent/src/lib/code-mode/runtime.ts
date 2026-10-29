@@ -21,6 +21,9 @@ import {
 	parseClassParameterShorthand,
 	resolveClassShorthand,
 	getOrgChartValidationIssues,
+	getQuadrantValidationIssues,
+	QuadrantValidationError,
+	type QuadrantValidationIssue,
 	resolveOrgChartShorthand,
 	getVennValidationIssues,
 	resolveVennShorthand,
@@ -57,6 +60,8 @@ import {
 	type ClassDiagram,
 	type ClassValidationIssueCode,
 	type OrgChartDiagram,
+	type QuadrantDiagram,
+	type QuadrantValidationIssueCode,
 	type OrgChartValidationIssueCode,
 	type VennDiagram,
 	type VennValidationIssueCode,
@@ -91,6 +96,8 @@ import {
 	isStructurallyValidSankeyMark,
 	sankeyLayoutIssues,
 	renderWireframeDiagram,
+	renderQuadrantDiagram,
+	isStructurallyValidQuadrantMark,
 	renderTimelineDiagram,
 	renderChartDiagram,
 	renderGanttDiagram,
@@ -135,6 +142,7 @@ import {
 	BuildJourneyMapRejected,
 	BuildSankeyRejected,
 	BuildWireframeRejected,
+	BuildQuadrantChartRejected,
 	BuildTimelineRejected,
 	BuildChartRejected,
 	BuildGanttRejected,
@@ -153,6 +161,7 @@ import {
 	BuildJourneyMapRequestSchema,
 	BuildSankeyRequestSchema,
 	BuildWireframeRequestSchema,
+	BuildQuadrantChartRequestSchema,
 	BuildTimelineRequestSchema,
 	BuildChartRequestSchema,
 	BuildGanttRequestSchema,
@@ -180,6 +189,7 @@ import {
 	type BuildJourneyMapRequest,
 	type BuildSankeyRequest,
 	type BuildWireframeRequest,
+	type BuildQuadrantChartRequest,
 	type BuildTimelineRequest,
 	type BuildChartRequest,
 	type BuildGanttRequest,
@@ -192,6 +202,7 @@ import {
 	type BuildJourneyMapResult,
 	type BuildSankeyResult,
 	type BuildWireframeResult,
+	type BuildQuadrantChartResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type BuildGanttResult,
@@ -219,6 +230,7 @@ import {
 	type NormalizedSankeySpec,
 	type NormalizedWireframeSpec,
 	type WireframeComponentInput,
+	type NormalizedQuadrantChartSpec,
 	type NormalizedTimelineSpec,
 	type NormalizedChartSpec,
 	type NormalizedGanttSpec,
@@ -327,6 +339,7 @@ type CodeModeBoundaryOperation =
 	| "buildJourneyMap"
 	| "buildSankey"
 	| "buildWireframe"
+	| "buildQuadrantChart"
 	| "buildTimeline"
 	| "buildChart"
 	| "buildGantt"
@@ -370,6 +383,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	if (operation === "buildJourneyMap") return "journey";
 	if (operation === "buildSankey") return "sankey";
 	if (operation === "buildWireframe") return "wireframe";
+	if (operation === "buildQuadrantChart") return "quadrant";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
 	return undefined;
@@ -1528,6 +1542,77 @@ function resolveWireframeRequest(input: unknown): unknown {
 	return { ...input, spec: resolveWireframeShorthand(input.spec) };
 }
 
+function normalizeQuadrantChartSpec(
+	spec: BuildQuadrantChartRequest["spec"],
+): NormalizedQuadrantChartSpec {
+	const title = cleanToolString(spec.title);
+	const axis = (value: BuildQuadrantChartRequest["spec"]["xAxis"]) => ({
+		title: cleanToolString(value.title),
+		low: cleanToolString(value.low),
+		high: cleanToolString(value.high),
+	});
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-quadrant-chart"),
+		title,
+		xAxis: axis(spec.xAxis),
+		yAxis: axis(spec.yAxis),
+		quadrants: {
+			topLeft: cleanToolString(spec.quadrants.topLeft),
+			topRight: cleanToolString(spec.quadrants.topRight),
+			bottomLeft: cleanToolString(spec.quadrants.bottomLeft),
+			bottomRight: cleanToolString(spec.quadrants.bottomRight),
+		},
+		points: spec.points.map((point) => {
+			const group = cleanOptional(point.group);
+			return {
+				label: cleanToolString(point.label),
+				x: point.x,
+				y: point.y,
+				...(group ? { group } : {}),
+			};
+		}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toQuadrantDiagram(spec: NormalizedQuadrantChartSpec): QuadrantDiagram {
+	return { ...spec, type: "quadrant" };
+}
+
+/** Code Mode's published issue codes for diagram-core's quadrant chart invariants. */
+const QUADRANT_ISSUE_CODES = {
+	quadrant_too_large: "quadrant_too_large",
+	invalid_quadrant_point: "invalid_quadrant_point",
+	invalid_quadrant_text: "invalid_quadrant_text",
+} as const satisfies Record<QuadrantValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedQuadrantChart(spec: NormalizedQuadrantChartSpec): CodeModeIssue[] {
+	return quadrantIssues(getQuadrantValidationIssues(toQuadrantDiagram(spec)));
+}
+
+function quadrantIssues(issues: readonly QuadrantValidationIssue[]): CodeModeIssue[] {
+	return issues.map((entry) =>
+		issue({
+			code: QUADRANT_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function quadrantChartQuality(spec: NormalizedQuadrantChartSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.points.length, edgeCount: 0 },
+		checks: [],
+	};
+}
+
 export class CodeModeArtifactRenderFailed extends Schema.TaggedError<CodeModeArtifactRenderFailed>()(
 	"CodeModeArtifactRenderFailed",
 	{ cause: Schema.Defect(), message: Schema.String },
@@ -1708,6 +1793,15 @@ const BuildTimelineFailure = workflowFailure(
 	"BuildTimelineFailure",
 	BuildTimelineRejected.fields.status,
 	BuildTimelineRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildQuadrantChartFailure = workflowFailure(
+	"BuildQuadrantChartFailure",
+	BuildQuadrantChartRejected.fields.status,
+	BuildQuadrantChartRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -2289,6 +2383,7 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 					isStructurallyValidTimelineMarker(element)) ||
 				(element.rendererRole === "chart-mark" && isStructurallyValidChartMark(element)) ||
 				(element.rendererRole === "journey-mark" && isStructurallyValidJourneyMark(element)) ||
+				(element.rendererRole === "quadrant-mark" && isStructurallyValidQuadrantMark(element)) ||
 				(element.rendererRole === "gantt-mark" && isStructurallyValidGanttMark(element)) ||
 				(element.rendererRole === "state-marker" && isStructurallyValidStateMarker(element)) ||
 				(element.rendererRole === "er-table" && isStructurallyValidErTable(element)) ||
@@ -4440,6 +4535,124 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 	} satisfies Extract<BuildWireframeResult, { ok: true }>;
 });
 
+const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildQuadrantChartRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildQuadrantChartFailure({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeQuadrantChartSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedQuadrantChart(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* new BuildQuadrantChartFailure({
+			status: "invalid_quadrant_chart",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = quadrantChartQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* new BuildQuadrantChartFailure({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* Effect.try({
+		try: () => renderQuadrantDiagram(toQuadrantDiagram(normalizedSpec)),
+		catch: (cause) =>
+			// A chart whose labels cannot all sit clear is rejected with its repair hint, never drawn.
+			cause instanceof QuadrantValidationError
+				? new BuildQuadrantChartFailure({
+						status: "invalid_quadrant_chart",
+						context: { ...qualityContext, issues: quadrantIssues(cause.issues) },
+					})
+				: new BuildQuadrantChartFailure({
+						status: "render_failed",
+						context: {
+							...qualityContext,
+							issues: [
+								issue({
+									code: "render_failed",
+									stage: "render",
+									ref: { kind: "diagram", id: normalizedSpec.id },
+									message:
+										cause instanceof Error
+											? cause.message
+											: "Unable to render quadrant chart scene.",
+									hint: "Repair the axes, quadrant names and points and retry.",
+								}),
+							],
+						},
+					}),
+	}).pipe(Effect.withSpan("codeMode.buildQuadrantChart.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* new BuildQuadrantChartFailure({
+			status: "render_failed",
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Use fewer points or shorter labels and retry buildQuadrantChart.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new BuildQuadrantChartFailure({
+					status: error.status,
+					context: {
+						...(error.status === "export_failed" ? exportContext : qualityContext),
+						issues: error.issues,
+					},
+				}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildQuadrantChartResult, { ok: true }>;
+});
+
 const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
 	input: unknown,
 ) {
@@ -5478,6 +5691,15 @@ export const buildSankey: (input: unknown) => CodeModeWorkflowEffect<BuildSankey
 /** A wireframe: low-fidelity screens, each a tree of components the host lays out. */
 export const buildWireframe: (input: unknown) => CodeModeWorkflowEffect<BuildWireframeResult> =
 	boundary("buildWireframe", buildWireframeWorkflow, failureResult);
+
+/** A quadrant chart: two axes, four named quadrants and points placed by their scores. */
+export const buildQuadrantChart: (
+	input: unknown,
+) => CodeModeWorkflowEffect<BuildQuadrantChartResult> = boundary(
+	"buildQuadrantChart",
+	buildQuadrantChartWorkflow,
+	failureResult,
+);
 
 export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTimelineResult> =
 	boundary("buildTimeline", buildTimelineWorkflow, failureResult);

@@ -14,6 +14,7 @@ import {
 	type BuildJourneyMapResult,
 	type BuildSankeyResult,
 	type BuildWireframeResult,
+	type BuildQuadrantChartResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CreateCanvasResult,
@@ -71,6 +72,7 @@ function requestTooLargeResult(
 		| "Journey map"
 		| "Sankey diagram"
 		| "Wireframe"
+		| "Quadrant chart"
 		| "Artifact patch",
 ) {
 	return {
@@ -202,6 +204,7 @@ type BuildResult =
 	| BuildJourneyMapResult
 	| BuildSankeyResult
 	| BuildWireframeResult
+	| BuildQuadrantChartResult
 	| CreateCanvasResult;
 
 type BuildOperation =
@@ -219,6 +222,7 @@ type BuildOperation =
 	| "buildJourneyMap"
 	| "buildSankey"
 	| "buildWireframe"
+	| "buildQuadrantChart"
 	| "createCanvas";
 
 function makeBuildHandler({
@@ -242,6 +246,7 @@ function makeBuildHandler({
 		| "Journey map"
 		| "Sankey diagram"
 		| "Wireframe"
+		| "Quadrant chart"
 		| "Canvas";
 	readonly run: (
 		codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
@@ -358,6 +363,11 @@ export const handleBuildWireframeRequest = makeBuildHandler({
 	operation: "buildWireframe",
 	label: "Wireframe",
 	run: (codeMode, input) => codeMode.buildWireframe(input),
+});
+export const handleBuildQuadrantChartRequest = makeBuildHandler({
+	operation: "buildQuadrantChart",
+	label: "Quadrant chart",
+	run: (codeMode, input) => codeMode.buildQuadrantChart(input),
 });
 export const handleCreateCanvasRequest = makeBuildHandler({
 	operation: "createCanvas",

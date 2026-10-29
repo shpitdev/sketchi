@@ -224,6 +224,12 @@ const WIREFRAME_ISSUE_CODE_ADDITIONS = new Set([
 	"invalid_screen",
 	"invalid_component",
 ]);
+// Quadrant charts add three issue codes.
+const QUADRANT_ISSUE_CODE_ADDITIONS = new Set([
+	"quadrant_too_large",
+	"invalid_quadrant_point",
+	"invalid_quadrant_text",
+]);
 const CANVAS_ARROWHEAD_ADDITIONS = new Set([
 	"crowfoot_one",
 	"crowfoot_many",
@@ -368,6 +374,7 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		JOURNEY_ISSUE_CODE_ADDITIONS.has(value) ||
 		SANKEY_ISSUE_CODE_ADDITIONS.has(value) ||
 		WIREFRAME_ISSUE_CODE_ADDITIONS.has(value) ||
+		QUADRANT_ISSUE_CODE_ADDITIONS.has(value) ||
 		// MCP best-effort PNG delivery (#499) adds one warning; frozen APIs remain strict.
 		value === "png_unavailable" ||
 		// MCP logo fill reports icon_filled with a new info severity.
@@ -1805,6 +1812,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!JOURNEY_ISSUE_CODE_ADDITIONS.has(code) &&
 						!SANKEY_ISSUE_CODE_ADDITIONS.has(code) &&
 						!WIREFRAME_ISSUE_CODE_ADDITIONS.has(code) &&
+						!QUADRANT_ISSUE_CODE_ADDITIONS.has(code) &&
 						code !== "png_unavailable",
 				)
 				.toSorted(),

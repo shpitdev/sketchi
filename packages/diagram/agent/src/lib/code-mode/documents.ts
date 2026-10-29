@@ -16,6 +16,7 @@ import {
 	type BuildJourneyMapResult,
 	type BuildSankeyResult,
 	type BuildWireframeResult,
+	type BuildQuadrantChartResult,
 	type BuildTimelineResult,
 	ClassSpec,
 	ErSpec,
@@ -33,6 +34,7 @@ import {
 	SankeySpec,
 	WireframeSpec,
 	type WireframeComponentInput,
+	QuadrantChartSpec,
 } from "./contract.js";
 import type { CodeModeArtifactStorage } from "./artifacts.js";
 import {
@@ -47,6 +49,7 @@ import {
 	buildJourneyMap,
 	buildSankey,
 	buildWireframe,
+	buildQuadrantChart,
 	buildTimeline,
 	buildChart,
 	buildGantt,
@@ -72,6 +75,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	journey: JourneySpec,
 	sankey: SankeySpec,
 	wireframe: WireframeSpec,
+	quadrant: QuadrantChartSpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -96,7 +100,8 @@ export type CanonicalBuildResult =
 	| BuildVennDiagramResult
 	| BuildJourneyMapResult
 	| BuildSankeyResult
-	| BuildWireframeResult;
+	| BuildWireframeResult
+	| BuildQuadrantChartResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -141,6 +146,8 @@ export function buildCanonicalDocument(
 			return buildSankey(request);
 		case "wireframe":
 			return buildWireframe(request);
+		case "quadrant":
+			return buildQuadrantChart(request);
 	}
 }
 
@@ -380,6 +387,19 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 							(component) => structuredClone(component) as WireframeComponentInput,
 						),
 					})),
+					style: diagram.style,
+				},
+			};
+		case "quadrant":
+			return {
+				type: "quadrant",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					xAxis: { ...diagram.xAxis },
+					yAxis: { ...diagram.yAxis },
+					quadrants: { ...diagram.quadrants },
+					points: diagram.points.map((point) => ({ ...point })),
 					style: diagram.style,
 				},
 			};

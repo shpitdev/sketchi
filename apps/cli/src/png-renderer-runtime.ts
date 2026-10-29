@@ -408,7 +408,8 @@ function bannerTitle(scene: PngRenderInput["scene"]): string | undefined {
 				element.id === "chart:title" ||
 				element.id === "gantt:title" ||
 				element.id === "text:journey:title" ||
-				element.id === "sankey:title",
+				element.id === "sankey:title" ||
+				element.id === "quadrant:title",
 		)
 	)
 		return undefined;

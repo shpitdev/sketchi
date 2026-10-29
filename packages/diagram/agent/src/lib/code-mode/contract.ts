@@ -463,6 +463,9 @@ export const CODE_MODE_ISSUE_CODES = [
 	"wireframe_too_large",
 	"invalid_screen",
 	"invalid_component",
+	"quadrant_too_large",
+	"invalid_quadrant_point",
+	"invalid_quadrant_text",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -1312,6 +1315,51 @@ export class WireframeSpec extends Schema.Class<WireframeSpec>("WireframeSpec")(
 ) {}
 export const WireframeSpecSchema = WireframeSpec;
 
+/**
+ * The authoring form of diagram-core's canonical QuadrantDiagram: style is
+ * defaulted. buildQuadrantChart normalizes it into the core contract, which
+ * owns every invariant.
+ */
+export class QuadrantAxisSpec extends Schema.Class<QuadrantAxisSpec>("QuadrantAxisSpec")(
+	{
+		title: RequiredNonEmptyString,
+		low: RequiredNonEmptyString,
+		high: RequiredNonEmptyString,
+	},
+	{ identifier: undefined },
+) {}
+export class QuadrantNamesSpec extends Schema.Class<QuadrantNamesSpec>("QuadrantNamesSpec")(
+	{
+		topLeft: RequiredNonEmptyString,
+		topRight: RequiredNonEmptyString,
+		bottomLeft: RequiredNonEmptyString,
+		bottomRight: RequiredNonEmptyString,
+	},
+	{ identifier: undefined },
+) {}
+export class QuadrantPointSpec extends Schema.Class<QuadrantPointSpec>("QuadrantPointSpec")(
+	{
+		label: RequiredNonEmptyString,
+		x: FiniteNumber,
+		y: FiniteNumber,
+		group: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+export class QuadrantChartSpec extends Schema.Class<QuadrantChartSpec>("QuadrantChartSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		xAxis: requiredObject(QuadrantAxisSpec),
+		yAxis: requiredObject(QuadrantAxisSpec),
+		quadrants: requiredObject(QuadrantNamesSpec),
+		points: requiredArray(Schema.Array(QuadrantPointSpec).pipe(Schema.mutable)),
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const QuadrantChartSpecSchema = QuadrantChartSpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -1644,6 +1692,26 @@ export const BuildWireframeToolInputSchema = Schema.Struct({
 	spec: requiredObject(WireframeToolSpecSchema),
 });
 export type BuildWireframeToolInput = typeof BuildWireframeToolInputSchema.Type;
+export class BuildQuadrantChartRequest extends Schema.Class<BuildQuadrantChartRequest>(
+	"BuildQuadrantChartRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(QuadrantChartSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildQuadrantChartRequestSchema = BuildQuadrantChartRequest;
+/** The quadrant chart spec a model authors; style is always the Sketchi palette. */
+export const QuadrantChartToolSpecSchema = QuadrantChartSpec.mapFields(
+	({ style: _style, ...fields }) => fields,
+);
+export const BuildQuadrantChartToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(QuadrantChartToolSpecSchema),
+});
+export type BuildQuadrantChartToolInput = typeof BuildQuadrantChartToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -2515,6 +2583,16 @@ const NormalizedWireframeSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedWireframeSpec = typeof NormalizedWireframeSpecSchema.Type;
+const NormalizedQuadrantChartSpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	xAxis: QuadrantAxisSpec,
+	yAxis: QuadrantAxisSpec,
+	quadrants: QuadrantNamesSpec,
+	points: Schema.Array(QuadrantPointSpec).pipe(Schema.mutable),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedQuadrantChartSpec = typeof NormalizedQuadrantChartSpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -3135,6 +3213,49 @@ export const BuildWireframeResultSchema = Schema.Union([
 	BuildWireframeRejected,
 ]);
 export type BuildWireframeResult = typeof BuildWireframeResultSchema.Type;
+
+export class BuildQuadrantChartAccepted extends Schema.Class<BuildQuadrantChartAccepted>(
+	"BuildQuadrantChartAccepted",
+)(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedQuadrantChartSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildQuadrantChartRejected extends Schema.Class<BuildQuadrantChartRejected>(
+	"BuildQuadrantChartRejected",
+)(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_quadrant_chart",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedQuadrantChartSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildQuadrantChartResultSchema = Schema.Union([
+	BuildQuadrantChartAccepted,
+	BuildQuadrantChartRejected,
+]);
+export type BuildQuadrantChartResult = typeof BuildQuadrantChartResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{

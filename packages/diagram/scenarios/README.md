@@ -120,6 +120,16 @@ and the eval harness use it.
   and exactly the stated screens and controls. The drawn scene must show every
   screen as a frame and every component as a group with its words, inside its
   parent and its screen, with nothing overlapping or spilling.
+- Quadrant scenarios read every placement through the axis ends as drawn, so
+  an axis that runs high to low passes when every name and point follows it.
+  They check each axis's variable and end labels, each quadrant name in the
+  corner its conditions describe, every item by label at its stated scores
+  (within 0.02, mirrored for a reversed axis) or strictly inside its stated
+  quadrant, a stated highlight in a group of its own, a quadrant the scores
+  leave empty, and no item the prompt does not state. `quadrant-drawn` reads
+  every dot back at its position with its label, and `quadrant-layout` that
+  no label overlaps text or a dot and each sits nearest its own dot or on a
+  leader.
 
 Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model

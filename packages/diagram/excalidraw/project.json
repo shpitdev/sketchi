@@ -84,6 +84,12 @@
 			"options": {
 				"command": "WIREFRAME_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/wireframe-fuzz.test.ts"
 			}
+		},
+		"quadrant-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "QUADRANT_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/quadrant-fuzz.test.ts"
+			}
 		}
 	}
 }

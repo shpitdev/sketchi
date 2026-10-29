@@ -35,6 +35,9 @@ import {
 	BuildWireframeRequestSchema,
 	BuildWireframeResultSchema,
 	WireframeToolSpecSchema,
+	BuildQuadrantChartRequestSchema,
+	BuildQuadrantChartResultSchema,
+	QuadrantChartToolSpecSchema,
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
@@ -207,6 +210,14 @@ export const codeModeContracts = {
 			spec: WireframeToolSpecSchema,
 		}),
 		output: BuildWireframeResultSchema,
+	},
+	buildQuadrantChart: {
+		input: Schema.Struct({
+			...BuildQuadrantChartRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: QuadrantChartToolSpecSchema,
+		}),
+		output: BuildQuadrantChartResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

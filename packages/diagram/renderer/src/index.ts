@@ -40,3 +40,5 @@ export {
 	sankeyFlowText,
 	sankeyNodeText,
 } from "./sankey-layout.js";
+export * from "./quadrant.js";
+export * from "./quadrant-readout.js";
