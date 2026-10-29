@@ -386,3 +386,93 @@ describe("wireframe input it must never misread", () => {
 		]);
 	});
 });
+
+describe("wireframe navigation", () => {
+	const flow = (first: unknown[], second: unknown[] = [{ type: "heading", text: "Done" }]) => ({
+		id: "flow",
+		title: "Flow",
+		type: wireframeDiagramType,
+		screens: [
+			{ id: "signup", name: "Sign up", children: first },
+			{ id: "done", name: "All done", children: second },
+		],
+	});
+
+	it("opens another screen from a button or link", () => {
+		const parsed = parseWireframeDiagram(
+			flow([
+				{ type: "button", text: "Continue", target: "done" },
+				{ type: "link", text: "Skip", target: "done" },
+			]),
+		);
+		expect(parsed.screens[0]!.children.map((component) => component.target)).toEqual([
+			"done",
+			"done",
+		]);
+	});
+
+	it.each([
+		[
+			"an unknown screen",
+			[{ type: "button", text: "Go", target: "nowhere" }],
+			"unknown_wireframe_target",
+		],
+		[
+			"its own screen",
+			[{ type: "button", text: "Go", target: "signup" }],
+			"unknown_wireframe_target",
+		],
+		[
+			"a card",
+			[{ type: "card", target: "done", children: [{ type: "divider" }] }],
+			"invalid_wireframe_option",
+		],
+	])("rejects a target on %s with a repair hint", (_name, children, code) => {
+		const issues = issuesOf(flow(children));
+		expect(issues.map((issue) => issue.code)).toEqual([code]);
+		expect(issues[0]!.hint).toMatch(/target/u);
+	});
+
+	it("reads a target written as a screen's name, a link or an alias", () => {
+		const resolved = resolveWireframeShorthand({
+			...flow([
+				{ type: "button", text: "Continue", goTo: "All done" },
+				{ type: "link", text: "Skip", href: "#done" },
+				{ type: "button", label: "Next", navigatesTo: "ALL-DONE" },
+				{ type: "button", text: "Elsewhere", target: "Nowhere" },
+			]),
+		}) as { screens: [{ children: { target?: string }[] }] };
+		expect(resolved.screens[0].children.map((component) => component.target)).toEqual([
+			"done",
+			"done",
+			"done",
+			"Nowhere",
+		]);
+		expect(codes(resolved)).toEqual(["unknown_wireframe_target"]);
+	});
+
+	it("keeps a target that already names a screen exactly, even when another screen squashes alike", () => {
+		const resolved = resolveWireframeShorthand({
+			id: "flow",
+			title: "Flow",
+			type: wireframeDiagramType,
+			screens: [
+				{
+					id: "sign-up",
+					name: "Sign up",
+					children: [{ type: "button", text: "Next", target: "signup" }],
+				},
+				{
+					id: "signup",
+					name: "Signup",
+					children: [{ type: "button", text: "Back", target: "sign-up" }],
+				},
+			],
+		}) as { screens: { children: { target?: string }[] }[] };
+		expect(resolved.screens.map((screen) => screen.children[0]!.target)).toEqual([
+			"signup",
+			"sign-up",
+		]);
+		expect(codes(resolved)).toEqual([]);
+	});
+});

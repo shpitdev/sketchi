@@ -1487,6 +1487,7 @@ const WIREFRAME_ISSUE_CODES = {
 	invalid_screen_id: "invalid_screen",
 	duplicate_screen_id: "duplicate_node_id",
 	empty_wireframe_screen: "invalid_screen",
+	unknown_wireframe_target: "missing_edge_target",
 	empty_wireframe_container: "invalid_component",
 	missing_wireframe_text: "invalid_component",
 	wireframe_text_too_long: "label_too_long",

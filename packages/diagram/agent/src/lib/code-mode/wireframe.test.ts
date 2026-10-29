@@ -254,6 +254,59 @@ describe("Code Mode native wireframe", () => {
 		expect(built.status).toBe("accepted");
 	});
 
+	it("draws a control's target as an arrow to the screen it opens, by id or by name", async () => {
+		const built = await build({
+			title: "Signup",
+			screens: [
+				{
+					name: "Sign up",
+					device: "mobile",
+					children: [
+						{ type: "button", text: "Continue", variant: "primary", goTo: "Verify email" },
+					],
+				},
+				{
+					name: "Verify email",
+					device: "mobile",
+					children: [{ type: "link", text: "Back", target: "sign-up" }],
+				},
+			],
+		});
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.screens.map((screen) => screen.children[0]!.target)).toEqual([
+			"verify-email",
+			"sign-up",
+		]);
+		const scene = inline(built).get("scene") as RenderedDiagramScene;
+		expect(
+			scene.elements.filter((element) => element.type === "arrow").map((arrow) => arrow.id),
+		).toEqual(["nav:sign-up:0", "nav:verify-email:0"]);
+		const excalidraw = inline(built).get("excalidraw") as Parameters<
+			typeof validateExcalidrawScene
+		>[0];
+		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
+		const unknown = await build({
+			title: "Bad",
+			screens: [{ name: "Home", children: [{ type: "button", text: "Go", target: "nowhere" }] }],
+		});
+		expect(unknown).toMatchObject({ ok: false, status: "invalid_wireframe" });
+		expect(unknown.issues.map((issue) => issue.code)).toEqual(["missing_edge_target"]);
+		// Ids that squash alike stay apart: a target naming one exactly opens that one.
+		const alike = await build({
+			title: "Alike",
+			screens: [
+				{ id: "sign-up", name: "Sign up", children: [{ type: "heading", text: "Sign up" }] },
+				{
+					id: "signup",
+					name: "Signup",
+					children: [{ type: "button", text: "Back", target: "sign-up" }],
+				},
+			],
+		});
+		if (!alike.ok) throw new Error(JSON.stringify(alike.issues));
+		expect(alike.normalizedSpec.screens[1]!.children[0]!.target).toBe("sign-up");
+	});
+
 	it("rejects an unknown component type before building, naming the field", async () => {
 		const result = await build({
 			title: "Bad",

@@ -206,7 +206,7 @@ const IR_INSTRUCTIONS = {
 			"Use it for UI wireframes, mockups and screen layouts; never supply coordinates or sizes.",
 			'Return screens: [{ id, name, device: "desktop" | "tablet" | "mobile", children }]. Every component sits under a screen\'s children, in reading order.',
 			"Containers hold children: header (top), footer (bottom, a save bar), sidebar (side: left or right), main, section and card (title?), modal, row, column, and grid (columns: n).",
-			"Widgets: heading (text, level 1-3), text (text, or lines for placeholder copy), link, badge and button (text; variant primary or secondary), input, textarea, select and search (label?, placeholder or value), checkbox, radio and toggle (label, checked), tabs, nav and breadcrumbs (items, active), list (items), avatar, icon, image and chart (label?), table (columns: headers, rows?), divider.",
+			"Widgets: heading (text, level 1-3), text (text, or lines for placeholder copy), link, badge and button (text; variant primary or secondary; target: the id of the screen it opens), input, textarea, select and search (label?, placeholder or value), checkbox, radio and toggle (label, checked), tabs, nav and breadcrumbs (items, active), list (items), avatar, icon, image and chart (label?), table (columns: headers, rows?), divider.",
 			"State: variant primary on the screen's main button, checked: true on what is on or selected, active on the selected tab or nav item, value on a field showing one.",
 			"Copy every screen, component, text and state the source states, in order; invent no controls or copy.",
 		],

@@ -511,6 +511,106 @@ describe("wireframe renderer", () => {
 		expect(byId(scene, "wf:s:15:label")).toMatchObject({ text: "AL" });
 	});
 
+	describe("navigation between screens", () => {
+		const flow = (screens: { id: string; device?: string; children: unknown[] }[]) =>
+			parseWireframeDiagram({
+				id: "flow",
+				title: "Flow",
+				type: "wireframe",
+				screens: screens.map((screen) => ({ device: "mobile", name: screen.id, ...screen })),
+			});
+		const arrows = (scene: RenderedDiagramScene) =>
+			scene.elements.filter((element) => element.type === "arrow");
+		const go = (target: string, text = "Continue") => ({
+			type: "button",
+			text,
+			variant: "primary",
+			target,
+		});
+		const filler = (count: number) =>
+			Array.from({ length: count }, () => ({ type: "text", lines: 2 }));
+
+		it("draws a straight arrow from a control to the next screen's frame", () => {
+			const diagram = wireframeStressFixtures["signupFlow"]!;
+			const scene = renderWireframeDiagram(diagram);
+			expectClean(scene, diagram);
+			const arrow = byId(scene, "nav:signup:4");
+			expect(arrow).toMatchObject({
+				type: "arrow",
+				sourceNodeId: "wf:signup:4:box",
+				targetNodeId: "screen:verify",
+				endArrowhead: "arrow",
+			});
+			if (arrow.type !== "arrow") throw new Error("Expected an arrow");
+			expect(arrow.points).toHaveLength(2);
+			expect(arrow.points[0].y).toBe(arrow.points[1]!.y);
+			const frame = scene.elements.find((element) => element.id === "frame:verify");
+			expect(frame).toMatchObject({ nodeId: "screen:verify" });
+			if (frame?.type !== "frame") throw new Error("Expected a frame");
+			expect(arrow.points[1]!.x).toBe(frame.x);
+			// A link binds its arrow to an invisible box behind its words.
+			expect(node(scene, "wf:verify:5:hit")).toMatchObject({
+				opacity: 0,
+				rendererRole: "wireframe-widget",
+			});
+			expect(byId(scene, "nav:verify:5")).toMatchObject({
+				sourceNodeId: "wf:verify:5:hit",
+				targetNodeId: "screen:signup",
+			});
+			expect(
+				layoutWireframeDiagram(diagram).navigations.every((navigation) => navigation.routed),
+			).toBe(true);
+		});
+
+		it("steps around a sibling beside the control instead of crossing it", () => {
+			const diagram = flow([
+				{
+					id: "a",
+					children: [
+						...filler(2),
+						{ type: "row", children: [go("b", "Next"), { type: "button", text: "Skip for now" }] },
+					],
+				},
+				{ id: "b", children: [{ type: "heading", text: "Done" }] },
+			]);
+			const scene = renderWireframeDiagram(diagram);
+			expectClean(scene, diagram);
+			const [arrow] = arrows(scene);
+			expect(arrow!.points.length).toBeGreaterThan(2);
+		});
+
+		it("goes around a screen between the control and the screen it opens, and back to an earlier one", () => {
+			const diagram = flow([
+				{ id: "a", children: [...filler(1), go("c", "Jump ahead")] },
+				{ id: "b", children: [...filler(3), go("a", "Back")] },
+				{ id: "c", children: [{ type: "heading", text: "End" }] },
+			]);
+			const scene = renderWireframeDiagram(diagram);
+			expectClean(scene, diagram);
+			const middle = scene.elements.find((element) => element.id === "frame:b");
+			if (middle?.type !== "frame") throw new Error("Expected a frame");
+			const ahead = byId(scene, "nav:a:1");
+			if (ahead.type !== "arrow") throw new Error("Expected an arrow");
+			expect(Math.min(...ahead.points.map((point) => point.y))).toBeLessThan(middle.y);
+			expect(byId(scene, "nav:b:3")).toMatchObject({ targetNodeId: "screen:a" });
+		});
+
+		it("reaches a screen on another row of the sheet", () => {
+			const diagram = flow(
+				["a", "b", "c", "d"].map((id, index, ids) => ({
+					id,
+					device: "desktop",
+					children: [{ type: "heading", text: id }, ...(index === 0 ? [go(ids[3]!)] : [])],
+				})),
+			);
+			const scene = renderWireframeDiagram(diagram);
+			expectClean(scene, diagram);
+			const frames = layoutWireframeDiagram(diagram).screens.map((screen) => screen.frame);
+			expect(frames[3]!.y).toBeGreaterThan(frames[0]!.y);
+			expect(byId(scene, "nav:a:1")).toMatchObject({ targetNodeId: "screen:d" });
+		});
+	});
+
 	it("keeps touch targets on a phone at least 44 tall", () => {
 		const diagram = screen(
 			[

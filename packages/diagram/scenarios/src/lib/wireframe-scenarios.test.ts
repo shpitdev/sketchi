@@ -25,6 +25,7 @@ const login = scenario("mobile-login-wireframe").expectedDiagram;
 const dashboard = scenario("saas-dashboard-wireframe").expectedDiagram;
 const settings = scenario("account-settings-wireframe").expectedDiagram;
 const product = scenario("product-page-wireframe").expectedDiagram;
+const signup = scenario("signup-flow-wireframe").expectedDiagram;
 
 /** The diagram with every component `change` maps, depth first; returning undefined drops it. */
 function edit(
@@ -52,6 +53,7 @@ describe("prompt-grounded wireframe scenarios", () => {
 			"saas-dashboard-wireframe",
 			"account-settings-wireframe",
 			"product-page-wireframe",
+			"signup-flow-wireframe",
 		]);
 		expect(wireframeScenarios.map((entry) => entry.difficulty)).toContain("challenge");
 		for (const entry of wireframeScenarios) {
@@ -423,6 +425,55 @@ describe("prompt-grounded wireframe scenarios", () => {
 			),
 		};
 		expect(wireframeDrawnCheck(login, unhinted).message).toContain('"you@example.com"');
+	});
+
+	it.each([
+		[
+			"a Continue button that opens nothing",
+			() =>
+				edit(signup, (component) =>
+					component.target === "choose-plan"
+						? { ...component, target: undefined as never }
+						: component,
+				),
+			["navigation:verify-email->choose-plan", "navigations-exact"],
+		],
+		[
+			"a Continue button that opens the wrong screen",
+			() =>
+				edit(signup, (component) =>
+					component.target === "choose-plan"
+						? { ...component, target: "create-account" }
+						: component,
+				),
+			["navigation:verify-email->choose-plan"],
+		],
+		[
+			"an unstated navigation",
+			() =>
+				edit(signup, (component) =>
+					component.text === "Resend code" ? { ...component, target: "create-account" } : component,
+				),
+			["navigations-exact"],
+		],
+	])("signup flow: %s fails exactly its checks", (_name, mutate, expected) => {
+		const diagram = mutate();
+		const cleaned = edit(diagram, (component) => {
+			if (component.target !== undefined) return component;
+			const { target: _target, ...rest } = component;
+			return rest;
+		});
+		expect(failed("signup-flow-wireframe", cleaned).toSorted()).toEqual([...expected].toSorted());
+	});
+
+	it("reads each navigation arrow off the drawing", () => {
+		const scene = renderDiagram(signup);
+		expect(wireframeDrawnCheck(signup, scene).passed).toBe(true);
+		const dropped = {
+			...scene,
+			elements: scene.elements.filter((element) => element.id !== "nav:create-account:4"),
+		};
+		expect(wireframeDrawnCheck(signup, dropped).message).toContain("arrow to verify-email");
 	});
 
 	it("requires exactly the stated screens", () => {

@@ -22,7 +22,8 @@ export interface WireframeLayoutIssue {
 		| "shapes-overlap"
 		| "text-crosses-shape"
 		| "texts-overlap"
-		| "text-outside-component";
+		| "text-outside-component"
+		| "arrow-crosses";
 	readonly elementIds: readonly string[];
 	readonly message: string;
 }
@@ -179,6 +180,50 @@ export function wireframeLayoutIssues(scene: RenderedDiagramScene): WireframeLay
 				elementIds: [text.id, outline.id],
 				message: `Text "${text.text.replace(/\n/gu, " ")}" spills out of "${outline.id}".`,
 			});
+	}
+	// A navigation arrow crosses nothing but the containers around its control on the way out.
+	const crosses = (from: { x: number; y: number }, to: { x: number; y: number }, box: Bounds) => {
+		const left = Math.min(from.x, to.x);
+		const right = Math.max(from.x, to.x);
+		const top = Math.min(from.y, to.y);
+		const bottom = Math.max(from.y, to.y);
+		return (
+			left < box.right - TOLERANCE &&
+			right > box.left + TOLERANCE &&
+			top < box.bottom - TOLERANCE &&
+			bottom > box.top + TOLERANCE
+		);
+	};
+	for (const arrow of scene.elements) {
+		if (arrow.type !== "arrow") continue;
+		const source = scene.elements.find(
+			(element) => element.type === "node" && element.nodeId === arrow.sourceNodeId,
+		);
+		const sourceBox = source ? bounds.get(source.id) : undefined;
+		for (const element of scene.elements) {
+			if (element.type !== "node" && element.type !== "text") continue;
+			if (element === source || (source && element.groupIds?.[0] === source.groupIds?.[0]))
+				continue;
+			// What a modal's backdrop dims lies under an arrow from the modal.
+			if (
+				source &&
+				element.frameId === source.frameId &&
+				(layers.get(element.id) ?? 0) < (layers.get(source.id) ?? 0)
+			)
+				continue;
+			const box = bounds.get(element.id)!;
+			if (element.type === "node" && sourceBox && inside(sourceBox, box)) continue;
+			if (element.type === "node" && element.opacity === 0) continue;
+			for (let index = 1; index < arrow.points.length; index += 1)
+				if (crosses(arrow.points[index - 1]!, arrow.points[index]!, box)) {
+					issues.push({
+						code: "arrow-crosses",
+						elementIds: [arrow.id, element.id],
+						message: `Arrow "${arrow.id}" crosses "${element.id}".`,
+					});
+					break;
+				}
+		}
 	}
 	return issues;
 }

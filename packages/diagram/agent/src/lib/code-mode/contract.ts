@@ -1242,6 +1242,7 @@ export interface WireframeComponentInput {
 	aspect?: (typeof WIREFRAME_IMAGE_ASPECTS)[number];
 	side?: "left" | "right";
 	align?: (typeof WIREFRAME_ALIGNMENTS)[number];
+	target?: string;
 	children?: WireframeComponentInput[];
 }
 
@@ -1280,6 +1281,7 @@ export const WireframeComponentSpec: Schema.Codec<
 	aspect: optionalContract(literals(WIREFRAME_IMAGE_ASPECTS)),
 	side: optionalContract(literals(["left", "right"])),
 	align: optionalContract(literals(WIREFRAME_ALIGNMENTS)),
+	target: optionalContract(NonEmptyString),
 	children: optionalContract(Schema.Array(WireframeComponentReference).pipe(Schema.mutable)),
 });
 export const WireframeComponentSpecSchema = WireframeComponentReference;

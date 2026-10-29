@@ -249,7 +249,7 @@ export const wireframeStressFixtures: Readonly<Record<string, WireframeDiagram>>
 					{ type: "input", label: "Email", placeholder: "you@example.com" },
 					{ type: "input", label: "Password", placeholder: "At least 8 characters" },
 					{ type: "checkbox", label: "I agree to the terms" },
-					{ type: "button", text: "Continue", variant: "primary" },
+					{ type: "button", text: "Continue", variant: "primary", target: "verify" },
 				],
 			},
 			{
@@ -262,8 +262,8 @@ export const wireframeStressFixtures: Readonly<Record<string, WireframeDiagram>>
 					{ type: "heading", text: "Check your inbox" },
 					{ type: "text", text: "We sent a six-digit code to you@example.com." },
 					{ type: "input", label: "Code", placeholder: "123456" },
-					{ type: "button", text: "Verify", variant: "primary" },
-					{ type: "link", text: "Resend code" },
+					{ type: "button", text: "Verify", variant: "primary", target: "welcome" },
+					{ type: "link", text: "Back to sign up", target: "signup" },
 				],
 			},
 			{

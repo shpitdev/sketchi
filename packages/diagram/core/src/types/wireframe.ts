@@ -125,6 +125,8 @@ export interface WireframeComponent {
 	 * stretches fields to the full width; center and end keep them at their own).
 	 */
 	readonly align?: WireframeAlignment;
+	/** The screen a button or link opens, by id, drawn as an arrow to that screen. */
+	readonly target?: string;
 	readonly children?: readonly WireframeComponent[];
 }
 
@@ -152,6 +154,7 @@ export const WireframeComponentSchema: Schema.Codec<WireframeComponent> = Schema
 	aspect: Schema.optionalKey(Schema.Literals(WIREFRAME_IMAGE_ASPECTS)),
 	side: Schema.optionalKey(Schema.Literals(["left", "right"])),
 	align: Schema.optionalKey(Schema.Literals(WIREFRAME_ALIGNMENTS)),
+	target: Schema.optionalKey(Schema.NonEmptyString),
 	children: Schema.optionalKey(Schema.Array(WireframeComponentReference)),
 });
 
@@ -193,6 +196,7 @@ export const WireframeValidationIssueCodeSchema = Schema.Literals([
 	"invalid_screen_id",
 	"duplicate_screen_id",
 	"empty_wireframe_screen",
+	"unknown_wireframe_target",
 	"empty_wireframe_container",
 	"missing_wireframe_text",
 	"wireframe_text_too_long",
@@ -266,6 +270,7 @@ const OPTION_TYPES: Readonly<Record<string, ReadonlySet<string>>> = {
 	aspect: new Set(["image"]),
 	side: new Set(["sidebar"]),
 	align: CONTAINERS,
+	target: new Set(["button", "link"]),
 	children: CONTAINERS,
 };
 
@@ -282,6 +287,7 @@ const OPTION_HINTS: Readonly<Record<string, string>> = {
 	items:
 		"items lists tabs, nav items, breadcrumbs or list items; a select shows its value, and each radio has its own label.",
 	value: "value is what an input, text area, select or search bar shows filled in.",
+	target: "Only a button or link opens another screen; set target on the control that does.",
 };
 
 /** Each component in depth-first order with its path, depth and screen index. */
@@ -339,6 +345,11 @@ export const WIREFRAME_DEFAULT_TEXT_LINES = 3;
  * WIREFRAME_MAX_ELEMENTS always fits a scene.
  */
 export function wireframeElementEstimate(component: WireframeComponent): number {
+	// A control that opens a screen adds its arrow, and a link the box it binds to.
+	return ownElementEstimate(component) + (component.target === undefined ? 0 : 2);
+}
+
+function ownElementEstimate(component: WireframeComponent): number {
 	const items = component.items?.length ?? 0;
 	switch (component.type) {
 		case "table": {
@@ -432,11 +443,31 @@ export function getWireframeValidationIssues(
 	let count = 0;
 	let elements = screens.length;
 	let deepest = 0;
-	for (const { component, path, depth } of wireframeComponents(diagram)) {
+	for (const { component, path, depth, screen } of wireframeComponents(diagram)) {
 		count += 1;
 		elements += wireframeElementEstimate(component);
 		deepest = Math.max(deepest, depth);
 		validateComponent(component, path, push);
+		const { target } = component;
+		if (target === undefined || (component.type !== "button" && component.type !== "link"))
+			continue;
+		if (!ids.has(target))
+			push(
+				"unknown_wireframe_target",
+				`${path}.target`,
+				`The ${component.type} at ${path} opens "${target}", which is not a screen.`,
+				`Set target to the id of the screen it opens: ${[...ids]
+					.slice(0, 6)
+					.map((id) => `"${id}"`)
+					.join(", ")}.`,
+			);
+		else if (target === screens[screen]!.id)
+			push(
+				"unknown_wireframe_target",
+				`${path}.target`,
+				`The ${component.type} at ${path} opens its own screen.`,
+				"Set target to another screen, or omit it.",
+			);
 	}
 	if (count > WIREFRAME_MAX_COMPONENTS)
 		push(
@@ -900,6 +931,21 @@ function resolveComponent(input: unknown): unknown {
 	}
 	if (rest["enabled"] === false && rest["disabled"] === undefined) rest["disabled"] = true;
 	delete rest["enabled"];
+	if (type === "button" || type === "link") {
+		const target = take(rest, [
+			"target",
+			"navigatesTo",
+			"navigateTo",
+			"goTo",
+			"goesTo",
+			"opens",
+			"to",
+			"href",
+			"next",
+			"screen",
+		]);
+		if (target !== undefined) resolved["target"] = words(target);
+	}
 	if (type === "button") {
 		const variant = take(rest, ["variant", "style", "appearance", "kind", "emphasis"]);
 		const primary = typeof rest["primary"] === "boolean" ? take(rest, ["primary"]) : undefined;
@@ -1058,7 +1104,44 @@ export function resolveWireframeShorthand(input: unknown): unknown {
 					: { children }),
 		};
 	});
-	return { ...chart, screens: resolvedScreens };
+	// A target written as a screen's name, or as a link to it, opens that screen. An
+	// exact id wins, then an id and then a name written loosely; a loose spelling two
+	// screens share stays as written, for validation to report.
+	const ids = new Set<string>();
+	const byId = new Map<string, string | undefined>();
+	const byName = new Map<string, string | undefined>();
+	const index = (map: Map<string, string | undefined>, spelling: string, id: string) =>
+		map.set(spelling, map.has(spelling) && map.get(spelling) !== id ? undefined : id);
+	for (const screen of resolvedScreens)
+		if (isRecord(screen) && typeof screen["id"] === "string") {
+			ids.add(screen["id"]);
+			index(byId, squash(screen["id"]), screen["id"]);
+			if (typeof screen["name"] === "string") index(byName, squash(screen["name"]), screen["id"]);
+		}
+	const lookup = (target: string) => {
+		if (ids.has(target)) return target;
+		const spelling = squash(target).replace(/^[#/]+/u, "");
+		return byId.has(spelling) ? byId.get(spelling) : byName.get(spelling);
+	};
+	const retarget = (component: unknown): unknown => {
+		if (!isRecord(component)) return component;
+		const target = component["target"];
+		const named = typeof target === "string" ? lookup(target) : undefined;
+		const children = component["children"];
+		return {
+			...component,
+			...(named === undefined || named === target ? {} : { target: named }),
+			...(Array.isArray(children) ? { children: children.map(retarget) } : {}),
+		};
+	};
+	return {
+		...chart,
+		screens: resolvedScreens.map((screen) =>
+			isRecord(screen) && Array.isArray(screen["children"])
+				? { ...screen, children: screen["children"].map(retarget) }
+				: screen,
+		),
+	};
 }
 
 export const wireframeFixture = parseWireframeDiagram({

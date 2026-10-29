@@ -2123,6 +2123,83 @@ describe("group frames", () => {
 			},
 		]);
 	});
+
+	describe("an overlay drawn after what it holds", () => {
+		const node = (id: string, x: number, y: number, extra: Record<string, unknown> = {}) => ({
+			type: "node" as const,
+			id: `node:${id}`,
+			nodeId: id,
+			shape: "rectangle" as const,
+			x,
+			y,
+			width: 100,
+			height: 60,
+			label: id,
+			...extra,
+		});
+		const crossing = (cover: Record<string, unknown>) => {
+			const scene = convertSceneToExcalidraw({
+				kind: "canvas",
+				version: 1,
+				diagramId: "covered",
+				title: "Covered",
+				width: 900,
+				height: 300,
+				accentColor: "#111827",
+				backgroundColor: "#ffffff",
+				elements: [
+					{ ...cover, id: "cover", x: 20, y: 20, width: 460, height: 160 } as never,
+					node("source", 40, 70, cover["type"] === "frame" ? { frameId: "cover" } : {}),
+					node("between", 260, 70, cover["type"] === "frame" ? { frameId: "cover" } : {}),
+					node("outside", 700, 70),
+					{
+						type: "arrow",
+						id: "edge:out",
+						edgeId: "out",
+						sourceNodeId: "source",
+						targetNodeId: "outside",
+						points: [
+							{ x: 140, y: 100 },
+							{ x: 700, y: 100 },
+						],
+					},
+				],
+				layers: [],
+				layouts: [],
+				zOrder: ["node:source", "node:between", "node:outside", "edge:out", "cover"],
+			});
+			// The cover comes after what it holds, as an overlay does.
+			const covering = scene.elements.filter(
+				(element) => element.id === "cover" || element.containerId === "cover",
+			);
+			const elements = [
+				...scene.elements.filter((element) => !covering.includes(element)),
+				...covering,
+			];
+			return validateExcalidrawScene({ ...scene, elements })
+				.issues.filter((issue) => issue.code === "arrow-segment-through-node")
+				.map((issue) => issue.message);
+		};
+		it("never hides an obstacle under a frame or a transparent box, which mask nothing", () => {
+			const through = 'Arrow "edge:out" passes through shape "node:between".';
+			expect(crossing({ type: "frame", name: "Screen" })).toContain(through);
+			expect(crossing({ type: "node", nodeId: "cover", shape: "rectangle", label: "" })).toContain(
+				through,
+			);
+		});
+
+		it("hides an obstacle under a filled overlay that holds the arrow's end, as a modal does", () => {
+			expect(
+				crossing({
+					type: "node",
+					nodeId: "cover",
+					shape: "rectangle",
+					label: "",
+					fillColor: "#ffffff",
+				}),
+			).toEqual([]);
+		});
+	});
 });
 
 describe("architecture zones and infrastructure shapes", () => {

@@ -262,6 +262,22 @@ function randomWireframe(r: Random, id: string): WireframeDiagram | undefined {
 				children,
 			};
 		});
+		// Some buttons and links open another screen.
+		if (screens.length > 1) {
+			const ids = screens.map((screen) => screen.id);
+			const open = (component: Spec, screen: string): Spec => {
+				if ((component["type"] === "button" || component["type"] === "link") && r.random() < 0.3) {
+					const others = ids.filter((other) => other !== screen);
+					return { ...component, target: r.pick(others) };
+				}
+				const children = component["children"];
+				return Array.isArray(children)
+					? { ...component, children: (children as Spec[]).map((child) => open(child, screen)) }
+					: component;
+			};
+			for (const screen of screens)
+				screen.children = screen.children.map((child) => open(child, screen.id));
+		}
 		try {
 			return parseWireframeDiagram({ id, title: "Random wireframe", type: "wireframe", screens });
 		} catch (error) {
@@ -323,11 +339,19 @@ describe("wireframe fuzz", () => {
 				];
 				const name = `${diagram.id} (${[...wireframeComponents(diagram)].length} components)`;
 				if (problems.length > 0) defects.push(`${name}: ${problems.slice(0, 3).join("; ")}`);
+				const unrouted = layoutWireframeDiagram(diagram).navigations.filter(
+					(navigation) => !navigation.routed,
+				);
+				if (unrouted.length > 0)
+					shortfalls.push(`${name}: ${unrouted.length} navigation arrows without a route`);
 				const widened = boxes.filter((issue) => issue.code === "screen-widened");
 				if (widened.length > 0)
 					shortfalls.push(`${name}: ${widened.map((issue) => issue.message).join("; ")}`);
 			}
-			if (FULL) console.info(`seed ${seed}: ${shortfalls.length} widened screens of ${WIREFRAMES}`);
+			if (FULL)
+				console.info(
+					`seed ${seed}: ${shortfalls.length} shortfalls of ${WIREFRAMES}\n${shortfalls.join("\n")}`,
+				);
 			expect(defects).toEqual([]);
 			expect(shortfalls.length, shortfalls.join("\n")).toBeLessThanOrEqual(WIREFRAMES / 50);
 		});

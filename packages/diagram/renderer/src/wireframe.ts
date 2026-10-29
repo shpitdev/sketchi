@@ -18,7 +18,9 @@ import {
 	wrapTextToWidth,
 } from "@sketchi/diagram-core";
 
+import { routeNavigations, type NavigationBox } from "./wireframe-navigation.js";
 import type {
+	ArrowSceneElement,
 	FrameSceneElement,
 	LineSceneElement,
 	NodeSceneElement,
@@ -2205,8 +2207,17 @@ export interface WireframeLayoutScreen {
 	readonly components: readonly WireframeLayoutComponent[];
 }
 
+/** A control that opens another screen, and whether its arrow found a route. */
+export interface WireframeLayoutNavigation {
+	readonly screen: string;
+	readonly path: string;
+	readonly target: string;
+	readonly routed: boolean;
+}
+
 export interface WireframeLayout {
 	readonly screens: readonly WireframeLayoutScreen[];
+	readonly navigations: readonly WireframeLayoutNavigation[];
 }
 
 interface PlacedScreen {
@@ -2351,7 +2362,11 @@ function layoutScreen(screen: WireframeScreen): PlacedScreen {
 	};
 }
 
-/** Screens in rows that read left to right, wrapped so the sheet stays within MAX_ASPECT. */
+/**
+ * Screens in rows that read left to right, as many to a row as keeps the
+ * sheet within MAX_ASPECT, then balanced over those rows: four desktop
+ * screens sit two by two rather than three over one.
+ */
 function arrangeScreens(placed: readonly PlacedScreen[]): { x: number; y: number }[] {
 	const arrangement = (perRow: number) => {
 		const origins: { x: number; y: number }[] = [];
@@ -2369,16 +2384,28 @@ function arrangeScreens(placed: readonly PlacedScreen[]): { x: number; y: number
 		}
 		return { origins, aspect: widest / Math.max(1, y - SCREEN_GAP_Y) };
 	};
-	for (let perRow = placed.length; perRow > 1; perRow -= 1) {
-		const candidate = arrangement(perRow);
-		if (candidate.aspect <= MAX_ASPECT) return candidate.origins;
-	}
-	return arrangement(1).origins;
+	let perRow = placed.length;
+	while (perRow > 1 && arrangement(perRow).aspect > MAX_ASPECT) perRow -= 1;
+	const rows = Math.ceil(placed.length / perRow);
+	return arrangement(Math.ceil(placed.length / rows)).origins;
+}
+
+/** A control that opens another screen, before its arrow is routed. */
+interface NavigationSource {
+	readonly screen: string;
+	readonly path: string;
+	readonly target: string;
+	/** The shape the arrow binds to: a button's box, or the box behind a link. */
+	readonly nodeId: string;
+	readonly box: Box;
+	/** The containers around it, which its arrow may cross on the way out. */
+	readonly ancestors: ReadonlySet<string>;
 }
 
 interface Painted {
 	readonly elements: SceneElement[];
 	readonly components: WireframeLayoutComponent[];
+	readonly navigations: NavigationSource[];
 }
 
 function paintScreen(placed: PlacedScreen, origin: { x: number; y: number }): Painted {
@@ -2386,6 +2413,7 @@ function paintScreen(placed: PlacedScreen, origin: { x: number; y: number }): Pa
 	const frameId = `frame:${screen.id}`;
 	const elements: SceneElement[] = [];
 	const components: WireframeLayoutComponent[] = [];
+	const navigations: NavigationSource[] = [];
 	const visit = (
 		item: Laid,
 		parentX: number,
@@ -2394,6 +2422,7 @@ function paintScreen(placed: PlacedScreen, origin: { x: number; y: number }): Pa
 		parent: string | undefined,
 		overlay: boolean,
 		opacity: number | undefined,
+		ancestors: readonly string[] = [],
 	) => {
 		const box: Box = {
 			x: parentX + item.x,
@@ -2410,7 +2439,34 @@ function paintScreen(placed: PlacedScreen, origin: { x: number; y: number }): Pa
 			frameId,
 			...(faded === undefined ? {} : { opacity: faded }),
 		};
-		elements.push(...item.paint(box, scope, `wf:${screen.id}:${item.path}`));
+		const id = `wf:${screen.id}:${item.path}`;
+		const { target } = item.component;
+		const opens =
+			target !== undefined && (item.component.type === "button" || item.component.type === "link");
+		// A link has no shape of its own for its arrow to bind to; an invisible box behind its words is one.
+		if (opens && item.component.type === "link")
+			elements.push({
+				...shape(
+					`${id}:hit`,
+					"link-target",
+					box,
+					WIDGET,
+					{ fill: WHITE, stroke: WHITE },
+					item.component.text ?? "Link",
+					scope,
+				),
+				opacity: 0,
+			});
+		elements.push(...item.paint(box, scope, id));
+		if (opens)
+			navigations.push({
+				screen: screen.id,
+				path: item.path,
+				target,
+				nodeId: item.component.type === "link" ? `${id}:hit` : `${id}:box`,
+				box,
+				ancestors: new Set(ancestors),
+			});
 		components.push({
 			path: item.path,
 			type: item.component.type,
@@ -2429,6 +2485,7 @@ function paintScreen(placed: PlacedScreen, origin: { x: number; y: number }): Pa
 				item.path,
 				overlay,
 				faded,
+				[...ancestors, item.path],
 			);
 	};
 	for (const item of placed.laid) {
@@ -2452,7 +2509,7 @@ function paintScreen(placed: PlacedScreen, origin: { x: number; y: number }): Pa
 			});
 		visit(item, origin.x, origin.y, [], undefined, overlay, undefined);
 	}
-	return { elements, components };
+	return { elements, components, navigations };
 }
 
 function placeScreens(diagram: WireframeDiagram) {
@@ -2483,19 +2540,37 @@ function renderWithLayout(input: WireframeDiagram): {
 	layout: WireframeLayout;
 } {
 	const diagram = validateWireframeDiagram(input);
-	const { placed, origins, frames } = placeScreens(diagram);
+	const { placed, origins, frames: placedFrames } = placeScreens(diagram);
 	const painted = placed.map((screen, index) => paintScreen(screen, origins[index]!));
-	const nameTop = Math.min(...frames.map((frame) => canvasFrameNameBox(frame).y));
-	const dx = PADDING;
-	const dy = PADDING - nameTop;
+	const navigations = painted.flatMap((screen) => screen.navigations);
+	// A screen a control opens carries a node id its arrow binds to.
+	const opened = new Set(navigations.map((navigation) => navigation.target));
+	const frames = placedFrames.map((frame, index) => {
+		const id = placed[index]!.screen.id;
+		return opened.has(id) ? { ...frame, nodeId: wireframeScreenNodeId(id) } : frame;
+	});
+	const arrows = navigationArrows(navigations, frames, painted);
+	const nameBoxes = frames.map((frame) => canvasFrameNameBox(frame));
+	const points = arrows.flatMap((arrow) => arrow.points);
+	const left = Math.min(...frames.map((frame) => frame.x), ...points.map((point) => point.x));
+	const top = Math.min(...nameBoxes.map((box) => box.y), ...points.map((point) => point.y));
+	const dx = PADDING - left;
+	const dy = PADDING - top;
 	const elements: SceneElement[] = [
 		...frames.map((frame) => offsetElement(frame, dx, dy)),
 		...painted.flatMap((screen) =>
 			screen.elements.map((element) => offsetElement(element, dx, dy)),
 		),
+		...arrows.map((arrow) => offsetElement(arrow, dx, dy)),
 	];
-	const right = Math.max(...frames.map((frame) => frame.x + frame.width));
-	const bottom = Math.max(...frames.map((frame) => frame.y + frame.height));
+	const right = Math.max(
+		...frames.map((frame) => frame.x + frame.width),
+		...points.map((point) => point.x),
+	);
+	const bottom = Math.max(
+		...frames.map((frame) => frame.y + frame.height),
+		...points.map((point) => point.y),
+	);
 	const scene: RenderedDiagramScene = {
 		kind: "canvas",
 		version: CANVAS_SPEC_VERSION,
@@ -2511,6 +2586,7 @@ function renderWithLayout(input: WireframeDiagram): {
 		zOrder: elements.map((element) => element.id),
 	};
 	const shift = (box: Box): Box => ({ ...box, x: box.x + dx, y: box.y + dy });
+	const routed = new Set(arrows.map((arrow) => arrow.id));
 	const layout: WireframeLayout = {
 		screens: placed.map((screen, index) => ({
 			id: screen.screen.id,
@@ -2522,8 +2598,113 @@ function renderWithLayout(input: WireframeDiagram): {
 				box: shift(component.box),
 			})),
 		})),
+		navigations: navigations.map((navigation) => ({
+			screen: navigation.screen,
+			path: navigation.path,
+			target: navigation.target,
+			routed: routed.has(wireframeNavigationId(navigation.screen, navigation.path)),
+		})),
 	};
 	return { scene, layout };
+}
+
+/** The node id a screen's frame binds the arrows of the controls that open it with. */
+export const wireframeScreenNodeId = (screen: string) => `screen:${screen}`;
+/** The id of the arrow from the control at `path` on `screen`. */
+export const wireframeNavigationId = (screen: string, path: string) => `nav:${screen}:${path}`;
+
+/** The box a text element is stored with, centered on its point. */
+function textBox(text: TextSceneElement): NavigationBox {
+	const width = Math.max(
+		1,
+		Math.min(text.maxWidth ?? 160, Math.ceil(estimateTextWidth(text.text, text.fontSize))),
+	);
+	const height = textHeight(text.text.split("\n").length, text.fontSize);
+	return { x: text.x - width / 2, y: text.y - height / 2, width, height };
+}
+
+/**
+ * One arrow per control that opens a screen, from its side to the screen's
+ * frame, clear of every other screen and name and of everything on its own
+ * screen but the containers around it. A control no route reaches draws none.
+ */
+function navigationArrows(
+	navigations: readonly NavigationSource[],
+	frames: readonly FrameSceneElement[],
+	painted: readonly Painted[],
+): ArrowSceneElement[] {
+	if (navigations.length === 0) return [];
+	const frameOf = new Map(frames.map((frame) => [frame.id, frame]));
+	const nameBoxes = frames.map((frame) => canvasFrameNameBox(frame));
+	const all = [...frames, ...nameBoxes];
+	const area = {
+		x: Math.min(...all.map((box) => box.x)) - 64,
+		y: Math.min(...all.map((box) => box.y)) - 64,
+		width:
+			Math.max(...all.map((box) => box.x + box.width)) - Math.min(...all.map((box) => box.x)) + 128,
+		height:
+			Math.max(...all.map((box) => box.y + box.height)) -
+			Math.min(...all.map((box) => box.y)) +
+			128,
+	};
+	const screens = new Map(painted.map((screen, index) => [frames[index]!.id, screen]));
+	const requests = navigations.map((navigation) => {
+		const source = frameOf.get(`frame:${navigation.screen}`)!;
+		const target = frameOf.get(`frame:${navigation.target}`)!;
+		const own = screens.get(source.id)!;
+		const prefix = `wf:${navigation.screen}:${navigation.path}:`;
+		// A control on a modal runs over what the modal's backdrop dims.
+		const overlay =
+			own.components.find((component) => component.path === navigation.path)?.overlay === true;
+		const scrim = own.elements.findIndex(
+			(element) => element.type === "node" && element.kind === "wireframe:scrim",
+		);
+		return {
+			source: navigation.box,
+			target,
+			obstacles: [
+				...frames.filter((frame) => frame !== source && frame !== target),
+				...nameBoxes,
+				...own.components
+					.filter(
+						(component) =>
+							component.path !== navigation.path &&
+							!navigation.ancestors.has(component.path) &&
+							!component.path.startsWith(`${navigation.path}.`) &&
+							(!overlay || component.overlay),
+					)
+					.map((component) => component.box),
+				...own.elements.flatMap((element, at) =>
+					element.type === "text" &&
+					!element.id.startsWith(prefix) &&
+					!element.containerId &&
+					(!overlay || at > scrim)
+						? [textBox(element)]
+						: [],
+				),
+			],
+		};
+	});
+	const routes = routeNavigations(requests, area);
+	return navigations.flatMap((navigation, index): ArrowSceneElement[] => {
+		const points = routes[index];
+		if (!points || points.length < 2) return [];
+		const id = wireframeNavigationId(navigation.screen, navigation.path);
+		return [
+			{
+				type: "arrow",
+				id,
+				edgeId: id,
+				sourceNodeId: navigation.nodeId,
+				targetNodeId: wireframeScreenNodeId(navigation.target),
+				points: points as [ScenePoint, ...ScenePoint[]],
+				startArrowhead: null,
+				endArrowhead: "arrow",
+				strokeColor: STROKE,
+				strokeWidth: 2,
+			},
+		];
+	});
 }
 
 /** A frame's name runs on one line, so an authored line break there reads as a space. */

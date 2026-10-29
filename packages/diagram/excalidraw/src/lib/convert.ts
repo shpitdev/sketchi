@@ -1246,6 +1246,8 @@ function arrowSegmentsThroughShapes(
 ): ExcalidrawSceneValidationIssue[] {
 	const segments = elements.filter((element) => element.type === "arrow").flatMap(arrowSegments);
 	const shapes = elements.filter(isBindableShape);
+	const boundsById = new Map(elements.map((element) => [element.id, elementBounds(element)]));
+	const order = new Map(elements.map((element, index) => [element.id, index]));
 	const frameOf = new Map(
 		elements.flatMap((element) =>
 			typeof element.frameId === "string" ? [[element.id, element.frameId] as const] : [],
@@ -1255,12 +1257,16 @@ function arrowSegmentsThroughShapes(
 	const seen = new Set<string>();
 
 	for (const segment of segments) {
+		// Shapes holding an end of this arrow, such as the card its button sits in.
+		const holders = shapes.filter((shape) => holdsBoundEnd(shape, segment, boundsById));
 		for (const shape of shapes) {
 			if (
 				isSequenceStructureShape(shape) ||
+				hiddenUnder(shape, holders, boundsById, order) ||
 				shape.id === segment.startBindingId ||
 				shape.id === segment.endBindingId ||
-				containsArrowEnd(shape, segment, frameOf)
+				containsArrowEnd(shape, segment, frameOf) ||
+				holdsBoundEnd(shape, segment, boundsById)
 			) {
 				continue;
 			}
@@ -1301,6 +1307,70 @@ function containsArrowEnd(
 		[segment.arrowId, segment.startBindingId, segment.endBindingId].some(
 			(id) => id !== null && frameOf.get(id) === shape.id,
 		)
+	);
+}
+
+/**
+ * A shape around the one an arrow binds to, such as the card a button sits
+ * in, has to be crossed on the way out; every other shape stays an obstacle.
+ */
+function holdsBoundEnd(
+	shape: ExcalidrawElement,
+	segment: ArrowSegment,
+	boundsById: ReadonlyMap<string, ElementBounds | null>,
+): boolean {
+	const outer = boundsById.get(shape.id);
+	if (!outer) return false;
+	return [segment.startBindingId, segment.endBindingId].some((id) => {
+		const inner = id === null ? undefined : boundsById.get(id);
+		return (
+			inner !== undefined &&
+			inner !== null &&
+			id !== shape.id &&
+			inner.x >= outer.x &&
+			inner.y >= outer.y &&
+			inner.x + inner.width <= outer.x + outer.width &&
+			inner.y + inner.height <= outer.y + outer.height
+		);
+	});
+}
+
+/**
+ * A shape drawn under one that holds the arrow's end and covers it, as a
+ * modal's backdrop covers the screen beneath, is hidden from the arrow. Only a
+ * filled shape covers anything: a frame or a transparent box hides nothing.
+ */
+function hiddenUnder(
+	shape: ExcalidrawElement,
+	holders: readonly ExcalidrawElement[],
+	boundsById: ReadonlyMap<string, ElementBounds | null>,
+	order: ReadonlyMap<string, number>,
+): boolean {
+	const inner = boundsById.get(shape.id);
+	if (!inner) return false;
+	return holders.some((holder) => {
+		const outer = boundsById.get(holder.id);
+		return (
+			holder.id !== shape.id &&
+			masks(holder) &&
+			outer !== undefined &&
+			outer !== null &&
+			(order.get(holder.id) ?? 0) > (order.get(shape.id) ?? 0) &&
+			inner.x >= outer.x &&
+			inner.y >= outer.y &&
+			inner.x + inner.width <= outer.x + outer.width &&
+			inner.y + inner.height <= outer.y + outer.height
+		);
+	});
+}
+
+/** Whether a shape paints over what lies beneath it. */
+function masks(element: ExcalidrawElement): boolean {
+	return (
+		element.type !== "frame" &&
+		typeof element.backgroundColor === "string" &&
+		element.backgroundColor !== "transparent" &&
+		(typeof element.opacity !== "number" || element.opacity > 0)
 	);
 }
 

@@ -70,6 +70,8 @@ export interface WireframeScenario {
 		/** Stated reading orders, by component key. */
 		readonly orders: Readonly<Record<string, readonly string[]>>;
 		readonly sides: readonly WireframeScenarioSide[];
+		/** Controls the prompt says open another screen: a component key and a screen key. */
+		readonly navigations: readonly { readonly from: string; readonly to: string }[];
 	};
 	readonly description: string;
 	readonly diagramType: "wireframe";
@@ -294,7 +296,7 @@ export function wireframeScenarioChecks(
 	scenario: WireframeScenario,
 	diagram: WireframeDiagram,
 ): ScenarioCheck[] {
-	const { screens, components, orders, sides } = scenario.assertions;
+	const { screens, components, orders, sides, navigations } = scenario.assertions;
 	const located = locate(diagram);
 	const screenKeys = Object.keys(screens);
 	// A screen the prompt does not name is the model's screen in its place; a named one matches by name.
@@ -406,6 +408,23 @@ export function wireframeScenarioChecks(
 			message: `Expected ${keys.join(", ")} in that order.`,
 		});
 	}
+	for (const { from, to } of navigations) {
+		const control = matches.get(from);
+		const screen = diagram.screens[screenIndex.get(to) ?? -1];
+		const fromScreen = components.find((entry) => entry.key === from)?.screen ?? from;
+		checks.push({
+			id: `navigation:${fromScreen}->${to}`,
+			passed:
+				control !== undefined && screen !== undefined && control.component.target === screen.id,
+			message: `Expected the ${from} control to open the ${screens[to]?.names[0] ?? to} screen (target "${screen?.id ?? to}").`,
+		});
+	}
+	const opening = located.filter((entry) => entry.component.target !== undefined).length;
+	checks.push({
+		id: "navigations-exact",
+		passed: opening === navigations.length,
+		message: `Expected exactly ${navigations.length} controls that open another screen; found ${opening}.`,
+	});
 	const found: WireframeScenarioFound = { matches, located, diagram };
 	for (const side of sides)
 		checks.push({ id: `side:${side.id}`, passed: side.holds(found), message: side.message });
@@ -521,6 +540,11 @@ export function wireframeDrawnCheck(
 				const parent = box?.parent === undefined ? undefined : byPath.get(box.parent);
 				if (box && parent && !holds(parent.box, box.box))
 					problems.push(`${path} outside its ${parent.type}`);
+				if (component.target !== undefined) {
+					const arrow = scene.elements.find((element) => element.id === `nav:${screen.id}:${path}`);
+					if (arrow?.type !== "arrow" || arrow.targetNodeId !== `screen:${component.target}`)
+						problems.push(`${path} arrow to ${component.target}`);
+				}
 				if (component.children) visit(component.children, path);
 			});
 		visit(screen.children, "");
@@ -575,16 +599,25 @@ interface WireframeScenarioDefinition {
 	readonly components: readonly WireframeScenarioComponent[];
 	readonly orders?: Readonly<Record<string, readonly string[]>>;
 	readonly sides?: readonly WireframeScenarioSide[];
+	readonly navigations?: readonly { readonly from: string; readonly to: string }[];
 	readonly expected: unknown;
 }
 
 function defineWireframeScenario(definition: WireframeScenarioDefinition): WireframeScenario {
-	const { screens, components, orders = {}, sides = [], expected, ...scenario } = definition;
+	const {
+		screens,
+		components,
+		orders = {},
+		sides = [],
+		navigations = [],
+		expected,
+		...scenario
+	} = definition;
 	return {
 		...scenario,
 		diagramType: "wireframe",
 		logos: [],
-		assertions: { screens, components, orders, sides },
+		assertions: { screens, components, orders, sides, navigations },
 		expectedDiagram: parseWireframeDiagram(expected),
 	};
 }
@@ -1158,6 +1191,99 @@ const wireframeScenarioDefinitions: readonly WireframeScenarioDefinition[] = [
 								},
 							],
 						},
+					],
+				},
+			],
+		},
+	},
+	{
+		id: "signup-flow-wireframe",
+		title: "Signup flow",
+		difficulty: "standard",
+		tags: ["wireframe", "mobile", "flow", "navigation"],
+		description:
+			"Three phone screens of a signup flow, each with its fields and a primary button, the first two opening the next screen.",
+		prompt:
+			'Draw a mobile wireframe of our three-screen signup flow. The "Create account" screen has the heading "Create your account", a Name input, an Email input, a Password input and a primary "Continue" button. The "Verify email" screen has the heading "Check your inbox", the text "Enter the 6-digit code we emailed you", a Code input, a primary "Continue" button and a "Resend code" link. The "Choose a plan" screen has the heading "Pick a plan", a "Free" radio (selected), a "Pro" radio and a primary "Start free trial" button. Each Continue button goes to the next screen.',
+		screens: {
+			"create-account": { names: ["Create account"], device: "mobile" },
+			"verify-email": { names: ["Verify email"], device: "mobile" },
+			"choose-plan": { names: ["Choose a plan"], device: "mobile" },
+		},
+		components: [
+			field("create-heading", ["heading"], ["Create your account"], { screen: "create-account" }),
+			field("name", ["input"], ["Name"], { screen: "create-account" }),
+			field("email", ["input"], ["Email"], { screen: "create-account" }),
+			field("password", ["input"], ["Password"], { screen: "create-account" }),
+			field("create-continue", ["button"], ["Continue"], {
+				screen: "create-account",
+				state: { variant: "primary" },
+			}),
+			field("verify-heading", ["heading"], ["Check your inbox"], { screen: "verify-email" }),
+			field("verify-text", COPY, ["Enter the 6-digit code we emailed you"], {
+				screen: "verify-email",
+			}),
+			field("code", ["input"], ["Code"], { screen: "verify-email" }),
+			field("verify-continue", ["button"], ["Continue"], {
+				screen: "verify-email",
+				state: { variant: "primary" },
+			}),
+			field("resend", ["link"], ["Resend code"], { screen: "verify-email" }),
+			field("plan-heading", ["heading"], ["Pick a plan"], { screen: "choose-plan" }),
+			field("free", ["radio"], ["Free"], { screen: "choose-plan", state: { checked: true } }),
+			field("pro", ["radio"], ["Pro"], { screen: "choose-plan", state: { checked: false } }),
+			field("trial", ["button"], ["Start free trial"], {
+				screen: "choose-plan",
+				state: { variant: "primary" },
+			}),
+		],
+		orders: {
+			"create-account": ["create-heading", "name", "email", "password", "create-continue"],
+			"verify-email": ["verify-heading", "verify-text", "code", "verify-continue", "resend"],
+			"choose-plan": ["plan-heading", "free", "pro", "trial"],
+		},
+		navigations: [
+			{ from: "create-continue", to: "verify-email" },
+			{ from: "verify-continue", to: "choose-plan" },
+		],
+		expected: {
+			id: "signup-flow-wireframe",
+			title: "Signup flow",
+			type: "wireframe",
+			screens: [
+				{
+					id: "create-account",
+					name: "Create account",
+					device: "mobile",
+					children: [
+						{ type: "heading", text: "Create your account" },
+						{ type: "input", label: "Name" },
+						{ type: "input", label: "Email" },
+						{ type: "input", label: "Password" },
+						{ type: "button", text: "Continue", variant: "primary", target: "verify-email" },
+					],
+				},
+				{
+					id: "verify-email",
+					name: "Verify email",
+					device: "mobile",
+					children: [
+						{ type: "heading", text: "Check your inbox" },
+						{ type: "text", text: "Enter the 6-digit code we emailed you" },
+						{ type: "input", label: "Code" },
+						{ type: "button", text: "Continue", variant: "primary", target: "choose-plan" },
+						{ type: "link", text: "Resend code" },
+					],
+				},
+				{
+					id: "choose-plan",
+					name: "Choose a plan",
+					device: "mobile",
+					children: [
+						{ type: "heading", text: "Pick a plan" },
+						{ type: "radio", label: "Free", checked: true },
+						{ type: "radio", label: "Pro" },
+						{ type: "button", text: "Start free trial", variant: "primary" },
 					],
 				},
 			],
