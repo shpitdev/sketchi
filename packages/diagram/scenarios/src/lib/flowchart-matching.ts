@@ -2,6 +2,7 @@ import type { FlowchartDiagram } from "@sketchi/diagram-core";
 
 import {
 	flowchartBranchRestates,
+	flowchartContentWords,
 	flowchartLabelMatches,
 	flowchartLabelWords,
 	flowchartObjectPhraseMatches,
@@ -31,6 +32,20 @@ export interface FlowchartStepMatches {
 }
 
 const MAX_CHAIN_NODES = 2;
+const ENTRY_HOSTING_WORDS = flowchartContentWords("host serve route deploy run");
+
+/** Captions may describe the entry's hosting relation, never additional work. */
+function entryCaptionMatches(
+	caption: string,
+	parts: NonNullable<RequiredStep["entryParts"]>,
+): boolean {
+	const allowed = new Set([
+		...ENTRY_HOSTING_WORDS,
+		...parts.flatMap((part) => part.labels.flatMap(flowchartContentWords)),
+	]);
+	const words = flowchartContentWords(caption);
+	return words.length > 0 && words.every((word) => allowed.has(word));
+}
 
 // An explicit semantic outcome has a closed vocabulary. Merely containing
 // "payment" does not make a rejection, hold, approval or request a payment.
@@ -54,6 +69,9 @@ function question(label: string): string {
 
 /** The label names the step, or for an action, its object without the leading verb. */
 function namesStepLabel(label: string, step: RequiredStep): boolean {
+	if (step.entryParts) {
+		return step.entryParts.every((part) => flowchartLabelMatches(label, part.labels));
+	}
 	// An action's purpose is not another performed step: "Resubmit report for
 	// review" must not own "Review report". Require the alternative's leading
 	// action word outside that purpose, but match its objects against the full
@@ -262,16 +280,46 @@ export function matchFlowchartSteps(
 	// Their combined labels must match; the chain's last node owns the step.
 	for (const start of graph.nodes.filter((node) => node.kind === "start")) {
 		const chain = [start];
+		const captions: string[] = [];
 		while (chain.length <= MAX_CHAIN_NODES) {
 			const next = outgoing(chain.at(-1)!.id);
-			const node = next.length === 1 && !next[0]!.label ? byId.get(next[0]!.target) : undefined;
-			if (node?.kind !== "process" || incoming(node.id).length !== 1 || namesStep(node.label)) {
+			const node = next.length === 1 ? byId.get(next[0]!.target) : undefined;
+			if (
+				node?.kind !== "process" ||
+				incoming(node.id).length !== 1 ||
+				requiredNodes.some(
+					(step) =>
+						!step.entryParts &&
+						(namesStepLabel(node.label, step) ||
+							(step.inverseLabels !== undefined &&
+								flowchartLabelMatches(node.label, step.inverseLabels))),
+				)
+			) {
 				break;
 			}
 			chain.push(node);
+			if (next[0]!.label) captions.push(next[0]!.label);
 			const combined = chain.map((entry) => question(entry.label)).join(" ");
 			for (const step of requiredNodes) {
-				if (step.kind === "start" && flowchartLabelMatches(combined, step.labels)) {
+				if (step.kind !== "start") continue;
+				// Declared entry parts must be individually named on adjacent nodes.
+				// A bare start may precede them, but unrelated work cannot separate them.
+				const parts = step.entryParts;
+				// A hosting caption may annotate declared entry parts, but does not
+				// relax the unlabeled-chain rule for any other scenario step.
+				if (captions.some((caption) => !parts || !entryCaptionMatches(caption, parts))) continue;
+				let matches = flowchartLabelMatches(combined, step.labels);
+				if (parts) {
+					const namesPart = (entry: FlowchartNode) =>
+						parts.some((part) => flowchartLabelMatches(entry.label, part.labels));
+					const entryNodes = namesPart(start) ? chain : chain.slice(1);
+					matches =
+						entryNodes.every(namesPart) &&
+						parts.every((part) =>
+							entryNodes.some((entry) => flowchartLabelMatches(entry.label, part.labels)),
+						);
+				}
+				if (matches) {
 					matchedNodes.get(step.id)!.add(node.id);
 				}
 			}

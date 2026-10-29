@@ -52,7 +52,11 @@ import { termTokens } from "@sketchi/icon-catalog";
 
 import type { DiagramScenario } from "./diagram-scenarios.js";
 import { flowchartLabelMatches } from "./flowchart-labels.js";
-import type { FlowchartScenario, DiagramScenarioLogo } from "./scenarios.js";
+import type {
+	FlowchartScenario,
+	FlowchartScenarioRequiredNode,
+	DiagramScenarioLogo,
+} from "./scenarios.js";
 import type { SequenceScenario, SequenceScenarioMessage } from "./sequence-scenarios.js";
 import {
 	type BranchMatcher,
@@ -319,6 +323,11 @@ export interface ScenarioLogoExpectations {
 	/** The prompt, whose product abbreviations also ground their products' logos. */
 	readonly prompt?: string;
 	readonly requiredIconSlugs: readonly string[];
+	/** Only an owned entry node naming every part may share its single logo slot. */
+	readonly sharedIconEntries?: readonly {
+		readonly parts: NonNullable<FlowchartScenarioRequiredNode["entryParts"]>;
+		readonly nodeIds: ReadonlySet<string>;
+	}[];
 }
 
 /**
@@ -387,10 +396,32 @@ export function scenarioLogoChecks(
 		const logo = logoFor(icon.slug);
 		return !logo || !labelNamesLogo(icon.label, logo);
 	});
+	const sharedEntryIcon = (slug: string) =>
+		modelDiagram.type === "flowchart" &&
+		(expected.sharedIconEntries ?? []).some(({ parts, nodeIds }) => {
+			const missing = logoFor(slug);
+			return (
+				missing !== undefined &&
+				parts.some((part) => part.iconSlug === slug) &&
+				modelDiagram.nodes.some((node) => {
+					const logo = node.icon && logoFor(node.icon.slug);
+					return (
+						nodeIds.has(node.id) &&
+						parts.every((part) => flowchartLabelMatches(node.label, part.labels)) &&
+						!modelDiagram.nodes.some(
+							(other) => other.id !== node.id && labelNamesLogo(other.label, missing),
+						) &&
+						logo !== undefined &&
+						labelNamesLogo(node.label, logo) &&
+						parts.some((part) => part.iconSlug === node.icon?.slug)
+					);
+				})
+			);
+		});
 	return [
 		...expected.requiredIconSlugs.map((slug) => ({
 			id: `icon:${slug}`,
-			passed: icons.some((icon) => icon.slug === slug),
+			passed: icons.some((icon) => icon.slug === slug) || sharedEntryIcon(slug),
 			message: `Expected the model to draw the "${slug}" logo.`,
 		})),
 		{
@@ -693,7 +724,7 @@ function flowchartLaneChecks(
 	];
 }
 
-function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram): ScenarioCheck[] {
+function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram) {
 	// Preserve merged-check accounting, but never pad counts with edge-step witnesses.
 	const { matchedNodes, graph, branchMatches, edgeStepCount, redundantOutcomeNodeCount } =
 		matchFlowchartSteps(scenario, diagram);
@@ -742,7 +773,7 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 	const paths = findPaths(selectedOwners);
 	const nodeKinds = new Set(diagram.nodes.map((node) => node.kind));
 
-	return [
+	const checks: ScenarioCheck[] = [
 		{
 			id: "min-node-count",
 			passed:
@@ -763,7 +794,9 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 		...scenario.assertions.requiredNodes.map((node) => ({
 			id: `node-label:${node.label}`,
 			passed: distinctSteps.has(node.id),
-			message: `Expected a distinct ${node.kind} node matching any of: ${node.labels.join(" | ")}.`,
+			message: node.entryParts
+				? `Expected an entry step naming every part: ${node.entryParts.map((part) => part.labels.join(" | ")).join("; ")} (one node or an adjacent chain).`
+				: `Expected a distinct ${node.kind} node matching any of: ${node.labels.join(" | ")}.`,
 		})),
 		...scenario.assertions.requiredBranchLabels.map((label) => ({
 			id: `branch-label:${label}`,
@@ -791,6 +824,7 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 		...flowchartGroupChecks(scenario, graph, ownedNodes),
 		...flowchartLaneChecks(scenario, graph, ownedNodes),
 	];
+	return { checks, ownedNodes };
 }
 
 export function extractJsonCandidate(output: string): unknown {
@@ -1114,13 +1148,19 @@ export function evaluateScenarioDiagram(
 	const diagram = parseFlowchartDiagram(candidate);
 	const modelDiagram =
 		modelCandidate === candidate ? diagram : parseFlowchartDiagram(modelCandidate);
+	const { checks, ownedNodes } = flowchartChecks(scenario, diagram);
+	const modelOwners =
+		modelDiagram === diagram ? ownedNodes : flowchartChecks(scenario, modelDiagram).ownedNodes;
 	return evaluation(scenario.id, diagram, [
-		...flowchartChecks(scenario, diagram),
+		...checks,
 		...scenarioLogoChecks(
 			{
 				logos: scenario.logos,
 				prompt: scenario.prompt,
 				requiredIconSlugs: scenario.assertions.requiredIconSlugs,
+				sharedIconEntries: scenario.assertions.requiredNodes.flatMap((step) =>
+					step.entryParts ? [{ parts: step.entryParts, nodeIds: modelOwners.get(step.id)! }] : [],
+				),
 			},
 			modelDiagram,
 		),

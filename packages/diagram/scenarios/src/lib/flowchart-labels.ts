@@ -172,6 +172,11 @@ const STOPWORDS = new Set([
 	"that",
 ]);
 
+/** Content lemmas, retaining negation and words that state additional work. */
+export function flowchartContentWords(label: string): string[] {
+	return flowchartLabelWords(label).filter((word) => !STOPWORDS.has(word));
+}
+
 const NEGATION_BOUNDARIES = new Set(["and", "or", "then", "but", "so", "otherwise"]);
 
 // A subordinate clause or `without` phrase qualifies the action before it: in

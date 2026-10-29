@@ -66,6 +66,11 @@ export interface FlowchartScenarioRequiredNode {
 	kind: FlowchartNodeKind;
 	label: string;
 	labels: readonly string[];
+	/** One entry event drawn together or as adjacent named parts, in either order. */
+	entryParts?: readonly {
+		labels: readonly string[];
+		iconSlug?: string;
+	}[];
 	/** Explicit opt-in: this outcome may be the decision branch into this shared end step. */
 	sharedEndId?: string;
 	/** Explicit equivalent terminal outcome, scoped to one stated predecessor. */
@@ -338,6 +343,16 @@ function buildAssertions(
 				label: id === startId && entry.size > 0 ? entryLabel : label,
 				kind,
 				labels,
+				...(id === startId && entry.size > 0
+					? {
+							entryParts: [startId, ...entry].map((partId) => {
+								const [, , , partLabels, iconSlug] = definition.nodes.find(
+									([nodeId]) => nodeId === partId,
+								)!;
+								return { labels: partLabels, ...(iconSlug ? { iconSlug } : {}) };
+							}),
+						}
+					: {}),
 				...(inverseLabels ? { inverseLabels } : {}),
 				...(equivalentOutcome ? { equivalentOutcome } : {}),
 				...(definition.sharedEnds?.[id] ? { sharedEndId: definition.sharedEnds[id] } : {}),
@@ -1815,16 +1830,7 @@ const flowchartScenarioDefinitions = [
 		// that names both, drawn as one node or a short entry chain.
 		entry: ["page"],
 		nodes: [
-			[
-				"request",
-				"Request reaches Vercel",
-				"start",
-				[
-					"Next.js page on Vercel receives question",
-					"Next.js page on Vercel receives the question",
-				],
-				"vercel",
-			],
+			["request", "Request reaches Vercel", "start", ["Vercel"], "vercel"],
 			["page", "Next.js page receives question", "process", ["Next.js page"], "nextjs"],
 			[
 				"cache",

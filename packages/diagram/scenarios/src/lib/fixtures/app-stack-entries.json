@@ -1,0 +1,366 @@
+[
+	{
+		"runId": "20261029-081902-m1xz",
+		"eval": "eval-20261029-081902-fm0e",
+		"spec": {
+			"id": "app-request-flow",
+			"title": "App request flow",
+			"nodes": [
+				{
+					"id": "page",
+					"label": "Next.js page",
+					"kind": "start",
+					"description": "Receives the question",
+					"icon": {
+						"slug": "nextjs"
+					}
+				},
+				{
+					"id": "host",
+					"label": "Vercel",
+					"kind": "process",
+					"description": "Hosts the Next.js page",
+					"icon": {
+						"slug": "vercel"
+					}
+				},
+				{
+					"id": "cache",
+					"label": "Check the Redis cache",
+					"kind": "process",
+					"icon": {
+						"slug": "redis"
+					},
+					"shape": "database"
+				},
+				{
+					"id": "hit",
+					"label": "Cache hit?",
+					"kind": "decision"
+				},
+				{
+					"id": "cached",
+					"label": "Return the cached answer",
+					"kind": "end"
+				},
+				{
+					"id": "model",
+					"label": "Call the OpenAI model",
+					"kind": "process",
+					"icon": {
+						"slug": "openai"
+					}
+				},
+				{
+					"id": "store",
+					"label": "Store the answer in Redis",
+					"kind": "process",
+					"icon": {
+						"slug": "redis"
+					},
+					"shape": "database"
+				},
+				{
+					"id": "errors",
+					"label": "Log any errors to Sentry",
+					"kind": "process",
+					"icon": {
+						"slug": "sentry"
+					}
+				},
+				{
+					"id": "answer",
+					"label": "Return the answer",
+					"kind": "end"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "page",
+					"target": "host"
+				},
+				{
+					"id": "edge-2",
+					"source": "host",
+					"target": "cache"
+				},
+				{
+					"id": "edge-3",
+					"source": "cache",
+					"target": "hit"
+				},
+				{
+					"id": "edge-4",
+					"source": "hit",
+					"target": "cached",
+					"label": "Hit"
+				},
+				{
+					"id": "edge-5",
+					"source": "hit",
+					"target": "model",
+					"label": "Miss"
+				},
+				{
+					"id": "edge-6",
+					"source": "model",
+					"target": "store"
+				},
+				{
+					"id": "edge-7",
+					"source": "store",
+					"target": "errors"
+				},
+				{
+					"id": "edge-8",
+					"source": "errors",
+					"target": "answer"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"runId": "20261029-081902-bndi",
+		"eval": "eval-20261029-081902-fm0e",
+		"spec": {
+			"id": "app-request-flow",
+			"title": "App request flow",
+			"nodes": [
+				{
+					"id": "page",
+					"label": "Next.js page",
+					"kind": "start",
+					"description": "Receives the question",
+					"icon": {
+						"slug": "nextjs"
+					}
+				},
+				{
+					"id": "vercel",
+					"label": "Vercel",
+					"kind": "process",
+					"description": "Hosts the Next.js page",
+					"icon": {
+						"slug": "vercel"
+					}
+				},
+				{
+					"id": "cache",
+					"label": "Check Redis cache",
+					"kind": "process",
+					"icon": {
+						"slug": "redis"
+					},
+					"shape": "database"
+				},
+				{
+					"id": "hit",
+					"label": "Cache hit?",
+					"kind": "decision"
+				},
+				{
+					"id": "cached",
+					"label": "Return the cached answer",
+					"kind": "end"
+				},
+				{
+					"id": "model",
+					"label": "Call the OpenAI model",
+					"kind": "process",
+					"icon": {
+						"slug": "openai"
+					}
+				},
+				{
+					"id": "store",
+					"label": "Store the answer in Redis",
+					"kind": "process",
+					"icon": {
+						"slug": "redis"
+					},
+					"shape": "database"
+				},
+				{
+					"id": "log",
+					"label": "Log any errors to Sentry",
+					"kind": "process",
+					"icon": {
+						"slug": "sentry"
+					}
+				},
+				{
+					"id": "answer",
+					"label": "Return the answer",
+					"kind": "end"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "page",
+					"target": "vercel"
+				},
+				{
+					"id": "edge-2",
+					"source": "vercel",
+					"target": "cache"
+				},
+				{
+					"id": "edge-3",
+					"source": "cache",
+					"target": "hit"
+				},
+				{
+					"id": "edge-4",
+					"source": "hit",
+					"target": "cached",
+					"label": "Hit"
+				},
+				{
+					"id": "edge-5",
+					"source": "hit",
+					"target": "model",
+					"label": "Miss"
+				},
+				{
+					"id": "edge-6",
+					"source": "model",
+					"target": "store"
+				},
+				{
+					"id": "edge-7",
+					"source": "store",
+					"target": "log"
+				},
+				{
+					"id": "edge-8",
+					"source": "log",
+					"target": "answer"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	},
+	{
+		"runId": "20261029-081902-gbd6",
+		"eval": "eval-20261029-081902-s0o9",
+		"spec": {
+			"id": "request-flow-next-js-on-vercel-with-redis-cache",
+			"title": "Request flow: Next.js on Vercel with Redis cache",
+			"nodes": [
+				{
+					"id": "recv",
+					"label": "Next.js page on Vercel receives the question",
+					"kind": "start",
+					"icon": {
+						"slug": "nextjs"
+					}
+				},
+				{
+					"id": "check",
+					"label": "Check the Redis cache",
+					"kind": "process",
+					"icon": {
+						"slug": "redis"
+					},
+					"shape": "database"
+				},
+				{
+					"id": "hit",
+					"label": "Cache hit?",
+					"kind": "decision"
+				},
+				{
+					"id": "call",
+					"label": "Call the OpenAI model",
+					"kind": "process",
+					"icon": {
+						"slug": "openai"
+					}
+				},
+				{
+					"id": "store",
+					"label": "Store the answer in Redis",
+					"kind": "process",
+					"icon": {
+						"slug": "redis"
+					},
+					"shape": "database"
+				},
+				{
+					"id": "err",
+					"label": "Log any errors to Sentry",
+					"kind": "process",
+					"icon": {
+						"slug": "sentry"
+					}
+				},
+				{
+					"id": "ret",
+					"label": "Return the answer",
+					"kind": "end"
+				}
+			],
+			"edges": [
+				{
+					"id": "edge-1",
+					"source": "recv",
+					"target": "check"
+				},
+				{
+					"id": "edge-2",
+					"source": "check",
+					"target": "hit"
+				},
+				{
+					"id": "edge-3",
+					"source": "hit",
+					"target": "ret",
+					"label": "yes (return cached answer)"
+				},
+				{
+					"id": "edge-4",
+					"source": "hit",
+					"target": "call",
+					"label": "no"
+				},
+				{
+					"id": "edge-5",
+					"source": "call",
+					"target": "store"
+				},
+				{
+					"id": "edge-6",
+					"source": "store",
+					"target": "err"
+				},
+				{
+					"id": "edge-7",
+					"source": "err",
+					"target": "ret"
+				}
+			],
+			"layout": {
+				"direction": "TB"
+			},
+			"style": {
+				"accentColor": "#8f707f",
+				"backgroundColor": "#fffdf8"
+			}
+		}
+	}
+]
