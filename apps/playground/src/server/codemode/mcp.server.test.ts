@@ -1184,7 +1184,10 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toMatch(
 				/^- buildChart: .*series: \[\{ name\?, values: number\[\] \}\]/m,
 			);
-			expect(codeDescription).toMatch(/^- buildStateMachine: .*one may be "else"/m);
+			// "one may be else" turned Sonnet's stated guards into else; the guards are copied instead.
+			expect(codeDescription).toMatch(
+				/^- buildStateMachine: .*copy each guard the prompt states; use "else" only for a branch/m,
+			);
 			expect(codeDescription).toMatch(/^- buildErDiagram: .*fromCardinality: "zero-or-many"/m);
 			expect(codeDescription).toMatch(
 				/^- buildClassDiagram: .*"composition" or "aggregation": from is the whole/m,
@@ -1201,7 +1204,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			);
 			// The head retains builder names; summaries ride on the code parameter. Nested zones
 			// and infrastructure shapes add three spec fields and their shape and logo rules. Venn
-			// diagrams and wireframes each add a builder name, a summary and one compact line.
+			// diagrams and wireframes each add a builder name, a summary and one compact line. Stated
+			// guards and the wireframe fields each type takes add 107 characters.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -1210,7 +1214,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(16_030);
+			).toBeLessThan(16_100);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

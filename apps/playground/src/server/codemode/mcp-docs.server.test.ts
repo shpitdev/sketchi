@@ -350,7 +350,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			'- buildSequenceDiagram: spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them, and calls nobody answers draw no bar. A participant\'s own step (validating, retrying) is a self-message with source = target.',
 		);
 		expect(codeLine("buildStateMachine")).toBe(
-			'- buildStateMachine: spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets; one may be "else". kind "final" (label optional) ends the machine and nothing leaves it. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.',
+			'- buildStateMachine: spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets: copy each guard the prompt states; use "else" only for a branch the prompt gives no condition. kind "final" (label optional) ends the machine and nothing leaves it. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.',
 		);
 		expect(codeLine("buildMindmap")).toBe(
 			'- buildMindmap: spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.',
@@ -406,7 +406,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(sankeyDocs.split("Request type:")[0]).toContain("A band under 3 px draws at 3 px");
 		// Wireframes add a builder name to the head and one compact line here (+807 characters).
 		expect(codeLine("buildWireframe")).toBe(
-			'- buildWireframe: spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, row (align?: "between" | "center" | "end"), column, grid (columns: n). Widgets: heading (text, level?), text (text or lines), link, badge, button (text, variant?, target?: screen id), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav, breadcrumbs, list (items, active?), avatar, icon, image, chart (label?), table (columns: string[]), divider. Set variant "primary", checked and active as stated. Copy every screen, component, text and state stated, in order; invent none.',
+			'- buildWireframe: spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, column, row (align?: "between" | "center" | "end"), grid (columns: n). Widgets: heading (text, level?), text (text or lines), badge (text), link (text, target?: screen id), button (text, variant?, target?), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav (items, active?), breadcrumbs, list (items), avatar, icon, image, chart (label?), table (columns: string[]), divider. Set variant "primary", checked and active as stated. Copy every screen, component, text and state stated, in order; invent none.',
 		);
 		const wireframeDocs = getCodeModeDocs({ topic: "buildWireframe" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(wireframeDocs.split("\n\n")[0]);
@@ -451,7 +451,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(stateMachineDocs.split("Request type:")[0]).toMatchInlineSnapshot(`
 			"buildStateMachine accepts { spec: { id?, title, initial, states: [{ id, label?, kind?, parent?, initial? }], transitions: [{ id?, source, target, event?, guard?, action? }], layout?: { direction } }, options? }. Omit layout to let the renderer pick LR or TB.
 
-			A regular state label defaults to its id verbatim; an explicit blank label is invalid. initial is the top-level state the machine starts in. kind "final" ends the machine: name it when it is a named outcome (for example Failed); generic ends need no name; kind "choice" is a diamond whose outgoing transitions each carry a guard; one may be "else". States other states name as parent form a composite, drawn as a frame around them: give it initial, its first substate. Composites do not nest.
+			A regular state label defaults to its id verbatim; an explicit blank label is invalid. initial is the top-level state the machine starts in. kind "final" ends the machine: name it when it is a named outcome (for example Failed); generic ends need no name; kind "choice" is a diamond whose outgoing transitions each carry a guard: copy each guard the prompt states; use "else" only for a branch the prompt gives no condition. States other states name as parent form a composite, drawn as a frame around them: give it initial, its first substate. Composites do not nest.
 
 			A transition is drawn event [guard] / action; write the guard without brackets. It may leave or enter a composite, or return to its own state. Every state must be reachable from initial, and final states have no outgoing transitions. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.
 
@@ -471,8 +471,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// Venn diagrams add a summary and one compact line (+336 characters).
 		// Journey maps add an index line and a compact spec line (+367 characters).
 		// Sankey diagrams add their compact line (+304 characters), wireframes theirs (+807),
-		// quadrant charts theirs (+508).
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(12_920);
+		// quadrant charts theirs (+508). Stated guards and wireframe fields each type takes add 107.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(12_980);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const line of overview
 			.split("\n")
