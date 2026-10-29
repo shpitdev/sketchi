@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.28.0
+
+### Minor Changes
+
+- [#558](https://github.com/shpitdev/sketchi/pull/558) [`efe8656`](https://github.com/shpitdev/sketchi/commit/efe865672651a81d15a21a8dbd75637af5752ac9) Thanks [@anandpant](https://github.com/anandpant)! - Add native Sankey diagrams: `sketchi create` builds `{ "type": "sankey", "spec": { "title", "nodes", "links", "unit" } }` documents offline, and `sketchi generate --type sankey` generates them. Each node sits one column past the longest run of flows into it and draws as a bar as tall as the larger of its inflow and outflow, labeled with its name and total; each flow draws as a band as wide as its value in its source's color, with its value written beside or on it. A flow too thin to see draws at 3 px and keeps its exact value. Cycles, self-links, repeated flows and non-positive values are rejected with repair hints.
+
 ## 0.27.0
 
 ### Minor Changes
