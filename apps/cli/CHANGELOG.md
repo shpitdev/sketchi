@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.30.0
+
+### Minor Changes
+
+- [#562](https://github.com/shpitdev/sketchi/pull/562) [`857329a`](https://github.com/shpitdev/sketchi/commit/857329a96cdd2733b638fc155c358df361845a81) Thanks [@anandpant](https://github.com/anandpant)! - Wireframes draw navigation between screens: `target` on a button or link names the screen it opens, and the control draws an arrow to that screen's frame, routed around everything in its way. Sheets of screens now balance their rows, so four desktop screens sit two by two.
+
 ## 0.29.1
 
 ### Patch Changes
