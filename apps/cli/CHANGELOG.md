@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.26.0
+
+### Minor Changes
+
+- [#557](https://github.com/shpitdev/sketchi/pull/557) [`bc303df`](https://github.com/shpitdev/sketchi/commit/bc303df7893d8b90af88f9a5a4ffc37c30354e2d) Thanks [@anandpant](https://github.com/anandpant)! - Add native Venn diagrams: `sketchi create` builds `{ "type": "venn", "spec": { "title", "sets", "regions" } }` documents offline, and `sketchi generate --type venn` generates them. Two or three equal, overlapping translucent circles each carry their set's label outside, and each region's items (or a count) sit centred inside exactly that region; the circles grow until every region's text fits, so a crowded centre or long items never cross an outline.
+
 ## 0.25.21
 
 ### Patch Changes
