@@ -117,9 +117,12 @@ and the eval harness use it.
   its label or placeholder, an amount in any spelling), the container it sits
   in, its stated state (variant, checked, active item, shown value), the
   stated reading orders, items, tabs, breadcrumbs, table columns and sides,
-  and exactly the stated screens and controls. The drawn scene must show every
-  screen as a frame and every component as a group with its words, inside its
-  parent and its screen, with nothing overlapping or spilling.
+  and exactly the stated screens and controls. Only when nothing of the stated
+  kind matches, a container's title reads as a stated heading or text inside
+  that container, and two or more adjacent links read as a stated nav whose
+  items are their words in order. The drawn scene must show every screen as a
+  frame and every component as a group with its words, inside its parent and
+  its screen, with nothing overlapping or spilling.
 - Quadrant scenarios read every placement through the axis ends as drawn, so
   an axis that runs high to low passes when every name and point follows it.
   They check each axis's variable and end labels, each quadrant name in the

@@ -1,4 +1,5 @@
 import {
+	isWireframeContainer,
 	parseWireframeDiagram,
 	type WireframeComponent,
 	type WireframeComponentType,
@@ -234,6 +235,52 @@ function candidates(
 	);
 }
 
+/**
+ * What reads as a stated component when nothing of its kind is drawn: a
+ * container's title, drawn at the top of the container, as a stated heading or
+ * text; and two or more adjacent links as a stated nav whose items are their
+ * words in order.
+ */
+function standIns(
+	stated: WireframeScenarioComponent,
+	located: readonly WireframeLocated[],
+): WireframeLocated[] {
+	const standing: WireframeLocated[] = [];
+	const textType = stated.types.find((type) => type === "heading" || type === "text");
+	if (textType)
+		for (const entry of located)
+			if (isWireframeContainer(entry.component) && entry.component.title !== undefined)
+				standing.push({
+					component: { type: textType, text: entry.component.title },
+					screen: entry.screen,
+					ancestors: [entry.component, ...entry.ancestors],
+					order: entry.order + 0.5,
+					parent: entry.component,
+					siblings: entry.component.children ?? [],
+				});
+	if (stated.types.includes("nav")) {
+		const bySiblings = new Map<readonly WireframeComponent[], WireframeLocated[]>();
+		for (const entry of located)
+			bySiblings.set(entry.siblings, [...(bySiblings.get(entry.siblings) ?? []), entry]);
+		for (const entries of bySiblings.values()) {
+			let run: WireframeLocated[] = [];
+			for (const entry of [...entries, undefined]) {
+				if (entry?.component.type === "link" && entry.component.text !== undefined) {
+					run.push(entry);
+					continue;
+				}
+				if (run.length >= 2)
+					standing.push({
+						...run[0]!,
+						component: { type: "nav", items: run.map((link) => link.component.text!) },
+					});
+				run = [];
+			}
+		}
+	}
+	return standing;
+}
+
 function stateHolds(
 	entry: WireframeLocated,
 	state: NonNullable<WireframeScenarioComponent["state"]>,
@@ -340,7 +387,10 @@ export function wireframeScenarioChecks(
 	const presentScreens = new Map([...screenIndex].filter(([, index]) => index >= 0));
 	const matches = new Map<string, WireframeLocated>();
 	for (const stated of components) {
-		const found = candidates(stated, located, presentScreens).toSorted(
+		const drawn = candidates(stated, located, presentScreens);
+		const found = (
+			drawn.length > 0 ? drawn : candidates(stated, standIns(stated, located), presentScreens)
+		).toSorted(
 			(a, b) =>
 				(stated.items
 					? itemOverlap(b.component, stated.items) - itemOverlap(a.component, stated.items)

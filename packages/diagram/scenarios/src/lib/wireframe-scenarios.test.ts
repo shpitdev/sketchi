@@ -43,6 +43,12 @@ function edit(
 		screens: diagram.screens.map((screen) => ({ ...screen, children: visit(screen.children) })),
 	};
 }
+/** A model's spec retained from an eval, as the diagram it decodes to. */
+const fixture = (name: string) =>
+	({
+		...JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8")),
+		type: "wireframe",
+	}) as WireframeDiagram;
 const named = (text: string) => (component: WireframeComponent) =>
 	component.text === text || component.label === text || component.title === text;
 
@@ -521,6 +527,135 @@ describe("prompt-grounded wireframe scenarios", () => {
 		);
 		expect(candidate.error).toBeUndefined();
 		expect(candidate.diagram).toEqual(login);
+	});
+
+	it("reads a container's title as a stated heading when none is drawn", () => {
+		// Sonnet's spec from the dashboard prompt (DT574 k5ci): "Northstar" is the sidebar's own title.
+		const sidebarTitle = fixture("wireframe-sidebar-title-k5ci.json");
+		expect(failed("saas-dashboard-wireframe", sidebarTitle)).toEqual([]);
+		// The title still has to say the stated words, in the stated container.
+		const retitle = (from: string, to: string) => (component: WireframeComponent) =>
+			component.type === from ? { ...component, title: to } : component;
+		expect(
+			failed("saas-dashboard-wireframe", edit(sidebarTitle, retitle("sidebar", "North Star HQ"))),
+		).toEqual(["component:product-name", "inside:product-name"]);
+		const inHeader = edit(
+			edit(sidebarTitle, ({ title, ...component }) =>
+				component.type === "sidebar" ? component : { ...component, ...(title ? { title } : {}) },
+			),
+			retitle("header", "Northstar"),
+		);
+		expect(failed("saas-dashboard-wireframe", inHeader)).toEqual(["inside:product-name"]);
+		// A drawn heading with the words still wins, wherever it sits.
+		const drawnHeading = edit(sidebarTitle, (component) =>
+			component.type === "main"
+				? { ...component, children: [{ type: "text", text: "Northstar" }, ...component.children!] }
+				: component,
+		);
+		expect(failed("saas-dashboard-wireframe", drawnHeading)).toEqual(["inside:product-name"]);
+	});
+
+	it("reads adjacent links in the stated container as the stated nav", () => {
+		// Sonnet's spec from the product page prompt (DT574 gsf2): the header's nav is four links.
+		const headerLinks = fixture("wireframe-header-links-gsf2.json");
+		expect(failed("product-page-wireframe", headerLinks)).toEqual([]);
+		const header = (change: (children: readonly WireframeComponent[]) => WireframeComponent[]) =>
+			edit(headerLinks, (component) =>
+				component.type === "header"
+					? { ...component, children: change(component.children!) }
+					: component,
+			);
+		const link = (text: string): WireframeComponent => ({ type: "link", text });
+		const [store, , , , , search, cart] = headerLinks.screens[0]!.children[0]!.children!;
+		// Reordered, missing or extra items still fail, and so do links split apart.
+		expect(
+			failed(
+				"product-page-wireframe",
+				header(() => [
+					store!,
+					link("Women"),
+					link("Men"),
+					link("Gear"),
+					link("Sale"),
+					search!,
+					cart!,
+				]),
+			),
+		).toEqual(["order:nav"]);
+		expect(
+			failed(
+				"product-page-wireframe",
+				header(() => [store!, link("Men"), link("Women"), link("Gear"), search!, cart!]),
+			),
+		).toEqual(["order:nav", "controls-stated"]);
+		expect(
+			failed(
+				"product-page-wireframe",
+				header(() => [
+					store!,
+					link("Men"),
+					link("Women"),
+					link("Gear"),
+					link("Sale"),
+					cart!,
+					search!,
+				]),
+			),
+		).toEqual(["order:nav", "order:header"]);
+		expect(
+			failed(
+				"product-page-wireframe",
+				header(() => [
+					store!,
+					link("Men"),
+					link("Women"),
+					search!,
+					link("Gear"),
+					link("Sale"),
+					cart!,
+				]),
+			),
+		).toEqual(["order:nav"]);
+		// One link is not a nav.
+		expect(
+			failed(
+				"product-page-wireframe",
+				header(() => [store!, link("Men"), search!, cart!]),
+			),
+		).toEqual(expect.arrayContaining(["component:nav"]));
+		// Links outside the stated container are not its nav.
+		const inMain = edit(headerLinks, (component) =>
+			component.type === "header"
+				? { ...component, children: [store!, search!, cart!] }
+				: component.type === "column" && component.children?.[0]?.type === "heading"
+					? {
+							...component,
+							children: [
+								link("Men"),
+								link("Women"),
+								link("Gear"),
+								link("Sale"),
+								...component.children,
+							],
+						}
+					: component,
+		);
+		expect(failed("product-page-wireframe", inMain)).toEqual(
+			expect.arrayContaining(["inside:nav", "side:header-top"]),
+		);
+		expect(failed("product-page-wireframe", inMain)).not.toContain("order:nav");
+		// Links carry no active item, so a stated active nav item still needs a nav.
+		const sidebarLinks = edit(dashboard, (component) =>
+			component.type === "sidebar"
+				? {
+						...component,
+						children: component.children!.flatMap((child) =>
+							child.type === "nav" ? child.items!.map(link) : [child],
+						),
+					}
+				: component,
+		);
+		expect(failed("saas-dashboard-wireframe", sidebarLinks)).toEqual(["state:nav"]);
 	});
 
 	it("grades a buildWireframe receipt from an MCP execute", () => {

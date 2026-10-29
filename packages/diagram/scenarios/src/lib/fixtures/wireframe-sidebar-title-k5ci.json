@@ -1,0 +1,123 @@
+{
+	"id": "northstar-saas-analytics-dashboard",
+	"title": "Northstar SaaS Analytics Dashboard",
+	"screens": [
+		{
+			"id": "overview",
+			"name": "Overview",
+			"device": "desktop",
+			"children": [
+				{
+					"type": "sidebar",
+					"title": "Northstar",
+					"children": [
+						{
+							"type": "nav",
+							"items": [
+								"Overview",
+								"Customers",
+								"Orders",
+								"Products",
+								"Reports",
+								"Integrations",
+								"Settings"
+							],
+							"active": "Overview"
+						}
+					]
+				},
+				{
+					"type": "header",
+					"children": [
+						{
+							"type": "search",
+							"placeholder": "Search orders, customers or products"
+						},
+						{
+							"type": "avatar"
+						}
+					]
+				},
+				{
+					"type": "main",
+					"children": [
+						{
+							"type": "heading",
+							"text": "Overview",
+							"level": 1
+						},
+						{
+							"type": "row",
+							"children": [
+								{
+									"type": "card",
+									"title": "Monthly recurring revenue",
+									"children": [
+										{
+											"type": "heading",
+											"text": "$48,200",
+											"level": 2
+										}
+									]
+								},
+								{
+									"type": "card",
+									"title": "Active subscriptions",
+									"children": [
+										{
+											"type": "heading",
+											"text": "1,284",
+											"level": 2
+										}
+									]
+								},
+								{
+									"type": "card",
+									"title": "Average revenue per account",
+									"children": [
+										{
+											"type": "heading",
+											"text": "$37.50",
+											"level": 2
+										}
+									]
+								},
+								{
+									"type": "card",
+									"title": "Churn rate this month",
+									"children": [
+										{
+											"type": "heading",
+											"text": "2.1%",
+											"level": 2
+										}
+									]
+								}
+							]
+						},
+						{
+							"type": "section",
+							"title": "Revenue over the last 12 months",
+							"children": [
+								{
+									"type": "chart",
+									"label": "Revenue over the last 12 months"
+								}
+							]
+						},
+						{
+							"type": "section",
+							"title": "Recent orders",
+							"children": [
+								{
+									"type": "table",
+									"columns": ["Order ID", "Customer", "Plan", "Amount", "Status", "Created at"]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

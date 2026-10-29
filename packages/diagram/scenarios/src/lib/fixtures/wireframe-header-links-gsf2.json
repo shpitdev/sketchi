@@ -1,0 +1,138 @@
+{
+	"id": "trailhead-outfitters-product-page",
+	"title": "Trailhead Outfitters Product Page",
+	"screens": [
+		{
+			"id": "product-page",
+			"name": "Product page",
+			"device": "desktop",
+			"children": [
+				{
+					"type": "header",
+					"children": [
+						{
+							"type": "heading",
+							"text": "Trailhead Outfitters",
+							"level": 2
+						},
+						{
+							"type": "link",
+							"text": "Men"
+						},
+						{
+							"type": "link",
+							"text": "Women"
+						},
+						{
+							"type": "link",
+							"text": "Gear"
+						},
+						{
+							"type": "link",
+							"text": "Sale"
+						},
+						{
+							"type": "search",
+							"placeholder": "Search"
+						},
+						{
+							"type": "link",
+							"text": "Cart"
+						}
+					]
+				},
+				{
+					"type": "breadcrumbs",
+					"items": ["Home", "Gear", "Backpacks"]
+				},
+				{
+					"type": "row",
+					"children": [
+						{
+							"type": "column",
+							"children": [
+								{
+									"type": "image"
+								},
+								{
+									"type": "row",
+									"children": [
+										{
+											"type": "image"
+										},
+										{
+											"type": "image"
+										},
+										{
+											"type": "image"
+										},
+										{
+											"type": "image"
+										}
+									]
+								}
+							]
+						},
+						{
+							"type": "column",
+							"children": [
+								{
+									"type": "heading",
+									"text": "Summit 40L Backpack",
+									"level": 1
+								},
+								{
+									"type": "text",
+									"text": "$189"
+								},
+								{
+									"type": "text",
+									"text": "Rated 4.6 from 212 reviews"
+								},
+								{
+									"type": "select",
+									"label": "Color",
+									"value": "Slate"
+								},
+								{
+									"type": "select",
+									"label": "Size",
+									"value": "M/L"
+								},
+								{
+									"type": "input",
+									"label": "Quantity",
+									"value": "1"
+								},
+								{
+									"type": "button",
+									"text": "Add to cart",
+									"variant": "primary"
+								},
+								{
+									"type": "button",
+									"text": "Save to wishlist",
+									"variant": "secondary"
+								}
+							]
+						}
+					]
+				},
+				{
+					"type": "section",
+					"title": "Customer reviews",
+					"children": [
+						{
+							"type": "list",
+							"items": [
+								"Fits a weekend's gear",
+								"Hip belt could be wider",
+								"Survived a week of rain"
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}
