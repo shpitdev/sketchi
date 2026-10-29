@@ -63,6 +63,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			edgeCount: diagram.relationships.length,
 			edgeNoun: "relationships",
 		};
+	if (diagram.type === "sankey")
+		return {
+			nodeCount: diagram.nodes.length,
+			nodeNoun: "nodes",
+			edgeCount: diagram.links.length,
+			edgeNoun: "flows",
+		};
 	if (diagram.type === "org-chart")
 		return {
 			nodeCount: diagram.people.length,

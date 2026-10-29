@@ -104,6 +104,14 @@ and the eval harness use it.
   persona its step names. The drawn scene must show every stage header, card,
   note and face, each face at its score's height in its step's column with the
   matching expression and the curve through them, nothing overlapping.
+- Sankey scenarios check every stated node by label, every stated flow from
+  its source into its target with its exact value (the same amount in another
+  accepted unit passes), the unit, and no unstated node or flow. A drop-off the
+  prompt does not pin down passes as one shared node or one per stage. The
+  drawn scene must show every bar with its label and total and every band
+  between its bars with its value, widths in proportion apart from the 3 px
+  floor, with no label overlapping and crossings no worse than the authored
+  order's.
 
 Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model

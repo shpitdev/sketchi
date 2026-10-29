@@ -10,6 +10,7 @@ import { type ClassScenario, classScenarios } from "./class-scenarios.js";
 import { type OrgChartScenario, orgChartScenarios } from "./org-chart-scenarios.js";
 import { type VennScenario, vennScenarios } from "./venn-scenarios.js";
 import { type JourneyScenario, journeyScenarios } from "./journey-scenarios.js";
+import { type SankeyScenario, sankeyScenarios } from "./sankey-scenarios.js";
 
 /** A maintained scenario of any canonical family, discriminated by `diagramType`. */
 export type DiagramScenario =
@@ -24,7 +25,8 @@ export type DiagramScenario =
 	| ClassScenario
 	| OrgChartScenario
 	| VennScenario
-	| JourneyScenario;
+	| JourneyScenario
+	| SankeyScenario;
 
 export const diagramScenarios: readonly DiagramScenario[] = [
 	...flowchartScenarios,
@@ -39,6 +41,7 @@ export const diagramScenarios: readonly DiagramScenario[] = [
 	...orgChartScenarios,
 	...vennScenarios,
 	...journeyScenarios,
+	...sankeyScenarios,
 ];
 
 export function getDiagramScenario(id: string): DiagramScenario {

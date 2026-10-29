@@ -62,7 +62,9 @@ export function buildResultFromMcp(
 												? "buildVennDiagram"
 												: diagramType === "journey"
 													? "buildJourneyMap"
-													: "buildFlowchart";
+													: diagramType === "sankey"
+														? "buildSankey"
+														: "buildFlowchart";
 	const receipts = Array.isArray(value.builds)
 		? value.builds.filter(
 				(build): build is Record<string, unknown> =>
@@ -92,8 +94,10 @@ export function buildResultFromMcp(
 					"buildErDiagram",
 					"buildClassDiagram",
 					"buildOrgChart",
+					"buildOrgChart",
 					"buildVennDiagram",
 					"buildJourneyMap",
+					"buildSankey",
 					"createCanvas",
 				].includes(returned.operation)))
 	)
@@ -193,6 +197,7 @@ const operationFamilies: Readonly<Record<string, string>> = {
 	buildOrgChart: "org-chart",
 	buildVennDiagram: "venn",
 	buildJourneyMap: "journey",
+	buildSankey: "sankey",
 	createCanvas: "canvas",
 };
 
@@ -311,7 +316,8 @@ export function candidateFromMcpResult(
 							  diagramType === "class" ||
 							  diagramType === "org-chart" ||
 							  diagramType === "venn" ||
-							  diagramType === "journey"
+							  diagramType === "journey" ||
+							  diagramType === "sankey"
 							? { ...build.normalizedSpec, type: diagramType }
 							: diagramType === "mindmap"
 								? specToMindmapCandidate(build.normalizedSpec)

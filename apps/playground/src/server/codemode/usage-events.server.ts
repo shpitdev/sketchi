@@ -43,6 +43,7 @@ export type CodeModeUsageOperation =
 	| "buildOrgChart"
 	| "buildVennDiagram"
 	| "buildJourneyMap"
+	| "buildSankey"
 	| "createCanvas"
 	| "execute"
 	| "generateDiagram";

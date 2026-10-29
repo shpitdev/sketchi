@@ -97,6 +97,13 @@ import {
 	StudioBuildJourneyMapInputSchema,
 	StudioBuildJourneyMapOutputSchema,
 } from "./studio-journey-tool.server";
+import {
+	makeStudioSankeyToolExecutor,
+	STUDIO_BUILD_SANKEY_TOOL_DESCRIPTION,
+	STUDIO_BUILD_SANKEY_TOOL_NAME,
+	StudioBuildSankeyInputSchema,
+	StudioBuildSankeyOutputSchema,
+} from "./studio-sankey-tool.server";
 
 export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
 	"StudioAgentRequestError",
@@ -221,6 +228,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	const journeyExecutor = yield* makeStudioJourneyMapToolExecutor(codeMode.buildJourneyMap, {
 		turn,
 	});
+	const sankeyExecutor = yield* makeStudioSankeyToolExecutor(codeMode.buildSankey, { turn });
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -287,6 +295,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildJourneyMapInputSchema,
 						outputSchema: StudioBuildJourneyMapOutputSchema,
 						execute: makeStudioBuildToolCallback(journeyExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_SANKEY_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_SANKEY_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildSankeyInputSchema,
+						outputSchema: StudioBuildSankeyOutputSchema,
+						execute: makeStudioBuildToolCallback(sankeyExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,

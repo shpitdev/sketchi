@@ -22,6 +22,8 @@ import {
 	ClassToolSpecSchema,
 	BuildOrgChartRequestSchema,
 	BuildOrgChartResultSchema,
+	BuildSankeyRequestSchema,
+	BuildSankeyResultSchema,
 	OrgChartToolSpecSchema,
 	BuildVennDiagramRequestSchema,
 	BuildVennDiagramResultSchema,
@@ -29,6 +31,7 @@ import {
 	BuildJourneyMapRequestSchema,
 	BuildJourneyMapResultSchema,
 	JourneyToolSpecSchema,
+	SankeyToolSpecSchema,
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
@@ -185,6 +188,14 @@ export const codeModeContracts = {
 			spec: JourneyToolSpecSchema,
 		}),
 		output: BuildJourneyMapResultSchema,
+	},
+	buildSankey: {
+		input: Schema.Struct({
+			...BuildSankeyRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: SankeyToolSpecSchema,
+		}),
+		output: BuildSankeyResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

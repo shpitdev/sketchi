@@ -211,6 +211,13 @@ const JOURNEY_ISSUE_CODE_ADDITIONS = new Set([
 	"invalid_journey_stage",
 	"invalid_journey_step",
 ]);
+// Sankey diagrams add four issue codes.
+const SANKEY_ISSUE_CODE_ADDITIONS = new Set([
+	"sankey_too_large",
+	"invalid_sankey_node",
+	"invalid_sankey_flow",
+	"sankey_cycle",
+]);
 const CANVAS_ARROWHEAD_ADDITIONS = new Set([
 	"crowfoot_one",
 	"crowfoot_many",
@@ -353,6 +360,7 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		ORG_CHART_ISSUE_CODE_ADDITIONS.has(value) ||
 		VENN_ISSUE_CODE_ADDITIONS.has(value) ||
 		JOURNEY_ISSUE_CODE_ADDITIONS.has(value) ||
+		SANKEY_ISSUE_CODE_ADDITIONS.has(value) ||
 		// MCP best-effort PNG delivery (#499) adds one warning; frozen APIs remain strict.
 		value === "png_unavailable" ||
 		// MCP logo fill reports icon_filled with a new info severity.
@@ -1788,6 +1796,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!ORG_CHART_ISSUE_CODE_ADDITIONS.has(code) &&
 						!VENN_ISSUE_CODE_ADDITIONS.has(code) &&
 						!JOURNEY_ISSUE_CODE_ADDITIONS.has(code) &&
+						!SANKEY_ISSUE_CODE_ADDITIONS.has(code) &&
 						code !== "png_unavailable",
 				)
 				.toSorted(),

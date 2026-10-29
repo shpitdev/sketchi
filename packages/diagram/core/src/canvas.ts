@@ -364,8 +364,9 @@ export interface CanvasIconAsset {
  * band) and optional-end rings, class boxes (a class's outline, name band
  * and methods compartment), swimlanes (a lane's band and its header),
  * architecture zones (a region, VPC, subnet or cluster outline), Venn
- * sets (a set's translucent fill and its outline), and a journey map's
- * faces (a face and its eyes on the experience curve).
+ * sets (a set's translucent fill and its outline), a journey map's faces
+ * (a face and its eyes on the experience curve), and Sankey marks (a node's
+ * bar and each flow's band).
  * Only a zone carries an icon, drawn in its header, and only a table's or a
  * class's name band and a lane's header carry a bound label.
  */
@@ -384,6 +385,7 @@ export const CANVAS_RENDERER_ROLES = [
 	"swimlane-header",
 	"venn-set",
 	"journey-mark",
+	"sankey-mark",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
@@ -406,13 +408,14 @@ export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 ];
 
 /**
- * Roles whose rectangles keep square corners: chart and Gantt bars, so their
- * ends sit exactly at their values and dates; a table's or class's outline and
- * name band, so the band fills its top; and lanes and zones, so neighbors share
- * one boundary.
+ * Roles whose rectangles keep square corners: chart, Gantt and Sankey bars, so
+ * their ends sit exactly at their values and dates and bands meet them flush; a
+ * table's or class's outline and name band, so the band fills its top; and
+ * lanes and zones, so neighbors share one boundary.
  */
 const SQUARE_CORNER_ROLES: ReadonlySet<CanvasRendererRole> = new Set([
 	"chart-mark",
+	"sankey-mark",
 	"gantt-mark",
 	"er-table",
 	"class-box",
@@ -461,6 +464,7 @@ const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"swimlane-header": "Swimlane header",
 	"timeline-marker": "Timeline marker",
 	"venn-set": "Venn set",
+	"sankey-mark": "Sankey mark",
 	zone: "Zone",
 };
 

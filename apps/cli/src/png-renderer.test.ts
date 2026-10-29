@@ -166,6 +166,39 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		}),
 	);
 
+	it.effect("exports a Sankey diagram whose bands are filled outlines", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "sankey",
+					spec: {
+						title: "Cloud budget",
+						unit: "$k",
+						nodes: [
+							{ id: "eng", label: "Engineering" },
+							{ id: "compute", label: "Compute" },
+							{ id: "storage", label: "Storage" },
+						],
+						links: [
+							{ source: "eng", target: "compute", value: 310 },
+							{ source: "eng", target: "storage", value: 2 },
+						],
+					},
+				}),
+			);
+			const bands = built.excalidraw.elements.filter((element) =>
+				JSON.stringify(element["customData"] ?? null).includes('"polygon"'),
+			);
+			assert.lengthOf(bands, 2);
+			assert.isTrue(built.scene.elements.some((element) => element.id === "sankey:title"));
+			const png = yield* renderer.renderPng({ scene: built.scene, excalidraw: built.excalidraw });
+			assert.isAbove(png.byteLength, 1_000);
+			assertInkHasPadding(png);
+		}),
+	);
+
 	it.effect("exports an org chart whose reporting lines share their manager's bus", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

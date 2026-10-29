@@ -518,6 +518,19 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			},
 		],
 		[
+			"buildSankey",
+			{
+				spec: {
+					title: "Budget",
+					nodes: [
+						{ id: "eng", label: "Engineering" },
+						{ id: "compute", label: "Compute" },
+					],
+					links: [{ source: "eng", target: "compute", value: 10 }],
+				},
+			},
+		],
+		[
 			"createCanvas",
 			{
 				spec: {
@@ -1162,6 +1175,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toMatch(/^- buildOrgChart: .*manager is the id they report to/m);
 			expect(codeDescription).toMatch(/^- buildVennDiagram: .*A region lies in exactly its sets/m);
 			expect(codeDescription).toMatch(/^- buildJourneyMap: .*3 is neutral/m);
+			expect(codeDescription).toMatch(/^- buildSankey: .*value is the stated amount/m);
 			// The head retains builder names; summaries ride on the code parameter. Nested zones
 			// and infrastructure shapes add three spec fields and their shape and logo rules. Venn
 			// diagrams add a builder name, a summary and one compact line.
@@ -1173,7 +1187,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(14_300);
+			).toBeLessThan(14_600);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

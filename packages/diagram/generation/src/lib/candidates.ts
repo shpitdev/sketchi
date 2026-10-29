@@ -22,6 +22,10 @@ import {
 	JourneyValidationError,
 	resolveJourneyShorthand,
 	validateJourneyDiagram,
+	SankeyDiagramSchema,
+	SankeyValidationError,
+	resolveSankeyShorthand,
+	validateSankeyDiagram,
 	resolveClassShorthand,
 	resolveErShorthand,
 	validateClassDiagram,
@@ -408,7 +412,8 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof ClassValidationError ||
 		error instanceof OrgChartValidationError ||
 		error instanceof VennValidationError ||
-		error instanceof JourneyValidationError
+		error instanceof JourneyValidationError ||
+		error instanceof SankeyValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
@@ -431,7 +436,9 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 												? "venn"
 												: error instanceof JourneyValidationError
 													? "journey"
-													: "sequence";
+													: error instanceof SankeyValidationError
+														? "sankey"
+														: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -593,6 +600,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 				ClassDiagramSchema,
 				normalizeGeneratedClassInput(titledDiagram),
 				validateClassDiagram,
+				intent,
+			),
+		sankey: () =>
+			decodeAndValidate(
+				SankeyDiagramSchema,
+				resolveSankeyShorthand(withSketchiDiagramStyle(titledDiagram)),
+				validateSankeyDiagram,
 				intent,
 			),
 		"org-chart": () =>
@@ -800,6 +814,8 @@ function labelsForRequirement(
 			]);
 		return undefined;
 	}
+	if (diagram.type === "sankey")
+		return requirement.target === "node" ? diagram.nodes.map((node) => node.label) : undefined;
 	if (diagram.type === "org-chart")
 		return requirement.target === "person"
 			? diagram.people.map((person) => person.name)
@@ -882,6 +898,12 @@ function countForRequirement(
 		return target === "tasks"
 			? diagram.stages.reduce((total, stage) => total + stage.steps.length, 0)
 			: undefined;
+	if (diagram.type === "sankey")
+		return target === "nodes"
+			? diagram.nodes.length
+			: target === "links"
+				? diagram.links.length
+				: undefined;
 	if (diagram.type === "er")
 		return target === "entities"
 			? diagram.entities.length

@@ -43,7 +43,8 @@ type StudioBuildOperation =
 	| "buildClassDiagram"
 	| "buildOrgChart"
 	| "buildVennDiagram"
-	| "buildJourneyMap";
+	| "buildJourneyMap"
+	| "buildSankey";
 
 /**
  * One agent turn's build budget, shared by every Studio build tool: one

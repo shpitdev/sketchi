@@ -17,6 +17,8 @@ import {
 	BuildVennDiagramToolInputSchema,
 	BuildJourneyMapResultSchema,
 	BuildJourneyMapToolInputSchema,
+	BuildSankeyResultSchema,
+	BuildSankeyToolInputSchema,
 	BuildTimelineResultSchema,
 	BuildTimelineToolInputSchema,
 	BuildChartResultSchema,
@@ -32,6 +34,7 @@ import {
 	type BuildOrgChartResult,
 	type BuildVennDiagramResult,
 	type BuildJourneyMapResult,
+	type BuildSankeyResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagram-agent";
@@ -54,7 +57,8 @@ export type StudioBuildResult =
 	| BuildClassDiagramResult
 	| BuildOrgChartResult
 	| BuildVennDiagramResult
-	| BuildJourneyMapResult;
+	| BuildJourneyMapResult
+	| BuildSankeyResult;
 
 const BUILD_TOOLS = {
 	"tool-build_chart": {
@@ -168,6 +172,14 @@ const BUILD_TOOLS = {
 				: [];
 		},
 	},
+	"tool-build_sankey": {
+		family: "sankey",
+		decodeResult: Schema.decodeUnknownResult(BuildSankeyResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildSankeyToolInputSchema)(input);
+			return Result.isSuccess(decoded) ? decoded.success.spec.nodes.map((node) => node.label) : [];
+		},
+	},
 } as const;
 
 export type DiagramToolPartType = keyof typeof BUILD_TOOLS;
@@ -202,6 +214,7 @@ const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 	"org-chart": "org chart",
 	venn: "Venn diagram",
 	journey: "journey map",
+	sankey: "Sankey diagram",
 };
 
 /**

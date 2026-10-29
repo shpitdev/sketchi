@@ -37,3 +37,5 @@ export * from "./types/venn.js";
 export * from "./venn-fixtures.js";
 export * from "./types/journey.js";
 export * from "./journey-fixtures.js";
+export * from "./types/sankey.js";
+export * from "./sankey-fixtures.js";

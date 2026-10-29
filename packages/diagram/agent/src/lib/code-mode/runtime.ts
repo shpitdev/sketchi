@@ -26,6 +26,8 @@ import {
 	resolveVennShorthand,
 	getJourneyValidationIssues,
 	resolveJourneyShorthand,
+	getSankeyValidationIssues,
+	resolveSankeyShorthand,
 	getTimelineValidationIssues,
 	getChartValidationIssues,
 	getGanttValidationIssues,
@@ -57,6 +59,8 @@ import {
 	type VennValidationIssueCode,
 	type JourneyDiagram,
 	type JourneyValidationIssueCode,
+	type SankeyDiagram,
+	type SankeyValidationIssueCode,
 } from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
@@ -78,6 +82,9 @@ import {
 	isStructurallyValidVennSet,
 	renderJourneyDiagram,
 	isStructurallyValidJourneyMark,
+	renderSankeyDiagram,
+	isStructurallyValidSankeyMark,
+	sankeyLayoutIssues,
 	renderTimelineDiagram,
 	renderChartDiagram,
 	renderGanttDiagram,
@@ -120,6 +127,7 @@ import {
 	BuildOrgChartRejected,
 	BuildVennDiagramRejected,
 	BuildJourneyMapRejected,
+	BuildSankeyRejected,
 	BuildTimelineRejected,
 	BuildChartRejected,
 	BuildGanttRejected,
@@ -136,6 +144,7 @@ import {
 	BuildOrgChartRequestSchema,
 	BuildVennDiagramRequestSchema,
 	BuildJourneyMapRequestSchema,
+	BuildSankeyRequestSchema,
 	BuildTimelineRequestSchema,
 	BuildChartRequestSchema,
 	BuildGanttRequestSchema,
@@ -161,6 +170,7 @@ import {
 	type BuildOrgChartRequest,
 	type BuildVennDiagramRequest,
 	type BuildJourneyMapRequest,
+	type BuildSankeyRequest,
 	type BuildTimelineRequest,
 	type BuildChartRequest,
 	type BuildGanttRequest,
@@ -171,6 +181,7 @@ import {
 	type BuildOrgChartResult,
 	type BuildVennDiagramResult,
 	type BuildJourneyMapResult,
+	type BuildSankeyResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type BuildGanttResult,
@@ -195,6 +206,7 @@ import {
 	type NormalizedOrgChartSpec,
 	type NormalizedVennSpec,
 	type NormalizedJourneySpec,
+	type NormalizedSankeySpec,
 	type NormalizedTimelineSpec,
 	type NormalizedChartSpec,
 	type NormalizedGanttSpec,
@@ -301,6 +313,7 @@ type CodeModeBoundaryOperation =
 	| "buildOrgChart"
 	| "buildVennDiagram"
 	| "buildJourneyMap"
+	| "buildSankey"
 	| "buildTimeline"
 	| "buildChart"
 	| "buildGantt"
@@ -342,6 +355,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	if (operation === "buildOrgChart") return "org-chart";
 	if (operation === "buildVennDiagram") return "venn";
 	if (operation === "buildJourneyMap") return "journey";
+	if (operation === "buildSankey") return "sankey";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
 	return undefined;
@@ -1175,6 +1189,77 @@ function orgChartQuality(spec: NormalizedOrgChartSpec, threshold: number): Quali
 	};
 }
 
+function normalizeSankeySpec(spec: BuildSankeyRequest["spec"]): NormalizedSankeySpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-sankey"),
+		title,
+		nodes: spec.nodes.map((node) => ({
+			id: cleanToolString(node.id),
+			label: cleanToolString(node.label),
+			...(node.color ? { color: node.color } : {}),
+		})),
+		links: spec.links.map((link) => ({
+			source: cleanToolString(link.source),
+			target: cleanToolString(link.target),
+			value: link.value,
+			...optional("label", link.label),
+		})),
+		...optional("unit", spec.unit),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toSankeyDiagram(spec: NormalizedSankeySpec): SankeyDiagram {
+	return { ...spec, type: "sankey" };
+}
+
+/** Code Mode's published issue codes for diagram-core's Sankey invariants. */
+const SANKEY_ISSUE_CODES = {
+	sankey_too_large: "sankey_too_large",
+	invalid_sankey_node_id: "invalid_sankey_node",
+	duplicate_sankey_node_id: "duplicate_node_id",
+	sankey_text_too_long: "label_too_long",
+	unknown_sankey_node: "invalid_sankey_flow",
+	sankey_self_link: "self_loop",
+	duplicate_sankey_link: "invalid_sankey_flow",
+	invalid_sankey_value: "invalid_sankey_flow",
+	sankey_cycle: "sankey_cycle",
+	unlinked_sankey_node: "invalid_sankey_node",
+	blank_sankey_label: "missing_field",
+} as const satisfies Record<SankeyValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedSankey(spec: NormalizedSankeySpec): CodeModeIssue[] {
+	return getSankeyValidationIssues(toSankeyDiagram(spec)).map((entry) =>
+		issue({
+			code: SANKEY_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function sankeyQuality(spec: NormalizedSankeySpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.nodes.length, edgeCount: spec.links.length },
+		checks: [],
+	};
+}
+
+/** Read flows, from/to and amount aliases and nodes named only by links before the request is decoded. */
+function resolveSankeyRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveSankeyShorthand(input.spec) };
+}
+
 /** Read manager, title and department aliases and dotted lines written on a person before the request is decoded. */
 function resolveOrgChartRequest(input: unknown): unknown {
 	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
@@ -1478,6 +1563,15 @@ const BuildJourneyMapFailure = workflowFailure(
 	"BuildJourneyMapFailure",
 	BuildJourneyMapRejected.fields.status,
 	BuildJourneyMapRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildSankeyFailure = workflowFailure(
+	"BuildSankeyFailure",
+	BuildSankeyRejected.fields.status,
+	BuildSankeyRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -2074,6 +2168,7 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				(element.rendererRole === "er-optional" && isStructurallyValidErOptional(element)) ||
 				(element.rendererRole === "class-box" && isStructurallyValidClassBox(element)) ||
 				(element.rendererRole === "venn-set" && isStructurallyValidVennSet(element)) ||
+				(element.rendererRole === "sankey-mark" && isStructurallyValidSankeyMark(element)) ||
 				((element.rendererRole === "swimlane" || element.rendererRole === "swimlane-header") &&
 					element.shape === "rectangle" &&
 					!element.icon) ||
@@ -3973,6 +4068,139 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 	} satisfies Extract<BuildJourneyMapResult, { ok: true }>;
 });
 
+const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function* (input: unknown) {
+	const parsed = Schema.decodeUnknownResult(BuildSankeyRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(resolveSankeyRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildSankeyFailure({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeSankeySpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedSankey(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* new BuildSankeyFailure({
+			status: "invalid_sankey",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = sankeyQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* new BuildSankeyFailure({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* Effect.try({
+		try: () => renderSankeyDiagram(toSankeyDiagram(normalizedSpec)),
+		catch: (cause) =>
+			new BuildSankeyFailure({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render Sankey scene.",
+							hint: "Repair the nodes and links and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildSankey.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* new BuildSankeyFailure({
+			status: "render_failed",
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten labels, or split the flows into smaller diagrams, and retry buildSankey.",
+				})),
+			},
+		});
+	}
+	// A layout whose labels still overlap after the renderer's reflow does not read.
+	const layoutIssues = sankeyLayoutIssues(scene);
+	if (layoutIssues.length > 0) {
+		const message = `${layoutIssues.length} labels, values or leaders would overlap another label or cover another flow, so the diagram would not read.`;
+		return yield* new BuildSankeyFailure({
+			status: "quality_failed",
+			context: {
+				...baseContext,
+				quality: {
+					...quality,
+					accepted: false,
+					score: 0,
+					checks: [{ code: "sankey_layout", passed: false, severity: "error", message, refs: [] }],
+				},
+				issues: [
+					issue({
+						code: "quality_below_threshold",
+						stage: "quality",
+						ref: { kind: "diagram", id: normalizedSpec.id },
+						message,
+						hint: "Shorten node and link labels or leave link labels out, or split the flows into smaller diagrams, then call buildSankey again.",
+					}),
+				],
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new BuildSankeyFailure({
+					status: error.status,
+					context: {
+						...(error.status === "export_failed" ? exportContext : qualityContext),
+						issues: error.issues,
+					},
+				}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildSankeyResult, { ok: true }>;
+});
+
 const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
 	input: unknown,
 ) {
@@ -5000,6 +5228,13 @@ export const buildVennDiagram: (input: unknown) => CodeModeWorkflowEffect<BuildV
 /** A user journey map: stages of steps scored for sentiment, with pain points and opportunities. */
 export const buildJourneyMap: (input: unknown) => CodeModeWorkflowEffect<BuildJourneyMapResult> =
 	boundary("buildJourneyMap", buildJourneyMapWorkflow, failureResult);
+
+/** A Sankey diagram: nodes and the weighted flows between them. */
+export const buildSankey: (input: unknown) => CodeModeWorkflowEffect<BuildSankeyResult> = boundary(
+	"buildSankey",
+	buildSankeyWorkflow,
+	failureResult,
+);
 
 export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTimelineResult> =
 	boundary("buildTimeline", buildTimelineWorkflow, failureResult);

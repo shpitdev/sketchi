@@ -92,6 +92,7 @@ function resultSummary(result: StudioBuildResult): {
 			connectionCount: spec.regions.length,
 			itemCount: spec.regions.reduce((sum, region) => sum + (region.items?.length ?? 0), 0),
 		};
+	if ("links" in spec) return { connectionCount: spec.links.length, itemCount: spec.nodes.length };
 	if ("people" in spec)
 		return {
 			connectionCount:
@@ -182,6 +183,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 		case "invalid_org_chart":
 		case "invalid_venn_diagram":
 		case "invalid_journey":
+		case "invalid_sankey":
 			return {
 				message: "This draft needs a clearer structure before it can be drawn.",
 				hint: "Clarify the steps or simplify the connections, then try again.",

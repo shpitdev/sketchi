@@ -14,6 +14,7 @@ import {
 	type BuildOrgChartResult,
 	type BuildVennDiagramResult,
 	type BuildJourneyMapResult,
+	type BuildSankeyResult,
 	type BuildTimelineResult,
 	ClassSpec,
 	ErSpec,
@@ -28,6 +29,7 @@ import {
 	OrgChartSpec,
 	VennSpec,
 	JourneySpec,
+	SankeySpec,
 } from "./contract.js";
 import type { CodeModeArtifactStorage } from "./artifacts.js";
 import {
@@ -40,6 +42,7 @@ import {
 	buildOrgChart,
 	buildVennDiagram,
 	buildJourneyMap,
+	buildSankey,
 	buildTimeline,
 	buildChart,
 	buildGantt,
@@ -63,6 +66,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	"org-chart": OrgChartSpec,
 	venn: VennSpec,
 	journey: JourneySpec,
+	sankey: SankeySpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -85,7 +89,8 @@ export type CanonicalBuildResult =
 	| BuildClassDiagramResult
 	| BuildOrgChartResult
 	| BuildVennDiagramResult
-	| BuildJourneyMapResult;
+	| BuildJourneyMapResult
+	| BuildSankeyResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -126,6 +131,8 @@ export function buildCanonicalDocument(
 			return buildVennDiagram(request);
 		case "journey":
 			return buildJourneyMap(request);
+		case "sankey":
+			return buildSankey(request);
 	}
 }
 
@@ -286,6 +293,18 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 						})),
 					})),
 					relationships: diagram.relationships.map((relationship) => ({ ...relationship })),
+					style: diagram.style,
+				},
+			};
+		case "sankey":
+			return {
+				type: "sankey",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					nodes: diagram.nodes.map((node) => ({ ...node })),
+					links: diagram.links.map((link) => ({ ...link })),
+					...(diagram.unit === undefined ? {} : { unit: diagram.unit }),
 					style: diagram.style,
 				},
 			};

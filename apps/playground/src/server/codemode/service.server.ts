@@ -12,6 +12,7 @@ import {
 	buildOrgChart,
 	buildVennDiagram,
 	buildJourneyMap,
+	buildSankey,
 	buildTimeline,
 	buildChart,
 	CodeModeArtifactStorage,
@@ -33,6 +34,7 @@ import {
 	type BuildOrgChartResult,
 	type BuildVennDiagramResult,
 	type BuildJourneyMapResult,
+	type BuildSankeyResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CodeModeArtifactStorageError,
@@ -100,6 +102,9 @@ export interface PlaygroundCodeModeShape {
 	readonly buildJourneyMap: (
 		input: unknown,
 	) => Effect.Effect<BuildJourneyMapResult, never, CodeModeRequestContext>;
+	readonly buildSankey: (
+		input: unknown,
+	) => Effect.Effect<BuildSankeyResult, never, CodeModeRequestContext>;
 	readonly createCanvas: (
 		input: unknown,
 	) => Effect.Effect<CreateCanvasResult, never, CodeModeRequestContext>;
@@ -264,6 +269,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
 			),
 			buildJourneyMap: Effect.fn("playground.codeMode.buildJourneyMap")((input) =>
 				provideRequestCodeMode(buildJourneyMap(input)),
+			),
+			buildSankey: Effect.fn("playground.codeMode.buildSankey")((input) =>
+				provideRequestCodeMode(buildSankey(input)),
 			),
 			createCanvas: Effect.fn("playground.codeMode.createCanvas")((input) =>
 				provideRequestCodeMode(createCanvas(input)),

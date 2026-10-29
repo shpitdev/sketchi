@@ -451,6 +451,10 @@ export const CODE_MODE_ISSUE_CODES = [
 	"journey_too_large",
 	"invalid_journey_stage",
 	"invalid_journey_step",
+	"sankey_too_large",
+	"invalid_sankey_node",
+	"invalid_sankey_flow",
+	"sankey_cycle",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -1172,6 +1176,43 @@ export class JourneySpec extends Schema.Class<JourneySpec>("JourneySpec")(
 ) {}
 export const JourneySpecSchema = JourneySpec;
 
+/**
+ * The authoring form of diagram-core's canonical SankeyDiagram: the id is
+ * optional and style is defaulted. buildSankey normalizes it into the core
+ * contract, which owns every invariant.
+ */
+export class SankeyNodeSpec extends Schema.Class<SankeyNodeSpec>("SankeyNodeSpec")(
+	{
+		id: RequiredNonEmptyString,
+		label: RequiredNonEmptyString,
+		color: optionalContract(HexColor),
+	},
+	{ identifier: undefined },
+) {}
+
+export class SankeyLinkSpec extends Schema.Class<SankeyLinkSpec>("SankeyLinkSpec")(
+	{
+		source: RequiredNonEmptyString,
+		target: RequiredNonEmptyString,
+		value: FiniteNumber,
+		label: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+export class SankeySpec extends Schema.Class<SankeySpec>("SankeySpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		nodes: requiredArray(nonEmptyArray(SankeyNodeSpec)),
+		links: requiredArray(nonEmptyArray(SankeyLinkSpec)),
+		unit: optionalContract(NonEmptyString),
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const SankeySpecSchema = SankeySpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -1468,6 +1509,22 @@ export const BuildJourneyMapToolInputSchema = Schema.Struct({
 	spec: requiredObject(JourneyToolSpecSchema),
 });
 export type BuildJourneyMapToolInput = typeof BuildJourneyMapToolInputSchema.Type;
+export class BuildSankeyRequest extends Schema.Class<BuildSankeyRequest>("BuildSankeyRequest")(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(SankeySpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildSankeyRequestSchema = BuildSankeyRequest;
+/** The Sankey spec a model authors; style is always the Sketchi palette. */
+export const SankeyToolSpecSchema = SankeySpec.mapFields(({ style: _style, ...fields }) => fields);
+export const BuildSankeyToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(SankeyToolSpecSchema),
+});
+export type BuildSankeyToolInput = typeof BuildSankeyToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -2315,6 +2372,15 @@ const NormalizedJourneySpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedJourneySpec = typeof NormalizedJourneySpecSchema.Type;
+const NormalizedSankeySpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	nodes: Schema.Array(SankeyNodeSpec).pipe(Schema.mutable),
+	links: Schema.Array(SankeyLinkSpec).pipe(Schema.mutable),
+	unit: optionalContract(NonEmptyString),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedSankeySpec = typeof NormalizedSankeySpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -2856,6 +2922,42 @@ export const BuildJourneyMapResultSchema = Schema.Union([
 	BuildJourneyMapRejected,
 ]);
 export type BuildJourneyMapResult = typeof BuildJourneyMapResultSchema.Type;
+
+export class BuildSankeyAccepted extends Schema.Class<BuildSankeyAccepted>("BuildSankeyAccepted")(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedSankeySpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildSankeyRejected extends Schema.Class<BuildSankeyRejected>("BuildSankeyRejected")(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_sankey",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedSankeySpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildSankeyResultSchema = Schema.Union([BuildSankeyAccepted, BuildSankeyRejected]);
+export type BuildSankeyResult = typeof BuildSankeyResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{

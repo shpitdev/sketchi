@@ -28,3 +28,13 @@ export * from "./chart-readout.js";
 export * from "./gantt.js";
 export * from "./gantt-scale.js";
 export * from "./gantt-readout.js";
+export * from "./sankey.js";
+export * from "./sankey-readout.js";
+export type { SankeyLayout } from "./sankey-layout.js";
+export {
+	layoutSankeyDiagram,
+	SANKEY_MIN_BAND,
+	SANKEY_SINK_COLOR,
+	sankeyFlowText,
+	sankeyNodeText,
+} from "./sankey-layout.js";

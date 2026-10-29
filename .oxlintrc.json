@@ -295,7 +295,8 @@
 				"packages/diagram/core/src/types/class.ts",
 				"packages/diagram/core/src/types/org-chart.ts",
 				"packages/diagram/core/src/types/venn.ts",
-				"packages/diagram/core/src/types/journey.ts"
+				"packages/diagram/core/src/types/journey.ts",
+				"packages/diagram/core/src/types/sankey.ts"
 			],
 			"rules": {
 				"eslint/no-restricted-imports": [

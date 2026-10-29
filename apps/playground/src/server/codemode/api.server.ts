@@ -12,6 +12,7 @@ import {
 	type BuildOrgChartResult,
 	type BuildVennDiagramResult,
 	type BuildJourneyMapResult,
+	type BuildSankeyResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CreateCanvasResult,
@@ -67,6 +68,7 @@ function requestTooLargeResult(
 		| "Org chart"
 		| "Venn diagram"
 		| "Journey map"
+		| "Sankey diagram"
 		| "Artifact patch",
 ) {
 	return {
@@ -196,6 +198,7 @@ type BuildResult =
 	| BuildOrgChartResult
 	| BuildVennDiagramResult
 	| BuildJourneyMapResult
+	| BuildSankeyResult
 	| CreateCanvasResult;
 
 type BuildOperation =
@@ -211,6 +214,7 @@ type BuildOperation =
 	| "buildOrgChart"
 	| "buildVennDiagram"
 	| "buildJourneyMap"
+	| "buildSankey"
 	| "createCanvas";
 
 function makeBuildHandler({
@@ -232,6 +236,7 @@ function makeBuildHandler({
 		| "Org chart"
 		| "Venn diagram"
 		| "Journey map"
+		| "Sankey diagram"
 		| "Canvas";
 	readonly run: (
 		codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
@@ -338,6 +343,11 @@ export const handleBuildJourneyMapRequest = makeBuildHandler({
 	operation: "buildJourneyMap",
 	label: "Journey map",
 	run: (codeMode, input) => codeMode.buildJourneyMap(input),
+});
+export const handleBuildSankeyRequest = makeBuildHandler({
+	operation: "buildSankey",
+	label: "Sankey diagram",
+	run: (codeMode, input) => codeMode.buildSankey(input),
 });
 export const handleCreateCanvasRequest = makeBuildHandler({
 	operation: "createCanvas",

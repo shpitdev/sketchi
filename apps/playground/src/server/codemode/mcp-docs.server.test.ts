@@ -397,6 +397,13 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(journeyDocs.split("Request type:")[0]).toContain(
 			"touchpoint the channel (Email, Website, Phone)",
 		);
+		// Sankey diagrams add a builder name to the head and one compact line here (+304 characters).
+		expect(codeLine("buildSankey")).toBe(
+			'- buildSankey: spec: { title, nodes: [{ id, label }], links: [{ source, target, value, label? }], unit? ("$k", "visits") }. value is the stated amount (> 0); links run one way. Copy every node, flow and value stated; add no balancing node.',
+		);
+		const sankeyDocs = getCodeModeDocs({ topic: "buildSankey" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(sankeyDocs.split("\n\n")[0]);
+		expect(sankeyDocs.split("Request type:")[0]).toContain("A band under 3 px draws at 3 px");
 		expect(codeLine("createCanvas")).toBeUndefined();
 		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
 			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
@@ -447,7 +454,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// Nested zones, infrastructure shapes and their logo rule add spec fields and docs (#476).
 		// Venn diagrams add a summary and one compact line (+336 characters).
 		// Journey maps add an index line and a compact spec line (+367 characters).
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(11_300);
+		// Sankey diagrams add their compact line (+304 characters).
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(11_600);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const line of overview
 			.split("\n")
@@ -470,6 +478,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			["buildOrgChart", ["BuildOrgChartRequest"]],
 			["buildVennDiagram", ["BuildVennDiagramRequest"]],
 			["buildJourneyMap", ["BuildJourneyMapRequest"]],
+			["buildSankey", ["BuildSankeyRequest"]],
 			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
 			["getArtifact", ["GetArtifactRequest"]],
 			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],

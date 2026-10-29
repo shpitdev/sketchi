@@ -20,6 +20,7 @@ import {
 	orgChartScenarioChecks,
 } from "./org-chart-scenarios.js";
 import { vennDrawnCheck, vennLayoutCheck, vennScenarioChecks } from "./venn-scenarios.js";
+import { sankeyDrawnCheck, sankeyLayoutCheck, sankeyScenarioChecks } from "./sankey-scenarios.js";
 import {
 	journeyDrawnCheck,
 	journeyLayoutCheck,
@@ -45,6 +46,7 @@ import {
 	parseVennDiagram,
 	resolveVennShorthand,
 	parseJourneyDiagram,
+	parseSankeyDiagram,
 	parseTimelineDiagram,
 	parseChartDiagram,
 	parseGanttDiagram,
@@ -1160,6 +1162,18 @@ export function evaluateScenarioDiagram(
 			diagram,
 			journeyScenarioChecks(scenario, modelDiagram),
 			(scene) => [journeyDrawnCheck(diagram, scene), journeyLayoutCheck(scene)],
+		);
+	}
+	if (scenario.diagramType === "sankey") {
+		const diagram = parseSankeyDiagram(candidate);
+		const modelDiagram =
+			modelCandidate === candidate ? diagram : parseSankeyDiagram(modelCandidate);
+		// The drawing and its layout read the scene, so they score the returned diagram.
+		return evaluation(
+			scenario.id,
+			diagram,
+			sankeyScenarioChecks(scenario, modelDiagram),
+			(scene) => [sankeyDrawnCheck(diagram, scene), sankeyLayoutCheck(diagram, scene)],
 		);
 	}
 	if (scenario.diagramType === "sequence") {

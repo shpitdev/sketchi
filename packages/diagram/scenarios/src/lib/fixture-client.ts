@@ -128,6 +128,20 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: stage.name,
 			})),
 		];
+	if (scenario.diagramType === "sankey")
+		return [
+			{
+				kind: "count",
+				target: "links",
+				comparator: "exact",
+				value: scenario.expectedDiagram.links.length,
+			},
+			...scenario.expectedDiagram.nodes.map((node) => ({
+				kind: "label",
+				target: "node",
+				value: node.label,
+			})),
+		];
 	if (scenario.diagramType === "org-chart")
 		return [
 			{

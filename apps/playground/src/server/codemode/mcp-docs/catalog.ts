@@ -36,6 +36,7 @@ const BUILDERS = {
 	buildOrgChart: "org charts of people, titles and reporting lines",
 	buildVennDiagram: "Venn diagrams of what overlapping sets share",
 	buildJourneyMap: "user journey maps: stages of steps scored for sentiment",
+	buildSankey: "Sankey diagrams of weighted flows between stages",
 	createCanvas: "hand-placed CanvasSpec, only for layouts no builder covers (dashboard, wireframe)",
 };
 const HELPERS = {
@@ -83,6 +84,9 @@ const VENN_REGION_RULE =
 /** Shared by the buildJourneyMap topic and its compact line in the execute description. */
 const JOURNEY_SCORE_RULE =
 	"score is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral.";
+/** Shared by the buildSankey topic and its compact line in the execute description. */
+const SANKEY_RULE =
+	"value is the stated amount (> 0); links run one way. Copy every node, flow and value stated; add no balancing node.";
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 /**
@@ -105,6 +109,7 @@ const FAST_PATH = {
 	buildOrgChart: `spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. ${ORG_CHART_RULE} Copy every person, title, department and line stated.`,
 	buildVennDiagram: `spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. ${VENN_REGION_RULE} Copy every set and item stated, each in its region.`,
 	buildJourneyMap: `spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. ${JOURNEY_SCORE_RULE} Copy every stage, step, score, actor, touchpoint and note stated.`,
+	buildSankey: `spec: { title, nodes: [{ id, label }], links: [{ source, target, value, label? }], unit? ("$k", "visits") }. ${SANKEY_RULE}`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 const EXECUTE_HELPERS = [
 	HELPERS.searchIcons,
@@ -854,6 +859,35 @@ export const catalog: CatalogEntry[] = [
 		],
 	},
 	{
+		id: "buildSankey",
+		kind: "operation",
+		title: "buildSankey",
+		topic: "buildSankey",
+		keywords: [
+			"sankey",
+			"flow diagram",
+			"budget flow",
+			"funnel",
+			"traffic sources",
+			"energy flow",
+			"drop-off",
+			"alluvial",
+		],
+		snippet: "Create a native Sankey diagram from nodes and the weighted flows between them.",
+		content: [
+			"buildSankey accepts { spec: { id?, title, nodes: [{ id, label, color? }], links: [{ source, target, value, label? }], unit? }, options? }. The renderer owns layout: each node one column past the longest run of links into it, a bar as tall as the larger of its inflow and outflow with its label and total, and each link a band as wide as its value in its source's color, with its value written. A band under 3 px draws at 3 px; its value stays exact.",
+			`${SANKEY_RULE} No cycles or self-links, one link per source and target, ids without colons. unit formats as charts do ("$k" gives $310k; "visits" reads on totals). A stage that loses flow sends it to a drop-off node (one shared "Rejected" or one per stage), or keeps less outflow than inflow.`,
+			operationTypes("buildSankey"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "A cloud budget from departments to services",
+				language: "js",
+				code: `async () => sketchi.buildSankey({ spec: { title: "Cloud budget", unit: "$k", nodes: [{ id: "eng", label: "Engineering" }, { id: "data", label: "Data" }, { id: "compute", label: "Compute" }, { id: "storage", label: "Storage" }], links: [{ source: "eng", target: "compute", value: 310 }, { source: "eng", target: "storage", value: 45 }, { source: "data", target: "compute", value: 140 }, { source: "data", target: "storage", value: 4 }] }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
 		id: "buildSequenceDiagram",
 		kind: "operation",
 		title: "buildSequenceDiagram",
@@ -912,7 +946,7 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Hand-place a layout no builder covers (dashboard, wireframe) as a versioned CanvasSpec.",
 		content: [
-			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); overlapping sets are Venn diagrams (buildVennDiagram); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
+			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); overlapping sets are Venn diagrams (buildVennDiagram); weighted flows are Sankey diagrams (buildSankey); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
 			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",

@@ -399,7 +399,7 @@ function loadExcalidraw() {
 	return excalidrawModule;
 }
 
-/** Charts and Gantt charts draw their own title in the scene; a second banner would repeat it. */
+/** Charts, Gantt charts and Sankey diagrams draw their own title in the scene; a second banner would repeat it. */
 function bannerTitle(scene: PngRenderInput["scene"]): string | undefined {
 	if (
 		!scene ||
@@ -407,7 +407,8 @@ function bannerTitle(scene: PngRenderInput["scene"]): string | undefined {
 			(element) =>
 				element.id === "chart:title" ||
 				element.id === "gantt:title" ||
-				element.id === "text:journey:title",
+				element.id === "text:journey:title" ||
+				element.id === "sankey:title",
 		)
 	)
 		return undefined;

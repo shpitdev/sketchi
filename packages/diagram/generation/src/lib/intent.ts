@@ -30,6 +30,7 @@ export class CountRequirement extends Schema.Class<CountRequirement>("CountRequi
 		"decision_nodes",
 		"entities",
 		"items",
+		"links",
 		"messages",
 		"events",
 		"nodes",
@@ -122,6 +123,7 @@ const FALLBACK_TITLES: Readonly<Record<DiagramGenerationType, string>> = {
 	"org-chart": "Generated org chart",
 	venn: "Generated Venn diagram",
 	journey: "Generated journey map",
+	sankey: "Generated Sankey diagram",
 };
 
 function titleFromId(id: string): string | undefined {

@@ -49,7 +49,7 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "people", "sets", "items", "relationships", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "people", "sets", "items", "relationships", "links", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
 	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", "member", "person", "set", or "item".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
@@ -188,6 +188,15 @@ const IR_INSTRUCTIONS = {
 			'actor is who acts (several who share a step: "Customer, Agent") and touchpoint is the channel (Email, Website, Phone); set the one the source states for each step. persona names whose journey it is; actors lists them when the source names several.',
 			"painPoints and opportunities are short phrases under the stage the source puts them in.",
 			"Copy every stage, step, score, actor, touchpoint, pain point and opportunity the source states; invent none.",
+		],
+	},
+	sankey: {
+		title: "Sankey IR rules",
+		rules: [
+			'Use diagram type "sankey".',
+			"Use it for weighted flows between stages: budgets, traffic, funnels, energy or material flows; never supply coordinates.",
+			"Return nodes: [{ id, label }] and links: [{ source, target, value, label? }]: value is the stated amount, greater than 0. Links run one way; no cycles or self-links.",
+			'Optional: unit ("$k", "%", "visits"). Copy every stated node, flow and value; invent no balancing node such as Other.',
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
@@ -458,6 +467,26 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "tasks", comparator: "exact", value: 3 },
 			{ kind: "label", target: "phase", value: "Buy" },
+		],
+	},
+	sankey: {
+		diagram: {
+			id: "cloud-budget",
+			type: "sankey",
+			unit: "$k",
+			nodes: [
+				{ id: "eng", label: "Engineering" },
+				{ id: "compute", label: "Compute" },
+				{ id: "storage", label: "Storage" },
+			],
+			links: [
+				{ source: "eng", target: "compute", value: 310 },
+				{ source: "eng", target: "storage", value: 45 },
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "links", comparator: "exact", value: 2 },
+			{ kind: "label", target: "node", value: "Compute" },
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;
