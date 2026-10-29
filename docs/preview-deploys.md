@@ -74,6 +74,13 @@ Pipeline-bound Playground uploads share `cloudflare-pipeline-bound-upload` with
 production. `queue: max` queues pending jobs without cancelling active uploads;
 other apps retain their per-app/per-PR concurrency policies.
 
+Preview and production uploads run through `07-wrangler-retry.mjs`. It retries
+only Cloudflare's `assets-upload-session` failure with code 10013, twice, after
+30s and then 60s
+([cloudflare/workers-sdk#16447](https://github.com/cloudflare/workers-sdk/issues/16447)).
+Cloudflare returns it before any asset is uploaded. Every other error fails on
+the first attempt.
+
 ## Required configuration
 
 - GitHub `staging`: `CLOUDFLARE_ACCOUNT_ID` variable or secret and
@@ -121,6 +128,7 @@ by this migration. Remove them separately; this workflow never deletes a Worker.
 - `03-upsert-preview-comment.mjs`: update only the owned, anchored bot comment.
 - `04-delete-preview.mjs`: delete a PR's Preview and confirm its URL stopped serving.
 - `05-prepare-production-domain-deploy.mjs`: prepare an explicitly requested production domain config.
+- `07-wrangler-retry.mjs`: run a Wrangler upload, retrying only the 10013 assets-upload-session error.
 
 ## Production Worker Deploys
 

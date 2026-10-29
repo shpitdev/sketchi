@@ -212,7 +212,6 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .memory
-          rm -f "$WRANGLER_OUTPUT_FILE_PATH"
           # CLI vars apply to the Preview only. They never rewrite production settings.
           preview_args=()
           if [ "$PROJECT_ID" = web ]; then
@@ -221,7 +220,8 @@ jobs:
               --var "SKETCHI_PLAYGROUND_URL:${{ steps.preview-settings.outputs.playground_preview_url }}"
             )
           fi
-          pnpm exec wrangler preview \
+          # The retry wrapper clears WRANGLER_OUTPUT_FILE_PATH before each attempt.
+          node scripts/07-wrangler-retry.mjs -- pnpm exec wrangler preview \
             --config "${{ steps.worker-app.outputs.worker_config_path }}" \
             --name "${{ steps.preview-settings.outputs.preview_name }}" \
             --ignore-base-config \

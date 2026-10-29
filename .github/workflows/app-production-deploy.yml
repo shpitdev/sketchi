@@ -107,7 +107,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .memory
-          pnpm exec wrangler deploy \
+          node scripts/07-wrangler-retry.mjs -- pnpm exec wrangler deploy \
             --config "${{ steps.worker-app.outputs.worker_config_path }}" \
             --no-x-provision \
             --message "project ${PROJECT_ID} Worker ${WORKER_NAME} production ${{ github.sha }}" \
@@ -190,7 +190,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          pnpm exec wrangler deploy \
+          node scripts/07-wrangler-retry.mjs -- pnpm exec wrangler deploy \
             --config "${{ steps.domains.outputs.domain_config_path }}" \
             --no-x-provision \
             --message "project ${{ steps.worker-app.outputs.project_id }} Worker ${{ steps.worker-app.outputs.worker_name }} production domain attach ${{ github.sha }}"

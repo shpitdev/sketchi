@@ -117,7 +117,8 @@ test("official Previews never create, deploy, or delete per-PR Workers", () => {
 	assert.match(deploy, /--ignore-base-config/);
 	const output = deployStep.env.WRANGLER_OUTPUT_FILE_PATH;
 	assert.match(output, /\.ndjson$/);
-	assert.match(deploy, /rm -f "\$WRANGLER_OUTPUT_FILE_PATH"/);
+	// The retry wrapper clears the output file before every attempt.
+	assert.match(deploy, /node scripts\/07-wrangler-retry\.mjs -- pnpm exec wrangler preview/);
 	assert.ok(
 		workflow.jobs["deploy-preview"].steps
 			.find(({ id }) => id === "preview-url")
