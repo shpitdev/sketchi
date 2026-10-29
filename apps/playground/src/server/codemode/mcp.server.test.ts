@@ -1160,7 +1160,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(executeTool?.description).toContain("When the prompt names technologies");
 			// Every request pays for tools/list. Claude Code cuts the description at 4096 characters in
 			// upfront mode but keeps parameter descriptions, so the builder specs ride on code.
-			expect(executeTool?.description?.length).toBeLessThanOrEqual(1_600);
+			expect(executeTool?.description?.length).toBeLessThanOrEqual(1_450);
 			const codeDescription = String(
 				Reflect.get(executeTool?.inputSchema.properties?.code ?? {}, "description"),
 			);
@@ -1179,8 +1179,11 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toContain(
 				'Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message',
 			);
-			expect(codeDescription).toContain(getCodeModeDocs({ topic: "buildFlowchart" }).content);
-			expect(codeDescription).not.toMatch(/^type Build(?!Flowchart|Options)/m);
+			expect(codeDescription).toMatch(/^buildFlowchart \(.*\): spec: \{ title, nodes: /m);
+			expect(getCodeModeDocs({ topic: "buildFlowchart" }).content).toContain(
+				"type BuildFlowchartRequest",
+			);
+			expect(codeDescription).not.toMatch(/^type /m);
 			expect(codeDescription).toMatch(
 				/^- buildChart: .*series: \[\{ name\?, values: number\[\] \}\]/m,
 			);
@@ -1188,7 +1191,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toMatch(
 				/^- buildStateMachine: .*copy each guard the prompt states; use "else" only for a branch/m,
 			);
-			expect(codeDescription).toMatch(/^- buildErDiagram: .*fromCardinality: "zero-or-many"/m);
+			expect(codeDescription).toMatch(/^- buildErDiagram \(.*fromCardinality: "zero-or-many"/m);
 			expect(codeDescription).toMatch(
 				/^- buildClassDiagram: .*"composition" or "aggregation": from is the whole/m,
 			);
@@ -1197,15 +1200,15 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toMatch(/^- buildJourneyMap: .*3 is neutral/m);
 			expect(codeDescription).toMatch(/^- buildSankey: .*value is the stated amount/m);
 			expect(codeDescription).toMatch(
-				/^- buildWireframe: .*device: "desktop" \| "tablet" \| "mobile"/m,
+				/^- buildWireframe \(.*device: "desktop" \| "tablet" \| "mobile"/m,
 			);
 			expect(codeDescription).toMatch(
-				/^- buildQuadrantChart: .*a score out of 100 is score \/ 100/m,
+				/^- buildQuadrantChart \(.*a score out of 100 is score \/ 100/m,
 			);
-			// The head retains builder names; summaries ride on the code parameter. Nested zones
-			// and infrastructure shapes add three spec fields and their shape and logo rules. Venn
-			// diagrams and wireframes each add a builder name, a summary and one compact line. Stated
-			// guards and the wireframe fields each type takes add 107 characters.
+			// The head retains builder names; specs and rules ride on the code parameter. Every request
+			// pays for this on every turn: five families took it from 13,468 characters to 16,093, and
+			// the compact flowchart spec, one shared copy rule and topic-only failure detail bring it
+			// under 12,800. Lower this budget; do not raise it.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -1214,7 +1217,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(16_100);
+			).toBeLessThan(12_800);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

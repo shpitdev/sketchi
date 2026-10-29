@@ -152,9 +152,15 @@ function skeletonErrors(fields: readonly DocField[], schema: unknown, root: Json
 	return errors;
 }
 
+/** A code parameter line such as `- buildErDiagram (database schemas): spec: { … }`. */
+const specLine = (operation: string) =>
+	new RegExp(`^(?:- )?${operation}(?: \\([^)]*\\))?: spec: \\{`);
+
 /** Every request skeleton in a text: `spec: { … }` and `accepts { spec: … }`. */
 function skeletons(text: string): DocField[][] {
-	return [...text.matchAll(/(?:accepts |^- \w+: (?=spec: \{))(\{|spec: \{)/gm)].map((match) => {
+	return [
+		...text.matchAll(/(?:accepts |^(?:- )?\w+(?: \([^)]*\))?: (?=spec: \{))(\{|spec: \{)/gm),
+	].map((match) => {
 		const open = match.index + match[0].length - 1;
 		const { fields, end } = readSkeleton(text, open);
 		expect(end, text.slice(match.index, end)).toBeGreaterThan(open);
@@ -164,15 +170,14 @@ function skeletons(text: string): DocField[][] {
 
 const BUILDERS = CODE_MODE_OPERATIONS.filter(
 	(operation): operation is Extract<CodeModeOperation, `build${string}`> =>
-		operation.startsWith("build") && operation !== "buildFlowchart",
+		operation.startsWith("build"),
 );
 
 describe("docs field lists", () => {
 	it("give every builder skeleton exactly the fields, requirements and literals its schema has", () => {
 		const lines = SKETCHI_EXECUTE_CODE_DESCRIPTION.split("\n");
 		for (const operation of BUILDERS) {
-			const line = lines.find((entry) => entry.startsWith(`- ${operation}: spec: {`));
-			// buildFlowchart carries its generated request type instead.
+			const line = lines.find((entry) => specLine(operation).test(entry));
 			expect(line, `${operation} has a compact spec line`).toBeDefined();
 			expect(skeletons(line!), operation).toHaveLength(1);
 			const guidance = getCodeModeDocs({ topic: operation }).content.split("Request type:")[0]!;
@@ -324,7 +329,7 @@ function fieldNames(note: string): string[] {
 describe("wireframe docs", () => {
 	const docs = {
 		"code parameter": SKETCHI_EXECUTE_CODE_DESCRIPTION.split("\n").find((line) =>
-			line.startsWith("- buildWireframe: spec: "),
+			specLine("buildWireframe").test(line),
 		)!,
 		topic: getCodeModeDocs({ topic: "buildWireframe" }).content.split("Request type:")[0]!,
 		"generation prompt": buildDiagramGenerationMessages({

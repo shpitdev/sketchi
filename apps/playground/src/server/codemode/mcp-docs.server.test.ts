@@ -271,7 +271,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			"createCanvas is a last resort for layouts no builder covers.",
 		);
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toMatch(
-			/- buildFlowchart: [^\n]*systems or packages interact/,
+			/^buildFlowchart \([^\n]*systems or packages interact/m,
 		);
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toMatch(
 			/- createCanvas: [^\n]*only for layouts no builder/,
@@ -318,36 +318,46 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// code parameter carries each builder's spec and rules once, so no client pays for them twice.
 		expect(EXECUTE_DESCRIPTION_WINDOW).toBe(4096);
 		expect(EXECUTE_DESCRIPTION_LEGACY_WINDOW).toBe(2048);
-		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThanOrEqual(1_600);
+		// Down from 1,600 once specs and rules no longer repeat between the head and the parameter.
+		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThanOrEqual(1_450);
 		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
 			'The code parameter gives each one\'s spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first',
 		);
 		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toMatch(/^type \w+/m);
 		expect(SKETCHI_EXECUTE_DESCRIPTION).not.toContain("spec: {");
-		// The code parameter carries the buildFlowchart topic verbatim, its generated request type and
-		// no other family's types.
+		// The code parameter carries a compact flowchart spec and every rule of the buildFlowchart
+		// topic, which adds what a build needs only once it fails and the generated request type.
 		const flowchartDocs = getCodeModeDocs({ topic: "buildFlowchart" }).content;
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toContain(`buildFlowchart:\n${flowchartDocs}\n`);
-		for (const name of ["BuildFlowchartRequest", "BuildOptions"]) {
-			expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toContain(`\n${declaration(name)}`);
-		}
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.match(/^type \w+/gm)).toEqual([
-			"type BuildFlowchartRequest",
-			"type BuildOptions",
-		]);
-		// Every other builder but createCanvas skips the docs turn on one compact line, not its topic.
+		const codeLines = SKETCHI_EXECUTE_CODE_DESCRIPTION.split("\n");
+		const flowchartStart = codeLines.findIndex((line) => line.startsWith("buildFlowchart ("));
+		const flowchartRules = codeLines.slice(
+			flowchartStart + 1,
+			codeLines.indexOf("", flowchartStart),
+		);
+		expect(flowchartRules.length).toBeGreaterThan(10);
+		const topicLines = flowchartDocs.split("\n");
+		for (const rule of flowchartRules)
+			expect(
+				topicLines.some((line) => line.startsWith(rule)),
+				rule,
+			).toBe(true);
+		expect(flowchartDocs).toContain(declaration("BuildFlowchartRequest"));
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toMatch(/^type \w+/m);
+		// Every builder but createCanvas skips the docs turn on one compact line, not its topic. A
+		// builder whose name could route a prompt wrongly says what it draws.
 		const codeLine = (operation: string) =>
-			SKETCHI_EXECUTE_CODE_DESCRIPTION.split("\n").find((line) =>
-				line.startsWith(`- ${operation}: spec: `),
-			);
+			codeLines.find((line) => new RegExp(`^- ${operation}(?: \\([^)]*\\))?: spec: `).test(line));
+		expect(codeLines[flowchartStart]).toMatch(
+			/^buildFlowchart \(process steps and decisions[^)]*\): spec: \{ title, nodes: \[\{ id, label, kind: "start" \| "process" \| "decision" \| "end"/,
+		);
 		expect(codeLine("buildChart")).toBe(
-			'- buildChart: spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values, at most 8 slices and no axis titles. Copy every number, category, series name, unit and axis title from the prompt; invent none.',
+			'- buildChart: spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values, at most 8 slices and no axis titles.',
 		);
 		expect(codeLine("buildTimeline")).toBe(
-			'- buildTimeline: spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. Dates keep the prompt\'s precision (YYYY, YYYY-MM, YYYY-MM-DD or ISO time); without dates, give every event a numeric order. end draws a phase, lane a labeled track; today only when given. Invent no events or dates.',
+			'- buildTimeline (dated or ordered events): spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. Dates keep the prompt\'s precision (YYYY, YYYY-MM, YYYY-MM-DD or ISO time); without dates, give every event a numeric order. end draws a phase, lane a labeled track; today only when given.',
 		);
 		expect(codeLine("buildSequenceDiagram")).toBe(
-			'- buildSequenceDiagram: spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them, and calls nobody answers draw no bar. A participant\'s own step (validating, retrying) is a self-message with source = target.',
+			'- buildSequenceDiagram (time-ordered messages): spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them. A participant\'s own step (validating, retrying) is a self-message with source = target.',
 		);
 		expect(codeLine("buildStateMachine")).toBe(
 			'- buildStateMachine: spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets: copy each guard the prompt states; use "else" only for a branch the prompt gives no condition. kind "final" (label optional) ends the machine and nothing leaves it. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.',
@@ -356,13 +366,13 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			'- buildMindmap: spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.',
 		);
 		expect(codeLine("buildGantt")).toBe(
-			'- buildGantt: spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. Pass a stated duration as duration, not a computed end. Copy every task, date, dependency, milestone and phase from the prompt; invent none.',
+			'- buildGantt (project schedules): spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. Pass a stated duration as duration, not a computed end.',
 		);
 		expect(codeLine("buildErDiagram")).toBe(
-			'- buildErDiagram: spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. Cardinalities: "one", "zero-or-one", "many", "one-or-many", "zero-or-many", each how many rows of its end match one row of the other. Copy every table, field, type, key and cardinality stated.',
+			'- buildErDiagram (database schemas): spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. Cardinalities: "one", "zero-or-one", "many", "one-or-many", "zero-or-many", each how many rows of its end match one row of the other.',
 		);
 		expect(codeLine("buildClassDiagram")).toBe(
-			'- buildClassDiagram: spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to. Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only. Copy every class, member and relationship stated.',
+			'- buildClassDiagram: spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to. Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only.',
 		);
 		const classDocs = getCodeModeDocs({ topic: "buildClassDiagram" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(classDocs.split("\n\n")[0]);
@@ -371,7 +381,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		);
 		// Org charts add a builder name to the head and one compact line here (+385 characters).
 		expect(codeLine("buildOrgChart")).toBe(
-			"- buildOrgChart: spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. manager is the id they report to; only the top person has none (forest: true for several). Copy every person, title, department and line stated.",
+			"- buildOrgChart: spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. manager is the id they report to; only the top person has none (forest: true for several).",
 		);
 		const orgChartDocs = getCodeModeDocs({ topic: "buildOrgChart" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(orgChartDocs.split("\n\n")[0]);
@@ -380,7 +390,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		);
 		// Venn diagrams add a builder name to the head and one compact line here.
 		expect(codeLine("buildVennDiagram")).toBe(
-			'- buildVennDiagram: spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. A region lies in exactly its sets: ["a"] is a only, ["a", "b"] is a and b but not c. Omit empty regions. Copy every set and item stated, each in its region.',
+			'- buildVennDiagram: spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. A region lies in exactly its sets: ["a"] is a only, ["a", "b"] is a and b but not c. Omit empty regions.',
 		);
 		const vennDocs = getCodeModeDocs({ topic: "buildVennDiagram" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(vennDocs.split("\n\n")[0]);
@@ -390,7 +400,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// Journey maps add a builder name to the head, an index line and one compact line here
 		// (+367 characters, +94 o200k tokens).
 		expect(codeLine("buildJourneyMap")).toBe(
-			"- buildJourneyMap: spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. score is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral. Copy every stage, step, score, actor, touchpoint and note stated.",
+			"- buildJourneyMap: spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. score is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral.",
 		);
 		const journeyDocs = getCodeModeDocs({ topic: "buildJourneyMap" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(journeyDocs.split("\n\n")[0]);
@@ -399,21 +409,21 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		);
 		// Sankey diagrams add a builder name to the head and one compact line here (+304 characters).
 		expect(codeLine("buildSankey")).toBe(
-			'- buildSankey: spec: { title, nodes: [{ id, label }], links: [{ source, target, value, label? }], unit? ("$k", "visits") }. value is the stated amount (> 0); links run one way. Copy every node, flow and value stated; add no balancing node.',
+			'- buildSankey: spec: { title, nodes: [{ id, label }], links: [{ source, target, value, label? }], unit? ("$k", "visits") }. value is the stated amount (> 0); links run one way; add no balancing node.',
 		);
 		const sankeyDocs = getCodeModeDocs({ topic: "buildSankey" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(sankeyDocs.split("\n\n")[0]);
 		expect(sankeyDocs.split("Request type:")[0]).toContain("A band under 3 px draws at 3 px");
 		// Wireframes add a builder name to the head and one compact line here (+807 characters).
 		expect(codeLine("buildWireframe")).toBe(
-			'- buildWireframe: spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, column, row (align?: "between" | "center" | "end"), grid (columns: n). Widgets: heading (text, level?), text (text or lines), badge (text), link (text, target?: screen id), button (text, variant?, target?), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav (items, active?), breadcrumbs, list (items), avatar, icon, image, chart (label?), table (columns: string[]), divider. Set variant "primary", checked and active as stated. Copy every screen, component, text and state stated, in order; invent none.',
+			'- buildWireframe (UI mockups): spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, column, row (align?: "between" | "center" | "end"), grid (columns: n). Widgets: heading (text, level?), text (text or lines), badge (text), link (text, target?: screen id), button (text, variant?, target?), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav (items, active?), breadcrumbs, list (items), avatar, icon, image, chart (label?), table (columns: string[]), divider. Set variant "primary", checked and active as stated.',
 		);
 		const wireframeDocs = getCodeModeDocs({ topic: "buildWireframe" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(wireframeDocs.split("\n\n")[0]);
 		expect(wireframeDocs.split("Request type:")[0]).toContain("A nav inside a sidebar stacks");
 		// Quadrant charts add a builder name to the head and one compact line here (+508 characters).
 		expect(codeLine("buildQuadrantChart")).toBe(
-			"- buildQuadrantChart: spec: { title, xAxis: { title, low, high }, yAxis: same, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }. low and high are the axis end labels as stated (x left to right, y bottom up); name each quadrant by the corner its conditions describe; x and y run 0 (low end) to 1 (high end), so a score out of 100 is score / 100. Copy every item and name stated.",
+			"- buildQuadrantChart (2\u00d72 matrices): spec: { title, xAxis: { title, low, high }, yAxis: same, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }. low and high are the axis end labels as stated (x left to right, y bottom up); name each quadrant by the corner its conditions describe; x and y run 0 (low end) to 1 (high end), so a score out of 100 is score / 100.",
 		);
 		const quadrantDocs = getCodeModeDocs({ topic: "buildQuadrantChart" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(quadrantDocs.split("\n\n")[0]);
@@ -466,18 +476,21 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 			"
 		`);
-		// Family summaries now live beside the specs, outside the truncated head.
-		// Nested zones, infrastructure shapes and their logo rule add spec fields and docs (#476).
-		// Venn diagrams add a summary and one compact line (+336 characters).
-		// Journey maps add an index line and a compact spec line (+367 characters).
-		// Sankey diagrams add their compact line (+304 characters), wireframes theirs (+807),
-		// quadrant charts theirs (+508). Stated guards and wireframe fields each type takes add 107.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(12_980);
+		// Every request pays for this parameter on every turn. Five families took it from 10,548
+		// characters to 12,976; a compact flowchart spec in place of its generated types, one shared
+		// copy rule, no separate builder index and failure-only detail left to the topics take it to
+		// 9,862, under where it stood before them. Lower this budget; do not raise it.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(9_900);
+		// The overview keeps every builder's summary; the code parameter names every builder once.
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
-		for (const line of overview
-			.split("\n")
-			.filter((line) => /^- (build\w+|createCanvas):/.test(line))) {
-			expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toContain(line);
+		for (const operation of CODE_MODE_OPERATIONS.filter((name) =>
+			/^(build|createCanvas)/.test(name),
+		)) {
+			expect(overview).toMatch(new RegExp(`^- ${operation}: `, "m"));
+			expect(
+				codeLines.filter((line) => new RegExp(`^(- )?${operation}\\b`).test(line)),
+				operation,
+			).toHaveLength(1);
 		}
 		expect(overview).toContain(`${CODE_MODE_OPERATIONS.length} operations:`);
 		for (const operation of CODE_MODE_OPERATIONS) {

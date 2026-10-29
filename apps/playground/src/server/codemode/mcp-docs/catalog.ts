@@ -70,8 +70,7 @@ const STATE_MACHINE_GUARD_RULE =
 const STATE_MACHINE_END_RULE =
 	"A state that ends the machine but has other outgoing transitions also gets a transition to a final state.";
 /** Shared by the buildGantt topic and its compact line in the execute description. */
-const GANTT_DATE_RULE =
-	"Pass a stated duration as duration, not a computed end. Copy every task, date, dependency, milestone and phase from the prompt; invent none.";
+const GANTT_DATE_RULE = "Pass a stated duration as duration, not a computed end.";
 
 /** Shared by the buildErDiagram topic and its compact line in the execute description. */
 const ER_CARDINALITY_RULE =
@@ -80,8 +79,7 @@ const ER_CARDINALITY_RULE =
 const CLASS_KIND_RULE =
 	'kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to. Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only.';
 /** Shared by the buildWireframe topic and its compact line in the execute description. */
-const WIREFRAME_RULE =
-	'Set variant "primary", checked and active as stated. Copy every screen, component, text and state stated, in order; invent none.';
+const WIREFRAME_RULE = 'Set variant "primary", checked and active as stated.';
 /** Shared by the buildOrgChart topic and its compact line in the execute description. */
 const ORG_CHART_RULE =
 	"manager is the id they report to; only the top person has none (forest: true for several).";
@@ -92,13 +90,15 @@ const VENN_REGION_RULE =
 const JOURNEY_SCORE_RULE =
 	"score is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral.";
 /** Shared by the buildSankey topic and its compact line in the execute description. */
-const SANKEY_RULE =
-	"value is the stated amount (> 0); links run one way. Copy every node, flow and value stated; add no balancing node.";
+const SANKEY_RULE = "value is the stated amount (> 0); links run one way; add no balancing node.";
 /** Shared by the buildQuadrantChart topic and its compact line in the execute description. */
 const QUADRANT_RULE =
 	"low and high are the axis end labels as stated (x left to right, y bottom up); name each quadrant by the corner its conditions describe; x and y run 0 (low end) to 1 (high end), so a score out of 100 is score / 100.";
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
+/** The code parameter states once for every builder what each topic says for its own family. */
+const COPY_RULE =
+	"For every builder, copy every item and detail the prompt states into its spec field, keeping its words and order; invent none.";
 /**
  * Claude Code cuts upfront-loaded MCP tool descriptions and server instructions at this many
  * characters (2048 before v2.1.296), but not parameter descriptions. The execute description is a
@@ -106,25 +106,34 @@ const CHART_COPY_RULE =
  */
 export const EXECUTE_DESCRIPTION_WINDOW = 4096;
 export const EXECUTE_DESCRIPTION_LEGACY_WINDOW = 2048;
-/** One compact line per builder after buildFlowchart, whose full topic the code parameter carries. */
+/** One compact line per builder after buildFlowchart, whose rules the code parameter carries. */
 const FAST_PATH = {
-	buildChart: `spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. ${CHART_SERIES_RULE} A pie has one series of non-negative values, at most 8 slices and no axis titles. ${CHART_COPY_RULE}`,
-	buildTimeline: `spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. Dates keep the prompt's precision (YYYY, YYYY-MM, YYYY-MM-DD or ISO time); without dates, give every event a numeric order. end draws a phase, lane a labeled track; today only when given. Invent no events or dates.`,
-	buildSequenceDiagram: `spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them, and calls nobody answers draw no bar. A participant's own step (validating, retrying) is a self-message with source = target.`,
+	buildChart: `spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. ${CHART_SERIES_RULE} A pie has one series of non-negative values, at most 8 slices and no axis titles.`,
+	buildTimeline: `spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. Dates keep the prompt's precision (YYYY, YYYY-MM, YYYY-MM-DD or ISO time); without dates, give every event a numeric order. end draws a phase, lane a labeled track; today only when given.`,
+	buildSequenceDiagram: `spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them. A participant's own step (validating, retrying) is a self-message with source = target.`,
 	buildStateMachine: `spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets: ${STATE_MACHINE_GUARD_RULE} kind "final" (label optional) ends the machine and nothing leaves it. ${STATE_MACHINE_END_RULE}`,
 	buildMindmap: `spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.`,
 	buildGantt: `spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. ${GANTT_DATE_RULE}`,
-	buildErDiagram: `spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. ${ER_CARDINALITY_RULE} Copy every table, field, type, key and cardinality stated.`,
-	buildClassDiagram: `spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. ${CLASS_KIND_RULE} Copy every class, member and relationship stated.`,
-	buildOrgChart: `spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. ${ORG_CHART_RULE} Copy every person, title, department and line stated.`,
-	buildVennDiagram: `spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. ${VENN_REGION_RULE} Copy every set and item stated, each in its region.`,
-	buildJourneyMap: `spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. ${JOURNEY_SCORE_RULE} Copy every stage, step, score, actor, touchpoint and note stated.`,
+	buildErDiagram: `spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. ${ER_CARDINALITY_RULE}`,
+	buildClassDiagram: `spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. ${CLASS_KIND_RULE}`,
+	buildOrgChart: `spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. ${ORG_CHART_RULE}`,
+	buildVennDiagram: `spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. ${VENN_REGION_RULE}`,
+	buildJourneyMap: `spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. ${JOURNEY_SCORE_RULE}`,
 	buildSankey: `spec: { title, nodes: [{ id, label }], links: [{ source, target, value, label? }], unit? ("$k", "visits") }. ${SANKEY_RULE}`,
 	buildWireframe: `spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, column, row (align?: "between" | "center" | "end"), grid (columns: n). Widgets: heading (text, level?), text (text or lines), badge (text), link (text, target?: screen id), button (text, variant?, target?), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav (items, active?), breadcrumbs, list (items), avatar, icon, image, chart (label?), table (columns: string[]), divider. ${WIREFRAME_RULE}`,
-	buildQuadrantChart: `spec: { title, xAxis: { title, low, high }, yAxis: same, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }. ${QUADRANT_RULE} Copy every item and name stated.`,
+	buildQuadrantChart: `spec: { title, xAxis: { title, low, high }, yAxis: same, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }. ${QUADRANT_RULE}`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
+/** What the code parameter names a builder for where its name alone could route a prompt wrongly. */
+const CODE_HINTS: Partial<Record<keyof typeof FAST_PATH, string>> = {
+	buildSequenceDiagram: "time-ordered messages",
+	buildTimeline: "dated or ordered events",
+	buildGantt: "project schedules",
+	buildErDiagram: "database schemas",
+	buildWireframe: "UI mockups",
+	buildQuadrantChart: "2×2 matrices",
+};
 const EXECUTE_HELPERS = [
-	HELPERS.searchIcons,
+	"searchIcons({ q }) resolves to { icons: [{ slug, match }] }",
 	HELPERS.getArtifact,
 	'applyDiagramPatch edits an accepted artifact; docs({ topic: "applyDiagramPatch" })',
 ];
@@ -165,32 +174,77 @@ function operationTypes(operation: CodeModeOperation): string {
 
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 
-/** The buildFlowchart topic, also carried verbatim by the execute code parameter. */
+const FLOWCHART_SPEC = `spec: { title, nodes: [{ id, label, kind: "start" | "process" | "decision" | "end", description?, icon?: { slug }, group?, lane?, shape?: "database" | "queue" | "document" | "storage" }], edges: [{ source, target, label? }], groups?: [{ id, label, parent?, kind?: "cloud" | "datacenter" | "region" | "zone" | "vpc" | "subnet" | "cluster" | "namespace" }], lanes?: [{ id, label }], layout?: { direction: "TB" | "LR" } }`;
+
+/**
+ * What a first flowchart build needs, each rule with any detail only the buildFlowchart topic
+ * adds. The code parameter carries the rules; the topic carries both.
+ */
+const FLOWCHART_RULES: readonly (readonly [rule: string, topicDetail?: string])[] = [
+	[
+		"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.",
+	],
+	[
+		'A stated check or verification ("verify the signature", "stock is checked") is its own process node before the decision that reads its result; "check whether X" alone is just that decision.',
+	],
+	[
+		"Label steps and decisions with the prompt's own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words the prompt itself uses.",
+	],
+	[
+		"Use one node per outcome the prompt names: point every branch that reaches the same named outcome at that one node, and do not add end nodes the prompt does not name.",
+	],
+	[
+		'Do not add decisions, loops, steps, or edges the prompt does not state; a step that handles "any errors" or acts "if needed" stays one step in sequence. A step that repeats an earlier step ("send another ...", "try again", "retry", "resubmit") continues that cycle: draw it as the earlier step or as a step that loops back to the decision after it, never as an end. Only a new, unrepeated final step with no stated next step is that branch\'s end node (kind: "end").',
+	],
+	[
+		"Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
+		"Use stable node ids.",
+	],
+	[
+		"Name technologies in node labels; a description draws as a small subtitle under the label, for detail.",
+	],
+	[
+		`Only when the prompt groups steps (teams, zones, phases), declare groups and set each member's group to its innermost group id; others stay ungrouped. Nested zones set parent (subnet in VPC) and kind. Set shape, even on a start or end: "database" databases; "document" files, archives, reports; "queue" queues, streams, topics; "storage" buckets, object stores. Only users stay ellipses. An architecture starts at its entry and ends at each sink.`,
+	],
+	[
+		"For swimlanes, a process across actors or roles, declare lanes in the prompt's order and set each node's lane to its actor; lanes take no groups.",
+	],
+	[
+		'Brand logos, only for technologies the prompt names: set that node\'s icon to { slug } with an exact slug sketchi.searchIcons returned, never a guess. Attach match: "exact" to the node naming that product and "vendor" only to a node whose label names the vendor (Cloudflare Workers takes cloudflare, Ingress controller no kubernetes); never "weak". Each node holds one icon: for X on Y, preserve both technologies as separate meaningful steps, each with its own logo, never hidden in the title or combined under one icon.',
+		"The logo is drawn above the label. Unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build. Keep the requested step order and stay within graph limits.",
+	],
+	[
+		"Before building, check that each named technology's node has its icon: a label or a search alone attaches none, and a missing icon gives no warning. If no logo matches, keep the technology label and report the logo unavailable; never substitute another brand.",
+	],
+	[
+		`At most ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges.`,
+		"Larger graphs fail with flowchart_too_large before render or persistence.",
+	],
+	[
+		"Every node must be reachable from the single start and able to reach an end.",
+		"Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
+	],
+	[
+		"Summarize a broad or vague repo/system architecture prompt into 8-14 high-signal nodes on a single readable spine with short side branches, not a dense dependency graph with one node per package or many crossing links.",
+	],
+	[
+		"When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
+	],
+	[
+		"Keep every package and component the prompt names under its own name; summarizing drops unnamed detail and never renames or generalizes named parts.",
+	],
+];
+
+/** The buildFlowchart topic: every flowchart rule with its detail, then the request type. */
 const FLOWCHART_DOCS = [
 	"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, and optional layout. Builds use the fixed Sketchi palette.",
-	"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.",
-	'A stated check or verification ("verify the signature", "stock is checked") is its own process node before the decision that reads its result; "check whether X" alone is just that decision.',
-	"Label steps and decisions with the prompt's own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words the prompt itself uses.",
-	"Use one node per outcome the prompt names: point every branch that reaches the same named outcome at that one node, and do not add end nodes the prompt does not name.",
-	'Do not add decisions, loops, steps, or edges the prompt does not state; a step that handles "any errors" or acts "if needed" stays one step in sequence. A step that repeats an earlier step ("send another ...", "try again", "retry", "resubmit") continues that cycle: draw it as the earlier step or as a step that loops back to the decision after it, never as an end. Only a new, unrepeated final step with no stated next step is that branch\'s end node (kind: "end").',
-	"Use stable node ids. Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
-	"Name technologies in node labels; a description draws as a small subtitle under the label, for detail.",
-	`Only when the prompt groups steps (teams, zones, phases), declare groups: [{ id, label }] and set each member's group to its innermost group id; others stay ungrouped. Nested zones set parent (subnet in VPC) and kind. Set shape, even on a start or end: "database" databases; "document" files, archives, reports; "queue" queues, streams, topics; "storage" buckets, object stores. Only users stay ellipses. An architecture starts at its entry and ends at each sink.`,
-	"For swimlanes, a process across actors or roles, declare lanes: [{ id, label }] in the prompt's order and set each node's lane to its actor; lanes take no groups.",
-	'Brand logos: when a node is about a named technology (GitHub, Docker, Postgres), call sketchi.searchIcons({ q: "docker" }) and set that node\'s icon to { slug } with an exact returned slug. The logo is drawn above the label. Never guess a slug: unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build.',
-	`Logo guidance applies only to technologies named in the prompt. Attach match: "exact" to the node naming that product and "vendor" only to a node whose label names the vendor (Cloudflare Workers takes cloudflare, Ingress controller no kubernetes); never "weak". Each node holds one icon. For X on Y, preserve both technologies as separate meaningful steps and attach each logo to its own node. Do not hide the host only in the title or combine both brands under one icon. Keep the requested step order and stay within graph limits.`,
-	"Before building, compare the named technologies with the icons assigned to nodes. A label or successful search alone does not attach a logo; omitted icons produce no warning. If no matching logo exists, keep the technology label and report the unavailable logo instead of substituting another brand.",
-	`Flowcharts are bounded to ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges. Larger graphs fail with flowchart_too_large before render or persistence.`,
-	"Every node must be reachable from the single start, and every reachable node must be able to reach an end. Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
-	"For broad or vague repo/system architecture prompts, summarize into 8-14 high-signal nodes. Prefer a single readable spine with short side branches over a dense dependency graph with one node per package or many crossing links.",
-	"When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
-	"Keep every package and component the prompt names under its own name; summarizing drops unnamed detail and never renames or generalizes named parts.",
+	...FLOWCHART_RULES.map(([rule, detail]) => (detail ? `${rule} ${detail}` : rule)),
 	"",
 	operationTypes("buildFlowchart"),
 ].join("\n");
 
 const LOGO_RULE =
-	"When the prompt names technologies, call sketchi.searchIcons({ q }) for each and set node.icon or sequence participant.icon to { slug } from a matching slug. One icon per node, so 'X on Y' is two steps; labels alone add no logo.";
+	"When the prompt names technologies, call sketchi.searchIcons({ q }) for each in the same script as the build, await them, and set node.icon or sequence participant.icon to { slug } from a matching slug.";
 
 /** Fits EXECUTE_DESCRIPTION_LEGACY_WINDOW, so every Claude Code version reads all of it. */
 export const EXECUTE_TOOL_DESCRIPTION = [
@@ -200,25 +254,26 @@ export const EXECUTE_TOOL_DESCRIPTION = [
 	"Helpers:",
 	...EXECUTE_HELPERS.map((summary) => `- ${summary}`),
 	`- ${LOGO_RULE}`,
-	"- Builds resolve to { ok: true, artifact, normalizedSpec, issues } or { ok: false, issues: [{ code, message, hint }] }; on ok: false, fix the spec per hint and rebuild.",
+	"- When a build resolves to { ok: false, issues: [{ code, message, hint }] }, fix the spec per hint and rebuild.",
 	"- Return the accepted result: execute adds artifactDelivery.finalResponseText; copy it verbatim as the final answer and stop, never recreating the diagram as Markdown, Mermaid, a file or an Antigravity artifact.",
 ].join("\n");
 
-/** Parameter descriptions are not truncated, so the fast path and the full flowchart topic live here. */
+/**
+ * Parameter descriptions are not truncated, so every builder's spec and the rules a first build
+ * needs live here. Each topic adds what a build only needs once it fails.
+ */
 export const EXECUTE_CODE_DESCRIPTION = [
-	"One async arrow function: sketchi.<builder>({ spec }). Excalidraw and PNG URLs are default for accepted builds and patches.",
+	`Excalidraw and PNG URLs are default for accepted builds and patches. ${COPY_RULE}`,
 	"",
-	"Builders:",
-	...Object.entries(BUILDERS).map(([operation, summary]) => `- ${operation}: ${summary}`),
-	"",
-	"buildFlowchart:",
-	FLOWCHART_DOCS,
+	`buildFlowchart (${BUILDERS.buildFlowchart}): ${FLOWCHART_SPEC}.`,
+	...FLOWCHART_RULES.map(([rule]) => rule),
 	"",
 	"Other builders:",
-	...Object.entries(FAST_PATH).map(([operation, line]) => `- ${operation}: ${line}`),
-	"",
-	"- Run logo searches and the build in one execute script: await the searches, then set each icon from a returned slug.",
-	'- structuredContent.builds records every build attempt in call order, whatever the script returns. docs({ topic: "execute" }) has every generated declaration, including results.',
+	...Object.entries(FAST_PATH).map(([operation, line]) => {
+		const hint = CODE_HINTS[operation as keyof typeof FAST_PATH];
+		return `- ${operation}${hint ? ` (${hint})` : ""}: ${line}`;
+	}),
+	`- createCanvas: ${BUILDERS.createCanvas}.`,
 ].join("\n");
 
 const PATCH_OPERATION_SUMMARY = [
@@ -685,7 +740,7 @@ export const catalog: CatalogEntry[] = [
 		content: [
 			"buildGantt accepts { spec: { id?, title, tasks: [{ id, label, start, end?, duration?, milestone?, phase?, dependsOn?, progress? }], phases?, today? }, options? }. The renderer owns layout: a to-scale date axis, one row per task under phase headers, and dependency arrows.",
 			"start and end are YYYY-MM-DD; end is the last day, inclusive. Give end or duration (calendar days counting start), not both. milestone: true draws a diamond on start. dependsOn lists finish-to-start predecessor ids, without cycles. Give every task a phase or none (phases sets their order). progress is percent done; today only when stated. Up to 60 tasks and 12 phases.",
-			`${GANTT_DATE_RULE} A task that starts before a predecessor finishes still builds, with a gantt_schedule_conflict warning.`,
+			`${GANTT_DATE_RULE} Copy every task, date, dependency, milestone and phase from the prompt; invent none. A task that starts before a predecessor finishes still builds, with a gantt_schedule_conflict warning.`,
 			operationTypes("buildGantt"),
 		].join("\n\n"),
 		examples: [
@@ -919,7 +974,7 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Create a native Sankey diagram from nodes and the weighted flows between them.",
 		content: [
 			"buildSankey accepts { spec: { id?, title, nodes: [{ id, label, color? }], links: [{ source, target, value, label? }], unit? }, options? }. The renderer owns layout: each node one column past the longest run of links into it, a bar as tall as the larger of its inflow and outflow with its label and total, and each link a band as wide as its value in its source's color, with its value written. A band under 3 px draws at 3 px; its value stays exact.",
-			`${SANKEY_RULE} No cycles or self-links, one link per source and target, ids without colons. unit formats as charts do ("$k" gives $310k; "visits" reads on totals). A stage that loses flow sends it to a drop-off node (one shared "Rejected" or one per stage), or keeps less outflow than inflow.`,
+			`${SANKEY_RULE} Copy every node, flow and value stated. No cycles or self-links, one link per source and target, ids without colons. unit formats as charts do ("$k" gives $310k; "visits" reads on totals). A stage that loses flow sends it to a drop-off node (one shared "Rejected" or one per stage), or keeps less outflow than inflow.`,
 			operationTypes("buildSankey"),
 		].join("\n\n"),
 		examples: [
@@ -942,7 +997,7 @@ export const catalog: CatalogEntry[] = [
 			'buildWireframe accepts { spec: { id?, title, screens: [{ id?, name, device?: "desktop" | "tablet" | "mobile", align?, children }] }, options? }. Each screen draws as a frame the size of its device. The renderer places everything: a header spans the top, a footer the bottom, a sidebar one side, a modal floats over the rest, and every other component stacks down the content area. No field takes a coordinate or size.',
 			'Containers hold children: header, footer, main, section, card and modal (title), sidebar (side: "left" | "right"), grid (columns: n), row, column. A row sets its children side by side and wraps them; align spreads them ("between"), centers or ends them. Rows and grids keep containers one height, buttons hug their text and fields stretch.',
 			'Widgets: heading (text, level 1-3), text (text, or lines for placeholder copy), link and badge (text), button (text, variant "primary" | "secondary"), input, textarea, select, search (label, placeholder, or value when it shows one), checkbox, radio, toggle (label, checked), tabs and nav (items, active), breadcrumbs and list (items), avatar and icon (label), image (label, aspect "wide" | "square" | "tall"), chart (label, kind "bar" | "line" | "pie"), table (columns: headers, rows: placeholder count), divider. A nav inside a sidebar stacks; any other runs across. A button or link with target: a screen id opens that screen, drawn as an arrow to it.',
-			`${WIREFRAME_RULE} Each screen a flow moves through is its own screen; set target only on the control stated to open one.`,
+			`${WIREFRAME_RULE} Copy every screen, component, text and state stated, in order; invent none. Each screen a flow moves through is its own screen; set target only on the control stated to open one.`,
 			operationTypes("buildWireframe"),
 		].join("\n\n"),
 		examples: [
