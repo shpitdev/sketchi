@@ -7,7 +7,7 @@ import {
 	type TelemetryLogEvent,
 	type TelemetryMetricEvent,
 } from "@sketchi/observability";
-import { Duration, Effect, Fiber, Layer } from "effect";
+import { Clock, Duration, Effect, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import { beforeEach, vi } from "vitest";
 
@@ -78,14 +78,49 @@ const prewarm = Effect.gen(function* () {
 
 const poolLayer = BrowserRenderPool.layer(browserBinding);
 
-/** Lets forked renders run until they wait on the clock or an unresolved promise. */
-const settle = Effect.promise(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+/** Wake times of the test-clock sleeps forked renders are waiting on. */
+const pendingWakes: number[] = [];
+const pendingWakesAt = (millis: number) => pendingWakes.filter((wake) => wake === millis).length;
+/** Whether a forked render is parked on a sleep that wakes by `millis`. */
+const parkedBy = (millis: number) => pendingWakes.some((wake) => wake <= millis);
+
+/** The test clock, recording each pending sleep so a test can wait for pool state instead of wall time. */
+const trackedClock = Layer.effect(
+	Clock.Clock,
+	TestClock.testClockWith((clock) =>
+		Effect.succeed<TestClock.TestClock>({
+			...clock,
+			sleep: (duration) =>
+				Effect.suspend(() => {
+					const wake = clock.currentTimeMillisUnsafe() + Duration.toMillis(duration);
+					pendingWakes.push(wake);
+					return clock.sleep(duration).pipe(
+						Effect.ensuring(
+							Effect.sync(() => {
+								pendingWakes.splice(pendingWakes.indexOf(wake), 1);
+							}),
+						),
+					);
+				}),
+		}),
+	),
+);
+
+const macrotask = Effect.promise(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+
+/** Lets forked renders run until `ready` holds; a state that never comes fails on the test timeout. */
+const waitUntil = (ready: () => boolean): Effect.Effect<void> =>
+	Effect.suspend(() => (ready() ? Effect.void : macrotask.pipe(Effect.andThen(waitUntil(ready)))));
+
+/** Lets forked renders act on a clock step before a check that nothing happened, without wall time. */
+const yieldTurns = Effect.replicateEffect(macrotask, 10, { discard: true });
 
 describe("Browser Run harness page pool", () => {
 	const launchMock = vi.mocked(launch);
 
 	beforeEach(() => {
 		launchMock.mockReset();
+		pendingWakes.length = 0;
 	});
 
 	it.effect("reuses one warm harness page across exports", () =>
@@ -190,10 +225,10 @@ describe("Browser Run harness page pool", () => {
 					},
 				),
 			);
-			// Launches are paced, so let the pool open every page first.
-			for (let second = 0; second * BROWSER_LAUNCHES_PER_SECOND < MAX_HARNESS_PAGES; second++) {
-				yield* settle;
-				yield* TestClock.adjust(1_000);
+			// Launches are paced, so let the pool open every page first, a launch window at a time.
+			for (let second = 1; exporting < MAX_HARNESS_PAGES; second++) {
+				yield* waitUntil(() => exporting === MAX_HARNESS_PAGES || parkedBy(second * 1_000));
+				if (exporting < MAX_HARNESS_PAGES) yield* TestClock.adjust(1_000);
 			}
 			yield* Effect.promise(() => allBusy.promise);
 			const queuedFiber = yield* Effect.forkChild(renderPng(request()));
@@ -205,7 +240,7 @@ describe("Browser Run harness page pool", () => {
 			expect(queued.coldStart).toBe(false);
 			expect(queued.timing).toEqual({ queueMs: 300, openMs: 0, exportMs: 0 });
 			expect(launchMock).toHaveBeenCalledTimes(MAX_HARNESS_PAGES);
-		}).pipe(Effect.provide(poolLayer)),
+		}).pipe(Effect.provide(poolLayer), Effect.provide(trackedClock)),
 	);
 
 	it.effect("starts no more than three launches per second while the pool grows", () =>
@@ -213,8 +248,10 @@ describe("Browser Run harness page pool", () => {
 			launchMock.mockResolvedValueOnce(mockBrowser().browser);
 			yield* renderPng(request());
 			const finishExports = Promise.withResolvers<string>();
+			const sessions: Array<ReturnType<typeof mockBrowser>> = [];
 			launchMock.mockImplementation(async () => {
 				const session = mockBrowser();
+				sessions.push(session);
 				session.page.evaluate.mockImplementation(async (script: unknown) =>
 					typeof script === "string" ? null : finishExports.promise,
 				);
@@ -230,25 +267,36 @@ describe("Browser Run harness page pool", () => {
 					},
 				),
 			);
-			yield* settle;
+			// The warm page's launch and two more fill the first window; the next waits for 1s.
+			yield* waitUntil(
+				() =>
+					launchMock.mock.calls.length > 3 ||
+					(launchMock.mock.calls.length === 3 && parkedBy(1_000)),
+			);
 			expect(launchMock).toHaveBeenCalledTimes(3);
 			yield* TestClock.adjust(999);
-			yield* settle;
+			yield* yieldTurns;
 			expect(launchMock).toHaveBeenCalledTimes(3);
 			yield* TestClock.adjust(1);
-			yield* settle;
+			yield* waitUntil(() => launchMock.mock.calls.length >= 6);
 			expect(launchMock).toHaveBeenCalledTimes(6);
 			for (let second = 0; second < 3; second++) {
 				const launched = launchMock.mock.calls.length;
 				yield* TestClock.adjust(1_000);
-				yield* settle;
+				// Every launched browser has opened its page, or the remaining launchers wait for the next window.
+				yield* yieldTurns;
+				yield* waitUntil(
+					() =>
+						sessions.every((session) => session.newPage.mock.calls.length > 0) ||
+						parkedBy((second + 3) * 1_000),
+				);
 				expect(launchMock.mock.calls.length - launched).toBeLessThanOrEqual(
 					BROWSER_LAUNCHES_PER_SECOND,
 				);
 			}
 			finishExports.resolve(btoa("PNG"));
 			yield* Fiber.join(renders);
-		}).pipe(Effect.provide(poolLayer)),
+		}).pipe(Effect.provide(poolLayer), Effect.provide(trackedClock)),
 	);
 
 	it.effect("paces launch retries with every other launch", () =>
@@ -267,22 +315,22 @@ describe("Browser Run harness page pool", () => {
 					},
 				),
 			);
-			yield* settle;
-			expect(launchMock).toHaveBeenCalledTimes(3);
 			// Each failed launch backs off 250ms, then waits for the launch window.
+			yield* waitUntil(() => pendingWakesAt(250) === 3);
+			expect(launchMock).toHaveBeenCalledTimes(3);
 			yield* TestClock.adjust(250);
-			yield* settle;
+			yield* waitUntil(() => parkedBy(1_000) || launchMock.mock.calls.length > 3);
 			expect(launchMock).toHaveBeenCalledTimes(3);
 			yield* TestClock.adjust(749);
-			yield* settle;
+			yield* yieldTurns;
 			expect(launchMock).toHaveBeenCalledTimes(3);
 			yield* TestClock.adjust(1);
-			yield* settle;
+			yield* waitUntil(() => launchMock.mock.calls.length >= 6);
 			expect(launchMock).toHaveBeenCalledTimes(6);
 			const rendered = yield* Fiber.join(renders);
 
 			expect(rendered).toHaveLength(3);
-		}).pipe(Effect.provide(poolLayer)),
+		}).pipe(Effect.provide(poolLayer), Effect.provide(trackedClock)),
 	);
 
 	it.effect("replaces a page whose Browser Run session closed while idle", () =>

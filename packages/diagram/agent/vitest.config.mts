@@ -19,6 +19,8 @@ export default defineConfig(() => ({
 		globals: true,
 		environment: "node",
 		include: ["{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
+		// Hang guard for the dense Code Mode flow exports, not a speed budget.
+		testTimeout: 60_000,
 		reporters: ["default"],
 		coverage: {
 			reportsDirectory: "../../../coverage/packages/diagram/agent",
