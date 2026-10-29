@@ -363,7 +363,8 @@ export interface CanvasIconAsset {
  * milestones, entity-relationship tables (a table's outline and its name
  * band) and optional-end rings, class boxes (a class's outline, name band
  * and methods compartment), swimlanes (a lane's band and its header), and
- * architecture zones (a region, VPC, subnet or cluster outline).
+ * architecture zones (a region, VPC, subnet or cluster outline), and Venn
+ * sets (a set's translucent fill and its outline).
  * Only a zone carries an icon, drawn in its header, and only a table's or a
  * class's name band and a lane's header carry a bound label.
  */
@@ -380,6 +381,7 @@ export const CANVAS_RENDERER_ROLES = [
 	"class-box",
 	"swimlane",
 	"swimlane-header",
+	"venn-set",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
@@ -455,6 +457,7 @@ const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	swimlane: "Swimlane",
 	"swimlane-header": "Swimlane header",
 	"timeline-marker": "Timeline marker",
+	"venn-set": "Venn set",
 	zone: "Zone",
 };
 

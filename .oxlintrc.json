@@ -293,7 +293,8 @@
 				"packages/diagram/core/src/types/gantt.ts",
 				"packages/diagram/core/src/types/er.ts",
 				"packages/diagram/core/src/types/class.ts",
-				"packages/diagram/core/src/types/org-chart.ts"
+				"packages/diagram/core/src/types/org-chart.ts",
+				"packages/diagram/core/src/types/venn.ts"
 			],
 			"rules": {
 				"eslint/no-restricted-imports": [

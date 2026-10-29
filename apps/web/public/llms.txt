@@ -22,7 +22,8 @@ The server is named sketchi-code-mode and exposes three tools:
 - search: look up Sketchi API surface before writing a call.
 - execute: run Sketchi code mode, which builds flowcharts, mindmaps, sequence
   diagrams, timelines, charts, state machines, Gantt charts, ER diagrams,
-  class diagrams and org charts, fetches artifacts, and applies diagram patches.
+  class diagrams, org charts and Venn diagrams, fetches artifacts, and applies
+  diagram patches.
 
 Per-agent setup instructions live at https://sketchi.app/agents, with pages for
 Claude Code, Codex, OpenCode, and Antigravity.
@@ -44,7 +45,7 @@ stdout, with status on stderr.
 
 - generate: one prompt to a validated diagram. One credential-free HTTPS
   request; no key, token, account, or login. Omit type for model selection, or
-  require flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, or org-chart explicitly. Unsupported native types
+  require flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, or venn explicitly. Unsupported native types
   fail clearly rather than becoming flowcharts.
 - create, edit, patch: author and revise from canonical JSON, or apply semantic
   style and layout operations. Fully offline.
@@ -75,3 +76,5 @@ Native ER diagrams: use `buildErDiagram` (Code Mode) or `generate --type er` (CL
 Native class diagrams: use `buildClassDiagram` (Code Mode) or `generate --type class` (CLI). Supply classes with unique ids (no colons or spaces), an optional `kind` (`abstract`, `interface` or `enum`) and members written as UML does (`"- radius: double"`, `"+ area(): double {abstract}"`), and relationships with a `kind`: `inheritance` or `realization` (`from` extends or implements `to`), `composition` or `aggregation` (`from` is the whole), `association` (`navigable: true` adds an arrow) or `dependency` (`from` uses `to`). Associations, compositions and aggregations take multiplicities and roles at each end. The renderer draws three-compartment boxes with superclasses above their subclasses and each relationship's UML head; it owns every coordinate.
 
 Native org charts: use `buildOrgChart` (Code Mode) or `generate --type org-chart` (CLI). Supply people with unique ids (no colons), a `name`, an optional `title` and `department`, and `manager`: the id of the person they report to (only the top person has none; `forest: true` allows several). `assistant: true` places an assistant beside their manager, `avatar: true` draws an initials placeholder, `dottedLines: [{ report, manager, label? }]` adds dotted-line or matrix reports (a stated scope or reason, such as "for clinical systems", goes in `label`), and `groupByDepartment: true` draws each department below the top as a labeled region. The renderer draws a card per person top-down, a bus line from each manager to their reports, long lists of reports stacked in one or two columns, and dotted lines dashed with a head at the second manager and their label beside them; it owns every coordinate.
+
+Native Venn diagrams: use `buildVennDiagram` (Code Mode) or `generate --type venn` (CLI). Supply two or three `sets: [{ id, label, color? }]` and `regions: [{ sets, items }]`, one region per overlap: `["a"]` holds what is only in a, `["a", "b"]` what is in a and b but not c. A region holds `items` (short phrases) or a `count`, and an optional `label` naming the overlap; omit empty regions. A set may instead list its whole membership as `items`, and each item then lands in the region of exactly the sets that list it. The renderer draws equal, overlapping translucent circles in the standard symmetric arrangement, each set's label outside its circle, and each region's text centred inside exactly that region; it sizes the circles until every region fits and owns every coordinate.

@@ -23,6 +23,9 @@ import {
 	BuildOrgChartRequestSchema,
 	BuildOrgChartResultSchema,
 	OrgChartToolSpecSchema,
+	BuildVennDiagramRequestSchema,
+	BuildVennDiagramResultSchema,
+	VennToolSpecSchema,
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
@@ -163,6 +166,14 @@ export const codeModeContracts = {
 			spec: OrgChartToolSpecSchema,
 		}),
 		output: BuildOrgChartResultSchema,
+	},
+	buildVennDiagram: {
+		input: Schema.Struct({
+			...BuildVennDiagramRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: VennToolSpecSchema,
+		}),
+		output: BuildVennDiagramResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

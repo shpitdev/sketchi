@@ -378,6 +378,15 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(orgChartDocs.split("Request type:")[0]).toContain(
 			"A dotted line joins report to a second manager outside the solid line",
 		);
+		// Venn diagrams add a builder name to the head and one compact line here.
+		expect(codeLine("buildVennDiagram")).toBe(
+			'- buildVennDiagram: spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. A region lies in exactly its sets: ["a"] is a only, ["a", "b"] is a and b but not c. Omit empty regions. Copy every set and item stated, each in its region.',
+		);
+		const vennDocs = getCodeModeDocs({ topic: "buildVennDiagram" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(vennDocs.split("\n\n")[0]);
+		expect(vennDocs.split("Request type:")[0]).toContain(
+			"A region holds items (short phrases) or a count, not both",
+		);
 		expect(codeLine("createCanvas")).toBeUndefined();
 		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
 			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
@@ -426,7 +435,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		`);
 		// Family summaries now live beside the specs, outside the truncated head.
 		// Nested zones, infrastructure shapes and their logo rule add spec fields and docs (#476).
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_650);
+		// Venn diagrams add a summary and one compact line (+336 characters).
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_900);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const line of overview
 			.split("\n")
@@ -447,6 +457,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			["buildErDiagram", ["BuildErDiagramRequest"]],
 			["buildClassDiagram", ["BuildClassDiagramRequest"]],
 			["buildOrgChart", ["BuildOrgChartRequest"]],
+			["buildVennDiagram", ["BuildVennDiagramRequest"]],
 			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
 			["getArtifact", ["GetArtifactRequest"]],
 			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],

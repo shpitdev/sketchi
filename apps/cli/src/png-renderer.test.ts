@@ -204,6 +204,38 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		}),
 	);
 
+	it.effect("exports a Venn diagram of translucent circles with its items inside", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "venn",
+					spec: {
+						title: "iOS vs Android",
+						sets: [
+							{ id: "ios", label: "iOS" },
+							{ id: "android", label: "Android" },
+						],
+						regions: [
+							{ sets: ["ios"], items: ["Apple Pay"] },
+							{ sets: ["android"], items: ["Google Pay"] },
+							{ sets: ["ios", "android"], items: ["Push notifications", "Dark mode"] },
+						],
+					},
+				}),
+			);
+			const ellipses = built.excalidraw.elements.filter((element) => element["type"] === "ellipse");
+			assert.sameMembers(
+				ellipses.map((ellipse) => String(ellipse["opacity"])),
+				["22", "22", "100", "100"],
+			);
+			const png = yield* renderer.renderPng({ scene: built.scene, excalidraw: built.excalidraw });
+			assert.isAbove(png.byteLength, 1_000);
+			assertInkHasPadding(png);
+		}),
+	);
+
 	it.effect("exports a class diagram whose lines bind elbowed with their UML heads", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

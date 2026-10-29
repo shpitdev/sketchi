@@ -22,6 +22,8 @@ import {
 	resolveClassShorthand,
 	getOrgChartValidationIssues,
 	resolveOrgChartShorthand,
+	getVennValidationIssues,
+	resolveVennShorthand,
 	getTimelineValidationIssues,
 	getChartValidationIssues,
 	getGanttValidationIssues,
@@ -49,6 +51,8 @@ import {
 	type ClassValidationIssueCode,
 	type OrgChartDiagram,
 	type OrgChartValidationIssueCode,
+	type VennDiagram,
+	type VennValidationIssueCode,
 } from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
@@ -66,6 +70,8 @@ import {
 	renderErDiagram,
 	renderClassDiagram,
 	renderOrgChartDiagram,
+	renderVennDiagram,
+	isStructurallyValidVennSet,
 	renderTimelineDiagram,
 	renderChartDiagram,
 	renderGanttDiagram,
@@ -106,6 +112,7 @@ import {
 	BuildErDiagramRejected,
 	BuildClassDiagramRejected,
 	BuildOrgChartRejected,
+	BuildVennDiagramRejected,
 	BuildTimelineRejected,
 	BuildChartRejected,
 	BuildGanttRejected,
@@ -120,6 +127,7 @@ import {
 	BuildErDiagramRequestSchema,
 	BuildClassDiagramRequestSchema,
 	BuildOrgChartRequestSchema,
+	BuildVennDiagramRequestSchema,
 	BuildTimelineRequestSchema,
 	BuildChartRequestSchema,
 	BuildGanttRequestSchema,
@@ -143,6 +151,7 @@ import {
 	type BuildErDiagramRequest,
 	type BuildClassDiagramRequest,
 	type BuildOrgChartRequest,
+	type BuildVennDiagramRequest,
 	type BuildTimelineRequest,
 	type BuildChartRequest,
 	type BuildGanttRequest,
@@ -151,6 +160,7 @@ import {
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
+	type BuildVennDiagramResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type BuildGanttResult,
@@ -173,6 +183,7 @@ import {
 	type NormalizedErSpec,
 	type NormalizedClassSpec,
 	type NormalizedOrgChartSpec,
+	type NormalizedVennSpec,
 	type NormalizedTimelineSpec,
 	type NormalizedChartSpec,
 	type NormalizedGanttSpec,
@@ -277,6 +288,7 @@ type CodeModeBoundaryOperation =
 	| "buildErDiagram"
 	| "buildClassDiagram"
 	| "buildOrgChart"
+	| "buildVennDiagram"
 	| "buildTimeline"
 	| "buildChart"
 	| "buildGantt"
@@ -316,6 +328,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	if (operation === "buildErDiagram") return "er";
 	if (operation === "buildClassDiagram") return "class";
 	if (operation === "buildOrgChart") return "org-chart";
+	if (operation === "buildVennDiagram") return "venn";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
 	return undefined;
@@ -1155,6 +1168,73 @@ function resolveOrgChartRequest(input: unknown): unknown {
 	return { ...input, spec: resolveOrgChartShorthand(input.spec) };
 }
 
+function normalizeVennSpec(spec: BuildVennDiagramRequest["spec"]): NormalizedVennSpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-venn"),
+		title,
+		sets: spec.sets.map((set) => ({
+			id: cleanToolString(set.id),
+			label: cleanToolString(set.label),
+			...optional("color", set.color),
+		})),
+		regions: spec.regions.map((region) => ({
+			sets: region.sets.map(cleanToolString),
+			...optional("label", region.label),
+			...(region.items === undefined ? {} : { items: region.items.map(cleanToolString) }),
+			...(region.count === undefined ? {} : { count: region.count }),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toVennDiagram(spec: NormalizedVennSpec): VennDiagram {
+	return { ...spec, type: "venn" };
+}
+
+/** Code Mode's published issue codes for diagram-core's Venn invariants. */
+const VENN_ISSUE_CODES = {
+	venn_set_count: "invalid_venn_set",
+	duplicate_venn_set: "duplicate_node_id",
+	invalid_venn_color: "invalid_venn_set",
+	unknown_venn_set: "invalid_venn_region",
+	duplicate_venn_region: "invalid_venn_region",
+	invalid_venn_region: "invalid_venn_region",
+	venn_text_too_long: "label_too_long",
+	venn_too_large: "venn_too_large",
+} as const satisfies Record<VennValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedVenn(spec: NormalizedVennSpec): CodeModeIssue[] {
+	return getVennValidationIssues(toVennDiagram(spec)).map((entry) =>
+		issue({
+			code: VENN_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function vennQuality(spec: NormalizedVennSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.sets.length, edgeCount: 0 },
+		checks: [],
+	};
+}
+
+/** Read sets named by label, `members`, and whole set memberships before the request is decoded. */
+function resolveVennRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveVennShorthand(input.spec) };
+}
+
 export class CodeModeArtifactRenderFailed extends Schema.TaggedError<CodeModeArtifactRenderFailed>()(
 	"CodeModeArtifactRenderFailed",
 	{ cause: Schema.Defect(), message: Schema.String },
@@ -1290,6 +1370,15 @@ const BuildOrgChartFailure = workflowFailure(
 	"BuildOrgChartFailure",
 	BuildOrgChartRejected.fields.status,
 	BuildOrgChartRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildVennDiagramFailure = workflowFailure(
+	"BuildVennDiagramFailure",
+	BuildVennDiagramRejected.fields.status,
+	BuildVennDiagramRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -1884,6 +1973,7 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				(element.rendererRole === "er-table" && isStructurallyValidErTable(element)) ||
 				(element.rendererRole === "er-optional" && isStructurallyValidErOptional(element)) ||
 				(element.rendererRole === "class-box" && isStructurallyValidClassBox(element)) ||
+				(element.rendererRole === "venn-set" && isStructurallyValidVennSet(element)) ||
 				((element.rendererRole === "swimlane" || element.rendererRole === "swimlane-header") &&
 					element.shape === "rectangle" &&
 					!element.icon) ||
@@ -3563,6 +3653,116 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 	} satisfies Extract<BuildOrgChartResult, { ok: true }>;
 });
 
+const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildVennDiagramRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(resolveVennRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildVennDiagramFailure({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeVennSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedVenn(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* new BuildVennDiagramFailure({
+			status: "invalid_venn_diagram",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = vennQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* new BuildVennDiagramFailure({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* Effect.try({
+		try: () => renderVennDiagram(toVennDiagram(normalizedSpec)),
+		catch: (cause) =>
+			new BuildVennDiagramFailure({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message:
+								cause instanceof Error ? cause.message : "Unable to render Venn diagram scene.",
+							hint: "Repair the sets and regions and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildVennDiagram.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* new BuildVennDiagramFailure({
+			status: "render_failed",
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten names or titles, or split the chart by division, and retry buildVennDiagram.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new BuildVennDiagramFailure({
+					status: error.status,
+					context: {
+						...(error.status === "export_failed" ? exportContext : qualityContext),
+						issues: error.issues,
+					},
+				}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildVennDiagramResult, { ok: true }>;
+});
+
 const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
 	input: unknown,
 ) {
@@ -4582,6 +4782,10 @@ export const buildClassDiagram: (
 /** An org chart: people, the managers they report to, and dotted-line reports. */
 export const buildOrgChart: (input: unknown) => CodeModeWorkflowEffect<BuildOrgChartResult> =
 	boundary("buildOrgChart", buildOrgChartWorkflow, failureResult);
+
+/** A Venn diagram: two or three sets and the items or counts in each of their regions. */
+export const buildVennDiagram: (input: unknown) => CodeModeWorkflowEffect<BuildVennDiagramResult> =
+	boundary("buildVennDiagram", buildVennDiagramWorkflow, failureResult);
 
 export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTimelineResult> =
 	boundary("buildTimeline", buildTimelineWorkflow, failureResult);

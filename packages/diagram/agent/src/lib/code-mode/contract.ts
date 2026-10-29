@@ -445,6 +445,9 @@ export const CODE_MODE_ISSUE_CODES = [
 	"org_chart_too_large",
 	"invalid_person",
 	"invalid_reporting_line",
+	"venn_too_large",
+	"invalid_venn_set",
+	"invalid_venn_region",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -1082,6 +1085,51 @@ export class OrgChartSpec extends Schema.Class<OrgChartSpec>("OrgChartSpec")(
 ) {}
 export const OrgChartSpecSchema = OrgChartSpec;
 
+/**
+ * The authoring form of diagram-core's canonical VennDiagram: regions default
+ * to none and style is defaulted. buildVennDiagram normalizes it into the core
+ * contract, which owns every invariant.
+ */
+export class VennSetSpec extends Schema.Class<VennSetSpec>("VennSetSpec")(
+	{
+		id: RequiredNonEmptyString,
+		label: RequiredNonEmptyString,
+		color: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+export class VennRegionSpec extends Schema.Class<VennRegionSpec>("VennRegionSpec")(
+	{
+		sets: requiredArray(nonEmptyArray(NonEmptyString)),
+		label: optionalContract(NonEmptyString),
+		items: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+		count: optionalContract(
+			Schema.Int.check(
+				Schema.isGreaterThanOrEqualTo(0, { message: "Too small: expected number to be >=0" }),
+			),
+		),
+	},
+	{ identifier: undefined },
+) {}
+
+const vennRegionsDefault: Array<typeof VennRegionSpec.Encoded> = [];
+const VennRegionsWithDefault = Schema.Array(VennRegionSpec)
+	.pipe(Schema.mutable)
+	.annotate({ default: vennRegionsDefault })
+	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(vennRegionsDefault)));
+export class VennSpec extends Schema.Class<VennSpec>("VennSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		sets: requiredArray(nonEmptyArray(VennSetSpec)),
+		regions: VennRegionsWithDefault,
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const VennSpecSchema = VennSpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -1340,6 +1388,24 @@ export const BuildOrgChartToolInputSchema = Schema.Struct({
 	spec: requiredObject(OrgChartToolSpecSchema),
 });
 export type BuildOrgChartToolInput = typeof BuildOrgChartToolInputSchema.Type;
+export class BuildVennDiagramRequest extends Schema.Class<BuildVennDiagramRequest>(
+	"BuildVennDiagramRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(VennSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildVennDiagramRequestSchema = BuildVennDiagramRequest;
+/** The Venn diagram spec a model authors; style is always the Sketchi palette. */
+export const VennToolSpecSchema = VennSpec.mapFields(({ style: _style, ...fields }) => fields);
+export const BuildVennDiagramToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(VennToolSpecSchema),
+});
+export type BuildVennDiagramToolInput = typeof BuildVennDiagramToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -2170,6 +2236,14 @@ const NormalizedOrgChartSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedOrgChartSpec = typeof NormalizedOrgChartSpecSchema.Type;
+const NormalizedVennSpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	sets: Schema.Array(VennSetSpec).pipe(Schema.mutable),
+	regions: Schema.Array(VennRegionSpec).pipe(Schema.mutable),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedVennSpec = typeof NormalizedVennSpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -2625,6 +2699,49 @@ export const BuildOrgChartResultSchema = Schema.Union([
 	BuildOrgChartRejected,
 ]);
 export type BuildOrgChartResult = typeof BuildOrgChartResultSchema.Type;
+
+export class BuildVennDiagramAccepted extends Schema.Class<BuildVennDiagramAccepted>(
+	"BuildVennDiagramAccepted",
+)(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedVennSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildVennDiagramRejected extends Schema.Class<BuildVennDiagramRejected>(
+	"BuildVennDiagramRejected",
+)(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_venn_diagram",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedVennSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildVennDiagramResultSchema = Schema.Union([
+	BuildVennDiagramAccepted,
+	BuildVennDiagramRejected,
+]);
+export type BuildVennDiagramResult = typeof BuildVennDiagramResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{

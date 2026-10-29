@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Typed, deterministic diagrams from your terminal.</strong><br />
-  Create, inspect, revise, and export local flowcharts, mindmaps, sequence diagrams, timelines, charts, state machines, Gantt charts, ER diagrams, class diagrams, and org charts—or turn one prompt into validated, editable Excalidraw.
+  Create, inspect, revise, and export local flowcharts, mindmaps, sequence diagrams, timelines, charts, state machines, Gantt charts, ER diagrams, class diagrams, org charts, and Venn diagrams—or turn one prompt into validated, editable Excalidraw.
 </p>
 
 <p align="center">
@@ -53,7 +53,7 @@ sketchi generate --prompt "Map release approval with pass and revise branches"
 
 With no `--prompt`, Sketchi opens a short wizard only when both standard input
 and standard output are human terminals, output is text, and CI is absent. It
-asks for prompt text, flowchart (the default), mind map, sequence diagram, timeline, chart, state machine, Gantt chart, ER diagram, class diagram, or org chart, and where to save the
+asks for prompt text, flowchart (the default), mind map, sequence diagram, timeline, chart, state machine, Gantt chart, ER diagram, class diagram, org chart, or Venn diagram, and where to save the
 PNG. The choices are the current directory, a `diagrams/` folder under exactly
 the directory where Sketchi was run, or a custom path with the same semantics as
 `--dest`. Sketchi does not inspect Git, and it creates `diagrams/` only after
@@ -64,7 +64,7 @@ that wizard question. Explicit `--format png` may proceed; another format or
 Scripts, pipes, redirected streams, CI, and `--output json` never prompt or
 block. They must pass `--prompt`; omitting it retains the deterministic usage
 error. Passing `--prompt` is always direct and noninteractive.
-`--type` accepts only flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, or org-chart and is authoritative.
+`--type` accepts only flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, or venn and is authoritative.
 Without it, the generation model selects one of those from the request; a
 request for any other kind of diagram returns a typed unsupported-type error
 instead of being coerced into a supported one.
@@ -103,7 +103,7 @@ The endpoint defaults to
 `https://playground.sketchi.app/api/v1/canvases/create`; use `--endpoint URL` or
 `SKETCHI_CANVAS_ENDPOINT` only for preview and local testing. The existing
 `create` command remains the separate, strictly offline command for accepted
-flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, and org-chart documents.
+flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, and venn documents.
 
 ## Create and work with a diagram offline
 
@@ -332,3 +332,5 @@ Native ER diagrams: use `buildErDiagram` (Code Mode) or `generate --type er` (CL
 Native class diagrams: use `buildClassDiagram` (Code Mode) or `generate --type class` (CLI). Supply classes with unique ids (no colons or spaces), an optional `kind` (`abstract`, `interface` or `enum`) and members written as UML does (`"- radius: double"`, `"+ area(): double {abstract}"`), and relationships with a `kind`: `inheritance` or `realization` (`from` extends or implements `to`), `composition` or `aggregation` (`from` is the whole), `association` (`navigable: true` adds an arrow) or `dependency` (`from` uses `to`). Associations, compositions and aggregations take multiplicities and roles at each end. The renderer draws three-compartment boxes with superclasses above their subclasses and each relationship's UML head; it owns every coordinate.
 
 Native org charts: use `buildOrgChart` (Code Mode) or `generate --type org-chart` (CLI). Supply people with unique ids (no colons), a `name`, an optional `title` and `department`, and `manager`: the id of the person they report to (only the top person has none; `forest: true` allows several). `assistant: true` places an assistant beside their manager, `avatar: true` draws an initials placeholder, `dottedLines: [{ report, manager, label? }]` adds dotted-line or matrix reports (a stated scope or reason, such as "for clinical systems", goes in `label`), and `groupByDepartment: true` draws each department below the top as a labeled region. The renderer draws a card per person top-down, a bus line from each manager to their reports, long lists of reports stacked in one or two columns, and dotted lines dashed with a head at the second manager and their label beside them; it owns every coordinate.
+
+Native Venn diagrams: use `buildVennDiagram` (Code Mode) or `generate --type venn` (CLI). Supply two or three `sets: [{ id, label, color? }]` and `regions: [{ sets, items }]`, one region per overlap: `["a"]` holds what is only in a, `["a", "b"]` what is in a and b but not c. A region holds `items` (short phrases) or a `count`, and an optional `label` naming the overlap; omit empty regions. A set may instead list its whole membership as `items`, and each item then lands in the region of exactly the sets that list it. The renderer draws equal, overlapping translucent circles in the standard symmetric arrangement, each set's label outside its circle, and each region's text centred inside exactly that region; it sizes the circles until every region fits and owns every coordinate.

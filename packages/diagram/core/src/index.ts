@@ -33,3 +33,5 @@ export * from "./types/org-chart.js";
 export * from "./org-chart-fixtures.js";
 export * from "./zone-fixtures.js";
 export * from "./zone-regions.js";
+export * from "./types/venn.js";
+export * from "./venn-fixtures.js";

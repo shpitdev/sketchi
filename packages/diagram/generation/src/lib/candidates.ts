@@ -14,6 +14,10 @@ import {
 	OrgChartValidationError,
 	resolveOrgChartShorthand,
 	validateOrgChartDiagram,
+	VennDiagramSchema,
+	VennValidationError,
+	resolveVennShorthand,
+	validateVennDiagram,
 	resolveClassShorthand,
 	resolveErShorthand,
 	validateClassDiagram,
@@ -398,7 +402,8 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof GanttValidationError ||
 		error instanceof ErValidationError ||
 		error instanceof ClassValidationError ||
-		error instanceof OrgChartValidationError
+		error instanceof OrgChartValidationError ||
+		error instanceof VennValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
@@ -417,7 +422,9 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 										? "class"
 										: error instanceof OrgChartValidationError
 											? "org-chart"
-											: "sequence";
+											: error instanceof VennValidationError
+												? "venn"
+												: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -586,6 +593,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 				OrgChartDiagramSchema,
 				resolveOrgChartShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateOrgChartDiagram,
+				intent,
+			),
+		venn: () =>
+			decodeAndValidate(
+				VennDiagramSchema,
+				resolveVennShorthand(withSketchiDiagramStyle(titledDiagram)),
+				validateVennDiagram,
 				intent,
 			),
 		sequence: () => {
@@ -776,6 +790,12 @@ function labelsForRequirement(
 		return requirement.target === "person"
 			? diagram.people.map((person) => person.name)
 			: undefined;
+	if (diagram.type === "venn")
+		return requirement.target === "set"
+			? diagram.sets.map((set) => set.label)
+			: requirement.target === "item"
+				? diagram.regions.flatMap((region) => region.items ?? [])
+				: undefined;
 	if (diagram.type === "er") {
 		if (requirement.target === "entity") return diagram.entities.map(erEntityName);
 		if (requirement.target === "field")
@@ -831,6 +851,12 @@ function countForRequirement(
 				? diagram.relationships.length
 				: undefined;
 	if (diagram.type === "org-chart") return target === "people" ? diagram.people.length : undefined;
+	if (diagram.type === "venn")
+		return target === "sets"
+			? diagram.sets.length
+			: target === "items"
+				? diagram.regions.reduce((sum, region) => sum + (region.items?.length ?? 0), 0)
+				: undefined;
 	if (diagram.type === "er")
 		return target === "entities"
 			? diagram.entities.length

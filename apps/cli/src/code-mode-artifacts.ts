@@ -65,6 +65,7 @@ export function codeModeFailure(
 					"invalid_er_diagram",
 					"invalid_class_diagram",
 					"invalid_org_chart",
+					"invalid_venn_diagram",
 					"quality_failed",
 				];
 	if (validationStatuses.includes(result.status))

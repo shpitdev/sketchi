@@ -12,6 +12,7 @@ import {
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
+	type BuildVennDiagramResult,
 	type BuildTimelineResult,
 	ClassSpec,
 	ErSpec,
@@ -24,6 +25,7 @@ import {
 	ChartSpec,
 	GanttSpec,
 	OrgChartSpec,
+	VennSpec,
 } from "./contract.js";
 import type { CodeModeArtifactStorage } from "./artifacts.js";
 import {
@@ -34,6 +36,7 @@ import {
 	buildErDiagram,
 	buildClassDiagram,
 	buildOrgChart,
+	buildVennDiagram,
 	buildTimeline,
 	buildChart,
 	buildGantt,
@@ -55,6 +58,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	er: ErSpec,
 	class: ClassSpec,
 	"org-chart": OrgChartSpec,
+	venn: VennSpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -75,7 +79,8 @@ export type CanonicalBuildResult =
 	| BuildGanttResult
 	| BuildErDiagramResult
 	| BuildClassDiagramResult
-	| BuildOrgChartResult;
+	| BuildOrgChartResult
+	| BuildVennDiagramResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -112,6 +117,8 @@ export function buildCanonicalDocument(
 			return buildClassDiagram(request);
 		case "org-chart":
 			return buildOrgChart(request);
+		case "venn":
+			return buildVennDiagram(request);
 	}
 }
 
@@ -287,6 +294,21 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 						? {}
 						: { groupByDepartment: diagram.groupByDepartment }),
 					...(diagram.forest === undefined ? {} : { forest: diagram.forest }),
+					style: diagram.style,
+				},
+			};
+		case "venn":
+			return {
+				type: "venn",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					sets: diagram.sets.map((set) => ({ ...set })),
+					regions: diagram.regions.map((region) => ({
+						...region,
+						sets: [...region.sets],
+						...(region.items === undefined ? {} : { items: [...region.items] }),
+					})),
 					style: diagram.style,
 				},
 			};

@@ -49,8 +49,8 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "people", "relationships", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", "member", or "person".',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "people", "sets", "items", "relationships", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", "member", "person", "set", or "item".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
 ];
@@ -167,6 +167,16 @@ const IR_INSTRUCTIONS = {
 			'Return dottedLines: [{ id, report, manager, label? }] for each dotted-line or matrix report the source states: report also answers to manager, outside the solid line. Put the scope or reason the source gives for it ("for clinical systems") in label.',
 			"Set groupByDepartment: true only when the source asks to group departments into regions.",
 			"Copy every person, title, department, reporting line and dotted line the source states; invent none.",
+		],
+	},
+	venn: {
+		title: "Venn diagram IR rules",
+		rules: [
+			'Use diagram type "venn".',
+			"Use it for Venn diagrams: what two or three overlapping sets share; never supply coordinates or sizes.",
+			'Return sets: [{ id, label }] and regions: [{ sets, items?, count?, label? }]. A region\'s sets are the ids it lies in, and it excludes every other set: ["a"] is a only, ["a", "b"] is a and b but not c.',
+			"Give a region items (short phrases) or a count, never both. Omit a region the source leaves empty; label names an overlap only when the source does.",
+			"Copy every set and item the source states, each once and in exactly its region; invent none.",
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
@@ -392,6 +402,25 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "people", comparator: "exact", value: 5 },
 			{ kind: "label", target: "person", value: "Alan Turing" },
+		],
+	},
+	venn: {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "venn",
+			sets: [
+				{ id: "ios", label: "iOS" },
+				{ id: "android", label: "Android" },
+			],
+			regions: [
+				{ sets: ["ios"], items: ["Apple Pay"] },
+				{ sets: ["android"], items: ["Google Pay"] },
+				{ sets: ["ios", "android"], items: ["Push notifications", "Dark mode"] },
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "items", comparator: "exact", value: 4 },
+			{ kind: "label", target: "item", value: "Apple Pay" },
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;

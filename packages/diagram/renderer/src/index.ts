@@ -9,6 +9,14 @@ export * from "./class-diagram.js";
 export * from "./org-chart.js";
 export * from "./org-chart-readout.js";
 export type { OrgLayout } from "./org-chart-layout.js";
+export * from "./venn.js";
+export * from "./venn-readout.js";
+export {
+	insideClearance,
+	layoutVennDiagram,
+	outsideClearance,
+	type VennLayout,
+} from "./venn-layout.js";
 
 export * from "./timeline.js";
 export * from "./timeline-readout.js";

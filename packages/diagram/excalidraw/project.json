@@ -55,6 +55,12 @@
 				"command": "SEQUENCE_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/sequence-fuzz.test.ts"
 			}
 		},
+		"venn-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "VENN_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/venn-fuzz.test.ts"
+			}
+		},
 		"org-chart-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {

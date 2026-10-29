@@ -29,12 +29,14 @@ export class CountRequirement extends Schema.Class<CountRequirement>("CountRequi
 		"cycles",
 		"decision_nodes",
 		"entities",
+		"items",
 		"messages",
 		"events",
 		"nodes",
 		"participants",
 		"people",
 		"relationships",
+		"sets",
 		"states",
 		"tasks",
 		"terminal_nodes",
@@ -71,6 +73,8 @@ export class LabelRequirement extends Schema.Class<LabelRequirement>("LabelRequi
 		"class",
 		"member",
 		"person",
+		"set",
+		"item",
 	]),
 	value: Schema.NonEmptyString,
 }) {}
@@ -116,6 +120,7 @@ const FALLBACK_TITLES: Readonly<Record<DiagramGenerationType, string>> = {
 	er: "Generated ER diagram",
 	class: "Generated class diagram",
 	"org-chart": "Generated org chart",
+	venn: "Generated Venn diagram",
 };
 
 function titleFromId(id: string): string | undefined {

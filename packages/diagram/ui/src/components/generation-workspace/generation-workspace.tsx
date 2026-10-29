@@ -72,6 +72,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 				diagram.dottedLines.length,
 			edgeNoun: "reporting lines",
 		};
+	if (diagram.type === "venn")
+		return {
+			nodeCount: diagram.sets.length,
+			nodeNoun: "sets",
+			edgeCount: diagram.regions.reduce((count, region) => count + (region.items?.length ?? 0), 0),
+			edgeNoun: "items",
+		};
 	return diagram.type === "sequence"
 		? {
 				nodeCount: diagram.participants.length,

@@ -1160,8 +1160,10 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				/^- buildClassDiagram: .*"composition" or "aggregation": from is the whole/m,
 			);
 			expect(codeDescription).toMatch(/^- buildOrgChart: .*manager is the id they report to/m);
+			expect(codeDescription).toMatch(/^- buildVennDiagram: .*A region lies in exactly its sets/m);
 			// The head retains builder names; summaries ride on the code parameter. Nested zones
-			// and infrastructure shapes add three spec fields and their shape and logo rules.
+			// and infrastructure shapes add three spec fields and their shape and logo rules. Venn
+			// diagrams add a builder name, a summary and one compact line.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -1170,7 +1172,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(13_650);
+			).toBeLessThan(13_870);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

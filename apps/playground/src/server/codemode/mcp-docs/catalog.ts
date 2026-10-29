@@ -34,6 +34,7 @@ const BUILDERS = {
 	buildErDiagram: "database schemas: tables, fields, keys and relationships",
 	buildClassDiagram: "UML classes, members and relationships",
 	buildOrgChart: "org charts of people, titles and reporting lines",
+	buildVennDiagram: "Venn diagrams of what overlapping sets share",
 	createCanvas: "hand-placed CanvasSpec, only for layouts no builder covers (dashboard, wireframe)",
 };
 const HELPERS = {
@@ -75,6 +76,9 @@ const CLASS_KIND_RULE =
 /** Shared by the buildOrgChart topic and its compact line in the execute description. */
 const ORG_CHART_RULE =
 	"manager is the id they report to; only the top person has none (forest: true for several).";
+/** Shared by the buildVennDiagram topic and its compact line in the execute description. */
+const VENN_REGION_RULE =
+	'A region lies in exactly its sets: ["a"] is a only, ["a", "b"] is a and b but not c. Omit empty regions.';
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 /**
@@ -95,6 +99,7 @@ const FAST_PATH = {
 	buildErDiagram: `spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. ${ER_CARDINALITY_RULE} Copy every table, field, type, key and cardinality stated.`,
 	buildClassDiagram: `spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. ${CLASS_KIND_RULE} Copy every class, member and relationship stated.`,
 	buildOrgChart: `spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. ${ORG_CHART_RULE} Copy every person, title, department and line stated.`,
+	buildVennDiagram: `spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. ${VENN_REGION_RULE} Copy every set and item stated, each in its region.`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 const EXECUTE_HELPERS = [
 	HELPERS.searchIcons,
@@ -793,6 +798,27 @@ export const catalog: CatalogEntry[] = [
 		],
 	},
 	{
+		id: "buildVennDiagram",
+		kind: "operation",
+		title: "buildVennDiagram",
+		topic: "buildVennDiagram",
+		keywords: ["venn", "venn diagram", "overlap", "intersection", "shared", "in common", "sets"],
+		snippet: "Create a native Venn diagram from two or three sets and the items in each region.",
+		content: [
+			"buildVennDiagram accepts { spec: { id?, title, sets: [{ id, label, color? }], regions?: [{ sets, label?, items?, count? }] }, options? }. The renderer draws two or three equal, overlapping translucent circles, each set's label outside its circle, and each region's items, one per line, centred inside exactly that region; it sizes the circles until every region's text fits.",
+			`${VENN_REGION_RULE} A region holds items (short phrases) or a count, not both; label names the overlap itself only when the prompt does. color is a palette name (blue, orange, green, yellow, pink, violet, red, gray) or #rrggbb.`,
+			"Copy every set and item the prompt states, each once and in exactly its region; invent none.",
+			operationTypes("buildVennDiagram"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "Two sets and their overlap",
+				language: "js",
+				code: `async () => sketchi.buildVennDiagram({ spec: { title: "iOS vs Android", sets: [{ id: "ios", label: "iOS" }, { id: "android", label: "Android" }], regions: [{ sets: ["ios"], items: ["Apple Pay"] }, { sets: ["android"], items: ["Google Pay"] }, { sets: ["ios", "android"], items: ["Push notifications", "Dark mode"] }] }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
 		id: "buildSequenceDiagram",
 		kind: "operation",
 		title: "buildSequenceDiagram",
@@ -851,7 +877,7 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Hand-place a layout no builder covers (dashboard, wireframe) as a versioned CanvasSpec.",
 		content: [
-			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
+			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); overlapping sets are Venn diagrams (buildVennDiagram); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
 			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",

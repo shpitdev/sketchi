@@ -19,6 +19,7 @@ import {
 	orgChartLayoutCheck,
 	orgChartScenarioChecks,
 } from "./org-chart-scenarios.js";
+import { vennDrawnCheck, vennLayoutCheck, vennScenarioChecks } from "./venn-scenarios.js";
 import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,
@@ -36,6 +37,8 @@ import {
 	parseErDiagram,
 	parseClassDiagram,
 	parseOrgChartDiagram,
+	parseVennDiagram,
+	resolveVennShorthand,
 	parseTimelineDiagram,
 	parseChartDiagram,
 	parseGanttDiagram,
@@ -1128,6 +1131,18 @@ export function evaluateScenarioDiagram(
 			orgChartScenarioChecks(scenario, modelDiagram),
 			(scene) => [orgChartDrawnCheck(diagram, scene), orgChartLayoutCheck(scene)],
 		);
+	}
+	if (scenario.diagramType === "venn") {
+		const diagram = parseVennDiagram(resolveVennShorthand(candidate));
+		const modelDiagram =
+			modelCandidate === candidate
+				? diagram
+				: parseVennDiagram(resolveVennShorthand(modelCandidate));
+		// The drawing and its layout read the scene, so they score the returned diagram.
+		return evaluation(scenario.id, diagram, vennScenarioChecks(scenario, modelDiagram), (scene) => [
+			vennDrawnCheck(diagram, scene),
+			vennLayoutCheck(scene),
+		]);
 	}
 	if (scenario.diagramType === "sequence") {
 		const diagram = parseSequenceDiagram(candidate);

@@ -125,6 +125,23 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: person.name,
 			})),
 		];
+	if (scenario.diagramType === "venn")
+		return [
+			{
+				kind: "count",
+				target: "items",
+				comparator: "exact",
+				value: scenario.expectedDiagram.regions.reduce(
+					(sum, region) => sum + (region.items?.length ?? 0),
+					0,
+				),
+			},
+			...scenario.expectedDiagram.sets.map((set) => ({
+				kind: "label",
+				target: "set",
+				value: set.label,
+			})),
+		];
 	if (scenario.diagramType === "sequence") {
 		return [
 			{

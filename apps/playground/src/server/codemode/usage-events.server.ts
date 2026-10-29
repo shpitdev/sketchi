@@ -41,6 +41,7 @@ export type CodeModeUsageOperation =
 	| "buildErDiagram"
 	| "buildClassDiagram"
 	| "buildOrgChart"
+	| "buildVennDiagram"
 	| "createCanvas"
 	| "execute"
 	| "generateDiagram";

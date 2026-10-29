@@ -1,7 +1,7 @@
 # Adding a diagram family
 
 Sketchi supports a fixed set of canonical diagram families: flowchart, mindmap,
-sequence, timeline, chart, state-machine, gantt, er, class, and org-chart. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
+sequence, timeline, chart, state-machine, gantt, er, class, org-chart, and venn. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
 registry. A family is supported only when it completes every stage below, and
 only supported families are advertised. Everything else, such as architecture or
 swimlane, fails with a typed `unsupported_diagram_type` and is never coerced
@@ -43,7 +43,9 @@ route on the graph router with pinned row ends; see `docs/er-diagrams.md`.
 Class diagrams place their boxes in rows, superclasses above, and route the
 same way with a port for every end; see `docs/class-diagrams.md`. Org charts
 place their own tree, a bus from each manager to their reports, and route only
-their dotted lines; see `docs/org-charts.md`.
+their dotted lines; see `docs/org-charts.md`. Venn diagrams have their own
+contract of sets and regions and size their circles until each region's text
+fits; see `docs/venn-diagrams.md`.
 
 Surfaces that offer a family to people also need updating: the playground
 generate API (`apps/playground/src/server/generation/api.server.ts`), Studio

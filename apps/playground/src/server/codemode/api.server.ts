@@ -10,6 +10,7 @@ import {
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
+	type BuildVennDiagramResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CreateCanvasResult,
@@ -63,6 +64,7 @@ function requestTooLargeResult(
 		| "ER diagram"
 		| "Class diagram"
 		| "Org chart"
+		| "Venn diagram"
 		| "Artifact patch",
 ) {
 	return {
@@ -190,6 +192,7 @@ type BuildResult =
 	| BuildErDiagramResult
 	| BuildClassDiagramResult
 	| BuildOrgChartResult
+	| BuildVennDiagramResult
 	| CreateCanvasResult;
 
 type BuildOperation =
@@ -203,6 +206,7 @@ type BuildOperation =
 	| "buildErDiagram"
 	| "buildClassDiagram"
 	| "buildOrgChart"
+	| "buildVennDiagram"
 	| "createCanvas";
 
 function makeBuildHandler({
@@ -222,6 +226,7 @@ function makeBuildHandler({
 		| "ER diagram"
 		| "Class diagram"
 		| "Org chart"
+		| "Venn diagram"
 		| "Canvas";
 	readonly run: (
 		codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
@@ -318,6 +323,11 @@ export const handleBuildOrgChartRequest = makeBuildHandler({
 	operation: "buildOrgChart",
 	label: "Org chart",
 	run: (codeMode, input) => codeMode.buildOrgChart(input),
+});
+export const handleBuildVennDiagramRequest = makeBuildHandler({
+	operation: "buildVennDiagram",
+	label: "Venn diagram",
+	run: (codeMode, input) => codeMode.buildVennDiagram(input),
 });
 export const handleCreateCanvasRequest = makeBuildHandler({
 	operation: "createCanvas",

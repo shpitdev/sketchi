@@ -87,6 +87,11 @@ function resultSummary(result: StudioBuildResult): {
 		return { connectionCount: spec.relationships.length, itemCount: spec.entities.length };
 	if ("classes" in spec)
 		return { connectionCount: spec.relationships.length, itemCount: spec.classes.length };
+	if ("regions" in spec)
+		return {
+			connectionCount: spec.regions.length,
+			itemCount: spec.regions.reduce((sum, region) => sum + (region.items?.length ?? 0), 0),
+		};
 	if ("people" in spec)
 		return {
 			connectionCount:
@@ -170,6 +175,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 		case "invalid_er_diagram":
 		case "invalid_class_diagram":
 		case "invalid_org_chart":
+		case "invalid_venn_diagram":
 			return {
 				message: "This draft needs a clearer structure before it can be drawn.",
 				hint: "Clarify the steps or simplify the connections, then try again.",

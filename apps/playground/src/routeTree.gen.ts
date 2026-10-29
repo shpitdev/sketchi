@@ -37,6 +37,7 @@ import { Route as ApiV1OrgChartsBuildRouteImport } from "./routes/api/v1/org-cha
 import { Route as ApiV1SequencesBuildRouteImport } from "./routes/api/v1/sequences/build";
 import { Route as ApiV1StateMachinesBuildRouteImport } from "./routes/api/v1/state-machines/build";
 import { Route as ApiV1TimelinesBuildRouteImport } from "./routes/api/v1/timelines/build";
+import { Route as ApiV1VennDiagramsBuildRouteImport } from "./routes/api/v1/venn-diagrams/build";
 import { Route as ApiV1ArtifactsArtifactIdPatchRouteImport } from "./routes/api/v1/artifacts/$artifactId/patch";
 
 const IndexRoute = IndexRouteImport.update({
@@ -183,6 +184,11 @@ const ApiV1TimelinesBuildRoute = ApiV1TimelinesBuildRouteImport.update({
   path: "/api/v1/timelines/build",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiV1VennDiagramsBuildRoute = ApiV1VennDiagramsBuildRouteImport.update({
+  id: "/api/v1/venn-diagrams/build",
+  path: "/api/v1/venn-diagrams/build",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiV1ArtifactsArtifactIdPatchRoute =
   ApiV1ArtifactsArtifactIdPatchRouteImport.update({
     id: "/patch",
@@ -219,6 +225,7 @@ export interface FileRoutesByFullPath {
   "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
   "/api/v1/state-machines/build": typeof ApiV1StateMachinesBuildRoute;
   "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
+  "/api/v1/venn-diagrams/build": typeof ApiV1VennDiagramsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesByTo {
@@ -250,6 +257,7 @@ export interface FileRoutesByTo {
   "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
   "/api/v1/state-machines/build": typeof ApiV1StateMachinesBuildRoute;
   "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
+  "/api/v1/venn-diagrams/build": typeof ApiV1VennDiagramsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesById {
@@ -282,6 +290,7 @@ export interface FileRoutesById {
   "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
   "/api/v1/state-machines/build": typeof ApiV1StateMachinesBuildRoute;
   "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
+  "/api/v1/venn-diagrams/build": typeof ApiV1VennDiagramsBuildRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRouteTypes {
@@ -315,6 +324,7 @@ export interface FileRouteTypes {
     | "/api/v1/sequences/build"
     | "/api/v1/state-machines/build"
     | "/api/v1/timelines/build"
+    | "/api/v1/venn-diagrams/build"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesByTo: FileRoutesByTo;
   to:
@@ -346,6 +356,7 @@ export interface FileRouteTypes {
     | "/api/v1/sequences/build"
     | "/api/v1/state-machines/build"
     | "/api/v1/timelines/build"
+    | "/api/v1/venn-diagrams/build"
     | "/api/v1/artifacts/$artifactId/patch";
   id:
     | "__root__"
@@ -377,6 +388,7 @@ export interface FileRouteTypes {
     | "/api/v1/sequences/build"
     | "/api/v1/state-machines/build"
     | "/api/v1/timelines/build"
+    | "/api/v1/venn-diagrams/build"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesById: FileRoutesById;
 }
@@ -408,6 +420,7 @@ export interface RootRouteChildren {
   ApiV1SequencesBuildRoute: typeof ApiV1SequencesBuildRoute;
   ApiV1StateMachinesBuildRoute: typeof ApiV1StateMachinesBuildRoute;
   ApiV1TimelinesBuildRoute: typeof ApiV1TimelinesBuildRoute;
+  ApiV1VennDiagramsBuildRoute: typeof ApiV1VennDiagramsBuildRoute;
 }
 
 declare module "@tanstack/react-router" {
@@ -608,6 +621,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiV1TimelinesBuildRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/v1/venn-diagrams/build": {
+      id: "/api/v1/venn-diagrams/build";
+      path: "/api/v1/venn-diagrams/build";
+      fullPath: "/api/v1/venn-diagrams/build";
+      preLoaderRoute: typeof ApiV1VennDiagramsBuildRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/v1/artifacts/$artifactId/patch": {
       id: "/api/v1/artifacts/$artifactId/patch";
       path: "/patch";
@@ -671,6 +691,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1SequencesBuildRoute: ApiV1SequencesBuildRoute,
   ApiV1StateMachinesBuildRoute: ApiV1StateMachinesBuildRoute,
   ApiV1TimelinesBuildRoute: ApiV1TimelinesBuildRoute,
+  ApiV1VennDiagramsBuildRoute: ApiV1VennDiagramsBuildRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

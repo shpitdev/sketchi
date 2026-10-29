@@ -83,6 +83,13 @@ import {
 	StudioBuildOrgChartInputSchema,
 	StudioBuildOrgChartOutputSchema,
 } from "./studio-org-chart-tool.server";
+import {
+	makeStudioVennToolExecutor,
+	STUDIO_BUILD_VENN_TOOL_DESCRIPTION,
+	STUDIO_BUILD_VENN_TOOL_NAME,
+	StudioBuildVennInputSchema,
+	StudioBuildVennOutputSchema,
+} from "./studio-venn-tool.server";
 
 export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
 	"StudioAgentRequestError",
@@ -203,6 +210,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	const erExecutor = yield* makeStudioErToolExecutor(codeMode.buildErDiagram, { turn });
 	const classExecutor = yield* makeStudioClassToolExecutor(codeMode.buildClassDiagram, { turn });
 	const orgChartExecutor = yield* makeStudioOrgChartToolExecutor(codeMode.buildOrgChart, { turn });
+	const vennExecutor = yield* makeStudioVennToolExecutor(codeMode.buildVennDiagram, { turn });
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -257,6 +265,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildOrgChartInputSchema,
 						outputSchema: StudioBuildOrgChartOutputSchema,
 						execute: makeStudioBuildToolCallback(orgChartExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_VENN_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_VENN_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildVennInputSchema,
+						outputSchema: StudioBuildVennOutputSchema,
+						execute: makeStudioBuildToolCallback(vennExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,

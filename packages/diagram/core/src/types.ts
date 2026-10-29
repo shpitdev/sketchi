@@ -14,6 +14,7 @@ export const DIAGRAM_TYPES = [
 	"er",
 	"class",
 	"org-chart",
+	"venn",
 ] as const;
 
 export type DiagramTypeValue = (typeof DIAGRAM_TYPES)[number];
