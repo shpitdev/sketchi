@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	CANVAS_FRAME_NAME,
 	canvasFrameNameWidth,
 	flowchartFixture,
 	getCanvasValidationIssues,
@@ -9,6 +10,7 @@ import {
 	routingQualityScale,
 } from "@sketchi/diagram-core";
 import {
+	arrowCrossings,
 	renderIntermediateDiagram,
 	type ArrowSceneElement,
 	type FrameSceneElement,
@@ -143,6 +145,113 @@ describe("grouped flowchart layout", () => {
 		expect(frame!.width).toBeGreaterThanOrEqual(30 * 14 * 0.944);
 		expect(frame!.width).toBeGreaterThanOrEqual(canvasFrameNameWidth(label));
 		expect(groupRegionIssues(scene)).toEqual([]);
+	});
+
+	it.each(["expense-approval-by-team", "expense-approval-resubmit"] as const)(
+		"wraps %s's long row of team groups into rows, each group whole",
+		(name) => {
+			// Round 25: two generated expense approvals drew their three team groups
+			// in one row, 4.96:1 and 4.26:1, since a grouped flow never wrapped.
+			const scene = rendered(name);
+			expect(Math.max(scene.width / scene.height, scene.height / scene.width)).toBeLessThan(2.45);
+			// The employee's and the manager's groups read left to right in the first
+			// row, and finance's starts the next under the manager's, clear of the
+			// taller employee's group beside it: it rises to the manager's.
+			const [employee, manager, finance] = framesOf(scene);
+			expect(employee!.x + employee!.width).toBeLessThan(manager!.x);
+			expect(employee!.y).toBeLessThan(manager!.y + manager!.height);
+			expect(manager!.y).toBeLessThan(employee!.y + employee!.height);
+			expect(employee!.x + employee!.width).toBeLessThan(finance!.x);
+			const nameBand = CANVAS_FRAME_NAME.height + CANVAS_FRAME_NAME.clearance;
+			const above = manager!.y + manager!.height;
+			expect(finance!.y - nameBand).toBeGreaterThanOrEqual(employee!.y + employee!.height);
+			// One band gap (144) below the manager's group, not below the employee's.
+			expect(finance!.y - nameBand - above).toBeLessThanOrEqual(150);
+			// No line crosses another, and none draws a reader finding.
+			const arrows = arrowsOf(scene);
+			expect(arrowCrossings(arrows)).toBe(0);
+			expect(
+				routingQualityFindings(
+					arrows.map((a) => ({
+						id: a.id,
+						points: a.points,
+						sourceId: a.sourceNodeId,
+						targetId: a.targetNodeId,
+					})),
+					routingQualityScale(scene),
+				),
+			).toEqual([]);
+			// The approval steps down through the gap under the manager's group, clear
+			// of every frame and its name, never around the outer margins.
+			const nodes = new Map(nodesOf(scene).map((node) => [node.nodeId, node]));
+			const between = arrows.filter(
+				(a) =>
+					nodes.get(a.targetNodeId)?.frameId === finance!.id &&
+					nodes.get(a.sourceNodeId)?.frameId === manager!.id,
+			);
+			expect(between).toHaveLength(1);
+			const { points } = between[0]!;
+			const across = points
+				.slice(1)
+				.flatMap((point, index) =>
+					Math.abs(point.y - points[index]!.y) < 0.01 && Math.abs(point.x - points[index]!.x) > 0.01
+						? [point.y]
+						: [],
+				);
+			expect(across).toHaveLength(1);
+			expect(across[0]).toBeGreaterThan(above);
+			expect(across[0]).toBeLessThan(finance!.y - nameBand);
+			for (const point of points) {
+				expect(point.x).toBeGreaterThanOrEqual(Math.min(employee!.x, finance!.x));
+				expect(point.x).toBeLessThanOrEqual(
+					Math.max(manager!.x + manager!.width, finance!.x + finance!.width),
+				);
+			}
+		},
+	);
+
+	it("keeps a row of teams between ungrouped steps in one row where every wrap adds a port jog", () => {
+		// The #548 review: each wrap of this row drew the decision's "No" branch
+		// with an 88.2-unit step beside its arrowhead, which the row does not draw.
+		const scene = rendered("mixed-membership-row");
+		const arrows = arrowsOf(scene);
+		expect(
+			routingQualityFindings(
+				arrows.map((a) => ({
+					id: a.id,
+					points: a.points,
+					sourceId: a.sourceNodeId,
+					targetId: a.targetNodeId,
+				})),
+				routingQualityScale(scene),
+			),
+		).toEqual([]);
+		const frames = framesOf(scene);
+		for (const [index, frame] of frames.slice(1).entries())
+			expect(frame.x).toBeGreaterThan(frames[index]!.x + frames[index]!.width);
+	});
+
+	it("wraps a five-team row whose ends' polish clears the jogs its wrap first steps", () => {
+		// The #548 delta review: judged before the ends' polish, the wrap's two
+		// transient jogs kept this row 4994 units long, though the polished wrap
+		// draws no reader finding.
+		const scene = rendered("five-team-row");
+		expect(Math.max(scene.width / scene.height, scene.height / scene.width)).toBeLessThan(4);
+		const frames = framesOf(scene);
+		expect(frames.some((frame) => frame.y > frames[0]!.y + frames[0]!.height)).toBe(true);
+		const arrows = arrowsOf(scene);
+		expect(arrowCrossings(arrows)).toBe(0);
+		expect(
+			routingQualityFindings(
+				arrows.map((a) => ({
+					id: a.id,
+					points: a.points,
+					sourceId: a.sourceNodeId,
+					targetId: a.targetNodeId,
+				})),
+				routingQualityScale(scene),
+			),
+		).toEqual([]);
 	});
 
 	it("renders an ungrouped flowchart exactly as before", () => {

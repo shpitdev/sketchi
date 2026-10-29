@@ -1418,6 +1418,12 @@ interface Wrap {
 	 * it instead of back at the start (zoned levels).
 	 */
 	readonly under?: boolean;
+	/**
+	 * Each band of a grouped top level sits its gap clear of only the blocks
+	 * before it that share its stretch of the flow, rather than of the broadest
+	 * band before it, so a band hanging under a short block rises to that block.
+	 */
+	readonly rise?: boolean;
 }
 
 const NO_WRAP: Wrap = { bandOf: new Map(), continuations: new Set() };
@@ -1581,7 +1587,8 @@ function planWrap(
 	balance = 0,
 	zone?: ZoneWrapOptions,
 ): Wrap {
-	// A band cut must not split a group; grouped flows stay in one band.
+	// A band cut must not split a group: a grouped flow wraps by level instead
+	// (planZoneWraps).
 	if (diagram.layout.edgeRouting !== "orthogonal" || groupStructure(diagram) || laned(diagram))
 		return NO_WRAP;
 	const { feedbackEdges, gapAfter, rankByNodeId, rankMetrics } = rankLayout(
@@ -1770,9 +1777,12 @@ const ZONE_WRAP_ALTERNATIVES = 2;
 const ZONE_WRAP_ROUNDS = 2;
 
 /**
- * Bands for a zoned flow too long for its breadth, best first. Each level (the
- * top level or one zone's members) wraps as a plain flow does, in the stated
- * direction, its zones whole ranks of it (planWrap). Levels wrap one at a time:
+ * Bands for a grouped flow too long for its breadth, best first. Each level
+ * (the top level or one zone's members) wraps as a plain flow does, in the
+ * stated direction, its groups whole ranks of it (planWrap). A flat group's
+ * members never wrap: its frame stays one block of the top level, which alone
+ * wraps, a row or column of groups laid out in rows or columns of them.
+ * Levels wrap one at a time:
  * each time the level and band count that bring the whole diagram within
  * WRAP_TARGET_ASPECT with the fewest bands or, if none does, nearest it, while
  * that keeps helping. The single-level plans that come next are alternatives,
@@ -1789,7 +1799,9 @@ function planZoneWraps(
 ): ReadonlyMap<string, Wrap>[] {
 	const levels = new Map<string, IntermediateDiagram>([
 		[TOP_LEVEL, structure.top],
-		...structure.groups.map((level) => [level.group.id, level.diagram] as const),
+		...(structure.zoned
+			? structure.groups.map((level) => [level.group.id, level.diagram] as const)
+			: []),
 	]);
 	const weights = zoneFlowRanks(structure);
 	const unrouted = (zoneWraps: ReadonlyMap<string, Wrap>) => {
@@ -2216,7 +2228,7 @@ function positionGroupedNodes(
 			nodes,
 		});
 	}
-	alignUnits(structure, units, vertical, topWrap.bandOf);
+	alignUnits(structure, units, vertical, topWrap.bandOf, topWrap.rise);
 	for (const [unitId, unit] of units) {
 		if (unit.frame) boxes.set(unitId.slice(GROUP_UNIT_PREFIX.length), unit.frame);
 		for (const [id, box] of unit.nested ?? []) boxes.set(id, box);
@@ -2317,6 +2329,7 @@ function alignUnits(
 	units: Map<string, PlacedUnit>,
 	vertical: boolean,
 	bandOf: ReadonlyMap<string, number> = new Map(),
+	rise = false,
 ): void {
 	const { crossEdges, top } = structure;
 	const feedback = flowFeedback(top);
@@ -2330,14 +2343,32 @@ function alignUnits(
 	const size = vertical ? "width" : "height";
 	// Each band's reach across the flow, so bands keep the gaps they were laid out with.
 	const bandCount = Math.max(0, ...bandOf.values()) + 1;
-	const extent = (band: number) => {
-		const boxes = [...units]
+	const boxesOf = (band: number) =>
+		[...units]
 			.filter(([id]) => (bandOf.get(id) ?? 0) === band)
 			.map(([, unit]) => unit.frame ?? unit.nodes[0]!);
+	const extent = (band: number) => {
+		const boxes = boxesOf(band);
 		return {
 			start: Math.min(...boxes.map((box) => box[across])),
 			end: Math.max(...boxes.map((box) => box[across] + box[size])),
 		};
+	};
+	// Risen, a band clears only the blocks before it that share its stretch of
+	// the flow: the skyline above it.
+	const skyline = (band: number) => {
+		const [along, length] = vertical ? (["y", "height"] as const) : (["x", "width"] as const);
+		const own = boxesOf(band);
+		const [low, high] = [
+			Math.min(...own.map((box) => box[along])),
+			Math.max(...own.map((box) => box[along] + box[length])),
+		];
+		const above = Array.from({ length: band }, (_, before) => boxesOf(before))
+			.flat()
+			.filter((box) => box[along] < high && box[along] + box[length] > low);
+		return above.length > 0
+			? Math.max(...above.map((box) => box[across] + box[size]))
+			: extent(band - 1).end;
 	};
 	const bandGaps = Array.from({ length: bandCount }, (_, band) =>
 		band === 0 ? 0 : extent(band).start - extent(band - 1).end,
@@ -2434,7 +2465,8 @@ function alignUnits(
 		gather(rank);
 	}
 	for (let band = 1; band < bandCount; band += 1) {
-		const delta = extent(band - 1).end + bandGaps[band]! - extent(band).start;
+		const delta =
+			(rise ? skyline(band) : extent(band - 1).end) + bandGaps[band]! - extent(band).start;
 		for (const [id] of units) if ((bandOf.get(id) ?? 0) === band) shift(id, delta);
 	}
 }
@@ -7375,6 +7407,64 @@ function assignContinuationLanes(
 	}
 }
 
+/**
+ * The line from one band of a wrapped row or column of frames to the next runs
+ * across the gap midway between them, clear of both bands' frames and names,
+ * as a continuation does (assignContinuationLanes); for a risen band, midway
+ * below the blocks it lies under. A gap that more lines cross is left to the
+ * router, which spaces them.
+ */
+function assignFrameGutterLanes(
+	routes: readonly RoutedEdge[],
+	nodes: readonly NodeSceneElement[],
+	groups: GroupLayout,
+	wrap: Wrap,
+	direction: LayoutDirection,
+): void {
+	const vertical = direction === "TB" || direction === "BT";
+	const [across, size] = vertical ? (["x", "width"] as const) : (["y", "height"] as const);
+	const [along, length] = vertical ? (["y", "height"] as const) : (["x", "width"] as const);
+	const unitOf = (nodeId: string) => {
+		const group = groups.groupOf.get(nodeId);
+		return group === undefined ? nodeId : groupUnitId(group);
+	};
+	const bandOf = (nodeId: string) => wrap.bandOf.get(unitOf(nodeId)) ?? 0;
+	const blocks = [
+		...groups.frames.map((frame) => ({
+			band: wrap.bandOf.get(groupUnitId(frame.id)) ?? 0,
+			box: boundsOf([frame.box, frame.labelBox]),
+		})),
+		...nodes.flatMap((node) =>
+			groups.groupOf.has(node.nodeId) ? [] : [{ band: bandOf(node.nodeId), box: node }],
+		),
+	];
+	const crossing = routes.filter(
+		(route) => bandOf(route.target.nodeId) === bandOf(route.source.nodeId) + 1,
+	);
+	for (const route of crossing) {
+		const band = bandOf(route.source.nodeId);
+		if (crossing.some((other) => other !== route && bandOf(other.source.nodeId) === band)) continue;
+		const next = blocks.filter(({ band: at }) => at === band + 1);
+		const [low, high] = [
+			Math.min(...next.map(({ box }) => box[along])),
+			Math.max(...next.map(({ box }) => box[along] + box[length])),
+		];
+		// Risen, the band clears the blocks of every band before it above its stretch.
+		const above = wrap.rise
+			? blocks.filter(
+					({ band: at, box }) => at <= band && box[along] < high && box[along] + box[length] > low,
+				)
+			: [];
+		const end = Math.max(
+			...(above.length > 0 ? above : blocks.filter(({ band: at }) => at === band)).map(
+				({ box }) => box[across] + box[size],
+			),
+		);
+		const start = Math.min(...next.map(({ box }) => box[across]));
+		route.lane = { at: (end + start) / 2, vertical };
+	}
+}
+
 interface DiagramLayout {
 	/** Whether arrivals on a side are ordered by where their routes leave (Arrangement.crossingRepair). */
 	byApproach?: boolean;
@@ -7856,6 +7946,9 @@ function layoutDiagramOnce(
 	nodeShapes = alignMarkers(routedEdges, nodeShapes, groups, portOffsets);
 	if (lanes) assignLaneContinuations(routedEdges, lanes, wrap);
 	else assignContinuationLanes(routedEdges, nodeShapes, wrap, direction);
+	const frameWrap = groups?.zoned === false ? arrangement.zoneWraps?.get(TOP_LEVEL) : undefined;
+	if (orthogonal && groups && frameWrap)
+		assignFrameGutterLanes(routedEdges, nodeShapes, groups, frameWrap, direction);
 
 	// Judge jogs and corridors at the size a reader sees the exported diagram.
 	const drawn = [...nodeShapes, ...groupBlocks(groups), ...laneBlocks(lanes)];
@@ -10347,10 +10440,9 @@ export function renderGraphDiagram(
 				considerWrap({ ...wrap, lineBreaks: true }, gap);
 		}
 	}
-	// A grouped flow never wraps, since a band cut would split a group; a long one
-	// lays its groups across the flow instead, when that routes no worse.
-	// Zones never do: across the flow, a zone's members would contradict the
-	// direction the diagram states.
+	// A long flow of groups first lays each group's members across the flow, when
+	// that routes no worse. Zones never do: across the flow, a zone's members
+	// would contradict the direction the diagram states.
 	const structure = groupStructure(diagram);
 	const groupsAcross =
 		arranged && orthogonal && tooLong && structure !== undefined && !structure.zoned;
@@ -10364,19 +10456,108 @@ export function renderGraphDiagram(
 	// of its labels.
 	const finished = (settled: DiagramLayout) =>
 		orthogonal ? clearLabels(clearOutlines(settled)) : settled;
-	// A zoned flow wraps instead, level by level, each band reading in the stated
-	// direction (planZoneWraps). Of the plans that route no worse, the first with
-	// no more crossings or reader findings than before is kept, else the one with
-	// the fewest crossings, then findings, then the squarest; one still too long
-	// plans again from the wrap it kept.
+	// Returns that wind round to a decision's far side, lines that turn over a
+	// corner into a crowded side, dip into their target, jog beside a port, meet
+	// a rounded node within its corner's curve, land alone by a side's corner or
+	// step sideways beside an end are polished where that draws no worse: last,
+	// after every choice.
+	const polished = (drawn: DiagramLayout) =>
+		orthogonal
+			? stepsClearOfEnds(
+					diagram,
+					centerLoneArrivals(
+						diagram,
+						endsOffCorners(
+							diagram,
+							straightenArrivals(
+								polishArrivals(
+									diagram,
+									returnsToNearVertices(diagram, drawn, finished, defectsOf, fewer),
+									finished,
+									defectsOf,
+									fewer,
+								),
+								finished,
+								defectsOf,
+								fewer,
+							),
+							finished,
+							defectsOf,
+							fewer,
+						),
+						finished,
+						defectsOf,
+						fewer,
+					),
+					defectsOf,
+					fewer,
+				)
+			: drawn;
+	// A line the finished layout moved clear of one node it passed too closely,
+	// or by one run, moves clear of every other it still passes. Only last,
+	// after every choice: a crossing it removes on the way would otherwise bar
+	// the rivals that clear lines out of arrowheads.
+	const clearedLast = (settled: DiagramLayout) => {
+		if (!orthogonal) return settled;
+		const cleared = clearOutlines(settled, true);
+		return cleared === settled ? settled : clearLabels(cleared);
+	};
+	// A grouped flow still too long wraps level by level, each band reading in the
+	// stated direction and each group a whole block of its level, since a band cut
+	// would split a group (planZoneWraps). Of the plans that route no worse, the
+	// first with no more crossings or reader findings than before is kept, else
+	// the one with the fewest crossings, then findings, then the squarest; one
+	// still too long plans again from the wrap it kept. A state machine's
+	// composite states never wrap: with no direction stated, it reads in whichever
+	// of two reads better instead (renderStateMachineDiagram).
 	const zoneScore = (layout: DiagramLayout) => [
 		arrowCrossings(layout.edgeArrows, false),
 		readerFindingCount(layout.edgeArrows, [...layout.nodeShapes, ...groupBlocks(layout.groups)]),
 		lengthOf(layout).aspect,
 	];
+	// As drawn, each line cleared at last of every node it still passes: no more
+	// crossings, detours, hooks, lines through heads or lines near nodes than the
+	// reference, and no line past twice its direct connection beyond its stubs.
+	// Judging `findings`, also no more reader findings, port jogs included, as
+	// drawn or, where the drawing has more, as both are polished at last: the
+	// ends' polish removes jogs a line steps on the way.
+	const findingsOf = (drawn: DiagramLayout) =>
+		readerFindingCount(drawn.edgeArrows, [...drawn.nodeShapes, ...groupBlocks(drawn.groups)]);
+	const drawnNoWorse = (candidate: DiagramLayout, reference: DiagramLayout, findings = false) => {
+		const [drawnCandidate, drawnReference] = [candidate, reference].map((settled) =>
+			clearedLast(finished(settled)),
+		);
+		return (
+			[false, true].every(
+				(runs) =>
+					arrowCrossings(drawnCandidate!.edgeArrows, runs) <=
+					arrowCrossings(drawnReference!.edgeArrows, runs),
+			) &&
+			detouredLines(drawnCandidate!.edgeArrows) <= detouredLines(drawnReference!.edgeArrows) &&
+			hookedRoutes(drawnCandidate!) <= hookedRoutes(drawnReference!) &&
+			headCrossers(drawnCandidate!).size <= headCrossers(drawnReference!).size &&
+			nearOutlines(drawnCandidate!) <= nearOutlines(drawnReference!) &&
+			drawnCandidate!.edgeArrows.every((arrow) => {
+				const [start, end] = [arrow.points[0], arrow.points.at(-1)!];
+				return (
+					arrow.sourceNodeId === arrow.targetNodeId ||
+					routeLength(arrow.points) <=
+						2 * (Math.abs(end.x - start.x) + Math.abs(end.y - start.y)) + 2 * ROUTE_STUB_LENGTH
+				);
+			}) &&
+			(!findings ||
+				findingsOf(drawnCandidate!) <= findingsOf(drawnReference!) ||
+				findingsOf(clearedLast(polished(finished(candidate)))) <=
+					findingsOf(clearedLast(polished(finished(reference)))))
+		);
+	};
 	for (
 		let round = 0;
-		round < ZONE_WRAP_ROUNDS && arranged && orthogonal && structure?.zoned;
+		round < ZONE_WRAP_ROUNDS &&
+		arranged &&
+		orthogonal &&
+		structure !== undefined &&
+		(structure.zoned || structure.composites.size === 0);
 		round += 1
 	) {
 		const length = lengthOf(best.layout);
@@ -10406,7 +10587,8 @@ export function renderGraphDiagram(
 			// than the layout it replaces, and no line in it runs more than twice
 			// its direct connection, past its stubs: a crossing a line's side change
 			// removes does not stack zones either. Such a plan never stacks them
-			// itself.
+			// itself. A row or column of frames wraps its top level alone, so each of
+			// its plans may be judged so.
 			const crossed =
 				!planned.avoidCrossings &&
 				arrowCrossings(drawn.edgeArrows, false) > arrowCrossings(kept.layout.edgeArrows, false);
@@ -10426,56 +10608,40 @@ export function renderGraphDiagram(
 				!acceptable(unrepaired) &&
 				repairable &&
 				crossed &&
-				!zoneWraps.has(TOP_LEVEL) &&
+				(!structure.zoned || !zoneWraps.has(TOP_LEVEL)) &&
 				arrowCrossings(rerouted.edgeArrows) === arrowCrossings(kept.layout.edgeArrows) + 1
 					? repairCrossings(diagram, levels[0]!, unrepaired, defectsOf, fewer)
 					: undefined;
-			// As drawn, each line cleared at last of every node it still passes.
-			const repairedNoWorse = (candidate: DiagramLayout) => {
-				const [drawnRepair, drawnKept] = [candidate, kept.layout].map((settled) => {
-					const cleared = finished(settled);
-					const last = clearOutlines(cleared, true);
-					return last === cleared ? cleared : clearLabels(last);
-				});
-				return (
-					[false, true].every(
-						(runs) =>
-							arrowCrossings(drawnRepair!.edgeArrows, runs) <=
-							arrowCrossings(drawnKept!.edgeArrows, runs),
-					) &&
-					detouredLines(drawnRepair!.edgeArrows) <= detouredLines(drawnKept!.edgeArrows) &&
-					hookedRoutes(drawnRepair!) <= hookedRoutes(drawnKept!) &&
-					headCrossers(drawnRepair!).size <= headCrossers(drawnKept!).size &&
-					nearOutlines(drawnRepair!) <= nearOutlines(drawnKept!) &&
-					drawnRepair!.edgeArrows.every((arrow) => {
-						const [start, end] = [arrow.points[0], arrow.points.at(-1)!];
-						return (
-							arrow.sourceNodeId === arrow.targetNodeId ||
-							routeLength(arrow.points) <=
-								2 * (Math.abs(end.x - start.x) + Math.abs(end.y - start.y)) + 2 * ROUTE_STUB_LENGTH
-						);
-					})
-				);
-			};
-			const repaired = repair !== undefined && acceptable(repair) && repairedNoWorse(repair.layout);
+			const repaired =
+				repair !== undefined &&
+				acceptable(repair) &&
+				drawnNoWorse(repair.layout, kept.layout, !structure.zoned);
 			const { arrangement, defects, layout } = repaired ? repair : unrepaired;
 			if (!repaired && !acceptable(unrepaired)) continue;
+			// A row of frames wraps only where, as drawn, it reads no worse than the
+			// row in every way a repaired plan must, and draws no more reader
+			// findings, port jogs included; failing that, the next plan is tried.
+			if (!repaired && !structure.zoned && !drawnNoWorse(layout, kept.layout, true)) continue;
 			const score = zoneScore(layout);
+			// A plan with no more crossings or reader findings than before needs no
+			// rival; a repaired one does among zones, where it is a fallback.
+			const [crossings, findings] = zoneScore(kept.layout);
+			const unrivaled = score[0]! <= crossings! && score[1]! <= findings!;
 			if (repaired) {
 				if (!repairedChoice || lowerScore(score, repairedChoice.score))
 					repairedChoice = { arrangement, defects, layout, score };
+				if (!structure.zoned && unrivaled) break;
 				continue;
 			}
 			if (!chosen || lowerScore(score, chosen.score))
 				chosen = { arrangement, defects, layout, score };
-			// A plan with no more crossings or reader findings than before needs no rival.
-			const [crossings, findings] = zoneScore(kept.layout);
-			if (score[0]! <= crossings! && score[1]! <= findings!) break;
+			if (unrivaled) break;
 		}
 		// A repaired plan only keeps sibling zones side by side: it replaces a
 		// chosen plan that stacks them, or one still too long, which plans again
 		// and may stack them, where it crosses and finds no more and is not too
-		// long itself.
+		// long itself. Every plan for a row of frames wraps its top level, so there
+		// it replaces any chosen plan it crosses and finds no more than.
 		if (
 			repairedChoice &&
 			(!chosen ||
@@ -10486,6 +10652,34 @@ export function renderGraphDiagram(
 		)
 			chosen = repairedChoice;
 		if (!chosen) break;
+		// A band of frames rises to the blocks it lies under (Wrap.rise) where that
+		// moves it at all, as planned, and routes and draws no worse than the plan
+		// as laid out.
+		const top = chosen.arrangement.zoneWraps?.get(TOP_LEVEL);
+		const arrangement = top && {
+			...chosen.arrangement,
+			zoneWraps: new Map([...chosen.arrangement.zoneWraps!, [TOP_LEVEL, { ...top, rise: true }]]),
+		};
+		const planned = (option: Arrangement) =>
+			positionLayout(diagram, new Map(), new Map(), option)
+				.nodes.map((node) => `${node.x},${node.y}`)
+				.join(" ");
+		if (
+			!structure.zoned &&
+			top &&
+			arrangement &&
+			!top.rise &&
+			planned(arrangement) !== planned(chosen.arrangement)
+		) {
+			const layout = layoutDiagram(diagram, levels[0]!, arrangement);
+			const defects = defectsOf(layout);
+			if (
+				!fewer(chosen.defects, defects) &&
+				routesNoWorse(layout, chosen.layout, false, false, false, false) &&
+				drawnNoWorse(layout, chosen.layout, true)
+			)
+				chosen = { arrangement, defects, layout, score: zoneScore(layout) };
+		}
 		best = chosen;
 	}
 	// A line into a hanging band that runs around a step of the target's rank
@@ -10732,53 +10926,8 @@ export function renderGraphDiagram(
 			defectsOf,
 			fewer,
 		));
-	// Last, returns that wind round to a decision's far side, lines that turn
-	// over a corner into a crowded side, dip into their target, jog beside a
-	// port, meet a rounded node within its corner's curve, land alone by a
-	// side's corner or step sideways beside an end are polished where that
-	// draws no worse.
-	const polished = (drawn: DiagramLayout) =>
-		orthogonal
-			? stepsClearOfEnds(
-					diagram,
-					centerLoneArrivals(
-						diagram,
-						endsOffCorners(
-							diagram,
-							straightenArrivals(
-								polishArrivals(
-									diagram,
-									returnsToNearVertices(diagram, drawn, finished, defectsOf, fewer),
-									finished,
-									defectsOf,
-									fewer,
-								),
-								finished,
-								defectsOf,
-								fewer,
-							),
-							finished,
-							defectsOf,
-							fewer,
-						),
-						finished,
-						defectsOf,
-						fewer,
-					),
-					defectsOf,
-					fewer,
-				)
-			: drawn;
+	// Last, the drawn layout's ends are polished.
 	layout = polished(layout);
-	// A line the finished layout moved clear of one node it passed too closely,
-	// or by one run, moves clear of every other it still passes. Only last,
-	// after every choice: a crossing it removes on the way would otherwise bar
-	// the rivals that clear lines out of arrowheads.
-	const clearedLast = (settled: DiagramLayout) => {
-		if (!orthogonal) return settled;
-		const cleared = clearOutlines(settled, true);
-		return cleared === settled ? settled : clearLabels(cleared);
-	};
 	// A plain flow, untightened and unwrapped, whose polished line still steps
 	// sideways across a rank gap too narrow for the step to clear both its ends
 	// grows that gap (narrowStepGaps), so the step can sit midway: a step within

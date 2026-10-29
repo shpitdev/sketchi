@@ -46,6 +46,11 @@ export const GroupedMixedMembership: Story = {
 	args: { diagram: groupFixtures["mixed-membership"] },
 };
 
+/** A left-to-right row of team groups too long for one row, wrapped into rows of whole groups. */
+export const GroupedRowWrapped: Story = {
+	args: { diagram: groupFixtures["expense-approval-by-team"] },
+};
+
 export const SwimlaneOrderFulfilment: Story = {
 	args: { diagram: laneFixtures["order-fulfilment"] },
 };

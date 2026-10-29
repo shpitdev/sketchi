@@ -1492,6 +1492,191 @@ describe("grouped routing fuzz", () => {
 	);
 });
 
+const TEAMS = ["Employee", "Manager", "Finance", "Legal and compliance", "Platform", "Support"];
+const TEAM_STEPS = [
+	"Submits an expense report",
+	"Reviews the report",
+	"Verifies the receipts",
+	"Checks the contract terms",
+	"Provisions the account",
+	"Replies to the customer",
+];
+
+/**
+ * Flows through three to five team groups in turn, as generated handoffs draw
+ * them: each group holds two or three steps, its last hands to the next group's
+ * first, and in about half the groups between the first and the last that
+ * last step is a decision whose other branch returns to an earlier group.
+ */
+function randomGroupRows(count: number, start = 20261028) {
+	let seed = start;
+	const random = () => {
+		seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+		return seed / 2_147_483_648;
+	};
+	return Array.from({ length: count }, (_, index) => {
+		const groups = TEAMS.slice(0, 3 + Math.floor(random() * 3)).map((label, group) => ({
+			id: `t${group}`,
+			label,
+		}));
+		const nodes: { id: string; label: string; kind: Kind; group: string }[] = [];
+		const edges: { id: string; source: string; target: string; label?: string }[] = [];
+		const firsts: string[] = [];
+		for (const [group, { id }] of groups.entries()) {
+			const size = 2 + Math.floor(random() * 2);
+			for (let step = 0; step < size; step += 1) {
+				const node = `${id}s${step}`;
+				const previous = nodes.at(-1);
+				nodes.push({
+					id: node,
+					label: `${TEAM_STEPS[Math.floor(random() * TEAM_STEPS.length)]} ${group}.${step}`,
+					kind: nodes.length === 0 ? "start" : "process",
+					group: id,
+				});
+				if (step === 0) firsts.push(node);
+				if (previous)
+					edges.push({
+						id: `e${edges.length}`,
+						source: previous.id,
+						target: node,
+						...(previous.kind === "decision" ? { label: "Yes" } : {}),
+					});
+			}
+			const last = nodes.at(-1)!;
+			if (group > 0 && group < groups.length - 1 && random() < 0.5) {
+				last.kind = "decision";
+				last.label = `Approved by ${groups[group]!.label}?`;
+				// The start takes no line in: a return to the first group meets its second step.
+				const earlier = Math.floor(random() * group);
+				edges.push({
+					id: `e${edges.length}`,
+					source: last.id,
+					target: earlier === 0 ? `${groups[0]!.id}s1` : firsts[earlier]!,
+					label: "No",
+				});
+			}
+		}
+		nodes.at(-1)!.kind = "end";
+		return { id: `row-${index}`, title: `Row ${index}`, groups, nodes, edges };
+	});
+}
+
+/**
+ * Flows of `randomGroupRows` left in one row or column of groups past the
+ * too-long rule, by direction: TB 7's only plan crosses two lines more than
+ * its column, and BT 11 and 23 split only into a long column and a short one,
+ * which a column short of 4:1 never wraps into. Then the crossings and
+ * reader-scale findings ("crossings/findings") main (96bb885b) draws for each
+ * flow; main left every one past the rule in a single band.
+ */
+const KNOWN_UNWRAPPED_ROWS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly number[]>> = {
+	TB: [7],
+	BT: [11, 23],
+	LR: [],
+	RL: [],
+};
+const GROUP_ROW_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
+	TB: "0/0 0/0 0/0 0/0 1/0 0/0 1/0 0/0 0/0 0/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0",
+	BT: "0/0 0/0 0/0 0/0 1/0 0/0 1/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0",
+	LR: "0/0 0/0 0/0 0/0 1/0 0/0 1/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0",
+	RL: "0/0 0/0 0/0 0/0 1/0 0/0 1/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0 0/0",
+};
+
+describe("group row fuzz", () => {
+	// Full proof: 24 flows through team groups x 4 directions. A row (or column)
+	// of groups past the too-long rule wraps into rows (or columns) of whole
+	// groups unless the wrapped plan routes worse; the lines between bands step
+	// through the gap between them, never around the outer margins, and no flow
+	// draws more crossings or reader findings than main.
+	const rows = randomGroupRows(FULL ? 24 : 6);
+	const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>[]>();
+	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
+		if (!scenes.has(direction))
+			scenes.set(
+				direction,
+				rows.map((spec) =>
+					renderIntermediateDiagram(
+						parseFlowchartDiagram({
+							...spec,
+							type: "flowchart",
+							layout: { direction, edgeRouting: "orthogonal" },
+						}),
+					),
+				),
+			);
+		return scenes.get(direction)!;
+	};
+
+	describe.each(["TB", "BT", "LR", "RL"] as const)("%s", (direction) => {
+		it("wraps every row of groups past the too-long rule, each group whole and the lines between bands through the gap", () => {
+			const vertical = direction === "TB" || direction === "BT";
+			const [along, length, across, breadth] = vertical
+				? (["y", "height", "x", "width"] as const)
+				: (["x", "width", "y", "height"] as const);
+			const failures = rendered(direction).flatMap((scene, index) => {
+				const frames = scene.elements.flatMap((e) => (e.type === "frame" ? [e] : []));
+				const nodes = new Map(
+					scene.elements.flatMap((e) => (e.type === "node" ? [[e.nodeId, e] as const] : [])),
+				);
+				// Bands: frames that share a stretch across the flow, in order across it.
+				const bands: (typeof frames)[] = [];
+				for (const frame of frames.toSorted((a, b) => a[across] - b[across])) {
+					const band = bands.find((members) =>
+						members.some(
+							(member) =>
+								member[across] < frame[across] + frame[breadth] &&
+								frame[across] < member[across] + member[breadth],
+						),
+					);
+					if (band) band.push(frame);
+					else bands.push([frame]);
+				}
+				const exported = convertSceneToExcalidraw(scene);
+				const issues = [
+					...validateExcalidrawScene(exported).issues.map((issue) => issue.message),
+					...diagonalRuns(scene),
+					...groupRegionIssues(scene).map((issue) => issue.message),
+				];
+				// The renderer's too-long rule, at the size the export draws.
+				const [long, short] = [scene[length], scene[breadth]].map((side) => side + 80);
+				const aspect = long! / short!;
+				const tooLong = aspect >= 4 || (aspect >= 2.45 && (vertical || scene[length] >= 1200));
+				if (bands.length === 1 && tooLong && !KNOWN_UNWRAPPED_ROWS[direction].includes(index))
+					issues.push(`one band of groups at ${aspect.toFixed(2)}:1`);
+				// A line between bands stays within the frames' reach across the flow
+				// and along it: through the gap, not around the drawing's margins.
+				const bandOf = (frameId: string | undefined) =>
+					bands.findIndex((band) => band.some((frame) => frame.id === frameId));
+				const [low, high] = [
+					Math.min(...frames.map((frame) => frame[along])),
+					Math.max(...frames.map((frame) => frame[along] + frame[length])),
+				];
+				for (const arrow of scene.elements.flatMap((e) => (e.type === "arrow" ? [e] : []))) {
+					const [source, target] = [arrow.sourceNodeId, arrow.targetNodeId].map((id) =>
+						bandOf(nodes.get(id)?.frameId),
+					);
+					if (source === target || source! < 0 || target! < 0) continue;
+					if (arrow.points.some((point) => point[along] < low || point[along] > high))
+						issues.push(`${arrow.edgeId} runs around the bands`);
+				}
+				return issues.map((issue) => `${index}: ${issue}`);
+			});
+			expect(failures).toEqual([]);
+		}, 60_000);
+
+		it("draws no row of groups with more crossings or reader-scale findings than main", () => {
+			const counts = rendered(direction).map((scene) => routingCounts(scene));
+			if (process.env.PRINT_ROUTING)
+				console.log(
+					"PIN rows",
+					direction,
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
+				);
+			expect(worseThanPinned("rows", counts, GROUP_ROW_ROUTING[direction], false)).toEqual([]);
+		}, 60_000);
+	});
+});
+
 const ZONE_KINDS = [
 	"cloud",
 	"datacenter",
