@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.29.1
+
+### Patch Changes
+
+- [#568](https://github.com/shpitdev/sketchi/pull/568) [`2ef6af4`](https://github.com/shpitdev/sketchi/commit/2ef6af4955dc042b66bf53f7bd756ffb99a993dc) Thanks [@anandpant](https://github.com/anandpant)! - Sankey labels read cleanly over their bands: a middle column's node label sits on a paper-coloured backing where it rides its own bands out, and a flow value along a band's curve keeps clear of the neighbouring bands instead of sitting against one.
+
 ## 0.29.0
 
 ### Minor Changes
