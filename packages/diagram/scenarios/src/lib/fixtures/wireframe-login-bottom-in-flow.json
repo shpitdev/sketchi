@@ -1,0 +1,55 @@
+{
+	"id": "login-screen",
+	"title": "Login screen",
+	"screens": [
+		{
+			"id": "login",
+			"name": "Login",
+			"device": "mobile",
+			"children": [
+				{
+					"type": "heading",
+					"text": "Welcome back"
+				},
+				{
+					"type": "text",
+					"text": "Sign in to continue"
+				},
+				{
+					"type": "input",
+					"label": "Email",
+					"placeholder": "you@example.com"
+				},
+				{
+					"type": "input",
+					"label": "Password"
+				},
+				{
+					"type": "checkbox",
+					"label": "Remember me"
+				},
+				{
+					"type": "button",
+					"text": "Sign in",
+					"variant": "primary"
+				},
+				{
+					"type": "link",
+					"text": "Forgot password?"
+				},
+				{
+					"type": "text",
+					"text": "New here?"
+				},
+				{
+					"type": "link",
+					"text": "Create account"
+				}
+			]
+		}
+	],
+	"style": {
+		"accentColor": "#8f707f",
+		"backgroundColor": "#fffdf8"
+	}
+}

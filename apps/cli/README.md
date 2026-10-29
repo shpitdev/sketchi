@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Typed, deterministic diagrams from your terminal.</strong><br />
-  Create, inspect, revise, and export local flowcharts, mindmaps, sequence diagrams, timelines, charts, state machines, Gantt charts, ER diagrams, class diagrams, org charts, Venn diagrams, journey maps, and Sankey diagrams—or turn one prompt into validated, editable Excalidraw.
+  Create, inspect, revise, and export local flowcharts, mindmaps, sequence diagrams, timelines, charts, state machines, Gantt charts, ER diagrams, class diagrams, org charts, Venn diagrams, journey maps, Sankey diagrams, and wireframes—or turn one prompt into validated, editable Excalidraw.
 </p>
 
 <p align="center">
@@ -53,7 +53,7 @@ sketchi generate --prompt "Map release approval with pass and revise branches"
 
 With no `--prompt`, Sketchi opens a short wizard only when both standard input
 and standard output are human terminals, output is text, and CI is absent. It
-asks for prompt text, flowchart (the default), mind map, sequence diagram, timeline, chart, state machine, Gantt chart, ER diagram, class diagram, org chart, Venn diagram, journey map, or Sankey diagram, and where to save the
+asks for prompt text, flowchart (the default), mind map, sequence diagram, timeline, chart, state machine, Gantt chart, ER diagram, class diagram, org chart, Venn diagram, journey map, Sankey diagram, or wireframe, and where to save the
 PNG. The choices are the current directory, a `diagrams/` folder under exactly
 the directory where Sketchi was run, or a custom path with the same semantics as
 `--dest`. Sketchi does not inspect Git, and it creates `diagrams/` only after
@@ -64,7 +64,7 @@ that wizard question. Explicit `--format png` may proceed; another format or
 Scripts, pipes, redirected streams, CI, and `--output json` never prompt or
 block. They must pass `--prompt`; omitting it retains the deterministic usage
 error. Passing `--prompt` is always direct and noninteractive.
-`--type` accepts only flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, or sankey and is authoritative.
+`--type` accepts only flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, or wireframe and is authoritative.
 Without it, the generation model selects one of those from the request; a
 request for any other kind of diagram returns a typed unsupported-type error
 instead of being coerced into a supported one.
@@ -103,7 +103,7 @@ The endpoint defaults to
 `https://playground.sketchi.app/api/v1/canvases/create`; use `--endpoint URL` or
 `SKETCHI_CANVAS_ENDPOINT` only for preview and local testing. The existing
 `create` command remains the separate, strictly offline command for accepted
-flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, and sankey documents.
+flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, and wireframe documents.
 
 ## Create and work with a diagram offline
 
@@ -338,3 +338,5 @@ Native Venn diagrams: use `buildVennDiagram` (Code Mode) or `generate --type ven
 Native journey maps: use `buildJourneyMap` (Code Mode) or `generate --type journey` (CLI). Supply `stages` in order, each `{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }`, with an optional `persona` (whose journey it is) and `actors`. `score` is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral. The renderer draws the stages as headers across the top, each step's card under its stage, an emotion curve through a face per step at its score over a dashed neutral baseline, and each stage's pain points and opportunities in rows beneath it; a journey too wide to read wraps into bands of whole stages with the curve running on between them. It owns every coordinate.
 
 Native Sankey diagrams: use `buildSankey` (Code Mode) or `generate --type sankey` (CLI). Supply `nodes: [{ id, label }]` (ids without colons) and `links: [{ source, target, value, label? }]` with every stated amount (`value` > 0), plus an optional `unit` formatted as charts format it (`$k` gives $310k; a word unit such as `visits` reads on node totals). Links run one way: no cycles, self-links or repeated pairs, and no invented balancing node. The renderer places each node one column past the longest run of links into it (a sink fed by several nodes aligns with the last column), draws each node as a bar as tall as the larger of its inflow and outflow with its label and total, and each link as a band as wide as its value in its source's color with its value written; a band under 3 px draws at 3 px and keeps its exact value. It owns every coordinate.
+
+Native wireframes: use `buildWireframe` (Code Mode) or `generate --type wireframe` (CLI). Supply `screens`, each with a `name`, a `device` (`desktop`, `tablet` or `mobile`, which sets the frame's size) and `children`: a tree of components in reading order. Containers hold children: `header`, `footer`, `sidebar` (`side: "left" | "right"`), `main`, `section`, `card` and `modal` (with a `title`), `row`, `column` and `grid` (`columns: n`); `align` spreads, centers or ends a row's children. Widgets draw from their own fields: `heading`, `text` (or `lines` of placeholder copy), `link`, `badge` and `button` show `text`; `input`, `textarea`, `select` and `search` take a `label`, a `placeholder` or the `value` they show; `checkbox`, `radio` and `toggle` take a `label`; `tabs`, `nav`, `breadcrumbs` and `list` take `items`; and `avatar`, `icon`, `image`, `chart`, `table` (`columns` of headers) and `divider` draw placeholders. State: `variant: "primary"` on the main action, `checked: true` on what is on, and `active` on the selected tab or nav item. The renderer draws each screen as an Excalidraw frame, its header across the top, footer along the bottom, sidebars down their sides and modals over a dimmed backdrop, with every component a group it places: rows wrap and grids drop columns before anything overflows, and text wraps at whole words; it owns every coordinate.

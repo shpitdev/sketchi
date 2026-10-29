@@ -39,3 +39,5 @@ export * from "./types/journey.js";
 export * from "./journey-fixtures.js";
 export * from "./types/sankey.js";
 export * from "./sankey-fixtures.js";
+export * from "./types/wireframe.js";
+export * from "./wireframe-fixtures.js";

@@ -199,6 +199,53 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		}),
 	);
 
+	it.effect("exports a wireframe's screens as frames with their components grouped", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "wireframe",
+					spec: {
+						title: "Signup",
+						screens: [
+							{
+								name: "Sign up",
+								device: "mobile",
+								children: [
+									{ type: "heading", text: "Create account" },
+									{ type: "input", label: "Email", placeholder: "you@example.com" },
+									{ type: "toggle", label: "Send me updates", checked: true },
+									{ type: "button", text: "Continue", variant: "primary" },
+								],
+							},
+							{
+								name: "Welcome",
+								device: "mobile",
+								children: [
+									{ type: "image", label: "Welcome art" },
+									{ type: "text", lines: 2 },
+								],
+							},
+						],
+					},
+				}),
+			);
+			const frames = built.excalidraw.elements.filter((element) => element["type"] === "frame");
+			assert.sameMembers(
+				frames.map((frame) => frame["name"]),
+				["Sign up", "Welcome"],
+			);
+			const button = built.excalidraw.elements.find(
+				(element) => element["id"] === "wf:sign-up:3:box",
+			);
+			assert.strictEqual(button?.["backgroundColor"], "#1971c2");
+			const png = yield* renderer.renderPng({ scene: built.scene, excalidraw: built.excalidraw });
+			assert.isAbove(png.byteLength, 1_000);
+			assertInkHasPadding(png);
+		}),
+	);
+
 	it.effect("exports an org chart whose reporting lines share their manager's bus", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

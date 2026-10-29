@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 
-import { type CanonicalDiagram, validateCanonicalDiagram } from "@sketchi/diagram-core";
+import {
+	type CanonicalDiagram,
+	validateCanonicalDiagram,
+	wireframeComponents,
+} from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 
@@ -92,6 +96,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			nodeNoun: "steps",
 			edgeCount: diagram.stages.length,
 			edgeNoun: "stages",
+		};
+	if (diagram.type === "wireframe")
+		return {
+			nodeCount: [...wireframeComponents(diagram)].length,
+			nodeNoun: "components",
+			edgeCount: diagram.screens.length,
+			edgeNoun: diagram.screens.length === 1 ? "screen" : "screens",
 		};
 	return diagram.type === "sequence"
 		? {

@@ -56,6 +56,7 @@ vi.mock("./service.server", async (importOriginal) => {
 			buildVennDiagram: () => Effect.die("Venn diagrams are outside the frozen v1 corpus."),
 			buildJourneyMap: () => Effect.die("Journey maps are outside the frozen v1 corpus."),
 			buildSankey: () => Effect.die("Sankey diagrams are outside the frozen v1 corpus."),
+			buildWireframe: () => Effect.die("Wireframes are outside the frozen v1 corpus."),
 			createCanvas: () => Effect.die("Canvas creation is outside the frozen v1 corpus."),
 			prewarmPngRenderer: Effect.void,
 			getArtifact: () => Effect.succeed(runtimeResults.getGetArtifact() as GetArtifactResult),

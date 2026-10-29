@@ -21,6 +21,11 @@ import {
 	STATE_MACHINE_DIRECTIONS,
 	STATE_MACHINE_STATE_KINDS,
 	TIMELINE_EVENT_KINDS,
+	WIREFRAME_ALIGNMENTS,
+	WIREFRAME_CHART_KINDS,
+	WIREFRAME_COMPONENT_TYPES,
+	WIREFRAME_DEVICES,
+	WIREFRAME_IMAGE_ASPECTS,
 } from "@sketchi/diagram-core";
 
 import { cleanToolString } from "../clean-tool-string.js";
@@ -455,6 +460,9 @@ export const CODE_MODE_ISSUE_CODES = [
 	"invalid_sankey_node",
 	"invalid_sankey_flow",
 	"sankey_cycle",
+	"wireframe_too_large",
+	"invalid_screen",
+	"invalid_component",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -1213,6 +1221,95 @@ export class SankeySpec extends Schema.Class<SankeySpec>("SankeySpec")(
 ) {}
 export const SankeySpecSchema = SankeySpec;
 
+/** One component of a wireframe screen, as a model writes it. */
+export interface WireframeComponentInput {
+	type: (typeof WIREFRAME_COMPONENT_TYPES)[number];
+	text?: string;
+	label?: string;
+	title?: string;
+	placeholder?: string;
+	value?: string;
+	level?: number;
+	lines?: number;
+	variant?: "primary" | "secondary";
+	checked?: boolean;
+	disabled?: boolean;
+	items?: string[];
+	active?: string;
+	columns?: number | string[];
+	rows?: number;
+	kind?: (typeof WIREFRAME_CHART_KINDS)[number];
+	aspect?: (typeof WIREFRAME_IMAGE_ASPECTS)[number];
+	side?: "left" | "right";
+	align?: (typeof WIREFRAME_ALIGNMENTS)[number];
+	children?: WireframeComponentInput[];
+}
+
+const WireframeComponentReference: Schema.Codec<WireframeComponentInput, WireframeComponentInput> =
+	requiredObject(
+		Schema.suspend(() => WireframeComponentSpec).annotate({ identifier: "Component" }),
+	);
+
+/**
+ * The authoring form of diagram-core's WireframeComponent: the same fields,
+ * which buildWireframe normalizes into the core contract, the owner of every
+ * invariant.
+ */
+export const WireframeComponentSpec: Schema.Codec<
+	WireframeComponentInput,
+	WireframeComponentInput
+> = Schema.Struct({
+	type: literals(WIREFRAME_COMPONENT_TYPES),
+	text: optionalContract(NonEmptyString),
+	label: optionalContract(NonEmptyString),
+	title: optionalContract(NonEmptyString),
+	placeholder: optionalContract(NonEmptyString),
+	value: optionalContract(NonEmptyString),
+	level: optionalContract(Schema.Int),
+	lines: optionalContract(Schema.Int),
+	variant: optionalContract(literals(["primary", "secondary"])),
+	checked: optionalContract(Schema.Boolean),
+	disabled: optionalContract(Schema.Boolean),
+	items: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	active: optionalContract(NonEmptyString),
+	columns: optionalContract(
+		Schema.Union([Schema.Int, Schema.Array(NonEmptyString).pipe(Schema.mutable)]),
+	),
+	rows: optionalContract(Schema.Int),
+	kind: optionalContract(literals(WIREFRAME_CHART_KINDS)),
+	aspect: optionalContract(literals(WIREFRAME_IMAGE_ASPECTS)),
+	side: optionalContract(literals(["left", "right"])),
+	align: optionalContract(literals(WIREFRAME_ALIGNMENTS)),
+	children: optionalContract(Schema.Array(WireframeComponentReference).pipe(Schema.mutable)),
+});
+export const WireframeComponentSpecSchema = WireframeComponentReference;
+
+export class WireframeScreenSpec extends Schema.Class<WireframeScreenSpec>("WireframeScreenSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		name: RequiredNonEmptyString,
+		device: optionalContract(literals(WIREFRAME_DEVICES)),
+		align: optionalContract(literals(WIREFRAME_ALIGNMENTS)),
+		children: requiredArray(nonEmptyArray(WireframeComponentReference)),
+	},
+	{ identifier: undefined },
+) {}
+
+/**
+ * The authoring form of diagram-core's canonical WireframeDiagram: screen ids
+ * and devices are optional and style is defaulted.
+ */
+export class WireframeSpec extends Schema.Class<WireframeSpec>("WireframeSpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		screens: requiredArray(nonEmptyArray(WireframeScreenSpec)),
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const WireframeSpecSchema = WireframeSpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -1525,6 +1622,26 @@ export const BuildSankeyToolInputSchema = Schema.Struct({
 	spec: requiredObject(SankeyToolSpecSchema),
 });
 export type BuildSankeyToolInput = typeof BuildSankeyToolInputSchema.Type;
+export class BuildWireframeRequest extends Schema.Class<BuildWireframeRequest>(
+	"BuildWireframeRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(WireframeSpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildWireframeRequestSchema = BuildWireframeRequest;
+/** The wireframe spec a model authors; style is always the Sketchi palette. */
+export const WireframeToolSpecSchema = WireframeSpec.mapFields(
+	({ style: _style, ...fields }) => fields,
+);
+export const BuildWireframeToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(WireframeToolSpecSchema),
+});
+export type BuildWireframeToolInput = typeof BuildWireframeToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -2381,6 +2498,21 @@ const NormalizedSankeySpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedSankeySpec = typeof NormalizedSankeySpecSchema.Type;
+const NormalizedWireframeSpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	screens: Schema.Array(
+		Schema.Struct({
+			id: NonEmptyString,
+			name: NonEmptyString,
+			device: literals(WIREFRAME_DEVICES),
+			align: optionalContract(literals(WIREFRAME_ALIGNMENTS)),
+			children: Schema.Array(WireframeComponentSpecSchema).pipe(Schema.mutable),
+		}),
+	).pipe(Schema.mutable),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedWireframeSpec = typeof NormalizedWireframeSpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -2958,6 +3090,49 @@ export class BuildSankeyRejected extends Schema.Class<BuildSankeyRejected>("Buil
 ) {}
 export const BuildSankeyResultSchema = Schema.Union([BuildSankeyAccepted, BuildSankeyRejected]);
 export type BuildSankeyResult = typeof BuildSankeyResultSchema.Type;
+
+export class BuildWireframeAccepted extends Schema.Class<BuildWireframeAccepted>(
+	"BuildWireframeAccepted",
+)(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedWireframeSpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildWireframeRejected extends Schema.Class<BuildWireframeRejected>(
+	"BuildWireframeRejected",
+)(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_wireframe",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedWireframeSpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildWireframeResultSchema = Schema.Union([
+	BuildWireframeAccepted,
+	BuildWireframeRejected,
+]);
+export type BuildWireframeResult = typeof BuildWireframeResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{

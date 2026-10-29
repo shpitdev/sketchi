@@ -49,8 +49,8 @@ const COMMON_INSTRUCTIONS = [
 	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
 	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
 	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "people", "sets", "items", "relationships", "links", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", "member", "person", "set", or "item".',
+	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "states", "transitions", "tasks", "entities", "classes", "people", "sets", "items", "relationships", "links", "screens", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
+	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", "member", "person", "set", "item", "screen", or "component".',
 	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
 	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
 ];
@@ -197,6 +197,18 @@ const IR_INSTRUCTIONS = {
 			"Use it for weighted flows between stages: budgets, traffic, funnels, energy or material flows; never supply coordinates.",
 			"Return nodes: [{ id, label }] and links: [{ source, target, value, label? }]: value is the stated amount, greater than 0. Links run one way; no cycles or self-links.",
 			'Optional: unit ("$k", "%", "visits"). Copy every stated node, flow and value; invent no balancing node such as Other.',
+		],
+	},
+	wireframe: {
+		title: "Wireframe IR rules",
+		rules: [
+			'Use diagram type "wireframe".',
+			"Use it for UI wireframes, mockups and screen layouts; never supply coordinates or sizes.",
+			'Return screens: [{ id, name, device: "desktop" | "tablet" | "mobile", children }]. Every component sits under a screen\'s children, in reading order.',
+			"Containers hold children: header (top), footer (bottom, a save bar), sidebar (side: left or right), main, section and card (title?), modal, row, column, and grid (columns: n).",
+			"Widgets: heading (text, level 1-3), text (text, or lines for placeholder copy), link, badge and button (text; variant primary or secondary), input, textarea, select and search (label?, placeholder or value), checkbox, radio and toggle (label, checked), tabs, nav and breadcrumbs (items, active), list (items), avatar, icon, image and chart (label?), table (columns: headers, rows?), divider.",
+			"State: variant primary on the screen's main button, checked: true on what is on or selected, active on the selected tab or nav item, value on a field showing one.",
+			"Copy every screen, component, text and state the source states, in order; invent no controls or copy.",
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
@@ -487,6 +499,30 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "links", comparator: "exact", value: 2 },
 			{ kind: "label", target: "node", value: "Compute" },
+		],
+	},
+	wireframe: {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "wireframe",
+			screens: [
+				{
+					id: "login",
+					name: "Login",
+					device: "mobile",
+					children: [
+						{ type: "heading", text: "Welcome back" },
+						{ type: "input", label: "Email", placeholder: "you@example.com" },
+						{ type: "toggle", label: "Remember me", checked: true },
+						{ type: "button", text: "Sign in", variant: "primary" },
+						{ type: "link", text: "Forgot password?" },
+					],
+				},
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "screens", comparator: "exact", value: 1 },
+			{ kind: "label", target: "component", value: "Sign in" },
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;

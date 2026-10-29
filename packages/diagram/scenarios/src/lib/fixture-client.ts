@@ -173,6 +173,20 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: set.label,
 			})),
 		];
+	if (scenario.diagramType === "wireframe")
+		return [
+			{
+				kind: "count",
+				target: "screens",
+				comparator: "exact",
+				value: scenario.expectedDiagram.screens.length,
+			},
+			...scenario.expectedDiagram.screens.map((screen) => ({
+				kind: "label",
+				target: "screen",
+				value: screen.name,
+			})),
+		];
 	if (scenario.diagramType === "sequence") {
 		return [
 			{

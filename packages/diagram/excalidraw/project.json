@@ -78,6 +78,12 @@
 			"options": {
 				"command": "SANKEY_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/sankey-fuzz.test.ts"
 			}
+		},
+		"wireframe-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "WIREFRAME_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/wireframe-fuzz.test.ts"
+			}
 		}
 	}
 }

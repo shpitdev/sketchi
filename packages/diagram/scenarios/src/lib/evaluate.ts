@@ -27,6 +27,11 @@ import {
 	journeyScenarioChecks,
 } from "./journey-scenarios.js";
 import {
+	wireframeDrawnCheck,
+	wireframeLayoutCheck,
+	wireframeScenarioChecks,
+} from "./wireframe-scenarios.js";
+import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,
 	ganttGeometryCheck,
@@ -47,6 +52,7 @@ import {
 	resolveVennShorthand,
 	parseJourneyDiagram,
 	parseSankeyDiagram,
+	parseWireframeDiagram,
 	parseTimelineDiagram,
 	parseChartDiagram,
 	parseGanttDiagram,
@@ -1174,6 +1180,18 @@ export function evaluateScenarioDiagram(
 			diagram,
 			sankeyScenarioChecks(scenario, modelDiagram),
 			(scene) => [sankeyDrawnCheck(diagram, scene), sankeyLayoutCheck(diagram, scene)],
+		);
+	}
+	if (scenario.diagramType === "wireframe") {
+		const diagram = parseWireframeDiagram(candidate);
+		const modelDiagram =
+			modelCandidate === candidate ? diagram : parseWireframeDiagram(modelCandidate);
+		// The drawing and its layout read the scene, so they score the returned diagram.
+		return evaluation(
+			scenario.id,
+			diagram,
+			wireframeScenarioChecks(scenario, modelDiagram),
+			(scene) => [wireframeDrawnCheck(diagram, scene), wireframeLayoutCheck(scene)],
 		);
 	}
 	if (scenario.diagramType === "sequence") {

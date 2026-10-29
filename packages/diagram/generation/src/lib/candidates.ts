@@ -26,6 +26,12 @@ import {
 	SankeyValidationError,
 	resolveSankeyShorthand,
 	validateSankeyDiagram,
+	resolveWireframeShorthand,
+	validateWireframeDiagram,
+	WireframeDiagramSchema,
+	WireframeValidationError,
+	wireframeComponents,
+	wireframeComponentWords,
 	resolveClassShorthand,
 	resolveErShorthand,
 	validateClassDiagram,
@@ -413,7 +419,8 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof OrgChartValidationError ||
 		error instanceof VennValidationError ||
 		error instanceof JourneyValidationError ||
-		error instanceof SankeyValidationError
+		error instanceof SankeyValidationError ||
+		error instanceof WireframeValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
@@ -438,7 +445,9 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 													? "journey"
 													: error instanceof SankeyValidationError
 														? "sankey"
-														: "sequence";
+														: error instanceof WireframeValidationError
+															? "wireframe"
+															: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -628,6 +637,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 				JourneyDiagramSchema,
 				resolveJourneyShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateJourneyDiagram,
+				intent,
+			),
+		wireframe: () =>
+			decodeAndValidate(
+				WireframeDiagramSchema,
+				resolveWireframeShorthand(withSketchiDiagramStyle(titledDiagram)),
+				validateWireframeDiagram,
 				intent,
 			),
 		sequence: () => {
@@ -833,6 +849,14 @@ function labelsForRequirement(
 			: requirement.target === "phase"
 				? diagram.stages.map((stage) => stage.name)
 				: undefined;
+	if (diagram.type === "wireframe")
+		return requirement.target === "screen"
+			? diagram.screens.map((screen) => screen.name)
+			: requirement.target === "component"
+				? [...wireframeComponents(diagram)].flatMap(({ component }) =>
+						wireframeComponentWords(component),
+					)
+				: undefined;
 	if (diagram.type === "er") {
 		if (requirement.target === "entity") return diagram.entities.map(erEntityName);
 		if (requirement.target === "field")
@@ -904,6 +928,8 @@ function countForRequirement(
 			: target === "links"
 				? diagram.links.length
 				: undefined;
+	if (diagram.type === "wireframe")
+		return target === "screens" ? diagram.screens.length : undefined;
 	if (diagram.type === "er")
 		return target === "entities"
 			? diagram.entities.length

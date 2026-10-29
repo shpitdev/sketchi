@@ -37,7 +37,8 @@ const BUILDERS = {
 	buildVennDiagram: "Venn diagrams of what overlapping sets share",
 	buildJourneyMap: "user journey maps: stages of steps scored for sentiment",
 	buildSankey: "Sankey diagrams of weighted flows between stages",
-	createCanvas: "hand-placed CanvasSpec, only for layouts no builder covers (dashboard, wireframe)",
+	buildWireframe: "UI wireframes and mockups: screens of components",
+	createCanvas: "hand-placed CanvasSpec, only for layouts no builder covers (illustration)",
 };
 const HELPERS = {
 	searchIcons:
@@ -75,6 +76,9 @@ const ER_CARDINALITY_RULE =
 /** Shared by the buildClassDiagram topic and its compact line in the execute description. */
 const CLASS_KIND_RULE =
 	'kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to. Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only.';
+/** Shared by the buildWireframe topic and its compact line in the execute description. */
+const WIREFRAME_RULE =
+	'Set variant "primary", checked and active as stated. Copy every screen, component, text and state stated, in order; invent none.';
 /** Shared by the buildOrgChart topic and its compact line in the execute description. */
 const ORG_CHART_RULE =
 	"manager is the id they report to; only the top person has none (forest: true for several).";
@@ -110,6 +114,7 @@ const FAST_PATH = {
 	buildVennDiagram: `spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. ${VENN_REGION_RULE} Copy every set and item stated, each in its region.`,
 	buildJourneyMap: `spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. ${JOURNEY_SCORE_RULE} Copy every stage, step, score, actor, touchpoint and note stated.`,
 	buildSankey: `spec: { title, nodes: [{ id, label }], links: [{ source, target, value, label? }], unit? ("$k", "visits") }. ${SANKEY_RULE}`,
+	buildWireframe: `spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, row (align?: "between" | "center" | "end"), column, grid (columns: n). Widgets: heading (text, level?), text (text or lines), link, badge, button (text, variant?), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav, breadcrumbs, list (items, active?), avatar, icon, image, chart (label?), table (columns: string[]), divider. ${WIREFRAME_RULE}`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 const EXECUTE_HELPERS = [
 	HELPERS.searchIcons,
@@ -350,7 +355,7 @@ const SEQUENCE_DIAGRAM_EXAMPLE = `async () => sketchi.buildSequenceDiagram({
 
 const CREATE_CANVAS_EXAMPLE = `async () => sketchi.createCanvas({
   spec: {
-    kind: "canvas", version: 1, diagramId: "signup-wireframe", title: "Signup wireframe",
+    kind: "canvas", version: 1, diagramId: "signup-form", title: "Signup form",
     width: 960, height: 560, accentColor: "#1f2937", backgroundColor: "#ffffff",
     layers: [{ id: "screens", name: "Screens" }, { id: "flow", name: "Flow" }],
     elements: [
@@ -888,6 +893,29 @@ export const catalog: CatalogEntry[] = [
 		],
 	},
 	{
+		id: "buildWireframe",
+		kind: "operation",
+		title: "buildWireframe",
+		topic: "buildWireframe",
+		keywords: ["wireframe", "mockup", "ui", "screen", "layout", "form", "dashboard", "app", "page"],
+		snippet:
+			"Create a native low-fidelity wireframe: screens on a device, each a tree of components.",
+		content: [
+			'buildWireframe accepts { spec: { id?, title, screens: [{ id?, name, device?: "desktop" | "tablet" | "mobile", align?, children }] }, options? }. Each screen draws as a frame the size of its device. The renderer places everything: a header spans the top, a footer the bottom, a sidebar one side, a modal floats over the rest, and every other component stacks down the content area. No field takes a coordinate or size.',
+			'Containers hold children: header, footer, sidebar (side: "left" | "right"), main, section, card and modal (title), row, column, grid (columns: n). A row sets its children side by side and wraps them; align spreads them ("between"), centers or ends them. Rows and grids keep containers one height, buttons hug their text and fields stretch.',
+			'Widgets: heading (text, level 1-3), text (text, or lines for placeholder copy), link, badge, button (text, variant "primary" | "secondary"), input, textarea, select, search (label, placeholder, or value when it shows one), checkbox, radio, toggle (label, checked), tabs, nav and breadcrumbs (items, active), list (items), avatar, icon, image (label, aspect "wide" | "square" | "tall"), chart (label, kind "bar" | "line" | "pie"), table (columns: headers, rows: placeholder count), divider. A nav inside a sidebar stacks; any other runs across.',
+			`${WIREFRAME_RULE} A screen to move between is its own screen.`,
+			operationTypes("buildWireframe"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "A phone login screen",
+				language: "js",
+				code: `async () => sketchi.buildWireframe({ spec: { title: "Login", screens: [{ name: "Login", device: "mobile", children: [{ type: "heading", text: "Welcome back" }, { type: "input", label: "Email", placeholder: "you@example.com" }, { type: "input", label: "Password" }, { type: "checkbox", label: "Remember me", checked: true }, { type: "button", text: "Sign in", variant: "primary" }, { type: "link", text: "Forgot password?" }] }] }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
 		id: "buildSequenceDiagram",
 		kind: "operation",
 		title: "buildSequenceDiagram",
@@ -932,21 +960,10 @@ export const catalog: CatalogEntry[] = [
 		kind: "operation",
 		title: "createCanvas",
 		topic: "createCanvas",
-		keywords: [
-			"canvas",
-			"arbitrary",
-			"erd",
-			"dashboard",
-			"wireframe",
-			"grid",
-			"layers",
-			"groups",
-			"polygon",
-		],
-		snippet:
-			"Hand-place a layout no builder covers (dashboard, wireframe) as a versioned CanvasSpec.",
+		keywords: ["canvas", "arbitrary", "erd", "dashboard", "grid", "layers", "groups", "polygon"],
+		snippet: "Hand-place a layout no builder covers (an illustration) as a versioned CanvasSpec.",
 		content: [
-			"Use createCanvas only for layouts no builder covers, such as dashboards and wireframes. Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); overlapping sets are Venn diagrams (buildVennDiagram); weighted flows are Sankey diagrams (buildSankey); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
+			"Use createCanvas only for layouts no builder covers, such as illustrations. UI screens and mockups are wireframes (buildWireframe). Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); overlapping sets are Venn diagrams (buildVennDiagram); weighted flows are Sankey diagrams (buildSankey); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
 			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",
@@ -959,7 +976,7 @@ export const catalog: CatalogEntry[] = [
 		].join("\n"),
 		examples: [
 			{
-				title: "Signup wireframe with layers, bindings, layout, and z-order",
+				title: "Signup form with layers, bindings, layout, and z-order",
 				language: "js",
 				code: CREATE_CANVAS_EXAMPLE,
 			},
@@ -1130,7 +1147,7 @@ export const catalog: CatalogEntry[] = [
 		kind: "example",
 		title: "Executable examples",
 		topic: "examples",
-		keywords: ["examples", "sample", "canvas", "erd", "dashboard", "wireframe"],
+		keywords: ["examples", "sample", "canvas", "erd", "dashboard"],
 		snippet:
 			"Runnable examples for accepted graph, patch, artifact retrieval, and repair feedback.",
 		content: "Use these examples as starting points for harness-generated execute code.",
@@ -1161,7 +1178,7 @@ export const catalog: CatalogEntry[] = [
 				code: SEQUENCE_DIAGRAM_EXAMPLE,
 			},
 			{
-				title: "Signup wireframe through createCanvas",
+				title: "Signup form through createCanvas",
 				language: "js",
 				code: CREATE_CANVAS_EXAMPLE,
 			},

@@ -33,7 +33,7 @@ scene representations.
 
 ## What Sketchi Does
 
-- Creates hosted flowcharts, mindmaps, sequence diagrams, timelines, state machines, Gantt charts, ER diagrams, UML class diagrams, org charts, Venn diagrams, user journey maps, Sankey diagrams, and bar, line, and pie charts from natural-language prompts.
+- Creates hosted flowcharts, mindmaps, sequence diagrams, timelines, state machines, Gantt charts, ER diagrams, UML class diagrams, org charts, Venn diagrams, user journey maps, Sankey diagrams, UI wireframes, and bar, line, and pie charts from natural-language prompts.
 - Produces validated, editable Excalidraw scenes instead of opaque images.
 - Exposes Code Mode through MCP and versioned HTTP artifact endpoints.
 - Keeps layout, bindings, wrapping, and scene conversion deterministic in code.
@@ -68,7 +68,7 @@ Explicit `--type` and file `--dest` values preset their wizard questions;
 interactive generation remains PNG-only, so other formats and `--dest -` also
 require `--prompt`.
 Without `--type`, the model selects a supported native type. Explicit flowchart,
-mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, or sankey selection is authoritative; architecture and
+mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, or wireframe selection is authoritative; architecture and
 swimlane requests fail clearly instead of being coerced.
 The default file is `<generated-id>.png` in the current directory. Use
 `--format excalidraw` or `--format scene` for another artifact, and `--dest`
@@ -149,7 +149,7 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
 
 The first high-reliability target is decision-heavy flowchart generation.
-`flowchart`, `mindmap`, `sequence`, `timeline`, `chart`, `state-machine`, `gantt`, `er`, `class`, `org-chart`, `venn`, `journey`, and `sankey` are explicit diagram families; unsupported families do
+`flowchart`, `mindmap`, `sequence`, `timeline`, `chart`, `state-machine`, `gantt`, `er`, `class`, `org-chart`, `venn`, `journey`, `sankey`, and `wireframe` are explicit diagram families; unsupported families do
 not silently fall back to a generic template. See the full
 [architecture guide](docs/architecture.md) and the
 [MCP-first generation boundary](docs/mcp-first-generation.md).
@@ -341,3 +341,5 @@ Native Venn diagrams: use `buildVennDiagram` (Code Mode) or `generate --type ven
 Native journey maps: use `buildJourneyMap` (Code Mode) or `generate --type journey` (CLI). Supply `stages` in order, each `{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }`, with an optional `persona` (whose journey it is) and `actors`. `score` is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral. The renderer draws the stages as headers across the top, each step's card under its stage, an emotion curve through a face per step at its score over a dashed neutral baseline, and each stage's pain points and opportunities in rows beneath it; a journey too wide to read wraps into bands of whole stages with the curve running on between them. It owns every coordinate.
 
 Native Sankey diagrams: use `buildSankey` (Code Mode) or `generate --type sankey` (CLI). Supply `nodes: [{ id, label }]` (ids without colons) and `links: [{ source, target, value, label? }]` with every stated amount (`value` > 0), plus an optional `unit` formatted as charts format it (`$k` gives $310k; a word unit such as `visits` reads on node totals). Links run one way: no cycles, self-links or repeated pairs, and no invented balancing node. The renderer places each node one column past the longest run of links into it (a sink fed by several nodes aligns with the last column), draws each node as a bar as tall as the larger of its inflow and outflow with its label and total, and each link as a band as wide as its value in its source's color with its value written; a band under 3 px draws at 3 px and keeps its exact value. It owns every coordinate.
+
+Native wireframes: use `buildWireframe` (Code Mode) or `generate --type wireframe` (CLI). Supply `screens`, each with a `name`, a `device` (`desktop`, `tablet` or `mobile`, which sets the frame's size) and `children`: a tree of components in reading order. Containers hold children: `header`, `footer`, `sidebar` (`side: "left" | "right"`), `main`, `section`, `card` and `modal` (with a `title`), `row`, `column` and `grid` (`columns: n`); `align` spreads, centers or ends a row's children. Widgets draw from their own fields: `heading`, `text` (or `lines` of placeholder copy), `link`, `badge` and `button` show `text`; `input`, `textarea`, `select` and `search` take a `label`, a `placeholder` or the `value` they show; `checkbox`, `radio` and `toggle` take a `label`; `tabs`, `nav`, `breadcrumbs` and `list` take `items`; and `avatar`, `icon`, `image`, `chart`, `table` (`columns` of headers) and `divider` draw placeholders. State: `variant: "primary"` on the main action, `checked: true` on what is on, and `active` on the selected tab or nav item. The renderer draws each screen as an Excalidraw frame, its header across the top, footer along the bottom, sidebars down their sides and modals over a dimmed backdrop, with every component a group it places: rows wrap and grids drop columns before anything overflows, and text wraps at whole words; it owns every coordinate.

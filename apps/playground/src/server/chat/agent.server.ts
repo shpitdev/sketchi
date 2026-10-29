@@ -104,6 +104,13 @@ import {
 	StudioBuildSankeyInputSchema,
 	StudioBuildSankeyOutputSchema,
 } from "./studio-sankey-tool.server";
+import {
+	makeStudioWireframeToolExecutor,
+	STUDIO_BUILD_WIREFRAME_TOOL_DESCRIPTION,
+	STUDIO_BUILD_WIREFRAME_TOOL_NAME,
+	StudioBuildWireframeInputSchema,
+	StudioBuildWireframeOutputSchema,
+} from "./studio-wireframe-tool.server";
 
 export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
 	"StudioAgentRequestError",
@@ -229,6 +236,9 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 		turn,
 	});
 	const sankeyExecutor = yield* makeStudioSankeyToolExecutor(codeMode.buildSankey, { turn });
+	const wireframeExecutor = yield* makeStudioWireframeToolExecutor(codeMode.buildWireframe, {
+		turn,
+	});
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -301,6 +311,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildSankeyInputSchema,
 						outputSchema: StudioBuildSankeyOutputSchema,
 						execute: makeStudioBuildToolCallback(sankeyExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_WIREFRAME_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_WIREFRAME_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildWireframeInputSchema,
+						outputSchema: StudioBuildWireframeOutputSchema,
+						execute: makeStudioBuildToolCallback(wireframeExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,

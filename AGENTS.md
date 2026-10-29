@@ -57,6 +57,7 @@ local proof when their inputs change:
 - `pnpm nx run diagram-excalidraw:venn-fuzz` (900 random Venn diagrams across three seeds; CI runs 12)
 - `pnpm nx run diagram-excalidraw:journey-fuzz` (900 random journeys across three seeds; CI runs 8)
 - `pnpm nx run diagram-excalidraw:sankey-fuzz` (1,200 random flows across three seeds; CI runs 10)
+- `pnpm nx run diagram-excalidraw:wireframe-fuzz` (1,200 random wireframes across three seeds; CI runs 8)
 - `pnpm nx run diagram-excalidraw:sequence-fuzz` (400 sequences with self-messages; CI runs 12)
 - `pnpm run test:wrangler-dry-runs` after app builds
 

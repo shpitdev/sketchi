@@ -1,7 +1,7 @@
 # Adding a diagram family
 
 Sketchi supports a fixed set of canonical diagram families: flowchart, mindmap,
-sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, and sankey. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
+sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, and wireframe. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
 registry. A family is supported only when it completes every stage below, and
 only supported families are advertised. Everything else, such as architecture or
 swimlane, fails with a typed `unsupported_diagram_type` and is never coerced
@@ -49,7 +49,10 @@ fits; see `docs/venn-diagrams.md`. Journey maps lay out stages as columns
 with an emotion curve and draw no connectors; see `docs/journey-maps.md`.
 Sankey diagrams are not nodes and edges: they place weighted bands between
 columns of bars, label every total and flow, and leave `GRAPH_DIAGRAM_TYPES`;
-see `docs/sankey.md`.
+see `docs/sankey.md`. Wireframes are no graph at all: screens of nested
+components the renderer boxes like flex layout; see `docs/wireframes.md`.
+Wireframes are no graph at all: screens of nested components the renderer
+boxes like flex layout; see `docs/wireframes.md`.
 
 Surfaces that offer a family to people also need updating: the playground
 generate API (`apps/playground/src/server/generation/api.server.ts`), Studio

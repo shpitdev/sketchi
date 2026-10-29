@@ -15,6 +15,7 @@ const FAILURE_HTTP_STATUS = {
 	invalid_venn_diagram: 422,
 	invalid_journey: 422,
 	invalid_sankey: 422,
+	invalid_wireframe: 422,
 	invalid_canvas: 422,
 	invalid_generated_document: 422,
 	quality_failed: 422,

@@ -404,6 +404,13 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		const sankeyDocs = getCodeModeDocs({ topic: "buildSankey" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(sankeyDocs.split("\n\n")[0]);
 		expect(sankeyDocs.split("Request type:")[0]).toContain("A band under 3 px draws at 3 px");
+		// Wireframes add a builder name to the head and one compact line here (+787 characters).
+		expect(codeLine("buildWireframe")).toBe(
+			'- buildWireframe: spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, row (align?: "between" | "center" | "end"), column, grid (columns: n). Widgets: heading (text, level?), text (text or lines), link, badge, button (text, variant?), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav, breadcrumbs, list (items, active?), avatar, icon, image, chart (label?), table (columns: string[]), divider. Set variant "primary", checked and active as stated. Copy every screen, component, text and state stated, in order; invent none.',
+		);
+		const wireframeDocs = getCodeModeDocs({ topic: "buildWireframe" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(wireframeDocs.split("\n\n")[0]);
+		expect(wireframeDocs.split("Request type:")[0]).toContain("A nav inside a sidebar stacks");
 		expect(codeLine("createCanvas")).toBeUndefined();
 		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
 			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
@@ -454,8 +461,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// Nested zones, infrastructure shapes and their logo rule add spec fields and docs (#476).
 		// Venn diagrams add a summary and one compact line (+336 characters).
 		// Journey maps add an index line and a compact spec line (+367 characters).
-		// Sankey diagrams add their compact line (+304 characters).
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(11_600);
+		// Sankey diagrams add their compact line (+304 characters), wireframes theirs (+787).
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(12_400);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const line of overview
 			.split("\n")

@@ -365,10 +365,13 @@ export interface CanvasIconAsset {
  * and methods compartment), swimlanes (a lane's band and its header),
  * architecture zones (a region, VPC, subnet or cluster outline), Venn
  * sets (a set's translucent fill and its outline), a journey map's faces
- * (a face and its eyes on the experience curve), and Sankey marks (a node's
- * bar and each flow's band).
+ * (a face and its eyes on the experience curve), Sankey marks (a node's bar
+ * and each flow's band), and wireframe components: a widget's own shapes (a
+ * card, control or pill) and a region of a screen (a header, sidebar, table or
+ * image placeholder).
  * Only a zone carries an icon, drawn in its header, and only a table's or a
- * class's name band and a lane's header carry a bound label.
+ * class's name band, a lane's header and a wireframe button or avatar carry a
+ * bound label.
  */
 export const CANVAS_RENDERER_ROLES = [
 	"zone",
@@ -386,6 +389,8 @@ export const CANVAS_RENDERER_ROLES = [
 	"venn-set",
 	"journey-mark",
 	"sankey-mark",
+	"wireframe-widget",
+	"wireframe-region",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
@@ -410,8 +415,9 @@ export const CANVAS_CROSSABLE_RENDERER_ROLES: readonly CanvasRendererRole[] = [
 /**
  * Roles whose rectangles keep square corners: chart, Gantt and Sankey bars, so
  * their ends sit exactly at their values and dates and bands meet them flush; a
- * table's or class's outline and name band, so the band fills its top; and
- * lanes and zones, so neighbors share one boundary.
+ * table's or class's outline and name band, so the band fills its top; lanes
+ * and zones, so neighbors share one boundary; and a wireframe's regions, which
+ * run to their screen's edges.
  */
 const SQUARE_CORNER_ROLES: ReadonlySet<CanvasRendererRole> = new Set([
 	"chart-mark",
@@ -422,6 +428,7 @@ const SQUARE_CORNER_ROLES: ReadonlySet<CanvasRendererRole> = new Set([
 	"swimlane",
 	"swimlane-header",
 	"zone",
+	"wireframe-region",
 ]);
 
 /** Whether a shape draws as a rectangle with Excalidraw's adaptive rounded corners. */
@@ -436,17 +443,28 @@ export function canvasRoundsCorners(
 
 /** Excalidraw's adaptive corner radius at most, reached once the shorter side is 128. */
 const CANVAS_CORNER_RADIUS = 32;
+/**
+ * A wireframe widget's corners stop at 8, Excalidraw's adaptive radius with a
+ * fixed size, so a card or text area reads as a control rather than a pill.
+ */
+export const CANVAS_WIREFRAME_CORNER_RADIUS = 8;
 
 /**
  * The radius a rounded rectangle's corners draw with: a quarter of its shorter
- * side, up to 32 (Excalidraw's adaptive radius). A line meeting a side nearer a
- * corner than this meets the curve, not the straight side. Square shapes have none.
+ * side, up to 32 (Excalidraw's adaptive radius), or up to 8 for a wireframe
+ * widget. A line meeting a side nearer a corner than this meets the curve, not
+ * the straight side. Square shapes have none.
  */
 export function canvasCornerRadius(
 	shape: Pick<CanvasShapeElement, "height" | "rendererRole" | "shape" | "width">,
 ): number {
 	return canvasRoundsCorners(shape)
-		? Math.min(Math.min(shape.width, shape.height) / 4, CANVAS_CORNER_RADIUS)
+		? Math.min(
+				Math.min(shape.width, shape.height) / 4,
+				shape.rendererRole === "wireframe-widget"
+					? CANVAS_WIREFRAME_CORNER_RADIUS
+					: CANVAS_CORNER_RADIUS,
+			)
 		: 0;
 }
 
@@ -465,6 +483,8 @@ const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"timeline-marker": "Timeline marker",
 	"venn-set": "Venn set",
 	"sankey-mark": "Sankey mark",
+	"wireframe-region": "Wireframe region",
+	"wireframe-widget": "Wireframe widget",
 	zone: "Zone",
 };
 

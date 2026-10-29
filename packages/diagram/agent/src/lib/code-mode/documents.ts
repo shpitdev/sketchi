@@ -15,6 +15,7 @@ import {
 	type BuildVennDiagramResult,
 	type BuildJourneyMapResult,
 	type BuildSankeyResult,
+	type BuildWireframeResult,
 	type BuildTimelineResult,
 	ClassSpec,
 	ErSpec,
@@ -30,6 +31,8 @@ import {
 	VennSpec,
 	JourneySpec,
 	SankeySpec,
+	WireframeSpec,
+	type WireframeComponentInput,
 } from "./contract.js";
 import type { CodeModeArtifactStorage } from "./artifacts.js";
 import {
@@ -43,6 +46,7 @@ import {
 	buildVennDiagram,
 	buildJourneyMap,
 	buildSankey,
+	buildWireframe,
 	buildTimeline,
 	buildChart,
 	buildGantt,
@@ -67,6 +71,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	venn: VennSpec,
 	journey: JourneySpec,
 	sankey: SankeySpec,
+	wireframe: WireframeSpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -90,7 +95,8 @@ export type CanonicalBuildResult =
 	| BuildOrgChartResult
 	| BuildVennDiagramResult
 	| BuildJourneyMapResult
-	| BuildSankeyResult;
+	| BuildSankeyResult
+	| BuildWireframeResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -133,6 +139,8 @@ export function buildCanonicalDocument(
 			return buildJourneyMap(request);
 		case "sankey":
 			return buildSankey(request);
+		case "wireframe":
+			return buildWireframe(request);
 	}
 }
 
@@ -353,6 +361,24 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 						...(stage.opportunities === undefined
 							? {}
 							: { opportunities: [...stage.opportunities] }),
+					})),
+					style: diagram.style,
+				},
+			};
+		case "wireframe":
+			return {
+				type: "wireframe",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					screens: diagram.screens.map((screen) => ({
+						id: screen.id,
+						name: screen.name,
+						device: screen.device,
+						...(screen.align === undefined ? {} : { align: screen.align }),
+						children: screen.children.map(
+							(component) => structuredClone(component) as WireframeComponentInput,
+						),
 					})),
 					style: diagram.style,
 				},

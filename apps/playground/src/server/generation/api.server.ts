@@ -230,6 +230,7 @@ function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFail
 		case "invalid_venn_diagram":
 		case "invalid_journey":
 		case "invalid_sankey":
+		case "invalid_wireframe":
 			return failure("invalid_generated_document", issues);
 		case "quality_failed":
 			return failure("quality_failed", issues);
@@ -281,6 +282,8 @@ function buildWithCodeMode(
 			return codeMode.buildJourneyMap(request);
 		case "sankey":
 			return codeMode.buildSankey(request);
+		case "wireframe":
+			return codeMode.buildWireframe(request);
 	}
 }
 

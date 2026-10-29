@@ -31,6 +31,7 @@ const expectedPublicFullPaths = [
 	"/api/v1/state-machines/build",
 	"/api/v1/timelines/build",
 	"/api/v1/venn-diagrams/build",
+	"/api/v1/wireframes/build",
 	"/artifacts/$artifactId",
 	"/artifacts/$artifactId/edit",
 	"/codemode-export-harness",
@@ -101,6 +102,7 @@ describe("Playground application structure", () => {
 			"api/v1/state-machines/build.ts",
 			"api/v1/timelines/build.ts",
 			"api/v1/venn-diagrams/build.ts",
+			"api/v1/wireframes/build.ts",
 			"mcp.ts",
 		]);
 

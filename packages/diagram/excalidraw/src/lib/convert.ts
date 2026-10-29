@@ -11,6 +11,7 @@ import {
 	AXIS_ALIGNED_EPSILON,
 	boundLabelWidth,
 	CANVAS_CROSSABLE_RENDERER_ROLES,
+	CANVAS_WIREFRAME_CORNER_RADIUS,
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasGroupIconBox,
@@ -450,7 +451,11 @@ function shapeElement(input: {
 		height,
 		backgroundColor: input.shape.fillColor ?? "transparent",
 		boundElements: boundElements.length > 0 ? boundElements : null,
-		roundness: canvasRoundsCorners(input.shape) ? { type: 3 } : null,
+		roundness: canvasRoundsCorners(input.shape)
+			? input.shape.rendererRole === "wireframe-widget"
+				? { type: 3, value: CANVAS_WIREFRAME_CORNER_RADIUS }
+				: { type: 3 }
+			: null,
 		strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
 		...(input.shape.rendererRole
 			? { customData: { sketchiRendererRole: input.shape.rendererRole } }

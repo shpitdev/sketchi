@@ -1,0 +1,136 @@
+{
+	"id": "northstar-analytics-dashboard",
+	"title": "Northstar analytics dashboard",
+	"screens": [
+		{
+			"id": "northstar-overview",
+			"name": "Northstar — Overview",
+			"device": "desktop",
+			"children": [
+				{
+					"type": "sidebar",
+					"children": [
+						{
+							"type": "heading",
+							"text": "Northstar"
+						},
+						{
+							"type": "nav",
+							"items": [
+								"Overview",
+								"Customers",
+								"Orders",
+								"Products",
+								"Reports",
+								"Integrations",
+								"Settings"
+							],
+							"active": "Overview"
+						}
+					]
+				},
+				{
+					"type": "column",
+					"children": [
+						{
+							"type": "header",
+							"children": [
+								{
+									"type": "search",
+									"placeholder": "Search orders, customers or products"
+								},
+								{
+									"type": "avatar"
+								}
+							]
+						},
+						{
+							"type": "main",
+							"children": [
+								{
+									"type": "heading",
+									"text": "Overview"
+								},
+								{
+									"type": "row",
+									"children": [
+										{
+											"type": "card",
+											"children": [
+												{
+													"type": "text",
+													"text": "Monthly recurring revenue"
+												},
+												{
+													"type": "heading",
+													"text": "$48,200"
+												}
+											]
+										},
+										{
+											"type": "card",
+											"children": [
+												{
+													"type": "text",
+													"text": "Active subscriptions"
+												},
+												{
+													"type": "heading",
+													"text": "1,284"
+												}
+											]
+										},
+										{
+											"type": "card",
+											"children": [
+												{
+													"type": "text",
+													"text": "Average revenue per account"
+												},
+												{
+													"type": "heading",
+													"text": "$37.50"
+												}
+											]
+										},
+										{
+											"type": "card",
+											"children": [
+												{
+													"type": "text",
+													"text": "Churn rate this month"
+												},
+												{
+													"type": "heading",
+													"text": "2.1%"
+												}
+											]
+										}
+									]
+								},
+								{
+									"type": "chart",
+									"label": "Revenue over the last 12 months"
+								},
+								{
+									"type": "section",
+									"title": "Recent orders",
+									"children": [
+										{
+											"type": "table",
+											"columns": ["Order ID", "Customer", "Plan", "Amount", "Status", "Created at"]
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	],
+	"style": {
+		"accentColor": "#8f707f",
+		"backgroundColor": "#fffdf8"
+	}
+}

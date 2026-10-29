@@ -64,8 +64,9 @@ function resultSummary(result: StudioBuildResult): {
 	score?: number;
 } {
 	const spec = result.normalizedSpec;
-	// Timeline events and chart values sit on axes; they have no connections to count.
-	const unconnected = spec !== undefined && ("events" in spec || "categories" in spec);
+	// Timeline events and chart values sit on axes, and wireframe components on screens; they have no connections to count.
+	const unconnected =
+		spec !== undefined && ("events" in spec || "categories" in spec || "screens" in spec);
 	if (result.quality) {
 		return {
 			...(unconnected ? {} : { connectionCount: result.quality.summary.edgeCount }),
@@ -93,6 +94,15 @@ function resultSummary(result: StudioBuildResult): {
 			itemCount: spec.regions.reduce((sum, region) => sum + (region.items?.length ?? 0), 0),
 		};
 	if ("links" in spec) return { connectionCount: spec.links.length, itemCount: spec.nodes.length };
+	if ("screens" in spec) {
+		const count = (components: readonly { children?: readonly unknown[] }[]): number =>
+			components.reduce(
+				(sum, component) =>
+					sum + 1 + count((component.children ?? []) as { children?: readonly unknown[] }[]),
+				0,
+			);
+		return { itemCount: spec.screens.reduce((sum, screen) => sum + count(screen.children), 0) };
+	}
 	if ("people" in spec)
 		return {
 			connectionCount:
@@ -184,6 +194,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 		case "invalid_venn_diagram":
 		case "invalid_journey":
 		case "invalid_sankey":
+		case "invalid_wireframe":
 			return {
 				message: "This draft needs a clearer structure before it can be drawn.",
 				hint: "Clarify the steps or simplify the connections, then try again.",

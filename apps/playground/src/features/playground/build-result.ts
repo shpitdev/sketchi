@@ -19,6 +19,8 @@ import {
 	BuildJourneyMapToolInputSchema,
 	BuildSankeyResultSchema,
 	BuildSankeyToolInputSchema,
+	BuildWireframeResultSchema,
+	BuildWireframeToolInputSchema,
 	BuildTimelineResultSchema,
 	BuildTimelineToolInputSchema,
 	BuildChartResultSchema,
@@ -35,6 +37,7 @@ import {
 	type BuildVennDiagramResult,
 	type BuildJourneyMapResult,
 	type BuildSankeyResult,
+	type BuildWireframeResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagram-agent";
@@ -58,7 +61,8 @@ export type StudioBuildResult =
 	| BuildOrgChartResult
 	| BuildVennDiagramResult
 	| BuildJourneyMapResult
-	| BuildSankeyResult;
+	| BuildSankeyResult
+	| BuildWireframeResult;
 
 const BUILD_TOOLS = {
 	"tool-build_chart": {
@@ -144,6 +148,16 @@ const BUILD_TOOLS = {
 				: [];
 		},
 	},
+	"tool-build_wireframe": {
+		family: "wireframe",
+		decodeResult: Schema.decodeUnknownResult(BuildWireframeResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildWireframeToolInputSchema)(input);
+			return Result.isSuccess(decoded)
+				? decoded.success.spec.screens.map((screen) => screen.name)
+				: [];
+		},
+	},
 	"tool-build_org_chart": {
 		family: "org-chart",
 		decodeResult: Schema.decodeUnknownResult(BuildOrgChartResultSchema),
@@ -215,6 +229,7 @@ const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 	venn: "Venn diagram",
 	journey: "journey map",
 	sankey: "Sankey diagram",
+	wireframe: "wireframe",
 };
 
 /**

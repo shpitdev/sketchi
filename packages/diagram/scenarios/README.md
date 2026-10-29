@@ -112,6 +112,14 @@ and the eval harness use it.
   between its bars with its value, widths in proportion apart from the 3 px
   floor, with no label overlapping and crossings no worse than the authored
   order's.
+- Wireframe scenarios check every stated screen and its device, every stated
+  component of a kind that draws it and showing its stated words (an input by
+  its label or placeholder, an amount in any spelling), the container it sits
+  in, its stated state (variant, checked, active item, shown value), the
+  stated reading orders, items, tabs, breadcrumbs, table columns and sides,
+  and exactly the stated screens and controls. The drawn scene must show every
+  screen as a frame and every component as a group with its words, inside its
+  parent and its screen, with nothing overlapping or spilling.
 
 Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model

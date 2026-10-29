@@ -32,6 +32,9 @@ import {
 	BuildJourneyMapResultSchema,
 	JourneyToolSpecSchema,
 	SankeyToolSpecSchema,
+	BuildWireframeRequestSchema,
+	BuildWireframeResultSchema,
+	WireframeToolSpecSchema,
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
@@ -196,6 +199,14 @@ export const codeModeContracts = {
 			spec: SankeyToolSpecSchema,
 		}),
 		output: BuildSankeyResultSchema,
+	},
+	buildWireframe: {
+		input: Schema.Struct({
+			...BuildWireframeRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: WireframeToolSpecSchema,
+		}),
+		output: BuildWireframeResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

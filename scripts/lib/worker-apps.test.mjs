@@ -45,6 +45,7 @@ const tanstackFullPathSnapshot = [
 	"/api/v1/state-machines/build",
 	"/api/v1/timelines/build",
 	"/api/v1/venn-diagrams/build",
+	"/api/v1/wireframes/build",
 	"/artifacts/$artifactId",
 	"/artifacts/$artifactId/edit",
 	"/codemode-export-harness",

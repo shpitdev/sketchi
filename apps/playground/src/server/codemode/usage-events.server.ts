@@ -44,6 +44,7 @@ export type CodeModeUsageOperation =
 	| "buildVennDiagram"
 	| "buildJourneyMap"
 	| "buildSankey"
+	| "buildWireframe"
 	| "createCanvas"
 	| "execute"
 	| "generateDiagram";
