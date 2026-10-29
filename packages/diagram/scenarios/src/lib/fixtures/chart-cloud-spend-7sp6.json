@@ -1,0 +1,22 @@
+{
+	"id": "last-month-s-cloud-spend-by-category-k",
+	"title": "Last month's cloud spend by category ($k)",
+	"kind": "pie",
+	"categories": [
+		"Compute — 920",
+		"Storage — 40",
+		"Networking — 22",
+		"Support — 11",
+		"Licenses — 7"
+	],
+	"series": [
+		{
+			"values": [920, 40, 22, 11, 7]
+		}
+	],
+	"unit": "$k",
+	"style": {
+		"accentColor": "#8f707f",
+		"backgroundColor": "#fffdf8"
+	}
+}
