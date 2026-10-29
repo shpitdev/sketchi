@@ -18,6 +18,10 @@ import {
 	VennValidationError,
 	resolveVennShorthand,
 	validateVennDiagram,
+	JourneyDiagramSchema,
+	JourneyValidationError,
+	resolveJourneyShorthand,
+	validateJourneyDiagram,
 	resolveClassShorthand,
 	resolveErShorthand,
 	validateClassDiagram,
@@ -403,7 +407,8 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof ErValidationError ||
 		error instanceof ClassValidationError ||
 		error instanceof OrgChartValidationError ||
-		error instanceof VennValidationError
+		error instanceof VennValidationError ||
+		error instanceof JourneyValidationError
 	) {
 		const family =
 			error instanceof FlowchartValidationError
@@ -424,7 +429,9 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 											? "org-chart"
 											: error instanceof VennValidationError
 												? "venn"
-												: "sequence";
+												: error instanceof JourneyValidationError
+													? "journey"
+													: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -600,6 +607,13 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 				VennDiagramSchema,
 				resolveVennShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateVennDiagram,
+				intent,
+			),
+		journey: () =>
+			decodeAndValidate(
+				JourneyDiagramSchema,
+				resolveJourneyShorthand(withSketchiDiagramStyle(titledDiagram)),
+				validateJourneyDiagram,
 				intent,
 			),
 		sequence: () => {
@@ -796,6 +810,13 @@ function labelsForRequirement(
 			: requirement.target === "item"
 				? diagram.regions.flatMap((region) => region.items ?? [])
 				: undefined;
+	// A journey's stages read as phases and its steps as tasks, as Mermaid's sections and tasks.
+	if (diagram.type === "journey")
+		return requirement.target === "task"
+			? diagram.stages.flatMap((stage) => stage.steps.map((step) => step.label))
+			: requirement.target === "phase"
+				? diagram.stages.map((stage) => stage.name)
+				: undefined;
 	if (diagram.type === "er") {
 		if (requirement.target === "entity") return diagram.entities.map(erEntityName);
 		if (requirement.target === "field")
@@ -857,6 +878,10 @@ function countForRequirement(
 			: target === "items"
 				? diagram.regions.reduce((sum, region) => sum + (region.items?.length ?? 0), 0)
 				: undefined;
+	if (diagram.type === "journey")
+		return target === "tasks"
+			? diagram.stages.reduce((total, stage) => total + stage.steps.length, 0)
+			: undefined;
 	if (diagram.type === "er")
 		return target === "entities"
 			? diagram.entities.length

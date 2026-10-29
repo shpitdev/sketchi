@@ -79,6 +79,13 @@ function diagramCounts(diagram: CanonicalDiagram) {
 			edgeCount: diagram.regions.reduce((count, region) => count + (region.items?.length ?? 0), 0),
 			edgeNoun: "items",
 		};
+	if (diagram.type === "journey")
+		return {
+			nodeCount: diagram.stages.reduce((total, stage) => total + stage.steps.length, 0),
+			nodeNoun: "steps",
+			edgeCount: diagram.stages.length,
+			edgeNoun: "stages",
+		};
 	return diagram.type === "sequence"
 		? {
 				nodeCount: diagram.participants.length,

@@ -90,6 +90,13 @@ import {
 	StudioBuildVennInputSchema,
 	StudioBuildVennOutputSchema,
 } from "./studio-venn-tool.server";
+import {
+	makeStudioJourneyMapToolExecutor,
+	STUDIO_BUILD_JOURNEY_MAP_TOOL_DESCRIPTION,
+	STUDIO_BUILD_JOURNEY_MAP_TOOL_NAME,
+	StudioBuildJourneyMapInputSchema,
+	StudioBuildJourneyMapOutputSchema,
+} from "./studio-journey-tool.server";
 
 export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
 	"StudioAgentRequestError",
@@ -211,6 +218,9 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	const classExecutor = yield* makeStudioClassToolExecutor(codeMode.buildClassDiagram, { turn });
 	const orgChartExecutor = yield* makeStudioOrgChartToolExecutor(codeMode.buildOrgChart, { turn });
 	const vennExecutor = yield* makeStudioVennToolExecutor(codeMode.buildVennDiagram, { turn });
+	const journeyExecutor = yield* makeStudioJourneyMapToolExecutor(codeMode.buildJourneyMap, {
+		turn,
+	});
 	return yield* Effect.try({
 		try: () => {
 			const result = streamText({
@@ -271,6 +281,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildVennInputSchema,
 						outputSchema: StudioBuildVennOutputSchema,
 						execute: makeStudioBuildToolCallback(vennExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_JOURNEY_MAP_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_JOURNEY_MAP_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildJourneyMapInputSchema,
+						outputSchema: StudioBuildJourneyMapOutputSchema,
+						execute: makeStudioBuildToolCallback(journeyExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,

@@ -66,6 +66,12 @@
 			"options": {
 				"command": "ORG_CHART_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/org-chart-fuzz.test.ts"
 			}
+		},
+		"journey-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "JOURNEY_FUZZ=full vitest run --config packages/diagram/excalidraw/vitest.config.mts packages/diagram/excalidraw/src/lib/journey-fuzz.test.ts"
+			}
 		}
 	}
 }

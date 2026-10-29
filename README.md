@@ -33,7 +33,7 @@ scene representations.
 
 ## What Sketchi Does
 
-- Creates hosted flowcharts, mindmaps, sequence diagrams, timelines, state machines, Gantt charts, ER diagrams, UML class diagrams, org charts, Venn diagrams, and bar, line, and pie charts from natural-language prompts.
+- Creates hosted flowcharts, mindmaps, sequence diagrams, timelines, state machines, Gantt charts, ER diagrams, UML class diagrams, org charts, Venn diagrams, user journey maps, and bar, line, and pie charts from natural-language prompts.
 - Produces validated, editable Excalidraw scenes instead of opaque images.
 - Exposes Code Mode through MCP and versioned HTTP artifact endpoints.
 - Keeps layout, bindings, wrapping, and scene conversion deterministic in code.
@@ -68,7 +68,7 @@ Explicit `--type` and file `--dest` values preset their wizard questions;
 interactive generation remains PNG-only, so other formats and `--dest -` also
 require `--prompt`.
 Without `--type`, the model selects a supported native type. Explicit flowchart,
-mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, or venn selection is authoritative; architecture and
+mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, or journey selection is authoritative; architecture and
 swimlane requests fail clearly instead of being coerced.
 The default file is `<generated-id>.png` in the current directory. Use
 `--format excalidraw` or `--format scene` for another artifact, and `--dest`
@@ -149,7 +149,7 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
 
 The first high-reliability target is decision-heavy flowchart generation.
-`flowchart`, `mindmap`, `sequence`, `timeline`, `chart`, `state-machine`, `gantt`, `er`, `class`, `org-chart`, and `venn` are explicit diagram families; unsupported families do
+`flowchart`, `mindmap`, `sequence`, `timeline`, `chart`, `state-machine`, `gantt`, `er`, `class`, `org-chart`, `venn`, and `journey` are explicit diagram families; unsupported families do
 not silently fall back to a generic template. See the full
 [architecture guide](docs/architecture.md) and the
 [MCP-first generation boundary](docs/mcp-first-generation.md).
@@ -337,3 +337,5 @@ Native class diagrams: use `buildClassDiagram` (Code Mode) or `generate --type c
 Native org charts: use `buildOrgChart` (Code Mode) or `generate --type org-chart` (CLI). Supply people with unique ids (no colons), a `name`, an optional `title` and `department`, and `manager`: the id of the person they report to (only the top person has none; `forest: true` allows several). `assistant: true` places an assistant beside their manager, `avatar: true` draws an initials placeholder, `dottedLines: [{ report, manager, label? }]` adds dotted-line or matrix reports (a stated scope or reason, such as "for clinical systems", goes in `label`), and `groupByDepartment: true` draws each department below the top as a labeled region. The renderer draws a card per person top-down, a bus line from each manager to their reports, long lists of reports stacked in one or two columns, and dotted lines dashed with a head at the second manager and their label beside them; it owns every coordinate.
 
 Native Venn diagrams: use `buildVennDiagram` (Code Mode) or `generate --type venn` (CLI). Supply two or three `sets: [{ id, label, color? }]` and `regions: [{ sets, items }]`, one region per overlap: `["a"]` holds what is only in a, `["a", "b"]` what is in a and b but not c. A region holds `items` (short phrases) or a `count`, and an optional `label` naming the overlap; omit empty regions. A set may instead list its whole membership as `items`, and each item then lands in the region of exactly the sets that list it. The renderer draws equal, overlapping translucent circles in the standard symmetric arrangement, each set's label outside its circle, and each region's text centred inside exactly that region; it sizes the circles until every region fits and owns every coordinate.
+
+Native journey maps: use `buildJourneyMap` (Code Mode) or `generate --type journey` (CLI). Supply `stages` in order, each `{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }`, with an optional `persona` (whose journey it is) and `actors`. `score` is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral. The renderer draws the stages as headers across the top, each step's card under its stage, an emotion curve through a face per step at its score over a dashed neutral baseline, and each stage's pain points and opportunities in rows beneath it; a journey too wide to read wraps into bands of whole stages with the curve running on between them. It owns every coordinate.

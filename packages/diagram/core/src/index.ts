@@ -35,3 +35,5 @@ export * from "./zone-fixtures.js";
 export * from "./zone-regions.js";
 export * from "./types/venn.js";
 export * from "./venn-fixtures.js";
+export * from "./types/journey.js";
+export * from "./journey-fixtures.js";

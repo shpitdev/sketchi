@@ -11,6 +11,7 @@ import { renderErDiagram } from "./er.js";
 import { renderClassDiagram } from "./class-diagram.js";
 import { renderOrgChartDiagram } from "./org-chart.js";
 import { renderVennDiagram } from "./venn.js";
+import { renderJourneyDiagram } from "./journey.js";
 
 /** Render any canonical diagram with its family's renderer. */
 export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
@@ -37,5 +38,7 @@ export function renderDiagram(diagram: CanonicalDiagram): RenderedDiagramScene {
 			return renderOrgChartDiagram(diagram);
 		case "venn":
 			return renderVennDiagram(diagram);
+		case "journey":
+			return renderJourneyDiagram(diagram);
 	}
 }

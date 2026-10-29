@@ -179,6 +179,17 @@ const IR_INSTRUCTIONS = {
 			"Copy every set and item the source states, each once and in exactly its region; invent none.",
 		],
 	},
+	journey: {
+		title: "Journey map IR rules",
+		rules: [
+			'Use diagram type "journey".',
+			"Use it for user or customer journey maps: stages of steps, each scored for sentiment; never supply coordinates.",
+			"Return stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] in the order the source gives them. score is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral.",
+			'actor is who acts (several who share a step: "Customer, Agent") and touchpoint is the channel (Email, Website, Phone); set the one the source states for each step. persona names whose journey it is; actors lists them when the source names several.',
+			"painPoints and opportunities are short phrases under the stage the source puts them in.",
+			"Copy every stage, step, score, actor, touchpoint, pain point and opportunity the source states; invent none.",
+		],
+	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
 
 /** The JSON shape shown for an explicitly requested family. */
@@ -421,6 +432,32 @@ const FAMILY_EXAMPLES = {
 		requirements: [
 			{ kind: "count", target: "items", comparator: "exact", value: 4 },
 			{ kind: "label", target: "item", value: "Apple Pay" },
+		],
+	},
+	journey: {
+		diagram: {
+			id: "short-kebab-case-id",
+			type: "journey",
+			persona: "Maya, a first-time buyer",
+			stages: [
+				{
+					name: "Discover",
+					steps: [{ label: "Sees an ad", score: 4, touchpoint: "Instagram" }],
+				},
+				{
+					name: "Buy",
+					steps: [
+						{ label: "Creates an account", score: 2, touchpoint: "Website" },
+						{ label: "Pays by card", score: 3, touchpoint: "Website" },
+					],
+					painPoints: ["Forced account creation"],
+					opportunities: ["Offer guest checkout"],
+				},
+			],
+		},
+		requirements: [
+			{ kind: "count", target: "tasks", comparator: "exact", value: 3 },
+			{ kind: "label", target: "phase", value: "Buy" },
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;

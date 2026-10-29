@@ -448,6 +448,9 @@ export const CODE_MODE_ISSUE_CODES = [
 	"venn_too_large",
 	"invalid_venn_set",
 	"invalid_venn_region",
+	"journey_too_large",
+	"invalid_journey_stage",
+	"invalid_journey_step",
 	"request_too_large",
 	"generic_label",
 	"label_too_long",
@@ -1130,6 +1133,45 @@ export class VennSpec extends Schema.Class<VennSpec>("VennSpec")(
 ) {}
 export const VennSpecSchema = VennSpec;
 
+/**
+ * The authoring form of diagram-core's canonical JourneyDiagram: style is
+ * defaulted. buildJourneyMap normalizes it into the core contract, which owns
+ * every invariant.
+ */
+export class JourneyStepSpec extends Schema.Class<JourneyStepSpec>("JourneyStepSpec")(
+	{
+		label: RequiredNonEmptyString,
+		/** A whole number from 1 (very negative) to 5 (very positive); 3 is neutral. */
+		score: FiniteNumber,
+		actor: optionalContract(NonEmptyString),
+		touchpoint: optionalContract(NonEmptyString),
+	},
+	{ identifier: undefined },
+) {}
+
+export class JourneyStageSpec extends Schema.Class<JourneyStageSpec>("JourneyStageSpec")(
+	{
+		name: RequiredNonEmptyString,
+		steps: requiredArray(Schema.Array(JourneyStepSpec).pipe(Schema.mutable)),
+		painPoints: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+		opportunities: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	},
+	{ identifier: undefined },
+) {}
+
+export class JourneySpec extends Schema.Class<JourneySpec>("JourneySpec")(
+	{
+		id: optionalContract(NonEmptyString),
+		title: RequiredNonEmptyString,
+		persona: optionalContract(NonEmptyString),
+		actors: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+		stages: requiredArray(nonEmptyArray(JourneyStageSpec)),
+		style: DiagramStyleWithDefault,
+	},
+	{ identifier: undefined },
+) {}
+export const JourneySpecSchema = JourneySpec;
+
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -1406,6 +1448,26 @@ export const BuildVennDiagramToolInputSchema = Schema.Struct({
 	spec: requiredObject(VennToolSpecSchema),
 });
 export type BuildVennDiagramToolInput = typeof BuildVennDiagramToolInputSchema.Type;
+export class BuildJourneyMapRequest extends Schema.Class<BuildJourneyMapRequest>(
+	"BuildJourneyMapRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		spec: requiredObject(JourneySpec),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildJourneyMapRequestSchema = BuildJourneyMapRequest;
+/** The journey map spec a model authors; style is always the Sketchi palette. */
+export const JourneyToolSpecSchema = JourneySpec.mapFields(
+	({ style: _style, ...fields }) => fields,
+);
+export const BuildJourneyMapToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(JourneyToolSpecSchema),
+});
+export type BuildJourneyMapToolInput = typeof BuildJourneyMapToolInputSchema.Type;
 
 export interface MindmapTopicInput {
 	label: string;
@@ -2244,6 +2306,15 @@ const NormalizedVennSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedVennSpec = typeof NormalizedVennSpecSchema.Type;
+const NormalizedJourneySpecSchema = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	persona: optionalContract(NonEmptyString),
+	actors: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	stages: Schema.Array(JourneyStageSpec).pipe(Schema.mutable),
+	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+});
+export type NormalizedJourneySpec = typeof NormalizedJourneySpecSchema.Type;
 const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	...fields,
 	id: NonEmptyString,
@@ -2742,6 +2813,49 @@ export const BuildVennDiagramResultSchema = Schema.Union([
 	BuildVennDiagramRejected,
 ]);
 export type BuildVennDiagramResult = typeof BuildVennDiagramResultSchema.Type;
+
+export class BuildJourneyMapAccepted extends Schema.Class<BuildJourneyMapAccepted>(
+	"BuildJourneyMapAccepted",
+)(
+	{
+		ok: booleanLiteral(true),
+		status: stringLiteral("accepted"),
+		buildId: Schema.String,
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: NormalizedJourneySpecSchema,
+		quality: QualityReportSchema,
+		artifact: ArtifactBundleSchema,
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export class BuildJourneyMapRejected extends Schema.Class<BuildJourneyMapRejected>(
+	"BuildJourneyMapRejected",
+)(
+	{
+		ok: booleanLiteral(false),
+		status: literals([
+			"invalid_input",
+			"invalid_journey",
+			"quality_failed",
+			"render_failed",
+			"export_failed",
+			"storage_failed",
+		]),
+		buildId: optionalContract(Schema.String),
+		requestId: optionalContract(Schema.String),
+		normalizedSpec: optionalContract(NormalizedJourneySpecSchema),
+		quality: optionalContract(QualityReportSchema),
+		partial: optionalContract(PartialArtifactBundleSchema),
+		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+	},
+	{ identifier: undefined },
+) {}
+export const BuildJourneyMapResultSchema = Schema.Union([
+	BuildJourneyMapAccepted,
+	BuildJourneyMapRejected,
+]);
+export type BuildJourneyMapResult = typeof BuildJourneyMapResultSchema.Type;
 
 export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
 	{

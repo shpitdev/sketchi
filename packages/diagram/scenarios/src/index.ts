@@ -13,6 +13,7 @@ export * from "./lib/er-scenarios.js";
 export * from "./lib/class-scenarios.js";
 export * from "./lib/org-chart-scenarios.js";
 export * from "./lib/venn-scenarios.js";
+export * from "./lib/journey-scenarios.js";
 
 export * from "./lib/timeline-scenarios.js";
 export * from "./lib/chart-scenarios.js";

@@ -35,6 +35,7 @@ const BUILDERS = {
 	buildClassDiagram: "UML classes, members and relationships",
 	buildOrgChart: "org charts of people, titles and reporting lines",
 	buildVennDiagram: "Venn diagrams of what overlapping sets share",
+	buildJourneyMap: "user journey maps: stages of steps scored for sentiment",
 	createCanvas: "hand-placed CanvasSpec, only for layouts no builder covers (dashboard, wireframe)",
 };
 const HELPERS = {
@@ -79,6 +80,9 @@ const ORG_CHART_RULE =
 /** Shared by the buildVennDiagram topic and its compact line in the execute description. */
 const VENN_REGION_RULE =
 	'A region lies in exactly its sets: ["a"] is a only, ["a", "b"] is a and b but not c. Omit empty regions.';
+/** Shared by the buildJourneyMap topic and its compact line in the execute description. */
+const JOURNEY_SCORE_RULE =
+	"score is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral.";
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 /**
@@ -100,6 +104,7 @@ const FAST_PATH = {
 	buildClassDiagram: `spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. ${CLASS_KIND_RULE} Copy every class, member and relationship stated.`,
 	buildOrgChart: `spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. ${ORG_CHART_RULE} Copy every person, title, department and line stated.`,
 	buildVennDiagram: `spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. ${VENN_REGION_RULE} Copy every set and item stated, each in its region.`,
+	buildJourneyMap: `spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. ${JOURNEY_SCORE_RULE} Copy every stage, step, score, actor, touchpoint and note stated.`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 const EXECUTE_HELPERS = [
 	HELPERS.searchIcons,
@@ -815,6 +820,36 @@ export const catalog: CatalogEntry[] = [
 				title: "Two sets and their overlap",
 				language: "js",
 				code: `async () => sketchi.buildVennDiagram({ spec: { title: "iOS vs Android", sets: [{ id: "ios", label: "iOS" }, { id: "android", label: "Android" }], regions: [{ sets: ["ios"], items: ["Apple Pay"] }, { sets: ["android"], items: ["Google Pay"] }, { sets: ["ios", "android"], items: ["Push notifications", "Dark mode"] }] }, options: ${DELIVERY_OPTIONS} })`,
+			},
+		],
+	},
+	{
+		id: "buildJourneyMap",
+		kind: "operation",
+		title: "buildJourneyMap",
+		topic: "buildJourneyMap",
+		keywords: [
+			"journey map",
+			"user journey",
+			"customer journey",
+			"experience map",
+			"touchpoint",
+			"pain point",
+			"sentiment",
+			"emotion curve",
+		],
+		snippet: "Create a native user journey map from stages of steps, each scored for sentiment.",
+		content: [
+			"buildJourneyMap accepts { spec: { id?, title, persona?, actors?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }, options? }. The renderer draws the stages as headers across the top, each step's card under its stage, a face per step on an emotion curve over a neutral baseline, and each stage's pain points and opportunities beneath it.",
+			`${JOURNEY_SCORE_RULE} Stages and steps keep their order. actor is who acts ("Customer, Agent" when several share a step) and touchpoint the channel (Email, Website, Phone); persona names whose journey it is, and actors, when given, lists every step's actor.`,
+			"Copy every stage, step, score, actor, touchpoint, pain point and opportunity the prompt states; invent none.",
+			operationTypes("buildJourneyMap"),
+		].join("\n\n"),
+		examples: [
+			{
+				title: "An online purchase with a pain point and an opportunity",
+				language: "js",
+				code: `async () => sketchi.buildJourneyMap({ spec: { title: "Online purchase", persona: "Maya, a first-time buyer", stages: [{ name: "Discover", steps: [{ label: "Sees an ad", score: 4, touchpoint: "Instagram" }] }, { name: "Buy", steps: [{ label: "Creates an account", score: 2, touchpoint: "Website" }, { label: "Pays by card", score: 3, touchpoint: "Website" }], painPoints: ["Forced account creation"], opportunities: ["Offer guest checkout"] }] }, options: ${DELIVERY_OPTIONS} })`,
 			},
 		],
 	},

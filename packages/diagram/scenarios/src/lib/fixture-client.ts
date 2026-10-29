@@ -111,6 +111,23 @@ function fixtureRequirements(scenario: DiagramScenario): readonly Record<string,
 				value: node.name ?? node.id,
 			})),
 		];
+	if (scenario.diagramType === "journey")
+		return [
+			{
+				kind: "count",
+				target: "tasks",
+				comparator: "exact",
+				value: scenario.expectedDiagram.stages.reduce(
+					(total, stage) => total + stage.steps.length,
+					0,
+				),
+			},
+			...scenario.expectedDiagram.stages.map((stage) => ({
+				kind: "label",
+				target: "phase",
+				value: stage.name,
+			})),
+		];
 	if (scenario.diagramType === "org-chart")
 		return [
 			{

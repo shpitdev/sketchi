@@ -236,6 +236,42 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		}),
 	);
 
+	it.effect("exports a journey map, its faces and curve drawn under its own title", () =>
+		Effect.gen(function* () {
+			const builder = yield* DiagramBuilder;
+			const renderer = yield* CliPngRenderer;
+			const built = yield* builder.build(
+				canonicalDocument({
+					type: "journey",
+					spec: {
+						title: "Online purchase",
+						persona: "Maya, a first-time buyer",
+						stages: [
+							{ name: "Discover", steps: [{ label: "Sees an ad", score: 4 }] },
+							{
+								name: "Buy",
+								steps: [
+									{ label: "Creates an account", score: 2, touchpoint: "Website" },
+									{ label: "Pays by card", score: 5, touchpoint: "Website" },
+								],
+								painPoints: ["Forced account creation"],
+							},
+						],
+					},
+				}),
+			);
+			const types = built.excalidraw.elements.map((element) => element["type"]);
+			assert.include(types, "ellipse");
+			assert.include(types, "line");
+			const png = yield* renderer.renderPng({ scene: built.scene, excalidraw: built.excalidraw });
+			assert.isAbove(png.byteLength, 1_000);
+			assertInkHasPadding(png);
+			// The scene draws its title and persona, so the PNG adds no banner above them.
+			const { height } = inkBounds(png);
+			assert.isBelow(height, built.scene.height * 2);
+		}),
+	);
+
 	it.effect("exports a class diagram whose lines bind elbowed with their UML heads", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;

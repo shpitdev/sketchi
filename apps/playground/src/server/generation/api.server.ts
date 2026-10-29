@@ -228,6 +228,7 @@ function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFail
 		case "invalid_class_diagram":
 		case "invalid_org_chart":
 		case "invalid_venn_diagram":
+		case "invalid_journey":
 			return failure("invalid_generated_document", issues);
 		case "quality_failed":
 			return failure("quality_failed", issues);
@@ -275,6 +276,8 @@ function buildWithCodeMode(
 			return codeMode.buildOrgChart(request);
 		case "venn":
 			return codeMode.buildVennDiagram(request);
+		case "journey":
+			return codeMode.buildJourneyMap(request);
 	}
 }
 

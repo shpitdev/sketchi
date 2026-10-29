@@ -17,6 +17,8 @@ export {
 	outsideClearance,
 	type VennLayout,
 } from "./venn-layout.js";
+export * from "./journey.js";
+export * from "./journey-readout.js";
 
 export * from "./timeline.js";
 export * from "./timeline-readout.js";

@@ -387,6 +387,16 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(vennDocs.split("Request type:")[0]).toContain(
 			"A region holds items (short phrases) or a count, not both",
 		);
+		// Journey maps add a builder name to the head, an index line and one compact line here
+		// (+367 characters, +94 o200k tokens).
+		expect(codeLine("buildJourneyMap")).toBe(
+			"- buildJourneyMap: spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. score is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral. Copy every stage, step, score, actor, touchpoint and note stated.",
+		);
+		const journeyDocs = getCodeModeDocs({ topic: "buildJourneyMap" }).content;
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(journeyDocs.split("\n\n")[0]);
+		expect(journeyDocs.split("Request type:")[0]).toContain(
+			"touchpoint the channel (Email, Website, Phone)",
+		);
 		expect(codeLine("createCanvas")).toBeUndefined();
 		for (const topic of ["buildMindmap", "buildSequenceDiagram", "buildTimeline"] as const) {
 			const guidance = getCodeModeDocs({ topic }).content.split("\n")[0]!;
@@ -436,7 +446,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// Family summaries now live beside the specs, outside the truncated head.
 		// Nested zones, infrastructure shapes and their logo rule add spec fields and docs (#476).
 		// Venn diagrams add a summary and one compact line (+336 characters).
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_900);
+		// Journey maps add an index line and a compact spec line (+367 characters).
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(11_300);
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const line of overview
 			.split("\n")
@@ -458,6 +469,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			["buildClassDiagram", ["BuildClassDiagramRequest"]],
 			["buildOrgChart", ["BuildOrgChartRequest"]],
 			["buildVennDiagram", ["BuildVennDiagramRequest"]],
+			["buildJourneyMap", ["BuildJourneyMapRequest"]],
 			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
 			["getArtifact", ["GetArtifactRequest"]],
 			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],

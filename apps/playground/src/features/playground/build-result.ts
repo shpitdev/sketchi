@@ -15,6 +15,8 @@ import {
 	BuildOrgChartToolInputSchema,
 	BuildVennDiagramResultSchema,
 	BuildVennDiagramToolInputSchema,
+	BuildJourneyMapResultSchema,
+	BuildJourneyMapToolInputSchema,
 	BuildTimelineResultSchema,
 	BuildTimelineToolInputSchema,
 	BuildChartResultSchema,
@@ -29,6 +31,7 @@ import {
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
 	type BuildVennDiagramResult,
+	type BuildJourneyMapResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagram-agent";
@@ -50,7 +53,8 @@ export type StudioBuildResult =
 	| BuildErDiagramResult
 	| BuildClassDiagramResult
 	| BuildOrgChartResult
-	| BuildVennDiagramResult;
+	| BuildVennDiagramResult
+	| BuildJourneyMapResult;
 
 const BUILD_TOOLS = {
 	"tool-build_chart": {
@@ -154,6 +158,16 @@ const BUILD_TOOLS = {
 			return Result.isSuccess(decoded) ? decoded.success.spec.sets.map((set) => set.label) : [];
 		},
 	},
+	"tool-build_journey_map": {
+		family: "journey",
+		decodeResult: Schema.decodeUnknownResult(BuildJourneyMapResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildJourneyMapToolInputSchema)(input);
+			return Result.isSuccess(decoded)
+				? decoded.success.spec.stages.flatMap((stage) => stage.steps.map((step) => step.label))
+				: [];
+		},
+	},
 } as const;
 
 export type DiagramToolPartType = keyof typeof BUILD_TOOLS;
@@ -187,6 +201,7 @@ const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 	class: "class diagram",
 	"org-chart": "org chart",
 	venn: "Venn diagram",
+	journey: "journey map",
 };
 
 /**

@@ -13,6 +13,7 @@ import {
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
 	type BuildVennDiagramResult,
+	type BuildJourneyMapResult,
 	type BuildTimelineResult,
 	ClassSpec,
 	ErSpec,
@@ -26,6 +27,7 @@ import {
 	GanttSpec,
 	OrgChartSpec,
 	VennSpec,
+	JourneySpec,
 } from "./contract.js";
 import type { CodeModeArtifactStorage } from "./artifacts.js";
 import {
@@ -37,6 +39,7 @@ import {
 	buildClassDiagram,
 	buildOrgChart,
 	buildVennDiagram,
+	buildJourneyMap,
 	buildTimeline,
 	buildChart,
 	buildGantt,
@@ -59,6 +62,7 @@ export const CANONICAL_DOCUMENT_SPECS = {
 	class: ClassSpec,
 	"org-chart": OrgChartSpec,
 	venn: VennSpec,
+	journey: JourneySpec,
 } as const satisfies Record<DiagramTypeValue, unknown>;
 
 /** A canonical diagram document: a family and its authoring spec. */
@@ -80,7 +84,8 @@ export type CanonicalBuildResult =
 	| BuildErDiagramResult
 	| BuildClassDiagramResult
 	| BuildOrgChartResult
-	| BuildVennDiagramResult;
+	| BuildVennDiagramResult
+	| BuildJourneyMapResult;
 
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
 	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
@@ -119,6 +124,8 @@ export function buildCanonicalDocument(
 			return buildOrgChart(request);
 		case "venn":
 			return buildVennDiagram(request);
+		case "journey":
+			return buildJourneyMap(request);
 	}
 }
 
@@ -308,6 +315,25 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 						...region,
 						sets: [...region.sets],
 						...(region.items === undefined ? {} : { items: [...region.items] }),
+					})),
+					style: diagram.style,
+				},
+			};
+		case "journey":
+			return {
+				type: "journey",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					...(diagram.persona === undefined ? {} : { persona: diagram.persona }),
+					...(diagram.actors === undefined ? {} : { actors: [...diagram.actors] }),
+					stages: diagram.stages.map((stage) => ({
+						name: stage.name,
+						steps: stage.steps.map((step) => ({ ...step })),
+						...(stage.painPoints === undefined ? {} : { painPoints: [...stage.painPoints] }),
+						...(stage.opportunities === undefined
+							? {}
+							: { opportunities: [...stage.opportunities] }),
 					})),
 					style: diagram.style,
 				},

@@ -362,9 +362,10 @@ export interface CanvasIconAsset {
  * dot, a final bullseye, an unlabeled choice), Gantt task bars and
  * milestones, entity-relationship tables (a table's outline and its name
  * band) and optional-end rings, class boxes (a class's outline, name band
- * and methods compartment), swimlanes (a lane's band and its header), and
- * architecture zones (a region, VPC, subnet or cluster outline), and Venn
- * sets (a set's translucent fill and its outline).
+ * and methods compartment), swimlanes (a lane's band and its header),
+ * architecture zones (a region, VPC, subnet or cluster outline), Venn
+ * sets (a set's translucent fill and its outline), and a journey map's
+ * faces (a face and its eyes on the experience curve).
  * Only a zone carries an icon, drawn in its header, and only a table's or a
  * class's name band and a lane's header carry a bound label.
  */
@@ -382,6 +383,7 @@ export const CANVAS_RENDERER_ROLES = [
 	"swimlane",
 	"swimlane-header",
 	"venn-set",
+	"journey-mark",
 ] as const;
 export type CanvasRendererRole = (typeof CANVAS_RENDERER_ROLES)[number];
 
@@ -451,6 +453,7 @@ const RENDERER_ROLE_NAMES: Readonly<Record<CanvasRendererRole, string>> = {
 	"er-optional": "Optional relationship end",
 	"er-table": "Entity table",
 	"gantt-mark": "Gantt mark",
+	"journey-mark": "Journey mark",
 	"sequence-activation": "Sequence activation",
 	"sequence-lifeline": "Sequence lifeline",
 	"state-marker": "State marker",

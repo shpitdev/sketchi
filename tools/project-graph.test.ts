@@ -65,6 +65,7 @@ const effectSchemaBoundaryFiles = new Set([
 	"packages/diagram/core/src/types/class.ts",
 	"packages/diagram/core/src/types/org-chart.ts",
 	"packages/diagram/core/src/types/venn.ts",
+	"packages/diagram/core/src/types/journey.ts",
 ]);
 const frameworkNativeProjectRoots = [
 	"apps/excalidraw",
@@ -172,6 +173,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/playground/src/routes/api/v1/flowcharts/build.ts": 6,
 	"apps/playground/src/routes/api/v1/gantts/build.ts": 6,
 	"apps/playground/src/routes/api/v1/generate.ts": 6,
+	"apps/playground/src/routes/api/v1/journey-maps/build.ts": 6,
 	"apps/playground/src/routes/api/v1/mindmaps/build.ts": 6,
 	"apps/playground/src/routes/api/v1/org-charts/build.ts": 6,
 	"apps/playground/src/routes/api/v1/sequences/build.ts": 6,
@@ -193,7 +195,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/playground/src/server/codemode/icon-catalog.server.ts": 5,
 	"apps/playground/src/server/codemode/png-renderer-object.server.ts": 2,
 	"apps/playground/src/server/codemode/mcp-session-prewarm.server.ts": 2,
-	"apps/playground/src/server/codemode/mcp.server.ts": 46,
+	"apps/playground/src/server/codemode/mcp.server.ts": 48,
 	"apps/playground/src/server/codemode/usage-events.server.ts": 8,
 	"apps/playground/src/server/runtime/request-body.server.ts": 9,
 	"apps/playground/src/server/runtime/runtime.server.ts": 15,

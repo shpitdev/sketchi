@@ -97,6 +97,13 @@ and the eval harness use it.
   appear. The drawn scene must show every card, name, title, reporting line,
   dotted line and region, with cards apart and lines orthogonal, through no
   card and never crossing.
+- Journey scenarios check the persona, every stated stage in order, every step
+  under its stage in order with its exact 1-5 score and its stated actor or
+  touchpoint, every pain point and opportunity under its stage, and exact
+  step, pain point and opportunity counts. A label may drop the actor or
+  persona its step names. The drawn scene must show every stage header, card,
+  note and face, each face at its score's height in its step's column with the
+  matching expression and the curve through them, nothing overlapping.
 
 Checks that measure the model (logos, sequence structure) score the model's own
 diagram from before candidate enforcement, so a repair never hides a model

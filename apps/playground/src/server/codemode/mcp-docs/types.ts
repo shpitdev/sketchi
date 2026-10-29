@@ -26,6 +26,9 @@ import {
 	BuildVennDiagramRequestSchema,
 	BuildVennDiagramResultSchema,
 	VennToolSpecSchema,
+	BuildJourneyMapRequestSchema,
+	BuildJourneyMapResultSchema,
+	JourneyToolSpecSchema,
 	BuildTimelineRequestSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildTimelineResultSchema,
@@ -174,6 +177,14 @@ export const codeModeContracts = {
 			spec: VennToolSpecSchema,
 		}),
 		output: BuildVennDiagramResultSchema,
+	},
+	buildJourneyMap: {
+		input: Schema.Struct({
+			...BuildJourneyMapRequestSchema.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: JourneyToolSpecSchema,
+		}),
+		output: BuildJourneyMapResultSchema,
 	},
 	createCanvas: {
 		input: CreateCanvasRequestSchema,

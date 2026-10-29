@@ -403,7 +403,12 @@ function loadExcalidraw() {
 function bannerTitle(scene: PngRenderInput["scene"]): string | undefined {
 	if (
 		!scene ||
-		scene.elements.some((element) => element.id === "chart:title" || element.id === "gantt:title")
+		scene.elements.some(
+			(element) =>
+				element.id === "chart:title" ||
+				element.id === "gantt:title" ||
+				element.id === "text:journey:title",
+		)
 	)
 		return undefined;
 	return scene.title;

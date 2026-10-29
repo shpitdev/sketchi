@@ -24,6 +24,8 @@ import {
 	resolveOrgChartShorthand,
 	getVennValidationIssues,
 	resolveVennShorthand,
+	getJourneyValidationIssues,
+	resolveJourneyShorthand,
 	getTimelineValidationIssues,
 	getChartValidationIssues,
 	getGanttValidationIssues,
@@ -53,6 +55,8 @@ import {
 	type OrgChartValidationIssueCode,
 	type VennDiagram,
 	type VennValidationIssueCode,
+	type JourneyDiagram,
+	type JourneyValidationIssueCode,
 } from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
@@ -72,6 +76,8 @@ import {
 	renderOrgChartDiagram,
 	renderVennDiagram,
 	isStructurallyValidVennSet,
+	renderJourneyDiagram,
+	isStructurallyValidJourneyMark,
 	renderTimelineDiagram,
 	renderChartDiagram,
 	renderGanttDiagram,
@@ -113,6 +119,7 @@ import {
 	BuildClassDiagramRejected,
 	BuildOrgChartRejected,
 	BuildVennDiagramRejected,
+	BuildJourneyMapRejected,
 	BuildTimelineRejected,
 	BuildChartRejected,
 	BuildGanttRejected,
@@ -128,6 +135,7 @@ import {
 	BuildClassDiagramRequestSchema,
 	BuildOrgChartRequestSchema,
 	BuildVennDiagramRequestSchema,
+	BuildJourneyMapRequestSchema,
 	BuildTimelineRequestSchema,
 	BuildChartRequestSchema,
 	BuildGanttRequestSchema,
@@ -152,6 +160,7 @@ import {
 	type BuildClassDiagramRequest,
 	type BuildOrgChartRequest,
 	type BuildVennDiagramRequest,
+	type BuildJourneyMapRequest,
 	type BuildTimelineRequest,
 	type BuildChartRequest,
 	type BuildGanttRequest,
@@ -161,6 +170,7 @@ import {
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
 	type BuildVennDiagramResult,
+	type BuildJourneyMapResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type BuildGanttResult,
@@ -184,6 +194,7 @@ import {
 	type NormalizedClassSpec,
 	type NormalizedOrgChartSpec,
 	type NormalizedVennSpec,
+	type NormalizedJourneySpec,
 	type NormalizedTimelineSpec,
 	type NormalizedChartSpec,
 	type NormalizedGanttSpec,
@@ -289,6 +300,7 @@ type CodeModeBoundaryOperation =
 	| "buildClassDiagram"
 	| "buildOrgChart"
 	| "buildVennDiagram"
+	| "buildJourneyMap"
 	| "buildTimeline"
 	| "buildChart"
 	| "buildGantt"
@@ -329,6 +341,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	if (operation === "buildClassDiagram") return "class";
 	if (operation === "buildOrgChart") return "org-chart";
 	if (operation === "buildVennDiagram") return "venn";
+	if (operation === "buildJourneyMap") return "journey";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
 	return undefined;
@@ -1235,6 +1248,83 @@ function resolveVennRequest(input: unknown): unknown {
 	return { ...input, spec: resolveVennShorthand(input.spec) };
 }
 
+function normalizeJourneySpec(spec: BuildJourneyMapRequest["spec"]): NormalizedJourneySpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	const notes = (key: string, values: readonly string[] | undefined) => {
+		const cleaned = (values ?? []).map(cleanToolString).filter((value) => value.length > 0);
+		return cleaned.length > 0 ? { [key]: cleaned } : {};
+	};
+	const actors = (spec.actors ?? []).map(cleanToolString).filter((actor) => actor.length > 0);
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-journey-map"),
+		title,
+		...optional("persona", spec.persona),
+		...(actors.length > 0 ? { actors } : {}),
+		stages: spec.stages.map((stage) => ({
+			name: cleanToolString(stage.name),
+			steps: stage.steps.map((step) => ({
+				label: cleanToolString(step.label),
+				score: step.score,
+				...optional("actor", step.actor),
+				...optional("touchpoint", step.touchpoint),
+			})),
+			...notes("painPoints", stage.painPoints),
+			...notes("opportunities", stage.opportunities),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toJourneyDiagram(spec: NormalizedJourneySpec): JourneyDiagram {
+	return { ...spec, type: "journey" };
+}
+
+/** Code Mode's published issue codes for diagram-core's journey invariants. */
+const JOURNEY_ISSUE_CODES = {
+	journey_too_large: "journey_too_large",
+	empty_journey_stage: "invalid_journey_stage",
+	duplicate_journey_stage: "invalid_journey_stage",
+	invalid_journey_score: "invalid_journey_step",
+	unknown_journey_actor: "invalid_journey_step",
+	duplicate_journey_actor: "invalid_journey_step",
+	journey_text_too_long: "label_too_long",
+	unplaced_journey_entry: "invalid_journey_stage",
+} as const satisfies Record<JourneyValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedJourney(spec: NormalizedJourneySpec): CodeModeIssue[] {
+	return getJourneyValidationIssues(toJourneyDiagram(spec)).map((entry) =>
+		issue({
+			code: JOURNEY_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function journeyQuality(spec: NormalizedJourneySpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: {
+			nodeCount: spec.stages.reduce((total, stage) => total + stage.steps.length, 0),
+			edgeCount: 0,
+		},
+		checks: [],
+	};
+}
+
+/** Read Mermaid sections, step and score aliases and flat staged steps before the request is decoded. */
+function resolveJourneyRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveJourneyShorthand(input.spec) };
+}
+
 export class CodeModeArtifactRenderFailed extends Schema.TaggedError<CodeModeArtifactRenderFailed>()(
 	"CodeModeArtifactRenderFailed",
 	{ cause: Schema.Defect(), message: Schema.String },
@@ -1379,6 +1469,15 @@ const BuildVennDiagramFailure = workflowFailure(
 	"BuildVennDiagramFailure",
 	BuildVennDiagramRejected.fields.status,
 	BuildVennDiagramRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildJourneyMapFailure = workflowFailure(
+	"BuildJourneyMapFailure",
+	BuildJourneyMapRejected.fields.status,
+	BuildJourneyMapRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -1968,6 +2067,7 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				(element.rendererRole === "timeline-marker" &&
 					isStructurallyValidTimelineMarker(element)) ||
 				(element.rendererRole === "chart-mark" && isStructurallyValidChartMark(element)) ||
+				(element.rendererRole === "journey-mark" && isStructurallyValidJourneyMark(element)) ||
 				(element.rendererRole === "gantt-mark" && isStructurallyValidGanttMark(element)) ||
 				(element.rendererRole === "state-marker" && isStructurallyValidStateMarker(element)) ||
 				(element.rendererRole === "er-table" && isStructurallyValidErTable(element)) ||
@@ -3763,6 +3863,116 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 	} satisfies Extract<BuildVennDiagramResult, { ok: true }>;
 });
 
+const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildJourneyMapRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(resolveJourneyRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildJourneyMapFailure({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeJourneySpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedJourney(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* new BuildJourneyMapFailure({
+			status: "invalid_journey",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = journeyQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* new BuildJourneyMapFailure({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* Effect.try({
+		try: () => renderJourneyDiagram(toJourneyDiagram(normalizedSpec)),
+		catch: (cause) =>
+			new BuildJourneyMapFailure({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message:
+								cause instanceof Error ? cause.message : "Unable to render journey map scene.",
+							hint: "Repair the stages and steps and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildJourneyMap.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* new BuildJourneyMapFailure({
+			status: "render_failed",
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten step labels or notes, or split the journey, and retry buildJourneyMap.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new BuildJourneyMapFailure({
+					status: error.status,
+					context: {
+						...(error.status === "export_failed" ? exportContext : qualityContext),
+						issues: error.issues,
+					},
+				}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildJourneyMapResult, { ok: true }>;
+});
+
 const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
 	input: unknown,
 ) {
@@ -4786,6 +4996,10 @@ export const buildOrgChart: (input: unknown) => CodeModeWorkflowEffect<BuildOrgC
 /** A Venn diagram: two or three sets and the items or counts in each of their regions. */
 export const buildVennDiagram: (input: unknown) => CodeModeWorkflowEffect<BuildVennDiagramResult> =
 	boundary("buildVennDiagram", buildVennDiagramWorkflow, failureResult);
+
+/** A user journey map: stages of steps scored for sentiment, with pain points and opportunities. */
+export const buildJourneyMap: (input: unknown) => CodeModeWorkflowEffect<BuildJourneyMapResult> =
+	boundary("buildJourneyMap", buildJourneyMapWorkflow, failureResult);
 
 export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTimelineResult> =
 	boundary("buildTimeline", buildTimelineWorkflow, failureResult);

@@ -15,6 +15,7 @@ const GENERATION_TYPE_CHOICES = {
 	class: { label: "Class diagram", hint: "best for UML classes, members and relationships" },
 	"org-chart": { label: "Org chart", hint: "best for people, titles and who reports to whom" },
 	venn: { label: "Venn diagram", hint: "best for what two or three overlapping sets share" },
+	journey: { label: "Journey map", hint: "best for stages, steps and how each one feels" },
 } as const satisfies Record<GenerationType, { readonly hint: string; readonly label: string }>;
 
 /** Wizard options in registry order, one per canonical family. */

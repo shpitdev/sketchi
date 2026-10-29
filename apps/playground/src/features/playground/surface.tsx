@@ -99,6 +99,11 @@ function resultSummary(result: StudioBuildResult): {
 				spec.dottedLines.length,
 			itemCount: spec.people.length,
 		};
+	if ("stages" in spec)
+		return {
+			connectionCount: 0,
+			itemCount: spec.stages.reduce((count, stage) => count + stage.steps.length, 0),
+		};
 	return "participants" in spec
 		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
 		: { connectionCount: spec.edges.length, itemCount: spec.nodes.length };
@@ -176,6 +181,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 		case "invalid_class_diagram":
 		case "invalid_org_chart":
 		case "invalid_venn_diagram":
+		case "invalid_journey":
 			return {
 				message: "This draft needs a clearer structure before it can be drawn.",
 				hint: "Clarify the steps or simplify the connections, then try again.",
