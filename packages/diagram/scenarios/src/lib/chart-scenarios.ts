@@ -305,6 +305,48 @@ function sameValues(actual: readonly number[], expected: readonly number[]): boo
 	);
 }
 
+/** A suffix states this category's prompt value, optionally with its unit, or its pie share. */
+function categoryValueMatches(scenario: ChartScenario, index: number, text: string): boolean {
+	const match = /^([+-]?)\s*([^\d\s+.,-]*)\s*(\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)\s*(.*?)$/u.exec(text);
+	if (!match) return false;
+	const value = Number(`${match[1]}${match[3]!.replace(/,/gu, "")}`);
+	const prefix = unitKey(match[2]!);
+	const suffix = unitKey(match[4]!);
+	const expected = scenario.assertions;
+	const unitMatches =
+		(prefix === "" && suffix === "") ||
+		expected.units?.some((unit) => {
+			const parts = unitParts(unit);
+			return (
+				(prefix === "" && suffix === unitKey(unit)) ||
+				((prefix === "" || prefix === unitKey(parts.prefix)) &&
+					(suffix === "" || suffix === unitKey(parts.suffix)))
+			);
+		});
+	if (unitMatches && expected.series.some((series) => sameValues([value], [series.values[index]!])))
+		return true;
+	if (expected.kind !== "pie" || prefix !== "" || suffix !== "%") return false;
+	const values = expected.series[0]!.values;
+	const total = values.reduce((sum, entry) => sum + entry, 0);
+	return total > 0 && sameValues([value], [(values[index]! / total) * 100]);
+}
+
+/** Keep the full category name; only a separated, correct value may follow it. */
+function categoryLabelMatches(scenario: ChartScenario, index: number, actual: string): boolean {
+	const name = normalize(scenario.assertions.categories[index]!);
+	if (normalize(actual) === name) return true;
+	for (const separator of actual.matchAll(/[—–:\-(]/gu)) {
+		if (normalize(actual.slice(0, separator.index)) !== name) continue;
+		let value = actual.slice(separator.index + 1).trim();
+		if (separator[0] === "(") {
+			if (!value.endsWith(")")) return false;
+			value = value.slice(0, -1).trim();
+		}
+		return categoryValueMatches(scenario, index, value);
+	}
+	return false;
+}
+
 /**
  * Score the model's chart against the prompt: its kind, every category in
  * order, every series and value, the unit, axis titles, and the stacked or
@@ -315,8 +357,8 @@ export function chartScenarioChecks(
 	diagram: ChartDiagram,
 ): ScenarioCheck[] {
 	const expected = scenario.assertions;
-	const order = expected.categories.map((category) =>
-		diagram.categories.findIndex((actual) => normalize(actual) === normalize(category)),
+	const order = expected.categories.map((_, index) =>
+		diagram.categories.findIndex((actual) => categoryLabelMatches(scenario, index, actual)),
 	);
 	const used = new Set<number>();
 	const seriesChecks = expected.series.map((series, index) => {
