@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.31.0
+
+### Minor Changes
+
+- [#564](https://github.com/shpitdev/sketchi/pull/564) [`854907c`](https://github.com/shpitdev/sketchi/commit/854907c06f689d5a7a40f9a9fcfbaacc71604ad3) Thanks [@anandpant](https://github.com/anandpant)! - Add native quadrant charts: `sketchi create` builds `{ "type": "quadrant", "spec": { "title", "xAxis", "yAxis", "quadrants", "points" } }` documents offline, and `sketchi generate --type quadrant` generates them. Each axis carries a title and its low and high end labels, the four quadrants are named by corner (`topLeft`, `topRight`, `bottomLeft`, `bottomRight`), and each point's `x` and `y` run from 0 to 1. The chart draws a square plot of four tinted quadrants, every dot at its exact position, and every label clear of the others, on a leader line where the plot is crowded.
+
 ## 0.30.0
 
 ### Minor Changes
