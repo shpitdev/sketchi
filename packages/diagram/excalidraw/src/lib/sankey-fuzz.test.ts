@@ -219,6 +219,7 @@ describe("Sankey fuzz", () => {
 			const shortfalls: string[] = [];
 			let leaders = 0;
 			let values = 0;
+			let papers = 0;
 			const byShape = new Map<string, number>();
 			for (const diagram of randomDiagrams(COUNT, seed)) {
 				const scene = renderSankeyDiagram(diagram);
@@ -234,6 +235,9 @@ describe("Sankey fuzz", () => {
 				const problems = [
 					...getCanvasValidationIssues(scene).map((issue) => issue.message),
 					...validateExcalidrawScene(exported).issues.map((issue) => issue.message),
+					// Overlaps, plus label-on-band: a label on its own bands has paper behind it,
+					// that paper hides no other band, and a value away from its band's ends keeps
+					// clear of every other band.
 					...sankeyLayoutIssues(scene).map((issue) => issue.message),
 					...scaleIssues(diagram, scene),
 					...(crossings > baseline * (1 + 1e-9)
@@ -250,6 +254,7 @@ describe("Sankey fuzz", () => {
 					problems.push("a flow has no band or no value");
 				if (aspect(scene) > 2.45) shortfalls.push(`aspect ${aspect(scene).toFixed(2)}`);
 				leaders += bands.filter((band) => band.leader).length;
+				papers += nodes.filter((node) => node.knockout).length;
 				const shape = diagram.id.split("-").at(-1)!;
 				byShape.set(shape, (byShape.get(shape) ?? 0) + bands.filter((band) => band.leader).length);
 				values += bands.length;
@@ -267,7 +272,7 @@ describe("Sankey fuzz", () => {
 					shortfalls[shortfalls.length - 1] = `${name}: ${shortfalls.at(-1)}`;
 			}
 			console.log(
-				`seed ${seed}: ${leaders} of ${values} values on leaders (${[...byShape].map(([shape, count]) => `${shape} ${count}`).join(", ")}); ${shortfalls.length} shortfalls`,
+				`seed ${seed}: ${leaders} of ${values} values on leaders (${[...byShape].map(([shape, count]) => `${shape} ${count}`).join(", ")}); ${papers} labels on paper; ${shortfalls.length} shortfalls`,
 			);
 			expect(defects).toEqual([]);
 			expect(shortfalls.length, shortfalls.join("\n")).toBeLessThanOrEqual(COUNT / 50);

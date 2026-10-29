@@ -29,7 +29,16 @@ export const SANKEY_LINE_HEIGHT = 1.35;
 /** Least vertical gap between two bars (or a bar and a band passing through) in one column. */
 const NODE_GAP = 22;
 /** Labels sit this far from the bar or band edge they describe. */
-const LABEL_GAP = 6;
+export const SANKEY_LABEL_GAP = 6;
+const LABEL_GAP = SANKEY_LABEL_GAP;
+/** A middle column's label knockout reaches this far past its text on each side. */
+const KNOCKOUT_PAD = 3;
+/**
+ * A value along a band's curve, or on a leader, keeps at least this far from every
+ * other band, so it never reads as sitting on one.
+ */
+export const SANKEY_MID_CLEARANCE = 5;
+const MID_CLEARANCE = SANKEY_MID_CLEARANCE;
 /** Two labels in one column stay this far apart. */
 const LABEL_CLEAR = 4;
 const LABEL_MAX_WIDTH = 170;
@@ -100,6 +109,11 @@ export interface SankeyLayoutNode {
 	readonly outflow: number;
 	readonly total: number;
 	readonly text: SankeyText;
+	/**
+	 * A paper-coloured box behind a middle column's label, which sits on the straight
+	 * leads of the node's own bands, so they fade under the text.
+	 */
+	readonly knockout?: SankeyBox;
 }
 
 export interface SankeyLayoutBand {
@@ -812,7 +826,21 @@ export function layoutSankeyDiagram(
 			const left =
 				align === "right" ? barX - LABEL_GAP - label.width : barX + SANKEY_NODE_WIDTH + LABEL_GAP;
 			const total = totals.get(node.id)!;
+			const box = { left, top, right: left + label.width, bottom: top + label.height };
+			// Only a middle column's label rides its node's own bands out; a sink has none.
+			const middle =
+				item.column > 0 && item.column < columns - 1 && (segmentsOutOf.get(item)?.length ?? 0) > 0;
 			return {
+				...(middle
+					? {
+							knockout: {
+								left: box.left - KNOCKOUT_PAD,
+								top: box.top,
+								right: box.right + KNOCKOUT_PAD,
+								bottom: box.bottom,
+							},
+						}
+					: {}),
 				id: node.id,
 				label: node.label,
 				color: colorOf.get(node.id)!,
@@ -828,7 +856,7 @@ export function layoutSankeyDiagram(
 					...label,
 					fontSize: SANKEY_LABEL_FONT,
 					align,
-					box: { left, top, right: left + label.width, bottom: top + label.height },
+					box,
 				},
 			};
 		});
@@ -882,7 +910,7 @@ export function layoutSankeyDiagram(
 
 		// Flow values: inside the band on its lead into the target when the band is thick
 		// enough; otherwise just above or below it wherever that is clear.
-		const placed: SankeyBox[] = nodes.map((node) => node.text.box);
+		const placed: SankeyBox[] = nodes.map((node) => node.knockout ?? node.text.box);
 		const bars = nodes.map((node) => ({
 			left: node.x,
 			top: node.y,
@@ -891,40 +919,70 @@ export function layoutSankeyDiagram(
 		}));
 		const outlines = bands.map((band) => ({ band, bounds: polygonBounds(band.points) }));
 		const leaders: (readonly [Point, Point])[] = [];
-		const clear = (box: SankeyBox, own: number) =>
-			!placed.some((other) => sankeyBoxesOverlap(box, other, 2)) &&
-			!leaders.some(([from, to]) => segmentMeetsBox(from, to, box)) &&
-			!bars.some((bar) => sankeyBoxesOverlap(box, bar, 2)) &&
-			!outlines.some(
-				({ band, bounds }) => band.index !== own && sankeyBoxMeetsPolygon(box, band.points, bounds),
+		/**
+		 * Whether a value fits at `box`: clear of labels, leaders and bars, and of every
+		 * other band by `margin`. A value beside its band at either end keeps to its stack
+		 * (margin 0); one along the curves, where bands pass and cross, keeps its distance.
+		 */
+		const clear = (box: SankeyBox, own: number, margin = 0) => {
+			const reach = {
+				left: box.left - margin,
+				top: box.top - margin,
+				right: box.right + margin,
+				bottom: box.bottom + margin,
+			};
+			return (
+				!placed.some((other) => sankeyBoxesOverlap(box, other, 2)) &&
+				!leaders.some(([from, to]) => segmentMeetsBox(from, to, box)) &&
+				!bars.some((bar) => sankeyBoxesOverlap(box, bar, 2)) &&
+				!outlines.some(
+					({ band, bounds }) =>
+						band.index !== own && sankeyBoxMeetsPolygon(reach, band.points, bounds),
+				)
 			);
+		};
 		let crowdedValues = 0;
 		let unplacedValues = 0;
-		const texted = bands.map((band): SankeyLayoutBand => {
-			const text = flowText[band.index]!;
-			const gap = columnOf.get(band.target)! - 1;
-			const right = columnX[gap + 1]! - LABEL_GAP;
-			const at = (left: number, top: number): SankeyText => ({
+		const valueAt = (index: number, left: number, top: number): SankeyText => {
+			const text = flowText[index]!;
+			return {
 				...text,
 				fontSize: SANKEY_VALUE_FONT,
 				align: "center",
 				box: { left, top, right: left + text.width, bottom: top + text.height },
-			});
-			const inside = at(right - text.width, band.targetTop + (band.width - text.height) / 2);
-			if (band.width >= text.height + 2) {
-				placed.push(inside.box);
-				return { ...band, text: inside };
-			}
+			};
+		};
+		const insides = bands.map((band) => {
+			const text = flowText[band.index]!;
+			const right = columnX[columnOf.get(band.target)!]! - LABEL_GAP;
+			return valueAt(
+				band.index,
+				right - text.width,
+				band.targetTop + (band.width - text.height) / 2,
+			);
+		});
+		const thick = (band: (typeof bands)[number]) => band.width >= flowText[band.index]!.height + 2;
+		// Values inside thick bands are fixed first, so no value or leader placed before
+		// one of them lands on it.
+		for (const band of bands) if (thick(band)) placed.push(insides[band.index]!.box);
+		const texted = bands.map((band): SankeyLayoutBand => {
+			const text = flowText[band.index]!;
+			const gap = columnOf.get(band.target)! - 1;
+			const right = columnX[gap + 1]! - LABEL_GAP;
+			const at = (left: number, top: number) => valueAt(band.index, left, top);
+			const inside = insides[band.index]!;
+			if (thick(band)) return { ...band, text: inside };
 			const chain = chains[band.index]!;
 			const first = chain[0]!;
 			const sourceLeft = columnX[first.from.column]! + SANKEY_NODE_WIDTH + LABEL_GAP;
 			// Beside the band where it meets its target, then its source, then along its curves.
-			const candidates: SankeyText[] = [
+			const ends: SankeyText[] = [
 				at(right - text.width, band.targetTop - text.height - 1),
 				at(right - text.width, band.targetTop + band.width + 1),
 				at(sourceLeft, band.sourceTop - text.height - 1),
 				at(sourceLeft, band.sourceTop + band.width + 1),
 			];
+			const candidates: SankeyText[] = [];
 			for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9])
 				for (const segment of chain) {
 					const g = segment.from.column;
@@ -941,8 +999,10 @@ export function layoutSankeyDiagram(
 						at(left, Math.max(...ys) + band.width + 2),
 					);
 				}
-			candidates.push(inside);
-			const found = candidates.find((candidate) => clear(candidate.box, band.index));
+			const found =
+				ends.find((candidate) => clear(candidate.box, band.index)) ??
+				candidates.find((candidate) => clear(candidate.box, band.index, MID_CLEARANCE)) ??
+				(clear(inside.box, band.index) ? inside : undefined);
 			if (found) {
 				placed.push(found.box);
 				return { ...band, text: found };
@@ -971,7 +1031,7 @@ export function layoutSankeyDiagram(
 							y: anchor.y + radius * Math.sin(angle),
 						};
 						const candidate = at(center.x - text.width / 2, center.y - text.height / 2);
-						if (!clear(candidate.box, band.index)) continue;
+						if (!clear(candidate.box, band.index, MID_CLEARANCE)) continue;
 						const end = {
 							x: Math.min(Math.max(anchor.x, candidate.box.left), candidate.box.right),
 							y: Math.min(Math.max(anchor.y, candidate.box.top - 1), candidate.box.bottom + 1),
@@ -1014,7 +1074,7 @@ export function layoutSankeyDiagram(
 				);
 				for (const spot of spots) {
 					const candidate = at(spot.x, spot.y);
-					if (!clear(candidate.box, band.index)) continue;
+					if (!clear(candidate.box, band.index, MID_CLEARANCE)) continue;
 					const end = {
 						x: Math.min(Math.max(anchor.x, candidate.box.left), candidate.box.right),
 						y: Math.min(Math.max(anchor.y, candidate.box.top - 1), candidate.box.bottom + 1),

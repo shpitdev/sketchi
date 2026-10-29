@@ -198,6 +198,94 @@ describe("Sankey renderer", () => {
 		}
 	});
 
+	it("sets a middle column's label on paper where it rides its own bands", () => {
+		const scene = renderSankeyDiagram(hiring);
+		const { nodes } = readSankeyScene(scene);
+		expect(
+			nodes
+				.filter((node) => node.knockout)
+				.map((node) => node.id)
+				.toSorted(),
+		).toEqual(["offer", "onsite", "phone-screen"]);
+		for (const node of nodes) {
+			if (!node.knockout) continue;
+			expect(node.knockout.left).toBeLessThan(node.textBox!.left);
+			expect(node.knockout.right).toBeGreaterThan(node.textBox!.right);
+			expect(node.knockout.top).toBeLessThanOrEqual(node.textBox!.top);
+			expect(node.knockout.bottom).toBeGreaterThanOrEqual(node.textBox!.bottom);
+		}
+		// Paper-coloured and grouped with its bar and label; the bands show faintly through.
+		const paper = scene.elements.find((element) => element.id === "node:sankey:knockout:onsite");
+		expect(paper).toMatchObject({
+			type: "node",
+			shape: "rectangle",
+			rendererRole: "sankey-mark",
+			fillColor: scene.backgroundColor,
+			groupIds: ["sankey:node:onsite"],
+		});
+		expect((paper as { opacity?: number }).opacity).toBeGreaterThanOrEqual(70);
+		// Without the paper, those labels sit on their own bands, which the guard reports.
+		const bare = {
+			...scene,
+			elements: scene.elements.filter((element) => !element.id.startsWith("node:sankey:knockout:")),
+		};
+		expect(
+			sankeyLayoutIssues(bare)
+				.filter((issue) => issue.code === "label-on-band")
+				.map((issue) => issue.elementId)
+				.toSorted(),
+		).toEqual([
+			"text:sankey:node:offer",
+			"text:sankey:node:onsite",
+			"text:sankey:node:phone-screen",
+		]);
+		// First-column labels and sinks need none.
+		expect(nodes.find((node) => node.id === "applicants")?.knockout).toBeUndefined();
+		expect(nodes.find((node) => node.id === "rejected")?.knockout).toBeUndefined();
+	});
+
+	it("keeps values along the curves clear of the bands they don't label", () => {
+		// Coal → Industrial, Natural gas → Commercial and Commercial → Rejected energy
+		// once sat on or against neighbouring bands.
+		expect(sankeyLayoutIssues(renderSankeyDiagram(energy))).toEqual([]);
+		const scene = renderSankeyDiagram(hiring);
+		const { bands, texts } = readSankeyScene(scene);
+		const value = texts.find((text) => text.id === "text:sankey:link:offer:declined")!;
+		const wide = bands.find((band) => band.source === "applicants" && band.target === "rejected")!;
+		const moveTo = (left: number, top: number) => ({
+			...scene,
+			elements: scene.elements.map((element) =>
+				element.id === value.id && element.type === "text"
+					? { ...element, x: element.x + left - value.box.left, y: element.y + top - value.box.top }
+					: element,
+			),
+		});
+		// The issues that place the value against Applicants → Rejected.
+		const against = (moved: typeof scene) =>
+			sankeyLayoutIssues(moved)
+				.filter(
+					(issue) =>
+						issue.elementId === value.id && issue.message.includes('"applicants" → "rejected"'),
+				)
+				.map((issue) => issue.code);
+		const width = value.box.right - value.box.left;
+		const height = value.box.bottom - value.box.top;
+		const x = (wide.bounds.left + wide.bounds.right) / 2;
+		// On it.
+		expect(against(moveTo(x, (wide.targetEnd.top + wide.targetEnd.bottom) / 2))).toContain(
+			"label-on-band",
+		);
+		// Two pixels above it, and then ten.
+		const half = wide.points.slice(0, wide.points.length / 2);
+		const edge = Math.min(
+			...half
+				.filter((point) => point.x >= x - 20 && point.x <= x + width + 20)
+				.map((point) => point.y),
+		);
+		expect(against(moveTo(x, edge - 2 - height))).toEqual(["label-on-band"]);
+		expect(against(moveTo(x, edge - 10 - height))).toEqual([]);
+	});
+
 	it("colors bands by source and draws nodes nothing leaves in gray", () => {
 		const scene = renderSankeyDiagram(hiring);
 		const fill = (id: string) =>

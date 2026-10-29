@@ -5,6 +5,8 @@ import {
 	SANKEY_LINE_HEIGHT,
 	sankeyBoxesOverlap,
 	sankeyBoxMeetsPolygon,
+	sankeyPointInPolygon,
+	SANKEY_LABEL_GAP,
 	segmentMeetsBox,
 	type SankeyBox,
 } from "./sankey-layout.js";
@@ -18,6 +20,8 @@ export interface SankeyReadNode {
 	/** The node's label text, as drawn. */
 	readonly text?: string;
 	readonly textBox?: SankeyBox;
+	/** The paper behind the label, when it sits on the node's own bands. */
+	readonly knockout?: SankeyBox;
 }
 
 export interface SankeyReadBand {
@@ -48,6 +52,9 @@ export interface SankeyReadout {
 	}[];
 }
 
+/** A value along the curves or on a leader stays at least this far from other bands. */
+const VALUE_GUARD = 4;
+
 export interface SankeyLayoutIssue {
 	readonly code:
 		| "side-unbalanced"
@@ -58,6 +65,7 @@ export interface SankeyLayoutIssue {
 		| "label-over-node"
 		| "label-over-band"
 		| "leader-over-label"
+		| "label-on-band"
 		| "text-overflow";
 	readonly elementId: string;
 	readonly message: string;
@@ -101,12 +109,26 @@ export function readSankeyScene(scene: RenderedDiagramScene): SankeyReadout {
 			element.type === "line" ? [[element.id, element] as const] : [],
 		),
 	);
+	const boxOf = (element: NodeSceneElement): SankeyBox => ({
+		left: element.x,
+		top: element.y,
+		right: element.x + element.width,
+		bottom: element.y + element.height,
+	});
+	const knockouts = new Map(
+		shapes.flatMap((element) => {
+			const match = /^sankey:knockout:([^:]+)$/u.exec(element.nodeId);
+			return match ? [[match[1]!, boxOf(element)] as const] : [];
+		}),
+	);
 	const nodes = shapes.flatMap((element): SankeyReadNode[] => {
 		const match = /^sankey:node:([^:]+)$/u.exec(element.nodeId);
 		if (!match || element.shape !== "rectangle") return [];
 		const text = texts.get(`text:${element.nodeId}`);
+		const knockout = knockouts.get(match[1]!);
 		return [
 			{
+				...(knockout ? { knockout } : {}),
 				id: match[1]!,
 				box: {
 					left: element.x,
@@ -354,6 +376,72 @@ export function sankeyLayoutIssues(scene: RenderedDiagramScene): SankeyLayoutIss
 					elementId: text.id,
 					message: `Label "${text.id}" covers band "${band.source}" → "${band.target}".`,
 				});
+		}
+		// A node's label sits on its own bands only over paper, which hides no other band.
+		if (owner?.[1] === "node") {
+			const node = byId.get(owner[2]!);
+			const paper = node?.knockout;
+			const covered =
+				paper !== undefined &&
+				paper.left <= text.box.left + 0.5 &&
+				paper.right >= text.box.right - 0.5 &&
+				paper.top <= text.box.top + 0.5 &&
+				paper.bottom >= text.box.bottom - 0.5;
+			if (
+				!covered &&
+				bands.some(
+					(band) =>
+						band.source === owner[2] && sankeyBoxMeetsPolygon(text.box, band.points, band.bounds),
+				)
+			)
+				issues.push({
+					code: "label-on-band",
+					elementId: text.id,
+					message: `Label "${text.id}" sits on its own bands with no paper behind it.`,
+				});
+			if (paper)
+				for (const band of bands)
+					if (band.source !== owner[2] && sankeyBoxMeetsPolygon(paper, band.points, band.bounds))
+						issues.push({
+							code: "label-on-band",
+							elementId: text.id,
+							message: `The paper behind "${text.id}" hides band "${band.source}" → "${band.target}".`,
+						});
+		}
+		// A value off its own band, along the curves or on a leader, keeps clear of every
+		// other band; one inside its band, or beside it at either end, keeps to its stack.
+		if (owner?.[1] === "link") {
+			const band = bands.find((entry) => entry.source === owner[2] && entry.target === owner[3]);
+			const source = band && byId.get(band.source);
+			const target = band && byId.get(band.target);
+			const corners = [
+				{ x: text.box.left, y: text.box.top },
+				{ x: text.box.right, y: text.box.top },
+				{ x: text.box.right, y: text.box.bottom },
+				{ x: text.box.left, y: text.box.bottom },
+			];
+			const inside =
+				band !== undefined && corners.every((corner) => sankeyPointInPolygon(corner, band.points));
+			const atEnd =
+				(target !== undefined &&
+					Math.abs(text.box.right - (target.box.left - SANKEY_LABEL_GAP)) <= 1) ||
+				(source !== undefined &&
+					Math.abs(text.box.left - (source.box.right + SANKEY_LABEL_GAP)) <= 1);
+			if (band && !inside && !atEnd) {
+				const reach = {
+					left: text.box.left - VALUE_GUARD,
+					top: text.box.top - VALUE_GUARD,
+					right: text.box.right + VALUE_GUARD,
+					bottom: text.box.bottom + VALUE_GUARD,
+				};
+				for (const other of bands)
+					if (other !== band && sankeyBoxMeetsPolygon(reach, other.points, other.bounds))
+						issues.push({
+							code: "label-on-band",
+							elementId: text.id,
+							message: `Value "${text.id}" sits within ${VALUE_GUARD} px of band "${other.source}" → "${other.target}".`,
+						});
+			}
 		}
 	}
 	return issues;

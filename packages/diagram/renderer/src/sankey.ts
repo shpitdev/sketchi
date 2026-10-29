@@ -46,6 +46,8 @@ const INK = SKETCHI_DIAGRAM_PALETTE.ink;
 const LEADER_INK = "#4c4639";
 /** Bands are translucent so overlaps read and the bars stay the strongest marks. */
 const BAND_OPACITY = 45;
+/** Paper behind a middle label lets its bands show faintly through, so they still leave the bar. */
+const KNOCKOUT_OPACITY = 75;
 
 /** Scene ids of a node's bar and label and of a flow's band and value. */
 export const sankeyNodeId = (id: string) => `sankey:node:${id}`;
@@ -126,6 +128,29 @@ export function sankeySceneFromLayout(
 	}
 	for (const node of layout.nodes) {
 		const nodeId = sankeyNodeId(node.id);
+		if (node.knockout) {
+			// Paper behind a middle column's label, so its own bands' edges fade under the text.
+			const knockoutId = `sankey:knockout:${node.id}`;
+			middle.push({
+				type: "node",
+				id: `node:${knockoutId}`,
+				nodeId: knockoutId,
+				rendererRole: SANKEY_MARK_ROLE,
+				shape: "rectangle",
+				x: round(node.knockout.left),
+				y: round(node.knockout.top),
+				width: round(node.knockout.right - node.knockout.left),
+				height: round(node.knockout.bottom - node.knockout.top),
+				label: "",
+				fillColor: diagram.style.backgroundColor,
+				fillStyle: "solid",
+				strokeColor: diagram.style.backgroundColor,
+				strokeWidth: 1,
+				roughness: 0,
+				opacity: KNOCKOUT_OPACITY,
+				groupIds: [nodeId],
+			} satisfies NodeSceneElement);
+		}
 		middle.push({
 			type: "node",
 			id: `node:${nodeId}`,
@@ -150,6 +175,7 @@ export function sankeySceneFromLayout(
 		...layout.nodes.flatMap((node) => [
 			{ left: node.x, top: node.y, right: node.x + node.width, bottom: node.y + node.height },
 			node.text.box,
+			...(node.knockout ? [node.knockout] : []),
 		]),
 		...layout.bands.flatMap((band) => [polygonBounds(band.points), band.text.box]),
 		...layout.bands.flatMap((band) => (band.leader ? [polygonBounds(band.leader)] : [])),
