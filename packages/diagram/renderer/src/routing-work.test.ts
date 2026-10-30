@@ -216,12 +216,15 @@ describe("crossing repair work", () => {
 	// moved them), screen moves onto a decision's free vertex, polish arrivals and
 	// move ends off rounded corners (13.98M before).
 	// 14.46M while the branch-side pass also completed the arranged layout's own
-	// assignment again.
+	// assignment again. 18.12M with the four merge fixtures (incident escalation's
+	// Monitoring merge and three patient-intake merges); 20.07M as the drawn
+	// layout's merging lines nest, 1.95M of it the incident-escalation samples and
+	// patient-intake merges whose lines into one end route again in each order.
 	it("bounds segment checks for the generated diagrams it repairs", () => {
 		work.checks = 0;
 		for (const fixture of Object.values(crossingFixtures)) renderIntermediateDiagram(fixture);
 		for (const machine of Object.values(crossingStateMachines)) renderStateMachineDiagram(machine);
-		expect(work.checks).toBeLessThan(15_000_000);
+		expect(work.checks).toBeLessThan(21_000_000);
 	});
 });
 
@@ -279,6 +282,8 @@ describe("swimlane routing work", () => {
 	// for the two stress cases (six lanes and thirty steps, and loops across four
 	// lanes). Rows of lanes past 2.3:1 lay out again to tighten: the six-lane row
 	// three times (2.56M, from 0.96M), incident response and the single lane twice.
+	// 2.51M with round 29's short-label incident row, and 2.56M as that row, still
+	// past 2.4:1, lays out again with its thinner lanes level.
 	it("bounds segment checks for the lane fixtures and stress cases", () => {
 		const render = (fixtures: Record<string, diagramCore.IntermediateDiagram>) => {
 			work.checks = 0;
@@ -293,7 +298,7 @@ describe("swimlane routing work", () => {
 		const small = render(laneFixtures);
 		const large = render(laneStressFixtures);
 		expect(small).toBeGreaterThan(0);
-		expect(small).toBeLessThan(2_500_000);
+		expect(small).toBeLessThan(2_700_000);
 		expect(large).toBeLessThan(7_000_000);
 	});
 });

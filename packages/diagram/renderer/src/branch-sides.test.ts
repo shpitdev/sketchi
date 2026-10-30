@@ -139,6 +139,80 @@ describe("live incident samples", () => {
 	);
 });
 
+/** A node of the scene by its id. */
+function nodeOf(scene: RenderedDiagramScene, nodeId: string) {
+	const node = scene.elements.find(
+		(element) => element.type === "node" && element.nodeId === nodeId,
+	);
+	if (node?.type !== "node") throw new Error(`No node ${nodeId}`);
+	return node;
+}
+
+/** The side of its target a line enters by, from the way its last run heads; curved sides included. */
+function arrivalSide(points: readonly Point[]): Side {
+	const [before, end] = [points.at(-2)!, points.at(-1)!];
+	return Math.abs(end.x - before.x) > Math.abs(end.y - before.y)
+		? end.x < before.x
+			? "right"
+			: "left"
+		: end.y > before.y
+			? "top"
+			: "bottom";
+}
+
+describe("branches merging into one end", () => {
+	it.each([
+		"patient-intake-merge-detour",
+		"patient-intake-merge-crossing",
+		"patient-intake-merge-long",
+	] as const)(
+		"brings %s's insurance and self-pay branches into routine scheduling by sides facing them, crossing nothing",
+		(name) => {
+			// With round 29's shorter labels the self-pay branch once ran down past
+			// routine scheduling, along its foot and round into its far side, or,
+			// a little narrower, crossed the insurance branch into its top.
+			const scene = renderIntermediateDiagram(crossingFixtures[name]);
+			expect(arrowCrossings(arrowsOf(scene))).toBe(0);
+			for (const edgeId of ["edge-6", "edge-8"]) {
+				const { points, sourceNodeId, targetNodeId } = line(scene, edgeId);
+				const [source, target] = [nodeOf(scene, sourceNodeId), nodeOf(scene, targetNodeId)];
+				const from = { x: source.x + source.width / 2, y: source.y + source.height / 2 };
+				const facing = {
+					top: from.y < target.y,
+					right: from.x > target.x + target.width,
+					bottom: from.y > target.y + target.height,
+					left: from.x < target.x,
+				};
+				expect(facing[arrivalSide(points)]).toBe(true);
+				// No run strays past the box the two nodes span.
+				const [left, top] = [Math.min(source.x, target.x), Math.min(source.y, target.y)];
+				const right = Math.max(source.x + source.width, target.x + target.width);
+				const bottom = Math.max(source.y + source.height, target.y + target.height);
+				for (const point of points) {
+					expect(point.x).toBeGreaterThanOrEqual(left - 1);
+					expect(point.x).toBeLessThanOrEqual(right + 1);
+					expect(point.y).toBeGreaterThanOrEqual(top - 1);
+					expect(point.y).toBeLessThanOrEqual(bottom + 1);
+				}
+			}
+		},
+	);
+
+	it("brings Monitoring into Resolve incident's side beneath the fix check's yes branch, crossing nothing", () => {
+		// Monitoring's line runs down outside the yes branch. It once turned in
+		// over Resolve incident's top and crossed the yes branch on its way, in
+		// every sample of rounds 27, 28 and 29.
+		const scene = renderIntermediateDiagram(
+			crossingFixtures["incident-escalation-monitoring-merge"],
+		);
+		expect(arrowCrossings(arrowsOf(scene))).toBe(0);
+		const [yes, monitoring] = [line(scene, "edge-10").points, line(scene, "edge-12").points];
+		expect(arrivalSide(yes)).toBe("right");
+		expect(arrivalSide(monitoring)).toBe("right");
+		expect(yes.at(-1)!.y).toBeLessThan(monitoring.at(-1)!.y);
+	});
+});
+
 describe("branch labels", () => {
 	it("keeps a short branch's label clear of its own arrowhead's wing", () => {
 		const scene = renderIntermediateDiagram(sideFixtures["expense-out-of-policy"]);

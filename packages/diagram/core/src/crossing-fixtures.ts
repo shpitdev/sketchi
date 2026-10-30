@@ -8,6 +8,7 @@ import groupedExpenseApproval from "./fixtures/crossings/grouped-expense-approva
 import incidentEscalation from "./fixtures/crossings/incident-escalation.js";
 import incidentEscalationBridge from "./fixtures/crossings/incident-escalation-bridge.js";
 import incidentEscalationEarlyBridge from "./fixtures/crossings/incident-escalation-early-bridge.js";
+import incidentEscalationMonitoringMerge from "./fixtures/crossings/incident-escalation-monitoring-merge.js";
 import incidentEscalationQueue from "./fixtures/crossings/incident-escalation-queue.js";
 import incidentEscalationSharedResolve from "./fixtures/crossings/incident-escalation-shared-resolve.js";
 import incidentEscalationStraightEscalation from "./fixtures/crossings/incident-escalation-straight-escalation.js";
@@ -16,6 +17,9 @@ import mediaPlayerEnded from "./fixtures/crossings/media-player-ended.js";
 import namedFinalRetry from "./fixtures/crossings/named-final-retry.js";
 import orderLifecycle from "./fixtures/crossings/order-lifecycle.js";
 import orderLifecycleEnded from "./fixtures/crossings/order-lifecycle-ended.js";
+import patientIntakeMergeCrossing from "./fixtures/crossings/patient-intake-merge-crossing.js";
+import patientIntakeMergeDetour from "./fixtures/crossings/patient-intake-merge-detour.js";
+import patientIntakeMergeLong from "./fixtures/crossings/patient-intake-merge-long.js";
 import patientIntakeScheduling from "./fixtures/crossings/patient-intake-scheduling.js";
 import procurementVendorApproval from "./fixtures/crossings/procurement-vendor-approval.js";
 import procurementVendorApprovalLegal from "./fixtures/crossings/procurement-vendor-approval-legal.js";
@@ -35,16 +39,21 @@ function flowchart(fixture: object) {
 /**
  * Generated flowcharts whose layouts drew avoidable crossings: long branches
  * that skip ranks, nested loops on one side, two arrivals that swap at their
- * target, and a branch that ran tangent to a terminal it passed.
+ * target, a branch that ran tangent to a terminal it passed, and branches
+ * merging into one end that crossed or wound round to its far side.
  */
 export const crossingFixtures = {
 	"incident-escalation": flowchart(incidentEscalation),
 	"incident-escalation-bridge": flowchart(incidentEscalationBridge),
 	"incident-escalation-early-bridge": flowchart(incidentEscalationEarlyBridge),
 	"incident-escalation-shared-resolve": flowchart(incidentEscalationSharedResolve),
+	"incident-escalation-monitoring-merge": flowchart(incidentEscalationMonitoringMerge),
 	"subscription-renewal-dunning": flowchart(subscriptionRenewalDunning),
 	"subscription-renewal-grace": flowchart(subscriptionRenewalGrace),
 	"patient-intake-scheduling": flowchart(patientIntakeScheduling),
+	"patient-intake-merge-detour": flowchart(patientIntakeMergeDetour),
+	"patient-intake-merge-crossing": flowchart(patientIntakeMergeCrossing),
+	"patient-intake-merge-long": flowchart(patientIntakeMergeLong),
 	"procurement-vendor-approval": flowchart(procurementVendorApproval),
 	"procurement-vendor-approval-legal": flowchart(procurementVendorApprovalLegal),
 	"restaurant-waitlist": flowchart(restaurantWaitlist),

@@ -166,6 +166,21 @@ describe("swimlane layout", () => {
 		expect((scene.width + 40) / (scene.height + 40)).toBeLessThan(2.75);
 	});
 
+	it("raises the thinnest lanes of a row too long for its breadth, so its PNG reads within 2.4:1", () => {
+		// Round 29's shorter decision label left the incident row at 2.55:1, past
+		// the 2.5:1 a reader takes for an extreme strip.
+		const scene = rendered("incident-response-short-labels");
+		const bands = nodesOf(scene).filter((shape) => shape.rendererRole === "swimlane");
+		const [oncall, sre, comms] = bands.map((band) => band.height);
+		// The PNG frames the pool, 20 px of padding round it.
+		const width = Math.max(...bands.map((band) => band.x + band.width)) - bands[0]!.x;
+		const height = bands.reduce((sum, band) => sum + band.height, 0);
+		expect((width + 40) / (height + 40)).toBeLessThanOrEqual(2.4);
+		// The on-call lane holds the tall decision; the other two rise level with each other.
+		expect(sre).toBe(comms);
+		expect(oncall).toBeGreaterThan(sre!);
+	});
+
 	it("routes the fixtures with no reader-scale finding", () => {
 		for (const name of ["order-fulfilment", "hiring", "incident-response"] as const) {
 			const scene = rendered(name);
