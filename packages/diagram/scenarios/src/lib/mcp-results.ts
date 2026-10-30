@@ -144,8 +144,37 @@ function cleanEdgeId(value: unknown): string | undefined {
 	}
 }
 
-/** Map the Code Mode authoring layout to the canonical flowchart IR. */
-export function specToFlowchartCandidate(spec: unknown): unknown {
+/**
+ * Groups take no authored logo. A build draws one before a group whose label
+ * names it and notes that as an `icon_filled` issue on the group (see
+ * fillGroupLogos in the diagram agent): group id to the logo it drew.
+ */
+function filledGroupLogos(build: Record<string, unknown>): ReadonlyMap<string, string> {
+	const logos = new Map<string, string>();
+	for (const issue of Array.isArray(build.issues) ? build.issues : []) {
+		if (
+			!isRecord(issue) ||
+			issue.code !== "icon_filled" ||
+			!isRecord(issue.ref) ||
+			issue.ref.kind !== "group" ||
+			typeof issue.ref.id !== "string" ||
+			typeof issue.message !== "string"
+		)
+			continue;
+		const slug = /\bdraws the "([^"]+)" logo\b/u.exec(issue.message)?.[1];
+		if (slug) logos.set(issue.ref.id, slug);
+	}
+	return logos;
+}
+
+/**
+ * Map the Code Mode authoring layout to the canonical flowchart IR, each group
+ * drawing the logo `groupLogos` gives it by id.
+ */
+export function specToFlowchartCandidate(
+	spec: unknown,
+	groupLogos: ReadonlyMap<string, string> = new Map(),
+): unknown {
 	if (!isRecord(spec)) return spec;
 	const layout = isRecord(spec.layout) ? spec.layout : {};
 	return {
@@ -153,7 +182,17 @@ export function specToFlowchartCandidate(spec: unknown): unknown {
 		title: spec.title,
 		type: "flowchart",
 		nodes: spec.nodes,
-		...(spec.groups === undefined ? {} : { groups: spec.groups }),
+		...(spec.groups === undefined
+			? {}
+			: {
+					groups: Array.isArray(spec.groups)
+						? spec.groups.map((group) => {
+								if (!isRecord(group) || group.icon !== undefined) return group;
+								const slug = typeof group.id === "string" ? groupLogos.get(group.id) : undefined;
+								return slug === undefined ? group : { ...group, icon: { slug } };
+							})
+						: spec.groups,
+				}),
 		...(spec.lanes === undefined ? {} : { lanes: spec.lanes }),
 		edges: Array.isArray(spec.edges)
 			? spec.edges.map((edge, index) =>
@@ -333,7 +372,7 @@ export function candidateFromMcpResult(
 								? specToMindmapCandidate(build.normalizedSpec)
 								: diagramType === "sequence"
 									? specToSequenceCandidate(build.normalizedSpec)
-									: specToFlowchartCandidate(build.normalizedSpec),
+									: specToFlowchartCandidate(build.normalizedSpec, filledGroupLogos(build)),
 		check: {
 			id: "mcp-build-accepted",
 			passed: true,
