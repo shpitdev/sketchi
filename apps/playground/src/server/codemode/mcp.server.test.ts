@@ -1167,6 +1167,11 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toContain(
 				"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order.",
 			);
+			// Without this, Sol labels "If parsing succeeds, validate the schema" with "If parsing
+			// succeeds" and "A file is uploaded and parsed" with "parsed".
+			expect(codeDescription).toContain(
+				'Label a step as a short action ("Resize image"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause',
+			);
 			// Without this, Sonnet folds "check supplier availability" into "Supplier available?".
 			expect(codeDescription).toContain(
 				'A stated check or verification ("verify the signature", "stock is checked") is its own process node before the decision that reads its result; "check whether X" alone is just that decision.',
@@ -1208,7 +1213,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			// The head retains builder names; specs and rules ride on the code parameter. Every request
 			// pays for this on every turn: five families took it from 13,468 characters to 16,093, and
 			// the compact flowchart spec, one shared copy rule and topic-only failure detail bring it
-			// under 12,800. Lower this budget; do not raise it.
+			// under 12,800. The flowchart label rule adds about 200 back. Lower this budget; do not
+			// raise it.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -1217,7 +1223,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(12_800);
+			).toBeLessThan(13_000);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

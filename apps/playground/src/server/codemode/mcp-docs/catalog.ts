@@ -96,9 +96,13 @@ const QUADRANT_RULE =
 	"low and high are the axis end labels as stated (x left to right, y bottom up); name each quadrant by the corner its conditions describe; x and y run 0 (low end) to 1 (high end), so a score out of 100 is score / 100.";
 const CHART_COPY_RULE =
 	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
-/** The code parameter states once for every builder what each topic says for its own family. */
+/**
+ * The code parameter states once for the builders after buildFlowchart what each topic says for
+ * its own family. Flowchart labels follow FLOWCHART_RULES instead: read as applying to every
+ * builder, this rule made Sol paste prompt clauses ("If parsing succeeds", "parsed") as labels.
+ */
 const COPY_RULE =
-	"For every builder, copy every item and detail the prompt states into its spec field, keeping its words and order; invent none.";
+	"copy every item and detail the prompt states into its spec field, keeping its words and order; invent none.";
 /**
  * Claude Code cuts upfront-loaded MCP tool descriptions and server instructions at this many
  * characters (2048 before v2.1.296), but not parameter descriptions. The execute description is a
@@ -191,6 +195,9 @@ const FLOWCHART_RULES: readonly (readonly [rule: string, topicDetail?: string])[
 		"Label steps and decisions with the prompt's own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words the prompt itself uses.",
 	],
 	[
+		'Label a step as a short action ("Resize image"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause ("if the image is too large", "whether …", "is resized").',
+	],
+	[
 		"Use one node per outcome the prompt names: point every branch that reaches the same named outcome at that one node, and do not add end nodes the prompt does not name.",
 	],
 	[
@@ -263,12 +270,12 @@ export const EXECUTE_TOOL_DESCRIPTION = [
  * needs live here. Each topic adds what a build only needs once it fails.
  */
 export const EXECUTE_CODE_DESCRIPTION = [
-	`Excalidraw and PNG URLs are default for accepted builds and patches. ${COPY_RULE}`,
+	"Excalidraw and PNG URLs are default for accepted builds and patches.",
 	"",
 	`buildFlowchart (${BUILDERS.buildFlowchart}): ${FLOWCHART_SPEC}.`,
 	...FLOWCHART_RULES.map(([rule]) => rule),
 	"",
-	"Other builders:",
+	`Other builders: ${COPY_RULE}`,
 	...Object.entries(FAST_PATH).map(([operation, line]) => {
 		const hint = CODE_HINTS[operation as keyof typeof FAST_PATH];
 		return `- ${operation}${hint ? ` (${hint})` : ""}: ${line}`;

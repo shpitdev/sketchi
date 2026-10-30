@@ -306,6 +306,49 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(getCodeModeDocs({ topic: "issues" }).content).toContain("request_too_large");
 	});
 
+	it("scopes the shared copy rule to the builders after the flowchart, whose labels have their own rule", () => {
+		const codeLines = SKETCHI_EXECUTE_CODE_DESCRIPTION.split("\n");
+		// Read as applying to every builder, the copy rule made Sol paste prompt clauses as flowchart
+		// labels ("If parsing succeeds", "parsed"), so it heads only the builders after the flowchart.
+		const copyRule =
+			"Other builders: copy every item and detail the prompt states into its spec field, keeping its words and order; invent none.";
+		expect(codeLines.filter((line) => line.includes("keeping its words"))).toEqual([copyRule]);
+		const otherBuilders = codeLines.indexOf(copyRule);
+		expect(otherBuilders).toBeGreaterThan(
+			codeLines.findIndex((line) => line.startsWith("buildFlowchart (")),
+		);
+		const builderLines = codeLines.filter((line) => /^- (build|createCanvas)/.test(line));
+		expect(builderLines).toHaveLength(
+			CODE_MODE_OPERATIONS.filter((name) => /^(build|createCanvas)/.test(name)).length - 1,
+		);
+		for (const line of builderLines) expect(codeLines.indexOf(line)).toBeGreaterThan(otherBuilders);
+		// Flowchart labels keep the prompt's terms as short actions and questions, never its clauses.
+		for (const text of [
+			SKETCHI_EXECUTE_CODE_DESCRIPTION,
+			getCodeModeDocs({ topic: "buildFlowchart" }).content,
+		]) {
+			expect(text).toContain("Label steps and decisions with the prompt's own words");
+			expect(text).toContain(
+				'Label a step as a short action ("Resize image"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause ("if the image is too large", "whether …", "is resized").',
+			);
+		}
+		// Each family whose stated text is copied still says so in its own topic.
+		for (const [topic, rule] of [
+			["buildChart", "Copy every number, category, series name, unit and axis title"],
+			["buildGantt", "Copy every task, date, dependency, milestone and phase"],
+			["buildErDiagram", "Copy every table, field, type, key, nullable marker and cardinality"],
+			["buildClassDiagram", "Copy every class, member, relationship, multiplicity and role"],
+			["buildQuadrantChart", "Copy every item, axis label and quadrant name"],
+			["buildOrgChart", "Copy every person, title, department, reporting line and dotted line"],
+			["buildVennDiagram", "Copy every set and item the prompt states, each once"],
+			["buildJourneyMap", "Copy every stage, step, score, actor, touchpoint"],
+			["buildSankey", "Copy every node, flow and value stated"],
+			["buildWireframe", "Copy every screen, component, text and state stated, in order"],
+		] as const) {
+			expect(getCodeModeDocs({ topic }).content, topic).toContain(rule);
+		}
+	});
+
 	it("keeps tools/list small and serves each family's generated types on demand", () => {
 		const declarations = SKETCHI_CODE_MODE_TYPES.split("\n\n");
 		const declaration = (name: string) => {
@@ -479,8 +522,10 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// Every request pays for this parameter on every turn. Five families took it from 10,548
 		// characters to 12,976; a compact flowchart spec in place of its generated types, one shared
 		// copy rule, no separate builder index and failure-only detail left to the topics take it to
-		// 9,862, under where it stood before them. Lower this budget; do not raise it.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(9_900);
+		// 9,862, under where it stood before them. The flowchart label rule, needed once Sol pasted
+		// prompt clauses as labels, and moving the copy rule onto the other builders add 190 (+46
+		// o200k tokens). Lower this budget; do not raise it.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_060);
 		// The overview keeps every builder's summary; the code parameter names every builder once.
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const operation of CODE_MODE_OPERATIONS.filter((name) =>
