@@ -30,9 +30,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # The Version Packages PR only restates what the source changesets already
-      # said, so it is merged unattended. It cannot gate itself: a PR opened with
-      # GITHUB_TOKEN never triggers pull_request CI, so release.yml runs the full
-      # ci.yml gate before anything reaches npm.
+      # said, so it is merged unattended. It cannot gate itself: nobody runs
+      # pnpm ci:local on a PR opened with GITHUB_TOKEN, so release.yml runs the
+      # full gate before anything reaches npm unless a local-ci signoff already
+      # covers the released source.
       - name: Merge the Version Packages PR and start the release
         if: ${{ steps.changesets.outputs.pullRequestNumber != '' }}
         env:
