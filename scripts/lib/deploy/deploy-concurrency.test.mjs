@@ -5,7 +5,7 @@ import test from "node:test";
 
 import { unstable_readConfig } from "wrangler";
 
-import { workerProjectConfig } from "../worker-apps.mjs";
+import { workerProjectConfig, workerProjectIds } from "../worker-apps.mjs";
 
 const require = createRequire(import.meta.resolve("nx/package.json"));
 const yaml = require("@zkochan/js-yaml");
@@ -46,7 +46,8 @@ function concurrency(job, project, prNumber = 42) {
 test("all Pipeline-bound preview and production uploads share a non-cancelling queue", async () => {
 	const groups = [];
 	for (const job of [preview, production]) {
-		for (const project of job.strategy.matrix.project) {
+		// The preview matrix is the selected subset of every Worker app.
+		for (const project of job === preview ? workerProjectIds : job.strategy.matrix.project) {
 			const config = await unstable_readConfig({
 				config: workerProjectConfig(project).wranglerInputConfigPath,
 			});

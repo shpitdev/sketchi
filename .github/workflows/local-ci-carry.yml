@@ -1,0 +1,18 @@
+name: local-ci carry
+
+# A restack or retarget that leaves this PR's own patch unchanged keeps its `pnpm ci:local`
+# signoff: the shared job re-posts `local-ci` on the new head. A changed patch needs a new run.
+on:
+  pull_request:
+    types: [synchronize, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  carry:
+    uses: shpitdev/.github/.github/workflows/local-ci-carry.yml@main
+    with:
+      runs-on: ubuntu-latest

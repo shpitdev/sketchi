@@ -83,19 +83,24 @@ jobs:
           cat view-error.log >&2
           exit 1
 
-  # Nothing reaches npm without the full pull-request gate. The Version Packages
-  # PR cannot run it itself: PRs opened with GITHUB_TOKEN never trigger workflows,
-  # so this is where a broken release is actually caught.
+  # Nothing reaches npm without the full local gate on the released source. The
+  # Version Packages PR cannot run it itself: nobody runs pnpm ci:local on a PR
+  # opened with GITHUB_TOKEN, so this is where a broken release is actually caught.
   verify:
     needs: guard
     if: ${{ needs.guard.outputs.publish == 'true' }}
-    # ci.yml jobs declare actions: read for nx-set-shas, so the caller must grant it.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-      actions: read
-    uses: ./.github/workflows/ci.yml
-    with:
-      all-projects: true
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # The gate compares HEAD with origin/main.
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-workspace
+      # A failing check prints the tail of its log.
+      - name: Run the local CI gate on every project
+        run: pnpm ci:local --no-signoff --all
 
   publish:
     needs: [guard, verify]

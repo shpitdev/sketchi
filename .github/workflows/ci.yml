@@ -1,22 +1,14 @@
 name: ci
 
-# CI double-checks the key gates; full proof runs locally (see AGENTS.md).
-# Pull requests and pushes to main run only the Nx-affected graph. Browser-mode
-# suites (`test-browser` targets), the SVG corpus renderer, and Wrangler dry-runs
-# are local proof; every same-repository PR also gets real Worker preview deploys.
+# The thin remote check: a typecheck of the Nx-affected graph, which also catches a bad merge
+# with the base. Lint, tests, builds, Storybook and the repository contracts run locally in
+# `pnpm ci:local`, which signs off the PR head as `local-ci` (see AGENTS.md).
 on:
   pull_request:
-  push:
-    branches:
-      - main
-  # release.yml calls this as the pre-publish gate with all-projects, so a
-  # release builds and tests the full graph with no second copy of the steps.
-  workflow_call:
-    inputs:
-      all-projects:
-        description: Run every project instead of the Nx-affected graph.
-        type: boolean
-        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -24,113 +16,18 @@ permissions:
 env:
   NX_DAEMON: "false"
   NX_TUI: "false"
-  CI_ALL_PROJECTS: ${{ inputs.all-projects == true }}
 
 jobs:
-  test:
+  typecheck:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # nx-set-shas reads the last successful main run.
-      actions: read
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: ./.github/actions/setup-workspace
-      - uses: nrwl/nx-set-shas@e602fada7ad5987b0f7b1905e7a99ea1c661514c # v5.1.0
-        if: env.CI_ALL_PROJECTS != 'true'
-      - name: Test affected projects
-        run: |
-          if [[ "$CI_ALL_PROJECTS" == "true" ]]; then
-            pnpm nx run-many -t test --parallel=4 --outputStyle=static
-          else
-            pnpm nx affected -t test --parallel=4 --outputStyle=static
-          fi
-
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: ./.github/actions/setup-workspace
-      - uses: nrwl/nx-set-shas@e602fada7ad5987b0f7b1905e7a99ea1c661514c # v5.1.0
-        if: env.CI_ALL_PROJECTS != 'true'
-      - name: Select conditional gates
-        id: scope
-        run: node scripts/ci-scope.mjs
-      - name: Typecheck and build affected projects
-        run: |
-          if [[ "$CI_ALL_PROJECTS" == "true" ]]; then
-            pnpm nx run-many -t typecheck,typecheck-native,build
-          else
-            pnpm nx affected -t typecheck,typecheck-native,build
-          fi
-      - name: Verify root TypeScript project references
-        if: steps.scope.outputs.code == 'true'
-        run: pnpm exec tsc6 -b --pretty false
-      - name: Build canonical diagram UI Storybook
-        if: steps.scope.outputs.storybook == 'true'
-        run: pnpm nx build-storybook diagram-ui
-
-  checks:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: ./.github/actions/setup-workspace
-      - name: Lint, format, and custom-rule checks
-        run: pnpm run check
-      # `pnpm run check` already built every package, including the scenarios CLI.
-      - name: Smoke-test built scenario CLI under plain Node
-        run: |
-          node packages/diagram/scenarios/dist/cli.js --list
-          node packages/diagram/scenarios/dist/cli.js --scenario sketchi-onboarding-decision-flow --fixture
-      - name: Verify deploy, onboarding, and cutover contracts
-        run: pnpm run test:deploy-scripts
-      - name: Verify repository tooling contracts
-        run: |
-          pnpm exec tsc -p tools/tsconfig.json --noEmit
-          pnpm exec vitest run --config tools/vitest.config.mts --exclude tools/project-graph.test.ts
-
-  graph:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: ./.github/actions/setup-workspace
-      - uses: nrwl/nx-set-shas@e602fada7ad5987b0f7b1905e7a99ea1c661514c # v5.1.0
-        if: env.CI_ALL_PROJECTS != 'true'
-      - name: Select conditional gates
-        id: scope
-        run: node scripts/ci-scope.mjs
-      - name: Verify workspace project graph contracts
-        if: steps.scope.outputs.code == 'true'
-        run: pnpm exec vitest run --config tools/vitest.config.mts tools/project-graph.test.ts
-
-  # The single required status check.
-  required:
-    if: always()
-    needs: [test, build, checks, graph]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require every CI job to pass
+      - name: Typecheck affected projects
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
-        run: |
-          echo "CI job results: $RESULTS"
-          for result in $RESULTS; do
-            [[ "$result" == "success" ]] || exit 1
-          done
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: pnpm nx affected -t typecheck --base="$(git merge-base "$BASE_SHA" HEAD)" --head=HEAD --outputStyle=static

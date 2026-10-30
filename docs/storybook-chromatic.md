@@ -14,7 +14,7 @@ flowchart LR
   UI["diagram-ui"] --> Storybook["Storybook"]
   Storybook --> MCP["/mcp endpoint"]
   Storybook --> Chromatic["Chromatic publish"]
-  CI["ci / required"] --> Build["Canonical Nx gates"]
+  CI["pnpm ci:local"] --> Build["Canonical Nx gates"]
   Build --> Storybook
 ```
 
@@ -69,9 +69,9 @@ published URL under `/mcp`.
 
 ## CI Contract
 
-The required `ci / required` check runs the Nx-affected
+The local gate, `pnpm ci:local`, runs the Nx-affected
 `typecheck,test,build` graph and builds `diagram-ui` Storybook whenever
-`diagram-ui` is affected.
+`diagram-ui` is affected, then signs off the PR head as `local-ci`.
 Chromatic remains an explicit, token-backed publishing target rather than a
 required pull-request check.
 

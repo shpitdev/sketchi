@@ -2,7 +2,24 @@ import {
 	assertWranglerWorkerIdentity,
 	requireWorkerIdentity,
 	workerProjectConfig,
+	workerProjectIds,
 } from "../worker-apps.mjs";
+
+// Preview tooling that belongs to no Nx project. A change to it previews every app.
+const PREVIEW_TOOLING =
+	/^(?:\.github\/workflows\/app-preview\.yml$|\.github\/actions\/|scripts\/0\d-[\w-]+\.mjs$|scripts\/lib\/worker-apps\.mjs$|scripts\/lib\/deploy\/)/;
+
+/**
+ * The Worker apps a preview run deploys: every app, one named app, or the apps the PR affects
+ * (all of them when it changes the preview tooling).
+ * @param {{ selection: string, affected?: string[], changedFiles?: string[] }} input
+ */
+export function selectPreviewProjects({ selection, affected = [], changedFiles = [] }) {
+	if (selection === "all") return [...workerProjectIds];
+	if (selection !== "affected") return [workerProjectConfig(selection).projectId];
+	if (changedFiles.some((file) => PREVIEW_TOOLING.test(file))) return [...workerProjectIds];
+	return workerProjectIds.filter((project) => affected.includes(project));
+}
 
 export const previewProjects = {
 	excalidraw: {

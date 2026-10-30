@@ -79,8 +79,8 @@ pnpm nx run svg-excalidraw:build
 ```
 
 The full corpus renderer is intentionally separate. It writes an untracked JSON
-report under `.memory/svg-native-corpus/`; CI runs it only when this package or
-the corpus inputs are affected and uploads that directory as an artifact:
+report under `.memory/svg-native-corpus/`. Neither CI nor the local gate runs it;
+run it when this package or the corpus inputs change:
 
 ```sh
 pnpm nx run svg-excalidraw:corpus-renderer

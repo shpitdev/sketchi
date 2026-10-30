@@ -30,7 +30,7 @@ test("root workspace and tooling files count as code without an affected project
 	);
 });
 
-test("the release gate runs everything", () => {
+test("--all runs everything", () => {
 	assert.deepEqual(ciScope({ all: true, projects: [], changedFiles: [] }), {
 		code: true,
 		storybook: true,

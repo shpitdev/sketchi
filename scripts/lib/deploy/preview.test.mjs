@@ -7,6 +7,7 @@ import {
 	previewCommentBody,
 	previewProjectConfig,
 	previewName,
+	selectPreviewProjects,
 	validatePreviewConfig,
 	officialPreviewUrl,
 	webPreviewUrls,
@@ -285,4 +286,42 @@ test("previewCommentBody keeps a still-reachable deleted Preview visible", () =>
 	assert.match(body, /Status: `deletion-pending`/);
 	assert.match(body, /- URL: https:\/\/pr-42-sketchi-web\.dimethyl\.workers\.dev/);
 	assert.match(body, /still reachable[\s\S]*cloudflare\/workers-sdk#15945/);
+});
+
+test("previews deploy the affected Worker apps unless asked for all or one", () => {
+	assert.deepEqual(
+		selectPreviewProjects({
+			selection: "affected",
+			affected: ["diagram-core", "playground", "web"],
+			changedFiles: ["packages/diagram/core/src/index.ts"],
+		}),
+		["playground", "web"],
+	);
+	assert.deepEqual(
+		selectPreviewProjects({ selection: "affected", changedFiles: ["docs/architecture.md"] }),
+		[],
+	);
+	assert.deepEqual(selectPreviewProjects({ selection: "all" }), workerProjectIds);
+	assert.deepEqual(selectPreviewProjects({ selection: "playground" }), ["playground"]);
+	assert.throws(() => selectPreviewProjects({ selection: "studio" }), /Unknown Worker project/);
+});
+
+test("a change to the preview tooling previews every Worker app", () => {
+	for (const file of [
+		".github/workflows/app-preview.yml",
+		".github/actions/setup-workspace/action.yml",
+		"scripts/07-wrangler-retry.mjs",
+		"scripts/lib/deploy/preview.mjs",
+		"scripts/lib/worker-apps.mjs",
+	]) {
+		assert.deepEqual(
+			selectPreviewProjects({ selection: "affected", changedFiles: [file] }),
+			workerProjectIds,
+			file,
+		);
+	}
+	assert.deepEqual(
+		selectPreviewProjects({ selection: "affected", changedFiles: ["scripts/ci-local.mjs"] }),
+		[],
+	);
 });

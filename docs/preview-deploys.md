@@ -52,9 +52,22 @@ service bindings currently call the target Worker's production deployment.
 
 ## Workflow and comments
 
-Same-repository pull requests to `main` deploy all five apps. Forks are excluded.
-Manual dispatch takes an open same-repository PR number and resolves its head SHA
-before checkout; the same SHA appears in deploy metadata and comments.
+Previews are opt-in. A same-repository pull request to `main` with the `preview`
+label deploys the apps it affects (`nx show projects --affected` between the PR's
+merge base and head) on every push; a change to the preview tooling itself
+(`app-preview.yml`, the shared setup action, `scripts/0*-*.mjs`, `scripts/lib/deploy/`)
+deploys all five. Unlabelled PRs deploy nothing, and adding another label runs
+nothing. Forks are excluded. Closing a same-repository PR deletes all five
+Previews when one can exist: the PR carries the `preview` label or a preview
+comment, however the Preview was deployed (including before previews were
+opt-in). Closing a PR with neither runs no cleanup jobs.
+
+Manual dispatch takes an open same-repository PR number, including a stacked PR
+whose base is not `main`, and a `project` choice (`affected`, `all`, or one app).
+It resolves the PR head SHA before checkout; the same SHA appears in deploy
+metadata and comments. It also adds the `preview` label before anything uploads,
+so closing the PR cleans up even if no Preview comment exists yet, and later
+pushes keep the PR's affected Previews current.
 
 - The shared mise setup uses the repository's exact Node/pnpm pins and a frozen lockfile.
 - Each build writes assets to `dist/apps/<project>/client` and the deploy snapshot
@@ -65,7 +78,8 @@ before checkout; the same SHA appears in deploy metadata and comments.
   only the stable workers.dev URL. Missing or disabled Preview URLs fail the job.
 - One owned sticky bot comment per app reports status, commit, URL, and workflow run.
 - Web receives sibling official Preview URLs through `--var` so its Icons and
-  Playground links stay on the same PR. These overrides affect only the Preview.
+  Playground links stay on the same PR when the same run deploys them; otherwise
+  they point at production. These overrides affect only the Preview.
 
 `web`, `playground`, and `icons` are public product surfaces. `eval-harness` and
 `excalidraw` remain internal and are not linked from public navigation.
