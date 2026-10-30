@@ -85,6 +85,7 @@ import {
 	type BranchMatcher,
 	type ExpectedEdge,
 	type FlowchartConnection,
+	flowchartGroupsAround,
 	matchFlowchartSteps,
 } from "./flowchart-matching.js";
 
@@ -346,7 +347,10 @@ export interface ScenarioLogoExpectations {
 	/** The prompt, whose product abbreviations also ground their products' logos. */
 	readonly prompt?: string;
 	readonly requiredIconSlugs: readonly string[];
-	/** Only an owned entry node naming every part may share its single logo slot. */
+	/**
+	 * Only an owned entry node naming every part may share its single logo
+	 * slot. A group around that node naming a part may draw that part's logo.
+	 */
 	readonly sharedIconEntries?: readonly {
 		readonly parts: NonNullable<FlowchartScenarioRequiredNode["entryParts"]>;
 		readonly nodeIds: ReadonlySet<string>;
@@ -441,10 +445,28 @@ export function scenarioLogoChecks(
 				})
 			);
 		});
+	// A group draws the logo its label names; credit it only for the entry part
+	// that group stands for around the owned entry node.
+	const hostGroupIcon = (slug: string) =>
+		modelDiagram.type === "flowchart" &&
+		(expected.sharedIconEntries ?? []).some(({ parts, nodeIds }) =>
+			modelDiagram.nodes.some(
+				(node) =>
+					nodeIds.has(node.id) &&
+					flowchartGroupsAround(modelDiagram, node).some(
+						(group) =>
+							group.icon?.slug === slug &&
+							parts.some(
+								(part) => part.iconSlug === slug && flowchartLabelMatches(group.label, part.labels),
+							),
+					),
+			),
+		);
 	return [
 		...expected.requiredIconSlugs.map((slug) => ({
 			id: `icon:${slug}`,
-			passed: icons.some((icon) => icon.slug === slug) || sharedEntryIcon(slug),
+			passed:
+				icons.some((icon) => icon.slug === slug) || sharedEntryIcon(slug) || hostGroupIcon(slug),
 			message: `Expected the model to draw the "${slug}" logo.`,
 		})),
 		{

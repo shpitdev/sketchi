@@ -34,6 +34,41 @@ export interface FlowchartStepMatches {
 const MAX_CHAIN_NODES = 2;
 const ENTRY_HOSTING_WORDS = flowchartContentWords("host serve route deploy run");
 
+/** The groups around a model node, innermost first; a loop stops the walk. */
+export function flowchartGroupsAround(
+	diagram: Pick<FlowchartDiagram, "groups">,
+	node: Pick<FlowchartNode, "group">,
+): NonNullable<FlowchartDiagram["groups"]> {
+	const groups = new Map((diagram.groups ?? []).map((group) => [group.id, group]));
+	const around: NonNullable<FlowchartDiagram["groups"]> = [];
+	for (let id = node.group; id !== undefined; id = groups.get(id)?.parent) {
+		const group = groups.get(id);
+		if (!group || around.includes(group)) break;
+		around.push(group);
+	}
+	return around;
+}
+
+/**
+ * Entry nodes that each name a declared part, together naming every part.
+ * A part may instead name a group around the node that owns the entry
+ * (`Next.js page receives question` inside a `Vercel` group).
+ */
+export function flowchartNamesEntryParts(
+	diagram: Pick<FlowchartDiagram, "groups">,
+	nodes: readonly FlowchartNode[],
+	parts: NonNullable<RequiredStep["entryParts"]>,
+): boolean {
+	const hosts = nodes.length > 0 ? flowchartGroupsAround(diagram, nodes.at(-1)!) : [];
+	return (
+		nodes.length > 0 &&
+		nodes.every((node) => parts.some((part) => flowchartLabelMatches(node.label, part.labels))) &&
+		parts.every((part) =>
+			[...nodes, ...hosts].some((named) => flowchartLabelMatches(named.label, part.labels)),
+		)
+	);
+}
+
 /** Captions may describe the entry's hosting relation, never additional work. */
 function entryCaptionMatches(
 	caption: string,
@@ -265,7 +300,13 @@ export function matchFlowchartSteps(
 			step.id,
 			new Set(
 				graph.nodes
-					.filter((node) => kindFits(node, step) && namesStepLabel(node.label, step))
+					.filter(
+						(node) =>
+							kindFits(node, step) &&
+							(step.entryParts
+								? flowchartNamesEntryParts(graph, [node], step.entryParts)
+								: namesStepLabel(node.label, step)),
+					)
 					.map((node) => node.id),
 			),
 		]),
@@ -310,14 +351,8 @@ export function matchFlowchartSteps(
 				if (captions.some((caption) => !parts || !entryCaptionMatches(caption, parts))) continue;
 				let matches = flowchartLabelMatches(combined, step.labels);
 				if (parts) {
-					const namesPart = (entry: FlowchartNode) =>
-						parts.some((part) => flowchartLabelMatches(entry.label, part.labels));
-					const entryNodes = namesPart(start) ? chain : chain.slice(1);
-					matches =
-						entryNodes.every(namesPart) &&
-						parts.every((part) =>
-							entryNodes.some((entry) => flowchartLabelMatches(entry.label, part.labels)),
-						);
+					const namesPart = parts.some((part) => flowchartLabelMatches(start.label, part.labels));
+					matches = flowchartNamesEntryParts(graph, namesPart ? chain : chain.slice(1), parts);
 				}
 				if (matches) {
 					matchedNodes.get(step.id)!.add(node.id);
@@ -555,7 +590,13 @@ export function matchFlowchartSteps(
 			const before = previous[0]!;
 			const target = byId.get(edge.target);
 			const words = flowchartLabelWords(edge.label!);
-			const bareAnswer = words.length === 1 && (words[0] === "yes" || words[0] === "hit");
+			const leadingAnswer = words[0] === "yes" || words[0] === "hit";
+			const bareAnswer = words.length === 1 && leadingAnswer;
+			// After its answer, a caption may state just the outcome's object
+			// (`yes: cached answer`); the shared end supplies the action.
+			const stated = leadingAnswer
+				? edge.label!.replace(/^\W*(?:yes|hit)\b[\s:;,.()\-–—]*/iu, "").replace(/\W+$/u, "")
+				: edge.label!;
 			return (
 				steps.get(before.sourceId)?.kind === "decision" &&
 				byId.get(edge.source)?.kind === "decision" &&
@@ -567,7 +608,7 @@ export function matchFlowchartSteps(
 					(expected) => expected.sourceId === step.id || expected.sourceId === shared.id,
 				) &&
 				branchMatches(edge, before) &&
-				(bareAnswer || namesStepLabel(edge.label!, step))
+				(bareAnswer || namesStepLabel(edge.label!, step) || namesStepLabel(stated, step))
 			);
 		});
 		if (outcomes.length > 0) splitEdgeStep(edge, outcomes, "end", "outcome");
