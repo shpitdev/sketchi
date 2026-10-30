@@ -2,6 +2,7 @@ import { parseIntermediateDiagram, type IntermediateDiagram } from "./intermedia
 import { parseFlowchartDiagram } from "./types/flowchart.js";
 import hiring from "./fixtures/lanes/hiring.js";
 import incidentResponse from "./fixtures/lanes/incident-response.js";
+import incidentResponseShortLabels from "./fixtures/lanes/incident-response-short-labels.js";
 import orderFulfilment from "./fixtures/lanes/order-fulfilment.js";
 import singleLane from "./fixtures/lanes/single-lane.js";
 import skipLanes from "./fixtures/lanes/skip-lanes.js";
@@ -16,14 +17,16 @@ function flowchart(fixture: object, direction: "LR" | "TB" = "LR") {
 
 /**
  * Swimlane flowcharts: handoffs between neighboring lanes, a loop back across
- * lanes, handoffs that skip a lane, parallel steps in one lane and a single
- * lane. Every step must sit in its lane, lanes in declared order, and edges
- * cross lane boundaries without running along them.
+ * lanes, handoffs that skip a lane, parallel steps in one lane, a single
+ * lane, and a row whose short labels leave it long for its breadth. Every step
+ * must sit in its lane, lanes in declared order, and edges cross lane
+ * boundaries without running along them.
  */
 export const laneFixtures = {
 	"order-fulfilment": flowchart(orderFulfilment),
 	hiring: flowchart(hiring, "TB"),
 	"incident-response": flowchart(incidentResponse),
+	"incident-response-short-labels": flowchart(incidentResponseShortLabels),
 	"skip-lanes": flowchart(skipLanes),
 	"single-lane": flowchart(singleLane, "TB"),
 };

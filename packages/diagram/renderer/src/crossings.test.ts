@@ -185,13 +185,17 @@ const NODE_CLEARANCE = 12;
  * that crosses a route where the route runs straight on.
  */
 const CROSSINGS: Readonly<Record<keyof typeof crossingFixtures, readonly [number, number]>> = {
-	"incident-escalation": [3, 1],
-	"incident-escalation-bridge": [3, 2],
-	"incident-escalation-early-bridge": [3, 1],
+	"incident-escalation": [3, 0],
+	"incident-escalation-bridge": [3, 0],
+	"incident-escalation-early-bridge": [3, 0],
 	"incident-escalation-shared-resolve": [2, 0],
+	"incident-escalation-monitoring-merge": [1, 0],
 	"subscription-renewal-dunning": [2, 0],
 	"subscription-renewal-grace": [2, 0],
 	"patient-intake-scheduling": [1, 0],
+	"patient-intake-merge-detour": [0, 0],
+	"patient-intake-merge-crossing": [1, 0],
+	"patient-intake-merge-long": [0, 0],
 	"procurement-vendor-approval": [1, 0],
 	"procurement-vendor-approval-legal": [2, 0],
 	"restaurant-waitlist": [1, 0],
