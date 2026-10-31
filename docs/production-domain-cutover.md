@@ -45,7 +45,7 @@ the registration away from Vercel or the underlying registrar is unnecessary.
 
 ## Prerequisites
 
-1. Merge the replacement pull request and verify `ci / required` plus the
+1. Merge the replacement pull request and verify its `local-ci` signoff plus the
    `app-production-deploy` run for the merge SHA.
 2. Verify these stable rollback/proof URLs before changing DNS:
    `sketchi-web.dimethyl.workers.dev`,

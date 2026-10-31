@@ -400,8 +400,8 @@ response envelope when pre-enforcement model-quality evidence is needed.
 
 Vitest covers label normalization, missing steps, wrong kinds/connections/
 branches, deterministic fixture exports, and offline CLI replay of captured
-MCP results. The `ci / required` job runs these Nx tests, typechecks, builds,
-and repository lint/format gates. Capture replay is not a live MCP call;
+MCP results. The local gate (`pnpm ci:local`) runs these Nx tests, typechecks,
+builds, and repository lint/format gates. Capture replay is not a live MCP call;
 these checks do not establish current deployed behavior.
 
 ## Usage

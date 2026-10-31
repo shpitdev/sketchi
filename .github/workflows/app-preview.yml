@@ -1,5 +1,8 @@
 name: app-preview
 
+# Previews are opt-in. A same-repository PR labelled `preview` deploys the Worker apps it affects
+# on every push; a dispatch previews any open same-repository PR, including a stacked one, and
+# labels it. Closing a PR deletes its Previews whenever it has the label or a preview comment.
 on:
   pull_request:
     branches:
@@ -8,12 +11,26 @@ on:
       - opened
       - synchronize
       - reopened
+      - labeled
       - closed
   workflow_dispatch:
     inputs:
       pr_number:
         description: Open same-repository PR number to preview.
         required: true
+      project:
+        description: Worker apps to preview.
+        required: true
+        default: affected
+        type: choice
+        options:
+          - affected
+          - all
+          - eval-harness
+          - playground
+          - web
+          - excalidraw
+          - icons
 
 permissions:
   contents: read
@@ -26,13 +43,19 @@ env:
 
 jobs:
   resolve-preview-pr:
+    # Without the label, only closing runs (cleanup). Adding some other label runs nothing.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+        (github.event.action == 'closed' ||
+          (contains(github.event.pull_request.labels.*.name, 'preview') &&
+            (github.event.action != 'labeled' || github.event.label.name == 'preview'))))
     runs-on: ubuntu-latest
     outputs:
       pr_number: ${{ steps.pr.outputs.pr_number }}
       sha: ${{ steps.pr.outputs.sha }}
+      projects: ${{ steps.projects.outputs.projects }}
+      cleanup: ${{ steps.existing.outputs.cleanup }}
     steps:
       - name: Resolve preview PR identity
         id: pr
@@ -73,27 +96,82 @@ jobs:
           if (typeof sha !== "string" || !/^[a-f0-9]{40}$/.test(sha)) {
             throw new Error("PR head SHA is missing or invalid.");
           }
-          appendFileSync(process.env.GITHUB_OUTPUT, `pr_number=${prNumber}\nsha=${sha}\n`);
+          appendFileSync(
+            process.env.GITHUB_OUTPUT,
+            `pr_number=${prNumber}\nsha=${sha}\nbase_sha=${pr.base.sha}\n`,
+          );
           NODE
+
+      # A dispatched Preview labels its PR before anything uploads, so a close always finds the
+      # label, even one before the first Preview comment. The deploy re-checks that the PR is
+      # open after this. A label added with the workflow token starts no run of its own.
+      - name: Label the PR for cleanup
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels" -f "labels[]=preview" --silent
+
+      # Previews are opt-in, so most closed PRs have none. One may exist when the PR carries the
+      # `preview` label or a preview comment, however it was deployed (including before opt-in).
+      - name: Detect an existing Preview
+        id: existing
+        if: github.event.action == 'closed'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAS_PREVIEW_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          if [ "$HAS_PREVIEW_LABEL" = true ]; then
+            echo "cleanup=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          export COMMENTS_FILE="$RUNNER_TEMP/preview-comments.json"
+          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" > "$COMMENTS_FILE"
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from "node:fs";
+
+          // The sticky comment scripts/03-upsert-preview-comment.mjs owns for each app.
+          const marker = /<!-- sketchi-[a-z-]+-preview -->/;
+          const found = JSON.parse(readFileSync(process.env.COMMENTS_FILE, "utf8"))
+            .flat()
+            .some(({ user, body }) => user?.login === "github-actions[bot]" && marker.test(body ?? ""));
+          if (!found) {
+            console.log(`PR #${process.env.PR_NUMBER} never had a Preview; nothing to clean up.`);
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `cleanup=${found}\n`);
+          NODE
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        if: github.event.action != 'closed'
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pr.outputs.sha }}
+
+      - uses: ./.github/actions/setup-workspace
+        if: github.event.action != 'closed'
+
+      - name: Select the Worker apps to preview
+        id: projects
+        if: github.event.action != 'closed'
+        env:
+          PREVIEW_SELECTION: ${{ inputs.project || 'affected' }}
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+        run: node scripts/08-select-preview-projects.mjs
 
   deploy-preview:
     needs: resolve-preview-pr
     if: >-
-      (github.event_name == 'pull_request' &&
-        github.event.action != 'closed' &&
-        github.event.pull_request.head.repo.full_name == github.repository) ||
-      github.event_name == 'workflow_dispatch'
+      github.event.action != 'closed' &&
+      needs.resolve-preview-pr.outputs.projects != '[]'
     runs-on: ubuntu-latest
     environment: staging
     strategy:
       fail-fast: false
       matrix:
-        project:
-          - eval-harness
-          - playground
-          - web
-          - excalidraw
-          - icons
+        project: ${{ fromJSON(needs.resolve-preview-pr.outputs.projects) }}
     concurrency:
       # Serialize Pipeline-bound uploads across Workers and streams in this account.
       # Use the same queued lock as production; leave other apps PR-scoped.
@@ -106,8 +184,6 @@ jobs:
           ref: ${{ needs.resolve-preview-pr.outputs.sha }}
 
       - uses: ./.github/actions/setup-workspace
-
-      - run: pnpm run test:deploy-scripts
 
       - name: Resolve Worker project and identity
         id: worker-app
@@ -209,16 +285,19 @@ jobs:
           PROJECT_ID: ${{ matrix.project }}
           WORKER_NAME: ${{ steps.worker-app.outputs.worker_name }}
           WRANGLER_OUTPUT_FILE_PATH: .memory/wrangler-${{ matrix.project }}-preview.ndjson
+          # Web links a sibling's Preview only when this run deploys it; otherwise production.
+          ICONS_PREVIEW_URL: ${{ contains(fromJSON(needs.resolve-preview-pr.outputs.projects), 'icons') && steps.preview-settings.outputs.icons_preview_url || '' }}
+          PLAYGROUND_PREVIEW_URL: ${{ contains(fromJSON(needs.resolve-preview-pr.outputs.projects), 'playground') && steps.preview-settings.outputs.playground_preview_url || '' }}
         run: |
           set -euo pipefail
           mkdir -p .memory
           # CLI vars apply to the Preview only. They never rewrite production settings.
           preview_args=()
-          if [ "$PROJECT_ID" = web ]; then
-            preview_args+=(
-              --var "SKETCHI_ICONS_URL:${{ steps.preview-settings.outputs.icons_preview_url }}"
-              --var "SKETCHI_PLAYGROUND_URL:${{ steps.preview-settings.outputs.playground_preview_url }}"
-            )
+          if [ "$PROJECT_ID" = web ] && [ -n "$ICONS_PREVIEW_URL" ]; then
+            preview_args+=(--var "SKETCHI_ICONS_URL:${ICONS_PREVIEW_URL}")
+          fi
+          if [ "$PROJECT_ID" = web ] && [ -n "$PLAYGROUND_PREVIEW_URL" ]; then
+            preview_args+=(--var "SKETCHI_PLAYGROUND_URL:${PLAYGROUND_PREVIEW_URL}")
           fi
           # The retry wrapper clears WRANGLER_OUTPUT_FILE_PATH before each attempt.
           node scripts/07-wrangler-retry.mjs -- pnpm exec wrangler preview \
@@ -261,11 +340,13 @@ jobs:
         run: node scripts/03-upsert-preview-comment.mjs
 
   cleanup-preview:
+    # Runs on a close whenever a Preview can exist, so none outlives its PR.
     needs: resolve-preview-pr
     if: >-
       github.event_name == 'pull_request' &&
       github.event.action == 'closed' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.resolve-preview-pr.outputs.cleanup == 'true'
     runs-on: ubuntu-latest
     environment: staging
     strategy:

@@ -6,11 +6,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
+import { workerProjectIds } from "../worker-apps.mjs";
+import { previewProjectConfig } from "./preview.mjs";
+
 const require = createRequire(import.meta.resolve("nx/package.json"));
 const workflow = require("@zkochan/js-yaml").load(
 	readFileSync(new URL("../../../.github/workflows/app-preview.yml", import.meta.url), "utf8"),
 );
 const sha = "a".repeat(40);
+const baseSha = "c".repeat(40);
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 async function resolvePr({
@@ -47,7 +51,12 @@ async function resolvePr({
 		async (url) => {
 			requests.push(url);
 			return Response.json(
-				{ number: 42, state, head: { sha, repo: { full_name: repository } } },
+				{
+					number: 42,
+					state,
+					base: { sha: baseSha },
+					head: { sha, repo: { full_name: repository } },
+				},
 				{ status: ok ? 200 : 404 },
 			);
 		},
@@ -61,7 +70,7 @@ async function resolvePr({
 
 test("manual preview resolution returns the PR head rather than the dispatch ref", async () => {
 	const resolved = await resolvePr();
-	assert.equal(resolved.outputs, `pr_number=42\nsha=${sha}\n`);
+	assert.equal(resolved.outputs, `pr_number=42\nsha=${sha}\nbase_sha=${baseSha}\n`);
 	assert.deepEqual(resolved.requests, ["https://api.github.com/repos/shpitdev/sketchi/pulls/42"]);
 });
 
@@ -154,9 +163,14 @@ test("closing a PR deletes its Previews and never deploys", () => {
 	assert.ok(workflow.on.pull_request.types.includes("closed"));
 	assert.match(workflow.jobs["deploy-preview"].if, /github\.event\.action != 'closed'/);
 	assert.match(workflow.jobs["cleanup-preview"].if, /github\.event\.action == 'closed'/);
+	// Every app, whichever ones this PR previewed.
 	assert.deepEqual(
-		workflow.jobs["cleanup-preview"].strategy.matrix.project,
+		workflow.jobs["cleanup-preview"].strategy.matrix.project.toSorted(),
+		workerProjectIds.toSorted(),
+	);
+	assert.equal(
 		workflow.jobs["deploy-preview"].strategy.matrix.project,
+		"${{ fromJSON(needs.resolve-preview-pr.outputs.projects) }}",
 	);
 	assert.deepEqual(
 		workflow.jobs["cleanup-preview"].concurrency,
@@ -210,4 +224,163 @@ test("deploys re-check the PR state after taking the lock and skip closed PRs", 
 	assert.equal(open.args, "api repos/shpitdev/sketchi/pulls/42 --jq .state");
 	assert.equal(open.output, "open=true\n");
 	assert.equal(recheckPrState("closed").output, "open=false\n");
+});
+
+// Evaluate the resolver's `if` for a pull_request event the way GitHub Actions would.
+function resolverRuns({ action, labels = [], label, repository = "shpitdev/sketchi" }) {
+	const expression = workflow.jobs["resolve-preview-pr"].if
+		.replaceAll("github.event_name", "event.name")
+		.replaceAll("github.event.pull_request.head.repo.full_name", "event.repository")
+		.replaceAll("github.repository", '"shpitdev/sketchi"')
+		.replaceAll("github.event.action", "event.action")
+		.replaceAll("github.event.label.name", "event.label")
+		.replaceAll(
+			"contains(github.event.pull_request.labels.*.name, 'preview')",
+			"event.labels.includes('preview')",
+		)
+		.replaceAll(/\s+/g, " ");
+	// oxlint-disable-next-line typescript/no-implied-eval -- evaluates the workflow expression the way GitHub Actions would
+	return new Function("event", `return (${expression});`)({
+		name: "pull_request",
+		action,
+		labels,
+		label,
+		repository,
+	});
+}
+
+test("only a PR labelled preview deploys; every same-repository close cleans up", () => {
+	assert.equal(resolverRuns({ action: "synchronize" }), false);
+	assert.equal(resolverRuns({ action: "opened" }), false);
+	assert.equal(resolverRuns({ action: "synchronize", labels: ["preview"] }), true);
+	assert.equal(resolverRuns({ action: "labeled", labels: ["preview"], label: "preview" }), true);
+	assert.equal(
+		resolverRuns({ action: "labeled", labels: ["preview", "bug"], label: "bug" }),
+		false,
+		"adding another label must not redeploy",
+	);
+	assert.equal(resolverRuns({ action: "closed" }), true);
+	assert.equal(resolverRuns({ action: "closed", repository: "fork/sketchi" }), false);
+	assert.equal(
+		resolverRuns({ action: "synchronize", labels: ["preview"], repository: "fork/sketchi" }),
+		false,
+	);
+	assert.ok(workflow.on.pull_request.types.includes("labeled"));
+});
+
+test("previews select their apps after the PR resolves, and deploy only those", () => {
+	const steps = workflow.jobs["resolve-preview-pr"].steps;
+	const select = steps.find(({ id }) => id === "projects");
+	assert.equal(select.run, "node scripts/08-select-preview-projects.mjs");
+	assert.equal(select.env.PREVIEW_SELECTION, "${{ inputs.project || 'affected' }}");
+	assert.equal(select.env.HEAD_SHA, "${{ steps.pr.outputs.sha }}");
+	assert.ok(steps.findIndex(({ id }) => id === "pr") < steps.indexOf(select));
+	assert.deepEqual(workflow.on.workflow_dispatch.inputs.project.options, [
+		"affected",
+		"all",
+		...workflow.jobs["cleanup-preview"].strategy.matrix.project,
+	]);
+	assert.match(workflow.jobs["deploy-preview"].if, /outputs\.projects != '\[\]'/);
+	assert.doesNotMatch(
+		JSON.stringify(workflow.jobs["deploy-preview"].steps),
+		/test:deploy-scripts/,
+		"pnpm ci:local proves the deploy scripts",
+	);
+});
+
+// Run the close-time Preview detection with a stub `gh` that serves the given comment pages.
+function detectExistingPreview({ label = false, pages = [] } = {}) {
+	const step = workflow.jobs["resolve-preview-pr"].steps.find(({ id }) => id === "existing");
+	const dir = mkdtempSync(path.join(tmpdir(), "preview-existing-"));
+	try {
+		const gh = path.join(dir, "gh");
+		writeFileSync(path.join(dir, "pages.json"), JSON.stringify(pages));
+		writeFileSync(
+			gh,
+			`#!/usr/bin/env bash\necho "$*" >> "${dir}/gh-args"\ncat "${dir}/pages.json"\n`,
+		);
+		chmodSync(gh, 0o755);
+		const output = path.join(dir, "output");
+		writeFileSync(output, "");
+		const result = spawnSync("bash", ["-c", step.run], {
+			encoding: "utf8",
+			env: {
+				...process.env,
+				GITHUB_OUTPUT: output,
+				GITHUB_REPOSITORY: "shpitdev/sketchi",
+				HAS_PREVIEW_LABEL: String(label),
+				PATH: `${dir}:${process.env.PATH}`,
+				PR_NUMBER: "42",
+				RUNNER_TEMP: dir,
+			},
+		});
+		assert.equal(result.status, 0, result.stderr);
+		let args = "";
+		try {
+			args = readFileSync(path.join(dir, "gh-args"), "utf8").trim();
+		} catch {}
+		return { args, output: readFileSync(output, "utf8") };
+	} finally {
+		rmSync(dir, { force: true, recursive: true });
+	}
+}
+
+const bot = { login: "github-actions[bot]" };
+
+test("a closed PR cleans up only when a Preview can exist", () => {
+	const step = workflow.jobs["resolve-preview-pr"].steps.find(({ id }) => id === "existing");
+	assert.equal(step.if, "github.event.action == 'closed'");
+	assert.match(
+		workflow.jobs["cleanup-preview"].if,
+		/needs\.resolve-preview-pr\.outputs\.cleanup == 'true'/,
+	);
+
+	// The label alone is enough, without reading comments.
+	assert.deepEqual(detectExistingPreview({ label: true }), { args: "", output: "cleanup=true\n" });
+
+	// A sticky comment from any app, on any page, counts, including Previews from before opt-in.
+	for (const project of workerProjectIds) {
+		const marker = previewProjectConfig(project).commentMarker;
+		const found = detectExistingPreview({
+			pages: [
+				[{ user: { login: "someone" }, body: "lgtm" }],
+				[{ user: bot, body: `${marker}\nready` }],
+			],
+		});
+		assert.equal(found.output, "cleanup=true\n", project);
+		assert.equal(found.args, "api --paginate --slurp repos/shpitdev/sketchi/issues/42/comments");
+	}
+
+	// No label and no bot-owned Preview comment: nothing to clean up.
+	assert.equal(detectExistingPreview({ pages: [[]] }).output, "cleanup=false\n");
+	assert.equal(
+		detectExistingPreview({
+			pages: [[{ user: { login: "someone" }, body: "<!-- sketchi-web-preview --> quoted" }]],
+		}).output,
+		"cleanup=false\n",
+	);
+});
+
+test("a dispatched Preview labels its PR before anything uploads", () => {
+	const resolver = workflow.jobs["resolve-preview-pr"].steps;
+	const label = resolver.findIndex(({ name }) => name === "Label the PR for cleanup");
+	assert.ok(label > resolver.findIndex(({ id }) => id === "pr"));
+	assert.ok(label < resolver.findIndex(({ uses }) => uses?.startsWith("actions/checkout")));
+	assert.equal(resolver[label].if, "github.event_name == 'workflow_dispatch'");
+	assert.equal(resolver[label].env.PR_NUMBER, "${{ steps.pr.outputs.pr_number }}");
+	assert.match(
+		resolver[label].run,
+		/gh api --method POST "repos\/\$\{GITHUB_REPOSITORY\}\/issues\/\$\{PR_NUMBER\}\/labels" -f "labels\[\]=preview"/,
+	);
+	assert.ok(
+		workflow.permissions["pull-requests"] === "write" || workflow.permissions.issues === "write",
+	);
+
+	// The deploy re-checks the PR after the label, so a close before the label skips the upload.
+	const deploy = workflow.jobs["deploy-preview"].steps;
+	assert.ok(
+		deploy.findIndex(({ id }) => id === "still-open") <
+			deploy.findIndex(({ id }) => id === "deploy"),
+	);
+	assert.match(deploy.find(({ id }) => id === "deploy").if, /still-open\.outputs\.open == 'true'/);
 });

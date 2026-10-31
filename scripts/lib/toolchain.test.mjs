@@ -10,9 +10,12 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+
+const yaml = createRequire(import.meta.resolve("nx/package.json"))("@zkochan/js-yaml");
 
 test("mise, metadata, and running/nested executables select one project toolchain", () => {
 	const result = spawnSync(
@@ -131,10 +134,10 @@ test("dependency-installing CI jobs use the shared mise setup", () => {
 		assert.match(workflow, /uses: \.\/\.github\/actions\/setup-workspace/);
 	}
 	const ci = read(".github/workflows/ci.yml");
-	assert.match(ci, /pnpm nx affected -t typecheck,typecheck-native,build/);
-	assert.match(ci, /pnpm nx run-many -t typecheck,typecheck-native,build/);
-	assert.match(ci, /pnpm exec tsc6 -b --pretty false/);
-	assert.doesNotMatch(ci, /playwright install|chromium/i);
+	// The thin remote check typechecks; `pnpm ci:local` runs everything else.
+	assert.deepEqual(Object.keys(yaml.load(ci).jobs), ["typecheck"]);
+	assert.match(ci, /pnpm nx affected -t typecheck --base=/);
+	assert.doesNotMatch(ci, /-t [\w,-]*(?:test|build)|pnpm run check|playwright install|chromium/i);
 	assert.doesNotMatch(ci, /tsgo|typecheck-tsgo/);
 	const setup = read(".github/actions/setup-workspace/action.yml");
 	assert.match(setup, /node scripts\/verify-toolchain\.mjs --skip-dependencies/);
