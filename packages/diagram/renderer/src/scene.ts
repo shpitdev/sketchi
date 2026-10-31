@@ -1426,6 +1426,8 @@ interface Wrap {
 	 * band before it, so a band hanging under a short block rises to that block.
 	 */
 	readonly rise?: boolean;
+	/** A cut carries a forward edge that skips ranks, whose line may cross another (zoned levels). */
+	readonly skips?: boolean;
 }
 
 const NO_WRAP: Wrap = { bandOf: new Map(), continuations: new Set() };
@@ -1580,6 +1582,8 @@ interface ZoneWrapOptions {
 	readonly sizes: ReadonlyMap<string, { width: number; height: number }>;
 	/** How many ranks of the whole flow a unit stands for: a zone, those it holds. */
 	readonly weights: ReadonlyMap<string, number>;
+	/** Whether a cut may carry a forward edge that skips ranks. */
+	readonly skips: boolean;
 }
 
 /**
@@ -1592,6 +1596,8 @@ interface ZoneWrapOptions {
  * One level of a zoned flow wraps the same way, its zones whole ranks of it.
  * There a cut may carry several edges, each joining the two ranks it separates,
  * since zoned routes are searched around every zone rather than run in one lane.
+ * With `skips`, a cut that one edge joins may also carry forward edges that skip
+ * ranks, each across that cut alone.
  */
 function planWrap(
 	diagram: IntermediateDiagram,
@@ -1630,26 +1636,41 @@ function planWrap(
 	const nodeKinds = new Map(diagram.nodes.map((node) => [node.id, node.kind]));
 	const rankOf = (nodeId: string) => rankByNodeId.get(nodeId) ?? 0;
 	const continuationAfter = new Map<number, string>();
+	const skippingAfter = new Set<number>();
 	for (const [index, metric] of rankMetrics.entries()) {
 		const spanning = diagram.edges.filter(
 			(edge) =>
 				Math.min(rankOf(edge.source), rankOf(edge.target)) <= metric.rank &&
 				Math.max(rankOf(edge.source), rankOf(edge.target)) > metric.rank,
 		);
-		const [edge] = spanning;
+		const joins = (edge: DiagramEdge) =>
+			rankOf(edge.source) === metric.rank && rankOf(edge.target) === metric.rank + 1;
+		// A cut may also carry a forward edge that skips ranks, as a cached page's
+		// line to a response past the private subnet: its line is searched around
+		// the zones like any other, so long as it crosses no other cut.
+		const edge = spanning.find(joins);
 		if (
 			(zone ? spanning.length >= 1 : spanning.length === 1) &&
 			edge &&
 			spanning.every(
 				(candidate) =>
 					!feedbackEdges.has(candidate.id) &&
-					rankOf(candidate.source) === metric.rank &&
-					rankOf(candidate.target) === metric.rank + 1 &&
+					(zone?.skips ? rankOf(candidate.source) < rankOf(candidate.target) : joins(candidate)) &&
 					!branches(nodeKinds.get(candidate.source)),
 			)
-		)
+		) {
 			continuationAfter.set(index, edge.id);
+			if (!spanning.every(joins)) skippingAfter.add(index);
+		}
 	}
+	// Whether an edge crosses both a cut after rank index `from` and one after `to`.
+	const spansCuts = (from: number, to: number) =>
+		zone?.skips === true &&
+		diagram.edges.some(
+			(edge) =>
+				Math.min(rankOf(edge.source), rankOf(edge.target)) <= rankMetrics[from]!.rank &&
+				Math.max(rankOf(edge.source), rankOf(edge.target)) > rankMetrics[to]!.rank,
+		);
 
 	// A band also holds the stubs of the continuations into and out of it.
 	const edgeLabels = new Map(diagram.edges.map((edge) => [edge.id, edge.label]));
@@ -1689,7 +1710,12 @@ function planWrap(
 				return;
 			}
 			for (const end of ends)
-				if (end !== last && end > previous && ranks(previous + 1, end) >= minimum)
+				if (
+					end !== last &&
+					end > previous &&
+					ranks(previous + 1, end) >= minimum &&
+					(previous < 0 || !spansCuts(previous, end))
+				)
 					visit([...cuts, end], end);
 		};
 		visit([], -1);
@@ -1716,6 +1742,7 @@ function planWrap(
 				if (band === bands ? end !== last : end === last) continue;
 				for (const [previous, partition] of [...partitions].reverse()) {
 					if (end <= previous || ranks(previous + 1, end) < minimum) continue;
+					if (end !== last && spansCuts(previous, end)) continue;
 					const length = bandLength(previous + 1, end);
 					const candidate = {
 						ends: [...partition.ends, end],
@@ -1757,6 +1784,7 @@ function planWrap(
 			chosen.ends.filter((end) => end !== last).map((end) => continuationAfter.get(end)!),
 		),
 		...(zone ? { under: true } : {}),
+		...(chosen.ends.some((end) => skippingAfter.has(end)) ? { skips: true } : {}),
 	};
 }
 
@@ -1797,8 +1825,8 @@ const ZONE_WRAP_ROUNDS = 2;
  * Levels wrap one at a time:
  * each time the level and band count that bring the whole diagram within
  * WRAP_TARGET_ASPECT with the fewest bands or, if none does, nearest it, while
- * that keeps helping; a row keeps its top-level zones side by side where a plan
- * within the target can. The single-level plans that come next are alternatives,
+ * that keeps helping; a row hangs as few top-level zones under one another as a
+ * plan no longer too long can. The single-level plans that come next are alternatives,
  * since a plan may route worse than the layout it replaces. Planning routes
  * nothing: it measures the unrouted layout, scaled by how far the routed one
  * (`drawn`) outgrows it, since routes widen zones for their stubs.
@@ -1843,18 +1871,21 @@ function planZoneWraps(
 	// export, where keeping both in one column would wrap the zone inside it
 	// into a taller one.
 	const row = diagram.layout.direction === "LR" || diagram.layout.direction === "RL";
-	const stacksZones = ({ next }: Plan) => {
+	// How many top-level zones a plan hangs under the one before.
+	const stackedZones = ({ next }: Plan) => {
 		const top = next.get(TOP_LEVEL);
-		if (!structure.zoned || !row || !top) return false;
+		if (!structure.zoned || !row || !top) return 0;
 		const bands = new Set(
 			structure.groups.flatMap(({ group }) =>
 				structure.parentOf.has(group.id) ? [] : [top.bandOf.get(groupUnitId(group.id))],
 			),
 		);
-		return bands.size > 1;
+		return bands.size - 1;
 	};
 	const planned = wraps.size;
 	let current = predict(wraps);
+	const skipping = (zoneWraps: ReadonlyMap<string, Wrap>) =>
+		[...zoneWraps.values()].some((wrap) => wrap.skips);
 	const alternatives: Map<string, Wrap>[] = [];
 	while (current.aspect > WRAP_TARGET_ASPECT) {
 		const sizes = new Map<string, { width: number; height: number }>([
@@ -1866,26 +1897,54 @@ function planZoneWraps(
 		const plans: Plan[] = [];
 		for (const [id, level] of levels) {
 			if (wraps.has(id)) continue;
-			for (let bands = 2; bands <= MAX_BANDS; bands += 1) {
-				const wrap = planWrap(level, arrangement.reorder, balance, { bands, sizes, weights });
-				if (wrap.bandOf.size === 0) continue;
-				const next = new Map([...wraps, [id, wrap]]);
-				plans.push({ ...predict(next), bands, next });
-				if (plans.at(-1)!.aspect <= WRAP_TARGET_ASPECT) break;
-			}
+			// Cuts that carry a line skipping ranks may balance the bands better,
+			// but the line may cross another, so the cuts that carry none are
+			// planned too where they differ.
+			const byBands = new Map<string, Plan>();
+			for (const skips of [true, false])
+				for (let bands = 2; bands <= MAX_BANDS; bands += 1) {
+					const wrap = planWrap(level, arrangement.reorder, balance, {
+						bands,
+						sizes,
+						weights,
+						skips,
+					});
+					if (wrap.bandOf.size === 0) continue;
+					const key = [...wrap.bandOf].join(" ");
+					let plan = byBands.get(key);
+					if (!plan) {
+						const next = new Map([...wraps, [id, wrap]]);
+						plan = { ...predict(next), bands, next };
+						byBands.set(key, plan);
+						plans.push(plan);
+					}
+					if (plan.aspect <= WRAP_TARGET_ASPECT) break;
+				}
 		}
 		const helping = plans.filter((plan) => plan.aspect < current.aspect).sort(rank);
-		// A plan within the target that keeps the zones side by side goes first,
-		// the stacking plan it passes its first alternative.
-		const sideBySide = helping.findIndex(
-			(plan) => plan.aspect <= WRAP_TARGET_ASPECT && !stacksZones(plan),
+		// Of the plans no longer too long, the first that stacks the fewest zones
+		// goes first, the plan it passes its first alternative: the target does
+		// not justify hanging one more zone under another.
+		const fewest = helping.reduce(
+			(best, plan, index) =>
+				plan.aspect < WRAP_ASPECT && stackedZones(plan) < stackedZones(helping[best]!)
+					? index
+					: best,
+			0,
 		);
-		if (sideBySide > 0 && stacksZones(helping[0]!))
-			helping.unshift(...helping.splice(sideBySide, 1));
+		if (fewest > 0) helping.unshift(...helping.splice(fewest, 1));
 		const [chosen] = helping;
 		if (!chosen) break;
-		if (wraps.size === planned)
-			alternatives.push(...helping.slice(1, 1 + ZONE_WRAP_ALTERNATIVES).map((plan) => plan.next));
+		if (wraps.size === planned) {
+			// A plan whose cuts carry a skipping line gives way to one without that
+			// routes better (layoutDiagram), so one such plan always comes along.
+			const next = helping.slice(1, 1 + ZONE_WRAP_ALTERNATIVES);
+			const plain =
+				skipping(chosen.next) && next.every((plan) => skipping(plan.next))
+					? helping.find((plan) => !skipping(plan.next))
+					: undefined;
+			alternatives.push(...[...next, ...(plain ? [plain] : [])].map((plan) => plan.next));
+		}
 		wraps = chosen.next;
 		current = chosen;
 	}
@@ -10996,6 +11055,11 @@ export function renderGraphDiagram(
 		const kept = best;
 		let chosen: (typeof best & { score: number[] }) | undefined;
 		let repairedChoice: (typeof best & { score: number[] }) | undefined;
+		// A chosen plan whose cuts carry a line skipping ranks also gives way to a
+		// later plan adding nothing that crosses fewer lines or draws fewer
+		// findings: the skipping line may cross another, so the plan is kept only
+		// where it draws neither more than such a rival.
+		let yielding = false;
 		for (const zoneWraps of planZoneWraps(
 			diagram,
 			structure,
@@ -11064,9 +11128,16 @@ export function renderGraphDiagram(
 				if (!structure.zoned && unrivaled) break;
 				continue;
 			}
-			if (!chosen || lowerScore(score, chosen.score))
+			const skips = [...zoneWraps.values()].some((wrap) => wrap.skips);
+			if (
+				!chosen ||
+				lowerScore(score, chosen.score) ||
+				(yielding && unrivaled && (score[0]! < chosen.score[0]! || score[1]! < chosen.score[1]!))
+			) {
 				chosen = { arrangement, defects, layout, score };
-			if (unrivaled) break;
+				yielding = skips;
+			}
+			if (unrivaled && !skips) break;
 		}
 		// A repaired plan only keeps sibling zones side by side: it replaces a
 		// chosen plan that stacks them, or one still too long, which plans again

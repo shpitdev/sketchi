@@ -14,6 +14,7 @@ import {
 	leftToRightHybridFlowchart,
 	parseFlowchartDiagram,
 	queriedArchitectureFlowchart,
+	requestPathFlowcharts,
 	requestedArchitectureFlowchart,
 	routingJogReach,
 	routingCorridorGap,
@@ -36,7 +37,11 @@ import {
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];
-const fixtures: Record<string, IntermediateDiagram> = { ...zoneFixtures, ...zoneStressFixtures };
+const fixtures: Record<string, IntermediateDiagram> = {
+	...zoneFixtures,
+	...zoneStressFixtures,
+	...requestPathFlowcharts,
+};
 
 const scenes = new Map<string, RenderedDiagramScene>();
 function rendered(
@@ -170,14 +175,16 @@ describe("zone layout", () => {
 		expect(vpn.x + vpn.width).toBeLessThan(api.x);
 	});
 
-	// Each ran 3.4:1 to 8.1:1 in one row or column; the stress case wraps least.
+	// Each ran 3.4:1 to 8.1:1 in one row or column. The four-deep zones' second
+	// availability zone hangs under the first, the load balancer's line to it
+	// skipping the first's ranks.
 	it.each([
 		["aws-three-tier", "LR", 2.45],
 		["aws-three-tier", "RL", 2.45],
 		["kubernetes-cluster", "LR", 2.45],
 		["hybrid-cloud", "LR", 2.45],
 		["hybrid-cloud", "RL", 2.45],
-		["depth-four", "LR", 3],
+		["depth-four", "LR", 2.45],
 		["depth-four", "TB", 2.45],
 	] as const)(
 		"wraps %s %s, too long for one row or column, in the stated direction",
@@ -431,6 +438,27 @@ describe("lines into a hanging zone band", () => {
 		},
 	);
 
+	it.each(
+		Object.keys(requestPathFlowcharts).flatMap((name) =>
+			(["LR", "RL"] as const).map((direction) => [name, direction] as const),
+		),
+	)("keeps the public internet beside the DMZ in %s, asked for %s", (name, direction) => {
+		// Asked for left to right, a Sol sample stacked all three zones: two bands
+		// missed the 2:1 target, so three did. Sonnet samples hung the DMZ under
+		// the public internet: the cached page's line to the response skipped the
+		// private subnet, which barred the cut after the DMZ. One zone at most now
+		// hangs under the DMZ, the request passing from each zone to the next.
+		const fixture = fixtures[name]!;
+		const scene = rendered(name, direction);
+		const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
+		const [internet, dmz] = fixture.groups!.map((group) => zones.get(`group:${group.id}`)!);
+		const [first, second] = direction === "LR" ? [internet!, dmz!] : [dmz!, internet!];
+		expect(first.x + first.width).toBeLessThan(second.x);
+		expect(internet!.y).toBeLessThan(dmz!.y + dmz!.height);
+		expect(dmz!.y).toBeLessThan(internet!.y + internet!.height);
+		expect(drawnAspect(scene)).toBeLessThan(2.45);
+	});
+
 	it("keeps the data center beside the cloud when a side change clears its region's wrap of crossings", () => {
 		// A Sol sample stacked the cloud under the data center: beside it, its
 		// region's wrap crossed the sync function's lines to the table and the
@@ -518,11 +546,13 @@ describe("lines past an infrastructure shape", () => {
 		},
 	);
 
-	// Every zone fixture and generated sample, in every direction. The stress
-	// cases stay out: thirty services pass a flowchart's limits, and the
-	// four-deep zones run too long for a zone to grow.
+	// Every zone fixture and generated sample, in every direction, and the
+	// four-deep zones, wrapped where too long for one row. Thirty services stay
+	// out: they pass a flowchart's limits.
 	const samples: Record<string, IntermediateDiagram> = {
 		...zoneFixtures,
+		...requestPathFlowcharts,
+		"depth-four": zoneStressFixtures["depth-four"],
 		...bypassingHybridFlowcharts,
 		"hybrid-cloud-archive-corridor": corridorHybridFlowchart,
 		"hybrid-cloud-described": describedHybridFlowchart,
