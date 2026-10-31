@@ -180,10 +180,7 @@ describe("Playground application structure", () => {
 			expect(existsSync(join(libRoot, path)), path).toBe(false);
 		}
 
-		expect(
-			sourceFilesUnder(libRoot)
-				.map((path) => relative(libRoot, path))
-				.sort(),
-		).toEqual(["utils.ts"]);
+		// `cn` and the shadcn primitives come from @sketchi/ui.
+		expect(existsSync(libRoot)).toBe(false);
 	});
 });

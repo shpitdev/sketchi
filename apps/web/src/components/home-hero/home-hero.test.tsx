@@ -12,7 +12,7 @@ describe("HomeHero", () => {
 			name: "Open the playground",
 		});
 		expect(primaryAction).toHaveProperty("href", "https://playground.sketchi.app/");
-		expect(primaryAction.classList).toContain("sk-btn--accent");
+		expect(primaryAction.dataset.variant).toBe("brand");
 		expect(screen.getByRole("link", { name: "Add to your agent" })).toHaveProperty(
 			"href",
 			"http://localhost:3000/agents",

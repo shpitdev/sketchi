@@ -147,6 +147,7 @@ model candidate → typed diagram IR → deterministic scene → Excalidraw arti
 | `packages/icons/catalog`      | Icon manifest, ranked search, SVG sources, node-logo rules      |
 | `packages/studio/projects`    | Studio project/diagram contracts and object-bucket persistence  |
 | `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
+| `packages/ui`                 | Shared shadcn primitives and tokens for the Tailwind apps       |
 
 The first high-reliability target is decision-heavy flowchart generation.
 `flowchart`, `mindmap`, `sequence`, `timeline`, `chart`, `state-machine`, `gantt`, `er`, `class`, `org-chart`, `venn`, `journey`, `sankey`, `wireframe`, and `quadrant` are explicit diagram families; unsupported families do
@@ -213,7 +214,9 @@ lint-rule tests.
   then runs [Oxlint](https://oxc.rs/docs/guide/usage/linter) over the whole
   repository with zero warnings allowed. `.oxlintrc.json` holds the rule set, the
   Nx module boundaries, and the Effect and Zod import policy; Sketchi's own rules
-  live in `tools/oxlint` and run with `pnpm run test:lint-rules`. Every
+  live in `tools/oxlint` and run with `pnpm run test:lint-rules`. `@shadcn/lint`
+  holds the Tailwind apps to their shared primitives; see
+  [UI style contracts](docs/ui-style-contracts.md). Every
   suppression is a single-line `oxlint-disable-next-line <rule> -- <reason>`.
 - `pnpm run format` applies [Oxfmt](https://oxc.rs/docs/guide/usage/formatter):
   tabs, 100 columns, double quotes, semicolons, trailing commas, and spaces in
@@ -294,7 +297,8 @@ apps/
 packages/
 ├── diagram/{agent,core,excalidraw,generation,renderer,scenarios,ui}/
 ├── studio/projects/              persistence contract and service
-└── svg-excalidraw/               native SVG conversion
+├── svg-excalidraw/               native SVG conversion
+└── ui/                           shared shadcn primitives
 tools/sketchi-generators/         Nx generators and tests
 scripts/                          deploy, cutover, and pipeline operations
 plugins/                          Codex and Claude Code distribution payloads
@@ -313,6 +317,7 @@ build configuration; see the
 
 - [Agent plugin quickstart](docs/code-mode-agent-plugins.md)
 - [Architecture](docs/architecture.md)
+- [UI style contracts](docs/ui-style-contracts.md)
 - [Agentic generation](docs/agentic-generation.md)
 - [MCP-first generation](docs/mcp-first-generation.md)
 - [SVG conversion plan](docs/svg-excalidraw-conversion-plan.md)

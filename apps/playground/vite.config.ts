@@ -71,6 +71,10 @@ export default defineConfig({
 				replacement: new URL("./src/", import.meta.url).pathname,
 			},
 			{
+				find: /^@sketchi\/ui\/(.*)$/,
+				replacement: `${new URL("../../packages/ui/src/", import.meta.url).pathname}$1`,
+			},
+			{
 				find: "@sketchi/diagram-agent",
 				replacement: new URL("../../packages/diagram/agent/src/index.ts", import.meta.url).pathname,
 			},

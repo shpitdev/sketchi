@@ -2,7 +2,22 @@
    Sketchi v2 — web surface. Tokens, base, motion, and shared atoms come
    from the global design system; this file owns web-specific layout.
    ===================================================================== */
-@import "../../../../packages/diagram/ui/src/theme.css";
+@import "../../../../packages/ui/src/styles.css";
+
+@source "../";
+
+/* Above this width the header shows its links inline instead of a menu. */
+@theme {
+	--breakpoint-nav: 860px;
+}
+
+/* Preflight strips link underlines. Restore the browser default for links in
+   running text; components that style their own links set it themselves. */
+@layer base {
+	a:not([data-slot]) {
+		text-decoration: underline;
+	}
+}
 
 /* ===================================================================== */
 /* Site header                                                           */
@@ -83,37 +98,14 @@
 	gap: 10px;
 }
 
-.site-header__cta {
-	font-size: 14px;
-	min-height: 40px;
-	padding: 0 15px;
-}
-
-.site-header__burger {
-	align-items: center;
-	background: var(--card);
-	border: 1px solid var(--line-2);
-	border-radius: var(--r-sm);
-	color: var(--ink);
-	cursor: pointer;
-	display: none;
-	block-size: 42px;
-	inline-size: 42px;
-	justify-content: center;
-}
-
 .site-header__sheet {
 	display: none;
 }
 
-@media (max-width: 860px) {
+@media (width < 860px) {
 	.site-header__nav,
 	.site-header__actions {
 		display: none;
-	}
-
-	.site-header__burger {
-		display: inline-flex;
 	}
 
 	.site-header__sheet {
@@ -132,10 +124,6 @@
 		display: grid;
 		gap: 10px;
 		margin-top: 8px;
-	}
-
-	.site-header__sheet-actions .sk-btn {
-		width: 100%;
 	}
 }
 
@@ -360,8 +348,10 @@
 	box-shadow: 2px 3px 0 rgba(26, 23, 18, 0.13);
 	display: inline-flex;
 	gap: 7px;
+	left: var(--node-x);
 	padding: 8px 11px;
 	position: absolute;
+	top: var(--node-y);
 	transform: translate(-50%, -50%) rotate(var(--tilt, -1.5deg));
 	white-space: nowrap;
 	z-index: 2;
@@ -1207,6 +1197,7 @@
 	font-size: 14px;
 	gap: 6px;
 	line-height: 1.5;
+	list-style: decimal;
 	margin: 0;
 	padding-left: 18px;
 }

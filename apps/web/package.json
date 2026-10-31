@@ -1,5 +1,13 @@
 {
 	"name": "@sketchi/web",
 	"private": true,
-	"type": "module"
+	"type": "module",
+	"dependencies": {
+		"@sketchi/ui": "workspace:*",
+		"lucide-react": "1.52.0"
+	},
+	"devDependencies": {
+		"@tailwindcss/vite": "4.3.3",
+		"tailwindcss": "4.3.3"
+	}
 }
