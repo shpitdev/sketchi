@@ -195,7 +195,7 @@ const FLOWCHART_RULES: readonly (readonly [rule: string, topicDetail?: string])[
 		"Label steps and decisions with the prompt's own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words the prompt itself uses.",
 	],
 	[
-		'Label a step as a short action ("Resize image"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause ("if the image is too large", "whether …", "is resized").',
+		'Label a step as a short action with its stated actor ("Server checks token"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause ("if the image is too large", "whether …", "is resized").',
 	],
 	[
 		"Use one node per outcome the prompt names: point every branch that reaches the same named outcome at that one node, and do not add end nodes the prompt does not name.",
@@ -207,9 +207,7 @@ const FLOWCHART_RULES: readonly (readonly [rule: string, topicDetail?: string])[
 		"Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
 		"Use stable node ids.",
 	],
-	[
-		"Name technologies in node labels; a description draws as a small subtitle under the label, for detail.",
-	],
+	["Name technologies in node labels; a description is a small subtitle, for detail."],
 	[
 		`Only when the prompt groups steps (teams, zones, phases), declare groups and set each member's group to its innermost group id; others stay ungrouped. Nested zones set parent (subnet in VPC) and kind. Set shape, even on a start or end: "database" databases; "document" files, archives, reports; "queue" queues, streams, topics; "storage" buckets, object stores. Only users stay ellipses. An architecture starts at its entry and ends at each sink.`,
 	],

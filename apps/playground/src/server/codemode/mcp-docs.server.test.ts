@@ -329,7 +329,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		]) {
 			expect(text).toContain("Label steps and decisions with the prompt's own words");
 			expect(text).toContain(
-				'Label a step as a short action ("Resize image"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause ("if the image is too large", "whether …", "is resized").',
+				'Label a step as a short action with its stated actor ("Server checks token"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause ("if the image is too large", "whether …", "is resized").',
 			);
 		}
 		// Each family whose stated text is copied still says so in its own topic.

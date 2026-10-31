@@ -1170,7 +1170,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			// Without this, Sol labels "If parsing succeeds, validate the schema" with "If parsing
 			// succeeds" and "A file is uploaded and parsed" with "parsed".
 			expect(codeDescription).toContain(
-				'Label a step as a short action ("Resize image"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause',
+				'Label a step as a short action with its stated actor ("Server checks token"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause',
 			);
 			// Without this, Sonnet folds "check supplier availability" into "Supplier available?".
 			expect(codeDescription).toContain(
