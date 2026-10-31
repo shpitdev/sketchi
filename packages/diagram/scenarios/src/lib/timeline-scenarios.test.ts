@@ -80,7 +80,7 @@ describe("prompt-grounded timeline scenarios", () => {
 	const byId = (id: string) => timelineScenarios.find((scenario) => scenario.id === id)!;
 	it.each([
 		{
-			id: "company-history-timeline",
+			id: "company-history-timeline-v2",
 			name: "a month widened to a day",
 			mutate: (input: TimelineDiagram) =>
 				withEvent(
@@ -90,7 +90,7 @@ describe("prompt-grounded timeline scenarios", () => {
 				),
 		},
 		{
-			id: "release-milestones-timeline",
+			id: "release-milestones-timeline-v2",
 			name: "a day turned into a midnight instant",
 			mutate: (input: TimelineDiagram) =>
 				withEvent(
@@ -100,7 +100,7 @@ describe("prompt-grounded timeline scenarios", () => {
 				),
 		},
 		{
-			id: "checkout-outage-timeline",
+			id: "checkout-outage-timeline-v2",
 			name: "a milestone drawn as an ordinary event",
 			mutate: (input: TimelineDiagram) =>
 				withEvent(
@@ -110,7 +110,7 @@ describe("prompt-grounded timeline scenarios", () => {
 				),
 		},
 		{
-			id: "checkout-outage-timeline",
+			id: "checkout-outage-timeline-v2",
 			name: "an ordinary event promoted to milestone",
 			mutate: (input: TimelineDiagram) =>
 				withEvent(
@@ -120,7 +120,7 @@ describe("prompt-grounded timeline scenarios", () => {
 				),
 		},
 		{
-			id: "checkout-outage-timeline",
+			id: "checkout-outage-timeline-v2",
 			name: "a shifted instant",
 			mutate: (input: TimelineDiagram) =>
 				withEvent(
@@ -130,7 +130,7 @@ describe("prompt-grounded timeline scenarios", () => {
 				),
 		},
 		{
-			id: "launch-phases-timeline",
+			id: "launch-phases-timeline-v2",
 			name: "a phase flattened to a point",
 			mutate: (input: TimelineDiagram) =>
 				withEvent(
@@ -140,7 +140,7 @@ describe("prompt-grounded timeline scenarios", () => {
 				),
 		},
 		{
-			id: "launch-phases-timeline",
+			id: "launch-phases-timeline-v2",
 			name: "a phase with the wrong end",
 			mutate: (input: TimelineDiagram) =>
 				withEvent(
@@ -150,12 +150,12 @@ describe("prompt-grounded timeline scenarios", () => {
 				),
 		},
 		{
-			id: "launch-phases-timeline",
+			id: "launch-phases-timeline-v2",
 			name: "a missing Today marker",
 			mutate: ({ today: _today, ...input }: TimelineDiagram) => input as TimelineDiagram,
 		},
 		{
-			id: "launch-workstreams-timeline",
+			id: "launch-workstreams-timeline-v2",
 			name: "an event in the wrong lane",
 			mutate: (input: TimelineDiagram) =>
 				withEvent(
@@ -165,7 +165,7 @@ describe("prompt-grounded timeline scenarios", () => {
 				),
 		},
 		{
-			id: "launch-workstreams-timeline",
+			id: "launch-workstreams-timeline-v2",
 			name: "a third invented lane",
 			mutate: ({ lanes: _lanes, ...input }: TimelineDiagram) => ({
 				...input,
@@ -175,7 +175,7 @@ describe("prompt-grounded timeline scenarios", () => {
 			}),
 		},
 		{
-			id: "lunar-mission-timeline",
+			id: "lunar-mission-timeline-v2",
 			name: "a dropped description",
 			mutate: (input: TimelineDiagram) =>
 				withEvent(
@@ -189,19 +189,7 @@ describe("prompt-grounded timeline scenarios", () => {
 		const mutated = mutate(scenario.expectedDiagram);
 		expect(evaluateScenarioDiagram(scenario, mutated).ok).toBe(false);
 	});
-	it("asks each real-voice v2 for its original's events", () => {
-		const v2s = timelineScenarios.filter((scenario) => scenario.id.endsWith("-v2"));
-		expect(v2s).toHaveLength(9);
-		for (const scenario of v2s) {
-			const original = byId(scenario.id.slice(0, -"-v2".length));
-			expect(scenario.expectedDiagram, scenario.id).toEqual({
-				...original.expectedDiagram,
-				id: scenario.id,
-			});
-			expect(scenario.prompt.length, scenario.id).toBeLessThan(original.prompt.length);
-		}
-	});
-	it("names general availability by the GA the v2 prompt uses, not by its other letters", () => {
+	it("names general availability by the GA the prompt uses, not by its other letters", () => {
 		const scenario = byId("release-milestones-timeline-v2");
 		const named = (label: string) =>
 			withEvent(
@@ -212,12 +200,9 @@ describe("prompt-grounded timeline scenarios", () => {
 		expect(evaluateScenarioDiagram(scenario, named("GA")).ok).toBe(true);
 		expect(evaluateScenarioDiagram(scenario, named("General availability (GA)")).ok).toBe(true);
 		expect(evaluateScenarioDiagram(scenario, named("Launch")).ok).toBe(false);
-		expect(evaluateScenarioDiagram(byId("release-milestones-timeline"), named("GA")).ok).toBe(
-			false,
-		);
 	});
 	it("accepts simultaneous events in either order and instants written in another offset", () => {
-		const lanes = byId("launch-workstreams-timeline");
+		const lanes = byId("launch-workstreams-timeline-v2");
 		const swapped = [...lanes.expectedDiagram.events];
 		const sdk = swapped.findIndex((event) => event.id === "sdk");
 		const blog = swapped.findIndex((event) => event.id === "blog");
@@ -225,7 +210,7 @@ describe("prompt-grounded timeline scenarios", () => {
 		expect(evaluateScenarioDiagram(lanes, { ...lanes.expectedDiagram, events: swapped }).ok).toBe(
 			true,
 		);
-		const outage = byId("checkout-outage-timeline");
+		const outage = byId("checkout-outage-timeline-v2");
 		const utc = withEvent(
 			outage.expectedDiagram,
 			() => true,
@@ -244,7 +229,7 @@ describe("prompt-grounded timeline scenarios", () => {
 		}
 	});
 	it("library-releases rejects equal breaks for unequal gaps and breaks that hide their time", () => {
-		const scenario = byId("library-releases-timeline");
+		const scenario = byId("library-releases-timeline-v2");
 		const scene = renderDiagram(scenario.expectedDiagram);
 		const check = (candidate: RenderedDiagramScene) =>
 			timelineGapOrderCheck(scenario, scenario.expectedDiagram, candidate);
@@ -294,7 +279,7 @@ describe("prompt-grounded timeline scenarios", () => {
 		expect(check(mislabeled).message).toContain('v10 → v20 states "5 months"');
 	});
 	it("library-releases rejects a gap compressed without a break and accepts one marked by a break", () => {
-		const scenario = byId("library-releases-timeline");
+		const scenario = byId("library-releases-timeline-v2");
 		const scene = renderDiagram(scenario.expectedDiagram);
 		expect(timelineSpacingCheck(scenario, scenario.expectedDiagram, scene).passed).toBe(true);
 		// Draw v1.0 at about 5x a 7-day gap after v0.3, with the break there removed.

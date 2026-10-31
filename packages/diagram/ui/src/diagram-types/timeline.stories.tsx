@@ -29,29 +29,29 @@ export const Ready: Story = {};
 
 /** Times under one dated, zoned header; milestones as diamonds. */
 export const SameDayIncident: Story = {
-	args: { diagram: scenarioDiagram("checkout-outage-timeline") },
+	args: { diagram: scenarioDiagram("checkout-outage-timeline-v2") },
 };
 
 /** Years, months and days keep the precision they were given. */
 export const MixedPrecision: Story = {
-	args: { diagram: scenarioDiagram("company-history-timeline") },
+	args: { diagram: scenarioDiagram("company-history-timeline-v2") },
 };
 
 /** A tight cluster fans out; a two-year gap becomes an axis break. */
 export const UnevenGaps: Story = {
-	args: { diagram: scenarioDiagram("library-releases-timeline") },
+	args: { diagram: scenarioDiagram("library-releases-timeline-v2") },
 };
 
 export const PhasesAndToday: Story = {
-	args: { diagram: scenarioDiagram("launch-phases-timeline") },
+	args: { diagram: scenarioDiagram("launch-phases-timeline-v2") },
 };
 
 export const Lanes: Story = {
-	args: { diagram: scenarioDiagram("launch-workstreams-timeline") },
+	args: { diagram: scenarioDiagram("launch-workstreams-timeline-v2") },
 };
 
 export const DenseMission: Story = {
-	args: { diagram: scenarioDiagram("lunar-mission-timeline") },
+	args: { diagram: scenarioDiagram("lunar-mission-timeline-v2") },
 };
 
 /** Rows read left to right and continue the axis with dashed cues. */

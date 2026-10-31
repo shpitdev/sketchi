@@ -495,25 +495,6 @@ const toolPoints: readonly PointDefinition[] = [
 
 const quadrantScenarioDefinitions: readonly QuadrantScenarioDefinition[] = [
 	{
-		id: "effort-impact-quadrant",
-		title: "Q3 backlog: effort vs impact",
-		difficulty: "challenge",
-		tags: ["quadrant", "prioritization", "crowded", "midline", "long-labels"],
-		description:
-			"Fifteen backlog items by effort and impact scores out of 100: eight crowded into Quick wins, several nearly coinciding, and one on the effort midline.",
-		prompt:
-			"Draw an effort vs impact quadrant chart for our Q3 backlog, with effort on the x-axis from Low effort to High effort and impact on the y-axis from Low impact to High impact. Name the quadrants Quick wins (low effort, high impact), Major projects (high effort, high impact), Fill-ins (low effort, low impact) and Thankless tasks (high effort, low impact). Place each item by its effort and impact scores out of 100: Single sign-on (30, 85), Dark mode (20, 40), CSV export (15, 70), Usage-based billing (80, 90), Mobile offline mode (85, 75), Custom report builder (70, 80), Audit log (35, 78), Slack notifications (18, 72), Bulk user import (25, 82), Two-factor authentication (28, 88), API rate limit dashboard (32, 66), Onboarding checklist (22, 76), Legacy theme cleanup (75, 20), Localization for 12 languages (90, 35), Admin role templates (50, 60).",
-		xAxis: { variable: ["Effort"], low: ["Low effort"], high: ["High effort"] },
-		yAxis: { variable: ["Impact"], low: ["Low impact"], high: ["High impact"] },
-		quadrants: {
-			"quick-wins": { names: ["Quick wins"], x: "low", y: "high" },
-			"major-projects": { names: ["Major projects"], x: "high", y: "high" },
-			"fill-ins": { names: ["Fill-ins"], x: "low", y: "low" },
-			"thankless-tasks": { names: ["Thankless tasks"], x: "high", y: "low" },
-		},
-		points: backlogPoints,
-	},
-	{
 		id: "effort-impact-quadrant-v2",
 		title: "Q3 backlog: effort vs impact",
 		difficulty: "challenge",
@@ -567,33 +548,6 @@ const quadrantScenarioDefinitions: readonly QuadrantScenarioDefinition[] = [
 		points: backlogPoints,
 	},
 	{
-		id: "eisenhower-matrix-quadrant",
-		title: "This week's Eisenhower matrix",
-		difficulty: "smoke",
-		tags: ["quadrant", "eisenhower", "membership"],
-		description:
-			"Eight tasks by quadrant only, urgency against importance, with the axis direction left to the model.",
-		prompt:
-			"Draw an Eisenhower matrix of my tasks this week as a quadrant chart, with urgency on the x-axis and importance on the y-axis. Name the quadrants Do first (urgent and important), Schedule (important, not urgent), Delegate (urgent, not important) and Eliminate (neither). Urgent and important: Fix the production outage, Submit the board deck. Important, not urgent: Plan the Q4 roadmap, Mentor the new hire. Urgent, not important: Reply to vendor invoices, Book the offsite venue. Neither: Reorganize the shared drive, Browse conference swag.",
-		xAxis: {
-			variable: ["Urgency", "Urgent"],
-			low: ["Not urgent", "Less urgent", "Low urgency"],
-			high: ["Urgent", "More urgent", "High urgency", "Very urgent"],
-		},
-		yAxis: {
-			variable: ["Importance", "Important"],
-			low: ["Not important", "Less important", "Low importance", "Unimportant"],
-			high: ["Important", "More important", "High importance", "Very important"],
-		},
-		quadrants: {
-			"do-first": { names: ["Do first"], x: "high", y: "high" },
-			schedule: { names: ["Schedule"], x: "low", y: "high" },
-			delegate: { names: ["Delegate"], x: "high", y: "low" },
-			eliminate: { names: ["Eliminate"], x: "low", y: "low" },
-		},
-		points: weekTaskPoints,
-	},
-	{
 		id: "eisenhower-matrix-quadrant-v2",
 		title: "This week's Eisenhower matrix",
 		difficulty: "smoke",
@@ -628,26 +582,6 @@ const quadrantScenarioDefinitions: readonly QuadrantScenarioDefinition[] = [
 			eliminate: { names: ["Eliminate", "Delete"], x: "low", y: "low" },
 		},
 		points: weekTaskPoints,
-	},
-	{
-		id: "competitor-positioning-quadrant",
-		title: "Project management tools by price and ease",
-		difficulty: "standard",
-		tags: ["quadrant", "positioning", "highlight", "empty-quadrant"],
-		description:
-			"Nine products by price and ease of use, one quadrant left empty and our product set apart in color.",
-		prompt:
-			"Draw a competitor positioning quadrant chart of project management tools, with price on the x-axis from Low price to High price and ease of use on the y-axis from Hard to use to Easy to use. Name the quadrants Best value (low price, easy), Premium and simple (high price, easy), Budget and complex (low price, hard) and Overpriced (high price, hard). Scores out of 100 (price, ease of use): Trello (25, 85), Asana (60, 75), Monday.com (65, 80), Jira (55, 30), Wrike (70, 45), ClickUp (35, 55), Smartsheet (75, 40), Basecamp (45, 70), Our product (40, 82). Show Our product in a different colour from the competitors.",
-		xAxis: { variable: ["Price"], low: ["Low price"], high: ["High price"] },
-		yAxis: { variable: ["Ease of use", "Ease"], low: ["Hard to use"], high: ["Easy to use"] },
-		quadrants: {
-			"best-value": { names: ["Best value"], x: "low", y: "high" },
-			"premium-and-simple": { names: ["Premium and simple"], x: "high", y: "high" },
-			"budget-and-complex": { names: ["Budget and complex"], x: "low", y: "low" },
-			overpriced: { names: ["Overpriced"], x: "high", y: "low" },
-		},
-		points: toolPoints,
-		emptyQuadrants: ["budget-and-complex"],
 	},
 	{
 		id: "competitor-positioning-quadrant-v2",

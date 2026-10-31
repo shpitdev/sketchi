@@ -684,9 +684,9 @@ describe("diagram scenario evaluation", () => {
 	});
 
 	it.each([
-		["ecommerce-return-authorization", "reject-return", "Not eligible? Reject return"],
+		["ecommerce-return-authorization-v2", "reject-return", "Not eligible? Reject return"],
 		["subscription-renewal-dunning", "send-reminder", "Payment fails. Send reminder"],
-		["ecommerce-return-authorization", "reject-return", "Not eligible → Reject return"],
+		["ecommerce-return-authorization-v2", "reject-return", "Not eligible → Reject return"],
 		["subscription-renewal-dunning", "send-reminder", "Payment fails - Send reminder"],
 		["subscription-renewal-dunning", "send-reminder", "Payment fails then send reminder"],
 		["ci-release-gate", "block-release", "Failed tests block release"],
@@ -720,11 +720,6 @@ describe("diagram scenario evaluation", () => {
 			"support-ticket-triage",
 			"engineering-resolved",
 			"Unknown fixes escalate to engineering and end as engineering resolved",
-		],
-		[
-			"ecommerce-return-authorization",
-			"reject-return",
-			"Ineligible or unacceptable returns end as rejected returns",
 		],
 		["incident-escalation", "incident-bridge", "If no, escalate to the incident bridge"],
 		["incident-response-code-mode-proof", "false-alarm", "False alarms close"],

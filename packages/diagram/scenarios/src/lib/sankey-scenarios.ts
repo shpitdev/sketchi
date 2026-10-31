@@ -414,19 +414,6 @@ const CITY_ENERGY_FLOWS: SankeyScenarioDefinition["flows"] = [
 
 const sankeyScenarioDefinitions: readonly SankeyScenarioDefinition[] = [
 	{
-		id: "cloud-budget-sankey",
-		title: "Monthly cloud budget",
-		difficulty: "challenge",
-		tags: ["sankey", "budget", "two-columns", "slivers", "long-labels"],
-		description:
-			"A monthly cloud budget from five departments to seven services: flows from 2 to 310 across two orders of magnitude, three slivers beside the largest flow, and long service names.",
-		prompt:
-			"Draw a Sankey diagram of our monthly cloud budget in $k, from departments to cloud services. Engineering: Compute 310, Managed databases 120, Object storage 45, Observability and logging 38. Data Science: Compute 140, GPU training clusters 220, Object storage 60. Marketing: Content delivery network 25, Compute 4. Sales: Customer relationship management hosting 12, Compute 2. Finance: Managed databases 3. Every flow keeps its own value, however small.",
-		unit: { label: "$k", forms: THOUSAND_DOLLARS },
-		nodes: CLOUD_BUDGET_NODES,
-		flows: CLOUD_BUDGET_FLOWS,
-	},
-	{
 		id: "cloud-budget-sankey-v2",
 		title: "Monthly cloud budget",
 		difficulty: "challenge",
@@ -453,18 +440,6 @@ const sankeyScenarioDefinitions: readonly SankeyScenarioDefinition[] = [
 		unit: { label: "$k", forms: THOUSAND_DOLLARS },
 		nodes: CLOUD_BUDGET_NODES,
 		flows: CLOUD_BUDGET_FLOWS,
-	},
-	{
-		id: "website-traffic-sankey",
-		title: "Website visits",
-		difficulty: "standard",
-		tags: ["sankey", "traffic", "three-columns", "crossings"],
-		description:
-			"Last month's website visits from three traffic sources through three landing pages to three outcomes, fifteen flows that cross.",
-		prompt:
-			"Draw a Sankey diagram of last month's website visits, from traffic source through landing page to outcome. Organic search: Home 4,200, Pricing 1,800, Blog 3,000. Paid ads: Pricing 2,400, Home 600. Social: Blog 1,500, Home 500. From Home: Signed up 700, Requested demo 200, Bounced 4,400. From Pricing: Signed up 1,200, Requested demo 400, Bounced 2,600. From Blog: Signed up 300, Bounced 4,200.",
-		nodes: WEBSITE_TRAFFIC_NODES,
-		flows: WEBSITE_TRAFFIC_FLOWS,
 	},
 	{
 		id: "website-traffic-sankey-v2",
@@ -497,18 +472,6 @@ const sankeyScenarioDefinitions: readonly SankeyScenarioDefinition[] = [
 		flows: WEBSITE_TRAFFIC_FLOWS,
 	},
 	{
-		id: "hiring-funnel-sankey",
-		title: "Engineering hiring funnel",
-		difficulty: "standard",
-		tags: ["sankey", "funnel", "drop-offs"],
-		description:
-			"A hiring funnel of five stages with rejections and withdrawals at every stage, drawn as one shared drop-off or one per stage.",
-		prompt:
-			"Draw a Sankey diagram of our 2026 engineering hiring funnel. Of 1,200 Applicants, 300 moved on to Phone screen and 900 were Rejected. From Phone screen, 120 moved on to Onsite, 150 were Rejected and 30 Withdrew. From Onsite, 40 moved on to Offer, 70 were Rejected and 10 Withdrew. From Offer, 32 were Hired and 8 Declined.",
-		nodes: HIRING_FUNNEL_NODES,
-		flows: HIRING_FUNNEL_FLOWS,
-	},
-	{
 		id: "hiring-funnel-sankey-v2",
 		title: "Engineering hiring funnel",
 		difficulty: "standard",
@@ -532,19 +495,6 @@ const sankeyScenarioDefinitions: readonly SankeyScenarioDefinition[] = [
 		].join("\n"),
 		nodes: HIRING_FUNNEL_NODES,
 		flows: HIRING_FUNNEL_FLOWS,
-	},
-	{
-		id: "city-energy-sankey",
-		title: "City energy flow",
-		difficulty: "challenge",
-		tags: ["sankey", "energy", "five-columns", "long-links"],
-		description:
-			"A city's yearly energy in GWh over five columns: sources, a gas plant, the grid, three sectors and what became useful or waste, with gas imports that skip to the sectors.",
-		prompt:
-			"Draw a Sankey diagram of our city's energy flow last year in GWh, from source through generation and the grid to end use and what it became. Solar farms: Grid electricity 120. Natural gas imports: Gas plant 550, Homes 260, Industry 180. Gas plant: Grid electricity 340, Heat losses 210. Grid electricity: Homes 190, Industry 150, Transport 70, Line losses 50. Homes: Useful energy 300, Waste heat 150. Industry: Useful energy 240, Waste heat 90. Transport: Useful energy 25, Waste heat 45.",
-		unit: { label: "GWh", forms: { gwh: 1, gigawatthours: 1, mwh: 0.001 } },
-		nodes: CITY_ENERGY_NODES,
-		flows: CITY_ENERGY_FLOWS,
 	},
 	{
 		id: "city-energy-sankey-v2",

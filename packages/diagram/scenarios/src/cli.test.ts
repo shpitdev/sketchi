@@ -366,7 +366,7 @@ describe("scenario CLI candidate decoding", () => {
 			"Expected native sequence, got buildFlowchart.",
 		],
 		[
-			"release-milestones-timeline",
+			"release-milestones-timeline-v2",
 			"buildSequenceDiagram",
 			sequenceSpec,
 			"Expected native timeline, got buildSequenceDiagram.",

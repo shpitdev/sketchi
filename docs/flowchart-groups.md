@@ -29,4 +29,4 @@ Each group is an Excalidraw frame named by its label. Excalidraw paints the name
 
 ## Scenarios
 
-Maintained scenarios: `grouped-expense-approval` (three teams and a loop back into the first), `three-zone-request-path` (three network zones, left to right) and `mixed-fulfilment-groups` (grouped and ungrouped steps). Their `--input` checks require a group under a prompt-grounded label for each stated group, that group to hold every step the prompt puts in it, distinct groups, and the steps the prompt keeps outside every group to be ungrouped.
+Maintained scenarios: `grouped-expense-approval-v2` (three teams and a loop back into the first), `three-zone-request-path-v2` (three network zones, left to right) and `mixed-fulfilment-groups-v2` (grouped and ungrouped steps). Their `--input` checks require a group under a prompt-grounded label for each stated group, that group to hold every step the prompt puts in it, distinct groups, and the steps the prompt keeps outside every group to be ungrouped.

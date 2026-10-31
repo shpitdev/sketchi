@@ -30,22 +30,22 @@ export const Ready: Story = {};
 
 /** Twelve people: three leads under the CEO, each team stacked under its lead. */
 export const Startup: Story = {
-	args: { diagram: scenarioDiagram("startup-team-org-chart") },
+	args: { diagram: scenarioDiagram("startup-team-org-chart-v2") },
 };
 
 /** Twenty-five people over three levels; a director's eight engineers stack in two columns. */
 export const Department: Story = {
-	args: { diagram: scenarioDiagram("engineering-department-org-chart") },
+	args: { diagram: scenarioDiagram("engineering-department-org-chart-v2") },
 };
 
 /** An executive assistant beside the CEO and a director's dotted-line report to another chief. */
 export const AssistantAndDottedLine: Story = {
-	args: { diagram: scenarioDiagram("leadership-dotted-line-org-chart") },
+	args: { diagram: scenarioDiagram("leadership-dotted-line-org-chart-v2") },
 };
 
 /** Each department below the top drawn as a labeled region. */
 export const DepartmentRegions: Story = {
-	args: { diagram: scenarioDiagram("sales-regions-org-chart") },
+	args: { diagram: scenarioDiagram("sales-regions-org-chart-v2") },
 };
 
 /** Eighty people: the CEO's six vice presidents wrap into rows down a trunk. */

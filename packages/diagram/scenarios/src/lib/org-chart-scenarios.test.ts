@@ -20,9 +20,9 @@ const failed = (id: string, diagram: OrgChartDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
-const startup = scenario("startup-team-org-chart").expectedDiagram;
-const leadership = scenario("leadership-dotted-line-org-chart").expectedDiagram;
-const regions = scenario("sales-regions-org-chart").expectedDiagram;
+const startup = scenario("startup-team-org-chart-v2").expectedDiagram;
+const leadership = scenario("leadership-dotted-line-org-chart-v2").expectedDiagram;
+const regions = scenario("sales-regions-org-chart-v2").expectedDiagram;
 const withPerson = (
 	diagram: OrgChartDiagram,
 	id: string,
@@ -37,7 +37,7 @@ describe("prompt-grounded org chart scenarios", () => {
 		const diagrams = orgChartScenarios.map((entry) => entry.expectedDiagram);
 		expect(orgChartScenarios.length).toBeGreaterThanOrEqual(3);
 		expect(startup.people).toHaveLength(12);
-		const department = scenario("engineering-department-org-chart").expectedDiagram;
+		const department = scenario("engineering-department-org-chart-v2").expectedDiagram;
 		expect(department.people).toHaveLength(25);
 		expect(
 			Math.max(
@@ -53,7 +53,7 @@ describe("prompt-grounded org chart scenarios", () => {
 		expect(diagrams.some((diagram) => diagram.groupByDepartment)).toBe(true);
 	});
 
-	it("pastes each real-voice chart as a CSV row per person, with the same key as its original", () => {
+	it("pastes each real-voice chart as a CSV row per person", () => {
 		const pasted = orgChartScenarios.filter((entry) => entry.tags.includes("real-voice"));
 		expect(pasted.map((entry) => entry.id)).toEqual([
 			"startup-team-org-chart-v2",
@@ -62,9 +62,6 @@ describe("prompt-grounded org chart scenarios", () => {
 			"sales-regions-org-chart-v2",
 		]);
 		for (const entry of pasted) {
-			expect(entry.assertions, entry.id).toEqual(
-				scenario(entry.id.replace(/-v2$/u, "")).assertions,
-			);
 			const rows = new Set(entry.prompt.split("\n"));
 			const { people } = entry.expectedDiagram;
 			const nameOf = (id: string | undefined) =>
@@ -93,7 +90,7 @@ describe("prompt-grounded org chart scenarios", () => {
 				...(person.id === "maya" ? { title: "Chief Executive Officer" } : {}),
 			})),
 		};
-		expect(failed("startup-team-org-chart", renamed)).toEqual([]);
+		expect(failed("startup-team-org-chart-v2", renamed)).toEqual([]);
 	});
 
 	it.each([
@@ -121,29 +118,27 @@ describe("prompt-grounded org chart scenarios", () => {
 			["people-exact"],
 		],
 	])("fails %s on the stated check", (_, change, expected) => {
-		expect(failed("startup-team-org-chart", change()).toSorted()).toEqual(expected.toSorted());
+		expect(failed("startup-team-org-chart-v2", change()).toSorted()).toEqual(expected.toSorted());
 	});
 
 	it("requires the stated assistant and dotted line, and no other", () => {
 		expect(
 			failed(
-				"leadership-dotted-line-org-chart",
+				"leadership-dotted-line-org-chart-v2",
 				withPerson(leadership, "daniel", ({ assistant: _assistant, ...person }) => person),
 			),
 		).toEqual(["assistant:daniel"]);
 		expect(
 			failed(
-				"leadership-dotted-line-org-chart",
+				"leadership-dotted-line-org-chart-v2",
 				withPerson(leadership, "victor", (person) => ({ ...person, assistant: true })),
 			),
 		).toEqual(["assistants-stated"]);
-		expect(failed("leadership-dotted-line-org-chart", { ...leadership, dottedLines: [] })).toEqual([
-			"dotted-line:1",
-			"dotted-line-scope:1",
-			"dotted-lines-exact",
-		]);
 		expect(
-			failed("leadership-dotted-line-org-chart", {
+			failed("leadership-dotted-line-org-chart-v2", { ...leadership, dottedLines: [] }),
+		).toEqual(["dotted-line:1", "dotted-line-scope:1", "dotted-lines-exact"]);
+		expect(
+			failed("leadership-dotted-line-org-chart-v2", {
 				...leadership,
 				dottedLines: [
 					{ id: "reversed", report: "linda", manager: "nina", label: "clinical systems" },
@@ -159,21 +154,25 @@ describe("prompt-grounded org chart scenarios", () => {
 			return { ...leadership, dottedLines: [label === undefined ? rest : { ...rest, label }] };
 		};
 		expect(line.label).toBe("clinical systems");
-		expect(failed("leadership-dotted-line-org-chart", labeled())).toEqual(["dotted-line-scope:1"]);
-		expect(failed("leadership-dotted-line-org-chart", labeled("matrix"))).toEqual([
+		expect(failed("leadership-dotted-line-org-chart-v2", labeled())).toEqual([
 			"dotted-line-scope:1",
 		]);
-		expect(failed("leadership-dotted-line-org-chart", labeled("For Clinical Systems"))).toEqual([]);
+		expect(failed("leadership-dotted-line-org-chart-v2", labeled("matrix"))).toEqual([
+			"dotted-line-scope:1",
+		]);
+		expect(failed("leadership-dotted-line-org-chart-v2", labeled("For Clinical Systems"))).toEqual(
+			[],
+		);
 	});
 
 	it("requires departments as regions when the prompt asks", () => {
 		const { groupByDepartment: _grouping, ...flat } = regions;
-		expect(failed("sales-regions-org-chart", flat as OrgChartDiagram)).toEqual([
+		expect(failed("sales-regions-org-chart-v2", flat as OrgChartDiagram)).toEqual([
 			"department-regions",
 		]);
 		expect(
 			failed(
-				"sales-regions-org-chart",
+				"sales-regions-org-chart-v2",
 				withPerson(regions, "mia", (person) => ({ ...person, department: "Marketing" })),
 			),
 		).toContain("department:mia");
@@ -204,7 +203,7 @@ describe("prompt-grounded org chart scenarios", () => {
 	});
 
 	it("keeps the VP's four reports on one level, though two lead big teams", () => {
-		const scene = renderDiagram(scenario("engineering-department-org-chart").expectedDiagram);
+		const scene = renderDiagram(scenario("engineering-department-org-chart-v2").expectedDiagram);
 		const top = (id: string) => {
 			const card = scene.elements.find((element) => element.id === `node:${id}`);
 			if (card?.type !== "node") throw new Error(`No card "${id}".`);
@@ -220,7 +219,7 @@ describe("prompt-grounded org chart scenarios", () => {
 				const client = yield* DiagramGenerationClient;
 				return yield* client.generate({
 					model: "fixture",
-					prompt: toDiagramGenerationPrompt(scenario("startup-team-org-chart")),
+					prompt: toDiagramGenerationPrompt(scenario("startup-team-org-chart-v2")),
 				});
 			}).pipe(Effect.provide(FixtureGenerationClientLayer)),
 		);
@@ -243,6 +242,6 @@ describe("prompt-grounded org chart scenarios", () => {
 		);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
-		expect(failed("startup-team-org-chart", candidate.diagram as OrgChartDiagram)).toEqual([]);
+		expect(failed("startup-team-org-chart-v2", candidate.diagram as OrgChartDiagram)).toEqual([]);
 	});
 });

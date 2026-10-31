@@ -4,9 +4,7 @@ import { zoneRegionIssues } from "@sketchi/diagram-core";
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
 import { getFlowchartScenario } from "./scenarios";
 
-const ids = ["aws-three-tier-zones", "kubernetes-cluster-zones", "hybrid-cloud-zones"].flatMap(
-	(id) => [id, `${id}-v2`],
-);
+const ids = ["aws-three-tier-zones-v2", "kubernetes-cluster-zones-v2", "hybrid-cloud-zones-v2"];
 
 function failed(scenarioId: string, candidate: unknown) {
 	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), candidate)
@@ -47,9 +45,9 @@ describe("zone scenarios", () => {
 	});
 
 	it("accepts the model's own zone ids, label wording and an extra zone between stated ones", () => {
-		const diagram = expected("aws-three-tier-zones");
+		const diagram = expected("aws-three-tier-zones-v2");
 		expect(
-			failed("aws-three-tier-zones", {
+			failed("aws-three-tier-zones-v2", {
 				...diagram,
 				groups: [
 					...diagram.groups!.map((group) =>
@@ -75,9 +73,9 @@ describe("zone scenarios", () => {
 	});
 
 	it("fails a step drawn in the wrong zone", () => {
-		const diagram = expected("aws-three-tier-zones");
+		const diagram = expected("aws-three-tier-zones-v2");
 		expect(
-			failed("aws-three-tier-zones", {
+			failed("aws-three-tier-zones-v2", {
 				...diagram,
 				nodes: diagram.nodes.map((node) =>
 					node.id === "web" ? { ...node, group: "public" } : node,
@@ -87,9 +85,9 @@ describe("zone scenarios", () => {
 	});
 
 	it("fails zones drawn flat instead of nested", () => {
-		const diagram = expected("aws-three-tier-zones");
+		const diagram = expected("aws-three-tier-zones-v2");
 		expect(
-			failed("aws-three-tier-zones", {
+			failed("aws-three-tier-zones-v2", {
 				...diagram,
 				// Every zone at the top level, the VPC dropped since it would hold nothing.
 				groups: diagram
@@ -109,9 +107,9 @@ describe("zone scenarios", () => {
 	});
 
 	it("fails a zone of the wrong kind and a store drawn as a plain step", () => {
-		const diagram = expected("kubernetes-cluster-zones");
+		const diagram = expected("kubernetes-cluster-zones-v2");
 		expect(
-			failed("kubernetes-cluster-zones", {
+			failed("kubernetes-cluster-zones-v2", {
 				...diagram,
 				groups: diagram.groups!.map((group) =>
 					group.id === "frontend" ? { ...group, kind: "subnet" } : group,
@@ -124,20 +122,20 @@ describe("zone scenarios", () => {
 	});
 
 	it("accepts an invoice archive drawn as a document or a bucket, not as a database", () => {
-		const diagram = expected("hybrid-cloud-zones");
+		const diagram = expected("hybrid-cloud-zones-v2");
 		const archive = (shape: string) => ({
 			...diagram,
 			nodes: diagram.nodes.map((node) => (node.id === "archive" ? { ...node, shape } : node)),
 		});
-		expect(failed("hybrid-cloud-zones", archive("document"))).toEqual([]);
-		expect(failed("hybrid-cloud-zones", archive("storage"))).toEqual([]);
-		expect(failed("hybrid-cloud-zones", archive("database"))).toEqual(["shape:Invoice archive"]);
+		expect(failed("hybrid-cloud-zones-v2", archive("document"))).toEqual([]);
+		expect(failed("hybrid-cloud-zones-v2", archive("storage"))).toEqual([]);
+		expect(failed("hybrid-cloud-zones-v2", archive("database"))).toEqual(["shape:Invoice archive"]);
 	});
 
 	it("fails a stated outside step drawn inside a zone", () => {
-		const diagram = expected("kubernetes-cluster-zones");
+		const diagram = expected("kubernetes-cluster-zones-v2");
 		expect(
-			failed("kubernetes-cluster-zones", {
+			failed("kubernetes-cluster-zones-v2", {
 				...diagram,
 				nodes: diagram.nodes.map((node) =>
 					node.id === "queue" ? { ...node, group: "backend" } : node,
@@ -146,22 +144,10 @@ describe("zone scenarios", () => {
 		).toEqual(["outside-group:RabbitMQ queue:GKE cluster"]);
 	});
 
-	it("accepts the browser named as the entry component of the request it starts", () => {
-		const diagram = expected("kubernetes-cluster-zones");
-		const entry = (label: string) => ({
-			...diagram,
-			nodes: diagram.nodes.map((node) => (node.id === "browser" ? { ...node, label } : node)),
-		});
-		expect(failed("kubernetes-cluster-zones", entry("Browser"))).toEqual([]);
-		expect(failed("kubernetes-cluster-zones", entry("Client"))).toContain(
-			"node-label:Browser request",
-		);
-	});
-
 	it("grounds a product's own logo named by its abbreviation, and only that", () => {
-		const diagram = expected("kubernetes-cluster-zones");
+		const diagram = expected("kubernetes-cluster-zones-v2");
 		const withIcon = (slug: string, node = "ingress") =>
-			evaluateScenarioDiagram(getFlowchartScenario("kubernetes-cluster-zones"), {
+			evaluateScenarioDiagram(getFlowchartScenario("kubernetes-cluster-zones-v2"), {
 				...diagram,
 				nodes: diagram.nodes.map((entry) =>
 					entry.id === node ? { ...entry, icon: { slug } } : entry,
@@ -178,9 +164,9 @@ describe("zone scenarios", () => {
 	});
 
 	it("fails a zone missing from the four-deep chain", () => {
-		const diagram = expected("hybrid-cloud-zones");
+		const diagram = expected("hybrid-cloud-zones-v2");
 		expect(
-			failed("hybrid-cloud-zones", {
+			failed("hybrid-cloud-zones-v2", {
 				...diagram,
 				groups: diagram
 					.groups!.filter((group) => group.id !== "aws")

@@ -35,10 +35,10 @@ export const SelfReference: Story = {
 
 /** Two tables joined many-to-many through a join table with a composite key. */
 export const JoinTable: Story = {
-	args: { diagram: scenarioDiagram("course-enrollment-er") },
+	args: { diagram: scenarioDiagram("course-enrollment-er-v2") },
 };
 
 /** Twelve tables in balanced columns, long links through corridors between tables. */
 export const LargeSchema: Story = {
-	args: { diagram: scenarioDiagram("saas-workspace-er") },
+	args: { diagram: scenarioDiagram("saas-workspace-er-v2") },
 };

@@ -178,24 +178,12 @@ const lunarMission: TimelineDiagram["events"] = [
 
 export const timelineScenarios: readonly TimelineScenario[] = [
 	scenario(
-		"release-milestones-timeline",
-		"Release milestones",
-		"Draw a timeline with exactly these release milestones: Scope agreed on 2026-09-01, Public beta on 2026-09-15, General availability on 2026-10-01. Preserve each date and show them chronologically; do not add events.",
-		releaseMilestones,
-	),
-	scenario(
 		"release-milestones-timeline-v2",
 		"Release milestones",
 		"timeline: scope agreed 9/1, public beta 9/15, GA 10/1 (2026)",
 		releaseMilestones,
 		// The prompt says GA, so GA names general availability.
 		{ tags: ["real-voice"], aliases: { ga: ["GA"] } },
-	),
-	scenario(
-		"incident-chronology-timeline",
-		"Incident chronology",
-		"Timeline of exactly four incident events on 2026-10-12 (all UTC): Alert fired at 09:05:00, Rollback started at 09:12:00, Service recovered at 09:18:00, Incident closed at 09:40:00. Preserve the times and chronology. No invented steps.",
-		incidentChronology,
 	),
 	scenario(
 		"incident-chronology-timeline-v2",
@@ -205,24 +193,11 @@ export const timelineScenarios: readonly TimelineScenario[] = [
 		{ tags: ["real-voice"] },
 	),
 	scenario(
-		"project-roadmap-timeline",
-		"Project roadmap",
-		"Draw a timeline for this project roadmap without calendar dates. In order: Discovery (order 1), Prototype (order 2), Pilot (order 3), Launch (order 4), Retrospective (order 5). Use exactly these five events and their explicit order; do not invent dates or events.",
-		projectRoadmap,
-	),
-	scenario(
 		"project-roadmap-timeline-v2",
 		"Project roadmap",
 		"roadmap timeline, no dates yet: discovery → prototype → pilot → launch → retrospective",
 		projectRoadmap,
 		{ tags: ["real-voice"] },
-	),
-	scenario(
-		"company-history-timeline",
-		"Company history",
-		"Draw a timeline of our company history and keep each date at the precision I give: Founded in 2019, Seed round in March 2020, Public launch on 2021-06-14, First enterprise customer in November 2021, and 1 million users in 2023. Use exactly these five events.",
-		companyHistory,
-		{ tags: ["mixed-granularity"] },
 	),
 	scenario(
 		"company-history-timeline-v2",
@@ -232,25 +207,11 @@ export const timelineScenarios: readonly TimelineScenario[] = [
 		{ tags: ["mixed-granularity", "real-voice"] },
 	),
 	scenario(
-		"checkout-outage-timeline",
-		"Checkout outage",
-		"Timeline of the checkout outage on 2026-11-03. All times are US Eastern, UTC-05:00: 13:58 Error rate alert, 14:03 Incident declared, 14:21 Bad deploy identified, 14:24 Rollback complete, 14:47 All clear. Mark Incident declared and All clear as milestones; the rest are ordinary events. Use exactly these five events.",
-		checkoutOutage,
-		{ tags: ["same-day", "timezone", "milestones"] },
-	),
-	scenario(
 		"checkout-outage-timeline-v2",
 		"Checkout outage",
 		"timeline for the checkout outage, nov 3 2026, times are ET (UTC-5)\n13:58 error rate alert\n14:03 incident declared\n14:21 bad deploy identified\n14:24 rollback complete\n14:47 all clear\nincident declared and all clear are the milestones",
 		checkoutOutage,
 		{ tags: ["same-day", "timezone", "milestones", "real-voice"] },
-	),
-	scenario(
-		"library-releases-timeline",
-		"Library releases",
-		"Show the release history of our open-source library on a timeline whose spacing reflects the real time between releases: v0.1 on 2026-01-05, v0.2 on 2026-01-12, v0.3 on 2026-01-19, v1.0 on 2026-06-30, and v2.0 on 2028-03-01. Use exactly these five releases.",
-		libraryReleases,
-		{ tags: ["uneven-gaps"] },
 	),
 	scenario(
 		"library-releases-timeline-v2",
@@ -260,13 +221,6 @@ export const timelineScenarios: readonly TimelineScenario[] = [
 		{ tags: ["uneven-gaps", "real-voice"] },
 	),
 	scenario(
-		"launch-phases-timeline",
-		"Launch phases",
-		"Plan our product launch as a timeline with three phases: Discovery from 2026-01-05 to 2026-02-13, Build from 2026-02-16 to 2026-05-29, and Beta from 2026-06-01 to 2026-07-31. Add two milestones: Design freeze on 2026-02-13 and Launch on 2026-08-04. Today is 2026-03-10, so mark today. Use exactly these five items.",
-		launchPhases,
-		{ tags: ["phases", "spans", "today"], today: "2026-03-10" },
-	),
-	scenario(
 		"launch-phases-timeline-v2",
 		"Launch phases",
 		"launch plan timeline (2026)\nphases: discovery jan 5 - feb 13, build feb 16 - may 29, beta jun 1 - jul 31\nmilestones: design freeze feb 13, launch aug 4\ntoday's mar 10, mark it",
@@ -274,25 +228,11 @@ export const timelineScenarios: readonly TimelineScenario[] = [
 		{ tags: ["phases", "spans", "today", "real-voice"], today: "2026-03-10" },
 	),
 	scenario(
-		"launch-workstreams-timeline",
-		"Launch workstreams",
-		"Draw a timeline with two lanes, Engineering and Marketing. Engineering: API beta on 2026-03-02, SDK release on 2026-04-15, GA hardening on 2026-05-20. Marketing: Waitlist opens on 2026-02-16, Launch blog on 2026-04-15, Conference talk on 2026-06-10. Use exactly these six events, each in its own lane.",
-		launchWorkstreams,
-		{ tags: ["lanes"], lanes: ["Engineering", "Marketing"] },
-	),
-	scenario(
 		"launch-workstreams-timeline-v2",
 		"Launch workstreams",
 		"timeline with a lane each for engineering and marketing (2026)\nengineering: API beta 3/2, SDK release 4/15, GA hardening 5/20\nmarketing: waitlist opens 2/16, launch blog 4/15, conference talk 6/10",
 		launchWorkstreams,
 		{ tags: ["lanes", "real-voice"], lanes: ["Engineering", "Marketing"] },
-	),
-	scenario(
-		"lunar-mission-timeline",
-		"Lunar mission",
-		"Make a timeline of the Lunar Pathfinder mission with these ten events: Launch on 2027-03-14; Trans-lunar injection on 2027-03-15; Lunar orbit insertion on 2027-03-19; First science image on 2027-03-24; Orbit lowered to 50 km on 2027-04-08; Lander separation on 2027-05-02; Touchdown on 2027-05-03; First rover drive on 2027-05-10; Primary mission ends on 2027-11-03; Extended mission ends on 2028-06-30. Give Touchdown the description 'First soft landing near the south pole.' Keep exactly these ten events.",
-		lunarMission,
-		{ tags: ["long", "descriptions"], difficulty: "challenge" },
 	),
 	scenario(
 		"lunar-mission-timeline-v2",

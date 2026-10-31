@@ -38,34 +38,34 @@ export const Ready: Story = {};
 
 /** A small brainstorm: four branches, two a side, clockwise from the top right. */
 export const Brainstorm: Story = {
-	args: { diagram: scenarioDiagram("team-offsite-mindmap") },
+	args: { diagram: scenarioDiagram("team-offsite-mindmap-v2") },
 };
 
 /** Study notes three levels deep. */
 export const StudyNotes: Story = {
-	args: { diagram: scenarioDiagram("photosynthesis-study-mindmap") },
+	args: { diagram: scenarioDiagram("photosynthesis-study-mindmap-v2") },
 };
 
 /** Seven main branches spread on an arc around the center. */
 export const ProductPlan: Story = {
-	args: { diagram: scenarioDiagram("app-launch-planning-mindmap") },
+	args: { diagram: scenarioDiagram("app-launch-planning-mindmap-v2") },
 };
 
 /** 41 topics, three levels. */
 export const LargeRoadmap: Story = {
-	args: { diagram: scenarioDiagram("ml-roadmap-mindmap") },
+	args: { diagram: scenarioDiagram("ml-roadmap-mindmap-v2") },
 };
 
 /** 42 topics five levels deep under two uneven branches. */
 export const DeepClassification: Story = {
-	args: { diagram: scenarioDiagram("animal-kingdom-mindmap") },
+	args: { diagram: scenarioDiagram("animal-kingdom-mindmap-v2") },
 };
 
 /** The same brainstorm mirrored: counter-clockwise from the top left. */
 export const RightToLeft: Story = {
 	args: {
 		diagram: {
-			...scenarioDiagram("team-offsite-mindmap"),
+			...scenarioDiagram("team-offsite-mindmap-v2"),
 			layout: { direction: "RL", edgeRouting: "curved" },
 		},
 	},

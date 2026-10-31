@@ -10,8 +10,8 @@ const failed = (id: string, diagram: ClassDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
-const shop = scenario("online-shop-domain-class").expectedDiagram;
-const shapes = scenario("shape-hierarchy-class").expectedDiagram;
+const shop = scenario("online-shop-domain-class-v2").expectedDiagram;
+const shapes = scenario("shape-hierarchy-class-v2").expectedDiagram;
 const withRelationship = (
 	diagram: ClassDiagram,
 	id: string,
@@ -58,12 +58,12 @@ describe("prompt-grounded class diagram scenarios", () => {
 			fromMultiplicity: "0..1",
 			toMultiplicity: "1",
 		}));
-		expect(failed("online-shop-domain-class", reversed)).toEqual([]);
+		expect(failed("online-shop-domain-class-v2", reversed)).toEqual([]);
 		const star = withRelationship(shop, "r1", (relationship) => ({
 			...relationship,
 			toMultiplicity: "*",
 		}));
-		expect(failed("online-shop-domain-class", star)).toEqual([]);
+		expect(failed("online-shop-domain-class-v2", star)).toEqual([]);
 	});
 
 	it("catches a reversed composition, a wrong kind, a wrong multiplicity and a lost role", () => {
@@ -74,20 +74,20 @@ describe("prompt-grounded class diagram scenarios", () => {
 			fromMultiplicity: "1",
 			toMultiplicity: "1",
 		}));
-		expect(failed("online-shop-domain-class", reversedWhole)).toEqual([
+		expect(failed("online-shop-domain-class-v2", reversedWhole)).toEqual([
 			"relationship-kind:3",
 			"multiplicity:3",
 			"role:3",
 		]);
 		expect(
 			failed(
-				"online-shop-domain-class",
+				"online-shop-domain-class-v2",
 				withRelationship(shop, "r2", (relationship) => ({ ...relationship, kind: "composition" })),
 			),
 		).toEqual(["relationship-kind:2", "multiplicity:2", "role:2"]);
 		expect(
 			failed(
-				"online-shop-domain-class",
+				"online-shop-domain-class-v2",
 				withRelationship(shop, "r1", (relationship) => ({
 					...relationship,
 					toMultiplicity: "1..*",
@@ -96,7 +96,7 @@ describe("prompt-grounded class diagram scenarios", () => {
 		).toEqual(["multiplicity:1"]);
 		expect(
 			failed(
-				"online-shop-domain-class",
+				"online-shop-domain-class-v2",
 				withRelationship(shop, "r1", ({ navigable: _navigable, ...relationship }) => relationship),
 			),
 		).toEqual(["navigable:1"]);
@@ -108,13 +108,13 @@ describe("prompt-grounded class diagram scenarios", () => {
 		) => ({ ...shapes, classes: shapes.classes.map((node) => change(node)) }) as ClassDiagram;
 		expect(
 			failed(
-				"shape-hierarchy-class",
+				"shape-hierarchy-class-v2",
 				changed((node) => (node.id === "Shape" ? { ...node, kind: "class" } : node)),
 			),
 		).toEqual(["kind:Shape"]);
 		expect(
 			failed(
-				"shape-hierarchy-class",
+				"shape-hierarchy-class-v2",
 				changed((node) =>
 					node.id === "Square"
 						? { ...node, methods: node.methods.map(({ static: _static, ...method }) => method) }
@@ -124,7 +124,7 @@ describe("prompt-grounded class diagram scenarios", () => {
 		).toEqual(["modifiers:Square.of()"]);
 		expect(
 			failed(
-				"shape-hierarchy-class",
+				"shape-hierarchy-class-v2",
 				changed((node) =>
 					node.id === "Shape"
 						? {
@@ -148,7 +148,7 @@ describe("prompt-grounded class diagram scenarios", () => {
 				{ id: "extra", kind: "inheritance", from: "Triangle", to: "Shape" },
 			],
 		};
-		expect(failed("shape-hierarchy-class", invented)).toEqual([
+		expect(failed("shape-hierarchy-class-v2", invented)).toEqual([
 			"classes-exact",
 			"relationships-exact",
 		]);
