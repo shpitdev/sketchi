@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
 import { getFlowchartScenario } from "./scenarios";
 
-const ids = ["swimlane-order-fulfilment", "swimlane-hiring", "swimlane-incident-response"];
+const ids = ["swimlane-order-fulfilment", "swimlane-hiring", "swimlane-incident-response"].flatMap(
+	(id) => [id, `${id}-v2`],
+);
 
 function failed(scenarioId: string, candidate: unknown) {
 	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), candidate)

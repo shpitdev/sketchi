@@ -44,12 +44,14 @@ const depth = (topic: MindmapTopicTree): number => 1 + Math.max(0, ...children(t
 
 describe("prompt-grounded mindmap scenarios", () => {
 	it("covers a brainstorm, three-level notes, a wide plan and two large maps", () => {
-		const sizes = mindmapScenarios.map((entry) => ({
-			id: entry.id,
-			topics: entry.expectedDiagram.nodes.length,
-			main: entry.expectedDiagram.edges.filter((edge) => edge.metadata.depth === 1).length,
-			levels: depth(treeOf(entry.expectedDiagram)) - 1,
-		}));
+		const sizes = mindmapScenarios
+			.filter((entry) => !entry.id.endsWith("-v2"))
+			.map((entry) => ({
+				id: entry.id,
+				topics: entry.expectedDiagram.nodes.length,
+				main: entry.expectedDiagram.edges.filter((edge) => edge.metadata.depth === 1).length,
+				levels: depth(treeOf(entry.expectedDiagram)) - 1,
+			}));
 		expect(sizes).toEqual([
 			{ id: "team-offsite-mindmap", topics: 14, main: 4, levels: 2 },
 			{ id: "photosynthesis-study-mindmap", topics: 22, main: 3, levels: 3 },
@@ -57,6 +59,11 @@ describe("prompt-grounded mindmap scenarios", () => {
 			{ id: "ml-roadmap-mindmap", topics: 41, main: 7, levels: 3 },
 			{ id: "animal-kingdom-mindmap", topics: 42, main: 2, levels: 5 },
 		]);
+		// Each real-voice v2 asks for the same map as its original.
+		for (const entry of mindmapScenarios.filter((candidate) => candidate.id.endsWith("-v2")))
+			expect(entry.expectedDiagram.nodes.map((node) => node.label)).toEqual(
+				scenario(entry.id.slice(0, -"-v2".length)).expectedDiagram.nodes.map((node) => node.label),
+			);
 	});
 
 	for (const entry of mindmapScenarios) {

@@ -452,6 +452,47 @@ function defineQuadrantScenario(definition: QuadrantScenarioDefinition): Quadran
 	};
 }
 
+const backlogPoints: readonly PointDefinition[] = [
+	["single-sign-on", "Single sign-on", [30, 85]],
+	["dark-mode", "Dark mode", [20, 40]],
+	["csv-export", "CSV export", [15, 70]],
+	["usage-based-billing", "Usage-based billing", [80, 90]],
+	["mobile-offline-mode", "Mobile offline mode", [85, 75]],
+	["custom-report-builder", "Custom report builder", [70, 80]],
+	["audit-log", "Audit log", [35, 78]],
+	["slack-notifications", "Slack notifications", [18, 72]],
+	["bulk-user-import", "Bulk user import", [25, 82]],
+	["two-factor-authentication", "Two-factor authentication", [28, 88]],
+	["api-rate-limit-dashboard", "API rate limit dashboard", [32, 66]],
+	["onboarding-checklist", "Onboarding checklist", [22, 76]],
+	["legacy-theme-cleanup", "Legacy theme cleanup", [75, 20]],
+	["localization", "Localization for 12 languages", [90, 35]],
+	["admin-role-templates", "Admin role templates", [50, 60]],
+];
+
+const weekTaskPoints: readonly PointDefinition[] = [
+	["production-outage", "Fix the production outage", "do-first"],
+	["board-deck", "Submit the board deck", "do-first"],
+	["q4-roadmap", "Plan the Q4 roadmap", "schedule"],
+	["mentor", "Mentor the new hire", "schedule"],
+	["vendor-invoices", "Reply to vendor invoices", "delegate"],
+	["offsite-venue", "Book the offsite venue", "delegate"],
+	["shared-drive", "Reorganize the shared drive", "eliminate"],
+	["conference-swag", "Browse conference swag", "eliminate"],
+];
+
+const toolPoints: readonly PointDefinition[] = [
+	["trello", "Trello", [25, 85]],
+	["asana", "Asana", [60, 75]],
+	["monday", "Monday.com", [65, 80]],
+	["jira", "Jira", [55, 30]],
+	["wrike", "Wrike", [70, 45]],
+	["clickup", "ClickUp", [35, 55]],
+	["smartsheet", "Smartsheet", [75, 40]],
+	["basecamp", "Basecamp", [45, 70]],
+	["our-product", "Our product", [40, 82], { highlight: true, group: "Our product" }],
+];
+
 const quadrantScenarioDefinitions: readonly QuadrantScenarioDefinition[] = [
 	{
 		id: "effort-impact-quadrant",
@@ -470,23 +511,60 @@ const quadrantScenarioDefinitions: readonly QuadrantScenarioDefinition[] = [
 			"fill-ins": { names: ["Fill-ins"], x: "low", y: "low" },
 			"thankless-tasks": { names: ["Thankless tasks"], x: "high", y: "low" },
 		},
-		points: [
-			["single-sign-on", "Single sign-on", [30, 85]],
-			["dark-mode", "Dark mode", [20, 40]],
-			["csv-export", "CSV export", [15, 70]],
-			["usage-based-billing", "Usage-based billing", [80, 90]],
-			["mobile-offline-mode", "Mobile offline mode", [85, 75]],
-			["custom-report-builder", "Custom report builder", [70, 80]],
-			["audit-log", "Audit log", [35, 78]],
-			["slack-notifications", "Slack notifications", [18, 72]],
-			["bulk-user-import", "Bulk user import", [25, 82]],
-			["two-factor-authentication", "Two-factor authentication", [28, 88]],
-			["api-rate-limit-dashboard", "API rate limit dashboard", [32, 66]],
-			["onboarding-checklist", "Onboarding checklist", [22, 76]],
-			["legacy-theme-cleanup", "Legacy theme cleanup", [75, 20]],
-			["localization", "Localization for 12 languages", [90, 35]],
-			["admin-role-templates", "Admin role templates", [50, 60]],
-		],
+		points: backlogPoints,
+	},
+	{
+		id: "effort-impact-quadrant-v2",
+		title: "Q3 backlog: effort vs impact",
+		difficulty: "challenge",
+		tags: ["quadrant", "prioritization", "crowded", "midline", "long-labels", "real-voice"],
+		description:
+			"Fifteen backlog items by effort and impact scores out of 100: eight crowded into Quick wins, several nearly coinciding, and one on the effort midline.",
+		prompt: [
+			"effort vs impact quadrant for the Q3 backlog, usual quadrant names",
+			"",
+			"item, effort (0-100), impact (0-100)",
+			"Single sign-on, 30, 85",
+			"Dark mode, 20, 40",
+			"CSV export, 15, 70",
+			"Usage-based billing, 80, 90",
+			"Mobile offline mode, 85, 75",
+			"Custom report builder, 70, 80",
+			"Audit log, 35, 78",
+			"Slack notifications, 18, 72",
+			"Bulk user import, 25, 82",
+			"Two-factor authentication, 28, 88",
+			"API rate limit dashboard, 32, 66",
+			"Onboarding checklist, 22, 76",
+			"Legacy theme cleanup, 75, 20",
+			"Localization for 12 languages, 90, 35",
+			"Admin role templates, 50, 60",
+		].join("\n"),
+		// The prompt names neither axis end nor which axis is which, and asks for
+		// the usual names: each end reads as its level or score, either variable
+		// may run across, and each corner takes its conventional names.
+		xAxis: {
+			variable: ["Effort"],
+			low: ["Low effort", "Low", "Less effort", "0"],
+			high: ["High effort", "High", "More effort", "100"],
+		},
+		yAxis: {
+			variable: ["Impact"],
+			low: ["Low impact", "Low", "Less impact", "0"],
+			high: ["High impact", "High", "More impact", "100"],
+		},
+		axesFixed: false,
+		quadrants: {
+			"quick-wins": { names: ["Quick wins"], x: "low", y: "high" },
+			"major-projects": { names: ["Major projects", "Big bets"], x: "high", y: "high" },
+			"fill-ins": { names: ["Fill-ins"], x: "low", y: "low" },
+			"thankless-tasks": {
+				names: ["Thankless tasks", "Thankless", "Money pit", "Money pits", "Time sinks"],
+				x: "high",
+				y: "low",
+			},
+		},
+		points: backlogPoints,
 	},
 	{
 		id: "eisenhower-matrix-quadrant",
@@ -513,16 +591,43 @@ const quadrantScenarioDefinitions: readonly QuadrantScenarioDefinition[] = [
 			delegate: { names: ["Delegate"], x: "high", y: "low" },
 			eliminate: { names: ["Eliminate"], x: "low", y: "low" },
 		},
-		points: [
-			["production-outage", "Fix the production outage", "do-first"],
-			["board-deck", "Submit the board deck", "do-first"],
-			["q4-roadmap", "Plan the Q4 roadmap", "schedule"],
-			["mentor", "Mentor the new hire", "schedule"],
-			["vendor-invoices", "Reply to vendor invoices", "delegate"],
-			["offsite-venue", "Book the offsite venue", "delegate"],
-			["shared-drive", "Reorganize the shared drive", "eliminate"],
-			["conference-swag", "Browse conference swag", "eliminate"],
-		],
+		points: weekTaskPoints,
+	},
+	{
+		id: "eisenhower-matrix-quadrant-v2",
+		title: "This week's Eisenhower matrix",
+		difficulty: "smoke",
+		tags: ["quadrant", "eisenhower", "membership", "real-voice"],
+		description:
+			"Eight tasks by quadrant only, urgency against importance, with the axis direction left to the model.",
+		prompt: [
+			"eisenhower matrix of my week, usual names",
+			"",
+			"urgent + important: fix the production outage, submit the board deck",
+			"important, not urgent: plan the Q4 roadmap, mentor the new hire",
+			"urgent, not important: reply to vendor invoices, book the offsite venue",
+			"neither: reorganize the shared drive, browse conference swag",
+		].join("\n"),
+		xAxis: {
+			variable: ["Urgency", "Urgent"],
+			low: ["Not urgent", "Less urgent", "Low urgency"],
+			high: ["Urgent", "More urgent", "High urgency", "Very urgent"],
+		},
+		yAxis: {
+			variable: ["Importance", "Important"],
+			low: ["Not important", "Less important", "Low importance", "Unimportant"],
+			high: ["Important", "More important", "High importance", "Very important"],
+		},
+		// The prompt leaves which variable runs across to the matrix's convention
+		// and asks for its usual names, in either of their two common sets.
+		axesFixed: false,
+		quadrants: {
+			"do-first": { names: ["Do first", "Do"], x: "high", y: "high" },
+			schedule: { names: ["Schedule", "Decide"], x: "low", y: "high" },
+			delegate: { names: ["Delegate"], x: "high", y: "low" },
+			eliminate: { names: ["Eliminate", "Delete"], x: "low", y: "low" },
+		},
+		points: weekTaskPoints,
 	},
 	{
 		id: "competitor-positioning-quadrant",
@@ -541,17 +646,51 @@ const quadrantScenarioDefinitions: readonly QuadrantScenarioDefinition[] = [
 			"budget-and-complex": { names: ["Budget and complex"], x: "low", y: "low" },
 			overpriced: { names: ["Overpriced"], x: "high", y: "low" },
 		},
-		points: [
-			["trello", "Trello", [25, 85]],
-			["asana", "Asana", [60, 75]],
-			["monday", "Monday.com", [65, 80]],
-			["jira", "Jira", [55, 30]],
-			["wrike", "Wrike", [70, 45]],
-			["clickup", "ClickUp", [35, 55]],
-			["smartsheet", "Smartsheet", [75, 40]],
-			["basecamp", "Basecamp", [45, 70]],
-			["our-product", "Our product", [40, 82], { highlight: true, group: "Our product" }],
-		],
+		points: toolPoints,
+		emptyQuadrants: ["budget-and-complex"],
+	},
+	{
+		id: "competitor-positioning-quadrant-v2",
+		title: "Project management tools by price and ease",
+		difficulty: "standard",
+		tags: ["quadrant", "positioning", "highlight", "empty-quadrant", "real-voice"],
+		description:
+			"Nine products by price and ease of use, one quadrant left empty and our product set apart in color.",
+		prompt: [
+			"price vs ease of use positioning quadrant for PM tools, highlight Our product",
+			"quadrants: best value (cheap, easy), premium and simple (pricey, easy), budget and complex (cheap, hard), overpriced (pricey, hard)",
+			"",
+			"tool, price, ease of use (both 0-100)",
+			"Trello, 25, 85",
+			"Asana, 60, 75",
+			"Monday.com, 65, 80",
+			"Jira, 55, 30",
+			"Wrike, 70, 45",
+			"ClickUp, 35, 55",
+			"Smartsheet, 75, 40",
+			"Basecamp, 45, 70",
+			"Our product, 40, 82",
+		].join("\n"),
+		// The prompt names no axis end and fixes no axis: each end reads as its
+		// level, its quadrant word or its score, and either variable may run across.
+		xAxis: {
+			variable: ["Price"],
+			low: ["Low price", "Low", "Cheap", "0"],
+			high: ["High price", "High", "Pricey", "Expensive", "100"],
+		},
+		yAxis: {
+			variable: ["Ease of use", "Ease"],
+			low: ["Hard to use", "Hard", "Low", "0"],
+			high: ["Easy to use", "Easy", "High", "100"],
+		},
+		axesFixed: false,
+		quadrants: {
+			"best-value": { names: ["Best value"], x: "low", y: "high" },
+			"premium-and-simple": { names: ["Premium and simple"], x: "high", y: "high" },
+			"budget-and-complex": { names: ["Budget and complex"], x: "low", y: "low" },
+			overpriced: { names: ["Overpriced"], x: "high", y: "low" },
+		},
+		points: toolPoints,
 		emptyQuadrants: ["budget-and-complex"],
 	},
 ];

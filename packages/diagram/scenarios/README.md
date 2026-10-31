@@ -56,7 +56,10 @@ and the eval harness use it.
   Zone scenarios check that each stated zone holds its steps (directly or in a
   zone nested in it), sits inside the zone the prompt puts it in, and has a kind
   that reads as what the prompt calls it, and that each database, queue or
-  document the prompt states draws as one.
+  document the prompt states draws as one. An architecture scenario
+  (`architecture: true`) draws components, not a process, so its first and
+  last components may draw as any node but a decision: `Users` as a plain
+  component that also receives responses passes.
 - Sequence scenarios check participants, required messages and their
   chronological order, calls answered by returns (activation bars), and that
   no return is stray.
@@ -79,14 +82,25 @@ and the eval harness use it.
 - ER scenarios check every stated entity, each of its fields with its type and
   its exact PK, FK, UK and nullable markers, and every stated relationship
   between the right entities through the right fields with the right
-  cardinality at each end, in either direction. No entity or relationship the
+  cardinality at each end, in either direction. A prompt that pastes DDL takes
+  its names, types and markers from the paste and its cardinalities from the
+  constraints: a not-null foreign key is exactly one, a nullable one zero or
+  one, and a unique one makes the other end zero or one. A many end the DDL
+  cannot pin down and no sentence states accepts zero or many, many, or one or
+  many. No entity or relationship the
   prompt does not state may appear, and the drawn scene must show every table,
   field, marker and crow's-foot end the diagram states.
 - Class scenarios check every stated class and its kind, every attribute with
   its type, visibility and static marker, every method with its parameter and
   return types and its markers, and every stated relationship between the
   right classes, of the right kind and in the right direction (an association
-  either way), with the multiplicities, roles and navigability it states. No
+  either way), with the multiplicities, roles and navigability it states. When
+  the prompt pastes source, a field typed by a class is that relationship,
+  navigable from the class holding it and named by the field as its role; a
+  collection reads as many, a single reference as one or zero or one, and the
+  end that holds no field stays open. A relationship kind the source cannot
+  tell apart (association, aggregation or composition) accepts each unless the
+  asker states one, and a field typed by an enum may draw its line or not. No
   class or relationship the prompt does not state may appear. The drawn scene
   must show every member, head, dash, multiplicity and role, each label clear
   of every box, line and other label.
@@ -126,7 +140,11 @@ and the eval harness use it.
 - Quadrant scenarios read every placement through the axis ends as drawn, so
   an axis that runs high to low passes when every name and point follows it.
   They check each axis's variable and end labels, each quadrant name in the
-  corner its conditions describe, every item by label at its stated scores
+  corner its conditions describe (a prompt that asks for a matrix's usual
+  names accepts that corner's conventional names, listed per quadrant, such
+  as `Big bets` for `Major projects`; a prompt that leaves the axes or their
+  ends unnamed accepts either variable across and each end as its level or
+  score), every item by label at its stated scores
   (within 0.02, mirrored for a reversed axis) or strictly inside its stated
   quadrant, a stated highlight in a group of its own, a quadrant the scores
   leave empty, and no item the prompt does not state. `quadrant-drawn` reads
@@ -154,7 +172,8 @@ to two plain, single-input actions after it, matched on their combined labels
 and owned by the last one, so `Question arrives → Vercel hosts the page →
 Next.js page receives the question` is the stated `Next.js page on Vercel
 receives the question`. A fixture `entry` lists the fixture nodes that draw
-such a first event. All canonical graph validation and exclusive ownership
+such a first event. The start and end steps are the expected graph's source
+and sinks; a prompt need not say which step starts or ends the flow. All canonical graph validation and exclusive ownership
 checks remain.
 
 The `ai-app-stack-logos` scenario explicitly opts its cached-answer outcome into
@@ -224,7 +243,8 @@ negators, auxiliary gaps, conjunctions, subordinators, `yes`) keep their exact
 form, and stemming never turns a content word into one. `flowchart-labels.ts` keeps a finite table for
 what the stemmer cannot reach: derivations and irregular forms (`verification`
 → `verify`, `payment`/`paid` → `pay`, `sent` → `send`, `approval` →
-`approve`), the compound `rollback` → `roll back`, `comms` → `communications`,
+`approve`), the compound `rollback` → `roll back`, `comms` → `communications`, the
+abbreviations `ALB`, `db` and `postgresql` → `postgres`,
 and inflected negators (`failed` → `fail`, `skipped` → `skip`). Thus `Verify
 income` matches `income verification`, and `Expense paid` matches `payment`.
 The explicit stopword set removes articles, auxiliaries, conjunctions, and

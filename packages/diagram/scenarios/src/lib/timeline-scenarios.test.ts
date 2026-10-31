@@ -189,6 +189,33 @@ describe("prompt-grounded timeline scenarios", () => {
 		const mutated = mutate(scenario.expectedDiagram);
 		expect(evaluateScenarioDiagram(scenario, mutated).ok).toBe(false);
 	});
+	it("asks each real-voice v2 for its original's events", () => {
+		const v2s = timelineScenarios.filter((scenario) => scenario.id.endsWith("-v2"));
+		expect(v2s).toHaveLength(9);
+		for (const scenario of v2s) {
+			const original = byId(scenario.id.slice(0, -"-v2".length));
+			expect(scenario.expectedDiagram, scenario.id).toEqual({
+				...original.expectedDiagram,
+				id: scenario.id,
+			});
+			expect(scenario.prompt.length, scenario.id).toBeLessThan(original.prompt.length);
+		}
+	});
+	it("names general availability by the GA the v2 prompt uses, not by its other letters", () => {
+		const scenario = byId("release-milestones-timeline-v2");
+		const named = (label: string) =>
+			withEvent(
+				scenario.expectedDiagram,
+				(event) => event.id === "ga",
+				(event) => ({ ...event, label }),
+			);
+		expect(evaluateScenarioDiagram(scenario, named("GA")).ok).toBe(true);
+		expect(evaluateScenarioDiagram(scenario, named("General availability (GA)")).ok).toBe(true);
+		expect(evaluateScenarioDiagram(scenario, named("Launch")).ok).toBe(false);
+		expect(evaluateScenarioDiagram(byId("release-milestones-timeline"), named("GA")).ok).toBe(
+			false,
+		);
+	});
 	it("accepts simultaneous events in either order and instants written in another offset", () => {
 		const lanes = byId("launch-workstreams-timeline");
 		const swapped = [...lanes.expectedDiagram.events];

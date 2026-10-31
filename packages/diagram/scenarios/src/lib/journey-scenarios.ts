@@ -380,6 +380,173 @@ function defineJourneyScenario(definition: JourneyScenarioDefinition): JourneySc
 	};
 }
 
+const onlinePurchaseStages: readonly StageDefinition[] = [
+	{
+		key: "discover",
+		name: "Discover",
+		steps: [
+			["instagram-ad", "Sees an Instagram ad", 4, { touchpoint: "Instagram" }],
+			["reviews", "Reads reviews on the brand site", 4, { touchpoint: "Website" }],
+		],
+	},
+	{
+		key: "choose",
+		name: "Choose",
+		steps: [
+			["compare", "Compares three models", 3, { touchpoint: "Website" }],
+			["size", "Can't find her size in stock", 1, { touchpoint: "Website" }],
+		],
+		painPoints: ["Sizes aren't shown until the product page"],
+		opportunities: ["Show stock by size in search results"],
+	},
+	{
+		key: "buy",
+		name: "Buy",
+		steps: [
+			["guest-checkout", "Checks out as a guest", 3, { touchpoint: "Website" }],
+			["apple-pay", "Pays with Apple Pay", 5, { touchpoint: "Website" }],
+		],
+	},
+	{
+		key: "receive",
+		name: "Receive",
+		steps: [
+			["confirmation", "Gets a shipping confirmation", 4, { touchpoint: "Email" }],
+			["late", "The package arrives a day late", 2, { touchpoint: "Courier" }],
+		],
+		painPoints: ["No notice of the delay"],
+		opportunities: ["Text customers when a delivery slips"],
+	},
+];
+
+const saasOnboardingStages: readonly StageDefinition[] = [
+	{
+		key: "sign-up",
+		name: "Sign up",
+		steps: [
+			["account", "Marco creates an account with his work email", 4, { actor: "Marco" }],
+			[
+				"verification",
+				"Marco finds the verification email in his spam folder",
+				2,
+				{ actor: "Marco" },
+			],
+		],
+		painPoints: ["Verification emails land in spam"],
+	},
+	{
+		key: "connect-data",
+		name: "Connect data",
+		steps: [
+			[
+				"warehouse",
+				"Marco connects the warehouse database with a read-only user",
+				3,
+				{ actor: "Marco" },
+			],
+			[
+				"allowlist",
+				[
+					"IT approves the firewall allowlist request after two days",
+					"IT team approves the firewall allowlist request after two days",
+				],
+				1,
+				{ actor: "IT team" },
+			],
+		],
+		painPoints: ["The allowlist request waits on IT"],
+		opportunities: ["Give IT a pre-filled allowlist request"],
+	},
+	{
+		key: "first-dashboard",
+		name: "First dashboard",
+		steps: [
+			[
+				"template",
+				"Marco builds a dashboard from the shipping delays template",
+				4,
+				{ actor: "Marco" },
+			],
+			["slow-query", "The first query takes ninety seconds to load", 2, { actor: "Beacon" }],
+		],
+		painPoints: ["The first query is slow"],
+		opportunities: ["Cache template queries"],
+	},
+	{
+		key: "invite-team",
+		name: "Invite team",
+		steps: [
+			["invite", "Marco invites five dispatchers by email", 4, { actor: "Marco" }],
+			["missed-invite", "Two dispatchers can't find the invitation", 2, { actor: "Dispatchers" }],
+		],
+		painPoints: ["Invitations are easy to miss"],
+		opportunities: ["Let admins share an invite link"],
+	},
+	{
+		key: "get-value",
+		name: "Get value",
+		steps: [
+			[
+				"late-carriers",
+				"Dispatchers spot late carriers on the daily delays chart",
+				5,
+				{ actor: "Dispatchers" },
+			],
+		],
+	},
+	{
+		key: "renew",
+		name: "Renew",
+		steps: [
+			[
+				"upgrade",
+				"Marco upgrades to the annual Team plan after a call with his customer success manager",
+				5,
+				{ actor: "Customer success" },
+			],
+		],
+	},
+];
+
+const supportTicketStages: readonly StageDefinition[] = [
+	{
+		key: "report",
+		name: "Report",
+		steps: [
+			["double-charge", "Dana sees a double charge on her card", 1, { touchpoint: "Bank app" }],
+			["ticket", "Dana opens a ticket in the help center", 2, { touchpoint: "Help center" }],
+		],
+		painPoints: ["The contact form is hidden behind three help articles"],
+	},
+	{
+		key: "triage",
+		name: "Triage",
+		steps: [
+			[
+				"auto-reply",
+				"An auto-reply promises an answer within 24 hours",
+				2,
+				{ touchpoint: "Email" },
+			],
+			["invoice", "An agent asks for the invoice number", 3, { touchpoint: "Email" }],
+		],
+		opportunities: ["Detect duplicate charges and refund them automatically"],
+	},
+	{
+		key: "resolve",
+		name: "Resolve",
+		steps: [
+			["call", "The agent calls to confirm the refund", 4, { touchpoint: "Phone" }],
+			["refund", "The refund appears on her statement", 4, { touchpoint: "Bank app" }],
+		],
+	},
+	{
+		key: "follow-up",
+		name: "Follow up",
+		steps: [["survey", "Dana rates the support in a survey", 5, { touchpoint: "Email" }]],
+	},
+];
+
 const journeyScenarioDefinitions: readonly JourneyScenarioDefinition[] = [
 	{
 		id: "online-purchase-journey",
@@ -391,44 +558,37 @@ const journeyScenarioDefinitions: readonly JourneyScenarioDefinition[] = [
 		prompt:
 			"Draw a user journey map of Priya buying running shoes online. Score each step's sentiment from 1 (very negative) to 5 (very positive), 3 neutral. Stages and steps, in order, each with its touchpoint and score. Discover: sees an Instagram ad (Instagram, 4); reads reviews on the brand site (Website, 4). Choose: compares three models (Website, 3); can't find her size in stock (Website, 1). Buy: checks out as a guest (Website, 3); pays with Apple Pay (Website, 5). Receive: gets a shipping confirmation (Email, 4); the package arrives a day late (Courier, 2). Pain points: Choose: sizes aren't shown until the product page. Receive: no notice of the delay. Opportunities: Choose: show stock by size in search results. Receive: text customers when a delivery slips.",
 		persona: { text: "Priya", words: ["Priya"] },
-		stages: [
-			{
-				key: "discover",
-				name: "Discover",
-				steps: [
-					["instagram-ad", "Sees an Instagram ad", 4, { touchpoint: "Instagram" }],
-					["reviews", "Reads reviews on the brand site", 4, { touchpoint: "Website" }],
-				],
-			},
-			{
-				key: "choose",
-				name: "Choose",
-				steps: [
-					["compare", "Compares three models", 3, { touchpoint: "Website" }],
-					["size", "Can't find her size in stock", 1, { touchpoint: "Website" }],
-				],
-				painPoints: ["Sizes aren't shown until the product page"],
-				opportunities: ["Show stock by size in search results"],
-			},
-			{
-				key: "buy",
-				name: "Buy",
-				steps: [
-					["guest-checkout", "Checks out as a guest", 3, { touchpoint: "Website" }],
-					["apple-pay", "Pays with Apple Pay", 5, { touchpoint: "Website" }],
-				],
-			},
-			{
-				key: "receive",
-				name: "Receive",
-				steps: [
-					["confirmation", "Gets a shipping confirmation", 4, { touchpoint: "Email" }],
-					["late", "The package arrives a day late", 2, { touchpoint: "Courier" }],
-				],
-				painPoints: ["No notice of the delay"],
-				opportunities: ["Text customers when a delivery slips"],
-			},
-		],
+		stages: onlinePurchaseStages,
+	},
+	{
+		id: "online-purchase-journey-v2",
+		title: "Priya buys running shoes online",
+		difficulty: "smoke",
+		tags: ["journey", "e-commerce", "touchpoints", "real-voice"],
+		description:
+			"Four stages of an online shoe purchase, two steps each with a touchpoint and score, and a pain point and an opportunity under two stages.",
+		prompt: [
+			"journey map from our research notes: Priya buying running shoes online, scores 1-5",
+			"",
+			"Discover",
+			"- sees an Instagram ad (Instagram) 4",
+			"- reads reviews on the brand site (Website) 4",
+			"Choose",
+			"- compares three models (Website) 3",
+			"- can't find her size in stock (Website) 1",
+			"pain point: sizes aren't shown until the product page",
+			"opportunity: show stock by size in search results",
+			"Buy",
+			"- checks out as a guest (Website) 3",
+			"- pays with Apple Pay (Website) 5",
+			"Receive",
+			"- gets a shipping confirmation (Email) 4",
+			"- the package arrives a day late (Courier) 2",
+			"pain point: no notice of the delay",
+			"opportunity: text customers when a delivery slips",
+		].join("\n"),
+		persona: { text: "Priya", words: ["Priya"] },
+		stages: onlinePurchaseStages,
 	},
 	{
 		id: "saas-onboarding-journey",
@@ -444,99 +604,47 @@ const journeyScenarioDefinitions: readonly JourneyScenarioDefinition[] = [
 			words: ["Marco", "operations lead"],
 		},
 		actors: ["Marco", "IT team", "Beacon", "Dispatchers", "Customer success"],
-		stages: [
-			{
-				key: "sign-up",
-				name: "Sign up",
-				steps: [
-					["account", "Marco creates an account with his work email", 4, { actor: "Marco" }],
-					[
-						"verification",
-						"Marco finds the verification email in his spam folder",
-						2,
-						{ actor: "Marco" },
-					],
-				],
-				painPoints: ["Verification emails land in spam"],
-			},
-			{
-				key: "connect-data",
-				name: "Connect data",
-				steps: [
-					[
-						"warehouse",
-						"Marco connects the warehouse database with a read-only user",
-						3,
-						{ actor: "Marco" },
-					],
-					[
-						"allowlist",
-						[
-							"IT approves the firewall allowlist request after two days",
-							"IT team approves the firewall allowlist request after two days",
-						],
-						1,
-						{ actor: "IT team" },
-					],
-				],
-				painPoints: ["The allowlist request waits on IT"],
-				opportunities: ["Give IT a pre-filled allowlist request"],
-			},
-			{
-				key: "first-dashboard",
-				name: "First dashboard",
-				steps: [
-					[
-						"template",
-						"Marco builds a dashboard from the shipping delays template",
-						4,
-						{ actor: "Marco" },
-					],
-					["slow-query", "The first query takes ninety seconds to load", 2, { actor: "Beacon" }],
-				],
-				painPoints: ["The first query is slow"],
-				opportunities: ["Cache template queries"],
-			},
-			{
-				key: "invite-team",
-				name: "Invite team",
-				steps: [
-					["invite", "Marco invites five dispatchers by email", 4, { actor: "Marco" }],
-					[
-						"missed-invite",
-						"Two dispatchers can't find the invitation",
-						2,
-						{ actor: "Dispatchers" },
-					],
-				],
-				painPoints: ["Invitations are easy to miss"],
-				opportunities: ["Let admins share an invite link"],
-			},
-			{
-				key: "get-value",
-				name: "Get value",
-				steps: [
-					[
-						"late-carriers",
-						"Dispatchers spot late carriers on the daily delays chart",
-						5,
-						{ actor: "Dispatchers" },
-					],
-				],
-			},
-			{
-				key: "renew",
-				name: "Renew",
-				steps: [
-					[
-						"upgrade",
-						"Marco upgrades to the annual Team plan after a call with his customer success manager",
-						5,
-						{ actor: "Customer success" },
-					],
-				],
-			},
-		],
+		stages: saasOnboardingStages,
+	},
+	{
+		id: "saas-onboarding-journey-v2",
+		title: "Beacon admin onboarding",
+		difficulty: "challenge",
+		tags: ["journey", "saas", "onboarding", "actors", "uneven-stages", "long-labels", "real-voice"],
+		description:
+			"Six stages of a SaaS admin's onboarding with uneven step counts, long step labels and five actors, and notes under four stages.",
+		prompt: [
+			"journey map of a new admin onboarding to Beacon, our analytics product. persona: Marco, operations lead at a 40-person logistics company. scores 1-5",
+			"",
+			"stage | step | who | score",
+			"Sign up | Marco creates an account with his work email | Marco | 4",
+			"Sign up | Marco finds the verification email in his spam folder | Marco | 2",
+			"Connect data | Marco connects the warehouse database with a read-only user | Marco | 3",
+			"Connect data | IT approves the firewall allowlist request after two days | IT team | 1",
+			"First dashboard | Marco builds a dashboard from the shipping delays template | Marco | 4",
+			"First dashboard | the first query takes ninety seconds to load | Beacon | 2",
+			"Invite team | Marco invites five dispatchers by email | Marco | 4",
+			"Invite team | two dispatchers can't find the invitation | Dispatchers | 2",
+			"Get value | dispatchers spot late carriers on the daily delays chart | Dispatchers | 5",
+			"Renew | Marco upgrades to the annual Team plan after a call with his customer success manager | Customer success | 5",
+			"",
+			"pain points",
+			"Sign up: verification emails land in spam",
+			"Connect data: the allowlist request waits on IT",
+			"First dashboard: the first query is slow",
+			"Invite team: invitations are easy to miss",
+			"",
+			"opportunities",
+			"Connect data: give IT a pre-filled allowlist request",
+			"First dashboard: cache template queries",
+			"Invite team: let admins share an invite link",
+		].join("\n"),
+		persona: {
+			text: "Marco, operations lead at a 40-person logistics company",
+			words: ["Marco", "operations lead"],
+		},
+		actors: ["Marco", "IT team", "Beacon", "Dispatchers", "Customer success"],
+		stages: saasOnboardingStages,
 	},
 	{
 		id: "support-ticket-journey",
@@ -548,44 +656,32 @@ const journeyScenarioDefinitions: readonly JourneyScenarioDefinition[] = [
 		prompt:
 			"Draw a user journey map of Dana getting a double charge refunded. Score each step from 1 (very negative) to 5 (very positive), 3 neutral. Stages in order, each step with its touchpoint and score. Report: Dana sees a double charge on her card (Bank app, 1); Dana opens a ticket in the help center (Help center, 2). Triage: an auto-reply promises an answer within 24 hours (Email, 2); an agent asks for the invoice number (Email, 3). Resolve: the agent calls to confirm the refund (Phone, 4); the refund appears on her statement (Bank app, 4). Follow up: Dana rates the support in a survey (Email, 5). Pain point: Report: the contact form is hidden behind three help articles. Opportunity: Triage: detect duplicate charges and refund them automatically.",
 		persona: { text: "Dana", words: ["Dana"] },
-		stages: [
-			{
-				key: "report",
-				name: "Report",
-				steps: [
-					["double-charge", "Dana sees a double charge on her card", 1, { touchpoint: "Bank app" }],
-					["ticket", "Dana opens a ticket in the help center", 2, { touchpoint: "Help center" }],
-				],
-				painPoints: ["The contact form is hidden behind three help articles"],
-			},
-			{
-				key: "triage",
-				name: "Triage",
-				steps: [
-					[
-						"auto-reply",
-						"An auto-reply promises an answer within 24 hours",
-						2,
-						{ touchpoint: "Email" },
-					],
-					["invoice", "An agent asks for the invoice number", 3, { touchpoint: "Email" }],
-				],
-				opportunities: ["Detect duplicate charges and refund them automatically"],
-			},
-			{
-				key: "resolve",
-				name: "Resolve",
-				steps: [
-					["call", "The agent calls to confirm the refund", 4, { touchpoint: "Phone" }],
-					["refund", "The refund appears on her statement", 4, { touchpoint: "Bank app" }],
-				],
-			},
-			{
-				key: "follow-up",
-				name: "Follow up",
-				steps: [["survey", "Dana rates the support in a survey", 5, { touchpoint: "Email" }]],
-			},
-		],
+		stages: supportTicketStages,
+	},
+	{
+		id: "support-ticket-journey-v2",
+		title: "Dana's double charge refund",
+		difficulty: "standard",
+		tags: ["journey", "support", "touchpoints", "refund", "real-voice"],
+		description:
+			"Four stages of getting a double charge refunded, seven steps with touchpoints and scores, one pain point and one opportunity.",
+		prompt: [
+			"journey map: Dana getting a double charge refunded (scores 1-5)",
+			"",
+			"stage,step,touchpoint,score",
+			"Report,Dana sees a double charge on her card,Bank app,1",
+			"Report,Dana opens a ticket in the help center,Help center,2",
+			"Triage,an auto-reply promises an answer within 24 hours,Email,2",
+			"Triage,an agent asks for the invoice number,Email,3",
+			"Resolve,the agent calls to confirm the refund,Phone,4",
+			"Resolve,the refund appears on her statement,Bank app,4",
+			"Follow up,Dana rates the support in a survey,Email,5",
+			"",
+			"pain point (Report): the contact form is hidden behind three help articles",
+			"opportunity (Triage): detect duplicate charges and refund them automatically",
+		].join("\n"),
+		persona: { text: "Dana", words: ["Dana"] },
+		stages: supportTicketStages,
 	},
 ];
 

@@ -53,6 +53,31 @@ describe("prompt-grounded org chart scenarios", () => {
 		expect(diagrams.some((diagram) => diagram.groupByDepartment)).toBe(true);
 	});
 
+	it("pastes each real-voice chart as a CSV row per person, with the same key as its original", () => {
+		const pasted = orgChartScenarios.filter((entry) => entry.tags.includes("real-voice"));
+		expect(pasted.map((entry) => entry.id)).toEqual([
+			"startup-team-org-chart-v2",
+			"engineering-department-org-chart-v2",
+			"leadership-dotted-line-org-chart-v2",
+			"sales-regions-org-chart-v2",
+		]);
+		for (const entry of pasted) {
+			expect(entry.assertions, entry.id).toEqual(
+				scenario(entry.id.replace(/-v2$/u, "")).assertions,
+			);
+			const rows = new Set(entry.prompt.split("\n"));
+			const { people } = entry.expectedDiagram;
+			const nameOf = (id: string | undefined) =>
+				people.find((person) => person.id === id)?.name ?? "";
+			for (const person of people) {
+				const department = entry.assertions.groupByDepartment ? [person.department ?? ""] : [];
+				expect(rows, `${entry.id} ${person.name}`).toContain(
+					[person.name, person.title, ...department, nameOf(person.manager)].join(", ").trimEnd(),
+				);
+			}
+		}
+	});
+
 	it("passes its own expected diagram, including what the scene draws and its layout", () => {
 		for (const entry of orgChartScenarios)
 			expect(failed(entry.id, entry.expectedDiagram), entry.id).toEqual([]);

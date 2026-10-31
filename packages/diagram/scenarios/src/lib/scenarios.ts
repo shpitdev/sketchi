@@ -17,6 +17,8 @@ export interface FlowchartScenarioAssertions {
 	requiredBranchLabels: string[];
 	requiredEdges: FlowchartScenarioRequiredEdge[];
 	requiredNodeKinds: FlowchartNodeKind[];
+	/** Components, not a process: the first and last steps may draw as any node but a decision. */
+	architecture: boolean;
 	requiredNodes: FlowchartScenarioRequiredNode[];
 	/** Fixture wording for diagnostic IDs and fixture intent, not label matching. */
 	requiredNodeLabels: string[];
@@ -164,6 +166,8 @@ interface FlowchartScenarioDefinition {
 	difficulty: DiagramScenarioDifficulty;
 	/** The prompt's stated reading direction; top to bottom by default. */
 	direction?: "LR" | "TB";
+	/** The prompt draws components, not a process: no start or end terminators. */
+	architecture?: boolean;
 	edges: readonly FlowchartEdgeDefinition[];
 	/**
 	 * Fixture nodes that continue the start step's entry chain, in order. They
@@ -406,6 +410,7 @@ function buildAssertions(
 			];
 		}),
 		requiredNodeKinds,
+		architecture: definition.architecture ?? false,
 		requiredNodes,
 		requiredNodeLabels: diagram.nodes.map((node) => node.label),
 		requiredGroups: groups.map(([id, label, labels, , zone]) => {
@@ -647,6 +652,46 @@ const flowchartScenarioDefinitions = [
 				"end",
 				["rejected returns", "ineligible or unacceptable returns end as rejected returns"],
 			],
+		],
+		edges: [
+			["request-window", "return-request", "verify-window"],
+			["window-eligible", "verify-window", "eligible"],
+			["eligible-label", "eligible", "issue-label", "yes", ["yes", "eligible"]],
+			["eligible-reject", "eligible", "reject-return", "no", ["no", "ineligible"]],
+			["label-inspect", "issue-label", "inspect-item"],
+			["inspect-condition", "inspect-item", "condition-ok"],
+			["condition-refund", "condition-ok", "refund", "yes", ["yes", "acceptable"]],
+			["condition-reject", "condition-ok", "reject-return", "no", ["no", "unacceptable"]],
+		],
+	},
+	{
+		id: "ecommerce-return-authorization-v2",
+		title: "Ecommerce return authorization",
+		difficulty: "standard",
+		tags: ["commerce", "authorization", "inspection", "real-voice"],
+		description:
+			"Exercises eligibility checks, item inspection, and separate refund/rejection endings.",
+		prompt:
+			"flowchart for ecommerce return authorization: a return request comes in, we verify the return window and decide if it's eligible. eligible → send a return label, then inspect the item when it arrives; if the condition is acceptable, refund. ineligible or unacceptable → reject the return",
+		nodes: [
+			["return-request", "Return request received", "start", ["return request"]],
+			[
+				"verify-window",
+				"Verify return window",
+				"process",
+				["verify the return window", "verify return window"],
+			],
+			["eligible", "Return eligible?", "decision", ["eligible"]],
+			["issue-label", "Issue return label", "process", ["return label"]],
+			["inspect-item", "Inspect returned item", "process", ["inspect the item", "inspect item"]],
+			[
+				"condition-ok",
+				"Condition acceptable?",
+				"decision",
+				["condition acceptable", "condition is acceptable"],
+			],
+			["refund", "Refund customer", "end", ["refund"]],
+			["reject-return", "Reject return", "end", ["reject the return", "reject return"]],
 		],
 		edges: [
 			["request-window", "return-request", "verify-window"],
@@ -1941,6 +1986,43 @@ const flowchartScenarioDefinitions = [
 		],
 	},
 	{
+		id: "grouped-expense-approval-v2",
+		roleGroups: true,
+		title: "Grouped expense approval",
+		difficulty: "standard",
+		tags: ["groups", "approval", "loop", "real-voice"],
+		description:
+			"An approval process grouped by team, with a rejection loop back into the first team's group.",
+		prompt:
+			"expense approval flowchart, grouped by team\nEmployee: submits an expense report\nManager: reviews the report, approved?\nFinance: verifies the receipts, then pays the employee\nrejected reports go back to the employee to revise and resubmit for review",
+		nodes: [
+			[
+				"submit",
+				"Submit expense report",
+				"start",
+				["submits an expense report", "submit expense report"],
+			],
+			["review", "Review the report", "process", ["reviews the report", "review report"]],
+			["approved", "Approved?", "decision", ["approved"]],
+			["revise", "Revise the report", "process", ["revise the report", "revise report"]],
+			["verify", "Verify receipts", "process", ["verifies the receipts", "verify receipts"]],
+			["pay", "Pay the employee", "end", ["pays the employee", "pay employee"]],
+		],
+		edges: [
+			["submit-review", "submit", "review"],
+			["review-approved", "review", "approved"],
+			["approved-verify", "approved", "verify", "yes", ["yes", "approved"]],
+			["approved-revise", "approved", "revise", "no", ["no", "rejected"]],
+			["revise-review", "revise", "review"],
+			["verify-pay", "verify", "pay"],
+		],
+		groups: [
+			["employee", "Employee", ["employee"], ["submit", "revise"]],
+			["manager", "Manager", ["manager"], ["review", "approved"]],
+			["finance", "Finance", ["finance"], ["verify", "pay"]],
+		],
+	},
+	{
 		id: "three-zone-request-path",
 		title: "Three-zone request path",
 		difficulty: "standard",
@@ -1950,6 +2032,51 @@ const flowchartScenarioDefinitions = [
 			"A request path through three network zones, with a cache decision that can end the flow early.",
 		prompt:
 			"Create a left-to-right flowchart of a web request crossing three network zones. In the Public internet zone, the browser sends a request, which starts the flow. In the DMZ, the CDN checks its cache and decides whether there is a cache hit. A hit returns the cached page and ends the flow. On a miss, the WAF filters the request. In the Private subnet zone, the API server handles the request and queries the database, and then the response is returned, which ends the flow.",
+		nodes: [
+			[
+				"request",
+				"Browser sends request",
+				"start",
+				["browser sends a request", "browser sends request"],
+			],
+			["cache", "CDN checks cache", "process", ["CDN checks its cache", "CDN checks cache"]],
+			["hit", "Cache hit?", "decision", ["cache hit"]],
+			["cached", "Return cached page", "end", ["returns the cached page", "cached page"]],
+			["waf", "WAF filters request", "process", ["WAF filters the request", "WAF filters"]],
+			[
+				"api",
+				"API server handles request",
+				"process",
+				["API server handles the request", "API server"],
+			],
+			["db", "Query the database", "process", ["queries the database", "query database"]],
+			["response", "Response returned", "end", ["response is returned", "response returned"]],
+		],
+		edges: [
+			["request-cache", "request", "cache"],
+			["cache-hit", "cache", "hit"],
+			["hit-cached", "hit", "cached", "hit"],
+			["hit-waf", "hit", "waf", "miss"],
+			["waf-api", "waf", "api"],
+			["api-db", "api", "db"],
+			["db-response", "db", "response"],
+		],
+		groups: [
+			["internet", "Public internet", ["public internet", "internet"], ["request"]],
+			["dmz", "DMZ", ["dmz"], ["cache", "hit", "waf"]],
+			["private", "Private subnet", ["private subnet", "private"], ["api", "db"]],
+		],
+	},
+	{
+		id: "three-zone-request-path-v2",
+		title: "Three-zone request path",
+		difficulty: "standard",
+		tags: ["groups", "zones", "architecture", "left-to-right", "real-voice"],
+		direction: "LR",
+		description:
+			"A request path through three network zones, with a cache decision that can end the flow early.",
+		prompt:
+			"left-to-right flowchart of a web request across our 3 network zones. public internet: the browser sends a request. DMZ: the CDN checks its cache - a hit returns the cached page, a miss goes to the WAF, which filters the request. private subnet: the API server handles the request and queries the database, then the response is returned",
 		nodes: [
 			[
 				"request",
@@ -2021,6 +2148,41 @@ const flowchartScenarioDefinitions = [
 		ungrouped: ["order", "fraud"],
 	},
 	{
+		id: "mixed-fulfilment-groups-v2",
+		roleGroups: true,
+		title: "Order fulfilment with grouped and ungrouped steps",
+		difficulty: "standard",
+		tags: ["groups", "mixed-membership", "decision", "real-voice"],
+		description:
+			"Only some steps belong to groups: intake and the fraud decision stay outside, while warehouse and carrier work is grouped.",
+		prompt:
+			"order fulfilment flowchart. order placed → fraud check; if it fails, cancel the order. if it passes, the Warehouse picks the items, packs the order and prints the shipping label, then the Carrier collects the parcel and delivers it to the customer. group the warehouse steps and the carrier steps, nothing else",
+		nodes: [
+			["order", "Order placed", "start", ["order placed"]],
+			["fraud", "Fraud check passed?", "decision", ["fraud check", "passes"]],
+			["cancel", "Cancel the order", "end", ["cancel the order", "cancel order"]],
+			["pick", "Pick the items", "process", ["picks the items", "pick items"]],
+			["pack", "Pack the order", "process", ["packs the order", "pack order"]],
+			["label", "Print shipping label", "process", ["prints the shipping label", "shipping label"]],
+			["collect", "Collect the parcel", "process", ["collects the parcel", "collect parcel"]],
+			["deliver", "Deliver to customer", "end", ["delivers it to the customer", "deliver"]],
+		],
+		edges: [
+			["order-fraud", "order", "fraud"],
+			["fraud-pick", "fraud", "pick", "yes", ["yes", "passes"]],
+			["fraud-cancel", "fraud", "cancel", "no", ["no", "failed"]],
+			["pick-pack", "pick", "pack"],
+			["pack-label", "pack", "label"],
+			["label-collect", "label", "collect"],
+			["collect-deliver", "collect", "deliver"],
+		],
+		groups: [
+			["warehouse", "Warehouse", ["warehouse"], ["pick", "pack", "label"]],
+			["carrier", "Carrier", ["carrier"], ["collect", "deliver"]],
+		],
+		ungrouped: ["order", "fraud"],
+	},
+	{
 		id: "swimlane-order-fulfilment",
 		title: "Order fulfilment swimlanes",
 		difficulty: "standard",
@@ -2066,6 +2228,51 @@ const flowchartScenarioDefinitions = [
 		],
 	},
 	{
+		id: "swimlane-order-fulfilment-v2",
+		title: "Order fulfilment swimlanes",
+		difficulty: "standard",
+		tags: ["lanes", "handoffs", "decision", "left-to-right", "real-voice"],
+		direction: "LR",
+		description:
+			"Order fulfilment across four lanes, with straight handoffs between neighbors and an invoice that crosses from the last lane to the first and back.",
+		prompt:
+			"swimlanes L→R for order fulfilment, lanes Customer | Sales | Warehouse | Finance\ncustomer places an order → sales reviews the order, items in stock? if not, sales notifies the customer of a backorder. if yes: warehouse picks the items, packs the order, ships it → finance sends the invoice → customer pays the invoice → finance records the payment",
+		nodes: [
+			["place", "Place order", "start", ["places an order", "place order"]],
+			["review", "Review the order", "process", ["reviews the order", "review order"]],
+			["stock", "Items in stock?", "decision", ["items in stock", "in stock"]],
+			[
+				"backorder",
+				"Notify customer of backorder",
+				"end",
+				["notifies the customer of a backorder", "backorder"],
+			],
+			["pick", "Pick the items", "process", ["picks the items", "pick items"]],
+			["pack", "Pack the order", "process", ["packs the order", "pack order"]],
+			["ship", "Ship the order", "process", ["ships it", "ship"]],
+			["invoice", "Send the invoice", "process", ["sends the invoice", "send invoice"]],
+			["pay", "Pay the invoice", "process", ["pays the invoice", "pay invoice"]],
+			["record", "Record the payment", "end", ["records the payment", "record payment"]],
+		],
+		edges: [
+			["place-review", "place", "review"],
+			["review-stock", "review", "stock"],
+			["stock-backorder", "stock", "backorder", "no", ["no", "not"]],
+			["stock-pick", "stock", "pick", "yes", ["yes", "in stock"]],
+			["pick-pack", "pick", "pack"],
+			["pack-ship", "pack", "ship"],
+			["ship-invoice", "ship", "invoice"],
+			["invoice-pay", "invoice", "pay"],
+			["pay-record", "pay", "record"],
+		],
+		lanes: [
+			["customer", "Customer", ["customer"], ["place", "pay"]],
+			["sales", "Sales", ["sales"], ["review", "stock", "backorder"]],
+			["warehouse", "Warehouse", ["warehouse"], ["pick", "pack", "ship"]],
+			["finance", "Finance", ["finance"], ["invoice", "record"]],
+		],
+	},
+	{
 		id: "swimlane-hiring",
 		title: "Hiring process swimlanes",
 		difficulty: "standard",
@@ -2074,6 +2281,55 @@ const flowchartScenarioDefinitions = [
 			"Hiring across three lanes, with a rejection handed back to the candidate and another interview round looping back across lanes.",
 		prompt:
 			"Create a swimlane flowchart of a hiring process with lanes for the Candidate, the Recruiter and the Hiring manager, in that order. The candidate submits an application, which starts the flow. The recruiter screens the application and decides whether the candidate is qualified. An unqualified candidate receives a rejection, which ends the flow. For a qualified candidate, the recruiter schedules an interview, the candidate attends the interview, and the hiring manager assesses the candidate and decides whether to hire. If the manager wants another round, the flow returns to scheduling an interview. On a hire, the recruiter sends an offer and the candidate accepts the offer, which ends the flow.",
+		nodes: [
+			["apply", "Submit application", "start", ["submits an application", "submit application"]],
+			[
+				"screen",
+				"Screen the application",
+				"process",
+				["screens the application", "screen application"],
+			],
+			["qualified", "Qualified?", "decision", ["qualified"]],
+			["reject", "Receive rejection", "end", ["receives a rejection", "rejection"]],
+			[
+				"schedule",
+				"Schedule interview",
+				"process",
+				["schedules an interview", "schedule interview"],
+			],
+			["attend", "Attend interview", "process", ["attends the interview", "attend interview"]],
+			["assess", "Assess the candidate", "process", ["assesses the candidate", "assess candidate"]],
+			["hire", "Hire?", "decision", ["hire"]],
+			["offer", "Send offer", "process", ["sends an offer", "send offer"]],
+			["accept", "Accept offer", "end", ["accepts the offer", "accept offer"]],
+		],
+		edges: [
+			["apply-screen", "apply", "screen"],
+			["screen-qualified", "screen", "qualified"],
+			["qualified-reject", "qualified", "reject", "no", ["no", "unqualified"]],
+			["qualified-schedule", "qualified", "schedule", "yes", ["yes", "qualified"]],
+			["schedule-attend", "schedule", "attend"],
+			["attend-assess", "attend", "assess"],
+			["assess-hire", "assess", "hire"],
+			["hire-offer", "hire", "offer", "yes", ["yes", "hire"]],
+			["hire-schedule", "hire", "schedule", "no", ["no", "another round"]],
+			["offer-accept", "offer", "accept"],
+		],
+		lanes: [
+			["candidate", "Candidate", ["candidate"], ["apply", "reject", "attend", "accept"]],
+			["recruiter", "Recruiter", ["recruiter"], ["screen", "qualified", "schedule", "offer"]],
+			["manager", "Hiring manager", ["hiring manager", "manager"], ["assess", "hire"]],
+		],
+	},
+	{
+		id: "swimlane-hiring-v2",
+		title: "Hiring process swimlanes",
+		difficulty: "standard",
+		tags: ["lanes", "handoffs", "decision", "loop", "real-voice"],
+		description:
+			"Hiring across three lanes, with a rejection handed back to the candidate and another interview round looping back across lanes.",
+		prompt:
+			"swimlane flowchart of our hiring process, lanes: Candidate, Recruiter, Hiring manager\ncandidate submits an application → recruiter screens the application, qualified? unqualified → candidate receives a rejection. qualified → recruiter schedules an interview → candidate attends the interview → hiring manager assesses the candidate, hire? another round → back to scheduling an interview. hire → recruiter sends an offer → candidate accepts the offer",
 		nodes: [
 			["apply", "Submit application", "start", ["submits an application", "submit application"]],
 			[
@@ -2161,7 +2417,54 @@ const flowchartScenarioDefinitions = [
 		],
 	},
 	{
+		id: "swimlane-incident-response-v2",
+		title: "Incident response swimlanes",
+		difficulty: "standard",
+		tags: ["lanes", "handoffs", "loop", "left-to-right", "real-voice"],
+		direction: "LR",
+		description:
+			"Incident response across three lanes, with a handoff that skips a lane and an unresolved incident looping back to the SRE.",
+		prompt:
+			"L→R swimlanes for incident response: On-call | SRE | Comms\nalert fires → on-call triages the alert and pages the SRE → SRE investigates the incident and applies a mitigation → comms posts a status update → on-call checks whether the incident is resolved. not resolved → back to the SRE investigating. resolved → comms publishes the resolution",
+		nodes: [
+			["alert", "Alert fires", "start", ["alert fires"]],
+			["triage", "Triage the alert", "process", ["triages the alert", "triage alert"]],
+			["page", "Page the SRE", "process", ["pages the SRE", "page SRE"]],
+			[
+				"investigate",
+				"Investigate the incident",
+				"process",
+				["investigates the incident", "investigate"],
+			],
+			["mitigate", "Apply a mitigation", "process", ["applies a mitigation", "mitigation"]],
+			["status", "Post status update", "process", ["posts a status update", "status update"]],
+			["resolved", "Incident resolved?", "decision", ["incident is resolved", "resolved"]],
+			[
+				"publish",
+				"Publish the resolution",
+				"end",
+				["publishes the resolution", "publish resolution"],
+			],
+		],
+		edges: [
+			["alert-triage", "alert", "triage"],
+			["triage-page", "triage", "page"],
+			["page-investigate", "page", "investigate"],
+			["investigate-mitigate", "investigate", "mitigate"],
+			["mitigate-status", "mitigate", "status"],
+			["status-resolved", "status", "resolved"],
+			["resolved-investigate", "resolved", "investigate", "no", ["no", "not"]],
+			["resolved-publish", "resolved", "publish", "yes", ["yes", "resolved"]],
+		],
+		lanes: [
+			["oncall", "On-call", ["on-call", "on call"], ["alert", "triage", "page", "resolved"]],
+			["sre", "SRE", ["sre"], ["investigate", "mitigate"]],
+			["comms", "Comms", ["comms"], ["status", "publish"]],
+		],
+	},
+	{
 		id: "aws-three-tier-zones",
+		architecture: true,
 		title: "AWS three-tier app in nested zones",
 		difficulty: "standard",
 		tags: ["zones", "nesting", "architecture", "shapes", "left-to-right"],
@@ -2239,7 +2542,72 @@ const flowchartScenarioDefinitions = [
 		shapes: { rds: "database", s3: "storage" },
 	},
 	{
+		id: "aws-three-tier-zones-v2",
+		architecture: true,
+		title: "AWS three-tier app in nested zones",
+		difficulty: "standard",
+		tags: ["zones", "nesting", "architecture", "shapes", "left-to-right", "real-voice"],
+		direction: "LR",
+		description:
+			"A three-tier AWS app: a load balancer in a public subnet, two services in a private subnet and a database in a database subnet, inside a VPC in a region, with a bucket in the region outside the VPC.",
+		prompt:
+			"draw our aws setup L→R: users → ALB (public subnet) → web + api ECS services (private subnet) → RDS postgres (db subnet). api also puts uploads in S3. the subnets are in the VPC, VPC + S3 are in us-east-1",
+		logos: [
+			{
+				aliases: ["AWS", "amazon", "amazon web services"],
+				collection: "cloud-vendors",
+				name: "AWS",
+				slug: "aws",
+			},
+			{
+				aliases: ["PostgreSQL", "postgres", "postgres sql", "psql"],
+				collection: "data-storage",
+				name: "PostgreSQL",
+				slug: "postgresql",
+			},
+		],
+		nodes: [
+			["users", "Users", "start", ["users"]],
+			["alb", "Application Load Balancer", "process", ["ALB"]],
+			["web", "ECS web service", "process", ["web service"]],
+			["api", "ECS API service", "process", ["API service"]],
+			["rds", "RDS PostgreSQL database", "end", ["RDS postgres", "postgres db"]],
+			// The prompt names the bucket only as S3, so S3 alone names it.
+			["s3", "S3 bucket", "end", ["S3"]],
+		],
+		edges: [
+			["users-alb", "users", "alb"],
+			["alb-web", "alb", "web"],
+			["alb-api", "alb", "api"],
+			["web-rds", "web", "rds"],
+			["api-rds", "api", "rds"],
+			["api-s3", "api", "s3"],
+		],
+		groups: [
+			["region", "us-east-1", ["us-east-1"], ["s3"], { kinds: ["region"] }],
+			["vpc", "VPC", ["vpc"], [], { parent: "region", kinds: ["vpc"] }],
+			[
+				"public",
+				"Public subnet",
+				["public subnet", "public"],
+				["alb"],
+				{ parent: "vpc", kinds: ["subnet"] },
+			],
+			[
+				"private",
+				"Private subnet",
+				["private subnet", "private"],
+				["web", "api"],
+				{ parent: "vpc", kinds: ["subnet"] },
+			],
+			["data", "Database subnet", ["db subnet"], ["rds"], { parent: "vpc", kinds: ["subnet"] }],
+		],
+		outsideGroups: { region: ["users"] },
+		shapes: { rds: "database", s3: "storage" },
+	},
+	{
 		id: "kubernetes-cluster-zones",
+		architecture: true,
 		title: "Kubernetes cluster with namespaces",
 		difficulty: "standard",
 		tags: ["zones", "nesting", "architecture", "shapes", "kubernetes"],
@@ -2308,7 +2676,78 @@ const flowchartScenarioDefinitions = [
 		shapes: { queue: "queue", db: "database" },
 	},
 	{
+		id: "kubernetes-cluster-zones-v2",
+		architecture: true,
+		title: "Kubernetes cluster with namespaces",
+		difficulty: "standard",
+		tags: ["zones", "nesting", "architecture", "shapes", "kubernetes", "real-voice"],
+		description:
+			"Services and pods in three namespaces of a cluster, with a managed database and a message queue outside the cluster.",
+		prompt:
+			"draw our k8s setup top to bottom. browser → ingress controller (ingress namespace) → web service → web pods (frontend namespace) → API service → API pods (backend namespace). the API pods write orders to Cloud SQL and publish jobs to a RabbitMQ queue; worker pods, also in backend, consume the jobs and write results to the same Cloud SQL db. the namespaces are in our GKE cluster, Cloud SQL and RabbitMQ are outside it",
+		logos: [
+			{
+				aliases: ["Kubernetes", "k8s", "kube"],
+				collection: "devtools-ci",
+				name: "Kubernetes",
+				slug: "kubernetes",
+			},
+			{ collection: "gcp", name: "Cloud SQL", slug: "cloud-sql" },
+			{ collection: "data-storage", name: "Rabbitmq", slug: "rabbitmq" },
+			{ collection: "gcp", name: "Gke", slug: "gke" },
+		],
+		nodes: [
+			["browser", "Browser", "start", ["browser"]],
+			["ingress", "Ingress controller", "process", ["ingress controller"]],
+			["websvc", "Web service", "process", ["web service"]],
+			["webpods", "Web pods", "process", ["web pods"]],
+			["apisvc", "API service", "process", ["API service"]],
+			["apipods", "API pods", "process", ["API pods"]],
+			["queue", "RabbitMQ queue", "process", ["RabbitMQ"]],
+			["workers", "Worker pods", "process", ["worker pods"]],
+			["db", "Cloud SQL database", "end", ["Cloud SQL"]],
+		],
+		edges: [
+			["browser-ingress", "browser", "ingress"],
+			["ingress-websvc", "ingress", "websvc"],
+			["websvc-webpods", "websvc", "webpods"],
+			["webpods-apisvc", "webpods", "apisvc"],
+			["apisvc-apipods", "apisvc", "apipods"],
+			["apipods-db", "apipods", "db"],
+			["apipods-queue", "apipods", "queue"],
+			["queue-workers", "queue", "workers"],
+			["workers-db", "workers", "db"],
+		],
+		groups: [
+			["cluster", "GKE cluster", ["GKE cluster", "cluster"], [], { kinds: ["cluster"] }],
+			[
+				"edge",
+				"Ingress namespace",
+				["ingress namespace", "ingress"],
+				["ingress"],
+				{ parent: "cluster", kinds: ["namespace"] },
+			],
+			[
+				"frontend",
+				"Frontend namespace",
+				["frontend namespace", "frontend"],
+				["websvc", "webpods"],
+				{ parent: "cluster", kinds: ["namespace"] },
+			],
+			[
+				"backend",
+				"Backend namespace",
+				["backend namespace", "backend"],
+				["apisvc", "apipods", "workers"],
+				{ parent: "cluster", kinds: ["namespace"] },
+			],
+		],
+		outsideGroups: { cluster: ["browser", "queue", "db"] },
+		shapes: { queue: "queue", db: "database" },
+	},
+	{
 		id: "hybrid-cloud-zones",
+		architecture: true,
 		title: "Hybrid on-prem and cloud setup",
 		difficulty: "challenge",
 		tags: ["zones", "nesting", "architecture", "shapes", "hybrid", "left-to-right"],
@@ -2380,6 +2819,88 @@ const flowchartScenarioDefinitions = [
 			],
 		],
 		// The prompt saves PDF documents in an archive in a cloud region: a document
+		// stack or an object-storage bucket each reads as that archive.
+		shapes: {
+			oracle: "database",
+			queue: "queue",
+			table: "database",
+			archive: ["document", "storage"],
+		},
+	},
+	{
+		id: "hybrid-cloud-zones-v2",
+		architecture: true,
+		title: "Hybrid on-prem and cloud setup",
+		difficulty: "challenge",
+		tags: ["zones", "nesting", "architecture", "shapes", "hybrid", "left-to-right", "real-voice"],
+		direction: "LR",
+		description:
+			"An on-prem data center joined by a VPN to a cloud VPC four zones deep, where orders queue for a sync function that writes a table and archives invoices.",
+		prompt:
+			"draw our hybrid setup left to right.\non-prem data center: office staff enter orders in the legacy ERP, both on the corporate network. the ERP stores records in an Oracle database in the data center.\nERP → site-to-site VPN gateway in our production VPC → order API in the VPC's private subnet → order queue → sync function → orders table. the sync function also saves each invoice as a PDF in the invoice archive.\nthe VPC, queue, sync function, table and archive are all in eu-west-1, in our AWS cloud",
+		logos: [
+			{ collection: "cloud-vendors", name: "Oracle", slug: "oracle" },
+			{
+				aliases: ["AWS", "amazon", "amazon web services"],
+				collection: "cloud-vendors",
+				name: "AWS",
+				slug: "aws",
+			},
+		],
+		nodes: [
+			["staff", "Office staff", "start", ["office staff"]],
+			["erp", "Legacy ERP", "process", ["legacy ERP", "ERP"]],
+			["oracle", "Oracle database", "end", ["Oracle database"]],
+			["vpn", "Site-to-site VPN gateway", "process", ["site-to-site VPN gateway", "VPN gateway"]],
+			["api", "Order API", "process", ["order API"]],
+			["queue", "Order queue", "process", ["order queue"]],
+			["sync", "Sync function", "process", ["sync function"]],
+			["table", "Orders table", "end", ["orders table"]],
+			["archive", "Invoice archive", "end", ["invoice archive"]],
+		],
+		edges: [
+			["staff-erp", "staff", "erp"],
+			["erp-oracle", "erp", "oracle"],
+			["erp-vpn", "erp", "vpn"],
+			["vpn-api", "vpn", "api"],
+			["api-queue", "api", "queue"],
+			["queue-sync", "queue", "sync"],
+			["sync-table", "sync", "table"],
+			["sync-archive", "sync", "archive"],
+		],
+		groups: [
+			[
+				"onprem",
+				"On-prem data center",
+				["on-prem data center", "data center"],
+				["oracle"],
+				{ kinds: ["datacenter"] },
+			],
+			["corp", "Corporate network", ["corporate network"], ["staff", "erp"], { parent: "onprem" }],
+			["aws", "AWS cloud", ["AWS cloud", "AWS"], [], { kinds: ["cloud"] }],
+			[
+				"region",
+				"eu-west-1",
+				["eu-west-1"],
+				["queue", "sync", "table", "archive"],
+				{ parent: "aws", kinds: ["region"] },
+			],
+			[
+				"vpc",
+				"Production VPC",
+				["production VPC", "VPC"],
+				["vpn"],
+				{ parent: "region", kinds: ["vpc"] },
+			],
+			[
+				"private",
+				"Private subnet",
+				["private subnet"],
+				["api"],
+				{ parent: "vpc", kinds: ["subnet"] },
+			],
+		],
+		// Invoices saved as PDFs in an archive in a cloud region: a document
 		// stack or an object-storage bucket each reads as that archive.
 		shapes: {
 			oracle: "database",

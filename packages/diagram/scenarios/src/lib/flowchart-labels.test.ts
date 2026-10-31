@@ -81,6 +81,10 @@ describe("prompt-grounded flowchart labels", () => {
 		["Payment fails then send reminder", ["send reminder"]],
 		["Payment fails or send reminder", ["send reminder"]],
 		["Next.js page receives question", ["Next.js"]],
+		["Application Load Balancer", ["ALB"]],
+		["ALB", ["application load balancer"]],
+		["Database subnet", ["db subnet"]],
+		["RDS PostgreSQL", ["RDS postgres"]],
 	])("accepts punctuation, case, and explicit alternatives in %s", (label, alternatives) => {
 		expect(flowchartLabelMatches(label, alternatives)).toBe(true);
 	});

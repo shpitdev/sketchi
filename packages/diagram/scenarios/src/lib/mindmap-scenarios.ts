@@ -258,6 +258,309 @@ function defineMindmapScenario(definition: MindmapScenarioDefinition): MindmapSc
 	};
 }
 
+const teamOffsite = topic(
+	"Team offsite",
+	["offsite"],
+	[
+		topic(
+			"Location",
+			["location"],
+			[topic("Mountain lodge", ["lodge"]), topic("City hotel", ["hotel"])],
+		),
+		topic(
+			"Activities",
+			["activit"],
+			[
+				topic("Hiking", ["hiking"]),
+				topic("Cooking class", ["cooking"]),
+				topic("Board games", ["board game"]),
+			],
+		),
+		topic("Food", ["food"], [topic("Catering", ["catering"]), topic("Group dinner", ["dinner"])]),
+		topic(
+			"Budget",
+			["budget"],
+			[topic("Travel costs", ["travel"]), topic("Venue deposit", ["deposit"])],
+		),
+	],
+);
+
+const photosynthesis = topic(
+	"Photosynthesis",
+	["photosynthesis"],
+	[
+		topic(
+			"Light reactions",
+			["light reaction"],
+			[
+				topic("Thylakoid membrane", ["thylakoid"]),
+				topic("Inputs", ["input"], [topic("Water", ["water"]), topic("Sunlight", ["sunlight"])]),
+				topic(
+					"Outputs",
+					["output"],
+					[topic("ATP", ["atp"]), topic("NADPH", ["nadph"]), topic("Oxygen", ["oxygen"])],
+				),
+			],
+		),
+		topic(
+			"Calvin cycle",
+			["calvin"],
+			[
+				topic("Stroma", ["stroma"]),
+				topic(
+					"Steps",
+					["step"],
+					[
+						topic("Carbon fixation", ["fixation"]),
+						topic("Reduction", ["reduction"]),
+						topic("Regeneration", ["regeneration"]),
+					],
+				),
+				topic("Product", ["product"], [topic("Glucose", ["glucose"])]),
+			],
+		),
+		topic(
+			"Limiting factors",
+			["limiting"],
+			[
+				topic("Light intensity", ["intensity"]),
+				topic("Carbon dioxide", ["carbon dioxide"]),
+				topic("Temperature", ["temperature"]),
+			],
+		),
+	],
+);
+
+const appLaunch = topic(
+	"App launch",
+	["app launch", "launch plan"],
+	[
+		topic(
+			"Goals",
+			["goal"],
+			[topic("10k signups", ["signup"]), topic("4-star rating", ["rating"])],
+		),
+		topic(
+			"Features",
+			["feature"],
+			[
+				topic("Shared budgets", ["shared budget"]),
+				topic("Bank sync", ["sync"]),
+				topic("Spending alerts", ["alert"]),
+			],
+		),
+		topic(
+			"Design",
+			["design"],
+			[topic("Onboarding flow", ["onboarding"]), topic("Dark mode", ["dark mode"])],
+		),
+		topic(
+			"Engineering",
+			["engineering"],
+			[topic("Load testing", ["load test"]), topic("Crash reporting", ["crash"])],
+		),
+		topic(
+			"Marketing",
+			["marketing"],
+			[
+				topic("Launch video", ["video"]),
+				topic("Influencer outreach", ["influencer"]),
+				topic("Press kit", ["press"]),
+			],
+		),
+		topic("Support", ["support"], [topic("Help center", ["help"]), topic("In-app chat", ["chat"])]),
+		topic(
+			"Risks",
+			["risk"],
+			[
+				topic("Bank API limits", ["api limit"]),
+				topic("App review delays", ["review delay", "app review"]),
+			],
+		),
+	],
+);
+
+const mlRoadmap = topic(
+	"Machine learning",
+	["machine learning"],
+	[
+		topic(
+			"Math foundations",
+			["math"],
+			[
+				topic("Linear algebra", ["algebra"]),
+				topic("Calculus", ["calculus"]),
+				topic("Probability", ["probabilit"]),
+				topic("Statistics", ["statistic"]),
+			],
+		),
+		topic(
+			"Programming",
+			["programming"],
+			[
+				topic("Python", ["python"]),
+				topic("NumPy", ["numpy"]),
+				topic("Pandas", ["pandas"]),
+				topic("Scikit-learn", ["scikit"]),
+				topic("Jupyter notebooks", ["jupyter"]),
+			],
+		),
+		topic(
+			"Supervised learning",
+			["supervised"],
+			[
+				topic(
+					"Regression",
+					["regression"],
+					[topic("Linear regression", ["linear regression"]), topic("Ridge regression", ["ridge"])],
+				),
+				topic(
+					"Classification",
+					["classification"],
+					[
+						topic("Logistic regression", ["logistic"]),
+						topic("Decision trees", ["decision tree"]),
+						topic("Support vector machines", ["support vector"]),
+					],
+				),
+			],
+		),
+		topic(
+			"Unsupervised learning",
+			["unsupervised"],
+			[
+				topic(
+					"Clustering",
+					["cluster"],
+					[topic("K-means", ["k means"]), topic("DBSCAN", ["dbscan"])],
+				),
+				topic(
+					"Dimensionality reduction",
+					["dimensionality"],
+					[topic("PCA", ["pca"]), topic("t-SNE", ["t sne"])],
+				),
+			],
+		),
+		topic(
+			"Deep learning",
+			["deep learning"],
+			[
+				topic("Neural networks", ["neural network"]),
+				topic("CNNs", ["cnn"]),
+				topic("Transformers", ["transformer"]),
+				topic(
+					"Training tricks",
+					["trick"],
+					[topic("Dropout", ["dropout"]), topic("Batch normalization", ["batch norm"])],
+				),
+			],
+		),
+		topic(
+			"Projects",
+			["project"],
+			[
+				topic("House price predictor", ["house price"]),
+				topic("Spam filter", ["spam"]),
+				topic("Image classifier", ["image"]),
+			],
+		),
+		topic(
+			"Deployment",
+			["deploy"],
+			[topic("Model serving", ["serving"]), topic("Monitoring", ["monitor"])],
+		),
+	],
+);
+
+const animalKingdom = topic(
+	"Animals",
+	["animal"],
+	[
+		topic(
+			"Vertebrates",
+			["vertebrate"],
+			[
+				topic(
+					"Mammals",
+					["mammal"],
+					[
+						topic(
+							"Primates",
+							["primate"],
+							[
+								topic(
+									"Great apes",
+									["great ape"],
+									[topic("Gorillas", ["gorilla"]), topic("Chimpanzees", ["chimpanzee"])],
+								),
+								topic("Monkeys", ["monkey"]),
+							],
+						),
+						topic(
+							"Carnivores",
+							["carnivore"],
+							[
+								topic(
+									"Big cats",
+									["big cat"],
+									[topic("Lions", ["lion"]), topic("Tigers", ["tiger"])],
+								),
+								topic("Bears", ["bear"]),
+							],
+						),
+						topic("Whales", ["whale"]),
+					],
+				),
+				topic(
+					"Birds",
+					["bird"],
+					[
+						topic("Raptors", ["raptor"], [topic("Eagles", ["eagle"]), topic("Owls", ["owl"])]),
+						topic("Songbirds", ["songbird"]),
+					],
+				),
+				topic("Reptiles", ["reptile"], [topic("Snakes", ["snake"]), topic("Lizards", ["lizard"])]),
+				topic(
+					"Amphibians",
+					["amphibian"],
+					[topic("Frogs", ["frog"]), topic("Salamanders", ["salamander"])],
+				),
+				topic("Fish", ["fish"], [topic("Sharks", ["shark"]), topic("Salmon", ["salmon"])]),
+			],
+		),
+		topic(
+			"Invertebrates",
+			["invertebrate"],
+			[
+				topic(
+					"Insects",
+					["insect"],
+					[
+						topic("Beetles", ["beetle"]),
+						topic("Butterflies", ["butterfl"]),
+						topic("Ants", ["ant"]),
+					],
+				),
+				topic(
+					"Mollusks",
+					["mollus"],
+					[topic("Octopuses", ["octopus"]), topic("Snails", ["snail"])],
+				),
+				topic(
+					"Arachnids",
+					["arachnid"],
+					[topic("Spiders", ["spider"]), topic("Scorpions", ["scorpion"])],
+				),
+				topic(
+					"Crustaceans",
+					["crustacean"],
+					[topic("Crabs", ["crab"]), topic("Lobsters", ["lobster"])],
+				),
+			],
+		),
+	],
+);
+
 const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 	{
 		id: "team-offsite-mindmap",
@@ -267,36 +570,17 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 		description: "A small brainstorm: four branches of two or three ideas each.",
 		prompt:
 			"Brainstorm our team offsite as a mindmap. The central topic is Team offsite, with four branches: Location (Mountain lodge, City hotel), Activities (Hiking, Cooking class, Board games), Food (Catering, Group dinner) and Budget (Travel costs, Venue deposit). Use only these topics.",
-		root: topic(
-			"Team offsite",
-			["offsite"],
-			[
-				topic(
-					"Location",
-					["location"],
-					[topic("Mountain lodge", ["lodge"]), topic("City hotel", ["hotel"])],
-				),
-				topic(
-					"Activities",
-					["activit"],
-					[
-						topic("Hiking", ["hiking"]),
-						topic("Cooking class", ["cooking"]),
-						topic("Board games", ["board game"]),
-					],
-				),
-				topic(
-					"Food",
-					["food"],
-					[topic("Catering", ["catering"]), topic("Group dinner", ["dinner"])],
-				),
-				topic(
-					"Budget",
-					["budget"],
-					[topic("Travel costs", ["travel"]), topic("Venue deposit", ["deposit"])],
-				),
-			],
-		),
+		root: teamOffsite,
+	},
+	{
+		id: "team-offsite-mindmap-v2",
+		title: "Team offsite",
+		difficulty: "smoke",
+		tags: ["mindmap", "brainstorm", "small", "real-voice"],
+		description: "A small brainstorm: four branches of two or three ideas each.",
+		prompt:
+			"offsite brainstorm, can you mindmap it\n\nTeam offsite\n- Location: Mountain lodge, City hotel\n- Activities: Hiking, Cooking class, Board games\n- Food: Catering, Group dinner\n- Budget: Travel costs, Venue deposit",
+		root: teamOffsite,
 	},
 	{
 		id: "photosynthesis-study-mindmap",
@@ -307,55 +591,18 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 			"Study notes three levels deep, with grouping topics (Inputs, Outputs, Steps) between a branch and its details.",
 		prompt:
 			"Turn my biology study notes into a mindmap. The central topic is Photosynthesis, with three branches. Light reactions has Thylakoid membrane, Inputs (Water, Sunlight) and Outputs (ATP, NADPH, Oxygen). Calvin cycle has Stroma, Steps (Carbon fixation, Reduction, Regeneration) and Product (Glucose). Limiting factors has Light intensity, Carbon dioxide and Temperature. Use only these topics.",
-		root: topic(
-			"Photosynthesis",
-			["photosynthesis"],
-			[
-				topic(
-					"Light reactions",
-					["light reaction"],
-					[
-						topic("Thylakoid membrane", ["thylakoid"]),
-						topic(
-							"Inputs",
-							["input"],
-							[topic("Water", ["water"]), topic("Sunlight", ["sunlight"])],
-						),
-						topic(
-							"Outputs",
-							["output"],
-							[topic("ATP", ["atp"]), topic("NADPH", ["nadph"]), topic("Oxygen", ["oxygen"])],
-						),
-					],
-				),
-				topic(
-					"Calvin cycle",
-					["calvin"],
-					[
-						topic("Stroma", ["stroma"]),
-						topic(
-							"Steps",
-							["step"],
-							[
-								topic("Carbon fixation", ["fixation"]),
-								topic("Reduction", ["reduction"]),
-								topic("Regeneration", ["regeneration"]),
-							],
-						),
-						topic("Product", ["product"], [topic("Glucose", ["glucose"])]),
-					],
-				),
-				topic(
-					"Limiting factors",
-					["limiting"],
-					[
-						topic("Light intensity", ["intensity"]),
-						topic("Carbon dioxide", ["carbon dioxide"]),
-						topic("Temperature", ["temperature"]),
-					],
-				),
-			],
-		),
+		root: photosynthesis,
+	},
+	{
+		id: "photosynthesis-study-mindmap-v2",
+		title: "Photosynthesis",
+		difficulty: "standard",
+		tags: ["mindmap", "study-notes", "three-levels", "real-voice"],
+		description:
+			"Study notes three levels deep, with grouping topics (Inputs, Outputs, Steps) between a branch and its details.",
+		prompt:
+			"mindmap of my bio notes\n\nPhotosynthesis\n- Light reactions\n  - Thylakoid membrane\n  - Inputs: Water, Sunlight\n  - Outputs: ATP, NADPH, Oxygen\n- Calvin cycle\n  - Stroma\n  - Steps: Carbon fixation, Reduction, Regeneration\n  - Product: Glucose\n- Limiting factors: Light intensity, Carbon dioxide, Temperature",
+		root: photosynthesis,
 	},
 	{
 		id: "app-launch-planning-mindmap",
@@ -365,58 +612,17 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 		description: "Product planning with seven main branches around the center.",
 		prompt:
 			"Plan the launch of our budgeting app as a mindmap. The central topic is App launch, with seven branches: Goals (10k signups, 4-star rating), Features (Shared budgets, Bank sync, Spending alerts), Design (Onboarding flow, Dark mode), Engineering (Load testing, Crash reporting), Marketing (Launch video, Influencer outreach, Press kit), Support (Help center, In-app chat) and Risks (Bank API limits, App review delays). Use only these topics.",
-		root: topic(
-			"App launch",
-			["app launch", "launch plan"],
-			[
-				topic(
-					"Goals",
-					["goal"],
-					[topic("10k signups", ["signup"]), topic("4-star rating", ["rating"])],
-				),
-				topic(
-					"Features",
-					["feature"],
-					[
-						topic("Shared budgets", ["shared budget"]),
-						topic("Bank sync", ["sync"]),
-						topic("Spending alerts", ["alert"]),
-					],
-				),
-				topic(
-					"Design",
-					["design"],
-					[topic("Onboarding flow", ["onboarding"]), topic("Dark mode", ["dark mode"])],
-				),
-				topic(
-					"Engineering",
-					["engineering"],
-					[topic("Load testing", ["load test"]), topic("Crash reporting", ["crash"])],
-				),
-				topic(
-					"Marketing",
-					["marketing"],
-					[
-						topic("Launch video", ["video"]),
-						topic("Influencer outreach", ["influencer"]),
-						topic("Press kit", ["press"]),
-					],
-				),
-				topic(
-					"Support",
-					["support"],
-					[topic("Help center", ["help"]), topic("In-app chat", ["chat"])],
-				),
-				topic(
-					"Risks",
-					["risk"],
-					[
-						topic("Bank API limits", ["api limit"]),
-						topic("App review delays", ["review delay", "app review"]),
-					],
-				),
-			],
-		),
+		root: appLaunch,
+	},
+	{
+		id: "app-launch-planning-mindmap-v2",
+		title: "App launch",
+		difficulty: "standard",
+		tags: ["mindmap", "product-planning", "wide", "real-voice"],
+		description: "Product planning with seven main branches around the center.",
+		prompt:
+			"mindmap for planning our budgeting app launch\n\nApp launch\n- Goals: 10k signups, 4-star rating\n- Features: Shared budgets, Bank sync, Spending alerts\n- Design: Onboarding flow, Dark mode\n- Engineering: Load testing, Crash reporting\n- Marketing: Launch video, Influencer outreach, Press kit\n- Support: Help center, In-app chat\n- Risks: Bank API limits, App review delays",
+		root: appLaunch,
 	},
 	{
 		id: "ml-roadmap-mindmap",
@@ -427,100 +633,18 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 			"A 41-topic study roadmap: seven branches, two with grouping topics, and labels that share words (four kinds of regression).",
 		prompt:
 			"Map my machine learning study roadmap as a mindmap. The central topic is Machine learning, with seven branches. Math foundations: Linear algebra, Calculus, Probability, Statistics. Programming: Python, NumPy, Pandas, Scikit-learn, Jupyter notebooks. Supervised learning: Regression (Linear regression, Ridge regression) and Classification (Logistic regression, Decision trees, Support vector machines). Unsupervised learning: Clustering (K-means, DBSCAN) and Dimensionality reduction (PCA, t-SNE). Deep learning: Neural networks, CNNs, Transformers and Training tricks (Dropout, Batch normalization). Projects: House price predictor, Spam filter, Image classifier. Deployment: Model serving, Monitoring. Use only these topics.",
-		root: topic(
-			"Machine learning",
-			["machine learning"],
-			[
-				topic(
-					"Math foundations",
-					["math"],
-					[
-						topic("Linear algebra", ["algebra"]),
-						topic("Calculus", ["calculus"]),
-						topic("Probability", ["probabilit"]),
-						topic("Statistics", ["statistic"]),
-					],
-				),
-				topic(
-					"Programming",
-					["programming"],
-					[
-						topic("Python", ["python"]),
-						topic("NumPy", ["numpy"]),
-						topic("Pandas", ["pandas"]),
-						topic("Scikit-learn", ["scikit"]),
-						topic("Jupyter notebooks", ["jupyter"]),
-					],
-				),
-				topic(
-					"Supervised learning",
-					["supervised"],
-					[
-						topic(
-							"Regression",
-							["regression"],
-							[
-								topic("Linear regression", ["linear regression"]),
-								topic("Ridge regression", ["ridge"]),
-							],
-						),
-						topic(
-							"Classification",
-							["classification"],
-							[
-								topic("Logistic regression", ["logistic"]),
-								topic("Decision trees", ["decision tree"]),
-								topic("Support vector machines", ["support vector"]),
-							],
-						),
-					],
-				),
-				topic(
-					"Unsupervised learning",
-					["unsupervised"],
-					[
-						topic(
-							"Clustering",
-							["cluster"],
-							[topic("K-means", ["k means"]), topic("DBSCAN", ["dbscan"])],
-						),
-						topic(
-							"Dimensionality reduction",
-							["dimensionality"],
-							[topic("PCA", ["pca"]), topic("t-SNE", ["t sne"])],
-						),
-					],
-				),
-				topic(
-					"Deep learning",
-					["deep learning"],
-					[
-						topic("Neural networks", ["neural network"]),
-						topic("CNNs", ["cnn"]),
-						topic("Transformers", ["transformer"]),
-						topic(
-							"Training tricks",
-							["trick"],
-							[topic("Dropout", ["dropout"]), topic("Batch normalization", ["batch norm"])],
-						),
-					],
-				),
-				topic(
-					"Projects",
-					["project"],
-					[
-						topic("House price predictor", ["house price"]),
-						topic("Spam filter", ["spam"]),
-						topic("Image classifier", ["image"]),
-					],
-				),
-				topic(
-					"Deployment",
-					["deploy"],
-					[topic("Model serving", ["serving"]), topic("Monitoring", ["monitor"])],
-				),
-			],
-		),
+		root: mlRoadmap,
+	},
+	{
+		id: "ml-roadmap-mindmap-v2",
+		title: "Machine learning roadmap",
+		difficulty: "challenge",
+		tags: ["mindmap", "large", "three-levels", "real-voice"],
+		description:
+			"A 41-topic study roadmap: seven branches, two with grouping topics, and labels that share words (four kinds of regression).",
+		prompt:
+			"my ML study roadmap as a mindmap\n\nMachine learning\n- Math foundations: Linear algebra, Calculus, Probability, Statistics\n- Programming: Python, NumPy, Pandas, Scikit-learn, Jupyter notebooks\n- Supervised learning\n  - Regression: Linear regression, Ridge regression\n  - Classification: Logistic regression, Decision trees, Support vector machines\n- Unsupervised learning\n  - Clustering: K-means, DBSCAN\n  - Dimensionality reduction: PCA, t-SNE\n- Deep learning: Neural networks, CNNs, Transformers\n  - Training tricks: Dropout, Batch normalization\n- Projects: House price predictor, Spam filter, Image classifier\n- Deployment: Model serving, Monitoring",
+		root: mlRoadmap,
 	},
 	{
 		id: "animal-kingdom-mindmap",
@@ -530,98 +654,17 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 		description: "A 42-topic classification five levels deep under two very uneven branches.",
 		prompt:
 			"Draw part of the animal kingdom as a mindmap. The central topic is Animals, with two branches, Vertebrates and Invertebrates. Vertebrates: Mammals, Birds, Reptiles, Amphibians, Fish. Mammals: Primates, Carnivores, Whales. Primates: Great apes (Gorillas, Chimpanzees) and Monkeys. Carnivores: Big cats (Lions, Tigers) and Bears. Birds: Raptors (Eagles, Owls) and Songbirds. Reptiles: Snakes, Lizards. Amphibians: Frogs, Salamanders. Fish: Sharks, Salmon. Invertebrates: Insects (Beetles, Butterflies, Ants), Mollusks (Octopuses, Snails), Arachnids (Spiders, Scorpions) and Crustaceans (Crabs, Lobsters). Use only these topics.",
-		root: topic(
-			"Animals",
-			["animal"],
-			[
-				topic(
-					"Vertebrates",
-					["vertebrate"],
-					[
-						topic(
-							"Mammals",
-							["mammal"],
-							[
-								topic(
-									"Primates",
-									["primate"],
-									[
-										topic(
-											"Great apes",
-											["great ape"],
-											[topic("Gorillas", ["gorilla"]), topic("Chimpanzees", ["chimpanzee"])],
-										),
-										topic("Monkeys", ["monkey"]),
-									],
-								),
-								topic(
-									"Carnivores",
-									["carnivore"],
-									[
-										topic(
-											"Big cats",
-											["big cat"],
-											[topic("Lions", ["lion"]), topic("Tigers", ["tiger"])],
-										),
-										topic("Bears", ["bear"]),
-									],
-								),
-								topic("Whales", ["whale"]),
-							],
-						),
-						topic(
-							"Birds",
-							["bird"],
-							[
-								topic("Raptors", ["raptor"], [topic("Eagles", ["eagle"]), topic("Owls", ["owl"])]),
-								topic("Songbirds", ["songbird"]),
-							],
-						),
-						topic(
-							"Reptiles",
-							["reptile"],
-							[topic("Snakes", ["snake"]), topic("Lizards", ["lizard"])],
-						),
-						topic(
-							"Amphibians",
-							["amphibian"],
-							[topic("Frogs", ["frog"]), topic("Salamanders", ["salamander"])],
-						),
-						topic("Fish", ["fish"], [topic("Sharks", ["shark"]), topic("Salmon", ["salmon"])]),
-					],
-				),
-				topic(
-					"Invertebrates",
-					["invertebrate"],
-					[
-						topic(
-							"Insects",
-							["insect"],
-							[
-								topic("Beetles", ["beetle"]),
-								topic("Butterflies", ["butterfl"]),
-								topic("Ants", ["ant"]),
-							],
-						),
-						topic(
-							"Mollusks",
-							["mollus"],
-							[topic("Octopuses", ["octopus"]), topic("Snails", ["snail"])],
-						),
-						topic(
-							"Arachnids",
-							["arachnid"],
-							[topic("Spiders", ["spider"]), topic("Scorpions", ["scorpion"])],
-						),
-						topic(
-							"Crustaceans",
-							["crustacean"],
-							[topic("Crabs", ["crab"]), topic("Lobsters", ["lobster"])],
-						),
-					],
-				),
-			],
-		),
+		root: animalKingdom,
+	},
+	{
+		id: "animal-kingdom-mindmap-v2",
+		title: "Animal kingdom",
+		difficulty: "challenge",
+		tags: ["mindmap", "large", "deep", "five-levels", "real-voice"],
+		description: "A 42-topic classification five levels deep under two very uneven branches.",
+		prompt:
+			"mindmap of this bit of the animal kingdom\n\nAnimals\n- Vertebrates\n  - Mammals\n    - Primates\n      - Great apes: Gorillas, Chimpanzees\n      - Monkeys\n    - Carnivores\n      - Big cats: Lions, Tigers\n      - Bears\n    - Whales\n  - Birds\n    - Raptors: Eagles, Owls\n    - Songbirds\n  - Reptiles: Snakes, Lizards\n  - Amphibians: Frogs, Salamanders\n  - Fish: Sharks, Salmon\n- Invertebrates\n  - Insects: Beetles, Butterflies, Ants\n  - Mollusks: Octopuses, Snails\n  - Arachnids: Spiders, Scorpions\n  - Crustaceans: Crabs, Lobsters",
+		root: animalKingdom,
 	},
 ];
 
