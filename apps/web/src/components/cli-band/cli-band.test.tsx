@@ -10,11 +10,15 @@ import {
 } from "../../lib/cli-package";
 
 describe("CliBand", () => {
-	it("publishes both verified install commands verbatim", () => {
+	/**
+	 * Two install commands one above the other read as two steps. The band
+	 * shows npm; the docs offer the install script as the labeled alternative.
+	 */
+	it("installs with one command, npm", () => {
 		render(<CliBand />);
 
-		expect(screen.getByText(CLI_INSTALL_COMMAND)).toBeTruthy();
 		expect(screen.getByText(CLI_NPM_INSTALL_COMMAND)).toBeTruthy();
+		expect(screen.queryByText(CLI_INSTALL_COMMAND)).toBeNull();
 	});
 
 	it("gives every command its own copy control", () => {
@@ -22,7 +26,7 @@ describe("CliBand", () => {
 
 		expect(
 			screen.getAllByRole("button").map((button) => button.getAttribute("aria-label")),
-		).toEqual(["Copy install script", "Copy npm install command", "Copy example command"]);
+		).toEqual(["Copy npm install command", "Copy example command"]);
 	});
 
 	/**
@@ -36,11 +40,6 @@ describe("CliBand", () => {
 		vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
 
 		render(<CliBand />);
-
-		fireEvent.click(screen.getByRole("button", { name: "Copy install script" }));
-		await waitFor(() => {
-			expect(writeText).toHaveBeenCalledWith(CLI_INSTALL_COMMAND);
-		});
 
 		fireEvent.click(screen.getByRole("button", { name: "Copy npm install command" }));
 		await waitFor(() => {

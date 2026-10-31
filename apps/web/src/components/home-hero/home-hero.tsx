@@ -93,9 +93,7 @@ export function HomeHero({
 			<div className="sk-shell home-hero__inner">
 				<div className="home-hero__copy">
 					<h1 className="home-hero__title sk-rise" style={{ "--i": 0 } as CSSProperties}>
-						Describe it.
-						<br />
-						Sketchi <em>draws it.</em>
+						Editable diagrams <em>from a prompt</em>
 					</h1>
 					<div className="home-hero__actions sk-rise" style={{ "--i": 1 } as CSSProperties}>
 						<Button asChild size="xl" variant="brand">

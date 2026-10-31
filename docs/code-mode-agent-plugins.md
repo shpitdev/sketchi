@@ -85,12 +85,13 @@ PNG URLs.
 
 ### Install
 
-Copy the portable skill into the project where Agy will run:
+Copy the portable skill into the project where Agy will run.
+`https://sketchi.app/skill.md` redirects to
+`.agents/skills/sketchi-code-mode/SKILL.md` on `main`:
 
 ```sh
 mkdir -p .agents/skills/sketchi-code-mode
-curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/.agents/skills/sketchi-code-mode/SKILL.md \
-  -o .agents/skills/sketchi-code-mode/SKILL.md
+curl -fsSL https://sketchi.app/skill.md -o .agents/skills/sketchi-code-mode/SKILL.md
 ```
 
 Add this server to `.agents/mcp_config.json`, merging it with any existing
@@ -137,8 +138,7 @@ remote MCP server:
 ```sh
 SKETCHI_SKILL_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills/sketchi-code-mode"
 mkdir -p "$SKETCHI_SKILL_DIR"
-curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/.agents/skills/sketchi-code-mode/SKILL.md \
-  -o "$SKETCHI_SKILL_DIR/SKILL.md"
+curl -fsSL https://sketchi.app/skill.md -o "$SKETCHI_SKILL_DIR/SKILL.md"
 opencode mcp add sketchi-code-mode --url https://playground.sketchi.app/mcp
 ```
 

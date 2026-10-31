@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import { MarketingHome } from "./marketing-home";
 
 describe("MarketingHome", () => {
-	it("composes the hero, features, icons, and CTA", () => {
+	it("composes the hero, features, CLI, and icons", () => {
 		render(<MarketingHome />);
 
-		expect(screen.getByRole("heading", { name: /Sketchi draws it/i })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "Editable diagrams from a prompt" })).toBeTruthy();
 		expect(
 			screen.getByRole("heading", {
 				name: "Built on Excalidraw",
@@ -18,7 +18,8 @@ describe("MarketingHome", () => {
 				name: "Logos for your stack",
 			}),
 		).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "Describe your first diagram." })).toBeTruthy();
+		// The hero carries the call to action; no closing band repeats it.
+		expect(screen.queryByRole("heading", { name: /first diagram/ })).toBeNull();
 	});
 
 	it("features the CLI on the homepage with a reachable anchor", () => {

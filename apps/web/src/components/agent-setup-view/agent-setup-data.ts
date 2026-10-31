@@ -1,6 +1,6 @@
+import { PORTABLE_SKILL_URL } from "../../lib/portable-skill";
+
 const mcpEndpoint = "https://playground.sketchi.app/mcp";
-const portableSkillUrl =
-	"https://raw.githubusercontent.com/shpitdev/sketchi/main/.agents/skills/sketchi-code-mode/SKILL.md";
 const firstDiagram =
 	"Create a top-to-bottom request approval flowchart and return the hosted Excalidraw and PNG artifacts.";
 const portableFirstDiagram =
@@ -75,8 +75,7 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
 				label: "Add the skill",
 				value: `SKETCHI_SKILL_DIR="\${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills/sketchi-code-mode"
 mkdir -p "$SKETCHI_SKILL_DIR"
-curl -fsSL -o "$SKETCHI_SKILL_DIR/SKILL.md" \\
-  ${portableSkillUrl}`,
+curl -fsSL ${PORTABLE_SKILL_URL} -o "$SKETCHI_SKILL_DIR/SKILL.md"`,
 				kind: "shell",
 			},
 			{
@@ -138,8 +137,7 @@ curl -fsSL -o "$SKETCHI_SKILL_DIR/SKILL.md" \\
 			{
 				label: "Add the skill to your project",
 				value: `mkdir -p .agents/skills/sketchi-code-mode
-curl -fsSL -o .agents/skills/sketchi-code-mode/SKILL.md \\
-  ${portableSkillUrl}`,
+curl -fsSL ${PORTABLE_SKILL_URL} -o .agents/skills/sketchi-code-mode/SKILL.md`,
 				kind: "shell",
 			},
 			{

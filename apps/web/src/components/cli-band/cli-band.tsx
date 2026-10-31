@@ -5,8 +5,8 @@ import { CommandBlock } from "../command-block/index.js";
 import {
 	CLI_EXAMPLE_COMMAND,
 	CLI_NODE_REQUIREMENT,
+	CLI_NPM_INSTALL_COMMAND,
 	CLI_NPM_URL,
-	cliInstallOptions,
 } from "../../lib/cli-package";
 
 export interface CliBandProps {
@@ -50,9 +50,7 @@ export function CliBand({ npmUrl = CLI_NPM_URL }: CliBandProps) {
 					</div>
 
 					<div className="cli-band__body">
-						{cliInstallOptions.map((option) => (
-							<CommandBlock key={option.command} label={option.label} value={option.command} />
-						))}
+						<CommandBlock label="npm install command" value={CLI_NPM_INSTALL_COMMAND} />
 						<div className="cli-band__example">
 							<CommandBlock label="example command" value={CLI_EXAMPLE_COMMAND} />
 						</div>

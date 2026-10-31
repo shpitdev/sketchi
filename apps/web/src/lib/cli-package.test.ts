@@ -5,7 +5,6 @@ import {
 	CLI_NPM_INSTALL_COMMAND,
 	CLI_NPM_URL,
 	CLI_PACKAGE_NAME,
-	cliInstallOptions,
 } from "./cli-package";
 
 /**
@@ -17,9 +16,7 @@ import {
  */
 describe("CLI package facts", () => {
 	it("publishes the verified installer one-liner", () => {
-		expect(CLI_INSTALL_COMMAND).toBe(
-			"curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/install.sh | sh",
-		);
+		expect(CLI_INSTALL_COMMAND).toBe("curl -fsSL https://sketchi.app/install.sh | sh");
 	});
 
 	it("publishes the verified npm install command", () => {
@@ -30,14 +27,14 @@ describe("CLI package facts", () => {
 		expect(CLI_PACKAGE_NAME).toBe("sketchi");
 		expect(CLI_NPM_URL).toBe("https://www.npmjs.com/package/sketchi");
 
-		for (const option of cliInstallOptions) {
-			expect(option.command).not.toContain("@sketchi/cli");
+		for (const command of [CLI_INSTALL_COMMAND, CLI_NPM_INSTALL_COMMAND]) {
+			expect(command).not.toContain("@sketchi/cli");
 		}
 	});
 
 	it("pins no version, so the copy cannot go stale", () => {
-		for (const option of cliInstallOptions) {
-			expect(option.command).not.toContain("sketchi@");
+		for (const command of [CLI_INSTALL_COMMAND, CLI_NPM_INSTALL_COMMAND]) {
+			expect(command).not.toContain("sketchi@");
 		}
 	});
 });

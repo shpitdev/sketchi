@@ -4,6 +4,5 @@ export * from "./components/site-footer/index.js";
 export * from "./components/home-hero/index.js";
 export * from "./components/feature-grid/index.js";
 export * from "./components/icon-wall/index.js";
-export * from "./components/cta-band/index.js";
 export * from "./components/brand-icon/index.js";
 export * from "./components/docs-view/index.js";

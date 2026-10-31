@@ -162,6 +162,18 @@ test("Agy and OpenCode stay on the portable skill and MCP-only boundary", () => 
 	assert.doesNotMatch(webSetup, /sketchi-code-mode-antigravity|--model/i);
 	assert.match(webSetup, /\.agents\/skills\/sketchi-code-mode/);
 	assert.match(webSetup, /Merge into \.agents\/mcp_config\.json/);
+
+	// Setup copies the skill through the site's short URL, which must redirect
+	// to the committed portable skill.
+	const skillLib = read("apps/web/src/lib/portable-skill.ts");
+	assert.ok(existsSync(new URL(".agents/skills/sketchi-code-mode/SKILL.md", repoRoot)));
+	assert.match(
+		skillLib,
+		/"https:\/\/raw\.githubusercontent\.com\/shpitdev\/sketchi\/main\/\.agents\/skills\/sketchi-code-mode\/SKILL\.md"/,
+	);
+	assert.match(webSetup, /curl -fsSL \$\{PORTABLE_SKILL_URL\}/);
+	assert.equal(quickstart.match(/curl -fsSL https:\/\/sketchi\.app\/skill\.md -o /g)?.length, 2);
+	assert.doesNotMatch(quickstart, /curl[^\n]*raw\.githubusercontent\.com/);
 	assert.match(webSetup, /opencode\/skills\/sketchi-code-mode/);
 });
 

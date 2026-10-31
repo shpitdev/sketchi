@@ -7,7 +7,9 @@ describe("HomeHero", () => {
 	it("renders the headline and primary actions", () => {
 		render(<HomeHero />);
 
-		expect(screen.getByRole("heading", { name: /Sketchi draws it/i })).toBeTruthy();
+		expect(
+			screen.getByRole("heading", { name: "Editable diagrams from a prompt", level: 1 }),
+		).toBeTruthy();
 		const primaryAction = screen.getByRole("link", {
 			name: "Open playground",
 		});

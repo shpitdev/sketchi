@@ -23,11 +23,13 @@ describe("DocsView", () => {
 		expect(screen.getByRole("heading", { name: "Three ways to use it" })).toBeTruthy();
 		expect(screen.getByRole("heading", { name: "CLI", level: 2 })).toBeTruthy();
 		expect(screen.getByRole("link", { name: "CLI" }).getAttribute("href")).toBe("#cli");
-		expect(screen.getByText(CLI_INSTALL_COMMAND)).toBeTruthy();
 		expect(screen.getByText(CLI_NPM_INSTALL_COMMAND)).toBeTruthy();
+		expect(screen.getByText(CLI_INSTALL_COMMAND)).toBeTruthy();
+		// npm first; the script is labeled as the alternative, not a second step.
 		expect(
 			screen.getAllByRole("button").map((button) => button.getAttribute("aria-label")),
-		).toEqual(["Copy install script", "Copy npm install command"]);
+		).toEqual(["Copy npm install command", "Copy install script"]);
+		expect(screen.getByText(/^Or use the install script/)).toBeTruthy();
 		expect(screen.getByRole("link", { name: "sketchi on npm" }).getAttribute("href")).toBe(
 			"https://www.npmjs.com/package/sketchi",
 		);

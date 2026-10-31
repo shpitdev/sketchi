@@ -33,7 +33,7 @@ Claude Code, Codex, OpenCode, and Antigravity.
 https://www.npmjs.com/package/sketchi — the published `sketchi` command-line
 tool. Requires Node.js 24.13.0 or newer. Install with either:
 
-  curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/install.sh | sh
+  curl -fsSL https://sketchi.app/install.sh | sh
   npm install -g sketchi
 
 Diagram records live under ~/.sketchi/diagrams. Every command accepts

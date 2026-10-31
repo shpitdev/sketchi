@@ -1,9 +1,10 @@
 import { CommandBlock } from "../command-block/index.js";
 import {
+	CLI_INSTALL_COMMAND,
 	CLI_NODE_REQUIREMENT,
+	CLI_NPM_INSTALL_COMMAND,
 	CLI_NPM_URL,
 	REPO_URL,
-	cliInstallOptions,
 } from "../../lib/cli-package";
 import { DEFAULT_WEB_SURFACE_URLS, type WebSurfaceUrls } from "../../lib/surface-urls";
 
@@ -104,9 +105,11 @@ export function DocsView({
 					<p>
 						<a href={CLI_NPM_URL}>sketchi on npm</a>. Requires {CLI_NODE_REQUIREMENT}.
 					</p>
-					{cliInstallOptions.map((option) => (
-						<CommandBlock key={option.command} label={option.label} value={option.command} />
-					))}
+					<CommandBlock label="npm install command" value={CLI_NPM_INSTALL_COMMAND} />
+					<p className="docs-install-alt">
+						Or use the install script, which also sets up shell completions:
+					</p>
+					<CommandBlock label="install script" value={CLI_INSTALL_COMMAND} />
 
 					<h3 className="docs-h3">Commands</h3>
 					<dl className="docs-defs">
