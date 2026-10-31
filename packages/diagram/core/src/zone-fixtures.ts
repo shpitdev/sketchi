@@ -15,6 +15,9 @@ import hybridCloudStacked from "./fixtures/zones/hybrid-cloud-stacked.js";
 import hybridCloudSync from "./fixtures/zones/hybrid-cloud-sync.js";
 import kindedFlat from "./fixtures/zones/kinded-flat.js";
 import kubernetesCluster from "./fixtures/zones/kubernetes-cluster.js";
+import threeZoneRequestPath from "./fixtures/zones/three-zone-request-path.js";
+import threeZoneRequestPathCached from "./fixtures/zones/three-zone-request-path-cached.js";
+import threeZoneRequestPathHit from "./fixtures/zones/three-zone-request-path-hit.js";
 
 function flowchart(fixture: object, direction: "LR" | "TB" = "LR") {
 	return parseFlowchartDiagram({
@@ -99,6 +102,17 @@ export const corridorHybridFlowchart = flowchart(hybridCloudArchiveCorridor);
  * embedded asset to export.
  */
 export const leftToRightHybridFlowchart = flowchart(hybridCloudLeftToRight);
+
+/**
+ * A web request asked for left to right across the public internet, a DMZ and
+ * a private subnet, as generated samples drew it: a wrap hung one zone under
+ * another though the request passes from each to the next along the row.
+ */
+export const requestPathFlowcharts = {
+	"three-zone-request-path": flowchart(threeZoneRequestPath),
+	"three-zone-request-path-cached": flowchart(threeZoneRequestPathCached),
+	"three-zone-request-path-hit": flowchart(threeZoneRequestPathHit),
+};
 
 /** Zones of the thirty-node stress case, each with its parent and kind. */
 const STRESS_ZONES = [

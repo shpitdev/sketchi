@@ -8,6 +8,7 @@ import {
 	leftToRightHybridFlowchart,
 	leftToRightIncidentFlowchart,
 	pharmaBatchDispositionFlowchart,
+	requestPathFlowcharts,
 	routingFixtures,
 	zoneFixtures,
 } from "@sketchi/diagram-core";
@@ -85,6 +86,16 @@ export const ZonesHybridCloud: Story = {
 /** Asked for left to right: the cloud stands beside the data center and its region wraps inside it. */
 export const ZonesHybridCloudLeftToRight: Story = {
 	args: { diagram: leftToRightHybridFlowchart },
+};
+
+/** Asked for left to right: the DMZ stands beside the public internet and the private subnet hangs under it. */
+export const ZonesThreeZoneRequestPath: Story = {
+	args: { diagram: requestPathFlowcharts["three-zone-request-path"] },
+};
+
+/** The cached page's line skips the private subnet to a response outside every zone. */
+export const ZonesThreeZoneRequestPathCached: Story = {
+	args: { diagram: requestPathFlowcharts["three-zone-request-path-cached"] },
 };
 
 export const RoutingContentModeration: Story = {
