@@ -10,12 +10,12 @@ describe("MarketingHome", () => {
 		expect(screen.getByRole("heading", { name: /Sketchi draws it/i })).toBeTruthy();
 		expect(
 			screen.getByRole("heading", {
-				name: "Built on Excalidraw.",
+				name: "Built on Excalidraw",
 			}),
 		).toBeTruthy();
 		expect(
 			screen.getByRole("heading", {
-				name: "Your stack’s logos, already sketched.",
+				name: "Logos for your stack",
 			}),
 		).toBeTruthy();
 		expect(screen.getByRole("heading", { name: "Describe your first diagram." })).toBeTruthy();
@@ -26,7 +26,7 @@ describe("MarketingHome", () => {
 
 		expect(
 			screen.getByRole("heading", {
-				name: "Draw diagrams from your terminal.",
+				name: "CLI",
 			}),
 		).toBeTruthy();
 		expect(container.querySelector("#cli")).toBeTruthy();
@@ -46,12 +46,12 @@ describe("MarketingHome", () => {
 		);
 
 		for (const link of screen.getAllByRole("link", {
-			name: "Open the playground",
+			name: "Open playground",
 		})) {
 			expect(link.getAttribute("href")).toBe("https://pr-42-sketchi-studio.dimethyl.workers.dev");
 		}
 
-		expect(screen.getByRole("link", { name: /Browse the library/ }).getAttribute("href")).toBe(
+		expect(screen.getByRole("link", { name: "Browse icons" }).getAttribute("href")).toBe(
 			"https://pr-42-sketchi-icons.dimethyl.workers.dev",
 		);
 	});

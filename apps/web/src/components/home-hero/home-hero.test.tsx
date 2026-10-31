@@ -9,7 +9,7 @@ describe("HomeHero", () => {
 
 		expect(screen.getByRole("heading", { name: /Sketchi draws it/i })).toBeTruthy();
 		const primaryAction = screen.getByRole("link", {
-			name: "Open the playground",
+			name: "Open playground",
 		});
 		expect(primaryAction).toHaveProperty("href", "https://playground.sketchi.app/");
 		expect(primaryAction.dataset.variant).toBe("brand");
@@ -17,6 +17,12 @@ describe("HomeHero", () => {
 			"href",
 			"http://localhost:3000/agents",
 		);
+	});
+
+	it("lets the headline and the board say what Sketchi is, without a subtitle", () => {
+		const { container } = render(<HomeHero />);
+
+		expect(container.querySelector(".home-hero__copy p")).toBeNull();
 	});
 
 	it("labels the sketched diagram illustration", () => {

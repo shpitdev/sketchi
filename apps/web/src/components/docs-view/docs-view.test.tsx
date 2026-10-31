@@ -11,7 +11,6 @@ describe("DocsView", () => {
 		expect(screen.getByRole("heading", { name: "How Sketchi works" })).toBeTruthy();
 		expect(screen.getByRole("navigation", { name: "Docs sections" })).toBeTruthy();
 		expect(screen.getByRole("link", { name: "How it works" })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: /Open source/ })).toBeTruthy();
 		expect(screen.getByRole("heading", { name: /Diagram types/ })).toBeTruthy();
 		expect(screen.getByRole("heading", { name: /FAQ/ })).toBeTruthy();
 		expect(screen.queryByRole("heading", { name: /In your coding agent/ })).toBeNull();
@@ -21,18 +20,17 @@ describe("DocsView", () => {
 	it("documents the CLI as the third path, with copyable install commands", () => {
 		render(<DocsView />);
 
-		expect(screen.getByRole("heading", { name: "Ways to use Sketchi" })).toBeTruthy();
-		expect(screen.getByText("The terminal")).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "The CLI" })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "Three ways to use it" })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "CLI", level: 2 })).toBeTruthy();
 		expect(screen.getByRole("link", { name: "CLI" }).getAttribute("href")).toBe("#cli");
 		expect(screen.getByText(CLI_INSTALL_COMMAND)).toBeTruthy();
 		expect(screen.getByText(CLI_NPM_INSTALL_COMMAND)).toBeTruthy();
 		expect(
 			screen.getAllByRole("button").map((button) => button.getAttribute("aria-label")),
 		).toEqual(["Copy install script", "Copy npm install command"]);
-		expect(
-			screen.getByRole("link", { name: /npmjs\.com\/package\/sketchi/ }).getAttribute("href"),
-		).toBe("https://www.npmjs.com/package/sketchi");
+		expect(screen.getByRole("link", { name: "sketchi on npm" }).getAttribute("href")).toBe(
+			"https://www.npmjs.com/package/sketchi",
+		);
 	});
 
 	/**
@@ -68,9 +66,9 @@ describe("DocsView", () => {
 	it("links to the live read-only example and the public source", () => {
 		render(<DocsView />);
 
-		expect(
-			screen.getByRole("link", { name: /interactive read-only diagram/ }).getAttribute("href"),
-		).toBe("https://playground.sketchi.app/examples/how-it-works");
+		expect(screen.getByRole("link", { name: /read-only diagram/ }).getAttribute("href")).toBe(
+			"https://playground.sketchi.app/examples/how-it-works",
+		);
 		expect(
 			screen.getByRole("link", { name: /github\.com\/shpitdev\/sketchi/ }).getAttribute("href"),
 		).toBe("https://github.com/shpitdev/sketchi");

@@ -8,9 +8,8 @@ import { getWebSurfaceUrls } from "../lib/surface-urls-rpc";
 export const Route = createFileRoute("/docs")({
 	head: () =>
 		pageMeta({
-			title: "Docs - Sketchi",
-			description:
-				"Learn how to create and edit Sketchi diagrams in the playground, your coding agent, or the sketchi CLI.",
+			title: "Docs – Sketchi",
+			description: "Use Sketchi in the playground, a coding agent, or the sketchi CLI.",
 			path: "/docs",
 		}),
 	loader: () => getWebSurfaceUrls(),

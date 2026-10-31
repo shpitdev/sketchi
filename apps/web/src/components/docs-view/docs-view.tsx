@@ -1,10 +1,8 @@
-import { BrandIcon } from "../brand-icon/index.js";
-import { CopyButton } from "../copy-button/index.js";
+import { CommandBlock } from "../command-block/index.js";
 import {
-	REPO_URL,
 	CLI_NODE_REQUIREMENT,
 	CLI_NPM_URL,
-	CLI_PACKAGE_NAME,
+	REPO_URL,
 	cliInstallOptions,
 } from "../../lib/cli-package";
 import { DEFAULT_WEB_SURFACE_URLS, type WebSurfaceUrls } from "../../lib/surface-urls";
@@ -23,7 +21,6 @@ export interface DocsViewProps {
 const defaultNav: readonly DocsNavEntry[] = [
 	{ href: "#how", label: "How it works" },
 	{ href: "#cli", label: "CLI" },
-	{ href: "#open-source", label: "Open source" },
 	{ href: "#diagram-types", label: "Diagram types" },
 	{ href: "#faq", label: "FAQ" },
 ];
@@ -38,7 +35,6 @@ export function DocsView({
 	return (
 		<div className="sk-shell docs-view">
 			<nav aria-label="Docs sections" className="docs-nav">
-				<p className="docs-nav__label">On this page</p>
 				<ul className="docs-nav__list">
 					{nav.map((entry) => (
 						<li key={entry.href}>
@@ -51,189 +47,120 @@ export function DocsView({
 			<article className="docs-article">
 				<h1 className="sk-section__title">How Sketchi works</h1>
 				<p className="docs-article__intro">
-					Sketchi turns a plain-language prompt into an editable diagram with your stack’s logos.
-					Use the playground, your coding agent, or the CLI.
+					Describe a diagram and Sketchi draws it as an editable Excalidraw scene. Use it in the
+					playground, your coding agent, or the CLI.
 				</p>
 
 				<section className="docs-section" id="how">
-					<h2>Ways to use Sketchi</h2>
-					<p>
-						Sketchi structures and validates every request before drawing. Each option handles
-						drawing and file storage differently.
-					</p>
+					<h2>Three ways to use it</h2>
 
 					<div className="docs-paths docs-paths--three">
 						<div className="docs-lane docs-lane--human">
-							<p className="docs-lane__tag">You, in the playground</p>
+							<h3 className="docs-lane__tag">Playground</h3>
 							<ol className="docs-lane__steps">
 								<li>Describe a diagram in the browser.</li>
-								<li>Sketchi draws it on the canvas.</li>
-								<li>Edit and export it.</li>
+								<li>Edit it on the canvas.</li>
+								<li>Export PNG or Excalidraw.</li>
 							</ol>
 							<p className="docs-lane__state">
-								Sketchi holds it as an unlisted link tied to your browser. No account yet, so treat
-								it as temporary.
+								Kept as an unlisted link tied to your browser. Export anything you want to keep.
 							</p>
 						</div>
 
 						<div className="docs-lane docs-lane--agent">
-							<p className="docs-lane__tag">Your coding agent</p>
+							<h3 className="docs-lane__tag">Coding agent</h3>
 							<ol className="docs-lane__steps">
-								<li>Ask your agent for a diagram in chat.</li>
-								<li>It calls Sketchi over MCP and gets one back.</li>
+								<li>Ask your agent for a diagram.</li>
+								<li>It calls Sketchi over MCP.</li>
 								<li>The diagram is saved in your project.</li>
 							</ol>
 							<p className="docs-lane__state">
-								Your agent and machine keep the file. Find setup instructions on the{" "}
-								<a href="/agents">agents page</a>.
+								Set up on the <a href="/agents">agents page</a>.
 							</p>
 						</div>
 
 						<div className="docs-lane docs-lane--cli">
-							<p className="docs-lane__tag">The terminal</p>
+							<h3 className="docs-lane__tag">CLI</h3>
 							<ol className="docs-lane__steps">
 								<li>
 									Run <code>sketchi generate --prompt "…"</code>.
 								</li>
-								<li>Sketchi validates the diagram and saves a local record.</li>
-								<li>The PNG is saved in the current directory.</li>
+								<li>Sketchi validates the diagram and keeps a record.</li>
+								<li>The PNG is written to the current directory.</li>
 							</ol>
 							<p className="docs-lane__state">
-								Your machine keeps the file, under <code>~/.sketchi/diagrams</code>. Install it{" "}
-								<a href="#cli">below</a>.
+								Records live in <code>~/.sketchi/diagrams</code>.
 							</p>
 						</div>
 					</div>
 
-					<div className="docs-callout">
-						<span className="docs-callout__k">See it live</span>
-						<span>
-							Open the <a href={liveExampleUrl}>interactive read-only diagram</a>, a real Sketchi
-							diagram you can pan and zoom.
-						</span>
-					</div>
+					<p>
+						Example: <a href={liveExampleUrl}>a read-only diagram you can pan and zoom</a>.
+					</p>
 				</section>
 
 				<section className="docs-section" id="cli">
-					<h2>The CLI</h2>
+					<h2>CLI</h2>
 					<p>
-						<code>{CLI_PACKAGE_NAME}</code> is published on npm and creates diagrams from your
-						shell. Records live under <code>~/.sketchi/diagrams</code> with the canonical document,
-						the Excalidraw artifact, and every prior revision.
+						<a href={CLI_NPM_URL}>sketchi on npm</a>. Requires {CLI_NODE_REQUIREMENT}.
 					</p>
-
-					<h3 className="docs-h3">Install</h3>
 					{cliInstallOptions.map((option) => (
-						<div className="code-snippet docs-install" key={option.command}>
-							<pre className="docs-codeblock">
-								<code>{option.command}</code>
-							</pre>
-							<CopyButton label={option.label} value={option.command} />
-						</div>
+						<CommandBlock key={option.command} label={option.label} value={option.command} />
 					))}
-					<p className="docs-install__note">Requires {CLI_NODE_REQUIREMENT}.</p>
 
-					<h3 className="docs-h3">What the commands do</h3>
+					<h3 className="docs-h3">Commands</h3>
 					<dl className="docs-defs">
 						<div className="docs-defs__row">
 							<dt>
 								<code>generate</code>
 							</dt>
-							<dd>
-								Turn one prompt into a validated diagram and write its PNG by default. No key,
-								token, account, or login.
-							</dd>
+							<dd>Turn a prompt into a validated diagram and write its PNG. No account or key.</dd>
 						</div>
 						<div className="docs-defs__row">
 							<dt>
 								<code>create</code>, <code>edit</code>, <code>patch</code>
 							</dt>
 							<dd>
-								Author and revise from canonical JSON, or apply semantic style and layout
-								operations. Fully offline.
+								Write or revise a diagram from JSON, or apply style and layout operations. Offline.
 							</dd>
 						</div>
 						<div className="docs-defs__row">
 							<dt>
 								<code>show</code>, <code>list</code>, <code>restore</code>
 							</dt>
-							<dd>
-								Inspect a record, list the local store, and recover any retained revision. Fully
-								offline.
-							</dd>
+							<dd>Inspect a record, list records, or restore an earlier revision. Offline.</dd>
 						</div>
 						<div className="docs-defs__row">
 							<dt>
 								<code>export</code>
 							</dt>
-							<dd>Write PNG or Excalidraw. Local and deterministic; never uses the network.</dd>
+							<dd>Write PNG or Excalidraw. Offline.</dd>
 						</div>
 						<div className="docs-defs__row">
 							<dt>
 								<code>share</code>, <code>pull</code>
 							</dt>
 							<dd>
-								Publish an encrypted excalidraw.com snapshot link, then pull browser edits back into
-								the record. One HTTPS request each. A share URL is a bearer secret: anyone with the
-								full link can decrypt it, and Sketchi cannot revoke it.
+								Publish an encrypted excalidraw.com link, then pull edits made there back into the
+								record. Anyone with the full link can open it, and Sketchi cannot revoke it.
 							</dd>
 						</div>
 					</dl>
 
-					<div className="docs-callout">
-						<span className="docs-callout__k">For agents</span>
-						<span>
-							Every command takes <code>--output json</code> for a stable result envelope.{" "}
-							<code>create</code>, <code>edit</code>, and <code>patch</code> take their JSON
-							noninteractively through <code>--json</code> or <code>--file</code>;{" "}
-							<code>generate</code> takes <code>--prompt</code> and writes PNG by default; and
-							either
-							<code>generate --dest -</code> or <code>export --dest -</code> streams raw artifact
-							bytes to stdout. Run <code>sketchi docs</code> for complete automation contracts.
-							Shell completions ship for zsh, bash, and fish.
-						</span>
-					</div>
-
-					<div className="docs-callout">
-						<span className="docs-callout__k">Package</span>
-						<span>
-							<a className="docs-npm-link" href={CLI_NPM_URL}>
-								<BrandIcon label="npm" size={15} src="/brand/npm.svg" />
-								npmjs.com/package/{CLI_PACKAGE_NAME}
-							</a>
-						</span>
-					</div>
-				</section>
-
-				<section className="docs-section" id="open-source">
-					<h2>Open source</h2>
 					<p>
-						Sketchi’s diagram engine, icon set, agent runtime, and website are open source and
-						MIT-licensed.
+						For scripts and agents, every command takes <code>--output json</code>.{" "}
+						<code>create</code>, <code>edit</code> and <code>patch</code> read JSON from{" "}
+						<code>--json</code> or <code>--file</code>, and <code>--dest -</code> writes the
+						artifact to stdout. <code>sketchi docs</code> prints the full contracts.
 					</p>
-					<div className="docs-callout">
-						<span className="docs-callout__k">Source</span>
-						<span>
-							Browse the code at <a href={repoUrl}>{repoLabel(repoUrl)}</a>.
-						</span>
-					</div>
 				</section>
 
 				<section className="docs-section" id="diagram-types">
 					<h2>Diagram types</h2>
-					<dl className="docs-defs">
-						<div className="docs-defs__row">
-							<dt>Flowchart</dt>
-							<dd>
-								Start, process, decision, and end steps with labeled branches. The best-supported
-								type today.
-							</dd>
-						</div>
-						<div className="docs-defs__row">
-							<dt>Mindmap</dt>
-							<dd>Radial breakdowns of an idea into related branches.</dd>
-						</div>
-					</dl>
+					<p>
+						Flowchart, mindmap, sequence, timeline, chart, state machine, Gantt, ER, class, org
+						chart, Venn, journey map, Sankey, wireframe and quadrant chart.
+					</p>
 				</section>
 
 				<section className="docs-section" id="faq">
@@ -241,28 +168,23 @@ export function DocsView({
 					<dl className="docs-defs">
 						<div className="docs-defs__row">
 							<dt>Do I need an account?</dt>
-							<dd>No. The playground needs no sign-up.</dd>
+							<dd>No.</dd>
 						</div>
 						<div className="docs-defs__row">
-							<dt>Does my work save?</dt>
+							<dt>Where are my diagrams saved?</dt>
 							<dd>
-								Not to an account yet. Diagrams are tied to your browser, so export anything you
-								want to keep.
+								The playground keeps them as unlisted links tied to your browser. Agents and the CLI
+								save them on your machine.
 							</dd>
 						</div>
 						<div className="docs-defs__row">
-							<dt>Are the diagrams editable?</dt>
-							<dd>Yes. You can move, relabel, and restyle every element.</dd>
+							<dt>Can I edit the result?</dt>
+							<dd>Yes. Every shape, arrow and label is editable.</dd>
 						</div>
 						<div className="docs-defs__row">
-							<dt>Can I export?</dt>
-							<dd>Yes, as PNG or Excalidraw.</dd>
-						</div>
-						<div className="docs-defs__row">
-							<dt>Is there a CLI?</dt>
+							<dt>Is it open source?</dt>
 							<dd>
-								Yes. Find <code>{CLI_PACKAGE_NAME}</code> on npm. See{" "}
-								<a href="#cli">the CLI section</a> for install and commands.
+								Yes, MIT-licensed: <a href={repoUrl}>{repoLabel(repoUrl)}</a>.
 							</dd>
 						</div>
 					</dl>

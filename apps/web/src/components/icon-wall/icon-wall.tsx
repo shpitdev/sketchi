@@ -76,11 +76,9 @@ export function IconWall({ iconsHref = DEFAULT_WEB_SURFACE_URLS.icons }: IconWal
 		<section className="sk-section icon-wall" id="icons">
 			<div className="sk-shell">
 				<div className="icon-wall__head">
-					<h2 className="sk-section__title icon-wall__title">
-						Your stack’s logos, already sketched.
-					</h2>
+					<h2 className="sk-section__title icon-wall__title">Logos for your stack</h2>
 					<Button asChild size="xl" variant="outline">
-						<a href={iconsHref}>Browse the library →</a>
+						<a href={iconsHref}>Browse icons</a>
 					</Button>
 				</div>
 

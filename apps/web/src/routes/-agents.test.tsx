@@ -56,11 +56,11 @@ describe("Agent detail route", () => {
 		).toBeTruthy();
 		expect(
 			screen.getByRole("heading", {
-				name: "Save or merge .agents/mcp_config.json",
+				name: "Merge into .agents/mcp_config.json",
 				level: 2,
 			}),
 		).toBeTruthy();
-		expect(screen.getByText(/merging the sketchi-code-mode server/)).toBeTruthy();
+		expect(screen.getByText(/"serverUrl": "https:\/\/playground\.sketchi\.app\/mcp"/)).toBeTruthy();
 		expect(
 			screen
 				.getAllByRole("link", { name: "Agents" })

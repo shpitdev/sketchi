@@ -81,15 +81,9 @@ export function SiteFooter({
 					<h3>More</h3>
 					<ul>
 						<li>
-							<a href="/docs">How it works</a>
-						</li>
-						<li>
 							<a aria-label="sketchi on npm" className="site-footer__npm" href={npmUrl}>
 								<span aria-hidden="true" className="npm-mark npm-mark--sm" />
 							</a>
-						</li>
-						<li>
-							<a href={repoUrl}>GitHub</a>
 						</li>
 						<li>
 							<a href={llmsTxtUrl}>llms.txt</a>

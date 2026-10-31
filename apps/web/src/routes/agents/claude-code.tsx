@@ -9,8 +9,8 @@ const agentId = "claude-code" satisfies AgentSetupId;
 export const Route = createFileRoute("/agents/claude-code")({
 	head: () =>
 		pageMeta({
-			title: "Claude Code setup - Sketchi",
-			description: "Add Sketchi to Claude Code and turn prompts into editable diagrams.",
+			title: "Claude Code setup – Sketchi",
+			description: "Install the Sketchi plugin in Claude Code.",
 			path: "/agents/claude-code",
 		}),
 	component: ClaudeCodeRoute,
