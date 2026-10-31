@@ -1,3 +1,4 @@
+import { Button } from "@sketchi/ui/components/button";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 
 import { siteSocialMeta } from "../lib/site-meta";
@@ -70,9 +71,9 @@ function NotFoundComponent() {
 	return (
 		<main className="sketchi-not-found">
 			<h1>This page isn&rsquo;t on the board.</h1>
-			<a className="sk-btn sk-btn--primary" href="/">
-				Back to Sketchi
-			</a>
+			<Button asChild size="xl" variant="brand">
+				<a href="/">Back to Sketchi</a>
+			</Button>
 		</main>
 	);
 }

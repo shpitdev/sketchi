@@ -76,11 +76,8 @@ function AgentSetupHub() {
 
 function AgentSetupDetail({ entry }: { entry: AgentSetupEntry }) {
 	return (
-		<div
-			className="agent-page agent-detail"
-			style={{ "--tile-accent": entry.accent } as CSSProperties}
-		>
-			<section className="agent-hero agent-hero--detail">
+		<div className="agent-page" style={{ "--tile-accent": entry.accent } as CSSProperties}>
+			<section className="agent-hero">
 				<div className="sk-shell agent-hero__inner">
 					<div className="agent-hero__copy">
 						<a className="agent-backlink" href="/agents">

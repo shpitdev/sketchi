@@ -40,7 +40,7 @@ export function CopyButton({ value, label }: CopyButtonProps) {
 			<span aria-hidden="true" className="copy-btn__glyph">
 				{copied ? <CheckGlyph /> : <ClipboardGlyph />}
 			</span>
-			<span className="copy-btn__text">{copied ? "Copied" : "Copy"}</span>
+			<span>{copied ? "Copied" : "Copy"}</span>
 		</button>
 	);
 }

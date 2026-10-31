@@ -1,0 +1,87 @@
+// Tailwind component contracts for the shadcn apps. The primitives live in
+// packages/ui; docs/ui-style-contracts.md explains the policy and exceptions.
+{
+	"overrides": [
+		{
+			"files": ["apps/web/src/**/*.{ts,tsx}", "apps/playground/src/**/*.{ts,tsx}"],
+			"rules": {
+				"shadcn/no-restyle": [
+					"error",
+					{
+						"allow": ["layout"],
+						"contracts": [
+							// Radix's Collapsible root renders an unstyled element.
+							{ "pattern": "^Collapsible$", "allow": ["layout", "color"] }
+						],
+						"message": {
+							"default": "Use a {{component}} variant for appearance; keep layout at the call site."
+						}
+					}
+				],
+				"shadcn/no-raw-colors": "error",
+				"shadcn/no-arbitrary-values": ["error", { "allow": ["layout"] }],
+				"shadcn/no-inline-styles": "error",
+				"shadcn/require-static-classes": "error",
+				"shadcn/no-unknown-classes": "error"
+			}
+		},
+		{
+			// Primitives style themselves; raw colors and inline styles stay banned.
+			"files": ["packages/ui/src/components/**"],
+			"rules": {
+				"shadcn/no-raw-colors": "error",
+				"shadcn/no-inline-styles": "error",
+				"shadcn/no-unknown-classes": "error"
+			}
+		},
+		{
+			// Vendored AI Elements compose and restyle primitives the way upstream
+			// does, so registry updates apply cleanly. `not-prose`, `is-user` and
+			// `is-assistant` are upstream marker classes with no CSS of their own.
+			"files": ["apps/playground/src/components/ai-elements/**"],
+			"rules": {
+				"shadcn/no-restyle": "off",
+				"shadcn/no-arbitrary-values": "off",
+				"shadcn/no-inline-styles": "off",
+				"shadcn/require-static-classes": "off",
+				"shadcn/no-unknown-classes": [
+					"error",
+					{ "allow": ["not-prose", "is-user", "is-assistant"] }
+				]
+			}
+		},
+		{
+			// Starter prompts render a Suggestion button as a two-line card.
+			"files": ["apps/playground/src/features/playground/surface.tsx"],
+			"rules": {
+				"shadcn/no-restyle": ["error", { "allow": ["layout", "studio__starter"] }]
+			}
+		},
+		{
+			"files": ["apps/web/src/**/*.{ts,tsx}"],
+			"rules": {
+				"better-tailwindcss/no-conflicting-classes": [
+					"error",
+					{ "cwd": "apps/web", "entryPoint": "src/styles/app.css" }
+				],
+				"better-tailwindcss/no-duplicate-classes": [
+					"error",
+					{ "cwd": "apps/web", "entryPoint": "src/styles/app.css" }
+				]
+			}
+		},
+		{
+			"files": ["apps/playground/src/**/*.{ts,tsx}"],
+			"rules": {
+				"better-tailwindcss/no-conflicting-classes": [
+					"error",
+					{ "cwd": "apps/playground", "entryPoint": "src/styles/app.css" }
+				],
+				"better-tailwindcss/no-duplicate-classes": [
+					"error",
+					{ "cwd": "apps/playground", "entryPoint": "src/styles/app.css" }
+				]
+			}
+		}
+	]
+}

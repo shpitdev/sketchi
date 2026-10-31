@@ -1,14 +1,14 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@sketchi/ui/components/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+} from "@sketchi/ui/components/select";
+import { cn } from "@sketchi/ui/lib/utils";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 import {

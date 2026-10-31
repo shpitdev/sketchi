@@ -1,3 +1,5 @@
+import { Button } from "@sketchi/ui/components/button";
+
 import { DEFAULT_WEB_SURFACE_URLS } from "../../lib/surface-urls";
 
 export interface CtaBandProps {
@@ -24,9 +26,9 @@ export function CtaBand({
 					<h2 className="cta-band__title">Describe your first diagram.</h2>
 					<p className="cta-band__lead">No sign-up required.</p>
 					<div className="cta-band__actions">
-						<a className="sk-btn sk-btn--accent" href={playgroundHref}>
-							Open the playground
-						</a>
+						<Button asChild size="xl" variant="brand">
+							<a href={playgroundHref}>Open the playground</a>
+						</Button>
 						<a className="cta-band__link" href={agentsHref}>
 							Add to your coding agent →
 						</a>

@@ -56,7 +56,10 @@ function themeConsumers(): string[] {
 				return false;
 			}
 
-			return appCss.includes("diagram/ui/src/theme.css");
+			// @sketchi/ui's stylesheet imports the theme for its Tailwind apps.
+			return (
+				appCss.includes("diagram/ui/src/theme.css") || appCss.includes("packages/ui/src/styles.css")
+			);
 		})
 		.map((app) => `apps/${app}`)
 		.sort();

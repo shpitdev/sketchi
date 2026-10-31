@@ -27,6 +27,7 @@ const intendedNxProjectRoots = [
 	"packages/observability",
 	"packages/studio/projects",
 	"packages/svg-excalidraw",
+	"packages/ui",
 	"tools/sketchi-generators",
 ];
 const intendedWorkspacePackageRoots = intendedNxProjectRoots.filter(
@@ -76,6 +77,7 @@ const frameworkNativeProjectRoots = [
 	"apps/native-conversion-storybook",
 	"apps/web",
 	"packages/diagram/ui",
+	"packages/ui",
 	"tools/sketchi-generators",
 ];
 const intendedCompositeReferences = [
@@ -96,6 +98,7 @@ const intendedCompositeReferences = [
 	"packages/observability/tsconfig.lib.json",
 	"packages/studio/projects/tsconfig.lib.json",
 	"packages/svg-excalidraw/tsconfig.lib.json",
+	"packages/ui/tsconfig.lib.json",
 	"tools/sketchi-generators/tsconfig.lib.json",
 ];
 const reviewedEffectUnstableAdapterPaths: string[] = [];
@@ -158,7 +161,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/playground/src/components/ai-elements/code-block.tsx": 9,
 	"apps/playground/src/components/ai-elements/conversation.tsx": 1,
 	"apps/playground/src/components/ai-elements/prompt-input.tsx": 28,
-	"apps/playground/src/components/ai-elements/reasoning.tsx": 1,
+	"apps/playground/src/components/ai-elements/reasoning.tsx": 2,
 	"apps/playground/src/features/artifacts/artifact-view-client.ts": 13,
 	"apps/playground/src/features/artifacts/excalidraw-png-export.ts": 1,
 	"apps/playground/src/features/resources/use-async-resource.ts": 3,

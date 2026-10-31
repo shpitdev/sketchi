@@ -20,7 +20,7 @@ import {
 	ToolOutput,
 } from "@/components/ai-elements/tool";
 import { StudioBrand } from "@/components/studio-brand";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import {
 	ArtifactActions,
 	AssistantFollowUp,
@@ -38,7 +38,7 @@ import {
 	type DiagramToolPart,
 	type StudioBuildResult,
 } from "@/features/playground/build-result";
-import { cn } from "@/lib/utils";
+import { cn } from "@sketchi/ui/lib/utils";
 
 export const Route = createFileRoute("/")({
 	component: StudioRoute,
@@ -57,7 +57,7 @@ function DiagramToolCard({
 	const { stopped, title } = diagramToolCardStatus(part, active);
 
 	return (
-		<Tool className="studio__tool" defaultOpen={false}>
+		<Tool className="bg-card" defaultOpen={false}>
 			<ToolHeader state={part.state} stopped={stopped} title={title} type={part.type} />
 			<ToolContent>
 				{result ? <BuildResultDetails pass={attempt} result={result} /> : null}
@@ -92,7 +92,7 @@ function renderAssistantParts(
 		if (part.type === "reasoning" && part.text.trim().length > 0) {
 			nodes.push(
 				<Reasoning
-					className="studio__reasoning"
+					className="w-full"
 					isStreaming={part.state === "streaming"}
 					key={`${message.id}-reasoning-${index}`}
 				>

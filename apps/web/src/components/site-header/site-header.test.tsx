@@ -13,7 +13,7 @@ describe("SiteHeader", () => {
 		expect(brand.querySelector(".sk-wordmark")?.textContent).toBe("Sketchi");
 		expect(screen.queryByRole("link", { name: "Product" })).toBeNull();
 		expect(screen.getByRole("link", { name: "Agents" })).toBeTruthy();
-		expect(screen.getByRole("link", { name: "Playground" }).classList).toContain("sk-btn--accent");
+		expect(screen.getByRole("link", { name: "Playground" }).dataset.variant).toBe("brand");
 		expect(screen.getByRole("link", { name: "Sketchi on GitHub" }).getAttribute("href")).toBe(
 			"https://github.com/shpitdev/sketchi",
 		);

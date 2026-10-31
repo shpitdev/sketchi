@@ -1,3 +1,5 @@
+import { Button } from "@sketchi/ui/components/button";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
 import { CLI_NPM_URL, REPO_URL } from "../../lib/cli-package";
@@ -80,37 +82,23 @@ export function SiteHeader({
 					>
 						<span aria-hidden="true" className="npm-mark" />
 					</a>
-					<a className="sk-btn sk-btn--accent site-header__cta" href={surfaceUrls.playground}>
-						Playground
-					</a>
+					<Button asChild size="lg" variant="brand">
+						<a href={surfaceUrls.playground}>Playground</a>
+					</Button>
 				</div>
 
-				<button
+				<Button
 					aria-controls="site-menu"
 					aria-expanded={open}
 					aria-label="Toggle menu"
-					className="site-header__burger"
+					className="nav:hidden"
 					onClick={() => setOpen((value) => !value)}
+					size="icon-lg"
 					type="button"
+					variant="outline"
 				>
-					<svg aria-hidden="true" fill="none" height="20" viewBox="0 0 20 20" width="20">
-						{open ? (
-							<path
-								d="M5 5l10 10M15 5L5 15"
-								stroke="currentColor"
-								strokeLinecap="round"
-								strokeWidth="1.8"
-							/>
-						) : (
-							<path
-								d="M3 6h14M3 10h14M3 14h14"
-								stroke="currentColor"
-								strokeLinecap="round"
-								strokeWidth="1.8"
-							/>
-						)}
-					</svg>
-				</button>
+					{open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+				</Button>
 			</div>
 
 			{open ? (
@@ -127,25 +115,23 @@ export function SiteHeader({
 						</a>
 					))}
 					<div className="site-header__sheet-actions">
-						<a className="sk-btn sk-btn--ghost" href={surfaceUrls.icons}>
-							Icons
-						</a>
-						<a className="sk-btn sk-btn--ghost" href={repoUrl} rel="noreferrer" target="_blank">
-							<span aria-hidden="true" className="gh-mark" />
-							GitHub
-						</a>
-						<a
-							aria-label="sketchi on npm"
-							className="sk-btn sk-btn--ghost"
-							href={npmUrl}
-							rel="noreferrer"
-							target="_blank"
-						>
-							<span aria-hidden="true" className="npm-mark" />
-						</a>
-						<a className="sk-btn sk-btn--accent" href={surfaceUrls.playground}>
-							Playground
-						</a>
+						<Button asChild className="w-full" size="xl" variant="outline">
+							<a href={surfaceUrls.icons}>Icons</a>
+						</Button>
+						<Button asChild className="w-full" size="xl" variant="outline">
+							<a href={repoUrl} rel="noreferrer" target="_blank">
+								<span aria-hidden="true" className="gh-mark" />
+								GitHub
+							</a>
+						</Button>
+						<Button asChild className="w-full" size="xl" variant="outline">
+							<a aria-label="sketchi on npm" href={npmUrl} rel="noreferrer" target="_blank">
+								<span aria-hidden="true" className="npm-mark" />
+							</a>
+						</Button>
+						<Button asChild className="w-full" size="xl" variant="brand">
+							<a href={surfaceUrls.playground}>Playground</a>
+						</Button>
 					</div>
 				</div>
 			) : null}

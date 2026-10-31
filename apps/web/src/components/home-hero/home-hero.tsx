@@ -1,3 +1,4 @@
+import { Button } from "@sketchi/ui/components/button";
 import type { CSSProperties } from "react";
 
 import { DEFAULT_WEB_SURFACE_URLS } from "../../lib/surface-urls";
@@ -91,25 +92,25 @@ export function HomeHero({
 		<section className="home-hero">
 			<div className="sk-shell home-hero__inner">
 				<div className="home-hero__copy">
-					<h1 className="home-hero__title sk-rise" style={rise(0)}>
+					<h1 className="home-hero__title sk-rise" style={{ "--i": 0 } as CSSProperties}>
 						Describe it.
 						<br />
 						Sketchi <em>draws it.</em>
 					</h1>
-					<p className="home-hero__lead sk-rise" style={rise(1)}>
+					<p className="home-hero__lead sk-rise" style={{ "--i": 1 } as CSSProperties}>
 						Turn a sentence into an editable diagram with the real logos of your stack.
 					</p>
-					<div className="home-hero__actions sk-rise" style={rise(2)}>
-						<a className="sk-btn sk-btn--accent" href={primaryHref}>
-							Open the playground
-						</a>
-						<a className="sk-btn sk-btn--ghost" href={agentsHref}>
-							Add to your agent
-						</a>
+					<div className="home-hero__actions sk-rise" style={{ "--i": 2 } as CSSProperties}>
+						<Button asChild size="xl" variant="brand">
+							<a href={primaryHref}>Open the playground</a>
+						</Button>
+						<Button asChild size="xl" variant="outline">
+							<a href={agentsHref}>Add to your agent</a>
+						</Button>
 					</div>
 				</div>
 
-				<div className="home-hero__visual sk-rise" style={rise(1)}>
+				<div className="home-hero__visual sk-rise" style={{ "--i": 1 } as CSSProperties}>
 					<div
 						aria-label="A prompt reading 'diagram our deploy pipeline' turning into a hand-drawn flowchart with GitHub, Docker, and Cloudflare icons"
 						className="sketch-board"
@@ -142,7 +143,6 @@ export function HomeHero({
 								>
 									{wires.map((wire) => (
 										<g
-											className="wire-group"
 											key={wire.d}
 											style={
 												{
@@ -166,10 +166,12 @@ export function HomeHero({
 									<div
 										className={`sketch-node${node.variant ? ` sketch-node--${node.variant}` : ""}`}
 										key={node.id}
-										style={{
-											left: `${node.left}%`,
-											top: `${node.top}%`,
-										}}
+										style={
+											{
+												"--node-x": `${node.left}%`,
+												"--node-y": `${node.top}%`,
+											} as CSSProperties
+										}
 									>
 										{node.icon ? (
 											<img
@@ -190,10 +192,6 @@ export function HomeHero({
 			</div>
 		</section>
 	);
-}
-
-function rise(i: number): CSSProperties {
-	return { "--i": i } as CSSProperties;
 }
 
 function PencilGlyph() {

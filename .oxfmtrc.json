@@ -28,7 +28,7 @@
 		"packages/diagram/agent/src/lib/code-mode/fixtures/**",
 		// Vendored shadcn and AI Elements registry components
 		"apps/playground/src/components/ai-elements/**",
-		"apps/playground/src/components/ui/**",
+		"packages/ui/src/components/**",
 		// Raw pipeline artifacts, and state that editor and agent tools rewrite
 		"packages/icons/catalog/pipeline-output/**",
 		".agents/**",

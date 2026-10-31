@@ -1,5 +1,5 @@
 import { SKETCHI_WEB_HOME_URL } from "@/features/playground/home-url";
-import { cn } from "@/lib/utils";
+import { cn } from "@sketchi/ui/lib/utils";
 
 export function StudioBrand({ className }: { className?: string }) {
 	return (
