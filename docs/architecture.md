@@ -43,6 +43,7 @@ from `scripts/lib/worker-apps.mjs`.
 | Studio persistence  | `packages/studio/projects`               | typed ownership and scoped R2 persistence services                               |
 | Telemetry           | `packages/observability`                 | scoped Workers-compatible tracing, logs, and metrics                             |
 | UI                  | `packages/diagram/ui` and app components | React rendering and local view state                                             |
+| UI primitives       | `packages/ui`                            | shared shadcn primitives and tokens for the Tailwind apps                        |
 
 Studio chat, HTTP `buildFlowchart`, and MCP `execute` call the same
 `diagram-agent` operation. An accepted build writes artifacts once; adapters do

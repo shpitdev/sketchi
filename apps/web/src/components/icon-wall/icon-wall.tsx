@@ -1,3 +1,5 @@
+import { Button } from "@sketchi/ui/components/button";
+
 import { BrandIcon } from "../brand-icon/index.js";
 import { DEFAULT_WEB_SURFACE_URLS } from "../../lib/surface-urls";
 
@@ -77,9 +79,9 @@ export function IconWall({ iconsHref = DEFAULT_WEB_SURFACE_URLS.icons }: IconWal
 					<h2 className="sk-section__title icon-wall__title">
 						Your stack’s logos, already sketched.
 					</h2>
-					<a className="sk-btn sk-btn--ghost" href={iconsHref}>
-						Browse the library →
-					</a>
+					<Button asChild size="xl" variant="outline">
+						<a href={iconsHref}>Browse the library →</a>
+					</Button>
 				</div>
 
 				<div className="icon-wall__rails" aria-hidden="true">

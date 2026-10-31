@@ -19,7 +19,7 @@ export const Default: Story = {
 		value: "codex plugin marketplace add shpitdev/sketchi",
 	},
 	render: (args) => (
-		<div className="code-snippet" style={{ maxWidth: 460 }}>
+		<div className="code-snippet max-w-md">
 			<pre className="docs-codeblock">
 				<code>{args.value}</code>
 			</pre>

@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@sketchi/ui/lib/utils";
 import type { MotionProps, MotionStyle } from "motion/react";
 import { motion } from "motion/react";
 import type { ElementType, JSX } from "react";

@@ -16,7 +16,7 @@ const requiredExclusions = [
 	"apps/playground/src/server/codemode/fixtures/http-artifact-compatibility-v1.json",
 	"packages/diagram/agent/src/lib/code-mode/fixtures/compatibility-v1.json",
 	"apps/playground/src/components/ai-elements/code-block.tsx",
-	"apps/playground/src/components/ui/button.tsx",
+	"packages/ui/src/components/button.tsx",
 	"packages/icons/catalog/pipeline-output/review/review-data.json",
 	"apps/cli/CHANGELOG.md",
 ];

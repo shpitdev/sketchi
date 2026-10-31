@@ -1,7 +1,12 @@
 import type { ComponentProps, ReactNode } from "react";
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@sketchi/ui/components/tooltip";
+import { cn } from "@sketchi/ui/lib/utils";
 
 import { SketchIcon, type SketchIconName } from "./sketch-icons";
 

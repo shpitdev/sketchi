@@ -1,3 +1,5 @@
+import { Button } from "@sketchi/ui/components/button";
+
 import { BrandIcon } from "../brand-icon/index.js";
 import { CopyButton } from "../copy-button/index.js";
 import {
@@ -20,9 +22,9 @@ export interface CliBandProps {
  */
 export function CliBand({ npmUrl = CLI_NPM_URL }: CliBandProps) {
 	return (
-		<section className="sk-section cli-band" id="cli">
+		<section className="sk-section" id="cli">
 			<div className="sk-shell cli-band__inner">
-				<div className="cli-band__copy">
+				<div>
 					<h2 className="sk-section__title cli-band__title">Draw diagrams from your terminal.</h2>
 					<p className="cli-band__lead">
 						<code>{CLI_PACKAGE_NAME}</code> draws diagrams from your shell without an account or API
@@ -30,10 +32,12 @@ export function CliBand({ npmUrl = CLI_NPM_URL }: CliBandProps) {
 					</p>
 
 					<div className="cli-band__links">
-						<a className="sk-btn sk-btn--ghost cli-band__npm" href={npmUrl}>
-							<BrandIcon label="npm" size={18} src="/brand/npm.svg" />
-							View on npm
-						</a>
+						<Button asChild size="xl" variant="outline">
+							<a className="cli-band__npm" href={npmUrl}>
+								<BrandIcon label="npm" size={18} src="/brand/npm.svg" />
+								View on npm
+							</a>
+						</Button>
 					</div>
 				</div>
 

@@ -1,11 +1,11 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@sketchi/ui/components/button";
 import {
   ScrollArea,
   ScrollBar,
-} from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+} from "@sketchi/ui/components/scroll-area";
+import { cn } from "@sketchi/ui/lib/utils";
 import type { ComponentProps } from "react";
 import { useCallback } from "react";
 
