@@ -62,6 +62,11 @@ export function routingCorridorGap(scale: number): number {
 	return CORRIDOR_GAP_PX / scale;
 }
 
+/** Scene-unit length from which side-by-side runs read as a corridor rather than a corner at this scale. */
+export function routingCorridorRun(scale: number): number {
+	return CORRIDOR_RUN_PX / scale;
+}
+
 /** Scene-unit reach from an end within which a kink reads as a port jog at this scale. */
 export function routingJogReach(scale: number): number {
 	return JOG_WINDOW_PX / scale;

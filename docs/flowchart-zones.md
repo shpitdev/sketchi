@@ -51,6 +51,7 @@ Each zone's label sits at the left of a header strip across its top; nothing the
 - A zone sits in its rank by its members rather than its outline, so a flow through nested zones runs straight past their header strips.
 - A step reached back through steps outside its zone, as workers fed by a queue the zone's API publishes to, sits beside the step that leaves; outside units in one rank sit under the members they join, a loop back pulling hardest, so the queue sits under its workers.
 - Among zones, no route runs along a node's border.
+- Among zones, a line also keeps the reader's corridor gap (24 px at a 2,000 px fit) from a node it runs alongside but neither leaves nor enters, past a corner's length: the last clearing pass, after every other choice, moves such a run out to the gap where the move brings the line within that clearance of no node and draws nothing worse. A zone whose outline leaves no lane there grows, once every other choice is made, where that routes no worse. Sol and Sonnet hybrid samples ran the ERP's line to the VPN gateway 13 units under the Oracle database's foot, between it and the data center's outline; the data center now grows and the line runs 27 units clear.
 
 ## Excalidraw
 

@@ -48,6 +48,7 @@ import {
 	arrowheadsNear,
 	candidateRouteQuality,
 	routingCorridorGap,
+	routingCorridorRun,
 	routingJogReach,
 	routingQualityFindings,
 	routingQualityScale,
@@ -1515,6 +1516,11 @@ interface Arrangement {
 	 * its rank, straight across the flow from the source, goes around that step.
 	 */
 	readonly aroundRanks?: boolean;
+	/**
+	 * Zones grown by this much on every side, by group id, so a line alongside
+	 * a node they hold has a lane the corridor gap from it (zonesWithoutAlongsideRoom).
+	 */
+	readonly zoneSlack?: ReadonlyMap<string, number>;
 	readonly wrap: Wrap;
 	/** Bands of a zoned flow's levels, by group id or TOP_LEVEL (see planZoneWraps). */
 	readonly zoneWraps?: ReadonlyMap<string, Wrap>;
@@ -4933,6 +4939,60 @@ function routeClearanceCount(
 	return near;
 }
 
+/**
+ * In zones, how near a line may run alongside a node it neither leaves nor
+ * enters: the reader's corridor gap, along more than a corner's length, so the
+ * line never reads as touching the node where it squeezes past it inside a
+ * zone. Outside zones only NODE_CLEARANCE holds.
+ */
+interface Alongside {
+	readonly gap: number;
+	readonly run: number;
+}
+
+function alongsideReach({
+	edgeArrows,
+	groups,
+	nodeShapes,
+}: Pick<DiagramLayout, "edgeArrows" | "groups" | "nodeShapes">): Alongside | undefined {
+	if (!groups?.zoned) return undefined;
+	const scale = routingQualityScale(drawnSize([...nodeShapes, ...groupBlocks(groups)], edgeArrows));
+	return { gap: routingCorridorGap(scale), run: routingCorridorRun(scale) };
+}
+
+/** Whether a run lies alongside a box's side, outside it but nearer than the gap, past a corner's length. */
+function segmentAlongside(segment: AxisAlignedSegment, box: Box, { gap, run }: Alongside): boolean {
+	const horizontal = segment.orientation === "horizontal";
+	const [low, size, along, length] = horizontal
+		? [box.y, box.height, box.x, box.width]
+		: [box.x, box.width, box.y, box.height];
+	const at = segment.staticCoordinate;
+	const distance = at < low ? low - at : at - low - size;
+	return (
+		distance > 0 &&
+		distance < gap &&
+		Math.min(segment.max, along + length) - Math.max(segment.min, along) > run
+	);
+}
+
+/** Middle runs of a route that lie alongside a node it neither leaves nor enters. */
+function routeAlongsideCount(
+	points: readonly ScenePoint[],
+	shapes: readonly NodeSceneElement[],
+	ignoredNodeIds: ReadonlySet<string>,
+	alongside: Alongside,
+): number {
+	return segmentsFromPoints(straightRuns(points)).filter(
+		(segment) =>
+			!segment.isFirstSegment &&
+			!segment.isLastSegment &&
+			shapes.some(
+				(shape) =>
+					keepsClearOf(shape, ignoredNodeIds) && segmentAlongside(segment, shape, alongside),
+			),
+	).length;
+}
+
 function routeLength(points: readonly ScenePoint[]): number {
 	let length = 0;
 
@@ -6347,7 +6407,8 @@ function lanesClearOfNeighbors(
 
 /**
  * Variants of a route whose middle runs that pass too close to a node's
- * outline move just clear of it, to either side of the node. A run moves whole,
+ * outline move just clear of it, to either side of the node; given the
+ * corridor gap, those that run alongside a node move out by the gap. A run moves whole,
  * from turn to turn, so the runs beside it stay straight, and a variant that
  * shortens either endpoint stub or turns it back is not offered.
  */
@@ -6355,6 +6416,7 @@ function runsClearOfOutlines(
 	points: readonly [ScenePoint, ...ScenePoint[]],
 	shapes: readonly NodeSceneElement[],
 	ignoredNodeIds: ReadonlySet<string>,
+	alongside?: Alongside,
 ): [ScenePoint, ...ScenePoint[]][] {
 	const corners = straightRuns(points);
 	const variants: [ScenePoint, ...ScenePoint[]][] = [];
@@ -6364,12 +6426,15 @@ function runsClearOfOutlines(
 			if (
 				!keepsClearOf(shape, ignoredNodeIds) ||
 				segmentCrossesBoundsInterior(run, shape) ||
-				!segmentNearOutline(run, shape, NODE_CLEARANCE)
+				!(alongside
+					? segmentAlongside(run, shape, alongside)
+					: segmentNearOutline(run, shape, NODE_CLEARANCE))
 			)
 				continue;
+			const clearance = alongside ? alongside.gap : NODE_CLEARANCE;
 			const [low, size] =
 				run.orientation === "horizontal" ? [shape.y, shape.height] : [shape.x, shape.width];
-			for (const lane of [low - NODE_CLEARANCE - 1, low + size + NODE_CLEARANCE + 1]) {
+			for (const lane of [low - clearance - 1, low + size + clearance + 1]) {
 				const moved = corners.map((point, index) =>
 					index === run.segmentIndex || index === run.segmentIndex + 1
 						? run.orientation === "horizontal"
@@ -7586,6 +7651,44 @@ function crowdedGroups(layout: DiagramLayout): Set<string> {
 }
 
 /**
+ * Zones where a line runs alongside a node they hold, nearer than the corridor
+ * gap, and the zone's outline leaves no lane the gap from the node there for
+ * clearOutlines to move it to.
+ */
+function zonesWithoutAlongsideRoom(layout: DiagramLayout): Set<string> {
+	const { edgeArrows, groups, nodeShapes } = layout;
+	const roomless = new Set<string>();
+	const alongside = alongsideReach(layout);
+	if (!groups || !alongside) return roomless;
+	for (const arrow of edgeArrows) {
+		const ends = new Set([arrow.sourceNodeId, arrow.targetNodeId]);
+		for (const run of segmentsFromPoints(straightRuns(arrow.points))) {
+			if (run.isFirstSegment || run.isLastSegment) continue;
+			for (const shape of nodeShapes) {
+				if (!keepsClearOf(shape, ends) || !segmentAlongside(run, shape, alongside)) continue;
+				const frame = groups.frames.find(
+					(candidate) => candidate.id === groups.groupOf.get(shape.nodeId),
+				);
+				if (!frame) continue;
+				const [low, size, start, end] =
+					run.orientation === "horizontal"
+						? [shape.y, shape.height, frame.box.y + ZONE_HEADER, frame.box.y + frame.box.height]
+						: [shape.x, shape.width, frame.box.x, frame.box.x + frame.box.width];
+				const lane =
+					run.staticCoordinate < low ? low - alongside.gap - 1 : low + size + alongside.gap + 1;
+				if (
+					run.staticCoordinate > start &&
+					run.staticCoordinate < end &&
+					(lane < start + GROUP_OUTLINE_CLEARANCE || lane > end - GROUP_OUTLINE_CLEARANCE)
+				)
+					roomless.add(frame.id);
+			}
+		}
+	}
+	return roomless;
+}
+
+/**
  * How short each gap between consecutive ranks of a column, or columns of
  * lanes, can draw: one that lines only cross straight, COMPACT_GAP; one that
  * lines turn in, a stub either side of the turns, which keep a port's spacing
@@ -7804,12 +7907,12 @@ function layoutDiagram(
 	polish: RoutingPolish,
 	arrangement: Arrangement = PLAIN_ARRANGEMENT,
 ): DiagramLayout {
-	let layout = layoutDiagramOnce(diagram, polish, arrangement, new Map());
+	let slack = new Map(arrangement.zoneSlack ?? []);
+	let layout = layoutDiagramOnce(diagram, polish, arrangement, slack);
 	if (!layout.groups) return layout;
 	const defects = (attempt: DiagramLayout) =>
 		exportRouteDefects(attempt.edgeArrows, attempt.nodeShapes, attempt.groups).length +
 		crowdedGroups(attempt).size;
-	let slack = new Map<string, number>();
 	let score = defects(layout);
 	for (let round = 0; round < GROUP_SLACK_ROUNDS && score > 0; round += 1) {
 		const crowded = crowdedGroups(layout);
@@ -8338,7 +8441,9 @@ function routesNoWorse(
  * or labels touching anything. Runs only after every other choice, so no
  * other route moves. In the `last` pass, after every choice, a line moves
  * again from where its last move left it until no run is near, and no move
- * may run a line through a head: no head repair follows.
+ * may run a line through a head: no head repair follows. Then, in zones, each
+ * run alongside a node nearer than the corridor gap moves out to the gap where
+ * that brings its line within the clearance of no node (alongsideReach).
  */
 function clearOutlines(layout: DiagramLayout, last = false): DiagramLayout {
 	const { groups, lanes, nodeShapes, routedEdges } = layout;
@@ -8354,31 +8459,53 @@ function clearOutlines(layout: DiagramLayout, last = false): DiagramLayout {
 			.touches,
 	});
 	let current: ReturnType<typeof score> | undefined;
+	// Runs within the clearance first, as everywhere; then, last, in zones, runs
+	// alongside a node, each move bringing the line within the clearance of none.
+	const passes = [undefined, last ? alongsideReach(layout) : undefined];
 	for (const [index, arrow] of layout.edgeArrows.entries()) {
 		const ends = new Set([arrow.sourceNodeId, arrow.targetNodeId]);
-		let near = routeClearanceCount(arrow.points, nodeShapes, ends);
-		// Each move clears at least one run, so a line stops once none is near.
-		for (let moves = 0; near > 0 && (last || moves === 0); moves += 1) {
-			current ??= score(arrows);
-			let moved = false;
-			for (const points of runsClearOfOutlines(arrows[index]!.points, nodeShapes, ends)) {
-				const nearer = routeClearanceCount(points, nodeShapes, ends);
-				if (!orthogonalRoute(points) || nearer >= near) continue;
-				const candidate = arrows.map((other, at) => (at === index ? { ...other, points } : other));
-				const next = score(candidate);
-				if (
-					next.defects <= current.defects &&
-					next.crossings <= current.crossings &&
-					next.findings <= current.findings &&
-					next.heads <= current.heads &&
-					next.inward <= current.inward &&
-					next.labels <= current.labels
-				) {
-					[arrows, current, near, moved] = [candidate, next, nearer, true];
-					break;
+		const close = (points: readonly ScenePoint[]) => routeClearanceCount(points, nodeShapes, ends);
+		for (const [pass, alongside] of passes.entries()) {
+			if (pass > 0 && !alongside) break;
+			const count = (points: readonly ScenePoint[]) =>
+				alongside ? routeAlongsideCount(points, nodeShapes, ends, alongside) : close(points);
+			let near = count(arrows[index]!.points);
+			// Each move clears at least one run, so a line stops once none is near.
+			for (let moves = 0; near > 0 && (last || moves === 0); moves += 1) {
+				current ??= score(arrows);
+				let moved = false;
+				const before = close(arrows[index]!.points);
+				for (const points of runsClearOfOutlines(
+					arrows[index]!.points,
+					nodeShapes,
+					ends,
+					alongside,
+				)) {
+					const nearer = count(points);
+					if (
+						!orthogonalRoute(points) ||
+						nearer >= near ||
+						(alongside !== undefined && close(points) > before)
+					)
+						continue;
+					const candidate = arrows.map((other, at) =>
+						at === index ? { ...other, points } : other,
+					);
+					const next = score(candidate);
+					if (
+						next.defects <= current.defects &&
+						next.crossings <= current.crossings &&
+						next.findings <= current.findings &&
+						next.heads <= current.heads &&
+						next.inward <= current.inward &&
+						next.labels <= current.labels
+					) {
+						[arrows, current, near, moved] = [candidate, next, nearer, true];
+						break;
+					}
 				}
+				if (!moved) break;
 			}
-			if (!moved) break;
 		}
 	}
 	return arrows === layout.edgeArrows ? layout : { ...layout, edgeArrows: arrows };
@@ -10992,6 +11119,27 @@ export function renderGraphDiagram(
 			hookedRoutes(layout) <= hookedRoutes(best.layout) &&
 			detouredLines(layout.edgeArrows) <= detouredLines(best.layout.edgeArrows) &&
 			total(layout) < total(best.layout) - AXIS_ALIGNED_EPSILON
+		)
+			best = { arrangement, defects, layout };
+	}
+	// A line alongside a node in a zone, nearer than the corridor gap, moves out
+	// to the gap last (clearOutlines). Where the zone's outline leaves it no lane
+	// there, the zone grows, once every other choice is made, where that routes
+	// no worse and leaves fewer such zones.
+	const roomless =
+		orthogonal && best.layout.groups?.zoned
+			? zonesWithoutAlongsideRoom(clearedLast(finished(best.layout)))
+			: new Set<string>();
+	if (roomless.size > 0) {
+		const zoneSlack = new Map(best.arrangement.zoneSlack ?? []);
+		for (const id of roomless) zoneSlack.set(id, (zoneSlack.get(id) ?? 0) + GROUP_SLACK);
+		const arrangement = { ...best.arrangement, zoneSlack };
+		const layout = layoutDiagram(diagram, levels[0]!, arrangement);
+		const defects = defectsOf(layout);
+		if (
+			!fewer(best.defects, defects) &&
+			routesNoWorse(layout, best.layout, false, false) &&
+			zonesWithoutAlongsideRoom(clearedLast(finished(layout))).size < roomless.size
 		)
 			best = { arrangement, defects, layout };
 	}

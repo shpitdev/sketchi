@@ -3,6 +3,7 @@ import {
 	CANVAS_SHAPE_CURVE,
 	bypassingHybridFlowcharts,
 	corridorHybridFlowchart,
+	describedArchitectureFlowchart,
 	describedHybridFlowchart,
 	canvasBoundTextBox,
 	canvasShapeOutline,
@@ -12,8 +13,11 @@ import {
 	groupFixtures,
 	leftToRightHybridFlowchart,
 	parseFlowchartDiagram,
+	queriedArchitectureFlowchart,
 	requestedArchitectureFlowchart,
 	routingJogReach,
+	routingCorridorGap,
+	routingCorridorRun,
 	routingQualityScale,
 	routingWideBend,
 	stackedHybridFlowchart,
@@ -511,6 +515,83 @@ describe("lines past an infrastructure shape", () => {
 						}),
 			);
 			expect(close).toEqual([]);
+		},
+	);
+
+	// Every zone fixture and generated sample, in every direction. The stress
+	// cases stay out: thirty services pass a flowchart's limits, and the
+	// four-deep zones run too long for a zone to grow.
+	const samples: Record<string, IntermediateDiagram> = {
+		...zoneFixtures,
+		...bypassingHybridFlowcharts,
+		"hybrid-cloud-archive-corridor": corridorHybridFlowchart,
+		"hybrid-cloud-described": describedHybridFlowchart,
+		"hybrid-cloud-left-to-right": leftToRightHybridFlowchart,
+		"hybrid-cloud-stacked": stackedHybridFlowchart,
+		"hybrid-cloud-sync": syncedHybridFlowchart,
+		"aws-three-tier-described": describedArchitectureFlowchart,
+		"aws-three-tier-queries": queriedArchitectureFlowchart,
+		"aws-three-tier-requests": requestedArchitectureFlowchart,
+	};
+	it.each(Object.keys(samples))(
+		"runs no line of %s alongside a node it passes, nearer than two lines read apart",
+		(name) => {
+			// Sol and Sonnet hybrid samples ran the ERP's line to the VPN gateway 13
+			// units under the Oracle database's foot, between it and the data
+			// center's outline, which reads as touching it at the reader's scale.
+			const along: string[] = [];
+			for (const direction of directions) {
+				const scene = renderIntermediateDiagram({
+					...samples[name]!,
+					layout: { direction, edgeRouting: "orthogonal" },
+				});
+				const nodes = scene.elements.filter(
+					(e): e is NodeSceneElement => e.type === "node" && e.rendererRole === undefined,
+				);
+				const points = scene.elements.flatMap((e) =>
+					e.type === "arrow"
+						? e.points
+						: e.type === "node"
+							? [
+									{ x: e.x, y: e.y },
+									{ x: e.x + e.width, y: e.y + e.height },
+								]
+							: [],
+				);
+				const [xs, ys] = [points.map((point) => point.x), points.map((point) => point.y)];
+				const scale = routingQualityScale({
+					width: Math.max(...xs) - Math.min(...xs),
+					height: Math.max(...ys) - Math.min(...ys),
+				});
+				const [corridor, run] = [routingCorridorGap(scale), routingCorridorRun(scale)];
+				for (const arrow of scene.elements) {
+					if (arrow.type !== "arrow") continue;
+					for (const [index, to] of arrow.points.slice(1).entries()) {
+						const from = arrow.points[index]!;
+						const horizontal = Math.abs(from.y - to.y) < 0.01;
+						for (const node of nodes) {
+							if (node.nodeId === arrow.sourceNodeId || node.nodeId === arrow.targetNodeId)
+								continue;
+							const [at, low, high, start, end] = horizontal
+								? [from.y, node.y, node.y + node.height, node.x, node.x + node.width]
+								: [from.x, node.x, node.x + node.width, node.y, node.y + node.height];
+							const [min, max] = horizontal
+								? [Math.min(from.x, to.x), Math.max(from.x, to.x)]
+								: [Math.min(from.y, to.y), Math.max(from.y, to.y)];
+							const distance = at < low ? low - at : at - high;
+							if (
+								distance > 0 &&
+								distance < corridor &&
+								Math.min(max, end) - Math.max(min, start) > run
+							)
+								along.push(
+									`${direction} ${arrow.edgeId} ${distance.toFixed(1)} from ${node.nodeId}`,
+								);
+						}
+					}
+				}
+			}
+			expect(along).toEqual([]);
 		},
 	);
 });
