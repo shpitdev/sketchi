@@ -3,6 +3,7 @@ import {
 	CANVAS_SHAPE_CURVE,
 	bypassingHybridFlowcharts,
 	corridorHybridFlowchart,
+	describedArchitectureFlowchart,
 	describedHybridFlowchart,
 	canvasBoundTextBox,
 	canvasShapeOutline,
@@ -10,9 +11,13 @@ import {
 	canvasNodeIconBox,
 	getCanvasValidationIssues,
 	groupFixtures,
+	leftToRightHybridFlowchart,
 	parseFlowchartDiagram,
+	queriedArchitectureFlowchart,
 	requestedArchitectureFlowchart,
 	routingJogReach,
+	routingCorridorGap,
+	routingCorridorRun,
 	routingQualityScale,
 	routingWideBend,
 	stackedHybridFlowchart,
@@ -57,6 +62,26 @@ const zonesOf = (scene: RenderedDiagramScene) =>
 	);
 const nodeOf = (scene: RenderedDiagramScene, id: string) =>
 	scene.elements.find((e): e is NodeSceneElement => e.type === "node" && e.nodeId === id)!;
+
+// Width over height, either way up, of what the export draws: zones, nodes and lines.
+const drawnAspect = (scene: RenderedDiagramScene) => {
+	const points = scene.elements.flatMap((element) =>
+		element.type === "arrow"
+			? element.points
+			: element.type === "node"
+				? [
+						{ x: element.x, y: element.y },
+						{ x: element.x + element.width, y: element.y + element.height },
+					]
+				: [],
+	);
+	const [xs, ys] = [points.map((point) => point.x), points.map((point) => point.y)];
+	const [width, height] = [
+		Math.max(...xs) - Math.min(...xs) + 40,
+		Math.max(...ys) - Math.min(...ys) + 40,
+	];
+	return Math.max(width, height) / Math.min(width, height);
+};
 
 describe.each(directions)("zoned flowcharts %s", (direction) => {
 	it.each(Object.keys(fixtures))("draws %s with every zone nested, apart and clear", (name) => {
@@ -135,35 +160,15 @@ describe("zone layout", () => {
 		const [edge, frontend, backend] = ["edge", "frontend", "backend"].map((id) => zone(k8s, id));
 		expect(edge!.y + edge!.height).toBeLessThan(frontend!.y);
 		expect(frontend!.y + frontend!.height).toBeLessThan(backend!.y);
-		// Left to right, the region's steps follow the flow; the data center and the
-		// cloud, too long for one row, wrap into two read the same way.
+		// Left to right, the cloud stands beside the data center that feeds it; too
+		// long for one row, its region wraps inside it, each row read left to right.
 		const hybrid = rendered("hybrid-cloud");
-		expect(zone(hybrid, "onprem").y + zone(hybrid, "onprem").height).toBeLessThan(
-			zone(hybrid, "aws").y,
+		expect(zone(hybrid, "onprem").x + zone(hybrid, "onprem").width).toBeLessThan(
+			zone(hybrid, "aws").x,
 		);
-		const [queue, sync] = [nodeOf(hybrid, "orders"), nodeOf(hybrid, "sync")];
-		expect(queue.x + queue.width).toBeLessThan(sync.x);
+		const [vpn, api] = [nodeOf(hybrid, "vpn"), nodeOf(hybrid, "api")];
+		expect(vpn.x + vpn.width).toBeLessThan(api.x);
 	});
-
-	// Width over height, either way up, of what the export draws: zones, nodes and lines.
-	const drawnAspect = (scene: RenderedDiagramScene) => {
-		const points = scene.elements.flatMap((element) =>
-			element.type === "arrow"
-				? element.points
-				: element.type === "node"
-					? [
-							{ x: element.x, y: element.y },
-							{ x: element.x + element.width, y: element.y + element.height },
-						]
-					: [],
-		);
-		const [xs, ys] = [points.map((point) => point.x), points.map((point) => point.y)];
-		const [width, height] = [
-			Math.max(...xs) - Math.min(...xs) + 40,
-			Math.max(...ys) - Math.min(...ys) + 40,
-		];
-		return Math.max(width, height) / Math.min(width, height);
-	};
 
 	// Each ran 3.4:1 to 8.1:1 in one row or column; the stress case wraps least.
 	it.each([
@@ -404,6 +409,28 @@ describe("lines into a hanging zone band", () => {
 		expect(dc.y).toBeLessThan(aws.y + aws.height);
 	});
 
+	it.each(["LR", "RL"] as const)(
+		"keeps the cloud beside the data center it follows in a %s row",
+		(direction) => {
+			// Two of three Sol samples asked for left to right hung the cloud under the
+			// data center: a top-level wrap came within the target aspect in two bands,
+			// the region's wrap inside the cloud in three, and the fewer bands won. The
+			// ERP's line ran down and back against the row to the VPN gateway.
+			const scene = renderIntermediateDiagram({
+				...leftToRightHybridFlowchart,
+				layout: { direction, edgeRouting: "orthogonal" },
+			});
+			const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
+			const [dc, aws] = [zones.get("group:dc")!, zones.get("group:aws")!];
+			const forward = direction === "LR" ? 1 : -1;
+			const [erp, vpn] = [nodeOf(scene, "erp"), nodeOf(scene, "vpn")];
+			if (direction === "LR") expect(aws.x).toBeGreaterThan(dc.x + dc.width);
+			else expect(dc.x).toBeGreaterThan(aws.x + aws.width);
+			expect(forward * (vpn.x - erp.x)).toBeGreaterThan(0);
+			expect(drawnAspect(scene)).toBeLessThan(2.45);
+		},
+	);
+
 	it("keeps the data center beside the cloud when a side change clears its region's wrap of crossings", () => {
 		// A Sol sample stacked the cloud under the data center: beside it, its
 		// region's wrap crossed the sync function's lines to the table and the
@@ -488,6 +515,83 @@ describe("lines past an infrastructure shape", () => {
 						}),
 			);
 			expect(close).toEqual([]);
+		},
+	);
+
+	// Every zone fixture and generated sample, in every direction. The stress
+	// cases stay out: thirty services pass a flowchart's limits, and the
+	// four-deep zones run too long for a zone to grow.
+	const samples: Record<string, IntermediateDiagram> = {
+		...zoneFixtures,
+		...bypassingHybridFlowcharts,
+		"hybrid-cloud-archive-corridor": corridorHybridFlowchart,
+		"hybrid-cloud-described": describedHybridFlowchart,
+		"hybrid-cloud-left-to-right": leftToRightHybridFlowchart,
+		"hybrid-cloud-stacked": stackedHybridFlowchart,
+		"hybrid-cloud-sync": syncedHybridFlowchart,
+		"aws-three-tier-described": describedArchitectureFlowchart,
+		"aws-three-tier-queries": queriedArchitectureFlowchart,
+		"aws-three-tier-requests": requestedArchitectureFlowchart,
+	};
+	it.each(Object.keys(samples))(
+		"runs no line of %s alongside a node it passes, nearer than two lines read apart",
+		(name) => {
+			// Sol and Sonnet hybrid samples ran the ERP's line to the VPN gateway 13
+			// units under the Oracle database's foot, between it and the data
+			// center's outline, which reads as touching it at the reader's scale.
+			const along: string[] = [];
+			for (const direction of directions) {
+				const scene = renderIntermediateDiagram({
+					...samples[name]!,
+					layout: { direction, edgeRouting: "orthogonal" },
+				});
+				const nodes = scene.elements.filter(
+					(e): e is NodeSceneElement => e.type === "node" && e.rendererRole === undefined,
+				);
+				const points = scene.elements.flatMap((e) =>
+					e.type === "arrow"
+						? e.points
+						: e.type === "node"
+							? [
+									{ x: e.x, y: e.y },
+									{ x: e.x + e.width, y: e.y + e.height },
+								]
+							: [],
+				);
+				const [xs, ys] = [points.map((point) => point.x), points.map((point) => point.y)];
+				const scale = routingQualityScale({
+					width: Math.max(...xs) - Math.min(...xs),
+					height: Math.max(...ys) - Math.min(...ys),
+				});
+				const [corridor, run] = [routingCorridorGap(scale), routingCorridorRun(scale)];
+				for (const arrow of scene.elements) {
+					if (arrow.type !== "arrow") continue;
+					for (const [index, to] of arrow.points.slice(1).entries()) {
+						const from = arrow.points[index]!;
+						const horizontal = Math.abs(from.y - to.y) < 0.01;
+						for (const node of nodes) {
+							if (node.nodeId === arrow.sourceNodeId || node.nodeId === arrow.targetNodeId)
+								continue;
+							const [at, low, high, start, end] = horizontal
+								? [from.y, node.y, node.y + node.height, node.x, node.x + node.width]
+								: [from.x, node.x, node.x + node.width, node.y, node.y + node.height];
+							const [min, max] = horizontal
+								? [Math.min(from.x, to.x), Math.max(from.x, to.x)]
+								: [Math.min(from.y, to.y), Math.max(from.y, to.y)];
+							const distance = at < low ? low - at : at - high;
+							if (
+								distance > 0 &&
+								distance < corridor &&
+								Math.min(max, end) - Math.max(min, start) > run
+							)
+								along.push(
+									`${direction} ${arrow.edgeId} ${distance.toFixed(1)} from ${node.nodeId}`,
+								);
+						}
+					}
+				}
+			}
+			expect(along).toEqual([]);
 		},
 	);
 });

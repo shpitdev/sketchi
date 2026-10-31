@@ -279,6 +279,87 @@ describe("flowchart node kinds", () => {
 		});
 	});
 
+	it("ends a shaped store nothing leaves and steps through a shaped end that passes data on", async () => {
+		// The hybrid sample Sonnet first sent three times: the Oracle database the ERP
+		// stores into, a dead end, marked process.
+		const hybrid = await build({
+			title: "Hybrid setup: on-prem to AWS",
+			layout: { direction: "LR" },
+			groups: [
+				{ id: "dc", label: "On-prem data center", kind: "datacenter" },
+				{ id: "corp", label: "Corporate network", kind: "zone", parent: "dc" },
+				{ id: "aws", label: "AWS cloud", kind: "cloud" },
+				{ id: "reg", label: "eu-west-1", kind: "region", parent: "aws" },
+				{ id: "vpc", label: "Production VPC", kind: "vpc", parent: "reg" },
+				{ id: "priv", label: "Private subnet", kind: "subnet", parent: "vpc" },
+			],
+			nodes: [
+				{ id: "staff", label: "Office staff", kind: "start", group: "corp" },
+				{ id: "erp", label: "Legacy ERP", kind: "process", group: "corp" },
+				{ id: "ora", label: "Oracle database", kind: "process", shape: "database", group: "dc" },
+				{ id: "vpn", label: "Site-to-site VPN gateway", kind: "process", group: "vpc" },
+				{ id: "api", label: "Order API", kind: "process", group: "priv" },
+				{ id: "q", label: "Order queue", kind: "process", shape: "queue", group: "reg" },
+				{ id: "fn", label: "Sync function", kind: "process", group: "reg" },
+				{ id: "tbl", label: "Orders table", kind: "end", shape: "database", group: "reg" },
+				{ id: "arc", label: "Invoice archive", kind: "end", shape: "storage", group: "reg" },
+			],
+			edges: [
+				{ source: "staff", target: "erp", label: "enter orders" },
+				{ source: "erp", target: "ora", label: "stores records" },
+				{ source: "erp", target: "vpn" },
+				{ source: "vpn", target: "api" },
+				{ source: "api", target: "q" },
+				{ source: "q", target: "fn" },
+				{ source: "fn", target: "tbl" },
+				{ source: "fn", target: "arc", label: "saves invoice PDF" },
+			],
+		});
+		if (!hybrid.ok) throw new Error(JSON.stringify(hybrid.issues));
+		expect(hybrid.normalizedSpec.nodes.find((node) => node.id === "ora")?.kind).toBe("end");
+		expect(hybrid.normalizedSpec.nodes.find((node) => node.id === "q")?.kind).toBe("process");
+
+		// The Kubernetes sample Sonnet first sent twice: RabbitMQ, which the workers
+		// read, marked end beside the Cloud SQL end.
+		const cluster = (rabbit: string) => ({
+			title: "GKE cluster setup",
+			nodes: [
+				{ id: "browser", label: "Browser", kind: "start" },
+				{ id: "api", label: "API pods", kind: "process" },
+				{ id: "workers", label: "Worker pods", kind: "process" },
+				{ id: "rmq", label: "RabbitMQ", kind: rabbit, shape: "queue" },
+				{ id: "sql", label: "Cloud SQL", kind: "end", shape: "database" },
+			],
+			edges: [
+				{ source: "browser", target: "api" },
+				{ source: "api", target: "sql", label: "write orders" },
+				{ source: "api", target: "rmq", label: "publish jobs" },
+				{ source: "rmq", target: "workers", label: "consume jobs" },
+				{ source: "workers", target: "sql", label: "write results" },
+			],
+		});
+		const built = await build(cluster("end"));
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.nodes.find((node) => node.id === "rmq")?.kind).toBe("process");
+
+		// The repair reads only shaped nodes: a plain step nothing leaves still needs
+		// its next edge, and a shaped end that is the flow's only end stays one.
+		expect(
+			kinds({
+				nodes: [
+					{ id: "a", label: "Receive", kind: "start" },
+					{ id: "b", label: "Review", kind: "process" },
+					{ id: "c", label: "Store", kind: "end", shape: "database" },
+				],
+				edges: [
+					{ source: "a", target: "b" },
+					{ source: "a", target: "c" },
+					{ source: "c", target: "b" },
+				],
+			}),
+		).toEqual(["start", "process", "end"]);
+	});
+
 	it("leaves unknown kinds and non-flowchart input alone", () => {
 		const input = { spec: invoice([{ id: "receive", label: "Receive", kind: "subroutine" }]) };
 		expect(resolveFlowchartNodeKinds(input)).toBe(input);

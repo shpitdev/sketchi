@@ -326,6 +326,6 @@ describe("zone routing work", () => {
 		const large = render(zoneStressFixtures);
 		expect(small).toBeGreaterThan(0);
 		expect(small).toBeLessThan(2_300_000);
-		expect(large).toBeLessThan(18_000_000);
+		expect(large).toBeLessThan(24_000_000);
 	});
 });

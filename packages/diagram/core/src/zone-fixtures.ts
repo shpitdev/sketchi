@@ -10,6 +10,7 @@ import hybridCloudBypass from "./fixtures/zones/hybrid-cloud-bypass.js";
 import hybridCloudBypassArchive from "./fixtures/zones/hybrid-cloud-bypass-archive.js";
 import hybridCloudDescribed from "./fixtures/zones/hybrid-cloud-described.js";
 import hybridCloudLabeled from "./fixtures/zones/hybrid-cloud-labeled.js";
+import hybridCloudLeftToRight from "./fixtures/zones/hybrid-cloud-left-to-right.js";
 import hybridCloudStacked from "./fixtures/zones/hybrid-cloud-stacked.js";
 import hybridCloudSync from "./fixtures/zones/hybrid-cloud-sync.js";
 import kindedFlat from "./fixtures/zones/kinded-flat.js";
@@ -91,6 +92,13 @@ export const stackedHybridFlowchart = flowchart(hybridCloudStacked);
  * facing it across a free corridor, as a generated sample drew it.
  */
 export const corridorHybridFlowchart = flowchart(hybridCloudArchiveCorridor);
+
+/**
+ * The hybrid setup asked for left to right, whose cloud a top-level wrap hung
+ * under the data center, as a generated sample drew it. Its logo needs an
+ * embedded asset to export.
+ */
+export const leftToRightHybridFlowchart = flowchart(hybridCloudLeftToRight);
 
 /** Zones of the thirty-node stress case, each with its parent and kind. */
 const STRESS_ZONES = [
