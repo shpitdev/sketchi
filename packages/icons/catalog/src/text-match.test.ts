@@ -87,8 +87,8 @@ describe("matchIconsInText", () => {
 		expect(slugs("GitHub Docker Cloudflare Redis", 2)).toEqual(["github", "docker"]);
 	});
 
-	it("offers only node-logo marks when given node-logo icons", () => {
-		expect(slugs("TanStack Query and Zustand on Linux")).toEqual([]);
+	it("offers marks that were once too large to embed, such as TanStack and Linux", () => {
+		expect(slugs("TanStack Query and Zustand on Linux")).toEqual(["tanstack", "zustand", "linux"]);
 	});
 });
 

@@ -54,7 +54,7 @@ function fixtureCatalog(): CodeModeIconCatalog {
 			catalogIcon("github", "GitHub"),
 			catalogIcon("broken", "Broken"),
 			catalogIcon("github-text", "GitHub Wordmark", { variant: "text" }),
-			catalogIcon("tanstack", "TanStack", { bytes: 498_897 }),
+			catalogIcon("heavy-mark", "Heavy Mark", { bytes: 64 * 1024 + 1 }),
 			catalogIcon("cloudflare", "Cloudflare", { collection: "cloud-vendors" }),
 			catalogIcon("aws", "AWS", {
 				aliases: ["AWS", "amazon", "amazon web services"],
@@ -183,7 +183,7 @@ describe("Code Mode icon catalog", () => {
 			slug: "docker",
 		});
 		expect(catalog.get("github-text")).toBeUndefined();
-		expect(catalog.get("tanstack")).toBeUndefined();
+		expect(catalog.get("heavy-mark")).toBeUndefined();
 		expect(catalog.search("git", 5).map((icon) => icon.slug)).toEqual(["github"]);
 	});
 });
