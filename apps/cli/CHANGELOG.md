@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.31.2
+
+### Patch Changes
+
+- [#594](https://github.com/shpitdev/sketchi/pull/594) [`4c3d745`](https://github.com/shpitdev/sketchi/commit/4c3d745bfe282382dfc999a5143942321070acbf) Thanks [@anandpant](https://github.com/anandpant)! - Two lines no longer draw as one. In incident escalation flows drawn left to right, the line from Monitoring used to step down midway and run along the fix check's "Yes" branch, one unit from it for about 500 units, into the resolution, so a reader could not tell the two apart. The polish of a line's ends now never moves a step or a port onto another line's track. Monitoring's line now drops to its own lane straight after leaving Monitoring.
+
 ## 0.31.1
 
 ### Patch Changes
