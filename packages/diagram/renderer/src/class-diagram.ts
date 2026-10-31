@@ -61,6 +61,12 @@ const LABEL_CLEARANCE = 3;
  */
 const ATTRIBUTION_RATIO = 1.5;
 const ATTRIBUTION_MARGIN = 8;
+/**
+ * A multiplicity or role reads as its own end's only when its middle stands
+ * this near the end's tip and, by the rule above, the line's other tip
+ * stands clearly further off.
+ */
+const END_LABEL_REACH = 110;
 /** Past this, a layout's export reads poorly; a candidate pays for any excess. */
 const READABLE_ASPECT = 2.5;
 const NAME_FILL = "#efe6ec";
@@ -73,6 +79,11 @@ const EXPORT_PADDING = 20;
  * placement within it that routes no worse takes its place.
  */
 const LONG_EXPORT = 2.4;
+/**
+ * A placement keeping room for labels that reads longer than that may still
+ * take over, when it reads at most this much longer than the one it replaces.
+ */
+const LABEL_ROOM_STRETCH = 1.05;
 
 /** Each kind's line: dashed or solid, and the heads at its `from` and `to` ends. */
 const LINE_STYLES: Readonly<
@@ -451,7 +462,7 @@ function bestScene(
 	}
 	// While a label stands clearly its own line's nowhere, the placements run again
 	// keeping room for labels; one takes its place when it leaves fewer such labels,
-	// draws no more crossings, detours or hugging runs, reads no longer, and draws
+	// draws no more crossings, detours or hugging runs, reads hardly longer, and draws
 	// no more crossings and findings together than one more for each label it clears:
 	// a label read as another line's misleads a reader more than a jog does.
 	const labelled = (routed: Routed) => ({
@@ -475,7 +486,7 @@ function bestScene(
 		const was = chosen.counts;
 		if (
 			routed.labels.unclear < chosen.labels.unclear &&
-			(!long(routed) || exportAspect(scene) <= exportAspect(chosen.scene)) &&
+			(!long(routed) || exportAspect(scene) <= LABEL_ROOM_STRETCH * exportAspect(chosen.scene)) &&
 			counts.crossings <= was.crossings &&
 			counts.crossings + counts.findings <=
 				was.crossings + was.findings + chosen.labels.unclear - routed.labels.unclear &&
@@ -635,6 +646,13 @@ function* labelSpots(
 	}
 }
 
+function rectPointDistance(rect: Rect, point: { readonly x: number; readonly y: number }): number {
+	return Math.hypot(
+		Math.max(0, rect.left - point.x, point.x - rect.right),
+		Math.max(0, rect.top - point.y, point.y - rect.bottom),
+	);
+}
+
 /** A route from its start up to halfway along it. */
 function halfway(points: readonly { x: number; y: number }[]): { x: number; y: number }[] {
 	const lengths = points
@@ -659,7 +677,9 @@ function halfway(points: readonly { x: number; y: number }[]): { x: number; y: n
  * Place each multiplicity and role beside its end's first run, the two on
  * opposite sides of the line, and each relationship's name beside its
  * longest run, every one clear of the boxes, the lines and the others, and
- * clearly nearer its own line than any other, so none reads as another's.
+ * clearly nearer its own line than any other, so none reads as another's;
+ * a multiplicity or role also stays beside its own end's tip, clearly nearer
+ * it than the line's other tip, so none reads as the other end's.
  */
 function placeLabels(
 	diagram: ClassDiagram,
@@ -683,19 +703,23 @@ function placeLabels(
 		placed.filter((other) => rectsOverlap(rect, other, LABEL_CLEARANCE)).length;
 	const free = (rect: Rect) => collisions(rect) === 0;
 	const anywhere = () => free;
-	// Free, and the text as drawn within its room stands clearly nearer its own line.
-	const attributed = (owner: string, text: string) => (rect: Rect) => {
-		if (!free(rect)) return false;
+	// The text as drawn within its room.
+	const drawnRect = (text: string, rect: Rect): Rect => {
 		const inset = {
 			x: (labelWidth(text) - estimateTextWidth(text, LABEL_FONT_SIZE)) / 2,
 			y: (text.split("\n").length * (LABEL_HEIGHT - LABEL_FONT_SIZE * 1.35)) / 2,
 		};
-		const drawn = {
+		return {
 			left: rect.left + inset.x,
 			top: rect.top + inset.y,
 			right: rect.right - inset.x,
 			bottom: rect.bottom - inset.y,
 		};
+	};
+	// Free, and the text as drawn within its room stands clearly nearer its own line.
+	const attributed = (owner: string, text: string) => (rect: Rect) => {
+		if (!free(rect)) return false;
+		const drawn = drawnRect(text, rect);
 		let [own, other] = [Infinity, Infinity];
 		for (const run of owned) {
 			const distance = rectSegmentDistance(drawn, run.segment);
@@ -741,6 +765,7 @@ function placeLabels(
 			const labels = endLabels(relationship, end);
 			if (labels.length === 0) continue;
 			const route = end === "from" ? arrow.points : arrow.points.toReversed();
+			const [tip, far] = [route[0]!, route.at(-1)!];
 			const owner = end === "from" ? arrow.sourceNodeId : arrow.targetNodeId;
 			const keys = [
 				relationship[end === "from" ? "fromMultiplicity" : "toMultiplicity"] && "multiplicity",
@@ -763,10 +788,29 @@ function placeLabels(
 				placed.splice(placed.length - rects.length, rects.length);
 				return rects.length === labels.length ? rects : undefined;
 			};
-			// On the end's first run, clearly its own line's: two labels on opposite
-			// sides, whichever way round fits, else together on one side; one label on
-			// either side, nearest the end first.
-			const mine = (text: string) => attributed(relationship.id, text);
+			// The text as drawn stands beside this end's tip, the other tip clearly further off.
+			const beside = (text: string) => (rect: Rect) => {
+				const drawn = drawnRect(text, rect);
+				const [own, other] = [rectPointDistance(drawn, tip), rectPointDistance(drawn, far)];
+				return (
+					Math.hypot(
+						(drawn.left + drawn.right) / 2 - tip.x,
+						(drawn.top + drawn.bottom) / 2 - tip.y,
+					) <= END_LABEL_REACH &&
+					other >= Math.max(ATTRIBUTION_RATIO * own, own + ATTRIBUTION_MARGIN)
+				);
+			};
+			const near = (text: string) => {
+				const here = beside(text);
+				return (rect: Rect) => free(rect) && here(rect);
+			};
+			// On the end's first run, beside the end and clearly its own line's: two labels
+			// on opposite sides, whichever way round fits, else together on one side; one
+			// label on either side, nearest the end first.
+			const mine = (text: string) => {
+				const [line, here] = [attributed(relationship.id, text), beside(text)];
+				return (rect: Rect) => line(rect) && here(rect);
+			};
 			const sides: ((index: number) => readonly (-1 | 1)[])[] =
 				labels.length === 2
 					? [
@@ -777,8 +821,9 @@ function placeLabels(
 						]
 					: [() => [1, -1]];
 			// Failing that, each the nearest such spot on either side along the end's
-			// half of the line; then opposite sides, then each the nearest free spot on
-			// either side anywhere along the line; then, with none free, its first spot.
+			// half of the line; then the same beside the end, if nearer another line;
+			// then opposite sides, then each the nearest free spot on either side along
+			// the end's half; then, with none free, its first spot.
 			const orders: (readonly (-1 | 1)[])[] =
 				labels.length === 2
 					? [
@@ -786,14 +831,17 @@ function placeLabels(
 							[-1, 1],
 						]
 					: [[1], [-1]];
-			const clear =
-				sides.map((side) => place(route.slice(0, 2), side, mine)).find(Boolean) ??
-				place(halfway(route), () => [1, -1], mine);
+			const half = halfway(route);
+			const nearest = (accept: (text: string) => (rect: Rect) => boolean) =>
+				sides.map((side) => place(route.slice(0, 2), side, accept)).find(Boolean) ??
+				place(half, () => [1, -1], accept);
+			const clear = nearest(mine);
 			if (!clear) unclear += labels.length;
 			const chosen =
 				clear ??
-				orders.map((order) => place(route, (index) => [order[index]!], anywhere)).find(Boolean) ??
-				place(route, () => [1, -1], anywhere) ??
+				nearest(near) ??
+				orders.map((order) => place(half, (index) => [order[index]!], anywhere)).find(Boolean) ??
+				place(half, () => [1, -1], anywhere) ??
 				labels.map((label) => spots(route, labelWidth(label), LABEL_HEIGHT, [1, -1], 4)[0]!);
 			for (const [index, rect] of chosen.entries())
 				add(
