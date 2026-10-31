@@ -1,7 +1,10 @@
 name: local-ci carry
 
 # A restack or retarget that leaves this PR's own patch unchanged keeps its `pnpm ci:local`
-# signoff: the shared job re-posts `local-ci` on the new head. A changed patch needs a new run.
+# signoff: this job re-posts `local-ci` on the new head. A changed patch needs a new run.
+#
+# Vendored from shpitdev/.github (local-ci-carry/carry.mjs at 7aff7f8599bd): this repository is
+# public, and a public repository cannot use a private repository's workflows or actions.
 on:
   pull_request:
     types: [synchronize, edited]
@@ -13,6 +16,404 @@ permissions:
 
 jobs:
   carry:
-    uses: shpitdev/.github/.github/workflows/local-ci-carry.yml@main
-    with:
-      runs-on: ubuntu-latest
+    # An edit matters only when it changed the base: the retarget after a parent merges.
+    if: github.event.action == 'synchronize' || (github.event.action == 'edited' && github.event.changes.base != null)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Carry local-ci
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          // local-ci carry: when a restack or a merge-queue rebase moves a PR head without changing the
+          // PR's own patch, post the earlier head's `local-ci` signoff on the new head, so the queue doesn't
+          // wait on a rerun of the local gate. A changed patch gets nothing: the author reruns the gate.
+          //
+          // Patch identity is `git diff $(git merge-base <base> <sha>) <sha> | git patch-id --verbatim`.
+          // `--verbatim` implies `--stable` and keeps whitespace, so an indentation-only change never matches.
+          // A patch-id match is then confirmed by replaying the earlier head's patch onto this head's base.
+          // An earlier head is measured from every base it could have had: the current base tip, the PR's
+          // earlier base tips, the default branch, and every head of the PRs it was stacked on. All of those
+          // are base-side commits, so a match means the earlier head was exactly some base plus this patch.
+          //
+          // Runs on pull_request `synchronize` and base-changing `edited` events. Locally, with the script
+          // saved as carry.mjs, `node carry.mjs --repo owner/name --pr 123 [--head sha] [--base sha]
+          // [--before sha]` evaluates a PR (or a past head of it) with GH_TOKEN and never posts.
+
+          import { execFileSync } from "node:child_process";
+          import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+          import { devNull, tmpdir } from "node:os";
+          import { join } from "node:path";
+          import { parseArgs } from "node:util";
+
+          export const CONTEXT = "local-ci";
+          const CARRIED = /^carried from ([0-9a-f]{40}) \(same patch\)$/;
+          const GIT_ENV = { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: devNull, GIT_TERMINAL_PROMPT: "0" };
+          const DIFF = [
+            "diff",
+            "--binary",
+            "--no-color",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-renames",
+            "--diff-algorithm=myers",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
+          ];
+          const MAX_BUFFER = 512 * 1024 * 1024;
+
+          export function carriedDescription(origin) {
+            return `carried from ${origin} (same patch)`;
+          }
+
+          // The signoff a commit's latest `local-ci` status stands for: the commit itself when ci:local posted
+          // it (as a user), or the original head when this job carried it (as a bot). Any other state or
+          // author is not a signoff, so a failure or a hand-written "carried from" is never carried.
+          export function signoffOrigin(sha, status) {
+            if (status?.state !== "SUCCESS") return null;
+            const description = status.description ?? "";
+            if (status.creator?.__typename !== "Bot") return description.startsWith("carried from ") ? null : sha;
+            return CARRIED.exec(description)?.[1] ?? null;
+          }
+
+          // Earlier heads (with their latest local-ci status), earlier base tips, and base ref names.
+          export function readTimeline(nodes) {
+            const heads = new Map();
+            const bases = new Set();
+            const baseRefs = new Set();
+            const addHead = (commit) => commit?.oid && heads.set(commit.oid, commit.status?.context ?? null);
+            for (const node of nodes) {
+              switch (node?.__typename) {
+                case "PullRequestCommit":
+                  addHead(node.commit);
+                  break;
+                case "HeadRefForcePushedEvent":
+                  addHead(node.beforeCommit);
+                  addHead(node.afterCommit);
+                  break;
+                case "BaseRefForcePushedEvent":
+                  for (const commit of [node.beforeCommit, node.afterCommit]) if (commit?.oid) bases.add(commit.oid);
+                  break;
+                case "BaseRefChangedEvent":
+                  baseRefs.add(node.previousRefName).add(node.currentRefName);
+                  break;
+                case "AutomaticBaseChangeSucceededEvent":
+                  baseRefs.add(node.oldBase).add(node.newBase);
+                  break;
+              }
+            }
+            for (const ref of baseRefs) if (!ref) baseRefs.delete(ref);
+            return { heads, bases, baseRefs };
+          }
+
+          // Signed earlier heads, newest first, each with the head whose gate run it stands for.
+          export function signedSources(heads, head) {
+            return [...heads]
+              .reverse()
+              .filter(([sha]) => sha !== head)
+              .map(([sha, status]) => ({ sha, origin: signoffOrigin(sha, status) }))
+              .filter(({ origin }) => origin);
+          }
+
+          export function parentHeads(pr) {
+            const shas = [pr?.headRefOid];
+            for (const node of pr?.timelineItems?.nodes ?? []) {
+              shas.push(node?.commit?.oid, node?.beforeCommit?.oid, node?.afterCommit?.oid);
+            }
+            return shas.filter(Boolean);
+          }
+
+          function git(cwd, args, input) {
+            return execFileSync("git", args, { cwd, env: GIT_ENV, input, maxBuffer: MAX_BUFFER, stdio: "pipe" });
+          }
+
+          export function mergeBase(cwd, a, b) {
+            try {
+              return git(cwd, ["merge-base", a, b]).toString().trim() || null;
+            } catch {
+              return null;
+            }
+          }
+
+          // Raw bytes all the way: decoding the diff as UTF-8 would fold distinct non-UTF-8 bytes together.
+          export function patchId(cwd, from, to) {
+            const diff = git(cwd, [...DIFF, from, to]);
+            if (diff.length === 0) return null;
+            return git(cwd, ["patch-id", "--verbatim"], diff).toString().split(" ")[0] || null;
+          }
+
+          // patch-id ignores hunk positions, so a hunk moved between two identical contexts still matches.
+          // Replaying the earlier head's patch onto this head's base must reproduce this head's tree exactly.
+          export function replaysTo(cwd, { from, onto, sha, head }) {
+            try {
+              const merged = git(cwd, ["merge-tree", "--write-tree", `--merge-base=${from}`, onto, sha]);
+              return merged.toString().split("\n")[0] === git(cwd, ["rev-parse", `${head}^{tree}`]).toString().trim();
+            } catch {
+              return false;
+            }
+          }
+
+          export function findCarry(cwd, { head, base, sources, bases }) {
+            const headBase = mergeBase(cwd, base, head);
+            if (!headBase) return { reason: `${short(head)} has no merge base with base ${short(base)}` };
+            const patch = patchId(cwd, headBase, head);
+            if (!patch) return { reason: "the PR's patch is empty" };
+            for (const { sha, origin } of sources) {
+              const tried = new Set();
+              for (const candidate of bases) {
+                const from = mergeBase(cwd, candidate, sha);
+                if (!from || from === sha || tried.has(from)) continue;
+                tried.add(from);
+                if (patchId(cwd, from, sha) === patch && replaysTo(cwd, { from, onto: headBase, sha, head })) {
+                  return { patch, carry: { sha, origin, from } };
+                }
+              }
+            }
+            return { patch, reason: `no signed earlier head has patch ${patch.slice(0, 12)}` };
+          }
+
+          const SIGNOFF = `fragment signoff on Commit {
+            oid
+            status { context(name: "${CONTEXT}") { state description creator { __typename login } } }
+          }`;
+
+          const HISTORY = `query($owner: String!, $name: String!, $number: Int!, $head: GitObjectID!, $before: GitObjectID!, $cursor: String) {
+            repository(owner: $owner, name: $name) {
+              defaultBranchRef { target { oid } }
+              head: object(oid: $head) { ...signoff }
+              before: object(oid: $before) { ...signoff }
+              pullRequest(number: $number) {
+                timelineItems(first: 100, after: $cursor, itemTypes: [PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT, BASE_REF_FORCE_PUSHED_EVENT, BASE_REF_CHANGED_EVENT, AUTOMATIC_BASE_CHANGE_SUCCEEDED_EVENT]) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes {
+                    __typename
+                    ... on PullRequestCommit { commit { ...signoff } }
+                    ... on HeadRefForcePushedEvent { beforeCommit { ...signoff } afterCommit { ...signoff } }
+                    ... on BaseRefForcePushedEvent { beforeCommit { oid } afterCommit { oid } }
+                    ... on BaseRefChangedEvent { previousRefName currentRefName }
+                    ... on AutomaticBaseChangeSucceededEvent { oldBase newBase }
+                  }
+                }
+              }
+            }
+          }
+          ${SIGNOFF}`;
+
+          function parentsQuery(count) {
+            const vars = Array.from({ length: count }, (_, i) => `$r${i}: String!`).join(", ");
+            const fields = Array.from(
+              { length: count },
+              (_, i) => `p${i}: pullRequests(headRefName: $r${i}, first: 5, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { ...parent } }`,
+            ).join("\n    ");
+            return `query($owner: String!, $name: String!, ${vars}) {
+            repository(owner: $owner, name: $name) {
+              ${fields}
+            }
+          }
+          fragment parent on PullRequest {
+            headRefOid
+            timelineItems(last: 100, itemTypes: [PULL_REQUEST_COMMIT, HEAD_REF_FORCE_PUSHED_EVENT]) {
+              nodes {
+                ... on PullRequestCommit { commit { oid } }
+                ... on HeadRefForcePushedEvent { beforeCommit { oid } afterCommit { oid } }
+              }
+            }
+          }`;
+          }
+
+          async function request(api, path, init = {}) {
+            const url = path.startsWith("https://") ? path : `${api.rest}${path}`;
+            for (let attempt = 1; ; attempt += 1) {
+              let response;
+              try {
+                response = await fetch(url, {
+                  ...init,
+                  headers: {
+                    accept: "application/vnd.github+json",
+                    authorization: `Bearer ${api.token}`,
+                    "content-type": "application/json",
+                    "user-agent": "shpitdev-local-ci-carry",
+                    "x-github-api-version": "2022-11-28",
+                  },
+                });
+              } catch (error) {
+                if (attempt < 3) {
+                  await sleep(2000 * attempt);
+                  continue;
+                }
+                throw error;
+              }
+              if (response.ok) return response.json();
+              if (attempt < 3 && (response.status >= 500 || response.status === 429)) {
+                await sleep(2000 * attempt);
+                continue;
+              }
+              throw new Error(`${init.method ?? "GET"} ${url}: HTTP ${response.status} ${await response.text()}`);
+            }
+          }
+
+          async function graphql(api, query, variables) {
+            const body = await request(api, api.graphql, { method: "POST", body: JSON.stringify({ query, variables }) });
+            if (body.errors?.length) throw new Error(`GraphQL: ${body.errors.map((error) => error.message).join("; ")}`);
+            return body.data;
+          }
+
+          async function loadHistory(api, repo, number, head, before) {
+            const [owner, name] = repo.split("/");
+            const nodes = [];
+            let repository;
+            let cursor = null;
+            for (let page = 0; page < 10; page += 1) {
+              ({ repository } = await graphql(api, HISTORY, { owner, name, number, head, before: before ?? head, cursor }));
+              const items = repository.pullRequest.timelineItems;
+              nodes.push(...items.nodes);
+              if (!items.pageInfo.hasNextPage) break;
+              cursor = items.pageInfo.endCursor;
+            }
+            const timeline = readTimeline(nodes);
+            // The push that triggered this run may not be in the timeline yet; the event's `before` is.
+            const previous = repository.before;
+            if (previous?.oid && !timeline.heads.has(previous.oid)) timeline.heads.set(previous.oid, previous.status?.context ?? null);
+            return { ...timeline, headStatus: repository.head?.status?.context ?? null, defaultTip: repository.defaultBranchRef?.target?.oid };
+          }
+
+          async function loadParentHeads(api, repo, refs) {
+            if (refs.length === 0) return [];
+            const [owner, name] = repo.split("/");
+            const variables = Object.fromEntries(refs.map((ref, i) => [`r${i}`, ref]));
+            const { repository } = await graphql(api, parentsQuery(refs.length), { owner, name, ...variables });
+            return Object.values(repository).flatMap((connection) => connection.nodes.flatMap(parentHeads));
+          }
+
+          async function headStatus(api, repo, sha) {
+            const combined = await request(api, `/repos/${repo}/commits/${sha}/status`);
+            return combined.statuses.find((status) => status.context === CONTEXT) ?? null;
+          }
+
+          function initRepo(dir, server, repo, token) {
+            git(dir, ["init", "--quiet"]);
+            git(dir, ["remote", "add", "origin", `${server}/${repo}.git`]);
+            git(dir, ["config", "gc.auto", "0"]);
+            const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
+            git(dir, ["config", `http.${server}/.extraheader`, `AUTHORIZATION: basic ${basic}`]);
+          }
+
+          // Full commit history without blobs: merge-base stays exact, and diff fetches only changed blobs.
+          function fetchCommits(dir, shas) {
+            const fetch = (...wanted) => git(dir, ["fetch", "--quiet", "--no-tags", "--filter=blob:none", "origin", ...wanted]);
+            try {
+              fetch(...shas);
+            } catch {
+              for (const sha of shas) {
+                try {
+                  fetch(sha);
+                } catch {
+                  log(`could not fetch ${short(sha)}; skipping it`);
+                }
+              }
+            }
+          }
+
+          async function localEvent(api, repo, cli) {
+            const pr = await request(api, `/repos/${repo}/pulls/${cli.pr}`);
+            return {
+              action: "synchronize",
+              before: cli.before,
+              pull_request: {
+                ...pr,
+                head: { ...pr.head, sha: cli.head ?? pr.head.sha },
+                base: { ...pr.base, sha: cli.base ?? pr.base.sha },
+              },
+            };
+          }
+
+          const short = (sha) => sha?.slice(0, 12);
+          const unique = (values) => [...new Set(values.filter(Boolean))];
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const log = (message) => console.log(`local-ci carry: ${message}`);
+
+          function summarize(line) {
+            if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${line}\n`);
+          }
+
+          async function main() {
+            const { values: cli } = parseArgs({
+              options: {
+                repo: { type: "string" },
+                pr: { type: "string" },
+                head: { type: "string" },
+                base: { type: "string" },
+                before: { type: "string" },
+              },
+            });
+            const local = Boolean(cli.repo);
+            const token = process.env["INPUT_GITHUB-TOKEN"] || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+            if (!token) throw new Error("no token: set the github-token input, GITHUB_TOKEN or GH_TOKEN");
+            const api = {
+              rest: process.env.GITHUB_API_URL ?? "https://api.github.com",
+              graphql: process.env.GITHUB_GRAPHQL_URL ?? "https://api.github.com/graphql",
+              token,
+            };
+            const server = process.env.GITHUB_SERVER_URL ?? "https://github.com";
+            const repo = cli.repo ?? process.env.GITHUB_REPOSITORY;
+            const event = local ? await localEvent(api, repo, cli) : JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, "utf8"));
+
+            const pr = event.pull_request;
+            if (!pr) return log("not a pull_request event; nothing to do");
+            if (event.action === "edited" && !event.changes?.base) return log("an edit that kept the base; nothing to do");
+            if (pr.head.repo?.full_name !== repo) return log("a fork PR; this token cannot post statuses");
+            const head = pr.head.sha;
+            const base = pr.base.sha;
+            const before = /^[0-9a-f]{40}$/.test(event.before ?? "") && !/^0+$/.test(event.before) ? event.before : undefined;
+            log(`PR #${pr.number} head ${short(head)} on ${pr.base.ref} ${short(base)}`);
+
+            const history = await loadHistory(api, repo, pr.number, head, before);
+            if (history.headStatus) {
+              const message = `${short(head)} already has local-ci ${history.headStatus.state.toLowerCase()}`;
+              if (!local) return log(`${message}; nothing to do`);
+              log(`${message}; evaluating anyway`);
+            }
+            const sources = signedSources(history.heads, head);
+            if (sources.length === 0) return log("no earlier head of this PR has a local-ci signoff; nothing to carry");
+            log(`signed earlier heads: ${sources.map(({ sha, origin }) => (sha === origin ? short(sha) : `${short(sha)} (carried from ${short(origin)})`)).join(", ")}`);
+
+            const baseRefs = unique([pr.base.ref, event.changes?.base?.ref?.from, ...history.baseRefs]);
+            const parents = await loadParentHeads(api, repo, baseRefs);
+            const bases = unique([base, event.changes?.base?.sha?.from, history.defaultTip, ...history.bases, ...parents]);
+
+            const dir = mkdtempSync(join(process.env.RUNNER_TEMP ?? tmpdir(), "local-ci-carry-"));
+            try {
+              initRepo(dir, server, repo, token);
+              fetchCommits(dir, unique([head, base, ...sources.map(({ sha }) => sha), ...bases]));
+              const result = findCarry(dir, { head, base, sources, bases });
+              if (!result.carry) {
+                log(`no carry: ${result.reason}. Rerun the local gate on this head.`);
+                return summarize(`No carry for \`${short(head)}\`: ${result.reason}.`);
+              }
+              const { sha, origin, from } = result.carry;
+              log(`patch ${result.patch.slice(0, 12)} matches ${short(sha)} measured from ${short(from)}`);
+              const description = carriedDescription(origin);
+              if (local) return log(`would post local-ci success on ${head}: ${description}`);
+              if (await headStatus(api, repo, head)) return log(`${short(head)} got a local-ci status meanwhile; leaving it`);
+              await request(api, `/repos/${repo}/statuses/${head}`, {
+                method: "POST",
+                body: JSON.stringify({
+                  state: "success",
+                  context: CONTEXT,
+                  description,
+                  target_url: `${server}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+                }),
+              });
+              log(`posted local-ci success on ${short(head)}: ${description}`);
+              summarize(`Carried \`local-ci\` to \`${short(head)}\` from \`${short(origin)}\` (same patch as \`${short(sha)}\`).`);
+            } finally {
+              rmSync(dir, { recursive: true, force: true });
+            }
+          }
+
+          main().catch((error) => {
+            console.error(`::error::local-ci carry: ${error.message}`);
+            process.exitCode = 1;
+          });
+          NODE
