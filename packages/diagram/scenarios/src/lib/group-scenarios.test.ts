@@ -11,7 +11,11 @@ const replays = retainedReplays.map(({ id, spec }) => ({
 	spec: parseFlowchartDiagram(specToFlowchartCandidate(spec)),
 }));
 
-const ids = ["grouped-expense-approval", "three-zone-request-path", "mixed-fulfilment-groups"];
+const ids = [
+	"grouped-expense-approval",
+	"three-zone-request-path",
+	"mixed-fulfilment-groups",
+].flatMap((id) => [id, `${id}-v2`]);
 
 function failed(scenarioId: string, candidate: unknown) {
 	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), candidate)

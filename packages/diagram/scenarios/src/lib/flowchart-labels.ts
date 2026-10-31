@@ -31,6 +31,10 @@ const WORD_ALIASES = new Map([
 	["validation", "validate"],
 	["successfully", "succeed"],
 	["attachment", "attach"],
+	// Abbreviations people type for the components they name.
+	["alb", "application load balancer"],
+	["db", "database"],
+	["postgresql", "postgres"],
 ]);
 
 /** Flowchart-only normalization; sequence and logo matching keep their own rules. */

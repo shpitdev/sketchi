@@ -33,18 +33,19 @@ const withPoint = (
 
 describe("prompt-grounded quadrant scenarios", () => {
 	it("covers a crowded challenge, membership only, a highlight and an empty quadrant", () => {
-		expect(quadrantScenarios.map((entry) => entry.difficulty).toSorted()).toEqual([
-			"challenge",
-			"smoke",
-			"standard",
-		]);
+		expect(
+			quadrantScenarios
+				.filter((entry) => !entry.id.endsWith("-v2"))
+				.map((entry) => entry.difficulty)
+				.toSorted(),
+		).toEqual(["challenge", "smoke", "standard"]);
 		expect(backlog.points).toHaveLength(15);
 		const quickWins = backlog.points.filter((point) => point.x < 0.5 && point.y > 0.5);
 		expect(quickWins).toHaveLength(8);
 		expect(backlog.points.some((point) => point.x === 0.5)).toBe(true);
 		expect(eisenhower.points).toHaveLength(8);
 		expect(positioning.points.filter((point) => point.group)).toHaveLength(1);
-		for (const entry of quadrantScenarios) expect(entry.prompt).toContain("quadrant chart");
+		for (const entry of quadrantScenarios) expect(entry.prompt).toMatch(/quadrant|matrix/);
 	});
 
 	it("passes its own expected diagram, including what the scene draws and its layout", () => {
@@ -97,6 +98,77 @@ describe("prompt-grounded quadrant scenarios", () => {
 			yAxis: { title: "Importance", low: "Unimportant", high: "Very important" },
 		};
 		expect(failed("eisenhower-matrix-quadrant", worded)).toEqual([]);
+	});
+
+	it("takes the usual names for a matrix only when the prompt asks for them, each in its own corner", () => {
+		const backlogNamed: QuadrantDiagram = {
+			...backlog,
+			quadrants: { ...backlog.quadrants, topRight: "Big bets", bottomRight: "Money pit" },
+		};
+		expect(failed("effort-impact-quadrant-v2", backlogNamed)).toEqual([]);
+		expect(failed("effort-impact-quadrant", backlogNamed).toSorted()).toEqual([
+			"quadrant:major-projects",
+			"quadrant:thankless-tasks",
+		]);
+		const swapped: QuadrantDiagram = {
+			...backlog,
+			quadrants: { ...backlog.quadrants, topRight: "Money pit", bottomRight: "Big bets" },
+		};
+		expect(failed("effort-impact-quadrant-v2", swapped).toSorted()).toEqual([
+			"quadrant:major-projects",
+			"quadrant:thankless-tasks",
+		]);
+		const decided: QuadrantDiagram = {
+			...eisenhower,
+			quadrants: {
+				topRight: "Do",
+				topLeft: "Decide",
+				bottomRight: "Delegate",
+				bottomLeft: "Delete",
+			},
+		};
+		expect(failed("eisenhower-matrix-quadrant-v2", decided)).toEqual([]);
+		expect(failed("eisenhower-matrix-quadrant", decided).toSorted()).toEqual([
+			"quadrant:do-first",
+			"quadrant:eliminate",
+			"quadrant:schedule",
+		]);
+		expect(
+			failed("eisenhower-matrix-quadrant-v2", {
+				...decided,
+				quadrants: { ...decided.quadrants, topLeft: "Delegate", bottomRight: "Decide" },
+			}).toSorted(),
+		).toEqual(["quadrant:delegate", "quadrant:schedule"]);
+	});
+
+	it("reads a pasted table's axes either way round, with bare level or score ends", () => {
+		// Impact across and effort up: every corner and point turns with the axes.
+		const turned: QuadrantDiagram = {
+			...backlog,
+			xAxis: { title: "Impact", low: "0", high: "100" },
+			yAxis: { title: "Effort", low: "Low", high: "High" },
+			quadrants: {
+				topLeft: backlog.quadrants.bottomRight,
+				topRight: backlog.quadrants.topRight,
+				bottomLeft: backlog.quadrants.bottomLeft,
+				bottomRight: backlog.quadrants.topLeft,
+			},
+			points: backlog.points.map((point) => ({ ...point, x: point.y, y: point.x })),
+		};
+		expect(failed("effort-impact-quadrant-v2", turned)).toEqual([]);
+		expect(failed("effort-impact-quadrant", turned)).toContain("axis:x");
+		const cheap: QuadrantDiagram = {
+			...positioning,
+			xAxis: { title: "Price", low: "Cheap", high: "Pricey" },
+			yAxis: { title: "Ease of use", low: "Hard", high: "Easy" },
+		};
+		expect(failed("competitor-positioning-quadrant-v2", cheap)).toEqual([]);
+		expect(
+			failed("competitor-positioning-quadrant-v2", {
+				...cheap,
+				xAxis: { title: "Price", low: "Easy", high: "Hard" },
+			}),
+		).toEqual(["axis-ends:x"]);
 	});
 
 	it.each([

@@ -32,13 +32,14 @@ export interface ErScenarioEntity {
 
 /**
  * A relationship the prompt states, between entities by key, through the
- * named field at each end when it names one, with the cardinality at each end.
+ * named field at each end when it names one, with the cardinalities that read
+ * as what the prompt states at each end, the stated one first.
  */
 export interface ErScenarioRelationship {
 	readonly from: { readonly entity: string; readonly field?: string };
 	readonly to: { readonly entity: string; readonly field?: string };
-	readonly fromCardinality: ErCardinality;
-	readonly toCardinality: ErCardinality;
+	readonly fromCardinalities: readonly ErCardinality[];
+	readonly toCardinalities: readonly ErCardinality[];
 }
 
 export interface ErScenario {
@@ -210,10 +211,10 @@ export function erScenarioChecks(scenario: ErScenario, diagram: ErDiagram): Scen
 				id: `cardinality:${index + 1}`,
 				passed: joined.some(
 					(way) =>
-						way.fromCardinality === expected.fromCardinality &&
-						way.toCardinality === expected.toCardinality,
+						expected.fromCardinalities.includes(way.fromCardinality) &&
+						expected.toCardinalities.includes(way.toCardinality),
 				),
-				message: `Expected ${description} to be ${expected.fromCardinality} to ${expected.toCardinality}.`,
+				message: `Expected ${description} to be ${expected.fromCardinalities.join(" | ")} to ${expected.toCardinalities.join(" | ")}.`,
 			},
 		];
 	});
@@ -339,13 +340,23 @@ type EntityDefinition = readonly [
 	/** Fields on one line each, `name type markers`; `a|b` accepts either type. */
 	fields: readonly string[],
 ];
+/** A cardinality, or every one that reads as the prompt's, the fixture's first. */
+type CardinalityDefinition = ErCardinality | readonly [ErCardinality, ...ErCardinality[]];
 type RelationshipDefinition = readonly [
 	from: string,
 	to: string,
-	fromCardinality: ErCardinality,
-	toCardinality: ErCardinality,
+	fromCardinality: CardinalityDefinition,
+	toCardinality: CardinalityDefinition,
 	label?: string,
 ];
+
+/**
+ * A many end of pasted DDL that no sentence pins down: a foreign key cannot say
+ * whether every parent has a child, so any many reads as it.
+ */
+const ANY_MANY = ["zero-or-many", "many", "one-or-many"] as const;
+const cardinalitiesOf = (cardinality: CardinalityDefinition): readonly ErCardinality[] =>
+	typeof cardinality === "string" ? [cardinality] : cardinality;
 
 interface ErScenarioDefinition {
 	readonly id: string;
@@ -392,8 +403,8 @@ function defineErScenario(definition: ErScenarioDefinition): ErScenario {
 			relationships: relationships.map(([from, to, fromCardinality, toCardinality]) => ({
 				from: endOf(from),
 				to: endOf(to),
-				fromCardinality,
-				toCardinality,
+				fromCardinalities: cardinalitiesOf(fromCardinality),
+				toCardinalities: cardinalitiesOf(toCardinality),
 			})),
 		},
 		expectedDiagram: parseErDiagram({
@@ -417,14 +428,106 @@ function defineErScenario(definition: ErScenarioDefinition): ErScenario {
 					id: `r${index + 1}`,
 					from,
 					to,
-					fromCardinality,
-					toCardinality,
+					fromCardinality: cardinalitiesOf(fromCardinality)[0]!,
+					toCardinality: cardinalitiesOf(toCardinality)[0]!,
 					...(label ? { label } : {}),
 				}),
 			),
 		}),
 	};
 }
+
+// Tables the prose prompt and its pasted-DDL twin state alike.
+const shopEntities: readonly EntityDefinition[] = [
+	["customers", ["customers", "customer"], ["id uuid PK", "email text UK", "name text"]],
+	[
+		"products",
+		["products", "product"],
+		["id uuid PK", "sku text UK", "name text", "price numeric(10,2)"],
+	],
+	[
+		"orders",
+		["orders", "order"],
+		["id uuid PK", "customer_id uuid FK", "placed_at timestamptz", "shipped_at timestamptz?"],
+	],
+	[
+		"order_items",
+		["order_items", "order_item", "order items"],
+		["order_id uuid PK FK", "product_id uuid PK FK", "quantity int|integer"],
+	],
+];
+
+const courseEntities: readonly EntityDefinition[] = [
+	["students", ["students", "student"], ["id int|integer PK", "name text", "email text UK"]],
+	["courses", ["courses", "course"], ["id int|integer PK", "code text UK", "title text"]],
+	[
+		"enrollments",
+		["enrollments", "enrollment"],
+		[
+			"student_id int|integer PK FK",
+			"course_id int|integer PK FK",
+			"enrolled_on date",
+			"grade text?",
+		],
+	],
+];
+
+const orgChartEntities: readonly EntityDefinition[] = [
+	[
+		"employees",
+		["employees", "employee"],
+		[
+			"id int|integer PK",
+			"manager_id int|integer? FK",
+			"department_id int|integer FK",
+			"name text",
+		],
+	],
+	["departments", ["departments", "department"], ["id int|integer PK", "name text UK"]],
+];
+
+const saasWorkspaceEntities: readonly EntityDefinition[] = [
+	["organizations", ["organizations", "organization", "orgs"], ["id uuid PK", "name text"]],
+	["users", ["users", "user"], ["id uuid PK", "email text UK", "name text"]],
+	[
+		"memberships",
+		["memberships", "membership"],
+		["organization_id uuid PK FK", "user_id uuid PK FK", "role text"],
+	],
+	["projects", ["projects", "project"], ["id uuid PK", "organization_id uuid FK", "name text"]],
+	[
+		"tasks",
+		["tasks", "task"],
+		["id uuid PK", "project_id uuid FK", "assignee_id uuid? FK", "title text", "due_on date?"],
+	],
+	[
+		"comments",
+		["comments", "comment"],
+		["id uuid PK", "task_id uuid FK", "author_id uuid FK", "body text"],
+	],
+	["labels", ["labels", "label"], ["id uuid PK", "organization_id uuid FK", "name text"]],
+	[
+		"task_labels",
+		["task_labels", "task_label", "task labels"],
+		["task_id uuid PK FK", "label_id uuid PK FK"],
+	],
+	["plans", ["plans", "plan"], ["id uuid PK", "name text UK", "monthly_price numeric"]],
+	[
+		"subscriptions",
+		["subscriptions", "subscription"],
+		["id uuid PK", "organization_id uuid FK UK", "plan_id uuid FK", "renews_on date"],
+	],
+	[
+		"invoices",
+		["invoices", "invoice"],
+		["id uuid PK", "subscription_id uuid FK", "amount numeric", "paid_at timestamptz?"],
+	],
+	[
+		"api_keys",
+		["api_keys", "api_key", "api keys"],
+		["id uuid PK", "organization_id uuid FK", "created_by uuid FK", "token_hash text UK"],
+	],
+];
 
 const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 	{
@@ -436,28 +539,37 @@ const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 			"A small shop schema: customers place orders of products through order items with a composite key, and a nullable timestamp.",
 		prompt:
 			"Draw an ER diagram of a small online shop's database. customers has id (uuid, primary key), email (text, unique) and name (text). products has id (uuid, primary key), sku (text, unique), name (text) and price (numeric(10,2)). orders has id (uuid, primary key), customer_id (uuid, foreign key to customers.id), placed_at (timestamptz) and shipped_at (timestamptz, nullable). order_items has order_id (uuid, foreign key to orders.id) and product_id (uuid, foreign key to products.id), which together form its primary key, and quantity (int). A customer places zero or many orders, and each order belongs to exactly one customer. An order has one or many order items, and each order item belongs to exactly one order. A product appears in zero or many order items, and each order item refers to exactly one product.",
-		entities: [
-			["customers", ["customers", "customer"], ["id uuid PK", "email text UK", "name text"]],
-			[
-				"products",
-				["products", "product"],
-				["id uuid PK", "sku text UK", "name text", "price numeric(10,2)"],
-			],
-			[
-				"orders",
-				["orders", "order"],
-				["id uuid PK", "customer_id uuid FK", "placed_at timestamptz", "shipped_at timestamptz?"],
-			],
-			[
-				"order_items",
-				["order_items", "order_item", "order items"],
-				["order_id uuid PK FK", "product_id uuid PK FK", "quantity int|integer"],
-			],
-		],
+		entities: shopEntities,
 		relationships: [
 			["customers.id", "orders.customer_id", "one", "zero-or-many", "places"],
 			["orders.id", "order_items.order_id", "one", "one-or-many"],
 			["products.id", "order_items.product_id", "one", "zero-or-many"],
+		],
+	},
+	{
+		id: "shop-orders-er-v2",
+		title: "Shop orders",
+		difficulty: "standard",
+		tags: ["er", "schema", "foreign-keys", "composite-key", "real-voice"],
+		description:
+			"A small shop schema: customers place orders of products through order items with a composite key, and a nullable timestamp.",
+		prompt: [
+			"ER diagram for this pls",
+			"",
+			"create table customers (id uuid primary key, email text not null unique, name text not null);",
+			"create table products (id uuid primary key, sku text not null unique, name text not null, price numeric(10,2) not null);",
+			"create table orders (id uuid primary key, customer_id uuid not null references customers(id), placed_at timestamptz not null, shipped_at timestamptz);",
+			"create table order_items (order_id uuid not null references orders(id), product_id uuid not null references products(id), quantity int not null, primary key (order_id, product_id));",
+			"",
+			"every order has at least one item",
+		].join("\n"),
+		entities: shopEntities,
+		// The DDL leaves open whether a customer or product needs any rows; the
+		// sentence says every order has an item.
+		relationships: [
+			["customers.id", "orders.customer_id", "one", ANY_MANY, "places"],
+			["orders.id", "order_items.order_id", "one", "one-or-many"],
+			["products.id", "order_items.product_id", "one", ANY_MANY],
 		],
 	},
 	{
@@ -469,23 +581,31 @@ const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 			"Students and courses joined many-to-many through an enrollments table with a composite key and a nullable grade.",
 		prompt:
 			"ER diagram for course enrollment. students has id (int, primary key), name (text) and email (text, unique). courses has id (int, primary key), code (text, unique) and title (text). Students and courses are many-to-many through enrollments: enrollments has student_id (int, foreign key to students.id) and course_id (int, foreign key to courses.id), which together form its primary key, plus enrolled_on (date) and grade (text, nullable). A student has zero or many enrollments, and each enrollment belongs to exactly one student. A course has zero or many enrollments, and each enrollment is for exactly one course.",
-		entities: [
-			["students", ["students", "student"], ["id int|integer PK", "name text", "email text UK"]],
-			["courses", ["courses", "course"], ["id int|integer PK", "code text UK", "title text"]],
-			[
-				"enrollments",
-				["enrollments", "enrollment"],
-				[
-					"student_id int|integer PK FK",
-					"course_id int|integer PK FK",
-					"enrolled_on date",
-					"grade text?",
-				],
-			],
-		],
+		entities: courseEntities,
 		relationships: [
 			["students.id", "enrollments.student_id", "one", "zero-or-many"],
 			["courses.id", "enrollments.course_id", "one", "zero-or-many"],
+		],
+	},
+	{
+		id: "course-enrollment-er-v2",
+		title: "Course enrollment",
+		difficulty: "smoke",
+		tags: ["er", "many-to-many", "join-table", "real-voice"],
+		description:
+			"Students and courses joined many-to-many through an enrollments table with a composite key and a nullable grade.",
+		prompt: [
+			"can you make an ER diagram of our enrollment tables",
+			"",
+			"create table students (id int primary key, name text not null, email text not null unique);",
+			"create table courses (id int primary key, code text not null unique, title text not null);",
+			"create table enrollments (student_id int not null references students(id), course_id int not null references courses(id), enrolled_on date not null, grade text, primary key (student_id, course_id));",
+		].join("\n"),
+		entities: courseEntities,
+		// The DDL leaves open whether a student or course needs an enrollment.
+		relationships: [
+			["students.id", "enrollments.student_id", "one", ANY_MANY],
+			["courses.id", "enrollments.course_id", "one", ANY_MANY],
 		],
 	},
 	{
@@ -497,21 +617,32 @@ const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 			"Employees who report to an optional manager in the same table, and work in a department.",
 		prompt:
 			"Draw an ER diagram of an org chart. employees has id (int, primary key), manager_id (int, nullable, foreign key to employees.id), department_id (int, foreign key to departments.id) and name (text). departments has id (int, primary key) and name (text, unique). Each employee reports to zero or one manager, who is another employee, and a manager has zero or many direct reports. Each employee works in exactly one department, and a department has one or many employees.",
-		entities: [
-			[
-				"employees",
-				["employees", "employee"],
-				[
-					"id int|integer PK",
-					"manager_id int|integer? FK",
-					"department_id int|integer FK",
-					"name text",
-				],
-			],
-			["departments", ["departments", "department"], ["id int|integer PK", "name text UK"]],
-		],
+		entities: orgChartEntities,
 		relationships: [
 			["employees.manager_id", "employees.id", "zero-or-many", "zero-or-one", "reports to"],
+			["departments.id", "employees.department_id", "one", "one-or-many"],
+		],
+	},
+	{
+		id: "org-chart-er-v2",
+		title: "Org chart",
+		difficulty: "standard",
+		tags: ["er", "self-reference", "optional", "real-voice"],
+		description:
+			"Employees who report to an optional manager in the same table, and work in a department.",
+		prompt: [
+			"ER diagram of our org chart schema:",
+			"",
+			"create table departments (id int primary key, name text not null unique);",
+			"create table employees (id int primary key, manager_id int references employees(id), department_id int not null references departments(id), name text not null);",
+			"",
+			"no department is ever empty",
+		].join("\n"),
+		entities: orgChartEntities,
+		// The DDL leaves open whether a manager needs reports; the sentence says
+		// every department has an employee.
+		relationships: [
+			["employees.manager_id", "employees.id", ANY_MANY, "zero-or-one", "reports to"],
 			["departments.id", "employees.department_id", "one", "one-or-many"],
 		],
 	},
@@ -524,48 +655,7 @@ const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 			"A twelve-table SaaS schema: organizations hold members, projects, tasks with labels and comments, a subscription with invoices, and API keys.",
 		prompt:
 			"Draw an ER diagram of a SaaS workspace database with exactly these twelve tables. organizations has id (uuid, primary key) and name (text). users has id (uuid, primary key), email (text, unique) and name (text). memberships has organization_id (uuid, foreign key to organizations.id) and user_id (uuid, foreign key to users.id), which together form its primary key, and role (text). projects has id (uuid, primary key), organization_id (uuid, foreign key to organizations.id) and name (text). tasks has id (uuid, primary key), project_id (uuid, foreign key to projects.id), assignee_id (uuid, nullable, foreign key to users.id), title (text) and due_on (date, nullable). comments has id (uuid, primary key), task_id (uuid, foreign key to tasks.id), author_id (uuid, foreign key to users.id) and body (text). labels has id (uuid, primary key), organization_id (uuid, foreign key to organizations.id) and name (text). task_labels has task_id (uuid, foreign key to tasks.id) and label_id (uuid, foreign key to labels.id), which together form its primary key. plans has id (uuid, primary key), name (text, unique) and monthly_price (numeric). subscriptions has id (uuid, primary key), organization_id (uuid, unique, foreign key to organizations.id), plan_id (uuid, foreign key to plans.id) and renews_on (date). invoices has id (uuid, primary key), subscription_id (uuid, foreign key to subscriptions.id), amount (numeric) and paid_at (timestamptz, nullable). api_keys has id (uuid, primary key), organization_id (uuid, foreign key to organizations.id), created_by (uuid, foreign key to users.id) and token_hash (text, unique). Cardinalities: an organization has one or many memberships, and a user has zero or many memberships; each membership belongs to exactly one organization and exactly one user. An organization has zero or many projects, labels and API keys, each of which belongs to exactly one organization. A project has zero or many tasks, and each task belongs to exactly one project. A task has zero or one assignee, and a user is assigned zero or many tasks. A task has zero or many comments, and each comment is on exactly one task; a user writes zero or many comments, and each comment has exactly one author. A task has zero or many task labels and a label has zero or many task labels; each task label joins exactly one task and exactly one label. An organization has zero or one subscription, and each subscription belongs to exactly one organization. A plan has zero or many subscriptions, and each subscription is on exactly one plan. A subscription has zero or many invoices, and each invoice belongs to exactly one subscription. A user creates zero or many API keys, and each API key was created by exactly one user.",
-		entities: [
-			["organizations", ["organizations", "organization", "orgs"], ["id uuid PK", "name text"]],
-			["users", ["users", "user"], ["id uuid PK", "email text UK", "name text"]],
-			[
-				"memberships",
-				["memberships", "membership"],
-				["organization_id uuid PK FK", "user_id uuid PK FK", "role text"],
-			],
-			["projects", ["projects", "project"], ["id uuid PK", "organization_id uuid FK", "name text"]],
-			[
-				"tasks",
-				["tasks", "task"],
-				["id uuid PK", "project_id uuid FK", "assignee_id uuid? FK", "title text", "due_on date?"],
-			],
-			[
-				"comments",
-				["comments", "comment"],
-				["id uuid PK", "task_id uuid FK", "author_id uuid FK", "body text"],
-			],
-			["labels", ["labels", "label"], ["id uuid PK", "organization_id uuid FK", "name text"]],
-			[
-				"task_labels",
-				["task_labels", "task_label", "task labels"],
-				["task_id uuid PK FK", "label_id uuid PK FK"],
-			],
-			["plans", ["plans", "plan"], ["id uuid PK", "name text UK", "monthly_price numeric"]],
-			[
-				"subscriptions",
-				["subscriptions", "subscription"],
-				["id uuid PK", "organization_id uuid FK UK", "plan_id uuid FK", "renews_on date"],
-			],
-			[
-				"invoices",
-				["invoices", "invoice"],
-				["id uuid PK", "subscription_id uuid FK", "amount numeric", "paid_at timestamptz?"],
-			],
-			[
-				"api_keys",
-				["api_keys", "api_key", "api keys"],
-				["id uuid PK", "organization_id uuid FK", "created_by uuid FK", "token_hash text UK"],
-			],
-		],
+		entities: saasWorkspaceEntities,
 		relationships: [
 			["organizations.id", "memberships.organization_id", "one", "one-or-many"],
 			["users.id", "memberships.user_id", "one", "zero-or-many"],
@@ -582,6 +672,50 @@ const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 			["subscriptions.id", "invoices.subscription_id", "one", "zero-or-many"],
 			["organizations.id", "api_keys.organization_id", "one", "zero-or-many"],
 			["users.id", "api_keys.created_by", "one", "zero-or-many"],
+		],
+	},
+	{
+		id: "saas-workspace-er-v2",
+		title: "SaaS workspace",
+		difficulty: "challenge",
+		tags: ["er", "large", "many-to-many", "optional", "real-voice"],
+		description:
+			"A twelve-table SaaS schema: organizations hold members, projects, tasks with labels and comments, a subscription with invoices, and API keys.",
+		prompt: [
+			"need an ER diagram of the workspace db, schema below. an org always has at least one member",
+			"",
+			"create table organizations (id uuid primary key, name text not null);",
+			"create table users (id uuid primary key, email text not null unique, name text not null);",
+			"create table memberships (organization_id uuid not null references organizations(id), user_id uuid not null references users(id), role text not null, primary key (organization_id, user_id));",
+			"create table projects (id uuid primary key, organization_id uuid not null references organizations(id), name text not null);",
+			"create table tasks (id uuid primary key, project_id uuid not null references projects(id), assignee_id uuid references users(id), title text not null, due_on date);",
+			"create table comments (id uuid primary key, task_id uuid not null references tasks(id), author_id uuid not null references users(id), body text not null);",
+			"create table labels (id uuid primary key, organization_id uuid not null references organizations(id), name text not null);",
+			"create table task_labels (task_id uuid not null references tasks(id), label_id uuid not null references labels(id), primary key (task_id, label_id));",
+			"create table plans (id uuid primary key, name text not null unique, monthly_price numeric not null);",
+			"create table subscriptions (id uuid primary key, organization_id uuid not null unique references organizations(id), plan_id uuid not null references plans(id), renews_on date not null);",
+			"create table invoices (id uuid primary key, subscription_id uuid not null references subscriptions(id), amount numeric not null, paid_at timestamptz);",
+			"create table api_keys (id uuid primary key, organization_id uuid not null references organizations(id), created_by uuid not null references users(id), token_hash text not null unique);",
+		].join("\n"),
+		entities: saasWorkspaceEntities,
+		// Only memberships has a stated minimum; the unique organization_id makes a
+		// subscription at most one per organization.
+		relationships: [
+			["organizations.id", "memberships.organization_id", "one", "one-or-many"],
+			["users.id", "memberships.user_id", "one", ANY_MANY],
+			["organizations.id", "projects.organization_id", "one", ANY_MANY],
+			["projects.id", "tasks.project_id", "one", ANY_MANY],
+			["users.id", "tasks.assignee_id", "zero-or-one", ANY_MANY],
+			["tasks.id", "comments.task_id", "one", ANY_MANY],
+			["users.id", "comments.author_id", "one", ANY_MANY],
+			["organizations.id", "labels.organization_id", "one", ANY_MANY],
+			["tasks.id", "task_labels.task_id", "one", ANY_MANY],
+			["labels.id", "task_labels.label_id", "one", ANY_MANY],
+			["organizations.id", "subscriptions.organization_id", "one", "zero-or-one"],
+			["plans.id", "subscriptions.plan_id", "one", ANY_MANY],
+			["subscriptions.id", "invoices.subscription_id", "one", ANY_MANY],
+			["organizations.id", "api_keys.organization_id", "one", ANY_MANY],
+			["users.id", "api_keys.created_by", "one", ANY_MANY],
 		],
 	},
 ];

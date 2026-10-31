@@ -33,9 +33,13 @@ describe("prompt-grounded Sankey scenarios", () => {
 	it("covers a sliver-heavy budget, crossing traffic, a funnel and a five-column energy flow", () => {
 		expect(sankeyScenarios.map((entry) => entry.id)).toEqual([
 			"cloud-budget-sankey",
+			"cloud-budget-sankey-v2",
 			"website-traffic-sankey",
+			"website-traffic-sankey-v2",
 			"hiring-funnel-sankey",
+			"hiring-funnel-sankey-v2",
 			"city-energy-sankey",
+			"city-energy-sankey-v2",
 		]);
 		expect(scenario("cloud-budget-sankey").difficulty).toBe("challenge");
 		expect(
@@ -46,12 +50,17 @@ describe("prompt-grounded Sankey scenarios", () => {
 		).toEqual([2, 3, 4]);
 		expect(scenario("website-traffic-sankey").expectedDiagram.links).toHaveLength(15);
 		expect(hiring.links).toHaveLength(10);
-		// Every fact a check scores is in the prompt.
-		for (const entry of sankeyScenarios)
+		// Every fact a check scores is in the prompt: in prose, or as a pasted CSV row.
+		for (const entry of sankeyScenarios) {
+			const label = (id: string) =>
+				entry.expectedDiagram.nodes.find((node) => node.id === id)!.label;
 			for (const link of entry.expectedDiagram.links)
 				expect(entry.prompt, `${entry.id} ${link.source}->${link.target}`).toContain(
-					link.value.toLocaleString("en-US"),
+					entry.tags.includes("real-voice")
+						? `${label(link.source)},${label(link.target)},${link.value}`
+						: link.value.toLocaleString("en-US"),
 				);
+		}
 	});
 
 	it("passes its own expected diagram, including what the scene draws and its layout", () => {

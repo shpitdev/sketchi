@@ -293,8 +293,14 @@ export function matchFlowchartSteps(
 			})
 			.map((node) => node.id),
 	);
+	// An architecture draws components, not a process: its first and last
+	// components may be any node but a decision, not only a terminator.
 	const kindFits = (node: FlowchartNode, step: RequiredStep) =>
-		node.kind === step.kind || (step.kind === "end" && endActions.has(node.id));
+		node.kind === step.kind ||
+		(step.kind === "end" && endActions.has(node.id)) ||
+		(scenario.assertions.architecture &&
+			(step.kind === "start" || step.kind === "end") &&
+			node.kind !== "decision");
 	const matchedNodes = new Map(
 		requiredNodes.map((step) => [
 			step.id,

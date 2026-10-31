@@ -234,6 +234,25 @@ describe("prompt-grounded Gantt scenarios", () => {
 		}
 	});
 
+	it("pastes each real-voice plan as a sheet row per task, with the same key as its original", () => {
+		const pasted = ganttScenarios.filter((entry) => entry.tags.includes("real-voice"));
+		expect(pasted.map((entry) => entry.id)).toEqual([
+			"app-release-gantt-v2",
+			"cafe-fit-out-gantt-v2",
+			"data-platform-migration-gantt-v2",
+		]);
+		for (const entry of pasted) {
+			const original = ganttScenarios.find((other) => `${other.id}-v2` === entry.id)!;
+			expect(entry.assertions, entry.id).toEqual(original.assertions);
+			const rows = entry.prompt.split("\n");
+			for (const task of entry.assertions.tasks)
+				expect(
+					rows.some((row) => row.split(" | ").includes(task.labels[0]!)),
+					`${entry.id} ${task.key}`,
+				).toBe(true);
+		}
+	});
+
 	for (const scenario of ganttScenarios) {
 		it(`${scenario.id}: accepts the fixture, drawn to scale and clear`, () => {
 			const evaluation = evaluateScenarioDiagram(scenario, scenario.expectedDiagram);
@@ -262,10 +281,11 @@ describe("prompt-grounded Gantt scenarios", () => {
 		});
 	}
 
-	const [release, cafe, migration] = ganttScenarios as [
-		(typeof ganttScenarios)[number],
-		(typeof ganttScenarios)[number],
-		(typeof ganttScenarios)[number],
+	const byId = (id: string) => ganttScenarios.find((entry) => entry.id === id)!;
+	const [release, cafe, migration] = [
+		byId("app-release-gantt"),
+		byId("cafe-fit-out-gantt"),
+		byId("data-platform-migration-gantt"),
 	];
 
 	it("catches a wrong date, a wrong duration, a dropped task and a computed-off-by-one end", () => {

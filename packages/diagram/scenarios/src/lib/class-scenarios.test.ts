@@ -154,6 +154,113 @@ describe("prompt-grounded class diagram scenarios", () => {
 		]);
 	});
 
+	it("lets pasted source leave a relationship's kind, an end and an enum's line open", () => {
+		const canvas = scenario("shape-hierarchy-class-v2").expectedDiagram;
+		const shopV2 = scenario("online-shop-domain-class-v2").expectedDiagram;
+		const shapesOf = (change: Parameters<typeof withRelationship>[2]) =>
+			failed("shape-hierarchy-class-v2", withRelationship(canvas, "r5", change));
+		// `shapes: Shape[]` says neither the kind nor the canvas end.
+		expect(shapesOf((relationship) => ({ ...relationship, kind: "association" }))).toEqual([]);
+		expect(
+			shapesOf(({ fromMultiplicity: _from, ...relationship }) => ({
+				...relationship,
+				kind: "composition",
+			})),
+		).toEqual([]);
+		expect(
+			shapesOf(({ toRole: _role, ...relationship }) => ({
+				...relationship,
+				kind: "association",
+				from: "Shape",
+				to: "Canvas",
+				fromMultiplicity: "*",
+				toMultiplicity: "0..1",
+				fromRole: "shapes",
+			})),
+		).toEqual([]);
+		// It does say the part, its role and that there are many.
+		expect(shapesOf((relationship) => ({ ...relationship, from: "Shape", to: "Canvas" }))).toEqual([
+			"relationship-kind:5",
+			"multiplicity:5",
+			"role:5",
+		]);
+		expect(
+			shapesOf(
+				({ fromMultiplicity: _from, toMultiplicity: _to, toRole: _role, ...relationship }) => ({
+					...relationship,
+					kind: "dependency",
+				}),
+			),
+		).toEqual(["relationship-kind:5", "multiplicity:5", "role:5"]);
+		expect(shapesOf((relationship) => ({ ...relationship, toMultiplicity: "1" }))).toEqual([
+			"multiplicity:5",
+		]);
+		// A single reference reads as 1 or 0..1, never many.
+		const product = (toMultiplicity: string) =>
+			failed(
+				"online-shop-domain-class-v2",
+				withRelationship(shopV2, "r4", (relationship) => ({ ...relationship, toMultiplicity })),
+			);
+		expect(product("0..1")).toEqual([]);
+		expect(product("*")).toEqual(["multiplicity:4"]);
+		// `status: OrderStatus` may draw its line or not, but not as a whole and part.
+		const status = shopV2.relationships.find((relationship) => relationship.to === "OrderStatus")!;
+		const withoutStatus = {
+			...shopV2,
+			relationships: shopV2.relationships.filter((relationship) => relationship !== status),
+		};
+		expect(failed("online-shop-domain-class-v2", withoutStatus)).toEqual([]);
+		expect(
+			failed(
+				"online-shop-domain-class-v2",
+				withRelationship(shopV2, status.id, (relationship) => ({
+					...relationship,
+					kind: "association",
+					fromMultiplicity: "*",
+					toMultiplicity: "1",
+				})),
+			),
+		).toEqual([]);
+		expect(
+			failed(
+				"online-shop-domain-class-v2",
+				withRelationship(shopV2, status.id, (relationship) => ({
+					...relationship,
+					kind: "composition",
+				})),
+			),
+		).toEqual(["relationship-kind:8"]);
+		// Leaving it out makes no room for an invented one.
+		expect(
+			failed("online-shop-domain-class-v2", {
+				...withoutStatus,
+				relationships: [
+					...withoutStatus.relationships,
+					{ id: "extra", kind: "dependency", from: "Customer", to: "Product" },
+				],
+			}),
+		).toEqual([]);
+		expect(
+			failed("online-shop-domain-class-v2", {
+				...shopV2,
+				relationships: [
+					...shopV2.relationships,
+					{ id: "extra", kind: "dependency", from: "Customer", to: "Product" },
+				],
+			}),
+		).toEqual(["relationships-exact"]);
+	});
+
+	it("keeps the observer list where the pasted Java holds it", () => {
+		const observer = scenario("observer-pattern-class-v2").expectedDiagram;
+		expect(
+			failed(
+				"observer-pattern-class-v2",
+				withRelationship(observer, "r1", (relationship) => ({ ...relationship, from: "Subject" })),
+			),
+		).toEqual(["relationship:1", "relationship-kind:1", "multiplicity:1", "role:1", "navigable:1"]);
+	});
+
 	it("checks the drawing: a wrong head or a missing multiplicity fails, and labels stand clear", () => {
 		const scene = renderDiagram(shop);
 		expect(classDrawnCheck(shop, scene).passed).toBe(true);

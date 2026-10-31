@@ -140,6 +140,54 @@ describe("prompt-grounded ER scenarios", () => {
 		expect(failed("shop-orders-er", invented)).toEqual(["entities-exact", "relationships-exact"]);
 	});
 
+	it("reads pasted DDL: an end its constraints leave open takes any many, a stated or keyed end stays exact", () => {
+		const shopDdl = scenario("shop-orders-er-v2").expectedDiagram;
+		const withEnds = (diagram: ErDiagram, id: string, from: string, to: string): ErDiagram => ({
+			...diagram,
+			relationships: diagram.relationships.map((relationship) =>
+				relationship.id === id
+					? ({ ...relationship, fromCardinality: from, toCardinality: to } as typeof relationship)
+					: relationship,
+			),
+		});
+		// A customer's orders: the DDL cannot say whether a customer needs one.
+		for (const many of ["zero-or-many", "many", "one-or-many"])
+			expect(failed("shop-orders-er-v2", withEnds(shopDdl, "r1", "one", many))).toEqual([]);
+		// The sentence says every order has an item; the not-null key, exactly one order.
+		expect(failed("shop-orders-er-v2", withEnds(shopDdl, "r2", "one", "zero-or-many"))).toEqual([
+			"cardinality:2",
+		]);
+		expect(
+			failed("shop-orders-er-v2", withEnds(shopDdl, "r1", "zero-or-one", "zero-or-many")),
+		).toEqual(["cardinality:1"]);
+		// A nullable key is zero or one; a unique key makes the many end at most one.
+		const saasDdl = scenario("saas-workspace-er-v2").expectedDiagram;
+		expect(failed("saas-workspace-er-v2", withEnds(saasDdl, "r5", "one", "zero-or-many"))).toEqual([
+			"cardinality:5",
+		]);
+		expect(failed("saas-workspace-er-v2", withEnds(saasDdl, "r11", "one", "zero-or-many"))).toEqual(
+			["cardinality:11"],
+		);
+		// The prose prompt still states every many end.
+		expect(failed("shop-orders-er", withEnds(shop, "r1", "one", "many"))).toEqual([
+			"cardinality:1",
+		]);
+	});
+
+	it("pastes every table and column a DDL scenario expects", () => {
+		for (const entry of erScenarios.filter((candidate) => candidate.id.endsWith("-v2")))
+			for (const entity of entry.expectedDiagram.entities) {
+				const table = entry.prompt
+					.split("\n")
+					.find((line) => line.startsWith(`create table ${entity.id} (`));
+				expect(table, `${entry.id} ${entity.id}`).toBeDefined();
+				for (const field of entity.fields)
+					expect(table, `${entry.id} ${entity.id}.${field.name}`).toMatch(
+						new RegExp(`(?:\\(|, )${field.name} ${field.type!.replace(/[()]/gu, "\\$&")}`, "u"),
+					);
+			}
+	});
+
 	it("reads a self-reference by its fields, not by table alone", () => {
 		const org = scenario("org-chart-er").expectedDiagram;
 		const backwards: ErDiagram = {

@@ -42,17 +42,35 @@ describe("prompt-grounded journey scenarios", () => {
 	it("covers an online purchase, a six-stage SaaS onboarding and a support ticket", () => {
 		expect(journeyScenarios.map((entry) => [entry.id, entry.difficulty])).toEqual([
 			["online-purchase-journey", "smoke"],
+			["online-purchase-journey-v2", "smoke"],
 			["saas-onboarding-journey", "challenge"],
+			["saas-onboarding-journey-v2", "challenge"],
 			["support-ticket-journey", "standard"],
+			["support-ticket-journey-v2", "standard"],
 		]);
 		expect(saas.stages.map((stage) => stage.steps.length)).toEqual([2, 2, 2, 2, 1, 1]);
 		expect(journeyScenarios.every((entry) => entry.tags.includes("journey"))).toBe(true);
 		// Every scored fact sits in the prompt, so it binds the grader too.
-		for (const entry of journeyScenarios)
+		for (const entry of journeyScenarios.filter((value) => !value.id.endsWith("-v2")))
 			for (const stage of entry.expectedDiagram.stages) {
 				expect(entry.prompt).toContain(`${stage.name}:`);
 				for (const step of stage.steps) expect(entry.prompt).toContain(`, ${step.score})`);
 			}
+		// A pasted note or table holds every stage, label, score and note as stated.
+		for (const entry of journeyScenarios.filter((value) => value.id.endsWith("-v2"))) {
+			const prompt = entry.prompt.toLowerCase();
+			for (const stage of entry.expectedDiagram.stages) {
+				expect(prompt).toContain(stage.name.toLowerCase());
+				for (const step of stage.steps) {
+					// The step's own line carries its actor or touchpoint and its score.
+					const line = prompt.split("\n").find((value) => value.includes(step.label.toLowerCase()));
+					expect(line, step.label).toContain((step.actor ?? step.touchpoint)!.toLowerCase());
+					expect(line?.match(/\d+$/u)?.[0], step.label).toBe(`${step.score}`);
+				}
+				for (const note of [...(stage.painPoints ?? []), ...(stage.opportunities ?? [])])
+					expect(prompt).toContain(note.toLowerCase());
+			}
+		}
 	});
 
 	it("passes its own expected diagram, including what the scene draws and its layout", () => {

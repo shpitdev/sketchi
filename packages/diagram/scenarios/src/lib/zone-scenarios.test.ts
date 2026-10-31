@@ -4,7 +4,9 @@ import { zoneRegionIssues } from "@sketchi/diagram-core";
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
 import { getFlowchartScenario } from "./scenarios";
 
-const ids = ["aws-three-tier-zones", "kubernetes-cluster-zones", "hybrid-cloud-zones"];
+const ids = ["aws-three-tier-zones", "kubernetes-cluster-zones", "hybrid-cloud-zones"].flatMap(
+	(id) => [id, `${id}-v2`],
+);
 
 function failed(scenarioId: string, candidate: unknown) {
 	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), candidate)
@@ -192,5 +194,60 @@ describe("zone scenarios", () => {
 			"zone-kind:AWS cloud",
 			"zone-parent:eu-west-1",
 		]);
+	});
+});
+
+describe("architecture scenarios", () => {
+	const scenario = getFlowchartScenario("aws-three-tier-zones-v2");
+	const diagram = scenario.expectedDiagram;
+	// Users drawn as a component that also gets the response back, after an
+	// unnamed start: neither a terminator nor a plain entry chain.
+	const component = {
+		...diagram,
+		nodes: [
+			{ id: "traffic", label: "Incoming traffic", kind: "start" as const },
+			...diagram.nodes.map((node) =>
+				node.id === "users" ? { ...node, kind: "process" as const } : node,
+			),
+		],
+		edges: [
+			{ id: "traffic-users", source: "traffic", target: "users" },
+			...diagram.edges,
+			{ id: "alb-users", source: "alb", target: "users", label: "response" },
+		],
+	};
+
+	it("accepts the first and last components drawn as plain components", () => {
+		expect(scenario.assertions.architecture).toBe(true);
+		expect(failed("aws-three-tier-zones-v2", component)).toEqual([]);
+	});
+
+	it("still requires a terminator for those steps in a process flowchart", () => {
+		const process = { ...scenario, assertions: { ...scenario.assertions, architecture: false } };
+		expect(
+			evaluateScenarioDiagram(process, component)
+				.checks.filter((check) => !check.passed)
+				.map((check) => check.id),
+		).toContain("node-label:Users");
+	});
+
+	it("never lets a decision stand for a component", () => {
+		expect(
+			failed("aws-three-tier-zones-v2", {
+				...component,
+				nodes: [
+					...component.nodes.map((node) =>
+						node.id === "users" ? { ...node, label: "Users?", kind: "decision" as const } : node,
+					),
+					{ id: "blocked", label: "Blocked", kind: "end" as const },
+				],
+				edges: [
+					...component.edges.map((edge) =>
+						edge.source === "users" ? { ...edge, label: "yes" } : edge,
+					),
+					{ id: "users-blocked", source: "users", target: "blocked", label: "no" },
+				],
+			}),
+		).toContain("node-label:Users");
 	});
 });

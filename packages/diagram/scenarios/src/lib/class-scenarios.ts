@@ -50,13 +50,26 @@ export interface ClassScenarioClass {
 /** A relationship the prompt states between classes by key, with what it states at each end. */
 export interface ClassScenarioRelationship {
 	readonly kind: ClassRelationshipKind;
+	/**
+	 * Every kind the prompt allows, `kind` first. Pasted source cannot tell an
+	 * association from an aggregation or composition unless the asker says so.
+	 */
+	readonly kinds?: readonly ClassRelationshipKind[];
 	readonly from: string;
 	readonly to: string;
+	/** Accepted multiplicities at each end, `|`-separated; none when the prompt states none. */
 	readonly fromMultiplicity?: string;
 	readonly toMultiplicity?: string;
+	/** Ends whose multiplicity the prompt leaves open: any multiplicity, or none, passes. */
+	readonly open?: readonly ("from" | "to")[];
 	readonly fromRole?: string;
 	readonly toRole?: string;
 	readonly navigable?: boolean;
+	/**
+	 * A relationship the prompt leaves to the reader, such as a field typed by an
+	 * enum: it may be left out, but drawn, it must be one the prompt allows.
+	 */
+	readonly optional?: boolean;
 }
 
 export interface ClassScenario {
@@ -207,10 +220,13 @@ export function classScenarioChecks(
 						return [];
 					})
 				: [];
+		const kinds = expected.kinds ?? [expected.kind];
 		const kinded = joined.filter(
 			({ relationship, reversed }) =>
-				relationship.kind === expected.kind && (!reversed || UNDIRECTED.has(expected.kind)),
+				kinds.includes(relationship.kind) && (!reversed || UNDIRECTED.has(relationship.kind)),
 		);
+		// An optional relationship left out passes every check of its own.
+		const absent = expected.optional === true && joined.length === 0;
 		const end = (way: (typeof kinded)[number], side: "from" | "to") => {
 			const actual = way.reversed ? (side === "from" ? "to" : "from") : side;
 			return {
@@ -218,28 +234,37 @@ export function classScenarioChecks(
 				role: way.relationship[`${actual}Role`],
 			};
 		};
+		const accepted = (side: "from" | "to") =>
+			expected[`${side}Multiplicity`]?.split("|").map(multiplicityKey) ?? [undefined];
 		const ends = (way: (typeof kinded)[number]) =>
 			(["from", "to"] as const).every(
 				(side) =>
-					multiplicityKey(end(way, side).multiplicity) ===
-					multiplicityKey(expected[`${side}Multiplicity`]),
+					expected.open?.includes(side) ||
+					accepted(side).includes(multiplicityKey(end(way, side).multiplicity)),
 			);
 		const roles = (way: (typeof kinded)[number]) =>
 			(["from", "to"] as const).every((side) => {
 				const role = expected[`${side}Role`];
 				return role === undefined || key(end(way, side).role ?? "") === key(role);
 			});
-		const multiplicities = [expected.fromMultiplicity ?? "none", expected.toMultiplicity ?? "none"];
+		const multiplicities = (["from", "to"] as const).map((side) =>
+			expected.open?.includes(side)
+				? "any"
+				: (expected[`${side}Multiplicity`]?.split("|").join(" or ") ?? "none"),
+		);
+		const kindText = kinds
+			.map((kind) => (kind === "association" ? "an association" : `a ${kind}`))
+			.join(" or ");
 		return [
 			{
 				id: `relationship:${index + 1}`,
-				passed: joined.length > 0,
-				message: `Expected a relationship from ${label}.`,
+				passed: joined.length > 0 || absent,
+				message: `Expected a relationship from ${label}${expected.optional ? ", or none" : ""}.`,
 			},
 			{
 				id: `relationship-kind:${index + 1}`,
-				passed: kinded.length > 0,
-				message: `Expected ${label} to be ${expected.kind === "association" ? "an association" : `a ${expected.kind}`}${UNDIRECTED.has(expected.kind) ? "" : ` from ${classes[expected.from]!.names[0]}`}.`,
+				passed: kinded.length > 0 || absent,
+				message: `Expected ${label} to be ${kindText}${kinds.every((kind) => UNDIRECTED.has(kind)) ? "" : ` from ${classes[expected.from]!.names[0]}`}.`,
 			},
 			...(expected.kind === "inheritance" ||
 			expected.kind === "realization" ||
@@ -248,7 +273,7 @@ export function classScenarioChecks(
 				: [
 						{
 							id: `multiplicity:${index + 1}`,
-							passed: kinded.some(ends),
+							passed: kinded.some(ends) || absent,
 							message: `Expected ${label} to be ${multiplicities[0]} to ${multiplicities[1]}.`,
 						},
 					]),
@@ -256,7 +281,7 @@ export function classScenarioChecks(
 				? [
 						{
 							id: `role:${index + 1}`,
-							passed: kinded.some(roles),
+							passed: kinded.some(roles) || absent,
 							message: `Expected ${label} to carry role ${[expected.fromRole, expected.toRole]
 								.filter(Boolean)
 								.map((role) => `"${role}"`)
@@ -268,10 +293,12 @@ export function classScenarioChecks(
 				? [
 						{
 							id: `navigable:${index + 1}`,
-							passed: kinded.some(
-								({ relationship, reversed }) =>
-									!reversed && Boolean(relationship.navigable) === expected.navigable,
-							),
+							passed:
+								absent ||
+								kinded.some(
+									({ relationship, reversed }) =>
+										!reversed && Boolean(relationship.navigable) === expected.navigable,
+								),
 							message: `Expected ${label} ${expected.navigable ? "to be navigable toward" : "not to be navigable toward"} ${classes[expected.to]!.names[0]}.`,
 						},
 					]
@@ -279,6 +306,7 @@ export function classScenarioChecks(
 		];
 	});
 	const expectedCount = Object.keys(classes).length;
+	const required = relationships.filter((relationship) => !relationship.optional).length;
 	return [
 		...classChecks,
 		{
@@ -289,8 +317,10 @@ export function classScenarioChecks(
 		...relationshipChecks,
 		{
 			id: "relationships-exact",
-			passed: diagram.relationships.length === relationships.length,
-			message: `Expected exactly ${relationships.length} relationships; found ${diagram.relationships.length}.`,
+			passed:
+				diagram.relationships.length >= required &&
+				diagram.relationships.length <= relationships.length,
+			message: `Expected exactly ${required === relationships.length ? required : `${required} to ${relationships.length}`} relationships; found ${diagram.relationships.length}.`,
 		},
 	];
 }
@@ -457,10 +487,13 @@ type ClassDefinition = readonly [
 	methods: readonly string[],
 ];
 type RelationshipDefinition = readonly [
-	kind: ClassRelationshipKind,
+	/** The fixture's kind, or every kind the prompt allows with the fixture's first. */
+	kind: ClassRelationshipKind | readonly [ClassRelationshipKind, ...ClassRelationshipKind[]],
 	from: string,
 	to: string,
-	ends?: Omit<ClassScenarioRelationship, "kind" | "from" | "to"> & { readonly label?: string },
+	ends?: Omit<ClassScenarioRelationship, "kind" | "kinds" | "from" | "to"> & {
+		readonly label?: string;
+	},
 ];
 
 interface ClassScenarioDefinition {
@@ -509,7 +542,9 @@ function defineClassScenario(definition: ClassScenarioDefinition): ClassScenario
 			),
 			relationships: relationships.map(([kind, from, to, ends]) => {
 				const { label: _label, ...rest } = ends ?? {};
-				return { kind, from, to, ...rest };
+				return typeof kind === "string"
+					? { kind, from, to, ...rest }
+					: { kind: kind[0], kinds: kind, from, to, ...rest };
 			}),
 		},
 		expectedDiagram: parseClassDiagram({
@@ -533,13 +568,20 @@ function defineClassScenario(definition: ClassScenarioDefinition): ClassScenario
 					...(method.returns ? { returns: first(method.returns) } : {}),
 				})),
 			})),
-			relationships: relationships.map(([kind, from, to, ends], index) => ({
-				id: `r${index + 1}`,
-				kind,
-				from,
-				to,
-				...ends,
-			})),
+			relationships: relationships.map(([kind, from, to, ends], index) => {
+				const { open: _open, optional: _optional, ...drawn } = ends ?? {};
+				return {
+					id: `r${index + 1}`,
+					kind: typeof kind === "string" ? kind : kind[0],
+					from,
+					to,
+					...drawn,
+					...(drawn.fromMultiplicity
+						? { fromMultiplicity: drawn.fromMultiplicity.split("|")[0]! }
+						: {}),
+					...(drawn.toMultiplicity ? { toMultiplicity: drawn.toMultiplicity.split("|")[0]! } : {}),
+				};
+			}),
 		}),
 	};
 }
@@ -590,6 +632,90 @@ const classScenarioDefinitions: readonly ClassScenarioDefinition[] = [
 				"Canvas",
 				"Shape",
 				{ fromMultiplicity: "1", toMultiplicity: "0..*", toRole: "shapes" },
+			],
+		],
+	},
+	{
+		id: "shape-hierarchy-class-v2",
+		title: "Shape hierarchy",
+		difficulty: "smoke",
+		tags: ["class", "inheritance", "interface", "abstract", "aggregation", "real-voice"],
+		description:
+			"An interface every shape implements through an abstract base, two concrete shapes, a square that refines the rectangle, and a canvas that aggregates shapes.",
+		prompt: [
+			"class diagram of our shape lib",
+			"",
+			"interface Drawable {",
+			"  draw(ctx: Canvas): void;",
+			"}",
+			"",
+			"abstract class Shape implements Drawable {",
+			"  protected x: number;",
+			"  protected y: number;",
+			"  abstract area(): number;",
+			"  moveTo(x: number, y: number): void { ... }",
+			"}",
+			"",
+			"class Circle extends Shape {",
+			"  private radius: number;",
+			"  area(): number { ... }",
+			"}",
+			"",
+			"class Rectangle extends Shape {",
+			"  private width: number;",
+			"  private height: number;",
+			"  area(): number { ... }",
+			"}",
+			"",
+			"class Square extends Rectangle {",
+			"  static of(side: number): Square { ... }",
+			"}",
+			"",
+			"class Canvas {",
+			"  static MAX_SHAPES: number = 500;",
+			"  shapes: Shape[] = [];",
+			"  add(shape: Shape): void { ... }",
+			"}",
+		].join("\n"),
+		// Types follow the pasted TypeScript: `number`, not `double` or `int`.
+		classes: [
+			["Drawable", ["Drawable"], "interface", [], ["+ draw(ctx: Canvas): void"]],
+			[
+				"Shape",
+				["Shape"],
+				"abstract",
+				["# x: number", "# y: number"],
+				["+ area(): number {abstract}", "+ moveTo(x: number, y: number): void"],
+			],
+			["Circle", ["Circle"], "class", ["- radius: number"], ["+ area(): number"]],
+			[
+				"Rectangle",
+				["Rectangle"],
+				"class",
+				["- width: number", "- height: number"],
+				["+ area(): number"],
+			],
+			["Square", ["Square"], "class", [], ["+ of(side: number): Square {static}"]],
+			[
+				"Canvas",
+				["Canvas"],
+				"class",
+				["+ MAX_SHAPES: number {static}"],
+				["+ add(shape: Shape): void"],
+			],
+		],
+		relationships: [
+			["realization", "Shape", "Drawable"],
+			["inheritance", "Circle", "Shape"],
+			["inheritance", "Rectangle", "Shape"],
+			["inheritance", "Square", "Rectangle"],
+			// `shapes: Shape[]` is the relationship by its role, listed as an
+			// attribute or not; the source cannot say its kind or the canvas end.
+			[
+				["aggregation", "association", "composition"],
+				"Canvas",
+				"Shape",
+				{ fromMultiplicity: "1", toMultiplicity: "0..*", toRole: "shapes", open: ["from"] },
 			],
 		],
 	},
@@ -693,6 +819,185 @@ const classScenarioDefinitions: readonly ClassScenarioDefinition[] = [
 		],
 	},
 	{
+		id: "online-shop-domain-class-v2",
+		title: "Online shop domain",
+		difficulty: "standard",
+		tags: [
+			"class",
+			"domain-model",
+			"composition",
+			"aggregation",
+			"multiplicity",
+			"enum",
+			"real-voice",
+		],
+		description:
+			"A shop's domain model: customers with addresses place orders composed of line items for products, paid by one of two payment kinds, with an order status enum.",
+		prompt: [
+			"class diagram of our shop domain. an order is composed of its line items and a customer aggregates their addresses; every order has at least one item and every customer at least one address",
+			"",
+			"public class Customer {",
+			"    private UUID id;",
+			"    private String name;",
+			"    private String email;",
+			"    private List<Address> addresses;",
+			"    private List<Order> orders;",
+			"    public Order placeOrder(Cart cart) { ... }",
+			"}",
+			"",
+			"public class Address {",
+			"    private String street;",
+			"    private String city;",
+			"    private String postcode;",
+			"}",
+			"",
+			"public class Order {",
+			"    private UUID id;",
+			"    private Instant placedAt;",
+			"    private OrderStatus status;",
+			"    private List<LineItem> items;",
+			"    private Payment payment;",
+			"    public Money total() { ... }",
+			"    public void cancel() { ... }",
+			"}",
+			"",
+			"public class LineItem {",
+			"    private int quantity;",
+			"    private Money unitPrice;",
+			"    private Product product;",
+			"    public Money subtotal() { ... }",
+			"}",
+			"",
+			"public class Product {",
+			"    private String sku;",
+			"    private String name;",
+			"    private Money price;",
+			"}",
+			"",
+			"public abstract class Payment {",
+			"    protected Money amount;",
+			"    protected Instant paidAt;",
+			"    public abstract boolean authorize();",
+			"}",
+			"",
+			"public class CardPayment extends Payment {",
+			"    private String cardLast4;",
+			"    public boolean authorize() { ... }",
+			"}",
+			"",
+			"public class BankTransfer extends Payment {",
+			"    private String iban;",
+			"    public boolean authorize() { ... }",
+			"}",
+			"",
+			"public enum OrderStatus { PENDING, PAID, SHIPPED, CANCELLED }",
+		].join("\n"),
+		// Types follow the pasted Java (`Instant`, not `DateTime`). Each field typed
+		// by a class is a relationship navigable from the class that holds it; the
+		// asker states composition, aggregation and the at-least-one ends, a single
+		// reference reads as 1 or 0..1, and the end that holds no field stays open.
+		classes: [
+			[
+				"Customer",
+				["Customer"],
+				"class",
+				["- id: UUID", "- name: String", "- email: String"],
+				["+ placeOrder(cart: Cart): Order"],
+			],
+			[
+				"Address",
+				["Address"],
+				"class",
+				["- street: String", "- city: String", "- postcode: String"],
+				[],
+			],
+			[
+				"Order",
+				["Order"],
+				"class",
+				["- id: UUID", "- placedAt: Instant", "- status: OrderStatus"],
+				["+ total(): Money", "+ cancel(): void"],
+			],
+			[
+				"LineItem",
+				["LineItem", "Line item"],
+				"class",
+				["- quantity: int|integer", "- unitPrice: Money"],
+				["+ subtotal(): Money"],
+			],
+			["Product", ["Product"], "class", ["- sku: String", "- name: String", "- price: Money"], []],
+			[
+				"Payment",
+				["Payment"],
+				"abstract",
+				["# amount: Money", "# paidAt: Instant"],
+				["+ authorize(): boolean|bool {abstract}"],
+			],
+			[
+				"CardPayment",
+				["CardPayment", "Card payment"],
+				"class",
+				["- cardLast4: String"],
+				["+ authorize(): boolean|bool"],
+			],
+			[
+				"BankTransfer",
+				["BankTransfer", "Bank transfer"],
+				"class",
+				["- iban: String"],
+				["+ authorize(): boolean|bool"],
+			],
+			[
+				"OrderStatus",
+				["OrderStatus", "Order status"],
+				"enum",
+				["PENDING", "PAID", "SHIPPED", "CANCELLED"],
+				[],
+			],
+		],
+		relationships: [
+			[
+				"association",
+				"Customer",
+				"Order",
+				{ fromMultiplicity: "1", toMultiplicity: "0..*", navigable: true, open: ["from"] },
+			],
+			[
+				"aggregation",
+				"Customer",
+				"Address",
+				{ fromMultiplicity: "1", toMultiplicity: "1..*", toRole: "addresses", open: ["from"] },
+			],
+			[
+				"composition",
+				"Order",
+				"LineItem",
+				{ fromMultiplicity: "1", toMultiplicity: "1..*", toRole: "items", open: ["from"] },
+			],
+			[
+				"association",
+				"LineItem",
+				"Product",
+				{ fromMultiplicity: "*", toMultiplicity: "1|0..1", navigable: true, open: ["from"] },
+			],
+			[
+				"association",
+				"Order",
+				"Payment",
+				{ fromMultiplicity: "1", toMultiplicity: "0..1|1", open: ["from"] },
+			],
+			["inheritance", "CardPayment", "Payment"],
+			["inheritance", "BankTransfer", "Payment"],
+			// `status: OrderStatus` may stay an attribute type or also draw its line.
+			[
+				["dependency", "association"],
+				"Order",
+				"OrderStatus",
+				{ optional: true, open: ["from", "to"] },
+			],
+		],
+	},
+	{
 		id: "observer-pattern-class",
 		title: "Observer pattern",
 		difficulty: "standard",
@@ -748,6 +1053,106 @@ const classScenarioDefinitions: readonly ClassScenarioDefinition[] = [
 			["realization", "PhoneDisplay", "Observer"],
 			["realization", "WindowDisplay", "Observer"],
 			["dependency", "PhoneDisplay", "WeatherStation", { label: "reads" }],
+		],
+	},
+	{
+		id: "observer-pattern-class-v2",
+		title: "Observer pattern",
+		difficulty: "standard",
+		tags: ["class", "design-pattern", "interface", "realization", "dependency", "real-voice"],
+		description:
+			"The observer pattern: a weather station implements a subject interface that notifies observers, and two displays implement the observer interface.",
+		prompt: [
+			"class diagram of the observer setup in our weather app",
+			"",
+			"public interface Subject {",
+			"    void attach(Observer o);",
+			"    void detach(Observer o);",
+			"    void notifyObservers();",
+			"}",
+			"",
+			"public interface Observer {",
+			"    void update(Subject subject);",
+			"}",
+			"",
+			"public class WeatherStation implements Subject {",
+			"    private double temperature;",
+			"    private double humidity;",
+			"    private List<Observer> observers;",
+			"    public void attach(Observer o) { ... }",
+			"    public void detach(Observer o) { ... }",
+			"    public void notifyObservers() { ... }",
+			"    public void setMeasurements(double t, double h) { ... }",
+			"    public double getTemperature() { ... }",
+			"}",
+			"",
+			"public class PhoneDisplay implements Observer {",
+			"    private double lastReading;",
+			"    public void update(Subject subject) {",
+			"        lastReading = ((WeatherStation) subject).getTemperature();",
+			"    }",
+			"}",
+			"",
+			"public class WindowDisplay implements Observer {",
+			"    public void update(Subject subject) { ... }",
+			"}",
+		].join("\n"),
+		// The pasted Java keeps the observer list on WeatherStation, not on the
+		// Subject interface, and adds the getter the phone display's cast reads.
+		classes: [
+			[
+				"Subject",
+				["Subject"],
+				"interface",
+				[],
+				["+ attach(o: Observer): void", "+ detach(o: Observer): void", "+ notifyObservers(): void"],
+			],
+			["Observer", ["Observer"], "interface", [], ["+ update(subject: Subject): void"]],
+			[
+				"WeatherStation",
+				["WeatherStation", "Weather station"],
+				"class",
+				["- temperature: double", "- humidity: double"],
+				[
+					"+ attach(o: Observer): void",
+					"+ detach(o: Observer): void",
+					"+ notifyObservers(): void",
+					"+ setMeasurements(t: double, h: double): void",
+					"+ getTemperature(): double",
+				],
+			],
+			[
+				"PhoneDisplay",
+				["PhoneDisplay", "Phone display"],
+				"class",
+				["- lastReading: double"],
+				["+ update(subject: Subject): void"],
+			],
+			[
+				"WindowDisplay",
+				["WindowDisplay", "Window display"],
+				"class",
+				[],
+				["+ update(subject: Subject): void"],
+			],
+		],
+		relationships: [
+			[
+				"association",
+				"WeatherStation",
+				"Observer",
+				{
+					fromMultiplicity: "1",
+					toMultiplicity: "0..*",
+					toRole: "observers",
+					navigable: true,
+					open: ["from"],
+				},
+			],
+			["realization", "WeatherStation", "Subject"],
+			["realization", "PhoneDisplay", "Observer"],
+			["realization", "WindowDisplay", "Observer"],
+			["dependency", "PhoneDisplay", "WeatherStation"],
 		],
 	},
 	{
@@ -861,6 +1266,241 @@ const classScenarioDefinitions: readonly ClassScenarioDefinition[] = [
 			["composition", "Loan", "Fine", { fromMultiplicity: "1", toMultiplicity: "0..1" }],
 			["dependency", "Librarian", "Loan", { label: "checks out" }],
 			["association", "Librarian", "Branch", { fromMultiplicity: "*", toMultiplicity: "1" }],
+		],
+	},
+	{
+		id: "library-system-class-v2",
+		title: "Library system",
+		difficulty: "challenge",
+		tags: ["class", "large", "inheritance", "composition", "multiplicity", "real-voice"],
+		description:
+			"A fifteen-class library system: items in a catalog with three subclasses, members of two kinds who borrow and reserve items, loans with fines, and librarians at branches.",
+		prompt: [
+			"class diagram of our library system. a library is composed of its branches (at least one) and its catalog, and a loan of its fine; the catalog aggregates items. every book has at least one author",
+			"",
+			"public class Library {",
+			"    private String name;",
+			"    private List<Branch> branches;",
+			"    private Catalog catalog;",
+			"    public List<Item> search(String query) { ... }",
+			"}",
+			"",
+			"public class Branch {",
+			"    private String address;",
+			"}",
+			"",
+			"public class Catalog {",
+			"    private List<Item> items;",
+			"    public void add(Item item) { ... }",
+			"    public Book find(String isbn) { ... }",
+			"}",
+			"",
+			"public abstract class Item {",
+			"    protected UUID id;",
+			"    protected String title;",
+			"    public abstract int loanPeriod();",
+			"}",
+			"",
+			"public class Book extends Item {",
+			"    private String isbn;",
+			"    private int pages;",
+			"    private List<Author> authors;",
+			"    public int loanPeriod() { ... }",
+			"}",
+			"",
+			"public class DVD extends Item {",
+			"    private int minutes;",
+			"    public int loanPeriod() { ... }",
+			"}",
+			"",
+			"public class Magazine extends Item {",
+			"    private int issue;",
+			"    public int loanPeriod() { ... }",
+			"}",
+			"",
+			"public class Author {",
+			"    private String name;",
+			"    private List<Book> books;",
+			"}",
+			"",
+			"public class Member {",
+			"    private String memberId;",
+			"    private String name;",
+			"    private List<Loan> loans;",
+			"    private List<Reservation> reservations;",
+			"    public Loan borrow(Item item) { ... }",
+			"    public Reservation reserve(Item item) { ... }",
+			"}",
+			"",
+			"public class StudentMember extends Member {",
+			"    private String school;",
+			"}",
+			"",
+			"public class StaffMember extends Member {",
+			"    private String department;",
+			"}",
+			"",
+			"public class Loan {",
+			"    private Date due;",
+			"    private Date returned;",
+			"    private Item item;",
+			"    private Fine fine;",
+			"    public boolean isOverdue() { ... }",
+			"}",
+			"",
+			"public class Reservation {",
+			"    private Date placed;",
+			"    private Item item;",
+			"}",
+			"",
+			"public class Fine {",
+			"    private Money amount;",
+			"    public void pay() { ... }",
+			"}",
+			"",
+			"public class Librarian {",
+			"    private String staffId;",
+			"    private Branch branch;",
+			"    public void checkOut(Loan loan) { ... }",
+			"}",
+		].join("\n"),
+		// As in the shop: each field typed by a class is a relationship from the
+		// class that holds it, the asker states the compositions, the aggregation
+		// and the at-least-one ends, a single reference reads as 1 or 0..1, and an
+		// end that holds no field stays open. `checkOut(loan: Loan)` only uses a
+		// loan, so its dependency may be drawn or left out.
+		classes: [
+			[
+				"Library",
+				["Library"],
+				"class",
+				["- name: String"],
+				["+ search(query: String): List<Item>"],
+			],
+			["Branch", ["Branch"], "class", ["- address: String"], []],
+			[
+				"Catalog",
+				["Catalog"],
+				"class",
+				[],
+				["+ add(item: Item): void", "+ find(isbn: String): Book"],
+			],
+			[
+				"Item",
+				["Item"],
+				"abstract",
+				["# id: UUID", "# title: String"],
+				["+ loanPeriod(): int|integer {abstract}"],
+			],
+			[
+				"Book",
+				["Book"],
+				"class",
+				["- isbn: String", "- pages: int|integer"],
+				["+ loanPeriod(): int|integer"],
+			],
+			["DVD", ["DVD", "Dvd"], "class", ["- minutes: int|integer"], ["+ loanPeriod(): int|integer"]],
+			[
+				"Magazine",
+				["Magazine"],
+				"class",
+				["- issue: int|integer"],
+				["+ loanPeriod(): int|integer"],
+			],
+			["Author", ["Author"], "class", ["- name: String"], []],
+			[
+				"Member",
+				["Member"],
+				"class",
+				["- memberId: String", "- name: String"],
+				["+ borrow(item: Item): Loan", "+ reserve(item: Item): Reservation"],
+			],
+			["StudentMember", ["StudentMember", "Student member"], "class", ["- school: String"], []],
+			["StaffMember", ["StaffMember", "Staff member"], "class", ["- department: String"], []],
+			[
+				"Loan",
+				["Loan"],
+				"class",
+				["- due: Date", "- returned: Date"],
+				["+ isOverdue(): boolean|bool"],
+			],
+			["Reservation", ["Reservation"], "class", ["- placed: Date"], []],
+			["Fine", ["Fine"], "class", ["- amount: Money"], ["+ pay(): void"]],
+			[
+				"Librarian",
+				["Librarian"],
+				"class",
+				["- staffId: String"],
+				["+ checkOut(loan: Loan): void"],
+			],
+		],
+		relationships: [
+			[
+				"composition",
+				"Library",
+				"Branch",
+				{ fromMultiplicity: "1", toMultiplicity: "1..*", open: ["from"] },
+			],
+			[
+				"composition",
+				"Library",
+				"Catalog",
+				{ fromMultiplicity: "1", toMultiplicity: "1|0..1", open: ["from"] },
+			],
+			[
+				"aggregation",
+				"Catalog",
+				"Item",
+				{ fromMultiplicity: "1", toMultiplicity: "0..*", toRole: "items", open: ["from"] },
+			],
+			["inheritance", "Book", "Item"],
+			["inheritance", "DVD", "Item"],
+			["inheritance", "Magazine", "Item"],
+			[
+				"association",
+				"Book",
+				"Author",
+				{ fromMultiplicity: "*", toMultiplicity: "1..*", toRole: "authors" },
+			],
+			["inheritance", "StudentMember", "Member"],
+			["inheritance", "StaffMember", "Member"],
+			[
+				"association",
+				"Member",
+				"Loan",
+				{ fromMultiplicity: "1", toMultiplicity: "0..*", navigable: true, open: ["from"] },
+			],
+			[
+				"association",
+				"Loan",
+				"Item",
+				{ fromMultiplicity: "*", toMultiplicity: "1|0..1", navigable: true, open: ["from"] },
+			],
+			[
+				"association",
+				"Member",
+				"Reservation",
+				{ fromMultiplicity: "1", toMultiplicity: "0..*", open: ["from"] },
+			],
+			[
+				"association",
+				"Reservation",
+				"Item",
+				{ fromMultiplicity: "*", toMultiplicity: "1|0..1", open: ["from"] },
+			],
+			[
+				"composition",
+				"Loan",
+				"Fine",
+				{ fromMultiplicity: "1", toMultiplicity: "0..1|1", open: ["from"] },
+			],
+			["dependency", "Librarian", "Loan", { optional: true }],
+			[
+				"association",
+				"Librarian",
+				"Branch",
+				{ fromMultiplicity: "*", toMultiplicity: "1|0..1", open: ["from"] },
+			],
 		],
 	},
 ];
