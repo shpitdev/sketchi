@@ -1,5 +1,5 @@
   sketchi
-  describe it. sketchi draws it.
+  Editable diagrams from a prompt.
 
 START HERE
   sketchi generate  interactive

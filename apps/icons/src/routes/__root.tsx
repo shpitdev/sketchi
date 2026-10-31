@@ -12,10 +12,28 @@ export const Route = createRootRoute({
 			},
 			{
 				name: "description",
-				content: "Search, copy, and download more than 1,400 SVG icons from Sketchi.",
+				content: "Search, copy, and download more than 1,400 SVG icons and logos.",
 			},
 			{ name: "theme-color", content: "#f6f1e7" },
 			{ title: "Sketchi Icons" },
+			{ property: "og:type", content: "website" },
+			{ property: "og:site_name", content: "Sketchi" },
+			{ property: "og:title", content: "Sketchi Icons" },
+			{
+				property: "og:description",
+				content: "Search, copy, and download more than 1,400 SVG icons and logos.",
+			},
+			// The site's card: served from sketchi.app because crawlers need an absolute URL.
+			{ property: "og:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
+			{ property: "og:image:width", content: "1200" },
+			{ property: "og:image:height", content: "630" },
+			{ name: "twitter:card", content: "summary_large_image" },
+			{ name: "twitter:title", content: "Sketchi Icons" },
+			{
+				name: "twitter:description",
+				content: "Search, copy, and download more than 1,400 SVG icons and logos.",
+			},
+			{ name: "twitter:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
 		],
 		links: [
 			{ rel: "icon", href: "/icon.svg", type: "image/svg+xml" },

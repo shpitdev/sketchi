@@ -66,6 +66,8 @@
 	--color-brand: var(--accent-strong);
 	--color-brand-foreground: var(--card);
 	--shadow-brand: 0 8px 20px rgb(111 84 98 / 0.28);
+	/* Text on the dark code surfaces. */
+	--color-code-ink: var(--code-ink);
 
 	--font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
 	--font-mono: "IBM Plex Mono", ui-monospace, monospace;

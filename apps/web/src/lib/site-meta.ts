@@ -10,7 +10,7 @@ export const OG_IMAGE = {
 	width: "1200",
 	height: "630",
 	type: "image/png",
-	alt: "Describe it. Sketchi draws it. A deploy flow connects GitHub push, Docker build, tests pass, and Cloudflare ship steps.",
+	alt: "Editable diagrams from a prompt, beside a deploy flowchart with GitHub, Docker, and Cloudflare logos.",
 } as const;
 
 /** A route-head meta entry (subset of what TanStack Router accepts). */

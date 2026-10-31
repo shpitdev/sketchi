@@ -7,9 +7,11 @@ describe("SiteFooter", () => {
 	it("renders the footer columns", () => {
 		render(<SiteFooter />);
 
-		expect(screen.getByRole("heading", { name: "Product" })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "Agents" })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "More" })).toBeTruthy();
+		// Columns are labelled for assistive tech, with no all-caps headings on screen.
+		expect(screen.getByRole("navigation", { name: "Product" })).toBeTruthy();
+		expect(screen.getByRole("navigation", { name: "Agents" })).toBeTruthy();
+		expect(screen.getByRole("navigation", { name: "More" })).toBeTruthy();
+		expect(screen.queryByRole("heading")).toBeNull();
 		expect(screen.getByRole("link", { name: "Sketchi on GitHub" }).getAttribute("href")).toBe(
 			"https://github.com/shpitdev/sketchi",
 		);

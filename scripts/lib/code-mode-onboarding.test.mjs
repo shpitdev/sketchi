@@ -9,6 +9,11 @@ function read(relativePath) {
 	return readFileSync(new URL(relativePath, repoRoot), "utf8");
 }
 
+/** Joins `command \\` + newline + indent, as written in a TypeScript template literal. */
+function joinContinuations(source) {
+	return source.replaceAll(/ \\\\\n\s+/g, " ");
+}
+
 function readJson(relativePath) {
 	return JSON.parse(read(relativePath));
 }
@@ -79,7 +84,10 @@ test("marketplaces and plugin manifests agree on package identity and version", 
 test("the quickstart keeps verified install commands and public expectations", () => {
 	const readme = read("README.md");
 	const quickstart = read("docs/code-mode-agent-plugins.md");
-	const webSetup = read("apps/web/src/components/agent-setup-view/agent-setup-data.ts");
+	// The site splits long commands with shell line continuations; compare them joined.
+	const webSetup = joinContinuations(
+		read("apps/web/src/components/agent-setup-view/agent-setup-data.ts"),
+	);
 
 	assert.match(readme, /\[agent quickstart\]\(docs\/code-mode-agent-plugins\.md\)/);
 
@@ -115,7 +123,14 @@ test("the quickstart keeps verified install commands and public expectations", (
 	const agySection = markdownSection(quickstart, "Agy (Google Antigravity)");
 	const openCodeSection = markdownSection(quickstart, "OpenCode");
 
+	// Every agent's first ask is the same short request a person would type, on
+	// the site and in the quickstart alike.
+	const firstAsk = webSetup.match(/FIRST_DIAGRAM_PROMPT = "([^"]+)"/)?.[1];
+	assert.equal(firstAsk, "Use Sketchi to draw our release approval flow as a flowchart.");
+
 	for (const [name, section] of [
+		["Codex", markdownSection(quickstart, "Codex")],
+		["Claude Code", markdownSection(quickstart, "Claude Code")],
 		["Agy", agySection],
 		["OpenCode", openCodeSection],
 	]) {
@@ -125,11 +140,7 @@ test("the quickstart keeps verified install commands and public expectations", (
 			/### Create the first diagram/,
 			`${name} is missing a first-diagram step`,
 		);
-		assert.match(
-			section,
-			/Use the sketchi-code-mode skill to create/,
-			`${name} is missing a first-diagram prompt`,
-		);
+		assert.ok(section.includes(`\n${firstAsk}\n`), `${name} is missing the first-diagram ask`);
 	}
 
 	assert.match(agySection, /test -f \.agents\/skills\/sketchi-code-mode/);
@@ -153,8 +164,19 @@ test("Agy and OpenCode stay on the portable skill and MCP-only boundary", () => 
 	assert.doesNotMatch(webSetup, /agy\s+plugin\s+(?:install|import|enable|link)\b/i);
 	assert.doesNotMatch(webSetup, /sketchi-code-mode-antigravity|--model/i);
 	assert.match(webSetup, /\.agents\/skills\/sketchi-code-mode/);
-	assert.match(webSetup, /Save or merge \.agents\/mcp_config\.json/);
-	assert.match(webSetup, /instead of overwriting it/);
+	assert.match(webSetup, /Merge into \.agents\/mcp_config\.json/);
+
+	// Setup copies the skill through the site's short URL, which must redirect
+	// to the committed portable skill.
+	const skillLib = read("apps/web/src/lib/portable-skill.ts");
+	assert.ok(existsSync(new URL(".agents/skills/sketchi-code-mode/SKILL.md", repoRoot)));
+	assert.match(
+		skillLib,
+		/"https:\/\/raw\.githubusercontent\.com\/shpitdev\/sketchi\/main\/\.agents\/skills\/sketchi-code-mode\/SKILL\.md"/,
+	);
+	assert.match(webSetup, /curl -fsSL \$\{PORTABLE_SKILL_URL\}/);
+	assert.equal(quickstart.match(/curl -fsSL https:\/\/sketchi\.app\/skill\.md -o /g)?.length, 2);
+	assert.doesNotMatch(quickstart, /curl[^\n]*raw\.githubusercontent\.com/);
 	assert.match(webSetup, /opencode\/skills\/sketchi-code-mode/);
 });
 

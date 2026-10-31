@@ -7,12 +7,8 @@ describe("IconWall", () => {
 	it("links to the configured icon library", () => {
 		render(<IconWall iconsHref="https://icons.example.test" />);
 
-		expect(
-			screen.getByRole("heading", {
-				name: "Your stack’s logos, already sketched.",
-			}),
-		).toBeTruthy();
-		expect(screen.getByRole("link", { name: /Browse the library/ })).toHaveProperty(
+		expect(screen.getByRole("heading", { name: "Logos for your stack" })).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Browse icons" })).toHaveProperty(
 			"href",
 			"https://icons.example.test/",
 		);

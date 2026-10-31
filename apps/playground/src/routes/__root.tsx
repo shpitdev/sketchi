@@ -11,13 +11,27 @@ export const Route = createRootRoute({
 				name: "viewport",
 				content: "width=device-width, initial-scale=1",
 			},
-			{
-				name: "description",
-				content:
-					"Sketchi Playground — chat with an AI companion that sketches diagrams as you talk.",
-			},
+			{ name: "description", content: "Describe a diagram in chat, then edit or export it." },
 			{ name: "theme-color", content: "#f6f1e7" },
 			{ title: "Sketchi Playground" },
+			{ property: "og:type", content: "website" },
+			{ property: "og:site_name", content: "Sketchi" },
+			{ property: "og:title", content: "Sketchi Playground" },
+			{
+				property: "og:description",
+				content: "Describe a diagram in chat, then edit or export it.",
+			},
+			// The site's card: served from sketchi.app because crawlers need an absolute URL.
+			{ property: "og:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
+			{ property: "og:image:width", content: "1200" },
+			{ property: "og:image:height", content: "630" },
+			{ name: "twitter:card", content: "summary_large_image" },
+			{ name: "twitter:title", content: "Sketchi Playground" },
+			{
+				name: "twitter:description",
+				content: "Describe a diagram in chat, then edit or export it.",
+			},
+			{ name: "twitter:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
 		],
 		links: [
 			{ rel: "icon", href: "/icon.svg", type: "image/svg+xml" },

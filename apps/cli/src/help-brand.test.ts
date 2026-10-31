@@ -12,7 +12,7 @@ describe("CLI help brand", () => {
 		const output = renderRootHelp({ colors: "none", background: "dark" });
 
 		expect(output).toContain("  sketchi\n");
-		expect(output).toContain("describe it. sketchi draws it.");
+		expect(output).toContain("Editable diagrams from a prompt.");
 		expect(output).toContain("START HERE");
 		expect(output).toContain("WORK WITH A DIAGRAM");
 		expect(output).not.toMatch(/[▀▄█]/u);

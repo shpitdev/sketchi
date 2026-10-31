@@ -14,9 +14,8 @@ export const Route = createFileRoute("/agents")({
 	head: (ctx) => {
 		const isLeafMatch = ctx.matches[ctx.matches.length - 1]?.id === ctx.match.id;
 		return pageMeta({
-			title: "Agent setup - Sketchi",
-			description:
-				"Set up Sketchi in Claude Code, Codex, OpenCode, or Antigravity to draw diagrams from prompts.",
+			title: "Agent setup – Sketchi",
+			description: "Add Sketchi to Codex, Claude Code, OpenCode, or Antigravity.",
 			path: "/agents",
 			canonical: isLeafMatch,
 		});

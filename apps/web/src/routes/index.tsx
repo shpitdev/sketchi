@@ -7,9 +7,9 @@ import { getWebSurfaceUrls } from "../lib/surface-urls-rpc";
 export const Route = createFileRoute("/")({
 	head: () =>
 		pageMeta({
-			title: "Sketchi: describe it, and Sketchi draws it",
+			title: "Sketchi: editable diagrams from a prompt",
 			description:
-				"Turn a prompt into an editable diagram with the real logos of your stack. Use Sketchi in the playground or your coding agent.",
+				"Describe a diagram and get an editable Excalidraw sketch with real tech logos. Use it in the browser, your coding agent, or the terminal.",
 			path: "/",
 		}),
 	loader: () => getWebSurfaceUrls(),

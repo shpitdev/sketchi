@@ -38,8 +38,7 @@ export function SiteFooter({
 					</a>
 				</div>
 
-				<div className="site-footer__col">
-					<h3>Product</h3>
+				<nav aria-label="Product" className="site-footer__col">
 					<ul>
 						<li>
 							<a href={surfaceUrls.playground}>Playground</a>
@@ -57,10 +56,9 @@ export function SiteFooter({
 							<a href="/docs">Docs</a>
 						</li>
 					</ul>
-				</div>
+				</nav>
 
-				<div className="site-footer__col">
-					<h3>Agents</h3>
+				<nav aria-label="Agents" className="site-footer__col">
 					<ul>
 						<li>
 							<a href="/agents/claude-code">Claude Code</a>
@@ -75,27 +73,20 @@ export function SiteFooter({
 							<a href="/agents/antigravity">Antigravity</a>
 						</li>
 					</ul>
-				</div>
+				</nav>
 
-				<div className="site-footer__col">
-					<h3>More</h3>
+				<nav aria-label="More" className="site-footer__col">
 					<ul>
-						<li>
-							<a href="/docs">How it works</a>
-						</li>
 						<li>
 							<a aria-label="sketchi on npm" className="site-footer__npm" href={npmUrl}>
 								<span aria-hidden="true" className="npm-mark npm-mark--sm" />
 							</a>
 						</li>
 						<li>
-							<a href={repoUrl}>GitHub</a>
-						</li>
-						<li>
 							<a href={llmsTxtUrl}>llms.txt</a>
 						</li>
 					</ul>
-				</div>
+				</nav>
 			</div>
 
 			<div className="site-footer__base">

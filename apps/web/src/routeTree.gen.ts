@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as DocsRouteImport } from './routes/docs'
+import { Route as InstallDotshRouteImport } from './routes/install[.]sh'
+import { Route as SkillDotmdRouteImport } from './routes/skill[.]md'
 import { Route as AgentsAntigravityRouteImport } from './routes/agents/antigravity'
 import { Route as AgentsClaudeCodeRouteImport } from './routes/agents/claude-code'
 import { Route as AgentsCodexRouteImport } from './routes/agents/codex'
@@ -30,6 +32,16 @@ const AgentsRoute = AgentsRouteImport.update({
 const DocsRoute = DocsRouteImport.update({
   id: '/docs',
   path: '/docs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstallDotshRoute = InstallDotshRouteImport.update({
+  id: '/install.sh',
+  path: '/install.sh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SkillDotmdRoute = SkillDotmdRouteImport.update({
+  id: '/skill.md',
+  path: '/skill.md',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsAntigravityRoute = AgentsAntigravityRouteImport.update({
@@ -57,6 +69,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRouteWithChildren
   '/docs': typeof DocsRoute
+  '/install.sh': typeof InstallDotshRoute
+  '/skill.md': typeof SkillDotmdRoute
   '/agents/antigravity': typeof AgentsAntigravityRoute
   '/agents/claude-code': typeof AgentsClaudeCodeRoute
   '/agents/codex': typeof AgentsCodexRoute
@@ -66,6 +80,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRouteWithChildren
   '/docs': typeof DocsRoute
+  '/install.sh': typeof InstallDotshRoute
+  '/skill.md': typeof SkillDotmdRoute
   '/agents/antigravity': typeof AgentsAntigravityRoute
   '/agents/claude-code': typeof AgentsClaudeCodeRoute
   '/agents/codex': typeof AgentsCodexRoute
@@ -76,6 +92,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRouteWithChildren
   '/docs': typeof DocsRoute
+  '/install.sh': typeof InstallDotshRoute
+  '/skill.md': typeof SkillDotmdRoute
   '/agents/antigravity': typeof AgentsAntigravityRoute
   '/agents/claude-code': typeof AgentsClaudeCodeRoute
   '/agents/codex': typeof AgentsCodexRoute
@@ -87,6 +105,8 @@ export interface FileRouteTypes {
     | '/'
     | '/agents'
     | '/docs'
+    | '/install.sh'
+    | '/skill.md'
     | '/agents/antigravity'
     | '/agents/claude-code'
     | '/agents/codex'
@@ -96,6 +116,8 @@ export interface FileRouteTypes {
     | '/'
     | '/agents'
     | '/docs'
+    | '/install.sh'
+    | '/skill.md'
     | '/agents/antigravity'
     | '/agents/claude-code'
     | '/agents/codex'
@@ -105,6 +127,8 @@ export interface FileRouteTypes {
     | '/'
     | '/agents'
     | '/docs'
+    | '/install.sh'
+    | '/skill.md'
     | '/agents/antigravity'
     | '/agents/claude-code'
     | '/agents/codex'
@@ -115,6 +139,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgentsRoute: typeof AgentsRouteWithChildren
   DocsRoute: typeof DocsRoute
+  InstallDotshRoute: typeof InstallDotshRoute
+  SkillDotmdRoute: typeof SkillDotmdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -138,6 +164,20 @@ declare module '@tanstack/react-router' {
       path: '/docs'
       fullPath: '/docs'
       preLoaderRoute: typeof DocsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/install.sh': {
+      id: '/install.sh'
+      path: '/install.sh'
+      fullPath: '/install.sh'
+      preLoaderRoute: typeof InstallDotshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/skill.md': {
+      id: '/skill.md'
+      path: '/skill.md'
+      fullPath: '/skill.md'
+      preLoaderRoute: typeof SkillDotmdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents/antigravity': {
@@ -192,6 +232,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgentsRoute: AgentsRouteWithChildren,
   DocsRoute: DocsRoute,
+  InstallDotshRoute: InstallDotshRoute,
+  SkillDotmdRoute: SkillDotmdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
