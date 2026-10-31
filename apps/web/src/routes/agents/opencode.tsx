@@ -9,8 +9,8 @@ const agentId = "opencode" satisfies AgentSetupId;
 export const Route = createFileRoute("/agents/opencode")({
 	head: () =>
 		pageMeta({
-			title: "OpenCode setup - Sketchi",
-			description: "Add Sketchi to OpenCode and turn prompts into editable diagrams.",
+			title: "OpenCode setup – Sketchi",
+			description: "Connect OpenCode to the Sketchi MCP server.",
 			path: "/agents/opencode",
 		}),
 	component: OpenCodeRoute,

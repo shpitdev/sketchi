@@ -9,8 +9,8 @@ const agentId = "antigravity" satisfies AgentSetupId;
 export const Route = createFileRoute("/agents/antigravity")({
 	head: () =>
 		pageMeta({
-			title: "Antigravity setup - Sketchi",
-			description: "Add Sketchi to Antigravity and turn prompts into editable diagrams.",
+			title: "Antigravity setup – Sketchi",
+			description: "Connect Antigravity to the Sketchi MCP server.",
 			path: "/agents/antigravity",
 		}),
 	component: AntigravityRoute,

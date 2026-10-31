@@ -9,8 +9,8 @@ const agentId = "codex" satisfies AgentSetupId;
 export const Route = createFileRoute("/agents/codex")({
 	head: () =>
 		pageMeta({
-			title: "Codex setup - Sketchi",
-			description: "Add Sketchi to Codex and turn prompts into editable diagrams.",
+			title: "Codex setup – Sketchi",
+			description: "Install the Sketchi plugin in Codex.",
 			path: "/agents/codex",
 		}),
 	component: CodexRoute,

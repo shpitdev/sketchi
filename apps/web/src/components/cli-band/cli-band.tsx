@@ -1,12 +1,11 @@
 import { Button } from "@sketchi/ui/components/button";
 
 import { BrandIcon } from "../brand-icon/index.js";
-import { CopyButton } from "../copy-button/index.js";
+import { CommandBlock } from "../command-block/index.js";
 import {
 	CLI_EXAMPLE_COMMAND,
 	CLI_NODE_REQUIREMENT,
 	CLI_NPM_URL,
-	CLI_PACKAGE_NAME,
 	cliInstallOptions,
 } from "../../lib/cli-package";
 
@@ -25,10 +24,9 @@ export function CliBand({ npmUrl = CLI_NPM_URL }: CliBandProps) {
 		<section className="sk-section" id="cli">
 			<div className="sk-shell cli-band__inner">
 				<div>
-					<h2 className="sk-section__title cli-band__title">Draw diagrams from your terminal.</h2>
+					<h2 className="sk-section__title cli-band__title">CLI</h2>
 					<p className="cli-band__lead">
-						<code>{CLI_PACKAGE_NAME}</code> draws diagrams from your shell without an account or API
-						key. Every command supports <code>--output json</code> for agents.
+						No account or API key. Every command takes <code>--output json</code>.
 					</p>
 
 					<div className="cli-band__links">
@@ -53,19 +51,10 @@ export function CliBand({ npmUrl = CLI_NPM_URL }: CliBandProps) {
 
 					<div className="cli-band__body">
 						{cliInstallOptions.map((option) => (
-							<div className="code-snippet" key={option.command}>
-								<pre className="docs-codeblock">
-									<code>{option.command}</code>
-								</pre>
-								<CopyButton label={option.label} value={option.command} />
-							</div>
+							<CommandBlock key={option.command} label={option.label} value={option.command} />
 						))}
-
-						<div className="code-snippet cli-band__example">
-							<pre className="docs-codeblock">
-								<code>{CLI_EXAMPLE_COMMAND}</code>
-							</pre>
-							<CopyButton label="example command" value={CLI_EXAMPLE_COMMAND} />
+						<div className="cli-band__example">
+							<CommandBlock label="example command" value={CLI_EXAMPLE_COMMAND} />
 						</div>
 						<p className="cli-band__req">Requires {CLI_NODE_REQUIREMENT}.</p>
 					</div>

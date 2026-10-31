@@ -9,6 +9,11 @@ function read(relativePath) {
 	return readFileSync(new URL(relativePath, repoRoot), "utf8");
 }
 
+/** Joins `command \\` + newline + indent, as written in a TypeScript template literal. */
+function joinContinuations(source) {
+	return source.replaceAll(/ \\\\\n\s+/g, " ");
+}
+
 function readJson(relativePath) {
 	return JSON.parse(read(relativePath));
 }
@@ -79,7 +84,10 @@ test("marketplaces and plugin manifests agree on package identity and version", 
 test("the quickstart keeps verified install commands and public expectations", () => {
 	const readme = read("README.md");
 	const quickstart = read("docs/code-mode-agent-plugins.md");
-	const webSetup = read("apps/web/src/components/agent-setup-view/agent-setup-data.ts");
+	// The site splits long commands with shell line continuations; compare them joined.
+	const webSetup = joinContinuations(
+		read("apps/web/src/components/agent-setup-view/agent-setup-data.ts"),
+	);
 
 	assert.match(readme, /\[agent quickstart\]\(docs\/code-mode-agent-plugins\.md\)/);
 
@@ -153,8 +161,7 @@ test("Agy and OpenCode stay on the portable skill and MCP-only boundary", () => 
 	assert.doesNotMatch(webSetup, /agy\s+plugin\s+(?:install|import|enable|link)\b/i);
 	assert.doesNotMatch(webSetup, /sketchi-code-mode-antigravity|--model/i);
 	assert.match(webSetup, /\.agents\/skills\/sketchi-code-mode/);
-	assert.match(webSetup, /Save or merge \.agents\/mcp_config\.json/);
-	assert.match(webSetup, /instead of overwriting it/);
+	assert.match(webSetup, /Merge into \.agents\/mcp_config\.json/);
 	assert.match(webSetup, /opencode\/skills\/sketchi-code-mode/);
 });
 

@@ -9,25 +9,21 @@ describe("CtaBand", () => {
 
 		expect(screen.getByRole("heading", { name: "Describe your first diagram." })).toBeTruthy();
 		const primaryAction = screen.getByRole("link", {
-			name: "Open the playground",
+			name: "Open playground",
 		});
 		expect(primaryAction).toHaveProperty("href", "https://play.example.test/");
 		expect(primaryAction.dataset.variant).toBe("brand");
-		expect(screen.getByRole("link", { name: /Add to your coding agent/ })).toHaveProperty(
-			"href",
-			"http://localhost:3000/agents",
-		);
 	});
 
 	/**
-	 * Three trailing routes out of one closing sheet is clutter. The playground
-	 * is the primary, the agent hub is the one alternative, and the CLI keeps
-	 * its own full section further up the page.
+	 * The hero already offers the agent route and the CLI has its own section,
+	 * so the closing sheet repeats only the one primary action.
 	 */
-	it("closes on one primary action and one alternative", () => {
+	it("closes on one primary action", () => {
 		const { container } = render(<CtaBand />);
 
-		expect(container.querySelectorAll(".cta-band__actions a")).toHaveLength(2);
+		expect(container.querySelectorAll(".cta-band__actions a")).toHaveLength(1);
+		expect(screen.queryByRole("link", { name: /coding agent/ })).toBeNull();
 		expect(screen.queryByRole("link", { name: /install the CLI/ })).toBeNull();
 	});
 });

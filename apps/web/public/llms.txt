@@ -1,6 +1,6 @@
 # Sketchi
 
-Sketchi turns a plain-language prompt into a clean, editable diagram, brand
+Sketchi turns a plain-language prompt into an editable diagram, brand
 logos included. It is usable by people in the browser, by software agents over
 MCP, and from a terminal through the sketchi CLI. Source is MIT-licensed at
 https://github.com/shpitdev/sketchi.
