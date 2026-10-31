@@ -123,7 +123,14 @@ test("the quickstart keeps verified install commands and public expectations", (
 	const agySection = markdownSection(quickstart, "Agy (Google Antigravity)");
 	const openCodeSection = markdownSection(quickstart, "OpenCode");
 
+	// Every agent's first ask is the same short request a person would type, on
+	// the site and in the quickstart alike.
+	const firstAsk = webSetup.match(/FIRST_DIAGRAM_PROMPT = "([^"]+)"/)?.[1];
+	assert.equal(firstAsk, "Use Sketchi to draw our release approval flow as a flowchart.");
+
 	for (const [name, section] of [
+		["Codex", markdownSection(quickstart, "Codex")],
+		["Claude Code", markdownSection(quickstart, "Claude Code")],
 		["Agy", agySection],
 		["OpenCode", openCodeSection],
 	]) {
@@ -133,11 +140,7 @@ test("the quickstart keeps verified install commands and public expectations", (
 			/### Create the first diagram/,
 			`${name} is missing a first-diagram step`,
 		);
-		assert.match(
-			section,
-			/Use the sketchi-code-mode skill to create/,
-			`${name} is missing a first-diagram prompt`,
-		);
+		assert.ok(section.includes(`\n${firstAsk}\n`), `${name} is missing the first-diagram ask`);
 	}
 
 	assert.match(agySection, /test -f \.agents\/skills\/sketchi-code-mode/);

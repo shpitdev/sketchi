@@ -1,10 +1,8 @@
 import { PORTABLE_SKILL_URL } from "../../lib/portable-skill";
 
 const mcpEndpoint = "https://playground.sketchi.app/mcp";
-const firstDiagram =
-	"Create a top-to-bottom request approval flowchart and return the hosted Excalidraw and PNG artifacts.";
-const portableFirstDiagram =
-	"Use the sketchi-code-mode skill to create a top-to-bottom flowchart for request intake, review, approval or revision, and completion. Return the hosted Excalidraw and PNG artifacts.";
+/** The first ask on every agent page: what a person would actually type. */
+export const FIRST_DIAGRAM_PROMPT = "Use Sketchi to draw our release approval flow as a flowchart.";
 
 export type AgentSetupId = "codex" | "opencode" | "claude-code" | "antigravity";
 
@@ -58,7 +56,7 @@ export const agentSetupEntries: readonly AgentSetupEntry[] = [
 			},
 			{
 				label: "Ask Codex for a diagram",
-				value: `$sketchi-code-mode ${firstDiagram}`,
+				value: FIRST_DIAGRAM_PROMPT,
 				kind: "prompt",
 			},
 		],
@@ -91,7 +89,7 @@ curl -fsSL ${PORTABLE_SKILL_URL} -o "$SKETCHI_SKILL_DIR/SKILL.md"`,
 			},
 			{
 				label: "Ask OpenCode for a diagram",
-				value: portableFirstDiagram,
+				value: FIRST_DIAGRAM_PROMPT,
 				kind: "prompt",
 			},
 		],
@@ -121,7 +119,7 @@ curl -fsSL ${PORTABLE_SKILL_URL} -o "$SKETCHI_SKILL_DIR/SKILL.md"`,
 			},
 			{
 				label: "Ask Claude Code for a diagram",
-				value: `/sketchi-code-mode-claude:sketchi-code-mode ${firstDiagram}`,
+				value: FIRST_DIAGRAM_PROMPT,
 				kind: "prompt",
 			},
 		],
@@ -153,7 +151,7 @@ curl -fsSL ${PORTABLE_SKILL_URL} -o .agents/skills/sketchi-code-mode/SKILL.md`,
 			},
 			{
 				label: "Ask Antigravity for a diagram",
-				value: portableFirstDiagram,
+				value: FIRST_DIAGRAM_PROMPT,
 				kind: "prompt",
 			},
 		],

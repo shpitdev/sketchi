@@ -44,7 +44,7 @@ after installation so the skill and MCP tools are in the session inventory.
 Start `codex`, then send:
 
 ```text
-$sketchi-code-mode Create a top-to-bottom flowchart for request intake, review, approval or revision, and completion. Return the hosted Excalidraw and PNG artifacts.
+Use Sketchi to draw our release approval flow as a flowchart.
 ```
 
 The skill discovers the current contract, calls the `execute` tool, and returns
@@ -75,7 +75,7 @@ installation, or run `/reload-plugins` in an existing session.
 Start `claude`, then send:
 
 ```text
-/sketchi-code-mode-claude:sketchi-code-mode Create a top-to-bottom flowchart for request intake, review, approval or revision, and completion. Return the hosted Excalidraw and PNG artifacts.
+Use Sketchi to draw our release approval flow as a flowchart.
 ```
 
 A successful result includes the accepted artifact ID plus raw Excalidraw and
@@ -122,7 +122,7 @@ rg -n '"sketchi-code-mode"|"serverUrl": "https://playground\.sketchi\.app/mcp"' 
 Open that project in Antigravity, then send:
 
 ```text
-Use the sketchi-code-mode skill to create a top-to-bottom flowchart for request intake, review, approval or revision, and completion. Return the hosted Excalidraw and PNG artifacts.
+Use Sketchi to draw our release approval flow as a flowchart.
 ```
 
 That is the supported Sketchi setup boundary for Agy. Model selection,
@@ -158,7 +158,7 @@ The MCP list should show `sketchi-code-mode` as connected.
 Start `opencode`, then send:
 
 ```text
-Use the sketchi-code-mode skill to create a top-to-bottom flowchart for request intake, review, approval or revision, and completion. Return the hosted Excalidraw and PNG artifacts.
+Use Sketchi to draw our release approval flow as a flowchart.
 ```
 
 That is the supported Sketchi setup boundary for OpenCode; provider, model, and

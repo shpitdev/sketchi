@@ -67,7 +67,8 @@ const TILE_MATERIALS: Readonly<Record<string, Record<HelpBrandOptions["backgroun
 
 const TILE_WIDTH = 16;
 const LOCKUP_GAP = 2;
-const TAGLINE = "describe it. sketchi draws it.";
+// Plain words for what Sketchi is, matching sketchi.app.
+const TAGLINE = "Editable diagrams from a prompt.";
 
 const BRAND = {
 	dark: { red: 195, green: 154, blue: 172, ansi256: 181 },

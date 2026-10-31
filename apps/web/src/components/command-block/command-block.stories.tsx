@@ -31,7 +31,6 @@ export const Prompt: Story = {
 	args: {
 		kind: "prose",
 		label: "first prompt",
-		value:
-			"$sketchi-code-mode Create a top-to-bottom request approval flowchart and return the hosted Excalidraw and PNG artifacts.",
+		value: "Use Sketchi to draw our release approval flow as a flowchart.",
 	},
 };
