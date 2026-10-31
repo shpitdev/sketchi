@@ -6,6 +6,7 @@ import {
 	groupFixtures,
 	laneFixtures,
 	leftToRightHybridFlowchart,
+	leftToRightIncidentFlowchart,
 	pharmaBatchDispositionFlowchart,
 	routingFixtures,
 	zoneFixtures,
@@ -96,6 +97,11 @@ export const RoutingDataImportValidation: Story = {
 
 export const RoutingIncidentEscalation: Story = {
 	args: { diagram: routingFixtures["incident-escalation"] },
+};
+
+/** Asked for left to right: the yes branch and Monitoring's line reach Resolve incident on lanes of their own. */
+export const RoutingIncidentEscalationLeftToRight: Story = {
+	args: { diagram: leftToRightIncidentFlowchart },
 };
 
 export const RoutingInvoiceApproval: Story = {

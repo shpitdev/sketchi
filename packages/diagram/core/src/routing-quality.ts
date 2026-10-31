@@ -42,12 +42,16 @@ const JOG_WINDOW_PX = 90;
 const WIDE_BEND_PX = 150;
 /** Parallel runs closer than this read as one doubled line (13-20 px in labeled images). */
 const CORRIDOR_GAP_PX = 24;
+/** Lines whose centres lie closer than this draw as one stroke: rough strokes leave no space between them. */
+const SHARED_STROKE_PX = 4;
 /** Shorter side-by-side runs are corners or crossings, not corridors. */
 const CORRIDOR_RUN_PX = 30;
 /** Arrowheads need at least this much visible space between them. */
 const ARROWHEAD_GAP_PX = 8;
 /** Excalidraw "arrow" head: 25 units long (at most half the last segment), wings 20 degrees off axis. */
 const ARROWHEAD_SIZE = 25;
+/** The run a head needs to draw full size, since Excalidraw draws it at most half its last segment. */
+const ARROWHEAD_APPROACH = 2 * ARROWHEAD_SIZE;
 const ARROWHEAD_ANGLE = (20 * Math.PI) / 180;
 const STROKE_WIDTH = 2;
 const EPSILON = 0.01;
@@ -215,6 +219,54 @@ function corridorFinding(
 				message: `Arrows "${a.id}" and "${b.id}" run side by side closer than ${CORRIDOR_GAP_PX} px.`,
 			}
 		: undefined;
+}
+
+export interface SharedSegment {
+	readonly arrowIds: readonly [string, string];
+	/** Scene units between the centres of the two runs. */
+	readonly gap: number;
+	/** Scene units the two runs lie side by side. */
+	readonly length: number;
+}
+
+/**
+ * Pairs of lines that draw one visible segment: parallel runs whose centres
+ * lie closer than SHARED_STROKE_PX at reader scale, side by side for longer
+ * than an arrowhead's approach. A near-coincident corridor reads as a doubled
+ * line; these read as one, so a reader cannot follow either line along it.
+ * Pieces of one line (a shared id) never pair. Each pair counts once, with its
+ * longest shared run.
+ */
+export function sharedSegments(
+	arrows: readonly RoutingQualityArrow[],
+	scale: number,
+): SharedSegment[] {
+	const gap = SHARED_STROKE_PX / scale;
+	const prepared = arrows.map((arrow) => ({
+		arrow,
+		bounds: boxOf(arrow.points, gap),
+		runs: runs(corners(arrow.points)),
+	}));
+	const shared: SharedSegment[] = [];
+	for (const [index, a] of prepared.entries())
+		for (const b of prepared.slice(index + 1)) {
+			if (a.arrow.id === b.arrow.id || !boxesMeet(a.bounds, b.bounds)) continue;
+			let longest: SharedSegment | undefined;
+			for (const x of a.runs)
+				for (const y of b.runs) {
+					const apart = Math.abs(x.at - y.at);
+					const length = Math.min(x.max, y.max) - Math.max(x.min, y.min);
+					if (
+						x.horizontal === y.horizontal &&
+						apart < gap &&
+						length > ARROWHEAD_APPROACH &&
+						(!longest || length > longest.length)
+					)
+						longest = { arrowIds: [a.arrow.id, b.arrow.id], gap: apart, length };
+				}
+			if (longest) shared.push(longest);
+		}
+	return shared;
 }
 
 function arrowhead(arrow: RoutingQualityArrow): Point[] | undefined {
