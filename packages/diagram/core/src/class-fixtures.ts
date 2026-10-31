@@ -12,8 +12,9 @@ const build = (input: Record<string, unknown>): ClassDiagram =>
  * Class diagrams that stress the layout: a model of twenty classes, a
  * hierarchy wider than any row should run, one five levels deep with an
  * interface several rows above its implementer, a class related to itself
- * twice, two classes in one row with a third between them, and two named
- * dependencies running opposite ways between a pair of interfaces.
+ * twice, two classes in one row with a third between them, two named
+ * dependencies running opposite ways between a pair of interfaces, and a
+ * library whose roles must each stay at their own end.
  */
 export const classStressFixtures = {
 	library: build({
@@ -362,6 +363,160 @@ export const classStressFixtures = {
 				to: "WeatherStation",
 				label: "casts to; getTemperature()",
 			},
+		],
+	}),
+	// Sol's library-system-class-v2 build (r30): the "reservations" role at the Reservation end
+	// of Member - Reservation, a line of one run, stood beside Member instead.
+	memberReservations: build({
+		id: "library-system",
+		title: "Library system",
+		classes: [
+			{
+				id: "Library",
+				attributes: ["- name: String", "- branches: List<Branch>", "- catalog: Catalog"],
+				methods: ["+ search(query: String): List<Item>"],
+			},
+			{ id: "Branch", attributes: ["- address: String"] },
+			{
+				id: "Catalog",
+				attributes: ["- items: List<Item>"],
+				methods: ["+ add(item: Item): void", "+ find(isbn: String): Book"],
+			},
+			{
+				id: "Item",
+				kind: "abstract",
+				attributes: ["# id: UUID", "# title: String"],
+				methods: ["+ loanPeriod(): int {abstract}"],
+			},
+			{
+				id: "Book",
+				attributes: ["- isbn: String", "- pages: int", "- authors: List<Author>"],
+				methods: ["+ loanPeriod(): int"],
+			},
+			{ id: "DVD", attributes: ["- minutes: int"], methods: ["+ loanPeriod(): int"] },
+			{ id: "Magazine", attributes: ["- issue: int"], methods: ["+ loanPeriod(): int"] },
+			{ id: "Author", attributes: ["- name: String", "- books: List<Book>"] },
+			{
+				id: "Member",
+				attributes: [
+					"- memberId: String",
+					"- name: String",
+					"- loans: List<Loan>",
+					"- reservations: List<Reservation>",
+				],
+				methods: ["+ borrow(item: Item): Loan", "+ reserve(item: Item): Reservation"],
+			},
+			{ id: "StudentMember", attributes: ["- school: String"] },
+			{ id: "StaffMember", attributes: ["- department: String"] },
+			{
+				id: "Loan",
+				attributes: ["- due: Date", "- returned: Date", "- item: Item", "- fine: Fine"],
+				methods: ["+ isOverdue(): boolean"],
+			},
+			{ id: "Reservation", attributes: ["- placed: Date", "- item: Item"] },
+			{ id: "Fine", attributes: ["- amount: Money"], methods: ["+ pay(): void"] },
+			{
+				id: "Librarian",
+				attributes: ["- staffId: String", "- branch: Branch"],
+				methods: ["+ checkOut(loan: Loan): void"],
+			},
+		],
+		relationships: [
+			{
+				id: "relationship-1",
+				kind: "composition",
+				from: "Library",
+				to: "Branch",
+				fromMultiplicity: "1",
+				toMultiplicity: "1..*",
+				toRole: "branches",
+			},
+			{
+				id: "relationship-2",
+				kind: "composition",
+				from: "Library",
+				to: "Catalog",
+				fromMultiplicity: "1",
+				toMultiplicity: "1",
+				toRole: "catalog",
+			},
+			{
+				id: "relationship-3",
+				kind: "composition",
+				from: "Loan",
+				to: "Fine",
+				fromMultiplicity: "1",
+				toRole: "fine",
+			},
+			{
+				id: "relationship-4",
+				kind: "aggregation",
+				from: "Catalog",
+				to: "Item",
+				toMultiplicity: "0..*",
+				toRole: "items",
+			},
+			{ id: "relationship-5", kind: "inheritance", from: "Book", to: "Item" },
+			{ id: "relationship-6", kind: "inheritance", from: "DVD", to: "Item" },
+			{ id: "relationship-7", kind: "inheritance", from: "Magazine", to: "Item" },
+			{
+				id: "relationship-8",
+				kind: "association",
+				from: "Book",
+				to: "Author",
+				fromMultiplicity: "0..*",
+				toMultiplicity: "1..*",
+				fromRole: "books",
+				toRole: "authors",
+			},
+			{ id: "relationship-9", kind: "inheritance", from: "StudentMember", to: "Member" },
+			{ id: "relationship-10", kind: "inheritance", from: "StaffMember", to: "Member" },
+			{
+				id: "relationship-11",
+				kind: "association",
+				from: "Member",
+				to: "Loan",
+				toMultiplicity: "0..*",
+				toRole: "loans",
+				navigable: true,
+			},
+			{
+				id: "relationship-12",
+				kind: "association",
+				from: "Member",
+				to: "Reservation",
+				toMultiplicity: "0..*",
+				toRole: "reservations",
+				navigable: true,
+			},
+			{
+				id: "relationship-13",
+				kind: "association",
+				from: "Loan",
+				to: "Item",
+				toRole: "item",
+				navigable: true,
+			},
+			{
+				id: "relationship-14",
+				kind: "association",
+				from: "Reservation",
+				to: "Item",
+				toRole: "item",
+				navigable: true,
+			},
+			{
+				id: "relationship-15",
+				kind: "association",
+				from: "Librarian",
+				to: "Branch",
+				toRole: "branch",
+				navigable: true,
+			},
+			{ id: "relationship-16", kind: "dependency", from: "Librarian", to: "Loan" },
+			{ id: "relationship-17", kind: "dependency", from: "Library", to: "Item" },
+			{ id: "relationship-18", kind: "dependency", from: "Catalog", to: "Book" },
+			{ id: "relationship-19", kind: "dependency", from: "Member", to: "Item" },
 		],
 	}),
 } as const satisfies Record<string, ClassDiagram>;

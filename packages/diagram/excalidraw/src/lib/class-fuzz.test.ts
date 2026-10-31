@@ -205,6 +205,8 @@ const PARALLEL_CLEARANCE = 10;
  */
 const ATTRIBUTION_RATIO = 1.5;
 const ATTRIBUTION_MARGIN = 8;
+/** A multiplicity or role sits beside its end when its middle stands this near the end's tip. */
+const END_LABEL_REACH = 110;
 
 /** Everything the export validator, the canvas validator or the layout guards would flag. */
 function defects(diagram: ClassDiagram): string[] {
@@ -349,6 +351,29 @@ function defects(diagram: ClassDiagram): string[] {
 			? [`${label.id} ${own.toFixed(0)} px from its line, ${nearest.toFixed(0)} px from ${other}`]
 			: [];
 	});
+	// Every multiplicity and role reads as its own end's: beside that end's tip, and the
+	// line's other tip clearly further off.
+	const tips = new Map(arrows.map((arrow) => [arrow.edgeId, arrow.points]));
+	const reach = (label: (typeof labels)[number], tip: { x: number; y: number }) =>
+		Math.hypot(
+			Math.max(0, label.left - tip.x, tip.x - label.right),
+			Math.max(0, label.top - tip.y, tip.y - label.bottom),
+		);
+	const misplaced = labels.flatMap((label) => {
+		const [, owner, end] = label.id.split(":");
+		if (end !== "from" && end !== "to") return [];
+		const points = tips.get(owner!)!;
+		const [tip, far] = end === "from" ? [points[0], points.at(-1)!] : [points.at(-1)!, points[0]];
+		const [own, other] = [reach(label, tip), reach(label, far)];
+		const center = Math.hypot(
+			(label.left + label.right) / 2 - tip.x,
+			(label.top + label.bottom) / 2 - tip.y,
+		);
+		return center > END_LABEL_REACH ||
+			other < Math.max(ATTRIBUTION_RATIO * own, own + ATTRIBUTION_MARGIN)
+			? [`${label.id} ${own.toFixed(0)} px from its end, ${other.toFixed(0)} px from the other`]
+			: [];
+	});
 	// No two lines run side by side closer than a reader can tell apart.
 	const runs = arrows.flatMap((arrow) =>
 		segmentsFromPoints(arrow.points).map((segment) => ({ arrow: arrow.id, segment })),
@@ -378,6 +403,7 @@ function defects(diagram: ClassDiagram): string[] {
 		...unwrapped,
 		...crowded,
 		...misattributed,
+		...misplaced,
 		...hugging,
 	];
 }

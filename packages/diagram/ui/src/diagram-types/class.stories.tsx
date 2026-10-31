@@ -47,3 +47,8 @@ export const OpposingDependencies: Story = {
 export const LargeModel: Story = {
 	args: { diagram: scenarioDiagram("library-system-class-v2") },
 };
+
+/** A library whose multiplicities and roles each stay at their own end: "reservations" beside Reservation, not Member. */
+export const RolesAtTheirEnds: Story = {
+	args: { diagram: classStressFixtures.memberReservations },
+};

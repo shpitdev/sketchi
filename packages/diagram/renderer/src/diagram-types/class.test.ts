@@ -337,6 +337,45 @@ describe("class diagram renderer", () => {
 		}
 	});
 
+	it("sets every multiplicity and role at its own end, clearly nearer its tip than the other", () => {
+		// Its middle within 110 of its end's tip, the line's other tip half again as far
+		// from it as its own, and 8 units further.
+		const reach = (label: ReturnType<typeof labelBoxes>[number], tip: { x: number; y: number }) =>
+			Math.hypot(
+				Math.max(0, label.left - tip.x, tip.x - label.right),
+				Math.max(0, label.top - tip.y, tip.y - label.bottom),
+			);
+		for (const diagram of all) {
+			const scene = renderDiagram(diagram);
+			for (const label of labelBoxes(scene)) {
+				const [, id, end] = label.id.split(":");
+				if (end !== "from" && end !== "to") continue;
+				const { points } = arrow(scene, id!);
+				const [tip, far] =
+					end === "from" ? [points[0], points.at(-1)!] : [points.at(-1)!, points[0]];
+				const own = reach(label, tip);
+				const middle = { x: (label.left + label.right) / 2, y: (label.top + label.bottom) / 2 };
+				expect(
+					Math.hypot(middle.x - tip.x, middle.y - tip.y),
+					`${diagram.id} ${label.id}`,
+				).toBeLessThanOrEqual(110);
+				expect(reach(label, far), `${diagram.id} ${label.id}`).toBeGreaterThanOrEqual(
+					Math.max(1.5 * own, own + 8),
+				);
+			}
+		}
+		// Member - Reservation runs straight up in one run; "reservations" stays at Reservation.
+		const scene = renderDiagram(classStressFixtures.memberReservations);
+		const reservations = arrow(scene, "relationship-12");
+		const role = text(scene, "relationship:relationship-12:to:role")!;
+		expect(role).toMatchObject({ text: "reservations", groupIds: ["class:Reservation"] });
+		const [tip, far] = [reservations.points.at(-1)!, reservations.points[0]];
+		if (role.type === "text")
+			expect(Math.hypot(role.x - tip.x, role.y - tip.y)).toBeLessThan(
+				Math.hypot(role.x - far.x, role.y - far.y) / 2,
+			);
+	});
+
 	it("loops a relationship to its own class out and back on one side, nesting a second", () => {
 		const scene = renderDiagram(classStressFixtures.selfReference);
 		const employee = box(scene, "Employee");
