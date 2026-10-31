@@ -53,6 +53,7 @@ import {
 	routingQualityFindings,
 	routingQualityScale,
 	routingWideBend,
+	sharedSegments,
 	wrapTextToUnits,
 } from "@sketchi/diagram-core";
 
@@ -10300,9 +10301,25 @@ function nearOutlines({ edgeArrows, nodeShapes }: DiagramLayout): number {
 }
 
 /**
+ * Pairs of lines drawn along one visible segment (sharedSegments), judged at
+ * the export size of everything drawn.
+ */
+function sharedSegmentCount({ edgeArrows, groups, lanes, nodeShapes }: DiagramLayout): number {
+	const scale = routingQualityScale(
+		drawnSize([...nodeShapes, ...groupBlocks(groups), ...laneBlocks(lanes)], edgeArrows),
+	);
+	return sharedSegments(
+		edgeArrows.map((arrow) => ({ id: arrow.id, points: arrow.points })),
+		scale,
+	).length;
+}
+
+/**
  * No more export defects, and no more crossings, reader findings, lines
- * through a head, hooks, detours, dips or crowded labels, and no newly
- * extreme aspect or longer a drawing.
+ * through a head, hooks, detours, dips, crowded labels or lines drawn along
+ * one segment, and no newly extreme aspect or longer a drawing. A line moved
+ * onto another reads as one line, which a reader cannot follow, even where it
+ * trades a finding for the corridor it draws.
  */
 function drawsNoWorse(
 	candidate: DiagramLayout,
@@ -10319,7 +10336,8 @@ function drawsNoWorse(
 		detouredLines(candidate.edgeArrows) <= detouredLines(current.edgeArrows) &&
 		dippedArrivals(candidate.edgeArrows).size <= dippedArrivals(current.edgeArrows).size &&
 		labels!.every((count, index) => count <= currentLabels![index]!) &&
-		drawnLongSide(candidate) <= drawnLongSide(current) + AXIS_ALIGNED_EPSILON
+		drawnLongSide(candidate) <= drawnLongSide(current) + AXIS_ALIGNED_EPSILON &&
+		sharedSegmentCount(candidate) <= sharedSegmentCount(current)
 	);
 }
 

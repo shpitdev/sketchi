@@ -3,6 +3,7 @@ import {
 	candidateRouteQuality,
 	canvasBoundTextBox,
 	canvasBoundTextInset,
+	crossingFixtures,
 	embedCanvasIcons,
 	getCanvasValidationIssues,
 	groupFixtures,
@@ -11,12 +12,16 @@ import {
 	laneFixtures,
 	laneRegionIssues,
 	laneStressFixtures,
+	leftToRightIncidentFlowchart,
 	parseCanonicalDiagram,
 	parseFlowchartDiagram,
+	routingFixtures,
 	routingQualityFindings,
 	routingQualityScale,
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
+	sharedSegments,
+	sideFixtures,
 	zoneFixtures,
 	zoneRegionIssues,
 	zoneStressFixtures,
@@ -414,6 +419,7 @@ function routingCounts(scene: ReturnType<typeof renderIntermediateDiagram>) {
 		crossings,
 		findings: routingQualityFindings(routes, scale).length + heads,
 		heads,
+		shared: sharedSegments(routes, scale).length,
 	};
 }
 
@@ -479,6 +485,60 @@ const HEADS: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL", 
 		RL: "1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 2 0 1 29 0 0 0 0 2 0",
 	},
 };
+
+/**
+ * Pairs of lines each graph draws along one visible segment (sharedSegments),
+ * by set and direction, in order; sets not listed draw none. Main (d99eb3ca)
+ * drew 468 over these sets, now 432: the polish of the drawn layout's ends no
+ * longer moves a step or a port where that draws one line onto another, so a
+ * port jog it would trade for one stays. A graph may draw no more than pinned.
+ */
+const SHARED: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL", string>>>> = {
+	flowcharts: {
+		TB: "9 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0 0",
+		BT: "0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0 5 0 0 0 0 1 0 0",
+		LR: "2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 1 0 5 1 0 1 0 1 0 0 0 0 1 0 0",
+		RL: "6 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 1 0 5 1 0 1 0 1 0 0 0 0 1 0 0",
+	},
+	grouped: {
+		TB: "0 0 0 0 0 0 0 0 0 0 1 2 0 3 0 0 0 0 0 0 3 1 2 0 2 1 0 1 1 0",
+		BT: "0 0 0 0 0 0 0 0 1 0 2 4 0 5 0 0 0 0 0 0 3 1 0 0 1 1 0 1 0 0",
+		LR: "0 0 0 0 0 0 0 0 0 0 1 5 0 9 1 0 0 1 0 0 2 2 0 0 4 3 0 0 2 0",
+		RL: "0 0 0 0 0 0 0 0 2 0 2 8 0 9 0 1 0 1 0 1 1 0 0 0 4 2 0 0 1 0",
+	},
+	zoned: {
+		TB: "4 0 0 0 0 0 0 0 5 2 0 1 0 0 0 0 0 0 2 7 4 7 0 1 0 0 7 0 6 1",
+		BT: "3 0 0 0 0 1 0 0 3 0 0 1 0 0 0 0 0 0 3 2 5 3 1 3 0 0 2 0 5 0",
+		LR: "4 0 1 0 2 1 0 0 1 0 0 2 1 0 0 1 0 0 6 6 7 5 3 4 0 0 10 0 5 4",
+		RL: "3 0 1 1 0 2 0 0 2 0 0 2 2 0 0 1 0 0 4 4 3 8 5 2 0 0 10 0 3 2",
+	},
+	laned: {
+		TB: "2 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 6 0 5 0 0 0 0",
+		BT: "2 3 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 5 0 3 0 0 0 0",
+		LR: "0 1 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0 1 0 0 5 0 9 0 0 0 0",
+		RL: "0 4 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 10 0 10 0 0 3 0",
+	},
+	state: {
+		TB: "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+		BT: "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+		LR: "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+		RL: "0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0",
+	},
+};
+
+/** Graphs that draw more pairs of lines along one visible segment than pinned. */
+function moreSharedThanPinned(
+	set: string,
+	direction: "TB" | "BT" | "LR" | "RL",
+	counts: readonly { shared: number }[],
+): string[] {
+	const pinned = SHARED[set]?.[direction].split(" ").map(Number) ?? [];
+	return counts.flatMap(({ shared }, index) =>
+		shared > (pinned[index] ?? 0)
+			? [`${set} ${index}: ${pinned[index] ?? 0} -> ${shared} lines sharing a segment`]
+			: [],
+	);
+}
 
 /** Graphs that draw more lines through another line's arrowhead than pinned. */
 function moreHeadsThanPinned(
@@ -1113,7 +1173,7 @@ describe("tall column fuzz", () => {
 				console.log(
 					"PIN tall",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
 					"ASPECTS",
 					aspects.map((aspect) => aspect.toFixed(2)).join(" "),
 				);
@@ -1129,6 +1189,7 @@ describe("tall column fuzz", () => {
 			).toEqual([]);
 			expect(worseThanPinned("tall", counts, TALL_ROUTING[direction], false)).toEqual([]);
 			expect(moreHeadsThanPinned("tall", direction, counts)).toEqual([]);
+			expect(moreSharedThanPinned("tall", direction, counts)).toEqual([]);
 			const pinned = TALL_ASPECTS[direction].split(" ").map(Number);
 			expect(
 				aspects.flatMap((aspect, index) =>
@@ -1226,11 +1287,12 @@ describe("routing fuzz", () => {
 					"PIN",
 					set,
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
 				);
 			return [
 				...worseThanPinned(set, counts, MAIN_ROUTING[set][direction]),
 				...moreHeadsThanPinned(set, direction, counts),
+				...moreSharedThanPinned(set, direction, counts),
 			];
 		});
 
@@ -1466,10 +1528,11 @@ describe("grouped routing fuzz", () => {
 				console.log(
 					"PIN grouped",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
 				);
 			expect(worseThanPinned("grouped", counts, GROUPED_ROUTING[direction])).toEqual([]);
 			expect(moreHeadsThanPinned("grouped", direction, counts)).toEqual([]);
+			expect(moreSharedThanPinned("grouped", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 
@@ -1673,9 +1736,10 @@ describe("group row fuzz", () => {
 				console.log(
 					"PIN rows",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
 				);
 			expect(worseThanPinned("rows", counts, GROUP_ROW_ROUTING[direction], false)).toEqual([]);
+			expect(moreSharedThanPinned("rows", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 });
@@ -1840,10 +1904,11 @@ describe("zoned routing fuzz", () => {
 				console.log(
 					"PIN zoned",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
 				);
 			expect(worseThanPinned("zoned", counts, ZONED_ROUTING[direction], false)).toEqual([]);
 			expect(moreHeadsThanPinned("zoned", direction, counts)).toEqual([]);
+			expect(moreSharedThanPinned("zoned", direction, counts)).toEqual([]);
 		}, 120_000);
 	});
 
@@ -2052,10 +2117,11 @@ describe("laned routing fuzz", () => {
 				console.log(
 					"PIN laned",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
 				);
 			expect(worseThanPinned("laned", counts, LANED_ROUTING[direction], false)).toEqual([]);
 			expect(moreHeadsThanPinned("laned", direction, counts)).toEqual([]);
+			expect(moreSharedThanPinned("laned", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 
@@ -2269,10 +2335,47 @@ describe("state graph fuzz", () => {
 				console.log(
 					"PIN state",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}`).join(" "),
+					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
 				);
 			expect(worseThanPinned("state", counts, STATE_ROUTING[direction])).toEqual([]);
 			expect(moreHeadsThanPinned("state", direction, counts)).toEqual([]);
+			expect(moreSharedThanPinned("state", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
+});
+
+describe("lines sharing a segment", () => {
+	// Two lines drawn along one run read as one, and a reader cannot follow
+	// either. Main drew every incident escalation flow so left to right and
+	// right to left: the fix check's yes branch and Monitoring's line one unit
+	// apart for about 500 units into Resolve incident. No realistic flowchart
+	// may, in any direction; the random graphs above, far denser, may draw no
+	// more than pinned (SHARED).
+	const fixtures = [
+		...Object.entries(crossingFixtures),
+		...Object.entries(sideFixtures),
+		...Object.entries(routingFixtures),
+		["incident-escalation-left-to-right", leftToRightIncidentFlowchart] as const,
+		...(FULL
+			? [
+					...Object.entries(groupFixtures),
+					...Object.entries(zoneFixtures),
+					...Object.entries(laneFixtures),
+				]
+			: []),
+	];
+	it.each(FULL ? (["TB", "BT", "LR", "RL"] as const) : (["LR", "RL"] as const))(
+		"draws no realistic flowchart with two lines along one segment: %s",
+		(direction) => {
+			expect(
+				fixtures.flatMap(([name, fixture]) => {
+					const { shared } = routingCounts(
+						renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+					);
+					return shared > 0 ? [`${name}: ${shared}`] : [];
+				}),
+			).toEqual([]);
+		},
+		60_000,
+	);
 });

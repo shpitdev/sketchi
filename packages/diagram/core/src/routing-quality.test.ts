@@ -5,6 +5,7 @@ import {
 	candidateRouteQuality,
 	routingQualityFindings,
 	routingQualityScale,
+	sharedSegments,
 	type RoutingQualityArrow,
 } from "./routing-quality";
 
@@ -80,6 +81,38 @@ describe("near-coincident corridors", () => {
 		expect(
 			kinds(arrivals.map((a) => ({ ...a, points: [{ ...a.points[0]!, y: -200 }, a.points[1]!] }))),
 		).toEqual(["near-coincident-corridor", "touching-arrowheads"]);
+	});
+});
+
+describe("shared segments", () => {
+	it("flags two lines drawn along one run, once per pair, with its longest shared run", () => {
+		expect(
+			sharedSegments(
+				[
+					arrow("yes", [0, 0], [0, 100], [500, 100], [500, 160]),
+					arrow("monitoring", [-200, 101], [300, 101], [300, 300], [520, 300]),
+				],
+				1,
+			),
+		).toEqual([{ arrowIds: ["yes", "monitoring"], gap: 1, length: 300 }]);
+	});
+
+	it("judges the gap at reader scale, so lines a few units apart share a run only when drawn small", () => {
+		const pair = [arrow("a", [0, 0], [400, 0]), arrow("b", [0, 6], [400, 6])];
+		expect(sharedSegments(pair, 1)).toEqual([]);
+		expect(sharedSegments(pair, 0.5)).toHaveLength(1);
+	});
+
+	it("accepts separate lanes, runs side by side no longer than an arrowhead's approach, and one line's own pieces", () => {
+		expect(
+			sharedSegments([arrow("a", [0, 0], [400, 0]), arrow("b", [0, 18], [400, 18])], 1),
+		).toEqual([]);
+		expect(
+			sharedSegments([arrow("a", [0, 0], [400, 0]), arrow("b", [350, 1], [600, 1])], 1),
+		).toEqual([]);
+		expect(sharedSegments([arrow("a", [0, 0], [400, 0]), arrow("a", [0, 1], [400, 1])], 1)).toEqual(
+			[],
+		);
 	});
 });
 

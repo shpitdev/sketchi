@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
 	crossingFixtures,
+	leftToRightIncidentFlowchart,
 	queriedArchitectureFlowchart,
 	receiptReturnFlowchart,
 	routingFixtures,
+	routingQualityScale,
+	sharedSegments,
 	sideFixtures,
 	wrappedLabelWidth,
 	wrapTextToWidth,
@@ -210,6 +213,22 @@ describe("branches merging into one end", () => {
 		expect(arrivalSide(yes)).toBe("right");
 		expect(arrivalSide(monitoring)).toBe("right");
 		expect(yes.at(-1)!.y).toBeLessThan(monitoring.at(-1)!.y);
+	});
+
+	it("keeps Monitoring's line off the fix check's yes branch into Resolve incident, left to right", () => {
+		// Both lines run beneath the queue row. Monitoring's once stepped down
+		// midway, clear of its port, and ran along the yes branch one unit from
+		// it for about 500 units: two lines drawn as one. Round 30, two of five
+		// Sonnet samples.
+		const scene = renderIntermediateDiagram(leftToRightIncidentFlowchart);
+		const routes = arrowsOf(scene).map((arrow) => ({ id: arrow.edgeId, points: arrow.points }));
+		expect(arrowCrossings(arrowsOf(scene))).toBe(0);
+		expect(sharedSegments(routes, routingQualityScale(scene))).toEqual([]);
+		const [yes, monitoring] = [line(scene, "edge-10").points, line(scene, "edge-12").points];
+		const below = (points: readonly Point[]) => Math.max(...points.map((point) => point.y));
+		expect(below(monitoring)).toBeGreaterThan(below(yes));
+		// Monitoring steps down before the yes branch begins, not beside it.
+		expect(monitoring[1]!.x).toBeLessThan(yes[0].x);
 	});
 });
 

@@ -25,6 +25,7 @@ import rolloutFailures from "./fixtures/routing/rollout-failures.js";
 import cacheLookup from "./fixtures/routing/cache-lookup.js";
 import expenseReceiptReturn from "./fixtures/routing/expense-receipt-return.js";
 import incidentResponseRankGap from "./fixtures/routing/incident-response-rank-gap.js";
+import incidentEscalationLeftToRight from "./fixtures/routing/incident-escalation-left-to-right.js";
 
 /** Readability regressions from normalized flowchart specs. */
 export const routingFixtures = {
@@ -168,4 +169,15 @@ export const rankGapFlowchart = parseFlowchartDiagram({
 	...incidentResponseRankGap,
 	type: "flowchart",
 	layout: { direction: "TB", edgeRouting: "orthogonal" },
+});
+
+/**
+ * The incident escalation flow asked for left to right, whose yes branch and
+ * Monitoring's line both run beneath the queue row into Resolve incident, as a
+ * generated sample drew it.
+ */
+export const leftToRightIncidentFlowchart = parseFlowchartDiagram({
+	...incidentEscalationLeftToRight,
+	type: "flowchart",
+	layout: { direction: "LR", edgeRouting: "orthogonal" },
 });
