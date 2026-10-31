@@ -18,8 +18,12 @@
 	"jsPlugins": [
 		// Provides @nx/enforce-module-boundaries; ESLint itself is not installed.
 		{ "name": "@nx", "specifier": "@nx/eslint-plugin" },
-		"./tools/oxlint/sketchi-plugin.ts"
+		"./tools/oxlint/sketchi-plugin.ts",
+		"@shadcn/lint",
+		"eslint-plugin-better-tailwindcss"
 	],
+	// Tailwind component contracts: docs/ui-style-contracts.md.
+	"extends": ["./tools/oxlint/ui-style-policy.json"],
 	"categories": {
 		"correctness": "error"
 	},
@@ -229,6 +233,7 @@
 				"packages/diagram/ui/**",
 				"packages/icons/catalog/**",
 				"packages/svg-excalidraw/**",
+				"packages/ui/**",
 				"tools/sketchi-generators/**"
 			],
 			"rules": {

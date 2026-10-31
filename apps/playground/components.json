@@ -13,8 +13,8 @@
 	"iconLibrary": "lucide",
 	"aliases": {
 		"components": "@/components",
-		"utils": "@/lib/utils",
-		"ui": "@/components/ui",
+		"utils": "@sketchi/ui/lib/utils",
+		"ui": "@sketchi/ui/components",
 		"lib": "@/lib",
 		"hooks": "@/hooks"
 	}

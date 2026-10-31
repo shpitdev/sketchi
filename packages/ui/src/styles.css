@@ -1,0 +1,80 @@
+/* =====================================================================
+   @sketchi/ui — shadcn semantic tokens on the shared "Drafting Studio"
+   palette. Every neutral, accent, line, radius, and shadow value lives in
+   packages/diagram/ui/src/theme.css; this file only maps shadcn's names onto
+   those tokens so the primitives in ./components inherit the same system.
+
+   Each Tailwind app imports this file first, then adds `@source` for its
+   own files. Automatic source detection is off so every app scans exactly
+   its own sources plus these primitives.
+   ===================================================================== */
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+/* The theme's element and .sk-* rules sit in the base layer so Tailwind
+   utilities, such as a Button's text colour, win over them. */
+@import "../../diagram/ui/src/theme.css" layer(base);
+
+@source "./components";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+	--radius: var(--r-md);
+
+	--background: var(--paper);
+	--foreground: var(--ink);
+	--card-foreground: var(--ink);
+	--popover: var(--card);
+	--popover-foreground: var(--ink);
+	--primary: var(--accent);
+	--primary-foreground: var(--paper-2);
+	--secondary: var(--paper-2);
+	--secondary-foreground: var(--ink);
+	--muted: var(--paper-2);
+	--muted-foreground: var(--ink-3);
+	--destructive: var(--danger);
+	--border: var(--line);
+	--input: var(--line-2);
+	--ring: var(--accent);
+}
+
+@theme inline {
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent-wash);
+	--color-accent-foreground: var(--accent-ink);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	/* The site's call-to-action fill: the strong mauve clears AA for button text. */
+	--color-brand: var(--accent-strong);
+	--color-brand-foreground: var(--card);
+	--shadow-brand: 0 8px 20px rgb(111 84 98 / 0.28);
+
+	--font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: "IBM Plex Mono", ui-monospace, monospace;
+	--font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+	--font-script: "Excalifont", cursive;
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+}

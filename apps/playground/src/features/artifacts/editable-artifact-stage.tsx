@@ -81,7 +81,7 @@ function EditorFrame({
 	headerLinks: ReactNode;
 }) {
 	return (
-		<main className="artifact-view artifact-view--edit">
+		<main className="artifact-view">
 			<header className="artifact-view__bar">
 				<StudioBrand />
 				<div className="artifact-view__actions">
