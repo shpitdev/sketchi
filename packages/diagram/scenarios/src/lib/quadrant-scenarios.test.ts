@@ -19,9 +19,9 @@ const failed = (id: string, diagram: QuadrantDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
-const backlog = scenario("effort-impact-quadrant").expectedDiagram;
-const eisenhower = scenario("eisenhower-matrix-quadrant").expectedDiagram;
-const positioning = scenario("competitor-positioning-quadrant").expectedDiagram;
+const backlog = scenario("effort-impact-quadrant-v2").expectedDiagram;
+const eisenhower = scenario("eisenhower-matrix-quadrant-v2").expectedDiagram;
+const positioning = scenario("competitor-positioning-quadrant-v2").expectedDiagram;
 const withPoint = (
 	diagram: QuadrantDiagram,
 	label: string,
@@ -33,12 +33,11 @@ const withPoint = (
 
 describe("prompt-grounded quadrant scenarios", () => {
 	it("covers a crowded challenge, membership only, a highlight and an empty quadrant", () => {
-		expect(
-			quadrantScenarios
-				.filter((entry) => !entry.id.endsWith("-v2"))
-				.map((entry) => entry.difficulty)
-				.toSorted(),
-		).toEqual(["challenge", "smoke", "standard"]);
+		expect(quadrantScenarios.map((entry) => entry.difficulty).toSorted()).toEqual([
+			"challenge",
+			"smoke",
+			"standard",
+		]);
 		expect(backlog.points).toHaveLength(15);
 		const quickWins = backlog.points.filter((point) => point.x < 0.5 && point.y > 0.5);
 		expect(quickWins).toHaveLength(8);
@@ -76,7 +75,7 @@ describe("prompt-grounded quadrant scenarios", () => {
 			},
 			points: eisenhower.points.map((point) => ({ ...point, x: 1 - point.x })),
 		};
-		expect(failed("eisenhower-matrix-quadrant", reversed)).toEqual([]);
+		expect(failed("eisenhower-matrix-quadrant-v2", reversed)).toEqual([]);
 		const backward: QuadrantDiagram = {
 			...backlog,
 			yAxis: { title: "Impact", low: "High impact", high: "Low impact" },
@@ -88,7 +87,7 @@ describe("prompt-grounded quadrant scenarios", () => {
 			},
 			points: backlog.points.map((point) => ({ ...point, y: 1 - point.y })),
 		};
-		expect(failed("effort-impact-quadrant", backward)).toEqual([]);
+		expect(failed("effort-impact-quadrant-v2", backward)).toEqual([]);
 	});
 
 	it("accepts the stated end words for an axis the prompt leaves unlabeled", () => {
@@ -97,19 +96,15 @@ describe("prompt-grounded quadrant scenarios", () => {
 			xAxis: { title: "Urgency", low: "Less urgent", high: "More urgent" },
 			yAxis: { title: "Importance", low: "Unimportant", high: "Very important" },
 		};
-		expect(failed("eisenhower-matrix-quadrant", worded)).toEqual([]);
+		expect(failed("eisenhower-matrix-quadrant-v2", worded)).toEqual([]);
 	});
 
-	it("takes the usual names for a matrix only when the prompt asks for them, each in its own corner", () => {
+	it("takes the usual names for a matrix the prompt asks for them by, each in its own corner", () => {
 		const backlogNamed: QuadrantDiagram = {
 			...backlog,
 			quadrants: { ...backlog.quadrants, topRight: "Big bets", bottomRight: "Money pit" },
 		};
 		expect(failed("effort-impact-quadrant-v2", backlogNamed)).toEqual([]);
-		expect(failed("effort-impact-quadrant", backlogNamed).toSorted()).toEqual([
-			"quadrant:major-projects",
-			"quadrant:thankless-tasks",
-		]);
 		const swapped: QuadrantDiagram = {
 			...backlog,
 			quadrants: { ...backlog.quadrants, topRight: "Money pit", bottomRight: "Big bets" },
@@ -128,11 +123,6 @@ describe("prompt-grounded quadrant scenarios", () => {
 			},
 		};
 		expect(failed("eisenhower-matrix-quadrant-v2", decided)).toEqual([]);
-		expect(failed("eisenhower-matrix-quadrant", decided).toSorted()).toEqual([
-			"quadrant:do-first",
-			"quadrant:eliminate",
-			"quadrant:schedule",
-		]);
 		expect(
 			failed("eisenhower-matrix-quadrant-v2", {
 				...decided,
@@ -156,7 +146,6 @@ describe("prompt-grounded quadrant scenarios", () => {
 			points: backlog.points.map((point) => ({ ...point, x: point.y, y: point.x })),
 		};
 		expect(failed("effort-impact-quadrant-v2", turned)).toEqual([]);
-		expect(failed("effort-impact-quadrant", turned)).toContain("axis:x");
 		const cheap: QuadrantDiagram = {
 			...positioning,
 			xAxis: { title: "Price", low: "Cheap", high: "Pricey" },
@@ -174,13 +163,13 @@ describe("prompt-grounded quadrant scenarios", () => {
 	it.each([
 		[
 			"a point moved across a midline",
-			"effort-impact-quadrant",
+			"effort-impact-quadrant-v2",
 			() => withPoint(backlog, "Dark mode", (point) => ({ ...point, x: 0.6 })),
 			["position:dark-mode"],
 		],
 		[
 			"two quadrant names swapped",
-			"effort-impact-quadrant",
+			"effort-impact-quadrant-v2",
 			() => ({
 				...backlog,
 				quadrants: {
@@ -193,7 +182,7 @@ describe("prompt-grounded quadrant scenarios", () => {
 		],
 		[
 			"an axis whose ends contradict the placements",
-			"effort-impact-quadrant",
+			"effort-impact-quadrant-v2",
 			() => ({ ...backlog, xAxis: { title: "Effort", low: "High effort", high: "Low effort" } }),
 			[
 				"quadrant:quick-wins",
@@ -201,41 +190,41 @@ describe("prompt-grounded quadrant scenarios", () => {
 				"quadrant:fill-ins",
 				"quadrant:thankless-tasks",
 				// Read through the stated ends, every point off the midline lands mirrored.
-				...scenario("effort-impact-quadrant")
+				...scenario("effort-impact-quadrant-v2")
 					.expectedDiagram.points.filter((point) => point.x !== 0.5)
 					.map(
 						(point) =>
-							`position:${Object.entries(scenario("effort-impact-quadrant").assertions.points).find(([, expected]) => expected.labels[0] === point.label)![0]}`,
+							`position:${Object.entries(scenario("effort-impact-quadrant-v2").assertions.points).find(([, expected]) => expected.labels[0] === point.label)![0]}`,
 					),
 			],
 		],
 		[
 			"an unstated axis end",
-			"effort-impact-quadrant",
+			"effort-impact-quadrant-v2",
 			() => ({ ...backlog, xAxis: { title: "Effort", low: "Easy", high: "Hard" } }),
 			["axis-ends:x"],
 		],
 		[
 			"the wrong variable on an axis",
-			"competitor-positioning-quadrant",
+			"competitor-positioning-quadrant-v2",
 			() => ({ ...positioning, xAxis: { ...positioning.xAxis, title: "Cost" } }),
 			["axis:x"],
 		],
 		[
 			"a task in the wrong quadrant",
-			"eisenhower-matrix-quadrant",
+			"eisenhower-matrix-quadrant-v2",
 			() => withPoint(eisenhower, "Browse conference swag", (point) => ({ ...point, y: 0.8 })),
 			["quadrant-of:conference-swag"],
 		],
 		[
 			"a task on a midline",
-			"eisenhower-matrix-quadrant",
+			"eisenhower-matrix-quadrant-v2",
 			() => withPoint(eisenhower, "Mentor the new hire", (point) => ({ ...point, x: 0.49 })),
 			["quadrant-of:mentor"],
 		],
 		[
 			"an invented item",
-			"competitor-positioning-quadrant",
+			"competitor-positioning-quadrant-v2",
 			() => ({
 				...positioning,
 				points: [...positioning.points, { label: "Notion", x: 0.3, y: 0.8 }],
@@ -244,7 +233,7 @@ describe("prompt-grounded quadrant scenarios", () => {
 		],
 		[
 			"a dropped item",
-			"competitor-positioning-quadrant",
+			"competitor-positioning-quadrant-v2",
 			() => ({
 				...positioning,
 				points: positioning.points.filter((point) => point.label !== "Jira"),
@@ -253,19 +242,19 @@ describe("prompt-grounded quadrant scenarios", () => {
 		],
 		[
 			"the highlight shared with a competitor",
-			"competitor-positioning-quadrant",
+			"competitor-positioning-quadrant-v2",
 			() => withPoint(positioning, "Trello", (point) => ({ ...point, group: "Our product" })),
 			["highlight:our-product"],
 		],
 		[
 			"no highlight at all",
-			"competitor-positioning-quadrant",
+			"competitor-positioning-quadrant-v2",
 			() => withPoint(positioning, "Our product", ({ group: _group, ...point }) => point),
 			["highlight:our-product"],
 		],
 		[
 			"a point in the quadrant the scores leave empty",
-			"competitor-positioning-quadrant",
+			"competitor-positioning-quadrant-v2",
 			() => withPoint(positioning, "ClickUp", (point) => ({ ...point, y: 0.45 })),
 			["position:clickup", "empty:budget-and-complex"],
 		],
@@ -311,7 +300,7 @@ describe("prompt-grounded quadrant scenarios", () => {
 				const client = yield* DiagramGenerationClient;
 				return yield* client.generate({
 					model: "fixture",
-					prompt: toDiagramGenerationPrompt(scenario("effort-impact-quadrant")),
+					prompt: toDiagramGenerationPrompt(scenario("effort-impact-quadrant-v2")),
 				});
 			}).pipe(Effect.provide(FixtureGenerationClientLayer)),
 		);
@@ -335,8 +324,8 @@ describe("prompt-grounded quadrant scenarios", () => {
 		);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
-		expect(failed("competitor-positioning-quadrant", candidate.diagram as QuadrantDiagram)).toEqual(
-			[],
-		);
+		expect(
+			failed("competitor-positioning-quadrant-v2", candidate.diagram as QuadrantDiagram),
+		).toEqual([]);
 	});
 });

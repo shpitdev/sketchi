@@ -15,8 +15,8 @@ const failed = (id: string, diagram: SankeyDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
-const budget = scenario("cloud-budget-sankey").expectedDiagram;
-const hiring = scenario("hiring-funnel-sankey").expectedDiagram;
+const budget = scenario("cloud-budget-sankey-v2").expectedDiagram;
+const hiring = scenario("hiring-funnel-sankey-v2").expectedDiagram;
 const withLink = (
 	diagram: SankeyDiagram,
 	source: string,
@@ -32,33 +32,27 @@ const withLink = (
 describe("prompt-grounded Sankey scenarios", () => {
 	it("covers a sliver-heavy budget, crossing traffic, a funnel and a five-column energy flow", () => {
 		expect(sankeyScenarios.map((entry) => entry.id)).toEqual([
-			"cloud-budget-sankey",
 			"cloud-budget-sankey-v2",
-			"website-traffic-sankey",
 			"website-traffic-sankey-v2",
-			"hiring-funnel-sankey",
 			"hiring-funnel-sankey-v2",
-			"city-energy-sankey",
 			"city-energy-sankey-v2",
 		]);
-		expect(scenario("cloud-budget-sankey").difficulty).toBe("challenge");
+		expect(scenario("cloud-budget-sankey-v2").difficulty).toBe("challenge");
 		expect(
 			budget.links
 				.map((link) => link.value)
 				.toSorted((a, b) => a - b)
 				.slice(0, 3),
 		).toEqual([2, 3, 4]);
-		expect(scenario("website-traffic-sankey").expectedDiagram.links).toHaveLength(15);
+		expect(scenario("website-traffic-sankey-v2").expectedDiagram.links).toHaveLength(15);
 		expect(hiring.links).toHaveLength(10);
-		// Every fact a check scores is in the prompt: in prose, or as a pasted CSV row.
+		// Every fact a check scores is in the prompt, as a pasted CSV row.
 		for (const entry of sankeyScenarios) {
 			const label = (id: string) =>
 				entry.expectedDiagram.nodes.find((node) => node.id === id)!.label;
 			for (const link of entry.expectedDiagram.links)
 				expect(entry.prompt, `${entry.id} ${link.source}->${link.target}`).toContain(
-					entry.tags.includes("real-voice")
-						? `${label(link.source)},${label(link.target)},${link.value}`
-						: link.value.toLocaleString("en-US"),
+					`${label(link.source)},${label(link.target)},${link.value}`,
 				);
 		}
 	});
@@ -82,12 +76,12 @@ describe("prompt-grounded Sankey scenarios", () => {
 				}))
 				.toReversed(),
 		};
-		expect(failed("cloud-budget-sankey", renamed)).toEqual([]);
-		expect(failed("cloud-budget-sankey", { ...budget, unit: "thousand dollars" })).toEqual([]);
-		expect(failed("cloud-budget-sankey", { ...budget, unit: "€k" })).toEqual(["unit"]);
+		expect(failed("cloud-budget-sankey-v2", renamed)).toEqual([]);
+		expect(failed("cloud-budget-sankey-v2", { ...budget, unit: "thousand dollars" })).toEqual([]);
+		expect(failed("cloud-budget-sankey-v2", { ...budget, unit: "€k" })).toEqual(["unit"]);
 		// Units naming Object members read as unknown units, never as accepted ones.
 		for (const unit of ["constructor", "__proto__", "toString"])
-			expect(failed("cloud-budget-sankey", { ...budget, unit }), unit).toEqual(["unit"]);
+			expect(failed("cloud-budget-sankey-v2", { ...budget, unit }), unit).toEqual(["unit"]);
 	});
 
 	it("accepts one drop-off per stage as the stated shared one", () => {
@@ -115,7 +109,7 @@ describe("prompt-grounded Sankey scenarios", () => {
 				return { ...link, target };
 			}),
 		};
-		expect(failed("hiring-funnel-sankey", perStage)).toEqual([]);
+		expect(failed("hiring-funnel-sankey-v2", perStage)).toEqual([]);
 	});
 
 	it.each([
@@ -182,7 +176,7 @@ describe("prompt-grounded Sankey scenarios", () => {
 			["node:finance", "flow:finance->managed-databases", "flows-exact"],
 		],
 	])("fails %s on the stated check", (_, change, expected) => {
-		expect(failed("cloud-budget-sankey", change()).toSorted()).toEqual(expected.toSorted());
+		expect(failed("cloud-budget-sankey-v2", change()).toSorted()).toEqual(expected.toSorted());
 	});
 
 	it("reads the drawing: a dropped band, a wrong width or a covered label fails the scene checks", () => {
@@ -238,12 +232,12 @@ describe("prompt-grounded Sankey scenarios", () => {
 				const client = yield* DiagramGenerationClient;
 				return yield* client.generate({
 					model: "fixture",
-					prompt: toDiagramGenerationPrompt(scenario("website-traffic-sankey")),
+					prompt: toDiagramGenerationPrompt(scenario("website-traffic-sankey-v2")),
 				});
 			}).pipe(Effect.provide(FixtureGenerationClientLayer)),
 		);
 		expect(candidate.error).toBeUndefined();
-		expect(candidate.diagram).toEqual(scenario("website-traffic-sankey").expectedDiagram);
+		expect(candidate.diagram).toEqual(scenario("website-traffic-sankey-v2").expectedDiagram);
 	});
 
 	it("grades a buildSankey receipt from an MCP execute", () => {
@@ -261,6 +255,6 @@ describe("prompt-grounded Sankey scenarios", () => {
 		);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
-		expect(failed("cloud-budget-sankey", candidate.diagram as SankeyDiagram)).toEqual([]);
+		expect(failed("cloud-budget-sankey-v2", candidate.diagram as SankeyDiagram)).toEqual([]);
 	});
 });

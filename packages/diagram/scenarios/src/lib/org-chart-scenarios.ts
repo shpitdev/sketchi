@@ -458,17 +458,6 @@ const COMMERCIAL_ORGANIZATION_PEOPLE: readonly PersonDefinition[] = [
 
 const orgChartScenarioDefinitions: readonly OrgChartScenarioDefinition[] = [
 	{
-		id: "startup-team-org-chart",
-		title: "Lumen Labs team",
-		difficulty: "smoke",
-		tags: ["org-chart", "startup", "small-team"],
-		description:
-			"A twelve-person startup: a CEO, three leads under her, and their teams of two to four.",
-		prompt:
-			"Draw an org chart of our 12-person startup, Lumen Labs. Maya Chen is the CEO. Reporting to Maya are Jordan Patel, CTO; Priya Nair, Head of Product; and Sam Rivera, Head of Growth. Reporting to Jordan are Alex Kim, Senior Backend Engineer; Taylor Brooks, Frontend Engineer; Chris Morgan, DevOps Engineer; and Jamie Lee, ML Engineer. Reporting to Priya are Riley Adams, Product Designer, and Casey Wong, Product Manager. Reporting to Sam are Morgan Diaz, Marketing Lead, and Avery Scott, Sales Lead.",
-		people: LUMEN_LABS_PEOPLE,
-	},
-	{
 		id: "startup-team-org-chart-v2",
 		title: "Lumen Labs team",
 		difficulty: "smoke",
@@ -493,17 +482,6 @@ const orgChartScenarioDefinitions: readonly OrgChartScenarioDefinition[] = [
 			"Avery Scott, Sales Lead, Sam Rivera",
 		].join("\n"),
 		people: LUMEN_LABS_PEOPLE,
-	},
-	{
-		id: "engineering-department-org-chart",
-		title: "Engineering department",
-		difficulty: "standard",
-		tags: ["org-chart", "department", "wide-team", "three-levels"],
-		description:
-			"A 25-person engineering department over three levels: a VP, a staff engineer and three directors, one of them with eight engineers.",
-		prompt:
-			"Draw the org chart of our Engineering department, 25 people in all. Elena Petrova, VP of Engineering, leads it. Reporting to Elena are Marcus Johnson, Director of Platform; Aisha Bello, Director of Product Engineering; Tomás García, Director of Infrastructure; and Wei Zhang, Staff Engineer. Reporting to Marcus are Ivan Novak, Senior Engineer; Hannah Schmidt, Senior Engineer; Diego Ramos, Engineer; Leila Haddad, Engineer; Owen Price, Engineer; and Yuki Tanaka, Engineer. Aisha leads the largest team, eight engineers: Sofia Rossi, Senior Engineer; Kwame Mensah, Senior Engineer; Laura Kowalski, Engineer; Ben Okafor, Engineer; Mei Lin, Engineer; Noah Fischer, Engineer; Zara Ahmed, Engineer; and Lucas Silva, Associate Engineer. Reporting to Tomás are Anna Berg, Site Reliability Lead; Raj Iyer, Site Reliability Engineer; Chloe Martin, Network Engineer; Pavel Sokolov, Database Administrator; Grace Obi, Security Engineer; and Felix Wagner, Cloud Engineer.",
-		people: ENGINEERING_DEPARTMENT_PEOPLE,
 	},
 	{
 		id: "engineering-department-org-chart-v2",
@@ -545,18 +523,6 @@ const orgChartScenarioDefinitions: readonly OrgChartScenarioDefinition[] = [
 		people: ENGINEERING_DEPARTMENT_PEOPLE,
 	},
 	{
-		id: "leadership-dotted-line-org-chart",
-		title: "Northwind Health leadership",
-		difficulty: "standard",
-		tags: ["org-chart", "assistant", "dotted-line", "matrix"],
-		description:
-			"A hospital group's leadership: a CEO with an executive assistant, three chiefs and their directors, and a director with a dotted-line report to another chief for a stated scope.",
-		prompt:
-			"Draw the leadership org chart of Northwind Health. Dr. Sarah Okafor is the Chief Executive Officer, and Daniel Kim is her Executive Assistant. Reporting to Sarah are Michael Torres, Chief Financial Officer; Linda Park, Chief Operating Officer; and Rahul Mehta, Chief Technology Officer. Reporting to Michael are Grace Liu, Controller, and Owen Hughes, FP&A Manager. Reporting to Linda are Fatima Hassan, Director of Clinical Operations, and Ben Carter, Director of Facilities. Reporting to Rahul are Nina Rossi, Director of IT, and Victor Alvarez, Security Lead. Nina Rossi also has a dotted-line report to Linda Park for clinical systems.",
-		people: NORTHWIND_LEADERSHIP_PEOPLE,
-		dottedLines: [["nina", "linda", "clinical systems"]],
-	},
-	{
 		id: "leadership-dotted-line-org-chart-v2",
 		title: "Northwind Health leadership",
 		difficulty: "standard",
@@ -583,18 +549,6 @@ const orgChartScenarioDefinitions: readonly OrgChartScenarioDefinition[] = [
 		].join("\n"),
 		people: NORTHWIND_LEADERSHIP_PEOPLE,
 		dottedLines: [["nina", "linda", "clinical systems"]],
-	},
-	{
-		id: "sales-regions-org-chart",
-		title: "Commercial organization",
-		difficulty: "standard",
-		tags: ["org-chart", "departments", "regions"],
-		description:
-			"A commercial organization of fourteen grouped into Sales, Marketing and Customer Success regions under a Chief Revenue Officer.",
-		prompt:
-			"Draw an org chart of our commercial organization with each department grouped into its own region. Olivia Grant is the Chief Revenue Officer. Three department heads report to her: Ethan Brooks, VP of Sales, in Sales; Hana Sato, VP of Marketing, in Marketing; and Carlos Mendes, VP of Customer Success, in Customer Success. In Sales, Ethan's reports are Mia Johansson, Enterprise Account Executive; Liam O'Brien, Mid-Market Account Executive; Ava Kowalczyk, Sales Development Manager; and Noor Rahman, Sales Engineer. Ava manages Jack Wilson, Sales Development Representative. In Marketing, Hana's reports are Isla Murphy, Content Marketing Manager; Leo Martins, Demand Generation Manager; and Ruby Chen, Product Marketing Manager. In Customer Success, Carlos's reports are Samuel Adeyemi, Customer Success Manager, and Elif Yilmaz, Support Lead.",
-		groupByDepartment: true,
-		people: COMMERCIAL_ORGANIZATION_PEOPLE,
 	},
 	{
 		id: "sales-regions-org-chart-v2",

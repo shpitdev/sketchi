@@ -437,7 +437,7 @@ function defineErScenario(definition: ErScenarioDefinition): ErScenario {
 	};
 }
 
-// Tables the prose prompt and its pasted-DDL twin state alike.
+// Tables the pasted DDL states.
 const shopEntities: readonly EntityDefinition[] = [
 	["customers", ["customers", "customer"], ["id uuid PK", "email text UK", "name text"]],
 	[
@@ -531,22 +531,6 @@ const saasWorkspaceEntities: readonly EntityDefinition[] = [
 
 const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 	{
-		id: "shop-orders-er",
-		title: "Shop orders",
-		difficulty: "standard",
-		tags: ["er", "schema", "foreign-keys", "composite-key"],
-		description:
-			"A small shop schema: customers place orders of products through order items with a composite key, and a nullable timestamp.",
-		prompt:
-			"Draw an ER diagram of a small online shop's database. customers has id (uuid, primary key), email (text, unique) and name (text). products has id (uuid, primary key), sku (text, unique), name (text) and price (numeric(10,2)). orders has id (uuid, primary key), customer_id (uuid, foreign key to customers.id), placed_at (timestamptz) and shipped_at (timestamptz, nullable). order_items has order_id (uuid, foreign key to orders.id) and product_id (uuid, foreign key to products.id), which together form its primary key, and quantity (int). A customer places zero or many orders, and each order belongs to exactly one customer. An order has one or many order items, and each order item belongs to exactly one order. A product appears in zero or many order items, and each order item refers to exactly one product.",
-		entities: shopEntities,
-		relationships: [
-			["customers.id", "orders.customer_id", "one", "zero-or-many", "places"],
-			["orders.id", "order_items.order_id", "one", "one-or-many"],
-			["products.id", "order_items.product_id", "one", "zero-or-many"],
-		],
-	},
-	{
 		id: "shop-orders-er-v2",
 		title: "Shop orders",
 		difficulty: "standard",
@@ -573,21 +557,6 @@ const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 		],
 	},
 	{
-		id: "course-enrollment-er",
-		title: "Course enrollment",
-		difficulty: "smoke",
-		tags: ["er", "many-to-many", "join-table"],
-		description:
-			"Students and courses joined many-to-many through an enrollments table with a composite key and a nullable grade.",
-		prompt:
-			"ER diagram for course enrollment. students has id (int, primary key), name (text) and email (text, unique). courses has id (int, primary key), code (text, unique) and title (text). Students and courses are many-to-many through enrollments: enrollments has student_id (int, foreign key to students.id) and course_id (int, foreign key to courses.id), which together form its primary key, plus enrolled_on (date) and grade (text, nullable). A student has zero or many enrollments, and each enrollment belongs to exactly one student. A course has zero or many enrollments, and each enrollment is for exactly one course.",
-		entities: courseEntities,
-		relationships: [
-			["students.id", "enrollments.student_id", "one", "zero-or-many"],
-			["courses.id", "enrollments.course_id", "one", "zero-or-many"],
-		],
-	},
-	{
 		id: "course-enrollment-er-v2",
 		title: "Course enrollment",
 		difficulty: "smoke",
@@ -606,21 +575,6 @@ const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 		relationships: [
 			["students.id", "enrollments.student_id", "one", ANY_MANY],
 			["courses.id", "enrollments.course_id", "one", ANY_MANY],
-		],
-	},
-	{
-		id: "org-chart-er",
-		title: "Org chart",
-		difficulty: "standard",
-		tags: ["er", "self-reference", "optional"],
-		description:
-			"Employees who report to an optional manager in the same table, and work in a department.",
-		prompt:
-			"Draw an ER diagram of an org chart. employees has id (int, primary key), manager_id (int, nullable, foreign key to employees.id), department_id (int, foreign key to departments.id) and name (text). departments has id (int, primary key) and name (text, unique). Each employee reports to zero or one manager, who is another employee, and a manager has zero or many direct reports. Each employee works in exactly one department, and a department has one or many employees.",
-		entities: orgChartEntities,
-		relationships: [
-			["employees.manager_id", "employees.id", "zero-or-many", "zero-or-one", "reports to"],
-			["departments.id", "employees.department_id", "one", "one-or-many"],
 		],
 	},
 	{
@@ -644,34 +598,6 @@ const erScenarioDefinitions: readonly ErScenarioDefinition[] = [
 		relationships: [
 			["employees.manager_id", "employees.id", ANY_MANY, "zero-or-one", "reports to"],
 			["departments.id", "employees.department_id", "one", "one-or-many"],
-		],
-	},
-	{
-		id: "saas-workspace-er",
-		title: "SaaS workspace",
-		difficulty: "challenge",
-		tags: ["er", "large", "many-to-many", "optional"],
-		description:
-			"A twelve-table SaaS schema: organizations hold members, projects, tasks with labels and comments, a subscription with invoices, and API keys.",
-		prompt:
-			"Draw an ER diagram of a SaaS workspace database with exactly these twelve tables. organizations has id (uuid, primary key) and name (text). users has id (uuid, primary key), email (text, unique) and name (text). memberships has organization_id (uuid, foreign key to organizations.id) and user_id (uuid, foreign key to users.id), which together form its primary key, and role (text). projects has id (uuid, primary key), organization_id (uuid, foreign key to organizations.id) and name (text). tasks has id (uuid, primary key), project_id (uuid, foreign key to projects.id), assignee_id (uuid, nullable, foreign key to users.id), title (text) and due_on (date, nullable). comments has id (uuid, primary key), task_id (uuid, foreign key to tasks.id), author_id (uuid, foreign key to users.id) and body (text). labels has id (uuid, primary key), organization_id (uuid, foreign key to organizations.id) and name (text). task_labels has task_id (uuid, foreign key to tasks.id) and label_id (uuid, foreign key to labels.id), which together form its primary key. plans has id (uuid, primary key), name (text, unique) and monthly_price (numeric). subscriptions has id (uuid, primary key), organization_id (uuid, unique, foreign key to organizations.id), plan_id (uuid, foreign key to plans.id) and renews_on (date). invoices has id (uuid, primary key), subscription_id (uuid, foreign key to subscriptions.id), amount (numeric) and paid_at (timestamptz, nullable). api_keys has id (uuid, primary key), organization_id (uuid, foreign key to organizations.id), created_by (uuid, foreign key to users.id) and token_hash (text, unique). Cardinalities: an organization has one or many memberships, and a user has zero or many memberships; each membership belongs to exactly one organization and exactly one user. An organization has zero or many projects, labels and API keys, each of which belongs to exactly one organization. A project has zero or many tasks, and each task belongs to exactly one project. A task has zero or one assignee, and a user is assigned zero or many tasks. A task has zero or many comments, and each comment is on exactly one task; a user writes zero or many comments, and each comment has exactly one author. A task has zero or many task labels and a label has zero or many task labels; each task label joins exactly one task and exactly one label. An organization has zero or one subscription, and each subscription belongs to exactly one organization. A plan has zero or many subscriptions, and each subscription is on exactly one plan. A subscription has zero or many invoices, and each invoice belongs to exactly one subscription. A user creates zero or many API keys, and each API key was created by exactly one user.",
-		entities: saasWorkspaceEntities,
-		relationships: [
-			["organizations.id", "memberships.organization_id", "one", "one-or-many"],
-			["users.id", "memberships.user_id", "one", "zero-or-many"],
-			["organizations.id", "projects.organization_id", "one", "zero-or-many"],
-			["projects.id", "tasks.project_id", "one", "zero-or-many"],
-			["users.id", "tasks.assignee_id", "zero-or-one", "zero-or-many"],
-			["tasks.id", "comments.task_id", "one", "zero-or-many"],
-			["users.id", "comments.author_id", "one", "zero-or-many"],
-			["organizations.id", "labels.organization_id", "one", "zero-or-many"],
-			["tasks.id", "task_labels.task_id", "one", "zero-or-many"],
-			["labels.id", "task_labels.label_id", "one", "zero-or-many"],
-			["organizations.id", "subscriptions.organization_id", "one", "zero-or-one"],
-			["plans.id", "subscriptions.plan_id", "one", "zero-or-many"],
-			["subscriptions.id", "invoices.subscription_id", "one", "zero-or-many"],
-			["organizations.id", "api_keys.organization_id", "one", "zero-or-many"],
-			["users.id", "api_keys.created_by", "one", "zero-or-many"],
 		],
 	},
 	{

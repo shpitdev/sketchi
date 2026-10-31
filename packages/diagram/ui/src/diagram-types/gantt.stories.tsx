@@ -30,17 +30,17 @@ export const ReleasePlan: Story = {};
 
 /** Week ticks, milestones, and dependencies routed around the bars between them. */
 export const AppRelease: Story = {
-	args: { diagram: scenarioDiagram("app-release-gantt") },
+	args: { diagram: scenarioDiagram("app-release-gantt-v2") },
 };
 
 /** Names indented under phases, with phase spans in the date column, and a Today line. */
 export const PhasesAndToday: Story = {
-	args: { diagram: scenarioDiagram("cafe-fit-out-gantt") },
+	args: { diagram: scenarioDiagram("cafe-fit-out-gantt-v2") },
 };
 
 /** 28 tasks over seven months: month ticks with weekly gridlines, and the axis repeated below. */
 export const LongPlan: Story = {
-	args: { diagram: scenarioDiagram("data-platform-migration-gantt") },
+	args: { diagram: scenarioDiagram("data-platform-migration-gantt-v2") },
 };
 
 /** A multi-year roadmap reads in quarters, and long names wrap in the name column. */

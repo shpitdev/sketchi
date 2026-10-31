@@ -486,15 +486,6 @@ const DATA_PLATFORM_TASKS: readonly ScenarioTaskInput[] = [
 
 export const ganttScenarios: readonly GanttScenario[] = [
 	scenario(
-		"app-release-gantt",
-		"Mobile app 3.0 release",
-		"Draw a Gantt chart of our mobile app 3.0 release. Requirements sign-off runs 2026-04-06 to 2026-04-10 and is 100% done. UX design takes 8 days starting 2026-04-13, after requirements sign-off. Backend API runs 2026-04-13 to 2026-04-30, after requirements sign-off, and is 40% done. iOS app takes 15 days starting 2026-04-21, after UX design. Android app runs 2026-04-21 to 2026-05-08, after UX design. Integration testing takes 5 days starting 2026-05-11, after backend API, iOS app and Android app. Beta release is a milestone on 2026-05-18, after integration testing. App store review runs 2026-05-18 to 2026-05-22, after beta release. Launch is a milestone on 2026-05-26, after app store review.",
-		{
-			tags: ["dependencies", "milestones", "progress"],
-			tasks: APP_RELEASE_TASKS,
-		},
-	),
-	scenario(
 		"app-release-gantt-v2",
 		"Mobile app 3.0 release",
 		[
@@ -514,16 +505,6 @@ export const ganttScenarios: readonly GanttScenario[] = [
 		{
 			tags: ["dependencies", "milestones", "progress", "real-voice"],
 			tasks: APP_RELEASE_TASKS,
-		},
-	),
-	scenario(
-		"cafe-fit-out-gantt",
-		"Harbor Street café fit-out",
-		'Make a Gantt chart of the Harbor Street café fit-out in four phases, and mark today as 2026-07-15. Phase "Permits": Building permit runs 2026-06-01 to 2026-06-19; Book inspection takes 3 days starting 2026-06-15. Phase "Demolition": Strip-out runs 2026-06-22 to 2026-06-26, after building permit; Waste removal takes 2 days starting 2026-06-29, after strip-out. Phase "Build-out": Plumbing rough-in runs 2026-06-29 to 2026-07-10, after strip-out; Electrical rough-in runs 2026-06-29 to 2026-07-08, after strip-out; Drywall takes 7 days starting 2026-07-13, after plumbing rough-in and electrical rough-in; Kitchen install runs 2026-07-20 to 2026-07-31, after drywall. Phase "Opening": Health inspection is a milestone on 2026-08-03, after kitchen install and book inspection; Soft opening is a milestone on 2026-08-07, after health inspection.',
-		{
-			tags: ["phases", "milestones", "today"],
-			today: "2026-07-15",
-			tasks: CAFE_FIT_OUT_TASKS,
 		},
 	),
 	scenario(
@@ -548,16 +529,6 @@ export const ganttScenarios: readonly GanttScenario[] = [
 			tags: ["phases", "milestones", "today", "real-voice"],
 			today: "2026-07-15",
 			tasks: CAFE_FIT_OUT_TASKS,
-		},
-	),
-	scenario(
-		"data-platform-migration-gantt",
-		"Data platform migration",
-		'Draw a Gantt chart of our data platform migration, grouped into six phases. Phase "Discovery": Inventory data sources runs 2026-01-05 to 2026-01-16; Stakeholder interviews run 2026-01-05 to 2026-01-23; Target architecture takes 10 days starting 2026-01-26, after inventory data sources and stakeholder interviews; Architecture approved is a milestone on 2026-02-06, after target architecture. Phase "Foundation": Cloud accounts runs 2026-02-09 to 2026-02-13, after architecture approved; Network and VPN runs 2026-02-16 to 2026-02-27, after cloud accounts; Identity and access takes 10 days starting 2026-02-16, after cloud accounts; Data lake storage runs 2026-03-02 to 2026-03-13, after network and VPN and identity and access; Orchestration runs 2026-03-02 to 2026-03-20, after network and VPN; Monitoring takes 7 days starting 2026-03-16, after data lake storage; Foundation ready is a milestone on 2026-03-23, after orchestration and monitoring. Phase "Wave 1": Migrate CRM runs 2026-03-23 to 2026-04-10, after foundation ready; Migrate billing runs 2026-03-30 to 2026-04-17, after foundation ready; Finance reports take 15 days starting 2026-04-13, after migrate CRM; Wave 1 validation runs 2026-04-20 to 2026-04-30, after migrate billing; Wave 1 sign-off is a milestone on 2026-05-01, after finance reports and wave 1 validation. Phase "Wave 2": Migrate catalog runs 2026-05-04 to 2026-05-22, after wave 1 sign-off; Migrate order history runs 2026-05-04 to 2026-06-05, after wave 1 sign-off; Migrate clickstream takes 20 days starting 2026-05-11, after wave 1 sign-off; Marketing dashboards run 2026-06-01 to 2026-06-12, after migrate clickstream; Wave 2 validation runs 2026-06-08 to 2026-06-19, after migrate catalog and migrate order history. Phase "Cutover": Freeze legacy writes is a milestone on 2026-06-22, after wave 2 validation and marketing dashboards; Final delta sync takes 3 days starting 2026-06-22, after freeze legacy writes; Switch traffic runs 2026-06-25 to 2026-06-26, after final delta sync; Go-live is a milestone on 2026-06-29, after switch traffic. Phase "Decommission": Archive legacy data runs 2026-06-29 to 2026-07-17, after go-live; Shut down legacy cluster takes 5 days starting 2026-07-20, after archive legacy data; Project closed is a milestone on 2026-07-31, after shut down legacy cluster.',
-		{
-			tags: ["phases", "dependencies", "milestones", "long"],
-			difficulty: "challenge",
-			tasks: DATA_PLATFORM_TASKS,
 		},
 	),
 	scenario(

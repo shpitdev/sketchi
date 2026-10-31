@@ -30,15 +30,15 @@ export const Ready: Story = {};
 
 /** Associations with multiplicities and roles, a composition, an aggregation and an enum. */
 export const DomainModel: Story = {
-	args: { diagram: scenarioDiagram("online-shop-domain-class") },
+	args: { diagram: scenarioDiagram("online-shop-domain-class-v2") },
 };
 
 /** Interfaces realized by concrete classes, a navigable association and a named dependency. */
 export const ObserverPattern: Story = {
-	args: { diagram: scenarioDiagram("observer-pattern-class") },
+	args: { diagram: scenarioDiagram("observer-pattern-class-v2") },
 };
 
 /** Fifteen classes in rows, two hierarchies and the associations between them. */
 export const LargeModel: Story = {
-	args: { diagram: scenarioDiagram("library-system-class") },
+	args: { diagram: scenarioDiagram("library-system-class-v2") },
 };

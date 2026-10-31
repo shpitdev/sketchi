@@ -8,7 +8,7 @@ import {
 	type TimelineScenario,
 } from "./timeline-scenarios.js";
 
-const lunar = timelineScenarios.find((scenario) => scenario.id === "lunar-mission-timeline")!;
+const lunar = timelineScenarios.find((scenario) => scenario.id === "lunar-mission-timeline-v2")!;
 const description = lunar.assertions.events[6]!.description!;
 const descriptionCheck = (diagram: TimelineDiagram, scenario: TimelineScenario = lunar) =>
 	timelineScenarioChecks(scenario, diagram).find((check) => check.id === "timeline-event:7");

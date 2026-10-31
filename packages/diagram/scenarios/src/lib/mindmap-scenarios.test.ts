@@ -44,26 +44,19 @@ const depth = (topic: MindmapTopicTree): number => 1 + Math.max(0, ...children(t
 
 describe("prompt-grounded mindmap scenarios", () => {
 	it("covers a brainstorm, three-level notes, a wide plan and two large maps", () => {
-		const sizes = mindmapScenarios
-			.filter((entry) => !entry.id.endsWith("-v2"))
-			.map((entry) => ({
-				id: entry.id,
-				topics: entry.expectedDiagram.nodes.length,
-				main: entry.expectedDiagram.edges.filter((edge) => edge.metadata.depth === 1).length,
-				levels: depth(treeOf(entry.expectedDiagram)) - 1,
-			}));
+		const sizes = mindmapScenarios.map((entry) => ({
+			id: entry.id,
+			topics: entry.expectedDiagram.nodes.length,
+			main: entry.expectedDiagram.edges.filter((edge) => edge.metadata.depth === 1).length,
+			levels: depth(treeOf(entry.expectedDiagram)) - 1,
+		}));
 		expect(sizes).toEqual([
-			{ id: "team-offsite-mindmap", topics: 14, main: 4, levels: 2 },
-			{ id: "photosynthesis-study-mindmap", topics: 22, main: 3, levels: 3 },
-			{ id: "app-launch-planning-mindmap", topics: 24, main: 7, levels: 2 },
-			{ id: "ml-roadmap-mindmap", topics: 41, main: 7, levels: 3 },
-			{ id: "animal-kingdom-mindmap", topics: 42, main: 2, levels: 5 },
+			{ id: "team-offsite-mindmap-v2", topics: 14, main: 4, levels: 2 },
+			{ id: "photosynthesis-study-mindmap-v2", topics: 22, main: 3, levels: 3 },
+			{ id: "app-launch-planning-mindmap-v2", topics: 24, main: 7, levels: 2 },
+			{ id: "ml-roadmap-mindmap-v2", topics: 41, main: 7, levels: 3 },
+			{ id: "animal-kingdom-mindmap-v2", topics: 42, main: 2, levels: 5 },
 		]);
-		// Each real-voice v2 asks for the same map as its original.
-		for (const entry of mindmapScenarios.filter((candidate) => candidate.id.endsWith("-v2")))
-			expect(entry.expectedDiagram.nodes.map((node) => node.label)).toEqual(
-				scenario(entry.id.slice(0, -"-v2".length)).expectedDiagram.nodes.map((node) => node.label),
-			);
 	});
 
 	for (const entry of mindmapScenarios) {
@@ -100,7 +93,7 @@ describe("prompt-grounded mindmap scenarios", () => {
 
 	it("checks each topic's parent", () => {
 		// Hiking moved from Activities to Food.
-		const moved = edited("team-offsite-mindmap", (tree) => ({
+		const moved = edited("team-offsite-mindmap-v2", (tree) => ({
 			...tree,
 			children: children(tree).map((branch) =>
 				branch.label === "Activities"
@@ -110,16 +103,16 @@ describe("prompt-grounded mindmap scenarios", () => {
 						: branch,
 			),
 		}));
-		expect(failed("team-offsite-mindmap", moved)).toEqual(["topic-parent:hiking"]);
+		expect(failed("team-offsite-mindmap-v2", moved)).toEqual(["topic-parent:hiking"]);
 	});
 
 	it("rejects invented and duplicated topics", () => {
-		const invented = edited("team-offsite-mindmap", (tree) => ({
+		const invented = edited("team-offsite-mindmap-v2", (tree) => ({
 			...tree,
 			children: [...children(tree), { label: "Weather backup plan" }],
 		}));
-		expect(failed("team-offsite-mindmap", invented)).toEqual(["no-invented-topics"]);
-		const twice = edited("team-offsite-mindmap", (tree) => ({
+		expect(failed("team-offsite-mindmap-v2", invented)).toEqual(["no-invented-topics"]);
+		const twice = edited("team-offsite-mindmap-v2", (tree) => ({
 			...tree,
 			children: children(tree).map((branch) =>
 				branch.label === "Food"
@@ -127,11 +120,11 @@ describe("prompt-grounded mindmap scenarios", () => {
 					: branch,
 			),
 		}));
-		expect(failed("team-offsite-mindmap", twice)).toEqual(["no-invented-topics"]);
+		expect(failed("team-offsite-mindmap-v2", twice)).toEqual(["no-invented-topics"]);
 	});
 
 	it("matches reworded labels and the central topic", () => {
-		const reworded = edited("photosynthesis-study-mindmap", (tree) => ({
+		const reworded = edited("photosynthesis-study-mindmap-v2", (tree) => ({
 			...tree,
 			label: "Photosynthesis study notes",
 			children: children(tree).map((branch) =>
@@ -140,19 +133,19 @@ describe("prompt-grounded mindmap scenarios", () => {
 					: branch,
 			),
 		}));
-		expect(failed("photosynthesis-study-mindmap", reworded)).toEqual([]);
-		const renamed = edited("photosynthesis-study-mindmap", (tree) => ({
+		expect(failed("photosynthesis-study-mindmap-v2", reworded)).toEqual([]);
+		const renamed = edited("photosynthesis-study-mindmap-v2", (tree) => ({
 			...tree,
 			label: "Plants",
 		}));
-		expect(failed("photosynthesis-study-mindmap", renamed)).toEqual(["root"]);
+		expect(failed("photosynthesis-study-mindmap-v2", renamed)).toEqual(["root"]);
 	});
 
 	it("keeps topics that share words apart", () => {
 		// Without the Regression grouping, its two regressions sit straight under
 		// Supervised learning: the grouping is missing and they are misplaced, but
 		// neither stands in for Logistic regression.
-		const flattened = edited("ml-roadmap-mindmap", (tree) => ({
+		const flattened = edited("ml-roadmap-mindmap-v2", (tree) => ({
 			...tree,
 			children: children(tree).map((branch) =>
 				branch.label === "Supervised learning"
@@ -165,14 +158,14 @@ describe("prompt-grounded mindmap scenarios", () => {
 					: branch,
 			),
 		}));
-		const failures = failed("ml-roadmap-mindmap", flattened);
+		const failures = failed("ml-roadmap-mindmap-v2", flattened);
 		expect(failures).toContain("topic-parent:linear-regression");
 		expect(failures).not.toContain("topic:logistic-regression");
 		expect(failures).not.toContain("topic-parent:logistic-regression");
 	});
 
 	it("grades a Code Mode build from its nested normalized spec", () => {
-		const entry = scenario("team-offsite-mindmap");
+		const entry = scenario("team-offsite-mindmap-v2");
 		const normalize = (topic: MindmapTopicTree, path: number[]): unknown => ({
 			id: `topic-${path.join("-")}`,
 			label: topic.label,

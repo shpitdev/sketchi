@@ -12,10 +12,10 @@ const replays = retainedReplays.map(({ id, spec }) => ({
 }));
 
 const ids = [
-	"grouped-expense-approval",
-	"three-zone-request-path",
-	"mixed-fulfilment-groups",
-].flatMap((id) => [id, `${id}-v2`]);
+	"grouped-expense-approval-v2",
+	"three-zone-request-path-v2",
+	"mixed-fulfilment-groups-v2",
+];
 
 function failed(scenarioId: string, candidate: unknown) {
 	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), candidate)
@@ -31,7 +31,7 @@ describe("group scenarios", () => {
 	// Exact normalized specs from the Sonnet-fidelity replays and Frontierclimb
 	// eval-20261019-202040-pyx1; the ids retain their archive provenance.
 	it.each(replays)("accepts stated membership in retained replay $id", ({ spec }) => {
-		expect(failed("grouped-expense-approval", specToFlowchartCandidate(spec))).toEqual([]);
+		expect(failed("grouped-expense-approval-v2", specToFlowchartCandidate(spec))).toEqual([]);
 	});
 
 	it.each(replays)("rejects a misplaced stated review in replay $id", ({ spec }) => {
@@ -43,13 +43,13 @@ describe("group scenarios", () => {
 				node === review ? { ...node, group: employee.group, lane: employee.lane } : node,
 			),
 		});
-		expect(failed("grouped-expense-approval", candidate)).toContain("group-members:Manager");
+		expect(failed("grouped-expense-approval-v2", candidate)).toContain("group-members:Manager");
 	});
 
 	it.each(["employee", "manager", undefined])(
 		"ignores an unstated resubmit helper in group %s, but cannot use it as the review",
 		(group) => {
-			const diagram = expected("grouped-expense-approval");
+			const diagram = expected("grouped-expense-approval-v2");
 			const candidate = {
 				...diagram,
 				nodes: [
@@ -63,9 +63,9 @@ describe("group scenarios", () => {
 					{ id: "resubmit-review", source: "resubmit", target: "review" },
 				],
 			};
-			expect(failed("grouped-expense-approval", candidate)).toEqual([]);
+			expect(failed("grouped-expense-approval-v2", candidate)).toEqual([]);
 			expect(
-				failed("grouped-expense-approval", {
+				failed("grouped-expense-approval-v2", {
 					...candidate,
 					nodes: candidate.nodes.filter((node) => node.id !== "review"),
 					edges: candidate.edges
@@ -76,7 +76,7 @@ describe("group scenarios", () => {
 		},
 	);
 
-	it.each(["three-zone-request-path", "aws-three-tier-zones"])(
+	it.each(["three-zone-request-path-v2", "aws-three-tier-zones-v2"])(
 		"does not substitute lanes for the explicit zones in %s",
 		(id) => {
 			const { groups, ...diagram } = expected(id);
@@ -94,7 +94,7 @@ describe("group scenarios", () => {
 	);
 
 	it("requires a resubmit helper's own membership when the prompt states it", () => {
-		const base = getFlowchartScenario("grouped-expense-approval");
+		const base = getFlowchartScenario("grouped-expense-approval-v2");
 		const scenario = {
 			...base,
 			prompt: `${base.prompt} Draw a separate Resubmit report for review step in Employee.`,
@@ -149,9 +149,9 @@ describe("group scenarios", () => {
 	});
 
 	it("rejects a second stated review in the wrong group even with a correct review witness", () => {
-		const diagram = expected("grouped-expense-approval");
+		const diagram = expected("grouped-expense-approval-v2");
 		expect(
-			failed("grouped-expense-approval", {
+			failed("grouped-expense-approval-v2", {
 				...diagram,
 				nodes: [
 					...diagram.nodes,
@@ -183,14 +183,14 @@ describe("group scenarios", () => {
 	});
 
 	it("accepts the model's own group ids and label wording", () => {
-		const diagram = expected("grouped-expense-approval");
+		const diagram = expected("grouped-expense-approval-v2");
 		const rename = new Map([
 			["employee", "staff"],
 			["manager", "approver"],
 			["finance", "accounts"],
 		]);
 		expect(
-			failed("grouped-expense-approval", {
+			failed("grouped-expense-approval-v2", {
 				...diagram,
 				groups: diagram.groups!.map((group) => ({
 					id: rename.get(group.id)!,
@@ -204,9 +204,9 @@ describe("group scenarios", () => {
 	});
 
 	it("fails a step drawn in the wrong group", () => {
-		const diagram = expected("grouped-expense-approval");
+		const diagram = expected("grouped-expense-approval-v2");
 		expect(
-			failed("grouped-expense-approval", {
+			failed("grouped-expense-approval-v2", {
 				...diagram,
 				nodes: diagram.nodes.map((node) =>
 					node.id === "revise" ? { ...node, group: "manager" } : node,
@@ -216,9 +216,9 @@ describe("group scenarios", () => {
 	});
 
 	it("fails a flowchart that draws no groups", () => {
-		const { groups: _groups, ...diagram } = expected("three-zone-request-path");
+		const { groups: _groups, ...diagram } = expected("three-zone-request-path-v2");
 		expect(
-			failed("three-zone-request-path", {
+			failed("three-zone-request-path-v2", {
 				...diagram,
 				nodes: diagram.nodes.map(({ group: _group, ...node }) => node),
 			}),
@@ -233,9 +233,9 @@ describe("group scenarios", () => {
 	});
 
 	it("fails a group whose label the prompt does not ground", () => {
-		const diagram = expected("three-zone-request-path");
+		const diagram = expected("three-zone-request-path-v2");
 		expect(
-			failed("three-zone-request-path", {
+			failed("three-zone-request-path-v2", {
 				...diagram,
 				groups: diagram.groups!.map((group) =>
 					group.id === "dmz" ? { ...group, label: "Perimeter" } : group,
@@ -245,9 +245,9 @@ describe("group scenarios", () => {
 	});
 
 	it("fails a step the prompt keeps outside every group drawn inside one", () => {
-		const diagram = expected("mixed-fulfilment-groups");
+		const diagram = expected("mixed-fulfilment-groups-v2");
 		expect(
-			failed("mixed-fulfilment-groups", {
+			failed("mixed-fulfilment-groups-v2", {
 				...diagram,
 				nodes: diagram.nodes.map((node) =>
 					node.id === "fraud" ? { ...node, group: "warehouse" } : node,
@@ -257,9 +257,9 @@ describe("group scenarios", () => {
 	});
 
 	it("keeps explicitly ungrouped fulfilment steps outside role lanes too", () => {
-		const { groups, ...diagram } = expected("mixed-fulfilment-groups");
+		const { groups, ...diagram } = expected("mixed-fulfilment-groups-v2");
 		expect(
-			failed("mixed-fulfilment-groups", {
+			failed("mixed-fulfilment-groups-v2", {
 				...diagram,
 				lanes: [
 					...groups!.map(({ id, label }) => ({ id, label })),
@@ -271,7 +271,7 @@ describe("group scenarios", () => {
 	});
 
 	it("grades the groups of a Code Mode build's normalized spec", () => {
-		const diagram = expected("mixed-fulfilment-groups");
+		const diagram = expected("mixed-fulfilment-groups-v2");
 		const candidate = specToFlowchartCandidate({
 			id: diagram.id,
 			title: diagram.title,
@@ -280,6 +280,6 @@ describe("group scenarios", () => {
 			groups: diagram.groups,
 			layout: { direction: "TB" },
 		});
-		expect(failed("mixed-fulfilment-groups", candidate)).toEqual([]);
+		expect(failed("mixed-fulfilment-groups-v2", candidate)).toEqual([]);
 	});
 });

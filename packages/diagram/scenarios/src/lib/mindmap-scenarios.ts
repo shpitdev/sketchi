@@ -563,16 +563,6 @@ const animalKingdom = topic(
 
 const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 	{
-		id: "team-offsite-mindmap",
-		title: "Team offsite",
-		difficulty: "smoke",
-		tags: ["mindmap", "brainstorm", "small"],
-		description: "A small brainstorm: four branches of two or three ideas each.",
-		prompt:
-			"Brainstorm our team offsite as a mindmap. The central topic is Team offsite, with four branches: Location (Mountain lodge, City hotel), Activities (Hiking, Cooking class, Board games), Food (Catering, Group dinner) and Budget (Travel costs, Venue deposit). Use only these topics.",
-		root: teamOffsite,
-	},
-	{
 		id: "team-offsite-mindmap-v2",
 		title: "Team offsite",
 		difficulty: "smoke",
@@ -581,17 +571,6 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 		prompt:
 			"offsite brainstorm, can you mindmap it\n\nTeam offsite\n- Location: Mountain lodge, City hotel\n- Activities: Hiking, Cooking class, Board games\n- Food: Catering, Group dinner\n- Budget: Travel costs, Venue deposit",
 		root: teamOffsite,
-	},
-	{
-		id: "photosynthesis-study-mindmap",
-		title: "Photosynthesis",
-		difficulty: "standard",
-		tags: ["mindmap", "study-notes", "three-levels"],
-		description:
-			"Study notes three levels deep, with grouping topics (Inputs, Outputs, Steps) between a branch and its details.",
-		prompt:
-			"Turn my biology study notes into a mindmap. The central topic is Photosynthesis, with three branches. Light reactions has Thylakoid membrane, Inputs (Water, Sunlight) and Outputs (ATP, NADPH, Oxygen). Calvin cycle has Stroma, Steps (Carbon fixation, Reduction, Regeneration) and Product (Glucose). Limiting factors has Light intensity, Carbon dioxide and Temperature. Use only these topics.",
-		root: photosynthesis,
 	},
 	{
 		id: "photosynthesis-study-mindmap-v2",
@@ -605,16 +584,6 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 		root: photosynthesis,
 	},
 	{
-		id: "app-launch-planning-mindmap",
-		title: "App launch",
-		difficulty: "standard",
-		tags: ["mindmap", "product-planning", "wide"],
-		description: "Product planning with seven main branches around the center.",
-		prompt:
-			"Plan the launch of our budgeting app as a mindmap. The central topic is App launch, with seven branches: Goals (10k signups, 4-star rating), Features (Shared budgets, Bank sync, Spending alerts), Design (Onboarding flow, Dark mode), Engineering (Load testing, Crash reporting), Marketing (Launch video, Influencer outreach, Press kit), Support (Help center, In-app chat) and Risks (Bank API limits, App review delays). Use only these topics.",
-		root: appLaunch,
-	},
-	{
 		id: "app-launch-planning-mindmap-v2",
 		title: "App launch",
 		difficulty: "standard",
@@ -623,17 +592,6 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 		prompt:
 			"mindmap for planning our budgeting app launch\n\nApp launch\n- Goals: 10k signups, 4-star rating\n- Features: Shared budgets, Bank sync, Spending alerts\n- Design: Onboarding flow, Dark mode\n- Engineering: Load testing, Crash reporting\n- Marketing: Launch video, Influencer outreach, Press kit\n- Support: Help center, In-app chat\n- Risks: Bank API limits, App review delays",
 		root: appLaunch,
-	},
-	{
-		id: "ml-roadmap-mindmap",
-		title: "Machine learning roadmap",
-		difficulty: "challenge",
-		tags: ["mindmap", "large", "three-levels"],
-		description:
-			"A 41-topic study roadmap: seven branches, two with grouping topics, and labels that share words (four kinds of regression).",
-		prompt:
-			"Map my machine learning study roadmap as a mindmap. The central topic is Machine learning, with seven branches. Math foundations: Linear algebra, Calculus, Probability, Statistics. Programming: Python, NumPy, Pandas, Scikit-learn, Jupyter notebooks. Supervised learning: Regression (Linear regression, Ridge regression) and Classification (Logistic regression, Decision trees, Support vector machines). Unsupervised learning: Clustering (K-means, DBSCAN) and Dimensionality reduction (PCA, t-SNE). Deep learning: Neural networks, CNNs, Transformers and Training tricks (Dropout, Batch normalization). Projects: House price predictor, Spam filter, Image classifier. Deployment: Model serving, Monitoring. Use only these topics.",
-		root: mlRoadmap,
 	},
 	{
 		id: "ml-roadmap-mindmap-v2",
@@ -645,16 +603,6 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 		prompt:
 			"my ML study roadmap as a mindmap\n\nMachine learning\n- Math foundations: Linear algebra, Calculus, Probability, Statistics\n- Programming: Python, NumPy, Pandas, Scikit-learn, Jupyter notebooks\n- Supervised learning\n  - Regression: Linear regression, Ridge regression\n  - Classification: Logistic regression, Decision trees, Support vector machines\n- Unsupervised learning\n  - Clustering: K-means, DBSCAN\n  - Dimensionality reduction: PCA, t-SNE\n- Deep learning: Neural networks, CNNs, Transformers\n  - Training tricks: Dropout, Batch normalization\n- Projects: House price predictor, Spam filter, Image classifier\n- Deployment: Model serving, Monitoring",
 		root: mlRoadmap,
-	},
-	{
-		id: "animal-kingdom-mindmap",
-		title: "Animal kingdom",
-		difficulty: "challenge",
-		tags: ["mindmap", "large", "deep", "five-levels"],
-		description: "A 42-topic classification five levels deep under two very uneven branches.",
-		prompt:
-			"Draw part of the animal kingdom as a mindmap. The central topic is Animals, with two branches, Vertebrates and Invertebrates. Vertebrates: Mammals, Birds, Reptiles, Amphibians, Fish. Mammals: Primates, Carnivores, Whales. Primates: Great apes (Gorillas, Chimpanzees) and Monkeys. Carnivores: Big cats (Lions, Tigers) and Bears. Birds: Raptors (Eagles, Owls) and Songbirds. Reptiles: Snakes, Lizards. Amphibians: Frogs, Salamanders. Fish: Sharks, Salmon. Invertebrates: Insects (Beetles, Butterflies, Ants), Mollusks (Octopuses, Snails), Arachnids (Spiders, Scorpions) and Crustaceans (Crabs, Lobsters). Use only these topics.",
-		root: animalKingdom,
 	},
 	{
 		id: "animal-kingdom-mindmap-v2",

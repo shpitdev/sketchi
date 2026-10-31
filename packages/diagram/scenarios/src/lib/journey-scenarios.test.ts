@@ -15,9 +15,9 @@ const failed = (id: string, diagram: JourneyDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
-const online = scenario("online-purchase-journey").expectedDiagram;
-const saas = scenario("saas-onboarding-journey").expectedDiagram;
-const support = scenario("support-ticket-journey").expectedDiagram;
+const online = scenario("online-purchase-journey-v2").expectedDiagram;
+const saas = scenario("saas-onboarding-journey-v2").expectedDiagram;
+const support = scenario("support-ticket-journey-v2").expectedDiagram;
 type Stage = JourneyDiagram["stages"][number];
 const withStage = (
 	diagram: JourneyDiagram,
@@ -41,23 +41,14 @@ const withStep = (
 describe("prompt-grounded journey scenarios", () => {
 	it("covers an online purchase, a six-stage SaaS onboarding and a support ticket", () => {
 		expect(journeyScenarios.map((entry) => [entry.id, entry.difficulty])).toEqual([
-			["online-purchase-journey", "smoke"],
 			["online-purchase-journey-v2", "smoke"],
-			["saas-onboarding-journey", "challenge"],
 			["saas-onboarding-journey-v2", "challenge"],
-			["support-ticket-journey", "standard"],
 			["support-ticket-journey-v2", "standard"],
 		]);
 		expect(saas.stages.map((stage) => stage.steps.length)).toEqual([2, 2, 2, 2, 1, 1]);
 		expect(journeyScenarios.every((entry) => entry.tags.includes("journey"))).toBe(true);
-		// Every scored fact sits in the prompt, so it binds the grader too.
-		for (const entry of journeyScenarios.filter((value) => !value.id.endsWith("-v2")))
-			for (const stage of entry.expectedDiagram.stages) {
-				expect(entry.prompt).toContain(`${stage.name}:`);
-				for (const step of stage.steps) expect(entry.prompt).toContain(`, ${step.score})`);
-			}
 		// A pasted note or table holds every stage, label, score and note as stated.
-		for (const entry of journeyScenarios.filter((value) => value.id.endsWith("-v2"))) {
+		for (const entry of journeyScenarios) {
 			const prompt = entry.prompt.toLowerCase();
 			for (const stage of entry.expectedDiagram.stages) {
 				expect(prompt).toContain(stage.name.toLowerCase());
@@ -83,26 +74,26 @@ describe("prompt-grounded journey scenarios", () => {
 			...step,
 			label: "Creates an account with his work email",
 		}));
-		expect(failed("saas-onboarding-journey", dropped)).toEqual([]);
+		expect(failed("saas-onboarding-journey-v2", dropped)).toEqual([]);
 		const it = withStep(saas, 1, 1, (step) => ({
 			...step,
 			label: "Approves the firewall allowlist request after two days",
 		}));
-		expect(failed("saas-onboarding-journey", it)).toEqual([]);
+		expect(failed("saas-onboarding-journey-v2", it)).toEqual([]);
 		const prefixed = withStep(online, 0, 0, (step) => ({
 			...step,
 			label: "Priya sees an Instagram ad",
 		}));
-		expect(failed("online-purchase-journey", prefixed)).toEqual([]);
+		expect(failed("online-purchase-journey-v2", prefixed)).toEqual([]);
 		const article = withStep(support, 1, 1, (step) => ({
 			...step,
 			label: "agent asks for the invoice number",
 		}));
-		expect(failed("support-ticket-journey", article)).toEqual([]);
+		expect(failed("support-ticket-journey-v2", article)).toEqual([]);
 		// The persona may live in the title.
 		const { persona: _persona, ...untitled } = online;
 		expect(
-			failed("online-purchase-journey", { ...untitled, title: "Priya's running shoe purchase" }),
+			failed("online-purchase-journey-v2", { ...untitled, title: "Priya's running shoe purchase" }),
 		).toEqual([]);
 	});
 
@@ -173,26 +164,28 @@ describe("prompt-grounded journey scenarios", () => {
 			["persona"],
 		],
 	])("fails %s on the stated check", (_, change, expected) => {
-		expect(failed("online-purchase-journey", change()).toSorted()).toEqual(expected.toSorted());
+		expect(failed("online-purchase-journey-v2", change()).toSorted()).toEqual(expected.toSorted());
 	});
 
 	it("requires each step's stated actor, or a label opening with it, and no unnamed actor", () => {
 		expect(
 			failed(
-				"saas-onboarding-journey",
+				"saas-onboarding-journey-v2",
 				withStep(saas, 2, 1, (step) => ({ ...step, actor: "Marco" })),
 			),
 		).toEqual(["actor:slow-query"]);
 		expect(
 			failed(
-				"saas-onboarding-journey",
+				"saas-onboarding-journey-v2",
 				withStep({ ...saas, actors: [...saas.actors!, "Ops manager"] }, 4, 0, (step) => ({
 					...step,
 					actor: "Ops manager",
 				})),
 			).toSorted(),
 		).toEqual(["actors-stated"]);
-		expect(failed("saas-onboarding-journey", { ...saas, persona: "Marco" })).toEqual(["persona"]);
+		expect(failed("saas-onboarding-journey-v2", { ...saas, persona: "Marco" })).toEqual([
+			"persona",
+		]);
 	});
 
 	it("reads the drawing: a sad face on a 5, a face between columns and a note across stages fail", () => {
@@ -259,7 +252,7 @@ describe("prompt-grounded journey scenarios", () => {
 				const client = yield* DiagramGenerationClient;
 				return yield* client.generate({
 					model: "fixture",
-					prompt: toDiagramGenerationPrompt(scenario("support-ticket-journey")),
+					prompt: toDiagramGenerationPrompt(scenario("support-ticket-journey-v2")),
 				});
 			}).pipe(Effect.provide(FixtureGenerationClientLayer)),
 		);
@@ -282,6 +275,6 @@ describe("prompt-grounded journey scenarios", () => {
 		);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
-		expect(failed("saas-onboarding-journey", candidate.diagram as JourneyDiagram)).toEqual([]);
+		expect(failed("saas-onboarding-journey-v2", candidate.diagram as JourneyDiagram)).toEqual([]);
 	});
 });

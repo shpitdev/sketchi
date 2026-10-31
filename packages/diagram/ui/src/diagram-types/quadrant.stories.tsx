@@ -30,17 +30,17 @@ export const Ready: Story = {};
 
 /** Eight items crowded into Quick wins take leader lines; one sits on the effort midline. */
 export const CrowdedBacklog: Story = {
-	args: { diagram: scenarioDiagram("effort-impact-quadrant") },
+	args: { diagram: scenarioDiagram("effort-impact-quadrant-v2") },
 };
 
 /** Tasks placed only by quadrant sit well inside it. */
 export const EisenhowerMatrix: Story = {
-	args: { diagram: scenarioDiagram("eisenhower-matrix-quadrant") },
+	args: { diagram: scenarioDiagram("eisenhower-matrix-quadrant-v2") },
 };
 
 /** One product in a group of its own color, and a quadrant left empty. */
 export const CompetitorPositioning: Story = {
-	args: { diagram: scenarioDiagram("competitor-positioning-quadrant") },
+	args: { diagram: scenarioDiagram("competitor-positioning-quadrant-v2") },
 };
 
 /** Points on the plot's corners, edges and middle lines stay readable. */

@@ -177,9 +177,9 @@ describe("prompt-grounded Gantt scenarios", () => {
 	// data-platform's detours and both of app-release's still have no forward route, as a bar
 	// between spans every forward column. The rest of each count is routing's to clear.
 	it.each([
-		["data-platform-migration-gantt", { detours: 3, kinks: 2, crossings: 1, hugs: 0 }],
-		["app-release-gantt", { detours: 2, kinks: 0, crossings: 3, hugs: 0 }],
-		["cafe-fit-out-gantt", { detours: 0, kinks: 0, crossings: 0, hugs: 0 }],
+		["data-platform-migration-gantt-v2", { detours: 3, kinks: 2, crossings: 1, hugs: 0 }],
+		["app-release-gantt-v2", { detours: 2, kinks: 0, crossings: 3, hugs: 0 }],
+		["cafe-fit-out-gantt-v2", { detours: 0, kinks: 0, crossings: 0, hugs: 0 }],
 	] as const)(
 		"routes %s forward where its rows allow, without kinks, crossings or tracing a bar",
 		(id, most) => {
@@ -197,11 +197,11 @@ describe("prompt-grounded Gantt scenarios", () => {
 	// height past that bar, clear of its edge and no further, and lands at the successor's start.
 	it.each([
 		[
-			"data-platform-migration-gantt",
+			"data-platform-migration-gantt-v2",
 			["foundation->billing", "lake->monitoring", "network->orchestration"],
 		],
-		["app-release-gantt", ["ux->android", "ux->ios"]],
-		["cafe-fit-out-gantt", []],
+		["app-release-gantt-v2", ["ux->android", "ux->ios"]],
+		["cafe-fit-out-gantt-v2", []],
 	] as const)("hooks in %s only where a bar between forces it, by its clearance", (id, forced) => {
 		const scenario = ganttScenarios.find((entry) => entry.id === id)!;
 		const turns = hookTurns(renderDiagram(scenario.expectedDiagram));
@@ -234,7 +234,7 @@ describe("prompt-grounded Gantt scenarios", () => {
 		}
 	});
 
-	it("pastes each real-voice plan as a sheet row per task, with the same key as its original", () => {
+	it("pastes each real-voice plan as a sheet row per task", () => {
 		const pasted = ganttScenarios.filter((entry) => entry.tags.includes("real-voice"));
 		expect(pasted.map((entry) => entry.id)).toEqual([
 			"app-release-gantt-v2",
@@ -242,8 +242,6 @@ describe("prompt-grounded Gantt scenarios", () => {
 			"data-platform-migration-gantt-v2",
 		]);
 		for (const entry of pasted) {
-			const original = ganttScenarios.find((other) => `${other.id}-v2` === entry.id)!;
-			expect(entry.assertions, entry.id).toEqual(original.assertions);
 			const rows = entry.prompt.split("\n");
 			for (const task of entry.assertions.tasks)
 				expect(
@@ -283,9 +281,9 @@ describe("prompt-grounded Gantt scenarios", () => {
 
 	const byId = (id: string) => ganttScenarios.find((entry) => entry.id === id)!;
 	const [release, cafe, migration] = [
-		byId("app-release-gantt"),
-		byId("cafe-fit-out-gantt"),
-		byId("data-platform-migration-gantt"),
+		byId("app-release-gantt-v2"),
+		byId("cafe-fit-out-gantt-v2"),
+		byId("data-platform-migration-gantt-v2"),
 	];
 
 	it("catches a wrong date, a wrong duration, a dropped task and a computed-off-by-one end", () => {

@@ -12,7 +12,7 @@ import { getFlowchartScenario } from "./scenarios";
 const samples = JSON.parse(
 	readFileSync(new URL("./fixtures/outside-cluster.json", import.meta.url), "utf8"),
 ) as { runId: string; spec: unknown }[];
-const scenario = getFlowchartScenario("kubernetes-cluster-zones");
+const scenario = getFlowchartScenario("kubernetes-cluster-zones-v2");
 const diagram = scenario.expectedDiagram;
 const failures = (candidate: unknown, expected = scenario) =>
 	evaluateScenarioDiagram(expected, candidate)
@@ -113,13 +113,13 @@ describe("prompt-scoped group exclusions", () => {
 				...diagram,
 				nodes: diagram.nodes.map((node) => (node.id === "browser" ? { ...node, group } : node)),
 			}),
-		).toContain("outside-group:Browser request:GKE cluster");
+		).toContain("outside-group:Browser:GKE cluster");
 	});
 
 	it.each(["region", "vpc", "public", "private", "data"])(
 		"rejects AWS users inside %s",
 		(group) => {
-			const aws = getFlowchartScenario("aws-three-tier-zones");
+			const aws = getFlowchartScenario("aws-three-tier-zones-v2");
 			expect(
 				failures(
 					{
@@ -130,13 +130,13 @@ describe("prompt-scoped group exclusions", () => {
 					},
 					aws,
 				),
-			).toContain("outside-group:Users send requests:us-east-1");
+			).toContain("outside-group:Users:us-east-1");
 		},
 	);
 
 	it.each([
-		["aws-three-tier-zones", "users", "Internet"],
-		["kubernetes-cluster-zones", "browser", "Clients"],
+		["aws-three-tier-zones-v2", "users", "Internet"],
+		["kubernetes-cluster-zones-v2", "browser", "Clients"],
 	] as const)("accepts an external %s wrapper for %s", (id, step, label) => {
 		const expected = getFlowchartScenario(id);
 		const candidate = expected.expectedDiagram;
@@ -177,7 +177,7 @@ describe("prompt-scoped group exclusions", () => {
 	});
 
 	it.each(["order", "fraud"])("keeps the mixed-fulfilment %s outside every group", (id) => {
-		const mixed = getFlowchartScenario("mixed-fulfilment-groups");
+		const mixed = getFlowchartScenario("mixed-fulfilment-groups-v2");
 		const candidate = {
 			...mixed.expectedDiagram,
 			groups: [...mixed.expectedDiagram.groups!, { id: "intake", label: "Order intake" }],
@@ -190,7 +190,7 @@ describe("prompt-scoped group exclusions", () => {
 	});
 
 	it("keeps strict ungrouped steps outside role swimlanes too", () => {
-		const mixed = getFlowchartScenario("mixed-fulfilment-groups");
+		const mixed = getFlowchartScenario("mixed-fulfilment-groups-v2");
 		const { groups, ...candidate } = mixed.expectedDiagram;
 		expect(
 			failures(

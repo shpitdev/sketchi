@@ -10,7 +10,7 @@ const failed = (id: string, diagram: ErDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
-const shop = scenario("shop-orders-er").expectedDiagram;
+const shop = scenario("shop-orders-er-v2").expectedDiagram;
 type Entity = ErDiagram["entities"][number];
 type Field = Entity["fields"][number];
 const withField = (
@@ -78,38 +78,38 @@ describe("prompt-grounded ER scenarios", () => {
 					: relationship,
 			),
 		};
-		expect(failed("shop-orders-er", reversed)).toEqual([]);
+		expect(failed("shop-orders-er-v2", reversed)).toEqual([]);
 	});
 
 	it("catches a wrong cardinality, a lost key marker, a wrong type and a missing field", () => {
 		const wrongEnd: ErDiagram = {
 			...shop,
 			relationships: shop.relationships.map((relationship) =>
-				relationship.id === "r1" ? { ...relationship, toCardinality: "many" } : relationship,
+				relationship.id === "r1" ? { ...relationship, toCardinality: "one" } : relationship,
 			),
 		};
-		expect(failed("shop-orders-er", wrongEnd)).toEqual(["cardinality:1"]);
+		expect(failed("shop-orders-er-v2", wrongEnd)).toEqual(["cardinality:1"]);
 		expect(
 			failed(
-				"shop-orders-er",
+				"shop-orders-er-v2",
 				withField(shop, "orders", "customer_id", ({ fk: _fk, ...field }) => field),
 			),
 		).toEqual(["keys:orders.customer_id"]);
 		expect(
 			failed(
-				"shop-orders-er",
+				"shop-orders-er-v2",
 				withField(shop, "orders", "shipped_at", ({ nullable: _nullable, ...field }) => field),
 			),
 		).toEqual(["keys:orders.shipped_at"]);
 		expect(
 			failed(
-				"shop-orders-er",
+				"shop-orders-er-v2",
 				withField(shop, "products", "price", (field) => ({ ...field, type: "float" })),
 			),
 		).toEqual(["type:products.price"]);
 		expect(
 			failed(
-				"shop-orders-er",
+				"shop-orders-er-v2",
 				withField(shop, "customers", "email", () => undefined),
 			),
 		).toEqual(["field:customers.email", "type:customers.email", "keys:customers.email"]);
@@ -122,7 +122,7 @@ describe("prompt-grounded ER scenarios", () => {
 				relationship.id === "r3" ? { ...relationship, to: "order_items.order_id" } : relationship,
 			),
 		};
-		expect(failed("shop-orders-er", wrongField)).toEqual(["relationship:3", "cardinality:3"]);
+		expect(failed("shop-orders-er-v2", wrongField)).toEqual(["relationship:3", "cardinality:3"]);
 		const invented: ErDiagram = {
 			...shop,
 			entities: [...shop.entities, { id: "carts", fields: [] }],
@@ -137,11 +137,13 @@ describe("prompt-grounded ER scenarios", () => {
 				},
 			],
 		};
-		expect(failed("shop-orders-er", invented)).toEqual(["entities-exact", "relationships-exact"]);
+		expect(failed("shop-orders-er-v2", invented)).toEqual([
+			"entities-exact",
+			"relationships-exact",
+		]);
 	});
 
 	it("reads pasted DDL: an end its constraints leave open takes any many, a stated or keyed end stays exact", () => {
-		const shopDdl = scenario("shop-orders-er-v2").expectedDiagram;
 		const withEnds = (diagram: ErDiagram, id: string, from: string, to: string): ErDiagram => ({
 			...diagram,
 			relationships: diagram.relationships.map((relationship) =>
@@ -152,13 +154,13 @@ describe("prompt-grounded ER scenarios", () => {
 		});
 		// A customer's orders: the DDL cannot say whether a customer needs one.
 		for (const many of ["zero-or-many", "many", "one-or-many"])
-			expect(failed("shop-orders-er-v2", withEnds(shopDdl, "r1", "one", many))).toEqual([]);
+			expect(failed("shop-orders-er-v2", withEnds(shop, "r1", "one", many))).toEqual([]);
 		// The sentence says every order has an item; the not-null key, exactly one order.
-		expect(failed("shop-orders-er-v2", withEnds(shopDdl, "r2", "one", "zero-or-many"))).toEqual([
+		expect(failed("shop-orders-er-v2", withEnds(shop, "r2", "one", "zero-or-many"))).toEqual([
 			"cardinality:2",
 		]);
 		expect(
-			failed("shop-orders-er-v2", withEnds(shopDdl, "r1", "zero-or-one", "zero-or-many")),
+			failed("shop-orders-er-v2", withEnds(shop, "r1", "zero-or-one", "zero-or-many")),
 		).toEqual(["cardinality:1"]);
 		// A nullable key is zero or one; a unique key makes the many end at most one.
 		const saasDdl = scenario("saas-workspace-er-v2").expectedDiagram;
@@ -168,14 +170,10 @@ describe("prompt-grounded ER scenarios", () => {
 		expect(failed("saas-workspace-er-v2", withEnds(saasDdl, "r11", "one", "zero-or-many"))).toEqual(
 			["cardinality:11"],
 		);
-		// The prose prompt still states every many end.
-		expect(failed("shop-orders-er", withEnds(shop, "r1", "one", "many"))).toEqual([
-			"cardinality:1",
-		]);
 	});
 
 	it("pastes every table and column a DDL scenario expects", () => {
-		for (const entry of erScenarios.filter((candidate) => candidate.id.endsWith("-v2")))
+		for (const entry of erScenarios)
 			for (const entity of entry.expectedDiagram.entities) {
 				const table = entry.prompt
 					.split("\n")
@@ -189,7 +187,7 @@ describe("prompt-grounded ER scenarios", () => {
 	});
 
 	it("reads a self-reference by its fields, not by table alone", () => {
-		const org = scenario("org-chart-er").expectedDiagram;
+		const org = scenario("org-chart-er-v2").expectedDiagram;
 		const backwards: ErDiagram = {
 			...org,
 			relationships: org.relationships.map((relationship) =>
@@ -198,7 +196,7 @@ describe("prompt-grounded ER scenarios", () => {
 					: relationship,
 			),
 		};
-		expect(failed("org-chart-er", backwards)).toEqual(["cardinality:1"]);
+		expect(failed("org-chart-er-v2", backwards)).toEqual(["cardinality:1"]);
 	});
 
 	it("checks the drawing: a head drawn for the wrong cardinality fails", () => {
@@ -217,7 +215,7 @@ describe("prompt-grounded ER scenarios", () => {
 	});
 
 	it("reads a table whose crowded key row grew, a text per row, as drawn", () => {
-		const saas = scenario("saas-workspace-er").expectedDiagram;
+		const saas = scenario("saas-workspace-er-v2").expectedDiagram;
 		const scene = renderDiagram(saas);
 		const cells = scene.elements.filter(
 			(element) => element.type === "text" && element.id.startsWith("text:organizations:fields:"),

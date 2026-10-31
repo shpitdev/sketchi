@@ -3,9 +3,7 @@ import { describe, expect, it } from "vitest";
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
 import { getFlowchartScenario } from "./scenarios";
 
-const ids = ["swimlane-order-fulfilment", "swimlane-hiring", "swimlane-incident-response"].flatMap(
-	(id) => [id, `${id}-v2`],
-);
+const ids = ["swimlane-order-fulfilment-v2", "swimlane-hiring-v2", "swimlane-incident-response-v2"];
 
 function failed(scenarioId: string, candidate: unknown) {
 	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), candidate)
@@ -42,14 +40,14 @@ describe("swimlane scenarios", () => {
 	});
 
 	it("accepts the model's own lane ids and label wording", () => {
-		const diagram = expected("swimlane-hiring");
+		const diagram = expected("swimlane-hiring-v2");
 		const rename = new Map([
 			["candidate", "applicant-lane"],
 			["recruiter", "talent"],
 			["manager", "boss"],
 		]);
 		expect(
-			failed("swimlane-hiring", {
+			failed("swimlane-hiring-v2", {
 				...diagram,
 				lanes: diagram.lanes!.map((lane) => ({
 					id: rename.get(lane.id)!,
@@ -61,9 +59,9 @@ describe("swimlane scenarios", () => {
 	});
 
 	it("fails a step drawn in the wrong lane, and every handoff of a lane it leaves unmatched", () => {
-		const diagram = expected("swimlane-order-fulfilment");
+		const diagram = expected("swimlane-order-fulfilment-v2");
 		expect(
-			failed("swimlane-order-fulfilment", {
+			failed("swimlane-order-fulfilment-v2", {
 				...diagram,
 				nodes: diagram.nodes.map((node) =>
 					node.id === "pay" ? { ...node, lane: "finance" } : node,
@@ -79,9 +77,9 @@ describe("swimlane scenarios", () => {
 	});
 
 	it("fails lanes out of the stated order", () => {
-		const diagram = expected("swimlane-incident-response");
+		const diagram = expected("swimlane-incident-response-v2");
 		expect(
-			failed("swimlane-incident-response", {
+			failed("swimlane-incident-response-v2", {
 				...diagram,
 				lanes: [...diagram.lanes!].reverse(),
 			}),
@@ -89,9 +87,9 @@ describe("swimlane scenarios", () => {
 	});
 
 	it("fails a flowchart without lanes and an ungrounded lane label", () => {
-		const diagram = expected("swimlane-hiring");
+		const diagram = expected("swimlane-hiring-v2");
 		const { lanes: _lanes, ...unlaned } = diagram;
-		const withoutLanes = failed("swimlane-hiring", {
+		const withoutLanes = failed("swimlane-hiring-v2", {
 			...unlaned,
 			nodes: diagram.nodes.map(({ lane: _lane, ...node }) => node),
 		});
@@ -100,7 +98,7 @@ describe("swimlane scenarios", () => {
 		);
 		expect(withoutLanes.filter((id) => id.startsWith("handoff:"))).toHaveLength(7);
 		expect(
-			failed("swimlane-hiring", {
+			failed("swimlane-hiring-v2", {
 				...diagram,
 				lanes: diagram.lanes!.map((lane) =>
 					lane.id === "manager" ? { ...lane, label: "Interview panel" } : lane,
@@ -117,10 +115,10 @@ describe("swimlane scenarios", () => {
 	});
 
 	it("fails a handoff routed through a third lane", () => {
-		const diagram = expected("swimlane-order-fulfilment");
+		const diagram = expected("swimlane-order-fulfilment-v2");
 		// Ship → Send the invoice now passes a Sales step the prompt never states.
 		expect(
-			failed("swimlane-order-fulfilment", {
+			failed("swimlane-order-fulfilment-v2", {
 				...diagram,
 				nodes: [...diagram.nodes, { id: "relay", label: "Relay", kind: "process", lane: "sales" }],
 				edges: diagram.edges.flatMap((edge) =>

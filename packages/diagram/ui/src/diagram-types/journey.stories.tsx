@@ -30,17 +30,17 @@ export const Ready: Story = {};
 
 /** Four stages, each step with its touchpoint, and a pain point and an opportunity under two. */
 export const OnlinePurchase: Story = {
-	args: { diagram: scenarioDiagram("online-purchase-journey") },
+	args: { diagram: scenarioDiagram("online-purchase-journey-v2") },
 };
 
 /** Six uneven stages with five actors and long labels: two bands, the curve running on between them. */
 export const SaasOnboarding: Story = {
-	args: { diagram: scenarioDiagram("saas-onboarding-journey") },
+	args: { diagram: scenarioDiagram("saas-onboarding-journey-v2") },
 };
 
 /** A support ticket from a double charge to a refund, rising from very negative to very positive. */
 export const SupportTicket: Story = {
-	args: { diagram: scenarioDiagram("support-ticket-journey") },
+	args: { diagram: scenarioDiagram("support-ticket-journey-v2") },
 };
 
 /** One stage of eight steps runs on into a second band, its header marked as continued. */

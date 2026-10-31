@@ -549,18 +549,6 @@ const supportTicketStages: readonly StageDefinition[] = [
 
 const journeyScenarioDefinitions: readonly JourneyScenarioDefinition[] = [
 	{
-		id: "online-purchase-journey",
-		title: "Priya buys running shoes online",
-		difficulty: "smoke",
-		tags: ["journey", "e-commerce", "touchpoints"],
-		description:
-			"Four stages of an online shoe purchase, two steps each with a touchpoint and score, and a pain point and an opportunity under two stages.",
-		prompt:
-			"Draw a user journey map of Priya buying running shoes online. Score each step's sentiment from 1 (very negative) to 5 (very positive), 3 neutral. Stages and steps, in order, each with its touchpoint and score. Discover: sees an Instagram ad (Instagram, 4); reads reviews on the brand site (Website, 4). Choose: compares three models (Website, 3); can't find her size in stock (Website, 1). Buy: checks out as a guest (Website, 3); pays with Apple Pay (Website, 5). Receive: gets a shipping confirmation (Email, 4); the package arrives a day late (Courier, 2). Pain points: Choose: sizes aren't shown until the product page. Receive: no notice of the delay. Opportunities: Choose: show stock by size in search results. Receive: text customers when a delivery slips.",
-		persona: { text: "Priya", words: ["Priya"] },
-		stages: onlinePurchaseStages,
-	},
-	{
 		id: "online-purchase-journey-v2",
 		title: "Priya buys running shoes online",
 		difficulty: "smoke",
@@ -589,22 +577,6 @@ const journeyScenarioDefinitions: readonly JourneyScenarioDefinition[] = [
 		].join("\n"),
 		persona: { text: "Priya", words: ["Priya"] },
 		stages: onlinePurchaseStages,
-	},
-	{
-		id: "saas-onboarding-journey",
-		title: "Beacon admin onboarding",
-		difficulty: "challenge",
-		tags: ["journey", "saas", "onboarding", "actors", "uneven-stages", "long-labels"],
-		description:
-			"Six stages of a SaaS admin's onboarding with uneven step counts, long step labels and five actors, and notes under four stages.",
-		prompt:
-			"Draw a user journey map of a new admin onboarding to our analytics product, Beacon. Persona: Marco, operations lead at a 40-person logistics company. Score each step from 1 (very negative) to 5 (very positive), 3 neutral. Six stages, in order, each step with its actor and score. Sign up: Marco creates an account with his work email (Marco, 4); Marco finds the verification email in his spam folder (Marco, 2). Connect data: Marco connects the warehouse database with a read-only user (Marco, 3); IT approves the firewall allowlist request after two days (IT team, 1). First dashboard: Marco builds a dashboard from the shipping delays template (Marco, 4); the first query takes ninety seconds to load (Beacon, 2). Invite team: Marco invites five dispatchers by email (Marco, 4); two dispatchers can't find the invitation (Dispatchers, 2). Get value: dispatchers spot late carriers on the daily delays chart (Dispatchers, 5). Renew: Marco upgrades to the annual Team plan after a call with his customer success manager (Customer success, 5). Pain points: Sign up: verification emails land in spam. Connect data: the allowlist request waits on IT. First dashboard: the first query is slow. Invite team: invitations are easy to miss. Opportunities: Connect data: give IT a pre-filled allowlist request. First dashboard: cache template queries. Invite team: let admins share an invite link.",
-		persona: {
-			text: "Marco, operations lead at a 40-person logistics company",
-			words: ["Marco", "operations lead"],
-		},
-		actors: ["Marco", "IT team", "Beacon", "Dispatchers", "Customer success"],
-		stages: saasOnboardingStages,
 	},
 	{
 		id: "saas-onboarding-journey-v2",
@@ -645,18 +617,6 @@ const journeyScenarioDefinitions: readonly JourneyScenarioDefinition[] = [
 		},
 		actors: ["Marco", "IT team", "Beacon", "Dispatchers", "Customer success"],
 		stages: saasOnboardingStages,
-	},
-	{
-		id: "support-ticket-journey",
-		title: "Dana's double charge refund",
-		difficulty: "standard",
-		tags: ["journey", "support", "touchpoints", "refund"],
-		description:
-			"Four stages of getting a double charge refunded, seven steps with touchpoints and scores, one pain point and one opportunity.",
-		prompt:
-			"Draw a user journey map of Dana getting a double charge refunded. Score each step from 1 (very negative) to 5 (very positive), 3 neutral. Stages in order, each step with its touchpoint and score. Report: Dana sees a double charge on her card (Bank app, 1); Dana opens a ticket in the help center (Help center, 2). Triage: an auto-reply promises an answer within 24 hours (Email, 2); an agent asks for the invoice number (Email, 3). Resolve: the agent calls to confirm the refund (Phone, 4); the refund appears on her statement (Bank app, 4). Follow up: Dana rates the support in a survey (Email, 5). Pain point: Report: the contact form is hidden behind three help articles. Opportunity: Triage: detect duplicate charges and refund them automatically.",
-		persona: { text: "Dana", words: ["Dana"] },
-		stages: supportTicketStages,
 	},
 	{
 		id: "support-ticket-journey-v2",

@@ -31,7 +31,7 @@ Each quadrant is a square-cornered tint grouped with its name; each dot is an el
 
 ## Scenarios
 
-Maintained scenarios: `effort-impact-quadrant` (fifteen backlog items by score, eight crowded into Quick wins, one on the effort midline; challenge), `eisenhower-matrix-quadrant` (eight tasks by quadrant only, axis direction left open; smoke) and `competitor-positioning-quadrant` (nine products by score, one quadrant empty, our product set apart in color; standard). Checks read every placement through the axis ends as drawn, so an axis that runs high to low passes when every name and point follows it:
+Maintained scenarios: `effort-impact-quadrant-v2` (fifteen backlog items by score, eight crowded into Quick wins, one on the effort midline; challenge), `eisenhower-matrix-quadrant-v2` (eight tasks by quadrant only, axis direction left open; smoke) and `competitor-positioning-quadrant-v2` (nine products by score, one quadrant empty, our product set apart in color; standard). Checks read every placement through the axis ends as drawn, so an axis that runs high to low passes when every name and point follows it:
 
 - `axis:x`, `axis:y`: each stated variable titles its axis. `axis-ends:x`, `axis-ends:y`: the stated end labels, in either direction.
 - `quadrant:<key>`: each name sits in the corner its conditions describe.
