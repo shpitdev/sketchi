@@ -6,9 +6,9 @@ import appStyles from "../styles/app.css?url";
 
 // Site-wide fallback copy. Each page overrides title/description (and adds its
 // own og:url + canonical) via `pageMeta`; these values also cover the 404 page.
-const FALLBACK_TITLE = "Sketchi: describe it, and Sketchi draws it";
+const FALLBACK_TITLE = "Sketchi";
 const FALLBACK_DESCRIPTION =
-	"Turn a prompt into an editable diagram with the real logos of your stack. Use Sketchi in the playground or your coding agent.";
+	"Describe a diagram and get an editable Excalidraw sketch with real tech logos. Use it in the browser, your coding agent, or the terminal.";
 
 export const Route = createRootRoute({
 	head: () => ({

@@ -7,10 +7,10 @@ describe("FeatureGrid", () => {
 	it("renders the three product benefits", () => {
 		render(<FeatureGrid />);
 
-		expect(screen.getByRole("heading", { name: "Built on Excalidraw." })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "Individual shapes and connectors" })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "1,400+ logos, already drawn" })).toBeTruthy();
-		expect(screen.getByRole("heading", { name: "Edit and export your diagrams" })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "Built on Excalidraw" })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "Editable shapes and arrows" })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "1,400+ tech logos" })).toBeTruthy();
+		expect(screen.getByRole("heading", { name: "Export to PNG or Excalidraw" })).toBeTruthy();
 	});
 
 	/**

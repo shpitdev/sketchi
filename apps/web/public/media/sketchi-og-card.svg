@@ -38,7 +38,7 @@
     <tspan x="60" dy="66" fill="#6a4e5c">Sketchi draws it.</tspan>
   </text>
   <path d="M60 300 C158 295 284 297 500 293" fill="none" stroke="#8f707f" stroke-linecap="round" stroke-width="6"/>
-  <text x="62" y="346" fill="#4c4639" font-family="IBM Plex Mono" font-size="17" font-weight="600" letter-spacing="0.2">PROMPT → CLEAN, EDITABLE DIAGRAM</text>
+  <text x="62" y="346" fill="#4c4639" font-family="IBM Plex Mono" font-size="19" font-weight="500">Editable diagrams from a prompt</text>
 
   <g filter="url(#soft-shadow)">
     <rect x="535" y="106" width="605" height="466" rx="18" fill="#fffdf8" stroke="#d8ccb1" stroke-width="2"/>

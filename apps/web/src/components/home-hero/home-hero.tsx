@@ -97,12 +97,9 @@ export function HomeHero({
 						<br />
 						Sketchi <em>draws it.</em>
 					</h1>
-					<p className="home-hero__lead sk-rise" style={{ "--i": 1 } as CSSProperties}>
-						Turn a sentence into an editable diagram with the real logos of your stack.
-					</p>
-					<div className="home-hero__actions sk-rise" style={{ "--i": 2 } as CSSProperties}>
+					<div className="home-hero__actions sk-rise" style={{ "--i": 1 } as CSSProperties}>
 						<Button asChild size="xl" variant="brand">
-							<a href={primaryHref}>Open the playground</a>
+							<a href={primaryHref}>Open playground</a>
 						</Button>
 						<Button asChild size="xl" variant="outline">
 							<a href={agentsHref}>Add to your agent</a>
