@@ -55,6 +55,12 @@ const LABEL_HEIGHT = Math.ceil(LABEL_FONT_SIZE * 1.35);
 const LABEL_OFFSET = 10;
 /** Room kept between a label and every box, line and other label. */
 const LABEL_CLEARANCE = 3;
+/**
+ * A label reads as its own line's only when every other line stands half again
+ * as far off as its own, and at least this much further.
+ */
+const ATTRIBUTION_RATIO = 1.5;
+const ATTRIBUTION_MARGIN = 8;
 /** Past this, a layout's export reads poorly; a candidate pays for any excess. */
 const READABLE_ASPECT = 2.5;
 const NAME_FILL = "#efe6ec";
@@ -376,8 +382,19 @@ function detour(arrow: ArrowSceneElement): number {
 	return Math.max(0, length / (direct + 2 * CLASS_END_RUN + 200) - 1);
 }
 
-/** Route each distinct candidate placement and keep the one that reads best. */
-function bestScene(diagram: ClassDiagram, boxes: ReadonlyMap<string, Box>): RenderedDiagramScene {
+/** A routed scene's class boxes, without the room it held for labels. */
+function classBoxes(scene: RenderedDiagramScene): NodeSceneElement[] {
+	return scene.elements.filter(
+		(element): element is NodeSceneElement =>
+			element.type === "node" && !element.nodeId.startsWith(LABEL_ROOM_PREFIX),
+	);
+}
+
+/** Route each distinct candidate placement, keep the one that reads best, and place its labels. */
+function bestScene(
+	diagram: ClassDiagram,
+	boxes: ReadonlyMap<string, Box>,
+): { readonly scene: RenderedDiagramScene; readonly labels: readonly TextSceneElement[] } {
 	const links: ClassLayoutLink[] = diagram.relationships.map((relationship) => ({
 		id: relationship.id,
 		from: relationship.from.trim(),
@@ -432,7 +449,42 @@ function bestScene(diagram: ClassDiagram, boxes: ReadonlyMap<string, Box>): Rend
 			best = routed;
 		if (routed.cost === 0 && !long(best)) break;
 	}
-	return best!.scene;
+	// While a label stands clearly its own line's nowhere, the placements run again
+	// keeping room for labels; one takes its place when it leaves fewer such labels,
+	// draws no more crossings, detours or hugging runs, reads no longer, and draws
+	// no more crossings and findings together than one more for each label it clears:
+	// a label read as another line's misleads a reader more than a jog does.
+	const labelled = (routed: Routed) => ({
+		...routed,
+		labels: placeLabels(
+			diagram,
+			routed.scene.elements.filter((e): e is ArrowSceneElement => e.type === "arrow"),
+			classBoxes(routed.scene),
+		),
+	});
+	let chosen = labelled(best!);
+	for (const option of options) {
+		if (chosen.labels.unclear === 0) break;
+		const placement = placeClasses(layoutBoxes, links, { ...option, labelRoom: true });
+		const key = JSON.stringify([...placement.boxes, ...placement.anchors]);
+		if (tried.has(key)) continue;
+		tried.add(key);
+		const scene = routedScene(diagram, boxes, placement);
+		const counts = routedCounts(scene);
+		const routed = labelled({ cost: routedCost(scene, counts), counts, scene });
+		const was = chosen.counts;
+		if (
+			routed.labels.unclear < chosen.labels.unclear &&
+			(!long(routed) || exportAspect(scene) <= exportAspect(chosen.scene)) &&
+			counts.crossings <= was.crossings &&
+			counts.crossings + counts.findings <=
+				was.crossings + was.findings + chosen.labels.unclear - routed.labels.unclear &&
+			counts.detours <= was.detours &&
+			counts.hugging <= was.hugging
+		)
+			chosen = routed;
+	}
+	return { scene: chosen.scene, labels: chosen.labels.texts };
 }
 
 /** A class's elements: its outline, its name band, its methods compartment and their texts. */
@@ -538,6 +590,17 @@ function rectTouchesSegment(rect: Rect, segment: AxisAlignedSegment, gap: number
 				segment.min < rect.bottom + gap;
 }
 
+function rectSegmentDistance(rect: Rect, segment: AxisAlignedSegment): number {
+	const [x0, x1, y0, y1] =
+		segment.orientation === "horizontal"
+			? [segment.min, segment.max, segment.staticCoordinate, segment.staticCoordinate]
+			: [segment.staticCoordinate, segment.staticCoordinate, segment.min, segment.max];
+	return Math.hypot(
+		Math.max(0, rect.left - x1, x0 - rect.right),
+		Math.max(0, rect.top - y1, y0 - rect.bottom),
+	);
+}
+
 /**
  * Where a label may go along one run of a line, nearest its start first: on
  * either side of the run, `along` units out from the run's start.
@@ -572,30 +635,78 @@ function* labelSpots(
 	}
 }
 
+/** A route from its start up to halfway along it. */
+function halfway(points: readonly { x: number; y: number }[]): { x: number; y: number }[] {
+	const lengths = points
+		.slice(1)
+		.map((point, index) => Math.hypot(point.x - points[index]!.x, point.y - points[index]!.y));
+	let rest = lengths.reduce((sum, length) => sum + length, 0) / 2;
+	const half = [points[0]!];
+	for (const [index, length] of lengths.entries()) {
+		const [from, to] = [points[index]!, points[index + 1]!];
+		if (length >= rest) {
+			const t = length > 0 ? rest / length : 0;
+			half.push({ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t });
+			break;
+		}
+		half.push(to);
+		rest -= length;
+	}
+	return half;
+}
+
 /**
  * Place each multiplicity and role beside its end's first run, the two on
  * opposite sides of the line, and each relationship's name beside its
- * longest run, every one clear of the boxes, the lines and the others.
+ * longest run, every one clear of the boxes, the lines and the others, and
+ * clearly nearer its own line than any other, so none reads as another's.
  */
 function placeLabels(
 	diagram: ClassDiagram,
 	arrows: readonly ArrowSceneElement[],
 	boxes: readonly NodeSceneElement[],
-): TextSceneElement[] {
+): { readonly texts: readonly TextSceneElement[]; readonly unclear: number } {
 	const boxRects = boxes.map((box) => ({
 		left: box.x,
 		top: box.y,
 		right: box.x + box.width,
 		bottom: box.y + box.height,
 	}));
-	const segments = arrows.flatMap((arrow) => segmentsFromPoints(arrow.points));
+	const owned = arrows.flatMap((arrow) =>
+		segmentsFromPoints(arrow.points).map((segment) => ({ owner: arrow.edgeId, segment })),
+	);
+	const segments = owned.map((run) => run.segment);
 	const placed: Rect[] = [];
 	const collisions = (rect: Rect) =>
 		boxRects.filter((box) => rectsOverlap(rect, box, LABEL_CLEARANCE)).length +
 		segments.filter((segment) => rectTouchesSegment(rect, segment, LABEL_CLEARANCE)).length +
 		placed.filter((other) => rectsOverlap(rect, other, LABEL_CLEARANCE)).length;
 	const free = (rect: Rect) => collisions(rect) === 0;
+	const anywhere = () => free;
+	// Free, and the text as drawn within its room stands clearly nearer its own line.
+	const attributed = (owner: string, text: string) => (rect: Rect) => {
+		if (!free(rect)) return false;
+		const inset = {
+			x: (labelWidth(text) - estimateTextWidth(text, LABEL_FONT_SIZE)) / 2,
+			y: (text.split("\n").length * (LABEL_HEIGHT - LABEL_FONT_SIZE * 1.35)) / 2,
+		};
+		const drawn = {
+			left: rect.left + inset.x,
+			top: rect.top + inset.y,
+			right: rect.right - inset.x,
+			bottom: rect.bottom - inset.y,
+		};
+		let [own, other] = [Infinity, Infinity];
+		for (const run of owned) {
+			const distance = rectSegmentDistance(drawn, run.segment);
+			if (run.owner === owner) own = Math.min(own, distance);
+			else other = Math.min(other, distance);
+		}
+		return other >= Math.max(ATTRIBUTION_RATIO * own, own + ATTRIBUTION_MARGIN);
+	};
 	const texts: TextSceneElement[] = [];
+	// Labels no spot left clearly their own line's.
+	let unclear = 0;
 	const add = (id: string, text: string, rect: Rect, groupId?: string) => {
 		placed.push(rect);
 		texts.push({
@@ -610,7 +721,7 @@ function placeLabels(
 		});
 	};
 	const byId = new Map(arrows.map((arrow) => [arrow.edgeId, arrow]));
-	// The first free spot along the route from one end, nearest that end first.
+	// The spots along the route from one end, nearest that end first.
 	const spots = (
 		points: readonly { x: number; y: number }[],
 		width: number,
@@ -623,7 +734,6 @@ function placeLabels(
 			.flatMap((point, index) => [
 				...labelSpots(point, points[index + 1]!, width, height, sides, index === 0 ? start : 6),
 			]);
-	const along = (...spot: Parameters<typeof spots>): Rect | undefined => spots(...spot).find(free);
 	for (const relationship of diagram.relationships) {
 		const arrow = byId.get(relationship.id);
 		if (!arrow) continue;
@@ -636,19 +746,16 @@ function placeLabels(
 				relationship[end === "from" ? "fromMultiplicity" : "toMultiplicity"] && "multiplicity",
 				relationship[end === "from" ? "fromRole" : "toRole"] && "role",
 			].filter((key): key is string => typeof key === "string");
-			// Two labels take opposite sides, whichever way round fits; then each takes
-			// the nearest free spot on either side; then, with none free, its first spot.
-			const orders: (readonly (-1 | 1)[])[] =
-				labels.length === 2
-					? [
-							[1, -1],
-							[-1, 1],
-						]
-					: [[1], [-1]];
-			const place = (side: (index: number) => readonly (-1 | 1)[]) => {
+			const place = (
+				points: readonly { x: number; y: number }[],
+				side: (index: number) => readonly (-1 | 1)[],
+				accept: (text: string) => (rect: Rect) => boolean,
+			) => {
 				const rects: Rect[] = [];
 				for (const [index, label] of labels.entries()) {
-					const rect = along(route, labelWidth(label), LABEL_HEIGHT, side(index), 4);
+					const rect = spots(points, labelWidth(label), LABEL_HEIGHT, side(index), 4).find(
+						accept(label),
+					);
 					if (!rect) break;
 					rects.push(rect);
 					placed.push(rect);
@@ -656,9 +763,37 @@ function placeLabels(
 				placed.splice(placed.length - rects.length, rects.length);
 				return rects.length === labels.length ? rects : undefined;
 			};
+			// On the end's first run, clearly its own line's: two labels on opposite
+			// sides, whichever way round fits, else together on one side; one label on
+			// either side, nearest the end first.
+			const mine = (text: string) => attributed(relationship.id, text);
+			const sides: ((index: number) => readonly (-1 | 1)[])[] =
+				labels.length === 2
+					? [
+							(index) => [index === 0 ? 1 : -1],
+							(index) => [index === 0 ? -1 : 1],
+							() => [1],
+							() => [-1],
+						]
+					: [() => [1, -1]];
+			// Failing that, each the nearest such spot on either side along the end's
+			// half of the line; then opposite sides, then each the nearest free spot on
+			// either side anywhere along the line; then, with none free, its first spot.
+			const orders: (readonly (-1 | 1)[])[] =
+				labels.length === 2
+					? [
+							[1, -1],
+							[-1, 1],
+						]
+					: [[1], [-1]];
+			const clear =
+				sides.map((side) => place(route.slice(0, 2), side, mine)).find(Boolean) ??
+				place(halfway(route), () => [1, -1], mine);
+			if (!clear) unclear += labels.length;
 			const chosen =
-				orders.map((order) => place((index) => [order[index]!])).find(Boolean) ??
-				place(() => [1, -1]) ??
+				clear ??
+				orders.map((order) => place(route, (index) => [order[index]!], anywhere)).find(Boolean) ??
+				place(route, () => [1, -1], anywhere) ??
 				labels.map((label) => spots(route, labelWidth(label), LABEL_HEIGHT, [1, -1], 4)[0]!);
 			for (const [index, rect] of chosen.entries())
 				add(
@@ -670,7 +805,8 @@ function placeLabels(
 		}
 	}
 	// Each name beside its longest run, else anywhere along its line past the end runs;
-	// a long name with no room on one line wraps onto up to five lines.
+	// a long name with no room on one line wraps onto up to five lines. A spot clearly
+	// its own line's comes first, then any free one.
 	for (const relationship of diagram.relationships) {
 		const arrow = byId.get(relationship.id);
 		if (!arrow || !relationship.label) continue;
@@ -696,9 +832,13 @@ function placeLabels(
 				...spots(arrow.points, width, height, [-1, 1], 0),
 			];
 		};
-		const found = candidates
-			.map((text) => ({ text, rect: search(text).find(free) }))
-			.find((candidate) => candidate.rect !== undefined);
+		const first = (accept: (text: string) => (rect: Rect) => boolean) =>
+			candidates
+				.map((text) => ({ text, rect: search(text).find(accept(text)) }))
+				.find((candidate) => candidate.rect !== undefined);
+		const clear = first((text) => attributed(relationship.id, text));
+		if (!clear) unclear += 1;
+		const found = clear ?? first(anywhere);
 		if (found) {
 			add(`relationship:${relationship.id}:name`, found.text, found.rect!);
 			continue;
@@ -709,7 +849,7 @@ function placeLabels(
 			.reduce((best, candidate) => (candidate.hits < best.hits ? candidate : best));
 		add(`relationship:${relationship.id}:name`, fallback.text, fallback.rect);
 	}
-	return texts;
+	return { texts, unclear };
 }
 
 /** Shift every element so nothing sits nearer the origin than the scene's padding. */
@@ -771,14 +911,8 @@ function padded(elements: readonly SceneElement[]): {
  */
 export function renderClassDiagram(diagram: ClassDiagram): RenderedDiagramScene {
 	const boxes = new Map(diagram.classes.map((node) => [node.id, boxOf(node)]));
-	const scene = bestScene(diagram, boxes);
-	const placed = new Map(
-		scene.elements.flatMap((element) =>
-			element.type === "node" && !element.nodeId.startsWith(LABEL_ROOM_PREFIX)
-				? [[element.nodeId, element] as const]
-				: [],
-		),
-	);
+	const { scene, labels } = bestScene(diagram, boxes);
+	const placed = new Map(classBoxes(scene).map((element) => [element.nodeId, element]));
 	const drawn = diagram.classes.map((node) =>
 		boxElements(boxes.get(node.id)!, placed.get(node.id)!, diagram),
 	);
@@ -797,7 +931,6 @@ export function renderClassDiagram(diagram: ClassDiagram): RenderedDiagramScene 
 			},
 		];
 	});
-	const labels = placeLabels(diagram, arrows, [...placed.values()]);
 	const { elements, width, height } = padded([
 		...drawn.flatMap((box) => [...box.nodes, ...box.texts]),
 		...arrows,

@@ -50,6 +50,12 @@ export interface ClassPlacementOptions {
 	 * hierarchy can step a row down beside another instead of sharing its rows.
 	 */
 	readonly hierarchies?: boolean;
+	/**
+	 * Keep the wider room that leaves each label clearly its own line's: between
+	 * neighboring ports, every box growing to hold it on each of its sides, and
+	 * between an end and a corridor passing beside it.
+	 */
+	readonly labelRoom?: boolean;
 }
 
 export interface ClassPlacement {
@@ -84,6 +90,13 @@ const PORT_STEP = 32;
  */
 const LABEL_ROOM = 14;
 const LABEL_ROW = 26;
+/**
+ * The room that instead leaves a neighbor's line clearly further from a label
+ * than its own: past a label's width beside a vertical run, or its height
+ * beside a horizontal one.
+ */
+const CLEAR_LABEL_ROOM = 30;
+const CLEAR_LABEL_ROW = 40;
 /** Height a channel adds above its tracks when a named line crosses it: a name on three lines. */
 const NAME_ROOM = 54;
 /** Ports keep this far from a side's corners, past the router's own port padding. */
@@ -813,6 +826,8 @@ interface Spacing {
 	readonly port: number;
 	readonly track: number;
 	readonly lane: number;
+	/** Keep the room that leaves each label clearly its own line's. */
+	readonly clearLabels: boolean;
 }
 
 /**
@@ -821,6 +836,8 @@ interface Spacing {
  * point their line heads for, so lines between rows run straight where they
  * can. A line that would still jog a little runs straight when one end can
  * move onto the other's line, and no port sits on a compartment's divider.
+ * Returns the length each box needs across and down to hold every side's
+ * ports with all their room.
  */
 function placePorts(
 	ends: readonly End[],
@@ -829,7 +846,7 @@ function placePorts(
 	labels: (end: End) => { readonly end: number; readonly name: number },
 	rowOf: (item: number) => number,
 	spacing: Spacing,
-): void {
+): Map<number, { width: number; height: number }> {
 	const { port: portStep, lane: laneClearance } = spacing;
 	const sides = new Map<string, End[]>();
 	for (const end of ends) {
@@ -843,10 +860,11 @@ function placePorts(
 	// rows, its name wrapped onto two lines. A side too short shares out what it has.
 	const roomOf = (end: End) => {
 		const { end: label, name } = labels(end);
-		if (!horizontal(end.side)) return label > 0 ? LABEL_ROW : 0;
+		if (!horizontal(end.side))
+			return label > 0 ? (spacing.clearLabels ? CLEAR_LABEL_ROW : LABEL_ROW) : 0;
 		// A name on two lines runs a word wider than half of it.
 		const widest = Math.max(label, end.loop || name === 0 ? 0 : Math.ceil(name / 2) + LABEL_ROOM);
-		return widest > 0 ? widest + LABEL_ROOM : 0;
+		return widest > 0 ? widest + (spacing.clearLabels ? CLEAR_LABEL_ROOM : LABEL_ROOM) : 0;
 	};
 	const gapOf = (a: End, b: End) => {
 		const [p, q] = [roomOf(a), roomOf(b)];
@@ -1033,6 +1051,22 @@ function placePorts(
 			break;
 		}
 	}
+	const needs = new Map<number, { width: number; height: number }>();
+	for (const list of sides.values()) {
+		const ordered = list.toSorted((a, b) => a.at - b.at);
+		const need =
+			2 * PORT_MARGIN +
+			ordered.slice(1).reduce((sum, end, index) => sum + gapOf(ordered[index]!, end), 0);
+		const { box: item, side } = ordered[0]!;
+		const known = needs.get(item) ?? { width: 0, height: 0 };
+		needs.set(
+			item,
+			horizontal(side)
+				? { ...known, width: Math.max(known.width, need) }
+				: { ...known, height: Math.max(known.height, need) },
+		);
+	}
+	return needs;
 }
 
 /** A line's sideways run in a channel between two rows: from its verticals above to those below. */
@@ -1196,8 +1230,9 @@ export function placeClasses(
 		const [near, far] = p < q ? [from, to] : [to, from];
 		const [nearLabel, farLabel] =
 			p < q ? [link.fromLabel, link.toLabel] : [link.toLabel, link.fromLabel];
-		widen(near, between[0]!, Math.max(CLASS_END_RUN, nearLabel + 16));
-		widen(between.at(-1)!, far, Math.max(CLASS_END_RUN, farLabel + 16));
+		const past = options.labelRoom ? CLEAR_LABEL_ROOM : 16;
+		widen(near, between[0]!, Math.max(CLASS_END_RUN, nearLabel + past));
+		widen(between.at(-1)!, far, Math.max(CLASS_END_RUN, farLabel + past));
 	}
 	// A loop keeps room for its run and labels from the nearest box on each side,
 	// past any corridor between them.
@@ -1239,6 +1274,7 @@ export function placeClasses(
 		port: Math.max(PORT_STEP, gap),
 		track: Math.max(CLASS_TRACK_STEP, gap),
 		lane: Math.max(LANE_CLEARANCE, gap),
+		clearLabels: options.labelRoom === true,
 	};
 	const ends = endsOf(graph, layers, rows, center);
 	if (attempt < MAX_GROWTH) {
@@ -1265,7 +1301,20 @@ export function placeClasses(
 			(item) => layers.row[item]!,
 			spacing,
 		);
-	ports();
+	const needs = ports();
+	// With room kept for clear labels, a box too short for it grows and the layout runs again.
+	if (options.labelRoom && attempt < MAX_GROWTH) {
+		const grown = boxes.map((box, item) => {
+			const need = needs.get(item);
+			const [width, height] = [
+				Math.ceil(Math.max(box.width, need?.width ?? 0)),
+				Math.ceil(Math.max(box.height, need?.height ?? 0)),
+			];
+			return width === box.width && height === box.height ? box : { ...box, width, height };
+		});
+		if (grown.some((box, item) => box !== boxes[item]))
+			return placeClasses(grown, links, options, attempt + 1);
+	}
 	const left = (item: number) => center[item]! - size(item).width / 2;
 	const portX = (end: End) => left(end.box) + end.at;
 	const linkEnds = links.map((_, index) =>
