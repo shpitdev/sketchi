@@ -33,7 +33,10 @@ Apps publish the SVGs themselves. `apps/icons` copies `svg/` to its public
 ## Node logos
 
 Diagrams embed only compact marks: no `-text` wordmarks and no source over
-`NODE_LOGO_MAX_BYTES` (64 KB). `normalizeNodeLogoSvg` adds the intrinsic
+`NODE_LOGO_MAX_BYTES` (64 KB). A test holds every non-wordmark source file
+under that cap, so every mark is a node logo; shrink an oversized source
+(fewer paths, coarser precision, a vector instead of an embedded raster)
+rather than raising the cap. `normalizeNodeLogoSvg` adds the intrinsic
 `width` and `height` from the viewBox, because browsers size a viewBox-only SVG
 image as 300x150 and distort it when drawing into a square.
 

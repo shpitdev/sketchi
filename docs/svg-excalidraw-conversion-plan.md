@@ -127,7 +127,9 @@ Minimal package skeleton plus throwaway IR. Fixtures from the real corpus: a
 wordmark with letter counters (e.g. `ai-model-providers/ai21labsai.svg`), a
 multi-color icon, a gradient icon, a `<style>`-driven icon, a real-clip icon, a
 stroke-only icon, the v1 multi-subpath artifact case, and
-`operating-systems/linux.svg` (474 KB genuine vector) as stress.
+the original `operating-systems/linux.svg` (474 KB genuine vector, now kept in
+`packages/svg-excalidraw/tests/fixtures/linux-stress.svg` since the catalog
+ships a compact Tux) as stress.
 
 Measure, in the real Excalidraw renderer:
 

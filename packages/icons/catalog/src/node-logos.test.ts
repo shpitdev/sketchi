@@ -22,20 +22,26 @@ describe("node logo eligibility", () => {
 		expect(isNodeLogoEligible({ bytes: 2_000, variant: "text" })).toBe(false);
 	});
 
-	it("selects every catalog mark except wordmarks and six oversized sources", () => {
+	it("keeps every non-wordmark mark within the cap, so all of them are node logos", () => {
 		const wordmarks = iconManifest.icons.filter((icon) => icon.variant);
 		const oversized = iconManifest.icons
 			.filter((icon) => !icon.variant && icon.bytes > NODE_LOGO_MAX_BYTES)
-			.map((icon) => icon.slug)
-			.sort();
+			.map((icon) => `${icon.slug} (${icon.bytes} bytes)`);
 
-		expect(oversized).toEqual(["aionlabs", "dolphin", "linux", "nano", "tanstack", "zustand"]);
-		expect(nodeLogoIcons).toHaveLength(
-			iconManifest.icons.length - wordmarks.length - oversized.length,
-		);
-		for (const slug of ["github", "docker", "cloudflare", "kubernetes"]) {
+		expect(oversized).toEqual([]);
+		expect(nodeLogoIcons).toHaveLength(iconManifest.icons.length - wordmarks.length);
+		for (const slug of ["github", "docker", "cloudflare", "kubernetes", "tanstack", "linux"]) {
 			expect(nodeLogoIcons.some((icon) => icon.slug === slug)).toBe(true);
 		}
+	});
+
+	it("measures every non-wordmark source file at or under the cap", () => {
+		const oversized = iconManifest.icons
+			.filter((icon) => !icon.variant)
+			.map((icon) => ({ slug: icon.slug, bytes: Buffer.byteLength(readSource(icon.slug)) }))
+			.filter(({ bytes }) => bytes > NODE_LOGO_MAX_BYTES);
+
+		expect(oversized).toEqual([]);
 	});
 });
 

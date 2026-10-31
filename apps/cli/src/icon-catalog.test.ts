@@ -15,9 +15,11 @@ describe("CLI icon catalog", () => {
 		expect(svg).toMatch(/^<svg\b[^>]* width="512" height="512"/u);
 	});
 
-	it("does not offer wordmarks or oversized marks", () => {
+	it("offers compact marks such as TanStack and Linux, but not wordmarks", () => {
 		expect(cliIconCatalog.get("docker-text")).toBeUndefined();
-		expect(cliIconCatalog.get("tanstack")).toBeUndefined();
+		for (const slug of ["tanstack", "linux"]) {
+			expect(cliIconCatalog.get(slug)?.slug, slug).toBe(slug);
+		}
 		for (const slug of ["constructor", "__proto__", "toString"]) {
 			expect(cliIconCatalog.get(slug), slug).toBeUndefined();
 		}
