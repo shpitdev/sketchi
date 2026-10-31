@@ -5,6 +5,7 @@ import {
 	flowchartFixture,
 	groupFixtures,
 	laneFixtures,
+	leftToRightHybridFlowchart,
 	pharmaBatchDispositionFlowchart,
 	routingFixtures,
 	zoneFixtures,
@@ -78,6 +79,11 @@ export const ZonesKubernetesCluster: Story = {
 
 export const ZonesHybridCloud: Story = {
 	args: { diagram: zoneFixtures["hybrid-cloud"] },
+};
+
+/** Asked for left to right: the cloud stands beside the data center and its region wraps inside it. */
+export const ZonesHybridCloudLeftToRight: Story = {
+	args: { diagram: leftToRightHybridFlowchart },
 };
 
 export const RoutingContentModeration: Story = {

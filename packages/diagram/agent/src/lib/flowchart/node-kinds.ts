@@ -28,6 +28,8 @@ const KIND_SYNONYMS: Readonly<Record<string, FlowchartNodeKind>> = {
 };
 /** Kinds that name a start or an end without saying which: the node's position decides. */
 const TERMINAL_KINDS = new Set(["terminal", "terminator", "terminus"]);
+/** Infrastructure shapes: a node drawn as one is a store or a channel, whatever its kind. */
+const INFRASTRUCTURE_SHAPES = new Set(["database", "document", "queue", "storage"]);
 
 interface Degree {
 	incoming: number;
@@ -41,6 +43,7 @@ interface LooseNode {
 	readonly label?: unknown;
 	readonly kind?: unknown;
 	readonly type?: unknown;
+	readonly shape?: unknown;
 }
 interface LooseEdge {
 	readonly source?: unknown;
@@ -72,7 +75,9 @@ const looseKey = (value: string) =>
  * several outgoing edges, keeps its value so validation asks the caller instead of turning a
  * would-be decision into a step. With another connected end, a non-question process leaf reached
  * by a labeled decision branch is also an end. Ordinary process chains still need their next edge.
- * Edges written { from, to } read as { source, target }.
+ * A connected node drawn as an infrastructure shape is an end when nothing leaves it (a database the
+ * flow stores into) and, with another connected end, a process when something does (a queue its
+ * workers read). Edges written { from, to } read as { source, target }.
  */
 export function resolveFlowchartNodeKinds(input: unknown): unknown {
 	if (!isRecord(input)) return input;
@@ -134,6 +139,13 @@ export function resolveFlowchartNodeKinds(input: unknown): unknown {
 			of(node.id).incoming > 0 &&
 			of(node.id).outgoing === 0,
 	);
+	const shaped = (node: LooseNode) =>
+		typeof node.shape === "string" && INFRASTRUCTURE_SHAPES.has(looseKey(node.shape));
+	// A shaped step nothing leaves is a store the flow ends at, and ends it as surely as an end.
+	const storeEnd = (node: LooseNode, kind: unknown) =>
+		kind === "process" && shaped(node) && of(node.id).incoming > 0 && of(node.id).outgoing === 0;
+	const endRemains =
+		hasConnectedEnd || nodes.some((node, index) => isRecord(node) && storeEnd(node, kinds[index]));
 	const decisions = new Set(
 		nodes.flatMap((node, index) =>
 			isRecord(node) && kinds[index] === "decision" ? [node.id] : [],
@@ -161,6 +173,11 @@ export function resolveFlowchartNodeKinds(input: unknown): unknown {
 		) {
 			kind = "end";
 		}
+		const { incoming, outgoing } = of(node.id);
+		if (storeEnd(node, kind)) kind = "end";
+		// A shaped end that passes data on, as a queue its workers read, is a step.
+		else if (kind === "end" && endRemains && shaped(node) && incoming > 0 && outgoing > 0)
+			kind = "process";
 		if (kind === node.kind) return node;
 		changed = true;
 		const { type: _type, ...rest } = node;

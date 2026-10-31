@@ -10,6 +10,7 @@ import {
 	canvasNodeIconBox,
 	getCanvasValidationIssues,
 	groupFixtures,
+	leftToRightHybridFlowchart,
 	parseFlowchartDiagram,
 	requestedArchitectureFlowchart,
 	routingJogReach,
@@ -57,6 +58,26 @@ const zonesOf = (scene: RenderedDiagramScene) =>
 	);
 const nodeOf = (scene: RenderedDiagramScene, id: string) =>
 	scene.elements.find((e): e is NodeSceneElement => e.type === "node" && e.nodeId === id)!;
+
+// Width over height, either way up, of what the export draws: zones, nodes and lines.
+const drawnAspect = (scene: RenderedDiagramScene) => {
+	const points = scene.elements.flatMap((element) =>
+		element.type === "arrow"
+			? element.points
+			: element.type === "node"
+				? [
+						{ x: element.x, y: element.y },
+						{ x: element.x + element.width, y: element.y + element.height },
+					]
+				: [],
+	);
+	const [xs, ys] = [points.map((point) => point.x), points.map((point) => point.y)];
+	const [width, height] = [
+		Math.max(...xs) - Math.min(...xs) + 40,
+		Math.max(...ys) - Math.min(...ys) + 40,
+	];
+	return Math.max(width, height) / Math.min(width, height);
+};
 
 describe.each(directions)("zoned flowcharts %s", (direction) => {
 	it.each(Object.keys(fixtures))("draws %s with every zone nested, apart and clear", (name) => {
@@ -135,35 +156,15 @@ describe("zone layout", () => {
 		const [edge, frontend, backend] = ["edge", "frontend", "backend"].map((id) => zone(k8s, id));
 		expect(edge!.y + edge!.height).toBeLessThan(frontend!.y);
 		expect(frontend!.y + frontend!.height).toBeLessThan(backend!.y);
-		// Left to right, the region's steps follow the flow; the data center and the
-		// cloud, too long for one row, wrap into two read the same way.
+		// Left to right, the cloud stands beside the data center that feeds it; too
+		// long for one row, its region wraps inside it, each row read left to right.
 		const hybrid = rendered("hybrid-cloud");
-		expect(zone(hybrid, "onprem").y + zone(hybrid, "onprem").height).toBeLessThan(
-			zone(hybrid, "aws").y,
+		expect(zone(hybrid, "onprem").x + zone(hybrid, "onprem").width).toBeLessThan(
+			zone(hybrid, "aws").x,
 		);
-		const [queue, sync] = [nodeOf(hybrid, "orders"), nodeOf(hybrid, "sync")];
-		expect(queue.x + queue.width).toBeLessThan(sync.x);
+		const [vpn, api] = [nodeOf(hybrid, "vpn"), nodeOf(hybrid, "api")];
+		expect(vpn.x + vpn.width).toBeLessThan(api.x);
 	});
-
-	// Width over height, either way up, of what the export draws: zones, nodes and lines.
-	const drawnAspect = (scene: RenderedDiagramScene) => {
-		const points = scene.elements.flatMap((element) =>
-			element.type === "arrow"
-				? element.points
-				: element.type === "node"
-					? [
-							{ x: element.x, y: element.y },
-							{ x: element.x + element.width, y: element.y + element.height },
-						]
-					: [],
-		);
-		const [xs, ys] = [points.map((point) => point.x), points.map((point) => point.y)];
-		const [width, height] = [
-			Math.max(...xs) - Math.min(...xs) + 40,
-			Math.max(...ys) - Math.min(...ys) + 40,
-		];
-		return Math.max(width, height) / Math.min(width, height);
-	};
 
 	// Each ran 3.4:1 to 8.1:1 in one row or column; the stress case wraps least.
 	it.each([
@@ -403,6 +404,28 @@ describe("lines into a hanging zone band", () => {
 		expect(aws.x).toBeGreaterThan(dc.x + dc.width);
 		expect(dc.y).toBeLessThan(aws.y + aws.height);
 	});
+
+	it.each(["LR", "RL"] as const)(
+		"keeps the cloud beside the data center it follows in a %s row",
+		(direction) => {
+			// Two of three Sol samples asked for left to right hung the cloud under the
+			// data center: a top-level wrap came within the target aspect in two bands,
+			// the region's wrap inside the cloud in three, and the fewer bands won. The
+			// ERP's line ran down and back against the row to the VPN gateway.
+			const scene = renderIntermediateDiagram({
+				...leftToRightHybridFlowchart,
+				layout: { direction, edgeRouting: "orthogonal" },
+			});
+			const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
+			const [dc, aws] = [zones.get("group:dc")!, zones.get("group:aws")!];
+			const forward = direction === "LR" ? 1 : -1;
+			const [erp, vpn] = [nodeOf(scene, "erp"), nodeOf(scene, "vpn")];
+			if (direction === "LR") expect(aws.x).toBeGreaterThan(dc.x + dc.width);
+			else expect(dc.x).toBeGreaterThan(aws.x + aws.width);
+			expect(forward * (vpn.x - erp.x)).toBeGreaterThan(0);
+			expect(drawnAspect(scene)).toBeLessThan(2.45);
+		},
+	);
 
 	it("keeps the data center beside the cloud when a side change clears its region's wrap of crossings", () => {
 		// A Sol sample stacked the cloud under the data center: beside it, its

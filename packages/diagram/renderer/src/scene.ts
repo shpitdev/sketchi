@@ -1790,7 +1790,8 @@ const ZONE_WRAP_ROUNDS = 2;
  * Levels wrap one at a time:
  * each time the level and band count that bring the whole diagram within
  * WRAP_TARGET_ASPECT with the fewest bands or, if none does, nearest it, while
- * that keeps helping. The single-level plans that come next are alternatives,
+ * that keeps helping; a row keeps its top-level zones side by side where a plan
+ * within the target can. The single-level plans that come next are alternatives,
  * since a plan may route worse than the layout it replaces. Planning routes
  * nothing: it measures the unrouted layout, scaled by how far the routed one
  * (`drawn`) outgrows it, since routes widen zones for their stubs.
@@ -1829,6 +1830,22 @@ function planZoneWraps(
 			? left.bands - right.bands || left.aspect - right.aspect
 			: left.aspect - right.aspect;
 	};
+	// In a row, a top-level cut between two zones hangs the later zone under the
+	// earlier, though the flow passes from one to the next along the row. A
+	// column's cut stands it beside the earlier one instead, across a wide
+	// export, where keeping both in one column would wrap the zone inside it
+	// into a taller one.
+	const row = diagram.layout.direction === "LR" || diagram.layout.direction === "RL";
+	const stacksZones = ({ next }: Plan) => {
+		const top = next.get(TOP_LEVEL);
+		if (!structure.zoned || !row || !top) return false;
+		const bands = new Set(
+			structure.groups.flatMap(({ group }) =>
+				structure.parentOf.has(group.id) ? [] : [top.bandOf.get(groupUnitId(group.id))],
+			),
+		);
+		return bands.size > 1;
+	};
 	const planned = wraps.size;
 	let current = predict(wraps);
 	const alternatives: Map<string, Wrap>[] = [];
@@ -1851,6 +1868,13 @@ function planZoneWraps(
 			}
 		}
 		const helping = plans.filter((plan) => plan.aspect < current.aspect).sort(rank);
+		// A plan within the target that keeps the zones side by side goes first,
+		// the stacking plan it passes its first alternative.
+		const sideBySide = helping.findIndex(
+			(plan) => plan.aspect <= WRAP_TARGET_ASPECT && !stacksZones(plan),
+		);
+		if (sideBySide > 0 && stacksZones(helping[0]!))
+			helping.unshift(...helping.splice(sideBySide, 1));
 		const [chosen] = helping;
 		if (!chosen) break;
 		if (wraps.size === planned)
