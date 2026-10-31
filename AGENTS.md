@@ -83,7 +83,7 @@ For routing and rendering changes, add the `preview` label, then replay the rele
 
 For UI-affecting changes, verify the changed flow against the real page.
 
-Never install or run a local Chromium. For real-page checks, use `agent-browser -p browserbase` against the PR preview or production. A browser test that is genuinely valuable calls Browserbase over its API instead of a local browser; Vitest browser-mode suites do this through `tools/testing/browserbase.ts`.
+For real-page checks, use `agent-browser` against the PR preview or production, headless (its default) or with `-p browserbase`. Never open a visible browser window on the owner's machine (`--headed` or any automation that pops up). A browser test that is genuinely valuable calls Browserbase over its API instead of a local browser; Vitest browser-mode suites do this through `tools/testing/browserbase.ts`.
 
 ## Temporary Artifacts
 
