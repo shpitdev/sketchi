@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.31.4
+
+### Patch Changes
+
+- [#603](https://github.com/shpitdev/sketchi/pull/603) [`e232809`](https://github.com/shpitdev/sketchi/commit/e232809bb187c780286e4f7cfe9774406f1341c2) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi --help` now opens with "Editable diagrams from a prompt." instead of the "describe it. sketchi draws it." tagline, matching sketchi.app.
+
 ## 0.31.3
 
 ### Patch Changes
