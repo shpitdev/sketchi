@@ -12,7 +12,8 @@ const build = (input: Record<string, unknown>): ClassDiagram =>
  * Class diagrams that stress the layout: a model of twenty classes, a
  * hierarchy wider than any row should run, one five levels deep with an
  * interface several rows above its implementer, a class related to itself
- * twice, and two classes in one row with a third between them.
+ * twice, two classes in one row with a third between them, and two named
+ * dependencies running opposite ways between a pair of interfaces.
  */
 export const classStressFixtures = {
 	library: build({
@@ -291,6 +292,76 @@ export const classStressFixtures = {
 			{ id: "totals", kind: "dependency", from: "Checkout", to: "Cart" },
 			{ id: "regular", kind: "realization", from: "Regular", to: "PricingStrategy" },
 			{ id: "sale", kind: "realization", from: "Sale", to: "PricingStrategy" },
+		],
+	}),
+	// Sol's observer-pattern-class-v2 build (rv583): "attach / detach" stood between its own
+	// line and "update parameter"'s, 6 units from its own and 4 from the other.
+	opposingDependencies: build({
+		id: "weather-observer",
+		title: "Weather station observer",
+		classes: [
+			{
+				id: "Subject",
+				kind: "interface",
+				methods: [
+					"+ attach(o: Observer): void",
+					"+ detach(o: Observer): void",
+					"+ notifyObservers(): void",
+				],
+			},
+			{ id: "Observer", kind: "interface", methods: ["+ update(subject: Subject): void"] },
+			{
+				id: "WeatherStation",
+				attributes: ["- temperature: double", "- humidity: double", "- observers: List<Observer>"],
+				methods: [
+					"+ attach(o: Observer): void",
+					"+ detach(o: Observer): void",
+					"+ notifyObservers(): void",
+					"+ setMeasurements(t: double, h: double): void",
+					"+ getTemperature(): double",
+				],
+			},
+			{
+				id: "PhoneDisplay",
+				attributes: ["- lastReading: double"],
+				methods: ["+ update(subject: Subject): void"],
+			},
+			{ id: "WindowDisplay", methods: ["+ update(subject: Subject): void"] },
+		],
+		relationships: [
+			{ id: "station-subject", kind: "realization", from: "WeatherStation", to: "Subject" },
+			{ id: "phone-observer", kind: "realization", from: "PhoneDisplay", to: "Observer" },
+			{ id: "window-observer", kind: "realization", from: "WindowDisplay", to: "Observer" },
+			{
+				id: "observers",
+				kind: "association",
+				from: "WeatherStation",
+				to: "Observer",
+				toMultiplicity: "0..*",
+				toRole: "observers",
+				navigable: true,
+			},
+			{
+				id: "attaches",
+				kind: "dependency",
+				from: "Subject",
+				to: "Observer",
+				label: "attach / detach",
+			},
+			{
+				id: "updates",
+				kind: "dependency",
+				from: "Observer",
+				to: "Subject",
+				label: "update parameter",
+			},
+			{
+				id: "reads",
+				kind: "dependency",
+				from: "PhoneDisplay",
+				to: "WeatherStation",
+				label: "casts to; getTemperature()",
+			},
 		],
 	}),
 } as const satisfies Record<string, ClassDiagram>;

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { classFixture } from "@sketchi/diagram-core";
+import { classFixture, classStressFixtures } from "@sketchi/diagram-core";
 import { classScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../components/generation-workspace";
@@ -36,6 +36,11 @@ export const DomainModel: Story = {
 /** Interfaces realized by concrete classes, a navigable association and a named dependency. */
 export const ObserverPattern: Story = {
 	args: { diagram: scenarioDiagram("observer-pattern-class-v2") },
+};
+
+/** Two named dependencies running opposite ways between two interfaces, each name beside its own line. */
+export const OpposingDependencies: Story = {
+	args: { diagram: classStressFixtures.opposingDependencies },
 };
 
 /** Fifteen classes in rows, two hierarchies and the associations between them. */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	type AxisAlignedSegment,
 	candidateRouteQuality,
 	type ClassDiagram,
 	type ClassRelationshipKind,
@@ -198,6 +199,12 @@ function routingCounts(scene: RenderedDiagramScene) {
 const PORT_CLEARANCE = 24;
 /** Parallel runs of two lines closer than this read as one line. */
 const PARALLEL_CLEARANCE = 10;
+/**
+ * A label reads as its own line's only when every other line stands half again
+ * as far off, and at least this much further.
+ */
+const ATTRIBUTION_RATIO = 1.5;
+const ATTRIBUTION_MARGIN = 8;
 
 /** Everything the export validator, the canvas validator or the layout guards would flag. */
 function defects(diagram: ClassDiagram): string[] {
@@ -319,6 +326,29 @@ function defects(diagram: ClassDiagram): string[] {
 			)
 			.map((other) => `${label.id} on ${other.id}`),
 	]);
+	// Every free label reads as its own line's: every other line stands clearly further off.
+	const routes = new Map(arrows.map((arrow) => [arrow.edgeId, segmentsFromPoints(arrow.points)]));
+	const gap = (label: (typeof labels)[number], run: AxisAlignedSegment) => {
+		const [x0, x1, y0, y1] =
+			run.orientation === "horizontal"
+				? [run.min, run.max, run.staticCoordinate, run.staticCoordinate]
+				: [run.staticCoordinate, run.staticCoordinate, run.min, run.max];
+		return Math.hypot(
+			Math.max(0, label.left - x1, x0 - label.right),
+			Math.max(0, label.top - y1, y0 - label.bottom),
+		);
+	};
+	const misattributed = labels.flatMap((label) => {
+		const owner = label.id.split(":")[1]!;
+		const own = Math.min(...routes.get(owner)!.map((run) => gap(label, run)));
+		const [other, nearest] = [...routes]
+			.filter(([id]) => id !== owner)
+			.map(([id, runs]) => [id, Math.min(...runs.map((run) => gap(label, run)))] as const)
+			.reduce((best, next) => (next[1] < best[1] ? next : best), ["", Infinity] as const);
+		return nearest < Math.max(ATTRIBUTION_RATIO * own, own + ATTRIBUTION_MARGIN)
+			? [`${label.id} ${own.toFixed(0)} px from its line, ${nearest.toFixed(0)} px from ${other}`]
+			: [];
+	});
 	// No two lines run side by side closer than a reader can tell apart.
 	const runs = arrows.flatMap((arrow) =>
 		segmentsFromPoints(arrow.points).map((segment) => ({ arrow: arrow.id, segment })),
@@ -347,6 +377,7 @@ function defects(diagram: ClassDiagram): string[] {
 		...packed,
 		...unwrapped,
 		...crowded,
+		...misattributed,
 		...hugging,
 	];
 }
@@ -356,7 +387,7 @@ function defects(diagram: ClassDiagram): string[] {
  * draws, in order. None may draw more crossings, nor more crossings and
  * findings together, and together they may draw no more of either.
  */
-const CLASS_ROUTING = "0/0 0/0 0/0 2/1 0/0 0/0 0/2 0/0 0/0 1/0 0/0 0/1 0/0 0/0 0/0 0/0";
+const CLASS_ROUTING = "0/0 0/0 0/0 0/2 0/0 0/0 0/2 0/0 0/0 1/0 0/0 0/1 0/0 0/0 0/0 0/0";
 
 /** Models checked in CI; the full fuzz runs locally with CLASS_FUZZ=full (and any CLASS_FUZZ_SEED). */
 const CI_MODELS = 16;

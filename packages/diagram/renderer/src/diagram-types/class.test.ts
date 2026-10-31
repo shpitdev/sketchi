@@ -303,6 +303,40 @@ describe("class diagram renderer", () => {
 		if (role.type === "text") expect(Math.hypot(role.x - tip.x, role.y - tip.y)).toBeLessThan(80);
 	});
 
+	it("sets every label clearly nearer its own line than any other", () => {
+		// Each other line stands half again as far from the label as its own, and 8 units further.
+		const gap = (label: ReturnType<typeof labelBoxes>[number], line: ArrowSceneElement) =>
+			Math.min(
+				...segmentsFromPoints(line.points).map((run) => {
+					const [low, high] = [run.min, run.max];
+					const along =
+						run.orientation === "horizontal"
+							? Math.max(0, label.left - high, low - label.right)
+							: Math.max(0, label.top - high, low - label.bottom);
+					const across =
+						run.orientation === "horizontal"
+							? Math.max(0, label.top - run.staticCoordinate, run.staticCoordinate - label.bottom)
+							: Math.max(0, label.left - run.staticCoordinate, run.staticCoordinate - label.right);
+					return Math.hypot(along, across);
+				}),
+			);
+		for (const diagram of all) {
+			const scene = renderDiagram(diagram);
+			for (const label of labelBoxes(scene)) {
+				const own = arrow(scene, label.id.split(":")[1]!);
+				const mine = gap(label, own);
+				const nearest = Math.min(
+					...arrows(scene)
+						.filter((line) => line !== own)
+						.map((line) => gap(label, line)),
+				);
+				expect(nearest, `${diagram.id} ${label.id}`).toBeGreaterThanOrEqual(
+					Math.max(1.5 * mine, mine + 8),
+				);
+			}
+		}
+	});
+
 	it("loops a relationship to its own class out and back on one side, nesting a second", () => {
 		const scene = renderDiagram(classStressFixtures.selfReference);
 		const employee = box(scene, "Employee");
