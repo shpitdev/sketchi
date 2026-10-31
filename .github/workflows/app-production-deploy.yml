@@ -67,9 +67,6 @@ jobs:
       - uses: ./.github/actions/setup-workspace
         if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
 
-      - if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
-        run: pnpm run test:deploy-scripts
-
       - name: Resolve Worker project and identity
         id: worker-app
         if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}

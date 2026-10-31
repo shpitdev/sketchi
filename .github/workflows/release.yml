@@ -28,11 +28,18 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # The source check reads merged PRs and their local-ci statuses.
+      pull-requests: read
+      statuses: read
     outputs:
       publish: ${{ steps.check.outputs.publish }}
       version: ${{ steps.check.outputs.version }}
+      verified: ${{ steps.source.outputs.verified }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # HEAD^ is the merge a Version Packages commit follows.
+          fetch-depth: 2
       - uses: ./.github/actions/setup-workspace
         with:
           install-dependencies: "false"
@@ -83,12 +90,20 @@ jobs:
           cat view-error.log >&2
           exit 1
 
-  # Nothing reaches npm without the full local gate on the released source. The
-  # Version Packages PR cannot run it itself: nobody runs pnpm ci:local on a PR
-  # opened with GITHUB_TOKEN, so this is where a broken release is actually caught.
+      - name: Find a local-ci signoff on the exact released source
+        id: source
+        if: steps.check.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release-source-signoff.mjs
+
+  # Nothing reaches npm without the full local gate on the released source. A
+  # Version Packages commit usually only bumps versions over a merged PR head that
+  # `pnpm ci:local` signed off; otherwise (nobody runs the gate on a PR opened with
+  # GITHUB_TOKEN) this job runs it, and is where a broken release is caught.
   verify:
     needs: guard
-    if: ${{ needs.guard.outputs.publish == 'true' }}
+    if: ${{ needs.guard.outputs.publish == 'true' && needs.guard.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -104,7 +119,8 @@ jobs:
 
   publish:
     needs: [guard, verify]
-    if: ${{ needs.guard.outputs.publish == 'true' }}
+    # A skipped verify means a local-ci signoff already covers the released source.
+    if: ${{ !cancelled() && needs.guard.outputs.publish == 'true' && (needs.verify.result == 'success' || needs.verify.result == 'skipped') }}
     runs-on: ubuntu-latest
     # id-token: write is required for npm OIDC trusted publishing; no npm secret
     # or NODE_AUTH_TOKEN is used. contents stays read-only here.
@@ -139,7 +155,7 @@ jobs:
 
   tag:
     needs: [guard, verify, publish]
-    if: ${{ needs.guard.outputs.publish == 'true' }}
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
     # contents: write is scoped to this job only, purely to push the release tag.
     permissions:
@@ -170,7 +186,7 @@ jobs:
 
   release:
     needs: [guard, verify, publish, tag]
-    if: ${{ needs.guard.outputs.publish == 'true' }}
+    if: ${{ !cancelled() && needs.tag.result == 'success' }}
     runs-on: ubuntu-latest
     # contents: write is scoped to this job only, purely to create the GitHub Release.
     permissions:
