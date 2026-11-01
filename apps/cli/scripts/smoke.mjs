@@ -329,7 +329,7 @@ try {
 			archivedNotices.stdout.includes(Buffer.from("is-ci 4.1.0")) &&
 			archivedNotices.stdout.includes(Buffer.from("pako 2.0.3")) &&
 			archivedNotices.stdout.includes(Buffer.from("Vitaly Puzrin and Andrei Tuputcyn")) &&
-			archivedNotices.stdout.includes(Buffer.from("linkedom 0.18.13")) &&
+			archivedNotices.stdout.includes(Buffer.from("linkedom 0.18.14")) &&
 			archivedNotices.stdout.includes(Buffer.from("htmlparser2 10.1.0")),
 		"Packaged third-party notices omit a bundled dependency license.",
 	);
