@@ -532,6 +532,9 @@ importers:
       ai:
         specifier: 7.0.159
         version: 7.0.159(zod@4.6.5)
+      katex:
+        specifier: 0.19.1
+        version: 0.19.1
       lucide-react:
         specifier: 1.65.0
         version: 1.65.0(@types/react@19.3.0)(react@19.3.1)

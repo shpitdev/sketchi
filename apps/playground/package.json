@@ -23,6 +23,7 @@
 		"@streamdown/code": "2.0.0",
 		"@streamdown/math": "1.0.3",
 		"ai": "7.0.159",
+		"katex": "0.19.1",
 		"lucide-react": "1.65.0",
 		"motion": "14.9.0",
 		"nanoid": "6.0.2",

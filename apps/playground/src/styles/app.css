@@ -1,4 +1,6 @@
 @import "../../../../packages/ui/src/styles.css";
+/* Math in chat and reasoning messages (@streamdown/math renders KaTeX). */
+@import "katex/dist/katex.min.css";
 
 @source "../";
 
