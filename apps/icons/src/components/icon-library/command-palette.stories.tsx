@@ -1,4 +1,3 @@
-import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { CommandPalette } from "./command-palette";
@@ -33,13 +32,6 @@ const meta = {
 		],
 	},
 	component: CommandPalette,
-	decorators: [
-		(Story) => (
-			<TooltipProvider>
-				<Story />
-			</TooltipProvider>
-		),
-	],
 	parameters: { layout: "fullscreen" },
 	title: "Icons/Command palette",
 } satisfies Meta<typeof CommandPalette>;

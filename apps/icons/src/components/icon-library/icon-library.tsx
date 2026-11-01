@@ -55,6 +55,11 @@ function isActionTarget(target: EventTarget | null): boolean {
 	return target instanceof HTMLElement && target.closest("a, button") !== null;
 }
 
+/** The commands, if they currently apply. */
+function commandsWhen(applies: boolean, ...commands: IconCommand[]): readonly IconCommand[] {
+	return applies ? commands : [];
+}
+
 function plural(count: number, one: string, many: string): string {
 	return `${count.toLocaleString()} ${count === 1 ? one : many}`;
 }
@@ -274,39 +279,39 @@ export function IconLibrary({
 	// registered below, so every name and key is defined once.
 	const commands: readonly IconCommand[] = [
 		{ hotkey: "/", id: "search", name: "Search icons", run: focusSearch, takesFocus: true },
-		...(canSelectResults
-			? [
-					{
-						hotkey: "Mod+A",
-						id: "select-results",
-						name:
-							pendingCount > capacityLeft
-								? `Select ${capacityLeft.toLocaleString()} of these results`
-								: `Select all ${plural(results.length, "result", "results")}`,
-						run: selectAllResults,
-					},
-				]
-			: []),
-		...(selectedCount && !selectionBusy
-			? [
-					{
-						id: "copy-selected",
-						name: `Copy ${selectedLabel}`,
-						run: () => void runSelectionAction("copy"),
-					},
-					{
-						id: "download-selected",
-						name: `Download ${selectedLabel} as zip`,
-						run: () => void runSelectionAction("zip"),
-					},
-				]
-			: []),
-		...(selectedCount
-			? [{ hotkey: "Mod+D", id: "clear-selection", name: "Clear selection", run: clearSelection }]
-			: []),
-		...(filtered
-			? [{ id: "clear-filters", name: "Clear search and filters", run: clearFilters }]
-			: []),
+		...commandsWhen(canSelectResults, {
+			hotkey: "Mod+A",
+			id: "select-results",
+			name:
+				pendingCount > capacityLeft
+					? `Select ${capacityLeft.toLocaleString()} of these results`
+					: `Select all ${plural(results.length, "result", "results")}`,
+			run: selectAllResults,
+		}),
+		...commandsWhen(
+			selectedCount > 0 && !selectionBusy,
+			{
+				id: "copy-selected",
+				name: `Copy ${selectedLabel}`,
+				run: () => void runSelectionAction("copy"),
+			},
+			{
+				id: "download-selected",
+				name: `Download ${selectedLabel} as zip`,
+				run: () => void runSelectionAction("zip"),
+			},
+		),
+		...commandsWhen(selectedCount > 0, {
+			hotkey: "Mod+D",
+			id: "clear-selection",
+			name: "Clear selection",
+			run: clearSelection,
+		}),
+		...commandsWhen(filtered, {
+			id: "clear-filters",
+			name: "Clear search and filters",
+			run: clearFilters,
+		}),
 		{
 			id: "preview",
 			name: previewMode === "light" ? "Use dark preview" : "Use light preview",
