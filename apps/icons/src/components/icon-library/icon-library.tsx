@@ -52,8 +52,15 @@ const emptyData: IconManifest = {
 
 const noCollections: readonly string[] = [];
 
+/**
+ * Links, buttons and form controls, which keep their own arrow and Enter keys.
+ * Hotkeys only leaves a checkbox its Space key, so the grid checks this itself.
+ */
 function isActionTarget(target: EventTarget | null): boolean {
-	return target instanceof HTMLElement && target.closest("a, button") !== null;
+	return (
+		target instanceof HTMLElement &&
+		target.closest("a, button, input, select, textarea, [contenteditable]") !== null
+	);
 }
 
 const nonTextInputTypes = new Set(["button", "checkbox", "radio", "reset", "submit"]);
