@@ -390,8 +390,8 @@ importers:
         specifier: 0.18.14
         version: 0.18.14
       pako:
-        specifier: 2.0.3
-        version: 2.0.3
+        specifier: 2.2.0
+        version: 2.2.0
       string-width:
         specifier: 8.3.0
         version: 8.3.0
@@ -9152,6 +9152,9 @@ packages:
 
   pako@2.0.3:
     resolution: {integrity: sha512-WjR1hOeg+kki3ZIOjaf4b5WVcay1jaliKSYiEaB1XzwhMQZJxRdQRv0V31EKBYlxb4T7SK3hjfc/jxyU64BoSw==}
+
+  pako@2.2.0:
+    resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -19632,6 +19635,8 @@ snapshots:
   package-manager-detector@1.9.0: {}
 
   pako@2.0.3: {}
+
+  pako@2.2.0: {}
 
   parent-module@1.0.1:
     dependencies:
