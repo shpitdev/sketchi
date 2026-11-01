@@ -106,7 +106,7 @@
 }
 
 .sketchi-flowchart-build-report__status {
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 15px;
 	font-weight: 700;
 }

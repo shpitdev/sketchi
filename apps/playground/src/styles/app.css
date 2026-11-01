@@ -157,7 +157,7 @@ body {
 }
 
 .studio__empty-title {
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: clamp(28px, 3.2vw, 36px);
 	font-weight: 700;
 	line-height: 1.05;
@@ -351,7 +351,7 @@ body {
 
 .studio__stage-title {
 	margin: 0;
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 22px;
 	font-weight: 700;
 }
@@ -846,7 +846,7 @@ button.studio__artifact-link {
 
 .studio-workspace__title {
 	margin: 2px 0 0;
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 34px;
 	line-height: 1.05;
 }
@@ -895,7 +895,7 @@ button.studio__artifact-link {
 
 .studio-project-row__content h2 {
 	margin: 0;
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 20px;
 	line-height: 1.15;
 }
