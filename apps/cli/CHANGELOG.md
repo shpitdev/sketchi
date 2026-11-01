@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.31.6
+
+### Patch Changes
+
+- [#612](https://github.com/shpitdev/sketchi/pull/612) [`d319d01`](https://github.com/shpitdev/sketchi/commit/d319d01b8e0cac816f56a242f841216163b947d9) Thanks [@anandpant](https://github.com/anandpant)! - Bundle pako 3.0.3 for Excalidraw share links. The CLI selects pako's classic zlib hash, so `sketchi share` produces the same encrypted payload bytes as before and `sketchi pull` reads existing links unchanged. The bundled third-party notices list pako 3.0.3.
+
 ## 0.31.5
 
 ### Patch Changes
