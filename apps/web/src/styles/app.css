@@ -475,46 +475,6 @@
 	inline-size: 38px;
 }
 
-.site-header__mark {
-	align-items: center;
-	border-radius: var(--r-sm);
-	color: var(--ink-2);
-	display: inline-flex;
-	block-size: 40px;
-	justify-content: center;
-	min-inline-size: 40px;
-	padding-inline: 9px;
-	transition:
-		color 0.16s var(--ease),
-		background 0.16s var(--ease);
-}
-
-.site-header__mark:hover {
-	background: color-mix(in srgb, var(--card) 70%, transparent);
-	color: var(--ink);
-}
-
-.site-header__mark:focus-visible {
-	outline: 2px solid var(--blueprint);
-	outline-offset: 2px;
-}
-
-/* The marks are a pair, so they sit tighter to each other than to the
-   surrounding actions. */
-.site-header__mark + .site-header__mark {
-	margin-inline-start: -6px;
-}
-
-.site-header__mark[aria-current="page"] {
-	background: var(--accent-wash);
-	color: var(--accent-ink);
-}
-
-.site-header__glyph {
-	block-size: 20px;
-	inline-size: 20px;
-}
-
 .site-footer__gh {
 	align-items: center;
 	color: #d8d1c2;
@@ -597,39 +557,91 @@
 }
 
 .benefit {
-	align-items: flex-start;
+	align-items: center;
 	display: flex;
-	gap: 14px;
+	gap: 16px;
 	min-width: 0;
-	padding: 24px;
+	padding: 20px 24px;
 }
 
 .benefit + .benefit {
 	border-inline-start: 1px solid var(--line);
 }
 
-.benefit__icon {
+/* Every visual sits in the same box so the three titles line up. */
+.benefit__visual {
 	align-items: center;
-	background: var(--accent-wash);
-	block-size: 42px;
-	border-radius: 11px;
-	color: var(--accent-ink);
 	display: inline-flex;
 	flex: none;
-	inline-size: 42px;
+	block-size: 44px;
+	inline-size: 80px;
 	justify-content: center;
 }
 
-.benefit__icon svg {
-	block-size: 21px;
-	inline-size: 21px;
-	stroke-width: 1.8;
+.benefit__shapes {
+	overflow: visible;
 }
 
-.benefit__text {
-	display: grid;
-	gap: 2px;
-	min-width: 0;
+.benefit__shape {
+	fill: var(--card);
+	stroke: var(--ink);
+	stroke-width: 1.5;
+}
+
+.benefit__shape--selected {
+	fill: var(--accent-wash);
+}
+
+.benefit__arrow {
+	stroke: var(--ink);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.5;
+}
+
+.benefit__selection {
+	stroke: var(--blueprint);
+	stroke-dasharray: 3 2;
+	stroke-width: 1;
+}
+
+.benefit__handle {
+	fill: var(--card);
+	stroke: var(--blueprint);
+	stroke-width: 1;
+}
+
+.benefit__agents {
+	display: inline-flex;
+}
+
+.benefit__agent {
+	background: var(--card);
+	block-size: 30px;
+	border: 1px solid var(--line-2);
+	border-radius: 8px;
+	box-shadow: var(--shadow-sm);
+	display: inline-flex;
+	flex: none;
+	inline-size: 30px;
+	padding: 4px;
+	z-index: calc(3 - var(--n));
+}
+
+.benefit__agent + .benefit__agent {
+	margin-inline-start: -5px;
+}
+
+.benefit__agent img {
+	block-size: 100%;
+	inline-size: 100%;
+}
+
+.benefit__price {
+	color: var(--accent-ink);
+	font-family: var(--font-script);
+	font-size: 38px;
+	line-height: 1;
 }
 
 .benefit__title {
@@ -637,12 +649,7 @@
 	font-size: 16px;
 	font-weight: 700;
 	line-height: 1.3;
-}
-
-.benefit__detail {
-	color: var(--ink-2);
-	font-size: 14px;
-	line-height: 1.45;
+	min-width: 0;
 }
 
 /* ===================================================================== */
@@ -1401,16 +1408,15 @@
 		width: 100%;
 	}
 
-	/* Still three equal columns, each centred with its icon on top. */
+	/* Still three equal columns, each centred with its visual on top. */
 	.benefit {
-		align-items: center;
 		flex-direction: column;
 		gap: 10px;
-		padding: 22px 16px;
+		padding: 20px 16px;
 		text-align: center;
 	}
 
-	.benefit__text {
+	.benefit__title {
 		text-wrap: balance;
 	}
 
@@ -1488,14 +1494,13 @@
 	}
 
 	.benefit {
-		align-items: flex-start;
 		flex-direction: row;
 		gap: 14px;
-		padding: 16px 0;
+		padding: 14px 0;
 		text-align: start;
 	}
 
-	.benefit__text {
+	.benefit__title {
 		text-wrap: wrap;
 	}
 

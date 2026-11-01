@@ -124,10 +124,12 @@ export function useIconSources(selectedIcons: readonly SketchiIcon[]) {
 			});
 			if (action === "copy") {
 				await copyText(sources.map(({ svg }) => svg).join("\n\n"));
-				showNotice(`${sources.length} SVGs copied.`);
+				showNotice(`Copied ${sources.length} ${sources.length === 1 ? "SVG" : "SVGs"}.`);
 			} else {
 				downloadBlob(createIconZip(sources), "sketchi-icons.zip");
-				showNotice(`${sources.length} SVGs downloaded as a zip.`);
+				showNotice(
+					`Downloaded ${sources.length} ${sources.length === 1 ? "SVG" : "SVGs"} as a zip.`,
+				);
 			}
 		} catch {
 			showNotice("Could not prepare the selected icons. Try again.");

@@ -8,7 +8,7 @@ import {
 	describeSelectionNotice,
 	initialSelectionState,
 	remainingCapacity,
-	selectAllLabel,
+	selectResultsLabel,
 	SELECTION_LIMIT,
 	type SelectionEvent,
 	type SelectionState,
@@ -60,21 +60,19 @@ describe("remainingCapacity", () => {
 	});
 });
 
-describe("selectAllLabel", () => {
-	it("names the exact count when everything fits", () => {
-		expect(selectAllLabel(262, 262, SELECTION_LIMIT)).toBe("Select all 262");
+describe("selectResultsLabel", () => {
+	it("stays short when every pending result fits", () => {
+		expect(selectResultsLabel(262, SELECTION_LIMIT)).toBe("Select all");
+		expect(selectResultsLabel(0, 84)).toBe("Select all");
 	});
 
 	it("states the truncation before the click rather than after", () => {
-		expect(selectAllLabel(1412, 1412, SELECTION_LIMIT)).toBe("Select 300 more of 1,412");
-	});
-
-	it("never promises icons that are already selected", () => {
-		expect(selectAllLabel(216, 0, 84)).toBe("All 216 selected");
+		expect(selectResultsLabel(1412, SELECTION_LIMIT)).toBe("Select 300");
+		expect(selectResultsLabel(216, 84)).toBe("Select 84");
 	});
 
 	it("reports a full selection", () => {
-		expect(selectAllLabel(262, 262, 0)).toBe("Selection full");
+		expect(selectResultsLabel(262, 0)).toBe("Selection full");
 	});
 });
 
@@ -168,6 +166,18 @@ describe("applySelectionEvent", () => {
 		const state = applySelectionEvent(selected, { type: "clear" });
 		expect(state.slugs.size).toBe(0);
 		expect(state.notice).toEqual({ kind: "cleared" });
+	});
+
+	it("removes only the given slugs and keeps the rest of the selection", () => {
+		const selected = fold([
+			{ slug: "a", type: "toggle" },
+			{ slug: "b", type: "toggle" },
+			{ slug: "c", type: "toggle" },
+		]);
+		const state = applySelectionEvent(selected, { slugs: ["a", "b", "z"], type: "deselect" });
+		expect([...state.slugs]).toEqual(["c"]);
+		expect(state.notice).toEqual({ kind: "deselected", removed: 2 });
+		expect(applySelectionEvent(state, { slugs: ["z"], type: "deselect" })).toBe(state);
 	});
 
 	it("keeps the real limit at the documented cap", () => {

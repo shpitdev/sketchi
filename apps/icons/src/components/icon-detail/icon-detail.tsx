@@ -1,8 +1,10 @@
+import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 
 import { formatBytes } from "../../lib/format-bytes.js";
+import { PreviewToggle } from "../preview-toggle/index.js";
 
 export type IconDetailAction = "copy-data-uri" | "copy-jsx" | "copy-svg" | "copy-url" | "download";
 
@@ -99,17 +101,18 @@ export function IconDetail({
 		>
 			<header className="icon-detail__head">
 				<div>
-					<p className="icon-detail__collection">{formatCollectionLabel(icon.collection)}</p>
 					<h2>{icon.name}</h2>
+					<p className="icon-detail__collection">{formatCollectionLabel(icon.collection)}</p>
 				</div>
 				<button
 					aria-label="Close icon details"
 					className="icon-detail__close"
 					onClick={onClose}
 					ref={closeButtonRef}
+					title="Close"
 					type="button"
 				>
-					Close
+					<X aria-hidden="true" />
 				</button>
 			</header>
 
@@ -117,24 +120,8 @@ export function IconDetail({
 				<img alt={`${icon.name} preview`} src={icon.svgPath} />
 			</div>
 
-			<div className="preview-toggle" aria-label="Preview background">
-				<span>Preview</span>
-				<div className="preview-toggle__buttons">
-					<button
-						aria-pressed={previewMode === "light"}
-						onClick={() => onPreviewModeChange?.("light")}
-						type="button"
-					>
-						Light
-					</button>
-					<button
-						aria-pressed={previewMode === "dark"}
-						onClick={() => onPreviewModeChange?.("dark")}
-						type="button"
-					>
-						Dark
-					</button>
-				</div>
+			<div className="icon-detail__preview-row">
+				<PreviewToggle onChange={(mode) => onPreviewModeChange?.(mode)} value={previewMode} />
 			</div>
 
 			<dl className="icon-detail__meta">

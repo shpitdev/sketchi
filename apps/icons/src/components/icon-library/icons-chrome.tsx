@@ -1,13 +1,23 @@
+import { GitHubMark, HeaderIconLink } from "@sketchi/ui/components/header-icon-link";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@sketchi/ui/components/tooltip";
+import { BookOpen, Command } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { PLAYGROUND_URL, REPO_URL } from "../../lib/home-url.js";
 
 export function IconsChrome({
 	children,
-	homeHref,
+	commandShortcut,
 	detailOpen,
+	homeHref,
+	onOpenCommands,
 }: {
 	children: ReactNode;
-	homeHref: string;
+	/** Platform label for the palette shortcut, e.g. "⌘K" or "Ctrl K". */
+	commandShortcut: string;
 	detailOpen: boolean;
+	homeHref: string;
+	onOpenCommands: () => void;
 }) {
 	return (
 		<>
@@ -22,13 +32,31 @@ export function IconsChrome({
 							<img alt="" height="30" src="/icon.svg" width="30" />
 						</span>
 						<span className="sk-wordmark">Sketchi</span>
-						<span className="icons-brand__surface">Icons</span>
 					</a>
-					<nav aria-label="Sketchi links" className="icons-header__nav">
-						<a href={`${homeHref}/docs`}>Docs</a>
-						<a href="/llms.txt">llms.txt</a>
-						<a href="https://github.com/shpitdev/sketchi">GitHub</a>
-					</nav>
+					<div className="icons-header__actions">
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<button
+									aria-haspopup="dialog"
+									aria-keyshortcuts="Control+K Meta+K"
+									aria-label="Commands"
+									className="icons-command-trigger"
+									onClick={onOpenCommands}
+									type="button"
+								>
+									<kbd className="icons-command-trigger__keys">{commandShortcut}</kbd>
+									<Command aria-hidden="true" className="icons-command-trigger__icon" />
+								</button>
+							</TooltipTrigger>
+							<TooltipContent sideOffset={6}>Commands and shortcuts</TooltipContent>
+						</Tooltip>
+						<HeaderIconLink href={`${homeHref}/docs`} label="Docs">
+							<BookOpen aria-hidden="true" />
+						</HeaderIconLink>
+						<HeaderIconLink external href={REPO_URL} label="Sketchi on GitHub" tooltip="GitHub">
+							<GitHubMark />
+						</HeaderIconLink>
+					</div>
 				</div>
 			</header>
 			{children}
@@ -38,18 +66,14 @@ export function IconsChrome({
 				inert={detailOpen ? true : undefined}
 			>
 				<div className="icons-shell icons-footer__inner">
-					<div>
-						<a className="icons-footer__brand" href={homeHref}>
-							<img alt="" height="30" src="/icon.svg" width="30" />
-							<span>Sketchi</span>
-						</a>
-						<p>Prompts become clear, editable diagrams, logos included.</p>
-					</div>
+					<a className="icons-footer__brand" href={homeHref}>
+						<img alt="" height="24" src="/icon.svg" width="24" />
+						<span>Sketchi</span>
+					</a>
 					<nav aria-label="Footer">
-						<a href={homeHref}>Home</a>
 						<a href={`${homeHref}/docs`}>Docs</a>
+						<a href={PLAYGROUND_URL}>Playground</a>
 						<a href="/llms.txt">llms.txt</a>
-						<a href="https://playground.sketchi.app">Playground</a>
 					</nav>
 				</div>
 			</footer>

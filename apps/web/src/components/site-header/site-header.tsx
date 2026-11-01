@@ -1,12 +1,8 @@
 import { Button } from "@sketchi/ui/components/button";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@sketchi/ui/components/tooltip";
+import { GitHubMark, HeaderIconLink } from "@sketchi/ui/components/header-icon-link";
+import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import { BookOpen, Menu, X } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 
 import { CLI_NPM_URL, REPO_URL } from "../../lib/cli-package";
 import { DEFAULT_WEB_SURFACE_URLS, type WebSurfaceUrls } from "../../lib/surface-urls";
@@ -72,20 +68,15 @@ export function SiteHeader({
 						Icons
 					</a>
 					<TooltipProvider>
-						<HeaderMark
-							current={activePath === docsHref}
-							href={docsHref}
-							label="Docs"
-							tooltip="Docs"
-						>
-							<BookOpen aria-hidden="true" className="site-header__glyph" />
-						</HeaderMark>
-						<HeaderMark external href={repoUrl} label="Sketchi on GitHub" tooltip="GitHub">
-							<span aria-hidden="true" className="gh-mark" />
-						</HeaderMark>
-						<HeaderMark external href={npmUrl} label="sketchi on npm" tooltip="npm">
+						<HeaderIconLink current={activePath === docsHref} href={docsHref} label="Docs">
+							<BookOpen aria-hidden="true" />
+						</HeaderIconLink>
+						<HeaderIconLink external href={repoUrl} label="Sketchi on GitHub" tooltip="GitHub">
+							<GitHubMark />
+						</HeaderIconLink>
+						<HeaderIconLink external href={npmUrl} label="sketchi on npm" tooltip="npm">
 							<span aria-hidden="true" className="npm-mark" />
-						</HeaderMark>
+						</HeaderIconLink>
 					</TooltipProvider>
 					<Button asChild size="lg" variant="brand">
 						<a href={surfaceUrls.playground}>Playground</a>
@@ -147,40 +138,5 @@ export function SiteHeader({
 				</div>
 			) : null}
 		</header>
-	);
-}
-
-/** A compact icon link with a hover and focus tooltip naming it. */
-function HeaderMark({
-	children,
-	current = false,
-	external = false,
-	href,
-	label,
-	tooltip,
-}: {
-	children: ReactNode;
-	current?: boolean;
-	external?: boolean;
-	href: string;
-	label: string;
-	tooltip: string;
-}) {
-	return (
-		<Tooltip>
-			<TooltipTrigger asChild>
-				<a
-					aria-current={current ? "page" : undefined}
-					aria-label={label}
-					className="site-header__mark"
-					href={href}
-					rel={external ? "noreferrer" : undefined}
-					target={external ? "_blank" : undefined}
-				>
-					{children}
-				</a>
-			</TooltipTrigger>
-			<TooltipContent sideOffset={6}>{tooltip}</TooltipContent>
-		</Tooltip>
 	);
 }

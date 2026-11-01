@@ -33,7 +33,9 @@ describe("IconCard", () => {
 			<IconCard icon={icon} onDetails={onDetails} onToggleSelected={onToggleSelected} selected />,
 		);
 
-		fireEvent.click(screen.getByRole("button", { name: /remove codex/i }));
+		const checkbox = screen.getByRole("checkbox", { name: "Select Codex" });
+		expect((checkbox as HTMLInputElement).checked).toBe(true);
+		fireEvent.click(checkbox);
 		fireEvent.click(screen.getByRole("button", { name: /view codex details/i }));
 		expect(onToggleSelected).toHaveBeenCalledWith(icon);
 		expect(onDetails).toHaveBeenCalledWith(icon);
