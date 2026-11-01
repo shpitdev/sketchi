@@ -83,7 +83,7 @@
 		"@storybook/addon-mcp": "10.6.5",
 		"@storybook/react-vite": "10.6.5",
 		"@swc-node/register": "1.12.1",
-		"@swc/cli": "0.8.1",
+		"@swc/cli": "0.8.2",
 		"@swc/core": "1.16.20",
 		"@swc/helpers": "0.5.23",
 		"@tanstack/router-plugin": "1.168.48",
