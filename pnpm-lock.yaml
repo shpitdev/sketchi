@@ -381,8 +381,8 @@ importers:
         specifier: 0.18.14
         version: 0.18.14
       pako:
-        specifier: 2.2.0
-        version: 2.2.0
+        specifier: 3.0.3
+        version: 3.0.3
       string-width:
         specifier: 8.3.0
         version: 8.3.0
@@ -390,9 +390,6 @@ importers:
         specifier: 10.0.2
         version: 10.0.2
     devDependencies:
-      '@types/pako':
-        specifier: 2.0.4
-        version: 2.0.4
       '@types/pngjs':
         specifier: 6.0.5
         version: 6.0.5
@@ -5599,9 +5596,6 @@ packages:
   '@types/node@26.6.6':
     resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
 
-  '@types/pako@2.0.4':
-    resolution: {integrity: sha512-VWDCbrLeVXJM9fihYodcLiIv0ku+AlOa/TQ1SvYOaBuyrSKgEcro95LJyIsJ4vSo6BXIxOKxiJAat04CmST9Fw==}
-
   '@types/parse-json@4.0.2':
     resolution: {integrity: sha512-dISoDXWWQwUquiKsyZ4Ng+HX2KsPL7LyHKHQwgGFEA3IaKac4Obd+h2a/a6waisAoepJlBcx9paWqjA8/HVjCw==}
 
@@ -8412,8 +8406,8 @@ packages:
   pako@2.0.3:
     resolution: {integrity: sha512-WjR1hOeg+kki3ZIOjaf4b5WVcay1jaliKSYiEaB1XzwhMQZJxRdQRv0V31EKBYlxb4T7SK3hjfc/jxyU64BoSw==}
 
-  pako@2.2.0:
-    resolution: {integrity: sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==}
+  pako@3.0.3:
+    resolution: {integrity: sha512-tmrebBBYI5FOw8QICGwJNqE8fotC8R+gwcxOvoFNv+GKehOI6Lc6YBolNcQNnC4v96l1wt7rh102ifD4kVeZAQ==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -14491,8 +14485,6 @@ snapshots:
     dependencies:
       undici-types: 8.9.0
 
-  '@types/pako@2.0.4': {}
-
   '@types/parse-json@4.0.2': {}
 
   '@types/pngjs@6.0.5':
@@ -17751,7 +17743,7 @@ snapshots:
 
   pako@2.0.3: {}
 
-  pako@2.2.0: {}
+  pako@3.0.3: {}
 
   parent-module@1.0.1:
     dependencies:

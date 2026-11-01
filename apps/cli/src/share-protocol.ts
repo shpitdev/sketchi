@@ -477,11 +477,11 @@ function deflateShareContents(data: Uint8Array, maximumBytes: number): Uint8Arra
 		uint32Buffer(data.byteLength),
 		data,
 	];
-	const deflater = new Deflate({ chunkSize: 64 * 1024 });
+	// Classic zlib hashing keeps the bytes Excalidraw's pako@1 format produces.
+	const deflater = new Deflate({ chunkSize: 64 * 1024, legacyHash: true });
 	const chunks: Uint8Array[] = [];
 	let size = 0;
-	deflater.onData = (chunk) => {
-		const bytes = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+	deflater.onData = (bytes) => {
 		size += bytes.byteLength;
 		if (size > maximumBytes) {
 			throw invalid(
