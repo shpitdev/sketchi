@@ -19,6 +19,11 @@
 				"command": "chromatic --storybook-build-dir storybook-static/native-conversion --storybook-config-dir apps/native-conversion-storybook/.storybook --storybook-base-dir apps/native-conversion-storybook"
 			}
 		},
+		"static-storybook": {
+			"options": {
+				"staticFilePath": "storybook-static/native-conversion"
+			}
+		},
 		"storybook": {
 			"options": {
 				"port": 6010

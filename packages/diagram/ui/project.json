@@ -29,6 +29,11 @@
 				"command": "chromatic --storybook-build-dir storybook-static/diagram-ui --storybook-config-dir packages/diagram/ui/.storybook --storybook-base-dir packages/diagram/ui"
 			}
 		},
+		"static-storybook": {
+			"options": {
+				"staticFilePath": "storybook-static/diagram-ui"
+			}
+		},
 		"storybook": {
 			"options": {
 				"port": 6006

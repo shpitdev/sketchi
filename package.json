@@ -73,6 +73,7 @@
 		"@nx/eslint-plugin": "24.0.3",
 		"@nx/js": "24.0.3",
 		"@nx/storybook": "24.0.3",
+		"@nx/web": "24.0.3",
 		"@oxlint/plugins": "1.90.0",
 		"@rspack/core": "2.3.0",
 		"@shadcn/lint": "0.2.3",

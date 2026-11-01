@@ -46,6 +46,11 @@
 				"command": "vite preview --config apps/excalidraw/vite.config.ts --host 127.0.0.1 --port 6302"
 			}
 		},
+		"static-storybook": {
+			"options": {
+				"staticFilePath": "storybook-static/excalidraw"
+			}
+		},
 		"storybook": {
 			"options": {
 				"port": 6008

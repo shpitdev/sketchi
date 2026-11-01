@@ -43,6 +43,11 @@
 				"command": "vite preview --config apps/web/vite.config.ts --host 127.0.0.1 --port 6301"
 			}
 		},
+		"static-storybook": {
+			"options": {
+				"staticFilePath": "storybook-static/web"
+			}
+		},
 		"storybook": {
 			"options": {
 				"port": 6007

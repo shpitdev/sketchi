@@ -46,6 +46,11 @@
 				"command": "vite preview --config apps/icons/vite.config.ts --host 127.0.0.1 --port 6303"
 			}
 		},
+		"static-storybook": {
+			"options": {
+				"staticFilePath": "storybook-static/icons"
+			}
+		},
 		"storybook": {
 			"dependsOn": ["sync-catalog-assets"],
 			"options": {
