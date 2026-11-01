@@ -6,3 +6,5 @@
  * serve it: a platform move must not break links we have already shipped.
  */
 export const SKETCHI_WEB_HOME_URL = "https://sketchi.app";
+
+export const SKETCHI_REPO_URL = "https://github.com/shpitdev/sketchi";

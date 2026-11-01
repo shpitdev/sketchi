@@ -17,7 +17,7 @@ import {
 	AssistantFollowUp,
 	BuildResultDetails,
 	PlaygroundComposer,
-	PlaygroundEmptyState,
+	PlaygroundStarters,
 	assistantAsksQuestion,
 	type ReadyPlaygroundArtifact,
 } from "./surface";
@@ -80,12 +80,11 @@ const rejectedBuild = {
 
 describe("playground surface", () => {
 	it("renders a genuine generated deploy scene with logos inside its nodes", () => {
-		render(<PlaygroundEmptyState onSelect={() => undefined} />);
+		render(<PlaygroundStarters onSelect={() => undefined} />);
 
-		expect(screen.getByText("Deploy pipeline")).toBeTruthy();
-		// The sample is the live renderer's output, and the caption says so. Keep
-		// the claim attached to the same figure that carries the real scene.
-		expect(screen.getByText("Rendered in Sketchi").closest("figcaption")).not.toBeNull();
+		// One caption names the sample; it sits on the figure that carries the real scene.
+		expect(screen.getByText("Example: deploy pipeline").closest("figcaption")).not.toBeNull();
+		expect(screen.queryByText("Rendered in Sketchi")).toBeNull();
 		expect(screen.getByTestId("diagram-preview").getAttribute("data-diagram-id")).toBe(
 			DEPLOY_PIPELINE_SCENE.diagramId,
 		);
@@ -118,7 +117,7 @@ describe("playground surface", () => {
 		expect(DEPLOY_PIPELINE_SPEC.edges).toEqual([
 			{ source: "push", target: "build" },
 			{ source: "build", target: "tests" },
-			{ label: "pass", source: "tests", target: "deploy" },
+			{ source: "tests", target: "deploy" },
 		]);
 		expect(JSON.stringify(DEPLOY_PIPELINE_SPEC)).not.toMatch(/fix build|retry/i);
 		expect(JSON.stringify(DEPLOY_PIPELINE_SCENE)).not.toMatch(/fix build|retry/i);
@@ -158,12 +157,20 @@ describe("playground surface", () => {
 		expect(document.querySelector(".studio__sample-arrow")).toBeNull();
 	});
 
-	it("keeps equal-priority starters and a separate mind map announcement", () => {
-		render(<PlaygroundEmptyState onSelect={() => undefined} />);
+	it("shows short starter labels that send the full prompt, without announcements", () => {
+		const selections: string[] = [];
+		render(<PlaygroundStarters onSelect={(prompt) => selections.push(prompt)} />);
 
-		expect(screen.getByLabelText("Starter prompts").children).toHaveLength(3);
-		expect(screen.getByText("Mind maps are a new sketch type, ready to explore.")).toBeTruthy();
-		expect(screen.getByRole("link", { name: "View the example →" })).toBeTruthy();
+		const starters = screen.getByLabelText("Starter prompts");
+		expect([...starters.children].map((starter) => starter.textContent)).toEqual([
+			"Login flow",
+			"CI/CD pipeline",
+			"Checkout sequence",
+		]);
+		fireEvent.click(screen.getByRole("button", { name: "Login flow" }));
+		expect(selections).toEqual(["Sketch a login flow with retries and a fraud check"]);
+		expect(screen.queryByText(/mind map/i)).toBeNull();
+		expect(screen.queryByRole("link")).toBeNull();
 	});
 
 	it("keeps generation telemetry inside a closed disclosure", () => {
@@ -174,6 +181,8 @@ describe("playground surface", () => {
 		expect(disclosure?.textContent).toContain("9.0");
 		expect(disclosure?.textContent).toContain("Diagram items2");
 		expect(screen.queryByText(/canonical artifact/i)).toBeNull();
+		// The action bar beside the stage already says the diagram is usable.
+		expect(screen.queryByText(/ready to view/i)).toBeNull();
 		expect(screen.queryByText(/attempt 1 of 3/i)).toBeNull();
 	});
 
@@ -196,6 +205,7 @@ describe("playground surface", () => {
 		render(<BuildResultDetails pass={3} result={rejectedBuild} />);
 
 		expect(screen.getByText("This draft needs another pass before it is ready.")).toBeTruthy();
+		expect(screen.queryByText("This version needs a few changes before it is ready.")).toBeNull();
 		expect(
 			screen.getByText("Ask Sketchi to simplify the flow or try a shorter description."),
 		).toBeTruthy();
@@ -219,6 +229,25 @@ describe("playground surface", () => {
 		fireEvent.change(composer, { target: { value: "Map a release flow" } });
 		expect(screen.getByLabelText("Describe your diagram")).toBe(composer);
 		expect(composer.value).toBe("Map a release flow");
+	});
+
+	it("names the composer button Send, keeps it a send after an error, and Stop while busy", () => {
+		const props = {
+			buildMode: false,
+			composerRef: createRef<HTMLTextAreaElement>(),
+			onSubmit: () => undefined,
+		};
+		const { rerender } = render(<PlaygroundComposer {...props} status="ready" />);
+		const sendIcon = screen.getByRole("button", { name: "Send" }).innerHTML;
+		expect(screen.queryByText(/Enter to send/)).toBeNull();
+
+		rerender(<PlaygroundComposer {...props} status="error" />);
+		const retry = screen.getByRole("button", { name: "Send" });
+		expect(retry.getAttribute("type")).toBe("submit");
+		expect(retry.innerHTML).toBe(sendIcon);
+
+		rerender(<PlaygroundComposer {...props} status="streaming" />);
+		expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
 	});
 
 	it("offers a custom answer without canned yes/no replies", () => {

@@ -515,7 +515,7 @@ describe("IconLibrary", () => {
 		expect(search().value).toBe("psql");
 	});
 
-	it("hydrates the shortcut label on a Mac without a mismatch", async () => {
+	it("shows the Command glyph and names the Mac shortcut in its tooltip after hydration", async () => {
 		const html = renderToString(<IconLibrary data={fixtureData} />);
 		const platform = Object.getOwnPropertyDescriptor(navigator, "platform");
 		Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
@@ -524,14 +524,20 @@ describe("IconLibrary", () => {
 		document.body.append(container);
 		const recoverableErrors = vi.fn();
 		try {
-			expect(container.querySelector(".icons-command-trigger__keys")?.textContent).toBe("Ctrl K");
+			const trigger = container.querySelector<HTMLButtonElement>(".icons-command-trigger");
+			expect(trigger?.getAttribute("aria-label")).toBe("Commands");
+			expect(trigger?.getAttribute("aria-keyshortcuts")).toBe("Control+K Meta+K");
+			expect(trigger?.querySelector("svg.icons-command-trigger__icon")).not.toBeNull();
+			expect(trigger?.textContent).toBe("");
 			const root = await act(async () =>
 				hydrateRoot(container, <IconLibrary data={fixtureData} />, {
 					onRecoverableError: recoverableErrors,
 				}),
 			);
 			expect(recoverableErrors).not.toHaveBeenCalled();
-			expect(container.querySelector(".icons-command-trigger__keys")?.textContent).toBe("⌘K");
+			act(() => trigger?.focus());
+			const tooltip = await screen.findByRole("tooltip");
+			expect(tooltip.textContent).toContain("⌘K");
 			act(() => root.unmount());
 		} finally {
 			container.remove();

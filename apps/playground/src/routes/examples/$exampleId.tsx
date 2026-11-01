@@ -9,7 +9,7 @@ import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 
-import { StudioBrand } from "@/components/studio-brand";
+import { StudioHeader } from "@/components/studio-header";
 
 export const Route = createFileRoute("/examples/$exampleId")({
 	component: ExampleRoute,
@@ -97,15 +97,12 @@ function ExampleRoute() {
 
 	return (
 		<main className="artifact-view">
-			<header className="artifact-view__bar">
-				<StudioBrand />
-				<div className="artifact-view__actions">
-					{example && scene ? <span className="studio__note">{example.blurb}</span> : null}
-					<a className="studio__artifact-link" href="/">
-						Playground
-					</a>
-				</div>
-			</header>
+			<StudioHeader className="studio-header--ruled">
+				{example && scene ? <span className="studio__note">{example.blurb}</span> : null}
+				<a className="studio-header__link" href="/">
+					Playground
+				</a>
+			</StudioHeader>
 
 			<section className="artifact-view__stage">
 				{example && scene ? (

@@ -13,7 +13,7 @@ export function IconsChrome({
 	onOpenCommands,
 }: {
 	children: ReactNode;
-	/** Platform label for the palette shortcut, e.g. "⌘K" or "Ctrl K". */
+	/** Platform label for the palette shortcut, e.g. "⌘K" or "Ctrl K", shown in the tooltip. */
 	commandShortcut: string;
 	detailOpen: boolean;
 	homeHref: string;
@@ -44,11 +44,12 @@ export function IconsChrome({
 									onClick={onOpenCommands}
 									type="button"
 								>
-									<kbd className="icons-command-trigger__keys">{commandShortcut}</kbd>
 									<Command aria-hidden="true" className="icons-command-trigger__icon" />
 								</button>
 							</TooltipTrigger>
-							<TooltipContent sideOffset={6}>Commands and shortcuts</TooltipContent>
+							<TooltipContent sideOffset={6}>
+								Commands <kbd className="icons-command-trigger__keys">{commandShortcut}</kbd>
+							</TooltipContent>
 						</Tooltip>
 						<HeaderIconLink href={`${homeHref}/docs`} label="Docs">
 							<BookOpen aria-hidden="true" />

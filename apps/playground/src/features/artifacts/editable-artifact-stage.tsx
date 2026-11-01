@@ -7,7 +7,7 @@ import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { ArtifactCanvas } from "@sketchi/diagram-ui";
 import { useCallback, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { IconActionBar, IconButton, IconLink } from "@/components/sketch-icons";
-import { StudioBrand } from "@/components/studio-brand";
+import { StudioHeader } from "@/components/studio-header";
 import { artifactRouteUrls, type ArtifactViewState } from "./artifact-view-client";
 
 export function useEditedDrawingDownload(scene: RenderedDiagramScene) {
@@ -82,13 +82,10 @@ function EditorFrame({
 }) {
 	return (
 		<main className="artifact-view">
-			<header className="artifact-view__bar">
-				<StudioBrand />
-				<div className="artifact-view__actions">
-					{headerLinks}
-					<IconActionBar>{actions}</IconActionBar>
-				</div>
-			</header>
+			<StudioHeader className="studio-header--ruled">
+				{headerLinks}
+				<IconActionBar>{actions}</IconActionBar>
+			</StudioHeader>
 			<section className="artifact-view__stage">{children}</section>
 		</main>
 	);

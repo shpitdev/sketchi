@@ -21,7 +21,7 @@ function ArtifactEditRoute() {
 			artifactId={artifactId}
 			downloadName={artifactId}
 			headerLinks={
-				<a className="studio__artifact-link" href={urls.review}>
+				<a className="studio-header__link" href={urls.review}>
 					Review
 				</a>
 			}

@@ -1,7 +1,7 @@
 import type { StudioBuildResult } from "./build-result";
 import { DiagramPreview } from "@sketchi/diagram-ui";
 import type { ChatStatus, UIMessage } from "ai";
-import type { RefObject } from "react";
+import { useCallback, useState, type RefObject } from "react";
 
 import {
 	PromptInput,
@@ -16,10 +16,14 @@ import { Suggestion } from "@/components/ai-elements/suggestion";
 
 import { DEPLOY_PIPELINE_SCENE } from "./deploy-pipeline-sample";
 
+/** Each chip shows a short label and sends the full prompt. */
 const STARTERS = [
-	"Sketch a login flow with retries and a fraud check",
-	"Diagram a CI/CD pipeline from commit to production",
-	"Show checkout as a sequence diagram: browser, API, payments",
+	{ label: "Login flow", prompt: "Sketch a login flow with retries and a fraud check" },
+	{ label: "CI/CD pipeline", prompt: "Diagram a CI/CD pipeline from commit to production" },
+	{
+		label: "Checkout sequence",
+		prompt: "Show checkout as a sequence diagram: browser, API, payments",
+	},
 ];
 
 export interface ReadyPlaygroundArtifact {
@@ -53,7 +57,7 @@ export function ArtifactActions({ artifact }: { artifact: ReadyPlaygroundArtifac
 					showLabel
 				/>
 			</IconActionBar>
-			<p className="studio__note">Shareable by link · no account yet</p>
+			<p className="studio__note">Anyone with the link can view it · not tied to an account</p>
 		</div>
 	);
 }
@@ -127,12 +131,6 @@ export function BuildResultDetails({ pass, result }: { pass: number; result: Stu
 
 	return (
 		<div className="studio__build-result">
-			<p className="studio__build-result-summary">
-				{result.ok
-					? "Your diagram is ready to view, edit, or download."
-					: "This version needs a few changes before it is ready."}
-			</p>
-
 			{guidance ? (
 				<ul className="studio__build-issues">
 					<li>
@@ -244,47 +242,64 @@ export function AssistantFollowUp({ onCompose }: { onCompose: () => void }) {
 	);
 }
 
-export function PlaygroundEmptyState({ onSelect }: { onSelect: (prompt: string) => void }) {
+/** The first-visit heading; the composer renders directly beneath it. */
+export function PlaygroundIntro() {
+	return <h1 className="studio__intro">What should we draw?</h1>;
+}
+
+/**
+ * Excalidraw fits a scene to its viewport once, on load. When the sample's
+ * frame changes width (rotation, window resize) a new revision remounts the
+ * preview so the whole diagram fits again.
+ */
+function useWidthRevision() {
+	const [revision, setRevision] = useState(0);
+	const observeWidth = useCallback((element: HTMLDivElement | null) => {
+		if (!element || typeof ResizeObserver === "undefined") return;
+		let width = element.getBoundingClientRect().width;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const observer = new ResizeObserver(([entry]) => {
+			const next = entry?.contentRect.width ?? width;
+			if (Math.abs(next - width) < 1) return;
+			width = next;
+			clearTimeout(timer);
+			timer = setTimeout(() => setRevision((value) => value + 1), 200);
+		});
+		observer.observe(element);
+		return () => {
+			clearTimeout(timer);
+			observer.disconnect();
+		};
+	}, []);
+
+	return { observeWidth, revision: `deploy-pipeline-${revision}` };
+}
+
+/** Starter prompts and a sample diagram, shown under the empty composer. */
+export function PlaygroundStarters({ onSelect }: { onSelect: (prompt: string) => void }) {
+	const { observeWidth, revision } = useWidthRevision();
 	return (
-		<div className="studio__empty-wrap">
-			<section aria-labelledby="playground-empty-title" className="studio__empty">
-				<div className="studio__empty-copy">
-					<h1 className="studio__empty-title" id="playground-empty-title">
-						What should we draw?
-					</h1>
-					<p className="studio__empty-sub">
-						Describe a system or flow. Sketchi drafts a diagram you can refine as you talk.
-					</p>
+		<div className="studio__starters-wrap">
+			<div aria-label="Starter prompts" className="studio__starters">
+				{STARTERS.map(({ label, prompt }) => (
+					<Suggestion
+						className="studio__starter"
+						key={label}
+						onClick={onSelect}
+						suggestion={prompt}
+						title={prompt}
+					>
+						{label}
+					</Suggestion>
+				))}
+			</div>
+
+			<figure className="studio__sample">
+				<figcaption className="studio__sample-caption">Example: deploy pipeline</figcaption>
+				<div className="studio__sample-canvas" ref={observeWidth}>
+					<DiagramPreview revision={revision} scene={DEPLOY_PIPELINE_SCENE} />
 				</div>
-
-				<figure className="studio__sample">
-					<figcaption className="studio__sample-caption">
-						<span>Deploy pipeline</span>
-						<span>Rendered in Sketchi</span>
-					</figcaption>
-					<div className="studio__sample-canvas">
-						<DiagramPreview scene={DEPLOY_PIPELINE_SCENE} />
-					</div>
-				</figure>
-
-				<div aria-label="Starter prompts" className="studio__starters">
-					{STARTERS.map((starter) => (
-						<Suggestion
-							className="studio__starter"
-							key={starter}
-							onClick={onSelect}
-							suggestion={starter}
-						/>
-					))}
-				</div>
-
-				<aside className="studio__announcement">
-					<span className="studio__announcement-copy">
-						Mind maps are a new sketch type, ready to explore.
-					</span>
-					<a href="/examples/public-mindmap">View the example →</a>
-				</aside>
-			</section>
+			</figure>
 		</div>
 	);
 }
@@ -310,12 +325,18 @@ export function PlaygroundComposer({
 					<PromptInputTextarea
 						id="playground-composer"
 						ref={composerRef}
-						placeholder={buildMode ? "Ask for changes to the sketch…" : "Describe a diagram…"}
+						placeholder={
+							buildMode ? "Ask for changes to the sketch…" : "Describe a system or flow…"
+						}
 					/>
 				</PromptInputBody>
-				<PromptInputFooter>
-					<span className="studio__composer-hint">Enter to send · Shift+Enter for a new line</span>
-					<PromptInputSubmit status={status} />
+				<PromptInputFooter className="justify-end">
+					{/* After a failed request the button still sends (a retry), so it keeps
+					    the send glyph; the error message above says what went wrong. */}
+					<PromptInputSubmit
+						aria-label={status === "submitted" || status === "streaming" ? "Stop" : "Send"}
+						status={status === "error" ? "ready" : status}
+					/>
 				</PromptInputFooter>
 			</PromptInput>
 		</div>
