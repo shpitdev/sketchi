@@ -22,7 +22,6 @@
 		"@streamdown/cjk": "1.0.4",
 		"@streamdown/code": "2.0.0",
 		"@streamdown/math": "1.0.3",
-		"@tanstack/react-virtual": "3.14.13",
 		"ai": "7.0.130",
 		"lucide-react": "1.52.0",
 		"motion": "14.0.0",

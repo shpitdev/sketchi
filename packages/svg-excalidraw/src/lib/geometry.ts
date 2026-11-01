@@ -736,12 +736,6 @@ export function decomposeNonzeroRings(
 	}
 }
 
-export function regionsFromEvenOddRings(
-	rings: readonly (readonly Point[])[],
-): readonly FilledRegion[] {
-	return regionsFromRings(rings, "evenodd");
-}
-
 interface RingNode {
 	readonly area: number;
 	readonly parentIndex: number | null;
