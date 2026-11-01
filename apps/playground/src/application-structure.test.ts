@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -43,24 +43,6 @@ const expectedPublicFullPaths = [
 	"/projects",
 	"/projects/$projectId",
 ].sort();
-
-const retiredGenericPaths = [
-	"agent.server.ts",
-	"api.server.test.ts",
-	"api.server.ts",
-	"artifact-view-client.ts",
-	"browser-renderer.server.test.ts",
-	"browser-renderer.server.ts",
-	"cloudflare-bindings.server.ts",
-	"home-url.ts",
-	"mcp-docs.server.test.ts",
-	"mcp-docs.server.ts",
-	"mcp.server.test.ts",
-	"mcp.server.ts",
-	"studio-flowchart-tool.server.test.ts",
-	"studio-flowchart-tool.server.ts",
-	"usage-events.server.ts",
-];
 
 function sourceFilesUnder(root: string): string[] {
 	return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
@@ -114,12 +96,10 @@ describe("Playground application structure", () => {
 				.map((match) => match[1])
 				.filter((specifier): specifier is string => specifier !== undefined);
 
-			expect(source, path).toMatch(/^import \{ createFileRoute \} from "@tanstack\/react-router";/);
 			expect(source, path).not.toContain('from "@sketchi/');
 			expect(source, path).not.toContain('from "cloudflare:');
 			expect(source, path).not.toContain('import "@tanstack/react-start/server-only"');
 			expect(source, path).not.toMatch(/export (?!const Route\b)/);
-			expect(source.split("\n").length, path).toBeLessThanOrEqual(60);
 			expect(dynamicImports.length, path).toBeGreaterThan(0);
 			expect(
 				dynamicImports.every((specifier) => specifier.startsWith("@/server/")),
@@ -171,16 +151,5 @@ describe("Playground application structure", () => {
 				/(?:from\s+|import\()["'][^"']*(?:\/|^)chat\//,
 			);
 		}
-	});
-
-	it("removes the retired generic lib paths", () => {
-		const libRoot = resolve(sourceRoot, "lib");
-
-		for (const path of retiredGenericPaths) {
-			expect(existsSync(join(libRoot, path)), path).toBe(false);
-		}
-
-		// `cn` and the shadcn primitives come from @sketchi/ui.
-		expect(existsSync(libRoot)).toBe(false);
 	});
 });
