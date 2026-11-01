@@ -26,7 +26,7 @@ export function CliBand({ npmUrl = CLI_NPM_URL }: CliBandProps) {
 				<div>
 					<h2 className="sk-section__title cli-band__title">CLI</h2>
 					<p className="cli-band__lead">
-						No account or API key. Every command takes <code>--output json</code>.
+						Every command takes <code>--output json</code>.
 					</p>
 
 					<div className="cli-band__links">

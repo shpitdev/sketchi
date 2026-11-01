@@ -1,4 +1,5 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
+import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -28,5 +29,14 @@ export default defineConfig({
 			srcDirectory: "src",
 		}),
 		react(),
+		tailwindcss(),
 	],
+	resolve: {
+		alias: [
+			{
+				find: /^@sketchi\/ui\/(.*)$/,
+				replacement: `${new URL("../../packages/ui/src/", import.meta.url).pathname}$1`,
+			},
+		],
+	},
 });

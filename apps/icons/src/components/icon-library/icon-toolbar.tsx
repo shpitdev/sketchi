@@ -1,127 +1,81 @@
+import { Search, X } from "lucide-react";
 import type { RefObject } from "react";
-import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
-import { selectAllLabel } from "../../lib/selection.js";
+import type { SketchiIcon } from "@sketchi/icon-catalog";
 
+import { PreviewToggle, type PreviewMode } from "../preview-toggle/index.js";
+import { CollectionFilter } from "./collection-filter.js";
+
+/** The page heading, search field, collection filter, and preview background. */
 export function IconToolbar({
 	activeIcon,
-	capacityLeft,
-	collection,
 	collections,
-	modifierLabel,
-	onCollectionChange,
+	collectionOptions,
+	onClearCollections,
+	onCollectionMenuChange,
 	onPreviewModeChange,
 	onQueryChange,
-	onSelectAll,
-	pendingCount,
+	onToggleCollection,
 	previewMode,
 	query,
-	resultCount,
 	searchRef,
-	selectionIsFull,
-	status,
 }: {
 	activeIcon: SketchiIcon | undefined;
-	capacityLeft: number;
-	collection: string;
-	collections: readonly [string, number][];
-	modifierLabel: string;
-	onCollectionChange: (value: string) => void;
-	onPreviewModeChange: (value: "light" | "dark") => void;
+	collections: ReadonlySet<string>;
+	collectionOptions: readonly (readonly [string, number])[];
+	onClearCollections: () => void;
+	onCollectionMenuChange: (open: boolean) => void;
+	onPreviewModeChange: (value: PreviewMode) => void;
 	onQueryChange: (value: string) => void;
-	onSelectAll: () => void;
-	pendingCount: number;
-	previewMode: "light" | "dark";
+	onToggleCollection: (collection: string) => void;
+	previewMode: PreviewMode;
 	query: string;
-	resultCount: number;
 	searchRef: RefObject<HTMLInputElement | null>;
-	selectionIsFull: boolean;
-	status: "loading" | "error" | "ready";
 }) {
 	return (
-		<>
-			<div className="icons-toolbar">
-				<label className="icons-search">
-					<span id="icon-search-label">Search icons</span>
-					<span className="icons-search__box">
-						<input
-							aria-labelledby="icon-search-label"
-							aria-activedescendant={activeIcon ? `icon-result-${activeIcon.slug}` : undefined}
-							aria-controls="icon-results"
-							onChange={(event) => onQueryChange(event.currentTarget.value)}
-							placeholder="Try k8s, next, psql, or Vercel"
-							ref={searchRef}
-							type="search"
-							value={query}
-						/>
-						{query ? (
-							<button aria-label="Clear search" onClick={() => onQueryChange("")} type="button">
-								Clear
-							</button>
-						) : (
-							<kbd>/</kbd>
-						)}
-					</span>
-				</label>
-				<label className="icons-collection">
-					<span id="icon-collection-label">Collection</span>
-					<select
-						aria-labelledby="icon-collection-label"
-						onChange={(event) => onCollectionChange(event.currentTarget.value)}
-						value={collection}
+		<div className="icons-toolbar">
+			<h1 className="icons-title">Icons</h1>
+			<div className="icons-search">
+				<Search aria-hidden="true" className="icons-search__icon" />
+				<input
+					aria-activedescendant={activeIcon ? `icon-result-${activeIcon.slug}` : undefined}
+					aria-controls="icon-results"
+					aria-label="Search icons"
+					autoComplete="off"
+					enterKeyHint="search"
+					onChange={(event) => onQueryChange(event.currentTarget.value)}
+					placeholder="Search icons"
+					ref={searchRef}
+					spellCheck={false}
+					type="search"
+					value={query}
+				/>
+				{query ? (
+					<button
+						aria-label="Clear search"
+						className="icons-search__clear"
+						onClick={() => {
+							onQueryChange("");
+							searchRef.current?.focus();
+						}}
+						title="Clear search"
+						type="button"
 					>
-						<option value="all">All collections</option>
-						{collections.map(([name, count]) => (
-							<option key={name} value={name}>
-								{formatCollectionLabel(name)} ({count})
-							</option>
-						))}
-					</select>
-				</label>
-				<div className="preview-toggle preview-toggle--toolbar">
-					<span>Preview</span>
-					<div className="preview-toggle__buttons">
-						<button
-							aria-pressed={previewMode === "light"}
-							onClick={() => onPreviewModeChange("light")}
-							type="button"
-						>
-							Light
-						</button>
-						<button
-							aria-pressed={previewMode === "dark"}
-							onClick={() => onPreviewModeChange("dark")}
-							type="button"
-						>
-							Dark
-						</button>
-					</div>
-				</div>
+						<X aria-hidden="true" />
+					</button>
+				) : (
+					<kbd aria-hidden="true" className="icons-search__key">
+						/
+					</kbd>
+				)}
 			</div>
-
-			<div className="icons-browser__meta">
-				<div className="icons-browser__count">
-					<p aria-live="polite" role="status">
-						{status === "ready"
-							? `${resultCount.toLocaleString()} ${resultCount === 1 ? "icon" : "icons"}`
-							: ""}
-					</p>
-					{status === "ready" && resultCount ? (
-						<button
-							className="icons-browser__select-all"
-							disabled={selectionIsFull || pendingCount === 0}
-							onClick={onSelectAll}
-							type="button"
-						>
-							{selectAllLabel(resultCount, pendingCount, capacityLeft)}
-						</button>
-					) : null}
-				</div>
-				<p className="icons-browser__keys">
-					<kbd>↑</kbd> <kbd>↓</kbd> move <kbd>Enter</kbd> copy SVG <kbd>{modifierLabel}</kbd>{" "}
-					<kbd>A</kbd> select all <kbd>{modifierLabel}</kbd> <kbd>D</kbd> clear selection{" "}
-					<kbd>Esc</kbd> clear search
-				</p>
-			</div>
-		</>
+			<CollectionFilter
+				collections={collections}
+				onClear={onClearCollections}
+				onOpenChange={onCollectionMenuChange}
+				onToggle={onToggleCollection}
+				options={collectionOptions}
+			/>
+			<PreviewToggle onChange={onPreviewModeChange} value={previewMode} />
+		</div>
 	);
 }

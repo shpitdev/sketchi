@@ -69,6 +69,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Ready: Story = {};
+/** Two collections ticked: icons from either one, ANDed with any search. */
+export const FilteredByCollections: Story = {
+	args: { initialCollections: ["data-storage", "devtools-ci"] },
+};
+/** A search with no match inside the chosen collection offers to widen it. */
+export const NoMatchInCollection: Story = {
+	args: { initialCollections: ["data-storage"], initialQuery: "k8s" },
+};
+export const DarkPreview: Story = { args: { initialPreviewMode: "dark" } };
+export const Narrow: Story = {
+	parameters: { viewport: { defaultViewport: "mobile1" } },
+};
 export const Loading: Story = { args: { status: "loading" } };
 export const ErrorState: Story = {
 	args: { errorMessage: "The library could not be loaded.", status: "error" },

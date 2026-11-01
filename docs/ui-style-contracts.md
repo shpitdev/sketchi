@@ -1,7 +1,7 @@
 # UI style contracts
 
-`apps/web` and `apps/playground` are Tailwind apps that share one set of shadcn
-primitives in `packages/ui` (`@sketchi/ui`). Each app's `components.json` points
+`apps/web`, `apps/playground` and `apps/icons` are Tailwind apps that share one
+set of shadcn primitives in `packages/ui` (`@sketchi/ui`). Each app's `components.json` points
 its `ui` and `utils` aliases at that package, so `shadcn add` writes new
 primitives there and both apps import the same file:
 
@@ -16,8 +16,9 @@ the theme. The theme is imported into Tailwind's `base` layer, so utilities win
 over its element rules while each app's own unlayered stylesheet still wins over
 both. Each app imports that file first and adds `@source` for its own
 files; automatic source detection is off. The theme stays the one place for
-colours, radii, shadows and fonts. `icons` and `excalidraw` still use the theme
-with plain CSS.
+colours, radii, shadows and fonts. `icons` takes its dialog, command, menu and
+tooltip primitives from `@sketchi/ui` and styles its own page in plain CSS;
+`excalidraw` still uses the theme with plain CSS only.
 
 ## Rules
 
@@ -37,7 +38,7 @@ properties in `style`; other inline style properties are rejected.
 [`eslint-plugin-better-tailwindcss`](https://github.com/schoero/eslint-plugin-better-tailwindcss)
 as Oxlint JS plugins, configured in `tools/oxlint/ui-style-policy.json`:
 
-- In `apps/web/src` and `apps/playground/src`: `no-restyle` (layout only),
+- In `apps/web/src`, `apps/playground/src` and `apps/icons/src`: `no-restyle` (layout only),
   `no-raw-colors`, `no-arbitrary-values` (layout only), `no-inline-styles`,
   `require-static-classes` and `no-unknown-classes`. Plain class selectors in the
   app's stylesheet count as known classes, so a class with no CSS behind it fails.

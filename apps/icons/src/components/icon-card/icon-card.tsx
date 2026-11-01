@@ -1,4 +1,5 @@
 import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
+import { Check, Info } from "lucide-react";
 
 export interface IconCardProps {
 	readonly active?: boolean;
@@ -12,6 +13,11 @@ export interface IconCardProps {
 	readonly selected?: boolean;
 }
 
+/**
+ * One result. The tile copies the SVG; the corner checkbox adds the icon to
+ * the selection and is always visible, so gathering several icons never
+ * depends on hover.
+ */
 export function IconCard({
 	active = false,
 	copied = false,
@@ -48,27 +54,26 @@ export function IconCard({
 					{formatCollectionLabel(icon.collection)}
 				</span>
 			</button>
-			<div className="icon-card__actions">
-				<button
-					aria-label={`${selected ? "Remove" : "Add"} ${icon.name} ${
-						selected ? "from" : "to"
-					} selection`}
-					aria-pressed={selected}
-					className="icon-card__select"
-					onClick={() => onToggleSelected?.(icon)}
-					type="button"
-				>
-					{selected ? "Selected" : "Select"}
-				</button>
-				<button
-					aria-label={`View ${icon.name} details`}
-					className="icon-card__details"
-					onClick={() => onDetails?.(icon)}
-					type="button"
-				>
-					Details
-				</button>
-			</div>
+			<label className="icon-card__check" title={selected ? "Selected" : "Select"}>
+				<input
+					aria-label={`Select ${icon.name}`}
+					checked={selected}
+					onChange={() => onToggleSelected?.(icon)}
+					type="checkbox"
+				/>
+				<span aria-hidden="true" className="icon-card__box">
+					<Check />
+				</span>
+			</label>
+			<button
+				aria-label={`View ${icon.name} details`}
+				className="icon-card__details"
+				onClick={() => onDetails?.(icon)}
+				title="Details"
+				type="button"
+			>
+				<Info aria-hidden="true" />
+			</button>
 		</article>
 	);
 }

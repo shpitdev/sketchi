@@ -3,7 +3,11 @@
 {
 	"overrides": [
 		{
-			"files": ["apps/web/src/**/*.{ts,tsx}", "apps/playground/src/**/*.{ts,tsx}"],
+			"files": [
+				"apps/web/src/**/*.{ts,tsx}",
+				"apps/playground/src/**/*.{ts,tsx}",
+				"apps/icons/src/**/*.{ts,tsx}"
+			],
 			"rules": {
 				"shadcn/no-restyle": [
 					"error",
@@ -80,6 +84,19 @@
 				"better-tailwindcss/no-duplicate-classes": [
 					"error",
 					{ "cwd": "apps/playground", "entryPoint": "src/styles/app.css" }
+				]
+			}
+		},
+		{
+			"files": ["apps/icons/src/**/*.{ts,tsx}"],
+			"rules": {
+				"better-tailwindcss/no-conflicting-classes": [
+					"error",
+					{ "cwd": "apps/icons", "entryPoint": "src/styles/app.css" }
+				],
+				"better-tailwindcss/no-duplicate-classes": [
+					"error",
+					{ "cwd": "apps/icons", "entryPoint": "src/styles/app.css" }
 				]
 			}
 		}

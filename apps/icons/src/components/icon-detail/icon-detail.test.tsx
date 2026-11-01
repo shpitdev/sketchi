@@ -45,7 +45,7 @@ describe("IconDetail", () => {
 			/>,
 		);
 		fireEvent.click(screen.getByRole("button", { name: "Copy JSX" }));
-		fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+		fireEvent.click(screen.getByRole("button", { name: "Dark preview" }));
 		expect(onAction).toHaveBeenCalledWith("copy-jsx", icon);
 		expect(onPreviewModeChange).toHaveBeenCalledWith("dark");
 	});

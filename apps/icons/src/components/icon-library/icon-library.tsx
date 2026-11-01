@@ -1,27 +1,27 @@
-import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
-import { useModifierLabel } from "../../lib/use-modifier-label.js";
-import { IconsChrome } from "./icons-chrome.js";
-import { IconToolbar } from "./icon-toolbar.js";
-import { SelectionBar } from "./selection-bar.js";
-import { useIconSources } from "./use-icon-sources.js";
-import { useHotkeys } from "@tanstack/react-hotkeys";
+import { TooltipProvider } from "@sketchi/ui/components/tooltip";
+import { formatForDisplay, useHotkeys, type UseHotkeyDefinition } from "@tanstack/react-hotkeys";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
-import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
-import {
-	formatCollectionLabel,
-	searchIcons,
-	type IconManifest,
-	type SketchiIcon,
-} from "@sketchi/icon-catalog";
+import { formatCollectionLabel, type IconManifest, type SketchiIcon } from "@sketchi/icon-catalog";
+import { filterIcons, toggleCollection } from "../../lib/filter.js";
+import { PLAYGROUND_URL, REPO_URL, SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
+import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
 import {
 	createSelectionStore,
 	describeSelectionNotice,
 	remainingCapacity,
+	SELECTION_LIMIT,
+	selectResultsLabel,
 	type SelectionEvent,
 } from "../../lib/selection.js";
 import { IconCard } from "../icon-card/index.js";
 import { IconDetail } from "../icon-detail/index.js";
+import type { PreviewMode } from "../preview-toggle/index.js";
+import { CommandPalette, type IconCommand, type PaletteLink } from "./command-palette.js";
+import { IconsChrome } from "./icons-chrome.js";
+import { IconToolbar } from "./icon-toolbar.js";
+import { SelectionBar } from "./selection-bar.js";
+import { useIconSources } from "./use-icon-sources.js";
 
 export type { IconManifest, SketchiIcon } from "@sketchi/icon-catalog";
 
@@ -30,13 +30,13 @@ const PAGE_SIZE = 72;
 const NO_ACTIVE_INDEX = -1;
 
 type LoadStatus = "error" | "loading" | "ready";
-type PreviewMode = "dark" | "light";
 
 export interface IconLibraryProps {
 	readonly data?: IconManifest;
 	readonly errorMessage?: string;
 	readonly homeHref?: string;
-	readonly initialCollection?: string;
+	/** Collections to filter by on first render. Empty means all. */
+	readonly initialCollections?: readonly string[];
 	readonly initialPreviewMode?: PreviewMode;
 	readonly initialQuery?: string;
 	readonly onRetry?: () => void;
@@ -49,25 +49,34 @@ const emptyData: IconManifest = {
 	version: 1,
 };
 
+const noCollections: readonly string[] = [];
+
 function isActionTarget(target: EventTarget | null): boolean {
 	return target instanceof HTMLElement && target.closest("a, button") !== null;
+}
+
+function plural(count: number, one: string, many: string): string {
+	return `${count.toLocaleString()} ${count === 1 ? one : many}`;
 }
 
 export function IconLibrary({
 	data = emptyData,
 	errorMessage,
 	homeHref = SKETCHI_WEB_HOME_URL,
-	initialCollection = "all",
+	initialCollections = noCollections,
 	initialPreviewMode = "light",
 	initialQuery = "",
 	onRetry,
 	status = "ready",
 }: IconLibraryProps) {
 	const [query, setQuery] = useState(initialQuery);
-	const [collection, setCollection] = useState(initialCollection);
+	const [collections, setCollections] = useState<ReadonlySet<string>>(
+		() => new Set(initialCollections),
+	);
 	const [previewMode, setPreviewMode] = useState<PreviewMode>(initialPreviewMode);
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 	const [highlightedIndex, setHighlightedIndex] = useState(NO_ACTIVE_INDEX);
+	const [paletteOpen, setPaletteOpen] = useState(false);
 	const [detail, setDetail] = useState<{
 		readonly opener: HTMLElement | null;
 		readonly slug: string;
@@ -80,7 +89,7 @@ export function IconLibrary({
 	);
 	const selectedSlugs = selection.slugs;
 	const searchRef = useRef<HTMLInputElement>(null);
-	const collections = useMemo(
+	const collectionOptions = useMemo(
 		() =>
 			Object.entries(data.summary.collectionCounts).sort(([left], [right]) =>
 				formatCollectionLabel(left).localeCompare(formatCollectionLabel(right)),
@@ -88,13 +97,10 @@ export function IconLibrary({
 		[data.summary.collectionCounts],
 	);
 	const results = useMemo(
-		() =>
-			searchIcons(data.icons, {
-				...(collection === "all" ? {} : { collection }),
-				...(query.trim() ? { query } : {}),
-			}).map(({ icon }) => icon),
-		[collection, data.icons, query],
+		() => filterIcons(data.icons, { collections, query }),
+		[collections, data.icons, query],
 	);
+	const filtered = query.trim() !== "" || collections.size > 0;
 	// A highlight past the end of the current results (for example after the
 	// manifest changes) reads as no highlight.
 	const activeIndex = highlightedIndex < results.length ? highlightedIndex : NO_ACTIVE_INDEX;
@@ -103,8 +109,20 @@ export function IconLibrary({
 	const selectedIcons = data.icons.filter((icon) => selectedSlugs.has(icon.slug));
 	const capacityLeft = remainingCapacity(selectedSlugs);
 	const selectionIsFull = capacityLeft === 0;
-	const pendingCount = results.filter((icon) => !selectedSlugs.has(icon.slug)).length;
-	const modifierLabel = useModifierLabel();
+	const selectedInResults = results.filter((icon) => selectedSlugs.has(icon.slug)).length;
+	const pendingCount = results.length - selectedInResults;
+	const hiddenSelectedCount = selectedIcons.length - selectedInResults;
+	const allResultsSelected = results.length > 0 && pendingCount === 0;
+	// Selecting the whole unfiltered library is never the point, so the
+	// checkbox, its shortcut, and its command only appear once a search or
+	// filter has narrowed things down, or when everything fits under the cap.
+	const showSelectResults =
+		status === "ready" && results.length > 0 && (filtered || results.length <= SELECTION_LIMIT);
+	const canSelectResults = showSelectResults && pendingCount > 0 && capacityLeft > 0;
+	// The grid's keys stand down whenever a dialog or menu owns the keyboard.
+	const overlayOpen = Boolean(detailIcon) || paletteOpen;
+	const [menuOpen, setMenuOpen] = useState(false);
+	const gridKeysActive = !overlayOpen && !menuOpen;
 	const closeDetail = useCallback(() => setDetail(undefined), []);
 
 	const {
@@ -121,17 +139,38 @@ export function IconLibrary({
 	} = useIconSources(selectedIcons);
 
 	// Changing the filter starts browsing from the top of the new results.
-	const changeQuery = useCallback((nextQuery: string) => {
-		setQuery(nextQuery);
+	// The selection is deliberately left alone.
+	const resetBrowsing = useCallback(() => {
 		setVisibleCount(PAGE_SIZE);
 		setHighlightedIndex(NO_ACTIVE_INDEX);
 	}, []);
 
-	const changeCollection = useCallback((nextCollection: string) => {
-		setCollection(nextCollection);
-		setVisibleCount(PAGE_SIZE);
-		setHighlightedIndex(NO_ACTIVE_INDEX);
-	}, []);
+	const changeQuery = useCallback(
+		(nextQuery: string) => {
+			setQuery(nextQuery);
+			resetBrowsing();
+		},
+		[resetBrowsing],
+	);
+
+	const changeCollection = useCallback(
+		(collection: string) => {
+			setCollections((current) => toggleCollection(current, collection));
+			resetBrowsing();
+		},
+		[resetBrowsing],
+	);
+
+	const clearCollections = useCallback(() => {
+		setCollections(new Set());
+		resetBrowsing();
+	}, [resetBrowsing]);
+
+	const clearFilters = useCallback(() => {
+		setQuery("");
+		setCollections(new Set());
+		resetBrowsing();
+	}, [resetBrowsing]);
 
 	const moveActive = useCallback(
 		(direction: -1 | 1) => {
@@ -147,7 +186,7 @@ export function IconLibrary({
 			const slug = results[next]?.slug;
 			if (!slug) return;
 			window.setTimeout(() => {
-				document.getElementById(`icon-result-${slug}`)?.scrollIntoView({ block: "nearest" });
+				document.getElementById(`icon-result-${slug}`)?.scrollIntoView?.({ block: "nearest" });
 			}, 0);
 		},
 		[activeIndex, results],
@@ -167,6 +206,13 @@ export function IconLibrary({
 		dispatchSelection({
 			slugs: results.map((icon) => icon.slug),
 			type: "select-all",
+		});
+	}, [dispatchSelection, results]);
+
+	const deselectResults = useCallback(() => {
+		dispatchSelection({
+			slugs: results.map((icon) => icon.slug),
+			type: "deselect",
 		});
 	}, [dispatchSelection, results]);
 
@@ -190,6 +236,7 @@ export function IconLibrary({
 	 */
 	const copyKeyboardTarget = useCallback(
 		(event: KeyboardEvent, allowTopResult: boolean) => {
+			if (event.defaultPrevented) return;
 			const icon =
 				activeIndex === NO_ACTIVE_INDEX
 					? allowTopResult
@@ -210,6 +257,7 @@ export function IconLibrary({
 	 */
 	const moveFromKey = useCallback(
 		(event: KeyboardEvent, direction: -1 | 1, fromSearch: boolean) => {
+			if (event.defaultPrevented) return;
 			if (!fromSearch && isActionTarget(event.target)) return;
 			if (!results.length) return;
 			event.preventDefault();
@@ -218,166 +266,269 @@ export function IconLibrary({
 		[moveActive, results.length],
 	);
 
+	const selectedCount = selectedIcons.length;
+	const selectionBusy = busySelectionAction !== undefined;
+	const selectedLabel = plural(selectedCount, "selected SVG", "selected SVGs");
+
+	// One list of commands feeds both the palette and the keyboard shortcuts
+	// registered below, so every name and key is defined once.
+	const commands: readonly IconCommand[] = [
+		{ hotkey: "/", id: "search", name: "Search icons", run: focusSearch, takesFocus: true },
+		...(canSelectResults
+			? [
+					{
+						hotkey: "Mod+A",
+						id: "select-results",
+						name:
+							pendingCount > capacityLeft
+								? `Select ${capacityLeft.toLocaleString()} of these results`
+								: `Select all ${plural(results.length, "result", "results")}`,
+						run: selectAllResults,
+					},
+				]
+			: []),
+		...(selectedCount && !selectionBusy
+			? [
+					{
+						id: "copy-selected",
+						name: `Copy ${selectedLabel}`,
+						run: () => void runSelectionAction("copy"),
+					},
+					{
+						id: "download-selected",
+						name: `Download ${selectedLabel} as zip`,
+						run: () => void runSelectionAction("zip"),
+					},
+				]
+			: []),
+		...(selectedCount
+			? [{ hotkey: "Mod+D", id: "clear-selection", name: "Clear selection", run: clearSelection }]
+			: []),
+		...(filtered
+			? [{ id: "clear-filters", name: "Clear search and filters", run: clearFilters }]
+			: []),
+		{
+			id: "preview",
+			name: previewMode === "light" ? "Use dark preview" : "Use light preview",
+			run: () => setPreviewMode(previewMode === "light" ? "dark" : "light"),
+		},
+	];
+
+	const links: readonly PaletteLink[] = [
+		{ href: `${homeHref}/docs`, name: "Docs" },
+		{ external: true, href: REPO_URL, name: "GitHub" },
+		{ href: "/llms.txt", name: "llms.txt" },
+		{ href: PLAYGROUND_URL, name: "Playground" },
+		{ href: homeHref, name: "Sketchi home" },
+	];
+
 	// Arrow and Enter shortcuts have to work both from the search field and from
 	// the page at large, but must leave every other input alone — notably the
-	// collection <select>, whose own arrow behaviour we do not want to hijack.
-	// One registration targets the search field (`ignoreInputs: false`), the
-	// other the document, where the default input handling skips form controls.
-	const gridHotkeys = useMemo(
-		() =>
-			(
-				[
-					["ArrowDown", 1],
-					["ArrowUp", -1],
-					["ArrowRight", 1],
-					["ArrowLeft", -1],
-				] as const
-			).flatMap(([hotkey, direction]) => [
-				{
-					callback: (event: KeyboardEvent) => moveFromKey(event, direction, true),
-					hotkey,
-					options: {
-						ignoreInputs: false,
-						preventDefault: false,
-						target: searchRef,
-					},
-				},
-				{
-					callback: (event: KeyboardEvent) => moveFromKey(event, direction, false),
-					hotkey,
-					options: { preventDefault: false },
-				},
-			]),
-		[moveFromKey],
-	);
-
-	useHotkeys(
+	// selection checkboxes, whose own keys we do not want to hijack. One
+	// registration targets the search field (`ignoreInputs: false`), the other
+	// the document, where the default input handling skips form controls.
+	const gridHotkeys: UseHotkeyDefinition[] = (
 		[
-			...gridHotkeys,
-			{ callback: focusSearch, hotkey: "/" },
-			// On layouts where slash is a shifted key — Shift+7 on German QWERTZ —
-			// the event still reads `key: "/"` but carries Shift, which the plain
-			// "/" registration rejects. This also picks up "?" on US layouts.
-			{ callback: focusSearch, hotkey: { key: "/", shift: true } },
-			{
-				callback: (event) => copyKeyboardTarget(event, true),
-				hotkey: "Enter",
-				// Enter must still activate whatever button has focus, so the default
-				// action is only suppressed when we actually copy something.
-				options: {
-					ignoreInputs: false,
-					preventDefault: false,
-					target: searchRef,
-				},
+			["ArrowDown", 1],
+			["ArrowUp", -1],
+			["ArrowRight", 1],
+			["ArrowLeft", -1],
+		] as const
+	).flatMap(([hotkey, direction]) => [
+		{
+			callback: (event: KeyboardEvent) => moveFromKey(event, direction, true),
+			hotkey,
+			options: {
+				enabled: gridKeysActive,
+				ignoreInputs: false,
+				meta: { group: "Icon grid", name: "Move highlight" },
+				preventDefault: false,
+				target: searchRef,
 			},
-			{
-				callback: (event) => {
-					if (isActionTarget(event.target)) return;
-					copyKeyboardTarget(event, false);
-				},
-				hotkey: "Enter",
-				options: { preventDefault: false },
+		},
+		{
+			callback: (event: KeyboardEvent) => moveFromKey(event, direction, false),
+			hotkey,
+			options: {
+				enabled: gridKeysActive,
+				meta: { group: "Icon grid", name: "Move highlight" },
+				preventDefault: false,
 			},
-			// These three stay unregistered when they would do nothing: a registered
-			// hotkey suppresses the browser's own Escape, Select All and Bookmark
-			// Page even when our callback bails out.
-			{
-				callback: clearSearch,
-				hotkey: "Escape",
-				options: {
-					enabled: !detailIcon && (query !== "" || activeIndex !== NO_ACTIVE_INDEX),
-				},
+		},
+	]);
+
+	useHotkeys([
+		// The palette shortcut works from anywhere, the search field included,
+		// and closes the palette again from inside it.
+		{
+			callback: () => setPaletteOpen((open) => !open),
+			hotkey: "Mod+K",
+			options: {
+				enabled: !detailIcon,
+				ignoreInputs: false,
+				meta: { name: "Commands" },
 			},
-			{
-				callback: selectAllResults,
-				hotkey: "Mod+A",
-				options: {
-					// Mirrors the select-all button: enabled only when the click would
-					// actually add something.
-					enabled: !detailIcon && status === "ready" && pendingCount > 0 && capacityLeft > 0,
-					// Leave Cmd/Ctrl+A alone while someone is editing the search text.
-					ignoreInputs: true,
-				},
+		},
+		...gridHotkeys,
+		{
+			callback: focusSearch,
+			hotkey: "/",
+			options: { enabled: gridKeysActive, meta: { name: "Search icons" } },
+		},
+		// On layouts where slash is a shifted key — Shift+7 on German QWERTZ —
+		// the event still reads `key: "/"` but carries Shift, which the plain
+		// "/" registration rejects. This also picks up "?" on US layouts.
+		{
+			callback: focusSearch,
+			hotkey: { key: "/", shift: true },
+			options: { enabled: gridKeysActive, meta: { name: "Search icons" } },
+		},
+		{
+			callback: (event) => copyKeyboardTarget(event, true),
+			hotkey: "Enter",
+			// Enter must still activate whatever button has focus, so the default
+			// action is only suppressed when we actually copy something.
+			options: {
+				enabled: gridKeysActive,
+				ignoreInputs: false,
+				meta: { group: "Icon grid", name: "Copy SVG" },
+				preventDefault: false,
+				target: searchRef,
 			},
-			// Clearing the selection has to work from the search field too: filtering
-			// then clearing is the normal flow, and unlike Mod+A there is no native
-			// in-field behaviour worth keeping. Mod+D is claimed on the field itself
-			// and, separately, everywhere outside an input.
-			{
-				callback: clearSelection,
-				hotkey: "Mod+D",
-				options: {
-					enabled: !detailIcon && selectedSlugs.size > 0,
-					ignoreInputs: false,
-					target: searchRef,
-				},
+		},
+		{
+			callback: (event) => {
+				if (isActionTarget(event.target)) return;
+				copyKeyboardTarget(event, false);
 			},
-			{
-				callback: clearSelection,
-				hotkey: "Mod+D",
-				options: {
-					enabled: !detailIcon && selectedSlugs.size > 0,
-					ignoreInputs: true,
-				},
+			hotkey: "Enter",
+			options: {
+				enabled: gridKeysActive,
+				meta: { group: "Icon grid", name: "Copy SVG" },
+				preventDefault: false,
 			},
-		],
-		{ enabled: !detailIcon },
-	);
+		},
+		// These stay disabled when they would do nothing: an enabled hotkey
+		// suppresses the browser's own Escape, Select All and Bookmark Page even
+		// when our callback bails out.
+		// Radix handles Escape first and dismisses the palette, menu, or tooltip;
+		// React re-renders before this listener sees the same event, so the
+		// registration is already re-enabled. An Escape that was already used
+		// (`defaultPrevented`) is not ours to clear the search with.
+		{
+			callback: (event) => {
+				if (event.defaultPrevented) return;
+				event.preventDefault();
+				clearSearch();
+			},
+			hotkey: "Escape",
+			options: {
+				enabled: gridKeysActive && (query !== "" || activeIndex !== NO_ACTIVE_INDEX),
+				meta: { group: "Icon grid", name: "Clear search" },
+				preventDefault: false,
+			},
+		},
+		{
+			callback: selectAllResults,
+			hotkey: "Mod+A",
+			options: {
+				// Mirrors the select-results checkbox: enabled only when it would
+				// actually add something.
+				enabled: gridKeysActive && canSelectResults,
+				// Leave Cmd/Ctrl+A alone while someone is editing the search text.
+				ignoreInputs: true,
+				meta: { name: "Select results" },
+			},
+		},
+		// Clearing the selection has to work from the search field too: filtering
+		// then clearing is the normal flow, and unlike Mod+A there is no native
+		// in-field behaviour worth keeping. Mod+D is claimed on the field itself
+		// and, separately, everywhere outside an input.
+		{
+			callback: clearSelection,
+			hotkey: "Mod+D",
+			options: {
+				enabled: gridKeysActive && selectedCount > 0,
+				ignoreInputs: false,
+				meta: { name: "Clear selection" },
+				target: searchRef,
+			},
+		},
+		{
+			callback: clearSelection,
+			hotkey: "Mod+D",
+			options: {
+				enabled: gridKeysActive && selectedCount > 0,
+				ignoreInputs: true,
+				meta: { name: "Clear selection" },
+			},
+		},
+	]);
 
 	function toggleSelected(icon: SketchiIcon) {
 		dispatchSelection({ slug: icon.slug, type: "toggle" });
 	}
 
-	return (
-		<div className="icons-product">
-			<IconsChrome homeHref={homeHref} detailOpen={Boolean(detailIcon)}>
-				<main
-					aria-hidden={detailIcon ? "true" : undefined}
-					className="icons-main"
-					inert={detailIcon ? true : undefined}
-				>
-					<section className="icons-hero">
-						<div className="icons-shell icons-hero__inner">
-							<div className="icons-hero__copy">
-								<h1>Icons, ready when you are.</h1>
-								<p>
-									Search {data.summary.totalIcons.toLocaleString()} clean SVGs. Copy one instantly
-									or gather a set to download.
-								</p>
-							</div>
-							<div className="icons-hero__facts" aria-label="Library summary">
-								<span>
-									<strong>{data.summary.totalIcons.toLocaleString()}</strong>
-									Icons
-								</span>
-								<span>
-									<strong>{collections.length.toLocaleString()}</strong>
-									Collections
-								</span>
-							</div>
-						</div>
-					</section>
+	function navigate(link: PaletteLink) {
+		if (link.external) window.open(link.href, "_blank", "noopener,noreferrer");
+		else window.location.assign(link.href);
+	}
 
-					<section className="icons-browser" aria-label="Browse icons">
+	return (
+		<TooltipProvider>
+			<div className="icons-product">
+				<IconsChrome
+					commandShortcut={formatForDisplay("Mod+K")}
+					detailOpen={Boolean(detailIcon)}
+					homeHref={homeHref}
+					onOpenCommands={() => setPaletteOpen(true)}
+				>
+					<main
+						aria-hidden={detailIcon ? "true" : undefined}
+						className="icons-main"
+						inert={detailIcon ? true : undefined}
+					>
 						<div className="icons-shell">
 							<IconToolbar
 								activeIcon={results[activeIndex]}
-								capacityLeft={capacityLeft}
-								collection={collection}
+								collectionOptions={collectionOptions}
 								collections={collections}
-								modifierLabel={modifierLabel}
-								onCollectionChange={changeCollection}
+								onClearCollections={clearCollections}
+								onCollectionMenuChange={setMenuOpen}
 								onPreviewModeChange={setPreviewMode}
 								onQueryChange={changeQuery}
-								onSelectAll={selectAllResults}
-								pendingCount={pendingCount}
+								onToggleCollection={changeCollection}
 								previewMode={previewMode}
 								query={query}
-								resultCount={results.length}
 								searchRef={searchRef}
-								selectionIsFull={selectionIsFull}
-								status={status}
 							/>
+
+							<div className="icons-results-bar">
+								<p aria-live="polite" className="icons-results-bar__count" role="status">
+									{status === "ready" ? plural(results.length, "icon", "icons") : ""}
+								</p>
+								{showSelectResults ? (
+									<label className="icons-select-results">
+										<input
+											aria-label={
+												pendingCount > capacityLeft && capacityLeft > 0
+													? `Select ${capacityLeft.toLocaleString()} of ${plural(results.length, "result", "results")}`
+													: "Select all results"
+											}
+											checked={allResultsSelected}
+											disabled={!allResultsSelected && capacityLeft === 0}
+											onChange={allResultsSelected ? deselectResults : selectAllResults}
+											ref={(element) => {
+												if (element) {
+													element.indeterminate = selectedInResults > 0 && !allResultsSelected;
+												}
+											}}
+											type="checkbox"
+										/>
+										<span aria-hidden="true">{selectResultsLabel(pendingCount, capacityLeft)}</span>
+									</label>
+								) : null}
+							</div>
 
 							{status === "loading" ? (
 								<section className="icons-loading" aria-label="Loading icons" role="status">
@@ -390,7 +541,7 @@ export function IconLibrary({
 
 							{status === "error" ? (
 								<section className="icons-state" role="alert">
-									<h2>We could not load the icon library.</h2>
+									<h2>Could not load the icon library</h2>
 									<p>{errorMessage ?? "Check your connection and try again."}</p>
 									{onRetry ? (
 										<button onClick={onRetry} type="button">
@@ -402,17 +553,22 @@ export function IconLibrary({
 
 							{status === "ready" && !results.length ? (
 								<section className="icons-state">
-									<h2>No icons found.</h2>
-									<p>Try a brand name, common alias, or another collection.</p>
-									<button
-										onClick={() => {
-											changeQuery("");
-											changeCollection("all");
-										}}
-										type="button"
-									>
-										Clear search
-									</button>
+									<h2>No icons found</h2>
+									<p>
+										{collections.size && query.trim()
+											? "Nothing in the chosen collections matches. Try all collections or another name."
+											: "Try a brand name or a common alias, such as k8s or psql."}
+									</p>
+									<div className="icons-state__actions">
+										{collections.size && query.trim() ? (
+											<button onClick={clearCollections} type="button">
+												Search all collections
+											</button>
+										) : null}
+										<button onClick={clearFilters} type="button">
+											Clear search and filters
+										</button>
+									</div>
 								</section>
 							) : null}
 
@@ -455,44 +611,58 @@ export function IconLibrary({
 								</>
 							) : null}
 						</div>
-					</section>
-				</main>
-			</IconsChrome>
+					</main>
+				</IconsChrome>
 
-			{detailIcon ? (
-				<div className="icon-detail-layer">
-					<button
-						aria-label="Close icon details"
-						className="icon-detail-layer__scrim"
-						onClick={closeDetail}
-						type="button"
-					/>
-					<IconDetail
-						{...(busyDetailAction ? { busyAction: busyDetailAction } : {})}
-						icon={detailIcon}
-						onAction={(action, icon) => void runDetailAction(action, icon)}
-						onClose={closeDetail}
-						onPreviewModeChange={setPreviewMode}
-						permanentUrl={permanentSvgUrl(detailIcon.slug)}
-						previewMode={previewMode}
-						returnFocusTo={detail?.opener ?? null}
-					/>
+				{detailIcon ? (
+					<div className="icon-detail-layer">
+						<button
+							aria-label="Close icon details"
+							className="icon-detail-layer__scrim"
+							onClick={closeDetail}
+							tabIndex={-1}
+							type="button"
+						/>
+						<IconDetail
+							{...(busyDetailAction ? { busyAction: busyDetailAction } : {})}
+							icon={detailIcon}
+							onAction={(action, icon) => void runDetailAction(action, icon)}
+							onClose={closeDetail}
+							onPreviewModeChange={setPreviewMode}
+							permanentUrl={permanentSvgUrl(detailIcon.slug)}
+							previewMode={previewMode}
+							returnFocusTo={detail?.opener ?? null}
+						/>
+					</div>
+				) : null}
+
+				<CommandPalette
+					collections={collections}
+					commands={commands}
+					links={links}
+					onClearCollections={clearCollections}
+					onNavigate={navigate}
+					onOpenChange={setPaletteOpen}
+					onToggleCollection={changeCollection}
+					open={paletteOpen}
+					options={collectionOptions}
+				/>
+
+				<SelectionBar
+					busySelectionAction={busySelectionAction}
+					detailOpen={Boolean(detailIcon)}
+					hiddenCount={hiddenSelectedCount}
+					onAction={runSelectionAction}
+					onClear={clearSelection}
+					selectedCount={selectedCount}
+					selectionIsFull={selectionIsFull}
+					selectionProgress={selectionProgress}
+				/>
+
+				<div aria-live="polite" aria-atomic="true" className="icons-toast" role="status">
+					{notice}
 				</div>
-			) : null}
-
-			<SelectionBar
-				busySelectionAction={busySelectionAction}
-				detailOpen={Boolean(detailIcon)}
-				onAction={runSelectionAction}
-				onClear={clearSelection}
-				selectedCount={selectedIcons.length}
-				selectionIsFull={selectionIsFull}
-				selectionProgress={selectionProgress}
-			/>
-
-			<div aria-live="polite" aria-atomic="true" className="icons-toast" role="status">
-				{notice}
 			</div>
-		</div>
+		</TooltipProvider>
 	);
 }

@@ -45,26 +45,17 @@ export function remainingCapacity(
 }
 
 /**
- * Label for the select-all control. It states the cap up front so a large
- * result set is never silently truncated after the click, and it counts only
- * the results that are not selected yet, so it never promises work it will not
- * do.
+ * Visible label for the select-results checkbox. It names a number only when
+ * the cap will truncate the click, so the common case stays "Select all" and a
+ * large result set is never silently cut short.
  *
- * @param resultCount every icon matching the current filter
  * @param pendingCount matching icons that are not selected yet
  * @param remaining how many more icons the selection can hold
  */
-export function selectAllLabel(
-	resultCount: number,
-	pendingCount: number,
-	remaining: number,
-): string {
-	if (pendingCount <= 0) return `All ${resultCount.toLocaleString()} selected`;
-	if (remaining <= 0) return "Selection full";
-	if (pendingCount <= remaining) {
-		return `Select all ${resultCount.toLocaleString()}`;
-	}
-	return `Select ${remaining.toLocaleString()} more of ${resultCount.toLocaleString()}`;
+export function selectResultsLabel(pendingCount: number, remaining: number): string {
+	if (pendingCount > 0 && remaining <= 0) return "Selection full";
+	if (pendingCount > remaining) return `Select ${remaining.toLocaleString()}`;
+	return "Select all";
 }
 
 /**
@@ -86,6 +77,7 @@ export type SelectionNotice =
 			readonly skipped: number;
 	  }
 	| { readonly kind: "cleared" }
+	| { readonly kind: "deselected"; readonly removed: number }
 	| { readonly kind: "full" };
 
 export interface SelectionState {
@@ -97,6 +89,7 @@ export interface SelectionState {
 export type SelectionEvent =
 	| { readonly slug: string; readonly type: "toggle" }
 	| { readonly slugs: readonly string[]; readonly type: "select-all" }
+	| { readonly slugs: readonly string[]; readonly type: "deselect" }
 	| { readonly type: "clear" };
 
 export const initialSelectionState: SelectionState = {
@@ -121,6 +114,13 @@ export function applySelectionEvent(
 		case "clear": {
 			if (!state.slugs.size) return state;
 			return { notice: { kind: "cleared" }, slugs: new Set() };
+		}
+		case "deselect": {
+			const slugs = new Set(state.slugs);
+			let removed = 0;
+			for (const slug of event.slugs) if (slugs.delete(slug)) removed += 1;
+			if (!removed) return state;
+			return { notice: { kind: "deselected", removed }, slugs };
 		}
 		case "select-all": {
 			const result = addToSelection(state.slugs, event.slugs, limit);
@@ -184,6 +184,8 @@ export function describeSelectionNotice(notice: SelectionNotice): string {
 	switch (notice.kind) {
 		case "cleared":
 			return "Selection cleared.";
+		case "deselected":
+			return `${notice.removed.toLocaleString()} ${notice.removed === 1 ? "icon" : "icons"} removed from the selection.`;
 		case "full":
 			return `Selection is full at ${SELECTION_LIMIT.toLocaleString()} icons.`;
 		case "selected":
