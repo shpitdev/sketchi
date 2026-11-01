@@ -3,7 +3,6 @@ import validationFixtures from "./fixtures/mcp-validation-issues-v2.json";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { describe, expect, it, vi } from "vitest";
 import { Context, Effect, Option, Schema } from "effect";
 
@@ -1568,7 +1567,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		});
 
 		try {
-			await client.connect(transport as unknown as Transport);
+			await client.connect(transport);
 
 			const tools = await client.listTools();
 			expect(tools.tools.map((tool) => tool.name).sort()).toEqual(["docs", "execute", "search"]);

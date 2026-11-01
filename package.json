@@ -48,13 +48,15 @@
 		"typecheck:native": "nx run-many -t typecheck-native"
 	},
 	"dependencies": {
-		"@cloudflare/codemode": "0.5.3",
-		"@modelcontextprotocol/sdk": "1.32.1",
+		"@cloudflare/codemode": "0.5.6",
+		"@modelcontextprotocol/client": "2.4.0",
+		"@modelcontextprotocol/sdk": "1.32.2",
+		"@modelcontextprotocol/server": "2.4.0",
 		"@standard-schema/spec": "1.1.0",
 		"@tanstack/react-query": "5.105.0",
 		"@tanstack/react-router": "1.170.46",
 		"@tanstack/react-start": "1.169.4",
-		"agents": "0.26.0",
+		"agents": "0.32.0",
 		"effect": "4.1.1",
 		"react": "19.3.1",
 		"react-dom": "19.3.1"

@@ -980,15 +980,15 @@ export const handleSketchiMcpRequest = Effect.fn("playground.http.mcp")(function
 	const env = yield* PlaygroundBindings;
 	const platform = yield* PlaygroundPlatformCallbacks;
 	platform.waitUntil(prewarmPngRendererOnSessionStart(request, yield* PlaygroundCodeMode));
-	const createMcpHandler = yield* Effect.tryPromise({
-		try: () => import("agents/mcp").then((module) => module.createMcpHandler),
+	const createLegacyMcpHandler = yield* Effect.tryPromise({
+		try: () => import("agents/mcp").then((module) => module.createLegacyMcpHandler),
 		catch: (cause) =>
 			McpTransportError.make({
 				cause,
 				message: cause instanceof Error ? cause.message : "MCP transport failed.",
 			}),
 	});
-	const handler: McpHttpHandler = createMcpHandler(
+	const handler: McpHttpHandler = createLegacyMcpHandler(
 		createSketchiMcpServer(callbacks.runPromise, options),
 		{ route: "/mcp" },
 	);
