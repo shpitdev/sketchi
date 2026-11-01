@@ -56,8 +56,8 @@
 		"@tanstack/react-start": "1.168.60",
 		"agents": "0.26.0",
 		"effect": "4.1.1",
-		"react": "19.3.0",
-		"react-dom": "19.3.0"
+		"react": "19.3.1",
+		"react-dom": "19.3.1"
 	},
 	"devDependencies": {
 		"@babel/core": "7.29.7",
