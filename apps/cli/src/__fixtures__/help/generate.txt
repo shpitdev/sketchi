@@ -39,7 +39,6 @@ USAGE
   sketchi generate [flags]
 
 FLAGS
-  --output text|json               Result presentation format. (choices: text, json)
   --prompt TEXT                    Diagram request text sent directly without interactive prompts.
   --type TYPE                      Authoritative diagram type; omit for model selection. (choices: flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, quadrant)
   --model MODEL                    Server-routed generation model id; default gemini-3.1-flash-lite.
@@ -47,10 +46,13 @@ FLAGS
   --format png|excalidraw|scene    Artifact exported after generation; default png. (choices: png, excalidraw, scene)
   --dest PATH|-                    Artifact destination; defaults from the generated id, or - for stdout.
 
+INHERITED FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+
 GLOBAL FLAGS
-  --help, -h                          Show help information
-  --version, -v                       Show version information
-  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
+  --help, -h                                          Show help information
+  --version, -v                                       Show version information
+  --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
   # Generate a flowchart with gemini-3.1-flash-lite and write its PNG.

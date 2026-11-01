@@ -8,14 +8,16 @@ ARGUMENTS
   diagram-id string
 
 FLAGS
-  --output text|json               Result presentation format. (choices: text, json)
   --format scene|excalidraw|png    Artifact format to export or render on demand. (choices: scene, excalidraw, png)
   --dest PATH|-                    Artifact byte destination path, or - for stdout.
 
+INHERITED FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+
 GLOBAL FLAGS
-  --help, -h                          Show help information
-  --version, -v                       Show version information
-  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
+  --help, -h                                          Show help information
+  --version, -v                                       Show version information
+  --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
   # Write an Excalidraw artifact atomically to a file.

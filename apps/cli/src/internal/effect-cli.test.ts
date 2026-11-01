@@ -20,11 +20,11 @@ describe("requested output format", () => {
 		[["--output", "invalid", "--output=json"], "text"],
 	] satisfies ReadonlyArray<readonly [ReadonlyArray<string>, OutputFormat]>;
 
-	it.each(cases)("uses the parser's first-value rule for %j", (args, expected) => {
+	it.each(cases)("presents usage errors in the first requested format for %j", (args, expected) => {
 		assert.strictEqual(requestedOutputFormat(args), expected);
 	});
 
-	it("formats usage failures like successful commands with repeated output flags", () => {
+	it("rejects repeated output flags in the first requested format", () => {
 		mkdirSync(resolve(".memory/s9-output-home"), { recursive: true });
 		const environment: NodeJS.ProcessEnv = {
 			...process.env,
@@ -32,42 +32,28 @@ describe("requested output format", () => {
 		};
 		delete environment["FORCE_COLOR"];
 		delete environment["NO_COLOR"];
+		const run = (args: ReadonlyArray<string>) =>
+			spawnSync(process.execPath, [resolve("apps/cli/dist/sketchi.js"), "list", ...args], {
+				encoding: "utf8",
+				env: environment,
+			});
 		for (const [first, second] of [
 			["text", "json"],
 			["json", "text"],
 		]) {
-			const result = spawnSync(
-				process.execPath,
-				[
-					resolve("apps/cli/dist/sketchi.js"),
-					"list",
-					"--output",
-					first!,
-					"--output",
-					second!,
-					"--bogus",
-				],
-				{
-					encoding: "utf8",
-					env: environment,
-				},
-			);
-			assert.strictEqual(result.status, 2);
-			if (first === "text") {
-				assert.match(result.stdout, /^DESCRIPTION/u);
-				assert.match(result.stderr, /^error: usage_error/u);
-			} else {
-				assert.strictEqual(result.stdout, "");
-				assert.strictEqual(JSON.parse(result.stderr).error.code, "usage_error");
+			for (const extra of [["--bogus"], []]) {
+				const result = run(["--output", first!, "--output", second!, ...extra]);
+				assert.strictEqual(result.status, 2);
+				if (first === "text") {
+					assert.match(result.stdout, /^DESCRIPTION/u);
+					assert.match(result.stderr, /^error: usage_error/u);
+				} else {
+					assert.strictEqual(result.stdout, "");
+					assert.strictEqual(JSON.parse(result.stderr).error.code, "usage_error");
+				}
+				if (extra.length === 0) assert.include(result.stderr, "at most 1 value");
 			}
-			const success = spawnSync(
-				process.execPath,
-				[resolve("apps/cli/dist/sketchi.js"), "list", "--output", first!, "--output", second!],
-				{
-					encoding: "utf8",
-					env: environment,
-				},
-			);
+			const success = run(["--output", first!]);
 			assert.strictEqual(success.status, 0);
 			assert.strictEqual(success.stderr, "");
 			if (first === "text") assert.strictEqual(success.stdout, "no diagrams\n");

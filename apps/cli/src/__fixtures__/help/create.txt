@@ -5,14 +5,16 @@ USAGE
   sketchi create [flags]
 
 FLAGS
+  --file PATH|-    Read one canonical document from PATH, or stdin with -.
+  --json VALUE     Read one canonical document from inline JSON.
+
+INHERITED FLAGS
   --output text|json    Result presentation format. (choices: text, json)
-  --file PATH|-         Read one canonical document from PATH, or stdin with -.
-  --json VALUE          Read one canonical document from inline JSON.
 
 GLOBAL FLAGS
-  --help, -h                          Show help information
-  --version, -v                       Show version information
-  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
+  --help, -h                                          Show help information
+  --version, -v                                       Show version information
+  --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
   # Create from a UTF-8 JSON file.

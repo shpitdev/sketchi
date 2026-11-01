@@ -23,17 +23,19 @@ USAGE
   sketchi canvas [flags]
 
 FLAGS
-  --output text|json               Result presentation format. (choices: text, json)
   --file PATH|-                    Read one CanvasSpec document from PATH, or stdin with -.
   --json VALUE                     Read one CanvasSpec document from inline JSON.
   --endpoint URL                   Unauthenticated create-canvas API URL; defaults to production.
   --format png|excalidraw|scene    Artifact exported after the canvas is created. (choices: png, excalidraw, scene)
   --dest PATH|-                    Artifact destination; defaults from diagramId, or - for stdout.
 
+INHERITED FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+
 GLOBAL FLAGS
-  --help, -h                          Show help information
-  --version, -v                       Show version information
-  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
+  --help, -h                                          Show help information
+  --version, -v                                       Show version information
+  --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
   # Build a CanvasSpec, store it locally, and write its PNG.

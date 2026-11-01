@@ -241,7 +241,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"tools/studio-routing-eval.ts": 4,
 };
 const approvedManagedPromiseFiles = Object.keys(approvedManagedPromiseSiteCounts).sort();
-const approvedEffectDependencyVersions = new Set(["4.0.1"]);
+const approvedEffectDependencyVersions = new Set(["4.1.1"]);
 const diagramPackages = [
 	{
 		name: "diagram-agent",
@@ -925,8 +925,8 @@ describe("diagram generation project boundaries", () => {
 		expect(actualEffectManifestPaths).toEqual(effectDependencyManifestPaths);
 
 		const rootManifest = readJsonFile<PackageManifest>(path.join(workspaceRoot, "package.json"));
-		expect(rootManifest.dependencies?.["effect"]).toBe("4.0.1");
-		expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("4.0.1");
+		expect(rootManifest.dependencies?.["effect"]).toBe("4.1.1");
+		expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("4.1.1");
 		expect(readFileSync(path.join(workspaceRoot, "pnpm-lock.yaml"), "utf8")).not.toContain(
 			"effect@3.",
 		);
@@ -1151,8 +1151,8 @@ describe("Effect structural guards", () => {
 			invalidEffectDependencyPins({
 				dependencies: {
 					"@effect/platform": "^4.0.0",
-					"@effect/platform-node": "4.0.1",
-					effect: "4.0.1",
+					"@effect/platform-node": "4.1.1",
+					effect: "4.1.1",
 				},
 			}),
 		).toEqual([{ dependency: "@effect/platform", version: "^4.0.0" }]);

@@ -101,7 +101,7 @@ export function invalidFlagValue(name: string, value: string, expected: string) 
 	});
 }
 
-/** Match the parser: the first --output value wins, before the -- separator. */
+/** Usage errors use the first --output value before the -- separator; the parser rejects repeats. */
 export function requestedOutputFormat(args: ReadonlyArray<string>): OutputFormat {
 	for (const [index, argument] of args.entries()) {
 		if (argument === "--") break;
