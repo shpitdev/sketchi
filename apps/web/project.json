@@ -13,11 +13,9 @@
 			}
 		},
 		"build-storybook": {
-			"executor": "@nx/storybook:build",
 			"outputs": ["{workspaceRoot}/storybook-static/web"],
 			"options": {
-				"configDir": "apps/web/.storybook",
-				"outputDir": "storybook-static/web"
+				"output-dir": "../../storybook-static/web"
 			}
 		},
 		"cf-typegen": {
@@ -46,9 +44,7 @@
 			}
 		},
 		"storybook": {
-			"executor": "@nx/storybook:storybook",
 			"options": {
-				"configDir": "apps/web/.storybook",
 				"port": 6007
 			}
 		},

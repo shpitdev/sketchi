@@ -41,6 +41,15 @@
 			"cache": true,
 			"dependsOn": ["^build"],
 			"inputs": ["production", "^production"]
+		},
+		"build-storybook": {
+			"inputs": [
+				"default",
+				"^default",
+				{
+					"externalDependencies": ["storybook"]
+				}
+			]
 		}
 	},
 	"release": {
@@ -52,5 +61,19 @@
 			"pattern": "cli-v{version}"
 		}
 	},
-	"analytics": false
+	"analytics": false,
+	"affected": {
+		"legacy": true
+	},
+	"plugins": [
+		{
+			"plugin": "@nx/storybook/plugin",
+			"options": {
+				"buildStorybookTargetName": "build-storybook",
+				"serveStorybookTargetName": "storybook",
+				"staticStorybookTargetName": "static-storybook",
+				"testStorybookTargetName": "test-storybook"
+			}
+		}
+	]
 }

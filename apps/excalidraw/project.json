@@ -16,11 +16,9 @@
 			}
 		},
 		"build-storybook": {
-			"executor": "@nx/storybook:build",
 			"outputs": ["{workspaceRoot}/storybook-static/excalidraw"],
 			"options": {
-				"configDir": "apps/excalidraw/.storybook",
-				"outputDir": "storybook-static/excalidraw"
+				"output-dir": "../../storybook-static/excalidraw"
 			}
 		},
 		"cf-typegen": {
@@ -49,9 +47,7 @@
 			}
 		},
 		"storybook": {
-			"executor": "@nx/storybook:storybook",
 			"options": {
-				"configDir": "apps/excalidraw/.storybook",
 				"port": 6008
 			}
 		},

@@ -7,11 +7,9 @@
 	"implicitDependencies": ["diagram-ui", "excalidraw", "icons"],
 	"targets": {
 		"build-storybook": {
-			"executor": "@nx/storybook:build",
 			"outputs": ["{workspaceRoot}/storybook-static/native-conversion"],
 			"options": {
-				"configDir": "apps/native-conversion-storybook/.storybook",
-				"outputDir": "storybook-static/native-conversion"
+				"output-dir": "../../storybook-static/native-conversion"
 			}
 		},
 		"chromatic": {
@@ -22,9 +20,7 @@
 			}
 		},
 		"storybook": {
-			"executor": "@nx/storybook:storybook",
 			"options": {
-				"configDir": "apps/native-conversion-storybook/.storybook",
 				"port": 6010
 			}
 		}
