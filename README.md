@@ -174,8 +174,8 @@ repository migration and its historical before tree are recorded in the
 
 ## Quick Start
 
-The project-local [mise](https://mise.jdx.dev/) configuration pins Node 26.10.0
-and native pnpm 12.10.1. The workspace uses stable native TypeScript 7.0.2 as
+The project-local [mise](https://mise.jdx.dev/) configuration pins Node 26.13.0
+and native pnpm 12.16.1. The workspace uses stable native TypeScript 7.0.2 as
 `tsc` while the `typescript` module and `tsc6` expose the supported TypeScript
 6.0.3 compiler API for Nx and the repository tooling tests through the official
 `@typescript/typescript6@6.0.2` compatibility package. Activate mise in your
