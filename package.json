@@ -64,7 +64,7 @@
 		"@babel/plugin-proposal-decorators": "7.29.7",
 		"@changesets/changelog-github": "1.0.1",
 		"@changesets/cli": "3.0.3",
-		"@cloudflare/vite-plugin": "1.63.0",
+		"@cloudflare/vite-plugin": "1.66.0",
 		"@effect/platform-node": "4.1.1",
 		"@effect/vitest": "4.1.1",
 		"@nx/devkit": "23.3.1",
@@ -108,7 +108,7 @@
 		"typescript": "npm:@typescript/typescript6@6.0.2",
 		"vite": "8.3.5",
 		"vitest": "5.0.5",
-		"wrangler": "4.148.0"
+		"wrangler": "4.156.0"
 	},
 	"engines": {
 		"node": "26.10.0",
