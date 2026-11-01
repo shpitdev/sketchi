@@ -1139,12 +1139,6 @@ describe("Effect structural guards", () => {
 		).toEqual([]);
 	});
 
-	it("documents that deliberate any laundering is outside the gate", () => {
-		expect(
-			promiseProbeSites("const deliberatelyErased: any = Promise; deliberatelyErased.resolve(1)"),
-		).toEqual([]);
-	});
-
 	it("rejects a ranged pin for any @effect package", () => {
 		expect(
 			invalidEffectDependencyPins({

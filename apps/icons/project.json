@@ -14,13 +14,11 @@
 			}
 		},
 		"build-storybook": {
-			"executor": "@nx/storybook:build",
 			"outputs": ["{workspaceRoot}/storybook-static/icons"],
+			"dependsOn": ["sync-catalog-assets"],
 			"options": {
-				"configDir": "apps/icons/.storybook",
-				"outputDir": "storybook-static/icons"
-			},
-			"dependsOn": ["sync-catalog-assets"]
+				"output-dir": "../../storybook-static/icons"
+			}
 		},
 		"cf-typegen": {
 			"executor": "nx:run-commands",
@@ -48,13 +46,16 @@
 				"command": "vite preview --config apps/icons/vite.config.ts --host 127.0.0.1 --port 6303"
 			}
 		},
-		"storybook": {
-			"executor": "@nx/storybook:storybook",
+		"static-storybook": {
 			"options": {
-				"configDir": "apps/icons/.storybook",
+				"staticFilePath": "storybook-static/icons"
+			}
+		},
+		"storybook": {
+			"dependsOn": ["sync-catalog-assets"],
+			"options": {
 				"port": 6009
-			},
-			"dependsOn": ["sync-catalog-assets"]
+			}
 		},
 		"sync-catalog-assets": {
 			"executor": "nx:run-commands",

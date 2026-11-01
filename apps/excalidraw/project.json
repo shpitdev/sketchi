@@ -16,11 +16,9 @@
 			}
 		},
 		"build-storybook": {
-			"executor": "@nx/storybook:build",
 			"outputs": ["{workspaceRoot}/storybook-static/excalidraw"],
 			"options": {
-				"configDir": "apps/excalidraw/.storybook",
-				"outputDir": "storybook-static/excalidraw"
+				"output-dir": "../../storybook-static/excalidraw"
 			}
 		},
 		"cf-typegen": {
@@ -48,10 +46,13 @@
 				"command": "vite preview --config apps/excalidraw/vite.config.ts --host 127.0.0.1 --port 6302"
 			}
 		},
-		"storybook": {
-			"executor": "@nx/storybook:storybook",
+		"static-storybook": {
 			"options": {
-				"configDir": "apps/excalidraw/.storybook",
+				"staticFilePath": "storybook-static/excalidraw"
+			}
+		},
+		"storybook": {
+			"options": {
 				"port": 6008
 			}
 		},

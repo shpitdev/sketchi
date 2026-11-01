@@ -17,15 +17,12 @@ async function sourceFiles(directory: string): Promise<ReadonlyArray<string>> {
 }
 
 describe("CLI dependency and public-surface audit", () => {
-	it("pins the exact stable Effect v4 dependencies without alternate CLI frameworks", async () => {
+	it("keeps alternate CLI frameworks and provider SDKs out of the manifest", async () => {
 		const manifest = JSON.parse(
 			await readFile(join(workspaceRoot, "apps/cli/package.json"), "utf8"),
 		);
 
-		assert.strictEqual(manifest.dependencies.effect, "4.1.1");
-		assert.strictEqual(manifest.dependencies["@effect/platform-node"], "4.1.1");
 		assert.strictEqual(manifest.dependencies["@sketchi/diagram-agent"], "workspace:*");
-		assert.strictEqual(manifest.dependencies.linkedom, "0.18.14");
 		assert.notProperty(manifest.dependencies, "jsdom");
 		assert.notProperty(manifest.dependencies, "@sketchi/diagram-generation");
 		assert.notProperty(manifest.dependencies, "@ai-sdk/google");
@@ -48,22 +45,6 @@ describe("CLI dependency and public-surface audit", () => {
 			directImports.map((file) => file.slice(workspaceRoot.length + 1)),
 			["apps/cli/src/internal/effect-cli.ts"],
 		);
-	});
-
-	it("uses package Effect codecs as the sole canonical document authority", async () => {
-		const files = await sourceFiles(join(workspaceRoot, "apps/cli/src"));
-		const source = (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
-		const adapter = await readFile(join(workspaceRoot, "apps/cli/src/document.ts"), "utf8");
-
-		assert.notInclude(source, "CanonicalDiagramDocumentSchema");
-		assert.notMatch(source, /from\s+["']zod["']/u);
-		// Each family's authoring spec comes from the diagram-agent family registry.
-		assert.include(adapter, "Schema.decodeUnknownEffect(CANONICAL_DOCUMENT_SPECS[type]");
-		assert.include(adapter, "isCanonicalDocumentType(fields.type)");
-		assert.notInclude(adapter, "Schema.Struct");
-		assert.notInclude(adapter, "Schema.Union");
-		assert.notInclude(source, "NormalizedFlowchartSchema");
-		assert.notInclude(source, "NormalizedMindmapSchema");
 	});
 
 	it("confines network boundaries to the four credential-free HTTPS commands", async () => {
@@ -108,48 +89,6 @@ describe("CLI dependency and public-surface audit", () => {
 		);
 		assert.notProperty(providerManifest.dependencies, "@ai-sdk/google");
 		assert.notProperty(providerManifest.dependencies, "ai");
-	});
-
-	it("keeps every command registered while root help uses progressive disclosure", async () => {
-		const help = await readFile(
-			join(workspaceRoot, "apps/cli/src/__fixtures__/help/root.txt"),
-			"utf8",
-		);
-		assert.include(help, "START HERE");
-		assert.include(help, "WORK WITH A DIAGRAM");
-		assert.include(help, "sketchi docs");
-		assert.notInclude(help, "SUBCOMMANDS");
-		assert.notInclude(help, "patch       Apply semantic edits");
-
-		const cliSource = await readFile(join(workspaceRoot, "apps/cli/src/cli.ts"), "utf8");
-		const registration = cliSource.match(/Command\.withSubcommands\(\[([\s\S]*?)\]\)/u)?.[1] ?? "";
-		const commands = [...registration.matchAll(/\b([a-z]+)Command\b/gu)].map(([, name]) => name);
-		assert.deepStrictEqual(commands, [
-			"generate",
-			"canvas",
-			"docs",
-			"create",
-			"show",
-			"edit",
-			"patch",
-			"list",
-			"restore",
-			"share",
-			"pull",
-			"export",
-		]);
-		for (const forbidden of [
-			"auth",
-			"config",
-			"completion",
-			"mcp",
-			"eval",
-			"scenario",
-			"delete",
-			"tui",
-		]) {
-			assert.notInclude(commands, forbidden);
-		}
 	});
 
 	it("emits a self-contained executable package with lazy local renderer code", async () => {

@@ -13,11 +13,9 @@
 			}
 		},
 		"build-storybook": {
-			"executor": "@nx/storybook:build",
 			"outputs": ["{workspaceRoot}/storybook-static/web"],
 			"options": {
-				"configDir": "apps/web/.storybook",
-				"outputDir": "storybook-static/web"
+				"output-dir": "../../storybook-static/web"
 			}
 		},
 		"cf-typegen": {
@@ -45,10 +43,13 @@
 				"command": "vite preview --config apps/web/vite.config.ts --host 127.0.0.1 --port 6301"
 			}
 		},
-		"storybook": {
-			"executor": "@nx/storybook:storybook",
+		"static-storybook": {
 			"options": {
-				"configDir": "apps/web/.storybook",
+				"staticFilePath": "storybook-static/web"
+			}
+		},
+		"storybook": {
+			"options": {
 				"port": 6007
 			}
 		},

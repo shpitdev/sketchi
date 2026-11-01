@@ -11,7 +11,6 @@ export const EXCALIDRAW_STORE_BASELINE_COMMIT = "76de642d0e9961f26bf6c1fe1dbe1ae
 export const EXCALIDRAW_POST_ENDPOINT = "https://json.excalidraw.com/api/v2/post/";
 export const EXCALIDRAW_GET_ENDPOINT = "https://json.excalidraw.com/api/v2/";
 export const MAX_SHARE_LINK_LENGTH = 4 * 1024;
-export const MAX_SHARE_ID_LENGTH = 128;
 export const MAX_SHARE_BODY_BYTES = 2 * 1024 * 1024;
 export const MAX_DECOMPRESSED_BYTES = 16 * 1024 * 1024;
 export const MAX_SHARE_ELEMENTS = 10_000;
@@ -477,11 +476,11 @@ function deflateShareContents(data: Uint8Array, maximumBytes: number): Uint8Arra
 		uint32Buffer(data.byteLength),
 		data,
 	];
-	const deflater = new Deflate({ chunkSize: 64 * 1024 });
+	// Classic zlib hashing keeps the bytes Excalidraw's pako@1 format produces.
+	const deflater = new Deflate({ chunkSize: 64 * 1024, legacyHash: true });
 	const chunks: Uint8Array[] = [];
 	let size = 0;
-	deflater.onData = (chunk) => {
-		const bytes = chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk);
+	deflater.onData = (bytes) => {
 		size += bytes.byteLength;
 		if (size > maximumBytes) {
 			throw invalid(

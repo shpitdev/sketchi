@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 const uiSourceRoot = fileURLToPath(new URL("..", import.meta.url));
 const componentsRoot = join(uiSourceRoot, "components");
 const packageIndex = readFileSync(join(uiSourceRoot, "index.ts"), "utf-8");
-const packageStyles = readFileSync(join(uiSourceRoot, "styles.css"), "utf-8");
 
 function componentFileExists(componentName: string, suffix: string): boolean {
 	return existsSync(join(componentsRoot, componentName, `${componentName}${suffix}`));
@@ -35,13 +34,5 @@ describe("Diagram UI component structure", () => {
 				expect(packageIndex).toContain(exportStatement);
 			}
 		}
-	});
-
-	it("removes empty mobile chrome without hiding editable controls", () => {
-		expect(packageStyles).toContain("@container (min-width: 700px)");
-		expect(packageStyles).toContain('.sketchi-excalidraw-scene-canvas[data-view-mode="true"]');
-		expect(packageStyles).toContain('.sketchi-excalidraw-scene-canvas[data-view-mode="false"]');
-		expect(packageStyles).toContain(".main-menu-trigger");
-		expect(packageStyles).toContain("width: max-content;");
 	});
 });

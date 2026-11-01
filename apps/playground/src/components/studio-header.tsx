@@ -9,7 +9,8 @@ import { SKETCHI_REPO_URL, SKETCHI_WEB_HOME_URL } from "@/features/playground/ho
 /**
  * The header every Playground route shares: the Sketchi lockup on the left,
  * then the route's own links and actions, then Docs and GitHub as the same
- * icon links the site and Icons headers use.
+ * icon links the site and Icons headers use. On phones a route with actions
+ * moves them to a second row so the lockup and Docs/GitHub share the first.
  */
 export function StudioHeader({
 	children,
@@ -26,24 +27,22 @@ export function StudioHeader({
 				</span>
 				<span className="studio-brand__wordmark">Sketchi</span>
 			</a>
-			<div className="studio-header__actions">
-				{children}
-				<TooltipProvider delayDuration={200}>
-					<span className="studio-header__site">
-						<HeaderIconLink href={`${SKETCHI_WEB_HOME_URL}/docs`} label="Docs">
-							<BookOpen aria-hidden="true" />
-						</HeaderIconLink>
-						<HeaderIconLink
-							external
-							href={SKETCHI_REPO_URL}
-							label="Sketchi on GitHub"
-							tooltip="GitHub"
-						>
-							<GitHubMark />
-						</HeaderIconLink>
-					</span>
-				</TooltipProvider>
-			</div>
+			{children ? <div className="studio-header__route">{children}</div> : null}
+			<TooltipProvider delayDuration={200}>
+				<span className="studio-header__site">
+					<HeaderIconLink href={`${SKETCHI_WEB_HOME_URL}/docs`} label="Docs">
+						<BookOpen aria-hidden="true" />
+					</HeaderIconLink>
+					<HeaderIconLink
+						external
+						href={SKETCHI_REPO_URL}
+						label="Sketchi on GitHub"
+						tooltip="GitHub"
+					>
+						<GitHubMark />
+					</HeaderIconLink>
+				</span>
+			</TooltipProvider>
 		</header>
 	);
 }

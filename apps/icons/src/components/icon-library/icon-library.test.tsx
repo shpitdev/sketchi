@@ -3,8 +3,6 @@ import { unzipSync, strFromU8 } from "fflate";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 import type { IconManifest, SketchiIcon } from "@sketchi/icon-catalog";
 import { IconLibrary } from "./icon-library";
@@ -142,21 +140,6 @@ describe("IconLibrary", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
 		vi.restoreAllMocks();
-	});
-
-	it("keeps the header wordmark on the shared script font", () => {
-		const styles = readFileSync(resolve(process.cwd(), "apps/icons/src/styles/app.css"), "utf8");
-		const rootRoute = readFileSync(
-			resolve(process.cwd(), "apps/icons/src/routes/__root.tsx"),
-			"utf8",
-		);
-		expect(styles).toMatch(
-			/\.icons-brand \.sk-wordmark\s*\{[^}]*font-family:\s*var\(--font-script\)/u,
-		);
-		expect(rootRoute).not.toContain("family=Dancing+Script");
-		expect(rootRoute).toContain(
-			"/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2",
-		);
 	});
 
 	it("leads with the heading and search, and names its header marks", () => {

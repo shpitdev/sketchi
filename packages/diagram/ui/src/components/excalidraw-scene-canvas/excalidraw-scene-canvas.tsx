@@ -103,7 +103,11 @@ export function ExcalidrawSceneCanvas({
 	// this only records the newest instance. Each scene revision remounts the
 	// editor with a fresh API.
 	const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
-	const fittedApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+	const fittedRef = useRef<{
+		readonly api: ExcalidrawImperativeAPI;
+		readonly height: number;
+		readonly width: number;
+	} | null>(null);
 	const synchronizeLabels = useRef(createBranchLabelSynchronizer());
 	const handleApiChange = useCallback(
 		(api: ExcalidrawImperativeAPI) => {
@@ -117,23 +121,31 @@ export function ExcalidrawSceneCanvas({
 	// Excalidraw reports changes only once a mounted editor has loaded its scene.
 	// The first change from the current editor fits that scene to the viewport;
 	// a discarded or replaced instance never matches the current API's state.
+	// A read-only canvas refits when its viewport resizes, while an editable one
+	// keeps the camera the user chose.
 	const handleChange: NonNullable<ExcalidrawProps["onChange"]> = useCallback(
 		(elements, appState, files) => {
 			const api = apiRef.current;
-			if (api && fittedApiRef.current !== api && api.getAppState() === appState) {
-				fittedApiRef.current = api;
-				api.scrollToContent(undefined, {
-					animate: false,
-					fitToViewport: true,
-					viewportZoomFactor: 1,
-				});
+			if (api && api.getAppState() === appState) {
+				const fitted = fittedRef.current;
+				const resized =
+					fitted?.api === api &&
+					(fitted.width !== appState.width || fitted.height !== appState.height);
+				if (fitted?.api !== api || (viewModeEnabled && resized)) {
+					fittedRef.current = { api, height: appState.height, width: appState.width };
+					api.scrollToContent(undefined, {
+						animate: false,
+						fitToViewport: true,
+						viewportZoomFactor: 1,
+					});
+				}
 			}
 			const synchronized = synchronizeLabels.current(elements);
 			if (api && synchronized !== elements) api.updateScene({ elements: synchronized });
 			onChange?.(synchronized, appState, files);
 			onSceneChange?.(sceneFromExcalidrawChange(synchronized, appState, files));
 		},
-		[onChange, onSceneChange],
+		[onChange, onSceneChange, viewModeEnabled],
 	);
 	const initialData = useMemo<ExcalidrawInitialDataState>(() => {
 		const elements = scene.elements as unknown as NonNullable<

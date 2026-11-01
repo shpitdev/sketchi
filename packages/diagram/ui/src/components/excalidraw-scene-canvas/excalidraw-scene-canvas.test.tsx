@@ -2,7 +2,10 @@ import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const excalidrawMock = vi.hoisted(() => ({
-	editors: [] as Array<{ readonly load: () => void }>,
+	editors: [] as Array<{
+		readonly load: () => void;
+		readonly resize: (width: number, height: number) => void;
+	}>,
 	props: vi.fn(),
 	scrollToContent: vi.fn(),
 }));
@@ -23,15 +26,20 @@ vi.mock("@excalidraw/excalidraw", async () => {
 			excalidrawMock.props(props);
 			// Like Excalidraw's App: hand over the API from the constructor, during
 			// render, and report changes once the mounted editor has loaded its
-			// scene (`load` stands in for that).
+			// scene (`load` stands in for that). A resize commits a new app state
+			// with the new viewport size and reports it the same way.
 			React.useState(() => {
-				const appState = {};
+				let appState = { height: 400, width: 1280 };
 				props.excalidrawAPI?.({
 					getAppState: () => appState,
 					scrollToContent: excalidrawMock.scrollToContent,
 				});
 				excalidrawMock.editors.push({
 					load: () => props.onChange?.([], appState, {}),
+					resize: (width, height) => {
+						appState = { height, width };
+						props.onChange?.([], appState, {});
+					},
 				});
 				return null;
 			});
@@ -131,6 +139,32 @@ describe("ExcalidrawSceneCanvas", () => {
 		expect(excalidrawMock.scrollToContent).not.toHaveBeenCalled();
 		rerender(<ExcalidrawSceneCanvas scene={scene} revision={2} title="Stable canvas" />);
 		expect(screen.getByTestId("mock-excalidraw")).not.toBe(canvas);
+	});
+
+	it("refits a read-only canvas when its viewport resizes", async () => {
+		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		render(<ExcalidrawSceneCanvas scene={scene} title="Read-only canvas" viewModeEnabled />);
+		await screen.findByTestId("mock-excalidraw");
+		loadEditor(0);
+		expect(excalidrawMock.scrollToContent).toHaveBeenCalledOnce();
+
+		// Wide load, then a phone-width viewport: the scene must fit again.
+		act(() => excalidrawMock.editors[0]?.resize(390, 400));
+		expect(excalidrawMock.scrollToContent).toHaveBeenCalledTimes(2);
+		expect(excalidrawMock.scrollToContent).toHaveBeenLastCalledWith(undefined, fitToViewport);
+
+		// Changes at the same size do not refit.
+		loadEditor(0);
+		expect(excalidrawMock.scrollToContent).toHaveBeenCalledTimes(2);
+	});
+
+	it("keeps the user's camera when an editable canvas resizes", async () => {
+		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		render(<ExcalidrawSceneCanvas scene={scene} title="Editable canvas" />);
+		await screen.findByTestId("mock-excalidraw");
+		loadEditor(0);
+		act(() => excalidrawMock.editors[0]?.resize(390, 400));
+		expect(excalidrawMock.scrollToContent).toHaveBeenCalledOnce();
 	});
 
 	it("fits only the editor for the current revision", async () => {

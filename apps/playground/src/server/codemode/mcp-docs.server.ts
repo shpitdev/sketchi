@@ -65,7 +65,6 @@ const CodeExampleContract = Schema.Struct({
 	language: Schema.Literals(["js", "json", "ts"]),
 	code: Schema.String,
 });
-export const CodeExampleSchema = toPlaygroundStandardSchema(CodeExampleContract);
 export type CodeExample = typeof CodeExampleContract.Type;
 
 const CodeModeDocsResultContract = Schema.Struct({
@@ -84,7 +83,6 @@ const CodeModeSearchHitContract = Schema.Struct({
 	snippet: Schema.String,
 	score: Schema.Finite,
 });
-export const CodeModeSearchHitSchema = toPlaygroundStandardSchema(CodeModeSearchHitContract);
 export type SearchHit = typeof CodeModeSearchHitContract.Type;
 
 const CodeModeSearchResultContract = Schema.Struct({

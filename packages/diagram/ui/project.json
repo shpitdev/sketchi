@@ -17,11 +17,9 @@
 			}
 		},
 		"build-storybook": {
-			"executor": "@nx/storybook:build",
 			"outputs": ["{workspaceRoot}/storybook-static/diagram-ui"],
 			"options": {
-				"configDir": "packages/diagram/ui/.storybook",
-				"outputDir": "storybook-static/diagram-ui"
+				"output-dir": "../../../storybook-static/diagram-ui"
 			}
 		},
 		"chromatic": {
@@ -31,10 +29,13 @@
 				"command": "chromatic --storybook-build-dir storybook-static/diagram-ui --storybook-config-dir packages/diagram/ui/.storybook --storybook-base-dir packages/diagram/ui"
 			}
 		},
-		"storybook": {
-			"executor": "@nx/storybook:storybook",
+		"static-storybook": {
 			"options": {
-				"configDir": "packages/diagram/ui/.storybook",
+				"staticFilePath": "storybook-static/diagram-ui"
+			}
+		},
+		"storybook": {
+			"options": {
 				"port": 6006
 			}
 		},
