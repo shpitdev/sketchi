@@ -157,9 +157,8 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/icons/src/routes/index.tsx": 8,
 	"apps/icons/src/routes/mcp.ts": 15,
 	"apps/playground/scripts/sync-node-logos.ts": 4,
-	"apps/playground/src/components/ai-elements/code-block.tsx": 9,
 	"apps/playground/src/components/ai-elements/conversation.tsx": 1,
-	"apps/playground/src/components/ai-elements/prompt-input.tsx": 28,
+	"apps/playground/src/components/ai-elements/prompt-input.tsx": 16,
 	"apps/playground/src/components/ai-elements/reasoning.tsx": 2,
 	"apps/playground/src/features/artifacts/artifact-view-client.ts": 13,
 	"apps/playground/src/features/artifacts/excalidraw-png-export.ts": 1,
@@ -241,7 +240,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"tools/studio-routing-eval.ts": 4,
 };
 const approvedManagedPromiseFiles = Object.keys(approvedManagedPromiseSiteCounts).sort();
-const approvedEffectDependencyVersions = new Set(["4.0.1"]);
+const approvedEffectDependencyVersions = new Set(["4.1.1"]);
 const diagramPackages = [
 	{
 		name: "diagram-agent",
@@ -925,8 +924,8 @@ describe("diagram generation project boundaries", () => {
 		expect(actualEffectManifestPaths).toEqual(effectDependencyManifestPaths);
 
 		const rootManifest = readJsonFile<PackageManifest>(path.join(workspaceRoot, "package.json"));
-		expect(rootManifest.dependencies?.["effect"]).toBe("4.0.1");
-		expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("4.0.1");
+		expect(rootManifest.dependencies?.["effect"]).toBe("4.1.1");
+		expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("4.1.1");
 		expect(readFileSync(path.join(workspaceRoot, "pnpm-lock.yaml"), "utf8")).not.toContain(
 			"effect@3.",
 		);
@@ -1151,8 +1150,8 @@ describe("Effect structural guards", () => {
 			invalidEffectDependencyPins({
 				dependencies: {
 					"@effect/platform": "^4.0.0",
-					"@effect/platform-node": "4.0.1",
-					effect: "4.0.1",
+					"@effect/platform-node": "4.1.1",
+					effect: "4.1.1",
 				},
 			}),
 		).toEqual([{ dependency: "@effect/platform", version: "^4.0.0" }]);

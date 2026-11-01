@@ -22,10 +22,10 @@ describe("CLI dependency and public-surface audit", () => {
 			await readFile(join(workspaceRoot, "apps/cli/package.json"), "utf8"),
 		);
 
-		assert.strictEqual(manifest.dependencies.effect, "4.0.1");
-		assert.strictEqual(manifest.dependencies["@effect/platform-node"], "4.0.1");
+		assert.strictEqual(manifest.dependencies.effect, "4.1.1");
+		assert.strictEqual(manifest.dependencies["@effect/platform-node"], "4.1.1");
 		assert.strictEqual(manifest.dependencies["@sketchi/diagram-agent"], "workspace:*");
-		assert.strictEqual(manifest.dependencies.linkedom, "0.18.13");
+		assert.strictEqual(manifest.dependencies.linkedom, "0.18.14");
 		assert.notProperty(manifest.dependencies, "jsdom");
 		assert.notProperty(manifest.dependencies, "@sketchi/diagram-generation");
 		assert.notProperty(manifest.dependencies, "@ai-sdk/google");

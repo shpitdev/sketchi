@@ -21,3 +21,4 @@ vitest.config.*.timestamp*
 apps/icons/public/icons-manifest.json
 apps/icons/public/output/
 apps/playground/public/node-logos/
+.vitest

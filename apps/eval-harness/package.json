@@ -10,6 +10,6 @@
 		"@sketchi/diagram-scenarios": "workspace:*",
 		"@sketchi/diagram-ui": "workspace:*",
 		"@sketchi/observability": "workspace:*",
-		"effect": "4.0.1"
+		"effect": "4.1.1"
 	}
 }

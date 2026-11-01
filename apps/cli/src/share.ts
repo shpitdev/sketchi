@@ -145,12 +145,13 @@ const terminateOpener = Effect.fn("sketchi.cli.share.terminateOpener")((child: O
 		child.onError(() => resume(Effect.void));
 		if (!child.kill("SIGTERM")) resume(Effect.void);
 	}).pipe(
-		Effect.timeout("250 millis"),
-		Effect.catchTag("TimeoutError", () =>
-			Effect.sync(() => {
-				child.kill("SIGKILL");
-			}),
-		),
+		Effect.timeoutOrElse({
+			duration: "250 millis",
+			orElse: () =>
+				Effect.sync(() => {
+					child.kill("SIGKILL");
+				}),
+		}),
 	),
 );
 
@@ -217,13 +218,14 @@ export function makeLinkOpenerLayer(
 				);
 				return terminateOpener(child);
 			}).pipe(
-				Effect.timeout(waitMs),
-				Effect.catchTag("TimeoutError", () =>
-					Effect.succeed<OpenResult>({
-						status: "unconfirmed",
-						reason: "timeout",
-					}),
-				),
+				Effect.timeoutOrElse({
+					duration: waitMs,
+					orElse: () =>
+						Effect.succeed<OpenResult>({
+							status: "unconfirmed",
+							reason: "timeout",
+						}),
+				}),
 			),
 	});
 }

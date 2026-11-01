@@ -119,7 +119,7 @@ describe("built icons Worker", () => {
 		const client = new Client({ name: "worker-smoke", version: "0.0.0" });
 		const transport = new StreamableHTTPClientTransport(new URL(`${origin}/mcp`));
 		try {
-			await client.connect(transport as Parameters<Client["connect"]>[0]);
+			await client.connect(transport);
 			const result = await client.callTool({
 				arguments: { slug: "kubernetes" },
 				name: "get_icon",

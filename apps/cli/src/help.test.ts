@@ -273,7 +273,7 @@ describe("golden product help", () => {
 	it("redacts bearer-shaped values from parser and typed error envelopes", () => {
 		const bearer = "https://excalidraw.com/#json=AAAAAAAAAAAAAAAAAAAAAA,BBBBBBBBBBBBBBBBBBBBBB";
 		for (const args of [
-			["pull", "missing", "--link", bearer, "--output", bearer, "--output", "json"],
+			["pull", "missing", "--link", bearer, "--output", bearer],
 			["pull", bearer, "--link", bearer, "--output", "json"],
 		]) {
 			const result = spawnSync(process.execPath, [binary, ...args], {
@@ -282,8 +282,8 @@ describe("golden product help", () => {
 			});
 
 			expect([2, 3]).toContain(result.status);
-			// An invalid first --output value uses text usage output; later flags do
-			// not change presentation. Text mode includes the normal usage help.
+			// An invalid --output value uses text usage output, which includes the
+			// normal usage help.
 			if (args[5] === bearer) {
 				expect(result.stdout).toMatch(/^DESCRIPTION/u);
 				expect(result.stderr).toMatch(/^error: usage_error/u);
@@ -291,6 +291,57 @@ describe("golden product help", () => {
 			expect(result.stdout).not.toContain(bearer);
 			expect(result.stderr).not.toContain(bearer);
 			expect(result.stderr).toContain("[redacted-share-link]");
+		}
+	});
+
+	it("keeps bearer-shaped values out of repeated --output usage errors", () => {
+		const bearer = "https://excalidraw.com/#json=AAAAAAAAAAAAAAAAAAAAAA,BBBBBBBBBBBBBBBBBBBBBB";
+		for (const [args, format] of [
+			[["pull", "missing", "--link", bearer, "--output", bearer, "--output", "json"], "text"],
+			[["pull", "missing", "--link", bearer, "--output", "json", "--output", bearer], "json"],
+		] as const) {
+			const result = spawnSync(process.execPath, [binary, ...args], {
+				encoding: "utf8",
+				env: cliEnvironment(),
+			});
+
+			expect(result.status).toBe(2);
+			expect(result.stdout).not.toContain(bearer);
+			expect(result.stderr).not.toContain(bearer);
+			// The first --output value picks the usage error presentation.
+			if (format === "text") {
+				expect(result.stdout).toMatch(/^DESCRIPTION/u);
+				expect(result.stderr).toMatch(/^error: usage_error\n.*--output.*at most 1 value/u);
+			} else {
+				expect(result.stdout).toBe("");
+				expect(JSON.parse(result.stderr)).toMatchObject({
+					ok: false,
+					command: "pull",
+					error: {
+						code: "usage_error",
+						message: expect.stringContaining("at most 1 value"),
+						hint: "Run sketchi pull --help for usage.",
+					},
+				});
+			}
+		}
+	});
+
+	it("keeps share --open opt-in, checking the diagram before any upload", () => {
+		for (const extra of [[], ["--no-open"]]) {
+			const result = spawnSync(
+				process.execPath,
+				[binary, "share", "missing-share-target", ...extra, "--output", "json"],
+				{ encoding: "utf8", env: cliEnvironment() },
+			);
+
+			expect(result.status).toBe(5);
+			expect(result.stdout).toBe("");
+			expect(JSON.parse(result.stderr)).toMatchObject({
+				ok: false,
+				command: "share",
+				error: { code: "diagram_not_found" },
+			});
 		}
 	});
 
@@ -343,22 +394,22 @@ describe("golden product help", () => {
 	});
 
 	it("reports unsupported completion shells as a text usage error", () => {
-		const result = spawnSync(process.execPath, [binary, "--completions", "powershell"], {
+		const result = spawnSync(process.execPath, [binary, "--completions", "nushell"], {
 			encoding: "utf8",
 			env: cliEnvironment(),
 		});
 
 		expect(result.status).toBe(2);
-		expect(result.stdout).toBe("");
+		expect(result.stdout).toMatch(/^DESCRIPTION/u);
 		expect(result.stderr).toContain("error: usage_error");
-		expect(result.stderr).toContain("powershell");
-		expect(result.stderr).toContain('"bash" | "zsh" | "fish" | "sh"');
+		expect(result.stderr).toContain("nushell");
+		expect(result.stderr).toContain('"bash" | "zsh" | "fish" | "powershell" | "sh" | "pwsh"');
 	});
 
 	it("reports unsupported completion shells in the JSON usage envelope", () => {
 		const result = spawnSync(
 			process.execPath,
-			[binary, "--output", "json", "--completions", "powershell"],
+			[binary, "--output", "json", "--completions", "nushell"],
 			{
 				encoding: "utf8",
 				env: cliEnvironment(),
@@ -372,7 +423,7 @@ describe("golden product help", () => {
 			command: "sketchi",
 			error: {
 				code: "usage_error",
-				message: expect.stringContaining('"bash" | "zsh" | "fish" | "sh"'),
+				message: expect.stringContaining('"bash" | "zsh" | "fish" | "powershell" | "sh" | "pwsh"'),
 			},
 		});
 	});

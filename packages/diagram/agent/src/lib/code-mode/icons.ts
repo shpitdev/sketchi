@@ -393,15 +393,27 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 		(icon) =>
 			catalog
 				? catalog.loadSvg(icon).pipe(
-						Effect.map((svg) => normalizeNodeLogoSvg(svg)),
+						// Malformed SVG is an unusable asset, like a missing one.
+						Effect.flatMap((svg) =>
+							Effect.try({
+								try: () => normalizeNodeLogoSvg(svg),
+								catch: (cause) =>
+									CodeModeIconLoadError.make({
+										cause,
+										message: `Node logo ${icon.slug} has unusable SVG.`,
+										slug: icon.slug,
+									}),
+							}),
+						),
 						Effect.map((svg): readonly [string, CanvasIconAsset] => [
 							icon.slug,
 							{ name: icon.name, svg },
 						]),
-						Effect.catchCause((cause) =>
+						// Only asset failures drop the icon; defects and interruption propagate.
+						Effect.catchTag("CodeModeIconLoadError", (error) =>
 							Effect.logWarning("Code Mode icon asset unavailable", {
-								slug: icon.slug,
-								cause,
+								error_tag: error._tag,
+								slug: error.slug,
 							}).pipe(Effect.as(undefined)),
 						),
 					)

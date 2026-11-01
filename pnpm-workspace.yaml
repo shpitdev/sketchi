@@ -19,10 +19,9 @@ overrides:
   "axios@>=1.0.0 <1.20.0": 1.20.0
   "katex@>=0.0.0 <0.18.2": 0.18.2
   "sharp@>=0.34.0 <0.35.5": 0.35.5
-  "@modelcontextprotocol/client@>=2.0.0 <2.2.0": 2.2.0
-  # agents 0.26's Babel 8 decorator dependency conflicts with Vite's Babel 7
+  # agents 0.32's Babel 8 decorator dependency conflicts with Vite's Babel 7
   # React transform. Babel 7.29 supports the same 2023-11 decorator proposal.
-  "agents@0.26.0>@babel/plugin-proposal-decorators": 7.29.7
+  "agents@0.32.0>@babel/plugin-proposal-decorators": 7.29.7
 
 allowBuilds:
   "@mongodb-js/zstd": false

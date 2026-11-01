@@ -102,7 +102,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-pako 2.0.3
+pako 2.2.0
 -----------
 
 The MIT License
@@ -227,18 +227,18 @@ linkedom and its dependency tree
 The headless renderer bundles the following DOM implementation packages.
 Their complete notices follow this inventory.
 
-- linkedom 0.18.13 (ISC)
+- linkedom 0.18.14 (ISC)
 - uhyphen 0.2.0 (ISC)
 - boolbase 2.0.0 (ISC)
 - css-select 7.0.0, css-what 8.0.0, domhandler 6.0.1 and 5.0.3,
   domutils 4.0.2 and 3.2.2, nth-check 3.0.1, domelementtype 3.0.0 and
   2.3.0, and entities 8.0.0, 7.0.1, and 4.5.0 (BSD-2-Clause)
-- cssom 0.5.0 (MIT)
+- @acemir/cssom 0.9.32 (MIT)
 - html-escaper 3.0.3 (MIT)
 - htmlparser2 10.1.0 (MIT)
 - dom-serializer 3.1.1 and 2.0.0 (MIT)
 
-linkedom 0.18.13
+linkedom 0.18.14
 ~~~~~~~~~~~~~~~~~
 
 ISC License
@@ -316,8 +316,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-cssom 0.5.0
-~~~~~~~~~~~
+@acemir/cssom 0.9.32
+~~~~~~~~~~~~~~~~~~~~
 
 Copyright (c) Nikita Vasilyev
 

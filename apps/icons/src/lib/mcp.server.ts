@@ -156,8 +156,8 @@ export async function handleIconMcpRequest(
 	request: Request,
 	sourceLoader: IconSourceLoader,
 ): Promise<Response> {
-	const { createMcpHandler } = await import("agents/mcp");
-	const handler = createMcpHandler(
+	const { createLegacyMcpHandler } = await import("agents/mcp");
+	const handler = createLegacyMcpHandler(
 		createIconMcpServer({
 			origin: new URL(request.url).origin,
 			sourceLoader,

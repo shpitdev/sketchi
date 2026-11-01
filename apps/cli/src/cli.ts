@@ -856,7 +856,9 @@ const shareCommand = Command.make(
 	"share",
 	{
 		diagramId: Argument.String("diagram-id"),
+		// Effect 4.1 makes a Boolean flag without a fallback required; --open stays opt-in.
 		open: Flag.Boolean("open").pipe(
+			Flag.withDefault(false),
 			Flag.withDescription("Hand the bearer link to the default OS browser opener."),
 		),
 	},

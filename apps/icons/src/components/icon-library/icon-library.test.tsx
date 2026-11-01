@@ -376,6 +376,19 @@ describe("IconLibrary", () => {
 			expect(writeText).not.toHaveBeenCalled();
 		});
 
+		it("leaves a focused checkbox's arrow and Enter keys alone while a card is highlighted", () => {
+			const { container } = render(<IconLibrary data={fixtureData} />);
+			const activeCards = () => container.querySelectorAll('[data-active="true"]');
+			fireEvent.keyDown(document, { key: "ArrowDown" });
+			expect(activeCards()[0]?.textContent).toContain("Codex");
+			const box = cardCheckbox("Kubernetes");
+			box.focus();
+			expect(fireEvent.keyDown(box, { key: "ArrowDown" })).toBe(true);
+			expect(fireEvent.keyDown(box, { key: "Enter" })).toBe(true);
+			expect(activeCards()[0]?.textContent).toContain("Codex");
+			expect(writeText).not.toHaveBeenCalled();
+		});
+
 		it("clears the selection by shortcut, from the search field too", () => {
 			render(<IconLibrary data={fixtureData} />);
 			fireEvent.keyDown(document, { ctrlKey: true, key: "a" });

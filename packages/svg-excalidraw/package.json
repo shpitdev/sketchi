@@ -21,7 +21,6 @@
 	},
 	"devDependencies": {
 		"@types/clipper-lib": "6.4.0",
-		"@types/earcut": "3.0.0",
 		"sharp": "0.35.5"
 	}
 }

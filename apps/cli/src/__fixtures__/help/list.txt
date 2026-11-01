@@ -4,13 +4,13 @@ DESCRIPTION
 USAGE
   sketchi list [flags]
 
-FLAGS
+INHERITED FLAGS
   --output text|json    Result presentation format. (choices: text, json)
 
 GLOBAL FLAGS
-  --help, -h                          Show help information
-  --version, -v                       Show version information
-  --completions <bash|zsh|fish|sh>    Print shell completion script (choices: bash, zsh, fish, sh)
+  --help, -h                                          Show help information
+  --version, -v                                       Show version information
+  --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
   # List records as a stable JSON envelope.
