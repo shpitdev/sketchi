@@ -39,8 +39,10 @@ function AgentSetupHub() {
 							style={{ "--tile-accent": entry.accent } as CSSProperties}
 						>
 							<BrandIcon label="" size={30} src={entry.icon} tile />
-							<span className="agent-card__name">{entry.name}</span>
-							<Badge variant="outline">{entry.badge}</Badge>
+							<span className="agent-card__label">
+								<span className="agent-card__name">{entry.name}</span>
+								<Badge variant="outline">{entry.badge}</Badge>
+							</span>
 							<span className="agent-card__cta">Set up →</span>
 						</a>
 					))}

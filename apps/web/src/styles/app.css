@@ -142,6 +142,7 @@
 	border-radius: 11px;
 	box-shadow: var(--shadow-sm);
 	display: inline-flex;
+	flex: none;
 	justify-content: center;
 	padding: 9px;
 }
@@ -1168,9 +1169,20 @@
 	transform: translateY(-2px);
 }
 
+/* Name and badge share a line; on phones the badge sits under the name so
+   the logo keeps its size. */
+.agent-card__label {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 10px;
+	min-width: 0;
+}
+
 .agent-card__name {
 	font-size: 19px;
 	font-weight: 700;
+	line-height: 1.25;
 }
 
 .agent-card__cta {
@@ -1494,6 +1506,16 @@
 
 	.agent-grid {
 		grid-template-columns: 1fr;
+	}
+
+	.agent-card {
+		gap: 12px;
+		padding: 16px;
+	}
+
+	.agent-card__label {
+		align-items: flex-start;
+		flex-direction: column;
 	}
 
 	.site-footer__inner {
