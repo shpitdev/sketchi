@@ -76,7 +76,7 @@
 		"@nx/vite": "23.3.1",
 		"@nx/vitest": "23.3.1",
 		"@oxlint/plugins": "1.90.0",
-		"@rspack/core": "2.2.8",
+		"@rspack/core": "2.3.0",
 		"@shadcn/lint": "0.2.3",
 		"@storybook/addon-mcp": "10.6.5",
 		"@storybook/react-vite": "10.6.5",
