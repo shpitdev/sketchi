@@ -3139,12 +3139,7 @@ function positionLanedNodes(
 		const placed: NodeSceneElement = { ...shape, [along]: alongAt, [across]: acrossAt };
 		return placed;
 	});
-	const box = (
-		alongFrom: number,
-		alongSize: number,
-		acrossFrom: number,
-		acrossSize: number,
-	): Box =>
+	const box = (alongFrom: number, alongSize: number, acrossFrom: number, acrossSize: number): Box =>
 		vertical
 			? { x: acrossFrom, y: alongFrom, width: acrossSize, height: alongSize }
 			: { x: alongFrom, y: acrossFrom, width: alongSize, height: acrossSize };
