@@ -21,7 +21,7 @@ export function SelectionBar({
 	busySelectionAction: SelectionAction | undefined;
 	detailOpen: boolean;
 	hiddenCount: number;
-	onAction: (action: SelectionAction) => Promise<void>;
+	onAction: (action: SelectionAction) => void;
 	onClear: () => void;
 	selectedCount: number;
 	selectionIsFull: boolean;
@@ -42,7 +42,7 @@ export function SelectionBar({
 				{selectionIsFull ? <span>Limit {SELECTION_LIMIT.toLocaleString()}</span> : null}
 			</p>
 			<div className="selection-bar__actions">
-				<button disabled={busy} onClick={() => void onAction("copy")} type="button">
+				<button disabled={busy} onClick={() => onAction("copy")} type="button">
 					<Copy aria-hidden="true" />
 					{busySelectionAction === "copy"
 						? `Copying ${selectionProgress.done}/${selectionProgress.total}`
@@ -51,7 +51,7 @@ export function SelectionBar({
 				<button
 					className="is-primary"
 					disabled={busy}
-					onClick={() => void onAction("zip")}
+					onClick={() => onAction("zip")}
 					type="button"
 				>
 					<Download aria-hidden="true" />

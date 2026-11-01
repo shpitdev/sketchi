@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { unzipSync, strFromU8 } from "fflate";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -386,6 +388,19 @@ describe("IconLibrary", () => {
 			expect(screen.getByText("Selection cleared.")).toBeTruthy();
 		});
 
+		it("keeps Mod+A and Mod+D working right after ticking a checkbox", () => {
+			render(<IconLibrary data={fixtureData} />);
+			const box = cardCheckbox("Codex");
+			box.focus();
+			fireEvent.click(box);
+			expect(document.activeElement).toBe(box);
+
+			expect(fireEvent.keyDown(box, { ctrlKey: true, key: "a" })).toBe(false);
+			expect(selectionBar()?.textContent).toContain("3 selected");
+			expect(fireEvent.keyDown(box, { ctrlKey: true, key: "d" })).toBe(false);
+			expect(selectionBar()).toBeNull();
+		});
+
 		it("leaves the browser's own shortcuts alone when it has nothing to do", () => {
 			const { unmount } = render(<IconLibrary data={fixtureData} initialQuery="missing" />);
 			expect(fireEvent.keyDown(document, { ctrlKey: true, key: "a" })).toBe(true);
@@ -498,6 +513,31 @@ describe("IconLibrary", () => {
 		expect(screen.queryByRole("dialog")).toBeNull();
 		expect(document.activeElement).toBe(opener);
 		expect(search().value).toBe("psql");
+	});
+
+	it("hydrates the shortcut label on a Mac without a mismatch", async () => {
+		const html = renderToString(<IconLibrary data={fixtureData} />);
+		const platform = Object.getOwnPropertyDescriptor(navigator, "platform");
+		Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
+		const container = document.createElement("div");
+		container.innerHTML = html;
+		document.body.append(container);
+		const recoverableErrors = vi.fn();
+		try {
+			expect(container.querySelector(".icons-command-trigger__keys")?.textContent).toBe("Ctrl K");
+			const root = await act(async () =>
+				hydrateRoot(container, <IconLibrary data={fixtureData} />, {
+					onRecoverableError: recoverableErrors,
+				}),
+			);
+			expect(recoverableErrors).not.toHaveBeenCalled();
+			expect(container.querySelector(".icons-command-trigger__keys")?.textContent).toBe("⌘K");
+			act(() => root.unmount());
+		} finally {
+			container.remove();
+			if (platform) Object.defineProperty(navigator, "platform", platform);
+			else Reflect.deleteProperty(navigator, "platform");
+		}
 	});
 
 	it("switches every preview between light and dark", () => {

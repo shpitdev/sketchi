@@ -1,11 +1,12 @@
 import { TooltipProvider } from "@sketchi/ui/components/tooltip";
-import { formatForDisplay, useHotkeys, type UseHotkeyDefinition } from "@tanstack/react-hotkeys";
+import { useHotkeys, type UseHotkeyDefinition } from "@tanstack/react-hotkeys";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { formatCollectionLabel, type IconManifest, type SketchiIcon } from "@sketchi/icon-catalog";
 import { filterIcons, toggleCollection } from "../../lib/filter.js";
 import { PLAYGROUND_URL, REPO_URL, SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
 import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
+import { useModifierLabel } from "../../lib/use-modifier-label.js";
 import {
 	createSelectionStore,
 	describeSelectionNotice,
@@ -21,7 +22,7 @@ import { CommandPalette, type IconCommand, type PaletteLink } from "./command-pa
 import { IconsChrome } from "./icons-chrome.js";
 import { IconToolbar } from "./icon-toolbar.js";
 import { SelectionBar } from "./selection-bar.js";
-import { useIconSources } from "./use-icon-sources.js";
+import { type SelectionAction, useIconSources } from "./use-icon-sources.js";
 
 export type { IconManifest, SketchiIcon } from "@sketchi/icon-catalog";
 
@@ -53,6 +54,22 @@ const noCollections: readonly string[] = [];
 
 function isActionTarget(target: EventTarget | null): boolean {
 	return target instanceof HTMLElement && target.closest("a, button") !== null;
+}
+
+const nonTextInputTypes = new Set(["button", "checkbox", "radio", "reset", "submit"]);
+
+/**
+ * Fields where Mod+A means "select this text". The selection checkboxes are
+ * inputs too, but have no text, so selection shortcuts still apply there.
+ */
+function isTextEntry(target: EventTarget | null): boolean {
+	if (!(target instanceof HTMLElement)) return false;
+	if (target instanceof HTMLInputElement) return !nonTextInputTypes.has(target.type);
+	return (
+		target instanceof HTMLTextAreaElement ||
+		target instanceof HTMLSelectElement ||
+		target.isContentEditable
+	);
 }
 
 /** The commands, if they currently apply. */
@@ -129,6 +146,8 @@ export function IconLibrary({
 	const [menuOpen, setMenuOpen] = useState(false);
 	const gridKeysActive = !overlayOpen && !menuOpen;
 	const closeDetail = useCallback(() => setDetail(undefined), []);
+	// Hydration-safe: the server renders "Ctrl", and Mac clients switch after.
+	const modifierLabel = useModifierLabel();
 
 	const {
 		busyDetailAction,
@@ -271,6 +290,12 @@ export function IconLibrary({
 		[moveActive, results.length],
 	);
 
+	// The selection bar and the palette start the same bulk export.
+	const startSelectionAction = useCallback(
+		(action: SelectionAction) => void runSelectionAction(action),
+		[runSelectionAction],
+	);
+
 	const selectedCount = selectedIcons.length;
 	const selectionBusy = busySelectionAction !== undefined;
 	const selectedLabel = plural(selectedCount, "selected SVG", "selected SVGs");
@@ -293,12 +318,12 @@ export function IconLibrary({
 			{
 				id: "copy-selected",
 				name: `Copy ${selectedLabel}`,
-				run: () => void runSelectionAction("copy"),
+				run: () => startSelectionAction("copy"),
 			},
 			{
 				id: "download-selected",
 				name: `Download ${selectedLabel} as zip`,
-				run: () => void runSelectionAction("zip"),
+				run: () => startSelectionAction("zip"),
 			},
 		),
 		...commandsWhen(selectedCount > 0, {
@@ -433,38 +458,32 @@ export function IconLibrary({
 				preventDefault: false,
 			},
 		},
+		// Mod+A and Mod+D have to work from the selection checkboxes, where focus
+		// lands after ticking an icon, so neither skips inputs wholesale. Mod+A
+		// still yields to text fields, where it selects the text; Mod+D has no
+		// in-field meaning, so it clears from the search field too.
 		{
-			callback: selectAllResults,
+			callback: (event) => {
+				if (isTextEntry(event.target)) return;
+				event.preventDefault();
+				selectAllResults();
+			},
 			hotkey: "Mod+A",
 			options: {
 				// Mirrors the select-results checkbox: enabled only when it would
-				// actually add something.
+				// actually add something, so the browser keeps Select All otherwise.
 				enabled: gridKeysActive && canSelectResults,
-				// Leave Cmd/Ctrl+A alone while someone is editing the search text.
-				ignoreInputs: true,
+				ignoreInputs: false,
 				meta: { name: "Select results" },
+				preventDefault: false,
 			},
 		},
-		// Clearing the selection has to work from the search field too: filtering
-		// then clearing is the normal flow, and unlike Mod+A there is no native
-		// in-field behaviour worth keeping. Mod+D is claimed on the field itself
-		// and, separately, everywhere outside an input.
 		{
 			callback: clearSelection,
 			hotkey: "Mod+D",
 			options: {
 				enabled: gridKeysActive && selectedCount > 0,
 				ignoreInputs: false,
-				meta: { name: "Clear selection" },
-				target: searchRef,
-			},
-		},
-		{
-			callback: clearSelection,
-			hotkey: "Mod+D",
-			options: {
-				enabled: gridKeysActive && selectedCount > 0,
-				ignoreInputs: true,
 				meta: { name: "Clear selection" },
 			},
 		},
@@ -483,7 +502,7 @@ export function IconLibrary({
 		<TooltipProvider>
 			<div className="icons-product">
 				<IconsChrome
-					commandShortcut={formatForDisplay("Mod+K")}
+					commandShortcut={modifierLabel === "⌘" ? "⌘K" : "Ctrl K"}
 					detailOpen={Boolean(detailIcon)}
 					homeHref={homeHref}
 					onOpenCommands={() => setPaletteOpen(true)}
@@ -657,7 +676,7 @@ export function IconLibrary({
 					busySelectionAction={busySelectionAction}
 					detailOpen={Boolean(detailIcon)}
 					hiddenCount={hiddenSelectedCount}
-					onAction={runSelectionAction}
+					onAction={startSelectionAction}
 					onClear={clearSelection}
 					selectedCount={selectedCount}
 					selectionIsFull={selectionIsFull}
