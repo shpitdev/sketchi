@@ -327,6 +327,24 @@ describe("golden product help", () => {
 		}
 	});
 
+	it("keeps share --open opt-in, checking the diagram before any upload", () => {
+		for (const extra of [[], ["--no-open"]]) {
+			const result = spawnSync(
+				process.execPath,
+				[binary, "share", "missing-share-target", ...extra, "--output", "json"],
+				{ encoding: "utf8", env: cliEnvironment() },
+			);
+
+			expect(result.status).toBe(5);
+			expect(result.stdout).toBe("");
+			expect(JSON.parse(result.stderr)).toMatchObject({
+				ok: false,
+				command: "share",
+				error: { code: "diagram_not_found" },
+			});
+		}
+	});
+
 	it("checks a pull target before reading a TTY-backed --link -", () => {
 		mkdirSync(helpHome, { recursive: true });
 		const ttyHome = mkdtempSync(resolve(helpHome, "tty-"));
