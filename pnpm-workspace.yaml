@@ -10,18 +10,14 @@ minimumReleaseAgeStrict: true
 pmOnFail: error
 
 overrides:
-  # Bound security overrides to affected transitive lines.
+  # Raise vulnerable or stale transitive lines within bounded ranges.
   "lodash-es@>=4.0.0 <4.18.1": 4.18.1
   "nanoid@>=3.0.0 <3.3.18": 3.3.18
   "nanoid@>=4.0.0 <5.1.16": 5.1.16
-  "smol-toml@>=1.0.0 <1.9.0": 1.9.0
+  "smol-toml@>=1.0.0 <1.9.1": 1.9.1
   "brace-expansion@>=5.0.0 <5.0.12": 5.0.12
-  "axios@>=1.0.0 <1.20.0": 1.20.0
-  "katex@>=0.0.0 <0.18.2": 0.18.2
+  "katex@>=0.0.0 <0.19.1": 0.19.1
   "sharp@>=0.34.0 <0.35.5": 0.35.5
-  # agents 0.32's Babel 8 decorator dependency conflicts with Vite's Babel 7
-  # React transform. Babel 7.29 supports the same 2023-11 decorator proposal.
-  "agents@0.32.0>@babel/plugin-proposal-decorators": 7.29.7
 
 allowBuilds:
   "@mongodb-js/zstd": false

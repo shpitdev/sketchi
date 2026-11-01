@@ -26,4 +26,23 @@ describe("studioStreamdownPlugins", () => {
     );
     expect(document.querySelector(".mermaid")).toBeNull();
   });
+
+  it("typesets display math and keeps invalid TeX readable", () => {
+    render(
+      <MessageResponse>
+        {"$$\n\\frac{a}{b} + \\sqrt{x}\n$$\n\n$$\n\\notacommand{x}\n$$"}
+      </MessageResponse>,
+    );
+
+    const [valid, invalid] = document.querySelectorAll(
+      ".katex-display .katex-mathml",
+    );
+    expect(valid?.querySelector("mfrac")).not.toBeNull();
+    expect(valid?.querySelector("msqrt")).not.toBeNull();
+    // Unknown commands stay visible in the error colour instead of failing
+    // the whole message.
+    expect(invalid?.querySelector("mstyle[mathcolor] mtext")?.textContent).toBe(
+      "\\notacommand",
+    );
+  });
 });
