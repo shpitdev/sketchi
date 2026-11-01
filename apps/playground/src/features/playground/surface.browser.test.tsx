@@ -81,8 +81,8 @@ describe("playground empty layout", () => {
 					element.type === "arrow",
 			),
 		).toHaveLength(3);
-		// 4 nodes, 4 labels, 3 arrows, 1 edge label, and 3 node logos.
-		expect(excalidrawProps?.initialData?.elements).toHaveLength(15);
+		// 4 nodes, 4 labels, 3 arrows, and 3 node logos.
+		expect(excalidrawProps?.initialData?.elements).toHaveLength(14);
 		expect(excalidrawProps?.initialData?.files).toEqual(expectedScene.files);
 		expect(JSON.stringify(excalidrawProps?.initialData)).not.toMatch(/fix build|retry/i);
 		// The scene fills the sample frame inside its border.

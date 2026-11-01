@@ -117,7 +117,7 @@ describe("playground surface", () => {
 		expect(DEPLOY_PIPELINE_SPEC.edges).toEqual([
 			{ source: "push", target: "build" },
 			{ source: "build", target: "tests" },
-			{ label: "pass", source: "tests", target: "deploy" },
+			{ source: "tests", target: "deploy" },
 		]);
 		expect(JSON.stringify(DEPLOY_PIPELINE_SPEC)).not.toMatch(/fix build|retry/i);
 		expect(JSON.stringify(DEPLOY_PIPELINE_SCENE)).not.toMatch(/fix build|retry/i);

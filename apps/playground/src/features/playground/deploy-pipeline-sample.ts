@@ -42,7 +42,7 @@ export const DEPLOY_PIPELINE_SPEC = {
 	edges: [
 		{ source: "push", target: "build" },
 		{ source: "build", target: "tests" },
-		{ source: "tests", target: "deploy", label: "pass" },
+		{ source: "tests", target: "deploy" },
 	],
 } satisfies FlowchartSpec;
 
