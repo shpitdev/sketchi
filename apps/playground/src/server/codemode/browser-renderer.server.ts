@@ -134,15 +134,16 @@ export function createCloudflareBrowserRunArtifactRenderer(
 					}),
 				),
 				Effect.map((result) => result.png),
-				Effect.timeout(BROWSER_RENDER_TIMEOUT_MS),
-				Effect.catchTag("TimeoutError", () =>
-					Effect.fail(
-						BrowserRenderingTimeout.make({
-							durationMs: BROWSER_RENDER_TIMEOUT_MS,
-							message: `Browser Rendering exceeded ${BROWSER_RENDER_TIMEOUT_MS}ms.`,
-						}),
-					),
-				),
+				Effect.timeoutOrElse({
+					duration: BROWSER_RENDER_TIMEOUT_MS,
+					orElse: () =>
+						Effect.fail(
+							BrowserRenderingTimeout.make({
+								durationMs: BROWSER_RENDER_TIMEOUT_MS,
+								message: `Browser Rendering exceeded ${BROWSER_RENDER_TIMEOUT_MS}ms.`,
+							}),
+						),
+				}),
 			);
 
 			return Effect.gen(function* () {

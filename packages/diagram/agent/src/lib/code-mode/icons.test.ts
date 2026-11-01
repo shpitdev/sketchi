@@ -911,6 +911,42 @@ describe("createCanvas icons", () => {
 		expect(scene.elements.some((element) => element.type === "node" && element.icon)).toBe(false);
 	});
 
+	it("drops an icon whose SVG cannot be normalized", async () => {
+		const catalog: CodeModeIconCatalog = {
+			...fixtureCatalog(),
+			loadSvg: () => Effect.succeed("<not-an-svg />"),
+		};
+		const result = await runtime(catalog).createCanvas({
+			spec: canvasSpec([{ id: "malformed", icon: { slug: "docker", size: 28 } }]),
+			options: { inlineArtifacts: ["scene"] },
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "icon_dropped",
+				ref: { kind: "element", id: "malformed", path: "elements[0].icon.slug" },
+			}),
+		]);
+		expect(inlineScene(result).icons).toBeUndefined();
+	});
+
+	it("does not hide an icon loader defect or interruption as a dropped icon", async () => {
+		for (const loadSvg of [
+			() => Effect.die(new Error("loader bug")),
+			() => Effect.interrupt,
+		] satisfies ReadonlyArray<CodeModeIconCatalog["loadSvg"]>) {
+			const catalog: CodeModeIconCatalog = { ...fixtureCatalog(), loadSvg };
+			await expect(
+				runtime(catalog).createCanvas({
+					spec: canvasSpec([{ id: "logo", icon: { slug: "docker", size: 28 } }]),
+					options: { inlineArtifacts: ["scene"] },
+				}),
+			).rejects.toBeDefined();
+		}
+	});
+
 	it("drops a logo that leaves no room for its label instead of failing", async () => {
 		const result = await runtime().createCanvas({
 			// A one-line label fits a 60px node alone but not under a 28px logo.

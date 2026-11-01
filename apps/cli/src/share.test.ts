@@ -227,6 +227,36 @@ describe("default browser opener", () => {
 			),
 		);
 	});
+	it.effect("does not escalate a timed-out opener that exits on SIGTERM", () => {
+		const signals: NodeJS.Signals[] = [];
+		return Effect.gen(function* () {
+			const opener = yield* LinkOpener;
+			const fiber = yield* opener.open("https://excalidraw.com/").pipe(Effect.forkChild);
+			yield* TestClock.adjust("4 seconds");
+			assert.deepEqual(yield* Fiber.join(fiber), {
+				status: "unconfirmed",
+				reason: "timeout",
+			});
+			assert.deepEqual(signals, ["SIGTERM"]);
+		}).pipe(
+			Effect.provide(
+				makeLinkOpenerLayer(() => {
+					let exitListener: ((code: number | null) => void) | undefined;
+					return {
+						onError: () => {},
+						onExit: (listener) => {
+							exitListener = listener;
+						},
+						kill: (signal) => {
+							signals.push(signal);
+							exitListener?.(null);
+							return true;
+						},
+					};
+				}),
+			),
+		);
+	});
 	it.effect("kills a pending opener on interruption", () => {
 		const killed = { value: false };
 		return Effect.gen(function* () {
