@@ -3,7 +3,7 @@ import { useAsyncResource } from "@/features/resources/use-async-resource";
 
 import { fetchStudioProjectDetails, studioDiagramUrl } from "@sketchi/studio-projects/client";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
-import { StudioBrand } from "@/components/studio-brand";
+import { StudioHeader } from "@/components/studio-header";
 
 export const Route = createFileRoute("/projects_/$projectId")({
 	component: ProjectRoute,
@@ -22,17 +22,14 @@ function ProjectRoute() {
 
 	return (
 		<main className="studio-workspace">
-			<header className="studio-workspace__bar">
-				<StudioBrand />
-				<div className="artifact-view__actions">
-					<a className="studio__artifact-link" href="/projects">
-						Projects
-					</a>
-					<a className="studio__artifact-link" href="/">
-						Playground
-					</a>
-				</div>
-			</header>
+			<StudioHeader className="studio-header--ruled">
+				<a className="studio-header__link" href="/projects">
+					Projects
+				</a>
+				<a className="studio-header__link" href="/">
+					Playground
+				</a>
+			</StudioHeader>
 
 			<section className="studio-workspace__body">
 				{state.status === "loading" ? (

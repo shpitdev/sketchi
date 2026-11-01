@@ -19,14 +19,15 @@ import {
 	ToolInput,
 	ToolOutput,
 } from "@/components/ai-elements/tool";
-import { StudioBrand } from "@/components/studio-brand";
+import { StudioHeader } from "@/components/studio-header";
 import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import {
 	ArtifactActions,
 	AssistantFollowUp,
 	BuildResultDetails,
 	PlaygroundComposer,
-	PlaygroundEmptyState,
+	PlaygroundIntro,
+	PlaygroundStarters,
 	assistantAsksQuestion,
 	type ReadyPlaygroundArtifact,
 } from "@/features/playground/surface";
@@ -165,25 +166,12 @@ function DiagramStage({
 	result: StudioBuildResult | undefined;
 	scene: RenderedDiagramScene | null;
 }) {
-	const title = scene?.title ?? result?.normalizedSpec?.title ?? "Warming up the pencil";
+	const title = scene?.title ?? result?.normalizedSpec?.title ?? "New diagram";
 	return (
 		<section className="studio__stage">
 			<header className="studio__stage-head">
-				<div>
-					<h2 className="studio__stage-title">{title}</h2>
-				</div>
-				<div className="studio__stage-meta">
-					{result ? (
-						<span
-							className={cn(
-								"studio__stage-chip",
-								result.ok ? "studio__stage-chip--ready" : "studio__stage-chip--draft",
-							)}
-						>
-							{result.ok ? "Ready" : "Needs changes"}
-						</span>
-					) : null}
-				</div>
+				<h2 className="studio__stage-title">{title}</h2>
+				{result && !result.ok ? <span className="studio__stage-chip">Needs changes</span> : null}
 			</header>
 			<div className="studio__stage-card">
 				{scene ? (
@@ -250,15 +238,12 @@ function StudioRoute() {
 
 	return (
 		<TooltipProvider delayDuration={300}>
-			<main className={cn("studio", buildMode && "studio--build")}>
-				<header className="studio__head">
-					<StudioBrand />
-					<div className="studio__head-actions">
-						<a className="studio__artifact-link" href="/projects">
-							Projects
-						</a>
-					</div>
-				</header>
+			<main className={cn("studio", isEmpty && "studio--empty", buildMode && "studio--build")}>
+				<StudioHeader>
+					<a className="studio-header__link" href="/projects">
+						Projects
+					</a>
+				</StudioHeader>
 
 				<div className="studio__body">
 					{buildMode ? (
@@ -273,8 +258,10 @@ function StudioRoute() {
 					) : null}
 
 					<section className="studio__chat" key="chat">
+						{/* The composer keeps one position in this list, so sending the first
+						    prompt swaps the content around it without remounting the field. */}
 						{isEmpty ? (
-							<PlaygroundEmptyState onSelect={send} />
+							<PlaygroundIntro />
 						) : (
 							<Conversation className="studio__conversation">
 								<ConversationContent>
@@ -323,6 +310,8 @@ function StudioRoute() {
 							onSubmit={handleSubmit}
 							status={status}
 						/>
+
+						{isEmpty ? <PlaygroundStarters onSelect={send} /> : null}
 					</section>
 				</div>
 			</main>

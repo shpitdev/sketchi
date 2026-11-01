@@ -133,9 +133,7 @@ kbd {
 	display: inline-flex;
 	height: 40px;
 	justify-content: center;
-	margin-inline-end: 4px;
-	min-width: 40px;
-	padding-inline: 6px;
+	width: 40px;
 }
 
 .icons-command-trigger:hover {
@@ -143,40 +141,30 @@ kbd {
 	color: var(--ink);
 }
 
-.icons-command-trigger__keys {
-	background: var(--card);
-	border: 1px solid var(--line-2);
-	border-radius: 6px;
-	box-shadow: 0 1px 0 var(--line-2);
-	font-size: 12px;
-	font-weight: 500;
-	line-height: 1;
-	padding: 6px 8px;
-	white-space: nowrap;
-}
-
 .icons-command-trigger__icon {
-	display: none;
 	height: 20px;
 	width: 20px;
 }
 
-/* A shortcut hint means nothing without a keyboard, and does not fit beside
-   the brand on the narrowest screens: both get the Command glyph that opens the
-   same palette. */
-@media (pointer: coarse), (max-width: 400px) {
+/* The tooltip names the platform shortcut; the button itself is the glyph. */
+.icons-command-trigger__keys {
+	font: inherit;
+	margin-inline-start: 6px;
+	opacity: 0.72;
+}
+
+@media (pointer: coarse) {
 	.icons-command-trigger {
 		height: 44px;
-		min-width: 44px;
+		width: 44px;
 	}
+}
 
-	.icons-command-trigger__keys,
+/* The slash hint means nothing without a keyboard and does not fit on the
+   narrowest screens. */
+@media (pointer: coarse), (max-width: 400px) {
 	.icons-search__key {
 		display: none;
-	}
-
-	.icons-command-trigger__icon {
-		display: block;
 	}
 }
 

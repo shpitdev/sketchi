@@ -6,7 +6,7 @@ import {
 	studioDiagramUrl,
 	studioProjectUrl,
 } from "@sketchi/studio-projects/client";
-import { StudioBrand } from "@/components/studio-brand";
+import { StudioHeader } from "@/components/studio-header";
 
 export const Route = createFileRoute("/projects")({
 	component: ProjectsRoute,
@@ -21,14 +21,11 @@ function ProjectsRoute() {
 
 	return (
 		<main className="studio-workspace">
-			<header className="studio-workspace__bar">
-				<StudioBrand />
-				<div className="artifact-view__actions">
-					<a className="studio__artifact-link" href="/">
-						Playground
-					</a>
-				</div>
-			</header>
+			<StudioHeader className="studio-header--ruled">
+				<a className="studio-header__link" href="/">
+					Playground
+				</a>
+			</StudioHeader>
 
 			<section className="studio-workspace__body">
 				<div className="studio-workspace__intro">

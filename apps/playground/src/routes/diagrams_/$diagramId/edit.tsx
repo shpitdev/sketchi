@@ -22,10 +22,10 @@ function DiagramEditRoute() {
 			headerLinks={
 				state.status === "ready" ? (
 					<>
-						<a className="studio__artifact-link" href={`/diagrams/${state.diagram.id}`}>
+						<a className="studio-header__link" href={`/diagrams/${state.diagram.id}`}>
 							Review
 						</a>
-						<a className="studio__artifact-link" href={`/projects/${state.project.id}`}>
+						<a className="studio-header__link" href={`/projects/${state.project.id}`}>
 							Project
 						</a>
 					</>

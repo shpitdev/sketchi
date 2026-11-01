@@ -22,7 +22,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 
 import "../../styles/app.css";
 import { DEPLOY_PIPELINE_SCENE } from "./deploy-pipeline-sample";
-import { PlaygroundComposer, PlaygroundEmptyState } from "./surface";
+import { PlaygroundComposer, PlaygroundIntro, PlaygroundStarters } from "./surface";
 
 afterEach(() => {
 	cleanup();
@@ -32,9 +32,28 @@ afterEach(() => {
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-describe("playground short viewport layout", () => {
+function EmptyPlayground({ onSelect = () => undefined }: { onSelect?: (prompt: string) => void }) {
+	return (
+		<main className="studio studio--empty">
+			<div className="studio__body">
+				<section className="studio__chat">
+					<PlaygroundIntro />
+					<PlaygroundComposer
+						buildMode={false}
+						composerRef={createRef<HTMLTextAreaElement>()}
+						onSubmit={() => undefined}
+						status="ready"
+					/>
+					<PlaygroundStarters onSelect={onSelect} />
+				</section>
+			</div>
+		</main>
+	);
+}
+
+describe("playground empty layout", () => {
 	it("routes the genuine deploy scene through the DiagramPreview canvas contract", async () => {
-		render(<PlaygroundEmptyState onSelect={() => undefined} />);
+		render(<EmptyPlayground />);
 
 		expect(await screen.findByTestId("mock-excalidraw")).toBeTruthy();
 
@@ -66,82 +85,46 @@ describe("playground short viewport layout", () => {
 		expect(excalidrawProps?.initialData?.elements).toHaveLength(15);
 		expect(excalidrawProps?.initialData?.files).toEqual(expectedScene.files);
 		expect(JSON.stringify(excalidrawProps?.initialData)).not.toMatch(/fix build|retry/i);
+		// The scene fills the sample frame inside its border.
 		expect(sceneCanvas.getBoundingClientRect()).toMatchObject({
-			height: sampleCanvas.getBoundingClientRect().height,
-			width: sampleCanvas.getBoundingClientRect().width,
+			height: sampleCanvas.clientHeight,
+			width: sampleCanvas.clientWidth,
 		});
 		if (bottomBar) {
 			expect(getComputedStyle(bottomBar).display).toBe("none");
 		}
 	});
 
-	it("states the sample is real output without shouting it", () => {
-		render(<PlaygroundEmptyState onSelect={() => undefined} />);
+	it("puts the composer under the heading, then the starters, in one centred column", () => {
+		render(<EmptyPlayground />);
 
-		const claim = screen.getByText("Rendered in Sketchi");
-		const style = getComputedStyle(claim);
-
-		expect(claim.closest("figcaption")).not.toBeNull();
-		expect(style.textTransform).toBe("none");
-		expect(style.letterSpacing).toBe("normal");
-	});
-
-	it("gives the empty state the same shell width as every other surface", () => {
-		render(
-			<main className="studio">
-				<div className="studio__body">
-					<section className="studio__chat">
-						<PlaygroundEmptyState onSelect={() => undefined} />
-					</section>
-				</div>
-			</main>,
-		);
-
-		const studio = document.querySelector(".studio");
-		const empty = document.querySelector(".studio__empty");
-		const wrap = document.querySelector(".studio__empty-wrap");
-		expect(studio).not.toBeNull();
-		expect(empty).not.toBeNull();
-		expect(wrap).not.toBeNull();
-		if (!studio || !empty || !wrap) {
+		const heading = screen.getByRole("heading", { level: 1, name: "What should we draw?" });
+		const composer = screen
+			.getByRole("textbox", { name: "Describe your diagram" })
+			.closest(".studio__composer");
+		const starters = screen.getByLabelText("Starter prompts");
+		const column = document.querySelector(".studio--empty .studio__chat");
+		expect(composer).not.toBeNull();
+		expect(column).not.toBeNull();
+		if (!composer || !column) {
 			return;
 		}
 
-		const shell = getComputedStyle(document.documentElement).getPropertyValue("--shell").trim();
-
-		expect(shell).toBe("1180px");
-		expect(getComputedStyle(studio).maxWidth).toBe(shell);
-
-		// The empty state fills the shell instead of sitting in its own narrower
-		// column, so the first screen is not visibly narrower than the rest.
-		const wrapStyle = getComputedStyle(wrap);
-		const inner =
-			wrap.getBoundingClientRect().width -
-			Number.parseFloat(wrapStyle.paddingLeft) -
-			Number.parseFloat(wrapStyle.paddingRight);
-
-		expect(empty.getBoundingClientRect().width).toBeCloseTo(inner, 1);
-		expect(getComputedStyle(empty).maxWidth).toBe("none");
+		expect(composer.getBoundingClientRect().top).toBeGreaterThan(
+			heading.getBoundingClientRect().bottom,
+		);
+		expect(starters.getBoundingClientRect().top).toBeGreaterThan(
+			composer.getBoundingClientRect().bottom,
+		);
+		const bounds = column.getBoundingClientRect();
+		expect(bounds.width).toBeLessThanOrEqual(760);
+		expect(bounds.left + bounds.width / 2).toBeCloseTo(document.documentElement.clientWidth / 2, 0);
 	});
 
 	it("keeps every starter in document flow and hit-testable at 1280x577", async () => {
 		const selections: string[] = [];
 
-		render(
-			<main className="studio">
-				<div className="studio__body">
-					<section className="studio__chat">
-						<PlaygroundEmptyState onSelect={(prompt) => selections.push(prompt)} />
-						<PlaygroundComposer
-							buildMode={false}
-							composerRef={createRef<HTMLTextAreaElement>()}
-							onSubmit={() => undefined}
-							status="ready"
-						/>
-					</section>
-				</div>
-			</main>,
-		);
+		render(<EmptyPlayground onSelect={(prompt) => selections.push(prompt)} />);
 
 		expect({ height: innerHeight, width: innerWidth }).toEqual({
 			height: 577,
@@ -153,19 +136,21 @@ describe("playground short viewport layout", () => {
 		const composer = screen
 			.getByRole("textbox", { name: "Describe your diagram" })
 			.closest(".studio__composer");
-		const emptyWrap = starterRegion.closest(".studio__empty-wrap");
+		const column = starterRegion.closest(".studio__chat");
 
 		expect(composer).not.toBeNull();
-		expect(emptyWrap).not.toBeNull();
-		if (!composer || !emptyWrap) {
+		expect(column).not.toBeNull();
+		if (!composer || !column) {
 			return;
 		}
 
-		expect(getComputedStyle(emptyWrap).overflowY).toBe("visible");
-		expect(composer.getBoundingClientRect().top).toBeGreaterThan(
-			starters.at(-1)?.getBoundingClientRect().bottom ?? 0,
+		// The page scrolls, not a hidden inner panel.
+		expect(getComputedStyle(column).overflowY).toBe("visible");
+		expect(composer.getBoundingClientRect().bottom).toBeLessThan(
+			starters[0]?.getBoundingClientRect().top ?? 0,
 		);
 		expect(document.documentElement.scrollHeight).toBeGreaterThan(innerHeight);
+		expect(document.documentElement.scrollWidth).toBe(document.documentElement.clientWidth);
 
 		for (const starter of starters) {
 			starter.scrollIntoView({ block: "center" });
