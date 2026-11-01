@@ -26,7 +26,6 @@
 		"lucide-react": "1.52.0",
 		"motion": "14.0.0",
 		"nanoid": "6.0.2",
-		"shiki": "4.5.0",
 		"streamdown": "2.7.0",
 		"use-stick-to-bottom": "1.1.6"
 	},

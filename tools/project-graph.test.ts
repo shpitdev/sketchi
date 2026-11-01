@@ -157,7 +157,6 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/icons/src/routes/index.tsx": 8,
 	"apps/icons/src/routes/mcp.ts": 15,
 	"apps/playground/scripts/sync-node-logos.ts": 4,
-	"apps/playground/src/components/ai-elements/code-block.tsx": 6,
 	"apps/playground/src/components/ai-elements/conversation.tsx": 1,
 	"apps/playground/src/components/ai-elements/prompt-input.tsx": 16,
 	"apps/playground/src/components/ai-elements/reasoning.tsx": 2,
