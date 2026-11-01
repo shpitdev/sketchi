@@ -11,7 +11,6 @@ export const EXCALIDRAW_STORE_BASELINE_COMMIT = "76de642d0e9961f26bf6c1fe1dbe1ae
 export const EXCALIDRAW_POST_ENDPOINT = "https://json.excalidraw.com/api/v2/post/";
 export const EXCALIDRAW_GET_ENDPOINT = "https://json.excalidraw.com/api/v2/";
 export const MAX_SHARE_LINK_LENGTH = 4 * 1024;
-export const MAX_SHARE_ID_LENGTH = 128;
 export const MAX_SHARE_BODY_BYTES = 2 * 1024 * 1024;
 export const MAX_DECOMPRESSED_BYTES = 16 * 1024 * 1024;
 export const MAX_SHARE_ELEMENTS = 10_000;
