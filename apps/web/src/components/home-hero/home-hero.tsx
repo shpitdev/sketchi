@@ -2,11 +2,18 @@ import { Button } from "@sketchi/ui/components/button";
 import type { CSSProperties } from "react";
 
 import { DEFAULT_WEB_SURFACE_URLS } from "../../lib/surface-urls";
+import { getAgentSetupEntry } from "../agent-setup-view/agent-setup-data.js";
 
 export interface HomeHeroProps {
 	agentsHref?: string;
 	primaryHref?: string;
 }
+
+/** Agents shown on the hero action, each backed by a setup page. */
+const heroAgents = (["codex", "claude-code", "opencode"] as const).map(getAgentSetupEntry);
+const heroAgentList = new Intl.ListFormat("en", { type: "disjunction" }).format(
+	heroAgents.map((entry) => entry.name),
+);
 
 interface SketchNode {
 	icon?: string;
@@ -100,7 +107,24 @@ export function HomeHero({
 							<a href={primaryHref}>Open playground</a>
 						</Button>
 						<Button asChild size="xl" variant="outline">
-							<a href={agentsHref}>Add to your agent</a>
+							<a
+								className="agent-action"
+								href={agentsHref}
+								title={`Set up Sketchi in ${heroAgentList}`}
+							>
+								<span aria-hidden="true" className="agent-action__stack">
+									{heroAgents.map((entry, index) => (
+										<span
+											className="agent-action__logo"
+											key={entry.id}
+											style={{ "--n": index } as CSSProperties}
+										>
+											<img alt="" height={20} src={entry.icon} width={20} />
+										</span>
+									))}
+								</span>
+								Add to your agent
+							</a>
 						</Button>
 					</div>
 				</div>

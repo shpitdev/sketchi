@@ -52,7 +52,7 @@
 }
 
 .svg-icon-workspace__sidebar h1 {
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 24px;
 	line-height: 1.05;
 	margin: 0;
@@ -218,7 +218,7 @@
 }
 
 .workspace-top-bar__title {
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 17px;
 	font-weight: 700;
 	overflow: hidden;
@@ -338,7 +338,7 @@
 }
 
 .diagram-switcher__title {
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 14.5px;
 	font-weight: 700;
 }
@@ -490,7 +490,7 @@
 }
 
 .diagram-inspector__scene-total {
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 15px;
 	font-weight: 700;
 	margin: 0;
@@ -529,7 +529,7 @@
 
 .workspace-state__title {
 	color: var(--ink);
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 20px;
 	margin: 0;
 }

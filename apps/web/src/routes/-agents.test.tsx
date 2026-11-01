@@ -38,10 +38,12 @@ describe("AgentsRoute", () => {
 			screen.getAllByRole("link", { name: "Playground" }).map((link) => link.getAttribute("href")),
 		).toEqual([previewSurfaceUrls.playground, previewSurfaceUrls.playground]);
 		expect(
-			screen
-				.getAllByRole("link", { name: "Agents" })
-				.some((link) => link.getAttribute("aria-current") === "page"),
-		).toBe(true);
+			screen.getByRole("heading", { name: "Add Sketchi to your agent", level: 1 }),
+		).toBeTruthy();
+		// The header has no Agents link; the footer keeps the way back here.
+		expect(
+			screen.getAllByRole("link", { name: "Agents" }).map((link) => link.getAttribute("href")),
+		).toEqual(["/agents"]);
 	});
 });
 
@@ -61,10 +63,6 @@ describe("Agent detail route", () => {
 			}),
 		).toBeTruthy();
 		expect(screen.getByText(/"serverUrl": "https:\/\/playground\.sketchi\.app\/mcp"/)).toBeTruthy();
-		expect(
-			screen
-				.getAllByRole("link", { name: "Agents" })
-				.some((link) => link.getAttribute("aria-current") === "page"),
-		).toBe(true);
+		expect(screen.getByRole("link", { name: "← All agents" }).getAttribute("href")).toBe("/agents");
 	});
 });

@@ -12,7 +12,6 @@ describe("SiteHeader", () => {
 		expect(brand.querySelector(".site-header__brand-icon")).toBeTruthy();
 		expect(brand.querySelector(".sk-wordmark")?.textContent).toBe("Sketchi");
 		expect(screen.queryByRole("link", { name: "Product" })).toBeNull();
-		expect(screen.getByRole("link", { name: "Agents" })).toBeTruthy();
 		expect(screen.getByRole("link", { name: "Playground" }).dataset.variant).toBe("brand");
 		expect(screen.getByRole("link", { name: "Sketchi on GitHub" }).getAttribute("href")).toBe(
 			"https://github.com/shpitdev/sketchi",
@@ -20,7 +19,10 @@ describe("SiteHeader", () => {
 		expect(screen.getByRole("link", { name: "sketchi on npm" }).getAttribute("href")).toBe(
 			"https://www.npmjs.com/package/sketchi",
 		);
-		expect(screen.getByRole("link", { name: "Docs" }).getAttribute("aria-current")).toBe("page");
+		const docs = screen.getByRole("link", { name: "Docs" });
+		expect(docs.getAttribute("href")).toBe("/docs");
+		expect(docs.getAttribute("aria-current")).toBe("page");
+		expect(docs.querySelector("svg.lucide-book-open")).toBeTruthy();
 	});
 
 	it("uses configured surface action URLs", () => {
@@ -42,20 +44,41 @@ describe("SiteHeader", () => {
 	});
 
 	/**
-	 * The CLI is a peer of the playground and the agent route, so it has to be
-	 * reachable from the nav on every page, in the desktop bar and the mobile
-	 * sheet alike.
+	 * The header is the brand, Icons, Docs, the source marks, and Playground.
+	 * CLI and agent setup are reached from the homepage and footer instead.
 	 */
-	it("offers the CLI in both the desktop nav and the mobile sheet", () => {
+	it("keeps CLI and Agents out of the header by default", () => {
 		render(<SiteHeader />);
 
-		expect(screen.getByRole("link", { name: "CLI" }).getAttribute("href")).toBe("/#cli");
+		expect(screen.queryByRole("navigation", { name: "Primary" })).toBeNull();
+		expect(screen.queryByRole("link", { name: "CLI" })).toBeNull();
+		expect(screen.queryByRole("link", { name: "Agents" })).toBeNull();
+		expect(screen.getByRole("link", { name: "Docs" }).getAttribute("aria-current")).toBeNull();
 
 		fireEvent.click(screen.getByRole("button", { name: "Toggle menu" }));
 
+		expect(screen.queryByRole("link", { name: "CLI" })).toBeNull();
 		expect(
-			screen.getAllByRole("link", { name: "CLI" }).map((link) => link.getAttribute("href")),
-		).toEqual(["/#cli", "/#cli"]);
+			screen.getAllByRole("link", { name: "Docs" }).map((link) => link.getAttribute("href")),
+		).toEqual(["/docs", "/docs"]);
+	});
+
+	it("still renders custom nav items in the bar and the sheet", () => {
+		render(
+			<SiteHeader
+				activePath="/changelog"
+				navItems={[{ href: "/changelog", label: "Changelog" }]}
+			/>,
+		);
+
+		expect(screen.getByRole("navigation", { name: "Primary" })).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Changelog" }).getAttribute("aria-current")).toBe(
+			"page",
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Toggle menu" }));
+
+		expect(screen.getAllByRole("link", { name: "Changelog" })).toHaveLength(2);
 	});
 
 	/**

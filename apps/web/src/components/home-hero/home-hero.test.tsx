@@ -21,6 +21,22 @@ describe("HomeHero", () => {
 		);
 	});
 
+	/**
+	 * The agent action leads with the real marks of agents that have a setup
+	 * page, and keeps a visible label so the logos never have to explain
+	 * themselves.
+	 */
+	it("shows the Codex, Claude Code, and OpenCode marks on the agent action", () => {
+		render(<HomeHero />);
+
+		const action = screen.getByRole("link", { name: "Add to your agent" });
+		expect(action.getAttribute("title")).toBe("Set up Sketchi in Codex, Claude Code, or OpenCode");
+		expect(
+			[...action.querySelectorAll(".agent-action__logo img")].map((img) => img.getAttribute("src")),
+		).toEqual(["/agents/codex.svg", "/agents/claude-code.svg", "/agents/opencode.svg"]);
+		expect(action.querySelector(".agent-action__stack")?.getAttribute("aria-hidden")).toBe("true");
+	});
+
 	it("lets the headline and the board say what Sketchi is, without a subtitle", () => {
 		const { container } = render(<HomeHero />);
 

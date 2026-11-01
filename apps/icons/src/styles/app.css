@@ -207,7 +207,7 @@ select:focus-visible {
 
 .icons-hero__facts strong {
 	color: var(--ink);
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: clamp(20px, 2vw, 28px);
 	letter-spacing: -0.02em;
 	text-transform: none;
@@ -795,7 +795,7 @@ select:focus-visible {
 }
 
 .selection-bar__count strong {
-	font-family: var(--font-display);
+	font-family: var(--font-body);
 	font-size: 24px;
 }
 

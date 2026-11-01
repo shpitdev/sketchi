@@ -1,5 +1,5 @@
+import { BenefitStrip } from "../benefit-strip/index.js";
 import { CliBand } from "../cli-band/index.js";
-import { FeatureGrid } from "../feature-grid/index.js";
 import { HomeHero } from "../home-hero/index.js";
 import { IconWall } from "../icon-wall/index.js";
 import { SiteShell } from "../site-shell/site-shell.js";
@@ -13,7 +13,7 @@ export function MarketingHome({ surfaceUrls = DEFAULT_WEB_SURFACE_URLS }: Market
 	return (
 		<SiteShell activePath="/" surfaceUrls={surfaceUrls}>
 			<HomeHero primaryHref={surfaceUrls.playground} />
-			<FeatureGrid />
+			<BenefitStrip />
 			<CliBand />
 			<IconWall iconsHref={surfaceUrls.icons} />
 		</SiteShell>

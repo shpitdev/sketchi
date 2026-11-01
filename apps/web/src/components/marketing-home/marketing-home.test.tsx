@@ -4,15 +4,12 @@ import { describe, expect, it } from "vitest";
 import { MarketingHome } from "./marketing-home";
 
 describe("MarketingHome", () => {
-	it("composes the hero, features, CLI, and icons", () => {
+	it("composes the hero, benefits, CLI, and icons", () => {
 		render(<MarketingHome />);
 
 		expect(screen.getByRole("heading", { name: "Editable diagrams from a prompt" })).toBeTruthy();
-		expect(
-			screen.getByRole("heading", {
-				name: "Built on Excalidraw",
-			}),
-		).toBeTruthy();
+		expect(screen.getByRole("region", { name: "Why Sketchi" })).toBeTruthy();
+		expect(screen.queryByRole("heading", { name: "Built on Excalidraw" })).toBeNull();
 		expect(
 			screen.getByRole("heading", {
 				name: "Logos for your stack",

@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { FeatureGrid } from "./feature-grid";
+import { BenefitStrip } from "./benefit-strip";
 import "../../styles/app.css";
 
 const meta = {
-	title: "Web/Components/FeatureGrid",
-	component: FeatureGrid,
+	title: "Web/Components/BenefitStrip",
+	component: BenefitStrip,
 	parameters: {
 		layout: "fullscreen",
 	},
 	tags: ["test"],
-} satisfies Meta<typeof FeatureGrid>;
+} satisfies Meta<typeof BenefitStrip>;
 
 export default meta;
 

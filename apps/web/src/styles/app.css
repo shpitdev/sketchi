@@ -142,6 +142,7 @@
 	border-radius: 11px;
 	box-shadow: var(--shadow-sm);
 	display: inline-flex;
+	flex: none;
 	justify-content: center;
 	padding: 9px;
 }
@@ -168,10 +169,10 @@
 
 /* Sized so "Editable diagrams" holds one line in the desktop column. */
 .home-hero__title {
-	font-size: clamp(40px, 5.4vw, 64px);
-	letter-spacing: -0.02em;
-	line-height: 1;
-	margin: 18px 0 0;
+	font-size: clamp(36px, 4.6vw, 56px);
+	letter-spacing: -0.025em;
+	line-height: 1.08;
+	margin: 0;
 	text-wrap: balance;
 }
 
@@ -182,8 +183,8 @@
 	text-decoration: underline;
 	text-decoration-color: var(--accent);
 	text-decoration-skip-ink: auto;
-	text-decoration-thickness: 5px;
-	text-underline-offset: 0.14em;
+	text-decoration-thickness: 0.08em;
+	text-underline-offset: 0.16em;
 }
 
 .home-hero__actions {
@@ -191,7 +192,7 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: 12px;
-	margin-top: 30px;
+	margin-top: 32px;
 }
 
 .home-hero__visual {
@@ -237,9 +238,7 @@
 
 .sketch-board__file {
 	color: var(--ink-3);
-	font-family: var(--font-mono);
-	font-size: 11.5px;
-	letter-spacing: 0.03em;
+	font-size: 12.5px;
 }
 
 .sketch-board__prompt {
@@ -258,8 +257,7 @@
 }
 
 .sketch-board__typed {
-	font-family: var(--font-mono);
-	font-size: 13.5px;
+	font-size: 14.5px;
 	overflow: hidden;
 	white-space: nowrap;
 }
@@ -293,6 +291,7 @@
 .sketch-board__scene {
 	inset: 0;
 	position: absolute;
+	translate: 0 12%;
 }
 
 .sketch-board__wires {
@@ -349,6 +348,9 @@
 	top: var(--node-y);
 	transform: translate(-50%, -50%) rotate(var(--tilt, -1.5deg));
 	white-space: nowrap;
+	/* Without this, a node near the right edge shrinks to the space left of
+	   its anchor and the label spills past its border. */
+	width: max-content;
 	z-index: 2;
 }
 
@@ -376,9 +378,9 @@
 
 .sketch-node__label {
 	color: var(--ink);
-	font-family: var(--font-mono);
-	font-size: 12.5px;
-	font-weight: 600;
+	font-family: var(--font-script);
+	font-size: 16px;
+	line-height: 1.2;
 }
 
 .sketch-node--ship {
@@ -410,7 +412,7 @@
 
 .sketch-node--decision .sketch-node__label {
 	color: var(--accent-ink);
-	line-height: 1.1;
+	line-height: 1.05;
 	max-width: 54px;
 	text-align: center;
 	white-space: normal;
@@ -419,21 +421,24 @@
 .sketch-tag {
 	color: var(--accent-ink);
 	font-family: var(--font-script);
-	font-size: 16px;
+	font-size: 17px;
 	position: absolute;
-	transform: rotate(-6deg);
 	z-index: 3;
 }
 
+/* Centred in the gap between the decision and ship nodes at every width. */
 .sketch-tag--yes {
-	left: 65%;
+	left: 67.5%;
 	top: 43%;
+	transform: translateX(-50%) rotate(-6deg);
 }
 
+/* Right-aligned just outside the "no" wire, which runs down x = 34%. */
 .sketch-tag--no {
 	color: var(--ink-3);
-	left: 31%;
+	left: 34%;
 	top: 39%;
+	transform: translateX(calc(-100% - 6px)) rotate(-6deg);
 }
 
 /* ===================================================================== */
@@ -500,6 +505,16 @@
 	margin-inline-start: -6px;
 }
 
+.site-header__mark[aria-current="page"] {
+	background: var(--accent-wash);
+	color: var(--accent-ink);
+}
+
+.site-header__glyph {
+	block-size: 20px;
+	inline-size: 20px;
+}
+
 .site-footer__gh {
 	align-items: center;
 	color: #d8d1c2;
@@ -564,61 +579,114 @@
 }
 
 /* ===================================================================== */
-/* Feature grid — a wordless capability trio                             */
+/* Benefit strip — three short reasons in one row under the hero          */
 /* ===================================================================== */
-.feature-grid__title {
-	max-width: 22ch;
+.benefit-strip {
+	border-block: 1px solid var(--line);
+	background: color-mix(in srgb, var(--card) 55%, transparent);
 }
 
-.feature-grid__cards {
+/* Every column carries the same inline padding, so the list drops the shell's
+   own and the first column's text still lines up with the page edge. */
+.benefit-strip__list {
 	display: grid;
-	gap: 20px;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
-	margin-top: 40px;
+	list-style: none;
+	margin-block: 0;
+	padding: 0;
 }
 
-/* Without a supporting sentence each, the cards need their own surface to
-   hold the band; the tile is the body. */
-.feature-card {
-	background: var(--card);
-	border: 1px solid var(--line);
-	border-radius: var(--r-lg);
-	box-shadow: var(--shadow-sm);
+.benefit {
+	align-items: flex-start;
 	display: flex;
-	flex-direction: column;
-	gap: 20px;
+	gap: 14px;
 	min-width: 0;
-	padding: 26px 24px 28px;
+	padding: 24px;
 }
 
-.feature-card__glyph {
+.benefit + .benefit {
+	border-inline-start: 1px solid var(--line);
+}
+
+.benefit__icon {
 	align-items: center;
 	background: var(--accent-wash);
-	border-radius: 12px;
+	block-size: 42px;
+	border-radius: 11px;
 	color: var(--accent-ink);
 	display: inline-flex;
-	block-size: 48px;
-	inline-size: 48px;
+	flex: none;
+	inline-size: 42px;
 	justify-content: center;
 }
 
-/* Match the single-glyph tiles' icon-row height so all three titles share a
-   baseline regardless of the cluster's shorter logo tiles. */
-.feature-card__cluster {
-	align-items: center;
-	block-size: 48px;
+.benefit__icon svg {
+	block-size: 21px;
+	inline-size: 21px;
+	stroke-width: 1.8;
+}
+
+.benefit__text {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.benefit__title {
+	color: var(--ink);
+	font-size: 16px;
+	font-weight: 700;
+	line-height: 1.3;
+}
+
+.benefit__detail {
+	color: var(--ink-2);
+	font-size: 14px;
+	line-height: 1.45;
+}
+
+/* ===================================================================== */
+/* Hero agent action — the supported agents' marks lead the label         */
+/* ===================================================================== */
+.agent-action__stack {
 	display: inline-flex;
-	gap: 7px;
+	margin-inline-end: 2px;
+	transition: margin 0.22s var(--ease);
 }
 
-.feature-card__cluster .brand-tile {
-	padding: 7px;
+.agent-action__logo {
+	background: var(--card);
+	block-size: 28px;
+	border: 1px solid var(--line-2);
+	border-radius: 8px;
+	box-shadow: var(--shadow-sm);
+	display: inline-flex;
+	inline-size: 28px;
+	overflow: hidden;
+	padding: 3px;
+	transition: transform 0.22s var(--ease);
+	z-index: calc(3 - var(--n));
 }
 
-.feature-card__title {
-	font-size: 19px;
-	margin: 0;
-	max-width: 18ch;
+/* A light overlap keeps the group together without hiding any mark. */
+.agent-action__logo + .agent-action__logo {
+	margin-inline-start: -4px;
+}
+
+.agent-action__logo img {
+	block-size: 100%;
+	inline-size: 100%;
+}
+
+/* On hover or focus the overlapped marks slide apart so each one reads. */
+.agent-action:hover .agent-action__logo,
+.agent-action:focus-visible .agent-action__logo {
+	transform: translateX(calc(var(--n) * 6px));
+}
+
+.agent-action:hover .agent-action__stack,
+.agent-action:focus-visible .agent-action__stack {
+	margin-inline-end: 14px;
 }
 
 /* ===================================================================== */
@@ -709,9 +777,7 @@
 
 .cli-band__shell {
 	color: var(--ink-3);
-	font-family: var(--font-mono);
-	font-size: 11.5px;
-	letter-spacing: 0.03em;
+	font-size: 12.5px;
 }
 
 .cli-band__body {
@@ -937,7 +1003,6 @@
 }
 
 .docs-h3 {
-	font-family: var(--font-display);
 	font-size: 17px;
 	margin: 26px 0 0;
 }
@@ -1028,7 +1093,6 @@
 
 .docs-lane__tag {
 	color: var(--ink) !important;
-	font-family: var(--font-display);
 	font-size: 16px;
 	font-weight: 700;
 	margin: 4px 0 0 !important;
@@ -1105,10 +1169,20 @@
 	transform: translateY(-2px);
 }
 
+/* Name and badge share a line; on phones the badge sits under the name so
+   the logo keeps its size. */
+.agent-card__label {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 10px;
+	min-width: 0;
+}
+
 .agent-card__name {
-	font-family: var(--font-display);
 	font-size: 19px;
 	font-weight: 700;
+	line-height: 1.25;
 }
 
 .agent-card__cta {
@@ -1193,8 +1267,8 @@
 	content: counter(step);
 	display: inline-flex;
 	flex: none;
-	font-family: var(--font-mono);
-	font-size: 12px;
+	font-size: 12.5px;
+	font-variant-numeric: tabular-nums;
 	block-size: 24px;
 	inline-size: 24px;
 	justify-content: center;
@@ -1312,15 +1386,32 @@
 		grid-template-columns: 1fr;
 	}
 
+	/* One column: the copy centres over the centred board. */
+	.home-hero__copy {
+		text-align: center;
+	}
+
+	.home-hero__actions {
+		justify-content: center;
+	}
+
 	.home-hero__visual {
 		justify-self: center;
 		max-width: 620px;
 		width: 100%;
 	}
 
-	.feature-grid__cards {
-		gap: 16px;
-		grid-template-columns: 1fr 1fr;
+	/* Still three equal columns, each centred with its icon on top. */
+	.benefit {
+		align-items: center;
+		flex-direction: column;
+		gap: 10px;
+		padding: 22px 16px;
+		text-align: center;
+	}
+
+	.benefit__text {
+		text-wrap: balance;
 	}
 
 	.cli-band__inner {
@@ -1360,8 +1451,14 @@
 		white-space: nowrap;
 	}
 
+	/* The brand takes its own row above three equal link columns. */
 	.site-footer__inner {
-		grid-template-columns: 1fr 1fr;
+		gap: 32px 20px;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.site-footer__about {
+		grid-column: 1 / -1;
 	}
 }
 
@@ -1371,20 +1468,59 @@
 	}
 
 	.home-hero__inner {
-		padding-block: 24px 40px;
+		padding-block: 28px 40px;
 	}
 
-	.feature-grid__cards {
+	/* Phones: left-aligned copy over two full-width actions of equal size. */
+	.home-hero__copy {
+		text-align: start;
+	}
+
+	.home-hero__actions {
+		display: grid;
 		grid-template-columns: 1fr;
+		margin-top: 24px;
+	}
+
+	.benefit-strip__list {
+		grid-template-columns: 1fr;
+		padding-inline: 16px;
+	}
+
+	.benefit {
+		align-items: flex-start;
+		flex-direction: row;
+		gap: 14px;
+		padding: 16px 0;
+		text-align: start;
+	}
+
+	.benefit__text {
+		text-wrap: wrap;
+	}
+
+	.benefit + .benefit {
+		border-inline-start: 0;
+		border-top: 1px solid var(--line);
 	}
 
 	.agent-grid {
 		grid-template-columns: 1fr;
 	}
 
+	.agent-card {
+		gap: 12px;
+		padding: 16px;
+	}
+
+	.agent-card__label {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
 	.site-footer__inner {
-		gap: 28px;
-		grid-template-columns: 1fr 1fr;
+		gap: 28px 16px;
+		padding-block: 40px;
 	}
 
 	.docs-defs__row {
@@ -1405,25 +1541,33 @@
 }
 
 /* Phones: the sketch nodes are fixed-size but placed by percentage, so on a
-   narrow canvas the rightmost node runs into the frame. Scale the whole scene
-   down as one unit to sit it back inside the sheet, wires and all. */
+   narrow canvas they shrink to keep clear of each other and the frame. */
 @media (max-width: 600px) {
-	.sketch-board__scene {
-		transform: scale(0.82);
-		transform-origin: center;
-	}
-
 	.sketch-node {
 		gap: 4px;
-		padding: 5px 7px;
+		padding: 4px 7px;
 	}
 
 	.sketch-node__icon {
-		block-size: 16px;
-		inline-size: 16px;
+		block-size: 14px;
+		inline-size: 14px;
 	}
 
 	.sketch-node__label {
-		font-size: 10.5px;
+		font-size: 13px;
+	}
+
+	.sketch-node--decision::before {
+		block-size: 48px;
+		inline-size: 48px;
+	}
+
+	.sketch-node--decision .sketch-node__label {
+		font-size: 12px;
+		max-width: 40px;
+	}
+
+	.sketch-tag {
+		font-size: 14px;
 	}
 }
