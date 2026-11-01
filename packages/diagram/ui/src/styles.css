@@ -367,15 +367,33 @@
 	width: 100%;
 }
 
-/* A read-only canvas has no tools, so its mobile menu and bottom bar are empty
-   chrome at every width. */
+/* A read-only canvas has no tools, so its mobile menu and bottom toolbar are
+   empty chrome at every width. The bottom bar still carries Excalidraw's
+   "Scroll back to content" button once the diagram is panned out of view, so
+   the bar stays while that button is present and shows only the button. */
 .sketchi-excalidraw-scene-canvas[data-view-mode="true"]
 	.excalidraw.excalidraw--mobile
-	.main-menu-trigger,
+	> .App-bottom-bar:not(:has(.scroll-back-to-content)),
 .sketchi-excalidraw-scene-canvas[data-view-mode="true"]
 	.excalidraw.excalidraw--mobile
-	> .App-bottom-bar {
+	> .App-bottom-bar
+	.App-toolbar-content {
 	display: none;
+}
+
+.sketchi-excalidraw-scene-canvas[data-view-mode="true"]
+	.excalidraw.excalidraw--mobile
+	> .App-bottom-bar
+	> .Island {
+	background: transparent;
+	box-shadow: none;
+	pointer-events: none;
+}
+
+.sketchi-excalidraw-scene-canvas[data-view-mode="true"]
+	.excalidraw.excalidraw--mobile
+	.scroll-back-to-content {
+	pointer-events: auto;
 }
 
 @container (min-width: 700px) {
