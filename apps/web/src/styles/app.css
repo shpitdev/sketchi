@@ -500,6 +500,16 @@
 	margin-inline-start: -6px;
 }
 
+.site-header__mark[aria-current="page"] {
+	background: var(--accent-wash);
+	color: var(--accent-ink);
+}
+
+.site-header__glyph {
+	block-size: 20px;
+	inline-size: 20px;
+}
+
 .site-footer__gh {
 	align-items: center;
 	color: #d8d1c2;
@@ -564,61 +574,119 @@
 }
 
 /* ===================================================================== */
-/* Feature grid — a wordless capability trio                             */
+/* Benefit strip — three short reasons in one row under the hero          */
 /* ===================================================================== */
-.feature-grid__title {
-	max-width: 22ch;
+.benefit-strip {
+	border-block: 1px solid var(--line);
+	background: color-mix(in srgb, var(--card) 55%, transparent);
 }
 
-.feature-grid__cards {
+.benefit-strip__list {
 	display: grid;
-	gap: 20px;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
-	margin-top: 40px;
+	list-style: none;
+	margin-block: 0;
+	padding-block: 0;
 }
 
-/* Without a supporting sentence each, the cards need their own surface to
-   hold the band; the tile is the body. */
-.feature-card {
-	background: var(--card);
-	border: 1px solid var(--line);
-	border-radius: var(--r-lg);
-	box-shadow: var(--shadow-sm);
+.benefit {
+	align-items: center;
 	display: flex;
-	flex-direction: column;
-	gap: 20px;
+	gap: 14px;
 	min-width: 0;
-	padding: 26px 24px 28px;
+	padding: 22px 24px;
 }
 
-.feature-card__glyph {
+.benefit:first-child {
+	padding-inline-start: 0;
+}
+
+.benefit:last-child {
+	padding-inline-end: 0;
+}
+
+.benefit + .benefit {
+	border-inline-start: 1px solid var(--line);
+}
+
+.benefit__icon {
 	align-items: center;
 	background: var(--accent-wash);
-	border-radius: 12px;
+	block-size: 42px;
+	border-radius: 11px;
 	color: var(--accent-ink);
 	display: inline-flex;
-	block-size: 48px;
-	inline-size: 48px;
+	flex: none;
+	inline-size: 42px;
 	justify-content: center;
 }
 
-/* Match the single-glyph tiles' icon-row height so all three titles share a
-   baseline regardless of the cluster's shorter logo tiles. */
-.feature-card__cluster {
-	align-items: center;
-	block-size: 48px;
+.benefit__icon svg {
+	block-size: 21px;
+	inline-size: 21px;
+	stroke-width: 1.8;
+}
+
+.benefit__text {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.benefit__title {
+	color: var(--ink);
+	font-family: var(--font-display);
+	font-size: 17px;
+	font-weight: 700;
+	line-height: 1.25;
+}
+
+.benefit__detail {
+	color: var(--ink-2);
+	font-size: 14px;
+	line-height: 1.45;
+}
+
+/* ===================================================================== */
+/* Hero agent action — the supported agents' marks lead the label         */
+/* ===================================================================== */
+.agent-action__stack {
 	display: inline-flex;
-	gap: 7px;
+	margin-inline-end: 2px;
+	transition: margin 0.22s var(--ease);
 }
 
-.feature-card__cluster .brand-tile {
-	padding: 7px;
+.agent-action__logo {
+	background: var(--card);
+	block-size: 28px;
+	border: 1px solid var(--line-2);
+	border-radius: 8px;
+	box-shadow: var(--shadow-sm);
+	display: inline-flex;
+	inline-size: 28px;
+	overflow: hidden;
+	transition: transform 0.22s var(--ease);
+	z-index: calc(3 - var(--n));
 }
 
-.feature-card__title {
-	font-size: 19px;
-	margin: 0;
-	max-width: 18ch;
+.agent-action__logo + .agent-action__logo {
+	margin-inline-start: -9px;
+}
+
+.agent-action__logo img {
+	block-size: 100%;
+	inline-size: 100%;
+}
+
+/* On hover or focus the overlapped marks slide apart so each one reads. */
+.agent-action:hover .agent-action__logo,
+.agent-action:focus-visible .agent-action__logo {
+	transform: translateX(calc(var(--n) * 6px));
+}
+
+.agent-action:hover .agent-action__stack,
+.agent-action:focus-visible .agent-action__stack {
+	margin-inline-end: 14px;
 }
 
 /* ===================================================================== */
@@ -1318,9 +1386,9 @@
 		width: 100%;
 	}
 
-	.feature-grid__cards {
-		gap: 16px;
-		grid-template-columns: 1fr 1fr;
+	.benefit {
+		align-items: flex-start;
+		padding: 20px 18px;
 	}
 
 	.cli-band__inner {
@@ -1374,8 +1442,20 @@
 		padding-block: 24px 40px;
 	}
 
-	.feature-grid__cards {
+	.benefit-strip__list {
 		grid-template-columns: 1fr;
+	}
+
+	.benefit,
+	.benefit:first-child,
+	.benefit:last-child {
+		align-items: center;
+		padding: 16px 0;
+	}
+
+	.benefit + .benefit {
+		border-inline-start: 0;
+		border-top: 1px solid var(--line);
 	}
 
 	.agent-grid {
