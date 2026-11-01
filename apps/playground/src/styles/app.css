@@ -91,13 +91,11 @@ body {
 	border-bottom: 1px solid var(--line);
 }
 
-.studio-header__actions {
+.studio-header__route {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 8px;
-	justify-content: flex-end;
-	margin-inline-start: auto;
 }
 
 .studio-header__site {
@@ -131,6 +129,7 @@ body {
 	color: var(--ink);
 	display: inline-flex;
 	gap: 10px;
+	margin-inline-end: auto;
 	min-width: 0;
 	text-decoration: none;
 }
@@ -649,6 +648,17 @@ button.studio__artifact-link {
 		padding-inline: 16px;
 	}
 
+	/* A route with actions takes its own second row, links left and actions
+	   right, under the lockup and Docs/GitHub. */
+	.studio-header__route:has(.studio__icon-bar) {
+		flex-basis: 100%;
+		order: 1;
+	}
+
+	.studio-header__route:has(.studio__icon-bar) .studio__icon-bar {
+		margin-inline-start: auto;
+	}
+
 	.studio-brand {
 		gap: 8px;
 	}
@@ -675,18 +685,21 @@ button.studio__artifact-link {
 	}
 }
 
-/* The brand, a route link, Docs and GitHub share one row down to 320px. */
+/* The brand, a route link, Docs and GitHub share one row down to 320px, and a
+   route link with five actions still fits its own row. */
 @media (max-width: 360px) {
 	.studio-header {
 		gap: 4px;
+		padding-inline: 12px;
 	}
 
-	.studio-header__actions {
+	.studio-header__route,
+	.studio-header .studio__icon-bar {
 		gap: 4px;
 	}
 
 	.studio-header__link {
-		padding-inline: 6px;
+		padding-inline: 4px;
 	}
 }
 
