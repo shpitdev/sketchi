@@ -367,11 +367,21 @@
 	width: 100%;
 }
 
+/* A read-only canvas has no tools, so its mobile menu and bottom bar are empty
+   chrome at every width. */
+.sketchi-excalidraw-scene-canvas[data-view-mode="true"]
+	.excalidraw.excalidraw--mobile
+	.main-menu-trigger,
+.sketchi-excalidraw-scene-canvas[data-view-mode="true"]
+	.excalidraw.excalidraw--mobile
+	> .App-bottom-bar {
+	display: none;
+}
+
 @container (min-width: 700px) {
-	.sketchi-excalidraw-scene-canvas .excalidraw.excalidraw--mobile .main-menu-trigger,
-	.sketchi-excalidraw-scene-canvas[data-view-mode="true"]
+	.sketchi-excalidraw-scene-canvas[data-view-mode="false"]
 		.excalidraw.excalidraw--mobile
-		> .App-bottom-bar {
+		.main-menu-trigger {
 		display: none;
 	}
 
