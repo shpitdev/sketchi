@@ -12,6 +12,7 @@ import {
 	type DiagramGenerationCandidate,
 	type DiagramGenerationError,
 	type DiagramGenerationType,
+	isSupportedGenerationModel,
 } from "@sketchi/diagram-generation";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result } from "effect";
@@ -38,6 +39,7 @@ type GenerateFailureStatus =
 	| "provider_failed"
 	| "generation_timeout"
 	| "unsupported_diagram_type"
+	| "unsupported_model"
 	| "malformed_output"
 	| "invalid_generated_document"
 	| "quality_failed"
@@ -390,11 +392,25 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 			]),
 		);
 	}
+	const model = input.model;
+	if (model !== undefined && !isSupportedGenerationModel(model)) {
+		return yield* finish(
+			rawBody,
+			failure("unsupported_model", [
+				issue(
+					"unsupported_model",
+					"input",
+					GENERATE_REQUEST_COPY.unsupportedModel,
+					GENERATE_REQUEST_COPY.requestSupportedModel,
+				),
+			]),
+		);
+	}
 	const generationInput = {
 		...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
 		prompt,
 		...(input.type ? { type: input.type } : {}),
-		...(input.model ? { model: input.model } : {}),
+		...(model ? { model } : {}),
 	};
 
 	const candidateResult = yield* withTelemetryCorrelation(generation.generate(generationInput), {

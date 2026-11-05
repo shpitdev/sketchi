@@ -12,6 +12,7 @@ import {
 	type DiagramGenerationError,
 	type DiagramGenerationType,
 	DiagramGenerationPolicyLive,
+	type SupportedGenerationModel,
 } from "@sketchi/diagram-generation";
 import { Context, Effect, Layer } from "effect";
 
@@ -24,7 +25,7 @@ const GENERATION_PROVIDER = "cloudflare-google-ai-studio" as const;
 
 export interface GenerateDiagramServiceInput {
 	readonly cacheMode?: DiagramGenerationCacheMode;
-	readonly model?: string;
+	readonly model?: SupportedGenerationModel;
 	readonly prompt: string;
 	readonly type?: DiagramGenerationType;
 }
@@ -90,7 +91,7 @@ export const PlaygroundGenerationLive = Layer.effect(
 			generate: Effect.fn("playground.generation.generate")(function* (input) {
 				const env = yield* PlaygroundBindings;
 				const config = aiEnvironment(env);
-				const model = input.model?.trim() || config.model;
+				const model = input.model ?? config.model;
 				if (!env.AI) {
 					return yield* DiagramGenerationConfigurationError.make({
 						message: "AI Gateway generation is not configured in this Worker environment (env.AI).",

@@ -45,7 +45,9 @@ Build one diagram from a typed spec and store the result as an artifact.
 POST /api/v1/generate
 Generate a flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, or quadrant diagram from a prompt rather than a
 prebuilt spec. Omit type for model selection, or pass a supported type as an
-authoritative constraint. Unsupported native types return a typed error.
+authoritative constraint. Unsupported native types return a typed error. Omit
+model to use the default; a model Sketchi does not support returns a typed 400
+unsupported_model naming the supported IDs.
 
 GET /api/v1/artifacts/{artifactId}?format=scene
 GET /api/v1/artifacts/{artifactId}?format=excalidraw

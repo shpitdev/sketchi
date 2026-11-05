@@ -126,6 +126,13 @@ function endpointFailure(status: number, body: typeof EndpointErrorBody.Type): C
 				hint: firstIssue?.hint ?? "Request a flowchart, mindmap, or sequence diagram instead.",
 				details,
 			});
+		case "unsupported_model":
+			return CliGenerationError.make({
+				code: "unsupported_model",
+				message: firstIssue?.message ?? "The Sketchi generate API rejected the requested model.",
+				hint: firstIssue?.hint ?? `Omit --model to use ${DEFAULT_GENERATION_MODEL}.`,
+				details,
+			});
 		default:
 			return CliGenerationError.make({
 				code: "provider_failure",
