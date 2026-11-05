@@ -2,7 +2,7 @@
 "@sketchi/cli": minor
 ---
 
-`sketchi generate` copies the PNG it writes to the desktop clipboard and says so, so the image is ready to paste. It uses `wl-copy`, `xclip`, `osascript`, or PowerShell, skips CI, `--dest -`, non-PNG formats, and `--no-copy`, and a clipboard failure never changes the exit code. JSON output adds `clipboard: { copied, reason? }`. The text result is now just the title and type, the saved path, the copy status, and the id; the model and other details stay in `--output json` and `show`.
+`sketchi generate` copies the PNG it writes to the desktop clipboard and says so, so the image is ready to paste. It uses `wl-copy`, `xclip`, `osascript`, or PowerShell, skips CI, `--dest -`, non-PNG formats, and `--no-copy`, and a clipboard failure never changes the exit code. `SKETCHI_CLIPBOARD_COMMAND` replaces the detected tool with a command that reads the PNG on stdin, or turns copying off with `off`. JSON output adds `clipboard: { copied, reason? }`. The text result is now just the title and type, the saved path, the copy status, and the id, plus the inline-Markdown display hint when stdout is not a terminal; the model and other details stay in `--output json` and `show`.
 
 New `sketchi copy [id]` copies any stored diagram's PNG, defaulting to the newest.
 

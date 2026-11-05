@@ -181,14 +181,16 @@ Input and output contracts:
   Direct generate exports PNG to <generated-id>.png by default; --format scene|excalidraw selects
   another artifact and --dest PATH|- overrides its destination. Use --output text|json for result
   presentation on every command. Text generate output is the title and type, the saved path,
-  whether the image was copied, and the id; --output json carries the full record, generation
-  model and provider, export details including the inline-Markdown display hint, and clipboard.
+  whether the image was copied, and the id. When stdout is not a terminal, as for an agent, it
+  adds a Hint row: display the saved PNG as an inline Markdown image. --output json carries the
+  full record, generation model and provider, export details including that hint, and clipboard.
 
 Clipboard:
   After generate writes a PNG file it copies the image to the desktop clipboard: wl-copy when
   WAYLAND_DISPLAY is set, else xclip when DISPLAY is set, osascript on macOS, PowerShell on
   Windows. It never copies in CI, for --dest -, for scene or excalidraw, or with --no-copy, and it
-  stays quiet when the session has no desktop clipboard. The tool's own daemon keeps the image
+  stays quiet when the session has no desktop clipboard. SKETCHI_CLIPBOARD_COMMAND replaces that
+  detection with a command that reads the PNG on stdin, or turns copying off with "off". The tool's own daemon keeps the image
   after Sketchi exits; Sketchi releases its streams and exits promptly. A clipboard failure
   prints one line and never changes the exit code. JSON adds
   "clipboard":{"copied":true} or {"copied":false,"reason":"..."}. sketchi copy [ID] copies any
@@ -341,6 +343,8 @@ function generatedData(result: GenerateDiagramResult) {
 
 interface GenerateCommandResult extends GenerateWorkflowResult {
 	readonly clipboard: ClipboardOutcome;
+	/** Agents reading piped text need the display hint; a person at a terminal does not. */
+	readonly displayHint: boolean;
 }
 
 function generatedArtifactData(result: GenerateCommandResult) {
@@ -386,7 +390,18 @@ function generatedArtifactText(result: GenerateCommandResult): string {
 		...clipboardRows(result.clipboard),
 		row("Id", diagram.manifest.id),
 		...warningLines(diagram),
+		...(result.displayHint ? hintRows(result.artifact) : []),
 	].join("\n");
+}
+
+function hintRows(artifact: GeneratedArtifact): string[] {
+	const hint = displayHint(artifact);
+	return hint ? [row("Hint", hint)] : [];
+}
+
+/** Whether generate's text should carry the agent display hint: only off a terminal. */
+function textNeedsDisplayHint(): boolean {
+	return process.stdout.isTTY !== true;
 }
 
 /** Copy a freshly written PNG unless policy says not to; never fails the command. */
@@ -542,6 +557,7 @@ Clipboard:
   Wayland, xclip on X11, osascript on macOS, PowerShell on Windows) and says so. It never copies in
   CI, for --dest -, for another --format, or with --no-copy, and stays quiet when the session has
   no desktop clipboard. A clipboard failure prints one line and never changes the exit code.
+  SKETCHI_CLIPBOARD_COMMAND=CMD|off replaces the detected tool or turns copying off.
   --output json reports clipboard {copied, reason?}. sketchi copy [ID] copies any stored diagram.
 
 Errors and next steps:
@@ -644,7 +660,7 @@ const generateCommand = Command.make(
 							});
 							const clipboard = yield* copyGeneratedArtifact(result.artifact, input.copy);
 							yield* activity.succeed("Diagram ready");
-							return { ...result, clipboard };
+							return { ...result, clipboard, displayHint: textNeedsDisplayHint() };
 						}),
 					),
 				);
@@ -664,7 +680,11 @@ const generateCommand = Command.make(
 				}).pipe(
 					Effect.flatMap((result) =>
 						copyGeneratedArtifact(result.artifact, input.copy).pipe(
-							Effect.map((clipboard) => ({ ...result, clipboard })),
+							Effect.map((clipboard) => ({
+								...result,
+								clipboard,
+								displayHint: textNeedsDisplayHint(),
+							})),
 						),
 					),
 				),

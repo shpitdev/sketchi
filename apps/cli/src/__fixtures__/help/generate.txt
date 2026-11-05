@@ -33,6 +33,7 @@ Clipboard:
   Wayland, xclip on X11, osascript on macOS, PowerShell on Windows) and says so. It never copies in
   CI, for --dest -, for another --format, or with --no-copy, and stays quiet when the session has
   no desktop clipboard. A clipboard failure prints one line and never changes the exit code.
+  SKETCHI_CLIPBOARD_COMMAND=CMD|off replaces the detected tool or turns copying off.
   --output json reports clipboard {copied, reason?}. sketchi copy [ID] copies any stored diagram.
 
 Errors and next steps:

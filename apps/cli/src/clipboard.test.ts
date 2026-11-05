@@ -37,6 +37,18 @@ describe("clipboard tool selection", () => {
 		]);
 	});
 
+	it("lets SKETCHI_CLIPBOARD_COMMAND replace detection on every platform", () => {
+		for (const platform of ["linux", "darwin", "win32"] as const) {
+			const tool = clipboardTool(platform, {
+				SKETCHI_CLIPBOARD_COMMAND: "/opt/bin/my-copy",
+				WAYLAND_DISPLAY: "wayland-1",
+			});
+			assert.strictEqual(tool?._tag, "Stdin");
+			assert.strictEqual(tool?.command, "/opt/bin/my-copy");
+			assert.deepStrictEqual(tool?._tag === "Stdin" ? tool.args : undefined, []);
+		}
+	});
+
 	it("finds no clipboard without a desktop session", () => {
 		assert.isUndefined(clipboardTool("linux", { PATH: "/usr/bin", HOME: "/home/a" }));
 		assert.isUndefined(clipboardTool("freebsd", {}));
@@ -210,6 +222,22 @@ describe.runIf(process.platform !== "win32")("clipboard adapter", () => {
 			assert.throws(() => process.kill(pid, 0));
 			yield* Effect.promise(() => rm(directory, { recursive: true, force: true }));
 		}),
+	);
+
+	it.live("never copies when SKETCHI_CLIPBOARD_COMMAND is off, on any platform", () =>
+		Effect.forEach(["linux", "darwin", "win32"] as const, (platform) =>
+			copyWith({ platform, env: { PATH: "/nonexistent", SKETCHI_CLIPBOARD_COMMAND: "off" } }),
+		).pipe(
+			Effect.map((outcomes) => {
+				for (const outcome of outcomes) {
+					assert.deepStrictEqual(outcome, {
+						_tag: "Skipped",
+						reason: "turned off by SKETCHI_CLIPBOARD_COMMAND",
+					});
+				}
+				assert.strictEqual(outcomes.length, 3);
+			}),
+		),
 	);
 
 	it.live("skips a session with no desktop clipboard without spawning anything", () =>

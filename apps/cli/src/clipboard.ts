@@ -70,10 +70,28 @@ const POWERSHELL_COPY_PNG = [
 const present = (value: string | undefined) => value !== undefined && value.trim() !== "";
 
 /** Pick the clipboard tool for this session, or undefined when it has no desktop clipboard. */
+/**
+ * Replaces platform detection: a command that reads the PNG on stdin, or "off". It serves
+ * clipboards Sketchi does not detect (WSL's clip.exe wrappers, remote sessions) and keeps
+ * every test that spawns the CLI away from the real clipboard on any OS.
+ */
+export const SKETCHI_CLIPBOARD_COMMAND_ENV = "SKETCHI_CLIPBOARD_COMMAND";
+export const CLIPBOARD_OFF = "off";
+
 export function clipboardTool(
 	platform: NodeJS.Platform,
 	env: NodeJS.ProcessEnv,
 ): ClipboardTool | undefined {
+	const override = env[SKETCHI_CLIPBOARD_COMMAND_ENV]?.trim();
+	if (override) {
+		return {
+			_tag: "Stdin",
+			name: override,
+			command: override,
+			args: [],
+			missing: `${override} not found; check ${SKETCHI_CLIPBOARD_COMMAND_ENV}`,
+		};
+	}
 	switch (platform) {
 		case "darwin":
 			return {
@@ -267,6 +285,12 @@ export function makeClipboardLayer(options: ClipboardLayerOptions = {}) {
 				);
 			return Clipboard.of({
 				copyPng: Effect.fn("sketchi.cli.clipboard.copyPng")(function* (png: Uint8Array) {
+					if (env[SKETCHI_CLIPBOARD_COMMAND_ENV]?.trim() === CLIPBOARD_OFF) {
+						return {
+							_tag: "Skipped",
+							reason: `turned off by ${SKETCHI_CLIPBOARD_COMMAND_ENV}`,
+						} as const;
+					}
 					const tool = clipboardTool(platform, env);
 					if (!tool) return { _tag: "Skipped", reason: NO_DESKTOP_CLIPBOARD } as const;
 					const run =

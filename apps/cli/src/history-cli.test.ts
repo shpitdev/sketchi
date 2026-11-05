@@ -38,14 +38,15 @@ let endpoint = "";
 let copiedFile = "";
 
 /**
- * The CLI under test sees a fake Wayland session whose wl-copy is a shim on PATH, so no
- * test reaches the real clipboard. CI is cleared so automatic copy is in play.
+ * The CLI under test copies through a fake clipboard tool named by SKETCHI_CLIPBOARD_COMMAND,
+ * which replaces platform detection, so no test reaches a real clipboard on any OS. The
+ * environment is built from scratch, so CI is absent and automatic copy is in play.
  */
 function environment(home: string, overrides: Readonly<Record<string, string | undefined>> = {}) {
 	const env: NodeJS.ProcessEnv = {
-		PATH: `${shims}:/usr/bin:/bin`,
+		PATH: "/usr/bin:/bin",
 		HOME: home,
-		WAYLAND_DISPLAY: "sketchi-test",
+		SKETCHI_CLIPBOARD_COMMAND: join(shims, "fake-clipboard"),
 		SHIM_OUT: copiedFile,
 	};
 	for (const [key, value] of Object.entries(overrides)) {
@@ -106,8 +107,11 @@ beforeAll(async () => {
 	copiedFile = join(root, "clipboard.png");
 	await mkdir(shims);
 	// Like wl-copy: read the image, fork a daemon holding inherited stdio, then exit.
-	await writeFile(join(shims, "wl-copy"), '#!/bin/sh\ncat > "$SHIM_OUT"\n(sleep 5 &)\nexit 0\n');
-	await chmod(join(shims, "wl-copy"), 0o755);
+	await writeFile(
+		join(shims, "fake-clipboard"),
+		'#!/bin/sh\ncat > "$SHIM_OUT"\n(sleep 5 &)\nexit 0\n',
+	);
+	await chmod(join(shims, "fake-clipboard"), 0o755);
 
 	// Seed the generate response from a real offline build of the same document.
 	const seedHome = await freshHome("seed");
@@ -143,7 +147,8 @@ afterAll(async () => {
 	await rm(root, { recursive: true, force: true });
 });
 
-describe("generate copies its PNG", () => {
+// The fake clipboard tool is a POSIX shell script.
+describe.runIf(process.platform !== "win32")("generate copies its PNG", () => {
 	it("prints only the essentials and puts the PNG on the clipboard", async () => {
 		const home = await freshHome("text");
 		await rm(copiedFile, { force: true });
@@ -156,12 +161,56 @@ describe("generate copies its PNG", () => {
 				`Saved     ${join(home, "checkout-flow.png")}`,
 				"Copied    to clipboard, paste anywhere",
 				"Id        checkout-flow",
+				`Hint      to show this diagram to the user, display the exported file as an inline markdown image, e.g. ![checkout-flow](<${join(home, "checkout-flow.png")}>)`,
 				"",
 			].join("\n"),
 		);
 		const copied = await readFile(copiedFile);
 		expect(copied.equals(await readFile(join(home, "checkout-flow.png")))).toBe(true);
 	});
+
+	// util-linux script gives the CLI a real terminal on stdout.
+	it.runIf(process.platform === "linux")(
+		"leaves the agent display hint out at a terminal",
+		async () => {
+			const home = await freshHome("tty");
+			const destination = join(home, "checkout-flow.png");
+			const command = [
+				process.execPath,
+				binary,
+				"generate",
+				"--prompt",
+				"x",
+				"--endpoint",
+				endpoint,
+				"--dest",
+				destination,
+			]
+				.map((part) => `'${part.replaceAll("'", "'\\''")}'`)
+				.join(" ");
+			const result = await new Promise<ProcessResult>((complete, reject) => {
+				const child = spawn("script", ["--quiet", "--return", "--command", command, "/dev/null"], {
+					cwd: root,
+					env: { ...environment(home), TERM: "dumb" },
+					stdio: ["ignore", "pipe", "pipe"],
+				});
+				const stdout: Buffer[] = [];
+				child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+				child.on("error", reject);
+				child.on("close", (code) =>
+					complete({
+						code: code ?? -1,
+						stdout: Buffer.concat(stdout).toString("utf8"),
+						stderr: "",
+					}),
+				);
+			});
+			expect(result.code).toBe(0);
+			expect(result.stdout).toContain("Copied    to clipboard, paste anywhere");
+			expect(result.stdout).toContain("Id        checkout-flow");
+			expect(result.stdout).not.toContain("Hint");
+		},
+	);
 
 	it("adds clipboard to JSON and writes nothing else to stdout", async () => {
 		const home = await freshHome("json");
@@ -219,46 +268,53 @@ describe("generate copies its PNG", () => {
 		});
 	});
 
-	it("stays quiet without a desktop clipboard, like Frontierclimb's PATH and HOME only run", async () => {
-		const home = await freshHome("headless");
-		const env = { PATH: `${shims}:/usr/bin:/bin`, HOME: home };
-		const text = await generate(home, [], env);
-		expect(text.code).toBe(0);
-		expect(text.stdout.split("\n")[2]).toBe("Id        checkout-flow");
-		const json = await runCli(
-			[
-				"generate",
-				"--prompt",
-				"x",
-				"--endpoint",
-				endpoint,
-				"--dest",
-				join(home, "b.png"),
-				"--output",
-				"json",
-			],
-			{ ...env, HOME: await freshHome("headless-json") },
-		);
-		expect(JSON.parse(json.stdout).data.clipboard).toEqual({
-			copied: false,
-			reason: "no desktop clipboard in this session",
-		});
-	});
+	// Only Linux can be headless with real detection and no clipboard tool to reach.
+	it.runIf(process.platform === "linux")(
+		"stays quiet without a desktop clipboard, like Frontierclimb's PATH and HOME only run",
+		async () => {
+			const home = await freshHome("headless");
+			const env = { PATH: "/usr/bin:/bin", HOME: home };
+			const text = await generate(home, [], env);
+			expect(text.code).toBe(0);
+			expect(text.stdout.split("\n")[2]).toBe("Id        checkout-flow");
+			const json = await runCli(
+				[
+					"generate",
+					"--prompt",
+					"x",
+					"--endpoint",
+					endpoint,
+					"--dest",
+					join(home, "b.png"),
+					"--output",
+					"json",
+				],
+				{ ...env, HOME: await freshHome("headless-json") },
+			);
+			expect(JSON.parse(json.stdout).data.clipboard).toEqual({
+				copied: false,
+				reason: "no desktop clipboard in this session",
+			});
+		},
+	);
 
 	it("keeps exit 0 and says why when the clipboard tool is missing", async () => {
 		const home = await freshHome("missing");
-		const emptyPath = join(root, "empty-bin");
-		await mkdir(emptyPath, { recursive: true });
-		const result = await generate(home, [], environment(home, { PATH: emptyPath }));
+		const missing = join(root, "no-such-clipboard-tool");
+		const result = await generate(
+			home,
+			[],
+			environment(home, { SKETCHI_CLIPBOARD_COMMAND: missing }),
+		);
 		expect(result.code).toBe(0);
 		expect(result.stdout).toContain(
-			"Clipboard not copied: wl-copy not found; install wl-clipboard\n",
+			`Clipboard not copied: ${missing} not found; check SKETCHI_CLIPBOARD_COMMAND\n`,
 		);
 		expect((await readFile(join(home, "checkout-flow.png"))).byteLength).toBeGreaterThan(0);
 	});
 });
 
-describe("finding past diagrams", () => {
+describe.runIf(process.platform !== "win32")("finding past diagrams", () => {
 	it("lists newest first, searches prompts, and resolves latest and prefixes", async () => {
 		const home = await freshHome("history");
 		const env = environment(home);
@@ -324,8 +380,9 @@ describe("finding past diagrams", () => {
 		);
 		expect((await readFile(copiedFile)).subarray(1, 4).toString("latin1")).toBe("PNG");
 
-		const headless = await runCli(["copy"], { PATH: "/usr/bin:/bin", HOME: home });
-		expect(headless.code).toBe(8);
-		expect(headless.stderr).toContain("error: clipboard_unavailable");
+		const off = await runCli(["copy"], environment(home, { SKETCHI_CLIPBOARD_COMMAND: "off" }));
+		expect(off.code).toBe(8);
+		expect(off.stderr).toContain("error: clipboard_unavailable");
+		expect(off.stderr).toContain("turned off by SKETCHI_CLIPBOARD_COMMAND");
 	});
 });

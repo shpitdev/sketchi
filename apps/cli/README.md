@@ -93,8 +93,9 @@ Copied    to clipboard, paste anywhere
 Id        checkout-flow
 ```
 
-`--output json` keeps everything else: the full record, the generation model and
-provider, and export details.
+When stdout is not a terminal, as when an agent runs it, a final `Hint` row says to
+display the saved PNG as an inline Markdown image. `--output json` keeps everything
+else: the full record, the generation model and provider, and export details.
 
 ### Clipboard
 
@@ -108,6 +109,9 @@ It is skipped in CI, for `--dest -`, for `--format excalidraw|scene`, and with
 If the copy fails, one line says why; the file is still saved and the exit code
 does not change. JSON output adds `"clipboard": {"copied": true}` or
 `{"copied": false, "reason": "..."}`.
+
+Set `SKETCHI_CLIPBOARD_COMMAND` to a command that reads a PNG on standard input to
+use a clipboard Sketchi does not detect, or to `off` to never copy.
 
 Copy any stored diagram again, rendering its PNG on demand:
 
@@ -339,10 +343,11 @@ raw artifact output through `export --dest -` without prompts.
 Agents must pass `--prompt` to `generate`. Interactive prompting is restricted
 to human text TTYs and is never enabled by JSON output, pipes, redirects, or CI.
 
-After exporting PNG to a file, agents can follow the returned hint to display
-that path as an inline Markdown image for the user. `generate` puts the same hint
-in its JSON `export.hint`, and when it reports `Copied` the user can also paste
-the image themselves.
+After writing a PNG file, `generate` and `export` give agents a hint to display
+that path as an inline Markdown image for the user: a `Hint` row in generate's
+text output when stdout is not a terminal, `export.hint` in generate's JSON, and
+`hint:` in export's status. When generate reports `Copied`, the user can also
+paste the image themselves.
 
 `generate`, `canvas`, `share`, and `pull` are deliberately separate, explicit network
 commands. They remain credential-free and each makes one HTTPS request. Share

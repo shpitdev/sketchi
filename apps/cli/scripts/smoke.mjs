@@ -367,9 +367,8 @@ try {
 	delete cliEnvironment.NO_COLOR;
 	delete cliEnvironment.FORCE_COLOR;
 	delete cliEnvironment.SKETCHI_GENERATE_ENDPOINT;
-	// No desktop clipboard: generate must never touch the real one during smoke.
-	delete cliEnvironment.WAYLAND_DISPLAY;
-	delete cliEnvironment.DISPLAY;
+	// Generate must never touch the real clipboard during smoke, on any OS.
+	cliEnvironment.SKETCHI_CLIPBOARD_COMMAND = "off";
 	const cli = (args, input) => run(binary, args, { cwd: fixtureRoot, env: cliEnvironment, input });
 
 	// Online environment for the generate endpoint-error proof only: the offline
