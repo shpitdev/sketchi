@@ -11,7 +11,6 @@ function envString(value: string | undefined, fallback: string): string {
 
 export function aiEnvironment(env: StudioEnv) {
 	return {
-		gatewayChat: env.SKETCHI_AI_GENERATION_CLIENT?.trim() === "gateway-chat",
 		gatewayId: envString(env.SKETCHI_AI_GATEWAY_ID, DEFAULT_GATEWAY_ID),
 		model: envString(env.SKETCHI_AI_MODEL, DEFAULT_MODEL),
 	};

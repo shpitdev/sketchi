@@ -27,7 +27,7 @@ vi.mock("@sketchi/diagram-generation", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@sketchi/diagram-generation")>();
 	return {
 		...actual,
-		CloudflareGoogleAiStudioClientLive: actual.CloudflareGoogleAiStudioClientLive.pipe(
+		CloudflareGatewayChatClientLive: actual.CloudflareGatewayChatClientLive.pipe(
 			Layer.tap(() =>
 				Effect.gen(function* () {
 					lifecycle.generationBuilt += 1;
@@ -66,12 +66,13 @@ function boundary(env: StudioEnv, request = new Request("https://studio.test/api
 	return { env, request, platform: { waitUntilPromise: () => undefined } };
 }
 
-function fakeAi(calls: { gatewayId: string; endpoint: string }[]): CloudflareAiGatewayProvider {
+function fakeAi(calls: { gatewayId: string; model: unknown }[]): CloudflareAiGatewayProvider {
 	return {
 		gateway: (gatewayId) => ({
 			getUrl: () => Promise.resolve("https://gateway.invalid"),
 			run: (input) => {
-				calls.push({ gatewayId, endpoint: input.endpoint });
+				const { model } = input.query as { readonly model?: unknown };
+				calls.push({ gatewayId, model });
 				// Permanent offline failure exercises client provisioning without retries or live AI.
 				return Promise.resolve(new Response("unauthorized", { status: 401 }));
 			},
@@ -94,7 +95,7 @@ describe("binding-dependent host lifecycles", () => {
 	it("builds one generation client per AI binding/gateway and closes only with its host", async () => {
 		const before = { ...lifecycle };
 		const runtime = makePlaygroundRuntime();
-		const calls: { gatewayId: string; endpoint: string }[] = [];
+		const calls: { gatewayId: string; model: unknown }[] = [];
 		const ai = fakeAi(calls);
 		try {
 			await Promise.all([
@@ -126,12 +127,8 @@ describe("binding-dependent host lifecycles", () => {
 			expect(lifecycle.generationBuilt - before.generationBuilt).toBe(1);
 			expect(lifecycle.generationClosed).toBe(before.generationClosed);
 			expect(calls.map((call) => call.gatewayId)).toEqual(["shared", "shared", "shared"]);
-			expect(calls.map((call) => call.endpoint)).toEqual(
-				expect.arrayContaining([
-					"v1beta/models/model-a:generateContent",
-					"v1beta/models/model-b:generateContent",
-					"v1beta/models/gemini-3.1-flash-lite:generateContent",
-				]),
+			expect(calls.map((call) => call.model)).toEqual(
+				expect.arrayContaining(["model-a", "model-b", "gemini-3.1-flash-lite"]),
 			);
 			await runtime.run(generate(), boundary({ AI: ai, SKETCHI_AI_GATEWAY_ID: "other" }));
 			await runtime.run(
@@ -153,29 +150,6 @@ describe("binding-dependent host lifecycles", () => {
 			await nextHost.dispose();
 		}
 		expect(lifecycle.generationClosed - before.generationClosed).toBe(4);
-	});
-
-	it("builds the gateway chat client only when the flag selects it", async () => {
-		const runtime = makePlaygroundRuntime();
-		const calls: { gatewayId: string; endpoint: string }[] = [];
-		const ai = fakeAi(calls);
-		try {
-			await runtime.run(generate(), boundary({ AI: ai, SKETCHI_AI_GATEWAY_ID: "shared" }));
-			await runtime.run(
-				generate(),
-				boundary({
-					AI: ai,
-					SKETCHI_AI_GATEWAY_ID: "shared",
-					SKETCHI_AI_GENERATION_CLIENT: "gateway-chat",
-				}),
-			);
-			expect(calls.map((call) => call.endpoint)).toEqual([
-				"v1beta/models/gemini-3.1-flash-lite:generateContent",
-				"v1beta/openai/chat/completions",
-			]);
-		} finally {
-			await runtime.dispose();
-		}
 	});
 
 	it("reuses Studio services per bucket while keeping request ownership and bucket data separate", async () => {

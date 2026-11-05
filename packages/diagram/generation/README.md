@@ -5,8 +5,8 @@ Model-facing generation helpers for Sketchi diagram candidates.
 ```mermaid
 flowchart LR
   Prompt["generation prompt contract"] --> Messages["prompt messages"]
-  Messages --> Gemini["Gemini request body"]
-  Gemini --> Intent["typed intent + requirement plan + IR"]
+  Messages --> Chat["effect/ai chat request"]
+  Chat --> Intent["typed intent + requirement plan + IR"]
   Intent --> Candidate["validated candidate + diagnostics"]
   Candidate --> Core["diagram-core parse"]
 ```
@@ -15,7 +15,7 @@ flowchart LR
 | ----------------------------------------- | ----------------------------- |
 | provider prompt and request contracts     | eval scenarios and assertions |
 | prompt message mapping                    | chat threads                  |
-| Gemini REST body mapping                  | artifact persistence          |
+| gateway route for each upstream           | artifact persistence          |
 | Effect client contract and runtime layers | UI streaming                  |
 | candidate parsing and diagnostics         | final grading/revision policy |
 | deterministic intent-plan enforcement     | artifact persistence          |
@@ -31,12 +31,10 @@ pnpm nx build diagram-generation
 ## Direction
 
 `DiagramGenerationClient` is the Effect-native primary API. Workers compose the
-Cloudflare AI Gateway binding (`CloudflareGoogleAiStudioClientLive`) at their
-runtime boundary; the binding authenticates the request and supplies the stored
-Google AI Studio BYOK key, so no provider credential is read or sent.
-`SKETCHI_AI_GENERATION_CLIENT=gateway-chat` selects `CloudflareGatewayChatClientLive`
-instead, which runs the same route on `effect/ai` and Google's OpenAI-compatible
-endpoint. Studio and the eval harness set it in `wrangler.jsonc`. The public
+Cloudflare AI Gateway binding (`CloudflareGatewayChatClientLive`) at their
+runtime boundary. It runs on `effect/ai` through Google's OpenAI-compatible
+endpoint; the binding authenticates the request and supplies the stored Google AI
+Studio BYOK key, so no provider credential is read or sent. The public
 Sketchi generate API and the eval harness are the only hosts that compose this
 client. There is no client-side/CLI token adapter: the CLI reaches generation
 through one unauthenticated HTTPS call to the public generate API. Pure prompt,

@@ -1,5 +1,5 @@
 import {
-	buildGeminiGenerateContentBody,
+	buildDiagramGenerationMessages,
 	candidateFromText,
 	DiagramGenerationClient,
 	DiagramGenerationPolicy,
@@ -137,36 +137,34 @@ describe("eval harness scenario generation composition", () => {
 	it("adapts a maintained scenario before calling the generation client", async () => {
 		const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
 		const { title, type, ...diagram } = scenario.expectedDiagram;
+		const messages = buildDiagramGenerationMessages(toDiagramGenerationPrompt(scenario));
 		const responseBody = {
-			candidates: [
+			choices: [
 				{
-					content: {
-						parts: [
+					finish_reason: "stop",
+					index: 0,
+					message: {
+						content: JSON.stringify(
 							{
-								text: JSON.stringify(
-									{
-										title,
-										intent: {
-											requestedKind: type,
-											nativeKind: type,
-											requirements: [],
-										},
-										diagram: { ...diagram, type },
-									},
-									null,
-									2,
-								),
+								title,
+								intent: {
+									requestedKind: type,
+									nativeKind: type,
+									requirements: [],
+								},
+								diagram: { ...diagram, type },
 							},
-						],
-						role: "model",
+							null,
+							2,
+						),
+						role: "assistant",
 					},
 				},
 			],
-			usageMetadata: {
-				candidatesTokenCount: 23,
-				promptTokenCount: 11,
-				totalTokenCount: 34,
-			},
+			created: 1,
+			id: "chatcmpl-test",
+			model: "gemini-3.1-flash-lite",
+			usage: { completion_tokens: 23, prompt_tokens: 11, total_tokens: 34 },
 		};
 		const run = vi.fn(
 			async () =>
@@ -189,15 +187,22 @@ describe("eval harness scenario generation composition", () => {
 
 		expect(run).toHaveBeenCalledWith(
 			expect.objectContaining({
-				query: buildGeminiGenerateContentBody({
-					cacheMode: "fresh",
-					model: "google/gemini-3.1-flash-lite",
-					prompt: toDiagramGenerationPrompt(scenario),
+				endpoint: "v1beta/openai/chat/completions",
+				query: expect.objectContaining({
+					messages: [
+						{ role: "system", content: messages.system },
+						{ role: "user", content: messages.user },
+					],
+					model: "gemini-3.1-flash-lite",
 				}),
 			}),
 			expect.objectContaining({
 				gateway: expect.objectContaining({
-					metadata: expect.objectContaining({ scenarioId: scenario.id }),
+					metadata: expect.objectContaining({
+						scenarioId: scenario.id,
+						sketchiSurface: "eval-harness",
+						sketchiTraceId: expect.any(String),
+					}),
 				}),
 			}),
 		);
@@ -217,60 +222,6 @@ describe("eval harness scenario generation composition", () => {
 			],
 			model: "google/gemini-3.1-flash-lite",
 			scenarioId: scenario.id,
-		});
-	});
-
-	it("uses the gateway chat client only when the flag selects it", async () => {
-		const scenario = getFlowchartScenario("pharma-batch-disposition");
-		const run = vi.fn(async () =>
-			Response.json({
-				id: "chat-1",
-				created: 1,
-				model: "gemini-3.1-flash-lite",
-				choices: [
-					{
-						index: 0,
-						finish_reason: "stop",
-						message: {
-							role: "assistant",
-							content: JSON.stringify({
-								title: "Unsupported",
-								intent: { requestedKind: "architecture", nativeKind: null, requirements: [] },
-							}),
-						},
-					},
-				],
-				usage: { prompt_tokens: 11, completion_tokens: 23, total_tokens: 34 },
-			}),
-		);
-		const result = await runGenerateScenarioCandidatesForInput(
-			{ providers: ["cloudflare-google-ai-studio"], scenarioId: scenario.id },
-			{
-				AI: { gateway: () => ({ getUrl: vi.fn(), run }) },
-				SKETCHI_AI_GENERATION_CLIENT: "gateway-chat",
-			},
-		);
-
-		expect(run).toHaveBeenCalledWith(
-			expect.objectContaining({ endpoint: "v1beta/openai/chat/completions" }),
-			expect.objectContaining({
-				gateway: expect.objectContaining({
-					metadata: expect.objectContaining({
-						scenarioId: scenario.id,
-						sketchiSurface: "eval-harness",
-						sketchiTraceId: expect.any(String),
-					}),
-				}),
-			}),
-		);
-		expect(result).toMatchObject({
-			candidates: [
-				{
-					model: "gemini-3.1-flash-lite",
-					provider: "cloudflare-google-ai-studio",
-					usage: { inputTokens: 11, outputTokens: 23, totalTokens: 34 },
-				},
-			],
 		});
 	});
 

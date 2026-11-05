@@ -6,9 +6,7 @@ export {
 	type CloudflareAiGatewayProvider,
 } from "./lib/cloudflare-ai-gateway.js";
 export * from "./lib/cloudflare-gateway-chat.js";
-export * from "./lib/cloudflare-google-ai-studio.js";
 export * from "./lib/errors.js";
-export * from "./lib/gemini.js";
 export * from "./lib/intent.js";
 export * from "./lib/logo-placement.js";
 export * from "./lib/messages.js";

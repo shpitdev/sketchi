@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { stripGoogleModelPrefix } from "./gemini.js";
+import { stripGoogleModelPrefix } from "./models.js";
 
 import type {
 	DiagramGenerationCacheMode,

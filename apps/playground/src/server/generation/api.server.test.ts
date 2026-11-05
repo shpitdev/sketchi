@@ -85,7 +85,16 @@ function fakeAiGateway(
 				return Promise.resolve(
 					new Response(
 						JSON.stringify({
-							candidates: [{ content: { parts: [{ text }] } }],
+							choices: [
+								{
+									finish_reason: "stop",
+									index: 0,
+									message: { content: text, role: "assistant" },
+								},
+							],
+							created: 1,
+							id: "chatcmpl-test",
+							model: "gemini-3.1-flash-lite",
 						}),
 						{ status: 200, headers: { "content-type": "application/json" } },
 					),
@@ -558,33 +567,33 @@ describe("generation request boundaries", () => {
 		"google/gemini-3.1-flash-lite",
 		"google-ai-studio/gemini-3.1-flash-lite",
 	])("routes supported model %s to the gateway", async (model) => {
-		const endpoints: string[] = [];
+		const models: unknown[] = [];
 		const response = await generateRequest(
 			{
 				AI: fakeAiGateway(generationText(flowchartIr), (input) => {
-					endpoints.push(input.endpoint);
+					models.push((input.query as { readonly model?: unknown }).model);
 				}),
 				SKETCHI_AI_MODEL: "google/configured-model",
 			},
 			{ prompt: "Show release approval", type: "flowchart", model },
 		);
 		expect(response.status).toBe(200);
-		expect(endpoints).toEqual(["v1beta/models/gemini-3.1-flash-lite:generateContent"]);
+		expect(models).toEqual(["gemini-3.1-flash-lite"]);
 	});
 
 	it("uses the configured model when a request names none", async () => {
-		const endpoints: string[] = [];
+		const models: unknown[] = [];
 		const response = await generateRequest(
 			{
 				AI: fakeAiGateway(generationText(flowchartIr), (input) => {
-					endpoints.push(input.endpoint);
+					models.push((input.query as { readonly model?: unknown }).model);
 				}),
 				SKETCHI_AI_MODEL: "google/configured-model",
 			},
 			{ prompt: "Show release approval", type: "flowchart" },
 		);
 		expect(response.status).toBe(200);
-		expect(endpoints).toEqual(["v1beta/models/configured-model:generateContent"]);
+		expect(models).toEqual(["configured-model"]);
 	});
 
 	it.each(["__tooLarge", "__invalidJson"])(
