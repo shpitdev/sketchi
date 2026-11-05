@@ -37,7 +37,7 @@ describe("generation prompt rules", () => {
 
 	it("gives every stated action a node, on return paths too", () => {
 		expect(system).toContain("Give every action the scenario states its own node");
-		expect(system).toContain("A return path that names an action");
+		expect(system).toContain("A return path that names an action, even waiting");
 	});
 
 	it("keeps a field typed as another class in its box, with a role on its relationship", () => {
