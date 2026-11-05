@@ -222,6 +222,7 @@ describe("Sankey renderer", () => {
 			rendererRole: "sankey-mark",
 			fillColor: scene.backgroundColor,
 			groupIds: ["sankey:node:onsite"],
+			label: "Onsite label background",
 		});
 		expect((paper as { opacity?: number }).opacity).toBeGreaterThanOrEqual(70);
 		// Without the paper, those labels sit on their own bands, which the guard reports.

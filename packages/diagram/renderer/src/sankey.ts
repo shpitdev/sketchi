@@ -141,7 +141,8 @@ export function sankeySceneFromLayout(
 				y: round(node.knockout.top),
 				width: round(node.knockout.right - node.knockout.left),
 				height: round(node.knockout.bottom - node.knockout.top),
-				label: "",
+				// Never drawn. A scene node's label must not be empty, or clients reject the scene.
+				label: `${node.label} label background`,
 				fillColor: diagram.style.backgroundColor,
 				fillStyle: "solid",
 				strokeColor: diagram.style.backgroundColor,
