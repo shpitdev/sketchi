@@ -11,10 +11,11 @@
 		}
 	},
 	"dependencies": {
+		"@effect/ai-openai-compat": "4.1.2",
 		"@sketchi/diagram-core": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/observability": "workspace:*",
-		"effect": "4.1.1",
+		"effect": "4.1.2",
 		"tslib": "^2.9.1"
 	}
 }
