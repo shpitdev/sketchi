@@ -5,6 +5,11 @@ import { buildDiagramGenerationMessages } from "./messages.js";
 const { system } = buildDiagramGenerationMessages({ id: "rules", request: "Draw it" });
 
 describe("generation prompt rules", () => {
+	it("says what a table's columns are and what a footer holds", () => {
+		expect(system).toContain("table (columns: an array of header strings, rows?)");
+		expect(system).toContain("footer (holds whatever the source puts at the bottom)");
+	});
+
 	it("gives every stated action a node, on return paths too", () => {
 		expect(system).toContain("Give every action the scenario states its own node");
 		expect(system).toContain("A return path that names an action");
