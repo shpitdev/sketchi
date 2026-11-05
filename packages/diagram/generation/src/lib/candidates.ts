@@ -232,7 +232,7 @@ function normalizeGeneratedFlowchartInput(input: unknown, diagnostics: string[])
 	const withIcons: Record<string, unknown> = {
 		...styled,
 		nodes: Array.isArray(nodes) ? nodes.map((node) => withKnownShape(node, diagnostics)) : nodes,
-		// Group logos are filled by Code Mode builds only; generation draws none.
+		// A group's logo comes from the catalog at build time, never from the model.
 		...(Array.isArray(groups)
 			? {
 					groups: groups.map((group) => {
