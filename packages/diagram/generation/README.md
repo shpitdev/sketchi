@@ -36,7 +36,7 @@ runtime boundary; the binding authenticates the request and supplies the stored
 Google AI Studio BYOK key, so no provider credential is read or sent.
 `SKETCHI_AI_GENERATION_CLIENT=gateway-chat` selects `CloudflareGatewayChatClientLive`
 instead, which runs the same route on `effect/ai` and Google's OpenAI-compatible
-endpoint. It is off by default. The public
+endpoint. Studio and the eval harness set it in `wrangler.jsonc`. The public
 Sketchi generate API and the eval harness are the only hosts that compose this
 client. There is no client-side/CLI token adapter: the CLI reaches generation
 through one unauthenticated HTTPS call to the public generate API. Pure prompt,
