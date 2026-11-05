@@ -46,10 +46,10 @@ function titleFromId(id: string): string | undefined {
 export function modelTitleOrFallback(
 	title: string | undefined,
 	id: string,
-	nativeKind: DiagramGenerationType,
+	type: DiagramGenerationType,
 ): string {
 	const candidate = title?.replace(/\s+/gu, " ").trim();
 	const decoded = Schema.decodeUnknownResult(GeneratedDiagramTitleSchema)(candidate);
 	if (Result.isSuccess(decoded)) return decoded.success;
-	return titleFromId(id) ?? FALLBACK_TITLES[nativeKind];
+	return titleFromId(id) ?? FALLBACK_TITLES[type];
 }

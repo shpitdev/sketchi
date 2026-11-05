@@ -209,6 +209,25 @@ describe("diagram generation prompt mapping", () => {
 		expect(messages.user).not.toContain("intent");
 	});
 
+	it("shows a type-less example that ends at stated steps and adds no loop", () => {
+		const { user } = buildDiagramGenerationMessages({ id: "example", request: "Draw it" });
+		const example = JSON.parse(user.slice(user.indexOf("{"), user.lastIndexOf("}") + 1)) as {
+			readonly diagram: {
+				readonly edges: readonly { readonly source: string; readonly target: string }[];
+				readonly nodes: readonly { readonly id: string; readonly kind: string }[];
+			};
+		};
+		const { nodes, edges } = example.diagram;
+		const order = nodes.map((node) => node.id);
+		expect(edges.every((edge) => order.indexOf(edge.source) < order.indexOf(edge.target))).toBe(
+			true,
+		);
+		expect(nodes.filter((node) => node.kind === "end").map((node) => node.id)).toEqual([
+			"publish",
+			"cancel",
+		]);
+	});
+
 	it("requires real loop topology and flowchart richness", () => {
 		const messages = buildDiagramGenerationMessages(prompt);
 
@@ -216,6 +235,12 @@ describe("diagram generation prompt mapping", () => {
 			"include a real back-edge to an earlier distinct process or decision",
 		);
 		expect(messages.system).toContain("Never target start and never use a self-loop");
+		expect(messages.system).toContain("Add nothing the scenario does not state");
+		expect(messages.system).toContain("no next step it gives only to other branches");
+		expect(messages.system).toContain(
+			"If the scenario says where the flow ends, every branch leads to that node.",
+		);
+		expect(messages.system).toContain("a branch with no stated next step stops at its last step");
 	});
 
 	it("uses the expanded output budget unless the request overrides it", () => {
