@@ -21,9 +21,8 @@ import {
 	DiagramGenerationClient,
 	DiagramGenerationPolicy,
 } from "./client.js";
+import { CloudflareAiGatewayBinding, type CloudflareAiGateway } from "./cloudflare-ai-gateway.js";
 import {
-	type CloudflareAiGateway,
-	CloudflareAiGatewayBinding,
 	CloudflareGoogleAiStudioClientLive,
 	CloudflareGoogleAiStudioConfig,
 } from "./cloudflare-google-ai-studio.js";

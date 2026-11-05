@@ -155,6 +155,29 @@ describe("binding-dependent host lifecycles", () => {
 		expect(lifecycle.generationClosed - before.generationClosed).toBe(4);
 	});
 
+	it("builds the gateway chat client only when the flag selects it", async () => {
+		const runtime = makePlaygroundRuntime();
+		const calls: { gatewayId: string; endpoint: string }[] = [];
+		const ai = fakeAi(calls);
+		try {
+			await runtime.run(generate(), boundary({ AI: ai, SKETCHI_AI_GATEWAY_ID: "shared" }));
+			await runtime.run(
+				generate(),
+				boundary({
+					AI: ai,
+					SKETCHI_AI_GATEWAY_ID: "shared",
+					SKETCHI_AI_GENERATION_CLIENT: "gateway-chat",
+				}),
+			);
+			expect(calls.map((call) => call.endpoint)).toEqual([
+				"v1beta/models/gemini-3.1-flash-lite:generateContent",
+				"v1beta/openai/chat/completions",
+			]);
+		} finally {
+			await runtime.dispose();
+		}
+	});
+
 	it("reuses Studio services per bucket while keeping request ownership and bucket data separate", async () => {
 		const before = { ...lifecycle };
 		const runtime = makePlaygroundRuntime();

@@ -2,6 +2,8 @@ import "@tanstack/react-start/server-only";
 
 import {
 	CloudflareAiGatewayBinding,
+	CloudflareGatewayChatClientLive,
+	CloudflareGatewayChatConfig,
 	CloudflareGoogleAiStudioClientLive,
 	CloudflareGoogleAiStudioConfig,
 	type CloudflareAiGatewayProvider,
@@ -12,6 +14,7 @@ import {
 	type DiagramGenerationError,
 	type DiagramGenerationType,
 	DiagramGenerationPolicyLive,
+	googleGatewayChatRoute,
 	type SupportedGenerationModel,
 } from "@sketchi/diagram-generation";
 import { Context, Effect, Layer } from "effect";
@@ -56,32 +59,51 @@ export const PlaygroundGenerationLive = Layer.effect(
 		const clientForBindings = Effect.fn("playground.generation.clientForBindings")(function* (
 			ai: CloudflareAiGatewayProvider,
 			gatewayId: string,
+			gatewayChat: boolean,
 		) {
 			let byGateway = clients.get(ai);
 			if (!byGateway) {
 				byGateway = new Map();
 				clients.set(ai, byGateway);
 			}
-			let client = byGateway.get(gatewayId);
+			const clientKey = `${gatewayChat ? "gateway-chat" : "gemini"}:${gatewayId}`;
+			let client = byGateway.get(clientKey);
 			if (!client) {
-				const clientLayer = CloudflareGoogleAiStudioClientLive.pipe(
-					Layer.provide(
-						Layer.mergeAll(
-							Layer.succeed(CloudflareAiGatewayBinding, ai),
-							Layer.succeed(CloudflareGoogleAiStudioConfig, {
-								collectLog: true,
-								gatewayId,
-							}),
-							DiagramGenerationPolicyLive,
-						),
-					),
+				const dependencies = Layer.merge(
+					Layer.succeed(CloudflareAiGatewayBinding, ai),
+					DiagramGenerationPolicyLive,
 				);
+				const clientLayer = gatewayChat
+					? CloudflareGatewayChatClientLive.pipe(
+							Layer.provide(
+								Layer.merge(
+									dependencies,
+									Layer.succeed(CloudflareGatewayChatConfig, {
+										collectLog: true,
+										gatewayId,
+										route: googleGatewayChatRoute,
+										surface: "generate-api",
+									}),
+								),
+							),
+						)
+					: CloudflareGoogleAiStudioClientLive.pipe(
+							Layer.provide(
+								Layer.merge(
+									dependencies,
+									Layer.succeed(CloudflareGoogleAiStudioConfig, {
+										collectLog: true,
+										gatewayId,
+									}),
+								),
+							),
+						);
 				client = yield* Effect.cached(
 					Layer.buildWithScope(clientLayer, scope).pipe(
 						Effect.map((context) => Context.get(context, DiagramGenerationClient)),
 					),
 				);
-				byGateway.set(gatewayId, client);
+				byGateway.set(clientKey, client);
 			}
 			return yield* client;
 		});
@@ -98,7 +120,7 @@ export const PlaygroundGenerationLive = Layer.effect(
 						provider: GENERATION_PROVIDER,
 					});
 				}
-				const client = yield* clientForBindings(env.AI, config.gatewayId);
+				const client = yield* clientForBindings(env.AI, config.gatewayId, config.gatewayChat);
 				const logos = logosNamedIn(input.prompt);
 				return yield* client.generate({
 					...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),

@@ -1,5 +1,7 @@
 import {
 	CloudflareAiGatewayBinding,
+	CloudflareGatewayChatClientLive,
+	CloudflareGatewayChatConfig,
 	CloudflareGoogleAiStudioClientLive,
 	CloudflareGoogleAiStudioConfig,
 	type CloudflareAiGatewayProvider,
@@ -15,6 +17,7 @@ import {
 	DiagramGenerationPolicyLive,
 	errorMessage,
 	generationErrorToCandidate,
+	googleGatewayChatRoute,
 	summarizeGenerationCandidate,
 } from "@sketchi/diagram-generation";
 import { getGenerationScenario, toDiagramGenerationPrompt } from "@sketchi/diagram-scenarios";
@@ -57,6 +60,7 @@ export class GenerateScenarioInputValidationError extends Schema.TaggedError<Gen
 export interface EvalHarnessEnv {
 	AI?: CloudflareAiGatewayProvider;
 	SKETCHI_AI_GATEWAY_ID?: string;
+	SKETCHI_AI_GENERATION_CLIENT?: string;
 	SKETCHI_AI_MODEL?: string;
 }
 
@@ -210,16 +214,37 @@ function generationClientLayer(bindings: EvalHarnessEnv, gatewayId: string) {
 		);
 	}
 
-	const dependencies = Layer.mergeAll(
+	const dependencies = Layer.merge(
 		Layer.succeed(CloudflareAiGatewayBinding, bindings.AI),
-		Layer.succeed(CloudflareGoogleAiStudioConfig, {
-			collectLog: true,
-			gatewayId,
-		}),
 		DiagramGenerationPolicyLive,
 	);
 
-	const clientLayer = CloudflareGoogleAiStudioClientLive.pipe(Layer.provide(dependencies));
+	const clientLayer =
+		envString(bindings, "SKETCHI_AI_GENERATION_CLIENT", "") === "gateway-chat"
+			? CloudflareGatewayChatClientLive.pipe(
+					Layer.provide(
+						Layer.merge(
+							dependencies,
+							Layer.succeed(CloudflareGatewayChatConfig, {
+								collectLog: true,
+								gatewayId,
+								route: googleGatewayChatRoute,
+								surface: "eval-harness",
+							}),
+						),
+					),
+				)
+			: CloudflareGoogleAiStudioClientLive.pipe(
+					Layer.provide(
+						Layer.merge(
+							dependencies,
+							Layer.succeed(CloudflareGoogleAiStudioConfig, {
+								collectLog: true,
+								gatewayId,
+							}),
+						),
+					),
+				);
 
 	return Layer.mergeAll(clientLayer, DiagramGenerationPolicyLive);
 }

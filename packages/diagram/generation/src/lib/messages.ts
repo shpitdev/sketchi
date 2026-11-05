@@ -661,6 +661,9 @@ function logoSection(prompt: DiagramGenerationPrompt): string[] {
 	];
 }
 
+export const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
+export const DEFAULT_TEMPERATURE = 0.1;
+
 export function buildDiagramGenerationMessages(
 	prompt: DiagramGenerationPrompt,
 ): DiagramGenerationMessages {
