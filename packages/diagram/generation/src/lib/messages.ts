@@ -45,6 +45,7 @@ const COMMON_INSTRUCTIONS = [
 	"Return only compact, minified JSON on one line. Do not use markdown.",
 	"Author one concise title of at most 60 characters. Do not copy the whole scenario into the title.",
 	'Return one object: { "title", "diagram" }.',
+	"Copy everything the scenario states, in full and in its order: every item, name, role, detail, number, key and connection. Add nothing it does not state: no step, decision, branch, loop, outcome, group, phase, field, item, connection or value.",
 	`Set diagram.type to the kind the scenario requests: ${listAlternatives(NATIVE_KINDS)}. A swimlane or architecture request is a "flowchart" with lanes or zone groups. Anything else uses the closest kind.`,
 ];
 
@@ -54,7 +55,7 @@ const FLOWCHART_IR_INSTRUCTIONS = [
 	"Use exactly one start node and at least one end node.",
 	"Every non-end node must have at least one outgoing edge; every end node must have zero outgoing edges.",
 	"Give every action the scenario states its own node; never fold one into an edge label, another node, or a check. A return path that names an action passes through a node for it before it rejoins.",
-	"Add nothing the scenario does not state: no extra step, decision, branch, loop or outcome, and no next step it gives only to other branches.",
+	"Add no next step the scenario gives only to other branches.",
 	"If the scenario says where the flow ends, every branch leads to that node. Otherwise a branch with no stated next step stops at its last step: mark that step as the end node, never a new result after it.",
 	"Every decision node must have at least two outgoing edges with non-empty unique labels.",
 	"For each retry, return, or feedback loop, include a real back-edge to an earlier distinct process or decision. Never target start and never use a self-loop.",
@@ -88,7 +89,7 @@ const IR_INSTRUCTIONS = {
 		rules: [
 			'Use diagram type "timeline".',
 			"Return events with unique stable id, label, optional concise description, and either date or order.",
-			"Keep each date at the source's precision: YYYY, YYYY-MM, YYYY-MM-DD, or YYYY-MM-DDTHH:mm[:ss] with Z or the stated ±HH:MM offset. Never invent dates or events.",
+			"Keep each date at the source's precision: YYYY, YYYY-MM, YYYY-MM-DD, or YYYY-MM-DDTHH:mm[:ss] with Z or the stated ±HH:MM offset.",
 			"Use dates for every event, or numeric order for every event when no calendar dates are supplied. Never mix modes or add resources or dependencies.",
 			'Optional: end (inclusive) makes a dated phase; kind "milestone" marks key moments; lane names a track for every event (lanes sets their order); today only when the source states it.',
 			"Equal dates or orders retain input order. Use 1–60 events and at most 6 lanes.",
@@ -100,7 +101,7 @@ const IR_INSTRUCTIONS = {
 			'Use diagram type "chart".',
 			'Set kind to "bar", "line", or "pie". Use a chart only for numeric data; never supply coordinates.',
 			"Return categories (x-axis labels, or pie slice names) and series: [{ name, values }] with exactly one value per category, in category order. Name every series when there are several.",
-			"Copy every number, category, series name, unit, and axis title from the source; never invent or round data.",
+			"Never round data.",
 			'Optional: unit ("$", "$M", "%", "ms"), categoryAxisTitle and valueAxisTitle (bar and line), stacked: true (bar), orientation "horizontal" (bar), donut: true (pie).',
 			"A pie has exactly one series of non-negative values and at most 8 slices. Bars and lines allow negative values, up to 40 categories and 6 series.",
 		],
@@ -124,8 +125,8 @@ const IR_INSTRUCTIONS = {
 		rules: [
 			'Use diagram type "gantt".',
 			"Return tasks with unique id, label, start (YYYY-MM-DD), and end (last day, inclusive) or duration (calendar days counting start). A milestone is milestone: true with start only. Never supply coordinates.",
-			"Copy every task, date, duration, dependency, milestone, phase and percent from the source; invent none. Compute a date only from a stated start plus a stated duration.",
-			"Optional: dependsOn lists the ids of tasks that must finish first; phase names a header for every task (phases sets their order); progress is percent complete; today only when stated.",
+			"Compute a date only from a stated start plus a stated duration.",
+			"Optional: dependsOn lists the ids of tasks that must finish first; phase names a header for every task only when the source itself names phases; otherwise omit it (phases sets their order); progress is percent complete; today only when stated.",
 			"Use 1–60 tasks, at most 12 phases, and no dependency cycles.",
 		],
 	},
@@ -137,7 +138,7 @@ const IR_INSTRUCTIONS = {
 			'Return entities: [{ id, name?, fields }]. Ids hold no dot or space; name defaults to the id. Each field is one string "name type markers": "id uuid PK", "customer_id uuid FK", "email text UK", "note text?" (nullable), "parent_id int? FK", with type optional.',
 			'Return relationships: [{ id, from, to, fromCardinality, toCardinality, label? }]. from and to are "entity.field" when the source states the key columns: "orders.customer_id" to "customers.id"; otherwise the entity id alone.',
 			'Each cardinality is "one", "zero-or-one", "many", "one-or-many" or "zero-or-many": how many rows of that end relate to one row of the other end. The end a nullable foreign key points at is zero-or-one, and a required one is one. The many end is zero-or-many unless the source says at least one.',
-			"Copy every entity, field, type, key, nullable marker and cardinality the source states; invent none. Mark every key column PK, FK or UK as stated.",
+			"Mark every key column PK, FK or UK as stated.",
 		],
 	},
 	class: {
@@ -149,7 +150,7 @@ const IR_INSTRUCTIONS = {
 			'Write each member as UML does: attributes "- radius: double", "+ count: int {static}"; methods "+ area(): double", "+ draw(ctx: Canvas): void {abstract}". Visibility is +, -, # or ~.',
 			'Return relationships: [{ id, kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }]. kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to.',
 			'Multiplicities ("1", "0..1", "*", "1..*"), roles and navigable (an open arrow at to) go on compositions, aggregations and associations only; a composition\'s whole is "1" or "0..1". Interfaces extend only interfaces, and inheritance never cycles.',
-			"Copy every class, member, relationship, multiplicity and role the source states; invent none. A field typed as another class stays in attributes and also draws a relationship whose toRole is the field's name: an association unless the source says composed or aggregated. A cast to or call on another class inside a method body draws a dependency.",
+			"A field typed as another class stays in attributes and also draws a relationship whose toRole is the field's name: an association unless the source says composed or aggregated. A cast to or call on another class inside a method body draws a dependency.",
 		],
 	},
 	"org-chart": {
@@ -161,7 +162,6 @@ const IR_INSTRUCTIONS = {
 			"assistant: true places an assistant beside their manager; an assistant has no reports.",
 			'Return dottedLines: [{ id, report, manager, label? }] for each dotted-line or matrix report the source states: report also answers to manager, outside the solid line. Put the scope or reason the source gives for it ("for clinical systems") in label.',
 			"Set groupByDepartment: true only when the source asks to group departments into regions.",
-			"Copy every person, title, department, reporting line and dotted line the source states; invent none.",
 		],
 	},
 	venn: {
@@ -171,7 +171,7 @@ const IR_INSTRUCTIONS = {
 			"Use it for Venn diagrams: what two or three overlapping sets share; never supply coordinates or sizes.",
 			'Return sets: [{ id, label }] and regions: [{ sets, items?, count?, label? }]. A region\'s sets are the ids it lies in, and it excludes every other set: ["a"] is a only, ["a", "b"] is a and b but not c.',
 			"Give a region items (short phrases) or a count, never both. Omit a region the source leaves empty; label names an overlap only when the source does.",
-			"Copy every set and item the source states, each once and in exactly its region; invent none.",
+			"Put each item once, in exactly its region.",
 		],
 	},
 	journey: {
@@ -180,9 +180,8 @@ const IR_INSTRUCTIONS = {
 			'Use diagram type "journey".',
 			"Use it for user or customer journey maps: stages of steps, each scored for sentiment; never supply coordinates.",
 			"Return stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] in the order the source gives them. score is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral.",
-			'actor is who acts (several who share a step: "Customer, Agent") and touchpoint is the channel (Email, Website, Phone); set the one the source states for each step. persona names whose journey it is; actors lists them when the source names several.',
+			'actor is who acts (several who share a step: "Customer, Agent") and touchpoint is the channel (Email, Website, Phone); set the one the source states for each step. persona is whose journey it is, with any role the source gives; actors lists them when the source names several.',
 			"painPoints and opportunities are short phrases under the stage the source puts them in.",
-			"Copy every stage, step, score, actor, touchpoint, pain point and opportunity the source states; invent none.",
 		],
 	},
 	sankey: {
@@ -191,7 +190,7 @@ const IR_INSTRUCTIONS = {
 			'Use diagram type "sankey".',
 			"Use it for weighted flows between stages: budgets, traffic, funnels, energy or material flows; never supply coordinates.",
 			"Return nodes: [{ id, label }] and links: [{ source, target, value, label? }]: value is the stated amount, greater than 0. Links run one way; no cycles or self-links.",
-			'Optional: unit ("$k", "%", "visits"). Copy every stated node, flow and value; invent no balancing node such as Other.',
+			'Optional: unit ("$k", "%", "visits"). Add no balancing node such as Other.',
 		],
 	},
 	wireframe: {
@@ -203,7 +202,6 @@ const IR_INSTRUCTIONS = {
 			"Containers hold children: header (top), footer (holds whatever the source puts at the bottom), sidebar (side: left or right), main, section and card (title?), grid (columns: n), modal, row and column.",
 			"Widgets: heading (text, level 1-3), text (text, or lines for placeholder copy), badge (text), link (text; target: the id of the screen it opens), button (text; variant primary or secondary; target), input, textarea, select and search (label?, placeholder or value), checkbox, radio and toggle (label, checked), tabs and nav (items, active), breadcrumbs and list (items), avatar, icon, image and chart (label?), table (columns: an array of header strings, rows?), divider.",
 			"State: variant primary on the screen's main button, checked: true on what is on or selected, active on the selected tab or nav item, value on a field showing one.",
-			"Copy every screen, component, text and state the source states, in order; invent no controls or copy.",
 		],
 	},
 	quadrant: {
@@ -214,7 +212,7 @@ const IR_INSTRUCTIONS = {
 			"Return xAxis and yAxis: { title, low, high }, where low and high label the axis ends (left or bottom, then right or top) as the source words them.",
 			"Return quadrants: { topLeft, topRight, bottomLeft, bottomRight }, each name in the corner its two conditions describe through those end labels.",
 			"Return points: [{ label, x, y, group? }] with x and y from 0 (low end) to 1 (high end): a score out of 100 is score / 100, and 0.5 sits on a middle line. Place an item given only its quadrant well inside it (0.25 or 0.75).",
-			"group colors points the source sets apart and adds a legend. Copy every item, axis label and quadrant name the source states; invent none. At most 30 points.",
+			"group colors points the source sets apart and adds a legend. At most 30 points.",
 		],
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
