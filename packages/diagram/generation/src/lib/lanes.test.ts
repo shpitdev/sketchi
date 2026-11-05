@@ -9,7 +9,6 @@ function candidate(diagram: unknown) {
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Hiring process",
-			intent: { requestedKind: "flowchart", nativeKind: "flowchart", requirements: [] },
 			diagram,
 		}),
 	});

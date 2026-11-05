@@ -1,7 +1,7 @@
 import { DIAGRAM_TYPES, type DiagramTypeValue } from "@sketchi/diagram-core";
 import { Schema } from "effect";
 
-import { DiagramGenerationTypeSchema, UnsupportedDiagramIntentKindSchema } from "./intent.js";
+import { DiagramGenerationTypeSchema } from "./intent.js";
 
 /** `a, b, or c` for a list of alternatives. */
 export function listAlternatives(values: readonly string[]): string {
@@ -11,7 +11,6 @@ export function listAlternatives(values: readonly string[]): string {
 }
 
 const NATIVE_KINDS = DIAGRAM_TYPES.map((type) => `"${type}"`);
-const UNSUPPORTED_KINDS: readonly string[] = UnsupportedDiagramIntentKindSchema.literals;
 
 /** A catalog logo the prompt names; the only slugs a node icon may use. */
 export class DiagramGenerationLogo extends Schema.Class<DiagramGenerationLogo>(
@@ -45,14 +44,8 @@ export class DiagramGenerationMessages extends Schema.Class<DiagramGenerationMes
 const COMMON_INSTRUCTIONS = [
 	"Return only compact, minified JSON on one line. Do not use markdown.",
 	"Author one concise title of at most 60 characters. Do not copy the whole scenario into the title.",
-	`Set intent.requestedKind to the diagram kind the scenario actually requests: ${listAlternatives([...NATIVE_KINDS, ...UNSUPPORTED_KINDS.map((kind) => `"${kind}"`)])}.`,
-	`Sketchi supports only nativeKind ${listAlternatives(NATIVE_KINDS)}. If the requested kind is ${listAlternatives(UNSUPPORTED_KINDS)}, set nativeKind to null, omit diagram, and never coerce it into a supported kind.`,
-	"When nativeKind is null, return an empty requirements array because there is no native artifact to validate.",
-	"List every measurable scenario requirement once in intent.requirements. Convert counts and minimums into count requirements, hierarchy depth into topic_levels, and required names or branch/message text into label requirements.",
-	'Count requirement target must be exactly one of "nodes", "decision_nodes", "terminal_nodes", "topics", "participants", "messages", "events", "categories", "series", "states", "transitions", "tasks", "entities", "classes", "people", "sets", "items", "points", "relationships", "links", "screens", or "cycles". Use "cycles" for loops and retry cycles; never invent another target name.',
-	'Depth requirement target must be exactly "topic_levels". Label requirement target must be exactly one of "node", "branch", "topic", "participant", "message", "event", "category", "series", "state", "transition", "task", "phase", "entity", "field", "class", "member", "person", "set", "item", "screen", or "component".',
-	'Use comparator "minimum" for phrases such as "at least" and "exact" for exact counts. Do not invent measurable requirements that the scenario did not request.',
-	"The diagram must satisfy every requirement in the plan. Sketchi deterministically checks the plan against the artifact.",
+	'Return one object: { "title", "diagram" }.',
+	`Set diagram.type to the kind the scenario requests: ${listAlternatives(NATIVE_KINDS)}. A swimlane or architecture request is a "flowchart" with lanes or zone groups. Anything else uses the closest kind.`,
 ];
 
 const FLOWCHART_IR_INSTRUCTIONS = [
@@ -235,10 +228,6 @@ const FAMILY_EXAMPLES = {
 				{ id: "ship", label: "Ship", date: "2026-10-01" },
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "events", comparator: "exact", value: 2 },
-			{ kind: "label", target: "event", value: "Beta" },
-		],
 	},
 	chart: {
 		diagram: {
@@ -249,10 +238,6 @@ const FAMILY_EXAMPLES = {
 			series: [{ name: "Revenue", values: [42, 51] }],
 			unit: "$M",
 		},
-		requirements: [
-			{ kind: "count", target: "categories", comparator: "exact", value: 2 },
-			{ kind: "label", target: "category", value: "Q1" },
-		],
 	},
 	flowchart: {
 		diagram: {
@@ -272,10 +257,6 @@ const FAMILY_EXAMPLES = {
 			],
 			layout: { direction: "TB", edgeRouting: "orthogonal" },
 		},
-		requirements: [
-			{ kind: "count", target: "nodes", comparator: "minimum", value: 8 },
-			{ kind: "label", target: "branch", value: "retry" },
-		],
 	},
 	mindmap: {
 		diagram: {
@@ -287,10 +268,6 @@ const FAMILY_EXAMPLES = {
 			},
 			layout: { direction: "LR", edgeRouting: "curved" },
 		},
-		requirements: [
-			{ kind: "count", target: "topics", comparator: "minimum", value: 8 },
-			{ kind: "label", target: "topic", value: "Operations" },
-		],
 	},
 	sequence: {
 		diagram: {
@@ -310,10 +287,6 @@ const FAMILY_EXAMPLES = {
 				},
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "messages", comparator: "minimum", value: 4 },
-			{ kind: "label", target: "participant", value: "Service" },
-		],
 	},
 	"state-machine": {
 		diagram: {
@@ -338,10 +311,6 @@ const FAMILY_EXAMPLES = {
 				{ id: "close", source: "paid", target: "done" },
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "states", comparator: "minimum", value: 3 },
-			{ kind: "label", target: "transition", value: "pay" },
-		],
 	},
 	gantt: {
 		diagram: {
@@ -367,10 +336,6 @@ const FAMILY_EXAMPLES = {
 				},
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "tasks", comparator: "exact", value: 3 },
-			{ kind: "label", target: "task", value: "Design" },
-		],
 	},
 	er: {
 		diagram: {
@@ -391,10 +356,6 @@ const FAMILY_EXAMPLES = {
 				},
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "entities", comparator: "exact", value: 2 },
-			{ kind: "label", target: "entity", value: "orders" },
-		],
 	},
 	class: {
 		diagram: {
@@ -418,10 +379,6 @@ const FAMILY_EXAMPLES = {
 				},
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "classes", comparator: "exact", value: 3 },
-			{ kind: "label", target: "class", value: "Circle" },
-		],
 	},
 	"org-chart": {
 		diagram: {
@@ -442,10 +399,6 @@ const FAMILY_EXAMPLES = {
 			],
 			dottedLines: [{ id: "ux-cto", report: "ux", manager: "cto", label: "design system" }],
 		},
-		requirements: [
-			{ kind: "count", target: "people", comparator: "exact", value: 5 },
-			{ kind: "label", target: "person", value: "Alan Turing" },
-		],
 	},
 	venn: {
 		diagram: {
@@ -461,10 +414,6 @@ const FAMILY_EXAMPLES = {
 				{ sets: ["ios", "android"], items: ["Push notifications", "Dark mode"] },
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "items", comparator: "exact", value: 4 },
-			{ kind: "label", target: "item", value: "Apple Pay" },
-		],
 	},
 	journey: {
 		diagram: {
@@ -487,10 +436,6 @@ const FAMILY_EXAMPLES = {
 				},
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "tasks", comparator: "exact", value: 3 },
-			{ kind: "label", target: "phase", value: "Buy" },
-		],
 	},
 	sankey: {
 		diagram: {
@@ -507,10 +452,6 @@ const FAMILY_EXAMPLES = {
 				{ source: "eng", target: "storage", value: 45 },
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "links", comparator: "exact", value: 2 },
-			{ kind: "label", target: "node", value: "Compute" },
-		],
 	},
 	wireframe: {
 		diagram: {
@@ -531,10 +472,6 @@ const FAMILY_EXAMPLES = {
 				},
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "screens", comparator: "exact", value: 1 },
-			{ kind: "label", target: "component", value: "Sign in" },
-		],
 	},
 	quadrant: {
 		diagram: {
@@ -553,31 +490,14 @@ const FAMILY_EXAMPLES = {
 				{ label: "Billing rewrite", x: 0.9, y: 0.3 },
 			],
 		},
-		requirements: [
-			{ kind: "count", target: "points", comparator: "exact", value: 2 },
-			{ kind: "label", target: "point", value: "Dark mode" },
-		],
 	},
-} as const satisfies Record<DiagramTypeValue, { diagram: object; requirements: readonly object[] }>;
+} as const satisfies Record<DiagramTypeValue, { diagram: object }>;
 
 function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 	const selectedType = prompt.requestedType;
 	if (!selectedType) {
 		const supportedExample = {
 			title: "Release approval",
-			intent: {
-				requestedKind: "flowchart",
-				nativeKind: "flowchart",
-				requirements: [
-					{
-						kind: "count",
-						target: "nodes",
-						comparator: "minimum",
-						value: 4,
-					},
-					{ kind: "label", target: "branch", value: "revise" },
-				],
-			},
 			diagram: {
 				id: "release-approval",
 				type: "flowchart",
@@ -606,27 +526,11 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 				layout: { direction: "TB", edgeRouting: "orthogonal" },
 			},
 		};
-		const unsupportedExample = {
-			title: "Order service architecture",
-			intent: {
-				requestedKind: "architecture",
-				nativeKind: null,
-				requirements: [],
-			},
-		};
-		return [
-			`Supported response example: ${JSON.stringify(supportedExample)}`,
-			`Unsupported response example: ${JSON.stringify(unsupportedExample)}`,
-		].join("\n");
+		return `Response example: ${JSON.stringify(supportedExample)}`;
 	}
-	const { diagram, requirements } = FAMILY_EXAMPLES[selectedType];
+	const { diagram } = FAMILY_EXAMPLES[selectedType];
 	return JSON.stringify({
 		title: "Concise model-authored title",
-		intent: {
-			requestedKind: selectedType,
-			nativeKind: selectedType,
-			requirements,
-		},
 		diagram,
 	});
 }
@@ -680,8 +584,8 @@ export function buildDiagramGenerationMessages(
 		]),
 	].join("\n");
 	const typeAuthority = explicitType
-		? `The caller explicitly requires ${explicitType}. Set both intent.requestedKind and intent.nativeKind to ${explicitType}, and return that diagram type.`
-		: "The caller omitted type. Select the scenario's requested kind; generate it only when it is natively supported.";
+		? `The caller explicitly requires ${explicitType}. Set diagram.type to ${explicitType}.`
+		: "The caller omitted type. Select the scenario's requested kind.";
 	const user = [
 		"Scenario:",
 		prompt.request,
@@ -689,7 +593,7 @@ export function buildDiagramGenerationMessages(
 		"Type authority:",
 		typeAuthority,
 		"",
-		"Expected JSON shape (adapt the intent plan and diagram to the scenario):",
+		"Expected JSON shape (adapt the diagram to the scenario):",
 		expectedJsonShape(prompt),
 		...logoSection(prompt),
 	].join("\n");

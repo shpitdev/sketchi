@@ -17,8 +17,7 @@ describe("live generator offline lifecycle", () => {
 			vi.stubEnv("SKETCHI_SCENARIO_ID", "offline");
 			vi.stubEnv("SKETCHI_PLAYGROUND_URL", "https://offline.invalid");
 			vi.stubEnv("SKETCHI_LIVE_RESULT_DIR", "");
-			const envelope =
-				'{"title":"Offline","intent":{"requestedKind":"flowchart","nativeKind":"flowchart","requirements":[]},"diagram":{"type":"flowchart"}}';
+			const envelope = '{"title":"Offline","diagram":{"type":"flowchart"}}';
 			vi.stubGlobal("fetch", () =>
 				Promise.resolve(
 					Response.json({

@@ -1,25 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { sankeyFixture } from "@sketchi/diagram-core";
 
-import { candidateFromText, enforceCandidateRequestRequirements } from "./candidates.js";
+import { candidateFromText } from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
 
-const request = {
-	model: "fixture",
-	prompt: {
-		id: "budget",
-		request: "our cloud budget as a Sankey diagram",
-		requestedType: "sankey" as const,
-	},
-};
-
-function candidate(diagram: unknown, requirements: readonly unknown[] = []) {
+function candidate(diagram: unknown) {
 	return candidateFromText({
 		model: "fixture",
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Cloud budget",
-			intent: { requestedKind: "sankey", nativeKind: "sankey", requirements },
 			diagram,
 		}),
 	});
@@ -62,26 +52,5 @@ describe("Sankey generation", () => {
 		expect(parsed.diagram).toBeUndefined();
 		expect(parsed.diagnostics.join(" ")).toContain("sankey.sankey_cycle");
 		expect(parsed.diagnostics.join(" ")).toContain("Hint:");
-	});
-
-	it("checks node and link counts and node labels", () => {
-		const met = enforceCandidateRequestRequirements(
-			candidate(sankeyFixture, [
-				{ kind: "count", target: "links", comparator: "exact", value: 9 },
-				{ kind: "count", target: "nodes", comparator: "exact", value: 7 },
-				{ kind: "label", target: "node", value: "Compute" },
-			]),
-			request,
-		);
-		expect(met.error).toBeUndefined();
-		const unmet = enforceCandidateRequestRequirements(
-			candidate(sankeyFixture, [
-				{ kind: "count", target: "links", comparator: "exact", value: 10 },
-				{ kind: "label", target: "node", value: "GPU clusters" },
-			]),
-			request,
-		);
-		expect(unmet.diagnostics.join(" ")).toContain("requirement_count_not_met");
-		expect(unmet.diagnostics.join(" ")).toContain('"GPU clusters"');
 	});
 });

@@ -26,8 +26,7 @@ describe("scenario prompts", () => {
 		expect(prompt.user).not.toContain("Flowchart IR rules:");
 		expect(prompt.user).not.toContain("Every node must have id, label, and kind");
 		expect(prompt.user).toContain("caller explicitly requires flowchart");
-		expect(prompt.system).toContain("List every measurable scenario requirement");
-		expect(prompt.user).toContain('"requestedKind":"flowchart"');
+		expect(prompt.user).toContain('"type":"flowchart"');
 	});
 
 	it("keeps a flattened prompt for stdin-based generator commands", () => {

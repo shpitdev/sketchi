@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { candidateFromText } from "./candidates.js";
+import {
+	candidateFromText,
+	enforceCandidateRequestRequirements,
+	WRONG_DIAGRAM_TYPE_ERROR,
+} from "./candidates.js";
 
-function parse(diagram: unknown, kind: string) {
+function parse(diagram: unknown) {
 	return candidateFromText({
 		model: "test",
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Title",
-			intent: { requestedKind: kind, nativeKind: kind, requirements: [] },
 			diagram,
 		}),
 	});
@@ -16,7 +19,7 @@ function parse(diagram: unknown, kind: string) {
 
 describe("mindmap trees", () => {
 	const tree = (root: unknown, extra: object = {}) =>
-		parse({ id: "plan", type: "mindmap", root, ...extra }, "mindmap");
+		parse({ id: "plan", type: "mindmap", root, ...extra });
 
 	it("reads a tree with no layout and leaves with no children", () => {
 		const candidate = tree({
@@ -53,24 +56,69 @@ describe("mindmap trees", () => {
 
 describe("flowchart node shapes", () => {
 	it("draws an unknown shape by its kind and keeps a real one", () => {
-		const candidate = parse(
-			{
-				type: "flowchart",
-				id: "flow",
-				nodes: [
-					{ id: "a", label: "Start", kind: "start", shape: "ellipse" },
-					{ id: "b", label: "Orders", kind: "process", shape: "database" },
-					{ id: "c", label: "End", kind: "end" },
-				],
-				edges: [
-					{ id: "a-b", source: "a", target: "b" },
-					{ id: "b-c", source: "b", target: "c" },
-				],
-			},
-			"flowchart",
-		);
+		const candidate = parse({
+			type: "flowchart",
+			id: "flow",
+			nodes: [
+				{ id: "a", label: "Start", kind: "start", shape: "ellipse" },
+				{ id: "b", label: "Orders", kind: "process", shape: "database" },
+				{ id: "c", label: "End", kind: "end" },
+			],
+			edges: [
+				{ id: "a-b", source: "a", target: "b" },
+				{ id: "b-c", source: "b", target: "c" },
+			],
+		});
 		expect(candidate.error).toBeUndefined();
 		expect(candidate.diagram).toMatchObject({ nodes: [{ id: "a" }, { shape: "database" }, {}] });
 		expect(candidate.diagnostics.join()).toContain("shape_dropped");
+	});
+});
+
+describe("the response envelope", () => {
+	const flowchart = {
+		type: "flowchart",
+		id: "flow",
+		nodes: [
+			{ id: "a", label: "Start", kind: "start" },
+			{ id: "b", label: "End", kind: "end" },
+		],
+		edges: [{ id: "a-b", source: "a", target: "b" }],
+	};
+
+	it("takes the family from diagram.type", () => {
+		expect(parse(flowchart).diagram?.type).toBe("flowchart");
+	});
+
+	it("ignores a plan an older prompt asked for", () => {
+		const candidate = candidateFromText({
+			model: "test",
+			provider: "fixture",
+			text: JSON.stringify({ intent: { requirements: [{ target: "nope" }] }, diagram: flowchart }),
+		});
+		expect(candidate.error).toBeUndefined();
+	});
+
+	it.each([
+		["no diagram", undefined, "diagram_missing"],
+		["a family Sketchi does not have", { ...flowchart, type: "gitgraph" }, "diagram_type_invalid"],
+		["no type", { id: "x" }, "diagram_type_invalid"],
+	])("rejects %s", (_name, diagram, code) => {
+		const candidate = parse(diagram);
+		expect(candidate.error).toBeDefined();
+		expect(candidate.diagnostics.join()).toContain(code);
+	});
+
+	it("holds a typed request to its type, and leaves it alone otherwise", () => {
+		const parsed = parse(flowchart);
+		const typed = (requestedType: "flowchart" | "sequence") =>
+			enforceCandidateRequestRequirements(parsed, {
+				model: "test",
+				prompt: { id: "x", request: "Draw it", requestedType },
+			});
+		expect(typed("flowchart").diagram?.type).toBe("flowchart");
+		expect(typed("sequence").diagram).toBeUndefined();
+		expect(typed("sequence").error).toBe(WRONG_DIAGRAM_TYPE_ERROR);
+		expect(typed("sequence").diagnostics.join()).toContain("explicit_type_not_met");
 	});
 });

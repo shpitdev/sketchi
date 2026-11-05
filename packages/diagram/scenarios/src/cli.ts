@@ -169,7 +169,7 @@ interface ScenarioRunEvaluation {
 	readonly error?: string;
 }
 
-const isResponseEnvelope = Schema.is(Schema.Struct({ intent: Schema.Unknown }));
+const isResponseEnvelope = Schema.is(Schema.Struct({ diagram: Schema.Unknown }));
 
 const evaluateCandidate = Effect.fn("diagramScenarios.evaluateCandidate")(function (
 	scenario: DiagramScenario,
@@ -204,31 +204,13 @@ const evaluateCandidate = Effect.fn("diagramScenarios.evaluateCandidate")(functi
 						[candidate.error ?? "No generated diagram.", ...candidate.diagnostics].join(" "),
 					);
 				}
-				// Score the model's own diagram even when enforcement rejects it, so a
-				// broken intent plan does not hide the structural signal; the
-				// enforcement verdict is its own check.
-				const evaluation = evaluateScenarioDiagram(
-					scenario,
-					candidate.diagram ?? modelDiagram,
-					modelDiagram,
-				);
-				const enforcementDiagnostics = candidate.diagnostics.filter(
-					(diagnostic) => !generated.diagnostics.includes(diagnostic),
-				);
-				const intentCheck = {
-					id: "intent-contract",
-					passed: !candidate.error,
-					message: candidate.error
-						? [candidate.error, ...enforcementDiagnostics].join(" ")
-						: "The diagram satisfies its typed intent plan.",
-				};
 				return {
 					candidateOutput,
-					evaluation: {
-						...evaluation,
-						checks: [...evaluation.checks, intentCheck],
-						ok: evaluation.ok && intentCheck.passed,
-					},
+					evaluation: evaluateScenarioDiagram(
+						scenario,
+						candidate.diagram ?? modelDiagram,
+						modelDiagram,
+					),
 				};
 			}
 			return {

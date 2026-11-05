@@ -6,7 +6,7 @@ Model-facing generation helpers for Sketchi diagram candidates.
 flowchart LR
   Prompt["generation prompt contract"] --> Messages["prompt messages"]
   Messages --> Chat["effect/ai chat request"]
-  Chat --> Intent["typed intent + requirement plan + IR"]
+  Chat --> Intent["typed IR"]
   Intent --> Candidate["validated candidate + diagnostics"]
   Candidate --> Core["diagram-core parse"]
 ```

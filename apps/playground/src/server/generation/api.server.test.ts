@@ -74,14 +74,10 @@ const sequenceIr = {
 	],
 };
 
-function generationText(
-	diagram: Readonly<Record<string, unknown>>,
-	requirements: ReadonlyArray<Record<string, unknown>> = [],
-): string {
+function generationText(diagram: Readonly<Record<string, unknown>>): string {
 	const { title, type, ...diagramWithoutTitle } = diagram;
 	return JSON.stringify({
 		title,
-		intent: { requestedKind: type, nativeKind: type, requirements },
 		diagram: { ...diagramWithoutTitle, type },
 	});
 }
@@ -359,33 +355,8 @@ describe("public generate endpoint", () => {
 		expect(body.diagram.document.type).toBe("sequence");
 	});
 
-	it.each(["architecture", "swimlane"])(
-		"fails clearly when model-selected %s generation is unsupported",
-		async (requestedKind) => {
-			const env: StudioEnv = {
-				AI: fakeAiGateway(
-					JSON.stringify({
-						title: "Unsupported diagram",
-						intent: { requestedKind, nativeKind: null, requirements: [] },
-					}),
-				),
-			};
-			const response = await generateRequest(env, {
-				prompt: `Create an ${requestedKind} diagram`,
-			});
-
-			expect(response.status).toBe(422);
-			const body = (await response.json()) as {
-				status: string;
-				issues: ReadonlyArray<{ message: string }>;
-			};
-			expect(body.status).toBe("unsupported_diagram_type");
-			expect(body.issues[0]?.message).toContain(requestedKind);
-		},
-	);
-
-	it.each(["architecture", "swimlane"])(
-		"rejects explicit unsupported type %s before provider dispatch",
+	it.each(["architecture", "swimlane", "gitgraph"])(
+		"rejects type %s as invalid input before provider dispatch",
 		async (type) => {
 			let dispatched = false;
 			const env: StudioEnv = {
@@ -393,17 +364,28 @@ describe("public generate endpoint", () => {
 					dispatched = true;
 				}),
 			};
-			const response = await generateRequest(env, {
-				prompt: `Create an ${type} diagram`,
-				type,
-			});
+			const response = await generateRequest(env, { prompt: "Draw it", type });
 
-			expect(response.status).toBe(422);
+			expect(response.status).toBe(400);
 			const body = (await response.json()) as { status: string };
-			expect(body.status).toBe("unsupported_diagram_type");
+			expect(body.status).toBe("invalid_input");
 			expect(dispatched).toBe(false);
 		},
 	);
+
+	it("rejects a diagram of another type than the request names", async () => {
+		const response = await generateRequest(
+			{ AI: fakeAiGateway(generationText(flowchartIr)) },
+			{ prompt: "Draw it", type: "sequence" },
+		);
+		expect(response.status).toBe(422);
+		const body = (await response.json()) as {
+			status: string;
+			issues: ReadonlyArray<{ code: string }>;
+		};
+		expect(body.status).toBe("quality_failed");
+		expect(body.issues[0]?.code).toBe("explicit_type_not_met");
+	});
 
 	it("grounds generated node logos in the technologies the prompt names", async () => {
 		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];

@@ -25,9 +25,17 @@ import { buildDiagramGenerationMessages } from "./messages.js";
 type RunArgs = Parameters<CloudflareAiGateway["run"]>;
 type RunFn = (...args: RunArgs) => Promise<Response>;
 
-const unsupported = JSON.stringify({
-	title: "Unsupported",
-	intent: { requestedKind: "architecture", nativeKind: null, requirements: [] },
+const answer = JSON.stringify({
+	title: "Flow",
+	diagram: {
+		type: "flowchart",
+		id: "flow",
+		nodes: [
+			{ id: "a", label: "Start", kind: "start" },
+			{ id: "b", label: "End", kind: "end" },
+		],
+		edges: [{ id: "a-b", source: "a", target: "b" }],
+	},
 });
 
 function completion(
@@ -98,7 +106,7 @@ function generate(layer: ReturnType<typeof clientLayer>, input: GenerationInput 
 	);
 }
 
-function capture(response: () => Response = () => completion(unsupported)) {
+function capture(response: () => Response = () => completion(answer)) {
 	const calls: RunArgs[] = [];
 	const run: RunFn = async (...args) => {
 		calls.push(args);
@@ -148,7 +156,7 @@ describe("gateway chat request", () => {
 			provider: "cloudflare-google-ai-studio",
 			usage: { inputTokens: 11, outputTokens: 7, totalTokens: 18 },
 		});
-		expect(candidate.intent?.nativeKind).toBeNull();
+		expect(candidate.diagram?.type).toBe("flowchart");
 	});
 
 	it("defaults max tokens and temperature, and sends no cache headers", async () => {
@@ -189,7 +197,7 @@ describe("gateway chat responses", () => {
 			async (...args) => {
 				calls.push(args);
 				call += 1;
-				return call === 1 ? completion('{"title":', "length") : completion(unsupported);
+				return call === 1 ? completion('{"title":', "length") : completion(answer);
 			},
 			{ maxRepairAttempts: 1 },
 		);
@@ -209,7 +217,7 @@ describe("gateway chat responses", () => {
 	});
 
 	it("omits usage when the upstream sends none", async () => {
-		const { run } = capture(() => completion(unsupported, "stop", null));
+		const { run } = capture(() => completion(answer, "stop", null));
 		const candidate = await Effect.runPromise(generate(clientLayer(run)));
 		expect(candidate.usage).toBeUndefined();
 	});
@@ -312,10 +320,10 @@ describe("gateway chat routes", () => {
 	it("retries Anthropic's overload status, then succeeds", async () => {
 		const responses = [
 			Response.json({ error: { message: "Overloaded" } }, { status: 529 }),
-			completion(unsupported),
+			completion(answer),
 		];
 		let index = 0;
-		const { calls, run } = capture(() => responses[index++] ?? completion(unsupported));
+		const { calls, run } = capture(() => responses[index++] ?? completion(answer));
 		const candidate = await Effect.runPromise(
 			generate(anthropicLayer(run, { maxRetries: 2 }), haiku),
 		);
@@ -324,7 +332,7 @@ describe("gateway chat routes", () => {
 	});
 
 	it("names Claude when its output is truncated", async () => {
-		const { run } = capture(() => completion(unsupported, "length"));
+		const { run } = capture(() => completion(answer, "length"));
 		const candidate = await Effect.runPromise(generate(anthropicLayer(run), haiku));
 		expect(candidate.error).toBe("Claude output was truncated.");
 	});
@@ -446,10 +454,10 @@ describe("gateway chat errors", () => {
 			let call = 0;
 			const chat = capture(() => {
 				call += 1;
-				return call === 1 ? brokenBody() : completion(unsupported);
+				return call === 1 ? brokenBody() : completion(answer);
 			});
 			const candidate = await Effect.runPromise(generate(clientLayer(chat.run, { maxRetries: 1 })));
-			expect(candidate.intent?.nativeKind).toBeNull();
+			expect(candidate.diagram?.type).toBe("flowchart");
 			expect(chat.calls).toHaveLength(2);
 		});
 
@@ -578,7 +586,7 @@ describe("gateway chat telemetry", () => {
 			call += 1;
 			if (call === 1)
 				return Response.json({ error: { message: "busy" } }, { status: 503, headers });
-			return call === 2 ? ok('{"title":', true) : ok(unsupported, false);
+			return call === 2 ? ok('{"title":', true) : ok(answer, false);
 		};
 	}
 

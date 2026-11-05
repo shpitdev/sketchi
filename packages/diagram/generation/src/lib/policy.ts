@@ -5,7 +5,6 @@ import {
 	type DiagramGenerationCandidate,
 	type DiagramGenerationProviderId,
 	type DiagramGenerationRequest,
-	decodedIntentFromText,
 	enforceCandidateRequestRequirements,
 } from "./candidates.js";
 import type { DiagramGenerationPolicyConfig } from "./client.js";
@@ -48,10 +47,7 @@ const generationDuration = Metric.histogram("sketchi_generation_duration_ms", {
 });
 
 function isAcceptedCandidate(candidate: DiagramGenerationCandidate): boolean {
-	return (
-		Boolean(candidate.diagram) ||
-		(!candidate.diagram && candidate.intent?.nativeKind === null && !candidate.error)
-	);
+	return Boolean(candidate.diagram);
 }
 
 export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWithPolicy")(
@@ -133,9 +129,6 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 				yield* executeModelCall(request),
 				request,
 			);
-			const originalRequirements =
-				originalCandidate.intent?.requirements ??
-				decodedIntentFromText(originalCandidate.text)?.requirements;
 			let latestCandidate = originalCandidate;
 			let candidate = originalCandidate;
 			let diagnostics = [...originalCandidate.diagnostics];
@@ -182,11 +175,7 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 					candidate = { ...originalCandidate, diagnostics };
 					break;
 				}
-				const repaired = enforceCandidateRequestRequirements(
-					repairResult.success,
-					request,
-					originalRequirements,
-				);
+				const repaired = enforceCandidateRequestRequirements(repairResult.success, request);
 				const repairedAccepted = isAcceptedCandidate(repaired);
 				const outcome = repairedAccepted ? "succeeded" : "failed";
 				yield* recordMetric(generationRepairs, 1, {
@@ -303,7 +292,6 @@ function buildRepairRequest(
 		"Original hard requirements (all remain mandatory):",
 		`- Diagram type authority: ${request.prompt.requestedType ?? "model-selected from the original scenario"}.`,
 		`- Original scenario: ${request.prompt.request}`,
-		"- Preserve the typed intent plan and make the corrected artifact satisfy every plan entry.",
 		"- Preserve the model-authored concise title unless a validator diagnostic requires changing it.",
 		"",
 	];

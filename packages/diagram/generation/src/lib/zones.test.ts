@@ -9,7 +9,6 @@ function candidate(diagram: unknown) {
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Hybrid on-prem and cloud",
-			intent: { requestedKind: "flowchart", nativeKind: "flowchart", requirements: [] },
 			diagram,
 		}),
 	});

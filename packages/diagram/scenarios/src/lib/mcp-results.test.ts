@@ -283,7 +283,7 @@ describe("MCP scenario adapter", () => {
 		expect(candidateFromMcpResult(scenario.expectedDiagram, "sequence")).toBeUndefined();
 		expect(
 			candidateFromMcpResult(
-				{ title: scenario.title, intent: {}, diagram: scenario.expectedDiagram },
+				{ title: scenario.title, diagram: scenario.expectedDiagram },
 				"sequence",
 			),
 		).toBeUndefined();

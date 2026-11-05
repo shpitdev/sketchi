@@ -1,25 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { journeyFixture } from "@sketchi/diagram-core";
 
-import { candidateFromText, enforceCandidateRequestRequirements } from "./candidates.js";
+import { candidateFromText } from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
 
-const request = {
-	model: "fixture",
-	prompt: {
-		id: "buy",
-		request: "Priya's shoe purchase journey",
-		requestedType: "journey" as const,
-	},
-};
-
-function candidate(diagram: unknown, requirements: readonly unknown[] = []) {
+function candidate(diagram: unknown) {
 	return candidateFromText({
 		model: "fixture",
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Online purchase",
-			intent: { requestedKind: "journey", nativeKind: "journey", requirements },
 			diagram,
 		}),
 	});
@@ -69,26 +59,5 @@ describe("journey map generation", () => {
 		expect(parsed.diagram).toBeUndefined();
 		expect(parsed.diagnostics.join(" ")).toContain("journey.invalid_journey_score");
 		expect(parsed.diagnostics.join(" ")).toContain("Hint:");
-	});
-
-	it("checks step counts, step labels and stage names", () => {
-		const met = enforceCandidateRequestRequirements(
-			candidate(journeyFixture, [
-				{ kind: "count", target: "tasks", comparator: "exact", value: 7 },
-				{ kind: "label", target: "task", value: "Pays by card" },
-				{ kind: "label", target: "phase", value: "Delivery" },
-			]),
-			request,
-		);
-		expect(met.error).toBeUndefined();
-		const unmet = enforceCandidateRequestRequirements(
-			candidate(journeyFixture, [
-				{ kind: "count", target: "tasks", comparator: "exact", value: 8 },
-				{ kind: "label", target: "phase", value: "Returns" },
-			]),
-			request,
-		);
-		expect(unmet.diagnostics.join(" ")).toContain("requirement_count_not_met");
-		expect(unmet.diagnostics.join(" ")).toContain('"Returns"');
 	});
 });

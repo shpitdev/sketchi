@@ -1,20 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { erFixture } from "@sketchi/diagram-core";
 
-import { candidateFromText, enforceCandidateRequestRequirements } from "./candidates.js";
+import { candidateFromText } from "./candidates.js";
 
-const request = {
-	model: "fixture",
-	prompt: { id: "shop", request: "shop schema", requestedType: "er" as const },
-};
-
-function candidate(diagram: unknown, requirements: readonly unknown[] = []) {
+function candidate(diagram: unknown) {
 	return candidateFromText({
 		model: "fixture",
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Shop",
-			intent: { requestedKind: "er", nativeKind: "er", requirements },
 			diagram,
 		}),
 	});
@@ -64,27 +58,5 @@ describe("ER generation", () => {
 		expect(parsed.diagram).toBeUndefined();
 		expect(parsed.diagnostics.join(" ")).toContain("er.missing_relationship_field");
 		expect(parsed.diagnostics.join(" ")).toContain("Hint:");
-	});
-
-	it("checks entity and relationship counts and entity and field names", () => {
-		const met = enforceCandidateRequestRequirements(
-			candidate(erFixture, [
-				{ kind: "count", target: "entities", comparator: "exact", value: 4 },
-				{ kind: "count", target: "relationships", comparator: "minimum", value: 3 },
-				{ kind: "label", target: "entity", value: "order_items" },
-				{ kind: "label", target: "field", value: "customer_id" },
-			]),
-			request,
-		);
-		expect(met.error).toBeUndefined();
-		const unmet = enforceCandidateRequestRequirements(
-			candidate(erFixture, [
-				{ kind: "count", target: "entities", comparator: "exact", value: 5 },
-				{ kind: "label", target: "field", value: "coupon_id" },
-			]),
-			request,
-		);
-		expect(unmet.diagnostics.join(" ")).toContain("requirement_count_not_met");
-		expect(unmet.diagnostics.join(" ")).toContain('required field label "coupon_id"');
 	});
 });

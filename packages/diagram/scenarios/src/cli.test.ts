@@ -21,15 +21,10 @@ const ExecuteFixture = Schema.Struct({
 });
 
 const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
-function generatedEnvelope(requirements: readonly unknown[] = []) {
+function generatedEnvelope() {
 	const { title, ...diagram } = scenario.expectedDiagram;
 	return JSON.stringify({
 		title,
-		intent: {
-			requestedKind: "flowchart",
-			nativeKind: "flowchart",
-			requirements,
-		},
 		diagram,
 	});
 }
@@ -461,7 +456,6 @@ describe("scenario CLI candidate decoding", () => {
 		const [submit, charge, approved, confirmation] = diagram.messages;
 		const output = JSON.stringify({
 			title,
-			intent: { requestedKind: "sequence", nativeKind: "sequence", requirements: [] },
 			diagram: { ...diagram, messages: [submit, approved, charge, confirmation] },
 		});
 		return withCandidate(output, (directory) =>
@@ -580,11 +574,6 @@ describe("scenario CLI candidate decoding", () => {
 			const modelIcons: Readonly<Record<string, string>> = icons;
 			const output = JSON.stringify({
 				title,
-				intent: {
-					requestedKind: "flowchart",
-					nativeKind: "flowchart",
-					requirements: [],
-				},
 				diagram: {
 					...diagram,
 					nodes: diagram.nodes.map(({ icon: _icon, ...node }) =>
@@ -642,37 +631,6 @@ describe("scenario CLI candidate decoding", () => {
 		),
 	);
 
-	it.live("enforces the typed requirements when replaying an envelope", () =>
-		withCandidate("", (directory) =>
-			Effect.gen(function* () {
-				const inputPath = path.join(directory, "candidate.txt");
-				const reportPath = path.join(directory, "report.json");
-				const output = generatedEnvelope([
-					{ kind: "count", target: "nodes", comparator: "minimum", value: 18 },
-				]);
-				yield* Effect.tryPromise(() =>
-					writeFile(inputPath, `Generated candidate:\n\`\`\`json\n${output}\n\`\`\``),
-				);
-				yield* runScenarioCli([
-					"--scenario",
-					scenario.id,
-					"--input",
-					inputPath,
-					"--report-out",
-					reportPath,
-				]);
-				const report = yield* Schema.decodeUnknownEffect(Report)(
-					yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
-				);
-				assert.isFalse(report.ok);
-				const intentCheck = report.checks.find((check) => check.id === "intent-contract");
-				assert.isFalse(intentCheck?.passed);
-				assert.include(intentCheck?.message ?? "", "requirement_count_not_met");
-				assert.strictEqual(process.exitCode, 1);
-			}),
-		),
-	);
-
 	for (const [label, output] of [
 		["invalid JSON", "not a diagram"],
 		[
@@ -680,18 +638,9 @@ describe("scenario CLI candidate decoding", () => {
 			'{"title":"Bad","intent":{"requestedKind":"flowchart","nativeKind":"flowchart","requirements":[]},"diagram":{}}',
 		],
 		[
-			"unsatisfied typed requirement",
-			generatedEnvelope([{ kind: "count", target: "nodes", comparator: "minimum", value: 18 }]),
-		],
-		[
 			"conflicting type",
 			JSON.stringify({
 				title: "Conflicting mindmap",
-				intent: {
-					requestedKind: "mindmap",
-					nativeKind: "mindmap",
-					requirements: [],
-				},
 				diagram: {
 					id: "conflict",
 					type: "mindmap",
@@ -719,17 +668,7 @@ describe("scenario CLI candidate decoding", () => {
 						yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
 					);
 					assert.isFalse(report.ok);
-					if (label === "unsatisfied typed requirement") {
-						// The model's diagram is still scored; enforcement fails its own check.
-						assert.isUndefined(report.error);
-						assert.isTrue(report.checks.some((check) => check.id === "min-node-count"));
-						assert.deepStrictEqual(
-							report.checks.filter((check) => !check.passed).map((check) => check.id),
-							["intent-contract"],
-						);
-					} else {
-						assert.isDefined(report.error);
-					}
+					assert.isDefined(report.error);
 					if (label === "conflicting type")
 						assert.include(report.error ?? "", "explicit_type_not_met");
 					assert.strictEqual(

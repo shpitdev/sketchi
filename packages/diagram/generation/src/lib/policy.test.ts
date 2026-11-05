@@ -77,53 +77,38 @@ function runRepairs(initialDiagnostics: string[]) {
 }
 
 describe("generation repair prompts", () => {
-	it.effect("keeps default warnings non-blocking and out of actual repair diagnostics", () =>
+	it.effect("keeps default warnings non-blocking", () =>
 		Effect.gen(function* () {
-			for (const requireMissingLabel of [false, true]) {
-				const requests: DiagramGenerationRequest[] = [];
-				const candidate = candidateFromText({
-					model: "fixture-model",
-					provider: "fixture",
-					text: JSON.stringify({
-						title: "Player",
-						intent: {
-							requestedKind: "state-machine",
-							nativeKind: "state-machine",
-							requirements: requireMissingLabel
-								? [{ kind: "label", target: "state", value: "Missing outcome" }]
-								: [],
-						},
-						diagram: {
-							...mediaPlayerStateMachine,
-							states: mediaPlayerStateMachine.states.map(
-								({ initial: _initial, ...state }) => state,
-							),
-						},
-					}),
-				});
-				const result = yield* runDiagramGenerationWithPolicy(
-					(input) => {
-						requests.push(input);
-						return Effect.succeed(candidate);
+			const requests: DiagramGenerationRequest[] = [];
+			const candidate = candidateFromText({
+				model: "fixture-model",
+				provider: "fixture",
+				text: JSON.stringify({
+					title: "Player",
+					diagram: {
+						...mediaPlayerStateMachine,
+						states: mediaPlayerStateMachine.states.map(({ initial: _initial, ...state }) => state),
 					},
-					{ ...request, prompt: { ...request.prompt, requestedType: "state-machine" } },
-					"fixture",
-					{
-						concurrency: 1,
-						maxRepairAttempts: 1,
-						maxRetries: 0,
-						requestTimeoutMs: 1000,
-						retryDelayMs: 1,
-					},
-				);
-				expect(requests).toHaveLength(requireMissingLabel ? 2 : 1);
-				expect(result.warnings?.[0]?.code).toBe("composite_initial_defaulted");
-				if (requireMissingLabel) {
-					expect(requests[1]?.prompt.request).toContain("Missing outcome");
-					expect(requests[1]?.prompt.request).not.toContain("composite_initial_defaulted");
-					expect(requests[1]?.prompt.request).not.toContain("defaulted to its first");
-				} else expect(result.error).toBeUndefined();
-			}
+				}),
+			});
+			const result = yield* runDiagramGenerationWithPolicy(
+				(input) => {
+					requests.push(input);
+					return Effect.succeed(candidate);
+				},
+				{ ...request, prompt: { ...request.prompt, requestedType: "state-machine" } },
+				"fixture",
+				{
+					concurrency: 1,
+					maxRepairAttempts: 1,
+					maxRetries: 0,
+					requestTimeoutMs: 1000,
+					retryDelayMs: 1,
+				},
+			);
+			expect(requests).toHaveLength(1);
+			expect(result.warnings?.[0]?.code).toBe("composite_initial_defaulted");
+			expect(result.error).toBeUndefined();
 		}),
 	);
 
@@ -196,39 +181,6 @@ describe("generation repair prompts", () => {
 			}),
 		);
 	}
-
-	it.effect("enforces the original candidate before deciding whether to repair", () =>
-		Effect.gen(function* () {
-			const candidate: DiagramGenerationCandidate = {
-				provider: "fixture",
-				model: request.model,
-				text: "parsed response",
-				diagnostics: [],
-				diagram: acceptedDiagram,
-				intent: {
-					requestedKind: "flowchart",
-					nativeKind: "flowchart",
-					requirements: [{ kind: "label", target: "node", value: "Missing required step" }],
-				},
-			};
-			const result = yield* runDiagramGenerationWithPolicy(
-				() => Effect.succeed(candidate),
-				request,
-				"fixture",
-				{
-					concurrency: 1,
-					maxRepairAttempts: 0,
-					maxRetries: 0,
-					requestTimeoutMs: 1000,
-					retryDelayMs: 1,
-				},
-			);
-			expect(result.diagram).toBeUndefined();
-			expect(result.error).toBe("Generated diagram did not satisfy its typed intent contract.");
-			expect(result.diagnostics).toHaveLength(1);
-			expect(result.diagnostics[0]).toContain("Missing required step");
-		}),
-	);
 
 	it.effect("includes the original scenario once in each repair prompt", () =>
 		Effect.gen(function* () {

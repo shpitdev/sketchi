@@ -551,36 +551,6 @@ describe("prompt-assisted generation over the public generate API", () => {
 		}),
 	);
 
-	it.effect("maps unsupported model-selected kinds to a clear typed error", () =>
-		Effect.gen(function* () {
-			stubFetch(() =>
-				jsonResponse(
-					{
-						ok: false,
-						status: "unsupported_diagram_type",
-						issues: [
-							{
-								message: "Sketchi does not natively support er generation.",
-								hint: "Request a flowchart, mindmap, or sequence diagram instead.",
-							},
-						],
-					},
-					422,
-				),
-			);
-			const created: BuiltDiagram[] = [];
-
-			const error = yield* Effect.flip(runGenerate(created));
-
-			assert.strictEqual(error._tag, "CliGenerationError");
-			if (error._tag === "CliGenerationError") {
-				assert.strictEqual(error.code, "unsupported_diagram_type");
-				assert.match(error.message, /er generation/u);
-			}
-			assert.strictEqual(created.length, 0);
-		}),
-	);
-
 	it.effect("maps a rejected model to a typed error naming the supported models", () =>
 		Effect.gen(function* () {
 			stubFetch(() =>

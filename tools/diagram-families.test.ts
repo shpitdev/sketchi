@@ -28,7 +28,6 @@ import {
 	buildDiagramGenerationMessages,
 	candidateFromText,
 	DiagramGenerationTypeSchema,
-	UnsupportedDiagramIntentKindSchema,
 } from "@sketchi/diagram-generation";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 import { generationScenarioRegistry } from "@sketchi/diagram-scenarios";
@@ -38,10 +37,7 @@ import { describe, expect, it } from "vitest";
 import { DiagramBuilder, DiagramBuilderLive } from "../apps/cli/src/builder.ts";
 import { decodeCanonicalDiagramDocument } from "../apps/cli/src/document.ts";
 import { GENERATION_TYPE_OPTIONS } from "../apps/cli/src/generation-types.ts";
-import {
-	decodeGenerateRequest,
-	isNativeGenerateType,
-} from "../apps/playground/src/server/generation/request.ts";
+import { decodeGenerateRequest } from "../apps/playground/src/server/generation/request.ts";
 
 const workspaceRoot = fileURLToPath(new URL("../", import.meta.url));
 
@@ -59,7 +55,6 @@ function generationEnvelope(diagram: CanonicalDiagram): string {
 	const { title, type, ...rest } = diagram;
 	return JSON.stringify({
 		title,
-		intent: { requestedKind: type, nativeKind: type, requirements: [] },
 		diagram: { ...rest, type },
 	});
 }
@@ -72,13 +67,6 @@ const cliBuilderLayer = DiagramBuilderLive.pipe(
 		),
 	),
 );
-
-/** The sentence telling the model which kinds to refuse. */
-function unsupportedKindsSentence(system: string): string {
-	return (
-		/If the requested kind is ([^,]+(?:, [^,]+)*?), set nativeKind to null/u.exec(system)?.[1] ?? ""
-	);
-}
 
 const stages: Record<string, (family: DiagramTypeValue) => void | Promise<void>> = {
 	"core contract and fixture": (family) => {
@@ -95,7 +83,6 @@ const stages: Record<string, (family: DiagramTypeValue) => void | Promise<void>>
 	},
 	"generation prompt": (family) => {
 		expect(Schema.is(DiagramGenerationTypeSchema)(family)).toBe(true);
-		expect(Schema.is(UnsupportedDiagramIntentKindSchema)(family)).toBe(false);
 		const messages = buildDiagramGenerationMessages({
 			id: "family-pipeline",
 			request: `Draw a ${family} diagram.`,
@@ -103,15 +90,7 @@ const stages: Record<string, (family: DiagramTypeValue) => void | Promise<void>>
 		});
 		expect(messages.system).toContain(`Use diagram type "${family}".`);
 		expect(messages.user).toContain(`"type":"${family}"`);
-		// The model is never told to refuse a supported family.
-		const refused = unsupportedKindsSentence(messages.system);
-		expect(refused).not.toBe("");
-		expect(refused.split(/,? or |, /u)).not.toContain(family);
-		const modelSelected = buildDiagramGenerationMessages({
-			id: "family-pipeline",
-			request: "Draw something.",
-		});
-		expect(modelSelected.user).not.toContain(`"requestedKind":"${family}","nativeKind":null`);
+		expect(messages.user).not.toContain("intent");
 	},
 	"generation output parsing": (family) => {
 		const candidate = candidateFromText({
@@ -154,7 +133,6 @@ const stages: Record<string, (family: DiagramTypeValue) => void | Promise<void>>
 	"generate API request": (family) => {
 		const decoded = decodeGenerateRequest({ prompt: `Draw a ${family} diagram.`, type: family });
 		expect(Result.isSuccess(decoded)).toBe(true);
-		expect(isNativeGenerateType(family)).toBe(true);
 	},
 	"maintained scenarios": (family) => {
 		expect(generationScenarioRegistry.some((scenario) => scenario.diagramType === family)).toBe(
