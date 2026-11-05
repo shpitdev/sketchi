@@ -32,7 +32,24 @@ export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
 		Schema.withDecodingDefaultKey(Effect.succeed("canonical")),
 	),
 	formats: Schema.Array(Schema.Literals(["scene", "excalidraw", "png"])),
+	/**
+	 * Additive provenance, still schema version 1: records written before these keys
+	 * existed decode without them, and older CLIs ignore them when reading new records.
+	 */
+	createdAt: Schema.optionalKey(Schema.String),
+	prompt: Schema.optionalKey(Schema.String),
 }) {}
+
+/** Creation provenance every later revision of a record keeps. */
+export function recordProvenance(manifest: DiagramRecordManifest): {
+	readonly createdAt?: string;
+	readonly prompt?: string;
+} {
+	return {
+		...(manifest.createdAt === undefined ? {} : { createdAt: manifest.createdAt }),
+		...(manifest.prompt === undefined ? {} : { prompt: manifest.prompt }),
+	};
+}
 
 export interface BuiltDiagram {
 	readonly warnings?: ReadonlyArray<CodeModeIssue>;
@@ -43,6 +60,8 @@ export interface BuiltDiagram {
 	readonly scene: PatchableScene;
 	readonly excalidraw: ExcalidrawFile;
 	readonly png?: Uint8Array;
+	/** The request text a generated diagram came from. */
+	readonly prompt?: string;
 }
 
 export interface PatchSource {
@@ -72,6 +91,12 @@ export interface DiagramSummary {
 	readonly formats: ReadonlyArray<DiagramFormat>;
 	readonly authority: DiagramAuthority;
 	readonly documentAuthoritative: boolean;
+	/** ISO time the record was created; absent on records older than this field. */
+	readonly createdAt?: string;
+	/** The generate prompt, for generated records. */
+	readonly prompt?: string;
+	/** ISO time the record last changed on disk; set by list. */
+	readonly updatedAt?: string;
 }
 
 /** Failed entries deliberately carry no inferred record metadata. */
@@ -94,6 +119,7 @@ export function summaryFromStored(diagram: StoredDiagram): DiagramSummary {
 		formats: diagram.manifest.formats,
 		authority: diagram.authority,
 		documentAuthoritative: diagram.authority === "canonical",
+		...recordProvenance(diagram.manifest),
 	};
 }
 

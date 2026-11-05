@@ -3,9 +3,19 @@ import {
 	CodeModeArtifactStorageMemory,
 	makeCodeModeRuntimeEnvironmentLayer,
 } from "@sketchi/diagram-agent";
-import { Cause, Effect, Layer, Option } from "effect";
+import { Cause, Clock, Effect, type FileSystem, Layer, Option } from "effect";
+import type { Stdio } from "effect/Stdio";
+import isCI from "is-ci";
+import stringWidth from "string-width";
 
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
+import {
+	automaticCopySkipReason,
+	Clipboard,
+	clipboardData,
+	ClipboardLive,
+	type ClipboardOutcome,
+} from "./clipboard.js";
 import {
 	createCanvasDiagram,
 	DEFAULT_CANVAS_ENDPOINT,
@@ -20,9 +30,18 @@ import {
 	type StoredDiagram,
 	summaryFromStored,
 } from "./contracts.js";
-import { alternativeList, encodeJson, validateStorageId } from "./document.js";
+import {
+	entryTime,
+	LATEST_DIAGRAM,
+	matchesQuery,
+	newestFirst,
+	relativeTime,
+	resolveDiagramId,
+} from "./diagram-catalog.js";
+import { alternativeList, encodeJson } from "./document.js";
 import {
 	type CliFailure,
+	CliExportError,
 	CliFilesystemError,
 	CliShareError,
 	CliValidationError,
@@ -91,13 +110,19 @@ import {
 	ShareTransportLive,
 } from "./share.js";
 import { MAX_SHARE_LINK_LENGTH } from "./share-protocol.js";
-import { DiagramStore, DiagramStoreLive, StorageRootLive, writeExportFile } from "./storage.js";
+import {
+	DiagramStore,
+	DiagramStoreLive,
+	type StorageRoot,
+	StorageRootLive,
+	writeExportFile,
+} from "./storage.js";
 
 const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
 
 Command map:
-  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use show, list,
-  and export for every local record. Edit and patch support canonical flowchart, mindmap, and
+  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use list to find a
+  record, show, copy, and export for every local record. Edit and patch support canonical flowchart, mindmap, and
   sequence records. Use create for accepted canonical JSON.
   Share and pull are explicit network
   boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
@@ -155,7 +180,32 @@ Input and output contracts:
   <cwd>/diagrams/<id>.png after generation succeeds, or accepts a custom file path.
   Direct generate exports PNG to <generated-id>.png by default; --format scene|excalidraw selects
   another artifact and --dest PATH|- overrides its destination. Use --output text|json for result
-  presentation on every command.
+  presentation on every command. Text generate output is the title and type, the saved path,
+  whether the image was copied, and the id. When stdout is not a terminal, as for an agent, it
+  adds a Hint row: display the saved PNG as an inline Markdown image. --output json carries the
+  full record, generation model and provider, export details including that hint, and clipboard.
+
+Clipboard:
+  After generate writes a PNG file it copies the image to the desktop clipboard: wl-copy when
+  WAYLAND_DISPLAY is set, else xclip when DISPLAY is set, osascript on macOS, PowerShell on
+  Windows. It never copies in CI, for --dest -, for scene or excalidraw, or with --no-copy, and it
+  stays quiet when the session has no desktop clipboard. SKETCHI_CLIPBOARD_COMMAND replaces that
+  detection with a command that reads the PNG on stdin, or turns copying off with "off". The tool's own daemon keeps the image
+  after Sketchi exits; Sketchi releases its streams and exits promptly. A clipboard failure
+  prints one line and never changes the exit code. JSON adds
+  "clipboard":{"copied":true} or {"copied":false,"reason":"..."}. sketchi copy [ID] copies any
+  stored diagram's PNG, rendered on demand, and fails with exit 8 when nothing can be copied.
+
+Finding diagrams:
+  generate records createdAt and the prompt in the local manifest. list shows the newest first;
+  list WORDS keeps diagrams whose title, id, or prompt contains every word; --type TYPE filters and
+  --limit N caps the result. Text shows 20 by default and says how many older ones it hid. JSON
+  list data is an array in the same newest-first order with every match unless --limit is given;
+  entries add createdAt, updatedAt (last change on disk), and prompt when known. Records made
+  before createdAt existed sort by updatedAt. Every DIAGRAM_ID argument accepts an exact id,
+  latest for the newest, or a unique id prefix; an unknown id fails with exit 5 and suggests
+  close ids, and an ambiguous prefix fails with ambiguous_diagram_id. show prints a summary;
+  --document adds the document, and show --output json always includes it.
   export writes bytes with --dest PATH|- and always writes status to stderr. With --dest -,
   stdout contains only artifact bytes. A successful PNG file export adds a generic inline-Markdown
   display hint for calling agents.
@@ -167,7 +217,7 @@ Share/pull safety limits:
   ${String(MAX_RENDER_OUTPUT_PIXELS)} pixels. Limits are checked before encryption or raster allocation.
 
 Offline boundary and storage:
-  create, patch, show, edit, list, export, and restore use no model, remote agent, MCP server, login,
+  create, patch, show, edit, list, copy, export, and restore use no model, remote agent, MCP server, login,
   account, browser, credential, or network. share sends only locally encrypted ciphertext from
   the selected record to Excalidraw storage; pull sends only the link id in its download request.
   Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
@@ -194,7 +244,7 @@ Revision recovery and next steps:
   edit, pull, and restore archive the complete prior authority state before atomic replacement.
   Use restore --revision N to recover through the CLI without consuming the selected snapshot.
   Start with generate for a prompt, canvas for CanvasSpec, or create for accepted canonical JSON.
-  Every returned id supports show, list, and export. Edit and patch are only for flowchart,
+  Every returned id supports show, copy, and export. Edit and patch are only for flowchart,
   mindmap, and sequence records; create a new canvas to replace a Universal CanvasSpec.`;
 
 const HUMAN_HELP = "Turn one prompt into a validated PNG and editable local diagram.";
@@ -291,45 +341,84 @@ function generatedData(result: GenerateDiagramResult) {
 	};
 }
 
-function generatedText(result: GenerateDiagramResult): string {
-	return [
-		summaryText("created", result.diagram).replace(/^created:/u, "generated:"),
-		`provider: ${result.provider}`,
-		`model: ${result.model}`,
-	].join("\n");
-}
-
 interface GenerateCommandResult extends GenerateWorkflowResult {
-	readonly interactive: boolean;
+	readonly clipboard: ClipboardOutcome;
+	/** Agents reading piped text need the display hint; a person at a terminal does not. */
+	readonly displayHint: boolean;
 }
 
 function generatedArtifactData(result: GenerateCommandResult) {
 	return {
 		...generatedData(result.generated),
 		export: exportData(result.artifact),
+		clipboard: clipboardData(result.clipboard),
 	};
 }
 
-function generatedArtifactText(result: GenerateCommandResult): string {
-	if (result.interactive) {
-		return [
-			`created: ${result.generated.diagram.manifest.id}`,
-			`artifact: ${result.artifact.destination}`,
-			...warningLines(result.generated.diagram),
-			"next:",
-			`  sketchi show ${result.generated.diagram.manifest.id}`,
-			`  sketchi export ${result.generated.diagram.manifest.id} --format excalidraw --dest ${result.generated.diagram.manifest.id}.excalidraw`,
-		].join("\n");
+/** One aligned "Label    value" row of human status output. */
+function row(label: string, value: string): string {
+	return `${label.padEnd(10)}${value}`;
+}
+
+function headline(diagram: StoredDiagram): string {
+	return `${diagram.manifest.title} (${diagram.manifest.type})`;
+}
+
+function savedRow(artifact: GeneratedArtifact): string {
+	return artifact.destination === "-" ? row("Wrote", "stdout") : row("Saved", artifact.destination);
+}
+
+const COPIED_ROW = row("Copied", "to clipboard, paste anywhere");
+
+/** A skipped copy is silent: only a copy or a real failure is news. */
+function clipboardRows(outcome: ClipboardOutcome): string[] {
+	switch (outcome._tag) {
+		case "Copied":
+			return [COPIED_ROW];
+		case "Failed":
+			return [row("Clipboard", `not copied: ${outcome.reason}`)];
+		case "Skipped":
+			return [];
 	}
-	const hint = displayHint(result.artifact);
+}
+
+function generatedArtifactText(result: GenerateCommandResult): string {
+	const diagram = result.generated.diagram;
 	return [
-		generatedText(result.generated),
-		`format: ${result.artifact.format}`,
-		`destination: ${result.artifact.destination}`,
-		`bytes: ${String(result.artifact.sizeBytes)}`,
-		...(hint ? [`hint: ${hint}`] : []),
+		headline(diagram),
+		savedRow(result.artifact),
+		...clipboardRows(result.clipboard),
+		row("Id", diagram.manifest.id),
+		...warningLines(diagram),
+		...(result.displayHint ? hintRows(result.artifact) : []),
 	].join("\n");
 }
+
+function hintRows(artifact: GeneratedArtifact): string[] {
+	const hint = displayHint(artifact);
+	return hint ? [row("Hint", hint)] : [];
+}
+
+/** Whether generate's text should carry the agent display hint: only off a terminal. */
+function textNeedsDisplayHint(): boolean {
+	return process.stdout.isTTY !== true;
+}
+
+/** Copy a freshly written PNG unless policy says not to; never fails the command. */
+const copyGeneratedArtifact = Effect.fn("sketchi.cli.generate.copy")(function* (
+	artifact: GeneratedArtifact,
+	copy: boolean,
+) {
+	const skipped = automaticCopySkipReason({
+		copy,
+		continuousIntegration: isCI,
+		format: artifact.format,
+		destination: artifact.destination,
+	});
+	if (skipped !== undefined) return { _tag: "Skipped", reason: skipped } satisfies ClipboardOutcome;
+	const clipboard = yield* Clipboard;
+	return yield* clipboard.copyPng(artifact.bytes);
+});
 
 function wizardDestination(destination: WizardDestination): GenerationDestination {
 	switch (destination._tag) {
@@ -357,48 +446,88 @@ function reportGenerateOperation<E extends CliFailure, R>(
 	);
 }
 
-function showText(diagram: StoredDiagram): string {
-	const revisions = revisionLocations(diagram);
+function showText(diagram: StoredDiagram, now: number, document: boolean): string {
+	const { manifest } = diagram;
+	const created = manifest.createdAt === undefined ? Number.NaN : Date.parse(manifest.createdAt);
+	const earlier = diagram.revisions.map((revision) => String(Number.parseInt(revision, 10)));
 	return [
-		`id: ${diagram.manifest.id}`,
-		`type: ${diagram.manifest.type}`,
-		`title: ${diagram.manifest.title}`,
-		`revision: ${String(diagram.manifest.revision)}`,
-		`authority: ${diagram.authority}`,
-		`document authoritative: ${String(diagram.authority === "canonical")}`,
-		`formats: ${diagram.manifest.formats.join(",")}`,
-		`revisions: ${revisions.length === 0 ? "none" : revisions.join(",")}`,
-		"document:",
-		encodeJson(diagram.document).trimEnd(),
+		headline(diagram),
+		row("Id", manifest.id),
+		...(Number.isFinite(created) ? [row("Created", relativeTime(created, now))] : []),
+		...(manifest.prompt === undefined ? [] : [row("Prompt", manifest.prompt)]),
+		row(
+			"Revision",
+			`${String(manifest.revision)}${earlier.length > 0 ? `, earlier ${earlier.join(", ")}` : ""}`,
+		),
+		...(diagram.authority === "canonical" ? [] : [row("Authority", diagram.authority)]),
+		row("Stored", storageLocation(manifest.id)),
+		...(document ? ["", encodeJson(diagram.document).trimEnd()] : []),
 	].join("\n");
 }
 
-function listText(diagrams: ReadonlyArray<DiagramListEntry>): string {
-	if (diagrams.length === 0) return "no diagrams";
+const DEFAULT_LIST_LIMIT = 20;
+const LIST_TITLE_WIDTH = 48;
+
+function fitWidth(value: string, width: number): string {
+	if (stringWidth(value) <= width) return value;
+	let fitted = "";
+	for (const character of value) {
+		if (stringWidth(`${fitted}${character}…`) > width) break;
+		fitted += character;
+	}
+	return `${fitted}…`;
+}
+
+function padWidth(value: string, width: number): string {
+	return `${value}${" ".repeat(Math.max(0, width - stringWidth(value)))}`;
+}
+
+interface ListResult {
+	readonly entries: ReadonlyArray<DiagramListEntry>;
+	readonly total: number;
+	readonly searched: boolean;
+	readonly now: number;
+}
+
+function listText({ entries, total, searched, now }: ListResult): string {
+	if (entries.length === 0) {
+		return searched
+			? "No matching diagrams."
+			: "No diagrams yet. Create one with sketchi generate.";
+	}
+	const rows = entries.map((entry) => {
+		if ("status" in entry) return [entry.id, `unavailable: ${entry.code}`, "", ""];
+		const time = entryTime(entry);
+		return [
+			entry.id,
+			fitWidth(entry.title, LIST_TITLE_WIDTH),
+			entry.type,
+			time === undefined ? "" : relativeTime(time, now),
+		];
+	});
+	const widths = [0, 1, 2].map((column) =>
+		Math.max(...rows.map((cells) => stringWidth(cells[column] ?? ""))),
+	);
+	const lines = rows.map((cells) =>
+		cells
+			.map((cell, column) => (column < 3 ? padWidth(cell, (widths[column] ?? 0) + 2) : cell))
+			.join("")
+			.trimEnd(),
+	);
+	const hidden = total - entries.length;
 	return [
-		"id\ttype\trevision\tauthority\tdocument-authoritative\tformats\ttitle",
-		...diagrams.map((diagram) =>
-			"status" in diagram
-				? [diagram.id, `unavailable:${diagram.code}`, "-", "-", "-", "-", diagram.message].join(
-						"\t",
-					)
-				: [
-						diagram.id,
-						diagram.type,
-						String(diagram.revision),
-						diagram.authority,
-						String(diagram.documentAuthoritative),
-						diagram.formats.join(","),
-						diagram.title,
-					].join("\t"),
-		),
+		...lines,
+		...(hidden > 0
+			? [`${String(hidden)} older not shown; --limit ${String(total)} shows all`]
+			: []),
 	].join("\n");
 }
 
 const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's four explicit network commands (generate, canvas, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Everyday wizard:
-  The wizard asks only for prompt text, flowchart (default), mind map, or sequence diagram, and a PNG destination.
+  The wizard asks only for prompt text, a diagram type (any of the ${String(CANONICAL_DOCUMENT_TYPES.length)} below; flowchart is the default),
+  and a PNG destination.
   Current directory writes <cwd>/<generated-id>.png. Project diagrams folder means exactly the
   directory where Sketchi was run: <cwd>/diagrams/<generated-id>.png, with no Git detection; the
   diagrams folder is created only after generation succeeds. Explicit --type and file --dest values
@@ -423,12 +552,21 @@ Validation and storage:
   and is not written back to that record. Network/endpoint/timeout/output/validation/storage
   failures leave no visible record; a later export destination failure leaves the created record.
 
+Clipboard:
+  After writing a PNG file, generate copies the image to the desktop clipboard (wl-copy on
+  Wayland, xclip on X11, osascript on macOS, PowerShell on Windows) and says so. It never copies in
+  CI, for --dest -, for another --format, or with --no-copy, and stays quiet when the session has
+  no desktop clipboard. A clipboard failure prints one line and never changes the exit code.
+  SKETCHI_CLIPBOARD_COMMAND=CMD|off replaces the detected tool or turns copying off.
+  --output json reports clipboard {copied, reason?}. sketchi copy [ID] copies any stored diagram.
+
 Errors and next steps:
   Exit 10 means a network or endpoint failure, 11 a timeout, and 12 malformed output;
   a rejected or invalid generated document uses 3, conflict uses 6, and storage uses 7.
   With --dest -, stdout contains artifact bytes only and all status uses stderr. On success, pass
-  the returned id to show, edit, list, or export. For strictly offline manual authoring, accepted
-  canonical JSON examples, and full error contracts, run sketchi docs.`;
+  the returned id, a unique prefix of it, or latest to show, copy, edit, or export. For strictly
+  offline manual authoring, accepted canonical JSON examples, and full error contracts, run
+  sketchi docs.`;
 
 const generateCommand = Command.make(
 	"generate",
@@ -465,6 +603,10 @@ const generateCommand = Command.make(
 				),
 				Flag.withMetavar("PATH|-"),
 			),
+		),
+		copy: Flag.Boolean("copy").pipe(
+			Flag.withDefault(true),
+			Flag.withDescription("Copy the PNG to the clipboard; --no-copy skips it."),
 		),
 	},
 	(input) =>
@@ -516,8 +658,9 @@ const generateCommand = Command.make(
 								format: "png",
 								destination: wizardDestination(answers.destination),
 							});
+							const clipboard = yield* copyGeneratedArtifact(result.artifact, input.copy);
 							yield* activity.succeed("Diagram ready");
-							return { ...result, interactive: true };
+							return { ...result, clipboard, displayHint: textNeedsDisplayHint() };
 						}),
 					),
 				);
@@ -534,7 +677,17 @@ const generateCommand = Command.make(
 						suppliedDestination === undefined
 							? { _tag: "Default" }
 							: { _tag: "Custom", path: suppliedDestination },
-				}).pipe(Effect.map((result) => ({ ...result, interactive: false }))),
+				}).pipe(
+					Effect.flatMap((result) =>
+						copyGeneratedArtifact(result.artifact, input.copy).pipe(
+							Effect.map((clipboard) => ({
+								...result,
+								clipboard,
+								displayHint: textNeedsDisplayHint(),
+							})),
+						),
+					),
+				),
 			);
 		}),
 ).pipe(
@@ -704,22 +857,42 @@ const createCommand = Command.make(
 	]),
 );
 
+const diagramIdArgument = Argument.String("diagram-id").pipe(
+	Argument.withDescription(
+		`A stored id, a unique prefix of one, or ${LATEST_DIAGRAM} for the newest.`,
+	),
+);
+
 const showCommand = Command.make(
 	"show",
-	{ diagramId: Argument.String("diagram-id") },
-	({ diagramId }) =>
+	{
+		diagramId: diagramIdArgument,
+		document: Flag.Boolean("document").pipe(
+			Flag.withDefault(false),
+			Flag.withDescription("Also print the canonical document JSON."),
+		),
+	},
+	({ diagramId, document }) =>
 		Effect.gen(function* () {
 			const { output } = yield* rootCommand;
 			const store = yield* DiagramStore;
-			const operation = validateStorageId(diagramId).pipe(Effect.flatMap((id) => store.show(id)));
-			yield* runReported("show", output, operation, showText, storedData);
+			const now = yield* Clock.currentTimeMillis;
+			const operation = resolveDiagramId(diagramId).pipe(Effect.flatMap((id) => store.show(id)));
+			yield* runReported(
+				"show",
+				output,
+				operation,
+				(diagram) => showText(diagram, now, document),
+				storedData,
+			);
 		}),
 ).pipe(
 	Command.withDescription(
-		"Show current authority, documentAuthoritative state, retained document provenance, manifest formats, and recoverable revision paths for DIAGRAM_ID. This is strictly offline and does not rebuild or mutate the record.",
+		"Summarize one local diagram: title, type, id, when it was created, the prompt that generated it, its revision and earlier revisions kept for restore, and where it is stored. --document adds the canonical document. --output json always includes the full record: authority, documentAuthoritative, formats, revision paths, createdAt, prompt, and document. This is strictly offline and does not rebuild or mutate the record.",
 	),
 	Command.withShortDescription("Inspect one local diagram."),
 	Command.withExamples([
+		{ command: "sketchi show latest", description: "Summarize the newest diagram." },
 		{
 			command: "sketchi show release-flow --output json",
 			description: "Read a record as a stable JSON envelope.",
@@ -730,7 +903,7 @@ const showCommand = Command.make(
 const editCommand = Command.make(
 	"edit",
 	{
-		diagramId: Argument.String("diagram-id"),
+		diagramId: diagramIdArgument,
 		...exclusiveInputSourceFlags(),
 	},
 	({ diagramId, fileInput, jsonInput }) =>
@@ -740,7 +913,7 @@ const editCommand = Command.make(
 			const builder = yield* DiagramBuilder;
 			const store = yield* DiagramStore;
 			const operation = Effect.gen(function* () {
-				const id = yield* validateStorageId(diagramId);
+				const id = yield* resolveDiagramId(diagramId);
 				const document = yield* readDocumentInput(source);
 				const built = yield* builder.build(document);
 				if (built.id !== id) {
@@ -776,7 +949,7 @@ const editCommand = Command.make(
 const patchCommand = Command.make(
 	"patch",
 	{
-		diagramId: Argument.String("diagram-id"),
+		diagramId: diagramIdArgument,
 		...exclusiveInputSourceFlags("patch request"),
 	},
 	({ diagramId, fileInput, jsonInput }) =>
@@ -786,7 +959,7 @@ const patchCommand = Command.make(
 			const patcher = yield* DiagramPatcher;
 			const store = yield* DiagramStore;
 			const operation = Effect.gen(function* () {
-				const id = yield* validateStorageId(diagramId);
+				const id = yield* resolveDiagramId(diagramId);
 				const input = yield* readPatchInput(source);
 				const current = yield* store.readPatchSource(id);
 				const artifacts = yield* patcher.patch(
@@ -822,29 +995,133 @@ const patchCommand = Command.make(
 	]),
 );
 
-const listCommand = Command.make("list", {}, () =>
-	Effect.gen(function* () {
-		const { output } = yield* rootCommand;
-		const store = yield* DiagramStore;
-		yield* runReported("list", output, store.list(), listText);
-	}),
+const listCommand = Command.make(
+	"list",
+	{
+		text: Argument.String("text").pipe(
+			Argument.withDescription("Words to find in titles, ids, and prompts."),
+			Argument.variadic(),
+		),
+		type: Flag.optional(
+			Flag.Literals("type", ["canvas", ...CANONICAL_DOCUMENT_TYPES]).pipe(
+				Flag.withDescription("Only diagrams of this type."),
+				Flag.withMetavar("TYPE"),
+			),
+		),
+		limit: Flag.optional(
+			Flag.Int("limit").pipe(
+				Flag.filter(
+					(limit) => limit > 0,
+					(limit) => `Expected a positive limit, got ${String(limit)}`,
+				),
+				Flag.withDescription(
+					`Most diagrams to show; text output defaults to ${String(DEFAULT_LIST_LIMIT)}.`,
+				),
+				Flag.withMetavar("N"),
+			),
+		),
+	},
+	({ limit, text, type }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const store = yield* DiagramStore;
+			const now = yield* Clock.currentTimeMillis;
+			const query = {
+				text: text.join(" "),
+				...Option.match(type, { onNone: () => ({}), onSome: (value) => ({ type: value }) }),
+			};
+			// JSON lists every match unless --limit is explicit; text keeps a screenful.
+			const shown = Option.getOrElse(limit, () =>
+				output === "json" ? Number.POSITIVE_INFINITY : DEFAULT_LIST_LIMIT,
+			);
+			const operation = store.list().pipe(
+				Effect.map((all) => {
+					const matched = newestFirst(all).filter((entry) => matchesQuery(entry, query));
+					return {
+						entries: matched.slice(0, shown),
+						total: matched.length,
+						searched: query.text !== "" || query.type !== undefined,
+						now,
+					} satisfies ListResult;
+				}),
+			);
+			yield* runReported("list", output, operation, listText, (result) => result.entries);
+		}),
 ).pipe(
 	Command.withDescription(
-		"List local diagrams in ascending id order with type, revision, authority, documentAuthoritative, current stored formats, and retained title provenance. The command is deterministic, strictly offline, and read-only.",
+		`List local diagrams newest first with id, title, type, and when each was created; records from before creation times were stored use their last change. Words narrow the list to diagrams whose title, id, or generate prompt contains every word. Text output shows ${String(DEFAULT_LIST_LIMIT)} and says how many older ones it hid. --output json returns every match as an array in the same newest-first order, with createdAt, updatedAt, and prompt when known. Strictly offline and read-only.`,
 	),
-	Command.withShortDescription("List local diagrams."),
+	Command.withShortDescription("Find local diagrams, newest first."),
 	Command.withExamples([
+		{ command: "sketchi list", description: "Show the most recent diagrams." },
+		{ command: "sketchi list checkout", description: "Find diagrams about checkout." },
 		{
-			command: "sketchi list --output json",
-			description: "List records as a stable JSON envelope.",
+			command: "sketchi list --type sequence --limit 5 --output json",
+			description: "The five newest sequence diagrams as JSON.",
 		},
+	]),
+);
+
+const copyCommand = Command.make(
+	"copy",
+	{
+		diagramId: Argument.String("diagram-id").pipe(
+			Argument.withDescription(
+				`A stored id, a unique prefix of one, or ${LATEST_DIAGRAM} (the default) for the newest.`,
+			),
+			Argument.withDefault(LATEST_DIAGRAM),
+		),
+	},
+	({ diagramId }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const store = yield* DiagramStore;
+			const exporter = yield* DiagramExporter;
+			const clipboard = yield* Clipboard;
+			const operation = Effect.gen(function* () {
+				const id = yield* resolveDiagramId(diagramId);
+				const diagram = yield* store.show(id);
+				const png = yield* exporter.exportArtifact(id, "png");
+				const outcome = yield* clipboard.copyPng(png);
+				if (outcome._tag !== "Copied") {
+					return yield* CliExportError.make({
+						code: "clipboard_unavailable",
+						diagramId: id,
+						format: "png",
+						message: `Could not copy "${id}": ${outcome.reason}.`,
+						hint: `Write the PNG to a file instead: sketchi export ${id} --format png --dest ${id}.png`,
+					});
+				}
+				return diagram;
+			});
+			yield* runReported(
+				"copy",
+				output,
+				operation,
+				(diagram) => [headline(diagram), COPIED_ROW, row("Id", diagram.manifest.id)].join("\n"),
+				(diagram) => ({
+					id: diagram.manifest.id,
+					type: diagram.manifest.type,
+					title: diagram.manifest.title,
+					clipboard: { copied: true },
+				}),
+			);
+		}),
+).pipe(
+	Command.withDescription(
+		"Copy a stored diagram's PNG to the desktop clipboard, rendering it on demand like export. Defaults to the newest diagram. Uses wl-copy on Wayland, xclip on X11, osascript on macOS, and PowerShell on Windows; with no desktop clipboard it fails with exit 8 and says why. Strictly offline and read-only.",
+	),
+	Command.withShortDescription("Copy a diagram's PNG to the clipboard."),
+	Command.withExamples([
+		{ command: "sketchi copy", description: "Copy the newest diagram." },
+		{ command: "sketchi copy release-flow", description: "Copy one diagram by id or prefix." },
 	]),
 );
 
 const shareCommand = Command.make(
 	"share",
 	{
-		diagramId: Argument.String("diagram-id"),
+		diagramId: diagramIdArgument,
 		// Effect 4.1 makes a Boolean flag without a fallback required; --open stays opt-in.
 		open: Flag.Boolean("open").pipe(
 			Flag.withDefault(false),
@@ -858,7 +1135,7 @@ const shareCommand = Command.make(
 			const sharing = yield* ExcalidrawShare;
 			const opener = yield* LinkOpener;
 			const operation = Effect.gen(function* () {
-				const id = yield* validateStorageId(diagramId);
+				const id = yield* resolveDiagramId(diagramId);
 				const source = yield* store.readExportSource(id, "excalidraw");
 				if (source._tag !== "StoredArtifact") {
 					return yield* CliShareError.make({
@@ -914,7 +1191,7 @@ const shareCommand = Command.make(
 const pullCommand = Command.make(
 	"pull",
 	{
-		diagramId: Argument.String("diagram-id"),
+		diagramId: diagramIdArgument,
 		link: exactlyOnceStringFlag(
 			"link",
 			"URL|-",
@@ -925,9 +1202,9 @@ const pullCommand = Command.make(
 		Effect.gen(function* () {
 			const { output } = yield* rootCommand;
 			const operation = Effect.gen(function* () {
-				const target = yield* preflightPullTarget(diagramId);
+				const target = yield* resolveDiagramId(diagramId).pipe(Effect.flatMap(preflightPullTarget));
 				const suppliedLink = yield* readLinkInput(link);
-				return yield* pullIntoStore(diagramId, suppliedLink, target);
+				return yield* pullIntoStore(target.id, suppliedLink, target);
 			});
 			yield* runReported(
 				"pull",
@@ -961,7 +1238,7 @@ const pullCommand = Command.make(
 const restoreCommand = Command.make(
 	"restore",
 	{
-		diagramId: Argument.String("diagram-id"),
+		diagramId: diagramIdArgument,
 		revision: Flag.Int("revision").pipe(
 			Flag.filter(
 				(revision) => revision > 0,
@@ -977,7 +1254,7 @@ const restoreCommand = Command.make(
 			const store = yield* DiagramStore;
 			const builder = yield* DiagramBuilder;
 			const operation = Effect.gen(function* () {
-				const id = yield* validateStorageId(diagramId);
+				const id = yield* resolveDiagramId(diagramId);
 				const selected = yield* store.readRevision(id, revision);
 				const restored =
 					selected._tag === "LegacyDocument"
@@ -1049,7 +1326,7 @@ function displayHint(result: GeneratedArtifact): string | undefined {
 const exportCommand = Command.make(
 	"export",
 	{
-		diagramId: Argument.String("diagram-id"),
+		diagramId: diagramIdArgument,
 		format: Flag.Literals("format", ["scene", "excalidraw", "png"]).pipe(
 			Flag.withDescription("Artifact format to export or render on demand."),
 			Flag.withMetavar("scene|excalidraw|png"),
@@ -1064,7 +1341,7 @@ const exportCommand = Command.make(
 			const { output } = yield* rootCommand;
 			const exporter = yield* DiagramExporter;
 			const operation = Effect.gen(function* () {
-				const id = yield* validateStorageId(diagramId);
+				const id = yield* resolveDiagramId(diagramId);
 				const bytes = yield* exporter.exportArtifact(id, format);
 				if (destination !== "-") yield* writeExportFile(destination, bytes);
 				return {
@@ -1072,6 +1349,7 @@ const exportCommand = Command.make(
 					format,
 					destination,
 					sizeBytes: bytes.byteLength,
+					bytes,
 					...(destination === "-" ? { stdoutBytes: bytes } : {}),
 				};
 			});
@@ -1121,6 +1399,7 @@ export const sketchiCommand = rootCommand.pipe(
 		editCommand,
 		patchCommand,
 		listCommand,
+		copyCommand,
 		restoreCommand,
 		shareCommand,
 		pullCommand,
@@ -1157,25 +1436,45 @@ const codeModeDependencies = Layer.mergeAll(
 );
 const diagramBuilderLayer = Layer.provide(DiagramBuilderLive, codeModeDependencies);
 const diagramPatcherLayer = Layer.provide(DiagramPatcherLive, codeModeDependencies);
-const storageDependencies = Layer.mergeAll(LocalFileSystemLive, StorageRootLive);
-const diagramStoreLayer = Layer.provide(DiagramStoreLive, storageDependencies);
-const diagramExporterLayer = Layer.provide(
-	DiagramExporterLive,
-	Layer.mergeAll(diagramStoreLayer, CliPngRendererLive),
-);
 const excalidrawShareLayer = Layer.provide(ExcalidrawShareLive, ShareTransportLive);
 
-export const CliApplicationLayer = Layer.mergeAll(
-	LocalFileSystemLive,
-	StorageRootLive,
-	diagramBuilderLayer,
-	diagramPatcherLayer,
-	diagramStoreLayer,
-	diagramExporterLayer,
-	CliPngRendererLive,
-	excalidrawShareLayer,
-	LinkOpenerLive,
-	InputReaderLive.pipe(Layer.provide(LocalFileSystemLive)),
-	OutputWriterLive,
-	GenerateWizardLive,
-);
+/** The application with its storage root, clipboard, and output chosen by the caller, for tests. */
+export function makeCliApplicationLayer({
+	clipboard,
+	output,
+	storageRoot,
+}: {
+	readonly storageRoot: Layer.Layer<StorageRoot>;
+	readonly clipboard: Layer.Layer<Clipboard, never, FileSystem.FileSystem>;
+	readonly output: Layer.Layer<OutputWriter, never, Stdio>;
+}) {
+	const diagramStoreLayer = Layer.provide(
+		DiagramStoreLive,
+		Layer.mergeAll(LocalFileSystemLive, storageRoot),
+	);
+	const diagramExporterLayer = Layer.provide(
+		DiagramExporterLive,
+		Layer.mergeAll(diagramStoreLayer, CliPngRendererLive),
+	);
+	return Layer.mergeAll(
+		LocalFileSystemLive,
+		storageRoot,
+		diagramBuilderLayer,
+		diagramPatcherLayer,
+		diagramStoreLayer,
+		diagramExporterLayer,
+		CliPngRendererLive,
+		excalidrawShareLayer,
+		LinkOpenerLive,
+		InputReaderLive.pipe(Layer.provide(LocalFileSystemLive)),
+		output,
+		GenerateWizardLive,
+		clipboard,
+	);
+}
+
+export const CliApplicationLayer = makeCliApplicationLayer({
+	storageRoot: StorageRootLive,
+	clipboard: ClipboardLive,
+	output: OutputWriterLive,
+});

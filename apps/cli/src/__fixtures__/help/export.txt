@@ -5,7 +5,7 @@ USAGE
   sketchi export [flags] <diagram-id>
 
 ARGUMENTS
-  diagram-id string
+  diagram-id string    A stored id, a unique prefix of one, or latest for the newest.
 
 FLAGS
   --format scene|excalidraw|png    Artifact format to export or render on demand. (choices: scene, excalidraw, png)

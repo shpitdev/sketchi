@@ -5,7 +5,7 @@ USAGE
   sketchi edit [flags] <diagram-id>
 
 ARGUMENTS
-  diagram-id string
+  diagram-id string    A stored id, a unique prefix of one, or latest for the newest.
 
 FLAGS
   --file PATH|-    Read one canonical document from PATH, or stdin with -.

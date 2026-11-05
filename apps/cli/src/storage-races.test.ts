@@ -125,6 +125,7 @@ function memoryRecord() {
 				for (const child of [...entries.keys()]) if (inTree(child, path)) entries.delete(child);
 			}),
 		realPath: (path) => Effect.succeed(path),
+		modifiedAt: () => Effect.succeed(undefined),
 	};
 	return {
 		root,

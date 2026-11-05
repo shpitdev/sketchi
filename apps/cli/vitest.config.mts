@@ -67,6 +67,9 @@ export default defineConfig(() => ({
 		// Hang guard, not a speed budget: the heavy deterministic suites here run several
 		// times slower on loaded CI runners, and only a real hang should fail them.
 		testTimeout: 60_000,
+		// Spawned CLIs inherit this environment, so none can reach the real clipboard on any
+		// OS. Clipboard tests inject their own platform, session, and fake tools.
+		env: { SKETCHI_CLIPBOARD_COMMAND: "off", WAYLAND_DISPLAY: "", DISPLAY: "" },
 		reporters: ["default"],
 		coverage: {
 			reportsDirectory: "../../coverage/apps/cli",

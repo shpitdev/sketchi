@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { ExcalidrawFileSchema, RenderedDiagramSceneSchema } from "@sketchi/diagram-agent";
-import { Context, Effect, Layer, Result, Schedule, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Result, Schedule, Schema } from "effect";
 
 import {
 	DOCUMENT_FILE,
@@ -20,6 +20,7 @@ import {
 	type PatchedDiagramArtifacts,
 	type PatchSource,
 	type StoredDiagram,
+	recordProvenance,
 	revisionFileName,
 	revisionDirectoryName,
 	summaryFromStored,
@@ -100,6 +101,8 @@ export class DiagramStore extends Context.Service<
 			ReadonlyArray<DiagramListEntry>,
 			CliFilesystemError | CliStorageError
 		>;
+		/** Visible record ids in code-unit order, without loading any record. */
+		readonly ids: () => Effect.Effect<ReadonlyArray<string>, CliFilesystemError | CliStorageError>;
 		readonly readExportSource: (
 			diagramId: string,
 			format: DiagramFormat,
@@ -949,7 +952,14 @@ const DiagramStoreLive = Layer.effect(
 							Effect.gen(function* () {
 								yield* copySafeTree(recordPath(root.path, diagramId), stage, diagramId);
 								yield* snapshotCurrent(diagramId, stage, current.manifest.revision);
-								const next = yield* write(stage, current, prepared);
+								const written = yield* write(stage, current, prepared);
+								const next = {
+									...written,
+									manifest: DiagramRecordManifest.make({
+										...written.manifest,
+										...recordProvenance(current.manifest),
+									}),
+								};
 								yield* fs.writeText(join(stage, MANIFEST_FILE), encodeJson(next.manifest), true);
 								yield* commitStage(diagramId, stage);
 								return {
@@ -980,6 +990,7 @@ const DiagramStoreLive = Layer.effect(
 							diagram.id,
 						);
 					}
+					const createdAt = new Date(yield* Clock.currentTimeMillis).toISOString();
 					const manifest = DiagramRecordManifest.make({
 						schemaVersion: RECORD_SCHEMA_VERSION,
 						id: diagram.id,
@@ -988,6 +999,8 @@ const DiagramStoreLive = Layer.effect(
 						revision: 1,
 						authority: "canonical",
 						formats: formatsFor("canonical", diagram.png !== undefined),
+						createdAt,
+						...(diagram.prompt === undefined ? {} : { prompt: diagram.prompt }),
 					});
 					return yield* Effect.acquireUseRelease(
 						fs.makeTempDirectory(root.path, STAGE_PREFIX),
@@ -1460,7 +1473,7 @@ const DiagramStoreLive = Layer.effect(
 			withLock(diagramId, loadUnlocked(diagramId), true),
 		);
 
-		const list = Effect.fn("sketchi.cli.storage.list")(function* () {
+		const discoverIds = Effect.fn("sketchi.cli.storage.discoverIds")(function* () {
 			yield* ensureRoot();
 			const entries = yield* fs.list(root.path);
 			yield* recoverStages(entries);
@@ -1474,13 +1487,43 @@ const DiagramStoreLive = Layer.effect(
 				const id = decodedId(entry.name.split(".")[2] ?? "");
 				if (id) diagramIds.add(id);
 			}
+			return [...diagramIds].sort(compareCodeUnits);
+		});
+
+		// Resolving an id is a read: a store that was never created holds no ids.
+		const ids = Effect.fn("sketchi.cli.storage.ids")(function* () {
+			if ((yield* fs.kind(root.path)) === "missing") return [];
+			return yield* discoverIds();
+		});
+
+		const updatedAt = (diagramId: string) =>
+			fs.modifiedAt(join(recordPath(root.path, diagramId), MANIFEST_FILE)).pipe(
+				Effect.map((time) =>
+					time === undefined ? {} : { updatedAt: new Date(time).toISOString() },
+				),
+				// The time only orders the listing; a vanished or unreadable manifest has none.
+				Effect.catch(() => Effect.succeed({})),
+			);
+
+		const list = Effect.fn("sketchi.cli.storage.list")(function* () {
 			return yield* Effect.forEach(
-				[...diagramIds].sort(compareCodeUnits),
+				yield* discoverIds(),
 				(diagramId) =>
-					withLock(diagramId, loadUnlocked(diagramId), true, true).pipe(
+					withLock(
+						diagramId,
+						loadUnlocked(diagramId).pipe(
+							Effect.flatMap((stored) =>
+								updatedAt(diagramId).pipe(
+									Effect.map((time) => ({ ...summaryFromStored(stored), ...time })),
+								),
+							),
+						),
+						true,
+						true,
+					).pipe(
 						Effect.result,
 						Effect.map((result): DiagramListEntry => {
-							if (Result.isSuccess(result)) return summaryFromStored(result.success);
+							if (Result.isSuccess(result)) return result.success;
 							const error = result.failure;
 							return {
 								id: diagramId,
@@ -1566,6 +1609,7 @@ const DiagramStoreLive = Layer.effect(
 			restore,
 			show,
 			list,
+			ids,
 			readExportSource,
 		};
 	}),

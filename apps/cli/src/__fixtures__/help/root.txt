@@ -8,6 +8,8 @@ START HERE
   canvas    Build and export a typed Universal CanvasSpec.
 
 WORK WITH A DIAGRAM
+  list      Find past diagrams, newest first. Add words to search.
+  copy      Copy a PNG to the clipboard; the newest by default.
   show      Inspect a local diagram.
   edit      Replace its canonical document.
   export    Write PNG, Excalidraw, or scene bytes.

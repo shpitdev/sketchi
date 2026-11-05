@@ -56,7 +56,8 @@ describe("requested output format", () => {
 			const success = run(["--output", first!]);
 			assert.strictEqual(success.status, 0);
 			assert.strictEqual(success.stderr, "");
-			if (first === "text") assert.strictEqual(success.stdout, "no diagrams\n");
+			if (first === "text")
+				assert.strictEqual(success.stdout, "No diagrams yet. Create one with sketchi generate.\n");
 			else assert.strictEqual(JSON.parse(success.stdout).ok, true);
 		}
 	});

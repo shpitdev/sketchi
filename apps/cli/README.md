@@ -84,6 +84,74 @@ sketchi generate --prompt "Map release approval" --output json
 contains artifact bytes only and the text or JSON status envelope moves to
 stderr. Generation, Universal Canvas compilation, sharing, and pulling are the CLI's four network commands.
 
+A successful generate prints the title and type, where the file went, and the id:
+
+```text
+Checkout flow (flowchart)
+Saved     checkout-flow.png
+Copied    to clipboard, paste anywhere
+Id        checkout-flow
+```
+
+When stdout is not a terminal, as when an agent runs it, a final `Hint` row says to
+display the saved PNG as an inline Markdown image. `--output json` keeps everything
+else: the full record, the generation model and provider, and export details.
+
+### Clipboard
+
+After writing a PNG file, `generate` copies the image to the desktop clipboard so
+you can paste it straight into a doc, chat, or issue. It uses `wl-copy` on Wayland
+(install `wl-clipboard`), `xclip` on X11, `osascript` on macOS, and PowerShell on
+Windows; Sketchi adds no native dependency. The copy happens whenever a desktop
+clipboard is available, including when an agent runs the CLI with piped output.
+It is skipped in CI, for `--dest -`, for `--format excalidraw|scene`, and with
+`--no-copy`, and nothing is printed when the session has no desktop clipboard.
+If the copy fails, one line says why; the file is still saved and the exit code
+does not change. JSON output adds `"clipboard": {"copied": true}` or
+`{"copied": false, "reason": "..."}`.
+
+Set `SKETCHI_CLIPBOARD_COMMAND` to a command that reads a PNG on standard input to
+use a clipboard Sketchi does not detect, or to `off` to never copy.
+
+Copy any stored diagram again, rendering its PNG on demand:
+
+```sh
+sketchi copy            # the newest diagram
+sketchi copy release    # by id or unique id prefix
+```
+
+macOS and Windows clipboard support is unit-tested but not yet verified on
+those systems.
+
+## Find past diagrams
+
+`list` shows the newest diagrams first with id, title, type, and how long ago
+each was created. Add words to search titles, ids, and the prompts that generated
+them:
+
+```sh
+sketchi list
+sketchi list checkout
+sketchi list --type sequence --limit 5
+```
+
+Text output shows 20 diagrams and says how many older ones it hid. `--output json`
+returns every match as an array in the same newest-first order, adding `createdAt`,
+`updatedAt`, and `prompt` when known. Records made before Sketchi stored creation
+times sort by when they last changed.
+
+Every command that takes a diagram id also accepts `latest` for the newest
+diagram, or any unique prefix of an id. An unknown id suggests the closest ones:
+
+```sh
+sketchi show latest
+sketchi export check --format png --dest checkout.png
+```
+
+`show` prints a summary: title, type, id, when it was created, its prompt,
+revisions, and where it is stored. Add `--document` for the canonical document;
+`show --output json` always includes it.
+
 ## Build a Universal CanvasSpec
 
 `canvas` sends an already-authored, typed CanvasSpec to Sketchi's public
@@ -264,9 +332,9 @@ source ~/.sketchi/completions/sketchi.fish
 
 ## For AI agents
 
-The seven deterministic commands—`create`, `patch`, `show`, `edit`, `list`,
+The deterministic commands—`create`, `patch`, `show`, `edit`, `list`,
 `export`, and `restore`—are fully offline and require no credentials, account,
-browser, model, or MCP server. Those seven commands never send stored records
+browser, model, or MCP server. They, and `copy`, never send stored records
 to a provider.
 Agents can use
 `--output json`, complete noninteractive input through `--json` or `--file`, and
@@ -275,8 +343,11 @@ raw artifact output through `export --dest -` without prompts.
 Agents must pass `--prompt` to `generate`. Interactive prompting is restricted
 to human text TTYs and is never enabled by JSON output, pipes, redirects, or CI.
 
-After exporting PNG to a file, agents can follow the returned hint to display
-that path as an inline Markdown image for the user.
+After writing a PNG file, `generate` and `export` give agents a hint to display
+that path as an inline Markdown image for the user: a `Hint` row in generate's
+text output when stdout is not a terminal, `export.hint` in generate's JSON, and
+`hint:` in export's status. When generate reports `Copied`, the user can also
+paste the image themselves.
 
 `generate`, `canvas`, `share`, and `pull` are deliberately separate, explicit network
 commands. They remain credential-free and each makes one HTTPS request. Share

@@ -72,6 +72,7 @@ export class CliInteractiveError extends Schema.TaggedError<CliInteractiveError>
 export class CliStorageError extends Schema.TaggedError<CliStorageError>()("CliStorageError", {
 	code: Schema.Literals([
 		"diagram_not_found",
+		"ambiguous_diagram_id",
 		"diagram_already_exists",
 		"diagram_busy",
 		"detached_edit",
@@ -116,6 +117,7 @@ export class CliExportError extends Schema.TaggedError<CliExportError>()("CliExp
 		"unsupported_render_glyph",
 		"rasterization_failed",
 		"export_write_failed",
+		"clipboard_unavailable",
 	]),
 	diagramId: Schema.optionalKey(Schema.String),
 	storagePath: Schema.optionalKey(Schema.String),
@@ -172,7 +174,7 @@ export function exitCodeForFailure(error: CliFailure): number {
 		case "CliInteractiveError":
 			return error.code === "cancelled" ? 2 : 1;
 		case "CliStorageError":
-			if (error.code === "diagram_not_found") return 5;
+			if (error.code === "diagram_not_found" || error.code === "ambiguous_diagram_id") return 5;
 			if (error.code === "revision_not_found") return 5;
 			if (
 				error.code === "diagram_already_exists" ||

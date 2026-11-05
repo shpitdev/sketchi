@@ -5,7 +5,7 @@ USAGE
   sketchi restore [flags] <diagram-id>
 
 ARGUMENTS
-  diagram-id string
+  diagram-id string    A stored id, a unique prefix of one, or latest for the newest.
 
 FLAGS
   --revision N    Archived revision number to restore without consuming it.

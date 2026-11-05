@@ -367,6 +367,8 @@ try {
 	delete cliEnvironment.NO_COLOR;
 	delete cliEnvironment.FORCE_COLOR;
 	delete cliEnvironment.SKETCHI_GENERATE_ENDPOINT;
+	// Generate must never touch the real clipboard during smoke, on any OS.
+	cliEnvironment.SKETCHI_CLIPBOARD_COMMAND = "off";
 	const cli = (args, input) => run(binary, args, { cwd: fixtureRoot, env: cliEnvironment, input });
 
 	// Online environment for the generate endpoint-error proof only: the offline
@@ -587,7 +589,7 @@ try {
 		]);
 		expectExit(wizardCurrent, 0, "wizard current-directory PNG");
 		assert(
-			wizardCurrent.stdout.includes(Buffer.from("created: generated-release-flow")) &&
+			wizardCurrent.stdout.includes(Buffer.from("Id        generated-release-flow")) &&
 				wizardCurrent.stdout.includes(Buffer.from(generatedPngPath)),
 			"Wizard current-directory default did not create and summarize its PNG.",
 		);
@@ -947,7 +949,7 @@ try {
 	assert(
 		JSON.stringify(parseJson(list.stdout, "diagram list").data.map(({ id }) => id)) ===
 			JSON.stringify(["launch-map", "release-flow"]),
-		"List output was not deterministically ordered.",
+		"List output was not newest first.",
 	);
 
 	const sceneDestination = resolve(fixtureRoot, "release.scene.json");
@@ -1139,7 +1141,7 @@ try {
 	const textShow = await cli(["show", "release-flow"]);
 	expectExit(textShow, 0, "text show");
 	assert(
-		textShow.stdout.toString("utf8").startsWith("id: release-flow\n"),
+		textShow.stdout.toString("utf8").includes("\nId        release-flow\n"),
 		"Text output envelope changed.",
 	);
 

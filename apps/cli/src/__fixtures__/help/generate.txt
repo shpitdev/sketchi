@@ -2,7 +2,8 @@ DESCRIPTION
   Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's four explicit network commands (generate, canvas, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Everyday wizard:
-  The wizard asks only for prompt text, flowchart (default), mind map, or sequence diagram, and a PNG destination.
+  The wizard asks only for prompt text, a diagram type (any of the 15 below; flowchart is the default),
+  and a PNG destination.
   Current directory writes <cwd>/<generated-id>.png. Project diagrams folder means exactly the
   directory where Sketchi was run: <cwd>/diagrams/<generated-id>.png, with no Git detection; the
   diagrams folder is created only after generation succeeds. Explicit --type and file --dest values
@@ -27,12 +28,21 @@ Validation and storage:
   and is not written back to that record. Network/endpoint/timeout/output/validation/storage
   failures leave no visible record; a later export destination failure leaves the created record.
 
+Clipboard:
+  After writing a PNG file, generate copies the image to the desktop clipboard (wl-copy on
+  Wayland, xclip on X11, osascript on macOS, PowerShell on Windows) and says so. It never copies in
+  CI, for --dest -, for another --format, or with --no-copy, and stays quiet when the session has
+  no desktop clipboard. A clipboard failure prints one line and never changes the exit code.
+  SKETCHI_CLIPBOARD_COMMAND=CMD|off replaces the detected tool or turns copying off.
+  --output json reports clipboard {copied, reason?}. sketchi copy [ID] copies any stored diagram.
+
 Errors and next steps:
   Exit 10 means a network or endpoint failure, 11 a timeout, and 12 malformed output;
   a rejected or invalid generated document uses 3, conflict uses 6, and storage uses 7.
   With --dest -, stdout contains artifact bytes only and all status uses stderr. On success, pass
-  the returned id to show, edit, list, or export. For strictly offline manual authoring, accepted
-  canonical JSON examples, and full error contracts, run sketchi docs.
+  the returned id, a unique prefix of it, or latest to show, copy, edit, or export. For strictly
+  offline manual authoring, accepted canonical JSON examples, and full error contracts, run
+  sketchi docs.
 
 USAGE
   sketchi generate [flags]
@@ -43,6 +53,7 @@ FLAGS
   --endpoint URL                   Unauthenticated generate API URL; defaults to the production Sketchi endpoint.
   --format png|excalidraw|scene    Artifact exported after generation; default png. (choices: png, excalidraw, scene)
   --dest PATH|-                    Artifact destination; defaults from the generated id, or - for stdout.
+  --copy                           Copy the PNG to the clipboard; --no-copy skips it.
 
 INHERITED FLAGS
   --output text|json    Result presentation format. (choices: text, json)

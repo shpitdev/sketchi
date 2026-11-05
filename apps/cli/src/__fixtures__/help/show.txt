@@ -1,11 +1,14 @@
 DESCRIPTION
-  Show current authority, documentAuthoritative state, retained document provenance, manifest formats, and recoverable revision paths for DIAGRAM_ID. This is strictly offline and does not rebuild or mutate the record.
+  Summarize one local diagram: title, type, id, when it was created, the prompt that generated it, its revision and earlier revisions kept for restore, and where it is stored. --document adds the canonical document. --output json always includes the full record: authority, documentAuthoritative, formats, revision paths, createdAt, prompt, and document. This is strictly offline and does not rebuild or mutate the record.
 
 USAGE
   sketchi show [flags] <diagram-id>
 
 ARGUMENTS
-  diagram-id string
+  diagram-id string    A stored id, a unique prefix of one, or latest for the newest.
+
+FLAGS
+  --document    Also print the canonical document JSON.
 
 INHERITED FLAGS
   --output text|json    Result presentation format. (choices: text, json)
@@ -16,5 +19,8 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
+  # Summarize the newest diagram.
+  sketchi show latest
+
   # Read a record as a stable JSON envelope.
   sketchi show release-flow --output json

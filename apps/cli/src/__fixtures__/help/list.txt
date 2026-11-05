@@ -1,8 +1,15 @@
 DESCRIPTION
-  List local diagrams in ascending id order with type, revision, authority, documentAuthoritative, current stored formats, and retained title provenance. The command is deterministic, strictly offline, and read-only.
+  List local diagrams newest first with id, title, type, and when each was created; records from before creation times were stored use their last change. Words narrow the list to diagrams whose title, id, or generate prompt contains every word. Text output shows 20 and says how many older ones it hid. --output json returns every match as an array in the same newest-first order, with createdAt, updatedAt, and prompt when known. Strictly offline and read-only.
 
 USAGE
-  sketchi list [flags]
+  sketchi list [flags] [<text...>]
+
+ARGUMENTS
+  text... string    Words to find in titles, ids, and prompts. (optional)
+
+FLAGS
+  --type TYPE    Only diagrams of this type. (choices: canvas, flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, quadrant)
+  --limit N      Most diagrams to show; text output defaults to 20.
 
 INHERITED FLAGS
   --output text|json    Result presentation format. (choices: text, json)
@@ -13,5 +20,11 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
-  # List records as a stable JSON envelope.
-  sketchi list --output json
+  # Show the most recent diagrams.
+  sketchi list
+
+  # Find diagrams about checkout.
+  sketchi list checkout
+
+  # The five newest sequence diagrams as JSON.
+  sketchi list --type sequence --limit 5 --output json
