@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.32.1
+
+### Patch Changes
+
+- [#654](https://github.com/shpitdev/sketchi/pull/654) [`bead216`](https://github.com/shpitdev/sketchi/commit/bead21655887c0bc123ddf6d360fcbab06a29cf0) Thanks [@anandpant](https://github.com/anandpant)! - A Sankey flow whose label only restates its value now draws the value once, and no longer pushes small flows onto a leader line.
+
 ## 0.32.0
 
 ### Minor Changes
