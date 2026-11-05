@@ -50,3 +50,27 @@ describe("mindmap trees", () => {
 		expect(tree({ label: "Plan" }).error).toBeDefined();
 	});
 });
+
+describe("flowchart node shapes", () => {
+	it("draws an unknown shape by its kind and keeps a real one", () => {
+		const candidate = parse(
+			{
+				type: "flowchart",
+				id: "flow",
+				nodes: [
+					{ id: "a", label: "Start", kind: "start", shape: "ellipse" },
+					{ id: "b", label: "Orders", kind: "process", shape: "database" },
+					{ id: "c", label: "End", kind: "end" },
+				],
+				edges: [
+					{ id: "a-b", source: "a", target: "b" },
+					{ id: "b-c", source: "b", target: "c" },
+				],
+			},
+			"flowchart",
+		);
+		expect(candidate.error).toBeUndefined();
+		expect(candidate.diagram).toMatchObject({ nodes: [{ id: "a" }, { shape: "database" }, {}] });
+		expect(candidate.diagnostics.join()).toContain("shape_dropped");
+	});
+});

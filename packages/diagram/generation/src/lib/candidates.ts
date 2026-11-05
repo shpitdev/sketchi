@@ -2,6 +2,7 @@ import {
 	type CanonicalDiagram,
 	CanonicalDiagramSchema,
 	DIAGRAM_TYPES,
+	DiagramNodeShapeSchema,
 	DiagramValidationError,
 	ClassDiagramSchema,
 	classNodeName,
@@ -211,13 +212,25 @@ function sanitizeGeneratedNodeIcons(
 	});
 }
 
+/** Models name shapes such as "ellipse" that a node's kind already decides; it draws by kind. */
+function withKnownShape(node: unknown, diagnostics: string[]): unknown {
+	if (!isUnknownRecord(node) || node["shape"] === undefined) return node;
+	if (Schema.is(DiagramNodeShapeSchema)(node["shape"])) return node;
+	const { shape, ...withoutShape } = node;
+	diagnostics.push(
+		`shape_dropped: node "${String(node["id"])}" shape ${JSON.stringify(shape)} is not a Sketchi shape; the node draws by its kind.`,
+	);
+	return withoutShape;
+}
+
 function normalizeGeneratedFlowchartInput(input: unknown, diagnostics: string[]): unknown {
 	const styled = withSketchiDiagramStyle(input);
 	if (!isUnknownRecord(styled)) return styled;
 	const groups = styled["groups"];
+	const nodes = sanitizeGeneratedNodeIcons(styled["nodes"], diagnostics);
 	const withIcons: Record<string, unknown> = {
 		...styled,
-		nodes: sanitizeGeneratedNodeIcons(styled["nodes"], diagnostics),
+		nodes: Array.isArray(nodes) ? nodes.map((node) => withKnownShape(node, diagnostics)) : nodes,
 		// Group logos are filled by Code Mode builds only; generation draws none.
 		...(Array.isArray(groups)
 			? {
