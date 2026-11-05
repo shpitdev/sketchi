@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ChartDiagram } from "@sketchi/diagram-core";
+import {
+	candidateFromText,
+	enforceCandidateRequestRequirements,
+} from "@sketchi/diagram-generation";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 import {
 	chartClearRulesCheck,
@@ -10,11 +14,86 @@ import {
 } from "./chart-scenarios.js";
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { candidateFromMcpResult } from "./mcp-results.js";
+import { toDiagramGenerationPrompt } from "./prompt.js";
 
 const failing = (scenario: (typeof chartScenarios)[number], diagram: ChartDiagram) =>
 	evaluateScenarioDiagram(scenario, diagram)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
+
+// Real model answers that plan a count of series, which the schema used to reject outright.
+const seriesCountOutputs = {
+	"quarterly-revenue-bar-chart": {
+		title: "Quarterly Revenue 2025-2026",
+		intent: {
+			requestedKind: "chart",
+			nativeKind: "chart",
+			requirements: [
+				{ kind: "count", target: "categories", comparator: "exact", value: 4 },
+				{ kind: "count", target: "series", comparator: "exact", value: 2 },
+				{ kind: "label", target: "series", value: "2025" },
+				{ kind: "label", target: "series", value: "2026" },
+			],
+		},
+		diagram: {
+			id: "quarterly-revenue",
+			type: "chart",
+			kind: "bar",
+			categories: ["Q1", "Q2", "Q3", "Q4"],
+			series: [
+				{ name: "2025", values: [42, 51, 47, 63] },
+				{ name: "2026", values: [48, 57, 61, 72] },
+			],
+			unit: "$M",
+			categoryAxisTitle: "Quarter",
+			valueAxisTitle: "Revenue",
+		},
+	},
+	"weekly-active-users-line-chart": {
+		title: "Weekly Active Users by Platform",
+		intent: {
+			requestedKind: "chart",
+			nativeKind: "chart",
+			requirements: [
+				{ kind: "count", target: "categories", comparator: "exact", value: 8 },
+				{ kind: "count", target: "series", comparator: "exact", value: 3 },
+			],
+		},
+		diagram: {
+			id: "wau-chart",
+			type: "chart",
+			kind: "line",
+			categories: ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"],
+			series: [
+				{ name: "iOS", values: [120, 135, 150, 160, 158, 172, 180, 195] },
+				{ name: "Android", values: [100, 110, 108, 125, 140, 138, 150, 162] },
+				{ name: "Web", values: [80, 82, 90, 88, 95, 99, 104, 101] },
+			],
+			unit: "k",
+			categoryAxisTitle: "Week",
+			valueAxisTitle: "Active users",
+		},
+	},
+};
+
+describe("model answers that count series", () => {
+	it.each(Object.entries(seriesCountOutputs))("accepts and grades %s", (id, output) => {
+		const scenario = chartScenarios.find((candidate) => candidate.id === id);
+		if (!scenario) throw new Error(`Unknown chart scenario ${id}.`);
+		const generated = candidateFromText({
+			model: "fixture",
+			provider: "fixture",
+			text: JSON.stringify(output),
+		});
+		const enforced = enforceCandidateRequestRequirements(generated, {
+			model: "fixture",
+			prompt: toDiagramGenerationPrompt(scenario),
+		});
+		expect(enforced.error).toBeUndefined();
+		expect(enforced.diagram?.type).toBe("chart");
+		expect(evaluateScenarioDiagram(scenario, enforced.diagram).ok).toBe(true);
+	});
+});
 
 describe("prompt-grounded chart scenarios", () => {
 	it("covers each kind three times and the variety the renderer supports", () => {

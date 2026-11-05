@@ -38,6 +38,7 @@ export class CountRequirement extends Schema.Class<CountRequirement>("CountRequi
 		"people",
 		"points",
 		"relationships",
+		"series",
 		"sets",
 		"screens",
 		"states",
