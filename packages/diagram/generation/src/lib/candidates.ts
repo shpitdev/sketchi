@@ -914,7 +914,11 @@ function countForRequirement(
 	}
 	if (diagram.type === "timeline") return target === "events" ? diagram.events.length : undefined;
 	if (diagram.type === "chart")
-		return target === "categories" ? diagram.categories.length : undefined;
+		return target === "categories"
+			? diagram.categories.length
+			: target === "series"
+				? diagram.series.length
+				: undefined;
 	if (diagram.type === "gantt") return target === "tasks" ? diagram.tasks.length : undefined;
 	if (diagram.type === "state-machine")
 		return target === "states"
