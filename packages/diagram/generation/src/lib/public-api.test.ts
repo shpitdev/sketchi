@@ -235,8 +235,10 @@ describe("diagram generation prompt mapping", () => {
 			"include a real back-edge to an earlier distinct process or decision",
 		);
 		expect(messages.system).toContain("Never target start and never use a self-loop");
-		expect(messages.system).toContain("Add nothing the scenario does not state");
-		expect(messages.system).toContain("no next step it gives only to other branches");
+		expect(messages.system).toContain("Copy everything the scenario states, in full");
+		expect(messages.system).toContain("Add nothing it does not state");
+		expect(messages.system).toContain("Add no next step the scenario gives only to other branches");
+		expect(messages.system).not.toContain("invent none");
 		expect(messages.system).toContain(
 			"If the scenario says where the flow ends, every branch leads to that node.",
 		);

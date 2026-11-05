@@ -5,6 +5,11 @@ import { buildDiagramGenerationMessages } from "./messages.js";
 const { system } = buildDiagramGenerationMessages({ id: "rules", request: "Draw it" });
 
 describe("generation prompt rules", () => {
+	it("uses Gantt phases only when stated and keeps a persona's role", () => {
+		expect(system).toContain("only when the source itself names phases; otherwise omit it");
+		expect(system).toContain("persona is whose journey it is, with any role the source gives");
+	});
+
 	it("uses key columns on ER relationships only when the source states them", () => {
 		expect(system).toContain('"entity.field" when the source states the key columns');
 		expect(system).toContain("otherwise the entity id alone");
