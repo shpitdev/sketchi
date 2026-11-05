@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.31.9
+
+### Patch Changes
+
+- [#628](https://github.com/shpitdev/sketchi/pull/628) [`2887948`](https://github.com/shpitdev/sketchi/commit/2887948a6a135f95fc29ac75c4a2140dd71fc657) Thanks [@anandpant](https://github.com/anandpant)! - Sankey diagrams with a middle column now build a scene every CLI command can read. Their label backgrounds used to carry an empty label, which the scene contract rejects.
+
 ## 0.31.8
 
 ### Patch Changes
