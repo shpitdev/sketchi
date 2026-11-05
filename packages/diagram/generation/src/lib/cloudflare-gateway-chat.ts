@@ -199,7 +199,7 @@ function mapAiError(
 	});
 }
 
-const runChatAttempt = Effect.fn("diagramGeneration.cloudflareGoogleAiStudio.attempt")(function* (
+const runChatAttempt = Effect.fn("diagramGeneration.gatewayChat.attempt")(function* (
 	model: Context.Service.Shape<typeof LanguageModel.LanguageModel>,
 	gateway: CloudflareAiGateway,
 	config: CloudflareGatewayChatConfigValue,

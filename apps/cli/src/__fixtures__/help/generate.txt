@@ -15,8 +15,6 @@ Network and options:
   and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
   Without --type, the model selects flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, or quadrant from the request;
   a request for any other kind of diagram gets the closest of those.
-  --model defaults to gemini-3.1-flash-lite. A model the server does not support
-  is rejected before generation, and the error names the supported ones.
   Override the endpoint for preview or local testing with SKETCHI_GENERATE_ENDPOINT
   or --endpoint URL. --format defaults to png. Without --dest, the artifact is written as
   <generated-id>.png, <generated-id>.excalidraw, or <generated-id>.scene.json in the current
@@ -31,7 +29,7 @@ Validation and storage:
 
 Errors and next steps:
   Exit 10 means a network or endpoint failure, 11 a timeout, and 12 malformed output;
-  a rejected model or invalid generated document uses 3, conflict uses 6, and storage uses 7.
+  a rejected or invalid generated document uses 3, conflict uses 6, and storage uses 7.
   With --dest -, stdout contains artifact bytes only and all status uses stderr. On success, pass
   the returned id to show, edit, list, or export. For strictly offline manual authoring, accepted
   canonical JSON examples, and full error contracts, run sketchi docs.
@@ -42,7 +40,6 @@ USAGE
 FLAGS
   --prompt TEXT                    Diagram request text sent directly without interactive prompts.
   --type TYPE                      Authoritative diagram type; omit for model selection. (choices: flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, quadrant)
-  --model MODEL                    Generation model id the server supports; default gemini-3.1-flash-lite.
   --endpoint URL                   Unauthenticated generate API URL; defaults to the production Sketchi endpoint.
   --format png|excalidraw|scene    Artifact exported after generation; default png. (choices: png, excalidraw, scene)
   --dest PATH|-                    Artifact destination; defaults from the generated id, or - for stdout.
@@ -56,7 +53,7 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
-  # Generate a flowchart with gemini-3.1-flash-lite and write its PNG.
+  # Generate a flowchart and write its PNG.
   sketchi generate --prompt "Map release approval with pass and revise branches"
 
   # Generate a mindmap and write editable Excalidraw.

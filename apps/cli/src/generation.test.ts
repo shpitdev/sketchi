@@ -11,11 +11,7 @@ import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
 import { decodeCanonicalDiagramDocument, encodeJson } from "./document.js";
 import { CliStorageError, exitCodeForFailure } from "./errors.js";
 import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
-import {
-	DEFAULT_GENERATE_ENDPOINT,
-	DEFAULT_GENERATION_MODEL,
-	generateDiagram,
-} from "./generation.js";
+import { DEFAULT_GENERATE_ENDPOINT, generateDiagram } from "./generation.js";
 import { DiagramStore } from "./storage.js";
 import { CliPngRendererLive } from "./png-renderer.js";
 import {
@@ -52,8 +48,8 @@ async function buildSuccessBody(input: unknown): Promise<string> {
 					excalidraw: built.excalidraw,
 				},
 				generation: {
-					model: DEFAULT_GENERATION_MODEL,
-					provider: "cloudflare-google-ai-studio",
+					model: "claude-haiku-5-5",
+					provider: "cloudflare-anthropic",
 				},
 			};
 		}).pipe(Effect.provide(builderLayer)),
@@ -173,7 +169,6 @@ function runGenerate(
 ) {
 	return generateDiagram({
 		endpoint: DEFAULT_GENERATE_ENDPOINT,
-		model: DEFAULT_GENERATION_MODEL,
 		prompt: "Create a diagram",
 		...(type ? { type } : {}),
 	}).pipe(Effect.provide(capturingStoreLayer(created)));
@@ -346,6 +341,21 @@ describe("prompt-assisted generation over the public generate API", () => {
 		}),
 	);
 
+	it.effect("names no model in its request, so the server's model applies", () =>
+		Effect.gen(function* () {
+			const body = yield* Effect.promise(() => buildSuccessBody(flowchartInput));
+			const sent: unknown[] = [];
+			stubFetch(async (request) => {
+				sent.push(await request.json());
+				return new Response(body, { status: 200 });
+			});
+
+			yield* runGenerate([], "flowchart");
+
+			assert.deepStrictEqual(sent, [{ prompt: "Create a diagram", type: "flowchart" }]);
+		}),
+	);
+
 	it.effect("persists a generated flowchart returned by the endpoint", () =>
 		Effect.gen(function* () {
 			const body = yield* Effect.promise(() => buildSuccessBody(flowchartInput));
@@ -356,8 +366,8 @@ describe("prompt-assisted generation over the public generate API", () => {
 
 			assert.strictEqual(result.diagram.manifest.id, flowchartInput.spec.id);
 			assert.strictEqual(result.diagram.document.type, "flowchart");
-			assert.strictEqual(result.provider, "cloudflare-google-ai-studio");
-			assert.strictEqual(result.model, DEFAULT_GENERATION_MODEL);
+			assert.strictEqual(result.provider, "cloudflare-anthropic");
+			assert.strictEqual(result.model, "claude-haiku-5-5");
 			assert.strictEqual(created.length, 1);
 		}),
 	);
@@ -435,7 +445,6 @@ describe("prompt-assisted generation over the public generate API", () => {
 					stubFetch(() => new Response(body, { status: 200 }));
 					const generated = yield* generateDiagram({
 						endpoint: DEFAULT_GENERATE_ENDPOINT,
-						model: DEFAULT_GENERATION_MODEL,
 						prompt: "Create a diagram",
 						type,
 					});
@@ -551,38 +560,6 @@ describe("prompt-assisted generation over the public generate API", () => {
 		}),
 	);
 
-	it.effect("maps a rejected model to a typed error naming the supported models", () =>
-		Effect.gen(function* () {
-			stubFetch(() =>
-				jsonResponse(
-					{
-						ok: false,
-						status: "unsupported_model",
-						issues: [
-							{
-								message:
-									"The requested model is not supported. Supported models: gemini-3.1-flash-lite.",
-								hint: "Omit the model to use the default, or name a supported model.",
-							},
-						],
-					},
-					400,
-				),
-			);
-			const created: BuiltDiagram[] = [];
-
-			const error = yield* Effect.flip(runGenerate(created));
-
-			assert.strictEqual(error._tag, "CliGenerationError");
-			if (error._tag === "CliGenerationError") {
-				assert.strictEqual(error.code, "unsupported_model");
-				assert.match(error.message, /gemini-3\.1-flash-lite/u);
-				assert.strictEqual(exitCodeForFailure(error), 3);
-			}
-			assert.strictEqual(created.length, 0);
-		}),
-	);
-
 	it.effect("maps an endpoint timeout to a typed timeout failure", () =>
 		Effect.gen(function* () {
 			stubFetch(() => jsonResponse({ ok: false, status: "generation_timeout", issues: [] }, 504));
@@ -626,8 +603,8 @@ describe("prompt-assisted generation over the public generate API", () => {
 							excalidraw: {},
 						},
 						generation: {
-							model: DEFAULT_GENERATION_MODEL,
-							provider: "cloudflare-google-ai-studio",
+							model: "claude-haiku-5-5",
+							provider: "cloudflare-anthropic",
 						},
 					},
 					200,
@@ -654,7 +631,6 @@ describe("prompt-assisted generation over the public generate API", () => {
 			const error = yield* Effect.flip(
 				generateDiagram({
 					endpoint: DEFAULT_GENERATE_ENDPOINT,
-					model: DEFAULT_GENERATION_MODEL,
 					prompt: "Create a release flow",
 					type: "flowchart",
 				}).pipe(Effect.provide(failingStoreLayer(attempts))),

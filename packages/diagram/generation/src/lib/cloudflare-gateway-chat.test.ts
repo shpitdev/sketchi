@@ -665,7 +665,7 @@ describe("gateway chat telemetry", () => {
 		expect(new Set(names)).toEqual(
 			new Set([
 				"LanguageModel.generateText",
-				"diagramGeneration.cloudflareGoogleAiStudio.attempt",
+				"diagramGeneration.gatewayChat.attempt",
 				"diagramGeneration.executeModelCall",
 				"diagramGeneration.generate",
 				"diagramGeneration.runWithPolicy",

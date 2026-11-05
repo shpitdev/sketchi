@@ -14,7 +14,6 @@ import { CliGenerationError } from "./errors.js";
 import { DiagramStore } from "./storage.js";
 import { API_REQUEST_TIMEOUT, MAX_API_RESPONSE_BYTES, readBoundedText } from "./response-body.js";
 
-export const DEFAULT_GENERATION_MODEL = "gemini-3.1-flash-lite";
 export const DEFAULT_GENERATE_ENDPOINT = "https://playground.sketchi.app/api/v1/generate";
 export const SKETCHI_GENERATE_ENDPOINT_ENV = "SKETCHI_GENERATE_ENDPOINT";
 
@@ -23,7 +22,6 @@ export type GenerationType = (typeof CANONICAL_DOCUMENT_TYPES)[number];
 
 export interface GenerateDiagramInput {
 	readonly endpoint: string;
-	readonly model: string;
 	readonly prompt: string;
 	readonly type?: GenerationType;
 }
@@ -118,13 +116,6 @@ function endpointFailure(status: number, body: typeof EndpointErrorBody.Type): C
 				hint: firstIssue?.hint ?? "Refine the prompt with concrete content, then retry.",
 				details,
 			});
-		case "unsupported_model":
-			return CliGenerationError.make({
-				code: "unsupported_model",
-				message: firstIssue?.message ?? "The Sketchi generate API rejected the requested model.",
-				hint: firstIssue?.hint ?? `Omit --model to use ${DEFAULT_GENERATION_MODEL}.`,
-				details,
-			});
 		default:
 			return CliGenerationError.make({
 				code: "provider_failure",
@@ -196,7 +187,6 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
 					body: JSON.stringify({
 						prompt: input.prompt,
 						...(input.type ? { type: input.type } : {}),
-						model: input.model,
 					}),
 					signal,
 				}),

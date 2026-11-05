@@ -505,7 +505,7 @@ try {
 							excalidraw: generatedExcalidraw,
 						},
 						generation: {
-							model: "gemini-3.1-flash-lite",
+							model: "claude-haiku-5-5",
 							provider: "smoke-loopback",
 						},
 					}),
@@ -635,20 +635,20 @@ try {
 		const requestCountBeforePreset = wizardRequests.length;
 		const wizardPreset = await runWizard(
 			[describeStep("Create a preset release map.\r")],
-			["--type", "mindmap", "--format", "png", "--dest", presetPng, "--model", "preset-model"],
+			["--type", "mindmap", "--format", "png", "--dest", presetPng],
 		);
 		expectExit(wizardPreset, 0, "wizard explicit presets");
 		const presetRequest = wizardRequests[requestCountBeforePreset];
 		assert(
 			presetRequest?.type === "mindmap" &&
-				presetRequest.model === "preset-model" &&
+				presetRequest.model === undefined &&
 				!wizardPreset.stdout.includes(Buffer.from("Diagram type")) &&
 				!wizardPreset.stdout.includes(Buffer.from("Save the PNG")),
-			"Wizard discarded an explicit type, format, model, or destination preset.",
+			"Wizard discarded an explicit type, format, or destination preset.",
 		);
 		assertPng(
 			await readFile(presetPng),
-			"Wizard discarded an explicit type, format, model, or destination preset.",
+			"Wizard discarded an explicit type, format, or destination preset.",
 		);
 		await rm(generatedRecord, { force: true, recursive: true });
 

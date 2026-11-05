@@ -1339,8 +1339,7 @@ layer(retryClientLayer)("bounded retry policy", (it) => {
 			);
 			const attempts = probe.events.filter(
 				(event): event is TelemetrySpanEvent =>
-					event.event === "effect.span" &&
-					event.name === "diagramGeneration.cloudflareGoogleAiStudio.attempt",
+					event.event === "effect.span" && event.name === "diagramGeneration.gatewayChat.attempt",
 			);
 			assert.strictEqual(
 				metrics.filter((metric) => metric.metric === "sketchi_generation_attempts").length,

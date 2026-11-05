@@ -45,7 +45,6 @@ import {
 } from "./generate-wizard.js";
 import {
 	DEFAULT_GENERATE_ENDPOINT,
-	DEFAULT_GENERATION_MODEL,
 	SKETCHI_GENERATE_ENDPOINT_ENV,
 	resolveGenerateEndpoint,
 	type GenerateDiagramResult,
@@ -130,16 +129,15 @@ Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate [--prompt TEXT] [--type ${CANONICAL_DOCUMENT_TYPES.join("|")}] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type ${CANONICAL_DOCUMENT_TYPES.join("|")}]
   sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at ${DEFAULT_GENERATE_ENDPOINT}
   and needs no token, key, account, or login. The model call, validation, and quality gate
   run server-side; the finished diagram and Excalidraw artifact come back and are committed
-  through the same local store as create. Without --type, the model selects a supported native type; the default model is
-  ${DEFAULT_GENERATION_MODEL}, and a model the server does not support exits 3 with an error naming
-  the supported ones. Override the endpoint for preview or local testing with
+  through the same local store as create. Without --type, the model selects a supported native type.
+  Override the endpoint for preview or local testing with
   ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.
   canvas submits the CanvasSpec object itself to ${DEFAULT_CANVAS_ENDPOINT}, validates the typed
   response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
@@ -413,8 +411,6 @@ Network and options:
   and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
   Without --type, the model selects ${alternativeList([...CANONICAL_DOCUMENT_TYPES])} from the request;
   a request for any other kind of diagram gets the closest of those.
-  --model defaults to ${DEFAULT_GENERATION_MODEL}. A model the server does not support
-  is rejected before generation, and the error names the supported ones.
   Override the endpoint for preview or local testing with ${SKETCHI_GENERATE_ENDPOINT_ENV}
   or --endpoint URL. --format defaults to png. Without --dest, the artifact is written as
   <generated-id>.png, <generated-id>.excalidraw, or <generated-id>.scene.json in the current
@@ -429,7 +425,7 @@ Validation and storage:
 
 Errors and next steps:
   Exit 10 means a network or endpoint failure, 11 a timeout, and 12 malformed output;
-  a rejected model or invalid generated document uses 3, conflict uses 6, and storage uses 7.
+  a rejected or invalid generated document uses 3, conflict uses 6, and storage uses 7.
   With --dest -, stdout contains artifact bytes only and all status uses stderr. On success, pass
   the returned id to show, edit, list, or export. For strictly offline manual authoring, accepted
   canonical JSON examples, and full error contracts, run sketchi docs.`;
@@ -448,13 +444,6 @@ const generateCommand = Command.make(
 				Flag.withDescription("Authoritative diagram type; omit for model selection."),
 				Flag.withMetavar("TYPE"),
 			),
-		),
-		model: Flag.String("model").pipe(
-			Flag.withDefault(DEFAULT_GENERATION_MODEL),
-			Flag.withDescription(
-				`Generation model id the server supports; default ${DEFAULT_GENERATION_MODEL}.`,
-			),
-			Flag.withMetavar("MODEL"),
 		),
 		endpoint: Flag.String("endpoint").pipe(
 			Flag.withDefault(resolveGenerateEndpoint()),
@@ -522,7 +511,6 @@ const generateCommand = Command.make(
 							const activity = yield* wizard.activity;
 							const result = yield* runGenerateWorkflow({
 								endpoint: input.endpoint,
-								model: input.model,
 								prompt: answers.prompt,
 								type: answers.type,
 								format: "png",
@@ -539,7 +527,6 @@ const generateCommand = Command.make(
 				output,
 				runGenerateWorkflow({
 					endpoint: input.endpoint,
-					model: input.model,
 					prompt: suppliedPrompt,
 					...(suppliedType ? { type: suppliedType } : {}),
 					format: suppliedFormat ?? "png",
@@ -556,7 +543,7 @@ const generateCommand = Command.make(
 	Command.withExamples([
 		{
 			command: 'sketchi generate --prompt "Map release approval with pass and revise branches"',
-			description: `Generate a flowchart with ${DEFAULT_GENERATION_MODEL} and write its PNG.`,
+			description: "Generate a flowchart and write its PNG.",
 		},
 		{
 			command:

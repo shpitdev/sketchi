@@ -18,7 +18,7 @@ export function isSupportedGenerationModel(model: string): model is SupportedGen
 }
 
 /**
- * Installed CLIs send this id on every request, whether or not the user chose it, so
+ * Older CLIs send this id on every request, whether or not the user chose it, so
  * naming it means the same as naming nothing: the deployment's configured model.
  */
 export function isLegacyCliDefaultModel(model: string): boolean {

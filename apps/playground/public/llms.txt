@@ -47,7 +47,7 @@ Generate a flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, 
 prebuilt spec. Omit type for model selection, or pass a supported type as an
 authoritative constraint. Unsupported native types return a typed error. Omit
 model to use the default; a model Sketchi does not support returns a typed 400
-unsupported_model naming the supported IDs.
+unsupported_model.
 
 GET /api/v1/artifacts/{artifactId}?format=scene
 GET /api/v1/artifacts/{artifactId}?format=excalidraw
