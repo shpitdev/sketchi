@@ -127,8 +127,9 @@ describe("binding-dependent host lifecycles", () => {
 			expect(lifecycle.generationBuilt - before.generationBuilt).toBe(1);
 			expect(lifecycle.generationClosed).toBe(before.generationClosed);
 			expect(calls.map((call) => call.gatewayId)).toEqual(["shared", "shared", "shared"]);
+			expect(calls.map((call) => call.model)).toHaveLength(3);
 			expect(calls.map((call) => call.model)).toEqual(
-				expect.arrayContaining(["model-a", "model-b", "gemini-3.1-flash-lite"]),
+				expect.arrayContaining(["model-a", "model-b"]),
 			);
 			await runtime.run(generate(), boundary({ AI: ai, SKETCHI_AI_GATEWAY_ID: "other" }));
 			await runtime.run(
@@ -150,6 +151,28 @@ describe("binding-dependent host lifecycles", () => {
 			await nextHost.dispose();
 		}
 		expect(lifecycle.generationClosed - before.generationClosed).toBe(4);
+	});
+
+	it("builds one generation client per route on the same gateway", async () => {
+		const before = { ...lifecycle };
+		const runtime = makePlaygroundRuntime();
+		const calls: { gatewayId: string; model: unknown }[] = [];
+		const ai = fakeAi(calls);
+		const haiku = boundary({ AI: ai, SKETCHI_AI_GENERATE_MODEL: "anthropic/claude-haiku-5-5" });
+		const google = boundary({ AI: ai });
+		try {
+			await runtime.run(generate(), haiku);
+			await runtime.run(generate(), google);
+			await runtime.run(generate(), haiku);
+			expect(lifecycle.generationBuilt - before.generationBuilt).toBe(2);
+			expect(calls.map((call) => call.model)).toEqual([
+				"claude-haiku-5-5",
+				"gemini-3.1-flash-lite",
+				"claude-haiku-5-5",
+			]);
+		} finally {
+			await runtime.dispose();
+		}
 	});
 
 	it("reuses Studio services per bucket while keeping request ownership and bucket data separate", async () => {

@@ -29,7 +29,7 @@ import {
 	DEFAULT_MAX_OUTPUT_TOKENS,
 	DEFAULT_TEMPERATURE,
 } from "./messages.js";
-import { stripGoogleModelPrefix } from "./models.js";
+import { stripAnthropicModelPrefix, stripGoogleModelPrefix } from "./models.js";
 import { runDiagramGenerationWithPolicy } from "./policy.js";
 
 // The gateway fetch below never dials this. It only satisfies the client's URL handling.
@@ -43,6 +43,8 @@ export interface GatewayChatRoute {
 	readonly modelId: (model: string) => string;
 	readonly modelLabel: string;
 	readonly provider: DiagramGenerationProviderId;
+	/** What this upstream takes beyond the model, messages and output budget. */
+	readonly requestFields: (request: DiagramGenerationRequest) => Record<string, unknown>;
 }
 
 export const googleGatewayChatRoute: GatewayChatRoute = {
@@ -52,7 +54,29 @@ export const googleGatewayChatRoute: GatewayChatRoute = {
 	modelId: stripGoogleModelPrefix,
 	modelLabel: "Gemini",
 	provider: "cloudflare-google-ai-studio",
+	requestFields: (request) => ({
+		response_format: { type: "json_object" },
+		temperature: request.temperature ?? DEFAULT_TEMPERATURE,
+	}),
 };
+
+export const anthropicGatewayChatRoute: GatewayChatRoute = {
+	endpoint: "v1/chat/completions",
+	gatewayLabel: "Anthropic",
+	gatewayProvider: "anthropic",
+	modelId: stripAnthropicModelPrefix,
+	modelLabel: "Claude",
+	provider: "cloudflare-anthropic",
+	// Haiku rejects `temperature` and a `json_object` format, and rejects our response schema
+	// as `json_schema`: `diagram` is open and the IR is recursive. The prompt asks for JSON and
+	// the parser is tolerant. Thinking on doubled tokens and latency without raising acceptance.
+	requestFields: () => ({ thinking: { type: "disabled" } }),
+};
+
+/** The route for a model id, named by its prefix. Unprefixed ids are Google's. */
+export function gatewayChatRouteForModel(model: string): GatewayChatRoute {
+	return model.startsWith("anthropic/") ? anthropicGatewayChatRoute : googleGatewayChatRoute;
+}
 
 export interface CloudflareGatewayChatConfigValue {
 	readonly collectLog: boolean;
@@ -198,8 +222,7 @@ const runChatAttempt = Effect.fn("diagramGeneration.cloudflareGoogleAiStudio.att
 		OpenAiLanguageModel.withConfigOverride({
 			max_output_tokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
 			model: modelId,
-			response_format: { type: "json_object" },
-			temperature: request.temperature ?? DEFAULT_TEMPERATURE,
+			...route.requestFields(request),
 		}),
 		Effect.provideService(LanguageModel.LanguageModel, model),
 		Effect.provideService(

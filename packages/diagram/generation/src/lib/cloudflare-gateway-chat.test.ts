@@ -13,8 +13,11 @@ import {
 } from "./client.js";
 import { type CloudflareAiGateway, CloudflareAiGatewayBinding } from "./cloudflare-ai-gateway.js";
 import {
+	anthropicGatewayChatRoute,
 	CloudflareGatewayChatClientLive,
 	CloudflareGatewayChatConfig,
+	gatewayChatRouteForModel,
+	type GatewayChatRoute,
 	googleGatewayChatRoute,
 } from "./cloudflare-gateway-chat.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
@@ -60,7 +63,11 @@ function bindingLayer(run: RunFn) {
 	});
 }
 
-function clientLayer(run: RunFn, policy: Partial<DiagramGenerationPolicyConfig> = {}) {
+function clientLayer(
+	run: RunFn,
+	policy: Partial<DiagramGenerationPolicyConfig> = {},
+	route: GatewayChatRoute = googleGatewayChatRoute,
+) {
 	return CloudflareGatewayChatClientLive.pipe(
 		Layer.provide(
 			Layer.mergeAll(
@@ -68,7 +75,7 @@ function clientLayer(run: RunFn, policy: Partial<DiagramGenerationPolicyConfig> 
 				Layer.succeed(CloudflareGatewayChatConfig, {
 					collectLog: true,
 					gatewayId: "test",
-					route: googleGatewayChatRoute,
+					route,
 					surface: "generate-api",
 				}),
 				Layer.succeed(DiagramGenerationPolicy, { ...testPolicy, ...policy }),
@@ -226,6 +233,100 @@ describe("gateway chat responses", () => {
 			provider: "cloudflare-google-ai-studio",
 		});
 		expect(calls).toHaveLength(1);
+	});
+});
+
+describe("gateway chat routes", () => {
+	const haiku = { ...request, model: "anthropic/claude-haiku-5-5" };
+	const anthropicLayer = (run: RunFn, policy: Partial<DiagramGenerationPolicyConfig> = {}) =>
+		clientLayer(run, policy, anthropicGatewayChatRoute);
+
+	it.each([
+		["anthropic/claude-haiku-5-5", anthropicGatewayChatRoute],
+		["google/gemini-3.1-flash-lite", googleGatewayChatRoute],
+		["google-ai-studio/gemini-3.1-flash-lite", googleGatewayChatRoute],
+		["gemini-3.1-flash-lite", googleGatewayChatRoute],
+	])("routes %s by its prefix", (model, route) => {
+		expect(gatewayChatRouteForModel(model)).toBe(route);
+	});
+
+	it("sends Haiku with thinking off, and no temperature or response format", async () => {
+		const { calls, run } = capture();
+		const candidate = await Effect.runPromise(
+			generate(anthropicLayer(run), { ...haiku, temperature: 0.4 }),
+		);
+		const { system, user } = buildDiagramGenerationMessages(prompt);
+		const [data, options] = calls[0] ?? [];
+		expect(data).toEqual({
+			endpoint: "v1/chat/completions",
+			provider: "anthropic",
+			headers: { "Content-Type": "application/json" },
+			query: {
+				model: "claude-haiku-5-5",
+				messages: [
+					{ role: "system", content: system },
+					{ role: "user", content: user },
+				],
+				max_tokens: 16_384,
+				thinking: { type: "disabled" },
+			},
+		});
+		expect(options?.gateway?.metadata?.["sketchiProvider"]).toBe("cloudflare-anthropic");
+		expect(candidate).toMatchObject({
+			model: "claude-haiku-5-5",
+			provider: "cloudflare-anthropic",
+			usage: { inputTokens: 11, outputTokens: 7, totalTokens: 18 },
+		});
+	});
+
+	it("reports Anthropic's error body and does not retry a rejected request", async () => {
+		const { calls, run } = capture(() =>
+			Response.json(
+				{
+					error: {
+						code: "invalid_request_error",
+						message: "`temperature` is deprecated for this model.",
+						type: "invalid_request_error",
+						param: null,
+					},
+				},
+				{ status: 400 },
+			),
+		);
+		const error = await Effect.runPromise(
+			generate(anthropicLayer(run, { maxRetries: 2 }), haiku).pipe(Effect.flip),
+		);
+		expect(error).toMatchObject({
+			_tag: "DiagramGenerationHttpError",
+			diagnostics: [
+				"Anthropic Gateway request failed with HTTP 400.",
+				"`temperature` is deprecated for this model.",
+			],
+			provider: "cloudflare-anthropic",
+			retryable: false,
+			status: 400,
+		});
+		expect(calls).toHaveLength(1);
+	});
+
+	it("retries Anthropic's overload status, then succeeds", async () => {
+		const responses = [
+			Response.json({ error: { message: "Overloaded" } }, { status: 529 }),
+			completion(unsupported),
+		];
+		let index = 0;
+		const { calls, run } = capture(() => responses[index++] ?? completion(unsupported));
+		const candidate = await Effect.runPromise(
+			generate(anthropicLayer(run, { maxRetries: 2 }), haiku),
+		);
+		expect(calls).toHaveLength(2);
+		expect(candidate.provider).toBe("cloudflare-anthropic");
+	});
+
+	it("names Claude when its output is truncated", async () => {
+		const { run } = capture(() => completion(unsupported, "length"));
+		const candidate = await Effect.runPromise(generate(anthropicLayer(run), haiku));
+		expect(candidate.error).toBe("Claude output was truncated.");
 	});
 });
 

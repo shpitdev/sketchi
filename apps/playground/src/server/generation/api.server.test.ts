@@ -2,6 +2,7 @@ import { mediaPlayerStateMachine } from "@sketchi/diagram-core";
 import type { CloudflareAiGateway, CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
 import { describe, expect, it } from "vitest";
 
+import { aiEnvironment } from "../bindings/ai-env.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 import { handleGenerateDiagramRequest } from "./api.server";
@@ -561,12 +562,12 @@ describe("generation request boundaries", () => {
 		expect(calls).toBe(0);
 	});
 
-	// Installed CLIs send the bare id on every request, so it must stay accepted.
+	// Installed CLIs send the bare id on every request, so naming it follows the deployment.
 	it.each([
 		"gemini-3.1-flash-lite",
 		"google/gemini-3.1-flash-lite",
 		"google-ai-studio/gemini-3.1-flash-lite",
-	])("routes supported model %s to the gateway", async (model) => {
+	])("resolves the installed CLI default %s to the configured model", async (model) => {
 		const models: unknown[] = [];
 		const response = await generateRequest(
 			{
@@ -578,7 +579,52 @@ describe("generation request boundaries", () => {
 			{ prompt: "Show release approval", type: "flowchart", model },
 		);
 		expect(response.status).toBe(200);
-		expect(models).toEqual(["gemini-3.1-flash-lite"]);
+		expect(models).toEqual(["configured-model"]);
+	});
+
+	it.each([
+		["with no model", {}],
+		["naming the installed CLI default", { model: "gemini-3.1-flash-lite" }],
+	])("routes generate to its own model %s", async (_name, requested) => {
+		const runs: Parameters<CloudflareAiGateway["run"]>[0][] = [];
+		const response = await generateRequest(
+			{
+				AI: fakeAiGateway(generationText(flowchartIr), (input) => {
+					runs.push(input);
+				}),
+				SKETCHI_AI_GENERATE_MODEL: "anthropic/claude-haiku-5-5",
+				SKETCHI_AI_MODEL: "google/configured-model",
+			},
+			{ prompt: "Show release approval", type: "flowchart", ...requested },
+		);
+		const body = (await response.json()) as { generation: unknown };
+		expect(response.status).toBe(200);
+		expect(body.generation).toEqual({
+			model: "claude-haiku-5-5",
+			provider: "cloudflare-anthropic",
+		});
+		expect(runs).toMatchObject([
+			{
+				endpoint: "v1/chat/completions",
+				provider: "anthropic",
+				query: { model: "claude-haiku-5-5" },
+			},
+		]);
+	});
+
+	it("does not route chat's model through a Haiku generate model", () => {
+		const environment = aiEnvironment({
+			SKETCHI_AI_GENERATE_MODEL: "anthropic/claude-haiku-5-5",
+			SKETCHI_AI_MODEL: "google/configured-model",
+		});
+		expect(environment.model).toBe("google/configured-model");
+		expect(environment.generateModel).toBe("anthropic/claude-haiku-5-5");
+	});
+
+	it("falls back to the shared model when generate has none of its own", () => {
+		expect(aiEnvironment({ SKETCHI_AI_MODEL: "google/configured-model" }).generateModel).toBe(
+			"google/configured-model",
+		);
 	});
 
 	it("uses the configured model when a request names none", async () => {

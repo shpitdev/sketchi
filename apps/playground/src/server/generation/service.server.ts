@@ -12,7 +12,9 @@ import {
 	type DiagramGenerationError,
 	type DiagramGenerationType,
 	DiagramGenerationPolicyLive,
-	googleGatewayChatRoute,
+	gatewayChatRouteForModel,
+	type GatewayChatRoute,
+	isLegacyCliDefaultModel,
 	type SupportedGenerationModel,
 } from "@sketchi/diagram-generation";
 import { Context, Effect, Layer } from "effect";
@@ -21,8 +23,6 @@ import { aiEnvironment } from "../bindings/ai-env.server";
 import { logosNamedIn } from "../codemode/icon-catalog.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundBindings } from "../runtime/context.server";
-
-const GENERATION_PROVIDER = "cloudflare-google-ai-studio" as const;
 
 export interface GenerateDiagramServiceInput {
 	readonly cacheMode?: DiagramGenerationCacheMode;
@@ -57,13 +57,15 @@ export const PlaygroundGenerationLive = Layer.effect(
 		const clientForBindings = Effect.fn("playground.generation.clientForBindings")(function* (
 			ai: CloudflareAiGatewayProvider,
 			gatewayId: string,
+			route: GatewayChatRoute,
 		) {
 			let byGateway = clients.get(ai);
 			if (!byGateway) {
 				byGateway = new Map();
 				clients.set(ai, byGateway);
 			}
-			let client = byGateway.get(gatewayId);
+			const clientKey = `${gatewayId}:${route.provider}`;
+			let client = byGateway.get(clientKey);
 			if (!client) {
 				const clientLayer = CloudflareGatewayChatClientLive.pipe(
 					Layer.provide(
@@ -72,7 +74,7 @@ export const PlaygroundGenerationLive = Layer.effect(
 							Layer.succeed(CloudflareGatewayChatConfig, {
 								collectLog: true,
 								gatewayId,
-								route: googleGatewayChatRoute,
+								route,
 								surface: "generate-api",
 							}),
 							DiagramGenerationPolicyLive,
@@ -84,24 +86,26 @@ export const PlaygroundGenerationLive = Layer.effect(
 						Effect.map((context) => Context.get(context, DiagramGenerationClient)),
 					),
 				);
-				byGateway.set(gatewayId, client);
+				byGateway.set(clientKey, client);
 			}
 			return yield* client;
 		});
 
 		return PlaygroundGeneration.of({
-			defaultModel: (env) => aiEnvironment(env).model,
+			defaultModel: (env) => aiEnvironment(env).generateModel,
 			generate: Effect.fn("playground.generation.generate")(function* (input) {
 				const env = yield* PlaygroundBindings;
 				const config = aiEnvironment(env);
-				const model = input.model ?? config.model;
+				const model =
+					input.model && !isLegacyCliDefaultModel(input.model) ? input.model : config.generateModel;
+				const route = gatewayChatRouteForModel(model);
 				if (!env.AI) {
 					return yield* DiagramGenerationConfigurationError.make({
 						message: "AI Gateway generation is not configured in this Worker environment (env.AI).",
-						provider: GENERATION_PROVIDER,
+						provider: route.provider,
 					});
 				}
-				const client = yield* clientForBindings(env.AI, config.gatewayId);
+				const client = yield* clientForBindings(env.AI, config.gatewayId, route);
 				const logos = logosNamedIn(input.prompt);
 				return yield* client.generate({
 					...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
