@@ -5,6 +5,11 @@ import { buildDiagramGenerationMessages } from "./messages.js";
 const { system } = buildDiagramGenerationMessages({ id: "rules", request: "Draw it" });
 
 describe("generation prompt rules", () => {
+	it("makes every named zone a group nested in the zone that holds it", () => {
+		expect(system).toContain("Every zone the scenario names is its own group");
+		expect(system).toContain('sets "parent" to the zone that holds it');
+	});
+
 	it("says what a table's columns are and what a footer holds", () => {
 		expect(system).toContain("table (columns: an array of header strings, rows?)");
 		expect(system).toContain("footer (holds whatever the source puts at the bottom)");
