@@ -9,7 +9,12 @@ import {
 } from "@sketchi/diagram-core";
 
 import { renderDiagram } from "../diagram.js";
-import { layoutSankeyDiagram, SANKEY_MIN_BAND, SANKEY_SINK_COLOR } from "../sankey-layout.js";
+import {
+	layoutSankeyDiagram,
+	SANKEY_MIN_BAND,
+	SANKEY_SINK_COLOR,
+	sankeyFlowText,
+} from "../sankey-layout.js";
 import {
 	readSankeyScene,
 	sankeyCrossingPairs,
@@ -38,6 +43,39 @@ function bandOf(diagram: SankeyDiagram, source: string, target: string) {
 	if (!band) throw new Error(`No band ${source} → ${target}.`);
 	return band;
 }
+
+describe("Sankey flow text", () => {
+	it.each([
+		["a bare number", "$k", "310", 310],
+		["the formatted value", "$k", "$310k", 310],
+		["a value with separators and a word unit", "visits", "1,200 visits", 1200],
+		["a value without its separators", "visits", "1200", 1200],
+	])("draws a label that restates the value once: %s", (_name, unit, label, value) => {
+		const text = sankeyFlowText({ unit }, { label, value });
+		expect(text).toBe(sankeyFlowText({ unit }, { value }));
+		expect(text).not.toContain("\n");
+	});
+
+	it("keeps a label that says something else above the value", () => {
+		expect(sankeyFlowText({ unit: "$k" }, { label: "Retained", value: 310 })).toBe(
+			"Retained\n$310k",
+		);
+		expect(sankeyFlowText({ unit: "$k" }, { label: "3100", value: 310 })).toContain("\n");
+	});
+
+	it("draws no value twice and needs no leader when every label restates its value", () => {
+		const restated = {
+			...sankeyFixture,
+			links: sankeyFixture.links.map((link) => ({ ...link, label: String(link.value) })),
+		};
+		const scene = renderSankeyDiagram(restated);
+		const plain = renderSankeyDiagram({
+			...sankeyFixture,
+			links: sankeyFixture.links.map(({ label: _label, ...link }) => link),
+		});
+		expect(scene.elements).toEqual(plain.elements);
+	});
+});
 
 describe("Sankey renderer", () => {
 	it("renders the fixture into a valid deterministic scene", () => {
