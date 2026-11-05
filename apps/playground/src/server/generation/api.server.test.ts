@@ -579,7 +579,7 @@ describe("generation request boundaries", () => {
 			status: "unsupported_model",
 			issues: [{ code: "unsupported_model", stage: "input" }],
 		});
-		expect(body.issues[0]?.message).toContain("gemini-3.1-flash-lite");
+		expect(body.issues[0]?.message).toBe("The requested model is not supported.");
 		expect(calls).toBe(0);
 	});
 

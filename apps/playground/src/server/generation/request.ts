@@ -1,5 +1,5 @@
 import { CANONICAL_DOCUMENT_TYPES } from "@sketchi/diagram-agent";
-import { listAlternatives, SUPPORTED_GENERATION_MODELS } from "@sketchi/diagram-generation";
+import { listAlternatives } from "@sketchi/diagram-generation";
 import { Schema } from "effect";
 
 export const GenerateRequestSchema = Schema.Struct({
@@ -17,6 +17,6 @@ const nativeTypeList = listAlternatives(CANONICAL_DOCUMENT_TYPES);
 
 export const GENERATE_REQUEST_COPY = {
 	invalidInput: `The generate request must include a string prompt and an optional type of ${nativeTypeList}.`,
-	unsupportedModel: `The requested model is not supported. Supported models: ${listAlternatives(SUPPORTED_GENERATION_MODELS)}.`,
-	requestSupportedModel: "Omit the model to use the default, or name a supported model.",
+	unsupportedModel: "The requested model is not supported.",
+	requestSupportedModel: "Omit the model to use the default.",
 } as const;

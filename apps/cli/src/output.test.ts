@@ -113,8 +113,8 @@ describe("output envelopes and exits", () => {
 					revision: 1,
 					formats: ["scene", "excalidraw"],
 					generation: {
-						model: "gemini-3.1-flash-lite",
-						provider: "cloudflare-google-ai-studio",
+						model: "claude-haiku-5-5",
+						provider: "cloudflare-anthropic",
 					},
 					export: {
 						format: "png",

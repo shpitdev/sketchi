@@ -34,16 +34,15 @@ Semantic color patch example:
   sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|timeline|chart|state-machine|gantt|er|class|org-chart|venn|journey|sankey|wireframe|quadrant] [--model MODEL]
+  sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|timeline|chart|state-machine|gantt|er|class|org-chart|venn|journey|sankey|wireframe|quadrant]
   sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
   generate makes one unauthenticated HTTPS POST to the public Sketchi generate API at https://playground.sketchi.app/api/v1/generate
   and needs no token, key, account, or login. The model call, validation, and quality gate
   run server-side; the finished diagram and Excalidraw artifact come back and are committed
-  through the same local store as create. Without --type, the model selects a supported native type; the default model is
-  gemini-3.1-flash-lite, and a model the server does not support exits 3 with an error naming
-  the supported ones. Override the endpoint for preview or local testing with
+  through the same local store as create. Without --type, the model selects a supported native type.
+  Override the endpoint for preview or local testing with
   SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
   canvas submits the CanvasSpec object itself to https://playground.sketchi.app/api/v1/canvases/create, validates the typed
   response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
