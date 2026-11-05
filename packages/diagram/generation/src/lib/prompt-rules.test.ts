@@ -5,6 +5,11 @@ import { buildDiagramGenerationMessages } from "./messages.js";
 const { system } = buildDiagramGenerationMessages({ id: "rules", request: "Draw it" });
 
 describe("generation prompt rules", () => {
+	it("gives every stated action a node, on return paths too", () => {
+		expect(system).toContain("Give every action the scenario states its own node");
+		expect(system).toContain("A return path that names an action");
+	});
+
 	it("keeps a field typed as another class in its box, with a role on its relationship", () => {
 		expect(system).toContain("stays in attributes");
 		expect(system).toContain("whose toRole is the field's name");
