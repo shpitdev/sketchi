@@ -215,6 +215,8 @@ describe("gateway chat responses", () => {
 		["empty content", () => completion("")],
 		["empty content at the token limit", () => completion(null, "length")],
 		["not JSON", () => new Response("<html>")],
+		["truncated JSON", () => new Response('{"id":"chatcmpl-1","choices":[')],
+		["no body", () => new Response(null, { status: 204 })],
 		["an embedded error object", () => Response.json({ error: { code: 502, message: "no host" } })],
 		["filtered content", () => completion(null, "content_filter")],
 	])("fails %s as a non-retryable ResponseError", async (_name, response) => {
@@ -308,6 +310,99 @@ describe("gateway chat errors", () => {
 			retryable: true,
 		});
 		expect(calls).toBe(2);
+	});
+
+	describe("when the connection breaks while reading the body", () => {
+		function brokenBody(init?: ResponseInit) {
+			return new Response(
+				new ReadableStream<Uint8Array>({
+					start(controller) {
+						controller.enqueue(new TextEncoder().encode('{"id":"chatcmpl-1",'));
+						controller.error(new Error("connection reset"));
+					},
+				}),
+				init,
+			);
+		}
+
+		function geminiClient(run: RunFn, maxRetries: number) {
+			return CloudflareGoogleAiStudioClientLive.pipe(
+				Layer.provide(
+					Layer.mergeAll(
+						bindingLayer(run),
+						Layer.succeed(CloudflareGoogleAiStudioConfig, { collectLog: true, gatewayId: "test" }),
+						Layer.succeed(DiagramGenerationPolicy, { ...testPolicy, maxRetries }),
+					),
+				),
+			);
+		}
+
+		const expected = {
+			_tag: "DiagramGenerationTransportError",
+			message: "connection reset",
+			operation: "gateway.run",
+			provider: "cloudflare-google-ai-studio",
+			retryable: true,
+		};
+
+		it.each([
+			["a successful response", undefined],
+			["an error response", { status: 500 }],
+		])("retries on both clients when it breaks during %s", async (_name, init) => {
+			const chat = capture(() => brokenBody(init));
+			const gemini = capture(() => brokenBody(init));
+			const [chatError, geminiError] = await Promise.all([
+				Effect.runPromise(generate(clientLayer(chat.run, { maxRetries: 2 })).pipe(Effect.flip)),
+				Effect.runPromise(generate(geminiClient(gemini.run, 2)).pipe(Effect.flip)),
+			]);
+			expect(chatError).toMatchObject(expected);
+			expect(geminiError).toMatchObject(expected);
+			expect(chat.calls).toHaveLength(3);
+			expect(gemini.calls).toHaveLength(3);
+		});
+
+		it("recovers on the retry on both clients", async () => {
+			const recovering = (good: () => Response) => {
+				let call = 0;
+				return capture(() => {
+					call += 1;
+					return call === 1 ? brokenBody() : good();
+				});
+			};
+			const chat = recovering(() => completion(unsupported));
+			const gemini = recovering(() =>
+				Response.json({
+					candidates: [{ content: { parts: [{ text: unsupported }] }, finishReason: "STOP" }],
+				}),
+			);
+			const [chatCandidate, geminiCandidate] = await Promise.all([
+				Effect.runPromise(generate(clientLayer(chat.run, { maxRetries: 1 }))),
+				Effect.runPromise(generate(geminiClient(gemini.run, 1))),
+			]);
+			expect(chatCandidate.intent?.nativeKind).toBeNull();
+			expect(geminiCandidate.intent?.nativeKind).toBeNull();
+			expect(chat.calls).toHaveLength(2);
+			expect(gemini.calls).toHaveLength(2);
+		});
+
+		it("still records the gateway log id on the failed attempt", async () => {
+			const { probe, sink } = makeTelemetryTestSink();
+			const logId = "01a1a910-c74c-713a-83ea-307998d588c7";
+			const { run } = capture(() => brokenBody({ headers: { "cf-aig-log-id": logId } }));
+			await Effect.runPromise(
+				generate(clientLayer(run)).pipe(
+					Effect.exit,
+					Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "test" }, sink })),
+				),
+			);
+			const attempt = probe.events.find(
+				(event) => event.event === "effect.span" && event.name.endsWith(".attempt"),
+			);
+			expect(attempt).toMatchObject({
+				attributes: { gateway_log_id: logId },
+				error_category: "DiagramGenerationTransportError",
+			});
+		});
 	});
 
 	it("reports an uninitialized gateway without an upstream attempt", async () => {

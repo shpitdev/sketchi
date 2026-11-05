@@ -102,7 +102,13 @@ function gatewayFetch(
 		);
 		const logId = response.headers.get("cf-aig-log-id");
 		if (logId) onGatewayLogId(logId);
-		return response;
+		if (!response.body) return response;
+		// Read the body here so a broken stream fails as transport and is retried. Past this
+		// point the client reports read failures and unparseable JSON as the same error.
+		return new Response(await response.text(), {
+			headers: response.headers,
+			status: response.status,
+		});
 	};
 }
 
