@@ -138,7 +138,8 @@ Explicit network commands (one credential-free HTTPS request each):
   and needs no token, key, account, or login. The model call, validation, and quality gate
   run server-side; the finished diagram and Excalidraw artifact come back and are committed
   through the same local store as create. Without --type, the model selects a supported native type; the default model is
-  ${DEFAULT_GENERATION_MODEL}. Override the endpoint for preview or local testing with
+  ${DEFAULT_GENERATION_MODEL}, and a model the server does not support exits 3 with an error naming
+  the supported ones. Override the endpoint for preview or local testing with
   ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.
   canvas submits the CanvasSpec object itself to ${DEFAULT_CANVAS_ENDPOINT}, validates the typed
   response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
@@ -412,7 +413,8 @@ Network and options:
   and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
   Without --type, the model selects ${alternativeList([...CANONICAL_DOCUMENT_TYPES])} from the request;
   a request for any other kind of diagram fails with a typed unsupported error.
-  --model defaults to ${DEFAULT_GENERATION_MODEL}.
+  --model defaults to ${DEFAULT_GENERATION_MODEL}. A model the server does not support
+  is rejected before generation, and the error names the supported ones.
   Override the endpoint for preview or local testing with ${SKETCHI_GENERATE_ENDPOINT_ENV}
   or --endpoint URL. --format defaults to png. Without --dest, the artifact is written as
   <generated-id>.png, <generated-id>.excalidraw, or <generated-id>.scene.json in the current
@@ -427,7 +429,7 @@ Validation and storage:
 
 Errors and next steps:
   Exit 10 means a network or endpoint failure, 11 a timeout, and 12 malformed output;
-  a rejected or invalid generated document uses 3, conflict uses 6, and storage uses 7.
+  a rejected model or invalid generated document uses 3, conflict uses 6, and storage uses 7.
   With --dest -, stdout contains artifact bytes only and all status uses stderr. On success, pass
   the returned id to show, edit, list, or export. For strictly offline manual authoring, accepted
   canonical JSON examples, and full error contracts, run sketchi docs.`;
@@ -450,7 +452,7 @@ const generateCommand = Command.make(
 		model: Flag.String("model").pipe(
 			Flag.withDefault(DEFAULT_GENERATION_MODEL),
 			Flag.withDescription(
-				`Server-routed generation model id; default ${DEFAULT_GENERATION_MODEL}.`,
+				`Generation model id the server supports; default ${DEFAULT_GENERATION_MODEL}.`,
 			),
 			Flag.withMetavar("MODEL"),
 		),

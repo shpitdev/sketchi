@@ -1,4 +1,7 @@
-import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
+import type {
+	CloudflareAiGatewayProvider,
+	SupportedGenerationModel,
+} from "@sketchi/diagram-generation";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
@@ -76,7 +79,7 @@ function fakeAi(calls: { gatewayId: string; endpoint: string }[]): CloudflareAiG
 	};
 }
 
-const generate = (model?: string) =>
+const generate = (model?: SupportedGenerationModel) =>
 	Effect.gen(function* () {
 		const generation = yield* PlaygroundGeneration;
 		return yield* Effect.result(
@@ -104,11 +107,22 @@ describe("binding-dependent host lifecycles", () => {
 					}),
 				),
 				runtime.run(
-					generate("google/model-b"),
-					boundary({ AI: ai, SKETCHI_AI_GATEWAY_ID: "shared" }),
+					generate("google/gemini-3.1-flash-lite"),
+					boundary({
+						AI: ai,
+						SKETCHI_AI_GATEWAY_ID: "shared",
+						SKETCHI_AI_MODEL: "google/model-b",
+					}),
 				),
 			]);
-			await runtime.run(generate(), boundary({ AI: ai, SKETCHI_AI_GATEWAY_ID: "shared" }));
+			await runtime.run(
+				generate(),
+				boundary({
+					AI: ai,
+					SKETCHI_AI_GATEWAY_ID: "shared",
+					SKETCHI_AI_MODEL: "google/model-b",
+				}),
+			);
 			expect(lifecycle.generationBuilt - before.generationBuilt).toBe(1);
 			expect(lifecycle.generationClosed).toBe(before.generationClosed);
 			expect(calls.map((call) => call.gatewayId)).toEqual(["shared", "shared", "shared"]);

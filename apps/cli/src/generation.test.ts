@@ -552,6 +552,38 @@ describe("prompt-assisted generation over the public generate API", () => {
 		}),
 	);
 
+	it.effect("maps a rejected model to a typed error naming the supported models", () =>
+		Effect.gen(function* () {
+			stubFetch(() =>
+				jsonResponse(
+					{
+						ok: false,
+						status: "unsupported_model",
+						issues: [
+							{
+								message:
+									"The requested model is not supported. Supported models: gemini-3.1-flash-lite.",
+								hint: "Omit the model to use the default, or name a supported model.",
+							},
+						],
+					},
+					400,
+				),
+			);
+			const created: BuiltDiagram[] = [];
+
+			const error = yield* Effect.flip(runGenerate(created));
+
+			assert.strictEqual(error._tag, "CliGenerationError");
+			if (error._tag === "CliGenerationError") {
+				assert.strictEqual(error.code, "unsupported_model");
+				assert.match(error.message, /gemini-3\.1-flash-lite/u);
+				assert.strictEqual(exitCodeForFailure(error), 3);
+			}
+			assert.strictEqual(created.length, 0);
+		}),
+	);
+
 	it.effect("maps an endpoint timeout to a typed timeout failure", () =>
 		Effect.gen(function* () {
 			stubFetch(() => jsonResponse({ ok: false, status: "generation_timeout", issues: [] }, 504));

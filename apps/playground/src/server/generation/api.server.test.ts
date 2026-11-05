@@ -498,30 +498,95 @@ describe("public generate endpoint", () => {
 });
 
 describe("generation request boundaries", () => {
-	it.each(["gemini-2.5-flash:countTokens?x=", "google/../other", "x".repeat(129), ""])(
-		"rejects unsafe model %s before gateway dispatch",
-		async (model) => {
-			let calls = 0;
-			const response = await generateRequest(
-				{
-					AI: fakeAiGateway(generationText(flowchartIr), () => {
-						calls += 1;
-					}),
-				},
-				{
-					prompt: "Show release approval",
-					model,
-				},
-			);
-			expect(response.status).toBe(400);
-			expect(await response.json()).toMatchObject({
-				ok: false,
-				status: "invalid_input",
-				issues: [{ code: "invalid_input" }],
-			});
-			expect(calls).toBe(0);
-		},
-	);
+	it.each([
+		"gemini-2.5-flash",
+		"google/gemini-2.5-flash",
+		"google-ai-studio/gemini-2.5-flash",
+		"google-ai-studio/google/gemini-3.1-flash-lite",
+		"GEMINI-3.1-FLASH-LITE",
+		" gemini-3.1-flash-lite ",
+		"gemini-2.5-flash:countTokens?x=",
+		"google/../other",
+		"x".repeat(129),
+		"",
+	])("rejects unsupported model %s before gateway dispatch", async (model) => {
+		let calls = 0;
+		const response = await generateRequest(
+			{
+				AI: fakeAiGateway(generationText(flowchartIr), () => {
+					calls += 1;
+				}),
+			},
+			{
+				prompt: "Show release approval",
+				model,
+			},
+		);
+		expect(response.status).toBe(400);
+		const body = (await response.json()) as {
+			ok: boolean;
+			status: string;
+			issues: { code: string; stage: string; message: string; hint: string }[];
+		};
+		expect(body).toMatchObject({
+			ok: false,
+			status: "unsupported_model",
+			issues: [{ code: "unsupported_model", stage: "input" }],
+		});
+		expect(body.issues[0]?.message).toContain("gemini-3.1-flash-lite");
+		expect(calls).toBe(0);
+	});
+
+	it("rejects a non-string model as invalid input before gateway dispatch", async () => {
+		let calls = 0;
+		const response = await generateRequest(
+			{
+				AI: fakeAiGateway(generationText(flowchartIr), () => {
+					calls += 1;
+				}),
+			},
+			{ prompt: "Show release approval", model: 42 },
+		);
+		expect(response.status).toBe(400);
+		expect(await response.json()).toMatchObject({ ok: false, status: "invalid_input" });
+		expect(calls).toBe(0);
+	});
+
+	// Installed CLIs send the bare id on every request, so it must stay accepted.
+	it.each([
+		"gemini-3.1-flash-lite",
+		"google/gemini-3.1-flash-lite",
+		"google-ai-studio/gemini-3.1-flash-lite",
+	])("routes supported model %s to the gateway", async (model) => {
+		const endpoints: string[] = [];
+		const response = await generateRequest(
+			{
+				AI: fakeAiGateway(generationText(flowchartIr), (input) => {
+					endpoints.push(input.endpoint);
+				}),
+				SKETCHI_AI_MODEL: "google/configured-model",
+			},
+			{ prompt: "Show release approval", type: "flowchart", model },
+		);
+		expect(response.status).toBe(200);
+		expect(endpoints).toEqual(["v1beta/models/gemini-3.1-flash-lite:generateContent"]);
+	});
+
+	it("uses the configured model when a request names none", async () => {
+		const endpoints: string[] = [];
+		const response = await generateRequest(
+			{
+				AI: fakeAiGateway(generationText(flowchartIr), (input) => {
+					endpoints.push(input.endpoint);
+				}),
+				SKETCHI_AI_MODEL: "google/configured-model",
+			},
+			{ prompt: "Show release approval", type: "flowchart" },
+		);
+		expect(response.status).toBe(200);
+		expect(endpoints).toEqual(["v1beta/models/configured-model:generateContent"]);
+	});
+
 	it.each(["__tooLarge", "__invalidJson"])(
 		"does not treat client key %s as a reader result",
 		async (key) => {
