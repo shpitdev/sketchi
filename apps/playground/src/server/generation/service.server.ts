@@ -4,8 +4,6 @@ import {
 	CloudflareAiGatewayBinding,
 	CloudflareGatewayChatClientLive,
 	CloudflareGatewayChatConfig,
-	CloudflareGoogleAiStudioClientLive,
-	CloudflareGoogleAiStudioConfig,
 	type CloudflareAiGatewayProvider,
 	type DiagramGenerationCacheMode,
 	DiagramGenerationClient,
@@ -59,51 +57,34 @@ export const PlaygroundGenerationLive = Layer.effect(
 		const clientForBindings = Effect.fn("playground.generation.clientForBindings")(function* (
 			ai: CloudflareAiGatewayProvider,
 			gatewayId: string,
-			gatewayChat: boolean,
 		) {
 			let byGateway = clients.get(ai);
 			if (!byGateway) {
 				byGateway = new Map();
 				clients.set(ai, byGateway);
 			}
-			const clientKey = `${gatewayChat ? "gateway-chat" : "gemini"}:${gatewayId}`;
-			let client = byGateway.get(clientKey);
+			let client = byGateway.get(gatewayId);
 			if (!client) {
-				const dependencies = Layer.merge(
-					Layer.succeed(CloudflareAiGatewayBinding, ai),
-					DiagramGenerationPolicyLive,
+				const clientLayer = CloudflareGatewayChatClientLive.pipe(
+					Layer.provide(
+						Layer.mergeAll(
+							Layer.succeed(CloudflareAiGatewayBinding, ai),
+							Layer.succeed(CloudflareGatewayChatConfig, {
+								collectLog: true,
+								gatewayId,
+								route: googleGatewayChatRoute,
+								surface: "generate-api",
+							}),
+							DiagramGenerationPolicyLive,
+						),
+					),
 				);
-				const clientLayer = gatewayChat
-					? CloudflareGatewayChatClientLive.pipe(
-							Layer.provide(
-								Layer.merge(
-									dependencies,
-									Layer.succeed(CloudflareGatewayChatConfig, {
-										collectLog: true,
-										gatewayId,
-										route: googleGatewayChatRoute,
-										surface: "generate-api",
-									}),
-								),
-							),
-						)
-					: CloudflareGoogleAiStudioClientLive.pipe(
-							Layer.provide(
-								Layer.merge(
-									dependencies,
-									Layer.succeed(CloudflareGoogleAiStudioConfig, {
-										collectLog: true,
-										gatewayId,
-									}),
-								),
-							),
-						);
 				client = yield* Effect.cached(
 					Layer.buildWithScope(clientLayer, scope).pipe(
 						Effect.map((context) => Context.get(context, DiagramGenerationClient)),
 					),
 				);
-				byGateway.set(clientKey, client);
+				byGateway.set(gatewayId, client);
 			}
 			return yield* client;
 		});
@@ -120,7 +101,7 @@ export const PlaygroundGenerationLive = Layer.effect(
 						provider: GENERATION_PROVIDER,
 					});
 				}
-				const client = yield* clientForBindings(env.AI, config.gatewayId, config.gatewayChat);
+				const client = yield* clientForBindings(env.AI, config.gatewayId);
 				const logos = logosNamedIn(input.prompt);
 				return yield* client.generate({
 					...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),

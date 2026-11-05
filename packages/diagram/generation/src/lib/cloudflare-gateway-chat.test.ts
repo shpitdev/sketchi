@@ -17,10 +17,6 @@ import {
 	CloudflareGatewayChatConfig,
 	googleGatewayChatRoute,
 } from "./cloudflare-gateway-chat.js";
-import {
-	CloudflareGoogleAiStudioClientLive,
-	CloudflareGoogleAiStudioConfig,
-} from "./cloudflare-google-ai-studio.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
 
 type RunArgs = Parameters<CloudflareAiGateway["run"]>;
@@ -325,18 +321,6 @@ describe("gateway chat errors", () => {
 			);
 		}
 
-		function geminiClient(run: RunFn, maxRetries: number) {
-			return CloudflareGoogleAiStudioClientLive.pipe(
-				Layer.provide(
-					Layer.mergeAll(
-						bindingLayer(run),
-						Layer.succeed(CloudflareGoogleAiStudioConfig, { collectLog: true, gatewayId: "test" }),
-						Layer.succeed(DiagramGenerationPolicy, { ...testPolicy, maxRetries }),
-					),
-				),
-			);
-		}
-
 		const expected = {
 			_tag: "DiagramGenerationTransportError",
 			message: "connection reset",
@@ -348,41 +332,24 @@ describe("gateway chat errors", () => {
 		it.each([
 			["a successful response", undefined],
 			["an error response", { status: 500 }],
-		])("retries on both clients when it breaks during %s", async (_name, init) => {
+		])("retries when it breaks during %s", async (_name, init) => {
 			const chat = capture(() => brokenBody(init));
-			const gemini = capture(() => brokenBody(init));
-			const [chatError, geminiError] = await Promise.all([
-				Effect.runPromise(generate(clientLayer(chat.run, { maxRetries: 2 })).pipe(Effect.flip)),
-				Effect.runPromise(generate(geminiClient(gemini.run, 2)).pipe(Effect.flip)),
-			]);
-			expect(chatError).toMatchObject(expected);
-			expect(geminiError).toMatchObject(expected);
+			const error = await Effect.runPromise(
+				generate(clientLayer(chat.run, { maxRetries: 2 })).pipe(Effect.flip),
+			);
+			expect(error).toMatchObject(expected);
 			expect(chat.calls).toHaveLength(3);
-			expect(gemini.calls).toHaveLength(3);
 		});
 
-		it("recovers on the retry on both clients", async () => {
-			const recovering = (good: () => Response) => {
-				let call = 0;
-				return capture(() => {
-					call += 1;
-					return call === 1 ? brokenBody() : good();
-				});
-			};
-			const chat = recovering(() => completion(unsupported));
-			const gemini = recovering(() =>
-				Response.json({
-					candidates: [{ content: { parts: [{ text: unsupported }] }, finishReason: "STOP" }],
-				}),
-			);
-			const [chatCandidate, geminiCandidate] = await Promise.all([
-				Effect.runPromise(generate(clientLayer(chat.run, { maxRetries: 1 }))),
-				Effect.runPromise(generate(geminiClient(gemini.run, 1))),
-			]);
-			expect(chatCandidate.intent?.nativeKind).toBeNull();
-			expect(geminiCandidate.intent?.nativeKind).toBeNull();
+		it("recovers on the retry", async () => {
+			let call = 0;
+			const chat = capture(() => {
+				call += 1;
+				return call === 1 ? brokenBody() : completion(unsupported);
+			});
+			const candidate = await Effect.runPromise(generate(clientLayer(chat.run, { maxRetries: 1 })));
+			expect(candidate.intent?.nativeKind).toBeNull();
 			expect(chat.calls).toHaveLength(2);
-			expect(gemini.calls).toHaveLength(2);
 		});
 
 		it("still records the gateway log id on the failed attempt", async () => {
@@ -503,18 +470,6 @@ describe("gateway chat telemetry", () => {
 		).then(() => probe.events);
 	}
 
-	function geminiLayer(run: RunFn, policy: Partial<DiagramGenerationPolicyConfig> = {}) {
-		return CloudflareGoogleAiStudioClientLive.pipe(
-			Layer.provide(
-				Layer.mergeAll(
-					bindingLayer(run),
-					Layer.succeed(CloudflareGoogleAiStudioConfig, { collectLog: true, gatewayId: "test" }),
-					Layer.succeed(DiagramGenerationPolicy, { ...testPolicy, ...policy }),
-				),
-			),
-		);
-	}
-
 	/** A first failure, a retry, then a truncated answer and a repair. */
 	function scripted(ok: (text: string, truncated: boolean) => Response): RunFn {
 		let call = 0;
@@ -557,37 +512,56 @@ describe("gateway chat telemetry", () => {
 				policy,
 			),
 		);
-	const geminiEvents = () =>
-		record(
-			geminiLayer(
-				scripted((text, truncated) =>
-					Response.json({
-						candidates: [
-							{
-								content: { parts: [{ text }] },
-								finishReason: truncated ? "MAX_TOKENS" : "STOP",
-							},
-						],
-						usageMetadata: { promptTokenCount: 11, candidatesTokenCount: 7, totalTokenCount: 18 },
-					}),
-				),
-				policy,
-			),
-		);
 
-	it("emits the same metrics and logs as the current client", async () => {
-		const [chat, gemini] = [await chatEvents(), await geminiEvents()];
-		expect(metrics(chat)).toEqual(metrics(gemini));
-		expect(logs(chat)).toEqual(logs(gemini));
-		expect(metrics(chat).length).toBeGreaterThan(0);
+	it("keeps the generation metrics, labels and log events", async () => {
+		const events = await chatEvents();
+		const provider = "cloudflare-google-ai-studio";
+		const operation = "generate";
+		expect(metrics(events)).toEqual([
+			{ attributes: { operation, provider }, metric: "sketchi_generation_attempts", value: 1 },
+			{
+				attributes: { operation, provider, retry_kind: "transient" },
+				metric: "sketchi_generation_retries",
+				value: 1,
+			},
+			{ attributes: { operation, provider }, metric: "sketchi_generation_attempts", value: 1 },
+			{
+				attributes: { operation, outcome: "attempted", provider },
+				metric: "sketchi_generation_repairs",
+				value: 1,
+			},
+			{ attributes: { operation, provider }, metric: "sketchi_generation_attempts", value: 1 },
+			{
+				attributes: { operation, outcome: "succeeded", provider },
+				metric: "sketchi_generation_repairs",
+				value: 1,
+			},
+			{
+				attributes: { operation, outcome: "success", provider },
+				metric: "sketchi_generation_requests",
+				value: 1,
+			},
+			{
+				attributes: { operation, outcome: "success", provider },
+				metric: "sketchi_generation_duration_ms",
+				value: "ms",
+			},
+		]);
+		expect(logs(events).map((log) => log.level)).toEqual(["Warn", "Warn"]);
+		expect(logs(events)[0]?.message).toBe("Retrying diagram generation");
 	});
 
-	it("keeps every span name and adds only the language model span", async () => {
-		const [chat, gemini] = [await chatEvents(), await geminiEvents()];
-		const names = (events: typeof chat) => spans(events).map((span) => span.name);
-		const added = "LanguageModel.generateText";
-		expect(names(chat).filter((name) => name !== added)).toEqual(names(gemini));
-		expect(names(chat)).toContain(added);
+	it("keeps the attempt span name and adds only the language model span", async () => {
+		const names = spans(await chatEvents()).map((span) => span.name);
+		expect(new Set(names)).toEqual(
+			new Set([
+				"LanguageModel.generateText",
+				"diagramGeneration.cloudflareGoogleAiStudio.attempt",
+				"diagramGeneration.executeModelCall",
+				"diagramGeneration.generate",
+				"diagramGeneration.runWithPolicy",
+			]),
+		);
 	});
 
 	it("records the gateway log id on each attempt span that got a response", async () => {

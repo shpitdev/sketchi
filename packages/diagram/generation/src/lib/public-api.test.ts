@@ -23,11 +23,16 @@ import {
 } from "./client.js";
 import { CloudflareAiGatewayBinding, type CloudflareAiGateway } from "./cloudflare-ai-gateway.js";
 import {
-	CloudflareGoogleAiStudioClientLive,
-	CloudflareGoogleAiStudioConfig,
-} from "./cloudflare-google-ai-studio.js";
-import { buildGeminiGenerateContentBody, stripGoogleModelPrefix } from "./gemini.js";
-import { buildDiagramGenerationMessages, DiagramGenerationPrompt } from "./messages.js";
+	CloudflareGatewayChatClientLive,
+	CloudflareGatewayChatConfig,
+	googleGatewayChatRoute,
+} from "./cloudflare-gateway-chat.js";
+import {
+	buildDiagramGenerationMessages,
+	DEFAULT_MAX_OUTPUT_TOKENS,
+	DiagramGenerationPrompt,
+} from "./messages.js";
+import { stripGoogleModelPrefix } from "./models.js";
 import { GeneratedMindmapTree, generatedMindmapTreeToDiagram } from "./mindmap-tree.js";
 
 const prompt: DiagramGenerationPrompt = {
@@ -104,28 +109,29 @@ const expectedText = generationResponseText({
 const expectedMessages = buildDiagramGenerationMessages(prompt);
 const expectedSystem = expectedMessages.system;
 const expectedUser = expectedMessages.user;
-const expectedGeminiBody = {
-	contents: [{ role: "user", parts: [{ text: expectedUser }] }],
-	generationConfig: {
-		maxOutputTokens: 512,
-		response_mime_type: "application/json",
-		temperature: 0.2,
-	},
-	system_instruction: { parts: [{ text: expectedSystem }] },
-};
-const geminiResponse = {
-	candidates: [
-		{
-			content: { role: "model", parts: [{ text: expectedText }] },
-			finishReason: "STOP",
-		},
+const expectedChatBody = {
+	max_tokens: 512,
+	messages: [
+		{ role: "system", content: expectedSystem },
+		{ role: "user", content: expectedUser },
 	],
-	usageMetadata: {
-		candidatesTokenCount: 23,
-		promptTokenCount: 11,
-		totalTokenCount: 34,
-	},
+	model: "gemini-3.1-flash-lite",
+	response_format: { type: "json_object" },
+	temperature: 0.2,
 };
+
+function chatResponseBody(content: string, finishReason = "stop") {
+	return {
+		choices: [{ finish_reason: finishReason, index: 0, message: { role: "assistant", content } }],
+		created: 1,
+		id: "chatcmpl-test",
+		model: "gemini-3.1-flash-lite",
+		object: "chat.completion",
+		usage: { completion_tokens: 23, prompt_tokens: 11, total_tokens: 34 },
+	};
+}
+
+const chatResponse = chatResponseBody(expectedText);
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
 	return new Response(JSON.stringify(body), {
@@ -134,9 +140,11 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
 	});
 }
 
-const configLayer = Layer.succeed(CloudflareGoogleAiStudioConfig, {
+const configLayer = Layer.succeed(CloudflareGatewayChatConfig, {
 	collectLog: true,
 	gatewayId: "sketchi",
+	route: googleGatewayChatRoute,
+	surface: "generate-api",
 });
 const retryPolicyLayer = Layer.succeed(DiagramGenerationPolicy, {
 	concurrency: 2,
@@ -230,28 +238,12 @@ describe("diagram generation prompt mapping", () => {
 		expect(messages.system).toContain("deterministically checks the plan");
 	});
 
-	it("keeps the Gemini REST body byte-for-byte stable", () => {
-		expect(
-			buildGeminiGenerateContentBody({
-				maxOutputTokens: 512,
-				model: "google/gemini-3.1-flash-lite",
-				prompt,
-				temperature: 0.2,
-			}),
-		).toEqual(expectedGeminiBody);
-	});
-
 	it("uses the expanded output budget unless the request overrides it", () => {
-		expect(
-			buildGeminiGenerateContentBody({
-				model: "google/gemini-3.1-flash-lite",
-				prompt,
-			}).generationConfig.maxOutputTokens,
-		).toBe(16_384);
+		expect(DEFAULT_MAX_OUTPUT_TOKENS).toBe(16_384);
 		expect(diagramGenerationPolicyDefaults.maxRepairAttempts).toBe(2);
 	});
 
-	it("normalizes Cloudflare Google model ids for provider-native calls", () => {
+	it("normalizes Cloudflare Google model ids for the Google route", () => {
 		expect(stripGoogleModelPrefix("google/gemini-3.1-flash-lite")).toBe("gemini-3.1-flash-lite");
 		expect(stripGoogleModelPrefix("google-ai-studio/gemini-3.1-flash-lite")).toBe(
 			"gemini-3.1-flash-lite",
@@ -745,8 +737,8 @@ describe("pure candidate behavior", () => {
 	});
 });
 
-const successfulRun = vi.fn(async () => jsonResponse(geminiResponse));
-const successfulClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const successfulRun = vi.fn(async () => jsonResponse(chatResponse));
+const successfulClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -759,7 +751,7 @@ const successfulClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
 );
 
 layer(successfulClientLayer)("Cloudflare Google AI Studio live layer", (it) => {
-	it.effect("uses the provider-native Google route", () =>
+	it.effect("uses the Google route with the current request settings", () =>
 		Effect.gen(function* () {
 			const client = yield* DiagramGenerationClient;
 			const candidate = yield* client.generate({
@@ -771,12 +763,12 @@ layer(successfulClientLayer)("Cloudflare Google AI Studio live layer", (it) => {
 
 			expect(successfulRun).toHaveBeenCalledWith(
 				expect.objectContaining({
-					endpoint: "v1beta/models/gemini-3.1-flash-lite:generateContent",
+					endpoint: "v1beta/openai/chat/completions",
 					headers: expect.not.objectContaining({
 						"Cache-Control": "no-store",
 					}),
 					provider: "google-ai-studio",
-					query: expectedGeminiBody,
+					query: expectedChatBody,
 				}),
 				expect.objectContaining({
 					gateway: expect.objectContaining({
@@ -965,20 +957,16 @@ function returnsDiagramText(
 	);
 }
 
-function geminiTextResponse(text: string): Response {
-	return jsonResponse({
-		candidates: [{ content: { role: "model", parts: [{ text }] }, finishReason: "STOP" }],
-	});
+function chatTextResponse(text: string): Response {
+	return jsonResponse(chatResponseBody(text));
 }
 
 let repairedRunCalls = 0;
 const repairedRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	repairedRunCalls += 1;
-	return repairedRunCalls === 1
-		? geminiTextResponse(invalidDiagramText)
-		: jsonResponse(geminiResponse);
+	return repairedRunCalls === 1 ? chatTextResponse(invalidDiagramText) : jsonResponse(chatResponse);
 });
-const repairedClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const repairedClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1023,13 +1011,11 @@ layer(repairedClientLayer)("semantic repair policy", (it) => {
 						"cf-aig-skip-cache": "true",
 					}),
 					query: expect.objectContaining({
-						contents: [
+						messages: [
+							expect.objectContaining({ role: "system" }),
 							expect.objectContaining({
-								parts: [
-									expect.objectContaining({
-										text: expect.stringContaining("Invalid model output:"),
-									}),
-								],
+								content: expect.stringContaining("Invalid model output:"),
+								role: "user",
 							}),
 						],
 					}),
@@ -1051,10 +1037,10 @@ let startIncomingRepairCalls = 0;
 const startIncomingRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	startIncomingRepairCalls += 1;
 	return startIncomingRepairCalls === 1
-		? geminiTextResponse(startIncomingDiagramText)
-		: jsonResponse(geminiResponse);
+		? chatTextResponse(startIncomingDiagramText)
+		: jsonResponse(chatResponse);
 });
-const startIncomingRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const startIncomingRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1083,15 +1069,13 @@ layer(startIncomingRepairClientLayer)("start edge semantic repair", (it) => {
 			expect(repairBody).toEqual(
 				expect.objectContaining({
 					query: expect.objectContaining({
-						contents: [
+						messages: [
+							expect.objectContaining({ role: "system" }),
 							expect.objectContaining({
-								parts: [
-									expect.objectContaining({
-										text: expect.stringMatching(
-											/Priority validator issue and hint:\n- flowchart\.start_has_incoming: Start node "start" cannot have incoming edges\. Hint: Route the start node only to later nodes\.[\s\S]*reroute each offending loop-back edge to the first process node after start\. Never target the start node; start nodes have no incoming edges\./u,
-										),
-									}),
-								],
+								content: expect.stringMatching(
+									/Priority validator issue and hint:\n- flowchart\.start_has_incoming: Start node "start" cannot have incoming edges\. Hint: Route the start node only to later nodes\.[\s\S]*reroute each offending loop-back edge to the first process node after start\. Never target the start node; start nodes have no incoming edges\./u,
+								),
+								role: "user",
 							}),
 						],
 					}),
@@ -1105,10 +1089,10 @@ let selfLoopRepairCalls = 0;
 const selfLoopRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	selfLoopRepairCalls += 1;
 	return selfLoopRepairCalls === 1
-		? geminiTextResponse(selfLoopDiagramText)
-		: jsonResponse(geminiResponse);
+		? chatTextResponse(selfLoopDiagramText)
+		: jsonResponse(chatResponse);
 });
-const selfLoopRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const selfLoopRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1137,15 +1121,13 @@ layer(selfLoopRepairClientLayer)("self-loop semantic repair", (it) => {
 			expect(repairBody).toEqual(
 				expect.objectContaining({
 					query: expect.objectContaining({
-						contents: [
+						messages: [
+							expect.objectContaining({ role: "system" }),
 							expect.objectContaining({
-								parts: [
-									expect.objectContaining({
-										text: expect.stringMatching(
-											/Priority validator issue and hint:\n- flowchart\.self_loop: Edge "fraud-self" connects node "fraud" to itself\. Hint: Connect the edge to a different target node\.[\s\S]*reroute each offending edge to an earlier distinct process or decision node\.[\s\S]*model every retry or re-check as a decision branch returning to that earlier distinct node\./u,
-										),
-									}),
-								],
+								content: expect.stringMatching(
+									/Priority validator issue and hint:\n- flowchart\.self_loop: Edge "fraud-self" connects node "fraud" to itself\. Hint: Connect the edge to a different target node\.[\s\S]*reroute each offending edge to an earlier distinct process or decision node\.[\s\S]*model every retry or re-check as a decision branch returning to that earlier distinct node\./u,
+								),
+								role: "user",
 							}),
 						],
 					}),
@@ -1165,15 +1147,15 @@ let compactingRepairCalls = 0;
 const compactingRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	compactingRepairCalls += 1;
 	if (compactingRepairCalls === 1) {
-		return geminiTextResponse(returnsDiagramText(18, true));
+		return chatTextResponse(returnsDiagramText(18, true));
 	}
-	return geminiTextResponse(
+	return chatTextResponse(
 		compactingRepairCalls === 2
 			? returnsDiagramText(16, false, returnsRequirements.slice(1))
 			: returnsDiagramText(18, false),
 	);
 });
-const compactingRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const compactingRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1241,13 +1223,13 @@ const unsupportedRepairText = JSON.stringify({
 let unsupportedRepairCalls = 0;
 const unsupportedRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	unsupportedRepairCalls += 1;
-	return geminiTextResponse(
+	return chatTextResponse(
 		unsupportedRepairCalls === 1
 			? '{"intent":{"requestedKind":"architecture"'
 			: unsupportedRepairText,
 	);
 });
-const unsupportedRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const unsupportedRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1305,9 +1287,9 @@ layer(unsupportedRepairClientLayer)("unsupported semantic repair", (it) => {
 let failedRepairCalls = 0;
 const failedRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	failedRepairCalls += 1;
-	return geminiTextResponse(failedRepairCalls === 1 ? invalidDiagramText : '{"type":"flowchart"');
+	return chatTextResponse(failedRepairCalls === 1 ? invalidDiagramText : '{"type":"flowchart"');
 });
-const failedRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const failedRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1354,13 +1336,13 @@ let exhaustedRepairCalls = 0;
 const exhaustedRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	exhaustedRepairCalls += 1;
 	return exhaustedRepairCalls === 1
-		? geminiTextResponse(invalidDiagramText)
+		? chatTextResponse(invalidDiagramText)
 		: jsonResponse(
 				{ error: { message: "repair provider temporarily unavailable" } },
 				{ status: 503 },
 			);
 });
-const exhaustedRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const exhaustedRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1428,7 +1410,7 @@ const interruptedRepairSignals: AbortSignal[] = [];
 const interruptedRepairRun = vi.fn<CloudflareAiGateway["run"]>(async (_data, options) => {
 	interruptedRepairCalls += 1;
 	if (interruptedRepairCalls === 1) {
-		return geminiTextResponse(invalidDiagramText);
+		return chatTextResponse(invalidDiagramText);
 	}
 	const signal = options?.signal;
 	if (!signal) {
@@ -1446,7 +1428,7 @@ const interruptedRepairRun = vi.fn<CloudflareAiGateway["run"]>(async (_data, opt
 		);
 	});
 });
-const interruptedRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const interruptedRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1491,23 +1473,11 @@ let multiRepairCalls = 0;
 const multiRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	multiRepairCalls += 1;
 	if (multiRepairCalls === 1) {
-		return jsonResponse({
-			candidates: [
-				{
-					content: {
-						role: "model",
-						parts: [{ text: '{"type":"flowchart"' }],
-					},
-					finishReason: "MAX_TOKENS",
-				},
-			],
-		});
+		return jsonResponse(chatResponseBody('{"type":"flowchart"', "length"));
 	}
-	return multiRepairCalls === 2
-		? geminiTextResponse(invalidDiagramText)
-		: jsonResponse(geminiResponse);
+	return multiRepairCalls === 2 ? chatTextResponse(invalidDiagramText) : jsonResponse(chatResponse);
 });
-const multiRepairClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const multiRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1555,7 +1525,7 @@ layer(multiRepairClientLayer)("multi-attempt semantic repair", (it) => {
 });
 
 const gatewayConstructionFailure = new Error("gateway construction failed");
-const gatewayConstructionFailureLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const gatewayConstructionFailureLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1626,9 +1596,9 @@ const transientRun = vi.fn(async () => {
 	transientAttempts += 1;
 	return transientAttempts < 3
 		? jsonResponse({ error: { message: "temporarily unavailable" } }, { status: 503 })
-		: jsonResponse(geminiResponse);
+		: jsonResponse(chatResponse);
 });
-const retryClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const retryClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1701,7 +1671,7 @@ layer(retryClientLayer)("bounded retry policy", (it) => {
 const permanentRun = vi.fn(async () =>
 	jsonResponse({ error: { message: "invalid request" } }, { status: 400 }),
 );
-const permanentClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const permanentClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1757,7 +1727,7 @@ const timeoutRun = vi.fn<CloudflareAiGateway["run"]>((_data, options) => {
 		);
 	});
 });
-const timeoutClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const timeoutClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1837,7 +1807,9 @@ layer(timeoutClientLayer)("timeouts and interruption", (it) => {
 					prompt,
 				}),
 			);
-			yield* Effect.yieldNow;
+			while (cancellationSignals.length === signalCountBeforeInterrupt) {
+				yield* Effect.yieldNow;
+			}
 			yield* Fiber.interrupt(fiber);
 			const exit = yield* Fiber.await(fiber);
 
@@ -1852,8 +1824,10 @@ layer(timeoutClientLayer)("timeouts and interruption", (it) => {
 	);
 });
 
-const malformedRun = vi.fn(async () => jsonResponse({ candidates: [] }));
-const malformedClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const malformedRun = vi.fn(async () =>
+	jsonResponse({ choices: [], created: 1, id: "chatcmpl-test", model: "m" }),
+);
+const malformedClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {
@@ -1884,16 +1858,9 @@ layer(malformedClientLayer)("malformed model responses", (it) => {
 });
 
 const truncatedRun = vi.fn<CloudflareAiGateway["run"]>(async () =>
-	jsonResponse({
-		candidates: [
-			{
-				content: { role: "model", parts: [{ text: '{"type":"flowchart"' }] },
-				finishReason: "MAX_TOKENS",
-			},
-		],
-	}),
+	jsonResponse(chatResponseBody('{"type":"flowchart"', "length")),
 );
-const truncatedClientLayer = CloudflareGoogleAiStudioClientLive.pipe(
+const truncatedClientLayer = CloudflareGatewayChatClientLive.pipe(
 	Layer.provide(
 		Layer.mergeAll(
 			Layer.succeed(CloudflareAiGatewayBinding, {

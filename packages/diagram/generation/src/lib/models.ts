@@ -16,3 +16,8 @@ const SUPPORTED_SPELLINGS: ReadonlySet<string> = new Set(
 export function isSupportedGenerationModel(model: string): model is SupportedGenerationModel {
 	return SUPPORTED_SPELLINGS.has(model);
 }
+
+/** The bare model id for a Google route, without its gateway routing prefix. */
+export function stripGoogleModelPrefix(model: string): string {
+	return model.replace(/^google-ai-studio\//, "").replace(/^google\//, "");
+}

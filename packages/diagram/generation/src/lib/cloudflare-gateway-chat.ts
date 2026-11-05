@@ -24,12 +24,12 @@ import {
 	DiagramGenerationTransportError,
 	errorMessage,
 } from "./errors.js";
-import { stripGoogleModelPrefix } from "./gemini.js";
 import {
 	buildDiagramGenerationMessages,
 	DEFAULT_MAX_OUTPUT_TOKENS,
 	DEFAULT_TEMPERATURE,
 } from "./messages.js";
+import { stripGoogleModelPrefix } from "./models.js";
 import { runDiagramGenerationWithPolicy } from "./policy.js";
 
 // The gateway fetch below never dials this. It only satisfies the client's URL handling.
@@ -66,6 +66,13 @@ export class CloudflareGatewayChatConfig extends Context.Service<
 	CloudflareGatewayChatConfigValue
 >()("@sketchi/diagram-generation/CloudflareGatewayChatConfig") {}
 
+// Synchronous, so an interrupted attempt cannot reach `gateway.run` after it was aborted.
+function decodeRequestBody(body: BodyInit | null | undefined): unknown {
+	if (typeof body === "string") return JSON.parse(body);
+	if (ArrayBuffer.isView(body)) return JSON.parse(new TextDecoder().decode(body));
+	throw new TypeError("The chat client sent an unexpected request body.");
+}
+
 function gatewayFetch(
 	gateway: CloudflareAiGateway,
 	config: CloudflareGatewayChatConfigValue,
@@ -74,7 +81,6 @@ function gatewayFetch(
 	onGatewayLogId: (id: string) => void,
 ): typeof globalThis.fetch {
 	return async (_input, init) => {
-		const query: unknown = init?.body ? JSON.parse(await new Response(init.body).text()) : {};
 		const response = await gateway.run(
 			{
 				endpoint: config.route.endpoint,
@@ -83,7 +89,7 @@ function gatewayFetch(
 					...cacheModeHeaders(request.cacheMode),
 				},
 				provider: config.route.gatewayProvider,
-				query,
+				query: decodeRequestBody(init?.body),
 			},
 			{
 				gateway: {
