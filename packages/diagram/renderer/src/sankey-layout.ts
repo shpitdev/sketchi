@@ -388,7 +388,8 @@ export function sankeyNodeText(
 /**
  * A flow's text as drawn, before wrapping: its value under its label when it
  * has one. A word unit ("visits") reads once on each total, so flow values
- * stay bare beside them; symbols and scale letters stay ($310k, 12%).
+ * stay bare beside them; symbols and scale letters stay ($310k, 12%). A label
+ * that only restates the value ("300", "$310k") draws once, as the value.
  */
 export function sankeyFlowText(
 	diagram: Pick<SankeyDiagram, "unit">,
@@ -399,7 +400,10 @@ export function sankeyFlowText(
 		link.value,
 		parts.suffix.startsWith(" ") ? { ...parts, suffix: "" } : parts,
 	);
-	return link.label === undefined ? value : `${link.label}\n${value}`;
+	if (link.label === undefined) return value;
+	const bare = (text: string) => text.replace(/[\s,]+/gu, "").toLowerCase();
+	const restated = [value, formatValue(link.value, parts), String(link.value)].map(bare);
+	return restated.includes(bare(link.label)) ? value : `${link.label}\n${value}`;
 }
 
 /** Lay out a Sankey diagram: columns, bars, bands and every label, in absolute coordinates. */
