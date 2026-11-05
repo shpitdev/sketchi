@@ -149,7 +149,7 @@ const IR_INSTRUCTIONS = {
 			'Write each member as UML does: attributes "- radius: double", "+ count: int {static}"; methods "+ area(): double", "+ draw(ctx: Canvas): void {abstract}". Visibility is +, -, # or ~.',
 			'Return relationships: [{ id, kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }]. kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to.',
 			'Multiplicities ("1", "0..1", "*", "1..*"), roles and navigable (an open arrow at to) go on compositions, aggregations and associations only; a composition\'s whole is "1" or "0..1". Interfaces extend only interfaces, and inheritance never cycles.',
-			"A field typed as another class stays in attributes and also draws a relationship whose toRole is the field's name: an association unless the source says composed or aggregated. A cast to or call on another class inside a method body draws a dependency.",
+			"A field typed as another class stays in attributes and also draws a relationship whose toRole is the field's name. It is an association; only pairs the source calls composed or aggregated take those kinds. A cast to or call on another class inside a method body draws a dependency.",
 		],
 	},
 	"org-chart": {
