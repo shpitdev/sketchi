@@ -1,25 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { vennFixture } from "@sketchi/diagram-core";
 
-import { candidateFromText, enforceCandidateRequestRequirements } from "./candidates.js";
+import { candidateFromText } from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
 
-const request = {
-	model: "fixture",
-	prompt: {
-		id: "skills",
-		request: "a Venn diagram of team skills",
-		requestedType: "venn" as const,
-	},
-};
-
-function candidate(diagram: unknown, requirements: readonly unknown[] = []) {
+function candidate(diagram: unknown) {
 	return candidateFromText({
 		model: "fixture",
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Product team skills",
-			intent: { requestedKind: "venn", nativeKind: "venn", requirements },
 			diagram,
 		}),
 	});
@@ -69,27 +59,5 @@ describe("Venn diagram generation", () => {
 		expect(parsed.diagram).toBeUndefined();
 		expect(parsed.diagnostics.join(" ")).toContain("venn.unknown_venn_set");
 		expect(parsed.diagnostics.join(" ")).toContain("Hint:");
-	});
-
-	it("checks set and item counts and names", () => {
-		const met = enforceCandidateRequestRequirements(
-			candidate(vennFixture, [
-				{ kind: "count", target: "sets", comparator: "exact", value: 3 },
-				{ kind: "count", target: "items", comparator: "exact", value: 10 },
-				{ kind: "label", target: "item", value: "Customer empathy" },
-				{ kind: "label", target: "set", value: "Engineering" },
-			]),
-			request,
-		);
-		expect(met.error).toBeUndefined();
-		const unmet = enforceCandidateRequestRequirements(
-			candidate(vennFixture, [
-				{ kind: "count", target: "items", comparator: "exact", value: 11 },
-				{ kind: "label", target: "item", value: "Brand strategy" },
-			]),
-			request,
-		);
-		expect(unmet.diagnostics.join(" ")).toContain("requirement_count_not_met");
-		expect(unmet.diagnostics.join(" ")).toContain('required item label "Brand strategy"');
 	});
 });

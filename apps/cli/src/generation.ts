@@ -118,14 +118,6 @@ function endpointFailure(status: number, body: typeof EndpointErrorBody.Type): C
 				hint: firstIssue?.hint ?? "Refine the prompt with concrete content, then retry.",
 				details,
 			});
-		case "unsupported_diagram_type":
-			return CliGenerationError.make({
-				code: "unsupported_diagram_type",
-				message:
-					firstIssue?.message ?? "Sketchi does not natively support the requested diagram type.",
-				hint: firstIssue?.hint ?? "Request a flowchart, mindmap, or sequence diagram instead.",
-				details,
-			});
 		case "unsupported_model":
 			return CliGenerationError.make({
 				code: "unsupported_model",

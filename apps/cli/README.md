@@ -66,8 +66,7 @@ block. They must pass `--prompt`; omitting it retains the deterministic usage
 error. Passing `--prompt` is always direct and noninteractive.
 `--type` accepts only flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, or quadrant and is authoritative.
 Without it, the generation model selects one of those from the request; a
-request for any other kind of diagram returns a typed unsupported-type error
-instead of being coerced into a supported one. `--model` defaults to
+request for any other kind of diagram gets the closest of those. `--model` defaults to
 `gemini-3.1-flash-lite`; a model the server does not support exits 3 with a
 typed `unsupported_model` error naming the supported IDs.
 

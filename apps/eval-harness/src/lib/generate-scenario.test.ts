@@ -147,11 +147,6 @@ describe("eval harness scenario generation composition", () => {
 						content: JSON.stringify(
 							{
 								title,
-								intent: {
-									requestedKind: type,
-									nativeKind: type,
-									requirements: [],
-								},
 								diagram: { ...diagram, type },
 							},
 							null,

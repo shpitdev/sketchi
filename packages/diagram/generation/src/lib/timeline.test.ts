@@ -9,19 +9,11 @@ describe("timeline generation", () => {
 			provider: "fixture",
 			text: JSON.stringify({
 				title: timelineFixture.title,
-				intent: {
-					requestedKind: "timeline",
-					nativeKind: "timeline",
-					requirements: [
-						{ kind: "count", target: "events", comparator: "exact", value: 3 },
-						{ kind: "label", target: "event", value: "Public beta" },
-					],
-				},
 				diagram: { ...timelineFixture, events },
 			}),
 		});
 	}
-	it("parses semantic timeline events and enforces event requirements", () => {
+	it("parses semantic timeline events", () => {
 		const output = candidate();
 		expect(output.error).toBeUndefined();
 		expect(
@@ -30,13 +22,6 @@ describe("timeline generation", () => {
 				prompt: { id: "timeline", request: "release timeline", requestedType: "timeline" },
 			}).error,
 		).toBeUndefined();
-		const missing = candidate(timelineFixture.events.slice(1));
-		expect(
-			enforceCandidateRequestRequirements(missing, {
-				model: "fixture",
-				prompt: { id: "timeline", request: "release timeline", requestedType: "timeline" },
-			}).error,
-		).toBeDefined();
 	});
 	it("preserves semantic validation repair hints for invalid dates", () => {
 		const output = candidate([{ id: "bad", label: "Public beta", date: "2026-02-30" }]);

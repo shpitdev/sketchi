@@ -35,11 +35,6 @@ function responseText(icons: Record<string, unknown>) {
 	});
 	return JSON.stringify({
 		title: "Deploy pipeline",
-		intent: {
-			requestedKind: "flowchart",
-			nativeKind: "flowchart",
-			requirements: [],
-		},
 		diagram: {
 			id: "deploy",
 			type: "flowchart",
@@ -177,7 +172,6 @@ function sequenceCandidate(icons: Record<string, unknown>) {
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Deploy",
-			intent: { requestedKind: "sequence", nativeKind: "sequence", requirements: [] },
 			diagram: {
 				id: "deploy",
 				type: "sequence",

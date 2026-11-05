@@ -8,7 +8,7 @@ const request = {
 	model: "fixture",
 	prompt: { id: "release", request: "release plan", requestedType: "gantt" as const },
 };
-function candidate(diagram: object, requirements: readonly object[] = []) {
+function candidate(diagram: object) {
 	const { title, ...rest } = diagram as { title: string };
 	return enforceCandidateRequestRequirements(
 		candidateFromText({
@@ -16,7 +16,6 @@ function candidate(diagram: object, requirements: readonly object[] = []) {
 			provider: "fixture",
 			text: JSON.stringify({
 				title,
-				intent: { requestedKind: "gantt", nativeKind: "gantt", requirements },
 				diagram: { ...rest, type: "gantt" },
 			}),
 		}),
@@ -34,21 +33,6 @@ describe("Gantt generation", () => {
 		expect(messages.system).toContain("Gantt IR rules");
 		expect(messages.system).toContain("dependsOn");
 		expect(messages.user).toContain('"type":"gantt"');
-	});
-
-	it("checks task counts and task and phase labels against the plan", () => {
-		expect(
-			candidate(ganttFixture, [
-				{ kind: "count", target: "tasks", comparator: "exact", value: 5 },
-				{ kind: "label", target: "task", value: "Web app" },
-				{ kind: "label", target: "phase", value: "Launch" },
-			]).error,
-		).toBeUndefined();
-		expect(
-			candidate(ganttFixture, [
-				{ kind: "count", target: "tasks", comparator: "exact", value: 6 },
-			]).diagnostics.join(" "),
-		).toContain("requirement_count_not_met");
 	});
 
 	it("returns repair hints for an invalid plan", () => {

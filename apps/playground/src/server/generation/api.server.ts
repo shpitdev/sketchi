@@ -13,6 +13,7 @@ import {
 	type DiagramGenerationError,
 	type DiagramGenerationType,
 	isSupportedGenerationModel,
+	WRONG_DIAGRAM_TYPE_ERROR,
 } from "@sketchi/diagram-generation";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result } from "effect";
@@ -25,7 +26,7 @@ import {
 	PlaygroundCodeModeUsage,
 } from "../codemode/usage-events.server";
 import { PlaygroundBindings, PlaygroundClock } from "../runtime/context.server";
-import { decodeGenerateRequest, GENERATE_REQUEST_COPY, isNativeGenerateType } from "./request";
+import { decodeGenerateRequest, GENERATE_REQUEST_COPY } from "./request";
 import { PlaygroundGeneration } from "./service.server";
 
 export const MAX_GENERATE_REQUEST_BYTES = 32 * 1024;
@@ -38,7 +39,6 @@ type GenerateFailureStatus =
 	| "invalid_input"
 	| "provider_failed"
 	| "generation_timeout"
-	| "unsupported_diagram_type"
 	| "unsupported_model"
 	| "malformed_output"
 	| "invalid_generated_document"
@@ -146,7 +146,7 @@ function generationErrorFailure(error: DiagramGenerationError): GenerateFailure 
 function malformedCandidateFailure(
 	candidate: DiagramGenerationCandidate,
 ): GenerateFailure | undefined {
-	if (candidate.diagram || candidate.intent?.nativeKind === null) {
+	if (candidate.diagram) {
 		return undefined;
 	}
 	const canParse = (() => {
@@ -182,35 +182,17 @@ function malformedCandidateFailure(
 	);
 }
 
-function unsupportedCandidateFailure(
-	candidate: DiagramGenerationCandidate,
-): GenerateFailure | undefined {
-	const intent = candidate.intent;
-	if (!intent || intent.nativeKind !== null || candidate.error) return undefined;
-	return failure("unsupported_diagram_type", [
+function wrongTypeFailure(candidate: DiagramGenerationCandidate): GenerateFailure | undefined {
+	if (candidate.error !== WRONG_DIAGRAM_TYPE_ERROR) return undefined;
+	return failure("quality_failed", [
 		issue(
-			"unsupported_diagram_type",
+			"explicit_type_not_met",
 			"generation",
-			`Sketchi does not natively support ${intent.requestedKind} generation.`,
-			GENERATE_REQUEST_COPY.requestSupportedType,
+			candidate.diagnostics.find((entry) => entry.startsWith("explicit_type_not_met")) ??
+				candidate.error,
+			"Retry, or omit the type to let the prompt decide.",
 		),
 	]);
-}
-
-function rejectedIntentFailure(candidate: DiagramGenerationCandidate): GenerateFailure | undefined {
-	if (!candidate.intent || !candidate.error) return undefined;
-	const diagnostics = candidate.diagnostics.slice(0, 8);
-	return failure(
-		"quality_failed",
-		diagnostics.map((diagnostic) =>
-			issue(
-				"intent_contract_not_met",
-				"generation",
-				diagnostic,
-				"Return one artifact that satisfies the typed intent plan and explicit type authority.",
-			),
-		),
-	);
 }
 
 function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFailure {
@@ -379,19 +361,6 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 			]),
 		);
 	}
-	if (input.type && !isNativeGenerateType(input.type)) {
-		return yield* finish(
-			rawBody,
-			failure("unsupported_diagram_type", [
-				issue(
-					"unsupported_diagram_type",
-					"input",
-					`Sketchi does not natively support ${input.type} generation.`,
-					GENERATE_REQUEST_COPY.requestSupportedType,
-				),
-			]),
-		);
-	}
 	const model = input.model;
 	if (model !== undefined && !isSupportedGenerationModel(model)) {
 		return yield* finish(
@@ -426,13 +395,9 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 		return yield* finish(generationInput, generationErrorFailure(candidateResult.error));
 	}
 	const candidate = candidateResult.candidate;
-	const unsupported = unsupportedCandidateFailure(candidate);
-	if (unsupported) {
-		return yield* finish(generationInput, unsupported);
-	}
-	const rejectedIntent = rejectedIntentFailure(candidate);
-	if (rejectedIntent) {
-		return yield* finish(generationInput, rejectedIntent);
+	const wrongType = wrongTypeFailure(candidate);
+	if (wrongType) {
+		return yield* finish(generationInput, wrongType);
 	}
 	const malformed = malformedCandidateFailure(candidate);
 	if (malformed || !candidate.diagram) {

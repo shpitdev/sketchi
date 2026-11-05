@@ -412,7 +412,7 @@ Network and options:
   The model call, schema validation, and quality gate run server-side; the finished diagram
   and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
   Without --type, the model selects ${alternativeList([...CANONICAL_DOCUMENT_TYPES])} from the request;
-  a request for any other kind of diagram fails with a typed unsupported error.
+  a request for any other kind of diagram gets the closest of those.
   --model defaults to ${DEFAULT_GENERATION_MODEL}. A model the server does not support
   is rejected before generation, and the error names the supported ones.
   Override the endpoint for preview or local testing with ${SKETCHI_GENERATE_ENDPOINT_ENV}

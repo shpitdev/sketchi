@@ -1,21 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { orgChartFixture } from "@sketchi/diagram-core";
 
-import { candidateFromText, enforceCandidateRequestRequirements } from "./candidates.js";
+import { candidateFromText } from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
 
-const request = {
-	model: "fixture",
-	prompt: { id: "team", request: "our startup's org chart", requestedType: "org-chart" as const },
-};
-
-function candidate(diagram: unknown, requirements: readonly unknown[] = []) {
+function candidate(diagram: unknown) {
 	return candidateFromText({
 		model: "fixture",
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Startup team",
-			intent: { requestedKind: "org-chart", nativeKind: "org-chart", requirements },
 			diagram,
 		}),
 	});
@@ -61,25 +55,5 @@ describe("org chart generation", () => {
 		expect(parsed.diagram).toBeUndefined();
 		expect(parsed.diagnostics.join(" ")).toContain("org-chart.multiple_roots");
 		expect(parsed.diagnostics.join(" ")).toContain("Hint:");
-	});
-
-	it("checks people counts and names", () => {
-		const met = enforceCandidateRequestRequirements(
-			candidate(orgChartFixture, [
-				{ kind: "count", target: "people", comparator: "exact", value: 7 },
-				{ kind: "label", target: "person", value: "Grace Hopper" },
-			]),
-			request,
-		);
-		expect(met.error).toBeUndefined();
-		const unmet = enforceCandidateRequestRequirements(
-			candidate(orgChartFixture, [
-				{ kind: "count", target: "people", comparator: "exact", value: 8 },
-				{ kind: "label", target: "person", value: "Barbara Liskov" },
-			]),
-			request,
-		);
-		expect(unmet.diagnostics.join(" ")).toContain("requirement_count_not_met");
-		expect(unmet.diagnostics.join(" ")).toContain('required person label "Barbara Liskov"');
 	});
 });

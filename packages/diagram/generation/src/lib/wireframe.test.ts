@@ -1,21 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { wireframeFixture } from "@sketchi/diagram-core";
 
-import { candidateFromText, enforceCandidateRequestRequirements } from "./candidates.js";
+import { candidateFromText } from "./candidates.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
 
-const request = {
-	model: "fixture",
-	prompt: { id: "login", request: "a mobile login screen", requestedType: "wireframe" as const },
-};
-
-function candidate(diagram: unknown, requirements: readonly unknown[] = []) {
+function candidate(diagram: unknown) {
 	return candidateFromText({
 		model: "fixture",
 		provider: "fixture",
 		text: JSON.stringify({
 			title: "Mobile login",
-			intent: { requestedKind: "wireframe", nativeKind: "wireframe", requirements },
 			diagram,
 		}),
 	});
@@ -69,26 +63,5 @@ describe("wireframe generation", () => {
 		expect(parsed.diagram).toBeUndefined();
 		expect(parsed.diagnostics.join(" ")).toContain("wireframe.missing_wireframe_text");
 		expect(parsed.diagnostics.join(" ")).toContain("Hint:");
-	});
-
-	it("checks screen counts and component words", () => {
-		const met = enforceCandidateRequestRequirements(
-			candidate(wireframeFixture, [
-				{ kind: "count", target: "screens", comparator: "exact", value: 1 },
-				{ kind: "label", target: "screen", value: "Login" },
-				{ kind: "label", target: "component", value: "Forgot password?" },
-			]),
-			request,
-		);
-		expect(met.error).toBeUndefined();
-		const unmet = enforceCandidateRequestRequirements(
-			candidate(wireframeFixture, [
-				{ kind: "count", target: "screens", comparator: "exact", value: 2 },
-				{ kind: "label", target: "component", value: "Sign in with Google" },
-			]),
-			request,
-		);
-		expect(unmet.diagnostics.join(" ")).toContain("requirement_count_not_met");
-		expect(unmet.diagnostics.join(" ")).toContain('required component label "Sign in with Google"');
 	});
 });

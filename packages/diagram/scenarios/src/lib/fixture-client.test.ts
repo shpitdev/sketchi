@@ -1,11 +1,9 @@
 import { assert, layer } from "@effect/vitest";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
 import { Effect } from "effect";
-import { vi } from "vitest";
 
 import { FixtureGenerationClientLayer } from "./fixture-client";
 import { toDiagramGenerationPrompt } from "./prompt";
-import * as diagramScenarios from "./diagram-scenarios";
 import { getFlowchartScenario } from "./scenarios";
 
 layer(FixtureGenerationClientLayer)("scenario fixture generation client", (it) => {
@@ -55,30 +53,6 @@ layer(FixtureGenerationClientLayer)("scenario fixture generation client", (it) =
 			assert.isDefined(candidate.error);
 			assert.isTrue(
 				candidate.diagnostics.some((message) => message.includes("explicit_type_not_met")),
-			);
-		}),
-	);
-
-	it.effect("checks the maintained typed count plan against fixture IR", () =>
-		Effect.gen(function* () {
-			const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
-			const getter = vi.spyOn(diagramScenarios, "getDiagramScenario").mockReturnValue({
-				...scenario,
-				assertions: {
-					...scenario.assertions,
-					minNodeCount: scenario.expectedDiagram.nodes.length + 1,
-				},
-			});
-			const client = yield* DiagramGenerationClient;
-			const candidate = yield* client
-				.generate({
-					model: "fixture",
-					prompt: toDiagramGenerationPrompt(scenario),
-				})
-				.pipe(Effect.ensuring(Effect.sync(() => getter.mockRestore())));
-			assert.isUndefined(candidate.diagram);
-			assert.isTrue(
-				candidate.diagnostics.some((message) => message.includes("requirement_count_not_met")),
 			);
 		}),
 	);

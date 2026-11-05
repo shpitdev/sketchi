@@ -3,9 +3,9 @@
 Sketchi supports a fixed set of canonical diagram families: flowchart, mindmap,
 sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, and quadrant. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
 registry. A family is supported only when it completes every stage below, and
-only supported families are advertised. Everything else, such as architecture or
-swimlane, fails with a typed `unsupported_diagram_type` and is never coerced
-into another family.
+only supported families are advertised. Swimlanes and architecture diagrams are
+flowchart features. A prompt for anything else generates the closest family, and
+a request whose `type` names no family is invalid input.
 
 Start with the generator, then work down the list:
 

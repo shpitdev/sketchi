@@ -139,7 +139,7 @@ export function usage(): string {
 		"",
 		"When --generator-command is used directly, put it last. The scenario prompt is written to stdin and SKETCHI_SCENARIO_ID is set.",
 		"--list prints each scenario's metadata and exact user prompt as JSON.",
-		"On stdout, prefer the typed JSON response envelope { title, intent, diagram }; bare JSON diagram IR is also accepted.",
+		"On stdout, prefer the JSON response envelope { title, diagram }; bare JSON diagram IR is also accepted.",
 		"--input also accepts an MCP execute structuredContent payload, its accepted build result with normalizedSpec, or an MCP tool result wrapping structuredContent.",
 	].join("\n");
 }
