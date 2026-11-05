@@ -20,7 +20,11 @@ import { Effect, Result } from "effect";
 
 import { resultHttpStatus } from "../runtime/http-status.server";
 import { readBoundedJson } from "../runtime/request-body.server";
-import { PlaygroundCodeMode, type PlaygroundCodeModeShape } from "../codemode/service.server";
+import {
+	PlaygroundCodeMode,
+	type PlaygroundCodeModeShape,
+	PlaygroundNamedLogoFill,
+} from "../codemode/service.server";
 import {
 	codeModeUsageResponseHeaders,
 	PlaygroundCodeModeUsage,
@@ -431,10 +435,12 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 
 	const document = canonicalDocumentFromDiagram(candidate.diagram);
 	const spec = document.spec;
-	const buildResult: BuildResult = yield* buildWithCodeMode(codeMode, document, {
-		artifactFormats: ["scene", "excalidraw"],
-		inlineArtifacts: ["scene", "excalidraw"],
-	});
+	const buildResult: BuildResult = yield* Effect.gen(function* () {
+		return yield* buildWithCodeMode(codeMode, document, {
+			artifactFormats: ["scene", "excalidraw"],
+			inlineArtifacts: ["scene", "excalidraw"],
+		});
+	}).pipe(Effect.provideService(PlaygroundNamedLogoFill, true));
 	if (!buildResult.ok) {
 		return yield* finish({ prompt, type, spec }, buildFailure(buildResult));
 	}

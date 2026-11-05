@@ -663,6 +663,37 @@ describe("generation request boundaries", () => {
 		);
 	});
 
+	it("draws the logo a group's label names once the diagram draws a logo", async () => {
+		const diagram = {
+			...flowchartIr,
+			groups: [{ id: "edge", label: "Vercel" }],
+			nodes: flowchartIr.nodes.map((node, index) =>
+				index === 0
+					? { ...node, label: "Push to GitHub", group: "edge", icon: { slug: "github" } }
+					: node,
+			),
+		};
+		const response = await generateRequest(
+			{
+				AI: fakeAiGateway(generationText(diagram)),
+				ASSETS: {
+					fetch: async () =>
+						new Response(
+							'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h1"/></svg>',
+						),
+				},
+			},
+			{ prompt: "Push to GitHub on Vercel", type: "flowchart" },
+		);
+		const body = (await response.json()) as {
+			issues: readonly { readonly severity: string }[];
+			diagram: { scene: { icons?: Record<string, unknown> } };
+		};
+		expect(response.status).toBe(200);
+		expect(Object.keys(body.diagram.scene.icons ?? {}).toSorted()).toEqual(["github", "vercel"]);
+		expect(body.issues.filter((issue) => issue.severity === "info")).toEqual([]);
+	});
+
 	it("uses the configured model when a request names none", async () => {
 		const models: unknown[] = [];
 		const response = await generateRequest(
