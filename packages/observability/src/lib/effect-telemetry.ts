@@ -57,6 +57,7 @@ const safeFieldNames = new Set([
 	"export_ms",
 	"failure_category",
 	"format_count",
+	"gateway_log_id",
 	"method",
 	"model",
 	"object_count",

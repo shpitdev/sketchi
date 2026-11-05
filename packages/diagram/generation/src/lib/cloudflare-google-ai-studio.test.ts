@@ -3,11 +3,10 @@ import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 
 import { DiagramGenerationRequest } from "./candidates.js";
 import { DiagramGenerationClient, DiagramGenerationPolicyLive } from "./client.js";
+import { CloudflareAiGatewayBinding, type CloudflareAiGateway } from "./cloudflare-ai-gateway.js";
 import {
-	CloudflareAiGatewayBinding,
 	CloudflareGoogleAiStudioClientLive,
 	CloudflareGoogleAiStudioConfig,
-	type CloudflareAiGateway,
 } from "./cloudflare-google-ai-studio.js";
 
 function clientLayer(run: CloudflareAiGateway["run"]) {

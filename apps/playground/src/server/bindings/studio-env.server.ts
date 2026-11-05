@@ -15,6 +15,7 @@ export interface StudioEnv {
 	LOADER?: unknown;
 	SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
 	SKETCHI_AI_GATEWAY_ID?: string;
+	SKETCHI_AI_GENERATION_CLIENT?: string;
 	SKETCHI_AI_MODEL?: string;
 	SKETCHI_RENDER_ASSET_ORIGIN?: string;
 }

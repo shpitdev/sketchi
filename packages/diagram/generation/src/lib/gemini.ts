@@ -1,6 +1,10 @@
 import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import type { DiagramGenerationUsage, DiagramGenerationRequest } from "./candidates.js";
-import { buildDiagramGenerationMessages } from "./messages.js";
+import {
+	buildDiagramGenerationMessages,
+	DEFAULT_MAX_OUTPUT_TOKENS,
+	DEFAULT_TEMPERATURE,
+} from "./messages.js";
 
 export interface GeminiTextPart {
 	text: string;
@@ -22,9 +26,6 @@ export interface GeminiGenerateContentBody {
 	generationConfig: GeminiGenerationConfig;
 	system_instruction: GeminiSystemInstruction;
 }
-
-const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
-const DEFAULT_TEMPERATURE = 0.1;
 
 function numberUsage(value: unknown): number | undefined {
 	return typeof value === "number" ? value : undefined;

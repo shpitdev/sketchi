@@ -1,5 +1,11 @@
 export * from "./lib/candidates.js";
 export * from "./lib/client.js";
+export {
+	type CloudflareAiGateway,
+	CloudflareAiGatewayBinding,
+	type CloudflareAiGatewayProvider,
+} from "./lib/cloudflare-ai-gateway.js";
+export * from "./lib/cloudflare-gateway-chat.js";
 export * from "./lib/cloudflare-google-ai-studio.js";
 export * from "./lib/errors.js";
 export * from "./lib/gemini.js";
