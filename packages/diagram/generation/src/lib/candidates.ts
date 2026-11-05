@@ -245,6 +245,22 @@ function normalizeGeneratedFlowchartInput(input: unknown, diagnostics: string[])
 	};
 }
 
+/** A leaf topic may omit its empty children, and a mindmap its only layout. */
+function normalizeGeneratedMindmapTree(input: Record<string, unknown>): Record<string, unknown> {
+	const topic = (value: unknown): unknown => {
+		if (!isUnknownRecord(value)) return value;
+		const children = value["children"];
+		if (children === undefined) return { ...value, children: [] };
+		// Anything else malformed reaches the schema, so its content can be repaired and not lost.
+		return Array.isArray(children) ? { ...value, children: children.map(topic) } : value;
+	};
+	return {
+		layout: { direction: "LR", edgeRouting: "curved" },
+		...input,
+		root: topic(input["root"]),
+	};
+}
+
 function normalizeGeneratedSequenceInput(input: unknown, diagnostics: string[]): unknown {
 	const styled = withSketchiDiagramStyle(input);
 	if (!isUnknownRecord(styled)) return styled;
@@ -574,7 +590,7 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 			"root" in titledDiagram
 				? decodeAndValidate(
 						GeneratedMindmapTree,
-						titledDiagram,
+						normalizeGeneratedMindmapTree(titledDiagram),
 						generatedMindmapTreeToDiagram,
 						intent,
 						"Generated mindmap schema validation failed.",
