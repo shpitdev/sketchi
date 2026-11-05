@@ -73,6 +73,10 @@ swimlane requests fail clearly instead of being coerced.
 The default file is `<generated-id>.png` in the current directory. Use
 `--format excalidraw` or `--format scene` for another artifact, and `--dest`
 to choose its path or stream bytes with `--dest -`.
+After writing the PNG, `generate` copies it to the desktop clipboard so it is
+ready to paste; `--no-copy` skips that. `sketchi copy` copies the newest diagram
+again, `sketchi list checkout` finds past diagrams by title or prompt, and every
+id argument accepts `latest` or a unique prefix.
 
 For manual offline authoring, create a canonical document, inspect and revise
 it, list the local store, then export another artifact:

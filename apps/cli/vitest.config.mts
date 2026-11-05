@@ -67,6 +67,9 @@ export default defineConfig(() => ({
 		// Hang guard, not a speed budget: the heavy deterministic suites here run several
 		// times slower on loaded CI runners, and only a real hang should fail them.
 		testTimeout: 60_000,
+		// Spawned CLIs inherit this environment; without a display they never touch the
+		// real clipboard. Clipboard tests pass their own fake session and tools.
+		env: { WAYLAND_DISPLAY: "", DISPLAY: "" },
 		reporters: ["default"],
 		coverage: {
 			reportsDirectory: "../../coverage/apps/cli",

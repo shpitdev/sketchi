@@ -234,6 +234,7 @@ export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
 		document,
 		scene,
 		excalidraw,
+		prompt: input.prompt,
 	};
 	const diagram = yield* store.create(built);
 

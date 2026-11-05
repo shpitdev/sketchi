@@ -1,0 +1,23 @@
+DESCRIPTION
+  Copy a stored diagram's PNG to the desktop clipboard, rendering it on demand like export. Defaults to the newest diagram. Uses wl-copy on Wayland, xclip on X11, osascript on macOS, and PowerShell on Windows; with no desktop clipboard it fails with exit 8 and says why. Strictly offline and read-only.
+
+USAGE
+  sketchi copy [flags] [<diagram-id>]
+
+ARGUMENTS
+  diagram-id string    A stored id, a unique prefix of one, or latest (the default) for the newest. (optional)
+
+INHERITED FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+
+GLOBAL FLAGS
+  --help, -h                                          Show help information
+  --version, -v                                       Show version information
+  --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+
+EXAMPLES
+  # Copy the newest diagram.
+  sketchi copy
+
+  # Copy one diagram by id or prefix.
+  sketchi copy release-flow

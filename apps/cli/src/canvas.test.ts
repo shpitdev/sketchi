@@ -72,6 +72,7 @@ function capturingStoreLayer(created: BuiltDiagram[]) {
 		commitPatch: () => Effect.die("unused commitPatch"),
 		show: () => Effect.die("unused show"),
 		list: () => Effect.die("unused list"),
+		ids: () => Effect.die("unused ids"),
 		replaceWithDetached: () => Effect.die("unused replaceWithDetached"),
 		readRevision: () => Effect.die("unused readRevision"),
 		restore: () => Effect.die("unused restore"),

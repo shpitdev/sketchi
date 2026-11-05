@@ -1,8 +1,8 @@
 Sketchi CLI contracts for agents and automation.
 
 Command map:
-  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use show, list,
-  and export for every local record. Edit and patch support canonical flowchart, mindmap, and
+  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use list to find a
+  record, show, copy, and export for every local record. Edit and patch support canonical flowchart, mindmap, and
   sequence records. Use create for accepted canonical JSON.
   Share and pull are explicit network
   boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
@@ -60,7 +60,30 @@ Input and output contracts:
   <cwd>/diagrams/<id>.png after generation succeeds, or accepts a custom file path.
   Direct generate exports PNG to <generated-id>.png by default; --format scene|excalidraw selects
   another artifact and --dest PATH|- overrides its destination. Use --output text|json for result
-  presentation on every command.
+  presentation on every command. Text generate output is the title and type, the saved path,
+  whether the image was copied, and the id; --output json carries the full record, generation
+  model and provider, export details including the inline-Markdown display hint, and clipboard.
+
+Clipboard:
+  After generate writes a PNG file it copies the image to the desktop clipboard: wl-copy when
+  WAYLAND_DISPLAY is set, else xclip when DISPLAY is set, osascript on macOS, PowerShell on
+  Windows. It never copies in CI, for --dest -, for scene or excalidraw, or with --no-copy, and it
+  stays quiet when the session has no desktop clipboard. The tool's own daemon keeps the image
+  after Sketchi exits; Sketchi releases its streams and exits promptly. A clipboard failure
+  prints one line and never changes the exit code. JSON adds
+  "clipboard":{"copied":true} or {"copied":false,"reason":"..."}. sketchi copy [ID] copies any
+  stored diagram's PNG, rendered on demand, and fails with exit 8 when nothing can be copied.
+
+Finding diagrams:
+  generate records createdAt and the prompt in the local manifest. list shows the newest first;
+  list WORDS keeps diagrams whose title, id, or prompt contains every word; --type TYPE filters and
+  --limit N caps the result. Text shows 20 by default and says how many older ones it hid. JSON
+  list data is an array in the same newest-first order with every match unless --limit is given;
+  entries add createdAt, updatedAt (last change on disk), and prompt when known. Records made
+  before createdAt existed sort by updatedAt. Every DIAGRAM_ID argument accepts an exact id,
+  latest for the newest, or a unique id prefix; an unknown id fails with exit 5 and suggests
+  close ids, and an ambiguous prefix fails with ambiguous_diagram_id. show prints a summary;
+  --document adds the document, and show --output json always includes it.
   export writes bytes with --dest PATH|- and always writes status to stderr. With --dest -,
   stdout contains only artifact bytes. A successful PNG file export adds a generic inline-Markdown
   display hint for calling agents.
@@ -72,7 +95,7 @@ Share/pull safety limits:
   25165824 pixels. Limits are checked before encryption or raster allocation.
 
 Offline boundary and storage:
-  create, patch, show, edit, list, export, and restore use no model, remote agent, MCP server, login,
+  create, patch, show, edit, list, copy, export, and restore use no model, remote agent, MCP server, login,
   account, browser, credential, or network. share sends only locally encrypted ciphertext from
   the selected record to Excalidraw storage; pull sends only the link id in its download request.
   Records live at ~/.sketchi/diagrams/<id>/ with manifest.json, document.json, scene.json,
@@ -99,5 +122,5 @@ Revision recovery and next steps:
   edit, pull, and restore archive the complete prior authority state before atomic replacement.
   Use restore --revision N to recover through the CLI without consuming the selected snapshot.
   Start with generate for a prompt, canvas for CanvasSpec, or create for accepted canonical JSON.
-  Every returned id supports show, list, and export. Edit and patch are only for flowchart,
+  Every returned id supports show, copy, and export. Edit and patch are only for flowchart,
   mindmap, and sequence records; create a new canvas to replace a Universal CanvasSpec.

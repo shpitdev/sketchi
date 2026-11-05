@@ -25,6 +25,7 @@ const PUBLIC_COMMANDS = new Set([
 	"edit",
 	"patch",
 	"list",
+	"copy",
 	"restore",
 	"share",
 	"pull",

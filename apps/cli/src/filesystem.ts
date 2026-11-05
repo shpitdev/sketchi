@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Context, Effect, FileSystem, Layer, type PlatformError } from "effect";
+import { Context, Effect, FileSystem, Layer, Option, type PlatformError } from "effect";
 
 import { CliFilesystemError } from "./errors.js";
 
@@ -36,6 +36,8 @@ export class LocalFileSystem extends Context.Service<
 		readonly kind: (path: string) => Effect.Effect<LocalEntryKind | "missing", CliFilesystemError>;
 		readonly realPath: (path: string) => Effect.Effect<string, CliFilesystemError>;
 		readonly readText: (path: string) => Effect.Effect<string, CliFilesystemError>;
+		/** Last modification time in epoch milliseconds, or undefined when unknown. */
+		readonly modifiedAt: (path: string) => Effect.Effect<number | undefined, CliFilesystemError>;
 		readonly readBytes: (path: string) => Effect.Effect<Uint8Array, CliFilesystemError>;
 		readonly writeText: (
 			path: string,
@@ -160,6 +162,11 @@ export function makeLocalFileSystem(fs: FileSystem.FileSystem): typeof LocalFile
 			),
 		kind,
 		realPath: (path) => fs.realPath(path).pipe(Effect.mapError(mapError("resolve", path))),
+		modifiedAt: (path) =>
+			fs.stat(path).pipe(
+				Effect.map((info) => Option.getOrUndefined(info.mtime)?.getTime()),
+				Effect.mapError(mapError("stat", path)),
+			),
 		readText: (path) =>
 			Effect.tryPromise({
 				try: async (signal) => {

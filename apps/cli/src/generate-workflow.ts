@@ -29,6 +29,8 @@ export interface GeneratedArtifact {
 	readonly format: DiagramFormat;
 	readonly destination: string;
 	readonly sizeBytes: number;
+	/** The artifact bytes, kept for the clipboard; never serialized. */
+	readonly bytes: Uint8Array;
 	readonly stdoutBytes?: Uint8Array;
 }
 
@@ -91,6 +93,7 @@ export const exportCreatedDiagram = Effect.fn("sketchi.cli.exportCreatedDiagram"
 		format,
 		destination,
 		sizeBytes: bytes.byteLength,
+		bytes,
 		...(destination === "-" ? { stdoutBytes: bytes } : {}),
 	} satisfies GeneratedArtifact;
 });

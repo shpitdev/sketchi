@@ -73,6 +73,7 @@ describe("golden product help", () => {
 		"edit",
 		"patch",
 		"list",
+		"copy",
 		"restore",
 		"share",
 		"pull",
