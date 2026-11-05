@@ -54,7 +54,7 @@ const FLOWCHART_IR_INSTRUCTIONS = [
 	'Every node must have id, label, and kind: "start", "process", "decision", or "end".',
 	"Use exactly one start node and at least one end node.",
 	"Every non-end node must have at least one outgoing edge; every end node must have zero outgoing edges.",
-	"Give every action the scenario states its own node; never fold one into an edge label, another node, or a check. A return path that names an action passes through a node for it before it rejoins.",
+	"Give every action the scenario states its own node; never fold one into an edge label, another node, or a check. A return path that names an action, even waiting, passes through a node for it before it rejoins.",
 	"Add no next step the scenario gives only to other branches.",
 	"If the scenario says where the flow ends, every branch leads to that node. Otherwise a branch with no stated next step stops at its last step: mark that step as the end node, never a new result after it.",
 	"Every decision node must have at least two outgoing edges with non-empty unique labels.",
