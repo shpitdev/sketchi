@@ -17,8 +17,12 @@ describe("generation prompt rules", () => {
 
 	it("reads nullable keys and stated minimums into ER cardinality", () => {
 		expect(system).toContain('"parent_id int? FK"');
-		expect(system).toContain("The end a nullable foreign key points at is zero-or-one");
-		expect(system).toContain("zero-or-many unless the source says at least one");
+		expect(system).toContain("from is the end holding the foreign key");
+		expect(system).toContain("otherwise zero-or-many");
+		expect(system).toContain("no row of the other side goes without one");
+		expect(system).toContain("zero-or-one if the key is nullable");
+		expect(system).toContain("zero-or-one if the key is unique or the sole primary key");
+		expect(system).toContain('"order_id uuid PK FK" (composite)');
 	});
 
 	it("makes every named zone a group nested in the zone that holds it", () => {

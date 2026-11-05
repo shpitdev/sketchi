@@ -134,10 +134,9 @@ const IR_INSTRUCTIONS = {
 		title: "ER IR rules",
 		rules: [
 			'Use diagram type "er".',
-			"Use it for database schemas and entity-relationship diagrams; never supply coordinates.",
-			'Return entities: [{ id, name?, fields }]. Ids hold no dot or space; name defaults to the id. Each field is one string "name type markers": "id uuid PK", "customer_id uuid FK", "email text UK", "note text?" (nullable), "parent_id int? FK", with type optional.',
-			'Return relationships: [{ id, from, to, fromCardinality, toCardinality, label? }]. from and to are "entity.field" when the source states the key columns: "orders.customer_id" to "customers.id"; otherwise the entity id alone.',
-			'Each cardinality is "one", "zero-or-one", "many", "one-or-many" or "zero-or-many": how many rows of that end relate to one row of the other end. The end a nullable foreign key points at is zero-or-one, and a required one is one. The many end is zero-or-many unless the source says at least one.',
+			'Return entities: [{ id, name?, fields }]. Ids hold no dot or space; name defaults to the id. Each field is one string "name type markers": "id uuid PK", "order_id uuid PK FK" (composite), "email text UK", "note text?" (nullable), "parent_id int? FK", with type optional.',
+			'Return relationships: [{ id, from, to, fromCardinality, toCardinality, label? }]. from is the end holding the foreign key and to the end it points at, as "entity.field" when the source states the key columns ("orders.customer_id" to "customers.id"), otherwise the entity id alone.',
+			'Each cardinality is "one", "zero-or-one", "many", "one-or-many" or "zero-or-many": how many rows of that end relate to one row of the other end. fromCardinality is one-or-many if the source says no row of the other side goes without one, zero-or-one if the key is unique or the sole primary key, otherwise zero-or-many. toCardinality is zero-or-one if the key is nullable, otherwise one.',
 			"Mark every key column PK, FK or UK as stated.",
 		],
 	},
