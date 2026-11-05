@@ -1,4 +1,15 @@
-import { mediaPlayerStateMachine } from "@sketchi/diagram-core";
+import {
+	CANONICAL_DOCUMENT_SPECS,
+	ExcalidrawFileSchema,
+	RenderedDiagramSceneSchema,
+} from "@sketchi/diagram-agent";
+import {
+	diagramFixtures,
+	mediaPlayerStateMachine,
+	sankeyStressFixtures,
+} from "@sketchi/diagram-core";
+import { diagramScenarios } from "@sketchi/diagram-scenarios";
+import { Schema } from "effect";
 import type { CloudflareAiGateway, CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
 import { describe, expect, it } from "vitest";
 
@@ -126,6 +137,49 @@ function generateRequest(env: StudioEnv, body: unknown): Promise<Response> {
 	});
 	return runPlaygroundEffect(handleGenerateDiagramRequest(request), testBoundary(env, request));
 }
+
+// The published CLI decodes a 200 with exactly these schemas (apps/cli/src/generation.ts), and
+// installed versions cannot be patched, so a response that fails them is a broken generate.
+describe("generate responses installed CLIs can decode", () => {
+	const diagrams = [
+		...diagramFixtures,
+		...Object.values(sankeyStressFixtures),
+		...diagramScenarios.flatMap((scenario) => scenario.expectedDiagram ?? []),
+	];
+	const decoded = new Set<string>();
+
+	it.each(diagrams.map((diagram) => [`${diagram.type} ${diagram.id}`, diagram] as const))(
+		"%s",
+		async (_name, diagram) => {
+			const response = await generateRequest(
+				{ AI: fakeAiGateway(generationText({ ...diagram })) },
+				{ prompt: "Draw it", type: diagram.type },
+			);
+			const body = (await response.json()) as {
+				readonly ok: boolean;
+				readonly diagram?: {
+					readonly document: { readonly spec: unknown };
+					readonly excalidraw: unknown;
+					readonly scene: unknown;
+				};
+			};
+			// A diagram this API rejects with a typed failure is not this mismatch.
+			if (!body.ok) return;
+			decoded.add(diagram.type);
+			const decode = (schema: Schema.Top & { readonly DecodingServices: never }, value: unknown) =>
+				Schema.decodeUnknownSync(schema)(value);
+			expect(() => decode(RenderedDiagramSceneSchema, body.diagram?.scene)).not.toThrow();
+			expect(() => decode(ExcalidrawFileSchema, body.diagram?.excalidraw)).not.toThrow();
+			expect(() =>
+				decode(CANONICAL_DOCUMENT_SPECS[diagram.type], body.diagram?.document.spec),
+			).not.toThrow();
+		},
+	);
+
+	it("decoded a response from every canonical family", () => {
+		expect(decoded).toEqual(new Set(Object.keys(CANONICAL_DOCUMENT_SPECS)));
+	});
+});
 
 describe("public generate endpoint", () => {
 	it("returns composite-entry warnings without blocking or retrying generation", async () => {

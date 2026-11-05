@@ -317,6 +317,35 @@ describe("prompt-assisted generation over the public generate API", () => {
 		globalThis.fetch = originalFetch;
 	});
 
+	it.effect("persists a Sankey whose middle column has label backgrounds", () =>
+		Effect.gen(function* () {
+			const body = yield* Effect.promise(() =>
+				buildSuccessBody({
+					type: "sankey",
+					spec: {
+						id: "funnel",
+						title: "Funnel",
+						nodes: [
+							{ id: "applied", label: "Applied" },
+							{ id: "screened", label: "Screened" },
+							{ id: "hired", label: "Hired" },
+						],
+						links: [
+							{ source: "applied", target: "screened", value: 10 },
+							{ source: "screened", target: "hired", value: 4 },
+						],
+					},
+				}),
+			);
+			assert.include(body, "node:sankey:knockout:screened");
+			stubFetch(() => new Response(body, { status: 200 }));
+
+			const result = yield* runGenerate([], "sankey");
+
+			assert.strictEqual(result.diagram.document.type, "sankey");
+		}),
+	);
+
 	it.effect("persists a generated flowchart returned by the endpoint", () =>
 		Effect.gen(function* () {
 			const body = yield* Effect.promise(() => buildSuccessBody(flowchartInput));
