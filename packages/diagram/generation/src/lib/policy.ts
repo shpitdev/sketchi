@@ -200,10 +200,13 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 					...repaired.diagnostics,
 					`repair_${outcome}: semantic repair attempt ${repairAttempt} ${outcome}.`,
 				];
+				// Another attempt differs only by its number, so the same answer would come back.
+				const repeated = repaired.text.trim() === latestCandidate.text.trim();
 				latestCandidate = repaired;
 				candidate = repairedAccepted
 					? { ...repaired, diagnostics }
 					: { ...originalCandidate, diagnostics };
+				if (repeated) break;
 			}
 			const finishedAt = yield* Clock.currentTimeMillis;
 			return {

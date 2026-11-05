@@ -127,6 +127,42 @@ describe("generation repair prompts", () => {
 		}),
 	);
 
+	for (const [name, texts, expectedCalls] of [
+		["stops when a repair repeats the attempt before it", ["same", "same", "unused"], 2],
+		["keeps repairing while repairs change", ["first", "second", "third"], 3],
+	] as const) {
+		it.effect(name, () =>
+			Effect.gen(function* () {
+				const requests: DiagramGenerationRequest[] = [];
+				const result = yield* runDiagramGenerationWithPolicy(
+					(input) =>
+						Effect.sync(() => {
+							requests.push(input);
+							return {
+								diagnostics: [currentIssue],
+								error: "Invalid.",
+								model: request.model,
+								provider: "fixture" as const,
+								text: texts[requests.length - 1] ?? "",
+							};
+						}),
+					request,
+					"fixture",
+					{
+						concurrency: 1,
+						maxRepairAttempts: 2,
+						maxRetries: 0,
+						requestTimeoutMs: 1_000,
+						retryDelayMs: 1,
+					},
+				);
+				expect(requests).toHaveLength(expectedCalls);
+				expect(result.error).toBe("Invalid.");
+				expect(result.text).toBe(texts[0]);
+			}),
+		);
+	}
+
 	for (const initialDiagnostics of [
 		["output_truncated: Regenerate the complete diagram."],
 		[
