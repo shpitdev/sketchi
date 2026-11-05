@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.31.8
+
+### Patch Changes
+
+- [#618](https://github.com/shpitdev/sketchi/pull/618) [`937c61d`](https://github.com/shpitdev/sketchi/commit/937c61d032b8b4bc1f83d5e6c902273534ac49bd) Thanks [@anandpant](https://github.com/anandpant)! - Bundle Effect 4.1.2. The CLI's commands, flags and output are unchanged.
+
 ## 0.31.7
 
 ### Patch Changes
