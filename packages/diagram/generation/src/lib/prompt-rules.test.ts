@@ -5,6 +5,17 @@ import { buildDiagramGenerationMessages } from "./messages.js";
 const { system } = buildDiagramGenerationMessages({ id: "rules", request: "Draw it" });
 
 describe("generation prompt rules", () => {
+	it("uses key columns on ER relationships only when the source states them", () => {
+		expect(system).toContain('"entity.field" when the source states the key columns');
+		expect(system).toContain("otherwise the entity id alone");
+	});
+
+	it("reads nullable keys and stated minimums into ER cardinality", () => {
+		expect(system).toContain('"parent_id int? FK"');
+		expect(system).toContain("The end a nullable foreign key points at is zero-or-one");
+		expect(system).toContain("zero-or-many unless the source says at least one");
+	});
+
 	it("makes every named zone a group nested in the zone that holds it", () => {
 		expect(system).toContain("Every zone the scenario names is its own group");
 		expect(system).toContain('sets "parent" to the zone that holds it');

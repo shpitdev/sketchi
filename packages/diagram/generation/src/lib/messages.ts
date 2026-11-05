@@ -135,9 +135,9 @@ const IR_INSTRUCTIONS = {
 		rules: [
 			'Use diagram type "er".',
 			"Use it for database schemas and entity-relationship diagrams; never supply coordinates.",
-			'Return entities: [{ id, name?, fields }]. Ids hold no dot or space; name defaults to the id. Each field is one string "name type markers": "id uuid PK", "customer_id uuid FK", "email text UK", "note text?" (nullable), with type optional.',
-			'Return relationships: [{ id, from, to, fromCardinality, toCardinality, label? }]. from and to name an entity, or "entity.field" for the key column at each end: "orders.customer_id" to "customers.id".',
-			'Each cardinality is "one", "zero-or-one", "many", "one-or-many" or "zero-or-many": how many rows of that end relate to one row of the other end.',
+			'Return entities: [{ id, name?, fields }]. Ids hold no dot or space; name defaults to the id. Each field is one string "name type markers": "id uuid PK", "customer_id uuid FK", "email text UK", "note text?" (nullable), "parent_id int? FK", with type optional.',
+			'Return relationships: [{ id, from, to, fromCardinality, toCardinality, label? }]. from and to are "entity.field" when the source states the key columns: "orders.customer_id" to "customers.id"; otherwise the entity id alone.',
+			'Each cardinality is "one", "zero-or-one", "many", "one-or-many" or "zero-or-many": how many rows of that end relate to one row of the other end. The end a nullable foreign key points at is zero-or-one, and a required one is one. The many end is zero-or-many unless the source says at least one.',
 			"Copy every entity, field, type, key, nullable marker and cardinality the source states; invent none. Mark every key column PK, FK or UK as stated.",
 		],
 	},

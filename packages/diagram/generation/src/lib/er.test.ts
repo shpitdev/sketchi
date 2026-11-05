@@ -50,6 +50,31 @@ describe("ER generation", () => {
 		]);
 	});
 
+	it("accepts relationships between entities when the source states no key columns", () => {
+		const parsed = candidate({
+			id: "shop",
+			type: "er",
+			entities: [
+				{ id: "customers", fields: [] },
+				{ id: "orders", fields: [] },
+			],
+			relationships: [
+				{
+					id: "customers-orders",
+					from: "customers",
+					to: "orders",
+					fromCardinality: "one",
+					toCardinality: "zero-or-many",
+					label: "place",
+				},
+			],
+		});
+		expect(parsed.error).toBeUndefined();
+		expect(parsed.diagram).toMatchObject({
+			relationships: [{ from: "customers", to: "orders" }],
+		});
+	});
+
 	it("reports an unknown field with its repair hint", () => {
 		const parsed = candidate({
 			...erFixture,
