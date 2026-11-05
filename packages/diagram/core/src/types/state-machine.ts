@@ -403,7 +403,7 @@ export function getStateMachineValidationIssues(
 				code: "final_has_outgoing",
 				path: `transitions.[${index}].source`,
 				message: `Transition "${transition.id}" leaves final state "${source.id}".`,
-				hint: "A final state ends the machine; leave from the state before it instead.",
+				hint: "A final state has no outgoing transitions. A state that both ends the machine and continues is a regular state with a transition to a new final state, plus its others.",
 			});
 		}
 		if (

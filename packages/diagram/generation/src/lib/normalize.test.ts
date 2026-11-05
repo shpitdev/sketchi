@@ -1,3 +1,4 @@
+import { stateLabel } from "@sketchi/diagram-core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -110,6 +111,91 @@ describe("flowchart steps with nothing after them", () => {
 			[{ id: "a-b", source: "a", target: "b" }],
 		);
 		expect(candidate.error).toBeDefined();
+	});
+});
+
+describe("a final state with outgoing transitions", () => {
+	const machine = (states: readonly object[], transitions: readonly object[]) =>
+		parse({ type: "state-machine", id: "order", initial: "open", states, transitions });
+
+	it("keeps its ending and its transitions, without a repair", () => {
+		const candidate = machine(
+			[
+				{ id: "open" },
+				{ id: "done", label: "Done", kind: "final" },
+				{ id: "refunded", kind: "final" },
+			],
+			[
+				{ id: "close", source: "open", target: "done", event: "close" },
+				{ id: "refund", source: "done", target: "refunded", event: "refund" },
+			],
+		);
+		expect(candidate.error).toBeUndefined();
+		const diagram = candidate.diagram;
+		if (diagram?.type !== "state-machine") throw new Error("Expected a state machine.");
+		expect(diagram.states.find((state) => state.id === "done")?.kind).not.toBe("final");
+		expect(diagram.states.find((state) => state.id === "end")?.kind).toBe("final");
+		expect(diagram.transitions.map((entry) => [entry.source, entry.target])).toEqual([
+			["open", "done"],
+			["done", "refunded"],
+			["done", "end"],
+		]);
+	});
+
+	it("draws the new ending as an anonymous marker, whatever the state is called", () => {
+		const candidate = machine(
+			[{ id: "open" }, { id: "delivered", kind: "final" }, { id: "refunded", kind: "final" }],
+			[
+				{ id: "ship", source: "open", target: "delivered" },
+				{ id: "refund", source: "delivered", target: "refunded" },
+			],
+		);
+		if (candidate.diagram?.type !== "state-machine") throw new Error("Expected a state machine.");
+		const added = candidate.diagram.states.find(
+			(state) => state.kind === "final" && state.id !== "refunded",
+		);
+		expect(added).toBeDefined();
+		expect(added && stateLabel(added)).toBeUndefined();
+	});
+
+	it("does not reuse an id the diagram already has", () => {
+		const candidate = machine(
+			[
+				{ id: "open" },
+				{ id: "end", label: "Archived" },
+				{ id: "end-2", kind: "final" },
+				{ id: "delivered", kind: "final" },
+				{ id: "refunded", kind: "final" },
+				{ id: "lost", kind: "final" },
+			],
+			[
+				{ id: "ship", source: "open", target: "delivered" },
+				{ id: "archive", source: "open", target: "end" },
+				{ id: "finish", source: "end", target: "end-2" },
+				{ id: "delivered-ends", source: "delivered", target: "refunded" },
+				{ id: "misplace", source: "delivered", target: "lost" },
+				{ id: "lost-ends", source: "lost", target: "refunded" },
+			],
+		);
+		expect(candidate.error).toBeUndefined();
+		if (candidate.diagram?.type !== "state-machine") throw new Error("Expected a state machine.");
+		const { states, transitions } = candidate.diagram;
+		expect(new Set(states.map((state) => state.id)).size).toBe(states.length);
+		expect(new Set(transitions.map((entry) => entry.id)).size).toBe(transitions.length);
+		const targets = (source: string) =>
+			transitions.filter((entry) => entry.source === source).map((entry) => entry.target);
+		expect(targets("delivered")).toEqual(["refunded", "lost", "end-3"]);
+		expect(targets("lost")).toEqual(["refunded", "end-4"]);
+		expect(states.find((state) => state.id === "end")?.kind).toBeUndefined();
+	});
+
+	it("leaves a final state with nothing after it alone", () => {
+		const candidate = machine(
+			[{ id: "open" }, { id: "done", kind: "final" }],
+			[{ id: "close", source: "open", target: "done" }],
+		);
+		if (candidate.diagram?.type !== "state-machine") throw new Error("Expected a state machine.");
+		expect(candidate.diagram.states.map((state) => state.id)).toEqual(["open", "done"]);
 	});
 });
 
