@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.32.0
+
+### Minor Changes
+
+- [#652](https://github.com/shpitdev/sketchi/pull/652) [`2fa58f1`](https://github.com/shpitdev/sketchi/commit/2fa58f15fa922612a6e42005f8f39d0e85962791) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi generate` no longer has a `--model` flag and no longer names a model in its request: the server chooses the model, and the result still reports which one ran. Scripts that pass `--model` must drop it.
+
 ## 0.31.11
 
 ### Patch Changes
