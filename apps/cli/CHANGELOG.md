@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.31.7
+
+### Patch Changes
+
+- [#615](https://github.com/shpitdev/sketchi/pull/615) [`64595b9`](https://github.com/shpitdev/sketchi/commit/64595b9dc96101d90834836dff4b0b567a69fb7f) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi generate --model` now reports a model the server does not support as a typed `unsupported_model` error that names the supported IDs and exits 3.
+
 ## 0.31.6
 
 ### Patch Changes
