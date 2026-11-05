@@ -81,9 +81,10 @@ import { GeneratedMindmapTree, generatedMindmapTreeToDiagram } from "./mindmap-t
 
 export const diagramGenerationProviderIds: readonly [
 	"fixture",
+	"cloudflare-anthropic",
 	"cloudflare-google-ai-studio",
 	"google-ai-studio",
-] = ["fixture", "cloudflare-google-ai-studio", "google-ai-studio"];
+] = ["fixture", "cloudflare-anthropic", "cloudflare-google-ai-studio", "google-ai-studio"];
 
 export const DiagramGenerationProviderIdSchema = Schema.Literals(diagramGenerationProviderIds);
 export type DiagramGenerationProviderId = typeof DiagramGenerationProviderIdSchema.Type;

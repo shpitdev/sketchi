@@ -10,8 +10,11 @@ function envString(value: string | undefined, fallback: string): string {
 }
 
 export function aiEnvironment(env: StudioEnv) {
+	const model = envString(env.SKETCHI_AI_MODEL, DEFAULT_MODEL);
 	return {
 		gatewayId: envString(env.SKETCHI_AI_GATEWAY_ID, DEFAULT_GATEWAY_ID),
-		model: envString(env.SKETCHI_AI_MODEL, DEFAULT_MODEL),
+		/** For `generate` only. Studio chat stays on `model`, which only a Google provider reads. */
+		generateModel: envString(env.SKETCHI_AI_GENERATE_MODEL, model),
+		model,
 	};
 }
