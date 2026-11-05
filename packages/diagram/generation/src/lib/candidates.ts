@@ -213,6 +213,17 @@ function withKnownShape(node: unknown, diagnostics: string[]): unknown {
 	return withoutShape;
 }
 
+/** A process step with nothing after it is where its path ends. */
+function withEndsWhereStepsStop(nodes: unknown, edges: readonly unknown[]): unknown {
+	if (!Array.isArray(nodes)) return nodes;
+	const sources = new Set(edges.map((edge) => objectValue(edge, "source")));
+	return nodes.map((node) =>
+		isUnknownRecord(node) && node["kind"] === "process" && !sources.has(node["id"])
+			? { ...node, kind: "end" }
+			: node,
+	);
+}
+
 function normalizeGeneratedFlowchartInput(input: unknown, diagnostics: string[]): unknown {
 	const styled = withSketchiDiagramStyle(input);
 	if (!isUnknownRecord(styled)) return styled;
@@ -238,6 +249,7 @@ function normalizeGeneratedFlowchartInput(input: unknown, diagnostics: string[])
 	}
 	return {
 		...withIcons,
+		nodes: withEndsWhereStepsStop(withIcons["nodes"], edges),
 		edges: edges.map((edge) =>
 			isUnknownRecord(edge) &&
 			typeof edge["label"] === "string" &&

@@ -75,6 +75,44 @@ describe("flowchart node shapes", () => {
 	});
 });
 
+describe("flowchart steps with nothing after them", () => {
+	const flow = (nodes: readonly object[], edges: readonly object[]) =>
+		parse({ type: "flowchart", id: "flow", nodes, edges });
+
+	it("end their path, without a repair", () => {
+		const candidate = flow(
+			[
+				{ id: "a", label: "Start", kind: "start" },
+				{ id: "b", label: "Route it", kind: "decision" },
+				{ id: "c", label: "Left", kind: "process" },
+				{ id: "d", label: "Right", kind: "process" },
+				{ id: "e", label: "Done", kind: "end" },
+			],
+			[
+				{ id: "a-b", source: "a", target: "b" },
+				{ id: "b-c", source: "b", target: "c", label: "left" },
+				{ id: "b-d", source: "b", target: "d", label: "right" },
+				{ id: "d-e", source: "d", target: "e" },
+			],
+		);
+		expect(candidate.error).toBeUndefined();
+		expect(candidate.diagram).toMatchObject({
+			nodes: [{}, {}, { id: "c", kind: "end" }, { id: "d", kind: "process" }, {}],
+		});
+	});
+
+	it("still rejects a decision with nothing after it", () => {
+		const candidate = flow(
+			[
+				{ id: "a", label: "Start", kind: "start" },
+				{ id: "b", label: "Route it", kind: "decision" },
+			],
+			[{ id: "a-b", source: "a", target: "b" }],
+		);
+		expect(candidate.error).toBeDefined();
+	});
+});
+
 describe("the response envelope", () => {
 	const flowchart = {
 		type: "flowchart",
