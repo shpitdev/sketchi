@@ -58,7 +58,6 @@ const FLOWCHART_IR_INSTRUCTIONS = [
 	"If the scenario says where the flow ends, every branch leads to that node. Otherwise a branch with no stated next step stops at its last step: mark that step as the end node, never a new result after it.",
 	"Every decision node must have at least two outgoing edges with non-empty unique labels.",
 	"For each retry, return, or feedback loop, include a real back-edge to an earlier distinct process or decision. Never target start and never use a self-loop.",
-	"Edges must use existing node ids.",
 	'Only when the scenario groups steps (teams, zones, phases), add groups [{ "id", "label" }] and set each member node\'s group to its innermost group id; leave other nodes ungrouped. Every zone the scenario names is its own group. One inside another sets "parent" to the zone that holds it, wherever the scenario says so, and "kind" (cloud, datacenter, region, zone, vpc, subnet, cluster or namespace) when the scenario names what a zone is. Set "shape", also on a start or end: "database" for databases, "document" for files, archives and reports, "queue" for queues, streams and topics, "storage" for buckets and object stores; only users stay ellipses. In an architecture the entry is the start and each sink an end.',
 	'For swimlanes, a process across actors or roles, add lanes [{ "id", "label" }] in the scenario\'s order and set every node\'s lane to its actor; lanes take no groups.',
 	'Use layout { "direction": "TB", "edgeRouting": "orthogonal" } unless the scenario says otherwise.',
@@ -78,7 +77,7 @@ const SEQUENCE_IR_INSTRUCTIONS = [
 	"Return chronological messages with stable ids, participant source and target ids, and concise labels.",
 	'Use message type "message" for calls and "return" for responses; dashed style is appropriate for responses.',
 	"Answer a call with a later return from the callee back to the caller; Sketchi draws the callee's activation bar from the call to its return. Leave fire-and-forget events unanswered.",
-	"Every message source and target must reference a participant; a message from a participant to itself draws as a self-message loop.",
+	"A message from a participant to itself draws as a self-message loop.",
 	"Use at most 12 participants and 40 messages.",
 ];
 
@@ -577,16 +576,17 @@ export function buildDiagramGenerationMessages(
 			...IR_INSTRUCTIONS[type].rules.map((instruction) => `- ${instruction}`),
 		]),
 	].join("\n");
-	const typeAuthority = explicitType
-		? `The caller explicitly requires ${explicitType}. Set diagram.type to ${explicitType}.`
-		: "The caller omitted type. Select the scenario's requested kind.";
 	const user = [
 		"Scenario:",
 		prompt.request,
 		"",
-		"Type authority:",
-		typeAuthority,
-		"",
+		...(explicitType
+			? [
+					"Type authority:",
+					`The caller explicitly requires ${explicitType}. Set diagram.type to ${explicitType}.`,
+					"",
+				]
+			: []),
 		"Expected JSON shape (adapt the diagram to the scenario):",
 		expectedJsonShape(prompt),
 		...logoSection(prompt),
