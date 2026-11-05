@@ -43,6 +43,7 @@ describe("generation prompt rules", () => {
 	it("keeps a field typed as another class in its box, with a role on its relationship", () => {
 		expect(system).toContain("stays in attributes");
 		expect(system).toContain("whose toRole is the field's name");
+		expect(system).toContain("only pairs the source calls composed or aggregated take those kinds");
 		expect(system).toContain("inside a method body draws a dependency");
 	});
 });
