@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.31.10
+
+### Patch Changes
+
+- [#633](https://github.com/shpitdev/sketchi/pull/633) [`c137002`](https://github.com/shpitdev/sketchi/commit/c13700277d181a05e6f0b82a3186abd8d08a635d) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi generate` no longer reports `unsupported_diagram_type`. The server now draws a request for any other kind of diagram as the closest supported family.
+
 ## 0.31.9
 
 ### Patch Changes
