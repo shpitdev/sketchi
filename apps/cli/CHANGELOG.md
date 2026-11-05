@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.31.11
+
+### Patch Changes
+
+- [#642](https://github.com/shpitdev/sketchi/pull/642) [`b3ab947`](https://github.com/shpitdev/sketchi/commit/b3ab9475324fa6663ddd3cbc92ba48109883e07e) Thanks [@anandpant](https://github.com/anandpant)! - The error for a transition leaving a final state now says how to model a state that both ends the machine and continues.
+
 ## 0.31.10
 
 ### Patch Changes
