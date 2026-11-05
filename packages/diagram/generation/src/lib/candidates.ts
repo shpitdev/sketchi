@@ -286,11 +286,57 @@ function normalizeGeneratedSequenceInput(input: unknown, diagnostics: string[]):
 }
 
 /**
+ * A final state with outgoing transitions both ends the machine and continues, so it
+ * becomes a regular state with a transition to its own unnamed final state. Ids built
+ * only from "end" and digits draw as an anonymous marker, not as a named state.
+ */
+function withEndsSplitFromFinalStates(input: unknown): unknown {
+	if (!isUnknownRecord(input)) return input;
+	const { states, transitions } = input;
+	if (!Array.isArray(states) || !Array.isArray(transitions)) return input;
+	const sources = new Set(transitions.map((transition) => objectValue(transition, "source")));
+	const continuing = (state: unknown): state is Record<string, unknown> =>
+		isUnknownRecord(state) && state["kind"] === "final" && sources.has(state["id"]);
+	if (!states.some(continuing)) return input;
+	const unused = (entries: readonly unknown[]) => {
+		const used = new Set(entries.map((entry) => objectValue(entry, "id")));
+		return (base: string) => {
+			let id = base;
+			for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
+			used.add(id);
+			return id;
+		};
+	};
+	const stateId = unused(states);
+	const transitionId = unused(transitions);
+	const added: unknown[] = [];
+	const split = states.flatMap((state) => {
+		if (!continuing(state)) return [state];
+		const { kind: _kind, ...regular } = state;
+		const end = stateId("end");
+		added.push({
+			id: transitionId(`${String(state["id"])}-ends`),
+			source: state["id"],
+			target: end,
+		});
+		return [
+			regular,
+			{
+				id: end,
+				kind: "final",
+				...(state["parent"] === undefined ? {} : { parent: state["parent"] }),
+			},
+		];
+	});
+	return { ...input, states: split, transitions: [...transitions, ...added] };
+}
+
+/**
  * Number transitions the model left without ids, by source and target, and
  * drop empty event, guard and action strings, which mean "none".
  */
 function normalizeGeneratedStateMachineInput(input: unknown): unknown {
-	const styled = withSketchiDiagramStyle(input);
+	const styled = withEndsSplitFromFinalStates(withSketchiDiagramStyle(input));
 	if (!isUnknownRecord(styled) || !Array.isArray(styled["transitions"])) return styled;
 	const used = new Set(
 		styled["transitions"].flatMap((transition) =>

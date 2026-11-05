@@ -19,6 +19,19 @@ const codes = (input: Partial<StateMachineDiagram>) =>
 	);
 
 describe("StateMachine diagram type", () => {
+	it("hints how a state can both end the machine and continue", () => {
+		const [issue] = getStateMachineValidationIssues({
+			...mediaPlayerStateMachine,
+			states: [...mediaPlayerStateMachine.states, { id: "end", kind: "final" }],
+			transitions: [
+				...mediaPlayerStateMachine.transitions,
+				{ id: "eject", source: "stopped", target: "end" },
+				{ id: "revive", source: "end", target: "stopped" },
+			],
+		});
+		expect(issue?.hint).toContain("a transition to a new final state");
+	});
+
 	it("skips final and choice children for defaults but preserves explicit choice entry", () => {
 		const input = {
 			id: "composite-entry",
