@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
 	arrowheadsNear,
 	candidateRouteQuality,
+	candidateTouches,
 	routingQualityFindings,
 	routingQualityScale,
 	sharedSegments,
+	touchingLines,
 	type RoutingQualityArrow,
 } from "./routing-quality";
 
@@ -187,5 +189,61 @@ describe("arrowheads near a step", () => {
 		// A 36-unit stub draws an 18-unit head; its line, once routed, draws 25.
 		expect(arrowheadsNear([stub], 1)(...step)).toBe(0);
 		expect(arrowheadsNear([{ ...stub, headRun: 50 }], 1)(...step)).toBe(1);
+	});
+});
+
+describe("touching lines", () => {
+	const pairs = (arrows: readonly RoutingQualityArrow[], scale = 1) =>
+		touchingLines(arrows, scale).map((touch) => touch.arrowIds.join("+"));
+
+	it("flags two branches that turn one unit apart in the gap between their checks", () => {
+		// The middle check's no branch and the right check's yes branch, as drawn on main.
+		expect(
+			pairs([
+				arrow("no", [589, 1493], [645, 1493], [645, 1638]),
+				arrow("yes", [701, 1493], [646, 1493], [646, 1507], [621, 1507], [621, 1579]),
+			]),
+		).toEqual(["no+yes"]);
+	});
+
+	it("flags a bend or an end on another line, and runs that meet end to end", () => {
+		expect(
+			pairs([arrow("a", [0, 50], [200, 50]), arrow("b", [100, 0], [100, 49], [300, 49])]),
+		).toEqual(["a+b"]);
+		expect(pairs([arrow("a", [0, 0], [100, 0]), arrow("b", [101, 0], [200, 0])])).toEqual(["a+b"]);
+		expect(pairs([arrow("a", [0, 0], [0, 100]), arrow("b", [-50, 105], [50, 105])])).toEqual([
+			"a+b",
+		]);
+	});
+
+	it("accepts a clean crossing and lines that keep the gap", () => {
+		expect(pairs([arrow("a", [0, 0], [0, 200]), arrow("b", [-100, 100], [100, 100])])).toEqual([]);
+		expect(pairs([arrow("a", [0, 0], [100, 0]), arrow("b", [113, 0], [200, 0])])).toEqual([]);
+	});
+
+	it("judges the gap at reader scale", () => {
+		const near = [arrow("a", [0, 0], [100, 0]), arrow("b", [110, 0], [110, 100])];
+		expect(pairs(near, 1)).toEqual(["a+b"]);
+		expect(pairs(near, 2)).toEqual([]);
+	});
+
+	it("lets lines leave one node at one point but not fork off a shared stem, and one line's pieces never pair", () => {
+		const out = (id: string, ...points: [number, number][]) => ({
+			...arrow(id, ...points),
+			sourceId: "check",
+		});
+		expect(
+			pairs([out("yes", [0, 0], [0, 40], [-100, 40]), out("no", [0, 0], [0, 40], [100, 40])]),
+		).toEqual(["yes+no"]);
+		expect(pairs([out("yes", [0, 0], [0, 40]), out("no", [0, 0], [-40, 0])])).toEqual([]);
+		expect(pairs([arrow("a", [0, 0], [100, 0]), arrow("a", [100, 1], [100, 100])])).toEqual([]);
+	});
+
+	it("takes a reserved stub's free end for no bend, its run for part of the line", () => {
+		const stub = { ...arrow("stub", [0, 0], [0, 36]), openEnd: "end" as const };
+		const score = candidateTouches([stub], 1);
+		expect(score(arrow("across", [-100, 36], [100, 36]))).toBe(0);
+		expect(score(arrow("bend", [-100, 20], [2, 20], [2, -50]))).toBe(1);
+		expect(score(arrow("stub", [0, 36], [0, 100], [50, 100]))).toBe(0);
 	});
 });

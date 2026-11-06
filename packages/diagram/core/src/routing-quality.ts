@@ -22,6 +22,11 @@ export interface RoutingQualityArrow {
 	 * than these points' last segment: a stub reserved for a line not yet routed.
 	 */
 	readonly headRun?: number;
+	/**
+	 * An end a line not yet routed runs on from, as a reserved stub's free
+	 * end: the line may run straight on there, so it is not a bend.
+	 */
+	readonly openEnd?: "start" | "end";
 }
 
 export interface RoutingQualityFinding {
@@ -44,6 +49,11 @@ const WIDE_BEND_PX = 150;
 const CORRIDOR_GAP_PX = 24;
 /** Lines whose centres lie closer than this draw as one stroke: rough strokes leave no space between them. */
 const SHARED_STROKE_PX = 4;
+/**
+ * A bend or end of one line nearer another line than this joins it: rough
+ * strokes wobble a few pixels, so a smaller gap reads as a fork or a merge.
+ */
+const TOUCH_GAP_PX = 12;
 /** Shorter side-by-side runs are corners or crossings, not corridors. */
 const CORRIDOR_RUN_PX = 30;
 /** Arrowheads need at least this much visible space between them. */
@@ -267,6 +277,117 @@ export function sharedSegments(
 			if (longest) shared.push(longest);
 		}
 	return shared;
+}
+
+export interface TouchingLines {
+	readonly arrowIds: readonly [string, string];
+	/** A bend or end of one line that sits on, or within the touch gap of, the other. */
+	readonly at: Point;
+}
+
+/** Scene-unit distance within which a bend or end of one line reads as joining another at this scale. */
+export function routingTouchGap(scale: number): number {
+	return TOUCH_GAP_PX / scale;
+}
+
+function pointRunDistance(point: Point, run: Run): number {
+	const along = run.horizontal ? point.x : point.y;
+	const across = run.horizontal ? point.y : point.x;
+	const beyond = Math.max(run.min - along, 0, along - run.max);
+	return Math.hypot(beyond, across - run.at);
+}
+
+interface TouchLine {
+	readonly arrow: RoutingQualityArrow;
+	readonly bounds: Box;
+	readonly points: readonly Point[];
+	readonly runs: readonly Run[];
+}
+
+function touchLine(arrow: RoutingQualityArrow, gap: number): TouchLine {
+	const points = corners(arrow.points);
+	return { arrow, bounds: boxOf(arrow.points, gap), points, runs: runs(points) };
+}
+
+/**
+ * A bend or end of `a` within the gap of a run of `b`, other than an end both
+ * lines share: lines leaving or reaching one node at one point share that stem.
+ */
+function bendOn(a: TouchLine, b: TouchLine, gap: number): Point | undefined {
+	const [firstOfB, lastOfB] = [b.points[0], b.points.at(-1)];
+	for (const [index, point] of a.points.entries()) {
+		const first = index === 0;
+		const last = index === a.points.length - 1;
+		if ((first && a.arrow.openEnd === "start") || (last && a.arrow.openEnd === "end")) continue;
+		for (const run of b.runs) {
+			if (pointRunDistance(point, run) >= gap) continue;
+			const stem =
+				(first &&
+					run.first &&
+					firstOfB !== undefined &&
+					Boolean(a.arrow.sourceId) &&
+					a.arrow.sourceId === b.arrow.sourceId &&
+					Math.hypot(point.x - firstOfB.x, point.y - firstOfB.y) <= EPSILON) ||
+				(last &&
+					run.last &&
+					lastOfB !== undefined &&
+					Boolean(a.arrow.targetId) &&
+					a.arrow.targetId === b.arrow.targetId &&
+					Math.hypot(point.x - lastOfB.x, point.y - lastOfB.y) <= EPSILON);
+			if (!stem) return point;
+		}
+	}
+	return undefined;
+}
+
+function touchAt(a: TouchLine, b: TouchLine, gap: number): Point | undefined {
+	return a.arrow.id === b.arrow.id || !boxesMeet(a.bounds, b.bounds)
+		? undefined
+		: (bendOn(a, b, gap) ?? bendOn(b, a, gap));
+}
+
+/**
+ * Pairs of lines that meet anywhere but a clean crossing: a bend or end of
+ * one within the touch gap of the other. Two lines may cross, each running
+ * straight on through the other; where one bends or stops on the other, a
+ * reader takes the two for one line that forks or merges there and can
+ * follow either into the other's target. Lines that share a bound stem at
+ * one node, leaving or reaching it at one point, do not pair there. Pieces of
+ * one line (a shared id) never pair. Each pair counts once, at the first
+ * bend found.
+ */
+export function touchingLines(
+	arrows: readonly RoutingQualityArrow[],
+	scale: number,
+): TouchingLines[] {
+	const gap = routingTouchGap(scale);
+	const prepared = arrows.map((arrow) => touchLine(arrow, gap));
+	const touching: TouchingLines[] = [];
+	for (const [index, a] of prepared.entries())
+		for (const b of prepared.slice(index + 1)) {
+			const at = touchAt(a, b, gap);
+			if (at) touching.push({ arrowIds: [a.arrow.id, b.arrow.id], at });
+		}
+	return touching;
+}
+
+/**
+ * Scores a candidate route for one edge against arrows already placed: how
+ * many other lines (by id) it touches anywhere but a clean crossing.
+ */
+export function candidateTouches(
+	placed: readonly RoutingQualityArrow[],
+	scale: number,
+): (candidate: RoutingQualityArrow) => number {
+	const gap = routingTouchGap(scale);
+	const prepared = placed.map((arrow) => touchLine(arrow, gap));
+	return (candidate) => {
+		const line = touchLine(candidate, gap);
+		const touched = new Set<string>();
+		for (const other of prepared)
+			if (!touched.has(other.arrow.id) && touchAt(line, other, gap)) touched.add(other.arrow.id);
+		return touched.size;
+	};
 }
 
 function arrowhead(arrow: RoutingQualityArrow): Point[] | undefined {

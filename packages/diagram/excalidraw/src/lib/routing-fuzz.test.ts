@@ -5,6 +5,7 @@ import {
 	canvasBoundTextInset,
 	crossingFixtures,
 	embedCanvasIcons,
+	fanInChecksFlowchart,
 	getCanvasValidationIssues,
 	groupFixtures,
 	groupRegionIssues,
@@ -22,6 +23,7 @@ import {
 	segmentsFromPoints,
 	sharedSegments,
 	sideFixtures,
+	touchingLines,
 	zoneFixtures,
 	zoneRegionIssues,
 	zoneStressFixtures,
@@ -420,6 +422,7 @@ function routingCounts(scene: ReturnType<typeof renderIntermediateDiagram>) {
 		findings: routingQualityFindings(routes, scale).length + heads,
 		heads,
 		shared: sharedSegments(routes, scale).length,
+		touches: touchingLines(routes, scale).length,
 	};
 }
 
@@ -526,6 +529,48 @@ const SHARED: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL",
 	},
 };
 
+/**
+ * Pairs of lines each graph draws touching (touchingLines): a bend or end of
+ * one within the touch gap of the other, anywhere but a clean crossing, by set
+ * and direction, in order; sets not listed draw none. Main (5434bcc7) drew
+ * 2,661 over these sets, now 2,538: where at most six lines touch, they are
+ * routed again, clear of other lines' bends, and kept where that touches fewer
+ * and draws no more crossings or findings, a touching pair counted as one. No
+ * graph touches more than main did. A graph may draw no more than pinned.
+ */
+const TOUCHES: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL", string>>>> = {
+	flowcharts: {
+		TB: "49 0 0 1 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 3 4 0 8 0 4 6 0 5 0 8 0 0 0 5 5 0 0",
+		BT: "14 0 0 2 0 0 0 0 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 5 0 8 0 4 5 0 6 1 17 0 0 0 5 5 0 0",
+		LR: "38 2 0 0 6 0 0 3 18 0 1 10 0 0 0 0 2 0 0 0 0 0 0 19 7 9 1 16 12 0 14 0 9 1 0 0 9 8 0 2",
+		RL: "31 3 0 0 6 0 0 1 9 0 1 8 0 0 1 0 1 0 0 0 0 0 3 21 6 7 1 16 12 1 13 1 9 1 0 0 11 8 0 0",
+	},
+	grouped: {
+		TB: "0 0 0 0 1 1 0 0 14 0 5 25 0 18 2 0 0 4 1 3 9 12 5 0 8 4 0 8 5 0",
+		BT: "0 0 0 1 0 0 0 0 16 0 7 27 0 27 0 0 3 2 0 3 12 9 0 0 11 5 0 8 4 0",
+		LR: "1 0 0 1 2 0 0 0 18 0 3 24 0 36 2 0 0 5 0 6 4 16 0 0 24 33 0 6 13 0",
+		RL: "1 0 0 0 4 0 0 0 23 0 2 30 3 37 6 0 0 4 0 1 2 20 0 0 22 15 0 8 10 0",
+	},
+	zoned: {
+		TB: "22 0 0 0 1 1 0 0 17 4 0 3 0 0 0 1 0 0 10 41 18 21 4 8 0 0 33 0 19 1",
+		BT: "21 0 0 0 2 1 0 0 16 1 0 1 3 0 0 1 0 0 8 31 15 15 5 8 0 0 32 0 15 0",
+		LR: "22 0 3 0 5 8 1 2 18 2 0 8 3 0 0 10 0 0 13 46 22 18 18 13 0 0 39 0 18 10",
+		RL: "20 0 4 4 4 9 1 1 25 6 0 4 11 0 0 7 0 0 12 29 23 27 18 10 0 3 51 0 19 7",
+	},
+	laned: {
+		TB: "10 6 0 1 0 0 0 1 0 0 0 3 0 0 8 0 0 0 0 6 4 0 4 22 0 17 0 0 4 0",
+		BT: "6 6 0 0 1 0 0 0 0 0 0 4 0 0 5 0 0 0 0 1 9 0 6 18 0 19 1 0 5 0",
+		LR: "5 9 0 0 0 0 1 1 1 0 0 1 0 0 13 0 0 0 0 1 4 0 1 21 0 37 2 0 4 0",
+		RL: "5 10 0 0 0 0 1 1 0 0 0 0 0 0 8 0 0 0 0 2 6 0 2 29 0 37 2 0 8 0",
+	},
+	state: {
+		TB: "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+		BT: "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+		LR: "0 0 1 0 0 0 0 2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 1 0 0 0 1 0 0 1 0 0 1 0 0 1 1 0 0 1",
+		RL: "0 0 1 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 1 0 0 1 1 0 0 1",
+	},
+};
+
 /** Graphs that draw more pairs of lines along one visible segment than pinned. */
 function moreSharedThanPinned(
 	set: string,
@@ -536,6 +581,20 @@ function moreSharedThanPinned(
 	return counts.flatMap(({ shared }, index) =>
 		shared > (pinned[index] ?? 0)
 			? [`${set} ${index}: ${pinned[index] ?? 0} -> ${shared} lines sharing a segment`]
+			: [],
+	);
+}
+
+/** Graphs that draw more pairs of lines touching than pinned. */
+function moreTouchesThanPinned(
+	set: string,
+	direction: "TB" | "BT" | "LR" | "RL",
+	counts: readonly { touches: number }[],
+): string[] {
+	const pinned = TOUCHES[set]?.[direction].split(" ").map(Number) ?? [];
+	return counts.flatMap(({ touches }, index) =>
+		touches > (pinned[index] ?? 0)
+			? [`${set} ${index}: ${pinned[index] ?? 0} -> ${touches} pairs of lines touching`]
 			: [],
 	);
 }
@@ -559,7 +618,9 @@ function moreHeadsThanPinned(
  * draws for each flowchart above, routed orthogonally, in order, counting a
  * line that crosses a route where the route runs straight on. Layout and
  * crossing repairs are kept only when they route no worse, so no flowchart may
- * draw more of either, and together they draw fewer crossings.
+ * draw more of either, and together they draw fewer crossings. Flowchart 29
+ * left to right draws one finding more than main: its pair of lines that
+ * touched (TOUCHES) now runs apart, by one jog or corridor.
  */
 const MAIN_ROUTING: Readonly<
 	Record<"flowcharts" | "longFlows", Readonly<Record<"TB" | "BT" | "LR" | "RL", string>>>
@@ -567,7 +628,7 @@ const MAIN_ROUTING: Readonly<
 	flowcharts: {
 		TB: "136/61 26/0 1/0 19/1 24/3 0/0 4/0 12/0 30/16 12/0 4/0 27/1 0/0 2/0 14/0 11/2 1/0 2/0 2/0 0/0 5/0 0/0 22/3 72/4 20/2 59/22 19/0 45/3 60/8 7/0 78/3 4/0 91/25 29/3 1/0 2/0 37/7 15/6 4/1 33/7",
 		BT: "135/17 33/0 1/0 14/2 18/7 0/0 1/0 9/0 28/7 14/0 5/3 26/1 0/0 1/0 14/0 21/2 3/0 1/0 2/0 0/0 3/0 0/0 15/0 72/6 18/4 68/19 21/1 42/3 57/7 16/5 81/7 3/0 106/34 35/3 1/0 2/0 47/11 15/7 4/1 41/0",
-		LR: "150/34 31/5 1/0 22/3 28/8 0/0 3/1 19/6 34/28 14/1 7/2 39/13 0/0 4/0 8/3 18/5 2/3 2/0 3/1 0/0 3/1 0/0 22/3 96/21 21/5 81/11 12/2 46/75 50/16 12/1 80/14 5/0 68/18 26/7 2/0 4/1 58/16 24/12 6/4 37/10",
+		LR: "150/34 31/5 1/0 22/3 28/8 0/0 3/1 19/6 34/28 14/1 7/2 39/13 0/0 4/0 8/3 18/5 2/3 2/0 3/1 0/0 3/1 0/0 22/3 96/21 21/5 81/11 12/2 46/75 50/16 12/2 80/14 5/0 68/18 26/7 2/0 4/1 58/16 24/12 6/4 37/10",
 		RL: "129/36 30/6 1/0 14/2 25/8 0/0 2/1 11/5 24/8 16/2 7/2 39/10 0/0 4/0 8/3 18/5 6/1 1/0 3/1 0/0 3/1 0/0 18/4 96/26 19/7 82/10 16/5 46/75 40/17 15/9 80/14 1/0 92/14 23/7 2/0 4/1 58/13 23/12 6/4 42/4",
 	},
 	longFlows: {
@@ -1173,7 +1234,9 @@ describe("tall column fuzz", () => {
 				console.log(
 					"PIN tall",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
+					counts
+						.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}/${c.touches}`)
+						.join(" "),
 					"ASPECTS",
 					aspects.map((aspect) => aspect.toFixed(2)).join(" "),
 				);
@@ -1190,6 +1253,7 @@ describe("tall column fuzz", () => {
 			expect(worseThanPinned("tall", counts, TALL_ROUTING[direction], false)).toEqual([]);
 			expect(moreHeadsThanPinned("tall", direction, counts)).toEqual([]);
 			expect(moreSharedThanPinned("tall", direction, counts)).toEqual([]);
+			expect(moreTouchesThanPinned("tall", direction, counts)).toEqual([]);
 			const pinned = TALL_ASPECTS[direction].split(" ").map(Number);
 			expect(
 				aspects.flatMap((aspect, index) =>
@@ -1287,12 +1351,15 @@ describe("routing fuzz", () => {
 					"PIN",
 					set,
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
+					counts
+						.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}/${c.touches}`)
+						.join(" "),
 				);
 			return [
 				...worseThanPinned(set, counts, MAIN_ROUTING[set][direction]),
 				...moreHeadsThanPinned(set, direction, counts),
 				...moreSharedThanPinned(set, direction, counts),
+				...moreTouchesThanPinned(set, direction, counts),
 			];
 		});
 
@@ -1528,11 +1595,14 @@ describe("grouped routing fuzz", () => {
 				console.log(
 					"PIN grouped",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
+					counts
+						.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}/${c.touches}`)
+						.join(" "),
 				);
 			expect(worseThanPinned("grouped", counts, GROUPED_ROUTING[direction])).toEqual([]);
 			expect(moreHeadsThanPinned("grouped", direction, counts)).toEqual([]);
 			expect(moreSharedThanPinned("grouped", direction, counts)).toEqual([]);
+			expect(moreTouchesThanPinned("grouped", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 
@@ -1736,10 +1806,13 @@ describe("group row fuzz", () => {
 				console.log(
 					"PIN rows",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
+					counts
+						.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}/${c.touches}`)
+						.join(" "),
 				);
 			expect(worseThanPinned("rows", counts, GROUP_ROW_ROUTING[direction], false)).toEqual([]);
 			expect(moreSharedThanPinned("rows", direction, counts)).toEqual([]);
+			expect(moreTouchesThanPinned("rows", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 });
@@ -1823,12 +1896,14 @@ function randomZonedFlowcharts(count: number, start: number) {
  * flowchart draws, counted as for MAIN_ROUTING, since zones too long for one
  * row or column wrap and each zone sits by its members (totals within 1% of
  * the first pins). No zoned flowchart may draw more of either, nor all of them
- * more crossings in total.
+ * more crossings in total. Zoned flowchart 3 left to right draws one finding
+ * more than first pinned, and seven crossings fewer: its two pairs of lines
+ * that touched run apart.
  */
 const ZONED_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
 	TB: "97/31 0/0 17/3 30/5 36/7 36/12 7/0 12/1 68/24 32/8 0/0 28/12 22/5 0/0 0/0 41/9 0/0 0/0 36/24 173/65 77/21 98/44 60/11 33/11 1/0 22/2 138/59 0/0 86/25 62/12",
 	BT: "99/26 0/0 16/2 30/8 21/6 42/7 1/0 9/0 61/25 44/9 0/0 30/16 22/11 0/0 0/0 47/8 0/0 0/0 37/14 184/64 79/24 92/45 60/15 35/16 1/0 14/2 146/59 0/0 94/30 54/7",
-	LR: "77/42 0/1 11/6 23/3 30/12 45/11 11/4 5/4 73/21 37/9 0/1 27/11 24/14 0/0 0/1 44/12 0/0 0/0 38/31 202/68 79/28 102/41 74/25 34/23 0/0 8/2 136/61 0/1 104/34 44/26",
+	LR: "77/42 0/1 11/6 23/4 30/12 45/11 11/4 5/4 73/21 37/9 0/1 27/11 24/14 0/0 0/1 44/12 0/0 0/0 38/31 202/68 79/28 102/41 74/25 34/23 0/0 8/2 136/61 0/1 104/34 44/26",
 	RL: "65/49 0/0 10/5 21/7 28/8 49/12 8/4 3/3 72/34 41/7 0/1 25/6 22/17 0/0 0/1 49/10 0/0 0/0 38/22 175/55 86/33 84/41 77/26 35/20 0/0 14/12 157/79 0/1 89/31 44/23",
 };
 
@@ -1904,11 +1979,14 @@ describe("zoned routing fuzz", () => {
 				console.log(
 					"PIN zoned",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
+					counts
+						.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}/${c.touches}`)
+						.join(" "),
 				);
 			expect(worseThanPinned("zoned", counts, ZONED_ROUTING[direction], false)).toEqual([]);
 			expect(moreHeadsThanPinned("zoned", direction, counts)).toEqual([]);
 			expect(moreSharedThanPinned("zoned", direction, counts)).toEqual([]);
+			expect(moreTouchesThanPinned("zoned", direction, counts)).toEqual([]);
 		}, 120_000);
 	});
 
@@ -2117,11 +2195,14 @@ describe("laned routing fuzz", () => {
 				console.log(
 					"PIN laned",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
+					counts
+						.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}/${c.touches}`)
+						.join(" "),
 				);
 			expect(worseThanPinned("laned", counts, LANED_ROUTING[direction], false)).toEqual([]);
 			expect(moreHeadsThanPinned("laned", direction, counts)).toEqual([]);
 			expect(moreSharedThanPinned("laned", direction, counts)).toEqual([]);
+			expect(moreTouchesThanPinned("laned", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 
@@ -2335,11 +2416,14 @@ describe("state graph fuzz", () => {
 				console.log(
 					"PIN state",
 					direction,
-					counts.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}`).join(" "),
+					counts
+						.map((c) => `${c.crossings}/${c.findings}/${c.heads}/${c.shared}/${c.touches}`)
+						.join(" "),
 				);
 			expect(worseThanPinned("state", counts, STATE_ROUTING[direction])).toEqual([]);
 			expect(moreHeadsThanPinned("state", direction, counts)).toEqual([]);
 			expect(moreSharedThanPinned("state", direction, counts)).toEqual([]);
+			expect(moreTouchesThanPinned("state", direction, counts)).toEqual([]);
 		}, 60_000);
 	});
 });
@@ -2377,5 +2461,158 @@ describe("lines sharing a segment", () => {
 			).toEqual([]);
 		},
 		60_000,
+	);
+});
+
+/**
+ * Checks in a row, each after its own fix, whose yes and no branches all fan
+ * into the same two steps: two to four checks, short, longer and wrapping
+ * labels, the failing step looping back for fresh evidence or ending.
+ * Neighboring checks send branches of opposite meaning into each gap between
+ * them, toward the same targets.
+ */
+function fanInFlowcharts() {
+	const labels = [
+		["yes", "no"],
+		["Stable", "Unstable"],
+		["Healthy, keep watching", "Still failing, page on-call"],
+	] as const;
+	return [2, 3, 4].flatMap((count) =>
+		labels.flatMap(([yes, no], labelIndex) =>
+			[false, true].map((loop) => {
+				const checks = Array.from({ length: count }, (_, index) => index);
+				return {
+					id: `fan-in-${count}-${labelIndex}-${loop ? "loop" : "end"}`,
+					title: "Fan-in",
+					nodes: [
+						{ id: "alert", label: "Alert received", kind: "start" as const },
+						{ id: "collect", label: "Collect evidence", kind: "process" as const },
+						{ id: "classify", label: "Classify root cause", kind: "decision" as const },
+						...checks.flatMap((index) => [
+							{ id: `fix${index}`, label: `Apply fix ${index + 1}`, kind: "process" as const },
+							{ id: `check${index}`, label: "Service stable?", kind: "decision" as const },
+						]),
+						{ id: "monitor", label: "Monitor service", kind: "process" as const },
+						{ id: "escalate", label: "Escalate incident", kind: "process" as const },
+						{ id: "resolved", label: "Incident resolved", kind: "end" as const },
+						...(loop ? [] : [{ id: "paged", label: "Page on-call", kind: "end" as const }]),
+					],
+					edges: [
+						{ id: "triage", source: "alert", target: "collect" },
+						{ id: "classify-in", source: "collect", target: "classify" },
+						...checks.flatMap((index) => [
+							{
+								id: `route${index}`,
+								source: "classify",
+								target: `fix${index}`,
+								label: `cause ${index + 1}`,
+							},
+							{ id: `verify${index}`, source: `fix${index}`, target: `check${index}` },
+							{ id: `pass${index}`, source: `check${index}`, target: "monitor", label: yes },
+							{ id: `fail${index}`, source: `check${index}`, target: "escalate", label: no },
+						]),
+						{ id: "close", source: "monitor", target: "resolved" },
+						loop
+							? { id: "retry", source: "escalate", target: "collect", label: "collect again" }
+							: { id: "page", source: "escalate", target: "paged" },
+					],
+				};
+			}),
+		),
+	);
+}
+
+/**
+ * Fan-ins that still draw a pair of lines touching, as `<flowchart>:<direction>`
+ * with the pairs it draws: four checks in a row, or three with a loop back,
+ * whose crowded gaps leave no clearing that routes no worse. Main drew 48
+ * pairs in 29 of these 72 drawings; 13 pairs in 12 remain. Never more.
+ */
+const KNOWN_TOUCHING_FAN_INS: Readonly<Record<string, number>> = {
+	"fan-in-4-2-loop:TB": 1,
+	"fan-in-4-1-loop:BT": 1,
+	"fan-in-4-2-loop:BT": 1,
+	"fan-in-3-0-loop:LR": 1,
+	"fan-in-3-1-end:LR": 1,
+	"fan-in-3-1-loop:LR": 1,
+	"fan-in-3-2-loop:LR": 1,
+	"fan-in-4-0-loop:LR": 1,
+	"fan-in-3-0-loop:RL": 1,
+	"fan-in-3-1-end:RL": 1,
+	"fan-in-3-1-loop:RL": 2,
+	"fan-in-3-2-loop:RL": 1,
+};
+
+/**
+ * Realistic flowcharts that still draw a pair of lines touching, as
+ * `<fixture>:<direction>` with the pairs it draws. Left to right, the incident
+ * response stacks its three stability checks in one column: the no branch of
+ * one and the yes branch of the next leave by facing vertices into one narrow
+ * gap, and no clearing keeps every label nearer its own line. Main drew as
+ * many. Never more.
+ */
+const KNOWN_TOUCHING_FIXTURES: Readonly<Record<string, number>> = {
+	"incident-fan-in-checks:LR": 2,
+};
+
+describe("lines that touch", () => {
+	// Two lines that meet anywhere but a clean crossing, one bending or ending on
+	// or beside the other, read as one line that forks or merges there. Main drew
+	// every generated incident response whose three stability checks fan into
+	// Monitor service and Escalate incident with one check's no branch and its
+	// neighbor's yes branch turning one unit apart. No realistic flowchart may, in
+	// any direction, but those still known; the random graphs above, far denser,
+	// may draw no more than pinned (TOUCHES).
+	const fixtures = [
+		...Object.entries(crossingFixtures),
+		...Object.entries(sideFixtures),
+		...Object.entries(routingFixtures),
+		["incident-escalation-left-to-right", leftToRightIncidentFlowchart] as const,
+		["incident-fan-in-checks", fanInChecksFlowchart] as const,
+		...(FULL
+			? [
+					...Object.entries(groupFixtures),
+					...Object.entries(zoneFixtures),
+					...Object.entries(laneFixtures),
+				]
+			: []),
+	];
+	it.each(["TB", "BT", "LR", "RL"] as const)(
+		"draws no realistic flowchart with two lines touching: %s",
+		(direction) => {
+			expect(
+				fixtures.flatMap(([name, fixture]) => {
+					const { touches } = routingCounts(
+						renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+					);
+					const known = KNOWN_TOUCHING_FIXTURES[`${name}:${direction}`] ?? 0;
+					return touches > known ? [`${name}: ${known} -> ${touches}`] : [];
+				}),
+			).toEqual([]);
+		},
+		120_000,
+	);
+
+	const fanIns = fanInFlowcharts().filter((spec) => FULL || spec.id === "fan-in-3-0-loop");
+	it.each(["TB", "BT", "LR", "RL"] as const)(
+		"draws checks fanning into shared steps with no more lines touching than known: %s",
+		(direction) => {
+			expect(
+				fanIns.flatMap((spec) => {
+					const { touches } = routingCounts(
+						renderIntermediateDiagram(
+							parseFlowchartDiagram({
+								...spec,
+								type: "flowchart",
+								layout: { direction, edgeRouting: "orthogonal" },
+							}),
+						),
+					);
+					const known = KNOWN_TOUCHING_FAN_INS[`${spec.id}:${direction}`] ?? 0;
+					return touches > known ? [`${spec.id}:${direction}: ${known} -> ${touches}`] : [];
+				}),
+			).toEqual([]);
+		},
+		300_000,
 	);
 });

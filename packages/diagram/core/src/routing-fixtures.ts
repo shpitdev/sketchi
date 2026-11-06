@@ -26,6 +26,7 @@ import cacheLookup from "./fixtures/routing/cache-lookup.js";
 import expenseReceiptReturn from "./fixtures/routing/expense-receipt-return.js";
 import incidentResponseRankGap from "./fixtures/routing/incident-response-rank-gap.js";
 import incidentEscalationLeftToRight from "./fixtures/routing/incident-escalation-left-to-right.js";
+import incidentFanInChecks from "./fixtures/routing/incident-fan-in-checks.js";
 
 /** Readability regressions from normalized flowchart specs. */
 export const routingFixtures = {
@@ -180,4 +181,14 @@ export const leftToRightIncidentFlowchart = parseFlowchartDiagram({
 	...incidentEscalationLeftToRight,
 	type: "flowchart",
 	layout: { direction: "LR", edgeRouting: "orthogonal" },
+});
+
+/**
+ * The incident response flow whose three stability checks fan their yes and
+ * no branches into the same two steps, as generated samples drew it.
+ */
+export const fanInChecksFlowchart = parseFlowchartDiagram({
+	...incidentFanInChecks,
+	type: "flowchart",
+	layout: { direction: "TB", edgeRouting: "orthogonal" },
 });
