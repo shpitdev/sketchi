@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.34.4
+
+### Patch Changes
+
+- [#677](https://github.com/shpitdev/sketchi/pull/677) [`b9c5c6b`](https://github.com/shpitdev/sketchi/commit/b9c5c6b3fe2e8ebfa4b1f3bacd5e99abb786b245) Thanks [@anandpant](https://github.com/anandpant)! - Flowchart branches that converge on the same steps no longer turn on or beside each other. Where one line bent or ended on another, as a "no" branch and a neighboring "yes" branch did in the gap between two checks, a reader could follow one into the other's target; such lines now take separate lanes and cross cleanly, and neighboring checks get the room for it.
+
 ## 0.34.3
 
 ### Patch Changes
