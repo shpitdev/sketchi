@@ -583,3 +583,56 @@ describe("a coverage repair that removes what nothing states", () => {
 		}),
 	);
 });
+
+describe("a composition the request never states", () => {
+	const request = (prose: string) =>
+		`class diagram. ${prose}\n\nclass Member {\n\tprivate List<Loan> loans;\n}\nclass Loan {}`;
+	const diagram = (kind: string) => ({
+		type: "class",
+		classes: [
+			{ id: "Member", attributes: [{ name: "loans", type: "List<Loan>" }] },
+			{ id: "Loan", attributes: [] },
+		],
+		relationships: [{ id: "r", kind, from: "Member", to: "Loan", toRole: "loans" }],
+	});
+
+	it("is an association: a collection field alone states no ownership", () => {
+		expect(codes(request("members borrow books."), diagram("composition"))).toEqual([
+			"class_whole_part_unstated",
+		]);
+		expect(codes(request("members borrow books."), diagram("association"))).toEqual([]);
+	});
+
+	it("stays a composition when a sentence makes the pair whole and part", () => {
+		expect(codes(request("a member is composed of its loans."), diagram("composition"))).toEqual(
+			[],
+		);
+	});
+
+	it.effect("may change kind in a repair that keeps everything else", () =>
+		Effect.gen(function* () {
+			const answer = (kind: string) =>
+				JSON.stringify({ title: "Members", diagram: { id: "m", ...diagram(kind) } });
+			const texts = [answer("composition"), answer("association")];
+			let calls = 0;
+			const candidate = yield* runDiagramGenerationWithPolicy(
+				() =>
+					Effect.succeed(
+						candidateFromText({ model: "m", provider: "fixture", text: texts[calls++] ?? "" }),
+					),
+				{ model: "m", prompt: { id: "x", request: request("members borrow books.") } },
+				"fixture",
+				{
+					concurrency: 1,
+					maxRepairAttempts: 2,
+					maxRetries: 0,
+					requestTimeoutMs: 1_000,
+					retryDelayMs: 1,
+					totalTimeoutMs: 10_000,
+				},
+			);
+			expect(calls).toBe(2);
+			expect(candidate.text).toBe(texts[1]);
+		}),
+	);
+});
