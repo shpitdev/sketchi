@@ -87,11 +87,9 @@ export function PlaygroundControls({
 
 			{state.mode === "llm" ? (
 				<GenerationRunPanel
-					cacheMode={state.cacheMode}
 					candidates={state.generationCandidates}
 					disabled={!canGenerate || busy}
 					{...(state.generationError ? { error: state.generationError } : {})}
-					onCacheModeChange={actions.setCacheMode}
 					onRun={() => void runGeneration()}
 					running={state.generationStatus === "running"}
 				/>

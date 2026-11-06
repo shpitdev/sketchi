@@ -1,7 +1,4 @@
-import type {
-	DiagramGenerationCacheMode,
-	DiagramGenerationCandidateSummary,
-} from "@sketchi/diagram-generation";
+import type { DiagramGenerationCandidateSummary } from "@sketchi/diagram-generation";
 import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import type { FlowchartScenario } from "@sketchi/diagram-scenarios";
 import { Store } from "@tanstack/react-store";
@@ -12,7 +9,6 @@ export type InspectorPanel = "ir" | "prompt" | "excalidraw";
 export type PlaygroundMode = "deterministic" | "llm";
 
 export interface PlaygroundState {
-	cacheMode: DiagramGenerationCacheMode;
 	candidateText: string;
 	canvasRevision: number;
 	editedExcalidrawScene: ExcalidrawScene | undefined;
@@ -38,7 +34,6 @@ function createInitialState(
 		scenarios.find((scenario) => scenario.id === initialScenarioId) ?? scenarios[0];
 
 	return {
-		cacheMode: "default",
 		candidateText: "",
 		canvasRevision: 0,
 		editedExcalidrawScene: undefined,
@@ -76,9 +71,6 @@ export function createPlaygroundStore(
 ) {
 	const store = new Store(createInitialState(scenarios, initialScenarioId));
 	const actions = {
-		setCacheMode: (cacheMode: DiagramGenerationCacheMode) => {
-			store.setState((current) => ({ ...current, cacheMode }));
-		},
 		selectInspector: (inspectorPanel: InspectorPanel) => {
 			store.setState((current) => ({ ...current, inspectorPanel }));
 		},

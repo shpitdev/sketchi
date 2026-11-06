@@ -1,7 +1,5 @@
 import { Context } from "effect";
 
-import type { DiagramGenerationCacheMode } from "./candidates.js";
-
 export interface CloudflareAiGateway {
 	run(
 		data: {
@@ -14,6 +12,7 @@ export interface CloudflareAiGateway {
 			gateway?: {
 				collectLog?: boolean;
 				metadata?: Record<string, number | string | boolean | null | bigint>;
+				skipCache?: boolean;
 			};
 			signal?: AbortSignal;
 		},
@@ -29,18 +28,6 @@ export class CloudflareAiGatewayBinding extends Context.Service<
 	CloudflareAiGatewayBinding,
 	CloudflareAiGatewayProvider
 >()("@sketchi/diagram-generation/CloudflareAiGatewayBinding") {}
-
-export function cacheModeHeaders(
-	cacheMode: DiagramGenerationCacheMode | undefined,
-): Record<string, string> {
-	return cacheMode === "fresh"
-		? {
-				"Cache-Control": "no-store",
-				"cf-aig-skip-cache": "true",
-				Pragma: "no-cache",
-			}
-		: {};
-}
 
 export function parseJsonResponse(text: string): unknown {
 	if (!text) return {};

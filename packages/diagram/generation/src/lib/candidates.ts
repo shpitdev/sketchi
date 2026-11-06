@@ -85,9 +85,6 @@ export const diagramGenerationProviderIds: readonly [
 export const DiagramGenerationProviderIdSchema = Schema.Literals(diagramGenerationProviderIds);
 export type DiagramGenerationProviderId = typeof DiagramGenerationProviderIdSchema.Type;
 
-export const DiagramGenerationCacheModeSchema = Schema.Literals(["default", "fresh"]);
-export type DiagramGenerationCacheMode = typeof DiagramGenerationCacheModeSchema.Type;
-
 export class DiagramGenerationUsage extends Schema.Class<DiagramGenerationUsage>(
 	"DiagramGenerationUsage",
 )({
@@ -101,7 +98,6 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
 )({
 	/** Model calls the request made, counting retries and repairs. */
 	attempts: Schema.optional(Schema.Number),
-	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
 	warnings: Schema.optionalKey(Schema.Array(StateMachineDefaultWarningSchema).pipe(Schema.mutable)),
 	diagram: Schema.optional(CanonicalDiagramSchema),
@@ -120,7 +116,6 @@ export class DiagramGenerationCandidateSummary extends Schema.Class<DiagramGener
 	"DiagramGenerationCandidateSummary",
 )({
 	attempts: Schema.optional(Schema.Number),
-	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
 	warnings: Schema.optionalKey(Schema.Array(StateMachineDefaultWarningSchema).pipe(Schema.mutable)),
 	diagramText: Schema.optional(Schema.String),
@@ -144,7 +139,6 @@ export class DiagramGenerationScenarioOutput extends Schema.Class<DiagramGenerat
 export class DiagramGenerationRequest extends Schema.Class<DiagramGenerationRequest>(
 	"DiagramGenerationRequest",
 )({
-	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
 	maxOutputTokens: Schema.optional(Schema.Number),
 	model: Schema.String.check(
 		Schema.isPattern(/^(?:(?:anthropic|google|google-ai-studio)\/)?[A-Za-z0-9._-]{1,128}$/),
@@ -860,7 +854,6 @@ export function summarizeGenerationCandidate(
 		provider: candidate.provider,
 		text: candidate.text,
 		...(candidate.attempts !== undefined ? { attempts: candidate.attempts } : {}),
-		...(candidate.cacheMode ? { cacheMode: candidate.cacheMode } : {}),
 		...(candidate.durationMs !== undefined ? { durationMs: candidate.durationMs } : {}),
 		...(candidate.error ? { error: candidate.error } : {}),
 		...(candidate.usage ? { usage: candidate.usage } : {}),

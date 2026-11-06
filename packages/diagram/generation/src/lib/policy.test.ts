@@ -165,7 +165,6 @@ describe("generation repair prompts", () => {
 				const { candidate, requests } = yield* runRepairs(initialDiagnostics);
 				expect(requests).toHaveLength(3);
 				const repair = requests[2];
-				expect(repair?.cacheMode).toBe("fresh");
 				expect(repair?.prompt.request).toContain(`Validator diagnostics:\n- ${currentIssue}`);
 				expect(repair?.prompt.request).toContain("latest invalid output");
 				for (const staleIssue of initialDiagnostics) {

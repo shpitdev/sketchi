@@ -85,13 +85,13 @@ function generationText(diagram: Readonly<Record<string, unknown>>): string {
 
 function fakeAiGateway(
 	text: string,
-	observeRun?: (input: Parameters<CloudflareAiGateway["run"]>[0]) => void,
+	observeRun?: (...args: Parameters<CloudflareAiGateway["run"]>) => void,
 	completion: { readonly finishReason?: string; readonly usage?: unknown } = {},
 ): CloudflareAiGatewayProvider {
 	return {
 		gateway: () => ({
-			run: (input) => {
-				observeRun?.(input);
+			run: (input, options) => {
+				observeRun?.(input, options);
 				return Promise.resolve(
 					new Response(
 						JSON.stringify({
@@ -447,30 +447,20 @@ describe("public generate endpoint", () => {
 		expect(assetRequests).toEqual(["/node-logos/github.svg"]);
 	});
 
-	it("requests fresh provider output for reliability probes", async () => {
-		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
+	it("asks the gateway for a new answer each time the same request is sent", async () => {
+		const skipCache: Array<boolean | undefined> = [];
 		const env: StudioEnv = {
-			AI: fakeAiGateway(generationText(flowchartIr), (input) => {
-				observedRuns.push(input);
+			AI: fakeAiGateway(generationText(flowchartIr), (_input, options) => {
+				skipCache.push(options?.gateway?.skipCache);
 			}),
 		};
-		const response = await generateRequest(env, {
-			cacheMode: "fresh",
+		const request = {
 			prompt: "Map release approval with pass and revise branches",
 			type: "flowchart",
-		});
-
-		expect(response.status).toBe(200);
-		expect(observedRuns).toHaveLength(1);
-		expect(observedRuns[0]).toEqual(
-			expect.objectContaining({
-				headers: expect.objectContaining({
-					"Cache-Control": "no-store",
-					"cf-aig-skip-cache": "true",
-					Pragma: "no-cache",
-				}),
-			}),
-		);
+		};
+		expect((await generateRequest(env, request)).status).toBe(200);
+		expect((await generateRequest(env, request)).status).toBe(200);
+		expect(skipCache).toEqual([true, true]);
 	});
 
 	it("rejects an empty prompt with a typed invalid-input contract", async () => {

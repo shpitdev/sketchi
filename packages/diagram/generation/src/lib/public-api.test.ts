@@ -576,9 +576,7 @@ layer(successfulClientLayer)("Cloudflare Google AI Studio live layer", (it) => {
 			expect(successfulRun).toHaveBeenCalledWith(
 				expect.objectContaining({
 					endpoint: "v1beta/openai/chat/completions",
-					headers: expect.not.objectContaining({
-						"Cache-Control": "no-store",
-					}),
+					headers: { "Content-Type": "application/json" },
 					provider: "google-ai-studio",
 					query: expectedChatBody,
 				}),
@@ -586,38 +584,12 @@ layer(successfulClientLayer)("Cloudflare Google AI Studio live layer", (it) => {
 					gateway: expect.objectContaining({
 						collectLog: true,
 						metadata: expect.objectContaining({ scenarioId: prompt.id }),
+						skipCache: true,
 					}),
 				}),
 			);
 			assert.strictEqual(candidate.diagram?.id, expectedDiagram.id);
 			assert.strictEqual(candidate.usage?.totalTokens, 34);
-		}),
-	);
-
-	it.effect("sends no-store headers and metadata for fresh runs", () =>
-		Effect.gen(function* () {
-			const client = yield* DiagramGenerationClient;
-			const candidate = yield* client.generate({
-				cacheMode: "fresh",
-				model: "google/gemini-3.1-flash-lite",
-				prompt,
-			});
-
-			expect(successfulRun).toHaveBeenLastCalledWith(
-				expect.objectContaining({
-					headers: expect.objectContaining({
-						"Cache-Control": "no-store",
-						"cf-aig-skip-cache": "true",
-						Pragma: "no-cache",
-					}),
-				}),
-				expect.objectContaining({
-					gateway: expect.objectContaining({
-						metadata: expect.objectContaining({ cacheMode: "fresh" }),
-					}),
-				}),
-			);
-			assert.strictEqual(candidate.cacheMode, "fresh");
 		}),
 	);
 });
@@ -802,12 +774,12 @@ layer(repairedClientLayer)("semantic repair policy", (it) => {
 			assert.isTrue(
 				candidate.diagnostics.includes("repair_succeeded: semantic repair attempt 1 succeeded."),
 			);
+			expect(repairedRun.mock.calls.map(([, options]) => options?.gateway?.skipCache)).toEqual([
+				true,
+				true,
+			]);
 			expect(repairedRun.mock.calls[1]?.[0]).toEqual(
 				expect.objectContaining({
-					headers: expect.objectContaining({
-						"Cache-Control": "no-store",
-						"cf-aig-skip-cache": "true",
-					}),
 					query: expect.objectContaining({
 						messages: [
 							expect.objectContaining({ role: "system" }),

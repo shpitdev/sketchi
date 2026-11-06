@@ -169,7 +169,6 @@ describe("eval harness scenario generation composition", () => {
 		);
 		const result = await runGenerateScenarioCandidatesForInput(
 			{
-				cacheMode: "fresh",
 				providers: ["cloudflare-google-ai-studio"],
 				scenarioId: scenario.id,
 			},
@@ -198,13 +197,13 @@ describe("eval harness scenario generation composition", () => {
 						sketchiSurface: "eval-harness",
 						sketchiTraceId: expect.any(String),
 					}),
+					skipCache: true,
 				}),
 			}),
 		);
 		expect(result).toMatchObject({
 			candidates: [
 				{
-					cacheMode: "fresh",
 					diagramValid: true,
 					model: "gemini-3.1-flash-lite",
 					provider: "cloudflare-google-ai-studio",
@@ -232,7 +231,6 @@ describe("eval harness scenario generation composition", () => {
 		expect(result).toEqual({
 			candidates: [
 				{
-					cacheMode: "default",
 					diagnostics: [
 						'Provider "cloudflare-google-ai-studio" is not configured in this Worker environment.',
 					],
@@ -273,7 +271,6 @@ describe("eval harness scenario generation composition", () => {
 		expect(result).toEqual({
 			candidates: [
 				{
-					cacheMode: "default",
 					diagnostics: [
 						"Google AI Studio Gateway request failed with HTTP 400.",
 						"invalid request",
@@ -309,7 +306,6 @@ describe("eval harness scenario generation composition", () => {
 		expect(result).toEqual({
 			candidates: [
 				{
-					cacheMode: "default",
 					diagnostics: ["gateway factory unavailable"],
 					diagramValid: false,
 					error: "gateway factory unavailable",
@@ -339,7 +335,6 @@ describe("eval harness scenario generation composition", () => {
 		expect(result).toEqual({
 			candidates: [
 				{
-					cacheMode: "default",
 					diagnostics: ['Unknown scenario "unknown-scenario".'],
 					diagramValid: false,
 					error: 'Unknown scenario "unknown-scenario".',
@@ -400,7 +395,6 @@ layer(concurrencyLayer)("eval generation policy", (it) => {
 						"cloudflare-google-ai-studio",
 					],
 					scenarioId: concurrencyScenario.id,
-					cacheMode: "default",
 				}),
 			);
 			yield* TestClock.adjust("5 seconds");

@@ -2,7 +2,6 @@ import { Schema } from "effect";
 import { stripGoogleModelPrefix } from "./models.js";
 
 import type {
-	DiagramGenerationCacheMode,
 	DiagramGenerationCandidate,
 	DiagramGenerationProviderId,
 	DiagramGenerationRequest,
@@ -114,10 +113,8 @@ function baseErrorCandidate(
 	provider: DiagramGenerationProviderId,
 	model: string,
 	message: string,
-	cacheMode: DiagramGenerationCacheMode,
 ): DiagramGenerationCandidate {
 	return {
-		cacheMode,
 		diagnostics: [message],
 		error: message,
 		model,
@@ -128,13 +125,10 @@ function baseErrorCandidate(
 
 export function generationErrorToCandidate(
 	error: DiagramGenerationError,
-	request: Pick<DiagramGenerationRequest, "cacheMode" | "model">,
+	request: Pick<DiagramGenerationRequest, "model">,
 ): DiagramGenerationCandidate {
-	const cacheMode = request.cacheMode ?? "default";
-
 	if (error._tag === "DiagramGenerationHttpError") {
 		return {
-			cacheMode,
 			diagnostics: [...error.diagnostics],
 			durationMs: error.durationMs,
 			error: `HTTP ${error.status}`,
@@ -147,20 +141,10 @@ export function generationErrorToCandidate(
 
 	if (error._tag === "DiagramGenerationLimitError") {
 		return {
-			...baseErrorCandidate(
-				error.provider,
-				stripGoogleModelPrefix(request.model),
-				error.message,
-				cacheMode,
-			),
+			...baseErrorCandidate(error.provider, stripGoogleModelPrefix(request.model), error.message),
 			diagnostics: [error.message, ...error.diagnostics],
 		};
 	}
 
-	return baseErrorCandidate(
-		error.provider,
-		stripGoogleModelPrefix(request.model),
-		error.message,
-		cacheMode,
-	);
+	return baseErrorCandidate(error.provider, stripGoogleModelPrefix(request.model), error.message);
 }
