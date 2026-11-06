@@ -21,13 +21,14 @@ describe("a prompt that carries one family's rules", () => {
 			request: "eisenhower matrix of my week, usual names",
 			requestedType: "quadrant",
 		});
-		expect(system).toContain("name each quadrant as that matrix conventionally does");
+		expect(system).toContain("The conditions that place items are not quadrant names.");
+		expect(system).toContain("use those names, even though the source does not state them");
 	});
 
 	it("leaves the full prompt as it was", () => {
 		const { system } = buildDiagramGenerationMessages({ id: "x", request: "draw it" });
 		expect(system).not.toContain("Return diagram.id, a short kebab-case id.");
-		expect(system).not.toContain("conventionally does");
+		expect(system).not.toContain("are not quadrant names");
 		expect(system).toContain("Return the diagram id.");
 	});
 });

@@ -8,7 +8,7 @@ export const QUADRANT_RULES = {
 	names:
 		"Return quadrants: { topLeft, topRight, bottomLeft, bottomRight }, each name in the corner its two conditions describe through those end labels.",
 	usualNames: (source: RuleSource) =>
-		`When ${source} names a known matrix (Eisenhower, BCG) without naming its quadrants, or asks for its usual names, name each quadrant as that matrix conventionally does, not by the two conditions that place it.`,
+		`The conditions that place items are not quadrant names. When ${source} names a matrix that has established quadrant names and does not name its quadrants, use those names, even though ${source} does not state them, each in the corner its conditions describe.`,
 	points:
 		"Return points: [{ label, x, y, group? }] with x and y from 0 (low end) to 1 (high end): a score out of 100 is score / 100, and 0.5 sits on a middle line. Place an item given only its quadrant well inside it (0.25 or 0.75).",
 	axes: (source: RuleSource) =>
