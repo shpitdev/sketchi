@@ -167,6 +167,186 @@ describe("tall flowchart columns", () => {
 	});
 });
 
+/**
+ * Haiku's order-to-cash-flowchart-large in the November 2026 round of large
+ * scenarios: a 61-step top-to-bottom process whose decisions' branches meet
+ * again, as models write long processes. As one column it exported at 1:4.6.
+ */
+const ORDER_TO_CASH_NODES: readonly (readonly [string, string, string])[] = [
+	["start", "Customer order received", "start"],
+	["enter_erp", "Enter order into ERP", "process"],
+	["validate", "Validate order details", "process"],
+	["details_ok", "Order details complete?", "decision"],
+	["ask_details", "Ask customer for details", "process"],
+	["check_credit", "Check customer credit", "process"],
+	["credit_ok", "Credit approved?", "decision"],
+	["hold_credit", "Hold order for credit review", "process"],
+	["mgr_approves", "Credit manager approves?", "decision"],
+	["cancel_order", "Cancel order", "end"],
+	["allocate", "Allocate warehouse", "process"],
+	["reserve", "Reserve inventory", "process"],
+	["in_stock", "All items in stock?", "decision"],
+	["backorder", "Create backorder", "process"],
+	["notify_backorder", "Notify customer of backorder", "process"],
+	["wait_restock", "Wait for restock", "process"],
+	["confirm_order", "Confirm order with customer", "process"],
+	["pick_list", "Create pick list", "process"],
+	["pick", "Pick items", "process"],
+	["qc", "Quality check items", "process"],
+	["inspection_ok", "Items pass inspection?", "decision"],
+	["replace", "Replace damaged items", "process"],
+	["pack", "Pack shipment", "process"],
+	["packing_slip", "Print packing slip", "process"],
+	["weigh", "Weigh package", "process"],
+	["carrier", "Select carrier", "process"],
+	["intl", "International shipment?", "decision"],
+	["customs", "Prepare customs documents", "process"],
+	["freight", "Book freight forwarder", "process"],
+	["label", "Generate shipping label", "process"],
+	["pickup", "Schedule pickup", "process"],
+	["load", "Load truck", "process"],
+	["handover", "Hand over to carrier", "process"],
+	["send_tracking", "Send tracking number to customer", "process"],
+	["track", "Track delivery", "process"],
+	["on_time", "Delivered on time?", "decision"],
+	["carrier_claim", "Open carrier claim", "process"],
+	["notify_delay", "Notify customer of delay", "process"],
+	["proof", "Record proof of delivery", "process"],
+	["confirm_delivery", "Confirm delivery", "process"],
+	["taxes", "Calculate taxes", "process"],
+	["gen_invoice", "Generate invoice", "process"],
+	["post_ar", "Post invoice to accounts receivable", "process"],
+	["send_invoice", "Send invoice", "process"],
+	["paid_30", "Payment received within 30 days?", "decision"],
+	["reminder", "Send payment reminder", "process"],
+	["paid_reminder", "Paid by reminder deadline?", "decision"],
+	["collections", "Escalate to collections", "process"],
+	["collections_ok", "Collections recover payment?", "decision"],
+	["write_off", "Write off debt", "end"],
+	["apply_payment", "Apply payment", "process"],
+	["receipt", "Issue receipt", "process"],
+	["reconcile", "Reconcile account", "process"],
+	["revenue_ledger", "Update revenue ledger", "process"],
+	["feedback", "Request customer feedback", "process"],
+	["feedback_neg", "Feedback negative?", "decision"],
+	["service_case", "Open service case", "process"],
+	["follow_up", "Follow up with customer", "process"],
+	["archive_neg", "Archive order records", "end"],
+	["archive", "Archive order records", "process"],
+	["close", "Close order", "end"],
+];
+const ORDER_TO_CASH_EDGES: readonly (readonly [string, string, string?])[] = [
+	["start", "enter_erp"],
+	["enter_erp", "validate"],
+	["validate", "details_ok"],
+	["details_ok", "ask_details", "no"],
+	["ask_details", "validate"],
+	["details_ok", "check_credit", "yes"],
+	["check_credit", "credit_ok"],
+	["credit_ok", "allocate", "yes"],
+	["credit_ok", "hold_credit", "no"],
+	["hold_credit", "mgr_approves"],
+	["mgr_approves", "allocate", "yes"],
+	["mgr_approves", "cancel_order", "no"],
+	["allocate", "reserve"],
+	["reserve", "in_stock"],
+	["in_stock", "backorder", "no"],
+	["backorder", "notify_backorder"],
+	["notify_backorder", "wait_restock"],
+	["wait_restock", "reserve"],
+	["in_stock", "confirm_order", "yes"],
+	["confirm_order", "pick_list"],
+	["pick_list", "pick"],
+	["pick", "qc"],
+	["qc", "inspection_ok"],
+	["inspection_ok", "replace", "no"],
+	["replace", "qc"],
+	["inspection_ok", "pack", "yes"],
+	["pack", "packing_slip"],
+	["packing_slip", "weigh"],
+	["weigh", "carrier"],
+	["carrier", "intl"],
+	["intl", "customs", "yes"],
+	["customs", "freight"],
+	["freight", "label"],
+	["intl", "label", "no"],
+	["label", "pickup"],
+	["pickup", "load"],
+	["load", "handover"],
+	["handover", "send_tracking"],
+	["send_tracking", "track"],
+	["track", "on_time"],
+	["on_time", "carrier_claim", "no"],
+	["carrier_claim", "notify_delay"],
+	["notify_delay", "track"],
+	["on_time", "proof", "yes"],
+	["proof", "confirm_delivery"],
+	["confirm_delivery", "taxes"],
+	["taxes", "gen_invoice"],
+	["gen_invoice", "post_ar"],
+	["post_ar", "send_invoice"],
+	["send_invoice", "paid_30"],
+	["paid_30", "apply_payment", "yes"],
+	["paid_30", "reminder", "no"],
+	["reminder", "paid_reminder"],
+	["paid_reminder", "apply_payment", "yes"],
+	["paid_reminder", "collections", "no"],
+	["collections", "collections_ok"],
+	["collections_ok", "apply_payment", "yes"],
+	["collections_ok", "write_off", "no"],
+	["apply_payment", "receipt"],
+	["receipt", "reconcile"],
+	["reconcile", "revenue_ledger"],
+	["revenue_ledger", "feedback"],
+	["feedback", "feedback_neg"],
+	["feedback_neg", "service_case", "yes"],
+	["service_case", "follow_up"],
+	["follow_up", "archive_neg"],
+	["feedback_neg", "archive", "no"],
+	["archive", "close"],
+];
+
+describe("long flowcharts", () => {
+	it("wraps a 61-step process into columns that read at a screen's size", () => {
+		const scene = renderIntermediateDiagram({
+			...flowchartFixture,
+			id: "order-to-cash",
+			title: "Order-to-cash process",
+			nodes: ORDER_TO_CASH_NODES.map(([id, label, kind]) => ({ id, label, kind })),
+			edges: ORDER_TO_CASH_EDGES.map(([source, target, label], index) => ({
+				id: `e${index + 1}`,
+				source,
+				target,
+				...(label ? { label } : {}),
+			})),
+			layout: { direction: "TB", edgeRouting: "orthogonal" },
+		});
+		const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
+		// A column 1631 wide and 7277 tall fitted its text to a screen at 4 px:
+		// a few more lines crossing where branches meet cost less than that.
+		expect(exportAspect(scene, 48)).toBeLessThan(2);
+		expect(Math.max(scene.width, scene.height)).toBeLessThan(4000);
+		const findings = routingQualityFindings(
+			arrows.map((arrow) => ({ id: arrow.edgeId, points: arrow.points })),
+			routingQualityScale(scene),
+		);
+		// No more crossings and reader findings together than the column drew (2 and 8).
+		expect(arrowCrossings(arrows) + findings.length).toBeLessThanOrEqual(10);
+		// Each column reads down from the top: every step past the first column's
+		// start sits below the step before it, or tops a column of its own.
+		const top = Math.min(
+			...scene.elements.flatMap((element) => (element.type === "node" ? [element.y] : [])),
+		);
+		const columnTops = new Set(
+			arrows.flatMap((arrow) => {
+				const [start, end] = [arrow.points[0], arrow.points.at(-1)!];
+				return end.y < start.y && Math.abs(end.y - top) < 48 ? [arrow.targetNodeId] : [];
+			}),
+		);
+		expect(columnTops.size).toBeGreaterThanOrEqual(1);
+	});
+});
+
 /** Single-row timelines round 19 flagged as wider than 2.5:1. */
 const WIDE_ROWS = {
 	"project-roadmap-timeline": {
