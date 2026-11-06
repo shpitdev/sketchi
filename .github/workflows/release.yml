@@ -1,9 +1,12 @@
 name: release
 
 on:
+  # Only a change to the CLI manifest can change the version this workflow publishes.
   push:
     branches:
       - main
+    paths:
+      - apps/cli/package.json
   # changesets.yml merges the Version Packages PR with GITHUB_TOKEN, which raises
   # no push event. workflow_dispatch is the documented exception to that rule, so
   # it is how the auto-merged release reaches this workflow.

@@ -7,6 +7,12 @@
 	"targets": {
 		"build": {
 			"executor": "nx:run-commands",
+			"inputs": [
+				"production",
+				"^production",
+				"{workspaceRoot}/scripts/lib/worker-apps.mjs",
+				"{workspaceRoot}/tools/local-dev-ports.ts"
+			],
 			"outputs": ["{workspaceRoot}/dist/apps/web", "{projectRoot}/.wrangler/deploy/config.json"],
 			"options": {
 				"command": "vite build --config apps/web/vite.config.ts"

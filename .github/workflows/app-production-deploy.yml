@@ -1,19 +1,25 @@
 name: app-production-deploy
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('production {0} {1}', inputs.domain_action, inputs.project) || format('production deploy all at {0}', github.sha) }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('production {0} {1}', inputs.domain_action, inputs.project) || format('production deploy at {0}', github.sha) }}
 
 on:
   push:
     branches:
       - main
+    # Every workspace package, the root files Nx counts as build inputs, and the repository scripts
+    # Worker builds import (each app's `build` inputs list them). A push outside these (docs, CI,
+    # other scripts) cannot reach a Worker build, so it starts nothing.
     paths:
       - "apps/**"
       - "packages/**"
-      - "scripts/**"
+      - "tools/**"
+      - "scripts/lib/excalidraw-fonts.mjs"
+      - "scripts/lib/worker-apps.mjs"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "nx.json"
       - "tsconfig.base.json"
+      - ".oxlintrc.json"
   workflow_dispatch:
     inputs:
       project:
@@ -43,18 +49,39 @@ env:
   NX_TUI: "false"
 
 jobs:
+  # A push deploys only the Worker apps whose build it reaches, including through a shared
+  # package; a dispatch deploys every app or the one it names.
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.projects.outputs.projects }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # The selection compares this push with the previous main commit.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-workspace
+        with:
+          install-dependencies: ${{ github.event_name == 'push' }}
+
+      - name: Select the Worker apps to deploy
+        id: projects
+        env:
+          PRODUCTION_SELECTION: ${{ inputs.project || 'affected' }}
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: node scripts/09-select-production-projects.mjs
+
   deploy:
+    needs: select
+    if: needs.select.outputs.projects != '[]'
     runs-on: ubuntu-latest
     environment: production
     strategy:
       fail-fast: false
       matrix:
-        project:
-          - eval-harness
-          - playground
-          - web
-          - excalidraw
-          - icons
+        project: ${{ fromJSON(needs.select.outputs.projects) }}
     concurrency:
       # Shared with PR previews, including uploads bound to different Pipeline streams.
       group: ${{ matrix.project == 'playground' && 'cloudflare-pipeline-bound-upload' || format('app-production-{0}', matrix.project) }}
@@ -62,24 +89,19 @@ jobs:
       queue: ${{ matrix.project == 'playground' && 'max' || 'single' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
 
       - uses: ./.github/actions/setup-workspace
-        if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
 
       - name: Resolve Worker project and identity
         id: worker-app
-        if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
         env:
           WORKER_PROJECT: ${{ matrix.project }}
         run: node scripts/00-resolve-worker-app.mjs --project "$WORKER_PROJECT"
 
-      - if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
-        run: pnpm nx build "${{ steps.worker-app.outputs.project_id }}"
+      - run: pnpm nx build "${{ steps.worker-app.outputs.project_id }}"
 
       - name: Check Cloudflare credentials
         id: credentials
-        if: ${{ github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project }}
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -95,7 +117,7 @@ jobs:
 
       - name: Deploy production Worker
         id: deploy
-        if: ${{ steps.credentials.outputs.configured == 'true' && (github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project) }}
+        if: ${{ steps.credentials.outputs.configured == 'true' }}
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -112,14 +134,14 @@ jobs:
 
       - name: Extract workers.dev URL
         id: workers-dev-url
-        if: ${{ steps.credentials.outputs.configured == 'true' && (github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project) }}
+        if: ${{ steps.credentials.outputs.configured == 'true' }}
         run: |
           node scripts/02-extract-preview-url.mjs \
             ".memory/wrangler-${{ matrix.project }}-production-deploy.log" \
             --worker-name "${{ steps.worker-app.outputs.worker_name }}"
 
       - name: Summarize production Worker
-        if: ${{ steps.credentials.outputs.configured == 'true' && (github.event_name == 'push' || inputs.project == 'all' || inputs.project == matrix.project) }}
+        if: ${{ steps.credentials.outputs.configured == 'true' }}
         env:
           PROJECT_ID: ${{ matrix.project }}
           WORKER_NAME: ${{ steps.worker-app.outputs.worker_name }}
@@ -153,7 +175,7 @@ jobs:
 
       - name: Prepare production domain Wrangler config
         id: domains
-        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' && (inputs.project == 'all' || inputs.project == matrix.project) }}
+        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' }}
         env:
           PROJECT_ID: ${{ matrix.project }}
         run: >-
@@ -162,7 +184,7 @@ jobs:
           --config "${{ steps.worker-app.outputs.worker_config_path }}"
 
       - name: Require an active Cloudflare zone before domain attach
-        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' && (inputs.project == 'all' || inputs.project == matrix.project) }}
+        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' }}
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -182,7 +204,7 @@ jobs:
           NODE
 
       - name: Attach production domains
-        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' && (inputs.project == 'all' || inputs.project == matrix.project) }}
+        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'attach' }}
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -193,7 +215,7 @@ jobs:
             --message "project ${{ steps.worker-app.outputs.project_id }} Worker ${{ steps.worker-app.outputs.worker_name }} production domain attach ${{ github.sha }}"
 
       - name: Detach production domains
-        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'detach' && (inputs.project == 'all' || inputs.project == matrix.project) }}
+        if: ${{ steps.credentials.outputs.configured == 'true' && github.event_name == 'workflow_dispatch' && inputs.domain_action == 'detach' }}
         env:
           PROJECT_ID: ${{ matrix.project }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}

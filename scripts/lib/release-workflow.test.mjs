@@ -8,9 +8,10 @@ import test from "node:test";
 
 const require = createRequire(import.meta.resolve("nx/package.json"));
 const yaml = require("@zkochan/js-yaml");
-const release = yaml.load(
-	readFileSync(new URL("../../.github/workflows/release.yml", import.meta.url), "utf8"),
-).jobs;
+const workflow = (name) =>
+	yaml.load(readFileSync(new URL(`../../.github/workflows/${name}`, import.meta.url), "utf8"));
+const releaseWorkflow = workflow("release.yml");
+const release = releaseWorkflow.jobs;
 const guardScript = release.guard.steps.find((step) => step.id === "check").run;
 const publishScript = release.publish.steps.find((step) => step.run?.includes("npm publish")).run;
 const cliManifest = readFileSync(new URL("../../apps/cli/package.json", import.meta.url), "utf8");
@@ -143,4 +144,13 @@ test("the release runs the packaging smoke, not the local gate, before publishin
 	assert.ok(!runs.some((run) => run.includes("ci:local")));
 	assert.match(release.tag.if, /needs\.publish\.result == 'success'/);
 	assert.match(release.release.if, /needs\.tag\.result == 'success'/);
+});
+
+test("only a push that can change the CLI version or a changeset starts these workflows", () => {
+	assert.deepEqual(releaseWorkflow.on.push.paths, ["apps/cli/package.json"]);
+	// changesets.yml merges the Version Packages PR with GITHUB_TOKEN and then dispatches the release.
+	assert.ok("workflow_dispatch" in releaseWorkflow.on);
+	const changesets = workflow("changesets.yml");
+	assert.deepEqual(changesets.on.push.paths, [".changeset/**"]);
+	assert.match(JSON.stringify(changesets.jobs.version.steps), /gh workflow run release\.yml/);
 });

@@ -2,7 +2,20 @@ import {
 	assertWranglerWorkerIdentity,
 	requireWorkerIdentity,
 	workerProjectConfig,
+	workerProjectIds,
 } from "../worker-apps.mjs";
+
+/**
+ * The Worker apps a production run deploys: every app, one named app, or the apps whose `build`
+ * a push reaches. `affected` comes from Nx's task-input selection, so a change only to tests,
+ * stories or files outside every project's build inputs deploys nothing.
+ * @param {{ selection: string, affected?: string[] }} input
+ */
+export function selectProductionProjects({ selection, affected = [] }) {
+	if (selection === "all") return [...workerProjectIds];
+	if (selection !== "affected") return [workerProjectConfig(selection).projectId];
+	return workerProjectIds.filter((project) => affected.includes(project));
+}
 
 export const productionProjects = {
 	excalidraw: {
