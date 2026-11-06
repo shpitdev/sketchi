@@ -133,3 +133,14 @@ test("publishing still fails for other conflicts and errors", () => {
 	});
 	assert.notEqual(forbidden.status, 0);
 });
+
+test("the release runs the packaging smoke, not the local gate, before publishing", () => {
+	assert.deepEqual(Object.keys(release), ["guard", "publish", "tag", "release"]);
+	assert.equal(release.publish.needs, "guard");
+	assert.match(release.publish.if, /needs\.guard\.outputs\.publish == 'true'/);
+	const runs = release.publish.steps.map((step) => step.run ?? "");
+	assert.ok(runs.includes("pnpm exec nx run sketchi-cli:smoke"));
+	assert.ok(!runs.some((run) => run.includes("ci:local")));
+	assert.match(release.tag.if, /needs\.publish\.result == 'success'/);
+	assert.match(release.release.if, /needs\.tag\.result == 'success'/);
+});
