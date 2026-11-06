@@ -248,6 +248,24 @@ describe("wireframe contract", () => {
 		expect(chart("kpi").screens[0].children[0]).toEqual({ type: "chart", label: "Revenue" });
 	});
 
+	it("puts a titled table in a section with that title", () => {
+		const resolved = resolveWireframeShorthand({
+			screens: [
+				{
+					name: "Reports",
+					children: [{ type: "table", title: "Agent performance", columns: ["Agent", "Rating"] }],
+				},
+			],
+		}) as { screens: [{ children: unknown[] }] };
+		expect(resolved.screens[0].children).toEqual([
+			{
+				type: "section",
+				title: "Agent performance",
+				children: [{ type: "table", columns: ["Agent", "Rating"] }],
+			},
+		]);
+	});
+
 	it("reads a lone screen written at the top", () => {
 		const resolved = resolveWireframeShorthand({
 			id: "login",

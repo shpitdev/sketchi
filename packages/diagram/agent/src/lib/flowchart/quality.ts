@@ -121,19 +121,14 @@ export function assessFlowchartQuality(
 		labelCounts.set(key, (labelCounts.get(key) ?? 0) + 1);
 	}
 	const duplicates = [...labelCounts.entries()].filter(([, count]) => count > 1);
+	// A request may name the same step on two branches; the repeat is reported, never rejected.
 	if (duplicates.length > 0) {
-		fault(
-			Math.min(duplicates.length, 3),
-			`duplicate label(s): ${duplicates.map(([label]) => `"${label}"`).join(", ")}`,
-			{
-				code: "duplicate_label",
-				refs: nodeRefs(
-					diagram.nodes.filter(
-						(node) => (labelCounts.get(node.label.trim().toLowerCase()) ?? 0) > 1,
-					),
-				),
-			},
-		);
+		fault(0, `duplicate label(s): ${duplicates.map(([label]) => `"${label}"`).join(", ")}`, {
+			code: "duplicate_label",
+			refs: nodeRefs(
+				diagram.nodes.filter((node) => (labelCounts.get(node.label.trim().toLowerCase()) ?? 0) > 1),
+			),
+		});
 	}
 
 	let underBranched = 0;

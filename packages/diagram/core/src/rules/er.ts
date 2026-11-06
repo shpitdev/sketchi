@@ -10,7 +10,7 @@ export const ER_RULES = {
 	cardinalities:
 		'Each cardinality is "one", "zero-or-one", "many", "one-or-many" or "zero-or-many": how many rows of that end relate to one row of the other end.',
 	cardinalityFromKeys: (source: RuleSource) =>
-		`fromCardinality is one-or-many if ${source} says no row of the other side goes without one, zero-or-one if the key is unique or the sole primary key, otherwise zero-or-many. toCardinality is zero-or-one if the key is nullable, otherwise one.`,
+		`fromCardinality is one-or-many if ${source} says no row of the other side goes without one, zero-or-one if the key is unique or the sole primary key, otherwise zero-or-many. toCardinality is zero-or-one if the key is nullable, otherwise one. A not-null key decides only toCardinality.`,
 	example:
 		'An order has one customer and a customer zero or many orders: from "orders.customer_id", fromCardinality "zero-or-many", to "customers.id", toCardinality "one".',
 	keys: "Mark every key column PK, FK or UK as stated.",

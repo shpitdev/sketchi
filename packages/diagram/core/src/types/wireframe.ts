@@ -989,6 +989,23 @@ function resolveComponent(input: unknown): unknown {
 		rest["level"] = Number.isFinite(level) ? level : rest["level"];
 	}
 	if (type === "table") {
+		// A table has no title of its own; a titled one sits in a section with that title.
+		const caption = take(rest, ["title", "caption", "heading", "name", "label"]);
+		if (caption !== undefined) {
+			const {
+				title: _title,
+				caption: _caption,
+				heading: _heading,
+				name: _name,
+				label: _label,
+				...table
+			} = input;
+			return {
+				type: "section",
+				title: words(caption),
+				children: [resolveComponent({ ...table, type: "table" })],
+			};
+		}
 		const headers = take(rest, ["columns", "headers", "fields", "cols"], true);
 		if (Array.isArray(headers)) resolved["columns"] = headers.map(itemText);
 		else if (headers !== undefined) resolved["columns"] = headers;
