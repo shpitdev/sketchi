@@ -28,7 +28,7 @@ describe("quadrant chart generation", () => {
 		const messages = buildDiagramGenerationMessages(request.prompt);
 		expect(messages.system).toContain('Use diagram type "quadrant".');
 		expect(messages.system).toContain("a score out of 100 is score / 100");
-		expect(messages.user).toContain('"quadrants":{"topLeft":"Quick wins"');
+		expect(messages.user).toContain('"quadrants":{"topLeft":"Best value"');
 	});
 
 	it("parses a quadrant chart", () => {

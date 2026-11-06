@@ -100,7 +100,7 @@ describe("generation reads the shared family rules", () => {
 			request: "Draw it",
 			requestedType: "er",
 		});
-		expect(user).toContain('"from":"orders.customer_id","to":"customers.id"');
+		expect(user).toContain('"from":"enrollments.student_id","to":"students.id"');
 	});
 });
 

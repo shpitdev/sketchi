@@ -19,6 +19,7 @@ import {
 } from "@sketchi/diagram-core";
 import { Schema } from "effect";
 
+import { CURATED_EXAMPLES } from "./examples.js";
 import { DiagramGenerationTypeSchema } from "./intent.js";
 
 /** `a, b, or c` for a list of alternatives. */
@@ -272,8 +273,8 @@ const IR_INSTRUCTIONS = {
 	},
 } as const satisfies Record<DiagramTypeValue, { title: string; rules: readonly string[] }>;
 
-/** The JSON shape shown for an explicitly requested family. */
-const FAMILY_EXAMPLES = {
+/** The JSON shape shown for an explicitly requested family that has no curated example. */
+const FAMILY_EXAMPLES: Partial<Readonly<Record<DiagramTypeValue, { readonly diagram: object }>>> = {
 	timeline: {
 		diagram: {
 			id: "release",
@@ -292,25 +293,6 @@ const FAMILY_EXAMPLES = {
 			categories: ["Q1", "Q2"],
 			series: [{ name: "Revenue", values: [42, 51] }],
 			unit: "$M",
-		},
-	},
-	flowchart: {
-		diagram: {
-			id: "short-kebab-case-id",
-			type: "flowchart",
-			nodes: [
-				{ id: "start-id", label: "Human label", kind: "start" },
-				{ id: "decision-id", label: "Question?", kind: "decision" },
-			],
-			edges: [
-				{
-					id: "edge-id",
-					source: "decision-id",
-					target: "target-id",
-					label: "yes",
-				},
-			],
-			layout: { direction: "TB", edgeRouting: "orthogonal" },
 		},
 	},
 	mindmap: {
@@ -343,30 +325,6 @@ const FAMILY_EXAMPLES = {
 			],
 		},
 	},
-	"state-machine": {
-		diagram: {
-			id: "short-kebab-case-id",
-			type: "state-machine",
-			initial: "pending",
-			states: [
-				{ id: "pending", label: "Pending" },
-				{ id: "paid", label: "Paid" },
-				{ id: "done", kind: "final" },
-			],
-			transitions: [
-				{
-					id: "pay",
-					source: "pending",
-					target: "paid",
-					event: "pay",
-					guard: "card valid",
-					action: "charge",
-				},
-				{ id: "remind", source: "pending", target: "pending", event: "timeout" },
-				{ id: "close", source: "paid", target: "done" },
-			],
-		},
-	},
 	gantt: {
 		diagram: {
 			id: "short-kebab-case-id",
@@ -388,49 +346,6 @@ const FAMILY_EXAMPLES = {
 					milestone: true,
 					phase: "Ship",
 					dependsOn: ["api"],
-				},
-			],
-		},
-	},
-	er: {
-		diagram: {
-			id: "short-kebab-case-id",
-			type: "er",
-			entities: [
-				{ id: "customers", fields: ["id uuid PK", "email text UK"] },
-				{ id: "orders", fields: ["id uuid PK", "customer_id uuid FK", "shipped_at date?"] },
-			],
-			relationships: [
-				{
-					id: "placed-by",
-					from: "orders.customer_id",
-					to: "customers.id",
-					fromCardinality: "zero-or-many",
-					toCardinality: "one",
-					label: "placed by",
-				},
-			],
-		},
-	},
-	class: {
-		diagram: {
-			id: "short-kebab-case-id",
-			type: "class",
-			classes: [
-				{ id: "Shape", kind: "abstract", methods: ["+ area(): double {abstract}"] },
-				{ id: "Circle", attributes: ["- radius: double"], methods: ["+ area(): double"] },
-				{ id: "Canvas", methods: ["+ add(shape: Shape): void"] },
-			],
-			relationships: [
-				{ id: "circle-is-shape", kind: "inheritance", from: "Circle", to: "Shape" },
-				{
-					id: "canvas-holds",
-					kind: "aggregation",
-					from: "Canvas",
-					to: "Shape",
-					fromMultiplicity: "1",
-					toMultiplicity: "0..*",
-					toRole: "shapes",
 				},
 			],
 		},
@@ -508,49 +423,19 @@ const FAMILY_EXAMPLES = {
 			],
 		},
 	},
-	wireframe: {
-		diagram: {
-			id: "short-kebab-case-id",
-			type: "wireframe",
-			screens: [
-				{
-					id: "login",
-					name: "Login",
-					device: "mobile",
-					children: [
-						{ type: "heading", text: "Welcome back" },
-						{ type: "input", label: "Email", placeholder: "you@example.com" },
-						{ type: "toggle", label: "Remember me", checked: true },
-						{ type: "button", text: "Sign in", variant: "primary" },
-						{ type: "link", text: "Forgot password?" },
-					],
-				},
-			],
-		},
-	},
-	quadrant: {
-		diagram: {
-			id: "effort-impact",
-			type: "quadrant",
-			xAxis: { title: "Effort", low: "Low effort", high: "High effort" },
-			yAxis: { title: "Impact", low: "Low impact", high: "High impact" },
-			quadrants: {
-				topLeft: "Quick wins",
-				topRight: "Major projects",
-				bottomLeft: "Fill-ins",
-				bottomRight: "Thankless tasks",
-			},
-			points: [
-				{ label: "Dark mode", x: 0.2, y: 0.75 },
-				{ label: "Billing rewrite", x: 0.9, y: 0.3 },
-			],
-		},
-	},
-} as const satisfies Record<DiagramTypeValue, { diagram: object }>;
+};
 
 function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
-	const selectedType = prompt.requestedType;
-	if (!selectedType) {
+	const curated = prompt.requestedType ? CURATED_EXAMPLES[prompt.requestedType] : undefined;
+	if (curated) {
+		return [
+			"Worked example: a different request and a correct answer. Follow its approach; draw only what the scenario states.",
+			`Request: ${curated.request}`,
+			`Answer: ${curated.answer}`,
+		].join("\n");
+	}
+	const shape = prompt.requestedType ? FAMILY_EXAMPLES[prompt.requestedType] : undefined;
+	if (!shape) {
 		const supportedExample = {
 			title: "Release approval",
 			diagram: {
@@ -574,10 +459,9 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 		};
 		return `Response example: ${JSON.stringify(supportedExample)}`;
 	}
-	const { diagram } = FAMILY_EXAMPLES[selectedType];
 	return JSON.stringify({
 		title: "Concise model-authored title",
-		diagram,
+		diagram: shape.diagram,
 	});
 }
 
