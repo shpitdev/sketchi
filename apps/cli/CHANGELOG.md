@@ -1,5 +1,13 @@
 # @sketchi/cli
 
+## 0.34.2
+
+### Patch Changes
+
+- [#670](https://github.com/shpitdev/sketchi/pull/670) [`0145e83`](https://github.com/shpitdev/sketchi/commit/0145e83e8d525e81f33b03d24a6a4ff46900b934) Thanks [@anandpant](https://github.com/anandpant)! - Large ER diagrams read cleanly at size: no relationship runs along or beside a table it doesn't join, a key row holding many ends always grows so each end meets its own line, and lines out of one table run a row apart instead of detouring around the diagram.
+
+- [#671](https://github.com/shpitdev/sketchi/pull/671) [`e576758`](https://github.com/shpitdev/sketchi/commit/e576758961b178ca82330e593565f7db5b7fa205) Thanks [@anandpant](https://github.com/anandpant)! - A sequence diagram whose message labels would read too small on a screen tightens its rows and lifelines, only as far as every label, bar and header stays apart. Forty messages across ten participants now read at about 10 px on a 2000 px screen, up from 7.
+
 ## 0.34.1
 
 ### Patch Changes
