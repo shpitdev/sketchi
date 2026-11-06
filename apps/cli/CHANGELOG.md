@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.34.3
+
+### Patch Changes
+
+- [#675](https://github.com/shpitdev/sketchi/pull/675) [`c3408c9`](https://github.com/shpitdev/sketchi/commit/c3408c956bdef78b1f58f81a7022d64b63ee70a7) Thanks [@anandpant](https://github.com/anandpant)! - A flowchart wrapped into columns whose text still reads small on a screen now tightens the gaps between its steps, where that makes the drawing shorter without routing worse. The 60-step process that wrapped to 3445 by 3130 now draws 1889 by 2554, its text about a third larger at a screen's size and its converging branches no longer crossing.
+
 ## 0.34.2
 
 ### Patch Changes
