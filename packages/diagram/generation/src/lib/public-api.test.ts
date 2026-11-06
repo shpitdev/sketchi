@@ -185,8 +185,8 @@ describe("diagram generation prompt mapping", () => {
 		expect(messages.system).toContain("Return the diagram id");
 		expect(messages.system).toContain("Do not return flat nodes");
 		expect(messages.system).toContain("derived ids");
-		expect(messages.system).toContain("2-4 children per major topic");
-		expect(messages.system).toContain("2-3 meaningful levels");
+		expect(messages.system).not.toContain("2-4 children per major topic");
+		expect(messages.system).toContain("Children keep their order.");
 		expect(messages.user).toContain('"type":"mindmap"');
 	});
 

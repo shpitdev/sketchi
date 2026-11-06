@@ -279,6 +279,20 @@ describe("flowchart node kinds", () => {
 		});
 	});
 
+	it("reads a blank edge label as none, as generation does", () => {
+		const blank = {
+			title: "Approval",
+			nodes: [
+				{ id: "start", label: "Submit", kind: "start" },
+				{ id: "done", label: "Approved", kind: "end" },
+			],
+			edges: [{ source: "start", target: "done", label: " " }],
+		};
+		expect(resolveFlowchartNodeKinds({ spec: blank })).toEqual({
+			spec: { ...blank, edges: [{ source: "start", target: "done" }] },
+		});
+	});
+
 	it("ends a shaped store nothing leaves and steps through a shaped end that passes data on", async () => {
 		// The hybrid sample Sonnet first sent three times: the Oracle database the ERP
 		// stores into, a dead end, marked process.

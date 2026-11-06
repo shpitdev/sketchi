@@ -1,4 +1,4 @@
-import type { FlowchartNodeKind } from "@sketchi/diagram-core";
+import { dropBlankEdgeLabels, type FlowchartNodeKind } from "@sketchi/diagram-core";
 
 import { cleanToolString } from "../clean-tool-string.js";
 
@@ -77,7 +77,8 @@ const looseKey = (value: string) =>
  * by a labeled decision branch is also an end. Ordinary process chains still need their next edge.
  * A connected node drawn as an infrastructure shape is an end when nothing leaves it (a database the
  * flow stores into) and, with another connected end, a process when something does (a queue its
- * workers read). Edges written { from, to } read as { source, target }.
+ * workers read). Edges written { from, to } read as { source, target }, and a blank edge label as
+ * none.
  */
 export function resolveFlowchartNodeKinds(input: unknown): unknown {
 	if (!isRecord(input)) return input;
@@ -85,7 +86,11 @@ export function resolveFlowchartNodeKinds(input: unknown): unknown {
 	if (!isRecord(spec) || !Array.isArray(spec.nodes)) return input;
 	const nodes: unknown[] = spec.nodes;
 	let changed = false;
-	const authoredEdges: unknown[] | undefined = Array.isArray(spec.edges) ? spec.edges : undefined;
+	const authoredEdges: unknown[] | undefined = Array.isArray(spec.edges)
+		? dropBlankEdgeLabels(spec.edges)
+		: undefined;
+	if (authoredEdges?.some((edge, index) => edge !== (spec.edges as unknown[])[index]))
+		changed = true;
 	const resolvedEdges = authoredEdges?.map((edge) => {
 		if (!isRecord(edge) || (edge.source !== undefined && edge.target !== undefined)) return edge;
 		if (edge.from === undefined && edge.to === undefined) return edge;

@@ -11,6 +11,7 @@ import {
 	getStateMachineValidationIssues,
 	stateLabel,
 	resolveStateMachineInitials,
+	splitContinuingFinalStates,
 	getStateMachineDefaultWarnings,
 	getErValidationIssues,
 	parseErFieldShorthand,
@@ -1005,6 +1006,12 @@ function erQuality(spec: NormalizedErSpec, threshold: number): QualityReport {
 		summary: { nodeCount: spec.entities.length, edgeCount: spec.relationships.length },
 		checks: [],
 	};
+}
+
+/** A final state that something leaves becomes a regular state that ends in its own final state. */
+function resolveStateMachineRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: splitContinuingFinalStates(input.spec) };
 }
 
 /** Read one-line fields, cardinality aliases and from/to aliases before the request is decoded. */
@@ -3634,7 +3641,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 	const parsed = Schema.decodeUnknownResult(BuildStateMachineRequestSchema, {
 		errors: "all",
 		reportInput: true,
-	})(input);
+	})(resolveStateMachineRequest(input));
 	if (!Result.isSuccess(parsed)) {
 		return yield* new BuildStateMachineFailure({
 			status: "invalid_input",

@@ -10,7 +10,7 @@ import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.ser
 import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-build-tool.server";
 export const STUDIO_BUILD_GANTT_TOOL_NAME = "build_gantt" as const;
 export const STUDIO_BUILD_GANTT_TOOL_DESCRIPTION =
-	"Build and persist a native Gantt chart: tasks with id, label, start (YYYY-MM-DD) and end (last day, inclusive) or duration (calendar days), optional milestone, phase, finish-to-start dependsOn ids and progress percent. Pass a stated duration as duration rather than computing end; invent no tasks or dates. The host draws the date axis, rows and dependency arrows. Repair structured issues, up to three total attempts.";
+	"Build and persist a native Gantt chart: tasks with id, label, start (YYYY-MM-DD) and end (last day, inclusive) or duration (calendar days), optional milestone, phase, finish-to-start dependsOn ids and progress percent. The host draws the date axis, rows and dependency arrows. Repair structured issues, up to three total attempts.";
 export const StudioBuildGanttInputSchema = toPlaygroundStandardSchema(BuildGanttToolInputSchema);
 export const StudioBuildGanttOutputSchema = toPlaygroundStandardSchema(BuildGanttResultSchema);
 export function makeStudioGanttToolExecutor<E, R>(
