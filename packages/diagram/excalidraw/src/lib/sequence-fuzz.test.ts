@@ -139,6 +139,44 @@ function deepSequence(
 	});
 }
 
+/**
+ * Wide sequences with one participant called again and again before any
+ * returns: eight to twelve participants, so a diagram at size tightens its
+ * lifelines, and twelve to nineteen calls nested into one participant from
+ * callers either side of it, so each later call meets a bar further right of
+ * its lifeline and carries its label with it.
+ */
+function wideNestedSequences(count: number, start: number): SequenceDiagram[] {
+	const { random, pick } = seeded(start);
+	return Array.from({ length: count }, (_, run) => {
+		const ids = Array.from({ length: 8 + Math.floor(random() * 5) }, (_, index) => `p${index}`);
+		const deep = ids[1 + Math.floor(random() * (ids.length - 2))]!;
+		const callers = ids.filter((id) => id !== deep);
+		const calls = Array.from({ length: 12 + Math.floor(random() * 8) }, (_, index) => ({
+			id: `call${index}`,
+			source: pick(callers),
+			target: deep,
+			label: pick(LABELS),
+		}));
+		return parseSequenceDiagram({
+			id: `sequence-wide-nested-${run}`,
+			title: "Wide nested sequence fuzz",
+			type: "sequence",
+			participants: ids.map((id) => ({ id, label: pick(PARTICIPANTS) })),
+			messages: [
+				...calls,
+				...calls.toReversed().map((call) => ({
+					id: `reply-${call.id}`,
+					source: deep,
+					target: call.source,
+					label: pick(LABELS),
+					type: "return" as const,
+				})),
+			],
+		});
+	});
+}
+
 interface Box {
 	readonly left: number;
 	readonly top: number;
@@ -277,17 +315,56 @@ function selfMessageIssues(diagram: SequenceDiagram, scene: RenderedDiagramScene
 	return issues;
 }
 
+/**
+ * Message labels that touch: however tightly a diagram at size spaces its rows
+ * and lifelines, each label stands clear of every other, and of every bar,
+ * header and lifeline, nested bars included.
+ */
+function labelOverlaps(
+	diagram: SequenceDiagram,
+	scene: RenderedDiagramScene,
+	nested = false,
+): string[] {
+	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
+	const nodes = scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
+	const labels = arrows.map((arrow) => [arrow.edgeId, paintedLabel(scene, arrow)] as const);
+	return labels.flatMap(([id, label], index) => [
+		...labels
+			.slice(index + 1)
+			.filter(([, other]) => overlaps(label, other, LABEL_CLEARANCE))
+			.map(([other]) => `${diagram.id} ${id} label overlaps ${other}'s label`),
+		...nodes
+			.filter(
+				(node) =>
+					nested &&
+					overlaps(
+						label,
+						{ left: node.x, top: node.y, right: node.x + node.width, bottom: node.y + node.height },
+						LABEL_CLEARANCE,
+					),
+			)
+			.map((node) => `${diagram.id} ${id} label sits on ${node.id}`),
+	]);
+}
+
 describe("sequence self-message fuzz", () => {
 	const diagrams = randomSequences(COUNT, 20261019);
 
-	it("draws every self-message as a loop clear of other messages, labels, bars and lifelines", () => {
+	it("draws every self-message as a loop clear of other messages, labels, bars and lifelines, every label apart", () => {
 		let loops = 0;
 		let nestedLoops = 0;
 		let deepLoops = 0;
+		let tightened = 0;
 		for (const diagram of diagrams) {
 			const scene = renderSequenceDiagram(diagram);
 			expect(getCanvasValidationIssues(scene), diagram.id).toEqual([]);
 			expect(selfMessageIssues(diagram, scene), diagram.id).toEqual([]);
+			expect(labelOverlaps(diagram, scene), diagram.id).toEqual([]);
+			// A diagram whose labels would read small on a screen tightens its rows.
+			const rows = scene.elements.flatMap((element) =>
+				element.type === "arrow" && element.points.length !== 4 ? [element.points[0].y] : [],
+			);
+			if (rows.slice(1).some((row, index) => row - rows[index]! < 88)) tightened += 1;
 			const loopArrows = scene.elements.filter(
 				(element) => element.type === "arrow" && element.points.length === 4,
 			);
@@ -309,6 +386,35 @@ describe("sequence self-message fuzz", () => {
 		expect(loops).toBeGreaterThan(COUNT);
 		expect(nestedLoops).toBeGreaterThan(0);
 		expect(deepLoops).toBeGreaterThan(0);
+		expect(tightened).toBeGreaterThan(0);
+	});
+
+	it("puts no label of a wide nested sequence on a bar it clears at natural spacing", () => {
+		let tightened = 0;
+		for (const diagram of wideNestedSequences(Math.ceil(COUNT / 4), 20261106)) {
+			const scene = renderSequenceDiagram(diagram);
+			expect(getCanvasValidationIssues(scene), diagram.id).toEqual([]);
+			// Bars nested deep inside a participant reach past its lifeline and carry
+			// its messages' ends, and so their labels, with them; at the natural
+			// spacing a label may already touch one, and tightening adds none.
+			const natural = new Set(
+				labelOverlaps(diagram, renderSequenceDiagram(diagram, { tighten: false }), true),
+			);
+			expect(
+				labelOverlaps(diagram, scene, true).filter((clash) => !natural.has(clash)),
+				diagram.id,
+			).toEqual([]);
+			const lifelines = scene.elements
+				.flatMap((element) =>
+					element.type === "node" && element.rendererRole === "sequence-lifeline"
+						? [element.x]
+						: [],
+				)
+				.toSorted((a, b) => a - b);
+			if (lifelines[1]! - lifelines[0]! < 320) tightened += 1;
+		}
+		// The generator must exercise lifelines stepping closer than their natural 320.
+		expect(tightened).toBeGreaterThan(0);
 	});
 
 	it("exports every diagram as a valid Excalidraw scene with each loop label grouped beside its loop", () => {
