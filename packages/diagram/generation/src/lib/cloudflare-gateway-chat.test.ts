@@ -63,6 +63,7 @@ const testPolicy: DiagramGenerationPolicyConfig = {
 	maxRetries: 0,
 	requestTimeoutMs: 5_000,
 	retryDelayMs: 1,
+	totalTimeoutMs: 60_000,
 };
 
 function bindingLayer(run: RunFn) {
@@ -190,30 +191,37 @@ describe("gateway chat request", () => {
 });
 
 describe("gateway chat responses", () => {
-	it("flags truncation in the current wording and regenerates fresh through the policy", async () => {
-		let call = 0;
-		const calls: RunArgs[] = [];
-		const layer = clientLayer(
-			async (...args) => {
-				calls.push(args);
-				call += 1;
-				return call === 1 ? completion('{"title":', "length") : completion(answer);
-			},
-			{ maxRepairAttempts: 1 },
+	it("fails an answer cut off at the output limit once, without regenerating or repairing it", async () => {
+		const { calls, run } = capture(() =>
+			completion('{"title":', "length", {
+				prompt_tokens: 11,
+				completion_tokens: 16_384,
+				total_tokens: 16_395,
+			}),
 		);
-		const candidate = await Effect.runPromise(generate(layer));
-		expect(calls).toHaveLength(2);
-		expect(calls[1]?.[0].headers["cf-aig-skip-cache"]).toBe("true");
-		expect(candidate.diagnostics).toContain(
-			"output_truncated: Gemini stopped at the maximum output-token budget; regenerate the complete diagram.",
+		const error = await Effect.runPromise(
+			generate(clientLayer(run, { maxRepairAttempts: 2, maxRetries: 2 })).pipe(Effect.flip),
 		);
-		expect(candidate.diagnostics.join("\n")).toContain("repair_succeeded");
+		expect(calls).toHaveLength(1);
+		expect(error).toMatchObject({
+			_tag: "DiagramGenerationLimitError",
+			limit: "output_tokens",
+			message: "The diagram needs more than the 16,384-token output limit allows in one answer.",
+			diagnostics: [
+				"output_truncated: Gemini stopped at the 16,384-token output limit after 16,384 tokens.",
+			],
+		});
 	});
 
-	it("reports truncation without repair as the current client does", async () => {
-		const { run } = capture(() => completion('{"title":', "length"));
-		const candidate = await Effect.runPromise(generate(clientLayer(run)));
-		expect(candidate.error).toBe("Gemini output was truncated.");
+	it("names the requested budget when a request sets its own", async () => {
+		const { run } = capture(() => completion(null, "length", null));
+		const error = await Effect.runPromise(
+			generate(clientLayer(run), { ...request, maxOutputTokens: 512 }).pipe(Effect.flip),
+		);
+		expect(error).toMatchObject({
+			_tag: "DiagramGenerationLimitError",
+			diagnostics: ["output_truncated: Gemini stopped at the 512-token output limit."],
+		});
 	});
 
 	it("omits usage when the upstream sends none", async () => {
@@ -224,7 +232,6 @@ describe("gateway chat responses", () => {
 
 	it.each([
 		["empty content", () => completion("")],
-		["empty content at the token limit", () => completion(null, "length")],
 		["not JSON", () => new Response("<html>")],
 		["truncated JSON", () => new Response('{"id":"chatcmpl-1","choices":[')],
 		["no body", () => new Response(null, { status: 204 })],
@@ -331,10 +338,14 @@ describe("gateway chat routes", () => {
 		expect(candidate.provider).toBe("cloudflare-anthropic");
 	});
 
-	it("names Claude when its output is truncated", async () => {
-		const { run } = capture(() => completion(answer, "length"));
-		const candidate = await Effect.runPromise(generate(anthropicLayer(run), haiku));
-		expect(candidate.error).toBe("Claude output was truncated.");
+	// Anthropic's chat-completions endpoint reports stop_reason max_tokens as finish_reason length.
+	it("names Claude when its output stops at max_tokens", async () => {
+		const { run } = capture(() => completion(answer, "length", null));
+		const error = await Effect.runPromise(generate(anthropicLayer(run), haiku).pipe(Effect.flip));
+		expect(error).toMatchObject({
+			_tag: "DiagramGenerationLimitError",
+			diagnostics: ["output_truncated: Claude stopped at the 16,384-token output limit."],
+		});
 	});
 });
 
@@ -579,14 +590,14 @@ describe("gateway chat telemetry", () => {
 		).then(() => probe.events);
 	}
 
-	/** A first failure, a retry, then a truncated answer and a repair. */
-	function scripted(ok: (text: string, truncated: boolean) => Response): RunFn {
+	/** A first failure, a retry, then an unreadable answer and a repair. */
+	function scripted(ok: (text: string) => Response): RunFn {
 		let call = 0;
 		return async () => {
 			call += 1;
 			if (call === 1)
 				return Response.json({ error: { message: "busy" } }, { status: 503, headers });
-			return call === 2 ? ok('{"title":', true) : ok(answer, false);
+			return ok(call === 2 ? '{"title":' : answer);
 		};
 	}
 
@@ -615,9 +626,7 @@ describe("gateway chat telemetry", () => {
 	const chatEvents = () =>
 		record(
 			clientLayer(
-				scripted((text, truncated) =>
-					completion(text, truncated ? "length" : "stop", undefined, { headers }),
-				),
+				scripted((text) => completion(text, "stop", undefined, { headers })),
 				policy,
 			),
 		);

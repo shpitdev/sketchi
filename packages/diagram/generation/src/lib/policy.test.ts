@@ -73,6 +73,7 @@ function runRepairs(initialDiagnostics: string[]) {
 		maxRetries: 0,
 		requestTimeoutMs: 1_000,
 		retryDelayMs: 1,
+		totalTimeoutMs: 60_000,
 	}).pipe(Effect.map((candidate) => ({ candidate, requests })));
 }
 
@@ -104,6 +105,7 @@ describe("generation repair prompts", () => {
 					maxRetries: 0,
 					requestTimeoutMs: 1000,
 					retryDelayMs: 1,
+					totalTimeoutMs: 60_000,
 				},
 			);
 			expect(requests).toHaveLength(1);
@@ -139,6 +141,7 @@ describe("generation repair prompts", () => {
 						maxRetries: 0,
 						requestTimeoutMs: 1_000,
 						retryDelayMs: 1,
+						totalTimeoutMs: 60_000,
 					},
 				);
 				expect(requests).toHaveLength(expectedCalls);

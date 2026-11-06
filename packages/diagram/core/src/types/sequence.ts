@@ -27,7 +27,8 @@ export function sequenceActivationId(participantId: string, callMessageId: strin
 
 /** Wider or longer diagrams stop reading as one sequence; split them instead. */
 export const SEQUENCE_MAX_PARTICIPANTS = 12;
-export const SEQUENCE_MAX_MESSAGES = 40;
+// Forty request-and-reply exchanges; 80 messages draw in one readable column.
+export const SEQUENCE_MAX_MESSAGES = 80;
 export const SEQUENCE_MAX_ISSUES = 20;
 
 export const SequenceMessageTypeSchema = Schema.Literals(SEQUENCE_MESSAGE_TYPES);

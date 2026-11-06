@@ -1,3 +1,4 @@
+import { diagramGenerationPolicyDefaults } from "@sketchi/diagram-generation";
 import {
 	generationReliabilityScenarios,
 	type GenerationReliabilityScenario,
@@ -27,10 +28,10 @@ describe("generation reliability structural assertions", () => {
 		expect(selectProbeScenarios(undefined)).toEqual(generationReliabilityScenarios);
 	});
 
-	it("budgets the outer request timeout beyond generation and repair policy", () => {
-		const policyBudgetMs = 3 * (3 * 30_000 + 250 + 500);
-
-		expect(generationProbeRequestTimeoutMs()).toBeGreaterThan(policyBudgetMs);
+	it("budgets the outer request timeout beyond the server's whole-request limit", () => {
+		expect(generationProbeRequestTimeoutMs()).toBeGreaterThan(
+			diagramGenerationPolicyDefaults.totalTimeoutMs,
+		);
 	});
 
 	it("bounds response body consumption and aborts the stalled loopback request", async () => {

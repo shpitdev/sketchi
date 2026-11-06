@@ -43,7 +43,7 @@ const children = (topic: MindmapTopicTree) => [...(topic.children ?? [])];
 const depth = (topic: MindmapTopicTree): number => 1 + Math.max(0, ...children(topic).map(depth));
 
 describe("prompt-grounded mindmap scenarios", () => {
-	it("covers a brainstorm, three-level notes, a wide plan and two large maps", () => {
+	it("covers a brainstorm, three-level notes, a wide plan and three large maps", () => {
 		const sizes = mindmapScenarios.map((entry) => ({
 			id: entry.id,
 			topics: entry.expectedDiagram.nodes.length,
@@ -56,6 +56,7 @@ describe("prompt-grounded mindmap scenarios", () => {
 			{ id: "app-launch-planning-mindmap-v2", topics: 24, main: 7, levels: 2 },
 			{ id: "ml-roadmap-mindmap-v2", topics: 41, main: 7, levels: 3 },
 			{ id: "animal-kingdom-mindmap-v2", topics: 42, main: 2, levels: 5 },
+			{ id: "web-development-mindmap-large", topics: 101, main: 14, levels: 3 },
 		]);
 	});
 

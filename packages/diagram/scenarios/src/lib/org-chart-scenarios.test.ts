@@ -60,6 +60,7 @@ describe("prompt-grounded org chart scenarios", () => {
 			"engineering-department-org-chart-v2",
 			"leadership-dotted-line-org-chart-v2",
 			"sales-regions-org-chart-v2",
+			"whole-company-org-chart-large",
 		]);
 		for (const entry of pasted) {
 			const rows = new Set(entry.prompt.split("\n"));

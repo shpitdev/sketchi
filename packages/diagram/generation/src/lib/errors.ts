@@ -64,7 +64,21 @@ export class DiagramGenerationTimeoutError extends Schema.TaggedError<DiagramGen
 	{
 		message: Schema.String,
 		provider: DiagramGenerationProviderIdSchema,
+		/** One model call, retried while time remains, or the whole request, which ends it. */
+		scope: Schema.Literals(["attempt", "request"]),
 		timeoutMs: Schema.Number,
+	},
+) {}
+
+/** The request needs more than Sketchi draws or than one answer may hold. */
+export class DiagramGenerationLimitError extends Schema.TaggedError<DiagramGenerationLimitError>()(
+	"DiagramGenerationLimitError",
+	{
+		diagnostics: Schema.Array(Schema.String),
+		/** `output_tokens`: the answer reached the output budget. `diagram_size`: a family limit. */
+		limit: Schema.Literals(["output_tokens", "diagram_size"]),
+		message: Schema.String,
+		provider: DiagramGenerationProviderIdSchema,
 	},
 ) {}
 
@@ -72,6 +86,7 @@ export type DiagramGenerationError =
 	| DiagramGenerationConfigurationError
 	| DiagramGenerationHttpError
 	| DiagramGenerationInputError
+	| DiagramGenerationLimitError
 	| DiagramGenerationResponseError
 	| DiagramGenerationTimeoutError
 	| DiagramGenerationTransportError;
@@ -82,9 +97,10 @@ export function isRetryableGenerationError(error: DiagramGenerationError): boole
 		case "DiagramGenerationTransportError":
 			return error.retryable;
 		case "DiagramGenerationTimeoutError":
-			return true;
+			return error.scope === "attempt";
 		case "DiagramGenerationConfigurationError":
 		case "DiagramGenerationInputError":
+		case "DiagramGenerationLimitError":
 		case "DiagramGenerationResponseError":
 			return false;
 	}
@@ -126,6 +142,18 @@ export function generationErrorToCandidate(
 			provider: error.provider,
 			raw: error.raw,
 			text: "",
+		};
+	}
+
+	if (error._tag === "DiagramGenerationLimitError") {
+		return {
+			...baseErrorCandidate(
+				error.provider,
+				stripGoogleModelPrefix(request.model),
+				error.message,
+				cacheMode,
+			),
+			diagnostics: [error.message, ...error.diagnostics],
 		};
 	}
 

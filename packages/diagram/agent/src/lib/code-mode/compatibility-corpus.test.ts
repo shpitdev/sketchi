@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Context, Effect, Schema } from "effect";
 import { readFile } from "node:fs/promises";
-import { CANVAS_LIMITS } from "@sketchi/diagram-core";
+import { CANVAS_LIMITS, FLOWCHART_MAX_NODES } from "@sketchi/diagram-core";
 import { FLOWCHART_NODE_KIND_HINT } from "../flowchart/node-kinds.js";
 
 import {
@@ -299,6 +299,34 @@ function normalizeFlowchartKindHintAgainstFrozen(value: unknown, frozen: unknown
 	return value === FLOWCHART_NODE_KIND_HINT &&
 		typeof frozen === "string" &&
 		/^Fix spec\.nodes\.\[\d+\]\.kind so it matches the Code Mode API contract\.$/.test(frozen)
+		? frozen
+		: value;
+}
+
+// Family size limits rose for large diagrams. The corpus builds one past each current
+// limit; the frozen capture names the limits, and the oversized input, of its day.
+const SIZE_LIMIT_TEXT = [
+	/^Flowchart has \d+ nodes; the supported maximum is \d+\.$/,
+	/^Mindmap exceeds the supported maximum of \d+ topic slots\.$/,
+	/^linear-workflow-with-\d+-concrete-operations$/,
+];
+const MAX_MINDMAP_TOPICS = 200;
+
+function normalizeSizeLimitsAgainstFrozen(value: unknown, frozen: unknown): unknown {
+	if (Array.isArray(value) && Array.isArray(frozen)) {
+		return value.map((item, index) => normalizeSizeLimitsAgainstFrozen(item, frozen[index]));
+	}
+	if (isRecord(value) && isRecord(frozen)) {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, nested]) => [
+				key,
+				normalizeSizeLimitsAgainstFrozen(nested, frozen[key]),
+			]),
+		);
+	}
+	return typeof value === "string" &&
+		typeof frozen === "string" &&
+		SIZE_LIMIT_TEXT.some((pattern) => pattern.test(value) && pattern.test(frozen))
 		? frozen
 		: value;
 }
@@ -1085,7 +1113,7 @@ async function buildIssueCompatibilityMatrix(sourceScene: typeof RenderedDiagram
 			edge.source === "approve" ? { ...edge, label: "same" } : edge,
 		),
 	});
-	const flowchartTooLarge = await flowchart(linearSpec(25));
+	const flowchartTooLarge = await flowchart(linearSpec(FLOWCHART_MAX_NODES + 1));
 	const disconnectedGraph = await deterministicRuntime().buildMindmap({
 		spec: { title: "Single topic", root: { label: "Only root" } },
 	});
@@ -1097,7 +1125,7 @@ async function buildIssueCompatibilityMatrix(sourceScene: typeof RenderedDiagram
 			title: "Wide hierarchy",
 			root: {
 				label: "Root",
-				children: Array.from({ length: 101 }, (_, index) => ({
+				children: Array.from({ length: MAX_MINDMAP_TOPICS + 1 }, (_, index) => ({
 					label: `Topic ${index}`,
 				})),
 			},
@@ -1839,11 +1867,14 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 			Schema.decodeUnknownSync(Schema.Unknown)(JSON.parse(await readFile(fixturePath, "utf8"))),
 		);
 		expect(
-			normalizeCanvasMigrationAgainstFrozen(
-				normalizeFlowchartKindHintAgainstFrozen(
-					normalizeBrandPaletteAgainstFrozen(
-						normalizeRoutingAgainstFrozen(
-							normalizeMindmapLayoutAgainstFrozen(corpus, frozen),
+			normalizeSizeLimitsAgainstFrozen(
+				normalizeCanvasMigrationAgainstFrozen(
+					normalizeFlowchartKindHintAgainstFrozen(
+						normalizeBrandPaletteAgainstFrozen(
+							normalizeRoutingAgainstFrozen(
+								normalizeMindmapLayoutAgainstFrozen(corpus, frozen),
+								frozen,
+							),
 							frozen,
 						),
 						frozen,

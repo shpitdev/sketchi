@@ -96,6 +96,8 @@ export class DiagramGenerationUsage extends Schema.Class<DiagramGenerationUsage>
 export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCandidate>(
 	"DiagramGenerationCandidate",
 )({
+	/** Model calls the request made, counting retries and repairs. */
+	attempts: Schema.optional(Schema.Number),
 	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
 	warnings: Schema.optionalKey(Schema.Array(StateMachineDefaultWarningSchema).pipe(Schema.mutable)),
@@ -112,6 +114,7 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
 export class DiagramGenerationCandidateSummary extends Schema.Class<DiagramGenerationCandidateSummary>(
 	"DiagramGenerationCandidateSummary",
 )({
+	attempts: Schema.optional(Schema.Number),
 	cacheMode: Schema.optional(DiagramGenerationCacheModeSchema),
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
 	warnings: Schema.optionalKey(Schema.Array(StateMachineDefaultWarningSchema).pipe(Schema.mutable)),
@@ -851,6 +854,7 @@ export function summarizeGenerationCandidate(
 		model: candidate.model,
 		provider: candidate.provider,
 		text: candidate.text,
+		...(candidate.attempts !== undefined ? { attempts: candidate.attempts } : {}),
 		...(candidate.cacheMode ? { cacheMode: candidate.cacheMode } : {}),
 		...(candidate.durationMs !== undefined ? { durationMs: candidate.durationMs } : {}),
 		...(candidate.error ? { error: candidate.error } : {}),

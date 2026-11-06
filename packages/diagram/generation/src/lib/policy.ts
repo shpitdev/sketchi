@@ -5,11 +5,13 @@ import {
 	type DiagramGenerationCandidate,
 	type DiagramGenerationProviderId,
 	type DiagramGenerationRequest,
+	type DiagramGenerationUsage,
 	enforceCandidateRequestRequirements,
 } from "./candidates.js";
 import type { DiagramGenerationPolicyConfig } from "./client.js";
 import {
 	type DiagramGenerationError,
+	DiagramGenerationLimitError,
 	DiagramGenerationTimeoutError,
 	generationErrorToCandidate,
 	isRetryableGenerationError,
@@ -42,12 +44,45 @@ const generationTimeouts = Metric.counter("sketchi_generation_timeouts", {
 const generationDuration = Metric.histogram("sketchi_generation_duration_ms", {
 	description: "Diagram generation request duration in milliseconds",
 	boundaries: Metric.boundariesFromIterable([
-		50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000,
+		50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000, 90_000, 120_000,
 	]),
 });
 
 function isAcceptedCandidate(candidate: DiagramGenerationCandidate): boolean {
 	return Boolean(candidate.diagram);
+}
+
+const seconds = (milliseconds: number) => String(Math.round(milliseconds / 100) / 10);
+
+/** A family validator's size limit, such as `flowchart.flowchart_too_large: ...`. */
+const DIAGRAM_SIZE_LIMIT = /^[a-z-]+\.[a-z_]+_too_large: /;
+
+export function isDiagramSizeLimitDiagnostic(diagnostic: string): boolean {
+	return DIAGRAM_SIZE_LIMIT.test(diagnostic);
+}
+
+/** The validator's own sentence, without its family code or its repair hint. */
+function diagramSizeLimitMessage(diagnostic: string): string {
+	return diagnostic.replace(DIAGRAM_SIZE_LIMIT, "").replace(/ Hint: .*$/s, "");
+}
+
+/** Every call a request makes is billed, so its usage is their sum. */
+function addUsage(
+	total: DiagramGenerationUsage | undefined,
+	next: DiagramGenerationUsage | undefined,
+): DiagramGenerationUsage | undefined {
+	if (!next) return total;
+	if (!total) return next;
+	const sum = (a: number | undefined, b: number | undefined) =>
+		a === undefined && b === undefined ? undefined : (a ?? 0) + (b ?? 0);
+	const inputTokens = sum(total.inputTokens, next.inputTokens);
+	const outputTokens = sum(total.outputTokens, next.outputTokens);
+	const totalTokens = sum(total.totalTokens, next.totalTokens);
+	return {
+		...(inputTokens === undefined ? {} : { inputTokens }),
+		...(outputTokens === undefined ? {} : { outputTokens }),
+		...(totalTokens === undefined ? {} : { totalTokens }),
+	};
 }
 
 export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWithPolicy")(
@@ -60,6 +95,9 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 		policy: DiagramGenerationPolicyConfig,
 	) {
 		const startedAt = yield* Clock.currentTimeMillis;
+		const deadline = startedAt + policy.totalTimeoutMs;
+		const callsRef = yield* Ref.make(0);
+		const usageRef = yield* Ref.make<DiagramGenerationUsage | undefined>(undefined);
 		const executeModelCall = Effect.fn("diagramGeneration.executeModelCall")(function* (
 			callRequest: DiagramGenerationRequest,
 		) {
@@ -83,6 +121,11 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 						retry_kind: "transient",
 					});
 				}
+				// Each call gets its own limit, cut short by what is left of the request's.
+				const remainingMs = deadline - (yield* Clock.currentTimeMillis);
+				const scope = remainingMs < policy.requestTimeoutMs ? "request" : "attempt";
+				const timeoutMs = Math.max(0, Math.min(policy.requestTimeoutMs, remainingMs));
+				const limitMs = scope === "request" ? policy.totalTimeoutMs : policy.requestTimeoutMs;
 				return yield* attempt.pipe(
 					Effect.onExit((exit) => {
 						const failure = Exit.isFailure(exit) ? Cause.findError(exit.cause) : undefined;
@@ -95,33 +138,54 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 						) {
 							return Effect.void;
 						}
-						return recordMetric(generationAttempts, 1, {
-							operation: "generate",
-							provider,
-						});
+						return Effect.andThen(
+							Ref.update(callsRef, (calls) => calls + 1),
+							recordMetric(generationAttempts, 1, {
+								operation: "generate",
+								provider,
+							}),
+						);
 					}),
+					Effect.tap((candidate) =>
+						Ref.update(usageRef, (total) => addUsage(total, candidate.usage)),
+					),
 					Effect.annotateSpans({ attempt: attemptNumber }),
 					Effect.timeoutOrElse({
-						duration: policy.requestTimeoutMs,
+						duration: timeoutMs,
 						orElse: () =>
 							Effect.fail(
 								DiagramGenerationTimeoutError.make({
-									message: `Generation timed out after ${policy.requestTimeoutMs} ms.`,
+									message:
+										scope === "request"
+											? `Generation did not finish within its ${seconds(limitMs)}-second limit.`
+											: `A model call did not finish within its ${seconds(limitMs)}-second limit.`,
 									provider,
-									timeoutMs: policy.requestTimeoutMs,
+									scope,
+									timeoutMs: limitMs,
 								}),
 							),
 					}),
 					Effect.tapError((error) => Ref.set(previousErrorTagRef, error._tag)),
 				);
 			});
-			return yield* measuredAttempt.pipe(
+			const candidate = yield* measuredAttempt.pipe(
 				Effect.retry({
 					schedule: Schedule.exponential(policy.retryDelayMs),
 					times: policy.maxRetries,
 					while: isRetryableGenerationError,
 				}),
 			);
+			// Repair could only meet a family limit by dropping what the request states.
+			const tooLarge = candidate.diagnostics.filter(isDiagramSizeLimitDiagnostic);
+			if (tooLarge.length > 0) {
+				return yield* DiagramGenerationLimitError.make({
+					diagnostics: tooLarge,
+					limit: "diagram_size",
+					message: diagramSizeLimitMessage(tooLarge[0]!),
+					provider,
+				});
+			}
+			return candidate;
 		});
 
 		const operation = Effect.gen(function* () {
@@ -137,9 +201,6 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 				repairAttempt <= policy.maxRepairAttempts && !isAcceptedCandidate(latestCandidate);
 				repairAttempt += 1
 			) {
-				const truncated = latestCandidate.diagnostics.some((diagnostic) =>
-					diagnostic.startsWith("output_truncated:"),
-				);
 				yield* recordMetric(generationRepairs, 1, {
 					operation: "generate",
 					outcome: "attempted",
@@ -149,13 +210,18 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 					operation: "generate",
 					provider,
 					repair_attempt: repairAttempt,
-					repair_kind: truncated ? "regenerate_truncated" : "repair_invalid",
+					repair_kind: "repair_invalid",
 				});
-				const repairRequest = truncated
-					? { ...request, cacheMode: "fresh" as const }
-					: buildRepairRequest(request, latestCandidate, repairAttempt);
-				const attemptedDiagnostic = `repair_attempted: ${truncated ? "regenerated a truncated response" : "requested a corrected response"} (attempt ${repairAttempt}).`;
+				const repairRequest = buildRepairRequest(request, latestCandidate, repairAttempt);
+				const attemptedDiagnostic = `repair_attempted: requested a corrected response (attempt ${repairAttempt}).`;
 				const repairResult = yield* Effect.result(executeModelCall(repairRequest));
+				// A limit is the answer: the repaired diagram cannot fit either.
+				if (
+					Result.isFailure(repairResult) &&
+					repairResult.failure._tag === "DiagramGenerationLimitError"
+				) {
+					return yield* repairResult.failure;
+				}
 				if (Result.isFailure(repairResult)) {
 					const failedRepairCandidate = generationErrorToCandidate(
 						repairResult.failure,
@@ -198,9 +264,12 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 				if (repeated) break;
 			}
 			const finishedAt = yield* Clock.currentTimeMillis;
+			const usage = yield* Ref.get(usageRef);
 			return {
 				...candidate,
+				attempts: yield* Ref.get(callsRef),
 				durationMs: Math.round(finishedAt - startedAt),
+				...(usage ? { usage } : {}),
 			};
 		}).pipe(
 			Effect.tap((candidate) =>

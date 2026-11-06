@@ -2,6 +2,9 @@ import { Effect, Stream } from "effect";
 
 export const MAX_API_RESPONSE_BYTES = 16 * 1024 * 1024;
 export const API_REQUEST_TIMEOUT = "90 seconds";
+// The generate API gives one request 120 s across its model calls, then builds
+// and returns the diagram; the wait covers both with room to spare.
+export const GENERATE_REQUEST_TIMEOUT = "150 seconds";
 
 /** The stream scope cancels the body on failure, timeout, or interruption. */
 export const readBoundedBody = Effect.fn("sketchi.cli.response.readBoundedBody")(function* <E>(

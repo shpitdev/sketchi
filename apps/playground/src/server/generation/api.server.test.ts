@@ -5,6 +5,7 @@ import {
 } from "@sketchi/diagram-agent";
 import {
 	diagramFixtures,
+	FLOWCHART_MAX_NODES,
 	mediaPlayerStateMachine,
 	sankeyStressFixtures,
 } from "@sketchi/diagram-core";
@@ -85,6 +86,7 @@ function generationText(diagram: Readonly<Record<string, unknown>>): string {
 function fakeAiGateway(
 	text: string,
 	observeRun?: (input: Parameters<CloudflareAiGateway["run"]>[0]) => void,
+	completion: { readonly finishReason?: string; readonly usage?: unknown } = {},
 ): CloudflareAiGatewayProvider {
 	return {
 		gateway: () => ({
@@ -95,7 +97,7 @@ function fakeAiGateway(
 						JSON.stringify({
 							choices: [
 								{
-									finish_reason: "stop",
+									finish_reason: completion.finishReason ?? "stop",
 									index: 0,
 									message: { content: text, role: "assistant" },
 								},
@@ -103,6 +105,7 @@ function fakeAiGateway(
 							created: 1,
 							id: "chatcmpl-test",
 							model: "gemini-3.1-flash-lite",
+							...(completion.usage ? { usage: completion.usage } : {}),
 						}),
 						{ status: 200, headers: { "content-type": "application/json" } },
 					),
@@ -541,6 +544,114 @@ describe("public generate endpoint", () => {
 		expect(body.issues.length).toBeLessThanOrEqual(8);
 		expect(body.issues.map((entry) => entry.message).join("\n")).toContain("end_has_outgoing");
 	});
+
+	it("names the output limit an answer reached instead of repairing it", async () => {
+		const runs: unknown[] = [];
+		const env: StudioEnv = {
+			AI: fakeAiGateway(
+				'{"title":"Release","diagram":{"type":"flowchart"',
+				(input) => runs.push(input),
+				{
+					finishReason: "length",
+				},
+			),
+		};
+		const response = await generateRequest(env, { prompt: "Map a flow", type: "flowchart" });
+
+		expect(response.status).toBe(413);
+		expect(runs).toHaveLength(1);
+		expect(await response.json()).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: [
+				{
+					code: "output_limit_exceeded",
+					message:
+						"The diagram needs more than the 16,384-token output limit allows in one answer.",
+				},
+			],
+		});
+	});
+
+	it("names the family limit a diagram passed instead of trimming it", async () => {
+		const runs: unknown[] = [];
+		const steps = FLOWCHART_MAX_NODES + 1;
+		const oversized = {
+			id: "oversized",
+			title: "Oversized",
+			type: "flowchart",
+			nodes: Array.from({ length: steps }, (_, index) => ({
+				id: `n${index}`,
+				label: `Step ${index}`,
+				kind: index === 0 ? "start" : index === steps - 1 ? "end" : "process",
+			})),
+			edges: Array.from({ length: steps - 1 }, (_, index) => ({
+				id: `e${index}`,
+				source: `n${index}`,
+				target: `n${index + 1}`,
+			})),
+		};
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(oversized), (input) => runs.push(input)),
+		};
+		const response = await generateRequest(env, { prompt: "Map a long flow", type: "flowchart" });
+
+		expect(response.status).toBe(413);
+		expect(runs).toHaveLength(1);
+		expect(await response.json()).toMatchObject({
+			status: "limit_exceeded",
+			issues: [
+				{
+					code: "diagram_too_large",
+					message: `Flowchart has ${steps} nodes; the supported maximum is ${FLOWCHART_MAX_NODES}.`,
+				},
+			],
+		});
+	});
+
+	it("reports a build's size limit as a limit, not a defect", async () => {
+		const wide = JSON.stringify({
+			title: "Every idea",
+			diagram: {
+				type: "mindmap",
+				id: "every-idea",
+				root: {
+					label: "Ideas",
+					children: Array.from({ length: 210 }, (_, index) => ({
+						label: `Idea ${index + 1}`,
+						children: [],
+					})),
+				},
+			},
+		});
+		const env: StudioEnv = { AI: fakeAiGateway(wide) };
+		const response = await generateRequest(env, { prompt: "Map every idea", type: "mindmap" });
+
+		expect(response.status).toBe(413);
+		expect(await response.json()).toMatchObject({
+			status: "limit_exceeded",
+			issues: [{ code: "mindmap_too_large", stage: "build" }],
+		});
+	});
+
+	it("reports the model calls, time and tokens a generation took", async () => {
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(flowchartIr), undefined, {
+				usage: { prompt_tokens: 6_000, completion_tokens: 900, total_tokens: 6_900 },
+			}),
+		};
+		const response = await generateRequest(env, {
+			prompt: "Show release approval",
+			type: "flowchart",
+		});
+		const body = (await response.json()) as { generation: unknown };
+
+		expect(response.status).toBe(200);
+		expect(body.generation).toMatchObject({
+			attempts: 1,
+			usage: { inputTokens: 6_000, outputTokens: 900 },
+		});
+	});
 });
 
 describe("generation request boundaries", () => {
@@ -636,6 +747,8 @@ describe("generation request boundaries", () => {
 		const body = (await response.json()) as { generation: unknown };
 		expect(response.status).toBe(200);
 		expect(body.generation).toEqual({
+			attempts: 1,
+			durationMs: expect.any(Number),
 			model: "claude-haiku-5-5",
 			provider: "cloudflare-anthropic",
 		});

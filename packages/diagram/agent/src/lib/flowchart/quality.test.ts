@@ -1,7 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 
-import { type FlowchartDiagram, parseFlowchartDiagram } from "@sketchi/diagram-core";
+import {
+	FLOWCHART_MAX_NODES,
+	type FlowchartDiagram,
+	parseFlowchartDiagram,
+} from "@sketchi/diagram-core";
 
 import { assessFlowchartQuality } from "./quality";
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../code-mode/artifacts.js";
@@ -233,20 +237,24 @@ describe("assessFlowchartQuality", () => {
 		]);
 	});
 
-	it.each([
-		{ count: 2, code: "graph_too_sparse" },
-		{ count: 25, code: "graph_too_dense" },
-	])("uses $code for graph scope", ({ count, code }) => {
-		const diagram = linearFlowchart(count);
+	it("uses graph_too_sparse for graph scope", () => {
+		const diagram = linearFlowchart(2);
 		const quality = assessFlowchartQuality(diagram, 8);
 
 		expect(quality.score).toBe(8);
 		expect(quality.checks).toEqual([
 			expect.objectContaining({
-				code,
+				code: "graph_too_sparse",
 				refs: [{ kind: "diagram", id: diagram.id, path: "spec.nodes" }],
 			}),
 		]);
+	});
+
+	it("scores a flowchart at its family limit without a size penalty", () => {
+		const quality = assessFlowchartQuality(linearFlowchart(FLOWCHART_MAX_NODES), 8);
+
+		expect(quality.score).toBe(10);
+		expect(quality.checks).toEqual([]);
 	});
 
 	it("identifies a weak title separately from label problems", () => {

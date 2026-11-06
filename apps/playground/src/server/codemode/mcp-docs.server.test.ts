@@ -1,3 +1,4 @@
+import { FLOWCHART_MAX_EDGES, FLOWCHART_MAX_NODES } from "@sketchi/diagram-core";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
@@ -222,8 +223,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		}
 		expect(catalog).toContain("arbitrary typed canvas artifact");
 		expect(catalog).toContain("CanvasSpec v1");
-		expect(catalog).toContain("24 nodes");
-		expect(catalog).toContain("64 edges");
+		expect(catalog).toContain(`${FLOWCHART_MAX_NODES} nodes`);
+		expect(catalog).toContain(`${FLOWCHART_MAX_EDGES} edges`);
 		expect(catalog).toContain("256 KiB");
 	});
 
@@ -253,7 +254,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		);
 
 		const boundedFlowchartResults = searchCodeModeDocs({
-			query: "nonterminating cycle 24 nodes 64 edges request_too_large",
+			query: `nonterminating cycle ${FLOWCHART_MAX_NODES} nodes ${FLOWCHART_MAX_EDGES} edges request_too_large`,
 		});
 		expect(boundedFlowchartResults.results.map((result) => result.id)).toEqual(
 			expect.arrayContaining(["buildFlowchart", "issues"]),
@@ -299,8 +300,8 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(docs.content).toContain("8-14 high-signal nodes");
 		expect(docs.content).toContain("single readable spine");
 		expect(docs.content).toContain("group related packages into layers");
-		expect(docs.content).toContain("24 nodes");
-		expect(docs.content).toContain("64 edges");
+		expect(docs.content).toContain(`${FLOWCHART_MAX_NODES} nodes`);
+		expect(docs.content).toContain(`${FLOWCHART_MAX_EDGES} edges`);
 		expect(docs.content).toContain("nonterminating_node");
 		// The 256 KiB limit applies to Studio HTTP requests, so it lives with the other issue hints.
 		expect(getCodeModeDocs({ topic: "issues" }).content).toContain("request_too_large");

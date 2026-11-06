@@ -106,14 +106,11 @@ export function assessFlowchartQuality(
 		}
 	}
 
+	// Size has no penalty: the family limit decides how many steps a flowchart holds,
+	// and a request that states 60 steps needs 60 nodes.
 	if (diagram.nodes.length < 3) {
 		fault(2, "too sparse — a useful flow needs at least 3 nodes", {
 			code: "graph_too_sparse",
-			refs: [{ kind: "diagram", id: diagram.id, path: "spec.nodes" }],
-		});
-	} else if (diagram.nodes.length > 24) {
-		fault(2, "too dense — trim or merge nodes (24 max)", {
-			code: "graph_too_dense",
 			refs: [{ kind: "diagram", id: diagram.id, path: "spec.nodes" }],
 		});
 	}

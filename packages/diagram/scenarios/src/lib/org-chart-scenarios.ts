@@ -456,6 +456,100 @@ const COMMERCIAL_ORGANIZATION_PEOPLE: readonly PersonDefinition[] = [
 	["elif", "Elif Yilmaz", "Support Lead", "carlos", { department: "Customer Success" }],
 ];
 
+const WHOLE_COMPANY_PEOPLE: readonly PersonDefinition[] = [
+	["adaeze", "Adaeze Okonkwo", "Chief Executive Officer"],
+	["rafael", "Rafael Moreno", "VP of Engineering", "adaeze"],
+	["ingrid", "Ingrid Halvorsen", "VP of Product", "adaeze"],
+	["kenji", "Kenji Watanabe", "VP of Sales", "adaeze"],
+	["lucia", ["Lucía Fernández", "Lucia Fernandez"], "VP of Marketing", "adaeze"],
+	["tobias", "Tobias Becker", "VP of Operations", "adaeze"],
+	["hiro", "Hiro Sato", "General Counsel", "adaeze"],
+	["sunita", "Sunita Rao", "Engineering Manager, Platform", "rafael"],
+	["arjun", "Arjun Mehta", "Senior Software Engineer", "sunita"],
+	["chloe", "Chloe Dubois", "Software Engineer", "sunita"],
+	["kwame", "Kwame Asante", "Site Reliability Engineer", "sunita"],
+	["linh", "Linh Tran", "Software Engineer", "sunita"],
+	["pedro", "Pedro Alves", "Senior Software Engineer", "sunita"],
+	["mateo", "Mateo Rossi", "Engineering Manager, Payments", "rafael"],
+	["fatima", "Fatima Zahra", "Senior Software Engineer", "mateo"],
+	["lars", "Lars Nilsson", "Software Engineer", "mateo"],
+	["yuki", "Yuki Tanaka", "Software Engineer", "mateo"],
+	["omar", "Omar Farouk", "QA Engineer", "mateo"],
+	["olga", "Olga Ivanova", "Engineering Manager, Mobile", "rafael"],
+	["isabela", "Isabela Souza", "iOS Engineer", "olga"],
+	["jaewon", "Jae-won Park", "Android Engineer", "olga"],
+	["marta", "Marta Nowak", "Mobile Engineer", "olga"],
+	["ravi", "Ravi Iyer", "Mobile Engineer", "olga"],
+	["chidi", "Chidi Nwosu", "Engineering Manager, Data", "rafael"],
+	["astrid", "Astrid Berg", "Data Engineer", "chidi"],
+	["rahul", "Rahul Gupta", "Data Engineer", "chidi"],
+	["camila", "Camila Torres", "Machine Learning Engineer", "chidi"],
+	["jakub", ["Jakub Wiśniewski", "Jakub Wisniewski"], "Analytics Engineer", "chidi"],
+	["jonas", "Jonas Lindqvist", "Group Product Manager", "ingrid"],
+	["arnav", "Arnav Joshi", "Technical Product Manager", "jonas"],
+	["hannah", "Hannah Weber", "Senior Product Manager", "jonas"],
+	["diego", ["Diego Ramírez", "Diego Ramirez"], "Product Manager", "jonas"],
+	["aisha", "Aisha Bello", "Product Manager", "jonas"],
+	["tomas", ["Tomás Novak", "Tomas Novak"], "Product Analyst", "jonas"],
+	["amara", "Amara Mensah", "Design Director", "ingrid"],
+	["freya", "Freya Larsen", "Senior Product Designer", "amara"],
+	["kofi", "Kofi Boateng", "Product Designer", "amara"],
+	["sakura", "Sakura Ito", "UX Researcher", "amara"],
+	["valentina", "Valentina Russo", "Content Designer", "amara"],
+	["beatriz", "Beatriz Costa", "Regional Sales Director, EMEA", "kenji"],
+	["henrik", "Henrik Johansson", "Account Executive", "beatriz"],
+	["zainab", "Zainab Musa", "Account Executive", "beatriz"],
+	["luca", "Luca Bianchi", "Sales Engineer", "beatriz"],
+	["emma", "Emma Schulz", "Account Executive", "beatriz"],
+	["cole", "Cole Harrington", "Regional Sales Director, Americas", "kenji"],
+	["maya", "Maya Patel", "Account Executive", "cole"],
+	["noah", "Noah Williams", "Account Executive", "cole"],
+	["sofia", "Sofia Gonzalez", "Sales Engineer", "cole"],
+	["ethan", "Ethan Brooks", "Sales Development Representative", "cole"],
+	["ava", "Ava Thompson", "Sales Development Representative", "cole"],
+	["mei", "Mei Chen", "Sales Operations Manager", "kenji"],
+	["wei", "Wei Zhang", "Sales Operations Analyst", "mei"],
+	["priya", "Priya Sharma", "Revenue Analyst", "mei"],
+	["jonah", "Jonah Fischer", "Deal Desk Specialist", "mei"],
+	["dmitri", "Dmitri Petrov", "Brand Manager", "lucia"],
+	["leila", "Leila Karimi", "Content Strategist", "dmitri"],
+	["marco", "Marco Conti", "Graphic Designer", "dmitri"],
+	["julia", "Julia Kowalska", "Copywriter", "dmitri"],
+	["nadia", "Nadia Haddad", "Growth Marketing Manager", "lucia"],
+	["ben", "Ben Carter", "Performance Marketing Specialist", "nadia"],
+	["ines", "Ines Duarte", "Lifecycle Marketing Specialist", "nadia"],
+	["kai", ["Kai Müller", "Kai Muller"], "Marketing Analyst", "nadia"],
+	["rosa", ["Rosa Jiménez", "Rosa Jimenez"], "SEO Specialist", "nadia"],
+	["grace", "Grace Kim", "Finance Manager", "tobias"],
+	["daniel", "Daniel Osei", "Senior Accountant", "grace"],
+	["anna", "Anna Svensson", "Accountant", "grace"],
+	["victor", "Victor Lee", "Financial Analyst", "grace"],
+	["samir", "Samir Khan", "People Operations Manager", "tobias"],
+	["chiara", "Chiara Romano", "Recruiter", "samir"],
+	["ibrahim", "Ibrahim Diallo", "Recruiter", "samir"],
+	["megan", "Megan Walsh", "People Partner", "samir"],
+	["elena", "Elena Popescu", "IT Manager", "tobias"],
+	["stefan", "Stefan Horvat", "Systems Administrator", "elena"],
+	["nkechi", "Nkechi Eze", "IT Support Specialist", "elena"],
+	["paolo", "Paolo Greco", "Security Analyst", "elena"],
+	["hana", "Hana Yamamoto", "Customer Support Manager", "tobias"],
+	["oliver", "Oliver Grant", "Support Specialist", "hana"],
+	["thandiwe", "Thandiwe Ndlovu", "Support Specialist", "hana"],
+	["mikael", "Mikael Virtanen", "Support Specialist", "hana"],
+	["leah", "Leah Cohen", "Support Team Lead", "hana"],
+];
+
+/** The roster as a pasted CSV: name, title and manager's name, the top row's manager empty. */
+function rosterRows(people: readonly PersonDefinition[]): string[] {
+	const nameOf = (personKey: string) =>
+		list(people.find(([candidate]) => candidate === personKey)?.[1])[0] ?? "";
+	return people.map(([, names, titles, manager]) =>
+		[list(names)[0], list(titles)[0], manager === undefined ? "" : nameOf(manager)]
+			.join(", ")
+			.trimEnd(),
+	);
+}
+
 const orgChartScenarioDefinitions: readonly OrgChartScenarioDefinition[] = [
 	{
 		id: "startup-team-org-chart-v2",
@@ -578,6 +672,21 @@ const orgChartScenarioDefinitions: readonly OrgChartScenarioDefinition[] = [
 		].join("\n"),
 		groupByDepartment: true,
 		people: COMMERCIAL_ORGANIZATION_PEOPLE,
+	},
+	{
+		id: "whole-company-org-chart-large",
+		title: "Whole company",
+		difficulty: "challenge",
+		tags: ["org-chart", "large", "four-levels", "real-voice"],
+		description:
+			"An 80-person company pasted as a CSV: a CEO, five VPs and a general counsel, fifteen managers and their teams of three to five.",
+		prompt: [
+			"org chart for the whole company, everyone on this list",
+			"",
+			"name, title, reports to",
+			...rosterRows(WHOLE_COMPANY_PEOPLE),
+		].join("\n"),
+		people: WHOLE_COMPANY_PEOPLE,
 	},
 ];
 

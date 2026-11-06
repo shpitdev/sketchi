@@ -176,6 +176,57 @@ const lunarMission: TimelineDiagram["events"] = [
 	{ id: "extended", label: "Extended mission ends", date: "2028-06-30" },
 ];
 
+const crosstownTram: TimelineDiagram["events"] = [
+	{ id: "feasibility-study-starts", label: "Feasibility study starts", date: "2024-01-15" },
+	{ id: "public-consultation-opens", label: "Public consultation opens", date: "2024-03-04" },
+	{ id: "consultation-closes", label: "Consultation closes", date: "2024-04-29" },
+	{ id: "route-options-published", label: "Route options published", date: "2024-06-10" },
+	{ id: "preferred-route-chosen", label: "Preferred route chosen", date: "2024-07-22" },
+	{ id: "environmental-survey-begins", label: "Environmental survey begins", date: "2024-09-02" },
+	{ id: "funding-bid-submitted", label: "Funding bid submitted", date: "2024-10-14" },
+	{ id: "federal-grant-awarded", label: "Federal grant awarded", date: "2024-12-09" },
+	{ id: "design-consultants-hired", label: "Design consultants hired", date: "2025-01-20" },
+	{ id: "station-locations-fixed", label: "Station locations fixed", date: "2025-02-17" },
+	{ id: "land-acquisition-starts", label: "Land acquisition starts", date: "2025-03-31" },
+	{ id: "utility-relocation-begins", label: "Utility relocation begins", date: "2025-05-12" },
+	{ id: "preliminary-design-approved", label: "Preliminary design approved", date: "2025-06-23" },
+	{ id: "main-contractor-selected", label: "Main contractor selected", date: "2025-08-04" },
+	{ id: "groundbreaking-ceremony", label: "Groundbreaking ceremony", date: "2025-09-15" },
+	{ id: "depot-construction-begins", label: "Depot construction begins", date: "2025-10-27" },
+	{ id: "first-track-section-laid", label: "First track section laid", date: "2025-12-08" },
+	{ id: "bridge-foundations-poured", label: "Bridge foundations poured", date: "2026-01-19" },
+	{ id: "tunnel-boring-starts", label: "Tunnel boring starts", date: "2026-03-02" },
+	{ id: "first-station-roof-completed", label: "First station roof completed", date: "2026-04-13" },
+	{ id: "signalling-contract-signed", label: "Signalling contract signed", date: "2026-05-25" },
+	{ id: "tunnel-breakthrough", label: "Tunnel breakthrough", date: "2026-07-06" },
+	{
+		id: "overhead-power-lines-installed",
+		label: "Overhead power lines installed",
+		date: "2026-08-17",
+	},
+	{ id: "first-trams-delivered", label: "First trams delivered", date: "2026-09-28" },
+	{ id: "depot-handed-over", label: "Depot handed over", date: "2026-11-09" },
+	{ id: "track-welding-complete", label: "Track welding complete", date: "2026-12-21" },
+	{ id: "power-on-testing", label: "Power-on testing", date: "2027-02-01" },
+	{ id: "first-test-run", label: "First test run", date: "2027-03-15" },
+	{ id: "driver-training-begins", label: "Driver training begins", date: "2027-04-26" },
+	{ id: "ticketing-system-live", label: "Ticketing system live", date: "2027-06-07" },
+	{ id: "safety-certification-granted", label: "Safety certification granted", date: "2027-07-19" },
+	{ id: "trial-operations-start", label: "Trial operations start", date: "2027-08-30" },
+	{ id: "accessibility-audit-passed", label: "Accessibility audit passed", date: "2027-10-11" },
+	{ id: "opening-ceremony", label: "Opening ceremony", date: "2027-11-22" },
+	{ id: "passenger-service-begins", label: "Passenger service begins", date: "2027-11-23" },
+	{
+		id: "timetable-expanded-to-7-minutes",
+		label: "Timetable expanded to 7 minutes",
+		date: "2028-01-10",
+	},
+	{ id: "park-and-ride-lot-opens", label: "Park-and-ride lot opens", date: "2028-03-20" },
+	{ id: "one-millionth-passenger", label: "One millionth passenger", date: "2028-05-01" },
+	{ id: "northern-extension-approved", label: "Northern extension approved", date: "2028-07-03" },
+	{ id: "first-year-review-published", label: "First-year review published", date: "2028-09-11" },
+];
+
 export const timelineScenarios: readonly TimelineScenario[] = [
 	scenario(
 		"release-milestones-timeline-v2",
@@ -240,6 +291,13 @@ export const timelineScenarios: readonly TimelineScenario[] = [
 		"Lunar Pathfinder mission timeline\n\ndate        event                    note\n2027-03-14  Launch\n2027-03-15  Trans-lunar injection\n2027-03-19  Lunar orbit insertion\n2027-03-24  First science image\n2027-04-08  Orbit lowered to 50 km\n2027-05-02  Lander separation\n2027-05-03  Touchdown                First soft landing near the south pole.\n2027-05-10  First rover drive\n2027-11-03  Primary mission ends\n2028-06-30  Extended mission ends",
 		lunarMission,
 		{ tags: ["long", "descriptions", "real-voice"], difficulty: "challenge" },
+	),
+	scenario(
+		"crosstown-tram-timeline-large",
+		"Crosstown tram project",
+		"timeline of the Crosstown tram project, all 40 milestones\n\n2024-01-15  Feasibility study starts\n2024-03-04  Public consultation opens\n2024-04-29  Consultation closes\n2024-06-10  Route options published\n2024-07-22  Preferred route chosen\n2024-09-02  Environmental survey begins\n2024-10-14  Funding bid submitted\n2024-12-09  Federal grant awarded\n2025-01-20  Design consultants hired\n2025-02-17  Station locations fixed\n2025-03-31  Land acquisition starts\n2025-05-12  Utility relocation begins\n2025-06-23  Preliminary design approved\n2025-08-04  Main contractor selected\n2025-09-15  Groundbreaking ceremony\n2025-10-27  Depot construction begins\n2025-12-08  First track section laid\n2026-01-19  Bridge foundations poured\n2026-03-02  Tunnel boring starts\n2026-04-13  First station roof completed\n2026-05-25  Signalling contract signed\n2026-07-06  Tunnel breakthrough\n2026-08-17  Overhead power lines installed\n2026-09-28  First trams delivered\n2026-11-09  Depot handed over\n2026-12-21  Track welding complete\n2027-02-01  Power-on testing\n2027-03-15  First test run\n2027-04-26  Driver training begins\n2027-06-07  Ticketing system live\n2027-07-19  Safety certification granted\n2027-08-30  Trial operations start\n2027-10-11  Accessibility audit passed\n2027-11-22  Opening ceremony\n2027-11-23  Passenger service begins\n2028-01-10  Timetable expanded to 7 minutes\n2028-03-20  Park-and-ride lot opens\n2028-05-01  One millionth passenger\n2028-07-03  Northern extension approved\n2028-09-11  First-year review published",
+		crosstownTram,
+		{ tags: ["long", "large", "real-voice"], difficulty: "challenge" },
 	),
 ];
 

@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 
 import {
 	MAX_RENDER_CANVAS_AREA,
+	MAX_RENDER_OUTPUT_DIMENSION,
 	MAX_RENDER_OUTPUT_PIXELS,
 	MAX_RENDER_FILE_BYTES,
 	PNG_EXPORT_SCALE,
@@ -11,20 +12,24 @@ import {
 } from "./render-limits.js";
 
 describe("PNG render limits", () => {
-	it("admits bounded production-sized geometry after the documented increase", () => {
+	it("admits a 60-step flowchart, about 9,000 units tall, under the raster ceiling", () => {
 		const failure = renderLimitDiagnostic([
-			{ x: 0, y: 0, width: 100, height: 100 },
-			{ x: 1_700, y: 2_600, width: 100, height: 100 },
+			{ x: 0, y: 0, width: 160, height: 60 },
+			{ x: 1_240, y: 8_940, width: 160, height: 60 },
 		]);
 		assert.isUndefined(failure);
-		assert.strictEqual(MAX_RENDER_CANVAS_AREA, 6_291_456);
+		assert.strictEqual(MAX_RENDER_CANVAS_AREA, MAX_RENDER_OUTPUT_PIXELS);
+		const scale = adaptivePngExportScale(1_440, 9_040);
+		assert.isNumber(scale);
+		if (typeof scale !== "number") return;
+		assert.isAtMost(9_040 * scale, MAX_RENDER_OUTPUT_DIMENSION);
 	});
 
 	it("measures unrotated elements by their own extent, and rotated ones by their radius", () => {
-		// A tall Gantt gridline beside a wide axis: the drawing is 2,400 × 1,800.
+		// A tall Gantt gridline beside a wide axis: the drawing is 4,000 × 4,500.
 		const tall = [
-			{ x: 0, y: 0, width: 2_400, height: 0, angle: 0 },
-			{ x: 1_200, y: 0, width: 0, height: 1_800, angle: 0 },
+			{ x: 0, y: 0, width: 4_000, height: 0, angle: 0 },
+			{ x: 2_000, y: 0, width: 0, height: 4_500, angle: 0 },
 			// An elbow route's points stay inside the drawing even past its start-to-end box.
 			{
 				x: 100,

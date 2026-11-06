@@ -12,14 +12,9 @@ const DEFAULT_ENDPOINT = "https://playground.sketchi.app/api/v1/generate";
 const DEFAULT_REPEATS = 3;
 const REQUEST_TIMEOUT_MARGIN_MS = 30_000;
 
+/** The server stops every generation at its policy's total; the probe waits a margin past it. */
 export function generationProbeRequestTimeoutMs(): number {
-	const policy = diagramGenerationPolicyDefaults;
-	const retryDelayBudgetMs = Array.from(
-		{ length: policy.maxRetries },
-		(_, retryIndex) => policy.retryDelayMs * 2 ** retryIndex,
-	).reduce((total, delayMs) => total + delayMs, 0);
-	const modelCallBudgetMs = (policy.maxRetries + 1) * policy.requestTimeoutMs + retryDelayBudgetMs;
-	return (policy.maxRepairAttempts + 1) * modelCallBudgetMs + REQUEST_TIMEOUT_MARGIN_MS;
+	return diagramGenerationPolicyDefaults.totalTimeoutMs + REQUEST_TIMEOUT_MARGIN_MS;
 }
 
 const REQUEST_TIMEOUT_MS = generationProbeRequestTimeoutMs();

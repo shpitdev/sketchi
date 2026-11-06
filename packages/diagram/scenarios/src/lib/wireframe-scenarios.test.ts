@@ -53,13 +53,14 @@ const named = (text: string) => (component: WireframeComponent) =>
 	component.text === text || component.label === text || component.title === text;
 
 describe("prompt-grounded wireframe scenarios", () => {
-	it("covers a phone form, a dense dashboard, a settings page of states and a two-column product page", () => {
+	it("covers a phone form, a dense dashboard, a settings page, a product page and two flows", () => {
 		expect(wireframeScenarios.map((entry) => entry.id)).toEqual([
 			"mobile-login-wireframe",
 			"saas-dashboard-wireframe",
 			"account-settings-wireframe",
 			"product-page-wireframe",
 			"signup-flow-wireframe",
+			"helpdesk-app-wireframe-large",
 		]);
 		expect(wireframeScenarios.map((entry) => entry.difficulty)).toContain("challenge");
 		for (const entry of wireframeScenarios) {
