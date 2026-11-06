@@ -187,3 +187,38 @@ describe("generation sends only the requested family's rules", () => {
 		expect(typed.length).toBeLessThan(system.length / 3);
 	});
 });
+
+describe("revising a diagram", () => {
+	const base = {
+		type: "flowchart",
+		id: "release-flow",
+		title: "Release approval",
+		nodes: [{ id: "start", label: "Change proposed", kind: "start" }],
+		edges: [],
+		style: { accentColor: "#000000", backgroundColor: "#ffffff" },
+	};
+
+	it("sends the current diagram and the request instead of a scenario", () => {
+		const messages = buildDiagramGenerationMessages({
+			id: "revise",
+			request: "Add a review step",
+			requestedType: "flowchart",
+			base,
+		});
+		expect(messages.system).toContain("Revision:");
+		expect(messages.system).toContain(
+			"Return the complete revised diagram, not only what changed.",
+		);
+		expect(messages.user).toContain("Current diagram:");
+		expect(messages.user).toContain('"id":"release-flow"');
+		expect(messages.user).toContain("Revision request:\nAdd a review step");
+		// The fixed palette is not content, and the example shape would compete with the diagram.
+		expect(messages.user).not.toContain("accentColor");
+		expect(messages.user).not.toContain("Expected JSON shape");
+		expect(messages.user).not.toContain("Scenario:");
+	});
+
+	it("leaves a new diagram's messages without revision rules", () => {
+		expect(system).not.toContain("Revision:");
+	});
+});

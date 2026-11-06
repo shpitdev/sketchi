@@ -67,6 +67,7 @@ describe("golden product help", () => {
 		"root",
 		"docs",
 		"generate",
+		"revise",
 		"canvas",
 		"create",
 		"show",

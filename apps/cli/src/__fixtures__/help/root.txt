@@ -11,6 +11,7 @@ WORK WITH A DIAGRAM
   list      Find past diagrams, newest first. Add words to search.
   copy      Copy a PNG to the clipboard; the newest by default.
   show      Inspect a local diagram.
+  revise    Change it with a request.
   edit      Replace its canonical document.
   export    Write PNG, Excalidraw, or scene bytes.
   share     Create an encrypted Excalidraw link.

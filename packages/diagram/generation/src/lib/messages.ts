@@ -49,6 +49,11 @@ export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPromp
 	logos: Schema.optionalKey(Schema.Array(DiagramGenerationLogo)),
 	request: Schema.String,
 	requestedType: Schema.optionalKey(DiagramGenerationTypeSchema),
+	/**
+	 * The diagram a revision starts from, as canonical diagram JSON ({ type, id, title, ... }).
+	 * The request then says what to change.
+	 */
+	base: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
 }) {}
 
 /** Provider adapters map these onto their own system and user channels. */
@@ -594,6 +599,19 @@ function logoSection(prompt: DiagramGenerationPrompt): string[] {
 	];
 }
 
+/** A revision starts from the current diagram; the request says what to change. */
+const REVISION_INSTRUCTIONS = [
+	"The scenario is a revision: the current diagram with the request applied.",
+	"Return the complete revised diagram, not only what changed. Keep diagram.id, and return the current title unless the request changes it.",
+	"Keep every element the request does not change, with its id, label, details and order. Change, add or remove only what the request asks.",
+];
+
+/** The current diagram as the model reads it: its content, without the fixed palette. */
+function baseDiagramJson(base: Readonly<Record<string, unknown>>): string {
+	const { style: _style, ...content } = base;
+	return JSON.stringify(content);
+}
+
 /**
  * A ceiling, not a target: billing counts only the tokens written, though the
  * provider's output rate limit reserves the whole ceiling while a call runs.
@@ -613,6 +631,9 @@ export function buildDiagramGenerationMessages(
 		"",
 		"Response contract:",
 		...COMMON_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
+		...(prompt.base
+			? ["", "Revision:", ...REVISION_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
+			: []),
 		// A caller that names the family gets only that family's rules; otherwise the model picks.
 		...(explicitType ? [explicitType] : DIAGRAM_TYPES).flatMap((type) => [
 			"",
@@ -621,7 +642,9 @@ export function buildDiagramGenerationMessages(
 		]),
 	].join("\n");
 	const user = [
-		"Scenario:",
+		...(prompt.base
+			? ["Current diagram:", baseDiagramJson(prompt.base), "", "Revision request:"]
+			: ["Scenario:"]),
 		prompt.request,
 		"",
 		...(explicitType
@@ -631,8 +654,9 @@ export function buildDiagramGenerationMessages(
 					"",
 				]
 			: []),
-		"Expected JSON shape (adapt the diagram to the scenario):",
-		expectedJsonShape(prompt),
+		...(prompt.base
+			? []
+			: ["Expected JSON shape (adapt the diagram to the scenario):", expectedJsonShape(prompt)]),
 		...logoSection(prompt),
 	].join("\n");
 

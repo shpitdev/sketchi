@@ -82,7 +82,7 @@ sketchi generate --prompt "Map release approval" --output json
 `--format` accepts `png`, `excalidraw`, or `scene`; their default names are
 `<id>.png`, `<id>.excalidraw`, and `<id>.scene.json`. With `--dest -`, stdout
 contains artifact bytes only and the text or JSON status envelope moves to
-stderr. Generation, Universal Canvas compilation, sharing, and pulling are the CLI's four network commands.
+stderr. Generation, revision, Universal Canvas compilation, sharing, and pulling are the CLI's five network commands.
 
 A successful generate prints the title and type, where the file went, and the id:
 
@@ -122,6 +122,25 @@ sketchi copy release    # by id or unique id prefix
 
 macOS and Windows clipboard support is unit-tested but not yet verified on
 those systems.
+
+## Revise a diagram with a request
+
+`revise` changes a stored diagram the way you describe it. It sends the diagram's
+document and your request to the same generate API, keeps the complete revised
+diagram as the record's next revision, and writes its PNG:
+
+```sh
+sketchi revise checkout --prompt "Add a fraud check before payment"
+sketchi revise latest --prompt "Rename Ship to Ship order and drop the manual review"
+sketchi revise latest --prompt "Show it as a sequence diagram" --type sequence
+```
+
+The diagram keeps its id and family unless `--type` names another, and
+everything the request doesn't mention stays as it was. `sketchi restore ID
+--revision N` brings back the earlier revision. If the diagram changes while
+the request runs, `revise` keeps that change and exits 6 instead of replacing
+it. Patched, pulled and canvas records refuse `revise`, as they refuse `edit`. `--format`, `--dest`,
+`--no-copy`, the clipboard and `--output json` work as they do for `generate`.
 
 ## Find past diagrams
 

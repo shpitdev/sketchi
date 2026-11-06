@@ -52,6 +52,7 @@ import { cliIconCatalog } from "./icon-catalog.js";
 import {
 	exportCreatedDiagram,
 	runGenerateWorkflow,
+	runReviseWorkflow,
 	type GenerateWorkflowResult,
 	type GeneratedArtifact,
 	type GenerationDestination,
@@ -121,8 +122,9 @@ import {
 const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
 
 Command map:
-  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use list to find a
-  record, show, copy, and export for every local record. Edit and patch support canonical flowchart, mindmap, and
+  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use revise to change
+  a stored diagram with a request. Use list to find a record, show, copy, and export for every
+  local record. Edit and patch support canonical flowchart, mindmap, and
   sequence records. Use create for accepted canonical JSON.
   Share and pull are explicit network
   boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
@@ -155,6 +157,7 @@ Semantic color patch example:
 
 Explicit network commands (one credential-free HTTPS request each):
   sketchi generate [--prompt TEXT] [--type ${CANONICAL_DOCUMENT_TYPES.join("|")}]
+  sketchi revise DIAGRAM_ID --prompt TEXT [--type TYPE]
   sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
@@ -164,6 +167,9 @@ Explicit network commands (one credential-free HTTPS request each):
   through the same local store as create. Without --type, the model selects a supported native type.
   Override the endpoint for preview or local testing with
   ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.
+  revise sends a stored diagram's canonical document with the request to the same endpoint and
+  keeps the complete revised document, with the same id and family unless --type names another,
+  as the record's next revision. Patched, pulled and canvas records refuse it, as they refuse edit.
   canvas submits the CanvasSpec object itself to ${DEFAULT_CANVAS_ENDPOINT}, validates the typed
   response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
   endpoint with ${SKETCHI_CANVAS_ENDPOINT_ENV} or --endpoint URL.
@@ -389,13 +395,14 @@ function clipboardRows(outcome: ClipboardOutcome): string[] {
 	}
 }
 
-function generatedArtifactText(result: GenerateCommandResult): string {
+function generatedArtifactText(result: GenerateCommandResult, revised = false): string {
 	const diagram = result.generated.diagram;
 	return [
 		headline(diagram),
 		savedRow(result.artifact),
 		...clipboardRows(result.clipboard),
 		row("Id", diagram.manifest.id),
+		...(revised ? [row("Revision", String(diagram.manifest.revision))] : []),
 		...warningLines(diagram),
 		...(result.displayHint ? hintRows(result.artifact) : []),
 	].join("\n");
@@ -441,13 +448,14 @@ function wizardDestination(destination: WizardDestination): GenerationDestinatio
 function reportGenerateOperation<E extends CliFailure, R>(
 	output: OutputFormat,
 	operation: Effect.Effect<GenerateCommandResult, E, R>,
+	command: "generate" | "revise" = "generate",
 ) {
 	return runReportedArtifact(
-		"generate",
+		command,
 		output,
 		operation,
 		(result) => result.artifact,
-		generatedArtifactText,
+		(result) => generatedArtifactText(result, command === "revise"),
 		generatedArtifactData,
 		(result) => (result.artifact.destination === "-" ? "stderr" : "stdout"),
 	);
@@ -530,7 +538,7 @@ function listText({ entries, total, searched, now }: ListResult): string {
 	].join("\n");
 }
 
-const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's four explicit network commands (generate, canvas, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
+const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's five explicit network commands (generate, revise, canvas, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Everyday wizard:
   The wizard asks only for prompt text, a diagram type (any of the ${String(CANONICAL_DOCUMENT_TYPES.length)} below; flowchart is the default),
@@ -903,6 +911,104 @@ const showCommand = Command.make(
 		{
 			command: "sketchi show release-flow --output json",
 			description: "Read a record as a stable JSON envelope.",
+		},
+	]),
+);
+
+const REVISE_HELP = `Change a stored diagram with a request, keep the change as the record's next revision, and export its PNG by default. Sketchi sends the diagram's canonical document and the request to the public Sketchi generate API in one unauthenticated HTTPS POST; the model returns the complete revised document, which keeps the diagram's id and family. Everything the request does not mention stays as it was.
+
+  --prompt TEXT says what to change: "add a fraud check before payment", "rename Ship to Ship order".
+  --type TYPE turns the diagram into another family; omit it to keep its own.
+  The earlier revision stays under revisions/ and sketchi restore brings it back. Patched, pulled
+  and canvas records refuse revise, as edit does; restore a canonical revision first.
+  --endpoint, --format, --dest, --no-copy, the clipboard, exit codes and output work as for
+  generate. Override the endpoint with ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.`;
+
+const reviseCommand = Command.make(
+	"revise",
+	{
+		diagramId: diagramIdArgument,
+		prompt: Flag.String("prompt").pipe(
+			Flag.withDescription("What to change in the diagram."),
+			Flag.withMetavar("TEXT"),
+		),
+		type: Flag.optional(
+			Flag.Literals("type", CANONICAL_DOCUMENT_TYPES).pipe(
+				Flag.withDescription("Turn the diagram into this family; omit to keep its own."),
+				Flag.withMetavar("TYPE"),
+			),
+		),
+		endpoint: Flag.String("endpoint").pipe(
+			Flag.withDefault(resolveGenerateEndpoint()),
+			Flag.withDescription(
+				"Unauthenticated generate API URL; defaults to the production Sketchi endpoint.",
+			),
+			Flag.withMetavar("URL"),
+		),
+		format: Flag.optional(
+			Flag.Literals("format", ["png", "excalidraw", "scene"]).pipe(
+				Flag.withDescription("Artifact exported after the revision; default png."),
+				Flag.withMetavar("png|excalidraw|scene"),
+			),
+		),
+		destination: Flag.optional(
+			Flag.String("dest").pipe(
+				Flag.withDescription(
+					"Artifact destination; defaults from the diagram id, or - for stdout.",
+				),
+				Flag.withMetavar("PATH|-"),
+			),
+		),
+		copy: Flag.Boolean("copy").pipe(
+			Flag.withDefault(true),
+			Flag.withDescription("Copy the PNG to the clipboard; --no-copy skips it."),
+		),
+	},
+	(input) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			const suppliedType = Option.getOrUndefined(input.type);
+			const suppliedDestination = Option.getOrUndefined(input.destination);
+			yield* reportGenerateOperation(
+				output,
+				resolveDiagramId(input.diagramId).pipe(
+					Effect.flatMap((diagramId) =>
+						runReviseWorkflow({
+							endpoint: input.endpoint,
+							diagramId,
+							prompt: input.prompt,
+							...(suppliedType ? { type: suppliedType } : {}),
+							format: Option.getOrUndefined(input.format) ?? "png",
+							destination:
+								suppliedDestination === undefined
+									? { _tag: "Default" }
+									: { _tag: "Custom", path: suppliedDestination },
+						}),
+					),
+					Effect.flatMap((result) =>
+						copyGeneratedArtifact(result.artifact, input.copy).pipe(
+							Effect.map((clipboard) => ({
+								...result,
+								clipboard,
+								displayHint: textNeedsDisplayHint(),
+							})),
+						),
+					),
+				),
+				"revise",
+			);
+		}),
+).pipe(
+	Command.withDescription(REVISE_HELP),
+	Command.withShortDescription("Change a stored diagram with a request."),
+	Command.withExamples([
+		{
+			command: 'sketchi revise checkout --prompt "Add a fraud check before payment"',
+			description: "Revise a diagram and write its new PNG.",
+		},
+		{
+			command: 'sketchi revise latest --prompt "Show it as a sequence diagram" --type sequence',
+			description: "Turn the newest diagram into another family.",
 		},
 	]),
 );
@@ -1399,6 +1505,7 @@ const exportCommand = Command.make(
 export const sketchiCommand = rootCommand.pipe(
 	Command.withSubcommands([
 		generateCommand,
+		reviseCommand,
 		canvasCommand,
 		docsCommand,
 		createCommand,

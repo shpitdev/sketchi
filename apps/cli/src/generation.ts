@@ -1,5 +1,6 @@
 import {
 	type CANONICAL_DOCUMENT_TYPES,
+	type CanonicalDiagramDocument,
 	ExcalidrawFileSchema,
 	CodeModeIssueSchema,
 	RenderedDiagramSceneSchema,
@@ -10,7 +11,7 @@ import { Effect, Schema, Result } from "effect";
 
 import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
 import { decodeCanonicalDiagramDocument, documentId, validateStorageId } from "./document.js";
-import { CliGenerationError } from "./errors.js";
+import { CliGenerationError, CliValidationError } from "./errors.js";
 import { DiagramStore } from "./storage.js";
 import {
 	GENERATE_REQUEST_TIMEOUT,
@@ -27,6 +28,15 @@ export type GenerationType = (typeof CANONICAL_DOCUMENT_TYPES)[number];
 export interface GenerateDiagramInput {
 	readonly endpoint: string;
 	readonly prompt: string;
+	readonly type?: GenerationType;
+}
+
+/** A request to change a stored diagram: the record, and what to change. */
+export interface ReviseDiagramInput {
+	readonly endpoint: string;
+	readonly diagramId: string;
+	readonly prompt: string;
+	/** Another family to turn the diagram into; omit to keep its own. */
 	readonly type?: GenerationType;
 }
 
@@ -187,7 +197,11 @@ function decodeExcalidraw(value: unknown): Effect.Effect<ExcalidrawFile, CliGene
 }
 
 const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
-	function* (input: GenerateDiagramInput) {
+	function* (
+		input: GenerateDiagramInput & {
+			readonly base?: { readonly document: CanonicalDiagramDocument; readonly id: string };
+		},
+	) {
 		const response = yield* Effect.tryPromise({
 			try: (signal) =>
 				globalThis.fetch(input.endpoint, {
@@ -199,6 +213,16 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
 					body: JSON.stringify({
 						prompt: input.prompt,
 						...(input.type ? { type: input.type } : {}),
+						// The API keeps a revision on the base's explicit id, so the base always names
+						// the stored record's id, even for a record made without one.
+						...(input.base
+							? {
+									base: {
+										type: input.base.document.type,
+										spec: { ...input.base.document.spec, id: input.base.id },
+									},
+								}
+							: {}),
 					}),
 					signal,
 				}),
@@ -263,5 +287,68 @@ export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
 		...(response.attempts === undefined ? {} : { attempts: response.attempts }),
 		...(response.durationMs === undefined ? {} : { durationMs: response.durationMs }),
 		...(response.outputTokens === undefined ? {} : { outputTokens: response.outputTokens }),
+	} satisfies GenerateDiagramResult;
+});
+
+function notRevisable(diagramId: string): CliValidationError {
+	return CliValidationError.make({
+		message: `Diagram "${diagramId}" was patched or restored from a drawing, so it has no document to revise.`,
+		hint: "Restore a canonical revision with sketchi restore, or change the drawing with sketchi patch.",
+		details: ["authority"],
+	});
+}
+
+/**
+ * Send a stored diagram's document with a request to change it, and keep the result as the
+ * record's next revision. The generate API returns the complete revised document with the same id.
+ */
+export const reviseDiagram = Effect.fn("sketchi.cli.revise")(function* (input: ReviseDiagramInput) {
+	const store = yield* DiagramStore;
+	const current = yield* store.show(input.diagramId);
+	const id = current.manifest.id;
+	if (current.authority !== "canonical") {
+		return yield* notRevisable(input.diagramId);
+	}
+	const stored = current.document;
+	if (stored.type === "canvas") {
+		return yield* CliValidationError.make({
+			message: `Diagram "${input.diagramId}" is a hand-placed canvas, which generate does not make.`,
+			hint: "Change a canvas with sketchi edit or sketchi patch.",
+			details: ["document.type"],
+		});
+	}
+	const response = yield* requestGeneration({
+		endpoint: input.endpoint,
+		prompt: input.prompt,
+		...(input.type ? { type: input.type } : {}),
+		base: { document: stored, id },
+	});
+	const document = yield* decodeCanonicalDiagramDocument(response.document).pipe(
+		Effect.mapError(() => invalidGeneratedDocument()),
+	);
+	if (documentId(document) !== id) {
+		return yield* invalidGeneratedDocument();
+	}
+	const scene = yield* decodeScene(response.scene);
+	const excalidraw = yield* decodeExcalidraw(response.excalidraw);
+	// Commit only on top of the revision the request was based on, so a change made while the
+	// model ran is never silently undone.
+	const diagram = yield* store.edit(
+		id,
+		{
+			id,
+			warnings: response.issues.filter((entry) => entry.severity === "warning"),
+			type: document.type,
+			title: document.spec.title,
+			document,
+			scene,
+			excalidraw,
+		},
+		current.manifest.revision,
+	);
+	return {
+		diagram,
+		model: response.model,
+		provider: response.provider,
 	} satisfies GenerateDiagramResult;
 });

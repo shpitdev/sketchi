@@ -1,8 +1,9 @@
 Sketchi CLI contracts for agents and automation.
 
 Command map:
-  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use list to find a
-  record, show, copy, and export for every local record. Edit and patch support canonical flowchart, mindmap, and
+  Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use revise to change
+  a stored diagram with a request. Use list to find a record, show, copy, and export for every
+  local record. Edit and patch support canonical flowchart, mindmap, and
   sequence records. Use create for accepted canonical JSON.
   Share and pull are explicit network
   boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
@@ -35,6 +36,7 @@ Semantic color patch example:
 
 Explicit network commands (one credential-free HTTPS request each):
   sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|timeline|chart|state-machine|gantt|er|class|org-chart|venn|journey|sankey|wireframe|quadrant]
+  sketchi revise DIAGRAM_ID --prompt TEXT [--type TYPE]
   sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
   sketchi share DIAGRAM_ID [--open]
   sketchi pull DIAGRAM_ID --link URL|-
@@ -44,6 +46,9 @@ Explicit network commands (one credential-free HTTPS request each):
   through the same local store as create. Without --type, the model selects a supported native type.
   Override the endpoint for preview or local testing with
   SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
+  revise sends a stored diagram's canonical document with the request to the same endpoint and
+  keeps the complete revised document, with the same id and family unless --type names another,
+  as the record's next revision. Patched, pulled and canvas records refuse it, as they refuse edit.
   canvas submits the CanvasSpec object itself to https://playground.sketchi.app/api/v1/canvases/create, validates the typed
   response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
   endpoint with SKETCHI_CANVAS_ENDPOINT or --endpoint URL.

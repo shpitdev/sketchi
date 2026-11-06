@@ -1,0 +1,38 @@
+DESCRIPTION
+  Change a stored diagram with a request, keep the change as the record's next revision, and export its PNG by default. Sketchi sends the diagram's canonical document and the request to the public Sketchi generate API in one unauthenticated HTTPS POST; the model returns the complete revised document, which keeps the diagram's id and family. Everything the request does not mention stays as it was.
+
+  --prompt TEXT says what to change: "add a fraud check before payment", "rename Ship to Ship order".
+  --type TYPE turns the diagram into another family; omit it to keep its own.
+  The earlier revision stays under revisions/ and sketchi restore brings it back. Patched, pulled
+  and canvas records refuse revise, as edit does; restore a canonical revision first.
+  --endpoint, --format, --dest, --no-copy, the clipboard, exit codes and output work as for
+  generate. Override the endpoint with SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
+
+USAGE
+  sketchi revise [flags] <diagram-id>
+
+ARGUMENTS
+  diagram-id string    A stored id, a unique prefix of one, or latest for the newest.
+
+FLAGS
+  --prompt TEXT                    What to change in the diagram.
+  --type TYPE                      Turn the diagram into this family; omit to keep its own. (choices: flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, quadrant)
+  --endpoint URL                   Unauthenticated generate API URL; defaults to the production Sketchi endpoint.
+  --format png|excalidraw|scene    Artifact exported after the revision; default png. (choices: png, excalidraw, scene)
+  --dest PATH|-                    Artifact destination; defaults from the diagram id, or - for stdout.
+  --copy                           Copy the PNG to the clipboard; --no-copy skips it.
+
+INHERITED FLAGS
+  --output text|json    Result presentation format. (choices: text, json)
+
+GLOBAL FLAGS
+  --help, -h                                          Show help information
+  --version, -v                                       Show version information
+  --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+
+EXAMPLES
+  # Revise a diagram and write its new PNG.
+  sketchi revise checkout --prompt "Add a fraud check before payment"
+
+  # Turn the newest diagram into another family.
+  sketchi revise latest --prompt "Show it as a sequence diagram" --type sequence

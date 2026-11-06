@@ -2,6 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import {
 	type BuildFlowchartOptions,
+	CANONICAL_DOCUMENT_SPECS,
 	type CanonicalBuildResult,
 	type CodeModeIssue,
 	type CanonicalDiagramDocument,
@@ -16,7 +17,7 @@ import {
 	WRONG_DIAGRAM_TYPE_ERROR,
 } from "@sketchi/diagram-generation";
 import { withTelemetryCorrelation } from "@sketchi/observability";
-import { Effect, Result } from "effect";
+import { Effect, Result, Schema } from "effect";
 
 import { resultHttpStatus } from "../runtime/http-status.server";
 import { readBoundedJson } from "../runtime/request-body.server";
@@ -30,7 +31,7 @@ import {
 	PlaygroundCodeModeUsage,
 } from "../codemode/usage-events.server";
 import { PlaygroundBindings, PlaygroundClock } from "../runtime/context.server";
-import { decodeGenerateRequest, GENERATE_REQUEST_COPY } from "./request";
+import { decodeGenerateRequest, GENERATE_REQUEST_COPY, type GenerateBaseSchema } from "./request";
 import { PlaygroundGeneration } from "./service.server";
 
 // Room for a pasted roster, DDL schema or task list of the largest diagrams the
@@ -259,6 +260,24 @@ function inlineArtifact(artifact: BuiltArtifact, format: "scene" | "excalidraw")
 	return ref?.inline;
 }
 
+/**
+ * The stored document a revision starts from, as the canonical diagram JSON the model reads, or
+ * undefined when its spec is not a valid document of its type.
+ */
+function baseDiagram(
+	base: typeof GenerateBaseSchema.Type,
+): { readonly diagram: Readonly<Record<string, unknown>>; readonly id?: string } | undefined {
+	const decoded = Schema.decodeUnknownResult(CANONICAL_DOCUMENT_SPECS[base.type])(base.spec);
+	if (Result.isFailure(decoded) || typeof base.spec !== "object" || base.spec === null) {
+		return undefined;
+	}
+	const spec = base.spec as Readonly<Record<string, unknown>>;
+	return {
+		diagram: { type: base.type, ...spec },
+		...(typeof spec["id"] === "string" ? { id: spec["id"] } : {}),
+	};
+}
+
 /** Build a generated document with its family's Code Mode operation. */
 function buildWithCodeMode(
 	codeMode: PlaygroundCodeModeShape,
@@ -401,11 +420,28 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 			]),
 		);
 	}
+	const base = input.base === undefined ? undefined : baseDiagram(input.base);
+	if (input.base !== undefined && base === undefined) {
+		return yield* finish(
+			rawBody,
+			failure("invalid_input", [
+				issue(
+					"invalid_base",
+					"input",
+					GENERATE_REQUEST_COPY.invalidBase,
+					GENERATE_REQUEST_COPY.requestValidBase,
+				),
+			]),
+		);
+	}
+	// A revision keeps its family unless the caller names another.
+	const requestedType = input.type ?? input.base?.type;
 	const generationInput = {
 		...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
 		prompt,
-		...(input.type ? { type: input.type } : {}),
+		...(requestedType ? { type: requestedType } : {}),
 		...(model ? { model } : {}),
+		...(base ? { base: base.diagram } : {}),
 	};
 
 	const candidateResult = yield* withTelemetryCorrelation(generation.generate(generationInput), {
@@ -440,14 +476,14 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 				]),
 		);
 	}
-	if (input.type && candidate.diagram.type !== input.type) {
+	if (requestedType && candidate.diagram.type !== requestedType) {
 		return yield* finish(
 			generationInput,
 			failure("invalid_generated_document", [
 				issue(
 					"invalid_generated_document",
 					"generation",
-					`The generation provider returned a ${candidate.diagram.type} for a ${input.type} request.`,
+					`The generation provider returned a ${candidate.diagram.type} for a ${requestedType} request.`,
 					"Retry once; if it persists, rephrase the prompt.",
 				),
 			]),
@@ -455,7 +491,10 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 	}
 	const type: DiagramGenerationType = candidate.diagram.type;
 
-	const document = canonicalDocumentFromDiagram(candidate.diagram);
+	// A revised diagram keeps the id of the record it replaces.
+	const document = canonicalDocumentFromDiagram(
+		base?.id === undefined ? candidate.diagram : { ...candidate.diagram, id: base.id },
+	);
 	const spec = document.spec;
 	const buildResult: BuildResult = yield* Effect.gen(function* () {
 		return yield* buildWithCodeMode(codeMode, document, {

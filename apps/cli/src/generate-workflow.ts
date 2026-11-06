@@ -8,6 +8,8 @@ import {
 	generateDiagram,
 	type GenerateDiagramInput,
 	type GenerateDiagramResult,
+	reviseDiagram,
+	type ReviseDiagramInput,
 } from "./generation.js";
 import { LocalFileSystem } from "./filesystem.js";
 import { CliExportError, type CliFilesystemError, type CliStorageError } from "./errors.js";
@@ -135,6 +137,24 @@ export const runGenerateWorkflow = Effect.fn("sketchi.cli.generateWorkflow")(fun
 	input: GenerateWorkflowInput,
 ) {
 	const generated = yield* generateDiagram(input);
+	const artifact = yield* exportCreatedDiagram(generated.diagram, input.format, input.destination);
+
+	return {
+		generated,
+		artifact,
+	} satisfies GenerateWorkflowResult;
+});
+
+export interface ReviseWorkflowInput extends ReviseDiagramInput {
+	readonly format: DiagramFormat;
+	readonly destination: GenerationDestination;
+}
+
+/** Revise a stored diagram with a request, then export its new revision. */
+export const runReviseWorkflow = Effect.fn("sketchi.cli.reviseWorkflow")(function* (
+	input: ReviseWorkflowInput,
+) {
+	const generated = yield* reviseDiagram(input);
 	const artifact = yield* exportCreatedDiagram(generated.diagram, input.format, input.destination);
 
 	return {
