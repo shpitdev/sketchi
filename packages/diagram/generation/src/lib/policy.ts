@@ -16,6 +16,7 @@ import {
 	generationErrorToCandidate,
 	isRetryableGenerationError,
 } from "./errors.js";
+import { withFamilyRoute } from "./routing.js";
 import { checkRequestCoverage, type CoverageIssue, keepsStatedStructure } from "./coverage.js";
 
 const generationAttempts = Metric.counter("sketchi_generation_attempts", {
@@ -104,11 +105,18 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 		prepareAttempt: (
 			request: DiagramGenerationRequest,
 		) => Effect.Effect<DiagramGenerationCandidate, DiagramGenerationError>,
-		request: DiagramGenerationRequest,
+		input: DiagramGenerationRequest,
 		provider: DiagramGenerationProviderId,
 		policy: DiagramGenerationPolicyConfig,
 	) {
 		const startedAt = yield* Clock.currentTimeMillis;
+		const routed = withFamilyRoute(input);
+		const request = routed.request;
+		yield* Effect.annotateCurrentSpan({
+			family_route: request.prompt.routedType
+				? `${routed.route?.cue ?? "named"}:${request.prompt.routedType}`
+				: "none",
+		});
 		const deadline = startedAt + policy.totalTimeoutMs;
 		const requestTimeout = () =>
 			DiagramGenerationTimeoutError.make({

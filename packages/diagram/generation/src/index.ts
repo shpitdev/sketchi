@@ -14,4 +14,5 @@ export * from "./lib/messages.js";
 export * from "./lib/mindmap-tree.js";
 export * from "./lib/models.js";
 export * from "./lib/policy.js";
+export * from "./lib/routing.js";
 export * from "./lib/styling.js";

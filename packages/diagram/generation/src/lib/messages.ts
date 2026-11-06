@@ -51,6 +51,11 @@ export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPromp
 	request: Schema.String,
 	requestedType: Schema.optionalKey(DiagramGenerationTypeSchema),
 	/**
+	 * The one family an untyped request names (see routeDiagramFamilies). Its prompt is built as
+	 * for that type, without requiring it: the model still sets diagram.type.
+	 */
+	routedType: Schema.optionalKey(DiagramGenerationTypeSchema),
+	/**
 	 * The diagram a revision starts from, as canonical diagram JSON ({ type, id, title, ... }).
 	 * The request then says what to change.
 	 */
@@ -425,8 +430,14 @@ const FAMILY_EXAMPLES: Partial<Readonly<Record<DiagramTypeValue, { readonly diag
 	},
 };
 
+/** The family a prompt is built for: the caller's type, or the one an untyped request names. */
+export function promptFamily(prompt: DiagramGenerationPrompt): DiagramTypeValue | undefined {
+	return prompt.requestedType ?? prompt.routedType;
+}
+
 function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
-	const curated = prompt.requestedType ? CURATED_EXAMPLES[prompt.requestedType] : undefined;
+	const family = promptFamily(prompt);
+	const curated = family ? CURATED_EXAMPLES[family] : undefined;
 	if (curated) {
 		return [
 			"Worked example: a different request and a correct answer. Follow its approach; draw only what the scenario states.",
@@ -434,7 +445,7 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 			`Answer: ${curated.answer}`,
 		].join("\n");
 	}
-	const shape = prompt.requestedType ? FAMILY_EXAMPLES[prompt.requestedType] : undefined;
+	const shape = family ? FAMILY_EXAMPLES[family] : undefined;
 	if (!shape) {
 		const supportedExample = {
 			title: "Release approval",
@@ -473,11 +484,12 @@ const LOGO_TARGETS = {
 
 function logoSection(prompt: DiagramGenerationPrompt): string[] {
 	const logos = prompt.logos ?? [];
+	const family = promptFamily(prompt);
 	const targets =
-		prompt.requestedType === undefined
+		family === undefined
 			? Object.values(LOGO_TARGETS)
-			: prompt.requestedType === "flowchart" || prompt.requestedType === "sequence"
-				? [LOGO_TARGETS[prompt.requestedType]]
+			: family === "flowchart" || family === "sequence"
+				? [LOGO_TARGETS[family]]
 				: [];
 	if (logos.length === 0 || targets.length === 0) {
 		return [];
@@ -529,24 +541,25 @@ export function buildDiagramGenerationMessages(
 	prompt: DiagramGenerationPrompt,
 ): DiagramGenerationMessages {
 	const explicitType = prompt.requestedType;
+	const family = promptFamily(prompt);
 	const system = [
 		"You are creating one typed Sketchi generation response.",
 		"",
 		"Response contract:",
 		...COMMON_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
-		...(explicitType ? ONE_FAMILY_INSTRUCTIONS.map((instruction) => `- ${instruction}`) : []),
+		...(family ? ONE_FAMILY_INSTRUCTIONS.map((instruction) => `- ${instruction}`) : []),
 		...(prompt.base
 			? ["", "Revision:", ...REVISION_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
 			: []),
 		...(prompt.styling
 			? ["", "Styling:", ...STYLING_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
 			: []),
-		// A caller that names the family gets only that family's rules; otherwise the model picks.
-		...(explicitType ? [explicitType] : DIAGRAM_TYPES).flatMap((type) => [
+		// A request whose family is known gets only that family's rules; otherwise the model picks.
+		...(family ? [family] : DIAGRAM_TYPES).flatMap((type) => [
 			"",
 			`${IR_INSTRUCTIONS[type].title}:`,
 			...IR_INSTRUCTIONS[type].rules.map((instruction) => `- ${instruction}`),
-			...(explicitType && type === "quadrant" ? [`- ${QUADRANT_RULES.usualNames(SOURCE)}`] : []),
+			...(family && type === "quadrant" ? [`- ${QUADRANT_RULES.usualNames(SOURCE)}`] : []),
 		]),
 	].join("\n");
 	const user = [
