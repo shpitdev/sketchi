@@ -10821,14 +10821,30 @@ export function renderGraphDiagram(
 			counts!.some((count, index) => count < currentCounts![index]!)
 		);
 	};
-	const consider = (arrangement: Arrangement, fewerCrossings: boolean, cleanerOnly = false) => {
+	// A flow too long to read pays for its length, which no crossing or finding
+	// outweighs one for one: a layout that brings it within a readable aspect
+	// also routes no worse when it draws no more flaws in all, its crossings
+	// and reader findings together, than the long one.
+	const flawCount = (layout: DiagramLayout) =>
+		routed(layout, false).reduce((sum, count) => sum + count, 0);
+	const readsWhole = (layout: DiagramLayout, current: DiagramLayout) =>
+		lengthOf(current).tooLong &&
+		!lengthOf(layout).tooLong &&
+		flawCount(layout) <= flawCount(current);
+	const consider = (
+		arrangement: Arrangement,
+		fewerCrossings: boolean,
+		cleanerOnly = false,
+		readable = false,
+	) => {
 		const layout = layoutDiagram(diagram, levels[0]!, arrangement);
 		const defects = defectsOf(layout);
 		if (
 			!fewer(best.defects, defects) &&
 			(cleanerOnly
 				? cleaner(layout, best.layout, false)
-				: routesNoWorse(layout, best.layout, fewerCrossings, false))
+				: routesNoWorse(layout, best.layout, fewerCrossings, false) ||
+					(readable && readsWhole(layout, best.layout)))
 		)
 			best = { arrangement, defects, layout };
 		return layout;
@@ -10895,7 +10911,12 @@ export function renderGraphDiagram(
 			? [true, false]
 			: [best.arrangement.crossingRepair]) {
 			if (next.continuations.size === 0 || best.arrangement.wrap === next) break;
-			tried = consider({ ...best.arrangement, crossingRepair, wrap: next }, false, cleanerOnly);
+			tried = consider(
+				{ ...best.arrangement, crossingRepair, wrap: next },
+				false,
+				cleanerOnly,
+				!cleanerOnly,
+			);
 		}
 		return tried;
 	};
