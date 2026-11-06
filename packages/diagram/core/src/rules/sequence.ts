@@ -9,6 +9,8 @@ export const SEQUENCE_RULES = {
 	replies: (source: RuleSource) =>
 		`Every reply ${source} states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them.`,
 	fireAndForget: "Leave fire-and-forget events unanswered.",
+	keepOrder: (source: RuleSource) =>
+		`Keep ${source}'s message order exactly, even where another order seems more natural.`,
 	activation:
 		'A message with type "return" from the callee back to its caller answers the latest open call between them; Sketchi draws the callee\'s activation bar from that call to its return, nesting re-entrant calls. Calls nobody answers draw no bar.',
 	selfStep:

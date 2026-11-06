@@ -803,6 +803,7 @@ export const catalog: CatalogEntry[] = [
 				CLASS_RULES.multiplicities,
 				CLASS_RULES.hierarchy,
 				CLASS_RULES.typedFields(PROMPT),
+				CLASS_RULES.onlyStated(PROMPT),
 			].join(" "),
 			CLASS_RULES.copy(PROMPT),
 			operationTypes("buildClassDiagram"),

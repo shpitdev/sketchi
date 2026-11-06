@@ -4,7 +4,7 @@ import type { RuleSource } from "./source.js";
 export const WIREFRAME_RULES = {
 	readingOrder: "Every component sits under a screen's children, in reading order.",
 	containers: (source: RuleSource) =>
-		`Containers hold children: header (top), footer (holds whatever ${source} puts at the bottom), sidebar (side: left or right), main, section, card and modal (title?), grid (columns: n), row and column.`,
+		`Containers hold children: header (top), footer (bottom), sidebar (side: left or right), main, section, card and modal (title?), grid (columns: n), row and column. Content ${source} places at the bottom of a screen goes in its footer, even a single line.`,
 	rows: 'A row sets its children side by side and wraps them; align spreads them ("between"), centers or ends them.',
 	sizing: "Rows and grids keep containers one height, buttons hug their text and fields stretch.",
 	widgets:

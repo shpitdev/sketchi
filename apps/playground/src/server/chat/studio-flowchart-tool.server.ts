@@ -47,7 +47,7 @@ export function studioSystemPrompt(
 		`- Logos for technologies the user named: ${logos
 			.map((logo) => `${logo.slug} (${logo.name})`)
 			.join(", ")}.`,
-		'- When a flowchart node or sequence participant is about one of these technologies, set its icon to { "slug": "<slug>" } with a slug from this list exactly. Leave icon off every other node and participant. Never invent a slug.',
+		`- When a flowchart node or sequence participant is about one of these technologies, set its icon to { "slug": "<slug>" } with a slug from this list exactly, and keep the technology's name in its label. Leave icon off every other node and participant. Never invent a slug.`,
 	].join("\n");
 }
 

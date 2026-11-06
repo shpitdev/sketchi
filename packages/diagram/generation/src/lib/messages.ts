@@ -86,9 +86,10 @@ const FLOWCHART_IR_INSTRUCTIONS = [
 	FLOWCHART_RULES.technologyLabels,
 	FLOWCHART_RULES.noBranchBorrowing(SCENARIO),
 	FLOWCHART_RULES.statedEnd(SCENARIO),
+	FLOWCHART_RULES.branchNames(SCENARIO),
 	FLOWCHART_RULES.decisionEdges,
 	FLOWCHART_RULES.backEdges,
-	FLOWCHART_RULES.groups(SCENARIO),
+	`${FLOWCHART_RULES.groups(SCENARIO)} ${FLOWCHART_RULES.zonesOutside}`,
 	FLOWCHART_RULES.lanes(SCENARIO),
 	[
 		FLOWCHART_RULES.limits,
@@ -112,7 +113,7 @@ const SEQUENCE_IR_INSTRUCTIONS = [
 	"Return chronological messages with stable ids, participant source and target ids, and concise labels.",
 	SEQUENCE_RULES.messageTypes,
 	`${SEQUENCE_RULES.replies(SCENARIO)} ${SEQUENCE_RULES.fireAndForget}`,
-	SEQUENCE_RULES.selfStep,
+	`${SEQUENCE_RULES.keepOrder(SCENARIO)} ${SEQUENCE_RULES.selfStep}`,
 	`Use ${SEQUENCE_RULES.limits}.`,
 ];
 
@@ -184,7 +185,7 @@ const IR_INSTRUCTIONS = {
 			CLASS_RULES.members,
 			`Return relationships: [{ id, kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }]. ${CLASS_RULES.relationships}`,
 			`${CLASS_RULES.multiplicities} ${CLASS_RULES.hierarchy}`,
-			CLASS_RULES.typedFields(SOURCE),
+			`${CLASS_RULES.typedFields(SOURCE)} ${CLASS_RULES.onlyStated(SOURCE)}`,
 		],
 	},
 	"org-chart": {
@@ -589,7 +590,7 @@ function logoSection(prompt: DiagramGenerationPrompt): string[] {
 			(logo) =>
 				`- ${logo.slug}: ${logo.name}${logo.aliases?.length ? ` (also ${logo.aliases.join(", ")})` : ""}`,
 		),
-		`A ${element} about one of these technologies may set "icon": { "slug": "<slug>" } using a slug from this list exactly. Put each logo on the ${owner} whose label names that technology. Omit icon on every other ${owner}. Never invent a slug.`,
+		`A ${element} about one of these technologies may set "icon": { "slug": "<slug>" } using a slug from this list exactly. Put each logo on the ${owner} whose label names that technology, and keep that name in the label. Omit icon on every other ${owner}. Never invent a slug.`,
 	];
 }
 

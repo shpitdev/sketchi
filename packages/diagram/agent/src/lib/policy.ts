@@ -40,7 +40,7 @@ const FAMILY_TOOLS = [
 	`- build_state_machine with { spec: StateMachineSpec } for states and the events that move between them: lifecycles, modes, protocols with states. Give initial, states with id and label, and transitions with source, target and optional event, guard and action. ${rules(STATE_MACHINE_RULES.initial, STATE_MACHINE_RULES.label, STATE_MACHINE_RULES.kinds(USER), STATE_MACHINE_RULES.composite, STATE_MACHINE_RULES.transitions, STATE_MACHINE_RULES.reachable, STATE_MACHINE_RULES.endsLifecycle)} Set layout { direction: "LR" | "TB" } only when the user states one. ${STATE_MACHINE_RULES.layout}`,
 	`- build_gantt with { spec: GanttSpec } for scheduled work: tasks with dates or durations, dependencies and milestones. ${rules(GANTT_RULES.tasks, GANTT_RULES.duration, GANTT_RULES.optional(USER), GANTT_RULES.limits, GANTT_RULES.copy(USER))}`,
 	`- build_er_diagram with { spec: ErSpec } for database schemas and entity relationships: entities (tables) with fields and keys, and the relationships between them. ${rules(ER_RULES.fields, ER_RULES.ids, ER_RULES.direction(USER), ER_RULES.cardinalities, ER_RULES.cardinalityFromKeys(USER), ER_RULES.example, ER_RULES.copy(USER))} The host lays out tables and crow's-foot lines.`,
-	`- build_class_diagram with { spec: ClassSpec } for UML class diagrams and object-oriented designs: classes, interfaces and enums with their members, and the relationships between them. ${rules(CLASS_RULES.members, CLASS_RULES.kinds, CLASS_RULES.stereotype(USER), CLASS_RULES.relationships, CLASS_RULES.multiplicities, CLASS_RULES.hierarchy, CLASS_RULES.typedFields(USER), CLASS_RULES.copy(USER))} The host lays out the boxes, hierarchy and lines.`,
+	`- build_class_diagram with { spec: ClassSpec } for UML class diagrams and object-oriented designs: classes, interfaces and enums with their members, and the relationships between them. ${rules(CLASS_RULES.members, CLASS_RULES.kinds, CLASS_RULES.stereotype(USER), CLASS_RULES.relationships, CLASS_RULES.multiplicities, CLASS_RULES.hierarchy, CLASS_RULES.typedFields(USER), CLASS_RULES.onlyStated(USER), CLASS_RULES.copy(USER))} The host lays out the boxes, hierarchy and lines.`,
 	`- build_org_chart with { spec: OrgChartSpec } for org charts and team structures: who reports to whom. Give each person an id, name, title and department as stated. ${rules(ORG_CHART_RULES.manager(USER), ORG_CHART_RULES.noCycles, ORG_CHART_RULES.assistant, ORG_CHART_RULES.avatar, ORG_CHART_RULES.dottedLines(USER), ORG_CHART_RULES.groupOnlyWhenAsked(USER), ORG_CHART_RULES.copy(USER))} The host lays out the tree, stacking long lists of reports.`,
 	`- build_venn_diagram with { spec: VennSpec } for Venn diagrams: what two or three overlapping sets share. Give sets: [{ id, label }] and regions: [{ sets: [ids], items }]. ${rules(VENN_RULES.regions, VENN_RULES.contents(USER), VENN_RULES.colorWhenStated(USER), VENN_RULES.copy(USER))} The host lays out the circles and fits each region's text.`,
 	`- build_journey_map with { spec: JourneySpec } for user and customer journey maps: stages of steps with how each feels. ${rules(JOURNEY_RULES.stages(USER), JOURNEY_RULES.score, JOURNEY_RULES.actors(USER), JOURNEY_RULES.notes(USER), JOURNEY_RULES.copy(USER))} The host draws the stages, cards and emotion curve.`,
@@ -52,9 +52,9 @@ const FAMILY_TOOLS = [
 const FLOWCHART_CRAFT = [
 	`- Node ids: short kebab-case. ${rules(FLOWCHART_RULES.labelWords(USER), FLOWCHART_RULES.labelForm)}`,
 	`- ${FLOWCHART_RULES.singleStart} Use "decision" for branch points and "process" for every other step. ${FLOWCHART_RULES.technologyLabels}`,
-	`- ${rules(FLOWCHART_RULES.decisionEdges, FLOWCHART_RULES.reachable, FLOWCHART_RULES.backEdges)}`,
+	`- ${rules(FLOWCHART_RULES.decisionEdges, FLOWCHART_RULES.branchNames(USER), FLOWCHART_RULES.noBranchBorrowing(USER), FLOWCHART_RULES.reachable, FLOWCHART_RULES.backEdges)}`,
 	`- ${rules(FLOWCHART_RULES.limits, FLOWCHART_RULES.direction(USER))}`,
-	`- ${rules(FLOWCHART_RULES.groups(USER))}`,
+	`- ${rules(FLOWCHART_RULES.groups(USER), FLOWCHART_RULES.zonesOutside)}`,
 	`- ${FLOWCHART_RULES.lanes(USER)}`,
 	"- Tool-call hygiene: every field is its own clean string. Node and edge ids must be unique, and every edge source/target must exactly equal an existing node id.",
 ];
@@ -62,7 +62,7 @@ const FLOWCHART_CRAFT = [
 const SEQUENCE_CRAFT = [
 	'- Participants: short kebab-case ids, ordered left to right as they first act. Labels name the actor or system ("Browser", "Auth service").',
 	'- Messages: chronological, one row each; the label says what is sent ("POST /login", "Session token"), 6 words max.',
-	`- ${rules(SEQUENCE_RULES.replies(USER), SEQUENCE_RULES.fireAndForget, SEQUENCE_RULES.selfStep)}`,
+	`- ${rules(SEQUENCE_RULES.replies(USER), SEQUENCE_RULES.fireAndForget, SEQUENCE_RULES.keepOrder(USER), SEQUENCE_RULES.selfStep)}`,
 	`- Use ${SEQUENCE_RULES.limits}.`,
 ];
 
