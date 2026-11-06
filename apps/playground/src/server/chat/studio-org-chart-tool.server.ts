@@ -11,7 +11,7 @@ import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-buil
 
 export const STUDIO_BUILD_ORG_CHART_TOOL_NAME = "build_org_chart" as const;
 export const STUDIO_BUILD_ORG_CHART_TOOL_DESCRIPTION =
-	"Build and persist a native org chart: one card per person with their name, title and department, each manager above the reports they lead, long lists of reports stacked in columns, assistants beside their manager, and dotted-line (matrix) reports dashed. Give each person an id, name and manager (the id they report to; only the top person has none), with optional title, department, assistant: true and avatar: true; add dottedLines: [{ report, manager }] for secondary reports and groupByDepartment: true for department regions. The host lays out the chart. Repair structured issues, up to three total attempts.";
+	"Build and persist a native org chart: one card per person with their name, title and department, each manager above the reports they lead, long lists of reports stacked in columns, assistants beside their manager, and dotted-line (matrix) reports dashed. Give each person an id, name and manager, with optional title, department, assistant: true and avatar: true; add dottedLines: [{ report, manager }] for secondary reports and groupByDepartment: true for department regions. The host lays out the chart. Repair structured issues, up to three total attempts.";
 export const StudioBuildOrgChartInputSchema = toPlaygroundStandardSchema(
 	BuildOrgChartToolInputSchema,
 );

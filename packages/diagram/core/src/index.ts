@@ -42,3 +42,4 @@ export * from "./sankey-fixtures.js";
 export * from "./types/wireframe.js";
 export * from "./wireframe-fixtures.js";
 export * from "./types/quadrant.js";
+export * from "./rules/index.js";

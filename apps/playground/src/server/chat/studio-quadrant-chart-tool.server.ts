@@ -11,7 +11,7 @@ import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-buil
 
 export const STUDIO_BUILD_QUADRANT_CHART_TOOL_NAME = "build_quadrant_chart" as const;
 export const STUDIO_BUILD_QUADRANT_CHART_TOOL_DESCRIPTION =
-	"Build and persist a native quadrant chart: a square plot split into four tinted, named quadrants, axis arrows carrying their end labels, and each item as a dot at its scores with its label beside it. Give xAxis and yAxis { title, low, high }, quadrants { topLeft, topRight, bottomLeft, bottomRight }, and points [{ label, x, y, group? }] with x and y from 0 (low end) to 1 (high end). The host places every dot and label. Repair structured issues, up to three total attempts.";
+	"Build and persist a native quadrant chart: a square plot split into four tinted, named quadrants, axis arrows carrying their end labels, and each item as a dot at its scores with its label beside it. Give xAxis and yAxis { title, low, high }, quadrants { topLeft, topRight, bottomLeft, bottomRight }, and points [{ label, x, y, group? }]. The host places every dot and label. Repair structured issues, up to three total attempts.";
 export const StudioBuildQuadrantChartInputSchema = toPlaygroundStandardSchema(
 	BuildQuadrantChartToolInputSchema,
 );

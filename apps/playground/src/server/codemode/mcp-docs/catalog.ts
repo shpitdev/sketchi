@@ -1,10 +1,23 @@
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import {
+	CHART_RULES,
+	CLASS_RULES,
+	ER_RULES,
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
-	SEQUENCE_MAX_MESSAGES,
-	SEQUENCE_MAX_PARTICIPANTS,
+	FLOWCHART_RULES,
+	GANTT_RULES,
+	JOURNEY_RULES,
+	MINDMAP_RULES,
+	ORG_CHART_RULES,
+	QUADRANT_RULES,
+	SANKEY_RULES,
+	SEQUENCE_RULES,
+	STATE_MACHINE_RULES,
+	TIMELINE_RULES,
+	VENN_RULES,
+	WIREFRAME_RULES,
 } from "@sketchi/diagram-core";
 import SKETCHI_CODE_MODE_TYPES from "./code-mode-types.generated.txt?raw";
 import type { CodeModeOperation } from "./types";
@@ -61,46 +74,13 @@ const operationIndex = (buildersHeading: string) =>
 const OPERATION_INDEX = operationIndex(
 	'Builders. Before the first call, read docs({ topic: "<builder>" }) for its request type, rules and example:',
 );
-/** Shared by the buildChart topic and the compact buildChart line in the execute description. */
-const CHART_SERIES_RULE =
-	"Give every series exactly one value per category, in category order, and name every series when there are several.";
-/** Shared by the buildStateMachine topic and its compact line in the execute description. */
-const STATE_MACHINE_GUARD_RULE =
-	'copy each guard the prompt states; use "else" only for a branch the prompt gives no condition.';
-const STATE_MACHINE_END_RULE =
-	"A state that ends the machine but has other outgoing transitions also gets a transition to a final state.";
-/** Shared by the buildGantt topic and its compact line in the execute description. */
-const GANTT_DATE_RULE = "Pass a stated duration as duration, not a computed end.";
-
-/** Shared by the buildErDiagram topic and its compact line in the execute description. */
-const ER_CARDINALITY_RULE =
-	'Cardinalities: "one", "zero-or-one", "many", "one-or-many", "zero-or-many", each how many rows of its end match one row of the other.';
-/** Shared by the buildClassDiagram topic and its compact line in the execute description. */
-const CLASS_KIND_RULE =
-	'kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to. Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only.';
-/** Shared by the buildWireframe topic and its compact line in the execute description. */
-const WIREFRAME_RULE = 'Set variant "primary", checked and active as stated.';
-/** Shared by the buildOrgChart topic and its compact line in the execute description. */
-const ORG_CHART_RULE =
-	"manager is the id they report to; only the top person has none (forest: true for several).";
-/** Shared by the buildVennDiagram topic and its compact line in the execute description. */
-const VENN_REGION_RULE =
-	'A region lies in exactly its sets: ["a"] is a only, ["a", "b"] is a and b but not c. Omit empty regions.';
-/** Shared by the buildJourneyMap topic and its compact line in the execute description. */
-const JOURNEY_SCORE_RULE =
-	"score is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral.";
-/** Shared by the buildSankey topic and its compact line in the execute description. */
-const SANKEY_RULE = "value is the stated amount (> 0); links run one way; add no balancing node.";
-/** Shared by the buildQuadrantChart topic and its compact line in the execute description. */
-const QUADRANT_RULE =
-	"low and high are the axis end labels as stated (x left to right, y bottom up); name each quadrant by the corner its conditions describe; x and y run 0 (low end) to 1 (high end), so a score out of 100 is score / 100.";
-const CHART_COPY_RULE =
-	"Copy every number, category, series name, unit and axis title from the prompt; invent none.";
 /**
  * The code parameter states once for the builders after buildFlowchart what each topic says for
  * its own family. Flowchart labels follow FLOWCHART_RULES instead: read as applying to every
  * builder, this rule made Sol paste prompt clauses ("If parsing succeeds", "parsed") as labels.
  */
+/** The MCP docs name the text a diagram comes from "the prompt". */
+const PROMPT = "the prompt";
 const COPY_RULE =
 	"copy every item and detail the prompt states into its spec field, keeping its words and order; invent none.";
 /**
@@ -112,20 +92,20 @@ export const EXECUTE_DESCRIPTION_WINDOW = 4096;
 export const EXECUTE_DESCRIPTION_LEGACY_WINDOW = 2048;
 /** One compact line per builder after buildFlowchart, whose rules the code parameter carries. */
 const FAST_PATH = {
-	buildChart: `spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. ${CHART_SERIES_RULE} A pie has one series of non-negative values, at most 8 slices and no axis titles.`,
-	buildTimeline: `spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. Dates keep the prompt's precision (YYYY, YYYY-MM, YYYY-MM-DD or ISO time); without dates, give every event a numeric order. end draws a phase, lane a labeled track; today only when given.`,
-	buildSequenceDiagram: `spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them. A participant's own step (validating, retrying) is a self-message with source = target.`,
-	buildStateMachine: `spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets: ${STATE_MACHINE_GUARD_RULE} kind "final" (label optional) ends the machine and nothing leaves it. ${STATE_MACHINE_END_RULE}`,
-	buildMindmap: `spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.`,
-	buildGantt: `spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. ${GANTT_DATE_RULE}`,
-	buildErDiagram: `spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. ${ER_CARDINALITY_RULE}`,
-	buildClassDiagram: `spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. ${CLASS_KIND_RULE}`,
-	buildOrgChart: `spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. ${ORG_CHART_RULE}`,
-	buildVennDiagram: `spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. ${VENN_REGION_RULE}`,
-	buildJourneyMap: `spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. ${JOURNEY_SCORE_RULE}`,
-	buildSankey: `spec: { title, nodes: [{ id, label }], links: [{ source, target, value, label? }], unit? ("$k", "visits") }. ${SANKEY_RULE}`,
-	buildWireframe: `spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, column, row (align?: "between" | "center" | "end"), grid (columns: n). Widgets: heading (text, level?), text (text or lines), badge (text), link (text, target?: screen id), button (text, variant?, target?), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav (items, active?), breadcrumbs, list (items), avatar, icon, image, chart (label?), table (columns: string[]), divider. ${WIREFRAME_RULE}`,
-	buildQuadrantChart: `spec: { title, xAxis: { title, low, high }, yAxis: same, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }. ${QUADRANT_RULE}`,
+	buildChart: `spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. ${CHART_RULES.series} ${CHART_RULES.pieCompact}`,
+	buildTimeline: `spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. ${TIMELINE_RULES.compact(PROMPT)}`,
+	buildSequenceDiagram: `spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. ${SEQUENCE_RULES.replies(PROMPT)} ${SEQUENCE_RULES.selfStep}`,
+	buildStateMachine: `spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets: ${STATE_MACHINE_RULES.guards(PROMPT)} kind "final" (label optional) ends the machine. ${STATE_MACHINE_RULES.endsLifecycle}`,
+	buildMindmap: `spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. ${MINDMAP_RULES.order}`,
+	buildGantt: `spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. ${GANTT_RULES.duration}`,
+	buildErDiagram: `spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. ${ER_RULES.cardinalities}`,
+	buildClassDiagram: `spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. ${CLASS_RULES.relationships} ${CLASS_RULES.multiplicitiesCompact}`,
+	buildOrgChart: `spec: { title, people: [{ id, name, title?, department?, manager?, assistant?: true }], dottedLines?: [{ report, manager, label?: stated scope }], groupByDepartment? }. ${ORG_CHART_RULES.managerCompact}`,
+	buildVennDiagram: `spec: { title, sets: [{ id, label }], regions: [{ sets: [ids], items?: string[], count? }] }. ${VENN_RULES.regionsCompact}`,
+	buildJourneyMap: `spec: { title, persona?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }. ${JOURNEY_RULES.score}`,
+	buildSankey: `spec: { title, nodes: [{ id, label }], links: [{ source, target, value, label? }], unit? ("$k", "visits") }. ${SANKEY_RULES.flows}`,
+	buildWireframe: `spec: { title, screens: [{ name, device: "desktop" | "tablet" | "mobile", children }] }. Containers (children, title?): header, footer (at the bottom), sidebar, main, section, card, modal, column, row (align?: "between" | "center" | "end"), grid (columns: n). Widgets: heading (text, level?), text (text or lines), badge (text), link (text, target?: screen id), button (text, variant?, target?), input, textarea, select, search (label?, placeholder?, value?), checkbox, radio, toggle (label, checked?), tabs, nav (items, active?), breadcrumbs, list (items), avatar, icon, image, chart (label?), table (columns: string[]), divider. ${WIREFRAME_RULES.stateCompact}`,
+	buildQuadrantChart: `spec: { title, xAxis: { title, low, high }, yAxis: same, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }. ${QUADRANT_RULES.placementCompact}`,
 } satisfies Record<Exclude<keyof typeof BUILDERS, "buildFlowchart" | "createCanvas">, string>;
 /** What the code parameter names a builder for where its name alone could route a prompt wrongly. */
 const CODE_HINTS: Partial<Record<keyof typeof FAST_PATH, string>> = {
@@ -182,40 +162,21 @@ const FLOWCHART_SPEC = `spec: { title, nodes: [{ id, label, kind: "start" | "pro
 
 /**
  * What a first flowchart build needs, each rule with any detail only the buildFlowchart topic
- * adds. The code parameter carries the rules; the topic carries both.
+ * adds. The code parameter carries the rules; the topic carries both. The rules themselves live in
+ * diagram-core, which the generation prompt and Studio chat read too; only the logo rules, which
+ * name sketchi.searchIcons, are the MCP's own.
  */
-const FLOWCHART_RULES: readonly (readonly [rule: string, topicDetail?: string])[] = [
-	[
-		"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.",
-	],
-	[
-		'A stated check or verification ("verify the signature", "stock is checked") is its own process node before the decision that reads its result; "check whether X" alone is just that decision.',
-	],
-	[
-		"Label steps and decisions with the prompt's own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words the prompt itself uses.",
-	],
-	[
-		'Label a step as a short action ("Resize image"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause ("if the image is too large", "whether …", "is resized").',
-	],
-	[
-		"Use one node per outcome the prompt names: point every branch that reaches the same named outcome at that one node, and do not add end nodes the prompt does not name.",
-	],
-	[
-		'Do not add decisions, loops, steps, or edges the prompt does not state; a step that handles "any errors" or acts "if needed" stays one step in sequence. A step that repeats an earlier step ("send another ...", "try again", "retry", "resubmit") continues that cycle: draw it as the earlier step or as a step that loops back to the decision after it, never as an end. Only a new, unrepeated final step with no stated next step is that branch\'s end node (kind: "end").',
-	],
-	[
-		"Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
-		"Use stable node ids.",
-	],
-	[
-		"Name technologies in node labels; a description draws as a small subtitle under the label, for detail.",
-	],
-	[
-		`Only when the prompt groups steps (teams, zones, phases), declare groups and set each member's group to its innermost group id; others stay ungrouped. Nested zones set parent (subnet in VPC) and kind. Set shape, even on a start or end: "database" databases; "document" files, archives, reports; "queue" queues, streams, topics; "storage" buckets, object stores. Only users stay ellipses. An architecture starts at its entry and ends at each sink.`,
-	],
-	[
-		"For swimlanes, a process across actors or roles, declare lanes in the prompt's order and set each node's lane to its actor; lanes take no groups.",
-	],
+const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: string])[] = [
+	[FLOWCHART_RULES.separateNodes(PROMPT)],
+	[FLOWCHART_RULES.statedChecks],
+	[FLOWCHART_RULES.labelWords(PROMPT)],
+	[FLOWCHART_RULES.labelForm],
+	[FLOWCHART_RULES.namedOutcomes(PROMPT)],
+	[FLOWCHART_RULES.noInventedSteps(PROMPT)],
+	[FLOWCHART_RULES.decisionsCompact, "Use stable node ids."],
+	[FLOWCHART_RULES.technologyLabels],
+	[FLOWCHART_RULES.groupsCompact(PROMPT)],
+	[FLOWCHART_RULES.lanesCompact(PROMPT)],
 	[
 		'Brand logos, only for technologies the prompt names: set that node\'s icon to { slug } with an exact slug sketchi.searchIcons returned, never a guess. Attach match: "exact" to the node naming that product and "vendor" only to a node whose label names the vendor (Cloudflare Workers takes cloudflare, Ingress controller no kubernetes); never "weak". Each node holds one icon: for X on Y, preserve both technologies as separate meaningful steps, each with its own logo, never hidden in the title or combined under one icon.',
 		"The logo is drawn above the label. Unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build. Keep the requested step order and stay within graph limits.",
@@ -223,29 +184,17 @@ const FLOWCHART_RULES: readonly (readonly [rule: string, topicDetail?: string])[
 	[
 		"Before building, check that each named technology's node has its icon: a label or a search alone attaches none, and a missing icon gives no warning. If no logo matches, keep the technology label and report the logo unavailable; never substitute another brand.",
 	],
-	[
-		`At most ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges.`,
-		"Larger graphs fail with flowchart_too_large before render or persistence.",
-	],
-	[
-		"Every node must be reachable from the single start and able to reach an end.",
-		"Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
-	],
-	[
-		"Summarize a broad or vague repo/system architecture prompt into 8-14 high-signal nodes on a single readable spine with short side branches, not a dense dependency graph with one node per package or many crossing links.",
-	],
-	[
-		"When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
-	],
-	[
-		"Keep every package and component the prompt names under its own name; summarizing drops unnamed detail and never renames or generalizes named parts.",
-	],
+	[FLOWCHART_RULES.limits, FLOWCHART_RULES.limitsDetail],
+	[FLOWCHART_RULES.reachable, FLOWCHART_RULES.reachableDetail],
+	[FLOWCHART_RULES.summarize],
+	[FLOWCHART_RULES.layers],
+	[FLOWCHART_RULES.keepNamed(PROMPT)],
 ];
 
 /** The buildFlowchart topic: every flowchart rule with its detail, then the request type. */
 const FLOWCHART_DOCS = [
 	"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, and optional layout. Builds use the fixed Sketchi palette.",
-	...FLOWCHART_RULES.map(([rule, detail]) => (detail ? `${rule} ${detail}` : rule)),
+	...FLOWCHART_DOC_RULES.map(([rule, detail]) => (detail ? `${rule} ${detail}` : rule)),
 	"",
 	operationTypes("buildFlowchart"),
 ].join("\n");
@@ -273,7 +222,7 @@ export const EXECUTE_CODE_DESCRIPTION = [
 	"Excalidraw and PNG URLs are default for accepted builds and patches.",
 	"",
 	`buildFlowchart (${BUILDERS.buildFlowchart}): ${FLOWCHART_SPEC}.`,
-	...FLOWCHART_RULES.map(([rule]) => rule),
+	...FLOWCHART_DOC_RULES.map(([rule]) => rule),
 	"",
 	`Other builders: ${COPY_RULE}`,
 	...Object.entries(FAST_PATH).map(([operation, line]) => {
@@ -681,8 +630,8 @@ export const catalog: CatalogEntry[] = [
 			"Create a native timeline from dated milestones, phases, or explicitly ordered events.",
 		content: [
 			"buildTimeline accepts { spec: { id?, title, events: [{ id, label, date?, end?, order?, kind?, lane?, description? }], lanes?, today? }, options? }. The renderer owns layout: a time-scaled axis, alternating labels and wrapped rows.",
-			"Use dates for every event, or numeric order for every event without dates. Keep source precision: YYYY, YYYY-MM, YYYY-MM-DD, or YYYY-MM-DDTHH:mm[:ss] with Z or ±HH:MM. Never invent events or dates.",
-			'Optional: end (inclusive, dated only) draws a phase; kind: "milestone" draws a diamond; lane puts every event on a labeled track (lanes sets order, max 6); today draws a Today marker only when supplied. No dependencies.',
+			`${TIMELINE_RULES.precision(PROMPT)} ${TIMELINE_RULES.mode} ${TIMELINE_RULES.noInvention}`,
+			`${TIMELINE_RULES.optional(PROMPT)} ${TIMELINE_RULES.ties}`,
 			"Results match the other native builders, including a hosted PNG by default in execute.",
 			operationTypes("buildTimeline"),
 		].join("\n\n"),
@@ -714,9 +663,9 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Create a native bar, line or pie chart from categories and series of numbers.",
 		content: [
 			"buildChart accepts { spec: { id?, title, kind, categories, series: [{ name?, values }], unit?, categoryAxisTitle?, valueAxisTitle?, stacked?, donut?, orientation? }, options? }. The renderer owns layout: nice ticks, value labels, legend and pie leader lines.",
-			'kind "bar" compares categories (stacked: true stacks the series; long names turn bars horizontal, or set orientation), "line" shows change across ordered categories, "pie" splits one whole (donut: true for a ring).',
-			`${CHART_SERIES_RULE} A pie has one series of non-negative values and at most 8 slices; bars and lines take negatives, up to 40 categories and 6 series.`,
-			`${CHART_COPY_RULE} unit labels ticks and values: currency symbols lead ("$", "$M"), others follow ("%", "ms", "k").`,
+			CHART_RULES.kinds,
+			`${CHART_RULES.categories} ${CHART_RULES.limits}`,
+			`${CHART_RULES.copy(PROMPT)} ${CHART_RULES.noRounding} ${CHART_RULES.unit}`,
 			operationTypes("buildChart"),
 		].join("\n\n"),
 		examples: [
@@ -746,8 +695,8 @@ export const catalog: CatalogEntry[] = [
 			"Create a native Gantt chart from dated tasks, durations, dependencies and milestones.",
 		content: [
 			"buildGantt accepts { spec: { id?, title, tasks: [{ id, label, start, end?, duration?, milestone?, phase?, dependsOn?, progress? }], phases?, today? }, options? }. The renderer owns layout: a to-scale date axis, one row per task under phase headers, and dependency arrows.",
-			"start and end are YYYY-MM-DD; end is the last day, inclusive. Give end or duration (calendar days counting start), not both. milestone: true draws a diamond on start. dependsOn lists finish-to-start predecessor ids, without cycles. Give every task a phase or none (phases sets their order). progress is percent done; today only when stated. Up to 60 tasks and 12 phases.",
-			`${GANTT_DATE_RULE} Copy every task, date, dependency, milestone and phase from the prompt; invent none. A task that starts before a predecessor finishes still builds, with a gantt_schedule_conflict warning.`,
+			`${GANTT_RULES.tasks} ${GANTT_RULES.optional(PROMPT)} ${GANTT_RULES.limits}`,
+			`${GANTT_RULES.duration} ${GANTT_RULES.copy(PROMPT)} ${GANTT_RULES.conflicts}`,
 			operationTypes("buildGantt"),
 		].join("\n\n"),
 		examples: [
@@ -775,9 +724,15 @@ export const catalog: CatalogEntry[] = [
 		],
 		snippet: "Create a native state machine from states and the transitions between them.",
 		content: [
-			"buildStateMachine accepts { spec: { id?, title, initial, states: [{ id, label?, kind?, parent?, initial? }], transitions: [{ id?, source, target, event?, guard?, action? }], layout?: { direction } }, options? }. Omit layout to let the renderer pick LR or TB.",
-			`A regular state label defaults to its id verbatim; an explicit blank label is invalid. initial is the top-level state the machine starts in. kind "final" ends the machine: name it when it is a named outcome (for example Failed); generic ends need no name; kind "choice" is a diamond whose outgoing transitions each carry a guard: ${STATE_MACHINE_GUARD_RULE} States other states name as parent form a composite, drawn as a frame around them: give it initial, its first substate. Composites do not nest.`,
-			`A transition is drawn event [guard] / action; write the guard without brackets. It may leave or enter a composite, or return to its own state. Every state must be reachable from initial, and final states have no outgoing transitions. ${STATE_MACHINE_END_RULE}`,
+			`buildStateMachine accepts { spec: { id?, title, initial, states: [{ id, label?, kind?, parent?, initial? }], transitions: [{ id?, source, target, event?, guard?, action? }], layout?: { direction } }, options? }. ${STATE_MACHINE_RULES.layout}`,
+			[
+				STATE_MACHINE_RULES.ids,
+				STATE_MACHINE_RULES.label,
+				STATE_MACHINE_RULES.initial,
+				STATE_MACHINE_RULES.kinds(PROMPT),
+				STATE_MACHINE_RULES.composite,
+			].join(" "),
+			`${STATE_MACHINE_RULES.transitions} ${STATE_MACHINE_RULES.reachable} ${STATE_MACHINE_RULES.endsLifecycle}`,
 			operationTypes("buildStateMachine"),
 		].join("\n\n"),
 		examples: [
@@ -806,9 +761,14 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Create a native ER diagram from entities, their fields and keys, and relationships.",
 		content: [
 			"buildErDiagram accepts { spec: { id?, title, entities: [{ id, name?, fields }], relationships: [{ id?, from, to, fromCardinality, toCardinality, label? }] }, options? }. The renderer draws each entity as a table and each relationship as a crow's-foot line between the rows it joins.",
-			'A field is one string "name type markers", type optional: "id uuid PK", "order_id uuid PK FK", "email text UK", "note text?" (nullable). Entity ids hold no dot or space; name defaults to the id.',
-			`from and to name "entity.field", the foreign key at one end and the key it references at the other, or an entity alone. ${ER_CARDINALITY_RULE} An order has one customer and a customer zero or many orders: from "orders.customer_id", fromCardinality "zero-or-many", to "customers.id", toCardinality "one".`,
-			"Copy every table, field, type, key, nullable marker and cardinality the prompt states; invent none.",
+			`${ER_RULES.fields} ${ER_RULES.ids}`,
+			[
+				ER_RULES.direction(PROMPT),
+				ER_RULES.cardinalities,
+				ER_RULES.cardinalityFromKeys(PROMPT),
+				ER_RULES.example,
+			].join(" "),
+			ER_RULES.copy(PROMPT),
 			operationTypes("buildErDiagram"),
 		].join("\n\n"),
 		examples: [
@@ -837,9 +797,14 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Create a native UML class diagram from classes, their members, and relationships.",
 		content: [
 			"buildClassDiagram accepts { spec: { id?, title, classes: [{ id, name?, kind?, stereotype?, attributes, methods }], relationships: [{ id?, kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }, options? }. The renderer draws each class as a box of name, attributes and methods, superclasses and interfaces above the classes that extend or implement them, and each relationship with its UML line and head.",
-			'A member is one string as UML writes it: attributes "- radius: double", "+ count: int {static}"; methods "+ area(): double", "+ draw(ctx: Canvas): void {abstract}". Visibility is +, -, # or ~. kind is "abstract", "interface" or "enum" (its values are attributes), or omitted for a class. Class ids hold no colon or space; name defaults to the id.',
-			`${CLASS_KIND_RULE} navigable: true puts an open arrow at to. A composition's whole is "1" or "0..1". Interfaces extend only interfaces, classes implement them, and no inheritance cycles.`,
-			"Copy every class, member, relationship, multiplicity and role the prompt states; invent none.",
+			`${CLASS_RULES.members} ${CLASS_RULES.kinds} ${CLASS_RULES.ids}`,
+			[
+				CLASS_RULES.relationships,
+				CLASS_RULES.multiplicities,
+				CLASS_RULES.hierarchy,
+				CLASS_RULES.typedFields(PROMPT),
+			].join(" "),
+			CLASS_RULES.copy(PROMPT),
 			operationTypes("buildClassDiagram"),
 		].join("\n\n"),
 		examples: [
@@ -868,9 +833,10 @@ export const catalog: CatalogEntry[] = [
 			"Create a native quadrant chart of items placed by two measures in four named quadrants.",
 		content: [
 			"buildQuadrantChart accepts { spec: { id?, title, xAxis: { title, low, high }, yAxis: { title, low, high }, quadrants: { topLeft, topRight, bottomLeft, bottomRight }, points: [{ label, x, y, group? }] }, options? }. The renderer draws a square plot split into four tinted quadrants with their names in their corners, axis arrows carrying the titles and end labels, and each point as a dot at its exact position with its label beside it, or on a leader line where the plot is crowded.",
-			`${QUADRANT_RULE.charAt(0).toUpperCase()}${QUADRANT_RULE.slice(1)} An axis may run from Urgent to Not urgent when the prompt draws it that way; topLeft is low x and high y as labeled. 0.5 sits on a middle line; an item given only its quadrant sits well inside it (0.25 or 0.75).`,
-			'group colors the points the prompt sets apart ("our product" against competitors) and adds a legend. At most 30 points, each label unique.',
-			"Copy every item, axis label and quadrant name the prompt states; invent none.",
+			`${QUADRANT_RULES.axisEnds(PROMPT)} ${QUADRANT_RULES.names}`,
+			`${QUADRANT_RULES.points} ${QUADRANT_RULES.axes(PROMPT)}`,
+			`${QUADRANT_RULES.groups(PROMPT)} ${QUADRANT_RULES.limits}`,
+			QUADRANT_RULES.copy(PROMPT),
 			operationTypes("buildQuadrantChart"),
 		].join("\n\n"),
 		examples: [
@@ -899,9 +865,15 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Create a native org chart from people, their titles and the managers they report to.",
 		content: [
 			"buildOrgChart accepts { spec: { id?, title, people: [{ id, name, title?, department?, manager?, assistant?, avatar? }], dottedLines?: [{ id?, report, manager, label? }], groupByDepartment?, forest? }, options? }. The renderer draws each person as a card of name, title and department, managers above the reports their bus line feeds, long lists of reports stacked in one or two columns, and each department in a color of its own.",
-			`${ORG_CHART_RULE} No reporting line may cycle. assistant: true draws an assistant beside their manager, off the reporting line; an assistant has no reports. avatar: true draws an initials placeholder. Person ids hold no colon.`,
-			'A dotted line joins report to a second manager outside the solid line, drawn dashed with an arrow at that manager; label carries the scope or reason the prompt states for it ("for clinical systems"), drawn beside the line. groupByDepartment: true draws each department below the top as a labeled region.',
-			"Copy every person, title, department, reporting line and dotted line the prompt states; invent none.",
+			[
+				ORG_CHART_RULES.manager(PROMPT),
+				ORG_CHART_RULES.noCycles,
+				ORG_CHART_RULES.assistant,
+				ORG_CHART_RULES.avatar,
+				ORG_CHART_RULES.ids,
+			].join(" "),
+			`${ORG_CHART_RULES.dottedLines(PROMPT)} ${ORG_CHART_RULES.groupByDepartment}`,
+			ORG_CHART_RULES.copy(PROMPT),
 			operationTypes("buildOrgChart"),
 		].join("\n\n"),
 		examples: [
@@ -921,8 +893,8 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Create a native Venn diagram from two or three sets and the items in each region.",
 		content: [
 			"buildVennDiagram accepts { spec: { id?, title, sets: [{ id, label, color? }], regions?: [{ sets, label?, items?, count? }] }, options? }. The renderer draws two or three equal, overlapping translucent circles, each set's label outside its circle, and each region's items, one per line, centred inside exactly that region; it sizes the circles until every region's text fits.",
-			`${VENN_REGION_RULE} A region holds items (short phrases) or a count, not both; label names the overlap itself only when the prompt does. color is a palette name (blue, orange, green, yellow, pink, violet, red, gray) or #rrggbb.`,
-			"Copy every set and item the prompt states, each once and in exactly its region; invent none.",
+			`${VENN_RULES.regions} ${VENN_RULES.contents(PROMPT)} ${VENN_RULES.color}`,
+			VENN_RULES.copy(PROMPT),
 			operationTypes("buildVennDiagram"),
 		].join("\n\n"),
 		examples: [
@@ -951,8 +923,13 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Create a native user journey map from stages of steps, each scored for sentiment.",
 		content: [
 			"buildJourneyMap accepts { spec: { id?, title, persona?, actors?, stages: [{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }] }, options? }. The renderer draws the stages as headers across the top, each step's card under its stage, a face per step on an emotion curve over a neutral baseline, and each stage's pain points and opportunities beneath it.",
-			`${JOURNEY_SCORE_RULE} Stages and steps keep their order. actor is who acts ("Customer, Agent" when several share a step) and touchpoint the channel (Email, Website, Phone); persona names whose journey it is, and actors, when given, lists every step's actor.`,
-			"Copy every stage, step, score, actor, touchpoint, pain point and opportunity the prompt states; invent none.",
+			[
+				JOURNEY_RULES.stages(PROMPT),
+				JOURNEY_RULES.score,
+				JOURNEY_RULES.actors(PROMPT),
+				JOURNEY_RULES.notes(PROMPT),
+			].join(" "),
+			JOURNEY_RULES.copy(PROMPT),
 			operationTypes("buildJourneyMap"),
 		].join("\n\n"),
 		examples: [
@@ -981,7 +958,14 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Create a native Sankey diagram from nodes and the weighted flows between them.",
 		content: [
 			"buildSankey accepts { spec: { id?, title, nodes: [{ id, label, color? }], links: [{ source, target, value, label? }], unit? }, options? }. The renderer owns layout: each node one column past the longest run of links into it, a bar as tall as the larger of its inflow and outflow with its label and total, and each link a band as wide as its value in its source's color, with its value written. A band under 3 px draws at 3 px; its value stays exact.",
-			`${SANKEY_RULE} Copy every node, flow and value stated. No cycles or self-links, one link per source and target, ids without colons. unit formats as charts do ("$k" gives $310k; "visits" reads on totals). A stage that loses flow sends it to a drop-off node (one shared "Rejected" or one per stage), or keeps less outflow than inflow.`,
+			[
+				SANKEY_RULES.links,
+				SANKEY_RULES.optional,
+				SANKEY_RULES.copy,
+				SANKEY_RULES.structure,
+				SANKEY_RULES.unit,
+				SANKEY_RULES.dropOff(PROMPT),
+			].join(" "),
 			operationTypes("buildSankey"),
 		].join("\n\n"),
 		examples: [
@@ -1002,9 +986,9 @@ export const catalog: CatalogEntry[] = [
 			"Create a native low-fidelity wireframe: screens on a device, each a tree of components.",
 		content: [
 			'buildWireframe accepts { spec: { id?, title, screens: [{ id?, name, device?: "desktop" | "tablet" | "mobile", align?, children }] }, options? }. Each screen draws as a frame the size of its device. The renderer places everything: a header spans the top, a footer the bottom, a sidebar one side, a modal floats over the rest, and every other component stacks down the content area. No field takes a coordinate or size.',
-			'Containers hold children: header, footer, main, section, card and modal (title), sidebar (side: "left" | "right"), grid (columns: n), row, column. A row sets its children side by side and wraps them; align spreads them ("between"), centers or ends them. Rows and grids keep containers one height, buttons hug their text and fields stretch.',
-			'Widgets: heading (text, level 1-3), text (text, or lines for placeholder copy), link and badge (text), button (text, variant "primary" | "secondary"), input, textarea, select, search (label, placeholder, or value when it shows one), checkbox, radio, toggle (label, checked), tabs and nav (items, active), breadcrumbs and list (items), avatar and icon (label), image (label, aspect "wide" | "square" | "tall"), chart (label, kind "bar" | "line" | "pie"), table (columns: headers, rows: placeholder count), divider. A nav inside a sidebar stacks; any other runs across. A button or link with target: a screen id opens that screen, drawn as an arrow to it.',
-			`${WIREFRAME_RULE} Copy every screen, component, text and state stated, in order; invent none. Each screen a flow moves through is its own screen; set target only on the control stated to open one.`,
+			`${WIREFRAME_RULES.containers(PROMPT)} ${WIREFRAME_RULES.rows} ${WIREFRAME_RULES.sizing}`,
+			`${WIREFRAME_RULES.widgets} ${WIREFRAME_RULES.nav} ${WIREFRAME_RULES.target}`,
+			`${WIREFRAME_RULES.state} ${WIREFRAME_RULES.copy} ${WIREFRAME_RULES.screens}`,
 			operationTypes("buildWireframe"),
 		].join("\n\n"),
 		examples: [
@@ -1034,10 +1018,10 @@ export const catalog: CatalogEntry[] = [
 		content: [
 			"buildSequenceDiagram accepts a semantic SequenceDiagramSpec with ordered participants and chronological messages. Builds use the fixed Sketchi palette.",
 			"Use a sequence diagram when time-ordered interactions between actors or systems are the main idea. Use buildFlowchart for decisions and process paths; use buildMindmap for nested topic hierarchy.",
-			"Participant order is preserved left-to-right. Message order is preserved top-to-bottom.",
-			'A message with type "return" from the callee back to its caller answers the latest open call between them; Sketchi draws the callee\'s activation bar from that call to its return, nesting re-entrant calls. Calls nobody answers draw no bar.',
-			"Every message source and target must reference a declared participant id. A self-message (source equals target) draws as a loop on that participant's lifeline; a self-call returns into a short nested activation bar, and self-messages never answer or open a call between participants.",
-			`A sequence diagram may have at most ${SEQUENCE_MAX_PARTICIPANTS} participants and ${SEQUENCE_MAX_MESSAGES} messages; larger ones are rejected with sequence_too_large.`,
+			SEQUENCE_RULES.order,
+			SEQUENCE_RULES.activation,
+			SEQUENCE_RULES.selfMessage,
+			`A sequence diagram may have ${SEQUENCE_RULES.limits}; larger ones are rejected with sequence_too_large.`,
 			"For every named technology participant (e.g. GitHub, Cloudflare Worker, Docker), call sketchi.searchIcons and set participant.icon to { slug } using a matching returned slug. Labels alone do not add logos, and omitted icons produce no warning. Leave human actors unbranded; a technology logo is drawn in the participant header and exported as an Excalidraw image. Unknown slugs are dropped with an unknown_icon warning, never a failed build.",
 			"",
 			operationTypes("buildSequenceDiagram"),

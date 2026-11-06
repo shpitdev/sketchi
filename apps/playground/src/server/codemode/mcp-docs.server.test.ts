@@ -1,4 +1,3 @@
-import { FLOWCHART_MAX_EDGES, FLOWCHART_MAX_NODES } from "@sketchi/diagram-core";
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
@@ -6,6 +5,15 @@ import ts from "typescript";
 import { catalog } from "./mcp-docs/catalog";
 import { CODE_MODE_OPERATIONS, generateCodeModeTypes, jsonSchemaType } from "./mcp-docs/types";
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
+import {
+	CLASS_RULES,
+	ER_RULES,
+	FLOWCHART_MAX_EDGES,
+	FLOWCHART_MAX_NODES,
+	SANKEY_RULES,
+	STATE_MACHINE_RULES,
+	WIREFRAME_RULES,
+} from "@sketchi/diagram-core";
 import {
 	getCodeModeDocs,
 	searchCodeModeDocs,
@@ -404,7 +412,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			'- buildSequenceDiagram (time-ordered messages): spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them. A participant\'s own step (validating, retrying) is a self-message with source = target.',
 		);
 		expect(codeLine("buildStateMachine")).toBe(
-			'- buildStateMachine: spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets: copy each guard the prompt states; use "else" only for a branch the prompt gives no condition. kind "final" (label optional) ends the machine and nothing leaves it. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.',
+			'- buildStateMachine: spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets: copy each guard the prompt states; use "else" only for a branch the prompt gives no condition. kind "final" (label optional) ends the machine. A state that ends the lifecycle is "final" even if something leaves it; Sketchi then draws its own end after it.',
 		);
 		expect(codeLine("buildMindmap")).toBe(
 			'- buildMindmap: spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.',
@@ -413,7 +421,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			'- buildGantt (project schedules): spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. Pass a stated duration as duration, not a computed end.',
 		);
 		expect(codeLine("buildErDiagram")).toBe(
-			'- buildErDiagram (database schemas): spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. Cardinalities: "one", "zero-or-one", "many", "one-or-many", "zero-or-many", each how many rows of its end match one row of the other.',
+			'- buildErDiagram (database schemas): spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. Each cardinality is "one", "zero-or-one", "many", "one-or-many" or "zero-or-many": how many rows of that end relate to one row of the other end.',
 		);
 		expect(codeLine("buildClassDiagram")).toBe(
 			'- buildClassDiagram: spec: { title, classes: [{ id, kind?: "abstract" | "interface" | "enum", attributes?: ["- id: UUID"], methods?: ["+ area(): double {abstract}"] }], relationships: [{ kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }] }. kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to. Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only.',
@@ -421,7 +429,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		const classDocs = getCodeModeDocs({ topic: "buildClassDiagram" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(classDocs.split("\n\n")[0]);
 		expect(classDocs.split("Request type:")[0]).toContain(
-			'A member is one string as UML writes it: attributes "- radius: double"',
+			'Write each member as UML does: attributes "- radius: double"',
 		);
 		// Org charts add a builder name to the head and one compact line here (+385 characters).
 		expect(codeLine("buildOrgChart")).toBe(
@@ -430,7 +438,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		const orgChartDocs = getCodeModeDocs({ topic: "buildOrgChart" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(orgChartDocs.split("\n\n")[0]);
 		expect(orgChartDocs.split("Request type:")[0]).toContain(
-			"A dotted line joins report to a second manager outside the solid line",
+			"report also answers to manager, outside the solid line",
 		);
 		// Venn diagrams add a builder name to the head and one compact line here.
 		expect(codeLine("buildVennDiagram")).toBe(
@@ -439,7 +447,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		const vennDocs = getCodeModeDocs({ topic: "buildVennDiagram" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(vennDocs.split("\n\n")[0]);
 		expect(vennDocs.split("Request type:")[0]).toContain(
-			"A region holds items (short phrases) or a count, not both",
+			"Give a region items (short phrases) or a count, never both.",
 		);
 		// Journey maps add a builder name to the head, an index line and one compact line here
 		// (+367 characters, +94 o200k tokens).
@@ -449,7 +457,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		const journeyDocs = getCodeModeDocs({ topic: "buildJourneyMap" }).content;
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).not.toContain(journeyDocs.split("\n\n")[0]);
 		expect(journeyDocs.split("Request type:")[0]).toContain(
-			"touchpoint the channel (Email, Website, Phone)",
+			"touchpoint is the channel (Email, Website, Phone)",
 		);
 		// Sankey diagrams add a builder name to the head and one compact line here (+304 characters).
 		expect(codeLine("buildSankey")).toBe(
@@ -496,25 +504,25 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 			kind "bar" compares categories (stacked: true stacks the series; long names turn bars horizontal, or set orientation), "line" shows change across ordered categories, "pie" splits one whole (donut: true for a ring).
 
-			Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values and at most 8 slices; bars and lines take negatives, up to 40 categories and 6 series.
+			Return categories (x-axis labels, or pie slice names) and series: [{ name, values }] with exactly one value per category, in category order. Name every series when there are several. A pie has exactly one series of non-negative values and at most 8 slices. Bars and lines allow negative values, up to 40 categories and 6 series.
 
-			Copy every number, category, series name, unit and axis title from the prompt; invent none. unit labels ticks and values: currency symbols lead ("$", "$M"), others follow ("%", "ms", "k").
+			Copy every number, category, series name, unit and axis title from the prompt; invent none. Never round data. unit labels ticks and values: currency symbols lead ("$", "$M"), others follow ("%", "ms", "k").
 
 			"
 		`);
 		expect(stateMachineDocs.split("Request type:")[0]).toMatchInlineSnapshot(`
 			"buildStateMachine accepts { spec: { id?, title, initial, states: [{ id, label?, kind?, parent?, initial? }], transitions: [{ id?, source, target, event?, guard?, action? }], layout?: { direction } }, options? }. Omit layout to let the renderer pick LR or TB.
 
-			A regular state label defaults to its id verbatim; an explicit blank label is invalid. initial is the top-level state the machine starts in. kind "final" ends the machine: name it when it is a named outcome (for example Failed); generic ends need no name; kind "choice" is a diamond whose outgoing transitions each carry a guard: copy each guard the prompt states; use "else" only for a branch the prompt gives no condition. States other states name as parent form a composite, drawn as a frame around them: give it initial, its first substate. Composites do not nest.
+			Every state has a unique id without ":". A regular state label defaults to its id verbatim; explicit labels must not be blank. initial is the top-level state the machine starts in. kind "final" ends the machine: name it when it is a named outcome (for example Failed); generic ends need no name; kind "choice" is a branch point whose outgoing transitions each carry a guard: copy each guard the prompt states; use "else" only for a branch the prompt gives no condition. A composite state is a state other states name as parent; give it initial, the substate it starts in. Composites do not nest.
 
-			A transition is drawn event [guard] / action; write the guard without brackets. It may leave or enter a composite, or return to its own state. Every state must be reachable from initial, and final states have no outgoing transitions. A state that ends the machine but has other outgoing transitions also gets a transition to a final state.
+			Every transition has a unique id, source, target, and optional event, guard (the condition, without brackets) and action. A transition may leave or enter a composite, or return to its own state. Every state must be reachable from initial. A state that ends the lifecycle is "final" even if something leaves it; Sketchi then draws its own end after it.
 
 			"
 		`);
 		expect(ganttDocs.split("Request type:")[0]).toMatchInlineSnapshot(`
 			"buildGantt accepts { spec: { id?, title, tasks: [{ id, label, start, end?, duration?, milestone?, phase?, dependsOn?, progress? }], phases?, today? }, options? }. The renderer owns layout: a to-scale date axis, one row per task under phase headers, and dependency arrows.
 
-			start and end are YYYY-MM-DD; end is the last day, inclusive. Give end or duration (calendar days counting start), not both. milestone: true draws a diamond on start. dependsOn lists finish-to-start predecessor ids, without cycles. Give every task a phase or none (phases sets their order). progress is percent done; today only when stated. Up to 60 tasks and 12 phases.
+			Return tasks with unique id, label, start (YYYY-MM-DD), and end (last day, inclusive) or duration (calendar days counting start). A milestone is milestone: true with start only. Never supply coordinates. Optional: dependsOn lists the ids of tasks that must finish first; phase names a header for every task only when the prompt itself names phases; otherwise omit it (phases sets their order); progress is percent complete; today only when stated. Use 1–60 tasks, at most 12 phases, and no dependency cycles.
 
 			Pass a stated duration as duration, not a computed end. Copy every task, date, dependency, milestone and phase from the prompt; invent none. A task that starts before a predecessor finishes still builds, with a gantt_schedule_conflict warning.
 
@@ -576,6 +584,25 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 				expect(example.code, example.title).not.toMatch(/inlineArtifacts: \[\s*"/);
 			}
 		}
+	});
+
+	it("resolves the rules generation, the MCP and Studio disagreed on in favor of one wording", () => {
+		const topic = (
+			name: "buildErDiagram" | "buildClassDiagram" | "buildSankey" | "buildWireframe",
+		) => getCodeModeDocs({ topic: name }).content.split("Request type:")[0];
+		// A foreign key sits at a relationship's from end, and cardinalities follow the keys.
+		expect(topic("buildErDiagram")).toContain(ER_RULES.direction("the prompt"));
+		expect(topic("buildErDiagram")).toContain(ER_RULES.cardinalityFromKeys("the prompt"));
+		// A field typed as another class draws an association named by its role.
+		expect(topic("buildClassDiagram")).toContain(CLASS_RULES.typedFields("the prompt"));
+		// A drop-off node only when one is named.
+		expect(topic("buildSankey")).toContain(SANKEY_RULES.dropOff("the prompt"));
+		expect(topic("buildSankey")).not.toContain("or keeps less outflow than inflow");
+		// What a footer holds, a table's columns, and each control's state.
+		expect(topic("buildWireframe")).toContain(WIREFRAME_RULES.containers("the prompt"));
+		expect(topic("buildWireframe")).toContain(WIREFRAME_RULES.state);
+		// A state that ends the lifecycle is final even when something leaves it; the builder splits it.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toContain(STATE_MACHINE_RULES.endsLifecycle);
 	});
 
 	it("documents patch envelopes and operation names for harness discovery", () => {

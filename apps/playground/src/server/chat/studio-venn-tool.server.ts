@@ -11,7 +11,7 @@ import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-buil
 
 export const STUDIO_BUILD_VENN_TOOL_NAME = "build_venn_diagram" as const;
 export const STUDIO_BUILD_VENN_TOOL_DESCRIPTION =
-	'Build and persist a native Venn diagram: two or three equal, overlapping translucent circles, each set\'s label outside its circle, and each region\'s items or count inside exactly that region. Give sets: [{ id, label }] and regions: [{ sets, items }], one region per overlap: ["a"] is a only, ["a", "b"] is a and b but not c. A region holds items or a count; omit empty regions. The host lays out the circles and sizes them to fit. Repair structured issues, up to three total attempts.';
+	"Build and persist a native Venn diagram: two or three equal, overlapping translucent circles, each set's label outside its circle, and each region's items or count inside exactly that region. Give sets: [{ id, label }] and regions: [{ sets, items }], one region per overlap. The host lays out the circles and sizes them to fit. Repair structured issues, up to three total attempts.";
 export const StudioBuildVennInputSchema = toPlaygroundStandardSchema(
 	BuildVennDiagramToolInputSchema,
 );

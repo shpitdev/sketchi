@@ -613,6 +613,24 @@ describe("Code Mode native state machine", () => {
 		},
 	);
 
+	it("ends a final state that something leaves in a final state of its own", async () => {
+		const result = await build({
+			...playerSpec,
+			transitions: [
+				...playerSpec.transitions,
+				{ source: "ejected", target: "stopped", event: "reload" },
+			],
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		const states = result.normalizedSpec.states;
+		expect(states.find((state) => state.id === "ejected")?.kind).not.toBe("final");
+		expect(states.find((state) => state.id === "end")?.kind).toBe("final");
+		expect(result.normalizedSpec.transitions).toContainEqual(
+			expect.objectContaining({ id: "ejected-ends", source: "ejected", target: "end" }),
+		);
+	});
+
 	it.each([
 		[{ initial: "nowhere" }, "unknown_initial_state"],
 		[{ initial: "playing" }, "unknown_initial_state"],
@@ -624,15 +642,6 @@ describe("Code Mode native state machine", () => {
 				],
 			},
 			"unknown_initial_state",
-		],
-		[
-			{
-				transitions: [
-					...playerSpec.transitions,
-					{ source: "ejected", target: "stopped", event: "reload" },
-				],
-			},
-			"final_has_outgoing",
 		],
 		[
 			{ transitions: [...playerSpec.transitions, { source: "stopped", target: "gone" }] },

@@ -534,3 +534,55 @@ export const mediaPlayerStateMachine = parseStateMachineDiagram({
 		{ id: "stop", source: "active", target: "stopped", event: "stop" },
 	],
 });
+
+const isStateRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * A final state with outgoing transitions both ends the machine and continues, so it becomes a
+ * regular state with a transition to its own unnamed final state. Ids built only from "end" and
+ * digits draw as an anonymous marker, not as a named state. Reads an undecoded diagram or spec, so
+ * every surface that accepts a state machine repairs it the same way before validation.
+ */
+export function splitContinuingFinalStates(input: unknown): unknown {
+	if (!isStateRecord(input)) return input;
+	const { states, transitions } = input;
+	if (!Array.isArray(states) || !Array.isArray(transitions)) return input;
+	const sources = new Set(
+		transitions.map((transition) => (isStateRecord(transition) ? transition["source"] : undefined)),
+	);
+	const continuing = (state: unknown): state is Record<string, unknown> =>
+		isStateRecord(state) && state["kind"] === "final" && sources.has(state["id"]);
+	if (!states.some(continuing)) return input;
+	const unused = (entries: readonly unknown[]) => {
+		const used = new Set(entries.map((entry) => (isStateRecord(entry) ? entry["id"] : undefined)));
+		return (base: string) => {
+			let id = base;
+			for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
+			used.add(id);
+			return id;
+		};
+	};
+	const stateId = unused(states);
+	const transitionId = unused(transitions);
+	const added: unknown[] = [];
+	const split = states.flatMap((state) => {
+		if (!continuing(state)) return [state];
+		const { kind: _kind, ...regular } = state;
+		const end = stateId("end");
+		added.push({
+			id: transitionId(`${String(state["id"])}-ends`),
+			source: state["id"],
+			target: end,
+		});
+		return [
+			regular,
+			{
+				id: end,
+				kind: "final",
+				...(state["parent"] === undefined ? {} : { parent: state["parent"] }),
+			},
+		];
+	});
+	return { ...input, states: split, transitions: [...transitions, ...added] };
+}
