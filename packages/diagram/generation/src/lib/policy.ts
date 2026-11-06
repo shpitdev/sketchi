@@ -56,9 +56,18 @@ const seconds = (milliseconds: number) => String(Math.round(milliseconds / 100) 
 
 /** A family validator's size limit, such as `flowchart.flowchart_too_large: ...`. */
 const DIAGRAM_SIZE_LIMIT = /^[a-z-]+\.[a-z_]+_too_large: /;
+/**
+ * Size limits on how a diagram is arranged rather than how much it states: how
+ * deep components or zones nest, how deep reporting chains run, how many stages
+ * a flow passes. A model can meet these by restructuring, such as dropping a
+ * redundant wrapper, without losing stated content, so repair still applies.
+ */
+const LAYOUT_BOUND =
+	/\bnest \d+ (?:levels )?deep\b|\brun \d+ levels deep\b|\bruns through \d+ stages\b/;
 
+/** A limit on how much the diagram holds, which repair can only meet by dropping content. */
 export function isDiagramSizeLimitDiagnostic(diagnostic: string): boolean {
-	return DIAGRAM_SIZE_LIMIT.test(diagnostic);
+	return DIAGRAM_SIZE_LIMIT.test(diagnostic) && !LAYOUT_BOUND.test(diagnostic);
 }
 
 /** The validator's own sentence, without its family code or its repair hint. */
@@ -96,6 +105,13 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 	) {
 		const startedAt = yield* Clock.currentTimeMillis;
 		const deadline = startedAt + policy.totalTimeoutMs;
+		const requestTimeout = () =>
+			DiagramGenerationTimeoutError.make({
+				message: `Generation did not finish within its ${seconds(policy.totalTimeoutMs)}-second limit.`,
+				provider,
+				scope: "request",
+				timeoutMs: policy.totalTimeoutMs,
+			});
 		const callsRef = yield* Ref.make(0);
 		const usageRef = yield* Ref.make<DiagramGenerationUsage | undefined>(undefined);
 		const executeModelCall = Effect.fn("diagramGeneration.executeModelCall")(function* (
@@ -121,11 +137,12 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 						retry_kind: "transient",
 					});
 				}
-				// Each call gets its own limit, cut short by what is left of the request's.
+				// Each call gets its own limit, cut short by what is left of the request's,
+				// and none starts once the request's is spent.
 				const remainingMs = deadline - (yield* Clock.currentTimeMillis);
+				if (remainingMs <= 0) return yield* requestTimeout();
 				const scope = remainingMs < policy.requestTimeoutMs ? "request" : "attempt";
-				const timeoutMs = Math.max(0, Math.min(policy.requestTimeoutMs, remainingMs));
-				const limitMs = scope === "request" ? policy.totalTimeoutMs : policy.requestTimeoutMs;
+				const timeoutMs = Math.min(policy.requestTimeoutMs, remainingMs);
 				return yield* attempt.pipe(
 					Effect.onExit((exit) => {
 						const failure = Exit.isFailure(exit) ? Cause.findError(exit.cause) : undefined;
@@ -154,25 +171,31 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 						duration: timeoutMs,
 						orElse: () =>
 							Effect.fail(
-								DiagramGenerationTimeoutError.make({
-									message:
-										scope === "request"
-											? `Generation did not finish within its ${seconds(limitMs)}-second limit.`
-											: `A model call did not finish within its ${seconds(limitMs)}-second limit.`,
-									provider,
-									scope,
-									timeoutMs: limitMs,
-								}),
+								scope === "request"
+									? requestTimeout()
+									: DiagramGenerationTimeoutError.make({
+											message: `A model call did not finish within its ${seconds(policy.requestTimeoutMs)}-second limit.`,
+											provider,
+											scope,
+											timeoutMs: policy.requestTimeoutMs,
+										}),
 							),
 					}),
 					Effect.tapError((error) => Ref.set(previousErrorTagRef, error._tag)),
 				);
 			});
+			const remainingMs = deadline - (yield* Clock.currentTimeMillis);
+			if (remainingMs <= 0) return yield* requestTimeout();
 			const candidate = yield* measuredAttempt.pipe(
 				Effect.retry({
 					schedule: Schedule.exponential(policy.retryDelayMs),
 					times: policy.maxRetries,
 					while: isRetryableGenerationError,
+				}),
+				// A retry's backoff ends at the request's limit too, not past it.
+				Effect.timeoutOrElse({
+					duration: remainingMs,
+					orElse: () => Effect.fail(requestTimeout()),
 				}),
 			);
 			// Repair could only meet a family limit by dropping what the request states.
@@ -215,10 +238,13 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 				const repairRequest = buildRepairRequest(request, latestCandidate, repairAttempt);
 				const attemptedDiagnostic = `repair_attempted: requested a corrected response (attempt ${repairAttempt}).`;
 				const repairResult = yield* Effect.result(executeModelCall(repairRequest));
-				// A limit is the answer: the repaired diagram cannot fit either.
+				// A limit is the answer: the repaired diagram cannot fit either. A spent
+				// request limit ends the request, which reports it as a timeout.
 				if (
 					Result.isFailure(repairResult) &&
-					repairResult.failure._tag === "DiagramGenerationLimitError"
+					(repairResult.failure._tag === "DiagramGenerationLimitError" ||
+						(repairResult.failure._tag === "DiagramGenerationTimeoutError" &&
+							repairResult.failure.scope === "request"))
 				) {
 					return yield* repairResult.failure;
 				}
