@@ -200,7 +200,9 @@ export function classScenarioChecks(
 							signature !== undefined &&
 							(method.visibility === undefined || signature.visibility === method.visibility) &&
 							Boolean(signature.static) === method.static &&
-							Boolean(signature.abstract) === method.abstract,
+							// An interface's operations are abstract whether or not they say so.
+							(Boolean(signature.abstract) === method.abstract ||
+								(expected.kind === "interface" && signature.abstract === true)),
 						message: `Expected "${name}.${method.name}()" to be ${method.visibility ?? "of any visibility"}${method.static ? ", static" : ""}${method.abstract ? ", abstract" : ""}.`,
 					},
 				];

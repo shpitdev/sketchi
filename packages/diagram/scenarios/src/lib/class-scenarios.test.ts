@@ -50,6 +50,23 @@ describe("prompt-grounded class diagram scenarios", () => {
 			expect(failed(entry.id, entry.expectedDiagram), entry.id).toEqual([]);
 	});
 
+	it("accepts an interface's operations marked abstract, and no other class's", () => {
+		const hotel = scenario("hotel-booking-class-large").expectedDiagram;
+		const marked = (className: string) => ({
+			...hotel,
+			classes: hotel.classes.map((node) =>
+				node.id === className
+					? { ...node, methods: node.methods.map((method) => ({ ...method, abstract: true })) }
+					: node,
+			),
+		});
+		expect(failed("hotel-booking-class-large", marked("Payment"))).toEqual([]);
+		expect(failed("hotel-booking-class-large", marked("CardPayment"))).toEqual([
+			"modifiers:CardPayment.authorize()",
+			"modifiers:CardPayment.refund()",
+		]);
+	});
+
 	it("accepts an association written the other way round and 0..* written as *", () => {
 		const reversed = withRelationship(shop, "r5", (relationship) => ({
 			...relationship,

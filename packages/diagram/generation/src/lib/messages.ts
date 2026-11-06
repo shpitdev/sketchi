@@ -564,9 +564,9 @@ function logoSection(prompt: DiagramGenerationPrompt): string[] {
 /**
  * A ceiling, not a target: billing counts only the tokens written, though the
  * provider's output rate limit reserves the whole ceiling while a call runs.
- * The largest diagram the family limits allow writes about 8,000 tokens (an
- * 80-person org chart about 3,700), so an answer that reaches this is too large
- * for one diagram; it fails as such instead of being repaired or regenerated.
+ * Haiku 5.5 wrote the ten large scenarios in 1,062 to 4,092 tokens (a 60-task
+ * Gantt the most, a 60-step flowchart 3,525), so an answer that reaches this is
+ * too large for one diagram; it fails as such instead of being repaired.
  */
 export const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
 export const DEFAULT_TEMPERATURE = 0.1;
