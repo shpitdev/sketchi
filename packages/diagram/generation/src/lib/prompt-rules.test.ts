@@ -167,3 +167,23 @@ describe("rules that close the graded gap with the MCP agent", () => {
 		expect(user).toContain("keep that name in the label");
 	});
 });
+
+describe("generation sends only the requested family's rules", () => {
+	it("keeps every family's rules when the model picks the family", () => {
+		expect(system).toContain("Flowchart IR rules:");
+		expect(system).toContain("Quadrant chart IR rules:");
+	});
+
+	it("sends one family's rules when the caller names it", () => {
+		const typed = buildDiagramGenerationMessages({
+			id: "typed",
+			request: "Draw it",
+			requestedType: "sankey",
+		}).system;
+		expect(typed).toContain("Sankey IR rules:");
+		expect(typed).toContain(SANKEY_RULES.dropOff("the source"));
+		expect(typed).not.toContain("Flowchart IR rules:");
+		expect(typed).not.toContain("Wireframe IR rules:");
+		expect(typed.length).toBeLessThan(system.length / 3);
+	});
+});
