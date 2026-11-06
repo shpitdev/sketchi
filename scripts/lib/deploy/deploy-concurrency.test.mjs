@@ -46,8 +46,8 @@ function concurrency(job, project, prNumber = 42) {
 test("all Pipeline-bound preview and production uploads share a non-cancelling queue", async () => {
 	const groups = [];
 	for (const job of [preview, production]) {
-		// The preview matrix is the selected subset of every Worker app.
-		for (const project of job === preview ? workerProjectIds : job.strategy.matrix.project) {
+		// Both matrices are the selected subset of every Worker app.
+		for (const project of workerProjectIds) {
 			const config = await unstable_readConfig({
 				config: workerProjectConfig(project).wranglerInputConfigPath,
 			});

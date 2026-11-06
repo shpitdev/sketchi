@@ -1,9 +1,12 @@
 name: changesets
 
+# Changesets has work only when a push adds or changes a changeset; any other push starts nothing.
 on:
   push:
     branches:
       - main
+    paths:
+      - ".changeset/**"
 
 concurrency:
   group: changesets-main

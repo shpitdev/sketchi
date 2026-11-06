@@ -1,8 +1,19 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import test from "node:test";
 
-import { productionDomainWranglerConfig, productionProjectConfig } from "./production.mjs";
-import { workerProjectConfig } from "../worker-apps.mjs";
+import {
+	productionDomainWranglerConfig,
+	productionProjectConfig,
+	selectProductionProjects,
+} from "./production.mjs";
+import { workerProjectConfig, workerProjectIds } from "../worker-apps.mjs";
+
+const require = createRequire(import.meta.resolve("nx/package.json"));
+const yaml = require("@zkochan/js-yaml");
+const read = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
+const workflow = yaml.load(read(".github/workflows/app-production-deploy.yml"));
 
 test("productionProjectConfig returns project-scoped domain metadata", () => {
 	assert.deepEqual(productionProjectConfig("web"), {
@@ -152,4 +163,56 @@ test("internal projects emit no public routes", () => {
 	assert.deepEqual(domainConfig.vars, {
 		SKETCHI_APP_SURFACE: "playground",
 	});
+});
+
+test("a production push deploys the Worker apps whose build it reaches", () => {
+	assert.deepEqual(
+		selectProductionProjects({
+			selection: "affected",
+			affected: ["diagram-core", "playground", "excalidraw", "sketchi-cli"],
+		}),
+		["excalidraw", "playground"],
+	);
+	assert.deepEqual(selectProductionProjects({ selection: "affected", affected: [] }), []);
+	assert.deepEqual(selectProductionProjects({ selection: "all" }), workerProjectIds);
+	assert.deepEqual(selectProductionProjects({ selection: "web" }), ["web"]);
+	assert.throws(() => selectProductionProjects({ selection: "studio" }), /Unknown Worker project/);
+});
+
+test("production deploys only the selected apps, and a dispatch selects all or one", () => {
+	const select = workflow.jobs.select.steps.find(({ id }) => id === "projects");
+	assert.equal(select.run, "node scripts/09-select-production-projects.mjs");
+	assert.equal(select.env.PRODUCTION_SELECTION, "${{ inputs.project || 'affected' }}");
+	assert.equal(select.env.BASE_SHA, "${{ github.event.before }}");
+	assert.equal(select.env.HEAD_SHA, "${{ github.sha }}");
+	const [first, ...apps] = workflow.on.workflow_dispatch.inputs.project.options;
+	assert.equal(first, "all");
+	assert.deepEqual(apps.toSorted(), workerProjectIds.toSorted());
+	const deploy = workflow.jobs.deploy;
+	assert.equal(deploy.needs, "select");
+	assert.match(deploy.if, /needs\.select\.outputs\.projects != '\[\]'/);
+	assert.equal(deploy.strategy.matrix.project, "${{ fromJSON(needs.select.outputs.projects) }}");
+	assert.doesNotMatch(JSON.stringify(deploy.steps), /inputs\.project/);
+	// The script reads the Nx graph task by task, so a test-only change reaches no build.
+	assert.match(read("scripts/09-select-production-projects.mjs"), /NX_LEGACY_AFFECTED: "false"/);
+	assert.match(read("scripts/09-select-production-projects.mjs"), /--withTarget=build/);
+});
+
+test("the production push filter covers every workspace package and shared build input", () => {
+	const paths = workflow.on.push.paths;
+	const workspace = yaml.load(read("pnpm-workspace.yaml")).packages;
+	for (const glob of workspace) {
+		assert.ok(paths.includes(`${glob.split("/")[0]}/**`), `${glob} must start a deploy run`);
+	}
+	const sharedGlobals = JSON.parse(read("nx.json")).namedInputs.sharedGlobals;
+	for (const input of sharedGlobals) {
+		assert.ok(paths.includes(input.replace("{workspaceRoot}/", "")), `${input} is a build input`);
+	}
+	for (const file of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]) {
+		assert.ok(paths.includes(file), file);
+	}
+	assert.ok(
+		!paths.some((path) => path.startsWith("scripts/")),
+		"repository scripts deploy nothing",
+	);
 });
