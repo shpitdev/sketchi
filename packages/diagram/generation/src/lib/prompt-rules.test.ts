@@ -1,11 +1,14 @@
 import {
 	CHART_RULES,
+	CLASS_RULES,
 	FLOWCHART_RULES,
 	GANTT_RULES,
+	ORG_CHART_RULES,
 	QUADRANT_RULES,
 	SANKEY_RULES,
 	SEQUENCE_RULES,
 	STATE_MACHINE_RULES,
+	VENN_RULES,
 	WIREFRAME_RULES,
 } from "@sketchi/diagram-core";
 import { describe, expect, it } from "vitest";
@@ -114,5 +117,23 @@ describe("quadrant placement in generation", () => {
 		expect(system).toContain(QUADRANT_RULES.names);
 		expect(system).toContain(QUADRANT_RULES.axisEnds("the source"));
 		expect(system).not.toContain(QUADRANT_RULES.placementCompact);
+	});
+});
+
+describe("generation reaches every field an MCP agent can set", () => {
+	it("says what each optional field draws and when to set it", () => {
+		for (const rule of [
+			FLOWCHART_RULES.technologyLabels,
+			STATE_MACHINE_RULES.layout,
+			CLASS_RULES.stereotype("the source"),
+			ORG_CHART_RULES.avatar,
+			VENN_RULES.colorWhenStated("the source"),
+			SANKEY_RULES.color("the source"),
+			WIREFRAME_RULES.disabled("the source"),
+		]) {
+			expect(system).toContain(rule);
+		}
+		expect(system).toContain("may have a description");
+		expect(system).toContain('layout { "direction": "LR" | "TB" } when the source states one');
 	});
 });

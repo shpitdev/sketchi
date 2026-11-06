@@ -1,6 +1,8 @@
 import { VENN_COLOR_NAMES } from "../types/venn.js";
 import type { RuleSource } from "./source.js";
 
+const palette = `a palette name (${VENN_COLOR_NAMES.join(", ")}) or #rrggbb`;
+
 /** How a request becomes a Venn diagram; see FLOWCHART_RULES. */
 export const VENN_RULES = {
 	regions:
@@ -11,7 +13,9 @@ export const VENN_RULES = {
 	contents: (source: RuleSource) =>
 		`Give a region items (short phrases) or a count, never both. Omit a region ${source} leaves empty; label names an overlap only when ${source} does.`,
 	placement: "Put each item once, in exactly its region.",
-	color: `color is a palette name (${VENN_COLOR_NAMES.join(", ")}) or #rrggbb.`,
+	color: `color is ${palette}.`,
+	colorWhenStated: (source: RuleSource) =>
+		`Set a set's color only when ${source} names one: ${palette}.`,
 	copy: (source: RuleSource) =>
 		`Copy every set and item ${source} states, each once and in exactly its region; invent none.`,
 } as const;

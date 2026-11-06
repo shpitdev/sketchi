@@ -10,6 +10,8 @@ export const SANKEY_RULES = {
 	copy: "Copy every node, flow and value stated.",
 	structure: "No cycles or self-links, one link per source and target, ids without colons.",
 	unit: 'unit formats as charts do ("$k" gives $310k; "visits" reads on totals).',
+	color: (source: RuleSource) =>
+		`Set a node's color (#rrggbb) only when ${source} names one; it colors the bar and every flow leaving it.`,
 	dropOff: (source: RuleSource) =>
 		`A stage that loses flow sends it to a drop-off node only when ${source} names one (one shared "Rejected" or one per stage); otherwise it keeps less outflow than inflow.`,
 } as const;
