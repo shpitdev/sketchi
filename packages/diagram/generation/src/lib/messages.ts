@@ -613,7 +613,8 @@ export function buildDiagramGenerationMessages(
 		"",
 		"Response contract:",
 		...COMMON_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
-		...DIAGRAM_TYPES.flatMap((type) => [
+		// A caller that names the family gets only that family's rules; otherwise the model picks.
+		...(explicitType ? [explicitType] : DIAGRAM_TYPES).flatMap((type) => [
 			"",
 			`${IR_INSTRUCTIONS[type].title}:`,
 			...IR_INSTRUCTIONS[type].rules.map((instruction) => `- ${instruction}`),
