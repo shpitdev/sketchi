@@ -723,6 +723,62 @@ describe("ER renderer", () => {
 		}
 	});
 
+	it("draws a 25-table storefront with every end of a crowded key on a line of its own and no line beside a table", () => {
+		const scene = renderDiagram(erStressFixtures.storefront);
+		const tables = nodes(scene).filter(
+			(node) => node.rendererRole === "er-table" && node.kind === "entity",
+		);
+		expect(tables).toHaveLength(25);
+		// users.id holds nine ends. Squeezed into one row their marks ran together;
+		// grown, each meets a line of the key row's band.
+		expect(bunchedEnds(scene)).toBe(0);
+		expect(keyBand(scene, "users", 0)).toBeDefined();
+		// No line runs through a table it doesn't join, on its outline, or within
+		// 24 of it: one ran along the wishlists name band, another 13 above the
+		// order_items band.
+		const beside = arrows(scene).flatMap((line) =>
+			segmentsFromPoints(line.points).flatMap((segment) =>
+				tables.flatMap((box) => {
+					if (box.nodeId === line.sourceNodeId || box.nodeId === line.targetNodeId) return [];
+					const horizontal = segment.orientation === "horizontal";
+					const [from, to, near, far] = horizontal
+						? [box.x, box.x + box.width, box.y, box.y + box.height]
+						: [box.y, box.y + box.height, box.x, box.x + box.width];
+					const at = segment.staticCoordinate;
+					const distance = at < near ? near - at : at > far ? at - far : -1;
+					return Math.min(segment.max, to) - Math.max(segment.min, from) > 16 && distance < 24
+						? [`${line.edgeId} beside ${box.nodeId}`]
+						: [];
+				}),
+			),
+		);
+		expect(beside).toEqual([]);
+		// Lines that share a table run a row apart rather than detour to stand
+		// further: messages' two lines to users run straight, and no line runs
+		// far past the way between its ends (one looped under every table).
+		expect(arrow(scene, "r29").points).toHaveLength(2);
+		expect(arrow(scene, "r30").points).toHaveLength(2);
+		for (const line of arrows(scene)) {
+			const [start, end] = [line.points[0], line.points.at(-1)!];
+			const length = line.points
+				.slice(1)
+				.reduce(
+					(sum, point, index) =>
+						sum +
+						Math.abs(point.x - line.points[index]!.x) +
+						Math.abs(point.y - line.points[index]!.y),
+					0,
+				);
+			expect(
+				length - Math.abs(end.x - start.x) - Math.abs(end.y - start.y),
+				line.edgeId,
+			).toBeLessThan(300);
+		}
+		expect(crossings(arrows(scene))).toBeLessThanOrEqual(14);
+		expect(aspectOf(scene)).toBeLessThanOrEqual(2);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
 	it("arranges a twenty-table schema as a grid of columns, no line through a table", () => {
 		const scene = renderDiagram(erStressFixtures.marketplace);
 		const tables = nodes(scene).filter(

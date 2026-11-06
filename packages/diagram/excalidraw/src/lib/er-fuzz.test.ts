@@ -274,6 +274,45 @@ function bunchedEnds(scene: RenderedDiagramScene): number {
 	return bunched;
 }
 
+/**
+ * Runs that lie along a table they don't join, on its outline or nearer than
+ * this, past a corner's length: the line reads as the table's border or as
+ * running along its name band.
+ */
+const BESIDE_TABLE = 24;
+const CORNER = 16;
+
+function runsBesideTables(scene: RenderedDiagramScene): string[] {
+	const tables = scene.elements.flatMap((element) =>
+		element.type === "node" && element.rendererRole === "er-table" && element.kind === "entity"
+			? [element]
+			: [],
+	);
+	return scene.elements.flatMap((arrow) =>
+		arrow.type === "arrow"
+			? arrow.points.slice(1).flatMap((q, index) => {
+					const p = arrow.points[index]!;
+					const horizontal = Math.abs(p.y - q.y) < 0.01;
+					const [at, low, high] = horizontal
+						? [p.y, Math.min(p.x, q.x), Math.max(p.x, q.x)]
+						: [p.x, Math.min(p.y, q.y), Math.max(p.y, q.y)];
+					return tables.flatMap((box) => {
+						if (box.nodeId === arrow.sourceNodeId || box.nodeId === arrow.targetNodeId) return [];
+						const [from, to, near, far] = horizontal
+							? [box.x, box.x + box.width, box.y, box.y + box.height]
+							: [box.y, box.y + box.height, box.x, box.x + box.width];
+						const distance = at < near ? near - at : at - far;
+						return Math.min(high, to) - Math.max(low, from) > CORNER &&
+							distance >= 0 &&
+							distance < BESIDE_TABLE
+							? [`${arrow.edgeId} runs ${distance.toFixed(0)} from ${box.nodeId}`]
+							: [];
+					});
+				})
+			: [],
+	);
+}
+
 /** Everything the export validator, the canvas validator or the layout guards would flag. */
 function defects(diagram: ErDiagram): string[] {
 	const scene = renderDiagram(diagram);
@@ -321,6 +360,7 @@ function defects(diagram: ErDiagram): string[] {
 		...diagonal,
 		...unwrapped,
 		...foreignMarks(scene),
+		...runsBesideTables(scene),
 	];
 }
 
@@ -330,14 +370,14 @@ function defects(diagram: ErDiagram): string[] {
  * may draw more crossings, nor more crossings and findings together, and
  * together they may draw no more of either.
  */
-const ER_ROUTING = "1/2 0/0 0/0 0/0 0/0 1/0 0/0 0/1 0/0 0/0 0/0 1/0 0/0 0/0 0/0 0/0";
+const ER_ROUTING = "1/2 0/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 0/0 0/0 1/0 0/0 0/0 0/0 0/0";
 /**
  * Neighboring ends that bunch across the schemas checked: a row holding more
- * than two ends on a side grows to give each a port of its own, except where
- * growing would draw worse (99 and 3 before rows grew, 18 and 0 before a
- * grown row gave each end a line of its own).
+ * than two ends on a side always grows to give each a port of its own (99 and
+ * 3 before rows grew, 18 and 0 before a grown row gave each end a line of its
+ * own, 12 and 0 while a row whose growth drew worse kept its ends bunched).
  */
-const ER_BUNCHED = { ci: 0, full: 12 };
+const ER_BUNCHED = { ci: 0, full: 0 };
 
 /** Schemas checked in CI; the full fuzz runs locally with ER_FUZZ=full (and any ER_FUZZ_SEED). */
 const CI_SCHEMAS = 16;
@@ -349,7 +389,7 @@ describe("ER routing fuzz", () => {
 		Number(process.env["ER_FUZZ_SEED"] ?? 20261019),
 	);
 
-	it("exports every random schema valid, orthogonal, unwrapped, with tables and marks apart", () => {
+	it("exports every random schema valid, orthogonal, unwrapped, with tables, marks and lines apart", () => {
 		const failures = schemas.flatMap((schema, index) =>
 			defects(schema).map((defect) => `${index}: ${defect}`),
 		);

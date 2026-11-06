@@ -132,6 +132,8 @@ interface RoutedEdge {
 	pinned?: { source?: number; target?: number };
 	/** Straight run kept at each end before the line turns or carries its label. */
 	endRun?: number;
+	/** How near this line may run beside another that shares one of its nodes (GraphRenderOptions.besideShared). */
+	besideShared?: number;
 	/** A pinned end's own straight run, in place of the end run. */
 	runs?: { source?: number; target?: number };
 	source: NodeSceneElement;
@@ -5319,6 +5321,7 @@ function routedSoFar(
 	readerScale: number | undefined,
 	avoidCrossings = false,
 	clearHeads = false,
+	shared?: { readonly of: (arrow: ArrowSceneElement) => boolean; readonly gap: number },
 ): RoutedSoFar {
 	const arrows = routedArrows.some((arrow) => arrow.id.startsWith(LANE_OUTLINE))
 		? routedArrows.filter((arrow) => !arrow.id.startsWith(LANE_OUTLINE))
@@ -5338,13 +5341,41 @@ function routedSoFar(
 			: {
 					...(avoidCrossings ? { crossings: crossingLookup(arrows) } : {}),
 					...(clearHeads ? { heads: arrowheadsNear(scored, readerScale) } : {}),
-					quality: candidateRouteQuality(scored, readerScale),
+					quality: sharedQuality(scored, arrows, readerScale, shared),
 				}),
 		outlines: existingRouteSegments(
 			routedArrows.filter((arrow) => arrow.id.startsWith(GROUP_OUTLINE)),
 		),
 		segments: existingRouteSegments(arrows),
 	};
+}
+
+/**
+ * Candidate route quality against arrows routed so far. With `shared`, a line
+ * sharing a node with the candidate runs beside it only when nearer than
+ * `shared.gap`, the spacing its family gives such lines, where that is nearer
+ * than a reader's corridor gap: its corridors are judged at the scale that
+ * makes the corridor gap that spacing. Jogs and arrowheads count as ever.
+ */
+function sharedQuality(
+	scored: readonly Parameters<typeof candidateRouteQuality>[0][number][],
+	arrows: readonly ArrowSceneElement[],
+	readerScale: number,
+	shared: { readonly of: (arrow: ArrowSceneElement) => boolean; readonly gap: number } | undefined,
+): ReturnType<typeof candidateRouteQuality> {
+	const all = candidateRouteQuality(scored, readerScale);
+	const readerGap = routingCorridorGap(readerScale);
+	if (!shared || shared.gap >= readerGap) return all;
+	const sharing = arrows.map((arrow) => shared.of(arrow));
+	const beside = scored.filter((_, index) => sharing[index]);
+	const others = scored.filter((_, index) => !sharing[index]);
+	if (beside.length === 0) return all;
+	const near = candidateRouteQuality(beside, (readerScale * readerGap) / shared.gap);
+	const far = candidateRouteQuality(others, readerScale);
+	return (candidate) => ({
+		...all(candidate),
+		corridors: far(candidate).corridors + near(candidate).corridors,
+	});
 }
 
 /** A straight run of a routed arrow, across which another line would cross it. */
@@ -6895,9 +6926,19 @@ function exteriorLaneRoute(
 		),
 	];
 
-	const routed = routedSoFar(existingArrows, readerScale, avoidCrossings, clearHeads);
-	// Among zones, a run along a node's border reads as part of the node.
-	const strict = groups?.zoned === true;
+	const ends = [route.source.nodeId, route.target.nodeId];
+	const sharesNode = (arrow: ArrowSceneElement) =>
+		ends.includes(arrow.sourceNodeId) || ends.includes(arrow.targetNodeId);
+	const routed = routedSoFar(
+		existingArrows,
+		readerScale,
+		avoidCrossings,
+		clearHeads,
+		route.besideShared === undefined ? undefined : { of: sharesNode, gap: route.besideShared },
+	);
+	// Among zones, or between boxes a family placed (tables, classes), a run
+	// along a node's border reads as part of the node.
+	const strict = groups?.zoned === true || route.pinned !== undefined;
 	const first = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, routed, strict);
 	const gap = readerScale === undefined ? 0 : routingCorridorGap(readerScale);
 	const best = gap
@@ -8051,7 +8092,7 @@ function layoutDiagramOnce(
 	slack: ReadonlyMap<string, number>,
 ): DiagramLayout {
 	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
-	const { anchors, endRun, placement } = graphOptions.get(diagram) ?? {};
+	const { anchors, besideShared, endRun, placement } = graphOptions.get(diagram) ?? {};
 	const offsetsFor = (routes: readonly RoutedEdge[]) =>
 		portOffsetsAt(routes, polish, arrangement.crossingRepair, laned(diagram));
 	const { wrap } = arrangement;
@@ -8113,6 +8154,8 @@ function layoutDiagramOnce(
 			route.targetEdge = behind ? FORWARD_SIDE[direction] : OPPOSITE_EDGE[toward];
 		}
 	if (endRun) for (const route of routedEdges) route.endRun = endRun;
+	if (besideShared !== undefined)
+		for (const route of routedEdges) route.besideShared = besideShared;
 	if (lanes) assignLaneSides(routedEdges, lanes);
 	const mirrored = orthogonal && polish.ports;
 	assignSides(routedEdges, mirrored);
@@ -10756,6 +10799,14 @@ export interface GraphRenderOptions {
 	 * label, so markers drawn at its ends (crow's feet) sit on a straight line.
 	 */
 	readonly endRun?: number;
+	/**
+	 * How near a line may run beside another that shares one of its nodes,
+	 * where that is nearer than a reader's corridor gap at the export's size: as
+	 * near as the family spaces their ports, rather than detour to keep the
+	 * reader's gap. Each end's own mark tells the two apart where they leave or
+	 * reach that node.
+	 */
+	readonly besideShared?: number;
 }
 
 const graphOptions = new WeakMap<IntermediateDiagram, GraphRenderOptions>();
