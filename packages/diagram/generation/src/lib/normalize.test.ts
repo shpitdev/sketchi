@@ -246,3 +246,21 @@ describe("the response envelope", () => {
 		expect(typed("sequence").diagnostics.join()).toContain("explicit_type_not_met");
 	});
 });
+
+describe("glyphs the export font cannot draw", () => {
+	it("writes arrows and comparison signs in ASCII", () => {
+		const candidate = parse({
+			id: "budget",
+			type: "sankey",
+			nodes: [
+				{ id: "eng", label: "Engineering → Compute" },
+				{ id: "ops", label: "Ops ≥ 10" },
+			],
+			links: [{ source: "eng", target: "ops", value: 5 }],
+		});
+		expect(candidate.error).toBeUndefined();
+		expect(JSON.stringify(candidate.diagram)).toContain("Engineering -> Compute");
+		expect(JSON.stringify(candidate.diagram)).toContain("Ops >= 10");
+		expect(candidate.diagnostics[0]).toMatch(/^glyph_replaced/u);
+	});
+});

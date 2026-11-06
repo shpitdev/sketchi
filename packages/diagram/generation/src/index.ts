@@ -1,4 +1,5 @@
 export * from "./lib/candidates.js";
+export * from "./lib/coverage.js";
 export * from "./lib/client.js";
 export {
 	type CloudflareAiGateway,

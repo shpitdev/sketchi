@@ -16,6 +16,7 @@ import {
 	generationErrorToCandidate,
 	isRetryableGenerationError,
 } from "./errors.js";
+import { checkRequestCoverage, type CoverageIssue, keepsStatedStructure } from "./coverage.js";
 
 const generationAttempts = Metric.counter("sketchi_generation_attempts", {
 	description: "Diagram generation upstream attempts",
@@ -31,6 +32,10 @@ const generationRetries = Metric.counter("sketchi_generation_retries", {
 });
 const generationRepairs = Metric.counter("sketchi_generation_repairs", {
 	description: "Diagram generation semantic repair attempts by outcome",
+	incremental: true,
+});
+const generationCoverageRepairs = Metric.counter("sketchi_generation_coverage_repairs", {
+	description: "Repairs of accepted diagrams that miss what their request states, by outcome",
 	incremental: true,
 });
 const generationFailures = Metric.counter("sketchi_generation_failures", {
@@ -219,11 +224,14 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 			let latestCandidate = originalCandidate;
 			let candidate = originalCandidate;
 			let diagnostics = [...originalCandidate.diagnostics];
+			// Validation and coverage repairs share the caller's repair budget.
+			let repairsUsed = 0;
 			for (
 				let repairAttempt = 1;
 				repairAttempt <= policy.maxRepairAttempts && !isAcceptedCandidate(latestCandidate);
 				repairAttempt += 1
 			) {
+				repairsUsed = repairAttempt;
 				yield* recordMetric(generationRepairs, 1, {
 					operation: "generate",
 					outcome: "attempted",
@@ -288,6 +296,65 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 					? { ...repaired, diagnostics }
 					: { ...originalCandidate, diagnostics };
 				if (repeated) break;
+			}
+			// Check the accepted diagram against what the request states outright, and repair once
+			// with the specific miss. A diagram that passes costs nothing more.
+			const coverage =
+				candidate.diagram && !candidate.error && !request.prompt.base
+					? checkRequestCoverage(request.prompt.request, candidate.diagram)
+					: [];
+			const covered = candidate.diagram;
+			if (coverage.length > 0 && covered && repairsUsed < policy.maxRepairAttempts) {
+				const original = candidate;
+				const issueDiagnostics = coverage.map(
+					(issue) => `coverage.${issue.code}: ${issue.message}`,
+				);
+				yield* Effect.logInfo("Repairing a diagram that misses what its request states", {
+					coverage_issues: coverage.map((issue) => issue.code).join(","),
+					operation: "generate",
+					provider,
+				});
+				const repairResult = yield* Effect.result(
+					executeModelCall(buildCoverageRepairRequest(request, original, coverage)),
+				);
+				const repaired = Result.isSuccess(repairResult)
+					? enforceCandidateRequestRequirements(repairResult.success, request)
+					: undefined;
+				// A repair in another family would pass the other family's checks without fixing anything.
+				const remaining =
+					repaired?.diagram && !repaired.error && repaired.diagram.type === covered.type
+						? checkRequestCoverage(request.prompt.request, repaired.diagram)
+						: undefined;
+				// Keep the repair only when it fixes a miss without dropping what the diagram held.
+				const improved =
+					repaired?.diagram !== undefined &&
+					remaining !== undefined &&
+					remaining.length < coverage.length &&
+					keepsStatedStructure(request.prompt.request, covered, repaired.diagram);
+				yield* recordMetric(generationCoverageRepairs, 1, {
+					operation: "generate",
+					outcome: improved ? "succeeded" : "kept_original",
+					provider,
+				});
+				candidate =
+					improved && repaired
+						? {
+								...repaired,
+								diagnostics: [
+									...original.diagnostics,
+									...issueDiagnostics,
+									...repaired.diagnostics,
+									`coverage_repair_succeeded: ${String(remaining?.length ?? 0)} of ${String(coverage.length)} issues remain.`,
+								],
+							}
+						: {
+								...original,
+								diagnostics: [
+									...original.diagnostics,
+									...issueDiagnostics,
+									"coverage_repair_kept_original: the repair fixed nothing without losing content, or failed.",
+								],
+							};
 			}
 			const finishedAt = yield* Clock.currentTimeMillis;
 			const usage = yield* Ref.get(usageRef);
@@ -406,6 +473,35 @@ function buildRepairRequest(
 				"",
 				"Validator diagnostics:",
 				...candidate.diagnostics.map((diagnostic) => `- ${diagnostic}`),
+			].join("\n"),
+		},
+	};
+}
+
+/**
+ * One repair of a valid diagram that misses what its request states: the
+ * specific misses, the request, and the diagram as the model wrote it.
+ */
+export function buildCoverageRepairRequest(
+	request: DiagramGenerationRequest,
+	candidate: DiagramGenerationCandidate,
+	issues: readonly CoverageIssue[],
+): DiagramGenerationRequest {
+	return {
+		...request,
+		cacheMode: "fresh",
+		prompt: {
+			...request.prompt,
+			request: [
+				"Your diagram for the request below is valid, but it misses what the request states. Return the complete corrected diagram.",
+				"Fix exactly these misses, and keep every other element with its id, label, details and order:",
+				...issues.map((issue) => `- ${issue.message}`),
+				"",
+				"Request:",
+				request.prompt.request,
+				"",
+				"Your diagram:",
+				candidate.text,
 			].join("\n"),
 		},
 	};
