@@ -8,6 +8,8 @@ import {
 	getCanvasValidationIssues,
 	parseSequenceDiagram,
 	sequenceFixture,
+	wrapTextToWidth,
+	wrappedLabelWidth,
 } from "@sketchi/diagram-core";
 
 import { renderDiagram } from "../diagram";
@@ -54,6 +56,82 @@ function unvalidated(overrides: Partial<SequenceDiagram>): SequenceDiagram {
 	return { ...sequence, ...overrides };
 }
 
+/**
+ * Haiku's ride-booking-sequence-large in the November 2026 round of large
+ * scenarios: ten participants and forty messages, by participant index.
+ */
+const RIDE_PARTICIPANTS = [
+	"Rider App",
+	"API Gateway",
+	"Auth Service",
+	"Trip Service",
+	"Pricing Service",
+	"Database",
+	"Payment Service",
+	"Dispatch Service",
+	"Driver App",
+	"Notification Service",
+];
+const RIDE_MESSAGES: readonly (readonly [number, number, string, "return"?])[] = [
+	[0, 1, "Request ride"],
+	[1, 2, "Validate token"],
+	[2, 1, "Token valid", "return"],
+	[1, 3, "Create trip"],
+	[3, 4, "Get fare estimate"],
+	[4, 5, "Load surge zones"],
+	[5, 4, "Surge zones", "return"],
+	[4, 3, "Fare estimate", "return"],
+	[3, 5, "Save trip request"],
+	[5, 3, "Trip saved", "return"],
+	[3, 1, "Trip created", "return"],
+	[1, 0, "Fare and trip id", "return"],
+	[0, 1, "Confirm booking"],
+	[1, 3, "Confirm trip"],
+	[3, 6, "Authorize card"],
+	[6, 3, "Authorization hold", "return"],
+	[3, 7, "Find driver"],
+	[7, 5, "Query nearby drivers"],
+	[5, 7, "Driver list", "return"],
+	[7, 8, "Offer trip"],
+	[8, 7, "Trip accepted", "return"],
+	[7, 3, "Driver assigned", "return"],
+	[3, 9, "Send driver details (no reply)"],
+	[9, 0, "Push driver arriving (no reply)"],
+	[3, 1, "Booking confirmed", "return"],
+	[1, 0, "Driver on the way", "return"],
+	[8, 3, "Arrived at pickup"],
+	[3, 9, "Notify rider of arrival (no reply)"],
+	[8, 3, "Start trip"],
+	[3, 5, "Record trip start"],
+	[5, 3, "Start recorded", "return"],
+	[8, 3, "End trip"],
+	[3, 4, "Calculate final fare"],
+	[4, 3, "Final fare", "return"],
+	[3, 6, "Capture payment"],
+	[6, 3, "Payment captured", "return"],
+	[3, 5, "Close trip"],
+	[5, 3, "Trip closed", "return"],
+	[3, 9, "Send receipt (no reply)"],
+	[9, 0, "Email receipt (no reply)"],
+];
+const rideBooking = parseSequenceDiagram({
+	id: "ride-booking",
+	title: "Booking a ride",
+	type: "sequence",
+	participants: RIDE_PARTICIPANTS.map((label) => ({
+		id: label.toLowerCase().replaceAll(" ", "-"),
+		label,
+	})),
+	messages: RIDE_MESSAGES.map(([source, target, label, type], index) => ({
+		id: `m${index + 1}`,
+		source: RIDE_PARTICIPANTS[source]!.toLowerCase().replaceAll(" ", "-"),
+		target: RIDE_PARTICIPANTS[target]!.toLowerCase().replaceAll(" ", "-"),
+		label,
+		type: type ?? "message",
+	})),
+	style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
+});
+
 describe("sequence diagram renderer", () => {
 	it("widens every header to its longest whole word and re-spaces the lifelines", () => {
 		const scene = renderSequenceDiagram(
@@ -85,6 +163,115 @@ describe("sequence diagram renderer", () => {
 				header.x + header.width / 2,
 			);
 		}
+	});
+
+	it("tightens a forty-message diagram until its labels read at a screen's size, each clear of the rest", () => {
+		const scene = renderSequenceDiagram(rideBooking);
+		// 88 between rows and 320 between lifelines drew it 3156 by 3720, its
+		// 13 px labels 7 px tall on a 2000 px screen.
+		expect((13 * 2000) / (Math.max(scene.width, scene.height) + 40)).toBeGreaterThanOrEqual(10);
+		const headers = scene.elements
+			.filter((e): e is NodeSceneElement => e.type === "node" && !e.nodeId.includes(":"))
+			.toSorted((a, b) => a.x - b.x);
+		expect(headers).toHaveLength(10);
+		for (const [index, header] of headers.slice(1).entries())
+			expect(header.x - headers[index]!.x - headers[index]!.width).toBeGreaterThanOrEqual(40);
+		const lifelines = headers.map((header) => header.x + header.width / 2);
+		// Each label as Excalidraw centers it: on a three-point arrow's middle point,
+		// otherwise its midpoint, wrapped at 160.
+		const labels = rideBooking.messages.map((message) => {
+			const { points } = arrow(scene, message.id);
+			const middle =
+				points.length === 3
+					? points[1]!
+					: { x: (points[0].x + points.at(-1)!.x) / 2, y: points[0].y };
+			const text = wrapTextToWidth(message.label, 160, 13);
+			return {
+				id: message.id,
+				...middle,
+				width: wrappedLabelWidth(text, 13, 160),
+				height: text.split("\n").length * 13 * 1.35,
+			};
+		});
+		for (const label of labels)
+			for (const lifeline of lifelines)
+				expect(Math.abs(label.x - lifeline), label.id).toBeGreaterThanOrEqual(label.width / 2 + 12);
+		for (const [index, label] of labels.entries())
+			for (const other of labels.slice(index + 1))
+				expect(
+					Math.abs(label.x - other.x) < (label.width + other.width) / 2 + 4 &&
+						Math.abs(label.y - other.y) < (label.height + other.height) / 2 + 4,
+					`${label.id} and ${other.id}`,
+				).toBe(false);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
+	it("tightens no further than keeps a label clear of the bars nested inside its target", () => {
+		// Nineteen calls nest into p1, so the last reaches p1 a bar 108 right of its
+		// lifeline, and its label, centered between its ends, moves right with it:
+		// a step of 220 held the label clear of one bar, but put it over p1's outer one.
+		const calls = Array.from({ length: 19 }, (_, index) => ({
+			id: `c${index}`,
+			source: "p0",
+			target: "p1",
+			label: "Validate credentials token",
+		}));
+		const scene = renderSequenceDiagram(
+			parseSequenceDiagram({
+				id: "nested-calls",
+				title: "Nested calls",
+				type: "sequence",
+				participants: Array.from({ length: 12 }, (_, index) => ({
+					id: `p${index}`,
+					label: `p${index}`,
+				})),
+				messages: [
+					...calls,
+					...calls.toReversed().map((call) => ({
+						id: `r${call.id.slice(1)}`,
+						source: "p1",
+						target: "p0",
+						label: call.label,
+						type: "return" as const,
+					})),
+				],
+			}),
+		);
+		const rows = calls.map((call) => arrow(scene, call.id).points[0].y);
+		expect(rows[1]! - rows[0]!).toBeLessThan(88);
+		const nodes = scene.elements.filter((e): e is NodeSceneElement => e.type === "node");
+		for (const element of scene.elements) {
+			if (element.type !== "arrow") continue;
+			const { points } = element;
+			const middle =
+				points.length === 3
+					? points[1]!
+					: { x: (points[0].x + points.at(-1)!.x) / 2, y: points[0].y };
+			const text = wrapTextToWidth(element.label ?? "", 160, 13);
+			const [width, height] = [
+				wrappedLabelWidth(text, 13, 160),
+				text.split("\n").length * 13 * 1.35,
+			];
+			for (const node of nodes)
+				expect(
+					middle.x - width / 2 < node.x + node.width &&
+						node.x < middle.x + width / 2 &&
+						middle.y - height / 2 < node.y + node.height &&
+						node.y < middle.y + height / 2,
+					`${element.edgeId} over ${node.nodeId}`,
+				).toBe(false);
+		}
+	});
+
+	it("keeps a diagram that reads at a screen's size at its natural spacing", () => {
+		const scene = renderSequenceDiagram(sequence);
+		const rows = ["start", "charge", "receipt"].map((id) => arrow(scene, id).points[0].y);
+		expect(rows[1]! - rows[0]!).toBe(88);
+		expect(rows[2]! - rows[1]!).toBe(88);
+		const headers = scene.elements
+			.filter((e): e is NodeSceneElement => e.type === "node" && !e.nodeId.includes(":"))
+			.toSorted((a, b) => a.x - b.x);
+		expect(headers[1]!.x - headers[0]!.x).toBe(320);
 	});
 
 	it("labels a message clear of the lifelines it passes", () => {
