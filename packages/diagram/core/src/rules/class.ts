@@ -7,6 +7,8 @@ export const CLASS_RULES = {
 	kinds:
 		'kind is "abstract", "interface" or "enum" (its values are attributes), or omitted for a class.',
 	ids: "Ids hold no colon or space; name defaults to the id.",
+	stereotype: (source: RuleSource) =>
+		`stereotype draws «text» over the name; set it only when ${source} states one.`,
 	relationships:
 		'kind "inheritance" or "realization": from extends or implements to; "composition" or "aggregation": from is the whole; "association"; "dependency": from uses to.',
 	multiplicities:

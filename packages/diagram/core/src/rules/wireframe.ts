@@ -13,6 +13,8 @@ export const WIREFRAME_RULES = {
 	target: "A button or link with target: a screen id opens that screen, drawn as an arrow to it.",
 	state:
 		"State: variant primary on the screen's main button, checked: true on what is on or selected, active on the selected tab or nav item, value on a field showing one.",
+	disabled: (source: RuleSource) =>
+		`disabled: true greys out a control ${source} says is unavailable.`,
 	/** The execute code parameter's form of `state`. */
 	stateCompact: 'Set variant "primary", checked and active as stated.',
 	copy: "Copy every screen, component, text and state stated, in order; invent none.",

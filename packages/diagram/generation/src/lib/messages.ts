@@ -78,11 +78,12 @@ const typeRule = (value: DiagramTypeValue) => `Use diagram type "${value}".`;
 
 const FLOWCHART_IR_INSTRUCTIONS = [
 	typeRule("flowchart"),
-	'Every node must have id, label, and kind: "start", "process", "decision", or "end".',
+	'Every node must have id, label, and kind: "start", "process", "decision", or "end", and may have a description.',
 	FLOWCHART_RULES.singleStart,
 	FLOWCHART_RULES.edgesByKind,
 	FLOWCHART_RULES.actionNodes(SCENARIO),
 	FLOWCHART_RULES.statedChecks,
+	FLOWCHART_RULES.technologyLabels,
 	FLOWCHART_RULES.noBranchBorrowing(SCENARIO),
 	FLOWCHART_RULES.statedEnd(SCENARIO),
 	FLOWCHART_RULES.decisionEdges,
@@ -151,6 +152,7 @@ const IR_INSTRUCTIONS = {
 			STATE_MACHINE_RULES.composite,
 			STATE_MACHINE_RULES.transitions,
 			`${STATE_MACHINE_RULES.reachable} ${STATE_MACHINE_RULES.endsLifecycle}`,
+			`Optional: layout { "direction": "LR" | "TB" } when the source states one. ${STATE_MACHINE_RULES.layout}`,
 		],
 	},
 	gantt: {
@@ -178,7 +180,7 @@ const IR_INSTRUCTIONS = {
 		rules: [
 			typeRule("class"),
 			"Use it for UML class diagrams and object-oriented designs; never supply coordinates.",
-			`Return classes: [{ id, name?, kind?, stereotype?, attributes, methods }]. ${CLASS_RULES.kinds} ${CLASS_RULES.ids}`,
+			`Return classes: [{ id, name?, kind?, stereotype?, attributes, methods }]. ${CLASS_RULES.kinds} ${CLASS_RULES.ids} ${CLASS_RULES.stereotype(SOURCE)}`,
 			CLASS_RULES.members,
 			`Return relationships: [{ id, kind, from, to, fromMultiplicity?, toMultiplicity?, fromRole?, toRole?, navigable?, label? }]. ${CLASS_RULES.relationships}`,
 			`${CLASS_RULES.multiplicities} ${CLASS_RULES.hierarchy}`,
@@ -191,7 +193,7 @@ const IR_INSTRUCTIONS = {
 			typeRule("org-chart"),
 			"Use it for org charts and team structures: who reports to whom; never supply coordinates.",
 			`Return people: [{ id, name, title?, department?, manager?, assistant?, avatar? }]. ${ORG_CHART_RULES.manager(SOURCE)} ${ORG_CHART_RULES.ids}`,
-			ORG_CHART_RULES.assistant,
+			`${ORG_CHART_RULES.assistant} ${ORG_CHART_RULES.avatar}`,
 			ORG_CHART_RULES.dottedLines(SOURCE),
 			ORG_CHART_RULES.groupOnlyWhenAsked(SOURCE),
 		],
@@ -201,9 +203,10 @@ const IR_INSTRUCTIONS = {
 		rules: [
 			typeRule("venn"),
 			"Use it for Venn diagrams: what two or three overlapping sets share; never supply coordinates or sizes.",
-			`Return sets: [{ id, label }] and regions: [{ sets, items?, count?, label? }]. ${VENN_RULES.regions}`,
+			`Return sets: [{ id, label, color? }] and regions: [{ sets, items?, count?, label? }]. ${VENN_RULES.regions}`,
 			VENN_RULES.contents(SOURCE),
 			VENN_RULES.placement,
+			VENN_RULES.colorWhenStated(SOURCE),
 		],
 	},
 	journey: {
@@ -222,7 +225,7 @@ const IR_INSTRUCTIONS = {
 			typeRule("sankey"),
 			"Use it for weighted flows between stages: budgets, traffic, funnels, energy or material flows; never supply coordinates.",
 			SANKEY_RULES.links,
-			`${SANKEY_RULES.optional} ${SANKEY_RULES.dropOff(SOURCE)}`,
+			`${SANKEY_RULES.optional} ${SANKEY_RULES.color(SOURCE)} ${SANKEY_RULES.dropOff(SOURCE)}`,
 		],
 	},
 	wireframe: {
@@ -233,7 +236,7 @@ const IR_INSTRUCTIONS = {
 			`Return screens: [{ id, name, device: "desktop" | "tablet" | "mobile", children }]. ${WIREFRAME_RULES.readingOrder}`,
 			`${WIREFRAME_RULES.containers(SOURCE)} ${WIREFRAME_RULES.rows}`,
 			`${WIREFRAME_RULES.widgets} ${WIREFRAME_RULES.nav} ${WIREFRAME_RULES.target}`,
-			WIREFRAME_RULES.state,
+			`${WIREFRAME_RULES.state} ${WIREFRAME_RULES.disabled(SOURCE)}`,
 			WIREFRAME_RULES.screens,
 		],
 	},
