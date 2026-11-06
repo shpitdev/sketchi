@@ -264,8 +264,6 @@ const PORT_MARGIN = 3;
 const MARK_REACH = 9;
 /** The router holds each port this far from its side's corners (scene's port padding). */
 const CORNER_CLEARANCE = 16;
-/** A row side holding more ends than this hands its farthest to the row's free side. */
-const CROWDED_ROW = 2;
 
 type Boxes = ReadonlyMap<
 	string,
@@ -322,42 +320,6 @@ function rowGroups(ends: readonly PinnedEnd[]): PinnedEnd[][] {
 		rows.set(key, [...(rows.get(key) ?? []), end]);
 	}
 	return [...rows.values()];
-}
-
-/**
- * Ends crowding one side of a row spill to its other side while that holds
- * fewer, the farthest reaching first: a line climbing past its table's top,
- * or dropping past its bottom, wraps around the table and clears the rest.
- * Loops keep their side. Reports whether any end moved.
- */
-function spillCrowdedRows(ends: readonly PinnedEnd[], boxes: Boxes): boolean {
-	let spilled = false;
-	for (const row of rowGroups(ends)) {
-		if (row.length <= CROWDED_ROW) continue;
-		const [entity, side] = [row[0]!.link[row[0]!.end].entity, row[0]!.side];
-		const box = boxes.get(entity)!;
-		const opposite = side === "left" ? "right" : "left";
-		let across = ends.filter(
-			(end) =>
-				end.link[end.end].entity === entity && end.side === opposite && end.row === row[0]!.row,
-		).length;
-		const reach = (end: PinnedEnd) => {
-			const target = rowOf(partnerOf(ends, end), boxes);
-			return Math.max(box.y - END_RUN - target, target - (box.y + box.height + END_RUN));
-		};
-		const movable = row
-			.filter((end) => partnerOf(ends, end).side !== end.side && reach(end) > 0)
-			.sort((a, b) => reach(b) - reach(a));
-		let here = row.length;
-		for (const end of movable) {
-			if (here - across < 2) break;
-			end.side = opposite;
-			here -= 1;
-			across += 1;
-			spilled = true;
-		}
-	}
-	return spilled;
 }
 
 /**
@@ -578,7 +540,13 @@ function routedScene(
 		style: diagram.style,
 		metadata: {},
 	} satisfies IntermediateDiagram;
-	return renderGraphDiagram(graph, { placement: placement.boxes, anchors, endRun: END_RUN });
+	return renderGraphDiagram(graph, {
+		placement: placement.boxes,
+		anchors,
+		endRun: END_RUN,
+		// Lines out of one table stand a row apart, as its rows of text do.
+		besideShared: ROW_HEIGHT,
+	});
 }
 
 /**
@@ -718,25 +686,19 @@ function detour(arrow: ArrowSceneElement): number {
 	return Math.max(0, length / (direct + 2 * END_RUN + 200) - 1);
 }
 
-/**
- * A placement, the tables and links it was made for and the option it was made
- * with, and whether its crowded rows spill to their free sides.
- */
+/** A placement, and the tables and links it was made for and the option it was made with. */
 interface Candidate {
 	readonly tables: ReadonlyMap<string, Table>;
 	readonly links: readonly Link[];
 	readonly placement: ErPlacement;
 	readonly option: ErPlacementOptions;
-	readonly spill: boolean;
 	/** Whether the ends on its grown rows pack around each row's middle instead of a line apart. */
 	readonly packed: boolean;
 }
 
-/** A candidate's ends, on the sides its placement gives them, spilled if it spills. */
+/** A candidate's ends, on the sides its placement gives them. */
 function endsOf(candidate: Candidate): PinnedEnd[] {
-	const ends = pinnedEnds(candidate.links, candidate.placement);
-	if (candidate.spill) spillCrowdedRows(ends, candidate.placement.boxes);
-	return ends;
+	return pinnedEnds(candidate.links, candidate.placement);
 }
 
 function sceneOf(diagram: ErDiagram, candidate: Candidate): RenderedDiagramScene {
@@ -992,49 +954,68 @@ function drawsNoWorse(after: RenderedDiagramScene, before: RenderedDiagramScene)
 }
 
 /**
- * Route each distinct candidate placement and keep the one that crosses least,
- * then give the ends on its crowded rows room of their own where that draws
- * no worse.
+ * Route each distinct candidate placement, then give the crowded rows of the
+ * few that cross least room for their ends, and keep the one that then costs
+ * least: rows that grow change which placement reads best.
  */
 function bestScene(
 	diagram: ErDiagram,
 	tables: ReadonlyMap<string, Table>,
 	links: readonly Link[],
-): { readonly scene: RenderedDiagramScene; readonly candidate: Candidate } {
+): Placed {
 	const options = diagram.entities.length > LARGE_SCHEMA ? PLACEMENTS.slice(0, 2) : PLACEMENTS;
 	const tried = new Set<string>();
-	let best:
-		| { cost: number; score: number; scene: RenderedDiagramScene; candidate: Candidate }
-		| undefined;
+	const placed: (Placed & { readonly score: number })[] = [];
 	for (const option of options) {
 		const placement = placeTables(tables, links, option);
 		const key = JSON.stringify([...placement.boxes, ...placement.sides]);
 		if (tried.has(key)) continue;
 		tried.add(key);
-		const candidate = { tables, links, placement, option, spill: false, packed: false };
+		const candidate = { tables, links, placement, option, packed: false };
 		const scene = sceneOf(diagram, candidate);
 		const cost = routedCost(scene);
 		// Another placement must beat the first, layered one clearly, not by a fraction.
-		const score = best ? cost : cost - PLACEMENT_MARGIN;
-		if (!best || score < best.score) best = { cost, score, scene, candidate };
+		placed.push({ scene, candidate, score: placed.length === 0 ? cost - PLACEMENT_MARGIN : cost });
 		if (cost === 0) break;
 	}
-	// The chosen placement also tries its crowded rows spilled to their free sides.
-	let chosen: { scene: RenderedDiagramScene; candidate: Candidate } = best!;
-	const spilled = { ...best!.candidate, spill: true };
-	if (spillCrowdedRows(pinnedEnds(spilled.links, spilled.placement), spilled.placement.boxes)) {
-		const scene = sceneOf(diagram, spilled);
-		if (routedCost(scene) < best!.cost) chosen = { scene, candidate: spilled };
-	}
-	// Then its crowded rows grow, a line to each end, or, where that draws worse,
-	// with their ends packed around each row's middle.
+	return placed
+		.toSorted((a, b) => a.score - b.score)
+		.slice(0, FINISHED_PLACEMENTS)
+		.map((start) => {
+			const roomy = roomyScene(diagram, start);
+			const margin = start === placed[0] ? PLACEMENT_MARGIN : 0;
+			return { ...roomy, score: routedCost(roomy.scene) - margin };
+		})
+		.reduce((kept, next) => (next.score < kept.score ? next : kept));
+}
+
+/** How many of the placements that cross least have their crowded rows grown (bestScene). */
+const FINISHED_PLACEMENTS = 3;
+
+interface Placed {
+	readonly scene: RenderedDiagramScene;
+	readonly candidate: Candidate;
+}
+
+/**
+ * A candidate with its crowded rows grown, a line to each end, or, where that
+ * draws worse, with their ends packed around each row's middle. Where both
+ * draw worse they grow all the same, whichever way costs less: more than two
+ * ends on one side of a plain row bunch their marks until a reader can't tell
+ * which end belongs to which line.
+ */
+function roomyScene(diagram: ErDiagram, start: Placed): Placed {
+	const grown: Placed[] = [];
 	for (const packed of [false, true]) {
-		const grown = grownCandidate(diagram, { ...chosen.candidate, packed });
-		if (grown.tables === chosen.candidate.tables) return chosen;
-		const scene = sceneOf(diagram, grown);
-		if (drawsNoWorse(scene, chosen.scene)) return { scene, candidate: grown };
+		const candidate = grownCandidate(diagram, { ...start.candidate, packed });
+		if (candidate.tables === start.candidate.tables) return start;
+		const scene = sceneOf(diagram, candidate);
+		if (drawsNoWorse(scene, start.scene)) return { scene, candidate };
+		grown.push({ scene, candidate });
 	}
-	return chosen;
+	return grown.reduce((kept, next) =>
+		routedCost(next.scene) < routedCost(kept.scene) ? next : kept,
+	);
 }
 
 /**

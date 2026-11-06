@@ -244,8 +244,10 @@ describe("crossed paired-return work", () => {
 });
 
 describe("ER routing work", () => {
-	// Measured: 7.1k checks for the two fixtures and 3.46M for the twenty-table
-	// marketplace, its candidate placements each routed in full.
+	// Measured: 7.1k checks for the two fixtures and 4.43M for the twenty-table
+	// marketplace, its candidate placements each routed in full and the three
+	// that cross least routed again with their crowded rows grown (3.46M when
+	// only the one chosen grew, and then only where that drew no worse).
 	it("bounds segment checks for typical schemas and the twenty-table stress schema", () => {
 		work.checks = 0;
 		renderErDiagram(erFixture);
