@@ -352,7 +352,69 @@ function classIssues(request: string, diagram: Json): CoverageIssue[] {
 			message: `The diagram draws a ${text(relationship["kind"]) || "relationship"} between ${names[0]} and ${names[1]}, but nothing in the request relates them: no field, signature, body or sentence names both. Remove it.`,
 		});
 	}
+	for (const { names } of unstatedWholeParts(request, diagram)) {
+		issues.push({
+			code: "class_whole_part_unstated",
+			message: `The diagram draws ${names[0]}–${names[1]} as a composition, but the request never calls that pair composed or part of the other. Draw it as an association, keeping its multiplicities and roles.`,
+		});
+	}
 	return issues;
+}
+
+/** A sentence that makes one thing part of another: "is composed of", "aggregates", "made of", "owns". */
+const WHOLE_PART =
+	/\b(?:compos\w*|aggregat\w*|made (?:up )?of|consists? of|comprised? of|part of|owns?|owned by)\b/iu;
+const MERMAID_WHOLE_PART =
+	/^\s*([A-Za-z_]\w*)\s*(?:"[^"]*"\s*)?(?:\*--|--\*|o--|--o)\s*(?:"[^"]*"\s*)?([A-Za-z_]\w*)/gmu;
+
+/**
+ * Compositions between declared classes that the request supports as a relationship but never
+ * states as whole and part: a field typed with another class is an association unless a
+ * sentence calls the pair composed.
+ */
+function unstatedWholeParts(
+	request: string,
+	diagram: Json,
+): { readonly relationship: Json; readonly names: readonly [string, string] }[] {
+	const declaredNames = new Map(
+		declaredClasses(request).map((entry) => [entry.name.toLowerCase(), entry]),
+	);
+	if (declaredNames.size === 0) return [];
+	const sentences = outsideDeclarations(request)
+		.split(/[.;\n]+/u)
+		.filter((sentence) => WHOLE_PART.test(sentence))
+		.map((sentence) => stems(sentence));
+	const mermaid = [...request.matchAll(MERMAID_WHOLE_PART)].map((match) =>
+		[match[1] ?? "", match[2] ?? ""].map((name) => name.toLowerCase()),
+	);
+	const unstated = new Set(
+		unstatedRelationships(request, diagram).map(({ relationship }) => relationship),
+	);
+	const nameOfId = new Map(records(diagram["classes"]).map((entry) => [text(entry["id"]), entry]));
+	return records(diagram["relationships"]).flatMap((relationship) => {
+		const kind = text(relationship["kind"]);
+		// An aggregation of a collection field reads as a loose whole; a composition claims ownership.
+		if (kind !== "composition" || unstated.has(relationship)) return [];
+		const ends = [relationship["from"], relationship["to"]].map(
+			(end) => text(end).split(".")[0] ?? "",
+		);
+		const [a, b] = ends.map((end) =>
+			declaredNames.get((text(nameOfId.get(end)?.["name"]) || end).toLowerCase()),
+		);
+		if (!a || !b || a === b) return [];
+		const stated =
+			sentences.some((sentence) =>
+				[a.name, b.name].every((name) =>
+					nameStems(name).every((word) => holds(new Set(sentence), word)),
+				),
+			) ||
+			mermaid.some(
+				([left, right]) =>
+					(left === a.name.toLowerCase() && right === b.name.toLowerCase()) ||
+					(left === b.name.toLowerCase() && right === a.name.toLowerCase()),
+			);
+		return stated ? [] : [{ relationship, names: [a.name, b.name] as const }];
+	});
 }
 
 /** Relationships between declared classes that no member, signature, body or sentence supports. */
@@ -1007,7 +1069,10 @@ export function keepsStatedStructure(
 		}
 		case "class": {
 			const unstated = new Set(
-				unstatedRelationships(request, original).flatMap(({ relationship }) =>
+				[
+					...unstatedRelationships(request, original),
+					...unstatedWholeParts(request, original),
+				].flatMap(({ relationship }) =>
 					links(
 						{ ...original, relationships: [relationship] },
 						"relationships",
