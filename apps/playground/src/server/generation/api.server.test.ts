@@ -736,6 +736,75 @@ describe("revising a stored diagram", () => {
 	});
 });
 
+describe("styling a diagram with a request", () => {
+	function styledText(styles: unknown): string {
+		const { title, type, ...rest } = flowchartIr;
+		return JSON.stringify({ title, diagram: { ...rest, type }, styles });
+	}
+
+	it("returns the colors and shapes the request asks for as patch operations", async () => {
+		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
+		const env: StudioEnv = {
+			AI: fakeAiGateway(
+				styledText([
+					{ targets: ["decision"], fillColor: "#ede9fe", strokeColor: "#7c3aed", shape: "diamond" },
+					{ targets: ["e4"], strokeColor: "#dc2626" },
+				]),
+				(input) => observedRuns.push(input),
+			),
+		};
+		const response = await generateRequest(env, {
+			prompt:
+				"Release approval; draw the decision as a purple diamond and the incomplete path in red",
+			type: "flowchart",
+		});
+
+		expect(response.status).toBe(200);
+		expect(JSON.stringify(observedRuns[0])).toContain("Styling:");
+		const body = (await response.json()) as {
+			diagram: { patch?: { operations: Array<{ op: string }> } };
+		};
+		expect(body.diagram.patch?.operations.map((operation) => operation.op)).toEqual([
+			"setStyle",
+			"setShape",
+			"setStyle",
+		]);
+	});
+
+	it("leaves a request without color or shape words unstyled and its prompt without styling rules", async () => {
+		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(flowchartIr), (input) => observedRuns.push(input)),
+		};
+		const response = await generateRequest(env, { prompt: "Release approval", type: "flowchart" });
+
+		expect(response.status).toBe(200);
+		expect(JSON.stringify(observedRuns[0])).not.toContain("Styling:");
+		const body = (await response.json()) as { diagram: { patch?: unknown } };
+		expect(body.diagram.patch).toBeUndefined();
+	});
+
+	it("drops styles that match nothing in the diagram with a warning", async () => {
+		const env: StudioEnv = {
+			AI: fakeAiGateway(styledText([{ targets: ["nowhere"], fillColor: "#fee2e2" }])),
+		};
+		const response = await generateRequest(env, {
+			prompt: "Release approval with a red review step",
+			type: "flowchart",
+		});
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			diagram: { patch?: unknown };
+			issues: Array<{ code: string; severity: string }>;
+		};
+		expect(body.diagram.patch).toBeUndefined();
+		expect(body.issues).toContainEqual(
+			expect.objectContaining({ code: "unknown_patch_target", severity: "warning" }),
+		);
+	});
+});
+
 describe("generation request boundaries", () => {
 	it.each([
 		"gemini-2.5-flash",

@@ -10,6 +10,8 @@ export class GeneratedDiagramResponse extends Schema.Class<GeneratedDiagramRespo
 	"GeneratedDiagramResponse",
 )({
 	diagram: Schema.optionalKey(Schema.Unknown),
+	/** Colors and shapes the request asks for, applied after the build; read by generatedStyles. */
+	styles: Schema.optionalKey(Schema.Unknown),
 	title: Schema.optionalKey(Schema.String),
 }) {}
 

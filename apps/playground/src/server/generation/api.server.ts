@@ -9,6 +9,7 @@ import {
 	canonicalDocumentFromDiagram,
 } from "@sketchi/diagram-agent";
 import {
+	type DiagramStyle,
 	extractJsonObject,
 	type DiagramGenerationCandidate,
 	type DiagramGenerationError,
@@ -80,6 +81,11 @@ interface GenerateSuccess {
 		};
 		readonly scene: unknown;
 		readonly excalidraw: unknown;
+		/**
+		 * Colors and shapes the request asked for, as patch operations for the caller to apply to the
+		 * scene above, as an MCP agent applies them with applyDiagramPatch.
+		 */
+		readonly patch?: { readonly operations: ReadonlyArray<unknown> };
 	};
 	readonly generation: {
 		readonly attempts?: number;
@@ -276,6 +282,25 @@ function baseDiagram(
 		diagram: { type: base.type, ...spec },
 		...(typeof spec["id"] === "string" ? { id: spec["id"] } : {}),
 	};
+}
+
+/** The patch operations that draw the styles a response asked for. */
+function styleOperations(styles: ReadonlyArray<DiagramStyle>): unknown[] {
+	return styles.flatMap((style) => {
+		const targets = [...style.targets];
+		const selector = { nodeIds: targets, edgeIds: targets, labels: targets };
+		const colors = {
+			...(style.fillColor ? { fillColor: style.fillColor } : {}),
+			...(style.strokeColor ? { strokeColor: style.strokeColor } : {}),
+			...(style.textColor ? { textColor: style.textColor } : {}),
+		};
+		return [
+			...(Object.keys(colors).length > 0 ? [{ op: "setStyle", selector, style: colors }] : []),
+			...(style.shape
+				? [{ op: "setShape", selector: { nodeIds: targets, labels: targets }, shape: style.shape }]
+				: []),
+		];
+	});
 }
 
 /** Build a generated document with its family's Code Mode operation. */
@@ -508,6 +533,32 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 
 	const scene = inlineArtifact(buildResult.artifact, "scene");
 	const excalidraw = inlineArtifact(buildResult.artifact, "excalidraw");
+	// Styles reach the caller only when they apply to the built diagram; otherwise it draws unstyled.
+	const operations = styleOperations(candidate.styles ?? []);
+	const styled =
+		operations.length === 0
+			? undefined
+			: yield* codeMode
+					.applyDiagramPatch({
+						source: { artifactId: buildResult.artifact.artifactId },
+						intent: "Colors and shapes the request asks for",
+						operations,
+						options: { artifactFormats: ["scene"], inlineArtifacts: [] },
+					})
+					.pipe(Effect.provideService(PlaygroundNamedLogoFill, true));
+	const styleIssues: CodeModeIssue[] =
+		styled === undefined || styled.ok
+			? []
+			: [
+					{
+						code: "unknown_patch_target",
+						severity: "warning",
+						stage: "input",
+						ref: { kind: "request", path: "styles" },
+						message: "The colors or shapes the request asked for did not match the diagram.",
+						hint: "Name the steps to style by their labels, or patch the stored diagram.",
+					},
+				];
 	if (scene === undefined || excalidraw === undefined) {
 		return yield* finish(
 			{ prompt, type, spec },
@@ -535,11 +586,13 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 				hint: warning.hint,
 			})),
 			...buildResult.issues.filter((entry) => entry.severity === "warning"),
+			...styleIssues,
 		],
 		diagram: {
 			document: { type, spec },
 			scene,
 			excalidraw,
+			...(styled?.ok ? { patch: { operations } } : {}),
 		},
 		generation: {
 			...(candidate.attempts === undefined ? {} : { attempts: candidate.attempts }),

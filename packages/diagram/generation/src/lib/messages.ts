@@ -54,6 +54,8 @@ export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPromp
 	 * The request then says what to change.
 	 */
 	base: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+	/** The request asks for colors or shapes (see asksForStyling), so the prompt says how to return them. */
+	styling: Schema.optionalKey(Schema.Boolean),
 }) {}
 
 /** Provider adapters map these onto their own system and user channels. */
@@ -606,6 +608,13 @@ const REVISION_INSTRUCTIONS = [
 	"Keep every element the request does not change, with its id, label, details and order. Change, add or remove only what the request asks.",
 ];
 
+/** Colors and shapes, sent only to a request that asks for them, so other requests pay nothing. */
+const STYLING_INSTRUCTIONS = [
+	'When the scenario asks for colors or shapes, also return styles: [{ "targets", "fillColor"?, "strokeColor"?, "textColor"?, "shape"? }] beside diagram, and nothing else when it does not.',
+	'targets lists the ids or labels of the nodes and edges a style applies to. Colors are #rrggbb: a colored node takes the color as strokeColor and its pale tint as fillColor, so its label stays readable (red #dc2626 on #fee2e2, orange #ea580c on #ffedd5, yellow #ca8a04 on #fef9c3, green #16a34a on #dcfce7, blue #2563eb on #dbeafe, purple #7c3aed on #ede9fe, gray #6b7280 on #f3f4f6); a colored edge takes strokeColor alone. shape is "rectangle", "diamond", "ellipse" or "circle".',
+	"Style exactly what the scenario asks for; the diagram's content stays as the other rules say.",
+];
+
 /** The current diagram as the model reads it: its content, without the fixed palette. */
 function baseDiagramJson(base: Readonly<Record<string, unknown>>): string {
 	const { style: _style, ...content } = base;
@@ -633,6 +642,9 @@ export function buildDiagramGenerationMessages(
 		...COMMON_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
 		...(prompt.base
 			? ["", "Revision:", ...REVISION_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
+			: []),
+		...(prompt.styling
+			? ["", "Styling:", ...STYLING_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
 			: []),
 		// A caller that names the family gets only that family's rules; otherwise the model picks.
 		...(explicitType ? [explicitType] : DIAGRAM_TYPES).flatMap((type) => [
