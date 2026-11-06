@@ -39,7 +39,7 @@ describe("placeNodeLogos", () => {
 		]);
 	});
 
-	it("matches aliases and keeps model choices on nodes no label claims", () => {
+	it("matches aliases and keeps a logo only where its own label names it", () => {
 		const result = placeNodeLogos(
 			[
 				{ id: "store", label: "Store rows in Postgres" },
@@ -49,21 +49,23 @@ describe("placeNodeLogos", () => {
 			logos,
 		);
 
-		expect(icons(result.nodes)).toEqual(["postgresql", "redis", undefined]);
+		// A logo never stands in for a technology the label leaves out.
+		expect(icons(result.nodes)).toEqual(["postgresql", undefined, undefined]);
 		expect(result.diagnostics).toEqual([
 			expect.stringContaining('icon_placed: node "store" names postgresql'),
+			'icon_dropped: node "cache" logo "redis" is not named by its label "Cache lookup".',
 			expect.stringContaining('icon_not_in_prompt: node "made-up" icon "kafka"'),
 		]);
 	});
 
-	it("never places everyday-word logos from a label, only the model's choice", () => {
+	it("never places everyday-word logos from a label, and keeps the model's where its label names it", () => {
 		const result = placeNodeLogos(
 			[
 				{ id: "build", label: "Build the API service", icon: { slug: "go" } },
 				{ id: "live", label: "Go Live" },
-				{ id: "ship", label: "Deploy With Go" },
+				{ id: "ship", label: "Deploy With Go", icon: { slug: "go" } },
 				{ id: "file", label: "File Ticket In Linear" },
-				{ id: "track", label: "Track work", icon: { slug: "linear" } },
+				{ id: "track", label: "Track work in Linear", icon: { slug: "linear" } },
 				{ id: "page", label: "Render Page" },
 			],
 			[
@@ -74,14 +76,16 @@ describe("placeNodeLogos", () => {
 		);
 
 		expect(icons(result.nodes)).toEqual([
+			undefined,
+			undefined,
 			"go",
-			undefined,
-			undefined,
 			undefined,
 			"linear",
 			undefined,
 		]);
-		expect(result.diagnostics).toEqual([]);
+		expect(result.diagnostics).toEqual([
+			'icon_dropped: node "build" logo "go" is not named by its label "Build the API service".',
+		]);
 	});
 
 	describe("vendor logos", () => {
@@ -108,11 +112,12 @@ describe("placeNodeLogos", () => {
 				vendors,
 			);
 
-			expect(icons(result.nodes)).toEqual([undefined, "docker", undefined, undefined]);
+			expect(icons(result.nodes)).toEqual([undefined, undefined, undefined, undefined]);
 			expect(result.diagnostics).toEqual([
-				'icon_dropped: node "ingress" logo "kubernetes" is a vendor logo, but its label "Ingress controller" does not name Kubernetes.',
-				'icon_dropped: node "s3" logo "aws" is a vendor logo, but its label "S3 bucket" does not name AWS.',
-				'icon_dropped: node "edge" logo "cloudflare" is a vendor logo, but its label "Edge worker" does not name Cloudflare.',
+				'icon_dropped: node "ingress" logo "kubernetes" is not named by its label "Ingress controller".',
+				'icon_dropped: node "build" logo "docker" is not named by its label "Build the image".',
+				'icon_dropped: node "s3" logo "aws" is not named by its label "S3 bucket".',
+				'icon_dropped: node "edge" logo "cloudflare" is not named by its label "Edge worker".',
 			]);
 		});
 
@@ -121,7 +126,7 @@ describe("placeNodeLogos", () => {
 				[
 					{ id: "ship", label: "Ship to Cloudflare Workers", icon: { slug: "cloudflare" } },
 					{ id: "fn", label: "Amazon Lambda", icon: { slug: "aws" } },
-					{ id: "gke", label: "GKE cluster", icon: { slug: "kubernetes" } },
+					{ id: "gke", label: "Kubernetes cluster on GKE", icon: { slug: "kubernetes" } },
 				],
 				vendors,
 			);
@@ -142,7 +147,7 @@ describe("placeNodeLogos", () => {
 
 			expect(icons(result.nodes)).toEqual(["cloudflare", undefined]);
 			expect(result.diagnostics).toEqual([
-				'icon_dropped: participant "queue" logo "aws" is a vendor logo, but its label "Job queue" does not name AWS.',
+				'icon_dropped: participant "queue" logo "aws" is not named by its label "Job queue".',
 			]);
 		});
 	});

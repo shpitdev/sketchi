@@ -148,7 +148,7 @@ describe("generated node icons", () => {
 		expect(enforced.error).toBeUndefined();
 		expect(nodeIcons(enforced)).toEqual([{ slug: "github" }, undefined, undefined]);
 		expect(enforced.diagnostics).toEqual([
-			'icon_dropped: node "build" logo "kubernetes" is a vendor logo, but its label "Build the image" does not name Kubernetes.',
+			'icon_dropped: node "build" logo "kubernetes" is not named by its label "Build the image".',
 		]);
 	});
 

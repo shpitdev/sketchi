@@ -484,7 +484,7 @@ describe("Studio chat node logos", () => {
 					...spec,
 					nodes: spec.nodes.map((node, index) =>
 						index === 0
-							? { ...node, icon: { slug: "GitHub" } }
+							? { ...node, label: "Open release on GitHub", icon: { slug: "GitHub" } }
 							: index === 1
 								? { ...node, icon: { slug: "kubernetes" } }
 								: node,

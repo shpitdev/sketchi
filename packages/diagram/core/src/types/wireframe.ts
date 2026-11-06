@@ -834,6 +834,29 @@ function itemText(item: unknown): unknown {
 	);
 }
 
+/** The chart a kind's common names draw: columns and histograms are bars, a donut is a pie. */
+const CHART_KIND_ALIASES: Readonly<Record<string, (typeof WIREFRAME_CHART_KINDS)[number]>> = {
+	column: "bar",
+	columns: "bar",
+	histogram: "bar",
+	stackedbar: "bar",
+	horizontalbar: "bar",
+	donut: "pie",
+	doughnut: "pie",
+	ring: "pie",
+	area: "line",
+	trend: "line",
+	timeseries: "line",
+	sparkline: "line",
+	spline: "line",
+};
+
+function chartKind(value: string): (typeof WIREFRAME_CHART_KINDS)[number] | undefined {
+	return (WIREFRAME_CHART_KINDS as readonly string[]).includes(value)
+		? (value as (typeof WIREFRAME_CHART_KINDS)[number])
+		: CHART_KIND_ALIASES[value];
+}
+
 function resolveComponent(input: unknown): unknown {
 	if (!isRecord(input)) return input;
 	const rest: Record<string, unknown> = { ...input };
@@ -983,8 +1006,9 @@ function resolveComponent(input: unknown): unknown {
 	if (type === "chart") {
 		const kind = take(rest, ["kind", "chartType", "variant"]);
 		if (typeof kind === "string") {
-			const value = squash(kind).replace(/chart$/u, "");
-			resolved["kind"] = value === "donut" ? "pie" : value === "area" ? "line" : value;
+			// A kind no wireframe chart draws leaves a plain chart placeholder rather than a failure.
+			const known = chartKind(squash(kind).replace(/chart$/u, ""));
+			if (known) resolved["kind"] = known;
 		} else if (kind !== undefined) resolved["kind"] = kind;
 	}
 	if (type === "sidebar") {

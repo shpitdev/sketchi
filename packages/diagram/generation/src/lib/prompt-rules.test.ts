@@ -47,12 +47,14 @@ describe("generation prompt rules", () => {
 		expect(system).toContain(
 			"table (columns: an array of header strings, rows: placeholder count)",
 		);
-		expect(system).toContain("footer (holds whatever the source puts at the bottom)");
+		expect(system).toContain(
+			"Content the source places at the bottom of a screen goes in its footer, even a single line.",
+		);
 	});
 
 	it("gives every stated action a node, on return paths too", () => {
 		expect(system).toContain("Give every action the scenario states its own node");
-		expect(system).toContain("A return path that names an action, even waiting");
+		expect(system).toContain("A return path that names an action or a state, even waiting");
 	});
 
 	it("keeps a field typed as another class in its box, with a role on its relationship", () => {
@@ -135,5 +137,33 @@ describe("generation reaches every field an MCP agent can set", () => {
 		}
 		expect(system).toContain("may have a description");
 		expect(system).toContain('layout { "direction": "LR" | "TB" } when the source states one');
+	});
+});
+
+describe("rules that close the graded gap with the MCP agent", () => {
+	it("keeps class relationships to what the code states and implies", () => {
+		expect(system).toContain(CLASS_RULES.onlyStated("the source"));
+		expect(system).toContain('with toMultiplicity "*" for a collection');
+	});
+
+	it("keeps sequence order, branch-specific steps, branch names, zones and footers as stated", () => {
+		for (const rule of [
+			SEQUENCE_RULES.keepOrder("the scenario"),
+			FLOWCHART_RULES.noBranchBorrowing("the scenario"),
+			FLOWCHART_RULES.branchNames("the scenario"),
+			FLOWCHART_RULES.zonesOutside,
+		]) {
+			expect(system).toContain(rule);
+		}
+	});
+
+	it("asks for each named technology's name to stay in the label that carries its logo", () => {
+		const { user } = buildDiagramGenerationMessages({
+			id: "logos",
+			request: "Cache answers in Redis",
+			requestedType: "flowchart",
+			logos: [{ slug: "redis", name: "Redis" }],
+		});
+		expect(user).toContain("keep that name in the label");
 	});
 });

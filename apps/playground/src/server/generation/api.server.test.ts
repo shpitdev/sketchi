@@ -396,7 +396,7 @@ describe("public generate endpoint", () => {
 			...flowchartIr,
 			nodes: flowchartIr.nodes.map((node) =>
 				node.id === "start"
-					? { ...node, icon: { slug: "github" } }
+					? { ...node, label: "Change pushed to GitHub", icon: { slug: "github" } }
 					: node.id === "review"
 						? { ...node, icon: { slug: "kubernetes" } }
 						: node,

@@ -235,6 +235,19 @@ describe("wireframe contract", () => {
 		expect(getWireframeValidationIssues(parseWireframeDiagram(resolved))).toEqual([]);
 	});
 
+	it("draws a chart placeholder whatever kind name a model writes", () => {
+		const chart = (kind: unknown) =>
+			resolveWireframeShorthand({
+				screens: [{ name: "Dashboard", children: [{ type: "chart", label: "Revenue", kind }] }],
+			}) as { screens: [{ children: [Record<string, unknown>] }] };
+		const kinds = ["column", "Doughnut", "time-series", "stacked bar", "pie chart", "line"].map(
+			(kind) => chart(kind).screens[0].children[0]["kind"],
+		);
+		expect(kinds).toEqual(["bar", "pie", "line", "bar", "pie", "line"]);
+		// A kind no wireframe chart draws leaves a plain chart, not a failed diagram.
+		expect(chart("kpi").screens[0].children[0]).toEqual({ type: "chart", label: "Revenue" });
+	});
+
 	it("reads a lone screen written at the top", () => {
 		const resolved = resolveWireframeShorthand({
 			id: "login",

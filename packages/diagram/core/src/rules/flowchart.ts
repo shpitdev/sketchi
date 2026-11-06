@@ -18,7 +18,7 @@ export const FLOWCHART_RULES = {
 	separateNodes: (source: RuleSource) =>
 		`Keep every requested step and decision in a separate node, preserving ${source}'s step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.`,
 	actionNodes: (source: RuleSource) =>
-		`Give every action ${source} states its own node; never fold one into an edge label, another node, or a check. A return path that names an action, even waiting, passes through a node for it before it rejoins.`,
+		`Give every action ${source} states its own node; never fold one into an edge label, another node, or a check. A return path that names an action or a state, even waiting, passes through a node for it before it rejoins.`,
 	statedChecks:
 		'A stated check or verification ("verify the signature", "stock is checked") is its own process node before the decision that reads its result; "check whether X" alone is just that decision.',
 	labelWords: (source: RuleSource) =>
@@ -26,7 +26,9 @@ export const FLOWCHART_RULES = {
 	labelForm:
 		'Label a step as a short action ("Resize image"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause ("if the image is too large", "whether …", "is resized").',
 	noBranchBorrowing: (source: RuleSource) =>
-		`Add no next step ${source} gives only to other branches.`,
+		`A step or check ${source} gives to some branches stays on those branches; never copy it onto another.`,
+	branchNames: (source: RuleSource) =>
+		`A branch ${source} names by its outcome ("pass", "retest", "reject") is the label on its decision's edge, never a decision of its own.`,
 	statedEnd: (source: RuleSource) =>
 		`If ${source} says where the flow ends, every branch leads to that node. Otherwise a branch with no stated next step stops at its last step: mark that step as the end node, never a new result after it.`,
 	namedOutcomes: (source: RuleSource) =>
@@ -50,6 +52,7 @@ export const FLOWCHART_RULES = {
 		`For swimlanes, a process across actors or roles, declare lanes in ${source}'s order and set each node's lane to its actor; lanes take no groups.`,
 	groupsCompact: (source: RuleSource) =>
 		`Only when ${source} groups steps (teams, zones, phases), declare groups and set each member's group to its innermost group id; others stay ungrouped. Nested zones set parent (subnet in VPC) and kind. Set shape, even on a start or end: "database" databases; "document" files, archives, reports; "queue" queues, streams, topics; "storage" buckets, object stores. Only users stay ellipses. An architecture starts at its entry and ends at each sink.`,
+	zonesOutside: "Anything stated as outside a zone stays outside it.",
 	lanes: (source: RuleSource) =>
 		`For swimlanes, a process across actors or roles, add lanes [{ "id", "label" }] in ${source}'s order and set every node's lane to its actor; lanes take no groups.`,
 	direction: (source: RuleSource) =>

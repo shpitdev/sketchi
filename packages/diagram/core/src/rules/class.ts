@@ -18,7 +18,9 @@ export const CLASS_RULES = {
 		'Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only.',
 	hierarchy: "Interfaces extend only interfaces, and inheritance never cycles.",
 	typedFields: (source: RuleSource) =>
-		`A field typed as another class stays in attributes and also draws a relationship whose toRole is the field's name. It is an association; only pairs ${source} calls composed or aggregated take those kinds. A cast to or call on another class inside a method body draws a dependency.`,
+		`A field typed as another class stays in attributes and also draws a relationship whose toRole is the field's name, with toMultiplicity "*" for a collection. It is an association; only pairs ${source} calls composed or aggregated take those kinds. A cast to or call on another class inside a method body draws a dependency.`,
+	onlyStated: (source: RuleSource) =>
+		`Draw exactly the relationships ${source} states and those its fields, casts and calls imply; add none between classes the code never connects.`,
 	copy: (source: RuleSource) =>
 		`Copy every class, member, relationship, multiplicity and role ${source} states; invent none.`,
 } as const;
