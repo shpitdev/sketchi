@@ -235,6 +235,47 @@ describe("wireframe contract", () => {
 		expect(getWireframeValidationIssues(parseWireframeDiagram(resolved))).toEqual([]);
 	});
 
+	it("reads kind as the type, a chart kind alone as a chart, a text styled as a heading as one, and the type when a component names both", () => {
+		const resolved = resolveWireframeShorthand({
+			id: "dash",
+			title: "Dash",
+			type: "wireframe",
+			screens: [
+				{
+					id: "home",
+					name: "Home",
+					children: [
+						{
+							kind: "container",
+							type: "sidebar",
+							children: [{ kind: "heading", text: "Northstar" }],
+						},
+						{ kind: "row", children: [{ kind: "line", label: "Revenue" }] },
+						{ kind: "column", children: [{ kind: "header", children: [{ kind: "search" }] }] },
+						{ kind: "text", text: "Northstar", variant: "heading" },
+						{ kind: "table", columns: ["Order"], rows: "placeholder" },
+						{ kind: "table", columns: ["Order"], rows: "3" },
+					],
+				},
+			],
+		});
+		expect(resolved).toMatchObject({
+			screens: [
+				{
+					children: [
+						{ type: "sidebar", children: [{ type: "heading", text: "Northstar" }] },
+						{ type: "row", children: [{ type: "chart", kind: "line", label: "Revenue" }] },
+						{ type: "column", children: [{ type: "header", children: [{ type: "search" }] }] },
+						{ type: "heading", text: "Northstar" },
+						{ type: "table", columns: ["Order"] },
+						{ type: "table", columns: ["Order"], rows: 3 },
+					],
+				},
+			],
+		});
+		expect(JSON.stringify(resolved)).not.toContain('"kind":"container"');
+	});
+
 	it("draws a chart placeholder whatever kind name a model writes", () => {
 		const chart = (kind: unknown) =>
 			resolveWireframeShorthand({

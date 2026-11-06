@@ -865,9 +865,27 @@ function resolveComponent(input: unknown): unknown {
 	// A chart kind written as the type is a chart of that kind.
 	if (raw === undefined && typeof rest["kind"] === "string") {
 		const kind = squash(rest["kind"]);
-		if (!(WIREFRAME_CHART_KINDS as readonly string[]).includes(kind)) {
+		// "kind" names the component ("column" is a layout column), or, as "line" alone, a chart.
+		const component =
+			(WIREFRAME_COMPONENT_TYPES as readonly string[]).includes(kind) ||
+			alias(TYPE_ALIASES, kind) !== undefined;
+		if (!component && chartKind(kind.replace(/chart$/u, "")) !== undefined) raw = "chart";
+		else {
 			raw = rest["kind"];
 			delete rest["kind"];
+		}
+	}
+	// A text styled as a heading ("variant": "heading", "style": "h2") is that heading.
+	if (typeof raw === "string" && squash(raw) === "text") {
+		const key = ["variant", "style"].find((name) => {
+			const value = rest[name];
+			if (typeof value !== "string") return false;
+			const named = squash(value);
+			return named === "heading" || alias(TYPE_ALIASES, named) === "heading";
+		});
+		if (key) {
+			raw = rest[key];
+			delete rest[key];
 		}
 	}
 	const squashed = typeof raw === "string" ? squash(raw) : undefined;
@@ -879,6 +897,15 @@ function resolveComponent(input: unknown): unknown {
 				: (alias(TYPE_ALIASES, squashed) ?? raw);
 	const resolved: Record<string, unknown> = { type };
 	if (typeof type !== "string") return { ...rest, type };
+	// "kind": "container" beside "type": "sidebar" names the component twice; the type decides.
+	if (type !== "chart" && type !== "button" && typeof rest["kind"] === "string") {
+		const named = squash(rest["kind"]);
+		if (
+			(WIREFRAME_COMPONENT_TYPES as readonly string[]).includes(named) ||
+			alias(TYPE_ALIASES, named) !== undefined
+		)
+			delete rest["kind"];
+	}
 	if (squashed !== undefined && /^h[1-4]$/u.test(squashed) && rest["level"] === undefined)
 		resolved["level"] = Math.min(3, Number(squashed.slice(1)));
 	if (squashed === "barchart" || squashed === "linechart" || squashed === "piechart")
@@ -1010,9 +1037,15 @@ function resolveComponent(input: unknown): unknown {
 		if (Array.isArray(headers)) resolved["columns"] = headers.map(itemText);
 		else if (headers !== undefined) resolved["columns"] = headers;
 		const rows = take(rest, ["rows", "data", "rowCount"], true);
+		// "rows": "3" is three rows; "rows": "placeholder" names no count, so the table draws its default.
+		const count = typeof rows === "string" ? Number(rows) : undefined;
 		resolved["rows"] = Array.isArray(rows)
 			? Math.max(1, Math.min(WIREFRAME_MAX_ROWS, rows.length))
-			: rows;
+			: count === undefined
+				? rows
+				: Number.isInteger(count) && count > 0
+					? count
+					: undefined;
 		if (resolved["rows"] === undefined) delete resolved["rows"];
 	}
 	if (type === "grid") {

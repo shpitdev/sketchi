@@ -703,6 +703,26 @@ function decodeAndValidate<S extends Schema.ConstraintDecoder<unknown>>(
 	}
 }
 
+/**
+ * Arrows and comparison signs a model copies from a request ("dept → service"), in ASCII. The
+ * CLI's export font has no arrows, so one "→" in a label would fail the whole PNG.
+ */
+const ASCII_GLYPHS: ReadonlyArray<readonly [RegExp, string]> = [
+	[/[→⟶➔➜➝➞➡]/gu, "->"],
+	[/[←⟵⬅]/gu, "<-"],
+	[/[↔⟷]/gu, "<->"],
+	[/[⇒⟹]/gu, "=>"],
+	[/[⇐⟸]/gu, "<="],
+	[/[⇔⟺]/gu, "<=>"],
+	[/≥/gu, ">="],
+	[/≤/gu, "<="],
+	[/≠/gu, "!="],
+];
+
+function withPlainGlyphs(text: string): string {
+	return ASCII_GLYPHS.reduce((value, [glyph, ascii]) => value.replace(glyph, ascii), text);
+}
+
 export function candidateFromText(
 	input: Omit<DiagramGenerationCandidate, "diagnostics" | "text"> & {
 		diagnostics?: string[];
@@ -718,8 +738,14 @@ export function candidateFromText(
 		};
 	}
 
-	const parsed = parseCandidateDiagram(input.text);
+	const plain = withPlainGlyphs(input.text);
+	const parsed = parseCandidateDiagram(plain);
 	if (parsed.success) {
+		if (plain !== input.text) {
+			diagnostics.push(
+				"glyph_replaced: arrows and comparison signs are written in ASCII, which every export font draws.",
+			);
+		}
 		diagnostics.push(...(parsed.diagnostics ?? []));
 		return {
 			...input,
