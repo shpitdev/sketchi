@@ -152,8 +152,11 @@ assigning final custom domains. A push to `main` deploys only the Workers whose
 `build` it reaches, compared with the previous `main` commit. That includes
 changes in a shared package the app depends on. The check uses Nx's task-input
 selection (`NX_LEGACY_AFFECTED=false nx show projects --affected --withTarget=build`),
-so a change only to tests, stories, docs, CI or repository scripts deploys
-nothing. When the previous commit is unknown, the push deploys all five. A
+so a change only to tests, stories, docs, CI or repository scripts no build
+imports deploys nothing. A repository file a Worker's Vite config imports, such
+as `scripts/lib/excalidraw-fonts.mjs`, is listed in that app's `build` inputs and
+in the workflow's push filter. A contract test fails when one is missing from
+either. When the previous commit is unknown, the push deploys all five. A
 manual dispatch deploys all five, or the one app it names. A Worker whose deploy
 failed stays on its last version until a later push reaches it or someone
 dispatches it. Production deploys also pass `--no-x-provision`; Workers may bind

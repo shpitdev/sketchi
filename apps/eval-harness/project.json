@@ -7,6 +7,13 @@
 	"targets": {
 		"build": {
 			"executor": "nx:run-commands",
+			"inputs": [
+				"production",
+				"^production",
+				"{workspaceRoot}/scripts/lib/excalidraw-fonts.mjs",
+				"{workspaceRoot}/scripts/lib/worker-apps.mjs",
+				"{workspaceRoot}/tools/local-dev-ports.ts"
+			],
 			"outputs": [
 				"{workspaceRoot}/dist/apps/eval-harness",
 				"{projectRoot}/.wrangler/deploy/config.json"

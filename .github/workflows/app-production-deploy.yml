@@ -5,12 +5,15 @@ on:
   push:
     branches:
       - main
-    # Every workspace package plus the root files Nx counts as build inputs. A push outside these
-    # (docs, CI, repository scripts) cannot reach a Worker build, so it starts nothing.
+    # Every workspace package, the root files Nx counts as build inputs, and the repository scripts
+    # Worker builds import (each app's `build` inputs list them). A push outside these (docs, CI,
+    # other scripts) cannot reach a Worker build, so it starts nothing.
     paths:
       - "apps/**"
       - "packages/**"
       - "tools/**"
+      - "scripts/lib/excalidraw-fonts.mjs"
+      - "scripts/lib/worker-apps.mjs"
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"

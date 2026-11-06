@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { globSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
+import { posix } from "node:path";
 import test from "node:test";
 
 import {
@@ -211,8 +212,73 @@ test("the production push filter covers every workspace package and shared build
 	for (const file of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]) {
 		assert.ok(paths.includes(file), file);
 	}
-	assert.ok(
-		!paths.some((path) => path.startsWith("scripts/")),
-		"repository scripts deploy nothing",
-	);
+});
+
+const repoRoot = new URL("../../../", import.meta.url);
+
+// A GitHub `paths` filter entry: `dir/**` covers everything under dir; anything else is one file.
+const pathFilterCovers = (paths, file) =>
+	paths.some((path) => (path.endsWith("/**") ? file.startsWith(path.slice(0, -2)) : path === file));
+
+// Workspace package roots and names. A package reaches a build through Nx's `^production`.
+const workspacePackages = new Map(
+	yaml
+		.load(read("pnpm-workspace.yaml"))
+		.packages.flatMap((glob) => globSync(`${glob}/package.json`, { cwd: repoRoot }))
+		.map((manifest) => [posix.dirname(manifest), JSON.parse(read(manifest)).name]),
+);
+const packageRootOf = (path) =>
+	[...workspacePackages.keys()].find((root) => path.startsWith(`${root}/`));
+
+/**
+ * The local paths a project's build configs reach outside the project, following the imports of
+ * every module they reach outside workspace packages. A specifier resolves to its file the way
+ * Vite would; a directory or asset path is kept as written.
+ */
+function externalBuildPaths(projectRoot, configs) {
+	const resolveModule = (path) =>
+		["", ".ts", ".mts", ".mjs", ".js", "/index.ts"]
+			.map((suffix) => `${path}${suffix}`)
+			.find((candidate) =>
+				statSync(new URL(candidate, repoRoot), { throwIfNoEntry: false })?.isFile(),
+			);
+	const found = new Set();
+	const queue = configs.map((config) => `${projectRoot}/${config}`);
+	for (let file = queue.shift(); file; file = queue.shift()) {
+		for (const [, specifier] of read(file).matchAll(/["'](\.{1,2}\/[^"'`$]*)["']/g)) {
+			const target = posix.normalize(posix.join(posix.dirname(file), specifier));
+			if (target.startsWith(`${projectRoot}/`) || target.startsWith("node_modules/")) continue;
+			const module = resolveModule(target);
+			const path = module ?? target;
+			if (found.has(path)) continue;
+			found.add(path);
+			if (module && /\.[mc]?[jt]s$/.test(module) && !packageRootOf(module)) queue.push(module);
+		}
+	}
+	return [...found];
+}
+
+test("every file a Worker build reaches outside its project redeploys that app", () => {
+	const paths = workflow.on.push.paths;
+	for (const projectId of workerProjectIds) {
+		const { projectRoot } = workerProjectConfig(projectId);
+		const manifest = JSON.parse(read(`${projectRoot}/package.json`));
+		const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
+		const inputs = JSON.parse(read(`${projectRoot}/project.json`)).targets.build.inputs ?? [];
+		const external = externalBuildPaths(projectRoot, ["vite.config.ts", "wrangler.jsonc"]);
+		assert.ok(external.length > 0, `${projectId}: the scan must see the config's imports`);
+		for (const path of external) {
+			const owner = packageRootOf(path);
+			if (owner) {
+				const name = workspacePackages.get(owner);
+				assert.ok(name in dependencies, `${projectId} must depend on ${name} to build ${path}`);
+				continue;
+			}
+			assert.ok(
+				inputs.includes(`{workspaceRoot}/${path}`),
+				`${projectId}: ${path} must be a build input`,
+			);
+			assert.ok(pathFilterCovers(paths, path), `${path} must start a production deploy run`);
+		}
+	}
 });
