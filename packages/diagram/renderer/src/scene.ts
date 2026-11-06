@@ -7788,7 +7788,10 @@ function zonesWithoutAlongsideRoom(layout: DiagramLayout): Set<string> {
  * How short each gap between consecutive ranks of a column, or columns of
  * lanes, can draw: one that lines only cross straight, COMPACT_GAP; one that
  * lines turn in, a stub either side of the turns, which keep a port's spacing
- * apart. With `straight`, only the gaps lines cross straight.
+ * apart. With `straight`, only the gaps lines cross straight. In a wrapped
+ * flow each band counts only its own lines' turns, since every band starts
+ * at the top, and the gap at a band's end, where the next band starts again,
+ * has no length to tighten.
  */
 function compactGaps(
 	diagram: IntermediateDiagram,
@@ -7818,25 +7821,41 @@ function compactGaps(
 			bottom: Math.max(...boxes.map((box) => box[along] + box[size])),
 		};
 	});
-	// Where along the flow lines run across it.
+	// Where along the flow lines run across it, and the bands of their ends.
 	const across = vertical ? "x" : "y";
+	const { bandOf } = arrangement.wrap;
+	const bandOfNode = (id: string) => bandOf.get(id) ?? 0;
 	const turns = layout.edgeArrows.flatMap((arrow) =>
 		arrow.points.slice(1).flatMap((point, index) => {
 			const previous = arrow.points[index]!;
 			return Math.abs(point[along] - previous[along]) <= AXIS_ALIGNED_EPSILON &&
 				Math.abs(point[across] - previous[across]) > AXIS_ALIGNED_EPSILON
-				? [point[along]]
+				? [
+						{
+							at: point[along],
+							bands: [bandOfNode(arrow.sourceNodeId), bandOfNode(arrow.targetNodeId)],
+						},
+					]
 				: [];
 		}),
 	);
 	const gaps = new Map<number, number>();
 	for (let index = 0; index < spans.length - 1; index += 1) {
+		const band = bandOfNode(columns[index]![0]!);
+		if (bandOfNode(columns[index + 1]![0]!) !== band) continue;
 		const [upper, lower] = [spans[index]!, spans[index + 1]!];
 		// Ranks run down the page in TB and up it in BT, columns right in LR and left in RL.
 		const [from, to] =
 			upper.bottom <= lower.top ? [upper.bottom, lower.top] : [lower.bottom, upper.top];
 		const levels = new Set(
-			turns.filter((at) => at > from + AXIS_ALIGNED_EPSILON && at < to - AXIS_ALIGNED_EPSILON),
+			turns
+				.filter(
+					({ at, bands }) =>
+						bands.includes(band) &&
+						at > from + AXIS_ALIGNED_EPSILON &&
+						at < to - AXIS_ALIGNED_EPSILON,
+				)
+				.map(({ at }) => at),
 		).size;
 		if (levels === 0) gaps.set(index, COMPACT_GAP);
 		else if (!straight) gaps.set(index, 2 * ROUTE_STUB_LENGTH + (levels - 1) * PORT_SPACING);
@@ -11393,21 +11412,33 @@ export function renderGraphDiagram(
 		// A rival already beaten as repaired needs no tightening or head repair.
 		if (hopeless?.(layout)) return { layout, settled: best };
 		// A plain column, or a laned flow, still too long for its breadth, which no
-		// wrap shortened, tightens along the flow. In lanes, a handoff to a lane
+		// wrap shortened, tightens along the flow; so do the bands of a wrapped
+		// flow whose text a screen still shrinks below WRAP_MIN_COLUMN_TEXT. In
+		// lanes, a handoff to a lane
 		// further than the next first stays in its source's column where the lanes
 		// between are empty there (laneColumns). Then rank or column gaps draw as
 		// short as the lines in them allow (compactGaps), or, failing that, only
-		// those lines cross straight. Each is kept when it reads shorter, routes no
-		// worse, lengthens, hooks or detours no line and crowds no label more. Lanes
+		// those lines cross straight. Each is kept when it reads shorter (a wrapped
+		// flow: its long side shrinks, which tighter bands can reach by rerouting a
+		// line that ran out around them), routes no worse, lengthens, hooks or
+		// detours no line and crowds no label more. Lanes
 		// tighten only while no line runs through an arrowhead, before or after: the
 		// head repair below reroutes such a line, and closed-up lanes leave it less
 		// room to.
+		const wrapped = () => best.arrangement.wrap.continuations.size > 0;
+		const longSide = (drawn: DiagramLayout) => {
+			const { width, height } = lengthOf(drawn).size;
+			return Math.max(width, height);
+		};
 		const tightenable = () =>
 			arranged &&
 			orthogonal &&
 			(laned(diagram) || (vertical && !structure)) &&
-			best.arrangement.wrap.continuations.size === 0 &&
-			lengthOf(layout).aspect >= COMPACT_ASPECT &&
+			(wrapped()
+				? !laned(diagram) &&
+					(NODE_LABEL_FONT_SIZE * FITTED_LONG_SIDE) / (longSide(layout) + 2 * EXPORT_PADDING) <
+						WRAP_MIN_COLUMN_TEXT
+				: lengthOf(layout).aspect >= COMPACT_ASPECT) &&
 			(!laned(diagram) || headCrossers(layout).size === 0);
 		const tighten = (arrangement: Arrangement) => {
 			const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
@@ -11426,7 +11457,9 @@ export function renderGraphDiagram(
 				hookedRoutes(candidate) <= hookedRoutes(layout) &&
 				detouredLines(candidate.edgeArrows) <= detouredLines(layout.edgeArrows) &&
 				labelCrowding(candidate).every((count, index) => count <= labelCrowding(layout)[index]!) &&
-				lengthOf(candidate).aspect < lengthOf(layout).aspect
+				(wrapped()
+					? longSide(candidate) < longSide(layout) - AXIS_ALIGNED_EPSILON
+					: lengthOf(candidate).aspect < lengthOf(layout).aspect)
 			) {
 				best = compact;
 				layout = candidate;
