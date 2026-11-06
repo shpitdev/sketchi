@@ -47,13 +47,16 @@ import {
 	parseIntermediateDiagram,
 	arrowheadsNear,
 	candidateRouteQuality,
+	candidateTouches,
 	routingCorridorGap,
 	routingCorridorRun,
 	routingJogReach,
 	routingQualityFindings,
 	routingQualityScale,
+	routingTouchGap,
 	routingWideBend,
 	sharedSegments,
+	touchingLines,
 	wrapTextToUnits,
 } from "@sketchi/diagram-core";
 
@@ -110,6 +113,11 @@ const ARROWHEAD_WING = (20 * Math.PI) / 180;
 const CORRIDOR_SEARCH_STEPS = 5_000;
 /** Grid-search cost of crossing another arrow: a detour this much longer reads better. */
 const CROSSING_COST = 320;
+/**
+ * Grid-search cost of a turn on another line, or a step past another line's
+ * turn or end: the two read as one line that forks there, worse than crossing.
+ */
+const TOUCH_COST = 1000;
 
 type ConnectionEdge = "top" | "right" | "bottom" | "left";
 
@@ -1072,6 +1080,8 @@ const CROSSING_SWEEPS = 8;
  * more; denser diagrams keep a single routing pass.
  */
 const CROSSING_REPAIR_MAX_EDGES = 24;
+/** Room past two facing stubs, when spread, for a lane each a corridor's width apart. */
+const FACING_LANES = 2 * ROUTE_STUB_LENGTH;
 /** Reduced rank orders by diagram; they depend on the graph, not on node sizes. */
 const reducedOrders = new WeakMap<IntermediateDiagram, ReadonlyMap<number, readonly string[]>>();
 
@@ -1306,20 +1316,23 @@ function rankLayout(
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
 	stubReach: ReadonlyMap<string, number>,
 	reorder = false,
+	spreadFacing = false,
 ) {
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
 	// Neighbors in a rank keep room for the stubs on their facing sides, so a long
-	// labeled stub never reaches the next node or meets its stub head-on.
+	// labeled stub never reaches the next node or meets its stub head-on, and,
+	// spread, a lane for each line beyond its stub (Arrangement.spreadFacing).
 	const [lowSide, highSide]: readonly [ConnectionEdge, ConnectionEdge] = vertical
 		? ["left", "right"]
 		: ["top", "bottom"];
-	const gapBetween = (left: NodeSceneElement, right: NodeSceneElement) =>
-		Math.max(
+	const gapBetween = (left: NodeSceneElement, right: NodeSceneElement) => {
+		const high = stubReach.get(portKey(left.nodeId, highSide)) ?? 0;
+		const low = stubReach.get(portKey(right.nodeId, lowSide)) ?? 0;
+		return Math.max(
 			HORIZONTAL_GAP,
-			(stubReach.get(portKey(left.nodeId, highSide)) ?? 0) +
-				(stubReach.get(portKey(right.nodeId, lowSide)) ?? 0) +
-				PORT_SPACING,
+			high + low + (spreadFacing && high > 0 && low > 0 ? FACING_LANES : PORT_SPACING),
 		);
+	};
 	const buckets = edgeBuckets(diagram.edges);
 	const shapesByNodeId = sizedShapes(diagram, minimumSizes, buckets, vertical);
 	const feedbackEdges = flowFeedback(diagram);
@@ -1490,6 +1503,19 @@ interface Arrangement {
 	 * or an overlap: a line through a head reads as pointing into its target.
 	 */
 	readonly clearHeads?: boolean;
+	/**
+	 * Route each edge so it bends and ends clear of other lines, and other lines'
+	 * bends and ends clear of it, before anything but a node or an overlap: two
+	 * lines that meet anywhere but a clean crossing read as one line that forks.
+	 */
+	readonly clearTouches?: boolean;
+	/**
+	 * Neighbors in a rank whose facing sides both send or take a line keep, past
+	 * both stubs, room for a lane each (FACING_LANES): two lines turning into one
+	 * narrow gap between neighbors, as branches converging on shared targets
+	 * from neighboring decisions do, otherwise turn on or beside each other.
+	 */
+	readonly spreadFacing?: boolean;
 	/** In lanes, move a departure off a side that lines arrive by. */
 	readonly separateRoles?: boolean;
 	/**
@@ -1994,7 +2020,7 @@ function positionNodes(
 	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }> = new Map(),
 	stubReach: ReadonlyMap<string, number> = new Map(),
-	{ compactGaps, reorder, widenGaps, wrap }: Arrangement = PLAIN_ARRANGEMENT,
+	{ compactGaps, reorder, spreadFacing, widenGaps, wrap }: Arrangement = PLAIN_ARRANGEMENT,
 	centers: ReadonlyMap<string, number> = new Map(),
 ): NodeSceneElement[] {
 	const { gapAfter, gapBetween, highSide, lowSide, rankMetrics, reachOf, vertical } = rankLayout(
@@ -2002,6 +2028,7 @@ function positionNodes(
 		minimumSizes,
 		stubReach,
 		reorder,
+		spreadFacing,
 	);
 	const bands: { index: number; metric: RankMetric }[][] = [];
 	for (const [index, metric] of rankMetrics.entries()) {
@@ -4784,6 +4811,13 @@ function stubReachForRoutes(
 
 /** Arrival stubs reserved for lines not yet routed; their heads are drawn full size. */
 const reservedArrivals = new WeakSet<ArrowSceneElement>();
+/** Departure stubs reserved for lines not yet routed. */
+const reservedDepartures = new WeakSet<ArrowSceneElement>();
+
+/** The free end of a reserved stub, which its line runs on from: no bend until routed. */
+function openEnd(arrow: ArrowSceneElement): "start" | "end" | undefined {
+	return reservedArrivals.has(arrow) ? "start" : reservedDepartures.has(arrow) ? "end" : undefined;
+}
 
 /** Reserve fixed endpoint approaches before any route can occupy a later route's stub. */
 function endpointStubsForRoutes(
@@ -4806,22 +4840,21 @@ function endpointStubsForRoutes(
 				end,
 			],
 		};
-		reservedArrivals.add(arrival);
-		return [
-			{
-				...arrow,
-				endArrowhead: null,
-				points: [
+		const departure: ArrowSceneElement = {
+			...arrow,
+			endArrowhead: null,
+			points: [
+				start,
+				pointAwayFromEdge(
 					start,
-					pointAwayFromEdge(
-						start,
-						route.sourceEdge,
-						sourceStubLength(route, start, ROUTE_STUB_LENGTH),
-					),
-				],
-			},
-			arrival,
-		];
+					route.sourceEdge,
+					sourceStubLength(route, start, ROUTE_STUB_LENGTH),
+				),
+			],
+		};
+		reservedArrivals.add(arrival);
+		reservedDepartures.add(departure);
+		return [departure, arrival];
 	});
 }
 
@@ -5101,6 +5134,112 @@ function existingRouteSegments(existingArrows: readonly ArrowSceneElement[]): Ro
 	);
 }
 
+/** Other lines a candidate meets anywhere but a clean crossing (touchingLines). */
+function routeTouchCount(
+	points: readonly ScenePoint[],
+	route: RoutedEdge,
+	routed: RoutedSoFar,
+): number {
+	return (
+		routed.touches?.({
+			id: `edge:${route.edge.id}`,
+			points,
+			sourceId: route.edge.source,
+			targetId: route.edge.target,
+		}) ?? 0
+	);
+}
+
+/**
+ * Touches a grid search judges step by step: other lines' turns and ends
+ * within the gap of a step, and other lines' runs within the gap of a turn.
+ */
+interface TouchGrid {
+	readonly gap: number;
+	readonly step: (from: ScenePoint, to: ScenePoint, arrowId: string) => number;
+	readonly turn: (point: ScenePoint, arrowId: string) => number;
+}
+
+/** First index in a list sorted by `key` whose key is at least `value`. */
+function lowerBound<T>(list: readonly T[], key: (item: T) => number, value: number): number {
+	let [low, high] = [0, list.length];
+	while (low < high) {
+		const middle = (low + high) >> 1;
+		if (key(list[middle]!) < value) low = middle + 1;
+		else high = middle;
+	}
+	return low;
+}
+
+function touchGrid(arrows: readonly ArrowSceneElement[], gap: number): TouchGrid {
+	const lines = arrows.filter((arrow) => !arrow.id.startsWith(GROUP_OUTLINE));
+	// A reserved stub's free end is no bend: its line may run straight on.
+	const bends = lines
+		.flatMap((arrow) => {
+			const points = straightRuns(arrow.points);
+			const open = openEnd(arrow);
+			return (
+				open === "start" ? points.slice(1) : open === "end" ? points.slice(0, -1) : points
+			).map((point) => ({ id: arrow.id, point }));
+		})
+		.sort((a, b) => a.point.x - b.point.x);
+	const runs: Record<AxisAlignedSegment["orientation"], CrossingRun[]> = {
+		horizontal: [],
+		vertical: [],
+	};
+	for (const arrow of lines)
+		for (const segment of segmentsFromPoints(straightRuns(arrow.points)))
+			runs[segment.orientation].push({
+				arrowId: arrow.id,
+				at: segment.staticCoordinate,
+				min: segment.min,
+				max: segment.max,
+			});
+	for (const list of Object.values(runs)) list.sort((a, b) => a.at - b.at);
+	const near = (value: number, low: number, high: number) =>
+		value > low - gap && value < high + gap;
+	return {
+		gap,
+		step: (from, to, arrowId) => {
+			const [minX, maxX] = [Math.min(from.x, to.x), Math.max(from.x, to.x)];
+			const [minY, maxY] = [Math.min(from.y, to.y), Math.max(from.y, to.y)];
+			const touched = new Set<string>();
+			for (
+				let index = lowerBound(bends, (bend) => bend.point.x, minX - gap + AXIS_ALIGNED_EPSILON);
+				index < bends.length && bends[index]!.point.x < maxX + gap;
+				index += 1
+			) {
+				const { id, point } = bends[index]!;
+				if (id === arrowId || !near(point.y, minY, maxY)) continue;
+				const dx = Math.max(minX - point.x, 0, point.x - maxX);
+				const dy = Math.max(minY - point.y, 0, point.y - maxY);
+				if (Math.hypot(dx, dy) < gap) touched.add(id);
+			}
+			return touched.size;
+		},
+		turn: (point, arrowId) => {
+			const touched = new Set<string>();
+			for (const [orientation, at, along] of [
+				["horizontal", point.y, point.x],
+				["vertical", point.x, point.y],
+			] as const) {
+				const list = runs[orientation];
+				for (
+					let index = lowerBound(list, (run) => run.at, at - gap + AXIS_ALIGNED_EPSILON);
+					index < list.length && list[index]!.at < at + gap;
+					index += 1
+				) {
+					const run = list[index]!;
+					if (run.arrowId === arrowId) continue;
+					const beyond = Math.max(run.min - along, 0, along - run.max);
+					if (Math.hypot(beyond, at - run.at) < gap) touched.add(run.arrowId);
+				}
+			}
+			return touched.size;
+		},
+	};
+}
+
 function routeArrowOverlapCount(
 	points: readonly ScenePoint[],
 	existingSegments: readonly RouteSegment[],
@@ -5297,6 +5436,8 @@ interface RouteOptions {
 	readonly avoidCrossings?: boolean;
 	/** Keep clear of other lines' arrowheads first (see Arrangement.clearHeads). */
 	readonly clearHeads?: boolean;
+	/** Bend and end clear of other lines first (see Arrangement.clearTouches). */
+	readonly clearTouches?: boolean;
 	/** Offer any line between facing sides a step midway, as the drawn layout's polish does. */
 	readonly midway?: boolean;
 }
@@ -5314,6 +5455,36 @@ interface RoutedSoFar {
 	readonly outlines: readonly RouteSegment[];
 	readonly quality?: ReturnType<typeof candidateRouteQuality>;
 	readonly segments: readonly RouteSegment[];
+	/** Other lines a route meets anywhere but a clean crossing, when routes bend clear of lines first. */
+	readonly touches?: ReturnType<typeof candidateTouches>;
+	/** Turns and ends of other lines, and their runs, a grid search keeps a touch gap from then. */
+	readonly touchGrid?: TouchGrid;
+}
+
+/** Touch scoring against the arrows routed so far: a reserved stub's free end is no bend. */
+function touchScoring(
+	arrows: readonly ArrowSceneElement[],
+	readerScale: number,
+): Pick<RoutedSoFar, "touches" | "touchGrid"> {
+	return {
+		touches: candidateTouches(
+			arrows.flatMap((arrow) => {
+				if (arrow.id.startsWith(GROUP_OUTLINE)) return [];
+				const open = openEnd(arrow);
+				return [
+					{
+						id: arrow.id,
+						points: arrow.points,
+						sourceId: arrow.sourceNodeId,
+						targetId: arrow.targetNodeId,
+						...(open ? { openEnd: open } : {}),
+					},
+				];
+			}),
+			readerScale,
+		),
+		touchGrid: touchGrid(arrows, routingTouchGap(readerScale)),
+	};
 }
 
 function routedSoFar(
@@ -5322,6 +5493,7 @@ function routedSoFar(
 	avoidCrossings = false,
 	clearHeads = false,
 	shared?: { readonly of: (arrow: ArrowSceneElement) => boolean; readonly gap: number },
+	clearTouches = false,
 ): RoutedSoFar {
 	const arrows = routedArrows.some((arrow) => arrow.id.startsWith(LANE_OUTLINE))
 		? routedArrows.filter((arrow) => !arrow.id.startsWith(LANE_OUTLINE))
@@ -5342,6 +5514,7 @@ function routedSoFar(
 					...(avoidCrossings ? { crossings: crossingLookup(arrows) } : {}),
 					...(clearHeads ? { heads: arrowheadsNear(scored, readerScale) } : {}),
 					quality: sharedQuality(scored, arrows, readerScale, shared),
+					...(clearTouches ? touchScoring(arrows, readerScale) : {}),
 				}),
 		outlines: existingRouteSegments(
 			routedArrows.filter((arrow) => arrow.id.startsWith(GROUP_OUTLINE)),
@@ -5544,6 +5717,7 @@ function chooseBestRoute(
 			...(borders ? [routeBorderRunCount(candidate, shapes, ignoredNodeIds)] : []),
 			routeSelfOverlapCount(candidate, route),
 			routeArrowOverlapCount(candidate, routed.segments, route),
+			routeTouchCount(candidate, route, routed),
 			routed.heads ? quality.arrowheadsCrossed : 0,
 			routeOutlineBesideCount(candidate, routed.outlines),
 			quality.corridors,
@@ -6591,13 +6765,18 @@ function obstacleRoute(
 	crossings?: CrossingLookup,
 	borders = false,
 	heads?: RoutedSoFar["heads"],
+	touches?: TouchGrid,
 ): [ScenePoint, ...ScenePoint[]] | undefined {
-	// With a corridor gap, also offer lanes far enough from each routed point to read apart.
+	// With a corridor gap, also offer lanes far enough from each routed point to read apart,
+	// and with a touch gap, lanes clear of each turn and end.
 	const lanes = (coordinate: number) =>
-		[...new Set([PORT_SPACING, Math.max(PORT_SPACING, corridorGap + 1)])].flatMap((offset) => [
-			coordinate - offset,
-			coordinate + offset,
-		]);
+		[
+			...new Set([
+				PORT_SPACING,
+				Math.max(PORT_SPACING, corridorGap + 1),
+				Math.max(PORT_SPACING, (touches?.gap ?? 0) + 1),
+			]),
+		].flatMap((offset) => [coordinate - offset, coordinate + offset]);
 	const xs = [
 		...new Set([
 			startStub.x,
@@ -6671,6 +6850,18 @@ function obstacleRoute(
 	const costs = new Map<number, number>([[key(initial.x, initial.y, initial.axis), 0]]);
 	// Each grid edge's obstacle test and length, computed once however often it is relaxed.
 	const edgeCosts = new Map<number, number | undefined>();
+	// What turning at each grid point costs beyond the turn itself, computed once.
+	const turnCosts = new Map<number, number>();
+	const turnCost = (x: number, y: number, point: ScenePoint) => {
+		if (!touches) return 0;
+		const at = x * ys.length + y;
+		let cost = turnCosts.get(at);
+		if (cost === undefined) {
+			cost = touches.turn(point, arrowId) * TOUCH_COST;
+			turnCosts.set(at, cost);
+		}
+		return cost;
+	};
 	for (let steps = 0; pending.size && steps < maxSteps; steps += 1) {
 		const current = pending.pop();
 		if (current.cost !== costs.get(key(current.x, current.y, current.axis))) continue;
@@ -6725,6 +6916,7 @@ function obstacleRoute(
 								(lane ? (lane.beside + lane.overlaps) * 1000 : 0) +
 								// Through another line's head costs as much as overlapping it.
 								(heads ? heads(point, next, arrowId) * 10000 : 0) +
+								(touches ? touches.step(point, next, arrowId) * TOUCH_COST : 0) +
 								(crossings && step
 									? crossings.step(
 											step.orientation,
@@ -6738,7 +6930,10 @@ function obstacleRoute(
 			}
 			const edgeCost = edgeCosts.get(gridEdge);
 			if (edgeCost === undefined) continue;
-			const cost = current.cost + edgeCost + (axis === current.axis ? 0 : 24);
+			const cost =
+				current.cost +
+				edgeCost +
+				(axis === current.axis ? 0 : 24 + turnCost(current.x, current.y, point));
 			const id = key(x, y, axis);
 			if (cost >= (costs.get(id) ?? Infinity)) continue;
 			costs.set(id, cost);
@@ -6757,6 +6952,7 @@ function exteriorLaneRoute(
 	{
 		avoidCrossings,
 		clearHeads,
+		clearTouches,
 		readerScale,
 		guided,
 		bandOf,
@@ -6935,6 +7131,7 @@ function exteriorLaneRoute(
 		avoidCrossings,
 		clearHeads,
 		route.besideShared === undefined ? undefined : { of: sharesNode, gap: route.besideShared },
+		clearTouches,
 	);
 	// Among zones, or between boxes a family placed (tables, classes), a run
 	// along a node's border reads as part of the node.
@@ -6971,7 +7168,10 @@ function exteriorLaneRoute(
 	const wanders =
 		route.pinned !== undefined &&
 		routeBacktrackDistance(best) + routeTargetOvershootDistance(best) > 0;
-	if (hard || border || quality(best).corridors || wanders) {
+	// Bending clear of other lines first, a line that touches one searches the
+	// whole grid, for lanes that also read apart.
+	const touching = routeTouchCount(best, route, routed) > 0;
+	if (hard || touching || border || quality(best).corridors || wanders) {
 		// Search lanes that read apart only when a corridor is what remains to fix.
 		const detour = obstacleRoute(
 			start,
@@ -6983,13 +7183,15 @@ function exteriorLaneRoute(
 			existingArrows,
 			routed.segments,
 			routed.outlines,
-			hard ? 0 : gap,
+			// Bending clear of other lines, lanes that read apart are searched for too.
+			hard && !clearTouches ? 0 : gap,
 			// A corridor or a crossing is polish: search a bounded neighborhood, never the whole grid.
 			hard ? Infinity : CORRIDOR_SEARCH_STEPS,
 			guided,
 			routed.crossings,
 			strict,
 			routed.heads,
+			routed.touchGrid,
 		);
 		if (detour)
 			return chooseBestRoute([best, detour], shapes, ignoredNodeIds, route, routed, strict);
@@ -7047,6 +7249,16 @@ function routeAllEdges(
 	// Hand arrows back in edge order so labels and z-order follow the diagram.
 	return routes.map((route) => edgeArrows.find((arrow) => arrow.edgeId === route.edge.id)!);
 }
+
+/**
+ * Touching lines few enough to route again, together and one at a time, each
+ * after all the others; a graph with more is too tangled for that to clear.
+ */
+const TOUCH_MOVES = 6;
+/** Rounds of clearing touching lines, each kept only where it touches fewer. */
+const TOUCH_ROUNDS = 2;
+/** Candidates a round of clearing touching lines draws in full, clearest first. */
+const TOUCH_DRAWINGS = 3;
 
 /** Reroutes allowed after a layout still has an export defect. */
 const MAX_REROUTES = 4;
@@ -8274,6 +8486,7 @@ function layoutDiagramOnce(
 		...(lanes ? { lanes } : {}),
 		...(arrangement.avoidCrossings ? { avoidCrossings: true } : {}),
 		...(arrangement.clearHeads ? { clearHeads: true } : {}),
+		...(arrangement.clearTouches ? { clearTouches: true } : {}),
 	};
 	let edgeArrows = routeAllEdges(
 		routedEdges,
@@ -8508,7 +8721,8 @@ function headCrossers(layout: DiagramLayout): Set<string> {
  * reader-scale findings, each judged at its own export size, and no newly
  * extreme or longer aspect, unless `narrower` and only narrower. Without
  * `jogs`, a jog beside a port does not count, being minor next to the extreme
- * aspect a zoned wrap removes.
+ * aspect a zoned wrap removes. With `touches`, each pair of lines that touch
+ * (touchingLines) counts as a finding.
  */
 function routesNoWorse(
 	candidate: Pick<DiagramLayout, "edgeArrows" | "groups" | "lanes" | "nodeShapes">,
@@ -8517,10 +8731,18 @@ function routesNoWorse(
 	runs = true,
 	narrower = false,
 	jogs = true,
+	touches = false,
 ): boolean {
 	const [crossings, currentCrossings] = [candidate, current].map((layout) =>
 		arrowCrossings(layout.edgeArrows, runs),
 	);
+	// Lines that touch, where counted, are reader findings too.
+	const findings = (layout: typeof candidate) =>
+		readerFindingCount(
+			layout.edgeArrows,
+			[...layout.nodeShapes, ...groupBlocks(layout.groups), ...laneBlocks(layout.lanes)],
+			jogs,
+		) + (touches ? touchingLineCount(layout) : 0);
 	const [size, currentSize] = [candidate, current].map((layout) =>
 		drawnSize(
 			[...layout.nodeShapes, ...groupBlocks(layout.groups), ...laneBlocks(layout.lanes)],
@@ -8538,16 +8760,7 @@ function routesNoWorse(
 			aspect! <= currentAspect! + AXIS_ALIGNED_EPSILON ||
 			// Narrower without growing longer: its text fits no smaller.
 			(narrower && longSide(size!) <= longSide(currentSize!) + AXIS_ALIGNED_EPSILON)) &&
-		readerFindingCount(
-			candidate.edgeArrows,
-			[...candidate.nodeShapes, ...groupBlocks(candidate.groups), ...laneBlocks(candidate.lanes)],
-			jogs,
-		) <=
-			readerFindingCount(
-				current.edgeArrows,
-				[...current.nodeShapes, ...groupBlocks(current.groups), ...laneBlocks(current.lanes)],
-				jogs,
-			)
+		findings(candidate) <= findings(current)
 	);
 }
 
@@ -10416,6 +10629,38 @@ function nearOutlines({ edgeArrows, nodeShapes }: DiagramLayout): number {
 	);
 }
 
+/** Pairs of lines that meet anywhere but a clean crossing, at the drawing's export scale. */
+function touchingPairs({
+	edgeArrows,
+	groups,
+	lanes,
+	nodeShapes,
+}: Pick<DiagramLayout, "edgeArrows" | "groups" | "lanes" | "nodeShapes">) {
+	const scale = routingQualityScale(
+		drawnSize([...nodeShapes, ...groupBlocks(groups), ...laneBlocks(lanes)], edgeArrows),
+	);
+	return touchingLines(
+		edgeArrows.map((arrow) => ({
+			id: arrow.edgeId,
+			points: arrow.points,
+			sourceId: arrow.sourceNodeId,
+			targetId: arrow.targetNodeId,
+		})),
+		scale,
+	);
+}
+
+function touchingLineCount(
+	layout: Pick<DiagramLayout, "edgeArrows" | "groups" | "lanes" | "nodeShapes">,
+): number {
+	return touchingPairs(layout).length;
+}
+
+/** Edges whose lines touch another line anywhere but a clean crossing. */
+function touchingEdges(layout: DiagramLayout): Set<string> {
+	return new Set(touchingPairs(layout).flatMap((pair) => pair.arrowIds));
+}
+
 /**
  * Pairs of lines drawn along one visible segment (sharedSegments), judged at
  * the export size of everything drawn.
@@ -10454,6 +10699,30 @@ function drawsNoWorse(
 		labels!.every((count, index) => count <= currentLabels![index]!) &&
 		drawnLongSide(candidate) <= drawnLongSide(current) + AXIS_ALIGNED_EPSILON &&
 		sharedSegmentCount(candidate) <= sharedSegmentCount(current)
+	);
+}
+
+/**
+ * No more branch labels touching anything, and no label nearer another line,
+ * by more, than it was: each label keeps its own room.
+ */
+function labelsNoWorse(candidate: DiagramLayout, current: DiagramLayout): boolean {
+	const [placed, was] = [candidate, current].map((layout) =>
+		placedBranchLabels(
+			[...layout.edgeArrows],
+			layout.routedEdges,
+			layout.nodeShapes,
+			layout.groups,
+			true,
+			layout.lanes,
+		),
+	);
+	const room = new Map(was!.shortfalls.map((label) => [label.index, label.shortfall]));
+	return (
+		placed!.touches <= was!.touches &&
+		placed!.shortfalls.every(
+			(label) => label.shortfall <= (room.get(label.index) ?? 0) + AXIS_ALIGNED_EPSILON,
+		)
 	);
 }
 
@@ -11047,7 +11316,7 @@ export function renderGraphDiagram(
 			defectsOf,
 			fewer,
 		);
-	const polished = (drawn: DiagramLayout) => {
+	const polished = (drawn: DiagramLayout, nest = true) => {
 		if (!orthogonal) return drawn;
 		const arrived = polishArrivals(
 			diagram,
@@ -11057,6 +11326,7 @@ export function renderGraphDiagram(
 			fewer,
 		);
 		const plain = polishedEnds(arrived);
+		if (!nest) return plain;
 		// Lines merging into one end nest (nestSharedArrivals) where, polished
 		// to the end, that draws no worse than leaving them: a nesting that
 		// removes one crossing must not bar a later polish that removes more.
@@ -11566,6 +11836,105 @@ export function renderGraphDiagram(
 				layout = candidate;
 		return { layout, settled: best };
 	};
+	// Two lines that meet anywhere but a clean crossing, one bending or ending on
+	// or beside the other (touchingLines), read as one line that forks or merges
+	// there: a reader can follow either into the other's target. Where the drawn
+	// layout leaves such pairs among at most TOUCH_MOVES lines, those lines are
+	// routed again after all the others, bending clear of other lines first:
+	// together in either order, and each alone. In a graph few enough edges to
+	// repair and not laned, every line is laid out again from scratch too, each
+	// gap between neighbors whose facing sides both carry a line spread to a
+	// lane each (Arrangement.spreadFacing). Of each kind, the candidates that,
+	// finished, touch fewer and fail no more are drawn in full, clearest first,
+	// up to TOUCH_DRAWINGS, and the first is kept that, as drawn, touches fewer
+	// and draws no more export defects, crossings, reader findings (a touching
+	// pair counts as one), lines through a head, hooks, shared segments, lines
+	// near nodes, dips, detours, crowded or detached labels, and no longer a
+	// drawing; the clearer of the two kinds wins.
+	const clearTouches = (layout: DiagramLayout, scratch: boolean): DiagramLayout => {
+		// A family that places its own boxes keeps its lines.
+		const touching = arranged && orthogonal ? touchingEdges(layout) : new Set<string>();
+		if (touching.size === 0 || !layout.portOffsets || !layout.routeOptions) return layout;
+		const { edgeArrows, nodeShapes, portOffsets, routeOptions, routedEdges } = layout;
+		const order = routedEdges.map((_, index) => index);
+		const moved = order.filter((index) => touching.has(routedEdges[index]!.edge.id));
+		if (moved.length > TOUCH_MOVES) return layout;
+		const touches = touchingLineCount(layout);
+		const aspectOf = (candidate: DiagramLayout) => {
+			const { width, height } = drawnExtent(candidate);
+			return exportAspect(width, height);
+		};
+		const clearer = (candidate: DiagramLayout) =>
+			!fewer(defectsOf(layout), defectsOf(candidate)) &&
+			touchingLineCount(candidate) < touches &&
+			routesNoWorse(candidate, layout, false, true, false, true, true) &&
+			headCrossers(candidate).size <= headCrossers(layout).size &&
+			hookedRoutes(candidate) <= hookedRoutes(layout) &&
+			sharedSegmentCount(candidate) <= sharedSegmentCount(layout) &&
+			nearOutlines(candidate) <= nearOutlines(layout) &&
+			dippedArrivals(candidate.edgeArrows).size <= dippedArrivals(layout.edgeArrows).size &&
+			drawnLongSide(candidate) <= drawnLongSide(layout) + AXIS_ALIGNED_EPSILON &&
+			aspectOf(candidate) <= aspectOf(layout) + AXIS_ALIGNED_EPSILON &&
+			detouredLines(candidate.edgeArrows) <= detouredLines(layout.edgeArrows) &&
+			labelsNoWorse(candidate, layout);
+		const clearness = (candidate: DiagramLayout) => [
+			touchingLineCount(candidate),
+			...routed(candidate, true),
+		];
+		// Only a candidate that, finished, touches fewer and fails no more is
+		// worth polishing and clearing at last to be judged as drawn.
+		const clearest = (candidates: readonly DiagramLayout[]) => {
+			const screened = candidates
+				.map(finished)
+				.filter(
+					(candidate) =>
+						touchingLineCount(candidate) < touches &&
+						!fewer(defectsOf(layout), defectsOf(candidate)),
+				)
+				.map((candidate) => ({ candidate, score: clearness(candidate) }))
+				.sort((a, b) => (lowerScore(a.score, b.score) ? -1 : lowerScore(b.score, a.score) ? 1 : 0));
+			for (const { candidate } of screened.slice(0, TOUCH_DRAWINGS)) {
+				// Polished as drawn but for nesting, which tries every order of
+				// every merge: most of the whole layout's polish.
+				const drawn = clearedLast(polished(candidate, false));
+				if (clearer(drawn)) return drawn;
+			}
+			return undefined;
+		};
+		const again = clearest(
+			[moved, [...moved].reverse(), ...moved.map((index) => [index])].map((last) => {
+				const rerouted = new Set(last);
+				return {
+					...layout,
+					edgeArrows: routeAllEdges(
+						routedEdges,
+						"orthogonal",
+						portOffsets,
+						nodeShapes,
+						{ ...routeOptions, clearTouches: true },
+						[...order.filter((index) => !rerouted.has(index)), ...last],
+						new Map(
+							edgeArrows
+								.filter((_, index) => !rerouted.has(index))
+								.map((arrow) => [arrow.edgeId, arrow]),
+						),
+					),
+				};
+			}),
+		);
+		// Lanes place their steps by lane, not by the gaps between neighbors.
+		const arrangement = { ...best.arrangement, clearTouches: true, spreadFacing: true };
+		const attempt =
+			repairable && scratch && !laned(diagram)
+				? layoutDiagram(diagram, levels[0]!, arrangement)
+				: undefined;
+		const fresh = attempt
+			? clearest([repaired({ arrangement, defects: defectsOf(attempt), layout: attempt }).layout])
+			: undefined;
+		return fresh && (!again || lowerScore(clearness(fresh), clearness(again)))
+			? fresh
+			: (again ?? layout);
+	};
 	const beforeRepairs = best;
 	({ layout, settled: best } = complete(beforeRepairs));
 	// A decision's branches leave by the vertices that route them best together.
@@ -11623,6 +11992,12 @@ export function renderGraphDiagram(
 			? { layout: candidate!, settled }
 			: { layout: current!, settled: drawn.settled });
 	} else layout = clearedLast(layout);
+	// Each round starts from the lines the last one left touching.
+	for (let round = 0; round < TOUCH_ROUNDS; round += 1) {
+		const cleared = clearTouches(layout, round === 0);
+		if (cleared === layout) break;
+		layout = cleared;
+	}
 	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];
 	const descriptions = new Map(

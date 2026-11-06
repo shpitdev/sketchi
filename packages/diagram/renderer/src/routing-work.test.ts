@@ -117,9 +117,10 @@ describe("routing work", () => {
 	// too closely (5.07M LR before it), ends moved off rounded corners (5.71M
 	// LR before) and steps moved clear of line ends (3.65M and 6.57M before).
 	// Rescanning every routed segment on each grid-search step (aa01b3f1) took
-	// 29.4M TB.
+	// 29.4M TB. Routing its touching lines again (5.99M TB) adds 2.22M: each
+	// candidate is routed, finished, and up to three are drawn in full.
 	it.each([
-		["TB", 6_000_000],
+		["TB", 7_000_000],
 		["LR", 9_000_000],
 	] as const)("bounds segment checks for a dense %s release flow", (direction, limit) => {
 		work.checks = 0;
