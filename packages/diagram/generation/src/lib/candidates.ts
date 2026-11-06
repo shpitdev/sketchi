@@ -508,6 +508,17 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 	};
 }
 
+/** "API p50 latency, one week" as "api-p50-latency-one-week". */
+function idFromTitle(title: string): string {
+	return title
+		.toLowerCase()
+		.normalize("NFKD")
+		.replace(/[^a-z0-9]+/gu, "-")
+		.replace(/^-+|-+$/gu, "")
+		.slice(0, 60)
+		.replace(/-+$/u, "");
+}
+
 function parseCandidateDiagram(text: string): CandidateParseResult {
 	let extracted: unknown;
 	try {
@@ -551,9 +562,12 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 	}
 
 	const id = typeof rawDiagram["id"] === "string" ? rawDiagram["id"] : "";
+	const finalTitle = modelTitleOrFallback(title, id, type);
 	const titledDiagram = {
 		...rawDiagram,
-		title: modelTitleOrFallback(title, id, type),
+		// A diagram the model left without an id takes one from its title; nothing else reads it.
+		...(id.trim() ? {} : { id: idFromTitle(finalTitle) || type }),
+		title: finalTitle,
 	};
 
 	const repairs: string[] = [];

@@ -76,6 +76,16 @@ const COMMON_INSTRUCTIONS = [
 ];
 
 /**
+ * Rules every family needs that the full prompt states only in some families' sections (the id
+ * in mindmap's, rounding in chart's, order in sequence's). A prompt that carries one family's
+ * rules gets them here; the full prompt already has them and stays as graded.
+ */
+const ONE_FAMILY_INSTRUCTIONS = [
+	"Return diagram.id, a short kebab-case id. Never supply coordinates or sizes: Sketchi lays the diagram out.",
+	"Never round a number the scenario states, and keep its order even where another order seems more natural.",
+];
+
+/**
  * Generation names the text a diagram comes from "the scenario", as its user message labels it,
  * and "the source" in the families whose rules were graded with that word.
  */
@@ -640,6 +650,7 @@ export function buildDiagramGenerationMessages(
 		"",
 		"Response contract:",
 		...COMMON_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
+		...(explicitType ? ONE_FAMILY_INSTRUCTIONS.map((instruction) => `- ${instruction}`) : []),
 		...(prompt.base
 			? ["", "Revision:", ...REVISION_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
 			: []),
@@ -651,6 +662,7 @@ export function buildDiagramGenerationMessages(
 			"",
 			`${IR_INSTRUCTIONS[type].title}:`,
 			...IR_INSTRUCTIONS[type].rules.map((instruction) => `- ${instruction}`),
+			...(explicitType && type === "quadrant" ? [`- ${QUADRANT_RULES.usualNames(SOURCE)}`] : []),
 		]),
 	].join("\n");
 	const user = [

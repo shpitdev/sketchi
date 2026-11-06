@@ -264,3 +264,23 @@ describe("glyphs the export font cannot draw", () => {
 		expect(candidate.diagnostics[0]).toMatch(/^glyph_replaced/u);
 	});
 });
+
+describe("a diagram without an id", () => {
+	it("takes one from its title instead of failing validation", () => {
+		const candidate = candidateFromText({
+			model: "test",
+			provider: "fixture",
+			text: JSON.stringify({
+				title: "API p50 latency, one week",
+				diagram: {
+					type: "chart",
+					kind: "line",
+					categories: ["Mon", "Tue"],
+					series: [{ name: "p50", values: [182, 175] }],
+				},
+			}),
+		});
+		expect(candidate.error).toBeUndefined();
+		expect(candidate.diagram?.id).toBe("api-p50-latency-one-week");
+	});
+});
