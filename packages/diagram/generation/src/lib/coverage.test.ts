@@ -636,3 +636,61 @@ describe("a composition the request never states", () => {
 		}),
 	);
 });
+
+describe("cardinalities the SQL decides", () => {
+	const sql = `create table orders (id int primary key, customer_id int not null references customers(id), coupon_id int references coupons(id));
+create table customers (id int primary key);
+create table coupons (id int primary key);
+create table order_items (order_id int not null references orders(id), sku text not null, primary key (order_id, sku));`;
+	const diagram = (cardinalities: [string, string][]) => ({
+		type: "er",
+		entities: [
+			{ id: "orders", fields: ["id int PK", "customer_id int FK", "coupon_id int? FK"] },
+			{ id: "customers", fields: ["id int PK"] },
+			{ id: "coupons", fields: ["id int PK"] },
+			{ id: "order_items", fields: ["order_id int PK FK", "sku text PK"] },
+		],
+		relationships: [
+			["orders.customer_id", "customers.id"],
+			["orders.coupon_id", "coupons.id"],
+			["order_items.order_id", "orders.id"],
+		].map(([from, to], index) => ({
+			id: `r${String(index)}`,
+			from,
+			to,
+			fromCardinality: cardinalities[index]?.[0],
+			toCardinality: cardinalities[index]?.[1],
+		})),
+	});
+	const asStated: [string, string][] = [
+		["zero-or-many", "one"],
+		["zero-or-many", "zero-or-one"],
+		["zero-or-many", "one"],
+	];
+
+	it("passes cardinalities as the keys decide them", () => {
+		expect(codes(`ER diagram\n${sql}`, diagram(asStated))).toEqual([]);
+	});
+
+	it("reports a minimum the request never states, and a nullable key drawn as required", () => {
+		const issues = checkRequestCoverage(
+			`ER diagram\n${sql}`,
+			diagram([
+				["zero-or-many", "one"],
+				["zero-or-many", "one"],
+				["one-or-many", "one"],
+			]),
+		);
+		expect(issues.map((issue) => issue.code)).toEqual([
+			"er_cardinality_mismatch",
+			"er_cardinality_mismatch",
+		]);
+	});
+
+	it("takes a minimum a sentence states", () => {
+		const stated: [string, string][] = [asStated[0]!, asStated[1]!, ["one-or-many", "one"]];
+		expect(
+			codes(`ER diagram. every order has at least one item.\n${sql}`, diagram(stated)),
+		).toEqual([]);
+	});
+});

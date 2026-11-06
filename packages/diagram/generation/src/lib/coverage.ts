@@ -475,6 +475,8 @@ interface DeclaredTable {
 	readonly name: string;
 	readonly columns: readonly DeclaredColumn[];
 	readonly references: readonly string[];
+	/** Each foreign key column and the table it references. */
+	readonly foreignKeys: readonly { readonly column: string; readonly table: string }[];
 }
 
 const CREATE_TABLE =
@@ -517,6 +519,7 @@ function declaredTables(request: string): DeclaredTable[] {
 		if (!name) return [];
 		const items = splitTopLevel(parenBody(request, (match.index ?? 0) + match[0].length - 1));
 		const references: string[] = [];
+		const foreignKeys: { column: string; table: string }[] = [];
 		const tablePk = new Set<string>();
 		const tableUnique = new Set<string>();
 		const tableFk = new Set<string>();
@@ -535,12 +538,16 @@ function declaredTables(request: string): DeclaredTable[] {
 					: kind === "unique"
 						? tableUnique
 						: tableFk;
-				for (const column of columnNames(constraint[2] ?? "")) target.add(column);
+				for (const column of columnNames(constraint[2] ?? "")) {
+					target.add(column);
+					if (target === tableFk && reference) foreignKeys.push({ column, table: reference });
+				}
 				continue;
 			}
 			if (/^(?:primary|foreign|constraint|unique|check|index|key|exclude)\b/iu.test(item)) continue;
 			const column = /^[`"[]?(\w+)/u.exec(item)?.[1];
 			if (column) inline.push({ name: column, item });
+			if (column && reference) foreignKeys.push({ column: column.toLowerCase(), table: reference });
 		}
 		const columns = inline.map(({ name: column, item }) => {
 			const key = column.toLowerCase();
@@ -553,7 +560,7 @@ function declaredTables(request: string): DeclaredTable[] {
 				nullable: !pk && !/\bnot\s+null\b/iu.test(item),
 			};
 		});
-		return [{ name, columns, references }];
+		return [{ name, columns, references, foreignKeys }];
 	});
 }
 
@@ -648,8 +655,88 @@ function erIssues(request: string, diagram: Json): CoverageIssue[] {
 				});
 			}
 		}
+		issues.push(...cardinalityIssues(request, table, id, relationships, byName));
 	}
 	return issues;
+}
+
+/** The request without its create table statements: the sentences around the SQL. */
+function outsideTables(request: string): string {
+	let prose = "";
+	let from = 0;
+	for (const match of request.matchAll(CREATE_TABLE)) {
+		const start = match.index ?? 0;
+		if (start < from) continue;
+		const open = start + match[0].length - 1;
+		prose += `${request.slice(from, start)}\n`;
+		from = open + parenBody(request, open).length + 2;
+	}
+	return prose + request.slice(from);
+}
+
+/** A sentence that gives a relationship a minimum: "every order has at least one item". */
+const MINIMUM = /\b(?:at least one|one or more|always has|never without|no \w+ without)\b/iu;
+
+/**
+ * The cardinalities the SQL decides, as the ER rules state them: toCardinality is zero-or-one
+ * for a nullable key and one otherwise; fromCardinality is zero-or-one for a unique or sole
+ * primary key, one-or-many only when a sentence states a minimum, otherwise zero-or-many.
+ */
+function cardinalityIssues(
+	request: string,
+	table: DeclaredTable,
+	id: string,
+	relationships: readonly Json[],
+	byName: ReadonlyMap<string, Json>,
+): CoverageIssue[] {
+	const minimums = outsideTables(request)
+		.split(/[.;\n]+/u)
+		.filter((sentence) => MINIMUM.test(sentence))
+		.map((sentence) => new Set(stems(sentence)));
+	const named = (name: string) => stems(name.replace(/_/gu, " "));
+	const pkCount = table.columns.filter((column) => column.pk).length;
+	const wrong: string[] = [];
+	for (const key of table.foreignKeys) {
+		const column = table.columns.find((entry) => entry.name.toLowerCase() === key.column);
+		const other = byName.get(key.table.toLowerCase());
+		if (!column || !other) continue;
+		const otherId = text(other["id"]);
+		const sameTarget = table.foreignKeys.filter((entry) => entry.table === key.table).length;
+		const stated = minimums.some((sentence) =>
+			[table.name, key.table].every((name) => named(name).every((word) => holds(sentence, word))),
+		);
+		const expectedFrom =
+			column.unique || (column.pk && pkCount === 1)
+				? "zero-or-one"
+				: stated
+					? "one-or-many"
+					: "zero-or-many";
+		const expectedTo = column.nullable ? "zero-or-one" : "one";
+		for (const relationship of relationships) {
+			const [fromEntity, fromColumn] = text(relationship["from"]).split(".");
+			const toEntity = text(relationship["to"]).split(".")[0];
+			if (fromEntity !== id || toEntity !== otherId) continue;
+			// A relationship that names no column is this key's only when no other key reaches that table.
+			if (fromColumn ? fromColumn.toLowerCase() !== key.column : sameTarget > 1) continue;
+			const from = text(relationship["fromCardinality"]);
+			const to = text(relationship["toCardinality"]);
+			if (!from || !to) continue;
+			const fromOk = from === expectedFrom || (from === "many" && expectedFrom === "zero-or-many");
+			if (!fromOk || to !== expectedTo) {
+				wrong.push(
+					`${table.name}.${column.name} → ${key.table}: fromCardinality ${expectedFrom} and toCardinality ${expectedTo} (drawn ${from} and ${to})`,
+				);
+			}
+		}
+	}
+	return wrong.length === 0
+		? []
+		: [
+				{
+					code: "er_cardinality_mismatch",
+					message: `The SQL decides these cardinalities: ${listed(wrong)}. fromCardinality is zero-or-one for a unique or sole primary key and one-or-many only when the request states a minimum; toCardinality is zero-or-one for a nullable key. Set them as the SQL decides.`,
+				},
+			];
 }
 
 // ---------------------------------------------------------------------------
