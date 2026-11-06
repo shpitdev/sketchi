@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.34.1
+
+### Patch Changes
+
+- [#669](https://github.com/shpitdev/sketchi/pull/669) [`68dfb47`](https://github.com/shpitdev/sketchi/commit/68dfb47bd1e3f1d0bcf3785028a9f4b09a95b96d) Thanks [@anandpant](https://github.com/anandpant)! - A flowchart too long to read at a screen's size now wraps into columns even where branches meeting in the columns cross a few more lines, as long as the columns draw no more flaws in all than the single column. A 60-step process that exported at 1:4.6 now draws near square.
+
 ## 0.34.0
 
 ### Minor Changes
