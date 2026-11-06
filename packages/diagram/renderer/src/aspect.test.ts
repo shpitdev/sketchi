@@ -323,15 +323,20 @@ describe("long flowcharts", () => {
 		});
 		const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 		// A column 1631 wide and 7277 tall fitted its text to a screen at 4 px:
-		// a few more lines crossing where branches meet cost less than that.
+		// a few more lines crossing where branches meet cost less than that. Its
+		// three columns, 3445 by 3130 while their rank gaps stayed full, fitted it
+		// at 8 px, one line where three branches meet running out past them all.
 		expect(exportAspect(scene, 48)).toBeLessThan(2);
-		expect(Math.max(scene.width, scene.height)).toBeLessThan(4000);
+		expect(Math.max(scene.width, scene.height)).toBeLessThan(2700);
 		const findings = routingQualityFindings(
 			arrows.map((arrow) => ({ id: arrow.edgeId, points: arrow.points })),
 			routingQualityScale(scene),
 		);
-		// No more crossings and reader findings together than the column drew (2 and 8).
-		expect(arrowCrossings(arrows) + findings.length).toBeLessThanOrEqual(10);
+		// Fewer crossings and reader findings than the column drew (2 and 8): tight
+		// bands leave the lines meeting at Allocate warehouse and Apply payment no
+		// way round but straight in.
+		expect(arrowCrossings(arrows)).toBe(0);
+		expect(findings).toEqual([]);
 		// Each column reads down from the top: every step past the first column's
 		// start sits below the step before it, or tops a column of its own.
 		const top = Math.min(
