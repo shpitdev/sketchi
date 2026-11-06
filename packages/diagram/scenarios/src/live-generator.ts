@@ -102,12 +102,10 @@ export const runLiveGenerator = Effect.fn("diagramScenarios.liveGenerator")(func
 	yield* readStdin();
 	const scenarioId = yield* requiredEnv("SKETCHI_SCENARIO_ID");
 	const playgroundUrl = yield* requiredEnv("SKETCHI_PLAYGROUND_URL");
-	const cacheMode = process.env.SKETCHI_SCENARIO_CACHE_MODE ?? "fresh";
 	const response = yield* Effect.tryPromise({
 		try: (signal) =>
 			fetch(endpointUrl(playgroundUrl), {
 				body: JSON.stringify({
-					cacheMode,
 					providers: ["cloudflare-google-ai-studio"],
 					scenarioId,
 				}),

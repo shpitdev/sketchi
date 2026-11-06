@@ -14,7 +14,6 @@ import { DiagramGenerationClient, DiagramGenerationPolicy } from "./client.js";
 import {
 	type CloudflareAiGateway,
 	CloudflareAiGatewayBinding,
-	cacheModeHeaders,
 	isTransientHttpStatus,
 	parseJsonResponse,
 } from "./cloudflare-ai-gateway.js";
@@ -109,10 +108,7 @@ function gatewayFetch(
 		const response = await gateway.run(
 			{
 				endpoint: config.route.endpoint,
-				headers: {
-					"Content-Type": "application/json",
-					...cacheModeHeaders(request.cacheMode),
-				},
+				headers: { "Content-Type": "application/json" },
 				provider: config.route.gatewayProvider,
 				query: decodeRequestBody(init?.body),
 			},
@@ -121,12 +117,14 @@ function gatewayFetch(
 					collectLog: config.collectLog,
 					// AI Gateway keeps five metadata entries per request and drops the rest.
 					metadata: {
-						cacheMode: request.cacheMode ?? "default",
 						scenarioId: request.prompt.id,
 						sketchiProvider: config.route.provider,
 						sketchiSurface: config.surface,
 						...(traceId ? { sketchiTraceId: traceId } : {}),
 					},
+					// Someone who sends the same request again wants another diagram, and an
+					// evaluation sample has to be a real draw, so no call replays a cached answer.
+					skipCache: true,
 				},
 				...(init?.signal ? { signal: init.signal } : {}),
 			},
@@ -267,7 +265,6 @@ const runChatAttempt = Effect.fn("diagramGeneration.gatewayChat.attempt")(functi
 		return yield* emptyResponseError(route, new Error(`Finish reason: ${response.finishReason}`));
 	}
 	return candidateFromText({
-		cacheMode: request.cacheMode ?? "default",
 		diagnostics: [],
 		model: modelId,
 		provider: route.provider,
@@ -315,7 +312,6 @@ export const CloudflareGatewayChatClientLive = Layer.effect(DiagramGenerationCli
 				request: DiagramGenerationRequest,
 			) {
 				yield* Effect.annotateCurrentSpan({
-					cache_mode: request.cacheMode ?? "default",
 					model: request.model,
 					provider,
 					"sketchi.scenario_id": request.prompt.id,

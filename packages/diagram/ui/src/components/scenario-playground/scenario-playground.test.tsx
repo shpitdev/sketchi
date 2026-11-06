@@ -307,21 +307,15 @@ describe("ScenarioPlayground", () => {
 		},
 	);
 
-	it.each(["Run", "Run selected"])(
-		"locks both run controls and cache settings during %s",
-		(runControl) => {
-			render(<ScenarioPlayground onGenerateScenario={() => new Promise(() => undefined)} />);
-			fireEvent.click(screen.getByRole("tab", { name: "Live generation" }));
-			fireEvent.click(screen.getByText("Run settings"));
-			fireEvent.click(screen.getByRole("button", { name: runControl }));
-			expect(screen.getByLabelText("Fresh")).toHaveProperty("disabled", true);
-			expect(screen.getByLabelText("Default")).toHaveProperty("disabled", true);
-			for (const button of screen.getAllByRole("button", {
-				name: /^(Run|Run selected|Running)$/,
-			}))
-				expect(button).toHaveProperty("disabled", true);
-		},
-	);
+	it.each(["Run", "Run selected"])("locks both run controls during %s", (runControl) => {
+		render(<ScenarioPlayground onGenerateScenario={() => new Promise(() => undefined)} />);
+		fireEvent.click(screen.getByRole("tab", { name: "Live generation" }));
+		fireEvent.click(screen.getByRole("button", { name: runControl }));
+		for (const button of screen.getAllByRole("button", {
+			name: /^(Run|Run selected|Running)$/,
+		}))
+			expect(button).toHaveProperty("disabled", true);
+	});
 
 	it("loads a generated candidate into the deterministic IR editor", async () => {
 		const generatedDiagram = {
@@ -347,7 +341,6 @@ describe("ScenarioPlayground", () => {
 
 		await waitFor(() => expect(onGenerateScenario).toHaveBeenCalledTimes(1));
 		expect(onGenerateScenario).toHaveBeenCalledWith({
-			cacheMode: "default",
 			providers: ["cloudflare-google-ai-studio"],
 			scenarioId: "sketchi-onboarding-decision-flow",
 		});
@@ -391,38 +384,5 @@ describe("ScenarioPlayground", () => {
 		expect(
 			screen.getByText(`${flowchartScenarios.length} / ${flowchartScenarios.length} passed`),
 		).toBeTruthy();
-	});
-
-	it("uses the fresh cache mode for selected LLM suite runs", async () => {
-		const onGenerateScenario = vi.fn(async ({ scenarioId }: ScenarioGenerationRequest) => {
-			const scenario = getFlowchartScenario(scenarioId);
-
-			return {
-				candidates: [
-					{
-						cacheMode: "fresh" as const,
-						diagnostics: [],
-						diagramValid: true,
-						durationMs: 25,
-						model: "google/gemini-3.1-flash-lite",
-						provider: "cloudflare-google-ai-studio" as const,
-						text: JSON.stringify(scenario.expectedDiagram, null, 2),
-					},
-				],
-				scenarioId,
-			};
-		});
-
-		render(<ScenarioPlayground onGenerateScenario={onGenerateScenario} />);
-		fireEvent.click(screen.getByRole("tab", { name: "Live generation" }));
-		fireEvent.click(screen.getByText("Run settings"));
-		fireEvent.click(screen.getByLabelText("Fresh"));
-		fireEvent.click(screen.getByRole("button", { name: "Run selected" }));
-
-		await waitFor(() => expect(onGenerateScenario).toHaveBeenCalledTimes(1));
-		expect(onGenerateScenario).toHaveBeenCalledWith(
-			expect.objectContaining({ cacheMode: "fresh" }),
-		);
-		expect(screen.getByText("Fresh run")).toBeTruthy();
 	});
 });

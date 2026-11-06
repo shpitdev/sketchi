@@ -25,7 +25,6 @@ export const FixtureGenerationClientLayer = Layer.succeed(DiagramGenerationClien
 		});
 		const { title, type, ...diagram } = scenario.expectedDiagram;
 		const candidate = candidateFromText({
-			cacheMode: request.cacheMode ?? "default",
 			model: "fixture",
 			provider: "fixture",
 			text: JSON.stringify(

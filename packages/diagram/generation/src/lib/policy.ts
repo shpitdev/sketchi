@@ -467,7 +467,6 @@ function buildRepairRequest(
 	];
 	return {
 		...request,
-		cacheMode: "fresh",
 		prompt: {
 			...request.prompt,
 			request: [
@@ -497,7 +496,6 @@ export function buildCoverageRepairRequest(
 ): DiagramGenerationRequest {
 	return {
 		...request,
-		cacheMode: "fresh",
 		prompt: {
 			...request.prompt,
 			request: [

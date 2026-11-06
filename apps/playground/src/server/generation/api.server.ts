@@ -462,7 +462,6 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 	// A revision keeps its family unless the caller names another.
 	const requestedType = input.type ?? input.base?.type;
 	const generationInput = {
-		...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
 		prompt,
 		...(requestedType ? { type: requestedType } : {}),
 		...(model ? { model } : {}),

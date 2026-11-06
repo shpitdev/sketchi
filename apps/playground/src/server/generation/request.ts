@@ -9,7 +9,6 @@ export const GenerateBaseSchema = Schema.Struct({
 });
 
 export const GenerateRequestSchema = Schema.Struct({
-	cacheMode: Schema.optional(Schema.Literals(["default", "fresh"])),
 	prompt: Schema.String,
 	type: Schema.optional(Schema.Literals(CANONICAL_DOCUMENT_TYPES)),
 	model: Schema.optional(Schema.String),

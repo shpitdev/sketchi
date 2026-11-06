@@ -1124,32 +1124,6 @@
 	min-height: 34px;
 }
 
-.sketchi-generation-run-panel__cache-mode {
-	border: 1px solid var(--line);
-	border-radius: 6px;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin: 0;
-	padding: 7px 8px;
-}
-
-.sketchi-generation-run-panel__cache-mode legend {
-	color: var(--ink-2);
-	font-size: 11px;
-	font-weight: 800;
-	padding: 0 4px;
-}
-
-.sketchi-generation-run-panel__cache-mode label {
-	align-items: center;
-	color: var(--ink-2);
-	display: inline-flex;
-	font-size: 12px;
-	font-weight: 800;
-	gap: 5px;
-}
-
 .sketchi-scenario-suite-panel {
 	border-top: 1px solid var(--line);
 	display: grid;

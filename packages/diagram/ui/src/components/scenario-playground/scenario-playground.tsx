@@ -1,5 +1,4 @@
 import type {
-	DiagramGenerationCacheMode,
 	DiagramGenerationCandidateSummary,
 	DiagramGenerationProviderId,
 } from "@sketchi/diagram-generation";
@@ -20,7 +19,6 @@ import { PlaygroundCanvas } from "./playground-canvas.js";
 import { PlaygroundInspector } from "./playground-inspector.js";
 
 export interface ScenarioGenerationRequest {
-	cacheMode: DiagramGenerationCacheMode;
 	providers: readonly DiagramGenerationProviderId[];
 	scenarioId: string;
 }
@@ -170,7 +168,6 @@ export function ScenarioPlayground({
 
 		const runToken = store.state.generationRunToken;
 		const generationResult = await onGenerateScenario({
-			cacheMode: store.state.cacheMode,
 			providers: defaultGenerationProviders,
 			scenarioId: scenario.id,
 		});

@@ -5,7 +5,6 @@ import {
 	CloudflareGatewayChatClientLive,
 	CloudflareGatewayChatConfig,
 	type CloudflareAiGatewayProvider,
-	type DiagramGenerationCacheMode,
 	DiagramGenerationClient,
 	DiagramGenerationConfigurationError,
 	type DiagramGenerationCandidate,
@@ -28,7 +27,6 @@ import { PlaygroundBindings } from "../runtime/context.server";
 export interface GenerateDiagramServiceInput {
 	/** The current diagram a revision starts from, as canonical diagram JSON. */
 	readonly base?: Readonly<Record<string, unknown>>;
-	readonly cacheMode?: DiagramGenerationCacheMode;
 	readonly model?: SupportedGenerationModel;
 	readonly prompt: string;
 	readonly type?: DiagramGenerationType;
@@ -114,7 +112,6 @@ export const PlaygroundGenerationLive = Layer.effect(
 					input.base ? `${input.prompt}\n${JSON.stringify(input.base)}` : input.prompt,
 				);
 				return yield* client.generate({
-					...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
 					model,
 					prompt: {
 						id: "sketchi-generate",

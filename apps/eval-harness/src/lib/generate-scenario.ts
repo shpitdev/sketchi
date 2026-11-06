@@ -6,7 +6,6 @@ import {
 	DiagramGenerationClient,
 	DiagramGenerationConfigurationError,
 	DiagramGenerationInputError,
-	type DiagramGenerationCacheMode,
 	type DiagramGenerationCandidateSummary,
 	type DiagramGenerationScenarioOutput,
 	type DiagramGenerationProviderId,
@@ -28,9 +27,6 @@ const DEFAULT_GATEWAY_ID = "google-ai-studio";
 const DEFAULT_MODEL = "google/gemini-3.1-flash-lite";
 const DEFAULT_PROVIDERS: readonly DiagramGenerationProviderId[] = ["cloudflare-google-ai-studio"];
 export const GenerateScenarioInputSchema = Schema.Struct({
-	cacheMode: Schema.Literals(["default", "fresh"]).pipe(
-		Schema.withDecodingDefaultKey(Effect.succeed("default" as const)),
-	),
 	providers: Schema.Array(DiagramGenerationProviderIdSchema).pipe(
 		Schema.withDecodingDefaultKey(Effect.succeed(DEFAULT_PROVIDERS)),
 	),
@@ -97,10 +93,8 @@ function errorCandidate(
 	provider: DiagramGenerationProviderId,
 	model: string,
 	message: string,
-	cacheMode: DiagramGenerationCacheMode = "default",
 ): DiagramGenerationCandidateSummary {
 	return {
-		cacheMode,
 		diagnostics: [message],
 		diagramValid: false,
 		error: message,
@@ -112,11 +106,10 @@ function errorCandidate(
 
 const runClient = Effect.fn("evalHarness.generateScenario.runClient")(function* (
 	client: Context.Service.Shape<typeof DiagramGenerationClient>,
-	cacheMode: DiagramGenerationCacheMode,
 	model: string,
 	scenarioId: string,
 ) {
-	const requestSettings = { cacheMode, model };
+	const requestSettings = { model };
 
 	return yield* Effect.gen(function* () {
 		const scenario = yield* Effect.try({
@@ -148,7 +141,6 @@ const generateScenarioCandidatesEffect = Effect.fn("evalHarness.generateScenario
 		const client = yield* DiagramGenerationClient;
 		const policy = yield* DiagramGenerationPolicy;
 		yield* Effect.annotateCurrentSpan({
-			cacheMode: data.cacheMode,
 			model,
 			providerCount: data.providers.length,
 			scenarioId: data.scenarioId,
@@ -161,7 +153,7 @@ const generateScenarioCandidatesEffect = Effect.fn("evalHarness.generateScenario
 		);
 		const candidates = yield* Effect.forEach(
 			configuredClients,
-			(configuredClient) => runClient(configuredClient, data.cacheMode, model, data.scenarioId),
+			(configuredClient) => runClient(configuredClient, model, data.scenarioId),
 			{ concurrency: policy.concurrency },
 		);
 		const missingCandidates = data.providers
@@ -171,7 +163,6 @@ const generateScenarioCandidatesEffect = Effect.fn("evalHarness.generateScenario
 					provider,
 					model,
 					`Provider "${provider}" is not configured in this Worker environment.`,
-					data.cacheMode,
 				),
 			);
 

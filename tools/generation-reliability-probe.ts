@@ -399,7 +399,6 @@ export const runProbe = Effect.fn("generationReliabilityProbe.run")(function* (
 		try: async (signal) => {
 			const response = await fetch(endpoint, {
 				body: JSON.stringify({
-					cacheMode: "fresh",
 					prompt: scenario.prompt,
 					type: scenario.diagramType,
 				}),

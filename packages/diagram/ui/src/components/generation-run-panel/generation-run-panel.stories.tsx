@@ -6,10 +6,8 @@ const meta = {
 	title: "Diagram UI/Components/GenerationRunPanel",
 	component: GenerationRunPanel,
 	args: {
-		cacheMode: "fresh",
 		candidates: [
 			{
-				cacheMode: "fresh",
 				diagnostics: [],
 				diagramValid: true,
 				durationMs: 836,

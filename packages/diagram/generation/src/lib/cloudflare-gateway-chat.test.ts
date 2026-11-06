@@ -96,7 +96,6 @@ function clientLayer(
 const prompt = { id: "scenario-1", request: "Draw it" };
 const request = { model: "google/gemini-3.1-flash-lite", prompt };
 type GenerationInput = typeof request & {
-	cacheMode?: "default" | "fresh";
 	maxOutputTokens?: number;
 	temperature?: number;
 };
@@ -122,7 +121,6 @@ describe("gateway chat request", () => {
 		const candidate = await Effect.runPromise(
 			generate(clientLayer(run), {
 				...request,
-				cacheMode: "fresh",
 				maxOutputTokens: 123,
 				temperature: 0.4,
 			}),
@@ -132,12 +130,7 @@ describe("gateway chat request", () => {
 		expect(data).toEqual({
 			endpoint: "v1beta/openai/chat/completions",
 			provider: "google-ai-studio",
-			headers: {
-				"Content-Type": "application/json",
-				"Cache-Control": "no-store",
-				"cf-aig-skip-cache": "true",
-				Pragma: "no-cache",
-			},
+			headers: { "Content-Type": "application/json" },
 			query: {
 				model: "gemini-3.1-flash-lite",
 				messages: [
@@ -150,9 +143,9 @@ describe("gateway chat request", () => {
 			},
 		});
 		expect(options?.gateway?.collectLog).toBe(true);
+		expect(options?.gateway?.skipCache).toBe(true);
 		expect(options?.signal).toBeInstanceOf(AbortSignal);
 		expect(candidate).toMatchObject({
-			cacheMode: "fresh",
 			model: "gemini-3.1-flash-lite",
 			provider: "cloudflare-google-ai-studio",
 			usage: { inputTokens: 11, outputTokens: 7, totalTokens: 18 },
@@ -160,10 +153,9 @@ describe("gateway chat request", () => {
 		expect(candidate.diagram?.type).toBe("flowchart");
 	});
 
-	it("defaults max tokens and temperature, and sends no cache headers", async () => {
+	it("defaults max tokens and temperature", async () => {
 		const { calls, run } = capture();
 		await Effect.runPromise(generate(clientLayer(run)));
-		expect(calls[0]?.[0].headers).toEqual({ "Content-Type": "application/json" });
 		expect(calls[0]?.[0].query).toMatchObject({ max_tokens: 16_384, temperature: 0.1 });
 	});
 
@@ -174,7 +166,6 @@ describe("gateway chat request", () => {
 		);
 		const metadata = calls[0]?.[1]?.gateway?.metadata;
 		expect(metadata).toEqual({
-			cacheMode: "default",
 			scenarioId: "scenario-1",
 			sketchiProvider: "cloudflare-google-ai-studio",
 			sketchiSurface: "generate-api",
@@ -392,6 +383,7 @@ describe("gateway chat errors", () => {
 		);
 		expect(error).toMatchObject({ retryable: true, status: 429 });
 		expect(calls).toHaveLength(2);
+		expect(calls.map(([, options]) => options?.gateway?.skipCache)).toEqual([true, true]);
 	});
 
 	it("reads Google's array-wrapped error body", async () => {

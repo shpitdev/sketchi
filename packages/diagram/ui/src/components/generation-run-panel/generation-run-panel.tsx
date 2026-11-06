@@ -1,15 +1,12 @@
 import type {
-	DiagramGenerationCacheMode,
 	DiagramGenerationCandidateSummary,
 	DiagramGenerationProviderId,
 } from "@sketchi/diagram-generation";
 
 export interface GenerationRunPanelProps {
-	cacheMode?: DiagramGenerationCacheMode;
 	candidates?: readonly DiagramGenerationCandidateSummary[];
 	disabled?: boolean;
 	error?: string;
-	onCacheModeChange?: (cacheMode: DiagramGenerationCacheMode) => void;
 	onRun?: () => void;
 	providers?: readonly GenerationRunProvider[];
 	running?: boolean;
@@ -80,11 +77,9 @@ function candidateMetrics(
 }
 
 export function GenerationRunPanel({
-	cacheMode = "default",
 	candidates = [],
 	disabled = false,
 	error,
-	onCacheModeChange,
 	onRun,
 	providers = defaultProviders,
 	running = false,
@@ -115,25 +110,8 @@ export function GenerationRunPanel({
 				{primaryMetrics ? <span>{primaryMetrics}</span> : null}
 			</p>
 
-			<details className="sketchi-generation-run-panel__settings" open={cacheMode === "fresh"}>
+			<details className="sketchi-generation-run-panel__settings">
 				<summary>Run settings</summary>
-				<fieldset className="sketchi-generation-run-panel__cache-mode">
-					<legend>Cache</legend>
-					{(["default", "fresh"] as const).map((mode) => (
-						<label key={mode}>
-							<input
-								checked={cacheMode === mode}
-								disabled={disabled || running}
-								name="generation-cache-mode"
-								onChange={() => onCacheModeChange?.(mode)}
-								type="radio"
-								value={mode}
-							/>
-							{mode === "fresh" ? "Fresh" : "Default"}
-						</label>
-					))}
-				</fieldset>
-
 				<ul>
 					{providers.map((provider) => {
 						const candidate = providerCandidate(candidates, provider.id);
@@ -153,9 +131,6 @@ export function GenerationRunPanel({
 									<p className="sketchi-generation-run-panel__diagnostics">{diagnostics}</p>
 								) : null}
 								{metrics ? <small>{metrics}</small> : null}
-								{candidate?.cacheMode ? (
-									<small>{candidate.cacheMode === "fresh" ? "Fresh" : "Default"} run</small>
-								) : null}
 							</li>
 						);
 					})}
