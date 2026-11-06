@@ -688,7 +688,7 @@ describe("Code Mode runtime", () => {
 				title: "Wide",
 				root: {
 					label: "root",
-					children: Array.from({ length: 101 }, (_, index) => ({
+					children: Array.from({ length: 201 }, (_, index) => ({
 						label: `topic ${index}`,
 					})),
 				},

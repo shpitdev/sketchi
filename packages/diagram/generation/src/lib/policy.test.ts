@@ -1,12 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import { mediaPlayerStateMachine, parseFlowchartDiagram } from "@sketchi/diagram-core";
-import { Effect } from "effect";
+import { Effect, Fiber } from "effect";
+import { TestClock } from "effect/testing";
 
 import {
 	candidateFromText,
 	type DiagramGenerationCandidate,
 	type DiagramGenerationRequest,
 } from "./candidates.js";
+import { DiagramGenerationHttpError } from "./errors.js";
 import { runDiagramGenerationWithPolicy } from "./policy.js";
 
 const request: DiagramGenerationRequest = {
@@ -73,6 +75,7 @@ function runRepairs(initialDiagnostics: string[]) {
 		maxRetries: 0,
 		requestTimeoutMs: 1_000,
 		retryDelayMs: 1,
+		totalTimeoutMs: 60_000,
 	}).pipe(Effect.map((candidate) => ({ candidate, requests })));
 }
 
@@ -104,6 +107,7 @@ describe("generation repair prompts", () => {
 					maxRetries: 0,
 					requestTimeoutMs: 1000,
 					retryDelayMs: 1,
+					totalTimeoutMs: 60_000,
 				},
 			);
 			expect(requests).toHaveLength(1);
@@ -139,6 +143,7 @@ describe("generation repair prompts", () => {
 						maxRetries: 0,
 						requestTimeoutMs: 1_000,
 						retryDelayMs: 1,
+						totalTimeoutMs: 60_000,
 					},
 				);
 				expect(requests).toHaveLength(expectedCalls);
@@ -189,6 +194,103 @@ describe("generation repair prompts", () => {
 				expect(repair.prompt.request.split(request.prompt.request)).toHaveLength(2);
 				expect(repair.prompt.request).toContain(`- Original scenario: ${request.prompt.request}`);
 			}
+		}),
+	);
+});
+
+describe("generation size limits", () => {
+	it.effect("repairs a layout bound, which restructuring meets without dropping content", () =>
+		Effect.gen(function* () {
+			const { candidate, requests } = yield* runRepairs([
+				"wireframe.wireframe_too_large: Components nest 10 levels deep; a wireframe draws at most 8. Hint: Remove wrappers that hold a single child.",
+			]);
+			expect(candidate.diagram).toBeDefined();
+			expect(requests).toHaveLength(3);
+		}),
+	);
+
+	it.effect("fails a count limit at once, which repair could meet only by dropping content", () =>
+		Effect.gen(function* () {
+			const error = yield* Effect.flip(
+				runRepairs([
+					"org-chart.org_chart_too_large: An org chart holds at most 100 people; this one has 120. Hint: Draw each division as its own chart.",
+				]),
+			);
+			expect(error).toMatchObject({
+				_tag: "DiagramGenerationLimitError",
+				limit: "diagram_size",
+				message: "An org chart holds at most 100 people; this one has 120.",
+			});
+		}),
+	);
+});
+
+describe("generation request deadline", () => {
+	const invalid: DiagramGenerationCandidate = {
+		provider: "fixture",
+		model: request.model,
+		text: "invalid output",
+		diagnostics: [currentIssue],
+	};
+	const busy = DiagramGenerationHttpError.make({
+		diagnostics: ["busy"],
+		durationMs: 1,
+		provider: "fixture",
+		raw: {},
+		retryable: true,
+		status: 503,
+	});
+	const policy = {
+		concurrency: 1,
+		maxRepairAttempts: 2,
+		maxRetries: 2,
+		requestTimeoutMs: 5_000,
+		retryDelayMs: 150,
+		totalTimeoutMs: 1_000,
+	};
+
+	it.effect("reports a repair that runs past the request's limit as a timeout", () =>
+		Effect.gen(function* () {
+			let calls = 0;
+			const prepareAttempt = (_request: DiagramGenerationRequest) =>
+				Effect.suspend(() => {
+					calls += 1;
+					return calls === 1 ? Effect.succeed(invalid) : Effect.never;
+				});
+			const fiber = yield* Effect.forkChild(
+				Effect.flip(runDiagramGenerationWithPolicy(prepareAttempt, request, "fixture", policy)),
+			);
+			yield* TestClock.adjust("2 seconds");
+			const error = yield* Fiber.join(fiber);
+			expect(calls).toBe(2);
+			expect(error).toMatchObject({ _tag: "DiagramGenerationTimeoutError", scope: "request" });
+		}),
+	);
+
+	it.effect("dispatches no call once a retry's backoff reaches the request's limit", () =>
+		Effect.gen(function* () {
+			let calls = 0;
+			const prepareAttempt = (_request: DiagramGenerationRequest) =>
+				Effect.suspend(() => {
+					calls += 1;
+					return Effect.fail(busy);
+				});
+			const fiber = yield* Effect.forkChild(
+				Effect.flip(
+					runDiagramGenerationWithPolicy(prepareAttempt, request, "fixture", {
+						...policy,
+						totalTimeoutMs: 40,
+					}),
+				),
+			);
+			yield* TestClock.adjust("1 second");
+			const error = yield* Fiber.join(fiber);
+			expect(calls).toBe(1);
+			expect(error).toMatchObject({
+				_tag: "DiagramGenerationTimeoutError",
+				scope: "request",
+				timeoutMs: 40,
+			});
 		}),
 	);
 });

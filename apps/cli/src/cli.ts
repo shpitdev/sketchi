@@ -183,7 +183,8 @@ Input and output contracts:
   presentation on every command. Text generate output is the title and type, the saved path,
   whether the image was copied, and the id. When stdout is not a terminal, as for an agent, it
   adds a Hint row: display the saved PNG as an inline Markdown image. --output json carries the
-  full record, generation model and provider, export details including that hint, and clipboard.
+  full record; the generation model, provider, model calls, duration and output tokens; export
+  details including that hint; and clipboard.
 
 Clipboard:
   After generate writes a PNG file it copies the image to the desktop clipboard: wl-copy when
@@ -337,7 +338,13 @@ function summaryText(action: "created" | "edited" | "patched", diagram: StoredDi
 function generatedData(result: GenerateDiagramResult) {
 	return {
 		...storedData(result.diagram),
-		generation: { model: result.model, provider: result.provider },
+		generation: {
+			model: result.model,
+			provider: result.provider,
+			...(result.attempts === undefined ? {} : { attempts: result.attempts }),
+			...(result.durationMs === undefined ? {} : { durationMs: result.durationMs }),
+			...(result.outputTokens === undefined ? {} : { outputTokens: result.outputTokens }),
+		},
 	};
 }
 

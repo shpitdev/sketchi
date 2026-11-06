@@ -6,7 +6,7 @@ import {
 	type TelemetryMetricEvent,
 	type TelemetrySpanEvent,
 } from "@sketchi/observability";
-import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/diagram-core";
+import { FLOWCHART_MAX_NODES, SKETCHI_DIAGRAM_STYLE } from "@sketchi/diagram-core";
 import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
@@ -15,6 +15,7 @@ import {
 	diagramGenerationPolicyDefaults,
 	DiagramGenerationClient,
 	DiagramGenerationPolicy,
+	MEASURED_OUTPUT_TOKENS_PER_SECOND,
 } from "./client.js";
 import { CloudflareAiGatewayBinding, type CloudflareAiGateway } from "./cloudflare-ai-gateway.js";
 import {
@@ -143,6 +144,7 @@ const retryPolicyLayer = Layer.succeed(DiagramGenerationPolicy, {
 	maxRetries: 2,
 	requestTimeoutMs: 1_000,
 	retryDelayMs: 100,
+	totalTimeoutMs: 60_000,
 });
 const cancellationPolicyLayer = Layer.succeed(DiagramGenerationPolicy, {
 	concurrency: 2,
@@ -150,6 +152,7 @@ const cancellationPolicyLayer = Layer.succeed(DiagramGenerationPolicy, {
 	maxRetries: 1,
 	requestTimeoutMs: 500,
 	retryDelayMs: 100,
+	totalTimeoutMs: 60_000,
 });
 
 describe("diagram generation prompt mapping", () => {
@@ -245,8 +248,12 @@ describe("diagram generation prompt mapping", () => {
 		expect(messages.system).toContain("a branch with no stated next step stops at its last step");
 	});
 
-	it("uses the expanded output budget unless the request overrides it", () => {
+	it("gives one model call time to write the whole output budget, inside the request's limit", () => {
+		const { requestTimeoutMs, totalTimeoutMs } = diagramGenerationPolicyDefaults;
+		const fullBudgetMs = (DEFAULT_MAX_OUTPUT_TOKENS / MEASURED_OUTPUT_TOKENS_PER_SECOND) * 1_000;
 		expect(DEFAULT_MAX_OUTPUT_TOKENS).toBe(16_384);
+		expect(requestTimeoutMs).toBeGreaterThan(fullBudgetMs + 5_000);
+		expect(totalTimeoutMs).toBeGreaterThan(requestTimeoutMs);
 		expect(diagramGenerationPolicyDefaults.maxRepairAttempts).toBe(2);
 	});
 
@@ -1174,7 +1181,7 @@ let multiRepairCalls = 0;
 const multiRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
 	multiRepairCalls += 1;
 	if (multiRepairCalls === 1) {
-		return jsonResponse(chatResponseBody('{"type":"flowchart"', "length"));
+		return jsonResponse(chatResponseBody('{"type":"flowchart"'));
 	}
 	return multiRepairCalls === 2 ? chatTextResponse(invalidDiagramText) : jsonResponse(chatResponse);
 });
@@ -1191,13 +1198,14 @@ const multiRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
 				maxRetries: 0,
 				requestTimeoutMs: 1_000,
 				retryDelayMs: 100,
+				totalTimeoutMs: 60_000,
 			}),
 		),
 	),
 );
 
 layer(multiRepairClientLayer)("multi-attempt semantic repair", (it) => {
-	it.effect("classifies truncation from only the latest response", () =>
+	it.effect("repairs each attempt from only the latest invalid answer", () =>
 		Effect.gen(function* () {
 			multiRepairCalls = 0;
 			multiRepairRun.mockClear();
@@ -1208,13 +1216,17 @@ layer(multiRepairClientLayer)("multi-attempt semantic repair", (it) => {
 			});
 
 			assert.strictEqual(candidate.diagram?.id, expectedDiagram.id);
+			assert.strictEqual(candidate.attempts, 3);
+			assert.deepStrictEqual(candidate.usage, {
+				inputTokens: 33,
+				outputTokens: 69,
+				totalTokens: 102,
+			});
 			assert.strictEqual(multiRepairRun.mock.calls.length, 3);
-			expect(JSON.stringify(multiRepairRun.mock.calls[1]?.[0].query)).not.toContain(
-				"Invalid model output:",
-			);
-			expect(JSON.stringify(multiRepairRun.mock.calls[2]?.[0].query)).toContain(
-				"Invalid model output:",
-			);
+			const firstRepair = JSON.stringify(multiRepairRun.mock.calls[1]?.[0].query);
+			const secondRepair = JSON.stringify(multiRepairRun.mock.calls[2]?.[0].query);
+			expect(firstRepair).toContain("Repair attempt 1");
+			expect(secondRepair).toContain("Repair attempt 2");
 			expect(candidate.diagnostics).toEqual(
 				expect.arrayContaining([
 					"repair_failed: semantic repair attempt 1 failed.",
@@ -1573,34 +1585,132 @@ const truncatedClientLayer = CloudflareGatewayChatClientLive.pipe(
 );
 
 layer(truncatedClientLayer)("token-budget exhaustion", (it) => {
-	it.effect("regenerates a truncated response without repairing partial JSON", () =>
+	it.effect("fails a cut-off answer as an output limit without regenerating or repairing it", () =>
 		Effect.gen(function* () {
 			truncatedRun.mockClear();
 			const client = yield* DiagramGenerationClient;
-			const candidate = yield* client.generate({
-				model: "google/gemini-3.1-flash-lite",
-				prompt,
-			});
-
-			assert.isUndefined(candidate.diagram);
-			expect(candidate.diagnostics).toContain(
-				"output_truncated: Gemini stopped at the maximum output-token budget; regenerate the complete diagram.",
-			);
-			expect(candidate.diagnostics).toEqual(
-				expect.arrayContaining([
-					"repair_attempted: regenerated a truncated response (attempt 1).",
-					"repair_failed: semantic repair attempt 1 failed.",
-				]),
-			);
-			assert.strictEqual(truncatedRun.mock.calls.length, 2);
-			expect(truncatedRun.mock.calls[1]?.[0]).toEqual(
-				expect.objectContaining({
-					headers: expect.objectContaining({ "Cache-Control": "no-store" }),
+			const error = yield* Effect.flip(
+				client.generate({
+					model: "google/gemini-3.1-flash-lite",
+					prompt,
 				}),
 			);
-			expect(JSON.stringify(truncatedRun.mock.calls[1]?.[0].query)).not.toContain(
-				"Invalid model output:",
+
+			assert.strictEqual(error._tag, "DiagramGenerationLimitError");
+			assert.strictEqual(truncatedRun.mock.calls.length, 1);
+			expect(error).toMatchObject({
+				limit: "output_tokens",
+				message: "The diagram needs more than the 16,384-token output limit allows in one answer.",
+			});
+		}),
+	);
+});
+
+/** A flowchart one node past the family limit, as a model would return it. */
+const oversizedFlowchartText = generationResponseText({
+	id: "oversized",
+	title: "Oversized",
+	type: "flowchart",
+	nodes: Array.from({ length: FLOWCHART_MAX_NODES + 1 }, (_, index) => ({
+		id: `n${index}`,
+		kind: index === 0 ? "start" : index === FLOWCHART_MAX_NODES ? "end" : "process",
+		label: `Step ${index}`,
+	})),
+	edges: Array.from({ length: FLOWCHART_MAX_NODES }, (_, index) => ({
+		id: `e${index}`,
+		source: `n${index}`,
+		target: `n${index + 1}`,
+	})),
+	layout: { direction: "TB", edgeRouting: "orthogonal" },
+});
+let oversizedCalls = 0;
+const oversizedRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
+	oversizedCalls += 1;
+	// The repair of an invalid first answer comes back past the size limit.
+	return chatTextResponse(oversizedCalls === 1 ? '{"type":"flowchart"' : oversizedFlowchartText);
+});
+const oversizedClientLayer = CloudflareGatewayChatClientLive.pipe(
+	Layer.provide(
+		Layer.mergeAll(
+			Layer.succeed(CloudflareAiGatewayBinding, {
+				gateway: () => ({ getUrl: vi.fn(), run: oversizedRun }),
+			}),
+			configLayer,
+			Layer.succeed(DiagramGenerationPolicy, {
+				concurrency: 2,
+				maxRepairAttempts: 2,
+				maxRetries: 2,
+				requestTimeoutMs: 1_000,
+				retryDelayMs: 100,
+				totalTimeoutMs: 60_000,
+			}),
+		),
+	),
+);
+
+layer(oversizedClientLayer)("family size limits", (it) => {
+	it.effect("fails a diagram past its family limit instead of repairing content away", () =>
+		Effect.gen(function* () {
+			oversizedCalls = 0;
+			oversizedRun.mockClear();
+			const client = yield* DiagramGenerationClient;
+			const error = yield* Effect.flip(
+				client.generate({ model: "google/gemini-3.1-flash-lite", prompt }),
 			);
+
+			assert.strictEqual(error._tag, "DiagramGenerationLimitError");
+			assert.strictEqual(oversizedRun.mock.calls.length, 2);
+			expect(error).toMatchObject({
+				limit: "diagram_size",
+				message: `Flowchart has ${FLOWCHART_MAX_NODES + 1} nodes; the supported maximum is ${FLOWCHART_MAX_NODES}.`,
+			});
+			expect(error._tag === "DiagramGenerationLimitError" && error.diagnostics[0]).toMatch(
+				/^flowchart\.flowchart_too_large: /,
+			);
+		}),
+	);
+});
+
+const deadlineClientLayer = CloudflareGatewayChatClientLive.pipe(
+	Layer.provide(
+		Layer.mergeAll(
+			Layer.succeed(CloudflareAiGatewayBinding, {
+				gateway: () => ({ getUrl: vi.fn(), run: timeoutRun }),
+			}),
+			configLayer,
+			Layer.succeed(DiagramGenerationPolicy, {
+				concurrency: 2,
+				maxRepairAttempts: 2,
+				maxRetries: 2,
+				requestTimeoutMs: 1_000,
+				retryDelayMs: 100,
+				totalTimeoutMs: 1_500,
+			}),
+		),
+	),
+);
+
+layer(deadlineClientLayer)("request deadline", (it) => {
+	it.effect("retries a slow call only while the request's limit leaves time", () =>
+		Effect.gen(function* () {
+			cancellationSignals.length = 0;
+			timeoutRun.mockClear();
+			const client = yield* DiagramGenerationClient;
+			const fiber = yield* Effect.forkChild(
+				Effect.flip(client.generate({ model: "google/gemini-3.1-flash-lite", prompt })),
+			);
+			yield* TestClock.adjust("2 seconds");
+			const error = yield* Fiber.join(fiber);
+
+			// One full call, then a retry cut short by the request's 1.5 s limit, then no more.
+			assert.strictEqual(timeoutRun.mock.calls.length, 2);
+			expect(error).toMatchObject({
+				_tag: "DiagramGenerationTimeoutError",
+				message: "Generation did not finish within its 1.5-second limit.",
+				scope: "request",
+				timeoutMs: 1_500,
+			});
+			assert.isTrue(cancellationSignals.every((signal) => signal.aborted));
 		}),
 	);
 });

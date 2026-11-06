@@ -1339,6 +1339,304 @@ const wireframeScenarioDefinitions: readonly WireframeScenarioDefinition[] = [
 			],
 		},
 	},
+	{
+		id: "helpdesk-app-wireframe-large",
+		title: "Helpdesk app",
+		difficulty: "challenge",
+		tags: ["wireframe", "desktop", "flow", "navigation", "dense", "large"],
+		description:
+			"Four desktop screens of a helpdesk app: an inbox with a sidebar, header, tabs and a ticket table; a ticket with selects and a reply box; a new-ticket form; and reports with three KPI cards, a chart and a table, joined by four navigations.",
+		prompt: [
+			"Wireframe our helpdesk web app, four desktop screens.",
+			"",
+			'1. "Inbox": a sidebar on the left with the product name "Helpdesk" and the nav items Inbox (active), Customers, Reports and Settings. A header with a search bar ("Search tickets") and an avatar. The main area has the heading "Inbox", a primary "New ticket" button that opens the New ticket screen, the tabs Open (active), Pending and Solved, and a "Tickets" table with the columns Ticket, Subject, Customer, Priority and Updated.',
+			'2. "Ticket": the heading "Ticket #4821", the text "Printer keeps jamming on the third floor", a "Status" select showing Open, an "Assignee" select showing Priya Shah, a "Reply" text area, a primary "Send reply" button, and a "Back to inbox" link that goes to Inbox.',
+			'3. "New ticket": the heading "New ticket", a "Customer email" input, a "Subject" input, a "Priority" select showing Normal, a "Description" text area, a "Notify the customer" checkbox (checked), a primary "Create ticket" button that opens the Ticket screen, and a secondary "Cancel" button back to Inbox.',
+			'4. "Reports": the heading "Reports", a row of three cards: "Open tickets" 128, "Median first reply" 2h 14m and "Customer satisfaction" 94%, then a line chart titled "Tickets per day" and an "Agent performance" table with the columns Agent, Solved, First reply and Rating.',
+		].join("\n"),
+		screens: {
+			inbox: { names: ["Inbox"], device: "desktop" },
+			ticket: { names: ["Ticket"], device: "desktop" },
+			"new-ticket": { names: ["New ticket"], device: "desktop" },
+			reports: { names: ["Reports"], device: "desktop" },
+		},
+		components: [
+			field("product-name", HEADING, ["Helpdesk"], {
+				screen: "inbox",
+				inside: { types: ["sidebar"] },
+			}),
+			field("nav", ["nav"], undefined, {
+				screen: "inbox",
+				items: ["Inbox", "Customers", "Reports", "Settings"],
+				inside: { types: ["sidebar"] },
+				state: { active: "Inbox" },
+			}),
+			field("search", SEARCH, ["Search tickets"], {
+				screen: "inbox",
+				inside: { types: ["header"] },
+			}),
+			field("avatar", ["avatar"], undefined, { screen: "inbox", inside: { types: ["header"] } }),
+			field("inbox-heading", ["heading"], ["Inbox"], { screen: "inbox" }),
+			field("new-ticket-button", ["button"], ["New ticket"], {
+				screen: "inbox",
+				state: { variant: "primary" },
+			}),
+			field("tabs", ["tabs"], undefined, {
+				screen: "inbox",
+				items: ["Open", "Pending", "Solved"],
+				state: { active: "Open" },
+			}),
+			field("tickets", ["table"], undefined, {
+				screen: "inbox",
+				titled: ["Tickets"],
+				items: ["Ticket", "Subject", "Customer", "Priority", "Updated"],
+			}),
+			field("ticket-heading", ["heading"], ["Ticket #4821"], { screen: "ticket" }),
+			field("ticket-text", COPY, ["Printer keeps jamming on the third floor"], {
+				screen: "ticket",
+			}),
+			field("status", ["select"], ["Status"], { screen: "ticket", state: { value: ["Open"] } }),
+			field("assignee", ["select"], ["Assignee"], {
+				screen: "ticket",
+				state: { value: ["Priya Shah"] },
+			}),
+			field("reply", ["textarea"], ["Reply"], { screen: "ticket" }),
+			field("send-reply", ["button"], ["Send reply"], {
+				screen: "ticket",
+				state: { variant: "primary" },
+			}),
+			field("back", ["link"], ["Back to inbox"], { screen: "ticket" }),
+			field("new-heading", ["heading"], ["New ticket"], { screen: "new-ticket" }),
+			field("customer-email", ["input"], ["Customer email"], { screen: "new-ticket" }),
+			field("subject", ["input"], ["Subject"], { screen: "new-ticket" }),
+			field("priority", ["select"], ["Priority"], {
+				screen: "new-ticket",
+				state: { value: ["Normal"] },
+			}),
+			field("description", ["textarea"], ["Description"], { screen: "new-ticket" }),
+			field("notify", ["checkbox"], ["Notify the customer"], {
+				screen: "new-ticket",
+				state: { checked: true },
+			}),
+			field("create", ["button"], ["Create ticket"], {
+				screen: "new-ticket",
+				state: { variant: "primary" },
+			}),
+			field("cancel", ["button"], ["Cancel"], {
+				screen: "new-ticket",
+				state: { variant: "secondary" },
+			}),
+			field("reports-heading", ["heading"], ["Reports"], { screen: "reports" }),
+			field("open-tickets", ["card", "section"], undefined, {
+				screen: "reports",
+				titled: ["Open tickets"],
+				amount: "128",
+			}),
+			field("first-reply", ["card", "section"], undefined, {
+				screen: "reports",
+				titled: ["Median first reply"],
+				amount: "2h 14m",
+			}),
+			field("satisfaction", ["card", "section"], undefined, {
+				screen: "reports",
+				titled: ["Customer satisfaction"],
+				amount: "94%",
+			}),
+			field("tickets-chart", ["chart"], undefined, {
+				screen: "reports",
+				titled: ["Tickets per day"],
+			}),
+			field("agents", ["table"], undefined, {
+				screen: "reports",
+				titled: ["Agent performance"],
+				items: ["Agent", "Solved", "First reply", "Rating"],
+			}),
+		],
+		orders: {
+			inbox: ["inbox-heading", "new-ticket-button", "tabs", "tickets"],
+			ticket: [
+				"ticket-heading",
+				"ticket-text",
+				"status",
+				"assignee",
+				"reply",
+				"send-reply",
+				"back",
+			],
+			"new-ticket": [
+				"new-heading",
+				"customer-email",
+				"subject",
+				"priority",
+				"description",
+				"notify",
+				"create",
+				"cancel",
+			],
+			reports: [
+				"reports-heading",
+				"open-tickets",
+				"first-reply",
+				"satisfaction",
+				"tickets-chart",
+				"agents",
+			],
+		},
+		sides: [
+			{
+				id: "sidebar-left",
+				message: "Expected the Inbox sidebar on the left.",
+				holds: (found) =>
+					found.matches
+						.get("nav")
+						?.ancestors.some(
+							(ancestor) => ancestor.type === "sidebar" && ancestor.side !== "right",
+						) ?? false,
+			},
+			{
+				id: "header-top",
+				message: "Expected the search bar and avatar in a header at the top of Inbox.",
+				holds: (found) => atTop(found, "search") && atTop(found, "avatar"),
+			},
+			{
+				id: "kpi-row",
+				message: "Expected the three report cards side by side in one row, in the stated order.",
+				holds: (found) => {
+					const cards = ["open-tickets", "first-reply", "satisfaction"].map((cardKey) =>
+						found.matches.get(cardKey),
+					);
+					const parent = cards[0]?.parent;
+					return (
+						parent !== undefined &&
+						(parent.type === "row" ||
+							(parent.type === "grid" && (parent.columns as number) >= 3)) &&
+						cards.every((card) => card?.parent === parent) &&
+						cards.every((card, at) => at === 0 || card!.order > cards[at - 1]!.order)
+					);
+				},
+			},
+		],
+		navigations: [
+			{ from: "new-ticket-button", to: "new-ticket" },
+			{ from: "back", to: "inbox" },
+			{ from: "create", to: "ticket" },
+			{ from: "cancel", to: "inbox" },
+		],
+		expected: {
+			id: "helpdesk-app-wireframe-large",
+			title: "Helpdesk app",
+			type: "wireframe",
+			screens: [
+				{
+					id: "inbox",
+					name: "Inbox",
+					device: "desktop",
+					children: [
+						{
+							type: "sidebar",
+							children: [
+								{ type: "heading", level: 3, text: "Helpdesk" },
+								{
+									type: "nav",
+									items: ["Inbox", "Customers", "Reports", "Settings"],
+									active: "Inbox",
+								},
+							],
+						},
+						{
+							type: "header",
+							children: [{ type: "search", placeholder: "Search tickets" }, { type: "avatar" }],
+						},
+						{
+							type: "main",
+							children: [
+								{ type: "heading", level: 1, text: "Inbox" },
+								{ type: "button", text: "New ticket", variant: "primary", target: "new-ticket" },
+								{ type: "tabs", items: ["Open", "Pending", "Solved"], active: "Open" },
+								{
+									type: "card",
+									title: "Tickets",
+									children: [
+										{
+											type: "table",
+											columns: ["Ticket", "Subject", "Customer", "Priority", "Updated"],
+										},
+									],
+								},
+							],
+						},
+					],
+				},
+				{
+					id: "ticket",
+					name: "Ticket",
+					device: "desktop",
+					children: [
+						{ type: "heading", level: 1, text: "Ticket #4821" },
+						{ type: "text", text: "Printer keeps jamming on the third floor" },
+						{ type: "select", label: "Status", value: "Open" },
+						{ type: "select", label: "Assignee", value: "Priya Shah" },
+						{ type: "textarea", label: "Reply" },
+						{ type: "button", text: "Send reply", variant: "primary" },
+						{ type: "link", text: "Back to inbox", target: "inbox" },
+					],
+				},
+				{
+					id: "new-ticket",
+					name: "New ticket",
+					device: "desktop",
+					children: [
+						{ type: "heading", level: 1, text: "New ticket" },
+						{ type: "input", label: "Customer email" },
+						{ type: "input", label: "Subject" },
+						{ type: "select", label: "Priority", value: "Normal" },
+						{ type: "textarea", label: "Description" },
+						{ type: "checkbox", label: "Notify the customer", checked: true },
+						{ type: "button", text: "Create ticket", variant: "primary", target: "ticket" },
+						{ type: "button", text: "Cancel", variant: "secondary", target: "inbox" },
+					],
+				},
+				{
+					id: "reports",
+					name: "Reports",
+					device: "desktop",
+					children: [
+						{ type: "heading", level: 1, text: "Reports" },
+						{
+							type: "row",
+							children: [
+								{
+									type: "card",
+									title: "Open tickets",
+									children: [{ type: "heading", level: 2, text: "128" }],
+								},
+								{
+									type: "card",
+									title: "Median first reply",
+									children: [{ type: "heading", level: 2, text: "2h 14m" }],
+								},
+								{
+									type: "card",
+									title: "Customer satisfaction",
+									children: [{ type: "heading", level: 2, text: "94%" }],
+								},
+							],
+						},
+						{
+							type: "card",
+							title: "Tickets per day",
+							children: [{ type: "chart", kind: "line" }],
+						},
+						{
+							type: "card",
+							title: "Agent performance",
+							children: [{ type: "table", columns: ["Agent", "Solved", "First reply", "Rating"] }],
+						},
+					],
+				},
+			],
+		},
+	},
 ];
 
 export const wireframeScenarios: readonly WireframeScenario[] =

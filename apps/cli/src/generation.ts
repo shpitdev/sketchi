@@ -12,7 +12,11 @@ import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
 import { decodeCanonicalDiagramDocument, documentId, validateStorageId } from "./document.js";
 import { CliGenerationError } from "./errors.js";
 import { DiagramStore } from "./storage.js";
-import { API_REQUEST_TIMEOUT, MAX_API_RESPONSE_BYTES, readBoundedText } from "./response-body.js";
+import {
+	GENERATE_REQUEST_TIMEOUT,
+	MAX_API_RESPONSE_BYTES,
+	readBoundedText,
+} from "./response-body.js";
 
 export const DEFAULT_GENERATE_ENDPOINT = "https://playground.sketchi.app/api/v1/generate";
 export const SKETCHI_GENERATE_ENDPOINT_ENV = "SKETCHI_GENERATE_ENDPOINT";
@@ -30,6 +34,10 @@ export interface GenerateDiagramResult {
 	readonly diagram: StoredDiagram;
 	readonly model: string;
 	readonly provider: string;
+	/** What the server reports the generation took, when it reports it. */
+	readonly attempts?: number;
+	readonly durationMs?: number;
+	readonly outputTokens?: number;
 }
 
 /**
@@ -109,6 +117,7 @@ function endpointFailure(status: number, body: typeof EndpointErrorBody.Type): C
 			});
 		case "invalid_input":
 		case "invalid_generated_document":
+		case "limit_exceeded":
 		case "quality_failed":
 			return CliGenerationError.make({
 				code: "invalid_generated_document",
@@ -138,8 +147,11 @@ const GenerateApiSuccess = Schema.Struct({
 		excalidraw: PresentValue,
 	}),
 	generation: Schema.Struct({
+		attempts: Schema.optionalKey(Schema.Number),
+		durationMs: Schema.optionalKey(Schema.Number),
 		model: Schema.NonEmptyString,
 		provider: Schema.NonEmptyString,
+		usage: Schema.optionalKey(Schema.Struct({ outputTokens: Schema.optionalKey(Schema.Number) })),
 	}),
 });
 
@@ -203,10 +215,16 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
 			return yield* endpointFailure(response.status, body);
 		}
 		const success = yield* decodeSuccessBody(text).pipe(Effect.mapError(malformedResponse));
-		return { ...success.diagram, ...success.generation, issues: success.issues ?? [] };
+		const { usage, ...generation } = success.generation;
+		return {
+			...success.diagram,
+			...generation,
+			...(usage?.outputTokens === undefined ? {} : { outputTokens: usage.outputTokens }),
+			issues: success.issues ?? [],
+		};
 	},
 	Effect.timeoutOrElse({
-		duration: API_REQUEST_TIMEOUT,
+		duration: GENERATE_REQUEST_TIMEOUT,
 		orElse: () => Effect.fail(timeoutFailure()),
 	}),
 );
@@ -242,5 +260,8 @@ export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
 		diagram,
 		model: response.model,
 		provider: response.provider,
+		...(response.attempts === undefined ? {} : { attempts: response.attempts }),
+		...(response.durationMs === undefined ? {} : { durationMs: response.durationMs }),
+		...(response.outputTokens === undefined ? {} : { outputTokens: response.outputTokens }),
 	} satisfies GenerateDiagramResult;
 });

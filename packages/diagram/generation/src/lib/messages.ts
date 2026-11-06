@@ -1,4 +1,9 @@
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "@sketchi/diagram-core";
+import {
+	DIAGRAM_TYPES,
+	type DiagramTypeValue,
+	SEQUENCE_MAX_MESSAGES,
+	SEQUENCE_MAX_PARTICIPANTS,
+} from "@sketchi/diagram-core";
 import { Schema } from "effect";
 
 import { DiagramGenerationTypeSchema } from "./intent.js";
@@ -46,6 +51,7 @@ const COMMON_INSTRUCTIONS = [
 	"Author one concise title of at most 60 characters. Do not copy the whole scenario into the title.",
 	'Return one object: { "title", "diagram" }.',
 	"Copy everything the scenario states, in full and in its order: every item, name, role, detail, number, key and connection. Add nothing it does not state: no step, decision, branch, loop, outcome, group, phase, field, item, connection or value.",
+	"The limits below are what Sketchi can draw, not targets: never drop, merge or summarize stated content to fit one. Sketchi reports a diagram that is too large.",
 	`Set diagram.type to the kind the scenario requests: ${listAlternatives(NATIVE_KINDS)}. A swimlane or architecture request is a "flowchart" with lanes or zone groups. Anything else uses the closest kind.`,
 ];
 
@@ -79,7 +85,7 @@ const SEQUENCE_IR_INSTRUCTIONS = [
 	'Use message type "message" for calls and "return" for responses; dashed style is appropriate for responses.',
 	"Answer a call with a later return from the callee back to the caller; Sketchi draws the callee's activation bar from the call to its return. Leave fire-and-forget events unanswered.",
 	"A message from a participant to itself draws as a self-message loop.",
-	"Use at most 12 participants and 40 messages.",
+	`Use at most ${SEQUENCE_MAX_PARTICIPANTS} participants and ${SEQUENCE_MAX_MESSAGES} messages.`,
 ];
 
 /** Model-facing IR rules for each canonical family, in registry order. */
@@ -555,6 +561,13 @@ function logoSection(prompt: DiagramGenerationPrompt): string[] {
 	];
 }
 
+/**
+ * A ceiling, not a target: billing counts only the tokens written, though the
+ * provider's output rate limit reserves the whole ceiling while a call runs.
+ * Haiku 5.5 wrote the ten large scenarios in 1,062 to 4,092 tokens (a 60-task
+ * Gantt the most, a 60-step flowchart 3,525), so an answer that reaches this is
+ * too large for one diagram; it fails as such instead of being repaired.
+ */
 export const DEFAULT_MAX_OUTPUT_TOKENS = 16_384;
 export const DEFAULT_TEMPERATURE = 0.1;
 

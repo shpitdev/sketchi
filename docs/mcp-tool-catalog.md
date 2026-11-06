@@ -510,7 +510,7 @@ flowchart TB
   Branches["decision branch labels are present and unique"]
   Edges["edges reference existing nodes"]
   NoLoops["no self-loops"]
-  Bounds["24 nodes and 64 edges maximum"]
+  Bounds["80 nodes and 120 edges maximum"]
 
   Start --> Reachable
   Reachable --> Terminating
@@ -540,7 +540,7 @@ Rules:
 - Every `decision` node must have at least two outgoing edges.
 - Every outgoing decision branch must have a non-empty label.
 - Decision branch labels from the same decision must be unique.
-- A flowchart may contain at most 24 nodes and 64 edges. Larger graphs fail
+- A flowchart may contain at most 80 nodes and 120 edges. Larger graphs fail
   with `flowchart_too_large` before render or persistence.
 - Semantic issue output is capped deterministically at 20 entries.
 
@@ -754,7 +754,7 @@ type IssueCode =
 The boundary failures added for bounded flowchart repair are:
 
 - `nonterminating_node`: a reachable node cannot reach any end.
-- `flowchart_too_large`: the semantic graph exceeds 24 nodes or 64 edges.
+- `flowchart_too_large`: the semantic graph exceeds 80 nodes or 120 edges.
 - `request_too_large`: the Studio HTTP body exceeds 256 KiB, including a
   streamed body with no `Content-Length`; the API returns 413.
 

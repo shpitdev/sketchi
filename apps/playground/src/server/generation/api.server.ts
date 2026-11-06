@@ -33,8 +33,10 @@ import { PlaygroundBindings, PlaygroundClock } from "../runtime/context.server";
 import { decodeGenerateRequest, GENERATE_REQUEST_COPY } from "./request";
 import { PlaygroundGeneration } from "./service.server";
 
-export const MAX_GENERATE_REQUEST_BYTES = 32 * 1024;
-export const MAX_GENERATE_PROMPT_LENGTH = 8_000;
+// Room for a pasted roster, DDL schema or task list of the largest diagrams the
+// family limits allow: 25 tables of DDL with their usual columns run past 8,000.
+export const MAX_GENERATE_REQUEST_BYTES = 64 * 1024;
+export const MAX_GENERATE_PROMPT_LENGTH = 20_000;
 
 type BuildResult = CanonicalBuildResult;
 type BuiltArtifact = Extract<BuildResult, { readonly ok: true }>["artifact"];
@@ -43,6 +45,7 @@ type GenerateFailureStatus =
 	| "invalid_input"
 	| "provider_failed"
 	| "generation_timeout"
+	| "limit_exceeded"
 	| "unsupported_model"
 	| "malformed_output"
 	| "invalid_generated_document"
@@ -77,7 +80,13 @@ interface GenerateSuccess {
 		readonly scene: unknown;
 		readonly excalidraw: unknown;
 	};
-	readonly generation: { readonly model: string; readonly provider: string };
+	readonly generation: {
+		readonly attempts?: number;
+		readonly durationMs?: number;
+		readonly model: string;
+		readonly provider: string;
+		readonly usage?: { readonly inputTokens?: number; readonly outputTokens?: number };
+	};
 }
 
 type GenerateResult = GenerateSuccess | GenerateFailure;
@@ -122,8 +131,17 @@ function generationErrorFailure(error: DiagramGenerationError): GenerateFailure 
 				issue(
 					"generation_timeout",
 					"generation",
-					"The generation provider did not respond in time.",
+					error.message,
 					"Retry once; if it persists, try a shorter prompt.",
+				),
+			]);
+		case "DiagramGenerationLimitError":
+			return failure("limit_exceeded", [
+				issue(
+					error.limit === "output_tokens" ? "output_limit_exceeded" : "diagram_too_large",
+					"generation",
+					error.message,
+					"Split the request into smaller diagrams.",
 				),
 			]);
 		case "DiagramGenerationResponseError":
@@ -203,6 +221,10 @@ function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFail
 	const issues = result.issues.map((entry) =>
 		issue(entry.code, "build", entry.message, entry.hint ?? "Refine the prompt and retry."),
 	);
+	// A family's size limit, such as a mindmap's topic count, is a limit and not a defect.
+	if (result.issues.some((entry) => entry.code.endsWith("_too_large"))) {
+		return failure("limit_exceeded", issues);
+	}
 	switch (result.status) {
 		case "invalid_input":
 		case "invalid_flowchart":
@@ -481,8 +503,20 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 			excalidraw,
 		},
 		generation: {
+			...(candidate.attempts === undefined ? {} : { attempts: candidate.attempts }),
+			...(candidate.durationMs === undefined ? {} : { durationMs: candidate.durationMs }),
 			model: candidate.model || generation.defaultModel(env),
 			provider: candidate.provider,
+			...(candidate.usage?.outputTokens === undefined
+				? {}
+				: {
+						usage: {
+							...(candidate.usage.inputTokens === undefined
+								? {}
+								: { inputTokens: candidate.usage.inputTokens }),
+							outputTokens: candidate.usage.outputTokens,
+						},
+					}),
 		},
 	};
 	return yield* finish({ prompt, type, spec }, success);

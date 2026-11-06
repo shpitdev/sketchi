@@ -20,6 +20,7 @@ import {
 } from "./cloudflare-ai-gateway.js";
 import {
 	DiagramGenerationHttpError,
+	DiagramGenerationLimitError,
 	DiagramGenerationResponseError,
 	DiagramGenerationTransportError,
 	errorMessage,
@@ -154,6 +155,8 @@ function transportFailure(networkError: AiError.NetworkError): unknown {
 		: networkError;
 }
 
+const tokenCount = (count: number) => count.toLocaleString("en-US");
+
 function emptyResponseError(route: GatewayChatRoute, cause: unknown) {
 	return DiagramGenerationResponseError.make({
 		cause,
@@ -213,6 +216,7 @@ const runChatAttempt = Effect.fn("diagramGeneration.gatewayChat.attempt")(functi
 	let gatewayLogId: string | undefined;
 	const { system, user } = buildDiagramGenerationMessages(request.prompt);
 	const modelId = route.modelId(request.model);
+	const maxOutputTokens = request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
 	const response = yield* LanguageModel.generateText({
 		prompt: Prompt.make([
 			{ role: "system", content: system },
@@ -220,7 +224,7 @@ const runChatAttempt = Effect.fn("diagramGeneration.gatewayChat.attempt")(functi
 		]),
 	}).pipe(
 		OpenAiLanguageModel.withConfigOverride({
-			max_output_tokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+			max_output_tokens: maxOutputTokens,
 			model: modelId,
 			...route.requestFields(request),
 		}),
@@ -245,23 +249,29 @@ const runChatAttempt = Effect.fn("diagramGeneration.gatewayChat.attempt")(functi
 		),
 	);
 
+	const { inputTokens, outputTokens } = response.usage;
+	// A cut-off answer is incomplete, not malformed: repairing or regenerating it
+	// under the same budget would only be cut off again.
+	if (response.finishReason === "length") {
+		return yield* DiagramGenerationLimitError.make({
+			diagnostics: [
+				`output_truncated: ${route.modelLabel} stopped at the ${tokenCount(maxOutputTokens)}-token output limit${outputTokens.total === undefined ? "" : ` after ${tokenCount(outputTokens.total)} tokens`}.`,
+			],
+			limit: "output_tokens",
+			message: `The diagram needs more than the ${tokenCount(maxOutputTokens)}-token output limit allows in one answer.`,
+			provider: route.provider,
+		});
+	}
 	const text = response.text.trim();
 	if (!text) {
 		return yield* emptyResponseError(route, new Error(`Finish reason: ${response.finishReason}`));
 	}
-	const truncated = response.finishReason === "length";
-	const { inputTokens, outputTokens } = response.usage;
 	return candidateFromText({
 		cacheMode: request.cacheMode ?? "default",
-		diagnostics: truncated
-			? [
-					`output_truncated: ${route.modelLabel} stopped at the maximum output-token budget; regenerate the complete diagram.`,
-				]
-			: [],
+		diagnostics: [],
 		model: modelId,
 		provider: route.provider,
 		text,
-		...(truncated ? { error: `${route.modelLabel} output was truncated.` } : {}),
 		...(inputTokens.total !== undefined && outputTokens.total !== undefined
 			? {
 					usage: {

@@ -1,10 +1,16 @@
-export const MAX_RENDER_ELEMENT_DIMENSION = 8_192;
-export const MAX_RENDER_CANVAS_DIMENSION = 8_192;
-// The original 4 Mi-square-unit and 16 MP limits rejected valid canonical
-// diagrams observed in production. A bounded 50% increase admits those cases
-// while preserving hard pre-raster geometry and allocation ceilings.
-export const MAX_RENDER_CANVAS_AREA = 6_291_456;
+/**
+ * The raster allocation ceiling. A drawing that would exceed it at full scale
+ * renders at a smaller scale, down to PNG_EXPORT_MIN_SCALE.
+ */
 export const MAX_RENDER_OUTPUT_PIXELS = 25_165_824;
+/** The longest PNG side, as in Chrome's canvas and the server's PNG export. */
+export const MAX_RENDER_OUTPUT_DIMENSION = 16_384;
+// A 60-step flowchart draws about 9,000 units tall and 1,400 wide. The drawing
+// may reach the output side at minimum scale, less the padding and title.
+export const MAX_RENDER_ELEMENT_DIMENSION = 16_000;
+export const MAX_RENDER_CANVAS_DIMENSION = 16_000;
+// At minimum scale a unit is a pixel, so the area guard is the allocation ceiling.
+export const MAX_RENDER_CANVAS_AREA = MAX_RENDER_OUTPUT_PIXELS;
 export const PNG_EXPORT_SCALE = 2;
 export const PNG_EXPORT_MIN_SCALE = 1;
 export const PNG_EXPORT_PADDING = 20;
@@ -225,7 +231,7 @@ export function adaptivePngExportScale(
 	if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
 		return diagnostic("invalid_geometry", "rendered SVG dimensions are invalid");
 	}
-	const maximumOutputDimension = MAX_RENDER_CANVAS_DIMENSION * PNG_EXPORT_SCALE;
+	const maximumOutputDimension = MAX_RENDER_OUTPUT_DIMENSION;
 	const maximumScale = Math.min(
 		PNG_EXPORT_SCALE,
 		maximumOutputDimension / width,

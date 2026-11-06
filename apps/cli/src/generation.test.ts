@@ -240,7 +240,10 @@ describe("prompt-assisted generation over the public generate API", () => {
 				const created: BuiltDiagram[] = [];
 				const fiber = yield* Effect.flip(runGenerate(created)).pipe(Effect.forkChild);
 				yield* Deferred.await(started);
-				yield* TestClock.adjust("90 seconds");
+				// A large diagram's model calls may take two minutes; the CLI waits past them.
+				yield* TestClock.adjust("149 seconds");
+				assert.isUndefined(fiber.pollUnsafe());
+				yield* TestClock.adjust("1 second");
 				assert.isDefined(fiber.pollUnsafe());
 				const error = yield* Fiber.join(fiber);
 				assert.strictEqual(error._tag, "CliGenerationError");
@@ -372,6 +375,57 @@ describe("prompt-assisted generation over the public generate API", () => {
 			assert.strictEqual(result.provider, "cloudflare-anthropic");
 			assert.strictEqual(result.model, "claude-haiku-5-5");
 			assert.strictEqual(created.length, 1);
+		}),
+	);
+
+	it.effect("keeps the model calls, time and output tokens the server reports", () =>
+		Effect.gen(function* () {
+			const body = JSON.parse(yield* Effect.promise(() => buildSuccessBody(flowchartInput)));
+			body.generation = {
+				...body.generation,
+				attempts: 2,
+				durationMs: 41_250,
+				usage: { inputTokens: 7_200, outputTokens: 5_100 },
+			};
+			stubFetch(() => new Response(JSON.stringify(body), { status: 200 }));
+
+			const result = yield* runGenerate([], "flowchart");
+
+			assert.strictEqual(result.attempts, 2);
+			assert.strictEqual(result.durationMs, 41_250);
+			assert.strictEqual(result.outputTokens, 5_100);
+		}),
+	);
+
+	it.effect("reports the limit a too-large diagram reached as a rejected document", () =>
+		Effect.gen(function* () {
+			stubFetch(() =>
+				jsonResponse(
+					{
+						ok: false,
+						status: "limit_exceeded",
+						issues: [
+							{
+								code: "diagram_too_large",
+								message: "Flowchart has 96 nodes; the supported maximum is 80.",
+								hint: "Split the request into smaller diagrams.",
+							},
+						],
+					},
+					413,
+				),
+			);
+			const created: BuiltDiagram[] = [];
+
+			const error = yield* Effect.flip(runGenerate(created, "flowchart"));
+
+			assert.strictEqual(error._tag, "CliGenerationError");
+			if (error._tag === "CliGenerationError") {
+				assert.strictEqual(error.code, "invalid_generated_document");
+				assert.strictEqual(error.message, "Flowchart has 96 nodes; the supported maximum is 80.");
+				assert.strictEqual(exitCodeForFailure(error), 3);
+			}
+			assert.strictEqual(created.length, 0);
 		}),
 	);
 

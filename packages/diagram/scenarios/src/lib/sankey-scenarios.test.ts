@@ -30,13 +30,15 @@ const withLink = (
 });
 
 describe("prompt-grounded Sankey scenarios", () => {
-	it("covers a sliver-heavy budget, crossing traffic, a funnel and a five-column energy flow", () => {
+	it("covers a sliver-heavy budget, crossing traffic, a funnel, an energy flow and a dense budget", () => {
 		expect(sankeyScenarios.map((entry) => entry.id)).toEqual([
 			"cloud-budget-sankey-v2",
 			"website-traffic-sankey-v2",
 			"hiring-funnel-sankey-v2",
 			"city-energy-sankey-v2",
+			"university-budget-sankey-large",
 		]);
+		expect(scenario("university-budget-sankey-large").expectedDiagram.links).toHaveLength(65);
 		expect(scenario("cloud-budget-sankey-v2").difficulty).toBe("challenge");
 		expect(
 			budget.links

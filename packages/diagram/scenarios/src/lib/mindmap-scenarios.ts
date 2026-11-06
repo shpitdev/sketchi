@@ -561,6 +561,150 @@ const animalKingdom = topic(
 	],
 );
 
+const leaves = (...entries: readonly (string | readonly [string, readonly string[]])[]) =>
+	entries.map((entry) => (typeof entry === "string" ? topic(entry) : topic(entry[0], entry[1])));
+
+const webDevelopment = topic(
+	"Web development",
+	["web development"],
+	[
+		topic(
+			"HTML",
+			["html"],
+			leaves(["Semantic elements", ["semantic"]], ["Forms", ["form"]], "Accessibility", [
+				"SEO basics",
+				["seo"],
+			]),
+		),
+		topic(
+			"CSS",
+			["css"],
+			leaves(
+				["Selectors", ["selector"]],
+				"Box model",
+				"Flexbox",
+				"Grid",
+				["Animations", ["animation"]],
+				"Responsive design",
+			),
+		),
+		topic(
+			"JavaScript",
+			["javascript"],
+			[
+				topic(
+					"Language basics",
+					["language"],
+					leaves(
+						["Variables", ["variable"]],
+						["Functions", ["function"]],
+						["Closures", ["closure"]],
+						["Promises", ["promise"]],
+						["Modules", ["module"]],
+					),
+				),
+				topic(
+					"Browser APIs",
+					["browser"],
+					leaves(["DOM manipulation", ["dom"]], "Fetch", "Local storage", [
+						"Web workers",
+						["worker"],
+					]),
+				),
+			],
+		),
+		topic(
+			"TypeScript",
+			["typescript"],
+			leaves(["Types", ["type"]], ["Generics", ["generic"]], "Type narrowing", [
+				"Declaration files",
+				["declaration"],
+			]),
+		),
+		topic(
+			"Frameworks",
+			["framework"],
+			[
+				topic(
+					"React",
+					["react"],
+					leaves(["Components", ["component"]], ["Hooks", ["hook"]], "State management", [
+						"Server components",
+						["server component"],
+					]),
+				),
+				topic("Vue", ["vue"], leaves(["Templates", ["template"]], "Composition API")),
+				topic("Svelte", ["svelte"]),
+			],
+		),
+		topic("Tooling", ["tool"], leaves("Git", "npm", "Vite", "ESLint", "Prettier")),
+		topic(
+			"Testing",
+			["test"],
+			leaves(
+				["Unit tests", ["unit"]],
+				["Integration tests", ["integration"]],
+				["End-to-end tests", ["end to end"]],
+				"Mocking",
+			),
+		),
+		topic(
+			"Backend",
+			["backend"],
+			[
+				topic("Node.js", ["node"], leaves("Express", ["Streams", ["stream"]], "Event loop")),
+				topic(
+					"Databases",
+					["database"],
+					leaves("PostgreSQL", "MongoDB", "Redis", ["Migrations", ["migration"]]),
+				),
+				topic(
+					"APIs",
+					["api"],
+					leaves("REST", "GraphQL", ["WebSockets", ["websocket"]], "Authentication"),
+				),
+			],
+		),
+		topic(
+			"Deployment",
+			["deploy"],
+			leaves("Docker", ["CI pipelines", ["ci"]], ["CDNs", ["cdn"]], "Serverless", "Monitoring"),
+		),
+		topic(
+			"Security",
+			["security"],
+			leaves("HTTPS", "CORS", "XSS", "CSRF", "Content Security Policy"),
+		),
+		topic(
+			"Performance",
+			["performance"],
+			leaves("Lazy loading", "Code splitting", "Caching", "Core Web Vitals", "Image optimization"),
+		),
+		topic(
+			"Design",
+			["design"],
+			leaves("Typography", "Color theory", "Figma", ["Design systems", ["design system"]]),
+		),
+		topic(
+			"Career",
+			["career"],
+			leaves("Portfolio", "Open source", ["Interviews", ["interview"]], "Networking"),
+		),
+		topic(
+			"Learning resources",
+			["resource"],
+			leaves(
+				["MDN docs", ["mdn"]],
+				["Online courses", ["course"]],
+				["Coding challenges", ["challenge"]],
+				["Tech blogs", ["blog"]],
+				["Podcasts", ["podcast"]],
+				["Meetups", ["meetup"]],
+			),
+		),
+	],
+);
+
 const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 	{
 		id: "team-offsite-mindmap-v2",
@@ -613,6 +757,42 @@ const mindmapScenarioDefinitions: readonly MindmapScenarioDefinition[] = [
 		prompt:
 			"mindmap of this bit of the animal kingdom\n\nAnimals\n- Vertebrates\n  - Mammals\n    - Primates\n      - Great apes: Gorillas, Chimpanzees\n      - Monkeys\n    - Carnivores\n      - Big cats: Lions, Tigers\n      - Bears\n    - Whales\n  - Birds\n    - Raptors: Eagles, Owls\n    - Songbirds\n  - Reptiles: Snakes, Lizards\n  - Amphibians: Frogs, Salamanders\n  - Fish: Sharks, Salmon\n- Invertebrates\n  - Insects: Beetles, Butterflies, Ants\n  - Mollusks: Octopuses, Snails\n  - Arachnids: Spiders, Scorpions\n  - Crustaceans: Crabs, Lobsters",
 		root: animalKingdom,
+	},
+	{
+		id: "web-development-mindmap-large",
+		title: "Web development",
+		difficulty: "challenge",
+		tags: ["mindmap", "large", "wide", "three-levels", "real-voice"],
+		description:
+			"A 101-topic learning plan: fourteen branches around the center, three of them with grouping topics, and leaves of one to three words.",
+		prompt: [
+			"turn my web dev learning plan into a mindmap, keep every topic",
+			"",
+			"Web development",
+			"- HTML: Semantic elements, Forms, Accessibility, SEO basics",
+			"- CSS: Selectors, Box model, Flexbox, Grid, Animations, Responsive design",
+			"- JavaScript",
+			"  - Language basics: Variables, Functions, Closures, Promises, Modules",
+			"  - Browser APIs: DOM manipulation, Fetch, Local storage, Web workers",
+			"- TypeScript: Types, Generics, Type narrowing, Declaration files",
+			"- Frameworks",
+			"  - React: Components, Hooks, State management, Server components",
+			"  - Vue: Templates, Composition API",
+			"  - Svelte",
+			"- Tooling: Git, npm, Vite, ESLint, Prettier",
+			"- Testing: Unit tests, Integration tests, End-to-end tests, Mocking",
+			"- Backend",
+			"  - Node.js: Express, Streams, Event loop",
+			"  - Databases: PostgreSQL, MongoDB, Redis, Migrations",
+			"  - APIs: REST, GraphQL, WebSockets, Authentication",
+			"- Deployment: Docker, CI pipelines, CDNs, Serverless, Monitoring",
+			"- Security: HTTPS, CORS, XSS, CSRF, Content Security Policy",
+			"- Performance: Lazy loading, Code splitting, Caching, Core Web Vitals, Image optimization",
+			"- Design: Typography, Color theory, Figma, Design systems",
+			"- Career: Portfolio, Open source, Interviews, Networking",
+			"- Learning resources: MDN docs, Online courses, Coding challenges, Tech blogs, Podcasts, Meetups",
+		].join("\n"),
+		root: webDevelopment,
 	},
 ];
 

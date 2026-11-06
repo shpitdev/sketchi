@@ -8,7 +8,7 @@ A mindmap draws a nested topic hierarchy around one central topic: a brainstorm,
 
 ## Contract
 
-- One `root` topic with ordered `children`, nested to any depth up to 8 levels and 100 topics.
+- One `root` topic with ordered `children`, nested to any depth up to 8 levels and 200 topics.
 - `layout.direction` is `LR` (the default: branches run clockwise from the top right) or `RL` (mirrored: counter-clockwise from the top left).
 
 ## Layout

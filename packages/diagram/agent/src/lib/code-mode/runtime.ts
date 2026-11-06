@@ -254,7 +254,8 @@ const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
 const DEFAULT_MIN_QUALITY_SCORE = 8;
 const SCENE_PADDING = 48;
 const MAX_MINDMAP_DEPTH = 8;
-const MAX_MINDMAP_TOPICS = 100;
+// A 200-topic map lays out with no overlapping topics or crossing curves.
+const MAX_MINDMAP_TOPICS = 200;
 const MAX_INPUT_ISSUES = 20;
 
 const codeModeRequests = Metric.counter("sketchi_codemode_requests", {

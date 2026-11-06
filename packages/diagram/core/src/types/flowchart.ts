@@ -9,8 +9,9 @@ import {
 
 export const flowchartDiagramType = "flowchart" as const;
 
-export const FLOWCHART_MAX_NODES = 24;
-export const FLOWCHART_MAX_EDGES = 64;
+// A 60-step process with its start and ends, and room for the nodes a model adds.
+export const FLOWCHART_MAX_NODES = 80;
+export const FLOWCHART_MAX_EDGES = 120;
 export const FLOWCHART_MAX_GROUPS = 8;
 /** Zones nest at most this deep: a cloud, a region, a VPC and a subnet. */
 export const FLOWCHART_MAX_GROUP_DEPTH = 4;

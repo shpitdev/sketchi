@@ -382,6 +382,7 @@ const concurrencyLayer = Layer.mergeAll(
 		maxRetries: 0,
 		requestTimeoutMs: 1_000,
 		retryDelayMs: 0,
+		totalTimeoutMs: 60_000,
 	}),
 );
 

@@ -282,9 +282,9 @@ use the unofficial `json.excalidraw.com` API without retries.
 
 The enforced v1 bounds are a 4 KiB bearer link, 2 MiB encrypted body, 16 MiB
 inflated contents, 10,000 elements, and JSON depth 64. Before any raster
-allocation, Sketchi also limits each element dimension to 8,192 units, each
-canvas dimension to 8,192 units, canvas area to 4,194,304 square units, and the
-final PNG to 16,777,216 pixels. Share enforces its compressed-output budget
+allocation, Sketchi also limits each element dimension to 16,000 units, each
+canvas dimension to 16,000 units, canvas area to 25,165,824 square units, and the
+final PNG to 25,165,824 pixels and 16,384 pixels a side. Share enforces its compressed-output budget
 while streaming and reserves framing plus encryption overhead before encryption.
 Pull requires exactly one literal root
 `https://excalidraw.com/#json=ID,KEY` or
