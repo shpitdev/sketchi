@@ -1,5 +1,13 @@
 # @sketchi/cli
 
+## 0.35.0
+
+### Minor Changes
+
+- [#662](https://github.com/shpitdev/sketchi/pull/662) [`bd3ffef`](https://github.com/shpitdev/sketchi/commit/bd3ffef112b5de9076c8ff2b112077628cc207c4) Thanks [@anandpant](https://github.com/anandpant)! - Add `sketchi revise <id> --prompt "..."`, which changes a stored diagram as the request describes and keeps the result as the record's next revision.
+
+- [#664](https://github.com/shpitdev/sketchi/pull/664) [`6af7c26`](https://github.com/shpitdev/sketchi/commit/6af7c26406bb0b1f818451ec06c0455e2881cb35) Thanks [@anandpant](https://github.com/anandpant)! - `generate` and `revise` draw the colors and shapes a prompt asks for ("draw the reject path in red") as one more revision on top of the diagram, the way `sketchi patch` does.
+
 ## 0.34.4
 
 ### Patch Changes
