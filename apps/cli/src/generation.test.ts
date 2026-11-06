@@ -12,6 +12,7 @@ import { decodeCanonicalDiagramDocument, encodeJson } from "./document.js";
 import { CliStorageError, exitCodeForFailure } from "./errors.js";
 import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import { DEFAULT_GENERATE_ENDPOINT, generateDiagram } from "./generation.js";
+import { DiagramPatcher } from "./patch.js";
 import { DiagramStore } from "./storage.js";
 import { CliPngRendererLive } from "./png-renderer.js";
 import {
@@ -152,6 +153,9 @@ function generatedArtifactStoreLayer(created: BuiltDiagram[]) {
 	});
 }
 
+/** Responses without styles never patch. */
+const unusedPatcher = Layer.succeed(DiagramPatcher, { patch: () => Effect.die("unused patch") });
+
 const originalFetch = globalThis.fetch;
 
 function stubFetch(handler: (request: Request) => Response | Promise<Response>): void {
@@ -174,7 +178,7 @@ function runGenerate(
 		endpoint: DEFAULT_GENERATE_ENDPOINT,
 		prompt: "Create a diagram",
 		...(type ? { type } : {}),
-	}).pipe(Effect.provide(capturingStoreLayer(created)));
+	}).pipe(Effect.provide(Layer.merge(capturingStoreLayer(created), unusedPatcher)));
 }
 
 describe("prompt-assisted generation over the public generate API", () => {
@@ -509,7 +513,7 @@ describe("prompt-assisted generation over the public generate API", () => {
 					const png = yield* exporter.exportArtifact(generated.diagram.manifest.id, "png");
 					assert.deepStrictEqual([...png.slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
 				}
-			}).pipe(Effect.provide(Layer.mergeAll(storeLayer, exporterLayer)));
+			}).pipe(Effect.provide(Layer.mergeAll(storeLayer, exporterLayer, unusedPatcher)));
 		},
 		{ timeout: 60_000 },
 	);
@@ -690,7 +694,7 @@ describe("prompt-assisted generation over the public generate API", () => {
 					endpoint: DEFAULT_GENERATE_ENDPOINT,
 					prompt: "Create a release flow",
 					type: "flowchart",
-				}).pipe(Effect.provide(failingStoreLayer(attempts))),
+				}).pipe(Effect.provide(Layer.merge(failingStoreLayer(attempts), unusedPatcher))),
 			);
 
 			assert.strictEqual(error._tag, "CliStorageError");

@@ -73,6 +73,7 @@ import { placeNodeLogos } from "./logo-placement.js";
 import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import { DiagramGenerationPrompt } from "./messages.js";
 import { GeneratedMindmapTree, generatedMindmapTreeToDiagram } from "./mindmap-tree.js";
+import { DiagramStyle, generatedStyles } from "./styling.js";
 
 export const diagramGenerationProviderIds: readonly [
 	"fixture",
@@ -109,6 +110,8 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
 	model: Schema.String,
 	provider: DiagramGenerationProviderIdSchema,
 	raw: Schema.optional(Schema.Unknown),
+	/** Colors and shapes the request asked for, for the host to apply after the build. */
+	styles: Schema.optional(Schema.Array(DiagramStyle).pipe(Schema.mutable)),
 	text: Schema.String,
 	usage: Schema.optional(DiagramGenerationUsage),
 }) {}
@@ -417,6 +420,7 @@ interface CandidateParseFailure {
 }
 
 interface CandidateParseSuccess {
+	readonly styles?: DiagramStyle[];
 	readonly warnings?: StateMachineDefaultWarning[];
 	/** Non-fatal repairs applied while decoding. */
 	readonly diagnostics?: readonly string[];
@@ -527,7 +531,7 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 		};
 	}
 
-	const { diagram: rawDiagram, title } = response.success;
+	const { diagram: rawDiagram, styles: rawStyles, title } = response.success;
 	if (!isUnknownRecord(rawDiagram)) {
 		return {
 			diagnostics: ["diagram_missing: the response must include one diagram object."],
@@ -662,7 +666,17 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 			return result.success && repairs.length > 0 ? { ...result, diagnostics: repairs } : result;
 		},
 	};
-	return parsers[type]();
+	const parsed = parsers[type]();
+	if (!parsed.success || rawStyles === undefined) return parsed;
+	const styleDiagnostics: string[] = [];
+	const styles = generatedStyles(rawStyles, styleDiagnostics);
+	return {
+		...parsed,
+		...(styles.length > 0 ? { styles } : {}),
+		...(styleDiagnostics.length > 0
+			? { diagnostics: [...(parsed.diagnostics ?? []), ...styleDiagnostics] }
+			: {}),
+	};
 }
 
 function decodeAndValidate<S extends Schema.ConstraintDecoder<unknown>>(
@@ -711,6 +725,7 @@ export function candidateFromText(
 			...input,
 			diagnostics,
 			...(parsed.warnings?.length ? { warnings: parsed.warnings } : {}),
+			...(parsed.styles?.length ? { styles: parsed.styles } : {}),
 			diagram: parsed.diagram,
 		};
 	}

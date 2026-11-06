@@ -9,22 +9,31 @@ import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
-import type { BuiltDiagram, DiagramAuthority, StoredDiagram } from "./contracts.js";
+import type {
+	BuiltDiagram,
+	DiagramAuthority,
+	PatchedDiagramArtifacts,
+	StoredDiagram,
+} from "./contracts.js";
 import { decodeCanonicalDiagramDocument, type DiagramDocument } from "./document.js";
 import { DEFAULT_GENERATE_ENDPOINT, reviseDiagram } from "./generation.js";
 import { exitCodeForFailure } from "./errors.js";
 import { LocalFileSystem } from "./filesystem.js";
+import { DiagramPatcher, DiagramPatcherLive } from "./patch.js";
 import { DiagramStore, DiagramStoreLive, makeStorageRootLayer } from "./storage.js";
-import { builtDiagram, flowchartInput, localFileSystemLive } from "./__tests__/fixtures.js";
+import {
+	builtDiagram,
+	compositeStateMachineInput,
+	flowchartInput,
+	localFileSystemLive,
+} from "./__tests__/fixtures.js";
 
-const builderLayer = DiagramBuilderLive.pipe(
-	Layer.provide(
-		Layer.mergeAll(
-			CodeModeArtifactStorageMemory,
-			makeCodeModeRuntimeEnvironmentLayer({ createId: (prefix) => `${prefix}_revise_test` }),
-		),
-	),
+const codeModeLayer = Layer.mergeAll(
+	CodeModeArtifactStorageMemory,
+	makeCodeModeRuntimeEnvironmentLayer({ createId: (prefix) => `${prefix}_revise_test` }),
 );
+const builderLayer = DiagramBuilderLive.pipe(Layer.provide(codeModeLayer));
+const patcherLayer = DiagramPatcherLive.pipe(Layer.provide(codeModeLayer));
 
 const build = (input: unknown) =>
 	Effect.runPromise(
@@ -56,13 +65,22 @@ const revisedInput = {
 	},
 };
 
-async function successBody(input: unknown): Promise<string> {
+async function successBody(
+	input: unknown,
+	patch?: { operations: unknown[] },
+	issues: readonly unknown[] = [],
+): Promise<string> {
 	const built = await build(input);
 	return JSON.stringify({
 		ok: true,
 		status: "generated",
-		issues: [],
-		diagram: { document: built.document, scene: built.scene, excalidraw: built.excalidraw },
+		issues,
+		diagram: {
+			document: built.document,
+			scene: built.scene,
+			excalidraw: built.excalidraw,
+			...(patch ? { patch } : {}),
+		},
 		generation: { model: "claude-haiku-5-5", provider: "cloudflare-anthropic" },
 	});
 }
@@ -89,7 +107,11 @@ function storedRecord(
 	};
 }
 
-function storeLayer(current: StoredDiagram, edited: BuiltDiagram[]) {
+function storeLayer(
+	current: StoredDiagram,
+	edited: BuiltDiagram[],
+	patched: PatchedDiagramArtifacts[] = [],
+) {
 	return Layer.succeed(DiagramStore, {
 		create: () => Effect.die("unused create"),
 		edit: Effect.fn("sketchi.cli.storage.testEdit")(function* (diagramId, diagram) {
@@ -102,7 +124,21 @@ function storeLayer(current: StoredDiagram, edited: BuiltDiagram[]) {
 			};
 		}),
 		readPatchSource: () => Effect.die("unused readPatchSource"),
-		commitPatch: () => Effect.die("unused commitPatch"),
+		commitPatch: Effect.fn("sketchi.cli.storage.testCommitPatch")(
+			function* (diagramId, expectedRevision, artifacts) {
+				patched.push(artifacts);
+				return {
+					...current,
+					manifest: {
+						...current.manifest,
+						id: diagramId,
+						revision: expectedRevision + 1,
+						authority: "patched" as const,
+					},
+					authority: "patched" as const,
+				};
+			},
+		),
 		show: () => Effect.succeed(current),
 		list: () => Effect.die("unused list"),
 		ids: () => Effect.die("unused ids"),
@@ -112,6 +148,9 @@ function storeLayer(current: StoredDiagram, edited: BuiltDiagram[]) {
 		readExportSource: () => Effect.die("unused readExportSource"),
 	});
 }
+
+/** Responses without styles never patch. */
+const unusedPatcher = Layer.succeed(DiagramPatcher, { patch: () => Effect.die("unused patch") });
 
 const originalFetch = globalThis.fetch;
 
@@ -132,13 +171,18 @@ function reviseRequest(diagramId = "release-flow") {
 }
 
 function revise(current: StoredDiagram, edited: BuiltDiagram[]) {
-	return reviseRequest(current.manifest.id).pipe(Effect.provide(storeLayer(current, edited)));
+	return reviseRequest(current.manifest.id).pipe(
+		Effect.provide(Layer.merge(storeLayer(current, edited), unusedPatcher)),
+	);
 }
 
 const testParent = resolve(process.cwd(), ".memory/cli-tests");
 
 /** A real store in a fresh directory, removed afterwards. */
-function withRealStore<A, E>(use: Effect.Effect<A, E, DiagramStore>) {
+function withRealStore<A, E>(
+	use: Effect.Effect<A, E, DiagramStore | DiagramPatcher>,
+	patcher: Layer.Layer<DiagramPatcher> = unusedPatcher,
+) {
 	return Effect.acquireUseRelease(
 		Effect.promise(async () => {
 			await mkdir(testParent, { recursive: true });
@@ -147,13 +191,16 @@ function withRealStore<A, E>(use: Effect.Effect<A, E, DiagramStore>) {
 		(root) =>
 			use.pipe(
 				Effect.provide(
-					Layer.fresh(DiagramStoreLive).pipe(
-						Layer.provide(
-							Layer.mergeAll(
-								Layer.succeed(LocalFileSystem, localFileSystemLive),
-								makeStorageRootLayer(root),
+					Layer.merge(
+						Layer.fresh(DiagramStoreLive).pipe(
+							Layer.provide(
+								Layer.mergeAll(
+									Layer.succeed(LocalFileSystem, localFileSystemLive),
+									makeStorageRootLayer(root),
+								),
 							),
 						),
+						patcher,
 					),
 				),
 			),
@@ -187,6 +234,79 @@ describe("revising a stored diagram with a request", () => {
 			assert.strictEqual(result.diagram.manifest.revision, 2);
 			assert.strictEqual(result.model, "claude-haiku-5-5");
 		}),
+	);
+
+	it.effect("draws the colors a request asks for as the revision after the content", () =>
+		Effect.gen(function* () {
+			const original = yield* Effect.promise(() => build(flowchartInput));
+			const response = yield* Effect.promise(() =>
+				successBody(flowchartInput, {
+					operations: [
+						{
+							op: "setStyle",
+							selector: { nodeIds: ["review"] },
+							style: { strokeColor: "#dc2626" },
+						},
+					],
+				}),
+			);
+			stubFetch(() => response);
+			const edited: BuiltDiagram[] = [];
+			const patched: PatchedDiagramArtifacts[] = [];
+			const result = yield* reviseDiagram({
+				endpoint: DEFAULT_GENERATE_ENDPOINT,
+				diagramId: "release-flow",
+				prompt: "Draw the review step in red",
+			}).pipe(
+				Effect.provide(
+					Layer.merge(
+						storeLayer(storedRecord(original.document, "canonical"), edited, patched),
+						patcherLayer,
+					),
+				),
+			);
+
+			assert.strictEqual(edited.length, 1);
+			assert.strictEqual(patched.length, 1);
+			assert.strictEqual(result.diagram.authority, "patched");
+			assert.include(JSON.stringify(patched[0]?.scene), "#dc2626");
+		}),
+	);
+
+	it.effect("keeps the generation's warnings on a revision it also styles", () =>
+		withRealStore(
+			Effect.gen(function* () {
+				const store = yield* DiagramStore;
+				yield* store.create(builtDiagram());
+				// A composite state without an initial substate builds with a warning.
+				const { warnings = [] } = yield* Effect.promise(() => build(compositeStateMachineInput));
+				assert.isAbove(warnings.length, 0);
+				const response = yield* Effect.promise(() =>
+					successBody(
+						flowchartInput,
+						{
+							operations: [
+								{
+									op: "setStyle",
+									selector: { nodeIds: ["review"] },
+									style: { strokeColor: "#dc2626" },
+								},
+							],
+						},
+						warnings,
+					),
+				);
+				stubFetch(() => response);
+
+				const result = yield* reviseRequest();
+				assert.strictEqual(result.diagram.authority, "patched");
+				assert.deepStrictEqual(
+					result.diagram.warnings?.map((warning) => warning.code),
+					warnings.map((warning) => warning.code),
+				);
+			}),
+			patcherLayer,
+		),
 	);
 
 	it.effect("refuses a patched record without calling the API", () =>

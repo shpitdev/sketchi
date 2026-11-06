@@ -562,7 +562,9 @@ Network and options:
 
 Validation and storage:
   The returned diagram is decoded against Sketchi's canonical package schemas and atomically
-  committed through the create store at ~/.sketchi/diagrams/<id>/. The record contains
+  committed through the create store at ~/.sketchi/diagrams/<id>/. Colors and shapes the prompt
+  asks for ("the reject path in red", "the gate as a purple diamond") come back as patch operations
+  and are drawn as revision 2, as sketchi patch would; revision 1 keeps the unstyled diagram. The record contains
   manifest.json, document.json, scene.json, and diagram.excalidraw. PNG rendering remains lazy
   and is not written back to that record. Network/endpoint/timeout/output/validation/storage
   failures leave no visible record; a later export destination failure leaves the created record.
@@ -921,6 +923,8 @@ const REVISE_HELP = `Change a stored diagram with a request, keep the change as 
   --type TYPE turns the diagram into another family; omit it to keep its own.
   The earlier revision stays under revisions/ and sketchi restore brings it back. Patched, pulled
   and canvas records refuse revise, as edit does; restore a canonical revision first.
+  Colors and shapes the request asks for ("draw the reject path in red") are drawn as one more
+  revision on top, as sketchi patch would; generate does the same.
   --endpoint, --format, --dest, --no-copy, the clipboard, exit codes and output work as for
   generate. Override the endpoint with ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.`;
 

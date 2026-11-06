@@ -135,6 +135,11 @@ sketchi revise latest --prompt "Rename Ship to Ship order and drop the manual re
 sketchi revise latest --prompt "Show it as a sequence diagram" --type sequence
 ```
 
+Colors and shapes a prompt asks for, in `generate` or `revise` ("draw the
+reject path in red", "make the gate a purple diamond"), are drawn as one more
+revision on top, the way `sketchi patch` draws them; the revision before stays
+unstyled and restorable.
+
 The diagram keeps its id and family unless `--type` names another, and
 everything the request doesn't mention stays as it was. `sketchi restore ID
 --revision N` brings back the earlier revision. If the diagram changes while

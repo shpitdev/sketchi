@@ -23,7 +23,9 @@ Network and options:
 
 Validation and storage:
   The returned diagram is decoded against Sketchi's canonical package schemas and atomically
-  committed through the create store at ~/.sketchi/diagrams/<id>/. The record contains
+  committed through the create store at ~/.sketchi/diagrams/<id>/. Colors and shapes the prompt
+  asks for ("the reject path in red", "the gate as a purple diamond") come back as patch operations
+  and are drawn as revision 2, as sketchi patch would; revision 1 keeps the unstyled diagram. The record contains
   manifest.json, document.json, scene.json, and diagram.excalidraw. PNG rendering remains lazy
   and is not written back to that record. Network/endpoint/timeout/output/validation/storage
   failures leave no visible record; a later export destination failure leaves the created record.

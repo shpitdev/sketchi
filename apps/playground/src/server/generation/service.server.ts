@@ -16,6 +16,7 @@ import {
 	type GatewayChatRoute,
 	isLegacyCliDefaultModel,
 	type SupportedGenerationModel,
+	asksForStyling,
 } from "@sketchi/diagram-generation";
 import { Context, Effect, Layer } from "effect";
 
@@ -119,6 +120,7 @@ export const PlaygroundGenerationLive = Layer.effect(
 						id: "sketchi-generate",
 						...(logos.length > 0 ? { logos } : {}),
 						...(input.base ? { base: input.base } : {}),
+						...(asksForStyling(input.prompt) ? { styling: true } : {}),
 						request: input.prompt,
 						...(input.type ? { requestedType: input.type } : {}),
 					},

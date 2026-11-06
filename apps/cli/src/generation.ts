@@ -1,4 +1,5 @@
 import {
+	ApplyDiagramPatchRequest,
 	type CANONICAL_DOCUMENT_TYPES,
 	type CanonicalDiagramDocument,
 	ExcalidrawFileSchema,
@@ -12,6 +13,7 @@ import { Effect, Schema, Result } from "effect";
 import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
 import { decodeCanonicalDiagramDocument, documentId, validateStorageId } from "./document.js";
 import { CliGenerationError, CliValidationError } from "./errors.js";
+import { DiagramPatcher } from "./patch.js";
 import { DiagramStore } from "./storage.js";
 import {
 	GENERATE_REQUEST_TIMEOUT,
@@ -155,6 +157,10 @@ const GenerateApiSuccess = Schema.Struct({
 		document: PresentValue,
 		scene: PresentValue,
 		excalidraw: PresentValue,
+		/** Colors and shapes the request asked for, applied to the stored scene as a patch. */
+		patch: Schema.optionalKey(
+			Schema.Struct({ operations: ApplyDiagramPatchRequest.fields.operations }),
+		),
 	}),
 	generation: Schema.Struct({
 		attempts: Schema.optionalKey(Schema.Number),
@@ -253,6 +259,31 @@ const requestGeneration = Effect.fn("sketchi.cli.generate.request")(
 	}),
 );
 
+/**
+ * Draw the colors and shapes a request asked for on a just-stored diagram, as the record's next
+ * revision: the scene becomes authoritative, as after sketchi patch, and the unstyled revision
+ * stays restorable.
+ */
+const applyRequestedStyles = Effect.fn("sketchi.cli.generate.styles")(function* (
+	diagram: StoredDiagram,
+	scene: PatchableScene,
+	patch: { readonly operations: ApplyDiagramPatchRequest["operations"] } | undefined,
+) {
+	if (patch === undefined) return diagram;
+	const patcher = yield* DiagramPatcher;
+	const store = yield* DiagramStore;
+	const id = diagram.manifest.id;
+	const artifacts = yield* patcher.patch(
+		scene,
+		{ operations: patch.operations, intent: "Colors and shapes the request asks for" },
+		`cli-styles-${id}-${String(diagram.manifest.revision + 1)}`,
+	);
+	const styled = yield* store.commitPatch(id, diagram.manifest.revision, artifacts);
+	// Styling is part of the same invocation, so the generation's warnings stay on its result.
+	const warnings = [...(diagram.warnings ?? []), ...(styled.warnings ?? [])];
+	return warnings.length === 0 ? styled : { ...styled, warnings };
+});
+
 export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
 	input: GenerateDiagramInput,
 ) {
@@ -278,7 +309,8 @@ export const generateDiagram = Effect.fn("sketchi.cli.generate")(function* (
 		excalidraw,
 		prompt: input.prompt,
 	};
-	const diagram = yield* store.create(built);
+	const created = yield* store.create(built);
+	const diagram = yield* applyRequestedStyles(created, built.scene, response.patch);
 
 	return {
 		diagram,
@@ -333,7 +365,7 @@ export const reviseDiagram = Effect.fn("sketchi.cli.revise")(function* (input: R
 	const excalidraw = yield* decodeExcalidraw(response.excalidraw);
 	// Commit only on top of the revision the request was based on, so a change made while the
 	// model ran is never silently undone.
-	const diagram = yield* store.edit(
+	const edited = yield* store.edit(
 		id,
 		{
 			id,
@@ -346,6 +378,7 @@ export const reviseDiagram = Effect.fn("sketchi.cli.revise")(function* (input: R
 		},
 		current.manifest.revision,
 	);
+	const diagram = yield* applyRequestedStyles(edited, scene, response.patch);
 	return {
 		diagram,
 		model: response.model,
