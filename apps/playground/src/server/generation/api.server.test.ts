@@ -654,6 +654,88 @@ describe("public generate endpoint", () => {
 	});
 });
 
+describe("revising a stored diagram", () => {
+	const storedSpec = {
+		id: "release-flow",
+		title: "Release approval",
+		nodes: [
+			{ id: "start", label: "Change proposed", kind: "start" },
+			{ id: "review", label: "Review evidence", kind: "process" },
+			{ id: "end", label: "Release recorded", kind: "end" },
+		],
+		edges: [
+			{ id: "e1", source: "start", target: "review" },
+			{ id: "e2", source: "review", target: "end" },
+		],
+	};
+
+	it("sends the current diagram with the request and keeps the record's id and family", async () => {
+		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(flowchartIr), (input) => observedRuns.push(input)),
+		};
+		const response = await generateRequest(env, {
+			prompt: "Add an approval decision after review",
+			base: { type: "flowchart", spec: storedSpec },
+		});
+
+		expect(response.status).toBe(200);
+		const providerRequest = JSON.stringify(observedRuns[0]);
+		expect(providerRequest).toContain("Current diagram:");
+		expect(providerRequest).toContain("Revision request:");
+		expect(providerRequest).toContain("Return the complete revised diagram");
+		expect(providerRequest).toContain("The caller explicitly requires flowchart");
+		// One family's rules: the stored diagram's.
+		expect(providerRequest).not.toContain("Sequence IR rules");
+		const body = (await response.json()) as {
+			diagram: { document: { type: string; spec: { id: string; nodes: unknown[] } } };
+		};
+		expect(body.diagram.document.type).toBe("flowchart");
+		expect(body.diagram.document.spec.id).toBe("release-flow");
+		expect(body.diagram.document.spec.nodes).toHaveLength(flowchartIr.nodes.length);
+	});
+
+	it("turns the diagram into the family the caller names", async () => {
+		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(sequenceIr), (input) => observedRuns.push(input)),
+		};
+		const response = await generateRequest(env, {
+			prompt: "Show it as a sequence of calls",
+			type: "sequence",
+			base: { type: "flowchart", spec: storedSpec },
+		});
+
+		expect(response.status).toBe(200);
+		expect(JSON.stringify(observedRuns[0])).toContain("The caller explicitly requires sequence");
+		const body = (await response.json()) as {
+			diagram: { document: { type: string; spec: { id: string } } };
+		};
+		expect(body.diagram.document).toMatchObject({
+			type: "sequence",
+			spec: { id: "release-flow" },
+		});
+	});
+
+	it("rejects a base that is not a valid document before calling the model", async () => {
+		let called = false;
+		const env: StudioEnv = {
+			AI: fakeAiGateway(generationText(flowchartIr), () => {
+				called = true;
+			}),
+		};
+		const response = await generateRequest(env, {
+			prompt: "Add a step",
+			base: { type: "flowchart", spec: { title: "No nodes" } },
+		});
+
+		expect(response.status).toBe(400);
+		expect(called).toBe(false);
+		const body = (await response.json()) as { issues: Array<{ code: string }> };
+		expect(body.issues.map((entry) => entry.code)).toEqual(["invalid_base"]);
+	});
+});
+
 describe("generation request boundaries", () => {
 	it.each([
 		"gemini-2.5-flash",

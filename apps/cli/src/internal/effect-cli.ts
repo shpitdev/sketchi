@@ -18,6 +18,7 @@ const cliVersion = typeof __SKETCHI_VERSION__ === "string" ? __SKETCHI_VERSION__
 
 const PUBLIC_COMMANDS = new Set([
 	"generate",
+	"revise",
 	"canvas",
 	"docs",
 	"create",

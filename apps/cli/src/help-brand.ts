@@ -281,6 +281,7 @@ export function renderRootHelp(options: HelpBrandOptions): string {
 		action("list", "Find past diagrams, newest first. Add words to search.", colors, width),
 		action("copy", "Copy a PNG to the clipboard; the newest by default.", colors, width),
 		action("show", "Inspect a local diagram.", colors, width),
+		action("revise", "Change it with a request.", colors, width),
 		action("edit", "Replace its canonical document.", colors, width),
 		action("export", "Write PNG, Excalidraw, or scene bytes.", colors, width),
 		action("share", "Create an encrypted Excalidraw link.", colors, width),

@@ -25,6 +25,8 @@ import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundBindings } from "../runtime/context.server";
 
 export interface GenerateDiagramServiceInput {
+	/** The current diagram a revision starts from, as canonical diagram JSON. */
+	readonly base?: Readonly<Record<string, unknown>>;
 	readonly cacheMode?: DiagramGenerationCacheMode;
 	readonly model?: SupportedGenerationModel;
 	readonly prompt: string;
@@ -106,13 +108,17 @@ export const PlaygroundGenerationLive = Layer.effect(
 					});
 				}
 				const client = yield* clientForBindings(env.AI, config.gatewayId, route);
-				const logos = logosNamedIn(input.prompt);
+				// A revision keeps the logos its current diagram names, as well as any the request adds.
+				const logos = logosNamedIn(
+					input.base ? `${input.prompt}\n${JSON.stringify(input.base)}` : input.prompt,
+				);
 				return yield* client.generate({
 					...(input.cacheMode ? { cacheMode: input.cacheMode } : {}),
 					model,
 					prompt: {
 						id: "sketchi-generate",
 						...(logos.length > 0 ? { logos } : {}),
+						...(input.base ? { base: input.base } : {}),
 						request: input.prompt,
 						...(input.type ? { requestedType: input.type } : {}),
 					},
