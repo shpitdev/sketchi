@@ -213,7 +213,7 @@ describe("assessFlowchartQuality", () => {
 		]);
 	});
 
-	it("reports every node with a duplicate normalized label", () => {
+	it("reports every node with a duplicate normalized label without rejecting the repeat", () => {
 		const base = linearFlowchart(4);
 		const diagram = {
 			...base,
@@ -223,9 +223,11 @@ describe("assessFlowchartQuality", () => {
 			})),
 		};
 
-		const quality = assessFlowchartQuality(diagram, 8);
+		// A request may name the same step on two branches, as a large order-to-cash flow does.
+		const quality = assessFlowchartQuality(diagram, 10);
 
-		expect(quality.score).toBe(9);
+		expect(quality.score).toBe(10);
+		expect(quality.accepted).toBe(true);
 		expect(quality.checks).toEqual([
 			expect.objectContaining({
 				code: "duplicate_label",

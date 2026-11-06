@@ -10,6 +10,8 @@ export const WIREFRAME_RULES = {
 	widgets:
 		'Widgets: heading (text, level 1-3), text (text, or lines for placeholder copy), link and badge (text), button (text, variant "primary" | "secondary"), input, textarea, select, search (label, placeholder, or value when it shows one), checkbox, radio, toggle (label, checked), tabs and nav (items, active), breadcrumbs and list (items), avatar and icon (label), image (label, aspect "wide" | "square" | "tall"), chart (label, kind "bar" | "line" | "pie"), table (columns: an array of header strings, rows: placeholder count), divider.',
 	nav: "A nav inside a sidebar stacks; any other runs across.",
+	titledTable: (source: RuleSource) =>
+		`A table ${source} names ("a Tickets table") sits in a section titled with that name.`,
 	target: "A button or link with target: a screen id opens that screen, drawn as an arrow to it.",
 	state:
 		"State: variant primary on the screen's main button, checked: true on what is on or selected, active on the selected tab or nav item, value on a field showing one.",

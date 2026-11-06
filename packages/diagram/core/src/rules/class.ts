@@ -17,6 +17,8 @@ export const CLASS_RULES = {
 	multiplicitiesCompact:
 		'Multiplicities ("1", "0..*") and roles go on compositions, aggregations and associations only.',
 	hierarchy: "Interfaces extend only interfaces, and inheritance never cycles.",
+	navigableWhen: (source: RuleSource) =>
+		`An association ${source} draws one way (an arrow such as "-->", or "A refers to B") sets navigable: true; a plain line leaves it off.`,
 	typedFields: (source: RuleSource) =>
 		`A field typed as another class stays in attributes and also draws a relationship whose toRole is the field's name, with toMultiplicity "*" for a collection. It is an association; only pairs ${source} calls composed or aggregated take those kinds. A cast to or call on another class inside a method body draws a dependency.`,
 	onlyStated: (source: RuleSource) =>

@@ -222,3 +222,11 @@ describe("revising a diagram", () => {
 		expect(system).not.toContain("Revision:");
 	});
 });
+
+describe("rules the large scenarios showed generate missing", () => {
+	it("says when an association is one way, that a titled table sits in a section, and what a not-null key decides", () => {
+		expect(system).toContain(CLASS_RULES.navigableWhen("the source"));
+		expect(system).toContain(WIREFRAME_RULES.titledTable("the source"));
+		expect(system).toContain("A not-null key decides only toCardinality.");
+	});
+});
