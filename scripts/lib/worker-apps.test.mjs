@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import { unstable_readConfig } from "wrangler";
@@ -20,6 +20,32 @@ const expectedWorkers = {
 	playground: "sketchi-studio",
 	web: "sketchi-web",
 };
+
+const telemetryEmitters = ["eval-harness", "playground"];
+
+function sourceFiles(directory) {
+	return readdirSync(directory, { recursive: true, withFileTypes: true })
+		.filter(
+			(entry) =>
+				entry.isFile() &&
+				/\.(?:ts|tsx|mts)$/.test(entry.name) &&
+				!/\.(?:test|spec)\.[cm]?tsx?$/.test(entry.name),
+		)
+		.map((entry) => `${entry.parentPath}/${entry.name}`);
+}
+
+function telemetryServiceNames(projectRoot) {
+	const names = [];
+	for (const file of sourceFiles(new URL(`${projectRoot}/src`, repoRoot).pathname)) {
+		const source = readFileSync(file, "utf8");
+		for (const match of source.matchAll(/serviceName:\s*([^,}\n]+)/g)) {
+			const literal = /^"([^"]+)"$/.exec(match[1].trim());
+			assert.ok(literal, `${file} must set serviceName to a string literal, found ${match[1]}`);
+			names.push({ file, serviceName: literal[1] });
+		}
+	}
+	return names;
+}
 
 const tanstackFullPathSnapshot = [
 	"/",
@@ -111,6 +137,26 @@ test("project IDs resolve independently to durable Worker identities", async () 
 	assert.equal(playground.projectId, "playground");
 	assert.equal(playground.workerName, "sketchi-studio");
 	assert.notEqual(playground.projectId, playground.workerName);
+});
+
+test("telemetry service names match the Worker that emits them", async () => {
+	for (const projectId of workerProjectIds) {
+		const project = workerProjectConfig(projectId);
+		const { name } = await unstable_readConfig({ config: project.wranglerInputConfigPath });
+		const emitters = telemetryServiceNames(project.projectRoot);
+
+		assert.equal(
+			emitters.length > 0,
+			telemetryEmitters.includes(projectId),
+			`${projectId} telemetry emitters changed; update telemetryEmitters`,
+		);
+		for (const { file, serviceName } of emitters) {
+			assert.ok(
+				serviceName === name || serviceName.startsWith(`${name}-`),
+				`${file} labels telemetry "${serviceName}" but runs in Worker "${name}"`,
+			);
+		}
+	}
 });
 
 test("final eval and public Playground projects retain their durable Workers", () => {

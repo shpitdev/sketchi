@@ -48,7 +48,7 @@ const PlaygroundCallbackFibersLive = Layer.effect(
 );
 
 const PlaygroundTelemetryLive = makeWorkersTelemetryLayer({
-	resource: { serviceName: "sketchi-playground" },
+	resource: { serviceName: "sketchi-studio" },
 });
 
 const PlaygroundCoreLive = Layer.mergeAll(
