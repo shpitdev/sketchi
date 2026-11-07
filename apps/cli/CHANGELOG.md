@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.35.1
+
+### Patch Changes
+
+- [#692](https://github.com/shpitdev/sketchi/pull/692) [`2c7658b`](https://github.com/shpitdev/sketchi/commit/2c7658b1aa15409422b8e1b8a6bea0aeb3163cb0) Thanks [@anandpant](https://github.com/anandpant)! - A generate request that doesn't name its diagram kind now gets the rules of only the kinds it could mean, instead of every kind's. On 76 such requests, 76 came back as diagrams instead of 72, and 75 were the right kind instead of 71. Each used about 70% fewer input tokens; choosing the kind adds about 0.2 s.
+
 ## 0.35.0
 
 ### Minor Changes
