@@ -165,7 +165,9 @@ spans catalog and the Code Mode usage catalog with a read-only
 through, for example `pnpm db -c "FROM generations LIMIT 5"`. It defines these
 views:
 
-- `spans`: one row per span, with `attributes`, `events` and `error` as JSON
+- `spans`: one row per span, with `attributes`, `events` and `error` as JSON. A
+  split span appears once all its parts have arrived.
+- `incomplete_spans`: split spans still missing a part, such as a late batch
 - `span_tree('<trace_id>')`: one trace, indented by parent
 - `generations`: one row per generation, with its prompt, output, tokens, model
   calls, repairs, coverage issues and durations

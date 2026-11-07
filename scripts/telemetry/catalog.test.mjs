@@ -11,10 +11,11 @@ import {
 	SNAPSHOTS_RETAINED,
 	telemetryTarget,
 	telemetryTargets,
+	wrangler,
 } from "./catalog.mjs";
 import { duckdbCommand } from "./db.mjs";
 
-const wrangler = JSON.parse(
+const studioWrangler = JSON.parse(
 	readFileSync(new URL("../../apps/playground/wrangler.jsonc", import.meta.url), "utf8").replace(
 		/^\s*\/\/.*$/gm,
 		"",
@@ -76,8 +77,10 @@ test("reads resource names from JSON and from Node's inspect format", () => {
 });
 
 test("binds Studio and its previews to separate spans streams", () => {
-	const production = wrangler.pipelines.find((binding) => binding.binding === "TELEMETRY_SPANS");
-	const preview = wrangler.previews.pipelines.find(
+	const production = studioWrangler.pipelines.find(
+		(binding) => binding.binding === "TELEMETRY_SPANS",
+	);
+	const preview = studioWrangler.previews.pipelines.find(
 		(binding) => binding.binding === "TELEMETRY_SPANS",
 	);
 	assert.ok(production?.stream);
@@ -105,4 +108,33 @@ test("runs DuckDB on the init file, through Infisical only without a token", () 
 		"--silent",
 		"--",
 	]);
+});
+
+test("reports a failed wrangler command without the catalog token", () => {
+	const token = "cfut_catalog_admin_secret";
+	const withToken = provisionSteps(telemetryTarget("production"), token)
+		.map((step) => step.args)
+		.filter((stepArgs) => stepArgs.includes(token));
+	// Compaction, snapshot expiration and the sink.
+	assert.equal(withToken.length, 3);
+	for (const args of withToken) {
+		const exec = (file, execArgs) => {
+			// What execFileSync throws: the whole command line, and the child's stderr.
+			const error = new Error(`Command failed: ${file} ${execArgs.join(" ")}`);
+			error.status = 1;
+			error.stderr = `✘ [ERROR] Request with token ${token} was rejected [code: 10000]\n`;
+			throw error;
+		};
+		assert.throws(
+			() => wrangler(args, exec),
+			(error) => {
+				assert.doesNotMatch(error.message, new RegExp(token));
+				assert.match(error.message, /^wrangler (basin|pipelines) /);
+				assert.match(error.message, /exit status 1/);
+				assert.match(error.message, /Request with token \[redacted\] was rejected/);
+				assert.equal(error.cause, undefined);
+				return true;
+			},
+		);
+	}
 });

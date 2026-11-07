@@ -22,9 +22,19 @@ ATTACH getvariable('account_id') || '_' || getvariable('usage_bucket') AS codemo
 	SECRET r2_data_read
 );
 
+-- begin: span reassembly
+-- The rows of spans larger than one stream record, each part once even if a batch
+-- was delivered twice.
+CREATE OR REPLACE VIEW span_parts AS
+SELECT DISTINCT ON (trace_id, span_id, part_index) *
+FROM telemetry.observability.spans
+WHERE part_count > 1
+ORDER BY trace_id, span_id, part_index, __ingest_ts;
+
 -- One row per span. A span larger than one stream record arrives as several rows that
 -- share its IDs; their attributes, events, error message, error and cause concatenate
--- by part_index. part_count > 1 marks a span that was split.
+-- by part_index. part_count > 1 marks a span that was split. A split span appears once
+-- all its parts have arrived; until then it is in incomplete_spans.
 CREATE OR REPLACE VIEW spans AS
 WITH
 	whole AS (
@@ -55,9 +65,9 @@ WITH
 			any_value(attempt_id) AS attempt_id,
 			any_value(part_count) AS part_count,
 			max(__ingest_ts) AS __ingest_ts
-		FROM telemetry.observability.spans
-		WHERE part_count > 1
+		FROM span_parts
 		GROUP BY trace_id, span_id
+		HAVING count(DISTINCT part_index) = any_value(part_count)
 	),
 	rows AS (
 		SELECT * EXCLUDE (part_index, schema) FROM whole
@@ -89,6 +99,23 @@ SELECT
 	part_count,
 	__ingest_ts AS ingested_at
 FROM rows;
+
+-- Split spans still missing a part: one whose batch is late, or never arrived.
+CREATE OR REPLACE VIEW incomplete_spans AS
+SELECT
+	trace_id,
+	span_id,
+	any_value(name) AS name,
+	any_value(service) AS service,
+	any_value(start_time) AS start_time,
+	any_value(part_count) AS part_count,
+	count(DISTINCT part_index) AS parts_received,
+	list(part_index ORDER BY part_index) AS parts,
+	max(__ingest_ts) AS last_ingested_at
+FROM span_parts
+GROUP BY trace_id, span_id
+HAVING count(DISTINCT part_index) < any_value(part_count);
+-- end: span reassembly
 
 -- Every span of one trace, indented under its parent and in start order. The Workers
 -- clock only advances on I/O, so spans that start in the same millisecond are ordered
@@ -234,4 +261,4 @@ CREATE OR REPLACE VIEW usage_issues AS FROM codemode.sketchi_codemode.usage_issu
 
 SELECT
 	getvariable('telemetry_env') AS environment,
-	'spans, span_tree(trace_id), generations, slowest_spans, span_durations, usage_events, usage_issues' AS views;
+	'spans, incomplete_spans, span_tree(trace_id), generations, slowest_spans, span_durations, usage_events, usage_issues' AS views;

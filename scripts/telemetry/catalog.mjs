@@ -129,12 +129,40 @@ export function provisionSteps(target, catalogToken) {
 	];
 }
 
-function wrangler(args) {
-	return execFileSync("pnpm", ["exec", "wrangler", ...args], {
-		encoding: "utf8",
-		env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID ?? ACCOUNT_ID },
-		stdio: ["ignore", "pipe", "inherit"],
-	});
+const SECRET_FLAGS = new Set(["--catalog-token", "--token"]);
+const REDACTED = "[redacted]";
+
+/**
+ * The failure of `wrangler <args>` without its secrets. execFileSync's own error
+ * message repeats the full command, so it is never passed on.
+ */
+export function wranglerFailure(args, error) {
+	const secrets = args.filter((_, index) => SECRET_FLAGS.has(args[index - 1]));
+	const redact = (text) =>
+		secrets.reduce((redacted, secret) => redacted.replaceAll(secret, REDACTED), text);
+	const command = args
+		.map((arg, index) => (SECRET_FLAGS.has(args[index - 1]) ? REDACTED : arg))
+		.join(" ");
+	const stderr = redact(String(error?.stderr ?? "").trim());
+	const status = error?.status ?? error?.signal ?? "unknown";
+	return new Error(
+		`wrangler ${command} failed with exit status ${status}${stderr ? `:\n${stderr}` : "."}`,
+	);
+}
+
+export function wrangler(args, exec = execFileSync) {
+	try {
+		return exec("pnpm", ["exec", "wrangler", ...args], {
+			encoding: "utf8",
+			env: {
+				...process.env,
+				CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID ?? ACCOUNT_ID,
+			},
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+	} catch (error) {
+		throw wranglerFailure(args, error);
+	}
 }
 
 /**
