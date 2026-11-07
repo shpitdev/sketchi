@@ -1,33 +1,17 @@
 import "@tanstack/react-start/server-only";
 
 import type { ArtifactFormat, ArtifactFormatRef } from "@sketchi/diagram-agent";
-import { recordMetric, withTelemetryCorrelation } from "@sketchi/observability";
-import { Context, Effect, Layer, Metric, Schema } from "effect";
+import { SpanContent } from "@sketchi/observability";
+import { Context, Effect, Layer } from "effect";
 
-import { correlationIdHeader } from "../runtime/correlation.server";
-import {
-	PlaygroundBindings,
-	PlaygroundClock,
-	PlaygroundIds,
-	PlaygroundPlatformCallbacks,
-	PlaygroundRequestMetadata,
-	type PlaygroundRequestServices,
-} from "../runtime/context.server";
+import { PlaygroundIds, PlaygroundRequestMetadata } from "../runtime/context.server";
 
-const USAGE_PREFIX = "codemode/usage";
-const USAGE_EVENT_SCHEMA = "sketchi.codemode.usage.v1";
-const MAX_SNAPSHOT_BYTES = 1_000_000;
 const MAX_ISSUE_DEPTH = 8;
-const MAX_ISSUE_ROWS = 100;
 
-const usageCaptureWrites = Metric.counter("sketchi_codemode_usage_capture_writes", {
-	description: "Code Mode usage capture writes by terminal outcome",
-	incremental: true,
-});
-const usageCaptureFailures = Metric.counter("sketchi_codemode_usage_capture_failures", {
-	description: "Code Mode usage capture sink failures",
-	incremental: true,
-});
+/** A Code Mode call's usage summary: one row of the `usage_events` view. */
+export const USAGE_EVENT_ATTRIBUTE = "sketchi.usage.event";
+/** The issues a Code Mode call reported: the rows of the `usage_issues` view. */
+export const USAGE_ISSUES_ATTRIBUTE = "sketchi.usage.issues";
 
 export type CodeModeUsageOperation =
 	| "applyDiagramPatch"
@@ -74,31 +58,6 @@ interface CodeModeUsageArtifactRef {
 	formats: ArtifactFormatRef[];
 }
 
-interface CodeModeUsageSnapshot {
-	contentType: "application/json";
-	omittedReason?: string;
-	sizeBytes?: number;
-	value?: unknown;
-}
-
-interface CodeModeUsageEvent {
-	artifactRefs: CodeModeUsageArtifactRef[];
-	attemptId: string;
-	client: CodeModeUsageClient;
-	durationMs: number;
-	eventId: string;
-	eventKey: string;
-	eventTime: string;
-	operation: CodeModeUsageOperation;
-	request: CodeModeUsageRequestSummary;
-	response: CodeModeUsageResponseSummary;
-	runId: string;
-	schema: typeof USAGE_EVENT_SCHEMA;
-	status: "error" | "ok";
-	statusCode?: number;
-	surface: CodeModeUsageSurface;
-}
-
 interface CodeModeUsageClient {
 	client?: string;
 	harness?: string;
@@ -106,16 +65,6 @@ interface CodeModeUsageClient {
 	reasoningLevel?: string;
 	scenarioId?: string;
 	userAgent?: string;
-}
-
-interface CodeModeUsageRequestSummary {
-	body: CodeModeUsageSnapshot;
-	method: string;
-	path: string;
-}
-
-interface CodeModeUsageResponseSummary {
-	body: CodeModeUsageSnapshot;
 }
 
 interface CodeModeUsageIssueSummary {
@@ -126,18 +75,17 @@ interface CodeModeUsageIssueSummary {
 	stage?: string;
 }
 
-interface CodeModeUsageAnalyticsRow {
+/** The fields the `usage_events` view reads from a capture span. */
+export interface CodeModeUsageEvent {
 	artifact_count: number;
 	artifact_delivery: boolean;
 	artifact_formats?: string;
+	artifacts: CodeModeUsageArtifactRef[];
 	attempt_id: string;
 	client?: string;
 	duration_ms: number;
 	error_message?: string;
-	event_date: string;
 	event_id: string;
-	event_key: string;
-	event_time: string;
 	harness?: string;
 	issue_codes?: string;
 	issue_count: number;
@@ -145,55 +93,19 @@ interface CodeModeUsageAnalyticsRow {
 	operation: CodeModeUsageOperation;
 	reasoning_level?: string;
 	request_method: string;
-	request_omitted_reason?: string;
 	request_path: string;
-	request_snapshot_bytes?: number;
-	response_omitted_reason?: string;
-	response_snapshot_bytes?: number;
 	run_id: string;
 	scenario_id?: string;
-	schema: typeof USAGE_EVENT_SCHEMA;
 	status: "error" | "ok";
 	status_code?: number;
 	surface: CodeModeUsageSurface;
 	user_agent?: string;
 }
 
-interface CodeModeUsageIssueAnalyticsRow {
-	attempt_id: string;
-	event_date: string;
-	event_id: string;
-	event_key: string;
-	event_time: string;
-	issue_code: string;
-	issue_message?: string;
-	issue_path: string;
-	issue_severity?: string;
-	issue_stage?: string;
-	operation: CodeModeUsageOperation;
-	run_id: string;
-	schema: typeof USAGE_EVENT_SCHEMA;
-	status: "error" | "ok";
-	surface: CodeModeUsageSurface;
-}
-
-const CodeModeUsageSinkSchema = Schema.Literals(["analytics", "artifacts"]);
-
-export class CodeModeUsageCaptureError extends Schema.TaggedError<CodeModeUsageCaptureError>()(
-	"CodeModeUsageCaptureError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		sink: CodeModeUsageSinkSchema,
-	},
-) {}
-
-type UsageRequestContext = PlaygroundRequestServices | PlaygroundClock | PlaygroundIds;
-
 export interface PlaygroundCodeModeUsageShape {
 	readonly capture: (
 		input: CodeModeUsageCaptureInput,
-	) => Effect.Effect<void, never, UsageRequestContext>;
+	) => Effect.Effect<void, never, PlaygroundRequestMetadata>;
 	readonly createContext: Effect.Effect<
 		CodeModeUsageContext,
 		never,
@@ -206,15 +118,15 @@ export class PlaygroundCodeModeUsage extends Context.Service<
 	PlaygroundCodeModeUsageShape
 >()("@sketchi/playground/PlaygroundCodeModeUsage") {}
 
+/** The request's run and attempt, and a new event for this call. */
 const createCodeModeUsageContext = Effect.fn("playground.codeModeUsage.createContext")(
 	function* () {
 		const ids = yield* PlaygroundIds;
 		const metadata = yield* PlaygroundRequestMetadata;
 		return {
-			attemptId:
-				correlationIdHeader(metadata.request, "x-sketchi-attempt-id") ?? ids.create("attempt"),
+			attemptId: metadata.attemptId,
 			eventId: ids.create("event"),
-			runId: correlationIdHeader(metadata.request, "x-sketchi-run-id") ?? ids.create("run"),
+			runId: metadata.runId,
 		};
 	},
 );
@@ -227,94 +139,23 @@ export function codeModeUsageResponseHeaders(context: CodeModeUsageContext): Hea
 	};
 }
 
+/**
+ * Records one Code Mode call on its span: the usage summary, every issue it
+ * reported, and the full request and response.
+ */
 const captureCodeModeUsageEvent = Effect.fn("playground.codeModeUsage.capture")(function* (
 	input: CodeModeUsageCaptureInput,
 ) {
-	const clock = yield* PlaygroundClock;
-	const env = yield* PlaygroundBindings;
 	const metadata = yield* PlaygroundRequestMetadata;
-	const platform = yield* PlaygroundPlatformCallbacks;
-	const eventTime = yield* clock.nowIso;
-	const event = codeModeUsageEventFromInput(input, metadata.request, eventTime);
+	const issues = issueSummariesFrom(input.responseBody);
 	yield* Effect.annotateCurrentSpan({
 		operation: input.operation,
-		"sketchi.attempt_id": input.context.attemptId,
-		"sketchi.run_id": input.context.runId,
 		surface: input.surface,
+		[USAGE_EVENT_ATTRIBUTE]: usageEventFrom(input, metadata.request, issues),
+		[USAGE_ISSUES_ATTRIBUTE]: issues,
+		[SpanContent.input]: input.requestBody,
+		[SpanContent.output]: input.responseBody,
 	});
-	const observeWrite = (
-		write: Effect.Effect<void, CodeModeUsageCaptureError>,
-		sink: typeof CodeModeUsageSinkSchema.Type,
-	) =>
-		write.pipe(
-			Effect.tap(() =>
-				recordMetric(usageCaptureWrites, 1, {
-					operation: input.operation,
-					outcome: "success",
-					sink,
-					surface: input.surface,
-				}),
-			),
-			Effect.catchTag("CodeModeUsageCaptureError", (error) =>
-				Effect.gen(function* () {
-					yield* recordMetric(usageCaptureWrites, 1, {
-						failureCategory: error._tag,
-						operation: input.operation,
-						outcome: "failure",
-						sink: error.sink,
-						surface: input.surface,
-					});
-					yield* recordMetric(usageCaptureFailures, 1, {
-						failureCategory: error._tag,
-						operation: input.operation,
-						sink: error.sink,
-						surface: input.surface,
-					});
-					yield* Effect.logWarning("Code Mode usage capture failed", {
-						error_tag: error._tag,
-						operation: input.operation,
-						sink: error.sink,
-						surface: input.surface,
-					});
-				}),
-			),
-		);
-	const writes: Array<Effect.Effect<void>> = [];
-	if (env.CODEMODE_USAGE_EVENTS || env.CODEMODE_USAGE_ISSUES) {
-		writes.push(
-			observeWrite(sendCodeModeUsageAnalytics(env, event, input.responseBody), "analytics"),
-		);
-	}
-
-	if (env.SKETCHI_ARTIFACTS) {
-		writes.push(
-			observeWrite(
-				Effect.tryPromise({
-					try: () =>
-						env.SKETCHI_ARTIFACTS?.put(event.eventKey, JSON.stringify(event), {
-							httpMetadata: { contentType: "application/json" },
-						}) ?? Promise.resolve(),
-					catch: (cause) =>
-						CodeModeUsageCaptureError.make({
-							cause,
-							message: "Code Mode usage artifact persistence failed.",
-							sink: "artifacts",
-						}),
-				}).pipe(Effect.asVoid),
-				"artifacts",
-			),
-		);
-	}
-
-	const deferredCapture = Effect.yieldNow.pipe(
-		Effect.andThen(Effect.all(writes, { concurrency: 2, discard: true })),
-	);
-	platform.waitUntil(
-		withTelemetryCorrelation(deferredCapture, {
-			attemptId: input.context.attemptId,
-			runId: input.context.runId,
-		}),
-	);
 });
 
 export const PlaygroundCodeModeUsageLive = Layer.succeed(PlaygroundCodeModeUsage, {
@@ -322,172 +163,46 @@ export const PlaygroundCodeModeUsageLive = Layer.succeed(PlaygroundCodeModeUsage
 	createContext: createCodeModeUsageContext(),
 });
 
-function codeModeUsageEventFromInput(
+export function usageEventFrom(
 	input: CodeModeUsageCaptureInput,
 	request: Request,
-	eventTime: string,
+	issues: readonly CodeModeUsageIssueSummary[],
 ): CodeModeUsageEvent {
-	const eventKey = keyForUsageEvent(input.context, eventTime, "event.json");
-
-	return {
-		artifactRefs: artifactRefsFrom(input.responseBody),
-		attemptId: input.context.attemptId,
-		client: clientFromRequest(request),
-		durationMs: input.durationMs,
-		eventId: input.context.eventId,
-		eventKey,
-		eventTime,
-		operation: input.operation,
-		request: {
-			body: snapshotFrom(input.requestBody),
-			method: request.method,
-			path: pathFromRequest(request),
-		},
-		response: {
-			body: snapshotFrom(input.responseBody),
-		},
-		runId: input.context.runId,
-		schema: USAGE_EVENT_SCHEMA,
-		status: okFromResponse(input.responseBody) ? "ok" : "error",
-		...(input.statusCode === undefined ? {} : { statusCode: input.statusCode }),
-		surface: input.surface,
-	};
-}
-
-function sendCodeModeUsageAnalytics(
-	env: Context.Service.Shape<typeof PlaygroundBindings>,
-	event: CodeModeUsageEvent,
-	responseBody: unknown,
-): Effect.Effect<void, CodeModeUsageCaptureError> {
-	const issueSummaries = issueSummariesFrom(responseBody);
-	return Effect.tryPromise({
-		try: async () => {
-			const writes: Promise<void>[] = [];
-			if (env.CODEMODE_USAGE_EVENTS) {
-				writes.push(
-					env.CODEMODE_USAGE_EVENTS.send([analyticsRowFrom(event, responseBody, issueSummaries)]),
-				);
-			}
-			if (env.CODEMODE_USAGE_ISSUES && issueSummaries.length > 0) {
-				writes.push(
-					env.CODEMODE_USAGE_ISSUES.send(
-						issueSummaries.map((issue) => issueAnalyticsRowFrom(event, issue)),
-					),
-				);
-			}
-			await Promise.all(writes);
-		},
-		catch: (cause) =>
-			CodeModeUsageCaptureError.make({
-				cause,
-				message: "Code Mode usage analytics persistence failed.",
-				sink: "analytics",
-			}),
-	});
-}
-
-function analyticsRowFrom(
-	event: CodeModeUsageEvent,
-	responseBody: unknown,
-	issueSummaries: CodeModeUsageIssueSummary[],
-): CodeModeUsageAnalyticsRow {
-	const eventDate = event.eventTime.slice(0, 10);
-	const issueCodes = joinedUnique(issueSummaries.map((issue) => issue.code));
+	const { responseBody } = input;
+	const artifacts = artifactRefsFrom(responseBody);
+	const client = clientFromRequest(request);
+	const issueCodes = joinedUnique(issues.map((issue) => issue.code));
 	const artifactFormats = joinedUnique(
-		event.artifactRefs.flatMap((ref) => ref.formats.map((formatRef) => formatRef.format)),
+		artifacts.flatMap((ref) => ref.formats.map((formatRef) => formatRef.format)),
 	);
 	const errorMessage =
 		stringValue(recordValue(responseBody, "error")) ??
-		issueSummaries.find((issue) => Boolean(issue.message))?.message;
+		issues.find((issue) => Boolean(issue.message))?.message;
 
 	return {
-		artifact_count: event.artifactRefs.length,
+		artifact_count: artifacts.length,
 		artifact_delivery: isRecord(recordValue(responseBody, "artifactDelivery")),
 		...(artifactFormats ? { artifact_formats: artifactFormats } : {}),
-		attempt_id: event.attemptId,
-		...(event.client.client ? { client: event.client.client } : {}),
-		duration_ms: event.durationMs,
+		artifacts,
+		attempt_id: input.context.attemptId,
+		...(client.client ? { client: client.client } : {}),
+		duration_ms: input.durationMs,
 		...(errorMessage ? { error_message: errorMessage } : {}),
-		event_date: eventDate,
-		event_id: event.eventId,
-		event_key: event.eventKey,
-		event_time: event.eventTime,
-		...(event.client.harness ? { harness: event.client.harness } : {}),
+		event_id: input.context.eventId,
+		...(client.harness ? { harness: client.harness } : {}),
 		...(issueCodes ? { issue_codes: issueCodes } : {}),
-		issue_count: issueSummaries.length,
-		...(event.client.model ? { model: event.client.model } : {}),
-		operation: event.operation,
-		...(event.client.reasoningLevel ? { reasoning_level: event.client.reasoningLevel } : {}),
-		request_method: event.request.method,
-		...(event.request.body.omittedReason
-			? { request_omitted_reason: event.request.body.omittedReason }
-			: {}),
-		request_path: event.request.path,
-		...(event.request.body.sizeBytes === undefined
-			? {}
-			: { request_snapshot_bytes: event.request.body.sizeBytes }),
-		...(event.response.body.omittedReason
-			? { response_omitted_reason: event.response.body.omittedReason }
-			: {}),
-		...(event.response.body.sizeBytes === undefined
-			? {}
-			: { response_snapshot_bytes: event.response.body.sizeBytes }),
-		run_id: event.runId,
-		...(event.client.scenarioId ? { scenario_id: event.client.scenarioId } : {}),
-		schema: event.schema,
-		status: event.status,
-		...(event.statusCode === undefined ? {} : { status_code: event.statusCode }),
-		surface: event.surface,
-		...(event.client.userAgent ? { user_agent: event.client.userAgent } : {}),
-	};
-}
-
-function issueAnalyticsRowFrom(
-	event: CodeModeUsageEvent,
-	issue: CodeModeUsageIssueSummary,
-): CodeModeUsageIssueAnalyticsRow {
-	return {
-		attempt_id: event.attemptId,
-		event_date: event.eventTime.slice(0, 10),
-		event_id: event.eventId,
-		event_key: event.eventKey,
-		event_time: event.eventTime,
-		issue_code: issue.code,
-		...(issue.message ? { issue_message: issue.message } : {}),
-		issue_path: issue.path,
-		...(issue.severity ? { issue_severity: issue.severity } : {}),
-		...(issue.stage ? { issue_stage: issue.stage } : {}),
-		operation: event.operation,
-		run_id: event.runId,
-		schema: event.schema,
-		status: event.status,
-		surface: event.surface,
-	};
-}
-
-function snapshotFrom(value: unknown): CodeModeUsageSnapshot {
-	const serialized = serializeSnapshot(value);
-
-	if (!serialized) {
-		return {
-			contentType: "application/json",
-			omittedReason: "not_json_serializable",
-		};
-	}
-
-	const sizeBytes = byteSize(serialized);
-	if (sizeBytes > MAX_SNAPSHOT_BYTES) {
-		return {
-			contentType: "application/json",
-			omittedReason: "snapshot_too_large",
-			sizeBytes,
-		};
-	}
-
-	return {
-		contentType: "application/json",
-		sizeBytes,
-		value,
+		issue_count: issues.length,
+		...(client.model ? { model: client.model } : {}),
+		operation: input.operation,
+		...(client.reasoningLevel ? { reasoning_level: client.reasoningLevel } : {}),
+		request_method: request.method,
+		request_path: pathFromRequest(request),
+		run_id: input.context.runId,
+		...(client.scenarioId ? { scenario_id: client.scenarioId } : {}),
+		status: okFromResponse(responseBody) ? "ok" : "error",
+		...(input.statusCode === undefined ? {} : { status_code: input.statusCode }),
+		surface: input.surface,
+		...(client.userAgent ? { user_agent: client.userAgent } : {}),
 	};
 }
 
@@ -598,28 +313,6 @@ function clientFromRequest(request: Request): CodeModeUsageClient {
 	return client;
 }
 
-function keyForUsageEvent(
-	context: CodeModeUsageContext,
-	eventTime: string,
-	fileName: "event.json",
-): string {
-	const now = new Date(eventTime);
-	const year = now.getUTCFullYear();
-	const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-	const day = String(now.getUTCDate()).padStart(2, "0");
-
-	return [
-		USAGE_PREFIX,
-		String(year),
-		month,
-		day,
-		context.runId,
-		context.attemptId,
-		context.eventId,
-		fileName,
-	].join("/");
-}
-
 function pathFromRequest(request: Request): string {
 	const url = new URL(request.url);
 	return `${url.pathname}${url.search}`;
@@ -676,16 +369,13 @@ function collectIssueSummaries(
 	depth: number,
 	receipts: readonly Record<string, unknown>[] = [],
 ): void {
-	if (depth > MAX_ISSUE_DEPTH || summaries.length >= MAX_ISSUE_ROWS) {
+	if (depth > MAX_ISSUE_DEPTH) {
 		return;
 	}
 
 	if (Array.isArray(value)) {
 		for (const [index, item] of value.entries()) {
 			collectIssueSummaries(item, `${path}[${index}]`, summaries, depth + 1, receipts);
-			if (summaries.length >= MAX_ISSUE_ROWS) {
-				return;
-			}
 		}
 		return;
 	}
@@ -704,9 +394,6 @@ function collectIssueSummaries(
 	for (const [key, child] of Object.entries(value)) {
 		if (copiedBuild && (key === "issues" || key === "quality")) continue;
 		collectIssueSummaries(child, childPath(path, key), summaries, depth + 1, receipts);
-		if (summaries.length >= MAX_ISSUE_ROWS) {
-			return;
-		}
 	}
 }
 
@@ -771,10 +458,6 @@ function serializeSnapshot(value: unknown): string | undefined {
 	} catch {
 		return undefined;
 	}
-}
-
-function byteSize(value: string): number {
-	return new TextEncoder().encode(value).byteLength;
 }
 
 function headerValue(request: Request, name: string): string | undefined {

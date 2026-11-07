@@ -116,7 +116,7 @@ test("Preview validation rejects production targets, missing bindings, and unrev
 			config.previews.r2_buckets[0].preview_bucket_name = config.r2_buckets[0].bucket_name;
 		},
 		(config) => {
-			config.previews.pipelines[0].stream = config.pipelines[1].stream;
+			config.previews.pipelines[0].stream = config.pipelines[0].stream;
 		},
 		(config) => {
 			delete config.previews.ai;

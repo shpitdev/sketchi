@@ -1,3 +1,4 @@
+import type { TelemetrySpanRow } from "@sketchi/observability";
 import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
 
@@ -18,6 +19,7 @@ import {
 } from "./api.server";
 import { PlaygroundCodeMode } from "./service.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
+import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "./usage-events.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
@@ -135,46 +137,29 @@ function artifactIdFrom(value: unknown): string {
 	throw new Error("Response did not contain an artifact id.");
 }
 
-async function readBucketJson(bucket: MemoryBucket, key: string): Promise<unknown> {
-	const object = await bucket.get(key);
-	return JSON.parse((await object?.text()) ?? "{}");
-}
+/** Collects the rows a request sends to the spans stream. */
+class SpanPipeline {
+	readonly rows: TelemetrySpanRow[] = [];
 
-async function usageEventsFrom(bucket: MemoryBucket): Promise<unknown[]> {
-	const eventKeys = [...bucket.objects.keys()]
-		.filter((key) => key.startsWith("codemode/usage/"))
-		.filter((key) => key.endsWith("/event.json"))
-		.sort();
-
-	return Promise.all(eventKeys.map((key) => readBucketJson(bucket, key)));
-}
-
-async function waitForUsageEvents(bucket: MemoryBucket, count: number): Promise<unknown[]> {
-	const deadline = Date.now() + 1_000;
-
-	while (Date.now() < deadline) {
-		const events = await usageEventsFrom(bucket);
-		if (events.length >= count) {
-			return events;
-		}
-		await delay(5);
+	async send(records: readonly unknown[]): Promise<void> {
+		this.rows.push(...(records as TelemetrySpanRow[]));
 	}
-
-	throw new Error(`Expected ${count} usage event(s) to be persisted.`);
 }
 
-async function waitForPipelineRecords(pipeline: MemoryPipeline, count: number): Promise<unknown[]> {
-	const deadline = Date.now() + 1_000;
-
-	while (Date.now() < deadline) {
-		const records = pipeline.records();
-		if (records.length >= count) {
-			return records;
-		}
-		await delay(5);
-	}
-
-	throw new Error(`Expected ${count} pipeline record(s) to be sent.`);
+/** Each Code Mode call's usage, as its capture span recorded it. */
+function usageCaptures(spans: SpanPipeline) {
+	return spans.rows
+		.filter((row) => row.name === "playground.codeModeUsage.capture")
+		.map((row) => {
+			const attributes = JSON.parse(row.attributes) as Record<string, unknown>;
+			return {
+				event: attributes[USAGE_EVENT_ATTRIBUTE],
+				issues: attributes[USAGE_ISSUES_ATTRIBUTE],
+				request: attributes["sketchi.input"],
+				response: attributes["sketchi.output"],
+				row,
+			};
+		});
 }
 
 class MemoryBucket implements CodeModeObjectBucket {
@@ -200,76 +185,10 @@ class MemoryBucket implements CodeModeObjectBucket {
 	}
 }
 
-class DelayedUsageBucket extends MemoryBucket {
-	private readonly releaseUsageWrite: Promise<void>;
-	private resolveReleaseUsageWrite: () => void = () => {};
-	readonly usageWriteFinished: Promise<void>;
-	private resolveUsageWriteFinished: () => void = () => {};
-	readonly usageWriteStarted: Promise<void>;
-	private resolveUsageWriteStarted: () => void = () => {};
-
-	constructor() {
-		super();
-		this.releaseUsageWrite = new Promise((resolve) => {
-			this.resolveReleaseUsageWrite = resolve;
-		});
-		this.usageWriteFinished = new Promise((resolve) => {
-			this.resolveUsageWriteFinished = resolve;
-		});
-		this.usageWriteStarted = new Promise((resolve) => {
-			this.resolveUsageWriteStarted = resolve;
-		});
-	}
-
-	override async put(key: string, value: string | ArrayBuffer | Uint8Array): Promise<unknown> {
-		if (!key.startsWith("codemode/usage/")) {
-			return super.put(key, value);
-		}
-
-		this.resolveUsageWriteStarted();
-		await this.releaseUsageWrite;
-		const result = await super.put(key, value);
-		this.resolveUsageWriteFinished();
-		return result;
-	}
-
-	releaseUsagePersistence(): void {
-		this.resolveReleaseUsageWrite();
-	}
-}
-
-class RejectingUsageBucket extends MemoryBucket {
-	override async put(key: string, value: string | ArrayBuffer | Uint8Array): Promise<unknown> {
-		if (key.startsWith("codemode/usage/")) {
-			throw new Error("usage persistence unavailable");
-		}
-
-		return super.put(key, value);
-	}
-}
-
-class MemoryPipeline {
-	readonly batches: unknown[][] = [];
-
-	async send(records: readonly unknown[]): Promise<void> {
-		this.batches.push([...records]);
-	}
-
-	records(): unknown[] {
-		return this.batches.flat();
-	}
-}
-
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 	const buffer = new ArrayBuffer(bytes.byteLength);
 	new Uint8Array(buffer).set(bytes);
 	return buffer;
-}
-
-function delay(ms: number): Promise<void> {
-	return new Promise((resolve) => {
-		setTimeout(resolve, ms);
-	});
 }
 
 describe("Code Mode API handlers", () => {
@@ -437,9 +356,9 @@ describe("Code Mode API handlers", () => {
 	});
 
 	it("rejects oversized public mindmap request bodies with a typed 413", async () => {
-		const bucket = new MemoryBucket();
+		const spans = new SpanPipeline();
 		const response = await handleBuildMindmapRequest(
-			{ SKETCHI_ARTIFACTS: bucket },
+			{ SKETCHI_ARTIFACTS: new MemoryBucket(), TELEMETRY_SPANS: spans },
 			postRequest("https://studio.test/api/v1/mindmaps/build", {
 				spec: {
 					title: "Large",
@@ -457,16 +376,12 @@ describe("Code Mode API handlers", () => {
 			status: "invalid_input",
 			issues: [{ code: "request_too_large", stage: "input" }],
 		});
-		const usageEvents = await waitForUsageEvents(bucket, 1);
-		expect(usageEvents[0]).toMatchObject({
-			operation: "buildMindmap",
-			request: {
-				body: {
-					value: { omitted: true, reason: "request_too_large" },
-				},
+		expect(usageCaptures(spans)).toMatchObject([
+			{
+				event: { operation: "buildMindmap", status_code: 413 },
+				request: { omitted: true, reason: "request_too_large" },
 			},
-			statusCode: 413,
-		});
+		]);
 	});
 
 	it("rejects malformed extreme width without response amplification", async () => {
@@ -677,9 +592,9 @@ describe("Code Mode API handlers", () => {
 	});
 
 	it("rejects flowchart Content-Length above 256 KiB with a typed 413", async () => {
-		const bucket = new MemoryBucket();
+		const spans = new SpanPipeline();
 		const response = await handleBuildFlowchartRequest(
-			{ SKETCHI_ARTIFACTS: bucket },
+			{ SKETCHI_ARTIFACTS: new MemoryBucket(), TELEMETRY_SPANS: spans },
 			new Request("https://studio.test/api/v1/flowcharts/build", {
 				method: "POST",
 				headers: {
@@ -696,14 +611,12 @@ describe("Code Mode API handlers", () => {
 			status: "invalid_input",
 			issues: [{ code: "request_too_large", stage: "input" }],
 		});
-		const usageEvents = await waitForUsageEvents(bucket, 1);
-		expect(usageEvents[0]).toMatchObject({
-			operation: "buildFlowchart",
-			request: {
-				body: { value: { omitted: true, reason: "request_too_large" } },
+		expect(usageCaptures(spans)).toMatchObject([
+			{
+				event: { operation: "buildFlowchart", status_code: 413 },
+				request: { omitted: true, reason: "request_too_large" },
 			},
-			statusCode: 413,
-		});
+		]);
 	});
 
 	it("stops and cancels an oversized chunked flowchart body", async () => {
@@ -854,7 +767,8 @@ describe("Code Mode API handlers", () => {
 
 	it("uses the R2-compatible artifact binding when one is configured", async () => {
 		const bucket = new MemoryBucket();
-		const env = { SKETCHI_ARTIFACTS: bucket };
+		const spans = new SpanPipeline();
+		const env = { SKETCHI_ARTIFACTS: bucket, TELEMETRY_SPANS: spans };
 		const buildResponse = await handleBuildFlowchartRequest(
 			env,
 			postRequest("https://studio.test/api/v1/flowcharts/build", {
@@ -897,109 +811,58 @@ describe("Code Mode API handlers", () => {
 			format: "scene",
 		});
 
-		const usageEvents = await waitForUsageEvents(bucket, 1);
-		expect(usageEvents).toHaveLength(1);
-		expect(usageEvents[0]).toMatchObject({
-			artifactRefs: [
-				{
-					artifactId,
-					diagramId: "worker-api-approval-flow",
-				},
-			],
-			client: {},
-			operation: "buildFlowchart",
-			request: {
-				method: "POST",
-				path: "/api/v1/flowcharts/build",
+		// The build, the get and the patch above each record one usage capture.
+		const [build] = usageCaptures(spans);
+		expect(build).toMatchObject({
+			event: {
+				artifacts: [{ artifactId, diagramId: "worker-api-approval-flow" }],
+				operation: "buildFlowchart",
+				request_method: "POST",
+				request_path: "/api/v1/flowcharts/build",
+				status: "ok",
+				status_code: 200,
+				surface: "api",
 			},
-			schema: "sketchi.codemode.usage.v1",
-			status: "ok",
-			statusCode: 200,
-			surface: "api",
+			request: { spec: { title: "Worker API approval flow" } },
+			response: { ok: true, status: "accepted" },
 		});
-		if (!isRecord(usageEvents[0]) || !isRecord(usageEvents[0].request)) {
-			throw new Error("Usage event did not include request metadata.");
-		}
-		if (!isRecord(usageEvents[0].request.body)) {
-			throw new Error("Usage event did not include a request snapshot.");
-		}
-		expect(usageEvents[0].request.body.value).toMatchObject({
-			spec: { title: "Worker API approval flow" },
-		});
+		expect([...bucket.objects.keys()].filter((key) => key.startsWith("codemode/usage/"))).toEqual(
+			[],
+		);
 	});
 
-	it("does not wait for usage event persistence before returning the API response", async () => {
-		const bucket = new DelayedUsageBucket();
-		const responsePromise = handleBuildFlowchartRequest(
-			{ SKETCHI_ARTIFACTS: bucket },
-			postRequest("https://studio.test/api/v1/flowcharts/build", {
-				spec: approvalSpec(),
+	it("gives every span of a call the run and attempt its response names", async () => {
+		const spans = new SpanPipeline();
+		const response = await handleBuildFlowchartRequest(
+			{ TELEMETRY_SPANS: spans },
+			new Request("https://studio.test/api/v1/flowcharts/build", {
+				body: JSON.stringify({ spec: approvalSpec() }),
+				headers: { "cf-ray": "8f00000000000001", "content-type": "application/json" },
+				method: "POST",
 			}),
 		);
-
-		await bucket.usageWriteStarted;
-		expect(await usageEventsFrom(bucket)).toHaveLength(0);
-
-		const response = await Promise.race([responsePromise, delay(250).then(() => undefined)]);
-
-		bucket.releaseUsagePersistence();
-		await bucket.usageWriteFinished;
-
-		if (!response) {
-			throw new Error("API response waited for usage event persistence.");
-		}
-
 		expect(response.status).toBe(200);
-		expect(await usageEventsFrom(bucket)).toHaveLength(1);
-	});
-
-	it("keeps API responses successful when deferred usage capture fails", async () => {
-		const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-		try {
-			const response = await handleBuildFlowchartRequest(
-				{ SKETCHI_ARTIFACTS: new RejectingUsageBucket() },
-				postRequest("https://studio.test/api/v1/flowcharts/build", {
-					spec: approvalSpec(),
-				}),
-			);
-
-			expect(response.status).toBe(200);
-			await expect(response.json()).resolves.toMatchObject({
-				ok: true,
-				status: "accepted",
+		const runId = response.headers.get("x-sketchi-run-id");
+		const attemptId = response.headers.get("x-sketchi-attempt-id");
+		expect(runId).toMatch(/^run_/);
+		expect(spans.rows.length).toBeGreaterThan(5);
+		for (const row of spans.rows) {
+			expect(row, row.name).toMatchObject({
+				attempt_id: attemptId,
+				ray_id: "8f00000000000001",
+				run_id: runId,
 			});
-			await vi.waitFor(() => {
-				expect(warning).toHaveBeenCalledWith(
-					"Code Mode usage capture failed",
-					expect.objectContaining({
-						type: "log",
-						fields: expect.objectContaining({
-							error_tag: "CodeModeUsageCaptureError",
-							operation: "buildFlowchart",
-							sink: "artifacts",
-							surface: "api",
-						}),
-						message: "Code Mode usage capture failed",
-					}),
-				);
-			});
-		} finally {
-			warning.mockRestore();
 		}
+		expect(usageCaptures(spans)).toMatchObject([
+			{ event: { attempt_id: attemptId, run_id: runId } },
+		]);
 	});
 
-	it("sends aggregate usage and issue rows to Pipeline bindings", async () => {
-		const bucket = new MemoryBucket();
-		const usageEvents = new MemoryPipeline();
-		const usageIssues = new MemoryPipeline();
+	it("records the usage summary and every issue of a failed build", async () => {
+		const spans = new SpanPipeline();
 
 		const response = await handleBuildFlowchartRequest(
-			{
-				CODEMODE_USAGE_EVENTS: usageEvents,
-				CODEMODE_USAGE_ISSUES: usageIssues,
-				SKETCHI_ARTIFACTS: bucket,
-			},
+			{ SKETCHI_ARTIFACTS: new MemoryBucket(), TELEMETRY_SPANS: spans },
 			postRequest("https://studio.test/api/v1/flowcharts/build", {
 				spec: {
 					title: "Broken approval flow",
@@ -1019,43 +882,25 @@ describe("Code Mode API handlers", () => {
 			]),
 		});
 
-		await waitForUsageEvents(bucket, 1);
-		const eventRows = await waitForPipelineRecords(usageEvents, 1);
-		const issueRows = await waitForPipelineRecords(usageIssues, 1);
-
-		expect(eventRows[0]).toMatchObject({
+		const [capture] = usageCaptures(spans);
+		if (!capture) throw new Error("The build recorded no usage capture.");
+		expect(capture.event).toMatchObject({
 			artifact_count: 0,
 			artifact_delivery: false,
-			issue_count: expect.any(Number),
 			operation: "buildFlowchart",
 			request_method: "POST",
 			request_path: "/api/v1/flowcharts/build",
-			schema: "sketchi.codemode.usage.v1",
 			status: "error",
 			status_code: 400,
 			surface: "api",
 		});
-		if (!isRecord(eventRows[0])) {
-			throw new Error("Usage pipeline event row was not an object.");
-		}
-		expect(eventRows[0].event_key).toMatch(/^codemode\/usage\//);
-		expect(eventRows[0].event_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-		expect(eventRows[0].issue_count).toBeGreaterThan(0);
-		expect(eventRows[0].request_snapshot_bytes).toBeGreaterThan(0);
-		expect(eventRows[0].response_snapshot_bytes).toBeGreaterThan(0);
-
-		expect(issueRows[0]).toMatchObject({
-			operation: "buildFlowchart",
-			schema: "sketchi.codemode.usage.v1",
-			status: "error",
-			surface: "api",
+		const issues = capture.issues as Array<Record<string, unknown>>;
+		expect(issues.length).toBeGreaterThan(0);
+		expect((capture.event as Record<string, unknown>)["issue_count"]).toBe(issues.length);
+		expect(issues[0]).toMatchObject({
+			code: expect.any(String),
+			path: expect.stringMatching(/^response\.issues\[/),
 		});
-		if (!isRecord(issueRows[0])) {
-			throw new Error("Usage pipeline issue row was not an object.");
-		}
-		expect(issueRows[0].event_key).toBe(eventRows[0].event_key);
-		expect(issueRows[0].issue_code).toEqual(expect.any(String));
-		expect(issueRows[0].issue_path).toMatch(/^response\.issues\[/);
 	});
 
 	it("wraps legacy raw Excalidraw scene artifacts in an importable file envelope", async () => {

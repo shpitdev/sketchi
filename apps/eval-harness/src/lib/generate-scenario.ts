@@ -255,28 +255,57 @@ function generationRuntime(bindings: EvalHarnessEnv) {
 	return runtime;
 }
 
-/** Roots a request's spans and sends them to the spans stream when it ends. */
-function exportRequestSpans(bindings: EvalHarnessEnv, waitUntil: EvalHarnessWaitUntil | undefined) {
+const correlationId = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** The request's ray ID, and its run and attempt from their headers or new ones. */
+function requestCorrelation(request: Request | undefined) {
+	const header = (name: string) => {
+		const value = request?.headers.get(name)?.trim();
+		return value && correlationId.test(value) ? value : undefined;
+	};
+	const created = (prefix: string) => `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
+	const rayId = request?.headers.get("cf-ray") ?? undefined;
+	return {
+		attemptId: header("x-sketchi-attempt-id") ?? created("attempt"),
+		...(rayId ? { rayId } : {}),
+		runId: header("x-sketchi-run-id") ?? created("run"),
+	};
+}
+
+export interface EvalHarnessRequestOptions {
+	readonly request?: Request;
+	readonly signal?: AbortSignal;
+	readonly waitUntil?: EvalHarnessWaitUntil;
+}
+
+/**
+ * Roots a request's spans, with its ray, run and attempt IDs, and sends them to the
+ * spans stream when it ends.
+ */
+function exportRequestSpans(bindings: EvalHarnessEnv, options: EvalHarnessRequestOptions) {
+	const { waitUntil } = options;
 	return <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-		(waitUntil
-			? effect.pipe(withTelemetryExport({ pipeline: bindings.TELEMETRY_SPANS, waitUntil }))
-			: effect
-		).pipe(Effect.withSpan("evalHarness.request"));
+		withTelemetryCorrelation(
+			(waitUntil
+				? effect.pipe(withTelemetryExport({ pipeline: bindings.TELEMETRY_SPANS, waitUntil }))
+				: effect
+			).pipe(Effect.withSpan("evalHarness.request")),
+			requestCorrelation(options.request),
+		);
 }
 
 export function runGenerateScenarioCandidatesForInput(
 	input: unknown,
 	bindings: EvalHarnessEnv,
-	signal?: AbortSignal,
-	waitUntil?: EvalHarnessWaitUntil,
+	options: EvalHarnessRequestOptions = {},
 ): Promise<DiagramGenerationScenarioOutput> {
 	const { model, runtime } = generationRuntime(bindings);
 	return runtime.runPromise(
 		decodeGenerateScenarioInput(input).pipe(
 			Effect.flatMap((data) => generateScenarioCandidatesForInput(data, model)),
-			exportRequestSpans(bindings, waitUntil),
+			exportRequestSpans(bindings, options),
 		),
-		signal ? { signal } : undefined,
+		options.signal ? { signal: options.signal } : undefined,
 	);
 }
 
@@ -286,9 +315,12 @@ export const generateScenarioCandidates = createServerFn({ method: "POST" })
 		const { getEvalHarnessBindings, waitUntil } = await import("./cloudflare-bindings.server");
 
 		const bindings = getEvalHarnessBindings();
+		const request = getRequest();
 		const { model, runtime } = generationRuntime(bindings);
 		return runtime.runPromise(
-			generateScenarioCandidatesForInput(data, model).pipe(exportRequestSpans(bindings, waitUntil)),
-			{ signal: getRequest().signal },
+			generateScenarioCandidatesForInput(data, model).pipe(
+				exportRequestSpans(bindings, { request, waitUntil }),
+			),
+			{ signal: request.signal },
 		);
 	});

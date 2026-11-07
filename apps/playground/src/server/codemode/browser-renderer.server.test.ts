@@ -1,5 +1,9 @@
 import { assert, describe, expect, it } from "@effect/vitest";
-import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
+import {
+	makeTelemetryTestSink,
+	makeWorkersTelemetryLayer,
+	withTelemetryCorrelation,
+} from "@sketchi/observability";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { TestClock } from "effect/testing";
@@ -163,6 +167,22 @@ describe("Cloudflare Browser Run Code Mode renderer", () => {
 			);
 			expect(error).toMatchObject({ _tag: "BrowserRenderingFailure", operation: "durableObject" });
 			expect(renderPng).toHaveBeenCalledTimes(1);
+		}),
+	);
+
+	it.effect("passes the request's ray, run and attempt IDs to the Durable Object", () =>
+		Effect.gen(function* () {
+			const { renderPng, renderers } = fakeRenderers(async () => rendered());
+			yield* withTelemetryCorrelation(
+				createCloudflareBrowserRunArtifactRenderer(renderers, {
+					assetOrigin: "https://studio.test",
+				}).renderPng(renderInput()),
+				{ attemptId: "attempt_1", rayId: "ray_1", runId: "run_1" },
+			);
+			expect(renderPng).toHaveBeenCalledWith(
+				expect.any(Object),
+				expect.objectContaining({ attemptId: "attempt_1", rayId: "ray_1", runId: "run_1" }),
+			);
 		}),
 	);
 

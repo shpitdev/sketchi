@@ -1,25 +1,27 @@
 # observability
 
-Workers-compatible Effect telemetry for Sketchi runtime boundaries.
+Workers-compatible Effect telemetry for Sketchi: every finished span, with its
+full content, as a row for the spans Pipeline stream.
 
 ```mermaid
 flowchart LR
-  Runtime["scoped Worker runtime"] --> Exporter["Effect tracer, logger, and metrics"]
-  Exporter --> Logs["bounded structured Workers Logs events"]
-  Correlation["request and product correlation"] --> Exporter
+  Request["request root span"] --> Batch["per-request batch"]
+  Spans["spans, logs, metric updates"] --> Batch
+  Batch -->|waitUntil| Stream["TELEMETRY_SPANS stream"]
+  Stream --> Table["R2 Data Catalog observability.spans"]
 ```
 
-| Owns                                           | Does not own                     |
-| ---------------------------------------------- | -------------------------------- |
-| scoped Effect telemetry resource lifecycle     | AI Gateway request logging       |
-| bounded span, log, and metric events           | usage-event schemas or Pipelines |
-| contextual correlation annotations             | R2 catalog or R2 SQL queries     |
-| deterministic test sinks and metric registries | product payload capture          |
+| Owns                                                 | Does not own                          |
+| ---------------------------------------------------- | ------------------------------------- |
+| the tracer, logger and metric exporter               | what each span records (its callers)  |
+| span rows, their splitting, and per-request batches  | the Pipeline, sink and catalog        |
+| request correlation: ray, run, attempt and other IDs | DuckDB views (`scripts/telemetry`)    |
+| the stream schema, `spans.schema.json`               | AI Gateway request logging            |
 
-The live layer allocates an exporter inside an Effect scope and releases it when
-the owning Worker runtime is disposed. It performs no module-scope I/O and starts
-no timers. Exported annotations and fields use explicit allowlists; prompts,
-artifacts, arbitrary causes, and other payloads are never serialized.
+`withTelemetryExport` makes the current span a request's root; the request's
+spans are sent when it ends. `withSpanContent` and `SpanContent` name the content
+a span records. The layer performs no module-scope I/O and starts no timers.
+`makeTelemetryTestSink` receives every span as it finishes, for tests.
 
 ## Commands
 

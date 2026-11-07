@@ -5,10 +5,14 @@ import { Clock, Context, Effect, Layer } from "effect";
 import type { StudioEnv } from "../bindings/studio-env.server";
 
 export interface PlaygroundRequestMetadataShape {
+	/** From `x-sketchi-attempt-id`, or created when the request started. */
+	readonly attemptId: string;
 	readonly method: string;
 	readonly origin: string;
 	readonly path: string;
 	readonly request: Request;
+	/** From `x-sketchi-run-id`, or created when the request started. */
+	readonly runId: string;
 	readonly traceId: string;
 }
 

@@ -254,8 +254,11 @@ export interface PngRenderRequest {
 	readonly excalidraw: unknown;
 }
 
-/** The caller's span, so the renderer's spans join the caller's trace. */
+/** The caller's span and request IDs, so the renderer's spans join the caller's trace. */
 export interface PngRenderCaller {
+	readonly attemptId?: string;
+	readonly rayId?: string;
+	readonly runId?: string;
 	readonly spanId: string;
 	readonly traceId: string;
 }

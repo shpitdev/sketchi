@@ -92,10 +92,8 @@ public CLI commands.
 
 ## Persistence and telemetry
 
-R2 stores accepted artifacts, Code Mode usage snapshots, and Studio project
-records. Browser Rendering produces PNG artifacts within a scoped lifecycle.
-Pipelines receive flat usage and issue rows; the existing R2 Data Catalog and
-R2 SQL verifier provide aggregate proof.
+R2 stores accepted artifacts and Studio project records. Browser Rendering
+produces PNG artifacts within a scoped lifecycle.
 
 Every finished Effect span is stored, with its full content, as a row in an
 Iceberg table. `packages/observability` supplies the tracer and logger. A
@@ -106,8 +104,10 @@ when the root ends. Spans the request left running, such as a streamed response,
 are sent in a later batch once they end. A row holds the trace, span and parent
 IDs, name, kind, service, start, end and duration, the outcome with the typed
 error, its message and the full cause, every attribute as JSON, and the span's
-events: its Effect logs, metric updates and span events. Rows also carry the
-Cloudflare ray ID and the run and attempt IDs. The Workers clock only advances
+events: its Effect logs, metric updates and span events. Every row of a request
+carries its Cloudflare ray ID and its run and attempt IDs, taken from
+`x-sketchi-run-id` and `x-sketchi-attempt-id` or created when the request starts;
+a span that records its own run keeps it. The Workers clock only advances
 on I/O, so many spans share a start time; `sketchi.span.start_seq` counts span
 starts within an isolate and orders them. A log with no open span becomes a row
 of its own. Warn and Error logs also go to the console.
@@ -126,6 +126,11 @@ Content is recorded in full, under these attribute names:
   Retries are sibling attempt spans with an `attempt` number.
 - Every Code Mode operation (`playground.codeMode.*`) records its input and output
   the same way.
+- Each Code Mode call (an API build, patch, canvas or generate, or an MCP
+  `execute`) has a `playground.codeModeUsage.capture` span. It records the usage
+  summary as `sketchi.usage.event`, every issue the call reported as
+  `sketchi.usage.issues`, and the full request and response as `sketchi.input`
+  and `sketchi.output`. The `usage_events` and `usage_issues` views read them.
 - `playground.request` records the URL, the request and response headers, the
   status and the response body. Cookie and authorization headers are left out
   because they are credentials. The span that reads a body records it as
@@ -159,9 +164,9 @@ Pipelines ingestion is free. Delivery to Iceberg costs $0.06/GB after 50 GB a
 month, and R2 storage is billed as usual.
 
 `pnpm db` opens DuckDB with `scripts/telemetry/duckdb-init.sql`. It attaches the
-spans catalog and the Code Mode usage catalog with a read-only
-`R2_DATA_READ_TOKEN`, which it takes from Infisical when the variable is unset.
-`pnpm db --preview` reads the preview catalogs, and DuckDB arguments pass
+spans catalog with a read-only `R2_DATA_READ_TOKEN`, which it takes from
+Infisical when the variable is unset. `pnpm db --preview` reads the preview
+spans catalog, and DuckDB arguments pass
 through, for example `pnpm db -c "FROM generations LIMIT 5"`. It defines these
 views:
 
@@ -172,7 +177,14 @@ views:
 - `generations`: one row per generation, with its prompt, output, tokens, model
   calls, repairs, coverage issues and durations
 - `slowest_spans` and `span_durations`: the last seven days
-- `usage_events` and `usage_issues`: the Code Mode usage tables
+- `usage_events` and `usage_issues`: one row per Code Mode call and per issue it
+  reported, with the call's request and response
+
+Code Mode usage rows written before usage moved into spans stay in the
+`sketchi-codemode-usage-analytics-{production,preview}-v4` catalogs, and the raw
+`codemode/usage/**/event.json` objects stay in the artifacts buckets. `pnpm db`
+attaches the production catalog read-only as `codemode_history`, with
+`codemode_history.sketchi_codemode.usage_events` and `.usage_issues`.
 
 No module starts I/O or timers at import time. Worker bindings are translated
 to layers per host lifecycle, and response-adjacent best-effort work is handed

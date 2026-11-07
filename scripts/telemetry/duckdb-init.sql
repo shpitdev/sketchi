@@ -1,6 +1,6 @@
--- Sketchi spans and Code Mode usage, read from R2 Data Catalog (Iceberg).
--- `pnpm db` runs this with R2_DATA_READ_TOKEN set; `pnpm db --preview` reads the
--- preview catalogs. See docs/architecture.md, "Persistence and telemetry".
+-- Sketchi spans, read from R2 Data Catalog (Iceberg), and the Code Mode usage views
+-- over them. `pnpm db` runs this with R2_DATA_READ_TOKEN set; `pnpm db --preview`
+-- reads the preview catalog. See docs/architecture.md, "Persistence and telemetry".
 INSTALL iceberg;
 LOAD iceberg;
 
@@ -9,17 +9,19 @@ CREATE OR REPLACE SECRET r2_data_read (TYPE ICEBERG, TOKEN getenv('R2_DATA_READ_
 SET VARIABLE telemetry_env = coalesce(nullif(getenv('TELEMETRY_ENV'), ''), 'production');
 SET VARIABLE account_id = '75f9660f39e4dafe8b95980b87e7399a';
 SET VARIABLE spans_bucket = 'sketchi-telemetry-' || getvariable('telemetry_env');
-SET VARIABLE usage_bucket = 'sketchi-codemode-usage-analytics-' || getvariable('telemetry_env') || '-v4';
 
 ATTACH getvariable('account_id') || '_' || getvariable('spans_bucket') AS telemetry (
 	TYPE ICEBERG,
 	URI 'https://catalog.cloudflarestorage.com/' || getvariable('account_id') || '/' || getvariable('spans_bucket'),
 	SECRET r2_data_read
 );
-ATTACH getvariable('account_id') || '_' || getvariable('usage_bucket') AS codemode (
+-- Production Code Mode usage rows written before usage moved into spans, kept as they
+-- were: codemode_history.sketchi_codemode.usage_events and .usage_issues.
+ATTACH getvariable('account_id') || '_sketchi-codemode-usage-analytics-production-v4' AS codemode_history (
 	TYPE ICEBERG,
-	URI 'https://catalog.cloudflarestorage.com/' || getvariable('account_id') || '/' || getvariable('usage_bucket'),
-	SECRET r2_data_read
+	URI 'https://catalog.cloudflarestorage.com/' || getvariable('account_id') || '/sketchi-codemode-usage-analytics-production-v4',
+	SECRET r2_data_read,
+	READ_ONLY
 );
 
 -- begin: span reassembly
@@ -256,8 +258,78 @@ WHERE start_time > (now() AT TIME ZONE 'UTC') - INTERVAL 7 DAY
 GROUP BY ALL
 ORDER BY p95_ms DESC;
 
-CREATE OR REPLACE VIEW usage_events AS FROM codemode.sketchi_codemode.usage_events;
-CREATE OR REPLACE VIEW usage_issues AS FROM codemode.sketchi_codemode.usage_issues;
+-- begin: usage views
+-- One row per Code Mode call (API build, patch, canvas, generate, MCP execute), from the
+-- usage summary its playground.codeModeUsage.capture span records, with the full
+-- request and response.
+CREATE OR REPLACE VIEW usage_events AS
+WITH captures AS (
+	SELECT *, attributes->'sketchi.usage.event' AS event
+	FROM spans
+	WHERE name = 'playground.codeModeUsage.capture'
+)
+SELECT
+	event->>'event_id' AS event_id,
+	event->>'run_id' AS run_id,
+	event->>'attempt_id' AS attempt_id,
+	start_time AS event_time,
+	start_time::DATE AS event_date,
+	event->>'surface' AS surface,
+	event->>'operation' AS operation,
+	event->>'status' AS status,
+	(event->>'status_code')::INTEGER AS status_code,
+	(event->>'duration_ms')::BIGINT AS duration_ms,
+	event->>'client' AS client,
+	event->>'harness' AS harness,
+	event->>'model' AS model,
+	event->>'reasoning_level' AS reasoning_level,
+	event->>'scenario_id' AS scenario_id,
+	event->>'user_agent' AS user_agent,
+	(event->>'artifact_count')::INTEGER AS artifact_count,
+	event->>'artifact_formats' AS artifact_formats,
+	(event->>'artifact_delivery')::BOOLEAN AS artifact_delivery,
+	event->'artifacts' AS artifacts,
+	(event->>'issue_count')::INTEGER AS issue_count,
+	event->>'issue_codes' AS issue_codes,
+	event->>'error_message' AS error_message,
+	event->>'request_path' AS request_path,
+	event->>'request_method' AS request_method,
+	attributes->'sketchi.input' AS request,
+	attributes->'sketchi.output' AS response,
+	ray_id,
+	trace_id,
+	span_id
+FROM captures;
+
+-- One row per issue a Code Mode call reported.
+CREATE OR REPLACE VIEW usage_issues AS
+WITH issues AS (
+	SELECT
+		*,
+		attributes->'sketchi.usage.event' AS event,
+		unnest(CAST(attributes->'sketchi.usage.issues' AS JSON[])) AS issue
+	FROM spans
+	WHERE name = 'playground.codeModeUsage.capture'
+)
+SELECT
+	event->>'event_id' AS event_id,
+	event->>'run_id' AS run_id,
+	event->>'attempt_id' AS attempt_id,
+	start_time AS event_time,
+	start_time::DATE AS event_date,
+	event->>'surface' AS surface,
+	event->>'operation' AS operation,
+	event->>'status' AS status,
+	issue->>'code' AS issue_code,
+	issue->>'message' AS issue_message,
+	issue->>'path' AS issue_path,
+	issue->>'severity' AS issue_severity,
+	issue->>'stage' AS issue_stage,
+	ray_id,
+	trace_id,
+	span_id
+FROM issues;
+-- end: usage views
 
 SELECT
 	getvariable('telemetry_env') AS environment,

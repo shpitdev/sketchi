@@ -11,8 +11,6 @@ export interface StudioEnv {
 	AI?: CloudflareAiGatewayProvider;
 	ASSETS?: PlaygroundAssetsBinding;
 	CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
-	CODEMODE_USAGE_EVENTS?: CodeModeUsagePipelineBinding;
-	CODEMODE_USAGE_ISSUES?: CodeModeUsagePipelineBinding;
 	LOADER?: unknown;
 	SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
 	SKETCHI_AI_GATEWAY_ID?: string;
@@ -20,8 +18,4 @@ export interface StudioEnv {
 	SKETCHI_AI_MODEL?: string;
 	SKETCHI_RENDER_ASSET_ORIGIN?: string;
 	TELEMETRY_SPANS?: TelemetryPipeline;
-}
-
-export interface CodeModeUsagePipelineBinding {
-	send(records: readonly unknown[]): Promise<void>;
 }

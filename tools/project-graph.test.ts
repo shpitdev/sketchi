@@ -120,7 +120,6 @@ const approvedRuntimeBoundaryFiles = [
 	"apps/playground/src/server/runtime/runtime.server.ts",
 	"packages/diagram/scenarios/src/cli.ts",
 	"packages/diagram/scenarios/src/live-generator.ts",
-	"scripts/pipelines/r2-catalog-smoke.ts",
 	"tools/generation-reliability-probe.ts",
 	"tools/harness-eval.ts",
 	"tools/studio-routing-eval.ts",
@@ -194,7 +193,6 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/playground/src/routes/projects.tsx": 3,
 	"apps/playground/src/routes/projects_/$projectId.tsx": 3,
 	"apps/playground/src/server/ai/model.server.ts": 2,
-	"apps/playground/src/server/bindings/studio-env.server.ts": 1,
 	"apps/playground/src/server/chat/agent.server.ts": 6,
 	"apps/playground/src/server/codemode/browser-render-pool.server.ts": 25,
 	"apps/playground/src/server/codemode/browser-renderer.server.ts": 6,
@@ -203,7 +201,6 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/playground/src/server/codemode/png-renderer-object.server.ts": 2,
 	"apps/playground/src/server/codemode/mcp-session-prewarm.server.ts": 2,
 	"apps/playground/src/server/codemode/mcp.server.ts": 54,
-	"apps/playground/src/server/codemode/usage-events.server.ts": 8,
 	"apps/playground/src/server/runtime/request-body.server.ts": 9,
 	"apps/playground/src/server/runtime/runtime.server.ts": 26,
 	"apps/playground/src/server/studio/projects.server.ts": 3,
@@ -231,7 +228,6 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"packages/studio/projects/src/client-api.ts": 20,
 	"packages/studio/projects/src/server/bucket.ts": 22,
 	"packages/studio/projects/src/server/http.ts": 2,
-	"scripts/pipelines/r2-catalog-smoke.ts": 20,
 	"tools/generation-reliability-probe.ts": 5,
 	"tools/harness-eval.ts": 8,
 	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.spec.ts": 6,
@@ -970,10 +966,7 @@ describe("diagram generation project boundaries", () => {
 
 	it("prevents unmanaged Promise and runtime regressions", () => {
 		const sourceFiles = globSync(
-			[
-				...["apps", "packages", "tools"].map((root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs}`),
-				"scripts/pipelines/r2-catalog-smoke.ts",
-			],
+			["apps", "packages", "tools"].map((root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs}`),
 			{
 				cwd: workspaceRoot,
 				exclude: [
