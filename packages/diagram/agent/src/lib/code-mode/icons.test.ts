@@ -993,6 +993,83 @@ describe("createCanvas icons", () => {
 	});
 });
 
+describe("hand-drawn icons", () => {
+	const RECIPE = {
+		parts: [{ kind: "rect", x: 2, y: 6, width: 20, height: 12, rounded: true, fill: "#2496ed" }],
+	} as const;
+
+	function recipeCatalog(loaded: string[]): CodeModeIconCatalog {
+		const base = fixtureCatalog();
+		const catalog = makeCodeModeIconCatalog({
+			icons: [catalogIcon("docker", "Docker"), catalogIcon("github", "GitHub")],
+			loadSvg: (icon) => {
+				loaded.push(icon.slug);
+				return base.loadSvg(icon);
+			},
+			recipes: { docker: RECIPE, github: { parts: [] }, "made-up": RECIPE },
+			slugLookup: "sketchi.searchIcons({ q })",
+		});
+		return catalog;
+	}
+
+	it("keeps only drawable recipes for catalog marks", () => {
+		const catalog = recipeCatalog([]);
+		expect(catalog.recipe("docker")).toEqual(RECIPE);
+		expect(catalog.recipe("github")).toBeUndefined();
+		expect(catalog.recipe("made-up")).toBeUndefined();
+	});
+
+	it("embeds the recipe and never reads the SVG of a mark drawn by hand", async () => {
+		const loaded: string[] = [];
+		const result = await runtime(recipeCatalog(loaded)).createCanvas({
+			spec: canvasSpec([
+				{ id: "build", icon: { slug: "docker", size: 28 } },
+				{ id: "push", icon: { slug: "github", size: 28 } },
+			]),
+			options: { inlineArtifacts: ["scene"] },
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.issues).toEqual([]);
+		expect(loaded).toEqual(["github"]);
+		expect(inlineScene(result).icons).toEqual({
+			docker: { name: "Docker", recipe: RECIPE },
+			github: {
+				name: "GitHub",
+				svg: '<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><circle r="1"/></svg>',
+			},
+		});
+	});
+
+	it("embeds the exact SVG for an icon that asks for it", async () => {
+		const loaded: string[] = [];
+		const result = await runtime(recipeCatalog(loaded)).createCanvas({
+			spec: canvasSpec([
+				{ id: "exact", icon: { slug: "docker", size: 28, exact: true } },
+				{ id: "drawn", icon: { slug: "docker", size: 28 } },
+			]),
+			options: { inlineArtifacts: ["scene"] },
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(loaded).toEqual(["docker"]);
+		const scene = inlineScene(result);
+		expect(scene.icons?.["docker"]).toEqual({
+			name: "Docker",
+			recipe: RECIPE,
+			svg: '<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M0 0h1"/></svg>',
+		});
+		expect(
+			scene.elements.map((element) => (element.type === "node" ? element.icon : undefined)),
+		).toEqual([
+			{ slug: "docker", size: 28, exact: true },
+			{ slug: "docker", size: 28 },
+		]);
+	});
+});
+
 describe("applyDiagramPatch icons", () => {
 	it("drops a patched-in logo that does not fit instead of failing", async () => {
 		const icons = runtime();

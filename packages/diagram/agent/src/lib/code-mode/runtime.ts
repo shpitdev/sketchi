@@ -2364,7 +2364,15 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 				id: element.id,
 				nodeId: element.nodeId,
 				...(element.kind ? { kind: element.kind } : {}),
-				...(element.icon ? { icon: { slug: element.icon.slug, size: element.icon.size } } : {}),
+				...(element.icon
+					? {
+							icon: {
+								slug: element.icon.slug,
+								size: element.icon.size,
+								...(element.icon.exact ? { exact: true } : {}),
+							},
+						}
+					: {}),
 				shape: element.shape,
 				...(element.fillColor ? { fillColor: element.fillColor } : {}),
 				...(element.strokeColor ? { strokeColor: element.strokeColor } : {}),

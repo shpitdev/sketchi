@@ -21,6 +21,10 @@
 			"types": "./dist/node-logo-svgs.d.ts",
 			"default": "./dist/node-logo-svgs.json"
 		},
+		"./native-icons": {
+			"types": "./dist/native-icons.d.ts",
+			"default": "./dist/native-icons.json"
+		},
 		"./node-logos/*": "./dist/node-logos/*",
 		"./svg/*": "./svg/*",
 		"./package.json": "./package.json"

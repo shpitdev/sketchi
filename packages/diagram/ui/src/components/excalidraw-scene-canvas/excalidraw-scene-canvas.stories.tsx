@@ -10,7 +10,12 @@ import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
 import { ExcalidrawSceneCanvas } from "./excalidraw-scene-canvas";
-import { groupLogoScene, nodeLogoScene, participantLogoScene } from "./node-logo-scene.fixtures";
+import {
+	groupLogoScene,
+	handDrawnLogoScene,
+	nodeLogoScene,
+	participantLogoScene,
+} from "./node-logo-scene.fixtures";
 
 const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
 
@@ -86,6 +91,17 @@ export const EditableNodeLogosLeftToRight: Story = {
 	args: {
 		scene: convertSceneToExcalidraw(nodeLogoScene("LR")),
 		title: "Editable left-to-right deploy pipeline with node logos",
+		viewModeEnabled: false,
+		zenModeEnabled: false,
+	},
+	tags: ["test"],
+};
+
+/** GitHub drawn by hand from its recipe, beside embedded SVG marks without one. */
+export const HandDrawnNodeLogo: Story = {
+	args: {
+		scene: convertSceneToExcalidraw(handDrawnLogoScene()),
+		title: "Deploy pipeline with a hand-drawn node logo",
 		viewModeEnabled: false,
 		zenModeEnabled: false,
 	},

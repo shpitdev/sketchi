@@ -15,6 +15,7 @@ import {
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasGroupIconBox,
+	canvasIconForm,
 	canvasNodeIconBox,
 	canvasComposedOnOutline,
 	canvasShapeOutline,
@@ -35,6 +36,8 @@ import {
 	wrapTextToWidth,
 } from "@sketchi/diagram-core";
 import { generateKeyBetween } from "fractional-indexing";
+
+import { iconRecipeElements } from "./icon-recipe.js";
 
 export type ExcalidrawElement = Record<string, unknown> & {
 	id: string;
@@ -348,6 +351,11 @@ function shapeStrokeElements(input: {
 	});
 }
 
+function iconBox(node: NodeSceneElement | FrameSceneElement) {
+	const group = node.type === "frame" || node.rendererRole === "zone";
+	return group ? canvasGroupIconBox(node) : canvasNodeIconBox(node);
+}
+
 function iconImageElement(input: {
 	fileId: string;
 	id: string;
@@ -355,7 +363,7 @@ function iconImageElement(input: {
 }): ExcalidrawElement | null {
 	const { node } = input;
 	const group = node.type === "frame" || node.rendererRole === "zone";
-	const box = group ? canvasGroupIconBox(node) : canvasNodeIconBox(node);
+	const box = iconBox(node);
 	if (!box || !node.icon) return null;
 	return {
 		...elementBase(input.id, node),
@@ -379,6 +387,53 @@ function iconImageElement(input: {
 		status: "saved",
 		strokeColor: "transparent",
 	};
+}
+
+/**
+ * A node's or frame's logo: its hand-drawn recipe as native elements, or the
+ * embedded SVG as one image when the icon asks for its exact mark or the
+ * slug has no recipe. Empty when the scene embeds neither.
+ */
+function iconElements(input: {
+	files: Record<string, ExcalidrawBinaryFile>;
+	ink: string;
+	node: NodeSceneElement | FrameSceneElement;
+	scene: RenderedDiagramScene;
+	usedElementIds: Set<string>;
+}): ExcalidrawElement[] {
+	const { node, scene } = input;
+	const asset =
+		node.icon && scene.icons && Object.hasOwn(scene.icons, node.icon.slug)
+			? scene.icons[node.icon.slug]
+			: undefined;
+	const form = node.icon ? canvasIconForm(node.icon, asset) : undefined;
+	if (!node.icon || !asset || !form) return [];
+	const id = iconElementId(node, input.usedElementIds);
+	if (form === "svg" && asset.svg !== undefined) {
+		const fileId = iconFileId(node.icon.slug, asset.svg);
+		const image = iconImageElement({ fileId, id, node });
+		if (!image) return [];
+		input.files[fileId] ??= iconFile(fileId, asset.svg);
+		return [image];
+	}
+	const box = iconBox(node);
+	if (!box || !asset.recipe) return [];
+	const group = node.type === "frame" || node.rendererRole === "zone";
+	const parts = iconRecipeElements(asset.recipe, {
+		box: { x: box.x, y: box.y, size: box.width },
+		id,
+		...(node.type === "frame"
+			? { frameId: node.id, groupIds: [] }
+			: { groupIds: [logoGroupId(node), ...(node.groupIds ?? [])] }),
+		ink: input.ink,
+		paper: scene.backgroundColor,
+		customData: group ? { sketchiGroupIcon: node.icon.slug } : { sketchiNodeIcon: node.icon.slug },
+		...(node.roughness === undefined ? {} : { roughness: node.roughness }),
+		...(node.locked === undefined ? {} : { locked: node.locked }),
+		...(node.opacity === undefined ? {} : { opacity: node.opacity }),
+	});
+	for (const part of parts) input.usedElementIds.add(part.id);
+	return parts;
 }
 
 function shapeElement(input: {
@@ -848,20 +903,18 @@ function buildElements(
 			logoNodesById.set(node.id, node);
 		}
 
-		const asset =
-			node.icon && scene.icons && Object.hasOwn(scene.icons, node.icon.slug)
-				? scene.icons[node.icon.slug]
-				: undefined;
-		if (!node.icon || typeof asset?.svg !== "string") continue;
-		const fileId = iconFileId(node.icon.slug, asset.svg);
-		const id = iconElementId(node, usedElementIds);
-		const image = iconImageElement({ fileId, id, node });
-		if (!image) continue;
-		files[fileId] ??= iconFile(fileId, asset.svg);
+		const icon = iconElements({
+			files,
+			ink: text?.textColor ?? node.textColor ?? DEFAULT_TEXT_COLOR,
+			node,
+			scene,
+			usedElementIds,
+		});
+		if (icon.length === 0) continue;
 		shape.groupIds = [logoGroupId(node), ...(node.groupIds ?? [])];
-		generatedSourceIds.set(id, node.id);
+		for (const part of icon) generatedSourceIds.set(part.id, node.id);
 		logoNodesById.set(node.id, node);
-		elements.push(image);
+		elements.push(...icon);
 	}
 
 	for (const frame of sourceElements.filter(isFrame)) {
@@ -876,18 +929,15 @@ function buildElements(
 		// A composite state's transitions bind to its frame.
 		if (frame.nodeId !== undefined) shapeElementsByNodeId.set(frame.nodeId, renderedFrame);
 		elements.push(renderedFrame);
-		const asset =
-			frame.icon && scene.icons && Object.hasOwn(scene.icons, frame.icon.slug)
-				? scene.icons[frame.icon.slug]
-				: undefined;
-		if (!frame.icon || typeof asset?.svg !== "string") continue;
-		const fileId = iconFileId(frame.icon.slug, asset.svg);
-		const id = iconElementId(frame, usedElementIds);
-		const image = iconImageElement({ fileId, id, node: frame });
-		if (!image) continue;
-		files[fileId] ??= iconFile(fileId, asset.svg);
-		generatedSourceIds.set(id, frame.id);
-		elements.push(image);
+		const icon = iconElements({
+			files,
+			ink: DEFAULT_TEXT_COLOR,
+			node: frame,
+			scene,
+			usedElementIds,
+		});
+		for (const part of icon) generatedSourceIds.set(part.id, frame.id);
+		elements.push(...icon);
 	}
 
 	for (const text of textElements) {
@@ -1180,7 +1230,7 @@ function sharesArrivalStem(left: ArrowSegment, right: ArrowSegment): boolean {
 function overlappingArrowSegments(
 	elements: readonly ExcalidrawElement[],
 ): ExcalidrawSceneValidationIssue[] {
-	const segments = elements.filter((element) => element.type === "arrow").flatMap(arrowSegments);
+	const segments = elements.filter(isConnector).flatMap(arrowSegments);
 	const issues: ExcalidrawSceneValidationIssue[] = [];
 	const seen = new Set<string>();
 
@@ -1230,7 +1280,22 @@ function overlappingArrowSegments(
 	return issues;
 }
 
+/** A part of a hand-drawn icon: drawing, never a connector or a shape to bind or avoid. */
+function isIconPart(element: ExcalidrawElement): boolean {
+	const customData = element.customData;
+	return (
+		customData !== null &&
+		typeof customData === "object" &&
+		(customData as Record<string, unknown>)["sketchiIconPart"] !== undefined
+	);
+}
+
+function isConnector(element: ExcalidrawElement): boolean {
+	return element.type === "arrow" && !isIconPart(element);
+}
+
 function isBindableShape(element: ExcalidrawElement): boolean {
+	if (isIconPart(element)) return false;
 	if (SHAPE_TYPES.has(element.type) || element.type === "frame") return true;
 	const customData = element.customData;
 	return (
@@ -1244,7 +1309,7 @@ function isBindableShape(element: ExcalidrawElement): boolean {
 function arrowSegmentsThroughShapes(
 	elements: readonly ExcalidrawElement[],
 ): ExcalidrawSceneValidationIssue[] {
-	const segments = elements.filter((element) => element.type === "arrow").flatMap(arrowSegments);
+	const segments = elements.filter(isConnector).flatMap(arrowSegments);
 	const shapes = elements.filter(isBindableShape);
 	const boundsById = new Map(elements.map((element) => [element.id, elementBounds(element)]));
 	const order = new Map(elements.map((element, index) => [element.id, index]));
@@ -1510,7 +1575,7 @@ function absoluteArrowPoints(element: ExcalidrawElement): { x: number; y: number
  */
 export function exportedRoutingQualityFindings(scene: ExcalidrawScene): RoutingQualityFinding[] {
 	const elements = scene.elements.filter((element) => element.isDeleted !== true);
-	const arrows = elements.filter((element) => element.type === "arrow");
+	const arrows = elements.filter(isConnector);
 	const corners = elements.flatMap((element) => {
 		if (element.type === "arrow" || element.type === "line") return absoluteArrowPoints(element);
 		const bounds = elementBounds(element);
@@ -1559,7 +1624,7 @@ export function validateExcalidrawScene(scene: ExcalidrawScene): ExcalidrawScene
 			});
 		}
 
-		if (element.type === "arrow") {
+		if (isConnector(element)) {
 			const isElbowed = element.elbowed === true;
 			const points = Array.isArray(element.points) ? element.points : [];
 

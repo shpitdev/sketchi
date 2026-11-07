@@ -2,9 +2,11 @@ import {
 	canvasNodeIconBand,
 	embedCanvasIcons,
 	isDiagramIconSlug,
+	isIconRecipe,
 	type CanvasIconAsset,
 	type CanvasSpec,
 	type DroppedCanvasIcon,
+	type IconRecipe,
 } from "@sketchi/diagram-core";
 import {
 	iconMatch,
@@ -67,6 +69,8 @@ export interface CodeModeIconCatalog {
 	readonly logoNamedByLabel: (label: string) => CodeModeCatalogIcon | undefined;
 	/** Raw SVG source for an eligible mark. */
 	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
+	/** The hand-drawn recipe for an eligible mark, when the catalog has one. */
+	readonly recipe: (slug: string) => IconRecipe | undefined;
 	/**
 	 * Where this host's agents look up exact slugs, quoted in unknown_icon
 	 * hints: `sketchi.searchIcons({ q })` in Code Mode, the catalog site offline.
@@ -81,13 +85,21 @@ function catalogIcon(icon: SketchiIcon): CodeModeCatalogIcon {
 export function makeCodeModeIconCatalog(options: {
 	readonly icons: readonly SketchiIcon[];
 	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
+	/** Hand-drawn recipes keyed by slug; undrawable ones are ignored. */
+	readonly recipes?: Readonly<Record<string, unknown>>;
 	readonly slugLookup: string;
 }): CodeModeIconCatalog {
 	const eligible = options.icons.filter(isNodeLogoEligible);
 	const icons = new Map(eligible.map((icon) => [icon.slug, icon]));
 	const bySlug = new Map(eligible.map((icon) => [icon.slug, catalogIcon(icon)]));
+	const recipes = new Map(
+		Object.entries(options.recipes ?? {}).flatMap(([slug, recipe]) =>
+			bySlug.has(slug) && isIconRecipe(recipe) ? [[slug, recipe] as const] : [],
+		),
+	);
 	return {
 		get: (slug) => bySlug.get(slug),
+		recipe: (slug) => recipes.get(slug),
 		isStrayVendorLogo: (slug, label) => {
 			const icon = icons.get(slug);
 			return icon !== undefined && isStrayVendorLogo(icon, label);
@@ -352,15 +364,18 @@ function droppedIconIssue(input: {
 }
 
 /**
- * Embed normalized catalog SVGs for every node icon in a scene. Authored assets
- * are always replaced, so output depends only on slugs. Unknown slugs are
- * dropped with unknown_icon warnings; icons that fail to load, sit on a
- * lifeline, leave no room for their label, or exceed the budget are dropped
- * with icon_dropped warnings. An icon never fails the build.
+ * Embed every node icon's catalog forms in a scene: its hand-drawn recipe,
+ * and its normalized SVG only where the scene draws the exact mark (an icon
+ * asking for it, every icon with `exactIcons`, or a slug with no recipe).
+ * Authored assets are always replaced, so output depends only on slugs.
+ * Unknown slugs are dropped with unknown_icon warnings; icons that fail to
+ * load, sit on a lifeline, leave no room for their label, or exceed the
+ * budget are dropped with icon_dropped warnings. An icon never fails the build.
  */
 export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* (
 	scene: CanvasSpec,
 	catalog: CodeModeIconCatalog | undefined,
+	options: { readonly exactIcons?: boolean } = {},
 ) {
 	const elements = scene.elements.map((element) =>
 		(element.type === "node" || element.type === "frame") && element.icon
@@ -373,23 +388,29 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 				}
 			: element,
 	);
-	const slugs = [
-		...new Set(
-			elements.flatMap((element) =>
-				(element.type === "node" || element.type === "frame") && element.icon
-					? [element.icon.slug]
-					: [],
-			),
-		),
-	];
+	const icons = elements.flatMap((element) =>
+		(element.type === "node" || element.type === "frame") && element.icon ? [element.icon] : [],
+	);
 	const known = new Map(
-		slugs.flatMap((slug) => {
+		icons.flatMap(({ slug }) => {
 			const icon = isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined;
 			return icon ? [[slug, icon] as const] : [];
 		}),
 	);
+	const recipes = new Map(
+		[...known.keys()].flatMap((slug) => {
+			const recipe = catalog?.recipe(slug);
+			return recipe ? [[slug, recipe] as const] : [];
+		}),
+	);
+	// A slug's SVG is read only when some icon draws the exact mark.
+	const exactSlugs = new Set(
+		icons
+			.filter(({ exact, slug }) => options.exactIcons || exact || !recipes.has(slug))
+			.map(({ slug }) => slug),
+	);
 	const loaded = yield* Effect.forEach(
-		[...known.values()],
+		[...known.values()].filter((icon) => exactSlugs.has(icon.slug)),
 		(icon) =>
 			catalog
 				? catalog.loadSvg(icon).pipe(
@@ -405,10 +426,7 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 									}),
 							}),
 						),
-						Effect.map((svg): readonly [string, CanvasIconAsset] => [
-							icon.slug,
-							{ name: icon.name, svg },
-						]),
+						Effect.map((svg) => [icon.slug, svg] as const),
 						// Only asset failures drop the icon; defects and interruption propagate.
 						Effect.catchTag("CodeModeIconLoadError", (error) =>
 							Effect.logWarning("Code Mode icon asset unavailable", {
@@ -420,8 +438,19 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 				: Effect.succeed(undefined),
 		{ concurrency: ICON_LOAD_CONCURRENCY },
 	);
-	const assets = new Map(loaded.flatMap((entry) => (entry ? [entry] : [])));
-	const embedding = embedCanvasIcons({ ...scene, elements }, (slug) => assets.get(slug));
+	const svgs = new Map(loaded.flatMap((entry) => (entry ? [entry] : [])));
+	const assetFor = (slug: string): CanvasIconAsset | undefined => {
+		const icon = known.get(slug);
+		const recipe = recipes.get(slug);
+		const svg = svgs.get(slug);
+		if (!icon || (!recipe && svg === undefined)) return undefined;
+		return {
+			name: icon.name,
+			...(recipe ? { recipe } : {}),
+			...(svg === undefined ? {} : { svg }),
+		};
+	};
+	const embedding = embedCanvasIcons({ ...scene, elements }, assetFor, options);
 	const issues = embedding.dropped.map((dropped) =>
 		droppedIconIssue({
 			catalog,
