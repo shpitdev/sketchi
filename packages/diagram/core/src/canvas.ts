@@ -12,16 +12,24 @@ import { boundLabelWidth, estimateTextWidth } from "./text-metrics.js";
 
 export const CANVAS_SPEC_VERSION = 1 as const;
 
+/**
+ * maxElements is the most a CLI share link can always pull back: a labelled
+ * node or connector exports as two Excalidraw elements, and a pulled share holds
+ * at most 10,000. A 5,000-element canvas validates and converts in under a
+ * second in Node, and its Browser Run PNG export takes about 14 of its 30
+ * seconds. A scene's zOrder lists each element once, and 4 MB leaves 800
+ * bytes of serialized input per element.
+ */
 export const CANVAS_LIMITS = Object.freeze({
 	maxDimension: 16_384,
-	maxElements: 600,
+	maxElements: 5_000,
 	maxGroupsPerElement: 16,
 	maxLayouts: 128,
 	maxLayers: 64,
 	maxPointsPerElement: 256,
-	maxSerializedBytes: 1_500_000,
+	maxSerializedBytes: 4_000_000,
 	maxTextLength: 4_096,
-	maxZOrderEntries: 600,
+	maxZOrderEntries: 5_000,
 });
 
 /**
@@ -1071,7 +1079,7 @@ export function getCanvasValidationIssues(canvas: CanvasSpec): CanvasValidationI
 	if (canvas.elements.length > CANVAS_LIMITS.maxElements) {
 		issues.push({
 			code: "limit_exceeded",
-			message: `Canvas exceeds ${CANVAS_LIMITS.maxElements} elements.`,
+			message: `Canvas has ${canvas.elements.length} elements, more than the ${CANVAS_LIMITS.maxElements} it may hold.`,
 			path: "elements",
 		});
 	}
@@ -1123,7 +1131,11 @@ export function getCanvasValidationIssues(canvas: CanvasSpec): CanvasValidationI
 			path: "zOrder",
 		});
 	}
-	if (canvas.zOrder.length > CANVAS_LIMITS.maxZOrderEntries) {
+	// A scene over the element limit is over the zOrder limit too; one issue says it.
+	if (
+		canvas.zOrder.length > CANVAS_LIMITS.maxZOrderEntries &&
+		canvas.elements.length <= CANVAS_LIMITS.maxElements
+	) {
 		issues.push({
 			code: "limit_exceeded",
 			message: `zOrder exceeds ${CANVAS_LIMITS.maxZOrderEntries} entries.`,

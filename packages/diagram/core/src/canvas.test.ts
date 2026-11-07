@@ -146,7 +146,7 @@ describe("CanvasSpec", () => {
 		expect(getCanvasValidationIssues(canvas)).toEqual([]);
 	});
 
-	it("compiles 600 elements with 256 points without spreading point arrays", () => {
+	it("compiles a full canvas of 256-point lines without spreading point arrays", () => {
 		const elements: CanvasSpec["elements"] = Array.from(
 			{ length: CANVAS_LIMITS.maxElements },
 			(_, index) => ({

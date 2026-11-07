@@ -224,13 +224,24 @@ function wrongTypeFailure(candidate: DiagramGenerationCandidate): GenerateFailur
 	]);
 }
 
-function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFailure {
+export function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFailure {
 	const issues = result.issues.map((entry) =>
 		issue(entry.code, "build", entry.message, entry.hint ?? "Refine the prompt and retry."),
 	);
 	// A family's size limit, such as a mindmap's topic count, is a limit and not a defect.
 	if (result.issues.some((entry) => entry.code.endsWith("_too_large"))) {
 		return failure("limit_exceeded", issues);
+	}
+	// So is a drawing too large for one canvas. As with a family limit, repair could only
+	// fit it by dropping what the request states, so the caller splits the request.
+	const canvasLimits = result.issues.filter((entry) => entry.code === "canvas_limit_exceeded");
+	if (canvasLimits.length > 0) {
+		return failure(
+			"limit_exceeded",
+			canvasLimits.map((entry) =>
+				issue(entry.code, "build", entry.message, "Split the request into smaller diagrams."),
+			),
+		);
 	}
 	switch (result.status) {
 		case "invalid_input":

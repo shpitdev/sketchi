@@ -2869,7 +2869,7 @@ describe("canvas geometry and input bounds", () => {
 		expect(scene.zOrder).toEqual(["b"]);
 	});
 
-	it("recomputes bounds after inserting 599 lines with 256 points", async () => {
+	it("recomputes bounds after filling the canvas with 256-point lines", async () => {
 		const result = await createTestRuntime().applyDiagramPatch({
 			source: { scene: geometryCanvas([geometryNode("a", 0, 0)]) },
 			operations: [
@@ -2887,11 +2887,11 @@ describe("canvas geometry and input bounds", () => {
 		});
 		expectPatchOk(result);
 		const scene = parseInlineScene(result.artifact.formats[0]?.inline);
-		expect(scene.elements).toHaveLength(600);
+		expect(scene.elements).toHaveLength(CANVAS_LIMITS.maxElements);
 		expect(scene).toMatchObject({ width: 648, height: 648 });
 	}, 60_000);
 
-	it("rejects a raw 600x256-point canvas before decode in both workflows", async () => {
+	it("rejects a raw full canvas of 256-point lines before decode in both workflows", async () => {
 		const scene = geometryCanvas(densePointElements(CANVAS_LIMITS.maxElements));
 		const runtime = createTestRuntime();
 		expect(await runtime.createCanvas({ spec: scene })).toMatchObject({

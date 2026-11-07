@@ -5452,7 +5452,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 		sourceLimits = [
 			{
 				code: "limit_exceeded",
-				message: `Canvas exceeds ${CANVAS_LIMITS.maxElements} elements.`,
+				message: `Canvas has ${scene.elements.length} elements, more than the ${CANVAS_LIMITS.maxElements} it may hold.`,
 				path: "elements",
 			},
 		];
