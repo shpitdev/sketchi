@@ -159,7 +159,7 @@ function operationTypes(operation: CodeModeOperation): string {
 
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 
-const FLOWCHART_SPEC = `spec: { title, nodes: [{ id, label, kind: "start" | "process" | "decision" | "end", description?, icon?: { slug }, group?, lane?, shape?: "database" | "queue" | "document" | "storage" }], edges: [{ source, target, label? }], groups?: [{ id, label, parent?, kind?: "cloud" | "datacenter" | "region" | "zone" | "vpc" | "subnet" | "cluster" | "namespace" }], lanes?: [{ id, label }], layout?: { direction: "TB" | "LR" } }`;
+const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null } }, edges: [[from, to, label?]], groups?: { [id]: { label, kind?: "cloud" | "datacenter" | "region" | "zone" | "vpc" | "subnet" | "cluster" | "namespace", contains: [ids] } }, lanes?: { [id]: { label, contains: [ids] } } }`;
 
 /**
  * What a first flowchart build needs, each rule with any detail only the buildFlowchart topic
@@ -168,25 +168,28 @@ const FLOWCHART_SPEC = `spec: { title, nodes: [{ id, label, kind: "start" | "pro
  * name sketchi.searchIcons, are the MCP's own.
  */
 const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: string])[] = [
+	[FLOWCHART_RULES.documentShape],
 	[FLOWCHART_RULES.separateNodes(PROMPT)],
 	[FLOWCHART_RULES.statedChecks],
 	[FLOWCHART_RULES.labelWords(PROMPT)],
 	[FLOWCHART_RULES.labelForm],
 	[FLOWCHART_RULES.namedOutcomes(PROMPT)],
-	[FLOWCHART_RULES.noInventedSteps(PROMPT)],
-	[FLOWCHART_RULES.decisionsCompact, "Use stable node ids."],
+	[FLOWCHART_RULES.documentRoles(PROMPT)],
+	[FLOWCHART_RULES.documentNoInventedSteps(PROMPT)],
+	[FLOWCHART_RULES.documentBranches(PROMPT)],
+	[
+		FLOWCHART_RULES.documentLoops,
+		"A loop with no way out fails with nonterminating_node; a retry loop that keeps an exit is valid.",
+	],
 	[FLOWCHART_RULES.technologyLabels],
-	[FLOWCHART_RULES.groupsCompact(PROMPT)],
-	[FLOWCHART_RULES.lanesCompact(PROMPT)],
+	[FLOWCHART_RULES.documentGroups(PROMPT)],
+	[FLOWCHART_RULES.documentLanes(PROMPT)],
 	[
-		'Brand logos, only for technologies the prompt names: set that node\'s icon to { slug } with an exact slug sketchi.searchIcons returned, never a guess. Attach match: "exact" to the node naming that product and "vendor" only to a node whose label names the vendor (Cloudflare Workers takes cloudflare, Ingress controller no kubernetes); never "weak". Each node holds one icon: for X on Y, preserve both technologies as separate meaningful steps, each with its own logo, never hidden in the title or combined under one icon.',
-		"The logo is drawn above the label. Unknown slugs are dropped with an unknown_icon warning, and logos that cannot be drawn are dropped with icon_dropped. Neither fails the build. Keep the requested step order and stay within graph limits.",
+		FLOWCHART_RULES.documentLogos(PROMPT),
+		"The logo is drawn above the label. An icon naming no logo is dropped with an unknown_icon warning, and a vendor's logo on a label that does not name the vendor with icon_dropped; neither fails the build.",
 	],
-	[
-		"Before building, check that each named technology's node has its icon: a label or a search alone attaches none, and a missing icon gives no warning. If no logo matches, keep the technology label and report the logo unavailable; never substitute another brand.",
-	],
+	[FLOWCHART_RULES.documentDirection(PROMPT)],
 	[FLOWCHART_RULES.limits, FLOWCHART_RULES.limitsDetail],
-	[FLOWCHART_RULES.reachable, FLOWCHART_RULES.reachableDetail],
 	[FLOWCHART_RULES.summarize],
 	[FLOWCHART_RULES.layers],
 	[FLOWCHART_RULES.keepNamed(PROMPT)],
@@ -194,14 +197,14 @@ const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: strin
 
 /** The buildFlowchart topic: every flowchart rule with its detail, then the request type. */
 const FLOWCHART_DOCS = [
-	"buildFlowchart accepts a compact FlowchartSpec: title, nodes, edges, and optional layout. Builds use the fixed Sketchi palette.",
+	"buildFlowchart accepts the flowchart document: title, nodes and edges, with optional direction, logos, groups and lanes. Builds use the fixed Sketchi palette.",
 	...FLOWCHART_DOC_RULES.map(([rule, detail]) => (detail ? `${rule} ${detail}` : rule)),
 	"",
 	operationTypes("buildFlowchart"),
 ].join("\n");
 
 const LOGO_RULE =
-	"When the prompt names technologies, call sketchi.searchIcons({ q }) for each in the same script as the build, await them, and set node.icon or sequence participant.icon to { slug } from a matching slug.";
+	"When the prompt names technologies, a flowchart sets logos: true; a sequence diagram awaits sketchi.searchIcons({ q }) for each in the same script and sets participant.icon to { slug }.";
 
 /** Fits EXECUTE_DESCRIPTION_LEGACY_WINDOW, so every Claude Code version reads all of it. */
 export const EXECUTE_TOOL_DESCRIPTION = [
@@ -274,16 +277,11 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
   const built = await sketchi.buildFlowchart({
     spec: {
       title: "Approval flow",
-      nodes: [
-        { id: "request", label: "Request", kind: "start" },
-        { id: "approved", label: "Approved?", kind: "decision" },
-        { id: "done", label: "Done", kind: "end" },
-        { id: "revise", label: "Revise", kind: "end" },
-      ],
+      nodes: { request: "Request", approved: "Approved?", done: "Done", revise: "Revise" },
       edges: [
-        { source: "request", target: "approved" },
-        { source: "approved", target: "done", label: "yes" },
-        { source: "approved", target: "revise", label: "no" },
+        ["request", "approved"],
+        ["approved", "done", "yes"],
+        ["approved", "revise", "no"],
       ],
     },
   });
@@ -309,27 +307,19 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
   });
 }`;
 
-const HOSTED_APP_LOGOS_EXAMPLE = `async () => {
-  const [nextjs, vercel] = await Promise.all([
-    sketchi.searchIcons({ q: "nextjs" }),
-    sketchi.searchIcons({ q: "vercel" })
-  ]);
-  const nextIcon = nextjs.icons.find(icon => icon.slug === "nextjs");
-  const hostIcon = vercel.icons.find(icon => icon.slug === "vercel");
-  if (!nextIcon || !hostIcon) return { missingLogos: true };
-  return sketchi.buildFlowchart({
-    spec: {
-      title: "Next.js page on Vercel",
-      nodes: [
-        { id: "host", label: "Vercel routes the request", kind: "start", icon: { slug: hostIcon.slug } },
-        { id: "page", label: "Next.js page receives question", kind: "process", icon: { slug: nextIcon.slug } },
-        { id: "done", label: "Return answer", kind: "end" }
-      ],
-      edges: [{ source: "host", target: "page" }, { source: "page", target: "done" }]
+const HOSTED_APP_LOGOS_EXAMPLE = `async () => sketchi.buildFlowchart({
+  spec: {
+    title: "Next.js page on Vercel",
+    logos: true,
+    nodes: {
+      host: "Vercel routes the request",
+      page: "Next.js page receives question",
+      done: "Return answer"
     },
-    options: ${DELIVERY_OPTIONS}
-  });
-}`;
+    edges: [["host", "page"], ["page", "done"]]
+  },
+  options: ${DELIVERY_OPTIONS}
+})`;
 
 const SEQUENCE_LOGOS_EXAMPLE = `async () => {
   const technologies = ["github", "cloudflare", "docker"];
@@ -394,18 +384,13 @@ const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
   const built = await sketchi.buildFlowchart({
     spec: {
       title: "Circle to decision",
-      nodes: [
-        { id: "circle", label: "Start", kind: "start" },
-        { id: "choice", label: "Continue?", kind: "decision" },
-        { id: "yes", label: "Continue", kind: "end" },
-        { id: "no", label: "Stop", kind: "end" },
-      ],
+      direction: "LR",
+      nodes: { circle: "Start", choice: "Continue?", yes: "Continue", no: "Stop" },
       edges: [
-        { source: "circle", target: "choice" },
-        { source: "choice", target: "yes", label: "yes" },
-        { source: "choice", target: "no", label: "no" },
+        ["circle", "choice"],
+        ["choice", "yes", "yes"],
+        ["choice", "no", "no"],
       ],
-      layout: { direction: "LR" },
     },
   });
 
@@ -430,14 +415,11 @@ const INVALID_FIRST_EXAMPLE = `async () => {
   const built = await sketchi.buildFlowchart({
     spec: {
       title: "Broken branch",
-      nodes: [
-        { id: "start", label: "Start", kind: "start" },
-        { id: "choice", label: "Ready?", kind: "decision" },
-        { id: "done", label: "Done", kind: "end" },
-      ],
+      nodes: { start: "Start", choice: "Ready?", done: "Done" },
       edges: [
-        { source: "start", target: "choice" },
-        { source: "choice", target: "done" }
+        ["start", "choice"],
+        ["choice", "done"],
+        ["choice", "retry"]
       ],
     },
   });
@@ -460,16 +442,11 @@ const REPLACE_TEXT_EXAMPLE = `async () => {
   const built = await sketchi.buildFlowchart({
     spec: {
       title: "Release gate",
-      nodes: [
-        { id: "start", label: "Start", kind: "start" },
-        { id: "gate", label: "Approved?", kind: "decision" },
-        { id: "ship", label: "Ship", kind: "end" },
-        { id: "revise", label: "Revise", kind: "end" },
-      ],
+      nodes: { start: "Start", gate: "Approved?", ship: "Ship", revise: "Revise" },
       edges: [
-        { source: "start", target: "gate" },
-        { source: "gate", target: "ship", label: "yes" },
-        { source: "gate", target: "revise", label: "no" },
+        ["start", "gate"],
+        ["gate", "ship", "yes"],
+        ["gate", "revise", "no"],
       ],
     },
   });
@@ -581,7 +558,7 @@ export const catalog: CatalogEntry[] = [
 		content: [
 			"searchIcons({ q, limit? }) ranks the Sketchi logo catalog by exact slug, name prefix, alias, then substring. Aliases such as k8s and psql work.",
 			"It returns { ok: true, query, icons: [{ slug, name, collection }] }. limit defaults to 10 and is capped at 25.",
-			'Use a returned slug as a FlowchartSpec node icon ({ icon: { slug: "docker" } }), a SequenceDiagramSpec participant icon ({ icon: { slug: "docker" } }), or a CanvasSpec node icon ({ icon: { slug: "docker", size: 28 } }).',
+			'Use a returned slug as a SequenceDiagramSpec participant icon ({ icon: { slug: "docker" } }) or a CanvasSpec node icon ({ icon: { slug: "docker", size: 28 } }). A flowchart needs no lookup: logos: true draws the logo each node label names, and a node\'s icon takes a product name or a slug.',
 			"Only compact brand marks are searchable: wordmarks and very large SVGs are excluded because they cannot be drawn inside a node.",
 			"Search once per technology, then build. Do not invent slugs; a slug that searchIcons did not return is dropped with an unknown_icon warning.",
 			"",
@@ -1099,7 +1076,7 @@ export const catalog: CatalogEntry[] = [
 			"- Selectors target nodeIds, edgeIds, labels, element ids, kinds, or broad scopes. Colors are 6-digit hex strings such as #7c3aed for strokeColor, fillColor, textColor, and backgroundColor.",
 			"- For a CanvasSpec, insert, remove, replace, reorder, group, and ungroup support iterative structural editing. Stable ids are mandatory; connectivity is preserved unless options.preserveConnectivity is false.",
 			"- Execute includes hosted visual proof (PNG) after an accepted patch by default; explicit artifactFormats override this.",
-			"- If export returns arrow_overlap, rebuild the FlowchartSpec as a cleaner DAG first; rerouteEdges preserves connectivity but cannot reliably fix a long upward return edge.",
+			"- If export returns arrow_overlap, rebuild the flowchart as a cleaner DAG first; rerouteEdges preserves connectivity but cannot reliably fix a long upward return edge.",
 			"",
 			operationTypes("applyDiagramPatch"),
 		].join("\n"),
@@ -1145,7 +1122,7 @@ export const catalog: CatalogEntry[] = [
 			"Use replaceText for label edits. Do not use setText, setLabel, rename, relabel, text, updateLabel, or setNodeLabel.",
 			'Selection-based operations use nodeIds, edgeIds, ids, labels, kinds, or scope. Structural insert/replace/reorder/group operations use stable element ids directly. The example below shows every operation\'s fields; docs({ topic: "applyDiagramPatch" }) has the full request type.',
 			"Style patches use strokeColor, fillColor, textColor, and backgroundColor.",
-			"If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges or translate, or rebuild the FlowchartSpec with more space. For complex flowcharts the most reliable repair is structural: keep edges flowing in the layout direction and avoid connecting a bottom node back to an early terminal.",
+			"If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges or translate, or rebuild the flowchart with more space. For complex flowcharts the most reliable repair is structural: keep edges flowing in the layout direction and avoid connecting a bottom node back to an early terminal.",
 		].join("\n"),
 		examples: [
 			{
@@ -1288,9 +1265,9 @@ export const catalog: CatalogEntry[] = [
 		topic: "overview",
 		keywords: ["non-goal", "excalidraw", "raw", "json", "structural"],
 		snippet:
-			"Native Excalidraw is an output format. Prefer semantic FlowchartSpec, MindmapSpec, SequenceDiagramSpec, TimelineSpec, or ChartSpec input.",
+			"Native Excalidraw is an output format. Prefer a semantic flowchart document, MindmapSpec, SequenceDiagramSpec, TimelineSpec, or ChartSpec input.",
 		content:
-			"Do not use native Excalidraw JSON as build input. Use FlowchartSpec, nested MindmapSpec, SequenceDiagramSpec, TimelineSpec, ChartSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic edits.",
+			"Do not use native Excalidraw JSON as build input. Use the flowchart document, nested MindmapSpec, SequenceDiagramSpec, TimelineSpec, ChartSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic edits.",
 	},
 	{
 		id: "managed-thread-non-goal",

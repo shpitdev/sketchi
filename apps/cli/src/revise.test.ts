@@ -49,18 +49,18 @@ const revisedInput = {
 	type: "flowchart",
 	spec: {
 		...flowchartInput.spec,
-		nodes: [
-			{ id: "start", label: "Change proposed", kind: "start" },
-			{ id: "review", label: "Review evidence", kind: "process" },
-			{ id: "approved", label: "Approved?", kind: "decision" },
-			{ id: "end", label: "Release approved", kind: "end" },
-			{ id: "rework", label: "Rework change", kind: "end" },
-		],
+		nodes: {
+			start: "Change proposed",
+			review: "Review evidence",
+			approved: "Approved?",
+			end: "Release approved",
+			rework: "Rework change",
+		},
 		edges: [
-			{ source: "start", target: "review" },
-			{ source: "review", target: "approved" },
-			{ source: "approved", target: "end", label: "yes" },
-			{ source: "approved", target: "rework", label: "no" },
+			["start", "review"],
+			["review", "approved"],
+			["approved", "end", "yes"],
+			["approved", "rework", "no"],
 		],
 	},
 };

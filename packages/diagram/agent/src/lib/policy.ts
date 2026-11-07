@@ -33,7 +33,7 @@ const USER = "the user";
 const rules = (...sentences: readonly string[]) => sentences.join(" ");
 
 const FAMILY_TOOLS = [
-	"- build_flowchart with { spec: FlowchartSpec } for processes, decisions, and pipelines.",
+	"- build_flowchart with { spec } (the flowchart document) for processes, decisions, and pipelines.",
 	`- build_timeline with { spec: TimelineSpec } for dated milestones, phases and event chronologies, or explicitly ordered events without dates. Supply events with unique id, label, date or numeric order, and optional concise description. ${rules(TIMELINE_RULES.mode, TIMELINE_RULES.precision(USER), TIMELINE_RULES.optional(USER), TIMELINE_RULES.noInvention)} The host lays out the timeline.`,
 	"- build_sequence_diagram with { spec: SequenceDiagramSpec } for time-ordered interactions between people or systems: requests and responses, handshakes, API calls, and protocols.",
 	`- build_chart with { spec: ChartSpec } for numbers compared across categories. ${rules(CHART_RULES.kinds, CHART_RULES.categories, CHART_RULES.limits, CHART_RULES.copy(USER), CHART_RULES.noRounding, CHART_RULES.unit)} The host draws axes, ticks, labels and legend.`,
@@ -50,13 +50,13 @@ const FAMILY_TOOLS = [
 ];
 
 const FLOWCHART_CRAFT = [
-	`- Node ids: short kebab-case. ${rules(FLOWCHART_RULES.labelWords(USER), FLOWCHART_RULES.labelForm)}`,
-	`- ${FLOWCHART_RULES.singleStart} Use "decision" for branch points and "process" for every other step. ${FLOWCHART_RULES.technologyLabels}`,
-	`- ${rules(FLOWCHART_RULES.decisionEdges, FLOWCHART_RULES.branchNames(USER), FLOWCHART_RULES.noBranchBorrowing(USER), FLOWCHART_RULES.reachable, FLOWCHART_RULES.backEdges)}`,
-	`- ${rules(FLOWCHART_RULES.limits, FLOWCHART_RULES.direction(USER))}`,
-	`- ${rules(FLOWCHART_RULES.groups(USER), FLOWCHART_RULES.zonesOutside)}`,
-	`- ${FLOWCHART_RULES.lanes(USER)}`,
-	"- Tool-call hygiene: every field is its own clean string. Node and edge ids must be unique, and every edge source/target must exactly equal an existing node id.",
+	`- ${FLOWCHART_RULES.documentShape} Node ids: short kebab-case.`,
+	`- ${rules(FLOWCHART_RULES.labelWords(USER), FLOWCHART_RULES.labelForm, FLOWCHART_RULES.technologyLabels)}`,
+	`- ${rules(FLOWCHART_RULES.documentRoles(USER), FLOWCHART_RULES.documentBranches(USER), FLOWCHART_RULES.branchNames(USER), FLOWCHART_RULES.noBranchBorrowing(USER), FLOWCHART_RULES.documentLoops)}`,
+	`- ${rules(FLOWCHART_RULES.limits, FLOWCHART_RULES.documentDirection(USER))}`,
+	`- ${rules(FLOWCHART_RULES.documentGroups(USER), FLOWCHART_RULES.zonesOutside)}`,
+	`- ${FLOWCHART_RULES.documentLanes(USER)}`,
+	"- Tool-call hygiene: every field is its own clean string, and every edge end and container member names a node id exactly.",
 ];
 
 const SEQUENCE_CRAFT = [

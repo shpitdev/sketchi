@@ -53,7 +53,6 @@ import {
 	CreateCanvasResultSchema,
 	DiagramSelectorSchema,
 	ErToolSpecSchema,
-	FlowchartSpecSchema,
 	MindmapSpecSchema,
 	SequenceDiagramSpecSchema,
 	StateMachineSpecSchema,
@@ -68,19 +67,7 @@ import {
 
 export const codeModeContracts = {
 	buildFlowchart: {
-		input: Schema.Struct({
-			...BuildFlowchartRequestSchema.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: FlowchartSpecSchema.mapFields(({ id, title, nodes, edges, groups, lanes, layout }) => ({
-				id,
-				title,
-				nodes,
-				edges,
-				groups,
-				lanes,
-				layout,
-			})),
-		}),
+		input: BuildFlowchartRequestSchema,
 		output: BuildFlowchartResultSchema,
 	},
 	buildMindmap: {
@@ -337,11 +324,16 @@ export function jsonSchemaType(
 			return "null";
 		case "array": {
 			if (Array.isArray(schema.prefixItems)) {
-				const tuple = schema.prefixItems.map(type);
-				// A tuple capped at its own length, such as [x, y], takes no rest elements.
-				if (schema.items !== false && schema.maxItems !== schema.prefixItems.length) {
-					tuple.push(`...Array<${type(schema.items ?? {})}>`);
-				}
+				// Elements past minItems are optional; maxItems at the tuple's length closes it.
+				const required =
+					typeof schema.minItems === "number" ? schema.minItems : schema.prefixItems.length;
+				const tuple = schema.prefixItems.map((element, index) => {
+					const declared = type(element);
+					if (index < required) return declared;
+					return declared.includes(" | ") ? `(${declared})?` : `${declared}?`;
+				});
+				const closed = schema.items === false || schema.maxItems === schema.prefixItems.length;
+				if (!closed) tuple.push(`...Array<${type(schema.items ?? {})}>`);
 				return `[${tuple.join(", ")}]`;
 			}
 			return `Array<${type(schema.items ?? {})}>`;

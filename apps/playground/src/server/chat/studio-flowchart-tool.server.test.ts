@@ -25,32 +25,21 @@ function acceptedSpec(): FlowchartSpec {
 	return {
 		id: "release-review-loop",
 		title: "Release review loop",
-		nodes: [
-			{ id: "start", kind: "start", label: "Open release" },
-			{ id: "review", kind: "decision", label: "Release ready?" },
-			{ id: "publish", kind: "process", label: "Publish release" },
-			{ id: "revise", kind: "process", label: "Revise release" },
-			{ id: "done", kind: "end", label: "Release live" },
-		],
+		direction: "TB",
+		nodes: {
+			start: "Open release",
+			review: "Release ready?",
+			publish: "Publish release",
+			revise: "Revise release",
+			done: "Release live",
+		},
 		edges: [
-			{ id: "start-review", source: "start", target: "review" },
-			{
-				id: "review-publish",
-				label: "yes",
-				source: "review",
-				target: "publish",
-			},
-			{
-				id: "review-revise",
-				label: "no",
-				source: "review",
-				target: "revise",
-			},
-			{ id: "revise-review", source: "revise", target: "review" },
-			{ id: "publish-done", source: "publish", target: "done" },
+			["start", "review"],
+			["review", "publish", "yes"],
+			["review", "revise", "no"],
+			["revise", "review"],
+			["publish", "done"],
 		],
-		layout: { direction: "TB" },
-		style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
 	};
 }
 
@@ -58,7 +47,9 @@ function rejectedSpec(): FlowchartSpec {
 	const spec = acceptedSpec();
 	return {
 		...spec,
-		edges: spec.edges.filter((edge) => edge.id !== "review-revise"),
+		edges: spec.edges.map((edge) =>
+			edge[0] === "review" && edge[1] === "revise" ? ["review", "revise"] : edge,
+		),
 	};
 }
 
@@ -141,19 +132,11 @@ describe("Studio build_flowchart host", () => {
 		).properties.spec.properties;
 		expect(Object.keys(properties)).toEqual(expect.arrayContaining(["groups", "lanes"]));
 
-		const lanes = [
-			{ id: "author", label: "Author" },
-			{ id: "reviewer", label: "Reviewer" },
-		];
-		const spec = acceptedSpec();
-		const laned = {
-			...spec,
-			lanes,
-			nodes: spec.nodes.map((node) => ({
-				...node,
-				lane: node.id === "review" ? "reviewer" : "author",
-			})),
+		const lanes = {
+			author: { label: "Author", contains: ["start", "publish", "revise", "done"] },
+			reviewer: { label: "Reviewer", contains: ["review"] },
 		};
+		const laned = { ...acceptedSpec(), lanes };
 		const validated = await StudioBuildFlowchartInputSchema["~standard"].validate({ spec: laned });
 		if (!("value" in validated)) throw new Error(JSON.stringify(validated.issues));
 		expect(validated.value.spec).toMatchObject({ lanes });
@@ -171,21 +154,15 @@ describe("Studio build_flowchart host", () => {
 	});
 
 	it("keeps nested zones and node shapes through Studio's tool schema and builds them", async () => {
-		const groups = [
-			{ id: "vpc", label: "VPC", kind: "vpc" as const },
-			{ id: "private", label: "Private subnet", kind: "subnet" as const, parent: "vpc" },
-		];
+		const groups = {
+			vpc: { label: "VPC", kind: "vpc" as const, contains: ["private", "revise"] },
+			private: { label: "Private subnet", kind: "subnet" as const, contains: ["publish"] },
+		};
 		const spec = acceptedSpec();
 		const zoned = {
 			...spec,
 			groups,
-			nodes: spec.nodes.map((node) =>
-				node.id === "publish"
-					? { ...node, group: "private", shape: "document" as const }
-					: node.id === "revise"
-						? { ...node, group: "vpc" }
-						: node,
-			),
+			nodes: { ...spec.nodes, publish: { label: "Publish release", shape: "document" as const } },
 		};
 		const validated = await StudioBuildFlowchartInputSchema["~standard"].validate({ spec: zoned });
 		if (!("value" in validated)) throw new Error(JSON.stringify(validated.issues));
@@ -247,8 +224,8 @@ describe("Studio build_flowchart host", () => {
 			status: "invalid_flowchart",
 			issues: expect.arrayContaining([
 				expect.objectContaining({
-					code: "underbranched_decision",
-					ref: expect.objectContaining({ id: "review", kind: "node" }),
+					code: "unlabeled_decision_branch",
+					ref: expect.objectContaining({ id: "review->revise", kind: "edge" }),
 					severity: "error",
 					stage: "flowchart",
 				}),
@@ -482,79 +459,22 @@ describe("Studio chat node logos", () => {
 			executor.execute({
 				spec: {
 					...spec,
-					nodes: spec.nodes.map((node, index) =>
-						index === 0
-							? { ...node, label: "Open release on GitHub", icon: { slug: "GitHub" } }
-							: index === 1
-								? { ...node, icon: { slug: "kubernetes" } }
-								: node,
-					),
+					nodes: {
+						...spec.nodes,
+						start: { label: "Open release on GitHub", icon: "GitHub" },
+						review: { label: "Release ready?", icon: "kubernetes" },
+					},
 				},
 			}),
 		);
 
 		const built = received[0] as { spec: FlowchartSpec };
-		expect(built.spec.nodes.map((node) => node.icon)).toEqual(
-			spec.nodes.map((_, index) => (index === 0 ? { slug: "github" } : undefined)),
-		);
+		expect(built.spec.nodes["start"]).toEqual({ label: "Open release on GitHub", icon: "GitHub" });
+		expect(built.spec.nodes["review"]).toEqual({ label: "Release ready?" });
 		expect(result.issues[0]).toMatchObject({
 			code: "unknown_icon",
 			severity: "warning",
-			ref: { kind: "node", id: spec.nodes[1]?.id, path: "nodes.icon.slug" },
+			ref: { kind: "node", id: "review", path: "nodes.review.icon" },
 		});
-	});
-
-	it("moves logos onto the nodes whose labels name them", async () => {
-		const received: unknown[] = [];
-		const accepted = await Effect.runPromise(
-			deterministicRuntime(countingStore())({ spec: acceptedSpec() }),
-		);
-		const executor = await Effect.runPromise(
-			makeStudioFlowchartToolExecutor(
-				(input) =>
-					Effect.sync(() => {
-						received.push(input);
-						return accepted;
-					}),
-				{
-					logos: [
-						{ name: "Github", slug: "github" },
-						{ aliases: ["postgres"], name: "PostgreSQL", slug: "postgresql" },
-					],
-				},
-			),
-		);
-		const spec = acceptedSpec();
-		const labels: Record<string, string> = {
-			start: "Open release on GitHub",
-			publish: "Record release in Postgres",
-		};
-		// The model shifted both logos down one node.
-		const icons: Record<string, string> = {
-			review: "github",
-			revise: "postgresql",
-		};
-		const result = await Effect.runPromise(
-			executor.execute({
-				spec: {
-					...spec,
-					nodes: spec.nodes.map((node) => ({
-						...node,
-						label: labels[node.id] ?? node.label,
-						...(icons[node.id] ? { icon: { slug: icons[node.id] ?? "" } } : {}),
-					})),
-				},
-			}),
-		);
-
-		const built = received[0] as { spec: FlowchartSpec };
-		expect(Object.fromEntries(built.spec.nodes.map((node) => [node.id, node.icon?.slug]))).toEqual({
-			start: "github",
-			review: undefined,
-			publish: "postgresql",
-			revise: undefined,
-			done: undefined,
-		});
-		expect(result.issues.filter((issue) => issue.code === "unknown_icon")).toEqual([]);
 	});
 });

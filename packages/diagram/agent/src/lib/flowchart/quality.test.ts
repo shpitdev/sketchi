@@ -1,5 +1,4 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect } from "effect";
 
 import {
 	FLOWCHART_MAX_NODES,
@@ -8,8 +7,6 @@ import {
 } from "@sketchi/diagram-core";
 
 import { assessFlowchartQuality } from "./quality";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "../code-mode/artifacts.js";
-import { buildFlowchart, CodeModeRuntimeEnvironment, getArtifact } from "../code-mode/runtime.js";
 
 function decisionLoopFlowchart() {
 	return parseFlowchartDiagram({
@@ -143,53 +140,6 @@ describe("assessFlowchartQuality", () => {
 				refs: [{ kind: "node", id: "node-1" }],
 			}),
 		]);
-	});
-
-	it.effect.each([
-		{ id: "node-2", label: "Refund issued?" },
-		{ id: "node-1", label: "Check stock?" },
-	])("builds and persists a non-decision question: $label", ({ id, label }) => {
-		const base = linearFlowchart();
-		const diagram = {
-			...base,
-			nodes: base.nodes.map((node) => (node.id === id ? { ...node, label } : node)),
-		};
-		return Effect.gen(function* () {
-			const built = yield* buildFlowchart({
-				spec: diagram,
-				options: { minQualityScore: 10, artifactFormats: ["scene"] },
-			});
-			expect(built.ok).toBe(true);
-			if (!built.ok) {
-				throw new Error("Question-labeled non-decision must be accepted.");
-			}
-			expect(built.quality.checks).toEqual([
-				expect.objectContaining({
-					code: "question_label_not_decision",
-					severity: "warning",
-					refs: [{ kind: "node", id }],
-				}),
-			]);
-			const stored = yield* getArtifact({
-				artifactId: built.artifact.artifactId,
-				format: "scene",
-				inline: true,
-			});
-			expect(stored.ok).toBe(true);
-			if (!stored.ok) {
-				throw new Error("Accepted flowchart artifact must be readable.");
-			}
-			expect(stored.inline).toMatchObject({
-				elements: expect.arrayContaining([
-					expect.objectContaining({ type: "node", nodeId: id, label }),
-				]),
-			});
-		}).pipe(
-			Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
-			Effect.provideService(CodeModeRuntimeEnvironment, {
-				createId: (prefix) => `${prefix}-question-label-test`,
-			}),
-		);
 	});
 
 	it("identifies decisions with unlabeled branches", () => {

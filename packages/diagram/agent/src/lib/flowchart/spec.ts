@@ -1,114 +1,106 @@
-import { Schema } from "effect";
 import {
-	FlowchartDiagramSchema,
-	SKETCHI_DIAGRAM_STYLE,
-	validateFlowchartDiagram,
+	flowchartDiagramFromDocument,
+	flowchartDocumentId,
+	flowchartNodeDetails,
 	type FlowchartDiagram,
+	type FlowchartDocumentEdge,
+	type FlowchartDocumentNode,
+	type FlowchartEdgeEnd,
 } from "@sketchi/diagram-core";
 
 import type { FlowchartSpec, NormalizedFlowchartSpec } from "../code-mode/contract.js";
 import { cleanToolString } from "../clean-tool-string.js";
 
-const FLOWCHART_TYPE = "flowchart" as const;
-const ORTHOGONAL_ROUTING = "orthogonal" as const;
-
-function slugify(value: string): string {
-	return value
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 48);
-}
-
 function cleanOptional(value: string | undefined): string | undefined {
-	if (value === undefined) {
-		return undefined;
-	}
+	if (value === undefined) return undefined;
 	const cleaned = cleanToolString(value);
 	return cleaned.length > 0 ? cleaned : undefined;
 }
 
+function cleanNode(node: FlowchartDocumentNode): FlowchartDocumentNode {
+	if (typeof node === "string") return cleanToolString(node);
+	const details = flowchartNodeDetails(node);
+	const note = cleanOptional(details.note);
+	return {
+		label: cleanToolString(details.label),
+		...(note ? { note } : {}),
+		...(details.shape ? { shape: details.shape } : {}),
+		...(details.icon === null
+			? { icon: null }
+			: details.icon
+				? { icon: cleanToolString(details.icon) }
+				: {}),
+	};
+}
+
+const cleanEnd = (end: FlowchartEdgeEnd): FlowchartEdgeEnd =>
+	typeof end === "string" ? cleanToolString(end) : end.map((id) => cleanToolString(id));
+
+function cleanEdge([from, to, label]: FlowchartDocumentEdge): FlowchartDocumentEdge {
+	const cleaned = cleanOptional(label);
+	return cleaned === undefined
+		? [cleanEnd(from), cleanEnd(to)]
+		: [cleanEnd(from), cleanEnd(to), cleaned];
+}
+
+const cleanContainers = <
+	C extends { readonly label: string; readonly contains: readonly string[] },
+>(
+	containers: Readonly<Record<string, C>> | undefined,
+): Record<string, C> | undefined =>
+	containers === undefined
+		? undefined
+		: Object.fromEntries(
+				Object.entries(containers).map(([id, container]) => [
+					cleanToolString(id),
+					{
+						...container,
+						label: cleanToolString(container.label),
+						contains: container.contains.map((member) => cleanToolString(member)),
+					},
+				]),
+			);
+
+/**
+ * The document as a build reads it: every string cleaned of tool-output debris, the id
+ * taken from the title when absent, and the direction filled in.
+ */
 export function normalizeFlowchartSpec(spec: FlowchartSpec): NormalizedFlowchartSpec {
 	const title = cleanToolString(spec.title);
-	const id = cleanOptional(spec.id) ?? (slugify(title) || "sketchi-flowchart");
-
+	const id = cleanOptional(spec.id);
+	const groups = cleanContainers(spec.groups);
+	const lanes = cleanContainers(spec.lanes);
 	return {
-		id,
+		id: flowchartDocumentId({ title, ...(id ? { id } : {}) }),
 		title,
-		nodes: spec.nodes.map((node) => ({
-			id: cleanToolString(node.id),
-			label: cleanToolString(node.label),
-			kind: node.kind,
-			...(node.description ? { description: cleanToolString(node.description) } : {}),
-			...(node.icon ? { icon: { slug: cleanToolString(node.icon.slug) } } : {}),
-			...(node.group ? { group: cleanToolString(node.group) } : {}),
-			...(node.lane ? { lane: cleanToolString(node.lane) } : {}),
-			...(node.shape ? { shape: node.shape } : {}),
-		})),
-		edges: spec.edges.map((edge, index) => ({
-			id: cleanOptional(edge.id) ?? `edge-${index + 1}`,
-			source: cleanToolString(edge.source),
-			target: cleanToolString(edge.target),
-			...(edge.label ? { label: cleanToolString(edge.label) } : {}),
-		})),
-		...(spec.groups
-			? {
-					groups: spec.groups.map((group) => ({
-						id: cleanToolString(group.id),
-						label: cleanToolString(group.label),
-						...(group.parent ? { parent: cleanToolString(group.parent) } : {}),
-						...(group.kind ? { kind: group.kind } : {}),
-					})),
-				}
-			: {}),
-		...(spec.lanes
-			? {
-					lanes: spec.lanes.map((lane) => ({
-						id: cleanToolString(lane.id),
-						label: cleanToolString(lane.label),
-					})),
-				}
-			: {}),
-		layout: {
-			direction: spec.layout.direction,
-		},
-		style: { ...SKETCHI_DIAGRAM_STYLE },
+		direction: spec.direction ?? "TB",
+		...(spec.logos === undefined ? {} : { logos: spec.logos }),
+		nodes: Object.fromEntries(
+			Object.entries(spec.nodes).map(([nodeId, node]) => [
+				cleanToolString(nodeId),
+				cleanNode(node),
+			]),
+		),
+		edges: spec.edges.map(cleanEdge),
+		...(groups ? { groups } : {}),
+		...(lanes ? { lanes } : {}),
 	};
 }
 
-/** The core diagram input for a spec, each group drawing the logo `groupLogos` gives it by id. */
-export function flowchartDiagramInput(
-	spec: NormalizedFlowchartSpec,
-	groupLogos: ReadonlyMap<string, string> = new Map(),
-) {
-	const groupIcon = (id: string) => {
-		const slug = groupLogos.get(id);
-		return slug ? { icon: { slug } } : {};
-	};
-	return {
-		id: spec.id,
-		title: spec.title,
-		type: FLOWCHART_TYPE,
-		nodes: spec.nodes.map((node) => ({ ...node, metadata: {} })),
-		edges: spec.edges.map((edge) => ({ ...edge, metadata: {} })),
-		...(spec.groups
-			? { groups: spec.groups.map((group) => ({ ...group, ...groupIcon(group.id) })) }
-			: {}),
-		...(spec.lanes ? { lanes: spec.lanes.map((lane) => ({ ...lane })) } : {}),
-		layout: {
-			direction: spec.layout.direction,
-			edgeRouting: ORTHOGONAL_ROUTING,
-		},
-		style: spec.style,
-		metadata: {},
-	};
-}
-
-/** Build the validated core diagram used by curated non-persisting views. */
+/**
+ * The drawing a curated, non-persisting view renders: a valid document only, each
+ * node icon read as the catalog slug it names, without a catalog lookup.
+ */
 export function flowchartDiagramFromSpec(spec: FlowchartSpec): FlowchartDiagram {
-	const diagram = Schema.decodeUnknownSync(FlowchartDiagramSchema, {
-		errors: "all",
-	})(flowchartDiagramInput(normalizeFlowchartSpec(spec)));
-	validateFlowchartDiagram(diagram);
-	return diagram;
+	const normalized = normalizeFlowchartSpec(spec);
+	const nodeIcons = new Map(
+		Object.entries(normalized.nodes).flatMap(([id, node]) =>
+			typeof node !== "string" && typeof node.icon === "string"
+				? [[id, node.icon.toLowerCase()] as const]
+				: [],
+		),
+	);
+	const built = flowchartDiagramFromDocument(normalized, { nodeIcons });
+	if (!built.ok) throw new Error(built.issues.map((issue) => issue.message).join("\n"));
+	return built.diagram;
 }

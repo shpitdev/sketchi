@@ -26,17 +26,17 @@ function build(spec: unknown) {
 function spec(apiDescription: string) {
 	return {
 		title: "AWS services",
-		layout: { direction: "LR" },
-		nodes: [
-			{ id: "users", label: "Users", kind: "start" },
-			{ id: "web", label: "Web service", kind: "process", description: "ECS Fargate" },
-			{ id: "api", label: "API service", kind: "process", description: apiDescription },
-			{ id: "db", label: "RDS PostgreSQL", kind: "end", shape: "database" },
-		],
+		direction: "LR",
+		nodes: {
+			users: "Users",
+			web: { label: "Web service", note: "ECS Fargate" },
+			api: { label: "API service", note: apiDescription },
+			db: { label: "RDS PostgreSQL", shape: "database" },
+		},
 		edges: [
-			{ source: "users", target: "web" },
-			{ source: "web", target: "api" },
-			{ source: "api", target: "db" },
+			["users", "web"],
+			["web", "api"],
+			["api", "db"],
 		],
 	};
 }

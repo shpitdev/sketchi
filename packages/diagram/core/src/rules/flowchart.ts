@@ -67,4 +67,26 @@ export const FLOWCHART_RULES = {
 		"When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
 	keepNamed: (source: RuleSource) =>
 		`Keep every package and component ${source} names under its own name; summarizing drops unnamed detail and never renames or generalizes named parts.`,
+	/**
+	 * The flowchart document's own rules: MCP and Studio chat author it today, and the
+	 * generation prompt moves to it next.
+	 */
+	documentShape:
+		'nodes map an id to its label or { label, … }; an edge is [from, to] or [from, to, "label"], and an end may list ids: [["web", "api"], "rds"] is one edge per id.',
+	documentRoles: (source: RuleSource) =>
+		`Sketchi reads roles from the edges: a question label is a decision, a node nothing enters starts the flow and one nothing leaves ends it. Draw only the steps and arrows ${source} states: a branch with no stated next step ends at its last step, with no onward arrow or closing node.`,
+	documentBranches: (source: RuleSource) =>
+		`Label every branch of a question with ${source}'s outcome words, usually "yes" and "no", each label once.`,
+	documentLoops:
+		'A step that repeats ("try again", "resubmit", "keeps waiting") points back to the step it repeats, never to itself.',
+	documentGroups: (source: RuleSource) =>
+		`Only when ${source} groups steps (teams, zones, phases), declare groups: { id: { label, kind?, contains: [ids] } }, each listing the nodes and groups ${source} puts in it; a group may list members at any depth and Sketchi nests them. Every zone ${source} names is its own group; anything ${source} keeps outside a zone stays out of its list. Set kind (${zoneKinds}) when ${source} says what a zone is. Set shape on infrastructure nodes, entries and ends too: "database" for databases, "document" for files, archives and reports, "queue" for queues, streams and topics, "storage" for buckets and object stores.`,
+	documentLanes: (source: RuleSource) =>
+		`For swimlanes, a process across actors or roles, declare lanes: { id: { label, contains: [ids] } } in ${source}'s order, every step in its actor's lane; lanes take no groups.`,
+	documentLogos: (source: RuleSource) =>
+		`When ${source} names technologies or asks for logos, set logos: true and each node whose label names a product draws its logo. A node's icon: "Name" picks a logo its label does not name, and icon: null drops one.`,
+	documentDirection: (source: RuleSource) =>
+		`Set direction: "LR" only when ${source} reads left to right; flowcharts run top to bottom otherwise.`,
+	documentNoInventedSteps: (source: RuleSource) =>
+		`Do not add decisions, loops, steps, or edges ${source} does not state; a step that handles "any errors" or acts "if needed" stays one step in sequence.`,
 } as const;

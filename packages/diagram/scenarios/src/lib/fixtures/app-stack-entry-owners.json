@@ -5,164 +5,54 @@
 		"spec": {
 			"id": "question-flow-next-js-on-vercel-with-redis-cache",
 			"title": "Question flow: Next.js on Vercel with Redis cache and OpenAI",
-			"nodes": [
-				{
-					"id": "question",
-					"label": "User sends question",
-					"kind": "start"
-				},
-				{
-					"id": "vercel",
+			"direction": "TB",
+			"nodes": {
+				"question": "User sends question",
+				"vercel": {
 					"label": "Vercel routes request to Next.js page",
-					"kind": "process",
-					"icon": {
-						"slug": "vercel"
-					}
+					"icon": "vercel"
 				},
-				{
-					"id": "page",
+				"page": {
 					"label": "Next.js page receives question",
-					"kind": "process",
-					"icon": {
-						"slug": "nextjs"
-					}
+					"icon": "nextjs"
 				},
-				{
-					"id": "check_cache",
+				"check_cache": {
 					"label": "Check Redis cache",
-					"kind": "process",
-					"icon": {
-						"slug": "redis"
-					}
+					"icon": "redis"
 				},
-				{
-					"id": "cache_hit",
-					"label": "Cache hit?",
-					"kind": "decision"
-				},
-				{
-					"id": "return_cached",
-					"label": "Return cached answer",
-					"kind": "process"
-				},
-				{
-					"id": "end_cached",
-					"label": "Answer returned from cache",
-					"kind": "end"
-				},
-				{
-					"id": "call_openai",
+				"cache_hit": "Cache hit?",
+				"return_cached": "Return cached answer",
+				"end_cached": "Answer returned from cache",
+				"call_openai": {
 					"label": "Call OpenAI model",
-					"kind": "process",
-					"icon": {
-						"slug": "openai"
-					}
+					"icon": "openai"
 				},
-				{
-					"id": "model_ok",
-					"label": "Model call succeeded?",
-					"kind": "decision"
-				},
-				{
-					"id": "store_redis",
+				"model_ok": "Model call succeeded?",
+				"store_redis": {
 					"label": "Store answer in Redis",
-					"kind": "process",
-					"icon": {
-						"slug": "redis"
-					}
+					"icon": "redis"
 				},
-				{
-					"id": "return_answer",
-					"label": "Return answer",
-					"kind": "end"
-				},
-				{
-					"id": "log_sentry",
+				"return_answer": "Return answer",
+				"log_sentry": {
 					"label": "Log error to Sentry",
-					"kind": "process",
-					"icon": {
-						"slug": "sentry"
-					}
+					"icon": "sentry"
 				},
-				{
-					"id": "return_error",
-					"label": "Return error response",
-					"kind": "end"
-				}
-			],
-			"edges": [
-				{
-					"id": "edge-1",
-					"source": "question",
-					"target": "vercel"
-				},
-				{
-					"id": "edge-2",
-					"source": "vercel",
-					"target": "page"
-				},
-				{
-					"id": "edge-3",
-					"source": "page",
-					"target": "check_cache"
-				},
-				{
-					"id": "edge-4",
-					"source": "check_cache",
-					"target": "cache_hit"
-				},
-				{
-					"id": "edge-5",
-					"source": "cache_hit",
-					"target": "return_cached",
-					"label": "yes"
-				},
-				{
-					"id": "edge-6",
-					"source": "return_cached",
-					"target": "end_cached"
-				},
-				{
-					"id": "edge-7",
-					"source": "cache_hit",
-					"target": "call_openai",
-					"label": "no (miss)"
-				},
-				{
-					"id": "edge-8",
-					"source": "call_openai",
-					"target": "model_ok"
-				},
-				{
-					"id": "edge-9",
-					"source": "model_ok",
-					"target": "store_redis",
-					"label": "yes"
-				},
-				{
-					"id": "edge-10",
-					"source": "store_redis",
-					"target": "return_answer"
-				},
-				{
-					"id": "edge-11",
-					"source": "model_ok",
-					"target": "log_sentry",
-					"label": "no (error)"
-				},
-				{
-					"id": "edge-12",
-					"source": "log_sentry",
-					"target": "return_error"
-				}
-			],
-			"layout": {
-				"direction": "TB"
+				"return_error": "Return error response"
 			},
-			"style": {
-				"accentColor": "#8f707f",
-				"backgroundColor": "#fffdf8"
-			}
+			"edges": [
+				["question", "vercel"],
+				["vercel", "page"],
+				["page", "check_cache"],
+				["check_cache", "cache_hit"],
+				["cache_hit", "return_cached", "yes"],
+				["return_cached", "end_cached"],
+				["cache_hit", "call_openai", "no (miss)"],
+				["call_openai", "model_ok"],
+				["model_ok", "store_redis", "yes"],
+				["store_redis", "return_answer"],
+				["model_ok", "log_sentry", "no (error)"],
+				["log_sentry", "return_error"]
+			]
 		}
 	},
 	{
@@ -171,151 +61,49 @@
 		"spec": {
 			"id": "cached-llm-request-flow",
 			"title": "Question request flow: Redis cache with OpenAI fallback",
-			"nodes": [
-				{
-					"id": "start",
-					"label": "User question received",
-					"kind": "start"
-				},
-				{
-					"id": "page",
+			"direction": "TB",
+			"nodes": {
+				"start": "User question received",
+				"page": {
 					"label": "Next.js page on Vercel handles request",
-					"kind": "process",
-					"icon": {
-						"slug": "nextjs"
-					}
+					"icon": "nextjs"
 				},
-				{
-					"id": "cache_check",
+				"cache_check": {
 					"label": "Check Redis for cached answer",
-					"kind": "process",
-					"icon": {
-						"slug": "redis"
-					}
+					"icon": "redis"
 				},
-				{
-					"id": "cache_hit",
-					"label": "Cache hit?",
-					"kind": "decision"
-				},
-				{
-					"id": "return_cached",
-					"label": "Use cached answer",
-					"kind": "process"
-				},
-				{
-					"id": "call_openai",
+				"cache_hit": "Cache hit?",
+				"return_cached": "Use cached answer",
+				"call_openai": {
 					"label": "Call OpenAI model",
-					"kind": "process",
-					"icon": {
-						"slug": "openai"
-					}
+					"icon": "openai"
 				},
-				{
-					"id": "openai_ok",
-					"label": "OpenAI call succeeded?",
-					"kind": "decision"
-				},
-				{
-					"id": "store_redis",
+				"openai_ok": "OpenAI call succeeded?",
+				"store_redis": {
 					"label": "Store answer in Redis",
-					"kind": "process",
-					"icon": {
-						"slug": "redis"
-					}
+					"icon": "redis"
 				},
-				{
-					"id": "log_sentry",
+				"log_sentry": {
 					"label": "Log error to Sentry",
-					"kind": "process",
-					"icon": {
-						"slug": "sentry"
-					}
+					"icon": "sentry"
 				},
-				{
-					"id": "error_response",
-					"label": "Return error response",
-					"kind": "process"
-				},
-				{
-					"id": "end",
-					"label": "Return answer to user",
-					"kind": "end"
-				}
-			],
-			"edges": [
-				{
-					"id": "e1",
-					"source": "start",
-					"target": "page"
-				},
-				{
-					"id": "e2",
-					"source": "page",
-					"target": "cache_check"
-				},
-				{
-					"id": "e3",
-					"source": "cache_check",
-					"target": "cache_hit"
-				},
-				{
-					"id": "e4",
-					"source": "cache_hit",
-					"target": "return_cached",
-					"label": "Yes"
-				},
-				{
-					"id": "e5",
-					"source": "cache_hit",
-					"target": "call_openai",
-					"label": "No"
-				},
-				{
-					"id": "e6",
-					"source": "call_openai",
-					"target": "openai_ok"
-				},
-				{
-					"id": "e7",
-					"source": "openai_ok",
-					"target": "store_redis",
-					"label": "Yes"
-				},
-				{
-					"id": "e8",
-					"source": "openai_ok",
-					"target": "log_sentry",
-					"label": "No"
-				},
-				{
-					"id": "e9",
-					"source": "store_redis",
-					"target": "end"
-				},
-				{
-					"id": "e10",
-					"source": "return_cached",
-					"target": "end"
-				},
-				{
-					"id": "e11",
-					"source": "log_sentry",
-					"target": "error_response"
-				},
-				{
-					"id": "e12",
-					"source": "error_response",
-					"target": "end"
-				}
-			],
-			"layout": {
-				"direction": "TB"
+				"error_response": "Return error response",
+				"end": "Return answer to user"
 			},
-			"style": {
-				"accentColor": "#8f707f",
-				"backgroundColor": "#fffdf8"
-			}
+			"edges": [
+				["start", "page"],
+				["page", "cache_check"],
+				["cache_check", "cache_hit"],
+				["cache_hit", "return_cached", "Yes"],
+				["cache_hit", "call_openai", "No"],
+				["call_openai", "openai_ok"],
+				["openai_ok", "store_redis", "Yes"],
+				["openai_ok", "log_sentry", "No"],
+				["store_redis", "end"],
+				["return_cached", "end"],
+				["log_sentry", "error_response"],
+				["error_response", "end"]
+			]
 		}
 	},
 	{
@@ -324,136 +112,34 @@
 		"spec": {
 			"id": "request-flow-cache-openai",
 			"title": "Request flow: Next.js on Vercel with Redis cache and OpenAI",
-			"nodes": [
-				{
-					"id": "start",
-					"label": "User sends question",
-					"kind": "start"
-				},
-				{
-					"id": "page",
-					"label": "Next.js page on Vercel receives request",
-					"kind": "process"
-				},
-				{
-					"id": "cache_read",
-					"label": "Check Redis cache",
-					"kind": "process"
-				},
-				{
-					"id": "cache_hit",
-					"label": "Cache hit?",
-					"kind": "decision"
-				},
-				{
-					"id": "cache_return",
-					"label": "Use cached answer",
-					"kind": "process"
-				},
-				{
-					"id": "llm_call",
-					"label": "Call OpenAI model",
-					"kind": "process"
-				},
-				{
-					"id": "llm_failed",
-					"label": "OpenAI call failed?",
-					"kind": "decision"
-				},
-				{
-					"id": "cache_write",
-					"label": "Store answer in Redis",
-					"kind": "process"
-				},
-				{
-					"id": "sentry_log",
-					"label": "Log error to Sentry",
-					"kind": "process"
-				},
-				{
-					"id": "end_hit",
-					"label": "Return cached answer",
-					"kind": "end"
-				},
-				{
-					"id": "end_miss",
-					"label": "Return answer to user",
-					"kind": "end"
-				},
-				{
-					"id": "end_error",
-					"label": "Return error response",
-					"kind": "end"
-				}
-			],
-			"edges": [
-				{
-					"id": "e1",
-					"source": "start",
-					"target": "page"
-				},
-				{
-					"id": "e2",
-					"source": "page",
-					"target": "cache_read"
-				},
-				{
-					"id": "e3",
-					"source": "cache_read",
-					"target": "cache_hit"
-				},
-				{
-					"id": "e4",
-					"source": "cache_hit",
-					"target": "cache_return",
-					"label": "Yes"
-				},
-				{
-					"id": "e5",
-					"source": "cache_hit",
-					"target": "llm_call",
-					"label": "No"
-				},
-				{
-					"id": "e6",
-					"source": "cache_return",
-					"target": "end_hit"
-				},
-				{
-					"id": "e7",
-					"source": "llm_call",
-					"target": "llm_failed"
-				},
-				{
-					"id": "e8",
-					"source": "llm_failed",
-					"target": "cache_write",
-					"label": "No"
-				},
-				{
-					"id": "e9",
-					"source": "llm_failed",
-					"target": "sentry_log",
-					"label": "Yes"
-				},
-				{
-					"id": "e10",
-					"source": "cache_write",
-					"target": "end_miss"
-				},
-				{
-					"id": "e11",
-					"source": "sentry_log",
-					"target": "end_error"
-				}
-			],
-			"layout": {
-				"direction": "TB"
+			"direction": "TB",
+			"nodes": {
+				"start": "User sends question",
+				"page": "Next.js page on Vercel receives request",
+				"cache_read": "Check Redis cache",
+				"cache_hit": "Cache hit?",
+				"cache_return": "Use cached answer",
+				"llm_call": "Call OpenAI model",
+				"llm_failed": "OpenAI call failed?",
+				"cache_write": "Store answer in Redis",
+				"sentry_log": "Log error to Sentry",
+				"end_hit": "Return cached answer",
+				"end_miss": "Return answer to user",
+				"end_error": "Return error response"
 			},
-			"style": {
-				"accentColor": "#8f707f",
-				"backgroundColor": "#fffdf8"
-			}
+			"edges": [
+				["start", "page"],
+				["page", "cache_read"],
+				["cache_read", "cache_hit"],
+				["cache_hit", "cache_return", "Yes"],
+				["cache_hit", "llm_call", "No"],
+				["cache_return", "end_hit"],
+				["llm_call", "llm_failed"],
+				["llm_failed", "cache_write", "No"],
+				["llm_failed", "sentry_log", "Yes"],
+				["cache_write", "end_miss"],
+				["sentry_log", "end_error"]
+			]
 		}
 	},
 	{
@@ -462,119 +148,47 @@
 		"spec": {
 			"id": "request-flow-next-js-on-vercel-with-redis-cache-",
 			"title": "Request flow: Next.js on Vercel with Redis cache, OpenAI and Sentry",
-			"nodes": [
-				{
-					"id": "start",
+			"direction": "TB",
+			"nodes": {
+				"start": {
 					"label": "Question received",
-					"kind": "start",
-					"description": "Next.js page on Vercel",
-					"icon": {
-						"slug": "nextjs"
-					}
+					"note": "Next.js page on Vercel",
+					"icon": "nextjs"
 				},
-				{
-					"id": "vercel",
+				"vercel": {
 					"label": "Next.js page on Vercel",
-					"kind": "process",
-					"icon": {
-						"slug": "vercel"
-					}
+					"icon": "vercel"
 				},
-				{
-					"id": "check",
+				"check": {
 					"label": "Check Redis cache",
-					"kind": "process",
-					"icon": {
-						"slug": "redis"
-					}
+					"icon": "redis"
 				},
-				{
-					"id": "hit",
-					"label": "Cache hit?",
-					"kind": "decision"
-				},
-				{
-					"id": "openai",
+				"hit": "Cache hit?",
+				"openai": {
 					"label": "Call OpenAI model",
-					"kind": "process",
-					"icon": {
-						"slug": "openai"
-					}
+					"icon": "openai"
 				},
-				{
-					"id": "store",
+				"store": {
 					"label": "Store answer in Redis",
-					"kind": "process",
-					"icon": {
-						"slug": "redis"
-					},
-					"shape": "database"
+					"shape": "database",
+					"icon": "redis"
 				},
-				{
-					"id": "sentry",
+				"sentry": {
 					"label": "Log any errors to Sentry",
-					"kind": "process",
-					"icon": {
-						"slug": "sentry"
-					}
+					"icon": "sentry"
 				},
-				{
-					"id": "ret",
-					"label": "Return the answer",
-					"kind": "end"
-				}
-			],
-			"edges": [
-				{
-					"id": "edge-1",
-					"source": "start",
-					"target": "vercel"
-				},
-				{
-					"id": "edge-2",
-					"source": "vercel",
-					"target": "check"
-				},
-				{
-					"id": "edge-3",
-					"source": "check",
-					"target": "hit"
-				},
-				{
-					"id": "edge-4",
-					"source": "hit",
-					"target": "ret",
-					"label": "yes: return cached answer"
-				},
-				{
-					"id": "edge-5",
-					"source": "hit",
-					"target": "openai",
-					"label": "no"
-				},
-				{
-					"id": "edge-6",
-					"source": "openai",
-					"target": "store"
-				},
-				{
-					"id": "edge-7",
-					"source": "store",
-					"target": "sentry"
-				},
-				{
-					"id": "edge-8",
-					"source": "sentry",
-					"target": "ret"
-				}
-			],
-			"layout": {
-				"direction": "TB"
+				"ret": "Return the answer"
 			},
-			"style": {
-				"accentColor": "#8f707f",
-				"backgroundColor": "#fffdf8"
-			}
+			"edges": [
+				["start", "vercel"],
+				["vercel", "check"],
+				["check", "hit"],
+				["hit", "ret", "yes: return cached answer"],
+				["hit", "openai", "no"],
+				["openai", "store"],
+				["store", "sentry"],
+				["sentry", "ret"]
+			]
 		}
 	}
 ]

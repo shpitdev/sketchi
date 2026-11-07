@@ -7,8 +7,9 @@ import {
 	CANVAS_COMPOSED_SHAPES,
 	CANVAS_RENDERER_ROLES,
 	CANVAS_SPEC_VERSION,
-	DIAGRAM_NODE_SHAPES,
-	DIAGRAM_ZONE_KINDS,
+	FLOWCHART_DIRECTIONS,
+	FlowchartDocumentSchema,
+	type FlowchartDocument,
 	CHART_KINDS,
 	CHART_ORIENTATIONS,
 	CLASS_KINDS,
@@ -604,66 +605,6 @@ export class NodeIconSpec extends Schema.Class<NodeIconSpec>("NodeIconSpec")(
 ) {}
 export const NodeIconSpecSchema = NodeIconSpec;
 
-export class FlowchartSpecNode extends Schema.Class<FlowchartSpecNode>("FlowchartSpecNode")(
-	{
-		id: RequiredNonEmptyString,
-		label: RequiredNonEmptyString,
-		kind: FlowchartNodeKindSchema,
-		description: optionalContract(NonEmptyString),
-		icon: optionalContract(NodeIconSpec),
-		group: optionalContract(NonEmptyString),
-		lane: optionalContract(NonEmptyString),
-		shape: optionalContract(literals(DIAGRAM_NODE_SHAPES)),
-	},
-	{ identifier: undefined },
-) {}
-
-/** A swimlane for one actor, holding the nodes whose lane is its id; lanes keep their order. */
-export class FlowchartSpecLane extends Schema.Class<FlowchartSpecLane>("FlowchartSpecLane")(
-	{
-		id: RequiredNonEmptyString,
-		label: RequiredNonEmptyString,
-	},
-	{ identifier: undefined },
-) {}
-
-/**
- * A labeled region that holds the nodes whose group is its id, inside the group
- * named by parent; kind says what an architecture zone stands for.
- */
-export class FlowchartSpecGroup extends Schema.Class<FlowchartSpecGroup>("FlowchartSpecGroup")(
-	{
-		id: RequiredNonEmptyString,
-		label: RequiredNonEmptyString,
-		parent: optionalContract(NonEmptyString),
-		kind: optionalContract(literals(DIAGRAM_ZONE_KINDS)),
-	},
-	{ identifier: undefined },
-) {}
-
-export class FlowchartSpecEdge extends Schema.Class<FlowchartSpecEdge>("FlowchartSpecEdge")(
-	{
-		id: optionalContract(NonEmptyString),
-		source: RequiredNonEmptyString,
-		target: RequiredNonEmptyString,
-		label: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
-
-const FlowchartDirection = literals(["TB", "LR"]);
-const flowchartDirectionDefault = "TB";
-const FlowchartDirectionWithDefault = FlowchartDirection.annotate({
-	default: flowchartDirectionDefault,
-}).pipe(Schema.withDecodingDefaultKey(Effect.succeed(flowchartDirectionDefault)));
-
-export class FlowchartSpecLayout extends Schema.Class<FlowchartSpecLayout>("FlowchartSpecLayout")(
-	{
-		direction: FlowchartDirectionWithDefault,
-	},
-	{ identifier: undefined },
-) {}
-
 const defaultAccentColor = SKETCHI_DIAGRAM_STYLE.accentColor;
 const DefaultAccentColor = hexColor(defaultAccentColor).pipe(
 	Schema.withDecodingDefaultKey(Effect.succeed(defaultAccentColor)),
@@ -673,60 +614,34 @@ const DefaultBackgroundColor = hexColor(defaultBackgroundColor).pipe(
 	Schema.withDecodingDefaultKey(Effect.succeed(defaultBackgroundColor)),
 );
 
-export class FlowchartSpecStyle extends Schema.Class<FlowchartSpecStyle>("FlowchartSpecStyle")(
+/** The fixed Sketchi palette a spec may still carry; builds always draw it. */
+export class DiagramSpecStyle extends Schema.Class<DiagramSpecStyle>("DiagramSpecStyle")(
 	{
 		accentColor: DefaultAccentColor,
 		backgroundColor: DefaultBackgroundColor,
 	},
 	{ identifier: undefined },
 ) {}
+export const DiagramSpecStyleSchema = DiagramSpecStyle;
 
-const flowchartEdgesDefault: Array<typeof FlowchartSpecEdge.Encoded> = [];
-const FlowchartEdgesWithDefault = Schema.Array(FlowchartSpecEdge)
-	.pipe(Schema.mutable)
-	.annotate({ default: flowchartEdgesDefault })
-	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(flowchartEdgesDefault)));
-const flowchartLayoutDefault: { readonly direction: "TB" } = {
-	direction: "TB",
-};
-const FlowchartLayoutWithDefault = FlowchartSpecLayout.annotate({
-	default: flowchartLayoutDefault,
-}).pipe(
-	Schema.withDecodingDefaultKey(Effect.succeed(flowchartLayoutDefault)),
-	Schema.annotateKey({
-		[contractDefaultAnnotation]: flowchartLayoutDefault,
-	}),
-);
 const diagramStyleDefault = {
 	accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
 	backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
 };
-const DiagramStyleWithDefault = FlowchartSpecStyle.annotate({
+const DiagramStyleWithDefault = DiagramSpecStyle.annotate({
 	default: diagramStyleDefault,
 }).pipe(
 	Schema.withDecodingDefaultKey(Effect.succeed(diagramStyleDefault)),
 	Schema.annotateKey({ [contractDefaultAnnotation]: diagramStyleDefault }),
 );
-export class FlowchartSpec extends Schema.Class<FlowchartSpec>("FlowchartSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		nodes: requiredArray(nonEmptyArray(FlowchartSpecNode)),
-		edges: FlowchartEdgesWithDefault,
-		groups: optionalContract(Schema.Array(FlowchartSpecGroup).pipe(Schema.mutable)),
-		lanes: optionalContract(Schema.Array(FlowchartSpecLane).pipe(Schema.mutable)),
-		layout: FlowchartLayoutWithDefault,
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+
+/**
+ * A flowchart is diagram-core's flowchart document: nodes as an id → label map,
+ * edges as [from, to, label?], and groups and lanes that list what they contain.
+ */
+export const FlowchartSpec = FlowchartDocumentSchema;
+export type FlowchartSpec = FlowchartDocument;
 export const FlowchartSpecSchema = FlowchartSpec;
-export const FlowchartSpecGroupSchema = FlowchartSpecGroup;
-export const FlowchartSpecLaneSchema = FlowchartSpecLane;
-export const FlowchartSpecNodeSchema = FlowchartSpecNode;
-export const FlowchartSpecEdgeSchema = FlowchartSpecEdge;
-export const FlowchartSpecLayoutSchema = FlowchartSpecLayout;
-export const FlowchartSpecStyleSchema = FlowchartSpecStyle;
 
 /**
  * The authoring form of diagram-core's canonical SequenceDiagram: message ids
@@ -1410,33 +1325,12 @@ export class BuildFlowchartRequest extends Schema.Class<BuildFlowchartRequest>(
 	{ identifier: undefined },
 ) {}
 
-/** The spec Studio's model writes: every authoring field but the fixed palette. */
-const FlowchartToolSpecContract = FlowchartSpec.mapFields(
-	({ id, title, nodes, edges, groups, lanes, layout }) => ({
-		id,
-		title,
-		nodes,
-		edges,
-		groups,
-		lanes,
-		layout,
-	}),
-);
+/** The document Studio's model writes: the same one every other surface takes. */
 const BuildFlowchartToolInputContract = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(FlowchartToolSpecContract),
+	spec: requiredObject(FlowchartSpec),
 });
-type ModelBuildFlowchartToolInput = typeof BuildFlowchartToolInputContract.Type;
-/**
- * The model contract intentionally excludes style. This public input type stays
- * wide enough for existing direct callback callers; the runtime accepts their
- * legacy field and normalizes it to the Sketchi palette.
- */
-export type BuildFlowchartToolInput = ModelBuildFlowchartToolInput & {
-	readonly spec: ModelBuildFlowchartToolInput["spec"] & {
-		readonly style?: typeof FlowchartSpecStyle.Type;
-	};
-};
+export type BuildFlowchartToolInput = typeof BuildFlowchartToolInputContract.Type;
 const BuildFlowchartToolInputStandardSchema = Schema.toStandardSchemaV1(
 	BuildFlowchartToolInputContract,
 	{ leafHook: contractLeafHook, parseOptions: { errors: "all" } },
@@ -2498,20 +2392,11 @@ export interface PartialArtifactBundle {
 	readonly formats?: ArtifactFormatRef[];
 }
 
+/** A flowchart document as the build read it: strings cleaned, id and direction filled. */
 const NormalizedFlowchartSpecSchema = Schema.Struct({
+	...FlowchartDocumentSchema.fields,
 	id: NonEmptyString,
-	title: NonEmptyString,
-	nodes: Schema.Array(FlowchartSpecNode).pipe(Schema.mutable),
-	edges: Schema.Array(
-		FlowchartSpecEdge.mapFields((fields) => ({
-			...fields,
-			id: NonEmptyString,
-		})),
-	).pipe(Schema.mutable),
-	groups: Schema.optionalKey(Schema.Array(FlowchartSpecGroup).pipe(Schema.mutable)),
-	lanes: Schema.optionalKey(Schema.Array(FlowchartSpecLane).pipe(Schema.mutable)),
-	layout: Schema.Struct({ direction: FlowchartDirection }),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
+	direction: literals(FLOWCHART_DIRECTIONS),
 });
 const NormalizedMindmapSpecSchema = Schema.Struct({
 	id: NonEmptyString,

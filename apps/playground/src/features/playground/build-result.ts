@@ -95,7 +95,11 @@ const BUILD_TOOLS = {
 				errors: "all",
 				reportInput: true,
 			})(input);
-			return Result.isSuccess(decoded) ? decoded.success.spec.nodes.map((node) => node.label) : [];
+			return Result.isSuccess(decoded)
+				? Object.values(decoded.success.spec.nodes).map((node) =>
+						typeof node === "string" ? node : node.label,
+					)
+				: [];
 		},
 	},
 	"tool-build_sequence_diagram": {
@@ -195,7 +199,11 @@ const BUILD_TOOLS = {
 		decodeResult: Schema.decodeUnknownResult(BuildSankeyResultSchema),
 		labels: (input: unknown) => {
 			const decoded = Schema.decodeUnknownResult(BuildSankeyToolInputSchema)(input);
-			return Result.isSuccess(decoded) ? decoded.success.spec.nodes.map((node) => node.label) : [];
+			return Result.isSuccess(decoded)
+				? Object.values(decoded.success.spec.nodes).map((node) =>
+						typeof node === "string" ? node : node.label,
+					)
+				: [];
 		},
 	},
 	"tool-build_quadrant_chart": {

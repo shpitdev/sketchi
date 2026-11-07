@@ -122,7 +122,10 @@ function resultSummary(result: StudioBuildResult): {
 	if ("quadrants" in spec) return { itemCount: spec.points.length };
 	return "participants" in spec
 		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
-		: { connectionCount: spec.edges.length, itemCount: spec.nodes.length };
+		: {
+				connectionCount: spec.edges.length,
+				itemCount: Array.isArray(spec.nodes) ? spec.nodes.length : Object.keys(spec.nodes).length,
+			};
 }
 
 export function BuildResultDetails({ pass, result }: { pass: number; result: StudioBuildResult }) {

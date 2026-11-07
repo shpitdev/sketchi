@@ -26,38 +26,32 @@ function build(spec: unknown) {
 
 const spec = {
 	title: "Expense approval by team",
-	groups: [
-		{ id: "employee", label: " Employee " },
-		{ id: "finance", label: "Finance" },
-	],
-	nodes: [
-		{ id: "submit", label: "Submit expense report", kind: "start", group: "employee" },
-		{ id: "approved", label: "Approved?", kind: "decision" },
-		{ id: "revise", label: "Revise the report", kind: "process", group: "employee" },
-		{ id: "pay", label: "Pay the employee", kind: "end", group: "finance" },
-	],
+	nodes: {
+		submit: "Submit expense report",
+		approved: "Approved?",
+		revise: "Revise the report",
+		pay: "Pay the employee",
+	},
 	edges: [
-		{ source: "submit", target: "approved" },
-		{ source: "approved", target: "pay", label: "yes" },
-		{ source: "approved", target: "revise", label: "no" },
-		{ source: "revise", target: "approved" },
+		["submit", "approved"],
+		["approved", "pay", "yes"],
+		["approved", "revise", "no"],
+		["revise", "approved"],
 	],
+	groups: {
+		employee: { label: " Employee ", contains: ["submit", "revise"] },
+		finance: { label: "Finance", contains: ["pay"] },
+	},
 };
 
 describe("Code Mode flowchart groups", () => {
 	it("builds declared groups into editable, named frames", async () => {
 		const built = await build(spec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(built.normalizedSpec.groups).toEqual([
-			{ id: "employee", label: "Employee" },
-			{ id: "finance", label: "Finance" },
-		]);
-		expect(built.normalizedSpec.nodes.map((node) => node.group)).toEqual([
-			"employee",
-			undefined,
-			"employee",
-			"finance",
-		]);
+		expect(built.normalizedSpec.groups).toEqual({
+			employee: { label: "Employee", contains: ["submit", "revise"] },
+			finance: { label: "Finance", contains: ["pay"] },
+		});
 		const scene = built.artifact.formats.find((format) => format.format === "scene")
 			?.inline as CanvasSpec;
 		expect(groupRegionIssues(scene)).toEqual([]);
@@ -77,40 +71,32 @@ describe("Code Mode flowchart groups", () => {
 		);
 	});
 
-	it("rejects a node in an undeclared group with a repair hint", async () => {
+	it("rejects a group listing an undeclared id with the nearest ids in its hint", async () => {
 		const built = await build({
 			...spec,
-			nodes: spec.nodes.map((node) =>
-				node.id === "pay" ? { ...node, group: "Finance team" } : node,
-			),
+			groups: { ...spec.groups, finance: { label: "Finance", contains: ["payy"] } },
 		});
 		expect(built.ok).toBe(false);
 		if (built.ok) return;
 		expect(built.status).toBe("invalid_flowchart");
-		// Moving the only Finance node also leaves that group empty; both point at the fix.
 		expect(built.issues).toEqual([
 			expect.objectContaining({
-				code: "unknown_node_group",
-				ref: { kind: "node", id: "pay", path: "spec.nodes.group" },
-				hint: 'Set group to a declared group id ("employee", "finance") or declare "Finance team" in groups.',
-			}),
-			expect.objectContaining({
-				code: "empty_group",
-				ref: { kind: "group", id: "finance", path: "spec.groups" },
+				code: "unknown_member",
+				ref: { kind: "group", id: "finance", path: "spec.groups.finance.contains[0]" },
+				hint: 'Use a declared node or group id ("pay"), or declare "payy".',
 			}),
 		]);
 	});
 
-	it("rejects an empty or repeated group with a group reference", async () => {
+	it("rejects a node two groups list when neither holds the other", async () => {
 		const built = await build({
 			...spec,
-			groups: [...spec.groups, { id: "finance", label: "Again" }, { id: "legal", label: "Legal" }],
+			groups: { ...spec.groups, finance: { label: "Finance", contains: ["pay", "revise"] } },
 		});
 		expect(built.ok).toBe(false);
 		if (built.ok) return;
 		expect(built.issues.map((issue) => [issue.code, issue.ref])).toEqual([
-			["duplicate_group_id", { kind: "group", id: "finance", path: "spec.groups" }],
-			["empty_group", { kind: "group", id: "legal", path: "spec.groups" }],
+			["overlapping_containers", { kind: "node", id: "revise", path: "spec.groups" }],
 		]);
 	});
 
@@ -118,11 +104,10 @@ describe("Code Mode flowchart groups", () => {
 		const document = canonicalDocumentFromDiagram(groupFixtures["mixed-membership"]);
 		expect(document.type).toBe("flowchart");
 		if (document.type !== "flowchart") return;
-		expect(document.spec.groups).toEqual([
-			{ id: "warehouse", label: "Warehouse" },
-			{ id: "shipping", label: "Shipping partner" },
-		]);
-		expect(document.spec.nodes.find((node) => node.id === "pick")?.group).toBe("warehouse");
-		expect(document.spec.nodes.find((node) => node.id === "order")?.group).toBeUndefined();
+		expect(Object.keys(document.spec.groups ?? {})).toEqual(["warehouse", "shipping"]);
+		expect(document.spec.groups?.["warehouse"]?.contains).toContain("pick");
+		expect(
+			Object.values(document.spec.groups ?? {}).some((group) => group.contains.includes("order")),
+		).toBe(false);
 	});
 });

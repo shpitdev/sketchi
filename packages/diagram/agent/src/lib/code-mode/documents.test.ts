@@ -27,16 +27,15 @@ describe("canonical diagram documents", () => {
 		const document = canonicalDocumentFromDiagram(deployPipelineLogoFlowchart);
 		expect(document.type).toBe("flowchart");
 		if (document.type !== "flowchart") return;
-		expect(document.spec.nodes.find((node) => node.id === "push")?.icon).toEqual({
-			slug: "github",
-		});
+		expect(document.spec.nodes["push"]).toMatchObject({ icon: "github" });
+		expect(document.spec.logos).toBe(true);
 		const rightToLeft = canonicalDocumentFromDiagram(
 			parseFlowchartDiagram({
 				...deployPipelineLogoFlowchart,
 				layout: { direction: "RL", edgeRouting: "orthogonal" },
 			}),
 		);
-		expect(rightToLeft.type === "flowchart" && rightToLeft.spec.layout.direction).toBe("LR");
+		expect(rightToLeft.type === "flowchart" && rightToLeft.spec.direction).toBe("LR");
 	});
 
 	it("rebuilds the nested mindmap hierarchy in sibling order", () => {

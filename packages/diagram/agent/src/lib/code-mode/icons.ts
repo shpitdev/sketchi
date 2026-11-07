@@ -247,6 +247,76 @@ export function resolveNodeIcons<
 }
 
 /**
+ * The logos a flowchart document's nodes draw. A node's `icon` names a product or a
+ * catalog slug and resolves on the server, so no lookup round trip is needed; null
+ * draws none. With `logos` set, every other node whose label unmistakably names a
+ * product draws its logo, reported as icon_filled. A vendor's mark stays only on a
+ * label that names the vendor. Concept marks are never filled from labels.
+ */
+export function resolveFlowchartLogos(
+	document: {
+		readonly logos?: boolean | "exact";
+		readonly nodes: Readonly<
+			Record<string, string | { readonly label: string; readonly icon?: string | null }>
+		>;
+	},
+	catalog: CodeModeIconCatalog | undefined,
+): { readonly issues: CodeModeIssue[]; readonly icons: ReadonlyMap<string, string> } {
+	const icons = new Map<string, string>();
+	const issues: CodeModeIssue[] = [];
+	for (const [id, node] of Object.entries(document.nodes)) {
+		const label = typeof node === "string" ? node : node.label;
+		const requested = typeof node === "string" ? undefined : node.icon;
+		if (requested === null) continue;
+		const ref = { kind: "node" as const, id, path: `nodes.${id}.icon` };
+		if (requested !== undefined) {
+			const slug = normalizeIconSlug(requested);
+			const icon =
+				(isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined) ??
+				catalog?.logoNamedByLabel(requested) ??
+				catalog?.search(requested, 1).find((hit) => hit.match === "exact");
+			if (!icon) {
+				issues.push(
+					unknownIconIssue({
+						catalog,
+						message: `Icon "${requested}" on node "${id}" names no Sketchi logo; the node renders without one.`,
+						ref,
+						slug,
+					}),
+				);
+				continue;
+			}
+			if (catalog?.isStrayVendorLogo(icon.slug, label)) {
+				issues.push({
+					code: "icon_dropped",
+					severity: "warning",
+					stage: "input",
+					ref,
+					message: `Icon "${icon.slug}" on node "${id}" is a vendor logo, but the label "${label}" does not name ${icon.name}; the node renders without a logo.`,
+					hint: `Put a vendor's logo only on a node whose label names that vendor ("Cloudflare Workers" takes cloudflare).`,
+				});
+				continue;
+			}
+			icons.set(id, icon.slug);
+			continue;
+		}
+		if (!document.logos || !catalog) continue;
+		const named = catalog.logoNamedByLabel(label);
+		if (!named) continue;
+		icons.set(id, named.slug);
+		issues.push({
+			code: "icon_filled",
+			severity: "info",
+			stage: "input",
+			ref,
+			message: `Node "${id}" draws the "${named.slug}" logo because its label "${label}" names ${named.name}.`,
+			hint: "No action needed.",
+		});
+	}
+	return { issues, icons };
+}
+
+/**
  * With fillNamedLogos, once a flowchart's nodes draw a logo, each group whose
  * label unmistakably names one ("Vercel") draws it before that label, reported
  * as an icon_filled note, on the same terms as resolveNodeIcons fills a node.

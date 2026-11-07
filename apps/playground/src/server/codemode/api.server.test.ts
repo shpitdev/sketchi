@@ -75,16 +75,16 @@ function handlePatchArtifactRequest(env: StudioEnv, request: Request, artifactId
 function approvalSpec() {
 	return {
 		title: "Worker API approval flow",
-		nodes: [
-			{ id: "request", label: "Request arrives", kind: "start" },
-			{ id: "approve", label: "Approved?", kind: "decision" },
-			{ id: "done", label: "Done", kind: "end" },
-			{ id: "revise", label: "Revise", kind: "end" },
-		],
+		nodes: {
+			request: "Request arrives",
+			approve: "Approved?",
+			done: "Done",
+			revise: "Revise",
+		},
 		edges: [
-			{ source: "request", target: "approve" },
-			{ source: "approve", target: "done", label: "yes" },
-			{ source: "approve", target: "revise", label: "no" },
+			["request", "approve"],
+			["approve", "done", "yes"],
+			["approve", "revise", "no"],
 		],
 	};
 }
@@ -531,19 +531,14 @@ describe("Code Mode API handlers", () => {
 			postRequest("https://studio.test/api/v1/flowcharts/build", {
 				spec: {
 					title: "Deploy pipeline",
-					nodes: [
-						{ id: "push", label: "Push to GitHub", kind: "start", icon: { slug: "github" } },
-						{
-							id: "build",
-							label: "Build the Docker image",
-							kind: "process",
-							icon: { slug: "docker" },
-						},
-						{ id: "ship", label: "Ship the Docker image", kind: "end", icon: { slug: "docker" } },
-					],
+					nodes: {
+						push: { label: "Push to GitHub", icon: "github" },
+						build: { label: "Build the Docker image", icon: "docker" },
+						ship: { label: "Ship the Docker image", icon: "docker" },
+					},
 					edges: [
-						{ source: "push", target: "build" },
-						{ source: "build", target: "ship" },
+						["push", "build"],
+						["build", "ship"],
 					],
 				},
 			}),
@@ -569,14 +564,10 @@ describe("Code Mode API handlers", () => {
 			postRequest("https://studio.test/api/v1/flowcharts/build", {
 				spec: {
 					...spec,
-					lanes: [
-						{ id: "requester", label: "Requester" },
-						{ id: "approver", label: "Approver" },
-					],
-					nodes: spec.nodes.map((node) => ({
-						...node,
-						lane: node.id === "approve" ? "approver" : "requester",
-					})),
+					lanes: {
+						requester: { label: "Requester", contains: ["request", "done", "revise"] },
+						approver: { label: "Approver", contains: ["approve"] },
+					},
 				},
 				options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
 			}),
@@ -587,9 +578,9 @@ describe("Code Mode API handlers", () => {
 			artifact: {
 				formats: { format: string; inline?: { elements: { rendererRole?: string }[] } }[];
 			};
-			normalizedSpec: { lanes?: unknown[] };
+			normalizedSpec: { lanes?: Record<string, unknown> };
 		};
-		expect(built.normalizedSpec.lanes).toHaveLength(2);
+		expect(Object.keys(built.normalizedSpec.lanes ?? {})).toHaveLength(2);
 		const scene = built.artifact.formats.find((format) => format.format === "scene")?.inline;
 		expect(scene?.elements.filter((element) => element.rendererRole === "swimlane")).toHaveLength(
 			2,
@@ -603,17 +594,11 @@ describe("Code Mode API handlers", () => {
 			postRequest("https://studio.test/api/v1/flowcharts/build", {
 				spec: {
 					...spec,
-					groups: [
-						{ id: "region", label: "us-east-1", kind: "region" },
-						{ id: "vpc", label: "VPC", kind: "vpc", parent: "region" },
-					],
-					nodes: spec.nodes.map((node) =>
-						node.id === "approve"
-							? { ...node, group: "vpc" }
-							: node.id === "done"
-								? { ...node, group: "region", shape: "database" }
-								: node,
-					),
+					groups: {
+						region: { label: "us-east-1", kind: "region", contains: ["vpc", "done"] },
+						vpc: { label: "VPC", kind: "vpc", contains: ["approve"] },
+					},
+					nodes: { ...spec.nodes, done: { label: "Done", shape: "database" } },
 				},
 				options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
 			}),
@@ -627,9 +612,9 @@ describe("Code Mode API handlers", () => {
 					inline?: { elements: { rendererRole?: string; shape?: string }[] };
 				}[];
 			};
-			normalizedSpec: { groups?: { parent?: string }[] };
+			normalizedSpec: { groups?: Record<string, { contains: string[] }> };
 		};
-		expect(built.normalizedSpec.groups?.[1]?.parent).toBe("region");
+		expect(built.normalizedSpec.groups?.["region"]?.contains).toContain("vpc");
 		const scene = built.artifact.formats.find((format) => format.format === "scene")?.inline;
 		expect(scene?.elements.filter((element) => element.rendererRole === "zone")).toHaveLength(2);
 		expect(scene?.elements.filter((element) => element.shape === "cylinder")).toHaveLength(1);

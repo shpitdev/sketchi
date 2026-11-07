@@ -213,48 +213,76 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 					style: diagram.style,
 				},
 			};
-		case "flowchart":
+		case "flowchart": {
+			// A generated flowchart arrives as the drawing's own graph; its document lists
+			// each container's direct members and keys nodes by id.
+			const members = (owner: string) => [
+				...diagram.nodes.filter((node) => node.group === owner).map((node) => node.id),
+				...(diagram.groups ?? [])
+					.filter((group) => group.parent === owner)
+					.map((group) => group.id),
+			];
 			return {
 				type: "flowchart",
 				spec: {
 					id: diagram.id,
 					title: diagram.title,
-					nodes: diagram.nodes.map((node) => ({
-						id: node.id,
-						label: node.label,
-						kind: node.kind,
-						...(node.description ? { description: node.description } : {}),
-						...(node.icon ? { icon: { slug: node.icon.slug } } : {}),
-						...(node.group ? { group: node.group } : {}),
-						...(node.lane ? { lane: node.lane } : {}),
-						...(node.shape ? { shape: node.shape } : {}),
-					})),
-					edges: diagram.edges.map((edge) => ({
-						id: edge.id,
-						source: edge.source,
-						target: edge.target,
-						...(edge.label ? { label: edge.label } : {}),
-					})),
-					...(diagram.groups
+					direction:
+						diagram.layout.direction === "LR" || diagram.layout.direction === "RL" ? "LR" : "TB",
+					...(diagram.nodes.some((node) => node.icon) ? { logos: true } : {}),
+					nodes: Object.fromEntries(
+						diagram.nodes.map((node) => {
+							// A decision whose label asks no question keeps its diamond.
+							const diamond = node.kind === "decision" && !node.label.trim().endsWith("?");
+							const shape = node.shape ?? (diamond ? "diamond" : undefined);
+							return [
+								node.id,
+								node.description || shape || node.icon
+									? {
+											label: node.label,
+											...(node.description ? { note: node.description } : {}),
+											...(shape ? { shape } : {}),
+											...(node.icon ? { icon: node.icon.slug } : {}),
+										}
+									: node.label,
+							];
+						}),
+					),
+					edges: diagram.edges.map((edge) =>
+						edge.label ? [edge.source, edge.target, edge.label] : [edge.source, edge.target],
+					),
+					...(diagram.groups?.length
 						? {
-								groups: diagram.groups.map((group) => ({
-									id: group.id,
-									label: group.label,
-									...(group.parent ? { parent: group.parent } : {}),
-									...(group.kind ? { kind: group.kind } : {}),
-								})),
+								groups: Object.fromEntries(
+									diagram.groups.map((group) => [
+										group.id,
+										{
+											label: group.label,
+											...(group.kind ? { kind: group.kind } : {}),
+											contains: members(group.id),
+										},
+									]),
+								),
 							}
 						: {}),
-					...(diagram.lanes
-						? { lanes: diagram.lanes.map((lane) => ({ id: lane.id, label: lane.label })) }
+					...(diagram.lanes?.length
+						? {
+								lanes: Object.fromEntries(
+									diagram.lanes.map((lane) => [
+										lane.id,
+										{
+											label: lane.label,
+											contains: diagram.nodes
+												.filter((node) => node.lane === lane.id)
+												.map((node) => node.id),
+										},
+									]),
+								),
+							}
 						: {}),
-					layout: {
-						direction:
-							diagram.layout.direction === "LR" || diagram.layout.direction === "RL" ? "LR" : "TB",
-					},
-					style: diagram.style,
 				},
 			};
+		}
 		case "mindmap":
 			return {
 				type: "mindmap",

@@ -26,103 +26,35 @@
 			"normalizedSpec": {
 				"id": "deploy-pipeline",
 				"title": "Deploy pipeline",
-				"nodes": [
-					{
-						"id": "push",
+				"direction": "TB",
+				"nodes": {
+					"push": {
 						"label": "Push to GitHub",
-						"kind": "start",
-						"icon": {
-							"slug": "github"
-						}
+						"icon": "github"
 					},
-					{
-						"id": "docker_build",
+					"docker_build": {
 						"label": "Docker builds image",
-						"kind": "process",
-						"icon": {
-							"slug": "docker"
-						}
+						"icon": "docker"
 					},
-					{
-						"id": "run_tests",
-						"label": "Run test suite",
-						"kind": "process"
-					},
-					{
-						"id": "tests_pass",
-						"label": "Tests pass?",
-						"kind": "decision"
-					},
-					{
-						"id": "ship",
+					"run_tests": "Run test suite",
+					"tests_pass": "Tests pass?",
+					"ship": {
 						"label": "Ship to Cloudflare Workers",
-						"kind": "process",
-						"icon": {
-							"slug": "cloudflare"
-						}
+						"icon": "cloudflare"
 					},
-					{
-						"id": "deployed",
-						"label": "Deployed",
-						"kind": "end"
-					},
-					{
-						"id": "notify",
-						"label": "Notify team",
-						"kind": "process"
-					},
-					{
-						"id": "stopped",
-						"label": "Stop",
-						"kind": "end"
-					}
-				],
-				"edges": [
-					{
-						"id": "edge-1",
-						"source": "push",
-						"target": "docker_build"
-					},
-					{
-						"id": "edge-2",
-						"source": "docker_build",
-						"target": "run_tests"
-					},
-					{
-						"id": "edge-3",
-						"source": "run_tests",
-						"target": "tests_pass"
-					},
-					{
-						"id": "edge-4",
-						"source": "tests_pass",
-						"target": "ship",
-						"label": "yes"
-					},
-					{
-						"id": "edge-5",
-						"source": "ship",
-						"target": "deployed"
-					},
-					{
-						"id": "edge-6",
-						"source": "tests_pass",
-						"target": "notify",
-						"label": "no"
-					},
-					{
-						"id": "edge-7",
-						"source": "notify",
-						"target": "stopped"
-					}
-				],
-				"layout": {
-					"direction": "TB"
+					"deployed": "Deployed",
+					"notify": "Notify team",
+					"stopped": "Stop"
 				},
-				"style": {
-					"accentColor": "#8f707f",
-					"backgroundColor": "#fffdf8"
-				}
+				"edges": [
+					["push", "docker_build"],
+					["docker_build", "run_tests"],
+					["run_tests", "tests_pass"],
+					["tests_pass", "ship", "yes"],
+					["ship", "deployed"],
+					["tests_pass", "notify", "no"],
+					["notify", "stopped"]
+				]
 			}
 		}
 	]

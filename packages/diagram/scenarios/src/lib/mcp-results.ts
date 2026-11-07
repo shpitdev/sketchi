@@ -1,4 +1,10 @@
-import { type MindmapTopicTree, mindmapDiagramFromTree } from "@sketchi/diagram-core";
+import {
+	decodeFlowchartDocument,
+	flowchartDiagramFromDocument,
+	type MindmapTopicTree,
+	mindmapDiagramFromTree,
+} from "@sketchi/diagram-core";
+import { Result } from "effect";
 
 import type { DiagramScenario } from "./diagram-scenarios.js";
 import type { ScenarioCheck } from "./evaluate.js";
@@ -123,27 +129,6 @@ export function normalizedSpecFrom(value: unknown): unknown {
 	return isRecord(build.normalizedSpec) ? build.normalizedSpec : undefined;
 }
 
-function cleanEdgeId(value: unknown): string | undefined {
-	if (typeof value !== "string") return undefined;
-	let cleaned = value.trim();
-	try {
-		const parsed: unknown = JSON.parse(cleaned);
-		if (typeof parsed === "string") cleaned = parsed.trim();
-	} catch {
-		// Unquoted ids are already strings.
-	}
-	for (;;) {
-		const next = cleaned
-			.replace(
-				/[,;]\s*(?:id|label|kind|group|source|target|title|direction|nodes|edges)\s*:?\s*$/i,
-				"",
-			)
-			.trim();
-		if (next === cleaned) return cleaned || undefined;
-		cleaned = next;
-	}
-}
-
 /**
  * Groups take no authored logo. A build draws one before a group whose label
  * names it and notes that as an `icon_filled` issue on the group (see
@@ -168,40 +153,30 @@ function filledGroupLogos(build: Record<string, unknown>): ReadonlyMap<string, s
 }
 
 /**
- * Map the Code Mode authoring layout to the canonical flowchart IR, each group
- * drawing the logo `groupLogos` gives it by id.
+ * Build a flowchart document as Sketchi draws it: each node's logo is the slug its
+ * normalized icon names, and each group draws the logo `groupLogos` gives it by id.
+ * A document that does not build is returned as is, for the parse to reject.
  */
 export function specToFlowchartCandidate(
 	spec: unknown,
 	groupLogos: ReadonlyMap<string, string> = new Map(),
 ): unknown {
 	if (!isRecord(spec)) return spec;
-	const layout = isRecord(spec.layout) ? spec.layout : {};
-	return {
-		id: spec.id,
-		title: spec.title,
-		type: "flowchart",
-		nodes: spec.nodes,
-		...(spec.groups === undefined
-			? {}
-			: {
-					groups: Array.isArray(spec.groups)
-						? spec.groups.map((group) => {
-								if (!isRecord(group) || group.icon !== undefined) return group;
-								const slug = typeof group.id === "string" ? groupLogos.get(group.id) : undefined;
-								return slug === undefined ? group : { ...group, icon: { slug } };
-							})
-						: spec.groups,
-				}),
-		...(spec.lanes === undefined ? {} : { lanes: spec.lanes }),
-		edges: Array.isArray(spec.edges)
-			? spec.edges.map((edge, index) =>
-					isRecord(edge) ? { ...edge, id: cleanEdgeId(edge.id) ?? `edge-${index + 1}` } : edge,
-				)
-			: spec.edges,
-		layout: { direction: layout.direction ?? "TB", edgeRouting: "orthogonal" },
-		style: spec.style,
-	};
+	const decoded = decodeFlowchartDocument(spec);
+	if (!Result.isSuccess(decoded)) return spec;
+	const document = decoded.success;
+	const nodeIcons = new Map(
+		Object.entries(document.nodes).flatMap(([id, node]) =>
+			typeof node !== "string" && typeof node.icon === "string" ? [[id, node.icon] as const] : [],
+		),
+	);
+	const built = flowchartDiagramFromDocument(document, { nodeIcons, groupIcons: groupLogos });
+	if (!built.ok) {
+		throw new Error(
+			`The flowchart document does not build: ${built.issues.map((issue) => issue.message).join(" ")}`,
+		);
+	}
+	return built.diagram;
 }
 
 /** Map a Code Mode mindmap's nested topics to the canonical mindmap IR. */

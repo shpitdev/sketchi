@@ -3,19 +3,19 @@
 Swimlanes draw a process across actors: one full-length band per customer, team, role or system, in a fixed order, with each step in its actor's band and handoffs crossing between bands. They are part of the flowchart family, not a family of their own.
 
 ```json
-{"type":"flowchart","spec":{"title":"Order fulfilment","lanes":[{"id":"customer","label":"Customer"},{"id":"sales","label":"Sales"},{"id":"warehouse","label":"Warehouse"}],"nodes":[{"id":"place","label":"Place order","kind":"start","lane":"customer"},{"id":"review","label":"Review the order","kind":"process","lane":"sales"},{"id":"stock","label":"Items in stock?","kind":"decision","lane":"sales"},{"id":"backorder","label":"Notify backorder","kind":"end","lane":"sales"},{"id":"ship","label":"Ship the order","kind":"end","lane":"warehouse"}],"edges":[{"source":"place","target":"review"},{"source":"review","target":"stock"},{"source":"stock","target":"ship","label":"yes"},{"source":"stock","target":"backorder","label":"no"}],"layout":{"direction":"LR"}}}
+{"type":"flowchart","spec":{"title":"Order fulfilment","direction":"LR","nodes":{"place":"Place order","review":"Review the order","stock":"Items in stock?","backorder":"Notify backorder","ship":"Ship the order"},"edges":[["place","review"],["review","stock"],["stock","ship","yes"],["stock","backorder","no"]],"lanes":{"customer":{"label":"Customer","contains":["place"]},"sales":{"label":"Sales","contains":["review","stock","backorder"]},"warehouse":{"label":"Warehouse","contains":["ship"]}}}}
 ```
 
 Pass this to `sketchi create --json`, or its `spec` to `sketchi.buildFlowchart`. Studio's `build_flowchart` and `POST /api/v1/flowcharts/build` take the same spec, and generation adds lanes when a prompt describes a process across actors.
 
 ## Contract
 
-- `lanes` declares `{ id, label }` bands in drawing order, at most 8. Lane ids are unique.
-- Every node sets `lane` to a declared id, and every lane holds at least one node.
-- The layout direction orients the lanes: `LR` and `RL` draw rows stacked top to bottom with their headers on the left, `TB` and `BT` columns side by side with their headers on top.
+- `lanes` maps an id to `{ label, contains }`, in drawing order, at most 8. `contains` lists the steps that actor does.
+- Every node sits in exactly one lane.
+- The layout direction orients the lanes: `LR` draws rows stacked top to bottom with their headers on the left, `TB` columns side by side with their headers on top.
 - Lanes and groups never mix: lanes already say who does each step, and a group inside or across lanes would cut the bands apart.
 
-Builds reject a node with no lane or an undeclared one (`unknown_node_lane`, with the declared ids in its hint), a repeated lane id (`duplicate_lane_id`), a lane with no nodes (`empty_lane`), lanes declared with groups (`lanes_with_groups`) and more than 8 lanes (`flowchart_too_large`). A flowchart without lanes renders exactly as before.
+Builds reject a node in no lane (`node_without_lane`, with the lane ids in its hint), a node two lanes list (`overlapping_containers`), a lane listing an id that is no node (`unknown_member`), lanes declared with groups (`lanes_with_groups`) and more than 8 lanes (`flowchart_too_large`). A flowchart without lanes renders exactly as before.
 
 ## Layout
 

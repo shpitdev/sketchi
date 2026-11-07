@@ -31,7 +31,7 @@ const Label = Schema.NonEmptyString;
 const NodeChangeSchema = Schema.Struct({
 	label: Schema.optionalKey(Label),
 	note: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
-	shape: Schema.optionalKey(Schema.NullOr(Schema.Literals(DIAGRAM_NODE_SHAPES))),
+	shape: Schema.optionalKey(Schema.NullOr(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"]))),
 	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 });
 

@@ -16,7 +16,6 @@ import {
 	DiagramPatchOperationSchema,
 	MindmapTopicSchema,
 	RenderedDiagramSceneSchema,
-	toCodeModeJsonSchema,
 } from "./contract";
 import { applyDiagramPatch, buildFlowchart, makeCodeModeRuntimeEnvironmentLayer } from "./runtime";
 
@@ -51,18 +50,18 @@ describe("Code Mode telemetry", () => {
 				requestId: "request-effect-telemetry",
 				spec: {
 					title: "Simple approval flow",
-					nodes: [
-						{ id: "request", label: "Request arrives", kind: "start" },
-						{ id: "approve", label: "Approved?", kind: "decision" },
-						{ id: "done", label: "Done", kind: "end" },
-						{ id: "revise", label: "Revise", kind: "end" },
-					],
+					direction: "TB",
+					nodes: {
+						request: "Request arrives",
+						approve: "Approved?",
+						done: "Done",
+						revise: "Revise",
+					},
 					edges: [
-						{ source: "request", target: "approve" },
-						{ source: "approve", target: "done", label: "yes" },
-						{ source: "approve", target: "revise", label: "no" },
+						["request", "approve"],
+						["approve", "done", "yes"],
+						["approve", "revise", "no"],
 					],
-					layout: { direction: "TB" },
 				},
 			});
 			assert.isTrue(result.ok);
@@ -150,48 +149,21 @@ describe("structured contract issue metadata", () => {
 });
 
 layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
-	it("keeps legacy style input decodable but out of the model contract", () => {
-		const legacy = Schema.decodeUnknownSync(BuildFlowchartRequestSchema, {
-			errors: "all",
-			reportInput: true,
-		})({
-			spec: {
-				title: "Legacy style",
-				nodes: [{ id: "start", kind: "start", label: "Start" }],
-				style: { accentColor: "#7c3aed", backgroundColor: "#ffffff" },
-			},
-		});
-		assert.deepInclude(legacy.spec.style, {
-			accentColor: "#7c3aed",
-			backgroundColor: "#ffffff",
-		});
-		assert.notInclude(
-			JSON.stringify(toCodeModeJsonSchema(BuildFlowchartRequestSchema.omit({ options: true }))),
-			'"style"',
-		);
-	});
-
-	it.effect("preserves golden request encoding and failure output", () =>
+	it.effect("round-trips the flowchart document and names every request problem", () =>
 		Effect.gen(function* () {
+			const request = {
+				spec: {
+					title: "Golden flow",
+					nodes: { start: "Start", done: "Done" },
+					edges: [["start", "done"] as [string, string]],
+				},
+			};
 			const decoded = yield* Schema.decodeUnknownEffect(BuildFlowchartRequestSchema, {
 				errors: "all",
 				reportInput: true,
-			})({
-				spec: {
-					nodes: [{ id: "start", kind: "start", label: "Start" }],
-					title: "Golden flow",
-				},
-			});
+			})(request);
 			const encoded = yield* Schema.encodeEffect(BuildFlowchartRequestSchema)(decoded);
-			assert.deepStrictEqual(encoded, {
-				spec: {
-					title: "Golden flow",
-					nodes: [{ id: "start", label: "Start", kind: "start" }],
-					edges: [],
-					layout: { direction: "TB" },
-					style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-				},
-			});
+			assert.deepStrictEqual(encoded, request);
 
 			const failure = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
 				errors: "all",
@@ -204,29 +176,10 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 			if (Result.isSuccess(failure)) {
 				return assert.fail("Invalid golden request unexpectedly decoded.");
 			}
-			assert.deepStrictEqual(formatContractSchemaError(failure.failure).issues, [
-				{
-					code: "custom",
-					issueTag: "Filter",
-					astKind: "String",
-					message: "Too small: expected string to have >=1 characters",
-					path: ["requestId"],
-				},
-				{
-					code: "custom",
-					issueTag: "Filter",
-					astKind: "String",
-					message: "Too small: expected string to have >=1 characters",
-					path: ["spec", "title"],
-				},
-				{
-					code: "custom",
-					issueTag: "Filter",
-					astKind: "Arrays",
-					message: "Too small: expected array to have >=1 items",
-					path: ["spec", "nodes"],
-				},
-			]);
+			assert.deepStrictEqual(
+				formatContractSchemaError(failure.failure).issues.map((issue) => issue.path),
+				[["requestId"], ["spec", "title"], ["spec", "nodes"], ["spec", "edges"]],
+			);
 		}),
 	);
 
@@ -350,18 +303,18 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 				buildFlowchart({
 					spec: {
 						title: "Simple approval flow",
-						nodes: [
-							{ id: "request", label: "Request arrives", kind: "start" },
-							{ id: "approve", label: "Approved?", kind: "decision" },
-							{ id: "done", label: "Done", kind: "end" },
-							{ id: "revise", label: "Revise", kind: "end" },
-						],
+						direction: "TB",
+						nodes: {
+							request: "Request arrives",
+							approve: "Approved?",
+							done: "Done",
+							revise: "Revise",
+						},
 						edges: [
-							{ source: "request", target: "approve" },
-							{ source: "approve", target: "done", label: "yes" },
-							{ source: "approve", target: "revise", label: "no" },
+							["request", "approve"],
+							["approve", "done", "yes"],
+							["approve", "revise", "no"],
 						],
-						layout: { direction: "TB" },
 					},
 					options: { artifactFormats: ["png"] },
 				}),

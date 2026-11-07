@@ -91,7 +91,7 @@ describe("flowchart documents", () => {
 			],
 		};
 		expect(kinds(document)).toMatchObject({
-			cause: "decision",
+			cause: "process",
 			provider: "end",
 			stable: "decision",
 			resolved: "end",
@@ -159,6 +159,27 @@ describe("flowchart documents", () => {
 			],
 		};
 		expect(kinds(document).sync).toBe("process");
+	});
+
+	it("draws a step given a diamond as a decision, and its other shapes only as drawings", () => {
+		const document: FlowchartDocument = {
+			title: "Classify",
+			nodes: {
+				alert: "Alert received",
+				cause: { label: "Classify root cause", shape: "diamond" },
+				rollback: "Roll back",
+				hotfix: { label: "Prepare hotfix", shape: "document" },
+			},
+			edges: [
+				["alert", "cause"],
+				["cause", "rollback", "deploy"],
+				["cause", "hotfix", "code"],
+			],
+		};
+		const diagram = build(document);
+		expect(kinds(document).cause).toBe("decision");
+		expect(diagram.nodes.find((node) => node.id === "cause")?.shape).toBeUndefined();
+		expect(diagram.nodes.find((node) => node.id === "hotfix")?.shape).toBe("document");
 	});
 
 	it("asks for a label on every branch of a question", () => {

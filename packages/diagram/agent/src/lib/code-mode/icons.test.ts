@@ -111,24 +111,29 @@ function runtime(
 }
 
 function deploySpec(icons: Record<string, string>) {
-	const node = (id: string, label: string, kind: string) => ({
-		id,
-		label,
-		kind,
-		...(icons[id] ? { icon: { slug: icons[id] } } : {}),
-	});
+	const node = (id: string, label: string) => (icons[id] ? { label, icon: icons[id] } : label);
 	return {
 		title: "Deploy pipeline",
-		nodes: [
-			node("push", "Push to GitHub", "start"),
-			node("build", "Build the Docker image", "process"),
-			node("ship", "Ship to production", "end"),
-		],
+		nodes: {
+			push: node("push", "Push to GitHub"),
+			build: node("build", "Build the Docker image"),
+			ship: node("ship", "Ship to production"),
+		},
 		edges: [
-			{ source: "push", target: "build" },
-			{ source: "build", target: "ship" },
+			["push", "build"],
+			["build", "ship"],
 		],
 	};
+}
+
+type FlowchartBuild = Awaited<ReturnType<ReturnType<typeof runtime>["buildFlowchart"]>>;
+
+/** The logo each node draws, in node order, from the document as built. */
+function nodeLogos(result: FlowchartBuild): (string | null | undefined)[] {
+	if (!result.ok) throw new Error(JSON.stringify(result.issues));
+	return Object.values(result.normalizedSpec.nodes).map((node) =>
+		typeof node === "string" ? undefined : node.icon,
+	);
 }
 
 function canvasSpec(
@@ -189,33 +194,17 @@ describe("Code Mode icon catalog", () => {
 });
 
 describe("buildFlowchart icons", () => {
-	it("keeps catalog slugs and drops unknown ones with an unknown_icon warning", async () => {
+	it("resolves an icon by slug or product name and drops one that names no logo", async () => {
 		const result = await runtime().buildFlowchart({
-			spec: deploySpec({
-				push: "GitHub",
-				build: "docker-engine",
-				ship: "github-text",
-			}),
+			spec: deploySpec({ push: "GitHub", build: "docker", ship: "zzz-not-a-logo" }),
 		});
 
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
-		expect(result.normalizedSpec.nodes.map((node) => node.icon)).toEqual([
-			{ slug: "github" },
-			undefined,
-			undefined,
-		]);
+		expect(nodeLogos(result)).toEqual(["github", "docker", undefined]);
 		expect(result.issues).toEqual([
 			expect.objectContaining({
 				code: "unknown_icon",
 				severity: "warning",
-				ref: { kind: "node", id: "build", path: "nodes.icon.slug" },
-				hint: 'Use an exact slug, for example "docker" (Docker), or look one up with sketchi.searchIcons({ q }).',
-			}),
-			expect.objectContaining({
-				code: "unknown_icon",
-				severity: "warning",
-				ref: { kind: "node", id: "ship", path: "nodes.icon.slug" },
+				ref: { kind: "node", id: "ship", path: "nodes.ship.icon" },
 			}),
 		]);
 	});
@@ -225,13 +214,7 @@ describe("buildFlowchart icons", () => {
 			spec: deploySpec({ push: "constructor", build: "__proto__" }),
 		});
 
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
-		expect(result.normalizedSpec.nodes.map((node) => node.icon)).toEqual([
-			undefined,
-			undefined,
-			undefined,
-		]);
+		expect(nodeLogos(result)).toEqual([undefined, undefined, undefined]);
 		expect(result.issues.map((entry) => entry.code)).toEqual(["unknown_icon", "unknown_icon"]);
 	});
 
@@ -240,9 +223,7 @@ describe("buildFlowchart icons", () => {
 			spec: deploySpec({ push: "github" }),
 		});
 
-		expect(result.ok).toBe(true);
-		if (!result.ok) return;
-		expect(result.normalizedSpec.nodes[0]?.icon).toBeUndefined();
+		expect(nodeLogos(result)).toEqual([undefined, undefined, undefined]);
 		expect(result.issues).toEqual([
 			expect.objectContaining({
 				code: "unknown_icon",
@@ -279,11 +260,7 @@ describe("logo payloads in build results", () => {
 			false,
 			false,
 		]);
-		expect(result.normalizedSpec.nodes.map((node) => node.icon?.slug)).toEqual([
-			"github",
-			"docker",
-			"docker",
-		]);
+		expect(nodeLogos(result)).toEqual(["github", "docker", "docker"]);
 
 		// The stored artifacts and the PNG renderer still get every logo.
 		const scene = await icons.getArtifact({
@@ -331,13 +308,8 @@ describe("vendor logos", () => {
 	function stackSpec(nodes: ReadonlyArray<readonly [string, string, string]>) {
 		return {
 			title: "Stack",
-			nodes: nodes.map(([id, label, slug], index) => ({
-				id,
-				label,
-				kind: index === 0 ? "start" : index === nodes.length - 1 ? "end" : "process",
-				icon: { slug },
-			})),
-			edges: nodes.slice(1).map(([id], index) => ({ source: nodes[index]?.[0], target: id })),
+			nodes: Object.fromEntries(nodes.map(([id, label, icon]) => [id, { label, icon }])),
+			edges: nodes.slice(1).map(([id], index) => [nodes[index]?.[0], id]),
 		};
 	}
 
@@ -349,13 +321,8 @@ describe("vendor logos", () => {
 				["fn", "AWS Lambda", "aws"],
 			]),
 		});
-		if (!result.ok) throw new Error(JSON.stringify(result.issues));
 
-		expect(result.normalizedSpec.nodes.map((node) => node.icon?.slug)).toEqual([
-			"github",
-			"cloudflare",
-			"aws",
-		]);
+		expect(nodeLogos(result)).toEqual(["github", "cloudflare", "aws"]);
 		expect(result.issues).toEqual([]);
 	});
 
@@ -367,23 +334,18 @@ describe("vendor logos", () => {
 				["s3", "S3 bucket", "aws"],
 			]),
 		});
-		if (!result.ok) throw new Error(JSON.stringify(result.issues));
 
-		expect(result.normalizedSpec.nodes.map((node) => node.icon?.slug)).toEqual([
-			undefined,
-			"docker",
-			undefined,
-		]);
+		expect(nodeLogos(result)).toEqual([undefined, "docker", undefined]);
 		expect(result.issues).toEqual([
 			expect.objectContaining({
 				code: "icon_dropped",
 				severity: "warning",
-				ref: { kind: "node", id: "ingress", path: "nodes.icon.slug" },
+				ref: { kind: "node", id: "ingress", path: "nodes.ingress.icon" },
 				message: expect.stringContaining('label "Ingress controller" does not name Kubernetes'),
 			}),
 			expect.objectContaining({
 				code: "icon_dropped",
-				ref: { kind: "node", id: "s3", path: "nodes.icon.slug" },
+				ref: { kind: "node", id: "s3", path: "nodes.s3.icon" },
 				message: expect.stringContaining('label "S3 bucket" does not name AWS'),
 			}),
 		]);
@@ -426,51 +388,45 @@ describe("named logo fill", () => {
 		loadSvg: () => Effect.succeed(SOURCES["docker"] ?? ""),
 	});
 	const filling = () => runtime(productionCatalog, undefined, { fillNamedLogos: true });
+	const production = () => runtime(productionCatalog);
 
-	// Frontierclimb r20 deploy-pipeline-logos s1: the model drew GitHub and
-	// Docker but left Cloudflare off "Ship to Cloudflare Workers".
+	// Frontierclimb r20 deploy-pipeline-logos s1: the labels name GitHub, Docker and
+	// Cloudflare; logos: true draws each one.
 	const r20DeploySpec = {
 		title: "Deploy pipeline",
-		nodes: [
-			{ id: "push", label: "Push to GitHub", kind: "start", icon: { slug: "github" } },
-			{ id: "build", label: "Docker builds the image", kind: "process", icon: { slug: "docker" } },
-			{ id: "tests", label: "Test suite runs", kind: "process" },
-			{ id: "pass", label: "Tests pass?", kind: "decision" },
-			{ id: "deploy", label: "Ship to Cloudflare Workers", kind: "end" },
-			{ id: "notify", label: "Notify the team and stop", kind: "end" },
-		],
+		logos: true,
+		nodes: {
+			push: "Push to GitHub",
+			build: "Docker builds the image",
+			tests: "Test suite runs",
+			pass: "Tests pass?",
+			deploy: "Ship to Cloudflare Workers",
+			notify: "Notify the team and stop",
+		},
 		edges: [
-			{ source: "push", target: "build" },
-			{ source: "build", target: "tests" },
-			{ source: "tests", target: "pass" },
-			{ source: "pass", target: "deploy", label: "Yes" },
-			{ source: "pass", target: "notify", label: "No" },
+			["push", "build"],
+			["build", "tests"],
+			["tests", "pass"],
+			["pass", "deploy", "Yes"],
+			["pass", "notify", "No"],
 		],
-		layout: { direction: "TB" },
 	};
 
-	function chain(nodes: ReadonlyArray<readonly [string, string, string?]>) {
+	function chain(nodes: ReadonlyArray<readonly [string, string, string?]>, logos = true) {
 		return {
 			title: "Stack",
-			nodes: nodes.map(([id, label, slug], index) => ({
-				id,
-				label,
-				kind: index === 0 ? "start" : index === nodes.length - 1 ? "end" : "process",
-				...(slug ? { icon: { slug } } : {}),
-			})),
-			edges: nodes.slice(1).map(([id], index) => ({ source: nodes[index]?.[0], target: id })),
+			...(logos ? { logos: true } : {}),
+			nodes: Object.fromEntries(
+				nodes.map(([id, label, icon]) => [id, icon ? { label, icon } : label]),
+			),
+			edges: nodes.slice(1).map(([id], index) => [nodes[index]?.[0], id]),
 		};
 	}
 
-	const slugs = (result: Awaited<ReturnType<ReturnType<typeof runtime>["buildFlowchart"]>>) => {
-		if (!result.ok) throw new Error(JSON.stringify(result.issues));
-		return result.normalizedSpec.nodes.map((node) => node.icon?.slug);
-	};
+	it("draws the logo of each product a label names when the document asks for logos", async () => {
+		const result = await production().buildFlowchart({ spec: r20DeploySpec });
 
-	it("gives a logo-less node the vendor logo its label names when the diagram draws logos", async () => {
-		const result = await filling().buildFlowchart({ spec: r20DeploySpec });
-
-		expect(slugs(result)).toEqual([
+		expect(nodeLogos(result)).toEqual([
 			"github",
 			"docker",
 			undefined,
@@ -478,59 +434,55 @@ describe("named logo fill", () => {
 			"cloudflare",
 			undefined,
 		]);
-		expect(result.issues).toEqual([
-			{
-				code: "icon_filled",
-				severity: "info",
-				stage: "input",
-				ref: { kind: "node", id: "deploy", path: "nodes.icon.slug" },
-				message:
-					'Node "deploy" draws the "cloudflare" logo because its label "Ship to Cloudflare Workers" names Cloudflare.',
-				hint: "No action needed.",
-			},
+		expect(result.issues.map((issue) => [issue.code, issue.ref?.id])).toEqual([
+			["icon_filled", "push"],
+			["icon_filled", "build"],
+			["icon_filled", "deploy"],
 		]);
+		expect(result.issues[2]).toEqual({
+			code: "icon_filled",
+			severity: "info",
+			stage: "input",
+			ref: { kind: "node", id: "deploy", path: "nodes.deploy.icon" },
+			message:
+				'Node "deploy" draws the "cloudflare" logo because its label "Ship to Cloudflare Workers" names Cloudflare.',
+			hint: "No action needed.",
+		});
 	});
 
-	it("leaves a diagram without logos without logos", async () => {
-		const spec = {
-			...r20DeploySpec,
-			nodes: r20DeploySpec.nodes.map(({ icon: _icon, ...node }) => node),
-		};
-		const result = await filling().buildFlowchart({ spec });
+	it("draws no logo the document does not ask for", async () => {
+		const { logos: _logos, ...spec } = r20DeploySpec;
+		const result = await production().buildFlowchart({ spec });
 
-		expect(slugs(result).filter(Boolean)).toEqual([]);
+		expect(nodeLogos(result).filter(Boolean)).toEqual([]);
 		expect(result.issues).toEqual([]);
 	});
 
-	it("does not count a dropped logo as one the diagram draws", async () => {
-		const result = await filling().buildFlowchart({
+	it("keeps an icon the document names and drops one set to null", async () => {
+		const result = await production().buildFlowchart({
 			spec: chain([
-				["push", "Push to GitHub", "not-a-logo"],
+				["push", "Push to GitHub", "docker"],
 				["ship", "Ship to Cloudflare Workers"],
 			]),
 		});
+		expect(nodeLogos(result)).toEqual(["docker", "cloudflare"]);
 
-		expect(slugs(result)).toEqual([undefined, undefined]);
-		expect(result.issues.map((issue) => issue.code)).toEqual(["unknown_icon"]);
-	});
-
-	it("keeps the logo the model chose, and fills no node it gave a logo", async () => {
-		const result = await filling().buildFlowchart({
-			spec: chain([
-				["push", "Push to GitHub", "github"],
-				["build", "Build with Docker", "github"],
-				["ship", "Ship to Cloudflare Workers", "not-a-logo"],
-			]),
+		const dropped = await production().buildFlowchart({
+			spec: {
+				...r20DeploySpec,
+				nodes: {
+					...r20DeploySpec.nodes,
+					deploy: { label: "Ship to Cloudflare Workers", icon: null },
+				},
+			},
 		});
-
-		expect(slugs(result)).toEqual(["github", "github", undefined]);
-		expect(result.issues.map((issue) => issue.code)).toEqual(["unknown_icon"]);
+		expect(nodeLogos(dropped)[4]).toBeNull();
 	});
 
 	it("never fills ambiguous, everyday-word, or unnamed labels", async () => {
-		const result = await filling().buildFlowchart({
+		const result = await production().buildFlowchart({
 			spec: chain([
-				["push", "Push to GitHub", "github"],
+				["push", "Push to GitHub"],
 				["page", "Next.js page (Vercel) receives the question"],
 				["image", "Docker image pushed to GitHub"],
 				["go", "Go to checkout"],
@@ -543,15 +495,8 @@ describe("named logo fill", () => {
 			]),
 		});
 
-		expect(slugs(result)).toEqual(["github", ...Array.from({ length: 9 }, () => undefined)]);
-		expect(result.issues).toEqual([]);
-	});
-
-	it("only fills when the host asks, as MCP builds do", async () => {
-		const result = await runtime(productionCatalog).buildFlowchart({ spec: r20DeploySpec });
-
-		expect(slugs(result)[4]).toBeUndefined();
-		expect(result.issues).toEqual([]);
+		expect(nodeLogos(result)).toEqual(["github", ...Array.from({ length: 9 }, () => undefined)]);
+		expect(result.issues.map((issue) => issue.code)).toEqual(["icon_filled"]);
 	});
 
 	it("fills sequence participants the same way", async () => {
@@ -588,43 +533,33 @@ describe("named logo fill", () => {
 	});
 
 	describe("flowchart groups", () => {
-		// Frontierclimb r23 ai-app-stack-logos s4 (Sonnet): the model drew Next.js,
-		// Redis, OpenAI and Sentry logos but left its "Vercel" group a bare name.
+		// Frontierclimb r23 ai-app-stack-logos s4 (Sonnet): the labels name Next.js,
+		// Redis, OpenAI and Sentry, and the group is "Vercel".
 		const r23AppSpec = {
 			title: "Request flow",
-			nodes: [
-				{
-					id: "page",
-					label: "Next.js page receives the question",
-					kind: "start",
-					icon: { slug: "nextjs" },
-					group: "vercel",
-				},
-				{
-					id: "check",
-					label: "Check Redis cache",
-					kind: "process",
-					icon: { slug: "redis" },
-					group: "vercel",
-				},
-				{ id: "hit", label: "Cache hit?", kind: "decision", group: "vercel" },
-				{ id: "call", label: "Call OpenAI model", kind: "process", icon: { slug: "openai" } },
-				{ id: "store", label: "Store answer in Redis", kind: "process", icon: { slug: "redis" } },
-				{ id: "log", label: "Log any errors to Sentry", kind: "process", icon: { slug: "sentry" } },
-				{ id: "ret", label: "Return the answer", kind: "end" },
-				{ id: "cached", label: "Return cached answer", kind: "end" },
-			],
+			logos: true,
+			nodes: {
+				page: "Next.js page receives the question",
+				check: "Check Redis cache",
+				hit: "Cache hit?",
+				call: "Call OpenAI model",
+				store: "Store answer in Redis",
+				log: "Log any errors to Sentry",
+				ret: "Return the answer",
+				cached: "Return cached answer",
+			},
 			edges: [
-				{ source: "page", target: "check" },
-				{ source: "check", target: "hit" },
-				{ source: "hit", target: "cached", label: "yes" },
-				{ source: "hit", target: "call", label: "no" },
-				{ source: "call", target: "store" },
-				{ source: "store", target: "log" },
-				{ source: "log", target: "ret" },
+				["page", "check"],
+				["check", "hit"],
+				["hit", "cached", "yes"],
+				["hit", "call", "no"],
+				["call", "store"],
+				["store", "log"],
+				["log", "ret"],
 			],
-			groups: [{ id: "vercel", label: "Vercel" }],
-			layout: { direction: "TB" },
+			groups: {
+				vercel: { label: "Vercel", contains: ["page", "check", "hit"] },
+			},
 		};
 		const options = {
 			artifactFormats: ["scene", "excalidraw"],
@@ -648,27 +583,17 @@ describe("named logo fill", () => {
 
 		/** A logo-drawing chain of nodes inside the given groups. */
 		function grouped(
-			groups: ReadonlyArray<{ id: string; label: string; parent?: string; kind?: string }>,
-			nodes: ReadonlyArray<readonly [string, string, string | undefined, string?]>,
+			groups: Record<string, { label: string; kind?: string; contains: string[] }>,
+			nodes: ReadonlyArray<readonly [string, string]>,
 		) {
-			const spec = chain(
-				nodes.map(([id, label, slug]) => (slug ? ([id, label, slug] as const) : [id, label])),
-			);
-			return {
-				...spec,
-				nodes: spec.nodes.map((node, index) => {
-					const group = nodes[index]?.[3];
-					return group ? { ...node, group } : node;
-				}),
-				groups,
-			};
+			return { ...chain(nodes), groups };
 		}
 
 		it("draws the logo a group's label names before its name, with an info note", async () => {
-			const result = await filling().buildFlowchart({ spec: r23AppSpec, options });
+			const result = await production().buildFlowchart({ spec: r23AppSpec, options });
 
 			expect(groupLogos(result)).toEqual({ vercel: "vercel" });
-			expect(result.issues).toEqual([
+			expect(result.issues.filter((issue) => issue.ref?.kind === "group")).toEqual([
 				{
 					code: "icon_filled",
 					severity: "info",
@@ -680,8 +605,10 @@ describe("named logo fill", () => {
 				},
 			]);
 			if (!result.ok) return;
-			// The spec the model wrote stays as written: groups take no authored logo.
-			expect(result.normalizedSpec.groups).toEqual([{ id: "vercel", label: "Vercel" }]);
+			// The document stays as written: groups take no authored logo.
+			expect(result.normalizedSpec.groups).toEqual({
+				vercel: { label: "Vercel", contains: ["page", "check", "hit"] },
+			});
 			const scene = inlineScene(result);
 			expect(Object.keys(scene.icons ?? {})).toContain("vercel");
 			const frame = scene.elements.find((element) => element.id === "group:vercel");
@@ -732,9 +659,9 @@ describe("named logo fill", () => {
 		it("draws a zone's logo in its header, its label after it", async () => {
 			const spec = {
 				...r23AppSpec,
-				groups: [{ id: "vercel", label: "Vercel", kind: "cloud" }],
+				groups: { vercel: { label: "Vercel", kind: "cloud", contains: ["page", "check", "hit"] } },
 			};
-			const result = await filling().buildFlowchart({ spec, options });
+			const result = await production().buildFlowchart({ spec, options });
 
 			expect(groupLogos(result)).toEqual({ vercel: "vercel" });
 			if (!result.ok) return;
@@ -761,10 +688,8 @@ describe("named logo fill", () => {
 			expect(outline?.groupIds[0]).toBeDefined();
 			expect(logo?.groupIds).toEqual(outline?.groupIds);
 			// The label starts after the logo and its gap.
-			const plain = await filling().buildFlowchart({
-				spec: { ...spec, nodes: spec.nodes.map(({ icon: _icon, ...node }) => node) },
-				options,
-			});
+			const { logos: _logos, ...withoutLogos } = spec;
+			const plain = await production().buildFlowchart({ spec: withoutLogos, options });
 			if (!plain.ok) throw new Error(JSON.stringify(plain.issues));
 			const plainLabel = inlineScene(plain).elements.find(
 				(element) => element.id === "zone-label:vercel",
@@ -776,52 +701,51 @@ describe("named logo fill", () => {
 			expect(label.x - zone.x - (plainLabel.x - plainZone.x)).toBe(24);
 		});
 
-		it("never fills a group in a diagram that draws no logo", async () => {
-			const spec = {
-				...r23AppSpec,
-				nodes: r23AppSpec.nodes.map(({ icon: _icon, ...node }) => node),
-			};
-			const result = await filling().buildFlowchart({ spec, options });
+		it("never fills a group in a diagram that asks for no logos", async () => {
+			const { logos: _logos, ...spec } = r23AppSpec;
+			const result = await production().buildFlowchart({ spec, options });
 
 			expect(groupLogos(result)).toEqual({});
 			expect(result.issues).toEqual([]);
 		});
 
 		it("never fills a group whose label names several products or an everyday word", async () => {
-			const result = await filling().buildFlowchart({
+			const result = await production().buildFlowchart({
 				spec: grouped(
+					{
+						both: { label: "Vercel and Cloudflare", contains: ["push"] },
+						front: { label: "Frontend", contains: ["page"] },
+						edge: { label: "Edge", contains: ["route"] },
+						stream: { label: "Stream processing", contains: ["events"] },
+					},
 					[
-						{ id: "both", label: "Vercel and Cloudflare" },
-						{ id: "front", label: "Frontend" },
-						{ id: "edge", label: "Edge" },
-						{ id: "stream", label: "Stream processing" },
-					],
-					[
-						["push", "Push to GitHub", "github", "both"],
-						["page", "Render the page", undefined, "front"],
-						["route", "Route the request", undefined, "edge"],
-						["events", "Process events", undefined, "stream"],
+						["push", "Push to GitHub"],
+						["page", "Render the page"],
+						["route", "Route the request"],
+						["events", "Process events"],
 					],
 				),
 				options,
 			});
 
 			expect(groupLogos(result)).toEqual({});
-			expect(result.issues).toEqual([]);
+			expect(result.issues.map((issue) => [issue.code, issue.ref?.id])).toEqual([
+				["icon_filled", "push"],
+			]);
 		});
 
 		it("never repeats a logo a node inside the group, or a group around it, already draws", async () => {
-			const result = await filling().buildFlowchart({
+			const result = await production().buildFlowchart({
 				spec: grouped(
+					{
+						cf: { label: "Cloudflare", kind: "cloud", contains: ["worker"] },
+						aws: { label: "AWS", kind: "cloud", contains: ["region"] },
+						region: { label: "AWS us-east-1", kind: "region", contains: ["queue"] },
+					},
 					[
-						{ id: "cf", label: "Cloudflare", kind: "cloud" },
-						{ id: "aws", label: "AWS", kind: "cloud" },
-						{ id: "region", label: "AWS us-east-1", parent: "aws", kind: "region" },
-					],
-					[
-						["push", "Push to GitHub", "github"],
-						["worker", "Cloudflare Workers", "cloudflare", "cf"],
-						["queue", "Enqueue the job", undefined, "region"],
+						["push", "Push to GitHub"],
+						["worker", "Cloudflare Workers"],
+						["queue", "Enqueue the job"],
 					],
 				),
 				options,
@@ -829,18 +753,10 @@ describe("named logo fill", () => {
 
 			expect(groupLogos(result)).toEqual({ aws: "aws" });
 			expect(result.issues.map((issue) => [issue.code, issue.ref?.id])).toEqual([
+				["icon_filled", "push"],
+				["icon_filled", "worker"],
 				["icon_filled", "aws"],
 			]);
-		});
-
-		it("only fills when the host asks, as MCP builds do", async () => {
-			const result = await runtime(productionCatalog).buildFlowchart({
-				spec: r23AppSpec,
-				options,
-			});
-
-			expect(groupLogos(result)).toEqual({});
-			expect(result.issues).toEqual([]);
 		});
 	});
 });
@@ -1067,6 +983,33 @@ describe("hand-drawn icons", () => {
 			{ slug: "docker", size: 28, exact: true },
 			{ slug: "docker", size: 28 },
 		]);
+	});
+	it("embeds catalog SVG marks for a flowchart whose document asks for exact logos", async () => {
+		const spec = {
+			title: "Build",
+			nodes: { build: "Build with Docker", ship: "Ship it" },
+			edges: [["build", "ship"]],
+		};
+		const options = { artifactFormats: ["scene"], inlineArtifacts: ["scene"] };
+		const drawnLoads: string[] = [];
+		const drawn = await runtime(recipeCatalog(drawnLoads)).buildFlowchart({
+			spec: { ...spec, logos: true },
+			options,
+		});
+		if (!drawn.ok) throw new Error(JSON.stringify(drawn.issues));
+		expect(drawnLoads).toEqual([]);
+		expect(inlineScene(drawn).icons?.["docker"]).toEqual({ name: "Docker", recipe: RECIPE });
+
+		const exactLoads: string[] = [];
+		const exact = await runtime(recipeCatalog(exactLoads)).buildFlowchart({
+			spec: { ...spec, logos: "exact" },
+			options,
+		});
+		if (!exact.ok) throw new Error(JSON.stringify(exact.issues));
+		expect(exactLoads).toEqual(["docker"]);
+		expect(inlineScene(exact).icons?.["docker"]).toMatchObject({
+			svg: expect.stringContaining("<svg"),
+		});
 	});
 });
 

@@ -4,7 +4,6 @@ import {
 	canvasNodeIconBand,
 	compileCanvasSpec,
 	embedCanvasIcons,
-	SKETCHI_DIAGRAM_STYLE,
 	type CanvasIconAsset,
 	type CanvasShapeElement,
 } from "@sketchi/diagram-core";
@@ -16,33 +15,17 @@ import githubSvg from "@sketchi/icon-catalog/svg/devtools-ci/github.svg?raw";
 
 export const DEPLOY_PIPELINE_SPEC = {
 	title: "Deploy pipeline",
-	layout: { direction: "LR" },
-	style: { ...SKETCHI_DIAGRAM_STYLE },
-	nodes: [
-		{
-			id: "push",
-			label: "GitHub push",
-			kind: "start",
-			icon: { slug: "github" },
-		},
-		{
-			id: "build",
-			label: "Docker build",
-			kind: "process",
-			icon: { slug: "docker" },
-		},
-		{ id: "tests", label: "Run tests", kind: "process" },
-		{
-			id: "deploy",
-			label: "Cloudflare ship",
-			kind: "end",
-			icon: { slug: "cloudflare" },
-		},
-	],
+	direction: "LR",
+	nodes: {
+		push: { label: "GitHub push", icon: "github" },
+		build: { label: "Docker build", icon: "docker" },
+		tests: "Run tests",
+		deploy: { label: "Cloudflare ship", icon: "cloudflare" },
+	},
 	edges: [
-		{ source: "push", target: "build" },
-		{ source: "build", target: "tests" },
-		{ source: "tests", target: "deploy" },
+		["push", "build"],
+		["build", "tests"],
+		["tests", "deploy"],
 	],
 } satisfies FlowchartSpec;
 

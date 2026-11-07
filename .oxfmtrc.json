@@ -25,7 +25,6 @@
 		// Byte-exact fixtures and frozen compatibility corpora
 		"apps/cli/src/__fixtures__/**",
 		"apps/playground/src/server/codemode/fixtures/**",
-		"packages/diagram/agent/src/lib/code-mode/fixtures/**",
 		// Vendored shadcn and AI Elements registry components
 		"apps/playground/src/components/ai-elements/**",
 		"packages/ui/src/components/**",

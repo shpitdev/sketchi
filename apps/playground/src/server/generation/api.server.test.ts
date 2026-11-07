@@ -430,16 +430,16 @@ describe("public generate endpoint", () => {
 		expect(providerRequest).not.toContain("- kubernetes:");
 		const body = (await response.json()) as {
 			diagram: {
-				document: { spec: { nodes: Array<{ id: string; icon?: unknown }> } };
+				document: { spec: { nodes: Record<string, string | { icon?: unknown }> } };
 				excalidraw: { elements: Array<{ type: string }>; files: object };
 				scene: { icons?: Record<string, unknown> };
 			};
 		};
 		expect(
-			body.diagram.document.spec.nodes
-				.filter((node) => node.icon)
-				.map((node) => [node.id, node.icon]),
-		).toEqual([["start", { slug: "github" }]]);
+			Object.entries(body.diagram.document.spec.nodes).flatMap(([id, node]) =>
+				typeof node !== "string" && node.icon ? [[id, node.icon]] : [],
+			),
+		).toEqual([["start", "github"]]);
 		expect(Object.keys(body.diagram.scene.icons ?? {})).toEqual(["github"]);
 		expect(
 			body.diagram.excalidraw.elements.filter((element) => element.type === "image"),
@@ -684,14 +684,14 @@ describe("revising a stored diagram", () => {
 	const storedSpec = {
 		id: "release-flow",
 		title: "Release approval",
-		nodes: [
-			{ id: "start", label: "Change proposed", kind: "start" },
-			{ id: "review", label: "Review evidence", kind: "process" },
-			{ id: "end", label: "Release recorded", kind: "end" },
-		],
+		nodes: {
+			start: "Change proposed",
+			review: "Review evidence",
+			end: "Release recorded",
+		},
 		edges: [
-			{ id: "e1", source: "start", target: "review" },
-			{ id: "e2", source: "review", target: "end" },
+			["start", "review"],
+			["review", "end"],
 		],
 	};
 
@@ -718,7 +718,7 @@ describe("revising a stored diagram", () => {
 		};
 		expect(body.diagram.document.type).toBe("flowchart");
 		expect(body.diagram.document.spec.id).toBe("release-flow");
-		expect(body.diagram.document.spec.nodes).toHaveLength(flowchartIr.nodes.length);
+		expect(Object.keys(body.diagram.document.spec.nodes)).toHaveLength(flowchartIr.nodes.length);
 	});
 
 	it("turns the diagram into the family the caller names", async () => {

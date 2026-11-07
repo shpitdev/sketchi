@@ -40,18 +40,17 @@ function handleListStudioProjectsRequest(env: StudioEnv, request: Request) {
 
 function flowchartSpec(title: string): FlowchartSpec {
 	return {
-		edges: [
-			{ id: "draft-persist", source: "draft", target: "persist" },
-			{ id: "persist-done", source: "persist", target: "done" },
-		],
-		nodes: [
-			{ id: "draft", label: "Draft diagram", kind: "start" },
-			{ id: "persist", label: "Save artifact", kind: "process" },
-			{ id: "done", label: "Persisted", kind: "end" },
-		],
-		layout: { direction: "LR" },
-		style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
 		title,
+		direction: "LR",
+		nodes: {
+			draft: "Draft diagram",
+			persist: "Save artifact",
+			done: "Persisted",
+		},
+		edges: [
+			["draft", "persist"],
+			["persist", "done"],
+		],
 	};
 }
 

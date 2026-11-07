@@ -19,16 +19,11 @@ const MCP_TIMEOUT_MS = 90_000;
 const EXECUTE_CODE = `async () => sketchi.buildFlowchart({
   spec: {
     title: "Sanity check",
-    nodes: [
-      { id: "start", label: "Start", kind: "start" },
-      { id: "ok", label: "Healthy?", kind: "decision" },
-      { id: "done", label: "Done", kind: "end" },
-      { id: "page", label: "Page on-call", kind: "end" },
-    ],
+    nodes: { start: "Start", ok: "Healthy?", done: "Done", page: "Page on-call" },
     edges: [
-      { source: "start", target: "ok" },
-      { source: "ok", target: "done", label: "yes" },
-      { source: "ok", target: "page", label: "no" },
+      ["start", "ok"],
+      ["ok", "done", "yes"],
+      ["ok", "page", "no"],
     ],
   },
 })`;
