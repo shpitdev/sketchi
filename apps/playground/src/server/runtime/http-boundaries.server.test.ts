@@ -13,7 +13,7 @@ import {
 import { McpTransportError } from "../codemode/mcp.server";
 import { handleGenerateDiagramRequest } from "../generation/api.server";
 import { PlaygroundCodeModeUsage } from "../codemode/usage-events.server";
-import { PlaygroundRequestMetadata } from "./context.server";
+import { PlaygroundPlatformCallbacks, PlaygroundRequestMetadata } from "./context.server";
 import { readBoundedJson, RequestBodyReadError } from "./request-body.server";
 import { makePlaygroundRuntime, runPlaygroundEffect } from "./runtime.server";
 
@@ -212,6 +212,49 @@ describe("request spans", () => {
 		const read = rows.find((row) => row.name === "playground.http.readBoundedJson");
 		expect(attributes(read)["http.request.body"]).toBe('{"prompt":"two boxes"}');
 		expect(read?.parent_span_id).toBe(root?.span_id);
+	});
+
+	it("gives every span of a request, deferred work and streams included, its IDs", async () => {
+		const request = new Request("https://studio.test/api/chat", {
+			headers: {
+				"cf-ray": "8f1a2b3c4d5e6f71-DFW",
+				"content-type": "application/json",
+				"x-sketchi-run-id": "run_from_header",
+			},
+			method: "POST",
+		});
+		const { boundary: exporting, pending, sends } = exportingBoundary(request);
+		const response = await runPlaygroundEffect(
+			Effect.gen(function* () {
+				const platform = yield* PlaygroundPlatformCallbacks;
+				const metadata = yield* PlaygroundRequestMetadata;
+				platform.waitUntil(Effect.void.pipe(Effect.withSpan("test.deferred.work")));
+				yield* Effect.logInfo("handled");
+				return new Response(`data: ${metadata.attemptId}\n\n`, {
+					headers: { "content-type": "text/event-stream" },
+				});
+			}),
+			exporting,
+		);
+		const attemptId = (await response.text()).slice("data: ".length).trim();
+		await Promise.all(pending);
+		const rows = sends.flat();
+		expect(rows.map((row) => row.name)).toEqual(
+			expect.arrayContaining([
+				"playground.request",
+				"playground.request.deferred",
+				"playground.response.stream",
+				"test.deferred.work",
+			]),
+		);
+		expect(attemptId).toMatch(/^attempt_/);
+		for (const row of rows) {
+			expect(row, row.name).toMatchObject({
+				attempt_id: attemptId,
+				ray_id: "8f1a2b3c4d5e6f71-DFW",
+				run_id: "run_from_header",
+			});
+		}
 	});
 
 	it("records a streamed response once it ends, without holding the response", async () => {

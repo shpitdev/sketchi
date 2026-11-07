@@ -81,9 +81,12 @@ describe("eval harness scenario generation composition", () => {
 		const scenarioIds = ["unknown-one", "unknown-two"];
 		await Promise.all(
 			scenarioIds.map((scenarioId) =>
-				runGenerateScenarioCandidatesForInput({ scenarioId }, bindings, undefined, (promise) =>
-					pending.push(promise),
-				),
+				runGenerateScenarioCandidatesForInput({ scenarioId }, bindings, {
+					request: new Request("https://eval.test/api/scenario-candidates", {
+						headers: { "cf-ray": `ray-${scenarioId}`, "x-sketchi-run-id": `run-${scenarioId}` },
+					}),
+					waitUntil: (promise) => pending.push(promise),
+				}),
 			),
 		);
 		await Promise.all(pending);
@@ -97,6 +100,15 @@ describe("eval harness scenario generation composition", () => {
 			);
 			expect(new Set(batch?.map((row) => row.trace_id)).size).toBe(1);
 			expect(batch?.every((row) => row.service === "sketchi-playground")).toBe(true);
+			// Every span carries its own request's IDs, though the runtime is shared.
+			for (const row of batch ?? []) {
+				expect(row).toMatchObject({
+					attempt_id: expect.stringMatching(/^attempt_/),
+					ray_id: `ray-${scenarioId}`,
+					run_id: `run-${scenarioId}`,
+				});
+			}
+			expect(new Set(batch?.map((row) => row.attempt_id)).size).toBe(1);
 		}
 		expect(sends[0]?.[0]?.trace_id).not.toBe(sends[1]?.[0]?.trace_id);
 	});
@@ -132,7 +144,7 @@ describe("eval harness scenario generation composition", () => {
 		const result = runGenerateScenarioCandidatesForInput(
 			{ scenarioId: "sketchi-onboarding-decision-flow" },
 			bindings,
-			controller.signal,
+			{ signal: controller.signal },
 		);
 		// oxlint-disable-next-line vitest/valid-expect -- attached before the abort and awaited below
 		const rejection = expect(result).rejects.toBeDefined();

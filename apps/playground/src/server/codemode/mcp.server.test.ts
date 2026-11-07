@@ -9,6 +9,8 @@ import { Context, Effect, Option, Schema } from "effect";
 import type { CodeModeObjectBucket, CodeModeObjectBucketObject } from "@sketchi/diagram-agent";
 import { normalizedSpecFrom } from "@sketchi/diagram-scenarios";
 
+import type { TelemetrySpanRow } from "@sketchi/observability";
+
 import type { StudioEnv } from "../bindings/studio-env.server";
 import type { PngRenderResult } from "./png-renderer-object.server";
 import { PlaygroundRequestMetadata } from "../runtime/context.server";
@@ -24,6 +26,7 @@ import {
 	CodeModeSearchResultSchema,
 } from "./mcp-docs.server";
 import { createEffectMcpServer, makeEffectMcpTool } from "./effect-mcp-adapter.server";
+import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "./usage-events.server";
 import {
 	ExecuteRequestSchema,
 	ExecuteResultSchema,
@@ -338,64 +341,58 @@ class MemoryBucket implements CodeModeObjectBucket {
 	}
 }
 
-class MemoryPipeline {
-	readonly batches: unknown[][] = [];
+/** Collects the rows requests send to the spans stream. */
+class SpanPipeline {
+	readonly rows: TelemetrySpanRow[] = [];
 
 	async send(records: readonly unknown[]): Promise<void> {
-		this.batches.push([...records]);
+		this.rows.push(...(records as TelemetrySpanRow[]));
+	}
+}
+
+/** Each Code Mode call's usage, as its capture span recorded it, joining split rows. */
+function usageCaptures(spans: SpanPipeline) {
+	const captures = new Map<string, TelemetrySpanRow[]>();
+	for (const row of spans.rows) {
+		if (row.name !== "playground.codeModeUsage.capture") continue;
+		captures.set(row.span_id, [...(captures.get(row.span_id) ?? []), row]);
+	}
+	return [...captures.values()]
+		.filter((parts) => parts.length === parts[0]?.part_count)
+		.map((parts) => {
+			const text = parts
+				.sort((left, right) => left.part_index - right.part_index)
+				.map((part) => part.attributes)
+				.join("");
+			const attributes = JSON.parse(text) as Record<string, unknown>;
+			return {
+				event: attributes[USAGE_EVENT_ATTRIBUTE] as Record<string, unknown>,
+				issues: attributes[USAGE_ISSUES_ATTRIBUTE] as unknown[],
+				parts: parts.length,
+				request: attributes["sketchi.input"],
+				response: attributes["sketchi.output"],
+			};
+		});
+}
+
+async function waitForUsageCaptures(spans: SpanPipeline, count: number) {
+	const deadline = Date.now() + 1_000;
+
+	while (Date.now() < deadline) {
+		const captures = usageCaptures(spans);
+		if (captures.length >= count) {
+			return captures;
+		}
+		await delay(5);
 	}
 
-	records(): unknown[] {
-		return this.batches.flat();
-	}
+	throw new Error(`Expected ${count} usage capture span(s) to be sent.`);
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 	const buffer = new ArrayBuffer(bytes.byteLength);
 	new Uint8Array(buffer).set(bytes);
 	return buffer;
-}
-
-async function readBucketJson(bucket: MemoryBucket, key: string): Promise<unknown> {
-	const object = await bucket.get(key);
-	return JSON.parse((await object?.text()) ?? "{}");
-}
-
-async function usageEventsFrom(bucket: MemoryBucket): Promise<unknown[]> {
-	const eventKeys = [...bucket.objects.keys()]
-		.filter((key) => key.startsWith("codemode/usage/"))
-		.filter((key) => key.endsWith("/event.json"))
-		.sort();
-
-	return Promise.all(eventKeys.map((key) => readBucketJson(bucket, key)));
-}
-
-async function waitForUsageEvents(bucket: MemoryBucket, count: number): Promise<unknown[]> {
-	const deadline = Date.now() + 1_000;
-
-	while (Date.now() < deadline) {
-		const events = await usageEventsFrom(bucket);
-		if (events.length >= count) {
-			return events;
-		}
-		await delay(5);
-	}
-
-	throw new Error(`Expected ${count} usage event(s) to be persisted.`);
-}
-
-async function waitForPipelineRecords(pipeline: MemoryPipeline, count: number): Promise<unknown[]> {
-	const deadline = Date.now() + 1_000;
-
-	while (Date.now() < deadline) {
-		const records = pipeline.records();
-		if (records.length >= count) {
-			return records;
-		}
-		await delay(5);
-	}
-
-	throw new Error(`Expected ${count} pipeline record(s) to be sent.`);
 }
 
 function delay(ms: number): Promise<void> {
@@ -1765,9 +1762,9 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 	);
 
 	it("reports every build over MCP when the script returns unrelated data", async () => {
-		const bucket = new MemoryBucket();
+		const spans = new SpanPipeline();
 		const server = await createSketchiMcpServer(
-			{ SKETCHI_ARTIFACTS: bucket },
+			{ SKETCHI_ARTIFACTS: new MemoryBucket(), TELEMETRY_SPANS: spans },
 			{ executor: createInProcessExecutor() },
 		);
 		const client = new Client({ name: "build-receipt-test", version: "1" });
@@ -1818,24 +1815,22 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			});
 			expect(JSON.stringify(output.builds)).not.toContain('"inline":');
 			expect(new TextEncoder().encode(JSON.stringify(output)).byteLength).toBeLessThan(1_000_000);
-			const events = await waitForUsageEvents(bucket, 1);
-			expect(events).toEqual(
+			const captures = await waitForUsageCaptures(spans, 1);
+			expect(captures).toEqual(
 				expect.arrayContaining([
 					expect.objectContaining({
-						operation: "execute",
-						artifactRefs: output.builds
-							.filter(isRecord)
-							.filter((build) => isRecord(build.artifact))
-							.map((build) =>
-								expect.objectContaining({
-									artifactId: isRecord(build.artifact) ? build.artifact.artifactId : undefined,
-								}),
-							),
-						response: {
-							body: expect.objectContaining({
-								value: expect.objectContaining({ builds: output.builds }),
-							}),
-						},
+						event: expect.objectContaining({
+							operation: "execute",
+							artifacts: output.builds
+								.filter(isRecord)
+								.filter((build) => isRecord(build.artifact))
+								.map((build) =>
+									expect.objectContaining({
+										artifactId: isRecord(build.artifact) ? build.artifact.artifactId : undefined,
+									}),
+								),
+						}),
+						response: expect.objectContaining({ builds: output.builds }),
 					}),
 				]),
 			);
@@ -1871,17 +1866,16 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			const scriptReturned = Promise.withResolvers<void>();
 			class GatedBucket extends MemoryBucket {
 				override async put(key: string, value: string | ArrayBuffer | Uint8Array) {
-					if (!key.startsWith("codemode/usage/")) {
-						writeStarted.resolve();
-						await releaseWrite.promise;
-					}
+					writeStarted.resolve();
+					await releaseWrite.promise;
 					return super.put(key, value);
 				}
 			}
 			const bucket = new GatedBucket();
+			const spans = new SpanPipeline();
 			let launched: Promise<unknown> | undefined;
 			const execution = executeSketchiCodeMode(
-				{ SKETCHI_ARTIFACTS: bucket },
+				{ SKETCHI_ARTIFACTS: bucket, TELEMETRY_SPANS: spans },
 				{ code: "async () => {}" },
 				{
 					executor: {
@@ -1915,14 +1909,10 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 					}),
 				]);
 				if (timedOut) expect(output).toMatchObject({ ok: false, error: "Execution timed out" });
-				const events = await waitForUsageEvents(bucket, 1);
-				expect(events).toEqual([
+				const captures = await waitForUsageCaptures(spans, 1);
+				expect(captures).toEqual([
 					expect.objectContaining({
-						response: {
-							body: expect.objectContaining({
-								value: expect.objectContaining({ builds: output.builds }),
-							}),
-						},
+						response: expect.objectContaining({ builds: output.builds }),
 					}),
 				]);
 				releaseWrite.resolve();
@@ -1939,10 +1929,9 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 	it.each([1, 2])(
 		"counts issues once per build, not per returned copy (%i builds)",
 		async (count) => {
-			const events = new MemoryPipeline();
-			const issues = new MemoryPipeline();
+			const spans = new SpanPipeline();
 			const output = await executeSketchiCodeMode(
-				{ CODEMODE_USAGE_EVENTS: events, CODEMODE_USAGE_ISSUES: issues },
+				{ TELEMETRY_SPANS: spans },
 				{
 					code: `async () => { let built; for (let i = 0; i < ${count}; i++) built = await sketchi.buildFlowchart({spec:{}}); return built; }`,
 				},
@@ -1950,18 +1939,16 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			);
 			const issueCount = output.builds.reduce((total, build) => total + build.issues.length, 0);
 			expect(issueCount).toBeGreaterThan(0);
-			expect(await waitForPipelineRecords(events, 1)).toEqual([
-				expect.objectContaining({ issue_count: issueCount }),
-			]);
-			expect(await waitForPipelineRecords(issues, issueCount)).toHaveLength(issueCount);
+			const [capture] = await waitForUsageCaptures(spans, 1);
+			expect(capture?.event).toMatchObject({ issue_count: issueCount });
+			expect(capture?.issues).toHaveLength(issueCount);
 		},
 	);
 
 	it("does not duplicate warnings from an accepted build returned directly", async () => {
-		const events = new MemoryPipeline();
-		const issues = new MemoryPipeline();
+		const spans = new SpanPipeline();
 		const output = await executeSketchiCodeMode(
-			{ CODEMODE_USAGE_EVENTS: events, CODEMODE_USAGE_ISSUES: issues },
+			{ TELEMETRY_SPANS: spans },
 			{
 				code: `async () => sketchi.buildFlowchart({spec:{title:"Warning receipt",nodes:[{id:"a",label:"Begin",kind:"start",icon:{slug:"not-a-real-logo"}},{id:"b",label:"Finish",kind:"end"}],edges:[{source:"a",target:"b"}]}})`,
 			},
@@ -1973,17 +1960,15 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			throw new Error("Missing quality report");
 		expect(build.issues.length).toBeGreaterThan(0);
 		const count = build.issues.length + build.quality.checks.length;
-		expect(await waitForPipelineRecords(events, 1)).toEqual([
-			expect.objectContaining({ issue_count: count }),
-		]);
-		expect(await waitForPipelineRecords(issues, count)).toHaveLength(count);
+		const [capture] = await waitForUsageCaptures(spans, 1);
+		expect(capture?.event).toMatchObject({ issue_count: count });
+		expect(capture?.issues).toHaveLength(count);
 	});
 
 	it("preserves non-build issues alongside canonical build receipt issues", async () => {
-		const events = new MemoryPipeline();
-		const issues = new MemoryPipeline();
+		const spans = new SpanPipeline();
 		const output = await executeSketchiCodeMode(
-			{ CODEMODE_USAGE_EVENTS: events, CODEMODE_USAGE_ISSUES: issues },
+			{ TELEMETRY_SPANS: spans },
 			{
 				code: `async () => { const built = await sketchi.buildFlowchart({spec:{}}); const extra = await sketchi.searchIcons({q:""}); return { built, extra }; }`,
 			},
@@ -1998,10 +1983,9 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		const count =
 			output.builds.reduce((total, build) => total + build.issues.length, 0) +
 			output.result.extra.issues.length;
-		expect(await waitForPipelineRecords(events, 1)).toEqual([
-			expect.objectContaining({ issue_count: count }),
-		]);
-		expect(await waitForPipelineRecords(issues, count)).toHaveLength(count);
+		const [capture] = await waitForUsageCaptures(spans, 1);
+		expect(capture?.event).toMatchObject({ issue_count: count });
+		expect(capture?.issues).toHaveLength(count);
 	});
 
 	it("waits for sandbox builds whose RPC arrives after the script returns", async () => {
@@ -2092,11 +2076,11 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 	});
 
 	it.each([950_000, 1_000_000])(
-		"keeps artifact refs and enforces the snapshot cap with %i bytes of script output",
+		"keeps artifact refs and the whole response with %i bytes of script output",
 		async (size) => {
-			const bucket = new MemoryBucket();
+			const spans = new SpanPipeline();
 			const output = await executeSketchiCodeMode(
-				{ SKETCHI_ARTIFACTS: bucket },
+				{ SKETCHI_ARTIFACTS: new MemoryBucket(), TELEMETRY_SPANS: spans },
 				{
 					code: `async () => {
             await (${BUILD_MINDMAP_CODE})();
@@ -2106,24 +2090,19 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				{ executor: createInProcessExecutor() },
 			);
 			expect(output.builds).toHaveLength(1);
-			const events = await waitForUsageEvents(bucket, 1);
-			expect(events).toEqual([
+			const captures = await waitForUsageCaptures(spans, 1);
+			expect(captures).toEqual([
 				expect.objectContaining({
-					artifactRefs: [
-						expect.objectContaining({ artifactId: output.builds[0]?.artifact?.artifactId }),
-					],
-					response: {
-						body: expect.objectContaining(
-							size < 1_000_000
-								? {
-										value: expect.objectContaining({ builds: output.builds }),
-										sizeBytes: expect.any(Number),
-									}
-								: { omittedReason: "snapshot_too_large", sizeBytes: expect.any(Number) },
-						),
-					},
+					event: expect.objectContaining({
+						artifacts: [
+							expect.objectContaining({ artifactId: output.builds[0]?.artifact?.artifactId }),
+						],
+					}),
+					response: expect.objectContaining({ builds: output.builds, result: "x".repeat(size) }),
 				}),
 			]);
+			// A span larger than one stream record continues across rows.
+			expect(captures[0]?.parts).toBeGreaterThan(1);
 			if (size < 1_000_000)
 				expect(new TextEncoder().encode(JSON.stringify(output)).byteLength).toBeLessThan(1_000_000);
 		},
@@ -2244,9 +2223,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		);
 	});
 
-	it("captures MCP execute usage events in the artifact bucket", async () => {
-		const bucket = new MemoryBucket();
-		const usageEventsPipeline = new MemoryPipeline();
+	it("records MCP execute usage, with the harness its headers name, on its capture span", async () => {
+		const spans = new SpanPipeline();
 		const request = new Request("https://studio.test/mcp", {
 			method: "POST",
 			headers: {
@@ -2259,10 +2237,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		});
 
 		const result = await executeSketchiCodeMode(
-			{
-				CODEMODE_USAGE_EVENTS: usageEventsPipeline,
-				SKETCHI_ARTIFACTS: bucket,
-			},
+			{ SKETCHI_ARTIFACTS: new MemoryBucket(), TELEMETRY_SPANS: spans },
 			{
 				code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
 			},
@@ -2280,64 +2255,33 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			ok: true,
 		});
 
-		const usageEvents = await waitForUsageEvents(bucket, 1);
-		expect(usageEvents).toHaveLength(1);
-		expect(usageEvents[0]).toMatchObject({
-			artifactRefs: [
-				{
-					artifactId: "artifact_without_urls",
-					diagramId: "diagram_without_urls",
-				},
-			],
-			client: {
+		const captures = await waitForUsageCaptures(spans, 1);
+		expect(captures).toHaveLength(1);
+		expect(captures[0]).toMatchObject({
+			event: {
+				artifact_count: 1,
+				artifact_delivery: true,
+				artifact_formats: "scene,excalidraw,png",
+				artifacts: [
+					{
+						artifactId: "artifact_without_urls",
+						diagramId: "diagram_without_urls",
+					},
+				],
 				harness: "agy",
+				issue_count: 0,
 				model: "gemini-3.5-flash",
-				reasoningLevel: "medium",
-				scenarioId: "scenario-approval",
-				userAgent: "agy-test",
+				operation: "execute",
+				reasoning_level: "medium",
+				request_method: "POST",
+				request_path: "/mcp",
+				scenario_id: "scenario-approval",
+				status: "ok",
+				surface: "mcp",
+				user_agent: "agy-test",
 			},
-			operation: "execute",
-			request: {
-				method: "POST",
-				path: "/mcp",
-			},
-			schema: "sketchi.codemode.usage.v1",
-			status: "ok",
-			surface: "mcp",
+			request: { code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE },
 		});
-		if (!isRecord(usageEvents[0]) || !isRecord(usageEvents[0].request)) {
-			throw new Error("Usage event did not include request metadata.");
-		}
-		if (!isRecord(usageEvents[0].request.body)) {
-			throw new Error("Usage event did not include a request snapshot.");
-		}
-		expect(usageEvents[0].request.body.value).toMatchObject({
-			code: ACCEPTED_ARTIFACT_WITHOUT_URLS_CODE,
-		});
-
-		const eventRows = await waitForPipelineRecords(usageEventsPipeline, 1);
-		expect(eventRows[0]).toMatchObject({
-			artifact_count: 1,
-			artifact_delivery: true,
-			artifact_formats: "scene,excalidraw,png",
-			harness: "agy",
-			issue_count: 0,
-			model: "gemini-3.5-flash",
-			operation: "execute",
-			reasoning_level: "medium",
-			request_method: "POST",
-			request_path: "/mcp",
-			scenario_id: "scenario-approval",
-			schema: "sketchi.codemode.usage.v1",
-			status: "ok",
-			surface: "mcp",
-			user_agent: "agy-test",
-		});
-		if (!isRecord(eventRows[0])) {
-			throw new Error("Usage pipeline event row was not an object.");
-		}
-		expect(eventRows[0].event_key).toMatch(/^codemode\/usage\//);
-		expect(eventRows[0].event_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 	});
 
 	it("synthesizes artifactDelivery URLs from the MCP origin when formats omit URLs", async () => {

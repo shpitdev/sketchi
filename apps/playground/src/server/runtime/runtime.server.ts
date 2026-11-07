@@ -134,17 +134,23 @@ function runWithPlaygroundRuntime<A, E>(
 		const url = new URL(boundary.request.url);
 		const traceId =
 			correlationIdHeader(boundary.request, "x-sketchi-trace-id") ?? ids.create("trace");
+		// One run and attempt per request, so every span of it carries them.
+		const runId = correlationIdHeader(boundary.request, "x-sketchi-run-id") ?? ids.create("run");
+		const attemptId =
+			correlationIdHeader(boundary.request, "x-sketchi-attempt-id") ?? ids.create("attempt");
 		const requestRoute = normalizedRequestRoute(url.pathname);
 		const requestAnnotations = {
 			"request.method": boundary.request.method,
 			"request.route": requestRoute,
 		};
-		const correlation = { traceId };
+		const correlation = { attemptId, ...(rayId ? { rayId } : {}), runId, traceId };
 
 		yield* Effect.annotateCurrentSpan({
 			...requestAnnotations,
 			...(rayId ? { "cf.ray_id": rayId } : {}),
 			"http.request.headers": recordedHeaders(boundary.request.headers),
+			"sketchi.attempt_id": attemptId,
+			"sketchi.run_id": runId,
 			"sketchi.trace_id": traceId,
 			"url.full": boundary.request.url,
 		});
@@ -185,10 +191,12 @@ function runWithPlaygroundRuntime<A, E>(
 				waitUntilPromise: boundary.platform.waitUntilPromise,
 			}),
 			Context.add(PlaygroundRequestMetadata, {
+				attemptId,
 				method: boundary.request.method,
 				origin: url.origin,
 				path: `${url.pathname}${url.search}`,
 				request: boundary.request,
+				runId,
 				traceId,
 			}),
 		);
@@ -242,7 +250,6 @@ function runWithPlaygroundRuntime<A, E>(
 	}).pipe(
 		withTelemetryExport({
 			pipeline: boundary.env.TELEMETRY_SPANS,
-			rayId,
 			waitUntil: boundary.platform.waitUntilPromise,
 		}),
 		Effect.withSpan("playground.request"),

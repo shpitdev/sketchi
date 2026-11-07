@@ -4,6 +4,7 @@ import { DurableObject } from "cloudflare:workers";
 import {
 	makeWorkersTelemetryLayer,
 	type TelemetryPipeline,
+	withTelemetryCorrelation,
 	withTelemetryExport,
 } from "@sketchi/observability";
 import { Effect, Layer, ManagedRuntime, Tracer } from "effect";
@@ -100,16 +101,31 @@ export class CodeModePngRenderer extends DurableObject<CodeModePngRendererEnv> {
 		);
 	}
 
-	/** Roots one call's spans under the caller's span and sends them when the call ends. */
+	/**
+	 * Roots one call's spans under the caller's span, with the caller's ray, run and
+	 * attempt IDs, and sends them when the call ends.
+	 */
 	#exportSpans(name: string, caller: PngRenderCaller | undefined) {
 		const target = {
 			pipeline: this.env.TELEMETRY_SPANS,
 			waitUntil: (promise: Promise<unknown>) => this.ctx.waitUntil(promise),
 		};
 		return <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-			effect.pipe(
-				withTelemetryExport(target),
-				Effect.withSpan(name, caller ? { parent: Tracer.externalSpan(caller) } : {}),
+			withTelemetryCorrelation(
+				effect.pipe(
+					withTelemetryExport(target),
+					Effect.withSpan(
+						name,
+						caller
+							? { parent: Tracer.externalSpan({ spanId: caller.spanId, traceId: caller.traceId }) }
+							: {},
+					),
+				),
+				{
+					...(caller?.attemptId ? { attemptId: caller.attemptId } : {}),
+					...(caller?.rayId ? { rayId: caller.rayId } : {}),
+					...(caller?.runId ? { runId: caller.runId } : {}),
+				},
 			);
 	}
 

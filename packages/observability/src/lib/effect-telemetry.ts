@@ -38,18 +38,25 @@ export interface TelemetryCorrelationInput {
 	readonly artifactId?: string;
 	readonly attemptId?: string;
 	readonly projectId?: string;
+	/** The Cloudflare ray ID of the request. */
+	readonly rayId?: string;
 	readonly requestId?: string;
 	readonly runId?: string;
 	readonly scenarioId?: string;
 	readonly traceId?: string;
 }
 
+const RAY_ID_ATTRIBUTE = "cf.ray_id";
+const RUN_ID_ATTRIBUTE = "sketchi.run_id";
+const ATTEMPT_ID_ATTRIBUTE = "sketchi.attempt_id";
+
 const correlationFields = [
 	["artifactId", "sketchi.artifact_id"],
-	["attemptId", "sketchi.attempt_id"],
+	["attemptId", ATTEMPT_ID_ATTRIBUTE],
 	["projectId", "sketchi.project_id"],
+	["rayId", RAY_ID_ATTRIBUTE],
 	["requestId", "sketchi.request_id"],
-	["runId", "sketchi.run_id"],
+	["runId", RUN_ID_ATTRIBUTE],
 	["scenarioId", "sketchi.scenario_id"],
 	["traceId", "sketchi.trace_id"],
 ] satisfies readonly (readonly [keyof TelemetryCorrelationInput, string])[];
@@ -86,8 +93,25 @@ export interface TelemetryPipeline {
 export interface TelemetryExportTarget {
 	/** The spans stream. Without one, the request's spans are not stored. */
 	readonly pipeline: TelemetryPipeline | undefined;
-	readonly rayId?: string | undefined;
 	readonly waitUntil: (promise: Promise<unknown>) => void;
+}
+
+/** The IDs every row of a request carries. */
+interface RowCorrelation {
+	readonly attempt_id?: string;
+	readonly ray_id?: string;
+	readonly run_id?: string;
+}
+
+function rowCorrelation(attributes: ReadonlyMap<string, unknown>): RowCorrelation {
+	const attemptId = stringAttribute(attributes, ATTEMPT_ID_ATTRIBUTE);
+	const rayId = stringAttribute(attributes, RAY_ID_ATTRIBUTE);
+	const runId = stringAttribute(attributes, RUN_ID_ATTRIBUTE);
+	return {
+		...(attemptId ? { attempt_id: attemptId } : {}),
+		...(rayId ? { ray_id: rayId } : {}),
+		...(runId ? { run_id: runId } : {}),
+	};
 }
 
 interface TelemetryExporterShape {
@@ -294,18 +318,21 @@ const MAX_HELD_SPANS = 1_000;
  */
 class SpanBatch {
 	readonly #exporter: SpanExporter;
+	readonly #root: Tracer.Span;
 	readonly #target: TelemetryExportTarget;
 	#open = 0;
 	#rootEnded = false;
 	#spans: TelemetrySpan[] = [];
 
-	constructor(exporter: SpanExporter, target: TelemetryExportTarget) {
+	constructor(exporter: SpanExporter, target: TelemetryExportTarget, root: Tracer.Span) {
 		this.#exporter = exporter;
+		this.#root = root;
 		this.#target = target;
 	}
 
-	get rayId(): string | undefined {
-		return this.#target.rayId;
+	/** The request's ray, run and attempt IDs, as its root span records them. */
+	get correlation(): RowCorrelation {
+		return rowCorrelation(this.#root.attributes);
 	}
 
 	enter(): void {
@@ -362,8 +389,8 @@ class SpanExporter implements TelemetryExporterShape {
 		return this.#sequence;
 	}
 
-	batch(target: TelemetryExportTarget): SpanBatch {
-		return new SpanBatch(this, target);
+	batch(target: TelemetryExportTarget, root: Tracer.Span): SpanBatch {
+		return new SpanBatch(this, target, root);
 	}
 
 	takeHeld(): TelemetrySpan[] {
@@ -420,7 +447,7 @@ class SpanExporter implements TelemetryExporterShape {
 				name: event.type === "log" ? "effect.log" : "effect.metric",
 				outcome: "success",
 				...(parent ? { parent_span_id: parent.spanId } : {}),
-				...(batch?.rayId ? { ray_id: batch.rayId } : {}),
+				...batch?.correlation,
 				...this.resourceFields(),
 				span_id: randomHex(8),
 				start_time: time,
@@ -463,7 +490,7 @@ class ExportingSpan extends Tracer.NativeSpan {
 	/** Makes this span the root of a request whose spans go to `target`. */
 	adopt(target: TelemetryExportTarget): void {
 		if (this.#batch || this.status._tag === "Ended") return;
-		this.#batch = this.#exporter.batch(target);
+		this.#batch = this.#exporter.batch(target, this);
 		this.#batch.enter();
 		this.#root = true;
 	}
@@ -507,9 +534,6 @@ class ExportingSpan extends Tracer.NativeSpan {
 	#finished(endTime: bigint, exit: Exit.Exit<unknown, unknown>): TelemetrySpan {
 		const parent = Option.getOrUndefined(this.parent);
 		const attributes = this.attributes;
-		const runId = stringAttribute(attributes, "sketchi.run_id");
-		const attemptId = stringAttribute(attributes, "sketchi.attempt_id");
-		const rayId = this.#batch?.rayId ?? stringAttribute(attributes, "cf.ray_id");
 		const links: TelemetryEvent[] = this.links.map((link) => ({
 			attributes: jsonRecord(Object.entries(link.attributes)),
 			seq: this.#exporter.nextSeq(),
@@ -518,7 +542,9 @@ class ExportingSpan extends Tracer.NativeSpan {
 			type: "link",
 		}));
 		return {
-			...(attemptId ? { attempt_id: attemptId } : {}),
+			// A span without its own IDs carries its request's.
+			...this.#batch?.correlation,
+			...rowCorrelation(attributes),
 			// The Workers clock only advances on I/O, so many spans share a start time.
 			attributes: { ...jsonRecord(attributes), [START_SEQ_ATTRIBUTE]: this.#startSeq },
 			duration_ms: Math.max(0, Number(endTime - this.startTime) / 1_000_000),
@@ -528,8 +554,6 @@ class ExportingSpan extends Tracer.NativeSpan {
 			name: this.name,
 			...exitDetails(exit),
 			...(parent ? { parent_span_id: parent.spanId } : {}),
-			...(rayId ? { ray_id: rayId } : {}),
-			...(runId ? { run_id: runId } : {}),
 			...this.#exporter.resourceFields(),
 			span_id: this.spanId,
 			start_time: isoFromNanos(this.startTime),

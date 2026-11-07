@@ -50,16 +50,6 @@
 		}
 	],
 	"pipelines": [
-		{
-			"binding": "CODEMODE_USAGE_EVENTS",
-			"stream": "d9044253316f4273a60298098f444a62",
-			"remote": true
-		},
-		{
-			"binding": "CODEMODE_USAGE_ISSUES",
-			"stream": "f687dab6e7d742c1a76834089e709462",
-			"remote": true
-		},
 		// sketchi_telemetry_spans_production. Not remote, so local development stays out of it.
 		{
 			"binding": "TELEMETRY_SPANS",
@@ -115,16 +105,6 @@
 			}
 		],
 		"pipelines": [
-			{
-				"binding": "CODEMODE_USAGE_EVENTS",
-				"stream": "e9fc3bcd35314fa39fc6a89018207acc",
-				"remote": true
-			},
-			{
-				"binding": "CODEMODE_USAGE_ISSUES",
-				"stream": "d95a1767edf246af8c637c5b9bf5a5c5",
-				"remote": true
-			},
 			// sketchi_telemetry_spans_preview
 			{
 				"binding": "TELEMETRY_SPANS",

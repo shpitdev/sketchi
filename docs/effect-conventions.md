@@ -26,21 +26,20 @@ proof.
   run, attempt, scenario, project, and artifact identifiers through Effect
   context and annotations. Correlation identifiers link events but are never
   metric attributes.
-- Logs inside the Effect ring use `Effect.log*` with approved static messages
-  and allowlisted scalar fields. Do not log causes, prompts, artifacts, request
-  bodies, response bodies, or arbitrary object serialization.
+- Logs inside the Effect ring use `Effect.log*` with a message and a record of
+  fields. Content, such as a prompt, a model's answer or a request body, goes on
+  the span as an attribute (`SpanContent` names the common ones) rather than in
+  a log message.
 
 ## Workers telemetry
 
 `@sketchi/observability` installs one tracer, logger, and isolated metric
-registry in an application-owned Effect scope. The live sink emits bounded JSON
-events to Workers Logs with Effect trace and span identifiers. Allocation and
-shutdown belong to the layer scope; the package performs no module-scope I/O,
-starts no timers, and owns no global mutable correlation state.
-
-The exporter complements Cloudflare surfaces. It does not change AI Gateway
-`collectLog`, Code Mode usage-event rows, Pipeline streams, R2 catalog targets,
-or R2 SQL verification queries.
+registry in an application-owned Effect scope. Each finished span becomes a row,
+with every attribute, its logs and metric updates, and the full cause of a
+failure; a request's rows go to the `TELEMETRY_SPANS` Pipeline stream when the
+request ends. The package performs no module-scope I/O, starts no timers, and
+owns no global mutable correlation state. It does not change AI Gateway
+`collectLog`.
 
 ## Services, layers, and runtimes
 
@@ -55,8 +54,6 @@ or R2 SQL verification queries.
   finalizers before exit. `Effect.runPromise` is not a Node main-loop adapter.
 - Parameterized layer construction is restricted to runtime bindings. Build it
   once at the edge and reuse the resulting layer.
-- `scripts/pipelines/r2-catalog-smoke.ts` runs through `jiti` and uses the
-  shared `diagram-scenarios` tool-process service, not a local runner.
 - Node child processes are scoped resources. Timeout is measured until process
   exit; close receives a separate bounded grace for inherited stdio. Timeout or
   interruption targets the owned process group/tree with SIGTERM, escalates to

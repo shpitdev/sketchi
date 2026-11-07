@@ -55,7 +55,6 @@ function fakeExport() {
 				return Promise.resolve();
 			},
 		},
-		rayId: "ray-test",
 		waitUntil: (promise) => pending.push(promise),
 	};
 	return { pending, sends, target };
@@ -258,8 +257,17 @@ describe("request span export", () => {
 		return Effect.gen(function* () {
 			yield* Effect.void.pipe(Effect.withSpan("held.before.request"));
 			yield* Effect.gen(function* () {
+				yield* Effect.annotateCurrentSpan({
+					"cf.ray_id": "ray-test",
+					"sketchi.attempt_id": "attempt-test",
+					"sketchi.run_id": "run-test",
+				});
 				yield* Effect.logInfo("inside");
 				yield* Effect.void.pipe(Effect.withSpan("request.child"));
+				// A span with its own run keeps it, and takes the request's other IDs.
+				yield* Effect.void.pipe(
+					Effect.withSpan("request.other_run", { attributes: { "sketchi.run_id": "run-other" } }),
+				);
 				assert.strictEqual(sends.length, 0);
 			}).pipe(withTelemetryExport(target), Effect.withSpan("request.root"));
 			assert.strictEqual(sends.length, 1);
@@ -267,13 +275,20 @@ describe("request span export", () => {
 			const rows = sends[0] ?? [];
 			assert.deepStrictEqual(
 				rows.map((row) => row.name),
-				["held.before.request", "request.child", "request.root"],
+				["held.before.request", "request.child", "request.other_run", "request.root"],
 			);
 			const root = rows.find((row) => row.name === "request.root");
 			const child = rows.find((row) => row.name === "request.child");
 			assert.strictEqual(child?.parent_span_id, root?.span_id);
-			assert.strictEqual(child?.ray_id, "ray-test");
+			for (const row of rows.slice(1)) {
+				assert.deepInclude(row, { attempt_id: "attempt-test", ray_id: "ray-test" }, row.name);
+			}
+			assert.strictEqual(child?.run_id, "run-test");
+			assert.strictEqual(root?.run_id, "run-test");
+			assert.strictEqual(rows.find((row) => row.name === "request.other_run")?.run_id, "run-other");
+			// A span from before the request belongs to no request.
 			assert.isUndefined(rows[0]?.ray_id);
+			assert.isUndefined(rows[0]?.run_id);
 			assert.strictEqual(JSON.parse(root?.events ?? "[]")[0]?.message, "inside");
 		}).pipe(Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "test" } })));
 	});

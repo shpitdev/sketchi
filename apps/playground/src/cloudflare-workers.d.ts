@@ -2,7 +2,6 @@ declare module "cloudflare:workers" {
   import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
   import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
   import type { TelemetryPipeline } from "@sketchi/observability";
-  import type { CodeModeUsagePipelineBinding } from "./server/bindings/studio-env.server";
   import type { CodeModePngRendererNamespace } from "./server/codemode/browser-renderer.server";
   import type { PlaygroundAssetsBinding } from "./server/codemode/icon-catalog.server";
 
@@ -10,8 +9,6 @@ declare module "cloudflare:workers" {
     AI?: CloudflareAiGatewayProvider;
     ASSETS?: PlaygroundAssetsBinding;
     CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
-    CODEMODE_USAGE_EVENTS?: CodeModeUsagePipelineBinding;
-    CODEMODE_USAGE_ISSUES?: CodeModeUsagePipelineBinding;
     LOADER?: unknown;
     SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
     SKETCHI_AI_GATEWAY_ID?: string;

@@ -17,8 +17,7 @@ export const Route = createFileRoute("/api/scenario-candidates")({
 						await runGenerateScenarioCandidatesForInput(
 							await request.json(),
 							getEvalHarnessBindings(),
-							request.signal,
-							waitUntil,
+							{ request, signal: request.signal, waitUntil },
 						),
 					);
 				} catch (error) {

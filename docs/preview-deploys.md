@@ -169,19 +169,14 @@ Production deploy summaries include the same public/internal route policy and
 the custom domains that would be attached by a manual domain dispatch. Internal
 apps report no custom domains.
 
-The Studio Worker binds Code Mode artifacts to R2 and Code Mode usage analytics
-to Cloudflare Pipelines. Studio and the eval harness also bind their spans
-stream:
+The Studio Worker binds Code Mode artifacts to R2. Studio and the eval harness
+bind their spans stream, which also carries Code Mode usage:
 
-| Surface                        | Binding                 | Remote target                                  |
-| ------------------------------ | ----------------------- | ---------------------------------------------- |
-| Studio Previews                | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-preview`    |
-| Studio production Worker       | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-production` |
-| Studio Previews                | `CODEMODE_USAGE_EVENTS` | `e9fc3bcd35314fa39fc6a89018207acc`             |
-| Studio Previews                | `CODEMODE_USAGE_ISSUES` | `d95a1767edf246af8c637c5b9bf5a5c5`             |
-| Studio production Worker       | `CODEMODE_USAGE_EVENTS` | `d9044253316f4273a60298098f444a62`             |
-| Studio production Worker       | `CODEMODE_USAGE_ISSUES` | `f687dab6e7d742c1a76834089e709462`             |
-| Studio and eval-harness Previews | `TELEMETRY_SPANS`     | `d3066c58106b4facbc146e9188e383b1`             |
+| Surface                            | Binding             | Remote target                                  |
+| ---------------------------------- | ------------------- | ---------------------------------------------- |
+| Studio Previews                    | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-preview`    |
+| Studio production Worker           | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-production` |
+| Studio and eval-harness Previews   | `TELEMETRY_SPANS`   | `d3066c58106b4facbc146e9188e383b1`             |
 | Studio and eval-harness production | `TELEMETRY_SPANS`   | `e118fdd69a2548258389e82fb1ade1d6`             |
 
 `TELEMETRY_SPANS` is not `remote`, so local development writes to a local stream
@@ -191,28 +186,20 @@ path is described in [architecture](architecture.md#persistence-and-telemetry),
 and `pnpm db --preview` queries what a Preview recorded.
 
 The checked-in `previews` block binds Studio Previews directly to the preview
-bucket and preview Pipeline streams. There is no generated resource rewrite. Production deploys
-keep production buckets and production streams. All Worker-bound buckets and
-streams must exist before their Workers deploy. The downstream R2 Data Catalog
-sinks are long-lived Cloudflare Pipeline resources, not Worker bindings. They
-write into `sketchi-codemode-usage-analytics-production-v4` and
-`sketchi-codemode-usage-analytics-preview-v4`; run
-`pnpm r2sql:codemode:resources` to print the sink, pipeline, bucket, and table
-map. The spans sinks write into `sketchi-telemetry-production` and
-`sketchi-telemetry-preview`; `pnpm telemetry:resources` prints their map. Preview resources are named explicitly and must already exist; the command does
-not provision data resources. The CI token does not need R2 object read access
-just to deploy.
+bucket and preview spans stream. There is no generated resource rewrite.
+Production deploys keep production buckets and the production stream. All
+Worker-bound buckets and streams must exist before their Workers deploy. The
+downstream R2 Data Catalog sinks are long-lived Cloudflare Pipeline resources,
+not Worker bindings. They write into `sketchi-telemetry-production` and
+`sketchi-telemetry-preview`; `pnpm telemetry:resources` prints their map.
+Preview resources are named explicitly and must already exist; deploys do not
+provision data resources. The CI token does not need R2 object read access just
+to deploy.
 
-R2 Data Catalog verification must prove an aggregate R2 SQL data scan through
-the direct R2 SQL API, not just `SHOW TABLES` or `DESCRIBE`, because
-metadata-only catalog calls can succeed before rows are queryable. The
-2026-06-29 real end-to-end check called production and preview Studio APIs with
-unique `x-sketchi-run-id` headers, then verified both `usage_events` and
-`usage_issues` rows in the v4 catalog buckets with
-`pnpm r2sql:codemode:verify-run -- --require-issues`. The verifier polls R2
-SQL by default. For normal successful API runs, issue rows may be absent; the
-command only requires issue rows when `--require-issues` or explicit
-issue-run-id options are supplied.
+To check that a Preview records a call, send it with a unique `x-sketchi-run-id`
+and wait about two minutes for the sink to roll. Then
+`pnpm db --preview -c "FROM usage_events WHERE run_id = '<id>'"` returns its
+usage row, and `span_tree` on its `trace_id` returns its spans.
 
 Wrangler accepts Pipeline stream names in local dry-runs, but the deploy API
 requires stream IDs for Worker bindings. Keep `apps/playground/wrangler.jsonc` on

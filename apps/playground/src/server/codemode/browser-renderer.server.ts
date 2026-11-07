@@ -1,7 +1,7 @@
 import "@tanstack/react-start/server-only";
 
 import type { CodeModeArtifactRenderer } from "@sketchi/diagram-agent";
-import { recordMetric } from "@sketchi/observability";
+import { recordMetric, TelemetryCorrelation } from "@sketchi/observability";
 import { Clock, Context, Effect, Layer, Metric, Option, Schema } from "effect";
 
 import {
@@ -94,13 +94,18 @@ export function createCloudflareBrowserRunArtifactRenderer(
 	options: CloudflareBrowserRunRendererOptions = {},
 ): CloudflareBrowserRunArtifactRenderer {
 	const harnessUrl = new URL(HARNESS_PATH, options.assetOrigin ?? DEFAULT_ASSET_ORIGIN).toString();
-	const caller = Effect.map(
-		Effect.option(Effect.currentSpan),
-		Option.match({
-			onNone: () => undefined,
-			onSome: ({ spanId, traceId }): PngRenderCaller => ({ spanId, traceId }),
-		}),
-	);
+	const caller = Effect.gen(function* () {
+		const span = Option.getOrUndefined(yield* Effect.option(Effect.currentSpan));
+		if (!span) return undefined;
+		const { attemptId, rayId, runId } = yield* TelemetryCorrelation;
+		return {
+			...(attemptId ? { attemptId } : {}),
+			...(rayId ? { rayId } : {}),
+			...(runId ? { runId } : {}),
+			spanId: span.spanId,
+			traceId: span.traceId,
+		} satisfies PngRenderCaller;
+	});
 
 	return {
 		prewarm: Effect.flatMap(caller, (parent) =>
