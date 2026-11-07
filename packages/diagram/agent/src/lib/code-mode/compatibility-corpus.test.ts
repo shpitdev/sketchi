@@ -230,6 +230,18 @@ const QUADRANT_ISSUE_CODE_ADDITIONS = new Set([
 	"invalid_quadrant_point",
 	"invalid_quadrant_text",
 ]);
+// The flowchart document and its edits add issue codes.
+const FLOWCHART_DOCUMENT_ISSUE_CODE_ADDITIONS = new Set([
+	"invalid_id",
+	"duplicate_edge",
+	"isolated_node",
+	"unknown_member",
+	"overlapping_containers",
+	"node_without_lane",
+	"flowchart_too_small",
+	"unknown_edit_target",
+	"invalid_edit",
+]);
 const CANVAS_ARROWHEAD_ADDITIONS = new Set([
 	"crowfoot_one",
 	"crowfoot_many",
@@ -403,6 +415,7 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		SANKEY_ISSUE_CODE_ADDITIONS.has(value) ||
 		WIREFRAME_ISSUE_CODE_ADDITIONS.has(value) ||
 		QUADRANT_ISSUE_CODE_ADDITIONS.has(value) ||
+		FLOWCHART_DOCUMENT_ISSUE_CODE_ADDITIONS.has(value) ||
 		// MCP best-effort PNG delivery (#499) adds one warning; frozen APIs remain strict.
 		value === "png_unavailable" ||
 		// MCP logo fill reports icon_filled with a new info severity.
@@ -1841,6 +1854,7 @@ describe("pre-Effect Code Mode compatibility corpus", () => {
 						!SANKEY_ISSUE_CODE_ADDITIONS.has(code) &&
 						!WIREFRAME_ISSUE_CODE_ADDITIONS.has(code) &&
 						!QUADRANT_ISSUE_CODE_ADDITIONS.has(code) &&
+						!FLOWCHART_DOCUMENT_ISSUE_CODE_ADDITIONS.has(code) &&
 						code !== "png_unavailable",
 				)
 				.toSorted(),
