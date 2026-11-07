@@ -262,6 +262,26 @@ pnpm nx g @sketchi/generators:ui-component StatusBadge
 pnpm nx g @sketchi/generators:diagram-type mindmap --title "Sketchi mindmap fixture"
 ```
 
+## Evals
+
+Graded evals live in Frontierclimb, a separate private repository. Its
+`sketchi` catalog grades agents building through the hosted MCP, and its
+`sketchi-generate` catalog grades `sketchi generate`. Both read their cases from
+this repository's scenarios (`packages/diagram/scenarios`) through the scenario
+CLI. Prompt and routing changes are measured there.
+
+This repository keeps only those scenarios and a hand-run sanity check: a typed
+generate, an untyped generate that must come back as the right kind, and one MCP
+`execute`. CI never runs it.
+
+```sh
+pnpm sanity                                                     # production
+pnpm sanity --endpoint https://pr-<N>-sketchi-studio.dimethyl.workers.dev
+```
+
+Its requests carry `x-sketchi-client: sketchi-sanity` and a `sanity_` run ID,
+which it prints with the DuckDB queries that find them.
+
 ## Deployment
 
 Eligible same-repository pull requests build and deploy app-specific Cloudflare

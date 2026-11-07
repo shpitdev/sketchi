@@ -120,10 +120,6 @@ const approvedRuntimeBoundaryFiles = [
 	"apps/playground/src/server/runtime/runtime.server.ts",
 	"packages/diagram/scenarios/src/cli.ts",
 	"packages/diagram/scenarios/src/live-generator.ts",
-	"tools/family-narrowing-eval.ts",
-	"tools/generation-reliability-probe.ts",
-	"tools/harness-eval.ts",
-	"tools/studio-routing-eval.ts",
 ];
 const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/cli/scripts/build.mjs": 27,
@@ -229,14 +225,11 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"packages/studio/projects/src/client-api.ts": 20,
 	"packages/studio/projects/src/server/bucket.ts": 22,
 	"packages/studio/projects/src/server/http.ts": 2,
-	"tools/generation-reliability-probe.ts": 5,
-	"tools/harness-eval.ts": 8,
 	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.spec.ts": 6,
 	"tools/testing/browserbase.ts": 29,
 	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.ts": 3,
 	"tools/sketchi-generators/src/generators/ui-component/ui-component.spec.ts": 3,
 	"tools/sketchi-generators/src/generators/ui-component/ui-component.ts": 3,
-	"tools/studio-routing-eval.ts": 4,
 };
 const approvedManagedPromiseFiles = Object.keys(approvedManagedPromiseSiteCounts).sort();
 const approvedEffectDependencyVersions = new Set(["4.1.2"]);
