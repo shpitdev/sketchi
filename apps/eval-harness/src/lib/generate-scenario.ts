@@ -222,7 +222,7 @@ function makeGenerationRuntime(bindings: EvalHarnessEnv) {
 	const gatewayId = envString(bindings, "SKETCHI_AI_GATEWAY_ID", DEFAULT_GATEWAY_ID);
 	const model = envString(bindings, "SKETCHI_AI_MODEL", DEFAULT_MODEL);
 	const telemetryLayer = makeWorkersTelemetryLayer({
-		resource: { serviceName: "sketchi-eval-harness" },
+		resource: { serviceName: "sketchi-playground" },
 	});
 	return {
 		model,

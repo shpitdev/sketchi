@@ -31,7 +31,7 @@ export type PngRenderResult =
 	  };
 
 const PngRendererTelemetryLive = makeWorkersTelemetryLayer({
-	resource: { serviceName: "sketchi-playground-png-renderer" },
+	resource: { serviceName: "sketchi-studio-png-renderer" },
 });
 
 function makeRendererRuntime(binding: CloudflareBrowserRunBinding) {
