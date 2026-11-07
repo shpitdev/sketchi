@@ -13,6 +13,7 @@ Convex, Vercel, Bun, or Turborepo stack.
 - Delete obsolete approaches when replacing them. Do not carry parallel systems unless a migration step explicitly requires it.
 - Graded evals live in Frontierclimb (catalogs `sketchi` and `sketchi-generate`); do not add eval suites or case sets here.
 - Generation cost is product quality. A diagram that reads badly is a failure, and so is one that takes excess tokens, tool calls, retries or wall time to produce. Measure both before claiming an improvement.
+- Diagrams are Excalidraw sketches: keep them simple and readable at a glance. Prefer fewer elements and standard stroke widths to fine detail or thin lines. Size limits are ceilings, not targets: draw what the request needs, and keep each family to the size that still reads as a sketch.
 
 ## Delegated agents
 
