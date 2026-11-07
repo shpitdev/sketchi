@@ -1,6 +1,6 @@
 import { flowchartFixture, parseFlowchartDiagram } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 // Like the real editor, this shell initializes only on mount. Do not mock the
@@ -14,15 +14,9 @@ vi.mock("@excalidraw/excalidraw", async () => {
 		},
 	};
 });
-vi.mock("../json-code-editor/index.js", () => ({
-	JsonCodeEditor: ({ label, value }: { label: string; value: string }) => (
-		<textarea aria-label={label} readOnly value={value} />
-	),
-}));
 
 import { ArtifactCanvas } from "./artifact-canvas";
 import { DiagramPreview } from "../diagram-preview/diagram-preview";
-import { ScenarioPlayground } from "../scenario-playground/scenario-playground";
 
 const firstScene = renderIntermediateDiagram(flowchartFixture);
 const followUpDiagram = parseFlowchartDiagram({
@@ -62,37 +56,5 @@ describe("source scene revisions", () => {
 		expect(screen.getByTestId("revision-editor").getAttribute("data-scene")).toContain(
 			"Verify follow-up",
 		);
-	});
-
-	it("replaces the editor in both directions when switching fixture and live modes", async () => {
-		render(
-			<ScenarioPlayground
-				onGenerateScenario={async ({ scenarioId }) => ({
-					scenarioId,
-					candidates: [
-						{
-							diagnostics: [],
-							diagramValid: true,
-							model: "fixture",
-							provider: "cloudflare-google-ai-studio",
-							text: JSON.stringify(followUpDiagram),
-						},
-					],
-				})}
-			/>,
-		);
-		await screen.findByTestId("revision-editor");
-		fireEvent.click(screen.getByRole("tab", { name: "Live generation" }));
-		fireEvent.click(screen.getByRole("button", { name: "Run" }));
-		const live = await screen.findByTestId("revision-editor");
-		expect(live.getAttribute("data-scene")).toContain("Verify follow-up");
-		fireEvent.click(screen.getByRole("tab", { name: "Fixture conversion" }));
-		const fixture = screen.getByTestId("revision-editor");
-		expect(fixture).not.toBe(live);
-		expect(fixture.getAttribute("data-scene")).not.toContain("Verify follow-up");
-		fireEvent.click(screen.getByRole("tab", { name: "Live generation" }));
-		const restoredLive = screen.getByTestId("revision-editor");
-		expect(restoredLive).not.toBe(fixture);
-		expect(restoredLive.getAttribute("data-scene")).toContain("Verify follow-up");
 	});
 });

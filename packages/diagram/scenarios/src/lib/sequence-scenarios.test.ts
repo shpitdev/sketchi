@@ -20,7 +20,7 @@ function failedChecks(scenarioId: string, diagram: SequenceDiagram): string[] {
 }
 
 describe("maintained sequence scenarios", () => {
-	it("register every sequence scenario for the CLI, fixtures, and the eval harness", () => {
+	it("register every sequence scenario for the CLI and fixtures", () => {
 		expect(sequenceScenarios.length).toBeGreaterThanOrEqual(4);
 		for (const scenario of sequenceScenarios) {
 			expect(getDiagramScenario(scenario.id)).toBe(scenario);

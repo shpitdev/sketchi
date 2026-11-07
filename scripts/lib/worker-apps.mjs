@@ -6,13 +6,6 @@ const workerProjects = {
 		workerName: "sketchi-excalidraw",
 		wranglerInputConfigPath: "apps/excalidraw/wrangler.jsonc",
 	},
-	"eval-harness": {
-		buildOutputPath: "dist/apps/eval-harness",
-		projectId: "eval-harness",
-		projectRoot: "apps/eval-harness",
-		workerName: "sketchi-playground",
-		wranglerInputConfigPath: "apps/eval-harness/wrangler.jsonc",
-	},
 	icons: {
 		buildOutputPath: "dist/apps/icons",
 		projectId: "icons",

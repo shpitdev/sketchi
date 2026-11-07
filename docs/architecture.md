@@ -22,11 +22,9 @@ flowchart LR
   Effect --> Telemetry["Spans: Pipelines → R2 Data Catalog → DuckDB"]
 ```
 
-The five Worker projects are `web`, `playground`, `eval-harness`, `excalidraw`,
-and `icons`. `playground` deploys as the durable `sketchi-studio` Worker and
+The four Worker projects are `web`, `playground`, `excalidraw`, and `icons`. `playground` deploys as the durable `sketchi-studio` Worker and
 owns chat, HTTP build/artifact APIs, MCP, Browser Rendering, and Studio
-persistence. `eval-harness` deploys as `sketchi-playground` and remains an
-internal scenario surface. Preview identities and production routes come only
+persistence. Preview identities and production routes come only
 from `scripts/lib/worker-apps.mjs`.
 
 ## Package ownership
@@ -60,9 +58,8 @@ wrapped once and receive an `AbortSignal` when supported.
 The approved runtime edges are mechanically checked:
 
 - the Node CLI entrypoint;
-- the eval-harness server-function adapter;
 - the Playground Worker runtime composition root;
-- the two internal scenario tool entrypoints.
+- the internal scenario CLI entrypoint.
 
 The CLI imports the stable `effect/cli` surface through the package-internal
 `apps/cli/src/internal/effect-cli.ts` adapter. The repository has no unstable
@@ -211,7 +208,7 @@ packaged CLI smoke, and applicable preview runtime probes.
 - `sketchi.app` and `www.sketchi.app` → `web`
 - `playground.sketchi.app` → `playground` / `sketchi-studio`
 - `icons.sketchi.app` → `icons`
-- eval-harness and Excalidraw workspaces → internal Workers
+- Excalidraw workspace → internal Worker
 
 Preview deploys remove production routes and use the canonical per-PR Worker
 names. Production or preview claims require exact-head runtime evidence; a

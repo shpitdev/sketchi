@@ -4,7 +4,7 @@ Sketchi exact-pins `effect` and every `@effect/*` package to the approved
 `4.1.1` stable substrate. Effect owns
 effectful orchestration in `diagram-generation`, `diagram-agent`,
 `diagram-scenarios`, `studio/projects`, `observability`, and the Worker runtime
-boundaries in `playground` and `eval-harness`. Parsing, formatting, IR
+boundary in `playground`. Parsing, formatting, IR
 validation, rendering, React/TanStack surfaces, and generators stay pure or
 framework-native.
 

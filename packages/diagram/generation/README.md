@@ -35,8 +35,7 @@ Cloudflare AI Gateway binding (`CloudflareGatewayChatClientLive`) at their
 runtime boundary. It runs on `effect/ai` through Google's OpenAI-compatible
 endpoint; the binding authenticates the request and supplies the stored Google AI
 Studio BYOK key, so no provider credential is read or sent. The public
-Sketchi generate API and the eval harness are the only hosts that compose this
-client. There is no client-side/CLI token adapter: the CLI reaches generation
+Sketchi generate API is the only host that composes this client. There is no client-side/CLI token adapter: the CLI reaches generation
 through one unauthenticated HTTPS call to the public generate API. Pure prompt,
 response, and candidate helpers stay independent of runtime wiring.
 

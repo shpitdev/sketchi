@@ -100,13 +100,7 @@ describe("vendored Excalifont", () => {
 	it("knows every surface that inherits the font declarations", () => {
 		// Listed as well as derived: a new theme consumer should fail here with
 		// "vendor the font too", not ship a surface that 404s its own brand face.
-		expect(SURFACES).toEqual([
-			"apps/eval-harness",
-			"apps/excalidraw",
-			"apps/icons",
-			"apps/playground",
-			"apps/web",
-		]);
+		expect(SURFACES).toEqual(["apps/excalidraw", "apps/icons", "apps/playground", "apps/web"]);
 	});
 
 	it.each(SURFACES)("serves byte-identical subsets from %s", (surface) => {

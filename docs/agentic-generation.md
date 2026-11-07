@@ -36,7 +36,6 @@ The following surfaces converge on that vertical:
 | HTTP           | request/response and status mapping                     | R2 artifact URLs                         |
 | MCP            | SDK callback and tool result mapping                    | the same R2 artifact URLs                |
 | CLI `generate` | terminal options/output and local atomic record storage | local versioned records                  |
-| eval harness   | scenario selection and candidate reporting              | internal evidence files                  |
 
 No surface owns a parallel flowchart schema, repair issue model, quality
 grader, renderer, or accepted-artifact writer.

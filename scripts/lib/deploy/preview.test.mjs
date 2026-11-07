@@ -35,16 +35,6 @@ test("playground project preserves the durable Studio preview Worker", () => {
 	});
 });
 
-test("eval-harness keeps its durable internal Worker", () => {
-	assert.deepEqual(previewProjectConfig("eval-harness"), {
-		...workerProjectConfig("eval-harness"),
-		commentMarker: "<!-- sketchi-playground-preview -->",
-		publicSurface: false,
-		routePolicy: "internal eval harness; no public product domain",
-		title: "Sketchi Eval Harness",
-	});
-});
-
 test("previewProjectConfig requires an explicit project selection", () => {
 	assert.throws(() => previewProjectConfig(), /Preview project selection is required/);
 });

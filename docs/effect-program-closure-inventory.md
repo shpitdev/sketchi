@@ -28,7 +28,7 @@ rg --hidden --files-with-matches \
 
 | Classification                      | Exhaustive scope                                                                                                                                                                                                                                                                                                                           | Rationale                                                                                                                                                                                                                    |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Effect-authoritative                | effectful code in `apps/cli`, `apps/eval-harness/src/lib`, `apps/playground/src/server`, `packages/diagram/{agent,generation,scenarios}`, `packages/observability`, and `packages/studio/projects/src/server`                                                                                                                              | I/O, time, concurrency, resources, expected failures, and orchestration return Effect. Throws inside pure parsers/constructors are defects or are captured immediately at the Effect boundary.                               |
+| Effect-authoritative                | effectful code in `apps/cli`, `apps/playground/src/server`, `packages/diagram/{agent,generation,scenarios}`, `packages/observability`, and `packages/studio/projects/src/server`                                                                                                                              | I/O, time, concurrency, resources, expected failures, and orchestration return Effect. Throws inside pure parsers/constructors are defects or are captured immediately at the Effect boundary.                               |
 | Pure                                | `packages/diagram/{core,renderer,excalidraw}`, `packages/svg-excalidraw`, deterministic scenario grading/argv helpers, contract fixtures, and ordinary unit-test data                                                                                                                                                                      | Synchronous validation, geometry, layout, formatting, and test assertions own no resource or async lifecycle. Effect Schema imports in the three core contract files define data; they do not make the algorithms effectful. |
 | Framework edge                      | TanStack route/server-function adapters, React components/hooks, AI SDK/MCP callbacks, Cloudflare binding adapters, app Vite/Storybook config, and browser/component tests. Hidden Storybook configs are explicitly `apps/{excalidraw,icons,native-conversion-storybook}/.storybook/main.ts` and `packages/diagram/ui/.storybook/main.ts`. | The host requires Promise callbacks or browser-native Promise APIs. Each server adapter decodes/imports, invokes one approved Effect runtime, and encodes; product workflow does not live here.                              |
 | Generated                           | `routeTree.gen.ts`, generated Cloudflare binding declarations, icon review/output assets, generator templates/fixtures, and build output excluded by the scan                                                                                                                                                                              | Regenerated from an upstream tool or data set; never an orchestration authority.                                                                                                                                             |
@@ -57,8 +57,7 @@ reviewed sites are:
   interfaces.
 
 There is no unmanaged Promise lifecycle in the scenario process service,
-scenario CLI, live scenario generator, eval-harness generation,
-or R2 catalog smoke workflow. Adding a type-identified site or increasing the
+scenario CLI or R2 catalog smoke workflow. Adding a type-identified site or increasing the
 reviewed site count fails `tools/project-graph.test.ts`.
 
 This is structural drift protection, not an adversarial-code sandbox. It
@@ -79,8 +78,7 @@ the smoke tests cover resource ownership and polling with offline fakes.
 ## Runtime and schema audit
 
 Approved production runtime boundaries are exactly the CLI host, Playground
-runtime composition root, eval-harness server-function host, and both
-internal scenario hosts. Runtime execution below those files is a
+runtime composition root, and the internal scenario CLI host. Runtime execution below those files is a
 test failure. The repository has no unstable Effect imports.
 
 Every direct `effect` or `@effect/*` declaration uses the exact approved

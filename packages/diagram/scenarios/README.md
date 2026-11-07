@@ -32,8 +32,8 @@ pnpm nx scenario diagram-scenarios -- --scenario pharma-batch-disposition --fixt
 ## Families
 
 `diagramScenarios` holds every maintained scenario, discriminated by
-`diagramType`; the CLI (`--list`, `--all`, `--scenario`), the fixture client,
-and the eval harness use it.
+`diagramType`; the CLI (`--list`, `--all`, `--scenario`) and the fixture client
+use it.
 
 - Flowchart scenarios check prompt-grounded steps, node kinds, branches, bounded
   connections, and logos. Group scenarios also check that each stated group holds

@@ -9,7 +9,6 @@ const repoRoot = new URL("../../", import.meta.url);
 test("the approved public-domain map is exact and internal apps stay private", () => {
 	const expectedDomains = {
 		excalidraw: [],
-		"eval-harness": [],
 		icons: ["icons.sketchi.app"],
 		playground: ["playground.sketchi.app"],
 		web: ["sketchi.app", "www.sketchi.app"],
@@ -20,12 +19,11 @@ test("the approved public-domain map is exact and internal apps stay private", (
 	}
 
 	assert.equal(productionProjectConfig("excalidraw").publicSurface, false);
-	assert.equal(productionProjectConfig("eval-harness").publicSurface, false);
 	assert.equal(productionProjectConfig("playground").publicSurface, true);
 });
 
 test("checked-in Wrangler configs never expose production custom domains", () => {
-	for (const projectId of ["eval-harness", "excalidraw", "icons", "playground", "web"]) {
+	for (const projectId of ["excalidraw", "icons", "playground", "web"]) {
 		const configPath = new URL(`apps/${projectId}/wrangler.jsonc`, repoRoot);
 		const config = readFileSync(configPath, "utf8");
 		assert.doesNotMatch(config, /(?:excalidraw|icons|playground|studio|www)\.sketchi\.app/);

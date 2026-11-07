@@ -30,12 +30,6 @@ export const productionProjects = {
 		routePolicy: "icons.sketchi.app product surface",
 		title: "Sketchi Icons",
 	},
-	"eval-harness": {
-		domainPatterns: [],
-		publicSurface: false,
-		routePolicy: "internal eval harness; no public product domain",
-		title: "Sketchi Eval Harness",
-	},
 	playground: {
 		domainPatterns: ["playground.sketchi.app"],
 		publicSurface: true,

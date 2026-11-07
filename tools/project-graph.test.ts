@@ -10,7 +10,6 @@ const workspaceRoot = fileURLToPath(new URL("../", import.meta.url));
 const requiredWorkspaceGlobs = ["apps/*", "packages/*", "packages/*/*", "tools/*"];
 const intendedNxProjectRoots = [
 	"apps/cli",
-	"apps/eval-harness",
 	"apps/excalidraw",
 	"apps/icons",
 	"apps/native-conversion-storybook",
@@ -35,7 +34,6 @@ const intendedWorkspacePackageRoots = intendedNxProjectRoots.filter(
 );
 const effectAuthoritativeProjectRoots = [
 	"apps/cli",
-	"apps/eval-harness",
 	"apps/playground",
 	"packages/diagram/agent",
 	"packages/diagram/generation",
@@ -82,7 +80,6 @@ const frameworkNativeProjectRoots = [
 ];
 const intendedCompositeReferences = [
 	"apps/cli/tsconfig.json",
-	"apps/eval-harness/tsconfig.json",
 	"apps/excalidraw/tsconfig.json",
 	"apps/icons/tsconfig.json",
 	"apps/playground/tsconfig.json",
@@ -104,7 +101,6 @@ const intendedCompositeReferences = [
 const reviewedEffectUnstableAdapterPaths: string[] = [];
 const effectDependencyManifestPaths = [
 	"apps/cli/package.json",
-	"apps/eval-harness/package.json",
 	"package.json",
 	"packages/diagram/agent/package.json",
 	"packages/diagram/core/package.json",
@@ -115,11 +111,9 @@ const effectDependencyManifestPaths = [
 ];
 const approvedRuntimeBoundaryFiles = [
 	"apps/cli/src/main.ts",
-	"apps/eval-harness/src/lib/generate-scenario.ts",
 	"apps/playground/src/server/codemode/png-renderer-object.server.ts",
 	"apps/playground/src/server/runtime/runtime.server.ts",
 	"packages/diagram/scenarios/src/cli.ts",
-	"packages/diagram/scenarios/src/live-generator.ts",
 ];
 const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/cli/scripts/build.mjs": 27,
@@ -136,9 +130,6 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/cli/src/share-protocol.ts": 12,
 	"apps/cli/src/share.ts": 2,
 	"apps/cli/vitest.config.mts": 1,
-	"apps/eval-harness/src/lib/generate-scenario.ts": 6,
-	"apps/eval-harness/src/routes/api/scenario-candidates.ts": 7,
-	"apps/eval-harness/src/routes/index.tsx": 4,
 	"apps/excalidraw/src/components/excalidraw-workspace/excalidraw-workspace.tsx": 4,
 	"apps/excalidraw/src/components/svg-icon-workspace/svg-icon-workspace.tsx": 8,
 	"apps/icons/scripts/sync-catalog-assets.ts": 8,
@@ -210,12 +201,8 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"packages/diagram/generation/src/lib/cloudflare-ai-gateway.ts": 2,
 	"packages/diagram/generation/src/lib/cloudflare-gateway-chat.ts": 5,
 	"packages/diagram/scenarios/src/cli.ts": 10,
-	"packages/diagram/scenarios/src/live-generator.ts": 8,
 	"packages/diagram/scenarios/vitest.config.mts": 1,
 	"packages/diagram/ui/src/components/excalidraw-scene-canvas/excalidraw-scene-canvas.tsx": 3,
-	"packages/diagram/ui/src/components/scenario-playground/playground-controls.tsx": 2,
-	"packages/diagram/ui/src/components/scenario-playground/playground-inspector.tsx": 2,
-	"packages/diagram/ui/src/components/scenario-playground/scenario-playground.tsx": 10,
 	"packages/diagram/ui/src/lib/browser-actions.ts": 3,
 	"packages/diagram/ui/src/lib/load-excalidraw.ts": 2,
 	"packages/icons/catalog/scripts/build-node-logos.ts": 14,
