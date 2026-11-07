@@ -91,11 +91,8 @@ manual duplicate.
 can evaluate fixtures, input files, or one generator command. The command
 lifecycle is a scoped Effect service: normal exit, inherited-stdio close grace,
 timeout, SIGTERM, SIGKILL escalation, forced settlement, interruption, output
-capture, and release are explicit and TestClock-tested.
-
-`tools/harness-eval.ts` uses that service to drive supported external harnesses
-and writes sanitized evidence under `.memory/`. These internal tools do not add
-public Sketchi CLI commands.
+capture, and release are explicit and TestClock-tested. Graded evals run
+in Frontierclimb, which reads these scenarios through that CLI.
 
 ## Proof
 

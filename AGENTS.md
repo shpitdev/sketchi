@@ -11,6 +11,7 @@ Convex, Vercel, Bun, or Turborepo stack.
 - Prefer readable, tested package boundaries over compatibility layers.
 - Treat diagram generation as product-critical infrastructure: deterministic inputs, typed intermediate representation, functional tests, and Storybook coverage.
 - Delete obsolete approaches when replacing them. Do not carry parallel systems unless a migration step explicitly requires it.
+- Graded evals live in Frontierclimb (catalogs `sketchi` and `sketchi-generate`); do not add eval suites or case sets here.
 - Generation cost is product quality. A diagram that reads badly is a failure, and so is one that takes excess tokens, tool calls, retries or wall time to produce. Measure both before claiming an improvement.
 
 ## Delegated agents

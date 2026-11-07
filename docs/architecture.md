@@ -62,8 +62,7 @@ The approved runtime edges are mechanically checked:
 - the Node CLI entrypoint;
 - the eval-harness server-function adapter;
 - the Playground Worker runtime composition root;
-- the two internal scenario tool entrypoints;
-- the internal harness-eval entrypoint.
+- the two internal scenario tool entrypoints.
 
 The CLI imports the stable `effect/cli` surface through the package-internal
 `apps/cli/src/internal/effect-cli.ts` adapter. The repository has no unstable
