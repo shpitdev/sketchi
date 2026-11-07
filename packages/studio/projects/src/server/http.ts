@@ -1,3 +1,4 @@
+import { SpanContent } from "@sketchi/observability";
 import { Context, Effect, Schema } from "effect";
 
 import {
@@ -11,7 +12,7 @@ import { StudioSessionService, type StudioSessionResolution } from "./session.js
 type RequestedResource = "diagram" | "project";
 
 const readRequestJson = Effect.fn("studioPersistence.http.readJson")(function* (request: Request) {
-	return yield* Effect.tryPromise({
+	const body: unknown = yield* Effect.tryPromise({
 		try: () => request.json(),
 		catch: (cause) =>
 			StudioInvalidInputError.make({
@@ -19,6 +20,8 @@ const readRequestJson = Effect.fn("studioPersistence.http.readJson")(function* (
 				message: "A playground artifactId is required.",
 			}),
 	});
+	yield* Effect.annotateCurrentSpan(SpanContent.httpRequestBody, body);
+	return body;
 });
 
 function responseHeaders(resolution?: StudioSessionResolution): Headers {

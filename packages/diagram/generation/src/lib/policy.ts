@@ -1,4 +1,9 @@
-import { recordMetric, withTelemetryCorrelation } from "@sketchi/observability";
+import {
+	recordMetric,
+	SpanContent,
+	withSpanContent,
+	withTelemetryCorrelation,
+} from "@sketchi/observability";
 import { Cause, Clock, Effect, Exit, Metric, Ref, Result, Schedule } from "effect";
 
 import {
@@ -116,6 +121,7 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 			family_route: request.prompt.routedType
 				? `${routed.route?.cue ?? "named"}:${request.prompt.routedType}`
 				: "none",
+			[SpanContent.input]: request,
 		});
 		const deadline = startedAt + policy.totalTimeoutMs;
 		const requestTimeout = () =>
@@ -130,6 +136,7 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 		const executeModelCall = Effect.fn("diagramGeneration.executeModelCall")(function* (
 			callRequest: DiagramGenerationRequest,
 		) {
+			yield* Effect.annotateCurrentSpan(SpanContent.input, callRequest);
 			const attempt = prepareAttempt(callRequest);
 			const attemptRef = yield* Ref.make(0);
 			const previousErrorTagRef = yield* Ref.make("initial");
@@ -211,6 +218,7 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 					orElse: () => Effect.fail(requestTimeout()),
 				}),
 			);
+			yield* Effect.annotateCurrentSpan(SpanContent.output, candidate);
 			// Repair could only meet a family limit by dropping what the request states.
 			const tooLarge = candidate.diagnostics.filter(isDiagramSizeLimitDiagnostic);
 			if (tooLarge.length > 0) {
@@ -222,6 +230,123 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 				});
 			}
 			return candidate;
+		});
+
+		/** One request for a corrected diagram, with what it was told and what came back. */
+		const repairInvalid = Effect.fn("diagramGeneration.repair")(function* (
+			latest: DiagramGenerationCandidate,
+			repairAttempt: number,
+		) {
+			yield* Effect.annotateCurrentSpan({
+				repair_attempt: repairAttempt,
+				repair_kind: "repair_invalid",
+				[SpanContent.input]: { diagnostics: latest.diagnostics, text: latest.text },
+			});
+			yield* recordMetric(generationRepairs, 1, {
+				operation: "generate",
+				outcome: "attempted",
+				provider,
+			});
+			yield* Effect.logWarning("Repairing invalid diagram generation", {
+				operation: "generate",
+				provider,
+				repair_attempt: repairAttempt,
+				repair_kind: "repair_invalid",
+			});
+			const repairRequest = buildRepairRequest(request, latest, repairAttempt);
+			const repairResult = yield* Effect.result(executeModelCall(repairRequest));
+			// A limit is the answer: the repaired diagram cannot fit either. A spent
+			// request limit ends the request, which reports it as a timeout.
+			if (
+				Result.isFailure(repairResult) &&
+				(repairResult.failure._tag === "DiagramGenerationLimitError" ||
+					(repairResult.failure._tag === "DiagramGenerationTimeoutError" &&
+						repairResult.failure.scope === "request"))
+			) {
+				return yield* repairResult.failure;
+			}
+			if (Result.isFailure(repairResult)) {
+				yield* recordMetric(generationRepairs, 1, {
+					operation: "generate",
+					outcome: "failed",
+					provider,
+				});
+				const failed = generationErrorToCandidate(repairResult.failure, repairRequest);
+				yield* Effect.annotateCurrentSpan(SpanContent.output, {
+					diagnostics: failed.diagnostics,
+					outcome: "failed",
+				});
+				return { _tag: "Failed", diagnostics: failed.diagnostics } as const;
+			}
+			const repaired = enforceCandidateRequestRequirements(repairResult.success, request);
+			const outcome = isAcceptedCandidate(repaired) ? "succeeded" : "failed";
+			yield* recordMetric(generationRepairs, 1, {
+				operation: "generate",
+				outcome,
+				provider,
+			});
+			yield* Effect.annotateCurrentSpan(SpanContent.output, {
+				diagnostics: repaired.diagnostics,
+				outcome,
+				text: repaired.text,
+			});
+			return { _tag: "Repaired", outcome, repaired } as const;
+		});
+
+		const checkCoverage = Effect.fn("diagramGeneration.coverage.check")(function* (
+			diagram: NonNullable<DiagramGenerationCandidate["diagram"]>,
+		) {
+			return yield* withSpanContent(
+				{ diagram, request: request.prompt.request },
+				Effect.sync(() => checkRequestCoverage(request.prompt.request, diagram)),
+			);
+		});
+
+		/**
+		 * One repair of a valid diagram that misses what its request states. The repair
+		 * is kept only when it fixes a miss without dropping what the diagram held.
+		 */
+		const repairCoverage = Effect.fn("diagramGeneration.coverage.repair")(function* (
+			original: DiagramGenerationCandidate,
+			covered: NonNullable<DiagramGenerationCandidate["diagram"]>,
+			coverage: readonly CoverageIssue[],
+		) {
+			yield* Effect.annotateCurrentSpan({
+				repair_kind: "repair_coverage",
+				[SpanContent.input]: { issues: coverage },
+			});
+			yield* Effect.logInfo("Repairing a diagram that misses what its request states", {
+				coverage_issues: coverage.map((issue) => issue.code).join(","),
+				operation: "generate",
+				provider,
+			});
+			const repairResult = yield* Effect.result(
+				executeModelCall(buildCoverageRepairRequest(request, original, coverage)),
+			);
+			const repaired = Result.isSuccess(repairResult)
+				? enforceCandidateRequestRequirements(repairResult.success, request)
+				: undefined;
+			// A repair in another family would pass the other family's checks without fixing anything.
+			const remaining =
+				repaired?.diagram && !repaired.error && repaired.diagram.type === covered.type
+					? yield* checkCoverage(repaired.diagram)
+					: undefined;
+			const improved =
+				repaired?.diagram !== undefined &&
+				remaining !== undefined &&
+				remaining.length < coverage.length &&
+				keepsStatedStructure(request.prompt.request, covered, repaired.diagram);
+			yield* recordMetric(generationCoverageRepairs, 1, {
+				operation: "generate",
+				outcome: improved ? "succeeded" : "kept_original",
+				provider,
+			});
+			yield* Effect.annotateCurrentSpan(SpanContent.output, {
+				improved,
+				...(remaining === undefined ? {} : { remaining }),
+				...(repaired ? { text: repaired.text } : {}),
+			});
+			return { improved, remaining, repaired };
 		});
 
 		const operation = Effect.gen(function* () {
@@ -240,57 +365,20 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 				repairAttempt += 1
 			) {
 				repairsUsed = repairAttempt;
-				yield* recordMetric(generationRepairs, 1, {
-					operation: "generate",
-					outcome: "attempted",
-					provider,
-				});
-				yield* Effect.logWarning("Repairing invalid diagram generation", {
-					operation: "generate",
-					provider,
-					repair_attempt: repairAttempt,
-					repair_kind: "repair_invalid",
-				});
-				const repairRequest = buildRepairRequest(request, latestCandidate, repairAttempt);
 				const attemptedDiagnostic = `repair_attempted: requested a corrected response (attempt ${repairAttempt}).`;
-				const repairResult = yield* Effect.result(executeModelCall(repairRequest));
-				// A limit is the answer: the repaired diagram cannot fit either. A spent
-				// request limit ends the request, which reports it as a timeout.
-				if (
-					Result.isFailure(repairResult) &&
-					(repairResult.failure._tag === "DiagramGenerationLimitError" ||
-						(repairResult.failure._tag === "DiagramGenerationTimeoutError" &&
-							repairResult.failure.scope === "request"))
-				) {
-					return yield* repairResult.failure;
-				}
-				if (Result.isFailure(repairResult)) {
-					const failedRepairCandidate = generationErrorToCandidate(
-						repairResult.failure,
-						repairRequest,
-					);
+				const repair = yield* repairInvalid(latestCandidate, repairAttempt);
+				if (repair._tag === "Failed") {
 					diagnostics = [
 						...diagnostics,
 						attemptedDiagnostic,
-						...failedRepairCandidate.diagnostics,
+						...repair.diagnostics,
 						`repair_failed: semantic repair attempt ${repairAttempt} failed.`,
 					];
-					yield* recordMetric(generationRepairs, 1, {
-						operation: "generate",
-						outcome: "failed",
-						provider,
-					});
 					candidate = { ...originalCandidate, diagnostics };
 					break;
 				}
-				const repaired = enforceCandidateRequestRequirements(repairResult.success, request);
-				const repairedAccepted = isAcceptedCandidate(repaired);
-				const outcome = repairedAccepted ? "succeeded" : "failed";
-				yield* recordMetric(generationRepairs, 1, {
-					operation: "generate",
-					outcome,
-					provider,
-				});
+				const { outcome, repaired } = repair;
+				const repairedAccepted = outcome === "succeeded";
 				diagnostics = [
 					...diagnostics,
 					attemptedDiagnostic,
@@ -309,7 +397,7 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 			// with the specific miss. A diagram that passes costs nothing more.
 			const coverage =
 				candidate.diagram && !candidate.error && !request.prompt.base
-					? checkRequestCoverage(request.prompt.request, candidate.diagram)
+					? yield* checkCoverage(candidate.diagram)
 					: [];
 			const covered = candidate.diagram;
 			if (coverage.length > 0 && covered && repairsUsed < policy.maxRepairAttempts) {
@@ -317,33 +405,11 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 				const issueDiagnostics = coverage.map(
 					(issue) => `coverage.${issue.code}: ${issue.message}`,
 				);
-				yield* Effect.logInfo("Repairing a diagram that misses what its request states", {
-					coverage_issues: coverage.map((issue) => issue.code).join(","),
-					operation: "generate",
-					provider,
-				});
-				const repairResult = yield* Effect.result(
-					executeModelCall(buildCoverageRepairRequest(request, original, coverage)),
+				const { improved, remaining, repaired } = yield* repairCoverage(
+					original,
+					covered,
+					coverage,
 				);
-				const repaired = Result.isSuccess(repairResult)
-					? enforceCandidateRequestRequirements(repairResult.success, request)
-					: undefined;
-				// A repair in another family would pass the other family's checks without fixing anything.
-				const remaining =
-					repaired?.diagram && !repaired.error && repaired.diagram.type === covered.type
-						? checkRequestCoverage(request.prompt.request, repaired.diagram)
-						: undefined;
-				// Keep the repair only when it fixes a miss without dropping what the diagram held.
-				const improved =
-					repaired?.diagram !== undefined &&
-					remaining !== undefined &&
-					remaining.length < coverage.length &&
-					keepsStatedStructure(request.prompt.request, covered, repaired.diagram);
-				yield* recordMetric(generationCoverageRepairs, 1, {
-					operation: "generate",
-					outcome: improved ? "succeeded" : "kept_original",
-					provider,
-				});
 				candidate =
 					improved && repaired
 						? {
@@ -366,12 +432,14 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 			}
 			const finishedAt = yield* Clock.currentTimeMillis;
 			const usage = yield* Ref.get(usageRef);
-			return {
+			const result = {
 				...candidate,
 				attempts: yield* Ref.get(callsRef),
 				durationMs: Math.round(finishedAt - startedAt),
 				...(usage ? { usage } : {}),
 			};
+			yield* Effect.annotateCurrentSpan(SpanContent.output, result);
+			return result;
 		}).pipe(
 			Effect.tap((candidate) =>
 				Effect.all([

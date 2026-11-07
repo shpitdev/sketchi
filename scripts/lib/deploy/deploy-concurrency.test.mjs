@@ -69,7 +69,7 @@ test("all Pipeline-bound preview and production uploads share a non-cancelling q
 });
 
 test("non-Pipeline apps retain independent preview and production concurrency", () => {
-	for (const project of ["web", "icons", "excalidraw", "eval-harness"]) {
+	for (const project of ["web", "icons", "excalidraw"]) {
 		const first = concurrency(preview, project, 42);
 		const next = concurrency(preview, project, 43);
 		const prod = concurrency(production, project);

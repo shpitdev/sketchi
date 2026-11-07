@@ -15,6 +15,13 @@
 			"head_sampling_rate": 1
 		}
 	},
+	// sketchi_telemetry_spans_production. Not remote, so local development stays out of it.
+	"pipelines": [
+		{
+			"binding": "TELEMETRY_SPANS",
+			"stream": "e118fdd69a2548258389e82fb1ade1d6"
+		}
+	],
 	"workers_dev": true,
 	"vars": {
 		"SKETCHI_APP_SURFACE": "playground",
@@ -37,6 +44,13 @@
 				"enabled": true,
 				"head_sampling_rate": 1
 			}
-		}
+		},
+		// sketchi_telemetry_spans_preview
+		"pipelines": [
+			{
+				"binding": "TELEMETRY_SPANS",
+				"stream": "d3066c58106b4facbc146e9188e383b1"
+			}
+		]
 	}
 }

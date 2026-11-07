@@ -1,10 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
-import {
-	makeTelemetryTestSink,
-	makeWorkersTelemetryLayer,
-	type TelemetryMetricEvent,
-	type TelemetrySpanEvent,
-} from "@sketchi/observability";
+import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { Arbitrary, Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 
 import {
@@ -268,12 +263,8 @@ describe("StudioProjects Effect service", () => {
 			const missing = yield* Effect.flip(projects.getProject(owner, "proj_missing_telemetry"));
 			assert.strictEqual(missing._tag, "StudioNotFoundError");
 
-			const spans = probe.events.filter(
-				(event): event is TelemetrySpanEvent => event.event === "effect.span",
-			);
-			const metrics = probe.events.filter(
-				(event): event is TelemetryMetricEvent => event.event === "effect.metric",
-			);
+			const spans = probe.spans;
+			const metrics = probe.metrics;
 			assert.deepInclude(
 				spans.find((span) => span.name === "studioPersistence.projects.createFromArtifact")
 					?.attributes,
@@ -295,7 +286,7 @@ describe("StudioProjects Effect service", () => {
 					(span) =>
 						span.name === "studioPersistence.projects.getProject" && span.outcome === "failure",
 				),
-				{ error_category: "StudioNotFoundError" },
+				{ error_tag: "StudioNotFoundError" },
 			);
 			assert.deepInclude(
 				metrics.find((metric) => metric.metric === "sketchi_studio_persistence_failures")

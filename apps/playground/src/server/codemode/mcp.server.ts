@@ -59,7 +59,7 @@ import {
 	SKETCHI_EXECUTE_DESCRIPTION,
 } from "./mcp-docs.server";
 import { createEffectMcpServer, makeEffectMcpTool } from "./effect-mcp-adapter.server";
-import { prewarmPngRendererOnSessionStart } from "./mcp-session-prewarm.server";
+import { prewarmPngRendererOnSessionStart, readMcpMessage } from "./mcp-session-prewarm.server";
 import { PlaygroundCodeModeUsage } from "./usage-events.server";
 
 export interface SketchiCodeModeProvider {
@@ -979,7 +979,8 @@ export const handleSketchiMcpRequest = Effect.fn("playground.http.mcp")(function
 	const callbacks = yield* PlaygroundRequestCallbacks;
 	const env = yield* PlaygroundBindings;
 	const platform = yield* PlaygroundPlatformCallbacks;
-	platform.waitUntil(prewarmPngRendererOnSessionStart(request, yield* PlaygroundCodeMode));
+	const message = yield* readMcpMessage(request);
+	platform.waitUntil(prewarmPngRendererOnSessionStart(message, yield* PlaygroundCodeMode));
 	const createLegacyMcpHandler = yield* Effect.tryPromise({
 		try: () => import("agents/mcp").then((module) => module.createLegacyMcpHandler),
 		catch: (cause) =>

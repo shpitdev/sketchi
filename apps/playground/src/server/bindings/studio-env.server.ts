@@ -2,6 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
 import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
+import type { TelemetryPipeline } from "@sketchi/observability";
 
 import type { CodeModePngRendererNamespace } from "../codemode/browser-renderer.server";
 import type { PlaygroundAssetsBinding } from "../codemode/icon-catalog.server";
@@ -18,6 +19,7 @@ export interface StudioEnv {
 	SKETCHI_AI_GENERATE_MODEL?: string;
 	SKETCHI_AI_MODEL?: string;
 	SKETCHI_RENDER_ASSET_ORIGIN?: string;
+	TELEMETRY_SPANS?: TelemetryPipeline;
 }
 
 export interface CodeModeUsagePipelineBinding {

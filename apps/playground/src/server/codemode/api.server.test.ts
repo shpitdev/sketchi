@@ -971,8 +971,9 @@ describe("Code Mode API handlers", () => {
 			});
 			await vi.waitFor(() => {
 				expect(warning).toHaveBeenCalledWith(
+					"Code Mode usage capture failed",
 					expect.objectContaining({
-						event: "effect.log",
+						type: "log",
 						fields: expect.objectContaining({
 							error_tag: "CodeModeUsageCaptureError",
 							operation: "buildFlowchart",

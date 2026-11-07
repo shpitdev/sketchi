@@ -2,7 +2,15 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { vi } from "vitest";
 
-import { prewarmPngRendererOnSessionStart } from "./mcp-session-prewarm.server";
+import { prewarmPngRendererOnSessionStart, readMcpMessage } from "./mcp-session-prewarm.server";
+
+const prewarmOn = <R>(
+	request: Request,
+	codeMode: { readonly prewarmPngRenderer: Effect.Effect<void, never, R> },
+) =>
+	Effect.flatMap(readMcpMessage(request), (message) =>
+		prewarmPngRendererOnSessionStart(message, codeMode),
+	);
 
 function mcpPost(body: unknown): Request {
 	return new Request("https://studio.test/mcp", {
@@ -34,7 +42,7 @@ describe("MCP session prewarm", () => {
 		it.effect(`prewarms the PNG renderer on ${name}`, () =>
 			Effect.gen(function* () {
 				const { codeMode, prewarmed } = prewarmProbe();
-				yield* prewarmPngRendererOnSessionStart(mcpPost(body), codeMode);
+				yield* prewarmOn(mcpPost(body), codeMode);
 				expect(prewarmed).toHaveBeenCalledTimes(1);
 			}),
 		);
@@ -52,7 +60,7 @@ describe("MCP session prewarm", () => {
 		it.effect(`does not prewarm on ${name}`, () =>
 			Effect.gen(function* () {
 				const { codeMode, prewarmed } = prewarmProbe();
-				yield* prewarmPngRendererOnSessionStart(request, codeMode);
+				yield* prewarmOn(request, codeMode);
 				expect(prewarmed).not.toHaveBeenCalled();
 			}),
 		);
@@ -62,9 +70,9 @@ describe("MCP session prewarm", () => {
 		Effect.gen(function* () {
 			const { codeMode } = prewarmProbe();
 			const request = mcpPost(jsonRpc("tools/list"));
-			const prewarm = prewarmPngRendererOnSessionStart(request, codeMode);
+			const message = yield* readMcpMessage(request);
+			yield* prewarmPngRendererOnSessionStart(message, codeMode);
 			const forwarded = yield* Effect.promise(() => request.json());
-			yield* prewarm;
 			expect(forwarded).toMatchObject({ method: "tools/list" });
 		}),
 	);

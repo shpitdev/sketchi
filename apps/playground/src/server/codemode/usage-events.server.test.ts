@@ -1,10 +1,5 @@
 import { assert, describe, expect, it } from "@effect/vitest";
-import {
-	makeTelemetryTestSink,
-	makeWorkersTelemetryLayer,
-	type TelemetryLogEvent,
-	type TelemetryMetricEvent,
-} from "@sketchi/observability";
+import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { Effect, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 
@@ -253,12 +248,8 @@ describe("Code Mode usage waitUntil boundary", () => {
 				}
 				yield* provideRequest(scheduledEffect);
 				assert.strictEqual(sinkCalls, 1);
-				const logs = probe.events.filter(
-					(event): event is TelemetryLogEvent => event.event === "effect.log",
-				);
-				const metrics = probe.events.filter(
-					(event): event is TelemetryMetricEvent => event.event === "effect.metric",
-				);
+				const logs = probe.logs;
+				const metrics = probe.metrics;
 				assert.strictEqual(logs.length, 1);
 				assert.deepStrictEqual(logs[0]?.fields, {
 					error_tag: "CodeModeUsageCaptureError",
@@ -334,10 +325,8 @@ describe("usage capture sink isolation", () => {
 				yield* TestClock.adjust("1 second");
 				expect(artifactKeys).toHaveLength(1);
 				expect(artifactKeys[0]).toContain("/run_test/attempt_test/event_test/event.json");
-				const writes = probe.events.filter(
-					(event): event is TelemetryMetricEvent =>
-						event.event === "effect.metric" &&
-						event.metric === "sketchi_codemode_usage_capture_writes",
+				const writes = probe.metrics.filter(
+					(event) => event.metric === "sketchi_codemode_usage_capture_writes",
 				);
 				expect(writes).toEqual([
 					expect.objectContaining({
@@ -414,9 +403,8 @@ describe("usage capture sink isolation", () => {
 				),
 			),
 		);
-		const writes = probe.events.filter(
-			(event): event is TelemetryMetricEvent =>
-				event.event === "effect.metric" && event.metric === "sketchi_codemode_usage_capture_writes",
+		const writes = probe.metrics.filter(
+			(event) => event.metric === "sketchi_codemode_usage_capture_writes",
 		);
 		expect(writes).toHaveLength(2);
 		expect(writes).toEqual(
@@ -435,12 +423,14 @@ describe("usage capture sink isolation", () => {
 				}),
 			]),
 		);
-		const logs = probe.events.filter(
-			(event): event is TelemetryLogEvent => event.event === "effect.log",
-		);
-		expect(logs.map((event) => String(event.fields.sink)).sort()).toEqual([
-			...(analyticsFails ? ["analytics"] : []),
-			...(artifactsFail ? ["artifacts"] : []),
-		]);
+		const logs = probe.logs;
+		expect(
+			logs
+				.flatMap((event) => {
+					const sink = event.fields["sink"];
+					return typeof sink === "string" ? [sink] : [];
+				})
+				.sort(),
+		).toEqual([...(analyticsFails ? ["analytics"] : []), ...(artifactsFail ? ["artifacts"] : [])]);
 	});
 });

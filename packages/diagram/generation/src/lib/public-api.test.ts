@@ -1,11 +1,5 @@
 import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
-import {
-	makeTelemetryTestSink,
-	makeWorkersTelemetryLayer,
-	type TelemetryLogEvent,
-	type TelemetryMetricEvent,
-	type TelemetrySpanEvent,
-} from "@sketchi/observability";
+import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { FLOWCHART_MAX_NODES, SKETCHI_DIAGRAM_STYLE } from "@sketchi/diagram-core";
 import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
@@ -791,9 +785,8 @@ layer(repairedClientLayer)("semantic repair policy", (it) => {
 					}),
 				}),
 			);
-			const repairs = probe.events.filter(
-				(event): event is TelemetryMetricEvent =>
-					event.event === "effect.metric" && event.metric === "sketchi_generation_repairs",
+			const repairs = probe.metrics.filter(
+				(event) => event.metric === "sketchi_generation_repairs",
 			);
 			assert.deepStrictEqual(
 				repairs.map((event) => event.attributes["outcome"]),
@@ -1068,19 +1061,15 @@ layer(exhaustedRepairClientLayer)("failed repair transport", (it) => {
 			assert.isTrue(
 				candidate.diagnostics.includes("repair_failed: semantic repair attempt 1 failed."),
 			);
-			const repairs = probe.events.filter(
-				(event): event is TelemetryMetricEvent =>
-					event.event === "effect.metric" && event.metric === "sketchi_generation_repairs",
+			const repairs = probe.metrics.filter(
+				(event) => event.metric === "sketchi_generation_repairs",
 			);
 			assert.deepStrictEqual(
 				repairs.map((event) => event.attributes["outcome"]),
 				["attempted", "failed"],
 			);
 			assert.strictEqual(
-				probe.events.filter(
-					(event): event is TelemetryMetricEvent =>
-						event.event === "effect.metric" && event.metric === "sketchi_generation_failures",
-				).length,
+				probe.metrics.filter((event) => event.metric === "sketchi_generation_failures").length,
 				0,
 			);
 		}).pipe(Effect.provide(telemetryLayer));
@@ -1249,9 +1238,7 @@ layer(gatewayConstructionFailureLayer)("provider preflight failures", (it) => {
 					assert.strictEqual(error.operation, "ai.gateway");
 					assert.isFalse(error.retryable);
 				}
-				const metrics = probe.events.filter(
-					(event): event is TelemetryMetricEvent => event.event === "effect.metric",
-				);
+				const metrics = probe.metrics;
 				assert.strictEqual(
 					metrics.filter((metric) => metric.metric === "sketchi_generation_attempts").length,
 					0,
@@ -1317,15 +1304,10 @@ layer(retryClientLayer)("bounded retry policy", (it) => {
 
 			assert.strictEqual(candidate.diagram?.id, expectedDiagram.id);
 			assert.strictEqual(transientAttempts, 3);
-			const metrics = probe.events.filter(
-				(event): event is TelemetryMetricEvent => event.event === "effect.metric",
-			);
-			const logs = probe.events.filter(
-				(event): event is TelemetryLogEvent => event.event === "effect.log",
-			);
-			const attempts = probe.events.filter(
-				(event): event is TelemetrySpanEvent =>
-					event.event === "effect.span" && event.name === "diagramGeneration.gatewayChat.attempt",
+			const metrics = probe.metrics;
+			const logs = probe.logs;
+			const attempts = probe.spans.filter(
+				(event) => event.name === "diagramGeneration.gatewayChat.attempt",
 			);
 			assert.strictEqual(
 				metrics.filter((metric) => metric.metric === "sketchi_generation_attempts").length,
@@ -1455,12 +1437,8 @@ layer(timeoutClientLayer)("timeouts and interruption", (it) => {
 			assert.isTrue(cancellationSignals.every((signal) => signal.aborted));
 			assert.strictEqual(activeUpstreamRequests, 0);
 			assert.strictEqual(maxActiveUpstreamRequests, 1);
-			const metrics = probe.events.filter(
-				(event): event is TelemetryMetricEvent => event.event === "effect.metric",
-			);
-			const logs = probe.events.filter(
-				(event): event is TelemetryLogEvent => event.event === "effect.log",
-			);
+			const metrics = probe.metrics;
+			const logs = probe.logs;
 			assert.strictEqual(
 				metrics.filter((metric) => metric.metric === "sketchi_generation_timeouts").length,
 				1,

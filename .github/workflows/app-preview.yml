@@ -175,9 +175,9 @@ jobs:
     concurrency:
       # Serialize Pipeline-bound uploads across Workers and streams in this account.
       # Use the same queued lock as production; leave other apps PR-scoped.
-      group: ${{ matrix.project == 'playground' && 'cloudflare-pipeline-bound-upload' || format('app-preview-{0}-pr-{1}', matrix.project, needs.resolve-preview-pr.outputs.pr_number) }}
-      cancel-in-progress: ${{ matrix.project != 'playground' }}
-      queue: ${{ matrix.project == 'playground' && 'max' || 'single' }}
+      group: ${{ (matrix.project == 'playground' || matrix.project == 'eval-harness') && 'cloudflare-pipeline-bound-upload' || format('app-preview-{0}-pr-{1}', matrix.project, needs.resolve-preview-pr.outputs.pr_number) }}
+      cancel-in-progress: ${{ matrix.project != 'playground' && matrix.project != 'eval-harness' }}
+      queue: ${{ (matrix.project == 'playground' || matrix.project == 'eval-harness') && 'max' || 'single' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -361,9 +361,9 @@ jobs:
     concurrency:
       # Same queue as deploy-preview. Deploys also re-check the PR state once they
       # hold the lock, so one that was waiting when the PR closed skips the upload.
-      group: ${{ matrix.project == 'playground' && 'cloudflare-pipeline-bound-upload' || format('app-preview-{0}-pr-{1}', matrix.project, needs.resolve-preview-pr.outputs.pr_number) }}
-      cancel-in-progress: ${{ matrix.project != 'playground' }}
-      queue: ${{ matrix.project == 'playground' && 'max' || 'single' }}
+      group: ${{ (matrix.project == 'playground' || matrix.project == 'eval-harness') && 'cloudflare-pipeline-bound-upload' || format('app-preview-{0}-pr-{1}', matrix.project, needs.resolve-preview-pr.outputs.pr_number) }}
+      cancel-in-progress: ${{ matrix.project != 'playground' && matrix.project != 'eval-harness' }}
+      queue: ${{ (matrix.project == 'playground' || matrix.project == 'eval-harness') && 'max' || 'single' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:

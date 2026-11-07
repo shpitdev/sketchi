@@ -2,12 +2,13 @@ import "@tanstack/react-start/server-only";
 
 import type { CodeModeArtifactRenderer } from "@sketchi/diagram-agent";
 import { recordMetric } from "@sketchi/observability";
-import { Clock, Context, Effect, Layer, Metric, Schema } from "effect";
+import { Clock, Context, Effect, Layer, Metric, Option, Schema } from "effect";
 
 import {
 	BrowserRenderingFailure,
 	browserFailure,
 	browserRenderingRetrySchedule,
+	type PngRenderCaller,
 	type PngRenderRequest,
 } from "./browser-render-pool.server";
 import type { PngRenderResult } from "./png-renderer-object.server";
@@ -51,8 +52,8 @@ export class BrowserRenderingTimeout extends Schema.TaggedError<BrowserRendering
 /** The `CODEMODE_PNG_RENDERER` Durable Object namespace, narrowed to what the Worker calls. */
 export interface CodeModePngRendererNamespace {
 	getByName(name: string): {
-		renderPng(request: PngRenderRequest): Promise<PngRenderResult>;
-		prewarm(harnessUrl: string): Promise<void> | void;
+		renderPng(request: PngRenderRequest, caller?: PngRenderCaller): Promise<PngRenderResult>;
+		prewarm(harnessUrl: string, caller?: PngRenderCaller): Promise<void> | void;
 	};
 }
 
@@ -93,26 +94,40 @@ export function createCloudflareBrowserRunArtifactRenderer(
 	options: CloudflareBrowserRunRendererOptions = {},
 ): CloudflareBrowserRunArtifactRenderer {
 	const harnessUrl = new URL(HARNESS_PATH, options.assetOrigin ?? DEFAULT_ASSET_ORIGIN).toString();
+	const caller = Effect.map(
+		Effect.option(Effect.currentSpan),
+		Option.match({
+			onNone: () => undefined,
+			onSome: ({ spanId, traceId }): PngRenderCaller => ({ spanId, traceId }),
+		}),
+	);
 
 	return {
-		prewarm: Effect.tryPromise({
-			try: async () => renderers.getByName(harnessUrl).prewarm(harnessUrl),
-			catch: browserFailure("durableObject"),
-		}).pipe(
+		prewarm: Effect.flatMap(caller, (parent) =>
+			Effect.tryPromise({
+				try: async () => renderers.getByName(harnessUrl).prewarm(harnessUrl, parent),
+				catch: browserFailure("durableObject"),
+			}),
+		).pipe(
 			Effect.withSpan("playground.browserRendering.prewarm"),
 			Effect.annotateSpans({ operation: "prewarm" }),
 			Effect.ignore,
 		),
 		renderPng: Effect.fn("playground.browserRendering.renderPng")((input) => {
-			const render = Effect.tryPromise({
-				try: () =>
-					renderers.getByName(harnessUrl).renderPng({
-						harnessUrl,
-						backgroundColor: input.scene.backgroundColor,
-						excalidraw: input.excalidraw,
-					}),
-				catch: browserFailure("durableObject"),
-			}).pipe(
+			const render = Effect.flatMap(caller, (parent) =>
+				Effect.tryPromise({
+					try: () =>
+						renderers.getByName(harnessUrl).renderPng(
+							{
+								harnessUrl,
+								backgroundColor: input.scene.backgroundColor,
+								excalidraw: input.excalidraw,
+							},
+							parent,
+						),
+					catch: browserFailure("durableObject"),
+				}),
+			).pipe(
 				Effect.retry(browserRenderingRetrySchedule),
 				Effect.flatMap((result) =>
 					result._tag === "Rendered"

@@ -1,19 +1,25 @@
 import "@tanstack/react-start/server-only";
 
 import { DurableObject } from "cloudflare:workers";
-import { makeWorkersTelemetryLayer } from "@sketchi/observability";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import {
+	makeWorkersTelemetryLayer,
+	type TelemetryPipeline,
+	withTelemetryExport,
+} from "@sketchi/observability";
+import { Effect, Layer, ManagedRuntime, Tracer } from "effect";
 
 import {
 	BrowserRenderPool,
 	type BrowserRenderingOperation,
 	type CloudflareBrowserRunBinding,
+	type PngRenderCaller,
 	type PngRenderRequest,
 	type PngRenderTiming,
 } from "./browser-render-pool.server";
 
 export interface CodeModePngRendererEnv {
 	readonly BROWSER?: CloudflareBrowserRunBinding;
+	readonly TELEMETRY_SPANS?: TelemetryPipeline;
 }
 
 /** Plain data so it crosses Durable Object RPC intact. */
@@ -48,7 +54,7 @@ function makeRendererRuntime(binding: CloudflareBrowserRunBinding) {
 export class CodeModePngRenderer extends DurableObject<CodeModePngRendererEnv> {
 	#runtime: ReturnType<typeof makeRendererRuntime> | undefined;
 
-	async renderPng(request: PngRenderRequest): Promise<PngRenderResult> {
+	async renderPng(request: PngRenderRequest, caller?: PngRenderCaller): Promise<PngRenderResult> {
 		const runtime = this.#rendererRuntime();
 		if (!runtime) {
 			return {
@@ -76,6 +82,7 @@ export class CodeModePngRenderer extends DurableObject<CodeModePngRendererEnv> {
 						timing,
 					}),
 				}),
+				this.#exportSpans("playground.pngRenderer.renderPng", caller),
 			),
 		);
 	}
@@ -84,13 +91,26 @@ export class CodeModePngRenderer extends DurableObject<CodeModePngRendererEnv> {
 	 * Starts opening a harness page and returns at once. A failure is recorded
 	 * on the prewarm span; the next export opens its own page.
 	 */
-	prewarm(harnessUrl: string): void {
+	prewarm(harnessUrl: string, caller?: PngRenderCaller): void {
 		this.#rendererRuntime()?.runFork(
 			Effect.gen(function* () {
 				const pool = yield* BrowserRenderPool;
 				yield* pool.prewarm(harnessUrl);
-			}).pipe(Effect.ignore),
+			}).pipe(Effect.ignore, this.#exportSpans("playground.pngRenderer.prewarm", caller)),
 		);
+	}
+
+	/** Roots one call's spans under the caller's span and sends them when the call ends. */
+	#exportSpans(name: string, caller: PngRenderCaller | undefined) {
+		const target = {
+			pipeline: this.env.TELEMETRY_SPANS,
+			waitUntil: (promise: Promise<unknown>) => this.ctx.waitUntil(promise),
+		};
+		return <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+			effect.pipe(
+				withTelemetryExport(target),
+				Effect.withSpan(name, caller ? { parent: Tracer.externalSpan(caller) } : {}),
+			);
 	}
 
 	#rendererRuntime() {

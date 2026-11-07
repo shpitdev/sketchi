@@ -1,10 +1,5 @@
 import { assert, describe, expect, it } from "@effect/vitest";
-import {
-	makeTelemetryTestSink,
-	makeWorkersTelemetryLayer,
-	type TelemetryMetricEvent,
-	type TelemetrySpanEvent,
-} from "@sketchi/observability";
+import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { TestClock } from "effect/testing";
@@ -81,14 +76,17 @@ describe("Cloudflare Browser Run Code Mode renderer", () => {
 
 			expect(new Uint8Array(png)).toEqual(new Uint8Array([80, 78, 71]));
 			expect(getByName).toHaveBeenCalledWith("https://studio.test/codemode-export-harness");
-			expect(renderPng).toHaveBeenCalledWith({
-				harnessUrl: "https://studio.test/codemode-export-harness",
-				backgroundColor: "#ffffff",
-				excalidraw: input.excalidraw,
-			});
-			const span = probe.events.find(
-				(event): event is TelemetrySpanEvent =>
-					event.event === "effect.span" && event.name === "playground.browserRendering.renderPng",
+			const span = probe.spans.find(
+				(event) => event.name === "playground.browserRendering.renderPng",
+			);
+			// The Durable Object roots its spans under this one.
+			expect(renderPng).toHaveBeenCalledWith(
+				{
+					harnessUrl: "https://studio.test/codemode-export-harness",
+					backgroundColor: "#ffffff",
+					excalidraw: input.excalidraw,
+				},
+				{ spanId: span?.span_id, traceId: span?.trace_id },
 			);
 			expect(span?.attributes).toMatchObject({
 				cache_mode: "cold",
@@ -96,11 +94,8 @@ describe("Cloudflare Browser Run Code Mode renderer", () => {
 				open_ms: 900,
 				export_ms: 250,
 			});
-			const metrics = probe.events.filter(
-				(event): event is TelemetryMetricEvent => event.event === "effect.metric",
-			);
 			assert.deepInclude(
-				metrics.find((metric) => metric.metric === "sketchi_browser_rendering_requests")
+				probe.metrics.find((metric) => metric.metric === "sketchi_browser_rendering_requests")
 					?.attributes,
 				{
 					operation: "renderPng",
@@ -178,7 +173,10 @@ describe("Cloudflare Browser Run Code Mode renderer", () => {
 				assetOrigin: "https://studio.test",
 			}).prewarm;
 			expect(getByName).toHaveBeenCalledWith("https://studio.test/codemode-export-harness");
-			expect(prewarm).toHaveBeenCalledWith("https://studio.test/codemode-export-harness");
+			expect(prewarm).toHaveBeenCalledWith("https://studio.test/codemode-export-harness", {
+				spanId: expect.any(String),
+				traceId: expect.any(String),
+			});
 		}),
 	);
 

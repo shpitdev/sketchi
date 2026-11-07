@@ -474,12 +474,10 @@ describe("gateway chat errors", () => {
 					Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "test" }, sink })),
 				),
 			);
-			const attempt = probe.events.find(
-				(event) => event.event === "effect.span" && event.name.endsWith(".attempt"),
-			);
+			const attempt = probe.spans.find((span) => span.name.endsWith(".attempt"));
 			expect(attempt).toMatchObject({
 				attributes: { gateway_log_id: logId },
-				error_category: "DiagramGenerationTransportError",
+				error_tag: "DiagramGenerationTransportError",
 			});
 		});
 	});
@@ -566,8 +564,8 @@ describe("gateway chat cancellation", () => {
 });
 
 describe("gateway chat telemetry", () => {
-	const SECRET_PROMPT = "PROMPT-MARKER-do-not-export";
-	const traced = { ...request, prompt: { id: "scenario-1", request: SECRET_PROMPT } };
+	const PROMPT = "PROMPT-MARKER-exported-in-full";
+	const traced = { ...request, prompt: { id: "scenario-1", request: PROMPT } };
 	const headers = { "cf-aig-log-id": "01a1a910-c74c-713a-83ea-307998d588c7" };
 
 	function record(layer: Layer.Layer<DiagramGenerationClient>, repeat = 1) {
@@ -579,7 +577,7 @@ describe("gateway chat telemetry", () => {
 				Effect.provide(layer),
 				Effect.provide(makeWorkersTelemetryLayer({ resource: { serviceName: "test" }, sink })),
 			),
-		).then(() => probe.events);
+		).then(() => probe);
 	}
 
 	/** A first failure, a retry, then an unreadable answer and a repair. */
@@ -593,26 +591,20 @@ describe("gateway chat telemetry", () => {
 		};
 	}
 
-	const metrics = (events: Awaited<ReturnType<typeof record>>) =>
-		events.flatMap((event) =>
-			event.event === "effect.metric"
-				? [
-						{
-							attributes: event.attributes,
-							metric: event.metric,
-							value: event.metric.endsWith("duration_ms") ? "ms" : event.value,
-						},
-					]
-				: [],
-		);
-	const logs = (events: Awaited<ReturnType<typeof record>>) =>
-		events.flatMap((event) =>
-			event.event === "effect.log"
-				? [{ fields: event.fields, level: event.level, message: event.message }]
-				: [],
-		);
-	const spans = (events: Awaited<ReturnType<typeof record>>) =>
-		events.flatMap((event) => (event.event === "effect.span" ? [event] : []));
+	type Recorded = Awaited<ReturnType<typeof record>>;
+	const metrics = (recorded: Recorded) =>
+		recorded.metrics.map((event) => ({
+			attributes: event.attributes,
+			metric: event.metric,
+			value: event.metric.endsWith("duration_ms") ? "ms" : event.value,
+		}));
+	const logs = (recorded: Recorded) =>
+		recorded.logs.map((event) => ({
+			fields: event.fields,
+			level: event.level,
+			message: event.message,
+		}));
+	const spans = (recorded: Recorded) => recorded.spans;
 
 	const policy = { maxRepairAttempts: 1, maxRetries: 1 };
 	const chatEvents = () =>
@@ -661,14 +653,16 @@ describe("gateway chat telemetry", () => {
 		expect(logs(events)[0]?.message).toBe("Retrying diagram generation");
 	});
 
-	it("keeps the attempt span name and adds only the language model span", async () => {
+	it("keeps the attempt span name and shows the repair and coverage check as spans", async () => {
 		const names = spans(await chatEvents()).map((span) => span.name);
 		expect(new Set(names)).toEqual(
 			new Set([
 				"LanguageModel.generateText",
+				"diagramGeneration.coverage.check",
 				"diagramGeneration.gatewayChat.attempt",
 				"diagramGeneration.executeModelCall",
 				"diagramGeneration.generate",
+				"diagramGeneration.repair",
 				"diagramGeneration.runWithPolicy",
 			]),
 		);
@@ -682,10 +676,38 @@ describe("gateway chat telemetry", () => {
 		}
 	});
 
-	it("exports no prompt or response text", async () => {
-		const exported = JSON.stringify(await chatEvents());
-		expect(exported).not.toContain(SECRET_PROMPT);
-		expect(exported).not.toContain("Response contract");
-		expect(exported).not.toContain("Unsupported");
+	it("records each model call's full request and response on its attempt span", async () => {
+		const recorded = spans(await chatEvents());
+		const attempts = recorded.filter((span) => span.name.endsWith(".attempt"));
+		expect(attempts.map((span) => span.outcome)).toEqual(["failure", "success", "success"]);
+		for (const attempt of attempts) {
+			expect(JSON.stringify(attempt.attributes["gen_ai.system_instructions"])).toContain(
+				"Response contract",
+			);
+			expect(JSON.stringify(attempt.attributes["gen_ai.input.messages"])).toContain(PROMPT);
+			expect(attempt.attributes["gen_ai.request.model"]).toBe("gemini-3.1-flash-lite");
+		}
+		const [failed, invalid, answered] = attempts;
+		expect(failed?.attributes["http.response.status_code"]).toBe(503);
+		expect(failed?.attributes["http.response.body"]).toContain("busy");
+		expect(invalid?.attributes["gen_ai.output.messages"]).toEqual([
+			{ finish_reason: "stop", parts: [{ content: '{"title":', type: "text" }], role: "assistant" },
+		]);
+		expect(answered?.attributes).toMatchObject({
+			"gen_ai.response.finish_reasons": ["stop"],
+			"gen_ai.usage.input_tokens": 11,
+			"gen_ai.usage.output_tokens": 7,
+		});
+		expect(answered?.attributes["http.response.body"]).toContain("chatcmpl-1");
+		// The repair attempt asks with the invalid output and its diagnostics.
+		expect(JSON.stringify(answered?.attributes["gen_ai.input.messages"])).toContain(
+			'{\\"title\\":',
+		);
+		const repair = recorded.find((span) => span.name === "diagramGeneration.repair");
+		expect(repair?.attributes["sketchi.input"]).toMatchObject({ text: '{"title":' });
+		expect(repair?.attributes["sketchi.output"]).toMatchObject({ outcome: "succeeded" });
+		const policy = recorded.find((span) => span.name === "diagramGeneration.runWithPolicy");
+		expect(policy?.attributes["sketchi.input"]).toMatchObject({ prompt: { request: PROMPT } });
+		expect(policy?.attributes["sketchi.output"]).toMatchObject({ attempts: 3 });
 	});
 });
