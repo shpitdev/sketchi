@@ -18,4 +18,6 @@ export interface StudioEnv {
 	SKETCHI_AI_MODEL?: string;
 	SKETCHI_RENDER_ASSET_ORIGIN?: string;
 	TELEMETRY_SPANS?: TelemetryPipeline;
+	/** A Worker secret: lets generate narrow an untyped request's families with Jev. */
+	TYPESAFE_API_KEY?: string;
 }

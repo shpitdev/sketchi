@@ -16,8 +16,9 @@ import {
 	isLegacyCliDefaultModel,
 	type SupportedGenerationModel,
 	asksForStyling,
+	typeSafeFamilyNarrowingLayer,
 } from "@sketchi/diagram-generation";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Redacted } from "effect";
 
 import { aiEnvironment } from "../bindings/ai-env.server";
 import { logosNamedIn } from "../codemode/icon-catalog.server";
@@ -59,13 +60,14 @@ export const PlaygroundGenerationLive = Layer.effect(
 			ai: CloudflareAiGatewayProvider,
 			gatewayId: string,
 			route: GatewayChatRoute,
+			typeSafeApiKey: string | undefined,
 		) {
 			let byGateway = clients.get(ai);
 			if (!byGateway) {
 				byGateway = new Map();
 				clients.set(ai, byGateway);
 			}
-			const clientKey = `${gatewayId}:${route.provider}`;
+			const clientKey = `${gatewayId}:${route.provider}:${typeSafeApiKey ? "narrowing" : "words"}`;
 			let client = byGateway.get(clientKey);
 			if (!client) {
 				const clientLayer = CloudflareGatewayChatClientLive.pipe(
@@ -79,6 +81,10 @@ export const PlaygroundGenerationLive = Layer.effect(
 								surface: "generate-api",
 							}),
 							DiagramGenerationPolicyLive,
+							// Without the key, an untyped request is routed by its words alone.
+							typeSafeApiKey
+								? typeSafeFamilyNarrowingLayer({ apiKey: Redacted.make(typeSafeApiKey) })
+								: Layer.empty,
 						),
 					),
 				);
@@ -106,7 +112,8 @@ export const PlaygroundGenerationLive = Layer.effect(
 						provider: route.provider,
 					});
 				}
-				const client = yield* clientForBindings(env.AI, config.gatewayId, route);
+				const typeSafeApiKey = env.TYPESAFE_API_KEY?.trim() || undefined;
+				const client = yield* clientForBindings(env.AI, config.gatewayId, route, typeSafeApiKey);
 				// A revision keeps the logos its current diagram names, as well as any the request adds.
 				const logos = logosNamedIn(
 					input.base ? `${input.prompt}\n${JSON.stringify(input.base)}` : input.prompt,

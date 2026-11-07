@@ -21,7 +21,8 @@ import {
 	generationErrorToCandidate,
 	isRetryableGenerationError,
 } from "./errors.js";
-import { withFamilyRoute } from "./routing.js";
+import { type DiagramFamilyNarrowing, familyNarrowingAttributes } from "./family-narrowing.js";
+import { withNarrowedFamilyRoute } from "./routing.js";
 import { checkRequestCoverage, type CoverageIssue, keepsStatedStructure } from "./coverage.js";
 
 const generationAttempts = Metric.counter("sketchi_generation_attempts", {
@@ -113,14 +114,17 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 		input: DiagramGenerationRequest,
 		provider: DiagramGenerationProviderId,
 		policy: DiagramGenerationPolicyConfig,
+		/** Jev, for an untyped request whose words name no family. */
+		narrowing?: DiagramFamilyNarrowing["Service"],
 	) {
 		const startedAt = yield* Clock.currentTimeMillis;
-		const routed = withFamilyRoute(input);
+		const routed = yield* withNarrowedFamilyRoute(input, narrowing);
 		const request = routed.request;
 		yield* Effect.annotateCurrentSpan({
-			family_route: request.prompt.routedType
-				? `${routed.route?.cue ?? "named"}:${request.prompt.routedType}`
+			family_route: routed.route
+				? `${routed.route.cue}:${routed.route.families.join(",")}`
 				: "none",
+			...(routed.narrowing ? familyNarrowingAttributes(routed.narrowing) : {}),
 			[SpanContent.input]: request,
 		});
 		const deadline = startedAt + policy.totalTimeoutMs;

@@ -120,6 +120,7 @@ const approvedRuntimeBoundaryFiles = [
 	"apps/playground/src/server/runtime/runtime.server.ts",
 	"packages/diagram/scenarios/src/cli.ts",
 	"packages/diagram/scenarios/src/live-generator.ts",
+	"tools/family-narrowing-eval.ts",
 	"tools/generation-reliability-probe.ts",
 	"tools/harness-eval.ts",
 	"tools/studio-routing-eval.ts",
