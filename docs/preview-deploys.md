@@ -84,9 +84,10 @@ pushes keep the PR's affected Previews current.
 `web`, `playground`, and `icons` are public product surfaces. `eval-harness` and
 `excalidraw` remain internal and are not linked from public navigation.
 
-Pipeline-bound Playground uploads share `cloudflare-pipeline-bound-upload` with
-production. `queue: max` queues pending jobs without cancelling active uploads;
-other apps retain their per-app/per-PR concurrency policies.
+Pipeline-bound Playground and eval-harness uploads share
+`cloudflare-pipeline-bound-upload` with production. `queue: max` queues pending
+jobs without cancelling active uploads; other apps retain their per-app/per-PR
+concurrency policies.
 
 Preview and production uploads run through `07-wrangler-retry.mjs`. It retries
 only Cloudflare's `assets-upload-session` failure with code 10013, twice, after
@@ -169,16 +170,25 @@ the custom domains that would be attached by a manual domain dispatch. Internal
 apps report no custom domains.
 
 The Studio Worker binds Code Mode artifacts to R2 and Code Mode usage analytics
-to Cloudflare Pipelines:
+to Cloudflare Pipelines. Studio and the eval harness also bind their spans
+stream:
 
-| Surface                  | Binding                 | Remote target                                  |
-| ------------------------ | ----------------------- | ---------------------------------------------- |
-| Studio Previews          | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-preview`    |
-| Studio production Worker | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-production` |
-| Studio Previews          | `CODEMODE_USAGE_EVENTS` | `e9fc3bcd35314fa39fc6a89018207acc`             |
-| Studio Previews          | `CODEMODE_USAGE_ISSUES` | `d95a1767edf246af8c637c5b9bf5a5c5`             |
-| Studio production Worker | `CODEMODE_USAGE_EVENTS` | `d9044253316f4273a60298098f444a62`             |
-| Studio production Worker | `CODEMODE_USAGE_ISSUES` | `f687dab6e7d742c1a76834089e709462`             |
+| Surface                        | Binding                 | Remote target                                  |
+| ------------------------------ | ----------------------- | ---------------------------------------------- |
+| Studio Previews                | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-preview`    |
+| Studio production Worker       | `SKETCHI_ARTIFACTS`     | `sketchi-studio-codemode-artifacts-production` |
+| Studio Previews                | `CODEMODE_USAGE_EVENTS` | `e9fc3bcd35314fa39fc6a89018207acc`             |
+| Studio Previews                | `CODEMODE_USAGE_ISSUES` | `d95a1767edf246af8c637c5b9bf5a5c5`             |
+| Studio production Worker       | `CODEMODE_USAGE_EVENTS` | `d9044253316f4273a60298098f444a62`             |
+| Studio production Worker       | `CODEMODE_USAGE_ISSUES` | `f687dab6e7d742c1a76834089e709462`             |
+| Studio and eval-harness Previews | `TELEMETRY_SPANS`     | `d3066c58106b4facbc146e9188e383b1`             |
+| Studio and eval-harness production | `TELEMETRY_SPANS`   | `e118fdd69a2548258389e82fb1ade1d6`             |
+
+`TELEMETRY_SPANS` is not `remote`, so local development writes to a local stream
+rather than production's. Every Preview shares the preview spans stream; the
+`url.full` attribute of `playground.request` names the Preview host. The spans
+path is described in [architecture](architecture.md#persistence-and-telemetry),
+and `pnpm db --preview` queries what a Preview recorded.
 
 The checked-in `previews` block binds Studio Previews directly to the preview
 bucket and preview Pipeline streams. There is no generated resource rewrite. Production deploys
@@ -188,7 +198,8 @@ sinks are long-lived Cloudflare Pipeline resources, not Worker bindings. They
 write into `sketchi-codemode-usage-analytics-production-v4` and
 `sketchi-codemode-usage-analytics-preview-v4`; run
 `pnpm r2sql:codemode:resources` to print the sink, pipeline, bucket, and table
-map. Preview resources are named explicitly and must already exist; the command does
+map. The spans sinks write into `sketchi-telemetry-production` and
+`sketchi-telemetry-preview`; `pnpm telemetry:resources` prints their map. Preview resources are named explicitly and must already exist; the command does
 not provision data resources. The CI token does not need R2 object read access
 just to deploy.
 

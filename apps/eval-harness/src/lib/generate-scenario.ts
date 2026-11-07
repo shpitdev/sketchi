@@ -18,7 +18,12 @@ import {
 	summarizeGenerationCandidate,
 } from "@sketchi/diagram-generation";
 import { getGenerationScenario, toDiagramGenerationPrompt } from "@sketchi/diagram-scenarios";
-import { makeWorkersTelemetryLayer, withTelemetryCorrelation } from "@sketchi/observability";
+import {
+	makeWorkersTelemetryLayer,
+	type TelemetryPipeline,
+	withTelemetryCorrelation,
+	withTelemetryExport,
+} from "@sketchi/observability";
 import { createServerFn } from "@tanstack/react-start";
 import { Context, Effect, Layer, ManagedRuntime, Schema, SchemaIssue } from "effect";
 import { getRequest } from "@tanstack/react-start/server";
@@ -55,9 +60,17 @@ export interface EvalHarnessEnv {
 	AI?: CloudflareAiGatewayProvider;
 	SKETCHI_AI_GATEWAY_ID?: string;
 	SKETCHI_AI_MODEL?: string;
+	TELEMETRY_SPANS?: TelemetryPipeline;
 }
 
-function envString(bindings: EvalHarnessEnv, key: keyof EvalHarnessEnv, fallback: string): string {
+/** Keeps the request alive for work it starts, such as sending its spans. */
+export type EvalHarnessWaitUntil = (promise: Promise<unknown>) => void;
+
+function envString(
+	bindings: EvalHarnessEnv,
+	key: "SKETCHI_AI_GATEWAY_ID" | "SKETCHI_AI_MODEL",
+	fallback: string,
+): string {
 	const value = bindings[key];
 
 	return typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
@@ -242,15 +255,26 @@ function generationRuntime(bindings: EvalHarnessEnv) {
 	return runtime;
 }
 
+/** Roots a request's spans and sends them to the spans stream when it ends. */
+function exportRequestSpans(bindings: EvalHarnessEnv, waitUntil: EvalHarnessWaitUntil | undefined) {
+	return <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+		(waitUntil
+			? effect.pipe(withTelemetryExport({ pipeline: bindings.TELEMETRY_SPANS, waitUntil }))
+			: effect
+		).pipe(Effect.withSpan("evalHarness.request"));
+}
+
 export function runGenerateScenarioCandidatesForInput(
 	input: unknown,
 	bindings: EvalHarnessEnv,
 	signal?: AbortSignal,
+	waitUntil?: EvalHarnessWaitUntil,
 ): Promise<DiagramGenerationScenarioOutput> {
 	const { model, runtime } = generationRuntime(bindings);
 	return runtime.runPromise(
 		decodeGenerateScenarioInput(input).pipe(
 			Effect.flatMap((data) => generateScenarioCandidatesForInput(data, model)),
+			exportRequestSpans(bindings, waitUntil),
 		),
 		signal ? { signal } : undefined,
 	);
@@ -259,10 +283,12 @@ export function runGenerateScenarioCandidatesForInput(
 export const generateScenarioCandidates = createServerFn({ method: "POST" })
 	.validator((input: unknown) => Effect.runSync(decodeGenerateScenarioInput(input)))
 	.handler(async ({ data }) => {
-		const { getEvalHarnessBindings } = await import("./cloudflare-bindings.server");
+		const { getEvalHarnessBindings, waitUntil } = await import("./cloudflare-bindings.server");
 
-		const { model, runtime } = generationRuntime(getEvalHarnessBindings());
-		return runtime.runPromise(generateScenarioCandidatesForInput(data, model), {
-			signal: getRequest().signal,
-		});
+		const bindings = getEvalHarnessBindings();
+		const { model, runtime } = generationRuntime(bindings);
+		return runtime.runPromise(
+			generateScenarioCandidatesForInput(data, model).pipe(exportRequestSpans(bindings, waitUntil)),
+			{ signal: getRequest().signal },
+		);
 	});

@@ -49,6 +49,7 @@ import {
 	type SearchIconsResult,
 	type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
+import { withSpanContent } from "@sketchi/observability";
 import { Context, Effect, Layer } from "effect";
 
 import {
@@ -242,61 +243,61 @@ export const PlaygroundCodeModeLive = Layer.effect(
 
 		return PlaygroundCodeMode.of({
 			applyDiagramPatch: Effect.fn("playground.codeMode.applyDiagramPatch")((input) =>
-				provideRequestCodeMode(applyDiagramPatch(input)),
+				withSpanContent(input, provideRequestCodeMode(applyDiagramPatch(input))),
 			),
 			buildFlowchart: Effect.fn("playground.codeMode.buildFlowchart")((input) =>
-				provideRequestCodeMode(buildFlowchart(input)),
+				withSpanContent(input, provideRequestCodeMode(buildFlowchart(input))),
 			),
 			buildMindmap: Effect.fn("playground.codeMode.buildMindmap")((input) =>
-				provideRequestCodeMode(buildMindmap(input)),
+				withSpanContent(input, provideRequestCodeMode(buildMindmap(input))),
 			),
 			buildSequenceDiagram: Effect.fn("playground.codeMode.buildSequenceDiagram")((input) =>
-				provideRequestCodeMode(buildSequenceDiagram(input)),
+				withSpanContent(input, provideRequestCodeMode(buildSequenceDiagram(input))),
 			),
 			buildTimeline: Effect.fn("playground.codeMode.buildTimeline")((input) =>
-				provideRequestCodeMode(buildTimeline(input)),
+				withSpanContent(input, provideRequestCodeMode(buildTimeline(input))),
 			),
 			buildChart: Effect.fn("playground.codeMode.buildChart")((input) =>
-				provideRequestCodeMode(buildChart(input)),
+				withSpanContent(input, provideRequestCodeMode(buildChart(input))),
 			),
 			buildStateMachine: Effect.fn("playground.codeMode.buildStateMachine")((input) =>
-				provideRequestCodeMode(buildStateMachine(input)),
+				withSpanContent(input, provideRequestCodeMode(buildStateMachine(input))),
 			),
 			buildGantt: Effect.fn("playground.codeMode.buildGantt")((input) =>
-				provideRequestCodeMode(buildGantt(input)),
+				withSpanContent(input, provideRequestCodeMode(buildGantt(input))),
 			),
 			buildErDiagram: Effect.fn("playground.codeMode.buildErDiagram")((input) =>
-				provideRequestCodeMode(buildErDiagram(input)),
+				withSpanContent(input, provideRequestCodeMode(buildErDiagram(input))),
 			),
 			buildClassDiagram: Effect.fn("playground.codeMode.buildClassDiagram")((input) =>
-				provideRequestCodeMode(buildClassDiagram(input)),
+				withSpanContent(input, provideRequestCodeMode(buildClassDiagram(input))),
 			),
 			buildOrgChart: Effect.fn("playground.codeMode.buildOrgChart")((input) =>
-				provideRequestCodeMode(buildOrgChart(input)),
+				withSpanContent(input, provideRequestCodeMode(buildOrgChart(input))),
 			),
 			buildVennDiagram: Effect.fn("playground.codeMode.buildVennDiagram")((input) =>
-				provideRequestCodeMode(buildVennDiagram(input)),
+				withSpanContent(input, provideRequestCodeMode(buildVennDiagram(input))),
 			),
 			buildJourneyMap: Effect.fn("playground.codeMode.buildJourneyMap")((input) =>
-				provideRequestCodeMode(buildJourneyMap(input)),
+				withSpanContent(input, provideRequestCodeMode(buildJourneyMap(input))),
 			),
 			buildSankey: Effect.fn("playground.codeMode.buildSankey")((input) =>
-				provideRequestCodeMode(buildSankey(input)),
+				withSpanContent(input, provideRequestCodeMode(buildSankey(input))),
 			),
 			buildWireframe: Effect.fn("playground.codeMode.buildWireframe")((input) =>
-				provideRequestCodeMode(buildWireframe(input)),
+				withSpanContent(input, provideRequestCodeMode(buildWireframe(input))),
 			),
 			buildQuadrantChart: Effect.fn("playground.codeMode.buildQuadrantChart")((input) =>
-				provideRequestCodeMode(buildQuadrantChart(input)),
+				withSpanContent(input, provideRequestCodeMode(buildQuadrantChart(input))),
 			),
 			createCanvas: Effect.fn("playground.codeMode.createCanvas")((input) =>
-				provideRequestCodeMode(createCanvas(input)),
+				withSpanContent(input, provideRequestCodeMode(createCanvas(input))),
 			),
 			getArtifact: Effect.fn("playground.codeMode.getArtifact")((input) =>
-				provideRequestCodeMode(getArtifact(input)),
+				withSpanContent(input, provideRequestCodeMode(getArtifact(input))),
 			),
 			searchIcons: Effect.fn("playground.codeMode.searchIcons")((input) =>
-				provideRequestCodeMode(searchIcons(input)),
+				withSpanContent(input, provideRequestCodeMode(searchIcons(input))),
 			),
 			prewarmPngRenderer: Effect.gen(function* () {
 				const env = yield* PlaygroundBindings;

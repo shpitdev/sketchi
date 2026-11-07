@@ -1,0 +1,28 @@
+{
+	"fields": [
+		{ "name": "schema", "type": "string", "required": true },
+		{ "name": "trace_id", "type": "string", "required": true },
+		{ "name": "span_id", "type": "string", "required": true },
+		{ "name": "parent_span_id", "type": "string", "required": false },
+		{ "name": "name", "type": "string", "required": true },
+		{ "name": "kind", "type": "string", "required": true },
+		{ "name": "service", "type": "string", "required": true },
+		{ "name": "environment", "type": "string", "required": false },
+		{ "name": "service_version", "type": "string", "required": false },
+		{ "name": "start_time", "type": "timestamp", "required": true },
+		{ "name": "end_time", "type": "timestamp", "required": true },
+		{ "name": "duration_ms", "type": "float64", "required": true },
+		{ "name": "outcome", "type": "string", "required": true },
+		{ "name": "error_tag", "type": "string", "required": false },
+		{ "name": "error_message", "type": "string", "required": false },
+		{ "name": "error", "type": "string", "required": false },
+		{ "name": "cause", "type": "string", "required": false },
+		{ "name": "attributes", "type": "string", "required": true },
+		{ "name": "events", "type": "string", "required": true },
+		{ "name": "ray_id", "type": "string", "required": false },
+		{ "name": "run_id", "type": "string", "required": false },
+		{ "name": "attempt_id", "type": "string", "required": false },
+		{ "name": "part_index", "type": "int32", "required": true },
+		{ "name": "part_count", "type": "int32", "required": true }
+	]
+}

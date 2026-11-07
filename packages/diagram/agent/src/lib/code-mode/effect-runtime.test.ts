@@ -4,12 +4,7 @@ import {
 	renderSequenceDiagram,
 	type RenderedDiagramScene as RendererScene,
 } from "@sketchi/diagram-renderer";
-import {
-	makeTelemetryTestSink,
-	makeWorkersTelemetryLayer,
-	type TelemetryMetricEvent,
-	type TelemetrySpanEvent,
-} from "@sketchi/observability";
+import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { Cause, Effect, Exit, Fiber, Layer, Schema, Result } from "effect";
 
 import { CodeModeArtifactStorageMemory } from "./artifacts";
@@ -44,7 +39,7 @@ const runtimeLayer = Layer.mergeAll(
 );
 
 describe("Code Mode telemetry", () => {
-	it.effect("records bounded stage spans, correlation, and boundary metrics", () => {
+	it.effect("records stage spans, correlation, and boundary metrics", () => {
 		const { probe, sink } = makeTelemetryTestSink();
 		const telemetryLayer = makeWorkersTelemetryLayer({
 			resource: { serviceName: "sketchi-codemode-test" },
@@ -72,12 +67,7 @@ describe("Code Mode telemetry", () => {
 			});
 			assert.isTrue(result.ok);
 
-			const spans = probe.events.filter(
-				(event): event is TelemetrySpanEvent => event.event === "effect.span",
-			);
-			const metrics = probe.events.filter(
-				(event): event is TelemetryMetricEvent => event.event === "effect.metric",
-			);
+			const { metrics, spans } = probe;
 			assert.deepInclude(
 				spans.find((span) => span.name === "codeMode.artifacts.store")?.attributes,
 				{ "sketchi.request_id": "request-effect-telemetry" },

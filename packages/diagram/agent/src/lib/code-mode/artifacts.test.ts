@@ -1,9 +1,5 @@
 import { assert, expect, it, layer } from "@effect/vitest";
-import {
-	makeTelemetryTestSink,
-	makeWorkersTelemetryLayer,
-	type TelemetrySpanEvent,
-} from "@sketchi/observability";
+import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { Cause, Context, Effect, Exit, Fiber, Layer } from "effect";
 
 import {
@@ -249,21 +245,22 @@ it.effect("records one span per stored object with its format and bytes", () => 
 	return Effect.gen(function* () {
 		yield* storage.write(writeInput());
 
-		const spans = probe.events.filter(
-			(event): event is TelemetrySpanEvent => event.event === "effect.span",
-		);
+		const spans = probe.spans;
 		const write = spans.find((span) => span.name === "codeMode.artifacts.r2.write");
 		const puts = spans.filter((span) => span.name === "codeMode.artifacts.r2.put");
 		const pngBytes = storedFormats().find((format) => format.format === "png")?.sizeBytes;
 
 		assert.deepInclude(write?.attributes, { object_count: 4 });
 		assert.isNumber(write?.attributes["body_ms"]);
-		assert.deepStrictEqual(puts.map((span) => String(span.attributes["artifact_format"])).sort(), [
-			"excalidraw",
-			"manifest",
-			"png",
-			"scene",
-		]);
+		assert.deepStrictEqual(
+			puts
+				.flatMap((span) => {
+					const format = span.attributes["artifact_format"];
+					return typeof format === "string" ? [format] : [];
+				})
+				.sort(),
+			["excalidraw", "manifest", "png", "scene"],
+		);
 		for (const put of puts) {
 			assert.strictEqual(put.parent_span_id, write?.span_id);
 			assert.isNumber(put.attributes["body_ms"]);

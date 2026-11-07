@@ -1,12 +1,7 @@
 import type { Browser } from "@cloudflare/playwright";
 import { launch } from "@cloudflare/playwright";
 import { describe, expect, it } from "@effect/vitest";
-import {
-	makeTelemetryTestSink,
-	makeWorkersTelemetryLayer,
-	type TelemetryLogEvent,
-	type TelemetryMetricEvent,
-} from "@sketchi/observability";
+import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { Clock, Duration, Effect, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import { beforeEach, vi } from "vitest";
@@ -523,19 +518,15 @@ describe("Browser Run harness page pool", () => {
 
 			expect(new Uint8Array(rendered.png)).toEqual(new Uint8Array([80, 78, 71]));
 			expect(launchMock).toHaveBeenCalledTimes(2);
-			const retries = probe.events.filter(
-				(event): event is TelemetryMetricEvent =>
-					event.event === "effect.metric" && event.metric === "sketchi_browser_rendering_retries",
+			const retries = probe.metrics.filter(
+				(event) => event.metric === "sketchi_browser_rendering_retries",
 			);
 			expect(retries).toHaveLength(1);
 			expect(retries[0]).toMatchObject({
 				value: 1,
 				attributes: { operation: "launch", failure_category: "BrowserRenderingFailure" },
 			});
-			const warnings = probe.events.filter(
-				(event): event is TelemetryLogEvent =>
-					event.event === "effect.log" && event.level === "Warn",
-			);
+			const warnings = probe.logs.filter((event) => event.level === "Warn");
 			expect(warnings).toHaveLength(1);
 			expect(warnings[0]).toMatchObject({
 				message: "Retrying Browser Rendering session",

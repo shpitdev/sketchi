@@ -6,6 +6,7 @@ import {
 } from "@sketchi/diagram-generation";
 import { getFlowchartScenario, toDiagramGenerationPrompt } from "@sketchi/diagram-scenarios";
 import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
+import type { TelemetrySpanRow } from "@sketchi/observability";
 import { Cause, Effect, Fiber, Layer, Exit } from "effect";
 import { TestClock } from "effect/testing";
 
@@ -67,30 +68,37 @@ describe("eval harness scenario generation composition", () => {
 		expect(gateway).toHaveBeenCalledTimes(2);
 	});
 
-	it("keeps scenario correlation on root spans in a shared runtime", async () => {
-		const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-		const bindings = {};
-		try {
-			const scenarioIds = ["unknown-one", "unknown-two"];
-			await Promise.all(
-				scenarioIds.map((scenarioId) =>
-					runGenerateScenarioCandidatesForInput({ scenarioId }, bindings),
+	it("sends each concurrent request's spans, with its scenario, as its own batch", async () => {
+		const sends: Array<ReadonlyArray<TelemetrySpanRow>> = [];
+		const pending: Promise<unknown>[] = [];
+		const bindings = {
+			TELEMETRY_SPANS: {
+				send: async (rows: readonly unknown[]) => {
+					sends.push(rows as TelemetrySpanRow[]);
+				},
+			},
+		};
+		const scenarioIds = ["unknown-one", "unknown-two"];
+		await Promise.all(
+			scenarioIds.map((scenarioId) =>
+				runGenerateScenarioCandidatesForInput({ scenarioId }, bindings, undefined, (promise) =>
+					pending.push(promise),
 				),
+			),
+		);
+		await Promise.all(pending);
+		expect(sends).toHaveLength(2);
+		for (const scenarioId of scenarioIds) {
+			const batch = sends.find((rows) =>
+				rows.some((row) => JSON.parse(row.attributes)["sketchi.scenario_id"] === scenarioId),
 			);
-			for (const scenarioId of scenarioIds) {
-				expect(log).toHaveBeenCalledWith(
-					expect.objectContaining({
-						event: "effect.span",
-						name: "evalHarness.generateScenarioCandidates",
-						attributes: expect.objectContaining({
-							"sketchi.scenario_id": scenarioId,
-						}),
-					}),
-				);
-			}
-		} finally {
-			log.mockRestore();
+			expect(batch?.map((row) => row.name)).toEqual(
+				expect.arrayContaining(["evalHarness.generateScenarioCandidates", "evalHarness.request"]),
+			);
+			expect(new Set(batch?.map((row) => row.trace_id)).size).toBe(1);
+			expect(batch?.every((row) => row.service === "sketchi-playground")).toBe(true);
 		}
+		expect(sends[0]?.[0]?.trace_id).not.toBe(sends[1]?.[0]?.trace_id);
 	});
 
 	it("forwards request cancellation through the runtime to the gateway", async () => {

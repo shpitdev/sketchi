@@ -9,6 +9,7 @@ const { bindings } = vi.hoisted(() => {
 });
 vi.mock("./cloudflare-bindings.server", () => ({
 	getEvalHarnessBindings: () => bindings,
+	waitUntil: () => undefined,
 }));
 
 async function post(request: Request) {

@@ -254,6 +254,12 @@ export interface PngRenderRequest {
 	readonly excalidraw: unknown;
 }
 
+/** The caller's span, so the renderer's spans join the caller's trace. */
+export interface PngRenderCaller {
+	readonly spanId: string;
+	readonly traceId: string;
+}
+
 /** Where one export spent its time in the pool, in milliseconds. */
 export interface PngRenderTiming {
 	/** Waiting for a free page, and any stale-page retries. */
