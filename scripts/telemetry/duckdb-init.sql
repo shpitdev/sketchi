@@ -198,7 +198,12 @@ WITH RECURSIVE
 			arg_min(s.attributes->'gen_ai.input.messages', s.start_time)
 				FILTER (s.name = 'diagramGeneration.gatewayChat.attempt') AS first_input_messages,
 			arg_min(s.attributes->'sketchi.output', s.start_time)
-				FILTER (s.name = 'diagramGeneration.coverage.check') AS coverage_issues
+				FILTER (s.name = 'diagramGeneration.coverage.check') AS coverage_issues,
+			-- Jev's requests narrowing an untyped request's families, before generation.
+			count(*) FILTER (s.name = 'diagramGeneration.familyNarrowing.round') AS jev_rounds,
+			sum(s.duration_ms) FILTER (s.name = 'diagramGeneration.familyNarrowing.round') AS jev_ms,
+			sum((s.attributes->>'gen_ai.usage.input_tokens')::BIGINT)
+				FILTER (s.name = 'diagramGeneration.familyNarrowing.round') AS jev_input_tokens
 		FROM below b
 		JOIN run_traces s ON s.trace_id = b.trace_id AND s.span_id = b.span_id
 		GROUP BY b.run_span_id
@@ -214,6 +219,8 @@ SELECT
 	r.attributes->'sketchi.input'->'prompt'->>'request' AS prompt,
 	r.attributes->'sketchi.input'->'prompt'->>'requestedType' AS requested_type,
 	r.attributes->>'family_route' AS family_route,
+	r.attributes->>'family_narrowing' AS family_narrowing,
+	r.attributes->>'family_shortlist' AS family_shortlist,
 	r.attributes->'sketchi.output'->'diagram'->>'type' AS diagram_type,
 	r.attributes->'sketchi.output'->>'text' AS output,
 	r.attributes->'sketchi.output'->'diagnostics' AS diagnostics,
@@ -229,6 +236,9 @@ SELECT
 	w.output_tokens,
 	w.input_tokens + w.output_tokens AS total_tokens,
 	w.coverage_issues,
+	w.jev_rounds,
+	round(w.jev_ms) AS jev_ms,
+	w.jev_input_tokens,
 	w.system_instructions,
 	w.first_input_messages
 FROM runs r

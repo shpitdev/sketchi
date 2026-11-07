@@ -22,11 +22,10 @@ import { Schema } from "effect";
 import { CURATED_EXAMPLES } from "./examples.js";
 import { DiagramGenerationTypeSchema } from "./intent.js";
 
-/** `a, b, or c` for a list of alternatives. */
+/** `a or b`, or `a, b, or c`, for a list of alternatives. */
 export function listAlternatives(values: readonly string[]): string {
-	return values.length < 2
-		? values.join("")
-		: `${values.slice(0, -1).join(", ")}, or ${values.at(-1)}`;
+	if (values.length < 3) return values.join(" or ");
+	return `${values.slice(0, -1).join(", ")}, or ${values.at(-1)}`;
 }
 
 const NATIVE_KINDS = DIAGRAM_TYPES.map((type) => `"${type}"`);
@@ -56,6 +55,11 @@ export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPromp
 	 */
 	routedType: Schema.optionalKey(DiagramGenerationTypeSchema),
 	/**
+	 * The two or three families an untyped request could mean (see narrowDiagramFamilies). Its
+	 * prompt carries only their rules and asks the model to choose among them.
+	 */
+	routedTypes: Schema.optionalKey(Schema.Array(DiagramGenerationTypeSchema)),
+	/**
 	 * The diagram a revision starts from, as canonical diagram JSON ({ type, id, title, ... }).
 	 * The request then says what to change.
 	 */
@@ -72,19 +76,31 @@ export class DiagramGenerationMessages extends Schema.Class<DiagramGenerationMes
 	user: Schema.String,
 }) {}
 
-const COMMON_INSTRUCTIONS = [
+const SWIMLANE_KIND =
+	'A swimlane or architecture request is a "flowchart" with lanes or zone groups.';
+
+/** Which kinds diagram.type may take: every kind, or the few a narrowed prompt carries. */
+function typeInstruction(families: readonly DiagramTypeValue[] | undefined): string {
+	if (!families) {
+		return `Set diagram.type to the kind the scenario requests: ${listAlternatives(NATIVE_KINDS)}. ${SWIMLANE_KIND} Anything else uses the closest kind.`;
+	}
+	const kinds = listAlternatives(families.map((type) => `"${type}"`));
+	return `Set diagram.type to whichever of ${kinds} the scenario requests, or the closest of them.${families.includes("flowchart") ? ` ${SWIMLANE_KIND}` : ""}`;
+}
+
+const commonInstructions = (narrowedTo?: readonly DiagramTypeValue[]) => [
 	"Return only compact, minified JSON on one line. Do not use markdown.",
 	"Author one concise title of at most 60 characters. Do not copy the whole scenario into the title.",
 	'Return one object: { "title", "diagram" }.',
 	"Copy everything the scenario states, in full and in its order: every item, name, role, detail, number, key and connection. Add nothing it does not state: no step, decision, branch, loop, outcome, group, phase, field, item, connection or value.",
 	"The limits below are what Sketchi can draw, not targets: never drop, merge or summarize stated content to fit one. Sketchi reports a diagram that is too large.",
-	`Set diagram.type to the kind the scenario requests: ${listAlternatives(NATIVE_KINDS)}. A swimlane or architecture request is a "flowchart" with lanes or zone groups. Anything else uses the closest kind.`,
+	typeInstruction(narrowedTo),
 ];
 
 /**
  * Rules every family needs that the full prompt states only in some families' sections (the id
  * in mindmap's, rounding in chart's, order in sequence's). A prompt that carries one family's
- * rules gets them here; the full prompt already has them and stays as graded.
+ * rules, or a narrowed few, gets them here; the full prompt already has them and stays as graded.
  */
 const ONE_FAMILY_INSTRUCTIONS = [
 	"Return diagram.id, a short kebab-case id. Never supply coordinates or sizes: Sketchi lays the diagram out.",
@@ -435,6 +451,21 @@ export function promptFamily(prompt: DiagramGenerationPrompt): DiagramTypeValue 
 	return prompt.requestedType ?? prompt.routedType;
 }
 
+/**
+ * The families whose rules a prompt carries: its one family, the few an untyped request was
+ * narrowed to, or undefined for every family.
+ */
+export function promptFamilies(
+	prompt: DiagramGenerationPrompt,
+): readonly DiagramTypeValue[] | undefined {
+	const family = promptFamily(prompt);
+	if (family) return [family];
+	const narrowed = prompt.routedTypes;
+	return narrowed && narrowed.length > 0 && narrowed.length < DIAGRAM_TYPES.length
+		? DIAGRAM_TYPES.filter((type) => narrowed.includes(type))
+		: undefined;
+}
+
 function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 	const family = promptFamily(prompt);
 	const curated = family ? CURATED_EXAMPLES[family] : undefined;
@@ -484,13 +515,10 @@ const LOGO_TARGETS = {
 
 function logoSection(prompt: DiagramGenerationPrompt): string[] {
 	const logos = prompt.logos ?? [];
-	const family = promptFamily(prompt);
-	const targets =
-		family === undefined
-			? Object.values(LOGO_TARGETS)
-			: family === "flowchart" || family === "sequence"
-				? [LOGO_TARGETS[family]]
-				: [];
+	const families = promptFamilies(prompt);
+	const targets = (["flowchart", "sequence"] as const)
+		.filter((family) => families === undefined || families.includes(family))
+		.map((family) => LOGO_TARGETS[family]);
 	if (logos.length === 0 || targets.length === 0) {
 		return [];
 	}
@@ -542,20 +570,24 @@ export function buildDiagramGenerationMessages(
 ): DiagramGenerationMessages {
 	const explicitType = prompt.requestedType;
 	const family = promptFamily(prompt);
+	const families = promptFamilies(prompt);
+	// A one-family prompt keeps the full type list it was graded with; a narrowed few name theirs.
+	const narrowedTo = family ? undefined : families;
 	const system = [
 		"You are creating one typed Sketchi generation response.",
 		"",
 		"Response contract:",
-		...COMMON_INSTRUCTIONS.map((instruction) => `- ${instruction}`),
-		...(family ? ONE_FAMILY_INSTRUCTIONS.map((instruction) => `- ${instruction}`) : []),
+		...commonInstructions(narrowedTo).map((instruction) => `- ${instruction}`),
+		...(families ? ONE_FAMILY_INSTRUCTIONS.map((instruction) => `- ${instruction}`) : []),
 		...(prompt.base
 			? ["", "Revision:", ...REVISION_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
 			: []),
 		...(prompt.styling
 			? ["", "Styling:", ...STYLING_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
 			: []),
-		// A request whose family is known gets only that family's rules; otherwise the model picks.
-		...(family ? [family] : DIAGRAM_TYPES).flatMap((type) => [
+		// A request whose family is known gets only that family's rules, a narrowed request only
+		// its few families'; otherwise every family's, and the model picks.
+		...(families ?? DIAGRAM_TYPES).flatMap((type) => [
 			"",
 			`${IR_INSTRUCTIONS[type].title}:`,
 			...IR_INSTRUCTIONS[type].rules.map((instruction) => `- ${instruction}`),

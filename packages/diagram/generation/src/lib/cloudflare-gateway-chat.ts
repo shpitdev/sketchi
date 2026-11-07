@@ -30,6 +30,7 @@ import {
 	DEFAULT_TEMPERATURE,
 } from "./messages.js";
 import { stripAnthropicModelPrefix, stripGoogleModelPrefix } from "./models.js";
+import { DiagramFamilyNarrowing } from "./family-narrowing.js";
 import { runDiagramGenerationWithPolicy } from "./policy.js";
 
 // The gateway fetch below never dials this. It only satisfies the client's URL handling.
@@ -350,6 +351,8 @@ export const CloudflareGatewayChatClientLive = Layer.effect(DiagramGenerationCli
 		const ai = yield* CloudflareAiGatewayBinding;
 		const config = yield* CloudflareGatewayChatConfig;
 		const policy = yield* DiagramGenerationPolicy;
+		// Without it, an untyped request is routed by its words alone.
+		const narrowing = Option.getOrUndefined(yield* Effect.serviceOption(DiagramFamilyNarrowing));
 		const { provider } = config.route;
 		const client = yield* OpenAiClient.make({ apiUrl: GATEWAY_FETCH_API_URL }).pipe(
 			Effect.provide(FetchHttpClient.layer),
@@ -388,6 +391,7 @@ export const CloudflareGatewayChatClientLive = Layer.effect(DiagramGenerationCli
 					request,
 					provider,
 					policy,
+					narrowing,
 				);
 			}),
 		};
