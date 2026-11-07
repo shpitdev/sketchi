@@ -81,7 +81,7 @@ SELECT to_json({
 );
 
 test(
-	"reads Code Mode usage and its issues from capture spans",
+	"reads Code Mode usage and its issues from capture spans that record a usage summary",
 	{ skip: duckdb.status === 0 ? false : "the DuckDB CLI is not installed" },
 	() => {
 		const capture = JSON.stringify({
@@ -110,10 +110,19 @@ test(
 				{ code: "invalid_node", path: "response.issues[1]", severity: "error" },
 			],
 		});
+		// A capture span as #690 wrote it, before the usage summary moved onto it.
+		const earlierCapture = JSON.stringify({
+			operation: "buildFlowchart",
+			"sketchi.attempt_id": "attempt_0",
+			"sketchi.run_id": "run_0",
+			"sketchi.usage.issues": [{ code: "stray", path: "response.issues[0]" }],
+			surface: "api",
+		});
 		const sql = `
 ${RAW_SPANS}
 INSERT INTO raw_spans VALUES
 	${row("capture", 0, 1, capture, "[]", undefined, "playground.codeModeUsage.capture")},
+	${row("earlier", 0, 1, earlierCapture, "[]", undefined, "playground.codeModeUsage.capture")},
 	${row("other", 0, 1, "{}", "[]")};
 ${section("span reassembly")}
 ${section("usage views")}

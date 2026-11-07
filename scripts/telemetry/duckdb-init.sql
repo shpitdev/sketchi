@@ -261,12 +261,14 @@ ORDER BY p95_ms DESC;
 -- begin: usage views
 -- One row per Code Mode call (API build, patch, canvas, generate, MCP execute), from the
 -- usage summary its playground.codeModeUsage.capture span records, with the full
--- request and response.
+-- request and response. Capture spans written before the summary moved onto them have
+-- none and are left out; their calls are in codemode_history.
 CREATE OR REPLACE VIEW usage_events AS
 WITH captures AS (
 	SELECT *, attributes->'sketchi.usage.event' AS event
 	FROM spans
 	WHERE name = 'playground.codeModeUsage.capture'
+		AND json_exists(attributes, '$."sketchi.usage.event"')
 )
 SELECT
 	event->>'event_id' AS event_id,
@@ -310,6 +312,7 @@ WITH issues AS (
 		unnest(CAST(attributes->'sketchi.usage.issues' AS JSON[])) AS issue
 	FROM spans
 	WHERE name = 'playground.codeModeUsage.capture'
+		AND json_exists(attributes, '$."sketchi.usage.event"')
 )
 SELECT
 	event->>'event_id' AS event_id,
