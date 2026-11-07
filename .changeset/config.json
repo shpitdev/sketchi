@@ -13,7 +13,6 @@
 	"baseBranch": "main",
 	"updateInternalDependencies": "patch",
 	"ignore": [
-		"@sketchi/eval-harness",
 		"@sketchi/excalidraw-app",
 		"@sketchi/icons-app",
 		"@sketchi/playground",

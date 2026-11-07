@@ -103,8 +103,7 @@ the registration away from Vercel or the underlying registrar is unnecessary.
 
    The `playground` project dispatch retains the `sketchi-studio` Worker and
    attaches only `playground.sketchi.app`; it does not
-   expose `studio.sketchi.app`. Never dispatch attach for `eval-harness` or
-   `excalidraw`. Verify `icons.sketchi.app` and `playground.sketchi.app` while
+   expose `studio.sketchi.app`. Never dispatch attach for `excalidraw`. Verify `icons.sketchi.app` and `playground.sketchi.app` while
    the wildcard DNS-only CNAME remains staged. That wildcard is not a working
    fallback for these two hosts: Vercel currently returns
    `DEPLOYMENT_NOT_FOUND` for both of them.

@@ -15,13 +15,12 @@ const repoRoot = new URL("../../", import.meta.url);
 
 const expectedWorkers = {
 	excalidraw: "sketchi-excalidraw",
-	"eval-harness": "sketchi-playground",
 	icons: "sketchi-icons",
 	playground: "sketchi-studio",
 	web: "sketchi-web",
 };
 
-const telemetryEmitters = ["eval-harness", "playground"];
+const telemetryEmitters = ["playground"];
 
 function sourceFiles(directory) {
 	return readdirSync(directory, { recursive: true, withFileTypes: true })
@@ -159,8 +158,7 @@ test("telemetry service names match the Worker that emits them", async () => {
 	}
 });
 
-test("final eval and public Playground projects retain their durable Workers", () => {
-	assert.equal(workerProjectConfig("eval-harness").workerName, "sketchi-playground");
+test("the public Playground project retains its durable Worker", () => {
 	assert.equal(workerProjectConfig("playground").workerName, "sketchi-studio");
 });
 

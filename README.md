@@ -167,10 +167,9 @@ not silently fall back to a generic template. See the full
 | `web`          | `sketchi.app` home, docs, and setup                                | `pnpm nx dev web`           |
 | `playground`   | Public Playground, Code Mode API/MCP, artifacts, Studio foundation | `pnpm nx dev playground`    |
 | `icons`        | `icons.sketchi.app` curated icon browser                           | `pnpm nx dev icons`         |
-| `eval-harness` | Internal scenario and model-output eval harness                    | `pnpm nx dev eval-harness`  |
 | `excalidraw`   | Internal real-canvas rendering and editing workspace               | `pnpm nx dev excalidraw`    |
 
-The internal harness is `eval-harness`. The public host is `playground`, while
+The public host is `playground`, while
 its durable Worker identity remains `sketchi-studio` and the extracted Studio
 persistence boundary remains `packages/studio/projects`. The completed
 repository migration and its historical before tree are recorded in the
@@ -289,8 +288,7 @@ Workers when Cloudflare credentials are configured, then maintain one preview
 comment per app. Relevant merges to `main` deploy production Workers when those
 credentials are available; custom domain attachment remains an explicit
 operator action. Forks and unconfigured environments retain build proof without
-a Worker deploy. The eval harness and standalone Excalidraw workspace are
-internal surfaces.
+a Worker deploy. The standalone Excalidraw workspace is an internal surface.
 
 Worker builds are isolated under `dist/apps/<app>` and resolved through an
 explicit Nx-project-to-Worker map, so parallel builds and later repository
@@ -300,7 +298,6 @@ See [preview deployments](docs/preview-deploys.md) and the guarded
 [production domain runbook](docs/production-domain-cutover.md).
 
 ```sh
-pnpm deploy:eval-harness
 pnpm deploy:playground
 pnpm deploy:web
 pnpm deploy:excalidraw
@@ -312,7 +309,6 @@ pnpm deploy:icons
 ```text
 apps/
 ├── cli/                          local authoring and generation CLI
-├── eval-harness/                 internal scenarios and model-output evals
 ├── excalidraw/                   internal real-canvas workspace
 ├── icons/                        public icon browser
 ├── native-conversion-storybook/ explicit cross-app Storybook composition

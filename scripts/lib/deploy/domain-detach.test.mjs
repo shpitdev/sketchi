@@ -68,11 +68,4 @@ test("internal projects never select a public domain", () => {
 		),
 		[],
 	);
-	assert.deepEqual(
-		selectProductionDomainDetachments(
-			{ projectId: "eval-harness", workerName: "sketchi-playground" },
-			[],
-		),
-		[],
-	);
 });

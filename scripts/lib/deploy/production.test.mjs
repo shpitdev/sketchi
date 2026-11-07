@@ -37,13 +37,6 @@ test("playground project preserves the Studio production Worker", () => {
 });
 
 test("internal projects stay off public domains", () => {
-	assert.deepEqual(productionProjectConfig("eval-harness"), {
-		...workerProjectConfig("eval-harness"),
-		domainPatterns: [],
-		publicSurface: false,
-		routePolicy: "internal eval harness; no public product domain",
-		title: "Sketchi Eval Harness",
-	});
 	assert.deepEqual(productionProjectConfig("excalidraw"), {
 		...workerProjectConfig("excalidraw"),
 		domainPatterns: [],
@@ -150,19 +143,19 @@ test("domain attach fails closed on project or source Worker mismatch", () => {
 test("internal projects emit no public routes", () => {
 	const domainConfig = productionDomainWranglerConfig(
 		{
-			name: "sketchi-playground",
-			routes: ["playground.sketchi.app/*"],
+			name: "sketchi-excalidraw",
+			routes: ["excalidraw.sketchi.app/*"],
 			vars: {
-				SKETCHI_APP_SURFACE: "playground",
+				SKETCHI_APP_SURFACE: "excalidraw",
 			},
 		},
-		{ projectId: "eval-harness", workerName: "sketchi-playground" },
+		{ projectId: "excalidraw", workerName: "sketchi-excalidraw" },
 	);
 
-	assert.equal(domainConfig.name, "sketchi-playground");
+	assert.equal(domainConfig.name, "sketchi-excalidraw");
 	assert.deepEqual(domainConfig.routes, []);
 	assert.deepEqual(domainConfig.vars, {
-		SKETCHI_APP_SURFACE: "playground",
+		SKETCHI_APP_SURFACE: "excalidraw",
 	});
 });
 

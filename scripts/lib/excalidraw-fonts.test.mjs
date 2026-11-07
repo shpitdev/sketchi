@@ -123,7 +123,7 @@ test("every Worker app that renders Excalidraw serves and caches its fonts", () 
 	const surfaces = workerProjectIds.filter((id) =>
 		reachesExcalidraw(workerProjectConfig(id).projectRoot),
 	);
-	assert.deepEqual([...surfaces].sort(), ["eval-harness", "excalidraw", "playground"]);
+	assert.deepEqual([...surfaces].sort(), ["excalidraw", "playground"]);
 	for (const id of surfaces) {
 		const root = workerProjectConfig(id).projectRoot;
 		assert.ok(

@@ -10,7 +10,6 @@ against its existing Worker. It no longer creates a separate Worker per PR.
 | `web`          | `sketchi-web`        | `pr-<number>-sketchi-web.<account>.workers.dev`        |
 | `playground`   | `sketchi-studio`     | `pr-<number>-sketchi-studio.<account>.workers.dev`     |
 | `icons`        | `sketchi-icons`      | `pr-<number>-sketchi-icons.<account>.workers.dev`      |
-| `eval-harness` | `sketchi-playground` | `pr-<number>-sketchi-playground.<account>.workers.dev` |
 | `excalidraw`   | `sketchi-excalidraw` | `pr-<number>-sketchi-excalidraw.<account>.workers.dev` |
 
 Cloudflare's [Worker Previews](https://developers.cloudflare.com/workers/previews/)
@@ -81,10 +80,10 @@ pushes keep the PR's affected Previews current.
   Playground links stay on the same PR when the same run deploys them; otherwise
   they point at production. These overrides affect only the Preview.
 
-`web`, `playground`, and `icons` are public product surfaces. `eval-harness` and
-`excalidraw` remain internal and are not linked from public navigation.
+`web`, `playground`, and `icons` are public product surfaces. `excalidraw`
+remains internal and are not linked from public navigation.
 
-Pipeline-bound Playground and eval-harness uploads share
+Pipeline-bound Playground uploads share
 `cloudflare-pipeline-bound-upload` with production. `queue: max` queues pending
 jobs without cancelling active uploads; other apps retain their per-app/per-PR
 concurrency policies.
@@ -169,15 +168,14 @@ Production deploy summaries include the same public/internal route policy and
 the custom domains that would be attached by a manual domain dispatch. Internal
 apps report no custom domains.
 
-The Studio Worker binds Code Mode artifacts to R2. Studio and the eval harness
-bind their spans stream, which also carries Code Mode usage:
+The Studio Worker binds Code Mode artifacts to R2. Studio binds its spans stream, which also carries Code Mode usage:
 
 | Surface                            | Binding             | Remote target                                  |
 | ---------------------------------- | ------------------- | ---------------------------------------------- |
 | Studio Previews                    | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-preview`    |
 | Studio production Worker           | `SKETCHI_ARTIFACTS` | `sketchi-studio-codemode-artifacts-production` |
-| Studio and eval-harness Previews   | `TELEMETRY_SPANS`   | `d3066c58106b4facbc146e9188e383b1`             |
-| Studio and eval-harness production | `TELEMETRY_SPANS`   | `e118fdd69a2548258389e82fb1ade1d6`             |
+| Studio Previews                    | `TELEMETRY_SPANS`   | `d3066c58106b4facbc146e9188e383b1`             |
+| Studio production                  | `TELEMETRY_SPANS`   | `e118fdd69a2548258389e82fb1ade1d6`             |
 
 `TELEMETRY_SPANS` is not `remote`, so local development writes to a local stream
 rather than production's. Every Preview shares the preview spans stream; the
@@ -217,10 +215,8 @@ When `domain_action=attach`, the production domain helper attaches
 `playground.sketchi.app` to the `playground` project while retaining the
 `sketchi-studio` Worker service. Authenticated Studio is not exposed, even
 though the Playground host has `/projects` and persisted
-`/diagrams/:diagramId` route foundations. The
-`eval-harness` has no public domain patterns; it deploys to the durable internal
-`sketchi-playground` Worker.
+`/diagrams/:diagramId` route foundations.
 
-The eval harness and standalone Excalidraw workspace should remain unlinked from
+The standalone Excalidraw workspace should remain unlinked from
 public navigation. Do not attach a public `excalidraw.sketchi.app` product route
 unless that product-route decision is explicitly reopened.

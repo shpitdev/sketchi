@@ -65,7 +65,7 @@ describe("generation reliability scenario registry", () => {
 		});
 	});
 
-	it("registers both large diagram types for eval-harness generation", () => {
+	it("registers both large diagram types for generation", () => {
 		expect(generationReliabilityScenarios.length).toBeGreaterThanOrEqual(7);
 		expect(
 			toDiagramGenerationPrompt(getGenerationScenario("reliability-curriculum-depth-four")),

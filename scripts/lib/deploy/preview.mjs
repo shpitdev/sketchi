@@ -34,12 +34,6 @@ export const previewProjects = {
 		routePolicy: "icons.sketchi.app product surface",
 		title: "Sketchi Icons",
 	},
-	"eval-harness": {
-		commentMarker: "<!-- sketchi-playground-preview -->",
-		publicSurface: false,
-		routePolicy: "internal eval harness; no public product domain",
-		title: "Sketchi Eval Harness",
-	},
 	playground: {
 		commentMarker: "<!-- sketchi-studio-preview -->",
 		publicSurface: true,
