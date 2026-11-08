@@ -45,6 +45,27 @@ const spec = {
 };
 
 describe("Code Mode flowchart groups", () => {
+	it("returns corrected document refs and a note through the shared MCP builder", async () => {
+		const built = await build({
+			title: "Form",
+			nodes: { submit_form: "Submit form", review_form: "Review form" },
+			edges: [["SUBMIT FORM,", "review-form."]],
+			groups: { employee: { label: "Employee", contains: ["submit-form"] } },
+		});
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.edges).toEqual([["submit_form", "review_form"]]);
+		expect(built.normalizedSpec.groups?.["employee"]?.contains).toEqual(["submit_form"]);
+		expect(built.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: "reference_resolved",
+					severity: "info",
+					message: expect.stringContaining("submit_form"),
+				}),
+			]),
+		);
+	});
+
 	it("builds declared groups into editable, named frames", async () => {
 		const built = await build(spec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));

@@ -668,9 +668,65 @@ function graphIssues(
 	return issues;
 }
 
+/** Resolve only unique spelling variants of declared ids; exact ids always win. */
+export function resolveFlowchartReferences(document: FlowchartDocument): {
+	readonly document: FlowchartDocument;
+	readonly notes: readonly string[];
+} {
+	const nodeIds = Object.keys(document.nodes);
+	const ids = [...nodeIds, ...Object.keys(document.groups ?? {})];
+	const exact = new Set(ids);
+	const key = (id: string) =>
+		id
+			.trim()
+			.replace(/[^\w-]+$/gu, "")
+			.toLowerCase()
+			.replace(/[-_\s]+/gu, "-");
+	const matches = new Map<string, string[]>();
+	for (const id of ids) matches.set(key(id), [...(matches.get(key(id)) ?? []), id]);
+	const notes: string[] = [];
+	const resolve = (id: string, path: string): string => {
+		if (exact.has(id)) return id;
+		const candidates = matches.get(key(id));
+		const found = candidates?.length === 1 ? candidates[0] : undefined;
+		if (found === undefined) return id;
+		notes.push(`${path}: resolved ${JSON.stringify(id)} to declared id ${JSON.stringify(found)}.`);
+		return found;
+	};
+	const end = (value: FlowchartEdgeEnd, path: string): FlowchartEdgeEnd =>
+		typeof value === "string"
+			? resolve(value, path)
+			: value.map((id, i) => resolve(id, `${path}[${i}]`));
+	return {
+		document: {
+			...document,
+			edges: document.edges.map(([from, to, label], i) => {
+				const pair = [end(from, `edges[${i}][0]`), end(to, `edges[${i}][1]`)] as const;
+				return label === undefined ? pair : [...pair, label];
+			}),
+			...(document.groups
+				? {
+						groups: Object.fromEntries(
+							Object.entries(document.groups).map(([id, group]) => [
+								id,
+								{
+									...group,
+									contains: group.contains.map((member, i) =>
+										resolve(member, `groups.${id}.contains[${i}]`),
+									),
+								},
+							]),
+						),
+					}
+				: {}),
+		},
+		notes,
+	};
+}
+
 /** A document built into the internal flowchart, or the problems that stop it. */
 export type FlowchartDocumentBuild =
-	| { readonly ok: true; readonly diagram: FlowchartDiagram }
+	| { readonly ok: true; readonly diagram: FlowchartDiagram; readonly notes: readonly string[] }
 	| { readonly ok: false; readonly issues: readonly FlowchartValidationIssue[] };
 
 export interface FlowchartDocumentBuildOptions {
@@ -686,9 +742,10 @@ export interface FlowchartDocumentBuildOptions {
  * container lists. Every problem comes back at once, each with its repair.
  */
 export function flowchartDiagramFromDocument(
-	document: FlowchartDocument,
+	input: FlowchartDocument,
 	options: FlowchartDocumentBuildOptions = {},
 ): FlowchartDocumentBuild {
+	const { document, notes } = resolveFlowchartReferences(input);
 	const issues: FlowchartValidationIssue[] = [];
 	const nodeEntries = Object.entries(document.nodes);
 	const nodeIds = nodeEntries.map(([id]) => id);
@@ -870,7 +927,7 @@ export function flowchartDiagramFromDocument(
 		style: { ...SKETCHI_DIAGRAM_STYLE },
 		metadata: document.logos ? { logos: document.logos === "exact" ? "exact" : "native" } : {},
 	});
-	return { ok: true, diagram };
+	return { ok: true, diagram, notes };
 }
 
 /** Decode unknown input as a flowchart document, every schema problem at once. */
