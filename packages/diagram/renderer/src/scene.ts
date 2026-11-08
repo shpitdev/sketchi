@@ -1,5 +1,6 @@
 import {
 	CANVAS_NODE_ICON,
+	DIAGRAM_NODE_COLORS,
 	CANVAS_SPEC_VERSION,
 	AXIS_ALIGNED_EPSILON,
 	canvasBoundTextBox,
@@ -340,10 +341,27 @@ function shapeForNode(node: DiagramNode): NodeSceneShape {
 	return "rectangle";
 }
 
+/** A colored node's stroke and its pale fill, so its label stays readable. */
+function nodeColorStyle(
+	node: GraphNode,
+): Pick<NodeSceneElement, "fillColor" | "fillStyle" | "strokeColor"> {
+	if (!node.color) return {};
+	const { stroke, fill } = DIAGRAM_NODE_COLORS[node.color];
+	return { strokeColor: stroke, fillColor: fill, fillStyle: "solid" };
+}
+
 function createNodeShape(
 	node: GraphNode,
 	minimumWidth = MIN_NODE_WIDTH,
 	lineUnits = MAX_LABEL_LINE_UNITS,
+): NodeSceneElement {
+	return { ...createUncoloredNodeShape(node, minimumWidth, lineUnits), ...nodeColorStyle(node) };
+}
+
+function createUncoloredNodeShape(
+	node: GraphNode,
+	minimumWidth: number,
+	lineUnits: number,
 ): NodeSceneElement {
 	const shape = shapeForNode(node);
 	const marker = markerSize(node);

@@ -3,6 +3,7 @@ import {
 	CANVAS_LIMITS,
 	CHART_RULES,
 	CLASS_RULES,
+	DIAGRAM_NODE_COLOR_NAMES,
 	ER_RULES,
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
@@ -58,9 +59,12 @@ const BUILDERS = {
 const HELPERS = {
 	searchIcons:
 		"searchIcons({ q, limit? }) resolves to { icons: [{ slug, name, collection, match }] }: exact logo slugs for named technologies",
-	getArtifact: "getArtifact({ artifactId, format?, inline? }) reads a stored artifact",
+	editFlowchart:
+		"editFlowchart({ artifactId, edits }) changes a built flowchart by node id or label and stores the result as a new artifact",
+	getArtifact:
+		'getArtifact({ artifactId, format?, inline? }) reads a stored artifact; format "document" is a flowchart\'s document',
 	applyDiagramPatch:
-		'applyDiagramPatch applies deterministic style, shape, text, move or structural edits to an accepted artifact; docs({ topic: "applyDiagramPatch" })',
+		'applyDiagramPatch applies deterministic style, shape, text, move or structural edits to an accepted artifact other than a flowchart; docs({ topic: "applyDiagramPatch" })',
 };
 // Adding an operation without a summary fails typechecking, so the index cannot go stale.
 const OPERATION_SUMMARIES: Record<CodeModeOperation, string> = { ...BUILDERS, ...HELPERS };
@@ -119,8 +123,9 @@ const CODE_HINTS: Partial<Record<keyof typeof FAST_PATH, string>> = {
 };
 const EXECUTE_HELPERS = [
 	"searchIcons({ q }) resolves to { icons: [{ slug, match }] }",
-	HELPERS.getArtifact,
-	'applyDiagramPatch edits an accepted artifact; docs({ topic: "applyDiagramPatch" })',
+	"editFlowchart({ artifactId, edits }) changes a flowchart; never rebuild or patch one",
+	'getArtifact({ artifactId, format? }) reads an artifact; "document" is a flowchart\'s',
+	'applyDiagramPatch edits other artifacts; docs({ topic: "applyDiagramPatch" })',
 ];
 
 const OPERATION_LIST = OPERATIONS.map((operation) => `sketchi.${operation}`).join(", ");
@@ -159,7 +164,8 @@ function operationTypes(operation: CodeModeOperation): string {
 
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 
-const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null, group?: id, lane?: id } }, edges: [[from, to, label?]], groups?: { [id]: { label, kind?: "cloud" | "datacenter" | "region" | "zone" | "vpc" | "subnet" | "cluster" | "namespace", contains?: [ids] } }, lanes?: { [id]: label } }`;
+const FLOWCHART_COLORS = DIAGRAM_NODE_COLOR_NAMES.map((name) => `"${name}"`).join(" | ");
+const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null, color?: ${FLOWCHART_COLORS} (only when asked), group?: id, lane?: id } }, edges: [[from, to, label?]], groups?: { [id]: { label, kind?: "cloud" | "datacenter" | "region" | "zone" | "vpc" | "subnet" | "cluster" | "namespace", contains?: [ids] } }, lanes?: { [id]: label } }`;
 
 /**
  * What a first flowchart build needs, each rule with any detail only the buildFlowchart topic
@@ -203,6 +209,22 @@ const FLOWCHART_DOCS = [
 	operationTypes("buildFlowchart"),
 ].join("\n");
 
+/** What an edit needs, carried by the code parameter so an edit takes no docs turn. */
+const FLOWCHART_EDIT_SPEC = `editFlowchart({ artifactId, edits }) changes any built flowchart without reading it first. edits: [{ op: "insert", node: { id: label }, between: [from, to] } | { op: "set", nodes?: { [id]: label | { ...node fields } | null }, groups?: { [id]: { ...group fields } | null }, lanes?: { [id]: label | null }, title?, direction? } | { op: "connect", edges } | { op: "disconnect", edges: [[from, to]] }].`;
+const FLOWCHART_EDIT_RULES = [
+	"Name nodes, groups and lanes by id or exact label. insert splits an existing edge. set merges, adds new ids and removes with null, bridging a removed step. connect adds or relabels edges. What edits do not name stays.",
+];
+
+/** The editFlowchart topic: the edit list, what it keeps, and the request type. */
+const FLOWCHART_EDIT_DOCS = [
+	FLOWCHART_EDIT_SPEC,
+	...FLOWCHART_EDIT_RULES,
+	"Edits apply in order. One that names an unknown id fails at its path, such as edits[1].between[0], with the nearest ids, and nothing is stored; an edited flowchart that does not build fails with the build's issues.",
+	'An accepted edit returns the new artifact (provenance.sourceArtifactId names the one it changed), the full document as normalizedSpec, and the edits. getArtifact({ artifactId, format: "document" }) reads the document of any flowchart.',
+	"",
+	operationTypes("editFlowchart"),
+].join("\n");
+
 const LOGO_RULE =
 	"When the prompt names technologies, a flowchart sets logos: true; a sequence diagram awaits sketchi.searchIcons({ q }) for each in the same script and sets participant.icon to { slug }.";
 
@@ -227,6 +249,9 @@ export const EXECUTE_CODE_DESCRIPTION = [
 	"",
 	`buildFlowchart (${BUILDERS.buildFlowchart}): ${FLOWCHART_SPEC}.`,
 	...FLOWCHART_DOC_RULES.map(([rule]) => rule),
+	"",
+	FLOWCHART_EDIT_SPEC,
+	...FLOWCHART_EDIT_RULES,
 	"",
 	`Other builders: ${COPY_RULE}`,
 	...Object.entries(FAST_PATH).map(([operation, line]) => {
@@ -498,7 +523,7 @@ export const catalog: CatalogEntry[] = [
 			OPERATION_LIST,
 			"Write JavaScript only: no TypeScript annotations, interfaces, generics, imports, or named wrapper functions. Pass the arrow function itself, for example async () => { const result = await sketchi.buildFlowchart(...); return result; }. An outer code fence and a trailing semicolon are accepted.",
 			"The sandbox has no secrets, storage bindings, model credentials, or network access. Call sketchi methods sequentially when possible so failures can be inspected and retried deliberately.",
-			"The response is { ok, result, logs, builds, artifactDelivery?, finalResponseText?, error? }. result is the script return value, or { buildId, ok, artifactId?, png? } when it exactly repeats a reference-only build receipt; resolve buildId in builds for the full receipt. Pre-ID failures, custom values and explicit inline exports stay unchanged. builds lists every buildFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, buildChart, and createCanvas attempt in call order, even when the script returns other data, nothing, or an error. Each receipt has operation, zero-based index, ok, status, and issues, plus buildId, quality, normalizedSpec, and artifact or partial references when available; inline exports are not duplicated. Retrieval and patch calls are not builds. A build still running when the executor times out or aborts has status: incomplete and ok: false.",
+			"The response is { ok, result, logs, builds, artifactDelivery?, finalResponseText?, error? }. result is the script return value, or { buildId, ok, artifactId?, png? } when it exactly repeats a reference-only build receipt; resolve buildId in builds for the full receipt. Pre-ID failures, custom values and explicit inline exports stay unchanged. builds lists every buildFlowchart, editFlowchart, buildMindmap, buildSequenceDiagram, buildTimeline, buildChart, and createCanvas attempt in call order, even when the script returns other data, nothing, or an error. Each receipt has operation, zero-based index, ok, status, and issues, plus buildId, quality, normalizedSpec, and artifact or partial references when available; inline exports are not duplicated. Retrieval and patch calls are not builds. A build still running when the executor times out or aborts has status: incomplete and ok: false.",
 			"When the script returns an accepted artifact, execute adds artifactDelivery (artifactId, format refs, raw Excalidraw/PNG URLs, and final-response instructions) and puts its finalResponseText first in the text content. Copy that text verbatim as the final chat answer and stop.",
 			"For user-facing completion, return the accepted Sketchi artifactId plus Excalidraw and PNG URLs. Do not synthesize a Mermaid or Markdown replacement after Sketchi accepts an artifact. Do not call file/create/artifact tools, inspect nested inline Excalidraw JSON, or create an Antigravity artifact after that point.",
 			"",
@@ -1057,10 +1082,40 @@ export const catalog: CatalogEntry[] = [
 			"- Reads a stored artifact by the artifactId a build or applyDiagramPatch returned. Do not fetch an accepted artifact just to summarize it; the build result is already the deliverable.",
 			"- format 'scene' is the compact Sketchi patch source; 'excalidraw' is an importable Excalidraw file JSON envelope with type, version, source, elements, appState, and files; 'png' is hosted visual proof, returned as metadata and never inline.",
 			"- Hosted responses include url fields for raw artifact downloads: GET /api/v1/artifacts/{artifactId}?format=excalidraw&raw=true returns importable JSON and format=png&raw=true returns image bytes. Pass inline: true only when the harness needs scene or Excalidraw JSON in the response.",
-			"- Patched artifacts return provenance.sourceArtifactId; root artifacts omit provenance.",
+			"- format 'document' is the flowchart document a flowchart artifact was built or edited from, returned inline; editFlowchart starts from it.",
+			"- Edited and patched artifacts return provenance.sourceArtifactId; root artifacts omit provenance.",
 			"",
 			operationTypes("getArtifact"),
 		].join("\n"),
+	},
+	{
+		id: "editFlowchart",
+		kind: "operation",
+		title: "editFlowchart",
+		// Edits are part of flowcharts; the docs topic list is frozen.
+		topic: "buildFlowchart",
+		keywords: [
+			"edit",
+			"change",
+			"insert",
+			"add",
+			"remove",
+			"rename",
+			"color",
+			"move",
+			"connect",
+			"disconnect",
+			"flowchart",
+		],
+		snippet: "Change a built flowchart by node id or label; the result is a new artifact.",
+		content: FLOWCHART_EDIT_DOCS,
+		examples: [
+			{
+				title: "Insert a step, color another and remove a third",
+				language: "js",
+				code: `async () => sketchi.editFlowchart({ artifactId: "artifact_…", edits: [{ op: "insert", node: { fraud: "Check for fraud" }, between: ["review", "pay"] }, { op: "set", nodes: { "Seat party": { color: "green" }, wait: null } }] })`,
+			},
+		],
 	},
 	{
 		id: "applyDiagramPatch",
@@ -1148,7 +1203,7 @@ export const catalog: CatalogEntry[] = [
 			"For mixed requests like 'circle connected to a purple decision diamond', split the task:",
 			"1. Choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, buildSequenceDiagram for chronological participant interactions, buildTimeline for milestones and event chronologies, buildChart for numbers compared across categories, or createCanvas only for layouts no builder covers.",
 			"2. Inspect issues. If the build is not accepted, repair the spec and call the same build operation again.",
-			"3. Once accepted, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
+			"3. Once accepted, change a flowchart with editFlowchart; for other artifacts, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
 			"4. Return the accepted build or patch; do not fetch the scene just to summarize it. Paste artifactDelivery.finalResponseText when present, otherwise the artifactId and Excalidraw/PNG URLs. Do not create a second Markdown, Mermaid, local file, or Antigravity artifact.",
 			"For broad architecture prompts, keep the first build small and readable: one start, a mostly monotonic spine, a few decision or branch points, and separate terminal nodes for separate outcomes.",
 		].join("\n"),

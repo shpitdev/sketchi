@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	DIAGRAM_NODE_COLORS,
 	flowchartFixture,
 	mindmapFixture,
 	pharmaBatchDispositionFlowchart,
@@ -53,6 +54,27 @@ describe("geometry bounds regressions", () => {
 		// Four 72-unit steps in one column read 2.75:1 at the full 96-unit rank gap;
 		// lines that only run straight down draw their gaps at 56.
 		expect(ys).toEqual([48, 176, 304, 432]);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
+	it("draws a colored node in its palette stroke over a pale fill, at the standard width", () => {
+		const scene = renderIntermediateDiagram({
+			...flowchartFixture,
+			nodes: [
+				{ id: "A", label: "Ready", color: "green" },
+				{ id: "B", label: "Ship" },
+			],
+			edges: [{ id: "ab", source: "A", target: "B" }],
+		});
+		const node = (id: string) =>
+			scene.elements.find((element) => element.type === "node" && element.nodeId === id);
+		expect(node("A")).toMatchObject({
+			strokeColor: DIAGRAM_NODE_COLORS.green.stroke,
+			fillColor: DIAGRAM_NODE_COLORS.green.fill,
+			fillStyle: "solid",
+		});
+		expect(node("A")).not.toHaveProperty("strokeWidth");
+		expect(node("B")).not.toHaveProperty("strokeColor");
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 	});
 

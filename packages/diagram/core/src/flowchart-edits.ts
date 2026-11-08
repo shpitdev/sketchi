@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { DIAGRAM_NODE_SHAPES, DIAGRAM_ZONE_KINDS } from "./intermediate.js";
+import { DIAGRAM_NODE_SHAPES, DIAGRAM_ZONE_KINDS, DiagramNodeColorSchema } from "./intermediate.js";
 import {
 	FLOWCHART_DIRECTIONS,
 	FlowchartDocumentEdgeSchema,
@@ -11,9 +11,11 @@ import {
 	flowchartEdgeEndIds,
 	flowchartGroupTree,
 	flowchartNodeDetails,
+	resolveFlowchartReference,
 	unknownFlowchartIdHint,
 	type FlowchartDocument,
 	type FlowchartDocumentEdge,
+	type FlowchartEdgeEnd,
 	type FlowchartDocumentGroup,
 	type FlowchartDocumentLane,
 	type FlowchartDocumentNode,
@@ -39,6 +41,7 @@ const NodeChangeSchema = Schema.Struct({
 	group: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 	/** The lane of whoever does the step. */
 	lane: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+	color: Schema.optionalKey(Schema.NullOr(DiagramNodeColorSchema)),
 });
 
 const GroupChangeSchema = Schema.Struct({
@@ -106,7 +109,12 @@ export interface FlowchartEditIssue {
 }
 
 export type FlowchartEditResult =
-	| { readonly ok: true; readonly document: FlowchartDocument }
+	| {
+			readonly ok: true;
+			readonly document: FlowchartDocument;
+			/** Each reference resolved to a declared id it does not spell exactly, at its path. */
+			readonly notes: readonly string[];
+	  }
 	| { readonly ok: false; readonly issues: readonly FlowchartEditIssue[] };
 
 /** One editable pair, retaining the authored edge that gives a fan-out its branch identity. */
@@ -348,6 +356,56 @@ function toDocument(state: Mutable): FlowchartDocument {
 }
 
 /**
+ * Two changes to one id as one, field by field: a string is a label, null removes. Undefined when
+ * they disagree.
+ */
+function mergeChanges(left: unknown, right: unknown): unknown {
+	if (left === null || right === null) return left === right ? null : undefined;
+	const fields = (value: unknown): Record<string, unknown> | undefined =>
+		typeof value === "string"
+			? { label: value }
+			: typeof value === "object" && !Array.isArray(value)
+				? (value as Record<string, unknown>)
+				: undefined;
+	const a = fields(left);
+	const b = fields(right);
+	if (a === undefined || b === undefined) return left === right ? left : undefined;
+	for (const [field, value] of Object.entries(b)) {
+		if (field in a && JSON.stringify(a[field]) !== JSON.stringify(value)) return undefined;
+	}
+	const merged = { ...a, ...b };
+	return typeof left === "string" && typeof right === "string" ? left : merged;
+}
+
+/** The fields a node's details may hold, besides the id an inserted node may carry inline. */
+const NODE_DETAIL_FIELDS = new Set(["label", "note", "shape", "icon", "color", "group", "lane"]);
+
+/**
+ * The node an insert adds, as { id: label } or { id: { label, … } }, or written flat as
+ * { id, label, … }, which models often reach for.
+ */
+function insertedNodeEntries(
+	node: Readonly<Record<string, FlowchartDocumentNode>>,
+): [string, FlowchartDocumentNode][] {
+	const { id, ...details } = node;
+	const flat =
+		typeof id === "string" &&
+		typeof details["label"] === "string" &&
+		Object.entries(details).every(
+			([field, value]) => NODE_DETAIL_FIELDS.has(field) && typeof value === "string",
+		);
+	if (!flat) return Object.entries(node);
+	return [
+		[
+			id,
+			Object.keys(details).length === 1
+				? (details["label"] as string)
+				: (details as unknown as FlowchartDocumentNodeDetails),
+		],
+	];
+}
+
+/**
  * Apply edits in order to a document. The result is an unchecked document: build
  * it as any other to learn whether it holds together. An edit that names an id or
  * an edge the document lacks stops the whole list, at its path.
@@ -402,6 +460,70 @@ export function applyFlowchartEdits(
 		});
 	const edgeIndex = (source: string, target: string) =>
 		state.edges.findIndex((edge) => edge.source === source && edge.target === target);
+	const notes: string[] = [];
+	/** A reference as the id it resolves to, by id, spelling or label; unchanged when none. */
+	const resolveIn = (
+		reference: string,
+		path: string,
+		declared: Iterable<readonly [string, string?]>,
+	): string => {
+		const found = resolveFlowchartReference(reference, declared);
+		if (found === undefined || found.by === "id") return reference;
+		notes.push(
+			`${path}: resolved ${JSON.stringify(reference)} to ${found.by === "label" ? "the node labeled it, " : "declared id "}${JSON.stringify(found.id)}.`,
+		);
+		return found.id;
+	};
+	const nodeRef = (reference: string, path: string) =>
+		resolveIn(
+			reference,
+			path,
+			state.nodes.map(([id, node]) => [id, flowchartNodeDetails(node).label] as const),
+		);
+	const endRef = (end: FlowchartEdgeEnd, path: string): FlowchartEdgeEnd =>
+		typeof end === "string"
+			? nodeRef(end, path)
+			: end.map((id, at) => nodeRef(id, `${path}[${at}]`));
+	const edgeRef = <E extends readonly [FlowchartEdgeEnd, FlowchartEdgeEnd, ...unknown[]]>(
+		edge: E,
+		path: string,
+	): E => {
+		const [from, to, ...rest] = edge;
+		return [endRef(from, `${path}[0]`), endRef(to, `${path}[1]`), ...rest] as unknown as E;
+	};
+	/** A change map keyed by the ids its keys resolve to. */
+	/**
+	 * A change map keyed by the ids its keys resolve to. Two keys that name one id (its id and its
+	 * label) merge their fields; changes that disagree, or a removal beside a change, are refused.
+	 */
+	const resolvedKeys = <V>(
+		changes: Readonly<Record<string, V>> | undefined,
+		path: string,
+		declared: () => Iterable<readonly [string, string?]>,
+	): Record<string, V> | undefined => {
+		if (changes === undefined) return undefined;
+		const resolved = new Map<string, { key: string; value: V }>();
+		for (const [key, value] of Object.entries(changes)) {
+			const id = resolveIn(key, `${path}.${key}`, declared());
+			const earlier = resolved.get(id);
+			if (earlier === undefined) {
+				resolved.set(id, { key, value });
+				continue;
+			}
+			const merged = mergeChanges(earlier.value, value);
+			if (merged === undefined) {
+				issues.push({
+					code: "invalid_edit",
+					path: `${path}.${key}`,
+					message: `${path}.${key} and ${path}.${earlier.key} both name "${id}" and disagree.`,
+					hint: `Write one change for "${id}".`,
+				});
+				continue;
+			}
+			resolved.set(id, { key: earlier.key, value: merged as V });
+		}
+		return Object.fromEntries([...resolved].map(([id, { value }]) => [id, value]));
+	};
 
 	/** Drop a node, joining its one way in to its one way out. */
 	const removeNode = (id: string) => {
@@ -443,12 +565,13 @@ export function applyFlowchartEdits(
 		removeNodeFromGroups(state, id, affected);
 	};
 
-	edits.forEach((edit, index) => {
+	edits.forEach((authored, index) => {
 		const at = `edits[${index}]`;
 		const before = issues.length;
-		switch (edit.op) {
+		switch (authored.op) {
 			case "insert": {
-				const entries = Object.entries(edit.node);
+				const edit = authored;
+				const entries = insertedNodeEntries(edit.node);
 				const [entry] = entries;
 				if (!entry || entries.length !== 1) {
 					issues.push({
@@ -460,7 +583,8 @@ export function applyFlowchartEdits(
 					return;
 				}
 				const [id, node] = entry;
-				const [from, to] = edit.between;
+				const from = nodeRef(edit.between[0], `${at}.between[0]`);
+				const to = nodeRef(edit.between[1], `${at}.between[1]`);
 				if (hasNode(id)) {
 					issues.push({
 						code: "invalid_edit",
@@ -533,6 +657,27 @@ export function applyFlowchartEdits(
 				return;
 			}
 			case "set": {
+				const groupEntries = () => state.groups.map(([id, group]) => [id, group.label] as const);
+				const edit = {
+					...authored,
+					...(authored.nodes === undefined
+						? {}
+						: {
+								nodes: resolvedKeys(authored.nodes, `${at}.nodes`, () =>
+									state.nodes.map(([id, node]) => [id, flowchartNodeDetails(node).label] as const),
+								),
+							}),
+					...(authored.groups === undefined
+						? {}
+						: { groups: resolvedKeys(authored.groups, `${at}.groups`, groupEntries) }),
+					...(authored.lanes === undefined
+						? {}
+						: {
+								lanes: resolvedKeys(authored.lanes, `${at}.lanes`, () =>
+									state.lanes.map(([id, lane]) => [id, lane] as const),
+								),
+							}),
+				};
 				const originalGroups = new Set(state.groups.map(([id]) => id));
 				const removedGroups = new Set(
 					Object.entries(edit.groups ?? {})
@@ -593,8 +738,11 @@ export function applyFlowchartEdits(
 				return;
 			}
 			case "connect": {
-				edit.edges.forEach((authored, edgeIndexAt) => {
-					const pairs = singlePairs([authored], nextBranch++);
+				authored.edges.forEach((written, edgeIndexAt) => {
+					const pairs = singlePairs(
+						[edgeRef(written, `${at}.edges[${edgeIndexAt}]`)],
+						nextBranch++,
+					);
 					// A connect joins the source's existing branch with this label, whether
 					// extending it or moving a target out of a differently labeled fan-out.
 					const labelKey = (label: string | undefined) => label?.trim().toLowerCase() ?? "";
@@ -634,7 +782,8 @@ export function applyFlowchartEdits(
 				return;
 			}
 			case "disconnect": {
-				edit.edges.forEach(([from, to], edgeIndexAt) => {
+				authored.edges.forEach((written, edgeIndexAt) => {
+					const [from, to] = edgeRef(written, `${at}.edges[${edgeIndexAt}]`);
 					for (const source of flowchartEdgeEndIds(from)) {
 						for (const target of flowchartEdgeEndIds(to)) {
 							const existing = edgeIndex(source, target);
@@ -669,7 +818,7 @@ export function applyFlowchartEdits(
 		seen.add(key);
 		return true;
 	});
-	return { ok: true, document: toDocument(state) };
+	return { ok: true, document: toDocument(state), notes };
 }
 
 /** Decode unknown input as an edit list, every schema problem at once. */

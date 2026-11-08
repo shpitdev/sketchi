@@ -16,6 +16,7 @@ export const USAGE_ISSUES_ATTRIBUTE = "sketchi.usage.issues";
 export type CodeModeUsageOperation =
 	| "applyDiagramPatch"
 	| "buildFlowchart"
+	| "editFlowchart"
 	| "buildMindmap"
 	| "buildSequenceDiagram"
 	| "buildTimeline"

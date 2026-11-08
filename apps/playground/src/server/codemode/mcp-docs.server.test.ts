@@ -371,8 +371,9 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// code parameter carries each builder's spec and rules once, so no client pays for them twice.
 		expect(EXECUTE_DESCRIPTION_WINDOW).toBe(4096);
 		expect(EXECUTE_DESCRIPTION_LEGACY_WINDOW).toBe(2048);
-		// Down from 1,600 once specs and rules no longer repeat between the head and the parameter.
-		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThanOrEqual(1_450);
+		// Down from 1,600 once specs and rules no longer repeat between the head and the parameter;
+		// editFlowchart and the document format add 96, still inside the 2,048 window.
+		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThanOrEqual(1_525);
 		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
 			'The code parameter gives each one\'s spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first',
 		);
@@ -534,8 +535,9 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// copy rule, no separate builder index and failure-only detail left to the topics take it to
 		// 9,862, under where it stood before them. The flowchart label rule, needed once Sol pasted
 		// prompt clauses as labels, and moving the copy rule onto the other builders add 190 (+46
-		// o200k tokens). Lower this budget; do not raise it.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_060);
+		// o200k tokens). Node colors and the editFlowchart line add 712, so an edit takes one execute
+		// and no docs turn. Lower this budget; do not raise it.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_760);
 		// The overview keeps every builder's summary; the code parameter names every builder once.
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const operation of CODE_MODE_OPERATIONS.filter((name) =>

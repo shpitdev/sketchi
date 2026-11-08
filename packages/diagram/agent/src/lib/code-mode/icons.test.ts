@@ -14,6 +14,7 @@ import {
 	type CodeModeArtifactRenderer,
 	CodeModeRuntimeEnvironment,
 	createCanvas,
+	editFlowchart,
 	getArtifact,
 	makeCodeModeRuntimeEnvironmentLayer,
 	searchIcons,
@@ -105,6 +106,7 @@ function runtime(
 		buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
 		buildSequenceDiagram: (input: unknown) => provide(buildSequenceDiagram(input)),
 		createCanvas: (input: unknown) => provide(createCanvas(input)),
+		editFlowchart: (input: unknown) => provide(editFlowchart(input)),
 		getArtifact: (input: unknown) => provide(getArtifact(input)),
 		searchIcons: (input: unknown) => provide(searchIcons(input)),
 	};
@@ -129,7 +131,9 @@ function deploySpec(icons: Record<string, string>) {
 type FlowchartBuild = Awaited<ReturnType<ReturnType<typeof runtime>["buildFlowchart"]>>;
 
 /** The logo each node draws, in node order, from the document as built. */
-function nodeLogos(result: FlowchartBuild): (string | null | undefined)[] {
+function nodeLogos(
+	result: FlowchartBuild | Awaited<ReturnType<ReturnType<typeof runtime>["editFlowchart"]>>,
+): (string | null | undefined)[] {
 	if (!result.ok) throw new Error(JSON.stringify(result.issues));
 	return Object.values(result.normalizedSpec.nodes).map((node) =>
 		typeof node === "string" ? undefined : node.icon,
@@ -256,6 +260,7 @@ describe("logo payloads in build results", () => {
 		expect(svgCount(result)).toBe(0);
 		expect(dataUrlCount(result)).toBe(0);
 		expect(result.artifact.formats.map((format) => "inline" in format)).toEqual([
+			false,
 			false,
 			false,
 			false,
@@ -422,6 +427,26 @@ describe("named logo fill", () => {
 			edges: nodes.slice(1).map(([id], index) => [nodes[index]?.[0], id]),
 		};
 	}
+
+	it("draws the logo a renamed node's new label names, not the one it drew before", async () => {
+		const run = production();
+		const built = await run.buildFlowchart({ spec: r20DeploySpec });
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		const edited = await run.editFlowchart({
+			artifactId: built.artifact.artifactId,
+			edits: [
+				{ op: "set", nodes: { build: "Bundle the release", tests: "GitHub Actions run tests" } },
+			],
+		});
+		expect(nodeLogos(edited)).toEqual([
+			"github",
+			undefined,
+			"github",
+			undefined,
+			"cloudflare",
+			undefined,
+		]);
+	});
 
 	it("draws the logo of each product a label names when the document asks for logos", async () => {
 		const result = await production().buildFlowchart({ spec: r20DeploySpec });

@@ -590,6 +590,10 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		}`;
 	}
 
+	/** A flowchart stores the document it was built from beside what its build exported. */
+	const documentFormat = (operation: string) =>
+		operation === "buildFlowchart" ? (["document"] as const) : [];
+
 	it.each(optionsOperations)(
 		"delivers a default PNG for accepted %s calls without options",
 		async (operation, request) => {
@@ -602,6 +606,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				"scene",
 				"excalidraw",
 				"png",
+				...documentFormat(operation),
 			]);
 			expect(output.finalResponseText).toContain(`PNG URL: ${output.artifactDelivery?.pngUrl}`);
 			expect(output.finalResponseText).not.toContain("unavailable");
@@ -631,6 +636,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(output.artifactDelivery?.formats.map(({ format }) => format)).toEqual([
 				"scene",
 				"excalidraw",
+				...documentFormat(operation),
 			]);
 			expect(output.artifactDelivery?.excalidrawUrl).toContain("format=excalidraw");
 			expect(output.artifactDelivery?.pngUrl).toBeUndefined();
@@ -918,6 +924,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 					formats: [
 						expect.objectContaining({ format: "scene", inline: expect.any(Object) }),
 						expect.objectContaining({ format: "png" }),
+						...documentFormat(operation).map((format) => expect.objectContaining({ format })),
 					],
 				},
 			});
@@ -948,6 +955,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 					expect.objectContaining({ format: "scene" }),
 					expect.objectContaining({ format: "excalidraw" }),
 					expect.objectContaining({ format: "png" }),
+					expect.objectContaining({ format: "document" }),
 				],
 			},
 		});
@@ -1161,7 +1169,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(executeTool?.description).toContain("When the prompt names technologies");
 			// Every request pays for tools/list. Claude Code cuts the description at 4096 characters in
 			// upfront mode but keeps parameter descriptions, so the builder specs ride on code.
-			expect(executeTool?.description?.length).toBeLessThanOrEqual(1_450);
+			expect(executeTool?.description?.length).toBeLessThanOrEqual(1_525);
 			const codeDescription = String(
 				Reflect.get(executeTool?.inputSchema.properties?.code ?? {}, "description"),
 			);
@@ -1214,7 +1222,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			// The head retains builder names; specs and rules ride on the code parameter. Every request
 			// pays for this on every turn: five families took it from 13,468 characters to 16,093, and
 			// the compact flowchart spec, one shared copy rule and topic-only failure detail bring it
-			// under 12,800. The flowchart label rule adds about 200 back. Lower this budget; do not
+			// under 12,800. The flowchart label rule adds about 200 back, and node colors with the
+			// editFlowchart line about 800, so an edit needs no docs turn. Lower this budget; do not
 			// raise it.
 			expect(
 				JSON.stringify(
@@ -1224,7 +1233,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(13_000);
+			).toBeLessThan(13_810);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,
@@ -1663,6 +1672,30 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		} finally {
 			await client.close();
 		}
+	});
+
+	it("deduplicates a returned edit, keeping its edits and provenance in the receipt", async () => {
+		const output = await executeSketchiCodeMode(
+			stubPngRenderer(),
+			{
+				code: `async () => { const built = await sketchi.buildFlowchart({ spec: { title: "Receipt edit", nodes: {a:"Start",b:"Finish"}, edges:[["a","b"]] } }); return await sketchi.editFlowchart({ artifactId: built.artifact.artifactId, edits: [{ op: "insert", node: { c: "Check" }, between: ["a", "b"] }] }); }`,
+			},
+			{ executor: createInProcessExecutor() },
+		);
+		const [built, edited] = output.builds;
+		expect(edited).toMatchObject({
+			operation: "editFlowchart",
+			ok: true,
+			edits: [{ op: "insert", node: { c: "Check" }, between: ["a", "b"] }],
+			artifact: { provenance: { sourceArtifactId: built?.artifact?.artifactId } },
+		});
+		expect(output.result).toEqual({
+			buildId: edited?.buildId,
+			ok: true,
+			artifactId: edited?.artifact?.artifactId,
+			png: output.artifactDelivery?.pngUrl,
+		});
+		expect(JSON.stringify(output).match(/"normalizedSpec":/g)).toHaveLength(2);
 	});
 
 	it.each([

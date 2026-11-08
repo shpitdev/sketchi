@@ -45,6 +45,7 @@ vi.mock("./service.server", async (importOriginal) => {
 			buildFlowchart: () =>
 				Effect.succeed(runtimeResults.getBuildFlowchart() as BuildFlowchartResult),
 			buildMindmap: () => Effect.succeed(runtimeResults.getBuildMindmap() as BuildMindmapResult),
+			editFlowchart: () => Effect.die("Flowchart edits are outside the frozen v1 corpus."),
 			buildTimeline: () => Effect.die("Timelines are outside the frozen v1 corpus."),
 			buildChart: () => Effect.die("Charts are outside the frozen v1 corpus."),
 			buildSequenceDiagram: () => Effect.die("Sequence diagrams are outside the frozen v1 corpus."),

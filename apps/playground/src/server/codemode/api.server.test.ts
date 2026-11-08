@@ -16,6 +16,7 @@ import {
 	handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
 	handleBuildSequenceDiagramRequest as handleBuildSequenceDiagramRequestEffect,
 	handleCreateCanvasRequest as handleCreateCanvasRequestEffect,
+	handleEditFlowchartRequest as handleEditFlowchartRequestEffect,
 	handleGetArtifactRequest as handleGetArtifactRequestEffect,
 	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./api.server";
@@ -41,6 +42,10 @@ function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
 		handleBuildFlowchartRequestEffect(request),
 		testBoundary(env, request),
 	);
+}
+
+function handleEditFlowchartRequest(env: StudioEnv, request: Request) {
+	return runPlaygroundEffect(handleEditFlowchartRequestEffect(request), testBoundary(env, request));
 }
 
 function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
@@ -549,7 +554,11 @@ describe("Code Mode API handlers", () => {
 		const built = JSON.parse(text) as {
 			artifact: { formats: { format: string; inline?: { icons?: object } }[] };
 		};
-		expect(built.artifact.formats.map(({ format }) => format)).toEqual(["excalidraw", "scene"]);
+		expect(built.artifact.formats.map(({ format }) => format)).toEqual([
+			"excalidraw",
+			"scene",
+			"document",
+		]);
 		const scene = built.artifact.formats.find((format) => format.format === "scene");
 		expect(Object.keys(scene?.inline?.icons ?? {}).sort()).toEqual(["docker", "github"]);
 		expect(built.artifact).not.toHaveProperty("preview");
@@ -705,6 +714,49 @@ describe("Code Mode API handlers", () => {
 		});
 	});
 
+	it("edits a flowchart by id over HTTP, and answers 404 and 422 for what it cannot edit", async () => {
+		const buildResponse = await handleBuildFlowchartRequest(
+			{},
+			postRequest("https://studio.test/api/v1/flowcharts/build", { spec: approvalSpec() }),
+		);
+		const artifactId = artifactIdFrom(await buildResponse.json());
+		const edits = [{ op: "set", nodes: { done: { color: "green" } } }];
+
+		const edited = await handleEditFlowchartRequest(
+			{},
+			postRequest("https://studio.test/api/v1/flowcharts/edit", { artifactId, edits }),
+		);
+		expect(edited.status).toBe(200);
+		expect(await edited.json()).toMatchObject({
+			ok: true,
+			artifact: { provenance: { sourceArtifactId: artifactId } },
+			edits,
+		});
+
+		const missing = await handleEditFlowchartRequest(
+			{},
+			postRequest("https://studio.test/api/v1/flowcharts/edit", {
+				artifactId: "artifact_missing",
+				edits,
+			}),
+		);
+		expect(missing.status).toBe(404);
+
+		const unknown = await handleEditFlowchartRequest(
+			{},
+			postRequest("https://studio.test/api/v1/flowcharts/edit", {
+				artifactId,
+				edits: [{ op: "disconnect", edges: [["request", "nowhere"]] }],
+			}),
+		);
+		expect(unknown.status).toBe(422);
+		expect(await unknown.json()).toMatchObject({
+			ok: false,
+			status: "invalid_edit",
+			issues: [{ code: "unknown_edit_target", ref: { path: "edits[0].edges[0]" } }],
+		});
+	});
+
 	it("builds, retrieves, and patches an artifact through Response handlers", async () => {
 		const buildResponse = await handleBuildFlowchartRequest(
 			{},
@@ -837,6 +889,7 @@ describe("Code Mode API handlers", () => {
 		expect(
 			[...bucket.objects.keys()].filter((key) => key.startsWith(`codemode/${artifactId}/`)).sort(),
 		).toEqual([
+			`codemode/${artifactId}/document.json`,
 			`codemode/${artifactId}/excalidraw.json`,
 			`codemode/${artifactId}/manifest.json`,
 			`codemode/${artifactId}/scene.json`,

@@ -7,6 +7,7 @@ import {
 	type ArtifactBundle,
 	type PartialArtifactBundle,
 	type BuildFlowchartResult,
+	type EditFlowchartResult,
 	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
@@ -135,11 +136,14 @@ const ExecuteBuildArtifactContract = Schema.Struct({
 	artifactId: Schema.optionalKey(Schema.String),
 	diagramId: Schema.optionalKey(Schema.String),
 	formats: ExecuteArtifactDeliveryContract.fields.formats,
+	/** The artifact an edit started from. */
+	provenance: Schema.optionalKey(Schema.Struct({ sourceArtifactId: Schema.String })),
 });
 const ExecuteBuildContract = Schema.Struct({
 	index: Schema.Number,
 	operation: Schema.Literals([
 		"buildFlowchart",
+		"editFlowchart",
 		"buildMindmap",
 		"buildSequenceDiagram",
 		"buildTimeline",
@@ -164,6 +168,8 @@ const ExecuteBuildContract = Schema.Struct({
 	quality: Schema.optionalKey(Schema.Unknown),
 	artifact: Schema.optionalKey(ExecuteBuildArtifactContract),
 	partial: Schema.optionalKey(ExecuteBuildArtifactContract),
+	/** The edits an editFlowchart applied. */
+	edits: Schema.optionalKey(Schema.Unknown),
 	issues: Schema.Array(CodeModeIssueSchema).pipe(Schema.mutable),
 });
 type ExecuteBuild = typeof ExecuteBuildContract.Type;
@@ -179,6 +185,7 @@ interface BuildObserver {
 type BuildOperation = ExecuteBuild["operation"];
 type BuildResult =
 	| BuildFlowchartResult
+	| EditFlowchartResult
 	| BuildMindmapResult
 	| BuildSequenceDiagramResult
 	| BuildTimelineResult
@@ -201,6 +208,9 @@ function buildArtifactReference(artifact: ArtifactBundle | PartialArtifactBundle
 		...(artifact.artifactId ? { artifactId: artifact.artifactId } : {}),
 		...(artifact.diagramId ? { diagramId: artifact.diagramId } : {}),
 		formats: artifactFormatsFrom(artifact.formats),
+		...("provenance" in artifact && artifact.provenance
+			? { provenance: { sourceArtifactId: artifact.provenance.sourceArtifactId } }
+			: {}),
 	};
 }
 
@@ -221,6 +231,8 @@ function buildReceipt(operation: BuildOperation, index: number, result: BuildRes
 			: result.partial
 				? { partial: buildArtifactReference(result.partial) }
 				: {}),
+		// An edit's result carries what it applied; the receipt matches it, so execute compacts it.
+		...("edits" in result && result.edits ? { edits: result.edits } : {}),
 		issues,
 	});
 }
@@ -281,7 +293,7 @@ function trackSandboxBuilds(code: string): string {
       const trackedSketchi = new Proxy(sketchi, {
         get(target, name) {
           const method = target[name];
-          if (!["buildFlowchart", "buildMindmap", "buildSequenceDiagram", "buildTimeline", "buildChart", "buildStateMachine", "buildGantt", "buildErDiagram", "buildClassDiagram", "buildOrgChart", "buildVennDiagram", "buildJourneyMap", "buildSankey", "buildWireframe", "buildQuadrantChart", "createCanvas"].includes(name)) return method;
+          if (!["buildFlowchart", "editFlowchart", "buildMindmap", "buildSequenceDiagram", "buildTimeline", "buildChart", "buildStateMachine", "buildGantt", "buildErDiagram", "buildClassDiagram", "buildOrgChart", "buildVennDiagram", "buildJourneyMap", "buildSankey", "buildWireframe", "buildQuadrantChart", "createCanvas"].includes(name)) return method;
           return (...args) => {
             const pending = method(...args);
             pendingBuilds.push(pending);
@@ -781,6 +793,13 @@ export function makeSketchiCodeModeProvider(
 				runToolEffect(
 					withTelemetryCorrelation(
 						build("buildFlowchart", withTrailingOptions(request, options)),
+						correlation,
+					),
+				),
+			editFlowchart: (request, options) =>
+				runToolEffect(
+					withTelemetryCorrelation(
+						build("editFlowchart", withTrailingOptions(request, options)),
 						correlation,
 					),
 				),

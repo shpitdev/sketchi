@@ -265,6 +265,7 @@ describe("Studio build_flowchart host", () => {
 						inline: expect.anything(),
 					}),
 					expect.objectContaining({ format: "excalidraw" }),
+					expect.objectContaining({ format: "document" }),
 				],
 			},
 		});

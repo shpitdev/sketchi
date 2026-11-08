@@ -261,6 +261,117 @@ describe("flowchart edits", () => {
 		expect(result.issues[0]?.hint).toContain('"review"');
 	});
 
+	it("resolves references by spelling or by a unique label, and says so", () => {
+		const result = applyFlowchartEdits(order, [
+			{ op: "insert", node: { card: "Check card" }, between: ["Approved?", "Take payment"] },
+			{ op: "set", nodes: { "Keep waiting": { color: "gray" }, Pay: { color: "green" } } },
+			{ op: "connect", edges: [["Cancel order", "place", "retry"]] },
+			{ op: "disconnect", edges: [["Place order", "REVIEW"]] },
+		]);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.document.nodes).toMatchObject({
+			wait: { label: "Keep waiting", color: "gray" },
+			pay: { label: "Take payment", color: "green" },
+			card: "Check card",
+		});
+		expect(Object.keys(result.document.nodes)).not.toContain("Keep waiting");
+		expect(result.document.edges).toContainEqual(["approved", "card", "yes"]);
+		expect(result.document.edges).toContainEqual(["cancel", "place", "retry"]);
+		expect(result.document.edges).not.toContainEqual(["place", "review"]);
+		expect(result.notes).toEqual([
+			'edits[0].between[0]: resolved "Approved?" to the node labeled it, "approved".',
+			'edits[0].between[1]: resolved "Take payment" to the node labeled it, "pay".',
+			'edits[1].nodes.Keep waiting: resolved "Keep waiting" to the node labeled it, "wait".',
+			'edits[1].nodes.Pay: resolved "Pay" to declared id "pay".',
+			'edits[2].edges[0][0]: resolved "Cancel order" to the node labeled it, "cancel".',
+			'edits[3].edges[0][0]: resolved "Place order" to the node labeled it, "place".',
+			'edits[3].edges[0][1]: resolved "REVIEW" to declared id "review".',
+		]);
+	});
+
+	it("reads an inserted node written flat as { id, label, … }", () => {
+		const edited = apply(order, [
+			{
+				op: "insert",
+				node: { id: "card", label: "Check card", color: "green" },
+				between: ["approved", "pay"],
+			},
+			{ op: "insert", node: { id: "log", label: "Log order" }, between: ["place", "review"] },
+		]);
+		expect(edited.nodes["card"]).toEqual({ label: "Check card", color: "green" });
+		expect(edited.nodes["log"]).toBe("Log order");
+		expect(edited.edges).toContainEqual(["approved", "card", "yes"]);
+		expect(Object.keys(edited.nodes)).not.toContain("id");
+	});
+
+	it("merges a set's changes to one node named by id and by label, and refuses ones that disagree", () => {
+		const merged = applyFlowchartEdits(order, [
+			{ op: "set", nodes: { review: { color: "green" }, "Review order": { note: "Approved" } } },
+		]);
+		expect(merged.ok).toBe(true);
+		if (!merged.ok) return;
+		expect(merged.document.nodes["review"]).toEqual({
+			label: "Review order",
+			color: "green",
+			note: "Approved",
+		});
+
+		const clash = applyFlowchartEdits(order, [
+			{ op: "set", nodes: { review: { color: "green" }, "Review order": { color: "red" } } },
+		]);
+		expect(clash.ok).toBe(false);
+		if (clash.ok) return;
+		expect(clash.issues.map((issue) => [issue.code, issue.path])).toEqual([
+			["invalid_edit", "edits[0].nodes.Review order"],
+		]);
+
+		const removal = applyFlowchartEdits(order, [
+			{ op: "set", nodes: { wait: null, "Keep waiting": { color: "gray" } } },
+		]);
+		expect(removal.ok).toBe(false);
+	});
+
+	it("matches an exact label before spelling variants, in any script", () => {
+		const langs: FlowchartDocument = {
+			title: "Languages",
+			nodes: { plain: "C", cpp: "C++", end: "Done", jp: "注文を確認" },
+			edges: [
+				["plain", "cpp"],
+				["cpp", "end"],
+				["end", "jp"],
+			],
+		};
+		const result = applyFlowchartEdits(langs, [
+			{ op: "insert", node: { lint: "Lint" }, between: ["C++", "Done"] },
+			{ op: "set", nodes: { 注文を確認: { color: "blue" } } },
+			{ op: "disconnect", edges: [["done", "注文を確認。"]] },
+		]);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.document.edges).toContainEqual(["cpp", "lint"]);
+		expect(result.document.edges).toContainEqual(["lint", "end"]);
+		expect(result.document.nodes["jp"]).toEqual({ label: "注文を確認", color: "blue" });
+		expect(result.document.edges).not.toContainEqual(["end", "jp"]);
+	});
+
+	it("leaves an ambiguous label unresolved, so a set adds a node under it", () => {
+		const twins: FlowchartDocument = {
+			title: "Twins",
+			nodes: { a: "Check", b: "Check", c: "Done" },
+			edges: [
+				["a", "b"],
+				["b", "c"],
+			],
+		};
+		const result = applyFlowchartEdits(twins, [
+			{ op: "insert", node: { x: "X" }, between: ["Check", "c"] },
+		]);
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.issues.map((issue) => issue.path)).toEqual(["edits[0].between[0]"]);
+	});
+
 	it("keeps an inserted node in the lane of the step before it and in the groups around both ends", () => {
 		const laned = apply(
 			{
