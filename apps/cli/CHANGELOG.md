@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.36.0
+
+### Minor Changes
+
+- [#706](https://github.com/shpitdev/sketchi/pull/706) [`e5ad580`](https://github.com/shpitdev/sketchi/commit/e5ad58043068214d61a41cdfeb957f23eee621a3) Thanks [@anandpant](https://github.com/anandpant)! - Flowcharts use the flowchart document: `nodes` maps an id to its label, `edges` are `[from, to, label?]` pairs (an end may list several ids), and groups and lanes list what they `contain`. Node roles come from the edges, so nodes no longer declare a `kind`, and `"logos": true` draws the logo of each product a node label names. Documents in the old node and edge arrays are no longer read.
+
 ## 0.35.2
 
 ### Patch Changes
