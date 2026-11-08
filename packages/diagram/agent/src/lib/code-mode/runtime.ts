@@ -1660,7 +1660,7 @@ const FailureContextSchema = Schema.Struct({
 class ArtifactExportFailure extends Schema.TaggedError<ArtifactExportFailure>()(
 	"ArtifactExportFailure",
 	{
-		status: Schema.Literal("export_failed"),
+		status: Schema.Literals(["export_failed", "limit_exceeded"]),
 		issues: FailureContextSchema.fields.issues,
 	},
 ) {}
@@ -3345,6 +3345,21 @@ const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore")(funct
 		const excalidraw = convertSceneToExcalidraw(input.scene);
 		return { excalidraw, validation: validateExcalidrawScene(excalidraw) };
 	}).pipe(Effect.withSpan("codeMode.artifacts.exportValidate"));
+	// A canvas of composed shapes exports several Excalidraw elements for each of its own.
+	if (excalidraw.elements.length > CANVAS_LIMITS.maxExportedElements) {
+		return yield* new ArtifactExportFailure({
+			status: "limit_exceeded",
+			issues: [
+				issue({
+					code: "canvas_limit_exceeded",
+					stage: "export",
+					ref: { kind: "diagram", id: input.scene.diagramId },
+					message: `Canvas exports ${excalidraw.elements.length} Excalidraw elements, more than the ${CANVAS_LIMITS.maxExportedElements} a share link holds.`,
+					hint: "Split the diagram into smaller canvases.",
+				}),
+			],
+		});
+	}
 	const issues = input.validationIssues(validation.issues);
 	if (issues.length > 0) {
 		return yield* new ArtifactExportFailure({

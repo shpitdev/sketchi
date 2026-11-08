@@ -1,5 +1,6 @@
 import { inflateSync } from "node:zlib";
 
+import { CANVAS_LIMITS } from "@sketchi/diagram-agent";
 import { Effect } from "effect";
 import { Deflate } from "pako";
 
@@ -13,7 +14,8 @@ export const EXCALIDRAW_GET_ENDPOINT = "https://json.excalidraw.com/api/v2/";
 export const MAX_SHARE_LINK_LENGTH = 4 * 1024;
 export const MAX_SHARE_BODY_BYTES = 2 * 1024 * 1024;
 export const MAX_DECOMPRESSED_BYTES = 16 * 1024 * 1024;
-export const MAX_SHARE_ELEMENTS = 10_000;
+/** Every canvas Sketchi accepts fits a share link. */
+export const MAX_SHARE_ELEMENTS = CANVAS_LIMITS.maxExportedElements;
 export const MAX_SHARE_STRUCTURE_DEPTH = 64;
 export const MAX_POST_RESPONSE_BYTES = 64 * 1024;
 export const SHARE_BACKEND_TIMEOUT_MS = 15_000;
@@ -355,7 +357,7 @@ export function validateShareScene(value: unknown): Effect.Effect<unknown, CliSh
 				throw new Error("Excalidraw library state is unsupported");
 			}
 			if (scene.elements.length > MAX_SHARE_ELEMENTS) {
-				throw new Error("element count exceeds 10000");
+				throw new Error(`element count exceeds ${MAX_SHARE_ELEMENTS}`);
 			}
 			if (Object.keys(scene.files).length > 0) {
 				throw new Error("binary files are unsupported");

@@ -65,17 +65,19 @@ dimension, 5,000 z-order entries, and 4 MB serialized input. These are
 ceilings, not targets: each diagram family keeps its own, much smaller limits
 (a flowchart holds 80 nodes), and a canvas reads best well under them.
 
-5,000 elements is the most a CLI share link can always pull back: a labelled
-node or connector exports as two Excalidraw elements, and a pulled share holds
-at most 10,000. A 5,000-element canvas validates and converts in under a second
+A canvas may also export at most 10,000 Excalidraw elements, the most a CLI share link pulls back, so no accepted canvas has more elements than a share link holds. A labelled node
+or connector exports as two Excalidraw elements and a composed shape, such as a
+labelled cylinder, as several, so 5,000 elements leaves room for a canvas of
+the simple ones. A 5,000-element canvas validates and converts in under a second
 in Node, its Browser Run PNG export takes about 14 of its 30 seconds, and Studio
 opens it in about 3 seconds. An MCP `execute` script's
 default PNG has a 15-second budget, which a canvas of a few thousand elements
 over a large area can miss: the build then succeeds with a `png_unavailable`
 warning, and a script that asks for `png` in `artifactFormats` gets the full 30
-seconds. A family builder whose scene exceeds the limit fails with
-`canvas_limit_exceeded`, which `POST /api/v1/generate` answers as
-`limit_exceeded` (HTTP 413).
+seconds. A build, patch or generate request over any of these limits
+fails with `canvas_limit_exceeded` and status `limit_exceeded` (HTTP 413). The
+HTTP canvas and patch endpoints accept request bodies up to the serialized limit
+plus 64 KB; the other builders keep their 256 KB.
 
 Executable Code Mode examples for ERD, architecture map, timeline,
 dashboard/chart, wireframe, and a dense 120-element matrix live in

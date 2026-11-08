@@ -3199,6 +3199,45 @@ describe("bot-reviewed canvas limits and coincident routes", () => {
 		});
 	});
 
+	it("keeps every accepted canvas within a share link's Excalidraw elements", async () => {
+		const cylinders = (count: number) =>
+			geometryCanvas(
+				Array.from({ length: count }, (_, index) => ({
+					...geometryNode(`db-${index}`, (index % 50) * 140, Math.floor(index / 50) * 120),
+					shape: "cylinder" as const,
+					width: 120,
+					height: 100,
+					label: "DB",
+				})),
+			);
+		const one = await createTestRuntime().createCanvas({
+			spec: cylinders(1),
+			options: { artifactFormats: ["excalidraw"], inlineArtifacts: ["excalidraw"] },
+		});
+		expectCanvasOk(one);
+		const inline = one.artifact.formats[0]?.inline as { readonly elements: readonly unknown[] };
+		// A labelled cylinder composes several Excalidraw elements.
+		const perCylinder = inline.elements.length;
+		expect(perCylinder).toBeGreaterThan(2);
+		const count = Math.floor(CANVAS_LIMITS.maxExportedElements / perCylinder) + 1;
+		expect(count).toBeLessThanOrEqual(CANVAS_LIMITS.maxElements);
+
+		const result = await createTestRuntime().createCanvas({
+			spec: cylinders(count),
+			options: { artifactFormats: ["scene"] },
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: [
+				expect.objectContaining({
+					code: "canvas_limit_exceeded",
+					message: `Canvas exports ${count * perCylinder} Excalidraw elements, more than the ${CANVAS_LIMITS.maxExportedElements} a share link holds.`,
+				}),
+			],
+		});
+	}, 60_000);
+
 	it("returns limit_exceeded when a patch grows a scene past the element limit", async () => {
 		const result = await createTestRuntime().applyDiagramPatch({
 			source: { scene: geometryCanvas([geometryNode("a", 0, 0)]) },
