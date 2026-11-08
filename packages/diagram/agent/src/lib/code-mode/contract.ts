@@ -1859,16 +1859,77 @@ export class CanvasNodeIcon extends Schema.Class<CanvasNodeIcon>("CanvasNodeIcon
 				},
 			),
 		).pipe(Schema.mutableKey),
+		/** Embed the catalog's exact SVG instead of the hand-drawn mark. */
+		exact: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
 	},
 	{ identifier: undefined },
 ) {}
 export const CanvasNodeIconSchema = CanvasNodeIcon;
 
-/** Derived SVG asset for one icon slug; Sketchi replaces any authored value. */
+const IconRecipePoint = Schema.Tuple([FiniteNumber, FiniteNumber]);
+const IconRecipePoints = Schema.Array(IconRecipePoint);
+const iconRecipePaint = {
+	stroke: optionalContract(Schema.String),
+	fill: optionalContract(Schema.String),
+	pen: optionalContract(literals([1, 2])),
+};
+const IconRecipePart = Schema.Union(
+	[
+		Schema.Struct({
+			kind: stringLiteral("rect"),
+			x: FiniteNumber,
+			y: FiniteNumber,
+			width: FiniteNumber,
+			height: FiniteNumber,
+			rounded: optionalContract(Schema.Boolean),
+			...iconRecipePaint,
+		}),
+		Schema.Struct({
+			kind: stringLiteral("ellipse"),
+			cx: FiniteNumber,
+			cy: FiniteNumber,
+			rx: FiniteNumber,
+			ry: FiniteNumber,
+			...iconRecipePaint,
+		}),
+		Schema.Struct({
+			kind: stringLiteral("stroke"),
+			points: IconRecipePoints,
+			smooth: optionalContract(Schema.Boolean),
+			closed: optionalContract(Schema.Boolean),
+			...iconRecipePaint,
+		}),
+		Schema.Struct({
+			kind: stringLiteral("arrow"),
+			points: IconRecipePoints,
+			smooth: optionalContract(Schema.Boolean),
+			stroke: iconRecipePaint.stroke,
+			pen: iconRecipePaint.pen,
+		}),
+		Schema.Struct({
+			kind: stringLiteral("text"),
+			cx: FiniteNumber,
+			cy: FiniteNumber,
+			text: Schema.String,
+			size: FiniteNumber,
+			color: optionalContract(Schema.String),
+		}),
+	],
+	{ mode: "oneOf" },
+);
+
+/** A hand-drawn icon: a few primitives on a 24-unit grid. */
+export const IconRecipeSchema = Schema.Struct({ parts: Schema.Array(IconRecipePart) });
+
+/**
+ * Derived forms of one icon slug, the hand-drawn recipe and the exact SVG;
+ * Sketchi replaces any authored value.
+ */
 export class CanvasIconAsset extends Schema.Class<CanvasIconAsset>("CanvasIconAsset")(
 	{
 		name: Schema.String,
-		svg: Schema.String,
+		recipe: optionalContract(IconRecipeSchema),
+		svg: optionalContract(Schema.String),
 	},
 	{ identifier: undefined },
 ) {}

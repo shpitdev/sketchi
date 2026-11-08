@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import {
 	ApplyDiagramPatchRequestSchema,
+	IconRecipeSchema,
 	ApplyDiagramPatchResultSchema,
 	BuildFlowchartAccepted,
 	BuildFlowchartOptionsSchema,
@@ -255,6 +256,7 @@ const sharedContracts = [
 	["PartialArtifact", BuildFlowchartRejected.fields.partial.schema],
 	["DiagramSelector", DiagramSelectorSchema],
 	["CanvasElement", SceneElementSchema],
+	["IconRecipe", IconRecipeSchema],
 	["CanvasSpec", CanvasSpecSchema],
 ] as const;
 
@@ -336,7 +338,10 @@ export function jsonSchemaType(
 		case "array": {
 			if (Array.isArray(schema.prefixItems)) {
 				const tuple = schema.prefixItems.map(type);
-				if (schema.items !== false) tuple.push(`...Array<${type(schema.items ?? {})}>`);
+				// A tuple capped at its own length, such as [x, y], takes no rest elements.
+				if (schema.items !== false && schema.maxItems !== schema.prefixItems.length) {
+					tuple.push(`...Array<${type(schema.items ?? {})}>`);
+				}
 				return `[${tuple.join(", ")}]`;
 			}
 			return `Array<${type(schema.items ?? {})}>`;

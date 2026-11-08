@@ -178,6 +178,61 @@ describe("embedCanvasIcons", () => {
 	});
 });
 
+const DOCKER_RECIPE = {
+	parts: [{ kind: "rect", x: 2, y: 6, width: 20, height: 12, rounded: true, fill: "#2496ed" }],
+} as const;
+
+describe("embedCanvasIcons forms", () => {
+	const both: CanvasIconAsset = { ...DOCKER, recipe: DOCKER_RECIPE };
+	const icon = { slug: "docker", size: 28 };
+
+	it("draws the hand-drawn recipe and embeds only it", () => {
+		const result = embedCanvasIcons(canvas([node("a", { icon })]), () => both);
+		expect(result.dropped).toEqual([]);
+		expect(result.scene.icons).toEqual({ docker: { name: "Docker", recipe: DOCKER_RECIPE } });
+	});
+
+	it("embeds the exact SVG for an icon that asks, and both forms when the scene draws both", () => {
+		const result = embedCanvasIcons(
+			canvas([node("a", { icon: { ...icon, exact: true } }), node("b", { icon, y: 100 })]),
+			() => both,
+		);
+		expect(result.scene.icons).toEqual({ docker: both });
+	});
+
+	it("draws every icon exact with exactIcons, marking each one", () => {
+		const result = embedCanvasIcons(canvas([node("a", { icon })]), () => both, {
+			exactIcons: true,
+		});
+		expect(result.scene.icons).toEqual({ docker: DOCKER });
+		expect(result.scene.elements[0]).toMatchObject({ icon: { slug: "docker", exact: true } });
+	});
+
+	it("falls back to the other form, and drops an icon with neither or an undrawable recipe", () => {
+		const exactWithoutSvg = embedCanvasIcons(
+			canvas([node("a", { icon: { ...icon, exact: true } })]),
+			() => ({
+				name: "Docker",
+				recipe: DOCKER_RECIPE,
+			}),
+		);
+		expect(exactWithoutSvg.scene.icons).toEqual({
+			docker: { name: "Docker", recipe: DOCKER_RECIPE },
+		});
+
+		const withoutRecipe = embedCanvasIcons(canvas([node("a", { icon })]), () => DOCKER);
+		expect(withoutRecipe.scene.icons).toEqual({ docker: DOCKER });
+
+		const broken = embedCanvasIcons(canvas([node("a", { icon })]), () => ({
+			name: "Docker",
+			recipe: { parts: [] },
+		}));
+		expect(broken.dropped).toEqual([
+			{ elementId: "a", index: 0, reason: "unavailable", slug: "docker" },
+		]);
+	});
+});
+
 describe("embedCanvasIcons safety", () => {
 	const prototypeSlugs = ["constructor", "__proto__", "toString", "hasOwnProperty"];
 
@@ -345,7 +400,24 @@ describe("node icon validation", () => {
 					},
 				}),
 			),
-		).toEqual([expect.objectContaining({ code: "limit_exceeded", path: "icons.huge" })]);
+		).toEqual([expect.objectContaining({ code: "limit_exceeded", path: "icons.huge.svg" })]);
+	});
+
+	it("requires a drawable recipe or an SVG for every embedded asset", () => {
+		expect(
+			getCanvasValidationIssues(
+				canvas([node("a")], {
+					icons: {
+						empty: { name: "Empty" },
+						broken: { name: "Broken", recipe: { parts: [] } },
+						drawn: { name: "Drawn", recipe: DOCKER_RECIPE },
+					},
+				}),
+			),
+		).toEqual([
+			expect.objectContaining({ code: "invalid_icon", path: "icons.empty" }),
+			expect.objectContaining({ code: "invalid_icon", path: "icons.broken.recipe" }),
+		]);
 	});
 
 	it("counts the icon band when checking whether a label fits", () => {

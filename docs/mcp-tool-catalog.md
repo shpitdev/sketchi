@@ -487,7 +487,10 @@ type HexColor = `#${string}`;
 `icon` draws a brand logo from the Sketchi icon catalog
 (`icons.sketchi.app`) top-center inside the node, above its label. Use an exact
 catalog slug such as `docker`, found with `sketchi.searchIcons({ q, limit? })`,
-which returns ranked `{ slug, name, collection }` matches. Wordmarks, marks over 64 KB, and unknown slugs
+which returns ranked `{ slug, name, collection }` matches. A mark the catalog
+has a hand-drawn recipe for is drawn as editable Excalidraw shapes in the
+scene's own pen; any other mark embeds its SVG. A canvas node icon with
+`exact: true` embeds the catalog SVG instead. Wordmarks, marks over 64 KB, and unknown slugs
 are dropped with an `unknown_icon` warning on the accepted result. A logo that
 cannot be drawn (no room above the label, a sequence lifeline, an asset that
 fails to load, or a diagram over its logo budget) is dropped with an
@@ -870,8 +873,8 @@ MCP `execute` results go to a model, so Code Mode builds and patches run
 there inline nothing unless `inlineArtifacts` asks for it: a result names each
 logo by its slug and never carries its SVG. The HTTP API keeps the defaults
 above. An inline format carries each logo once:
-the scene's `icons` map holds one SVG per slug and the Excalidraw `files` map
-one image per distinct logo. Native Excalidraw JSON is large and noisy, and
+the scene's `icons` map holds each slug's recipe, SVG, or both, as the scene
+draws them, and the Excalidraw `files` map one image per distinct embedded SVG. Native Excalidraw JSON is large and noisy, and
 most agents should not inspect or rewrite it directly; read stored formats
 through their URLs or `getArtifact` instead.
 

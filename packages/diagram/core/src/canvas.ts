@@ -8,6 +8,7 @@
 
 import { cubicConnectorPoints } from "./curves.js";
 import { isDiagramIconSlug } from "./icon.js";
+import { iconRecipeByteLength, iconRecipeIssues, type IconRecipe } from "./icon-recipe.js";
 import { boundLabelWidth, estimateTextWidth } from "./text-metrics.js";
 
 export const CANVAS_SPEC_VERSION = 1 as const;
@@ -353,16 +354,33 @@ export interface CanvasStrokeStyleFields {
 	readonly strokeWidth?: 1 | 2 | 4;
 }
 
-/** An icon-catalog mark drawn inside a node; `size` is its square edge. */
+/**
+ * An icon-catalog mark drawn inside a node; `size` is its square edge. Marks
+ * are hand-drawn when the catalog has a recipe; `exact` embeds the catalog SVG.
+ */
 export interface CanvasNodeIcon {
 	readonly slug: string;
 	readonly size: number;
+	readonly exact?: boolean;
 }
 
-/** Normalized SVG markup for one icon slug, embedded so scenes render offline. */
+/**
+ * One icon slug's embedded forms, so scenes render offline: the hand-drawn
+ * recipe, the normalized catalog SVG, or both when the scene draws both.
+ */
 export interface CanvasIconAsset {
 	readonly name: string;
-	readonly svg: string;
+	readonly recipe?: IconRecipe;
+	readonly svg?: string;
+}
+
+/** Which embedded form draws an icon: the recipe unless the icon asks for its exact SVG. */
+export function canvasIconForm(
+	icon: Pick<CanvasNodeIcon, "exact">,
+	asset: CanvasIconAsset | undefined,
+): "recipe" | "svg" | undefined {
+	const forms = icon.exact ? (["svg", "recipe"] as const) : (["recipe", "svg"] as const);
+	return forms.find((form) => asset?.[form] !== undefined);
 }
 
 /**
@@ -769,6 +787,18 @@ function svgByteLength(svg: string): number {
 	return utf8Encoder.encode(svg).byteLength;
 }
 
+function iconFormBytes(asset: CanvasIconAsset, form: "recipe" | "svg"): number {
+	if (form === "svg") return asset.svg === undefined ? 0 : svgByteLength(asset.svg);
+	return asset.recipe === undefined ? 0 : iconRecipeByteLength(asset.recipe);
+}
+
+/** An embeddable form: an SVG within the per-asset cap, or a drawable recipe. */
+function usableIconForm(asset: CanvasIconAsset, form: "recipe" | "svg"): boolean {
+	return form === "svg"
+		? asset.svg !== undefined && svgByteLength(asset.svg) <= CANVAS_NODE_ICON.maxAssetBytes
+		: asset.recipe !== undefined && iconRecipeIssues(asset.recipe).length === 0;
+}
+
 /** Excalidraw's inset from a container's edge to its bound-text box. */
 export function canvasBoundTextInset(
 	node: Pick<CanvasShapeElement, "height" | "shape" | "width">,
@@ -929,36 +959,48 @@ function nodeLabelOverflows(
 /**
  * Embed one asset per referenced icon slug and remove icons that cannot be
  * drawn, so an icon never fails a build and every exported scene renders
- * without a catalog or network. Any authored `icons` map is replaced. An icon
- * is dropped when its asset is unavailable, it sits on a sequence lifeline or
- * activation bar, or
- * its label would no longer fit; icons past the per-scene byte budget are
- * dropped in element order, which keeps the result deterministic.
+ * without a catalog or network. Any authored `icons` map is replaced. Each
+ * icon draws its slug's recipe, or its exact SVG when it asks for one (every
+ * icon does with `exactIcons`), falling back to the other form; only the
+ * forms drawn are embedded. An icon is dropped when neither form is
+ * available, it sits on a sequence lifeline or activation bar, or its label
+ * would no longer fit; icons past the per-scene byte budget are dropped in
+ * element order, which keeps the result deterministic.
  */
 export function embedCanvasIcons(
 	canvas: CanvasSpec,
 	assetFor: (slug: string) => CanvasIconAsset | undefined,
+	options: { readonly exactIcons?: boolean } = {},
 ): CanvasIconEmbedding {
 	const icons = new Map<string, CanvasIconAsset>();
+	const sources = new Map<string, CanvasIconAsset | undefined>();
 	const dropped: DroppedCanvasIcon[] = [];
 	const isVisible = canvasLayerVisibility(canvas);
 	const boundLabels = visibleBoundLabels(canvas, isVisible);
 	let totalBytes = 0;
 	const elements = canvas.elements.map((element, index): CanvasElement => {
 		if ((element.type !== "node" && element.type !== "frame") || !element.icon) return element;
-		const icon = element.icon;
+		const icon: CanvasNodeIcon = options.exactIcons
+			? { ...element.icon, exact: true }
+			: element.icon;
 		const drop = (reason: DroppedCanvasIcon["reason"]): CanvasElement => {
 			dropped.push({ elementId: element.id, index, reason, slug: icon.slug });
 			return withoutIcon(element);
 		};
-		const embedded = icons.get(icon.slug);
-		const asset = embedded ?? (isDiagramIconSlug(icon.slug) ? assetFor(icon.slug) : undefined);
-		if (
-			typeof asset?.svg !== "string" ||
-			svgByteLength(asset.svg) > CANVAS_NODE_ICON.maxAssetBytes
-		) {
-			return drop("unavailable");
+		if (!sources.has(icon.slug)) {
+			const source = isDiagramIconSlug(icon.slug) ? assetFor(icon.slug) : undefined;
+			sources.set(
+				icon.slug,
+				source && {
+					name: source.name,
+					...(source.recipe && usableIconForm(source, "recipe") ? { recipe: source.recipe } : {}),
+					...(source.svg !== undefined && usableIconForm(source, "svg") ? { svg: source.svg } : {}),
+				},
+			);
 		}
+		const source = sources.get(icon.slug);
+		const form = canvasIconForm(icon, source);
+		if (!source || !form) return drop("unavailable");
 		if (element.type === "node" && element.rendererRole && element.rendererRole !== "zone")
 			return drop("lifeline");
 		// A group's logo sits beside its name, which its renderer sized to hold both.
@@ -976,15 +1018,19 @@ export function embedCanvasIcons(
 				return drop("no_room");
 			}
 		}
-		if (!embedded) {
-			const bytes = svgByteLength(asset.svg);
+		const embedded = icons.get(icon.slug);
+		if (embedded?.[form] === undefined) {
+			const bytes = iconFormBytes(source, form);
 			if (totalBytes + bytes > CANVAS_NODE_ICON.maxTotalAssetBytes) {
 				return drop("budget");
 			}
 			totalBytes += bytes;
-			icons.set(icon.slug, { name: asset.name, svg: asset.svg });
+			icons.set(icon.slug, {
+				...(embedded ?? { name: source.name }),
+				[form]: source[form],
+			});
 		}
-		return element;
+		return icon === element.icon ? element : { ...element, icon };
 	});
 	const { icons: _authored, ...rest } = canvas;
 	return {
@@ -1048,14 +1094,36 @@ function validateIconAssets(canvas: CanvasSpec): CanvasValidationIssue[] {
 	const issues: CanvasValidationIssue[] = [];
 	let totalBytes = 0;
 	for (const [slug, asset] of Object.entries(canvas.icons ?? {})) {
-		const bytes = svgByteLength(asset.svg);
-		totalBytes += bytes;
-		if (bytes > CANVAS_NODE_ICON.maxAssetBytes) {
+		const path = `icons.${slug}`;
+		if (asset.svg === undefined && asset.recipe === undefined) {
 			issues.push({
-				code: "limit_exceeded",
-				message: `Icon asset "${slug}" exceeds ${CANVAS_NODE_ICON.maxAssetBytes} bytes.`,
-				path: `icons.${slug}`,
+				code: "invalid_icon",
+				message: `Icon asset "${slug}" has neither a recipe nor an SVG.`,
+				path,
 			});
+		}
+		if (asset.svg !== undefined) {
+			const bytes = svgByteLength(asset.svg);
+			totalBytes += bytes;
+			if (bytes > CANVAS_NODE_ICON.maxAssetBytes) {
+				issues.push({
+					code: "limit_exceeded",
+					message: `Icon asset "${slug}" exceeds ${CANVAS_NODE_ICON.maxAssetBytes} bytes.`,
+					path: `${path}.svg`,
+				});
+			}
+		}
+		if (asset.recipe !== undefined) {
+			const [problem] = iconRecipeIssues(asset.recipe);
+			if (problem) {
+				issues.push({
+					code: "invalid_icon",
+					message: `Icon asset "${slug}" has an undrawable recipe: ${problem}`,
+					path: `${path}.recipe`,
+				});
+			} else {
+				totalBytes += iconRecipeByteLength(asset.recipe);
+			}
 		}
 	}
 	if (totalBytes > CANVAS_NODE_ICON.maxTotalAssetBytes) {

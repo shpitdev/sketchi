@@ -1,9 +1,10 @@
 import { CodeModeIconLoadError, makeCodeModeIconCatalog } from "@sketchi/diagram-agent";
 import { iconManifest } from "@sketchi/icon-catalog/catalog";
+import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import nodeLogoSvgs from "@sketchi/icon-catalog/node-logo-svgs";
 import { Effect } from "effect";
 
-/** Offline node-logo catalog: the CLI bundles every normalized node-logo SVG. */
+/** Offline node-logo catalog: the CLI bundles every hand-drawn recipe and normalized SVG. */
 export const cliIconCatalog = makeCodeModeIconCatalog({
 	icons: iconManifest.icons,
 	loadSvg: (icon) => {
@@ -18,6 +19,7 @@ export const cliIconCatalog = makeCodeModeIconCatalog({
 				)
 			: Effect.succeed(svg);
 	},
+	recipes: nativeIcons,
 	// The offline runtime has no search operation; the catalog site does.
 	slugLookup: "https://icons.sketchi.app",
 });

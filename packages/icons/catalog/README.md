@@ -8,6 +8,7 @@ for embedding marks inside diagram nodes.
 | SVG sources under `svg/`                      | HTTP routes, MCP, or browser UI  |
 | icon pipeline output under `pipeline-output/` | where an app publishes the files |
 | generated manifest and slug-to-source map     | diagram layout or Excalidraw     |
+| hand-drawn icon recipes under `recipes/`      | the recipe format and its drawing |
 | ranked search and node-logo eligibility       |                                  |
 
 ## Entry points
@@ -17,6 +18,8 @@ for embedding marks inside diagram nodes.
   so browser code can import it.
 - `@sketchi/icon-catalog/catalog`: the generated catalog (`iconManifest`,
   `getIconBySlug`, `getIconSourcePath`, `getIconSourceFile`, `nodeLogoIcons`).
+- `@sketchi/icon-catalog/native-icons`: the built map of hand-drawn recipes by
+  slug.
 
 ## Data flow
 
@@ -39,6 +42,16 @@ under that cap, so every mark is a node logo; shrink an oversized source
 rather than raising the cap. `normalizeNodeLogoSvg` adds the intrinsic
 `width` and `height` from the viewBox, because browsers size a viewBox-only SVG
 image as 300x150 and distort it when drawing into a square.
+
+## Hand-drawn icons
+
+Diagrams draw a mark by hand when it has a recipe: `recipes/<slug>.json`, a
+few rectangles, ellipses, strokes, an arrow, or a word on a 24-unit grid (the
+`IconRecipe` format in `@sketchi/diagram-core`). The build bundles every recipe
+into `@sketchi/icon-catalog/native-icons`; a recipe must name a catalog slug.
+Diagram packages validate each recipe and draw it as plain Excalidraw
+elements, and embed the SVG only for marks without one or when a diagram asks
+for exact marks.
 
 ## Commands
 

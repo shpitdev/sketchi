@@ -7,6 +7,7 @@ import {
 } from "@sketchi/diagram-agent";
 import { logosNamedInText, type NamedLogo } from "@sketchi/icon-catalog";
 import { iconManifest, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
+import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import { Effect } from "effect";
 
 /** Static-asset path of normalized node-logo SVGs (see scripts/sync-node-logos.ts). */
@@ -27,8 +28,9 @@ export interface PlaygroundAssetsBinding {
 const catalogs = new WeakMap<PlaygroundAssetsBinding, Map<string, CodeModeIconCatalog>>();
 
 /**
- * Node-logo catalog backed by the Worker's static assets. Only the manifest is
- * bundled into the script; SVG bytes stay outside the script size limit.
+ * Node-logo catalog backed by the Worker's static assets. The manifest and the
+ * small hand-drawn recipes are bundled into the script; SVG bytes stay outside
+ * the script size limit.
  * Assets are addressed at the request's own origin: deployed ASSETS ignores the
  * host, and the local Vite dev server rejects hosts it does not serve.
  */
@@ -61,6 +63,7 @@ export function playgroundIconCatalog(
 						slug: icon.slug,
 					}),
 			}),
+		recipes: nativeIcons,
 		slugLookup: "sketchi.searchIcons({ q })",
 	});
 	byOrigin.set(origin, catalog);
