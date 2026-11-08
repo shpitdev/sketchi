@@ -73,6 +73,7 @@ import {
 	GeneratedDiagramResponse,
 	modelTitleOrFallback,
 } from "./intent.js";
+import { withoutUnstatedGanttDependencies } from "./gantt-dependencies.js";
 import { placeNodeLogos, type OfferedLogo } from "./logo-placement.js";
 import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import { DiagramGenerationPrompt } from "./messages.js";
@@ -941,7 +942,7 @@ function groundDiagramIcons(
 
 export const WRONG_DIAGRAM_TYPE_ERROR = "Generated diagram is not the requested type.";
 
-/** Hold the answer to the caller's explicit type, and ground its logos in the prompt. */
+/** Hold the answer to the caller's explicit type, and ground its logos and Gantt dependencies in the prompt. */
 export function enforceCandidateRequestRequirements(
 	input: DiagramGenerationCandidate,
 	request: DiagramGenerationRequest,
@@ -960,14 +961,36 @@ export function enforceCandidateRequestRequirements(
 		};
 	}
 	const grounding = groundDiagramIcons({ ...input, diagram: input.diagram }, request);
-	return grounding.diagnostics.length > 0 || grounding.diagram !== input.diagram
+	const dependencies = groundGanttDependencies(grounding.diagram, request);
+	const diagnostics = [...grounding.diagnostics, ...dependencies.diagnostics];
+	return diagnostics.length > 0 || dependencies.diagram !== input.diagram
 		? {
 				...input,
-				diagram: grounding.diagram,
+				diagram: dependencies.diagram,
 				...(grounding.flowchart ? { flowchart: grounding.flowchart } : {}),
-				diagnostics: [...input.diagnostics, ...grounding.diagnostics],
+				diagnostics: [...input.diagnostics, ...diagnostics],
 			}
 		: input;
+}
+
+/**
+ * A Gantt chart whose request states no dependency draws none. A revision keeps the
+ * dependencies of the chart it revises.
+ */
+function groundGanttDependencies(
+	diagram: CanonicalDiagram,
+	request: DiagramGenerationRequest,
+): { readonly diagnostics: string[]; readonly diagram: CanonicalDiagram } {
+	if (diagram.type !== "gantt" || request.prompt.base) return { diagnostics: [], diagram };
+	const grounded = withoutUnstatedGanttDependencies(diagram, request.prompt.request);
+	return grounded.dropped === 0
+		? { diagnostics: [], diagram }
+		: {
+				diagnostics: [
+					`gantt_dependencies_unstated: removed ${grounded.dropped} ${grounded.dropped === 1 ? "dependency" : "dependencies"} the request does not state.`,
+				],
+				diagram: grounded.diagram,
+			};
 }
 
 export function summarizeGenerationCandidate(

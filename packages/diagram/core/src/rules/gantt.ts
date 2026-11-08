@@ -8,6 +8,10 @@ export const GANTT_RULES = {
 	duration: "Pass a stated duration as duration, not a computed end.",
 	optional: (source: RuleSource) =>
 		`Optional: dependsOn lists the ids of tasks that must finish first; phase names a header for every task only when ${source} itself names phases; otherwise omit it (phases sets their order); progress is percent complete; today only when stated.`,
+	dependencies: (source: RuleSource) =>
+		`Set dependsOn only where ${source} states that a task waits for another, as an after or depends-on column or wording such as "after X" or "once X is done". Tasks that only follow one another in date order depend on nothing.`,
+	listedTasks: (source: RuleSource) =>
+		`A list in ${source} headed "phases:" or "milestones:" names tasks, not the phase headers they sit under.`,
 	limits: `Use 1–${GANTT_MAX_TASKS} tasks, at most ${GANTT_MAX_PHASES} phases, and no dependency cycles.`,
 	copy: (source: RuleSource) =>
 		`Copy every task, date, dependency, milestone and phase from ${source}; invent none.`,

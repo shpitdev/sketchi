@@ -88,7 +88,6 @@ const TODAY_FONT = 12;
 const INK = SKETCHI_DIAGRAM_PALETTE.ink;
 const MUTED_INK = "#4c4639";
 const GRID_COLOR = "#e6dfd2";
-const MINOR_GRID_COLOR = "#f0ebe1";
 const ROW_RULE_COLOR = "#ebe4d8";
 const BAND_GRID_COLOR = "#cbbfa9";
 const AXIS_COLOR = "#8c826f";
@@ -132,8 +131,8 @@ const MAX_ASPECT = 2.2;
 const BOTTOM_AXIS_ROWS = 16;
 /**
  * A chart with more elements than this, counting every rule piece a label breaks,
- * reads as crowded, so it thins its rules: minor lines, the repeated bottom axis,
- * then gridlines inside bands. A readability rule, well under the canvas's limit.
+ * reads as crowded, so it thins its rules: the repeated bottom axis, then
+ * gridlines inside bands. A readability rule, well under the canvas's limit.
  */
 const RULED_ELEMENT_BUDGET = 600;
 /** Routes keep this far above and below bars, and farther beside them. */
@@ -2484,20 +2483,18 @@ function layoutAt(
 	/*
 	 * Rules break around every label they pass behind, and a chart past
 	 * RULED_ELEMENT_BUDGET elements reads as crowded. Take the richest plan within it: every
-	 * tick's gridline, the bottom axis on a tall chart, and weekly or monthly minor
-	 * lines; then fewer.
+	 * tick's gridline and the bottom axis on a tall chart; then fewer.
 	 */
 	const bandEdges = new Set([axis.start, axis.end, ...axis.bands.map((band) => band.start)]);
 	const tickDays = [...axis.cells.map((cell) => cell.start), axis.end];
 	const wantsBottom = taskRows >= BOTTOM_AXIS_ROWS;
 	const plans = [true, false].flatMap((rowRules) =>
 		[
-			{ grid: tickDays, minor: true, bottom: wantsBottom },
-			{ grid: tickDays, minor: false, bottom: wantsBottom },
-			{ grid: tickDays, minor: false, bottom: false },
-			{ grid: tickDays.filter((day) => bandEdges.has(day)), minor: false, bottom: wantsBottom },
-			{ grid: tickDays.filter((day) => bandEdges.has(day)), minor: false, bottom: false },
-			{ grid: [axis.start, axis.end], minor: false, bottom: false },
+			{ grid: tickDays, bottom: wantsBottom },
+			{ grid: tickDays, bottom: false },
+			{ grid: tickDays.filter((day) => bandEdges.has(day)), bottom: wantsBottom },
+			{ grid: tickDays.filter((day) => bandEdges.has(day)), bottom: false },
+			{ grid: [axis.start, axis.end], bottom: false },
 		].map((plan) => ({ ...plan, rowRules })),
 	);
 	const rulesFor = (plan: (typeof plans)[number]): LineSceneElement[] => {
@@ -2534,13 +2531,6 @@ function layoutAt(
 							roughness: 0,
 							strokeWidth: 1,
 							strokeColor: ROW_RULE_COLOR,
-						}),
-					)
-				: []),
-			...(plan.minor
-				? axis.minor.map((day) =>
-						rule(`gantt:minor:${formatGanttDay(day)}`, xOf(day), rowsTop, rowsBottom, {
-							strokeColor: MINOR_GRID_COLOR,
 						}),
 					)
 				: []),
@@ -2590,7 +2580,6 @@ function layoutAt(
 	builder.breakRulesUnderText(
 		(id) =>
 			id.startsWith("gantt:grid:") ||
-			id.startsWith("gantt:minor:") ||
 			id.startsWith("gantt:row-rule:") ||
 			id.startsWith("gantt:axis") ||
 			id.startsWith("gantt:band-edge"),

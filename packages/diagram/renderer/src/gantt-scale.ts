@@ -23,8 +23,6 @@ export interface GanttAxis {
 	readonly cells: readonly GanttAxisCell[];
 	/** Months above day ticks, otherwise years; none above year ticks. */
 	readonly bands: readonly GanttAxisCell[];
-	/** Unlabeled gridlines inside month cells (weeks) and quarter cells (months). */
-	readonly minor: readonly number[];
 }
 
 export const GANTT_TICK_FONT_SIZE = 12;
@@ -36,8 +34,6 @@ export const GANTT_PLOT_WIDTH = 960;
 const MAX_PX_PER_DAY = 56;
 /** Past this many cells, ticks coarsen even when labels still fit. */
 const MAX_CELLS = 36;
-/** Minor gridlines only where they stay at least this far apart. */
-const MIN_MINOR_GAP = 12;
 
 interface Calendar {
 	readonly year: number;
@@ -190,14 +186,6 @@ export function ganttAxis(start: number, end: number, width = GANTT_PLOT_WIDTH):
 							(day) => `${MONTHS[calendar(day).month - 1]} ${calendar(day).year}`,
 						)
 					: cellsOf(axisStart, axisEnd, "year", 1, (day) => String(calendar(day).year))) ?? [];
-		const boundaries = new Set(cells.map((cell) => cell.start));
-		const minorUnit = unit === "month" ? "week" : unit === "quarter" ? "month" : undefined;
-		const minor =
-			minorUnit && (minorUnit === "week" ? 7 : 28) * pxPerDay >= MIN_MINOR_GAP
-				? (cellsOf(axisStart, axisEnd, minorUnit, 1, () => "") ?? [])
-						.map((cell) => cell.start)
-						.filter((day) => day > axisStart && !boundaries.has(day))
-				: [];
 		return {
 			unit,
 			step,
@@ -205,7 +193,6 @@ export function ganttAxis(start: number, end: number, width = GANTT_PLOT_WIDTH):
 			end: axisEnd,
 			pxPerDay,
 			cells,
-			minor,
 			bands: bands.map((band) => ({
 				start: Math.max(band.start, axisStart),
 				end: Math.min(band.end, axisEnd),
