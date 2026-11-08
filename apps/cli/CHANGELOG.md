@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.36.1
+
+### Patch Changes
+
+- [#712](https://github.com/shpitdev/sketchi/pull/712) [`da88193`](https://github.com/shpitdev/sketchi/commit/da88193a752b389406361df1eff99a3160a9c8e6) Thanks [@anandpant](https://github.com/anandpant)! - `generate` and `revise` read flowcharts in the hosted service's new flowchart document, where each step names its swimlane or group. Earlier versions reject those flowcharts with `invalid_generated_document`, so update to keep swimlane and grouped flowcharts working.
+
 ## 0.36.0
 
 ### Minor Changes
