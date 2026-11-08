@@ -518,7 +518,7 @@ describe("Code Mode API handlers", () => {
 		});
 	});
 
-	it("inlines the scene by default over HTTP, with each logo once", async () => {
+	it("inlines the scene by default over HTTP, with each hand-drawn logo once", async () => {
 		const response = await handleBuildFlowchartRequest(
 			{
 				ASSETS: {
@@ -553,7 +553,8 @@ describe("Code Mode API handlers", () => {
 		const scene = built.artifact.formats.find((format) => format.format === "scene");
 		expect(Object.keys(scene?.inline?.icons ?? {}).sort()).toEqual(["docker", "github"]);
 		expect(built.artifact).not.toHaveProperty("preview");
-		expect(text.split("<svg").length - 1).toBe(2);
+		expect(text.split('"recipe":').length - 1).toBe(2);
+		expect(text).not.toContain("<svg");
 		expect(text).not.toContain("data:image/");
 	});
 

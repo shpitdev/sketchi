@@ -2,6 +2,7 @@ import {
 	CodeModeArtifactStorageMemory,
 	makeCodeModeRuntimeEnvironmentLayer,
 } from "@sketchi/diagram-agent";
+import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import { assert, layer } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { PNG } from "pngjs";
@@ -75,9 +76,12 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG node logos
 			const builder = yield* DiagramBuilder;
 			const renderer = yield* CliPngRenderer;
 			const built = yield* builder.build(canonicalDocument(logoFlowchart));
+			// Marks with a recipe draw by hand; the rest embed their SVG as one image each.
+			const slugs = ["github", "docker", "vitest", "cloudflare"];
+			const embedded = slugs.filter((slug) => !Object.hasOwn(nativeIcons, slug));
 			const images = built.excalidraw.elements.filter((element) => element["type"] === "image");
-			assert.lengthOf(images, 4);
-			assert.lengthOf(Object.keys(built.excalidraw.files), 4);
+			assert.lengthOf(images, embedded.length);
+			assert.lengthOf(Object.keys(built.excalidraw.files), embedded.length);
 
 			const png = yield* renderer.renderPng({
 				scene: built.scene,
@@ -85,8 +89,8 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG node logos
 			});
 			const counts = brandPixelCounts(png);
 			// Logos are 20-28px squares at 2x export scale. Thresholds are about
-			// half of each mark's measured brand-color area (Docker 804, Cloudflare
-			// 372, Vitest green 102), so a clipped or missing image fails.
+			// half of each mark's smallest measured brand-color area (Docker 804,
+			// Cloudflare 372, Vitest green 102), so a clipped or missing logo fails.
 			assert.isAbove(counts.docker, 400, "Docker mark painted");
 			assert.isAbove(counts.cloudflare, 180, "Cloudflare mark painted");
 			assert.isAbove(counts.vitest, 50, "Vitest mark painted");
@@ -118,7 +122,7 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG node logos
 			);
 			assert.lengthOf(
 				built.excalidraw.elements.filter((element) => element["type"] === "image"),
-				2,
+				["cloudflare", "docker"].filter((slug) => !Object.hasOwn(nativeIcons, slug)).length,
 			);
 
 			const counts = brandPixelCounts(

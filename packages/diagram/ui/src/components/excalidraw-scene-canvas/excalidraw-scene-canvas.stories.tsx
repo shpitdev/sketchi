@@ -97,11 +97,11 @@ export const EditableNodeLogosLeftToRight: Story = {
 	tags: ["test"],
 };
 
-/** GitHub drawn by hand from its recipe, beside embedded SVG marks without one. */
-export const HandDrawnNodeLogo: Story = {
+/** Catalog marks drawn by hand from their recipes, beside an embedded SVG mark without one. */
+export const HandDrawnNodeLogos: Story = {
 	args: {
 		scene: convertSceneToExcalidraw(handDrawnLogoScene()),
-		title: "Deploy pipeline with a hand-drawn node logo",
+		title: "Deploy pipeline with hand-drawn node logos",
 		viewModeEnabled: false,
 		zenModeEnabled: false,
 	},

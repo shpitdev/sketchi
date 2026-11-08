@@ -3,8 +3,8 @@ import {
 	deployWebhookLogoSequence,
 	requestFlowGroupLogoFlowchart,
 	embedCanvasIcons,
+	isIconRecipe,
 	type CanvasIconAsset,
-	type IconRecipe,
 	type LayoutDirection,
 } from "@sketchi/diagram-core";
 import {
@@ -13,6 +13,7 @@ import {
 	type RenderedDiagramScene,
 } from "@sketchi/diagram-renderer";
 import { normalizeNodeLogoSvg } from "@sketchi/icon-catalog";
+import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import cloudflare from "@sketchi/icon-catalog/svg/cloud-vendors/cloudflare.svg?raw";
 import docker from "@sketchi/icon-catalog/svg/devtools-ci/docker.svg?raw";
 import github from "@sketchi/icon-catalog/svg/devtools-ci/github.svg?raw";
@@ -50,49 +51,15 @@ export function nodeLogoScene(direction: LayoutDirection = "TB"): RenderedDiagra
 	).scene;
 }
 
-/** A hand-drawn GitHub mark: the cat cut out of an ink disc, so it inverts with the theme. */
-const GITHUB_RECIPE: IconRecipe = {
-	parts: [
-		{ kind: "ellipse", cx: 12, cy: 12, rx: 10.5, ry: 10.5, fill: "ink" },
-		{
-			kind: "stroke",
-			smooth: true,
-			closed: true,
-			stroke: "paper",
-			fill: "paper",
-			points: [
-				[12, 7.1],
-				[14.6, 7.3],
-				[15.9, 6.4],
-				[17.5, 5.9],
-				[17.9, 8.2],
-				[18.7, 10.6],
-				[18.3, 13.6],
-				[16.4, 15.6],
-				[14.8, 16.4],
-				[14.8, 22],
-				[9.6, 22],
-				[9.4, 16.4],
-				[7.6, 15.6],
-				[5.7, 13.6],
-				[5.3, 10.6],
-				[6.1, 8.2],
-				[6.5, 5.9],
-				[8.1, 6.4],
-				[9.4, 7.3],
-			],
-		},
-	],
-};
-
 /**
- * The deploy-pipeline fixture with GitHub drawn by hand from a recipe beside
- * the embedded SVG marks of icons that have none.
+ * The deploy-pipeline fixture as diagrams draw it: marks with a catalog recipe
+ * drawn by hand, the rest as their embedded SVG.
  */
 export function handDrawnLogoScene(): RenderedDiagramScene {
 	return embedCanvasIcons(renderIntermediateDiagram(deployPipelineLogoFlowchart), (slug) => {
 		const asset = nodeLogo(slug);
-		return asset && slug === "github" ? { ...asset, recipe: GITHUB_RECIPE } : asset;
+		const recipe = Object.hasOwn(nativeIcons, slug) ? nativeIcons[slug] : undefined;
+		return asset && isIconRecipe(recipe) ? { ...asset, recipe } : asset;
 	}).scene;
 }
 

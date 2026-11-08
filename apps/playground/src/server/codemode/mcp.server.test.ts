@@ -8,6 +8,7 @@ import { Context, Effect, Option, Schema } from "effect";
 
 import type { CodeModeObjectBucket, CodeModeObjectBucketObject } from "@sketchi/diagram-agent";
 import { normalizedSpecFrom } from "@sketchi/diagram-scenarios";
+import nativeIcons from "@sketchi/icon-catalog/native-icons";
 
 import type { TelemetrySpanRow } from "@sketchi/observability";
 
@@ -1458,10 +1459,17 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						: [],
 			),
 		).toEqual(slugs);
-		for (const slug of slugs) expect(requested).toContain(`/node-logos/${slug}.svg`);
-		// The exported artifact must contain an image for each logo, not just normalized metadata.
+		// The exported artifact must draw each logo, not just carry normalized metadata: a
+		// mark with a recipe by hand, without fetching its SVG; any other as an image.
 		const serialized = JSON.stringify(output.result);
-		expect(serialized.match(/"type":"image"/g)).toHaveLength(slugs.length);
+		const drawn = slugs.filter((slug) => Object.hasOwn(nativeIcons, slug));
+		for (const slug of drawn) {
+			expect(requested).not.toContain(`/node-logos/${slug}.svg`);
+			expect(serialized).toContain(`"sketchiNodeIcon":"${slug}"`);
+		}
+		const embedded = slugs.filter((slug) => !drawn.includes(slug));
+		for (const slug of embedded) expect(requested).toContain(`/node-logos/${slug}.svg`);
+		expect(serialized.match(/"type":"image"/g) ?? []).toHaveLength(embedded.length);
 	});
 
 	describe("logo payloads in execute results", () => {
@@ -1511,39 +1519,84 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 
 		const count = (text: string, needle: string) => text.split(needle).length - 1;
 
-		it("returns artifact URLs and logo slugs without image bytes by default", async () => {
-			const { bucket, text } = await executeText(
-				logoFlowchartCode('{ artifactFormats: ["scene", "excalidraw"] }'),
-			);
-
-			expect(count(text, "<svg")).toBe(0);
-			expect(count(text, "data:image/")).toBe(0);
-			expect(text).toContain('"icon":"docker"');
-			expect(text).toContain("format=excalidraw&raw=true");
-			// The stored exports still draw every logo.
+		function storedExports(bucket: MemoryBucket) {
 			const stored = [...bucket.objects].filter(([key]) => !key.includes("usage"));
 			const excalidraw = stored.find(([key]) => key.endsWith("/excalidraw.json"))?.[1];
 			const scene = stored.find(([key]) => key.endsWith("/scene.json"))?.[1];
 			if (typeof excalidraw !== "string" || typeof scene !== "string") {
 				throw new Error("Missing stored exports");
 			}
-			expect(count(excalidraw, '"type":"image"')).toBe(3);
-			expect(count(excalidraw, "data:image/svg+xml")).toBe(2);
-			expect(count(scene, "<svg")).toBe(2);
+			return { excalidraw, scene };
+		}
+
+		it("returns artifact URLs and logo slugs, and draws catalog logos by hand", async () => {
+			const { bucket, text } = await executeText(
+				logoFlowchartCode('{ artifactFormats: ["scene", "excalidraw"] }'),
+			);
+
+			expect(count(text, "<svg")).toBe(0);
+			expect(count(text, "data:image/")).toBe(0);
+			expect(count(text, '"recipe":')).toBe(0);
+			expect(text).toContain('"icon":"docker"');
+			expect(text).toContain("format=excalidraw&raw=true");
+			// The stored exports draw every logo by hand, each recipe once in the scene.
+			const { excalidraw, scene } = storedExports(bucket);
+			expect(count(excalidraw, '"type":"image"')).toBe(0);
+			expect(count(excalidraw, '"sketchiNodeIcon":"docker"')).toBeGreaterThan(0);
+			expect(count(excalidraw, '"sketchiNodeIcon":"github"')).toBeGreaterThan(0);
+			expect(count(scene, '"recipe":')).toBe(2);
+			expect(count(scene, "<svg")).toBe(0);
 		});
 
-		it.each([
-			["scene", "<svg"],
-			["excalidraw", "data:image/svg+xml"],
-		])("inlines each image once when the script opts into %s", async (format, needle) => {
+		it("inlines each hand-drawn logo's recipe once when the script opts into the scene", async () => {
 			const { text } = await executeText(
 				logoFlowchartCode(
-					`{ artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["${format}"] }`,
+					`{ artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["scene"] }`,
 				),
 			);
 
-			expect(count(text, needle)).toBe(2);
-			expect(count(text, "<svg") + count(text, "data:image/")).toBe(2);
+			expect(count(text, '"recipe":')).toBe(2);
+			expect(count(text, "<svg") + count(text, "data:image/")).toBe(0);
+		});
+
+		it.each([
+			[true, 0, 0],
+			["exact", 3, 2],
+		] as const)(
+			"draws the marks labels name by hand, or as exact SVGs, with logos: %j",
+			async (logos, images, files) => {
+				const { bucket } = await executeText(`async () => sketchi.buildFlowchart({
+  spec: {
+    title: "Deploy pipeline",
+    logos: ${JSON.stringify(logos)},
+    nodes: { push: "Push to GitHub", build: "Build the Docker image", ship: "Ship the Docker image" },
+    edges: [["push", "build"], ["build", "ship"]]
+  },
+  options: { artifactFormats: ["scene", "excalidraw"] }
+})`);
+
+				const { excalidraw, scene } = storedExports(bucket);
+				expect(count(excalidraw, '"type":"image"')).toBe(images);
+				expect(count(excalidraw, "data:image/svg+xml")).toBe(files);
+				expect(count(scene, "<svg")).toBe(files);
+				expect(count(excalidraw, '"sketchiIconPart"') > 0).toBe(images === 0);
+			},
+		);
+
+		it("embeds each exact mark's image once, however many nodes draw it", async () => {
+			const node = (id: string, x: number, slug: string) =>
+				`{ type: "node", id: "${id}", nodeId: "${id}", shape: "rectangle", x: ${x}, y: 40, width: 184, height: 96, label: "${id}", icon: { slug: "${slug}", size: 28, exact: true } }`;
+			const { bucket, text } = await executeText(`async () => sketchi.createCanvas({
+  spec: { kind: "canvas", version: 1, diagramId: "exact", title: "Exact marks", width: 720, height: 200, accentColor: "#1f2937", backgroundColor: "#ffffff",
+    elements: [${node("a", 20, "docker")}, ${node("b", 240, "docker")}, ${node("c", 460, "github")}] },
+  options: { artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["excalidraw"] }
+})`);
+
+			expect(count(text, "data:image/svg+xml")).toBe(2);
+			const { excalidraw, scene } = storedExports(bucket);
+			expect(count(excalidraw, '"type":"image"')).toBe(3);
+			expect(count(excalidraw, "data:image/svg+xml")).toBe(2);
+			expect(count(scene, "<svg")).toBe(2);
 		});
 
 		it("fills the logo a label names in a diagram that draws logos, with an info note", async () => {
