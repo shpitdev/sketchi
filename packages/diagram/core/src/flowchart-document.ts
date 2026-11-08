@@ -1,0 +1,868 @@
+import { Schema } from "effect";
+
+import { DIAGRAM_NODE_SHAPES, DIAGRAM_ZONE_KINDS, SKETCHI_DIAGRAM_STYLE } from "./intermediate.js";
+import {
+	FLOWCHART_MAX_EDGES,
+	FLOWCHART_MAX_GROUP_DEPTH,
+	FLOWCHART_MAX_GROUPS,
+	FLOWCHART_MAX_ISSUES,
+	FLOWCHART_MAX_LANES,
+	FLOWCHART_MAX_NODES,
+	FlowchartDiagramSchema,
+	type FlowchartDiagram,
+	type FlowchartNodeKind,
+	type FlowchartValidationIssue,
+} from "./types/flowchart.js";
+
+/**
+ * The flowchart document: the one shape every surface reads and writes. MCP's
+ * buildFlowchart, the CLI, Studio and the hosted generate model all author it, and
+ * edits change it by id. Nodes are an id → label map, edges are [from, to, label?]
+ * pairs, and containers list what they hold. A node's role (entry, step,
+ * decision, end) is read from its edges; nobody declares it.
+ */
+
+/** Node, group and lane ids: a letter, then letters, digits, `_` or `-`, so no key reads as an integer. */
+export const FLOWCHART_ID_PATTERN = /^[A-Za-z][\w-]*$/u;
+export const FLOWCHART_DIRECTIONS = ["TB", "LR"] as const;
+export type FlowchartDirection = (typeof FLOWCHART_DIRECTIONS)[number];
+
+const Label = Schema.NonEmptyString.annotate({ message: "Expected a non-empty label" });
+const Id = Schema.NonEmptyString;
+
+/**
+ * One end of an edge: a node id, or several, which draws one edge per id
+ * ("web + api → RDS" is [["web", "api"], "rds"]).
+ */
+export const FlowchartEdgeEndSchema = Schema.Union([
+	Id,
+	Schema.Array(Id).check(Schema.isMinLength(1, { message: "Expected at least one node id" })),
+]);
+export type FlowchartEdgeEnd = typeof FlowchartEdgeEndSchema.Type;
+
+/** [from, to] or [from, to, label]. The pair is the edge's identity. */
+export const FlowchartDocumentEdgeSchema = Schema.Tuple([
+	FlowchartEdgeEndSchema,
+	FlowchartEdgeEndSchema,
+	Schema.optionalKey(Schema.String),
+]);
+export type FlowchartDocumentEdge = typeof FlowchartDocumentEdgeSchema.Type;
+
+/** A node's details beyond its label. */
+export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
+	label: Label,
+	/** A smaller subtitle drawn under the label. */
+	note: Schema.optionalKey(Schema.NonEmptyString),
+	/** Draw an infrastructure node as a database, queue, document or storage bucket. */
+	shape: Schema.optionalKey(Schema.Literals(DIAGRAM_NODE_SHAPES)),
+	/** A product name or catalog slug whose logo the node draws; null draws none. */
+	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+});
+export interface FlowchartDocumentNodeDetails extends Schema.Schema.Type<
+	typeof FlowchartDocumentNodeDetailsSchema
+> {}
+
+/** A node: its label, or its details. */
+export const FlowchartDocumentNodeSchema = Schema.Union([
+	Label,
+	FlowchartDocumentNodeDetailsSchema,
+]);
+export type FlowchartDocumentNode = typeof FlowchartDocumentNodeSchema.Type;
+
+const Members = Schema.Array(Id).check(
+	Schema.isMinLength(1, { message: "Expected at least one member id" }),
+);
+
+/** A labeled region that holds nodes and other groups; kind says what an architecture zone stands for. */
+export const FlowchartDocumentGroupSchema = Schema.Struct({
+	label: Label,
+	kind: Schema.optionalKey(Schema.Literals(DIAGRAM_ZONE_KINDS)),
+	/** The node and group ids inside it, at any depth. */
+	contains: Members,
+});
+export interface FlowchartDocumentGroup extends Schema.Schema.Type<
+	typeof FlowchartDocumentGroupSchema
+> {}
+
+/** A swimlane: a full-length band for one actor, holding the steps that actor does. */
+export const FlowchartDocumentLaneSchema = Schema.Struct({
+	label: Label,
+	contains: Members,
+});
+export interface FlowchartDocumentLane extends Schema.Schema.Type<
+	typeof FlowchartDocumentLaneSchema
+> {}
+
+/**
+ * Logos for the products node labels name: true draws Sketchi's hand-drawn marks,
+ * "exact" the original marks, false or absent none.
+ */
+export const FlowchartLogosSchema = Schema.Union([Schema.Boolean, Schema.Literal("exact")]);
+export type FlowchartLogos = typeof FlowchartLogosSchema.Type;
+
+export const FlowchartDocumentSchema = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
+	title: Schema.NonEmptyString,
+	direction: Schema.optionalKey(Schema.Literals(FLOWCHART_DIRECTIONS)),
+	logos: Schema.optionalKey(FlowchartLogosSchema),
+	nodes: Schema.Record(Schema.String, FlowchartDocumentNodeSchema),
+	edges: Schema.Array(FlowchartDocumentEdgeSchema),
+	groups: Schema.optionalKey(Schema.Record(Schema.String, FlowchartDocumentGroupSchema)),
+	lanes: Schema.optionalKey(Schema.Record(Schema.String, FlowchartDocumentLaneSchema)),
+});
+export interface FlowchartDocument extends Schema.Schema.Type<typeof FlowchartDocumentSchema> {}
+
+/** The label of a node value. */
+export function flowchartNodeLabel(node: FlowchartDocumentNode): string {
+	return typeof node === "string" ? node : node.label;
+}
+
+/** A node value's details, a bare label read as { label }. */
+export function flowchartNodeDetails(node: FlowchartDocumentNode): FlowchartDocumentNodeDetails {
+	return typeof node === "string" ? { label: node } : node;
+}
+
+/** The ids one edge end names. */
+export function flowchartEdgeEndIds(end: FlowchartEdgeEnd): readonly string[] {
+	return typeof end === "string" ? [end] : end;
+}
+
+/** One drawn edge: an end expanded to a single id on each side. */
+export interface FlowchartDocumentPair {
+	readonly source: string;
+	readonly target: string;
+	readonly label?: string;
+	/** Index of the authored edge it came from. */
+	readonly index: number;
+}
+
+/** Each authored edge expanded into one pair per id on each side, blank labels dropped. */
+export function flowchartDocumentPairs(
+	edges: readonly FlowchartDocumentEdge[],
+): FlowchartDocumentPair[] {
+	return edges.flatMap(([from, to, label], index) => {
+		const trimmed = label?.trim();
+		return flowchartEdgeEndIds(from).flatMap((source) =>
+			flowchartEdgeEndIds(to).map((target) => ({
+				source,
+				target,
+				...(trimmed ? { label: trimmed } : {}),
+				index,
+			})),
+		);
+	});
+}
+
+/** The internal edge id of a pair: its two ends. */
+export function flowchartEdgeId(source: string, target: string): string {
+	return `${source}->${target}`;
+}
+
+function slugify(value: string): string {
+	return value
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.slice(0, 48);
+}
+
+/** The diagram id a document builds as: its own, or one made from its title. */
+export function flowchartDocumentId(document: Pick<FlowchartDocument, "id" | "title">): string {
+	return document.id ?? (slugify(document.title) || "flowchart");
+}
+
+const quoted = (ids: Iterable<string>) => [...ids].map((id) => `"${id}"`).join(", ");
+
+/** Up to three declared ids that look like an unknown one, else every id when there are few. */
+export function nearestFlowchartIds(id: string, known: Iterable<string>): string[] {
+	const ids = [...known];
+	const lower = id.toLowerCase();
+	const distance = (left: string, right: string) => {
+		const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+		for (let i = 1; i <= left.length; i += 1) {
+			let previous = row[0] ?? 0;
+			row[0] = i;
+			for (let j = 1; j <= right.length; j += 1) {
+				const current = row[j] ?? 0;
+				row[j] = Math.min(
+					current + 1,
+					(row[j - 1] ?? 0) + 1,
+					previous + (left[i - 1] === right[j - 1] ? 0 : 1),
+				);
+				previous = current;
+			}
+		}
+		return row[right.length] ?? 0;
+	};
+	const close = ids
+		.map((candidate) => ({ candidate, score: distance(lower, candidate.toLowerCase()) }))
+		.filter(
+			({ candidate, score }) =>
+				score <= Math.max(2, Math.floor(id.length / 3)) ||
+				candidate.toLowerCase().includes(lower) ||
+				lower.includes(candidate.toLowerCase()),
+		)
+		.sort((left, right) => left.score - right.score)
+		.map(({ candidate }) => candidate);
+	if (close.length > 0) return close.slice(0, 3);
+	return ids.length <= 12 ? ids : [];
+}
+
+/** "Use one of …" for an id nobody declared. */
+export function unknownFlowchartIdHint(id: string, known: Iterable<string>, noun: string): string {
+	const nearest = nearestFlowchartIds(id, known);
+	return nearest.length > 0
+		? `Use a declared ${noun} id (${quoted(nearest)}), or declare "${id}".`
+		: `Declare "${id}", or use a declared ${noun} id.`;
+}
+
+/** Whether a label asks a question: a decision whatever its edges. */
+function asksQuestion(label: string): boolean {
+	return label.trim().endsWith("?");
+}
+
+interface Degrees {
+	incoming: number;
+	outgoing: number;
+	labeledOutgoing: number;
+}
+
+/**
+ * Roles read from the edges. A decision is a node whose label asks a question and
+ * that something leaves, or whose two or more outgoing edges are all labeled. Any
+ * other node nothing enters is an entry (start) and one nothing leaves an end.
+ * When every node is entered, as when a loop returns to the first step, the first
+ * node written is the entry.
+ */
+export function deriveFlowchartKinds(
+	nodes: readonly { readonly id: string; readonly label: string }[],
+	pairs: readonly Pick<FlowchartDocumentPair, "source" | "target" | "label">[],
+): Map<string, FlowchartNodeKind> {
+	const degrees = new Map<string, Degrees>(
+		nodes.map((node) => [node.id, { incoming: 0, outgoing: 0, labeledOutgoing: 0 }]),
+	);
+	for (const pair of pairs) {
+		const source = degrees.get(pair.source);
+		const target = degrees.get(pair.target);
+		if (source) {
+			source.outgoing += 1;
+			if (pair.label) source.labeledOutgoing += 1;
+		}
+		if (target) target.incoming += 1;
+	}
+	const kinds = new Map<string, FlowchartNodeKind>();
+	for (const node of nodes) {
+		const { incoming, outgoing, labeledOutgoing } = degrees.get(node.id) ?? {
+			incoming: 0,
+			outgoing: 0,
+			labeledOutgoing: 0,
+		};
+		const decision =
+			(outgoing >= 1 && asksQuestion(node.label)) ||
+			(outgoing >= 2 && labeledOutgoing === outgoing);
+		kinds.set(
+			node.id,
+			decision ? "decision" : incoming === 0 ? "start" : outgoing === 0 ? "end" : "process",
+		);
+	}
+	const first = nodes[0];
+	if (
+		first &&
+		![...kinds.values()].includes("start") &&
+		kinds.get(first.id) !== "decision" &&
+		kinds.get(first.id) !== "end"
+	) {
+		kinds.set(first.id, "start");
+	}
+	return kinds;
+}
+
+/** A container tree read from what each container lists. */
+interface Containment {
+	/** Node id → innermost group id. */
+	readonly nodeGroup: ReadonlyMap<string, string>;
+	/** Group id → the group it sits in. */
+	readonly groupParent: ReadonlyMap<string, string>;
+	/** Node id → lane id. */
+	readonly nodeLane: ReadonlyMap<string, string>;
+	readonly issues: FlowchartValidationIssue[];
+}
+
+function groupContainment(
+	document: FlowchartDocument,
+	nodeIds: ReadonlySet<string>,
+	issues: FlowchartValidationIssue[],
+): { nodeGroup: Map<string, string>; groupParent: Map<string, string> } {
+	const groups = Object.entries(document.groups ?? {});
+	const groupIds = new Set(groups.map(([id]) => id));
+	const order = new Map(groups.map(([id], index) => [id, index]));
+	const nodeGroup = new Map<string, string>();
+	const groupParent = new Map<string, string>();
+	if (groups.length === 0) return { nodeGroup, groupParent };
+
+	// Who lists whom, directly.
+	const listedGroups = new Map<string, string[]>();
+	const nodeListers = new Map<string, string[]>();
+	const groupListers = new Map<string, string[]>();
+	for (const [id, group] of groups) {
+		const listed: string[] = [];
+		group.contains.forEach((member, index) => {
+			const path = `groups.${id}.contains[${index}]`;
+			if (member === id) {
+				issues.push({
+					code: "group_cycle",
+					ref: { kind: "group", id, path },
+					message: `Group "${id}" lists itself.`,
+					hint: "List only the nodes and groups inside it.",
+				});
+			} else if (groupIds.has(member)) {
+				listed.push(member);
+				groupListers.set(member, [...(groupListers.get(member) ?? []), id]);
+			} else if (nodeIds.has(member)) {
+				nodeListers.set(member, [...(nodeListers.get(member) ?? []), id]);
+			} else {
+				issues.push({
+					code: "unknown_member",
+					ref: { kind: "group", id, path },
+					message: `Group "${id}" lists "${member}", which is no node or group.`,
+					hint: unknownFlowchartIdHint(member, [...nodeIds, ...groupIds], "node or group"),
+				});
+			}
+		});
+		listedGroups.set(id, listed);
+	}
+
+	// A group listed, at any depth, inside itself.
+	const visiting = new Set<string>();
+	const done = new Set<string>();
+	const cyclic = new Set<string>();
+	const visit = (id: string, path: string[]) => {
+		if (done.has(id)) return;
+		if (visiting.has(id)) {
+			const loop = path.slice(path.indexOf(id));
+			for (const member of loop) cyclic.add(member);
+			return;
+		}
+		visiting.add(id);
+		for (const child of listedGroups.get(id) ?? []) visit(child, [...path, child]);
+		visiting.delete(id);
+		done.add(id);
+	};
+	for (const [id] of groups) visit(id, [id]);
+	for (const id of cyclic) {
+		issues.push({
+			code: "group_cycle",
+			ref: { kind: "group", id, path: `groups.${id}.contains` },
+			message: `Group "${id}" ends up inside itself through what the groups list.`,
+			hint: "A group lists the groups inside it; never one that holds it.",
+		});
+	}
+	if (cyclic.size > 0) return { nodeGroup, groupParent };
+
+	// Every group and node a group holds, through the groups it lists.
+	const insideGroups = new Map<string, Set<string>>();
+	const insideNodes = new Map<string, Set<string>>();
+	const collect = (id: string): void => {
+		if (insideGroups.has(id)) return;
+		const groupsInside = new Set<string>();
+		const nodesInside = new Set<string>();
+		for (const child of listedGroups.get(id) ?? []) {
+			collect(child);
+			groupsInside.add(child);
+			for (const nested of insideGroups.get(child) ?? []) groupsInside.add(nested);
+			for (const node of insideNodes.get(child) ?? []) nodesInside.add(node);
+		}
+		for (const [node, listers] of nodeListers) if (listers.includes(id)) nodesInside.add(node);
+		insideGroups.set(id, groupsInside);
+		insideNodes.set(id, nodesInside);
+	};
+	for (const [id] of groups) collect(id);
+	const holds = (outer: string, inner: string) => insideGroups.get(outer)?.has(inner) === true;
+
+	// The innermost of several containers, if they nest; else undefined.
+	const innermost = (candidates: readonly string[]) =>
+		candidates.find((candidate) =>
+			candidates.every((other) => other === candidate || holds(other, candidate)),
+		);
+
+	// A group listed by several: the innermost of them. A group nobody lists sits
+	// inside the smallest group holding every node it holds, which reads "corp:
+	// [staff, erp]" inside "dc: [staff, erp, oracle]"; equal groups nest in the
+	// order written.
+	for (const [id] of groups) {
+		const listers = groupListers.get(id) ?? [];
+		if (listers.length > 0) {
+			const parent = innermost(listers);
+			if (parent === undefined) {
+				issues.push({
+					code: "overlapping_containers",
+					ref: { kind: "group", id, path: `groups.${id}` },
+					message: `Group "${id}" is listed by ${quoted(listers)}, which do not nest.`,
+					hint: "List the group in the one group that holds it, or list one of those groups inside the other.",
+				});
+			} else {
+				groupParent.set(id, parent);
+			}
+		}
+	}
+	// Ancestors through the parents derived so far.
+	const ancestors = (id: string) => {
+		const chain: string[] = [];
+		let parent = groupParent.get(id);
+		while (parent !== undefined && !chain.includes(parent)) {
+			chain.push(parent);
+			parent = groupParent.get(parent);
+		}
+		return chain;
+	};
+	for (const [id] of groups) {
+		if (groupParent.has(id) || (groupListers.get(id)?.length ?? 0) > 0) continue;
+		const nodes = insideNodes.get(id) ?? new Set<string>();
+		if (nodes.size === 0) continue;
+		const candidates = groups
+			.map(([other]) => other)
+			.filter((other) => {
+				// Never under a group already inside this one, listed or inferred.
+				if (other === id || holds(id, other) || ancestors(other).includes(id)) return false;
+				const outer = insideNodes.get(other) ?? new Set<string>();
+				if (![...nodes].every((node) => outer.has(node))) return false;
+				return outer.size > nodes.size || (order.get(other) ?? 0) < (order.get(id) ?? 0);
+			});
+		const smallest = candidates.sort(
+			(left, right) =>
+				(insideNodes.get(left)?.size ?? 0) - (insideNodes.get(right)?.size ?? 0) ||
+				(order.get(right) ?? 0) - (order.get(left) ?? 0),
+		)[0];
+		if (smallest !== undefined) groupParent.set(id, smallest);
+	}
+	// Whatever was listed or inferred, the parents form a tree: walks up a group's
+	// ancestors always end.
+	for (const [id] of groups) {
+		const seen = new Set([id]);
+		for (let parent = groupParent.get(id); parent !== undefined; parent = groupParent.get(parent)) {
+			if (!seen.has(parent)) {
+				seen.add(parent);
+				continue;
+			}
+			issues.push({
+				code: "group_cycle",
+				ref: { kind: "group", id, path: `groups.${id}` },
+				message: `Group "${id}" ends up inside itself.`,
+				hint: "A group lists the groups inside it; never one that holds it.",
+			});
+			return { nodeGroup, groupParent: new Map() };
+		}
+	}
+	for (const [node, listers] of nodeListers) {
+		const inner = listers.find((candidate) =>
+			listers.every((other) => other === candidate || ancestors(candidate).includes(other)),
+		);
+		if (inner === undefined) {
+			issues.push({
+				code: "overlapping_containers",
+				ref: { kind: "node", id: node, path: "groups" },
+				message: `Node "${node}" is listed by groups ${quoted(listers)}, which do not nest.`,
+				hint: "List the node in the one group that holds it, or list one of those groups inside the other.",
+			});
+		} else {
+			nodeGroup.set(node, inner);
+		}
+	}
+
+	let deepest = 0;
+	for (const [id] of groups) deepest = Math.max(deepest, ancestors(id).length + 1);
+	if (deepest > FLOWCHART_MAX_GROUP_DEPTH) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", path: "groups" },
+			message: `Groups nest ${deepest} deep; the supported maximum is ${FLOWCHART_MAX_GROUP_DEPTH}.`,
+			hint: "Drop an intermediate zone, or merge a zone into the one around it.",
+		});
+	}
+	if (groups.length > FLOWCHART_MAX_GROUPS) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", path: "groups" },
+			message: `Flowchart has ${groups.length} groups; the supported maximum is ${FLOWCHART_MAX_GROUPS}.`,
+			hint: "Merge related groups or leave minor steps ungrouped.",
+		});
+	}
+	return { nodeGroup, groupParent };
+}
+
+/** The group each node sits in and the group each group sits in, as a build derives them. */
+export function flowchartGroupTree(document: FlowchartDocument): {
+	readonly nodeGroup: ReadonlyMap<string, string>;
+	readonly groupParent: ReadonlyMap<string, string>;
+} {
+	return groupContainment(document, new Set(Object.keys(document.nodes)), []);
+}
+
+function laneContainment(
+	document: FlowchartDocument,
+	nodeIds: readonly string[],
+	issues: FlowchartValidationIssue[],
+): Map<string, string> {
+	const lanes = Object.entries(document.lanes ?? {});
+	const nodeLane = new Map<string, string>();
+	if (lanes.length === 0) return nodeLane;
+	const known = new Set(nodeIds);
+	if (lanes.length > FLOWCHART_MAX_LANES) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", path: "lanes" },
+			message: `Flowchart has ${lanes.length} lanes; the supported maximum is ${FLOWCHART_MAX_LANES}.`,
+			hint: "Merge related actors into one lane.",
+		});
+	}
+	if (Object.keys(document.groups ?? {}).length > 0) {
+		issues.push({
+			code: "lanes_with_groups",
+			ref: { kind: "diagram", path: "groups" },
+			message: "A flowchart with lanes cannot also declare groups.",
+			hint: "Keep the lanes for the actors and remove groups.",
+		});
+	}
+	for (const [id, lane] of lanes) {
+		lane.contains.forEach((member, index) => {
+			const path = `lanes.${id}.contains[${index}]`;
+			if (!known.has(member)) {
+				issues.push({
+					code: "unknown_member",
+					ref: { kind: "lane", id, path },
+					message: `Lane "${id}" lists "${member}", which is no node.`,
+					hint: unknownFlowchartIdHint(member, nodeIds, "node"),
+				});
+				return;
+			}
+			const other = nodeLane.get(member);
+			if (other !== undefined && other !== id) {
+				issues.push({
+					code: "overlapping_containers",
+					ref: { kind: "node", id: member, path },
+					message: `Node "${member}" is in lanes "${other}" and "${id}".`,
+					hint: "Keep each step in the one lane of the actor that does it.",
+				});
+				return;
+			}
+			nodeLane.set(member, id);
+		});
+	}
+	const laneIds = lanes.map(([id]) => id);
+	for (const node of nodeIds) {
+		if (nodeLane.has(node)) continue;
+		issues.push({
+			code: "node_without_lane",
+			ref: { kind: "node", id: node, path: "lanes" },
+			message: `Node "${node}" is in no lane.`,
+			hint: `List it in the lane of the actor that does it (${quoted(laneIds)}).`,
+		});
+	}
+	return nodeLane;
+}
+
+function containment(document: FlowchartDocument, nodeIds: readonly string[]): Containment {
+	const issues: FlowchartValidationIssue[] = [];
+	const { nodeGroup, groupParent } = groupContainment(document, new Set(nodeIds), issues);
+	const nodeLane = laneContainment(document, nodeIds, issues);
+	return { nodeGroup, groupParent, nodeLane, issues };
+}
+
+function graphIssues(
+	nodes: readonly { readonly id: string; readonly label: string }[],
+	pairs: readonly FlowchartDocumentPair[],
+	kinds: ReadonlyMap<string, FlowchartNodeKind>,
+): FlowchartValidationIssue[] {
+	const issues: FlowchartValidationIssue[] = [];
+	const outgoing = new Map<string, FlowchartDocumentPair[]>();
+	const incoming = new Map<string, FlowchartDocumentPair[]>();
+	for (const pair of pairs) {
+		outgoing.set(pair.source, [...(outgoing.get(pair.source) ?? []), pair]);
+		incoming.set(pair.target, [...(incoming.get(pair.target) ?? []), pair]);
+	}
+	if (nodes.length > 1) {
+		for (const node of nodes) {
+			if (!outgoing.has(node.id) && !incoming.has(node.id)) {
+				issues.push({
+					code: "isolated_node",
+					ref: { kind: "node", id: node.id, path: `nodes.${node.id}` },
+					message: `Node "${node.id}" has no edges.`,
+					hint: "Connect it where the flow reaches it, or remove it.",
+				});
+			}
+		}
+	}
+	for (const node of nodes) {
+		if (kinds.get(node.id) !== "decision") continue;
+		const exits = outgoing.get(node.id) ?? [];
+		if (exits.length < 2) continue;
+		for (const exit of exits.filter((pair) => !pair.label)) {
+			issues.push({
+				code: "unlabeled_decision_branch",
+				ref: {
+					kind: "edge",
+					id: flowchartEdgeId(exit.source, exit.target),
+					path: `edges[${exit.index}]`,
+				},
+				message: `Decision "${node.id}" has an unlabeled branch to "${exit.target}".`,
+				hint: 'Label every branch of a question, such as "yes" and "no".',
+			});
+		}
+		const seen = new Set<string>();
+		for (const exit of exits) {
+			const label = exit.label?.toLowerCase();
+			if (label === undefined) continue;
+			if (seen.has(label)) {
+				issues.push({
+					code: "duplicate_decision_branch_label",
+					ref: { kind: "node", id: node.id, path: `edges[${exit.index}][2]` },
+					message: `Decision "${node.id}" repeats the branch label "${exit.label}".`,
+					hint: "Give each branch of the same question its own label.",
+				});
+			}
+			seen.add(label);
+		}
+	}
+
+	const reach = (from: readonly string[], next: (id: string) => readonly string[]) => {
+		const seen = new Set<string>();
+		const queue = [...from];
+		while (queue.length > 0) {
+			const id = queue.pop();
+			if (id === undefined || seen.has(id)) continue;
+			seen.add(id);
+			queue.push(...next(id));
+		}
+		return seen;
+	};
+	// Entries by the edges alone: what nothing enters, else the first node written. A
+	// question can be an entry too.
+	const unentered = nodes.filter((node) => !incoming.has(node.id)).map((node) => node.id);
+	const first = nodes[0]?.id;
+	const entries = unentered.length > 0 ? unentered : first === undefined ? [] : [first];
+	const reached = reach(entries, (id) => (outgoing.get(id) ?? []).map((pair) => pair.target));
+	for (const node of nodes) {
+		if (reached.has(node.id) || !incoming.has(node.id)) continue;
+		issues.push({
+			code: "unreachable_node",
+			ref: { kind: "node", id: node.id, path: `nodes.${node.id}` },
+			message: `Node "${node.id}" is only reached from a loop nothing enters.`,
+			hint: "Connect the loop to the flow that reaches it.",
+		});
+	}
+	const ends = nodes.filter((node) => !outgoing.has(node.id)).map((node) => node.id);
+	const reachesEnd = reach(ends, (id) => (incoming.get(id) ?? []).map((pair) => pair.source));
+	for (const node of nodes) {
+		if (reachesEnd.has(node.id) || !outgoing.has(node.id)) continue;
+		issues.push({
+			code: "nonterminating_node",
+			ref: { kind: "node", id: node.id, path: `nodes.${node.id}` },
+			message: `Node "${node.id}" is in a loop with no way out.`,
+			hint: "Give the loop an exit to a step that ends the flow.",
+		});
+	}
+	return issues;
+}
+
+/** A document built into the internal flowchart, or the problems that stop it. */
+export type FlowchartDocumentBuild =
+	| { readonly ok: true; readonly diagram: FlowchartDiagram }
+	| { readonly ok: false; readonly issues: readonly FlowchartValidationIssue[] };
+
+export interface FlowchartDocumentBuildOptions {
+	/** Node id → the catalog slug of the logo it draws, as the host resolved it. */
+	readonly nodeIcons?: ReadonlyMap<string, string>;
+	/** Group id → the catalog slug of the logo before its label. */
+	readonly groupIcons?: ReadonlyMap<string, string>;
+}
+
+/**
+ * Check a document and build the internal flowchart the renderer draws: roles
+ * read from the edges, list ends expanded, the container tree read from what each
+ * container lists. Every problem comes back at once, each with its repair.
+ */
+export function flowchartDiagramFromDocument(
+	document: FlowchartDocument,
+	options: FlowchartDocumentBuildOptions = {},
+): FlowchartDocumentBuild {
+	const issues: FlowchartValidationIssue[] = [];
+	const nodeEntries = Object.entries(document.nodes);
+	const nodeIds = nodeEntries.map(([id]) => id);
+	const known = new Set(nodeIds);
+	const groupIds = new Set(Object.keys(document.groups ?? {}));
+	const laneIds = new Set(Object.keys(document.lanes ?? {}));
+
+	for (const [kind, ids] of [
+		["node", nodeIds],
+		["group", [...groupIds]],
+		["lane", [...laneIds]],
+	] as const) {
+		for (const id of ids) {
+			if (FLOWCHART_ID_PATTERN.test(id)) continue;
+			issues.push({
+				code: "invalid_id",
+				ref: { kind, id, path: `${kind === "node" ? "nodes" : `${kind}s`}.${id}` },
+				message: `The ${kind} id "${id}" must start with a letter and use only letters, digits, "_" or "-".`,
+				hint: `Rename "${id}", for example to "${kind}-${id.replace(/[^\w-]+/gu, "-")}".`,
+			});
+		}
+	}
+	for (const id of nodeIds) {
+		if (groupIds.has(id) || laneIds.has(id)) {
+			issues.push({
+				code: "duplicate_node_id",
+				ref: { kind: "node", id, path: `nodes.${id}` },
+				message: `"${id}" names both a node and a ${groupIds.has(id) ? "group" : "lane"}.`,
+				hint: "Give every node, group and lane its own id.",
+			});
+		}
+	}
+	if (nodeEntries.length < 2) {
+		issues.push({
+			code: "flowchart_too_small",
+			ref: { kind: "diagram", path: "nodes" },
+			message: `A flowchart needs at least two nodes; this one has ${nodeEntries.length}.`,
+			hint: "Add the steps the flow passes through.",
+		});
+	}
+	if (nodeEntries.length > FLOWCHART_MAX_NODES) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", path: "nodes" },
+			message: `Flowchart has ${nodeEntries.length} nodes; the supported maximum is ${FLOWCHART_MAX_NODES}.`,
+			hint: "Split the workflow or combine lower-signal steps.",
+		});
+	}
+
+	const pairs = flowchartDocumentPairs(document.edges);
+	const valid: FlowchartDocumentPair[] = [];
+	const seen = new Map<string, number>();
+	for (const pair of pairs) {
+		const id = flowchartEdgeId(pair.source, pair.target);
+		const ends = [
+			[pair.source, 0, "missing_edge_source"],
+			[pair.target, 1, "missing_edge_target"],
+		] as const;
+		let ok = true;
+		for (const [end, side, code] of ends) {
+			if (known.has(end)) continue;
+			ok = false;
+			issues.push({
+				code,
+				ref: { kind: "edge", id, path: `edges[${pair.index}][${side}]` },
+				message: `edges[${pair.index}] names "${end}", which is no node.`,
+				hint: unknownFlowchartIdHint(end, nodeIds, "node"),
+			});
+		}
+		if (pair.source === pair.target) {
+			ok = false;
+			issues.push({
+				code: "self_loop",
+				ref: { kind: "edge", id, path: `edges[${pair.index}]` },
+				message: `edges[${pair.index}] connects "${pair.source}" to itself.`,
+				hint: "A repeated step returns to an earlier step instead.",
+			});
+		}
+		const first = seen.get(id);
+		if (first !== undefined) {
+			ok = false;
+			issues.push({
+				code: "duplicate_edge",
+				ref: { kind: "edge", id, path: `edges[${pair.index}]` },
+				message: `edges[${pair.index}] repeats ${pair.source} → ${pair.target} from edges[${first}].`,
+				hint: "Keep one edge between two nodes; put both words in its label if needed.",
+			});
+		}
+		if (ok) {
+			seen.set(id, pair.index);
+			valid.push(pair);
+		}
+	}
+	if (valid.length === 0 && issues.length === 0) {
+		issues.push({
+			code: "flowchart_too_small",
+			ref: { kind: "diagram", path: "edges" },
+			message: "A flowchart needs at least one edge.",
+			hint: "Connect the nodes in the order the flow takes.",
+		});
+	}
+	if (pairs.length > FLOWCHART_MAX_EDGES) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", path: "edges" },
+			message: `Flowchart draws ${pairs.length} edges; the supported maximum is ${FLOWCHART_MAX_EDGES}.`,
+			hint: "Split the workflow or remove lower-signal connections.",
+		});
+	}
+
+	const contained = containment(document, nodeIds);
+	issues.push(...contained.issues);
+
+	const labeled = nodeEntries.map(([id, node]) => ({ id, label: flowchartNodeLabel(node) }));
+	const kinds = deriveFlowchartKinds(labeled, valid);
+	issues.push(...graphIssues(labeled, valid, kinds));
+
+	if (issues.length > 0) return { ok: false, issues: issues.slice(0, FLOWCHART_MAX_ISSUES) };
+
+	const diagram = Schema.decodeUnknownSync(FlowchartDiagramSchema)({
+		id: flowchartDocumentId(document),
+		title: document.title,
+		type: "flowchart",
+		nodes: nodeEntries.map(([id, value]) => {
+			const node = flowchartNodeDetails(value);
+			const group = contained.nodeGroup.get(id);
+			const lane = contained.nodeLane.get(id);
+			const icon = options.nodeIcons?.get(id);
+			return {
+				id,
+				label: node.label,
+				kind: kinds.get(id) ?? "process",
+				...(node.note ? { description: node.note } : {}),
+				...(node.shape ? { shape: node.shape } : {}),
+				...(icon ? { icon: { slug: icon } } : {}),
+				...(group ? { group } : {}),
+				...(lane ? { lane } : {}),
+				metadata: {},
+			};
+		}),
+		edges: valid.map((pair) => ({
+			id: flowchartEdgeId(pair.source, pair.target),
+			source: pair.source,
+			target: pair.target,
+			...(pair.label ? { label: pair.label } : {}),
+			metadata: {},
+		})),
+		...(groupIds.size > 0
+			? {
+					groups: Object.entries(document.groups ?? {}).map(([id, group]) => {
+						const parent = contained.groupParent.get(id);
+						const icon = options.groupIcons?.get(id);
+						return {
+							id,
+							label: group.label,
+							...(parent ? { parent } : {}),
+							...(group.kind ? { kind: group.kind } : {}),
+							...(icon ? { icon: { slug: icon } } : {}),
+						};
+					}),
+				}
+			: {}),
+		...(laneIds.size > 0
+			? {
+					lanes: Object.entries(document.lanes ?? {}).map(([id, lane]) => ({
+						id,
+						label: lane.label,
+					})),
+				}
+			: {}),
+		layout: { direction: document.direction ?? "TB", edgeRouting: "orthogonal" },
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+		metadata: document.logos ? { logos: document.logos === "exact" ? "exact" : "native" } : {},
+	});
+	return { ok: true, diagram };
+}
+
+/** Decode unknown input as a flowchart document, every schema problem at once. */
+export const decodeFlowchartDocument = Schema.decodeUnknownResult(FlowchartDocumentSchema, {
+	errors: "all",
+});

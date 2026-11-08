@@ -46,6 +46,13 @@ export const FlowchartValidationIssueCodeSchema = Schema.Literals([
 	"unknown_node_lane",
 	"empty_lane",
 	"lanes_with_groups",
+	"invalid_id",
+	"duplicate_edge",
+	"isolated_node",
+	"unknown_member",
+	"overlapping_containers",
+	"node_without_lane",
+	"flowchart_too_small",
 ]);
 
 export class FlowchartValidationIssueRef extends Schema.Class<FlowchartValidationIssueRef>(

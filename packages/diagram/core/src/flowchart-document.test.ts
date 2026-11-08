@@ -1,0 +1,411 @@
+import { Result } from "effect";
+import { describe, expect, it } from "vitest";
+
+import {
+	decodeFlowchartDocument,
+	flowchartDiagramFromDocument,
+	type FlowchartDocument,
+} from "./flowchart-document";
+
+const waitlist: FlowchartDocument = {
+	title: "Restaurant waitlist",
+	nodes: {
+		arrive: "Party arrives",
+		quote: "Quote wait time",
+		available: "Table available?",
+		seat: "Seat party",
+		waitlist: "Add party to waitlist",
+		responds: "Party responds?",
+		remove: "Remove party from list",
+		ready: "Table ready?",
+		wait: "Keep waiting",
+	},
+	edges: [
+		["arrive", "quote"],
+		["quote", "available"],
+		["available", "seat", "yes"],
+		["available", "waitlist", "no"],
+		["waitlist", "responds"],
+		["responds", "remove", "no"],
+		["responds", "ready", "yes"],
+		["ready", "seat", "yes"],
+		["ready", "wait", "no"],
+		["wait", "responds"],
+	],
+};
+
+function build(document: FlowchartDocument) {
+	const result = flowchartDiagramFromDocument(document);
+	if (!result.ok) throw new Error(result.issues.map((issue) => issue.message).join("\n"));
+	return result.diagram;
+}
+
+function issues(document: FlowchartDocument) {
+	const result = flowchartDiagramFromDocument(document);
+	return result.ok ? [] : result.issues.map((issue) => [issue.code, issue.ref?.path]);
+}
+
+const kinds = (document: FlowchartDocument) =>
+	Object.fromEntries(build(document).nodes.map((node) => [node.id, node.kind]));
+
+describe("flowchart documents", () => {
+	it("decode a bare-label document and build it with roles read from the edges", () => {
+		const decoded = decodeFlowchartDocument(waitlist);
+		expect(Result.isSuccess(decoded)).toBe(true);
+		const diagram = build(waitlist);
+		expect(diagram.id).toBe("restaurant-waitlist");
+		expect(diagram.layout.direction).toBe("TB");
+		expect(kinds(waitlist)).toEqual({
+			arrive: "start",
+			quote: "process",
+			available: "decision",
+			seat: "end",
+			waitlist: "process",
+			responds: "decision",
+			remove: "end",
+			ready: "decision",
+			wait: "process",
+		});
+		expect(diagram.edges.map((edge) => edge.id)).toContain("available->seat");
+		expect(diagram.edges.find((edge) => edge.id === "ready->wait")?.label).toBe("no");
+	});
+
+	it("ends a branch at its last step without asking for another edge", () => {
+		const document: FlowchartDocument = {
+			title: "Incident",
+			nodes: {
+				alert: "Alert received",
+				cause: "Classify root cause",
+				rollback: "Roll back deploy",
+				provider: "Escalate to provider",
+				stable: "Service stable?",
+				resolved: "Resolved",
+			},
+			edges: [
+				["alert", "cause"],
+				["cause", "rollback", "deploy"],
+				["cause", "provider", "provider"],
+				["rollback", "stable"],
+				["stable", "resolved", "yes"],
+				["stable", "cause", "no"],
+			],
+		};
+		expect(kinds(document)).toMatchObject({
+			cause: "decision",
+			provider: "end",
+			stable: "decision",
+			resolved: "end",
+		});
+	});
+
+	it("takes the first node as the entry when a loop returns to it", () => {
+		const document: FlowchartDocument = {
+			title: "Expense approval",
+			nodes: { submit: "Submit report", approved: "Approved?", pay: "Pay employee" },
+			edges: [
+				["submit", "approved"],
+				["approved", "pay", "yes"],
+				["approved", "submit", "no"],
+			],
+		};
+		expect(kinds(document)).toEqual({ submit: "start", approved: "decision", pay: "end" });
+	});
+
+	it("allows several entries and expands list ends into one edge per id", () => {
+		const document: FlowchartDocument = {
+			title: "AWS",
+			direction: "LR",
+			nodes: {
+				users: "Users",
+				admins: "Admins",
+				alb: "ALB",
+				web: "Web service",
+				api: "API service",
+				rds: { label: "RDS PostgreSQL", shape: "database" },
+			},
+			edges: [
+				[["users", "admins"], "alb"],
+				["alb", ["web", "api"]],
+				[["web", "api"], "rds"],
+			],
+		};
+		const diagram = build(document);
+		expect(diagram.edges.map((edge) => edge.id)).toEqual([
+			"users->alb",
+			"admins->alb",
+			"alb->web",
+			"alb->api",
+			"web->rds",
+			"api->rds",
+		]);
+		expect(kinds(document)).toMatchObject({ users: "start", admins: "start", rds: "end" });
+		expect(diagram.nodes.find((node) => node.id === "rds")?.shape).toBe("database");
+		expect(diagram.layout.direction).toBe("LR");
+	});
+
+	it("reads a labeled edge out of an ordinary step as a labeled edge, not a decision", () => {
+		const document: FlowchartDocument = {
+			title: "Sync",
+			nodes: {
+				queue: "Order queue",
+				sync: "Sync function",
+				table: "Orders table",
+				archive: "Archive",
+			},
+			edges: [
+				["queue", "sync"],
+				["sync", "table"],
+				["sync", "archive", "invoice PDF"],
+			],
+		};
+		expect(kinds(document).sync).toBe("process");
+	});
+
+	it("asks for a label on every branch of a question", () => {
+		expect(
+			issues({
+				title: "Gate",
+				nodes: { start: "Start", ok: "Tests pass?", ship: "Ship", fix: "Fix" },
+				edges: [
+					["start", "ok"],
+					["ok", "ship", "yes"],
+					["ok", "fix"],
+				],
+			}),
+		).toEqual([["unlabeled_decision_branch", "edges[2]"]]);
+	});
+
+	it("derives the zone tree from what each container lists, innermost wins", () => {
+		const document: FlowchartDocument = {
+			title: "Hybrid",
+			nodes: {
+				staff: "Office staff",
+				erp: "Legacy ERP",
+				oracle: { label: "Oracle database", shape: "database" },
+				vpn: "VPN gateway",
+				api: "Order API",
+				queue: { label: "Order queue", shape: "queue" },
+				table: { label: "Orders table", shape: "database" },
+			},
+			edges: [
+				["staff", "erp"],
+				["erp", "oracle"],
+				["erp", "vpn"],
+				["vpn", "api"],
+				["api", "queue"],
+				["queue", "table"],
+			],
+			groups: {
+				dc: { label: "On-prem data center", kind: "datacenter", contains: ["corp", "oracle"] },
+				corp: { label: "Corporate network", kind: "zone", contains: ["staff", "erp"] },
+				aws: { label: "AWS cloud", kind: "cloud", contains: ["eu"] },
+				eu: { label: "eu-west-1", kind: "region", contains: ["vpc", "queue", "table", "api"] },
+				vpc: { label: "Production VPC", kind: "vpc", contains: ["vpn", "private"] },
+				private: { label: "Private subnet", kind: "subnet", contains: ["api"] },
+			},
+		};
+		const diagram = build(document);
+		expect(Object.fromEntries(diagram.nodes.map((node) => [node.id, node.group]))).toEqual({
+			staff: "corp",
+			erp: "corp",
+			oracle: "dc",
+			vpn: "vpc",
+			api: "private",
+			queue: "eu",
+			table: "eu",
+		});
+		expect(
+			Object.fromEntries((diagram.groups ?? []).map((group) => [group.id, group.parent])),
+		).toEqual({
+			dc: undefined,
+			corp: "dc",
+			aws: undefined,
+			eu: "aws",
+			vpc: "eu",
+			private: "vpc",
+		});
+	});
+
+	it("nests a group nobody lists inside the group that holds all its nodes", () => {
+		const document: FlowchartDocument = {
+			title: "On-prem",
+			nodes: { staff: "Office staff", erp: "Legacy ERP", oracle: "Oracle database" },
+			edges: [
+				["staff", "erp"],
+				["erp", "oracle"],
+			],
+			groups: {
+				dc: { label: "Data center", contains: ["staff", "erp", "oracle"] },
+				corp: { label: "Corporate network", contains: ["staff", "erp"] },
+			},
+		};
+		const diagram = build(document);
+		expect(diagram.groups?.find((group) => group.id === "corp")?.parent).toBe("dc");
+		expect(diagram.nodes.find((node) => node.id === "staff")?.group).toBe("corp");
+		expect(diagram.nodes.find((node) => node.id === "oracle")?.group).toBe("dc");
+	});
+
+	it("names each container problem at its path", () => {
+		expect(
+			issues({
+				title: "Zones",
+				nodes: { a: "A", b: "B", c: "C" },
+				edges: [
+					["a", "b"],
+					["b", "c"],
+				],
+				groups: {
+					left: { label: "Left", contains: ["a", "b"] },
+					right: { label: "Right", contains: ["b", "c", "ghost"] },
+				},
+			}),
+		).toEqual([
+			["unknown_member", "groups.right.contains[2]"],
+			["overlapping_containers", "groups"],
+		]);
+		expect(
+			issues({
+				title: "Loop",
+				nodes: { a: "A", b: "B" },
+				edges: [["a", "b"]],
+				groups: {
+					outer: { label: "Outer", contains: ["inner", "a"] },
+					inner: { label: "Inner", contains: ["outer", "b"] },
+				},
+			}).map(([code]) => code),
+		).toEqual(["group_cycle", "group_cycle"]);
+	});
+
+	it("never infers a group inside a group that already sits inside it", () => {
+		const document: FlowchartDocument = {
+			title: "Peers",
+			nodes: { a: "A", b: "B" },
+			edges: [["a", "b"]],
+			groups: {
+				inner: { label: "Inner", contains: ["a", "b"] },
+				peer: { label: "Peer", contains: ["a", "b"] },
+				outer: { label: "Outer", contains: ["inner"] },
+			},
+		};
+		const diagram = build(document);
+		const parents = Object.fromEntries(
+			(diagram.groups ?? []).map((group) => [group.id, group.parent]),
+		);
+		expect(parents).toEqual({ inner: "outer", peer: "inner", outer: undefined });
+		for (const group of diagram.groups ?? []) {
+			const seen = new Set<string>();
+			for (let id: string | undefined = group.id; id !== undefined; id = parents[id]) {
+				expect(seen.has(id)).toBe(false);
+				seen.add(id);
+			}
+		}
+	});
+
+	it("reaches the ends of a flow that opens with a question", () => {
+		const document: FlowchartDocument = {
+			title: "Gate",
+			nodes: { ready: "Ready?", ship: "Ship", fix: "Fix" },
+			edges: [
+				["ready", "ship", "yes"],
+				["ready", "fix", "no"],
+			],
+		};
+		expect(issues(document)).toEqual([]);
+		expect(kinds(document)).toEqual({ ready: "decision", ship: "end", fix: "end" });
+	});
+
+	it("puts every node in one lane", () => {
+		const document: FlowchartDocument = {
+			title: "Hiring",
+			direction: "LR",
+			nodes: { apply: "Apply", screen: "Screen resume", offer: "Make offer" },
+			edges: [
+				["apply", "screen"],
+				["screen", "offer"],
+			],
+			lanes: {
+				candidate: { label: "Candidate", contains: ["apply"] },
+				recruiter: { label: "Recruiter", contains: ["screen", "offer"] },
+			},
+		};
+		const diagram = build(document);
+		expect(diagram.lanes?.map((lane) => lane.id)).toEqual(["candidate", "recruiter"]);
+		expect(diagram.nodes.map((node) => node.lane)).toEqual(["candidate", "recruiter", "recruiter"]);
+		expect(
+			issues({
+				...document,
+				lanes: { candidate: { label: "Candidate", contains: ["apply"] } },
+				groups: { g: { label: "G", contains: ["apply"] } },
+			}),
+		).toEqual([
+			["lanes_with_groups", "groups"],
+			["node_without_lane", "lanes"],
+			["node_without_lane", "lanes"],
+		]);
+	});
+
+	it("names unknown ends with the nearest ids, and every graph problem", () => {
+		const result = flowchartDiagramFromDocument({
+			title: "Broken",
+			nodes: { review: "Review", pay: "Pay", "1x": "Bad id", lone: "Lone" },
+			edges: [
+				["review", "payy"],
+				["review", "review"],
+				["review", "pay"],
+				["review", "pay"],
+				["1x", "pay"],
+			],
+		});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.issues.map((issue) => issue.code)).toEqual([
+			"invalid_id",
+			"missing_edge_target",
+			"self_loop",
+			"duplicate_edge",
+			"isolated_node",
+		]);
+		expect(result.issues[1]?.hint).toContain('"pay"');
+	});
+
+	it("reports a loop with no way out and a loop nothing enters", () => {
+		expect(
+			issues({
+				title: "Loops",
+				nodes: { a: "A", b: "B", c: "C", d: "D", e: "E" },
+				edges: [
+					["a", "b"],
+					["b", "c"],
+					["c", "b"],
+					["d", "e"],
+					["e", "d"],
+				],
+			}).map(([code]) => code),
+		).toEqual([
+			"unreachable_node",
+			"unreachable_node",
+			"nonterminating_node",
+			"nonterminating_node",
+			"nonterminating_node",
+			"nonterminating_node",
+			"nonterminating_node",
+		]);
+	});
+
+	it("passes the logo style and node logos the host resolved to the drawing", () => {
+		const result = flowchartDiagramFromDocument(
+			{ ...waitlist, logos: "exact" },
+			{ nodeIcons: new Map([["seat", "opentable"]]) },
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.diagram.metadata).toEqual({ logos: "exact" });
+		expect(result.diagram.nodes.find((node) => node.id === "seat")?.icon?.slug).toBe("opentable");
+	});
+
+	it("rejects a document too small to draw", () => {
+		expect(issues({ title: "One", nodes: { a: "A" }, edges: [] })).toEqual([
+			["flowchart_too_small", "nodes"],
+		]);
+	});
+});
