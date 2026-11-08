@@ -7,6 +7,7 @@ import { catalogCommonWords, loadCommonEnglishWords } from "./common-words-gener
 import { GENERIC_PROMPTS } from "./generic-prompts";
 import {
 	logoNamedByLabel,
+	logosNamedByLabel,
 	logosNamedInText,
 	matchIconMentions,
 	matchIconsInText,
@@ -129,6 +130,34 @@ describe("logoNamedByLabel", () => {
 		expect(named("Docker image pushed to GitHub")).toBeUndefined();
 		// An everyday-word product beside a distinctive one is still ambiguous.
 		expect(named("Docker build tickets in Linear")).toBeUndefined();
+	});
+});
+
+describe("logosNamedByLabel", () => {
+	const named = (label: string) => logosNamedByLabel(label, nodeLogoIcons).map((icon) => icon.slug);
+
+	it("names every product a label names, unmistakable names first", () => {
+		expect(named("Next.js app hosted on Vercel")).toEqual(["nextjs", "vercel"]);
+		expect(named("Supabase Postgres")).toEqual(["supabase", "postgresql"]);
+		expect(named("Redis cache on Upstash")).toEqual(["redis"]);
+		expect(named("Docker build tickets in Linear")).toEqual(["docker", "linear"]);
+		expect(named("Log errors to Sentry")).toEqual(["sentry"]);
+	});
+
+	it("reads product names written with a dot", () => {
+		expect(named("Node.js worker")).toEqual(["nodejs"]);
+		expect(named("Vue.js frontend")).toEqual(["vuejs"]);
+		expect(named("Socket.io server")).toEqual(["socketio"]);
+		expect(named("Deploy to Fly.io")).toEqual(["flyio"]);
+		expect(logoNamedByLabel("Express.js API", nodeLogoIcons)?.slug).toBe("expressjs");
+		// Abbreviations keep their dots: "i.e." is not Internet Explorer.
+		expect(named("Retry later, i.e. after a backoff")).toEqual([]);
+	});
+
+	it("still names nothing for an everyday word that starts a label", () => {
+		for (const label of ["Go to checkout", "Rust service", "Stream events", "Send Mail"]) {
+			expect(named(label), label).toEqual([]);
+		}
 	});
 });
 

@@ -13,6 +13,7 @@ import {
 	isNodeLogoEligible,
 	isStrayVendorLogo,
 	logoNamedByLabel,
+	logosNamedByLabel,
 	normalizeNodeLogoSvg,
 	searchIcons,
 	type IconMatch,
@@ -67,6 +68,12 @@ export interface CodeModeIconCatalog {
 	 * only by an everyday word ("Go to checkout").
 	 */
 	readonly logoNamedByLabel: (label: string) => CodeModeCatalogIcon | undefined;
+	/**
+	 * Every mark a label names, unmistakable names first ("Next.js app hosted on Vercel" names
+	 * nextjs, then vercel), then any an everyday word names only by its capitals mid-label
+	 * ("Log errors to Sentry").
+	 */
+	readonly logosNamedByLabel: (label: string) => readonly CodeModeCatalogIcon[];
 	/** Raw SVG source for an eligible mark. */
 	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
 	/** The hand-drawn recipe for an eligible mark, when the catalog has one. */
@@ -108,6 +115,11 @@ export function makeCodeModeIconCatalog(options: {
 			const icon = logoNamedByLabel(label, eligible);
 			return icon ? bySlug.get(icon.slug) : undefined;
 		},
+		logosNamedByLabel: (label) =>
+			logosNamedByLabel(label, eligible).flatMap((icon) => {
+				const found = bySlug.get(icon.slug);
+				return found ? [found] : [];
+			}),
 		search: (query, limit) =>
 			searchIcons(eligible, { limit, query }).map(({ icon }) => ({
 				...catalogIcon(icon),
@@ -273,7 +285,7 @@ export function resolveFlowchartLogos(
 			const slug = normalizeIconSlug(requested);
 			const icon =
 				(isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined) ??
-				catalog?.logoNamedByLabel(requested) ??
+				catalog?.logosNamedByLabel(requested)[0] ??
 				catalog?.search(requested, 1).find((hit) => hit.match === "exact");
 			if (!icon) {
 				issues.push(
@@ -301,7 +313,8 @@ export function resolveFlowchartLogos(
 			continue;
 		}
 		if (!document.logos || !catalog) continue;
-		const named = catalog.logoNamedByLabel(label);
+		// A node draws one logo: the first product its label names.
+		const [named, ...others] = catalog.logosNamedByLabel(label);
 		if (!named) continue;
 		icons.set(id, named.slug);
 		issues.push({
@@ -309,8 +322,14 @@ export function resolveFlowchartLogos(
 			severity: "info",
 			stage: "input",
 			ref,
-			message: `Node "${id}" draws the "${named.slug}" logo because its label "${label}" names ${named.name}.`,
-			hint: "No action needed.",
+			message:
+				others.length === 0
+					? `Node "${id}" draws the "${named.slug}" logo because its label "${label}" names ${named.name}.`
+					: `Node "${id}" draws the "${named.slug}" logo, the first of the products its label "${label}" names (${[named, ...others].map((icon) => icon.name).join(", ")}).`,
+			hint:
+				others.length === 0
+					? "No action needed."
+					: `Set icon to another of them, such as "${others[0]?.name}", to draw that one instead.`,
 		});
 	}
 	return { issues, icons };

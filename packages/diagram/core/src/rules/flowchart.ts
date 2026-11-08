@@ -84,7 +84,7 @@ export const FLOWCHART_RULES = {
 	documentLanes: (source: RuleSource) =>
 		`For swimlanes, a process across actors or roles, declare lanes: { id: { label, contains: [ids] } } in ${source}'s order, every step in its actor's lane; lanes take no groups.`,
 	documentLogos: (source: RuleSource) =>
-		`When ${source} names technologies or asks for logos, set logos: true and each node whose label names a product draws its logo. A node's icon: "Name" picks a logo its label does not name, and icon: null drops one.`,
+		`When ${source} names technologies or asks for logos, set logos: true: each node draws the logo of the first product its label names. icon: "Name" picks another, and icon: null drops it.`,
 	documentDirection: (source: RuleSource) =>
 		`Set direction: "LR" only when ${source} reads left to right; flowcharts run top to bottom otherwise.`,
 	documentNoInventedSteps: (source: RuleSource) =>

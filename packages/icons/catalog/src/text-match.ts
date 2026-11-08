@@ -61,6 +61,15 @@ function isCasedAsName(token: TextToken): boolean {
 	return !token.initial && !token.titleCase && isCapitalized(token.raw);
 }
 
+/**
+ * A phrase as the term index keys it: lowercased words, a dot inside a name dropped, so
+ * "Vue.js" finds the catalog's "Vuejs" and "socket.io" its "socketio". A dot between single
+ * letters stays, so "i.e." never reads as "ie".
+ */
+function phraseKey(words: readonly string[]): string {
+	return words.map((word) => word.replace(/(?<=[a-z0-9]{2})\.(?=[a-z0-9]{2})/gu, "")).join(" ");
+}
+
 const termIndexes = new WeakMap<readonly SearchableIcon[], Map<string, SearchableIcon[]>>();
 
 /** Icons by tokenized slug, name, and alias, built once per icon list. */
@@ -69,7 +78,7 @@ function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): Map<str
 	if (cached) return cached as Map<string, Icon[]>;
 	const index = new Map<string, Icon[]>();
 	const add = (term: string, icon: Icon) => {
-		const key = termTokens(term).join(" ");
+		const key = phraseKey(termTokens(term));
 		if (!key) return;
 		const entries = index.get(key) ?? [];
 		if (!entries.includes(icon)) entries.push(icon);
@@ -105,7 +114,7 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 		let matched = 0;
 		for (let length = Math.min(MAX_PHRASE_TOKENS, tokens.length - start); length > 0; length -= 1) {
 			const phraseTokens = tokens.slice(start, start + length);
-			const entries = index.get(phraseTokens.map((token) => token.lower).join(" "));
+			const entries = index.get(phraseKey(phraseTokens.map((token) => token.lower)));
 			if (!entries) continue;
 			const distinctive = phraseTokens.some(isDistinctive);
 			if (!distinctive && !phraseTokens.some(isCasedAsName)) continue;
@@ -149,6 +158,22 @@ export function logoNamedByLabel<Icon extends SearchableIcon>(
 ): Icon | undefined {
 	const [mention, ...others] = matchIconMentions(label, icons, 2);
 	return mention?.distinctive && others.length === 0 ? mention.icon : undefined;
+}
+
+/**
+ * Every catalog logo a node label names, unmistakable names first ("Next.js app hosted on
+ * Vercel" names nextjs, then vercel), then any an everyday word names only by its capitals mid-
+ * label ("Log errors to Sentry"). A diagram that asks for logos draws the first.
+ */
+export function logosNamedByLabel<Icon extends SearchableIcon>(
+	label: string,
+	icons: readonly Icon[],
+): Icon[] {
+	const mentions = matchIconMentions(label, icons);
+	return [
+		...mentions.filter((mention) => mention.distinctive),
+		...mentions.filter((mention) => !mention.distinctive),
+	].map((mention) => mention.icon);
 }
 
 /** A logo a text names, as generation offers it to a model. */

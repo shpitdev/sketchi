@@ -479,7 +479,7 @@ describe("named logo fill", () => {
 		expect(nodeLogos(dropped)[4]).toBeNull();
 	});
 
-	it("never fills ambiguous, everyday-word, or unnamed labels", async () => {
+	it("draws the first product a label names, and never fills an everyday word or an unnamed label", async () => {
 		const result = await production().buildFlowchart({
 			spec: chain([
 				["push", "Push to GitHub"],
@@ -495,8 +495,55 @@ describe("named logo fill", () => {
 			]),
 		});
 
-		expect(nodeLogos(result)).toEqual(["github", ...Array.from({ length: 9 }, () => undefined)]);
-		expect(result.issues.map((issue) => issue.code)).toEqual(["icon_filled"]);
+		expect(nodeLogos(result)).toEqual([
+			"github",
+			"nextjs",
+			"docker",
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			"sentry",
+			undefined,
+		]);
+	});
+
+	it("reads dotted product names and names every product a label holds", async () => {
+		const result = await production().buildFlowchart({
+			spec: chain([
+				["worker", "Node.js worker"],
+				["app", "Next.js app hosted on Vercel"],
+				["cache", "Redis cache on Upstash"],
+				["ui", "Vue.js frontend"],
+				["socket", "Socket.io server"],
+				["db", "Postgres on Supabase"],
+			]),
+		});
+
+		expect(nodeLogos(result)).toEqual([
+			"nodejs",
+			"nextjs",
+			"redis",
+			"vuejs",
+			"socketio",
+			"postgresql",
+		]);
+		expect(result.issues.find((issue) => issue.ref?.id === "app")).toMatchObject({
+			code: "icon_filled",
+			message:
+				'Node "app" draws the "nextjs" logo, the first of the products its label "Next.js app hosted on Vercel" names (Next.js, Vercel).',
+			hint: 'Set icon to another of them, such as "Vercel", to draw that one instead.',
+		});
+
+		const vercel = await production().buildFlowchart({
+			spec: chain([
+				["app", "Next.js app hosted on Vercel", "Vercel"],
+				["worker", "Node.js worker"],
+				["ui", "Frontend", "Vue.js"],
+			]),
+		});
+		expect(nodeLogos(vercel)).toEqual(["vercel", "nodejs", "vuejs"]);
 	});
 
 	it("fills sequence participants the same way", async () => {
