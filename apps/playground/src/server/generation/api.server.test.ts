@@ -441,11 +441,19 @@ describe("public generate endpoint", () => {
 			),
 		).toEqual([["start", "github"]]);
 		expect(Object.keys(body.diagram.scene.icons ?? {})).toEqual(["github"]);
+		// GitHub is drawn by hand: its parts, no image, and no SVG fetched.
 		expect(
 			body.diagram.excalidraw.elements.filter((element) => element.type === "image"),
-		).toHaveLength(1);
-		expect(Object.keys(body.diagram.excalidraw.files)).toHaveLength(1);
-		expect(assetRequests).toEqual(["/node-logos/github.svg"]);
+		).toHaveLength(0);
+		expect(
+			body.diagram.excalidraw.elements.filter(
+				(element) =>
+					(element as { customData?: { sketchiNodeIcon?: string } }).customData?.sketchiNodeIcon ===
+					"github",
+			).length,
+		).toBeGreaterThan(0);
+		expect(Object.keys(body.diagram.excalidraw.files)).toHaveLength(0);
+		expect(assetRequests).toEqual([]);
 	});
 
 	it("asks the gateway for a new answer each time the same request is sent", async () => {

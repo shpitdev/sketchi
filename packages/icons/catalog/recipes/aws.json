@@ -1,0 +1,21 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 9.4,
+			"text": "aws",
+			"size": 11
+		},
+		{
+			"kind": "arrow",
+			"smooth": true,
+			"stroke": "#ff9900",
+			"points": [
+				[3.4, 15.2],
+				[11.6, 18.6],
+				[19.8, 15.4]
+			]
+		}
+	]
+}

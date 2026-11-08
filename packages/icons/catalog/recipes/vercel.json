@@ -1,0 +1,14 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"closed": true,
+			"fill": "ink",
+			"points": [
+				[12, 3],
+				[22, 20.5],
+				[2, 20.5]
+			]
+		}
+	]
+}
