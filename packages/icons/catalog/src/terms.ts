@@ -1,5 +1,4 @@
 import commonWordsJson from "./generated/common-words.json" with { type: "json" };
-import everydayWordsJson from "./generated/everyday-words.json" with { type: "json" };
 
 /**
  * Generic technical words in catalog terms that the SCOWL list lacks or ranks
@@ -57,29 +56,4 @@ export function termTokens(value: string): string[] {
  */
 export function isDistinctiveWord(lower: string): boolean {
 	return /[0-9.+#]/u.test(lower) || (lower.length >= 3 && !COMMON_WORDS.has(lower));
-}
-
-/**
- * Catalog words that start a step label far more often than they name a product: the
- * catalog's words in SCOWL size 10 ("make", "go", "next", "box"), generated with the catalog,
- * and everyday words probes of step labels turned up ("swift", "segment", "render the page").
- */
-const PROBED_EVERYDAY_WORDS = [
-	"batch",
-	"clerk",
-	"notion",
-	"passport",
-	"payload",
-	"render",
-	"segment",
-	"swift",
-];
-const EVERYDAY_WORDS: ReadonlySet<string> = new Set([
-	...everydayWordsJson,
-	...PROBED_EVERYDAY_WORDS,
-]);
-
-/** A lowercased word that starts a step label as an everyday word ("Make payment"). */
-export function isEverydayWord(lower: string): boolean {
-	return EVERYDAY_WORDS.has(lower);
 }
