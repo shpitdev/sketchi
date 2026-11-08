@@ -303,3 +303,27 @@ describe("a diagram without an id", () => {
 		expect(candidate.diagram?.id).toBe("api-p50-latency-one-week");
 	});
 });
+
+describe("generated flowchart reference spelling", () => {
+	it.each(["lane", "group"] as const)(
+		"keeps corrected node %s refs and build notes in the candidate document",
+		(kind) => {
+			const candidate = parse({
+				type: "flowchart",
+				id: "sales",
+				nodes: {
+					submit_form: { label: "Submit", [kind]: "SALES OPS," },
+					review_form: { label: "Review", [kind]: "sales-ops" },
+				},
+				edges: [["submit-form", "review_form"]],
+				...(kind === "lane"
+					? { lanes: { sales_ops: "Sales" } }
+					: { groups: { sales_ops: { label: "Sales" } } }),
+			});
+			expect(candidate.error).toBeUndefined();
+			expect(candidate.flowchart?.edges).toEqual([["submit_form", "review_form"]]);
+			expect(candidate.flowchart?.nodes["submit_form"]).toMatchObject({ [kind]: "sales_ops" });
+			expect(candidate.diagnostics.join()).toContain("reference_resolved:");
+		},
+	);
+});

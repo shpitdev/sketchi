@@ -41,6 +41,7 @@ import {
 	FLOWCHART_RULES,
 	flowchartDiagramFromDocument,
 	flowchartNodeDetails,
+	resolveFlowchartReferences,
 	FlowchartDocumentSchema,
 	type FlowchartDocument,
 	MindmapDiagramSchema,
@@ -305,9 +306,11 @@ function parseGeneratedFlowchart(
 
 /** The drawing a flowchart document builds as, each catalog-shaped icon its node's logo. */
 function drawnFlowchart(
-	document: FlowchartDocument,
+	input: FlowchartDocument,
 	diagnostics: readonly string[] = [],
 ): CandidateParseResult {
+	const { document, notes } = resolveFlowchartReferences(input);
+	const buildNotes = [...diagnostics, ...notes.map((note) => `reference_resolved: ${note}`)];
 	const nodeIcons = new Map(
 		Object.entries(document.nodes).flatMap(([id, node]) => {
 			const icon = flowchartNodeDetails(node).icon?.trim().toLowerCase();
@@ -328,7 +331,7 @@ function drawnFlowchart(
 		diagram: built.diagram,
 		flowchart: document,
 		success: true,
-		...(diagnostics.length > 0 ? { diagnostics } : {}),
+		...(buildNotes.length > 0 ? { diagnostics: buildNotes } : {}),
 	};
 }
 

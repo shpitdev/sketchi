@@ -94,7 +94,7 @@ describe("Code Mode flowchart groups", () => {
 	it("keeps a loop step's node group through normalization and Excalidraw export", async () => {
 		const built = await build({
 			...spec,
-			nodes: { ...spec.nodes, revise: { label: "Revise the report", group: " employee " } },
+			nodes: { ...spec.nodes, revise: { label: "Revise the report", group: " EMPLOYEE, " } },
 			groups: { ...spec.groups, employee: { label: "Employee", contains: ["submit"] } },
 		});
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));

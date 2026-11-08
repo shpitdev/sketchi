@@ -87,23 +87,69 @@ describe("flowchart reference resolution", () => {
 		expect(source.edges[0]?.[1]).toBe("review-form");
 	});
 
-	it("resolves legacy lane member variants and records their paths", () => {
+	it("resolves node lane references against declared lane ids", () => {
 		const result = flowchartDiagramFromDocument({
 			title: "Sales",
-			nodes: { submit_form: "Submit form", review_form: "Review form" },
+			nodes: {
+				submit_form: { label: "Submit form", lane: "SALES OPS," },
+				review_form: { label: "Review form", lane: "sales-ops" },
+			},
 			edges: [["submit_form", "review_form"]],
-			lanes: { sales: { label: "Sales", contains: ["submit-form", "REVIEW FORM,"] } },
+			lanes: { sales_ops: "Sales" },
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.diagram.nodes.map(({ lane }) => lane)).toEqual(["sales", "sales"]);
+		expect(result.diagram.nodes.map(({ lane }) => lane)).toEqual(["sales_ops", "sales_ops"]);
 		expect(result.notes).toEqual(
 			expect.arrayContaining([
-				expect.stringContaining("lanes.sales.contains[0]"),
-				expect.stringContaining('"submit_form"'),
+				expect.stringContaining("nodes.submit_form.lane"),
+				expect.stringContaining('"sales_ops"'),
 			]),
 		);
 	});
+
+	it("resolves node group references with contains omitted and unions them with member lists", () => {
+		const result = flowchartDiagramFromDocument({
+			title: "Sales",
+			nodes: {
+				submit_form: { label: "Submit form", group: "SALES OPS," },
+				review_form: { label: "Review form", group: "review-team" },
+			},
+			edges: [["submit_form", "review_form"]],
+			groups: {
+				sales_ops: { label: "Sales" },
+				review_team: { label: "Review", contains: ["review-form"] },
+			},
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.diagram.nodes.map(({ group }) => group)).toEqual(["sales_ops", "review_team"]);
+		expect(result.notes).toEqual(
+			expect.arrayContaining([expect.stringContaining("nodes.submit_form.group")]),
+		);
+	});
+
+	it.each(["lane", "group"] as const)(
+		"does not resolve an unknown node %s against node ids or ambiguous container ids",
+		(kind) => {
+			const result = flowchartDiagramFromDocument({
+				title: "Sales",
+				nodes: {
+					node_only: { label: "Submit", [kind]: "NODE ONLY," },
+					review: { label: "Review", [kind]: "SALES OPS," },
+				},
+				edges: [["node_only", "review"]],
+				...(kind === "lane"
+					? { lanes: { sales_ops: "Sales", "sales-ops": "Other sales" } }
+					: { groups: { sales_ops: { label: "Sales" }, "sales-ops": { label: "Other sales" } } }),
+			});
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			const unknown = result.issues.filter(({ code }) => code === `unknown_node_${kind}`);
+			expect(unknown).toHaveLength(2);
+			expect(unknown[1]?.hint).toContain("sales_ops");
+		},
+	);
 
 	it("refuses ambiguous and unrelated spellings, retaining nearest-id hints", () => {
 		const result = flowchartDiagramFromDocument({
@@ -527,6 +573,39 @@ describe("flowchart documents", () => {
 		expect(
 			diagram.groups?.filter(({ id }) => id !== "workflow").map(({ parent }) => parent),
 		).toEqual(["workflow", "workflow"]);
+	});
+
+	it("unions node membership before inferring parents, just as contains-only membership does", () => {
+		const base: FlowchartDocument = {
+			title: "Zones",
+			nodes: { a: "A", b: "B", c: "C" },
+			edges: [
+				["a", "b"],
+				["b", "c"],
+			],
+			groups: {
+				zone: { label: "Zone", contains: ["a", "b"] },
+				team: { label: "Team", contains: ["a"] },
+			},
+		};
+		for (const document of [
+			{ ...base, nodes: { ...base.nodes, c: { label: "C", group: "team" } } },
+			{ ...base, groups: { ...base.groups, team: { label: "Team", contains: ["a", "c"] } } },
+		]) {
+			const result = flowchartDiagramFromDocument(document);
+			expect(result.ok).toBe(false);
+			if (!result.ok)
+				expect(result.issues.some(({ code }) => code === "overlapping_containers")).toBe(true);
+		}
+		const nested = build({
+			...base,
+			nodes: { ...base.nodes, c: { label: "C", group: "team" } },
+			groups: {
+				zone: { label: "Zone", contains: ["team", "b"] },
+				team: { label: "Team", contains: ["a"] },
+			},
+		});
+		expect(nested.groups?.find(({ id }) => id === "team")?.parent).toBe("zone");
 	});
 
 	it("refuses a declared group that no node or nested group uses", () => {

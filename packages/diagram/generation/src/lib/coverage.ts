@@ -119,6 +119,10 @@ const QUOTED = /["“]([^"”\s{}();=<>][^"”\n{}();=<>]{0,78}[^"”\s{}();=<>]
 const LEAVES_OUT =
 	/\b(?:no|not|never|none|nor|without|avoid|omit|omits|omitted|exclude|excludes|excluding|remove|removes|removed|hide|hides|hidden|drop|drops|except|unless|instead|rather|don't|doesn't|isn't|aren't|won't|shouldn't|mustn't)\b/iu;
 
+/** Ordering negation, not action names such as "Remove item" or "Drop package". */
+const NEGATES_ORDER =
+	/\b(?:cannot|(?:can|mustn|shouldn|don|doesn|isn|aren|wasn|weren)['’]t|(?:must|should|do|does|is|are|was|were)\s+not|forbidden|never|without|avoid)\b/iu;
+
 /** Quoted text a clause asks to show; a clause that leaves something out asks for none of it. */
 function requiredQuotes(request: string): string[] {
 	return request.split(/[.;!?\n]+/u).flatMap((clause) => {
@@ -838,10 +842,13 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 			: undefined;
 	};
 	for (const sentence of request.split(/[.!;\n]/u)) {
+		// Conditional alternatives do not state an order between their outcomes.
+		// Skip uncertain prose rather than spending a repair on a false connection.
+		if (NEGATES_ORDER.test(sentence) || /\bif\b.*\bthen\b|\b(?:otherwise|else)\b/iu.test(sentence))
+			continue;
 		const parts = sentence.split(/\b(?:before|then)\b/iu);
 		for (let index = 1; index < parts.length; index += 1) {
 			const left = parts[index - 1] ?? "";
-			if (LEAVES_OUT.test(left)) continue;
 			const from = proseNode(left, true);
 			const to = proseNode(parts[index] ?? "", false);
 			if (from === undefined || to === undefined || from === to) continue;

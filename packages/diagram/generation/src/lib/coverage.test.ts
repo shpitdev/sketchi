@@ -193,6 +193,57 @@ describe("flowchart connections and containers", () => {
 		expect(codes("Copy text, then Format document.", diagram)).toEqual([]);
 	});
 
+	it.each([
+		"If approved then publish, if rejected then archive.",
+		"If valid then save, otherwise then reject.",
+	])("does not infer connections across conditional alternatives: %s", (request) => {
+		expect(
+			codes(request, {
+				type: "flowchart",
+				nodes: ["Approved?", "Publish", "Rejected?", "Archive", "Valid?", "Save", "Reject"].map(
+					(label) => ({ id: label, label }),
+				),
+				edges: [],
+			}),
+		).toEqual([]);
+	});
+
+	it.each([
+		"Deploying before running tests is forbidden.",
+		"cannot ship before payment succeeds.",
+		"can't ship before payment succeeds.",
+		"must not ship before payment succeeds.",
+		"Never ship before payment succeeds.",
+	])("does not enforce negated ordering in the whole sentence: %s", (request) => {
+		expect(
+			codes(request, {
+				type: "flowchart",
+				nodes: ["Deploy", "Run tests", "Ship", "Payment succeeds"].map((label) => ({
+					id: label,
+					label,
+				})),
+				edges: [],
+			}),
+		).toEqual([]);
+	});
+
+	it("checks action names such as Remove item rather than treating them as exclusions", () => {
+		const nodes = [
+			{ id: "remove", label: "Remove item" },
+			{ id: "checkout", label: "Checkout" },
+		];
+		expect(codes("Remove item, then Checkout.", { type: "flowchart", nodes, edges: [] })).toEqual([
+			"flowchart_connection_missing",
+		]);
+		expect(
+			codes("Remove item, then Checkout.", {
+				type: "flowchart",
+				nodes,
+				edges: [{ source: "remove", target: "checkout" }],
+			}),
+		).toEqual([]);
+	});
+
 	it("reports a named zone that no group carries", () => {
 		const diagram = { type: "flowchart", nodes, edges, groups: groups.slice(1) };
 		const issues = checkRequestCoverage(request, diagram);
@@ -397,6 +448,29 @@ describe("the coverage repair", () => {
 				});
 				expect(candidate.diagnostics.at(-1)).toMatch(/^coverage_repair_succeeded/u);
 			}),
+	);
+
+	it.effect("does not repair a correct pair of exclusive conditional branches", () =>
+		Effect.gen(function* () {
+			const source = JSON.stringify({
+				title: "Review",
+				diagram: {
+					type: "flowchart",
+					nodes: { submit: "Submit", valid: "Valid?", save: "Save", reject: "Reject" },
+					edges: [
+						["submit", "valid"],
+						["valid", "save", "yes"],
+						["valid", "reject", "no"],
+					],
+				},
+			});
+			const { candidate, seen } = yield* run(
+				[source],
+				"If valid then save, otherwise then reject.",
+			);
+			expect(seen).toHaveLength(1);
+			expect(candidate.error).toBeUndefined();
+		}),
 	);
 
 	it.effect("does not spend a repair call on a harmless unsupported group kind", () =>

@@ -46,6 +46,24 @@ const spec = {
 };
 
 describe("Code Mode flowchart lanes", () => {
+	it("returns a corrected node lane reference and a resolution note", async () => {
+		const built = await build({
+			...spec,
+			nodes: { ...spec.nodes, submit: { label: "Submit expense report", lane: " EMPLOYEE, " } },
+		});
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.nodes["submit"]).toMatchObject({ lane: "employee" });
+		expect(built.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: "reference_resolved",
+					severity: "info",
+					message: expect.stringContaining("nodes.submit.lane"),
+				}),
+			]),
+		);
+	});
+
 	it("builds declared lanes into locked bands that hold their steps", async () => {
 		const built = await build({ ...spec, lanes: { ...spec.lanes, customer: "Customer" } });
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));

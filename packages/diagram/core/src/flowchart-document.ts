@@ -347,6 +347,13 @@ function groupContainment(
 		listedGroups.set(id, listed);
 	}
 
+	// Node pointers contribute membership before any parent is inferred, exactly
+	// as another member in the group's contains list would.
+	for (const [id, group] of namedGroups) {
+		if (groupIds.has(group))
+			nodeListers.set(id, [...new Set([...(nodeListers.get(id) ?? []), group])]);
+	}
+
 	// A group listed, at any depth, inside itself.
 	const visiting = new Set<string>();
 	const done = new Set<string>();
@@ -475,7 +482,11 @@ function groupContainment(
 		if (inner === undefined) {
 			issues.push({
 				code: "overlapping_containers",
-				ref: { kind: "node", id: node, path: "groups" },
+				ref: {
+					kind: "node",
+					id: node,
+					path: namedGroups.some(([id]) => id === node) ? `nodes.${node}.group` : "groups",
+				},
 				message: `Node "${node}" is listed by groups ${quoted(listers)}, which do not nest.`,
 				hint: "List the node in the one group that holds it, or list one of those groups inside the other.",
 			});
@@ -715,45 +726,37 @@ export function resolveFlowchartReferences(document: FlowchartDocument): {
 	readonly document: FlowchartDocument;
 	readonly notes: readonly string[];
 } {
-	const nodeIds = Object.keys(document.nodes);
-	const ids = [...nodeIds, ...Object.keys(document.groups ?? {})];
-	const exact = new Set(ids);
 	const key = (id: string) =>
 		id
 			.trim()
 			.replace(/[^\w-]+$/gu, "")
 			.toLowerCase()
 			.replace(/[-_\s]+/gu, "-");
-	const matches = new Map<string, string[]>();
-	for (const id of ids) matches.set(key(id), [...(matches.get(key(id)) ?? []), id]);
 	const notes: string[] = [];
-	const resolve = (id: string, path: string): string => {
-		if (exact.has(id)) return id;
-		const candidates = matches.get(key(id));
-		const found = candidates?.length === 1 ? candidates[0] : undefined;
-		if (found === undefined) return id;
-		notes.push(`${path}: resolved ${JSON.stringify(id)} to declared id ${JSON.stringify(found)}.`);
-		return found;
+	const resolver = (ids: readonly string[]) => {
+		const exact = new Set(ids);
+		const matches = new Map<string, string[]>();
+		for (const id of ids) matches.set(key(id), [...(matches.get(key(id)) ?? []), id]);
+		return (id: string, path: string): string => {
+			if (exact.has(id)) return id;
+			const candidates = matches.get(key(id));
+			const found = candidates?.length === 1 ? candidates[0] : undefined;
+			if (found === undefined) return id;
+			notes.push(
+				`${path}: resolved ${JSON.stringify(id)} to declared id ${JSON.stringify(found)}.`,
+			);
+			return found;
+		};
 	};
+	const groupIds = Object.keys(document.groups ?? {});
+	const resolve = resolver([...Object.keys(document.nodes), ...groupIds]);
+	const groupRef = resolver(groupIds);
+	const laneRef = resolver(Object.keys(document.lanes ?? {}));
 	const end = (value: FlowchartEdgeEnd, path: string): FlowchartEdgeEnd =>
 		typeof value === "string"
 			? resolve(value, path)
 			: value.map((id, i) => resolve(id, `${path}[${i}]`));
-	const containers = <C extends { readonly contains: readonly string[] }>(
-		values: Readonly<Record<string, C>>,
-		kind: "groups" | "lanes",
-	): Record<string, C> =>
-		Object.fromEntries(
-			Object.entries(values).map(([id, container]) => [
-				id,
-				{
-					...container,
-					contains: container.contains.map((member, i) =>
-						resolve(member, `${kind}.${id}.contains[${i}]`),
-					),
-				},
-			]),
-		);
+
 	return {
 		document: {
 			...document,
@@ -761,8 +764,37 @@ export function resolveFlowchartReferences(document: FlowchartDocument): {
 				const pair = [end(from, `edges[${i}][0]`), end(to, `edges[${i}][1]`)] as const;
 				return label === undefined ? pair : [...pair, label];
 			}),
-			...(document.groups ? { groups: containers(document.groups, "groups") } : {}),
-			...(document.lanes ? { lanes: containers(document.lanes, "lanes") } : {}),
+			nodes: Object.fromEntries(
+				Object.entries(document.nodes).map(([id, node]) => [
+					id,
+					typeof node === "string"
+						? node
+						: {
+								...node,
+								...(node.group ? { group: groupRef(node.group, `nodes.${id}.group`) } : {}),
+								...(node.lane ? { lane: laneRef(node.lane, `nodes.${id}.lane`) } : {}),
+							},
+				]),
+			),
+			...(document.groups
+				? {
+						groups: Object.fromEntries(
+							Object.entries(document.groups).map(([id, group]) => [
+								id,
+								{
+									...group,
+									...(group.contains
+										? {
+												contains: group.contains.map((member, i) =>
+													resolve(member, `groups.${id}.contains[${i}]`),
+												),
+											}
+										: {}),
+								},
+							]),
+						),
+					}
+				: {}),
 		},
 		notes,
 	};

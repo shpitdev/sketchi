@@ -167,6 +167,45 @@ describe("flowchart edits", () => {
 		expect(flowchartDiagramFromDocument(extended).ok).toBe(true);
 	});
 
+	it("moves a fan-out target to another branch and matches branch labels without case", () => {
+		const document: FlowchartDocument = {
+			title: "Stock",
+			nodes: { question: "Stock short?", notify: "Notify", reorder: "Reorder", done: "Done" },
+			edges: [
+				["question", ["notify", "reorder"], "yes"],
+				["question", "done", "no"],
+			],
+		};
+		const same = apply(document, [{ op: "connect", edges: [["question", "reorder", "Yes"]] }]);
+		expect(same.edges).toEqual(document.edges);
+		expect(flowchartDiagramFromDocument(same).ok).toBe(true);
+		const moved = apply(document, [
+			{ op: "connect", edges: [["question", "reorder", "no"]] },
+			{ op: "connect", edges: [["question", "done", "No"]] },
+		]);
+		expect(moved.edges).toContainEqual(["question", "notify", "yes"]);
+		expect(moved.edges).toContainEqual(["question", ["reorder", "done"], "no"]);
+		expect(flowchartDiagramFromDocument(moved).ok).toBe(true);
+	});
+
+	it("allows a same-set deletion of the label-only group its removed node already pruned", () => {
+		const document: FlowchartDocument = {
+			title: "Office",
+			nodes: { a: "A", b: "B", c: { label: "C", group: "office" } },
+			edges: [
+				["a", "b"],
+				["b", "c"],
+			],
+			groups: { office: { label: "Office" } },
+		};
+		const result = apply(document, [{ op: "set", nodes: { c: null }, groups: { office: null } }]);
+		expect(result.groups).toBeUndefined();
+		expect(flowchartDiagramFromDocument(result).ok).toBe(true);
+		expect(applyFlowchartEdits(document, [{ op: "set", groups: { missing: null } }]).ok).toBe(
+			false,
+		);
+	});
+
 	it("does not merge independently authored branches that repeat a label", () => {
 		const edited = apply(
 			{

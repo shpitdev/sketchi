@@ -533,6 +533,7 @@ export function applyFlowchartEdits(
 				return;
 			}
 			case "set": {
+				const originalGroups = new Set(state.groups.map(([id]) => id));
 				const removedGroups = new Set(
 					Object.entries(edit.groups ?? {})
 						.filter(([, value]) => value === null)
@@ -568,7 +569,16 @@ export function applyFlowchartEdits(
 					}
 					state.nodes = upsert(state.nodes, id, mergeNode(label, change));
 				}
-				state.groups = setContainers(state.groups, edit.groups, "group", at, issues);
+				// A node removal can already have pruned a group removed by this same set.
+				const groupChanges = Object.fromEntries(
+					Object.entries(edit.groups ?? {}).filter(
+						([id, change]) =>
+							change !== null ||
+							!originalGroups.has(id) ||
+							state.groups.some(([key]) => key === id),
+					),
+				);
+				state.groups = setContainers(state.groups, groupChanges, "group", at, issues);
 				state.nodes = state.nodes.map(([id, node]) => {
 					let group = flowchartNodeDetails(node).group;
 					if (group === undefined || !removedGroups.has(group)) return [id, node];
@@ -585,16 +595,26 @@ export function applyFlowchartEdits(
 			case "connect": {
 				edit.edges.forEach((authored, edgeIndexAt) => {
 					const pairs = singlePairs([authored], nextBranch++);
-					// Reconnecting an existing pair with the same label is a no-op for its
-					// branch; a list can extend that branch with additional targets.
-					const existingBranches = new Map<string, number>();
+					// A connect joins the source's existing branch with this label, whether
+					// extending it or moving a target out of a differently labeled fan-out.
+					const labelKey = (label: string | undefined) => label?.trim().toLowerCase() ?? "";
+					const existingBranches = new Map<string, Edge>();
 					for (const pair of pairs) {
-						const current = state.edges[edgeIndex(pair.source, pair.target)];
-						if (current && current.label === pair.label)
-							existingBranches.set(pair.source, current.branch);
+						const branch = state.edges.find(
+							(edge) =>
+								edge.source === pair.source && labelKey(edge.label) === labelKey(pair.label),
+						);
+						if (branch) existingBranches.set(pair.source, branch);
 					}
 					for (const pair of pairs) {
-						const edge = { ...pair, branch: existingBranches.get(pair.source) ?? pair.branch };
+						const branch = existingBranches.get(pair.source);
+						const edge = branch
+							? {
+									...pair,
+									branch: branch.branch,
+									...(branch.label === undefined ? {} : { label: branch.label }),
+								}
+							: pair;
 						const [source, target] = ends(edge);
 						let ok = true;
 						for (const [id, side] of [
