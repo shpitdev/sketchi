@@ -355,6 +355,98 @@ describe("flowchart edits", () => {
 		expect(result.document.edges).not.toContainEqual(["end", "jp"]);
 	});
 
+	it("inserts a node a set declared, named by { id } alone", () => {
+		const edited = apply(order, [
+			{ op: "set", nodes: { log: { label: "Log order", color: "blue" } } },
+			{ op: "insert", node: { id: "log" }, between: ["place", "review"] },
+		]);
+		expect(edited.nodes["log"]).toEqual({ label: "Log order", color: "blue" });
+		expect(Object.keys(edited.nodes)).not.toContain("id");
+		expect(edited.edges).toContainEqual(["place", "log"]);
+		expect(edited.edges).toContainEqual(["log", "review"]);
+
+		const wired = applyFlowchartEdits(order, [
+			{ op: "insert", node: { id: "pay" }, between: ["place", "review"] },
+		]);
+		expect(wired.ok).toBe(false);
+		const unknown = applyFlowchartEdits(order, [
+			{ op: "insert", node: { id: "ghost" }, between: ["place", "review"] },
+		]);
+		expect(unknown.ok ? [] : unknown.issues.map((issue) => issue.path)).toEqual([
+			"edits[0].node.id",
+		]);
+	});
+
+	it("drops a removal's joining edge when the edits lead around it, and keeps it otherwise", () => {
+		const checkout: FlowchartDocument = {
+			title: "Checkout",
+			nodes: {
+				address: "Address valid?",
+				pay: "Take payment",
+				ok: "Payment approved?",
+				fix: "Fix address",
+			},
+			edges: [
+				["address", "pay", "yes"],
+				["address", "fix", "no"],
+				["pay", "ok"],
+			],
+		};
+		const split = apply(checkout, [
+			{ op: "set", nodes: { pay: null, auth: "Authorize card", capture: "Capture payment" } },
+			{
+				op: "connect",
+				edges: [
+					["address", "auth", "yes"],
+					["auth", "capture"],
+					["capture", "ok"],
+				],
+			},
+		]);
+		expect(split.edges).not.toContainEqual(["address", "ok", "yes"]);
+		expect(split.edges).toContainEqual(["address", "auth", "yes"]);
+		expect(split.edges).toContainEqual(["capture", "ok"]);
+
+		// Inserting into the joining edge, then leading on through another step, leaves no bypass.
+		const inserted = apply(checkout, [
+			{ op: "set", nodes: { pay: null, auth: "Authorize card", capture: "Capture payment" } },
+			{ op: "insert", node: { id: "auth" }, between: ["address", "ok"] },
+			{
+				op: "connect",
+				edges: [
+					["auth", "capture"],
+					["capture", "ok"],
+				],
+			},
+		]);
+		expect(inserted.edges).toEqual([
+			["address", "auth", "yes"],
+			["address", "fix", "no"],
+			["auth", "capture"],
+			["capture", "ok"],
+		]);
+
+		// Another branch reaching the target never stands in for the removed step's branch.
+		const branches: FlowchartDocument = {
+			title: "Branches",
+			nodes: { a: "Ready?", b: "Take path B", d: "Take path D", c: "Done" },
+			edges: [
+				["a", "b", "yes"],
+				["b", "c"],
+				["a", "d", "no"],
+				["d", "c"],
+			],
+		};
+		const kept = apply(branches, [
+			{ op: "set", nodes: { b: null } },
+			{ op: "connect", edges: [["d", "c", "after D"]] },
+		]);
+		expect(kept.edges).toContainEqual(["a", "c", "yes"]);
+
+		const removed = apply(checkout, [{ op: "set", nodes: { pay: null } }]);
+		expect(removed.edges).toContainEqual(["address", "ok", "yes"]);
+	});
+
 	it("leaves an ambiguous label unresolved, so a set adds a node under it", () => {
 		const twins: FlowchartDocument = {
 			title: "Twins",

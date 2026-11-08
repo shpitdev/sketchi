@@ -1,5 +1,5 @@
 DESCRIPTION
-  Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.
+  Change the canonical document for DIAGRAM_ID, offline. For a flowchart, pass {"edits":[...]} to change it by id or label: insert puts a step into an edge, set merges fields and removes with null, connect adds or relabels edges, disconnect removes them; sketchi show ID --document prints the ids. Any diagram also takes a complete replacement document whose spec.id matches DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative.
 
 USAGE
   sketchi edit [flags] <diagram-id>
@@ -20,5 +20,8 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
+  # Insert a step and color another in a stored flowchart.
+  sketchi edit checkout --json '{"edits":[{"op":"insert","node":{"fraud":"Check for fraud"},"between":["review","pay"]},{"op":"set","nodes":{"pay":{"color":"green"}}}]}'
+
   # Replace a document and retain the prior revision.
   sketchi edit release-flow --file revised.json

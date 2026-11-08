@@ -717,7 +717,8 @@ describe("revising a stored diagram", () => {
 		const providerRequest = JSON.stringify(observedRuns[0]);
 		expect(providerRequest).toContain("Current diagram:");
 		expect(providerRequest).toContain("Revision request:");
-		expect(providerRequest).toContain("Return the complete revised diagram");
+		// A flowchart revision asks for edits; a whole diagram stays accepted.
+		expect(providerRequest).toContain("return only the changes it asks for, as edits");
 		expect(providerRequest).toContain("The caller explicitly requires flowchart");
 		// One family's rules: the stored diagram's.
 		expect(providerRequest).not.toContain("Sequence IR rules");
@@ -729,6 +730,81 @@ describe("revising a stored diagram", () => {
 		expect(Object.keys(body.diagram.document.spec.nodes)).toHaveLength(
 			Object.keys(flowchartAnswer.nodes).length,
 		);
+	});
+
+	it("applies a flowchart revision's edits and returns them with the document", async () => {
+		const edits = [
+			{ op: "insert", node: { approve: "Approved?" }, between: ["review", "end"] },
+			{
+				op: "connect",
+				edges: [
+					["approve", "end", "yes"],
+					["approve", "start", "no"],
+				],
+			},
+			{ op: "set", nodes: { end: { color: "green" } } },
+		];
+		const env: StudioEnv = { AI: fakeAiGateway(JSON.stringify({ edits })) };
+		const response = await generateRequest(env, {
+			prompt: "Add an approval decision after review; a rejection goes back to the start",
+			base: { type: "flowchart", spec: storedSpec },
+		});
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			diagram: {
+				document: { type: string; spec: { id: string; nodes: object; edges: unknown[] } };
+				edits: unknown[];
+				patch?: unknown;
+			};
+		};
+		expect(body.diagram.edits).toEqual(edits);
+		expect(body.diagram.patch).toBeUndefined();
+		expect(body.diagram.document.spec).toMatchObject({
+			id: "release-flow",
+			title: "Release approval",
+			nodes: {
+				start: "Change proposed",
+				approve: "Approved?",
+				end: { label: "Release recorded", color: "green" },
+			},
+		});
+		expect(body.diagram.document.spec.edges).toEqual([
+			["start", "review"],
+			["review", "approve"],
+			["approve", "end", "yes"],
+			["approve", "start", "no"],
+		]);
+	});
+
+	it("draws a revision's edge color as a patch and its node color in the document", async () => {
+		const answer = {
+			edits: [{ op: "set", nodes: { review: "Review the evidence" } }],
+			styles: [
+				{ targets: ["start->review"], strokeColor: "#dc2626" },
+				{ targets: ["end"], strokeColor: "#16a34a" },
+			],
+		};
+		const env: StudioEnv = { AI: fakeAiGateway(JSON.stringify(answer)) };
+		const response = await generateRequest(env, {
+			prompt: "Rename the review step, draw its incoming edge in red and the end in green",
+			base: { type: "flowchart", spec: storedSpec },
+		});
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			diagram: {
+				document: { spec: { nodes: Record<string, unknown> } };
+				patch?: { operations: Array<{ op: string }> };
+				edits: unknown[];
+			};
+		};
+		expect(body.diagram.edits).toEqual(answer.edits);
+		expect(body.diagram.document.spec.nodes["end"]).toEqual({
+			label: "Release recorded",
+			color: "green",
+		});
+		expect(body.diagram.patch?.operations.map((operation) => operation.op)).toEqual(["setStyle"]);
 	});
 
 	it("turns the diagram into the family the caller names", async () => {
@@ -778,7 +854,7 @@ describe("styling a diagram with a request", () => {
 		return JSON.stringify({ title, diagram: { ...rest, type }, styles });
 	}
 
-	it("returns the colors and shapes the request asks for as patch operations", async () => {
+	it("draws a flowchart node's color in its document and patches only what the document cannot hold", async () => {
 		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
 		const env: StudioEnv = {
 			AI: fakeAiGateway(
@@ -798,13 +874,17 @@ describe("styling a diagram with a request", () => {
 		expect(response.status).toBe(200);
 		expect(JSON.stringify(observedRuns[0])).toContain("Styling:");
 		const body = (await response.json()) as {
-			diagram: { patch?: { operations: Array<{ op: string }> } };
+			diagram: {
+				document: { spec: { nodes: Record<string, unknown> } };
+				patch?: { operations: Array<{ op: string }> };
+			};
 		};
-		expect(body.diagram.patch?.operations.map((operation) => operation.op)).toEqual([
-			"setStyle",
-			"setShape",
-			"setStyle",
-		]);
+		expect(body.diagram.document.spec.nodes["decision"]).toMatchObject({
+			color: "purple",
+			shape: "diamond",
+		});
+		// The edge's color stays a patch.
+		expect(body.diagram.patch?.operations.map((operation) => operation.op)).toEqual(["setStyle"]);
 	});
 
 	it("leaves a request without color or shape words unstyled and its prompt without styling rules", async () => {

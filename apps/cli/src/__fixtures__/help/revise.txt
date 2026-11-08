@@ -1,12 +1,13 @@
 DESCRIPTION
-  Change a stored diagram with a request, keep the change as the record's next revision, and export its PNG by default. Sketchi sends the diagram's canonical document and the request to the public Sketchi generate API in one unauthenticated HTTPS POST; the model returns the complete revised document, which keeps the diagram's id and family. Everything the request does not mention stays as it was.
+  Change a stored diagram with a request, keep the change as the record's next revision, and export its PNG by default. Sketchi sends the diagram's canonical document and the request to the public Sketchi generate API in one unauthenticated HTTPS POST; for a flowchart the model writes only edits by id, which the server applies and returns with the document (--output json shows them); for other families it returns the complete revised document. Either keeps the diagram's id and family, and everything the request does not mention stays as it was.
 
   --prompt TEXT says what to change: "add a fraud check before payment", "rename Ship to Ship order".
   --type TYPE turns the diagram into another family; omit it to keep its own.
   The earlier revision stays under revisions/ and sketchi restore brings it back. Patched, pulled
   and canvas records refuse revise, as edit does; restore a canonical revision first.
-  Colors and shapes the request asks for ("draw the reject path in red") are drawn as one more
-  revision on top, as sketchi patch would; generate does the same.
+  A flowchart node's color is part of its document. Other colors and shapes the request asks for
+  ("draw the reject path in red") are drawn as one more revision on top, as sketchi patch would;
+  generate does the same.
   --endpoint, --format, --dest, --no-copy, the clipboard, exit codes and output work as for
   generate. Override the endpoint with SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
 

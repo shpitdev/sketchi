@@ -1,4 +1,4 @@
-import { DIAGRAM_ZONE_KINDS } from "../intermediate.js";
+import { DIAGRAM_NODE_COLOR_NAMES, DIAGRAM_ZONE_KINDS } from "../intermediate.js";
 import { FLOWCHART_MAX_EDGES, FLOWCHART_MAX_NODES } from "../types/flowchart.js";
 import type { RuleSource } from "./source.js";
 
@@ -69,4 +69,14 @@ export const FLOWCHART_RULES = {
 		`Set direction: "LR" only when ${source} reads left to right; flowcharts run top to bottom otherwise.`,
 	documentNoInventedSteps: (source: RuleSource) =>
 		`Do not add decisions, loops, steps, or edges ${source} does not state; a step that handles "any errors" or acts "if needed" stays one step in sequence.`,
+} as const;
+
+/**
+ * How edits change a flowchart document, for every surface that writes them: the MCP's
+ * editFlowchart, the CLI's edit and a hosted revision.
+ */
+export const FLOWCHART_EDIT_RULES = {
+	ops: 'edits: [{ op: "insert", node: { id: label }, between: [from, to] } | { op: "set", nodes?: { [id]: label | { ...node fields } | null }, groups?: { [id]: { ...group fields } | null }, lanes?: { [id]: label | null }, title?, direction? } | { op: "connect", edges } | { op: "disconnect", edges: [[from, to]] }].',
+	refs: "Name nodes, groups and lanes by id or exact label. insert splits an existing edge. set merges, adds new ids and removes with null, bridging a removed step. connect adds or relabels edges. What edits do not name stays.",
+	colors: `Color a node only when asked, as set: { nodes: { id: { color } } } with color ${DIAGRAM_NODE_COLOR_NAMES.map((name) => `"${name}"`).join(", ")}; null clears it.`,
 } as const;

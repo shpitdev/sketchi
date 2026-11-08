@@ -87,6 +87,8 @@ interface GenerateSuccess {
 		 * scene above, as an MCP agent applies them with applyDiagramPatch.
 		 */
 		readonly patch?: { readonly operations: ReadonlyArray<unknown> };
+		/** A flowchart revision's edits, which made the document from the base the caller sent. */
+		readonly edits?: ReadonlyArray<unknown>;
 	};
 	readonly generation: {
 		readonly attempts?: number;
@@ -622,6 +624,7 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 			scene,
 			excalidraw,
 			...(styled?.ok ? { patch: { operations } } : {}),
+			...(candidate.edits ? { edits: candidate.edits } : {}),
 		},
 		generation: {
 			...(candidate.attempts === undefined ? {} : { attempts: candidate.attempts }),

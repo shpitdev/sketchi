@@ -1,9 +1,11 @@
 import {
 	CHART_RULES,
 	CLASS_RULES,
+	DIAGRAM_NODE_COLOR_NAMES,
 	DIAGRAM_TYPES,
 	type DiagramTypeValue,
 	ER_RULES,
+	FLOWCHART_EDIT_RULES,
 	FLOWCHART_RULES,
 	GANTT_RULES,
 	JOURNEY_RULES,
@@ -88,13 +90,19 @@ function typeInstruction(families: readonly DiagramTypeValue[] | undefined): str
 	return `Set diagram.type to whichever of ${kinds} the scenario requests, or the closest of them.${families.includes("flowchart") ? ` ${SWIMLANE_KIND}` : ""}`;
 }
 
-const commonInstructions = (narrowedTo?: readonly DiagramTypeValue[]) => [
+const commonInstructions = (narrowedTo?: readonly DiagramTypeValue[], edits = false) => [
 	"Return only compact, minified JSON on one line. Do not use markdown.",
-	"Author one concise title of at most 60 characters. Do not copy the whole scenario into the title.",
-	'Return one object: { "title", "diagram" }.',
+	...(edits
+		? [
+				'Return one object: { "edits" }. The flowchart rules below say how to write the nodes, edges and labels an edit adds.',
+			]
+		: [
+				"Author one concise title of at most 60 characters. Do not copy the whole scenario into the title.",
+				'Return one object: { "title", "diagram" }.',
+			]),
 	"Copy everything the scenario states, in full and in its order: every item, name, role, detail, number, key and connection. Add nothing it does not state: no step, decision, branch, loop, outcome, group, phase, field, item, connection or value.",
 	"The limits below are what Sketchi can draw, not targets: never drop, merge or summarize stated content to fit one. Sketchi reports a diagram that is too large.",
-	typeInstruction(narrowedTo),
+	...(edits ? [] : [typeInstruction(narrowedTo)]),
 ];
 
 /**
@@ -532,10 +540,39 @@ const REVISION_INSTRUCTIONS = [
 	"Keep every element the request does not change, with its id, label, details and order. Change, add or remove only what the request asks.",
 ];
 
+/**
+ * A flowchart revision writes only its changes, as edits to the current document by id, so the
+ * answer is as long as the change and everything else stays as it was.
+ */
+const FLOWCHART_EDIT_REVISION_INSTRUCTIONS = [
+	"The scenario is a revision of the current flowchart: return only the changes it asks for, as edits applied in order to the current document. Keep diagram ids; the title stays unless the request changes it.",
+	FLOWCHART_EDIT_RULES.ops,
+	FLOWCHART_EDIT_RULES.refs,
+	"A removed step's one way in and out are joined only when the edits do not connect around it, so to replace or split a step, remove it and connect its replacements; never disconnect an edge the edits add.",
+	FLOWCHART_EDIT_RULES.colors,
+];
+
+/**
+ * Colors and shapes for a flowchart revision: a node's color is an edit, and what edits cannot
+ * set comes back as styles beside them.
+ */
+const EDIT_STYLING_INSTRUCTIONS = [
+	'Color a node with its color in a set edit. For an edge color, a text color, or a "rectangle", "ellipse" or "circle" shape, also return styles: [{ "targets", "strokeColor"?, "textColor"?, "shape"? }] beside edits; targets are node ids or edges as "from->to", and colors are #rrggbb.',
+	"Style exactly what the request asks for.",
+];
+
+/** Whether a prompt revises a flowchart into a flowchart, which it answers with edits. */
+export function revisesFlowchartWithEdits(prompt: DiagramGenerationPrompt): boolean {
+	return (
+		prompt.base?.["type"] === "flowchart" && (prompt.requestedType ?? "flowchart") === "flowchart"
+	);
+}
+
 /** Colors and shapes, sent only to a request that asks for them, so other requests pay nothing. */
 const STYLING_INSTRUCTIONS = [
 	'When the scenario asks for colors or shapes, also return styles: [{ "targets", "fillColor"?, "strokeColor"?, "textColor"?, "shape"? }] beside diagram, and nothing else when it does not.',
 	'targets lists the ids or labels of the nodes and edges a style applies to; a flowchart edge\'s id is "from->to". Colors are #rrggbb: a colored node takes the color as strokeColor and its pale tint as fillColor, so its label stays readable (red #dc2626 on #fee2e2, orange #ea580c on #ffedd5, yellow #ca8a04 on #fef9c3, green #16a34a on #dcfce7, blue #2563eb on #dbeafe, purple #7c3aed on #ede9fe, gray #6b7280 on #f3f4f6); a colored edge takes strokeColor alone. shape is "rectangle", "diamond", "ellipse" or "circle".',
+	`A flowchart colors a node with its own color field instead: { "label", "color" }, color ${listAlternatives(DIAGRAM_NODE_COLOR_NAMES.map((name) => `"${name}"`))}; styles then cover only its edges and shapes.`,
 	"Style exactly what the scenario asks for; the diagram's content stays as the other rules say.",
 ];
 
@@ -563,17 +600,30 @@ export function buildDiagramGenerationMessages(
 	const families = promptFamilies(prompt);
 	// A one-family prompt keeps the full type list it was graded with; a narrowed few name theirs.
 	const narrowedTo = family ? undefined : families;
+	const edits = revisesFlowchartWithEdits(prompt);
 	const system = [
 		"You are creating one typed Sketchi generation response.",
 		"",
 		"Response contract:",
-		...commonInstructions(narrowedTo).map((instruction) => `- ${instruction}`),
-		...(families ? ONE_FAMILY_INSTRUCTIONS.map((instruction) => `- ${instruction}`) : []),
+		...commonInstructions(narrowedTo, edits).map((instruction) => `- ${instruction}`),
+		...(families && !edits ? ONE_FAMILY_INSTRUCTIONS.map((instruction) => `- ${instruction}`) : []),
 		...(prompt.base
-			? ["", "Revision:", ...REVISION_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
+			? [
+					"",
+					"Revision:",
+					...(edits ? FLOWCHART_EDIT_REVISION_INSTRUCTIONS : REVISION_INSTRUCTIONS).map(
+						(instruction) => `- ${instruction}`,
+					),
+				]
 			: []),
 		...(prompt.styling
-			? ["", "Styling:", ...STYLING_INSTRUCTIONS.map((instruction) => `- ${instruction}`)]
+			? [
+					"",
+					"Styling:",
+					...(edits ? EDIT_STYLING_INSTRUCTIONS : STYLING_INSTRUCTIONS).map(
+						(instruction) => `- ${instruction}`,
+					),
+				]
 			: []),
 		// A request whose family is known gets only that family's rules, a narrowed request only
 		// its few families'; otherwise every family's, and the model picks.

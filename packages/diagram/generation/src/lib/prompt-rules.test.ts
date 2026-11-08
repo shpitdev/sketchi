@@ -212,9 +212,16 @@ describe("revising a diagram", () => {
 			base,
 		});
 		expect(messages.system).toContain("Revision:");
-		expect(messages.system).toContain(
-			"Return the complete revised diagram, not only what changed.",
-		);
+		// A flowchart revision writes only its edits.
+		expect(messages.system).toContain("return only the changes it asks for, as edits");
+		expect(
+			buildDiagramGenerationMessages({
+				id: "revise",
+				request: "Show it as a sequence",
+				requestedType: "sequence",
+				base,
+			}).system,
+		).toContain("Return the complete revised diagram, not only what changed.");
 		expect(messages.user).toContain("Current diagram:");
 		expect(messages.user).toContain('"id":"release-flow"');
 		expect(messages.user).toContain("Revision request:\nAdd a review step");

@@ -37,7 +37,11 @@ import {
 	resolveErShorthand,
 	validateClassDiagram,
 	validateErDiagram,
+	applyFlowchartEdits,
 	decodeFlowchartDocument,
+	decodeFlowchartEdits,
+	FlowchartEditsSchema,
+	type FlowchartEdit,
 	FLOWCHART_RULES,
 	flowchartDiagramFromDocument,
 	flowchartNodeDetails,
@@ -78,7 +82,7 @@ import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import { DiagramGenerationPrompt } from "./messages.js";
 import { GeneratedMindmapTree, generatedMindmapTreeToDiagram } from "./mindmap-tree.js";
 import { repeatedJsonKeys } from "./repeated-keys.js";
-import { DiagramStyle, generatedStyles } from "./styling.js";
+import { DiagramStyle, flowchartStylesAsNodeColors, generatedStyles } from "./styling.js";
 
 export const diagramGenerationProviderIds: readonly [
 	"fixture",
@@ -108,6 +112,8 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
 	diagram: Schema.optional(CanonicalDiagramSchema),
 	/** A flowchart's document as the model wrote it, checked; `diagram` is what it draws. */
 	flowchart: Schema.optional(FlowchartDocumentSchema),
+	/** The edits a flowchart revision wrote, which made `flowchart` from the base document. */
+	edits: Schema.optional(FlowchartEditsSchema),
 	durationMs: Schema.optional(Schema.Number),
 	error: Schema.optional(Schema.String),
 	model: Schema.String,
@@ -499,6 +505,7 @@ interface CandidateParseSuccess {
 	readonly diagnostics?: readonly string[];
 	readonly diagram: CanonicalDiagram;
 	readonly flowchart?: FlowchartDocument;
+	readonly edits?: readonly FlowchartEdit[];
 	readonly success: true;
 }
 
@@ -590,7 +597,89 @@ function idFromTitle(title: string): string {
 		.replace(/-+$/u, "");
 }
 
-function parseCandidateDiagram(text: string): CandidateParseResult {
+/**
+ * A flowchart revision written as edits: the edits applied to the base document, then drawn as
+ * any generated flowchart. An edit naming what the base lacks goes back for repair at its path.
+ */
+function parseFlowchartRevision(
+	base: Readonly<Record<string, unknown>>,
+	rawEdits: unknown,
+): CandidateParseResult {
+	const { type: _type, style: _style, ...spec } = base;
+	const document = decodeFlowchartDocument(spec);
+	if (Result.isFailure(document)) {
+		const diagnostic = "revision_base_invalid: the current flowchart is not a flowchart document.";
+		return { diagnostics: [diagnostic], error: diagnostic, success: false };
+	}
+	// As in a generated document, a stray shape or group kind draws plain rather than failing; a
+	// null still clears the field.
+	const notes: string[] = [];
+	const keepingNull =
+		(field: string, known: (id: string, value: unknown, diagnostics: string[]) => unknown) =>
+		(id: string, value: unknown, diagnostics: string[]) =>
+			isUnknownRecord(value) && value[field] === null ? value : known(id, value, diagnostics);
+	const lenient = (
+		values: unknown,
+		known: (id: string, value: unknown, diagnostics: string[]) => unknown,
+	) =>
+		isUnknownRecord(values)
+			? Object.fromEntries(
+					Object.entries(values).map(([id, value]) => [id, known(id, value, notes)]),
+				)
+			: values;
+	const edits = decodeFlowchartEdits(
+		Array.isArray(rawEdits)
+			? rawEdits.map((edit) =>
+					isUnknownRecord(edit)
+						? {
+								...edit,
+								...(edit["node"] === undefined
+									? {}
+									: { node: lenient(edit["node"], keepingNull("shape", withKnownShape)) }),
+								...(edit["nodes"] === undefined
+									? {}
+									: { nodes: lenient(edit["nodes"], keepingNull("shape", withKnownShape)) }),
+								...(edit["groups"] === undefined
+									? {}
+									: { groups: lenient(edit["groups"], keepingNull("kind", withKnownGroupKind)) }),
+							}
+						: edit,
+				)
+			: rawEdits,
+	);
+	if (Result.isFailure(edits)) {
+		const diagnostics = schemaIssueFormatter(edits.failure.issue).issues.map(
+			(issue) =>
+				`edits_invalid: ${schemaIssueDiagnostic(issue).replace(/ at diagram:/u, " at edits:")}`,
+		);
+		return {
+			diagnostics,
+			error: diagnostics[0] ?? "Generated edits are invalid.",
+			success: false,
+		};
+	}
+	const applied = applyFlowchartEdits(document.success, edits.success);
+	if (!applied.ok) {
+		const diagnostics = applied.issues.map(
+			(issue) => `flowchart.${issue.code} at ${issue.path}: ${issue.message} Hint: ${issue.hint}`,
+		);
+		return {
+			diagnostics,
+			error: applied.issues[0]?.message ?? "Generated edits do not apply.",
+			success: false,
+		};
+	}
+	const drawn = drawnFlowchart(applied.document, [
+		...notes,
+		...applied.notes.map((note) => `reference_resolved: ${note}`),
+	]);
+	return drawn.success ? { ...drawn, edits: edits.success } : drawn;
+}
+
+function parseCandidateDiagram(
+	text: string,
+	base?: Readonly<Record<string, unknown>>,
+): CandidateParseResult {
 	let extracted: unknown;
 	try {
 		extracted = extractJsonObject(text);
@@ -613,7 +702,30 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 		};
 	}
 
-	const { diagram: rawDiagram, styles: rawStyles, title } = response.success;
+	const { diagram: rawDiagram, styles: rawStyles, title, edits: rawEdits } = response.success;
+	// A flowchart revision writes edits; a whole diagram stays accepted.
+	if (rawDiagram === undefined && rawEdits !== undefined && base?.["type"] === "flowchart") {
+		const revised = parseFlowchartRevision(base, rawEdits);
+		if (!revised.success || rawStyles === undefined || !revised.flowchart) return revised;
+		// Colors and shapes the request asks for beside its edits: a node's color and a diamond go
+		// into the document; the rest stays a style.
+		const styleDiagnostics: string[] = [];
+		const moved = flowchartStylesAsNodeColors(
+			revised.flowchart,
+			generatedStyles(rawStyles, styleDiagnostics),
+		);
+		const drawn = drawnFlowchart(moved.document, [
+			...(revised.diagnostics ?? []),
+			...styleDiagnostics,
+		]);
+		return drawn.success
+			? {
+					...drawn,
+					...(revised.edits ? { edits: revised.edits } : {}),
+					...(moved.styles.length > 0 ? { styles: moved.styles } : {}),
+				}
+			: drawn;
+	}
 	if (!isUnknownRecord(rawDiagram)) {
 		return {
 			diagnostics: ["diagram_missing: the response must include one diagram object."],
@@ -747,7 +859,22 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 	const parsed = parsers[type]();
 	if (!parsed.success || rawStyles === undefined) return parsed;
 	const styleDiagnostics: string[] = [];
-	const styles = generatedStyles(rawStyles, styleDiagnostics);
+	const generated = generatedStyles(rawStyles, styleDiagnostics);
+	// A flowchart's node colors belong to its document, not to a patch over its drawing.
+	if (parsed.flowchart && generated.length > 0) {
+		const moved = flowchartStylesAsNodeColors(parsed.flowchart, generated);
+		const drawn = drawnFlowchart(moved.document, parsed.diagnostics);
+		if (drawn.success) {
+			return {
+				...drawn,
+				...(moved.styles.length > 0 ? { styles: moved.styles } : {}),
+				...(styleDiagnostics.length > 0
+					? { diagnostics: [...(drawn.diagnostics ?? []), ...styleDiagnostics] }
+					: {}),
+			};
+		}
+	}
+	const styles = generated;
 	return {
 		...parsed,
 		...(styles.length > 0 ? { styles } : {}),
@@ -806,6 +933,8 @@ export function candidateFromText(
 		diagnostics?: string[];
 		text: string;
 	},
+	/** The diagram a revision starts from, which a flowchart revision's edits apply to. */
+	base?: Readonly<Record<string, unknown>>,
 ): DiagramGenerationCandidate {
 	const diagnostics = [...(input.diagnostics ?? [])];
 
@@ -817,7 +946,7 @@ export function candidateFromText(
 	}
 
 	const plain = withPlainGlyphs(input.text);
-	const parsed = parseCandidateDiagram(plain);
+	const parsed = parseCandidateDiagram(plain, base);
 	if (parsed.success) {
 		if (plain !== input.text) {
 			diagnostics.push(
@@ -832,6 +961,7 @@ export function candidateFromText(
 			...(parsed.styles?.length ? { styles: parsed.styles } : {}),
 			diagram: parsed.diagram,
 			...(parsed.flowchart ? { flowchart: parsed.flowchart } : {}),
+			...(parsed.edits ? { edits: parsed.edits } : {}),
 		};
 	}
 
