@@ -289,10 +289,10 @@ const PATCH_OPERATIONS_EXAMPLE = `[
 
 const FULL_PATCH_REQUEST_EXAMPLE = `{
   source: { artifactId: built.artifact.artifactId },
-  intent: "Highlight the gate and rename the release step",
+  intent: "Highlight one topic and rename another",
   operations: [
-    { op: "setStyle", selector: { nodeIds: ["gate"] }, style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" } },
-    { op: "replaceText", selector: { nodeIds: ["ship"] }, text: "Ship to production" }
+    { op: "setStyle", selector: { labels: ["Product"] }, style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" } },
+    { op: "replaceText", selector: { labels: ["Operations"] }, text: "Launch operations" }
   ],
   options: { artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [], preserveConnectivity: true }
 }`;
@@ -312,20 +312,12 @@ const ACCEPTANCE_LOOP_EXAMPLE = `async () => {
 
   if (!built.ok) return built;
 
-  return sketchi.applyDiagramPatch({
-    source: { artifactId: built.artifact.artifactId },
-    intent: "Make the decision node a purple diamond after the graph is accepted.",
-    operations: [
-      {
-        op: "setStyle",
-        selector: { nodeIds: ["approved"] },
-        style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
-      },
-      {
-        op: "setShape",
-        selector: { nodeIds: ["approved"] },
-        shape: "diamond",
-      },
+  // A later change is an edit by id or label, never a patch over the drawing.
+  return sketchi.editFlowchart({
+    artifactId: built.artifact.artifactId,
+    edits: [
+      { op: "insert", node: { notify: "Notify requester" }, between: ["approved", "revise"] },
+      { op: "set", nodes: { approved: { color: "purple" } } },
     ],
     options: ${DELIVERY_OPTIONS},
   });
@@ -404,36 +396,24 @@ const CREATE_CANVAS_EXAMPLE = `async () => sketchi.createCanvas({
   options: ${DELIVERY_OPTIONS}
 })`;
 
-const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => {
-  const built = await sketchi.buildFlowchart({
-    spec: {
-      title: "Circle to decision",
-      direction: "LR",
-      nodes: { circle: "Start", choice: "Continue?", yes: "Continue", no: "Stop" },
-      edges: [
-        ["circle", "choice"],
-        ["choice", "yes", "yes"],
-        ["choice", "no", "no"],
-      ],
+const CIRCLE_TO_DIAMOND_EXAMPLE = `async () => sketchi.buildFlowchart({
+  spec: {
+    title: "Purple decision",
+    direction: "LR",
+    nodes: {
+      start: "Start",
+      choice: { label: "Continue?", shape: "diamond", color: "purple" },
+      yes: "Continue",
+      no: "Stop",
     },
-  });
-
-  if (!built.ok) return built;
-
-  return sketchi.applyDiagramPatch({
-    source: { artifactId: built.artifact.artifactId },
-    operations: [
-      { op: "setShape", selector: { nodeIds: ["circle"] }, shape: "circle" },
-      { op: "setShape", selector: { nodeIds: ["choice"] }, shape: "diamond" },
-      {
-        op: "setStyle",
-        selector: { nodeIds: ["choice"] },
-        style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
-      },
+    edges: [
+      ["start", "choice"],
+      ["choice", "yes", "yes"],
+      ["choice", "no", "no"],
     ],
-    options: ${DELIVERY_OPTIONS},
-  });
-}`;
+  },
+  options: ${DELIVERY_OPTIONS},
+})`;
 
 const INVALID_FIRST_EXAMPLE = `async () => {
   const built = await sketchi.buildFlowchart({
@@ -463,15 +443,10 @@ const INVALID_FIRST_EXAMPLE = `async () => {
 }`;
 
 const REPLACE_TEXT_EXAMPLE = `async () => {
-  const built = await sketchi.buildFlowchart({
+  const built = await sketchi.buildMindmap({
     spec: {
-      title: "Release gate",
-      nodes: { start: "Start", gate: "Approved?", ship: "Ship", revise: "Revise" },
-      edges: [
-        ["start", "gate"],
-        ["gate", "ship", "yes"],
-        ["gate", "revise", "no"],
-      ],
+      title: "Launch plan",
+      root: { label: "Launch", children: [{ label: "Product" }, { label: "Operations" }] },
     },
   });
 
@@ -479,12 +454,12 @@ const REPLACE_TEXT_EXAMPLE = `async () => {
 
   return sketchi.applyDiagramPatch({
     source: { artifactId: built.artifact.artifactId },
-    intent: "Rename the final state without rebuilding structure.",
+    intent: "Rename a topic without rebuilding the structure.",
     operations: [
       {
         op: "replaceText",
-        selector: { nodeIds: ["ship"] },
-        text: "Ship to production",
+        selector: { labels: ["Operations"] },
+        text: "Launch operations",
       },
     ],
     options: ${DELIVERY_OPTIONS},
@@ -531,7 +506,7 @@ export const catalog: CatalogEntry[] = [
 		].join("\n"),
 		examples: [
 			{
-				title: "Accepted graph followed by visual patch",
+				title: "Build a flowchart, then edit it by id",
 				language: "js",
 				code: ACCEPTANCE_LOOP_EXAMPLE,
 			},
@@ -1130,7 +1105,7 @@ export const catalog: CatalogEntry[] = [
 			"- Selectors target nodeIds, edgeIds, labels, element ids, kinds, or broad scopes. Colors are 6-digit hex strings such as #7c3aed for strokeColor, fillColor, textColor, and backgroundColor.",
 			"- For a CanvasSpec, insert, remove, replace, reorder, group, and ungroup support iterative structural editing. Stable ids are mandatory; connectivity is preserved unless options.preserveConnectivity is false.",
 			"- Execute includes hosted visual proof (PNG) after an accepted patch by default; explicit artifactFormats override this.",
-			"- If export returns arrow_overlap, rebuild the flowchart as a cleaner DAG first; rerouteEdges preserves connectivity but cannot reliably fix a long upward return edge.",
+			"- A flowchart is not patched: applyDiagramPatch refuses it with unsupported_operation. Change it with editFlowchart.",
 			"",
 			operationTypes("applyDiagramPatch"),
 		].join("\n"),
@@ -1141,7 +1116,7 @@ export const catalog: CatalogEntry[] = [
 				code: FULL_PATCH_REQUEST_EXAMPLE,
 			},
 			{
-				title: "Rename an accepted node label with replaceText",
+				title: "Rename an accepted mindmap topic with replaceText",
 				language: "js",
 				code: REPLACE_TEXT_EXAMPLE,
 			},
@@ -1176,7 +1151,7 @@ export const catalog: CatalogEntry[] = [
 			"Use replaceText for label edits. Do not use setText, setLabel, rename, relabel, text, updateLabel, or setNodeLabel.",
 			'Selection-based operations use nodeIds, edgeIds, ids, labels, kinds, or scope. Structural insert/replace/reorder/group operations use stable element ids directly. The example below shows every operation\'s fields; docs({ topic: "applyDiagramPatch" }) has the full request type.',
 			"Style patches use strokeColor, fillColor, textColor, and backgroundColor.",
-			"If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges or translate, or rebuild the flowchart with more space. For complex flowcharts the most reliable repair is structural: keep edges flowing in the layout direction and avoid connecting a bottom node back to an early terminal.",
+			"If a shape change causes arrow_overlap or text_overflow during export, retry with rerouteEdges or translate, or rebuild with more space.",
 		].join("\n"),
 		examples: [
 			{
@@ -1185,7 +1160,7 @@ export const catalog: CatalogEntry[] = [
 				code: PATCH_OPERATIONS_EXAMPLE,
 			},
 			{
-				title: "Rename an accepted node label with replaceText",
+				title: "Rename an accepted mindmap topic with replaceText",
 				language: "js",
 				code: REPLACE_TEXT_EXAMPLE,
 			},
@@ -1197,18 +1172,18 @@ export const catalog: CatalogEntry[] = [
 		title: "Agent sequence",
 		topic: "agentSequence",
 		keywords: ["sequence", "repair", "retry", "loop", "style after graph"],
-		snippet: "First get the semantic graph accepted, then apply visual patches.",
+		snippet: "Build once with the styles the request states; change a flowchart with edits.",
 		content: [
-			"For mixed requests like 'circle connected to a purple decision diamond', split the task:",
+			'A flowchart states its colors and shapes in the build (\'a purple decision diamond\' is { label, shape: "diamond", color: "purple" }); other families get them by patch after the build:',
 			"1. Choose buildFlowchart for a process graph, buildMindmap for a nested topic hierarchy, buildSequenceDiagram for chronological participant interactions, buildTimeline for milestones and event chronologies, buildChart for numbers compared across categories, or createCanvas only for layouts no builder covers.",
 			"2. Inspect issues. If the build is not accepted, repair the spec and call the same build operation again.",
-			"3. Once accepted, change a flowchart with editFlowchart; for other artifacts, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
+			"3. Once accepted, change a flowchart with editFlowchart (applyDiagramPatch refuses flowcharts); for other artifacts, use applyDiagramPatch for circle, diamond, color, movement, rerouteEdges, or replaceText tweaks.",
 			"4. Return the accepted build or patch; do not fetch the scene just to summarize it. Paste artifactDelivery.finalResponseText when present, otherwise the artifactId and Excalidraw/PNG URLs. Do not create a second Markdown, Mermaid, local file, or Antigravity artifact.",
 			"For broad architecture prompts, keep the first build small and readable: one start, a mostly monotonic spine, a few decision or branch points, and separate terminal nodes for separate outcomes.",
 		].join("\n"),
 		examples: [
 			{
-				title: "Circle connected to purple decision diamond",
+				title: "A purple decision diamond in one build",
 				language: "js",
 				code: CIRCLE_TO_DIAMOND_EXAMPLE,
 			},
@@ -1270,12 +1245,12 @@ export const catalog: CatalogEntry[] = [
 		content: "Use these examples as starting points for harness-generated execute code.",
 		examples: [
 			{
-				title: "Accepted graph followed by visual patch",
+				title: "Build a flowchart, then edit it by id",
 				language: "js",
 				code: ACCEPTANCE_LOOP_EXAMPLE,
 			},
 			{
-				title: "Circle connected to purple decision diamond",
+				title: "A purple decision diamond in one build",
 				language: "js",
 				code: CIRCLE_TO_DIAMOND_EXAMPLE,
 			},
@@ -1285,7 +1260,7 @@ export const catalog: CatalogEntry[] = [
 				code: INVALID_FIRST_EXAMPLE,
 			},
 			{
-				title: "Rename an accepted node label with replaceText",
+				title: "Rename an accepted mindmap topic with replaceText",
 				language: "js",
 				code: REPLACE_TEXT_EXAMPLE,
 			},
@@ -1321,7 +1296,7 @@ export const catalog: CatalogEntry[] = [
 		snippet:
 			"Native Excalidraw is an output format. Prefer a semantic flowchart document, MindmapSpec, SequenceDiagramSpec, TimelineSpec, or ChartSpec input.",
 		content:
-			"Do not use native Excalidraw JSON as build input. Use the flowchart document, nested MindmapSpec, SequenceDiagramSpec, TimelineSpec, ChartSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats, and applyDiagramPatch handles deterministic edits.",
+			"Do not use native Excalidraw JSON as build input. Use the flowchart document, nested MindmapSpec, SequenceDiagramSpec, TimelineSpec, ChartSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats; editFlowchart changes a flowchart and applyDiagramPatch any other diagram.",
 	},
 	{
 		id: "managed-thread-non-goal",

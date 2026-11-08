@@ -777,7 +777,7 @@ describe("revising a stored diagram", () => {
 		]);
 	});
 
-	it("draws a revision's edge color as a patch and its node color in the document", async () => {
+	it("draws a revision's node color in the document and reports the edge color it cannot draw", async () => {
 		const answer = {
 			edits: [{ op: "set", nodes: { review: "Review the evidence" } }],
 			styles: [
@@ -795,16 +795,26 @@ describe("revising a stored diagram", () => {
 		const body = (await response.json()) as {
 			diagram: {
 				document: { spec: { nodes: Record<string, unknown> } };
-				patch?: { operations: Array<{ op: string }> };
+				patch?: unknown;
 				edits: unknown[];
 			};
+			issues: Array<{ code: string; severity: string; message: string }>;
 		};
 		expect(body.diagram.edits).toEqual(answer.edits);
 		expect(body.diagram.document.spec.nodes["end"]).toEqual({
 			label: "Release recorded",
 			color: "green",
 		});
-		expect(body.diagram.patch?.operations.map((operation) => operation.op)).toEqual(["setStyle"]);
+		// A flowchart is never patched: the edge color comes back as a warning.
+		expect(body.diagram.patch).toBeUndefined();
+		expect(body.issues).toContainEqual(
+			expect.objectContaining({
+				code: "unsupported_patch_operation",
+				severity: "warning",
+				message:
+					"A flowchart draws node colors and diamonds only, so the color of start->review was not drawn.",
+			}),
+		);
 	});
 
 	it("turns the diagram into the family the caller names", async () => {
@@ -854,7 +864,7 @@ describe("styling a diagram with a request", () => {
 		return JSON.stringify({ title, diagram: { ...rest, type }, styles });
 	}
 
-	it("draws a flowchart node's color in its document and patches only what the document cannot hold", async () => {
+	it("draws a flowchart node's color in its document and reports what it cannot draw", async () => {
 		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
 		const env: StudioEnv = {
 			AI: fakeAiGateway(
@@ -876,15 +886,19 @@ describe("styling a diagram with a request", () => {
 		const body = (await response.json()) as {
 			diagram: {
 				document: { spec: { nodes: Record<string, unknown> } };
-				patch?: { operations: Array<{ op: string }> };
+				patch?: unknown;
 			};
+			issues: Array<{ code: string; message: string }>;
 		};
 		expect(body.diagram.document.spec.nodes["decision"]).toMatchObject({
 			color: "purple",
 			shape: "diamond",
 		});
-		// The edge's color stays a patch.
-		expect(body.diagram.patch?.operations.map((operation) => operation.op)).toEqual(["setStyle"]);
+		// The edge's color is reported, not patched.
+		expect(body.diagram.patch).toBeUndefined();
+		expect(body.issues.map((entry) => entry.message)).toContain(
+			"A flowchart draws node colors and diamonds only, so the color of decision->revise was not drawn.",
+		);
 	});
 
 	it("leaves a request without color or shape words unstyled and its prompt without styling rules", async () => {
@@ -916,7 +930,11 @@ describe("styling a diagram with a request", () => {
 		};
 		expect(body.diagram.patch).toBeUndefined();
 		expect(body.issues).toContainEqual(
-			expect.objectContaining({ code: "unknown_patch_target", severity: "warning" }),
+			expect.objectContaining({
+				code: "unsupported_patch_operation",
+				severity: "warning",
+				message: expect.stringContaining("nowhere"),
+			}),
 		);
 	});
 });

@@ -3195,6 +3195,24 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
 		});
 	}
 
+	// A flowchart is changed through its document, so its drawing is never patched.
+	if (manifest.formats.some((format) => format.format === "document")) {
+		return yield* new ApplyDiagramPatchFailure({
+			status: "unsupported_operation",
+			context: {
+				issues: [
+					issue({
+						code: "unsupported_patch_operation",
+						stage: "input",
+						ref: { kind: "artifact", id: input.source.artifactId },
+						message: `Artifact "${input.source.artifactId}" is a flowchart, which is not patched.`,
+						hint: "Change it with sketchi.editFlowchart({ artifactId, edits }): colors, shapes, labels and steps are all edits.",
+					}),
+				],
+			},
+		});
+	}
+
 	const artifact = yield* store.read(input.source.artifactId, "scene").pipe(
 		Effect.mapError(
 			(error) =>

@@ -564,8 +564,34 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 
 	const scene = inlineArtifact(buildResult.artifact, "scene");
 	const excalidraw = inlineArtifact(buildResult.artifact, "excalidraw");
+	// A flowchart's node colors and diamonds are in its document, and its drawing is never patched:
+	// what styles are left (an edge color, a text color, another shape) is reported, not drawn.
+	const unstyled: CodeModeIssue[] =
+		type === "flowchart" && candidate.styles?.length
+			? [
+					{
+						code: "unsupported_patch_operation",
+						severity: "warning",
+						stage: "input",
+						ref: { kind: "request", path: "styles" },
+						message: `A flowchart draws node colors and diamonds only, so ${candidate.styles
+							.map((style) =>
+								[
+									style.strokeColor || style.fillColor ? "the color" : undefined,
+									style.textColor ? "the text color" : undefined,
+									style.shape ? `the ${style.shape} shape` : undefined,
+								]
+									.filter(Boolean)
+									.join(" and ")
+									.concat(` of ${style.targets.join(", ")}`),
+							)
+							.join("; ")} was not drawn.`,
+						hint: "Color nodes, not edges or text, and use the flowchart's own shapes.",
+					},
+				]
+			: [];
 	// Styles reach the caller only when they apply to the built diagram; otherwise it draws unstyled.
-	const operations = styleOperations(candidate.styles ?? []);
+	const operations = type === "flowchart" ? [] : styleOperations(candidate.styles ?? []);
 	const styled =
 		operations.length === 0
 			? undefined
@@ -618,6 +644,7 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 			})),
 			...buildResult.issues.filter((entry) => entry.severity === "warning"),
 			...styleIssues,
+			...unstyled,
 		],
 		diagram: {
 			document: { type, spec },

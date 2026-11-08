@@ -132,14 +132,15 @@ const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
 Command map:
   Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use revise to change
   a stored diagram with a request. Use list to find a record, show, copy, and export for every
-  local record. Edit and patch support canonical flowchart, mindmap, and
-  sequence records. Use create for accepted canonical JSON.
+  local record. Edit changes a flowchart with {"edits":[...]} by id or label, or replaces any
+  canonical document; patch restyles mindmap and sequence records. Use create for accepted
+  canonical JSON.
   Share and pull are explicit network
   boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
 
 Manual JSON workflow (strictly offline):
-  create a canonical document, apply semantic patches, inspect or replace it, list local records,
-  and export stored artifacts.
+  create a canonical document, edit or patch it, inspect or replace it, list local records, and
+  export stored artifacts.
   Accepted input is exactly one complete JSON object shaped like an example below.
 
 Canonical flowchart example:
@@ -161,8 +162,8 @@ Canonical sequence example:
 Universal CanvasSpec example:
   {"kind":"canvas","version":1,"diagramId":"release-board","title":"Release board","width":640,"height":360,"accentColor":"#2563eb","backgroundColor":"#ffffff","elements":[{"type":"node","id":"ready","nodeId":"ready","shape":"rectangle","x":40,"y":40,"width":240,"height":120,"label":"Ready to release"}],"layers":[],"layouts":[],"zOrder":["ready"]}
 
-Semantic color patch example:
-  sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
+Flowchart edit example (insert a step into an edge, color another):
+  sketchi edit release-flow --json '{"edits":[{"op":"insert","node":{"approve":"Approved?"},"between":["review","end"]},{"op":"set","nodes":{"end":{"color":"green"}}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
   sketchi generate [--prompt TEXT] [--type ${CANONICAL_DOCUMENT_TYPES.join("|")}]
@@ -177,8 +178,8 @@ Explicit network commands (one credential-free HTTPS request each):
   Override the endpoint for preview or local testing with
   ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.
   revise sends a stored diagram's canonical document with the request to the same endpoint and
-  keeps the complete revised document, with the same id and family unless --type names another,
-  as the record's next revision. Patched, pulled and canvas records refuse it, as they refuse edit.
+  keeps the revised document, with the same id and family unless --type names another, as the
+  record's next revision; a flowchart comes back with the edits that made it. Patched, pulled and canvas records refuse it, as they refuse edit.
   canvas submits the CanvasSpec object itself to ${DEFAULT_CANVAS_ENDPOINT}, validates the typed
   response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
   endpoint with ${SKETCHI_CANVAS_ENDPOINT_ENV} or --endpoint URL.
@@ -1131,6 +1132,15 @@ const patchCommand = Command.make(
 			const operation = Effect.gen(function* () {
 				const id = yield* resolveDiagramId(diagramId);
 				const input = yield* readPatchInput(source);
+				// A flowchart changes through its document; its drawing is never patched.
+				const stored = yield* store.show(id);
+				if (stored.document.type === "flowchart") {
+					return yield* CliValidationError.make({
+						message: `Diagram "${id}" is a flowchart, which is not patched.`,
+						hint: `Change it with sketchi edit ${id} --json '{"edits":[...]}': colors, shapes, labels and steps are all edits.`,
+						details: ["document.type"],
+					});
+				}
 				const current = yield* store.readPatchSource(id);
 				const artifacts = yield* patcher.patch(
 					current.scene,
@@ -1149,17 +1159,17 @@ const patchCommand = Command.make(
 		}),
 ).pipe(
 	Command.withDescription(
-		"Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.",
+		"Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene of any diagram but a flowchart, which changes with sketchi edit. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.",
 	),
 	Command.withShortDescription("Apply semantic edits to a stored diagram."),
 	Command.withExamples([
 		{
 			command:
-				'sketchi patch release-flow --json \'{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}\'',
-			description: "Color selected nodes through semantic ids.",
+				'sketchi patch launch-map --json \'{"operations":[{"op":"setStyle","selector":{"labels":["Product"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}\'',
+			description: "Color a mindmap topic through its label.",
 		},
 		{
-			command: "sketchi patch release-flow --file patch.json --output json",
+			command: "sketchi patch launch-map --file patch.json --output json",
 			description: "Patch from a file, then export or restore the reported diagram revision.",
 		},
 	]),

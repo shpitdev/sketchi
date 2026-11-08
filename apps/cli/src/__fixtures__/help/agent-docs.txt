@@ -3,14 +3,15 @@ Sketchi CLI contracts for agents and automation.
 Command map:
   Start with generate for prompt-to-PNG or canvas for an authored CanvasSpec. Use revise to change
   a stored diagram with a request. Use list to find a record, show, copy, and export for every
-  local record. Edit and patch support canonical flowchart, mindmap, and
-  sequence records. Use create for accepted canonical JSON.
+  local record. Edit changes a flowchart with {"edits":[...]} by id or label, or replaces any
+  canonical document; patch restyles mindmap and sequence records. Use create for accepted
+  canonical JSON.
   Share and pull are explicit network
   boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
 
 Manual JSON workflow (strictly offline):
-  create a canonical document, apply semantic patches, inspect or replace it, list local records,
-  and export stored artifacts.
+  create a canonical document, edit or patch it, inspect or replace it, list local records, and
+  export stored artifacts.
   Accepted input is exactly one complete JSON object shaped like an example below.
 
 Canonical flowchart example:
@@ -32,8 +33,8 @@ Canonical sequence example:
 Universal CanvasSpec example:
   {"kind":"canvas","version":1,"diagramId":"release-board","title":"Release board","width":640,"height":360,"accentColor":"#2563eb","backgroundColor":"#ffffff","elements":[{"type":"node","id":"ready","nodeId":"ready","shape":"rectangle","x":40,"y":40,"width":240,"height":120,"label":"Ready to release"}],"layers":[],"layouts":[],"zOrder":["ready"]}
 
-Semantic color patch example:
-  sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
+Flowchart edit example (insert a step into an edge, color another):
+  sketchi edit release-flow --json '{"edits":[{"op":"insert","node":{"approve":"Approved?"},"between":["review","end"]},{"op":"set","nodes":{"end":{"color":"green"}}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
   sketchi generate [--prompt TEXT] [--type flowchart|mindmap|sequence|timeline|chart|state-machine|gantt|er|class|org-chart|venn|journey|sankey|wireframe|quadrant]
@@ -48,8 +49,8 @@ Explicit network commands (one credential-free HTTPS request each):
   Override the endpoint for preview or local testing with
   SKETCHI_GENERATE_ENDPOINT or --endpoint URL.
   revise sends a stored diagram's canonical document with the request to the same endpoint and
-  keeps the complete revised document, with the same id and family unless --type names another,
-  as the record's next revision. Patched, pulled and canvas records refuse it, as they refuse edit.
+  keeps the revised document, with the same id and family unless --type names another, as the
+  record's next revision; a flowchart comes back with the edits that made it. Patched, pulled and canvas records refuse it, as they refuse edit.
   canvas submits the CanvasSpec object itself to https://playground.sketchi.app/api/v1/canvases/create, validates the typed
   response, stores the normalized scene and Excalidraw artifact, and exports locally. Override its
   endpoint with SKETCHI_CANVAS_ENDPOINT or --endpoint URL.

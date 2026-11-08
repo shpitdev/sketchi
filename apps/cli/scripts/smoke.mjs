@@ -240,6 +240,32 @@ const colorPatch = {
 		},
 	],
 };
+/** The same colors as flowchart edits, in the document. */
+const colorEdits = {
+	edits: [
+		{
+			op: "set",
+			nodes: {
+				start: { color: "purple" },
+				review: { color: "blue" },
+				decision: { color: "green" },
+				approve: { color: "orange" },
+				revise: { color: "orange" },
+			},
+		},
+	],
+};
+/** A mindmap still patches. */
+const mindmapPatch = {
+	intent: "Color the product branch.",
+	operations: [
+		{
+			op: "setStyle",
+			selector: { labels: ["Product"] },
+			style: { fillColor: "#dbeafe", strokeColor: "#2563eb" },
+		},
+	],
+};
 const wideTitleFlowchart = {
 	...flowchart,
 	spec: {
@@ -866,54 +892,33 @@ try {
 		"Offline restore did not recover the archived document.",
 	);
 
-	const patchFlow = await cli(
+	// A flowchart is never patched: its colors are edits to its document.
+	const refusedPatch = await cli(
 		["patch", "release-flow", "--file", "-", "--output", "json"],
 		`${JSON.stringify(colorPatch)}\n`,
 	);
-	expectExit(patchFlow, 0, "flowchart semantic patch");
-	const patchData = parseJson(patchFlow.stdout, "flowchart semantic patch").data;
+	expectExit(refusedPatch, 3, "flowchart patch refusal");
 	assert(
-		patchData.revision === 4 &&
-			patchData.authority === "patched" &&
-			patchData.documentAuthoritative === false,
-		"Semantic patch did not establish scene authority.",
+		parseJson(refusedPatch.stderr, "flowchart patch refusal").error.message ===
+			'Diagram "release-flow" is a flowchart, which is not patched.',
+		"Flowchart patch was not refused with its edit hint.",
 	);
-	const blockedEdit = await cli([
+	const colorFlow = await cli([
 		"edit",
 		"release-flow",
 		"--json",
-		JSON.stringify(flowchart),
+		JSON.stringify(colorEdits),
 		"--output",
 		"json",
 	]);
-	expectExit(blockedEdit, 6, "patched flowchart edit rejection");
+	expectExit(colorFlow, 0, "flowchart color edits");
+	const colorData = parseJson(colorFlow.stdout, "flowchart color edits").data;
 	assert(
-		parseJson(blockedEdit.stderr, "patched edit rejection").error.code === "detached_edit",
-		"Patched edit did not use the documented authority error.",
+		colorData.revision === 4 &&
+			colorData.authority === "canonical" &&
+			colorData.document.spec.nodes.review.color === "blue",
+		"Flowchart color edits did not keep canonical authority.",
 	);
-	const restoreBeforePatch = await cli([
-		"restore",
-		"release-flow",
-		"--revision",
-		"3",
-		"--output",
-		"json",
-	]);
-	expectExit(restoreBeforePatch, 0, "pre-patch canonical restore");
-	assert(
-		parseJson(restoreBeforePatch.stdout, "pre-patch canonical restore").data.authority ===
-			"canonical",
-		"Restore did not recover canonical authority after patching.",
-	);
-	const repatchFlow = await cli([
-		"patch",
-		"release-flow",
-		"--json",
-		JSON.stringify(colorPatch),
-		"--output",
-		"json",
-	]);
-	expectExit(repatchFlow, 0, "flowchart semantic repatch");
 
 	const createMindmap = await cli(
 		["create", "--file", "-", "--output", "json"],
@@ -943,6 +948,55 @@ try {
 			"Launch plan revised",
 		"Mindmap edit was not visible.",
 	);
+
+	const patchMindmap = await cli(
+		["patch", "launch-map", "--file", "-", "--output", "json"],
+		`${JSON.stringify(mindmapPatch)}\n`,
+	);
+	expectExit(patchMindmap, 0, "mindmap semantic patch");
+	const patchData = parseJson(patchMindmap.stdout, "mindmap semantic patch").data;
+	assert(
+		patchData.revision === 3 &&
+			patchData.authority === "patched" &&
+			patchData.documentAuthoritative === false,
+		"Semantic patch did not establish scene authority.",
+	);
+	const blockedEdit = await cli([
+		"edit",
+		"launch-map",
+		"--json",
+		JSON.stringify(revisedMindmap),
+		"--output",
+		"json",
+	]);
+	expectExit(blockedEdit, 6, "patched mindmap edit rejection");
+	assert(
+		parseJson(blockedEdit.stderr, "patched edit rejection").error.code === "detached_edit",
+		"Patched edit did not use the documented authority error.",
+	);
+	const restoreBeforePatch = await cli([
+		"restore",
+		"launch-map",
+		"--revision",
+		"2",
+		"--output",
+		"json",
+	]);
+	expectExit(restoreBeforePatch, 0, "pre-patch canonical restore");
+	assert(
+		parseJson(restoreBeforePatch.stdout, "pre-patch canonical restore").data.authority ===
+			"canonical",
+		"Restore did not recover canonical authority after patching.",
+	);
+	const repatchMindmap = await cli([
+		"patch",
+		"launch-map",
+		"--json",
+		JSON.stringify(mindmapPatch),
+		"--output",
+		"json",
+	]);
+	expectExit(repatchMindmap, 0, "mindmap semantic repatch");
 
 	const list = await cli(["list", "--output", "json"]);
 	expectExit(list, 0, "diagram list");
@@ -1208,8 +1262,6 @@ try {
 		"revisions/000001/document.json",
 		"revisions/000002/manifest.json",
 		"revisions/000003/manifest.json",
-		"revisions/000004/manifest.json",
-		"revisions/000005/manifest.json",
 	]) {
 		await readFile(resolve(record, relative));
 	}
@@ -1241,8 +1293,9 @@ try {
 			"generate:wizard-current-project-custom-mindmap-cancel",
 			"flowchart:create-show-edit-show",
 			"flowchart:restore-offline",
-			"flowchart:patch-edit-blocked-restore-repatch",
+			"flowchart:patch-refused-color-edits",
 			"mindmap:create-show-edit-show",
+			"mindmap:patch-edit-blocked-restore-repatch",
 			"list",
 			"export:file-stdout-png-on-demand",
 		],

@@ -16,7 +16,7 @@ Use the bundled `sketchi-code-mode` MCP server for Sketchi diagrams instead of r
 1. Call `docs` or `search` first when you need the current contract for graph input, patch input, artifact retrieval, or supported style fields.
 2. Use `execute` with an async JavaScript arrow function expression.
 3. Build structure with `sketchi.buildFlowchart(input)` for process graphs, `sketchi.buildMindmap(input)` for nested topic hierarchies, or `sketchi.buildSequenceDiagram(input)` for chronological participant interactions.
-4. Apply non-structural visual edits with `sketchi.applyDiagramPatch(input)`.
+4. Change a built flowchart with `sketchi.editFlowchart({ artifactId, edits })`: steps, labels, colors and shapes, by id or label. A flowchart states its colors and shapes in the build and is never patched; apply visual edits to other diagrams with `sketchi.applyDiagramPatch(input)`.
 5. Only retrieve proof or output with `sketchi.getArtifact(input)` when you need raw Excalidraw/PNG metadata; do not fetch `scene` just to summarize the diagram.
 6. If the MCP text content begins with `Sketchi artifact ready.`, paste that first text block as the final chat response and stop.
 7. If the execute result contains `artifactDelivery.finalResponseText`, paste that text as the final chat response and stop.
@@ -44,45 +44,33 @@ async () => {
 
   if (!built.ok) return built;
 
-  const patched = await sketchi.applyDiagramPatch({
-    source: { artifactId: built.artifact.artifactId },
-    intent: "Make the decision node a purple diamond.",
-    operations: [
-      {
-        op: "setStyle",
-        selector: { nodeIds: ["approved"] },
-        style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
-      },
-      {
-        op: "setShape",
-        selector: { nodeIds: ["approved"] },
-        shape: "diamond",
-      },
-    ],
+  const edited = await sketchi.editFlowchart({
+    artifactId: built.artifact.artifactId,
+    edits: [{ op: "set", nodes: { approved: { shape: "diamond", color: "purple" } } }],
     options: {
       artifactFormats: ["scene", "excalidraw", "png"],
       inlineArtifacts: [],
     },
   });
 
-  if (!patched.ok) return patched;
+  if (!edited.ok) return edited;
 
   const excalidraw = await sketchi.getArtifact({
-    artifactId: patched.artifact.artifactId,
+    artifactId: edited.artifact.artifactId,
     format: "excalidraw",
     inline: false,
   });
   const png = await sketchi.getArtifact({
-    artifactId: patched.artifact.artifactId,
+    artifactId: edited.artifact.artifactId,
     format: "png",
     inline: false,
   });
 
   return {
     ok: true,
-    artifactId: patched.artifact.artifactId,
-    diagramId: patched.artifact.diagramId,
-    formats: patched.artifact.formats,
+    artifactId: edited.artifact.artifactId,
+    diagramId: edited.artifact.diagramId,
+    formats: edited.artifact.formats,
     excalidraw,
     png,
   };

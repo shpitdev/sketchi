@@ -91,6 +91,24 @@ describe("request-driven styling", () => {
 		]);
 	});
 
+	it("keeps a node's text color as a style, since the node's color draws its stroke and fill only", () => {
+		const candidate = candidateFromText({
+			model: "test",
+			provider: "fixture",
+			text: JSON.stringify({
+				title: "Release",
+				diagram: flowchart,
+				styles: [
+					{ targets: ["ship"], fillColor: "#dcfce7", strokeColor: "#16a34a", textColor: "#16a34a" },
+				],
+			}),
+		});
+		expect(candidate.flowchart?.nodes["ship"]).toEqual({ label: "Ship", color: "green" });
+		expect(candidate.styles?.map((style) => ({ ...style, targets: [...style.targets] }))).toEqual([
+			{ targets: ["ship"], textColor: "#16a34a" },
+		]);
+	});
+
 	it("tells a flowchart to color nodes in its document", () => {
 		const styled = buildDiagramGenerationMessages({ id: "s", request: "red gate", styling: true });
 		expect(styled.system).toContain("A flowchart colors a node with its own color field instead");

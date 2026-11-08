@@ -90,6 +90,23 @@ function createTestRuntime() {
 	});
 }
 
+/**
+ * The approval flowchart's drawing stored as a canvas. A flowchart is never patched, so the patch
+ * engine's tests run on the same graph through a canvas artifact.
+ */
+async function approvalCanvas(
+	runtime: ReturnType<typeof createTestRuntime>,
+	inlineArtifacts: ("scene" | "excalidraw")[] = [],
+) {
+	const built = await runtime.buildFlowchart({
+		spec: approvalSpec(),
+		options: { inlineArtifacts: ["scene"] },
+	});
+	if (!built.ok) throw new Error("Expected the approval flowchart to build.");
+	const scene = built.artifact.formats.find((format) => format.format === "scene")?.inline;
+	return runtime.createCanvas({ spec: scene, options: { inlineArtifacts } });
+}
+
 function approvalSpec() {
 	return {
 		title: "Simple approval flow",
@@ -1242,8 +1259,8 @@ describe("Code Mode runtime", () => {
 
 	it("patches styling after the graph artifact is accepted", async () => {
 		const runtime = createTestRuntime();
-		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-		expectBuildOk(built);
+		const built = await approvalCanvas(runtime);
+		expectCanvasOk(built);
 
 		const patched = await runtime.applyDiagramPatch({
 			source: { artifactId: built.artifact.artifactId },
@@ -1297,8 +1314,8 @@ describe("Code Mode runtime", () => {
 					Effect.succeed(new Uint8Array([137, 80, 78, 71, scene.elements.length])),
 			},
 		});
-		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-		expectBuildOk(built);
+		const built = await approvalCanvas(runtime);
+		expectCanvasOk(built);
 
 		const patched = await runtime.applyDiagramPatch({
 			source: { artifactId: built.artifact.artifactId },
@@ -1343,8 +1360,8 @@ describe("Code Mode runtime", () => {
 				renderPng: () => Effect.succeed(new Uint8Array([137, 80, 78, 71])),
 			},
 		});
-		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-		expectBuildOk(built);
+		const built = await approvalCanvas(runtime);
+		expectCanvasOk(built);
 
 		expect(built.artifact).not.toHaveProperty("provenance");
 		const rootScene = await runtime.getArtifact({
@@ -1394,8 +1411,8 @@ describe("Code Mode runtime", () => {
 
 	it("keeps scoped edge style patches from recoloring node labels", async () => {
 		const runtime = createTestRuntime();
-		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-		expectBuildOk(built);
+		const built = await approvalCanvas(runtime);
+		expectCanvasOk(built);
 
 		const patched = await runtime.applyDiagramPatch({
 			source: { artifactId: built.artifact.artifactId },
@@ -1429,11 +1446,8 @@ describe("Code Mode runtime", () => {
 
 	it("keeps positioned branch labels associated through edge patches", async () => {
 		const runtime = createTestRuntime();
-		const built = await runtime.buildFlowchart({
-			spec: approvalSpec(),
-			options: { inlineArtifacts: ["scene"] },
-		});
-		expectBuildOk(built);
+		const built = await approvalCanvas(runtime, ["scene"]);
+		expectCanvasOk(built);
 		const patched = await runtime.applyDiagramPatch({
 			source: { artifactId: built.artifact.artifactId },
 			operations: [
@@ -1472,8 +1486,8 @@ describe("Code Mode runtime", () => {
 
 	it("rejects patch selectors that do not match the accepted artifact", async () => {
 		const runtime = createTestRuntime();
-		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-		expectBuildOk(built);
+		const built = await approvalCanvas(runtime);
+		expectCanvasOk(built);
 
 		const patched = await runtime.applyDiagramPatch({
 			source: { artifactId: built.artifact.artifactId },
@@ -1522,8 +1536,8 @@ describe("Code Mode runtime", () => {
 
 	it("uses replaceText to update accepted node labels", async () => {
 		const runtime = createTestRuntime();
-		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
-		expectBuildOk(built);
+		const built = await approvalCanvas(runtime);
+		expectCanvasOk(built);
 
 		const patched = await runtime.applyDiagramPatch({
 			source: { artifactId: built.artifact.artifactId },
@@ -3658,6 +3672,30 @@ describe("editFlowchart", () => {
 
 		expect(result).toMatchObject({ ok: false, status: "invalid_flowchart" });
 		expect(result.ok ? undefined : result.partial?.artifactId).toBeUndefined();
+	});
+
+	it("refuses to patch a flowchart, which changes by edits", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		if (!built.ok) throw new Error("Expected the base to build.");
+
+		const patched = await runtime.applyDiagramPatch({
+			source: { artifactId: built.artifact.artifactId },
+			operations: [
+				{ op: "setStyle", selector: { nodeIds: ["done"] }, style: { strokeColor: "#16a34a" } },
+			],
+		});
+
+		expect(patched).toMatchObject({
+			ok: false,
+			status: "unsupported_operation",
+			issues: [
+				expect.objectContaining({
+					code: "unsupported_patch_operation",
+					hint: expect.stringContaining("sketchi.editFlowchart"),
+				}),
+			],
+		});
 	});
 
 	it("names an edit that targets nothing and changes nothing", async () => {
