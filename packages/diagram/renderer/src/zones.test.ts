@@ -474,7 +474,8 @@ describe("lines into a hanging zone band", () => {
 		// Asked for left to right, Sol and Sonnet samples hung the DMZ under the
 		// public internet, or the private subnet under the DMZ, wrapping a row that
 		// ran past 2.45:1. The request now passes from each zone to the next along
-		// the row, which draws 5:1 to 8.6:1.
+		// the row, which draws 2.7:1 to 6.7:1, its steps past the last zone wrapping
+		// under it.
 		const fixture = fixtures[name]!;
 		const scene = rendered(name, direction);
 		const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
@@ -486,7 +487,36 @@ describe("lines into a hanging zone band", () => {
 			expect(before.y).toBeLessThan(zone.y + zone.height);
 			expect(zone.y).toBeLessThan(before.y + before.height);
 		}
-		expect(drawnAspect(scene)).toBeLessThan(9);
+		expect(drawnAspect(scene)).toBeLessThan(7);
+	});
+
+	it("wraps a row's steps past its last zone under it, the zone kept in the first band", () => {
+		// Four steps, a one-step cloud and three steps more ran 2,252 px in one row:
+		// the most even cuts hung the cloud, and no other cut was tried.
+		const ids = ["a1", "a2", "a3", "a4", "z1", "b1", "b2", "b3"];
+		const scene = renderIntermediateDiagram(
+			parseFlowchartDiagram({
+				id: "trailing-steps",
+				title: "Trailing steps",
+				type: "flowchart",
+				layout: { direction: "LR", edgeRouting: "orthogonal" },
+				nodes: ids.map((id, index) => ({
+					id,
+					label: `Step ${id}`,
+					kind: index === 0 ? "start" : index === ids.length - 1 ? "end" : "process",
+					...(id === "z1" ? { group: "cloud" } : {}),
+				})),
+				edges: ids
+					.slice(1)
+					.map((id, index) => ({ id: `e${index}`, source: ids[index]!, target: id })),
+				groups: [{ id: "cloud", label: "Cloud", kind: "cloud" }],
+			}),
+		);
+		expect(scene.width).toBeLessThan(1_600);
+		const cloud = zonesOf(scene)[0]!;
+		const [a4, b1] = [nodeOf(scene, "a4"), nodeOf(scene, "b1")];
+		expect(cloud.x).toBeGreaterThan(a4.x + a4.width);
+		expect(b1.y).toBeGreaterThan(cloud.y + cloud.height);
 	});
 
 	it("keeps every zone of a hybrid row along the flow, nested zones included", () => {

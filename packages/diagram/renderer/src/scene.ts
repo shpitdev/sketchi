@@ -1630,6 +1630,8 @@ interface ZoneWrapOptions {
 	readonly weights: ReadonlyMap<string, number>;
 	/** Whether a cut may carry a forward edge that skips ranks. */
 	readonly skips: boolean;
+	/** Units that stay in the first band: a row's zones, which no cut may hang. */
+	readonly firstBand?: ReadonlySet<string>;
 }
 
 /**
@@ -1733,9 +1735,18 @@ function planWrap(
 		return flow(from, to) + (from > 0 ? ROUTE_STUB_LENGTH : 0) + departure;
 	};
 
-	// Band ends: a clean cut or the last rank. Each band keeps at least two ranks;
-	// a zoned band hangs under the steps that reach it, so it may hold one.
-	const ends = [...continuationAfter.keys(), last].sort((a, b) => a - b);
+	// Band ends: a clean cut or the last rank, the first past every unit that
+	// stays in the first band. Each band keeps at least two ranks; a zoned band
+	// hangs under the steps that reach it, so it may hold one.
+	const firstEnd = Math.max(
+		-1,
+		...rankMetrics.flatMap((metric, index) =>
+			metric.shapes.some((shape) => zone?.firstBand?.has(shape.nodeId)) ? [index] : [],
+		),
+	);
+	const ends = [...continuationAfter.keys(), last]
+		.filter((end) => end >= firstEnd)
+		.sort((a, b) => a - b);
 	const minimum = zone ? 1 : 2;
 	// An even wrap keeps every band at least `balance` of the longest, so no band
 	// stands short beside a long one with empty space past its end.
@@ -1922,13 +1933,18 @@ function planZoneWraps(
 	// beside the earlier instead, across a wide export, where keeping both in one
 	// column would wrap the group inside it into a taller one.
 	const row = diagram.layout.direction === "LR" || diagram.layout.direction === "RL";
-	const hangsZone = (level: string, wrap: Wrap) =>
-		structure.zoned &&
-		structure.groups.some(
-			({ group }) =>
-				(structure.parentOf.get(group.id) ?? TOP_LEVEL) === level &&
-				(wrap.bandOf.get(groupUnitId(group.id)) ?? 0) > 0,
+	const zonesOf = (level: string) =>
+		new Set(
+			structure.zoned
+				? structure.groups.flatMap(({ group }) =>
+						(structure.parentOf.get(group.id) ?? TOP_LEVEL) === level
+							? [groupUnitId(group.id)]
+							: [],
+					)
+				: [],
 		);
+	const hangsZone = (level: string, wrap: Wrap) =>
+		[...zonesOf(level)].some((unit) => (wrap.bandOf.get(unit) ?? 0) > 0);
 	const planned = wraps.size;
 	let current = predict(wraps);
 	const skipping = (zoneWraps: ReadonlyMap<string, Wrap>) =>
@@ -1955,8 +1971,9 @@ function planZoneWraps(
 						sizes,
 						weights,
 						skips,
+						...(row && !hangZones ? { firstBand: zonesOf(id) } : {}),
 					});
-					if (wrap.bandOf.size === 0 || (row && !hangZones && hangsZone(id, wrap))) continue;
+					if (wrap.bandOf.size === 0) continue;
 					const key = [...wrap.bandOf].join(" ");
 					let plan = byBands.get(key);
 					if (!plan) {
