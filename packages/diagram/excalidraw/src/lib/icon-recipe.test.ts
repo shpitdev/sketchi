@@ -8,7 +8,11 @@ import {
 	type CanvasShapeElement,
 	type IconRecipe,
 } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import {
+	renderIntermediateDiagram,
+	type NodeSceneElement,
+	type SceneElement,
+} from "@sketchi/diagram-renderer";
 
 import {
 	convertSceneToExcalidraw,
@@ -159,6 +163,87 @@ describe("hand-drawn node logos in Excalidraw output", () => {
 			type: "image",
 		});
 		expect(Object.keys(excalidraw.files ?? {})).not.toHaveLength(0);
+	});
+
+	const canvasScene = (elements: SceneElement[], recipe = true) =>
+		convertSceneToExcalidraw(
+			embedCanvasIcons(
+				{
+					...renderIntermediateDiagram(deployPipelineLogoFlowchart),
+					elements,
+					zOrder: elements.map((element) => element.id),
+				},
+				() => ({
+					name: "Docker",
+					...(recipe
+						? { recipe: RECIPE }
+						: {
+								svg: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"/>`,
+							}),
+				}),
+			).scene,
+		);
+	const logoNode = (overrides: Partial<NodeSceneElement> = {}): NodeSceneElement => ({
+		type: "node",
+		id: "n",
+		nodeId: "n",
+		shape: "rectangle",
+		x: 40,
+		y: 40,
+		width: 184,
+		height: 96,
+		label: "Build",
+		icon: { slug: "docker", size: 28 },
+		...overrides,
+	});
+
+	it("never gives a part the id of an element the scene already has", () => {
+		const authored = {
+			type: "text",
+			id: "n-icon-0",
+			x: 300,
+			y: 40,
+			text: "Note",
+			fontSize: 16,
+		} as const;
+		const excalidraw = convertSceneToExcalidraw(
+			embedCanvasIcons(
+				{
+					...renderIntermediateDiagram(deployPipelineLogoFlowchart),
+					elements: [logoNode(), authored],
+					zOrder: ["n", "n-icon-0"],
+				},
+				() => ({ name: "Docker", recipe: RECIPE }),
+			).scene,
+		);
+		const ids = excalidraw.elements.map((element) => element.id);
+		expect(new Set(ids).size).toBe(ids.length);
+		const parts = excalidraw.elements.filter((element) =>
+			Boolean((element.customData as Record<string, unknown> | undefined)?.["sketchiIconPart"]),
+		);
+		expect(parts).toHaveLength(RECIPE.parts.length);
+		expect(parts.map((part) => part.id)).not.toContain("n-icon-0");
+		expect(excalidraw.elements.find((element) => element.id === "n-icon-0")).toMatchObject({
+			type: "text",
+		});
+	});
+
+	it("keeps a node's hand-drawn logo in the node's frame, as its SVG logo is", () => {
+		const frame = {
+			type: "frame",
+			id: "f",
+			name: "Build",
+			x: 0,
+			y: 0,
+			width: 320,
+			height: 200,
+		} as const;
+		for (const recipe of [true, false]) {
+			const excalidraw = canvasScene([frame, logoNode({ frameId: "f" })], recipe);
+			const logo = excalidraw.elements.filter((element) => element.id.startsWith("n-icon"));
+			expect(logo.length).toBeGreaterThan(0);
+			for (const part of logo) expect(part.frameId).toBe("f");
+		}
 	});
 
 	it("draws a group's logo before its name inside the frame", () => {

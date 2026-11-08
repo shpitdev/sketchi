@@ -408,10 +408,13 @@ function iconElements(input: {
 			: undefined;
 	const form = node.icon ? canvasIconForm(node.icon, asset) : undefined;
 	if (!node.icon || !asset || !form) return [];
-	const id = iconElementId(node, input.usedElementIds);
 	if (form === "svg" && asset.svg !== undefined) {
 		const fileId = iconFileId(node.icon.slug, asset.svg);
-		const image = iconImageElement({ fileId, id, node });
+		const image = iconImageElement({
+			fileId,
+			id: iconElementId(node, input.usedElementIds),
+			node,
+		});
 		if (!image) return [];
 		input.files[fileId] ??= iconFile(fileId, asset.svg);
 		return [image];
@@ -419,12 +422,16 @@ function iconElements(input: {
 	const box = iconBox(node);
 	if (!box || !asset.recipe) return [];
 	const group = node.type === "frame" || node.rendererRole === "zone";
-	const parts = iconRecipeElements(asset.recipe, {
+	return iconRecipeElements(asset.recipe, {
 		box: { x: box.x, y: box.y, size: box.width },
-		id,
+		id: iconElementId(node, input.usedElementIds, asset.recipe.parts.length),
+		// A frame's logo is one of its children; a node's sits in the node's frame.
 		...(node.type === "frame"
 			? { frameId: node.id, groupIds: [] }
-			: { groupIds: [logoGroupId(node), ...(node.groupIds ?? [])] }),
+			: {
+					frameId: node.frameId ?? null,
+					groupIds: [logoGroupId(node), ...(node.groupIds ?? [])],
+				}),
 		ink: input.ink,
 		paper: scene.backgroundColor,
 		customData: group ? { sketchiGroupIcon: node.icon.slug } : { sketchiNodeIcon: node.icon.slug },
@@ -432,8 +439,6 @@ function iconElements(input: {
 		...(node.locked === undefined ? {} : { locked: node.locked }),
 		...(node.opacity === undefined ? {} : { opacity: node.opacity }),
 	});
-	for (const part of parts) input.usedElementIds.add(part.id);
-	return parts;
 }
 
 function shapeElement(input: {
@@ -820,20 +825,29 @@ function synthesizeNodeLabels(sourceElements: readonly SceneElement[]): {
 	return { textElements, generatedLabelSourceIds };
 }
 
+/**
+ * A logo's id, unique in the scene with every `${id}-${part}` id its hand-drawn
+ * parts take, all reserved before any is emitted.
+ */
 function iconElementId(
 	node: NodeSceneElement | FrameSceneElement,
 	usedElementIds: Set<string>,
+	parts = 0,
 ): string {
 	// Excalidraw's SVG export selects per-element image symbols by id, so the
 	// id must be a valid CSS identifier fragment (node ids contain colons).
 	const baseId = `${node.id.replace(/[^\w-]/gu, "-")}-icon`;
+	const claimed = (id: string) => [
+		id,
+		...Array.from({ length: parts }, (_, index) => `${id}-${index}`),
+	];
 	let id = baseId;
 	let suffix = 2;
-	while (usedElementIds.has(id)) {
+	while (claimed(id).some((candidate) => usedElementIds.has(candidate))) {
 		id = `${baseId}-${suffix}`;
 		suffix += 1;
 	}
-	usedElementIds.add(id);
+	for (const candidate of claimed(id)) usedElementIds.add(candidate);
 	return id;
 }
 
