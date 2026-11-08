@@ -3,6 +3,7 @@ import "@tanstack/react-start/server-only";
 import {
 	applyDiagramPatch,
 	buildFlowchart,
+	editFlowchart,
 	buildMindmap,
 	buildSequenceDiagram,
 	buildStateMachine,
@@ -27,6 +28,7 @@ import {
 	type ApplyDiagramPatchResult,
 	type ArtifactFormat,
 	type BuildFlowchartResult,
+	type EditFlowchartResult,
 	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
@@ -74,6 +76,9 @@ export interface PlaygroundCodeModeShape {
 	readonly buildFlowchart: (
 		input: unknown,
 	) => Effect.Effect<BuildFlowchartResult, never, CodeModeRequestContext>;
+	readonly editFlowchart: (
+		input: unknown,
+	) => Effect.Effect<EditFlowchartResult, never, CodeModeRequestContext>;
 	readonly buildMindmap: (
 		input: unknown,
 	) => Effect.Effect<BuildMindmapResult, never, CodeModeRequestContext>;
@@ -247,6 +252,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
 			),
 			buildFlowchart: Effect.fn("playground.codeMode.buildFlowchart")((input) =>
 				withSpanContent(input, provideRequestCodeMode(buildFlowchart(input))),
+			),
+			editFlowchart: Effect.fn("playground.codeMode.editFlowchart")((input) =>
+				withSpanContent(input, provideRequestCodeMode(editFlowchart(input))),
 			),
 			buildMindmap: Effect.fn("playground.codeMode.buildMindmap")((input) =>
 				withSpanContent(input, provideRequestCodeMode(buildMindmap(input))),

@@ -241,6 +241,7 @@ declare const sketchi: {
     input: BuildSequenceDiagramRequest,
   ): Promise<BuildSequenceDiagramResult>;
   createCanvas(input: CreateCanvasRequest): Promise<CreateCanvasResult>;
+  editFlowchart(input: EditFlowchartRequest): Promise<EditFlowchartResult>;
   getArtifact(input: GetArtifactRequest): Promise<GetArtifactResult>;
   applyDiagramPatch(
     input: ApplyDiagramPatchRequest,
@@ -283,6 +284,7 @@ flowchart LR
 | `POST /api/v1/mindmaps/build`              | `sketchi.buildMindmap(input)`         | Yes                   |
 | `POST /api/v1/sequences/build`             | `sketchi.buildSequenceDiagram(input)` | Yes                   |
 | `POST /api/v1/canvases/create`             | `sketchi.createCanvas(input)`         | Yes                   |
+| `POST /api/v1/flowcharts/edit`             | `sketchi.editFlowchart(input)`        | Yes                   |
 | `GET /api/v1/artifacts/:artifactId`        | `sketchi.getArtifact(input)`          | Yes                   |
 | `POST /api/v1/artifacts/:artifactId/patch` | `sketchi.applyDiagramPatch(input)`    | Yes                   |
 | validate IR                                | none                                  | No, internal to build |
@@ -859,10 +861,32 @@ draws them, and the Excalidraw `files` map one image per distinct embedded SVG. 
 most agents should not inspect or rewrite it directly; read stored formats
 through their URLs or `getArtifact` instead.
 
+## `editFlowchart`
+
+Every flowchart build stores its document beside the drawing, as the
+`document` format. `editFlowchart({ artifactId, edits })` applies edits to that
+document in order and builds the result as a new artifact whose
+`provenance.sourceArtifactId` names the one it changed. Edits name nodes,
+groups and lanes by id, by a unique spelling of the id, or by a unique label:
+
+| op           | What it does                                                                                   |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `insert`     | Puts a node into an existing edge: `a → b` becomes `a → new → b`, keeping the label on `a → new`. |
+| `set`        | Merges a partial document: new ids add, fields merge, `null` removes.                          |
+| `connect`    | Adds edges, or relabels an edge that exists.                                                    |
+| `disconnect` | Removes edges.                                                                                 |
+
+An accepted edit returns the new artifact, the full document as
+`normalizedSpec` and the edits. An edit naming an id the document lacks fails at
+its own path (`edits[2].between[1]`) with the nearest ids, and nothing is
+stored. Nodes may take a `color` (`red`, `orange`, `yellow`, `green`, `blue`,
+`purple` or `gray`), drawn as the color's stroke over its pale tint.
+
 ## `getArtifact`
 
 `getArtifact` retrieves a stored artifact format by `artifactId`. `diagramId`
-is semantic and not unique enough for retrieval.
+is semantic and not unique enough for retrieval. `format: "document"` returns a
+flowchart's document inline.
 
 ```mermaid
 sequenceDiagram

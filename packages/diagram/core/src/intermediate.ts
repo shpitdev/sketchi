@@ -106,6 +106,26 @@ export const DIAGRAM_NODE_SHAPES = ["database", "queue", "document", "storage"] 
 export const DiagramNodeShapeSchema = Schema.Literals(DIAGRAM_NODE_SHAPES);
 export type DiagramNodeShape = typeof DiagramNodeShapeSchema.Type;
 
+/**
+ * Colors a node may take, each drawn as its stroke over a pale tint of it, so the label
+ * stays readable.
+ */
+export const DIAGRAM_NODE_COLORS = {
+	red: { stroke: "#dc2626", fill: "#fee2e2" },
+	orange: { stroke: "#ea580c", fill: "#ffedd5" },
+	yellow: { stroke: "#ca8a04", fill: "#fef9c3" },
+	green: { stroke: "#16a34a", fill: "#dcfce7" },
+	blue: { stroke: "#2563eb", fill: "#dbeafe" },
+	purple: { stroke: "#7c3aed", fill: "#ede9fe" },
+	gray: { stroke: "#6b7280", fill: "#f3f4f6" },
+} as const;
+export const DIAGRAM_NODE_COLOR_NAMES = Object.keys(DIAGRAM_NODE_COLORS) as [
+	keyof typeof DIAGRAM_NODE_COLORS,
+	...(keyof typeof DIAGRAM_NODE_COLORS)[],
+];
+export const DiagramNodeColorSchema = Schema.Literals(DIAGRAM_NODE_COLOR_NAMES);
+export type DiagramNodeColor = typeof DiagramNodeColorSchema.Type;
+
 export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
 	id: NonEmptyString,
 	label: NonEmptyString,
@@ -116,6 +136,8 @@ export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
 	kind: Schema.optional(NonEmptyString),
 	shape: Schema.optional(DiagramNodeShapeSchema),
 	icon: Schema.optional(DiagramIconRef),
+	/** A palette color the node draws in, its stroke over a pale tint. */
+	color: Schema.optional(DiagramNodeColorSchema),
 	metadata: withDefault(Metadata, {}),
 }) {}
 export const DiagramNodeSchema = DiagramNode;

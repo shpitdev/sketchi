@@ -8,6 +8,8 @@ import {
 	BuildFlowchartRejected,
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
+	EditFlowchartRequestSchema,
+	EditFlowchartResultSchema,
 	BuildMindmapRequestSchema,
 	BuildMindmapResultSchema,
 	BuildSequenceDiagramRequestSchema,
@@ -69,6 +71,10 @@ export const codeModeContracts = {
 	buildFlowchart: {
 		input: BuildFlowchartRequestSchema,
 		output: BuildFlowchartResultSchema,
+	},
+	editFlowchart: {
+		input: EditFlowchartRequestSchema,
+		output: EditFlowchartResultSchema,
 	},
 	buildMindmap: {
 		input: Schema.Struct({

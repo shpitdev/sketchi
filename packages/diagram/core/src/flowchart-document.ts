@@ -1,6 +1,11 @@
 import { Schema } from "effect";
 
-import { DIAGRAM_NODE_SHAPES, DIAGRAM_ZONE_KINDS, SKETCHI_DIAGRAM_STYLE } from "./intermediate.js";
+import {
+	DIAGRAM_NODE_SHAPES,
+	DIAGRAM_ZONE_KINDS,
+	DiagramNodeColorSchema,
+	SKETCHI_DIAGRAM_STYLE,
+} from "./intermediate.js";
 import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_GROUP_DEPTH,
@@ -64,6 +69,8 @@ export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
 	group: Schema.optionalKey(Schema.NonEmptyString),
 	/** The id of the lane of whoever does the step, in a flowchart with lanes. */
 	lane: Schema.optionalKey(Schema.NonEmptyString),
+	/** A palette color the node draws in: red, orange, yellow, green, blue, purple or gray. */
+	color: Schema.optionalKey(DiagramNodeColorSchema),
 });
 export interface FlowchartDocumentNodeDetails extends Schema.Schema.Type<
 	typeof FlowchartDocumentNodeDetailsSchema
@@ -721,17 +728,49 @@ function graphIssues(
 	return issues;
 }
 
+/**
+ * The spelling of a reference that case, separators and trailing punctuation do not change.
+ * Letters and digits of any script count, so a non-Latin label keeps its key.
+ */
+export function flowchartReferenceKey(reference: string): string {
+	return reference
+		.trim()
+		.replace(/[^\p{L}\p{N}_-]+$/gu, "")
+		.toLowerCase()
+		.replace(/[-_\s]+/gu, "-");
+}
+
+/**
+ * Resolve a reference to one declared id, trying in turn the id itself, the one label it spells
+ * exactly, the one id it spells differently, then the one label it spells differently. An
+ * ambiguous or unknown reference resolves to nothing.
+ */
+export function resolveFlowchartReference(
+	reference: string,
+	declared: Iterable<readonly [id: string, label?: string]>,
+): { readonly id: string; readonly by: "id" | "spelling" | "label" } | undefined {
+	const entries = [...declared];
+	if (entries.some(([id]) => id === reference)) return { id: reference, by: "id" };
+	const unique = (matches: readonly (readonly [string, string?])[]) =>
+		matches.length === 1 ? matches[0]?.[0] : undefined;
+	const labeled = unique(entries.filter(([, label]) => label === reference));
+	if (labeled !== undefined) return { id: labeled, by: "label" };
+	const key = flowchartReferenceKey(reference);
+	if (key === "") return undefined;
+	const spelled = unique(entries.filter(([id]) => flowchartReferenceKey(id) === key));
+	if (spelled !== undefined) return { id: spelled, by: "spelling" };
+	const spelledLabel = unique(
+		entries.filter(([, label]) => label !== undefined && flowchartReferenceKey(label) === key),
+	);
+	return spelledLabel === undefined ? undefined : { id: spelledLabel, by: "label" };
+}
+
 /** Resolve only unique spelling variants of declared ids; exact ids always win. */
 export function resolveFlowchartReferences(document: FlowchartDocument): {
 	readonly document: FlowchartDocument;
 	readonly notes: readonly string[];
 } {
-	const key = (id: string) =>
-		id
-			.trim()
-			.replace(/[^\w-]+$/gu, "")
-			.toLowerCase()
-			.replace(/[-_\s]+/gu, "-");
+	const key = flowchartReferenceKey;
 	const notes: string[] = [];
 	const resolver = (ids: readonly string[]) => {
 		const exact = new Set(ids);
@@ -964,6 +1003,7 @@ export function flowchartDiagramFromDocument(
 				...(node.note ? { description: node.note } : {}),
 				...(node.shape && node.shape !== "diamond" ? { shape: node.shape } : {}),
 				...(icon ? { icon: { slug: icon } } : {}),
+				...(node.color ? { color: node.color } : {}),
 				...(group ? { group } : {}),
 				...(lane ? { lane } : {}),
 				metadata: {},

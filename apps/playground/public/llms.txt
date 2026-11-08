@@ -18,7 +18,8 @@ sketchi-code-mode and exposes three tools:
 - execute: run Sketchi code mode, which builds flowcharts, mindmaps, sequence
   diagrams, timelines, charts, state machines, Gantt charts, ER diagrams,
   class diagrams, org charts, Venn diagrams, journey maps, Sankey diagrams,
-  wireframes and quadrant charts, fetches artifacts, and applies diagram patches.
+  wireframes and quadrant charts, edits flowcharts, fetches artifacts, and
+  applies diagram patches.
 
 This is the recommended entry point for agents. Prefer it over the HTTP
 endpoints below unless you need a single direct call.
@@ -41,6 +42,10 @@ POST /api/v1/sankey-diagrams/build
 POST /api/v1/wireframes/build
 POST /api/v1/quadrant-charts/build
 Build one diagram from a typed spec and store the result as an artifact.
+
+POST /api/v1/flowcharts/edit
+Apply edits ({ artifactId, edits }) to a built flowchart and store the result
+as a new artifact.
 
 POST /api/v1/generate
 Generate a flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, or quadrant diagram from a prompt rather than a

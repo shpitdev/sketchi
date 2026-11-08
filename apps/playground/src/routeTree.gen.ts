@@ -31,6 +31,7 @@ import { Route as ApiV1ChartsBuildRouteImport } from "./routes/api/v1/charts/bui
 import { Route as ApiV1ClassDiagramsBuildRouteImport } from "./routes/api/v1/class-diagrams/build";
 import { Route as ApiV1ErDiagramsBuildRouteImport } from "./routes/api/v1/er-diagrams/build";
 import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
+import { Route as ApiV1FlowchartsEditRouteImport } from "./routes/api/v1/flowcharts/edit";
 import { Route as ApiV1GanttsBuildRouteImport } from "./routes/api/v1/gantts/build";
 import { Route as ApiV1JourneyMapsBuildRouteImport } from "./routes/api/v1/journey-maps/build";
 import { Route as ApiV1MindmapsBuildRouteImport } from "./routes/api/v1/mindmaps/build";
@@ -158,6 +159,11 @@ const ApiV1FlowchartsBuildRoute = ApiV1FlowchartsBuildRouteImport.update({
   path: "/api/v1/flowcharts/build",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiV1FlowchartsEditRoute = ApiV1FlowchartsEditRouteImport.update({
+  id: "/api/v1/flowcharts/edit",
+  path: "/api/v1/flowcharts/edit",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiV1GanttsBuildRoute = ApiV1GanttsBuildRouteImport.update({
   id: "/api/v1/gantts/build",
   path: "/api/v1/gantts/build",
@@ -245,6 +251,7 @@ export interface FileRoutesByFullPath {
   "/api/v1/class-diagrams/build": typeof ApiV1ClassDiagramsBuildRoute;
   "/api/v1/er-diagrams/build": typeof ApiV1ErDiagramsBuildRoute;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
+  "/api/v1/flowcharts/edit": typeof ApiV1FlowchartsEditRoute;
   "/api/v1/gantts/build": typeof ApiV1GanttsBuildRoute;
   "/api/v1/journey-maps/build": typeof ApiV1JourneyMapsBuildRoute;
   "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
@@ -281,6 +288,7 @@ export interface FileRoutesByTo {
   "/api/v1/class-diagrams/build": typeof ApiV1ClassDiagramsBuildRoute;
   "/api/v1/er-diagrams/build": typeof ApiV1ErDiagramsBuildRoute;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
+  "/api/v1/flowcharts/edit": typeof ApiV1FlowchartsEditRoute;
   "/api/v1/gantts/build": typeof ApiV1GanttsBuildRoute;
   "/api/v1/journey-maps/build": typeof ApiV1JourneyMapsBuildRoute;
   "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
@@ -318,6 +326,7 @@ export interface FileRoutesById {
   "/api/v1/class-diagrams/build": typeof ApiV1ClassDiagramsBuildRoute;
   "/api/v1/er-diagrams/build": typeof ApiV1ErDiagramsBuildRoute;
   "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
+  "/api/v1/flowcharts/edit": typeof ApiV1FlowchartsEditRoute;
   "/api/v1/gantts/build": typeof ApiV1GanttsBuildRoute;
   "/api/v1/journey-maps/build": typeof ApiV1JourneyMapsBuildRoute;
   "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
@@ -356,6 +365,7 @@ export interface FileRouteTypes {
     | "/api/v1/class-diagrams/build"
     | "/api/v1/er-diagrams/build"
     | "/api/v1/flowcharts/build"
+    | "/api/v1/flowcharts/edit"
     | "/api/v1/gantts/build"
     | "/api/v1/journey-maps/build"
     | "/api/v1/mindmaps/build"
@@ -392,6 +402,7 @@ export interface FileRouteTypes {
     | "/api/v1/class-diagrams/build"
     | "/api/v1/er-diagrams/build"
     | "/api/v1/flowcharts/build"
+    | "/api/v1/flowcharts/edit"
     | "/api/v1/gantts/build"
     | "/api/v1/journey-maps/build"
     | "/api/v1/mindmaps/build"
@@ -428,6 +439,7 @@ export interface FileRouteTypes {
     | "/api/v1/class-diagrams/build"
     | "/api/v1/er-diagrams/build"
     | "/api/v1/flowcharts/build"
+    | "/api/v1/flowcharts/edit"
     | "/api/v1/gantts/build"
     | "/api/v1/journey-maps/build"
     | "/api/v1/mindmaps/build"
@@ -464,6 +476,7 @@ export interface RootRouteChildren {
   ApiV1ClassDiagramsBuildRoute: typeof ApiV1ClassDiagramsBuildRoute;
   ApiV1ErDiagramsBuildRoute: typeof ApiV1ErDiagramsBuildRoute;
   ApiV1FlowchartsBuildRoute: typeof ApiV1FlowchartsBuildRoute;
+  ApiV1FlowchartsEditRoute: typeof ApiV1FlowchartsEditRoute;
   ApiV1GanttsBuildRoute: typeof ApiV1GanttsBuildRoute;
   ApiV1JourneyMapsBuildRoute: typeof ApiV1JourneyMapsBuildRoute;
   ApiV1MindmapsBuildRoute: typeof ApiV1MindmapsBuildRoute;
@@ -633,6 +646,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiV1FlowchartsBuildRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/v1/flowcharts/edit": {
+      id: "/api/v1/flowcharts/edit";
+      path: "/api/v1/flowcharts/edit";
+      fullPath: "/api/v1/flowcharts/edit";
+      preLoaderRoute: typeof ApiV1FlowchartsEditRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/v1/gantts/build": {
       id: "/api/v1/gantts/build";
       path: "/api/v1/gantts/build";
@@ -767,6 +787,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1ClassDiagramsBuildRoute: ApiV1ClassDiagramsBuildRoute,
   ApiV1ErDiagramsBuildRoute: ApiV1ErDiagramsBuildRoute,
   ApiV1FlowchartsBuildRoute: ApiV1FlowchartsBuildRoute,
+  ApiV1FlowchartsEditRoute: ApiV1FlowchartsEditRoute,
   ApiV1GanttsBuildRoute: ApiV1GanttsBuildRoute,
   ApiV1JourneyMapsBuildRoute: ApiV1JourneyMapsBuildRoute,
   ApiV1MindmapsBuildRoute: ApiV1MindmapsBuildRoute,

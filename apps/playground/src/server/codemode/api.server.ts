@@ -3,6 +3,7 @@ import "@tanstack/react-start/server-only";
 import {
 	type ArtifactFormat,
 	type BuildFlowchartResult,
+	type EditFlowchartResult,
 	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
@@ -198,6 +199,7 @@ function rawArtifactResponse(input: {
 
 type BuildResult =
 	| BuildFlowchartResult
+	| EditFlowchartResult
 	| BuildMindmapResult
 	| BuildSequenceDiagramResult
 	| BuildTimelineResult
@@ -216,6 +218,7 @@ type BuildResult =
 
 type BuildOperation =
 	| "buildFlowchart"
+	| "editFlowchart"
 	| "buildMindmap"
 	| "buildSequenceDiagram"
 	| "buildTimeline"
@@ -307,6 +310,11 @@ export const handleBuildFlowchartRequest = makeBuildHandler({
 	operation: "buildFlowchart",
 	label: "Flowchart",
 	run: (codeMode, input) => codeMode.buildFlowchart(input),
+});
+export const handleEditFlowchartRequest = makeBuildHandler({
+	operation: "editFlowchart",
+	label: "Flowchart",
+	run: (codeMode, input) => codeMode.editFlowchart(input),
 });
 export const handleBuildMindmapRequest = makeBuildHandler({
 	operation: "buildMindmap",

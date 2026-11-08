@@ -40,6 +40,7 @@ import {
 import {
 	applyDiagramPatch,
 	buildFlowchart,
+	editFlowchart,
 	buildMindmap,
 	buildSequenceDiagram,
 	CodeModeRuntimeEnvironment,
@@ -76,6 +77,7 @@ function makeTestRuntime(
 		buildMindmap: (input: unknown) => run(buildMindmap(input)),
 		buildSequenceDiagram: (input: unknown) => run(buildSequenceDiagram(input)),
 		createCanvas: (input: unknown) => run(createCanvas(input)),
+		editFlowchart: (input: unknown) => run(editFlowchart(input)),
 		getArtifact: (input: unknown) => run(getArtifact(input)),
 	};
 }
@@ -730,7 +732,11 @@ describe("Code Mode runtime", () => {
 		expect(built.status).toBe("accepted");
 		expect(built.requestId).toBe("request-1");
 
-		expect(built.artifact.formats.map((format) => format.format)).toEqual(["excalidraw", "scene"]);
+		expect(built.artifact.formats.map((format) => format.format)).toEqual([
+			"excalidraw",
+			"scene",
+			"document",
+		]);
 
 		const inlineScene = built.artifact.formats.find((format) => format.format === "scene")?.inline;
 		expect(parseInlineScene(inlineScene).elements.length).toBeGreaterThan(0);
@@ -823,7 +829,11 @@ describe("Code Mode runtime", () => {
 
 		expectBuildOk(built);
 		expect(built.quality.summary).toEqual({ nodeCount: 16, edgeCount: 19 });
-		expect(built.artifact.formats.map((format) => format.format)).toEqual(["scene", "excalidraw"]);
+		expect(built.artifact.formats.map((format) => format.format)).toEqual([
+			"scene",
+			"excalidraw",
+			"document",
+		]);
 	});
 
 	it("exports production release rollback flows without dense route collisions", async () => {
@@ -838,7 +848,11 @@ describe("Code Mode runtime", () => {
 
 		expectBuildOk(built);
 		expect(built.quality.summary).toEqual({ nodeCount: 24, edgeCount: 32 });
-		expect(built.artifact.formats.map((format) => format.format)).toEqual(["scene", "excalidraw"]);
+		expect(built.artifact.formats.map((format) => format.format)).toEqual([
+			"scene",
+			"excalidraw",
+			"document",
+		]);
 	});
 
 	it.each(whitespaceFlowchartCases())(
@@ -1596,6 +1610,7 @@ describe("Code Mode runtime", () => {
 		expectBuildOk(built);
 
 		expect([...bucket.objects.keys()].sort()).toEqual([
+			"codemode/artifact-2/document.json",
 			"codemode/artifact-2/excalidraw.json",
 			"codemode/artifact-2/manifest.json",
 			"codemode/artifact-2/scene.json",
@@ -1666,6 +1681,7 @@ describe("Code Mode runtime", () => {
 		expectBuildOk(built);
 
 		expect([...bucket.objects.keys()].sort()).toEqual([
+			"codemode/artifact-2/document.json",
 			"codemode/artifact-2/manifest.json",
 			"codemode/artifact-2/png.png",
 			"codemode/artifact-2/scene.json",
@@ -3535,4 +3551,165 @@ describe("shared artifact export-and-store boundary", () => {
 			expect(writeCalls).toBe(0);
 		},
 	);
+});
+
+describe("editFlowchart", () => {
+	it("changes a built flowchart by id and builds the edit as a new artifact", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		if (!built.ok) throw new Error("Expected the base to build.");
+		const document = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "document",
+			inline: true,
+		});
+		expect(document).toMatchObject({ ok: true });
+
+		const edited = await runtime.editFlowchart({
+			artifactId: built.artifact.artifactId,
+			edits: [
+				{ op: "insert", node: { notify: "Notify requester" }, between: ["approve", "revise"] },
+				{ op: "set", nodes: { done: { color: "green" } } },
+			],
+		});
+
+		expect(edited).toMatchObject({ ok: true, status: "accepted" });
+		if (!edited.ok) return;
+		expect(edited.artifact.artifactId).not.toBe(built.artifact.artifactId);
+		expect(edited.normalizedSpec.nodes).toMatchObject({
+			done: { label: "Done", color: "green" },
+			notify: "Notify requester",
+		});
+		expect(edited.normalizedSpec.edges).toEqual([
+			["request", "approve"],
+			["approve", "done", "yes"],
+			["approve", "notify", "no"],
+			["notify", "revise"],
+		]);
+		const scene = edited.artifact.formats.find((format) => format.format === "scene")?.inline as {
+			elements: { id: string; strokeColor?: string; fillColor?: string }[];
+		};
+		expect(scene.elements.find((element) => element.id === "node:done")).toMatchObject({
+			strokeColor: "#16a34a",
+			fillColor: "#dcfce7",
+		});
+
+		expect(edited).toMatchObject({
+			artifact: { provenance: { sourceArtifactId: built.artifact.artifactId } },
+			edits: [
+				{ op: "insert", node: { notify: "Notify requester" }, between: ["approve", "revise"] },
+				{ op: "set", nodes: { done: { color: "green" } } },
+			],
+		});
+
+		// The edit is itself editable.
+		const again = await runtime.editFlowchart({
+			artifactId: edited.artifact.artifactId,
+			edits: [{ op: "set", nodes: { done: { color: null } } }],
+		});
+		expect(again.ok && again.normalizedSpec.nodes["done"]).toBe("Done");
+	});
+
+	it("reads the stored document inline and edits it by label in one call", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		if (!built.ok) throw new Error("Expected the base to build.");
+		const read = await runtime.getArtifact({
+			artifactId: built.artifact.artifactId,
+			format: "document",
+		});
+		expect(read).toMatchObject({
+			ok: true,
+			format: "document",
+			inline: { type: "flowchart", spec: { nodes: approvalSpec().nodes } },
+		});
+
+		const edited = await runtime.editFlowchart({
+			artifactId: built.artifact.artifactId,
+			edits: [
+				{ op: "insert", node: { log: "Log request" }, between: ["Request arrives", "Approved?"] },
+				{ op: "set", nodes: { Revise: { color: "red" } } },
+			],
+		});
+		if (!edited.ok) throw new Error(JSON.stringify(edited.issues));
+		expect(edited.normalizedSpec.edges).toContainEqual(["request", "log"]);
+		expect(edited.normalizedSpec.edges).toContainEqual(["log", "approve"]);
+		expect(edited.normalizedSpec.nodes["revise"]).toEqual({ label: "Revise", color: "red" });
+		expect(
+			edited.issues
+				.filter((entry) => entry.code === "reference_resolved")
+				.map((entry) => entry.message),
+		).toEqual([
+			'edits[0].between[0]: resolved "Request arrives" to the node labeled it, "request".',
+			'edits[0].between[1]: resolved "Approved?" to the node labeled it, "approve".',
+			'edits[1].nodes.Revise: resolved "Revise" to the node labeled it, "revise".',
+		]);
+	});
+
+	it("stores nothing when the edited flowchart does not build", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		if (!built.ok) throw new Error("Expected the base to build.");
+
+		const result = await runtime.editFlowchart({
+			artifactId: built.artifact.artifactId,
+			edits: [{ op: "disconnect", edges: [["approve", "revise"]] }],
+		});
+
+		expect(result).toMatchObject({ ok: false, status: "invalid_flowchart" });
+		expect(result.ok ? undefined : result.partial?.artifactId).toBeUndefined();
+	});
+
+	it("names an edit that targets nothing and changes nothing", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec: approvalSpec() });
+		if (!built.ok) throw new Error("Expected the base to build.");
+
+		const result = await runtime.editFlowchart({
+			artifactId: built.artifact.artifactId,
+			edits: [{ op: "insert", node: { x: "X" }, between: ["aprove", "done"] }],
+		});
+
+		expect(result).toMatchObject({
+			ok: false,
+			status: "invalid_edit",
+			issues: [
+				expect.objectContaining({
+					code: "unknown_edit_target",
+					ref: { kind: "diagram", path: "edits[0].between[0]" },
+				}),
+			],
+		});
+	});
+
+	it("reports an artifact it cannot edit", async () => {
+		const runtime = createTestRuntime();
+		const missing = await runtime.editFlowchart({
+			artifactId: "artifact-missing",
+			edits: [{ op: "set", title: "Renamed" }],
+		});
+		expect(missing).toMatchObject({
+			ok: false,
+			status: "not_found",
+			issues: [expect.objectContaining({ message: 'Artifact "artifact-missing" was not found.' })],
+		});
+
+		const mindmap = await runtime.buildMindmap({
+			spec: { title: "Launch", root: { label: "Launch", children: [{ label: "Scope" }] } },
+		});
+		if (!mindmap.ok) throw new Error("Expected the mindmap to build.");
+		const noDocument = await runtime.editFlowchart({
+			artifactId: mindmap.artifact.artifactId,
+			edits: [{ op: "set", title: "Renamed" }],
+		});
+		expect(noDocument).toMatchObject({
+			ok: false,
+			status: "not_found",
+			issues: [
+				expect.objectContaining({
+					message: expect.stringContaining("holds no flowchart document"),
+				}),
+			],
+		});
+	});
 });

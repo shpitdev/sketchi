@@ -45,6 +45,7 @@ import {
 	mindmapDiagramFromTree,
 	wrappedLabelWidth,
 	wrapTextToWidth,
+	applyFlowchartEdits,
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
 	type FlowchartValidationIssue,
@@ -132,6 +133,7 @@ import {
 import {
 	formatContractSchemaError,
 	BuildFlowchartRejected,
+	EditFlowchartRejected,
 	BuildMindmapRejected,
 	BuildSequenceDiagramRejected,
 	BuildStateMachineRejected,
@@ -151,6 +153,7 @@ import {
 	ApplyDiagramPatchRejected,
 	ApplyDiagramPatchRequestSchema,
 	BuildFlowchartRequestSchema,
+	EditFlowchartRequestSchema,
 	BuildMindmapRequestSchema,
 	BuildSequenceDiagramRequestSchema,
 	BuildStateMachineRequestSchema,
@@ -179,6 +182,7 @@ import {
 	type ArtifactFormat,
 	type BuildFlowchartRequest,
 	type BuildFlowchartResult,
+	type EditFlowchartResult,
 	type BuildMindmapResult,
 	type BuildSequenceDiagramRequest,
 	type BuildStateMachineRequest,
@@ -329,6 +333,7 @@ function unknownRecord(value: unknown): Record<string, unknown> | undefined {
 type CodeModeBoundaryOperation =
 	| "applyDiagramPatch"
 	| "buildFlowchart"
+	| "editFlowchart"
 	| "buildMindmap"
 	| "buildSequenceDiagram"
 	| "buildStateMachine"
@@ -1700,6 +1705,15 @@ const BuildFlowchartFailure = workflowFailure(
 	"BuildFlowchartFailure",
 	BuildFlowchartRejected.fields.status,
 	BuildFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const EditFlowchartFailure = workflowFailure(
+	"EditFlowchartFailure",
+	EditFlowchartRejected.fields.status,
+	EditFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -3294,6 +3308,8 @@ const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore")(funct
 	inlineFormats: InlineArtifactFormat[];
 	requestId?: string;
 	provenance?: ArtifactBundle["provenance"];
+	/** The document the scene was built from, stored beside it for later edits. */
+	document?: unknown;
 	validationIssues: typeof exportIssues;
 }) {
 	const environment = yield* CodeModeRuntimeEnvironment;
@@ -3340,12 +3356,24 @@ const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore")(funct
 		),
 	);
 	const artifactId = yield* Effect.sync(() => environment.createId("artifact"));
+	const stored =
+		input.document === undefined
+			? formats
+			: [
+					...formats,
+					{
+						format: "document" as const,
+						mimeType: ARTIFACT_MIME_TYPES.document,
+						data: input.document,
+						sizeBytes: sizeBytesForArtifactData(input.document),
+					},
+				];
 	const artifact = yield* withTelemetryCorrelation(
 		store
 			.write({
 				artifactId,
 				diagramId: input.scene.diagramId,
-				formats,
+				formats: stored,
 				inlineFormats: input.inlineFormats,
 				...(input.provenance ? { provenance: input.provenance } : {}),
 			})
@@ -5134,6 +5162,8 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 
 const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(function* (
 	input: unknown,
+	/** The artifact an edit started from, recorded on the one this build stores. */
+	provenance?: ArtifactBundle["provenance"],
 ) {
 	const parsed = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
 		errors: "all",
@@ -5281,6 +5311,10 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 		formats: requestedFormats(request.options),
 		inlineFormats: requestedInlineFormats(request.options),
 		...(request.requestId ? { requestId: request.requestId } : {}),
+		...(provenance ? { provenance } : {}),
+		// The document as written, not as drawn: an edit that renames a node draws the logo
+		// its new label names.
+		document: { type: "flowchart", spec: authoredSpec },
 		validationIssues: exportIssues,
 	}).pipe(
 		Effect.mapError(
@@ -5319,6 +5353,106 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 			...longDescriptionIssues(scene),
 		],
 	} satisfies Extract<BuildFlowchartResult, { ok: true }>;
+});
+
+/** The flowchart document an artifact was built from, or why there is none. */
+const storedFlowchartDocument = Effect.fn("codeMode.editFlowchart.readDocument")(function* (
+	artifactId: string,
+) {
+	const store = yield* CodeModeArtifactStorage;
+	const readFailure = (error: CodeModeArtifactStorageError) =>
+		new BuildFlowchartFailure({
+			status: "storage_failed",
+			context: { issues: [storageFailureIssue(error, "storage_read_failed")] },
+		});
+	const stored = yield* store.read(artifactId, "document").pipe(Effect.mapError(readFailure));
+	const document = stored ? unknownRecord(stored.data) : undefined;
+	const decoded =
+		document?.["type"] === "flowchart" ? decodeFlowchartDocument(document["spec"]) : undefined;
+	if (decoded && Result.isSuccess(decoded)) return decoded.success;
+	const manifest = stored
+		? undefined
+		: yield* store.readManifest(artifactId).pipe(Effect.mapError(readFailure));
+	return yield* new EditFlowchartFailure({
+		status: "not_found",
+		context: {
+			issues: [
+				issue({
+					code: "patch_source_unavailable",
+					stage: "storage",
+					ref: { kind: "artifact", id: artifactId },
+					message:
+						stored || manifest
+							? `Artifact "${artifactId}" holds no flowchart document to edit.`
+							: `Artifact "${artifactId}" was not found.`,
+					hint: "Edit the artifactId a buildFlowchart or editFlowchart result returned, or build the flowchart again.",
+				}),
+			],
+		},
+	});
+});
+
+/**
+ * Apply edits to the document a flowchart artifact was built from and build the result as a
+ * new artifact. Edits that name what the document lacks change nothing and come back as issues.
+ */
+const editFlowchartWorkflow = Effect.fn("codeMode.editFlowchart.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(EditFlowchartRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* new BuildFlowchartFailure({
+			status: "invalid_input",
+			context: { issues: inputIssues(formatContractSchemaError(parsed.failure)) },
+		});
+	}
+	const request = parsed.success;
+	const document = yield* storedFlowchartDocument(request.artifactId);
+	const edited = applyFlowchartEdits(document, request.edits);
+	if (!edited.ok) {
+		return yield* new EditFlowchartFailure({
+			status: "invalid_edit",
+			context: {
+				...responseRequestId(request.requestId),
+				issues: edited.issues.map((entry) =>
+					issue({
+						code: entry.code,
+						stage: "input",
+						ref: { kind: "diagram", path: entry.path },
+						message: entry.message,
+						hint: entry.hint,
+					}),
+				),
+			},
+		});
+	}
+	const built = yield* buildFlowchartWorkflow(
+		{
+			spec: edited.document,
+			...(request.options ? { options: request.options } : {}),
+			...(request.requestId ? { requestId: request.requestId } : {}),
+		},
+		{ sourceArtifactId: request.artifactId },
+	);
+	return {
+		...built,
+		edits: request.edits,
+		issues: [
+			...edited.notes.map((message) =>
+				issue({
+					code: "reference_resolved",
+					hint: "Use the resolved id in later edits.",
+					severity: "info",
+					stage: "input",
+					message,
+				}),
+			),
+			...built.issues,
+		],
+	} satisfies Extract<EditFlowchartResult, { ok: true }>;
 });
 
 const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function* (input: unknown) {
@@ -5426,9 +5560,10 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function*
 					}),
 				}
 			: {}),
-		...(request.inline !== true || !isInlineArtifactFormat(format)
-			? {}
-			: { inline: artifact.data }),
+		// A flowchart's document is what a reader asks for, so it comes inline unless declined.
+		...((request.inline ?? format === "document") && isInlineArtifactFormat(format)
+			? { inline: artifact.data }
+			: {}),
 		sizeBytes: artifact.sizeBytes,
 		...(manifest.provenance ? { provenance: manifest.provenance } : {}),
 	} satisfies Extract<GetArtifactResult, { ok: true }>;
@@ -5683,6 +5818,9 @@ function boundary<A extends ObservableCodeModeResult, E, B extends ObservableCod
 
 export const buildFlowchart: (input: unknown) => CodeModeWorkflowEffect<BuildFlowchartResult> =
 	boundary("buildFlowchart", buildFlowchartWorkflow, failureResult);
+
+export const editFlowchart: (input: unknown) => CodeModeWorkflowEffect<EditFlowchartResult> =
+	boundary("editFlowchart", editFlowchartWorkflow, failureResult);
 
 export const buildMindmap: (input: unknown) => CodeModeWorkflowEffect<BuildMindmapResult> =
 	boundary("buildMindmap", buildMindmapWorkflow, failureResult);

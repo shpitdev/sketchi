@@ -9,6 +9,7 @@ import {
 	CANVAS_SPEC_VERSION,
 	FLOWCHART_DIRECTIONS,
 	FlowchartDocumentSchema,
+	FlowchartEditsSchema,
 	type FlowchartDocument,
 	CHART_KINDS,
 	CHART_ORIENTATIONS,
@@ -357,9 +358,18 @@ const HexColor = hexColor();
 
 export const HexColorSchema = HexColor;
 
-export const ARTIFACT_FORMATS = ["excalidraw", "scene", "png"] as const;
-export const INLINE_ARTIFACT_FORMATS = ["excalidraw", "scene"] as const;
+/** Formats a build can export. */
+export const BUILD_ARTIFACT_FORMATS = ["excalidraw", "scene", "png"] as const;
+/**
+ * Formats an artifact can hold: what its build exported, and for a flowchart its
+ * document, which editFlowchart starts from.
+ */
+export const ARTIFACT_FORMATS = [...BUILD_ARTIFACT_FORMATS, "document"] as const;
+export const INLINE_ARTIFACT_FORMATS = ["excalidraw", "scene", "document"] as const;
 
+export const BuildArtifactFormatSchema = Object.assign(literals(BUILD_ARTIFACT_FORMATS), {
+	options: BUILD_ARTIFACT_FORMATS,
+});
 export const ArtifactFormatSchema = Object.assign(literals(ARTIFACT_FORMATS), {
 	options: ARTIFACT_FORMATS,
 });
@@ -1285,7 +1295,7 @@ export class QuadrantChartSpec extends Schema.Class<QuadrantChartSpec>("Quadrant
 ) {}
 export const QuadrantChartSpecSchema = QuadrantChartSpec;
 
-const ArtifactFormatsOption = optionalContract(nonEmptyArray(ArtifactFormatSchema));
+const ArtifactFormatsOption = optionalContract(nonEmptyArray(BuildArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
 );
@@ -1325,6 +1335,23 @@ export class BuildFlowchartRequest extends Schema.Class<BuildFlowchartRequest>(
 	},
 	{ identifier: undefined },
 ) {}
+
+/**
+ * A change to a built flowchart: the artifact it starts from and the edits, by id. The edited
+ * document builds as a new artifact.
+ */
+export class EditFlowchartRequest extends Schema.Class<EditFlowchartRequest>(
+	"EditFlowchartRequest",
+)(
+	{
+		requestId: optionalContract(NonEmptyString),
+		artifactId: RequiredNonEmptyString,
+		edits: requiredObject(FlowchartEditsSchema),
+		options: optionalContract(BuildFlowchartOptions),
+	},
+	{ identifier: undefined },
+) {}
+export const EditFlowchartRequestSchema = EditFlowchartRequest;
 
 /** The document Studio's model writes: the same one every other surface takes. */
 const BuildFlowchartToolInputContract = Schema.Struct({
@@ -2636,6 +2663,40 @@ export const BuildFlowchartResultSchema = Schema.Union([
 	BuildFlowchartRejected,
 ]);
 export type BuildFlowchartResult = typeof BuildFlowchartResultSchema.Type;
+
+/** An edited flowchart, built as a new artifact whose provenance names the one it changed. */
+export class EditFlowchartAccepted extends Schema.Class<EditFlowchartAccepted>(
+	"EditFlowchartAccepted",
+)(
+	{
+		...BuildFlowchartAccepted.fields,
+		/** The edits as applied. */
+		edits: FlowchartEditsSchema,
+	},
+	{ identifier: undefined },
+) {}
+/**
+ * An edit that stored nothing: no flowchart document to start from, an edit naming what the
+ * document lacks, or an edited document that does not build.
+ */
+export class EditFlowchartRejected extends Schema.Class<EditFlowchartRejected>(
+	"EditFlowchartRejected",
+)(
+	{
+		...BuildFlowchartRejected.fields,
+		status: literals([
+			...BuildFlowchartRejected.fields.status.literals,
+			"not_found",
+			"invalid_edit",
+		]),
+	},
+	{ identifier: undefined },
+) {}
+export const EditFlowchartResultSchema = Schema.Union([
+	EditFlowchartAccepted,
+	EditFlowchartRejected,
+]);
+export type EditFlowchartResult = typeof EditFlowchartResultSchema.Type;
 
 export class BuildMindmapAccepted extends Schema.Class<BuildMindmapAccepted>(
 	"BuildMindmapAccepted",

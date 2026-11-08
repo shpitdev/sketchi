@@ -29,6 +29,7 @@ function cleanNode(node: FlowchartDocumentNode): FlowchartDocumentNode {
 		...(details.shape ? { shape: details.shape } : {}),
 		...(details.group ? { group: cleanToolString(details.group) } : {}),
 		...(details.lane ? { lane: cleanToolString(details.lane) } : {}),
+		...(details.color ? { color: details.color } : {}),
 		...(details.icon === null
 			? { icon: null }
 			: details.icon

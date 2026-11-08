@@ -87,6 +87,7 @@ export interface CodeModeObjectBucket {
 const MANIFEST_FORMAT = "manifest";
 
 export const ARTIFACT_MIME_TYPES: Record<ArtifactFormat, string> = {
+	document: "application/vnd.sketchi.document+json",
 	excalidraw: "application/vnd.excalidraw+json",
 	png: "image/png",
 	scene: "application/vnd.sketchi.scene+json",
@@ -107,7 +108,7 @@ function artifactRef(
 }
 
 export function isInlineArtifactFormat(format: ArtifactFormat): format is InlineArtifactFormat {
-	return format === "excalidraw" || format === "scene";
+	return format !== "png";
 }
 
 function manifestRef(artifact: StoredArtifactFormat): ArtifactFormatRef {

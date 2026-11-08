@@ -4,6 +4,7 @@ const FAILURE_HTTP_STATUS = {
 	invalid_input: 400,
 	unsupported_model: 400,
 	invalid_flowchart: 422,
+	invalid_edit: 422,
 	invalid_mindmap: 422,
 	invalid_sequence: 422,
 	invalid_timeline: 422,
