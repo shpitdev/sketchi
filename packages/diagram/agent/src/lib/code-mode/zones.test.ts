@@ -2,14 +2,12 @@ import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import {
 	flowchartDiagramFromDocument,
-	zoneFixtures,
 	zoneRegionIssues,
 	type CanvasSpec,
 } from "@sketchi/diagram-core";
 import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
 import { buildFlowchart, CodeModeRuntimeEnvironment } from "./runtime.js";
 
 function build(spec: unknown) {
@@ -119,17 +117,5 @@ describe("Code Mode architecture zones", () => {
 		expect(built.ok).toBe(false);
 		if (built.ok) return;
 		expect(built.issues[0]).toMatchObject({ code: "invalid_enum" });
-	});
-
-	it("keeps zones and shapes through the canonical document a generated diagram builds from", () => {
-		const document = canonicalDocumentFromDiagram(zoneFixtures["hybrid-cloud"]);
-		expect(document.type).toBe("flowchart");
-		if (document.type !== "flowchart") return;
-		expect(document.spec.groups?.["corp"]).toMatchObject({
-			label: "Corporate network",
-			kind: "zone",
-		});
-		expect(document.spec.groups?.["onprem"]?.contains).toContain("corp");
-		expect(document.spec.nodes["orders"]).toMatchObject({ shape: "queue" });
 	});
 });

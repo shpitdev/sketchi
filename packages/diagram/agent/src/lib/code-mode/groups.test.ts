@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
-import { groupFixtures, groupRegionIssues, type CanvasSpec } from "@sketchi/diagram-core";
+import { groupRegionIssues, type CanvasSpec } from "@sketchi/diagram-core";
 import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
 import { buildFlowchart, CodeModeRuntimeEnvironment } from "./runtime.js";
 
 function build(spec: unknown) {
@@ -92,6 +91,37 @@ describe("Code Mode flowchart groups", () => {
 		);
 	});
 
+	it("keeps a loop step's node group through normalization and Excalidraw export", async () => {
+		const built = await build({
+			...spec,
+			nodes: { ...spec.nodes, revise: { label: "Revise the report", group: " EMPLOYEE, " } },
+			groups: { ...spec.groups, employee: { label: "Employee", contains: ["submit"] } },
+		});
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.nodes["revise"]).toEqual({
+			label: "Revise the report",
+			group: "employee",
+		});
+		const excalidraw = built.artifact.formats.find(({ format }) => format === "excalidraw")
+			?.inline as Parameters<typeof validateExcalidrawScene>[0];
+		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
+		expect(excalidraw.elements.find(({ id }) => id === "node:revise")?.["frameId"]).toBe(
+			"group:employee",
+		);
+	});
+
+	it("keeps unsupported group kinds strict on the MCP builder, with a repair hint", async () => {
+		const built = await build({
+			...spec,
+			groups: { ...spec.groups, employee: { ...spec.groups.employee, kind: "team" } },
+		});
+		expect(built.ok).toBe(false);
+		if (built.ok) return;
+		const problem = built.issues.find(({ ref }) => ref?.path === "spec.groups.employee.kind");
+		expect(problem).toBeDefined();
+		expect(problem?.hint).toBeTruthy();
+	});
+
 	it("rejects a group listing an undeclared id with the nearest ids in its hint", async () => {
 		const built = await build({
 			...spec,
@@ -119,16 +149,5 @@ describe("Code Mode flowchart groups", () => {
 		expect(built.issues.map((issue) => [issue.code, issue.ref])).toEqual([
 			["overlapping_containers", { kind: "node", id: "revise", path: "spec.groups" }],
 		]);
-	});
-
-	it("keeps groups through the canonical document a generated diagram builds from", () => {
-		const document = canonicalDocumentFromDiagram(groupFixtures["mixed-membership"]);
-		expect(document.type).toBe("flowchart");
-		if (document.type !== "flowchart") return;
-		expect(Object.keys(document.spec.groups ?? {})).toEqual(["warehouse", "shipping"]);
-		expect(document.spec.groups?.["warehouse"]?.contains).toContain("pick");
-		expect(
-			Object.values(document.spec.groups ?? {}).some((group) => group.contains.includes("order")),
-		).toBe(false);
 	});
 });

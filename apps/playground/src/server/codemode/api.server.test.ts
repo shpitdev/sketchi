@@ -565,10 +565,13 @@ describe("Code Mode API handlers", () => {
 			postRequest("https://studio.test/api/v1/flowcharts/build", {
 				spec: {
 					...spec,
-					lanes: {
-						requester: { label: "Requester", contains: ["request", "done", "revise"] },
-						approver: { label: "Approver", contains: ["approve"] },
-					},
+					nodes: Object.fromEntries(
+						Object.entries(spec.nodes).map(([id, label]) => [
+							id,
+							{ label, lane: id === "approve" ? "approver" : "requester" },
+						]),
+					),
+					lanes: { requester: "Requester", approver: "Approver" },
 				},
 				options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
 			}),

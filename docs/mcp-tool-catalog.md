@@ -456,8 +456,8 @@ interface FlowchartDocument {
   logos?: true | "exact";   // draw the logo each node label names
   nodes: Record<NodeId, string | FlowchartNode>; // id → label, or id → details
   edges: Array<[from: End, to: End, label?: string]>;
-  groups?: Record<GroupId, { label: string; kind?: ZoneKind; contains: string[] }>;
-  lanes?: Record<LaneId, { label: string; contains: string[] }>;
+  groups?: Record<GroupId, { label: string; kind?: ZoneKind; contains?: string[] }>;
+  lanes?: Record<LaneId, string>; // id → label, in drawing order
 }
 
 interface FlowchartNode {
@@ -465,6 +465,8 @@ interface FlowchartNode {
   note?: string;                                        // a subtitle under the label
   shape?: "database" | "queue" | "document" | "storage" | "diamond";
   icon?: string | null;                                 // a product name or slug; null draws none
+  group?: GroupId;                                      // innermost group; unions with contains
+  lane?: LaneId;                                        // the lane of whoever does the step
 }
 
 type End = NodeId | NodeId[]; // a list draws one edge per id
@@ -481,11 +483,14 @@ other node that nothing enters starts the flow and one that nothing leaves ends
 it; when a loop returns to the first step, the first node written is the entry.
 A flowchart may have several entries.
 
-Containers list what they hold: a group's `contains` names nodes and other groups,
-at any depth, and Sketchi derives the tree, so a node listed by both a region and
-the VPC inside it sits in the VPC. A group that no other group lists sits inside
-the smallest group holding all its nodes. Lanes hold every node, keep their
-written order and never mix with groups.
+A group's `contains` names nodes and other groups, at any depth, and Sketchi derives
+the tree, so a node listed by both a region and the VPC inside it sits in the VPC.
+A group that no other group lists sits inside the smallest group holding all its
+nodes. A node may name its innermost `group` directly. That membership is
+unioned with `contains`; another direct owner is rejected as `overlapping_containers`.
+A group can omit `contains` when nodes name it. Lanes are the other way round: `lanes` only declares and orders them, and
+every node names its own `lane`, the lane of whoever does it. A named actor with no stated action keeps an empty lane. Lanes never mix with
+groups.
 
 With `logos`, every node whose label names a product draws its logo, written with or
 without a dot ("Node.js", "Socket.io"). A name that is also an English word counts as
@@ -519,7 +524,7 @@ naming the nearest declared ids:
   another id with spaces around it (`duplicate_node_id`, `duplicate_group_id`, `duplicate_lane_id`);
 - a container lists an unknown id (`unknown_member`), two containers that do not nest
   share a member (`overlapping_containers`), groups nest in a cycle (`group_cycle`),
-  a node has no lane (`node_without_lane`), or lanes are mixed with groups (`lanes_with_groups`);
+  a node names no lane (`node_without_lane`) or an undeclared one (`unknown_node_lane`), or lanes are mixed with groups (`lanes_with_groups`);
 - fewer than two nodes or no edge (`flowchart_too_small`), or more than 80 nodes, 120
   drawn edges, 8 groups, 8 lanes or 4 levels of nesting (`flowchart_too_large`, with status
   `limit_exceeded`). Edges are counted with each list end expanded, before any is drawn.

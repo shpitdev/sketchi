@@ -60,6 +60,10 @@ export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
 	shape: Schema.optionalKey(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"])),
 	/** A product name or catalog slug whose logo the node draws; null draws none. */
 	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+	/** The innermost group containing this node; unioned with groups’ member lists. */
+	group: Schema.optionalKey(Schema.NonEmptyString),
+	/** The id of the lane of whoever does the step, in a flowchart with lanes. */
+	lane: Schema.optionalKey(Schema.NonEmptyString),
 });
 export interface FlowchartDocumentNodeDetails extends Schema.Schema.Type<
 	typeof FlowchartDocumentNodeDetailsSchema
@@ -72,29 +76,23 @@ export const FlowchartDocumentNodeSchema = Schema.Union([
 ]);
 export type FlowchartDocumentNode = typeof FlowchartDocumentNodeSchema.Type;
 
-const Members = Schema.Array(Id).check(
-	Schema.isMinLength(1, { message: "Expected at least one member id" }),
-);
-
 /** A labeled region that holds nodes and other groups; kind says what an architecture zone stands for. */
 export const FlowchartDocumentGroupSchema = Schema.Struct({
 	label: Label,
 	kind: Schema.optionalKey(Schema.Literals(DIAGRAM_ZONE_KINDS)),
 	/** The node and group ids inside it, at any depth. */
-	contains: Members,
+	contains: Schema.optionalKey(Schema.Array(Id)),
 });
 export interface FlowchartDocumentGroup extends Schema.Schema.Type<
 	typeof FlowchartDocumentGroupSchema
 > {}
 
-/** A swimlane: a full-length band for one actor, holding the steps that actor does. */
-export const FlowchartDocumentLaneSchema = Schema.Struct({
-	label: Label,
-	contains: Members,
-});
-export interface FlowchartDocumentLane extends Schema.Schema.Type<
-	typeof FlowchartDocumentLaneSchema
-> {}
+/**
+ * A swimlane's label: a full-length band for one actor, drawn in declared order. Each node
+ * names its own lane, so a step sits with whoever does it.
+ */
+export const FlowchartDocumentLaneSchema = Label;
+export type FlowchartDocumentLane = typeof FlowchartDocumentLaneSchema.Type;
 
 /**
  * Logos for the products node labels name: true draws Sketchi's hand-drawn marks,
@@ -302,6 +300,19 @@ function groupContainment(
 	const order = new Map(groups.map(([id], index) => [id, index]));
 	const nodeGroup = new Map<string, string>();
 	const groupParent = new Map<string, string>();
+	const namedGroups = Object.entries(document.nodes).flatMap(([id, node]) => {
+		const group = flowchartNodeDetails(node).group;
+		return group === undefined ? [] : [[id, group] as const];
+	});
+	for (const [id, group] of namedGroups) {
+		if (groupIds.has(group)) continue;
+		issues.push({
+			code: "unknown_node_group",
+			ref: { kind: "node", id, path: `nodes.${id}.group` },
+			message: `Node "${id}" names undeclared group "${group}".`,
+			hint: unknownFlowchartIdHint(group, groupIds, "group"),
+		});
+	}
 	if (groups.length === 0) return { nodeGroup, groupParent };
 
 	// Who lists whom, directly.
@@ -310,7 +321,7 @@ function groupContainment(
 	const groupListers = new Map<string, string[]>();
 	for (const [id, group] of groups) {
 		const listed: string[] = [];
-		group.contains.forEach((member, index) => {
+		(group.contains ?? []).forEach((member, index) => {
 			const path = `groups.${id}.contains[${index}]`;
 			if (member === id) {
 				issues.push({
@@ -334,6 +345,13 @@ function groupContainment(
 			}
 		});
 		listedGroups.set(id, listed);
+	}
+
+	// Node pointers contribute membership before any parent is inferred, exactly
+	// as another member in the group's contains list would.
+	for (const [id, group] of namedGroups) {
+		if (groupIds.has(group))
+			nodeListers.set(id, [...new Set([...(nodeListers.get(id) ?? []), group])]);
 	}
 
 	// A group listed, at any depth, inside itself.
@@ -464,7 +482,11 @@ function groupContainment(
 		if (inner === undefined) {
 			issues.push({
 				code: "overlapping_containers",
-				ref: { kind: "node", id: node, path: "groups" },
+				ref: {
+					kind: "node",
+					id: node,
+					path: namedGroups.some(([id]) => id === node) ? `nodes.${node}.group` : "groups",
+				},
 				message: `Node "${node}" is listed by groups ${quoted(listers)}, which do not nest.`,
 				hint: "List the node in the one group that holds it, or list one of those groups inside the other.",
 			});
@@ -491,6 +513,36 @@ function groupContainment(
 			hint: "Merge related groups or leave minor steps ungrouped.",
 		});
 	}
+	// A node names its innermost group. A contains list may also name it in that
+	// group or an ancestor, but must not assign it to a different direct owner.
+	for (const [id, group] of namedGroups) {
+		if (!groupIds.has(group)) continue;
+		const listed = nodeGroup.get(id);
+		if (listed !== undefined && listed !== group && !ancestors(group).includes(listed)) {
+			issues.push({
+				code: "overlapping_containers",
+				ref: { kind: "node", id, path: `nodes.${id}.group` },
+				message: `Node "${id}" names group "${group}", but contains places it in "${listed}".`,
+				hint: `Use the same innermost group in both forms, or remove the conflicting contains membership.`,
+			});
+		} else nodeGroup.set(id, group);
+	}
+
+	const used = new Set<string>();
+	for (const group of nodeGroup.values()) {
+		used.add(group);
+		for (const parent of ancestors(group)) used.add(parent);
+	}
+	for (const [id, group] of groups) {
+		if (!group.contains?.length && !used.has(id))
+			issues.push({
+				code: "empty_group",
+				ref: { kind: "group", id, path: `groups.${id}` },
+				message: `Group "${id}" contains no nodes.`,
+				hint: "Assign its nodes with group or contains, or remove the group.",
+			});
+	}
+
 	return { nodeGroup, groupParent };
 }
 
@@ -509,8 +561,19 @@ function laneContainment(
 ): Map<string, string> {
 	const lanes = Object.entries(document.lanes ?? {});
 	const nodeLane = new Map<string, string>();
-	if (lanes.length === 0) return nodeLane;
-	const known = new Set(nodeIds);
+	if (lanes.length === 0) {
+		for (const node of nodeIds) {
+			const lane = flowchartNodeDetails(document.nodes[node] ?? node).lane;
+			if (lane === undefined) continue;
+			issues.push({
+				code: "unknown_node_lane",
+				ref: { kind: "node", id: node, path: `nodes.${node}.lane` },
+				message: `Node "${node}" names lane "${lane}", but the flowchart declares no lanes.`,
+				hint: `Declare lanes: { "${lane}": "Label" }, or remove the node's lane.`,
+			});
+		}
+		return nodeLane;
+	}
 	if (lanes.length > FLOWCHART_MAX_LANES) {
 		issues.push({
 			code: "flowchart_too_large",
@@ -527,40 +590,28 @@ function laneContainment(
 			hint: "Keep the lanes for the actors and remove groups.",
 		});
 	}
-	for (const [id, lane] of lanes) {
-		lane.contains.forEach((member, index) => {
-			const path = `lanes.${id}.contains[${index}]`;
-			if (!known.has(member)) {
-				issues.push({
-					code: "unknown_member",
-					ref: { kind: "lane", id, path },
-					message: `Lane "${id}" lists "${member}", which is no node.`,
-					hint: unknownFlowchartIdHint(member, nodeIds, "node"),
-				});
-				return;
-			}
-			const other = nodeLane.get(member);
-			if (other !== undefined && other !== id) {
-				issues.push({
-					code: "overlapping_containers",
-					ref: { kind: "node", id: member, path },
-					message: `Node "${member}" is in lanes "${other}" and "${id}".`,
-					hint: "Keep each step in the one lane of the actor that does it.",
-				});
-				return;
-			}
-			nodeLane.set(member, id);
-		});
-	}
 	const laneIds = lanes.map(([id]) => id);
+	const declared = new Set(laneIds);
 	for (const node of nodeIds) {
-		if (nodeLane.has(node)) continue;
-		issues.push({
-			code: "node_without_lane",
-			ref: { kind: "node", id: node, path: "lanes" },
-			message: `Node "${node}" is in no lane.`,
-			hint: `List it in the lane of the actor that does it (${quoted(laneIds)}).`,
-		});
+		const lane = flowchartNodeDetails(document.nodes[node] ?? node).lane;
+		const path = `nodes.${node}.lane`;
+		if (lane === undefined) {
+			issues.push({
+				code: "node_without_lane",
+				ref: { kind: "node", id: node, path },
+				message: `Node "${node}" names no lane.`,
+				hint: `Set its lane to whoever does it (${quoted(laneIds)}).`,
+			});
+		} else if (!declared.has(lane)) {
+			issues.push({
+				code: "unknown_node_lane",
+				ref: { kind: "node", id: node, path },
+				message: `Node "${node}" names lane "${lane}", which is not declared.`,
+				hint: unknownFlowchartIdHint(lane, laneIds, "lane"),
+			});
+		} else {
+			nodeLane.set(node, lane);
+		}
 	}
 	return nodeLane;
 }
@@ -612,19 +663,21 @@ function graphIssues(
 				hint: 'Label every branch of a question, such as "yes" and "no".',
 			});
 		}
-		const seen = new Set<string>();
+		// One edge whose end lists several steps is one branch: its label fans out.
+		const seen = new Map<string, number>();
 		for (const exit of exits) {
 			const label = exit.label?.toLowerCase();
 			if (label === undefined) continue;
-			if (seen.has(label)) {
+			const first = seen.get(label);
+			if (first !== undefined && first !== exit.index) {
 				issues.push({
 					code: "duplicate_decision_branch_label",
 					ref: { kind: "node", id: node.id, path: `edges[${exit.index}][2]` },
 					message: `Decision "${node.id}" repeats the branch label "${exit.label}".`,
-					hint: "Give each branch of the same question its own label.",
+					hint: `Give each branch of the same question its own label; a branch that leads to several steps lists them in one edge: ["${node.id}", ["${exit.target}", "…"], "${exit.label}"].`,
 				});
 			}
-			seen.add(label);
+			if (first === undefined) seen.set(label, exit.index);
 		}
 	}
 
@@ -673,45 +726,37 @@ export function resolveFlowchartReferences(document: FlowchartDocument): {
 	readonly document: FlowchartDocument;
 	readonly notes: readonly string[];
 } {
-	const nodeIds = Object.keys(document.nodes);
-	const ids = [...nodeIds, ...Object.keys(document.groups ?? {})];
-	const exact = new Set(ids);
 	const key = (id: string) =>
 		id
 			.trim()
 			.replace(/[^\w-]+$/gu, "")
 			.toLowerCase()
 			.replace(/[-_\s]+/gu, "-");
-	const matches = new Map<string, string[]>();
-	for (const id of ids) matches.set(key(id), [...(matches.get(key(id)) ?? []), id]);
 	const notes: string[] = [];
-	const resolve = (id: string, path: string): string => {
-		if (exact.has(id)) return id;
-		const candidates = matches.get(key(id));
-		const found = candidates?.length === 1 ? candidates[0] : undefined;
-		if (found === undefined) return id;
-		notes.push(`${path}: resolved ${JSON.stringify(id)} to declared id ${JSON.stringify(found)}.`);
-		return found;
+	const resolver = (ids: readonly string[]) => {
+		const exact = new Set(ids);
+		const matches = new Map<string, string[]>();
+		for (const id of ids) matches.set(key(id), [...(matches.get(key(id)) ?? []), id]);
+		return (id: string, path: string): string => {
+			if (exact.has(id)) return id;
+			const candidates = matches.get(key(id));
+			const found = candidates?.length === 1 ? candidates[0] : undefined;
+			if (found === undefined) return id;
+			notes.push(
+				`${path}: resolved ${JSON.stringify(id)} to declared id ${JSON.stringify(found)}.`,
+			);
+			return found;
+		};
 	};
+	const groupIds = Object.keys(document.groups ?? {});
+	const resolve = resolver([...Object.keys(document.nodes), ...groupIds]);
+	const groupRef = resolver(groupIds);
+	const laneRef = resolver(Object.keys(document.lanes ?? {}));
 	const end = (value: FlowchartEdgeEnd, path: string): FlowchartEdgeEnd =>
 		typeof value === "string"
 			? resolve(value, path)
 			: value.map((id, i) => resolve(id, `${path}[${i}]`));
-	const containers = <C extends { readonly contains: readonly string[] }>(
-		values: Readonly<Record<string, C>>,
-		kind: "groups" | "lanes",
-	): Record<string, C> =>
-		Object.fromEntries(
-			Object.entries(values).map(([id, container]) => [
-				id,
-				{
-					...container,
-					contains: container.contains.map((member, i) =>
-						resolve(member, `${kind}.${id}.contains[${i}]`),
-					),
-				},
-			]),
-		);
+
 	return {
 		document: {
 			...document,
@@ -719,8 +764,37 @@ export function resolveFlowchartReferences(document: FlowchartDocument): {
 				const pair = [end(from, `edges[${i}][0]`), end(to, `edges[${i}][1]`)] as const;
 				return label === undefined ? pair : [...pair, label];
 			}),
-			...(document.groups ? { groups: containers(document.groups, "groups") } : {}),
-			...(document.lanes ? { lanes: containers(document.lanes, "lanes") } : {}),
+			nodes: Object.fromEntries(
+				Object.entries(document.nodes).map(([id, node]) => [
+					id,
+					typeof node === "string"
+						? node
+						: {
+								...node,
+								...(node.group ? { group: groupRef(node.group, `nodes.${id}.group`) } : {}),
+								...(node.lane ? { lane: laneRef(node.lane, `nodes.${id}.lane`) } : {}),
+							},
+				]),
+			),
+			...(document.groups
+				? {
+						groups: Object.fromEntries(
+							Object.entries(document.groups).map(([id, group]) => [
+								id,
+								{
+									...group,
+									...(group.contains
+										? {
+												contains: group.contains.map((member, i) =>
+													resolve(member, `groups.${id}.contains[${i}]`),
+												),
+											}
+										: {}),
+								},
+							]),
+						),
+					}
+				: {}),
 		},
 		notes,
 	};
@@ -919,10 +993,7 @@ export function flowchartDiagramFromDocument(
 			: {}),
 		...(laneIds.size > 0
 			? {
-					lanes: Object.entries(document.lanes ?? {}).map(([id, lane]) => ({
-						id,
-						label: lane.label,
-					})),
+					lanes: Object.entries(document.lanes ?? {}).map(([id, label]) => ({ id, label })),
 				}
 			: {}),
 		layout: { direction: document.direction ?? "TB", edgeRouting: "orthogonal" },

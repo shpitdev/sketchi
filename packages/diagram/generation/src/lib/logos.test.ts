@@ -26,28 +26,24 @@ function request(
 	};
 }
 
-function responseText(icons: Record<string, unknown>) {
-	const node = (id: string, label: string, kind: string) => ({
-		id,
-		label,
-		kind,
-		...(icons[id] === undefined ? {} : { icon: icons[id] }),
-	});
+function responseText(icons: Record<string, unknown>, extra: Record<string, unknown> = {}) {
+	const node = (id: string, label: string) =>
+		icons[id] === undefined ? label : { label, icon: icons[id] };
 	return JSON.stringify({
 		title: "Deploy pipeline",
 		diagram: {
 			id: "deploy",
 			type: "flowchart",
-			nodes: [
-				node("push", "Push to GitHub", "start"),
-				node("build", "Build the image", "process"),
-				node("ship", "Ship it", "end"),
-			],
+			...extra,
+			nodes: {
+				push: node("push", "Push to GitHub"),
+				build: node("build", "Build the image"),
+				ship: node("ship", "Ship it"),
+			},
 			edges: [
-				{ id: "a", source: "push", target: "build" },
-				{ id: "b", source: "build", target: "ship" },
+				["push", "build"],
+				["build", "ship"],
 			],
-			layout: { direction: "TB", edgeRouting: "orthogonal" },
 		},
 	});
 }
@@ -63,11 +59,11 @@ function nodeIcons(result: { readonly diagram?: unknown }) {
 	return diagram.nodes.map((node) => node.icon);
 }
 
-function candidate(icons: Record<string, unknown>) {
+function candidate(icons: Record<string, unknown>, extra: Record<string, unknown> = {}) {
 	return candidateFromText({
 		model: "gemini-test",
 		provider: "fixture",
-		text: responseText(icons),
+		text: responseText(icons, extra),
 	});
 }
 
@@ -76,18 +72,21 @@ describe("generation logo guidance", () => {
 		const { user } = buildDiagramGenerationMessages(request().prompt);
 		expect(user).toContain("Available logos:");
 		expect(user).toContain("- github: GitHub\n- docker: Docker");
-		expect(user).toContain("A flowchart node or sequence participant about one of these");
+		expect(user).toContain('In a flowchart, set "logos": true');
+		expect(user).toContain("A sequence participant about one of these");
 		expect(user).toContain("Never invent a slug.");
 
 		const flowchart = buildDiagramGenerationMessages(
 			request({ requestedType: "flowchart" }).prompt,
 		);
-		expect(flowchart.user).toContain("A flowchart node about one of these");
+		expect(flowchart.user).toContain(
+			'In a flowchart, set "logos": true and keep each technology\'s name in the label of the node or group about it',
+		);
 		expect(flowchart.user).not.toContain("participant");
 
 		const sequence = buildDiagramGenerationMessages(request({ requestedType: "sequence" }).prompt);
 		expect(sequence.user).toContain("A sequence participant about one of these");
-		expect(sequence.user).toContain("Put each logo on the participant whose label names");
+		expect(sequence.user).not.toContain("In a flowchart");
 	});
 
 	it("adds nothing when no logos apply or another family is required", () => {
@@ -101,33 +100,26 @@ describe("generation logo guidance", () => {
 });
 
 describe("generated node icons", () => {
-	it("normalizes slug case and drops malformed icons without failing", () => {
-		const result = candidate({
-			push: { slug: "GitHub" },
-			build: { slug: "Docker Logo" },
-			ship: "cloudflare",
-		});
+	it("draws an icon a node names by slug or name, and leaves the rest to grounding", () => {
+		const result = candidate({ push: "GitHub", build: "Docker Logo" });
 
 		expect(result.error).toBeUndefined();
 		expect(nodeIcons(result)).toEqual([{ slug: "github" }, undefined, undefined]);
-		expect(result.diagnostics).toEqual([
-			expect.stringContaining('icon_dropped: node "build"'),
-			expect.stringContaining('icon_dropped: node "ship"'),
-		]);
 	});
 
 	it("keeps only logos the prompt offered", () => {
 		const enforced = enforceCandidateRequestRequirements(
-			candidate({
-				push: { slug: "github" },
-				build: { slug: "kubernetes" },
-				ship: { slug: "constructor" },
-			}),
+			candidate({ push: "github", build: "kubernetes", ship: "constructor" }),
 			request(),
 		);
 
 		expect(enforced.error).toBeUndefined();
 		expect(nodeIcons(enforced)).toEqual([{ slug: "github" }, undefined, undefined]);
+		expect(enforced.flowchart?.nodes).toEqual({
+			push: { label: "Push to GitHub", icon: "github" },
+			build: "Build the image",
+			ship: "Ship it",
+		});
 		expect(enforced.diagnostics).toEqual([
 			expect.stringContaining('icon_not_in_prompt: node "build" icon "kubernetes"'),
 			expect.stringContaining('icon_not_in_prompt: node "ship" icon "constructor"'),
@@ -136,7 +128,7 @@ describe("generated node icons", () => {
 
 	it("drops a vendor logo from a node whose label does not name the vendor", () => {
 		const enforced = enforceCandidateRequestRequirements(
-			candidate({ push: { slug: "github" }, build: { slug: "kubernetes" } }),
+			candidate({ push: "github", build: "kubernetes" }),
 			request({
 				logos: [
 					{ slug: "github", name: "GitHub", collection: "devtools-ci" },
@@ -154,10 +146,24 @@ describe("generated node icons", () => {
 
 	it("drops every icon when the prompt offered no logos", () => {
 		const enforced = enforceCandidateRequestRequirements(
-			candidate({ push: { slug: "github" } }),
+			candidate({ push: "github" }),
 			request({ logos: [] }),
 		);
 		expect(nodeIcons(enforced).every((icon) => !icon)).toBe(true);
+	});
+
+	it("with logos on, draws each offered logo a label names and sets every other node to none", () => {
+		const enforced = enforceCandidateRequestRequirements(candidate({}, { logos: true }), request());
+
+		expect(nodeIcons(enforced)).toEqual([{ slug: "github" }, undefined, undefined]);
+		expect(enforced.flowchart).toMatchObject({
+			logos: true,
+			nodes: {
+				push: { label: "Push to GitHub", icon: "github" },
+				build: { label: "Build the image", icon: null },
+				ship: { label: "Ship it", icon: null },
+			},
+		});
 	});
 });
 

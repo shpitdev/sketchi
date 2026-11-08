@@ -21,3 +21,4 @@ export * from "./lib/quadrant-scenarios.js";
 export * from "./lib/timeline-scenarios.js";
 export * from "./lib/chart-scenarios.js";
 export * from "./lib/gantt-scenarios.js";
+export * from "./lib/flowchart-document.js";

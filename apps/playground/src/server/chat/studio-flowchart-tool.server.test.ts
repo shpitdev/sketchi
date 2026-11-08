@@ -132,11 +132,21 @@ describe("Studio build_flowchart host", () => {
 		).properties.spec.properties;
 		expect(Object.keys(properties)).toEqual(expect.arrayContaining(["groups", "lanes"]));
 
-		const lanes = {
-			author: { label: "Author", contains: ["start", "publish", "revise", "done"] },
-			reviewer: { label: "Reviewer", contains: ["review"] },
+		const lanes = { author: "Author", reviewer: "Reviewer" };
+		const accepted = acceptedSpec();
+		const laned = {
+			...accepted,
+			nodes: Object.fromEntries(
+				Object.entries(accepted.nodes).map(([id, node]) => [
+					id,
+					{
+						...(typeof node === "string" ? { label: node } : node),
+						lane: id === "review" ? "reviewer" : "author",
+					},
+				]),
+			),
+			lanes,
 		};
-		const laned = { ...acceptedSpec(), lanes };
 		const validated = await StudioBuildFlowchartInputSchema["~standard"].validate({ spec: laned });
 		if (!("value" in validated)) throw new Error(JSON.stringify(validated.issues));
 		expect(validated.value.spec).toMatchObject({ lanes });

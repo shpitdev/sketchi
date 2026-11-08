@@ -30,11 +30,8 @@ const answer = JSON.stringify({
 	diagram: {
 		type: "flowchart",
 		id: "flow",
-		nodes: [
-			{ id: "a", label: "Start", kind: "start" },
-			{ id: "b", label: "End", kind: "end" },
-		],
-		edges: [{ id: "a-b", source: "a", target: "b" }],
+		nodes: { a: "Start", b: "End" },
+		edges: [["a", "b"]],
 	},
 });
 

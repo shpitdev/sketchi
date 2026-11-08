@@ -74,6 +74,23 @@ describe.each(directions)("swimlane flowcharts %s", (direction) => {
 });
 
 describe("swimlane layout", () => {
+	it.each(["TB", "LR"] as const)(
+		"draws an empty recipient lane with finite bounds, %s",
+		(direction) => {
+			const diagram = parseIntermediateDiagram({
+				...laneFixtures.hiring,
+				layout: { direction, edgeRouting: "orthogonal" },
+				lanes: [...laneFixtures.hiring.lanes!, { id: "customer", label: "Customer" }],
+			});
+			const scene = renderIntermediateDiagram(diagram);
+			expect(getCanvasValidationIssues(scene)).toEqual([]);
+			expect(laneRegionIssues(scene, diagram)).toEqual([]);
+			expect(node(scene, "lane:customer")).toMatchObject({ label: "Customer", locked: true });
+			expect(node(scene, "lane:customer").width).toBeGreaterThan(0);
+			expect(node(scene, "lane:customer").height).toBeGreaterThan(0);
+		},
+	);
+
 	it("stacks rows for a horizontal flow and columns for a vertical one, in declared order", () => {
 		for (const [direction, axis] of [
 			["LR", "y"],

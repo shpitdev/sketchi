@@ -56,61 +56,83 @@ describe("mindmap trees", () => {
 });
 
 describe("flowchart node shapes", () => {
-	it("draws an unknown shape by its kind and keeps a real one", () => {
+	it("draws a shape Sketchi doesn't have plain and keeps a real one", () => {
 		const candidate = parse({
 			type: "flowchart",
 			id: "flow",
-			nodes: [
-				{ id: "a", label: "Start", kind: "start", shape: "ellipse" },
-				{ id: "b", label: "Orders", kind: "process", shape: "database" },
-				{ id: "c", label: "End", kind: "end" },
-			],
+			nodes: {
+				a: { label: "Start", shape: "ellipse" },
+				b: { label: "Orders", shape: "database" },
+				c: "End",
+			},
 			edges: [
-				{ id: "a-b", source: "a", target: "b" },
-				{ id: "b-c", source: "b", target: "c" },
+				["a", "b"],
+				["b", "c"],
 			],
 		});
 		expect(candidate.error).toBeUndefined();
 		expect(candidate.diagram).toMatchObject({ nodes: [{ id: "a" }, { shape: "database" }, {}] });
+		expect(candidate.flowchart?.nodes["a"]).toEqual({ label: "Start" });
 		expect(candidate.diagnostics.join()).toContain("shape_dropped");
 	});
 });
 
-describe("flowchart steps with nothing after them", () => {
-	const flow = (nodes: readonly object[], edges: readonly object[]) =>
+describe("generated flowchart group kinds", () => {
+	it("drops an unsupported group kind with a note, preserving membership and real zone kinds", () => {
+		const candidate = parse({
+			type: "flowchart",
+			id: "teams",
+			nodes: { a: { label: "Draft", group: "team" }, b: { label: "Publish", group: "region" } },
+			edges: [["a", "b"]],
+			groups: {
+				team: { label: "Writers", kind: "team" },
+				region: { label: "East", kind: "region" },
+			},
+		});
+		expect(candidate.error).toBeUndefined();
+		expect(candidate.flowchart?.groups?.["team"]).toEqual({ label: "Writers" });
+		expect(candidate.flowchart?.groups?.["region"]?.kind).toBe("region");
+		expect(candidate.diagram).toMatchObject({ nodes: [{ group: "team" }, { group: "region" }] });
+		expect(candidate.diagnostics.join()).toContain('group_kind_dropped: group "team" kind "team"');
+	});
+});
+
+describe("flowchart roles", () => {
+	const flow = (nodes: Record<string, unknown>, edges: readonly unknown[]) =>
 		parse({ type: "flowchart", id: "flow", nodes, edges });
 
-	it("end their path, without a repair", () => {
+	it("come from the edges: a step nothing follows ends its path", () => {
 		const candidate = flow(
+			{
+				a: "Start",
+				b: { label: "Route it", shape: "diamond" },
+				c: "Left",
+				d: "Right",
+				e: "Done",
+			},
 			[
-				{ id: "a", label: "Start", kind: "start" },
-				{ id: "b", label: "Route it", kind: "decision" },
-				{ id: "c", label: "Left", kind: "process" },
-				{ id: "d", label: "Right", kind: "process" },
-				{ id: "e", label: "Done", kind: "end" },
-			],
-			[
-				{ id: "a-b", source: "a", target: "b" },
-				{ id: "b-c", source: "b", target: "c", label: "left" },
-				{ id: "b-d", source: "b", target: "d", label: "right" },
-				{ id: "d-e", source: "d", target: "e" },
+				["a", "b"],
+				["b", "c", "left"],
+				["b", "d", "right"],
+				["d", "e"],
 			],
 		);
 		expect(candidate.error).toBeUndefined();
 		expect(candidate.diagram).toMatchObject({
-			nodes: [{}, {}, { id: "c", kind: "end" }, { id: "d", kind: "process" }, {}],
+			nodes: [
+				{ id: "a", kind: "start" },
+				{ id: "b", kind: "decision" },
+				{ id: "c", kind: "end" },
+				{ id: "d", kind: "process" },
+				{ id: "e", kind: "end" },
+			],
 		});
 	});
 
-	it("still rejects a decision with nothing after it", () => {
-		const candidate = flow(
-			[
-				{ id: "a", label: "Start", kind: "start" },
-				{ id: "b", label: "Route it", kind: "decision" },
-			],
-			[{ id: "a-b", source: "a", target: "b" }],
-		);
-		expect(candidate.error).toBeDefined();
+	it("draw a question nothing follows as where its path ends", () => {
+		const candidate = flow({ a: "Start", b: "Route it?" }, [["a", "b"]]);
+		expect(candidate.error).toBeUndefined();
+		expect(candidate.diagram).toMatchObject({ nodes: [{ kind: "start" }, { kind: "end" }] });
 	});
 });
 
@@ -203,11 +225,8 @@ describe("the response envelope", () => {
 	const flowchart = {
 		type: "flowchart",
 		id: "flow",
-		nodes: [
-			{ id: "a", label: "Start", kind: "start" },
-			{ id: "b", label: "End", kind: "end" },
-		],
-		edges: [{ id: "a-b", source: "a", target: "b" }],
+		nodes: { a: "Start", b: "End" },
+		edges: [["a", "b"]],
 	};
 
 	it("takes the family from diagram.type", () => {
@@ -283,4 +302,28 @@ describe("a diagram without an id", () => {
 		expect(candidate.error).toBeUndefined();
 		expect(candidate.diagram?.id).toBe("api-p50-latency-one-week");
 	});
+});
+
+describe("generated flowchart reference spelling", () => {
+	it.each(["lane", "group"] as const)(
+		"keeps corrected node %s refs and build notes in the candidate document",
+		(kind) => {
+			const candidate = parse({
+				type: "flowchart",
+				id: "sales",
+				nodes: {
+					submit_form: { label: "Submit", [kind]: "SALES OPS," },
+					review_form: { label: "Review", [kind]: "sales-ops" },
+				},
+				edges: [["submit-form", "review_form"]],
+				...(kind === "lane"
+					? { lanes: { sales_ops: "Sales" } }
+					: { groups: { sales_ops: { label: "Sales" } } }),
+			});
+			expect(candidate.error).toBeUndefined();
+			expect(candidate.flowchart?.edges).toEqual([["submit_form", "review_form"]]);
+			expect(candidate.flowchart?.nodes["submit_form"]).toMatchObject({ [kind]: "sales_ops" });
+			expect(candidate.diagnostics.join()).toContain("reference_resolved:");
+		},
+	);
 });

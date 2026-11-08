@@ -103,6 +103,129 @@ describe("flowchart edits", () => {
 		expect(edited.edges).not.toContainEqual(["wait", "review"]);
 	});
 
+	it("keeps one authored fan-out branch valid through title, insert and remove edits", () => {
+		const document: FlowchartDocument = {
+			title: "Stock",
+			nodes: {
+				question: "Stock short?",
+				notify: "Notify customer",
+				reorder: "Reorder stock",
+				done: "Ship order",
+			},
+			edges: [
+				["question", ["notify", "reorder"], "yes"],
+				["question", "done", "no"],
+			],
+		};
+		expect(flowchartDiagramFromDocument(document).ok).toBe(true);
+		const renamed = apply(document, [{ op: "set", title: "Stock check" }]);
+		expect(flowchartDiagramFromDocument(renamed).ok).toBe(true);
+		const inserted = apply(renamed, [
+			{ op: "insert", node: { audit: "Record notice" }, between: ["question", "notify"] },
+		]);
+		expect(flowchartDiagramFromDocument(inserted).ok).toBe(true);
+		const removed = apply(inserted, [{ op: "set", nodes: { audit: null } }]);
+		expect(removed.edges).toEqual(renamed.edges);
+		expect(flowchartDiagramFromDocument(removed).ok).toBe(true);
+		const disconnected = apply(removed, [
+			{ op: "disconnect", edges: [["question", "notify"]] },
+			{ op: "set", nodes: { notify: null } },
+		]);
+		expect(disconnected.edges).toContainEqual(["question", "reorder", "yes"]);
+		expect(flowchartDiagramFromDocument(disconnected).ok).toBe(true);
+	});
+
+	it("keeps list-ended connect as one branch across later edits and extensions", () => {
+		const document: FlowchartDocument = {
+			title: "Stock",
+			nodes: {
+				question: "Stock short?",
+				notify: "Notify customer",
+				reorder: "Reorder stock",
+				done: "Ship order",
+			},
+			edges: [
+				["question", "notify", "yes"],
+				["question", "done", "no"],
+			],
+		};
+		const connected = apply(document, [
+			{ op: "connect", edges: [["question", ["notify", "reorder"], "yes"]] },
+		]);
+		expect(flowchartDiagramFromDocument(connected).ok).toBe(true);
+		const renamed = apply(connected, [
+			{ op: "set", title: "Stock check" },
+			{ op: "connect", edges: [["question", "notify", "yes"]] },
+		]);
+		expect(renamed.edges).toEqual(connected.edges);
+		expect(flowchartDiagramFromDocument(renamed).ok).toBe(true);
+		const extended = apply(renamed, [
+			{ op: "set", nodes: { track: "Track stock" } },
+			{ op: "connect", edges: [["question", ["notify", "track"], "yes"]] },
+		]);
+		expect(extended.edges).toContainEqual(["question", ["notify", "reorder", "track"], "yes"]);
+		expect(flowchartDiagramFromDocument(extended).ok).toBe(true);
+	});
+
+	it("moves a fan-out target to another branch and matches branch labels without case", () => {
+		const document: FlowchartDocument = {
+			title: "Stock",
+			nodes: { question: "Stock short?", notify: "Notify", reorder: "Reorder", done: "Done" },
+			edges: [
+				["question", ["notify", "reorder"], "yes"],
+				["question", "done", "no"],
+			],
+		};
+		const same = apply(document, [{ op: "connect", edges: [["question", "reorder", "Yes"]] }]);
+		expect(same.edges).toEqual(document.edges);
+		expect(flowchartDiagramFromDocument(same).ok).toBe(true);
+		const moved = apply(document, [
+			{ op: "connect", edges: [["question", "reorder", "no"]] },
+			{ op: "connect", edges: [["question", "done", "No"]] },
+		]);
+		expect(moved.edges).toContainEqual(["question", "notify", "yes"]);
+		expect(moved.edges).toContainEqual(["question", ["reorder", "done"], "no"]);
+		expect(flowchartDiagramFromDocument(moved).ok).toBe(true);
+	});
+
+	it("allows a same-set deletion of the label-only group its removed node already pruned", () => {
+		const document: FlowchartDocument = {
+			title: "Office",
+			nodes: { a: "A", b: "B", c: { label: "C", group: "office" } },
+			edges: [
+				["a", "b"],
+				["b", "c"],
+			],
+			groups: { office: { label: "Office" } },
+		};
+		const result = apply(document, [{ op: "set", nodes: { c: null }, groups: { office: null } }]);
+		expect(result.groups).toBeUndefined();
+		expect(flowchartDiagramFromDocument(result).ok).toBe(true);
+		expect(applyFlowchartEdits(document, [{ op: "set", groups: { missing: null } }]).ok).toBe(
+			false,
+		);
+	});
+
+	it("does not merge independently authored branches that repeat a label", () => {
+		const edited = apply(
+			{
+				title: "Stock",
+				nodes: { question: "Stock short?", notify: "Notify customer", reorder: "Reorder stock" },
+				edges: [
+					["question", "notify", "yes"],
+					["question", "reorder", "yes"],
+				],
+			},
+			[{ op: "set", title: "Still invalid" }],
+		);
+		const built = flowchartDiagramFromDocument(edited);
+		expect(built.ok).toBe(false);
+		if (!built.ok)
+			expect(built.issues.some(({ code }) => code === "duplicate_decision_branch_label")).toBe(
+				true,
+			);
+	});
+
 	it("refuses list ends that would draw too many edges, before expanding them", () => {
 		const ids = Array.from({ length: 200 }, (_, index) => `n${index}`);
 		const result = applyFlowchartEdits(order, [{ op: "connect", edges: [[ids, ids]] }]);
@@ -142,19 +265,26 @@ describe("flowchart edits", () => {
 		const laned = apply(
 			{
 				title: "Hiring",
-				nodes: { apply: "Apply", screen: "Screen", offer: "Offer" },
+				nodes: {
+					apply: { label: "Apply", lane: "candidate" },
+					screen: { label: "Screen", lane: "recruiter" },
+					offer: { label: "Offer", lane: "recruiter" },
+				},
 				edges: [
 					["apply", "screen"],
 					["screen", "offer"],
 				],
-				lanes: {
-					candidate: { label: "Candidate", contains: ["apply"] },
-					recruiter: { label: "Recruiter", contains: ["screen", "offer"] },
-				},
+				lanes: { candidate: "Candidate", recruiter: "Recruiter" },
 			},
 			[{ op: "insert", node: { call: "Phone call" }, between: ["screen", "offer"] }],
 		);
-		expect(laned.lanes?.recruiter?.contains).toEqual(["screen", "offer", "call"]);
+		expect(laned.nodes["call"]).toEqual({ label: "Phone call", lane: "recruiter" });
+		// A lane edit is a node change; a lane's own entry only names it.
+		const moved = apply(laned, [
+			{ op: "set", nodes: { offer: { lane: "candidate" } }, lanes: { recruiter: "Recruiting" } },
+		]);
+		expect(moved.nodes["offer"]).toEqual({ label: "Offer", lane: "candidate" });
+		expect(moved.lanes).toEqual({ candidate: "Candidate", recruiter: "Recruiting" });
 		const grouped = apply(
 			{
 				title: "Zones",
@@ -171,6 +301,60 @@ describe("flowchart edits", () => {
 			],
 		);
 		expect(grouped.groups?.vpc?.contains).toEqual(["b", "c", "waf"]);
+	});
+
+	it("keeps node-group ownership through inserts, moves and removal of groups or their last nodes", () => {
+		const document: FlowchartDocument = {
+			title: "Teams",
+			nodes: {
+				a: { label: "A", group: "team" },
+				b: { label: "B", group: "team" },
+				c: { label: "C", group: "office" },
+			},
+			edges: [
+				["a", "b"],
+				["b", "c"],
+			],
+			groups: {
+				outer: { label: "Workflow", contains: ["team"] },
+				team: { label: "Team" },
+				office: { label: "Office" },
+			},
+		};
+		const inserted = apply(document, [{ op: "insert", node: { x: "X" }, between: ["a", "b"] }]);
+		expect(inserted.nodes.x).toEqual({ label: "X", group: "team" });
+		expect(flowchartDiagramFromDocument(inserted).ok).toBe(true);
+		const moved = apply(inserted, [
+			{ op: "set", nodes: { x: { group: "audit" } }, groups: { audit: { label: "Audit" } } },
+		]);
+		expect(flowchartDiagramFromDocument(moved).ok).toBe(true);
+		const ungrouped = apply(moved, [{ op: "set", groups: { team: null } }]);
+		expect(ungrouped.nodes.a).toEqual({ label: "A", group: "outer" });
+		expect(flowchartDiagramFromDocument(ungrouped).ok).toBe(true);
+		const pruned = apply(ungrouped, [{ op: "set", nodes: { a: null, b: null } }]);
+		expect(pruned.groups).not.toHaveProperty("outer");
+		expect(flowchartDiagramFromDocument(pruned).ok).toBe(true);
+	});
+
+	it("does not prune a group added for a later edit when removing an unrelated node", () => {
+		const edited = apply(
+			{
+				title: "Teams",
+				nodes: { a: "A", b: "B", c: "C" },
+				edges: [
+					["a", "b"],
+					["b", "c"],
+				],
+				groups: { team: { label: "Team", contains: ["a", "b"] } },
+			},
+			[
+				{ op: "set", groups: { next: { label: "Next team" } } },
+				{ op: "set", nodes: { c: null } },
+				{ op: "set", nodes: { b: { group: "next" } }, groups: { team: { contains: ["a"] } } },
+			],
+		);
+		expect(edited.groups).toHaveProperty("next");
+		expect(flowchartDiagramFromDocument(edited).ok).toBe(true);
 	});
 
 	it("moves members between containers and removes a container without losing what it held", () => {

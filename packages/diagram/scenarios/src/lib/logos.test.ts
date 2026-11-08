@@ -142,7 +142,23 @@ layer(FixtureGenerationClientLayer)("fixture generation with logos", (it) => {
 			});
 
 			assert.isUndefined(candidate.error);
-			assert.deepEqual(candidate.diagram, scenario.expectedDiagram);
+			// Grounding settles every other node to no logo; the drawn graph is the expected one.
+			assert.strictEqual(candidate.flowchart?.logos, true);
+			const drawn = candidate.diagram;
+			if (drawn?.type !== "flowchart") throw new Error("Expected a flowchart.");
+			assert.deepEqual(
+				drawn.nodes.map((node) => [node.id, node.label, node.kind, node.icon?.slug]),
+				scenario.expectedDiagram.nodes.map((node) => [
+					node.id,
+					node.label,
+					node.kind,
+					node.icon?.slug,
+				]),
+			);
+			assert.deepEqual(
+				drawn.edges.map((edge) => [edge.source, edge.target, edge.label]),
+				scenario.expectedDiagram.edges.map((edge) => [edge.source, edge.target, edge.label]),
+			);
 		}),
 	);
 });

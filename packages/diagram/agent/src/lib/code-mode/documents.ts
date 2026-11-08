@@ -2,7 +2,6 @@ import {
 	type CanonicalDiagram,
 	DIAGRAM_TYPES,
 	type DiagramTypeValue,
-	FLOWCHART_ID_PATTERN,
 	type FlowchartDiagram,
 } from "@sketchi/diagram-core";
 import type { Effect } from "effect";
@@ -178,57 +177,12 @@ function mindmapRoot(diagram: Extract<CanonicalDiagram, { type: "mindmap" }>): M
 
 /**
  * The canonical document for a validated core diagram, for example a
- * generated candidate about to be built and persisted.
+ * generated candidate about to be built and persisted. A flowchart has no
+ * such conversion: it is written as its document.
  */
-/** The document id each id of a generated flowchart's nodes, groups and lanes becomes. */
-export interface FlowchartDocumentIds {
-	readonly nodes: ReadonlyMap<string, string>;
-	readonly groups: ReadonlyMap<string, string>;
-	readonly lanes: ReadonlyMap<string, string>;
-}
-
-/**
- * A generated flowchart's ids as its document keys them: each id that fits the
- * document's pattern and is free stays as written, and any other is made from it
- * ("Hiring manager" becomes "hiring-manager"), unique across nodes, groups and lanes.
- */
-export function flowchartDocumentIds(diagram: FlowchartDiagram): FlowchartDocumentIds {
-	const kinds = [
-		["node", diagram.nodes.map((node) => node.id)],
-		["group", (diagram.groups ?? []).map((group) => group.id)],
-		["lane", (diagram.lanes ?? []).map((lane) => lane.id)],
-	] as const;
-	const taken = new Set<string>();
-	const maps = {
-		node: new Map<string, string>(),
-		group: new Map<string, string>(),
-		lane: new Map<string, string>(),
-	};
-	for (const [kind, ids] of kinds)
-		for (const id of ids)
-			if (FLOWCHART_ID_PATTERN.test(id) && !taken.has(id) && !maps[kind].has(id)) {
-				taken.add(id);
-				maps[kind].set(id, id);
-			}
-	for (const [kind, ids] of kinds)
-		for (const id of ids) {
-			if (maps[kind].has(id)) continue;
-			const slug = id
-				.trim()
-				.toLowerCase()
-				.replace(/[^a-z0-9_-]+/gu, "-")
-				.replace(/^[^a-z]+/u, "")
-				.replace(/-+$/u, "");
-			const base = slug || kind;
-			let next = base;
-			for (let suffix = 2; taken.has(next); suffix += 1) next = `${base}-${suffix}`;
-			taken.add(next);
-			maps[kind].set(id, next);
-		}
-	return { nodes: maps.node, groups: maps.group, lanes: maps.lane };
-}
-
-export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): CanonicalDiagramDocument {
+export function canonicalDocumentFromDiagram(
+	diagram: Exclude<CanonicalDiagram, FlowchartDiagram>,
+): CanonicalDiagramDocument {
 	switch (diagram.type) {
 		case "gantt": {
 			const { type: _type, ...spec } = diagram;
@@ -267,81 +221,6 @@ export function canonicalDocumentFromDiagram(diagram: CanonicalDiagram): Canonic
 					style: diagram.style,
 				},
 			};
-		case "flowchart": {
-			// A generated flowchart arrives as the drawing's own graph; its document lists
-			// each container's direct members and keys nodes by id.
-			const ids = flowchartDocumentIds(diagram);
-			const node = (id: string) => ids.nodes.get(id) ?? id;
-			const group = (id: string) => ids.groups.get(id) ?? id;
-			const members = (owner: string) => [
-				...diagram.nodes.filter((entry) => entry.group === owner).map((entry) => node(entry.id)),
-				...(diagram.groups ?? [])
-					.filter((entry) => entry.parent === owner)
-					.map((entry) => group(entry.id)),
-			];
-			return {
-				type: "flowchart",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					direction:
-						diagram.layout.direction === "LR" || diagram.layout.direction === "RL" ? "LR" : "TB",
-					...(diagram.nodes.some((entry) => entry.icon) ? { logos: true } : {}),
-					nodes: Object.fromEntries(
-						diagram.nodes.map((entry) => {
-							// A decision whose label asks no question keeps its diamond.
-							const diamond = entry.kind === "decision" && !entry.label.trim().endsWith("?");
-							const shape = entry.shape ?? (diamond ? "diamond" : undefined);
-							return [
-								node(entry.id),
-								entry.description || shape || entry.icon
-									? {
-											label: entry.label,
-											...(entry.description ? { note: entry.description } : {}),
-											...(shape ? { shape } : {}),
-											...(entry.icon ? { icon: entry.icon.slug } : {}),
-										}
-									: entry.label,
-							];
-						}),
-					),
-					edges: diagram.edges.map((edge) =>
-						edge.label
-							? [node(edge.source), node(edge.target), edge.label]
-							: [node(edge.source), node(edge.target)],
-					),
-					...(diagram.groups?.length
-						? {
-								groups: Object.fromEntries(
-									diagram.groups.map((entry) => [
-										group(entry.id),
-										{
-											label: entry.label,
-											...(entry.kind ? { kind: entry.kind } : {}),
-											contains: members(entry.id),
-										},
-									]),
-								),
-							}
-						: {}),
-					...(diagram.lanes?.length
-						? {
-								lanes: Object.fromEntries(
-									diagram.lanes.map((lane) => [
-										ids.lanes.get(lane.id) ?? lane.id,
-										{
-											label: lane.label,
-											contains: diagram.nodes
-												.filter((entry) => entry.lane === lane.id)
-												.map((entry) => node(entry.id)),
-										},
-									]),
-								),
-							}
-						: {}),
-				},
-			};
-		}
 		case "mindmap":
 			return {
 				type: "mindmap",

@@ -2,14 +2,12 @@ import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import {
 	flowchartDiagramFromDocument,
-	laneFixtures,
 	laneRegionIssues,
 	type CanvasSpec,
 } from "@sketchi/diagram-core";
 import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
 import { buildFlowchart, CodeModeRuntimeEnvironment } from "./runtime.js";
 
 function build(spec: unknown) {
@@ -33,10 +31,10 @@ const spec = {
 	title: "Expense approval across roles",
 	direction: "LR",
 	nodes: {
-		submit: "Submit expense report",
-		approved: "Approved?",
-		revise: "Revise the report",
-		pay: "Pay the employee",
+		submit: { label: "Submit expense report", lane: "employee" },
+		approved: { label: "Approved?", lane: "manager" },
+		revise: { label: "Revise the report", lane: "employee" },
+		pay: { label: "Pay the employee", lane: "finance" },
 	},
 	edges: [
 		["submit", "approved"],
@@ -44,21 +42,36 @@ const spec = {
 		["approved", "revise", "no"],
 		["revise", "approved"],
 	],
-	lanes: {
-		employee: { label: " Employee ", contains: ["submit", "revise"] },
-		manager: { label: "Manager", contains: ["approved"] },
-		finance: { label: "Finance", contains: ["pay"] },
-	},
+	lanes: { employee: " Employee ", manager: "Manager", finance: "Finance" },
 };
 
 describe("Code Mode flowchart lanes", () => {
+	it("returns a corrected node lane reference and a resolution note", async () => {
+		const built = await build({
+			...spec,
+			nodes: { ...spec.nodes, submit: { label: "Submit expense report", lane: " EMPLOYEE, " } },
+		});
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.nodes["submit"]).toMatchObject({ lane: "employee" });
+		expect(built.issues).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: "reference_resolved",
+					severity: "info",
+					message: expect.stringContaining("nodes.submit.lane"),
+				}),
+			]),
+		);
+	});
+
 	it("builds declared lanes into locked bands that hold their steps", async () => {
-		const built = await build(spec);
+		const built = await build({ ...spec, lanes: { ...spec.lanes, customer: "Customer" } });
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
 		expect(built.normalizedSpec.lanes).toEqual({
-			employee: { label: "Employee", contains: ["submit", "revise"] },
-			manager: { label: "Manager", contains: ["approved"] },
-			finance: { label: "Finance", contains: ["pay"] },
+			employee: "Employee",
+			manager: "Manager",
+			finance: "Finance",
+			customer: "Customer",
 		});
 		const drawn = flowchartDiagramFromDocument(built.normalizedSpec);
 		if (!drawn.ok) throw new Error(JSON.stringify(drawn.issues));
@@ -74,6 +87,10 @@ describe("Code Mode flowchart lanes", () => {
 		const excalidraw = built.artifact.formats.find((format) => format.format === "excalidraw")
 			?.inline as Parameters<typeof validateExcalidrawScene>[0];
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
+		expect(excalidraw.elements.find((element) => element.id === "lane:customer")).toMatchObject({
+			type: "rectangle",
+			locked: true,
+		});
 		const band = excalidraw.elements.find((element) => element.id === "lane:manager");
 		expect(band).toMatchObject({ type: "rectangle", locked: true, roundness: null });
 		expect(
@@ -81,27 +98,23 @@ describe("Code Mode flowchart lanes", () => {
 		).toBe("Manager");
 	});
 
-	it("rejects a node in no lane, or in two, with a repair hint", async () => {
+	it("rejects a node that names no lane or an undeclared one, with a repair hint", async () => {
 		const built = await build({
 			...spec,
-			lanes: {
-				employee: { label: "Employee", contains: ["submit"] },
-				manager: { label: "Manager", contains: ["approved", "pay"] },
-				finance: { label: "Finance", contains: ["pay"] },
-			},
+			nodes: { ...spec.nodes, revise: "Revise the report", pay: { label: "Pay", lane: "payroll" } },
 		});
 		expect(built.ok).toBe(false);
 		if (built.ok) return;
 		expect(built.status).toBe("invalid_flowchart");
 		expect(built.issues).toEqual([
 			expect.objectContaining({
-				code: "overlapping_containers",
-				ref: { kind: "node", id: "pay", path: "spec.lanes.finance.contains[0]" },
+				code: "node_without_lane",
+				ref: { kind: "node", id: "revise", path: "spec.nodes.revise.lane" },
+				hint: 'Set its lane to whoever does it ("employee", "manager", "finance").',
 			}),
 			expect.objectContaining({
-				code: "node_without_lane",
-				ref: { kind: "node", id: "revise", path: "spec.lanes" },
-				hint: 'List it in the lane of the actor that does it ("employee", "manager", "finance").',
+				code: "unknown_node_lane",
+				ref: { kind: "node", id: "pay", path: "spec.nodes.pay.lane" },
 			}),
 		]);
 	});
@@ -116,18 +129,5 @@ describe("Code Mode flowchart lanes", () => {
 		expect(built.issues.map((issue) => [issue.code, issue.ref])).toEqual(
 			expect.arrayContaining([["lanes_with_groups", { kind: "diagram", path: "spec.groups" }]]),
 		);
-	});
-
-	it("keeps lanes through the canonical document a generated diagram builds from", () => {
-		const document = canonicalDocumentFromDiagram(laneFixtures["order-fulfilment"]);
-		expect(document.type).toBe("flowchart");
-		if (document.type !== "flowchart") return;
-		expect(Object.keys(document.spec.lanes ?? {})).toEqual([
-			"customer",
-			"sales",
-			"warehouse",
-			"billing",
-		]);
-		expect(document.spec.lanes?.["customer"]?.contains).toContain("pay");
 	});
 });

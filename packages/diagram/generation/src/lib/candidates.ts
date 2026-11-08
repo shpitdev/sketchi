@@ -2,8 +2,8 @@ import {
 	type CanonicalDiagram,
 	CanonicalDiagramSchema,
 	DiagramNodeShapeSchema,
+	DiagramZoneKindSchema,
 	DiagramValidationError,
-	dropBlankEdgeLabels,
 	ClassDiagramSchema,
 	ClassValidationError,
 	ErDiagramSchema,
@@ -37,8 +37,13 @@ import {
 	resolveErShorthand,
 	validateClassDiagram,
 	validateErDiagram,
-	FlowchartDiagramSchema,
-	FlowchartValidationError,
+	decodeFlowchartDocument,
+	FLOWCHART_RULES,
+	flowchartDiagramFromDocument,
+	flowchartNodeDetails,
+	resolveFlowchartReferences,
+	FlowchartDocumentSchema,
+	type FlowchartDocument,
 	MindmapDiagramSchema,
 	SKETCHI_DIAGRAM_STYLE,
 	SequenceDiagramSchema,
@@ -57,7 +62,6 @@ import {
 	validateGanttDiagram,
 	validateChartDiagram,
 	SequenceValidationError,
-	validateFlowchartDiagram,
 	validateMindmapDiagram,
 	validateSequenceDiagram,
 	validateStateMachineDiagram,
@@ -69,10 +73,11 @@ import {
 	GeneratedDiagramResponse,
 	modelTitleOrFallback,
 } from "./intent.js";
-import { placeNodeLogos } from "./logo-placement.js";
+import { placeNodeLogos, type OfferedLogo } from "./logo-placement.js";
 import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import { DiagramGenerationPrompt } from "./messages.js";
 import { GeneratedMindmapTree, generatedMindmapTreeToDiagram } from "./mindmap-tree.js";
+import { repeatedJsonKeys } from "./repeated-keys.js";
 import { DiagramStyle, generatedStyles } from "./styling.js";
 
 export const diagramGenerationProviderIds: readonly [
@@ -101,6 +106,8 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
 	warnings: Schema.optionalKey(Schema.Array(StateMachineDefaultWarningSchema).pipe(Schema.mutable)),
 	diagram: Schema.optional(CanonicalDiagramSchema),
+	/** A flowchart's document as the model wrote it, checked; `diagram` is what it draws. */
+	flowchart: Schema.optional(FlowchartDocumentSchema),
 	durationMs: Schema.optional(Schema.Number),
 	error: Schema.optional(Schema.String),
 	model: Schema.String,
@@ -204,55 +211,127 @@ function sanitizeGeneratedNodeIcons(
 	});
 }
 
-/** Models name shapes such as "ellipse" that a node's kind already decides; it draws by kind. */
-function withKnownShape(node: unknown, diagnostics: string[]): unknown {
+/** Models name shapes such as "ellipse" that Sketchi doesn't draw; such a node draws plain. */
+function withKnownShape(id: string, node: unknown, diagnostics: string[]): unknown {
 	if (!isUnknownRecord(node) || node["shape"] === undefined) return node;
-	if (Schema.is(DiagramNodeShapeSchema)(node["shape"])) return node;
+	if (node["shape"] === "diamond" || Schema.is(DiagramNodeShapeSchema)(node["shape"])) return node;
 	const { shape, ...withoutShape } = node;
 	diagnostics.push(
-		`shape_dropped: node "${String(node["id"])}" shape ${JSON.stringify(shape)} is not a Sketchi shape; the node draws by its kind.`,
+		`shape_dropped: node "${id}" shape ${JSON.stringify(shape)} is not a Sketchi shape; the node draws plain.`,
 	);
 	return withoutShape;
 }
 
-/** A process step with nothing after it is where its path ends. */
-function withEndsWhereStepsStop(nodes: unknown, edges: readonly unknown[]): unknown {
-	if (!Array.isArray(nodes)) return nodes;
-	const sources = new Set(edges.map((edge) => objectValue(edge, "source")));
-	return nodes.map((node) =>
-		isUnknownRecord(node) && node["kind"] === "process" && !sources.has(node["id"])
-			? { ...node, kind: "end" }
-			: node,
+/** A generated team's stray kind is presentation metadata, not a reason to rebuild the graph. */
+function withKnownGroupKind(id: string, group: unknown, diagnostics: string[]): unknown {
+	if (
+		!isUnknownRecord(group) ||
+		group["kind"] === undefined ||
+		Schema.is(DiagramZoneKindSchema)(group["kind"])
+	)
+		return group;
+	const { kind, ...plain } = group;
+	diagnostics.push(
+		`group_kind_dropped: group "${id}" kind ${JSON.stringify(kind)} is not a zone kind; the group draws plain.`,
 	);
+	return plain;
 }
 
-function normalizeGeneratedFlowchartInput(input: unknown, diagnostics: string[]): unknown {
-	const styled = withSketchiDiagramStyle(input);
-	if (!isUnknownRecord(styled)) return styled;
-	const groups = styled["groups"];
-	const nodes = sanitizeGeneratedNodeIcons(styled["nodes"], diagnostics);
-	const withIcons: Record<string, unknown> = {
-		...styled,
-		nodes: Array.isArray(nodes) ? nodes.map((node) => withKnownShape(node, diagnostics)) : nodes,
-		// A group's logo comes from the catalog at build time, never from the model.
-		...(Array.isArray(groups)
+/**
+ * A generated flowchart document as a build reads it, or the problems that send it back for
+ * repair: a node, group or lane key the response repeats (JSON keeps only the last), a schema
+ * problem, or a graph the document can't draw. Unsupported shapes and group kinds draw plain, with a diagnostic note.
+ */
+function parseGeneratedFlowchart(
+	input: Record<string, unknown>,
+	repeated: readonly string[],
+	diagnostics: string[],
+): CandidateParseResult {
+	const repeats = repeated.flatMap((path) => {
+		const match = /^diagram\.(nodes|groups|lanes)\.([^.[\]]+)$/u.exec(path);
+		return match?.[1] && match[2] !== undefined ? [{ kind: match[1], id: match[2] }] : [];
+	});
+	if (repeats.length > 0) {
+		const noun = { nodes: "node", groups: "group", lanes: "lane" } as const;
+		return {
+			diagnostics: repeats.map(({ kind, id }) => {
+				const name = noun[kind as keyof typeof noun];
+				return `flowchart.duplicate_${name}_id: ${kind} repeats the id "${id}", and JSON keeps only the last one. Hint: Give each ${name} its own id.`;
+			}),
+			error: "Generated flowchart repeats an id.",
+			success: false,
+		};
+	}
+	const { type: _type, style: _style, ...fields } = input;
+	const nodes = fields["nodes"];
+	const groups = fields["groups"];
+	const edges = fields["edges"];
+	// A drawn graph's node and edge objects fail on every entry; one line says what to write.
+	if (Array.isArray(nodes) || (Array.isArray(edges) && edges.some(isUnknownRecord))) {
+		const diagnostic = `flowchart.invalid_type: nodes map each id to its label, and each edge is a list, not an object. Hint: ${FLOWCHART_RULES.documentShape}`;
+		return { diagnostics: [diagnostic], error: diagnostic, success: false };
+	}
+	const decoded = decodeFlowchartDocument({
+		...fields,
+		...(isUnknownRecord(groups)
 			? {
-					groups: groups.map((group) => {
-						if (!isUnknownRecord(group)) return group;
-						const { icon: _icon, ...withoutIcon } = group;
-						return withoutIcon;
-					}),
+					groups: Object.fromEntries(
+						Object.entries(groups).map(([id, group]) => [
+							id,
+							withKnownGroupKind(id, group, diagnostics),
+						]),
+					),
 				}
 			: {}),
-	};
-	const edges = withIcons["edges"];
-	if (!Array.isArray(edges)) {
-		return withIcons;
+		...(isUnknownRecord(nodes)
+			? {
+					nodes: Object.fromEntries(
+						Object.entries(nodes).map(([id, node]) => [id, withKnownShape(id, node, diagnostics)]),
+					),
+				}
+			: {}),
+	});
+	if (Result.isFailure(decoded)) {
+		const schemaDiagnostics = schemaIssueFormatter(decoded.failure.issue).issues.map(
+			schemaIssueDiagnostic,
+		);
+		return {
+			diagnostics: schemaDiagnostics,
+			error: schemaDiagnostics[0] ?? "Generated flowchart schema validation failed.",
+			success: false,
+		};
+	}
+	return drawnFlowchart(decoded.success, diagnostics);
+}
+
+/** The drawing a flowchart document builds as, each catalog-shaped icon its node's logo. */
+function drawnFlowchart(
+	input: FlowchartDocument,
+	diagnostics: readonly string[] = [],
+): CandidateParseResult {
+	const { document, notes } = resolveFlowchartReferences(input);
+	const buildNotes = [...diagnostics, ...notes.map((note) => `reference_resolved: ${note}`)];
+	const nodeIcons = new Map(
+		Object.entries(document.nodes).flatMap(([id, node]) => {
+			const icon = flowchartNodeDetails(node).icon?.trim().toLowerCase();
+			return icon && isDiagramIconSlug(icon) ? [[id, icon] as const] : [];
+		}),
+	);
+	const built = flowchartDiagramFromDocument(document, { nodeIcons });
+	if (!built.ok) {
+		return {
+			diagnostics: built.issues.map(
+				(entry) => `flowchart.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
+			),
+			error: built.issues[0]?.message ?? "Generated flowchart is not a valid graph.",
+			success: false,
+		};
 	}
 	return {
-		...withIcons,
-		nodes: withEndsWhereStepsStop(withIcons["nodes"], edges),
-		edges: dropBlankEdgeLabels(edges),
+		diagram: built.diagram,
+		flowchart: document,
+		success: true,
+		...(buildNotes.length > 0 ? { diagnostics: buildNotes } : {}),
 	};
 }
 
@@ -419,6 +498,7 @@ interface CandidateParseSuccess {
 	/** Non-fatal repairs applied while decoding. */
 	readonly diagnostics?: readonly string[];
 	readonly diagram: CanonicalDiagram;
+	readonly flowchart?: FlowchartDocument;
 	readonly success: true;
 }
 
@@ -439,7 +519,6 @@ function schemaIssueDiagnostic(issue: {
 
 function diagramValidationFailure(error: unknown): CandidateParseFailure {
 	if (
-		error instanceof FlowchartValidationError ||
 		error instanceof SequenceValidationError ||
 		error instanceof TimelineValidationError ||
 		error instanceof ChartValidationError ||
@@ -455,33 +534,31 @@ function diagramValidationFailure(error: unknown): CandidateParseFailure {
 		error instanceof QuadrantValidationError
 	) {
 		const family =
-			error instanceof FlowchartValidationError
-				? "flowchart"
-				: error instanceof TimelineValidationError
-					? "timeline"
-					: error instanceof ChartValidationError
-						? "chart"
-						: error instanceof StateMachineValidationError
-							? "state-machine"
-							: error instanceof GanttValidationError
-								? "gantt"
-								: error instanceof ErValidationError
-									? "er"
-									: error instanceof ClassValidationError
-										? "class"
-										: error instanceof OrgChartValidationError
-											? "org-chart"
-											: error instanceof VennValidationError
-												? "venn"
-												: error instanceof JourneyValidationError
-													? "journey"
-													: error instanceof SankeyValidationError
-														? "sankey"
-														: error instanceof WireframeValidationError
-															? "wireframe"
-															: error instanceof QuadrantValidationError
-																? "quadrant"
-																: "sequence";
+			error instanceof TimelineValidationError
+				? "timeline"
+				: error instanceof ChartValidationError
+					? "chart"
+					: error instanceof StateMachineValidationError
+						? "state-machine"
+						: error instanceof GanttValidationError
+							? "gantt"
+							: error instanceof ErValidationError
+								? "er"
+								: error instanceof ClassValidationError
+									? "class"
+									: error instanceof OrgChartValidationError
+										? "org-chart"
+										: error instanceof VennValidationError
+											? "venn"
+											: error instanceof JourneyValidationError
+												? "journey"
+												: error instanceof SankeyValidationError
+													? "sankey"
+													: error instanceof WireframeValidationError
+														? "wireframe"
+														: error instanceof QuadrantValidationError
+															? "quadrant"
+															: "sequence";
 		return {
 			diagnostics: error.issues.map(
 				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
@@ -579,14 +656,7 @@ function parseCandidateDiagram(text: string): CandidateParseResult {
 				withSketchiDiagramStyle(titledDiagram),
 				validateTimelineDiagram,
 			),
-		flowchart: () => {
-			const result = decodeAndValidate(
-				FlowchartDiagramSchema,
-				normalizeGeneratedFlowchartInput(titledDiagram, repairs),
-				validateFlowchartDiagram,
-			);
-			return result.success && repairs.length > 0 ? { ...result, diagnostics: repairs } : result;
-		},
+		flowchart: () => parseGeneratedFlowchart(titledDiagram, repeatedJsonKeys(text), repairs),
 		mindmap: () =>
 			"root" in titledDiagram
 				? decodeAndValidate(
@@ -761,6 +831,7 @@ export function candidateFromText(
 			...(parsed.warnings?.length ? { warnings: parsed.warnings } : {}),
 			...(parsed.styles?.length ? { styles: parsed.styles } : {}),
 			diagram: parsed.diagram,
+			...(parsed.flowchart ? { flowchart: parsed.flowchart } : {}),
 		};
 	}
 
@@ -772,6 +843,61 @@ export function candidateFromText(
 	};
 }
 
+/** The offered logo an authored icon names, by slug, name or alias, or the icon as written. */
+function offeredSlug(icon: string, logos: readonly OfferedLogo[]): string {
+	const wanted = icon.trim().toLowerCase();
+	return (
+		logos.find((logo) =>
+			[logo.slug, logo.name, ...(logo.aliases ?? [])].some((name) => name.toLowerCase() === wanted),
+		)?.slug ?? wanted
+	);
+}
+
+/**
+ * A flowchart document's logos settled to the ones the prompt offered: each node whose label
+ * names one draws it, and every other icon is dropped. With logos on, every other node is set to
+ * draw none, so the build fills no logo from the catalog that the request never named.
+ */
+function groundFlowchartLogos(
+	document: FlowchartDocument,
+	logos: readonly OfferedLogo[],
+): { readonly diagnostics: string[]; readonly document: FlowchartDocument } {
+	const entries = Object.entries(document.nodes);
+	const placement = placeNodeLogos(
+		entries.flatMap(([id, node]) => {
+			const details = flowchartNodeDetails(node);
+			if (details.icon === null) return [];
+			return [
+				{
+					id,
+					label: details.label,
+					...(details.icon ? { icon: { slug: offeredSlug(details.icon, logos) } } : {}),
+				},
+			];
+		}),
+		logos,
+	);
+	const placed = new Map(placement.nodes.map((node) => [node.id, node.icon?.slug]));
+	let changed = false;
+	const nodes = Object.fromEntries(
+		entries.map(([id, node]) => {
+			const details = flowchartNodeDetails(node);
+			if (details.icon === null) return [id, node];
+			const slug = placed.get(id);
+			const icon = slug ?? (document.logos ? null : undefined);
+			if (icon === details.icon) return [id, node];
+			changed = true;
+			const { icon: _icon, ...rest } = details;
+			if (icon !== undefined) return [id, { ...rest, icon }];
+			return [id, Object.keys(rest).length === 1 ? rest.label : rest];
+		}),
+	);
+	return {
+		diagnostics: placement.diagnostics,
+		document: changed ? { ...document, nodes } : document,
+	};
+}
+
 /**
  * Place logos the prompt offered on the flowchart nodes or sequence
  * participants that name them and drop the rest, so a generated diagram never
@@ -779,22 +905,23 @@ export function candidateFromText(
  * logo onto the wrong one.
  */
 function groundDiagramIcons(
-	diagram: CanonicalDiagram,
+	candidate: DiagramGenerationCandidate & { readonly diagram: CanonicalDiagram },
 	request: DiagramGenerationRequest,
-): { readonly diagnostics: string[]; readonly diagram: CanonicalDiagram } {
+): {
+	readonly diagnostics: string[];
+	readonly diagram: CanonicalDiagram;
+	readonly flowchart?: FlowchartDocument;
+} {
 	const logos = request.prompt.logos ?? [];
-	if (diagram.type === "flowchart") {
-		const encoded = Schema.encodeSync(FlowchartDiagramSchema)(diagram);
-		const placement = placeNodeLogos(encoded.nodes, logos);
-		return placement.diagnostics.length === 0
-			? { diagnostics: [], diagram }
-			: {
-					diagnostics: placement.diagnostics,
-					diagram: Schema.decodeUnknownSync(FlowchartDiagramSchema)({
-						...encoded,
-						nodes: placement.nodes,
-					}),
-				};
+	const { diagram } = candidate;
+	if (diagram.type === "flowchart" && candidate.flowchart) {
+		const grounded = groundFlowchartLogos(candidate.flowchart, logos);
+		if (grounded.document === candidate.flowchart)
+			return { diagnostics: grounded.diagnostics, diagram, flowchart: candidate.flowchart };
+		const drawn = drawnFlowchart(grounded.document);
+		return drawn.success
+			? { diagnostics: grounded.diagnostics, diagram: drawn.diagram, flowchart: grounded.document }
+			: { diagnostics: [], diagram, flowchart: candidate.flowchart };
 	}
 	if (diagram.type === "sequence") {
 		const encoded = Schema.encodeSync(SequenceDiagramSchema)(diagram);
@@ -832,11 +959,12 @@ export function enforceCandidateRequestRequirements(
 			error: WRONG_DIAGRAM_TYPE_ERROR,
 		};
 	}
-	const grounding = groundDiagramIcons(input.diagram, request);
-	return grounding.diagnostics.length > 0
+	const grounding = groundDiagramIcons({ ...input, diagram: input.diagram }, request);
+	return grounding.diagnostics.length > 0 || grounding.diagram !== input.diagram
 		? {
 				...input,
 				diagram: grounding.diagram,
+				...(grounding.flowchart ? { flowchart: grounding.flowchart } : {}),
 				diagnostics: [...input.diagnostics, ...grounding.diagnostics],
 			}
 		: input;

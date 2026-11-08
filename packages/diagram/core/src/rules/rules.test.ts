@@ -20,8 +20,8 @@ describe("shared family rules", () => {
 	});
 
 	it("name the request in each surface's own word", () => {
-		expect(FLOWCHART_RULES.lanes("the prompt")).toContain("in the prompt's order");
-		expect(FLOWCHART_RULES.lanes("the user")).toContain("in the user's order");
+		expect(FLOWCHART_RULES.documentLanes("the prompt")).toContain("in the prompt's order");
+		expect(FLOWCHART_RULES.documentLanes("the user")).toContain("in the user's order");
 		expect(ER_RULES.direction("the scenario")).toContain(
 			"when the scenario states the key columns",
 		);

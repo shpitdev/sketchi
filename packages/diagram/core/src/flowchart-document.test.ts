@@ -87,23 +87,69 @@ describe("flowchart reference resolution", () => {
 		expect(source.edges[0]?.[1]).toBe("review-form");
 	});
 
-	it("resolves legacy lane member variants and records their paths", () => {
+	it("resolves node lane references against declared lane ids", () => {
 		const result = flowchartDiagramFromDocument({
 			title: "Sales",
-			nodes: { submit_form: "Submit form", review_form: "Review form" },
+			nodes: {
+				submit_form: { label: "Submit form", lane: "SALES OPS," },
+				review_form: { label: "Review form", lane: "sales-ops" },
+			},
 			edges: [["submit_form", "review_form"]],
-			lanes: { sales: { label: "Sales", contains: ["submit-form", "REVIEW FORM,"] } },
+			lanes: { sales_ops: "Sales" },
 		});
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.diagram.nodes.map(({ lane }) => lane)).toEqual(["sales", "sales"]);
+		expect(result.diagram.nodes.map(({ lane }) => lane)).toEqual(["sales_ops", "sales_ops"]);
 		expect(result.notes).toEqual(
 			expect.arrayContaining([
-				expect.stringContaining("lanes.sales.contains[0]"),
-				expect.stringContaining('"submit_form"'),
+				expect.stringContaining("nodes.submit_form.lane"),
+				expect.stringContaining('"sales_ops"'),
 			]),
 		);
 	});
+
+	it("resolves node group references with contains omitted and unions them with member lists", () => {
+		const result = flowchartDiagramFromDocument({
+			title: "Sales",
+			nodes: {
+				submit_form: { label: "Submit form", group: "SALES OPS," },
+				review_form: { label: "Review form", group: "review-team" },
+			},
+			edges: [["submit_form", "review_form"]],
+			groups: {
+				sales_ops: { label: "Sales" },
+				review_team: { label: "Review", contains: ["review-form"] },
+			},
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.diagram.nodes.map(({ group }) => group)).toEqual(["sales_ops", "review_team"]);
+		expect(result.notes).toEqual(
+			expect.arrayContaining([expect.stringContaining("nodes.submit_form.group")]),
+		);
+	});
+
+	it.each(["lane", "group"] as const)(
+		"does not resolve an unknown node %s against node ids or ambiguous container ids",
+		(kind) => {
+			const result = flowchartDiagramFromDocument({
+				title: "Sales",
+				nodes: {
+					node_only: { label: "Submit", [kind]: "NODE ONLY," },
+					review: { label: "Review", [kind]: "SALES OPS," },
+				},
+				edges: [["node_only", "review"]],
+				...(kind === "lane"
+					? { lanes: { sales_ops: "Sales", "sales-ops": "Other sales" } }
+					: { groups: { sales_ops: { label: "Sales" }, "sales-ops": { label: "Other sales" } } }),
+			});
+			expect(result.ok).toBe(false);
+			if (result.ok) return;
+			const unknown = result.issues.filter(({ code }) => code === `unknown_node_${kind}`);
+			expect(unknown).toHaveLength(2);
+			expect(unknown[1]?.hint).toContain("sales_ops");
+		},
+	);
 
 	it("refuses ambiguous and unrelated spellings, retaining nearest-id hints", () => {
 		const result = flowchartDiagramFromDocument({
@@ -424,34 +470,182 @@ describe("flowchart documents", () => {
 		expect(kinds(document)).toEqual({ ready: "decision", ship: "end", fix: "end" });
 	});
 
-	it("puts every node in one lane", () => {
+	it("puts every node in the lane it names", () => {
 		const document: FlowchartDocument = {
 			title: "Hiring",
 			direction: "LR",
-			nodes: { apply: "Apply", screen: "Screen resume", offer: "Make offer" },
+			nodes: {
+				apply: { label: "Apply", lane: "candidate" },
+				screen: { label: "Screen resume", lane: "recruiter" },
+				offer: { label: "Make offer", lane: "recruiter" },
+			},
 			edges: [
 				["apply", "screen"],
 				["screen", "offer"],
 			],
-			lanes: {
-				candidate: { label: "Candidate", contains: ["apply"] },
-				recruiter: { label: "Recruiter", contains: ["screen", "offer"] },
-			},
+			lanes: { candidate: "Candidate", recruiter: "Recruiter" },
 		};
 		const diagram = build(document);
-		expect(diagram.lanes?.map((lane) => lane.id)).toEqual(["candidate", "recruiter"]);
+		expect(diagram.lanes?.map((lane) => [lane.id, lane.label])).toEqual([
+			["candidate", "Candidate"],
+			["recruiter", "Recruiter"],
+		]);
 		expect(diagram.nodes.map((node) => node.lane)).toEqual(["candidate", "recruiter", "recruiter"]);
 		expect(
 			issues({
 				...document,
-				lanes: { candidate: { label: "Candidate", contains: ["apply"] } },
+				nodes: {
+					...document.nodes,
+					screen: "Screen resume",
+					offer: { label: "Make offer", lane: "hr" },
+				},
+				lanes: { candidate: "Candidate", manager: "Hiring manager" },
 				groups: { g: { label: "G", contains: ["apply"] } },
 			}),
 		).toEqual([
 			["lanes_with_groups", "groups"],
-			["node_without_lane", "lanes"],
-			["node_without_lane", "lanes"],
+			["node_without_lane", "nodes.screen.lane"],
+			["unknown_node_lane", "nodes.offer.lane"],
 		]);
+		expect(
+			issues({ ...document, lanes: undefined } as unknown as FlowchartDocument).map(
+				([code]) => code,
+			),
+		).toEqual(["unknown_node_lane", "unknown_node_lane", "unknown_node_lane"]);
+	});
+
+	it("keeps a named recipient lane empty instead of assigning it the sender's action", () => {
+		const diagram = build({
+			title: "On-call response",
+			nodes: {
+				alert: { label: "See alert", lane: "monitoring" },
+				page: { label: "Page on-call engineer", lane: "monitoring" },
+				fix: { label: "Fix service", lane: "engineer" },
+				tell: { label: "Tell customer incident is resolved", lane: "monitoring" },
+			},
+			edges: [
+				["alert", "page"],
+				["page", "fix"],
+				["fix", "tell"],
+			],
+			lanes: { monitoring: "Monitoring lead", engineer: "On-call engineer", customer: "Customer" },
+		});
+		expect(diagram.lanes?.map(({ id }) => id)).toEqual(["monitoring", "engineer", "customer"]);
+		expect(diagram.nodes.find(({ id }) => id === "tell")?.lane).toBe("monitoring");
+	});
+
+	it("unions node groups with member lists and keeps return-loop actions with their doer", () => {
+		const decoded = decodeFlowchartDocument({
+			title: "Permit review",
+			nodes: {
+				submit: { label: "Submit form", group: "applicant" },
+				review: { label: "Review form", group: "office" },
+				complete: { label: "Complete?", group: "office" },
+				revise: { label: "Correct form", group: "applicant" },
+				resubmit: { label: "Resubmit form", group: "applicant" },
+				issue: { label: "Issue permit", group: "office" },
+			},
+			edges: [
+				["submit", "review"],
+				["review", "complete"],
+				["complete", "revise", "no"],
+				["revise", "resubmit"],
+				["resubmit", "review"],
+				["complete", "issue", "yes"],
+			],
+			groups: {
+				workflow: { label: "Workflow", contains: ["applicant", "office", "revise"] },
+				applicant: { label: "Applicant team" },
+				office: { label: "Permit office", contains: ["review", "complete", "issue"] },
+			},
+		});
+		expect(Result.isSuccess(decoded)).toBe(true);
+		if (Result.isFailure(decoded)) return;
+		const diagram = build(decoded.success);
+		expect(diagram.nodes.map(({ id, group }) => [id, group])).toEqual([
+			["submit", "applicant"],
+			["review", "office"],
+			["complete", "office"],
+			["revise", "applicant"],
+			["resubmit", "applicant"],
+			["issue", "office"],
+		]);
+		expect(
+			diagram.groups?.filter(({ id }) => id !== "workflow").map(({ parent }) => parent),
+		).toEqual(["workflow", "workflow"]);
+	});
+
+	it("unions node membership before inferring parents, just as contains-only membership does", () => {
+		const base: FlowchartDocument = {
+			title: "Zones",
+			nodes: { a: "A", b: "B", c: "C" },
+			edges: [
+				["a", "b"],
+				["b", "c"],
+			],
+			groups: {
+				zone: { label: "Zone", contains: ["a", "b"] },
+				team: { label: "Team", contains: ["a"] },
+			},
+		};
+		for (const document of [
+			{ ...base, nodes: { ...base.nodes, c: { label: "C", group: "team" } } },
+			{ ...base, groups: { ...base.groups, team: { label: "Team", contains: ["a", "c"] } } },
+		]) {
+			const result = flowchartDiagramFromDocument(document);
+			expect(result.ok).toBe(false);
+			if (!result.ok)
+				expect(result.issues.some(({ code }) => code === "overlapping_containers")).toBe(true);
+		}
+		const nested = build({
+			...base,
+			nodes: { ...base.nodes, c: { label: "C", group: "team" } },
+			groups: {
+				zone: { label: "Zone", contains: ["team", "b"] },
+				team: { label: "Team", contains: ["a"] },
+			},
+		});
+		expect(nested.groups?.find(({ id }) => id === "team")?.parent).toBe("zone");
+	});
+
+	it("refuses a declared group that no node or nested group uses", () => {
+		for (const group of [{ label: "Unused" }, { label: "Unused", contains: [] }]) {
+			expect(
+				issues({
+					title: "Flow",
+					nodes: { a: "A", b: "B" },
+					edges: [["a", "b"]],
+					groups: { unused: group },
+				}),
+			).toEqual([["empty_group", "groups.unused"]]);
+		}
+	});
+
+	it("refuses a node group contradicting contains, or naming an undeclared group", () => {
+		const document: FlowchartDocument = {
+			title: "Teams",
+			nodes: {
+				revise: { label: "Revise", group: "office" },
+				review: { label: "Review", group: "office" },
+			},
+			edges: [["revise", "review"]],
+			groups: {
+				applicant: { label: "Applicant", contains: ["revise"] },
+				office: { label: "Office" },
+			},
+		};
+		expect(issues(document)).toContainEqual(["overlapping_containers", "nodes.revise.group"]);
+		expect(
+			issues({
+				...document,
+				nodes: { ...document.nodes, revise: { label: "Revise", group: "missing" } },
+			}),
+		).toContainEqual(["unknown_node_group", "nodes.revise.group"]);
+		expect(
+			issues({ title: "No groups", nodes: document.nodes, edges: document.edges }).map(
+				([code]) => code,
+			),
+		).toEqual(["unknown_node_group", "unknown_node_group"]);
 	});
 
 	it("names unknown ends with the nearest ids, and every graph problem", () => {
@@ -542,5 +736,49 @@ describe("flowchart document limits", () => {
 				}),
 			],
 		});
+	});
+});
+
+describe("flowchart document branches", () => {
+	const delay = (edges: FlowchartDocument["edges"]): FlowchartDocument => ({
+		title: "Delayed order",
+		nodes: {
+			check: "Check stock",
+			short: "Stock short?",
+			notify: "Notify the customer",
+			reorder: "Reorder stock",
+			ship: "Ship the order",
+		},
+		edges,
+	});
+
+	it("reads one edge that lists several steps as one branch", () => {
+		const result = flowchartDiagramFromDocument(
+			delay([
+				["check", "short"],
+				["short", ["notify", "reorder"], "yes"],
+				["short", "ship", "no"],
+			]),
+		);
+		expect(result.ok).toBe(true);
+	});
+
+	it("still refuses two edges that repeat a branch label, and shows the list form", () => {
+		const result = flowchartDiagramFromDocument(
+			delay([
+				["check", "short"],
+				["short", "notify", "yes"],
+				["short", "reorder", "yes"],
+				["short", "ship", "no"],
+			]),
+		);
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "duplicate_decision_branch_label",
+				hint: 'Give each branch of the same question its own label; a branch that leads to several steps lists them in one edge: ["short", ["reorder", "…"], "yes"].',
+			}),
+		]);
 	});
 });

@@ -3,19 +3,20 @@
 Swimlanes draw a process across actors: one full-length band per customer, team, role or system, in a fixed order, with each step in its actor's band and handoffs crossing between bands. They are part of the flowchart family, not a family of their own.
 
 ```json
-{"type":"flowchart","spec":{"title":"Order fulfilment","direction":"LR","nodes":{"place":"Place order","review":"Review the order","stock":"Items in stock?","backorder":"Notify backorder","ship":"Ship the order"},"edges":[["place","review"],["review","stock"],["stock","ship","yes"],["stock","backorder","no"]],"lanes":{"customer":{"label":"Customer","contains":["place"]},"sales":{"label":"Sales","contains":["review","stock","backorder"]},"warehouse":{"label":"Warehouse","contains":["ship"]}}}}
+{"type":"flowchart","spec":{"title":"Order fulfilment","direction":"LR","nodes":{"place":{"label":"Place order","lane":"customer"},"review":{"label":"Review the order","lane":"sales"},"stock":{"label":"Items in stock?","lane":"sales"},"backorder":{"label":"Notify customer of backorder","lane":"sales"},"ship":{"label":"Ship the order","lane":"warehouse"}},"edges":[["place","review"],["review","stock"],["stock","ship","yes"],["stock","backorder","no"]],"lanes":{"customer":"Customer","sales":"Sales","warehouse":"Warehouse"}}}
 ```
 
 Pass this to `sketchi create --json`, or its `spec` to `sketchi.buildFlowchart`. Studio's `build_flowchart` and `POST /api/v1/flowcharts/build` take the same spec, and generation adds lanes when a prompt describes a process across actors.
 
 ## Contract
 
-- `lanes` maps an id to `{ label, contains }`, in drawing order, at most 8. `contains` lists the steps that actor does.
-- Every node sits in exactly one lane.
+- `lanes` maps an id to its label, in drawing order, at most 8. It only declares and orders the lanes.
+- A named actor with no stated action keeps an empty lane; never assign it a step done by someone else.
+- Every node names its own lane, questions too: `{ label, lane }`, the lane of whoever does the step. "Notify customer of backorder", done by Sales, names `sales`, not the customer it acts on. A lane edit is a node change: `{ op: "set", nodes: { backorder: { lane: "warehouse" } } }`.
 - The layout direction orients the lanes: `LR` draws rows stacked top to bottom with their headers on the left, `TB` columns side by side with their headers on top.
 - Lanes and groups never mix: lanes already say who does each step, and a group inside or across lanes would cut the bands apart.
 
-Builds reject a node in no lane (`node_without_lane`, with the lane ids in its hint), a node two lanes list (`overlapping_containers`), a lane listing an id that is no node (`unknown_member`), lanes declared with groups (`lanes_with_groups`) and more than 8 lanes (`flowchart_too_large`). A flowchart without lanes renders exactly as before.
+Builds reject a node that names no lane (`node_without_lane`, with the lane ids in its hint), a node that names a lane the flowchart doesn't declare (`unknown_node_lane`), lanes declared with groups (`lanes_with_groups`) and more than 8 lanes (`flowchart_too_large`). A flowchart without lanes renders exactly as before.
 
 ## Layout
 

@@ -17,23 +17,27 @@ function candidate(diagram: unknown) {
 describe("swimlane generation", () => {
 	it("keeps a generated flowchart's lanes and each node's lane", () => {
 		const { id, title, lanes, nodes, edges } = laneFixtures.hiring;
+		// The model writes the flowchart document: each node names its lane.
 		const parsed = candidate({
 			id,
 			title,
 			type: "flowchart",
-			lanes: lanes!.map((lane) => ({ id: lane.id, label: lane.label })),
-			nodes: nodes.map((node) => ({
-				id: node.id,
-				label: node.label,
-				kind: node.kind,
-				lane: node.lane,
-			})),
-			edges: edges.map((edge) => ({
-				id: edge.id,
-				source: edge.source,
-				target: edge.target,
-				...(edge.label ? { label: edge.label } : {}),
-			})),
+			lanes: Object.fromEntries((lanes ?? []).map((lane) => [lane.id, lane.label])),
+			nodes: Object.fromEntries(
+				nodes.map((node) => [
+					node.id,
+					{
+						label: node.label,
+						...(node.kind === "decision" && !node.label.trim().endsWith("?")
+							? { shape: "diamond" }
+							: {}),
+						...(node.lane ? { lane: node.lane } : {}),
+					},
+				]),
+			),
+			edges: edges.map((edge) =>
+				edge.label ? [edge.source, edge.target, edge.label] : [edge.source, edge.target],
+			),
 		});
 		expect(parsed.error).toBeUndefined();
 		const diagram = parsed.diagram;

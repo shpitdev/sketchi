@@ -10,8 +10,8 @@ Pass this to `sketchi create --json`, or its `spec` to `sketchi.buildFlowchart`.
 
 ## Contract
 
-- `groups` maps an id to `{ label, contains }`, at most 8. `contains` lists the nodes (and, for zones, the groups) inside it.
-- A node outside every group's list stays outside every group, and a flowchart can mix both.
+- `groups` maps an id to `{ label, contains? }`, at most 8. `contains` lists the nodes (and, for zones, the groups) inside it.
+- A node with no `group` and outside every group's list stays ungrouped; grouped and ungrouped nodes may mix.
 - A group with no `kind` that no other group lists draws as a frame, as below. Groups that nest or name what they stand for draw as zones; see [architecture zones](./flowchart-zones.md).
 
 Builds reject a group that lists an id that is no node or group (`unknown_member`, with the nearest declared ids in its hint) and a node two groups list when neither group holds the other (`overlapping_containers`).
@@ -30,3 +30,14 @@ Each group is an Excalidraw frame named by its label. Excalidraw paints the name
 ## Scenarios
 
 Maintained scenarios: `grouped-expense-approval-v2` (three teams and a loop back into the first), `three-zone-request-path-v2` (three network zones, left to right) and `mixed-fulfilment-groups-v2` (grouped and ungrouped steps). Their `--input` checks require a group under a prompt-grounded label for each stated group, that group to hold every step the prompt puts in it, distinct groups, and the steps the prompt keeps outside every group to be ungrouped.
+
+## Team ownership
+
+A node can name its innermost group: `{ label: "Resubmit the form", group: "applicant" }`.
+Declare the group as `{ applicant: { label: "Applicant team" } }`; `contains` is optional.
+Use this for team-owned actions, including correction and resubmission steps on a loop.
+Each stated action stays a node before the loop returns to the repeated step.
+
+Node groups and `contains` are unioned. A list may repeat the same membership or list a node in an ancestor of its named group. A contradictory direct owner is rejected as `overlapping_containers`; an undeclared node group is `unknown_node_group`. When using both forms in an edit, remove the old conflicting list membership as well as changing the node's `group`.
+
+`set: { nodes: { resubmit: { group: "applicant" } } }` changes a node's group. Removing a group lifts its node memberships to its parent, or clears them when it has no parent. Removing the last node also removes the groups it leaves empty. Architecture zones keep their `contains` lists and nesting.

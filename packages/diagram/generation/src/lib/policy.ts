@@ -502,25 +502,15 @@ function buildRepairRequest(
 	candidate: DiagramGenerationCandidate,
 	repairAttempt: number,
 ): DiagramGenerationRequest {
-	const priorityDiagnostics = candidate.diagnostics.filter(
-		(diagnostic) =>
-			diagnostic.startsWith("flowchart.start_has_incoming:") ||
-			diagnostic.startsWith("flowchart.self_loop:"),
+	const priorityDiagnostics = candidate.diagnostics.filter((diagnostic) =>
+		diagnostic.startsWith("flowchart.self_loop:"),
 	);
-	const priorityCorrections = [
-		...(priorityDiagnostics.some((diagnostic) =>
-			diagnostic.startsWith("flowchart.start_has_incoming:"),
-		)
+	const priorityCorrections =
+		priorityDiagnostics.length > 0
 			? [
-					"Required correction for start-node incoming edges: reroute each offending loop-back edge to the first process node after start. Never target the start node; start nodes have no incoming edges.",
+					"Required correction for self-loops: reroute each offending edge to an earlier distinct step or question. Never keep the same node as both ends; draw every retry or re-check as a branch returning to that earlier node.",
 				]
-			: []),
-		...(priorityDiagnostics.some((diagnostic) => diagnostic.startsWith("flowchart.self_loop:"))
-			? [
-					"Required correction for self-loops: reroute each offending edge to an earlier distinct process or decision node. Never keep the same node as both source and target; model every retry or re-check as a decision branch returning to that earlier distinct node.",
-				]
-			: []),
-	];
+			: [];
 	const priorityGuidance =
 		priorityDiagnostics.length > 0
 			? [

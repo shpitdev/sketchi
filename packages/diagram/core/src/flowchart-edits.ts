@@ -35,17 +35,16 @@ const NodeChangeSchema = Schema.Struct({
 	note: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 	shape: Schema.optionalKey(Schema.NullOr(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"]))),
 	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+	/** The node’s innermost group; null clears it. */
+	group: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+	/** The lane of whoever does the step. */
+	lane: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 });
 
 const GroupChangeSchema = Schema.Struct({
 	label: Schema.optionalKey(Label),
 	kind: Schema.optionalKey(Schema.NullOr(Schema.Literals(DIAGRAM_ZONE_KINDS))),
 	/** Replaces what the group lists. */
-	contains: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
-});
-
-const LaneChangeSchema = Schema.Struct({
-	label: Schema.optionalKey(Label),
 	contains: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
 });
 
@@ -70,7 +69,8 @@ export const FlowchartSetEditSchema = Schema.Struct({
 		),
 	),
 	groups: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(GroupChangeSchema))),
-	lanes: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(LaneChangeSchema))),
+	/** A lane's label, or null to remove it; a node's lane says who does it. */
+	lanes: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(Label))),
 });
 
 /** Adds edges, or relabels an edge that exists. */
@@ -109,7 +109,13 @@ export type FlowchartEditResult =
 	| { readonly ok: true; readonly document: FlowchartDocument }
 	| { readonly ok: false; readonly issues: readonly FlowchartEditIssue[] };
 
-type Edge = FlowchartDocumentEdge;
+/** One editable pair, retaining the authored edge that gives a fan-out its branch identity. */
+interface Edge {
+	readonly source: string;
+	readonly target: string;
+	readonly label?: string;
+	readonly branch: number;
+}
 type Mutable = {
 	title: string;
 	id?: string;
@@ -123,18 +129,44 @@ type Mutable = {
 
 const pairKey = (source: string, target: string) => `${source}\u0000${target}`;
 
-/** The edges as single pairs, each authored list end split, in the written order. */
-function singlePairs(edges: readonly Edge[]): Edge[] {
-	return edges.flatMap(([from, to, label]) =>
+/** Split list ends for pair-addressed edits without losing their shared branch. */
+function singlePairs(edges: readonly FlowchartDocumentEdge[], firstBranch = 0): Edge[] {
+	return edges.flatMap(([from, to, label], index) =>
 		flowchartEdgeEndIds(from).flatMap((source) =>
-			flowchartEdgeEndIds(to).map((target): Edge =>
-				label === undefined ? [source, target] : [source, target, label],
-			),
+			flowchartEdgeEndIds(to).map((target) => ({
+				source,
+				target,
+				...(label === undefined ? {} : { label }),
+				branch: firstBranch + index,
+			})),
 		),
 	);
 }
 
-const ends = (edge: Edge) => [edge[0] as string, edge[1] as string] as const;
+const ends = (edge: Edge) => [edge.source, edge.target] as const;
+
+/** Rejoin only pairs from the same authored branch, separately for each source. */
+function documentEdges(edges: readonly Edge[]): FlowchartDocumentEdge[] {
+	const branches = new Map<
+		string,
+		{ source: string; targets: [string, ...string[]]; label?: string }
+	>();
+	for (const edge of edges) {
+		const key = `${edge.branch}:${edge.source}`;
+		const branch = branches.get(key);
+		if (branch) branch.targets.push(edge.target);
+		else
+			branches.set(key, {
+				source: edge.source,
+				targets: [edge.target],
+				...(edge.label === undefined ? {} : { label: edge.label }),
+			});
+	}
+	return [...branches.values()].map(({ source, targets, label }) => {
+		const target = targets.length === 1 ? targets[0] : targets;
+		return label === undefined ? [source, target] : [source, target, label];
+	});
+}
 
 /** Replace or add an entry in an ordered map, a new one after `after` when given. */
 function upsert<V>(entries: [string, V][], id: string, value: V, after?: string): [string, V][] {
@@ -145,30 +177,35 @@ function upsert<V>(entries: [string, V][], id: string, value: V, after?: string)
 	return [...entries.slice(0, position + 1), [id, value], ...entries.slice(position + 1)];
 }
 
-/**
- * Containers without the given ids. A container left empty goes too, and comes out of
- * the containers that listed it, up through every ancestor it empties in turn.
- */
-function unlist<C extends { readonly contains: readonly string[] }>(
-	entries: [string, C][],
-	ids: readonly string[],
-): [string, C][] {
-	let result = entries;
-	let removing = new Set(ids);
-	while (removing.size > 0) {
-		const emptied = new Set<string>();
-		result = result.flatMap(([key, container]): [string, C][] => {
-			const contains = container.contains.filter((member) => !removing.has(member));
-			if (contains.length === container.contains.length) return [[key, container]];
-			if (contains.length === 0) {
-				emptied.add(key);
-				return [];
-			}
-			return [[key, { ...container, contains }]];
-		});
-		removing = emptied;
+/** Drop a node from member lists, pruning only the groups its removal empties. */
+function removeNodeFromGroups(state: Mutable, id: string, affected: ReadonlySet<string>): void {
+	state.groups = state.groups.map(([key, group]) => [
+		key,
+		group.contains === undefined
+			? group
+			: { ...group, contains: group.contains.filter((member) => member !== id) },
+	]);
+	const tree = flowchartGroupTree(toDocument(state));
+	const used = new Set<string>();
+	for (const group of tree.nodeGroup.values()) {
+		for (
+			let current: string | undefined = group;
+			current !== undefined && !used.has(current);
+			current = tree.groupParent.get(current)
+		)
+			used.add(current);
 	}
-	return result;
+	const emptied = new Set(
+		state.groups.filter(([key]) => affected.has(key) && !used.has(key)).map(([key]) => key),
+	);
+	state.groups = state.groups
+		.filter(([key]) => !emptied.has(key))
+		.map(([key, group]) => [
+			key,
+			group.contains === undefined
+				? group
+				: { ...group, contains: group.contains.filter((member) => !emptied.has(member)) },
+		]);
 }
 
 /** A node value with a change merged in; null clears a field. */
@@ -194,7 +231,7 @@ function mergeNode(
  * replaces, and null removes a container while the containers that listed it list
  * what it held instead.
  */
-function setContainers<C extends { readonly label: string; readonly contains: readonly string[] }>(
+function setContainers<C extends { readonly label: string; readonly contains?: readonly string[] }>(
 	entries: [string, C][],
 	changes: Readonly<Record<string, Record<string, unknown> | null>> | undefined,
 	collection: "group" | "lane",
@@ -222,10 +259,12 @@ function setContainers<C extends { readonly label: string; readonly contains: re
 			result = result
 				.filter(([key]) => key !== id)
 				.map(([key, container]): [string, C] => {
-					if (!container.contains.includes(id)) return [key, container];
+					if (!container.contains?.includes(id)) return [key, container];
 					const contains = [
 						...new Set(
-							container.contains.flatMap((member) => (member === id ? current.contains : [member])),
+							container.contains.flatMap((member) =>
+								member === id ? (current.contains ?? []) : [member],
+							),
 						),
 					];
 					return [key, { ...container, contains }];
@@ -238,22 +277,53 @@ function setContainers<C extends { readonly label: string; readonly contains: re
 			else merged[field] = value;
 		}
 		const { label, contains } = merged;
-		if (typeof label !== "string" || !Array.isArray(contains) || contains.length === 0) {
+		if (typeof label !== "string" || (contains !== undefined && !Array.isArray(contains))) {
 			issues.push({
 				code: "invalid_edit",
 				path,
 				message:
 					current === undefined
-						? `${at} adds ${collection} "${id}" without a label and what it contains.`
-						: `${at} leaves ${collection} "${id}" containing nothing.`,
+						? `${at} adds ${collection} "${id}" without a label.`
+						: `${at} leaves ${collection} "${id}" invalid.`,
 				hint:
 					current === undefined
-						? `Give the new ${collection} { label, contains: [ids] }.`
+						? `Give the new ${collection} a label and assign its nodes with group or contains.`
 						: `Remove the ${collection} with null instead.`,
 			});
 			continue;
 		}
 		result = upsert(result, id, merged as unknown as C);
+	}
+	return result;
+}
+
+/** Lanes with changes merged in: a label adds or renames a lane, and null removes it. */
+function setLanes(
+	entries: [string, string][],
+	changes: Readonly<Record<string, string | null>> | undefined,
+	at: string,
+	issues: FlowchartEditIssue[],
+): [string, string][] {
+	let result = entries;
+	for (const [id, label] of Object.entries(changes ?? {})) {
+		if (label !== null) {
+			result = upsert(result, id, label);
+			continue;
+		}
+		if (!result.some(([key]) => key === id)) {
+			issues.push({
+				code: "unknown_edit_target",
+				path: `${at}.lanes.${id}`,
+				message: `${at} removes lane "${id}", which does not exist.`,
+				hint: unknownFlowchartIdHint(
+					id,
+					result.map(([key]) => key),
+					"lane",
+				),
+			});
+			continue;
+		}
+		result = result.filter(([key]) => key !== id);
 	}
 	return result;
 }
@@ -271,7 +341,7 @@ function toDocument(state: Mutable): FlowchartDocument {
 		...(state.direction === undefined ? {} : { direction: state.direction }),
 		...(state.logos === undefined ? {} : { logos: state.logos }),
 		nodes: Object.fromEntries(state.nodes),
-		edges: state.edges,
+		edges: documentEdges(state.edges),
 		...(groups ? { groups } : {}),
 		...(lanes ? { lanes } : {}),
 	};
@@ -319,6 +389,7 @@ export function applyFlowchartEdits(
 		groups: Object.entries(document.groups ?? {}),
 		lanes: Object.entries(document.lanes ?? {}),
 	};
+	let nextBranch = document.edges.length;
 	const issues: FlowchartEditIssue[] = [];
 	const nodeIds = () => state.nodes.map(([id]) => id);
 	const hasNode = (id: string) => state.nodes.some(([key]) => key === id);
@@ -330,28 +401,46 @@ export function applyFlowchartEdits(
 			hint: unknownFlowchartIdHint(id, nodeIds(), "node"),
 		});
 	const edgeIndex = (source: string, target: string) =>
-		state.edges.findIndex((edge) => edge[0] === source && edge[1] === target);
+		state.edges.findIndex((edge) => edge.source === source && edge.target === target);
 
 	/** Drop a node, joining its one way in to its one way out. */
 	const removeNode = (id: string) => {
-		const into = state.edges.filter((edge) => edge[1] === id);
-		const out = state.edges.filter((edge) => edge[0] === id);
+		const tree = flowchartGroupTree(toDocument(state));
+		const affected = new Set<string>();
+		for (
+			let group = tree.nodeGroup.get(id);
+			group !== undefined && !affected.has(group);
+			group = tree.groupParent.get(group)
+		)
+			affected.add(group);
+		const into = state.edges.filter((edge) => edge.target === id);
+		const out = state.edges.filter((edge) => edge.source === id);
 		const [inEdge] = into;
 		const [outEdge] = out;
 		let joined: Edge | undefined;
-		if (into.length === 1 && out.length === 1 && inEdge && outEdge && inEdge[0] !== outEdge[1]) {
-			const label = inEdge[2] ?? outEdge[2];
+		if (
+			into.length === 1 &&
+			out.length === 1 &&
+			inEdge &&
+			outEdge &&
+			inEdge.source !== outEdge.target
+		) {
+			const label = inEdge.label ?? outEdge.label;
 			const [source] = ends(inEdge);
 			const [, target] = ends(outEdge);
 			if (edgeIndex(source, target) < 0)
-				joined = label === undefined ? [source, target] : [source, target, label];
+				joined = {
+					source,
+					target,
+					...(label === undefined ? {} : { label }),
+					branch: inEdge.label === undefined ? outEdge.branch : inEdge.branch,
+				};
 		}
 		const at = state.edges.findIndex((edge) => edge === inEdge);
-		state.edges = state.edges.filter((edge) => edge[0] !== id && edge[1] !== id);
+		state.edges = state.edges.filter((edge) => edge.source !== id && edge.target !== id);
 		if (joined) state.edges.splice(Math.max(0, Math.min(at, state.edges.length)), 0, joined);
 		state.nodes = state.nodes.filter(([key]) => key !== id);
-		state.lanes = unlist(state.lanes, [id]);
-		state.groups = unlist(state.groups, [id]);
+		removeNodeFromGroups(state, id, affected);
 	};
 
 	edits.forEach((edit, index) => {
@@ -394,20 +483,26 @@ export function applyFlowchartEdits(
 					return;
 				}
 				const old = state.edges[position];
-				const label = old?.[2];
-				state.edges.splice(position, 1, label === undefined ? [from, id] : [from, id, label], [
-					id,
-					to,
-				]);
+				const label = old?.label;
+				state.edges.splice(
+					position,
+					1,
+					{
+						source: from,
+						target: id,
+						...(label === undefined ? {} : { label }),
+						branch: old?.branch ?? nextBranch++,
+					},
+					{ source: id, target: to, branch: nextBranch++ },
+				);
 				state.nodes = upsert(state.nodes, id, node, from);
-				// The new node joins the lane of the step before it, and the innermost
-				// group holding both ends.
-				const lane = state.lanes.find(([, container]) => container.contains.includes(from));
-				if (lane) {
-					state.lanes = upsert(state.lanes, lane[0], {
-						...lane[1],
-						contains: [...lane[1].contains, id],
-					});
+				// The new node joins the lane of the step before it unless it names its own,
+				// and the innermost group holding both ends.
+				const lane = flowchartNodeDetails(
+					state.nodes.find(([key]) => key === from)?.[1] ?? from,
+				).lane;
+				if (lane !== undefined && flowchartNodeDetails(node).lane === undefined) {
+					state.nodes = upsert(state.nodes, id, mergeNode(node, { lane }));
 				}
 				// The innermost group around both ends, read from the derived tree.
 				const tree = flowchartGroupTree(toDocument(state));
@@ -425,15 +520,29 @@ export function applyFlowchartEdits(
 				const shared = chain(from).find((group) => around.includes(group));
 				const holder =
 					shared === undefined ? undefined : state.groups.find(([key]) => key === shared);
-				if (holder) {
-					state.groups = upsert(state.groups, holder[0], {
-						...holder[1],
-						contains: [...holder[1].contains, id],
-					});
+				if (holder && flowchartNodeDetails(node).group === undefined) {
+					if (holder[1].contains === undefined) {
+						const current = state.nodes.find(([key]) => key === id)?.[1] ?? node;
+						state.nodes = upsert(state.nodes, id, mergeNode(current, { group: holder[0] }));
+					} else
+						state.groups = upsert(state.groups, holder[0], {
+							...holder[1],
+							contains: [...holder[1].contains, id],
+						});
 				}
 				return;
 			}
 			case "set": {
+				const originalGroups = new Set(state.groups.map(([id]) => id));
+				const removedGroups = new Set(
+					Object.entries(edit.groups ?? {})
+						.filter(([, value]) => value === null)
+						.map(([id]) => id),
+				);
+				const previousParents =
+					removedGroups.size === 0
+						? new Map<string, string>()
+						: flowchartGroupTree(toDocument(state)).groupParent;
 				if (edit.title !== undefined) state.title = edit.title;
 				if (edit.direction !== undefined) state.direction = edit.direction;
 				if (edit.logos !== undefined) state.logos = edit.logos;
@@ -460,13 +569,52 @@ export function applyFlowchartEdits(
 					}
 					state.nodes = upsert(state.nodes, id, mergeNode(label, change));
 				}
-				state.groups = setContainers(state.groups, edit.groups, "group", at, issues);
-				state.lanes = setContainers(state.lanes, edit.lanes, "lane", at, issues);
+				// A node removal can already have pruned a group removed by this same set.
+				const groupChanges = Object.fromEntries(
+					Object.entries(edit.groups ?? {}).filter(
+						([id, change]) =>
+							change !== null ||
+							!originalGroups.has(id) ||
+							state.groups.some(([key]) => key === id),
+					),
+				);
+				state.groups = setContainers(state.groups, groupChanges, "group", at, issues);
+				state.nodes = state.nodes.map(([id, node]) => {
+					let group = flowchartNodeDetails(node).group;
+					if (group === undefined || !removedGroups.has(group)) return [id, node];
+					const seen = new Set<string>();
+					while (group !== undefined && removedGroups.has(group) && !seen.has(group)) {
+						seen.add(group);
+						group = previousParents.get(group);
+					}
+					return [id, mergeNode(node, { group: group ?? null })];
+				});
+				state.lanes = setLanes(state.lanes, edit.lanes, at, issues);
 				return;
 			}
 			case "connect": {
 				edit.edges.forEach((authored, edgeIndexAt) => {
-					for (const edge of singlePairs([authored])) {
+					const pairs = singlePairs([authored], nextBranch++);
+					// A connect joins the source's existing branch with this label, whether
+					// extending it or moving a target out of a differently labeled fan-out.
+					const labelKey = (label: string | undefined) => label?.trim().toLowerCase() ?? "";
+					const existingBranches = new Map<string, Edge>();
+					for (const pair of pairs) {
+						const branch = state.edges.find(
+							(edge) =>
+								edge.source === pair.source && labelKey(edge.label) === labelKey(pair.label),
+						);
+						if (branch) existingBranches.set(pair.source, branch);
+					}
+					for (const pair of pairs) {
+						const branch = existingBranches.get(pair.source);
+						const edge = branch
+							? {
+									...pair,
+									branch: branch.branch,
+									...(branch.label === undefined ? {} : { label: branch.label }),
+								}
+							: pair;
 						const [source, target] = ends(edge);
 						let ok = true;
 						for (const [id, side] of [
@@ -497,8 +645,8 @@ export function applyFlowchartEdits(
 									message: `${at} removes ${source} → ${target}, but no such edge exists.`,
 									hint: `Edges from "${source}": ${
 										state.edges
-											.filter((edge) => edge[0] === source)
-											.map((edge) => `${source} → ${String(edge[1])}`)
+											.filter((edge) => edge.source === source)
+											.map((edge) => `${source} → ${edge.target}`)
 											.join(", ") || "none"
 									}.`,
 								});
@@ -513,8 +661,7 @@ export function applyFlowchartEdits(
 		}
 	});
 	if (issues.length > 0) return { ok: false, issues };
-	// Edges that the document wrote with list ends stay split once edited; the pairs
-	// keep their written order.
+	// Deduplicate pairs, then serialize their retained branch identities as list ends.
 	const seen = new Set<string>();
 	state.edges = state.edges.filter((edge) => {
 		const key = pairKey(...ends(edge));

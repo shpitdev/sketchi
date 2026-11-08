@@ -408,7 +408,6 @@ export const CODE_MODE_ISSUE_CODES = [
 	"shaped_decision",
 	"duplicate_lane_id",
 	"unknown_node_lane",
-	"empty_lane",
 	"lanes_with_groups",
 	"invalid_id",
 	"duplicate_edge",

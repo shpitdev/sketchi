@@ -3,6 +3,7 @@ import { DiagramGenerationClient } from "@sketchi/diagram-generation";
 import { Effect } from "effect";
 
 import { FixtureGenerationClientLayer } from "./fixture-client";
+import { scenarioFlowchartDocument } from "./flowchart-document";
 import { toDiagramGenerationPrompt } from "./prompt";
 import { getFlowchartScenario } from "./scenarios";
 
@@ -17,7 +18,23 @@ layer(FixtureGenerationClientLayer)("scenario fixture generation client", (it) =
 			});
 
 			assert.isUndefined(candidate.error);
-			assert.deepEqual(candidate.diagram, scenario.expectedDiagram);
+			// The model answers with the expected diagram's document, which draws the same graph.
+			assert.deepEqual(candidate.flowchart, scenarioFlowchartDocument(scenario.expectedDiagram));
+			const drawn = candidate.diagram;
+			if (drawn?.type !== "flowchart") throw new Error("Expected a flowchart.");
+			assert.deepEqual(
+				drawn.nodes.map((node) => [node.id, node.label, node.kind, node.icon?.slug]),
+				scenario.expectedDiagram.nodes.map((node) => [
+					node.id,
+					node.label,
+					node.kind,
+					node.icon?.slug,
+				]),
+			);
+			assert.deepEqual(
+				drawn.edges.map((edge) => [edge.source, edge.target, edge.label]),
+				scenario.expectedDiagram.edges.map((edge) => [edge.source, edge.target, edge.label]),
+			);
 		}),
 	);
 
