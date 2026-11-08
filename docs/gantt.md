@@ -18,7 +18,7 @@ Every task needs a unique `id`, a `label` and a `start` day (`YYYY-MM-DD`), plus
 
 Optional fields:
 
-- `dependsOn`: ids of the tasks that must finish before this one starts (finish-to-start). Generation sets it only where the request says a task waits for another (an after column, "after X", "once X is done"), never from date order alone, and a chart generated from a request with no such wording draws no dependency.
+- `dependsOn`: ids of the tasks that must finish before this one starts (finish-to-start). Generation sets it only where the request says a task waits for another (an after column, "after X", "once X is done"), never from date order alone.
 - `phase`: the header a task sits under. When any task has a phase, every task needs one. Top-level `phases` sets their order (default: first use); at most 12.
 - `progress`: percent complete, 0–100, on tasks but not milestones.
 - `today`: draws a Today line on that day. Nothing reads the clock, so output stays deterministic.
