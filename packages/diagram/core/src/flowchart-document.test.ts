@@ -488,6 +488,87 @@ describe("flowchart documents", () => {
 		expect(diagram.nodes.find(({ id }) => id === "tell")?.lane).toBe("monitoring");
 	});
 
+	it("unions node groups with member lists and keeps return-loop actions with their doer", () => {
+		const decoded = decodeFlowchartDocument({
+			title: "Permit review",
+			nodes: {
+				submit: { label: "Submit form", group: "applicant" },
+				review: { label: "Review form", group: "office" },
+				complete: { label: "Complete?", group: "office" },
+				revise: { label: "Correct form", group: "applicant" },
+				resubmit: { label: "Resubmit form", group: "applicant" },
+				issue: { label: "Issue permit", group: "office" },
+			},
+			edges: [
+				["submit", "review"],
+				["review", "complete"],
+				["complete", "revise", "no"],
+				["revise", "resubmit"],
+				["resubmit", "review"],
+				["complete", "issue", "yes"],
+			],
+			groups: {
+				workflow: { label: "Workflow", contains: ["applicant", "office", "revise"] },
+				applicant: { label: "Applicant team" },
+				office: { label: "Permit office", contains: ["review", "complete", "issue"] },
+			},
+		});
+		expect(Result.isSuccess(decoded)).toBe(true);
+		if (Result.isFailure(decoded)) return;
+		const diagram = build(decoded.success);
+		expect(diagram.nodes.map(({ id, group }) => [id, group])).toEqual([
+			["submit", "applicant"],
+			["review", "office"],
+			["complete", "office"],
+			["revise", "applicant"],
+			["resubmit", "applicant"],
+			["issue", "office"],
+		]);
+		expect(
+			diagram.groups?.filter(({ id }) => id !== "workflow").map(({ parent }) => parent),
+		).toEqual(["workflow", "workflow"]);
+	});
+
+	it("refuses a declared group that no node or nested group uses", () => {
+		for (const group of [{ label: "Unused" }, { label: "Unused", contains: [] }]) {
+			expect(
+				issues({
+					title: "Flow",
+					nodes: { a: "A", b: "B" },
+					edges: [["a", "b"]],
+					groups: { unused: group },
+				}),
+			).toEqual([["empty_group", "groups.unused"]]);
+		}
+	});
+
+	it("refuses a node group contradicting contains, or naming an undeclared group", () => {
+		const document: FlowchartDocument = {
+			title: "Teams",
+			nodes: {
+				revise: { label: "Revise", group: "office" },
+				review: { label: "Review", group: "office" },
+			},
+			edges: [["revise", "review"]],
+			groups: {
+				applicant: { label: "Applicant", contains: ["revise"] },
+				office: { label: "Office" },
+			},
+		};
+		expect(issues(document)).toContainEqual(["overlapping_containers", "nodes.revise.group"]);
+		expect(
+			issues({
+				...document,
+				nodes: { ...document.nodes, revise: { label: "Revise", group: "missing" } },
+			}),
+		).toContainEqual(["unknown_node_group", "nodes.revise.group"]);
+		expect(
+			issues({ title: "No groups", nodes: document.nodes, edges: document.edges }).map(
+				([code]) => code,
+			),
+		).toEqual(["unknown_node_group", "unknown_node_group"]);
+	});
+
 	it("names unknown ends with the nearest ids, and every graph problem", () => {
 		const result = flowchartDiagramFromDocument({
 			title: "Broken",

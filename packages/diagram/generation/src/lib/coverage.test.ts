@@ -150,6 +150,49 @@ describe("flowchart connections and containers", () => {
 		expect(issues[0]?.message).toContain('"worker → database"');
 	});
 
+	it("catches a conditional prerequisite ending before the shared continuation", () => {
+		const request =
+			"Sensitive releases require Legal review before Publish note. Routine releases go straight to Publish note.";
+		const diagram = {
+			type: "flowchart",
+			nodes: [
+				{ id: "route", label: "Sensitive release?" },
+				{ id: "review", label: "Legal review" },
+				{ id: "publish", label: "Publish note" },
+			],
+			edges: [
+				{ source: "route", target: "review" },
+				{ source: "route", target: "publish" },
+			],
+		};
+		expect(codes(request, diagram)).toEqual(["flowchart_connection_missing"]);
+		expect(
+			codes(request, {
+				...diagram,
+				edges: [...diagram.edges, { source: "review", target: "publish" }],
+			}),
+		).toEqual([]);
+	});
+
+	it("checks then-chains without requiring a direct edge for a stated before relationship", () => {
+		const nodes = [
+			{ id: "copy", label: "Copy text" },
+			{ id: "format", label: "Format text" },
+			{ id: "publish", label: "Publish text" },
+		];
+		const diagram = { type: "flowchart", nodes, edges: [{ source: "copy", target: "format" }] };
+		expect(codes("Copy text, then Format text, then Publish text.", diagram)).toEqual([
+			"flowchart_connection_missing",
+		]);
+		const complete = {
+			...diagram,
+			edges: [...diagram.edges, { source: "format", target: "publish" }],
+		};
+		expect(codes("Copy text before Publish text.", complete)).toEqual([]);
+		expect(codes("Do not Publish text before Copy text.", complete)).toEqual([]);
+		expect(codes("Copy text, then Format document.", diagram)).toEqual([]);
+	});
+
 	it("reports a named zone that no group carries", () => {
 		const diagram = { type: "flowchart", nodes, edges, groups: groups.slice(1) };
 		const issues = checkRequestCoverage(request, diagram);
@@ -157,7 +200,7 @@ describe("flowchart connections and containers", () => {
 		expect(issues[0]?.message).toContain('"production VPC"');
 	});
 
-	it("does not read several zones, or a sequence of prose steps, as names or edges", () => {
+	it("does not invent nodes for unmatched prose or names for generic zone counts", () => {
 		expect(
 			codes("flowchart across our 3 network zones: request → check cache, then answer", {
 				type: "flowchart",
@@ -315,7 +358,7 @@ describe("the coverage repair", () => {
 		retryDelayMs: 1,
 		totalTimeoutMs: 10_000,
 	};
-	const run = (texts: string[]) => {
+	const run = (texts: string[], request = "flowchart: push → build → test → ship") => {
 		const seen: DiagramGenerationRequest[] = [];
 		return runDiagramGenerationWithPolicy(
 			(attempt) => {
@@ -331,11 +374,30 @@ describe("the coverage repair", () => {
 							}),
 						);
 			},
-			{ model: "m", prompt: { id: "x", request: "flowchart: push → build → test → ship" } },
+			{ model: "m", prompt: { id: "x", request } },
 			"fixture",
 			policy,
 		).pipe(Effect.map((candidate) => ({ candidate, seen })));
 	};
+
+	it.effect(
+		"repairs a stated before continuation that otherwise leaves a valid terminal node",
+		() =>
+			Effect.gen(function* () {
+				const { candidate, seen } = yield* run(
+					[skipsTest, complete],
+					"flowchart: Push, then Build, then Test before Ship.",
+				);
+				expect(seen).toHaveLength(2);
+				expect(candidate.diagram).toMatchObject({
+					type: "flowchart",
+					edges: expect.arrayContaining([
+						expect.objectContaining({ source: "test", target: "ship" }),
+					]),
+				});
+				expect(candidate.diagnostics.at(-1)).toMatch(/^coverage_repair_succeeded/u);
+			}),
+	);
 
 	it.effect("makes no further call when the diagram covers the request", () =>
 		Effect.gen(function* () {

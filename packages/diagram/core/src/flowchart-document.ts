@@ -60,6 +60,8 @@ export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
 	shape: Schema.optionalKey(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"])),
 	/** A product name or catalog slug whose logo the node draws; null draws none. */
 	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+	/** The innermost group containing this node; unioned with groups’ member lists. */
+	group: Schema.optionalKey(Schema.NonEmptyString),
 	/** The id of the lane of whoever does the step, in a flowchart with lanes. */
 	lane: Schema.optionalKey(Schema.NonEmptyString),
 });
@@ -74,16 +76,12 @@ export const FlowchartDocumentNodeSchema = Schema.Union([
 ]);
 export type FlowchartDocumentNode = typeof FlowchartDocumentNodeSchema.Type;
 
-const Members = Schema.Array(Id).check(
-	Schema.isMinLength(1, { message: "Expected at least one member id" }),
-);
-
 /** A labeled region that holds nodes and other groups; kind says what an architecture zone stands for. */
 export const FlowchartDocumentGroupSchema = Schema.Struct({
 	label: Label,
 	kind: Schema.optionalKey(Schema.Literals(DIAGRAM_ZONE_KINDS)),
 	/** The node and group ids inside it, at any depth. */
-	contains: Members,
+	contains: Schema.optionalKey(Schema.Array(Id)),
 });
 export interface FlowchartDocumentGroup extends Schema.Schema.Type<
 	typeof FlowchartDocumentGroupSchema
@@ -302,6 +300,19 @@ function groupContainment(
 	const order = new Map(groups.map(([id], index) => [id, index]));
 	const nodeGroup = new Map<string, string>();
 	const groupParent = new Map<string, string>();
+	const namedGroups = Object.entries(document.nodes).flatMap(([id, node]) => {
+		const group = flowchartNodeDetails(node).group;
+		return group === undefined ? [] : [[id, group] as const];
+	});
+	for (const [id, group] of namedGroups) {
+		if (groupIds.has(group)) continue;
+		issues.push({
+			code: "unknown_node_group",
+			ref: { kind: "node", id, path: `nodes.${id}.group` },
+			message: `Node "${id}" names undeclared group "${group}".`,
+			hint: unknownFlowchartIdHint(group, groupIds, "group"),
+		});
+	}
 	if (groups.length === 0) return { nodeGroup, groupParent };
 
 	// Who lists whom, directly.
@@ -310,7 +321,7 @@ function groupContainment(
 	const groupListers = new Map<string, string[]>();
 	for (const [id, group] of groups) {
 		const listed: string[] = [];
-		group.contains.forEach((member, index) => {
+		(group.contains ?? []).forEach((member, index) => {
 			const path = `groups.${id}.contains[${index}]`;
 			if (member === id) {
 				issues.push({
@@ -491,6 +502,36 @@ function groupContainment(
 			hint: "Merge related groups or leave minor steps ungrouped.",
 		});
 	}
+	// A node names its innermost group. A contains list may also name it in that
+	// group or an ancestor, but must not assign it to a different direct owner.
+	for (const [id, group] of namedGroups) {
+		if (!groupIds.has(group)) continue;
+		const listed = nodeGroup.get(id);
+		if (listed !== undefined && listed !== group && !ancestors(group).includes(listed)) {
+			issues.push({
+				code: "overlapping_containers",
+				ref: { kind: "node", id, path: `nodes.${id}.group` },
+				message: `Node "${id}" names group "${group}", but contains places it in "${listed}".`,
+				hint: `Use the same innermost group in both forms, or remove the conflicting contains membership.`,
+			});
+		} else nodeGroup.set(id, group);
+	}
+
+	const used = new Set<string>();
+	for (const group of nodeGroup.values()) {
+		used.add(group);
+		for (const parent of ancestors(group)) used.add(parent);
+	}
+	for (const [id, group] of groups) {
+		if (!group.contains?.length && !used.has(id))
+			issues.push({
+				code: "empty_group",
+				ref: { kind: "group", id, path: `groups.${id}` },
+				message: `Group "${id}" contains no nodes.`,
+				hint: "Assign its nodes with group or contains, or remove the group.",
+			});
+	}
+
 	return { nodeGroup, groupParent };
 }
 

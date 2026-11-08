@@ -41,8 +41,9 @@ export const FLOWCHART_RULES = {
 	/** The flowchart document's own rules, which every surface that writes one reads. */
 	documentShape:
 		'nodes map an id to its label or { label, … }; an edge is [from, to] or [from, to, "label"], and an end may list ids: [["web", "api"], "rds"] is one edge per id.',
-	documentRoles: (source: RuleSource) =>
-		`Sketchi reads roles from the edges: a question label is a decision, a node nothing enters starts the flow and one nothing leaves ends it. Draw only the steps and arrows ${source} states: a branch with no stated next step ends at its last step, with no onward arrow or closing node.`,
+	documentRoles: (_source: RuleSource) =>
+		'Roles come from edges: question labels are decisions. Keep every stated "X before Y" or "X then Y" connection and branch rejoin; a branch with no stated next step ends at its last step, with no onward arrow or closing node.',
+
 	documentNodeDetails:
 		'A node is "Label", or { "label", "note"?, "shape"? } when it has a subtitle or a shape; give every database, queue, bucket and file its shape.',
 	documentEdgeLabels: (source: RuleSource) =>
@@ -55,9 +56,11 @@ export const FLOWCHART_RULES = {
 	documentBranches: (source: RuleSource) =>
 		`Label every branch of a question with ${source}'s outcome words, usually "yes" and "no", each label once.`,
 	documentLoops:
-		'A repeated step ("send another …", "try again", "resubmit") points back at the step it repeats, never at itself, and is never an end.',
+		"Keep each action on a return path as its own node in its actor's group or lane, then connect back to the repeated step; never make it an end or put its action only on an arrow.",
+
 	documentGroups: (source: RuleSource) =>
-		`Only when ${source} groups steps (teams, zones, phases), declare groups: { id: { label, kind?, contains: [ids] } }, each listing the nodes and groups ${source} puts in it; a group may list members at any depth and Sketchi nests them. Every zone ${source} names is its own group; anything ${source} keeps outside a zone stays out of its list. Set kind (${zoneKinds}) when ${source} says what a zone is. Set shape on infrastructure nodes, entries and ends too: "database" for databases, "document" for files, archives and reports, "queue" for queues, streams and topics, "storage" for buckets and object stores.`,
+		`When ${source} groups steps, declare groups: { id: { label, kind?, contains?: [ids] } }. For teams, each node names its doer in group, return-loop actions too; contains lists nested groups. For zones, contains lists nodes and groups at any depth; Sketchi nests them. node.group combines with contains; conflicting owners fail. Each named zone has its own group; outside stays out. Zone kind: ${zoneKinds}. Shapes on all nodes, entries/ends too: "database" for databases, "document" for files/archives/reports, "queue" for queues/streams/topics, "storage" for buckets/object stores.`,
+
 	documentLanes: (source: RuleSource) =>
 		`For swimlanes, a process across actors or roles, declare lanes: { id: "Label" } in ${source}'s order and set every node's lane, questions too, to whoever does it: { label, lane }. Lanes may be empty; no groups.`,
 	documentLogos: (source: RuleSource) =>

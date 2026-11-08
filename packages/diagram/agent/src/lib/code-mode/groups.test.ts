@@ -91,6 +91,25 @@ describe("Code Mode flowchart groups", () => {
 		);
 	});
 
+	it("keeps a loop step's node group through normalization and Excalidraw export", async () => {
+		const built = await build({
+			...spec,
+			nodes: { ...spec.nodes, revise: { label: "Revise the report", group: " employee " } },
+			groups: { ...spec.groups, employee: { label: "Employee", contains: ["submit"] } },
+		});
+		if (!built.ok) throw new Error(JSON.stringify(built.issues));
+		expect(built.normalizedSpec.nodes["revise"]).toEqual({
+			label: "Revise the report",
+			group: "employee",
+		});
+		const excalidraw = built.artifact.formats.find(({ format }) => format === "excalidraw")
+			?.inline as Parameters<typeof validateExcalidrawScene>[0];
+		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
+		expect(excalidraw.elements.find(({ id }) => id === "node:revise")?.["frameId"]).toBe(
+			"group:employee",
+		);
+	});
+
 	it("rejects a group listing an undeclared id with the nearest ids in its hint", async () => {
 		const built = await build({
 			...spec,

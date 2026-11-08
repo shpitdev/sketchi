@@ -17,7 +17,7 @@ Additive to [flowchart groups](./flowchart-groups.md):
 - A group's `contains` may list other groups. Nesting is read from those lists, never out of ids or labels; a group may list members at any depth, so a region can list the bucket beside its VPC and the VPC its subnets, and Sketchi derives the tree. A group no other group lists sits inside the smallest group holding all its nodes.
 - `groups[].kind` is one of `cloud`, `datacenter`, `region`, `zone`, `vpc`, `subnet`, `cluster` or `namespace`. It says what a zone stands for and sets how it draws. It is a closed set so a model picks a drawn treatment, not free text.
 - `nodes[id].shape` is one of `database`, `queue`, `document` or `storage`. A node's role (entry, step, decision, end) comes from its edges whatever its shape, so a database a request ends at needs no more than its shape.
-- A node sits in the innermost group that lists it, directly or through the groups nested in it.
+- A node sits in its named `group`, or the innermost group that lists it when it names none. A list can also place it in an ancestor of its named group; a different direct owner is refused.
 - Zones nest at most 4 deep (a cloud, a region, a VPC and a subnet), and a flowchart keeps at most 8 groups.
 
 Builds reject a group that lists an id that is no node or group (`unknown_member`, with the nearest declared ids in its hint), groups that list each other in a cycle (`group_cycle`), two groups that share a member without one holding the other (`overlapping_containers`), and zones nested deeper than 4 (`flowchart_too_large`).

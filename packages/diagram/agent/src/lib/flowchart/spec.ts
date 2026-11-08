@@ -27,6 +27,7 @@ function cleanNode(node: FlowchartDocumentNode): FlowchartDocumentNode {
 		label: cleanToolString(details.label),
 		...(note ? { note } : {}),
 		...(details.shape ? { shape: details.shape } : {}),
+		...(details.group ? { group: cleanToolString(details.group) } : {}),
 		...(details.lane ? { lane: cleanToolString(details.lane) } : {}),
 		...(details.icon === null
 			? { icon: null }
@@ -47,7 +48,7 @@ function cleanEdge([from, to, label]: FlowchartDocumentEdge): FlowchartDocumentE
 }
 
 const cleanContainers = <
-	C extends { readonly label: string; readonly contains: readonly string[] },
+	C extends { readonly label: string; readonly contains?: readonly string[] },
 >(
 	containers: Readonly<Record<string, C>> | undefined,
 ): Record<string, C> | undefined =>
@@ -59,7 +60,9 @@ const cleanContainers = <
 					{
 						...container,
 						label: cleanToolString(container.label),
-						contains: container.contains.map((member) => cleanToolString(member)),
+						...(container.contains === undefined
+							? {}
+							: { contains: container.contains.map((member) => cleanToolString(member)) }),
 					},
 				]),
 			);

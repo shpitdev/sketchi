@@ -195,7 +195,7 @@ describe("diagram generation prompt mapping", () => {
 	it("sends a repeated step back to the step it repeats and keeps flowchart richness", () => {
 		const messages = buildDiagramGenerationMessages(prompt);
 
-		expect(messages.system).toContain("points back at the step it repeats, never at itself");
+		expect(messages.system).toContain("then connect back to the repeated step");
 		expect(messages.system).toContain("Copy everything the scenario states, in full");
 		expect(messages.system).toContain("Add nothing it does not state");
 		expect(messages.system).toContain(

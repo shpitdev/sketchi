@@ -716,7 +716,7 @@ const DiagramStoreLive = Layer.effect(
 					storageError(
 						"corrupt_record",
 						`Diagram "${diagramId}" has an invalid canonical document.`,
-						"Recover a prior canonical document from the revisions directory.",
+						"Regenerate diagrams stored in an older flowchart format; otherwise recover a prior canonical document from the revisions directory.",
 						diagramId,
 					),
 				),

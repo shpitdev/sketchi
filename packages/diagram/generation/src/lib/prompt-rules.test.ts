@@ -39,8 +39,8 @@ describe("generation prompt rules", () => {
 	});
 
 	it("makes every named zone a group nested in the zone that holds it", () => {
-		expect(system).toContain("Every zone the scenario names is its own group");
-		expect(system).toContain("a group may list members at any depth and Sketchi nests them");
+		expect(system).toContain("Each named zone has its own group");
+		expect(system).toContain("contains lists nodes and groups at any depth; Sketchi nests them");
 		expect(system).toContain(FLOWCHART_RULES.documentZonesNotNodes);
 		expect(system).toContain(FLOWCHART_RULES.documentOwners("the scenario"));
 		expect(system).toContain(FLOWCHART_RULES.documentFanOut);

@@ -1,9 +1,9 @@
 /**
  * Deterministic checks of a generated diagram against what its request states
  * outright: the classes, fields and tables pasted as code, quoted text, the
- * connections drawn with arrows, the containers an architecture names, and the
+ * connections drawn with arrows or explicit before/then order, the containers an architecture names, and the
  * messages a sequence lists. A check reads only structure the request spells
- * out, so a request in plain prose passes without a cost.
+ * out, without another model call.
  */
 import { isUnknownRecord } from "./unknown-record.js";
 
@@ -761,6 +761,24 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 		const source = text(edge["source"]);
 		outgoing.set(source, [...(outgoing.get(source) ?? []), text(edge["target"])]);
 	}
+	// A stated order can pass through intermediate steps; arrow chains limit those to three.
+	const reaches = (from: string, to: string, blocked = new Set<string>(), limit = nodes.length) => {
+		let frontier = [from];
+		const seen = new Set(frontier);
+		for (let depth = 0; depth < limit; depth += 1) {
+			const next: string[] = [];
+			for (const id of frontier) {
+				for (const target of outgoing.get(id) ?? []) {
+					if (target === to) return true;
+					if (seen.has(target) || blocked.has(target)) continue;
+					seen.add(target);
+					next.push(target);
+				}
+			}
+			frontier = next;
+		}
+		return false;
+	};
 	const issues: CoverageIssue[] = [];
 	const missing: string[] = [];
 	for (const line of request.replace(DIRECTION, " ").split(/\n/u)) {
@@ -779,39 +797,63 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 				.flat()
 				.flatMap((entry) => (entry.node === undefined ? [] : [text(nodes[entry.node]?.["id"])])),
 		);
-		// Reached within three edges, through no other node this line names.
-		const reaches = (from: string, to: string) => {
-			let frontier = [from];
-			const seen = new Set(frontier);
-			for (let depth = 0; depth < 3; depth += 1) {
-				const next: string[] = [];
-				for (const id of frontier) {
-					for (const target of outgoing.get(id) ?? []) {
-						if (target === to) return true;
-						if (seen.has(target) || chainNodes.has(target)) continue;
-						seen.add(target);
-						next.push(target);
-					}
-				}
-				frontier = next;
-			}
-			return false;
-		};
 		for (let index = 1; index < matched.length; index += 1) {
 			for (const from of matched[index - 1] ?? []) {
 				for (const to of matched[index] ?? []) {
 					if (from.node === undefined || to.node === undefined || from.node === to.node) continue;
 					const fromId = text(nodes[from.node]?.["id"]);
 					const toId = text(nodes[to.node]?.["id"]);
-					if (!reaches(fromId, toId)) missing.push(`${from.item} → ${to.item}`);
+					if (!reaches(fromId, toId, chainNodes, 3)) missing.push(`${from.item} → ${to.item}`);
 				}
 			}
 		}
 	}
+	// Prose is checked only when both sides explicitly name one unambiguous node.
+	// Read the closest complete label before/after the connective, not incidental
+	// mentions elsewhere in the sentence; negated ordering is left to the model.
+	const proseNode = (phrase: string, before: boolean): number | undefined => {
+		const tokens = stems(phrase);
+		const candidates = nodes
+			.flatMap((node, index) => {
+				const wanted = stems(text(node["label"]));
+				if (wanted.length === 0) return [];
+				const positions = wanted.map((word) =>
+					before
+						? tokens.findLastIndex((token) => holds(new Set([token]), word))
+						: tokens.findIndex((token) => holds(new Set([token]), word)),
+				);
+				if (positions.some((position) => position < 0)) return [];
+				return [
+					{
+						index,
+						near: before ? Math.min(...positions) : -Math.max(...positions),
+						words: wanted.length,
+					},
+				];
+			})
+			.sort((left, right) => right.near - left.near || right.words - left.words);
+		const [first, second] = candidates;
+		return first && !(second && first.near === second.near && first.words === second.words)
+			? first.index
+			: undefined;
+	};
+	for (const sentence of request.split(/[.!;\n]/u)) {
+		const parts = sentence.split(/\b(?:before|then)\b/iu);
+		for (let index = 1; index < parts.length; index += 1) {
+			const left = parts[index - 1] ?? "";
+			if (LEAVES_OUT.test(left)) continue;
+			const from = proseNode(left, true);
+			const to = proseNode(parts[index] ?? "", false);
+			if (from === undefined || to === undefined || from === to) continue;
+			if (!reaches(text(nodes[from]?.["id"]), text(nodes[to]?.["id"])))
+				missing.push(`${text(nodes[from]?.["label"])} → ${text(nodes[to]?.["label"])}`);
+		}
+	}
+
 	if (missing.length > 0) {
 		issues.push({
 			code: "flowchart_connection_missing",
-			message: `The request connects ${quoteList([...new Set(missing)])}, but the diagram has no such edge. Draw an edge for every stated arrow; "a + b → c" means both a → c and b → c.`,
+			message: `The request connects ${quoteList([...new Set(missing)])}, but the diagram has no directed path between them. Keep every stated arrow, "X before Y" and "X then Y" continuation; "a + b → c" means both a → c and b → c.`,
 		});
 	}
 
