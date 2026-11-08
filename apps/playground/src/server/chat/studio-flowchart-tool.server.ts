@@ -9,7 +9,7 @@ import {
 	type CodeModeIssue,
 	normalizeIconSlug,
 } from "@sketchi/diagram-agent";
-import type { OfferedLogo } from "@sketchi/diagram-generation";
+import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
 import type { Effect } from "effect";
 
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
@@ -50,8 +50,10 @@ export function studioSystemPrompt(
 }
 
 /**
- * A flowchart's logos follow its labels, so only the technologies the user named
- * draw: a node icon naming another is dropped before the build.
+ * Only the technologies the user named draw: a node icon naming another is
+ * dropped before the build. With logos on, each bare node is settled here too,
+ * to the named logo its label names or to none, so the build fills no logo the
+ * user never named.
  */
 function groundSpecIcons(
 	input: StudioBuildFlowchartInput,
@@ -61,24 +63,47 @@ function groundSpecIcons(
 	readonly issues: CodeModeIssue[];
 } {
 	const offered = new Set(logos.map((logo) => logo.slug));
+	const fills = Boolean(input.spec.logos);
 	const issues: CodeModeIssue[] = [];
+	const bare = Object.entries(input.spec.nodes).flatMap(
+		([id, node]): { id: string; label: string; icon?: { slug: string } }[] =>
+			typeof node === "string"
+				? [{ id, label: node }]
+				: node.icon === undefined
+					? [{ id, label: node.label }]
+					: [],
+	);
+	const fromLabels = new Map(
+		fills
+			? placeNodeLogos(bare, logos).nodes.flatMap((node) =>
+					node.icon ? [[node.id, node.icon.slug] as const] : [],
+				)
+			: [],
+	);
+	let changed = false;
 	const nodes = Object.fromEntries(
 		Object.entries(input.spec.nodes).map(([id, node]) => {
-			if (typeof node === "string" || typeof node.icon !== "string") return [id, node];
-			if (offered.has(normalizeIconSlug(node.icon))) return [id, node];
+			const details = typeof node === "string" ? { label: node } : node;
+			if (typeof details.icon !== "string") {
+				if (!fills || details.icon === null) return [id, node];
+				changed = true;
+				return [id, { ...details, icon: fromLabels.get(id) ?? null }];
+			}
+			if (offered.has(normalizeIconSlug(details.icon))) return [id, node];
+			changed = true;
 			issues.push({
 				code: "unknown_icon",
 				severity: "warning",
 				stage: "input",
 				ref: { kind: "node", id, path: `nodes.${id}.icon` },
-				message: `Icon "${node.icon}" on node "${id}" is not a technology the user named; the node renders without a logo.`,
+				message: `Icon "${details.icon}" on node "${id}" is not a technology the user named; the node renders without a logo.`,
 				hint: "Only use logos from the NODE LOGOS list.",
 			});
-			const { icon: _icon, ...rest } = node;
-			return [id, rest];
+			const { icon: _icon, ...rest } = details;
+			return [id, fills ? { ...rest, icon: null } : rest];
 		}),
 	);
-	return issues.length > 0
+	return changed
 		? { input: { ...input, spec: { ...input.spec, nodes } }, issues }
 		: { input, issues };
 }

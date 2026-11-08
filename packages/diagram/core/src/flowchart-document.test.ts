@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
+	flowchartDocumentPairCount,
 	type FlowchartDocument,
 } from "./flowchart-document";
 
@@ -428,5 +429,30 @@ describe("flowchart documents", () => {
 		expect(issues({ title: "One", nodes: { a: "A" }, edges: [] })).toEqual([
 			["flowchart_too_small", "nodes"],
 		]);
+	});
+});
+
+describe("flowchart document limits", () => {
+	it("counts list-ended edges without expanding them, and refuses past the limit", () => {
+		const ids = (prefix: string) => Array.from({ length: 300 }, (_, index) => `${prefix}${index}`);
+		const edges: FlowchartDocument["edges"] = [
+			[ids("a"), ids("b")],
+			["x", ["y", "z"]],
+		];
+		expect(flowchartDocumentPairCount(edges)).toBe(90_002);
+		const result = flowchartDiagramFromDocument({
+			title: "Fan out",
+			nodes: { x: "X", y: "Y" },
+			edges,
+		});
+		expect(result).toEqual({
+			ok: false,
+			issues: [
+				expect.objectContaining({
+					code: "flowchart_too_large",
+					message: "Flowchart draws 90002 edges; the supported maximum is 120.",
+				}),
+			],
+		});
 	});
 });

@@ -797,6 +797,48 @@ describe("styling a diagram with a request", () => {
 		]);
 	});
 
+	it("keys a generated flowchart's free-form ids as document ids and styles them by those ids", async () => {
+		const { title, type, ...rest } = flowchartIr;
+		const rename = (id: string) => (id === "decision" ? "Release decision" : id);
+		const text = JSON.stringify({
+			title,
+			diagram: {
+				...rest,
+				type,
+				nodes: rest.nodes.map((node) => ({ ...node, id: rename(node.id) })),
+				edges: rest.edges.map((edge) => ({
+					...edge,
+					source: rename(edge.source),
+					target: rename(edge.target),
+				})),
+			},
+			styles: [
+				{ targets: ["Release decision"], fillColor: "#ede9fe" },
+				{ targets: ["e4"], strokeColor: "#dc2626" },
+			],
+		});
+		const response = await generateRequest(
+			{ AI: fakeAiGateway(text) },
+			{
+				prompt: "Release approval with a purple decision and a red incomplete path",
+				type: "flowchart",
+			},
+		);
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			diagram: {
+				document: { spec: { nodes: Record<string, unknown> } };
+				patch?: { operations: Array<{ selector: { nodeIds: string[] } }> };
+			};
+		};
+		expect(Object.keys(body.diagram.document.spec.nodes)).toContain("release-decision");
+		expect(body.diagram.patch?.operations.map((operation) => operation.selector.nodeIds)).toEqual([
+			["release-decision"],
+			["release-decision->revise"],
+		]);
+	});
+
 	it("leaves a request without color or shape words unstyled and its prompt without styling rules", async () => {
 		const observedRuns: Array<Parameters<CloudflareAiGateway["run"]>[0]> = [];
 		const env: StudioEnv = {

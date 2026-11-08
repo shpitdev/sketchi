@@ -120,26 +120,20 @@ describe("assessFlowchartQuality", () => {
 		]);
 	});
 
-	it("identifies under-branched decisions without question labels", () => {
+	it("accepts a question with one stated way on, without asking for an invented branch", () => {
 		const base = linearFlowchart();
 		const diagram: FlowchartDiagram = {
 			...base,
 			nodes: base.nodes.map((node): FlowchartDiagram["nodes"][number] =>
-				node.id === "node-1" ? { ...node, kind: "decision" } : node,
+				node.id === "node-1" ? { ...node, kind: "decision", label: "Verify deployment?" } : node,
 			),
 		};
 
-		const quality = assessFlowchartQuality(diagram, 0);
+		const quality = assessFlowchartQuality(diagram, 8);
 
-		expect(quality.accepted).toBe(false);
-		expect(quality.score).toBe(8.5);
-		expect(quality.checks).toEqual([
-			expect.objectContaining({
-				code: "underbranched_decision",
-				severity: "error",
-				refs: [{ kind: "node", id: "node-1" }],
-			}),
-		]);
+		expect(quality.accepted).toBe(true);
+		expect(quality.score).toBe(10);
+		expect(quality.checks).toEqual([]);
 	});
 
 	it("identifies decisions with unlabeled branches", () => {

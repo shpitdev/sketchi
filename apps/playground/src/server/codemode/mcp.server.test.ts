@@ -757,15 +757,14 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		{ spec: {} },
 		{
 			spec: {
-				title: "Underbranched",
+				title: "Unknown end",
 				nodes: {
 					a: "Start",
-					b: "Continue?",
-					c: "Finish",
+					b: "Continue",
 				},
 				edges: [
 					["a", "b"],
-					["b", "c", "yes"],
+					["b", "c"],
 				],
 			},
 		},

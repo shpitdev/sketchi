@@ -960,11 +960,66 @@ describe("Code Mode runtime", () => {
 		]) {
 			const result = await createTestRuntime().buildFlowchart({ spec });
 			expectBuildFailure(result);
-			expect(result.status).toBe("invalid_flowchart");
+			expect(result.status).toBe("limit_exceeded");
 			expect(result.issues).toContainEqual(
 				expect.objectContaining({ code: "flowchart_too_large" }),
 			);
 		}
+	});
+
+	it("refuses two node ids that are one id once trimmed", async () => {
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Trimmed ids",
+				nodes: { a: "Start", " a ": "Start again", b: "Finish" },
+				edges: [["a", "b"]],
+			},
+		});
+
+		expectBuildFailure(result);
+		expect(result.status).toBe("invalid_flowchart");
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "duplicate_node_id",
+				ref: { kind: "node", id: "a", path: "spec.nodes. a " },
+			}),
+		]);
+	});
+
+	it("accepts a question with one stated way on", async () => {
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Deploy check",
+				nodes: { begin: "Begin", verify: "Verify deployment?", notify: "Notify team" },
+				edges: [
+					["begin", "verify"],
+					["verify", "notify"],
+				],
+			},
+		});
+
+		expect(result).toMatchObject({ ok: true, status: "accepted" });
+	});
+
+	it("counts list-ended edges before expanding them", async () => {
+		const ids = (prefix: string) => Array.from({ length: 300 }, (_, index) => `${prefix}${index}`);
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Fan out",
+				nodes: { a: "Start", b: "Finish" },
+				edges: [[ids("from"), ids("to")]],
+			},
+		});
+
+		expectBuildFailure(result);
+		expect(result.status).toBe("limit_exceeded");
+		// Only the count: no pair was expanded to report its unknown ends.
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "flowchart_too_large",
+				message: "Flowchart draws 90000 edges; the supported maximum is 120.",
+			}),
+		]);
 	});
 
 	it("fails semantic limits before rendering or persisting artifacts", async () => {
@@ -1000,7 +1055,7 @@ describe("Code Mode runtime", () => {
 		});
 
 		expectBuildFailure(result);
-		expect(result.status).toBe("invalid_flowchart");
+		expect(result.status).toBe("limit_exceeded");
 		expect(renderCalls).toBe(0);
 		expect(writeCalls).toBe(0);
 	});

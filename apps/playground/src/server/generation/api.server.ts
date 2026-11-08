@@ -7,6 +7,7 @@ import {
 	type CodeModeIssue,
 	type CanonicalDiagramDocument,
 	canonicalDocumentFromDiagram,
+	flowchartDocumentIds,
 } from "@sketchi/diagram-agent";
 import {
 	type DiagramStyle,
@@ -562,16 +563,25 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 	const scene = inlineArtifact(buildResult.artifact, "scene");
 	const excalidraw = inlineArtifact(buildResult.artifact, "excalidraw");
 	// Styles reach the caller only when they apply to the built diagram; otherwise it draws unstyled.
-	// A drawn flowchart names each edge by its two ends; a style may name the generated edge id.
-	const edgeIds = new Map(
-		candidate.diagram.type === "flowchart"
-			? candidate.diagram.edges.map((edge) => [edge.id, `${edge.source}->${edge.target}`] as const)
-			: [],
-	);
+	// A drawn flowchart keys each element by its document id, and each edge by its two
+	// ends; a style may name the generated id of either.
+	const documentIds = (() => {
+		if (candidate.diagram.type !== "flowchart") return new Map<string, string>();
+		const ids = flowchartDocumentIds(candidate.diagram);
+		const node = (id: string) => ids.nodes.get(id) ?? id;
+		return new Map([
+			...ids.lanes,
+			...ids.groups,
+			...ids.nodes,
+			...candidate.diagram.edges.map(
+				(edge) => [edge.id, `${node(edge.source)}->${node(edge.target)}`] as const,
+			),
+		]);
+	})();
 	const operations = styleOperations(
 		(candidate.styles ?? []).map((style) => ({
 			...style,
-			targets: style.targets.map((target) => edgeIds.get(target) ?? target),
+			targets: style.targets.map((target) => documentIds.get(target) ?? target),
 		})),
 	);
 	const styled =

@@ -477,4 +477,55 @@ describe("Studio chat node logos", () => {
 			ref: { kind: "node", id: "review", path: "nodes.review.icon" },
 		});
 	});
+
+	it("lets logos fill only a logo the user named, and never refills a dropped icon", async () => {
+		const received: unknown[] = [];
+		const accepted = await Effect.runPromise(
+			deterministicRuntime(countingStore())({ spec: acceptedSpec() }),
+		);
+		const executor = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(
+				(input) =>
+					Effect.sync(() => {
+						received.push(input);
+						return accepted;
+					}),
+				{ logos: [{ name: "Github", slug: "github" }] },
+			),
+		);
+		const result = await Effect.runPromise(
+			executor.execute({
+				spec: {
+					title: "Release",
+					logos: true,
+					nodes: {
+						start: "Open release on GitHub",
+						review: { label: "Release ready?", icon: "kubernetes" },
+						deploy: "Deploy to Kubernetes",
+						skip: { label: "Skip release", icon: null },
+					},
+					edges: [
+						["start", "review"],
+						["review", "deploy", "yes"],
+						["review", "skip", "no"],
+					],
+				},
+			}),
+		);
+
+		const built = received[0] as { spec: FlowchartSpec };
+		expect(built.spec.logos).toBe(true);
+		expect(built.spec.nodes).toEqual({
+			start: { label: "Open release on GitHub", icon: "github" },
+			review: { label: "Release ready?", icon: null },
+			deploy: { label: "Deploy to Kubernetes", icon: null },
+			skip: { label: "Skip release", icon: null },
+		});
+		expect(result.issues.filter((issue) => issue.code === "unknown_icon")).toEqual([
+			expect.objectContaining({
+				ref: { kind: "node", id: "review", path: "nodes.review.icon" },
+				message: expect.stringContaining("renders without a logo"),
+			}),
+		]);
+	});
 });

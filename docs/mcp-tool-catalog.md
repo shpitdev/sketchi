@@ -506,12 +506,14 @@ naming the nearest declared ids:
 - a loop has no way out (`nonterminating_node`), or only a loop reaches a node (`unreachable_node`);
 - a question with two or more exits leaves one unlabeled (`unlabeled_decision_branch`)
   or repeats a label (`duplicate_decision_branch_label`);
-- an id breaks the pattern (`invalid_id`) or names both a node and a container (`duplicate_node_id`);
+- an id breaks the pattern (`invalid_id`), names both a node and a container, or is
+  another id with spaces around it (`duplicate_node_id`, `duplicate_group_id`, `duplicate_lane_id`);
 - a container lists an unknown id (`unknown_member`), two containers that do not nest
   share a member (`overlapping_containers`), groups nest in a cycle (`group_cycle`),
   a node has no lane (`node_without_lane`), or lanes are mixed with groups (`lanes_with_groups`);
 - fewer than two nodes or no edge (`flowchart_too_small`), or more than 80 nodes, 120
-  drawn edges, 8 groups, 8 lanes or 4 levels of nesting (`flowchart_too_large`).
+  drawn edges, 8 groups, 8 lanes or 4 levels of nesting (`flowchart_too_large`, with status
+  `limit_exceeded`). Edges are counted with each list end expanded, before any is drawn.
 
 Issue output is capped deterministically at 20 entries.
 
@@ -537,6 +539,7 @@ interface BuildFlowchartFailure {
     | "invalid_input"
     | "invalid_flowchart"
     | "quality_failed"
+    | "limit_exceeded"
     | "render_failed"
     | "export_failed"
     | "storage_failed";

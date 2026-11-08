@@ -124,16 +124,17 @@ layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
 			const invalid = canonicalDocument({
 				type: "flowchart",
 				spec: {
-					id: "broken-decision",
-					title: "Broken decision",
+					id: "two-islands",
+					title: "Two islands",
 					nodes: {
-						start: "Start",
-						decision: "Ready?",
-						end: "Done",
+						order: "Take order",
+						ship: "Ship order",
+						invoice: "Send invoice",
+						paid: "Record payment",
 					},
 					edges: [
-						["start", "decision"],
-						["decision", "end", "Yes"],
+						["order", "ship"],
+						["invoice", "paid"],
 					],
 				},
 			});

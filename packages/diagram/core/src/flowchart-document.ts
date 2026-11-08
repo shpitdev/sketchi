@@ -139,6 +139,14 @@ export interface FlowchartDocumentPair {
 	readonly index: number;
 }
 
+/** How many pairs the edges draw once each list end is expanded, counted without expanding them. */
+export function flowchartDocumentPairCount(edges: readonly FlowchartDocumentEdge[]): number {
+	let count = 0;
+	for (const [from, to] of edges)
+		count += flowchartEdgeEndIds(from).length * flowchartEdgeEndIds(to).length;
+	return count;
+}
+
 /** Each authored edge expanded into one pair per id on each side, blank labels dropped. */
 export function flowchartDocumentPairs(
 	edges: readonly FlowchartDocumentEdge[],
@@ -730,6 +738,18 @@ export function flowchartDiagramFromDocument(
 		});
 	}
 
+	// List ends multiply, so a short request can name a vast number of edges: count them
+	// before expanding any.
+	const pairCount = flowchartDocumentPairCount(document.edges);
+	if (pairCount > FLOWCHART_MAX_EDGES) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", path: "edges" },
+			message: `Flowchart draws ${pairCount} edges; the supported maximum is ${FLOWCHART_MAX_EDGES}.`,
+			hint: "Split the workflow or remove lower-signal connections.",
+		});
+		return { ok: false, issues: issues.slice(0, FLOWCHART_MAX_ISSUES) };
+	}
 	const pairs = flowchartDocumentPairs(document.edges);
 	const valid: FlowchartDocumentPair[] = [];
 	const seen = new Map<string, number>();
@@ -782,15 +802,6 @@ export function flowchartDiagramFromDocument(
 			hint: "Connect the nodes in the order the flow takes.",
 		});
 	}
-	if (pairs.length > FLOWCHART_MAX_EDGES) {
-		issues.push({
-			code: "flowchart_too_large",
-			ref: { kind: "diagram", path: "edges" },
-			message: `Flowchart draws ${pairs.length} edges; the supported maximum is ${FLOWCHART_MAX_EDGES}.`,
-			hint: "Split the workflow or remove lower-signal connections.",
-		});
-	}
-
 	const contained = containment(document, nodeIds);
 	issues.push(...contained.issues);
 

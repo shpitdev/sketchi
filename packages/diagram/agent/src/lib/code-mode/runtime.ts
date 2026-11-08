@@ -5153,7 +5153,18 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	const request = parsed.success;
 
 	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const authoredSpec = normalizeFlowchartSpec(request.spec);
+	const normalized = normalizeFlowchartSpec(request.spec);
+	if (!normalized.ok) {
+		return yield* new BuildFlowchartFailure({
+			status: "invalid_flowchart",
+			context: {
+				buildId,
+				...responseRequestId(request.requestId),
+				issues: flowchartDocumentIssues(normalized.issues),
+			},
+		});
+	}
+	const authoredSpec = normalized.spec;
 	// Cleaning can empty a string the request held, so the cleaned document is checked again.
 	const cleaned = decodeFlowchartDocument(authoredSpec);
 	if (!Result.isSuccess(cleaned)) {
@@ -5190,7 +5201,10 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	const built = flowchartDiagramFromDocument(normalizedSpec, { nodeIcons: logos.icons });
 	if (!built.ok) {
 		return yield* new BuildFlowchartFailure({
-			status: "invalid_flowchart",
+			// A document past the size limits answers as a limit, as an oversized canvas does.
+			status: built.issues.some((entry) => entry.code === "flowchart_too_large")
+				? "limit_exceeded"
+				: "invalid_flowchart",
 			context: { ...baseContext, issues: flowchartDocumentIssues(built.issues) },
 		});
 	}

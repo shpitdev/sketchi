@@ -6,6 +6,7 @@ import {
 	type FlowchartDocumentEdge,
 	type FlowchartDocumentNode,
 	type FlowchartEdgeEnd,
+	type FlowchartValidationIssue,
 } from "@sketchi/diagram-core";
 
 import type { FlowchartSpec, NormalizedFlowchartSpec } from "../code-mode/contract.js";
@@ -61,29 +62,73 @@ const cleanContainers = <
 				]),
 			);
 
+const DUPLICATE_ID_CODES = {
+	node: "duplicate_node_id",
+	group: "duplicate_group_id",
+	lane: "duplicate_lane_id",
+} as const;
+
+/** Ids that cleaning makes one ("a" and " a "), which would otherwise keep one entry and drop the other. */
+function collidingIds(
+	kind: keyof typeof DUPLICATE_ID_CODES,
+	entries: Readonly<Record<string, unknown>> | undefined,
+): FlowchartValidationIssue[] {
+	const first = new Map<string, string>();
+	const issues: FlowchartValidationIssue[] = [];
+	for (const id of Object.keys(entries ?? {})) {
+		const cleaned = cleanToolString(id);
+		const earlier = first.get(cleaned);
+		if (earlier === undefined) {
+			first.set(cleaned, id);
+			continue;
+		}
+		issues.push({
+			code: DUPLICATE_ID_CODES[kind],
+			ref: { kind, ...(cleaned ? { id: cleaned } : {}), path: `${kind}s.${id}` },
+			message: `${JSON.stringify(earlier)} and ${JSON.stringify(id)} are one ${kind} id once trimmed.`,
+			hint: `Give each ${kind} its own id.`,
+		});
+	}
+	return issues;
+}
+
 /**
  * The document as a build reads it: every string cleaned of tool-output debris, the id
- * taken from the title when absent, and the direction filled in.
+ * taken from the title when absent, and the direction filled in. Two ids that clean to
+ * the same one are refused rather than merged.
  */
-export function normalizeFlowchartSpec(spec: FlowchartSpec): NormalizedFlowchartSpec {
+export function normalizeFlowchartSpec(
+	spec: FlowchartSpec,
+):
+	| { readonly ok: true; readonly spec: NormalizedFlowchartSpec }
+	| { readonly ok: false; readonly issues: readonly FlowchartValidationIssue[] } {
+	const collisions = [
+		...collidingIds("node", spec.nodes),
+		...collidingIds("group", spec.groups),
+		...collidingIds("lane", spec.lanes),
+	];
+	if (collisions.length > 0) return { ok: false, issues: collisions };
 	const title = cleanToolString(spec.title);
 	const id = cleanOptional(spec.id);
 	const groups = cleanContainers(spec.groups);
 	const lanes = cleanContainers(spec.lanes);
 	return {
-		id: flowchartDocumentId({ title, ...(id ? { id } : {}) }),
-		title,
-		direction: spec.direction ?? "TB",
-		...(spec.logos === undefined ? {} : { logos: spec.logos }),
-		nodes: Object.fromEntries(
-			Object.entries(spec.nodes).map(([nodeId, node]) => [
-				cleanToolString(nodeId),
-				cleanNode(node),
-			]),
-		),
-		edges: spec.edges.map(cleanEdge),
-		...(groups ? { groups } : {}),
-		...(lanes ? { lanes } : {}),
+		ok: true,
+		spec: {
+			id: flowchartDocumentId({ title, ...(id ? { id } : {}) }),
+			title,
+			direction: spec.direction ?? "TB",
+			...(spec.logos === undefined ? {} : { logos: spec.logos }),
+			nodes: Object.fromEntries(
+				Object.entries(spec.nodes).map(([nodeId, node]) => [
+					cleanToolString(nodeId),
+					cleanNode(node),
+				]),
+			),
+			edges: spec.edges.map(cleanEdge),
+			...(groups ? { groups } : {}),
+			...(lanes ? { lanes } : {}),
+		},
 	};
 }
 
@@ -92,7 +137,9 @@ export function normalizeFlowchartSpec(spec: FlowchartSpec): NormalizedFlowchart
  * node icon read as the catalog slug it names, without a catalog lookup.
  */
 export function flowchartDiagramFromSpec(spec: FlowchartSpec): FlowchartDiagram {
-	const normalized = normalizeFlowchartSpec(spec);
+	const result = normalizeFlowchartSpec(spec);
+	if (!result.ok) throw new Error(result.issues.map((issue) => issue.message).join("\n"));
+	const normalized = result.spec;
 	const nodeIcons = new Map(
 		Object.entries(normalized.nodes).flatMap(([id, node]) =>
 			typeof node !== "string" && typeof node.icon === "string"

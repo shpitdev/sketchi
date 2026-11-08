@@ -78,7 +78,7 @@ export const FLOWCHART_RULES = {
 	documentBranches: (source: RuleSource) =>
 		`Label every branch of a question with ${source}'s outcome words, usually "yes" and "no", each label once.`,
 	documentLoops:
-		'A step that repeats ("try again", "resubmit", "keeps waiting") points back to the step it repeats, never to itself.',
+		'A repeated step ("send another …", "try again", "resubmit") points back at the step it repeats, never at itself, and is never an end.',
 	documentGroups: (source: RuleSource) =>
 		`Only when ${source} groups steps (teams, zones, phases), declare groups: { id: { label, kind?, contains: [ids] } }, each listing the nodes and groups ${source} puts in it; a group may list members at any depth and Sketchi nests them. Every zone ${source} names is its own group; anything ${source} keeps outside a zone stays out of its list. Set kind (${zoneKinds}) when ${source} says what a zone is. Set shape on infrastructure nodes, entries and ends too: "database" for databases, "document" for files, archives and reports, "queue" for queues, streams and topics, "storage" for buckets and object stores.`,
 	documentLanes: (source: RuleSource) =>
