@@ -128,10 +128,12 @@ const FLOWCHART_INSTRUCTIONS = [
 	FLOWCHART_RULES.namedOutcomes(SCENARIO),
 	FLOWCHART_RULES.branchNames(SCENARIO),
 	FLOWCHART_RULES.documentBranches(SCENARIO),
+	FLOWCHART_RULES.documentFanOut,
 	FLOWCHART_RULES.documentLoops,
 	FLOWCHART_RULES.documentNoInventedSteps(SCENARIO),
 	`${FLOWCHART_RULES.documentGroups(SCENARIO)} ${FLOWCHART_RULES.zonesOutside} ${FLOWCHART_RULES.documentZonesNotNodes}`,
 	FLOWCHART_RULES.documentLanes(SCENARIO),
+	FLOWCHART_RULES.documentOwners(SCENARIO),
 	[
 		FLOWCHART_RULES.limits,
 		FLOWCHART_RULES.summarize,

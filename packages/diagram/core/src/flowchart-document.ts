@@ -612,19 +612,21 @@ function graphIssues(
 				hint: 'Label every branch of a question, such as "yes" and "no".',
 			});
 		}
-		const seen = new Set<string>();
+		// One edge whose end lists several steps is one branch: its label fans out.
+		const seen = new Map<string, number>();
 		for (const exit of exits) {
 			const label = exit.label?.toLowerCase();
 			if (label === undefined) continue;
-			if (seen.has(label)) {
+			const first = seen.get(label);
+			if (first !== undefined && first !== exit.index) {
 				issues.push({
 					code: "duplicate_decision_branch_label",
 					ref: { kind: "node", id: node.id, path: `edges[${exit.index}][2]` },
 					message: `Decision "${node.id}" repeats the branch label "${exit.label}".`,
-					hint: "Give each branch of the same question its own label.",
+					hint: `Give each branch of the same question its own label; a branch that leads to several steps lists them in one edge: ["${node.id}", ["${exit.target}", "…"], "${exit.label}"].`,
 				});
 			}
-			seen.add(label);
+			if (first === undefined) seen.set(label, exit.index);
 		}
 	}
 

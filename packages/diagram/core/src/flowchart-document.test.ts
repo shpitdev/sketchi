@@ -544,3 +544,47 @@ describe("flowchart document limits", () => {
 		});
 	});
 });
+
+describe("flowchart document branches", () => {
+	const delay = (edges: FlowchartDocument["edges"]): FlowchartDocument => ({
+		title: "Delayed order",
+		nodes: {
+			check: "Check stock",
+			short: "Stock short?",
+			notify: "Notify the customer",
+			reorder: "Reorder stock",
+			ship: "Ship the order",
+		},
+		edges,
+	});
+
+	it("reads one edge that lists several steps as one branch", () => {
+		const result = flowchartDiagramFromDocument(
+			delay([
+				["check", "short"],
+				["short", ["notify", "reorder"], "yes"],
+				["short", "ship", "no"],
+			]),
+		);
+		expect(result.ok).toBe(true);
+	});
+
+	it("still refuses two edges that repeat a branch label, and shows the list form", () => {
+		const result = flowchartDiagramFromDocument(
+			delay([
+				["check", "short"],
+				["short", "notify", "yes"],
+				["short", "reorder", "yes"],
+				["short", "ship", "no"],
+			]),
+		);
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "duplicate_decision_branch_label",
+				hint: 'Give each branch of the same question its own label; a branch that leads to several steps lists them in one edge: ["short", ["reorder", "…"], "yes"].',
+			}),
+		]);
+	});
+});

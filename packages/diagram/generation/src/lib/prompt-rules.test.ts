@@ -42,6 +42,8 @@ describe("generation prompt rules", () => {
 		expect(system).toContain("Every zone the scenario names is its own group");
 		expect(system).toContain("a group may list members at any depth and Sketchi nests them");
 		expect(system).toContain(FLOWCHART_RULES.documentZonesNotNodes);
+		expect(system).toContain(FLOWCHART_RULES.documentOwners("the scenario"));
+		expect(system).toContain(FLOWCHART_RULES.documentFanOut);
 	});
 
 	it("says what a table's columns are and what a footer holds", () => {
