@@ -1,6 +1,8 @@
 import {
+	applyFlowchartEdits,
 	CANONICAL_DOCUMENT_TYPES,
 	CodeModeArtifactStorageMemory,
+	type CodeModeIssue,
 	makeCodeModeRuntimeEnvironmentLayer,
 } from "@sketchi/diagram-agent";
 import { Cause, Clock, Effect, type FileSystem, Layer, Option } from "effect";
@@ -82,7 +84,13 @@ import {
 	runEffectCommand,
 	requestedOutputFormat,
 } from "./internal/effect-cli.js";
-import { InputReader, InputReaderLive, readDocumentInput, readPatchInput } from "./input.js";
+import {
+	InputReader,
+	InputReaderLive,
+	readDocumentInput,
+	readEditInput,
+	readPatchInput,
+} from "./input.js";
 import {
 	CliCommandExit,
 	OutputWriter,
@@ -352,6 +360,7 @@ function generatedData(result: GenerateDiagramResult) {
 			...(result.durationMs === undefined ? {} : { durationMs: result.durationMs }),
 			...(result.outputTokens === undefined ? {} : { outputTokens: result.outputTokens }),
 		},
+		...(result.edits === undefined ? {} : { edits: result.edits }),
 	};
 }
 
@@ -918,14 +927,15 @@ const showCommand = Command.make(
 	]),
 );
 
-const REVISE_HELP = `Change a stored diagram with a request, keep the change as the record's next revision, and export its PNG by default. Sketchi sends the diagram's canonical document and the request to the public Sketchi generate API in one unauthenticated HTTPS POST; the model returns the complete revised document, which keeps the diagram's id and family. Everything the request does not mention stays as it was.
+const REVISE_HELP = `Change a stored diagram with a request, keep the change as the record's next revision, and export its PNG by default. Sketchi sends the diagram's canonical document and the request to the public Sketchi generate API in one unauthenticated HTTPS POST; for a flowchart the model writes only edits by id, which the server applies and returns with the document (--output json shows them); for other families it returns the complete revised document. Either keeps the diagram's id and family, and everything the request does not mention stays as it was.
 
   --prompt TEXT says what to change: "add a fraud check before payment", "rename Ship to Ship order".
   --type TYPE turns the diagram into another family; omit it to keep its own.
   The earlier revision stays under revisions/ and sketchi restore brings it back. Patched, pulled
   and canvas records refuse revise, as edit does; restore a canonical revision first.
-  Colors and shapes the request asks for ("draw the reject path in red") are drawn as one more
-  revision on top, as sketchi patch would; generate does the same.
+  A flowchart node's color is part of its document. Other colors and shapes the request asks for
+  ("draw the reject path in red") are drawn as one more revision on top, as sketchi patch would;
+  generate does the same.
   --endpoint, --format, --dest, --no-copy, the clipboard, exit codes and output work as for
   generate. Override the endpoint with ${SKETCHI_GENERATE_ENDPOINT_ENV} or --endpoint URL.`;
 
@@ -1032,8 +1042,45 @@ const editCommand = Command.make(
 			const store = yield* DiagramStore;
 			const operation = Effect.gen(function* () {
 				const id = yield* resolveDiagramId(diagramId);
-				const document = yield* readDocumentInput(source);
-				const built = yield* builder.build(document);
+				const input = yield* readEditInput(source);
+				if (input._tag === "Edits") {
+					// Edits change the stored flowchart document, offline, with the function the
+					// hosted editFlowchart uses; the result is the record's next revision.
+					const stored = yield* store.show(id);
+					if (stored.document.type !== "flowchart") {
+						return yield* CliValidationError.make({
+							message: `Diagram "${id}" is a ${stored.document.type}; edits change flowcharts.`,
+							hint: "Pass the whole revised document instead of edits.",
+							details: ["edits"],
+						});
+					}
+					const edited = applyFlowchartEdits(stored.document.spec, input.edits);
+					if (!edited.ok) {
+						return yield* CliValidationError.make({
+							message: `The edits do not apply to "${id}"; nothing changed.`,
+							hint: edited.issues[0]?.hint ?? "Name ids the flowchart declares.",
+							details: edited.issues.map((issue) => `${issue.path}: ${issue.message}`),
+						});
+					}
+					const built = yield* builder.build({ type: "flowchart", spec: edited.document });
+					const saved = yield* store.edit(id, built, stored.manifest.revision);
+					return edited.notes.length === 0
+						? saved
+						: {
+								...saved,
+								warnings: [
+									...(saved.warnings ?? []),
+									...edited.notes.map((message): CodeModeIssue => ({
+										code: "reference_resolved",
+										severity: "info",
+										stage: "input",
+										message,
+										hint: "Use the resolved id in later edits.",
+									})),
+								],
+							};
+				}
+				const built = yield* builder.build(input.document);
 				if (built.id !== id) {
 					return yield* CliValidationError.make({
 						message: `Edited document id "${built.id}" does not match "${id}".`,
@@ -1053,10 +1100,15 @@ const editCommand = Command.make(
 		}),
 ).pipe(
 	Command.withDescription(
-		"Replace the complete canonical document for DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative. The new spec.id must match DIAGRAM_ID.",
+		'Change the canonical document for DIAGRAM_ID, offline. For a flowchart, pass {"edits":[...]} to change it by id or label: insert puts a step into an edge, set merges fields and removes with null, connect adds or relabels edges, disconnect removes them; sketchi show ID --document prints the ids. Any diagram also takes a complete replacement document whose spec.id matches DIAGRAM_ID. Sketchi validates and builds first, preserves the prior full authority state under revisions/, and atomically swaps the record. Patched and detached records refuse edit because their canonical document is no longer authoritative.',
 	),
-	Command.withShortDescription("Replace a canonical diagram document."),
+	Command.withShortDescription("Edit a flowchart by id, or replace a document."),
 	Command.withExamples([
+		{
+			command:
+				'sketchi edit checkout --json \'{"edits":[{"op":"insert","node":{"fraud":"Check for fraud"},"between":["review","pay"]},{"op":"set","nodes":{"pay":{"color":"green"}}}]}\'',
+			description: "Insert a step and color another in a stored flowchart.",
+		},
 		{
 			command: "sketchi edit release-flow --file revised.json",
 			description: "Replace a document and retain the prior revision.",

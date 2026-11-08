@@ -58,6 +58,41 @@ describe("request-driven styling", () => {
 			}),
 		});
 		expect(candidate.error).toBeUndefined();
-		expect(candidate.styles?.map((style) => [...style.targets])).toEqual([["e3", "revise"]]);
+		// A flowchart node's color moves into its document; only the edge stays a style.
+		expect(candidate.flowchart?.nodes["revise"]).toEqual({ label: "Revise", color: "red" });
+		expect(candidate.styles?.map((style) => [...style.targets])).toEqual([["e3"]]);
+	});
+
+	it("moves a flowchart's node colors and diamonds into its document, the nearest palette color for any hex", () => {
+		const candidate = candidateFromText({
+			model: "test",
+			provider: "fixture",
+			text: JSON.stringify({
+				title: "Release",
+				diagram: flowchart,
+				styles: [
+					{ targets: ["Ship"], fillColor: "#dcfce7", strokeColor: "#16a34a" },
+					{ targets: ["start"], strokeColor: "#ff0000", textColor: "#111111" },
+					{ targets: ["revise"], shape: "circle" },
+					{ targets: ["gate"], shape: "diamond", fillColor: "#ede9fe" },
+				],
+			}),
+		});
+		expect(candidate.error).toBeUndefined();
+		expect(candidate.flowchart?.nodes).toEqual({
+			start: { label: "Change proposed", color: "red" },
+			gate: { label: "Approved?", color: "purple", shape: "diamond" },
+			ship: { label: "Ship", color: "green" },
+			revise: "Revise",
+		});
+		expect(candidate.styles?.map((style) => ({ ...style, targets: [...style.targets] }))).toEqual([
+			{ targets: ["start"], textColor: "#111111" },
+			{ targets: ["revise"], shape: "circle" },
+		]);
+	});
+
+	it("tells a flowchart to color nodes in its document", () => {
+		const styled = buildDiagramGenerationMessages({ id: "s", request: "red gate", styling: true });
+		expect(styled.system).toContain("A flowchart colors a node with its own color field instead");
 	});
 });

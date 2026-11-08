@@ -7,5 +7,13 @@ export * from "./lib/code-mode/icons.js";
 export * from "./lib/code-mode/runtime.js";
 export * from "./lib/flowchart/quality.js";
 export * from "./lib/flowchart/spec.js";
-// The CLI reads the canvas limits its share links must hold.
-export { CANVAS_LIMITS } from "@sketchi/diagram-core";
+// The CLI reads the canvas limits its share links must hold, and edits flowcharts offline with
+// the same function the hosted editFlowchart uses.
+export {
+	CANVAS_LIMITS,
+	applyFlowchartEdits,
+	decodeFlowchartEdits,
+	FlowchartEditsSchema,
+	type FlowchartEdit,
+	type FlowchartEditIssue,
+} from "@sketchi/diagram-core";

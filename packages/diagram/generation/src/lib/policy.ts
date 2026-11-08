@@ -22,6 +22,7 @@ import {
 	isRetryableGenerationError,
 } from "./errors.js";
 import { type DiagramFamilyNarrowing, familyNarrowingAttributes } from "./family-narrowing.js";
+import { revisesFlowchartWithEdits } from "./messages.js";
 import { withNarrowedFamilyRoute } from "./routing.js";
 import { checkRequestCoverage, type CoverageIssue, keepsStatedStructure } from "./coverage.js";
 
@@ -532,7 +533,9 @@ function buildRepairRequest(
 		prompt: {
 			...request.prompt,
 			request: [
-				`Repair attempt ${repairAttempt}: return a complete corrected diagram that satisfies every validator diagnostic below.`,
+				revisesFlowchartWithEdits(request.prompt)
+					? `Repair attempt ${repairAttempt}: return the complete corrected list of edits to the current flowchart, so that every validator diagnostic below is resolved.`
+					: `Repair attempt ${repairAttempt}: return a complete corrected diagram that satisfies every validator diagnostic below.`,
 				"PRESERVE all existing nodes and labels except the minimal edit needed to fix the listed issues. Do not compact, summarize, remove, combine, rename, or relabel unaffected content.",
 				"",
 				...originalHardRequirements,

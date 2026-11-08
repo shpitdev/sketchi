@@ -382,12 +382,14 @@ const NODE_DETAIL_FIELDS = new Set(["label", "note", "shape", "icon", "color", "
 
 /**
  * The node an insert adds, as { id: label } or { id: { label, … } }, or written flat as
- * { id, label, … }, which models often reach for.
+ * { id, label, … }, which models often reach for. { id } alone names a node the edits already
+ * declared, which has no node value of its own here.
  */
 function insertedNodeEntries(
 	node: Readonly<Record<string, FlowchartDocumentNode>>,
-): [string, FlowchartDocumentNode][] {
+): [string, FlowchartDocumentNode | undefined][] {
 	const { id, ...details } = node;
+	if (typeof id === "string" && Object.keys(details).length === 0) return [[id, undefined]];
 	const flat =
 		typeof id === "string" &&
 		typeof details["label"] === "string" &&
@@ -399,7 +401,7 @@ function insertedNodeEntries(
 		[
 			id,
 			Object.keys(details).length === 1
-				? (details["label"] as string)
+				? details["label"]
 				: (details as unknown as FlowchartDocumentNodeDetails),
 		],
 	];
@@ -461,6 +463,9 @@ export function applyFlowchartEdits(
 	const edgeIndex = (source: string, target: string) =>
 		state.edges.findIndex((edge) => edge.source === source && edge.target === target);
 	const notes: string[] = [];
+	/** Edges a removal joined across the removed node, and edges the edits wrote themselves. */
+	const bridges = new Set<Edge>();
+	const added = new Set<Edge>();
 	/** A reference as the id it resolves to, by id, spelling or label; unchanged when none. */
 	const resolveIn = (
 		reference: string,
@@ -560,7 +565,10 @@ export function applyFlowchartEdits(
 		}
 		const at = state.edges.findIndex((edge) => edge === inEdge);
 		state.edges = state.edges.filter((edge) => edge.source !== id && edge.target !== id);
-		if (joined) state.edges.splice(Math.max(0, Math.min(at, state.edges.length)), 0, joined);
+		if (joined) {
+			bridges.add(joined);
+			state.edges.splice(Math.max(0, Math.min(at, state.edges.length)), 0, joined);
+		}
 		state.nodes = state.nodes.filter(([key]) => key !== id);
 		removeNodeFromGroups(state, id, affected);
 	};
@@ -582,20 +590,30 @@ export function applyFlowchartEdits(
 					});
 					return;
 				}
-				const [id, node] = entry;
+				const [id, given] = entry;
 				const from = nodeRef(edit.between[0], `${at}.between[0]`);
 				const to = nodeRef(edit.between[1], `${at}.between[1]`);
-				if (hasNode(id)) {
+				// A node the edits declared but have not wired yet may be inserted; one in the flow may not.
+				const declared = state.nodes.find(([key]) => key === id)?.[1];
+				const wired = state.edges.some((edge) => edge.source === id || edge.target === id);
+				if (declared !== undefined && wired) {
 					issues.push({
 						code: "invalid_edit",
 						path: `${at}.node.${id}`,
-						message: `${at} inserts "${id}", which is already a node.`,
+						message: `${at} inserts "${id}", which is already a node in the flow.`,
 						hint: "Give the new node an id of its own.",
 					});
 				}
+				if (declared === undefined && given === undefined) unknownNode(id, `${at}.node.id`);
 				if (!hasNode(from)) unknownNode(from, `${at}.between[0]`);
 				if (!hasNode(to)) unknownNode(to, `${at}.between[1]`);
 				if (issues.length > before) return;
+				const node: FlowchartDocumentNode =
+					declared === undefined
+						? (given as FlowchartDocumentNode)
+						: given === undefined
+							? declared
+							: mergeNode(declared, given);
 				const position = edgeIndex(from, to);
 				if (position < 0) {
 					issues.push({
@@ -608,17 +626,18 @@ export function applyFlowchartEdits(
 				}
 				const old = state.edges[position];
 				const label = old?.label;
-				state.edges.splice(
-					position,
-					1,
-					{
-						source: from,
-						target: id,
-						...(label === undefined ? {} : { label }),
-						branch: old?.branch ?? nextBranch++,
-					},
-					{ source: id, target: to, branch: nextBranch++ },
-				);
+				const into: Edge = {
+					source: from,
+					target: id,
+					...(label === undefined ? {} : { label }),
+					branch: old?.branch ?? nextBranch++,
+				};
+				const onward: Edge = { source: id, target: to, branch: nextBranch++ };
+				added.add(into).add(onward);
+				// Splitting a removal's joining edge leaves two joining halves, each dropped if the
+				// edits also lead around it.
+				if (old && bridges.delete(old)) bridges.add(into).add(onward);
+				state.edges.splice(position, 1, into, onward);
 				state.nodes = upsert(state.nodes, id, node, from);
 				// The new node joins the lane of the step before it unless it names its own,
 				// and the innermost group holding both ends.
@@ -775,6 +794,7 @@ export function applyFlowchartEdits(
 						}
 						if (!ok) continue;
 						const existing = edgeIndex(source, target);
+						added.add(edge);
 						if (existing >= 0) state.edges[existing] = edge;
 						else state.edges.push(edge);
 					}
@@ -810,6 +830,37 @@ export function applyFlowchartEdits(
 		}
 	});
 	if (issues.length > 0) return { ok: false, issues };
+	// A removal's joining edge goes when the edits replace it: an edge they added leaves its source
+	// on the same branch (same label) and leads on to its target, as a split step's two new steps do.
+	// Another branch reaching the target keeps the joining edge, so no branch is lost.
+	const branchKey = (label: string | undefined) => label?.trim().toLowerCase() ?? "";
+	for (const bridge of bridges) {
+		if (!state.edges.includes(bridge)) continue;
+		const starts = state.edges.filter(
+			(edge) =>
+				edge !== bridge &&
+				edge.source === bridge.source &&
+				added.has(edge) &&
+				branchKey(edge.label) === branchKey(bridge.label),
+		);
+		const seen = new Set<string>([bridge.source]);
+		const queue = starts.map((edge) => edge.target);
+		let replaced = queue.includes(bridge.target);
+		while (queue.length > 0 && !replaced) {
+			const node = queue.shift() ?? "";
+			if (seen.has(node)) continue;
+			seen.add(node);
+			for (const edge of state.edges) {
+				if (edge === bridge || edge.source !== node) continue;
+				if (edge.target === bridge.target) {
+					replaced = true;
+					break;
+				}
+				queue.push(edge.target);
+			}
+		}
+		if (replaced) state.edges = state.edges.filter((edge) => edge !== bridge);
+	}
 	// Deduplicate pairs, then serialize their retained branch identities as list ends.
 	const seen = new Set<string>();
 	state.edges = state.edges.filter((edge) => {

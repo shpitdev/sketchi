@@ -1,8 +1,13 @@
-import { Context, Effect, Layer, Stream } from "effect";
+import { decodeFlowchartEdits, type FlowchartEdit } from "@sketchi/diagram-agent";
+import { Context, Effect, Layer, Result, Stream } from "effect";
 import { Stdio } from "effect/Stdio";
 
-import { parseJsonDocument } from "./document.js";
-import { CliInputError } from "./errors.js";
+import {
+	type CanonicalDiagramDocument,
+	decodeCanonicalDiagramDocument,
+	parseJsonDocument,
+} from "./document.js";
+import { CliInputError, CliValidationError } from "./errors.js";
 import { LocalFileSystem } from "./filesystem.js";
 import type { InputSource } from "./internal/effect-cli.js";
 import { parseJsonPatchInput } from "./patch.js";
@@ -136,6 +141,50 @@ export const readDocumentInput = Effect.fn("sketchi.cli.input.readDocument")(fun
 	const reader = yield* InputReader;
 	const text = yield* reader.read(source);
 	return yield* parseJsonDocument(text);
+});
+
+/** What edit takes: a whole document that replaces the record, or edits to a flowchart's. */
+export type EditInput =
+	| { readonly _tag: "Document"; readonly document: CanonicalDiagramDocument }
+	| { readonly _tag: "Edits"; readonly edits: readonly FlowchartEdit[] };
+
+export const readEditInput = Effect.fn("sketchi.cli.input.readEdit")(function* (
+	source: InputSource,
+) {
+	const reader = yield* InputReader;
+	const text = yield* reader.read(source);
+	const input: unknown = yield* Effect.try({
+		try: () => JSON.parse(text),
+		catch: () =>
+			CliInputError.make({
+				code: "invalid_json",
+				message: "The input is not valid JSON.",
+				hint: 'Pass one complete canonical document object, or {"edits":[...]} for a flowchart.',
+			}),
+	});
+	if (
+		input === null ||
+		typeof input !== "object" ||
+		Array.isArray(input) ||
+		!("edits" in input) ||
+		"type" in input
+	) {
+		const whole: EditInput = {
+			_tag: "Document",
+			document: yield* decodeCanonicalDiagramDocument(input),
+		};
+		return whole;
+	}
+	const decoded = decodeFlowchartEdits(input.edits);
+	if (Result.isFailure(decoded)) {
+		return yield* CliValidationError.make({
+			message: "The flowchart edits are invalid.",
+			hint: 'Pass {"edits":[{ "op": "insert" | "set" | "connect" | "disconnect", ... }]}.',
+			details: [String(decoded.failure)],
+		});
+	}
+	const edits: EditInput = { _tag: "Edits", edits: decoded.success };
+	return edits;
 });
 
 export const readPatchInput = Effect.fn("sketchi.cli.input.readPatch")(function* (

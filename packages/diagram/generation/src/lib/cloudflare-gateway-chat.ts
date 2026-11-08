@@ -329,21 +329,24 @@ const runChatAttempt = Effect.fn("diagramGeneration.gatewayChat.attempt")(functi
 	if (!text) {
 		return yield* emptyResponseError(route, new Error(`Finish reason: ${response.finishReason}`));
 	}
-	return candidateFromText({
-		diagnostics: [],
-		model: modelId,
-		provider: route.provider,
-		text,
-		...(inputTokens.total !== undefined && outputTokens.total !== undefined
-			? {
-					usage: {
-						inputTokens: inputTokens.total,
-						outputTokens: outputTokens.total,
-						totalTokens: inputTokens.total + outputTokens.total,
-					},
-				}
-			: {}),
-	});
+	return candidateFromText(
+		{
+			diagnostics: [],
+			model: modelId,
+			provider: route.provider,
+			text,
+			...(inputTokens.total !== undefined && outputTokens.total !== undefined
+				? {
+						usage: {
+							inputTokens: inputTokens.total,
+							outputTokens: outputTokens.total,
+							totalTokens: inputTokens.total + outputTokens.total,
+						},
+					}
+				: {}),
+		},
+		request.prompt.base,
+	);
 });
 
 export const CloudflareGatewayChatClientLive = Layer.effect(DiagramGenerationClient)(

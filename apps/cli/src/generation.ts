@@ -50,6 +50,8 @@ export interface GenerateDiagramResult {
 	readonly attempts?: number;
 	readonly durationMs?: number;
 	readonly outputTokens?: number;
+	/** A flowchart revision's edits, as the hosted model wrote them. */
+	readonly edits?: ReadonlyArray<unknown>;
 }
 
 /**
@@ -161,6 +163,8 @@ const GenerateApiSuccess = Schema.Struct({
 		patch: Schema.optionalKey(
 			Schema.Struct({ operations: ApplyDiagramPatchRequest.fields.operations }),
 		),
+		/** A flowchart revision's edits, which the server applied to the document sent. */
+		edits: Schema.optionalKey(Schema.Array(Schema.Unknown)),
 	}),
 	generation: Schema.Struct({
 		attempts: Schema.optionalKey(Schema.Number),
@@ -383,5 +387,9 @@ export const reviseDiagram = Effect.fn("sketchi.cli.revise")(function* (input: R
 		diagram,
 		model: response.model,
 		provider: response.provider,
+		...(response.attempts === undefined ? {} : { attempts: response.attempts }),
+		...(response.durationMs === undefined ? {} : { durationMs: response.durationMs }),
+		...(response.outputTokens === undefined ? {} : { outputTokens: response.outputTokens }),
+		...(response.edits === undefined ? {} : { edits: response.edits }),
 	} satisfies GenerateDiagramResult;
 });

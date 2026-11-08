@@ -8,6 +8,7 @@ import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
+	FLOWCHART_EDIT_RULES,
 	FLOWCHART_RULES,
 	GANTT_RULES,
 	JOURNEY_RULES,
@@ -210,15 +211,13 @@ const FLOWCHART_DOCS = [
 ].join("\n");
 
 /** What an edit needs, carried by the code parameter so an edit takes no docs turn. */
-const FLOWCHART_EDIT_SPEC = `editFlowchart({ artifactId, edits }) changes any built flowchart without reading it first. edits: [{ op: "insert", node: { id: label }, between: [from, to] } | { op: "set", nodes?: { [id]: label | { ...node fields } | null }, groups?: { [id]: { ...group fields } | null }, lanes?: { [id]: label | null }, title?, direction? } | { op: "connect", edges } | { op: "disconnect", edges: [[from, to]] }].`;
-const FLOWCHART_EDIT_RULES = [
-	"Name nodes, groups and lanes by id or exact label. insert splits an existing edge. set merges, adds new ids and removes with null, bridging a removed step. connect adds or relabels edges. What edits do not name stays.",
-];
+const FLOWCHART_EDIT_SPEC = `editFlowchart({ artifactId, edits }) changes any built flowchart without reading it first. ${FLOWCHART_EDIT_RULES.ops}`;
+const FLOWCHART_EDIT_LINES = [FLOWCHART_EDIT_RULES.refs];
 
 /** The editFlowchart topic: the edit list, what it keeps, and the request type. */
 const FLOWCHART_EDIT_DOCS = [
 	FLOWCHART_EDIT_SPEC,
-	...FLOWCHART_EDIT_RULES,
+	...FLOWCHART_EDIT_LINES,
 	"Edits apply in order. One that names an unknown id fails at its path, such as edits[1].between[0], with the nearest ids, and nothing is stored; an edited flowchart that does not build fails with the build's issues.",
 	'An accepted edit returns the new artifact (provenance.sourceArtifactId names the one it changed), the full document as normalizedSpec, and the edits. getArtifact({ artifactId, format: "document" }) reads the document of any flowchart.',
 	"",
@@ -251,7 +250,7 @@ export const EXECUTE_CODE_DESCRIPTION = [
 	...FLOWCHART_DOC_RULES.map(([rule]) => rule),
 	"",
 	FLOWCHART_EDIT_SPEC,
-	...FLOWCHART_EDIT_RULES,
+	...FLOWCHART_EDIT_LINES,
 	"",
 	`Other builders: ${COPY_RULE}`,
 	...Object.entries(FAST_PATH).map(([operation, line]) => {
