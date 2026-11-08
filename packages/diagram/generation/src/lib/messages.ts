@@ -115,28 +115,28 @@ const SCENARIO = "the scenario";
 const SOURCE = "the source";
 const typeRule = (value: DiagramTypeValue) => `Use diagram type "${value}".`;
 
-const FLOWCHART_IR_INSTRUCTIONS = [
+const FLOWCHART_INSTRUCTIONS = [
 	typeRule("flowchart"),
-	'Every node must have id, label, and kind: "start", "process", "decision", or "end", and may have a description.',
-	FLOWCHART_RULES.singleStart,
-	FLOWCHART_RULES.edgesByKind,
+	`Return diagram as the flowchart document: { "type": "flowchart", "id", "direction"?, "logos"?, "nodes", "edges", "groups"?, "lanes"? }. ${FLOWCHART_RULES.documentShape} A node's details are { "label", "note"?, "shape"? }.`,
+	FLOWCHART_RULES.documentRoles(SCENARIO),
 	FLOWCHART_RULES.actionNodes(SCENARIO),
 	FLOWCHART_RULES.statedChecks,
 	FLOWCHART_RULES.technologyLabels,
 	FLOWCHART_RULES.noBranchBorrowing(SCENARIO),
-	FLOWCHART_RULES.statedEnd(SCENARIO),
+	FLOWCHART_RULES.namedOutcomes(SCENARIO),
 	FLOWCHART_RULES.branchNames(SCENARIO),
-	FLOWCHART_RULES.decisionEdges,
-	FLOWCHART_RULES.backEdges,
-	`${FLOWCHART_RULES.groups(SCENARIO)} ${FLOWCHART_RULES.zonesOutside}`,
-	FLOWCHART_RULES.lanes(SCENARIO),
+	FLOWCHART_RULES.documentBranches(SCENARIO),
+	FLOWCHART_RULES.documentLoops,
+	FLOWCHART_RULES.documentNoInventedSteps(SCENARIO),
+	`${FLOWCHART_RULES.documentGroups(SCENARIO)} ${FLOWCHART_RULES.zonesOutside}`,
+	FLOWCHART_RULES.documentLanes(SCENARIO),
 	[
 		FLOWCHART_RULES.limits,
 		FLOWCHART_RULES.summarize,
 		FLOWCHART_RULES.summarizeOnlyUnnamed,
 		FLOWCHART_RULES.keepNamed(SCENARIO),
 	].join(" "),
-	FLOWCHART_RULES.direction(SCENARIO),
+	FLOWCHART_RULES.documentDirection(SCENARIO),
 ];
 
 const MINDMAP_IR_INSTRUCTIONS = [
@@ -180,7 +180,7 @@ const IR_INSTRUCTIONS = {
 			CHART_RULES.limits,
 		],
 	},
-	flowchart: { title: "Flowchart IR rules", rules: FLOWCHART_IR_INSTRUCTIONS },
+	flowchart: { title: "Flowchart document rules", rules: FLOWCHART_INSTRUCTIONS },
 	mindmap: { title: "Mindmap IR rules", rules: MINDMAP_IR_INSTRUCTIONS },
 	sequence: { title: "Sequence IR rules", rules: SEQUENCE_IR_INSTRUCTIONS },
 	"state-machine": {
@@ -481,22 +481,19 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 		const supportedExample = {
 			title: "Release approval",
 			diagram: {
-				id: "release-approval",
 				type: "flowchart",
-				nodes: [
-					{ id: "start", label: "Start", kind: "start" },
-					{ id: "draft", label: "Prepare release", kind: "process" },
-					{ id: "review", label: "Approved?", kind: "decision" },
-					{ id: "publish", label: "Publish release", kind: "end" },
-					{ id: "cancel", label: "Cancel release", kind: "end" },
-				],
+				id: "release-approval",
+				nodes: {
+					draft: "Prepare release",
+					review: "Approved?",
+					publish: "Publish release",
+					cancel: "Cancel release",
+				},
 				edges: [
-					{ id: "begin", source: "start", target: "draft" },
-					{ id: "submit", source: "draft", target: "review" },
-					{ id: "approve", source: "review", target: "publish", label: "approve" },
-					{ id: "reject", source: "review", target: "cancel", label: "reject" },
+					["draft", "review"],
+					["review", "publish", "approve"],
+					["review", "cancel", "reject"],
 				],
-				layout: { direction: "TB", edgeRouting: "orthogonal" },
 			},
 		};
 		return `Response example: ${JSON.stringify(supportedExample)}`;
@@ -509,8 +506,12 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 
 /** Families that draw catalog logos, and which element carries them. */
 const LOGO_TARGETS = {
-	flowchart: { element: "flowchart node", owner: "node" },
-	sequence: { element: "sequence participant", owner: "participant" },
+	flowchart: {
+		rule: 'In a flowchart, set "logos": true and keep each technology\'s name in the label of the node about it; its logo follows the label.',
+	},
+	sequence: {
+		rule: 'A sequence participant about one of these technologies may set "icon": { "slug": "<slug>" } using a slug from this list exactly, and keeps that name in its label. Omit icon on every other participant. Never invent a slug.',
+	},
 } as const;
 
 function logoSection(prompt: DiagramGenerationPrompt): string[] {
@@ -522,8 +523,6 @@ function logoSection(prompt: DiagramGenerationPrompt): string[] {
 	if (logos.length === 0 || targets.length === 0) {
 		return [];
 	}
-	const element = targets.map((target) => target.element).join(" or ");
-	const owner = targets.map((target) => target.owner).join(" or ");
 	return [
 		"",
 		"Available logos:",
@@ -531,7 +530,7 @@ function logoSection(prompt: DiagramGenerationPrompt): string[] {
 			(logo) =>
 				`- ${logo.slug}: ${logo.name}${logo.aliases?.length ? ` (also ${logo.aliases.join(", ")})` : ""}`,
 		),
-		`A ${element} about one of these technologies may set "icon": { "slug": "<slug>" } using a slug from this list exactly. Put each logo on the ${owner} whose label names that technology, and keep that name in the label. Omit icon on every other ${owner}. Never invent a slug.`,
+		...targets.map((target) => target.rule),
 	];
 }
 
@@ -545,7 +544,7 @@ const REVISION_INSTRUCTIONS = [
 /** Colors and shapes, sent only to a request that asks for them, so other requests pay nothing. */
 const STYLING_INSTRUCTIONS = [
 	'When the scenario asks for colors or shapes, also return styles: [{ "targets", "fillColor"?, "strokeColor"?, "textColor"?, "shape"? }] beside diagram, and nothing else when it does not.',
-	'targets lists the ids or labels of the nodes and edges a style applies to. Colors are #rrggbb: a colored node takes the color as strokeColor and its pale tint as fillColor, so its label stays readable (red #dc2626 on #fee2e2, orange #ea580c on #ffedd5, yellow #ca8a04 on #fef9c3, green #16a34a on #dcfce7, blue #2563eb on #dbeafe, purple #7c3aed on #ede9fe, gray #6b7280 on #f3f4f6); a colored edge takes strokeColor alone. shape is "rectangle", "diamond", "ellipse" or "circle".',
+	'targets lists the ids or labels of the nodes and edges a style applies to; a flowchart edge\'s id is "from->to". Colors are #rrggbb: a colored node takes the color as strokeColor and its pale tint as fillColor, so its label stays readable (red #dc2626 on #fee2e2, orange #ea580c on #ffedd5, yellow #ca8a04 on #fef9c3, green #16a34a on #dcfce7, blue #2563eb on #dbeafe, purple #7c3aed on #ede9fe, gray #6b7280 on #f3f4f6); a colored edge takes strokeColor alone. shape is "rectangle", "diamond", "ellipse" or "circle".',
 	"Style exactly what the scenario asks for; the diagram's content stays as the other rules say.",
 ];
 

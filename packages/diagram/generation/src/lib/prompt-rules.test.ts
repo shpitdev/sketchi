@@ -40,7 +40,7 @@ describe("generation prompt rules", () => {
 
 	it("makes every named zone a group nested in the zone that holds it", () => {
 		expect(system).toContain("Every zone the scenario names is its own group");
-		expect(system).toContain('sets "parent" to the zone that holds it');
+		expect(system).toContain("a group may list members at any depth and Sketchi nests them");
 	});
 
 	it("says what a table's columns are and what a footer holds", () => {
@@ -135,7 +135,7 @@ describe("generation reaches every field an MCP agent can set", () => {
 		]) {
 			expect(system).toContain(rule);
 		}
-		expect(system).toContain("may have a description");
+		expect(system).toContain('A node\'s details are { "label", "note"?, "shape"? }.');
 		expect(system).toContain('layout { "direction": "LR" | "TB" } when the source states one');
 	});
 });
@@ -164,13 +164,13 @@ describe("rules that close the graded gap with the MCP agent", () => {
 			requestedType: "flowchart",
 			logos: [{ slug: "redis", name: "Redis" }],
 		});
-		expect(user).toContain("keep that name in the label");
+		expect(user).toContain("keep each technology's name in the label of the node about it");
 	});
 });
 
 describe("generation sends only the requested family's rules", () => {
 	it("keeps every family's rules when the model picks the family", () => {
-		expect(system).toContain("Flowchart IR rules:");
+		expect(system).toContain("Flowchart document rules:");
 		expect(system).toContain("Quadrant chart IR rules:");
 	});
 
@@ -182,7 +182,7 @@ describe("generation sends only the requested family's rules", () => {
 		}).system;
 		expect(typed).toContain("Sankey IR rules:");
 		expect(typed).toContain(SANKEY_RULES.dropOff("the source"));
-		expect(typed).not.toContain("Flowchart IR rules:");
+		expect(typed).not.toContain("Flowchart document rules:");
 		expect(typed).not.toContain("Wireframe IR rules:");
 		expect(typed.length).toBeLessThan(system.length / 3);
 	});

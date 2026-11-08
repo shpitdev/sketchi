@@ -9,12 +9,6 @@ const zoneKinds = `${DIAGRAM_ZONE_KINDS.slice(0, -1).join(", ")} or ${DIAGRAM_ZO
  * render the rules they use from here; no surface words a flowchart rule of its own.
  */
 export const FLOWCHART_RULES = {
-	singleStart: "Use exactly one start node and at least one end node.",
-	edgesByKind:
-		"Every non-end node must have at least one outgoing edge; every end node must have zero outgoing edges.",
-	reachable: "Every node must be reachable from the single start and able to reach an end.",
-	reachableDetail:
-		"Closed cycles fail with nonterminating_node; retry loops remain valid when they retain an eventual exit to an end.",
 	separateNodes: (source: RuleSource) =>
 		`Keep every requested step and decision in a separate node, preserving ${source}'s step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.`,
 	actionNodes: (source: RuleSource) =>
@@ -29,34 +23,11 @@ export const FLOWCHART_RULES = {
 		`A step or check ${source} gives to some branches stays on those branches; never copy it onto another.`,
 	branchNames: (source: RuleSource) =>
 		`A branch ${source} names by its outcome ("pass", "retest", "reject") is the label on its decision's edge, never a decision of its own.`,
-	statedEnd: (source: RuleSource) =>
-		`If ${source} says where the flow ends, every branch leads to that node. Otherwise a branch with no stated next step stops at its last step: mark that step as the end node, never a new result after it.`,
 	namedOutcomes: (source: RuleSource) =>
 		`Use one node per outcome ${source} names: point every branch that reaches the same named outcome at that one node, and do not add end nodes ${source} does not name.`,
-	noInventedSteps: (source: RuleSource) =>
-		`Do not add decisions, loops, steps, or edges ${source} does not state; a step that handles "any errors" or acts "if needed" stays one step in sequence. A step that repeats an earlier step ("send another ...", "try again", "retry", "resubmit") continues that cycle: draw it as the earlier step or as a step that loops back to the decision after it, never as an end. Only a new, unrepeated final step with no stated next step is that branch's end node (kind: "end").`,
-	decisionEdges:
-		"Every decision node must have at least two outgoing edges with non-empty unique labels.",
-	backEdges:
-		"For each retry, return, or feedback loop, include a real back-edge to an earlier distinct process or decision. Never target start and never use a self-loop.",
 	technologyLabels:
-		"Name technologies in node labels; a description draws as a small subtitle under the label, for detail.",
-	groups: (source: RuleSource) =>
-		`Only when ${source} groups steps (teams, zones, phases), add groups [{ "id", "label" }] and set each member node's group to its innermost group id; leave other nodes ungrouped. Every zone ${source} names is its own group. One inside another sets "parent" to the zone that holds it, wherever ${source} says so, and "kind" (${zoneKinds}) when ${source} names what a zone is. Set "shape", also on a start or end: "database" for databases, "document" for files, archives and reports, "queue" for queues, streams and topics, "storage" for buckets and object stores; only users stay ellipses. In an architecture the entry is the start and each sink an end.`,
-	/**
-	 * The MCP's compact forms of decisionEdges, groups and lanes: the execute code parameter carries
-	 * every flowchart rule on every turn, inside a fixed character budget.
-	 */
-	decisionsCompact: "Decision nodes need meaningful labeled outgoing branches, usually yes/no.",
-	lanesCompact: (source: RuleSource) =>
-		`For swimlanes, a process across actors or roles, declare lanes in ${source}'s order and set each node's lane to its actor; lanes take no groups.`,
-	groupsCompact: (source: RuleSource) =>
-		`Only when ${source} groups steps (teams, zones, phases), declare groups and set each member's group to its innermost group id; others stay ungrouped. Nested zones set parent (subnet in VPC) and kind. Set shape, even on a start or end: "database" databases; "document" files, archives, reports; "queue" queues, streams, topics; "storage" buckets, object stores. Only users stay ellipses. An architecture starts at its entry and ends at each sink.`,
+		"Name technologies in node labels; a note draws as a small subtitle under the label, for detail.",
 	zonesOutside: "Anything stated as outside a zone stays outside it.",
-	lanes: (source: RuleSource) =>
-		`For swimlanes, a process across actors or roles, add lanes [{ "id", "label" }] in ${source}'s order and set every node's lane to its actor; lanes take no groups.`,
-	direction: (source: RuleSource) =>
-		`Use layout { "direction": "TB", "edgeRouting": "orthogonal" } unless ${source} says otherwise.`,
 	limits: `At most ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges.`,
 	limitsDetail: "Larger graphs fail with flowchart_too_large before render or persistence.",
 	summarize:
@@ -67,10 +38,7 @@ export const FLOWCHART_RULES = {
 		"When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
 	keepNamed: (source: RuleSource) =>
 		`Keep every package and component ${source} names under its own name; summarizing drops unnamed detail and never renames or generalizes named parts.`,
-	/**
-	 * The flowchart document's own rules: MCP and Studio chat author it today, and the
-	 * generation prompt moves to it next.
-	 */
+	/** The flowchart document's own rules, which every surface that writes one reads. */
 	documentShape:
 		'nodes map an id to its label or { label, … }; an edge is [from, to] or [from, to, "label"], and an end may list ids: [["web", "api"], "rds"] is one edge per id.',
 	documentRoles: (source: RuleSource) =>

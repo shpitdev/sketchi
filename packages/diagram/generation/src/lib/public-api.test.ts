@@ -35,46 +35,18 @@ const expectedDiagram = {
 	id: "pharma-batch-disposition-fixture",
 	title: "Pharma batch disposition",
 	type: "flowchart",
-	nodes: [
-		{ id: "received", label: "Batch received", kind: "start" },
-		{
-			id: "final-review",
-			label: "QA Manager final review",
-			kind: "decision",
-		},
-		{
-			id: "investigation",
-			label: "Investigate retesting",
-			kind: "process",
-		},
-		{ id: "packaging", label: "Send to packaging", kind: "end" },
-	],
+	nodes: {
+		received: "Batch received",
+		"final-review": { label: "QA Manager final review", shape: "diamond" },
+		investigation: "Investigate retesting",
+		packaging: "Send to packaging",
+	},
 	edges: [
-		{
-			id: "received-to-final-review",
-			source: "received",
-			target: "final-review",
-		},
-		{
-			id: "final-review-to-packaging",
-			source: "final-review",
-			target: "packaging",
-			label: "yes",
-		},
-		{
-			id: "final-review-to-investigation",
-			source: "final-review",
-			target: "investigation",
-			label: "retest",
-		},
-		{
-			id: "investigation-to-final-review",
-			source: "investigation",
-			target: "final-review",
-		},
+		["received", "final-review"],
+		["final-review", "packaging", "yes"],
+		["final-review", "investigation", "retest"],
+		["investigation", "final-review"],
 	],
-	layout: { direction: "TB", edgeRouting: "orthogonal" },
-	style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
 };
 function generationResponseText(diagram: Readonly<Record<string, unknown>>): string {
 	const { title, type, ...diagramWithoutTitle } = diagram;
@@ -88,10 +60,7 @@ function generationResponseText(diagram: Readonly<Record<string, unknown>>): str
 	);
 }
 
-const expectedText = generationResponseText({
-	...expectedDiagram,
-	style: { accentColor: "#0f766e", backgroundColor: "#ffffff" },
-});
+const expectedText = generationResponseText(expectedDiagram);
 const expectedMessages = buildDiagramGenerationMessages(prompt);
 const expectedSystem = expectedMessages.system;
 const expectedUser = expectedMessages.user;
@@ -210,28 +179,23 @@ describe("diagram generation prompt mapping", () => {
 		const { user } = buildDiagramGenerationMessages({ id: "example", request: "Draw it" });
 		const example = JSON.parse(user.slice(user.indexOf("{"), user.lastIndexOf("}") + 1)) as {
 			readonly diagram: {
-				readonly edges: readonly { readonly source: string; readonly target: string }[];
-				readonly nodes: readonly { readonly id: string; readonly kind: string }[];
+				readonly edges: readonly (readonly [string, string, string?])[];
+				readonly nodes: Readonly<Record<string, unknown>>;
 			};
 		};
 		const { nodes, edges } = example.diagram;
-		const order = nodes.map((node) => node.id);
-		expect(edges.every((edge) => order.indexOf(edge.source) < order.indexOf(edge.target))).toBe(
-			true,
-		);
-		expect(nodes.filter((node) => node.kind === "end").map((node) => node.id)).toEqual([
+		const order = Object.keys(nodes);
+		expect(edges.every(([from, to]) => order.indexOf(from) < order.indexOf(to))).toBe(true);
+		expect(order.filter((id) => !edges.some(([from]) => from === id))).toEqual([
 			"publish",
 			"cancel",
 		]);
 	});
 
-	it("requires real loop topology and flowchart richness", () => {
+	it("sends a repeated step back to the step it repeats and keeps flowchart richness", () => {
 		const messages = buildDiagramGenerationMessages(prompt);
 
-		expect(messages.system).toContain(
-			"include a real back-edge to an earlier distinct process or decision",
-		);
-		expect(messages.system).toContain("Never target start and never use a self-loop");
+		expect(messages.system).toContain("points back at the step it repeats, never at itself");
 		expect(messages.system).toContain("Copy everything the scenario states, in full");
 		expect(messages.system).toContain("Add nothing it does not state");
 		expect(messages.system).toContain(
@@ -239,9 +203,9 @@ describe("diagram generation prompt mapping", () => {
 		);
 		expect(messages.system).not.toContain("invent none");
 		expect(messages.system).toContain(
-			"If the scenario says where the flow ends, every branch leads to that node.",
+			"a branch with no stated next step ends at its last step, with no onward arrow or closing node",
 		);
-		expect(messages.system).toContain("a branch with no stated next step stops at its last step");
+		expect(messages.system).not.toContain('"kind"');
 	});
 
 	it("gives one model call time to write the whole output budget, inside the request's limit", () => {
@@ -319,7 +283,13 @@ describe("pure candidate behavior", () => {
 
 		expect(candidate.error).toBeUndefined();
 		expect(candidate.diagram?.id).toBe(expectedDiagram.id);
-		expect(candidate.diagram?.style).toEqual(expectedDiagram.style);
+		expect(candidate.diagram?.style).toEqual(SKETCHI_DIAGRAM_STYLE);
+		expect(candidate.flowchart).toEqual({
+			id: expectedDiagram.id,
+			title: expectedDiagram.title,
+			nodes: expectedDiagram.nodes,
+			edges: expectedDiagram.edges,
+		});
 	});
 
 	it("parses and validates native sequence candidates", () => {
@@ -381,7 +351,7 @@ describe("pure candidate behavior", () => {
 		]);
 	});
 
-	it("requires the response envelope instead of accepting raw IR", () => {
+	it("requires the response envelope instead of accepting a bare diagram", () => {
 		const candidate = candidateFromText({
 			model: "fixture",
 			provider: "fixture",
@@ -412,9 +382,7 @@ describe("pure candidate behavior", () => {
 			provider: "fixture",
 			text: generationResponseText({
 				...expectedDiagram,
-				edges: expectedDiagram.edges.map((edge, index) =>
-					index === 0 ? { ...edge, label: "" } : edge,
-				),
+				edges: expectedDiagram.edges.map((edge, index) => (index === 0 ? [...edge, ""] : edge)),
 			}),
 		});
 
@@ -516,30 +484,54 @@ describe("pure candidate behavior", () => {
 				id: "broken-loop",
 				title: "Broken loop",
 				type: "flowchart",
-				nodes: [
-					{ id: "start", label: "Start", kind: "start" },
-					{ id: "retry", label: "Retry?", kind: "decision" },
-					{ id: "done", label: "Done", kind: "end" },
-				],
+				nodes: { start: "Start", retry: "Retry?", done: "Done", stop: "Stop" },
 				edges: [
-					{ id: "start-retry", source: "start", target: "retry" },
-					{ id: "retry-done", source: "retry", target: "done" },
-					{ id: "done-start", source: "done", target: "start" },
+					["start", "retry"],
+					["retry", "done"],
+					["retry", "stop"],
+					["done", "done"],
+					["stop", "nowhere"],
 				],
-				layout: { direction: "TB", edgeRouting: "orthogonal" },
 			}),
 		});
 
 		expect(candidate.diagram).toBeUndefined();
 		expect(candidate.diagnostics).toEqual(
 			expect.arrayContaining([
-				expect.stringContaining("start_has_incoming"),
-				expect.stringContaining("end_has_outgoing"),
-				expect.stringContaining("underbranched_decision"),
-				expect.stringContaining("unlabeled_decision_branch"),
+				expect.stringContaining("flowchart.missing_edge_target"),
+				expect.stringContaining("flowchart.self_loop"),
+				expect.stringContaining("flowchart.unlabeled_decision_branch"),
 				expect.stringContaining("Hint:"),
 			]),
 		);
+	});
+
+	it("refuses a repeated node id that JSON would silently keep once", () => {
+		const text = `{"title":"Repeat","diagram":{"type":"flowchart","id":"repeat","nodes":{"a":"Start","b":"Review","b":"Ship"},"edges":[["a","b"]]}}`;
+		const candidate = candidateFromText({ model: "fixture", provider: "fixture", text });
+
+		expect(candidate.diagram).toBeUndefined();
+		expect(candidate.diagnostics).toEqual([
+			'flowchart.duplicate_node_id: nodes repeats the id "b", and JSON keeps only the last one. Hint: Give each node its own id.',
+		]);
+	});
+
+	it("names a response in the drawn graph's shape once instead of per edge", () => {
+		const candidate = candidateFromText({
+			model: "fixture",
+			provider: "fixture",
+			text: generationResponseText({
+				id: "old-shape",
+				title: "Old shape",
+				type: "flowchart",
+				nodes: [{ id: "a", label: "Start", kind: "start" }],
+				edges: [{ id: "e", source: "a", target: "b" }],
+			}),
+		});
+
+		expect(candidate.diagram).toBeUndefined();
+		expect(candidate.diagnostics).toHaveLength(1);
+		expect(candidate.diagnostics[0]).toMatch(/^flowchart\.invalid_type: /u);
 	});
 });
 
@@ -592,132 +584,51 @@ const invalidDiagramText = generationResponseText({
 	id: "invalid-retry",
 	title: "Invalid retry",
 	type: "flowchart",
-	nodes: [
-		{ id: "start", kind: "start", label: "Start" },
-		{ id: "retry", kind: "decision", label: "Retry?" },
-		{ id: "end", kind: "end", label: "Done" },
-	],
+	nodes: { start: "Start", retry: "Retry?", end: "Done" },
 	edges: [
-		{ id: "start-retry", source: "start", target: "retry" },
-		{ id: "retry-end", source: "retry", target: "end" },
+		["start", "retry"],
+		["retry", "end", "yes"],
+		["retry", "finish", "no"],
 	],
-	layout: { direction: "TB", edgeRouting: "orthogonal" },
-});
-
-const startIncomingDiagramText = generationResponseText({
-	id: "expense-resubmission",
-	title: "Expense resubmission",
-	type: "flowchart",
-	nodes: [
-		{ id: "start", kind: "start", label: "Start" },
-		{ id: "submission", kind: "process", label: "Submission" },
-		{ id: "manager", kind: "decision", label: "Manager approves?" },
-		{ id: "finance", kind: "decision", label: "Finance approves?" },
-		{ id: "rejection", kind: "process", label: "Rejection" },
-		{ id: "resubmit", kind: "process", label: "Resubmit" },
-		{ id: "reimbursement", kind: "end", label: "Reimbursement" },
-	],
-	edges: [
-		{ id: "start-submission", source: "start", target: "submission" },
-		{ id: "submission-manager", source: "submission", target: "manager" },
-		{
-			id: "manager-finance",
-			source: "manager",
-			target: "finance",
-			label: "approved",
-		},
-		{
-			id: "manager-rejection",
-			source: "manager",
-			target: "rejection",
-			label: "rejected",
-		},
-		{
-			id: "finance-reimbursement",
-			source: "finance",
-			target: "reimbursement",
-			label: "approved",
-		},
-		{
-			id: "finance-rejection",
-			source: "finance",
-			target: "rejection",
-			label: "rejected",
-		},
-		{ id: "rejection-resubmit", source: "rejection", target: "resubmit" },
-		{ id: "resubmit-start", source: "resubmit", target: "start" },
-	],
-	layout: { direction: "TB", edgeRouting: "orthogonal" },
 });
 
 const selfLoopDiagramText = generationResponseText({
 	id: "returns-fraud-review",
 	title: "Returns fraud review",
 	type: "flowchart",
-	nodes: [
-		{ id: "start", kind: "start", label: "Start" },
-		{ id: "return", kind: "process", label: "Receive return" },
-		{ id: "fraud", kind: "decision", label: "Fraud check passes?" },
-		{ id: "done", kind: "end", label: "Refund complete" },
-	],
+	nodes: {
+		start: "Start",
+		return: "Receive return",
+		fraud: "Fraud check passes?",
+		done: "Refund complete",
+	},
 	edges: [
-		{ id: "start-return", source: "start", target: "return" },
-		{ id: "return-fraud", source: "return", target: "fraud" },
-		{
-			id: "fraud-self",
-			source: "fraud",
-			target: "fraud",
-			label: "re-check",
-		},
-		{ id: "fraud-done", source: "fraud", target: "done", label: "clear" },
+		["start", "return"],
+		["return", "fraud"],
+		["fraud", "fraud", "re-check"],
+		["fraud", "done", "clear"],
 	],
-	layout: { direction: "TB", edgeRouting: "orthogonal" },
 });
 
 function returnsDiagramText(nodeCount: number, selfLoop: boolean): string {
-	const processCount = nodeCount - 3;
-	const processNodes = Array.from({ length: processCount }, (_, index) => ({
-		id: `step-${index + 1}`,
-		kind: "process",
-		label: `Return step ${index + 1}`,
-	}));
-	const processEdges = processNodes.map((node, index) => ({
-		id: `step-edge-${index + 1}`,
-		source: node.id,
-		target: processNodes[index + 1]?.id ?? "fraud-check",
-	}));
-	const lastProcessId = processNodes.at(-1)?.id ?? "fraud-review";
+	const steps = Array.from({ length: nodeCount - 3 }, (_, index) => `step-${index + 1}`);
+	const last = steps.at(-1) ?? "start";
 	return generationResponseText({
 		id: "returns-minimum-repair",
 		title: "Ecommerce returns",
 		type: "flowchart",
-		nodes: [
-			{ id: "start", kind: "start", label: "Return initiated" },
-			...processNodes,
-			{ id: "fraud-check", kind: "decision", label: "Fraud check?" },
-			{ id: "done", kind: "end", label: "Return closed" },
-		],
+		nodes: {
+			start: "Return initiated",
+			...Object.fromEntries(steps.map((id, index) => [id, `Return step ${index + 1}`])),
+			"fraud-check": "Fraud check?",
+			done: "Return closed",
+		},
 		edges: [
-			{
-				id: "start-step",
-				source: "start",
-				target: processNodes[0]?.id ?? "fraud-check",
-			},
-			...processEdges,
-			{
-				id: "fraud-recheck",
-				source: "fraud-check",
-				target: selfLoop ? "fraud-check" : lastProcessId,
-				label: "re-check",
-			},
-			{
-				id: "fraud-clear",
-				source: "fraud-check",
-				target: "done",
-				label: "clear",
-			},
+			["start", steps[0] ?? "fraud-check"],
+			...steps.map((id, index) => [id, steps[index + 1] ?? "fraud-check"]),
+			["fraud-check", selfLoop ? "fraud-check" : last, "re-check"],
+			["fraud-check", "done", "clear"],
 		],
-		layout: { direction: "TB", edgeRouting: "orthogonal" },
 	});
 }
 
@@ -762,7 +673,7 @@ layer(repairedClientLayer)("semantic repair policy", (it) => {
 			assert.strictEqual(candidate.diagram?.id, expectedDiagram.id);
 			assert.isTrue(
 				candidate.diagnostics.some((diagnostic) =>
-					diagnostic.startsWith("flowchart.underbranched_decision:"),
+					diagnostic.startsWith("flowchart.missing_edge_target:"),
 				),
 			);
 			assert.isTrue(
@@ -794,58 +705,6 @@ layer(repairedClientLayer)("semantic repair policy", (it) => {
 			);
 		}).pipe(Effect.provide(telemetryLayer));
 	});
-});
-
-let startIncomingRepairCalls = 0;
-const startIncomingRepairRun = vi.fn<CloudflareAiGateway["run"]>(async () => {
-	startIncomingRepairCalls += 1;
-	return startIncomingRepairCalls === 1
-		? chatTextResponse(startIncomingDiagramText)
-		: jsonResponse(chatResponse);
-});
-const startIncomingRepairClientLayer = CloudflareGatewayChatClientLive.pipe(
-	Layer.provide(
-		Layer.mergeAll(
-			Layer.succeed(CloudflareAiGatewayBinding, {
-				gateway: () => ({ getUrl: vi.fn(), run: startIncomingRepairRun }),
-			}),
-			configLayer,
-			retryPolicyLayer,
-		),
-	),
-);
-
-layer(startIncomingRepairClientLayer)("start edge semantic repair", (it) => {
-	it.effect("prioritizes rerouting loop-back edges away from start", () =>
-		Effect.gen(function* () {
-			startIncomingRepairCalls = 0;
-			startIncomingRepairRun.mockClear();
-			const client = yield* DiagramGenerationClient;
-			const candidate = yield* client.generate({
-				model: "google/gemini-3.1-flash-lite",
-				prompt,
-			});
-
-			assert.strictEqual(startIncomingRepairRun.mock.calls.length, 2);
-			assert.strictEqual(candidate.diagram?.id, expectedDiagram.id);
-			const repairBody = startIncomingRepairRun.mock.calls[1]?.[0];
-			expect(repairBody).toEqual(
-				expect.objectContaining({
-					query: expect.objectContaining({
-						messages: [
-							expect.objectContaining({ role: "system" }),
-							expect.objectContaining({
-								content: expect.stringMatching(
-									/Priority validator issue and hint:\n- flowchart\.start_has_incoming: Start node "start" cannot have incoming edges\. Hint: Route the start node only to later nodes\.[\s\S]*reroute each offending loop-back edge to the first process node after start\. Never target the start node; start nodes have no incoming edges\./u,
-								),
-								role: "user",
-							}),
-						],
-					}),
-				}),
-			);
-		}),
-	);
 });
 
 let selfLoopRepairCalls = 0;
@@ -888,7 +747,7 @@ layer(selfLoopRepairClientLayer)("self-loop semantic repair", (it) => {
 							expect.objectContaining({ role: "system" }),
 							expect.objectContaining({
 								content: expect.stringMatching(
-									/Priority validator issue and hint:\n- flowchart\.self_loop: Edge "fraud-self" connects node "fraud" to itself\. Hint: Connect the edge to a different target node\.[\s\S]*reroute each offending edge to an earlier distinct process or decision node\.[\s\S]*model every retry or re-check as a decision branch returning to that earlier distinct node\./u,
+									/Priority validator issue and hint:\n- flowchart\.self_loop: edges\[2\] connects "fraud" to itself\. Hint: A repeated step returns to an earlier step instead\.[\s\S]*reroute each offending edge to an earlier distinct step or question\.[\s\S]*draw every retry or re-check as a branch returning to that earlier node\./u,
 								),
 								role: "user",
 							}),
@@ -991,10 +850,10 @@ layer(failedRepairClientLayer)("failed semantic repair", (it) => {
 			assert.isUndefined(candidate.diagram);
 			assert.strictEqual(candidate.text, invalidDiagramText);
 			assert.notStrictEqual(candidate.text, '{"type":"flowchart"');
-			assert.match(candidate.error ?? "", /Decision node/u);
+			assert.match(candidate.error ?? "", /names "finish"/u);
 			assert.isTrue(
 				candidate.diagnostics.some((diagnostic) =>
-					diagnostic.startsWith("flowchart.underbranched_decision:"),
+					diagnostic.startsWith("flowchart.missing_edge_target:"),
 				),
 			);
 			assert.isTrue(
@@ -1052,7 +911,7 @@ layer(exhaustedRepairClientLayer)("failed repair transport", (it) => {
 			assert.strictEqual(exhaustedRepairRun.mock.calls.length, 4);
 			assert.isUndefined(candidate.diagram);
 			assert.strictEqual(candidate.text, invalidDiagramText);
-			assert.match(candidate.error ?? "", /Decision node/u);
+			assert.match(candidate.error ?? "", /names "finish"/u);
 			assert.isTrue(
 				candidate.diagnostics.some((diagnostic) =>
 					diagnostic.includes("repair provider temporarily unavailable"),
@@ -1563,17 +1422,10 @@ const oversizedFlowchartText = generationResponseText({
 	id: "oversized",
 	title: "Oversized",
 	type: "flowchart",
-	nodes: Array.from({ length: FLOWCHART_MAX_NODES + 1 }, (_, index) => ({
-		id: `n${index}`,
-		kind: index === 0 ? "start" : index === FLOWCHART_MAX_NODES ? "end" : "process",
-		label: `Step ${index}`,
-	})),
-	edges: Array.from({ length: FLOWCHART_MAX_NODES }, (_, index) => ({
-		id: `e${index}`,
-		source: `n${index}`,
-		target: `n${index + 1}`,
-	})),
-	layout: { direction: "TB", edgeRouting: "orthogonal" },
+	nodes: Object.fromEntries(
+		Array.from({ length: FLOWCHART_MAX_NODES + 1 }, (_, index) => [`n${index}`, `Step ${index}`]),
+	),
+	edges: Array.from({ length: FLOWCHART_MAX_NODES }, (_, index) => [`n${index}`, `n${index + 1}`]),
 });
 let oversizedCalls = 0;
 const oversizedRun = vi.fn<CloudflareAiGateway["run"]>(async () => {

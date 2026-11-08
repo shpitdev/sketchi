@@ -18,13 +18,13 @@ describe("scenario prompts", () => {
 		const prompt = buildScenarioPromptParts(scenario);
 
 		expect(Object.keys(prompt).sort()).toEqual(["system", "user"]);
-		expect(prompt.system).toContain("Flowchart IR rules:");
+		expect(prompt.system).toContain("Flowchart document rules:");
 		expect(prompt.user).toContain("Scenario:");
 		expect(prompt.system).not.toContain(scenario.prompt);
-		expect(prompt.system).toContain("Every node must have id, label, and kind");
+		expect(prompt.system).toContain("Return diagram as the flowchart document");
 		expect(prompt.user).toContain(scenario.prompt);
-		expect(prompt.user).not.toContain("Flowchart IR rules:");
-		expect(prompt.user).not.toContain("Every node must have id, label, and kind");
+		expect(prompt.user).not.toContain("Flowchart document rules:");
+		expect(prompt.user).not.toContain("Return diagram as the flowchart document");
 		expect(prompt.user).toContain("caller explicitly requires flowchart");
 		expect(prompt.user).toContain('"type":"flowchart"');
 	});

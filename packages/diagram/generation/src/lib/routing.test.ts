@@ -129,7 +129,7 @@ describe("the prompt of a routed request", () => {
 			routedTypes: ["flowchart", "er"],
 		});
 		expect(withFlowchart.system).toContain("A swimlane or architecture request");
-		expect(withFlowchart.user).toContain("A flowchart node about one of these technologies");
+		expect(withFlowchart.user).toContain('In a flowchart, set "logos": true');
 		const without = buildDiagramGenerationMessages({
 			id: "x",
 			logos,

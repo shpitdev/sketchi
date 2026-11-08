@@ -17,19 +17,33 @@ function candidate(diagram: unknown) {
 describe("zone generation", () => {
 	it("keeps a generated flowchart's nested zones, their kinds and each node's shape", () => {
 		const { id, title, groups, nodes, edges } = zoneFixtures["hybrid-cloud"];
+		// The model writes the flowchart document: each zone lists its nodes and zones.
 		const parsed = candidate({
 			id,
 			title,
 			type: "flowchart",
-			groups: groups!.map((group) => ({ ...group })),
-			nodes: nodes.map((node) => ({
-				id: node.id,
-				label: node.label,
-				kind: node.kind,
-				...(node.group ? { group: node.group } : {}),
-				...(node.shape ? { shape: node.shape } : {}),
-			})),
-			edges: edges.map((edge) => ({ id: edge.id, source: edge.source, target: edge.target })),
+			groups: Object.fromEntries(
+				(groups ?? []).map((group) => [
+					group.id,
+					{
+						label: group.label,
+						...(group.kind ? { kind: group.kind } : {}),
+						contains: [
+							...nodes.filter((node) => node.group === group.id).map((node) => node.id),
+							...(groups ?? [])
+								.filter((inner) => inner.parent === group.id)
+								.map((inner) => inner.id),
+						],
+					},
+				]),
+			),
+			nodes: Object.fromEntries(
+				nodes.map((node) => [
+					node.id,
+					node.shape ? { label: node.label, shape: node.shape } : node.label,
+				]),
+			),
+			edges: edges.map((edge) => [edge.source, edge.target]),
 		});
 		expect(parsed.error).toBeUndefined();
 		const diagram = parsed.diagram;
@@ -46,15 +60,12 @@ describe("zone generation", () => {
 			id: "edge",
 			title: "Edge",
 			type: "flowchart",
-			groups: [
-				{ id: "vercel", label: "Vercel", icon: { slug: "vercel" } },
-				{ id: "cloud", label: "Cloud", icon: "not an icon" },
-			],
-			nodes: [
-				{ id: "page", label: "Page", kind: "start", group: "vercel" },
-				{ id: "api", label: "API", kind: "end", group: "cloud" },
-			],
-			edges: [{ id: "a", source: "page", target: "api" }],
+			groups: {
+				vercel: { label: "Vercel", icon: { slug: "vercel" }, contains: ["page"] },
+				cloud: { label: "Cloud", icon: "not an icon", contains: ["api"] },
+			},
+			nodes: { page: "Page", api: "API" },
+			edges: [["page", "api"]],
 		});
 		expect(parsed.error).toBeUndefined();
 		const diagram = parsed.diagram;

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import {
 	buildCanonicalDocument,
+	type CanonicalDiagramDocument,
 	canonicalDocumentFromDiagram,
 	CodeModeArtifactStorage,
 	CodeModeArtifactStorageMemory,
@@ -30,7 +31,7 @@ import {
 	DiagramGenerationTypeSchema,
 } from "@sketchi/diagram-generation";
 import { renderDiagram } from "@sketchi/diagram-renderer";
-import { generationScenarioRegistry } from "@sketchi/diagram-scenarios";
+import { generationScenarioRegistry, scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
 import { Effect, Layer, Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -51,12 +52,25 @@ function fixtureFor(family: DiagramTypeValue): CanonicalDiagram {
 	return fixture;
 }
 
+/** A family's fixture as a model answers it: a flowchart as its document, any other as its diagram. */
 function generationEnvelope(diagram: CanonicalDiagram): string {
+	if (diagram.type === "flowchart") {
+		const { title, ...document } = scenarioFlowchartDocument(diagram);
+		return JSON.stringify({ title, diagram: { type: "flowchart", ...document } });
+	}
 	const { title, type, ...rest } = diagram;
 	return JSON.stringify({
 		title,
 		diagram: { ...rest, type },
 	});
+}
+
+/** The document a family's fixture builds from: a flowchart's is written, not converted. */
+function documentFor(family: DiagramTypeValue): CanonicalDiagramDocument {
+	const diagram = fixtureFor(family);
+	return diagram.type === "flowchart"
+		? { type: "flowchart", spec: scenarioFlowchartDocument(diagram) }
+		: canonicalDocumentFromDiagram(diagram);
 }
 
 const cliBuilderLayer = DiagramBuilderLive.pipe(
@@ -103,7 +117,7 @@ const stages: Record<string, (family: DiagramTypeValue) => void | Promise<void>>
 	},
 	"Code Mode build": async (family) => {
 		const result = await Effect.runPromise(
-			buildCanonicalDocument(canonicalDocumentFromDiagram(fixtureFor(family)), {
+			buildCanonicalDocument(documentFor(family), {
 				artifactFormats: ["scene", "excalidraw"],
 			}).pipe(
 				Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
@@ -116,7 +130,7 @@ const stages: Record<string, (family: DiagramTypeValue) => void | Promise<void>>
 		expect(result.ok).toBe(true);
 	},
 	"CLI document dispatch": async (family) => {
-		const document = canonicalDocumentFromDiagram(fixtureFor(family));
+		const document = documentFor(family);
 		const built = await Effect.runPromise(
 			Effect.gen(function* () {
 				const decoded = yield* decodeCanonicalDiagramDocument(document);

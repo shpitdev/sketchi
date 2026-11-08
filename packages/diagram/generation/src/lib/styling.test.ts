@@ -7,18 +7,12 @@ import { asksForStyling, generatedStyles } from "./styling.js";
 const flowchart = {
 	id: "release",
 	type: "flowchart",
-	nodes: [
-		{ id: "start", label: "Change proposed", kind: "start" },
-		{ id: "gate", label: "Approved?", kind: "decision" },
-		{ id: "ship", label: "Ship", kind: "end" },
-		{ id: "revise", label: "Revise", kind: "end" },
-	],
+	nodes: { start: "Change proposed", gate: "Approved?", ship: "Ship", revise: "Revise" },
 	edges: [
-		{ id: "e1", source: "start", target: "gate" },
-		{ id: "e2", source: "gate", target: "ship", label: "yes" },
-		{ id: "e3", source: "gate", target: "revise", label: "no" },
+		["start", "gate"],
+		["gate", "ship", "yes"],
+		["gate", "revise", "no"],
 	],
-	layout: { direction: "TB", edgeRouting: "orthogonal" },
 };
 
 describe("request-driven styling", () => {

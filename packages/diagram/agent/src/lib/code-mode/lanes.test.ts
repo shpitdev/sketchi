@@ -2,14 +2,12 @@ import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 import {
 	flowchartDiagramFromDocument,
-	laneFixtures,
 	laneRegionIssues,
 	type CanvasSpec,
 } from "@sketchi/diagram-core";
 import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
 import { buildFlowchart, CodeModeRuntimeEnvironment } from "./runtime.js";
 
 function build(spec: unknown) {
@@ -116,18 +114,5 @@ describe("Code Mode flowchart lanes", () => {
 		expect(built.issues.map((issue) => [issue.code, issue.ref])).toEqual(
 			expect.arrayContaining([["lanes_with_groups", { kind: "diagram", path: "spec.groups" }]]),
 		);
-	});
-
-	it("keeps lanes through the canonical document a generated diagram builds from", () => {
-		const document = canonicalDocumentFromDiagram(laneFixtures["order-fulfilment"]);
-		expect(document.type).toBe("flowchart");
-		if (document.type !== "flowchart") return;
-		expect(Object.keys(document.spec.lanes ?? {})).toEqual([
-			"customer",
-			"sales",
-			"warehouse",
-			"billing",
-		]);
-		expect(document.spec.lanes?.["customer"]?.contains).toContain("pay");
 	});
 });

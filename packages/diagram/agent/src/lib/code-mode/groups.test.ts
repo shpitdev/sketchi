@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
-import { groupFixtures, groupRegionIssues, type CanvasSpec } from "@sketchi/diagram-core";
+import { groupRegionIssues, type CanvasSpec } from "@sketchi/diagram-core";
 import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
 import { buildFlowchart, CodeModeRuntimeEnvironment } from "./runtime.js";
 
 function build(spec: unknown) {
@@ -119,16 +118,5 @@ describe("Code Mode flowchart groups", () => {
 		expect(built.issues.map((issue) => [issue.code, issue.ref])).toEqual([
 			["overlapping_containers", { kind: "node", id: "revise", path: "spec.groups" }],
 		]);
-	});
-
-	it("keeps groups through the canonical document a generated diagram builds from", () => {
-		const document = canonicalDocumentFromDiagram(groupFixtures["mixed-membership"]);
-		expect(document.type).toBe("flowchart");
-		if (document.type !== "flowchart") return;
-		expect(Object.keys(document.spec.groups ?? {})).toEqual(["warehouse", "shipping"]);
-		expect(document.spec.groups?.["warehouse"]?.contains).toContain("pick");
-		expect(
-			Object.values(document.spec.groups ?? {}).some((group) => group.contains.includes("order")),
-		).toBe(false);
 	});
 });

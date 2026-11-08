@@ -292,13 +292,8 @@ describe("the coverage repair", () => {
 			diagram: {
 				id: "deploy",
 				type: "flowchart",
-				nodes: [
-					{ id: "push", label: "Push", kind: "start" },
-					{ id: "build", label: "Build", kind: "process" },
-					{ id: "test", label: "Test", kind: "process" },
-					{ id: "ship", label: "Ship", kind: "end" },
-				],
-				edges: edges.map((edge, index) => ({ id: `e${String(index)}`, ...edge })),
+				nodes: { push: "Push", build: "Build", test: "Test", ship: "Ship" },
+				edges: edges.map((edge) => [edge.source, edge.target]),
 			},
 		});
 	const complete = flowchart([
@@ -389,16 +384,11 @@ describe("a coverage repair in another family", () => {
 				diagram: {
 					id: "deploy",
 					type: "flowchart",
-					nodes: [
-						{ id: "push", label: "Push", kind: "start" },
-						{ id: "build", label: "Build", kind: "process" },
-						{ id: "test", label: "Test", kind: "process" },
-						{ id: "ship", label: "Ship", kind: "end" },
-					],
+					nodes: { push: "Push", build: "Build", test: "Test", ship: "Ship" },
 					edges: [
-						{ id: "a", source: "push", target: "build" },
-						{ id: "b", source: "build", target: "test" },
-						{ id: "c", source: "build", target: "ship" },
+						["push", "build"],
+						["build", "test"],
+						["build", "ship"],
 					],
 				},
 			});
@@ -469,16 +459,8 @@ describe("review: the coverage repair keeps what the request names, within the r
 			diagram: {
 				id: "deploy",
 				type: "flowchart",
-				nodes: nodes.map(([id, label], index) => ({
-					id,
-					label,
-					kind: index === 0 ? "start" : id === "ship" ? "end" : "process",
-				})),
-				edges: edges.map(([source, target], index) => ({
-					id: `e${String(index)}`,
-					source,
-					target,
-				})),
+				nodes: Object.fromEntries(nodes),
+				edges,
 			},
 		});
 	const nodes: [string, string][] = [

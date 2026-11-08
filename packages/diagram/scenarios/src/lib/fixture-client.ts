@@ -8,6 +8,7 @@ import {
 import { Clock, Effect, Layer } from "effect";
 
 import { getDiagramScenario } from "./diagram-scenarios.js";
+import { scenarioFlowchartDocument } from "./flowchart-document.js";
 
 export const FixtureGenerationClientLayer = Layer.succeed(DiagramGenerationClient, {
 	provider: "fixture",
@@ -23,18 +24,16 @@ export const FixtureGenerationClientLayer = Layer.succeed(DiagramGenerationClien
 					scenarioId: request.prompt.id,
 				}),
 		});
-		const { title, type, ...diagram } = scenario.expectedDiagram;
+		const expected = scenario.expectedDiagram;
+		// A model writes a flowchart as its document, and every other family as its diagram.
+		const { title, ...diagram } =
+			expected.type === "flowchart"
+				? { ...scenarioFlowchartDocument(expected), type: "flowchart" }
+				: expected;
 		const candidate = candidateFromText({
 			model: "fixture",
 			provider: "fixture",
-			text: JSON.stringify(
-				{
-					title,
-					diagram: { ...diagram, type },
-				},
-				null,
-				2,
-			),
+			text: JSON.stringify({ title, diagram }, null, 2),
 		});
 		const finishedAt = yield* Clock.currentTimeMillis;
 

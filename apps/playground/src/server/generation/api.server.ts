@@ -7,7 +7,6 @@ import {
 	type CodeModeIssue,
 	type CanonicalDiagramDocument,
 	canonicalDocumentFromDiagram,
-	flowchartDocumentIds,
 } from "@sketchi/diagram-agent";
 import {
 	type DiagramStyle,
@@ -18,11 +17,7 @@ import {
 	isSupportedGenerationModel,
 	WRONG_DIAGRAM_TYPE_ERROR,
 } from "@sketchi/diagram-generation";
-import {
-	FlowchartDiagramSchema,
-	decodeFlowchartDocument,
-	flowchartDiagramFromDocument,
-} from "@sketchi/diagram-core";
+import { decodeFlowchartDocument, flowchartDiagramFromDocument } from "@sketchi/diagram-core";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result, Schema } from "effect";
 
@@ -296,17 +291,12 @@ function baseDiagram(
 	}
 	const spec = base.spec as Readonly<Record<string, unknown>>;
 	if (base.type === "flowchart") {
-		// The generation model still writes a flowchart's drawn graph, so it revises one.
+		// A flowchart revises its document, which must still draw.
 		const document = decodeFlowchartDocument(base.spec);
 		if (Result.isFailure(document)) return undefined;
 		const built = flowchartDiagramFromDocument(document.success);
 		if (!built.ok) return undefined;
-		const {
-			style: _style,
-			metadata: _metadata,
-			...diagram
-		} = Schema.encodeSync(FlowchartDiagramSchema)(built.diagram);
-		return { diagram, id: built.diagram.id };
+		return { diagram: { type: "flowchart", ...document.success }, id: built.diagram.id };
 	}
 	return {
 		diagram: { type: base.type, ...spec },
@@ -516,7 +506,21 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 		return yield* finish(generationInput, wrongType);
 	}
 	const malformed = malformedCandidateFailure(candidate);
-	if (malformed || !candidate.diagram) {
+	const diagram = candidate.diagram;
+	// A revised diagram keeps the id of the record it replaces. A flowchart builds from the
+	// document the model wrote.
+	const document: CanonicalDiagramDocument | undefined =
+		diagram === undefined
+			? undefined
+			: diagram.type === "flowchart"
+				? candidate.flowchart && {
+						type: "flowchart",
+						spec: { ...candidate.flowchart, ...(base?.id === undefined ? {} : { id: base.id }) },
+					}
+				: canonicalDocumentFromDiagram(
+						base?.id === undefined ? diagram : { ...diagram, id: base.id },
+					);
+	if (malformed || !candidate.diagram || !document) {
 		return yield* finish(
 			generationInput,
 			malformed ??
@@ -545,10 +549,6 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 	}
 	const type: DiagramGenerationType = candidate.diagram.type;
 
-	// A revised diagram keeps the id of the record it replaces.
-	const document = canonicalDocumentFromDiagram(
-		base?.id === undefined ? candidate.diagram : { ...candidate.diagram, id: base.id },
-	);
 	const spec = document.spec;
 	const buildResult: BuildResult = yield* Effect.gen(function* () {
 		return yield* buildWithCodeMode(codeMode, document, {
@@ -563,27 +563,7 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 	const scene = inlineArtifact(buildResult.artifact, "scene");
 	const excalidraw = inlineArtifact(buildResult.artifact, "excalidraw");
 	// Styles reach the caller only when they apply to the built diagram; otherwise it draws unstyled.
-	// A drawn flowchart keys each element by its document id, and each edge by its two
-	// ends; a style may name the generated id of either.
-	const documentIds = (() => {
-		if (candidate.diagram.type !== "flowchart") return new Map<string, string>();
-		const ids = flowchartDocumentIds(candidate.diagram);
-		const node = (id: string) => ids.nodes.get(id) ?? id;
-		return new Map([
-			...ids.lanes,
-			...ids.groups,
-			...ids.nodes,
-			...candidate.diagram.edges.map(
-				(edge) => [edge.id, `${node(edge.source)}->${node(edge.target)}`] as const,
-			),
-		]);
-	})();
-	const operations = styleOperations(
-		(candidate.styles ?? []).map((style) => ({
-			...style,
-			targets: style.targets.map((target) => documentIds.get(target) ?? target),
-		})),
-	);
+	const operations = styleOperations(candidate.styles ?? []);
 	const styled =
 		operations.length === 0
 			? undefined

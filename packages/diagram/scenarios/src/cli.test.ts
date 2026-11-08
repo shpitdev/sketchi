@@ -6,6 +6,7 @@ import { Cause, Effect, Exit, Layer, Schema } from "effect";
 
 import { runScenarioCli, ScenarioCliUsageError, scenarioCliExitCode } from "./cli.js";
 import { ToolProcessSpawner, ToolProcessSpawnerLive } from "./internal/tool-process.js";
+import { scenarioFlowchartDocument } from "./lib/flowchart-document.js";
 import { getFlowchartScenario } from "./lib/scenarios.js";
 import { getSequenceScenario } from "./lib/sequence-scenarios.js";
 import { diagramScenarios } from "./lib/diagram-scenarios.js";
@@ -21,12 +22,10 @@ const ExecuteFixture = Schema.Struct({
 });
 
 const scenario = getFlowchartScenario("sketchi-onboarding-decision-flow");
+/** The response a generation model gives: a flowchart as its document. */
 function generatedEnvelope() {
-	const { title, ...diagram } = scenario.expectedDiagram;
-	return JSON.stringify({
-		title,
-		diagram,
-	});
+	const { title, ...document } = scenarioFlowchartDocument(scenario.expectedDiagram);
+	return JSON.stringify({ title, diagram: { type: "flowchart", ...document } });
 }
 
 function withCandidate(
@@ -570,17 +569,15 @@ describe("scenario CLI candidate decoding", () => {
 	] as const) {
 		it.live(`scores logos before placement repairs ${name}`, () => {
 			const target = getFlowchartScenario(scenarioId);
-			const { title, ...diagram } = target.expectedDiagram;
 			const modelIcons: Readonly<Record<string, string>> = icons;
-			const output = JSON.stringify({
-				title,
-				diagram: {
-					...diagram,
-					nodes: diagram.nodes.map(({ icon: _icon, ...node }) =>
-						modelIcons[node.id] ? { ...node, icon: { slug: modelIcons[node.id] } } : node,
-					),
-				},
+			const { title, ...document } = scenarioFlowchartDocument({
+				...target.expectedDiagram,
+				nodes: target.expectedDiagram.nodes.map(({ icon: _icon, ...node }) => {
+					const slug = modelIcons[node.id];
+					return slug ? { ...node, icon: { slug } } : node;
+				}),
 			});
+			const output = JSON.stringify({ title, diagram: { type: "flowchart", ...document } });
 			return withCandidate(output, (directory) =>
 				Effect.gen(function* () {
 					const reportPath = path.join(directory, "report.json");

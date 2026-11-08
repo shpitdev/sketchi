@@ -2,8 +2,9 @@
  * One worked example per family whose requests the CLI lost graded samples on: a tuning
  * scenario and the answer Haiku 5.5 gave that passed grading on all three samples, curated
  * only where it disagreed with a rule (the class answer drew an unstated aggregation; the
- * quadrant answer carried styles its request did not need). A typed request of one of these
- * families gets its example in place of the family's JSON shape.
+ * quadrant answer carried styles its request did not need). The flowchart answer is Haiku's,
+ * rewritten as the flowchart document. A typed request of one of these families gets its example
+ * in place of the family's JSON shape.
  */
 import type { DiagramTypeValue } from "@sketchi/diagram-core";
 
@@ -18,7 +19,7 @@ export const CURATED_EXAMPLES: Partial<Readonly<Record<DiagramTypeValue, Curated
 		request:
 			"Create a subscription renewal dunning flowchart. A renewal is due and the system charges payment. If payment succeeds, renew the subscription. If payment fails, send a reminder and decide whether payment was updated. Updated payment retries the charge. If not updated, decide whether the grace period has expired. Expired grace pauses the subscription; otherwise send another reminder.",
 		answer:
-			'{"title":"Subscription renewal dunning","diagram":{"id":"subscription-renewal-dunning","type":"flowchart","nodes":[{"id":"start","label":"Renewal due","kind":"start"},{"id":"charge","label":"Charge payment","kind":"process"},{"id":"paid","label":"Payment succeeded?","kind":"decision"},{"id":"renew","label":"Renew subscription","kind":"end"},{"id":"remind1","label":"Send payment reminder","kind":"process"},{"id":"updated","label":"Payment updated?","kind":"decision"},{"id":"grace","label":"Grace period expired?","kind":"decision"},{"id":"pause","label":"Pause subscription","kind":"end"},{"id":"remind2","label":"Send another reminder","kind":"process"}],"edges":[{"id":"e1","source":"start","target":"charge"},{"id":"e2","source":"charge","target":"paid"},{"id":"e3","source":"paid","target":"renew","label":"yes"},{"id":"e4","source":"paid","target":"remind1","label":"no"},{"id":"e5","source":"remind1","target":"updated"},{"id":"e6","source":"updated","target":"charge","label":"yes"},{"id":"e7","source":"updated","target":"grace","label":"no"},{"id":"e8","source":"grace","target":"pause","label":"yes"},{"id":"e9","source":"grace","target":"remind2","label":"no"},{"id":"e10","source":"remind2","target":"updated"}],"layout":{"direction":"TB","edgeRouting":"orthogonal"}}}',
+			'{"title":"Subscription renewal dunning","diagram":{"type":"flowchart","id":"subscription-renewal-dunning","nodes":{"due":"Renewal due","charge":"Charge payment","paid":"Payment succeeded?","renew":"Renew subscription","remind":"Send payment reminder","updated":"Payment updated?","grace":"Grace period expired?","pause":"Pause subscription","again":"Send another reminder"},"edges":[["due","charge"],["charge","paid"],["paid","renew","yes"],["paid","remind","no"],["remind","updated"],["updated","charge","yes"],["updated","grace","no"],["grace","pause","yes"],["grace","again","no"],["again","updated"]]}}',
 	},
 	// media-player-state-machine
 	"state-machine": {
