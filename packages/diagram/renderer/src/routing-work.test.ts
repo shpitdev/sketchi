@@ -307,10 +307,12 @@ describe("swimlane routing work", () => {
 });
 
 describe("zone routing work", () => {
-	// Measured: 2.12M checks for the four zone fixtures in LR and TB, and 16.4M for
+	// Measured: 2.78M checks for the four zone fixtures in LR and TB, and 24.3M for
 	// the two stress cases (zones four deep across two availability zones, and
-	// thirty services in eight zones), each wrapped where too long for one row or
-	// column; 2.08M and 16.3M before ends moved off rounded corners, 1.96M and
+	// thirty services in eight zones), each column wrapped where too long and each
+	// row keeping its zones side by side, its plans that hang a zone routed too
+	// where the row crosses lines; 2.22M and 22.4M while rows hung zones under one
+	// another, 2.08M and 16.3M before ends moved off rounded corners, 1.96M and
 	// 14.6M before the drawn layout's arrival polish. Testing
 	// each grid step only against the shapes its line runs through took the
 	// stress cases from 27.5M.
@@ -328,7 +330,7 @@ describe("zone routing work", () => {
 		const small = render(zoneFixtures);
 		const large = render(zoneStressFixtures);
 		expect(small).toBeGreaterThan(0);
-		expect(small).toBeLessThan(2_300_000);
-		expect(large).toBeLessThan(24_000_000);
+		expect(small).toBeLessThan(3_000_000);
+		expect(large).toBeLessThan(26_000_000);
 	});
 });
