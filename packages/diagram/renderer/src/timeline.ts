@@ -442,6 +442,48 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 				.map((item) => anchors[item.endKey]!.time - anchors[item.startKey]!.time),
 		);
 		const maxScale = longestSpan > 0 ? Math.max(comfortable, (2 * maxGap) / longestSpan) : Infinity;
+		// A crowded pair should not set the scale for the whole chronology: raised until
+		// one close pair clears, the scale can draw nearly every other gap past a break's
+		// length, so nearly every gap breaks. A pair raises the scale only as far as that
+		// marks fewer gaps than leaving it crowded, where it takes a break of its own. So
+		// the scale stops at the highest that marks the fewest gaps: those it draws past a
+		// break's length, which break, and the pairs still too close, which each take one.
+		const crowdCap = (() => {
+			const measured = distances();
+			const marksAt = (candidate: number) => {
+				const broken = new Set(breaks);
+				const breakPast = (limit: number) =>
+					gaps.forEach((gap, key) => {
+						if (gap * candidate > limit && !insideSpan(key)) broken.add(key);
+					});
+				const crowded = () =>
+					measured.filter(
+						({ from, to, min, fixed, perScale }) =>
+							fixed + perScale * candidate < min - 1e-6 &&
+							!gaps.slice(from, to).some((_, offset) => broken.has(from + offset)),
+					).length;
+				breakPast(broken.size ? 2 * breakLength : maxGap);
+				if (broken.size + crowded() > 0) breakPast(2 * breakLength);
+				return broken.size - breaks.size + crowded();
+			};
+			const candidates = [
+				...new Set([
+					comfortable,
+					...measured.flatMap(({ min, fixed, perScale }) =>
+						perScale > 0 && fixed < min ? [Math.min(maxScale, (min - fixed) / perScale)] : [],
+					),
+				]),
+			]
+				.filter((candidate) => candidate >= comfortable)
+				.toSorted((a, b) => b - a);
+			let cap = candidates[0]!;
+			let fewest = marksAt(cap);
+			for (const candidate of candidates.slice(1)) {
+				const marks = marksAt(candidate);
+				if (marks < fewest) [cap, fewest] = [candidate, marks];
+			}
+			return cap;
+		})();
 		let scale = comfortable;
 		for (;;) {
 			const kept = gaps.reduce((sum, gap, key) => sum + (breaks.has(key) ? 0 : gap), 0);
@@ -456,7 +498,7 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 			const needed = Math.max(
 				relaxed,
 				...measured.map(({ min, fixed, perScale }) =>
-					perScale > 0 && fixed < min ? (min - fixed) / perScale : 0,
+					perScale > 0 && fixed < min ? Math.min(crowdCap, (min - fixed) / perScale) : 0,
 				),
 			);
 			scale = Math.min(needed, maxScale);
@@ -717,7 +759,8 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 				const stroke = { strokeColor: tone.stroke, strokeWidth: 2 as const, roughness: 0 as const };
 				// Axis segments between breaks, then break ticks around each break's
 				// duration, and row continuations. A row that ends in a break draws all
-				// of it before the continuation.
+				// of it before the continuation. Every lane leaves the same gap, so a
+				// break's ticks line up across lanes under its one duration.
 				const rowBreaks = [...breaks]
 					.toSorted((a, b) => a - b)
 					.filter((key) => key >= rowLayout.row.first && key <= rowLayout.row.last)
@@ -753,17 +796,19 @@ export function renderTimelineDiagram(diagram: TimelineDiagram): RenderedDiagram
 							),
 							front,
 						);
-					push(
-						text(
-							`break-label:${suffix}:${index}`,
-							entry.text,
-							entry.x,
-							axisY,
-							BREAK_FONT_SIZE,
-							tone.ink,
-						),
-						front,
-					);
+					// Every lane breaks at the same moment, so the first lane states its time once.
+					if (laneIndex === 0)
+						push(
+							text(
+								`break-label:${suffix}:${index}`,
+								entry.text,
+								entry.x,
+								axisY,
+								BREAK_FONT_SIZE,
+								tone.ink,
+							),
+							front,
+						);
 				});
 				if (resumed)
 					push(
