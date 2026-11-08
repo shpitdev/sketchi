@@ -1,5 +1,5 @@
 import { searchIcons, type SearchableIcon } from "./search.js";
-import { isDistinctiveWord, isEverydayWord, termTokens, wordsOf } from "./terms.js";
+import { isDistinctiveWord, termTokens, wordsOf } from "./terms.js";
 
 /** Most catalog terms a prompt can offer one diagram. */
 export const MAX_TEXT_ICON_MATCHES = 24;
@@ -27,13 +27,11 @@ export interface IconMention<Icon extends SearchableIcon = SearchableIcon> {
 	 */
 	readonly distinctive: boolean;
 	/**
-	 * True when only being the capitalized first word of a label made it a name ("Python
-	 * worker"), which counts only where a diagram asks for logos.
+	 * True when only being the capitalized first word of a label made an English word a name
+	 * ("Python worker", "Sync the order"), which counts only where a diagram asks for logos.
 	 */
 	readonly labelInitial?: boolean;
-	/** A label-initial mention whose words all start step labels far more often ("Make"). */
-	readonly everyday?: boolean;
-	/** The lowercased word after a label-initial mention ("app" in "React app"). */
+	/** The lowercased word after a label-initial mention ("app" in "React app"), if any. */
 	readonly nextWord?: string;
 }
 
@@ -144,13 +142,11 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 			const earlier = best ? seen.get(best.slug) : undefined;
 			if (best && earlier === undefined) {
 				seen.set(best.slug, mentions.length);
-				const everyday = labelInitial && phraseTokens.every((token) => isEverydayWord(token.lower));
 				const nextWord = labelInitial ? tokens[start + length]?.lower : undefined;
 				mentions.push({
 					icon: best,
 					distinctive,
 					...(labelInitial ? { labelInitial } : {}),
-					...(everyday ? { everyday } : {}),
 					...(nextWord ? { nextWord } : {}),
 				});
 			} else if (best && distinctive && earlier !== undefined) {
@@ -192,39 +188,46 @@ export function logoNamedByLabel<Icon extends SearchableIcon>(
 export interface LabelLogos<Icon extends SearchableIcon = SearchableIcon> {
 	/**
 	 * Every catalog logo the label names, unmistakable names first ("Next.js app hosted on
-	 * Vercel" names nextjs, then vercel), then names an everyday word carries only by its
+	 * Vercel" names nextjs, then vercel), then names an English word carries only by its
 	 * capitals ("Log errors to Sentry", "Python worker"). The diagram draws the first.
 	 */
 	readonly named: readonly Icon[];
 	/**
-	 * A product the label's first word may mean, when that word starts step labels far more
-	 * often ("Make payment", "Go to checkout"); it draws nothing unless an icon names it.
+	 * A product an English first word may mean when the label reads as a step ("Make payment",
+	 * "Sync the order"); it draws nothing unless an icon names it.
 	 */
 	readonly possible: readonly Icon[];
 }
 
-/** Words that, after an everyday first word, show the label names software ("React app"). */
+/** Words that, after an English first word, show the label names software ("React app"). */
 const TECH_NOUNS: ReadonlySet<string> = new Set(
 	[
 		"api",
 		"app",
 		"backend",
+		"broker",
+		"bucket",
+		"cache",
 		"client",
 		"cluster",
 		"database",
 		"frontend",
 		"function",
+		"gateway",
 		"job",
+		"pipeline",
+		"queue",
 		"sdk",
 		"server",
 		"service",
+		"topic",
 		"worker",
 	].flatMap((noun) => [noun, `${noun}s`]),
 );
 
 /**
  * Marks a tech noun never rescues. Google Cloud's generic service marks ("Storage",
- * "Compute", "Batch") would read "Storage service" as that one product, and some everyday
+ * "Compute", "Batch") would read "Storage service" as that one product, and some English
  * words name a generic technology before a tech noun ("Edge function", "Stream worker").
  */
 const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set(["gcp", "gcp-legacy"]);
@@ -235,10 +238,13 @@ const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
 	"stream",
 ]);
 
-/** An everyday first word the next word shows is the product ("React app", "Spring service"). */
-function namesSoftware(mention: IconMention): boolean {
+/**
+ * Whether an English first word names the product: the label is only the name ("Python"), or
+ * a tech noun follows it ("React app", "Spring service").
+ */
+function namesProduct(mention: IconMention): boolean {
+	if (mention.nextWord === undefined) return true;
 	return (
-		mention.nextWord !== undefined &&
 		TECH_NOUNS.has(mention.nextWord) &&
 		!GENERIC_COLLECTIONS.has(mention.icon.collection) &&
 		!GENERIC_TECH_SLUGS.has(mention.icon.slug)
@@ -251,7 +257,10 @@ export function labelLogos<Icon extends SearchableIcon>(
 	icons: readonly Icon[],
 ): LabelLogos<Icon> {
 	const mentions = matchIconMentions(label, icons, MAX_TEXT_ICON_MATCHES, { labelInitial: true });
-	const step = (mention: IconMention<Icon>) => mention.everyday === true && !namesSoftware(mention);
+	// A first word that is an English word reads as a step unless the label shows it is a name;
+	// a name that is no English word ("Kafka", "Kubernetes") is distinctive and always counts.
+	const step = (mention: IconMention<Icon>) =>
+		mention.labelInitial === true && !namesProduct(mention);
 	return {
 		named: [
 			...mentions.filter((mention) => mention.distinctive),

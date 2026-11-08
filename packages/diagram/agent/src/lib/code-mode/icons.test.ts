@@ -519,6 +519,30 @@ describe("named logo fill", () => {
 		});
 	});
 
+	it("keeps a payment flow's steps clean when the document asks for logos", async () => {
+		const result = await production().buildFlowchart({
+			spec: {
+				title: "Payment processing",
+				logos: true,
+				nodes: {
+					a: "Validate the card",
+					b: "Look up the user ID",
+					c: "Sync the order to the warehouse",
+				},
+				edges: [
+					["a", "b"],
+					["b", "c"],
+				],
+			},
+		});
+
+		expect(nodeLogos(result)).toEqual([undefined, undefined, undefined]);
+		expect(result.issues.map((issue) => [issue.code, issue.ref?.id])).toEqual([
+			["icon_possible", "c"],
+		]);
+		expect(result.issues[0]?.hint).toBe('If it means Sync, set icon: "Sync".');
+	});
+
 	it("draws a product that starts a label, and leaves a step word that starts one to an icon", async () => {
 		const result = await production().buildFlowchart({
 			spec: chain([

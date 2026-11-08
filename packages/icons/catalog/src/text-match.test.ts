@@ -3,11 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { iconManifest, nodeLogoIcons } from "./catalog";
-import {
-	catalogCommonWords,
-	EVERYDAY_WORD_SIZES,
-	loadCommonEnglishWords,
-} from "./common-words-generation";
+import { catalogCommonWords, loadCommonEnglishWords } from "./common-words-generation";
 import { GENERIC_PROMPTS } from "./generic-prompts";
 import {
 	labelLogos,
@@ -160,44 +156,50 @@ describe("labelLogos", () => {
 		expect(named("Retry later, i.e. after a backoff")).toEqual([]);
 	});
 
-	it("names a product that starts a label unless that word usually names a step", () => {
+	it("names a first word that is no English word wherever it stands", () => {
+		expect(named("Terraform applies the plan")).toEqual(["terraform"]);
+		expect(named("Kubernetes rolls out the release")).toEqual(["kubernetes"]);
+		expect(named("Postgres stores the order")).toEqual(["postgresql"]);
+	});
+
+	it("names an English first word only as a whole label or before a tech noun", () => {
 		expect(named("Python worker")).toEqual(["python"]);
 		expect(named("Angular app")).toEqual(["angular"]);
 		expect(named("Azure Functions")).toEqual(["azure"]);
-		expect(named("Playwright tests")).toEqual(["playwright"]);
-		for (const label of ["Make payment", "Go to checkout", "Next step", "Swift review"]) {
-			expect(named(label), label).toEqual([]);
-		}
-		expect(possible("Make payment")).toEqual(["make"]);
-		expect(possible("React to incident")).toEqual(["react"]);
-		expect(possible("Go to checkout")).toEqual(["go"]);
-		expect(possible("Render the page")).toEqual(["render"]);
-		expect(possible("Python worker")).toEqual([]);
-	});
-
-	it("names an everyday first word that a tech noun shows is the product", () => {
 		expect(named("React app")).toEqual(["react"]);
 		expect(named("Spring service")).toEqual(["spring"]);
 		expect(named("Go worker")).toEqual(["go"]);
 		expect(named("Linear API")).toEqual(["linear"]);
 		expect(named("Next frontend")).toEqual(["nextjs"]);
-		// A generic service mark or a generic technology stays a note.
+		expect(named("Redis cache")).toEqual(["redis"]);
+		expect(named("Python")).toEqual(["python"]);
+		for (const label of ["Make payment", "Go to checkout", "Next step", "React to incident"]) {
+			expect(named(label), label).toEqual([]);
+			expect(possible(label), label).toHaveLength(1);
+		}
+		// A generic service mark or a generic technology stays a note before a tech noun too.
 		for (const label of ["Storage service", "Batch job", "Edge function", "Stream worker"]) {
 			expect(named(label), label).toEqual([]);
 			expect(possible(label), label).toHaveLength(1);
 		}
 	});
-});
 
-describe("everyday catalog words", () => {
-	it("match SCOWL size 10 for the current catalog", () => {
-		const generated: unknown = JSON.parse(
-			readFileSync(new URL("./generated/everyday-words.json", import.meta.url), "utf8"),
-		);
-		// Regenerate with `nx run icon-catalog:generate-catalog`.
-		expect(generated).toEqual(
-			catalogCommonWords(iconManifest.icons, loadCommonEnglishWords(EVERYDAY_WORD_SIZES)),
-		);
+	it("keeps generic payment steps clean", () => {
+		for (const label of [
+			"Validate the card",
+			"Look up the user ID",
+			"Sync the order to the warehouse",
+			"Charge the card",
+			"Capture the payment",
+			"Refund the order",
+			"Notify the customer",
+			"Retry the charge",
+			"Record the payment",
+			"Send the receipt",
+		]) {
+			expect(named(label), label).toEqual([]);
+		}
+		expect(possible("Sync the order to the warehouse")).toEqual(["sync"]);
 	});
 });
 

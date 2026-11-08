@@ -210,7 +210,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"packages/diagram/ui/src/lib/browser-actions.ts": 3,
 	"packages/diagram/ui/src/lib/load-excalidraw.ts": 2,
 	"packages/icons/catalog/scripts/build-node-logos.ts": 14,
-	"packages/icons/catalog/scripts/generate-catalog.ts": 10,
+	"packages/icons/catalog/scripts/generate-catalog.ts": 8,
 	"packages/observability/src/lib/effect-telemetry.ts": 5,
 	"packages/observability/vitest.config.mts": 1,
 	"packages/studio/projects/src/client-api.ts": 20,
