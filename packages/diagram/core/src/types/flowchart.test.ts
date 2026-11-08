@@ -438,7 +438,6 @@ describe("flowchart lanes", () => {
 			["duplicate_lane_id", { kind: "lane", id: "author", path: "lanes" }],
 			["unknown_node_lane", { kind: "node", id: "draft", path: "nodes.lane" }],
 			["unknown_node_lane", { kind: "node", id: "review", path: "nodes.lane" }],
-			["empty_lane", { kind: "lane", id: "spare", path: "lanes" }],
 		]);
 		expect(issues[3]?.hint).toBe(
 			'Set lane to the declared lane id ("author", "reviewer", "spare") of the actor that does this step.',

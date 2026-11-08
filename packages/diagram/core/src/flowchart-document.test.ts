@@ -460,13 +460,32 @@ describe("flowchart documents", () => {
 			["lanes_with_groups", "groups"],
 			["node_without_lane", "nodes.screen.lane"],
 			["unknown_node_lane", "nodes.offer.lane"],
-			["empty_lane", "lanes.manager"],
 		]);
 		expect(
 			issues({ ...document, lanes: undefined } as unknown as FlowchartDocument).map(
 				([code]) => code,
 			),
 		).toEqual(["unknown_node_lane", "unknown_node_lane", "unknown_node_lane"]);
+	});
+
+	it("keeps a named recipient lane empty instead of assigning it the sender's action", () => {
+		const diagram = build({
+			title: "On-call response",
+			nodes: {
+				alert: { label: "See alert", lane: "monitoring" },
+				page: { label: "Page on-call engineer", lane: "monitoring" },
+				fix: { label: "Fix service", lane: "engineer" },
+				tell: { label: "Tell customer incident is resolved", lane: "monitoring" },
+			},
+			edges: [
+				["alert", "page"],
+				["page", "fix"],
+				["fix", "tell"],
+			],
+			lanes: { monitoring: "Monitoring lead", engineer: "On-call engineer", customer: "Customer" },
+		});
+		expect(diagram.lanes?.map(({ id }) => id)).toEqual(["monitoring", "engineer", "customer"]);
+		expect(diagram.nodes.find(({ id }) => id === "tell")?.lane).toBe("monitoring");
 	});
 
 	it("names unknown ends with the nearest ids, and every graph problem", () => {

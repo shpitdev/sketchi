@@ -47,12 +47,13 @@ const spec = {
 
 describe("Code Mode flowchart lanes", () => {
 	it("builds declared lanes into locked bands that hold their steps", async () => {
-		const built = await build(spec);
+		const built = await build({ ...spec, lanes: { ...spec.lanes, customer: "Customer" } });
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
 		expect(built.normalizedSpec.lanes).toEqual({
 			employee: "Employee",
 			manager: "Manager",
 			finance: "Finance",
+			customer: "Customer",
 		});
 		const drawn = flowchartDiagramFromDocument(built.normalizedSpec);
 		if (!drawn.ok) throw new Error(JSON.stringify(drawn.issues));
@@ -68,6 +69,10 @@ describe("Code Mode flowchart lanes", () => {
 		const excalidraw = built.artifact.formats.find((format) => format.format === "excalidraw")
 			?.inline as Parameters<typeof validateExcalidrawScene>[0];
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
+		expect(excalidraw.elements.find((element) => element.id === "lane:customer")).toMatchObject({
+			type: "rectangle",
+			locked: true,
+		});
 		const band = excalidraw.elements.find((element) => element.id === "lane:manager");
 		expect(band).toMatchObject({ type: "rectangle", locked: true, roundness: null });
 		expect(
@@ -92,10 +97,6 @@ describe("Code Mode flowchart lanes", () => {
 			expect.objectContaining({
 				code: "unknown_node_lane",
 				ref: { kind: "node", id: "pay", path: "spec.nodes.pay.lane" },
-			}),
-			expect.objectContaining({
-				code: "empty_lane",
-				ref: expect.objectContaining({ id: "finance" }),
 			}),
 		]);
 	});

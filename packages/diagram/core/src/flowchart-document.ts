@@ -561,16 +561,6 @@ function laneContainment(
 			nodeLane.set(node, lane);
 		}
 	}
-	const used = new Set(nodeLane.values());
-	for (const id of laneIds) {
-		if (used.has(id)) continue;
-		issues.push({
-			code: "empty_lane",
-			ref: { kind: "lane", id, path: `lanes.${id}` },
-			message: `Lane "${id}" holds no node.`,
-			hint: "Set the lane of the steps its actor does to it, or remove the lane.",
-		});
-	}
 	return nodeLane;
 }
 

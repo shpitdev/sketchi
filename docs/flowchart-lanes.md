@@ -11,11 +11,12 @@ Pass this to `sketchi create --json`, or its `spec` to `sketchi.buildFlowchart`.
 ## Contract
 
 - `lanes` maps an id to its label, in drawing order, at most 8. It only declares and orders the lanes.
+- A named actor with no stated action keeps an empty lane; never assign it a step done by someone else.
 - Every node names its own lane, questions too: `{ label, lane }`, the lane of whoever does the step. "Notify customer of backorder", done by Sales, names `sales`, not the customer it acts on. A lane edit is a node change: `{ op: "set", nodes: { backorder: { lane: "warehouse" } } }`.
 - The layout direction orients the lanes: `LR` draws rows stacked top to bottom with their headers on the left, `TB` columns side by side with their headers on top.
 - Lanes and groups never mix: lanes already say who does each step, and a group inside or across lanes would cut the bands apart.
 
-Builds reject a node that names no lane (`node_without_lane`, with the lane ids in its hint), a node that names a lane the flowchart doesn't declare (`unknown_node_lane`), a lane no node names (`empty_lane`), lanes declared with groups (`lanes_with_groups`) and more than 8 lanes (`flowchart_too_large`). A flowchart without lanes renders exactly as before.
+Builds reject a node that names no lane (`node_without_lane`, with the lane ids in its hint), a node that names a lane the flowchart doesn't declare (`unknown_node_lane`), lanes declared with groups (`lanes_with_groups`) and more than 8 lanes (`flowchart_too_large`). A flowchart without lanes renders exactly as before.
 
 ## Layout
 

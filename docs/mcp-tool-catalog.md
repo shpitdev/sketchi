@@ -486,7 +486,7 @@ A group's `contains` names nodes and other groups, at any depth, and Sketchi der
 the tree, so a node listed by both a region and the VPC inside it sits in the VPC.
 A group that no other group lists sits inside the smallest group holding all its
 nodes. Lanes are the other way round: `lanes` only declares and orders them, and
-every node names its own `lane`, the lane of whoever does it. Lanes never mix with
+every node names its own `lane`, the lane of whoever does it. A named actor with no stated action keeps an empty lane. Lanes never mix with
 groups.
 
 With `logos`, every node whose label names a product draws its logo, written with or
@@ -521,8 +521,7 @@ naming the nearest declared ids:
   another id with spaces around it (`duplicate_node_id`, `duplicate_group_id`, `duplicate_lane_id`);
 - a container lists an unknown id (`unknown_member`), two containers that do not nest
   share a member (`overlapping_containers`), groups nest in a cycle (`group_cycle`),
-  a node names no lane (`node_without_lane`) or an undeclared one (`unknown_node_lane`), a lane
-  holds no node (`empty_lane`), or lanes are mixed with groups (`lanes_with_groups`);
+  a node names no lane (`node_without_lane`) or an undeclared one (`unknown_node_lane`), or lanes are mixed with groups (`lanes_with_groups`);
 - fewer than two nodes or no edge (`flowchart_too_small`), or more than 80 nodes, 120
   drawn edges, 8 groups, 8 lanes or 4 levels of nesting (`flowchart_too_large`, with status
   `limit_exceeded`). Edges are counted with each list end expanded, before any is drawn.

@@ -44,7 +44,6 @@ export const FlowchartValidationIssueCodeSchema = Schema.Literals([
 	"shaped_decision",
 	"duplicate_lane_id",
 	"unknown_node_lane",
-	"empty_lane",
 	"lanes_with_groups",
 	"invalid_id",
 	"duplicate_edge",
@@ -240,7 +239,7 @@ function groupNestingIssues(diagram: FlowchartDiagram): FlowchartValidationIssue
 
 /**
  * Lane problems, each with its repair: too many lanes, a repeated lane id, a
- * node in an undeclared lane or in none, a lane with no nodes, and lanes
+ * node in an undeclared lane or in none, and lanes
  * declared together with groups.
  */
 function laneIssues(diagram: FlowchartDiagram): FlowchartValidationIssue[] {
@@ -299,15 +298,6 @@ function laneIssues(diagram: FlowchartDiagram): FlowchartValidationIssue[] {
 				node.lane === undefined
 					? `Set lane to the declared lane id (${declared}) of the actor that does this step.`
 					: `Set lane to a declared lane id (${declared}) or declare "${node.lane}" in lanes.`,
-		});
-	}
-	const used = new Set(diagram.nodes.map((node) => node.lane));
-	for (const lane of lanes.filter((lane) => !used.has(lane.id))) {
-		issues.push({
-			code: "empty_lane",
-			ref: { kind: "lane", id: lane.id, path: "lanes" },
-			message: `Lane "${lane.id}" has no nodes.`,
-			hint: "Set lane on the steps this actor does, or remove the lane.",
 		});
 	}
 	return issues;
