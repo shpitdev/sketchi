@@ -112,7 +112,9 @@ export function readTimelineAxis(scene: RenderedDiagramScene): readonly Timeline
 			const marks = new Map<string, number[]>();
 			for (const tick of ticks) marks.set(tick.key, [...(marks.get(tick.key) ?? []), tick.x]);
 			return [...marks].map(([key, xs]): TimelineBreakReadout => {
-				const label = breakLabels.get(key);
+				// Every lane breaks at the same moments; the first lane states each one's time.
+				const label =
+					breakLabels.get(key) ?? breakLabels.get(key.replace(/^break:\d+:/u, "break:0:"));
 				const duration = label === undefined ? undefined : statedDuration(label);
 				return {
 					at: at(entry, xs.reduce((sum, value) => sum + value, 0) / xs.length),

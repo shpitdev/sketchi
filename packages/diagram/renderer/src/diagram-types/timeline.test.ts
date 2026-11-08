@@ -40,6 +40,50 @@ function box(element: CanvasTextElement) {
 	};
 }
 
+/** #701: a five-lane, 40-event project about six weeks apart, with operations opening a day apart. */
+const TRAM_PROJECT: readonly (readonly [date: string, label: string, lane: string])[] = [
+	["2024-01-15", "Feasibility study starts", "Planning"],
+	["2024-03-04", "Public consultation opens", "Planning"],
+	["2024-04-29", "Consultation closes", "Planning"],
+	["2024-06-10", "Route options published", "Planning"],
+	["2024-07-22", "Preferred route chosen", "Planning"],
+	["2024-09-02", "Environmental survey begins", "Planning"],
+	["2024-10-14", "Funding bid submitted", "Planning"],
+	["2024-12-09", "Federal grant awarded", "Planning"],
+	["2025-01-20", "Design consultants hired", "Design"],
+	["2025-02-17", "Station locations fixed", "Design"],
+	["2025-03-31", "Land acquisition starts", "Design"],
+	["2025-05-12", "Utility relocation begins", "Construction"],
+	["2025-06-23", "Preliminary design approved", "Design"],
+	["2025-08-04", "Main contractor selected", "Design"],
+	["2025-09-15", "Groundbreaking ceremony", "Construction"],
+	["2025-10-27", "Depot construction begins", "Construction"],
+	["2025-12-08", "First track section laid", "Construction"],
+	["2026-01-19", "Bridge foundations poured", "Construction"],
+	["2026-03-02", "Tunnel boring starts", "Construction"],
+	["2026-04-13", "First station roof completed", "Construction"],
+	["2026-05-25", "Signalling contract signed", "Design"],
+	["2026-07-06", "Tunnel breakthrough", "Construction"],
+	["2026-08-17", "Overhead power lines installed", "Construction"],
+	["2026-09-28", "First trams delivered", "Systems"],
+	["2026-11-09", "Depot handed over", "Systems"],
+	["2026-12-21", "Track welding complete", "Systems"],
+	["2027-02-01", "Power-on testing", "Systems"],
+	["2027-03-15", "First test run", "Systems"],
+	["2027-04-26", "Driver training begins", "Systems"],
+	["2027-06-07", "Ticketing system live", "Systems"],
+	["2027-07-19", "Safety certification granted", "Systems"],
+	["2027-08-30", "Trial operations start", "Systems"],
+	["2027-10-11", "Accessibility audit passed", "Systems"],
+	["2027-11-22", "Opening ceremony", "Operations"],
+	["2027-11-23", "Passenger service begins", "Operations"],
+	["2028-01-10", "Timetable expanded to 7 minutes", "Operations"],
+	["2028-03-20", "Park-and-ride lot opens", "Operations"],
+	["2028-05-01", "One millionth passenger", "Operations"],
+	["2028-07-03", "Northern extension approved", "Operations"],
+	["2028-09-11", "First-year review published", "Operations"],
+];
+
 /** Rows of a wrapped timeline: every row but the last ends in a continuation on each lane. */
 const rows = (scene: RenderedDiagramScene) =>
 	lines(scene).filter((line) => line.id.startsWith("continue-out:0:")).length + 1;
@@ -656,6 +700,40 @@ describe("native timeline layout", () => {
 		expect(lines(scene).some((line) => line.id.startsWith("break:"))).toBe(true);
 		expectHonestMarkers(diagram, scene);
 		expectToScale(diagram, scene);
+		expectReadableLayout(scene);
+	});
+
+	it("breaks a lone close pair once instead of nearly every gap on every lane", () => {
+		const lanes = ["Planning", "Design", "Construction", "Systems", "Operations"];
+		const project = (opening: string) =>
+			timeline(
+				TRAM_PROJECT.map(([date, label, lane], index) => ({
+					id: `e${index}`,
+					label,
+					date: label === "Passenger service begins" ? opening : date,
+					lane,
+				})),
+				{ lanes },
+			);
+		const apart = renderDiagram(project("2027-12-06"));
+		const diagram = project("2027-11-23");
+		const scene = renderDiagram(diagram);
+		// The one-day pair used to set the scale, breaking 38 gaps on all five lanes: 950 elements.
+		expect(lines(apart).some((line) => line.id.startsWith("break:"))).toBe(false);
+		expect(scene.elements.length).toBeLessThanOrEqual(210);
+		expect(scene.elements.length - apart.elements.length).toBeLessThanOrEqual(2 * lanes.length + 6);
+		// Its one break draws its ticks on every lane and states its time once.
+		expect(
+			texts(scene)
+				.filter((element) => element.id.startsWith("break-label:"))
+				.map((element) => element.text),
+		).toEqual(["24 hours"]);
+		expect(lines(scene).filter((line) => line.id.startsWith("break:"))).toHaveLength(
+			2 * lanes.length,
+		);
+		expectToScale(diagram, scene);
+		expectGapOrder(diagram, scene);
+		expectHonestMarkers(diagram, scene);
 		expectReadableLayout(scene);
 	});
 

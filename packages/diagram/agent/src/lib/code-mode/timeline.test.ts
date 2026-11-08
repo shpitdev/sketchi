@@ -144,8 +144,8 @@ describe("Code Mode timeline size", () => {
 			{ length: TIMELINE_MAX_LANES },
 			(_, index) => `Workstream ${index + 1}`,
 		);
-		// Six weeks apart but for one pair on a lane a day apart, which spreads the axis so
-		// that it breaks between the others, on every lane.
+		// Six weeks apart but for one pair on a lane a day apart. That pair once set the scale
+		// and broke the axis between nearly every other pair, on every lane: 1,668 elements.
 		let day = Date.UTC(2024, 0, 15);
 		const events = Array.from({ length: TIMELINE_MAX_EVENTS }, (_, index) => {
 			day += (index === 31 ? 1 : 42) * 86_400_000;
@@ -162,8 +162,8 @@ describe("Code Mode timeline size", () => {
 		const scene = result.artifact.formats.find((format) => format.format === "scene")?.inline as {
 			readonly elements: readonly unknown[];
 		};
-		// Over the canvas's old 600-element limit, which turned such timelines away.
-		expect(scene.elements.length).toBeGreaterThan(600);
 		expect(scene.elements.length).toBeLessThanOrEqual(CANVAS_LIMITS.maxElements);
+		// The pair now takes one break of its own.
+		expect(scene.elements.length).toBeLessThan(400);
 	});
 });
