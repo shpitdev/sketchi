@@ -224,7 +224,7 @@ function wrongTypeFailure(candidate: DiagramGenerationCandidate): GenerateFailur
 	]);
 }
 
-function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFailure {
+export function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFailure {
 	const issues = result.issues.map((entry) =>
 		issue(entry.code, "build", entry.message, entry.hint ?? "Refine the prompt and retry."),
 	);
@@ -233,6 +233,17 @@ function buildFailure(result: Extract<BuildResult, { ok: false }>): GenerateFail
 		return failure("limit_exceeded", issues);
 	}
 	switch (result.status) {
+		// So is a drawing too large for one canvas. As with a family limit, repair could only
+		// fit it by dropping what the request states, so the caller splits the request.
+		case "limit_exceeded":
+			return failure(
+				"limit_exceeded",
+				issues.map((entry) =>
+					entry.code === "canvas_limit_exceeded"
+						? { ...entry, hint: "Split the request into smaller diagrams." }
+						: entry,
+				),
+			);
 		case "invalid_input":
 		case "invalid_flowchart":
 		case "invalid_mindmap":

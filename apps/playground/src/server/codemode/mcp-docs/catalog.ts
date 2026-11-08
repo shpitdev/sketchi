@@ -1,5 +1,6 @@
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import {
+	CANVAS_LIMITS,
 	CHART_RULES,
 	CLASS_RULES,
 	ER_RULES,
@@ -1053,7 +1054,7 @@ export const catalog: CatalogEntry[] = [
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",
 			"CanvasSpec does not accept SVG, HTML, scripts, data URLs, external URLs, or executable payloads. Use only the typed primitives in the contract.",
-			"Limits: 600 elements, 64 layers, 128 layout primitives, 256 points per element, 16 groups per element, 4096 characters per text element, 16384 canvas units per dimension, and 1.5 MB serialized input.",
+			`Limits: ${CANVAS_LIMITS.maxElements} elements (${CANVAS_LIMITS.maxExportedElements} once exported to Excalidraw, where a composed shape counts several), ${CANVAS_LIMITS.maxLayers} layers, ${CANVAS_LIMITS.maxLayouts} layout primitives, ${CANVAS_LIMITS.maxPointsPerElement} points per element, ${CANVAS_LIMITS.maxGroupsPerElement} groups per element, ${CANVAS_LIMITS.maxTextLength} characters per text element, ${CANVAS_LIMITS.maxDimension} canvas units per dimension, and ${CANVAS_LIMITS.maxSerializedBytes / 1_000_000} MB serialized input. These are ceilings, not targets: a canvas reads best well under them, and a crowded one reads better split.`,
 			"Use applyDiagramPatch structural operations for iterative edits without regenerating the whole scene.",
 			"The repository examples include executable dashboard/chart, wireframe, and dense 120-element cases.",
 			"",

@@ -17,7 +17,8 @@ import { describe, expect, it } from "vitest";
 import { aiEnvironment } from "../bindings/ai-env.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
-import { handleGenerateDiagramRequest } from "./api.server";
+import { resultHttpStatus } from "../runtime/http-status.server";
+import { buildFailure, handleGenerateDiagramRequest } from "./api.server";
 
 const flowchartIr = {
 	id: "generated-release-flow",
@@ -622,6 +623,41 @@ describe("public generate endpoint", () => {
 			status: "limit_exceeded",
 			issues: [{ code: "mindmap_too_large", stage: "build" }],
 		});
+	});
+
+	it("answers a drawing too large for one canvas as a limit, never a render failure", () => {
+		// What a builder returns when its scene overflows the canvas: a timeline's chronology
+		// can pass its family's limits and still draw more elements than a canvas holds, and
+		// a builder reports that as a limit.
+		const result = buildFailure({
+			ok: false,
+			status: "limit_exceeded",
+			issues: [
+				{
+					code: "canvas_limit_exceeded",
+					severity: "error",
+					stage: "canvas",
+					ref: { kind: "request", path: "elements" },
+					message: "Canvas has 5200 elements, more than the 5000 it may hold.",
+					hint: "Split the chronology into smaller timelines and retry buildTimeline.",
+				},
+			],
+		});
+
+		expect(result).toEqual({
+			ok: false,
+			status: "limit_exceeded",
+			issues: [
+				{
+					code: "canvas_limit_exceeded",
+					severity: "error",
+					stage: "build",
+					message: "Canvas has 5200 elements, more than the 5000 it may hold.",
+					hint: "Split the request into smaller diagrams.",
+				},
+			],
+		});
+		expect(resultHttpStatus(result)).toBe(413);
 	});
 
 	it("reports the model calls, time and tokens a generation took", async () => {

@@ -204,6 +204,11 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 				message: "This draft needs another pass before it is ready.",
 				hint: "Ask Sketchi to simplify the flow or try a shorter description.",
 			};
+		case "limit_exceeded":
+			return {
+				message: "This diagram is too large to draw on one canvas.",
+				hint: "Split it into smaller diagrams.",
+			};
 		case "render_failed":
 			return {
 				message: "The diagram could not be drawn this time.",

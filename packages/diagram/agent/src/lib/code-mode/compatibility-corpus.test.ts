@@ -420,6 +420,8 @@ function isApprovedCanvasArrayAddition(value: string): boolean {
 		value === "png_unavailable" ||
 		// MCP logo fill reports icon_filled with a new info severity.
 		value === "info" ||
+		// A patch that grows a scene past a canvas limit is a limit (413), not a render failure.
+		value === "limit_exceeded" ||
 		CANVAS_ARROWHEAD_ADDITIONS.has(value)
 	);
 }
@@ -489,7 +491,8 @@ function normalizeCanvasMigrationAgainstFrozen(value: unknown, frozen: unknown):
 					(key === "maxItems" &&
 						value["minItems"] === 2 &&
 						entry === CANVAS_LIMITS.maxPointsPerElement &&
-						!Object.hasOwn(frozen, key))
+						!Object.hasOwn(frozen, key)) ||
+					(key === "limit_exceeded" && entry === 413 && !Object.hasOwn(frozen, key))
 				) {
 					return [];
 				}
@@ -907,6 +910,7 @@ const httpStatusMappings = {
 		invalid_input: 400,
 		invalid_flowchart: 422,
 		quality_failed: 422,
+		limit_exceeded: 413,
 		render_failed: 500,
 		export_failed: 500,
 		storage_failed: 500,
@@ -916,6 +920,7 @@ const httpStatusMappings = {
 		invalid_input: 400,
 		invalid_mindmap: 422,
 		quality_failed: 422,
+		limit_exceeded: 413,
 		render_failed: 500,
 		export_failed: 500,
 		storage_failed: 500,
@@ -935,6 +940,7 @@ const httpStatusMappings = {
 		target_not_found: 404,
 		unsupported_operation: 422,
 		connectivity_changed: 422,
+		limit_exceeded: 413,
 		render_failed: 500,
 		export_failed: 500,
 		storage_failed: 500,

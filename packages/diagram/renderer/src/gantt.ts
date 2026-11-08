@@ -1,5 +1,4 @@
 import {
-	CANVAS_LIMITS,
 	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
 	formatGanttDay,
@@ -131,6 +130,12 @@ const MIN_PLOT_WIDTH = 640;
 const MAX_ASPECT = 2.2;
 /** Charts this tall repeat the axis under their rows. */
 const BOTTOM_AXIS_ROWS = 16;
+/**
+ * A chart with more elements than this, counting every rule piece a label breaks,
+ * reads as crowded, so it thins its rules: minor lines, the repeated bottom axis,
+ * then gridlines inside bands. A readability rule, well under the canvas's limit.
+ */
+const RULED_ELEMENT_BUDGET = 600;
 /** Routes keep this far above and below bars, and farther beside them. */
 const BAR_CLEARANCE = 4;
 const BAR_SIDE_CLEARANCE = 8;
@@ -2477,8 +2482,8 @@ function layoutAt(
 	);
 
 	/*
-	 * Rules break around every label they pass behind, and a scene holds at most
-	 * CANVAS_LIMITS.maxElements elements. Take the richest plan that fits: every
+	 * Rules break around every label they pass behind, and a chart past
+	 * RULED_ELEMENT_BUDGET elements reads as crowded. Take the richest plan within it: every
 	 * tick's gridline, the bottom axis on a tall chart, and weekly or monthly minor
 	 * lines; then fewer.
 	 */
@@ -2575,7 +2580,7 @@ function layoutAt(
 			const count = rules.reduce((sum, rule) => sum + (pieces.get(rule.id)?.length ?? 1), 0);
 			return (
 				builder.elements.length + count + (candidate.bottom ? bottomAxisCount : 0) <=
-				CANVAS_LIMITS.maxElements
+				RULED_ELEMENT_BUDGET
 			);
 		}) ?? [plans.at(-1)!, false];
 	if (plan.bottom) drawAxis("bottom");

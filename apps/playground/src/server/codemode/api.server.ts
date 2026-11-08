@@ -19,6 +19,7 @@ import {
 	type BuildChartResult,
 	type CreateCanvasResult,
 	type StoredArtifactFormat,
+	CANVAS_LIMITS,
 } from "@sketchi/diagram-agent";
 import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import { withTelemetryCorrelation } from "@sketchi/observability";
@@ -36,6 +37,11 @@ import { resultHttpStatus } from "../runtime/http-status.server";
 import { codeModeUsageResponseHeaders, PlaygroundCodeModeUsage } from "./usage-events.server";
 
 export const MAX_CODE_MODE_BUILD_REQUEST_BYTES = 256 * 1024;
+/**
+ * A canvas build or patch carries a CanvasSpec or scene of up to the canvas's serialized
+ * limit, with room for the request around it.
+ */
+export const MAX_CANVAS_REQUEST_BYTES = CANVAS_LIMITS.maxSerializedBytes + 64 * 1024;
 
 export class CodeModeHttpRequestError extends Schema.TaggedError<CodeModeHttpRequestError>()(
 	"CodeModeHttpRequestError",
@@ -74,6 +80,7 @@ function requestTooLargeResult(
 		| "Wireframe"
 		| "Quadrant chart"
 		| "Artifact patch",
+	limitBytes: number,
 ) {
 	return {
 		ok: false as const,
@@ -84,7 +91,7 @@ function requestTooLargeResult(
 				severity: "error" as const,
 				stage: "input" as const,
 				ref: { kind: "request" as const, path: "input" },
-				message: `${diagramType} request exceeds the ${MAX_CODE_MODE_BUILD_REQUEST_BYTES}-byte limit.`,
+				message: `${diagramType} request exceeds the ${limitBytes}-byte limit.`,
 				hint: "Send a smaller semantic diagram request.",
 			},
 		],
@@ -229,8 +236,10 @@ function makeBuildHandler({
 	operation,
 	label,
 	run,
+	maxRequestBytes = MAX_CODE_MODE_BUILD_REQUEST_BYTES,
 }: {
 	readonly operation: BuildOperation;
+	readonly maxRequestBytes?: number;
 	readonly label:
 		| "Flowchart"
 		| "Mindmap"
@@ -263,7 +272,7 @@ function makeBuildHandler({
 		const usage = yield* PlaygroundCodeModeUsage;
 		const usageContext = yield* usage.createContext;
 		const startedAt = yield* clock.nowMillis;
-		const bounded = yield* readBoundedJson(request, MAX_CODE_MODE_BUILD_REQUEST_BYTES);
+		const bounded = yield* readBoundedJson(request, maxRequestBytes);
 		if (bounded._tag === "InvalidJson") {
 			return yield* CodeModeHttpRequestError.make({
 				cause: undefined,
@@ -274,7 +283,7 @@ function makeBuildHandler({
 		const requestBody =
 			bounded._tag === "Body" ? bounded.body : { omitted: true, reason: "request_too_large" };
 		const result = tooLarge
-			? requestTooLargeResult(label)
+			? requestTooLargeResult(label, maxRequestBytes)
 			: yield* withTelemetryCorrelation(run(codeMode, requestBody), {
 					attemptId: usageContext.attemptId,
 					runId: usageContext.runId,
@@ -373,6 +382,7 @@ export const handleCreateCanvasRequest = makeBuildHandler({
 	operation: "createCanvas",
 	label: "Canvas",
 	run: (codeMode, input) => codeMode.createCanvas(input),
+	maxRequestBytes: MAX_CANVAS_REQUEST_BYTES,
 });
 
 export const handleGetArtifactRequest = Effect.fn("playground.http.getArtifact")(function* (
@@ -476,7 +486,8 @@ export const handlePatchArtifactRequest = Effect.fn("playground.http.patchArtifa
 	const usage = yield* PlaygroundCodeModeUsage;
 	const usageContext = yield* usage.createContext;
 	const startedAt = yield* clock.nowMillis;
-	const bounded = yield* readBoundedJson(request, MAX_CODE_MODE_BUILD_REQUEST_BYTES);
+	// A patch may carry its source scene inline, as large as a canvas.
+	const bounded = yield* readBoundedJson(request, MAX_CANVAS_REQUEST_BYTES);
 	if (bounded._tag === "InvalidJson") {
 		return yield* CodeModeHttpRequestError.make({
 			cause: undefined,
@@ -484,7 +495,7 @@ export const handlePatchArtifactRequest = Effect.fn("playground.http.patchArtifa
 		});
 	}
 	if (bounded._tag === "TooLarge") {
-		const result = requestTooLargeResult("Artifact patch");
+		const result = requestTooLargeResult("Artifact patch", MAX_CANVAS_REQUEST_BYTES);
 		const finishedAt = yield* clock.nowMillis;
 		yield* usage.capture({
 			context: usageContext,

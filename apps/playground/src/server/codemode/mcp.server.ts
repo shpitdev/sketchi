@@ -58,6 +58,7 @@ import {
 	SKETCHI_EXECUTE_CODE_DESCRIPTION,
 	SKETCHI_EXECUTE_DESCRIPTION,
 } from "./mcp-docs.server";
+import { PNG_EXPORT_TIMEOUT_MS } from "./browser-render-pool.server";
 import { createEffectMcpServer, makeEffectMcpTool } from "./effect-mcp-adapter.server";
 import { prewarmPngRendererOnSessionStart, readMcpMessage } from "./mcp-session-prewarm.server";
 import { PlaygroundCodeModeUsage } from "./usage-events.server";
@@ -94,6 +95,13 @@ type McpHttpHandler = (
 	env: unknown,
 	ctx: MinimalExecutionContext,
 ) => Promise<Response>;
+
+/**
+ * A script's default PNGs share this budget, so execute stays responsive; an explicit
+ * "png" in artifactFormats waits for the renderer's own PNG_EXPORT_TIMEOUT_MS instead.
+ */
+const DEFAULT_PNG_BUDGET_MS = 15_000;
+const DEFAULT_PNG_UNAVAILABLE_HINT = `Scene and Excalidraw are available. For the PNG, call again with options.artifactFormats ["scene", "excalidraw", "png"], which gives the export ${PNG_EXPORT_TIMEOUT_MS / 1000} seconds.`;
 
 const ExecuteRequestContract = Schema.Struct({
 	code: Schema.String.check(
@@ -547,7 +555,7 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 	const builds: ExecuteBuild[] = [];
 	const pendingBuilds: Effect.Effect<void>[] = [];
 	const pngWarnings = new Map<string, string>();
-	const pngDeadlineMillis = (yield* Clock.currentTimeMillis) + 15_000;
+	const pngDeadlineMillis = (yield* Clock.currentTimeMillis) + DEFAULT_PNG_BUDGET_MS;
 
 	const executed: SketchiCodeModeExecuteOutput = yield* Effect.gen(function* () {
 		const parsed = yield* Effect.try({
@@ -707,7 +715,7 @@ export function makeSketchiCodeModeProvider(
 			isRecord(request) &&
 			(request.options === undefined ||
 				(isRecord(request.options) && request.options.artifactFormats === undefined));
-		if (defaulted) defaultPngDeadline ??= (yield* Clock.currentTimeMillis) + 15_000;
+		if (defaulted) defaultPngDeadline ??= (yield* Clock.currentTimeMillis) + DEFAULT_PNG_BUDGET_MS;
 		const result = yield* workflow.pipe(
 			Effect.provideService(
 				PlaygroundDefaultPngDelivery,
@@ -720,7 +728,7 @@ export function makeSketchiCodeModeProvider(
 									severity: "warning",
 									stage: "export",
 									message: `PNG unavailable: ${message}`,
-									hint: "Scene and Excalidraw are available; retry for a PNG.",
+									hint: DEFAULT_PNG_UNAVAILABLE_HINT,
 								}),
 						}
 					: undefined,
@@ -731,7 +739,7 @@ export function makeSketchiCodeModeProvider(
 			if (warnings.length)
 				observer?.pngUnavailable(
 					result.artifact.artifactId,
-					"PNG unavailable; scene and Excalidraw are available. Retry for a PNG.",
+					`PNG unavailable. ${DEFAULT_PNG_UNAVAILABLE_HINT}`,
 				);
 			return { ...result, issues: [...result.issues, ...warnings] };
 		}

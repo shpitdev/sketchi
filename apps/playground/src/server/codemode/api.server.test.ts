@@ -2,13 +2,15 @@ import type { TelemetrySpanRow } from "@sketchi/observability";
 import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
 
-import type {
-	BuildFlowchartResult,
-	CodeModeObjectBucket,
-	CodeModeObjectBucketObject,
+import {
+	type BuildFlowchartResult,
+	CANVAS_LIMITS,
+	type CodeModeObjectBucket,
+	type CodeModeObjectBucketObject,
 } from "@sketchi/diagram-agent";
 
 import {
+	MAX_CANVAS_REQUEST_BYTES,
 	MAX_CODE_MODE_BUILD_REQUEST_BYTES,
 	handleBuildFlowchartRequest as handleBuildFlowchartRequestEffect,
 	handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
@@ -240,6 +242,69 @@ describe("Code Mode API handlers", () => {
 				diagramId: "http-canvas",
 				formats: [{ format: "scene" }, { format: "excalidraw" }],
 			},
+		});
+	});
+
+	it("accepts a canvas request as large as the canvas allows", async () => {
+		const elements = Array.from({ length: CANVAS_LIMITS.maxElements }, (_, index) => ({
+			type: "frame",
+			id: `frame-${index}`,
+			x: (index % 100) * 12,
+			y: Math.floor(index / 100) * 12,
+			width: 10,
+			height: 10,
+		}));
+		const body = {
+			spec: {
+				kind: "canvas",
+				version: 1,
+				diagramId: "full-canvas",
+				title: "Full canvas",
+				width: 1_200,
+				height: 600,
+				accentColor: "#111827",
+				backgroundColor: "#ffffff",
+				elements,
+				layers: [],
+				layouts: [],
+				zOrder: elements.map(({ id }) => id),
+			},
+			options: { artifactFormats: ["scene"] },
+		};
+		// Past the other builders' request ceiling, so only the canvas's own ceiling admits it.
+		expect(JSON.stringify(body).length).toBeGreaterThan(MAX_CODE_MODE_BUILD_REQUEST_BYTES);
+
+		const response = await handleCreateCanvasRequest(
+			{},
+			postRequest("https://studio.test/api/v1/canvases/create", body),
+		);
+
+		expect(response.status).toBe(200);
+		await expect(response.json()).resolves.toMatchObject({ ok: true, status: "accepted" });
+	});
+
+	it("rejects a canvas request past the canvas's own ceiling with a typed 413", async () => {
+		const response = await handleCreateCanvasRequest(
+			{},
+			new Request("https://studio.test/api/v1/canvases/create", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Content-Length": String(MAX_CANVAS_REQUEST_BYTES + 1),
+				},
+				body: "{}",
+			}),
+		);
+
+		expect(response.status).toBe(413);
+		await expect(response.json()).resolves.toMatchObject({
+			status: "invalid_input",
+			issues: [
+				{
+					code: "request_too_large",
+					message: `Canvas request exceeds the ${MAX_CANVAS_REQUEST_BYTES}-byte limit.`,
+				},
+			],
 		});
 	});
 
@@ -987,18 +1052,23 @@ describe("Code Mode API handlers", () => {
 });
 
 describe("artifact patch request boundaries", () => {
-	it("caps patch bodies like build bodies", async () => {
+	it("caps patch bodies like canvas bodies, since a patch may carry its scene inline", async () => {
 		const request = new Request("https://studio.test/api/v1/artifacts/id/patch", {
 			method: "POST",
 			body: JSON.stringify({
 				operations: [],
-				padding: "x".repeat(MAX_CODE_MODE_BUILD_REQUEST_BYTES),
+				padding: "x".repeat(MAX_CANVAS_REQUEST_BYTES),
 			}),
 		});
 		const response = await handlePatchArtifactRequest({}, request, "id");
 		expect(response.status).toBe(413);
 		expect(await response.json()).toMatchObject({
-			issues: [{ code: "request_too_large" }],
+			issues: [
+				{
+					code: "request_too_large",
+					message: `Artifact patch request exceeds the ${MAX_CANVAS_REQUEST_BYTES}-byte limit.`,
+				},
+			],
 		});
 	});
 });

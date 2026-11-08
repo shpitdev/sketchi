@@ -9,6 +9,7 @@ import {
 } from "@sketchi/diagram-core";
 import {
 	JOURNEY_MAX_ASPECT,
+	JOURNEY_MAX_ELEMENTS,
 	journeyLayoutIssues,
 	renderJourneyDiagram,
 	type RenderedDiagramScene,
@@ -150,6 +151,8 @@ describe("journey map fuzz", () => {
 					...journeyLayoutIssues(scene).map((issue) => issue.message),
 				];
 				if (aspect(scene) > JOURNEY_MAX_ASPECT) problems.push(`aspect ${aspect(scene).toFixed(2)}`);
+				if (scene.elements.length > JOURNEY_MAX_ELEMENTS)
+					problems.push(`${scene.elements.length} elements`);
 				const steps = diagram.stages.reduce((total, stage) => total + stage.steps.length, 0);
 				// A journey fits the CLI's PNG ceiling, its title banner included. Past 30 steps
 				// with full note stacks, the rarest few may not (Excalidraw and hosted PNGs are

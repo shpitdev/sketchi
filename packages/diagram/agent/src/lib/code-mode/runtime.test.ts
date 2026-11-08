@@ -2869,7 +2869,7 @@ describe("canvas geometry and input bounds", () => {
 		expect(scene.zOrder).toEqual(["b"]);
 	});
 
-	it("recomputes bounds after inserting 599 lines with 256 points", async () => {
+	it("recomputes bounds after filling the canvas with 256-point lines", async () => {
 		const result = await createTestRuntime().applyDiagramPatch({
 			source: { scene: geometryCanvas([geometryNode("a", 0, 0)]) },
 			operations: [
@@ -2887,11 +2887,11 @@ describe("canvas geometry and input bounds", () => {
 		});
 		expectPatchOk(result);
 		const scene = parseInlineScene(result.artifact.formats[0]?.inline);
-		expect(scene.elements).toHaveLength(600);
+		expect(scene.elements).toHaveLength(CANVAS_LIMITS.maxElements);
 		expect(scene).toMatchObject({ width: 648, height: 648 });
 	}, 60_000);
 
-	it("rejects a raw 600x256-point canvas before decode in both workflows", async () => {
+	it("rejects a raw full canvas of 256-point lines before decode in both workflows", async () => {
 		const scene = geometryCanvas(densePointElements(CANVAS_LIMITS.maxElements));
 		const runtime = createTestRuntime();
 		expect(await runtime.createCanvas({ spec: scene })).toMatchObject({
@@ -3199,7 +3199,76 @@ describe("bot-reviewed canvas limits and coincident routes", () => {
 		});
 	});
 
-	it("returns limit_exceeded for 601 small elements below the byte limit", async () => {
+	it("keeps every accepted canvas within a share link's Excalidraw elements", async () => {
+		const cylinders = (count: number) =>
+			geometryCanvas(
+				Array.from({ length: count }, (_, index) => ({
+					...geometryNode(`db-${index}`, (index % 50) * 140, Math.floor(index / 50) * 120),
+					shape: "cylinder" as const,
+					width: 120,
+					height: 100,
+					label: "DB",
+				})),
+			);
+		const one = await createTestRuntime().createCanvas({
+			spec: cylinders(1),
+			options: { artifactFormats: ["excalidraw"], inlineArtifacts: ["excalidraw"] },
+		});
+		expectCanvasOk(one);
+		const inline = one.artifact.formats[0]?.inline as { readonly elements: readonly unknown[] };
+		// A labelled cylinder composes several Excalidraw elements.
+		const perCylinder = inline.elements.length;
+		expect(perCylinder).toBeGreaterThan(2);
+		const count = Math.floor(CANVAS_LIMITS.maxExportedElements / perCylinder) + 1;
+		expect(count).toBeLessThanOrEqual(CANVAS_LIMITS.maxElements);
+
+		const result = await createTestRuntime().createCanvas({
+			spec: cylinders(count),
+			options: { artifactFormats: ["scene"] },
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: [
+				expect.objectContaining({
+					code: "canvas_limit_exceeded",
+					message: `Canvas exports ${count * perCylinder} Excalidraw elements, more than the ${CANVAS_LIMITS.maxExportedElements} a share link holds.`,
+				}),
+			],
+		});
+	}, 60_000);
+
+	it("returns limit_exceeded when a patch grows a scene past the element limit", async () => {
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: { scene: geometryCanvas([geometryNode("a", 0, 0)]) },
+			operations: [
+				{
+					op: "insert",
+					elements: Array.from({ length: CANVAS_LIMITS.maxElements }, (_, index) => ({
+						type: "frame",
+						id: `frame-${index}`,
+						x: 0,
+						y: 0,
+						width: 10,
+						height: 10,
+					})),
+				},
+			],
+			options: { preserveConnectivity: false, artifactFormats: ["scene"] },
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: [
+				expect.objectContaining({
+					code: "canvas_limit_exceeded",
+					message: `Canvas has ${CANVAS_LIMITS.maxElements + 1} elements, more than the ${CANVAS_LIMITS.maxElements} it may hold.`,
+				}),
+			],
+		});
+	});
+
+	it("returns limit_exceeded for one small element past the limit below the byte limit", async () => {
 		const elements: CanvasSpec["elements"] = Array.from(
 			{ length: CANVAS_LIMITS.maxElements + 1 },
 			(_, index) => ({
@@ -3394,7 +3463,8 @@ describe("final-review correlation and sequence canvas bounds", () => {
 			} else {
 				expect(result).toMatchObject({
 					ok: false,
-					status: "render_failed",
+					// Too tall for a canvas: a limit the caller meets by splitting, not a render defect.
+					status: "limit_exceeded",
 					buildId: "build-test",
 					requestId: "sequence-bounds-request",
 					normalizedSpec: {

@@ -1660,7 +1660,7 @@ const FailureContextSchema = Schema.Struct({
 class ArtifactExportFailure extends Schema.TaggedError<ArtifactExportFailure>()(
 	"ArtifactExportFailure",
 	{
-		status: Schema.Literal("export_failed"),
+		status: Schema.Literals(["export_failed", "limit_exceeded"]),
 		issues: FailureContextSchema.fields.issues,
 	},
 ) {}
@@ -2287,6 +2287,15 @@ function canvasIssueCode(validationIssue: CanvasValidationIssue): CodeModeIssueC
 		case "unknown_layout_target":
 			return "unknown_layout_target";
 	}
+}
+
+/** A scene over a canvas limit is too large rather than broken: the caller splits it. */
+function canvasFailureStatus(
+	validationIssues: readonly CanvasValidationIssue[],
+): "limit_exceeded" | "render_failed" {
+	return validationIssues.some((entry) => entry.code === "limit_exceeded")
+		? "limit_exceeded"
+		: "render_failed";
 }
 
 function canvasValidationIssues(
@@ -3336,6 +3345,21 @@ const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore")(funct
 		const excalidraw = convertSceneToExcalidraw(input.scene);
 		return { excalidraw, validation: validateExcalidrawScene(excalidraw) };
 	}).pipe(Effect.withSpan("codeMode.artifacts.exportValidate"));
+	// A canvas of composed shapes exports several Excalidraw elements for each of its own.
+	if (excalidraw.elements.length > CANVAS_LIMITS.maxExportedElements) {
+		return yield* new ArtifactExportFailure({
+			status: "limit_exceeded",
+			issues: [
+				issue({
+					code: "canvas_limit_exceeded",
+					stage: "export",
+					ref: { kind: "diagram", id: input.scene.diagramId },
+					message: `Canvas exports ${excalidraw.elements.length} Excalidraw elements, more than the ${CANVAS_LIMITS.maxExportedElements} a share link holds.`,
+					hint: "Split the diagram into smaller canvases.",
+				}),
+			],
+		});
+	}
 	const issues = input.validationIssues(validation.issues);
 	if (issues.length > 0) {
 		return yield* new ArtifactExportFailure({
@@ -3593,7 +3617,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildSequenceDiagramFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -3711,7 +3735,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildStateMachineFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -3820,7 +3844,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildErDiagramFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -3930,7 +3954,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildClassDiagramFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4039,7 +4063,7 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildOrgChartFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4149,7 +4173,7 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildVennDiagramFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4259,7 +4283,7 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildJourneyMapFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4366,7 +4390,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildSankeyFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4501,7 +4525,7 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildWireframeFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4619,7 +4643,7 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildQuadrantChartFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4730,7 +4754,7 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildTimelineFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4838,7 +4862,7 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildChartFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4946,7 +4970,7 @@ const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildGanttFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -5452,7 +5476,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 		sourceLimits = [
 			{
 				code: "limit_exceeded",
-				message: `Canvas exceeds ${CANVAS_LIMITS.maxElements} elements.`,
+				message: `Canvas has ${scene.elements.length} elements, more than the ${CANVAS_LIMITS.maxElements} it may hold.`,
 				path: "elements",
 			},
 		];
@@ -5534,7 +5558,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 	const structuralIssues = getCanvasValidationIssues(patchedScene);
 	if (structuralIssues.length > 0) {
 		return yield* new ApplyDiagramPatchFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(structuralIssues),
 			context: {
 				...sourceContext,
 				partial: scenePartial(patchedScene),

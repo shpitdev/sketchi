@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
-import { timelineFixture } from "@sketchi/diagram-core";
+import {
+	CANVAS_LIMITS,
+	TIMELINE_MAX_EVENTS,
+	TIMELINE_MAX_LANES,
+	timelineFixture,
+} from "@sketchi/diagram-core";
 import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 import { applyDiagramPatch, buildTimeline, CodeModeRuntimeEnvironment } from "./runtime.js";
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
@@ -130,5 +135,35 @@ describe("Code Mode native timeline", () => {
 		expect(result.issues.length).toBeGreaterThan(0);
 		expect(result.issues.every((issue) => issue.hint && issue.stage === "input")).toBe(true);
 		expect(() => Schema.decodeUnknownSync(BuildTimelineResultSchema)(result)).not.toThrow();
+	});
+});
+
+describe("Code Mode timeline size", () => {
+	it("draws the largest chronology its family allows on one canvas", async () => {
+		const lanes = Array.from(
+			{ length: TIMELINE_MAX_LANES },
+			(_, index) => `Workstream ${index + 1}`,
+		);
+		// Six weeks apart but for one pair on a lane a day apart, which spreads the axis so
+		// that it breaks between the others, on every lane.
+		let day = Date.UTC(2024, 0, 15);
+		const events = Array.from({ length: TIMELINE_MAX_EVENTS }, (_, index) => {
+			day += (index === 31 ? 1 : 42) * 86_400_000;
+			return {
+				id: `e${index + 1}`,
+				label: `Milestone ${index + 1} for the program`,
+				date: new Date(day).toISOString().slice(0, 10),
+				lane: lanes[Math.floor((index * lanes.length) / TIMELINE_MAX_EVENTS)],
+			};
+		});
+		const result = await build({ title: "Program milestones", lanes, events });
+
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+		const scene = result.artifact.formats.find((format) => format.format === "scene")?.inline as {
+			readonly elements: readonly unknown[];
+		};
+		// Over the canvas's old 600-element limit, which turned such timelines away.
+		expect(scene.elements.length).toBeGreaterThan(600);
+		expect(scene.elements.length).toBeLessThanOrEqual(CANVAS_LIMITS.maxElements);
 	});
 });
