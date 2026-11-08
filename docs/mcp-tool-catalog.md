@@ -499,7 +499,10 @@ every mark's catalog SVG. A node's `icon` names a logo its label does not, or an
 of the products it names, and `null` drops one. An icon that names no logo is
 dropped with `unknown_icon`, and a vendor's logo on a label that does not name the
 vendor with `icon_dropped`. Icons never fail the build. Sequence participants and
-canvases still take `{ slug }` icons found with `sketchi.searchIcons`.
+canvases still take `{ slug }` icons found with `sketchi.searchIcons`. Search also
+returns generic concept icons (collection `concepts`: database, queue, user, cloud,
+and others), always drawn by hand; a node's `icon` or a `{ slug }` icon attaches
+one by its slug when the node is that thing. No label fills in a concept icon.
 
 ### Flowchart Checks
 

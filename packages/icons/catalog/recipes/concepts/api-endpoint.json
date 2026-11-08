@@ -1,0 +1,6 @@
+{
+	"parts": [
+		{ "kind": "rect", "x": 1.5, "y": 5.5, "width": 21, "height": 13, "rounded": true },
+		{ "kind": "text", "cx": 12, "cy": 12, "text": "API", "size": 8.5 }
+	]
+}

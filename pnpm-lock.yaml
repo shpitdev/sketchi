@@ -693,6 +693,12 @@ importers:
 
   packages/icons/catalog:
     devDependencies:
+      lucide-static:
+        specifier: 1.65.0
+        version: 1.65.0
+      svg-pathdata:
+        specifier: 9.0.0
+        version: 9.0.0
       wordlist-english:
         specifier: 1.2.1
         version: 1.2.1
@@ -7863,6 +7869,9 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  lucide-static@1.65.0:
+    resolution: {integrity: sha512-Mbahsp1MHXzBK2qQ+j+OpdwvPwOFYFBOe2pD1O5eI+XLRpbqPY2euz6vemAddXGevRvJ5n8D83ilUCrtxP07RQ==}
 
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
@@ -16767,6 +16776,8 @@ snapshots:
       react: 19.3.1
     optionalDependencies:
       '@types/react': 19.3.0
+
+  lucide-static@1.65.0: {}
 
   lz-string@1.5.0: {}
 

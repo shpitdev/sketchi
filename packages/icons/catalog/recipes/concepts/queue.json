@@ -1,0 +1,35 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 4,
+			"width": 6,
+			"height": 7,
+			"rounded": true
+		},
+		{
+			"kind": "rect",
+			"x": 9,
+			"y": 4,
+			"width": 6,
+			"height": 7,
+			"rounded": true
+		},
+		{
+			"kind": "rect",
+			"x": 16.5,
+			"y": 4,
+			"width": 6,
+			"height": 7,
+			"rounded": true
+		},
+		{
+			"kind": "arrow",
+			"points": [
+				[2, 17],
+				[22, 17]
+			]
+		}
+	]
+}

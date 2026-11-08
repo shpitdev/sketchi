@@ -1,26 +1,67 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
 import { getIconBySlug } from "../src/catalog.js";
+import { CONCEPT_ICONS } from "../src/concepts.js";
+import { transcribeLucideIcon, type LucideIconNode } from "../src/lucide-recipes.js";
 
-// Hand-drawn recipes, one JSON file per slug under recipes/, bundled into one
-// map. Diagram packages own the recipe format and check every entry draws.
+// Every hand-drawn recipe keyed by slug: concept icons transcribed from Lucide
+// or drawn under recipes/concepts/, and brand marks drawn under recipes/.
+// Diagram packages own the recipe format and check every entry draws.
 const packageRoot = resolve(import.meta.dirname, "..");
 const recipesRoot = resolve(packageRoot, "recipes");
 const distRoot = resolve(packageRoot, "dist");
 
-const files = existsSync(recipesRoot)
-	? readdirSync(recipesRoot)
-			.filter((file) => file.endsWith(".json"))
-			.sort()
-	: [];
+function jsonSlugs(directory: string): string[] {
+	return existsSync(directory)
+		? readdirSync(directory)
+				.filter((file) => file.endsWith(".json"))
+				.map((file) => file.slice(0, -".json".length))
+				.sort()
+		: [];
+}
+
+function readRecipe(directory: string, slug: string): unknown {
+	return JSON.parse(readFileSync(resolve(directory, `${slug}.json`), "utf8"));
+}
+
 const recipes: Record<string, unknown> = {};
-for (const file of files) {
-	const slug = file.slice(0, -".json".length);
-	if (!getIconBySlug(slug)) {
-		throw new Error(`Recipe ${file} names no catalog icon.`);
+
+const lucideNodes = JSON.parse(
+	readFileSync(createRequire(import.meta.url).resolve("lucide-static/icon-nodes.json"), "utf8"),
+) as Record<string, LucideIconNode>;
+const conceptsRoot = resolve(recipesRoot, "concepts");
+const drawnConcepts = jsonSlugs(conceptsRoot);
+for (const concept of CONCEPT_ICONS) {
+	if (getIconBySlug(concept.slug) || Object.hasOwn(recipes, concept.slug)) {
+		throw new Error(`Concept ${concept.slug} shares its slug with a mark or another concept.`);
 	}
-	recipes[slug] = JSON.parse(readFileSync(resolve(recipesRoot, file), "utf8"));
+	if (concept.lucide && drawnConcepts.includes(concept.slug)) {
+		throw new Error(`Concept ${concept.slug} has both a Lucide icon and a drawn recipe.`);
+	}
+	if (concept.lucide) {
+		const node = lucideNodes[concept.lucide];
+		if (!node) throw new Error(`Concept ${concept.slug} names no Lucide icon ${concept.lucide}.`);
+		recipes[concept.slug] = transcribeLucideIcon(concept.lucide, node);
+	} else if (drawnConcepts.includes(concept.slug)) {
+		recipes[concept.slug] = readRecipe(conceptsRoot, concept.slug);
+	} else {
+		throw new Error(`Concept ${concept.slug} has neither a Lucide icon nor a drawn recipe.`);
+	}
+}
+for (const slug of drawnConcepts) {
+	if (!CONCEPT_ICONS.some((concept) => concept.slug === slug)) {
+		throw new Error(`recipes/concepts/${slug}.json draws no concept.`);
+	}
+}
+
+const brands = jsonSlugs(recipesRoot);
+for (const slug of brands) {
+	if (!getIconBySlug(slug)) {
+		throw new Error(`Recipe ${slug}.json names no catalog icon.`);
+	}
+	recipes[slug] = readRecipe(recipesRoot, slug);
 }
 
 mkdirSync(distRoot, { recursive: true });
@@ -37,5 +78,5 @@ writeFileSync(
 );
 
 process.stdout.write(
-	`Built ${files.length} native icon recipes into packages/icons/catalog/dist.\n`,
+	`Built ${CONCEPT_ICONS.length} concept and ${brands.length} brand icon recipes into packages/icons/catalog/dist.\n`,
 );

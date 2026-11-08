@@ -1118,6 +1118,76 @@ describe("hand-drawn icons", () => {
 	});
 });
 
+describe("concept icons", () => {
+	const DATABASE = {
+		parts: [
+			{ kind: "ellipse", cx: 12, cy: 5, rx: 9, ry: 3 },
+			{
+				kind: "stroke",
+				points: [
+					[3, 5],
+					[3, 19],
+					[21, 19],
+					[21, 5],
+				],
+			},
+		],
+	} as const;
+
+	function conceptCatalog(loaded: string[]): CodeModeIconCatalog {
+		const base = fixtureCatalog();
+		return makeCodeModeIconCatalog({
+			icons: [catalogIcon("docker", "Docker")],
+			concepts: [
+				{ slug: "database", name: "Database", aliases: ["db", "data store"] },
+				{ slug: "undrawn", name: "Undrawn", aliases: [] },
+			],
+			loadSvg: (icon) => {
+				loaded.push(icon.slug);
+				return base.loadSvg(icon);
+			},
+			recipes: { database: DATABASE },
+			slugLookup: "sketchi.searchIcons({ q })",
+		});
+	}
+
+	it("offers drawable concepts to search and slugs, beside catalog marks", () => {
+		const catalog = conceptCatalog([]);
+		expect(catalog.get("database")).toEqual({
+			collection: "concepts",
+			name: "Database",
+			slug: "database",
+		});
+		expect(catalog.get("undrawn")).toBeUndefined();
+		expect(catalog.search("data store", 3).map((icon) => icon.slug)).toEqual(["database"]);
+	});
+
+	it("never fills a concept from a label", () => {
+		const catalog = conceptCatalog([]);
+		expect(catalog.logoNamedByLabel("Write to the database")).toBeUndefined();
+		expect(catalog.isStrayVendorLogo("database", "Docker build")).toBe(false);
+	});
+
+	it("draws a concept by hand, even where the diagram asks for exact marks", async () => {
+		const loaded: string[] = [];
+		const result = await runtime(conceptCatalog(loaded)).createCanvas({
+			spec: canvasSpec([
+				{ id: "store", icon: { slug: "database", size: 28 } },
+				{ id: "exact", icon: { slug: "database", size: 28, exact: true } },
+			]),
+			options: { inlineArtifacts: ["scene"] },
+		});
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.issues).toEqual([]);
+		expect(loaded).toEqual([]);
+		expect(inlineScene(result).icons).toEqual({
+			database: { name: "Database", recipe: DATABASE },
+		});
+	});
+});
+
 describe("applyDiagramPatch icons", () => {
 	it("drops a patched-in logo that does not fit instead of failing", async () => {
 		const icons = runtime();
