@@ -131,7 +131,6 @@ export function assessFlowchartQuality(
 		});
 	}
 
-	let underBranched = 0;
 	let unlabeledBranches = 0;
 	for (const node of diagram.nodes) {
 		if (node.kind !== "decision") {
@@ -144,16 +143,10 @@ export function assessFlowchartQuality(
 			}
 			continue;
 		}
+		// A question with one stated way on stays as written: inventing a second branch
+		// would draw a step the request never named.
 		const branches = outgoing.get(node.id) ?? [];
-		if (branches.length < 2) {
-			underBranched += 1;
-			fault(
-				0,
-				`decision "${node.id}" needs at least 2 outgoing branches`,
-				{ code: "underbranched_decision", refs: nodeRefs([node]) },
-				true,
-			);
-		} else if (branches.some((edge) => !edge.label)) {
+		if (branches.length >= 2 && branches.some((edge) => !edge.label)) {
 			unlabeledBranches += 1;
 			fault(0, `label every branch out of decision "${node.id}" (yes/no, …)`, {
 				code: "unlabeled_decision_branch",
@@ -161,7 +154,7 @@ export function assessFlowchartQuality(
 			});
 		}
 	}
-	penalty += Math.min(1.5 * underBranched, 4.5) + Math.min(unlabeledBranches, 3);
+	penalty += Math.min(unlabeledBranches, 3);
 
 	const longLabels = diagram.nodes.filter((node) => node.label.length > 42);
 	if (longLabels.length > 0) {

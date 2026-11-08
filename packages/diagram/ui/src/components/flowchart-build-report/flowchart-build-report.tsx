@@ -1,3 +1,4 @@
+import { flowchartDocumentPairs } from "@sketchi/diagram-core";
 import type { BuildFlowchartResult, CodeModeIssue } from "@sketchi/diagram-agent";
 
 export interface FlowchartBuildReportProps {
@@ -52,8 +53,8 @@ function resultSummary(result: BuildFlowchartResult): {
 	}
 	if (result.normalizedSpec) {
 		return {
-			edgeCount: result.normalizedSpec.edges.length,
-			nodeCount: result.normalizedSpec.nodes.length,
+			edgeCount: flowchartDocumentPairs(result.normalizedSpec.edges).length,
+			nodeCount: Object.keys(result.normalizedSpec.nodes).length,
 		};
 	}
 	return {};

@@ -42,7 +42,11 @@ describe("build result selectors", () => {
 	it("uses the latest assistant's active input during a new run", () => {
 		const state = deriveBuildState([pendingMessage("old"), pendingMessage("new")], true);
 		expect(state.activePart?.toolCallId).toBe("new");
-		expect(state.ghostLabels).toEqual(DEPLOY_PIPELINE_SPEC.nodes.map((node) => node.label));
+		expect(state.ghostLabels).toEqual(
+			Object.values(DEPLOY_PIPELINE_SPEC.nodes).map((node) =>
+				typeof node === "string" ? node : node.label,
+			),
+		);
 	});
 	it("rejects malformed accepted payloads before selecting formats", () => {
 		const part: DiagramToolPart = {
@@ -67,14 +71,7 @@ describe("build result selectors", () => {
 			status: "accepted",
 			buildId: "accepted",
 			issues: [],
-			normalizedSpec: {
-				...DEPLOY_PIPELINE_SPEC,
-				id: "pipeline",
-				edges: DEPLOY_PIPELINE_SPEC.edges.map((edge, index) => ({
-					...edge,
-					id: `edge-${index}`,
-				})),
-			},
+			normalizedSpec: { ...DEPLOY_PIPELINE_SPEC, id: "pipeline" },
 			quality: {
 				accepted: true,
 				checks: [],

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
+	flowchartDocumentPairCount,
 	type FlowchartDocument,
 } from "./flowchart-document";
 
@@ -91,7 +92,7 @@ describe("flowchart documents", () => {
 			],
 		};
 		expect(kinds(document)).toMatchObject({
-			cause: "decision",
+			cause: "process",
 			provider: "end",
 			stable: "decision",
 			resolved: "end",
@@ -159,6 +160,27 @@ describe("flowchart documents", () => {
 			],
 		};
 		expect(kinds(document).sync).toBe("process");
+	});
+
+	it("draws a step given a diamond as a decision, and its other shapes only as drawings", () => {
+		const document: FlowchartDocument = {
+			title: "Classify",
+			nodes: {
+				alert: "Alert received",
+				cause: { label: "Classify root cause", shape: "diamond" },
+				rollback: "Roll back",
+				hotfix: { label: "Prepare hotfix", shape: "document" },
+			},
+			edges: [
+				["alert", "cause"],
+				["cause", "rollback", "deploy"],
+				["cause", "hotfix", "code"],
+			],
+		};
+		const diagram = build(document);
+		expect(kinds(document).cause).toBe("decision");
+		expect(diagram.nodes.find((node) => node.id === "cause")?.shape).toBeUndefined();
+		expect(diagram.nodes.find((node) => node.id === "hotfix")?.shape).toBe("document");
 	});
 
 	it("asks for a label on every branch of a question", () => {
@@ -407,5 +429,30 @@ describe("flowchart documents", () => {
 		expect(issues({ title: "One", nodes: { a: "A" }, edges: [] })).toEqual([
 			["flowchart_too_small", "nodes"],
 		]);
+	});
+});
+
+describe("flowchart document limits", () => {
+	it("counts list-ended edges without expanding them, and refuses past the limit", () => {
+		const ids = (prefix: string) => Array.from({ length: 300 }, (_, index) => `${prefix}${index}`);
+		const edges: FlowchartDocument["edges"] = [
+			[ids("a"), ids("b")],
+			["x", ["y", "z"]],
+		];
+		expect(flowchartDocumentPairCount(edges)).toBe(90_002);
+		const result = flowchartDiagramFromDocument({
+			title: "Fan out",
+			nodes: { x: "X", y: "Y" },
+			edges,
+		});
+		expect(result).toEqual({
+			ok: false,
+			issues: [
+				expect.objectContaining({
+					code: "flowchart_too_large",
+					message: "Flowchart draws 90002 edges; the supported maximum is 120.",
+				}),
+			],
+		});
 	});
 });

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
-import { zoneFixtures, zoneRegionIssues, type CanvasSpec } from "@sketchi/diagram-core";
+import {
+	flowchartDiagramFromDocument,
+	zoneFixtures,
+	zoneRegionIssues,
+	type CanvasSpec,
+} from "@sketchi/diagram-core";
 import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
@@ -26,37 +31,44 @@ function build(spec: unknown) {
 
 const spec = {
 	title: "AWS three-tier app",
-	layout: { direction: "LR" },
-	groups: [
-		{ id: "region", label: " us-east-1 ", kind: "region" },
-		{ id: "vpc", label: "VPC", kind: "vpc", parent: " region " },
-		{ id: "public", label: "Public subnet", kind: "subnet", parent: "vpc" },
-		{ id: "data", label: "Database subnet", kind: "subnet", parent: "vpc" },
-	],
-	nodes: [
-		{ id: "users", label: "Users", kind: "start" },
-		{ id: "alb", label: "Application Load Balancer", kind: "process", group: "public" },
-		{ id: "rds", label: "RDS PostgreSQL", kind: "end", shape: "database", group: "data" },
-		{ id: "s3", label: "S3 bucket", kind: "end", shape: "document", group: "region" },
-	],
+	direction: "LR",
+	nodes: {
+		users: "Users",
+		alb: "Application Load Balancer",
+		rds: { label: "RDS PostgreSQL", shape: "database" },
+		s3: { label: "S3 bucket", shape: "document" },
+	},
 	edges: [
-		{ source: "users", target: "alb" },
-		{ source: "alb", target: "rds" },
-		{ source: "alb", target: "s3" },
+		["users", "alb"],
+		["alb", "rds"],
+		["alb", "s3"],
 	],
+	groups: {
+		region: { label: " us-east-1 ", kind: "region", contains: [" vpc ", "s3"] },
+		vpc: { label: "VPC", kind: "vpc", contains: ["public", "data"] },
+		public: { label: "Public subnet", kind: "subnet", contains: ["alb"] },
+		data: { label: "Database subnet", kind: "subnet", contains: ["rds"] },
+	},
 };
 
 describe("Code Mode architecture zones", () => {
 	it("builds nested zones and infrastructure shapes into an editable scene", async () => {
 		const built = await build(spec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(built.normalizedSpec.groups).toEqual([
-			{ id: "region", label: "us-east-1", kind: "region" },
-			{ id: "vpc", label: "VPC", parent: "region", kind: "vpc" },
-			{ id: "public", label: "Public subnet", parent: "vpc", kind: "subnet" },
-			{ id: "data", label: "Database subnet", parent: "vpc", kind: "subnet" },
+		expect(built.normalizedSpec.groups?.["region"]).toEqual({
+			label: "us-east-1",
+			kind: "region",
+			contains: ["vpc", "s3"],
+		});
+		const drawn = flowchartDiagramFromDocument(built.normalizedSpec);
+		if (!drawn.ok) throw new Error(JSON.stringify(drawn.issues));
+		expect(drawn.diagram.groups?.map((group) => [group.id, group.parent])).toEqual([
+			["region", undefined],
+			["vpc", "region"],
+			["public", "vpc"],
+			["data", "vpc"],
 		]);
-		expect(built.normalizedSpec.nodes.map((node) => node.shape)).toEqual([
+		expect(drawn.diagram.nodes.map((node) => node.shape)).toEqual([
 			undefined,
 			undefined,
 			"database",
@@ -64,7 +76,7 @@ describe("Code Mode architecture zones", () => {
 		]);
 		const scene = built.artifact.formats.find((format) => format.format === "scene")
 			?.inline as CanvasSpec;
-		expect(zoneRegionIssues(scene, built.normalizedSpec)).toEqual([]);
+		expect(zoneRegionIssues(scene, drawn.diagram)).toEqual([]);
 		const excalidraw = built.artifact.formats.find((format) => format.format === "excalidraw")
 			?.inline as Parameters<typeof validateExcalidrawScene>[0];
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
@@ -79,46 +91,30 @@ describe("Code Mode architecture zones", () => {
 		).toEqual({ sketchiShape: "cylinder" });
 	});
 
-	it("rejects an undeclared parent, a nesting loop and a shaped decision with repair hints", async () => {
+	it("rejects an unknown member and a nesting loop with repair hints", async () => {
 		const built = await build({
 			...spec,
-			groups: [
-				{ id: "region", label: "us-east-1", parent: "vpc" },
-				{ id: "vpc", label: "VPC", parent: "region" },
-				{ id: "public", label: "Public subnet", parent: "cloud" },
-				{ id: "data", label: "Database subnet", parent: "vpc" },
-			],
-			nodes: [
-				...spec.nodes,
-				{ id: "healthy", label: "Healthy?", kind: "decision", shape: "database" },
-			],
-			edges: [
-				{ source: "users", target: "healthy" },
-				{ source: "healthy", target: "alb", label: "yes" },
-				{ source: "healthy", target: "rds", label: "no" },
-				...spec.edges.slice(1),
-			],
+			groups: {
+				region: { label: "us-east-1", contains: ["vpc", "s3"] },
+				vpc: { label: "VPC", contains: ["region", "public", "data"] },
+				public: { label: "Public subnet", contains: ["alb", "cloud"] },
+				data: { label: "Database subnet", contains: ["rds"] },
+			},
 		});
 		expect(built.ok).toBe(false);
 		if (built.ok) return;
 		expect(built.status).toBe("invalid_flowchart");
 		expect(built.issues.map((issue) => [issue.code, issue.ref])).toEqual([
-			["group_cycle", { kind: "group", id: "region", path: "spec.groups.parent" }],
-			["group_cycle", { kind: "group", id: "vpc", path: "spec.groups.parent" }],
-			["unknown_group_parent", { kind: "group", id: "public", path: "spec.groups.parent" }],
-			["shaped_decision", { kind: "node", id: "healthy", path: "spec.nodes.shape" }],
+			["unknown_member", { kind: "group", id: "public", path: "spec.groups.public.contains[1]" }],
+			["group_cycle", { kind: "group", id: "region", path: "spec.groups.region.contains" }],
+			["group_cycle", { kind: "group", id: "vpc", path: "spec.groups.vpc.contains" }],
 		]);
-		expect(built.issues[2]?.hint).toBe(
-			'Set parent to the id of the declared group that encloses it ("region", "vpc", "public", "data"), or remove parent.',
-		);
 	});
 
 	it("rejects an unknown zone kind or shape at the contract", async () => {
 		const built = await build({
 			...spec,
-			groups: spec.groups.map((group, index) =>
-				index === 0 ? { ...group, kind: "galaxy" } : group,
-			),
+			groups: { ...spec.groups, region: { ...spec.groups.region, kind: "galaxy" } },
 		});
 		expect(built.ok).toBe(false);
 		if (built.ok) return;
@@ -129,12 +125,11 @@ describe("Code Mode architecture zones", () => {
 		const document = canonicalDocumentFromDiagram(zoneFixtures["hybrid-cloud"]);
 		expect(document.type).toBe("flowchart");
 		if (document.type !== "flowchart") return;
-		expect(document.spec.groups?.find((group) => group.id === "corp")).toEqual({
-			id: "corp",
+		expect(document.spec.groups?.["corp"]).toMatchObject({
 			label: "Corporate network",
-			parent: "onprem",
 			kind: "zone",
 		});
-		expect(document.spec.nodes.find((node) => node.id === "orders")?.shape).toBe("queue");
+		expect(document.spec.groups?.["onprem"]?.contains).toContain("corp");
+		expect(document.spec.nodes["orders"]).toMatchObject({ shape: "queue" });
 	});
 });

@@ -272,13 +272,28 @@ describe("group scenarios", () => {
 
 	it("grades the groups of a Code Mode build's normalized spec", () => {
 		const diagram = expected("mixed-fulfilment-groups-v2");
+		// The flowchart document a Code Mode build returns for the expected drawing.
 		const candidate = specToFlowchartCandidate({
 			id: diagram.id,
 			title: diagram.title,
-			nodes: diagram.nodes.map(({ metadata: _metadata, ...node }) => node),
-			edges: diagram.edges.map(({ metadata: _metadata, ...edge }) => edge),
-			groups: diagram.groups,
-			layout: { direction: "TB" },
+			nodes: Object.fromEntries(diagram.nodes.map((node) => [node.id, node.label])),
+			edges: diagram.edges.map((edge) =>
+				edge.label ? [edge.source, edge.target, edge.label] : [edge.source, edge.target],
+			),
+			groups: Object.fromEntries(
+				(diagram.groups ?? []).map((group) => [
+					group.id,
+					{
+						label: group.label,
+						contains: [
+							...diagram.nodes.filter((node) => node.group === group.id).map((node) => node.id),
+							...(diagram.groups ?? [])
+								.filter((other) => other.parent === group.id)
+								.map((other) => other.id),
+						],
+					},
+				]),
+			),
 		});
 		expect(failed("mixed-fulfilment-groups-v2", candidate)).toEqual([]);
 	});

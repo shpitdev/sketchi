@@ -3,9 +3,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { iconManifest, nodeLogoIcons } from "./catalog";
-import { catalogCommonWords, loadCommonEnglishWords } from "./common-words-generation";
+import {
+	catalogCommonWords,
+	EVERYDAY_WORD_SIZES,
+	loadCommonEnglishWords,
+} from "./common-words-generation";
 import { GENERIC_PROMPTS } from "./generic-prompts";
 import {
+	labelLogos,
 	logoNamedByLabel,
 	logosNamedInText,
 	matchIconMentions,
@@ -129,6 +134,70 @@ describe("logoNamedByLabel", () => {
 		expect(named("Docker image pushed to GitHub")).toBeUndefined();
 		// An everyday-word product beside a distinctive one is still ambiguous.
 		expect(named("Docker build tickets in Linear")).toBeUndefined();
+	});
+});
+
+describe("labelLogos", () => {
+	const named = (label: string) => labelLogos(label, nodeLogoIcons).named.map((icon) => icon.slug);
+	const possible = (label: string) =>
+		labelLogos(label, nodeLogoIcons).possible.map((icon) => icon.slug);
+
+	it("names every product a label names, unmistakable names first", () => {
+		expect(named("Next.js app hosted on Vercel")).toEqual(["nextjs", "vercel"]);
+		expect(named("Supabase Postgres")).toEqual(["supabase", "postgresql"]);
+		expect(named("Redis cache on Upstash")).toEqual(["redis"]);
+		expect(named("Docker build tickets in Linear")).toEqual(["docker", "linear"]);
+		expect(named("Log errors to Sentry")).toEqual(["sentry"]);
+	});
+
+	it("reads product names written with a dot", () => {
+		expect(named("Node.js worker")).toEqual(["nodejs"]);
+		expect(named("Vue.js frontend")).toEqual(["vuejs"]);
+		expect(named("Socket.io server")).toEqual(["socketio"]);
+		expect(named("Deploy to Fly.io")).toEqual(["flyio"]);
+		expect(logoNamedByLabel("Express.js API", nodeLogoIcons)?.slug).toBe("expressjs");
+		// Abbreviations keep their dots: "i.e." is not Internet Explorer.
+		expect(named("Retry later, i.e. after a backoff")).toEqual([]);
+	});
+
+	it("names a product that starts a label unless that word usually names a step", () => {
+		expect(named("Python worker")).toEqual(["python"]);
+		expect(named("Angular app")).toEqual(["angular"]);
+		expect(named("Azure Functions")).toEqual(["azure"]);
+		expect(named("Playwright tests")).toEqual(["playwright"]);
+		for (const label of ["Make payment", "Go to checkout", "Next step", "Swift review"]) {
+			expect(named(label), label).toEqual([]);
+		}
+		expect(possible("Make payment")).toEqual(["make"]);
+		expect(possible("React to incident")).toEqual(["react"]);
+		expect(possible("Go to checkout")).toEqual(["go"]);
+		expect(possible("Render the page")).toEqual(["render"]);
+		expect(possible("Python worker")).toEqual([]);
+	});
+
+	it("names an everyday first word that a tech noun shows is the product", () => {
+		expect(named("React app")).toEqual(["react"]);
+		expect(named("Spring service")).toEqual(["spring"]);
+		expect(named("Go worker")).toEqual(["go"]);
+		expect(named("Linear API")).toEqual(["linear"]);
+		expect(named("Next frontend")).toEqual(["nextjs"]);
+		// A generic service mark or a generic technology stays a note.
+		for (const label of ["Storage service", "Batch job", "Edge function", "Stream worker"]) {
+			expect(named(label), label).toEqual([]);
+			expect(possible(label), label).toHaveLength(1);
+		}
+	});
+});
+
+describe("everyday catalog words", () => {
+	it("match SCOWL size 10 for the current catalog", () => {
+		const generated: unknown = JSON.parse(
+			readFileSync(new URL("./generated/everyday-words.json", import.meta.url), "utf8"),
+		);
+		// Regenerate with `nx run icon-catalog:generate-catalog`.
+		expect(generated).toEqual(
+			catalogCommonWords(iconManifest.icons, loadCommonEnglishWords(EVERYDAY_WORD_SIZES)),
+		);
 	});
 });
 

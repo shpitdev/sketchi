@@ -53,8 +53,11 @@ export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
 	label: Label,
 	/** A smaller subtitle drawn under the label. */
 	note: Schema.optionalKey(Schema.NonEmptyString),
-	/** Draw an infrastructure node as a database, queue, document or storage bucket. */
-	shape: Schema.optionalKey(Schema.Literals(DIAGRAM_NODE_SHAPES)),
+	/**
+	 * Draw an infrastructure node as a database, queue, document or storage bucket, or
+	 * any step as a decision diamond.
+	 */
+	shape: Schema.optionalKey(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"])),
 	/** A product name or catalog slug whose logo the node draws; null draws none. */
 	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 });
@@ -134,6 +137,14 @@ export interface FlowchartDocumentPair {
 	readonly label?: string;
 	/** Index of the authored edge it came from. */
 	readonly index: number;
+}
+
+/** How many pairs the edges draw once each list end is expanded, counted without expanding them. */
+export function flowchartDocumentPairCount(edges: readonly FlowchartDocumentEdge[]): number {
+	let count = 0;
+	for (const [from, to] of edges)
+		count += flowchartEdgeEndIds(from).length * flowchartEdgeEndIds(to).length;
+	return count;
 }
 
 /** Each authored edge expanded into one pair per id on each side, blank labels dropped. */
@@ -224,42 +235,35 @@ function asksQuestion(label: string): boolean {
 interface Degrees {
 	incoming: number;
 	outgoing: number;
-	labeledOutgoing: number;
 }
 
 /**
- * Roles read from the edges. A decision is a node whose label asks a question and
- * that something leaves, or whose two or more outgoing edges are all labeled. Any
- * other node nothing enters is an entry (start) and one nothing leaves an end.
+ * Roles read from the edges. A decision is a node whose label asks a question, or
+ * that is drawn as a diamond, and that something leaves; labeled edges out of any other node (an architecture's
+ * "write orders", "publish jobs") stay plain labeled edges. Any other node nothing
+ * enters is an entry (start) and one nothing leaves an end.
  * When every node is entered, as when a loop returns to the first step, the first
  * node written is the entry.
  */
 export function deriveFlowchartKinds(
-	nodes: readonly { readonly id: string; readonly label: string }[],
+	nodes: readonly { readonly id: string; readonly label: string; readonly diamond?: boolean }[],
 	pairs: readonly Pick<FlowchartDocumentPair, "source" | "target" | "label">[],
 ): Map<string, FlowchartNodeKind> {
 	const degrees = new Map<string, Degrees>(
-		nodes.map((node) => [node.id, { incoming: 0, outgoing: 0, labeledOutgoing: 0 }]),
+		nodes.map((node) => [node.id, { incoming: 0, outgoing: 0 }]),
 	);
 	for (const pair of pairs) {
 		const source = degrees.get(pair.source);
 		const target = degrees.get(pair.target);
 		if (source) {
 			source.outgoing += 1;
-			if (pair.label) source.labeledOutgoing += 1;
 		}
 		if (target) target.incoming += 1;
 	}
 	const kinds = new Map<string, FlowchartNodeKind>();
 	for (const node of nodes) {
-		const { incoming, outgoing, labeledOutgoing } = degrees.get(node.id) ?? {
-			incoming: 0,
-			outgoing: 0,
-			labeledOutgoing: 0,
-		};
-		const decision =
-			(outgoing >= 1 && asksQuestion(node.label)) ||
-			(outgoing >= 2 && labeledOutgoing === outgoing);
+		const { incoming, outgoing } = degrees.get(node.id) ?? { incoming: 0, outgoing: 0 };
+		const decision = outgoing >= 1 && (node.diamond === true || asksQuestion(node.label));
 		kinds.set(
 			node.id,
 			decision ? "decision" : incoming === 0 ? "start" : outgoing === 0 ? "end" : "process",
@@ -734,6 +738,18 @@ export function flowchartDiagramFromDocument(
 		});
 	}
 
+	// List ends multiply, so a short request can name a vast number of edges: count them
+	// before expanding any.
+	const pairCount = flowchartDocumentPairCount(document.edges);
+	if (pairCount > FLOWCHART_MAX_EDGES) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", path: "edges" },
+			message: `Flowchart draws ${pairCount} edges; the supported maximum is ${FLOWCHART_MAX_EDGES}.`,
+			hint: "Split the workflow or remove lower-signal connections.",
+		});
+		return { ok: false, issues: issues.slice(0, FLOWCHART_MAX_ISSUES) };
+	}
 	const pairs = flowchartDocumentPairs(document.edges);
 	const valid: FlowchartDocumentPair[] = [];
 	const seen = new Map<string, number>();
@@ -786,19 +802,14 @@ export function flowchartDiagramFromDocument(
 			hint: "Connect the nodes in the order the flow takes.",
 		});
 	}
-	if (pairs.length > FLOWCHART_MAX_EDGES) {
-		issues.push({
-			code: "flowchart_too_large",
-			ref: { kind: "diagram", path: "edges" },
-			message: `Flowchart draws ${pairs.length} edges; the supported maximum is ${FLOWCHART_MAX_EDGES}.`,
-			hint: "Split the workflow or remove lower-signal connections.",
-		});
-	}
-
 	const contained = containment(document, nodeIds);
 	issues.push(...contained.issues);
 
-	const labeled = nodeEntries.map(([id, node]) => ({ id, label: flowchartNodeLabel(node) }));
+	const labeled = nodeEntries.map(([id, node]) => ({
+		id,
+		label: flowchartNodeLabel(node),
+		diamond: flowchartNodeDetails(node).shape === "diamond",
+	}));
 	const kinds = deriveFlowchartKinds(labeled, valid);
 	issues.push(...graphIssues(labeled, valid, kinds));
 
@@ -818,7 +829,7 @@ export function flowchartDiagramFromDocument(
 				label: node.label,
 				kind: kinds.get(id) ?? "process",
 				...(node.note ? { description: node.note } : {}),
-				...(node.shape ? { shape: node.shape } : {}),
+				...(node.shape && node.shape !== "diamond" ? { shape: node.shape } : {}),
 				...(icon ? { icon: { slug: icon } } : {}),
 				...(group ? { group } : {}),
 				...(lane ? { lane } : {}),

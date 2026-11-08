@@ -201,7 +201,7 @@ flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, 
 Create a canonical flowchart from inline JSON:
 
 ```sh
-sketchi create --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
+sketchi create --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":{"start":"Change proposed","review":"Review evidence","end":"Release approved"},"edges":[["start","review"],["review","end"]]}}'
 ```
 
 Inspect it, replace it with another complete canonical document, and list the
@@ -210,7 +210,7 @@ local store:
 ```sh
 sketchi show release-flow
 
-sketchi edit release-flow --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval revised","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review complete evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
+sketchi edit release-flow --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval revised","nodes":{"start":"Change proposed","review":"Review complete evidence","end":"Release approved"},"edges":[["start","review"],["review","end"]]}}'
 
 sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb"}}]}'
 

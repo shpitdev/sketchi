@@ -21,8 +21,10 @@ describe("FlowchartBuildReport", () => {
 
 		expect(screen.getByText("Repair the flowchart")).toBeTruthy();
 		expect(screen.getByText("Attempt 2 of 3")).toBeTruthy();
-		expect(screen.getByText("underbranched_decision")).toBeTruthy();
-		expect(screen.getByText("review")).toBeTruthy();
-		expect(screen.getByText("Add another labeled branch from this decision.")).toBeTruthy();
+		expect(screen.getByText("unlabeled_decision_branch")).toBeTruthy();
+		expect(screen.getByText("review->revise")).toBeTruthy();
+		expect(
+			screen.getByText('Label every branch of a question, such as "yes" and "no".'),
+		).toBeTruthy();
 	});
 });

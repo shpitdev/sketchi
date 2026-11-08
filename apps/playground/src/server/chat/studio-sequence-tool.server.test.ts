@@ -64,16 +64,16 @@ function deterministicRuntime() {
 const releaseFlow: StudioBuildFlowchartInput = {
 	spec: {
 		title: "Release",
-		nodes: [
-			{ id: "start", label: "Open release", kind: "start" },
-			{ id: "ship", label: "Ship release", kind: "process" },
-			{ id: "done", label: "Release live", kind: "end" },
-		],
+		direction: "TB",
+		nodes: {
+			start: "Open release",
+			ship: "Ship release",
+			done: "Release live",
+		},
 		edges: [
-			{ source: "start", target: "ship" },
-			{ source: "ship", target: "done" },
+			["start", "ship"],
+			["ship", "done"],
 		],
-		layout: { direction: "TB" },
 	},
 };
 describe("Studio build_sequence_diagram host", () => {

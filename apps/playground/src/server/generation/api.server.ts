@@ -7,6 +7,7 @@ import {
 	type CodeModeIssue,
 	type CanonicalDiagramDocument,
 	canonicalDocumentFromDiagram,
+	flowchartDocumentIds,
 } from "@sketchi/diagram-agent";
 import {
 	type DiagramStyle,
@@ -17,6 +18,11 @@ import {
 	isSupportedGenerationModel,
 	WRONG_DIAGRAM_TYPE_ERROR,
 } from "@sketchi/diagram-generation";
+import {
+	FlowchartDiagramSchema,
+	decodeFlowchartDocument,
+	flowchartDiagramFromDocument,
+} from "@sketchi/diagram-core";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result, Schema } from "effect";
 
@@ -289,6 +295,19 @@ function baseDiagram(
 		return undefined;
 	}
 	const spec = base.spec as Readonly<Record<string, unknown>>;
+	if (base.type === "flowchart") {
+		// The generation model still writes a flowchart's drawn graph, so it revises one.
+		const document = decodeFlowchartDocument(base.spec);
+		if (Result.isFailure(document)) return undefined;
+		const built = flowchartDiagramFromDocument(document.success);
+		if (!built.ok) return undefined;
+		const {
+			style: _style,
+			metadata: _metadata,
+			...diagram
+		} = Schema.encodeSync(FlowchartDiagramSchema)(built.diagram);
+		return { diagram, id: built.diagram.id };
+	}
 	return {
 		diagram: { type: base.type, ...spec },
 		...(typeof spec["id"] === "string" ? { id: spec["id"] } : {}),
@@ -544,7 +563,27 @@ export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate"
 	const scene = inlineArtifact(buildResult.artifact, "scene");
 	const excalidraw = inlineArtifact(buildResult.artifact, "excalidraw");
 	// Styles reach the caller only when they apply to the built diagram; otherwise it draws unstyled.
-	const operations = styleOperations(candidate.styles ?? []);
+	// A drawn flowchart keys each element by its document id, and each edge by its two
+	// ends; a style may name the generated id of either.
+	const documentIds = (() => {
+		if (candidate.diagram.type !== "flowchart") return new Map<string, string>();
+		const ids = flowchartDocumentIds(candidate.diagram);
+		const node = (id: string) => ids.nodes.get(id) ?? id;
+		return new Map([
+			...ids.lanes,
+			...ids.groups,
+			...ids.nodes,
+			...candidate.diagram.edges.map(
+				(edge) => [edge.id, `${node(edge.source)}->${node(edge.target)}`] as const,
+			),
+		]);
+	})();
+	const operations = styleOperations(
+		(candidate.styles ?? []).map((style) => ({
+			...style,
+			targets: style.targets.map((target) => documentIds.get(target) ?? target),
+		})),
+	);
 	const styled =
 		operations.length === 0
 			? undefined

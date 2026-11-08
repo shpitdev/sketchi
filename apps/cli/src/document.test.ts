@@ -17,8 +17,7 @@ describe("canonical document decoding", () => {
 			const sequence = yield* parseJsonDocument(JSON.stringify(sequenceInput));
 
 			assert.strictEqual(flowchart.type, "flowchart");
-			assert.instanceOf(flowchart.spec, FlowchartSpec);
-			assert.strictEqual(flowchart.spec.layout.direction, "TB");
+			assert.isTrue(Schema.is(FlowchartSpec)(flowchart.spec));
 			assert.strictEqual(mindmap.type, "mindmap");
 			assert.instanceOf(mindmap.spec, MindmapSpec);
 			assert.strictEqual(mindmap.spec.layout.direction, "LR");

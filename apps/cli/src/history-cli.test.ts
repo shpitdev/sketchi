@@ -13,14 +13,14 @@ const flowchart = {
 	spec: {
 		id: "checkout-flow",
 		title: "Checkout flow",
-		nodes: [
-			{ id: "cart", label: "Cart", kind: "start" },
-			{ id: "pay", label: "Pay", kind: "process" },
-			{ id: "done", label: "Order placed", kind: "end" },
-		],
+		nodes: {
+			cart: "Cart",
+			pay: "Pay",
+			done: "Order placed",
+		},
 		edges: [
-			{ source: "cart", target: "pay" },
-			{ source: "pay", target: "done" },
+			["cart", "pay"],
+			["pay", "done"],
 		],
 	},
 };

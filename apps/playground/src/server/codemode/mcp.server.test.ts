@@ -130,18 +130,13 @@ const CIRCLE_TO_DIAMOND_CODE = `async () => {
   const built = await sketchi.buildFlowchart({
     spec: {
       title: "Harness MCP proof flow",
-      nodes: [
-        { id: "start", label: "Start", kind: "start" },
-        { id: "choice", label: "Continue?", kind: "decision" },
-        { id: "yes", label: "Continue", kind: "end" },
-        { id: "no", label: "Stop", kind: "end" },
-      ],
+      direction: "LR",
+      nodes: { start: "Start", choice: "Continue?", yes: "Continue", no: "Stop" },
       edges: [
-        { source: "start", target: "choice" },
-        { source: "choice", target: "yes", label: "yes" },
-        { source: "choice", target: "no", label: "no" },
+        ["start", "choice"],
+        ["choice", "yes", "yes"],
+        ["choice", "no", "no"],
       ],
-      layout: { direction: "LR" },
     },
   });
 
@@ -416,11 +411,11 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			{
 				spec: {
 					title: "Trailing options flow",
-					nodes: [
-						{ id: "start", label: "Start", kind: "start" },
-						{ id: "end", label: "Done", kind: "end" },
-					],
-					edges: [{ source: "start", target: "end" }],
+					nodes: {
+						start: "Start",
+						end: "Done",
+					},
+					edges: [["start", "end"]],
 				},
 			},
 		],
@@ -762,19 +757,26 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		{ spec: {} },
 		{
 			spec: {
-				title: "Underbranched",
-				nodes: [
-					{ id: "a", label: "Start", kind: "start" },
-					{ id: "b", label: "Continue?", kind: "decision" },
-					{ id: "c", label: "Finish", kind: "end" },
-				],
+				title: "Unknown end",
+				nodes: {
+					a: "Start",
+					b: "Continue",
+				},
 				edges: [
-					{ source: "a", target: "b" },
-					{ source: "b", target: "c", label: "yes" },
+					["a", "b"],
+					["b", "c"],
 				],
 			},
 		},
-		{ spec: { title: "Invalid", nodes: [{ id: "a", label: "Only", kind: "start" }], edges: [] } },
+		{
+			spec: {
+				title: "Invalid",
+				nodes: {
+					a: "Only",
+				},
+				edges: [],
+			},
+		},
 	])("does not invoke PNG rendering for rejected or invalid builds", async (request) => {
 		const renderPng = vi.fn(async () => {
 			throw new Error("Rejected builds must not render PNG");
@@ -1154,7 +1156,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(executeTool?.description).toContain("plain JavaScript (no TypeScript");
 			expect(executeTool?.description).toContain("async () =>");
 			expect(executeTool?.description).toContain("artifactDelivery");
-			expect(executeTool?.description).toContain("sequence participant.icon");
+			expect(executeTool?.description).toContain("sets participant.icon");
 			expect(executeTool?.description).toContain("When the prompt names technologies");
 			// Every request pays for tools/list. Claude Code cuts the description at 4096 characters in
 			// upfront mode but keeps parameter descriptions, so the builder specs ride on code.
@@ -1182,7 +1184,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(codeDescription).toContain(
 				'Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message',
 			);
-			expect(codeDescription).toMatch(/^buildFlowchart \(.*\): spec: \{ title, nodes: /m);
+			expect(codeDescription).toMatch(/^buildFlowchart \(.*\): spec: \{ title, direction\?: /m);
 			expect(getCodeModeDocs({ topic: "buildFlowchart" }).content).toContain(
 				"type BuildFlowchartRequest",
 			);
@@ -1439,13 +1441,22 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		expect(output.ok).toBe(true);
 		const build = output.builds[0];
 		expect(build?.ok).toBe(true);
-		expect(build?.issues).toEqual([]);
+		expect(build?.issues.filter((issue) => issue.code !== "icon_filled")).toEqual([]);
 		const spec = build?.normalizedSpec;
 		if (!isRecord(spec)) throw new Error("Missing normalized spec");
-		const items = topic === "buildFlowchart" ? spec.nodes : spec.participants;
+		const items =
+			topic === "buildFlowchart" && isRecord(spec.nodes)
+				? Object.values(spec.nodes)
+				: spec.participants;
 		if (!Array.isArray(items)) throw new Error("Missing logo-bearing items");
 		expect(
-			items.flatMap((item) => (isRecord(item) && isRecord(item.icon) ? [item.icon.slug] : [])),
+			items.flatMap((item) =>
+				isRecord(item) && isRecord(item.icon)
+					? [item.icon.slug]
+					: isRecord(item) && typeof item.icon === "string"
+						? [item.icon]
+						: [],
+			),
 		).toEqual(slugs);
 		for (const slug of slugs) expect(requested).toContain(`/node-logos/${slug}.svg`);
 		// The exported artifact must contain an image for each logo, not just normalized metadata.
@@ -1459,12 +1470,12 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			return `async () => sketchi.buildFlowchart({
   spec: {
     title: "Deploy pipeline",
-    nodes: [
-      { id: "push", label: "Push to GitHub", kind: "start", icon: { slug: "github" } },
-      { id: "build", label: "Build the Docker image", kind: "process", icon: { slug: "docker" } },
-      { id: "ship", label: "Ship the Docker image", kind: "end", icon: { slug: "docker" } }
-    ],
-    edges: [{ source: "push", target: "build" }, { source: "build", target: "ship" }]
+    nodes: {
+      push: { label: "Push to GitHub", icon: "github" },
+      build: { label: "Build the Docker image", icon: "docker" },
+      ship: { label: "Ship the Docker image", icon: "docker" }
+    },
+    edges: [["push", "build"], ["build", "ship"]]
   },
   options: ${options}
 })`;
@@ -1507,7 +1518,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 
 			expect(count(text, "<svg")).toBe(0);
 			expect(count(text, "data:image/")).toBe(0);
-			expect(text).toContain('"icon":{"slug":"docker"}');
+			expect(text).toContain('"icon":"docker"');
 			expect(text).toContain("format=excalidraw&raw=true");
 			// The stored exports still draw every logo.
 			const stored = [...bucket.objects].filter(([key]) => !key.includes("usage"));
@@ -1539,19 +1550,18 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			const { text } = await executeText(`async () => sketchi.buildFlowchart({
   spec: {
     title: "Deploy pipeline",
-    nodes: [
-      { id: "push", label: "Push to GitHub", kind: "start", icon: { slug: "github" } },
-      { id: "build", label: "Docker builds the image", kind: "process", icon: { slug: "docker" } },
-      { id: "deploy", label: "Ship to Cloudflare Workers", kind: "end" }
-    ],
-    edges: [{ source: "push", target: "build" }, { source: "build", target: "deploy" }]
+    logos: true,
+    nodes: {
+      push: "Push to GitHub",
+      build: "Docker builds the image",
+      deploy: "Ship to Cloudflare Workers"
+    },
+    edges: [["push", "build"], ["build", "deploy"]]
   },
   options: { artifactFormats: ["scene"] }
 })`);
 
-			expect(text).toContain(
-				'{"id":"deploy","label":"Ship to Cloudflare Workers","kind":"end","icon":{"slug":"cloudflare"}}',
-			);
+			expect(text).toContain('"deploy":{"label":"Ship to Cloudflare Workers","icon":"cloudflare"}');
 			expect(text).toContain('"code":"icon_filled","severity":"info"');
 		});
 	});
@@ -1612,7 +1622,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			const output = await executeSketchiCodeMode(
 				stubPngRenderer(),
 				{
-					code: `async () => { const built = await sketchi.buildFlowchart({ spec: { title: "Receipt contract", nodes: [{id:"a",label:"Start",kind:"start"},{id:"b",label:"Finish",kind:"end"}], edges:[{source:"a",target:"b"}] }, options: { artifactFormats: ["scene", "png"] } }); return ${returned}; }`,
+					code: `async () => { const built = await sketchi.buildFlowchart({ spec: { title: "Receipt contract", nodes: {a:"Start",b:"Finish"}, edges:[["a","b"]] }, options: { artifactFormats: ["scene", "png"] } }); return ${returned}; }`,
 				},
 				{ executor: createInProcessExecutor() },
 			);
@@ -1736,7 +1746,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				stubPngRenderer(),
 				{
 					code: `async () => {
-			const first = await sketchi.buildFlowchart({spec:{title:"First build",nodes:[{id:"a",label:"Start",kind:"start"},{id:"b",label:"Finish",kind:"end"}],edges:[{source:"a",target:"b"}]},options:{artifactFormats:["scene","excalidraw","png"]}});
+			const first = await sketchi.buildFlowchart({spec:{title:"First build",nodes:{a:"Start",b:"Finish"},edges:[["a","b"]]},options:{artifactFormats:["scene","excalidraw","png"]}});
 			if(!first.ok) return first;
 			const patched = await sketchi.applyDiagramPatch({source:{artifactId:first.artifact.artifactId},operations:[{op:"setStyle",selector:{nodeIds:["b"]},style:{strokeColor:"#7c3aed"}}],options:{artifactFormats:["scene","png"]}});
 			if(!patched.ok) return patched;
@@ -1952,7 +1962,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		const output = await executeSketchiCodeMode(
 			{ TELEMETRY_SPANS: spans },
 			{
-				code: `async () => sketchi.buildFlowchart({spec:{title:"Warning receipt",nodes:[{id:"a",label:"Begin",kind:"start",icon:{slug:"not-a-real-logo"}},{id:"b",label:"Finish",kind:"end"}],edges:[{source:"a",target:"b"}]}})`,
+				code: `async () => sketchi.buildFlowchart({spec:{title:"Warning receipt",nodes:{a:{label:"Begin",icon:"zzz-not-a-real-logo"},b:"Finish"},edges:[["a","b"]]}})`,
 			},
 			{ executor: createInProcessExecutor() },
 		);

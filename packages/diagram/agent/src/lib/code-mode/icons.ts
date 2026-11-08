@@ -13,6 +13,7 @@ import {
 	isNodeLogoEligible,
 	isStrayVendorLogo,
 	logoNamedByLabel,
+	labelLogos,
 	normalizeNodeLogoSvg,
 	searchIcons,
 	type IconMatch,
@@ -67,6 +68,15 @@ export interface CodeModeIconCatalog {
 	 * only by an everyday word ("Go to checkout").
 	 */
 	readonly logoNamedByLabel: (label: string) => CodeModeCatalogIcon | undefined;
+	/**
+	 * The marks a label names in a diagram that asks for logos: every one it names, unmistakable
+	 * names first ("Next.js app hosted on Vercel" names nextjs, then vercel), and any its first
+	 * word may mean when that word starts step labels far more often ("Make payment").
+	 */
+	readonly labelLogos: (label: string) => {
+		readonly named: readonly CodeModeCatalogIcon[];
+		readonly possible: readonly CodeModeCatalogIcon[];
+	};
 	/** Raw SVG source for an eligible mark. */
 	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
 	/** The hand-drawn recipe for an eligible mark, when the catalog has one. */
@@ -107,6 +117,15 @@ export function makeCodeModeIconCatalog(options: {
 		logoNamedByLabel: (label) => {
 			const icon = logoNamedByLabel(label, eligible);
 			return icon ? bySlug.get(icon.slug) : undefined;
+		},
+		labelLogos: (label) => {
+			const found = labelLogos(label, eligible);
+			const marks = (icons: readonly SketchiIcon[]) =>
+				icons.flatMap((icon) => {
+					const mark = bySlug.get(icon.slug);
+					return mark ? [mark] : [];
+				});
+			return { named: marks(found.named), possible: marks(found.possible) };
 		},
 		search: (query, limit) =>
 			searchIcons(eligible, { limit, query }).map(({ icon }) => ({
@@ -244,6 +263,97 @@ export function resolveNodeIcons<
 		return { ...node, icon: { slug: icon.slug } };
 	});
 	return { issues, nodes: filled };
+}
+
+/**
+ * The logos a flowchart document's nodes draw. A node's `icon` names a product or a
+ * catalog slug and resolves on the server, so no lookup round trip is needed; null
+ * draws none. With `logos` set, every other node whose label unmistakably names a
+ * product draws its logo, reported as icon_filled. A vendor's mark stays only on a
+ * label that names the vendor. Concept marks are never filled from labels.
+ */
+export function resolveFlowchartLogos(
+	document: {
+		readonly logos?: boolean | "exact";
+		readonly nodes: Readonly<
+			Record<string, string | { readonly label: string; readonly icon?: string | null }>
+		>;
+	},
+	catalog: CodeModeIconCatalog | undefined,
+): { readonly issues: CodeModeIssue[]; readonly icons: ReadonlyMap<string, string> } {
+	const icons = new Map<string, string>();
+	const issues: CodeModeIssue[] = [];
+	for (const [id, node] of Object.entries(document.nodes)) {
+		const label = typeof node === "string" ? node : node.label;
+		const requested = typeof node === "string" ? undefined : node.icon;
+		if (requested === null) continue;
+		const ref = { kind: "node" as const, id, path: `nodes.${id}.icon` };
+		if (requested !== undefined) {
+			const slug = normalizeIconSlug(requested);
+			const icon =
+				(isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined) ??
+				catalog?.labelLogos(requested).named[0] ??
+				catalog?.labelLogos(requested).possible[0] ??
+				catalog?.search(requested, 1).find((hit) => hit.match === "exact");
+			if (!icon) {
+				issues.push(
+					unknownIconIssue({
+						catalog,
+						message: `Icon "${requested}" on node "${id}" names no Sketchi logo; the node renders without one.`,
+						ref,
+						slug,
+					}),
+				);
+				continue;
+			}
+			if (catalog?.isStrayVendorLogo(icon.slug, label)) {
+				issues.push({
+					code: "icon_dropped",
+					severity: "warning",
+					stage: "input",
+					ref,
+					message: `Icon "${icon.slug}" on node "${id}" is a vendor logo, but the label "${label}" does not name ${icon.name}; the node renders without a logo.`,
+					hint: `Put a vendor's logo only on a node whose label names that vendor ("Cloudflare Workers" takes cloudflare).`,
+				});
+				continue;
+			}
+			icons.set(id, icon.slug);
+			continue;
+		}
+		if (!document.logos || !catalog) continue;
+		// A node draws one logo: the first product its label names.
+		const found = catalog.labelLogos(label);
+		const [named, ...others] = found.named;
+		const [possible] = found.possible;
+		if (!named && possible) {
+			issues.push({
+				code: "icon_possible",
+				severity: "info",
+				stage: "input",
+				ref,
+				message: `Node "${id}" draws no logo: its label "${label}" starts with "${label.trim().split(/\s+/u)[0]}", which usually names a step, not ${possible.name}.`,
+				hint: `If it means ${possible.name}, set icon: "${possible.name}".`,
+			});
+			continue;
+		}
+		if (!named) continue;
+		icons.set(id, named.slug);
+		issues.push({
+			code: "icon_filled",
+			severity: "info",
+			stage: "input",
+			ref,
+			message:
+				others.length === 0
+					? `Node "${id}" draws the "${named.slug}" logo because its label "${label}" names ${named.name}.`
+					: `Node "${id}" draws the "${named.slug}" logo, the first of the products its label "${label}" names (${[named, ...others].map((icon) => icon.name).join(", ")}).`,
+			hint:
+				others.length === 0
+					? "No action needed."
+					: `Set icon to another of them, such as "${others[0]?.name}", to draw that one instead.`,
+		});
+	}
+	return { issues, icons };
 }
 
 /**

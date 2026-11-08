@@ -193,14 +193,14 @@ describe("binding-dependent host lifecycles", () => {
 					return yield* codeMode.buildFlowchart({
 						spec: {
 							title: "Lifecycle source",
-							nodes: [
-								{ id: "start", label: "Change proposed", kind: "start" },
-								{ id: "review", label: "Review evidence", kind: "process" },
-								{ id: "end", label: "Change recorded", kind: "end" },
-							],
+							nodes: {
+								start: "Change proposed",
+								review: "Review evidence",
+								end: "Change recorded",
+							},
 							edges: [
-								{ source: "start", target: "review" },
-								{ source: "review", target: "end" },
+								["start", "review"],
+								["review", "end"],
 							],
 						},
 						options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },

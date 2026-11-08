@@ -32,15 +32,14 @@ const acceptedBuild = {
 	buildId: "build_release",
 	issues: [],
 	normalizedSpec: {
-		edges: [{ id: "start-done", source: "start", target: "done" }],
 		id: "release",
-		layout: { direction: "TB" },
-		nodes: [
-			{ id: "start", kind: "start", label: "Start" },
-			{ id: "done", kind: "end", label: "Done" },
-		],
-		style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
 		title: "Release",
+		direction: "TB",
+		nodes: {
+			start: "Start",
+			done: "Done",
+		},
+		edges: [["start", "done"]],
 	},
 	ok: true,
 	quality: {
@@ -107,17 +106,16 @@ describe("playground surface", () => {
 
 		expect(DEPLOY_PIPELINE_SCENE.accentColor).toBe("#8f707f");
 		expect(DEPLOY_PIPELINE_SCENE.backgroundColor).toBe("#fffdf8");
-		expect(DEPLOY_PIPELINE_SPEC.nodes.map((node) => node.label)).toEqual([
-			"GitHub push",
-			"Docker build",
-			"Run tests",
-			"Cloudflare ship",
-		]);
-		expect(DEPLOY_PIPELINE_SPEC.nodes).toHaveLength(4);
+		expect(
+			Object.values(DEPLOY_PIPELINE_SPEC.nodes).map((node) =>
+				typeof node === "string" ? node : node.label,
+			),
+		).toEqual(["GitHub push", "Docker build", "Run tests", "Cloudflare ship"]);
+		expect(Object.keys(DEPLOY_PIPELINE_SPEC.nodes)).toHaveLength(4);
 		expect(DEPLOY_PIPELINE_SPEC.edges).toEqual([
-			{ source: "push", target: "build" },
-			{ source: "build", target: "tests" },
-			{ source: "tests", target: "deploy" },
+			["push", "build"],
+			["build", "tests"],
+			["tests", "deploy"],
 		]);
 		expect(JSON.stringify(DEPLOY_PIPELINE_SPEC)).not.toMatch(/fix build|retry/i);
 		expect(JSON.stringify(DEPLOY_PIPELINE_SCENE)).not.toMatch(/fix build|retry/i);

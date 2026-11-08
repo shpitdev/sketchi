@@ -8,9 +8,6 @@ import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
-	FlowchartDiagramSchema,
-	SKETCHI_DIAGRAM_STYLE,
-	getFlowchartValidationIssues,
 	mindmapFixture,
 	parseChartDiagram,
 } from "@sketchi/diagram-core";
@@ -94,18 +91,18 @@ function createTestRuntime() {
 function approvalSpec() {
 	return {
 		title: "Simple approval flow",
-		nodes: [
-			{ id: "request", label: "Request arrives", kind: "start" },
-			{ id: "approve", label: "Approved?", kind: "decision" },
-			{ id: "done", label: "Done", kind: "end" },
-			{ id: "revise", label: "Revise", kind: "end" },
-		],
+		direction: "TB",
+		nodes: {
+			request: "Request arrives",
+			approve: "Approved?",
+			done: "Done",
+			revise: "Revise",
+		},
 		edges: [
-			{ source: "request", target: "approve" },
-			{ source: "approve", target: "done", label: "yes" },
-			{ source: "approve", target: "revise", label: "no" },
+			["request", "approve"],
+			["approve", "done", "yes"],
+			["approve", "revise", "no"],
 		],
-		layout: { direction: "TB" },
 	};
 }
 
@@ -228,37 +225,24 @@ function spoofedInlineLifelineScene(options: { readonly useLifelineId: boolean }
 }
 
 function linearFlowchartSpec(nodeCount: number) {
-	const nodes = Array.from({ length: nodeCount }, (_, index) => ({
-		id: `node-${index}`,
-		label: `Concrete operation ${index}`,
-		kind: index === 0 ? "start" : index === nodeCount - 1 ? "end" : "process",
-	}));
+	const ids = Array.from({ length: nodeCount }, (_, index) => `node-${index}`);
 	return {
 		title: `Linear flow with ${nodeCount} nodes`,
-		nodes,
-		edges: nodes.slice(0, -1).map((node, index) => ({
-			source: node.id,
-			target: nodes[index + 1]?.id,
-		})),
+		nodes: Object.fromEntries(ids.map((id, index) => [id, `Concrete operation ${index}`])),
+		edges: ids.slice(0, -1).map((id, index) => [id, ids[index + 1] ?? id] as [string, string]),
 	};
 }
 
 function denseAcyclicFlowchartSpec(edgeCount: number) {
 	const spec = linearFlowchartSpec(FLOWCHART_MAX_NODES);
-	const chainKeys = new Set(spec.edges.map((edge) => `${edge.source}->${edge.target}`));
-	const extraEdges = spec.nodes.flatMap((source, sourceIndex) =>
-		spec.nodes.slice(sourceIndex + 1).flatMap((target, targetOffset) => {
-			const key = `${source.id}->${target.id}`;
-			return chainKeys.has(key)
-				? []
-				: [
-						{
-							source: source.id,
-							target: target.id,
-							id: `extra-${sourceIndex}-${sourceIndex + targetOffset + 1}`,
-						},
-					];
-		}),
+	const ids = Object.keys(spec.nodes);
+	const chainKeys = new Set(spec.edges.map(([source, target]) => `${source}->${target}`));
+	const extraEdges = ids.flatMap((source, sourceIndex) =>
+		ids
+			.slice(sourceIndex + 1)
+			.flatMap((target) =>
+				chainKeys.has(`${source}->${target}`) ? [] : [[source, target] as [string, string]],
+			),
 	);
 	return {
 		...spec,
@@ -272,107 +256,60 @@ function whitespaceFlowchartCases(): Array<{
 	spec: unknown;
 }> {
 	const base = linearFlowchartSpec(3);
-	const processNodeId = base.nodes[1]?.id ?? "node-1";
 	return [
-		{
-			name: "title",
-			path: "spec.title",
-			spec: { ...base, title: "   " },
-		},
+		{ name: "title", path: "spec.title", spec: { ...base, title: "   " } },
 		{
 			name: "node label",
-			path: "spec.nodes.[1].label",
-			spec: {
-				...base,
-				nodes: base.nodes.map((node, index) => (index === 1 ? { ...node, label: "   " } : node)),
-			},
-		},
-		{
-			name: "node id",
-			path: "spec.nodes.[1].id",
-			spec: {
-				...base,
-				nodes: base.nodes.map((node, index) => (index === 1 ? { ...node, id: "   " } : node)),
-				edges: base.edges.map((edge) => ({
-					...edge,
-					source: edge.source === processNodeId ? "   " : edge.source,
-					target: edge.target === processNodeId ? "   " : edge.target,
-				})),
-			},
-		},
-		{
-			name: "optional node description",
-			path: "spec.nodes.[1].description",
-			spec: {
-				...base,
-				nodes: base.nodes.map((node, index) =>
-					index === 1 ? { ...node, description: "   " } : node,
-				),
-			},
+			path: "spec.nodes.node-1",
+			spec: { ...base, nodes: { ...base.nodes, "node-1": "   " } },
 		},
 	];
-}
-
-function canonicalCodesForSpec(spec: ReturnType<typeof approvalSpec>) {
-	const diagram = Schema.decodeUnknownSync(FlowchartDiagramSchema, {
-		errors: "all",
-	})({
-		id: "canonical-parity",
-		title: spec.title,
-		type: "flowchart",
-		nodes: spec.nodes,
-		edges: spec.edges.map((edge, index) => ({
-			...edge,
-			id: `edge-${index + 1}`,
-		})),
-	});
-	return getFlowchartValidationIssues(diagram).map((issue) => issue.code);
 }
 
 function incidentEscalationOpsSpec() {
 	return {
 		id: "incident-escalation-ops",
 		title: "Incident Escalation & Operations Response",
-		nodes: [
-			{ id: "alert_received", label: "Alert Received", kind: "start" },
-			{ id: "triage", label: "Triage & Deduplicate", kind: "process" },
-			{ id: "is_actionable", label: "Actionable Signal?", kind: "decision" },
-			{ id: "auto_close", label: "Auto-Close / Suppress", kind: "end" },
-			{ id: "severity", label: "Assess Severity", kind: "decision" },
-			{ id: "sev1_page", label: "Page On-Call (SEV1)", kind: "process" },
-			{ id: "sev2_assign", label: "Assign Owner (SEV2)", kind: "process" },
-			{ id: "sev3_queue", label: "Queue Backlog (SEV3)", kind: "process" },
-			{ id: "incident_bridge", label: "Open Incident Bridge", kind: "process" },
-			{ id: "investigate", label: "Investigate Root Cause", kind: "process" },
-			{ id: "mitigated", label: "Mitigated?", kind: "decision" },
-			{ id: "reassess", label: "Reassess Severity", kind: "process" },
-			{ id: "comms", label: "Notify Stakeholders", kind: "process" },
-			{ id: "monitor", label: "Stable After Monitoring?", kind: "decision" },
-			{ id: "postmortem", label: "Write Postmortem", kind: "process" },
-			{ id: "resolved", label: "Incident Resolved", kind: "end" },
-		],
+		direction: "TB",
+		nodes: {
+			alert_received: "Alert Received",
+			triage: "Triage & Deduplicate",
+			is_actionable: "Actionable Signal?",
+			auto_close: "Auto-Close / Suppress",
+			severity: "Assess Severity",
+			sev1_page: "Page On-Call (SEV1)",
+			sev2_assign: "Assign Owner (SEV2)",
+			sev3_queue: "Queue Backlog (SEV3)",
+			incident_bridge: "Open Incident Bridge",
+			investigate: "Investigate Root Cause",
+			mitigated: "Mitigated?",
+			reassess: "Reassess Severity",
+			comms: "Notify Stakeholders",
+			monitor: "Stable After Monitoring?",
+			postmortem: "Write Postmortem",
+			resolved: "Incident Resolved",
+		},
 		edges: [
-			{ source: "alert_received", target: "triage" },
-			{ source: "triage", target: "is_actionable" },
-			{ source: "is_actionable", target: "auto_close", label: "no" },
-			{ source: "is_actionable", target: "severity", label: "yes" },
-			{ source: "severity", target: "sev1_page", label: "SEV1" },
-			{ source: "severity", target: "sev2_assign", label: "SEV2" },
-			{ source: "severity", target: "sev3_queue", label: "SEV3" },
-			{ source: "sev1_page", target: "incident_bridge" },
-			{ source: "sev2_assign", target: "incident_bridge" },
-			{ source: "incident_bridge", target: "investigate" },
-			{ source: "sev3_queue", target: "investigate" },
-			{ source: "investigate", target: "mitigated" },
-			{ source: "mitigated", target: "comms", label: "yes" },
-			{ source: "mitigated", target: "reassess", label: "no" },
-			{ source: "reassess", target: "severity", label: "re-triage" },
-			{ source: "comms", target: "monitor" },
-			{ source: "monitor", target: "postmortem", label: "stable" },
-			{ source: "monitor", target: "investigate", label: "regressed" },
-			{ source: "postmortem", target: "resolved" },
+			["alert_received", "triage"],
+			["triage", "is_actionable"],
+			["is_actionable", "auto_close", "no"],
+			["is_actionable", "severity", "yes"],
+			["severity", "sev1_page", "SEV1"],
+			["severity", "sev2_assign", "SEV2"],
+			["severity", "sev3_queue", "SEV3"],
+			["sev1_page", "incident_bridge"],
+			["sev2_assign", "incident_bridge"],
+			["incident_bridge", "investigate"],
+			["sev3_queue", "investigate"],
+			["investigate", "mitigated"],
+			["mitigated", "comms", "yes"],
+			["mitigated", "reassess", "no"],
+			["reassess", "severity", "re-triage"],
+			["comms", "monitor"],
+			["monitor", "postmortem", "stable"],
+			["monitor", "investigate", "regressed"],
+			["postmortem", "resolved"],
 		],
-		layout: { direction: "TB" },
 	};
 }
 
@@ -380,79 +317,67 @@ function productionReleaseRollbackSpec() {
 	return {
 		id: "production-release-incident-response-rollback",
 		title: "Production Release Incident Response Rollback Flow",
-		nodes: [
-			{ id: "start", label: "Start", kind: "start" },
-			{ id: "ci_build", label: "CI Build", kind: "process" },
-			{ id: "ci_gate", label: "CI Gate", kind: "decision" },
-			{ id: "security_scan", label: "Security Scan", kind: "process" },
-			{ id: "scan_gate", label: "Scan Gate", kind: "decision" },
-			{ id: "vuln_gate", label: "Vuln Gate", kind: "decision" },
-			{ id: "deploy_staging", label: "Deploy Staging", kind: "process" },
-			{ id: "smoke_staging", label: "Smoke Staging", kind: "process" },
-			{ id: "staging_gate", label: "Staging Gate", kind: "decision" },
-			{ id: "fix_code", label: "Fix Code", kind: "process" },
-			{ id: "canary_deploy", label: "Canary Deploy", kind: "process" },
-			{ id: "canary_gate", label: "Canary Gate", kind: "decision" },
-			{ id: "full_rollout", label: "Full Rollout", kind: "process" },
-			{ id: "monitor", label: "Monitor", kind: "process" },
-			{ id: "incident_gate", label: "Incident Gate", kind: "decision" },
-			{ id: "severity_gate", label: "Severity Gate", kind: "decision" },
-			{ id: "page_oncall", label: "Page Oncall", kind: "process" },
-			{ id: "mitigate", label: "Mitigate", kind: "process" },
-			{ id: "mitigation_gate", label: "Mitigation Gate", kind: "decision" },
-			{ id: "rollback", label: "Rollback", kind: "process" },
-			{ id: "rollback_gate", label: "Rollback Gate", kind: "decision" },
-			{ id: "manual_recovery", label: "Manual Recovery", kind: "process" },
-			{ id: "postmortem", label: "Postmortem", kind: "process" },
-			{ id: "done", label: "Done", kind: "end" },
-		],
+		direction: "TB",
+		nodes: {
+			start: "Start",
+			ci_build: "CI Build",
+			ci_gate: "CI Gate",
+			security_scan: "Security Scan",
+			scan_gate: "Scan Gate",
+			vuln_gate: "Vuln Gate",
+			deploy_staging: "Deploy Staging",
+			smoke_staging: "Smoke Staging",
+			staging_gate: "Staging Gate",
+			fix_code: "Fix Code",
+			canary_deploy: "Canary Deploy",
+			canary_gate: "Canary Gate",
+			full_rollout: "Full Rollout",
+			monitor: "Monitor",
+			incident_gate: "Incident Gate",
+			severity_gate: "Severity Gate",
+			page_oncall: "Page Oncall",
+			mitigate: "Mitigate",
+			mitigation_gate: "Mitigation Gate",
+			rollback: "Rollback",
+			rollback_gate: "Rollback Gate",
+			manual_recovery: "Manual Recovery",
+			postmortem: "Postmortem",
+			done: "Done",
+		},
 		edges: [
-			{ source: "start", target: "ci_build", label: "trigger" },
-			{ source: "ci_build", target: "ci_gate", label: "tests done" },
-			{ source: "ci_gate", target: "security_scan", label: "green" },
-			{ source: "ci_gate", target: "fix_code", label: "red" },
-			{ source: "fix_code", target: "ci_build", label: "rebuild" },
-			{ source: "security_scan", target: "scan_gate", label: "scan" },
-			{ source: "scan_gate", target: "deploy_staging", label: "clean" },
-			{ source: "scan_gate", target: "vuln_gate", label: "vulns" },
-			{ source: "vuln_gate", target: "done", label: "abort" },
-			{ source: "vuln_gate", target: "fix_code", label: "patch" },
-			{ source: "deploy_staging", target: "smoke_staging", label: "deploy" },
-			{ source: "smoke_staging", target: "staging_gate", label: "verify" },
-			{ source: "staging_gate", target: "canary_deploy", label: "healthy" },
-			{ source: "staging_gate", target: "fix_code", label: "failed" },
-			{
-				source: "canary_deploy",
-				target: "canary_gate",
-				label: "5 percent",
-			},
-			{ source: "canary_gate", target: "full_rollout", label: "ok" },
-			{ source: "canary_gate", target: "rollback", label: "regression" },
-			{ source: "full_rollout", target: "monitor", label: "observe" },
-			{ source: "monitor", target: "incident_gate", label: "signals" },
-			{ source: "incident_gate", target: "done", label: "stable" },
-			{ source: "incident_gate", target: "severity_gate", label: "incident" },
-			{ source: "severity_gate", target: "page_oncall", label: "sev1" },
-			{ source: "severity_gate", target: "mitigate", label: "low sev" },
-			{ source: "page_oncall", target: "mitigate", label: "triage" },
-			{ source: "mitigate", target: "mitigation_gate", label: "mitigate" },
-			{ source: "mitigation_gate", target: "monitor", label: "worked" },
-			{ source: "mitigation_gate", target: "rollback", label: "missed SLA" },
-			{ source: "rollback", target: "rollback_gate", label: "rollback" },
-			{ source: "rollback_gate", target: "postmortem", label: "restored" },
-			{
-				source: "rollback_gate",
-				target: "manual_recovery",
-				label: "still failing",
-			},
-			{
-				source: "manual_recovery",
-				target: "rollback_gate",
-				label: "re-verify",
-			},
-			{ source: "postmortem", target: "done", label: "closed" },
+			["start", "ci_build", "trigger"],
+			["ci_build", "ci_gate", "tests done"],
+			["ci_gate", "security_scan", "green"],
+			["ci_gate", "fix_code", "red"],
+			["fix_code", "ci_build", "rebuild"],
+			["security_scan", "scan_gate", "scan"],
+			["scan_gate", "deploy_staging", "clean"],
+			["scan_gate", "vuln_gate", "vulns"],
+			["vuln_gate", "done", "abort"],
+			["vuln_gate", "fix_code", "patch"],
+			["deploy_staging", "smoke_staging", "deploy"],
+			["smoke_staging", "staging_gate", "verify"],
+			["staging_gate", "canary_deploy", "healthy"],
+			["staging_gate", "fix_code", "failed"],
+			["canary_deploy", "canary_gate", "5 percent"],
+			["canary_gate", "full_rollout", "ok"],
+			["canary_gate", "rollback", "regression"],
+			["full_rollout", "monitor", "observe"],
+			["monitor", "incident_gate", "signals"],
+			["incident_gate", "done", "stable"],
+			["incident_gate", "severity_gate", "incident"],
+			["severity_gate", "page_oncall", "sev1"],
+			["severity_gate", "mitigate", "low sev"],
+			["page_oncall", "mitigate", "triage"],
+			["mitigate", "mitigation_gate", "mitigate"],
+			["mitigation_gate", "monitor", "worked"],
+			["mitigation_gate", "rollback", "missed SLA"],
+			["rollback", "rollback_gate", "rollback"],
+			["rollback_gate", "postmortem", "restored"],
+			["rollback_gate", "manual_recovery", "still failing"],
+			["manual_recovery", "rollback_gate", "re-verify"],
+			["postmortem", "done", "closed"],
 		],
-		layout: { direction: "TB" },
 	};
 }
 
@@ -572,45 +497,6 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 describe("Code Mode runtime", () => {
-	it("normalizes accepted legacy builder styles to the Sketchi palette", async () => {
-		const legacyStyle = {
-			accentColor: "#7c3aed",
-			backgroundColor: "#ffffff",
-		};
-		const results = await Promise.all([
-			createTestRuntime().buildFlowchart({
-				spec: { ...approvalSpec(), style: legacyStyle },
-				options: { inlineArtifacts: ["scene"] },
-			}),
-			createTestRuntime().buildMindmap({
-				spec: {
-					title: "Legacy mindmap style",
-					root: { label: "Root", children: [{ label: "Child" }] },
-					style: legacyStyle,
-				},
-				options: { inlineArtifacts: ["scene"] },
-			}),
-			createTestRuntime().buildSequenceDiagram({
-				spec: { ...checkoutSequenceSpec(), style: legacyStyle },
-				options: { inlineArtifacts: ["scene"] },
-			}),
-		]);
-
-		for (const result of results) {
-			expect(result).toMatchObject({
-				ok: true,
-				normalizedSpec: { style: SKETCHI_DIAGRAM_STYLE },
-			});
-			if (!result.ok) throw new Error("Expected accepted branded diagram.");
-			expect(
-				result.artifact.formats.find(({ format }) => format === "scene")?.inline,
-			).toMatchObject({
-				accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
-				backgroundColor: SKETCHI_DIAGRAM_STYLE.backgroundColor,
-			});
-		}
-	});
-
 	it("builds a nested mindmap with deterministic hierarchy ids and exports", async () => {
 		const runtime = createTestRuntime();
 		const built = await runtime.buildMindmap({
@@ -724,7 +610,8 @@ describe("Code Mode runtime", () => {
 		const result = await createTestRuntime().buildFlowchart({
 			spec: {
 				title: "Malformed",
-				nodes: Array.from({ length: 1_000 }, () => ({})),
+				nodes: Object.fromEntries(Array.from({ length: 1_000 }, (_, index) => [`n${index}`, {}])),
+				edges: [],
 			},
 		});
 		expect(result).toMatchObject({ ok: false, status: "invalid_input" });
@@ -842,10 +729,7 @@ describe("Code Mode runtime", () => {
 		expectBuildOk(built);
 		expect(built.status).toBe("accepted");
 		expect(built.requestId).toBe("request-1");
-		expect(built.normalizedSpec.style).toEqual({
-			accentColor: "#8f707f",
-			backgroundColor: "#fffdf8",
-		});
+
 		expect(built.artifact.formats.map((format) => format.format)).toEqual(["excalidraw", "scene"]);
 
 		const inlineScene = built.artifact.formats.find((format) => format.format === "scene")?.inline;
@@ -957,38 +841,6 @@ describe("Code Mode runtime", () => {
 		expect(built.artifact.formats.map((format) => format.format)).toEqual(["scene", "excalidraw"]);
 	});
 
-	it("keeps missing start and end failures in parity with diagram-core", async () => {
-		const specs = [
-			{
-				expected: "missing_start",
-				spec: {
-					...approvalSpec(),
-					nodes: approvalSpec().nodes.map((node) =>
-						node.kind === "start" ? { ...node, kind: "process" } : node,
-					),
-				},
-			},
-			{
-				expected: "missing_end",
-				spec: {
-					...approvalSpec(),
-					nodes: approvalSpec().nodes.map((node) =>
-						node.kind === "end" ? { ...node, kind: "process" } : node,
-					),
-				},
-			},
-		];
-
-		for (const { expected, spec } of specs) {
-			const canonicalCodes = canonicalCodesForSpec(spec);
-			const result = await createTestRuntime().buildFlowchart({ spec });
-			expectBuildFailure(result);
-			expect(result.status).toBe("invalid_flowchart");
-			expect(result.issues.map((issue) => issue.code)).toEqual(canonicalCodes);
-			expect(canonicalCodes).toContain(expected);
-		}
-	});
-
 	it.each(whitespaceFlowchartCases())(
 		"rejects whitespace-only $name after normalization as a bounded flowchart failure",
 		async ({ spec, path }) => {
@@ -1011,7 +863,7 @@ describe("Code Mode runtime", () => {
 		const base = linearFlowchartSpec(FLOWCHART_MAX_NODES);
 		const spec = {
 			...base,
-			nodes: base.nodes.map((node) => ({ ...node, label: "   " })),
+			nodes: Object.fromEntries(Object.keys(base.nodes).map((id) => [id, "   "])),
 		};
 		const first = await createTestRuntime().buildFlowchart({ spec });
 		const second = await createTestRuntime().buildFlowchart({ spec });
@@ -1027,19 +879,19 @@ describe("Code Mode runtime", () => {
 		const result = await createTestRuntime().buildFlowchart({
 			spec: {
 				title: "Closed retry cycle",
-				nodes: [
-					{ id: "start", label: "Request arrives", kind: "start" },
-					{ id: "route", label: "Ready?", kind: "decision" },
-					{ id: "done", label: "Completed", kind: "end" },
-					{ id: "retry-a", label: "Retry stage alpha", kind: "process" },
-					{ id: "retry-b", label: "Retry stage beta", kind: "process" },
-				],
+				nodes: {
+					start: "Request arrives",
+					route: "Ready?",
+					done: "Completed",
+					"retry-a": "Retry stage alpha",
+					"retry-b": "Retry stage beta",
+				},
 				edges: [
-					{ source: "start", target: "route" },
-					{ source: "route", target: "done", label: "yes" },
-					{ source: "route", target: "retry-a", label: "retry" },
-					{ source: "retry-a", target: "retry-b" },
-					{ source: "retry-b", target: "retry-a" },
+					["start", "route"],
+					["route", "done", "yes"],
+					["route", "retry-a", "retry"],
+					["retry-a", "retry-b"],
+					["retry-b", "retry-a"],
 				],
 			},
 		});
@@ -1057,17 +909,17 @@ describe("Code Mode runtime", () => {
 		const result = await createTestRuntime().buildFlowchart({
 			spec: {
 				title: "Retry with eventual exit",
-				nodes: [
-					{ id: "start", label: "Start request", kind: "start" },
-					{ id: "attempt", label: "Attempt operation", kind: "process" },
-					{ id: "retry", label: "Succeeded?", kind: "decision" },
-					{ id: "done", label: "Complete request", kind: "end" },
-				],
+				nodes: {
+					start: "Start request",
+					attempt: "Attempt operation",
+					retry: "Succeeded?",
+					done: "Complete request",
+				},
 				edges: [
-					{ source: "start", target: "attempt" },
-					{ source: "attempt", target: "retry" },
-					{ source: "retry", target: "attempt", label: "retry" },
-					{ source: "retry", target: "done", label: "yes" },
+					["start", "attempt"],
+					["attempt", "retry"],
+					["retry", "attempt", "retry"],
+					["retry", "done", "yes"],
 				],
 			},
 		});
@@ -1079,16 +931,16 @@ describe("Code Mode runtime", () => {
 		const result = await createTestRuntime().buildFlowchart({
 			spec: {
 				title: "Disconnected graph",
-				nodes: [
-					{ id: "start", label: "Start request", kind: "start" },
-					{ id: "done", label: "Complete request", kind: "end" },
-					{ id: "orphan-a", label: "Orphan alpha", kind: "process" },
-					{ id: "orphan-b", label: "Orphan beta", kind: "process" },
-				],
+				nodes: {
+					start: "Start request",
+					done: "Complete request",
+					"orphan-a": "Orphan alpha",
+					"orphan-b": "Orphan beta",
+				},
 				edges: [
-					{ source: "start", target: "done" },
-					{ source: "orphan-a", target: "orphan-b" },
-					{ source: "orphan-b", target: "orphan-a" },
+					["start", "done"],
+					["orphan-a", "orphan-b"],
+					["orphan-b", "orphan-a"],
 				],
 			},
 		});
@@ -1108,11 +960,66 @@ describe("Code Mode runtime", () => {
 		]) {
 			const result = await createTestRuntime().buildFlowchart({ spec });
 			expectBuildFailure(result);
-			expect(result.status).toBe("invalid_flowchart");
+			expect(result.status).toBe("limit_exceeded");
 			expect(result.issues).toContainEqual(
 				expect.objectContaining({ code: "flowchart_too_large" }),
 			);
 		}
+	});
+
+	it("refuses two node ids that are one id once trimmed", async () => {
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Trimmed ids",
+				nodes: { a: "Start", " a ": "Start again", b: "Finish" },
+				edges: [["a", "b"]],
+			},
+		});
+
+		expectBuildFailure(result);
+		expect(result.status).toBe("invalid_flowchart");
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "duplicate_node_id",
+				ref: { kind: "node", id: "a", path: "spec.nodes. a " },
+			}),
+		]);
+	});
+
+	it("accepts a question with one stated way on", async () => {
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Deploy check",
+				nodes: { begin: "Begin", verify: "Verify deployment?", notify: "Notify team" },
+				edges: [
+					["begin", "verify"],
+					["verify", "notify"],
+				],
+			},
+		});
+
+		expect(result).toMatchObject({ ok: true, status: "accepted" });
+	});
+
+	it("counts list-ended edges before expanding them", async () => {
+		const ids = (prefix: string) => Array.from({ length: 300 }, (_, index) => `${prefix}${index}`);
+		const result = await createTestRuntime().buildFlowchart({
+			spec: {
+				title: "Fan out",
+				nodes: { a: "Start", b: "Finish" },
+				edges: [[ids("from"), ids("to")]],
+			},
+		});
+
+		expectBuildFailure(result);
+		expect(result.status).toBe("limit_exceeded");
+		// Only the count: no pair was expanded to report its unknown ends.
+		expect(result.issues).toEqual([
+			expect.objectContaining({
+				code: "flowchart_too_large",
+				message: "Flowchart draws 90000 edges; the supported maximum is 120.",
+			}),
+		]);
 	});
 
 	it("fails semantic limits before rendering or persisting artifacts", async () => {
@@ -1148,7 +1055,7 @@ describe("Code Mode runtime", () => {
 		});
 
 		expectBuildFailure(result);
-		expect(result.status).toBe("invalid_flowchart");
+		expect(result.status).toBe("limit_exceeded");
 		expect(renderCalls).toBe(0);
 		expect(writeCalls).toBe(0);
 	});
@@ -1156,16 +1063,17 @@ describe("Code Mode runtime", () => {
 	it("caps canonical flowchart issue output deterministically", async () => {
 		const spec = {
 			title: "Bounded issue output",
-			nodes: [
-				{ id: "start", label: "Start request", kind: "start" },
-				{ id: "done", label: "Complete request", kind: "end" },
-				...Array.from({ length: FLOWCHART_MAX_NODES - 2 }, (_, index) => ({
-					id: `orphan-${index}`,
-					label: `Orphan operation ${index}`,
-					kind: "process",
-				})),
-			],
-			edges: [{ source: "start", target: "done" }],
+			nodes: {
+				start: "Start request",
+				done: "Complete request",
+				...Object.fromEntries(
+					Array.from({ length: FLOWCHART_MAX_NODES - 2 }, (_, index) => [
+						`orphan-${index}`,
+						`Orphan operation ${index}`,
+					]),
+				),
+			},
+			edges: [["start", "done"]],
 		};
 		const first = await createTestRuntime().buildFlowchart({ spec });
 		const second = await createTestRuntime().buildFlowchart({ spec });
@@ -1181,7 +1089,12 @@ describe("Code Mode runtime", () => {
 		const built = await runtime.buildFlowchart({
 			spec: {
 				...approvalSpec(),
-				edges: [{ source: "request", target: "approve" }],
+				edges: [
+					["request", "approve"],
+					["approve", "done"],
+					["approve", "revise", "no"],
+					["approve", "ghost", "maybe"],
+				],
 			},
 		});
 
@@ -1189,14 +1102,14 @@ describe("Code Mode runtime", () => {
 		expect(built.status).toBe("invalid_flowchart");
 		expect(built.issues).toContainEqual(
 			expect.objectContaining({
-				code: "underbranched_decision",
-				ref: expect.objectContaining({ id: "approve" }),
+				code: "missing_edge_target",
+				ref: expect.objectContaining({ path: "spec.edges[3][1]" }),
 			}),
 		);
 		expect(built.issues).toContainEqual(
 			expect.objectContaining({
-				code: "unreachable_node",
-				ref: expect.objectContaining({ id: "done" }),
+				code: "unlabeled_decision_branch",
+				ref: expect.objectContaining({ id: "approve->done" }),
 			}),
 		);
 	});
@@ -2132,9 +2045,10 @@ describe("Code Mode runtime", () => {
 		const flowchart = await runtime.buildFlowchart({
 			spec: {
 				...flowchartSpec,
-				nodes: flowchartSpec.nodes.map((node, index) =>
-					index === 0 ? { ...node, rendererRole: "sequence-lifeline" } : node,
-				),
+				nodes: {
+					...flowchartSpec.nodes,
+					request: { label: flowchartSpec.nodes.request, rendererRole: "sequence-lifeline" },
+				},
 			},
 			options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
 		});

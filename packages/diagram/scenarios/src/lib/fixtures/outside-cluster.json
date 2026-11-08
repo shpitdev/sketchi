@@ -4,144 +4,61 @@
 		"spec": {
 			"id": "gke-kubernetes-architecture",
 			"title": "GKE Kubernetes Architecture",
-			"nodes": [
-				{
-					"id": "browser",
-					"label": "Browser request",
-					"kind": "start"
-				},
-				{
-					"id": "ingress",
-					"label": "Ingress controller",
-					"kind": "process",
-					"group": "ing"
-				},
-				{
-					"id": "websvc",
-					"label": "Web service",
-					"kind": "process",
-					"group": "fe"
-				},
-				{
-					"id": "webpods",
-					"label": "Web pods",
-					"kind": "process",
-					"group": "fe"
-				},
-				{
-					"id": "apisvc",
-					"label": "API service",
-					"kind": "process",
-					"group": "be"
-				},
-				{
-					"id": "apipods",
-					"label": "API pods",
-					"kind": "process",
-					"group": "be"
-				},
-				{
-					"id": "worker",
-					"label": "Worker pods",
-					"kind": "process",
-					"group": "be"
-				},
-				{
-					"id": "mq",
+			"nodes": {
+				"browser": "Browser request",
+				"ingress": "Ingress controller",
+				"websvc": "Web service",
+				"webpods": "Web pods",
+				"apisvc": "API service",
+				"apipods": "API pods",
+				"worker": "Worker pods",
+				"mq": {
 					"label": "RabbitMQ",
-					"kind": "process",
-					"shape": "queue",
-					"group": "ext"
+					"shape": "queue"
 				},
-				{
-					"id": "db",
+				"db": {
 					"label": "Cloud SQL database",
-					"kind": "end",
-					"shape": "database",
-					"group": "ext"
+					"shape": "database"
 				}
-			],
+			},
 			"edges": [
-				{
-					"id": "edge-1",
-					"source": "browser",
-					"target": "ingress"
-				},
-				{
-					"id": "edge-2",
-					"source": "ingress",
-					"target": "websvc"
-				},
-				{
-					"id": "edge-3",
-					"source": "websvc",
-					"target": "webpods"
-				},
-				{
-					"id": "edge-4",
-					"source": "webpods",
-					"target": "apisvc"
-				},
-				{
-					"id": "edge-5",
-					"source": "apisvc",
-					"target": "apipods"
-				},
-				{
-					"id": "edge-6",
-					"source": "apipods",
-					"target": "db",
-					"label": "write orders"
-				},
-				{
-					"id": "edge-7",
-					"source": "apipods",
-					"target": "mq",
-					"label": "publish jobs"
-				},
-				{
-					"id": "edge-8",
-					"source": "mq",
-					"target": "worker",
-					"label": "consume jobs"
-				},
-				{
-					"id": "edge-9",
-					"source": "worker",
-					"target": "db",
-					"label": "write results"
-				}
+				["browser", "ingress"],
+				["ingress", "websvc"],
+				["websvc", "webpods"],
+				["webpods", "apisvc"],
+				["apisvc", "apipods"],
+				["apipods", "db", "write orders"],
+				["apipods", "mq", "publish jobs"],
+				["mq", "worker", "consume jobs"],
+				["worker", "db", "write results"]
 			],
-			"groups": [
-				{
-					"id": "cluster",
+			"groups": {
+				"cluster": {
 					"label": "GKE cluster",
-					"kind": "cluster"
+					"kind": "cluster",
+					"contains": ["ing", "fe", "be"]
 				},
-				{
-					"id": "ing",
+				"ing": {
 					"label": "ingress namespace",
-					"parent": "cluster",
-					"kind": "namespace"
+					"kind": "namespace",
+					"contains": ["ingress"]
 				},
-				{
-					"id": "fe",
+				"fe": {
 					"label": "frontend namespace",
-					"parent": "cluster",
-					"kind": "namespace"
+					"kind": "namespace",
+					"contains": ["websvc", "webpods"]
 				},
-				{
-					"id": "be",
+				"be": {
 					"label": "backend namespace",
-					"parent": "cluster",
-					"kind": "namespace"
+					"kind": "namespace",
+					"contains": ["apisvc", "apipods", "worker"]
 				},
-				{
-					"id": "ext",
+				"ext": {
 					"label": "Outside the cluster",
-					"kind": "zone"
+					"kind": "zone",
+					"contains": ["mq", "db"]
 				}
-			]
+			}
 		}
 	},
 	{
@@ -149,144 +66,61 @@
 		"spec": {
 			"id": "gke-kubernetes-architecture",
 			"title": "GKE Kubernetes Architecture",
-			"nodes": [
-				{
-					"id": "b",
-					"label": "Browser",
-					"kind": "start"
-				},
-				{
-					"id": "ic",
-					"label": "Ingress controller",
-					"kind": "process",
-					"group": "ing"
-				},
-				{
-					"id": "ws",
-					"label": "Web service",
-					"kind": "process",
-					"group": "fe"
-				},
-				{
-					"id": "wp",
-					"label": "Web pods",
-					"kind": "process",
-					"group": "fe"
-				},
-				{
-					"id": "as",
-					"label": "API service",
-					"kind": "process",
-					"group": "be"
-				},
-				{
-					"id": "ap",
-					"label": "API pods",
-					"kind": "process",
-					"group": "be"
-				},
-				{
-					"id": "q",
+			"nodes": {
+				"b": "Browser",
+				"ic": "Ingress controller",
+				"ws": "Web service",
+				"wp": "Web pods",
+				"as": "API service",
+				"ap": "API pods",
+				"q": {
 					"label": "RabbitMQ queue",
-					"kind": "process",
-					"shape": "queue",
-					"group": "ext"
+					"shape": "queue"
 				},
-				{
-					"id": "wk",
-					"label": "Worker pods",
-					"kind": "process",
-					"group": "be"
-				},
-				{
-					"id": "db",
+				"wk": "Worker pods",
+				"db": {
 					"label": "Cloud SQL database",
-					"kind": "end",
-					"shape": "database",
-					"group": "ext"
+					"shape": "database"
 				}
-			],
+			},
 			"edges": [
-				{
-					"id": "edge-1",
-					"source": "b",
-					"target": "ic"
-				},
-				{
-					"id": "edge-2",
-					"source": "ic",
-					"target": "ws"
-				},
-				{
-					"id": "edge-3",
-					"source": "ws",
-					"target": "wp"
-				},
-				{
-					"id": "edge-4",
-					"source": "wp",
-					"target": "as"
-				},
-				{
-					"id": "edge-5",
-					"source": "as",
-					"target": "ap"
-				},
-				{
-					"id": "edge-6",
-					"source": "ap",
-					"target": "db",
-					"label": "write orders"
-				},
-				{
-					"id": "edge-7",
-					"source": "ap",
-					"target": "q",
-					"label": "publish jobs"
-				},
-				{
-					"id": "edge-8",
-					"source": "q",
-					"target": "wk",
-					"label": "consume jobs"
-				},
-				{
-					"id": "edge-9",
-					"source": "wk",
-					"target": "db",
-					"label": "write results"
-				}
+				["b", "ic"],
+				["ic", "ws"],
+				["ws", "wp"],
+				["wp", "as"],
+				["as", "ap"],
+				["ap", "db", "write orders"],
+				["ap", "q", "publish jobs"],
+				["q", "wk", "consume jobs"],
+				["wk", "db", "write results"]
 			],
-			"groups": [
-				{
-					"id": "gke",
+			"groups": {
+				"gke": {
 					"label": "GKE cluster",
-					"kind": "cluster"
+					"kind": "cluster",
+					"contains": ["ing", "fe", "be"]
 				},
-				{
-					"id": "ing",
+				"ing": {
 					"label": "ingress namespace",
-					"parent": "gke",
-					"kind": "namespace"
+					"kind": "namespace",
+					"contains": ["ic"]
 				},
-				{
-					"id": "fe",
+				"fe": {
 					"label": "frontend namespace",
-					"parent": "gke",
-					"kind": "namespace"
+					"kind": "namespace",
+					"contains": ["ws", "wp"]
 				},
-				{
-					"id": "be",
+				"be": {
 					"label": "backend namespace",
-					"parent": "gke",
-					"kind": "namespace"
+					"kind": "namespace",
+					"contains": ["as", "ap", "wk"]
 				},
-				{
-					"id": "ext",
+				"ext": {
 					"label": "Outside the cluster",
-					"kind": "zone"
+					"kind": "zone",
+					"contains": ["q", "db"]
 				}
-			]
+			}
 		}
 	},
 	{
@@ -294,144 +128,61 @@
 		"spec": {
 			"id": "gke-kubernetes-architecture",
 			"title": "GKE Kubernetes Architecture",
-			"nodes": [
-				{
-					"id": "browser",
-					"label": "Browser request",
-					"kind": "start"
-				},
-				{
-					"id": "ingress",
-					"label": "Ingress controller",
-					"kind": "process",
-					"group": "ing"
-				},
-				{
-					"id": "websvc",
-					"label": "Web service",
-					"kind": "process",
-					"group": "fe"
-				},
-				{
-					"id": "webpods",
-					"label": "Web pods",
-					"kind": "process",
-					"group": "fe"
-				},
-				{
-					"id": "apisvc",
-					"label": "API service",
-					"kind": "process",
-					"group": "be"
-				},
-				{
-					"id": "apipods",
-					"label": "API pods",
-					"kind": "process",
-					"group": "be"
-				},
-				{
-					"id": "workers",
-					"label": "Worker pods",
-					"kind": "process",
-					"group": "be"
-				},
-				{
-					"id": "rabbit",
+			"nodes": {
+				"browser": "Browser request",
+				"ingress": "Ingress controller",
+				"websvc": "Web service",
+				"webpods": "Web pods",
+				"apisvc": "API service",
+				"apipods": "API pods",
+				"workers": "Worker pods",
+				"rabbit": {
 					"label": "RabbitMQ queue",
-					"kind": "process",
-					"shape": "queue",
-					"group": "ext"
+					"shape": "queue"
 				},
-				{
-					"id": "db",
+				"db": {
 					"label": "Cloud SQL database",
-					"kind": "end",
-					"shape": "database",
-					"group": "ext"
+					"shape": "database"
 				}
-			],
+			},
 			"edges": [
-				{
-					"id": "edge-1",
-					"source": "browser",
-					"target": "ingress"
-				},
-				{
-					"id": "edge-2",
-					"source": "ingress",
-					"target": "websvc"
-				},
-				{
-					"id": "edge-3",
-					"source": "websvc",
-					"target": "webpods"
-				},
-				{
-					"id": "edge-4",
-					"source": "webpods",
-					"target": "apisvc"
-				},
-				{
-					"id": "edge-5",
-					"source": "apisvc",
-					"target": "apipods"
-				},
-				{
-					"id": "edge-6",
-					"source": "apipods",
-					"target": "db",
-					"label": "write orders"
-				},
-				{
-					"id": "edge-7",
-					"source": "apipods",
-					"target": "rabbit",
-					"label": "publish jobs"
-				},
-				{
-					"id": "edge-8",
-					"source": "rabbit",
-					"target": "workers",
-					"label": "consume jobs"
-				},
-				{
-					"id": "edge-9",
-					"source": "workers",
-					"target": "db",
-					"label": "write results"
-				}
+				["browser", "ingress"],
+				["ingress", "websvc"],
+				["websvc", "webpods"],
+				["webpods", "apisvc"],
+				["apisvc", "apipods"],
+				["apipods", "db", "write orders"],
+				["apipods", "rabbit", "publish jobs"],
+				["rabbit", "workers", "consume jobs"],
+				["workers", "db", "write results"]
 			],
-			"groups": [
-				{
-					"id": "gke",
+			"groups": {
+				"gke": {
 					"label": "GKE cluster",
-					"kind": "cluster"
+					"kind": "cluster",
+					"contains": ["ing", "fe", "be"]
 				},
-				{
-					"id": "ing",
+				"ing": {
 					"label": "ingress namespace",
-					"parent": "gke",
-					"kind": "namespace"
+					"kind": "namespace",
+					"contains": ["ingress"]
 				},
-				{
-					"id": "fe",
+				"fe": {
 					"label": "frontend namespace",
-					"parent": "gke",
-					"kind": "namespace"
+					"kind": "namespace",
+					"contains": ["websvc", "webpods"]
 				},
-				{
-					"id": "be",
+				"be": {
 					"label": "backend namespace",
-					"parent": "gke",
-					"kind": "namespace"
+					"kind": "namespace",
+					"contains": ["apisvc", "apipods", "workers"]
 				},
-				{
-					"id": "ext",
+				"ext": {
 					"label": "Outside the cluster",
-					"kind": "zone"
+					"kind": "zone",
+					"contains": ["rabbit", "db"]
 				}
-			]
+			}
 		}
 	}
 ]

@@ -62,15 +62,15 @@ layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
 					type: "flowchart",
 					spec: {
 						title: "Ticket handling",
-						lanes: [
-							{ id: "customer", label: "Customer" },
-							{ id: "support", label: "Support" },
-						],
-						nodes: [
-							{ id: "open", label: "Open a ticket", kind: "start", lane: "customer" },
-							{ id: "answer", label: "Answer the ticket", kind: "end", lane: "support" },
-						],
-						edges: [{ source: "open", target: "answer" }],
+						nodes: {
+							open: "Open a ticket",
+							answer: "Answer the ticket",
+						},
+						edges: [["open", "answer"]],
+						lanes: {
+							customer: { label: "Customer", contains: ["open"] },
+							support: { label: "Support", contains: ["answer"] },
+						},
 					},
 				}),
 			);
@@ -91,19 +91,19 @@ layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
 					type: "flowchart",
 					spec: {
 						title: "Web app in a VPC",
-						groups: [
-							{ id: "vpc", label: "VPC", kind: "vpc" },
-							{ id: "private", label: "Private subnet", kind: "subnet", parent: "vpc" },
-						],
-						nodes: [
-							{ id: "users", label: "Users", kind: "start" },
-							{ id: "api", label: "API service", kind: "process", group: "private" },
-							{ id: "db", label: "Orders database", kind: "end", shape: "database", group: "vpc" },
-						],
+						nodes: {
+							users: "Users",
+							api: "API service",
+							db: { label: "Orders database", shape: "database" },
+						},
 						edges: [
-							{ source: "users", target: "api" },
-							{ source: "api", target: "db" },
+							["users", "api"],
+							["api", "db"],
 						],
+						groups: {
+							vpc: { label: "VPC", kind: "vpc", contains: ["db", "private"] },
+							private: { label: "Private subnet", kind: "subnet", contains: ["api"] },
+						},
 					},
 				}),
 			);
@@ -124,16 +124,17 @@ layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
 			const invalid = canonicalDocument({
 				type: "flowchart",
 				spec: {
-					id: "broken-decision",
-					title: "Broken decision",
-					nodes: [
-						{ id: "start", label: "Start", kind: "start" },
-						{ id: "decision", label: "Ready?", kind: "decision" },
-						{ id: "end", label: "Done", kind: "end" },
-					],
+					id: "two-islands",
+					title: "Two islands",
+					nodes: {
+						order: "Take order",
+						ship: "Ship order",
+						invoice: "Send invoice",
+						paid: "Record payment",
+					},
 					edges: [
-						{ source: "start", target: "decision" },
-						{ source: "decision", target: "end", label: "Yes" },
+						["order", "ship"],
+						["invoice", "paid"],
 					],
 				},
 			});

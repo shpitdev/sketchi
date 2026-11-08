@@ -310,7 +310,7 @@ positioning.
 ```mermaid
 flowchart LR
   Request["human request<br/>flow + style mixed together"]
-  Spec["semantic FlowchartSpec<br/>nodes + edges"]
+  Spec["flowchart document<br/>nodes + edges"]
   Build["buildFlowchart"]
   Accepted["accepted artifact"]
   Patch["applyDiagramPatch"]
@@ -373,7 +373,7 @@ flowchart TD
 ```ts
 interface BuildFlowchartRequest {
   requestId?: string;
-  spec: FlowchartSpec;
+  spec: FlowchartDocument;
   options?: BuildFlowchartOptions;
 }
 
@@ -444,108 +444,84 @@ An oversized body returns HTTP 413 with `status: "invalid_input"` and a typed
 
 ### Flowchart Spec
 
-The public input is not the full internal IR. It is the smallest shape agents
-need to author correctly.
+`spec` is the flowchart document, the same JSON every surface reads and writes
+(MCP, the CLI, Studio and the HTTP API). It is defined once, in
+`@sketchi/diagram-core` (`flowchart-document.ts`).
 
 ```ts
-interface FlowchartSpec {
+interface FlowchartDocument {
   id?: string;
   title: string;
-  nodes: FlowchartNode[];
-  edges: FlowchartEdge[];
-  layout?: FlowchartLayout;
-  style?: FlowchartStyle;
+  direction?: "TB" | "LR"; // TB by default
+  logos?: true | "exact";   // draw the logo each node label names
+  nodes: Record<NodeId, string | FlowchartNode>; // id → label, or id → details
+  edges: Array<[from: End, to: End, label?: string]>;
+  groups?: Record<GroupId, { label: string; kind?: ZoneKind; contains: string[] }>;
+  lanes?: Record<LaneId, { label: string; contains: string[] }>;
 }
 
 interface FlowchartNode {
-  id: string;
   label: string;
-  kind: "start" | "process" | "decision" | "end";
-  description?: string;
-  icon?: { slug: string };
+  note?: string;                                        // a subtitle under the label
+  shape?: "database" | "queue" | "document" | "storage" | "diamond";
+  icon?: string | null;                                 // a product name or slug; null draws none
 }
 
-interface FlowchartEdge {
-  id?: string;
-  source: string;
-  target: string;
-  label?: string;
-}
-
-interface FlowchartLayout {
-  direction?: "TB" | "LR";
-}
-
-interface FlowchartStyle {
-  accentColor?: HexColor;
-  backgroundColor?: HexColor;
-}
-
-type HexColor = `#${string}`;
+type End = NodeId | NodeId[]; // a list draws one edge per id
+type ZoneKind = "cloud" | "datacenter" | "region" | "zone" | "vpc" | "subnet" | "cluster" | "namespace";
 ```
 
-`icon` draws a brand logo from the Sketchi icon catalog
-(`icons.sketchi.app`) top-center inside the node, above its label. Use an exact
-catalog slug such as `docker`, found with `sketchi.searchIcons({ q, limit? })`,
-which returns ranked `{ slug, name, collection }` matches. A mark the catalog
-has a hand-drawn recipe for is drawn as editable Excalidraw shapes in the
-scene's own pen; any other mark embeds its SVG. A canvas node icon with
-`exact: true` embeds the catalog SVG instead. Wordmarks, marks over 64 KB, and unknown slugs
-are dropped with an `unknown_icon` warning on the accepted result. A logo that
-cannot be drawn (no room above the label, a sequence lifeline, an asset that
-fails to load, or a diagram over its logo budget) is dropped with an
-`icon_dropped` warning. Icons never fail the build.
+Ids start with a letter and use letters, digits, `_` and `-`, so JavaScript keeps
+the written order. An edge's identity is its two ends.
 
-Default styling is intentionally plain: black stroke, black text, and no
-decorative fill unless the caller asks for styling. Agents should not spend
-repair attempts on visual polish until graph invariants pass.
+Nobody declares a node's role. A decision (a diamond) is a node whose label asks
+a question, or one given `shape: "diamond"`; labeled edges out of any other node
+stay plain labeled edges. Any
+other node that nothing enters starts the flow and one that nothing leaves ends
+it; when a loop returns to the first step, the first node written is the entry.
+A flowchart may have several entries.
 
-### Required Flowchart Invariants
+Containers list what they hold: a group's `contains` names nodes and other groups,
+at any depth, and Sketchi derives the tree, so a node listed by both a region and
+the VPC inside it sits in the VPC. A group that no other group lists sits inside
+the smallest group holding all its nodes. Lanes hold every node, keep their
+written order and never mix with groups.
 
-```mermaid
-flowchart TB
-  Start["exactly one start"]
-  End["at least one end"]
-  Reachable["every node reachable from the single start"]
-  Terminating["every reachable node can reach an end"]
-  Outgoing["every non-end node has outgoing edge"]
-  Decision["every decision has >= 2 outgoing edges"]
-  Branches["decision branch labels are present and unique"]
-  Edges["edges reference existing nodes"]
-  NoLoops["no self-loops"]
-  Bounds["80 nodes and 120 edges maximum"]
+With `logos`, every node whose label names a product draws its logo, written with or
+without a dot ("Node.js", "Socket.io") and as the label's first word ("Python worker").
+A first word that usually names a step ("Make payment", "Go to checkout") draws
+nothing, and an `icon_possible` note names the product it could mean, unless a tech
+noun follows it ("React app", "Spring service"). A node draws one
+logo: a label that names several products ("Next.js app hosted on Vercel") draws the
+first, and its `icon_filled` note names the others. `true` draws a mark the catalog has a hand-drawn
+recipe for as editable Excalidraw shapes in the scene's own pen, and `"exact"` embeds
+every mark's catalog SVG. A node's `icon` names a logo its label does not, or another
+of the products it names, and `null` drops one. An icon that names no logo is
+dropped with `unknown_icon`, and a vendor's logo on a label that does not name the
+vendor with `icon_dropped`. Icons never fail the build. Sequence participants and
+canvases still take `{ slug }` icons found with `sketchi.searchIcons`.
 
-  Start --> Reachable
-  Reachable --> Terminating
-  Terminating --> Outgoing
-  Outgoing --> Decision
-  Decision --> Branches
-  End --> Outgoing
-  Edges --> NoLoops
-  Bounds --> Start
-```
+### Flowchart Checks
 
-Rules:
+A build reports every problem at once, each at its `spec` path with a repair hint
+naming the nearest declared ids:
 
-- Node ids must be unique.
-- Edge ids, when supplied, must be unique.
-- Every edge source and target must match a node id.
-- Edges cannot connect a node to itself.
-- A flowchart must have exactly one `start` node.
-- A flowchart must have at least one `end` node.
-- The `start` node cannot have incoming edges.
-- Every node must be reachable from the single `start` node.
-- Every reachable node must be able to reach an `end` node. Retry loops and
-  back-edges are valid only when every node in the loop retains an eventual
-  exit path to an end.
-- Every `end` node must have zero outgoing edges.
-- Every non-end node must have at least one outgoing edge.
-- Every `decision` node must have at least two outgoing edges.
-- Every outgoing decision branch must have a non-empty label.
-- Decision branch labels from the same decision must be unique.
-- A flowchart may contain at most 80 nodes and 120 edges. Larger graphs fail
-  with `flowchart_too_large` before render or persistence.
-- Semantic issue output is capped deterministically at 20 entries.
+- an edge end names no node (`missing_edge_source`, `missing_edge_target`);
+- an edge connects a node to itself (`self_loop`) or repeats a pair (`duplicate_edge`);
+- a node has no edges (`isolated_node`);
+- a loop has no way out (`nonterminating_node`), or only a loop reaches a node (`unreachable_node`);
+- a question with two or more exits leaves one unlabeled (`unlabeled_decision_branch`)
+  or repeats a label (`duplicate_decision_branch_label`);
+- an id breaks the pattern (`invalid_id`), names both a node and a container, or is
+  another id with spaces around it (`duplicate_node_id`, `duplicate_group_id`, `duplicate_lane_id`);
+- a container lists an unknown id (`unknown_member`), two containers that do not nest
+  share a member (`overlapping_containers`), groups nest in a cycle (`group_cycle`),
+  a node has no lane (`node_without_lane`), or lanes are mixed with groups (`lanes_with_groups`);
+- fewer than two nodes or no edge (`flowchart_too_small`), or more than 80 nodes, 120
+  drawn edges, 8 groups, 8 lanes or 4 levels of nesting (`flowchart_too_large`, with status
+  `limit_exceeded`). Edges are counted with each list end expanded, before any is drawn.
+
+Issue output is capped deterministically at 20 entries.
 
 ### Result
 
@@ -557,7 +533,7 @@ interface BuildFlowchartSuccess {
   status: "accepted";
   buildId: string;
   requestId?: string;
-  normalizedSpec: NormalizedFlowchartSpec;
+  normalizedSpec: FlowchartDocument; // as drawn: id and direction filled, logo slugs resolved
   quality: QualityReport;
   artifact: ArtifactBundle;
   issues: Issue[];
@@ -569,20 +545,17 @@ interface BuildFlowchartFailure {
     | "invalid_input"
     | "invalid_flowchart"
     | "quality_failed"
+    | "limit_exceeded"
     | "render_failed"
     | "export_failed"
     | "storage_failed";
   buildId?: string;
   requestId?: string;
-  normalizedSpec?: NormalizedFlowchartSpec;
+  normalizedSpec?: FlowchartDocument;
   quality?: QualityReport;
   partial?: PartialArtifactBundle;
   issues: Issue[];
 }
-
-type NormalizedFlowchartSpec = Required<
-  Pick<FlowchartSpec, "id" | "title" | "nodes" | "edges" | "layout" | "style">
->;
 
 type BuildMindmapResult = BuildMindmapSuccess | BuildMindmapFailure;
 
@@ -1136,16 +1109,11 @@ async () => {
   const built = await sketchi.buildFlowchart({
     spec: {
       title: "Simple approval",
-      nodes: [
-        { id: "start", label: "Request", kind: "start" },
-        { id: "approve", label: "Approved?", kind: "decision" },
-        { id: "done", label: "Done", kind: "end" },
-        { id: "revise", label: "Revise", kind: "end" },
-      ],
+      nodes: { start: "Request", approve: "Approved?", done: "Done", revise: "Revise" },
       edges: [
-        { source: "start", target: "approve" },
-        { source: "approve", target: "done", label: "yes" },
-        { source: "approve", target: "revise", label: "no" },
+        ["start", "approve"],
+        ["approve", "done", "yes"],
+        ["approve", "revise", "no"],
       ],
     },
   });
@@ -1209,18 +1177,17 @@ Example sandbox code:
 async () => {
   let spec = {
     title: "Incident triage flow",
-    nodes: [
-      { id: "report", label: "Report received", kind: "start" },
-      { id: "severity", label: "Severity high?", kind: "decision" },
-      { id: "page", label: "Page responder", kind: "end" },
-      { id: "queue", label: "Queue for review", kind: "end" },
-    ],
+    nodes: {
+      report: "Report received",
+      severity: "Severity high?",
+      page: "Page responder",
+      queue: "Queue for review",
+    },
     edges: [
-      { source: "report", target: "severity" },
-      { source: "severity", target: "page", label: "yes" },
-      { source: "severity", target: "queue", label: "no" },
+      ["report", "severity"],
+      ["severity", "page", "yes"],
+      ["severity", "queue", "no"],
     ],
-    layout: { direction: "TB" },
   };
 
   for (let attempt = 0; attempt < 3; attempt += 1) {

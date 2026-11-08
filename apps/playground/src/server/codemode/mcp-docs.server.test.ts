@@ -128,12 +128,13 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
         type OptionalKeys<T> = {
           [K in keyof T]-?: {} extends Pick<T, K> ? K : never
         }[keyof T];
-        type FlowchartRequestDefaults = Assert<
-          "edges" | "layout" extends OptionalKeys<BuildFlowchartRequest["spec"]> ? true : false
+        type FlowchartRequestOptional = Assert<
+          "direction" | "logos" | "groups" | "lanes" extends OptionalKeys<BuildFlowchartRequest["spec"]> ? true : false
         >;
-        type FlowchartResultDefaults = Assert<
-          Extract<OptionalKeys<Extract<BuildFlowchartResult, { ok: true }>["normalizedSpec"]>, "edges" | "layout" | "style"> extends never ? true : false
+        type FlowchartResultFilled = Assert<
+          Extract<OptionalKeys<Extract<BuildFlowchartResult, { ok: true }>["normalizedSpec"]>, "id" | "direction" | "edges"> extends never ? true : false
         >;
+        type FlowchartEdgeTuple = Assert<Same<BuildFlowchartRequest["spec"]["edges"][number], [string | Array<string>, string | Array<string>, string?]>>;
         type FlowchartPaletteNotAnInput = Assert<"style" extends keyof BuildFlowchartRequest["spec"] ? false : true>;
         type MindmapPaletteNotAnInput = Assert<"style" extends keyof BuildMindmapRequest["spec"] ? false : true>;
         type SequencePaletteNotAnInput = Assert<"style" extends keyof BuildSequenceDiagramRequest["spec"] ? false : true>;
@@ -244,7 +245,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 
 		const logoResults = searchCodeModeDocs({ query: "brand logo" });
 		expect(logoResults.results.map((result) => result.id)).toContain("searchIcons");
-		expect(getCodeModeDocs({ topic: "buildFlowchart" }).content).toContain("sketchi.searchIcons");
+		expect(getCodeModeDocs({ topic: "buildFlowchart" }).content).toContain("set logos: true");
 		expect(SKETCHI_CODE_MODE_TYPES).toContain(
 			"searchIcons(input: SearchIconsRequest): Promise<SearchIconsResult>;",
 		);
@@ -400,7 +401,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		const codeLine = (operation: string) =>
 			codeLines.find((line) => new RegExp(`^- ${operation}(?: \\([^)]*\\))?: spec: `).test(line));
 		expect(codeLines[flowchartStart]).toMatch(
-			/^buildFlowchart \(process steps and decisions[^)]*\): spec: \{ title, nodes: \[\{ id, label, kind: "start" \| "process" \| "decision" \| "end"/,
+			/^buildFlowchart \(process steps and decisions[^)]*\): spec: \{ title, direction\?: "TB" \| "LR", logos\?: true \| "exact", nodes: \{ \[id\]: label/,
 		);
 		expect(codeLine("buildChart")).toBe(
 			'- buildChart: spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. Give every series exactly one value per category, in category order, and name every series when there are several. A pie has one series of non-negative values, at most 8 slices and no axis titles.',

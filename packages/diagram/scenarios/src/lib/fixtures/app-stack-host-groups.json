@@ -14,61 +14,58 @@
 					"normalizedSpec": {
 						"id": "app-request-flow",
 						"title": "App request flow",
-						"nodes": [
-							{
-								"id": "page",
+						"direction": "TB",
+						"nodes": {
+							"page": {
 								"label": "Next.js page",
-								"kind": "start",
-								"description": "Receives the question",
-								"icon": { "slug": "nextjs" },
-								"group": "vercel"
+								"note": "Receives the question",
+								"icon": "nextjs"
 							},
-							{
-								"id": "check",
+							"check": {
 								"label": "Check Redis cache",
-								"kind": "process",
-								"icon": { "slug": "redis" }
+								"icon": "redis"
 							},
-							{ "id": "hit", "label": "Cache hit?", "kind": "decision" },
-							{ "id": "cached", "label": "Return the cached answer", "kind": "end" },
-							{
-								"id": "model",
+							"hit": "Cache hit?",
+							"cached": "Return the cached answer",
+							"model": {
 								"label": "Call OpenAI model",
-								"kind": "process",
-								"icon": { "slug": "openai" }
+								"icon": "openai"
 							},
-							{
-								"id": "store",
+							"store": {
 								"label": "Store the answer in Redis",
-								"kind": "process",
-								"icon": { "slug": "redis" }
+								"icon": "redis"
 							},
-							{
-								"id": "log",
+							"log": {
 								"label": "Log any errors to Sentry",
-								"kind": "process",
-								"icon": { "slug": "sentry" }
+								"icon": "sentry"
 							},
-							{ "id": "return", "label": "Return the answer", "kind": "end" }
-						],
+							"return": "Return the answer"
+						},
 						"edges": [
-							{ "id": "edge-1", "source": "page", "target": "check" },
-							{ "id": "edge-2", "source": "check", "target": "hit" },
-							{ "id": "edge-3", "source": "hit", "target": "cached", "label": "Yes" },
-							{ "id": "edge-4", "source": "hit", "target": "model", "label": "No" },
-							{ "id": "edge-5", "source": "model", "target": "store" },
-							{ "id": "edge-6", "source": "store", "target": "log" },
-							{ "id": "edge-7", "source": "log", "target": "return" }
+							["page", "check"],
+							["check", "hit"],
+							["hit", "cached", "Yes"],
+							["hit", "model", "No"],
+							["model", "store"],
+							["store", "log"],
+							["log", "return"]
 						],
-						"groups": [{ "id": "vercel", "label": "Vercel", "kind": "cloud" }],
-						"layout": { "direction": "TB" },
-						"style": { "accentColor": "#8f707f", "backgroundColor": "#fffdf8" }
+						"groups": {
+							"vercel": {
+								"label": "Vercel",
+								"kind": "cloud",
+								"contains": ["page"]
+							}
+						}
 					},
 					"quality": {
 						"accepted": true,
 						"score": 10,
 						"threshold": 8,
-						"summary": { "nodeCount": 8, "edgeCount": 7 },
+						"summary": {
+							"nodeCount": 8,
+							"edgeCount": 7
+						},
 						"checks": []
 					},
 					"issues": [
@@ -76,7 +73,10 @@
 							"code": "icon_filled",
 							"severity": "info",
 							"stage": "input",
-							"ref": { "kind": "group", "id": "vercel" },
+							"ref": {
+								"kind": "group",
+								"id": "vercel"
+							},
 							"message": "Group \"vercel\" draws the \"vercel\" logo because its label \"Vercel\" names Vercel.",
 							"hint": "No action needed."
 						}
@@ -100,65 +100,57 @@
 					"normalizedSpec": {
 						"id": "request-flow",
 						"title": "Request flow",
-						"nodes": [
-							{
-								"id": "page",
+						"direction": "LR",
+						"nodes": {
+							"page": {
 								"label": "Next.js page receives question",
-								"kind": "start",
-								"icon": { "slug": "nextjs" },
-								"group": "v"
+								"icon": "nextjs"
 							},
-							{
-								"id": "check",
+							"check": {
 								"label": "Check Redis cache",
-								"kind": "process",
-								"icon": { "slug": "redis" }
+								"icon": "redis"
 							},
-							{ "id": "hit", "label": "Cache hit?", "kind": "decision" },
-							{
-								"id": "call",
+							"hit": "Cache hit?",
+							"call": {
 								"label": "Call OpenAI model",
-								"kind": "process",
-								"icon": { "slug": "openai" }
+								"icon": "openai"
 							},
-							{
-								"id": "store",
+							"store": {
 								"label": "Store answer in Redis",
-								"kind": "process",
-								"icon": { "slug": "redis" },
-								"shape": "database"
+								"shape": "database",
+								"icon": "redis"
 							},
-							{
-								"id": "log",
+							"log": {
 								"label": "Log errors to Sentry",
-								"kind": "process",
-								"icon": { "slug": "sentry" }
+								"icon": "sentry"
 							},
-							{ "id": "ret", "label": "Return answer", "kind": "end" }
-						],
+							"ret": "Return answer"
+						},
 						"edges": [
-							{ "id": "edge-1", "source": "page", "target": "check" },
-							{ "id": "edge-2", "source": "check", "target": "hit" },
-							{
-								"id": "edge-3",
-								"source": "hit",
-								"target": "ret",
-								"label": "yes (return cached answer)"
-							},
-							{ "id": "edge-4", "source": "hit", "target": "call", "label": "no" },
-							{ "id": "edge-5", "source": "call", "target": "store" },
-							{ "id": "edge-6", "source": "store", "target": "log" },
-							{ "id": "edge-7", "source": "log", "target": "ret" }
+							["page", "check"],
+							["check", "hit"],
+							["hit", "ret", "yes (return cached answer)"],
+							["hit", "call", "no"],
+							["call", "store"],
+							["store", "log"],
+							["log", "ret"]
 						],
-						"groups": [{ "id": "v", "label": "Vercel", "kind": "cloud" }],
-						"layout": { "direction": "LR" },
-						"style": { "accentColor": "#8f707f", "backgroundColor": "#fffdf8" }
+						"groups": {
+							"v": {
+								"label": "Vercel",
+								"kind": "cloud",
+								"contains": ["page"]
+							}
+						}
 					},
 					"quality": {
 						"accepted": true,
 						"score": 10,
 						"threshold": 8,
-						"summary": { "nodeCount": 7, "edgeCount": 7 },
+						"summary": {
+							"nodeCount": 7,
+							"edgeCount": 7
+						},
 						"checks": []
 					},
 					"issues": [
@@ -166,7 +158,10 @@
 							"code": "icon_filled",
 							"severity": "info",
 							"stage": "input",
-							"ref": { "kind": "group", "id": "v" },
+							"ref": {
+								"kind": "group",
+								"id": "v"
+							},
 							"message": "Group \"v\" draws the \"vercel\" logo because its label \"Vercel\" names Vercel.",
 							"hint": "No action needed."
 						}
@@ -190,64 +185,55 @@
 					"normalizedSpec": {
 						"id": "request-flow",
 						"title": "Request flow",
-						"nodes": [
-							{
-								"id": "page",
+						"direction": "LR",
+						"nodes": {
+							"page": {
 								"label": "Next.js page receives question",
-								"kind": "start",
-								"icon": { "slug": "nextjs" },
-								"group": "v"
+								"icon": "nextjs"
 							},
-							{
-								"id": "check",
+							"check": {
 								"label": "Check Redis cache",
-								"kind": "process",
-								"icon": { "slug": "redis" }
+								"icon": "redis"
 							},
-							{ "id": "hit", "label": "Cache hit?", "kind": "decision" },
-							{
-								"id": "call",
+							"hit": "Cache hit?",
+							"call": {
 								"label": "Call OpenAI model",
-								"kind": "process",
-								"icon": { "slug": "openai" }
+								"icon": "openai"
 							},
-							{
-								"id": "store",
+							"store": {
 								"label": "Store answer in Redis",
-								"kind": "process",
-								"icon": { "slug": "redis" }
+								"icon": "redis"
 							},
-							{
-								"id": "log",
+							"log": {
 								"label": "Log any errors to Sentry",
-								"kind": "process",
-								"icon": { "slug": "sentry" }
+								"icon": "sentry"
 							},
-							{ "id": "ret", "label": "Return answer", "kind": "end" }
-						],
+							"ret": "Return answer"
+						},
 						"edges": [
-							{ "id": "edge-1", "source": "page", "target": "check" },
-							{ "id": "edge-2", "source": "check", "target": "hit" },
-							{
-								"id": "edge-3",
-								"source": "hit",
-								"target": "ret",
-								"label": "yes (return cached answer)"
-							},
-							{ "id": "edge-4", "source": "hit", "target": "call", "label": "no" },
-							{ "id": "edge-5", "source": "call", "target": "store" },
-							{ "id": "edge-6", "source": "store", "target": "log" },
-							{ "id": "edge-7", "source": "log", "target": "ret" }
+							["page", "check"],
+							["check", "hit"],
+							["hit", "ret", "yes (return cached answer)"],
+							["hit", "call", "no"],
+							["call", "store"],
+							["store", "log"],
+							["log", "ret"]
 						],
-						"groups": [{ "id": "v", "label": "Vercel" }],
-						"layout": { "direction": "LR" },
-						"style": { "accentColor": "#8f707f", "backgroundColor": "#fffdf8" }
+						"groups": {
+							"v": {
+								"label": "Vercel",
+								"contains": ["page"]
+							}
+						}
 					},
 					"quality": {
 						"accepted": true,
 						"score": 10,
 						"threshold": 8,
-						"summary": { "nodeCount": 7, "edgeCount": 7 },
+						"summary": {
+							"nodeCount": 7,
+							"edgeCount": 7
+						},
 						"checks": []
 					},
 					"issues": [
@@ -255,7 +241,10 @@
 							"code": "icon_filled",
 							"severity": "info",
 							"stage": "input",
-							"ref": { "kind": "group", "id": "v" },
+							"ref": {
+								"kind": "group",
+								"id": "v"
+							},
 							"message": "Group \"v\" draws the \"vercel\" logo because its label \"Vercel\" names Vercel.",
 							"hint": "No action needed."
 						}
@@ -279,68 +268,56 @@
 					"normalizedSpec": {
 						"id": "request-flow",
 						"title": "Request flow",
-						"nodes": [
-							{
-								"id": "page",
+						"direction": "TB",
+						"nodes": {
+							"page": {
 								"label": "Next.js page receives question",
-								"kind": "start",
-								"icon": { "slug": "nextjs" },
-								"group": "v"
+								"icon": "nextjs"
 							},
-							{
-								"id": "check",
+							"check": {
 								"label": "Check Redis cache",
-								"kind": "process",
-								"icon": { "slug": "redis" },
-								"group": "v"
+								"icon": "redis"
 							},
-							{ "id": "hit", "label": "Cache hit?", "kind": "decision", "group": "v" },
-							{
-								"id": "call",
+							"hit": "Cache hit?",
+							"call": {
 								"label": "Call OpenAI model",
-								"kind": "process",
-								"icon": { "slug": "openai" },
-								"group": "v"
+								"icon": "openai"
 							},
-							{
-								"id": "store",
+							"store": {
 								"label": "Store answer in Redis",
-								"kind": "process",
-								"icon": { "slug": "redis" },
-								"group": "v"
+								"icon": "redis"
 							},
-							{
-								"id": "err",
+							"err": {
 								"label": "Log errors to Sentry",
-								"kind": "process",
-								"icon": { "slug": "sentry" },
-								"group": "v"
+								"icon": "sentry"
 							},
-							{ "id": "ret", "label": "Return answer", "kind": "end", "group": "v" }
-						],
+							"ret": "Return answer"
+						},
 						"edges": [
-							{ "id": "edge-1", "source": "page", "target": "check" },
-							{ "id": "edge-2", "source": "check", "target": "hit" },
-							{
-								"id": "edge-3",
-								"source": "hit",
-								"target": "ret",
-								"label": "yes (return cached answer)"
-							},
-							{ "id": "edge-4", "source": "hit", "target": "call", "label": "no" },
-							{ "id": "edge-5", "source": "call", "target": "store" },
-							{ "id": "edge-6", "source": "store", "target": "err" },
-							{ "id": "edge-7", "source": "err", "target": "ret" }
+							["page", "check"],
+							["check", "hit"],
+							["hit", "ret", "yes (return cached answer)"],
+							["hit", "call", "no"],
+							["call", "store"],
+							["store", "err"],
+							["err", "ret"]
 						],
-						"groups": [{ "id": "v", "label": "Vercel", "kind": "cloud" }],
-						"layout": { "direction": "TB" },
-						"style": { "accentColor": "#8f707f", "backgroundColor": "#fffdf8" }
+						"groups": {
+							"v": {
+								"label": "Vercel",
+								"kind": "cloud",
+								"contains": ["page", "check", "hit", "call", "store", "err", "ret"]
+							}
+						}
 					},
 					"quality": {
 						"accepted": true,
 						"score": 10,
 						"threshold": 8,
-						"summary": { "nodeCount": 7, "edgeCount": 7 },
+						"summary": {
+							"nodeCount": 7,
+							"edgeCount": 7
+						},
 						"checks": []
 					},
 					"issues": [
@@ -348,7 +325,10 @@
 							"code": "icon_filled",
 							"severity": "info",
 							"stage": "input",
-							"ref": { "kind": "group", "id": "v" },
+							"ref": {
+								"kind": "group",
+								"id": "v"
+							},
 							"message": "Group \"v\" draws the \"vercel\" logo because its label \"Vercel\" names Vercel.",
 							"hint": "No action needed."
 						}
@@ -372,65 +352,55 @@
 					"normalizedSpec": {
 						"id": "request-flow",
 						"title": "Request flow",
-						"nodes": [
-							{
-								"id": "page",
+						"direction": "LR",
+						"nodes": {
+							"page": {
 								"label": "Next.js page receives question",
-								"kind": "start",
-								"icon": { "slug": "nextjs" }
+								"icon": "nextjs"
 							},
-							{
-								"id": "vercel",
+							"vercel": {
 								"label": "Vercel",
-								"kind": "process",
-								"icon": { "slug": "vercel" }
+								"icon": "vercel"
 							},
-							{
-								"id": "check",
+							"check": {
 								"label": "Check Redis cache",
-								"kind": "process",
-								"icon": { "slug": "redis" }
+								"icon": "redis"
 							},
-							{ "id": "hit", "label": "Cache hit?", "kind": "decision" },
-							{
-								"id": "call",
+							"hit": "Cache hit?",
+							"call": {
 								"label": "Call OpenAI model",
-								"kind": "process",
-								"icon": { "slug": "openai" }
+								"icon": "openai"
 							},
-							{
-								"id": "store",
+							"store": {
 								"label": "Store answer in Redis",
-								"kind": "process",
-								"icon": { "slug": "redis" },
-								"shape": "database"
+								"shape": "database",
+								"icon": "redis"
 							},
-							{
-								"id": "log",
+							"log": {
 								"label": "Log errors to Sentry",
-								"kind": "process",
-								"icon": { "slug": "sentry" }
+								"icon": "sentry"
 							},
-							{ "id": "ret", "label": "Return answer", "kind": "end" }
-						],
+							"ret": "Return answer"
+						},
 						"edges": [
-							{ "id": "edge-1", "source": "page", "target": "vercel" },
-							{ "id": "edge-2", "source": "vercel", "target": "check" },
-							{ "id": "edge-3", "source": "check", "target": "hit" },
-							{ "id": "edge-4", "source": "hit", "target": "ret", "label": "yes: cached answer" },
-							{ "id": "edge-5", "source": "hit", "target": "call", "label": "no" },
-							{ "id": "edge-6", "source": "call", "target": "store" },
-							{ "id": "edge-7", "source": "store", "target": "log" },
-							{ "id": "edge-8", "source": "log", "target": "ret" }
-						],
-						"layout": { "direction": "LR" },
-						"style": { "accentColor": "#8f707f", "backgroundColor": "#fffdf8" }
+							["page", "vercel"],
+							["vercel", "check"],
+							["check", "hit"],
+							["hit", "ret", "yes: cached answer"],
+							["hit", "call", "no"],
+							["call", "store"],
+							["store", "log"],
+							["log", "ret"]
+						]
 					},
 					"quality": {
 						"accepted": true,
 						"score": 10,
 						"threshold": 8,
-						"summary": { "nodeCount": 8, "edgeCount": 8 },
+						"summary": {
+							"nodeCount": 8,
+							"edgeCount": 8
+						},
 						"checks": []
 					},
 					"issues": []
@@ -453,61 +423,56 @@
 					"normalizedSpec": {
 						"id": "request-flow",
 						"title": "Request flow",
-						"nodes": [
-							{
-								"id": "page",
+						"direction": "TB",
+						"nodes": {
+							"page": {
 								"label": "Next.js page receives the question",
-								"kind": "start",
-								"icon": { "slug": "nextjs" },
-								"group": "vercel"
+								"icon": "nextjs"
 							},
-							{
-								"id": "check",
+							"check": {
 								"label": "Check Redis cache",
-								"kind": "process",
-								"icon": { "slug": "redis" },
-								"group": "vercel"
+								"icon": "redis"
 							},
-							{ "id": "hit", "label": "Cache hit?", "kind": "decision", "group": "vercel" },
-							{
-								"id": "call",
+							"hit": "Cache hit?",
+							"call": {
 								"label": "Call OpenAI model",
-								"kind": "process",
-								"icon": { "slug": "openai" }
+								"icon": "openai"
 							},
-							{
-								"id": "store",
+							"store": {
 								"label": "Store answer in Redis",
-								"kind": "process",
-								"icon": { "slug": "redis" }
+								"icon": "redis"
 							},
-							{
-								"id": "log",
+							"log": {
 								"label": "Log any errors to Sentry",
-								"kind": "process",
-								"icon": { "slug": "sentry" }
+								"icon": "sentry"
 							},
-							{ "id": "ret", "label": "Return the answer", "kind": "end" },
-							{ "id": "cached", "label": "Return cached answer", "kind": "end" }
-						],
+							"ret": "Return the answer",
+							"cached": "Return cached answer"
+						},
 						"edges": [
-							{ "id": "edge-1", "source": "page", "target": "check" },
-							{ "id": "edge-2", "source": "check", "target": "hit" },
-							{ "id": "edge-3", "source": "hit", "target": "cached", "label": "yes" },
-							{ "id": "edge-4", "source": "hit", "target": "call", "label": "no" },
-							{ "id": "edge-5", "source": "call", "target": "store" },
-							{ "id": "edge-6", "source": "store", "target": "log" },
-							{ "id": "edge-7", "source": "log", "target": "ret" }
+							["page", "check"],
+							["check", "hit"],
+							["hit", "cached", "yes"],
+							["hit", "call", "no"],
+							["call", "store"],
+							["store", "log"],
+							["log", "ret"]
 						],
-						"groups": [{ "id": "vercel", "label": "Vercel" }],
-						"layout": { "direction": "TB" },
-						"style": { "accentColor": "#8f707f", "backgroundColor": "#fffdf8" }
+						"groups": {
+							"vercel": {
+								"label": "Vercel",
+								"contains": ["page", "check", "hit"]
+							}
+						}
 					},
 					"quality": {
 						"accepted": true,
 						"score": 10,
 						"threshold": 8,
-						"summary": { "nodeCount": 8, "edgeCount": 7 },
+						"summary": {
+							"nodeCount": 8,
+							"edgeCount": 7
+						},
 						"checks": []
 					},
 					"issues": []

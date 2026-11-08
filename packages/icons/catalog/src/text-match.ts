@@ -1,5 +1,5 @@
 import { searchIcons, type SearchableIcon } from "./search.js";
-import { isDistinctiveWord, termTokens, wordsOf } from "./terms.js";
+import { isDistinctiveWord, isEverydayWord, termTokens, wordsOf } from "./terms.js";
 
 /** Most catalog terms a prompt can offer one diagram. */
 export const MAX_TEXT_ICON_MATCHES = 24;
@@ -26,6 +26,15 @@ export interface IconMention<Icon extends SearchableIcon = SearchableIcon> {
 	 * Go", "tickets in Linear").
 	 */
 	readonly distinctive: boolean;
+	/**
+	 * True when only being the capitalized first word of a label made it a name ("Python
+	 * worker"), which counts only where a diagram asks for logos.
+	 */
+	readonly labelInitial?: boolean;
+	/** A label-initial mention whose words all start step labels far more often ("Make"). */
+	readonly everyday?: boolean;
+	/** The lowercased word after a label-initial mention ("app" in "React app"). */
+	readonly nextWord?: string;
 }
 
 const SEGMENT_BREAK = /(?<=[.!?:])\s+|\n+/u;
@@ -61,6 +70,15 @@ function isCasedAsName(token: TextToken): boolean {
 	return !token.initial && !token.titleCase && isCapitalized(token.raw);
 }
 
+/**
+ * A phrase as the term index keys it: lowercased words, a dot inside a name dropped, so
+ * "Vue.js" finds the catalog's "Vuejs" and "socket.io" its "socketio". A dot between single
+ * letters stays, so "i.e." never reads as "ie".
+ */
+function phraseKey(words: readonly string[]): string {
+	return words.map((word) => word.replace(/(?<=[a-z0-9]{2})\.(?=[a-z0-9]{2})/gu, "")).join(" ");
+}
+
 const termIndexes = new WeakMap<readonly SearchableIcon[], Map<string, SearchableIcon[]>>();
 
 /** Icons by tokenized slug, name, and alias, built once per icon list. */
@@ -69,7 +87,7 @@ function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): Map<str
 	if (cached) return cached as Map<string, Icon[]>;
 	const index = new Map<string, Icon[]>();
 	const add = (term: string, icon: Icon) => {
-		const key = termTokens(term).join(" ");
+		const key = phraseKey(termTokens(term));
 		if (!key) return;
 		const entries = index.get(key) ?? [];
 		if (!entries.includes(icon)) entries.push(icon);
@@ -96,6 +114,8 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 	text: string,
 	icons: readonly Icon[],
 	limit = MAX_TEXT_ICON_MATCHES,
+	/** Count a capitalized first word too, as a label in a diagram that asks for logos. */
+	options: { readonly labelInitial?: boolean } = {},
 ): IconMention<Icon>[] {
 	const index = termIndex(icons);
 	const tokens = tokenize(text);
@@ -105,17 +125,34 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 		let matched = 0;
 		for (let length = Math.min(MAX_PHRASE_TOKENS, tokens.length - start); length > 0; length -= 1) {
 			const phraseTokens = tokens.slice(start, start + length);
-			const entries = index.get(phraseTokens.map((token) => token.lower).join(" "));
+			const entries = index.get(phraseKey(phraseTokens.map((token) => token.lower)));
 			if (!entries) continue;
 			const distinctive = phraseTokens.some(isDistinctive);
-			if (!distinctive && !phraseTokens.some(isCasedAsName)) continue;
+			const cased = phraseTokens.some(isCasedAsName);
+			const first = phraseTokens[0];
+			const labelInitial =
+				!distinctive &&
+				!cased &&
+				options.labelInitial === true &&
+				start === 0 &&
+				first !== undefined &&
+				isCapitalized(first.raw);
+			if (!distinctive && !cased && !labelInitial) continue;
 			const best = searchIcons(entries, {
 				query: phraseTokens.map((token) => token.lower).join(" "),
 			})[0]?.icon;
 			const earlier = best ? seen.get(best.slug) : undefined;
 			if (best && earlier === undefined) {
 				seen.set(best.slug, mentions.length);
-				mentions.push({ icon: best, distinctive });
+				const everyday = labelInitial && phraseTokens.every((token) => isEverydayWord(token.lower));
+				const nextWord = labelInitial ? tokens[start + length]?.lower : undefined;
+				mentions.push({
+					icon: best,
+					distinctive,
+					...(labelInitial ? { labelInitial } : {}),
+					...(everyday ? { everyday } : {}),
+					...(nextWord ? { nextWord } : {}),
+				});
 			} else if (best && distinctive && earlier !== undefined) {
 				// A later unmistakable mention settles an earlier ambiguous one.
 				mentions[earlier] = { icon: best, distinctive };
@@ -149,6 +186,79 @@ export function logoNamedByLabel<Icon extends SearchableIcon>(
 ): Icon | undefined {
 	const [mention, ...others] = matchIconMentions(label, icons, 2);
 	return mention?.distinctive && others.length === 0 ? mention.icon : undefined;
+}
+
+/** The logos a node label names, for a diagram that asks for logos. */
+export interface LabelLogos<Icon extends SearchableIcon = SearchableIcon> {
+	/**
+	 * Every catalog logo the label names, unmistakable names first ("Next.js app hosted on
+	 * Vercel" names nextjs, then vercel), then names an everyday word carries only by its
+	 * capitals ("Log errors to Sentry", "Python worker"). The diagram draws the first.
+	 */
+	readonly named: readonly Icon[];
+	/**
+	 * A product the label's first word may mean, when that word starts step labels far more
+	 * often ("Make payment", "Go to checkout"); it draws nothing unless an icon names it.
+	 */
+	readonly possible: readonly Icon[];
+}
+
+/** Words that, after an everyday first word, show the label names software ("React app"). */
+const TECH_NOUNS: ReadonlySet<string> = new Set(
+	[
+		"api",
+		"app",
+		"backend",
+		"client",
+		"cluster",
+		"database",
+		"frontend",
+		"function",
+		"job",
+		"sdk",
+		"server",
+		"service",
+		"worker",
+	].flatMap((noun) => [noun, `${noun}s`]),
+);
+
+/**
+ * Marks a tech noun never rescues. Google Cloud's generic service marks ("Storage",
+ * "Compute", "Batch") would read "Storage service" as that one product, and some everyday
+ * words name a generic technology before a tech noun ("Edge function", "Stream worker").
+ */
+const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set(["gcp", "gcp-legacy"]);
+const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
+	"automatic",
+	"edge",
+	"processing",
+	"stream",
+]);
+
+/** An everyday first word the next word shows is the product ("React app", "Spring service"). */
+function namesSoftware(mention: IconMention): boolean {
+	return (
+		mention.nextWord !== undefined &&
+		TECH_NOUNS.has(mention.nextWord) &&
+		!GENERIC_COLLECTIONS.has(mention.icon.collection) &&
+		!GENERIC_TECH_SLUGS.has(mention.icon.slug)
+	);
+}
+
+/** The logos a node label names, in a diagram that asks for logos. */
+export function labelLogos<Icon extends SearchableIcon>(
+	label: string,
+	icons: readonly Icon[],
+): LabelLogos<Icon> {
+	const mentions = matchIconMentions(label, icons, MAX_TEXT_ICON_MATCHES, { labelInitial: true });
+	const step = (mention: IconMention<Icon>) => mention.everyday === true && !namesSoftware(mention);
+	return {
+		named: [
+			...mentions.filter((mention) => mention.distinctive),
+			...mentions.filter((mention) => !mention.distinctive && !step(mention)),
+		].map((mention) => mention.icon),
+		possible: mentions.filter(step).map((mention) => mention.icon),
+	};
 }
 
 /** A logo a text names, as generation offers it to a model. */

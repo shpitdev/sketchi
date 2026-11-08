@@ -168,9 +168,11 @@ function skeletons(text: string): DocField[][] {
 	});
 }
 
+// The flowchart document writes its maps and tuples as `{ [id]: … }` and `[[from, to, label?]]`,
+// which this field-list grammar does not read; the generated types pin its shape instead.
 const BUILDERS = CODE_MODE_OPERATIONS.filter(
 	(operation): operation is Extract<CodeModeOperation, `build${string}`> =>
-		operation.startsWith("build"),
+		operation.startsWith("build") && operation !== "buildFlowchart",
 );
 
 describe("docs field lists", () => {

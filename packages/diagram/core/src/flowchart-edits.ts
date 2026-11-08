@@ -7,6 +7,7 @@ import {
 	FlowchartDocumentNodeSchema,
 	FlowchartEdgeEndSchema,
 	FlowchartLogosSchema,
+	flowchartDocumentPairCount,
 	flowchartEdgeEndIds,
 	flowchartGroupTree,
 	flowchartNodeDetails,
@@ -18,6 +19,7 @@ import {
 	type FlowchartDocumentNode,
 	type FlowchartDocumentNodeDetails,
 } from "./flowchart-document.js";
+import { FLOWCHART_MAX_EDGES } from "./types/flowchart.js";
 
 /**
  * Edits to a flowchart document, each addressing nodes, groups and lanes by id
@@ -31,7 +33,7 @@ const Label = Schema.NonEmptyString;
 const NodeChangeSchema = Schema.Struct({
 	label: Schema.optionalKey(Label),
 	note: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
-	shape: Schema.optionalKey(Schema.NullOr(Schema.Literals(DIAGRAM_NODE_SHAPES))),
+	shape: Schema.optionalKey(Schema.NullOr(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"]))),
 	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 });
 
@@ -284,6 +286,29 @@ export function applyFlowchartEdits(
 	document: FlowchartDocument,
 	edits: readonly FlowchartEdit[],
 ): FlowchartEditResult {
+	// List ends multiply: count what the document and each edit's edges would draw before
+	// expanding any of them.
+	const oversized = [
+		["document.edges", document.edges] as const,
+		...edits.flatMap((edit, index) =>
+			edit.op === "connect" || edit.op === "disconnect"
+				? [[`edits[${index}].edges`, edit.edges] as const]
+				: [],
+		),
+	].flatMap(([path, edges]) => {
+		const count = flowchartDocumentPairCount(edges);
+		return count > FLOWCHART_MAX_EDGES
+			? [
+					{
+						code: "invalid_edit" as const,
+						path,
+						message: `${path} names ${count} edges; a flowchart draws at most ${FLOWCHART_MAX_EDGES}.`,
+						hint: "Name fewer ids in each list end.",
+					},
+				]
+			: [];
+	});
+	if (oversized.length > 0) return { ok: false, issues: oversized };
 	const state: Mutable = {
 		title: document.title,
 		...(document.id === undefined ? {} : { id: document.id }),

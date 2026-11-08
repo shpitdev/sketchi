@@ -3,18 +3,18 @@
 Groups draw labeled regions around flowchart steps that belong together: a team in an approval process, a network zone on a request path, or a phase of a rollout. They are part of the flowchart family, not a family of their own.
 
 ```json
-{"type":"flowchart","spec":{"title":"Expense approval","groups":[{"id":"employee","label":"Employee"},{"id":"finance","label":"Finance"}],"nodes":[{"id":"submit","label":"Submit expense report","kind":"start","group":"employee"},{"id":"approved","label":"Approved?","kind":"decision"},{"id":"revise","label":"Revise the report","kind":"process","group":"employee"},{"id":"pay","label":"Pay the employee","kind":"end","group":"finance"}],"edges":[{"source":"submit","target":"approved"},{"source":"approved","target":"pay","label":"yes"},{"source":"approved","target":"revise","label":"no"},{"source":"revise","target":"approved"}]}}
+{"type":"flowchart","spec":{"title":"Expense approval","nodes":{"submit":"Submit expense report","approved":"Approved?","revise":"Revise the report","pay":"Pay the employee"},"edges":[["submit","approved"],["approved","pay","yes"],["approved","revise","no"],["revise","approved"]],"groups":{"employee":{"label":"Employee","contains":["submit","revise"]},"finance":{"label":"Finance","contains":["pay"]}}}}
 ```
 
 Pass this to `sketchi create --json`, or its `spec` to `sketchi.buildFlowchart`. Studio's `build_flowchart` and `POST /api/v1/flowcharts/build` take the same spec, and generation adds groups when a prompt groups its steps.
 
 ## Contract
 
-- `groups` declares `{ id, label }` regions, at most 8. Group ids are unique.
-- A node joins a group by setting `group` to a declared id. Nodes without `group` stay outside every group, and a flowchart can mix both.
-- A group with neither `parent` nor `kind` draws as a frame, as below. Groups that nest or name what they stand for draw as zones; see [architecture zones](./flowchart-zones.md).
+- `groups` maps an id to `{ label, contains }`, at most 8. `contains` lists the nodes (and, for zones, the groups) inside it.
+- A node outside every group's list stays outside every group, and a flowchart can mix both.
+- A group with no `kind` that no other group lists draws as a frame, as below. Groups that nest or name what they stand for draw as zones; see [architecture zones](./flowchart-zones.md).
 
-Builds reject a node whose `group` names no declared group (`unknown_node_group`, with the declared ids in its hint), a repeated group id (`duplicate_group_id`) and a group with no nodes (`empty_group`).
+Builds reject a group that lists an id that is no node or group (`unknown_member`, with the nearest declared ids in its hint) and a node two groups list when neither group holds the other (`overlapping_containers`).
 
 ## Layout
 

@@ -103,6 +103,21 @@ describe("flowchart edits", () => {
 		expect(edited.edges).not.toContainEqual(["wait", "review"]);
 	});
 
+	it("refuses list ends that would draw too many edges, before expanding them", () => {
+		const ids = Array.from({ length: 200 }, (_, index) => `n${index}`);
+		const result = applyFlowchartEdits(order, [{ op: "connect", edges: [[ids, ids]] }]);
+		expect(result).toEqual({
+			ok: false,
+			issues: [
+				expect.objectContaining({
+					code: "invalid_edit",
+					path: "edits[0].edges",
+					message: "edits[0].edges names 40000 edges; a flowchart draws at most 120.",
+				}),
+			],
+		});
+	});
+
 	it("names an unknown target at its path and applies nothing", () => {
 		const result = applyFlowchartEdits(order, [
 			{ op: "set", nodes: { pay: "Charge card" } },

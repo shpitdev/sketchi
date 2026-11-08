@@ -69,14 +69,14 @@ const flowchart = {
 	spec: {
 		id: "native-logos",
 		title: "Native logos",
-		nodes: [
-			{ id: "push", label: "Push to GitHub", kind: "start", icon: { slug: "github" } },
-			{ id: "build", label: "Build the Docker image", kind: "process", icon: { slug: "docker" } },
-			{ id: "ship", label: "Ship it", kind: "end" },
-		],
+		nodes: {
+			push: { label: "Push to GitHub", icon: "github" },
+			build: { label: "Build the Docker image", icon: "docker" },
+			ship: "Ship it",
+		},
 		edges: [
-			{ source: "push", target: "build" },
-			{ source: "build", target: "ship" },
+			["push", "build"],
+			["build", "ship"],
 		],
 	},
 } as const;

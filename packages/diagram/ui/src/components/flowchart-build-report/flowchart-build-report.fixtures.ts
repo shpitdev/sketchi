@@ -1,13 +1,9 @@
 import type {
 	ArtifactBundle,
 	BuildFlowchartResult,
-	FlowchartSpecEdge,
-	FlowchartSpecNode,
 	NormalizedFlowchartSpec,
 	QualityReport,
 } from "@sketchi/diagram-agent";
-
-const style = { accentColor: "#8f707f", backgroundColor: "#fffdf8" };
 
 function artifact(diagramId: string): ArtifactBundle {
 	return {
@@ -43,32 +39,21 @@ function quality(nodeCount: number, edgeCount: number): QualityReport {
 const decisionLoopSpec: NormalizedFlowchartSpec = {
 	id: "release-review-loop",
 	title: "Release review loop",
-	nodes: [
-		{ id: "start", kind: "start", label: "Open release" },
-		{ id: "review", kind: "decision", label: "Release ready?" },
-		{ id: "publish", kind: "process", label: "Publish release" },
-		{ id: "revise", kind: "process", label: "Revise release" },
-		{ id: "done", kind: "end", label: "Release live" },
-	],
+	direction: "TB",
+	nodes: {
+		start: "Open release",
+		review: "Release ready?",
+		publish: "Publish release",
+		revise: "Revise release",
+		done: "Release live",
+	},
 	edges: [
-		{ id: "start-review", source: "start", target: "review" },
-		{
-			id: "review-publish",
-			label: "yes",
-			source: "review",
-			target: "publish",
-		},
-		{
-			id: "review-revise",
-			label: "no",
-			source: "review",
-			target: "revise",
-		},
-		{ id: "revise-review", source: "revise", target: "review" },
-		{ id: "publish-done", source: "publish", target: "done" },
+		["start", "review"],
+		["review", "publish", "yes"],
+		["review", "revise", "no"],
+		["revise", "review"],
+		["publish", "done"],
 	],
-	layout: { direction: "TB" },
-	style,
 };
 
 export const acceptedFlowchartBuild = {
@@ -87,40 +72,36 @@ export const rejectedFlowchartBuild = {
 	buildId: "build_repair",
 	normalizedSpec: {
 		...decisionLoopSpec,
-		edges: decisionLoopSpec.edges.filter((edge) => edge.id !== "review-revise"),
+		edges: decisionLoopSpec.edges.map((edge) =>
+			edge[0] === "review" && edge[1] === "revise" ? (["review", "revise"] as const) : edge,
+		),
 	},
 	issues: [
 		{
-			code: "underbranched_decision",
+			code: "unlabeled_decision_branch",
 			severity: "error",
 			stage: "flowchart",
-			ref: { kind: "node", id: "review", path: "spec.nodes[1]" },
-			message: "Decision review must have at least two outgoing branches.",
-			hint: "Add another labeled branch from this decision.",
+			ref: { kind: "edge", id: "review->revise", path: "spec.edges[2]" },
+			message: 'Decision "review" has an unlabeled branch to "revise".',
+			hint: 'Label every branch of a question, such as "yes" and "no".',
 		},
 	],
 } satisfies BuildFlowchartResult;
 
-const denseNodes: FlowchartSpecNode[] = Array.from({ length: 24 }, (_, index) => ({
-	id: `step-${index + 1}`,
-	kind: index === 0 ? "start" : index === 23 ? "end" : "process",
-	label: index === 0 ? "Start intake" : index === 23 ? "Finish intake" : `Process intake ${index}`,
-}));
-const denseEdges: Array<FlowchartSpecEdge & { id: string }> = Array.from(
-	{ length: 23 },
-	(_, index) => ({
-		id: `edge-${index + 1}`,
-		source: `step-${index + 1}`,
-		target: `step-${index + 2}`,
-	}),
-);
 const denseSpec: NormalizedFlowchartSpec = {
 	id: "dense-intake",
 	title: "Dense intake process",
-	nodes: denseNodes,
-	edges: denseEdges,
-	layout: { direction: "LR" },
-	style,
+	direction: "LR",
+	nodes: Object.fromEntries(
+		Array.from({ length: 24 }, (_, index) => [
+			`step-${index + 1}`,
+			index === 0 ? "Start intake" : index === 23 ? "Finish intake" : `Process intake ${index}`,
+		]),
+	),
+	edges: Array.from(
+		{ length: 23 },
+		(_, index) => [`step-${index + 1}`, `step-${index + 2}`] as const,
+	),
 };
 
 export const denseFlowchartBuild = {

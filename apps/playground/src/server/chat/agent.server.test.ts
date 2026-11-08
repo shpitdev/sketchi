@@ -63,16 +63,12 @@ describe("Studio agent request callbacks", () => {
 					callback: execute({
 						spec: {
 							title: "Trace context",
-							nodes: [
-								{ id: "start", kind: "start", label: "Start" },
-								{ id: "done", kind: "end", label: "Done" },
-							],
-							edges: [{ source: "start", target: "done" }],
-							layout: { direction: "TB" },
-							style: {
-								accentColor: "#2563eb",
-								backgroundColor: "#ffffff",
+							direction: "TB",
+							nodes: {
+								start: "Start",
+								done: "Done",
 							},
+							edges: [["start", "done"]],
 						},
 					}),
 					requestContext,

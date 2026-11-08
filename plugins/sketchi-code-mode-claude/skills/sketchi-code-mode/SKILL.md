@@ -29,18 +29,12 @@ async () => {
   const built = await sketchi.buildFlowchart({
     spec: {
       title: "Approval flow",
-      nodes: [
-        { id: "request", label: "Request", kind: "start" },
-        { id: "approved", label: "Approved?", kind: "decision" },
-        { id: "done", label: "Done", kind: "end" },
-        { id: "revise", label: "Revise", kind: "end" },
-      ],
+      nodes: { request: "Request", approved: "Approved?", done: "Done", revise: "Revise" },
       edges: [
-        { source: "request", target: "approved" },
-        { source: "approved", target: "done", label: "yes" },
-        { source: "approved", target: "revise", label: "no" },
+        ["request", "approved"],
+        ["approved", "done", "yes"],
+        ["approved", "revise", "no"],
       ],
-      layout: { direction: "TB" },
     },
     options: {
       artifactFormats: ["scene", "excalidraw", "png"],

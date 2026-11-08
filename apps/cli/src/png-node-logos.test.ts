@@ -28,39 +28,19 @@ const logoFlowchart = {
 	spec: {
 		id: "deploy-logos",
 		title: "Deploy pipeline",
-		nodes: [
-			{
-				id: "push",
-				label: "Push to GitHub",
-				kind: "start",
-				icon: { slug: "github" },
-			},
-			{
-				id: "build",
-				label: "Build the Docker image",
-				kind: "process",
-				icon: { slug: "docker" },
-			},
-			{
-				id: "tests",
-				label: "Tests pass?",
-				kind: "decision",
-				icon: { slug: "vitest" },
-			},
-			{ id: "fix", label: "Fix the failing tests", kind: "process" },
-			{
-				id: "ship",
-				label: "Ship to Cloudflare",
-				kind: "end",
-				icon: { slug: "cloudflare" },
-			},
-		],
+		nodes: {
+			push: { label: "Push to GitHub", icon: "github" },
+			build: { label: "Build the Docker image", icon: "docker" },
+			tests: { label: "Tests pass?", icon: "vitest" },
+			fix: "Fix the failing tests",
+			ship: { label: "Ship to Cloudflare", icon: "cloudflare" },
+		},
 		edges: [
-			{ source: "push", target: "build" },
-			{ source: "build", target: "tests" },
-			{ source: "tests", target: "ship", label: "yes" },
-			{ source: "tests", target: "fix", label: "no" },
-			{ source: "fix", target: "build" },
+			["push", "build"],
+			["build", "tests"],
+			["tests", "ship", "yes"],
+			["tests", "fix", "no"],
+			["fix", "build"],
 		],
 	},
 } as const;

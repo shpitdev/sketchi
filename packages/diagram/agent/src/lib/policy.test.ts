@@ -40,7 +40,9 @@ describe("diagram agent policy", () => {
 	});
 
 	it("routes time-ordered interactions to the sequence build tool", () => {
-		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain("build_flowchart with { spec: FlowchartSpec }");
+		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain(
+			"build_flowchart with { spec } (the flowchart document)",
+		);
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain(
 			"build_sequence_diagram with { spec: SequenceDiagramSpec }",
 		);
@@ -59,7 +61,7 @@ describe("Studio chat rules", () => {
 	it("reads every family's rules from diagram-core in the user's voice", () => {
 		for (const rule of [
 			FLOWCHART_RULES.labelForm,
-			FLOWCHART_RULES.lanes("the user"),
+			FLOWCHART_RULES.documentLanes("the user"),
 			SEQUENCE_RULES.selfStep,
 			STATE_MACHINE_RULES.kinds("the user"),
 			STATE_MACHINE_RULES.endsLifecycle,
@@ -82,7 +84,7 @@ describe("Studio chat rules", () => {
 	it("allows self-messages, lays flows out top to bottom unless asked, and states limits once", () => {
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).not.toContain("two different participant ids");
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).not.toContain('"LR" for pipelines and lifecycles');
-		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain(FLOWCHART_RULES.direction("the user"));
+		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain(FLOWCHART_RULES.documentDirection("the user"));
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).not.toContain("read best");
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain(
 			`Use at most ${SEQUENCE_MAX_PARTICIPANTS} participants and ${SEQUENCE_MAX_MESSAGES} messages.`,
