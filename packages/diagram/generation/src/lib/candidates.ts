@@ -2,6 +2,7 @@ import {
 	type CanonicalDiagram,
 	CanonicalDiagramSchema,
 	DiagramNodeShapeSchema,
+	DiagramZoneKindSchema,
 	DiagramValidationError,
 	ClassDiagramSchema,
 	ClassValidationError,
@@ -220,10 +221,25 @@ function withKnownShape(id: string, node: unknown, diagnostics: string[]): unkno
 	return withoutShape;
 }
 
+/** A generated team's stray kind is presentation metadata, not a reason to rebuild the graph. */
+function withKnownGroupKind(id: string, group: unknown, diagnostics: string[]): unknown {
+	if (
+		!isUnknownRecord(group) ||
+		group["kind"] === undefined ||
+		Schema.is(DiagramZoneKindSchema)(group["kind"])
+	)
+		return group;
+	const { kind, ...plain } = group;
+	diagnostics.push(
+		`group_kind_dropped: group "${id}" kind ${JSON.stringify(kind)} is not a zone kind; the group draws plain.`,
+	);
+	return plain;
+}
+
 /**
  * A generated flowchart document as a build reads it, or the problems that send it back for
  * repair: a node, group or lane key the response repeats (JSON keeps only the last), a schema
- * problem, or a graph the document can't draw. A shape Sketchi doesn't draw is dropped.
+ * problem, or a graph the document can't draw. Unsupported shapes and group kinds draw plain, with a diagnostic note.
  */
 function parseGeneratedFlowchart(
 	input: Record<string, unknown>,
@@ -247,6 +263,7 @@ function parseGeneratedFlowchart(
 	}
 	const { type: _type, style: _style, ...fields } = input;
 	const nodes = fields["nodes"];
+	const groups = fields["groups"];
 	const edges = fields["edges"];
 	// A drawn graph's node and edge objects fail on every entry; one line says what to write.
 	if (Array.isArray(nodes) || (Array.isArray(edges) && edges.some(isUnknownRecord))) {
@@ -255,6 +272,16 @@ function parseGeneratedFlowchart(
 	}
 	const decoded = decodeFlowchartDocument({
 		...fields,
+		...(isUnknownRecord(groups)
+			? {
+					groups: Object.fromEntries(
+						Object.entries(groups).map(([id, group]) => [
+							id,
+							withKnownGroupKind(id, group, diagnostics),
+						]),
+					),
+				}
+			: {}),
 		...(isUnknownRecord(nodes)
 			? {
 					nodes: Object.fromEntries(

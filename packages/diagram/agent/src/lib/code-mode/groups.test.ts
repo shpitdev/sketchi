@@ -110,6 +110,18 @@ describe("Code Mode flowchart groups", () => {
 		);
 	});
 
+	it("keeps unsupported group kinds strict on the MCP builder, with a repair hint", async () => {
+		const built = await build({
+			...spec,
+			groups: { ...spec.groups, employee: { ...spec.groups.employee, kind: "team" } },
+		});
+		expect(built.ok).toBe(false);
+		if (built.ok) return;
+		const problem = built.issues.find(({ ref }) => ref?.path === "spec.groups.employee.kind");
+		expect(problem).toBeDefined();
+		expect(problem?.hint).toBeTruthy();
+	});
+
 	it("rejects a group listing an undeclared id with the nearest ids in its hint", async () => {
 		const built = await build({
 			...spec,

@@ -77,6 +77,26 @@ describe("flowchart node shapes", () => {
 	});
 });
 
+describe("generated flowchart group kinds", () => {
+	it("drops an unsupported group kind with a note, preserving membership and real zone kinds", () => {
+		const candidate = parse({
+			type: "flowchart",
+			id: "teams",
+			nodes: { a: { label: "Draft", group: "team" }, b: { label: "Publish", group: "region" } },
+			edges: [["a", "b"]],
+			groups: {
+				team: { label: "Writers", kind: "team" },
+				region: { label: "East", kind: "region" },
+			},
+		});
+		expect(candidate.error).toBeUndefined();
+		expect(candidate.flowchart?.groups?.["team"]).toEqual({ label: "Writers" });
+		expect(candidate.flowchart?.groups?.["region"]?.kind).toBe("region");
+		expect(candidate.diagram).toMatchObject({ nodes: [{ group: "team" }, { group: "region" }] });
+		expect(candidate.diagnostics.join()).toContain('group_kind_dropped: group "team" kind "team"');
+	});
+});
+
 describe("flowchart roles", () => {
 	const flow = (nodes: Record<string, unknown>, edges: readonly unknown[]) =>
 		parse({ type: "flowchart", id: "flow", nodes, edges });

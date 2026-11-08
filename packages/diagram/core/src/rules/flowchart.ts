@@ -59,7 +59,7 @@ export const FLOWCHART_RULES = {
 		"Keep each action on a return path as its own node in its actor's group or lane, then connect back to the repeated step; never make it an end or put its action only on an arrow.",
 
 	documentGroups: (source: RuleSource) =>
-		`When ${source} groups steps, declare groups: { id: { label, kind?, contains?: [ids] } }. For teams, each node names its doer in group, return-loop actions too; contains lists nested groups. For zones, contains lists nodes and groups at any depth; Sketchi nests them. node.group combines with contains; conflicting owners fail. Each named zone has its own group; outside stays out. Zone kind: ${zoneKinds}. Shapes on all nodes, entries/ends too: "database" for databases, "document" for files/archives/reports, "queue" for queues/streams/topics, "storage" for buckets/object stores.`,
+		`When ${source} groups steps, declare groups: { id: { label, kind?, contains?: [ids] } }. For teams, each node names its doer in group, return-loop actions too; contains lists nested groups. For zones, contains lists nodes and groups at any depth; Sketchi nests them. node.group combines with contains; conflicting owners fail. Each named zone has its own group; outside stays out. Only zones take kind (${zoneKinds}); omit kind for teams. Shapes on all nodes, entries/ends too: "database" for databases, "document" for files/archives/reports, "queue" for queues/streams/topics, "storage" for buckets/object stores.`,
 
 	documentLanes: (source: RuleSource) =>
 		`For swimlanes, a process across actors or roles, declare lanes: { id: "Label" } in ${source}'s order and set every node's lane, questions too, to whoever does it: { label, lane }. Lanes may be empty; no groups.`,

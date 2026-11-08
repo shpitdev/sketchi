@@ -399,6 +399,28 @@ describe("the coverage repair", () => {
 			}),
 	);
 
+	it.effect("does not spend a repair call on a harmless unsupported group kind", () =>
+		Effect.gen(function* () {
+			const source = JSON.parse(complete);
+			source.diagram.groups = {
+				release: {
+					label: "Release team",
+					kind: "team",
+					contains: ["push", "build", "test", "ship"],
+				},
+			};
+			const { candidate, seen } = yield* run(
+				[JSON.stringify(source)],
+				"Flowchart in Release team: Push → Build → Test → Ship.",
+			);
+			expect(seen).toHaveLength(1);
+			expect(candidate.error).toBeUndefined();
+			expect(candidate.diagnostics.some((note) => note.startsWith("group_kind_dropped:"))).toBe(
+				true,
+			);
+		}),
+	);
+
 	it.effect("makes no further call when the diagram covers the request", () =>
 		Effect.gen(function* () {
 			const { candidate, seen } = yield* run([complete]);
