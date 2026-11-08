@@ -49,7 +49,7 @@ export const FLOWCHART_RULES = {
 		`Label an arrow with the words ${source} gives it ("write orders", "publish jobs"): ["api", "db", "write orders"].`,
 	documentZonesNotNodes: "A zone is only a group: never also a node, and never an arrow's end.",
 	documentOwners: (source: RuleSource) =>
-		`List each node, questions too, in the lane or group of whoever does it in ${source}, never of whoever it names or acts on: "support notifies the customer" is Support's, and a step redone after a rejection stays with whoever redoes it.`,
+		`List each node, questions too, in the lane or group of whoever does it in ${source}, never of whoever it names or acts on: "support notifies the customer" is Support's.`,
 	documentFanOut:
 		'A branch that leads to several steps lists them in one edge: ["short", ["notify", "reorder"], "yes"].',
 	documentBranches: (source: RuleSource) =>

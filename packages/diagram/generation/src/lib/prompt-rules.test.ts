@@ -168,7 +168,9 @@ describe("rules that close the graded gap with the MCP agent", () => {
 			requestedType: "flowchart",
 			logos: [{ slug: "redis", name: "Redis" }],
 		});
-		expect(user).toContain("keep each technology's name in the label of the node about it");
+		expect(user).toContain(
+			"keep each technology's name in the label of the node or group about it",
+		);
 	});
 });
 

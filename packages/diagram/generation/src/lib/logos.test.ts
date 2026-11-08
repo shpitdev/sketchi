@@ -80,7 +80,7 @@ describe("generation logo guidance", () => {
 			request({ requestedType: "flowchart" }).prompt,
 		);
 		expect(flowchart.user).toContain(
-			'In a flowchart, set "logos": true and keep each technology\'s name in the label of the node about it',
+			'In a flowchart, set "logos": true and keep each technology\'s name in the label of the node or group about it',
 		);
 		expect(flowchart.user).not.toContain("participant");
 

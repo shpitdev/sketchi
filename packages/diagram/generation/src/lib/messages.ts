@@ -511,7 +511,7 @@ function expectedJsonShape(prompt: DiagramGenerationPrompt): string {
 /** Families that draw catalog logos, and which element carries them. */
 const LOGO_TARGETS = {
 	flowchart: {
-		rule: 'In a flowchart, set "logos": true and keep each technology\'s name in the label of the node about it; its logo follows the label.',
+		rule: 'In a flowchart, set "logos": true and keep each technology\'s name in the label of the node or group about it; its logo follows the label, so never add a node only to show a logo.',
 	},
 	sequence: {
 		rule: 'A sequence participant about one of these technologies may set "icon": { "slug": "<slug>" } using a slug from this list exactly, and keeps that name in its label. Omit icon on every other participant. Never invent a slug.',
