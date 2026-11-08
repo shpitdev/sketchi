@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.35.2
+
+### Patch Changes
+
+- [#698](https://github.com/shpitdev/sketchi/pull/698) [`5d1e57b`](https://github.com/shpitdev/sketchi/commit/5d1e57bf2ff6dd07c45166b1e71ebfea764c6529) Thanks [@anandpant](https://github.com/anandpant)! - A canvas now holds up to 5,000 elements instead of 600, so a diagram within its family's limits, such as a 40-event timeline across five lanes, no longer fails for drawing more than 600 elements. Each family keeps its own limits. A generate request whose diagram still draws too much for one canvas answers `limit_exceeded` (HTTP 413) with the element count, instead of `render_failed` (HTTP 500).
+
 ## 0.35.1
 
 ### Patch Changes
