@@ -1,5 +1,6 @@
 import { CodeModeIconLoadError, makeCodeModeIconCatalog } from "@sketchi/diagram-agent";
 import { iconManifest } from "@sketchi/icon-catalog/catalog";
+import { CONCEPT_ICONS } from "@sketchi/icon-catalog/concepts";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import nodeLogoSvgs from "@sketchi/icon-catalog/node-logo-svgs";
 import { Effect } from "effect";
@@ -7,6 +8,7 @@ import { Effect } from "effect";
 /** Offline node-logo catalog: the CLI bundles every hand-drawn recipe and normalized SVG. */
 export const cliIconCatalog = makeCodeModeIconCatalog({
 	icons: iconManifest.icons,
+	concepts: CONCEPT_ICONS,
 	loadSvg: (icon) => {
 		const svg = Object.hasOwn(nodeLogoSvgs, icon.slug) ? nodeLogoSvgs[icon.slug] : undefined;
 		return svg === undefined

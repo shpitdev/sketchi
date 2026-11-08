@@ -20,6 +20,7 @@ for embedding marks inside diagram nodes.
   `getIconBySlug`, `getIconSourcePath`, `getIconSourceFile`, `nodeLogoIcons`).
 - `@sketchi/icon-catalog/native-icons`: the built map of hand-drawn recipes by
   slug.
+- `@sketchi/icon-catalog/concepts`: the generic concept icons (`CONCEPT_ICONS`).
 
 ## Data flow
 
@@ -52,6 +53,21 @@ into `@sketchi/icon-catalog/native-icons`; a recipe must name a catalog slug.
 Diagram packages validate each recipe and draw it as plain Excalidraw
 elements, and embed the SVG only for marks without one or when a diagram asks
 for exact marks.
+
+## Concept icons
+
+`src/concepts.ts` lists generic concepts diagrams draw by hand: a database, a
+queue, a user. They are not brand marks and have no SVG. The build transcribes
+each concept's Lucide icon (`lucide-static`, ISC) into a recipe, primitive by
+primitive, squaring small rounded corners. A concept Lucide draws poorly at
+node-logo size has its own recipe under `recipes/concepts/` instead. The build
+fails when a concept needs more than a recipe's 8 parts or shares a mark's slug.
+Icon search returns concepts so an agent can attach one by slug, but no label
+fills one in.
+
+Every concept and brand recipe must stay readable at 28 px with the scene's
+2-unit pen. Fewer, bolder strokes beat detail: cut parts or drop a concept
+rather than thin its lines.
 
 ## Commands
 

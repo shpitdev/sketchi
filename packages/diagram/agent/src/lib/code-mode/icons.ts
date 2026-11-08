@@ -9,6 +9,7 @@ import {
 	type IconRecipe,
 } from "@sketchi/diagram-core";
 import {
+	CONCEPT_COLLECTION,
 	iconMatch,
 	isNodeLogoEligible,
 	isStrayVendorLogo,
@@ -16,6 +17,7 @@ import {
 	labelLogos,
 	normalizeNodeLogoSvg,
 	searchIcons,
+	type ConceptIcon,
 	type IconMatch,
 	type SketchiIcon,
 } from "@sketchi/icon-catalog";
@@ -92,8 +94,32 @@ function catalogIcon(icon: SketchiIcon): CodeModeCatalogIcon {
 	return { collection: icon.collection, name: icon.name, slug: icon.slug };
 }
 
+/** A concept as a search entry; concepts have no SVG source. */
+function conceptSearchIcon(concept: ConceptIcon): SketchiIcon {
+	return {
+		aliases: concept.aliases,
+		bytes: 0,
+		collection: CONCEPT_COLLECTION,
+		keywords: [],
+		name: concept.name,
+		slug: concept.slug,
+		svgPath: "",
+		viewBox: { height: 24, minX: 0, minY: 0, width: 24 },
+	};
+}
+
+/** Whether a catalog icon is a generic concept, drawn only by hand and never named by a label. */
+export function isConceptIcon(icon: Pick<CodeModeCatalogIcon, "collection">): boolean {
+	return icon.collection === CONCEPT_COLLECTION;
+}
+
 export function makeCodeModeIconCatalog(options: {
 	readonly icons: readonly SketchiIcon[];
+	/**
+	 * Generic concepts (a database, a queue, a user) that search returns and a
+	 * slug attaches; only those with a drawable recipe are offered.
+	 */
+	readonly concepts?: readonly ConceptIcon[];
 	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
 	/** Hand-drawn recipes keyed by slug; undrawable ones are ignored. */
 	readonly recipes?: Readonly<Record<string, unknown>>;
@@ -101,11 +127,21 @@ export function makeCodeModeIconCatalog(options: {
 }): CodeModeIconCatalog {
 	const eligible = options.icons.filter(isNodeLogoEligible);
 	const icons = new Map(eligible.map((icon) => [icon.slug, icon]));
-	const bySlug = new Map(eligible.map((icon) => [icon.slug, catalogIcon(icon)]));
+	const recipeFor = (slug: string) => {
+		const recipe = Object.hasOwn(options.recipes ?? {}, slug) ? options.recipes?.[slug] : undefined;
+		return isIconRecipe(recipe) ? recipe : undefined;
+	};
+	// A concept needs its recipe and a slug no mark uses.
+	const concepts = (options.concepts ?? [])
+		.filter((concept) => !icons.has(concept.slug) && recipeFor(concept.slug))
+		.map(conceptSearchIcon);
+	const searchable = [...eligible, ...concepts];
+	const bySlug = new Map(searchable.map((icon) => [icon.slug, catalogIcon(icon)]));
 	const recipes = new Map(
-		Object.entries(options.recipes ?? {}).flatMap(([slug, recipe]) =>
-			bySlug.has(slug) && isIconRecipe(recipe) ? [[slug, recipe] as const] : [],
-		),
+		searchable.flatMap((icon) => {
+			const recipe = recipeFor(icon.slug);
+			return recipe ? [[icon.slug, recipe] as const] : [];
+		}),
 	);
 	return {
 		get: (slug) => bySlug.get(slug),
@@ -128,7 +164,7 @@ export function makeCodeModeIconCatalog(options: {
 			return { named: marks(found.named), possible: marks(found.possible) };
 		},
 		search: (query, limit) =>
-			searchIcons(eligible, { limit, query }).map(({ icon }) => ({
+			searchIcons(searchable, { limit, query }).map(({ icon }) => ({
 				...catalogIcon(icon),
 				match: iconMatch(icon, query),
 			})),
@@ -513,11 +549,15 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 			return recipe ? [[slug, recipe] as const] : [];
 		}),
 	);
-	// A slug's SVG is read only when some icon draws the exact mark.
+	// A slug's SVG is read only when some icon draws the exact mark; a concept has none.
 	const exactSlugs = new Set(
 		icons
 			.filter(({ exact, slug }) => options.exactIcons || exact || !recipes.has(slug))
-			.map(({ slug }) => slug),
+			.map(({ slug }) => slug)
+			.filter((slug) => {
+				const icon = known.get(slug);
+				return icon !== undefined && !isConceptIcon(icon);
+			}),
 	);
 	const loaded = yield* Effect.forEach(
 		[...known.values()].filter((icon) => exactSlugs.has(icon.slug)),

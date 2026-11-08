@@ -7,6 +7,7 @@ import {
 } from "@sketchi/diagram-agent";
 import { logosNamedInText, type NamedLogo } from "@sketchi/icon-catalog";
 import { iconManifest, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
+import { CONCEPT_ICONS } from "@sketchi/icon-catalog/concepts";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import { Effect } from "effect";
 
@@ -44,6 +45,7 @@ export function playgroundIconCatalog(
 	if (cached) return cached;
 	const catalog = makeCodeModeIconCatalog({
 		icons: iconManifest.icons,
+		concepts: CONCEPT_ICONS,
 		loadSvg: (icon) =>
 			Effect.tryPromise({
 				try: async (signal) => {

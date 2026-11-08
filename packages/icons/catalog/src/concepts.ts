@@ -1,0 +1,230 @@
+import type { ConceptIcon } from "./concept.js";
+
+/**
+ * The concept icons diagrams may draw, each transcribed from a Lucide (ISC)
+ * icon or drawn under recipes/concepts/ where Lucide has no pictogram that
+ * reads as the concept at node-logo size. Slugs never collide with a mark.
+ */
+export const CONCEPT_ICONS: readonly ConceptIcon[] = [
+	{ slug: "database", name: "Database", aliases: ["db", "sql", "data store"], lucide: "database" },
+	{
+		slug: "queue",
+		name: "Queue",
+		aliases: ["message queue", "job queue", "buffer", "topic", "conveyor"],
+	},
+	{
+		slug: "server",
+		name: "Server",
+		aliases: ["host", "machine", "backend", "rack"],
+		lucide: "server",
+	},
+	{ slug: "cloud", name: "Cloud", aliases: ["internet", "hosting"] },
+	{
+		slug: "browser",
+		name: "Browser",
+		aliases: ["web app", "website", "web page", "frontend"],
+		lucide: "app-window",
+	},
+	{
+		slug: "user",
+		name: "User",
+		aliases: ["person", "customer", "client", "account"],
+		lucide: "user",
+	},
+	{
+		slug: "users",
+		name: "Users",
+		aliases: ["team", "people", "group", "customers"],
+		lucide: "users",
+	},
+	{
+		slug: "api-endpoint",
+		name: "API",
+		aliases: ["api", "endpoint", "rest api", "service interface"],
+	},
+	{
+		slug: "mobile",
+		name: "Mobile",
+		aliases: ["phone app", "smartphone", "ios", "android"],
+		lucide: "smartphone",
+	},
+	{
+		slug: "monitor",
+		name: "Monitor",
+		aliases: ["screen", "display", "desktop"],
+		lucide: "monitor",
+	},
+	{
+		slug: "globe",
+		name: "Globe",
+		aliases: ["web", "world", "global", "public internet"],
+		lucide: "globe",
+	},
+	{
+		slug: "lock",
+		name: "Lock",
+		aliases: ["auth", "authentication", "private", "padlock"],
+		lucide: "lock",
+	},
+	{
+		slug: "key",
+		name: "Key",
+		aliases: ["secret", "credential", "api key", "token"],
+		lucide: "key-round",
+	},
+	{
+		slug: "shield",
+		name: "Shield",
+		aliases: ["firewall", "protection", "waf", "policy"],
+	},
+	{
+		slug: "package",
+		name: "Package",
+		aliases: ["artifact", "bundle", "release", "parcel", "box", "cardboard box"],
+		lucide: "package",
+	},
+	{
+		slug: "document",
+		name: "Document",
+		aliases: ["file", "report", "page", "doc"],
+	},
+	{ slug: "folder", name: "Folder", aliases: ["directory", "files"], lucide: "folder" },
+	{
+		slug: "email",
+		name: "Email",
+		aliases: ["mail", "inbox", "message", "envelope"],
+		lucide: "mail",
+	},
+	{
+		slug: "chat",
+		name: "Chat",
+		aliases: ["message", "conversation", "comment", "speech bubble"],
+	},
+	{
+		slug: "notification",
+		name: "Notification",
+		aliases: ["alert", "bell", "push notification"],
+		lucide: "bell",
+	},
+	{
+		slug: "search",
+		name: "Search",
+		aliases: ["find", "lookup", "query", "magnifying glass", "magnifier"],
+		lucide: "search",
+	},
+	{
+		slug: "settings",
+		name: "Settings",
+		aliases: ["config", "configuration", "preferences", "gear", "sliders", "controls", "toggles"],
+		lucide: "settings-2",
+	},
+	{
+		slug: "clock",
+		name: "Clock",
+		aliases: ["scheduler", "cron", "timer", "schedule"],
+		lucide: "clock",
+	},
+	{ slug: "calendar", name: "Calendar", aliases: ["date", "event", "booking"], lucide: "calendar" },
+	{
+		slug: "payment",
+		name: "Payment",
+		aliases: ["credit card", "checkout", "card"],
+		lucide: "credit-card",
+	},
+	{
+		slug: "cart",
+		name: "Cart",
+		aliases: ["shopping cart", "basket", "order"],
+		lucide: "shopping-cart",
+	},
+	{ slug: "store", name: "Store", aliases: ["shop", "storefront", "retail"], lucide: "store" },
+	{
+		slug: "truck",
+		name: "Truck",
+		aliases: ["delivery", "shipping", "fulfillment"],
+	},
+	{
+		slug: "chart",
+		name: "Chart",
+		aliases: ["analytics", "metrics", "report", "bar chart"],
+		lucide: "chart-column",
+	},
+	{
+		slug: "dashboard",
+		name: "Dashboard",
+		aliases: ["admin", "console", "overview"],
+		lucide: "layout-dashboard",
+	},
+	{
+		slug: "code",
+		name: "Code",
+		aliases: ["source code", "repository", "html"],
+		lucide: "code-xml",
+	},
+	{
+		slug: "terminal",
+		name: "Terminal",
+		aliases: ["cli", "shell", "command line", "console"],
+		lucide: "terminal",
+	},
+	{
+		slug: "git-branch",
+		name: "Git branch",
+		aliases: ["branch", "version control", "merge"],
+		lucide: "git-branch",
+	},
+	{
+		slug: "bot",
+		name: "Bot",
+		aliases: ["agent", "ai agent", "chatbot", "assistant", "ai model", "llm", "robot"],
+	},
+	{ slug: "image", name: "Image", aliases: ["photo", "picture", "media"], lucide: "image" },
+	{ slug: "video", name: "Video", aliases: ["camera", "recording"], lucide: "video" },
+	{ slug: "phone", name: "Phone", aliases: ["call", "telephone", "sms"], lucide: "phone" },
+	{
+		slug: "location",
+		name: "Location",
+		aliases: ["map", "map pin", "address", "geo"],
+		lucide: "map-pin",
+	},
+	{
+		slug: "warning",
+		name: "Warning",
+		aliases: ["error", "incident", "alert"],
+		lucide: "triangle-alert",
+	},
+	{
+		slug: "success",
+		name: "Success",
+		aliases: ["done", "approved", "check", "ok", "checkmark"],
+		lucide: "circle-check",
+	},
+	{
+		slug: "activity",
+		name: "Activity",
+		aliases: ["monitoring", "health", "heartbeat", "pulse"],
+		lucide: "activity",
+	},
+	{
+		slug: "gauge",
+		name: "Gauge",
+		aliases: ["performance", "speed", "latency", "meter", "speedometer", "dial"],
+		lucide: "gauge",
+	},
+	{ slug: "plug", name: "Plug", aliases: ["integration", "connector", "plugin"], lucide: "plug" },
+	{ slug: "wallet", name: "Wallet", aliases: ["balance", "funds", "money"], lucide: "wallet" },
+	{
+		slug: "archive",
+		name: "Archive",
+		aliases: ["backup", "cold storage", "storage box"],
+		lucide: "archive",
+	},
+	{ slug: "upload", name: "Upload", aliases: ["cloud upload", "publish"], lucide: "cloud-upload" },
+	{
+		slug: "download",
+		name: "Download",
+		aliases: ["cloud download", "fetch"],
+		lucide: "cloud-download",
+	},
+	{ slug: "layers", name: "Layers", aliases: ["stack", "tiers", "layer"], lucide: "layers" },
+];

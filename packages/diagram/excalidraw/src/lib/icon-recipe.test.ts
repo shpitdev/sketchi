@@ -19,7 +19,7 @@ import {
 	validateExcalidrawScene,
 	type ExcalidrawElement,
 } from "./convert";
-import { iconRecipeElements } from "./icon-recipe";
+import { iconRecipeElements, legibleIconInk } from "./icon-recipe";
 
 const RECIPE: IconRecipe = {
 	parts: [
@@ -275,5 +275,75 @@ describe("hand-drawn node logos in Excalidraw output", () => {
 			groupIds: ["zone-icon"],
 			x: expect.closeTo(box.x + (2 * box.width) / 24, 2),
 		});
+	});
+});
+
+describe("inverted marks on light-on-dark nodes", () => {
+	/** An inverted mark, as GitHub's and Next.js's are: an ink disc with a paper cutout. */
+	const INVERTED: IconRecipe = {
+		parts: [
+			{ kind: "ellipse", cx: 12, cy: 12, rx: 10, ry: 10, fill: "ink" },
+			{ kind: "ellipse", cx: 12, cy: 12, rx: 5, ry: 5, stroke: "paper", fill: "paper" },
+		],
+	};
+
+	it("keeps ink that reads on its paper, and swaps ink that would vanish", () => {
+		expect(legibleIconInk("#ffffff", "#1f2937")).toBe("#ffffff");
+		expect(legibleIconInk("#1e1e1e", "#ffffff")).toBe("#1e1e1e");
+		expect(legibleIconInk("#ffffff", "#ffffff")).toBe("#1e1e1e");
+		expect(legibleIconInk("#fafafa", "#fff")).toBe("#1e1e1e");
+		expect(legibleIconInk("#111827", "#1f2937")).toBe("#ffffff");
+		expect(legibleIconInk("ink", "#ffffff")).toBe("ink");
+	});
+
+	const nodeScene = (node: Partial<NodeSceneElement>, backgroundColor = "#ffffff") => {
+		const shape: NodeSceneElement = {
+			type: "node",
+			id: "n",
+			nodeId: "n",
+			shape: "rectangle",
+			x: 40,
+			y: 40,
+			width: 184,
+			height: 96,
+			label: "Push to GitHub",
+			icon: { slug: "github", size: 28 },
+			...node,
+		};
+		const excalidraw = convertSceneToExcalidraw(
+			embedCanvasIcons(
+				{
+					...renderIntermediateDiagram(deployPipelineLogoFlowchart),
+					backgroundColor,
+					elements: [shape],
+					zOrder: ["n"],
+				},
+				() => ({ name: "GitHub", recipe: INVERTED }),
+			).scene,
+		);
+		const [disc, cutout] = excalidraw.elements.filter((element) =>
+			element.id.startsWith("n-icon-"),
+		);
+		return { disc, cutout };
+	};
+
+	it("cuts the mark out of the node's own fill when white label text sits on a dark node", () => {
+		const { disc, cutout } = nodeScene({ fillColor: "#1f2937", textColor: "#ffffff" });
+		expect(disc).toMatchObject({ backgroundColor: "#ffffff" });
+		expect(cutout).toMatchObject({ backgroundColor: "#1f2937", strokeColor: "#1f2937" });
+	});
+
+	it("never draws a blank disc when the label's ink matches the canvas", () => {
+		const { disc, cutout } = nodeScene({ textColor: "#ffffff" });
+		expect(disc).toMatchObject({ backgroundColor: "#1e1e1e" });
+		expect(cutout).toMatchObject({ backgroundColor: "#ffffff" });
+	});
+
+	it("sits on the canvas, not a hatched fill, when the node is not solid", () => {
+		const { cutout } = nodeScene(
+			{ fillColor: "#1f2937", fillStyle: "hachure", textColor: "#ffffff" },
+			"#121212",
+		);
+		expect(cutout).toMatchObject({ backgroundColor: "#121212" });
 	});
 });

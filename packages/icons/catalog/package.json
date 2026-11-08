@@ -13,6 +13,10 @@
 			"types": "./dist/catalog.d.ts",
 			"default": "./dist/catalog.js"
 		},
+		"./concepts": {
+			"types": "./dist/concepts.d.ts",
+			"default": "./dist/concepts.js"
+		},
 		"./generic-prompts": {
 			"types": "./dist/generic-prompts.d.ts",
 			"default": "./dist/generic-prompts.js"
@@ -30,6 +34,8 @@
 		"./package.json": "./package.json"
 	},
 	"devDependencies": {
+		"lucide-static": "1.65.0",
+		"svg-pathdata": "9.0.0",
 		"wordlist-english": "1.2.1"
 	}
 }
