@@ -41,6 +41,7 @@ describe("generation prompt rules", () => {
 	it("makes every named zone a group nested in the zone that holds it", () => {
 		expect(system).toContain("Every zone the scenario names is its own group");
 		expect(system).toContain("a group may list members at any depth and Sketchi nests them");
+		expect(system).toContain(FLOWCHART_RULES.documentZonesNotNodes);
 	});
 
 	it("says what a table's columns are and what a footer holds", () => {
@@ -135,7 +136,8 @@ describe("generation reaches every field an MCP agent can set", () => {
 		]) {
 			expect(system).toContain(rule);
 		}
-		expect(system).toContain('A node\'s details are { "label", "note"?, "shape"? }.');
+		expect(system).toContain(FLOWCHART_RULES.documentNodeDetails);
+		expect(system).toContain(FLOWCHART_RULES.documentEdgeLabels("the scenario"));
 		expect(system).toContain('layout { "direction": "LR" | "TB" } when the source states one');
 	});
 });

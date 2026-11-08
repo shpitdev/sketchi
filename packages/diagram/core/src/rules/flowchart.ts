@@ -43,6 +43,11 @@ export const FLOWCHART_RULES = {
 		'nodes map an id to its label or { label, … }; an edge is [from, to] or [from, to, "label"], and an end may list ids: [["web", "api"], "rds"] is one edge per id.',
 	documentRoles: (source: RuleSource) =>
 		`Sketchi reads roles from the edges: a question label is a decision, a node nothing enters starts the flow and one nothing leaves ends it. Draw only the steps and arrows ${source} states: a branch with no stated next step ends at its last step, with no onward arrow or closing node.`,
+	documentNodeDetails:
+		'A node is "Label", or { "label", "note"?, "shape"? } when it has a subtitle or a shape; give every database, queue, bucket and file its shape.',
+	documentEdgeLabels: (source: RuleSource) =>
+		`Label an arrow with the words ${source} gives it ("write orders", "publish jobs"): ["api", "db", "write orders"].`,
+	documentZonesNotNodes: "A zone is only a group: never also a node, and never an arrow's end.",
 	documentBranches: (source: RuleSource) =>
 		`Label every branch of a question with ${source}'s outcome words, usually "yes" and "no", each label once.`,
 	documentLoops:

@@ -117,7 +117,9 @@ const typeRule = (value: DiagramTypeValue) => `Use diagram type "${value}".`;
 
 const FLOWCHART_INSTRUCTIONS = [
 	typeRule("flowchart"),
-	`Return diagram as the flowchart document: { "type": "flowchart", "id", "direction"?, "logos"?, "nodes", "edges", "groups"?, "lanes"? }. ${FLOWCHART_RULES.documentShape} A node's details are { "label", "note"?, "shape"? }.`,
+	`Return diagram as the flowchart document: { "type": "flowchart", "id", "direction"?, "logos"?, "nodes", "edges", "groups"?, "lanes"? }. ${FLOWCHART_RULES.documentShape}`,
+	FLOWCHART_RULES.documentNodeDetails,
+	FLOWCHART_RULES.documentEdgeLabels(SCENARIO),
 	FLOWCHART_RULES.documentRoles(SCENARIO),
 	FLOWCHART_RULES.actionNodes(SCENARIO),
 	FLOWCHART_RULES.statedChecks,
@@ -128,7 +130,7 @@ const FLOWCHART_INSTRUCTIONS = [
 	FLOWCHART_RULES.documentBranches(SCENARIO),
 	FLOWCHART_RULES.documentLoops,
 	FLOWCHART_RULES.documentNoInventedSteps(SCENARIO),
-	`${FLOWCHART_RULES.documentGroups(SCENARIO)} ${FLOWCHART_RULES.zonesOutside}`,
+	`${FLOWCHART_RULES.documentGroups(SCENARIO)} ${FLOWCHART_RULES.zonesOutside} ${FLOWCHART_RULES.documentZonesNotNodes}`,
 	FLOWCHART_RULES.documentLanes(SCENARIO),
 	[
 		FLOWCHART_RULES.limits,
