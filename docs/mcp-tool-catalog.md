@@ -488,9 +488,11 @@ the smallest group holding all its nodes. Lanes hold every node, keep their
 written order and never mix with groups.
 
 With `logos`, every node whose label names a product draws its logo, written with or
-without a dot ("Node.js", "Socket.io"). A node draws one logo: a label that names
-several products ("Next.js app hosted on Vercel") draws the first, and its
-`icon_filled` note names the others. `true` draws a mark the catalog has a hand-drawn
+without a dot ("Node.js", "Socket.io") and as the label's first word ("Python worker").
+A first word that usually names a step ("Make payment", "Go to checkout") draws
+nothing, and an `icon_possible` note names the product it could mean. A node draws one
+logo: a label that names several products ("Next.js app hosted on Vercel") draws the
+first, and its `icon_filled` note names the others. `true` draws a mark the catalog has a hand-drawn
 recipe for as editable Excalidraw shapes in the scene's own pen, and `"exact"` embeds
 every mark's catalog SVG. A node's `icon` names a logo its label does not, or another
 of the products it names, and `null` drops one. An icon that names no logo is

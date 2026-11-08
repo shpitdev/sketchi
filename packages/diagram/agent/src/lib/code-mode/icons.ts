@@ -13,7 +13,7 @@ import {
 	isNodeLogoEligible,
 	isStrayVendorLogo,
 	logoNamedByLabel,
-	logosNamedByLabel,
+	labelLogos,
 	normalizeNodeLogoSvg,
 	searchIcons,
 	type IconMatch,
@@ -69,11 +69,14 @@ export interface CodeModeIconCatalog {
 	 */
 	readonly logoNamedByLabel: (label: string) => CodeModeCatalogIcon | undefined;
 	/**
-	 * Every mark a label names, unmistakable names first ("Next.js app hosted on Vercel" names
-	 * nextjs, then vercel), then any an everyday word names only by its capitals mid-label
-	 * ("Log errors to Sentry").
+	 * The marks a label names in a diagram that asks for logos: every one it names, unmistakable
+	 * names first ("Next.js app hosted on Vercel" names nextjs, then vercel), and any its first
+	 * word may mean when that word starts step labels far more often ("Make payment").
 	 */
-	readonly logosNamedByLabel: (label: string) => readonly CodeModeCatalogIcon[];
+	readonly labelLogos: (label: string) => {
+		readonly named: readonly CodeModeCatalogIcon[];
+		readonly possible: readonly CodeModeCatalogIcon[];
+	};
 	/** Raw SVG source for an eligible mark. */
 	readonly loadSvg: (icon: CodeModeCatalogIcon) => Effect.Effect<string, CodeModeIconLoadError>;
 	/** The hand-drawn recipe for an eligible mark, when the catalog has one. */
@@ -115,11 +118,15 @@ export function makeCodeModeIconCatalog(options: {
 			const icon = logoNamedByLabel(label, eligible);
 			return icon ? bySlug.get(icon.slug) : undefined;
 		},
-		logosNamedByLabel: (label) =>
-			logosNamedByLabel(label, eligible).flatMap((icon) => {
-				const found = bySlug.get(icon.slug);
-				return found ? [found] : [];
-			}),
+		labelLogos: (label) => {
+			const found = labelLogos(label, eligible);
+			const marks = (icons: readonly SketchiIcon[]) =>
+				icons.flatMap((icon) => {
+					const mark = bySlug.get(icon.slug);
+					return mark ? [mark] : [];
+				});
+			return { named: marks(found.named), possible: marks(found.possible) };
+		},
 		search: (query, limit) =>
 			searchIcons(eligible, { limit, query }).map(({ icon }) => ({
 				...catalogIcon(icon),
@@ -285,7 +292,8 @@ export function resolveFlowchartLogos(
 			const slug = normalizeIconSlug(requested);
 			const icon =
 				(isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined) ??
-				catalog?.logosNamedByLabel(requested)[0] ??
+				catalog?.labelLogos(requested).named[0] ??
+				catalog?.labelLogos(requested).possible[0] ??
 				catalog?.search(requested, 1).find((hit) => hit.match === "exact");
 			if (!icon) {
 				issues.push(
@@ -314,7 +322,20 @@ export function resolveFlowchartLogos(
 		}
 		if (!document.logos || !catalog) continue;
 		// A node draws one logo: the first product its label names.
-		const [named, ...others] = catalog.logosNamedByLabel(label);
+		const found = catalog.labelLogos(label);
+		const [named, ...others] = found.named;
+		const [possible] = found.possible;
+		if (!named && possible) {
+			issues.push({
+				code: "icon_possible",
+				severity: "info",
+				stage: "input",
+				ref,
+				message: `Node "${id}" draws no logo: its label "${label}" starts with "${label.trim().split(/\s+/u)[0]}", which usually names a step, not ${possible.name}.`,
+				hint: `If it means ${possible.name}, set icon: "${possible.name}".`,
+			});
+			continue;
+		}
 		if (!named) continue;
 		icons.set(id, named.slug);
 		issues.push({

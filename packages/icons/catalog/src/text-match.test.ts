@@ -3,11 +3,15 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { iconManifest, nodeLogoIcons } from "./catalog";
-import { catalogCommonWords, loadCommonEnglishWords } from "./common-words-generation";
+import {
+	catalogCommonWords,
+	EVERYDAY_WORD_SIZES,
+	loadCommonEnglishWords,
+} from "./common-words-generation";
 import { GENERIC_PROMPTS } from "./generic-prompts";
 import {
+	labelLogos,
 	logoNamedByLabel,
-	logosNamedByLabel,
 	logosNamedInText,
 	matchIconMentions,
 	matchIconsInText,
@@ -133,8 +137,10 @@ describe("logoNamedByLabel", () => {
 	});
 });
 
-describe("logosNamedByLabel", () => {
-	const named = (label: string) => logosNamedByLabel(label, nodeLogoIcons).map((icon) => icon.slug);
+describe("labelLogos", () => {
+	const named = (label: string) => labelLogos(label, nodeLogoIcons).named.map((icon) => icon.slug);
+	const possible = (label: string) =>
+		labelLogos(label, nodeLogoIcons).possible.map((icon) => icon.slug);
 
 	it("names every product a label names, unmistakable names first", () => {
 		expect(named("Next.js app hosted on Vercel")).toEqual(["nextjs", "vercel"]);
@@ -154,10 +160,30 @@ describe("logosNamedByLabel", () => {
 		expect(named("Retry later, i.e. after a backoff")).toEqual([]);
 	});
 
-	it("still names nothing for an everyday word that starts a label", () => {
-		for (const label of ["Go to checkout", "Rust service", "Stream events", "Send Mail"]) {
+	it("names a product that starts a label unless that word usually names a step", () => {
+		expect(named("Python worker")).toEqual(["python"]);
+		expect(named("Angular app")).toEqual(["angular"]);
+		expect(named("Azure Functions")).toEqual(["azure"]);
+		expect(named("Playwright tests")).toEqual(["playwright"]);
+		for (const label of ["Make payment", "Go to checkout", "Next step", "Swift review"]) {
 			expect(named(label), label).toEqual([]);
 		}
+		expect(possible("Make payment")).toEqual(["make"]);
+		expect(possible("Go to checkout")).toEqual(["go"]);
+		expect(possible("Render the page")).toEqual(["render"]);
+		expect(possible("Python worker")).toEqual([]);
+	});
+});
+
+describe("everyday catalog words", () => {
+	it("match SCOWL size 10 for the current catalog", () => {
+		const generated: unknown = JSON.parse(
+			readFileSync(new URL("./generated/everyday-words.json", import.meta.url), "utf8"),
+		);
+		// Regenerate with `nx run icon-catalog:generate-catalog`.
+		expect(generated).toEqual(
+			catalogCommonWords(iconManifest.icons, loadCommonEnglishWords(EVERYDAY_WORD_SIZES)),
+		);
 	});
 });
 

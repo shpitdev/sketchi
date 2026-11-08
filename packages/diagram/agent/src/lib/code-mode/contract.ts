@@ -507,6 +507,7 @@ export const CODE_MODE_ISSUE_CODES = [
 	"invalid_canvas_icon",
 	"icon_dropped",
 	"icon_filled",
+	"icon_possible",
 ] as const;
 
 export const CodeModeIssueCodeSchema = Object.assign(literals(CODE_MODE_ISSUE_CODES), {

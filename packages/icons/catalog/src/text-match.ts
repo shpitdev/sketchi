@@ -1,5 +1,5 @@
 import { searchIcons, type SearchableIcon } from "./search.js";
-import { isDistinctiveWord, termTokens, wordsOf } from "./terms.js";
+import { isDistinctiveWord, isEverydayWord, termTokens, wordsOf } from "./terms.js";
 
 /** Most catalog terms a prompt can offer one diagram. */
 export const MAX_TEXT_ICON_MATCHES = 24;
@@ -26,6 +26,13 @@ export interface IconMention<Icon extends SearchableIcon = SearchableIcon> {
 	 * Go", "tickets in Linear").
 	 */
 	readonly distinctive: boolean;
+	/**
+	 * True when only being the capitalized first word of a label made it a name ("Python
+	 * worker"), which counts only where a diagram asks for logos.
+	 */
+	readonly labelInitial?: boolean;
+	/** A label-initial mention whose words all start step labels far more often ("Make"). */
+	readonly everyday?: boolean;
 }
 
 const SEGMENT_BREAK = /(?<=[.!?:])\s+|\n+/u;
@@ -105,6 +112,8 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 	text: string,
 	icons: readonly Icon[],
 	limit = MAX_TEXT_ICON_MATCHES,
+	/** Count a capitalized first word too, as a label in a diagram that asks for logos. */
+	options: { readonly labelInitial?: boolean } = {},
 ): IconMention<Icon>[] {
 	const index = termIndex(icons);
 	const tokens = tokenize(text);
@@ -117,14 +126,29 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 			const entries = index.get(phraseKey(phraseTokens.map((token) => token.lower)));
 			if (!entries) continue;
 			const distinctive = phraseTokens.some(isDistinctive);
-			if (!distinctive && !phraseTokens.some(isCasedAsName)) continue;
+			const cased = phraseTokens.some(isCasedAsName);
+			const first = phraseTokens[0];
+			const labelInitial =
+				!distinctive &&
+				!cased &&
+				options.labelInitial === true &&
+				start === 0 &&
+				first !== undefined &&
+				isCapitalized(first.raw);
+			if (!distinctive && !cased && !labelInitial) continue;
 			const best = searchIcons(entries, {
 				query: phraseTokens.map((token) => token.lower).join(" "),
 			})[0]?.icon;
 			const earlier = best ? seen.get(best.slug) : undefined;
 			if (best && earlier === undefined) {
 				seen.set(best.slug, mentions.length);
-				mentions.push({ icon: best, distinctive });
+				const everyday = labelInitial && phraseTokens.every((token) => isEverydayWord(token.lower));
+				mentions.push({
+					icon: best,
+					distinctive,
+					...(labelInitial ? { labelInitial } : {}),
+					...(everyday ? { everyday } : {}),
+				});
 			} else if (best && distinctive && earlier !== undefined) {
 				// A later unmistakable mention settles an earlier ambiguous one.
 				mentions[earlier] = { icon: best, distinctive };
@@ -160,20 +184,36 @@ export function logoNamedByLabel<Icon extends SearchableIcon>(
 	return mention?.distinctive && others.length === 0 ? mention.icon : undefined;
 }
 
-/**
- * Every catalog logo a node label names, unmistakable names first ("Next.js app hosted on
- * Vercel" names nextjs, then vercel), then any an everyday word names only by its capitals mid-
- * label ("Log errors to Sentry"). A diagram that asks for logos draws the first.
- */
-export function logosNamedByLabel<Icon extends SearchableIcon>(
+/** The logos a node label names, for a diagram that asks for logos. */
+export interface LabelLogos<Icon extends SearchableIcon = SearchableIcon> {
+	/**
+	 * Every catalog logo the label names, unmistakable names first ("Next.js app hosted on
+	 * Vercel" names nextjs, then vercel), then names an everyday word carries only by its
+	 * capitals ("Log errors to Sentry", "Python worker"). The diagram draws the first.
+	 */
+	readonly named: readonly Icon[];
+	/**
+	 * A product the label's first word may mean, when that word starts step labels far more
+	 * often ("Make payment", "Go to checkout"); it draws nothing unless an icon names it.
+	 */
+	readonly possible: readonly Icon[];
+}
+
+/** The logos a node label names, in a diagram that asks for logos. */
+export function labelLogos<Icon extends SearchableIcon>(
 	label: string,
 	icons: readonly Icon[],
-): Icon[] {
-	const mentions = matchIconMentions(label, icons);
-	return [
-		...mentions.filter((mention) => mention.distinctive),
-		...mentions.filter((mention) => !mention.distinctive),
-	].map((mention) => mention.icon);
+): LabelLogos<Icon> {
+	const mentions = matchIconMentions(label, icons, MAX_TEXT_ICON_MATCHES, { labelInitial: true });
+	return {
+		named: [
+			...mentions.filter((mention) => mention.distinctive),
+			...mentions.filter((mention) => !mention.distinctive && mention.everyday !== true),
+		].map((mention) => mention.icon),
+		possible: mentions
+			.filter((mention) => mention.everyday === true)
+			.map((mention) => mention.icon),
+	};
 }
 
 /** A logo a text names, as generation offers it to a model. */

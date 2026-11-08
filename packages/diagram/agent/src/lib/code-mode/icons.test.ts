@@ -479,7 +479,7 @@ describe("named logo fill", () => {
 		expect(nodeLogos(dropped)[4]).toBeNull();
 	});
 
-	it("draws the first product a label names, and never fills an everyday word or an unnamed label", async () => {
+	it("draws the first product a label names, and never fills a step word or an unnamed label", async () => {
 		const result = await production().buildFlowchart({
 			spec: chain([
 				["push", "Push to GitHub"],
@@ -500,13 +500,55 @@ describe("named logo fill", () => {
 			"nextjs",
 			"docker",
 			undefined,
-			undefined,
+			"rust",
 			undefined,
 			undefined,
 			undefined,
 			"sentry",
 			undefined,
 		]);
+		// "Go", "Stream" and "Notion" start step labels far more often than they name the product.
+		expect(
+			result.issues.filter((issue) => issue.code === "icon_possible").map((issue) => issue.ref?.id),
+		).toEqual(["go", "stream", "notion"]);
+		expect(result.issues.find((issue) => issue.ref?.id === "go")).toMatchObject({
+			severity: "info",
+			message:
+				'Node "go" draws no logo: its label "Go to checkout" starts with "Go", which usually names a step, not Go.',
+			hint: 'If it means Go, set icon: "Go".',
+		});
+	});
+
+	it("draws a product that starts a label, and leaves a step word that starts one to an icon", async () => {
+		const result = await production().buildFlowchart({
+			spec: chain([
+				["worker", "Python worker"],
+				["app", "Angular app"],
+				["fn", "Azure Functions"],
+				["pay", "Make payment"],
+				["checkout", "Go to checkout"],
+				["page", "Render the page"],
+			]),
+		});
+		expect(nodeLogos(result)).toEqual([
+			"python",
+			"angular",
+			"azure",
+			undefined,
+			undefined,
+			undefined,
+		]);
+		expect(
+			result.issues.filter((issue) => issue.code === "icon_possible").map((issue) => issue.ref?.id),
+		).toEqual(["pay", "checkout", "page"]);
+
+		const meant = await production().buildFlowchart({
+			spec: chain([
+				["pay", "Make payment"],
+				["page", "Render the page", "Render"],
+			]),
+		});
+		expect(nodeLogos(meant)).toEqual([undefined, "render"]);
 	});
 
 	it("reads dotted product names and names every product a label holds", async () => {
@@ -778,6 +820,7 @@ describe("named logo fill", () => {
 			expect(groupLogos(result)).toEqual({});
 			expect(result.issues.map((issue) => [issue.code, issue.ref?.id])).toEqual([
 				["icon_filled", "push"],
+				["icon_possible", "page"],
 			]);
 		});
 

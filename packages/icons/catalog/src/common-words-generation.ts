@@ -11,15 +11,21 @@ import { termTokens } from "./terms.js";
  * the product far more often than anything else.
  */
 export const COMMON_WORD_SIZES = [10, 20, 35, 40, 50] as const;
+/**
+ * SCOWL size 10 is the everyday cut: "make", "go", "next", "box", but not "python",
+ * "angular" or "azure". A label that starts with one of these words is a step, not a
+ * product, unless an icon says otherwise.
+ */
+export const EVERYDAY_WORD_SIZES = [10] as const;
 const DIALECTS = ["english", "american"] as const;
 
 /** Lowercased common English words from the wordlist-english SCOWL lists. */
-export function loadCommonEnglishWords(): Set<string> {
+export function loadCommonEnglishWords(sizes: readonly number[] = COMMON_WORD_SIZES): Set<string> {
 	const require = createRequire(import.meta.url);
 	const root = dirname(require.resolve("wordlist-english/package.json"));
 	const words = new Set<string>();
 	for (const dialect of DIALECTS) {
-		for (const size of COMMON_WORD_SIZES) {
+		for (const size of sizes) {
 			const list: unknown = JSON.parse(
 				readFileSync(join(root, `${dialect}-words-${String(size)}.json`), "utf8"),
 			);
