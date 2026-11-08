@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.37.0
+
+### Minor Changes
+
+- [#717](https://github.com/shpitdev/sketchi/pull/717) [`4048329`](https://github.com/shpitdev/sketchi/commit/404832933d5e4d669beefa0a0903db8f4a99b74b) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi edit ID --json '{"edits":[...]}'` changes a stored flowchart by node id or label, offline: insert a step into an edge, set fields (including a node's `color`), connect or disconnect edges. `revise` on a flowchart now gets only the edits from the hosted model, so the answer is as long as the change; `--output json` shows them, with the output tokens and time the revision took. Flowchart node colors are part of the document, so a colored flowchart stays editable.
+
 ## 0.36.1
 
 ### Patch Changes
