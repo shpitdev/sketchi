@@ -542,6 +542,21 @@ describe("named logo fill", () => {
 			result.issues.filter((issue) => issue.code === "icon_possible").map((issue) => issue.ref?.id),
 		).toEqual(["pay", "checkout", "page"]);
 
+		const software = await production().buildFlowchart({
+			spec: chain([
+				["web", "React app"],
+				["api", "Spring service"],
+				["incident", "React to incident"],
+				["edge", "Edge function"],
+			]),
+		});
+		expect(nodeLogos(software)).toEqual(["react", "spring", undefined, undefined]);
+		expect(
+			software.issues
+				.filter((issue) => issue.code === "icon_possible")
+				.map((issue) => issue.ref?.id),
+		).toEqual(["incident", "edge"]);
+
 		const meant = await production().buildFlowchart({
 			spec: chain([
 				["pay", "Make payment"],

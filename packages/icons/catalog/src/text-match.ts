@@ -33,6 +33,8 @@ export interface IconMention<Icon extends SearchableIcon = SearchableIcon> {
 	readonly labelInitial?: boolean;
 	/** A label-initial mention whose words all start step labels far more often ("Make"). */
 	readonly everyday?: boolean;
+	/** The lowercased word after a label-initial mention ("app" in "React app"). */
+	readonly nextWord?: string;
 }
 
 const SEGMENT_BREAK = /(?<=[.!?:])\s+|\n+/u;
@@ -143,11 +145,13 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 			if (best && earlier === undefined) {
 				seen.set(best.slug, mentions.length);
 				const everyday = labelInitial && phraseTokens.every((token) => isEverydayWord(token.lower));
+				const nextWord = labelInitial ? tokens[start + length]?.lower : undefined;
 				mentions.push({
 					icon: best,
 					distinctive,
 					...(labelInitial ? { labelInitial } : {}),
 					...(everyday ? { everyday } : {}),
+					...(nextWord ? { nextWord } : {}),
 				});
 			} else if (best && distinctive && earlier !== undefined) {
 				// A later unmistakable mention settles an earlier ambiguous one.
@@ -199,20 +203,61 @@ export interface LabelLogos<Icon extends SearchableIcon = SearchableIcon> {
 	readonly possible: readonly Icon[];
 }
 
+/** Words that, after an everyday first word, show the label names software ("React app"). */
+const TECH_NOUNS: ReadonlySet<string> = new Set(
+	[
+		"api",
+		"app",
+		"backend",
+		"client",
+		"cluster",
+		"database",
+		"frontend",
+		"function",
+		"job",
+		"sdk",
+		"server",
+		"service",
+		"worker",
+	].flatMap((noun) => [noun, `${noun}s`]),
+);
+
+/**
+ * Marks a tech noun never rescues. Google Cloud's generic service marks ("Storage",
+ * "Compute", "Batch") would read "Storage service" as that one product, and some everyday
+ * words name a generic technology before a tech noun ("Edge function", "Stream worker").
+ */
+const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set(["gcp", "gcp-legacy"]);
+const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
+	"automatic",
+	"edge",
+	"processing",
+	"stream",
+]);
+
+/** An everyday first word the next word shows is the product ("React app", "Spring service"). */
+function namesSoftware(mention: IconMention): boolean {
+	return (
+		mention.nextWord !== undefined &&
+		TECH_NOUNS.has(mention.nextWord) &&
+		!GENERIC_COLLECTIONS.has(mention.icon.collection) &&
+		!GENERIC_TECH_SLUGS.has(mention.icon.slug)
+	);
+}
+
 /** The logos a node label names, in a diagram that asks for logos. */
 export function labelLogos<Icon extends SearchableIcon>(
 	label: string,
 	icons: readonly Icon[],
 ): LabelLogos<Icon> {
 	const mentions = matchIconMentions(label, icons, MAX_TEXT_ICON_MATCHES, { labelInitial: true });
+	const step = (mention: IconMention<Icon>) => mention.everyday === true && !namesSoftware(mention);
 	return {
 		named: [
 			...mentions.filter((mention) => mention.distinctive),
-			...mentions.filter((mention) => !mention.distinctive && mention.everyday !== true),
+			...mentions.filter((mention) => !mention.distinctive && !step(mention)),
 		].map((mention) => mention.icon),
-		possible: mentions
-			.filter((mention) => mention.everyday === true)
-			.map((mention) => mention.icon),
+		possible: mentions.filter(step).map((mention) => mention.icon),
 	};
 }
 

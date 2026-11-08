@@ -169,9 +169,23 @@ describe("labelLogos", () => {
 			expect(named(label), label).toEqual([]);
 		}
 		expect(possible("Make payment")).toEqual(["make"]);
+		expect(possible("React to incident")).toEqual(["react"]);
 		expect(possible("Go to checkout")).toEqual(["go"]);
 		expect(possible("Render the page")).toEqual(["render"]);
 		expect(possible("Python worker")).toEqual([]);
+	});
+
+	it("names an everyday first word that a tech noun shows is the product", () => {
+		expect(named("React app")).toEqual(["react"]);
+		expect(named("Spring service")).toEqual(["spring"]);
+		expect(named("Go worker")).toEqual(["go"]);
+		expect(named("Linear API")).toEqual(["linear"]);
+		expect(named("Next frontend")).toEqual(["nextjs"]);
+		// A generic service mark or a generic technology stays a note.
+		for (const label of ["Storage service", "Batch job", "Edge function", "Stream worker"]) {
+			expect(named(label), label).toEqual([]);
+			expect(possible(label), label).toHaveLength(1);
+		}
 	});
 });
 
