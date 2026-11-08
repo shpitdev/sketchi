@@ -87,6 +87,24 @@ describe("flowchart reference resolution", () => {
 		expect(source.edges[0]?.[1]).toBe("review-form");
 	});
 
+	it("resolves legacy lane member variants and records their paths", () => {
+		const result = flowchartDiagramFromDocument({
+			title: "Sales",
+			nodes: { submit_form: "Submit form", review_form: "Review form" },
+			edges: [["submit_form", "review_form"]],
+			lanes: { sales: { label: "Sales", contains: ["submit-form", "REVIEW FORM,"] } },
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.diagram.nodes.map(({ lane }) => lane)).toEqual(["sales", "sales"]);
+		expect(result.notes).toEqual(
+			expect.arrayContaining([
+				expect.stringContaining("lanes.sales.contains[0]"),
+				expect.stringContaining('"submit_form"'),
+			]),
+		);
+	});
+
 	it("refuses ambiguous and unrelated spellings, retaining nearest-id hints", () => {
 		const result = flowchartDiagramFromDocument({
 			title: "Review",

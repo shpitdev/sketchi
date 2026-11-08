@@ -697,6 +697,21 @@ export function resolveFlowchartReferences(document: FlowchartDocument): {
 		typeof value === "string"
 			? resolve(value, path)
 			: value.map((id, i) => resolve(id, `${path}[${i}]`));
+	const containers = <C extends { readonly contains: readonly string[] }>(
+		values: Readonly<Record<string, C>>,
+		kind: "groups" | "lanes",
+	): Record<string, C> =>
+		Object.fromEntries(
+			Object.entries(values).map(([id, container]) => [
+				id,
+				{
+					...container,
+					contains: container.contains.map((member, i) =>
+						resolve(member, `${kind}.${id}.contains[${i}]`),
+					),
+				},
+			]),
+		);
 	return {
 		document: {
 			...document,
@@ -704,21 +719,8 @@ export function resolveFlowchartReferences(document: FlowchartDocument): {
 				const pair = [end(from, `edges[${i}][0]`), end(to, `edges[${i}][1]`)] as const;
 				return label === undefined ? pair : [...pair, label];
 			}),
-			...(document.groups
-				? {
-						groups: Object.fromEntries(
-							Object.entries(document.groups).map(([id, group]) => [
-								id,
-								{
-									...group,
-									contains: group.contains.map((member, i) =>
-										resolve(member, `groups.${id}.contains[${i}]`),
-									),
-								},
-							]),
-						),
-					}
-				: {}),
+			...(document.groups ? { groups: containers(document.groups, "groups") } : {}),
+			...(document.lanes ? { lanes: containers(document.lanes, "lanes") } : {}),
 		},
 		notes,
 	};
