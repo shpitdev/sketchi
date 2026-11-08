@@ -2,6 +2,7 @@ import {
 	flowchartDiagramFromDocument,
 	flowchartDocumentId,
 	flowchartNodeDetails,
+	resolveFlowchartReferences,
 	type FlowchartDiagram,
 	type FlowchartDocumentEdge,
 	type FlowchartDocumentNode,
@@ -100,7 +101,7 @@ function collidingIds(
 export function normalizeFlowchartSpec(
 	spec: FlowchartSpec,
 ):
-	| { readonly ok: true; readonly spec: NormalizedFlowchartSpec }
+	| { readonly ok: true; readonly spec: NormalizedFlowchartSpec; readonly notes: readonly string[] }
 	| { readonly ok: false; readonly issues: readonly FlowchartValidationIssue[] } {
 	const collisions = [
 		...collidingIds("node", spec.nodes),
@@ -112,24 +113,23 @@ export function normalizeFlowchartSpec(
 	const id = cleanOptional(spec.id);
 	const groups = cleanContainers(spec.groups);
 	const lanes = cleanContainers(spec.lanes);
-	return {
-		ok: true,
-		spec: {
-			id: flowchartDocumentId({ title, ...(id ? { id } : {}) }),
-			title,
-			direction: spec.direction ?? "TB",
-			...(spec.logos === undefined ? {} : { logos: spec.logos }),
-			nodes: Object.fromEntries(
-				Object.entries(spec.nodes).map(([nodeId, node]) => [
-					cleanToolString(nodeId),
-					cleanNode(node),
-				]),
-			),
-			edges: spec.edges.map(cleanEdge),
-			...(groups ? { groups } : {}),
-			...(lanes ? { lanes } : {}),
-		},
+	const cleaned: NormalizedFlowchartSpec = {
+		id: flowchartDocumentId({ title, ...(id ? { id } : {}) }),
+		title,
+		direction: spec.direction ?? "TB",
+		...(spec.logos === undefined ? {} : { logos: spec.logos }),
+		nodes: Object.fromEntries(
+			Object.entries(spec.nodes).map(([nodeId, node]) => [
+				cleanToolString(nodeId),
+				cleanNode(node),
+			]),
+		),
+		edges: spec.edges.map(cleanEdge),
+		...(groups ? { groups } : {}),
+		...(lanes ? { lanes } : {}),
 	};
+	const resolved = resolveFlowchartReferences(cleaned);
+	return { ok: true, spec: { ...cleaned, ...resolved.document }, notes: resolved.notes };
 }
 
 /**

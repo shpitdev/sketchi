@@ -505,6 +505,7 @@ export const CODE_MODE_ISSUE_CODES = [
 	"unknown_layout_target",
 	"unknown_icon",
 	"invalid_canvas_icon",
+	"reference_resolved",
 	"icon_dropped",
 	"icon_filled",
 	"icon_possible",

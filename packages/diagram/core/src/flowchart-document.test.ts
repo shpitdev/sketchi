@@ -49,6 +49,94 @@ function issues(document: FlowchartDocument) {
 const kinds = (document: FlowchartDocument) =>
 	Object.fromEntries(build(document).nodes.map((node) => [node.id, node.kind]));
 
+describe("flowchart reference resolution", () => {
+	it("resolves unique spelling variants in list-ended edges and nested group members, with notes", () => {
+		const source: FlowchartDocument = {
+			title: "Review",
+			nodes: { submit_form: "Submit", review_form: "Review", issue_permit: "Issue" },
+			edges: [
+				[["SUBMIT FORM,"], "review-form"],
+				["review_form", "issue-permit."],
+			],
+			groups: {
+				applicant_team: { label: "Applicant", contains: ["submit-form"] },
+				office: { label: "Office", contains: ["review form", "issue_permit"] },
+				process: { label: "Process", contains: ["APPLICANT TEAM;", "office"] },
+			},
+		};
+		const result = flowchartDiagramFromDocument(source);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.diagram.edges.map(({ source, target }) => [source, target])).toEqual([
+			["submit_form", "review_form"],
+			["review_form", "issue_permit"],
+		]);
+		expect(result.diagram.nodes.find(({ id }) => id === "submit_form")?.group).toBe(
+			"applicant_team",
+		);
+		expect(result.diagram.groups?.find(({ id }) => id === "applicant_team")?.parent).toBe(
+			"process",
+		);
+		expect(result).toHaveProperty(
+			"notes",
+			expect.arrayContaining([
+				expect.stringContaining('"SUBMIT FORM,"'),
+				expect.stringContaining('"APPLICANT TEAM;"'),
+			]),
+		);
+		expect(source.edges[0]?.[1]).toBe("review-form");
+	});
+
+	it("resolves legacy lane member variants and records their paths", () => {
+		const result = flowchartDiagramFromDocument({
+			title: "Sales",
+			nodes: { submit_form: "Submit form", review_form: "Review form" },
+			edges: [["submit_form", "review_form"]],
+			lanes: { sales: { label: "Sales", contains: ["submit-form", "REVIEW FORM,"] } },
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.diagram.nodes.map(({ lane }) => lane)).toEqual(["sales", "sales"]);
+		expect(result.notes).toEqual(
+			expect.arrayContaining([
+				expect.stringContaining("lanes.sales.contains[0]"),
+				expect.stringContaining('"submit_form"'),
+			]),
+		);
+	});
+
+	it("refuses ambiguous and unrelated spellings, retaining nearest-id hints", () => {
+		const result = flowchartDiagramFromDocument({
+			title: "Review",
+			nodes: { start: "Start", review_form: "Review one", "review-form": "Review two" },
+			edges: [
+				["start", "REVIEW FORM,"],
+				["start", "review_frm"],
+			],
+			groups: { team: { label: "Team", contains: ["REVIEW FORM"] } },
+		});
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		for (const code of ["missing_edge_target", "unknown_member"]) {
+			expect(result.issues).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ code, hint: expect.stringContaining("review_form") }),
+				]),
+			);
+		}
+	});
+
+	it("keeps exact references even when another id has the same normalized spelling", () => {
+		const result = flowchartDiagramFromDocument({
+			title: "Review",
+			nodes: { start: "Start", review_form: "Review one", "review-form": "Review two" },
+			edges: [["start", ["review_form", "review-form"]]],
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result).toHaveProperty("notes", []);
+	});
+});
+
 describe("flowchart documents", () => {
 	it("decode a bare-label document and build it with roles read from the edges", () => {
 		const decoded = decodeFlowchartDocument(waitlist);

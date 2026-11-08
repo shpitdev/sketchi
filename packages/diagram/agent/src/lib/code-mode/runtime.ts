@@ -1879,7 +1879,7 @@ function defaultCreateId(prefix: string): string {
 
 function issue(input: {
 	code: CodeModeIssueCode;
-	severity?: "error" | "warning";
+	severity?: CodeModeIssue["severity"];
 	stage: CodeModeIssue["stage"];
 	ref?: CodeModeIssueRef;
 	message: string;
@@ -5304,6 +5304,15 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 		quality,
 		artifact,
 		issues: [
+			...normalized.notes.map((message) =>
+				issue({
+					code: "reference_resolved",
+					hint: "Use the resolved declared id in future references.",
+					severity: "info",
+					stage: "flowchart",
+					message,
+				}),
+			),
 			...logos.issues,
 			...groupLogos.issues,
 			...embedded.issues,
