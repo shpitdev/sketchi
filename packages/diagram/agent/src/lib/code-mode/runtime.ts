@@ -2289,6 +2289,15 @@ function canvasIssueCode(validationIssue: CanvasValidationIssue): CodeModeIssueC
 	}
 }
 
+/** A scene over a canvas limit is too large rather than broken: the caller splits it. */
+function canvasFailureStatus(
+	validationIssues: readonly CanvasValidationIssue[],
+): "limit_exceeded" | "render_failed" {
+	return validationIssues.some((entry) => entry.code === "limit_exceeded")
+		? "limit_exceeded"
+		: "render_failed";
+}
+
 function canvasValidationIssues(
 	validationIssues: readonly CanvasValidationIssue[],
 ): CodeModeIssue[] {
@@ -3593,7 +3602,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildSequenceDiagramFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -3711,7 +3720,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildStateMachineFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -3820,7 +3829,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildErDiagramFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -3930,7 +3939,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildClassDiagramFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4039,7 +4048,7 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildOrgChartFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4149,7 +4158,7 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildVennDiagramFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4259,7 +4268,7 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildJourneyMapFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4366,7 +4375,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildSankeyFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4501,7 +4510,7 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildWireframeFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4619,7 +4628,7 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildQuadrantChartFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4730,7 +4739,7 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildTimelineFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4838,7 +4847,7 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildChartFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -4946,7 +4955,7 @@ const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
 		return yield* new BuildGanttFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
 				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
@@ -5534,7 +5543,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 	const structuralIssues = getCanvasValidationIssues(patchedScene);
 	if (structuralIssues.length > 0) {
 		return yield* new ApplyDiagramPatchFailure({
-			status: "render_failed",
+			status: canvasFailureStatus(structuralIssues),
 			context: {
 				...sourceContext,
 				partial: scenePartial(patchedScene),

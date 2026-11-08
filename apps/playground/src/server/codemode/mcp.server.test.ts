@@ -648,6 +648,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						code: "png_unavailable",
 						severity: "warning",
 						message: expect.stringContaining("Browser Run 429"),
+						// Retrying the same default would miss the same budget; an explicit PNG waits longer.
+						hint: expect.stringContaining('options.artifactFormats ["scene", "excalidraw", "png"]'),
 					}),
 				]),
 			);

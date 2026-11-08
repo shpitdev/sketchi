@@ -627,10 +627,11 @@ describe("public generate endpoint", () => {
 
 	it("answers a drawing too large for one canvas as a limit, never a render failure", () => {
 		// What a builder returns when its scene overflows the canvas: a timeline's chronology
-		// can pass its family's limits and still draw more elements than a canvas holds.
+		// can pass its family's limits and still draw more elements than a canvas holds, and
+		// a builder reports that as a limit.
 		const result = buildFailure({
 			ok: false,
-			status: "render_failed",
+			status: "limit_exceeded",
 			issues: [
 				{
 					code: "canvas_limit_exceeded",

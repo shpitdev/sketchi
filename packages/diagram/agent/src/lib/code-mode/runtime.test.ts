@@ -3199,7 +3199,37 @@ describe("bot-reviewed canvas limits and coincident routes", () => {
 		});
 	});
 
-	it("returns limit_exceeded for 601 small elements below the byte limit", async () => {
+	it("returns limit_exceeded when a patch grows a scene past the element limit", async () => {
+		const result = await createTestRuntime().applyDiagramPatch({
+			source: { scene: geometryCanvas([geometryNode("a", 0, 0)]) },
+			operations: [
+				{
+					op: "insert",
+					elements: Array.from({ length: CANVAS_LIMITS.maxElements }, (_, index) => ({
+						type: "frame",
+						id: `frame-${index}`,
+						x: 0,
+						y: 0,
+						width: 10,
+						height: 10,
+					})),
+				},
+			],
+			options: { preserveConnectivity: false, artifactFormats: ["scene"] },
+		});
+		expect(result).toMatchObject({
+			ok: false,
+			status: "limit_exceeded",
+			issues: [
+				expect.objectContaining({
+					code: "canvas_limit_exceeded",
+					message: `Canvas has ${CANVAS_LIMITS.maxElements + 1} elements, more than the ${CANVAS_LIMITS.maxElements} it may hold.`,
+				}),
+			],
+		});
+	});
+
+	it("returns limit_exceeded for one small element past the limit below the byte limit", async () => {
 		const elements: CanvasSpec["elements"] = Array.from(
 			{ length: CANVAS_LIMITS.maxElements + 1 },
 			(_, index) => ({
@@ -3394,7 +3424,8 @@ describe("final-review correlation and sequence canvas bounds", () => {
 			} else {
 				expect(result).toMatchObject({
 					ok: false,
-					status: "render_failed",
+					// Too tall for a canvas: a limit the caller meets by splitting, not a render defect.
+					status: "limit_exceeded",
 					buildId: "build-test",
 					requestId: "sequence-bounds-request",
 					normalizedSpec: {

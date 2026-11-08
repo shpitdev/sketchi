@@ -232,18 +232,18 @@ export function buildFailure(result: Extract<BuildResult, { ok: false }>): Gener
 	if (result.issues.some((entry) => entry.code.endsWith("_too_large"))) {
 		return failure("limit_exceeded", issues);
 	}
-	// So is a drawing too large for one canvas. As with a family limit, repair could only
-	// fit it by dropping what the request states, so the caller splits the request.
-	const canvasLimits = result.issues.filter((entry) => entry.code === "canvas_limit_exceeded");
-	if (canvasLimits.length > 0) {
-		return failure(
-			"limit_exceeded",
-			canvasLimits.map((entry) =>
-				issue(entry.code, "build", entry.message, "Split the request into smaller diagrams."),
-			),
-		);
-	}
 	switch (result.status) {
+		// So is a drawing too large for one canvas. As with a family limit, repair could only
+		// fit it by dropping what the request states, so the caller splits the request.
+		case "limit_exceeded":
+			return failure(
+				"limit_exceeded",
+				issues.map((entry) =>
+					entry.code === "canvas_limit_exceeded"
+						? { ...entry, hint: "Split the request into smaller diagrams." }
+						: entry,
+				),
+			);
 		case "invalid_input":
 		case "invalid_flowchart":
 		case "invalid_mindmap":

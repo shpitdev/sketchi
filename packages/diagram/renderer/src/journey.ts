@@ -1,5 +1,4 @@
 import {
-	CANVAS_LIMITS,
 	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
 	JOURNEY_MAX_SCORE,
@@ -111,6 +110,8 @@ const ROW_LABEL_GAP = 16;
 export const JOURNEY_MAX_ASPECT = 2.45;
 /** The CLI's PNG ceiling in square units, with room for its 64-unit title banner. */
 const MAX_AREA = 6_291_456;
+/** A placement with more elements than this reads as crowded; well under the canvas's limit. */
+export const JOURNEY_MAX_ELEMENTS = 600;
 const BANNER_HEIGHT = 64;
 
 interface Measured {
@@ -618,7 +619,7 @@ function planJourney(
 	const bandsHeight =
 		bands.reduce((total, band) => total + band.height, 0) + (bands.length - 1) * BAND_GAP;
 	// The scene's elements: every band repeats its row labels, scale and rules, so a
-	// placement of many bands can outgrow the canvas's element limit.
+	// placement of many bands can outgrow JOURNEY_MAX_ELEMENTS.
 	const steps = texts.flat();
 	const elements =
 		1 +
@@ -664,20 +665,19 @@ function planJourney(
 }
 
 const aspectOf = (plan: Plan) => (plan.width - 2 * PADDING) / (plan.height - 2 * PADDING);
-/** Whether a placement keeps to the canvas's element limit, the PNG ceiling and the readable aspect. */
+/** Whether a placement keeps to JOURNEY_MAX_ELEMENTS, the PNG ceiling and the readable aspect. */
 const fits = (plan: Plan) =>
-	plan.elements <= CANVAS_LIMITS.maxElements &&
+	plan.elements <= JOURNEY_MAX_ELEMENTS &&
 	plan.width * (plan.height + BANNER_HEIGHT) <= MAX_AREA &&
 	aspectOf(plan) <= JOURNEY_MAX_ASPECT;
 /** Past this a fallback placement reads too tall: a column of bands no screen shows whole. */
 const MIN_ASPECT = 0.8;
 /**
- * When no placement fits, how far one misses: past the canvas's element limit
- * first, then past the PNG ceiling and the readable aspect (either way)
+ * When no placement fits, how far one misses: past JOURNEY_MAX_ELEMENTS first, then past the PNG ceiling and the readable aspect (either way)
  * together, each relative to its bound.
  */
 const excessOf = (plan: Plan): readonly [number, number] => [
-	Math.max(0, plan.elements - CANVAS_LIMITS.maxElements),
+	Math.max(0, plan.elements - JOURNEY_MAX_ELEMENTS),
 	Math.max(0, plan.width * (plan.height + BANNER_HEIGHT) - MAX_AREA) / MAX_AREA +
 		Math.max(0, aspectOf(plan) - JOURNEY_MAX_ASPECT) / JOURNEY_MAX_ASPECT +
 		Math.max(0, MIN_ASPECT - aspectOf(plan)) / MIN_ASPECT,

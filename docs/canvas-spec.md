@@ -61,7 +61,9 @@ than introducing an unreliable or unsafe partial contract.
 
 Limits are 5,000 elements, 64 layers, 128 layouts, 256 points per element, 16
 groups per element, 4,096 characters per text element, 16,384 units per canvas
-dimension, 5,000 z-order entries, and 4 MB serialized input.
+dimension, 5,000 z-order entries, and 4 MB serialized input. These are
+ceilings, not targets: each diagram family keeps its own, much smaller limits
+(a flowchart holds 80 nodes), and a canvas reads best well under them.
 
 5,000 elements is the most a CLI share link can always pull back: a labelled
 node or connector exports as two Excalidraw elements, and a pulled share holds
