@@ -31,10 +31,10 @@ const spec = {
 	title: "Expense approval across roles",
 	direction: "LR",
 	nodes: {
-		submit: "Submit expense report",
-		approved: "Approved?",
-		revise: "Revise the report",
-		pay: "Pay the employee",
+		submit: { label: "Submit expense report", lane: "employee" },
+		approved: { label: "Approved?", lane: "manager" },
+		revise: { label: "Revise the report", lane: "employee" },
+		pay: { label: "Pay the employee", lane: "finance" },
 	},
 	edges: [
 		["submit", "approved"],
@@ -42,11 +42,7 @@ const spec = {
 		["approved", "revise", "no"],
 		["revise", "approved"],
 	],
-	lanes: {
-		employee: { label: " Employee ", contains: ["submit", "revise"] },
-		manager: { label: "Manager", contains: ["approved"] },
-		finance: { label: "Finance", contains: ["pay"] },
-	},
+	lanes: { employee: " Employee ", manager: "Manager", finance: "Finance" },
 };
 
 describe("Code Mode flowchart lanes", () => {
@@ -54,9 +50,9 @@ describe("Code Mode flowchart lanes", () => {
 		const built = await build(spec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
 		expect(built.normalizedSpec.lanes).toEqual({
-			employee: { label: "Employee", contains: ["submit", "revise"] },
-			manager: { label: "Manager", contains: ["approved"] },
-			finance: { label: "Finance", contains: ["pay"] },
+			employee: "Employee",
+			manager: "Manager",
+			finance: "Finance",
 		});
 		const drawn = flowchartDiagramFromDocument(built.normalizedSpec);
 		if (!drawn.ok) throw new Error(JSON.stringify(drawn.issues));
@@ -79,27 +75,27 @@ describe("Code Mode flowchart lanes", () => {
 		).toBe("Manager");
 	});
 
-	it("rejects a node in no lane, or in two, with a repair hint", async () => {
+	it("rejects a node that names no lane or an undeclared one, with a repair hint", async () => {
 		const built = await build({
 			...spec,
-			lanes: {
-				employee: { label: "Employee", contains: ["submit"] },
-				manager: { label: "Manager", contains: ["approved", "pay"] },
-				finance: { label: "Finance", contains: ["pay"] },
-			},
+			nodes: { ...spec.nodes, revise: "Revise the report", pay: { label: "Pay", lane: "payroll" } },
 		});
 		expect(built.ok).toBe(false);
 		if (built.ok) return;
 		expect(built.status).toBe("invalid_flowchart");
 		expect(built.issues).toEqual([
 			expect.objectContaining({
-				code: "overlapping_containers",
-				ref: { kind: "node", id: "pay", path: "spec.lanes.finance.contains[0]" },
+				code: "node_without_lane",
+				ref: { kind: "node", id: "revise", path: "spec.nodes.revise.lane" },
+				hint: 'Set its lane to whoever does it ("employee", "manager", "finance").',
 			}),
 			expect.objectContaining({
-				code: "node_without_lane",
-				ref: { kind: "node", id: "revise", path: "spec.lanes" },
-				hint: 'List it in the lane of the actor that does it ("employee", "manager", "finance").',
+				code: "unknown_node_lane",
+				ref: { kind: "node", id: "pay", path: "spec.nodes.pay.lane" },
+			}),
+			expect.objectContaining({
+				code: "empty_lane",
+				ref: expect.objectContaining({ id: "finance" }),
 			}),
 		]);
 	});

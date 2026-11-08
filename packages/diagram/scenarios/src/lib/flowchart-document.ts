@@ -2,8 +2,9 @@ import type { FlowchartDiagram, FlowchartDocument } from "@sketchi/diagram-core"
 
 /**
  * A scenario's expected flowchart written as the document a model returns: nodes keyed by id,
- * edges as [from, to, label?], and each container listing its direct members. A decision whose
- * label asks no question keeps its diamond; a node logo becomes its icon, with logos on.
+ * edges as [from, to, label?], each group listing its direct members and each node naming its
+ * lane. A decision whose label asks no question keeps its diamond; a node logo becomes its
+ * icon, with logos on.
  */
 export function scenarioFlowchartDocument(diagram: FlowchartDiagram): FlowchartDocument {
 	const members = (owner: string) => [
@@ -23,12 +24,13 @@ export function scenarioFlowchartDocument(diagram: FlowchartDiagram): FlowchartD
 				const shape = node.shape ?? (diamond ? "diamond" : undefined);
 				return [
 					node.id,
-					node.description || shape || node.icon
+					node.description || shape || node.icon || node.lane
 						? {
 								label: node.label,
 								...(node.description ? { note: node.description } : {}),
 								...(shape ? { shape } : {}),
 								...(node.icon ? { icon: node.icon.slug } : {}),
+								...(node.lane ? { lane: node.lane } : {}),
 							}
 						: node.label,
 				];
@@ -52,19 +54,7 @@ export function scenarioFlowchartDocument(diagram: FlowchartDiagram): FlowchartD
 				}
 			: {}),
 		...(diagram.lanes?.length
-			? {
-					lanes: Object.fromEntries(
-						diagram.lanes.map((lane) => [
-							lane.id,
-							{
-								label: lane.label,
-								contains: diagram.nodes
-									.filter((node) => node.lane === lane.id)
-									.map((node) => node.id),
-							},
-						]),
-					),
-				}
+			? { lanes: Object.fromEntries(diagram.lanes.map((lane) => [lane.id, lane.label])) }
 			: {}),
 	};
 }

@@ -60,6 +60,8 @@ export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
 	shape: Schema.optionalKey(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"])),
 	/** A product name or catalog slug whose logo the node draws; null draws none. */
 	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+	/** The id of the lane of whoever does the step, in a flowchart with lanes. */
+	lane: Schema.optionalKey(Schema.NonEmptyString),
 });
 export interface FlowchartDocumentNodeDetails extends Schema.Schema.Type<
 	typeof FlowchartDocumentNodeDetailsSchema
@@ -87,14 +89,12 @@ export interface FlowchartDocumentGroup extends Schema.Schema.Type<
 	typeof FlowchartDocumentGroupSchema
 > {}
 
-/** A swimlane: a full-length band for one actor, holding the steps that actor does. */
-export const FlowchartDocumentLaneSchema = Schema.Struct({
-	label: Label,
-	contains: Members,
-});
-export interface FlowchartDocumentLane extends Schema.Schema.Type<
-	typeof FlowchartDocumentLaneSchema
-> {}
+/**
+ * A swimlane's label: a full-length band for one actor, drawn in declared order. Each node
+ * names its own lane, so a step sits with whoever does it.
+ */
+export const FlowchartDocumentLaneSchema = Label;
+export type FlowchartDocumentLane = typeof FlowchartDocumentLaneSchema.Type;
 
 /**
  * Logos for the products node labels name: true draws Sketchi's hand-drawn marks,
@@ -509,8 +509,19 @@ function laneContainment(
 ): Map<string, string> {
 	const lanes = Object.entries(document.lanes ?? {});
 	const nodeLane = new Map<string, string>();
-	if (lanes.length === 0) return nodeLane;
-	const known = new Set(nodeIds);
+	if (lanes.length === 0) {
+		for (const node of nodeIds) {
+			const lane = flowchartNodeDetails(document.nodes[node] ?? node).lane;
+			if (lane === undefined) continue;
+			issues.push({
+				code: "unknown_node_lane",
+				ref: { kind: "node", id: node, path: `nodes.${node}.lane` },
+				message: `Node "${node}" names lane "${lane}", but the flowchart declares no lanes.`,
+				hint: `Declare lanes: { "${lane}": "Label" }, or remove the node's lane.`,
+			});
+		}
+		return nodeLane;
+	}
 	if (lanes.length > FLOWCHART_MAX_LANES) {
 		issues.push({
 			code: "flowchart_too_large",
@@ -527,39 +538,37 @@ function laneContainment(
 			hint: "Keep the lanes for the actors and remove groups.",
 		});
 	}
-	for (const [id, lane] of lanes) {
-		lane.contains.forEach((member, index) => {
-			const path = `lanes.${id}.contains[${index}]`;
-			if (!known.has(member)) {
-				issues.push({
-					code: "unknown_member",
-					ref: { kind: "lane", id, path },
-					message: `Lane "${id}" lists "${member}", which is no node.`,
-					hint: unknownFlowchartIdHint(member, nodeIds, "node"),
-				});
-				return;
-			}
-			const other = nodeLane.get(member);
-			if (other !== undefined && other !== id) {
-				issues.push({
-					code: "overlapping_containers",
-					ref: { kind: "node", id: member, path },
-					message: `Node "${member}" is in lanes "${other}" and "${id}".`,
-					hint: "Keep each step in the one lane of the actor that does it.",
-				});
-				return;
-			}
-			nodeLane.set(member, id);
-		});
-	}
 	const laneIds = lanes.map(([id]) => id);
+	const declared = new Set(laneIds);
 	for (const node of nodeIds) {
-		if (nodeLane.has(node)) continue;
+		const lane = flowchartNodeDetails(document.nodes[node] ?? node).lane;
+		const path = `nodes.${node}.lane`;
+		if (lane === undefined) {
+			issues.push({
+				code: "node_without_lane",
+				ref: { kind: "node", id: node, path },
+				message: `Node "${node}" names no lane.`,
+				hint: `Set its lane to whoever does it (${quoted(laneIds)}).`,
+			});
+		} else if (!declared.has(lane)) {
+			issues.push({
+				code: "unknown_node_lane",
+				ref: { kind: "node", id: node, path },
+				message: `Node "${node}" names lane "${lane}", which is not declared.`,
+				hint: unknownFlowchartIdHint(lane, laneIds, "lane"),
+			});
+		} else {
+			nodeLane.set(node, lane);
+		}
+	}
+	const used = new Set(nodeLane.values());
+	for (const id of laneIds) {
+		if (used.has(id)) continue;
 		issues.push({
-			code: "node_without_lane",
-			ref: { kind: "node", id: node, path: "lanes" },
-			message: `Node "${node}" is in no lane.`,
-			hint: `List it in the lane of the actor that does it (${quoted(laneIds)}).`,
+			code: "empty_lane",
+			ref: { kind: "lane", id, path: `lanes.${id}` },
+			message: `Lane "${id}" holds no node.`,
+			hint: "Set the lane of the steps its actor does to it, or remove the lane.",
 		});
 	}
 	return nodeLane;
@@ -921,10 +930,7 @@ export function flowchartDiagramFromDocument(
 			: {}),
 		...(laneIds.size > 0
 			? {
-					lanes: Object.entries(document.lanes ?? {}).map(([id, lane]) => ({
-						id,
-						label: lane.label,
-					})),
+					lanes: Object.entries(document.lanes ?? {}).map(([id, label]) => ({ id, label })),
 				}
 			: {}),
 		layout: { direction: document.direction ?? "TB", edgeRouting: "orthogonal" },

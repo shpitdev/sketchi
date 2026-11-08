@@ -63,14 +63,11 @@ layer(builderLayer)("Effect-native Code Mode builder layer", (it) => {
 					spec: {
 						title: "Ticket handling",
 						nodes: {
-							open: "Open a ticket",
-							answer: "Answer the ticket",
+							open: { label: "Open a ticket", lane: "customer" },
+							answer: { label: "Answer the ticket", lane: "support" },
 						},
 						edges: [["open", "answer"]],
-						lanes: {
-							customer: { label: "Customer", contains: ["open"] },
-							support: { label: "Support", contains: ["answer"] },
-						},
+						lanes: { customer: "Customer", support: "Support" },
 					},
 				}),
 			);

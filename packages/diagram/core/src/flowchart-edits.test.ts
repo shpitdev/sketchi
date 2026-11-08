@@ -142,19 +142,26 @@ describe("flowchart edits", () => {
 		const laned = apply(
 			{
 				title: "Hiring",
-				nodes: { apply: "Apply", screen: "Screen", offer: "Offer" },
+				nodes: {
+					apply: { label: "Apply", lane: "candidate" },
+					screen: { label: "Screen", lane: "recruiter" },
+					offer: { label: "Offer", lane: "recruiter" },
+				},
 				edges: [
 					["apply", "screen"],
 					["screen", "offer"],
 				],
-				lanes: {
-					candidate: { label: "Candidate", contains: ["apply"] },
-					recruiter: { label: "Recruiter", contains: ["screen", "offer"] },
-				},
+				lanes: { candidate: "Candidate", recruiter: "Recruiter" },
 			},
 			[{ op: "insert", node: { call: "Phone call" }, between: ["screen", "offer"] }],
 		);
-		expect(laned.lanes?.recruiter?.contains).toEqual(["screen", "offer", "call"]);
+		expect(laned.nodes["call"]).toEqual({ label: "Phone call", lane: "recruiter" });
+		// A lane edit is a node change; a lane's own entry only names it.
+		const moved = apply(laned, [
+			{ op: "set", nodes: { offer: { lane: "candidate" } }, lanes: { recruiter: "Recruiting" } },
+		]);
+		expect(moved.nodes["offer"]).toEqual({ label: "Offer", lane: "candidate" });
+		expect(moved.lanes).toEqual({ candidate: "Candidate", recruiter: "Recruiting" });
 		const grouped = apply(
 			{
 				title: "Zones",

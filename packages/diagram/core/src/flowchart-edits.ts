@@ -35,17 +35,14 @@ const NodeChangeSchema = Schema.Struct({
 	note: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 	shape: Schema.optionalKey(Schema.NullOr(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"]))),
 	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+	/** The lane of whoever does the step. */
+	lane: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 });
 
 const GroupChangeSchema = Schema.Struct({
 	label: Schema.optionalKey(Label),
 	kind: Schema.optionalKey(Schema.NullOr(Schema.Literals(DIAGRAM_ZONE_KINDS))),
 	/** Replaces what the group lists. */
-	contains: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
-});
-
-const LaneChangeSchema = Schema.Struct({
-	label: Schema.optionalKey(Label),
 	contains: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
 });
 
@@ -70,7 +67,8 @@ export const FlowchartSetEditSchema = Schema.Struct({
 		),
 	),
 	groups: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(GroupChangeSchema))),
-	lanes: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(LaneChangeSchema))),
+	/** A lane's label, or null to remove it; a node's lane says who does it. */
+	lanes: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(Label))),
 });
 
 /** Adds edges, or relabels an edge that exists. */
@@ -258,6 +256,37 @@ function setContainers<C extends { readonly label: string; readonly contains: re
 	return result;
 }
 
+/** Lanes with changes merged in: a label adds or renames a lane, and null removes it. */
+function setLanes(
+	entries: [string, string][],
+	changes: Readonly<Record<string, string | null>> | undefined,
+	at: string,
+	issues: FlowchartEditIssue[],
+): [string, string][] {
+	let result = entries;
+	for (const [id, label] of Object.entries(changes ?? {})) {
+		if (label !== null) {
+			result = upsert(result, id, label);
+			continue;
+		}
+		if (!result.some(([key]) => key === id)) {
+			issues.push({
+				code: "unknown_edit_target",
+				path: `${at}.lanes.${id}`,
+				message: `${at} removes lane "${id}", which does not exist.`,
+				hint: unknownFlowchartIdHint(
+					id,
+					result.map(([key]) => key),
+					"lane",
+				),
+			});
+			continue;
+		}
+		result = result.filter(([key]) => key !== id);
+	}
+	return result;
+}
+
 function compact<V>(entries: readonly [string, V][]): Record<string, V> | undefined {
 	return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
@@ -350,7 +379,6 @@ export function applyFlowchartEdits(
 		state.edges = state.edges.filter((edge) => edge[0] !== id && edge[1] !== id);
 		if (joined) state.edges.splice(Math.max(0, Math.min(at, state.edges.length)), 0, joined);
 		state.nodes = state.nodes.filter(([key]) => key !== id);
-		state.lanes = unlist(state.lanes, [id]);
 		state.groups = unlist(state.groups, [id]);
 	};
 
@@ -400,14 +428,13 @@ export function applyFlowchartEdits(
 					to,
 				]);
 				state.nodes = upsert(state.nodes, id, node, from);
-				// The new node joins the lane of the step before it, and the innermost
-				// group holding both ends.
-				const lane = state.lanes.find(([, container]) => container.contains.includes(from));
-				if (lane) {
-					state.lanes = upsert(state.lanes, lane[0], {
-						...lane[1],
-						contains: [...lane[1].contains, id],
-					});
+				// The new node joins the lane of the step before it unless it names its own,
+				// and the innermost group holding both ends.
+				const lane = flowchartNodeDetails(
+					state.nodes.find(([key]) => key === from)?.[1] ?? from,
+				).lane;
+				if (lane !== undefined && flowchartNodeDetails(node).lane === undefined) {
+					state.nodes = upsert(state.nodes, id, mergeNode(node, { lane }));
 				}
 				// The innermost group around both ends, read from the derived tree.
 				const tree = flowchartGroupTree(toDocument(state));
@@ -461,7 +488,7 @@ export function applyFlowchartEdits(
 					state.nodes = upsert(state.nodes, id, mergeNode(label, change));
 				}
 				state.groups = setContainers(state.groups, edit.groups, "group", at, issues);
-				state.lanes = setContainers(state.lanes, edit.lanes, "lane", at, issues);
+				state.lanes = setLanes(state.lanes, edit.lanes, at, issues);
 				return;
 			}
 			case "connect": {

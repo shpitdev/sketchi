@@ -166,13 +166,34 @@
 			"title": "Expense Approval Process",
 			"direction": "TB",
 			"nodes": {
-				"submit": "Submit an expense report",
-				"review": "Review the report",
-				"approved": "Is the report approved?",
-				"revise": "Revise the report",
-				"resubmit": "Resubmit it for review",
-				"verify": "Verify the receipts",
-				"pay": "Pay the employee"
+				"submit": {
+					"label": "Submit an expense report",
+					"lane": "employee"
+				},
+				"review": {
+					"label": "Review the report",
+					"lane": "manager"
+				},
+				"approved": {
+					"label": "Is the report approved?",
+					"lane": "manager"
+				},
+				"revise": {
+					"label": "Revise the report",
+					"lane": "employee"
+				},
+				"resubmit": {
+					"label": "Resubmit it for review",
+					"lane": "employee"
+				},
+				"verify": {
+					"label": "Verify the receipts",
+					"lane": "finance"
+				},
+				"pay": {
+					"label": "Pay the employee",
+					"lane": "finance"
+				}
 			},
 			"edges": [
 				["submit", "review"],
@@ -184,18 +205,9 @@
 				["verify", "pay"]
 			],
 			"lanes": {
-				"employee": {
-					"label": "Employee",
-					"contains": ["submit", "revise", "resubmit"]
-				},
-				"manager": {
-					"label": "Manager",
-					"contains": ["review", "approved"]
-				},
-				"finance": {
-					"label": "Finance",
-					"contains": ["verify", "pay"]
-				}
+				"employee": "Employee",
+				"manager": "Manager",
+				"finance": "Finance"
 			}
 		}
 	}

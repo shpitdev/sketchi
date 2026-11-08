@@ -27,6 +27,7 @@ function cleanNode(node: FlowchartDocumentNode): FlowchartDocumentNode {
 		label: cleanToolString(details.label),
 		...(note ? { note } : {}),
 		...(details.shape ? { shape: details.shape } : {}),
+		...(details.lane ? { lane: cleanToolString(details.lane) } : {}),
 		...(details.icon === null
 			? { icon: null }
 			: details.icon
@@ -112,7 +113,15 @@ export function normalizeFlowchartSpec(
 	const title = cleanToolString(spec.title);
 	const id = cleanOptional(spec.id);
 	const groups = cleanContainers(spec.groups);
-	const lanes = cleanContainers(spec.lanes);
+	const lanes =
+		spec.lanes === undefined
+			? undefined
+			: Object.fromEntries(
+					Object.entries(spec.lanes).map(([id, label]) => [
+						cleanToolString(id),
+						cleanToolString(label),
+					]),
+				);
 	const cleaned: NormalizedFlowchartSpec = {
 		id: flowchartDocumentId({ title, ...(id ? { id } : {}) }),
 		title,

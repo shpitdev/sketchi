@@ -424,34 +424,49 @@ describe("flowchart documents", () => {
 		expect(kinds(document)).toEqual({ ready: "decision", ship: "end", fix: "end" });
 	});
 
-	it("puts every node in one lane", () => {
+	it("puts every node in the lane it names", () => {
 		const document: FlowchartDocument = {
 			title: "Hiring",
 			direction: "LR",
-			nodes: { apply: "Apply", screen: "Screen resume", offer: "Make offer" },
+			nodes: {
+				apply: { label: "Apply", lane: "candidate" },
+				screen: { label: "Screen resume", lane: "recruiter" },
+				offer: { label: "Make offer", lane: "recruiter" },
+			},
 			edges: [
 				["apply", "screen"],
 				["screen", "offer"],
 			],
-			lanes: {
-				candidate: { label: "Candidate", contains: ["apply"] },
-				recruiter: { label: "Recruiter", contains: ["screen", "offer"] },
-			},
+			lanes: { candidate: "Candidate", recruiter: "Recruiter" },
 		};
 		const diagram = build(document);
-		expect(diagram.lanes?.map((lane) => lane.id)).toEqual(["candidate", "recruiter"]);
+		expect(diagram.lanes?.map((lane) => [lane.id, lane.label])).toEqual([
+			["candidate", "Candidate"],
+			["recruiter", "Recruiter"],
+		]);
 		expect(diagram.nodes.map((node) => node.lane)).toEqual(["candidate", "recruiter", "recruiter"]);
 		expect(
 			issues({
 				...document,
-				lanes: { candidate: { label: "Candidate", contains: ["apply"] } },
+				nodes: {
+					...document.nodes,
+					screen: "Screen resume",
+					offer: { label: "Make offer", lane: "hr" },
+				},
+				lanes: { candidate: "Candidate", manager: "Hiring manager" },
 				groups: { g: { label: "G", contains: ["apply"] } },
 			}),
 		).toEqual([
 			["lanes_with_groups", "groups"],
-			["node_without_lane", "lanes"],
-			["node_without_lane", "lanes"],
+			["node_without_lane", "nodes.screen.lane"],
+			["unknown_node_lane", "nodes.offer.lane"],
+			["empty_lane", "lanes.manager"],
 		]);
+		expect(
+			issues({ ...document, lanes: undefined } as unknown as FlowchartDocument).map(
+				([code]) => code,
+			),
+		).toEqual(["unknown_node_lane", "unknown_node_lane", "unknown_node_lane"]);
 	});
 
 	it("names unknown ends with the nearest ids, and every graph problem", () => {

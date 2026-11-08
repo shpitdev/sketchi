@@ -159,7 +159,7 @@ function operationTypes(operation: CodeModeOperation): string {
 
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 
-const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null } }, edges: [[from, to, label?]], groups?: { [id]: { label, kind?: "cloud" | "datacenter" | "region" | "zone" | "vpc" | "subnet" | "cluster" | "namespace", contains: [ids] } }, lanes?: { [id]: { label, contains: [ids] } } }`;
+const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null, lane?: id } }, edges: [[from, to, label?]], groups?: { [id]: { label, kind?: "cloud" | "datacenter" | "region" | "zone" | "vpc" | "subnet" | "cluster" | "namespace", contains: [ids] } }, lanes?: { [id]: label } }`;
 
 /**
  * What a first flowchart build needs, each rule with any detail only the buildFlowchart topic

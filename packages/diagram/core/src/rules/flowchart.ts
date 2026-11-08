@@ -49,7 +49,7 @@ export const FLOWCHART_RULES = {
 		`Label an arrow with the words ${source} gives it ("write orders", "publish jobs"): ["api", "db", "write orders"].`,
 	documentZonesNotNodes: "A zone is only a group: never also a node, and never an arrow's end.",
 	documentOwners: (source: RuleSource) =>
-		`List each node, questions too, in the lane or group of whoever does it in ${source}, never of whoever it names or acts on: "support notifies the customer" is Support's.`,
+		`A node belongs to whoever does it in ${source}, never to whoever it names or acts on: "support notifies the customer" is Support's, in its lane or group.`,
 	documentFanOut:
 		'A branch that leads to several steps lists them in one edge: ["short", ["notify", "reorder"], "yes"].',
 	documentBranches: (source: RuleSource) =>
@@ -59,7 +59,7 @@ export const FLOWCHART_RULES = {
 	documentGroups: (source: RuleSource) =>
 		`Only when ${source} groups steps (teams, zones, phases), declare groups: { id: { label, kind?, contains: [ids] } }, each listing the nodes and groups ${source} puts in it; a group may list members at any depth and Sketchi nests them. Every zone ${source} names is its own group; anything ${source} keeps outside a zone stays out of its list. Set kind (${zoneKinds}) when ${source} says what a zone is. Set shape on infrastructure nodes, entries and ends too: "database" for databases, "document" for files, archives and reports, "queue" for queues, streams and topics, "storage" for buckets and object stores.`,
 	documentLanes: (source: RuleSource) =>
-		`For swimlanes, a process across actors or roles, declare lanes: { id: { label, contains: [ids] } } in ${source}'s order, every step in its actor's lane; lanes take no groups.`,
+		`For swimlanes, a process across actors or roles, declare lanes: { id: "Label" } in ${source}'s order and set every node's lane, questions too, to whoever does it: { label, lane }; lanes take no groups.`,
 	documentLogos: (source: RuleSource) =>
 		`When ${source} names technologies or asks for logos, set logos: true: each node draws the logo of the first product its label names. icon: "Name" picks another, and icon: null drops it.`,
 	documentDirection: (source: RuleSource) =>
