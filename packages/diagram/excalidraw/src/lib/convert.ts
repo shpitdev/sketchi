@@ -351,6 +351,17 @@ function shapeStrokeElements(input: {
 	});
 }
 
+/** What a logo sits on: its node's own solid fill, else the canvas. */
+function iconPaper(
+	node: NodeSceneElement | FrameSceneElement,
+	scene: RenderedDiagramScene,
+): string {
+	const solid = (node.fillStyle ?? "solid") === "solid";
+	return node.fillColor && node.fillColor !== "transparent" && solid
+		? node.fillColor
+		: scene.backgroundColor;
+}
+
 function iconBox(node: NodeSceneElement | FrameSceneElement) {
 	const group = node.type === "frame" || node.rendererRole === "zone";
 	return group ? canvasGroupIconBox(node) : canvasNodeIconBox(node);
@@ -433,7 +444,7 @@ function iconElements(input: {
 					groupIds: [logoGroupId(node), ...(node.groupIds ?? [])],
 				}),
 		ink: input.ink,
-		paper: scene.backgroundColor,
+		paper: iconPaper(node, scene),
 		customData: group ? { sketchiGroupIcon: node.icon.slug } : { sketchiNodeIcon: node.icon.slug },
 		...(node.roughness === undefined ? {} : { roughness: node.roughness }),
 		...(node.locked === undefined ? {} : { locked: node.locked }),

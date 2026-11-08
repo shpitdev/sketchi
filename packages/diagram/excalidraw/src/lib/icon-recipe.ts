@@ -25,7 +25,7 @@ export interface IconRecipeDrawing {
 	readonly frameId?: string | null;
 	/** The color `ink` parts take: the label color of the node the icon sits in. */
 	readonly ink: string;
-	/** The color `paper` parts take: the scene's background. */
+	/** The color `paper` parts take: what the icon sits on, the node's fill or the canvas. */
 	readonly paper: string;
 	/** Strokes take the node's roughness; small fills always draw clean. */
 	readonly roughness?: number;
@@ -40,6 +40,46 @@ export const ICON_RECIPE_STROKE_WIDTH = 2;
 
 function round(value: number): number {
 	return Math.round(value * 100) / 100;
+}
+
+const DARK_INK = "#1e1e1e";
+const LIGHT_INK = "#ffffff";
+/** WCAG's floor for graphics: below it a mark's ink blurs into its paper. */
+const MIN_INK_CONTRAST = 3;
+
+function channels(value: string): readonly [number, number, number] | undefined {
+	const hex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/iu.exec(value)?.[1];
+	if (!hex) return undefined;
+	const full = hex.length === 3 ? [...hex].map((digit) => digit + digit).join("") : hex;
+	return [0, 2, 4].map((start) => Number.parseInt(full.slice(start, start + 2), 16)) as [
+		number,
+		number,
+		number,
+	];
+}
+
+function luminance([red, green, blue]: readonly [number, number, number]): number {
+	const linear = (channel: number) => {
+		const value = channel / 255;
+		return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+	};
+	return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue);
+}
+
+/**
+ * Ink that reads on the icon's paper: the given ink, or near-black or white
+ * when the two are too close to tell apart (white label text on a white
+ * canvas would otherwise draw an inverted mark as a blank disc).
+ */
+export function legibleIconInk(ink: string, paper: string): string {
+	const inkChannels = channels(ink);
+	const paperChannels = channels(paper);
+	if (!inkChannels || !paperChannels) return ink;
+	const [lighter, darker] = [luminance(inkChannels), luminance(paperChannels)].sort(
+		(left, right) => right - left,
+	) as [number, number];
+	if ((lighter + 0.05) / (darker + 0.05) >= MIN_INK_CONTRAST) return ink;
+	return luminance(paperChannels) > 0.18 ? DARK_INK : LIGHT_INK;
 }
 
 function color(
@@ -63,6 +103,7 @@ export function iconRecipeElements(
 	drawing: IconRecipeDrawing,
 ): ExcalidrawElement[] {
 	const scale = drawing.box.size / ICON_RECIPE_GRID;
+	const palette = { ink: legibleIconInk(drawing.ink, drawing.paper), paper: drawing.paper };
 	const at = ([x, y]: IconRecipePoint): readonly [number, number] => [
 		drawing.box.x + x * scale,
 		drawing.box.y + y * scale,
@@ -109,7 +150,7 @@ export function iconRecipeElements(
 				width,
 				height,
 				backgroundColor: "transparent",
-				strokeColor: color(part.color, drawing, drawing.ink),
+				strokeColor: color(part.color, palette, palette.ink),
 				strokeWidth: 1,
 				text: part.text,
 				originalText: part.text,
@@ -127,8 +168,8 @@ export function iconRecipeElements(
 			fill !== undefined && drawing.box.size < SMALL_ICON_EDGE ? 0 : (drawing.roughness ?? 1);
 		const paint = {
 			...base(part, index, roughness),
-			backgroundColor: color(fill, drawing, "transparent"),
-			strokeColor: color(part.stroke, drawing, drawing.ink),
+			backgroundColor: color(fill, palette, "transparent"),
+			strokeColor: color(part.stroke, palette, palette.ink),
 			strokeWidth: ICON_RECIPE_STROKE_WIDTH * (part.pen ?? 1),
 		};
 		if (part.kind === "rect" || part.kind === "ellipse") {
