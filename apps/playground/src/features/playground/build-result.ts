@@ -2,6 +2,8 @@ import { stateLabel } from "@sketchi/diagram-core";
 import {
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
+	BuildMindmapResultSchema,
+	BuildMindmapToolInputSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildStateMachineResultSchema,
 	BuildStateMachineToolInputSchema,
@@ -30,6 +32,7 @@ import {
 	BuildSequenceDiagramToolInputSchema,
 	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
+	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildGanttResult,
@@ -54,6 +57,7 @@ type MessagePart = UIMessage["parts"][number];
 /** A canonical build result from any Studio build tool. */
 export type StudioBuildResult =
 	| BuildFlowchartResult
+	| BuildMindmapResult
 	| BuildSequenceDiagramResult
 	| BuildTimelineResult
 	| BuildChartResult
@@ -68,7 +72,24 @@ export type StudioBuildResult =
 	| BuildWireframeResult
 	| BuildQuadrantChartResult;
 
+type MindmapTopic = {
+	readonly label: string;
+	readonly children?: readonly MindmapTopic[] | undefined;
+};
+const topicLabels = (topic: MindmapTopic): string[] => [
+	topic.label,
+	...(topic.children ?? []).flatMap(topicLabels),
+];
+
 const BUILD_TOOLS = {
+	"tool-build_mindmap": {
+		family: "mindmap",
+		decodeResult: Schema.decodeUnknownResult(BuildMindmapResultSchema),
+		labels: (input: unknown) => {
+			const decoded = Schema.decodeUnknownResult(BuildMindmapToolInputSchema)(input);
+			return Result.isSuccess(decoded) ? topicLabels(decoded.success.spec.root) : [];
+		},
+	},
 	"tool-build_chart": {
 		family: "chart",
 		decodeResult: Schema.decodeUnknownResult(BuildChartResultSchema),
@@ -240,6 +261,7 @@ export function diagramToolFamily(part: DiagramToolPart): DiagramToolFamily {
 
 const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 	flowchart: "flowchart",
+	mindmap: "mindmap",
 	sequence: "sequence diagram",
 	timeline: "timeline",
 	chart: "chart",

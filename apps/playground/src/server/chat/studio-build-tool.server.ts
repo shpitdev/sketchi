@@ -34,6 +34,7 @@ export interface StudioBuildToolExecutor<Input, Result, E = never, R = never> {
 
 type StudioBuildOperation =
 	| "buildFlowchart"
+	| "buildMindmap"
 	| "buildSequenceDiagram"
 	| "buildTimeline"
 	| "buildChart"

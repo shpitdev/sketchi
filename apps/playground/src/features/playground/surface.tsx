@@ -120,6 +120,15 @@ function resultSummary(result: StudioBuildResult): {
 			itemCount: spec.stages.reduce((count, stage) => count + stage.steps.length, 0),
 		};
 	if ("quadrants" in spec) return { itemCount: spec.points.length };
+	if ("root" in spec) {
+		const topics = (topic: { readonly children?: readonly unknown[] }): number =>
+			1 +
+			(topic.children ?? []).reduce<number>(
+				(sum, child) => sum + topics(child as { readonly children?: readonly unknown[] }),
+				0,
+			);
+		return { itemCount: topics(spec.root) };
+	}
 	return "participants" in spec
 		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
 		: {
@@ -185,6 +194,7 @@ function failureCopy(status: Exclude<StudioBuildResult, { ok: true }>["status"])
 				hint: "Describe the main steps and how they connect, then try again.",
 			};
 		case "invalid_flowchart":
+		case "invalid_mindmap":
 		case "invalid_sequence":
 		case "invalid_timeline":
 		case "invalid_chart":
