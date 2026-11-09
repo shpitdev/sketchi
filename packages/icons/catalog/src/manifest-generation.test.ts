@@ -197,6 +197,17 @@ describe("public icon manifest generation", () => {
 		);
 	});
 
+	it("does not let Palantir aliases hijack generic icon searches", () => {
+		for (const query of ["calendar", "folder", "sunset"]) {
+			expect(searchIcons(iconManifest.icons, { query })[0]?.icon.collection, query).not.toBe(
+				"palantir",
+			);
+		}
+		expect(
+			searchIcons(iconManifest.icons, { query: "application" }).map(({ rank }) => rank),
+		).not.toContain(2);
+	});
+
 	it("accounts for promoted Palantir glyph pairs in review aggregates", () => {
 		const path = resolve(
 			process.cwd(),
