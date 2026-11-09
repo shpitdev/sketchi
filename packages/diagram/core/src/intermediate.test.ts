@@ -94,8 +94,27 @@ describe("parseIntermediateDiagram", () => {
 		).toEqual({ slug: "cloudflare" });
 	});
 
+	it("accepts community icon slugs under their namespace", () => {
+		const diagram = parseIntermediateDiagram({
+			id: "logos",
+			title: "Logos",
+			nodes: [{ id: "queue", label: "Queue", icon: { slug: "community/ring-queue" } }],
+		});
+		expect(diagram.nodes[0]?.icon?.slug).toBe("community/ring-queue");
+	});
+
 	it("rejects icon slugs that are not catalog-shaped", () => {
-		for (const slug of ["Docker", "docker logo", "", "-docker", "a".repeat(65)]) {
+		for (const slug of [
+			"Docker",
+			"docker logo",
+			"",
+			"-docker",
+			"a".repeat(65),
+			"community/",
+			"community/a/b",
+			`community/${"a".repeat(65)}`,
+			"other/docker",
+		]) {
 			expect(() =>
 				parseIntermediateDiagram({
 					id: "logos",

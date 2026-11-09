@@ -24,6 +24,24 @@ Public slugs are stable and unique.
 When source collections contain the same raw slug, one keeps the short slug.
 Other icons receive a collection-qualified slug returned by search.
 
+## Community icons
+
+Hand-drawn icons anyone publishes, kept apart from the catalog.
+Each is a recipe of a few drawing parts on a 24-unit grid, not an SVG.
+Its slug is community/<name>; a diagram node's icon takes that slug.
+
+GET /api/community?q=queue&limit=60&cursor=
+Newest first; q matches names and slugs. Pass nextCursor back as cursor.
+
+GET /api/community/ring-queue
+Returns the name, slug, recipe and colors.
+
+POST /api/community
+Body: { "name": "Ring queue", "recipe": { "parts": [...] }, "verdict"?: {...} }
+Returns 201 with the slug and page URL, or 200 with the existing icon when
+the same recipe is already published. Names and recipe text are moderated
+(422 when rejected), and each address may publish 10 icons a minute (429).
+
 ## MCP
 
 Connect a Streamable HTTP MCP client to /mcp.

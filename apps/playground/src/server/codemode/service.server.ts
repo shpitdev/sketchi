@@ -65,6 +65,7 @@ import {
 	PlaygroundBrowserRenderingLive,
 	type CloudflareBrowserRunRendererOptions,
 } from "./browser-renderer.server";
+import { studioCommunityIcons } from "./community-icons.server";
 import { playgroundIconCatalog } from "./icon-catalog.server";
 
 export type CodeModeRequestContext = PlaygroundBindings | PlaygroundIds | PlaygroundRequestMetadata;
@@ -229,6 +230,9 @@ export const PlaygroundCodeModeLive = Layer.effect(
 					...(fillNamedLogos ? { fillNamedLogos } : {}),
 					artifactUrl: (input) => artifactUrl(metadata.origin, input),
 					...(env.ASSETS ? { icons: playgroundIconCatalog(env.ASSETS, metadata.origin) } : {}),
+					...(env.COMMUNITY_ICONS
+						? { communityIcons: studioCommunityIcons(env.COMMUNITY_ICONS) }
+						: {}),
 					...(env.CODEMODE_PNG_RENDERER
 						? {
 								renderer: browserRendering.renderer(

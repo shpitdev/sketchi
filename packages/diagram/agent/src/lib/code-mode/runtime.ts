@@ -246,10 +246,12 @@ import {
 	type QualityReport,
 } from "./contract.js";
 import {
+	catalogForRequest,
 	embedSceneIcons,
 	fillGroupLogos,
 	resolveFlowchartLogos,
 	resolveNodeIcons,
+	type CodeModeCommunityIcons,
 	type CodeModeIconCatalog,
 } from "./icons.js";
 import { cleanToolString } from "../clean-tool-string.js";
@@ -288,6 +290,8 @@ export interface CodeModeRuntimeOptions {
 	createId?: (prefix: string) => string;
 	/** Node-logo catalog; without one, every node icon is dropped with a warning. */
 	icons?: CodeModeIconCatalog;
+	/** Published community icons, which a request names by `community/<slug>`. */
+	communityIcons?: CodeModeCommunityIcons;
 	renderer?: CodeModeArtifactRenderer;
 	/** Internal per-call policy for optional default PNGs; explicit exports remain strict. */
 	defaultPng?: {
@@ -309,7 +313,7 @@ export class CodeModeRuntimeEnvironment extends Context.Service<
 	Required<Pick<CodeModeRuntimeOptions, "createId">> &
 		Pick<
 			CodeModeRuntimeOptions,
-			"artifactUrl" | "icons" | "renderer" | "defaultPng" | "fillNamedLogos"
+			"artifactUrl" | "communityIcons" | "icons" | "renderer" | "defaultPng" | "fillNamedLogos"
 		>
 >()("@sketchi/diagram-agent/CodeModeRuntimeEnvironment") {}
 
@@ -321,6 +325,7 @@ export function makeCodeModeRuntimeEnvironmentLayer(options: CodeModeRuntimeOpti
 	return Layer.succeed(CodeModeRuntimeEnvironment, {
 		createId: options.createId ?? defaultCreateId,
 		...(options.icons ? { icons: options.icons } : {}),
+		...(options.communityIcons ? { communityIcons: options.communityIcons } : {}),
 		...(options.renderer ? { renderer: options.renderer } : {}),
 		...(options.defaultPng ? { defaultPng: options.defaultPng } : {}),
 		...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
@@ -3595,11 +3600,16 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	const environment = yield* CodeModeRuntimeEnvironment;
 
 	const request = parsed.success;
+	const icons = yield* catalogForRequest(
+		environment.icons,
+		environment.communityIcons,
+		request.spec,
+	);
 	const buildId = yield* Effect.sync(() => environment.createId("build"));
 	const authoredSpec = normalizeSequenceDiagramSpec(request.spec);
 	const resolvedIcons = resolveNodeIcons(
 		authoredSpec.participants,
-		environment.icons,
+		icons,
 		{ noun: "participant", path: "participants" },
 		{ fillNamedLogos: environment.fillNamedLogos === true },
 	);
@@ -3649,7 +3659,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 				},
 			}),
 	}).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.render"));
-	const embedded = yield* embedSceneIcons(renderedScene, environment.icons);
+	const embedded = yield* embedSceneIcons(renderedScene, icons);
 	const scene = embedded.scene;
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
@@ -5159,7 +5169,10 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 			},
 		});
 	}
-	const embedded = yield* embedSceneIcons(compileCanvasSpec(normalized), environment.icons);
+	const embedded = yield* embedSceneIcons(
+		compileCanvasSpec(normalized),
+		yield* catalogForRequest(environment.icons, environment.communityIcons, normalized),
+	);
 	const scene = embedded.scene;
 	const normalizedSpec = withoutIconAssets(scene);
 	const validationIssues = getCanvasValidationIssues(scene);
@@ -5260,6 +5273,11 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 		});
 	}
 	const authoredSpec = normalized.spec;
+	const icons = yield* catalogForRequest(
+		environment.icons,
+		environment.communityIcons,
+		authoredSpec,
+	);
 	// Cleaning can empty a string the request held, so the cleaned document is checked again.
 	const cleaned = decodeFlowchartDocument(authoredSpec);
 	if (!Result.isSuccess(cleaned)) {
@@ -5272,7 +5290,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 			},
 		});
 	}
-	const logos = resolveFlowchartLogos(authoredSpec, environment.icons);
+	const logos = resolveFlowchartLogos(authoredSpec, icons);
 	// The document as drawn: each node that draws a logo names its slug, and an icon
 	// that named none is gone.
 	const normalizedSpec = {
@@ -5315,7 +5333,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 					...(node.group ? { group: node.group } : {}),
 					...(node.icon ? { icon: { slug: node.icon.slug } } : {}),
 				})),
-				environment.icons,
+				icons,
 				{ fillNamedLogos: true },
 			)
 		: { issues: [], logos: new Map<string, string>() };
@@ -5366,7 +5384,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 			}),
 	}).pipe(Effect.withSpan("codeMode.buildFlowchart.render"));
 	// logos: "exact" embeds every mark's catalog SVG instead of its hand-drawn recipe.
-	const embedded = yield* embedSceneIcons(renderedScene, environment.icons, {
+	const embedded = yield* embedSceneIcons(renderedScene, icons, {
 		exactIcons: diagram.metadata["logos"] === "exact",
 	});
 	const scene = embedded.scene;
@@ -5768,7 +5786,10 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 		});
 	}
 
-	const embedded = yield* embedSceneIcons(renderedScene, environment.icons);
+	const embedded = yield* embedSceneIcons(
+		renderedScene,
+		yield* catalogForRequest(environment.icons, environment.communityIcons, renderedScene.elements),
+	);
 	const patchedScene = embedded.scene;
 	const structuralIssues = getCanvasValidationIssues(patchedScene);
 	if (structuralIssues.length > 0) {

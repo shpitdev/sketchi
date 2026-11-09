@@ -1,9 +1,10 @@
 import { X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
 import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 
 import { formatBytes } from "../../lib/format-bytes.js";
+import { useDialogFocus } from "../../lib/use-dialog-focus.js";
 import { PreviewToggle } from "../preview-toggle/index.js";
 
 export type IconDetailAction = "copy-data-uri" | "copy-jsx" | "copy-svg" | "copy-url" | "download";
@@ -48,48 +49,7 @@ export function IconDetail({
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
 	const dialogRef = useRef<HTMLElement>(null);
 
-	// oxlint-disable-next-line sketchi/no-react-effects -- modal focus trap: subscribes to window keydown and restores focus to the opener on close
-	useEffect(() => {
-		closeButtonRef.current?.focus();
-
-		function handleKeyDown(event: KeyboardEvent) {
-			if (event.key === "Escape") {
-				event.preventDefault();
-				event.stopPropagation();
-				onClose?.();
-				return;
-			}
-			if (event.key !== "Tab") return;
-
-			const focusable = Array.from(
-				dialogRef.current?.querySelectorAll<HTMLElement>(
-					'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
-				) ?? [],
-			).filter((element) => !element.hasAttribute("disabled"));
-			const first = focusable[0];
-			const last = focusable.at(-1);
-			if (!first || !last) {
-				event.preventDefault();
-				return;
-			}
-			if (event.shiftKey && document.activeElement === first) {
-				event.preventDefault();
-				last.focus();
-			} else if (!event.shiftKey && document.activeElement === last) {
-				event.preventDefault();
-				first.focus();
-			} else if (!dialogRef.current?.contains(document.activeElement)) {
-				event.preventDefault();
-				(event.shiftKey ? last : first).focus();
-			}
-		}
-
-		window.addEventListener("keydown", handleKeyDown, true);
-		return () => {
-			window.removeEventListener("keydown", handleKeyDown, true);
-			if (returnFocusTo?.isConnected) returnFocusTo.focus();
-		};
-	}, [onClose, returnFocusTo]);
+	useDialogFocus({ dialog: dialogRef, initial: closeButtonRef, onClose, returnFocusTo });
 
 	return (
 		<aside

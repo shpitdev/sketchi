@@ -1,5 +1,6 @@
 import "@tanstack/react-start/server-only";
 
+import type { CommunityIconDatabase } from "@sketchi/community-icons";
 import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
 import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
 import type { TelemetryPipeline } from "@sketchi/observability";
@@ -11,6 +12,8 @@ export interface StudioEnv {
 	AI?: CloudflareAiGatewayProvider;
 	ASSETS?: PlaygroundAssetsBinding;
 	CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
+	/** D1: the community icons the icons app publishes, which diagrams draw by slug. */
+	COMMUNITY_ICONS?: CommunityIconDatabase;
 	LOADER?: unknown;
 	SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
 	SKETCHI_AI_GATEWAY_ID?: string;

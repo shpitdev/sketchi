@@ -352,6 +352,7 @@ export function IconLibrary({
 	];
 
 	const links: readonly PaletteLink[] = [
+		{ href: "/community", name: "Community icons" },
 		{ href: `${homeHref}/docs`, name: "Docs" },
 		{ external: true, href: REPO_URL, name: "GitHub" },
 		{ href: "/llms.txt", name: "llms.txt" },
