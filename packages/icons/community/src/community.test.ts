@@ -290,6 +290,10 @@ describe("Workers AI moderation", () => {
 			_tag: "Success",
 			success: { allowed: false },
 		});
+		// The Workers AI binding wraps the answer.
+		expect(
+			await Effect.runPromise(jev({ state: "Completed", result: noul(0.07) }).review),
+		).toMatchObject({ _tag: "Success", success: { allowed: true } });
 	});
 
 	it("reports moderation unavailable when Jev fails or answers off-shape", async () => {

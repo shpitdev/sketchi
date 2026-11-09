@@ -50,6 +50,13 @@ const JevResponse = Schema.Struct({
 });
 const decodeJevResponse = Schema.decodeUnknownEffect(JevResponse);
 
+/** The binding wraps Jev's answer as `{ state, result }`; the documented shape is bare. */
+function jevResult(response: unknown): unknown {
+	return typeof response === "object" && response !== null && "result" in response
+		? response.result
+		: response;
+}
+
 const unavailable = (cause: unknown) =>
 	CommunityIconModerationUnavailableError.make({ cause, message: "Moderation is unavailable." });
 
@@ -77,7 +84,9 @@ export function workersAiCommunityModeration(
 						Effect.fail(unavailable(new Error(`Jev did not answer within ${timeoutMs} ms.`))),
 				}),
 			);
-			const decoded = yield* decodeJevResponse(response).pipe(Effect.mapError(unavailable));
+			const decoded = yield* decodeJevResponse(jevResult(response)).pipe(
+				Effect.mapError(unavailable),
+			);
 			const unfit = decoded.answers.unfit.noul;
 			yield* Effect.annotateCurrentSpan("sketchi.community_icons.unfit", unfit);
 			return { allowed: unfit < COMMUNITY_MODERATION_THRESHOLD };
