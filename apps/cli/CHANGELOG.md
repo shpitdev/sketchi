@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.37.1
+
+### Patch Changes
+
+- [#720](https://github.com/shpitdev/sketchi/pull/720) [`3f11037`](https://github.com/shpitdev/sketchi/commit/3f11037cc8d92bb121369e21f15998b5470fdaf2) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi patch` refuses a flowchart and points at `sketchi edit ID --json '{"edits":[...]}'`, which changes its steps, labels, colors and shapes in the document. `generate` and `revise` no longer patch a flowchart's drawing: node colors and diamonds are in its document, and an edge color, a text color or another shape the request asks for comes back as a warning.
+
 ## 0.37.0
 
 ### Minor Changes
