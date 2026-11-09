@@ -757,7 +757,7 @@ describe("Code Mode API handlers", () => {
 		});
 	});
 
-	it("builds, retrieves, and patches an artifact through Response handlers", async () => {
+	it("builds and retrieves a flowchart through Response handlers, and refuses to patch it", async () => {
 		const buildResponse = await handleBuildFlowchartRequest(
 			{},
 			postRequest("https://studio.test/api/v1/flowcharts/build", {
@@ -846,28 +846,12 @@ describe("Code Mode API handlers", () => {
 			artifactId,
 		);
 
-		expect(patchResponse.status).toBe(200);
-		const patched: unknown = await patchResponse.json();
-		expect(patched).toMatchObject({
-			ok: true,
-			sourceArtifactId: artifactId,
-			status: "accepted",
-			artifact: {
-				provenance: { sourceArtifactId: artifactId },
-			},
-		});
-
-		const childArtifactId = artifactIdFrom(patched);
-		const childResponse = await handleGetArtifactRequest(
-			{},
-			new Request(`https://studio.test/api/v1/artifacts/${childArtifactId}?format=scene`),
-			childArtifactId,
-		);
-		expect(childResponse.status).toBe(200);
-		await expect(childResponse.json()).resolves.toMatchObject({
-			ok: true,
-			artifactId: childArtifactId,
-			provenance: { sourceArtifactId: artifactId },
+		// A flowchart changes by edits; its drawing is never patched.
+		expect(patchResponse.status).toBe(422);
+		await expect(patchResponse.json()).resolves.toMatchObject({
+			ok: false,
+			status: "unsupported_operation",
+			issues: [{ code: "unsupported_patch_operation" }],
 		});
 	});
 

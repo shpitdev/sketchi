@@ -112,6 +112,29 @@ describe("sketchi edit with flowchart edits", () => {
 		expect(shown.data.revision).toBe(1);
 	});
 
+	it("refuses to patch a flowchart, pointing at edit", () => {
+		expect(run("create", "--output", "json", "--json", JSON.stringify(waitlist)).status).toBe(0);
+		const refused = run(
+			"patch",
+			"waitlist",
+			"--output",
+			"json",
+			"--json",
+			JSON.stringify({
+				operations: [
+					{ op: "setStyle", selector: { nodeIds: ["seat"] }, style: { strokeColor: "#16a34a" } },
+				],
+			}),
+		);
+		expect(refused.status).toBe(3);
+		expect(JSON.parse(refused.stderr)).toMatchObject({
+			error: {
+				message: 'Diagram "waitlist" is a flowchart, which is not patched.',
+				hint: expect.stringContaining("sketchi edit waitlist --json"),
+			},
+		});
+	});
+
 	it("refuses edits to a diagram that is not a flowchart", () => {
 		const timeline = {
 			type: "timeline",

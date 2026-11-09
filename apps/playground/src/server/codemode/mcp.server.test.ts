@@ -132,38 +132,28 @@ const CIRCLE_TO_DIAMOND_CODE = `async () => {
     spec: {
       title: "Harness MCP proof flow",
       direction: "LR",
-      nodes: { start: "Start", choice: "Continue?", yes: "Continue", no: "Stop" },
+      nodes: {
+        start: "Start",
+        choice: { label: "Continue?", shape: "diamond", color: "purple" },
+        yes: "Continue",
+        no: "Stop",
+      },
       edges: [
         ["start", "choice"],
         ["choice", "yes", "yes"],
         ["choice", "no", "no"],
       ],
     },
-  });
-
-  if (!built.ok) return built;
-
-  const patched = await sketchi.applyDiagramPatch({
-    source: { artifactId: built.artifact.artifactId },
-    operations: [
-      { op: "setShape", selector: { nodeIds: ["start"] }, shape: "circle" },
-      { op: "setShape", selector: { nodeIds: ["choice"] }, shape: "diamond" },
-      {
-        op: "setStyle",
-        selector: { nodeIds: ["choice"] },
-        style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
-      },
-    ],
     options: {
       artifactFormats: ["scene", "excalidraw"],
       inlineArtifacts: ["excalidraw"],
     },
   });
 
-  if (!patched.ok) return patched;
+  if (!built.ok) return built;
 
   return sketchi.getArtifact({
-    artifactId: patched.artifact.artifactId,
+    artifactId: built.artifact.artifactId,
     format: "excalidraw",
     inline: true,
   });
@@ -572,7 +562,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		],
 		[
 			"applyDiagramPatch",
-			{ operations: [{ op: "setShape", selector: { nodeIds: ["start"] }, shape: "circle" }] },
+			{ operations: [{ op: "setShape", selector: { nodeIds: ["card"] }, shape: "circle" }] },
 		],
 	] as const;
 
@@ -581,7 +571,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			const request = ${JSON.stringify(request)};
 			${
 				operation === "applyDiagramPatch"
-					? `const built = await sketchi.buildFlowchart(${JSON.stringify(optionsOperations[0][1])});
+					? // A flowchart is never patched, so patches start from the canvas case.
+						`const built = await sketchi.createCanvas(${JSON.stringify(optionsOperations.find(([name]) => name === "createCanvas")?.[1])});
 			if (!built.ok) return built;
 			request.source = { artifactId: built.artifact.artifactId };`
 					: ""
@@ -848,7 +839,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		const output = await executeSketchiCodeMode(
 			env,
 			{
-				code: `async () => { const built = await sketchi.buildFlowchart(${JSON.stringify(optionsOperations[0][1])}); const patched = await sketchi.applyDiagramPatch({ source: { artifactId: built.artifact.artifactId }, operations: [{ op: "setStyle", selector: { nodeIds: ["end"] }, style: { strokeColor: "#7c3aed" } }], options: { artifactFormats: ["scene", "excalidraw", "png"] } }); return { built, patched }; }`,
+				code: `async () => { const built = await sketchi.createCanvas(${JSON.stringify(optionsOperations.find(([name]) => name === "createCanvas")?.[1])}); const patched = await sketchi.applyDiagramPatch({ source: { artifactId: built.artifact.artifactId }, operations: [{ op: "setStyle", selector: { nodeIds: ["card"] }, style: { strokeColor: "#7c3aed" } }], options: { artifactFormats: ["scene", "excalidraw", "png"] } }); return { built, patched }; }`,
 			},
 			{ executor: createInProcessExecutor() },
 		);
@@ -1834,7 +1825,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 					code: `async () => {
 			const first = await sketchi.buildFlowchart({spec:{title:"First build",nodes:{a:"Start",b:"Finish"},edges:[["a","b"]]},options:{artifactFormats:["scene","excalidraw","png"]}});
 			if(!first.ok) return first;
-			const patched = await sketchi.applyDiagramPatch({source:{artifactId:first.artifact.artifactId},operations:[{op:"setStyle",selector:{nodeIds:["b"]},style:{strokeColor:"#7c3aed"}}],options:{artifactFormats:["scene","png"]}});
+			const scene = await sketchi.getArtifact({artifactId:first.artifact.artifactId,format:"scene",inline:true});
+			const patched = await sketchi.applyDiagramPatch({source:{scene:scene.inline},operations:[{op:"setStyle",selector:{nodeIds:["b"]},style:{strokeColor:"#7c3aed"}}],options:{artifactFormats:["scene","png"]}});
 			if(!patched.ok) return patched;
 			const rebuilt = await sketchi.buildFlowchart({spec:{...first.normalizedSpec,title:"Rebuilt"},options:{artifactFormats:["scene","png"]}});
 			return ${returned};

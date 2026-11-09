@@ -296,39 +296,32 @@ flowchart LR
 
 ## Agent Sequencing
 
-Agents should handle user requests in two phases:
-
-1. Build and repair the semantic graph.
-2. Patch visual styling, shape, text, or layout details against the accepted
-   artifact.
-
-This matters even when the human request mixes structure and style in one
-sentence, such as "I want a circle connected to a decision diamond that is
-purple." The first call should still produce a valid flowchart with correct
-nodes and edges. Only after `buildFlowchart` returns `ok: true` should the agent
-use `applyDiagramPatch` to set the circle shape, diamond shape, color, or
-positioning.
+A flowchart is written and changed as its document. A request that mixes
+structure and style, such as "a circle connected to a decision diamond that is
+purple", is one `buildFlowchart` call: the diamond and the purple are fields on
+the node (`shape: "diamond"`, `color: "purple"`). A later change, from this
+session or another, is one `editFlowchart` call with the edits by id or label;
+the flowchart's drawing is never patched, and `applyDiagramPatch` refuses it.
 
 ```mermaid
 flowchart LR
-  Request["human request<br/>flow + style mixed together"]
-  Spec["flowchart document<br/>nodes + edges"]
-  Build["buildFlowchart"]
+  Request["request<br/>structure + style"]
+  Build["buildFlowchart<br/>document with colors and shapes"]
   Accepted["accepted artifact"]
-  Patch["applyDiagramPatch"]
-  Styled["styled artifact"]
+  Edit["editFlowchart<br/>edits by id or label"]
+  Edited["new artifact<br/>provenance names the source"]
 
-  Request --> Spec
-  Spec --> Build
+  Request --> Build
   Build --> Accepted
-  Accepted --> Patch
-  Patch --> Styled
+  Accepted --> Edit
+  Edit --> Edited
 ```
 
-Do not ask the model to directly edit native Excalidraw JSON for common style
-or shape changes. Native Excalidraw is intentionally treated as a noisy export
-format. Agents should prefer compact Sketchi specs, deterministic scene
-artifacts, and structured patch operations.
+Other families build first and then use `applyDiagramPatch` for shape, color,
+text or position changes against the accepted artifact. Do not ask the model to
+edit native Excalidraw JSON directly: it is a noisy export format. Agents should
+prefer compact Sketchi specs, deterministic scene artifacts, flowchart edits and
+structured patch operations.
 
 ## `buildFlowchart`
 
@@ -836,7 +829,7 @@ as a manifest plus one object per format. A patched artifact manifest records
 `provenance.sourceArtifactId`, so every stored format resolves to the same
 durable source reference; root build artifacts omit provenance. Studio Worker
 deployments bind `SKETCHI_ARTIFACTS` to R2 so
-`buildFlowchart/buildMindmap/buildSequenceDiagram/createCanvas -> getArtifact -> applyDiagramPatch` can cross request
+`buildFlowchart -> getArtifact -> editFlowchart` and `buildMindmap/buildSequenceDiagram/createCanvas -> getArtifact -> applyDiagramPatch` can cross request
 boundaries.
 
 | Environment       | Bucket                                         |
@@ -937,7 +930,9 @@ interface GetArtifactFailure {
 ## `applyDiagramPatch`
 
 `applyDiagramPatch` is the codemod-style operation for deterministic visual
-changes after a flowchart, mindmap, sequence, or canvas artifact has already been accepted. It should handle
+changes after a mindmap, sequence, canvas or other non-flowchart artifact has
+been accepted. It refuses a flowchart (`unsupported_operation`), which changes
+with `editFlowchart`. It should handle
 common user requests such as changing colors, switching node shapes, shifting a
 group, replacing text, or rerouting edges without asking the agent to edit raw
 Excalidraw JSON.
@@ -1138,15 +1133,10 @@ Example:
 
 ```js
 async () => {
-  const built = await sketchi.buildFlowchart({
+  const built = await sketchi.buildMindmap({
     spec: {
-      title: "Simple approval",
-      nodes: { start: "Request", approve: "Approved?", done: "Done", revise: "Revise" },
-      edges: [
-        ["start", "approve"],
-        ["approve", "done", "yes"],
-        ["approve", "revise", "no"],
-      ],
+      title: "Launch plan",
+      root: { label: "Launch", children: [{ label: "Product" }, { label: "Operations" }] },
     },
   });
 
@@ -1154,17 +1144,12 @@ async () => {
 
   return sketchi.applyDiagramPatch({
     source: { artifactId: built.artifact.artifactId },
-    intent: "Make the decision diamond purple after the flow is accepted.",
+    intent: "Highlight the product topic.",
     operations: [
       {
         op: "setStyle",
-        selector: { nodeIds: ["approve"] },
+        selector: { labels: ["Product"] },
         style: { strokeColor: "#7c3aed", fillColor: "#ede9fe" },
-      },
-      {
-        op: "setShape",
-        selector: { nodeIds: ["approve"] },
-        shape: "diamond",
       },
     ],
   });

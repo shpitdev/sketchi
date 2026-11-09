@@ -1,5 +1,5 @@
 DESCRIPTION
-  Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.
+  Apply Sketchi semantic setStyle, setDefaultStyle, setShape, translate, replaceText, or rerouteEdges operations to the current stored scene of any diagram but a flowchart, which changes with sketchi edit. The CLI owns source and requestId; input contains operations plus optional options or intent. The prior full revision is recoverable, document.json remains unchanged provenance, stale stored PNG is removed, and the patched scene becomes authoritative. This command is strictly offline. Edit remains blocked until a canonical revision is restored.
 
 USAGE
   sketchi patch [flags] <diagram-id>
@@ -20,8 +20,8 @@ GLOBAL FLAGS
   --completions <bash|zsh|fish|powershell|sh|pwsh>    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
 
 EXAMPLES
-  # Color selected nodes through semantic ids.
-  sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review","approve"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
+  # Color a mindmap topic through its label.
+  sketchi patch launch-map --json '{"operations":[{"op":"setStyle","selector":{"labels":["Product"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb","textColor":"#1e3a8a"}}]}'
 
   # Patch from a file, then export or restore the reported diagram revision.
-  sketchi patch release-flow --file patch.json --output json
+  sketchi patch launch-map --file patch.json --output json

@@ -64,7 +64,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(docs.examples).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
-					title: "Accepted graph followed by visual patch",
+					title: "Build a flowchart, then edit it by id",
 				}),
 			]),
 		);

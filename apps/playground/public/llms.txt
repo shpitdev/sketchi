@@ -60,7 +60,8 @@ Fetch a stored artifact. Add raw=true to receive only the file body, which is
 what a download wants; omit it for the metadata envelope.
 
 POST /api/v1/artifacts/{artifactId}/patch
-Apply a patch to a stored diagram and record a new artifact.
+Apply a patch to a stored diagram other than a flowchart and record a new
+artifact. A flowchart changes with /api/v1/flowcharts/edit.
 
 These endpoints are same-origin: they do not send CORS headers, so call them
 from a server or an agent runtime rather than from another site's browser page.
