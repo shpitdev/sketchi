@@ -5,6 +5,7 @@ import {
 	FLOWCHART_RULES,
 	GANTT_RULES,
 	JOURNEY_RULES,
+	MINDMAP_RULES,
 	ORG_CHART_RULES,
 	QUADRANT_RULES,
 	SANKEY_RULES,
@@ -55,6 +56,11 @@ describe("diagram agent policy", () => {
 			"a flowchart of an OAuth handshake is still a flowchart",
 		);
 	});
+
+	it("routes mindmaps to the mindmap build tool", () => {
+		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain('"mindmap" or "mind map" means build_mindmap');
+		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain("build_mindmap with { spec: MindmapSpec }");
+	});
 });
 
 describe("Studio chat rules", () => {
@@ -76,6 +82,7 @@ describe("Studio chat rules", () => {
 			VENN_RULES.regions,
 			TIMELINE_RULES.precision("the user"),
 			CHART_RULES.noRounding,
+			MINDMAP_RULES.order,
 		]) {
 			expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain(rule);
 		}

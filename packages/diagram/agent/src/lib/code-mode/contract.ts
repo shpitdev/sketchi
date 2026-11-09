@@ -1714,6 +1714,15 @@ export class BuildMindmapRequest extends Schema.Class<BuildMindmapRequest>("Buil
 	{ identifier: undefined },
 ) {}
 export const BuildMindmapRequestSchema = BuildMindmapRequestContract;
+/** The mindmap spec a model authors; style is always the Sketchi palette. */
+export const MindmapToolSpecSchema = MindmapSpecContract.mapFields(
+	({ style: _style, ...fields }) => fields,
+);
+export const BuildMindmapToolInputSchema = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(MindmapToolSpecSchema),
+});
+export type BuildMindmapToolInput = typeof BuildMindmapToolInputSchema.Type;
 
 export class ScenePoint extends Schema.Class<ScenePoint>("ScenePoint")(
 	{

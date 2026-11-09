@@ -49,6 +49,13 @@ import {
 } from "./studio-sequence-tool.server";
 import { makeStudioBuildTurn } from "./studio-build-tool.server";
 import {
+	makeStudioMindmapToolExecutor,
+	STUDIO_BUILD_MINDMAP_TOOL_DESCRIPTION,
+	STUDIO_BUILD_MINDMAP_TOOL_NAME,
+	StudioBuildMindmapInputSchema,
+	StudioBuildMindmapOutputSchema,
+} from "./studio-mindmap-tool.server";
+import {
 	makeStudioStateMachineToolExecutor,
 	STUDIO_BUILD_STATE_MACHINE_TOOL_DESCRIPTION,
 	STUDIO_BUILD_STATE_MACHINE_TOOL_NAME,
@@ -228,6 +235,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 		turn,
 	});
 
+	const mindmapExecutor = yield* makeStudioMindmapToolExecutor(codeMode.buildMindmap, { turn });
 	const timelineExecutor = yield* makeStudioTimelineToolExecutor(codeMode.buildTimeline, { turn });
 	const chartExecutor = yield* makeStudioChartToolExecutor(codeMode.buildChart, { turn });
 	const stateMachineExecutor = yield* makeStudioStateMachineToolExecutor(
@@ -274,6 +282,12 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 						inputSchema: StudioBuildFlowchartInputSchema,
 						outputSchema: StudioBuildFlowchartOutputSchema,
 						execute: makeStudioBuildToolCallback(flowchartExecutor, callbacks.runPromise),
+					}),
+					[STUDIO_BUILD_MINDMAP_TOOL_NAME]: tool({
+						description: STUDIO_BUILD_MINDMAP_TOOL_DESCRIPTION,
+						inputSchema: StudioBuildMindmapInputSchema,
+						outputSchema: StudioBuildMindmapOutputSchema,
+						execute: makeStudioBuildToolCallback(mindmapExecutor, callbacks.runPromise),
 					}),
 					[STUDIO_BUILD_STATE_MACHINE_TOOL_NAME]: tool({
 						description: STUDIO_BUILD_STATE_MACHINE_TOOL_DESCRIPTION,
