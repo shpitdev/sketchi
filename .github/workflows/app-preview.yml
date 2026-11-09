@@ -287,12 +287,8 @@ jobs:
           # Web links a sibling's Preview only when this run deploys it; otherwise production.
           ICONS_PREVIEW_URL: ${{ contains(fromJSON(needs.resolve-preview-pr.outputs.projects), 'icons') && steps.preview-settings.outputs.icons_preview_url || '' }}
           PLAYGROUND_PREVIEW_URL: ${{ contains(fromJSON(needs.resolve-preview-pr.outputs.projects), 'playground') && steps.preview-settings.outputs.playground_preview_url || '' }}
-          # Studio narrows an untyped request's diagram families with TypeSafe's Jev, as
-          # production does with the same Worker secret. Only Studio's Preview receives it.
-          TYPESAFE_API_KEY: ${{ matrix.project == 'playground' && secrets.TYPESAFE_API_KEY || '' }}
         run: |
           set -euo pipefail
-          trap 'rm -f "${RUNNER_TEMP}/preview-secrets.json"' EXIT
           mkdir -p .memory
           # CLI vars apply to the Preview only. They never rewrite production settings.
           preview_args=()
@@ -301,17 +297,6 @@ jobs:
           fi
           if [ "$PROJECT_ID" = web ] && [ -n "$PLAYGROUND_PREVIEW_URL" ]; then
             preview_args+=(--var "SKETCHI_PLAYGROUND_URL:${PLAYGROUND_PREVIEW_URL}")
-          fi
-          # Secrets upload with the Preview deployment from a file outside the checkout,
-          # written without echoing the value; the dashboard Preview base stays ignored.
-          if [ "$PROJECT_ID" = playground ]; then
-            if [ -n "${TYPESAFE_API_KEY:-}" ]; then
-              secrets_file="${RUNNER_TEMP}/preview-secrets.json"
-              node -e 'process.stdout.write(JSON.stringify({ TYPESAFE_API_KEY: process.env.TYPESAFE_API_KEY }))' > "$secrets_file"
-              preview_args+=(--secrets-file "$secrets_file")
-            else
-              echo "::warning::TYPESAFE_API_KEY is not set in the staging environment; the Studio Preview routes untyped requests by their words alone."
-            fi
           fi
           # The retry wrapper clears WRANGLER_OUTPUT_FILE_PATH before each attempt.
           node scripts/07-wrangler-retry.mjs -- pnpm exec wrangler preview \

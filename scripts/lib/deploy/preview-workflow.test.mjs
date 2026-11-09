@@ -119,23 +119,6 @@ test("deploy checkout, metadata, and comments share the resolved PR SHA", () => 
 	}
 });
 
-test("Studio's Preview uploads the TypeSafe key with its deployment, and only Studio's", () => {
-	const deployStep = workflow.jobs["deploy-preview"].steps.find(({ id }) => id === "deploy");
-	assert.equal(
-		deployStep.env.TYPESAFE_API_KEY,
-		"${{ matrix.project == 'playground' && secrets.TYPESAFE_API_KEY || '' }}",
-	);
-	const deploy = deployStep.run;
-	assert.match(deploy, /if \[ "\$PROJECT_ID" = playground \]; then/);
-	assert.match(deploy, /preview_args\+=\(--secrets-file "\$secrets_file"\)/);
-	assert.match(deploy, /secrets_file="\$\{RUNNER_TEMP\}\/preview-secrets\.json"/);
-	assert.match(deploy, /trap 'rm -f "\$\{RUNNER_TEMP\}\/preview-secrets\.json"' EXIT/);
-	// The key is read from the environment by node, never written to the log.
-	assert.doesNotMatch(deploy, /echo[^\n]*\$\{?TYPESAFE_API_KEY/);
-	assert.doesNotMatch(deploy, /set -x|preview base-config/);
-	assert.match(deploy, /--ignore-base-config/);
-});
-
 test("official Previews never create, deploy, or delete per-PR Workers", () => {
 	const deployStep = workflow.jobs["deploy-preview"].steps.find(({ id }) => id === "deploy");
 	const deploy = deployStep.run;

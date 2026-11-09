@@ -8,6 +8,7 @@ export {
 export * from "./lib/cloudflare-gateway-chat.js";
 export * from "./lib/errors.js";
 export * from "./lib/family-narrowing.js";
+export * from "./lib/jev-workers-ai.js";
 export * from "./lib/family-questions.js";
 export * from "./lib/intent.js";
 export * from "./lib/logo-placement.js";

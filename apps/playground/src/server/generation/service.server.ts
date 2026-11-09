@@ -16,9 +16,10 @@ import {
 	isLegacyCliDefaultModel,
 	type SupportedGenerationModel,
 	asksForStyling,
-	typeSafeFamilyNarrowingLayer,
+	workersAiFamilyNarrowingLayer,
+	type WorkersAiRunner,
 } from "@sketchi/diagram-generation";
-import { Context, Effect, Layer, Redacted } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 import { aiEnvironment } from "../bindings/ai-env.server";
 import { logosNamedIn } from "../codemode/icon-catalog.server";
@@ -57,17 +58,16 @@ export const PlaygroundGenerationLive = Layer.effect(
 		// Bindings may differ in local/test hosts. Each binding/configuration is
 		// initialized once and owned by the host scope, not by a request scope.
 		const clientForBindings = Effect.fn("playground.generation.clientForBindings")(function* (
-			ai: CloudflareAiGatewayProvider,
+			ai: CloudflareAiGatewayProvider & Partial<WorkersAiRunner>,
 			gatewayId: string,
 			route: GatewayChatRoute,
-			typeSafeApiKey: string | undefined,
 		) {
 			let byGateway = clients.get(ai);
 			if (!byGateway) {
 				byGateway = new Map();
 				clients.set(ai, byGateway);
 			}
-			const clientKey = `${gatewayId}:${route.provider}:${typeSafeApiKey ? "narrowing" : "words"}`;
+			const clientKey = `${gatewayId}:${route.provider}`;
 			let client = byGateway.get(clientKey);
 			if (!client) {
 				const clientLayer = CloudflareGatewayChatClientLive.pipe(
@@ -81,9 +81,10 @@ export const PlaygroundGenerationLive = Layer.effect(
 								surface: "generate-api",
 							}),
 							DiagramGenerationPolicyLive,
-							// Without the key, an untyped request is routed by its words alone.
-							typeSafeApiKey
-								? typeSafeFamilyNarrowingLayer({ apiKey: Redacted.make(typeSafeApiKey) })
+							// Jev narrows an untyped request's families on the same binding; a host
+							// binding without `run` routes it by its words alone.
+							ai.run
+								? workersAiFamilyNarrowingLayer({ ai: { run: ai.run.bind(ai) } })
 								: Layer.empty,
 						),
 					),
@@ -112,8 +113,7 @@ export const PlaygroundGenerationLive = Layer.effect(
 						provider: route.provider,
 					});
 				}
-				const typeSafeApiKey = env.TYPESAFE_API_KEY?.trim() || undefined;
-				const client = yield* clientForBindings(env.AI, config.gatewayId, route, typeSafeApiKey);
+				const client = yield* clientForBindings(env.AI, config.gatewayId, route);
 				// A revision keeps the logos its current diagram names, as well as any the request adds.
 				const logos = logosNamedIn(
 					input.base ? `${input.prompt}\n${JSON.stringify(input.base)}` : input.prompt,

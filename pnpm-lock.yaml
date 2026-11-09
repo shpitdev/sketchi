@@ -227,9 +227,6 @@ importers:
       '@cloudflare/vite-plugin':
         specifier: 1.66.0
         version: 1.66.0(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))(workerd@1.20261023.1)(wrangler@4.156.0(@types/node@26.6.6))
-      '@effect/ai-typesafe':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(effect@4.1.2)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))
@@ -604,9 +601,6 @@ importers:
   packages/diagram/generation:
     dependencies:
       '@effect/ai-openai-compat':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)
-      '@effect/ai-typesafe':
         specifier: 4.1.2
         version: 4.1.2(effect@4.1.2)
       '@sketchi/diagram-core':
@@ -1755,11 +1749,6 @@ packages:
 
   '@effect/ai-openai-compat@4.1.2':
     resolution: {integrity: sha512-6NRpW6GTLoCIuGcs0mCX3cBSZZKJRX1Fo0oDA6NwUKraaAoYJM1gw8/P2vRfi0+G9xXS7EqO2Asgf7ecJb5/AQ==}
-    peerDependencies:
-      effect: ^4.1.2
-
-  '@effect/ai-typesafe@4.1.2':
-    resolution: {integrity: sha512-k4DC2CD8nvf0bioe2/VxA4KKyUNVgv9CFcejhl9Hrnci3cpTdVnrYgdVPL/VxnxfYCVGlCQO/xTzO1g+nT7Yqg==}
     peerDependencies:
       effect: ^4.1.2
 
@@ -11000,10 +10989,6 @@ snapshots:
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
   '@effect/ai-openai-compat@4.1.2(effect@4.1.2)':
-    dependencies:
-      effect: 4.1.2
-
-  '@effect/ai-typesafe@4.1.2(effect@4.1.2)':
     dependencies:
       effect: 4.1.2
 

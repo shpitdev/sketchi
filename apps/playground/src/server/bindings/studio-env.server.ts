@@ -1,14 +1,15 @@
 import "@tanstack/react-start/server-only";
 
 import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
-import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
+import type { CloudflareAiGatewayProvider, WorkersAiRunner } from "@sketchi/diagram-generation";
 import type { TelemetryPipeline } from "@sketchi/observability";
 
 import type { CodeModePngRendererNamespace } from "../codemode/browser-renderer.server";
 import type { PlaygroundAssetsBinding } from "../codemode/icon-catalog.server";
 
 export interface StudioEnv {
-	AI?: CloudflareAiGatewayProvider;
+	/** Workers AI: the AI Gateway for generation, and `run` for Jev's family narrowing. */
+	AI?: CloudflareAiGatewayProvider & Partial<WorkersAiRunner>;
 	ASSETS?: PlaygroundAssetsBinding;
 	CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
 	LOADER?: unknown;
@@ -18,6 +19,4 @@ export interface StudioEnv {
 	SKETCHI_AI_MODEL?: string;
 	SKETCHI_RENDER_ASSET_ORIGIN?: string;
 	TELEMETRY_SPANS?: TelemetryPipeline;
-	/** A Worker secret: lets generate narrow an untyped request's families with Jev. */
-	TYPESAFE_API_KEY?: string;
 }
