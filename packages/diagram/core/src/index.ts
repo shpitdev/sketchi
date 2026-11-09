@@ -9,6 +9,7 @@ export * from "./types/mindmap.js";
 export * from "./types/flowchart.js";
 export * from "./flowchart-document.js";
 export * from "./flowchart-edits.js";
+export * from "./coverage.js";
 export * from "./types/sequence.js";
 export * from "./segments.js";
 export * from "./boxes.js";

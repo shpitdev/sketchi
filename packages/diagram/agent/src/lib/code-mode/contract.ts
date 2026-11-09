@@ -7,6 +7,7 @@ import {
 	CANVAS_COMPOSED_SHAPES,
 	CANVAS_RENDERER_ROLES,
 	CANVAS_SPEC_VERSION,
+	FLOWCHART_COVERAGE_CODES,
 	FLOWCHART_DIRECTIONS,
 	FlowchartDocumentSchema,
 	FlowchartEditsSchema,
@@ -518,6 +519,7 @@ export const CODE_MODE_ISSUE_CODES = [
 	"icon_dropped",
 	"icon_filled",
 	"icon_possible",
+	...FLOWCHART_COVERAGE_CODES,
 ] as const;
 
 export const CodeModeIssueCodeSchema = Object.assign(literals(CODE_MODE_ISSUE_CODES), {
@@ -545,6 +547,7 @@ const CodeModeIssueStageSchema = literals([
 	"render",
 	"export",
 	"storage",
+	"coverage",
 ]);
 
 export class CodeModeIssueRef extends Schema.Class<CodeModeIssueRef>("CodeModeIssueRef")(
@@ -1325,12 +1328,22 @@ export class BuildFlowchartOptions extends Schema.Class<BuildFlowchartOptions>(
 ) {}
 export const BuildFlowchartOptionsSchema = optionalContract(BuildFlowchartOptions);
 
+/** The request a flowchart draws, in the user's words, as long as a generate prompt may be. */
+export const FLOWCHART_REQUEST_MAX_LENGTH = 20_000;
+const FlowchartRequestText = NonEmptyString.check(
+	Schema.isMaxLength(FLOWCHART_REQUEST_MAX_LENGTH, {
+		message: `request must be at most ${FLOWCHART_REQUEST_MAX_LENGTH} characters.`,
+	}),
+);
+
 export class BuildFlowchartRequest extends Schema.Class<BuildFlowchartRequest>(
 	"BuildFlowchartRequest",
 )(
 	{
 		requestId: optionalContract(NonEmptyString),
 		spec: requiredObject(FlowchartSpec),
+		/** The user's words: an accepted build lists what they state that it misses. */
+		request: optionalContract(FlowchartRequestText),
 		options: optionalContract(BuildFlowchartOptions),
 	},
 	{ identifier: undefined },
@@ -1347,6 +1360,7 @@ export class EditFlowchartRequest extends Schema.Class<EditFlowchartRequest>(
 		requestId: optionalContract(NonEmptyString),
 		artifactId: RequiredNonEmptyString,
 		edits: requiredObject(FlowchartEditsSchema),
+		request: optionalContract(FlowchartRequestText),
 		options: optionalContract(BuildFlowchartOptions),
 	},
 	{ identifier: undefined },

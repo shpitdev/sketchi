@@ -3751,3 +3751,70 @@ describe("editFlowchart", () => {
 		});
 	});
 });
+
+describe("a flowchart built from the request it draws", () => {
+	const request =
+		"draw our setup L→R: users → load balancer → web + api servers → database. the load balancer, web and api servers are in the app VPC";
+	const spec = {
+		title: "App setup",
+		direction: "LR" as const,
+		nodes: {
+			users: "Users",
+			lb: { label: "Load balancer", group: "vpc" },
+			web: { label: "Web server", group: "vpc" },
+			api: { label: "API server", group: "vpc" },
+			db: { label: "Database", shape: "database" as const },
+		},
+		edges: [
+			["users", "lb"],
+			["lb", ["web", "api"]],
+			["api", "db"],
+		] as [string | string[], string | string[]][],
+		groups: { vpc: { label: "App VPC", kind: "vpc" as const } },
+	};
+	const coverage = (result: { issues: readonly { stage: string; code: string }[] }) =>
+		result.issues.filter((entry) => entry.stage === "coverage").map((entry) => entry.code);
+
+	it("is accepted, and lists what the request states that it misses", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec, request });
+		expectBuildOk(built);
+		expect(coverage(built)).toEqual(["flowchart_connection_missing"]);
+		expect(built.issues.find((entry) => entry.stage === "coverage")).toMatchObject({
+			severity: "warning",
+			message: expect.stringContaining('"web → database"'),
+			hint: expect.stringContaining("editFlowchart"),
+		});
+	});
+
+	it("reads a request written inside the spec as the build's request", async () => {
+		const built = await createTestRuntime().buildFlowchart({ spec: { ...spec, request } });
+		expectBuildOk(built);
+		expect(coverage(built)).toEqual(["flowchart_connection_missing"]);
+		expect(built.normalizedSpec).not.toHaveProperty("request");
+	});
+
+	it("checks nothing without a request", async () => {
+		const built = await createTestRuntime().buildFlowchart({ spec });
+		expectBuildOk(built);
+		expect(coverage(built)).toEqual([]);
+	});
+
+	it("checks an edit against the request it is given", async () => {
+		const runtime = createTestRuntime();
+		const built = await runtime.buildFlowchart({ spec, request });
+		expectBuildOk(built);
+		const fixed = await runtime.editFlowchart({
+			artifactId: built.artifact.artifactId,
+			edits: [{ op: "connect", edges: [["web", "db"]] }],
+			request,
+		});
+		expect(fixed.ok && coverage(fixed)).toEqual([]);
+		const unfixed = await runtime.editFlowchart({
+			artifactId: built.artifact.artifactId,
+			edits: [{ op: "set", nodes: { db: { color: "blue" } } }],
+			request,
+		});
+		expect(unfixed.ok && coverage(unfixed)).toEqual(["flowchart_connection_missing"]);
+	});
+});
