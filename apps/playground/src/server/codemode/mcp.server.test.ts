@@ -1160,12 +1160,16 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(executeTool?.description).toContain("When the prompt names technologies");
 			// Every request pays for tools/list. Claude Code cuts the description at 4096 characters in
 			// upfront mode but keeps parameter descriptions, so the builder specs ride on code.
-			expect(executeTool?.description?.length).toBeLessThanOrEqual(1_525);
+			expect(executeTool?.description?.length).toBeLessThanOrEqual(1_382);
 			const codeDescription = String(
 				Reflect.get(executeTool?.inputSchema.properties?.code ?? {}, "description"),
 			);
 			expect(codeDescription).toContain(
-				"Keep every requested step and decision in a separate node, preserving the prompt's step wording and order.",
+				"Keep every requested step and decision in a separate node, in the prompt's order;",
+			);
+			// The flowchart logo rule rides on the code parameter only.
+			expect(codeDescription).toContain(
+				"When the prompt names technologies or asks for logos, set logos: true",
 			);
 			// Without this, Sol labels "If parsing succeeds, validate the schema" with "If parsing
 			// succeeds" and "A file is uploaded and parsed" with "parsed".
@@ -1215,7 +1219,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			// the compact flowchart spec, one shared copy rule and topic-only failure detail bring it
 			// under 12,800. The flowchart label rule adds about 200 back, and node colors with the
 			// editFlowchart line about 800, so an edit needs no docs turn, and the label-scope and
-			// two-product rules about 300. Lower this budget; do not raise it.
+			// two-product rules about 300; merging rules that repeat the spec or each other takes it to
+			// 13,311. Lower this budget; do not raise it.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -1224,7 +1229,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(14_145);
+			).toBeLessThan(13_315);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

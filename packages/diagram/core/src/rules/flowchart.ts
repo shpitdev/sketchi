@@ -10,13 +10,13 @@ const zoneKinds = `${DIAGRAM_ZONE_KINDS.slice(0, -1).join(", ")} or ${DIAGRAM_ZO
  */
 export const FLOWCHART_RULES = {
 	separateNodes: (source: RuleSource) =>
-		`Keep every requested step and decision in a separate node, preserving ${source}'s step wording and order. Use plain step labels; do not merge a destination with its next action or replace a named step with a paraphrase.`,
+		`Keep every requested step and decision in a separate node, in ${source}'s order; never merge a destination with its next action.`,
 	actionNodes: (source: RuleSource) =>
 		`Give every action ${source} states its own node; never fold one into an edge label, another node, or a check. A return path that names an action or a state, even waiting, passes through a node for it before it rejoins.`,
 	statedChecks:
 		'A stated check or verification ("verify the signature", "stock is checked") is its own process node before the decision that reads its result; "check whether X" alone is just that decision.',
 	labelWords: (source: RuleSource) =>
-		`Label steps and decisions with ${source}'s own words, including how it phrases each decision, and keep every decision it states as a decision node. Only when two labels would be identical, add the distinguishing words ${source} itself uses.`,
+		`Label steps and decisions with ${source}'s own words, including how it phrases each decision; only when two labels would be identical, add the distinguishing words it uses.`,
 	labelForm:
 		'Label a step as a short action ("Resize image"), a decision as a short question ("Image too large?") and a component by its name; never paste a clause ("if the image is too large", "whether …", "is resized").',
 	noBranchBorrowing: (source: RuleSource) =>
@@ -38,7 +38,7 @@ export const FLOWCHART_RULES = {
 	/** Where the generation prompt also says never to drop stated content to fit a limit. */
 	summarizeOnlyUnnamed: "Summarize only a request that names no steps or parts of its own.",
 	layers:
-		"When a prompt asks how packages or systems interact, group related packages into layers and show the main flow of responsibility. Use labels/descriptions for detail instead of adding every possible transitive edge.",
+		"When a prompt asks how packages or systems interact, group related packages into layers along the main flow.",
 	keepNamed: (source: RuleSource) =>
 		`Keep every package and component ${source} names under its own name; summarizing drops unnamed detail and never renames or generalizes named parts.`,
 	/** The flowchart document's own rules, which every surface that writes one reads. */
@@ -67,7 +67,7 @@ export const FLOWCHART_RULES = {
 	documentLanes: (source: RuleSource) =>
 		`For swimlanes, a process across actors or roles, declare lanes: { id: "Label" } in ${source}'s order and set every node's lane, questions too, to whoever does it: { label, lane }. Lanes may be empty; no groups.`,
 	documentLogos: (source: RuleSource) =>
-		`When ${source} names technologies or asks for logos, set logos: true: each node draws the logo of the first product its label names. icon: "Name" picks another, and icon: null drops it.`,
+		`When ${source} names technologies or asks for logos, set logos: true: each node draws the logo of the first product its label names; icon: "Name" picks another and icon: null drops it.`,
 	documentDirection: (source: RuleSource) =>
 		`Set direction: "LR" only when ${source} reads left to right; flowcharts run top to bottom otherwise.`,
 	documentNoInventedSteps: (source: RuleSource) =>

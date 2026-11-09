@@ -274,12 +274,6 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			query: "architecture packages agent core renderer excalidraw hosted artifact response",
 		});
 		expect(architectureResults.results[0]?.id).toBe("buildFlowchart");
-		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
-			"Use buildFlowchart for system/package interactions.",
-		);
-		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
-			"createCanvas is a last resort for layouts no builder covers.",
-		);
 		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION).toMatch(
 			/^buildFlowchart \([^\n]*systems or packages interact/m,
 		);
@@ -372,8 +366,9 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		expect(EXECUTE_DESCRIPTION_WINDOW).toBe(4096);
 		expect(EXECUTE_DESCRIPTION_LEGACY_WINDOW).toBe(2048);
 		// Down from 1,600 once specs and rules no longer repeat between the head and the parameter;
-		// editFlowchart and the document format add 96, still inside the 2,048 window.
-		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThanOrEqual(1_525);
+		// editFlowchart and the document format add 96, still inside the 2,048 window. Routing and the
+		// flowchart logo rule, which the code parameter states, leave it at 1,382.
+		expect(SKETCHI_EXECUTE_DESCRIPTION.length).toBeLessThanOrEqual(1_382);
 		expect(SKETCHI_EXECUTE_DESCRIPTION).toContain(
 			'The code parameter gives each one\'s spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first',
 		);
@@ -414,7 +409,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			'- buildSequenceDiagram (time-ordered messages): spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. Every reply the prompt states, including a redirect back to the caller, is its own type: "return" message from the callee back to its caller; it answers the latest open call between them. A participant\'s own step (validating, retrying) is a self-message with source = target.',
 		);
 		expect(codeLine("buildStateMachine")).toBe(
-			'- buildStateMachine: spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets: copy each guard the prompt states; use "else" only for a branch the prompt gives no condition. kind "final" (label optional) ends the machine. A state that ends the lifecycle is "final" even if something leaves it; Sketchi then draws its own end after it.',
+			'- buildStateMachine: spec: { title, initial: top-level start state, states: [{ id, label? (defaults to id), kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A composite (a state named as parent) sets its own initial to its first substate; composites do not nest. Each transition out of a choice has a guard, without brackets: copy each guard the prompt states; use "else" only for a branch the prompt gives no condition. A state that ends the lifecycle is "final" even if something leaves it; Sketchi then draws its own end after it.',
 		);
 		expect(codeLine("buildMindmap")).toBe(
 			'- buildMindmap: spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. Children keep their order.',
@@ -537,9 +532,10 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// prompt clauses as labels, and moving the copy rule onto the other builders add 190 (+46
 		// o200k tokens). Node colors and the editFlowchart line add 712, so an edit takes one execute
 		// and no docs turn. The label-scope rule and the two-product split add 331, for labels that
-		// add conditions or drop their doer and entry steps that lose a logo. Lower this budget; do
-		// not raise it.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(11_090);
+		// add conditions or drop their doer and entry steps that lose a logo. Merging rules that
+		// repeat the spec or each other takes it from 11,084 to 10,427. Lower this budget; do not
+		// raise it.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_430);
 		// The overview keeps every builder's summary; the code parameter names every builder once.
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const operation of CODE_MODE_OPERATIONS.filter((name) =>

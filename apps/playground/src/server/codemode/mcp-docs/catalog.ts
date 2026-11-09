@@ -40,7 +40,7 @@ export interface CatalogEntry {
 /** Family summaries shared by the docs index and the execute code parameter. */
 const BUILDERS = {
 	buildFlowchart:
-		"process steps and decisions, including how systems or packages interact along a request or data flow, and nested architecture zones",
+		"process steps and decisions, how systems or packages interact, and nested architecture zones",
 	buildMindmap: "a nested topic hierarchy",
 	buildSequenceDiagram: "time-ordered messages between participants",
 	buildTimeline: "dated or ordered events, milestones and phases",
@@ -101,7 +101,7 @@ const FAST_PATH = {
 	buildChart: `spec: { title, kind: "bar" | "line" | "pie", categories: string[], series: [{ name?, values: number[] }], unit? ("$M", "%"), categoryAxisTitle?, valueAxisTitle?, stacked? (bar), donut? (pie), orientation? ("horizontal", bar) }. ${CHART_RULES.series} ${CHART_RULES.pieCompact}`,
 	buildTimeline: `spec: { title, events: [{ id, label, date?, end?, order?, kind?: "milestone", lane? }], lanes?: string[], today? }. ${TIMELINE_RULES.compact(PROMPT)}`,
 	buildSequenceDiagram: `spec: { title, participants: [{ id, label, icon?: { slug } }], messages: [{ source, target, label, type?: "return", style?: "dashed" }] }. Order is kept. ${SEQUENCE_RULES.replies(PROMPT)} ${SEQUENCE_RULES.selfStep}`,
-	buildStateMachine: `spec: { title, initial, states: [{ id, label?, kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A regular state label defaults to its id verbatim. spec.initial is the top-level start state. A state named as parent is a composite: set initial on the composite itself to its first substate id; composites do not nest. Every outgoing transition of a choice has a guard, without brackets: ${STATE_MACHINE_RULES.guards(PROMPT)} kind "final" (label optional) ends the machine. ${STATE_MACHINE_RULES.endsLifecycle}`,
+	buildStateMachine: `spec: { title, initial: top-level start state, states: [{ id, label? (defaults to id), kind?: "final" | "choice", parent?: compositeId, initial?: substateId }], transitions: [{ source, target, event?, guard?, action? }] }. A composite (a state named as parent) sets its own initial to its first substate; composites do not nest. Each transition out of a choice has a guard, without brackets: ${STATE_MACHINE_RULES.guards(PROMPT)} ${STATE_MACHINE_RULES.endsLifecycle}`,
 	buildMindmap: `spec: { title, root: { label, children?: [{ label, children? }] }, layout?: { direction: "LR" | "RL" } }. ${MINDMAP_RULES.order}`,
 	buildGantt: `spec: { title, tasks: [{ id, label, start: "YYYY-MM-DD", end? (last day) | duration? (days), milestone?: true, phase?, dependsOn?: [ids finishing first], progress?: % }], phases?, today? }. ${GANTT_RULES.duration}`,
 	buildErDiagram: `spec: { title, entities: [{ id, fields: ["id uuid PK", "customer_id uuid FK", "email text UK", "note text?"] }], relationships: [{ from: "orders.customer_id", to: "customers.id", fromCardinality: "zero-or-many", toCardinality: "one", label? }] }. ${ER_RULES.cardinalities}`,
@@ -166,7 +166,7 @@ function operationTypes(operation: CodeModeOperation): string {
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 
 const FLOWCHART_COLORS = DIAGRAM_NODE_COLOR_NAMES.map((name) => `"${name}"`).join(" | ");
-const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null, color?: ${FLOWCHART_COLORS} (only when asked), group?: id, lane?: id } }, edges: [[from, to, label?]], groups?: { [id]: { label, kind?: "cloud" | "datacenter" | "region" | "zone" | "vpc" | "subnet" | "cluster" | "namespace", contains?: [ids] } }, lanes?: { [id]: label } }`;
+const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null, color?: ${FLOWCHART_COLORS} (only when asked), group?: id, lane?: id } }, edges: [[from, to, label?]] (an end may list ids: one edge per id), groups?: { [id]: { label, kind?, contains?: [ids] } }, lanes?: { [id]: label } }`;
 
 /**
  * What a first flowchart build needs, each rule with any detail only the buildFlowchart topic
@@ -175,7 +175,6 @@ const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "
  * name sketchi.searchIcons, are the MCP's own.
  */
 const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: string])[] = [
-	[FLOWCHART_RULES.documentShape],
 	[FLOWCHART_RULES.separateNodes(PROMPT)],
 	[FLOWCHART_RULES.statedChecks],
 	[FLOWCHART_RULES.labelWords(PROMPT)],
@@ -203,16 +202,20 @@ const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: strin
 	[FLOWCHART_RULES.keepNamed(PROMPT)],
 ];
 
-/** The buildFlowchart topic: every flowchart rule with its detail, then the request type. */
+/**
+ * The buildFlowchart topic: the document's shape, which FLOWCHART_SPEC states for the code
+ * parameter, every flowchart rule with its detail, then the request type.
+ */
 const FLOWCHART_DOCS = [
 	"buildFlowchart accepts the flowchart document: title, nodes and edges, with optional direction, logos, groups and lanes. Builds use the fixed Sketchi palette.",
+	FLOWCHART_RULES.documentShape,
 	...FLOWCHART_DOC_RULES.map(([rule, detail]) => (detail ? `${rule} ${detail}` : rule)),
 	"",
 	operationTypes("buildFlowchart"),
 ].join("\n");
 
 /** What an edit needs, carried by the code parameter so an edit takes no docs turn. */
-const FLOWCHART_EDIT_SPEC = `editFlowchart({ artifactId, edits }) changes any built flowchart without reading it first. ${FLOWCHART_EDIT_RULES.ops}`;
+const FLOWCHART_EDIT_SPEC = `editFlowchart({ artifactId, edits }) changes a built flowchart; no read first. ${FLOWCHART_EDIT_RULES.ops}`;
 const FLOWCHART_EDIT_LINES = [FLOWCHART_EDIT_RULES.refs];
 
 /** The editFlowchart topic: the edit list, what it keeps, and the request type. */
@@ -226,13 +229,12 @@ const FLOWCHART_EDIT_DOCS = [
 ].join("\n");
 
 const LOGO_RULE =
-	"When the prompt names technologies, a flowchart sets logos: true; a sequence diagram awaits sketchi.searchIcons({ q }) for each in the same script and sets participant.icon to { slug }.";
+	"When the prompt names technologies, a sequence diagram awaits sketchi.searchIcons({ q }) for each in the same script and sets participant.icon to { slug }.";
 
 /** Fits EXECUTE_DESCRIPTION_LEGACY_WINDOW, so every Claude Code version reads all of it. */
 export const EXECUTE_TOOL_DESCRIPTION = [
 	"Run JavaScript against the typed sketchi client. code is one async arrow function in plain JavaScript (no TypeScript, imports or named wrappers): async () => sketchi.buildFlowchart({ spec })",
 	`Builders: ${Object.keys(BUILDERS).join(", ")}. The code parameter gives each one's spec and rules, so only createCanvas needs docs({ topic: "createCanvas" }) first.`,
-	"Use buildFlowchart for system/package interactions. createCanvas is a last resort for layouts no builder covers.",
 	"Helpers:",
 	...EXECUTE_HELPERS.map((summary) => `- ${summary}`),
 	`- ${LOGO_RULE}`,
