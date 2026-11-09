@@ -401,5 +401,16 @@ describe("judge", () => {
 			["#e01e5a", 30],
 			["#808080", 10],
 		]);
+		// A gradient's blends count toward its stops, never as colors of their own.
+		expect(
+			sourcePalette({ kind: "svg", svg: "", colors: ["#f05a28", "#fff100"] }, [
+				["#fabd0e", 47],
+				["#f05a28", 43],
+				["#f58b1b", 4],
+			]),
+		).toEqual([
+			["#fff100", 47],
+			["#f05a28", 47],
+		]);
 	});
 });

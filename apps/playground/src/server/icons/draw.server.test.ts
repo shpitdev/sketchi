@@ -28,7 +28,7 @@ function fakeEnv(calls: Calls, authorReplies: unknown[]): StudioEnv {
 					const text = JSON.stringify(authorReplies.shift());
 					return Promise.resolve(
 						Response.json({
-							model: "claude-opus-5-5",
+							model: "claude-sonnet-5-5",
 							content: [{ type: "text", text }],
 							stop_reason: "end_turn",
 							usage: { input_tokens: 10, output_tokens: 30, cache_read_input_tokens: 900 },
@@ -118,7 +118,7 @@ describe("POST /api/v1/icons/draw", () => {
 			recipe,
 			previews: { png28: "iVBORw0KGgo=", png112: "iVBORw0KGgo=" },
 			excalidrawlib: { type: "excalidrawlib", version: 2 },
-			author: { model: "anthropic/claude-opus-5-5", accepted: true },
+			author: { model: "anthropic/claude-sonnet-5-5", accepted: true },
 		});
 		const judge = body["judge"] as { lineup: string[]; picked: string; recognizable: boolean };
 		expect(judge).toMatchObject({ model: "gemini-3.8-flash", attempts: 1 });
@@ -133,7 +133,7 @@ describe("POST /api/v1/icons/draw", () => {
 			...(judge.recognizable ? [] : ["anthropic v1/messages"]),
 		]);
 		expect(calls.gateway[0]?.query).toMatchObject({
-			model: "claude-opus-5-5",
+			model: "claude-sonnet-5-5",
 			thinking: { type: "adaptive" },
 			output_config: { effort: "low", format: { type: "json_schema" } },
 		});

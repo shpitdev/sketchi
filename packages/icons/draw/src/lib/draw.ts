@@ -99,21 +99,29 @@ export interface IconDrawResult {
 	readonly usage: IconDrawUsage;
 }
 
+/** A measured color this far from every paint is something the paint reader missed, such as an embedded image. */
+const PAINT_MATCH_DISTANCE = 120;
+
 /**
- * The colors a recipe may use. An SVG's exact paints come first, in the order
- * the drawing shows them; a raster's are its quantized pixel colors. A pixel
- * color no paint explains (a gradient's blend) is kept as measured.
+ * The colors a recipe may use, with the share of the mark each covers. An
+ * SVG's are its exact paints: each measured color counts toward the nearest
+ * paint, so a gradient's blends count toward its stops rather than becoming
+ * colors the source never names. A raster's are its quantized pixel colors.
  */
 export function sourcePalette(source: IconSource, pixels: readonly MarkColor[]): MarkColor[] {
 	if (source.kind === "raster" || source.colors.length === 0) return [...pixels];
-	const palette: MarkColor[] = [];
+	const shares = new Map<string, number>();
 	for (const [measured, share] of pixels) {
-		const paint = source.colors
-			.filter((color) => !palette.some(([taken]) => taken === color))
-			.sort((left, right) => colorDistance(left, measured) - colorDistance(right, measured))[0];
-		palette.push([paint && colorDistance(paint, measured) <= 48 ? paint : measured, share]);
+		const paint = [...source.colors].sort(
+			(left, right) => colorDistance(left, measured) - colorDistance(right, measured),
+		)[0];
+		const color =
+			paint && colorDistance(paint, measured) <= PAINT_MATCH_DISTANCE ? paint : measured;
+		shares.set(color, (shares.get(color) ?? 0) + share);
 	}
-	return palette;
+	return [...shares.entries()]
+		.map(([color, share]): MarkColor => [color, share])
+		.sort((left, right) => right[1] - left[1]);
 }
 
 function imageBlock(png: string): AuthorContentBlock {

@@ -48,7 +48,9 @@ import {
 } from "../runtime/context.server";
 import { readBoundedJson } from "../runtime/request-body.server";
 
-const DEFAULT_AUTHOR_MODEL: IconAuthorModel = "anthropic/claude-opus-5-5";
+// On the sketchi-icons tuning split, Sonnet 5.5 and Opus 5.5 drew equally recognizable icons (28 and 27 of 28 picked
+// out of their look-alikes by Sol at 28 px) and Sonnet cost about a fifth less per icon.
+const DEFAULT_AUTHOR_MODEL: IconAuthorModel = "anthropic/claude-sonnet-5-5";
 const DEFAULT_JUDGE_MODEL = "google/gemini-3.8-flash";
 
 type IconDrawFailureStatus =
