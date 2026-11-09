@@ -1,5 +1,5 @@
 import type { IconRecipe } from "@sketchi/diagram-core";
-import { colorDistance, type MarkColor, sanitizeSvg } from "@sketchi/icon-catalog";
+import { colorDistance, hexRgb, type MarkColor, sanitizeSvg } from "@sketchi/icon-catalog";
 import { rankLookAlikes } from "@sketchi/icon-catalog/look-alikes";
 import { Clock, Context, Effect } from "effect";
 
@@ -101,12 +101,27 @@ export interface IconDrawResult {
 
 /** A measured color this far from every paint is something the paint reader missed, such as an embedded image. */
 const PAINT_MATCH_DISTANCE = 120;
+/** How close to the line from a paint to white a color must be to count as that paint thinned over paper. */
+const TINT_DISTANCE = 24;
+
+/** Whether `measured` is `paint` blended with white paper: thin lines and anti-aliasing, not a color of its own. */
+function isTint(measured: string, paint: string): boolean {
+	const [mr, mg, mb] = hexRgb(measured);
+	const [pr, pg, pb] = hexRgb(paint);
+	const [dr, dg, db] = [255 - pr, 255 - pg, 255 - pb];
+	const length = dr * dr + dg * dg + db * db;
+	if (length === 0) return false;
+	const t = ((mr - pr) * dr + (mg - pg) * dg + (mb - pb) * db) / length;
+	if (t <= 0 || t >= 1) return false;
+	return Math.hypot(mr - (pr + t * dr), mg - (pg + t * dg), mb - (pb + t * db)) <= TINT_DISTANCE;
+}
 
 /**
  * The colors a recipe may use, with the share of the mark each covers. An
  * SVG's are its exact paints: each measured color counts toward the nearest
  * paint, so a gradient's blends count toward its stops rather than becoming
- * colors the source never names. A raster's are its quantized pixel colors.
+ * colors the source never names, and a paint thinned over paper is dropped.
+ * A raster's are its quantized pixel colors.
  */
 export function sourcePalette(source: IconSource, pixels: readonly MarkColor[]): MarkColor[] {
 	if (source.kind === "raster" || source.colors.length === 0) return [...pixels];
@@ -115,9 +130,11 @@ export function sourcePalette(source: IconSource, pixels: readonly MarkColor[]):
 		const paint = [...source.colors].sort(
 			(left, right) => colorDistance(left, measured) - colorDistance(right, measured),
 		)[0];
-		const color =
-			paint && colorDistance(paint, measured) <= PAINT_MATCH_DISTANCE ? paint : measured;
-		shares.set(color, (shares.get(color) ?? 0) + share);
+		if (paint && colorDistance(paint, measured) <= PAINT_MATCH_DISTANCE) {
+			shares.set(paint, (shares.get(paint) ?? 0) + share);
+		} else if (!source.colors.some((color) => isTint(measured, color))) {
+			shares.set(measured, (shares.get(measured) ?? 0) + share);
+		}
 	}
 	return [...shares.entries()]
 		.map(([color, share]): MarkColor => [color, share])

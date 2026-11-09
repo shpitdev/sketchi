@@ -412,5 +412,12 @@ describe("judge", () => {
 			["#fff100", 47],
 			["#f05a28", 47],
 		]);
+		// Thin teal lines on paper measure as a pale teal: a tint, not a color.
+		expect(
+			sourcePalette({ kind: "svg", svg: "", colors: ["#25c7b7"] }, [
+				["#25c7b7", 93],
+				["#d0f3f0", 4],
+			]),
+		).toEqual([["#25c7b7", 93]]);
 	});
 });
