@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none"><g transform="translate(30.72 30.72) scale(18.773)"><title>VS Code</title>
+<metadata>{"backgroundColor": "#8abbff"}</metadata>
+<g clip-path="url(#clip0_104_906)">
+<path d="M22 0H2C0.89543 0 0 0.89543 0 2V22C0 23.1046 0.89543 24 2 24H22C23.1046 24 24 23.1046 24 22V2C24 0.89543 23.1046 0 22 0Z" fill="#4BA5F3"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M13 16V14L17 12L13 10V8L15 7L21 10V14L15 17L13 16ZM18 11.5L14 9.5V8.5L15 8L20 10.5V11V13V13.5L15 16L14 15.5V14.5L18 12.5V11.5Z" fill="white"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M11 16V14L7 12L11 10V8L9 7L3 10V14L9 17L11 16ZM6 11.5L10 9.5V8.5L9 8L4 10.5V11V13V13.5L9 16L10 15.5V14.5L6 12.5V11.5Z" fill="white"/>
+</g>
+<defs>
+<clipPath id="clip0_104_906">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</g></svg>

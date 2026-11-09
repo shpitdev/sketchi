@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-06-06T16:05:35.422Z",
+  "generatedAt": "2026-11-09T02:30:00.000Z",
   "summary": {
-    "totalIcons": 1412,
+    "totalIcons": 1443,
     "collectionCounts": {
       "ai-apps-agents": 152,
       "ai-devtools": 86,
@@ -29,24 +29,24 @@
       "hardware-iot": 2,
       "observability-security": 20,
       "operating-systems": 14,
-      "palantir": 69,
+      "palantir": 100,
       "programming-languages": 36,
       "social-communication": 1
     },
     "flagCounts": {
-      "duplicate-raster": 26,
-      "duplicate-raster-cross-name": 26
+      "duplicate-raster": 28,
+      "duplicate-raster-cross-name": 28
     },
     "duplicateGroupsCount": 0,
     "duplicateCrossNameGroupsCount": 0,
-    "visualDuplicateGroupsCount": 3,
-    "visualDuplicateCrossNameGroupsCount": 3,
-    "rasterDuplicateGroupsCount": 15,
-    "rasterDuplicateCrossNameGroupsCount": 15,
-    "nearSimilarityGroupsCount": 27,
-    "nearSimilarityCrossNameGroupsCount": 27,
-    "similarityGroupsCount": 27,
-    "similarityCrossNameGroupsCount": 27
+    "visualDuplicateGroupsCount": 4,
+    "visualDuplicateCrossNameGroupsCount": 4,
+    "rasterDuplicateGroupsCount": 16,
+    "rasterDuplicateCrossNameGroupsCount": 16,
+    "nearSimilarityGroupsCount": 28,
+    "nearSimilarityCrossNameGroupsCount": 28,
+    "similarityGroupsCount": 28,
+    "similarityCrossNameGroupsCount": 28
   },
   "icons": [
     {
@@ -44036,10 +44036,10 @@
       "visualHash": "a34154c0f9192bad167a1c9b383c67228519041b",
       "rasterHash": "728a48c3959f8a9773ccaf2218fbdcb8a28be92c",
       "perceptualHash": "00007fffc003ce8dfe3ffe3ffc4fc87fc879ce39c639c611c401c0037fff0000",
-      "similarityGroupKey": null,
-      "similarityGroupSize": 1,
-      "nearSimilarityGroupKey": null,
-      "nearSimilarityGroupSize": 1,
+      "similarityGroupKey": "palantir:neutral:728a48c3959f8a9773ccaf2218fbdcb8a28be92c",
+      "similarityGroupSize": 2,
+      "nearSimilarityGroupKey": "palantir:neutral:00007fffc003ce8dfe3ffe3ffc4fc87fc879ce39c639c611c401c0037fff0000",
+      "nearSimilarityGroupSize": 2,
       "hasViewBox": true,
       "viewBox": {
         "minX": 0,
@@ -44052,7 +44052,10 @@
       "rasterFillRatio": 0.90625,
       "rasterAreaRatio": 0.736328125,
       "rasterAspectRatio": 1.1153846153846154,
-      "flags": []
+      "flags": [
+        "duplicate-raster",
+        "duplicate-raster-cross-name"
+      ]
     },
     {
       "id": "palantir:workflow-builder-app",
@@ -45310,6 +45313,701 @@
       "rasterAreaRatio": 0.79296875,
       "rasterAspectRatio": 0.9655172413793104,
       "flags": []
+    },
+    {
+      "id": "palantir:foundry-platform",
+      "collection": "palantir",
+      "fileName": "foundry-platform.svg",
+      "slug": "foundry-platform",
+      "baseSlug": "foundry-platform",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/foundry-platform.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/foundry-platform.svg",
+      "bytes": 417,
+      "hash": "56f2211cf522925875280ea4322b538f4b95d217",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:notifications-app",
+      "collection": "palantir",
+      "fileName": "notifications-app.svg",
+      "slug": "notifications-app",
+      "baseSlug": "notifications-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/notifications-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/notifications-app.svg",
+      "bytes": 490,
+      "hash": "4505e17ea359b07e1775f56591f0b905c89c67a2",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:aip-analyst-app",
+      "collection": "palantir",
+      "fileName": "aip-analyst-app.svg",
+      "slug": "aip-analyst-app",
+      "baseSlug": "aip-analyst-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/aip-analyst-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/aip-analyst-app.svg",
+      "bytes": 3643,
+      "hash": "9bba073a3e3ce2856341e1182d56c504067c2781",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:insight-app",
+      "collection": "palantir",
+      "fileName": "insight-app.svg",
+      "slug": "insight-app",
+      "baseSlug": "insight-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/insight-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/insight-app.svg",
+      "bytes": 1198,
+      "hash": "79f3ee0c48e4ce405713dbc2b26d28ee275e923c",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:vortex-map-layer-app",
+      "collection": "palantir",
+      "fileName": "vortex-map-layer-app.svg",
+      "slug": "vortex-map-layer-app",
+      "baseSlug": "vortex-map-layer-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/vortex-map-layer-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/vortex-map-layer-app.svg",
+      "bytes": 3004,
+      "hash": "b39be064ddc894778bdf5b84e54d53c29f90ed49",
+      "visualHash": "a34154c0f9192bad167a1c9b383c67228519041b",
+      "rasterHash": "728a48c3959f8a9773ccaf2218fbdcb8a28be92c",
+      "perceptualHash": "00007fffc003ce8dfe3ffe3ffc4fc87fc879ce39c639c611c401c0037fff0000",
+      "similarityGroupKey": "palantir:neutral:728a48c3959f8a9773ccaf2218fbdcb8a28be92c",
+      "similarityGroupSize": 2,
+      "nearSimilarityGroupKey": "palantir:neutral:00007fffc003ce8dfe3ffe3ffc4fc87fc879ce39c639c611c401c0037fff0000",
+      "nearSimilarityGroupSize": 2,
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "rasterFillRatio": 0.90625,
+      "rasterAreaRatio": 0.736328125,
+      "rasterAspectRatio": 1.1153846153846154,
+      "flags": [
+        "duplicate-raster",
+        "duplicate-raster-cross-name"
+      ]
+    },
+    {
+      "id": "palantir:foundry-vulcan",
+      "collection": "palantir",
+      "fileName": "foundry-vulcan.svg",
+      "slug": "foundry-vulcan",
+      "baseSlug": "foundry-vulcan",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/foundry-vulcan.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/foundry-vulcan.svg",
+      "bytes": 884,
+      "hash": "4e004376f49a563e9315b199568b70413b8b0e19",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:boardroom-app",
+      "collection": "palantir",
+      "fileName": "boardroom-app.svg",
+      "slug": "boardroom-app",
+      "baseSlug": "boardroom-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/boardroom-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/boardroom-app.svg",
+      "bytes": 5269,
+      "hash": "949d951f0a79d2e46e628674ebed54b03ccad7c9",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:hivemind-app",
+      "collection": "palantir",
+      "fileName": "hivemind-app.svg",
+      "slug": "hivemind-app",
+      "baseSlug": "hivemind-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/hivemind-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/hivemind-app.svg",
+      "bytes": 4305,
+      "hash": "b4a52e403ba353cbe6817f01febd14f1404d4894",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:mindkit-app",
+      "collection": "palantir",
+      "fileName": "mindkit-app.svg",
+      "slug": "mindkit-app",
+      "baseSlug": "mindkit-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/mindkit-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/mindkit-app.svg",
+      "bytes": 4304,
+      "hash": "7ef91fceddafc88980a486028e9f07ac567d9b05",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:pilot-app",
+      "collection": "palantir",
+      "fileName": "pilot-app.svg",
+      "slug": "pilot-app",
+      "baseSlug": "pilot-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/pilot-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/pilot-app.svg",
+      "bytes": 2637,
+      "hash": "8a6e9706d49a38653dbefe70f3ebbcb03e705e7c",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:sql-studio-app",
+      "collection": "palantir",
+      "fileName": "sql-studio-app.svg",
+      "slug": "sql-studio-app",
+      "baseSlug": "sql-studio-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/sql-studio-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/sql-studio-app.svg",
+      "bytes": 4257,
+      "hash": "95875578faa5f8cdb4df03fc28edb0164fad4417",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:foundry-build-schedules",
+      "collection": "palantir",
+      "fileName": "foundry-build-schedules.svg",
+      "slug": "foundry-build-schedules",
+      "baseSlug": "foundry-build-schedules",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/foundry-build-schedules.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/foundry-build-schedules.svg",
+      "bytes": 536,
+      "hash": "aafc9894a13b7f5841accb61e3bf8071e7b1542b",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:foundry-code-templates",
+      "collection": "palantir",
+      "fileName": "foundry-code-templates.svg",
+      "slug": "foundry-code-templates",
+      "baseSlug": "foundry-code-templates",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/foundry-code-templates.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/foundry-code-templates.svg",
+      "bytes": 631,
+      "hash": "9e1832dbd532bc814544b94bd236d1784ae5ce1a",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:peer-manager-app",
+      "collection": "palantir",
+      "fileName": "peer-manager-app.svg",
+      "slug": "peer-manager-app",
+      "baseSlug": "peer-manager-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/peer-manager-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/peer-manager-app.svg",
+      "bytes": 9682,
+      "hash": "1370b9fe22fc924b128ae7ef2446e389713ad2d3",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:symbols-management-app",
+      "collection": "palantir",
+      "fileName": "symbols-management-app.svg",
+      "slug": "symbols-management-app",
+      "baseSlug": "symbols-management-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/symbols-management-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/symbols-management-app.svg",
+      "bytes": 1608,
+      "hash": "513391880f6f3123982172a132e6319361677572",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:mcp-hub-app",
+      "collection": "palantir",
+      "fileName": "mcp-hub-app.svg",
+      "slug": "mcp-hub-app",
+      "baseSlug": "mcp-hub-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/mcp-hub-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/mcp-hub-app.svg",
+      "bytes": 1044,
+      "hash": "ed662702e37b39d372769ed55863cc377f0f659c",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:custom-endpoints-app",
+      "collection": "palantir",
+      "fileName": "custom-endpoints-app.svg",
+      "slug": "custom-endpoints-app",
+      "baseSlug": "custom-endpoints-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/custom-endpoints-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/custom-endpoints-app.svg",
+      "bytes": 3045,
+      "hash": "77496c806649b1dd9f12e39feadd8b5a2eacfcc0",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:aip-evolve-app",
+      "collection": "palantir",
+      "fileName": "aip-evolve-app.svg",
+      "slug": "aip-evolve-app",
+      "baseSlug": "aip-evolve-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/aip-evolve-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/aip-evolve-app.svg",
+      "bytes": 3497,
+      "hash": "144dfb44cd8142ff684ed83c56027ab22fbac488",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:workflow-builder-write-mode-app",
+      "collection": "palantir",
+      "fileName": "workflow-builder-write-mode-app.svg",
+      "slug": "workflow-builder-write-mode-app",
+      "baseSlug": "workflow-builder-write-mode-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/workflow-builder-write-mode-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/workflow-builder-write-mode-app.svg",
+      "bytes": 2018,
+      "hash": "b8d4d366aaeb9dd8b2f0f9c356dd27240fe081d4",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:foundry-projects-files",
+      "collection": "palantir",
+      "fileName": "foundry-projects-files.svg",
+      "slug": "foundry-projects-files",
+      "baseSlug": "foundry-projects-files",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/foundry-projects-files.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/foundry-projects-files.svg",
+      "bytes": 465,
+      "hash": "b68c52b22dcb26f7956e0a86589530918f828560",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:foundry-user-directory",
+      "collection": "palantir",
+      "fileName": "foundry-user-directory.svg",
+      "slug": "foundry-user-directory",
+      "baseSlug": "foundry-user-directory",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/foundry-user-directory.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/foundry-user-directory.svg",
+      "bytes": 631,
+      "hash": "bd8a2146c6ba42a6819f1a6d66ab2af531a3ef6b",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:audit-explorer-app",
+      "collection": "palantir",
+      "fileName": "audit-explorer-app.svg",
+      "slug": "audit-explorer-app",
+      "baseSlug": "audit-explorer-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/audit-explorer-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/audit-explorer-app.svg",
+      "bytes": 2238,
+      "hash": "c8ab4925d46d2bf58a1b40bc092abdee93264bbb",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:ai-fde-app",
+      "collection": "palantir",
+      "fileName": "ai-fde-app.svg",
+      "slug": "ai-fde-app",
+      "baseSlug": "ai-fde-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/ai-fde-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/ai-fde-app.svg",
+      "bytes": 3602,
+      "hash": "cf907c46cd17220b8135e9a024da2a292331976d",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:foundry-documentation",
+      "collection": "palantir",
+      "fileName": "foundry-documentation.svg",
+      "slug": "foundry-documentation",
+      "baseSlug": "foundry-documentation",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/foundry-documentation.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/foundry-documentation.svg",
+      "bytes": 324,
+      "hash": "1a9821994a566922629656e419e8bd99fa4d9938",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:foundry-issues",
+      "collection": "palantir",
+      "fileName": "foundry-issues.svg",
+      "slug": "foundry-issues",
+      "baseSlug": "foundry-issues",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/foundry-issues.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/foundry-issues.svg",
+      "bytes": 293,
+      "hash": "52c517bba12af69cb1871b9d12d723a674da4e8c",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:foundry-applications-portal",
+      "collection": "palantir",
+      "fileName": "foundry-applications-portal.svg",
+      "slug": "foundry-applications-portal",
+      "baseSlug": "foundry-applications-portal",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/foundry-applications-portal.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/foundry-applications-portal.svg",
+      "bytes": 519,
+      "hash": "dbc105f27a4fd341acf4ac9a15ea61e077765d5f",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:agent-builder-app",
+      "collection": "palantir",
+      "fileName": "agent-builder-app.svg",
+      "slug": "agent-builder-app",
+      "baseSlug": "agent-builder-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/agent-builder-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/agent-builder-app.svg",
+      "bytes": 1971,
+      "hash": "9ba3b6ff45aec509843ce284573a5f11f141eb89",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:agent-manager-app",
+      "collection": "palantir",
+      "fileName": "agent-manager-app.svg",
+      "slug": "agent-manager-app",
+      "baseSlug": "agent-manager-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/agent-manager-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/agent-manager-app.svg",
+      "bytes": 3095,
+      "hash": "af160ab704a97b01e8beb79a5f998c2408acdcfc",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:code-workspace-jupyter-app",
+      "collection": "palantir",
+      "fileName": "code-workspace-jupyter-app.svg",
+      "slug": "code-workspace-jupyter-app",
+      "baseSlug": "code-workspace-jupyter-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/code-workspace-jupyter-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/code-workspace-jupyter-app.svg",
+      "bytes": 2637,
+      "hash": "4ccb0a9ef36ce8f9f9e5b5caf05346f8db8c625f",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:code-workspace-rstudio-app",
+      "collection": "palantir",
+      "fileName": "code-workspace-rstudio-app.svg",
+      "slug": "code-workspace-rstudio-app",
+      "baseSlug": "code-workspace-rstudio-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/code-workspace-rstudio-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/code-workspace-rstudio-app.svg",
+      "bytes": 1051,
+      "hash": "287ce6486a12fac3037c615b8744a00ca191e1f1",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
+    },
+    {
+      "id": "palantir:code-workspace-vscode-app",
+      "collection": "palantir",
+      "fileName": "code-workspace-vscode-app.svg",
+      "slug": "code-workspace-vscode-app",
+      "baseSlug": "code-workspace-vscode-app",
+      "variant": null,
+      "relativePath": "output/upload-ready/svg/palantir/code-workspace-vscode-app.svg",
+      "urlPath": "/output/upload-ready/svg/palantir/code-workspace-vscode-app.svg",
+      "bytes": 877,
+      "hash": "0fcc13494b942e8768e4d42c8cdcc72351586189",
+      "hasViewBox": true,
+      "viewBox": {
+        "minX": 0,
+        "minY": 0,
+        "width": 512,
+        "height": 512
+      },
+      "widthAttr": null,
+      "heightAttr": null,
+      "flags": []
     }
   ],
   "duplicateGroups": [],
@@ -45360,6 +46058,22 @@
       "samplePaths": [
         "output/upload-ready/svg/palantir/palantir-pipeline.svg",
         "output/upload-ready/svg/palantir/pipeline-builder-graph-app.svg"
+      ]
+    },
+    {
+      "groupKey": "palantir:neutral:a34154c0f9192bad167a1c9b383c67228519041b",
+      "visualHash": "a34154c0f9192bad167a1c9b383c67228519041b",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "vortex-map-app",
+        "vortex-map-layer-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/vortex-map-app.svg",
+        "output/upload-ready/svg/palantir/vortex-map-layer-app.svg"
       ]
     }
   ],
@@ -45624,6 +46338,22 @@
       "samplePaths": [
         "output/upload-ready/svg/programming-languages/clojure.svg",
         "output/upload-ready/svg/programming-languages/wolfram.svg"
+      ]
+    },
+    {
+      "groupKey": "palantir:neutral:728a48c3959f8a9773ccaf2218fbdcb8a28be92c",
+      "rasterHash": "728a48c3959f8a9773ccaf2218fbdcb8a28be92c",
+      "size": 2,
+      "distinctBaseSlugs": [
+        "vortex-map-app",
+        "vortex-map-layer-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/vortex-map-app.svg",
+        "output/upload-ready/svg/palantir/vortex-map-layer-app.svg"
       ]
     }
   ],
@@ -46090,6 +46820,22 @@
       "samplePaths": [
         "output/upload-ready/svg/programming-languages/crystal.svg",
         "output/upload-ready/svg/programming-languages/perl.svg"
+      ]
+    },
+    {
+      "key": "palantir:neutral:00007fffc003ce8dfe3ffe3ffc4fc87fc879ce39c639c611c401c0037fff0000",
+      "maxHammingDistance": 0,
+      "size": 2,
+      "distinctBaseSlugs": [
+        "vortex-map-app",
+        "vortex-map-layer-app"
+      ],
+      "distinctCollections": [
+        "palantir"
+      ],
+      "samplePaths": [
+        "output/upload-ready/svg/palantir/vortex-map-app.svg",
+        "output/upload-ready/svg/palantir/vortex-map-layer-app.svg"
       ]
     }
   ]

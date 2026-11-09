@@ -354,21 +354,21 @@ describe("full corpus Excalidraw renderer", () => {
 		);
 
 		expect(renderer.files).toBeGreaterThan(0);
-		expect(renderer.corpusFiles).toBe(1_412);
+		expect(renderer.corpusFiles).toBe(1_443);
 		expect(renderer.coverage.beforeDecomposition).toEqual({
-			blockedFiles: 296,
-			nativeFiles: 1_116,
+			blockedFiles: 309,
+			nativeFiles: 1_134,
 		});
 		expect(renderer.coverage.afterDecomposition).toEqual({
-			blockedFiles: 84,
-			nativeFiles: 1_328,
+			blockedFiles: 93,
+			nativeFiles: 1_350,
 		});
-		expect(renderer.files).toBeGreaterThanOrEqual(1_328);
-		expect(renderer.blockedFiles).toBeLessThanOrEqual(84);
+		expect(renderer.files).toBeGreaterThanOrEqual(1_350);
+		expect(renderer.blockedFiles).toBeLessThanOrEqual(93);
 		expect(renderer.corpusFiles).toBe(renderer.files + renderer.blockedFiles);
 		expect(renderer.rows).toHaveLength(renderer.files);
 		expect(renderer.blockers.rows).toHaveLength(renderer.blockedFiles);
-		expect(renderer.baselineBlockers.rows).toHaveLength(296);
+		expect(renderer.baselineBlockers.rows).toHaveLength(309);
 		expect(renderer.blockers.rows.every((row) => row.blockerCodes.length > 0)).toBe(true);
 		expect(renderer.baselineBlockers.rows.every((row) => row.blockerCodes.length > 0)).toBe(true);
 		expect(
@@ -379,7 +379,7 @@ describe("full corpus Excalidraw renderer", () => {
 				(total, signature) => total + signature.count,
 				0,
 			),
-		).toBe(296);
+		).toBe(309);
 		const rowsByPath = new Map(renderer.rows.map((row) => [row.path, row]));
 		for (const path of ["ai-apps-agents/agentvoice.svg", "ai-ecosystem/perplexity.svg"]) {
 			expect(rowsByPath.get(path)?.tolerantOverlap).toBeGreaterThanOrEqual(0.99);
