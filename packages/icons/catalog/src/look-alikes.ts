@@ -34,13 +34,17 @@ function words(value: string): string {
 		.trim();
 }
 
-/** Whether a catalog mark is the brand the caller named. */
+/** A name without spaces, case or a trailing version number: `Netlify 2` and `netlify2` are `netlify`. */
+function compact(value: string): string {
+	return words(value).replace(/ /gu, "").replace(/\d+$/u, "");
+}
+
+/** Whether a catalog mark is the brand the caller named, under any of its names or versions. */
 function namesMark(name: string, slug: string): boolean {
-	const wanted = words(name);
+	const wanted = compact(name);
 	const icon = getIconBySlug(slug);
 	return [slug, icon?.name ?? "", ...(icon?.aliases ?? [])].some(
-		(term) =>
-			words(term) === wanted || words(term).replace(/ /gu, "") === wanted.replace(/ /gu, ""),
+		(term) => compact(term) === wanted,
 	);
 }
 

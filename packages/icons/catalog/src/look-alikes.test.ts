@@ -82,6 +82,12 @@ describe("look-alike index", () => {
 		expect(ranked).toHaveLength(4);
 		expect(ranked.map(({ slug }) => slug)).not.toContain("slack");
 		expect(new Set(ranked.map(({ slug }) => slug)).size).toBe(4);
+		// A second version of a mark is the same brand.
+		expect(
+			rankLookAlikes(lookAlikeMarks["netlify2"]!, { name: "Netlify", count: 8 }).map(
+				({ slug }) => slug,
+			),
+		).not.toContain("netlify");
 		const unnamed = rankLookAlikes(slack, { name: "Something else", count: 4 });
 		expect(unnamed.map(({ slug }) => slug)).not.toContain("slack");
 		for (const { distance } of ranked) expect(distance).toBeGreaterThan(0);
