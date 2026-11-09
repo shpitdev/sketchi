@@ -98,6 +98,34 @@ async function withStore(
 	);
 }
 
+/**
+ * The body, read chunk by chunk and abandoned once it passes `limit`, so a
+ * client that sends no Content-Length cannot make the Worker buffer it all.
+ */
+async function readAtMost(request: Request, limit: number): Promise<Uint8Array | undefined> {
+	if (!request.body) return new Uint8Array();
+	const reader = request.body.getReader();
+	const chunks: Uint8Array[] = [];
+	let size = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		size += value.byteLength;
+		if (size > limit) {
+			await reader.cancel();
+			return undefined;
+		}
+		chunks.push(value);
+	}
+	const bytes = new Uint8Array(size);
+	let offset = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return bytes;
+}
+
 async function readJsonBody(
 	request: Request,
 ): Promise<
@@ -114,8 +142,8 @@ async function readJsonBody(
 		),
 	});
 	if (declared > COMMUNITY_ICON_LIMITS.maxBodyBytes) return tooLarge();
-	const bytes = new Uint8Array(await request.arrayBuffer());
-	if (bytes.byteLength > COMMUNITY_ICON_LIMITS.maxBodyBytes) return tooLarge();
+	const bytes = await readAtMost(request, COMMUNITY_ICON_LIMITS.maxBodyBytes);
+	if (!bytes) return tooLarge();
 	try {
 		return { ok: true, body: JSON.parse(new TextDecoder().decode(bytes)) as unknown };
 	} catch {

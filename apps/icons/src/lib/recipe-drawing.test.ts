@@ -30,14 +30,33 @@ describe("recipe drawing", () => {
 		const palette = { ink: "#111111", paper: "#ffffff" };
 		const preview = recipePreview(QUEUE, palette);
 		expect(preview).toEqual(recipePreview(QUEUE, palette));
-		expect(preview.texts).toEqual([{ x: 48, y: 12, size: 16, text: "MQ", fill: "#111111" }]);
-		const strokes = new Set(
-			preview.paths.map((path) => path.stroke).filter((stroke) => stroke !== "none"),
-		);
+		expect(preview.parts.map((part) => part.kind)).toEqual(["shape", "shape", "shape", "text"]);
+		expect(preview.parts[3]).toEqual({
+			kind: "text",
+			x: 48,
+			y: 12,
+			size: 16,
+			text: "MQ",
+			fill: "#111111",
+		});
+		const paths = preview.parts.flatMap((part) => (part.kind === "shape" ? part.paths : []));
+		const strokes = new Set(paths.map((path) => path.stroke).filter((stroke) => stroke !== "none"));
 		expect(strokes).toEqual(new Set(["#111111", "#ffffff"]));
-		expect(preview.paths.some((path) => path.fill === "#e8590c")).toBe(true);
+		expect(paths.some((path) => path.fill === "#e8590c")).toBe(true);
 		// The arrow draws its shaft and two head strokes.
-		expect(preview.paths.length).toBeGreaterThanOrEqual(5);
+		const arrow = preview.parts[2];
+		expect(arrow?.kind === "shape" && arrow.paths.length).toBeGreaterThanOrEqual(3);
+	});
+
+	it("paints a paper mask after the letter it covers, in recipe order", () => {
+		const masked: IconRecipe = {
+			parts: [
+				{ kind: "text", cx: 12, cy: 12, text: "A", size: 12 },
+				{ kind: "rect", x: 4, y: 10, width: 16, height: 4, stroke: "none", fill: "paper" },
+			],
+		};
+		const preview = recipePreview(masked, { ink: "#111111", paper: "#ffffff" });
+		expect(preview.parts.map((part) => part.kind)).toEqual(["text", "shape"]);
 	});
 
 	it("copies Excalidraw clipboard shapes and builds a library item per icon", () => {

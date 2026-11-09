@@ -29,6 +29,7 @@ export interface RecipePreviewPath {
 }
 
 export interface RecipePreviewText {
+	readonly kind: "text";
 	readonly x: number;
 	readonly y: number;
 	readonly size: number;
@@ -36,9 +37,15 @@ export interface RecipePreviewText {
 	readonly fill: string;
 }
 
-export interface RecipePreview {
+/** One recipe part's hand-drawn paths. */
+export interface RecipePreviewShape {
+	readonly kind: "shape";
 	readonly paths: readonly RecipePreviewPath[];
-	readonly texts: readonly RecipePreviewText[];
+}
+
+/** The recipe's parts in recipe order, so a later part paints over an earlier one. */
+export interface RecipePreview {
+	readonly parts: readonly (RecipePreviewShape | RecipePreviewText)[];
 }
 
 function paint(value: string | undefined, palette: RecipePalette, fallback: string): string {
@@ -72,12 +79,12 @@ function roundedRect(x: number, y: number, width: number, height: number): strin
  */
 export function recipePreview(recipe: IconRecipe, palette: RecipePalette): RecipePreview {
 	const generator = rough.generator();
-	const paths: RecipePreviewPath[] = [];
-	const texts: RecipePreviewText[] = [];
+	const parts: (RecipePreviewShape | RecipePreviewText)[] = [];
 	recipe.parts.forEach((part, index) => {
 		if (part.kind === "text") {
 			const [x, y] = at([part.cx, part.cy]);
-			texts.push({
+			parts.push({
+				kind: "text",
 				x,
 				y,
 				size: part.size * SCALE,
@@ -138,18 +145,19 @@ export function recipePreview(recipe: IconRecipe, palette: RecipePalette): Recip
 				}
 			}
 		}
-		for (const drawable of drawables) {
-			for (const path of generator.toPaths(drawable)) {
-				paths.push({
+		parts.push({
+			kind: "shape",
+			paths: drawables.flatMap((drawable) =>
+				generator.toPaths(drawable).map((path) => ({
 					d: path.d,
 					fill: path.fill ?? "none",
 					stroke: path.stroke,
 					strokeWidth: path.strokeWidth,
-				});
-			}
-		}
+				})),
+			),
+		});
 	});
-	return { paths, texts };
+	return { parts };
 }
 
 /** Where an icon lands in Excalidraw: a 96px square, drawn in the default ink on white. */

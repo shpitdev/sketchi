@@ -1,4 +1,6 @@
 import {
+	DIAGRAM_ICON_SLUG_MAX_LENGTH,
+	COMMUNITY_ICON_SLUG_PREFIX,
 	ICON_RECIPE_INK,
 	ICON_RECIPE_PAPER,
 	type IconRecipe,
@@ -28,6 +30,23 @@ export function communityIconBaseSlug(name: string): string {
 		.slice(0, COMMUNITY_ICON_NAME_MAX_LENGTH)
 		.replace(/-+$/u, "");
 	return slug || "icon";
+}
+
+/** The longest bare slug a diagram accepts after the `community/` prefix. */
+const MAX_SLUG_LENGTH = DIAGRAM_ICON_SLUG_MAX_LENGTH - COMMUNITY_ICON_SLUG_PREFIX.length;
+
+/**
+ * Slugs to try in order: the name's, then the name's with a longer and longer
+ * piece of the recipe hash, each within the length a diagram slug allows.
+ */
+export function communityIconSlugCandidates(name: string, hash: string): string[] {
+	const base = communityIconBaseSlug(name);
+	const suffixed = [6, 12, 24].map((length) => {
+		const suffix = hash.slice(0, length);
+		const head = base.slice(0, MAX_SLUG_LENGTH - suffix.length - 1).replace(/-+$/u, "");
+		return head ? `${head}-${suffix}` : suffix;
+	});
+	return [base, ...suffixed];
 }
 
 /** The fixed colors a recipe draws in, sorted; `ink` and `paper` follow the scene. */

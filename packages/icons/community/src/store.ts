@@ -7,7 +7,7 @@ import {
 	CommunityIconVerdict,
 	type CommunityIcon,
 } from "./contracts.js";
-import { communityIconBaseSlug, communityIconColors } from "./recipe.js";
+import { communityIconColors, communityIconSlugCandidates } from "./recipe.js";
 
 /** The slice of a Cloudflare D1 binding the store uses. */
 export interface CommunityIconStatement {
@@ -246,8 +246,7 @@ export function makeCommunityIconStore(
 		}),
 		findByHash,
 		insert: Effect.fn("communityIcons.store.insert")(function* (input) {
-			const base = communityIconBaseSlug(input.name);
-			const candidates = [base, `${base}-${input.hash.slice(0, 6)}`, `${base}-${input.hash}`];
+			const candidates = communityIconSlugCandidates(input.name, input.hash);
 			const createdAt = now().toISOString();
 			for (const slug of candidates) {
 				const result = yield* query("write", () =>
@@ -275,7 +274,7 @@ export function makeCommunityIconStore(
 				if (existing) return { ...existing, created: false };
 			}
 			return yield* CommunityIconStorageError.make({
-				cause: new Error(`Every slug for "${base}" is taken.`),
+				cause: new Error(`Every slug for "${input.name}" is taken.`),
 				message: "Community icon write failed.",
 				operation: "write",
 			});

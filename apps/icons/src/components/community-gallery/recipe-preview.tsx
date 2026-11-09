@@ -36,31 +36,36 @@ export function RecipePreview({
 			role={label ? "img" : undefined}
 			viewBox={`${-pad} ${-pad} ${RECIPE_PREVIEW_SIZE + pad * 2} ${RECIPE_PREVIEW_SIZE + pad * 2}`}
 		>
-			{drawing.paths.map((path, index) => (
-				<path
-					d={path.d}
-					fill={path.fill}
-					key={index}
-					stroke={path.stroke}
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					strokeWidth={path.strokeWidth}
-				/>
-			))}
-			{drawing.texts.map((text, index) => (
-				<text
-					dominantBaseline="central"
-					fill={text.fill}
-					fontFamily="var(--font-script)"
-					fontSize={text.size}
-					key={`text-${index}`}
-					textAnchor="middle"
-					x={text.x}
-					y={text.y}
-				>
-					{text.text}
-				</text>
-			))}
+			{drawing.parts.map((part, index) =>
+				part.kind === "text" ? (
+					<text
+						dominantBaseline="central"
+						fill={part.fill}
+						fontFamily="var(--font-script)"
+						fontSize={part.size}
+						key={index}
+						textAnchor="middle"
+						x={part.x}
+						y={part.y}
+					>
+						{part.text}
+					</text>
+				) : (
+					<g key={index}>
+						{part.paths.map((path, pathIndex) => (
+							<path
+								d={path.d}
+								fill={path.fill}
+								key={pathIndex}
+								stroke={path.stroke}
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								strokeWidth={path.strokeWidth}
+							/>
+						))}
+					</g>
+				),
+			)}
 		</svg>
 	);
 }

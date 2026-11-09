@@ -59,15 +59,21 @@ export function bareSlug(slug: string): string {
 	return slug.replace(/^community\//u, "");
 }
 
-/** One icon by slug, or undefined when it is not published. */
+/** A linked icon: found, or not published (never published, or hidden). */
+export type LinkedCommunityIcon =
+	| { readonly status: "found"; readonly icon: CommunityIconEntry }
+	| { readonly status: "missing" };
+
+/** One icon by slug; a 404 is a defined result, other failures throw. */
 export async function fetchCommunityIcon(
 	slug: string,
 	signal?: AbortSignal,
-): Promise<CommunityIconEntry | undefined> {
+): Promise<LinkedCommunityIcon> {
 	const response = await fetch(`/api/community/${encodeURIComponent(bareSlug(slug))}`, {
 		...(signal ? { signal } : {}),
 	});
-	if (response.status === 404) return undefined;
+	if (response.status === 404) return { status: "missing" };
 	if (!response.ok) throw new Error(`Community icon returned HTTP ${response.status}.`);
-	return entry(await response.json());
+	const icon = entry(await response.json());
+	return icon ? { status: "found", icon } : { status: "missing" };
 }

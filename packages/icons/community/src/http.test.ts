@@ -200,4 +200,34 @@ describe("community icon API", () => {
 		);
 		expect(noToken.status).toBe(401);
 	});
+
+	it("stops reading a body without Content-Length once it passes the limit", async () => {
+		const chunk = new TextEncoder().encode("x".repeat(1024));
+		let pulled = 0;
+		let cancelled = false;
+		const body = new ReadableStream<Uint8Array>({
+			pull(controller) {
+				pulled += 1;
+				if (pulled > 1024) controller.close();
+				else controller.enqueue(chunk);
+			},
+			cancel() {
+				cancelled = true;
+			},
+		});
+		const request = new Request(`${ORIGIN}/api/community`, {
+			method: "POST",
+			body,
+			duplex: "half",
+		} as RequestInit);
+		expect(request.headers.get("Content-Length")).toBeNull();
+		const response = await handleCommunityPublish(
+			request,
+			{ COMMUNITY_ICONS: sqliteDatabase() },
+			{ moderation: allow },
+		);
+		expect(response.status).toBe(413);
+		expect(cancelled).toBe(true);
+		expect(pulled).toBeLessThan(16);
+	});
 });

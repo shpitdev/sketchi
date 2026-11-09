@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 
-import type { IconRecipe } from "@sketchi/diagram-core";
+import { isDiagramIconSlug, type IconRecipe } from "@sketchi/diagram-core";
 import { Effect, Layer } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -9,6 +9,7 @@ import {
 	communityIconBaseSlug,
 	communityIconColors,
 	communityIconHash,
+	communityIconSlugCandidates,
 	communityIconStoreLayer,
 	CommunityIconStore,
 	makeCommunityIconStore,
@@ -84,6 +85,17 @@ describe("community icon names and recipes", () => {
 		expect(communityIconBaseSlug("a".repeat(80))).toHaveLength(48);
 	});
 
+	it("keeps every slug candidate usable as a diagram slug", async () => {
+		const hash = await communityIconHash(BOX);
+		for (const name of ["Box", "a".repeat(48), "x", "✨"]) {
+			const candidates = communityIconSlugCandidates(name, hash);
+			expect(new Set(candidates).size).toBe(4);
+			for (const slug of candidates) {
+				expect(isDiagramIconSlug(`community/${slug}`), slug).toBe(true);
+			}
+		}
+	});
+
 	it("lists only fixed colors", () => {
 		expect(communityIconColors(BOX)).toEqual(["#2496ed"]);
 		expect(communityIconColors(RING)).toEqual([]);
@@ -139,6 +151,28 @@ describe("publishCommunityIcon", () => {
 			icon: { slug: "box", name: "Box" },
 		});
 		expect(reviewed).toHaveLength(1);
+	});
+
+	it("falls back to a longer hash suffix when the name and its short suffix are taken", async () => {
+		const database = sqliteDatabase();
+		const name = "q".repeat(48);
+		const hash = await communityIconHash(RING);
+		const [base, short, longer] = communityIconSlugCandidates(name, hash);
+		// Any read creates the table.
+		await run(
+			Effect.flatMap(CommunityIconStore, (store) => store.get("none")),
+			{ database },
+		);
+		for (const [index, slug] of [base, short].entries()) {
+			database.sqlite
+				.prepare(
+					"INSERT INTO community_icons (slug, name, recipe, colors, hash, verdict, created_at, hidden) VALUES (?, 'Taken', ?, '[]', ?, NULL, '2026-01-01T00:00:00.000Z', 0)",
+				)
+				.run(slug ?? "", JSON.stringify(BOX), `taken-${index}`);
+		}
+		const result = await run(publishCommunityIcon({ name, recipe: RING }), { database });
+		expect(result._tag === "Success" && result.success.icon.slug).toBe(longer);
+		expect(isDiagramIconSlug(`community/${longer}`)).toBe(true);
 	});
 
 	it("suffixes the slug when another recipe has the name", async () => {

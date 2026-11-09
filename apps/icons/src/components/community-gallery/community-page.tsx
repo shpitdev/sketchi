@@ -65,7 +65,16 @@ export function CommunityPage({ slug }: { readonly slug?: string }) {
 	return (
 		<CommunityGallery
 			key="gallery"
-			{...(linked.data ? { initialIcon: linked.data } : {})}
+			{...(linked.data?.status === "found" ? { initialIcon: linked.data.icon } : {})}
+			{...(slug !== undefined && linked.data?.status === "missing"
+				? { linked: { slug, status: "missing" as const } }
+				: {})}
+			{...(slug !== undefined && linked.isError
+				? {
+						linked: { slug, status: "error" as const },
+						onRetryLinked: () => void linked.refetch(),
+					}
+				: {})}
 			{...(pages.isError
 				? {
 						errorMessage:

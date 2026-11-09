@@ -25,6 +25,9 @@ export interface CommunityGalleryProps {
 	readonly onLoadMore?: () => void;
 	/** The icon `/community/<slug>` opens, wherever it sits in the list. */
 	readonly initialIcon?: CommunityIconEntry;
+	/** A linked icon that is not published, or could not be loaded. */
+	readonly linked?: { readonly slug: string; readonly status: "error" | "missing" };
+	readonly onRetryLinked?: () => void;
 	readonly homeHref?: string;
 	readonly initialPreviewMode?: PreviewMode;
 }
@@ -46,10 +49,12 @@ export function CommunityGallery({
 	icons,
 	initialPreviewMode = "light",
 	initialIcon,
+	linked,
 	loadingMore = false,
 	onLoadMore,
 	onQueryChange,
 	onRetry,
+	onRetryLinked,
 	query,
 	status,
 }: CommunityGalleryProps) {
@@ -175,6 +180,21 @@ export function CommunityGallery({
 										: ""}
 								</p>
 							</div>
+
+							{linked ? (
+								<section className="icons-state community-linked" role="alert">
+									<h2>
+										{linked.status === "missing"
+											? `${linked.slug} is not published`
+											: `Could not load ${linked.slug}`}
+									</h2>
+									{linked.status === "error" && onRetryLinked ? (
+										<button onClick={onRetryLinked} type="button">
+											Try again
+										</button>
+									) : null}
+								</section>
+							) : null}
 
 							{status === "loading" ? (
 								<section className="icons-loading" aria-label="Loading icons" role="status">
