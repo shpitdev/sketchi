@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none"><g transform="translate(30.72 30.72) scale(18.773)"><title>Workflow Builder</title>
+<metadata>{"backgroundColor":"#D69FD6"}</metadata>
+<g clip-path="url(#clip0_399_166)">
+<path d="M23 4C23 2.89543 22.1046 2 21 2H6V6H23V4Z" fill="#D69FD6"/>
+<path d="M1 12C1 10.8954 1.89543 10 3 10H20V14H1V12Z" fill="#D69FD6"/>
+<path d="M5 0.5H1C0.723858 0.5 0.5 0.723858 0.5 1V6C0.5 6.27614 0.723858 6.5 1 6.5H5C5.27614 6.5 5.5 6.27614 5.5 6V1C5.5 0.758287 5.32855 0.556292 5.10059 0.509766L5 0.5Z" fill="#BD6BBD" stroke="#BD6BBD"/>
+<rect x="6" y="4" width="13" height="2" fill="#9D3F9D"/>
+<path d="M1 14C1 12.8954 1.89543 12 3 12H5V22H3C1.89543 22 1 21.1046 1 20V14Z" fill="#9D3F9D"/>
+<rect x="4" y="20" width="14" height="2" fill="#9D3F9D"/>
+<rect width="13" height="2" transform="matrix(-1 0 0 1 18 18)" fill="#D69FD6"/>
+<rect x="5" y="19" width="1" height="1" fill="#9D3F9D"/>
+<rect width="2" height="2" rx="1" transform="matrix(-1 0 0 1 7 18)" fill="#D69FD6"/>
+<rect width="1" height="1" transform="matrix(-1 0 0 1 19 11)" fill="#9D3F9D"/>
+<rect x="17" y="10" width="2" height="2" rx="1" fill="#D69FD6"/>
+<path d="M23 16.5H19C18.7239 16.5 18.5 16.7239 18.5 17V22C18.5 22.2761 18.7239 22.5 19 22.5H23C23.2761 22.5 23.5 22.2761 23.5 22V17C23.5 16.7583 23.3286 16.5563 23.1006 16.5098L23 16.5Z" fill="#BD6BBD" stroke="#BD6BBD"/>
+<path d="M23 12C23 13.1046 22.1046 14 21 14H19V4H21C22.1046 4 23 4.89543 23 6V12Z" fill="#9D3F9D"/>
+<path d="M24 19C24 18.4477 23.5523 18 23 18H19C18.4477 18 18 18.4477 18 19V23C18 23.5523 18.4477 24 19 24H23C23.5523 24 24 23.5523 24 23V19Z" fill="#7C327C"/>
+<path d="M6 3C6 2.44772 5.55228 2 5 2H1C0.447715 2 0 2.44772 0 3V7C0 7.55228 0.447715 8 1 8H5C5.55228 8 6 7.55228 6 7V3Z" fill="#7C327C"/>
+<rect width="15" height="2" transform="matrix(-1 0 0 1 19 12)" fill="#9D3F9D"/>
+</g>
+<defs>
+<clipPath id="clip0_399_166">
+<rect width="24" height="24" fill="white" transform="matrix(-1 0 0 1 24 0)"/>
+</clipPath>
+</defs>
+</g></svg>

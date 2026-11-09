@@ -179,12 +179,12 @@ describe("public icon manifest generation", () => {
 		expect(
 			Object.fromEntries(catalog.manifest.icons.map(({ name, slug }) => [slug, name])),
 		).toMatchObject({
-			"aip-autopilot-app": "AIP Autopilot App",
-			"ontology-objecttype-app": "Ontology Object Type App",
+			"aip-autopilot-app": "Autopilot",
+			"ontology-objecttype-app": "Ontology Manager",
 			"palantir-ontology": "Ontology",
 			"palantir-pipeline": "Pipeline Builder",
 			"palantir-workshop": "Workshop",
-			"sddi-app": "SDDI App",
+			"sddi-app": "HyperAuto (legacy)",
 		});
 		expect(searchIcons(catalog.manifest.icons, { query: "ontology" })[0]?.icon.slug).toBe(
 			"palantir-ontology",
@@ -253,7 +253,7 @@ describe("public icon manifest generation", () => {
 	it("ships a compact clean manifest with aliases and no review fields", () => {
 		const source = JSON.stringify(iconManifest);
 		const manifest = decodeIconManifest(JSON.parse(source));
-		expect(manifest.summary.totalIcons).toBe(1412);
+		expect(manifest.summary.totalIcons).toBe(1443);
 		expect(new Set(manifest.icons.map((icon) => icon.slug)).size).toBe(manifest.icons.length);
 		expect(manifest.icons.find((icon) => icon.slug === "kubernetes")?.aliases).toContain("k8s");
 		expect(manifest.icons.find((icon) => icon.slug === "adobefirefly-text")?.name).toBe(
