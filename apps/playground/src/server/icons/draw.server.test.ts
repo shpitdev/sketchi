@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import type { CodeModePngRendererNamespace } from "../codemode/browser-renderer.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
-import { handleDrawIconRequest } from "./draw.server";
+import { drawIconForAgent, handleDrawIconRequest, secondsUntilUtcMidnight } from "./draw.server";
 
 const SVG = `<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" fill="#e01e5a"/></svg>`;
 const recipe = {
@@ -170,5 +170,118 @@ describe("POST /api/v1/icons/draw", () => {
 		const response = await draw({}, { name: "Acme", svg: SVG });
 		expect(response.status).toBe(503);
 		expect(await response.json()).toMatchObject({ ok: false, status: "not_configured" });
+	});
+});
+
+describe("drawing is bounded per client and per day", () => {
+	const recipeReplies = () => [
+		{ accept: false, recipe },
+		{ accept: true, recipe: null },
+		{ accept: true, recipe: null },
+	];
+	const withRequest = (env: StudioEnv, body: unknown, ip = "203.0.113.7") => {
+		const request = new Request("https://studio.example/api/v1/icons/draw", {
+			method: "POST",
+			headers: { "content-type": "application/json", "cf-connecting-ip": ip },
+			body: JSON.stringify(body),
+		});
+		return runPlaygroundEffect(handleDrawIconRequest(request), {
+			env,
+			request,
+			platform: { waitUntilPromise: () => undefined },
+		});
+	};
+
+	it("refuses a client over its per-minute limit with Retry-After, before reading its logo", async () => {
+		const calls: Calls = { gateway: [], jobs: [], assets: [] };
+		const keys: string[] = [];
+		const env: StudioEnv = {
+			...fakeEnv(calls, recipeReplies()),
+			ICON_DRAW_RATE_LIMIT: {
+				limit: ({ key }) => {
+					keys.push(key);
+					return Promise.resolve({ success: false });
+				},
+			},
+		};
+		// Malformed or not, every request counts against the client.
+		expect((await withRequest(env, { name: "Acme", svg: "<svg" })).status).toBe(429);
+		const response = await withRequest(env, { name: "Acme", svg: SVG });
+		expect(response.status).toBe(429);
+		expect(response.headers.get("retry-after")).toBe("60");
+		expect(await response.json()).toMatchObject({
+			ok: false,
+			status: "rate_limited",
+			issues: [{ code: "rate_limited" }],
+		});
+		expect(keys).toEqual(["203.0.113.7", "203.0.113.7"]);
+		expect(calls.gateway).toEqual([]);
+	});
+
+	it("refuses every client once the day's budget is spent, until midnight UTC", async () => {
+		const calls: Calls = { gateway: [], jobs: [], assets: [] };
+		const admitted: number[] = [];
+		let used = 0;
+		const env: StudioEnv = {
+			...fakeEnv(calls, recipeReplies()),
+			SKETCHI_ICON_DAILY_DRAWS: "1",
+			ICON_DRAW_BUDGET: {
+				getByName: () => ({
+					admit: (cap) => {
+						admitted.push(cap);
+						if (used >= cap) return Promise.resolve({ admitted: false, used });
+						used += 1;
+						return Promise.resolve({ admitted: true, used });
+					},
+				}),
+			},
+		};
+		// A request the input checks refuse never counts against the budget.
+		expect((await withRequest(env, { name: "Acme", svg: "<svg" })).status).toBe(400);
+		expect(admitted).toEqual([]);
+		expect((await withRequest(env, { name: "Acme", svg: SVG })).status).toBe(200);
+		const refused = await withRequest(env, { name: "Acme", svg: SVG }, "198.51.100.2");
+		expect(refused.status).toBe(429);
+		expect(await refused.json()).toMatchObject({ issues: [{ code: "daily_limit" }] });
+		const retryAfter = Number(refused.headers.get("retry-after"));
+		expect(retryAfter).toBeGreaterThan(0);
+		expect(retryAfter).toBeLessThanOrEqual(24 * 60 * 60);
+		expect(admitted).toEqual([1, 1]);
+	});
+
+	it("does not draw when the budget cannot be counted", async () => {
+		const calls: Calls = { gateway: [], jobs: [], assets: [] };
+		const env: StudioEnv = {
+			...fakeEnv(calls, recipeReplies()),
+			ICON_DRAW_BUDGET: { getByName: () => ({ admit: () => Promise.reject(new Error("down")) }) },
+		};
+		const response = await withRequest(env, { name: "Acme", svg: SVG });
+		expect(response.status).toBe(503);
+		expect(await response.json()).toMatchObject({ issues: [{ code: "budget_unavailable" }] });
+		expect(calls.gateway).toEqual([]);
+	});
+
+	it("gives an agent's script the recipe and verdict without the images", async () => {
+		const calls: Calls = { gateway: [], jobs: [], assets: [] };
+		const env = fakeEnv(calls, recipeReplies());
+		const request = new Request("https://studio.example/mcp", { method: "POST" });
+		const result = await runPlaygroundEffect(drawIconForAgent({ name: "Acme", svg: SVG }), {
+			env,
+			request,
+			platform: { waitUntilPromise: () => undefined },
+		});
+		expect(result).toMatchObject({ ok: true, status: "drawn", name: "Acme", recipe });
+		expect(result).not.toHaveProperty("previews");
+		expect(result).not.toHaveProperty("excalidrawlib");
+		expect(Object.keys(result).sort()).toEqual(
+			["author", "judge", "name", "ok", "palette", "recipe", "status", "usage"].sort(),
+		);
+	});
+});
+
+describe("secondsUntilUtcMidnight", () => {
+	it("counts to the next UTC day", () => {
+		expect(secondsUntilUtcMidnight(Date.UTC(2026, 10, 9, 23, 59, 0))).toBe(60);
+		expect(secondsUntilUtcMidnight(Date.UTC(2026, 10, 9, 0, 0, 0))).toBe(24 * 60 * 60);
 	});
 });

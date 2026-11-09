@@ -89,8 +89,13 @@ PNG, JPEG or WebP and a name in, a checked recipe, PNG previews, an
 `.excalidrawlib` and a judge's verdict out. A Claude author drafts and revises
 against renders of its own recipe on the gateway's native Messages route; a
 Gemini judge picks the source among catalog look-alikes from the 28 px drawing.
-Browser Rendering's export harness decodes logos and exports the renders. See
-[icon-draw](../packages/icons/draw/README.md).
+Browser Rendering's export harness decodes logos and exports the renders. Each
+client IP may start 6 draws a minute (the `ICON_DRAW_RATE_LIMIT` binding), and
+every client together `SKETCHI_ICON_DAILY_DRAWS` a UTC day (the `IconDrawBudget`
+Durable Object), which bounds model spend; over either limit the endpoint
+answers 429 with `Retry-After`. Code Mode scripts call the same draw as
+`sketchi.drawIcon({ name, svg })`, which returns the recipe and verdict without
+the images. See [icon-draw](../packages/icons/draw/README.md).
 
 Scenario and harness commands are internal Nx/tool entrypoints and are not
 public CLI commands.

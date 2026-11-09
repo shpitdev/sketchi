@@ -1,5 +1,6 @@
 import handler from "@tanstack/react-start/server-entry";
 
 export { CodeModePngRenderer } from "./server/codemode/png-renderer-object.server";
+export { IconDrawBudget } from "./server/icons/budget-object.server";
 
 export default handler;
