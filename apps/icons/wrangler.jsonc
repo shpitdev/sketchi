@@ -3,7 +3,7 @@
 	"name": "sketchi-icons",
 	"compatibility_date": "2026-06-06",
 	"compatibility_flags": ["nodejs_compat"],
-	"main": "@tanstack/react-start/server-entry",
+	"main": "./src/worker-entry.ts",
 	"assets": {
 		"binding": "ASSETS"
 	},
@@ -23,12 +23,19 @@
 			"preview_database_id": "21be8746-89ec-4af2-9981-e21808adedb3"
 		}
 	],
-	// Publishing is public: each client IP may publish this many icons a minute.
-	"ratelimits": [
+	// Publishing is public: one object per client IP counts its publishes, an exact limit.
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "COMMUNITY_CLIENT_LIMIT",
+				"class_name": "ClientRateLimit"
+			}
+		]
+	},
+	"migrations": [
 		{
-			"name": "COMMUNITY_PUBLISH_LIMIT",
-			"namespace_id": "6201",
-			"simple": { "limit": 10, "period": 60 }
+			"tag": "v1",
+			"new_sqlite_classes": ["ClientRateLimit"]
 		}
 	],
 	"workers_dev": true,
@@ -53,12 +60,13 @@
 				"database_id": "21be8746-89ec-4af2-9981-e21808adedb3"
 			}
 		],
-		"ratelimits": [
-			{
-				"name": "COMMUNITY_PUBLISH_LIMIT",
-				"namespace_id": "6202",
-				"simple": { "limit": 10, "period": 60 }
-			}
-		]
+		"durable_objects": {
+			"bindings": [
+				{
+					"name": "COMMUNITY_CLIENT_LIMIT",
+					"class_name": "ClientRateLimit"
+				}
+			]
+		}
 	}
 }

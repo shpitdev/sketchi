@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import type { CommunityIconDatabase } from "@sketchi/community-icons";
+import type { ClientLimitNamespace, CommunityIconDatabase } from "@sketchi/community-icons";
 import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
 import type { CloudflareAiGatewayProvider, WorkersAiRunner } from "@sketchi/diagram-generation";
 import type { TelemetryPipeline } from "@sketchi/observability";
@@ -27,8 +27,8 @@ export interface StudioEnv {
 	SKETCHI_ICON_JUDGE_MODEL?: string;
 	/** Icon draws a day across every client; the bound on drawing spend. */
 	SKETCHI_ICON_DAILY_DRAWS?: string;
-	/** Workers rate limit on icon draws, keyed by client IP. */
-	ICON_DRAW_RATE_LIMIT?: { limit(options: { key: string }): Promise<{ success: boolean }> };
+	/** One limit object per client address, counting its icon draw requests. */
+	ICON_DRAW_CLIENT_LIMIT?: ClientLimitNamespace;
 	/** The daily icon-draw count. */
 	ICON_DRAW_BUDGET?: IconDrawBudgetNamespace;
 	SKETCHI_RENDER_ASSET_ORIGIN?: string;

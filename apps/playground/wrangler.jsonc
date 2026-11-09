@@ -31,6 +31,11 @@
 			{
 				"name": "ICON_DRAW_BUDGET",
 				"class_name": "IconDrawBudget"
+			},
+			// One per client IP: its icon draw requests in the last minute, an exact limit.
+			{
+				"name": "ICON_DRAW_CLIENT_LIMIT",
+				"class_name": "ClientRateLimit"
 			}
 		]
 	},
@@ -42,14 +47,10 @@
 		{
 			"tag": "v2",
 			"new_sqlite_classes": ["IconDrawBudget"]
-		}
-	],
-	// Icon drawing is public and spends model money: each client IP may start this many draws a minute.
-	"ratelimits": [
+		},
 		{
-			"name": "ICON_DRAW_RATE_LIMIT",
-			"namespace_id": "6301",
-			"simple": { "limit": 6, "period": 60 }
+			"tag": "v3",
+			"new_sqlite_classes": ["ClientRateLimit"]
 		}
 	],
 	"observability": {
@@ -121,16 +122,13 @@
 				{
 					"name": "ICON_DRAW_BUDGET",
 					"class_name": "IconDrawBudget"
+				},
+				{
+					"name": "ICON_DRAW_CLIENT_LIMIT",
+					"class_name": "ClientRateLimit"
 				}
 			]
 		},
-		"ratelimits": [
-			{
-				"name": "ICON_DRAW_RATE_LIMIT",
-				"namespace_id": "6302",
-				"simple": { "limit": 6, "period": 60 }
-			}
-		],
 		"observability": {
 			"enabled": true,
 			"traces": {

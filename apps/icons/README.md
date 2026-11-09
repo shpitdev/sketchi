@@ -39,8 +39,8 @@ Hand-drawn icons published through the API live in the `COMMUNITY_ICONS` D1
 database (`@sketchi/community-icons` owns the table), separate from the
 curated catalog, and show under `/community`. Only the name and recipe are
 stored and served. Names and recipe text are moderated by Jev through the
-Workers AI `AI` binding (`typesafe/jev`), and publishing is rate limited per
-client address by `COMMUNITY_PUBLISH_LIMIT`. Studio reads the same database, so a
+Workers AI `AI` binding (`typesafe/jev`), and each client address may publish 10
+icons a minute, counted exactly by its own `ClientRateLimit` Durable Object. Studio reads the same database, so a
 flowchart or canvas node's `icon` can name `community/<slug>`; a catalog slug
 never resolves to a community icon.
 - `/llms.txt` documents the contracts for agents.

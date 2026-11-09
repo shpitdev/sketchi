@@ -108,13 +108,6 @@ const previewDataBindings = {
 		target: "database_id",
 		declaredPreviewKey: "preview_database_id",
 	},
-	// A rate limit counts in its namespace, so a Preview counts in its own.
-	ratelimits: {
-		bindingKey: "name",
-		allowedKeys: ["name", "namespace_id", "simple"],
-		productionTargetKeys: ["namespace_id"],
-		target: "namespace_id",
-	},
 };
 
 export function validatePreviewConfig(config, projectId) {
@@ -135,7 +128,6 @@ export function validatePreviewConfig(config, projectId) {
 		"observability",
 		"r2_buckets",
 		"d1_databases",
-		"ratelimits",
 		"pipelines",
 	]);
 	for (const field of Object.keys(previews)) {
@@ -158,7 +150,7 @@ export function validatePreviewConfig(config, projectId) {
 		throw new Error("Preview must retain the selected application surface.");
 	}
 	// Previews must bind every data binding production has, and none of them
-	// may name a production bucket, database, stream or rate-limit namespace.
+	// may name a production bucket, database or stream.
 	for (const [field, spec] of Object.entries(previewDataBindings)) {
 		const production = config[field] ?? [];
 		const preview = previews[field] ?? [];

@@ -1,5 +1,7 @@
 import { Effect, Layer, Schema } from "effect";
 
+import { type ClientLimitNamespace, limitClient } from "./client-limit.js";
+
 import {
 	bareCommunitySlug,
 	COMMUNITY_ICON_LIMITS,
@@ -27,14 +29,13 @@ function json(value: unknown, init: ResponseInit = {}): Response {
 	return Response.json(value, init);
 }
 
-/** Workers rate-limit binding. */
-export interface CommunityRateLimiter {
-	limit(options: { key: string }): Promise<{ success: boolean }>;
-}
+/** Icons one client address may publish a minute. */
+export const COMMUNITY_PUBLISHES_PER_CLIENT_MINUTE = 10;
 
 export interface CommunityEnv {
 	readonly COMMUNITY_ICONS?: CommunityIconDatabase;
-	readonly COMMUNITY_PUBLISH_LIMIT?: CommunityRateLimiter;
+	/** One limit object per client address, counting its publishes. */
+	readonly COMMUNITY_CLIENT_LIMIT?: ClientLimitNamespace;
 	/** Workers AI: Jev moderates names before they publish. */
 	readonly AI?: CommunityModerationAi;
 	/** A Worker secret: the bearer token that hides or restores an icon. */
@@ -51,8 +52,6 @@ export interface CommunityIconResult {
 	readonly url: string;
 	readonly api: string;
 }
-
-const RETRY_AFTER_SECONDS = 60;
 
 function errorJson(status: number, code: string, message: string, extra: object = {}) {
 	return json({ error: { code, message, ...extra } }, { status });
@@ -157,16 +156,21 @@ export async function handleCommunityPublish(
 	env: CommunityEnv,
 	options: { readonly moderation?: Layer.Layer<CommunityIconModeration> } = {},
 ): Promise<Response> {
-	if (env.COMMUNITY_PUBLISH_LIMIT) {
-		const key = request.headers.get("CF-Connecting-IP") ?? "unknown";
-		const { success } = await env.COMMUNITY_PUBLISH_LIMIT.limit({ key });
-		if (!success) {
+	if (env.COMMUNITY_CLIENT_LIMIT) {
+		const decision = await limitClient(
+			env.COMMUNITY_CLIENT_LIMIT,
+			request,
+			COMMUNITY_PUBLISHES_PER_CLIENT_MINUTE,
+			60_000,
+			// A limit object that cannot answer does not stop publishing; moderation still runs.
+		).catch(() => ({ allowed: true, retryAfterSeconds: 0 }));
+		if (!decision.allowed) {
 			const response = errorJson(
 				429,
 				"rate_limited",
 				"Too many icons published; try again in a minute.",
 			);
-			response.headers.set("Retry-After", String(RETRY_AFTER_SECONDS));
+			response.headers.set("Retry-After", String(decision.retryAfterSeconds));
 			return response;
 		}
 	}

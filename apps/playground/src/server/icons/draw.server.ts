@@ -17,6 +17,7 @@ import {
 	type IconImagingJob,
 	prepareIconInput,
 } from "@sketchi/icon-draw";
+import { limitClient } from "@sketchi/community-icons";
 import { Clock, Effect, Layer, Result } from "effect";
 
 import { aiEnvironment } from "../bindings/ai-env.server";
@@ -76,7 +77,7 @@ const FAILURE_STATUS: Record<IconDrawFailureStatus, number> = {
 	draw_timeout: 504,
 };
 
-/** Draws one client (by IP) may start a minute: the `ICON_DRAW_RATE_LIMIT` binding's limit. */
+/** Draw requests one client address may send a minute, counted by its `ICON_DRAW_CLIENT_LIMIT` object. */
 export const ICON_DRAWS_PER_CLIENT_MINUTE = 6;
 /** Draws a day across every client when `SKETCHI_ICON_DAILY_DRAWS` is unset: the bound on model spend. */
 export const DEFAULT_DAILY_ICON_DRAWS = 200;
@@ -274,29 +275,28 @@ const admitClient = Effect.fn("playground.icons.admitClient")(function* (
 	env: StudioEnv,
 	request: Request,
 ) {
-	const limiter = env.ICON_DRAW_RATE_LIMIT;
-	if (!limiter) yield* Effect.annotateCurrentSpan({ "sketchi.icon.client_limit": "unbound" });
-	if (limiter) {
-		const client = request.headers.get("cf-connecting-ip") ?? "unknown";
-		// The limiter is best effort; the daily budget below still bounds spend if it fails.
-		const decision = yield* Effect.tryPromise(() => limiter.limit({ key: client })).pipe(
-			Effect.map(({ success }) => (success ? "allowed" : "refused")),
-			Effect.orElseSucceed(() => "failed"),
-		);
-		yield* Effect.annotateCurrentSpan({ "sketchi.icon.client_limit": decision });
-		const allowed = decision !== "refused";
-		if (!allowed) {
-			return {
-				failure: failure("rate_limited", {
-					code: "rate_limited",
-					message: `Each client may start ${ICON_DRAWS_PER_CLIENT_MINUTE} icon draws a minute.`,
-					hint: "Wait for Retry-After, then send the next logo.",
-				}),
-				retryAfterSeconds: 60,
-			} satisfies Refusal;
-		}
+	const limits = env.ICON_DRAW_CLIENT_LIMIT;
+	if (!limits) {
+		yield* Effect.annotateCurrentSpan({ "sketchi.icon.client_limit": "unbound" });
+		return undefined;
 	}
-	return undefined;
+	// A limit object that cannot answer lets the request through; the daily budget still bounds spend.
+	const decision = yield* Effect.tryPromise(() =>
+		limitClient(limits, request, ICON_DRAWS_PER_CLIENT_MINUTE, 60_000),
+	).pipe(Effect.orElseSucceed(() => undefined));
+	yield* Effect.annotateCurrentSpan({
+		"sketchi.icon.client_limit":
+			decision === undefined ? "failed" : decision.allowed ? "allowed" : "refused",
+	});
+	if (!decision || decision.allowed) return undefined;
+	return {
+		failure: failure("rate_limited", {
+			code: "rate_limited",
+			message: `Each client may send ${ICON_DRAWS_PER_CLIENT_MINUTE} icon draw requests a minute.`,
+			hint: "Wait for Retry-After, then send the next logo.",
+		}),
+		retryAfterSeconds: decision.retryAfterSeconds,
+	} satisfies Refusal;
 });
 
 /**

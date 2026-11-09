@@ -128,16 +128,21 @@ describe("community icon API", () => {
 			{ name: "Ring", recipe: RING },
 			{
 				COMMUNITY_ICONS: sqliteDatabase(),
-				COMMUNITY_PUBLISH_LIMIT: {
-					limit: async ({ key }) => (keys.push(key), { success: false }),
+				COMMUNITY_CLIENT_LIMIT: {
+					getByName: (name) => ({
+						take: async (limit, windowMs) => (
+							keys.push(`${name} ${limit}/${windowMs}`),
+							{ allowed: false, retryAfterSeconds: 42 }
+						),
+					}),
 				},
 			},
 			allow,
 			{ "CF-Connecting-IP": "203.0.113.7" },
 		);
 		expect(limited.status).toBe(429);
-		expect(limited.headers.get("Retry-After")).toBe("60");
-		expect(keys).toEqual(["203.0.113.7"]);
+		expect(limited.headers.get("Retry-After")).toBe("42");
+		expect(keys).toEqual(["client:203.0.113.7 10/60000"]);
 
 		const unmoderated = await handleCommunityPublish(
 			new Request(`${ORIGIN}/api/community`, {

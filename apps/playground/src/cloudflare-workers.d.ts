@@ -26,6 +26,8 @@ declare module "cloudflare:workers" {
     put<T>(key: string, value: T): Promise<void>;
     list<T>(options?: { prefix?: string }): Promise<Map<string, T>>;
     delete(keys: string[]): Promise<number>;
+    setAlarm(scheduledTime: number): Promise<void>;
+    deleteAll(): Promise<void>;
   }
 
   export abstract class DurableObject<Env = unknown> {

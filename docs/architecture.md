@@ -90,7 +90,8 @@ PNG, JPEG or WebP and a name in, a checked recipe, PNG previews, an
 against renders of its own recipe on the gateway's native Messages route; a
 Gemini judge picks the source among catalog look-alikes from the 28 px drawing.
 Browser Rendering's export harness decodes logos and exports the renders. Each
-client IP may start 6 draws a minute (the `ICON_DRAW_RATE_LIMIT` binding), and
+client IP may send 6 draw requests a minute (the `ClientRateLimit` Durable
+Object, one per IP, counting each request exactly), and
 every client together `SKETCHI_ICON_DAILY_DRAWS` a UTC day (the `IconDrawBudget`
 Durable Object), which bounds model spend; over either limit the endpoint
 answers 429 with `Retry-After`. Code Mode scripts call the same draw as

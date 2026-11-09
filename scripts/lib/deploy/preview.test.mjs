@@ -133,17 +133,14 @@ test("Preview validation rejects production targets, missing bindings, and unrev
 	}
 });
 
-test("Icons Previews publish into their own database and rate-limit namespace", async () => {
+test("Icons Previews publish into their own database and keep the per-client publish limit", async () => {
 	const original = await unstable_readConfig({
 		config: workerProjectConfig("icons").wranglerInputConfigPath,
 	});
 	assert.equal(validatePreviewConfig(original, "icons").projectId, "icons");
 	for (const mutate of [
 		(config) => {
-			config.previews.ratelimits[0].namespace_id = config.ratelimits[0].namespace_id;
-		},
-		(config) => {
-			delete config.previews.ratelimits;
+			delete config.previews.durable_objects;
 		},
 		(config) => {
 			config.previews.d1_databases = config.d1_databases;

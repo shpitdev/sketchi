@@ -6,4 +6,18 @@ declare module "cloudflare:workers" {
     ASSETS: IconAssetsBinding;
     SKETCHI_APP_SURFACE?: string;
   };
+
+  /** The Durable Object storage calls the icons Worker's objects make. */
+  export interface DurableObjectStorage {
+    get<T>(key: string): Promise<T | undefined>;
+    put<T>(key: string, value: T): Promise<void>;
+    setAlarm(scheduledTime: number): Promise<void>;
+    deleteAll(): Promise<void>;
+  }
+
+  export abstract class DurableObject<Env = unknown> {
+    protected readonly ctx: { readonly storage: DurableObjectStorage };
+    protected readonly env: Env;
+    constructor(ctx: unknown, env: Env);
+  }
 }
