@@ -62,7 +62,6 @@
 		"@changesets/changelog-github": "1.0.1",
 		"@changesets/cli": "3.0.3",
 		"@cloudflare/vite-plugin": "1.66.0",
-		"@effect/ai-typesafe": "4.1.2",
 		"@effect/platform-node": "4.1.2",
 		"@effect/vitest": "4.1.2",
 		"@nx/devkit": "24.0.3",

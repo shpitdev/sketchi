@@ -249,8 +249,8 @@ describe("narrowing with Jev", () => {
 			const { layer } = scriptedJev(
 				[],
 				AiError.make({
-					module: "TypeSafeClient",
-					method: "systemOne",
+					module: "WorkersAiJev",
+					method: "decide",
 					reason: new AiError.RateLimitError({}),
 				}),
 			);

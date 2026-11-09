@@ -32,15 +32,10 @@ AI, Browser Run, and Worker Loader bindings are configured explicitly where need
 Assets and compatibility settings remain at the top level as required by Wrangler.
 
 The workflow uses `--ignore-base-config` to exclude dashboard Preview base settings
-when a PR Preview is created, and imports no production secrets. One secret uploads
-with a Preview deployment: Studio's `TYPESAFE_API_KEY`, which narrows an untyped
-generate request's diagram families with TypeSafe's Jev. The deploy step reads it
-from the GitHub `staging` environment, writes it to a file under `RUNNER_TEMP`
-without logging it, and passes that file to `wrangler preview --secrets-file`, so
-every deploy carries it and no one sets it by hand. Without the secret, the Studio
-Preview deploys with a warning and routes untyped requests by their words alone.
-Other secrets need their own reviewed change. Do not copy production secrets into
-the Preview base.
+when a PR Preview is created. It does not import production secrets or upload
+secrets. These apps use configured API bindings without Worker secrets. If a future
+feature requires secrets, provision preview-only credentials through a separately
+reviewed change. Do not copy production secrets into the Preview base.
 
 `scripts/01-validate-preview-config.mjs` checks the generated build config before
 upload: Worker identity, explicit runtime bindings, and that `previews` binds every
@@ -103,8 +98,7 @@ the first attempt.
 ## Required configuration
 
 - GitHub `staging`: `CLOUDFLARE_ACCOUNT_ID` variable or secret and
-  `CLOUDFLARE_API_TOKEN` secret with Workers edit/deploy and bound-resource access,
-  and `TYPESAFE_API_KEY` for Studio's Preview.
+  `CLOUDFLARE_API_TOKEN` secret with Workers edit/deploy and bound-resource access.
 - GitHub `production`: separate production credentials for production deploys.
 - `CHROMATIC_PROJECT_TOKEN`: staging secret for the CI Storybook gate.
 

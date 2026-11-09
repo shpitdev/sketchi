@@ -4,13 +4,12 @@
  * them through the truth table below and decides which families' rules the prompt carries.
  * A Jev error or timeout is recorded on its span and narrows nothing.
  */
-import { TypeSafeClient, TypeSafeDecisionModel } from "@effect/ai-typesafe";
 import { recordMetric, SpanContent } from "@sketchi/observability";
 import { DIAGRAM_TYPES, type DiagramTypeValue } from "@sketchi/diagram-core";
-import { Context, Effect, Layer, Metric, type Redacted, Schema } from "effect";
+import { Context, Effect, Layer, Metric, Schema } from "effect";
 import { type AiError, Decision, DecisionModel } from "effect/ai";
-import { FetchHttpClient, HttpClient } from "effect/http";
 
+import { workersAiJevLayer, type WorkersAiRunner } from "./jev-workers-ai.js";
 import {
 	anyKindFitsQuestion,
 	FAMILY_NARROWING_MODEL,
@@ -202,9 +201,6 @@ export const makeDiagramFamilyNarrowing = (options: { readonly timeoutMs: number
 		const narrow = Effect.fn("diagramGeneration.familyNarrowing")(function* (request: string) {
 			const result = yield* narrowByRankAndRecheck(request, options.timeoutMs).pipe(
 				Effect.provideService(DecisionModel.DecisionModel, model),
-				// Each round's span times its call and records what it sent; an HTTP span would
-				// only repeat it.
-				Effect.provideService(HttpClient.TracerDisabledWhen, () => true),
 				Effect.catch((error): Effect.Effect<FamilyNarrowing> =>
 					Effect.succeed({ _tag: "Failed", error: error.message }),
 				),
@@ -297,18 +293,14 @@ const narrowByRankAndRecheck = Effect.fnUntraced(function* (
 });
 
 /**
- * Narrowing over TypeSafe's API, called directly over HTTPS. The client does not retry: a rate
- * limit or any other error narrows nothing, so generation waits for no backoff.
+ * Narrowing by Jev on Workers AI, through the Worker's own AI binding. The call does not retry:
+ * a rate limit or any other error narrows nothing, so generation waits for no backoff.
  */
-export const typeSafeFamilyNarrowingLayer = (options: {
-	readonly apiKey: Redacted.Redacted<string>;
+export const workersAiFamilyNarrowingLayer = (options: {
+	readonly ai: WorkersAiRunner;
 	readonly timeoutMs?: number;
 }): Layer.Layer<DiagramFamilyNarrowing> =>
 	Layer.effect(
 		DiagramFamilyNarrowing,
 		makeDiagramFamilyNarrowing({ timeoutMs: options.timeoutMs ?? 3_000 }),
-	).pipe(
-		Layer.provide(TypeSafeDecisionModel.layer({ model: FAMILY_NARROWING_MODEL })),
-		Layer.provide(TypeSafeClient.layer({ apiKey: options.apiKey })),
-		Layer.provide(FetchHttpClient.layer),
-	);
+	).pipe(Layer.provide(workersAiJevLayer({ ai: options.ai, model: FAMILY_NARROWING_MODEL })));

@@ -44,11 +44,12 @@ response, and candidate helpers stay independent of runtime wiring.
 An untyped request carries every family's rules unless routing narrows it.
 `withNarrowedFamilyRoute` reads the request's words first: one named family gets
 that family's typed prompt, two or three get only their rules. When the words
-name no family and the host provides `DiagramFamilyNarrowing`, Jev (TypeSafe's
-`jev-1.14.0`) picks the families in `family-narrowing.ts`, with its questions and
-thresholds in `family-questions.ts`. An error or timeout falls back to the words.
-Studio composes `typeSafeFamilyNarrowingLayer` when its Worker has a
-`TYPESAFE_API_KEY` secret. The route is internal: it shows only on spans
+name no family and the host provides `DiagramFamilyNarrowing`, Jev
+(`typesafe/jev-1.14.0` on Workers AI) picks the families in
+`family-narrowing.ts`, with its questions and thresholds in
+`family-questions.ts`. An error or timeout falls back to the words. Studio
+composes `workersAiFamilyNarrowingLayer` over its `AI` binding, so no API key is
+involved; `jev-workers-ai.ts` answers DecisionModel questions there. The route is internal: it shows only on spans
 (`diagramGeneration.familyNarrowing.round`, and `family_route`,
 `family_narrowing` and `family_shortlist` on the request's span), never in a
 response. Frontierclimb's `sketchi-generate` catalog measures it.
