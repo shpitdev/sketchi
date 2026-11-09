@@ -20,6 +20,19 @@
 				"command": "jiti packages/icons/catalog/scripts/generate-catalog.ts"
 			}
 		},
+		"generate-look-alikes": {
+			"executor": "nx:run-commands",
+			"inputs": [
+				"{projectRoot}/svg/**/*",
+				"{projectRoot}/src/generated/icon-catalog.json",
+				"{projectRoot}/src/mark-features.ts",
+				"{projectRoot}/src/svg-input.ts"
+			],
+			"outputs": ["{projectRoot}/src/generated/look-alikes.json"],
+			"options": {
+				"command": "jiti packages/icons/catalog/scripts/generate-look-alikes.ts"
+			}
+		},
 		"test": {
 			"executor": "nx:run-commands",
 			"outputs": ["{workspaceRoot}/coverage/packages/icons/catalog"],

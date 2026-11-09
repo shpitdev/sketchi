@@ -67,6 +67,40 @@ import {
 	toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
 
+/** sketchi.drawIcon: a logo and its name in, the hand-drawn recipe and the judge's verdict out. */
+const DrawIconRequestSchema = Schema.Struct({
+	name: Schema.String,
+	svg: Schema.optionalKey(Schema.String),
+	/** A PNG, JPEG or WebP as base64 or a data: URL, instead of svg. */
+	image: Schema.optionalKey(Schema.String),
+	model: Schema.optionalKey(Schema.String),
+});
+const DrawIconResultSchema = Schema.Union([
+	Schema.Struct({
+		ok: Schema.Literal(true),
+		status: Schema.Literal("drawn"),
+		name: Schema.String,
+		recipe: IconRecipeSchema,
+		/** Whether a judge from another model family picked the source out of look-alikes at 28 px. */
+		judge: Schema.Struct({
+			recognizable: Schema.Boolean,
+			picked: Schema.optionalKey(Schema.String),
+		}),
+		/** The source colors the recipe may use, with the share of the mark each covers. */
+		palette: Schema.Array(Schema.Tuple([Schema.String, Schema.Number])),
+		author: Schema.Struct({ model: Schema.String, rounds: Schema.Number }),
+		usage: Schema.Struct({ calls: Schema.Number, ms: Schema.Number }),
+	}),
+	Schema.Struct({
+		ok: Schema.Literal(false),
+		status: Schema.String,
+		issues: Schema.Array(
+			Schema.Struct({ code: Schema.String, message: Schema.String, hint: Schema.String }),
+		),
+		retryAfterSeconds: Schema.optionalKey(Schema.Number),
+	}),
+]);
+
 export const codeModeContracts = {
 	buildFlowchart: {
 		input: BuildFlowchartRequestSchema,
@@ -228,6 +262,10 @@ export const codeModeContracts = {
 	searchIcons: {
 		input: SearchIconsRequestSchema,
 		output: SearchIconsResultSchema,
+	},
+	drawIcon: {
+		input: DrawIconRequestSchema,
+		output: DrawIconResultSchema,
 	},
 };
 

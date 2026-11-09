@@ -46,6 +46,15 @@ export default defineConfig({
 					.pathname,
 			},
 			{
+				find: /^@sketchi\/icon-catalog\/look-alikes$/,
+				replacement: new URL("../../packages/icons/catalog/src/look-alikes.ts", import.meta.url)
+					.pathname,
+			},
+			{
+				find: "@sketchi/icon-draw",
+				replacement: new URL("../../packages/icons/draw/src/index.ts", import.meta.url).pathname,
+			},
+			{
 				find: "@sketchi/studio-projects/client",
 				replacement: new URL("../../packages/studio/projects/src/client.ts", import.meta.url)
 					.pathname,

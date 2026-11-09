@@ -9,10 +9,13 @@ import {
 } from "@sketchi/observability";
 import { Effect, Layer, ManagedRuntime, Tracer } from "effect";
 
+import type { IconImagingResult } from "@sketchi/icon-draw";
+
 import {
 	BrowserRenderPool,
 	type BrowserRenderingOperation,
 	type CloudflareBrowserRunBinding,
+	type IconJobRequest,
 	type PngRenderCaller,
 	type PngRenderRequest,
 	type PngRenderTiming,
@@ -31,6 +34,15 @@ export type PngRenderResult =
 			readonly coldStart: boolean;
 			readonly timing: PngRenderTiming;
 	  }
+	| {
+			readonly _tag: "Failed";
+			readonly message: string;
+			readonly operation: BrowserRenderingOperation;
+	  };
+
+/** Plain data so it crosses Durable Object RPC intact. */
+export type IconJobResult =
+	| { readonly _tag: "Done"; readonly result: IconImagingResult }
 	| {
 			readonly _tag: "Failed";
 			readonly message: string;
@@ -84,6 +96,34 @@ export class CodeModePngRenderer extends DurableObject<CodeModePngRendererEnv> {
 					}),
 				}),
 				this.#exportSpans("playground.pngRenderer.renderPng", caller),
+			),
+		);
+	}
+
+	/** Prepares logos and exports icon scenes for the icon draw service. */
+	async runIconJob(request: IconJobRequest, caller?: PngRenderCaller): Promise<IconJobResult> {
+		const runtime = this.#rendererRuntime();
+		if (!runtime) {
+			return {
+				_tag: "Failed",
+				message: "The Browser Run binding is not configured.",
+				operation: "launch",
+			};
+		}
+		return runtime.runPromise(
+			Effect.gen(function* () {
+				const pool = yield* BrowserRenderPool;
+				return yield* pool.runIconJob(request);
+			}).pipe(
+				Effect.match({
+					onFailure: (error): IconJobResult => ({
+						_tag: "Failed",
+						message: error.message,
+						operation: error.operation,
+					}),
+					onSuccess: (result): IconJobResult => ({ _tag: "Done", result }),
+				}),
+				this.#exportSpans("playground.pngRenderer.iconJob", caller),
 			),
 		);
 	}

@@ -60,6 +60,8 @@ const BUILDERS = {
 const HELPERS = {
 	searchIcons:
 		"searchIcons({ q, limit? }) resolves to { icons: [{ slug, name, collection, match }] }: exact logo slugs for named technologies",
+	drawIcon:
+		"drawIcon({ name, svg }) hand-draws a logo the catalog lacks as an icon recipe, with a judge's verdict; about 15 s",
 	editFlowchart:
 		"editFlowchart({ artifactId, edits }) changes a built flowchart by node id or label and stores the result as a new artifact",
 	getArtifact:
@@ -123,7 +125,7 @@ const CODE_HINTS: Partial<Record<keyof typeof FAST_PATH, string>> = {
 	buildQuadrantChart: "2×2 matrices",
 };
 const EXECUTE_HELPERS = [
-	"searchIcons({ q }) resolves to { icons: [{ slug, match }] }",
+	"searchIcons({ q }) resolves to { icons: [{ slug, match }] }; drawIcon draws a logo it lacks",
 	"editFlowchart({ artifactId, edits }) changes a flowchart; never rebuild or patch one",
 	'getArtifact({ artifactId, format? }) reads an artifact; "document" is a flowchart\'s',
 	'applyDiagramPatch edits other artifacts; docs({ topic: "applyDiagramPatch" })',
@@ -265,6 +267,7 @@ export const EXECUTE_CODE_DESCRIPTION = [
 		return `- ${operation}${hint ? ` (${hint})` : ""}: ${line}`;
 	}),
 	`- createCanvas: ${BUILDERS.createCanvas}.`,
+	"- drawIcon({ name, svg }) hand-draws a logo: { recipe, judge }",
 ].join("\n");
 
 const PATCH_OPERATION_SUMMARY = [

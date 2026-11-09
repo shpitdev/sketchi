@@ -2,10 +2,13 @@ import { loadExcalidraw } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 
+import type { IconImagingJob, IconImagingResult } from "@sketchi/icon-draw";
+
 import {
 	exportExcalidrawPngBase64,
 	type PngExportOptions,
 } from "@/features/artifacts/excalidraw-png-export";
+import { runIconImagingJob } from "@/features/icons/icon-job";
 
 export const Route = createFileRoute("/codemode-export-harness")({
 	component: CodeModeExportHarnessRoute,
@@ -17,6 +20,7 @@ declare global {
 		| ((scene: unknown, options: PngExportOptions) => Promise<string>)
 		| undefined;
 	var sketchiExportReady: boolean | undefined;
+	var sketchiIconJob: ((job: IconImagingJob) => Promise<IconImagingResult>) | undefined;
 }
 
 function CodeModeExportHarnessRoute() {
@@ -35,6 +39,10 @@ function CodeModeExportHarnessRoute() {
 
 				globalThis.sketchiExportPng = (scene, options) =>
 					exportExcalidrawPngBase64(exportToBlob, scene, options);
+				globalThis.sketchiIconJob = (job) =>
+					runIconImagingJob(job, (scene, options) =>
+						exportExcalidrawPngBase64(exportToBlob, scene, options),
+					);
 				globalThis.sketchiExportReady = true;
 			})
 			.catch((error: unknown) => {

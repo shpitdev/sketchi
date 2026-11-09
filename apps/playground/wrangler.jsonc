@@ -26,6 +26,11 @@
 			{
 				"name": "CODEMODE_PNG_RENDERER",
 				"class_name": "CodeModePngRenderer"
+			},
+			// Counts icon draws per UTC day, against SKETCHI_ICON_DAILY_DRAWS.
+			{
+				"name": "ICON_DRAW_BUDGET",
+				"class_name": "IconDrawBudget"
 			}
 		]
 	},
@@ -33,6 +38,18 @@
 		{
 			"tag": "v1",
 			"new_sqlite_classes": ["CodeModePngRenderer"]
+		},
+		{
+			"tag": "v2",
+			"new_sqlite_classes": ["IconDrawBudget"]
+		}
+	],
+	// Icon drawing is public and spends model money: each client IP may start this many draws a minute.
+	"ratelimits": [
+		{
+			"name": "ICON_DRAW_RATE_LIMIT",
+			"namespace_id": "6301",
+			"simple": { "limit": 6, "period": 60 }
 		}
 	],
 	"observability": {
@@ -70,14 +87,17 @@
 		"SKETCHI_APP_SURFACE": "studio",
 		"SKETCHI_AI_GATEWAY_ID": "google-ai-studio",
 		"SKETCHI_AI_GENERATE_MODEL": "anthropic/claude-haiku-5-5",
-		"SKETCHI_AI_MODEL": "google/gemini-3.1-flash-lite"
+		"SKETCHI_AI_MODEL": "google/gemini-3.1-flash-lite",
+		// Icon draws a day across every client: about $0.015 each, $0.06 at most.
+		"SKETCHI_ICON_DAILY_DRAWS": "300"
 	},
 	"previews": {
 		"vars": {
 			"SKETCHI_APP_SURFACE": "studio",
 			"SKETCHI_AI_GATEWAY_ID": "google-ai-studio",
 			"SKETCHI_AI_GENERATE_MODEL": "anthropic/claude-haiku-5-5",
-			"SKETCHI_AI_MODEL": "google/gemini-3.1-flash-lite"
+			"SKETCHI_AI_MODEL": "google/gemini-3.1-flash-lite",
+			"SKETCHI_ICON_DAILY_DRAWS": "100"
 		},
 		"ai": {
 			"binding": "AI",
@@ -97,9 +117,20 @@
 				{
 					"name": "CODEMODE_PNG_RENDERER",
 					"class_name": "CodeModePngRenderer"
+				},
+				{
+					"name": "ICON_DRAW_BUDGET",
+					"class_name": "IconDrawBudget"
 				}
 			]
 		},
+		"ratelimits": [
+			{
+				"name": "ICON_DRAW_RATE_LIMIT",
+				"namespace_id": "6302",
+				"simple": { "limit": 6, "period": 60 }
+			}
+		],
 		"observability": {
 			"enabled": true,
 			"traces": {

@@ -38,6 +38,7 @@ from `scripts/lib/worker-apps.mjs`.
 | Product build       | `packages/diagram/agent`                 | canonical normalize, validate, quality, render, export, and artifact transaction |
 | Scenario evaluation | `packages/diagram/scenarios`             | maintained scenarios, pure grading, and internal Effect tooling                  |
 | Icon catalog        | `packages/icons/catalog`                 | icon manifest, ranked search, SVG sources, and node-logo eligibility             |
+| Icon drawing        | `packages/icons/draw`                    | a logo in, a judged hand-drawn recipe out: author rounds, renders, and the judge |
 | Studio persistence  | `packages/studio/projects`               | typed ownership and scoped R2 persistence services                               |
 | Telemetry           | `packages/observability`                 | span rows with full content, batched per request to a Pipelines stream           |
 | UI                  | `packages/diagram/ui` and app components | React rendering and local view state                                             |
@@ -82,6 +83,19 @@ offline. The credential-free network commands are `generate`, `share`, and
 `pull`: each makes one unauthenticated HTTPS request to its documented endpoint
 and needs no token, key, account, or login. `share` uses randomized client-side
 encryption, and `pull` depends on Excalidraw share availability.
+
+`POST /api/v1/icons/draw` on the same Worker draws a logo by hand: an SVG or a
+PNG, JPEG or WebP and a name in, a checked recipe, PNG previews, an
+`.excalidrawlib` and a judge's verdict out. A Claude author drafts and revises
+against renders of its own recipe on the gateway's native Messages route; a
+Gemini judge picks the source among catalog look-alikes from the 28 px drawing.
+Browser Rendering's export harness decodes logos and exports the renders. Each
+client IP may start 6 draws a minute (the `ICON_DRAW_RATE_LIMIT` binding), and
+every client together `SKETCHI_ICON_DAILY_DRAWS` a UTC day (the `IconDrawBudget`
+Durable Object), which bounds model spend; over either limit the endpoint
+answers 429 with `Retry-After`. Code Mode scripts call the same draw as
+`sketchi.drawIcon({ name, svg })`, which returns the recipe and verdict without
+the images. See [icon-draw](../packages/icons/draw/README.md).
 
 Scenario and harness commands are internal Nx/tool entrypoints and are not
 public CLI commands.

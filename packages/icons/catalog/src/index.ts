@@ -4,3 +4,5 @@ export * from "./node-logos.js";
 export * from "./search.js";
 export * from "./terms.js";
 export * from "./text-match.js";
+export * from "./mark-features.js";
+export * from "./svg-input.js";

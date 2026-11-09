@@ -9,6 +9,7 @@ for embedding marks inside diagram nodes.
 | icon pipeline output under `pipeline-output/` | where an app publishes the files |
 | generated manifest and slug-to-source map     | diagram layout or Excalidraw     |
 | hand-drawn icon recipes under `recipes/`      | the recipe format and its drawing |
+| SVG sanitizing and mark features, look-alikes | drawing new icons (icon-draw)     |
 | ranked search and node-logo eligibility       |                                  |
 
 ## Entry points
@@ -21,6 +22,8 @@ for embedding marks inside diagram nodes.
 - `@sketchi/icon-catalog/native-icons`: the built map of hand-drawn recipes by
   slug.
 - `@sketchi/icon-catalog/concepts`: the generic concept icons (`CONCEPT_ICONS`).
+- `@sketchi/icon-catalog/look-alikes`: each node logo's features and
+  `rankLookAlikes`.
 
 ## Data flow
 
@@ -69,10 +72,23 @@ Every concept and brand recipe must stay readable at 28 px with the scene's
 2-unit pen. Fewer, bolder strokes beat detail: cut parts or drop a concept
 rather than thin its lines.
 
+## Uploaded logos and look-alikes
+
+`sanitizeSvg` makes an untrusted SVG safe to rasterize (drawing elements and
+presentation attributes only, references inside the document, an explicit
+viewBox) and reads the exact paint colors it uses. `markFeatures` measures a
+mark drawn on white paper: its ink box, dominant colors and an 8x8 coverage
+grid. `@sketchi/icon-catalog/look-alikes` keeps those features for every node
+logo in `src/generated/look-alikes.json` and ranks the marks a new logo most
+resembles, which the icon draw service shows its judge. A test fails when a
+mark's source changes without the index; regenerate it with
+`pnpm nx generate-look-alikes icon-catalog`.
+
 ## Commands
 
 ```sh
 pnpm nx generate-catalog icon-catalog
+pnpm nx generate-look-alikes icon-catalog
 pnpm nx test icon-catalog
 pnpm nx typecheck icon-catalog
 pnpm nx build icon-catalog

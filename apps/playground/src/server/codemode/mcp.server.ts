@@ -27,6 +27,7 @@ import {
 	type CodeModeIssue,
 } from "@sketchi/diagram-agent";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { ICON_DRAW_BUDGET_MS } from "@sketchi/icon-draw";
 import { withTelemetryCorrelation, type TelemetryCorrelationInput } from "@sketchi/observability";
 import { Clock, Context, Deferred, Effect, Schema } from "effect";
 
@@ -63,6 +64,7 @@ import { PNG_EXPORT_TIMEOUT_MS } from "./browser-render-pool.server";
 import { createEffectMcpServer, makeEffectMcpTool } from "./effect-mcp-adapter.server";
 import { prewarmPngRendererOnSessionStart, readMcpMessage } from "./mcp-session-prewarm.server";
 import { PlaygroundCodeModeUsage } from "./usage-events.server";
+import { drawIconForAgent } from "../icons/draw.server";
 
 export interface SketchiCodeModeProvider {
 	name: string;
@@ -102,6 +104,8 @@ type McpHttpHandler = (
  * "png" in artifactFormats waits for the renderer's own PNG_EXPORT_TIMEOUT_MS instead.
  */
 const DEFAULT_PNG_BUDGET_MS = 15_000;
+/** A script may wait out one icon draw, whose budget is the longest of any operation. */
+const CODE_MODE_EXECUTE_TIMEOUT_MS = Math.max(30_000, ICON_DRAW_BUDGET_MS + 10_000);
 const DEFAULT_PNG_UNAVAILABLE_HINT = `Scene and Excalidraw are available. For the PNG, call again with options.artifactFormats ["scene", "excalidraw", "png"], which gives the export ${PNG_EXPORT_TIMEOUT_MS / 1000} seconds.`;
 
 const ExecuteRequestContract = Schema.Struct({
@@ -563,7 +567,7 @@ function createDefaultCodeModeExecutor() {
 				return new DynamicWorkerExecutor({
 					loader: env.LOADER,
 					globalOutbound: null,
-					timeout: 30_000,
+					timeout: CODE_MODE_EXECUTE_TIMEOUT_MS,
 				});
 			},
 			catch: (cause) =>
@@ -953,6 +957,8 @@ export function makeSketchiCodeModeProvider(
 				),
 			searchIcons: (request) =>
 				runToolEffect(withTelemetryCorrelation(codeMode.searchIcons(request), correlation)),
+			drawIcon: (request) =>
+				runToolEffect(withTelemetryCorrelation(drawIconForAgent(request), correlation)),
 		},
 	};
 }

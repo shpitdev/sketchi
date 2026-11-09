@@ -1160,7 +1160,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			expect(executeTool?.description).toContain("When the prompt names technologies");
 			// Every request pays for tools/list. Claude Code cuts the description at 4096 characters in
 			// upfront mode but keeps parameter descriptions, so the builder specs ride on code.
-			expect(executeTool?.description?.length).toBeLessThanOrEqual(1_382);
+			expect(executeTool?.description?.length).toBeLessThanOrEqual(1_414);
 			const codeDescription = String(
 				Reflect.get(executeTool?.inputSchema.properties?.code ?? {}, "description"),
 			);
@@ -1220,8 +1220,9 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			// under 12,800. The flowchart label rule adds about 200 back, and node colors with the
 			// editFlowchart line about 800, so an edit needs no docs turn, and the label-scope and
 			// two-product rules about 300; merging rules that repeat the spec or each other takes it to
-			// 13,311. The request line adds 90, so a build can name what it misses. Lower this budget;
-			// do not raise it.
+			// 13,311. The request line adds 90, so a build can name what it misses, and drawIcon 93 (32
+			// in the head, 61 in the code parameter), so an agent can draw a logo the catalog lacks.
+			// Lower this budget; do not raise it.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -1230,7 +1231,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(13_405);
+			).toBeLessThan(13_498);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,

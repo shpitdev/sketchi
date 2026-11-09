@@ -8,10 +8,11 @@ import {
 	BrowserRenderingFailure,
 	browserFailure,
 	browserRenderingRetrySchedule,
+	type IconJobRequest,
 	type PngRenderCaller,
 	type PngRenderRequest,
 } from "./browser-render-pool.server";
-import type { PngRenderResult } from "./png-renderer-object.server";
+import type { IconJobResult, PngRenderResult } from "./png-renderer-object.server";
 
 export const BROWSER_RENDER_TIMEOUT_MS = 60_000;
 /**
@@ -53,6 +54,8 @@ export class BrowserRenderingTimeout extends Schema.TaggedError<BrowserRendering
 export interface CodeModePngRendererNamespace {
 	getByName(name: string): {
 		renderPng(request: PngRenderRequest, caller?: PngRenderCaller): Promise<PngRenderResult>;
+		/** The icon draw service's raster work; a stub in tests that do not draw icons may omit it. */
+		runIconJob?(request: IconJobRequest, caller?: PngRenderCaller): Promise<IconJobResult>;
 		prewarm(harnessUrl: string, caller?: PngRenderCaller): Promise<void> | void;
 	};
 }
@@ -85,6 +88,25 @@ export const PlaygroundBrowserRenderingLive = Layer.succeed(PlaygroundBrowserRen
 	renderer: createCloudflareBrowserRunArtifactRenderer,
 });
 
+/** The export harness page Browser Rendering loads. */
+export function browserRunHarnessUrl(options: CloudflareBrowserRunRendererOptions = {}): string {
+	return new URL(HARNESS_PATH, options.assetOrigin ?? DEFAULT_ASSET_ORIGIN).toString();
+}
+
+/** The caller's span and request IDs, so the renderer's spans join the caller's trace. */
+export const browserRunCaller = Effect.gen(function* () {
+	const span = Option.getOrUndefined(yield* Effect.option(Effect.currentSpan));
+	if (!span) return undefined;
+	const { attemptId, rayId, runId } = yield* TelemetryCorrelation;
+	return {
+		...(attemptId ? { attemptId } : {}),
+		...(rayId ? { rayId } : {}),
+		...(runId ? { runId } : {}),
+		spanId: span.spanId,
+		traceId: span.traceId,
+	} satisfies PngRenderCaller;
+});
+
 /**
  * Renders through the `CodeModePngRenderer` Durable Object for the harness
  * URL, which keeps warm Browser Run pages between requests.
@@ -93,19 +115,8 @@ export function createCloudflareBrowserRunArtifactRenderer(
 	renderers: CodeModePngRendererNamespace,
 	options: CloudflareBrowserRunRendererOptions = {},
 ): CloudflareBrowserRunArtifactRenderer {
-	const harnessUrl = new URL(HARNESS_PATH, options.assetOrigin ?? DEFAULT_ASSET_ORIGIN).toString();
-	const caller = Effect.gen(function* () {
-		const span = Option.getOrUndefined(yield* Effect.option(Effect.currentSpan));
-		if (!span) return undefined;
-		const { attemptId, rayId, runId } = yield* TelemetryCorrelation;
-		return {
-			...(attemptId ? { attemptId } : {}),
-			...(rayId ? { rayId } : {}),
-			...(runId ? { runId } : {}),
-			spanId: span.spanId,
-			traceId: span.traceId,
-		} satisfies PngRenderCaller;
-	});
+	const harnessUrl = browserRunHarnessUrl(options);
+	const caller = browserRunCaller;
 
 	return {
 		prewarm: Effect.flatMap(caller, (parent) =>
