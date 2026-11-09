@@ -180,6 +180,7 @@ const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: strin
 	[FLOWCHART_RULES.statedChecks],
 	[FLOWCHART_RULES.labelWords(PROMPT)],
 	[FLOWCHART_RULES.labelForm],
+	[FLOWCHART_RULES.labelScope(PROMPT)],
 	[FLOWCHART_RULES.namedOutcomes(PROMPT)],
 	[FLOWCHART_RULES.documentRoles(PROMPT)],
 	[FLOWCHART_RULES.documentNoInventedSteps(PROMPT)],
