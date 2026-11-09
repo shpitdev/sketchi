@@ -1,4 +1,5 @@
 import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
+import { takeClientRequest } from "@sketchi/community-icons";
 import { lookAlikeMarks } from "@sketchi/icon-catalog/look-alikes";
 import type { IconImagingJob } from "@sketchi/icon-draw";
 import { describe, expect, it } from "vitest";
@@ -192,29 +193,57 @@ describe("drawing is bounded per client and per day", () => {
 		});
 	};
 
-	it("refuses a client over its per-minute limit with Retry-After, before reading its logo", async () => {
+	it("refuses a client's seventh request in a minute with Retry-After, before reading its logo", async () => {
 		const calls: Calls = { gateway: [], jobs: [], assets: [] };
-		const keys: string[] = [];
+		// The real sliding window, one store per object name, as the Durable Objects keep them.
+		const objects = new Map<string, Map<string, unknown>>();
+		const names: string[] = [];
 		const env: StudioEnv = {
 			...fakeEnv(calls, recipeReplies()),
-			ICON_DRAW_RATE_LIMIT: {
-				limit: ({ key }) => {
-					keys.push(key);
-					return Promise.resolve({ success: false });
+			ICON_DRAW_CLIENT_LIMIT: {
+				getByName: (name) => {
+					names.push(name);
+					const stored = objects.get(name) ?? new Map<string, unknown>();
+					objects.set(name, stored);
+					return {
+						take: (limit, windowMs) =>
+							takeClientRequest(
+								{
+									get: <T>(key: string) => Promise.resolve(stored.get(key) as T | undefined),
+									put: <T>(key: string, value: T) => {
+										stored.set(key, value);
+										return Promise.resolve();
+									},
+								},
+								limit,
+								windowMs,
+								Date.now(),
+							),
+					};
 				},
 			},
 		};
-		// Malformed or not, every request counts against the client.
-		expect((await withRequest(env, { name: "Acme", svg: "<svg" })).status).toBe(429);
-		const response = await withRequest(env, { name: "Acme", svg: SVG });
-		expect(response.status).toBe(429);
-		expect(response.headers.get("retry-after")).toBe("60");
-		expect(await response.json()).toMatchObject({
+		// Malformed or not, every request counts against its client.
+		const statuses: number[] = [];
+		for (let request = 0; request < 10; request += 1) {
+			statuses.push((await withRequest(env, { name: "Acme", svg: "<svg" })).status);
+		}
+		expect(statuses).toEqual([400, 400, 400, 400, 400, 400, 429, 429, 429, 429]);
+		const refused = await withRequest(env, { name: "Acme", svg: SVG });
+		expect(refused.status).toBe(429);
+		const retryAfter = Number(refused.headers.get("retry-after"));
+		expect(retryAfter).toBeGreaterThan(0);
+		expect(retryAfter).toBeLessThanOrEqual(60);
+		expect(await refused.json()).toMatchObject({
 			ok: false,
 			status: "rate_limited",
 			issues: [{ code: "rate_limited" }],
 		});
-		expect(keys).toEqual(["203.0.113.7", "203.0.113.7"]);
+		// Another address has its own count.
+		expect((await withRequest(env, { name: "Acme", svg: "<svg" }, "198.51.100.2")).status).toBe(
+			400,
+		);
+		expect(new Set(names)).toEqual(new Set(["client:203.0.113.7", "client:198.51.100.2"]));
 		expect(calls.gateway).toEqual([]);
 	});
 
