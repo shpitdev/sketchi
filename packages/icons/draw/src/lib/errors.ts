@@ -30,4 +30,15 @@ export class IconRecipeError extends Schema.TaggedError<IconRecipeError>()("Icon
 	message: Schema.String,
 }) {}
 
-export type IconDrawError = IconInputError | IconModelError | IconImagingError | IconRecipeError;
+/** The draw used up its time budget before it had a drawing to return. */
+export class IconTimeoutError extends Schema.TaggedError<IconTimeoutError>()("IconTimeoutError", {
+	message: Schema.String,
+	stage: Schema.Literals(["source", "lineup", "author", "render", "judge"]),
+}) {}
+
+export type IconDrawError =
+	| IconInputError
+	| IconModelError
+	| IconImagingError
+	| IconRecipeError
+	| IconTimeoutError;

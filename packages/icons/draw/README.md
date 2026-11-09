@@ -39,11 +39,16 @@ flowchart LR
    at most three author calls in all.
 4. **Judge.** A model from another family sees the 28 px drawing and five logos:
    the source and the four catalog marks it most resembles in color, layout and
-   proportion. When it picks a look-alike and a round remains, the author sees
-   the two side by side and revises once; the revision is kept only if the judge
-   then picks the source. An unrecognized icon still comes back, marked.
+   proportion (spares ranked after them replace any that fail to load or draw;
+   without four, the judge does not run and the verdict says why). When it picks
+   a look-alike and a round remains, the author sees the two side by side and
+   revises once; the revision is kept only if the judge then picks the source.
+   An unrecognized icon still comes back, marked.
 
-A draw stays within about 85 seconds; a round that would not fit is not started.
+A draw stays within 85 seconds. Every step (imaging, each model call and its
+retries) stops at the deadline, author rounds and renders keep 15 seconds free
+for the judge, and a round that would not fit is not started. A draw that runs
+out of time with a drawing returns it; one without a drawing fails as a timeout.
 
 ## Services
 

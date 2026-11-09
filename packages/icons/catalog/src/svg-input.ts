@@ -9,6 +9,8 @@ import { XMLBuilder, XMLParser, XMLValidator } from "fast-xml-parser";
 
 export const SVG_INPUT_MAX_BYTES = 1024 * 1024;
 export const SVG_INPUT_MAX_ELEMENTS = 20_000;
+/** Real drawings nest a handful of groups; this many is a file built to exhaust a parser. */
+export const SVG_INPUT_MAX_DEPTH = 32;
 
 export interface SvgViewBox {
 	readonly minX: number;
@@ -210,10 +212,15 @@ function safeAttributes(tag: string, attributes: Record<string, string>): Record
 
 interface SanitizeState {
 	elements: number;
+	tooDeep: boolean;
 }
 
-function sanitizeChildren(nodes: readonly XmlNode[], state: SanitizeState): XmlNode[] {
+function sanitizeChildren(nodes: readonly XmlNode[], state: SanitizeState, depth = 1): XmlNode[] {
 	const kept: XmlNode[] = [];
+	if (depth > SVG_INPUT_MAX_DEPTH) {
+		state.tooDeep = true;
+		return kept;
+	}
 	for (const node of nodes) {
 		const tag = tagOf(node);
 		if (tag === undefined) continue;
@@ -223,7 +230,7 @@ function sanitizeChildren(nodes: readonly XmlNode[], state: SanitizeState): XmlN
 		}
 		if (tag.startsWith("?") || tag.startsWith("!") || tag === "#comment") continue;
 		if (UNWRAPPED_ELEMENTS.has(tag)) {
-			kept.push(...sanitizeChildren(childrenOf(node, tag), state));
+			kept.push(...sanitizeChildren(childrenOf(node, tag), state, depth + 1));
 			continue;
 		}
 		if (!ALLOWED_ELEMENTS.has(tag)) continue;
@@ -238,7 +245,7 @@ function sanitizeChildren(nodes: readonly XmlNode[], state: SanitizeState): XmlN
 							? [{ "#text": safeCss(String(child["#text"])) }]
 							: [],
 					)
-				: sanitizeChildren(childrenOf(node, tag), state);
+				: sanitizeChildren(childrenOf(node, tag), state, depth + 1);
 		kept.push({
 			[tag]: children,
 			...(Object.keys(attributes).length > 0 ? { ":@": attributes } : {}),
@@ -303,7 +310,12 @@ export function sanitizeSvg(source: string): SanitizeSvgResult {
 		processEntities: false,
 		removeNSPrefix: false,
 	});
-	const parsed: unknown = parser.parse(source);
+	let parsed: unknown;
+	try {
+		parsed = parser.parse(source);
+	} catch {
+		return { ok: false, issue: "malformed_svg", message: "The SVG could not be parsed." };
+	}
 	const nodes = Array.isArray(parsed) ? (parsed as XmlNode[]) : [];
 	const root = nodes.find((node) => tagOf(node) === "svg");
 	if (!root) {
@@ -318,13 +330,15 @@ export function sanitizeSvg(source: string): SanitizeSvgResult {
 			message: "The SVG has neither a viewBox nor a numeric width and height.",
 		};
 	}
-	const state: SanitizeState = { elements: 0 };
+	const state: SanitizeState = { elements: 0, tooDeep: false };
 	const children = sanitizeChildren(childrenOf(root, "svg"), state);
-	if (state.elements > SVG_INPUT_MAX_ELEMENTS) {
+	if (state.elements > SVG_INPUT_MAX_ELEMENTS || state.tooDeep) {
 		return {
 			ok: false,
 			issue: "svg_too_complex",
-			message: `The SVG has more than ${SVG_INPUT_MAX_ELEMENTS} elements.`,
+			message: state.tooDeep
+				? `The SVG nests elements more than ${SVG_INPUT_MAX_DEPTH} levels deep.`
+				: `The SVG has more than ${SVG_INPUT_MAX_ELEMENTS} elements.`,
 		};
 	}
 	const {
@@ -355,7 +369,15 @@ export function sanitizeSvg(source: string): SanitizeSvgResult {
 		suppressEmptyNode: true,
 		processEntities: false,
 	});
-	return { ok: true, value: { svg: builder.build([tree]), viewBox, colors } };
+	try {
+		return { ok: true, value: { svg: builder.build([tree]), viewBox, colors } };
+	} catch {
+		return {
+			ok: false,
+			issue: "svg_too_complex",
+			message: "The SVG could not be rewritten safely.",
+		};
+	}
 }
 
 function hasDrawing(nodes: readonly XmlNode[]): boolean {
@@ -476,6 +498,8 @@ function cssRules(tree: XmlNode): Map<string, Record<string, string>> {
 interface Paint {
 	readonly fill: string | undefined;
 	readonly stroke: string | undefined;
+	/** What `currentColor` means here: the nearest `color`, black when none is set. */
+	readonly color: string | undefined;
 }
 
 /**
@@ -505,10 +529,12 @@ function svgPaintColors(tree: XmlNode): string[] {
 	collectGradients(tree);
 
 	const counts = new Map<string, number>();
-	const count = (value: string | undefined) => {
+	const count = (value: string | undefined, currentColor: string | undefined) => {
 		if (!value) return;
-		const reference = /^url\(\s*['"]?#([^'")]+)['"]?\s*\)/u.exec(value.trim())?.[1];
-		const colors = reference ? (gradients.get(reference) ?? []) : [normalizeCssColor(value)];
+		const paint =
+			value.trim().toLowerCase() === "currentcolor" ? (currentColor ?? "#000000") : value;
+		const reference = /^url\(\s*['"]?#([^'")]+)['"]?\s*\)/u.exec(paint.trim())?.[1];
+		const colors = reference ? (gradients.get(reference) ?? []) : [normalizeCssColor(paint)];
 		for (const color of colors) {
 			if (color) counts.set(color, (counts.get(color) ?? 0) + 1);
 		}
@@ -523,23 +549,30 @@ function svgPaintColors(tree: XmlNode): string[] {
 			.split(/\s+/u)
 			.filter(Boolean)
 			.map((name) => rules.get(`.${name}`) ?? {});
+		// CSS precedence: element, then class, then id selectors, then the inline style.
 		const element = Object.assign(
 			{},
 			rules.get(tag) ?? {},
 			...classRules,
+			attributes["id"] ? (rules.get(`#${attributes["id"]}`) ?? {}) : {},
 			declarations(attributes["style"]),
 		);
+		const color = element["color"] ?? attributes["color"];
 		const paint: Paint = {
 			fill: element["fill"] ?? attributes["fill"] ?? inherited.fill,
 			stroke: element["stroke"] ?? attributes["stroke"] ?? inherited.stroke,
+			color:
+				color === undefined || color.trim().toLowerCase() === "currentcolor"
+					? inherited.color
+					: (normalizeCssColor(color) ?? inherited.color),
 		};
 		if (DRAWN_ELEMENTS.has(tag) && tag !== "tspan") {
-			if (tag !== "line" && tag !== "polyline") count(paint.fill ?? "#000000");
-			count(paint.stroke);
+			if (tag !== "line" && tag !== "polyline") count(paint.fill ?? "#000000", paint.color);
+			count(paint.stroke, paint.color);
 		}
 		childrenOf(node, tag).forEach((child) => visit(child, paint));
 	};
-	visit(tree, { fill: undefined, stroke: undefined });
+	visit(tree, { fill: undefined, stroke: undefined, color: undefined });
 	return [...counts.entries()]
 		.sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
 		.map(([color]) => color);

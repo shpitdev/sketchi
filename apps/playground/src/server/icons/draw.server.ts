@@ -59,6 +59,7 @@ type IconDrawFailureStatus =
 	| "provider_failed"
 	| "render_failed"
 	| "invalid_recipe"
+	| "draw_timeout"
 	| "not_configured";
 
 const FAILURE_STATUS: Record<IconDrawFailureStatus, number> = {
@@ -68,6 +69,7 @@ const FAILURE_STATUS: Record<IconDrawFailureStatus, number> = {
 	render_failed: 502,
 	provider_failed: 502,
 	not_configured: 503,
+	draw_timeout: 504,
 };
 
 interface IconDrawIssue {
@@ -134,6 +136,12 @@ function errorFailure(error: IconDrawError): IconDrawFailure {
 				code: `${error.stage}_failed`,
 				message: error.message,
 				hint: "Retry once; if it persists, send the logo as a PNG.",
+			});
+		case "IconTimeoutError":
+			return failure("draw_timeout", {
+				code: `${error.stage}_timeout`,
+				message: error.message,
+				hint: "Retry once; a simpler logo draws faster.",
 			});
 		case "IconRecipeError":
 			return failure("invalid_recipe", {

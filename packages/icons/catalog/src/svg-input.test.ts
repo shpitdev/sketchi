@@ -57,6 +57,31 @@ describe("sanitizeSvg", () => {
 		);
 	});
 
+	it("reads id-selector rules over element rules", () => {
+		const { colors } = sanitized(`<svg viewBox="0 0 10 10">
+  <style>path { fill: #ff0000 } #mark { fill: #ff7700 }</style>
+  <path id="mark" d="M0 0h1v1z"/>
+</svg>`);
+		expect(colors).toEqual(["#ff7700"]);
+	});
+
+	it("resolves currentColor from the nearest color, black when none is set", () => {
+		const { colors } = sanitized(`<svg viewBox="0 0 10 10">
+  <g color="#2496ed"><path fill="currentColor" d="M1 1h1v1z"/><g style="color: #e01e5a"><path stroke="currentColor" fill="none" d="M2 2h1v1z"/></g></g>
+  <path fill="currentColor" d="M3 3h1v1z"/>
+</svg>`);
+		expect([...colors].sort()).toEqual(["#000000", "#2496ed", "#e01e5a"]);
+	});
+
+	it("answers a deeply nested file as too complex instead of failing", () => {
+		const nested = `<svg viewBox="0 0 1 1">${"<g>".repeat(99)}<rect width="1" height="1"/>${"</g>".repeat(99)}</svg>`;
+		expect(nested.length).toBeLessThan(1024);
+		expect(sanitizeSvg(nested)).toMatchObject({ ok: false, issue: "svg_too_complex" });
+		const deeper = `<svg viewBox="0 0 1 1">${"<g>".repeat(5000)}${"</g>".repeat(5000)}</svg>`;
+		expect(() => sanitizeSvg(deeper)).not.toThrow();
+		expect(sanitizeSvg(deeper).ok).toBe(false);
+	});
+
 	it("rejects what it cannot draw safely", () => {
 		expect(sanitizeSvg("<svg><rect")).toMatchObject({ ok: false, issue: "malformed_svg" });
 		expect(sanitizeSvg("<html><body/></html>")).toMatchObject({ ok: false, issue: "not_svg" });

@@ -1,10 +1,11 @@
 import { iconRecipeIssues } from "@sketchi/diagram-core";
-import { lookAlikeMarks } from "@sketchi/icon-catalog/look-alikes";
-import { Effect, Layer } from "effect";
-import { describe, expect, it } from "vitest";
+import { lookAlikeMarks, rankLookAlikes } from "@sketchi/icon-catalog/look-alikes";
+import { Effect, Fiber, Layer } from "effect";
+import { TestClock } from "effect/testing";
+import { describe, expect, it } from "@effect/vitest";
 
 import { AUTHOR_SYSTEM_PROMPT, decodeAuthorReply, normalizeRecipe } from "./author.js";
-import { drawIcon, IconCatalogSvgs, sourcePalette } from "./draw.js";
+import { drawIcon, ICON_DRAW_BUDGET_MS, IconCatalogSvgs, sourcePalette } from "./draw.js";
 import { IconImaging, type IconImagingJob } from "./imaging.js";
 import { prepareIconInput, rasterHeader } from "./input.js";
 import { decodeJudgeReply, judgeLineup } from "./judge.js";
@@ -66,6 +67,11 @@ const usage = { inputTokens: 10, outputTokens: 20, cacheReadTokens: 100, cacheWr
 interface Script {
 	readonly author: readonly unknown[];
 	readonly judge: readonly string[];
+	/** How long each model call takes, on the test clock. */
+	readonly authorDelayMs?: number;
+	readonly judgeDelayMs?: number;
+	/** Catalog marks that fail to load. */
+	readonly missing?: (slug: string) => boolean;
 }
 
 /** Fakes for every service a draw needs, replying from a script and recording what was asked. */
@@ -97,22 +103,35 @@ function fakes(script: Script) {
 				}),
 		}),
 		Layer.succeed(IconCatalogSvgs, {
-			load: () => Effect.succeed('<svg viewBox="0 0 2 2"><rect width="2" height="1"/></svg>'),
+			load: (slug) =>
+				Effect.succeed(
+					script.missing?.(slug)
+						? undefined
+						: '<svg viewBox="0 0 2 2"><rect width="2" height="1"/></svg>',
+				),
 		}),
 		Layer.succeed(IconDrawModels, {
 			judgeModel: "judge",
 			author: ({ messages }) =>
-				Effect.sync(() => {
-					seen.authorTurns.push(messages.length);
-					const reply = authorReplies.shift();
-					const text = typeof reply === "string" ? reply : JSON.stringify(reply);
-					return { content: [{ type: "text", text }], text, call: call("author") };
-				}),
+				Effect.sleep(script.authorDelayMs ?? 0).pipe(
+					Effect.andThen(
+						Effect.sync(() => {
+							seen.authorTurns.push(messages.length);
+							const reply = authorReplies.shift();
+							const text = typeof reply === "string" ? reply : JSON.stringify(reply);
+							return { content: [{ type: "text", text }], text, call: call("author") };
+						}),
+					),
+				),
 			judge: ({ lineup }) =>
-				Effect.sync(() => {
-					seen.judged.push([...lineup]);
-					return { text: judgeReplies.shift() ?? "", call: call("judge") };
-				}),
+				Effect.sleep(script.judgeDelayMs ?? 0).pipe(
+					Effect.andThen(
+						Effect.sync(() => {
+							seen.judged.push([...lineup]);
+							return { text: judgeReplies.shift() ?? "", call: call("judge") };
+						}),
+					),
+				),
 		}),
 	);
 	return { layer, seen };
@@ -152,7 +171,8 @@ describe("drawIcon", () => {
 		// One job prepared the source; the round's job exported the sheet and previews and the lineup.
 		expect(seen.jobs[0]?.prepare.map(({ id }) => id)).toEqual(["source", "lineup:source"]);
 		expect(seen.jobs[1]?.exports.map(({ id }) => id)).toEqual(["sheet", "png28", "png112"]);
-		expect(seen.jobs[1]?.prepare).toHaveLength(4);
+		// Every loaded look-alike is drawn, so a spare can replace one that draws nothing.
+		expect(seen.jobs[1]?.prepare).toHaveLength(8);
 		// The judge saw five logos and gave no usable answer, so the drawing is marked.
 		expect(seen.judged[0]).toHaveLength(5);
 		expect(icon.judge).toMatchObject({ recognizable: false, attempts: 1, model: "judge" });
@@ -265,6 +285,97 @@ describe("drawIcon", () => {
 	});
 });
 
+describe("drawIcon within its budget", () => {
+	it.effect("stops starting rounds and cuts the judge off at the deadline", () =>
+		Effect.gen(function* () {
+			const { layer } = fakes({
+				author: [
+					{ accept: false, recipe: draft },
+					{ accept: false, recipe: revised },
+					{ accept: false, recipe: draft },
+				],
+				judge: ['{"logo": 1}'],
+				authorDelayMs: 30_000,
+				judgeDelayMs: 30_000,
+			});
+			const fiber = yield* Effect.forkChild(
+				prepareIconInput({ name: "Slack", svg: SLACK_SVG }).pipe(
+					Effect.flatMap((prepared) =>
+						drawIcon(prepared, { authorModel: "anthropic/claude-sonnet-5-5" }),
+					),
+					Effect.provide(layer),
+				),
+			);
+			yield* TestClock.adjust("200 seconds");
+			const icon = yield* Fiber.join(fiber);
+			// Two 30 s rounds fit; a third would run into the judge's reserve, and the judge's 30 s
+			// call is cut off when the 85 s run out. The icon still comes back, marked.
+			expect(icon.author.rounds).toBe(2);
+			expect(icon.recipe).toEqual(revised);
+			expect(icon.usage.ms).toBeLessThanOrEqual(ICON_DRAW_BUDGET_MS);
+			expect(icon.judge).toMatchObject({ recognizable: false, attempts: 1 });
+			expect(icon.judge.error).toContain("budget");
+		}),
+	);
+
+	it.effect("fails with a timeout when not even a first draft fits", () =>
+		Effect.gen(function* () {
+			const { layer } = fakes({ author: [], judge: [], authorDelayMs: 120_000 });
+			const fiber = yield* Effect.forkChild(
+				prepareIconInput({ name: "Slack", svg: SLACK_SVG }).pipe(
+					Effect.flatMap((prepared) =>
+						drawIcon(prepared, { authorModel: "anthropic/claude-sonnet-5-5" }),
+					),
+					Effect.provide(layer),
+					Effect.flip,
+				),
+			);
+			yield* TestClock.adjust("200 seconds");
+			expect(yield* Fiber.join(fiber)).toMatchObject({ _tag: "IconTimeoutError", stage: "author" });
+		}),
+	);
+});
+
+describe("the judge's lineup", () => {
+	const ranked = rankLookAlikes(lookAlikeMarks["slack"]!, { name: "Slack", count: 8 }).map(
+		({ slug }) => slug,
+	);
+
+	it("replaces look-alikes that fail to load with the next ranked ones", async () => {
+		const unavailable = new Set(ranked.slice(0, 2));
+		const { result, seen } = await run({
+			// A third turn in case the judge's pick is a look-alike: the author keeps its drawing.
+			author: [
+				{ accept: false, recipe: draft },
+				{ accept: true, recipe: null },
+				{ accept: true, recipe: null },
+			],
+			judge: ['{"logo": 1}'],
+			missing: (slug) => unavailable.has(slug),
+		});
+		if (result._tag !== "Success") throw new Error("draw failed");
+		expect(seen.judged[0]).toHaveLength(5);
+		expect([...result.success.judge.lineup].sort()).toEqual(
+			["source", ...ranked.slice(2, 6)].sort(),
+		);
+	});
+
+	it("does not judge without a full lineup, and says why", async () => {
+		const { result, seen } = await run({
+			author: [
+				{ accept: false, recipe: draft },
+				{ accept: true, recipe: null },
+			],
+			judge: ['{"logo": 1}'],
+			missing: (slug) => slug !== ranked[0],
+		});
+		if (result._tag !== "Success") throw new Error("draw failed");
+		expect(seen.judged).toEqual([]);
+		expect(result.success.judge).toMatchObject({ recognizable: false, attempts: 0, lineup: [] });
+		expect(result.success.judge.error).toContain("Only 1 of the 4 look-alikes");
+	});
+});
+
 describe("prepareIconInput", () => {
 	const png = (width: number, height: number) => {
 		const bytes = new Uint8Array(33);
@@ -301,6 +412,8 @@ describe("prepareIconInput", () => {
 			"one_source_required",
 		);
 		expect(await code({ name: "Acme", svg: "<svg" })).toBe("malformed_svg");
+		const nested = `<svg viewBox="0 0 1 1">${"<g>".repeat(99)}<rect width="1" height="1"/>${"</g>".repeat(99)}</svg>`;
+		expect(await code({ name: "Acme", svg: nested })).toBe("svg_too_complex");
 		expect(await code({ name: "Acme", image: "!!!" })).toBe("invalid_image");
 		expect(await code({ name: "Acme", image: btoa("GIF89a....") })).toBe("unsupported_image");
 		expect(await code({ name: "Acme", image: png(5000, 64) })).toBe("image_size");

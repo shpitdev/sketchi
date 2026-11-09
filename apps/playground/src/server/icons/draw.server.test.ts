@@ -138,7 +138,8 @@ describe("POST /api/v1/icons/draw", () => {
 			output_config: { effort: "low", format: { type: "json_schema" } },
 		});
 		// The look-alikes come from the Worker's own node-logo assets.
-		expect(calls.assets).toHaveLength(4);
+		// Eight ranked look-alikes load, so a spare replaces any that fails.
+		expect(calls.assets).toHaveLength(8);
 		expect(calls.assets.every((url) => url.startsWith("https://studio.example/node-logos/"))).toBe(
 			true,
 		);
