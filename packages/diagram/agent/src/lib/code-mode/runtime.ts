@@ -46,7 +46,11 @@ import {
 	wrappedLabelWidth,
 	wrapTextToWidth,
 	applyFlowchartEdits,
+	checkRequestCoverage,
+	type CoverageIssueCode,
 	decodeFlowchartDocument,
+	FLOWCHART_COVERAGE_CODES,
+	type FlowchartDiagram,
 	flowchartDiagramFromDocument,
 	type FlowchartValidationIssue,
 	type FlowchartValidationIssueRef,
@@ -1907,6 +1911,36 @@ function issue(input: {
 		message: input.message,
 		hint: input.hint,
 	};
+}
+
+const FLOWCHART_COVERAGE = new Set<CoverageIssueCode>(FLOWCHART_COVERAGE_CODES);
+const isFlowchartCoverageCode = (
+	code: CoverageIssueCode,
+): code is (typeof FLOWCHART_COVERAGE_CODES)[number] => FLOWCHART_COVERAGE.has(code);
+
+/**
+ * What the caller's request states that an accepted flowchart misses, checked as generation
+ * checks its own diagrams. The build still stands; one edit can add what is missing.
+ */
+function flowchartCoverageIssues(
+	request: string | undefined,
+	diagram: FlowchartDiagram,
+): CodeModeIssue[] {
+	if (request === undefined) return [];
+	return checkRequestCoverage(request, diagram).flatMap((entry) =>
+		isFlowchartCoverageCode(entry.code)
+			? [
+					issue({
+						code: entry.code,
+						severity: "warning",
+						stage: "coverage",
+						ref: { kind: "diagram" },
+						message: entry.message,
+						hint: "Fix it with editFlowchart({ artifactId, edits }) before you answer.",
+					}),
+				]
+			: [],
+	);
 }
 
 /** A description past its line limit still draws in full; the build warns so it can be shortened. */
@@ -5178,6 +5212,19 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 	} satisfies Extract<CreateCanvasResult, { ok: true }>;
 });
 
+/**
+ * Agents write the request inside the spec as often as beside it, where the spec would drop it
+ * unread; it describes the whole build, so it moves beside the spec.
+ */
+function requestBesideSpec(input: unknown): unknown {
+	const request = unknownRecord(input);
+	const spec = unknownRecord(request?.["spec"]);
+	if (!request || !spec || request["request"] !== undefined || typeof spec["request"] !== "string")
+		return input;
+	const { request: text, ...document } = spec;
+	return { ...request, spec: document, request: text };
+}
+
 const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(function* (
 	input: unknown,
 	/** The artifact an edit started from, recorded on the one this build stores. */
@@ -5186,7 +5233,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	const parsed = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
 		errors: "all",
 		reportInput: true,
-	})(input);
+	})(requestBesideSpec(input));
 	if (!Result.isSuccess(parsed)) {
 		return yield* new BuildFlowchartFailure({
 			status: "invalid_input",
@@ -5369,6 +5416,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 			...groupLogos.issues,
 			...embedded.issues,
 			...longDescriptionIssues(scene),
+			...flowchartCoverageIssues(request.request, diagram),
 		],
 	} satisfies Extract<BuildFlowchartResult, { ok: true }>;
 });
@@ -5450,6 +5498,7 @@ const editFlowchartWorkflow = Effect.fn("codeMode.editFlowchart.workflow")(funct
 	const built = yield* buildFlowchartWorkflow(
 		{
 			spec: edited.document,
+			...(request.request ? { request: request.request } : {}),
 			...(request.options ? { options: request.options } : {}),
 			...(request.requestId ? { requestId: request.requestId } : {}),
 		},

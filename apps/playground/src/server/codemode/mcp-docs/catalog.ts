@@ -175,6 +175,10 @@ const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "
  * name sketchi.searchIcons, are the MCP's own.
  */
 const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: string])[] = [
+	[
+		"Pass { spec, request }: request is the prompt, verbatim; the build lists what it misses.",
+		"Each coverage issue names a stated arrow, step or zone the accepted diagram lacks; one editFlowchart adds it.",
+	],
 	[FLOWCHART_RULES.separateNodes(PROMPT)],
 	[FLOWCHART_RULES.statedChecks],
 	[FLOWCHART_RULES.labelWords(PROMPT)],

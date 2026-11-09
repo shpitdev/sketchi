@@ -5,16 +5,46 @@
  * messages a sequence lists. A check reads only structure the request spells
  * out, without another model call.
  */
-import { isUnknownRecord } from "./unknown-record.js";
+
+/** What a flowchart can miss of its request, which every surface that builds one can check. */
+export const FLOWCHART_COVERAGE_CODES = [
+	"quoted_text_missing",
+	"flowchart_connection_missing",
+	"flowchart_return_step_missing",
+	"flowchart_container_missing",
+	"flowchart_containment_wrong",
+	"flowchart_containment_unstated",
+	"flowchart_zone_merged",
+] as const;
+
+export const COVERAGE_ISSUE_CODES = [
+	...FLOWCHART_COVERAGE_CODES,
+	"class_missing",
+	"class_field_missing",
+	"class_link_missing",
+	"class_generalization_missing",
+	"class_relationship_unstated",
+	"class_whole_part_unstated",
+	"er_table_missing",
+	"er_column_missing",
+	"er_marker_mismatch",
+	"er_reference_missing",
+	"sequence_message_missing",
+	"sequence_order_changed",
+] as const;
+export type CoverageIssueCode = (typeof COVERAGE_ISSUE_CODES)[number];
 
 export interface CoverageIssue {
 	/** A stable code, such as `class_field_missing`. */
-	readonly code: string;
+	readonly code: CoverageIssueCode;
 	/** What the request states and the diagram lacks, worded as the fix. */
 	readonly message: string;
 }
 
 type Json = Readonly<Record<string, unknown>>;
+
+const isUnknownRecord = (value: unknown): value is Record<string, unknown> =>
+	value !== null && typeof value === "object" && !Array.isArray(value);
 
 const records = (value: unknown): Json[] =>
 	Array.isArray(value) ? value.filter((entry): entry is Json => isUnknownRecord(entry)) : [];
@@ -49,10 +79,15 @@ function stem(word: string): string {
 	return result;
 }
 
+/** Abbreviations a request and a label use interchangeably: "db subnet" is the "Database subnet". */
+const SPELLED_OUT: Readonly<Record<string, string>> = { db: "database" };
+
+const stemWord = (word: string) => stem(SPELLED_OUT[word] ?? word);
+
 function stems(value: string): string[] {
 	return words(value)
 		.filter((word) => !STOP_WORDS.has(word))
-		.map(stem);
+		.map(stemWord);
 }
 
 const normalized = (value: string) => words(value).join(" ");
@@ -122,6 +157,15 @@ const LEAVES_OUT =
 /** Ordering negation, not action names such as "Remove item" or "Drop package". */
 const NEGATES_ORDER =
 	/\b(?:cannot|(?:can|mustn|shouldn|don|doesn|isn|aren|wasn|weren)['’]t|(?:must|should|do|does|is|are|was|were)\s+not|forbidden|never|without|avoid)\b/iu;
+
+/** A verb negated: "do not send", "never retries". A bare "not ready" or "no reply" is a condition. */
+const NEGATED_ACTION =
+	/\b(?:(?:do|does|did|will|would|must|should|can|could|may|might)\s+not|(?:don|doesn|didn|won|wouldn|can|mustn|shouldn)['’]t|cannot|never|avoid|without)\b/iu;
+/** A clause that places nothing where it names: "do not put the API in the public subnet". */
+const NEGATED_PLACEMENT = new RegExp(
+	`${NEGATED_ACTION.source}|\\b(?:not|no|nor|none|outside|except|instead)\\b`,
+	"iu",
+);
 
 /** Quoted text a clause asks to show; a clause that leaves something out asks for none of it. */
 function requiredQuotes(request: string): string[] {
@@ -744,6 +788,22 @@ function chainItems(segment: string, position: "first" | "middle" | "last"): str
 	);
 }
 
+/**
+ * The arrow chains of a request, one per line or clause. A ";" ends a chain, and so does a
+ * parenthesized branch with arrows of its own ("complete? (no → ask; yes → check)"), which states
+ * what follows the step before it only through the answer inside.
+ */
+function arrowChains(request: string): string[] {
+	let flattened = request;
+	for (let previous = ""; previous !== flattened;) {
+		previous = flattened;
+		flattened = flattened.replace(/\(([^()]*)\)/gu, (group, inner: string) =>
+			ARROW.test(inner) ? `;${inner};` : group,
+		);
+	}
+	return flattened.split(/[\n;]/u);
+}
+
 function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 	const nodes = records(diagram["nodes"]);
 	const edges = records(diagram["edges"]);
@@ -785,7 +845,7 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 	};
 	const issues: CoverageIssue[] = [];
 	const missing: string[] = [];
-	for (const line of request.replace(DIRECTION, " ").split(/\n/u)) {
+	for (const line of arrowChains(request.replace(DIRECTION, " "))) {
 		// A yes or no between two arrows labels the edge rather than naming a step.
 		const segments = line.split(ARROW).filter((segment) => !BRANCH_ANSWER.test(segment.trim()));
 		if (segments.length < 2) continue;
@@ -863,6 +923,13 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 			message: `The request connects ${quoteList([...new Set(missing)])}, but the diagram has no directed path between them. Keep every stated arrow, "X before Y" and "X then Y" continuation; "a + b → c" means both a → c and b → c.`,
 		});
 	}
+	const unshown = returnActions(request, nodes, edges);
+	if (unshown.length > 0) {
+		issues.push({
+			code: "flowchart_return_step_missing",
+			message: `The request states ${quoteList(unshown)} before a step repeats, but no node on that loop shows ${unshown.length === 1 ? "it" : "them"}. Give each such action its own node on the return path, then connect it back to the repeated step.`,
+		});
+	}
 
 	const containers = records(diagram["groups"])
 		.concat(records(diagram["lanes"]))
@@ -884,6 +951,98 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 	}
 	issues.push(...containmentIssues(request, nodes, records(diagram["groups"]), match));
 	return issues;
+}
+
+/** A clause that goes back to an earlier step: "checks again", "loops back to", "repeat the review". */
+const RETURNS = /\b(?:again|back\s+to|loops?\s+back|returns?\s+to|repeats?)\b/iu;
+/** A clause that states when, not what: the condition before a branch's actions. */
+const CONDITION = /\b(?:if|when|whenever|unless|once|after|before|while|until)\b/iu;
+/** The condition that ends a repeat: "until done", "while pending". */
+const LOOP_CONDITION = /\s*\b(?:until|till|unless|while|as long as|if|when|once)\b.*$/iu;
+/** Words that name no action of their own: "keeps waiting" acts by waiting. */
+const AUXILIARY = new Set(
+	"keep keeps keeping continue continues stay stays remain remains go goes going through still just instead get gets start starts begin begins will can may must should would not no never"
+		.split(" ")
+		.map(stem),
+);
+
+/**
+ * Actions a request states on the way back to an earlier step ("not ready keeps waiting and
+ * checks again") that no node on a loop shows. Words a decision already shows are the branch's
+ * condition, not its action. Arrow chains are left to the connection check.
+ */
+function returnActions(request: string, nodes: readonly Json[], edges: readonly Json[]): string[] {
+	const ids = nodes.map((node) => text(node["id"]));
+	const labelStems = nodes.map((node) => new Set(stems(text(node["label"]))));
+	const decisionStems = new Set(
+		nodes.flatMap((node, index) =>
+			node["kind"] === "decision" ? [...(labelStems[index] ?? [])] : [],
+		),
+	);
+	const successors = new Map<string, string[]>();
+	for (const edge of edges) {
+		const source = text(edge["source"]);
+		successors.set(source, [...(successors.get(source) ?? []), text(edge["target"])]);
+	}
+	const reaches = (from: string, to: string) => {
+		const seen = new Set<string>();
+		const pending = [...(successors.get(from) ?? [])];
+		while (pending.length > 0) {
+			const id = pending.pop() ?? "";
+			if (id === to) return true;
+			if (seen.has(id)) continue;
+			seen.add(id);
+			pending.push(...(successors.get(id) ?? []));
+		}
+		return false;
+	};
+	const onLoop = new Set(ids.filter((id) => reaches(id, id)));
+	const missing: string[] = [];
+	for (const line of request.split("\n")) {
+		if (ARROW.test(line)) continue;
+		for (const sentence of line.split(/[.!?;]/u)) {
+			const conjuncts = sentence
+				.split(/,|\b(?:and|then|but)\b/iu)
+				.map((part) => part.trim())
+				.filter(Boolean);
+			const back = conjuncts.findIndex((part) => RETURNS.test(part));
+			const action = conjuncts[back - 1];
+			const repeat = conjuncts[back] ?? "";
+			// A forbidden action is no step to draw, and a stated condition is no action.
+			if (
+				back < 1 ||
+				action === undefined ||
+				CONDITION.test(action) ||
+				NEGATED_ACTION.test(action) ||
+				NEGATED_ACTION.test(repeat)
+			)
+				continue;
+			// "repeat Check status until done" repeats Check status; "until done" is when it stops.
+			const repeated = new Set(stems(repeat.replace(LOOP_CONDITION, "")));
+			const repeatedStep = [...repeated].filter(
+				(word) => !AUXILIARY.has(word) && !RETURNS.test(word) && !/^(?:loop|back)$/u.test(word),
+			);
+			const wanted = stems(action).filter(
+				(word) => !AUXILIARY.has(word) && !holds(decisionStems, word) && !holds(repeated, word),
+			);
+			if (wanted.length === 0) continue;
+			const shown = nodes.some((node, index) => {
+				if (node["kind"] === "decision") return false;
+				if (!wanted.some((word) => holds(labelStems[index] ?? new Set(), word))) return false;
+				const id = text(node["id"]);
+				// An unrolled repeat draws the action just before a node for the step it repeats.
+				const leadsToRepeat =
+					repeatedStep.length > 0 &&
+					(successors.get(id) ?? []).some((next) => {
+						const stemsOfNext = labelStems[ids.indexOf(next)] ?? new Set();
+						return repeatedStep.every((word) => holds(stemsOfNext, word));
+					});
+				return onLoop.size === 0 || onLoop.has(id) || leadsToRepeat;
+			});
+			if (!shown) missing.push(action);
+		}
+	}
+	return [...new Set(missing)];
 }
 
 /**
@@ -909,7 +1068,7 @@ function containmentIssues(
 	};
 	/** The one group a zone phrase names, if exactly one does. */
 	const zoneGroup = (phrase: string): number | undefined => {
-		const named = namedContainers(phrase)[0];
+		const named = zoneName(phrase);
 		if (!named) return undefined;
 		const hits = groupStems.flatMap((shown, index) =>
 			named.heads.every((head) => holds(shown, head)) &&
@@ -934,45 +1093,186 @@ function containmentIssues(
 		const node = matchNode(item);
 		return node === undefined ? { groups: [] } : { groups: [], node };
 	};
-	const stated: { item: string; zone: string }[] = [];
+	/** Nodes a phrase names in full: "office staff enter orders in the legacy ERP" names both. */
+	const mentioned = (phrase: string) => {
+		const said = new Set(stems(phrase));
+		return nodes.flatMap((node, index) => {
+			const wanted = stems(text(node["label"]));
+			return wanted.length > 0 && wanted.every((word) => holds(said, word)) ? [index] : [];
+		});
+	};
+	/** The longest end of a clause that names a node or zone: "saves files to a file server" names the server. */
+	const namingTail = (phrase: string) => {
+		const parts = phrase.trim().split(/\s+/u);
+		for (let start = 0; start < parts.length; start += 1) {
+			const tail = parts.slice(start).join(" ");
+			const resolved = resolve(tail);
+			if (resolved.node !== undefined || resolved.groups.length > 0) return tail;
+		}
+		return phrase;
+	};
+	const stated: { item: string; zone: string; node?: number }[] = [];
 	for (const match of request.matchAll(/([^()→\n,.;:]+?)\s*\(([^()]+)\)/gu)) {
-		if (namedContainers(match[2] ?? "").length === 0) continue;
+		if (namedContainers(match[2] ?? "").length === 0 || NEGATED_PLACEMENT.test(match[0])) continue;
 		for (const item of (match[1] ?? "").split(/\s*\+\s*|\s*&\s*/u))
 			stated.push({ item, zone: match[2] ?? "" });
 	}
-	for (const clause of request.split(/[.;\n]|,\s+/u)) {
-		const sentence =
-			/^(.*?)\s+(?:are|is|sit|sits|live|lives|run|runs|stay|stays)\s+(?:all\s+|both\s+)?(?:in|inside|within)\s+(.+)$/iu.exec(
-				clause.trim(),
+	for (const sentence of request.split(/[.;\n]/u).map((part) => part.trim())) {
+		if (NEGATED_PLACEMENT.test(sentence)) continue;
+		// "the VPC, queue and table are all in eu-west-1, in our AWS cloud": each item in the first
+		// zone, and that zone in the second.
+		const located =
+			/^(.*?)\s+(?:are|is|sit|sits|live|lives|run|runs|stay|stays)\s+(?:all\s+|both\s+)?(?:in|inside|within|on)\s+([^,]+)(?:,\s*(?:all\s+)?(?:in|inside|within|on)\s+([^,]+))?/iu.exec(
+				sentence,
 			);
-		if (!sentence || namedContainers(sentence[2] ?? "").length === 0) continue;
-		for (const item of (sentence[1] ?? "").split(/\s*\+\s*|\s*&\s*|\s*,\s*|\s+and\s+/u))
-			stated.push({ item, zone: sentence[2] ?? "" });
+		if (located && zoneName(located[2] ?? "")) {
+			for (const item of (located[1] ?? "").split(/\s*\+\s*|\s*&\s*|\s*,\s*|\s+and\s+/u))
+				stated.push({ item, zone: located[2] ?? "" });
+			if (zoneName(located[3] ?? ""))
+				stated.push({ item: located[2] ?? "", zone: located[3] ?? "" });
+		}
+		// "office staff enter orders in the legacy ERP, both on the corporate network".
+		const both = /^(.*),\s*both\s+(?:are\s+)?(?:in|inside|within|on)\s+([^,]+)$/iu.exec(sentence);
+		const pair = both ? mentioned(both[1] ?? "") : [];
+		if (both && pair.length === 2 && zoneName(both[2] ?? "")) {
+			for (const node of pair)
+				stated.push({ item: text(nodes[node]?.["label"]), zone: both[2] ?? "", node });
+		}
+	}
+	// "VPN gateway in our production VPC → order API in the VPC's private subnet": each step in the
+	// zone right after it, and a possessive zone in its owner.
+	for (const segment of request.split(/→|->|=>|[\n.;:(),]/u)) {
+		if (NEGATED_PLACEMENT.test(segment)) continue;
+		const pieces = segment.split(/\s+(?:in|inside|within)\s+/iu);
+		for (let index = 1; index < pieces.length; index += 1) {
+			const possessive = /^(.*?)['’]s\s+(.+)$/u.exec(pieces[index] ?? "");
+			const zone = possessive?.[2] ?? pieces[index] ?? "";
+			if (!zoneName(zone)) continue;
+			// "VPC + S3 are in us-east-1" lists its items before the verb.
+			const items = (pieces[index - 1] ?? "")
+				.replace(/\s+(?:are|is|sit|sits|live|lives|run|runs|stay|stays)(?:\s+(?:all|both))?$/iu, "")
+				.split(/\s*\+\s*|\s*&\s*|\s+and\s+/u);
+			for (const item of items) stated.push({ item: namingTail(item), zone });
+			if (possessive && zoneName(possessive[1] ?? ""))
+				stated.push({ item: zone, zone: possessive[1] ?? "" });
+		}
+	}
+	// A line headed by a zone ("on-prem data center: … on the corporate network") puts every zone
+	// it places something in inside that zone.
+	for (const line of request.split("\n")) {
+		const heading = /^\s*([^:\n]{1,60}?)\s*:\s*(.+)$/u.exec(line);
+		const head = heading?.[1] ?? "";
+		const named = zoneName(head);
+		if (
+			!heading ||
+			!named ||
+			!stems(head).every((word) => [...named.heads, ...named.modifiers].includes(word))
+		)
+			continue;
+		for (const clause of (heading[2] ?? "").split(/[,.;]/u)) {
+			if (NEGATED_PLACEMENT.test(clause)) continue;
+			for (const place of clause.matchAll(/\b(?:in|inside|within|on)\s+([^,.;:()→]+)/giu)) {
+				const zone = place[1] ?? "";
+				if (zoneName(zone) && !sameZone(zone, head)) stated.push({ item: zone, zone: head });
+			}
+		}
 	}
 	const outside: string[] = [];
-	for (const { item, zone } of stated) {
+	const merged: string[] = [];
+	// Two statements of one fact, such as "VPC + S3 are in us-east-1" and "the VPC … in us-east-1".
+	const checked = new Set<string>();
+	/** Each node's stated zones, and the zones whose members the request names. */
+	const zonesOf = new Map<number, { readonly container: number; readonly zone: string }[]>();
+	const withMembers = new Set<number>();
+	for (const { item, zone, node } of stated) {
 		const container = zoneGroup(zone);
 		if (container === undefined || stems(item).length === 0) continue;
 		const zoneId = text(groups[container]?.["id"]);
-		const resolved = resolve(item);
-		const inside =
-			resolved.node !== undefined
-				? ancestors(text(nodes[resolved.node]?.["group"])).has(zoneId)
-				: resolved.groups.every(
-						(index) =>
-							index === container || ancestors(text(groups[index]?.["parent"])).has(zoneId),
-					);
-		if ((resolved.node !== undefined || resolved.groups.length > 0) && !inside)
-			outside.push(`${item.trim()} in ${zone.trim()}`);
+		const resolved = node === undefined ? resolve(item) : { groups: [], node };
+		const statement = `${item.trim()} in ${zone.trim()}`;
+		if (resolved.node !== undefined || resolved.groups.some((index) => index !== container))
+			withMembers.add(container);
+		if (resolved.node !== undefined) {
+			if (checked.has(`node ${resolved.node} ${container}`)) continue;
+			checked.add(`node ${resolved.node} ${container}`);
+			zonesOf.set(resolved.node, [...(zonesOf.get(resolved.node) ?? []), { container, zone }]);
+			if (!ancestors(text(nodes[resolved.node]?.["group"])).has(zoneId)) outside.push(statement);
+			continue;
+		}
+		for (const index of resolved.groups) {
+			if (checked.has(`group ${index} ${container}`)) continue;
+			checked.add(`group ${index} ${container}`);
+			if (index === container) {
+				// One group named for two zones the request nests, such as "Production VPC (eu-west-1)".
+				if (!sameZone(item, zone)) merged.push(statement);
+			} else if (!ancestors(text(groups[index]?.["parent"])).has(zoneId)) outside.push(statement);
+		}
 	}
-	return outside.length === 0
-		? []
-		: [
-				{
-					code: "flowchart_containment_wrong",
-					message: `The request puts ${quoteList([...new Set(outside)])}, but the diagram draws ${outside.length === 1 ? "it" : "them"} outside. Set each node's group, and each group's parent, to the zone the request puts it in.`,
-				},
-			];
+	// "the VPC, queue and table are all in eu-west-1": the queue sits beside the VPC, not in it. A
+	// node drawn inside a zone whose members the request names, but not it, adds a placement.
+	const groupIndex = new Map(groups.map((group, index) => [text(group["id"]), index]));
+	const inside = (inner: number, outer: number) =>
+		ancestors(text(groups[inner]?.["id"])).has(text(groups[outer]?.["id"]));
+	const added: string[] = [];
+	for (const [node, placed] of zonesOf) {
+		const drawn = [...ancestors(text(nodes[node]?.["group"]))].flatMap((id) => {
+			const index = groupIndex.get(id);
+			return index === undefined ? [] : [index];
+		});
+		for (const { container, zone } of placed) {
+			if (!drawn.includes(container)) continue;
+			const extra = drawn.find(
+				(index) =>
+					index !== container &&
+					inside(index, container) &&
+					withMembers.has(index) &&
+					!placed.some((other) => inside(other.container, index)),
+			);
+			if (extra !== undefined)
+				added.push(
+					`${text(nodes[node]?.["label"])} in ${zone.trim()}, not in ${text(groups[extra]?.["label"])}`,
+				);
+		}
+	}
+	const issues: CoverageIssue[] = [];
+	if (added.length > 0)
+		issues.push({
+			code: "flowchart_containment_unstated",
+			message: `The request puts ${quoteList([...new Set(added)])}, but the diagram draws ${added.length === 1 ? "it" : "them"} inside that inner zone too, which the request gives other members. Move each to the zone the request puts it in.`,
+		});
+	if (outside.length > 0)
+		issues.push({
+			code: "flowchart_containment_wrong",
+			message: `The request puts ${quoteList([...new Set(outside)])}, but the diagram draws ${outside.length === 1 ? "it" : "them"} outside. Set each node's group, and each group's parent, to the zone the request puts it in.`,
+		});
+	if (merged.length > 0)
+		issues.push({
+			code: "flowchart_zone_merged",
+			message: `The request puts ${quoteList([...new Set(merged)])}, but one group stands for both zones. Draw each as its own group, the inner zone's parent set to the outer one.`,
+		});
+	return issues;
+}
+
+/** A zone a phrase names: a container phrase, or a named cloud ("our AWS cloud") where it locates something. */
+function zoneName(
+	phrase: string,
+): { readonly heads: readonly string[]; readonly modifiers: readonly string[] } | undefined {
+	const named = namedContainers(phrase)[0];
+	if (named) return named;
+	const cloud = /\b((?:[\w-]+\s+){1,2})clouds?\b/iu.exec(phrase);
+	const modifiers = words(cloud?.[1] ?? "")
+		.filter((word) => !NOT_A_NAME.has(word) && !STOP_WORDS.has(word))
+		.map(stemWord);
+	return modifiers.length > 0 ? { heads: ["cloud"], modifiers } : undefined;
+}
+
+/** Whether two phrases name the same kind of zone, such as "the data center" and "on-prem data center". */
+function sameZone(a: string, b: string): boolean {
+	const left = zoneName(a);
+	const right = zoneName(b);
+	return (
+		left !== undefined && right !== undefined && left.heads.join(" ") === right.heads.join(" ")
+	);
 }
 
 /** Container nouns that are names on their own, and ones that name a container only with a modifier. */
@@ -981,7 +1281,7 @@ const QUALIFIED_HEADS = /^(?:network|zon|region|cluster)$/u;
 const CONTAINER_PHRASE =
 	/\b((?:[\w-]+\s+){0,2}?)(subnets?|vpcs?|vnets?|namespaces?|dmz|data\s?cent(?:er|re)s?|networks?|zones?|regions?|clusters?)\b|\b((?:us|eu|ap|sa|ca|me|af)-(?:north|south|east|west|central|northeast|southeast|northwest|southwest)-\d)\b/giu;
 const NOT_A_NAME = new Set(
-	"a an the our your their its this that each every all both same other one two three 3 2 4 own new separate".split(
+	"a an the our your their its this that each every all both same other one two three 3 2 4 own new separate s".split(
 		" ",
 	),
 );
@@ -1001,7 +1301,7 @@ function namedContainers(
 		const joinedHead = headStems.join(" ");
 		const modifiers = words(match[1] ?? "")
 			.filter((word) => !NOT_A_NAME.has(word) && !STOP_WORDS.has(word))
-			.map(stem);
+			.map(stemWord);
 		const specific = CONTAINER_HEADS.test(joinedHead);
 		if (!specific && (!QUALIFIED_HEADS.test(joinedHead) || modifiers.length === 0)) return [];
 		const named = (match[1] ?? "")
@@ -1108,9 +1408,12 @@ export function keepsStatedStructure(
 	};
 	switch (text(original["type"])) {
 		case "flowchart": {
-			// A missing arrow may need an edge moved; the steps the request names stay either way.
+			// A missing arrow or return step may need an edge moved; the steps the request names stay
+			// either way.
 			const rerouted = flowchartIssues(request, original).some(
-				(issue) => issue.code === "flowchart_connection_missing",
+				(issue) =>
+					issue.code === "flowchart_connection_missing" ||
+					issue.code === "flowchart_return_step_missing",
 			);
 			return (
 				keeps("nodes", named) && (rerouted || keepsLinks("edges", "source", "target", "nodes"))

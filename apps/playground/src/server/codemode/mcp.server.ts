@@ -258,10 +258,37 @@ function compactBuildResult(value: unknown, builds: readonly ExecuteBuild[]): un
 	return value;
 }
 
+/**
+ * A flowchart built from a request it misses in part is still delivered, but the caller first
+ * gets one chance to fix it with an edit. An edit's own misses do not hold delivery again.
+ */
+function coverageNotice(
+	delivery: ArtifactDelivery | undefined,
+	builds: readonly (ExecuteBuild | undefined)[],
+): string | undefined {
+	const delivered = builds.find(
+		(build) =>
+			build?.operation === "buildFlowchart" &&
+			build.ok &&
+			delivery !== undefined &&
+			build.artifact?.artifactId === delivery.artifactId,
+	);
+	const missing = delivered?.issues.filter((issue) => issue.stage === "coverage") ?? [];
+	if (!delivery || missing.length === 0) return undefined;
+	return [
+		`Before you answer, fix what the request states that this flowchart misses with sketchi.editFlowchart({ artifactId: "${delivery.artifactId}", edits }), then answer with that result:`,
+		...missing.map((issue) => `- ${issue.message}`),
+	].join("\n");
+}
+const COVERAGE_DELIVERY_INSTRUCTION =
+	"Fix the coverage issues with editFlowchart first, then paste that result's artifactDelivery.finalResponseText as the final chat response and stop.";
+
 const ExecuteResultContract = Schema.Struct({
 	builds: Schema.Array(ExecuteBuildContract).pipe(Schema.mutable),
 	artifactDelivery: Schema.optionalKey(ExecuteArtifactDeliveryContract),
 	finalResponseText: Schema.optionalKey(Schema.String),
+	/** What an accepted flowchart misses of the request it was given, to fix before answering. */
+	coverageNotice: Schema.optionalKey(Schema.String),
 	ok: Schema.Boolean,
 	result: Schema.optionalKey(Schema.Unknown),
 	error: Schema.optionalKey(Schema.String),
@@ -336,11 +363,8 @@ function toolResult(
 }
 
 function executeResult(value: Record<string, unknown>) {
-	const finalResponseText = finalResponseTextFromResult(value);
-	return toolResult(value, [
-		...(finalResponseText ? [finalResponseText] : []),
-		JSON.stringify(value),
-	]);
+	const lead = stringValue(value.coverageNotice) ?? finalResponseTextFromResult(value);
+	return toolResult(value, [...(lead ? [lead] : []), JSON.stringify(value)]);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -635,9 +659,16 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 			};
 		}
 
+		const notice = coverageNotice(artifactDelivery, builds);
 		return {
-			...(artifactDelivery ? { artifactDelivery } : {}),
-			...(finalResponseText ? { finalResponseText } : {}),
+			...(artifactDelivery
+				? {
+						artifactDelivery: notice
+							? { ...artifactDelivery, finalResponseInstruction: COVERAGE_DELIVERY_INSTRUCTION }
+							: artifactDelivery,
+					}
+				: {}),
+			...(notice ? { coverageNotice: notice } : finalResponseText ? { finalResponseText } : {}),
 			ok: true,
 			result: execution.result,
 			logs: execution.logs ?? [],

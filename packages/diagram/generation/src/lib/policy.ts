@@ -1,4 +1,9 @@
 import {
+	checkRequestCoverage,
+	type CoverageIssue,
+	keepsStatedStructure,
+} from "@sketchi/diagram-core";
+import {
 	recordMetric,
 	SpanContent,
 	withSpanContent,
@@ -24,7 +29,6 @@ import {
 import { type DiagramFamilyNarrowing, familyNarrowingAttributes } from "./family-narrowing.js";
 import { revisesFlowchartWithEdits } from "./messages.js";
 import { withNarrowedFamilyRoute } from "./routing.js";
-import { checkRequestCoverage, type CoverageIssue, keepsStatedStructure } from "./coverage.js";
 
 const generationAttempts = Metric.counter("sketchi_generation_attempts", {
 	description: "Diagram generation upstream attempts",

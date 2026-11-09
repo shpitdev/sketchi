@@ -1220,7 +1220,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			// under 12,800. The flowchart label rule adds about 200 back, and node colors with the
 			// editFlowchart line about 800, so an edit needs no docs turn, and the label-scope and
 			// two-product rules about 300; merging rules that repeat the spec or each other takes it to
-			// 13,311. Lower this budget; do not raise it.
+			// 13,311. The request line adds 90, so a build can name what it misses. Lower this budget;
+			// do not raise it.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -1229,7 +1230,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(13_315);
+			).toBeLessThan(13_405);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,
@@ -1406,6 +1407,70 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				},
 				ok: true,
 			});
+		} finally {
+			await client.close();
+			await server.close();
+		}
+	});
+
+	it("asks for an edit before delivering a flowchart that misses its request, once", async () => {
+		const server = await createSketchiMcpServer(
+			{ SKETCHI_ARTIFACTS: new MemoryBucket() },
+			{ executor: createInProcessExecutor(), origin: "https://studio.test" },
+		);
+		const client = new Client({ name: "sketchi-codemode-coverage-test", version: "0" });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+		const request = "flowchart: intake → triage → web + phone support → close ticket";
+		const spec = {
+			title: "Support",
+			nodes: {
+				intake: "Intake",
+				triage: "Triage",
+				web: "Web support",
+				phone: "Phone support",
+				close: "Close ticket",
+			},
+			edges: [
+				["intake", "triage"],
+				["triage", ["web", "phone"]],
+				["web", "close"],
+				["phone", "triage"],
+			],
+		};
+		try {
+			await server.connect(serverTransport);
+			await client.connect(clientTransport);
+			const built = await client.callTool({
+				name: "execute",
+				arguments: {
+					code: `async () => sketchi.buildFlowchart(${JSON.stringify({ spec, request })})`,
+				},
+			});
+			const text = textContent(built);
+			const artifactId = String(
+				(structuredContent(built).artifactDelivery as { artifactId?: string } | undefined)
+					?.artifactId,
+			);
+			expect(text).toHaveLength(2);
+			expect(text[0]).toContain(`sketchi.editFlowchart({ artifactId: "${artifactId}", edits })`);
+			expect(text[0]).toContain('"phone support → close ticket"');
+			expect(structuredContent(built)).not.toHaveProperty("finalResponseText");
+			expect(structuredContent(built)).toMatchObject({
+				ok: true,
+				artifactDelivery: {
+					finalResponseInstruction: expect.stringContaining("editFlowchart first"),
+				},
+			});
+
+			// The edit delivers as usual, even with what its request still finds missing.
+			const edited = await client.callTool({
+				name: "execute",
+				arguments: {
+					code: `async () => sketchi.editFlowchart(${JSON.stringify({ artifactId, edits: [{ op: "set", nodes: { close: { color: "green" } } }], request })})`,
+				},
+			});
+			expect(textContent(edited)[0]).toMatch(/^Sketchi artifact ready\./u);
+			expect(structuredContent(edited)).not.toHaveProperty("coverageNotice");
 		} finally {
 			await client.close();
 			await server.close();

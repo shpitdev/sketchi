@@ -22,6 +22,8 @@ Additive to [flowchart groups](./flowchart-groups.md):
 
 Builds reject a group that lists an id that is no node or group (`unknown_member`, with the nearest declared ids in its hint), groups that list each other in a cycle (`group_cycle`), two groups that share a member without one holding the other (`overlapping_containers`), and zones nested deeper than 4 (`flowchart_too_large`).
 
+Generation checks the zones a prompt places things in: "ALB (public subnet)", "API in the VPC's private subnet", "the VPC, queue and table are all in eu-west-1, in our AWS cloud", a line headed by a zone ("on-prem data center: … on the corporate network") and "staff and ERP, both on the corporate network". A step or zone drawn outside the zone the prompt puts it in (`flowchart_containment_wrong`), one group drawn for two zones the prompt nests, such as "Production VPC (eu-west-1)" (`flowchart_zone_merged`), or a step drawn inside an inner zone whose members the prompt names without it, such as the queue it lists beside the VPC (`flowchart_containment_unstated`), costs one repair call. An MCP build given the prompt as `request` reports them as warnings.
+
 ## Drawing
 
 A diagram whose groups nest or declare a `kind` draws them as zones. A flowchart whose groups do neither draws frames exactly as before.
