@@ -17,8 +17,8 @@
 
 Sketchi stores canonical diagram documents and authoritative Excalidraw artifacts
 under `~/.sketchi/diagrams`. Its manual and recovery workflows stay local;
-generation, Universal Canvas compilation, and encrypted snapshot exchange are explicit, credential-free network
-commands.
+generation, Universal Canvas compilation, icon drawing, and encrypted snapshot exchange are explicit,
+credential-free network commands.
 
 ## Install
 
@@ -195,6 +195,26 @@ The endpoint defaults to
 `SKETCHI_CANVAS_ENDPOINT` only for preview and local testing. The existing
 `create` command remains the separate, strictly offline command for accepted
 flowchart, mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, and quadrant documents.
+
+## Draw a logo as a hand-drawn icon
+
+`icon draw` sends a logo (SVG, PNG, JPEG or WebP) and its name to Sketchi's
+public icon service and writes the hand-drawn icon: an `.excalidrawlib` with one
+library item, PNG previews at node size and four times that, and the recipe:
+
+```sh
+sketchi icon draw acme.svg --name "Acme"
+sketchi icon draw logos/ --dest icons --publish
+```
+
+A folder draws every logo file directly in it, names each after its file, and
+adds one `<folder>.excalidrawlib` pack. Each icon reports whether a judge from
+another model family picked it out of four look-alike logos at 28 px; one it did
+not is still written. `--publish` adds each icon to the public community set at
+icons.sketchi.app. The service is unauthenticated and limits each client to a few
+draws a minute (the CLI waits out a short limit) and everyone to a daily budget.
+Use `--endpoint URL` or `SKETCHI_ICON_DRAW_ENDPOINT`, and
+`SKETCHI_COMMUNITY_ENDPOINT`, only for preview and local testing.
 
 ## Create and work with a diagram offline
 
@@ -373,8 +393,9 @@ text output when stdout is not a terminal, `export.hint` in generate's JSON, and
 `hint:` in export's status. When generate reports `Copied`, the user can also
 paste the image themselves.
 
-`generate`, `canvas`, `share`, and `pull` are deliberately separate, explicit network
-commands. They remain credential-free and each makes one HTTPS request. Share
+`generate`, `canvas`, `icon draw`, `share`, and `pull` are deliberately separate,
+explicit network commands. They remain credential-free; each makes one HTTPS
+request (`icon draw` one per logo, and one more per logo with `--publish`). Share
 is randomized by its key and IV; pull depends on remote availability and
 untrusted input, so neither belongs to determinism claims.
 

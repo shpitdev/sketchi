@@ -76,6 +76,7 @@ function failureView(error: CliFailure): ErrorView {
 				details: error.details,
 			};
 		case "CliCanvasError":
+		case "CliIconError":
 			return {
 				code: error.code,
 				message: error.message,

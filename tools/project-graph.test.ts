@@ -138,6 +138,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/cli/src/filesystem.ts": 41,
 	"apps/cli/src/generate-wizard.ts": 8,
 	"apps/cli/src/generation.ts": 2,
+	"apps/cli/src/icon-draw.ts": 2,
 	"apps/cli/src/png-renderer-runtime.ts": 30,
 	"apps/cli/src/png-renderer.ts": 8,
 	"apps/cli/src/response-body.ts": 2,

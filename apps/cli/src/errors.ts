@@ -60,6 +60,24 @@ export class CliCanvasError extends Schema.TaggedError<CliCanvasError>()("CliCan
 	details: Schema.Array(Schema.String),
 }) {}
 
+/** Drawing an icon through the hosted service, or publishing it to the community store. */
+export class CliIconError extends Schema.TaggedError<CliIconError>()("CliIconError", {
+	code: Schema.Literals([
+		"icon_input",
+		"icon_rejected",
+		"rate_limited",
+		"daily_limit",
+		"endpoint_failure",
+		"network_failure",
+		"icon_timeout",
+		"malformed_response",
+		"publish_failed",
+	]),
+	message: Schema.String,
+	hint: Schema.String,
+	details: Schema.Array(Schema.String),
+}) {}
+
 export class CliInteractiveError extends Schema.TaggedError<CliInteractiveError>()(
 	"CliInteractiveError",
 	{
@@ -135,6 +153,7 @@ export type CliFailure =
 	| CliValidationError
 	| CliBuildError
 	| CliCanvasError
+	| CliIconError
 	| CliGenerationError
 	| CliInteractiveError
 	| CliStorageError
@@ -168,6 +187,23 @@ export function exitCodeForFailure(error: CliFailure): number {
 				case "network_failure":
 					return 10;
 				case "canvas_timeout":
+					return 11;
+				case "malformed_response":
+					return 12;
+			}
+		case "CliIconError":
+			switch (error.code) {
+				case "icon_input":
+					return 3;
+				case "icon_rejected":
+					return 4;
+				case "rate_limited":
+				case "daily_limit":
+				case "endpoint_failure":
+				case "network_failure":
+				case "publish_failed":
+					return 10;
+				case "icon_timeout":
 					return 11;
 				case "malformed_response":
 					return 12;

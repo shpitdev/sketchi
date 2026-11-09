@@ -6,6 +6,7 @@ START HERE
   sketchi generate --prompt "Map release approval with pass and revise branches"
   Writes <generated-id>.png in this directory. No account or API key needed.
   canvas    Build and export a typed Universal CanvasSpec.
+  icon      Hand-draw a logo as an Excalidraw icon: icon draw FILE.
 
 WORK WITH A DIAGRAM
   list      Find past diagrams, newest first. Add words to search.
