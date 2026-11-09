@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	CANVAS_SHAPE_CURVE,
 	bypassingHybridFlowcharts,
+	corporateHybridFlowchart,
 	corridorHybridFlowchart,
 	describedArchitectureFlowchart,
 	describedHybridFlowchart,
@@ -65,6 +66,31 @@ const zonesOf = (scene: RenderedDiagramScene) =>
 	scene.elements.filter(
 		(e): e is NodeSceneElement => e.type === "node" && e.rendererRole === "zone",
 	);
+/** Zones that hang under a sibling zone: one's span along a row overlaps the other's, one above the other. */
+const stackedZones = (scene: RenderedDiagramScene) => {
+	const zones = zonesOf(scene);
+	const holds = (outer: NodeSceneElement, inner: NodeSceneElement) =>
+		outer !== inner &&
+		inner.x >= outer.x &&
+		inner.y >= outer.y &&
+		inner.x + inner.width <= outer.x + outer.width &&
+		inner.y + inner.height <= outer.y + outer.height;
+	const parentOf = (zone: NodeSceneElement) =>
+		zones
+			.filter((other) => holds(other, zone))
+			.toSorted((a, b) => a.width * a.height - b.width * b.height)[0];
+	return zones.flatMap((zone, index) =>
+		zones
+			.slice(index + 1)
+			.flatMap((other) =>
+				parentOf(zone) === parentOf(other) &&
+				Math.min(zone.x + zone.width, other.x + other.width) > Math.max(zone.x, other.x) &&
+				Math.min(zone.y + zone.height, other.y + other.height) <= Math.max(zone.y, other.y)
+					? [`${zone.label} | ${other.label}`]
+					: [],
+			),
+	);
+};
 const nodeOf = (scene: RenderedDiagramScene, id: string) =>
 	scene.elements.find((e): e is NodeSceneElement => e.type === "node" && e.nodeId === id)!;
 
@@ -175,22 +201,24 @@ describe("zone layout", () => {
 		expect(vpn.x + vpn.width).toBeLessThan(api.x);
 	});
 
-	// Each ran 3.4:1 to 8.1:1 in one row or column. The four-deep zones' second
-	// availability zone hangs under the first, the load balancer's line to it
-	// skipping the first's ranks.
+	// Each ran 3.4:1 to 8.1:1 in one row or column. A column wraps within 2.45:1.
+	// A row keeps its zones along the flow: only steps past a level's zones wrap,
+	// as the bucket hangs under the VPC beside it, so a row of zones may run
+	// longer, the four-deep zones' two availability zones 5:1 side by side.
 	it.each([
 		["aws-three-tier", "LR", 2.45],
 		["aws-three-tier", "RL", 2.45],
-		["kubernetes-cluster", "LR", 2.45],
+		["kubernetes-cluster", "LR", 4.5],
 		["hybrid-cloud", "LR", 2.45],
 		["hybrid-cloud", "RL", 2.45],
-		["depth-four", "LR", 2.45],
+		["depth-four", "LR", 5.5],
 		["depth-four", "TB", 2.45],
 	] as const)(
-		"wraps %s %s, too long for one row or column, in the stated direction",
+		"lays %s %s, too long for one row or column, out in the stated direction",
 		(name, direction, below) => {
 			const scene = rendered(name, direction);
 			expect(drawnAspect(scene)).toBeLessThan(below);
+			if (direction !== "TB") expect(stackedZones(scene)).toEqual([]);
 			expect(zoneRegionIssues(scene, fixtures[name]!)).toEqual([]);
 			// Each step a line joins in the same row (or column) lies ahead of the step it leaves.
 			const across = direction === "LR" || direction === "RL" ? "y" : "x";
@@ -442,21 +470,68 @@ describe("lines into a hanging zone band", () => {
 		Object.keys(requestPathFlowcharts).flatMap((name) =>
 			(["LR", "RL"] as const).map((direction) => [name, direction] as const),
 		),
-	)("keeps the public internet beside the DMZ in %s, asked for %s", (name, direction) => {
-		// Asked for left to right, a Sol sample stacked all three zones: two bands
-		// missed the 2:1 target, so three did. Sonnet samples hung the DMZ under
-		// the public internet: the cached page's line to the response skipped the
-		// private subnet, which barred the cut after the DMZ. One zone at most now
-		// hangs under the DMZ, the request passing from each zone to the next.
+	)("keeps all three zones of %s side by side, asked for %s", (name, direction) => {
+		// Asked for left to right, Sol and Sonnet samples hung the DMZ under the
+		// public internet, or the private subnet under the DMZ, wrapping a row that
+		// ran past 2.45:1. The request now passes from each zone to the next along
+		// the row, which draws 2.7:1 to 6.7:1, its steps past the last zone wrapping
+		// under it.
 		const fixture = fixtures[name]!;
 		const scene = rendered(name, direction);
 		const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
-		const [internet, dmz] = fixture.groups!.map((group) => zones.get(`group:${group.id}`)!);
-		const [first, second] = direction === "LR" ? [internet!, dmz!] : [dmz!, internet!];
-		expect(first.x + first.width).toBeLessThan(second.x);
-		expect(internet!.y).toBeLessThan(dmz!.y + dmz!.height);
-		expect(dmz!.y).toBeLessThan(internet!.y + internet!.height);
-		expect(drawnAspect(scene)).toBeLessThan(2.45);
+		const along = fixture.groups!.map((group) => zones.get(`group:${group.id}`)!);
+		const ordered = direction === "LR" ? along : along.toReversed();
+		for (const [index, zone] of ordered.slice(1).entries()) {
+			const before = ordered[index]!;
+			expect(before.x + before.width).toBeLessThan(zone.x);
+			expect(before.y).toBeLessThan(zone.y + zone.height);
+			expect(zone.y).toBeLessThan(before.y + before.height);
+		}
+		expect(drawnAspect(scene)).toBeLessThan(7);
+	});
+
+	it("wraps a row's steps past its last zone under it, the zone kept in the first band", () => {
+		// Four steps, a one-step cloud and three steps more ran 2,252 px in one row:
+		// the most even cuts hung the cloud, and no other cut was tried.
+		const ids = ["a1", "a2", "a3", "a4", "z1", "b1", "b2", "b3"];
+		const scene = renderIntermediateDiagram(
+			parseFlowchartDiagram({
+				id: "trailing-steps",
+				title: "Trailing steps",
+				type: "flowchart",
+				layout: { direction: "LR", edgeRouting: "orthogonal" },
+				nodes: ids.map((id, index) => ({
+					id,
+					label: `Step ${id}`,
+					kind: index === 0 ? "start" : index === ids.length - 1 ? "end" : "process",
+					...(id === "z1" ? { group: "cloud" } : {}),
+				})),
+				edges: ids
+					.slice(1)
+					.map((id, index) => ({ id: `e${index}`, source: ids[index]!, target: id })),
+				groups: [{ id: "cloud", label: "Cloud", kind: "cloud" }],
+			}),
+		);
+		expect(scene.width).toBeLessThan(1_600);
+		const cloud = zonesOf(scene)[0]!;
+		const [a4, b1] = [nodeOf(scene, "a4"), nodeOf(scene, "b1")];
+		expect(cloud.x).toBeGreaterThan(a4.x + a4.width);
+		expect(b1.y).toBeGreaterThan(cloud.y + cloud.height);
+	});
+
+	it("keeps every zone of a hybrid row along the flow, nested zones included", () => {
+		// A Haiku sample hung the cloud under the corporate network that holds the
+		// data center, the ERP's line dropping to the VPN gateway; the cloud now
+		// stands beside the network, and the private subnet beside the gateway.
+		const scene = renderIntermediateDiagram(corporateHybridFlowchart);
+		expect(stackedZones(scene)).toEqual([]);
+		const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
+		const [corp, aws, priv] = ["corp", "aws", "private"].map((id) => zones.get(`group:${id}`)!);
+		expect(aws!.x).toBeGreaterThan(corp!.x + corp!.width);
+		const [erp, vpn] = [nodeOf(scene, "erp"), nodeOf(scene, "vpn")];
+		expect(vpn.x).toBeGreaterThan(erp.x + erp.width);
+		expect(priv!.x).toBeGreaterThan(vpn.x + vpn.width);
+		expect(zoneRegionIssues(scene, corporateHybridFlowchart)).toEqual([]);
 	});
 
 	it("keeps the data center beside the cloud when a side change clears its region's wrap of crossings", () => {
@@ -652,14 +727,16 @@ describe("line ends from generated samples", () => {
 			);
 		});
 
-	it("lands the users' requests away from the load balancer's corner, past the subnet's name", () => {
-		// The drop into the middle meets the public subnet's name, so the line
-		// once took the far end of the top instead, beside the rounded corner.
+	it("runs the users' requests straight into the load balancer, beside the region", () => {
+		// The users once hung over the region and their line dropped into the load
+		// balancer's top, past the public subnet's name; asked for left to right,
+		// they now stand before the region and the line runs straight in.
 		const scene = renderIntermediateDiagram(requestedArchitectureFlowchart);
 		const alb = node(scene, "alb");
-		const end = arrow(scene, "edge-1").points.at(-1)!;
-		expect(end.y).toBe(alb.y);
-		expect(Math.abs(end.x - alb.x - alb.width / 2)).toBeLessThanOrEqual((3 / 4) * (alb.width / 2));
+		const { points } = arrow(scene, "edge-1");
+		expect(points).toHaveLength(2);
+		expect(points.at(-1)!.x).toBe(alb.x);
+		expect(points.at(-1)!.y).toBe(alb.y + alb.height / 2);
 	});
 
 	it("runs the sync function's line straight into the archive's side across the free corridor", () => {

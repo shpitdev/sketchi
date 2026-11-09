@@ -8,6 +8,7 @@ import hybridCloud from "./fixtures/zones/hybrid-cloud.js";
 import hybridCloudArchiveCorridor from "./fixtures/zones/hybrid-cloud-archive-corridor.js";
 import hybridCloudBypass from "./fixtures/zones/hybrid-cloud-bypass.js";
 import hybridCloudBypassArchive from "./fixtures/zones/hybrid-cloud-bypass-archive.js";
+import hybridCloudCorporate from "./fixtures/zones/hybrid-cloud-corporate.js";
 import hybridCloudDescribed from "./fixtures/zones/hybrid-cloud-described.js";
 import hybridCloudLabeled from "./fixtures/zones/hybrid-cloud-labeled.js";
 import hybridCloudLeftToRight from "./fixtures/zones/hybrid-cloud-left-to-right.js";
@@ -102,6 +103,13 @@ export const corridorHybridFlowchart = flowchart(hybridCloudArchiveCorridor);
  * embedded asset to export.
  */
 export const leftToRightHybridFlowchart = flowchart(hybridCloudLeftToRight);
+
+/**
+ * The hybrid setup asked for left to right, its corporate network holding the
+ * data center, whose cloud a top-level wrap hung under that network, as a
+ * generated sample drew it.
+ */
+export const corporateHybridFlowchart = flowchart(hybridCloudCorporate);
 
 /**
  * A web request asked for left to right across the public internet, a DMZ and

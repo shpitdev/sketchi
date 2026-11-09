@@ -1630,6 +1630,8 @@ interface ZoneWrapOptions {
 	readonly weights: ReadonlyMap<string, number>;
 	/** Whether a cut may carry a forward edge that skips ranks. */
 	readonly skips: boolean;
+	/** Units that stay in the first band: a row's zones, which no cut may hang. */
+	readonly firstBand?: ReadonlySet<string>;
 }
 
 /**
@@ -1733,9 +1735,18 @@ function planWrap(
 		return flow(from, to) + (from > 0 ? ROUTE_STUB_LENGTH : 0) + departure;
 	};
 
-	// Band ends: a clean cut or the last rank. Each band keeps at least two ranks;
-	// a zoned band hangs under the steps that reach it, so it may hold one.
-	const ends = [...continuationAfter.keys(), last].sort((a, b) => a - b);
+	// Band ends: a clean cut or the last rank, the first past every unit that
+	// stays in the first band. Each band keeps at least two ranks; a zoned band
+	// hangs under the steps that reach it, so it may hold one.
+	const firstEnd = Math.max(
+		-1,
+		...rankMetrics.flatMap((metric, index) =>
+			metric.shapes.some((shape) => zone?.firstBand?.has(shape.nodeId)) ? [index] : [],
+		),
+	);
+	const ends = [...continuationAfter.keys(), last]
+		.filter((end) => end >= firstEnd)
+		.sort((a, b) => a - b);
 	const minimum = zone ? 1 : 2;
 	// An even wrap keeps every band at least `balance` of the longest, so no band
 	// stands short beside a long one with empty space past its end.
@@ -1871,8 +1882,8 @@ const ZONE_WRAP_ROUNDS = 2;
  * Levels wrap one at a time:
  * each time the level and band count that bring the whole diagram within
  * WRAP_TARGET_ASPECT with the fewest bands or, if none does, nearest it, while
- * that keeps helping; a row hangs as few top-level zones under one another as a
- * plan no longer too long can. The single-level plans that come next are alternatives,
+ * that keeps helping. A row keeps its zones along the flow (see `hangZones`). The
+ * single-level plans that come next are alternatives,
  * since a plan may route worse than the layout it replaces. Planning routes
  * nothing: it measures the unrouted layout, scaled by how far the routed one
  * (`drawn`) outgrows it, since routes widen zones for their stubs.
@@ -1883,6 +1894,7 @@ function planZoneWraps(
 	arrangement: Arrangement,
 	balance: number,
 	drawn: { readonly width: number; readonly height: number },
+	hangZones = false,
 ): ReadonlyMap<string, Wrap>[] {
 	const levels = new Map<string, IntermediateDiagram>([
 		[TOP_LEVEL, structure.top],
@@ -1911,23 +1923,28 @@ function planZoneWraps(
 			? left.bands - right.bands || left.aspect - right.aspect
 			: left.aspect - right.aspect;
 	};
-	// In a row, a top-level cut between two zones hangs the later zone under the
-	// earlier, though the flow passes from one to the next along the row. A
-	// column's cut stands it beside the earlier one instead, across a wide
-	// export, where keeping both in one column would wrap the zone inside it
-	// into a taller one.
+	// In a row, a cut before a zone hangs that zone under the steps or zone before
+	// it, though the flow passes from one to the next along the row, so every
+	// zone of a level stays in the level's first band and only steps past them
+	// wrap, as a bucket hangs under the VPC beside it. With `hangZones`, a row
+	// plans only the cuts that hang a zone, which a layout keeps only where they
+	// cross fewer lines (layoutDiagram). Flat groups, such as teams, still wrap a
+	// long row into rows of whole groups. A column's cut stands the later group
+	// beside the earlier instead, across a wide export, where keeping both in one
+	// column would wrap the group inside it into a taller one.
 	const row = diagram.layout.direction === "LR" || diagram.layout.direction === "RL";
-	// How many top-level zones a plan hangs under the one before.
-	const stackedZones = ({ next }: Plan) => {
-		const top = next.get(TOP_LEVEL);
-		if (!structure.zoned || !row || !top) return 0;
-		const bands = new Set(
-			structure.groups.flatMap(({ group }) =>
-				structure.parentOf.has(group.id) ? [] : [top.bandOf.get(groupUnitId(group.id))],
-			),
+	const zonesOf = (level: string) =>
+		new Set(
+			structure.zoned
+				? structure.groups.flatMap(({ group }) =>
+						(structure.parentOf.get(group.id) ?? TOP_LEVEL) === level
+							? [groupUnitId(group.id)]
+							: [],
+					)
+				: [],
 		);
-		return bands.size - 1;
-	};
+	const hangsZone = (level: string, wrap: Wrap) =>
+		[...zonesOf(level)].some((unit) => (wrap.bandOf.get(unit) ?? 0) > 0);
 	const planned = wraps.size;
 	let current = predict(wraps);
 	const skipping = (zoneWraps: ReadonlyMap<string, Wrap>) =>
@@ -1954,6 +1971,7 @@ function planZoneWraps(
 						sizes,
 						weights,
 						skips,
+						...(row && !hangZones ? { firstBand: zonesOf(id) } : {}),
 					});
 					if (wrap.bandOf.size === 0) continue;
 					const key = [...wrap.bandOf].join(" ");
@@ -1968,17 +1986,6 @@ function planZoneWraps(
 				}
 		}
 		const helping = plans.filter((plan) => plan.aspect < current.aspect).sort(rank);
-		// Of the plans no longer too long, the first that stacks the fewest zones
-		// goes first, the plan it passes its first alternative: the target does
-		// not justify hanging one more zone under another.
-		const fewest = helping.reduce(
-			(best, plan, index) =>
-				plan.aspect < WRAP_ASPECT && stackedZones(plan) < stackedZones(helping[best]!)
-					? index
-					: best,
-			0,
-		);
-		if (fewest > 0) helping.unshift(...helping.splice(fewest, 1));
 		const [chosen] = helping;
 		if (!chosen) break;
 		if (wraps.size === planned) {
@@ -1994,7 +2001,10 @@ function planZoneWraps(
 		wraps = chosen.next;
 		current = chosen;
 	}
-	return wraps.size > planned ? [wraps, ...alternatives] : [];
+	const hanging = (zoneWraps: ReadonlyMap<string, Wrap>) =>
+		[...zoneWraps].some(([id, wrap]) => hangsZone(id, wrap));
+	const result = wraps.size > planned ? [wraps, ...alternatives] : [];
+	return row && hangZones ? result.filter(hanging) : result;
 }
 
 /** How far along the flow each band starts, for a wrap whose bands hang under their entries. */
@@ -11434,13 +11444,20 @@ export function renderGraphDiagram(
 		// findings: the skipping line may cross another, so the plan is kept only
 		// where it draws neither more than such a rival.
 		let yielding = false;
-		for (const zoneWraps of planZoneWraps(
-			diagram,
-			structure,
-			kept.arrangement,
-			length.balance,
-			length.size,
-		)) {
+		// A row's plans keep its zones along the flow. Those that hang a zone come
+		// last, each kept only where it crosses fewer lines than the row and than
+		// any plan before it, as a dense graph's lines back against the flow may;
+		// a row that crosses none plans none.
+		const rowOfZones =
+			structure.zoned &&
+			(diagram.layout.direction === "LR" || diagram.layout.direction === "RL") &&
+			arrowCrossings(kept.layout.edgeArrows, false) > 0;
+		const plans = [false, ...(rowOfZones ? [true] : [])].flatMap((hangs) =>
+			planZoneWraps(diagram, structure, kept.arrangement, length.balance, length.size, hangs).map(
+				(zoneWraps) => ({ hangs, zoneWraps }),
+			),
+		);
+		for (const { hangs, zoneWraps } of plans) {
 			const planned = {
 				...kept.arrangement,
 				crossingRepair: repairable || kept.arrangement.crossingRepair,
@@ -11474,6 +11491,7 @@ export function renderGraphDiagram(
 				!fewer(kept.defects, defects) &&
 				routesNoWorse(layout, kept.layout, false, false, false, false);
 			const repair =
+				!hangs &&
 				!acceptable(unrepaired) &&
 				repairable &&
 				crossed &&
@@ -11502,6 +11520,11 @@ export function renderGraphDiagram(
 				if (!structure.zoned && unrivaled) break;
 				continue;
 			}
+			if (
+				hangs &&
+				(score[0]! >= crossings! || (chosen !== undefined && score[0]! >= chosen.score[0]!))
+			)
+				continue;
 			const skips = [...zoneWraps.values()].some((wrap) => wrap.skips);
 			if (
 				!chosen ||
