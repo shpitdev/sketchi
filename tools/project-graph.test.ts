@@ -204,7 +204,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/web/src/routes/index.tsx": 2,
 	"packages/diagram/agent/src/lib/code-mode/artifacts.ts": 16,
 	"packages/diagram/generation/src/lib/cloudflare-ai-gateway.ts": 2,
-	"packages/diagram/generation/src/lib/cloudflare-gateway-chat.ts": 5,
+	"packages/diagram/generation/src/lib/cloudflare-gateway-chat.ts": 10,
 	"packages/diagram/scenarios/src/cli.ts": 10,
 	"packages/diagram/scenarios/vitest.config.mts": 1,
 	"packages/diagram/ui/src/components/excalidraw-scene-canvas/excalidraw-scene-canvas.tsx": 3,

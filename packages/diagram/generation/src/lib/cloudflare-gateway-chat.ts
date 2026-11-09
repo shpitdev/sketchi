@@ -28,6 +28,7 @@ import {
 	buildDiagramGenerationMessages,
 	DEFAULT_MAX_OUTPUT_TOKENS,
 	DEFAULT_TEMPERATURE,
+	revisesFlowchartWithEdits,
 } from "./messages.js";
 import { stripAnthropicModelPrefix, stripGoogleModelPrefix } from "./models.js";
 import { DiagramFamilyNarrowing } from "./family-narrowing.js";
@@ -70,7 +71,8 @@ export const anthropicGatewayChatRoute: GatewayChatRoute = {
 	provider: "cloudflare-anthropic",
 	// Haiku rejects `temperature` and a `json_object` format, and rejects our response schema
 	// as `json_schema`: `diagram` is open and the IR is recursive. The prompt asks for JSON and
-	// the parser is tolerant. Thinking on doubled tokens and latency without raising acceptance.
+	// the parser is tolerant. On a new diagram, thinking doubled tokens and latency without raising
+	// acceptance; a flowchart revision thinks instead, through the Messages API (runMessagesAttempt).
 	requestFields: () => ({ thinking: { type: "disabled" } }),
 };
 
@@ -349,6 +351,162 @@ const runChatAttempt = Effect.fn("diagramGeneration.gatewayChat.attempt")(functi
 	);
 });
 
+/**
+ * How a flowchart revision thinks on Claude. Writing edits against a document by id is where
+ * thinking pays: on the sketchi-edit tuning revisions it took Haiku from 48/60 to 56/60, for about
+ * 350 more output tokens and 1.5 s. A new diagram gains nothing from it, so only revisions think.
+ * The OpenAI-compatible endpoint refuses adaptive thinking, so these go to the native Messages API.
+ */
+const REVISION_THINKING = {
+	thinking: { type: "adaptive" },
+	output_config: { effort: "medium" },
+} as const;
+
+/** The text and usage of a native Messages API reply. */
+interface MessagesReply {
+	readonly content?: ReadonlyArray<{ readonly type?: string; readonly text?: string }>;
+	readonly id?: string;
+	readonly model?: string;
+	readonly stop_reason?: string;
+	readonly usage?: { readonly input_tokens?: number; readonly output_tokens?: number };
+}
+
+const runMessagesAttempt = Effect.fn("diagramGeneration.gatewayMessages.attempt")(function* (
+	gateway: CloudflareAiGateway,
+	config: CloudflareGatewayChatConfigValue,
+	request: DiagramGenerationRequest,
+) {
+	const { route } = config;
+	const startedAt = yield* Clock.currentTimeMillis;
+	const correlation = yield* TelemetryCorrelation;
+	const span = yield* Effect.option(Effect.currentSpan);
+	const traceId = correlation.traceId ?? Option.getOrUndefined(span)?.traceId;
+	const { system, user } = buildDiagramGenerationMessages(request.prompt);
+	const modelId = route.modelId(request.model);
+	const maxOutputTokens = request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+	yield* Effect.annotateCurrentSpan({
+		"gen_ai.input.messages": [{ role: "user", parts: [{ type: "text", content: user }] }],
+		"gen_ai.operation.name": "chat",
+		"gen_ai.provider.name": route.gatewayProvider,
+		"gen_ai.request.max_tokens": maxOutputTokens,
+		"gen_ai.request.model": modelId,
+		"gen_ai.system_instructions": [{ type: "text", content: system }],
+		"sketchi.gateway.request_fields": REVISION_THINKING,
+	});
+	const response = yield* Effect.tryPromise({
+		try: async (signal) => {
+			const reply = await gateway.run(
+				{
+					endpoint: "v1/messages",
+					headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" },
+					provider: route.gatewayProvider,
+					query: {
+						model: modelId,
+						max_tokens: maxOutputTokens,
+						system,
+						messages: [{ role: "user", content: user }],
+						...REVISION_THINKING,
+					},
+				},
+				{
+					gateway: {
+						collectLog: config.collectLog,
+						metadata: {
+							scenarioId: request.prompt.id,
+							sketchiProvider: route.provider,
+							sketchiSurface: config.surface,
+							...(traceId ? { sketchiTraceId: traceId } : {}),
+						},
+						skipCache: true,
+					},
+					signal,
+				},
+			);
+			return {
+				body: await reply.text(),
+				logId: reply.headers.get("cf-aig-log-id"),
+				status: reply.status,
+			};
+		},
+		catch: (cause) =>
+			DiagramGenerationTransportError.make({
+				cause,
+				message: errorMessage(cause, "Generation request failed."),
+				operation: "gateway.run",
+				provider: route.provider,
+				retryable: true,
+			}),
+	});
+	const finishedAt = yield* Clock.currentTimeMillis;
+	yield* Effect.annotateCurrentSpan({
+		...(response.logId ? { gateway_log_id: response.logId } : {}),
+		"http.response.status_code": response.status,
+		[SpanContent.httpResponseBody]: response.body,
+	});
+	const raw = parseJsonResponse(response.body);
+	if (response.status < 200 || response.status >= 300) {
+		const diagnostic = responseErrorDiagnostic(raw);
+		return yield* DiagramGenerationHttpError.make({
+			diagnostics: [
+				`${route.gatewayLabel} Gateway request failed with HTTP ${response.status}.`,
+				...(diagnostic ? [diagnostic] : []),
+			],
+			durationMs: Math.round(finishedAt - startedAt),
+			provider: route.provider,
+			raw,
+			retryable: isTransientHttpStatus(response.status),
+			status: response.status,
+		});
+	}
+	const reply = raw as MessagesReply;
+	const inputTokens = reply.usage?.input_tokens;
+	const outputTokens = reply.usage?.output_tokens;
+	const text = (reply.content ?? [])
+		.flatMap((part) => (part.type === "text" && part.text ? [part.text] : []))
+		.join("")
+		.trim();
+	yield* Effect.annotateCurrentSpan({
+		"gen_ai.output.messages": [
+			{
+				finish_reason: reply.stop_reason,
+				parts: [{ type: "text", content: text }],
+				role: "assistant",
+			},
+		],
+		"gen_ai.response.finish_reasons": [reply.stop_reason],
+		...(reply.id ? { "gen_ai.response.id": reply.id } : {}),
+		...(reply.model ? { "gen_ai.response.model": reply.model } : {}),
+		...(inputTokens === undefined ? {} : { "gen_ai.usage.input_tokens": inputTokens }),
+		...(outputTokens === undefined ? {} : { "gen_ai.usage.output_tokens": outputTokens }),
+	});
+	// A cut-off answer is incomplete, not malformed, as on the chat route.
+	if (reply.stop_reason === "max_tokens") {
+		return yield* DiagramGenerationLimitError.make({
+			diagnostics: [
+				`output_truncated: ${route.modelLabel} stopped at the ${tokenCount(maxOutputTokens)}-token output limit${outputTokens === undefined ? "" : ` after ${tokenCount(outputTokens)} tokens`}.`,
+			],
+			limit: "output_tokens",
+			message: `The diagram needs more than the ${tokenCount(maxOutputTokens)}-token output limit allows in one answer.`,
+			provider: route.provider,
+		});
+	}
+	if (!text) {
+		return yield* emptyResponseError(route, new Error(`Stop reason: ${reply.stop_reason}`));
+	}
+	return candidateFromText(
+		{
+			diagnostics: [],
+			model: modelId,
+			provider: route.provider,
+			text,
+			...(inputTokens !== undefined && outputTokens !== undefined
+				? { usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens } }
+				: {}),
+		},
+		request.prompt.base,
+	);
+});
+
 export const CloudflareGatewayChatClientLive = Layer.effect(DiagramGenerationClient)(
 	Effect.gen(function* () {
 		const ai = yield* CloudflareAiGatewayBinding;
@@ -388,9 +546,13 @@ export const CloudflareGatewayChatClientLive = Layer.effect(DiagramGenerationCli
 				});
 				return yield* runDiagramGenerationWithPolicy(
 					(attemptRequest) =>
-						Result.isSuccess(gateway)
-							? runChatAttempt(model, gateway.success, config, attemptRequest)
-							: Effect.fail(gateway.failure),
+						Result.isFailure(gateway)
+							? Effect.fail(gateway.failure)
+							: // A flowchart revision on Claude thinks; every other request does not.
+								config.route.gatewayProvider === "anthropic" &&
+								  revisesFlowchartWithEdits(attemptRequest.prompt)
+								? runMessagesAttempt(gateway.success, config, attemptRequest)
+								: runChatAttempt(model, gateway.success, config, attemptRequest),
 					request,
 					provider,
 					policy,

@@ -282,6 +282,107 @@ describe("gateway chat routes", () => {
 		});
 	});
 
+	describe("a flowchart revision", () => {
+		const base = {
+			type: "flowchart",
+			id: "flow",
+			title: "Flow",
+			nodes: { a: "Start", b: "End" },
+			edges: [["a", "b"]],
+		};
+		const revision = {
+			...haiku,
+			prompt: { id: "revise", request: "Add Check between Start and End", base },
+		};
+		const messages = (text: string, stop = "end_turn", init?: ResponseInit) =>
+			Response.json(
+				{
+					id: "msg_1",
+					type: "message",
+					model: "claude-haiku-5-5",
+					content: [
+						{ type: "thinking", thinking: "", signature: "sig" },
+						{ type: "text", text },
+					],
+					stop_reason: stop,
+					usage: { input_tokens: 20, output_tokens: 9 },
+				},
+				init,
+			);
+		const edits = JSON.stringify({
+			edits: [{ op: "insert", node: { check: "Check" }, between: ["a", "b"] }],
+		});
+
+		it("thinks through the native Messages API and applies the edits", async () => {
+			const { calls, run } = capture(() => messages(edits));
+			const candidate = await Effect.runPromise(generate(anthropicLayer(run), revision));
+			const { system, user } = buildDiagramGenerationMessages(revision.prompt);
+			expect(calls[0]?.[0]).toEqual({
+				endpoint: "v1/messages",
+				provider: "anthropic",
+				headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" },
+				query: {
+					model: "claude-haiku-5-5",
+					max_tokens: 16_384,
+					system,
+					messages: [{ role: "user", content: user }],
+					thinking: { type: "adaptive" },
+					output_config: { effort: "medium" },
+				},
+			});
+			expect(candidate).toMatchObject({
+				provider: "cloudflare-anthropic",
+				usage: { inputTokens: 20, outputTokens: 9, totalTokens: 29 },
+				edits: [{ op: "insert" }],
+			});
+			expect(candidate.flowchart?.edges).toEqual([
+				["a", "check"],
+				["check", "b"],
+			]);
+		});
+
+		it("reports a cut-off answer as the output limit and an overloaded upstream as retryable", async () => {
+			const cut = await Effect.runPromise(
+				generate(anthropicLayer(capture(() => messages("{", "max_tokens")).run), revision).pipe(
+					Effect.flip,
+				),
+			);
+			expect(cut).toMatchObject({ _tag: "DiagramGenerationLimitError", limit: "output_tokens" });
+
+			const overloaded = await Effect.runPromise(
+				generate(
+					anthropicLayer(
+						capture(() =>
+							Response.json(
+								{ type: "error", error: { type: "overloaded_error", message: "Overloaded" } },
+								{ status: 529 },
+							),
+						).run,
+					),
+					revision,
+				).pipe(Effect.flip),
+			);
+			expect(overloaded).toMatchObject({
+				_tag: "DiagramGenerationHttpError",
+				status: 529,
+				retryable: true,
+			});
+		});
+
+		it("keeps a revision into another family on the chat route, thinking off", async () => {
+			const { calls, run } = capture();
+			const intoMindmap = {
+				...revision,
+				prompt: { ...revision.prompt, requestedType: "mindmap" as const },
+			};
+			await Effect.runPromise(generate(anthropicLayer(run), intoMindmap).pipe(Effect.result));
+			expect(calls[0]?.[0]).toMatchObject({
+				endpoint: "v1/chat/completions",
+				query: { thinking: { type: "disabled" } },
+			});
+		});
+	});
+
 	it("reports Anthropic's error body and does not retry a rejected request", async () => {
 		const { calls, run } = capture(() =>
 			Response.json(
