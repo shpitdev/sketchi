@@ -47,7 +47,7 @@ describe("CLI dependency and public-surface audit", () => {
 		);
 	});
 
-	it("confines network boundaries to the four credential-free HTTPS commands", async () => {
+	it("confines network boundaries to the five credential-free HTTPS commands", async () => {
 		const files = await sourceFiles(join(workspaceRoot, "apps/cli/src"));
 		const fetchFiles: string[] = [];
 		let cliSource = "";
@@ -60,7 +60,12 @@ describe("CLI dependency and public-surface audit", () => {
 		}
 		assert.deepStrictEqual(
 			fetchFiles.map((file) => file.slice(workspaceRoot.length + 1)),
-			["apps/cli/src/canvas.ts", "apps/cli/src/generation.ts", "apps/cli/src/share.ts"],
+			[
+				"apps/cli/src/canvas.ts",
+				"apps/cli/src/generation.ts",
+				"apps/cli/src/icon-draw.ts",
+				"apps/cli/src/share.ts",
+			],
 		);
 		assert.notInclude(cliSource, "GOOGLE_GENERATIVE_AI_API_KEY");
 		assert.notInclude(cliSource, "CF_AIG_TOKEN");
@@ -76,6 +81,10 @@ describe("CLI dependency and public-surface audit", () => {
 
 		const canvasSource = await readFile(join(workspaceRoot, "apps/cli/src/canvas.ts"), "utf8");
 		assert.include(canvasSource, "https://playground.sketchi.app/api/v1/canvases/create");
+
+		const iconSource = await readFile(join(workspaceRoot, "apps/cli/src/icon-draw.ts"), "utf8");
+		assert.include(iconSource, "https://playground.sketchi.app/api/v1/icons/draw");
+		assert.include(iconSource, "https://icons.sketchi.app/api/community");
 
 		const shareProtocolSource = await readFile(
 			join(workspaceRoot, "apps/cli/src/share-protocol.ts"),

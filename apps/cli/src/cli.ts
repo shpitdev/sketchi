@@ -52,6 +52,14 @@ import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import { LocalFileSystemLive } from "./filesystem.js";
 import { cliIconCatalog } from "./icon-catalog.js";
 import {
+	drawIcons,
+	iconDrawText,
+	resolveCommunityEndpoint,
+	resolveIconDrawEndpoint,
+	SKETCHI_COMMUNITY_ENDPOINT_ENV,
+	SKETCHI_ICON_DRAW_ENDPOINT_ENV,
+} from "./icon-draw.js";
+import {
 	exportCreatedDiagram,
 	runGenerateWorkflow,
 	runReviseWorkflow,
@@ -136,7 +144,8 @@ Command map:
   canonical document; patch restyles mindmap and sequence records. Use create for accepted
   canonical JSON.
   Share and pull are explicit network
-  boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
+  boundaries for Excalidraw links. icon draw turns a logo file into a hand-drawn Excalidraw icon.
+  Run sketchi COMMAND --help for every flag and example.
 
 Manual JSON workflow (strictly offline):
   create a canonical document, edit or patch it, inspect or replace it, list local records, and
@@ -145,6 +154,15 @@ Manual JSON workflow (strictly offline):
 
 Canonical flowchart example:
   {"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":{"start":"Change proposed","review":"Review evidence","end":"Release approved"},"edges":[["start","review"],["review","end"]]}}
+
+Hand-drawn icons:
+  sketchi icon draw FILE --name NAME sends one SVG, PNG, JPEG or WebP logo and its name to the public
+  Sketchi icon service (one unauthenticated HTTPS POST per logo) and writes NAME.excalidrawlib,
+  NAME.28.png, NAME.112.png and NAME.recipe.json into --dest. A folder draws every logo file in it
+  and adds one FOLDER.excalidrawlib pack; --publish adds each icon to the public community set at
+  icons.sketchi.app. JSON data lists icons (name, files, recognizable, rounds, published) and failed
+  logos; the command fails only when no logo was drawn. A short rate limit is waited out; a spent
+  daily budget fails with daily_limit (exit 10).
 
 Node logos:
   A flowchart sets "logos":true to draw the logo of each product a node label names, and a node
@@ -260,7 +278,8 @@ Exit codes and errors:
 Revision recovery and next steps:
   edit, pull, and restore archive the complete prior authority state before atomic replacement.
   Use restore --revision N to recover through the CLI without consuming the selected snapshot.
-  Start with generate for a prompt, canvas for CanvasSpec, or create for accepted canonical JSON.
+  Start with generate for a prompt, canvas for CanvasSpec, or create for accepted canonical JSON;
+  icon draw turns a logo file into an Excalidraw library item.
   Every returned id supports show, copy, and export. Edit and patch are only for flowchart,
   mindmap, and sequence records; create a new canvas to replace a Universal CanvasSpec.`;
 
@@ -844,6 +863,94 @@ const canvasCommand = Command.make(
 			description: "Read CanvasSpec from stdin and export editable Excalidraw.",
 		},
 	]),
+);
+
+const ICON_DRAW_HELP = `Draw a logo as a hand-drawn Sketchi icon. Sketchi sends the logo (an SVG, or a PNG, JPEG or WebP) and its name to the public Sketchi icon service in one unauthenticated HTTPS POST per logo; a model draws it as a few Excalidraw parts, checks it at 28 px against the source, and a judge from another model family tries to pick it out of four look-alike logos.
+
+  PATH is one logo file, or a folder: every .svg, .png, .jpg, .jpeg and .webp directly in it is drawn,
+  named after its file, and the folder also gets one <folder>.excalidrawlib pack of them all.
+  --name NAME is the brand or product name for one file; it defaults to the file's name.
+  For each logo it writes <name>.excalidrawlib (one library item to drop into Excalidraw),
+  <name>.28.png and <name>.112.png previews, and <name>.recipe.json, into --dest (this directory by
+  default). A drawing the judge did not pick out is still written, marked with !.
+  --publish adds each drawn icon to the public community set at icons.sketchi.app with the judge's
+  verdict, and prints its page.
+  --model MODEL asks for another author model the service offers.
+  The service limits how many logos one client draws a minute; Sketchi waits out a short limit. Override
+  the service with ${SKETCHI_ICON_DRAW_ENDPOINT_ENV} or --endpoint URL, the store with
+  ${SKETCHI_COMMUNITY_ENDPOINT_ENV}. One logo that fails does not stop a folder; the command fails only
+  when nothing was drawn. Exit codes: 3 unreadable input, 4 logo refused, 10 network, rate limit or
+  publish failure, 11 timeout, 12 malformed response.`;
+
+const iconDrawCommand = Command.make(
+	"draw",
+	{
+		path: Argument.String("path").pipe(
+			Argument.withDescription("A logo file (.svg, .png, .jpg, .webp), or a folder of them."),
+		),
+		name: Flag.optional(
+			Flag.String("name").pipe(
+				Flag.withDescription("The logo's brand or product name; defaults to the file's name."),
+				Flag.withMetavar("NAME"),
+			),
+		),
+		dest: Flag.String("dest").pipe(
+			Flag.withDefault("."),
+			Flag.withDescription("Directory for the icon files."),
+			Flag.withMetavar("DIR"),
+		),
+		model: Flag.optional(
+			Flag.String("model").pipe(
+				Flag.withDescription("An author model the service offers; omit for its default."),
+				Flag.withMetavar("MODEL"),
+			),
+		),
+		publish: Flag.Boolean("publish").pipe(
+			Flag.withDefault(false),
+			Flag.withDescription("Also add each drawn icon to the public community set."),
+		),
+		endpoint: Flag.String("endpoint").pipe(
+			Flag.withDefault(resolveIconDrawEndpoint()),
+			Flag.withDescription("Unauthenticated icon draw API URL; defaults to production."),
+			Flag.withMetavar("URL"),
+		),
+	},
+	({ dest, endpoint, model, name, path, publish }) =>
+		Effect.gen(function* () {
+			const { output } = yield* rootCommand;
+			yield* runReported(
+				"icon draw",
+				output,
+				drawIcons({
+					path,
+					dest,
+					endpoint,
+					...(Option.isSome(name) ? { name: name.value } : {}),
+					...(Option.isSome(model) ? { model: model.value } : {}),
+					...(publish ? { publish: { endpoint: resolveCommunityEndpoint() } } : {}),
+				}),
+				iconDrawText,
+			);
+		}),
+).pipe(
+	Command.withDescription(ICON_DRAW_HELP),
+	Command.withShortDescription("Hand-draw a logo as an Excalidraw icon."),
+	Command.withExamples([
+		{
+			command: 'sketchi icon draw acme.svg --name "Acme"',
+			description: "Draw one logo and write its library, previews and recipe here.",
+		},
+		{
+			command: "sketchi icon draw logos/ --dest icons --publish",
+			description: "Draw a folder as one pack and publish each icon.",
+		},
+	]),
+);
+
+const iconCommand = Command.make("icon").pipe(
+	Command.withDescription("Hand-drawn icons from logos."),
+	Command.withShortDescription("Hand-draw a logo as an Excalidraw icon."),
+	Command.withSubcommands([iconDrawCommand]),
 );
 
 const createCommand = Command.make(
@@ -1574,6 +1681,7 @@ export const sketchiCommand = rootCommand.pipe(
 		generateCommand,
 		reviseCommand,
 		canvasCommand,
+		iconCommand,
 		docsCommand,
 		createCommand,
 		showCommand,

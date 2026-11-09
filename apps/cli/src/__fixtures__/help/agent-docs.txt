@@ -7,7 +7,8 @@ Command map:
   canonical document; patch restyles mindmap and sequence records. Use create for accepted
   canonical JSON.
   Share and pull are explicit network
-  boundaries for Excalidraw links. Run sketchi COMMAND --help for every flag and example.
+  boundaries for Excalidraw links. icon draw turns a logo file into a hand-drawn Excalidraw icon.
+  Run sketchi COMMAND --help for every flag and example.
 
 Manual JSON workflow (strictly offline):
   create a canonical document, edit or patch it, inspect or replace it, list local records, and
@@ -16,6 +17,15 @@ Manual JSON workflow (strictly offline):
 
 Canonical flowchart example:
   {"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":{"start":"Change proposed","review":"Review evidence","end":"Release approved"},"edges":[["start","review"],["review","end"]]}}
+
+Hand-drawn icons:
+  sketchi icon draw FILE --name NAME sends one SVG, PNG, JPEG or WebP logo and its name to the public
+  Sketchi icon service (one unauthenticated HTTPS POST per logo) and writes NAME.excalidrawlib,
+  NAME.28.png, NAME.112.png and NAME.recipe.json into --dest. A folder draws every logo file in it
+  and adds one FOLDER.excalidrawlib pack; --publish adds each icon to the public community set at
+  icons.sketchi.app. JSON data lists icons (name, files, recognizable, rounds, published) and failed
+  logos; the command fails only when no logo was drawn. A short rate limit is waited out; a spent
+  daily budget fails with daily_limit (exit 10).
 
 Node logos:
   A flowchart sets "logos":true to draw the logo of each product a node label names, and a node
@@ -131,6 +141,7 @@ Exit codes and errors:
 Revision recovery and next steps:
   edit, pull, and restore archive the complete prior authority state before atomic replacement.
   Use restore --revision N to recover through the CLI without consuming the selected snapshot.
-  Start with generate for a prompt, canvas for CanvasSpec, or create for accepted canonical JSON.
+  Start with generate for a prompt, canvas for CanvasSpec, or create for accepted canonical JSON;
+  icon draw turns a logo file into an Excalidraw library item.
   Every returned id supports show, copy, and export. Edit and patch are only for flowchart,
   mindmap, and sequence records; create a new canvas to replace a Universal CanvasSpec.

@@ -276,6 +276,7 @@ export function renderRootHelp(options: HelpBrandOptions): string {
 			width,
 		),
 		action("canvas", "Build and export a typed Universal CanvasSpec.", colors, width),
+		action("icon", "Hand-draw a logo as an Excalidraw icon: icon draw FILE.", colors, width),
 		"",
 		colors.heading("WORK WITH A DIAGRAM"),
 		action("list", "Find past diagrams, newest first. Add words to search.", colors, width),

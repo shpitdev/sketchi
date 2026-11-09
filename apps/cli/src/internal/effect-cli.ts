@@ -20,6 +20,7 @@ const PUBLIC_COMMANDS = new Set([
 	"generate",
 	"revise",
 	"canvas",
+	"icon",
 	"docs",
 	"create",
 	"show",
