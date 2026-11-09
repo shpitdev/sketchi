@@ -32,6 +32,7 @@ export type CodeModeUsageOperation =
 	| "buildWireframe"
 	| "buildQuadrantChart"
 	| "createCanvas"
+	| "drawIcon"
 	| "execute"
 	| "generateDiagram";
 

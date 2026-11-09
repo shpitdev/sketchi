@@ -63,6 +63,7 @@ const tanstackFullPathSnapshot = [
 	"/api/v1/flowcharts/edit",
 	"/api/v1/gantts/build",
 	"/api/v1/generate",
+	"/api/v1/icons/draw",
 	"/api/v1/journey-maps/build",
 	"/api/v1/mindmaps/build",
 	"/api/v1/org-charts/build",

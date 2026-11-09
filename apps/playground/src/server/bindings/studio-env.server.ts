@@ -19,6 +19,10 @@ export interface StudioEnv {
 	SKETCHI_AI_GATEWAY_ID?: string;
 	SKETCHI_AI_GENERATE_MODEL?: string;
 	SKETCHI_AI_MODEL?: string;
+	/** The author model icon drawing uses when a request names none. */
+	SKETCHI_ICON_AUTHOR_MODEL?: string;
+	/** The model that judges a drawn icon; another family than the author's. */
+	SKETCHI_ICON_JUDGE_MODEL?: string;
 	SKETCHI_RENDER_ASSET_ORIGIN?: string;
 	TELEMETRY_SPANS?: TelemetryPipeline;
 	/** A Worker secret: lets generate narrow an untyped request's families with Jev. */

@@ -505,6 +505,9 @@ importers:
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../../packages/icons/catalog
+      '@sketchi/icon-draw':
+        specifier: workspace:*
+        version: link:../../packages/icons/draw
       '@sketchi/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -707,7 +710,14 @@ importers:
         version: 19.3.1(react@19.3.1)
 
   packages/icons/catalog:
+    dependencies:
+      fast-xml-parser:
+        specifier: 5.11.2
+        version: 5.11.2
     devDependencies:
+      '@resvg/resvg-wasm':
+        specifier: 2.6.2
+        version: 2.6.2
       lucide-static:
         specifier: 1.65.0
         version: 1.65.0
@@ -729,6 +739,34 @@ importers:
       tslib:
         specifier: ^2.9.1
         version: 2.9.1
+
+  packages/icons/draw:
+    dependencies:
+      '@sketchi/diagram-core':
+        specifier: workspace:*
+        version: link:../../diagram/core
+      '@sketchi/diagram-excalidraw':
+        specifier: workspace:*
+        version: link:../../diagram/excalidraw
+      '@sketchi/diagram-generation':
+        specifier: workspace:*
+        version: link:../../diagram/generation
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../catalog
+      '@sketchi/observability':
+        specifier: workspace:*
+        version: link:../../observability
+      effect:
+        specifier: 4.1.2
+        version: 4.1.2
+      tslib:
+        specifier: ^2.9.1
+        version: 2.9.1
+    devDependencies:
+      '@excalidraw/excalidraw':
+        specifier: 0.18.1
+        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
 
   packages/observability:
     dependencies:

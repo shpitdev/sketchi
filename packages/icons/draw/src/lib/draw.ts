@@ -1,0 +1,404 @@
+import type { IconRecipe } from "@sketchi/diagram-core";
+import { colorDistance, type MarkColor, sanitizeSvg } from "@sketchi/icon-catalog";
+import { rankLookAlikes } from "@sketchi/icon-catalog/look-alikes";
+import { Clock, Context, Effect } from "effect";
+
+import {
+	confusedRequestText,
+	decodeAuthorReply,
+	draftRequestText,
+	normalizeRecipe,
+	repairRequestText,
+	REVIEW_REQUEST_TEXT,
+} from "./author.js";
+import { IconInputError, IconRecipeError } from "./errors.js";
+import { IconImaging, type IconImageExport, type IconImagePrepare } from "./imaging.js";
+import type { IconDrawInput, IconSource } from "./input.js";
+import {
+	decodeJudgeReply,
+	type IconJudgeVerdict,
+	JUDGE_LOOK_ALIKES,
+	type JudgeCandidate,
+	judgeLineup,
+} from "./judge.js";
+import {
+	type AuthorContentBlock,
+	type AuthorTurn,
+	type IconAuthorModel,
+	IconDrawModels,
+	type ModelCall,
+} from "./models.js";
+import {
+	ICON_EXPORT_SCALE,
+	iconLibrary,
+	type IconLibrary,
+	LARGE_ICON_SIZE,
+	NODE_ICON_SIZE,
+	previewScene,
+	roundSheet,
+} from "./scenes.js";
+
+/** Catalog marks by slug, as SVG markup, for the judge's lineup. */
+export class IconCatalogSvgs extends Context.Service<
+	IconCatalogSvgs,
+	{ readonly load: (slug: string) => Effect.Effect<string | undefined> }
+>()("@sketchi/icon-draw/IconCatalogSvgs") {}
+
+/** The author's view of the source. */
+const SOURCE_SIZE = 256;
+/** Each logo in the judge's lineup. */
+const LINEUP_SIZE = 128;
+/** Author calls per draw, the judge's revision included. */
+export const ICON_DRAW_MAX_ROUNDS = 3;
+/** A draw answers within this, so a client can wait on one HTTP request. */
+export const ICON_DRAW_BUDGET_MS = 85_000;
+/** Time a round needs: an author call and a render. A round that would not fit is not started. */
+const ROUND_RESERVE_MS = 25_000;
+
+export interface IconDrawOptions {
+	readonly authorModel: IconAuthorModel;
+	readonly maxRounds?: number;
+	readonly budgetMs?: number;
+}
+
+export interface IconDrawUsage {
+	/** Model calls, author and judge. */
+	readonly calls: number;
+	/** Every input token, cached or not. */
+	readonly inputTokens: number;
+	readonly cacheReadTokens: number;
+	readonly cacheWriteTokens: number;
+	readonly outputTokens: number;
+	readonly ms: number;
+	readonly byCall: readonly ModelCall[];
+}
+
+export interface AuthorTurnOutcome {
+	readonly outcome: "drawn" | "accepted" | "invalid";
+	/** Why the checker rejected the recipe, for an invalid turn. */
+	readonly issues?: readonly string[];
+}
+
+export interface IconDrawResult {
+	readonly name: string;
+	readonly recipe: IconRecipe;
+	/** Base64 PNGs at node size and four times node size, exported at twice their size. */
+	readonly previews: { readonly png28: string; readonly png112: string };
+	readonly excalidrawlib: IconLibrary;
+	readonly judge: IconJudgeVerdict;
+	/** The source colors the recipe may use, with the share of the mark each covers. */
+	readonly palette: readonly MarkColor[];
+	readonly author: {
+		readonly model: string;
+		readonly rounds: number;
+		/** True when the author accepted its own drawing, rather than running out of rounds. */
+		readonly accepted: boolean;
+		/** What each author turn did, in order. */
+		readonly turns: readonly AuthorTurnOutcome[];
+	};
+	readonly usage: IconDrawUsage;
+}
+
+/**
+ * The colors a recipe may use. An SVG's exact paints come first, in the order
+ * the drawing shows them; a raster's are its quantized pixel colors. A pixel
+ * color no paint explains (a gradient's blend) is kept as measured.
+ */
+export function sourcePalette(source: IconSource, pixels: readonly MarkColor[]): MarkColor[] {
+	if (source.kind === "raster" || source.colors.length === 0) return [...pixels];
+	const palette: MarkColor[] = [];
+	for (const [measured, share] of pixels) {
+		const paint = source.colors
+			.filter((color) => !palette.some(([taken]) => taken === color))
+			.sort((left, right) => colorDistance(left, measured) - colorDistance(right, measured))[0];
+		palette.push([paint && colorDistance(paint, measured) <= 48 ? paint : measured, share]);
+	}
+	return palette;
+}
+
+function imageBlock(png: string): AuthorContentBlock {
+	return { type: "image", source: { type: "base64", media_type: "image/png", data: png } };
+}
+
+function textBlock(text: string): AuthorContentBlock {
+	return { type: "text", text };
+}
+
+interface Rendered {
+	readonly recipe: IconRecipe;
+	readonly sheet: string;
+	readonly png28: string;
+	readonly png112: string;
+}
+
+function renderExports(recipe: IconRecipe, sourcePng: string): IconImageExport[] {
+	return [
+		{ id: "sheet", scene: roundSheet(recipe, sourcePng), padding: 12, scale: ICON_EXPORT_SCALE },
+		{
+			id: "png28",
+			scene: previewScene(recipe, NODE_ICON_SIZE),
+			padding: 4,
+			scale: ICON_EXPORT_SCALE,
+		},
+		{
+			id: "png112",
+			scene: previewScene(recipe, LARGE_ICON_SIZE),
+			padding: 8,
+			scale: ICON_EXPORT_SCALE,
+		},
+	];
+}
+
+/**
+ * Draw a logo as a hand-drawn recipe: prepare the source, let the author draft
+ * and revise against renders of its own recipe, then have a judge from another
+ * model family pick the source out of look-alikes from the 28 px drawing alone.
+ * A drawing the judge does not recognise still comes back, marked.
+ */
+export const drawIcon = Effect.fn("iconDraw.draw")(function* (
+	input: IconDrawInput,
+	options: IconDrawOptions,
+) {
+	const imaging = yield* IconImaging;
+	const models = yield* IconDrawModels;
+	const catalog = yield* IconCatalogSvgs;
+	const startedAt = yield* Clock.currentTimeMillis;
+	const maxRounds = options.maxRounds ?? ICON_DRAW_MAX_ROUNDS;
+	const budgetMs = options.budgetMs ?? ICON_DRAW_BUDGET_MS;
+	const calls: ModelCall[] = [];
+	const timeLeft = Effect.map(Clock.currentTimeMillis, (now) => budgetMs - (now - startedAt));
+
+	// 1. The source, trimmed and square on paper, and what it looks like.
+	const prepared = yield* imaging.run({
+		prepare: [
+			{
+				id: "source",
+				source: input.source,
+				size: SOURCE_SIZE,
+				quantize: input.source.kind === "raster",
+			},
+			{
+				id: "lineup:source",
+				source: input.source,
+				size: LINEUP_SIZE,
+				quantize: input.source.kind === "raster",
+			},
+		],
+		exports: [],
+	});
+	const source = prepared.prepared["source"];
+	const lineupSource = prepared.prepared["lineup:source"];
+	if (!source || !lineupSource) {
+		return yield* IconInputError.make({
+			code: "blank_image",
+			message: "The logo draws nothing visible on white paper.",
+			hint: "Send a logo with dark or colored ink; a white mark needs its background.",
+		});
+	}
+	const palette = sourcePalette(input.source, source.features.palette);
+	const paletteHexes = palette.map(([hex]) => hex);
+	yield* Effect.annotateCurrentSpan({ "sketchi.icon.palette": paletteHexes.join(" ") });
+
+	// 2. The judge's lineup: the catalog marks the source most resembles.
+	const lookAlikes = rankLookAlikes(source.features, {
+		name: input.name,
+		count: JUDGE_LOOK_ALIKES,
+	});
+	const loaded = yield* Effect.forEach(
+		lookAlikes,
+		({ slug }) =>
+			catalog.load(slug).pipe(
+				Effect.map((svg) => {
+					const sanitized = svg === undefined ? undefined : sanitizeSvg(svg);
+					return sanitized?.ok ? { slug, svg: sanitized.value } : undefined;
+				}),
+			),
+		{ concurrency: JUDGE_LOOK_ALIKES },
+	);
+	const lineupPrepare: IconImagePrepare[] = loaded.flatMap((entry) =>
+		entry
+			? [
+					{
+						id: `lineup:${entry.slug}`,
+						source: { kind: "svg", svg: entry.svg.svg, colors: entry.svg.colors },
+						size: LINEUP_SIZE,
+						quantize: false,
+					} satisfies IconImagePrepare,
+				]
+			: [],
+	);
+	const lineupImages: Record<string, string> = { source: lineupSource.png };
+
+	// 3. Draft, render, review.
+	const messages: AuthorTurn[] = [
+		{
+			role: "user",
+			content: [imageBlock(source.png), textBlock(draftRequestText(input.name, palette))],
+		},
+	];
+	let rounds = 0;
+	let accepted = false;
+	let current: Rendered | undefined;
+	let lastIssues: readonly string[] = [];
+	const turns: AuthorTurnOutcome[] = [];
+
+	const authorTurn = Effect.fnUntraced(function* () {
+		const reply = yield* models.author({ model: options.authorModel, messages });
+		rounds += 1;
+		calls.push(reply.call);
+		messages.push({ role: "assistant", content: reply.content });
+		return decodeAuthorReply(reply.text);
+	});
+
+	const render = Effect.fnUntraced(function* (recipe: IconRecipe) {
+		const result = yield* imaging.run({
+			prepare: lineupPrepare.filter(
+				({ id }) => lineupImages[id.slice("lineup:".length)] === undefined,
+			),
+			exports: renderExports(recipe, source.png),
+		});
+		for (const [id, image] of Object.entries(result.prepared)) {
+			lineupImages[id.slice("lineup:".length)] = image.png;
+		}
+		const { sheet, png28, png112 } = result.exported;
+		if (!sheet || !png28 || !png112) {
+			return yield* IconRecipeError.make({
+				issues: [],
+				message: "The recipe could not be drawn.",
+			});
+		}
+		return { recipe, sheet, png28, png112 } satisfies Rendered;
+	});
+
+	/** One author turn that should end in a recipe; undefined when it did not. */
+	const revise = Effect.fnUntraced(function* () {
+		const reply = yield* authorTurn();
+		const invalid = (issues: readonly string[]) => {
+			lastIssues = issues;
+			turns.push({ outcome: "invalid", issues });
+			messages.push({ role: "user", content: [textBlock(repairRequestText(issues))] });
+			return "repair" as const;
+		};
+		if (!reply) return invalid(['The reply was not the {"accept", "recipe"} JSON.']);
+		if (reply.accept && current) {
+			turns.push({ outcome: "accepted" });
+			return "accepted" as const;
+		}
+		const normalized = normalizeRecipe(reply.recipe, paletteHexes);
+		if (!normalized.recipe) {
+			return invalid(reply.recipe === null ? ["A draft needs a recipe."] : normalized.issues);
+		}
+		turns.push({ outcome: "drawn" });
+		return yield* render(normalized.recipe);
+	});
+
+	while (rounds < maxRounds) {
+		if (rounds > 0 && (yield* timeLeft) < ROUND_RESERVE_MS) break;
+		const outcome = yield* revise();
+		if (outcome === "accepted") {
+			accepted = true;
+			break;
+		}
+		if (outcome === "repair") continue;
+		current = outcome;
+		if (rounds < maxRounds) {
+			messages.push({
+				role: "user",
+				content: [imageBlock(current.sheet), textBlock(REVIEW_REQUEST_TEXT)],
+			});
+		}
+	}
+	if (!current) {
+		return yield* IconRecipeError.make({
+			issues: lastIssues,
+			message: "The author did not produce a recipe that can be drawn.",
+		});
+	}
+
+	// 4. The judge, and one revision when it mistook the drawing for a look-alike.
+	const lineupSlugs = ["source", ...loaded.flatMap((entry) => (entry ? [entry.slug] : []))];
+	const lineup: JudgeCandidate[] = judgeLineup(
+		input.name,
+		lineupSlugs.filter((slug) => slug !== "source" && lineupImages[slug] !== undefined),
+	);
+	const lineupNames = lineup.map((candidate) =>
+		candidate.kind === "source" ? "source" : candidate.slug,
+	);
+	const judgeOnce = Effect.fnUntraced(function* (drawing: Rendered) {
+		const reply = yield* models.judge({
+			sketch: drawing.png28,
+			lineup: lineupNames.map((name) => lineupImages[name] ?? ""),
+		});
+		calls.push(reply.call);
+		const picked = decodeJudgeReply(reply.text, lineup.length);
+		return picked === undefined ? undefined : lineupNames[picked - 1];
+	});
+
+	let attempts = 1;
+	const first = yield* judgeOnce(current).pipe(Effect.result);
+	let picked = first._tag === "Success" ? first.success : undefined;
+	let judgeError = first._tag === "Failure" ? first.failure.message : undefined;
+	if (
+		first._tag === "Success" &&
+		picked !== undefined &&
+		picked !== "source" &&
+		rounds < maxRounds &&
+		(yield* timeLeft) >= ROUND_RESERVE_MS
+	) {
+		const confused = lineupImages[picked];
+		if (confused) {
+			messages.push({
+				role: "user",
+				content: [imageBlock(source.png), imageBlock(confused), textBlock(confusedRequestText())],
+			});
+			const outcome = yield* revise();
+			if (outcome !== "accepted" && outcome !== "repair") {
+				attempts += 1;
+				const second = yield* judgeOnce(outcome).pipe(Effect.result);
+				if (second._tag === "Success" && second.success === "source") {
+					current = outcome;
+					picked = "source";
+				} else if (second._tag === "Failure") {
+					judgeError = second.failure.message;
+				}
+			}
+		}
+	}
+
+	const finishedAt = yield* Clock.currentTimeMillis;
+	const judge: IconJudgeVerdict = {
+		recognizable: picked === "source",
+		...(picked === undefined ? {} : { picked }),
+		lineup: lineupNames,
+		model: models.judgeModel,
+		attempts,
+		...(judgeError === undefined ? {} : { error: judgeError }),
+	};
+	yield* Effect.annotateCurrentSpan({
+		"sketchi.icon.rounds": rounds,
+		"sketchi.icon.accepted": accepted,
+		"sketchi.icon.recognizable": judge.recognizable,
+	});
+	const sum = (pick: (call: ModelCall) => number) =>
+		calls.reduce((total, call) => total + pick(call), 0);
+	return {
+		name: input.name,
+		recipe: current.recipe,
+		previews: { png28: current.png28, png112: current.png112 },
+		excalidrawlib: iconLibrary(input.name, current.recipe),
+		judge,
+		palette,
+		author: { model: options.authorModel, rounds, accepted, turns },
+		usage: {
+			calls: calls.length,
+			inputTokens: sum(
+				(call) => call.usage.inputTokens + call.usage.cacheReadTokens + call.usage.cacheWriteTokens,
+			),
+			cacheReadTokens: sum((call) => call.usage.cacheReadTokens),
+			cacheWriteTokens: sum((call) => call.usage.cacheWriteTokens),
+			outputTokens: sum((call) => call.usage.outputTokens),
+			ms: finishedAt - startedAt,
+			byCall: calls,
+		},
+	} satisfies IconDrawResult;
+});

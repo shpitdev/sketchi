@@ -29,11 +29,19 @@
 			"types": "./dist/native-icons.d.ts",
 			"default": "./dist/native-icons.json"
 		},
+		"./look-alikes": {
+			"types": "./dist/look-alikes.d.ts",
+			"default": "./dist/look-alikes.js"
+		},
 		"./node-logos/*": "./dist/node-logos/*",
 		"./svg/*": "./svg/*",
 		"./package.json": "./package.json"
 	},
+	"dependencies": {
+		"fast-xml-parser": "5.11.2"
+	},
 	"devDependencies": {
+		"@resvg/resvg-wasm": "2.6.2",
 		"lucide-static": "1.65.0",
 		"svg-pathdata": "9.0.0",
 		"wordlist-english": "1.2.1"

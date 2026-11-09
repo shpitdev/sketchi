@@ -17,6 +17,7 @@
 		"@sketchi/diagram-scenarios": "workspace:*",
 		"@sketchi/diagram-ui": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
+		"@sketchi/icon-draw": "workspace:*",
 		"@sketchi/observability": "workspace:*",
 		"@sketchi/studio-projects": "workspace:*",
 		"@sketchi/ui": "workspace:*",

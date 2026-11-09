@@ -25,10 +25,11 @@ interface BodyRead {
 
 /**
  * Reads a JSON body up to `maxBytes`, then cancels the rest. The span records the body
- * as it arrived, or, for one over the limit, how many bytes came before the read stopped.
+ * as it arrived (unless `recordBody` is false), or, for one over the limit, how many bytes
+ * came before the read stopped.
  */
 export const readBoundedJson = Effect.fn("playground.http.readBoundedJson")(
-	(request: Request, maxBytes: number) =>
+	(request: Request, maxBytes: number, options: { readonly recordBody?: boolean } = {}) =>
 		Effect.tryPromise({
 			try: async (effectSignal): Promise<BodyRead> => {
 				const signal = AbortSignal.any([effectSignal, request.signal]);
@@ -87,7 +88,10 @@ export const readBoundedJson = Effect.fn("playground.http.readBoundedJson")(
 				Effect.annotateCurrentSpan({
 					"http.request.body.size": bytesRead,
 					"http.request.body.outcome": result._tag,
-					...(text === undefined ? {} : { [SpanContent.httpRequestBody]: text }),
+					// A body that carries an uploaded file is sized, not recorded.
+					...(text === undefined || options.recordBody === false
+						? {}
+						: { [SpanContent.httpRequestBody]: text }),
 				}),
 			),
 			Effect.map(({ result }) => result),

@@ -113,6 +113,10 @@ export default defineConfig({
 					.pathname,
 			},
 			{
+				find: "@sketchi/icon-draw",
+				replacement: new URL("../../packages/icons/draw/src/index.ts", import.meta.url).pathname,
+			},
+			{
 				find: "@sketchi/diagram-ui/styles.css",
 				replacement: new URL("../../packages/diagram/ui/src/styles.css", import.meta.url).pathname,
 			},

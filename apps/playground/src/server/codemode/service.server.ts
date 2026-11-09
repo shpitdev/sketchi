@@ -186,7 +186,7 @@ function artifactUrl(
 	return url.toString();
 }
 
-function rendererOptions(
+export function rendererOptions(
 	env: Context.Service.Shape<typeof PlaygroundBindings>,
 	origin: string,
 ): CloudflareBrowserRunRendererOptions {

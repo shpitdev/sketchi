@@ -1,6 +1,7 @@
 import "@tanstack/react-start/server-only";
 
 import type { Browser, BrowserWorker, Page } from "@cloudflare/playwright";
+import type { IconImagingJob, IconImagingResult } from "@sketchi/icon-draw";
 import { recordMetric } from "@sketchi/observability";
 import {
 	Cause,
@@ -337,6 +338,46 @@ const exportHarnessPng = Effect.fnUntraced(function* (
 	);
 });
 
+export interface IconJobRequest {
+	readonly harnessUrl: string;
+	readonly job: IconImagingJob;
+}
+
+/** An icon job runs several exports and logo decodes; it gets more time than one export. */
+export const ICON_JOB_TIMEOUT_MS = 45_000;
+
+const runHarnessIconJob = Effect.fnUntraced(function* (
+	harness: HarnessPage,
+	request: IconJobRequest,
+) {
+	return yield* tryBrowserPromise("evaluate", () =>
+		harness.page.evaluate(
+			async (job) =>
+				(
+					globalThis as unknown as {
+						sketchiIconJob: (job: IconImagingJob) => Promise<IconImagingResult>;
+					}
+				).sketchiIconJob(job),
+			request.job,
+		),
+	).pipe(
+		Effect.timeoutOrElse({
+			duration: ICON_JOB_TIMEOUT_MS,
+			orElse: () =>
+				Effect.suspend(() => {
+					harness.abandoned = true;
+					return Effect.fail(
+						BrowserRenderingFailure.make({
+							cause: new Error("Icon job timed out"),
+							message: `The icon job exceeded ${ICON_JOB_TIMEOUT_MS}ms.`,
+							operation: "evaluate",
+						}),
+					);
+				}),
+		}),
+	);
+});
+
 class StaleHarnessPage extends Schema.TaggedError<StaleHarnessPage>()("StaleHarnessPage", {
 	cause: Schema.Defect(),
 }) {}
@@ -345,6 +386,10 @@ export interface BrowserRenderPoolShape {
 	readonly renderPng: (
 		request: PngRenderRequest,
 	) => Effect.Effect<RenderedPng, BrowserRenderingFailure>;
+	/** Prepares logos and exports icon scenes in one page call, for the icon draw service. */
+	readonly runIconJob: (
+		request: IconJobRequest,
+	) => Effect.Effect<IconImagingResult, BrowserRenderingFailure>;
 	/**
 	 * Opens one harness page when none is open or opening, so the first export
 	 * of a session finds it ready. It never adds a page to a pool in use.
@@ -413,12 +458,16 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 					idleTimeToLive: Duration.infinity,
 				});
 
-				const renderOnce = (request: PngRenderRequest) =>
+				/** One piece of work on a warm page; a page Browser Run closed fails as stale. */
+				const onHarnessPage = <A>(
+					harnessUrl: string,
+					work: (harness: HarnessPage) => Effect.Effect<A, BrowserRenderingFailure>,
+				) =>
 					Effect.scoped(
 						Effect.gen(function* () {
 							const requestedAt = ++sequence;
 							const startedAt = yield* Clock.currentTimeMillis;
-							const pages = yield* RcMap.get(pagesByHarness, request.harnessUrl);
+							const pages = yield* RcMap.get(pagesByHarness, harnessUrl);
 							const harness = yield* Pool.get(pages);
 							const acquiredAt = yield* Clock.currentTimeMillis;
 							// Browser Run may have closed an idle session; replace it.
@@ -427,7 +476,7 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 								return yield* new StaleHarnessPage({ cause: new Error("Browser Run page closed") });
 							}
 							const coldStart = harness.openedAt > requestedAt;
-							const png = yield* exportHarnessPng(harness, request).pipe(
+							const value = yield* work(harness).pipe(
 								Effect.catch(
 									(error): Effect.Effect<never, BrowserRenderingFailure | StaleHarnessPage> => {
 										if (isLive(harness)) {
@@ -446,21 +495,28 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 							const exportedAt = yield* Clock.currentTimeMillis;
 							// A page another caller started opening may finish within a shorter wait.
 							const openMs = coldStart ? Math.min(harness.openMs, acquiredAt - startedAt) : 0;
-							return { png, coldStart, openMs, exportMs: exportedAt - acquiredAt };
+							return { value, coldStart, openMs, exportMs: exportedAt - acquiredAt };
 						}),
+					).pipe(
+						Effect.retry({
+							times: 2,
+							while: (error) => error._tag === "StaleHarnessPage",
+						}),
+						Effect.catchTag("StaleHarnessPage", (error) =>
+							Effect.fail(browserFailure("evaluate")(error.cause)),
+						),
 					);
 
 				return BrowserRenderPool.of({
 					renderPng: Effect.fn("playground.browserRendering.renderPool")(function* (request) {
 						const startedAt = yield* Clock.currentTimeMillis;
-						const { png, coldStart, openMs, exportMs } = yield* renderOnce(request).pipe(
-							Effect.retry({
-								times: 2,
-								while: (error) => error._tag === "StaleHarnessPage",
-							}),
-							Effect.catchTag("StaleHarnessPage", (error) =>
-								Effect.fail(browserFailure("evaluate")(error.cause)),
-							),
+						const {
+							value: png,
+							coldStart,
+							openMs,
+							exportMs,
+						} = yield* onHarnessPage(request.harnessUrl, (harness) =>
+							exportHarnessPng(harness, request),
 						);
 						const finishedAt = yield* Clock.currentTimeMillis;
 						// Queue time is everything else: waiting for a page, and any stale-page retries.
@@ -476,6 +532,17 @@ export class BrowserRenderPool extends Context.Service<BrowserRenderPool, Browse
 							export_ms: timing.exportMs,
 						});
 						return { png, coldStart, timing } satisfies RenderedPng;
+					}),
+					runIconJob: Effect.fn("playground.browserRendering.iconJob")(function* (request) {
+						const { value, coldStart, exportMs } = yield* onHarnessPage(
+							request.harnessUrl,
+							(harness) => runHarnessIconJob(harness, request),
+						);
+						yield* Effect.annotateCurrentSpan({
+							cache_mode: coldStart ? "cold" : "warm",
+							export_ms: exportMs,
+						});
+						return value;
 					}),
 					prewarm: Effect.fn("playground.browserRendering.prewarm")(function* (harnessUrl) {
 						if (prewarming.has(harnessUrl) || (pageCounts.get(harnessUrl) ?? 0) > 0) {

@@ -1,0 +1,25 @@
+{
+	"name": "@sketchi/icon-draw",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"dependencies": {
+		"@sketchi/diagram-core": "workspace:*",
+		"@sketchi/diagram-excalidraw": "workspace:*",
+		"@sketchi/diagram-generation": "workspace:*",
+		"@sketchi/icon-catalog": "workspace:*",
+		"@sketchi/observability": "workspace:*",
+		"effect": "4.1.2",
+		"tslib": "^2.9.1"
+	},
+	"devDependencies": {
+		"@excalidraw/excalidraw": "0.18.1"
+	}
+}
