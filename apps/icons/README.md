@@ -27,6 +27,22 @@ through the Worker.
 - `GET /api/icons/:slug` returns metadata with inline SVG.
 - `GET /api/icons/:slug.svg` returns raw SVG.
 - `/mcp` exposes `search_icons` and `get_icon`.
+- `GET /api/community?q=&limit=&cursor=`, `GET /api/community/:slug` and
+  `POST /api/community` list, read and publish community icons.
+- `PATCH /api/community/:slug` with `{ "hidden": true }` and
+  `Authorization: Bearer $COMMUNITY_ADMIN_TOKEN` hides an icon (`false`
+  restores it).
+
+## Community icons
+
+Hand-drawn icons published through the API live in the `COMMUNITY_ICONS` D1
+database (`@sketchi/community-icons` owns the table), separate from the
+curated catalog, and show under `/community`. Only the name and recipe are
+stored and served. Names and recipe text are moderated by Jev through the
+Workers AI `AI` binding (`typesafe/jev`), and publishing is rate limited per
+client address by `COMMUNITY_PUBLISH_LIMIT`. Studio reads the same database, so a
+flowchart or canvas node's `icon` can name `community/<slug>`; a catalog slug
+never resolves to a community icon.
 - `/llms.txt` documents the contracts for agents.
 
 API and MCP responses have permissive CORS. Source reports and the source data

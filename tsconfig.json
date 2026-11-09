@@ -14,6 +14,7 @@
     { "path": "./packages/diagram/ui/tsconfig.lib.json" },
     { "path": "./packages/ui/tsconfig.lib.json" },
     { "path": "./packages/icons/catalog/tsconfig.lib.json" },
+    { "path": "./packages/icons/community/tsconfig.lib.json" },
     { "path": "./tools/sketchi-generators/tsconfig.lib.json" },
     { "path": "./apps/cli" },
     { "path": "./apps/excalidraw" },

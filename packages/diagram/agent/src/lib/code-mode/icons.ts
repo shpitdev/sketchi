@@ -1,6 +1,8 @@
 import {
 	canvasNodeIconBand,
+	COMMUNITY_ICON_COLLECTION,
 	embedCanvasIcons,
+	isCommunityIconSlug,
 	isDiagramIconSlug,
 	isIconRecipe,
 	type CanvasIconAsset,
@@ -112,6 +114,102 @@ function conceptSearchIcon(concept: ConceptIcon): SketchiIcon {
 export function isConceptIcon(icon: Pick<CodeModeCatalogIcon, "collection">): boolean {
 	return icon.collection === CONCEPT_COLLECTION;
 }
+
+/** Whether an icon is drawn only by its recipe: a concept or a community icon has no SVG. */
+function isRecipeOnlyIcon(icon: Pick<CodeModeCatalogIcon, "collection">): boolean {
+	return isConceptIcon(icon) || icon.collection === COMMUNITY_ICON_COLLECTION;
+}
+
+/** A published community icon a diagram may draw by its `community/<slug>` slug. */
+export interface CodeModeCommunityIcon {
+	/** With the `community/` prefix. */
+	readonly slug: string;
+	readonly name: string;
+	readonly recipe: IconRecipe;
+}
+
+/**
+ * Where a host reads community icons from. Loading never fails a build: a host
+ * that cannot read its store returns none, and their slugs draw nothing.
+ */
+export interface CodeModeCommunityIcons {
+	readonly load: (slugs: readonly string[]) => Effect.Effect<readonly CodeModeCommunityIcon[]>;
+}
+
+/** The most community icons one request resolves. */
+const MAX_COMMUNITY_ICONS = 24;
+
+/**
+ * Every community slug a request names, wherever it sits: a node's `icon`
+ * string, an `icon.slug`, a canvas element. Catalog slugs and other strings
+ * are left alone, and a request naming none costs no lookup.
+ */
+export function communityIconSlugsIn(value: unknown): string[] {
+	const found = new Set<string>();
+	const visit = (entry: unknown, depth: number) => {
+		if (found.size >= MAX_COMMUNITY_ICONS || depth > 12) return;
+		if (typeof entry === "string") {
+			if (entry.length > 100) return;
+			const slug = normalizeIconSlug(entry);
+			if (isCommunityIconSlug(slug)) found.add(slug);
+			return;
+		}
+		if (Array.isArray(entry)) {
+			for (const item of entry) visit(item, depth + 1);
+			return;
+		}
+		if (entry !== null && typeof entry === "object") {
+			for (const item of Object.values(entry)) visit(item, depth + 1);
+		}
+	};
+	visit(value, 0);
+	return [...found];
+}
+
+/**
+ * The catalog with community icons added under their `community/` slugs.
+ * They resolve by exact slug and draw by recipe; search, label matching and
+ * vendor checks see only the catalog, and a catalog slug always wins.
+ */
+export function withCommunityIcons(
+	catalog: CodeModeIconCatalog,
+	icons: readonly CodeModeCommunityIcon[],
+): CodeModeIconCatalog {
+	const community = new Map(
+		icons
+			.filter((icon) => isCommunityIconSlug(icon.slug) && isIconRecipe(icon.recipe))
+			.map((icon) => [icon.slug, icon] as const),
+	);
+	if (community.size === 0) return catalog;
+	return {
+		...catalog,
+		get: (slug) => {
+			const known = catalog.get(slug);
+			if (known) return known;
+			const icon = community.get(slug);
+			return icon ? { collection: COMMUNITY_ICON_COLLECTION, name: icon.name, slug } : undefined;
+		},
+		recipe: (slug) => (catalog.get(slug) ? catalog.recipe(slug) : community.get(slug)?.recipe),
+	};
+}
+
+/**
+ * The catalog a request builds with: the host's, plus the community icons the
+ * request names, read once per build.
+ */
+export const catalogForRequest = Effect.fn("codeMode.icons.community")(function* (
+	catalog: CodeModeIconCatalog | undefined,
+	communityIcons: CodeModeCommunityIcons | undefined,
+	request: unknown,
+) {
+	if (!catalog || !communityIcons) return catalog;
+	const slugs = communityIconSlugsIn(request).filter((slug) => !catalog.get(slug));
+	if (slugs.length === 0) return catalog;
+	yield* Effect.annotateCurrentSpan("sketchi.icons.community_requested", slugs.length);
+	const icons = yield* communityIcons.load(slugs);
+	yield* Effect.annotateCurrentSpan("sketchi.icons.community_found", icons.length);
+	return withCommunityIcons(catalog, icons);
+});
 
 export function makeCodeModeIconCatalog(options: {
 	readonly icons: readonly SketchiIcon[];
@@ -326,11 +424,13 @@ export function resolveFlowchartLogos(
 		const ref = { kind: "node" as const, id, path: `nodes.${id}.icon` };
 		if (requested !== undefined) {
 			const slug = normalizeIconSlug(requested);
-			const icon =
-				(isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined) ??
-				catalog?.labelLogos(requested).named[0] ??
-				catalog?.labelLogos(requested).possible[0] ??
-				catalog?.search(requested, 1).find((hit) => hit.match === "exact");
+			// A community slug names one published drawing; it never falls back to a catalog mark.
+			const icon = isCommunityIconSlug(slug)
+				? catalog?.get(slug)
+				: ((isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined) ??
+					catalog?.labelLogos(requested).named[0] ??
+					catalog?.labelLogos(requested).possible[0] ??
+					catalog?.search(requested, 1).find((hit) => hit.match === "exact"));
 			if (!icon) {
 				issues.push(
 					unknownIconIssue({
@@ -556,7 +656,7 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 			.map(({ slug }) => slug)
 			.filter((slug) => {
 				const icon = known.get(slug);
-				return icon !== undefined && !isConceptIcon(icon);
+				return icon !== undefined && !isRecipeOnlyIcon(icon);
 			}),
 	);
 	const loaded = yield* Effect.forEach(

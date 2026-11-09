@@ -117,10 +117,41 @@ test("Preview validation rejects production targets, missing bindings, and unrev
 		(config) => {
 			config.previews.services = [{ binding: "AUTH", service: "production-auth" }];
 		},
+		(config) => {
+			config.previews.d1_databases[0].database_id = config.d1_databases[0].database_id;
+		},
+		(config) => {
+			config.previews.d1_databases[0].database_id = "unreviewed-database";
+		},
+		(config) => {
+			delete config.previews.d1_databases;
+		},
 	]) {
 		const config = structuredClone(original);
 		mutate(config);
 		assert.throws(() => validatePreviewConfig(config, "playground"));
+	}
+});
+
+test("Icons Previews publish into their own database and rate-limit namespace", async () => {
+	const original = await unstable_readConfig({
+		config: workerProjectConfig("icons").wranglerInputConfigPath,
+	});
+	assert.equal(validatePreviewConfig(original, "icons").projectId, "icons");
+	for (const mutate of [
+		(config) => {
+			config.previews.ratelimits[0].namespace_id = config.ratelimits[0].namespace_id;
+		},
+		(config) => {
+			delete config.previews.ratelimits;
+		},
+		(config) => {
+			config.previews.d1_databases = config.d1_databases;
+		},
+	]) {
+		const config = structuredClone(original);
+		mutate(config);
+		assert.throws(() => validatePreviewConfig(config, "icons"));
 	}
 });
 

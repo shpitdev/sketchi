@@ -117,6 +117,33 @@ kbd {
 	display: block;
 }
 
+/* Catalog and Community: the two icon sets, side by side after the brand. */
+.icons-sets {
+	display: flex;
+	gap: 2px;
+	margin-inline-end: auto;
+}
+
+.icons-sets a {
+	border-radius: var(--r-sm);
+	color: var(--ink-2);
+	font-size: 14px;
+	font-weight: 600;
+	padding: 8px 12px;
+	text-decoration: none;
+}
+
+.icons-sets a:hover {
+	background: color-mix(in srgb, var(--card) 70%, transparent);
+	color: var(--ink);
+}
+
+.icons-sets a[aria-current="page"] {
+	background: var(--card);
+	box-shadow: inset 0 0 0 1px var(--line-2);
+	color: var(--ink);
+}
+
 .icons-header__actions {
 	align-items: center;
 	display: flex;
@@ -373,6 +400,67 @@ kbd {
 .preview-toggle svg {
 	height: 17px;
 	width: 17px;
+}
+
+/* ===================================================================== */
+/* Community view                                                        */
+/* ===================================================================== */
+.icons-toolbar.community-toolbar {
+	grid-template-areas: "search download preview";
+	grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.community-download {
+	align-items: center;
+	background: var(--card);
+	border: 1px solid var(--line-2);
+	border-radius: var(--r-sm);
+	color: var(--ink);
+	cursor: pointer;
+	display: inline-flex;
+	font-size: 14px;
+	font-weight: 600;
+	gap: 8px;
+	grid-area: download;
+	height: 44px;
+	padding-inline: 14px;
+	white-space: nowrap;
+}
+
+.community-download:hover:not(:disabled) {
+	border-color: var(--ink-3);
+}
+
+.community-download:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+.community-download svg {
+	height: 17px;
+	width: 17px;
+}
+
+.community-card__drawing {
+	display: block;
+	height: 62%;
+	width: 62%;
+}
+
+.community-detail__drawing {
+	display: block;
+	height: 66%;
+	width: 66%;
+}
+
+.community-card__slug {
+	font-family: var(--font-mono);
+	font-size: 11px;
+}
+
+.icons-state code {
+	font-family: var(--font-mono);
+	font-size: 13px;
 }
 
 /* ===================================================================== */
@@ -1249,7 +1337,27 @@ kbd {
 	}
 
 	.icons-header__inner {
-		gap: 8px;
+		flex-wrap: wrap;
+		gap: 0 8px;
+	}
+
+	/* The sets move to their own row under the brand. */
+	.icons-sets {
+		margin-inline-end: 0;
+		order: 3;
+		padding-bottom: 8px;
+		width: 100%;
+	}
+
+	.icons-toolbar.community-toolbar {
+		grid-template-areas:
+			"search search"
+			"download preview";
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+
+	.community-download {
+		justify-self: start;
 	}
 
 	.icons-toolbar {
@@ -1345,4 +1453,8 @@ kbd {
 	.icons-toast {
 		transition: none;
 	}
+}
+
+.community-linked {
+	margin-bottom: 16px;
 }

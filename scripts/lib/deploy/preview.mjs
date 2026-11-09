@@ -100,6 +100,20 @@ const previewDataBindings = {
 		allowedKeys: ["binding", "bucket_name", "remote", "jurisdiction"],
 		productionTargetKeys: ["bucket_name"],
 		target: "bucket_name",
+		declaredPreviewKey: "preview_bucket_name",
+	},
+	d1_databases: {
+		allowedKeys: ["binding", "database_name", "database_id", "remote"],
+		productionTargetKeys: ["database_id"],
+		target: "database_id",
+		declaredPreviewKey: "preview_database_id",
+	},
+	// A rate limit counts in its namespace, so a Preview counts in its own.
+	ratelimits: {
+		bindingKey: "name",
+		allowedKeys: ["name", "namespace_id", "simple"],
+		productionTargetKeys: ["namespace_id"],
+		target: "namespace_id",
 	},
 };
 
@@ -120,6 +134,8 @@ export function validatePreviewConfig(config, projectId) {
 		"durable_objects",
 		"observability",
 		"r2_buckets",
+		"d1_databases",
+		"ratelimits",
 		"pipelines",
 	]);
 	for (const field of Object.keys(previews)) {
@@ -142,13 +158,14 @@ export function validatePreviewConfig(config, projectId) {
 		throw new Error("Preview must retain the selected application surface.");
 	}
 	// Previews must bind every data binding production has, and none of them
-	// may name a production bucket or stream.
+	// may name a production bucket, database, stream or rate-limit namespace.
 	for (const [field, spec] of Object.entries(previewDataBindings)) {
 		const production = config[field] ?? [];
 		const preview = previews[field] ?? [];
+		const bindingKey = spec.bindingKey ?? "binding";
 		const bindingNames = (list) =>
 			list
-				.map(({ binding }) => binding)
+				.map((binding) => binding[bindingKey])
 				.sort()
 				.join();
 		if (bindingNames(preview) !== bindingNames(production)) {
@@ -158,14 +175,17 @@ export function validatePreviewConfig(config, projectId) {
 			production.flatMap((b) => spec.productionTargetKeys.map((key) => b[key])),
 		);
 		for (const binding of preview) {
+			const name = binding[bindingKey];
 			const unreviewed = Object.keys(binding).filter((key) => !spec.allowedKeys.includes(key));
 			if (unreviewed.length > 0) {
 				throw new Error(
-					`Preview ${field} binding ${binding.binding} has unreviewed keys: ${unreviewed.join(", ")}.`,
+					`Preview ${field} binding ${name} has unreviewed keys: ${unreviewed.join(", ")}.`,
 				);
 			}
 			const target = binding[spec.target];
-			const declared = production.find((b) => b.binding === binding.binding)?.preview_bucket_name;
+			const declared = spec.declaredPreviewKey
+				? production.find((b) => b[bindingKey] === name)?.[spec.declaredPreviewKey]
+				: undefined;
 			if (
 				typeof target !== "string" ||
 				!target ||
@@ -173,7 +193,7 @@ export function validatePreviewConfig(config, projectId) {
 				(declared && target !== declared)
 			) {
 				throw new Error(
-					`Preview ${field} binding ${binding.binding} must target its non-production ${spec.target}.`,
+					`Preview ${field} binding ${name} must target its non-production ${spec.target}.`,
 				);
 			}
 		}

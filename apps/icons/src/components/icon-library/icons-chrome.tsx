@@ -11,13 +11,17 @@ export function IconsChrome({
 	detailOpen,
 	homeHref,
 	onOpenCommands,
+	section = "catalog",
 }: {
 	children: ReactNode;
 	/** Platform label for the palette shortcut, e.g. "⌘K" or "Ctrl K", shown in the tooltip. */
-	commandShortcut: string;
+	commandShortcut?: string;
 	detailOpen: boolean;
 	homeHref: string;
-	onOpenCommands: () => void;
+	/** Opens the command palette; a page without one shows no trigger. */
+	onOpenCommands?: () => void;
+	/** Which icon set the page shows. */
+	section?: "catalog" | "community";
 }) {
 	return (
 		<>
@@ -33,24 +37,34 @@ export function IconsChrome({
 						</span>
 						<span className="sk-wordmark">Sketchi</span>
 					</a>
+					<nav aria-label="Icon sets" className="icons-sets">
+						<a aria-current={section === "catalog" ? "page" : undefined} href="/">
+							Catalog
+						</a>
+						<a aria-current={section === "community" ? "page" : undefined} href="/community">
+							Community
+						</a>
+					</nav>
 					<div className="icons-header__actions">
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<button
-									aria-haspopup="dialog"
-									aria-keyshortcuts="Control+K Meta+K"
-									aria-label="Commands"
-									className="icons-command-trigger"
-									onClick={onOpenCommands}
-									type="button"
-								>
-									<Command aria-hidden="true" className="icons-command-trigger__icon" />
-								</button>
-							</TooltipTrigger>
-							<TooltipContent sideOffset={6}>
-								Commands <kbd className="icons-command-trigger__keys">{commandShortcut}</kbd>
-							</TooltipContent>
-						</Tooltip>
+						{onOpenCommands ? (
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<button
+										aria-haspopup="dialog"
+										aria-keyshortcuts="Control+K Meta+K"
+										aria-label="Commands"
+										className="icons-command-trigger"
+										onClick={onOpenCommands}
+										type="button"
+									>
+										<Command aria-hidden="true" className="icons-command-trigger__icon" />
+									</button>
+								</TooltipTrigger>
+								<TooltipContent sideOffset={6}>
+									Commands <kbd className="icons-command-trigger__keys">{commandShortcut}</kbd>
+								</TooltipContent>
+							</Tooltip>
+						) : null}
 						<HeaderIconLink href={`${homeHref}/docs`} label="Docs">
 							<BookOpen aria-hidden="true" />
 						</HeaderIconLink>

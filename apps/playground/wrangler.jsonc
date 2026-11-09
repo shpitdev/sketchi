@@ -49,6 +49,15 @@
 			"preview_bucket_name": "sketchi-studio-codemode-artifacts-preview"
 		}
 	],
+	// Community icons the icons app publishes; Studio only reads them.
+	"d1_databases": [
+		{
+			"binding": "COMMUNITY_ICONS",
+			"database_name": "sketchi-community-icons",
+			"database_id": "2f12d256-d5c2-471c-97c7-bcefad4a558c",
+			"preview_database_id": "21be8746-89ec-4af2-9981-e21808adedb3"
+		}
+	],
 	"pipelines": [
 		// sketchi_telemetry_spans_production. Not remote, so local development stays out of it.
 		{
@@ -102,6 +111,13 @@
 			{
 				"binding": "SKETCHI_ARTIFACTS",
 				"bucket_name": "sketchi-studio-codemode-artifacts-preview"
+			}
+		],
+		"d1_databases": [
+			{
+				"binding": "COMMUNITY_ICONS",
+				"database_name": "sketchi-community-icons-preview",
+				"database_id": "21be8746-89ec-4af2-9981-e21808adedb3"
 			}
 		],
 		"pipelines": [
