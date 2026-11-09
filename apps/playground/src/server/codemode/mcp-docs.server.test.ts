@@ -536,8 +536,10 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		// 9,862, under where it stood before them. The flowchart label rule, needed once Sol pasted
 		// prompt clauses as labels, and moving the copy rule onto the other builders add 190 (+46
 		// o200k tokens). Node colors and the editFlowchart line add 712, so an edit takes one execute
-		// and no docs turn. Lower this budget; do not raise it.
-		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(10_760);
+		// and no docs turn. The label-scope rule and the two-product split add 331, for labels that
+		// add conditions or drop their doer and entry steps that lose a logo. Lower this budget; do
+		// not raise it.
+		expect(SKETCHI_EXECUTE_CODE_DESCRIPTION.length).toBeLessThan(11_090);
 		// The overview keeps every builder's summary; the code parameter names every builder once.
 		const overview = getCodeModeDocs({ topic: "overview" }).content;
 		for (const operation of CODE_MODE_OPERATIONS.filter((name) =>

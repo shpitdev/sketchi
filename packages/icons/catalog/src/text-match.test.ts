@@ -178,7 +178,13 @@ describe("labelLogos", () => {
 			expect(possible(label), label).toHaveLength(1);
 		}
 		// A generic service mark or a generic technology stays a note before a tech noun too.
-		for (const label of ["Storage service", "Batch job", "Edge function", "Stream worker"]) {
+		for (const label of [
+			"Storage service",
+			"Batch job",
+			"Edge function",
+			"Stream worker",
+			"Sync function",
+		]) {
 			expect(named(label), label).toEqual([]);
 			expect(possible(label), label).toHaveLength(1);
 		}

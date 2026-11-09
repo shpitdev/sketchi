@@ -53,7 +53,7 @@ const FAMILY_TOOLS = [
 
 const FLOWCHART_CRAFT = [
 	`- ${FLOWCHART_RULES.documentShape} Node ids: short kebab-case.`,
-	`- ${rules(FLOWCHART_RULES.labelWords(USER), FLOWCHART_RULES.labelForm, FLOWCHART_RULES.technologyLabels)}`,
+	`- ${rules(FLOWCHART_RULES.labelWords(USER), FLOWCHART_RULES.labelForm, FLOWCHART_RULES.labelScope(USER), FLOWCHART_RULES.technologyLabels)}`,
 	`- ${rules(FLOWCHART_RULES.documentRoles(USER), FLOWCHART_RULES.documentBranches(USER), FLOWCHART_RULES.branchNames(USER), FLOWCHART_RULES.noBranchBorrowing(USER), FLOWCHART_RULES.documentLoops)}`,
 	`- ${rules(FLOWCHART_RULES.limits, FLOWCHART_RULES.documentDirection(USER))}`,
 	`- ${rules(FLOWCHART_RULES.documentGroups(USER), FLOWCHART_RULES.zonesOutside)}`,

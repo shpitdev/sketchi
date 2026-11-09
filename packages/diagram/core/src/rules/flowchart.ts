@@ -26,7 +26,10 @@ export const FLOWCHART_RULES = {
 	namedOutcomes: (source: RuleSource) =>
 		`Use one node per outcome ${source} names: point every branch that reaches the same named outcome at that one node, and do not add end nodes ${source} does not name.`,
 	technologyLabels:
-		"Name technologies in node labels; a note draws as a small subtitle under the label, for detail.",
+		"Name technologies in node labels; a note draws as a small subtitle under the label, for detail. A step that names two products, an app on its platform, is two nodes, platform first, so each draws its logo.",
+	/** What a label may say: no more than its source says of that step, and who does it. */
+	labelScope: (source: RuleSource) =>
+		`A step's label adds no condition, timing or reason ${source} does not give that step ("Notify customer", not "Notify customer once approved"), and keeps the doer ${source} names when no lane or group shows who does it.`,
 	zonesOutside: "Anything stated as outside a zone stays outside it.",
 	limits: `At most ${FLOWCHART_MAX_NODES} nodes and ${FLOWCHART_MAX_EDGES} edges.`,
 	limitsDetail: "Larger graphs fail with flowchart_too_large before render or persistence.",

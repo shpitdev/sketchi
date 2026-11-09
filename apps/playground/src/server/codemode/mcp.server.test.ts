@@ -1214,8 +1214,8 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			// pays for this on every turn: five families took it from 13,468 characters to 16,093, and
 			// the compact flowchart spec, one shared copy rule and topic-only failure detail bring it
 			// under 12,800. The flowchart label rule adds about 200 back, and node colors with the
-			// editFlowchart line about 800, so an edit needs no docs turn. Lower this budget; do not
-			// raise it.
+			// editFlowchart line about 800, so an edit needs no docs turn, and the label-scope and
+			// two-product rules about 300. Lower this budget; do not raise it.
 			expect(
 				JSON.stringify(
 					tools.tools.map(({ name, description, inputSchema }) => ({
@@ -1224,7 +1224,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 						inputSchema,
 					})),
 				).length,
-			).toBeLessThan(13_810);
+			).toBeLessThan(14_145);
 			expect(executeTool?.annotations).toMatchObject({
 				readOnlyHint: false,
 				destructiveHint: false,
