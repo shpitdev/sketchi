@@ -15,6 +15,11 @@ export function isNodeLogoEligible(icon: Pick<SketchiIcon, "bytes" | "variant">)
 	return icon.variant === undefined && icon.bytes <= NODE_LOGO_MAX_BYTES;
 }
 
+/** A wordmark a diagram may place as a standalone icon, never inside a node. */
+export function isStandaloneWordmark(icon: Pick<SketchiIcon, "bytes" | "variant">): boolean {
+	return icon.variant === "text" && icon.bytes <= NODE_LOGO_MAX_BYTES;
+}
+
 /**
  * Give a catalog SVG the intrinsic size image decoders need. Chrome sizes a
  * viewBox-only SVG image as 300x150, which distorts it when a canvas draws it

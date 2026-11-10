@@ -382,7 +382,9 @@ function drawnFlowchart(
 	const buildNotes = [...diagnostics, ...notes.map((note) => `reference_resolved: ${note}`)];
 	const nodeIcons = new Map(
 		Object.entries(document.nodes).flatMap(([id, node]) => {
-			const icon = flowchartNodeDetails(node).icon?.trim().toLowerCase();
+			// Generated documents name logos by slug; they never carry a drawn icon.
+			const authored = flowchartNodeDetails(node).icon;
+			const icon = typeof authored === "string" ? authored.trim().toLowerCase() : undefined;
 			return icon && isDiagramIconSlug(icon) ? [[id, icon] as const] : [];
 		}),
 	);
@@ -1064,7 +1066,9 @@ function groundFlowchartLogos(
 				{
 					id,
 					label: details.label,
-					...(details.icon ? { icon: { slug: offeredSlug(details.icon, logos) } } : {}),
+					...(typeof details.icon === "string"
+						? { icon: { slug: offeredSlug(details.icon, logos) } }
+						: {}),
 				},
 			];
 		}),

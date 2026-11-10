@@ -226,3 +226,67 @@ describe("sequence participant logos in Excalidraw output", () => {
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
 	});
 });
+
+describe("standalone icons in Excalidraw output", () => {
+	const recipe = {
+		parts: [
+			{ kind: "ellipse" as const, cx: 12, cy: 12, rx: 9, ry: 9 },
+			{ kind: "text" as const, cx: 12, cy: 12, text: "A", size: 10 },
+		],
+	};
+	const scene = {
+		kind: "canvas" as const,
+		version: 1 as const,
+		diagramId: "stack",
+		title: "Stack",
+		width: 400,
+		height: 200,
+		accentColor: "#1f2937",
+		backgroundColor: "#ffffff",
+		elements: [
+			{
+				type: "icon" as const,
+				id: "word",
+				slug: "vercel-text",
+				x: 20,
+				y: 20,
+				width: 160,
+				height: 40,
+			},
+			{
+				type: "icon" as const,
+				id: "drawn",
+				slug: "drawn/0123456789abcdef",
+				x: 220,
+				y: 20,
+				width: 48,
+				height: 48,
+			},
+		],
+		icons: {
+			"vercel-text": { name: "Vercel Wordmark", svg: svgFor("vercel-text") },
+			"drawn/0123456789abcdef": { name: "Acme", recipe },
+		},
+		layers: [],
+		layouts: [],
+		zOrder: ["drawn", "word"],
+	};
+
+	it("draws an SVG mark as one image in its square, and a recipe as grouped parts in z-order", () => {
+		const excalidraw = convertSceneToExcalidraw(scene);
+		const image = byId(excalidraw.elements, "word");
+		expect(image).toMatchObject({ type: "image", x: 80, y: 20, width: 40, height: 40 });
+		expect(decodeDataUrl(String(excalidraw.files?.[String(image.fileId)]?.dataURL))).toContain(
+			"vercel-text",
+		);
+		const parts = excalidraw.elements.filter(
+			(element) =>
+				(element.customData as { sketchiIcon?: string } | undefined)?.sketchiIcon ===
+				"drawn/0123456789abcdef",
+		);
+		expect(parts).toHaveLength(recipe.parts.length);
+		expect(new Set(parts.map((part) => (part.groupIds as string[])[0])).size).toBe(1);
+		expect(excalidraw.elements.indexOf(parts[0]!)).toBeLessThan(excalidraw.elements.indexOf(image));
+		expect(validateExcalidrawScene(excalidraw).ok).toBe(true);
+	});
+});

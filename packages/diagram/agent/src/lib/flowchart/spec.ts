@@ -32,9 +32,11 @@ function cleanNode(node: FlowchartDocumentNode): FlowchartDocumentNode {
 		...(details.color ? { color: details.color } : {}),
 		...(details.icon === null
 			? { icon: null }
-			: details.icon
+			: typeof details.icon === "string"
 				? { icon: cleanToolString(details.icon) }
-				: {}),
+				: details.icon
+					? { icon: details.icon }
+					: {}),
 	};
 }
 

@@ -7,7 +7,7 @@
  */
 
 import { cubicConnectorPoints } from "./curves.js";
-import { isDiagramIconSlug } from "./icon.js";
+import { isDiagramIconSlug, isDrawnIconSlug } from "./icon.js";
 import { iconRecipeByteLength, iconRecipeIssues, type IconRecipe } from "./icon-recipe.js";
 import { boundLabelWidth, estimateTextWidth } from "./text-metrics.js";
 
@@ -47,6 +47,15 @@ export const CANVAS_NODE_ICON = Object.freeze({
 	maxAssetBytes: 64 * 1024,
 	maxSize: 64,
 	maxTotalAssetBytes: 768 * 1024,
+	minSize: 16,
+});
+
+/**
+ * A standalone icon's mark fills the largest square its box holds, an edge
+ * of minSize to maxSize.
+ */
+export const CANVAS_ICON_ELEMENT = Object.freeze({
+	maxSize: 512,
 	minSize: 16,
 });
 
@@ -607,12 +616,30 @@ export interface CanvasFrameElement extends CanvasElementComposition, CanvasStro
 	readonly height: number;
 }
 
+/**
+ * A mark placed on its own, as a stack legend's logos or an illustration's,
+ * drawn in the largest square centered in its box (see canvasIconElementBox).
+ * Unlike a node's logo it may be a wordmark. Nothing binds to it.
+ */
+export interface CanvasIconElement extends CanvasElementComposition {
+	readonly type: "icon";
+	readonly id: string;
+	readonly slug: string;
+	/** Embed the catalog's exact SVG instead of the hand-drawn mark. */
+	readonly exact?: boolean;
+	readonly x: number;
+	readonly y: number;
+	readonly width: number;
+	readonly height: number;
+}
+
 export type CanvasElement =
 	| CanvasShapeElement
 	| CanvasTextElement
 	| CanvasConnectorElement
 	| CanvasLineElement
-	| CanvasFrameElement;
+	| CanvasFrameElement
+	| CanvasIconElement;
 
 export interface CanvasLayer {
 	readonly id: string;
@@ -882,6 +909,19 @@ export function canvasNodeIconBox(
 	};
 }
 
+/** Absolute box of a standalone icon's mark: the largest square centered in its box. */
+export function canvasIconElementBox(
+	element: Pick<CanvasIconElement, "height" | "width" | "x" | "y">,
+): CanvasElementBounds {
+	const size = Math.min(element.width, element.height);
+	return {
+		x: element.x + (element.width - size) / 2,
+		y: element.y + (element.height - size) / 2,
+		width: size,
+		height: size,
+	};
+}
+
 export interface DroppedCanvasIcon {
 	readonly elementId: string;
 	readonly index: number;
@@ -889,6 +929,7 @@ export interface DroppedCanvasIcon {
 	 * unavailable: no catalog asset; lifeline: sequence lifelines and activation
 	 * bars carry no logo;
 	 * no_room: the label would no longer fit; budget: per-scene bytes spent.
+	 * A standalone icon element is dropped whole.
 	 */
 	readonly reason: "budget" | "lifeline" | "no_room" | "unavailable";
 	readonly slug: string;
@@ -956,41 +997,68 @@ function nodeLabelOverflows(
 	return textWidth + 24 > element.width || textHeight + 18 > element.height;
 }
 
+/** A drawn slug's recipe as its scene carries it, when the recipe checks. */
+function carriedDrawnAsset(canvas: CanvasSpec, slug: string): CanvasIconAsset | undefined {
+	if (!isDrawnIconSlug(slug) || !canvas.icons || !Object.hasOwn(canvas.icons, slug)) {
+		return undefined;
+	}
+	const asset = canvas.icons[slug];
+	return asset?.recipe && iconRecipeIssues(asset.recipe).length === 0
+		? { name: asset.name, recipe: asset.recipe }
+		: undefined;
+}
+
+/** A scene without some elements, which leave its zOrder and layouts too. */
+export function withoutCanvasElements(canvas: CanvasSpec, ids: ReadonlySet<string>): CanvasSpec {
+	if (ids.size === 0) return canvas;
+	return {
+		...canvas,
+		elements: canvas.elements.filter((element) => !ids.has(element.id)),
+		zOrder: canvas.zOrder.filter((id) => !ids.has(id)),
+		layouts: canvas.layouts.flatMap((layout) => {
+			const kept = layout.ids.filter((id) => !ids.has(id));
+			if (kept.length === layout.ids.length) return [layout];
+			return kept.length > 0 ? [{ ...layout, ids: kept }] : [];
+		}),
+	};
+}
+
 /**
  * Embed one asset per referenced icon slug and remove icons that cannot be
  * drawn, so an icon never fails a build and every exported scene renders
- * without a catalog or network. Any authored `icons` map is replaced. Each
- * icon draws its slug's recipe, or its exact SVG when it asks for one (every
- * icon does with `exactIcons`), falling back to the other form; only the
- * forms drawn are embedded. An icon is dropped when neither form is
- * available, it sits on a sequence lifeline or activation bar, or its label
- * would no longer fit; icons past the per-scene byte budget are dropped in
- * element order, which keeps the result deterministic.
+ * without a catalog or network. The authored `icons` map is replaced, except
+ * that a drawn slug (`drawn/…`) keeps the recipe its scene carries when that
+ * recipe checks: nothing else can draw it, and no other slug takes an
+ * authored asset. Each icon draws its slug's recipe, or its exact SVG when it
+ * asks for one (every icon does with `exactIcons`), falling back to the other
+ * form; only the forms drawn are embedded. A logo is dropped from its node
+ * when neither form is available, it sits on a sequence lifeline or
+ * activation bar, or its label would no longer fit, and a standalone icon
+ * element is removed when its mark cannot be drawn; icons past the per-scene
+ * byte budget are dropped in element order, which keeps the result
+ * deterministic. `assetFor` learns whether the icon stands alone, which may
+ * draw marks a node may not, such as wordmarks.
  */
 export function embedCanvasIcons(
 	canvas: CanvasSpec,
-	assetFor: (slug: string) => CanvasIconAsset | undefined,
+	assetFor: (slug: string, standalone: boolean) => CanvasIconAsset | undefined,
 	options: { readonly exactIcons?: boolean } = {},
 ): CanvasIconEmbedding {
 	const icons = new Map<string, CanvasIconAsset>();
 	const sources = new Map<string, CanvasIconAsset | undefined>();
 	const dropped: DroppedCanvasIcon[] = [];
+	const removed = new Set<string>();
 	const isVisible = canvasLayerVisibility(canvas);
 	const boundLabels = visibleBoundLabels(canvas, isVisible);
 	let totalBytes = 0;
-	const elements = canvas.elements.map((element, index): CanvasElement => {
-		if ((element.type !== "node" && element.type !== "frame") || !element.icon) return element;
-		const icon: CanvasNodeIcon = options.exactIcons
-			? { ...element.icon, exact: true }
-			: element.icon;
-		const drop = (reason: DroppedCanvasIcon["reason"]): CanvasElement => {
-			dropped.push({ elementId: element.id, index, reason, slug: icon.slug });
-			return withoutIcon(element);
-		};
-		if (!sources.has(icon.slug)) {
-			const source = isDiagramIconSlug(icon.slug) ? assetFor(icon.slug) : undefined;
+	const sourceFor = (slug: string, standalone: boolean) => {
+		const key = `${standalone ? "standalone" : "logo"}:${slug}`;
+		if (!sources.has(key)) {
+			const source = isDiagramIconSlug(slug)
+				? (carriedDrawnAsset(canvas, slug) ?? assetFor(slug, standalone))
+				: undefined;
 			sources.set(
-				icon.slug,
+				key,
 				source && {
 					name: source.name,
 					...(source.recipe && usableIconForm(source, "recipe") ? { recipe: source.recipe } : {}),
@@ -998,7 +1066,19 @@ export function embedCanvasIcons(
 				},
 			);
 		}
-		const source = sources.get(icon.slug);
+		return sources.get(key);
+	};
+	const elements = canvas.elements.map((element, index): CanvasElement => {
+		const authored = canvasElementIcon(element);
+		if (!authored) return element;
+		const standalone = element.type === "icon";
+		const icon: CanvasNodeIcon = options.exactIcons ? { ...authored, exact: true } : authored;
+		const drop = (reason: DroppedCanvasIcon["reason"]): CanvasElement => {
+			dropped.push({ elementId: element.id, index, reason, slug: icon.slug });
+			if (element.type === "icon") removed.add(element.id);
+			return element.type === "node" || element.type === "frame" ? withoutIcon(element) : element;
+		};
+		const source = sourceFor(icon.slug, standalone);
 		const form = canvasIconForm(icon, source);
 		if (!source || !form) return drop("unavailable");
 		if (element.type === "node" && element.rendererRole && element.rendererRole !== "zone")
@@ -1030,27 +1110,43 @@ export function embedCanvasIcons(
 				[form]: source[form],
 			});
 		}
-		return icon === element.icon ? element : { ...element, icon };
+		if (!options.exactIcons) return element;
+		if (element.type === "icon") return { ...element, exact: true };
+		return element.type === "node" || element.type === "frame" ? { ...element, icon } : element;
 	});
-	const { icons: _authored, ...rest } = canvas;
+	const { icons: _authored, ...rest } = withoutCanvasElements({ ...canvas, elements }, removed);
 	return {
 		dropped,
-		scene:
-			icons.size > 0
-				? { ...rest, elements, icons: Object.fromEntries(icons) }
-				: { ...rest, elements },
+		scene: icons.size > 0 ? { ...rest, icons: Object.fromEntries(icons) } : rest,
 	};
+}
+
+/**
+ * The mark an element draws: a node's or frame's logo, or a standalone icon's
+ * mark at its drawn size.
+ */
+export function canvasElementIcon(element: CanvasElement): CanvasNodeIcon | undefined {
+	if (element.type === "icon") {
+		return {
+			slug: element.slug,
+			size: canvasIconElementBox(element).width,
+			...(element.exact ? { exact: true } : {}),
+		};
+	}
+	return element.type === "node" || element.type === "frame" ? element.icon : undefined;
 }
 
 function validateIcon(
 	canvas: CanvasSpec,
-	element: CanvasShapeElement | CanvasFrameElement,
+	element: CanvasElement,
 	index: number,
 ): CanvasValidationIssue[] {
-	const icon = element.icon;
+	const icon = canvasElementIcon(element);
 	if (!icon) return [];
-	const path = `elements[${index}].icon`;
-	const noun = element.type === "frame" ? "Frame" : "Node";
+	const standalone = element.type === "icon";
+	const path = standalone ? `elements[${index}]` : `elements[${index}].icon`;
+	const noun = standalone ? "Icon" : element.type === "frame" ? "Frame" : "Node";
+	const sizes = standalone ? CANVAS_ICON_ELEMENT : CANVAS_NODE_ICON;
 	const issues: CanvasValidationIssue[] = [];
 	if (element.type === "node" && element.rendererRole && element.rendererRole !== "zone") {
 		issues.push({
@@ -1075,16 +1171,14 @@ function validateIcon(
 			path: `${path}.slug`,
 		});
 	}
-	if (
-		!Number.isFinite(icon.size) ||
-		icon.size < CANVAS_NODE_ICON.minSize ||
-		icon.size > CANVAS_NODE_ICON.maxSize
-	) {
+	if (!Number.isFinite(icon.size) || icon.size < sizes.minSize || icon.size > sizes.maxSize) {
 		issues.push({
 			code: "invalid_icon",
 			elementId: element.id,
-			message: `${noun} "${element.id}" icon size must be ${CANVAS_NODE_ICON.minSize}-${CANVAS_NODE_ICON.maxSize}.`,
-			path: `${path}.size`,
+			message: standalone
+				? `Icon "${element.id}" must hold a square of ${sizes.minSize}-${sizes.maxSize}: its width and height are both ${sizes.minSize} or more, and the smaller at most ${sizes.maxSize}.`
+				: `${noun} "${element.id}" icon size must be ${sizes.minSize}-${sizes.maxSize}.`,
+			path: standalone ? `${path}.width` : `${path}.size`,
 		});
 	}
 	return issues;
@@ -1260,9 +1354,7 @@ export function getCanvasValidationIssues(canvas: CanvasSpec): CanvasValidationI
 	issues.push(...validateIconAssets(canvas));
 	canvas.elements.forEach((element, index) => {
 		issues.push(...validateElementLimits(element, index));
-		if (element.type === "node" || element.type === "frame") {
-			issues.push(...validateIcon(canvas, element, index));
-		}
+		issues.push(...validateIcon(canvas, element, index));
 		if (element.type === "node" && element.shape !== "polygon" && isLayerVisible(element)) {
 			const boundLabel = nodeLabelsByContainerId.get(element.id);
 			if (boundLabel || element.rendererRole === undefined) {

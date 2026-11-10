@@ -27,6 +27,7 @@ import {
 	type CanvasConnectorElement,
 	type CanvasElement,
 	type CanvasFrameElement,
+	type CanvasIconElement,
 	type CanvasLineElement,
 	type CanvasNodeIcon,
 	type CanvasPoint,
@@ -68,6 +69,7 @@ export type TextSceneElement = CanvasTextElement;
 export type ArrowSceneElement = CanvasConnectorElement;
 export type LineSceneElement = CanvasLineElement;
 export type FrameSceneElement = CanvasFrameElement;
+export type IconSceneElement = CanvasIconElement;
 export type ScenePoint = CanvasPoint;
 export type RenderedDiagramScene = CanvasSpec;
 

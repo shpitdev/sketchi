@@ -73,6 +73,10 @@ function runtime(published = PUBLISHED) {
 					loads.push([...slugs]);
 					return published.filter((icon) => slugs.includes(icon.slug));
 				}),
+			search: (query) =>
+				Effect.sync(() =>
+					published.filter((icon) => icon.name.toLowerCase().includes(query.toLowerCase())),
+				),
 		},
 	});
 	const provide = <A>(

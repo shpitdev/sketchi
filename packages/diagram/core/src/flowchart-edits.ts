@@ -5,6 +5,7 @@ import {
 	FLOWCHART_DIRECTIONS,
 	FlowchartDocumentEdgeSchema,
 	FlowchartDocumentNodeSchema,
+	FlowchartNodeIconSchema,
 	FlowchartEdgeEndSchema,
 	FlowchartLogosSchema,
 	flowchartDocumentPairCount,
@@ -36,7 +37,7 @@ const NodeChangeSchema = Schema.Struct({
 	label: Schema.optionalKey(Label),
 	note: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 	shape: Schema.optionalKey(Schema.NullOr(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"]))),
-	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+	icon: Schema.optionalKey(FlowchartNodeIconSchema),
 	/** The node’s innermost group; null clears it. */
 	group: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 	/** The lane of whoever does the step. */

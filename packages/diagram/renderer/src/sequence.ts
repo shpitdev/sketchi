@@ -103,7 +103,7 @@ interface SequenceLifelineStructureScene {
 	readonly elements: readonly (
 		| SequenceLifelineStructureNode
 		| {
-				readonly type: "arrow" | "frame" | "line" | "text";
+				readonly type: "arrow" | "frame" | "icon" | "line" | "text";
 				readonly id: string;
 		  }
 	)[];

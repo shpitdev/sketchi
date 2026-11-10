@@ -1,9 +1,14 @@
 import {
+	canvasElementIcon,
 	canvasNodeIconBand,
 	COMMUNITY_ICON_COLLECTION,
+	DRAWN_ICON_COLLECTION,
+	drawnIconSlug,
 	embedCanvasIcons,
+	iconRecipeIssues,
 	isCommunityIconSlug,
 	isDiagramIconSlug,
+	isDrawnIconSlug,
 	isIconRecipe,
 	type CanvasIconAsset,
 	type CanvasSpec,
@@ -14,6 +19,7 @@ import {
 	CONCEPT_COLLECTION,
 	iconMatch,
 	isNodeLogoEligible,
+	isStandaloneWordmark,
 	isStrayVendorLogo,
 	logoNamedByLabel,
 	labelLogos,
@@ -52,6 +58,11 @@ export class CodeModeIconLoadError extends Schema.TaggedError<CodeModeIconLoadEr
 export interface CodeModeIconCatalog {
 	/** The eligible node-logo mark for an exact slug. */
 	readonly get: (slug: string) => CodeModeCatalogIcon | undefined;
+	/**
+	 * A wordmark for an exact slug, when this host serves them. Only a
+	 * standalone icon draws one; a node's logo never does.
+	 */
+	readonly wordmark: (slug: string) => CodeModeCatalogIcon | undefined;
 	/**
 	 * Ranked node-logo search, shared with icons.sketchi.app, each result with
 	 * how it answers the query: the product's own mark, its vendor's, or weak.
@@ -115,9 +126,13 @@ export function isConceptIcon(icon: Pick<CodeModeCatalogIcon, "collection">): bo
 	return icon.collection === CONCEPT_COLLECTION;
 }
 
-/** Whether an icon is drawn only by its recipe: a concept or a community icon has no SVG. */
+/** Whether an icon is drawn only by its recipe: a concept, community or drawn icon has no SVG. */
 function isRecipeOnlyIcon(icon: Pick<CodeModeCatalogIcon, "collection">): boolean {
-	return isConceptIcon(icon) || icon.collection === COMMUNITY_ICON_COLLECTION;
+	return (
+		isConceptIcon(icon) ||
+		icon.collection === COMMUNITY_ICON_COLLECTION ||
+		icon.collection === DRAWN_ICON_COLLECTION
+	);
 }
 
 /** A published community icon a diagram may draw by its `community/<slug>` slug. */
@@ -129,15 +144,137 @@ export interface CodeModeCommunityIcon {
 }
 
 /**
- * Where a host reads community icons from. Loading never fails a build: a host
- * that cannot read its store returns none, and their slugs draw nothing.
+ * Where a host reads community icons from. Reading never fails a build or a
+ * search: a host that cannot read its store returns none, and their slugs draw
+ * nothing. Hidden icons are never returned.
  */
 export interface CodeModeCommunityIcons {
 	readonly load: (slugs: readonly string[]) => Effect.Effect<readonly CodeModeCommunityIcon[]>;
+	/**
+	 * A bounded set of icons whose name or slug contains the query, or a bare
+	 * query; the caller ranks and truncates it.
+	 */
+	readonly search: (query: string) => Effect.Effect<readonly CodeModeCommunityIcon[]>;
 }
 
-/** The most community icons one request resolves. */
-const MAX_COMMUNITY_ICONS = 24;
+/** The most community icons, and the most drawn icons, one request resolves. */
+const MAX_REQUEST_ICONS = 24;
+
+/** A drawn icon a request carries: the recipe and the name it draws under. */
+export interface CodeModeDrawnIcon {
+	readonly slug: string;
+	readonly name: string;
+	readonly recipe: IconRecipe;
+}
+
+const DRAWN_ICON_NAME = "Drawn icon";
+
+/**
+ * Every drawn icon a request carries, wherever it sits: any object whose
+ * `recipe` checks, keyed by the slug the recipe draws under. A diagram's own
+ * `drawn/…` assets count too, so a scene keeps its drawn icons through edits.
+ */
+export function drawnIconsIn(value: unknown): Map<string, CodeModeDrawnIcon> {
+	const found = new Map<string, CodeModeDrawnIcon>();
+	const visit = (entry: unknown, depth: number) => {
+		if (found.size >= MAX_REQUEST_ICONS || depth > 12 || entry === null) return;
+		if (Array.isArray(entry)) {
+			for (const item of entry) visit(item, depth + 1);
+			return;
+		}
+		if (typeof entry !== "object") return;
+		const record = entry as Record<string, unknown>;
+		const recipe = record["recipe"];
+		if (recipe !== undefined) {
+			if (isIconRecipe(recipe)) {
+				const slug = drawnIconSlug(recipe);
+				const name = typeof record["name"] === "string" ? cleanToolString(record["name"]) : "";
+				if (!found.has(slug)) found.set(slug, { slug, name: name || DRAWN_ICON_NAME, recipe });
+			}
+			return;
+		}
+		for (const item of Object.values(record)) visit(item, depth + 1);
+	};
+	visit(value, 0);
+	return found;
+}
+
+/** An authored icon: a slug or product name, or a drawn icon's name and recipe. */
+export type CodeModeIconRef =
+	| string
+	| { readonly slug?: string; readonly name?: string; readonly recipe?: unknown };
+
+/**
+ * The slug an authored icon draws under: its own, normalized, or its recipe's
+ * drawn slug; or why it draws nothing (a failed drawIcon result has no recipe).
+ */
+export function iconRefSlug(
+	ref: CodeModeIconRef,
+): { readonly slug: string } | { readonly problem: string } {
+	if (typeof ref === "string") return { slug: normalizeIconSlug(ref) };
+	if (ref.recipe !== undefined) {
+		const [problem] = iconRecipeIssues(ref.recipe);
+		return problem ? { problem } : { slug: drawnIconSlug(ref.recipe as IconRecipe) };
+	}
+	if (ref.slug !== undefined) return { slug: normalizeIconSlug(ref.slug) };
+	return { problem: "it has neither a slug nor a recipe." };
+}
+
+/** The issue for an authored icon that names no slug and carries no drawable recipe. */
+export function undrawableIconIssue(input: {
+	readonly owner: string;
+	readonly id: string;
+	readonly path: string;
+	readonly problem: string;
+}): CodeModeIssue {
+	return {
+		code: "icon_dropped",
+		severity: "warning",
+		stage: "input",
+		ref: { kind: "node", id: input.id, path: input.path },
+		message: `The icon on ${input.owner} "${input.id}" cannot be drawn: ${input.problem} The ${input.owner} renders without it.`,
+		hint: "Pass a slug from sketchi.searchIcons, or the result of a sketchi.drawIcon call that succeeded.",
+	};
+}
+
+/** What a host without a catalog draws from: only drawn icons. */
+const EMPTY_CATALOG: CodeModeIconCatalog = {
+	get: () => undefined,
+	wordmark: () => undefined,
+	search: () => [],
+	isStrayVendorLogo: () => false,
+	logoNamedByLabel: () => undefined,
+	labelLogos: () => ({ named: [], possible: [] }),
+	loadSvg: (icon) =>
+		Effect.fail(
+			CodeModeIconLoadError.make({
+				cause: undefined,
+				message: "This host has no icon catalog.",
+				slug: icon.slug,
+			}),
+		),
+	recipe: () => undefined,
+	slugLookup: "a host with an icon catalog",
+};
+
+/** The catalog with a request's drawn icons added under their drawn slugs. */
+export function withDrawnIcons(
+	catalog: CodeModeIconCatalog | undefined,
+	drawn: ReadonlyMap<string, CodeModeDrawnIcon>,
+): CodeModeIconCatalog | undefined {
+	if (drawn.size === 0) return catalog;
+	const base = catalog ?? EMPTY_CATALOG;
+	const drawnIcon = (slug: string) => {
+		const icon = drawn.get(slug);
+		return icon ? { collection: DRAWN_ICON_COLLECTION, name: icon.name, slug } : undefined;
+	};
+	return {
+		...base,
+		get: (slug) => (isDrawnIconSlug(slug) ? drawnIcon(slug) : base.get(slug)),
+		wordmark: (slug) => (isDrawnIconSlug(slug) ? undefined : base.wordmark(slug)),
+		recipe: (slug) => (isDrawnIconSlug(slug) ? drawn.get(slug)?.recipe : base.recipe(slug)),
+	};
+}
 
 /**
  * Every community slug a request names, wherever it sits: a node's `icon`
@@ -147,7 +284,7 @@ const MAX_COMMUNITY_ICONS = 24;
 export function communityIconSlugsIn(value: unknown): string[] {
 	const found = new Set<string>();
 	const visit = (entry: unknown, depth: number) => {
-		if (found.size >= MAX_COMMUNITY_ICONS || depth > 12) return;
+		if (found.size >= MAX_REQUEST_ICONS || depth > 12) return;
 		if (typeof entry === "string") {
 			if (entry.length > 100) return;
 			const slug = normalizeIconSlug(entry);
@@ -195,21 +332,25 @@ export function withCommunityIcons(
 
 /**
  * The catalog a request builds with: the host's, plus the community icons the
- * request names, read once per build.
+ * request names, read once per build, and the drawn icons it carries.
  */
 export const catalogForRequest = Effect.fn("codeMode.icons.community")(function* (
 	catalog: CodeModeIconCatalog | undefined,
 	communityIcons: CodeModeCommunityIcons | undefined,
 	request: unknown,
 ) {
-	if (!catalog || !communityIcons) return catalog;
+	const drawn = drawnIconsIn(request);
+	if (drawn.size > 0) yield* Effect.annotateCurrentSpan("sketchi.icons.drawn", drawn.size);
+	if (!catalog || !communityIcons) return withDrawnIcons(catalog, drawn);
 	const slugs = communityIconSlugsIn(request).filter((slug) => !catalog.get(slug));
-	if (slugs.length === 0) return catalog;
+	if (slugs.length === 0) return withDrawnIcons(catalog, drawn);
 	yield* Effect.annotateCurrentSpan("sketchi.icons.community_requested", slugs.length);
 	const icons = yield* communityIcons.load(slugs);
 	yield* Effect.annotateCurrentSpan("sketchi.icons.community_found", icons.length);
-	return withCommunityIcons(catalog, icons);
+	return withDrawnIcons(withCommunityIcons(catalog, icons), drawn);
 });
+
+const WORDMARK_QUERY = /\bwordmarks?\b/iu;
 
 export function makeCodeModeIconCatalog(options: {
 	readonly icons: readonly SketchiIcon[];
@@ -222,8 +363,12 @@ export function makeCodeModeIconCatalog(options: {
 	/** Hand-drawn recipes keyed by slug; undrawable ones are ignored. */
 	readonly recipes?: Readonly<Record<string, unknown>>;
 	readonly slugLookup: string;
+	/** Whether loadSvg serves wordmarks too, which standalone icons may draw. */
+	readonly wordmarks?: boolean;
 }): CodeModeIconCatalog {
 	const eligible = options.icons.filter(isNodeLogoEligible);
+	const wordmarkIcons = options.wordmarks ? options.icons.filter(isStandaloneWordmark) : [];
+	const wordmarks = new Map(wordmarkIcons.map((icon) => [icon.slug, catalogIcon(icon)] as const));
 	const icons = new Map(eligible.map((icon) => [icon.slug, icon]));
 	const recipeFor = (slug: string) => {
 		const recipe = Object.hasOwn(options.recipes ?? {}, slug) ? options.recipes?.[slug] : undefined;
@@ -243,6 +388,7 @@ export function makeCodeModeIconCatalog(options: {
 	);
 	return {
 		get: (slug) => bySlug.get(slug),
+		wordmark: (slug) => wordmarks.get(slug),
 		recipe: (slug) => recipes.get(slug),
 		isStrayVendorLogo: (slug, label) => {
 			const icon = icons.get(slug);
@@ -261,8 +407,12 @@ export function makeCodeModeIconCatalog(options: {
 				});
 			return { named: marks(found.named), possible: marks(found.possible) };
 		},
+		// Wordmarks answer only a query that asks for one ("Vercel wordmark").
 		search: (query, limit) =>
-			searchIcons(searchable, { limit, query }).map(({ icon }) => ({
+			searchIcons(WORDMARK_QUERY.test(query) ? wordmarkIcons : searchable, {
+				limit,
+				query,
+			}).map(({ icon }) => ({
 				...catalogIcon(icon),
 				match: iconMatch(icon, query),
 			})),
@@ -339,7 +489,7 @@ function unknownIconIssue(input: {
 export function resolveNodeIcons<
 	Node extends {
 		readonly id: string;
-		readonly icon?: { readonly slug: string };
+		readonly icon?: Exclude<CodeModeIconRef, string>;
 		readonly label: string;
 	},
 >(
@@ -352,7 +502,20 @@ export function resolveNodeIcons<
 	const issues: CodeModeIssue[] = [];
 	const resolved = nodes.map((node) => {
 		if (!node.icon) return node;
-		const slug = normalizeIconSlug(node.icon.slug);
+		const found = iconRefSlug(node.icon);
+		if ("problem" in found) {
+			issues.push(
+				undrawableIconIssue({
+					owner: owner.noun,
+					id: node.id,
+					path: `${owner.path}.icon`,
+					problem: found.problem,
+				}),
+			);
+			const { icon: _icon, ...withoutIcon } = node;
+			return withoutIcon as Node;
+		}
+		const { slug } = found;
 		const ref = { kind: "node" as const, id: node.id, path: `${owner.path}.icon.slug` };
 		const icon = isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined;
 		if (icon && !catalog?.isStrayVendorLogo(slug, node.label)) {
@@ -370,7 +533,7 @@ export function resolveNodeIcons<
 					}
 				: unknownIconIssue({
 						catalog,
-						message: `Icon "${node.icon.slug}" on ${owner.noun} "${node.id}" is not a Sketchi node logo; the ${owner.noun} renders without a logo.`,
+						message: `Icon "${node.icon.slug ?? slug}" on ${owner.noun} "${node.id}" is not a Sketchi node logo; the ${owner.noun} renders without a logo.`,
 						ref,
 						slug,
 					}),
@@ -410,7 +573,7 @@ export function resolveFlowchartLogos(
 	document: {
 		readonly logos?: boolean | "exact";
 		readonly nodes: Readonly<
-			Record<string, string | { readonly label: string; readonly icon?: string | null }>
+			Record<string, string | { readonly label: string; readonly icon?: CodeModeIconRef | null }>
 		>;
 	},
 	catalog: CodeModeIconCatalog | undefined,
@@ -422,15 +585,41 @@ export function resolveFlowchartLogos(
 		const requested = typeof node === "string" ? undefined : node.icon;
 		if (requested === null) continue;
 		const ref = { kind: "node" as const, id, path: `nodes.${id}.icon` };
+		if (requested !== undefined && typeof requested !== "string") {
+			const found = iconRefSlug(requested);
+			if ("problem" in found) {
+				issues.push(
+					undrawableIconIssue({
+						owner: "node",
+						id,
+						path: `nodes.${id}.icon`,
+						problem: found.problem,
+					}),
+				);
+			} else if (catalog?.get(found.slug)) {
+				icons.set(id, found.slug);
+			} else {
+				issues.push(
+					unknownIconIssue({
+						catalog,
+						message: `Icon "${found.slug}" on node "${id}" names no Sketchi logo; the node renders without one.`,
+						ref,
+						slug: found.slug,
+					}),
+				);
+			}
+			continue;
+		}
 		if (requested !== undefined) {
 			const slug = normalizeIconSlug(requested);
-			// A community slug names one published drawing; it never falls back to a catalog mark.
-			const icon = isCommunityIconSlug(slug)
-				? catalog?.get(slug)
-				: ((isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined) ??
-					catalog?.labelLogos(requested).named[0] ??
-					catalog?.labelLogos(requested).possible[0] ??
-					catalog?.search(requested, 1).find((hit) => hit.match === "exact"));
+			// A community or drawn slug names one drawing; it never falls back to a catalog mark.
+			const icon =
+				isCommunityIconSlug(slug) || isDrawnIconSlug(slug)
+					? catalog?.get(slug)
+					: ((isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined) ??
+						catalog?.labelLogos(requested).named[0] ??
+						catalog?.labelLogos(requested).possible[0] ??
+						catalog?.search(requested, 1).find((hit) => hit.match === "exact"));
 			if (!icon) {
 				issues.push(
 					unknownIconIssue({
@@ -560,13 +749,36 @@ function droppedIconIssue(input: {
 	readonly element: CanvasSpec["elements"][number] | undefined;
 	readonly known: boolean;
 }): CodeModeIssue {
-	const { dropped } = input;
+	const { dropped, element } = input;
+	const standalone = element?.type === "icon";
 	const ref = {
 		kind: "element" as const,
 		id: dropped.elementId,
-		path: `elements[${dropped.index}].icon${dropped.reason === "unavailable" ? ".slug" : ""}`,
+		path: standalone
+			? `elements[${dropped.index}].slug`
+			: `elements[${dropped.index}].icon${dropped.reason === "unavailable" ? ".slug" : ""}`,
 	};
-	const { element } = input;
+	if (standalone) {
+		const message = `Icon element "${dropped.elementId}" (${dropped.slug}) was removed:`;
+		return dropped.reason === "unavailable" && !input.known
+			? unknownIconIssue({
+					catalog: input.catalog,
+					message: `${message} the slug names no Sketchi icon.`,
+					ref,
+					slug: dropped.slug,
+				})
+			: {
+					code: "icon_dropped",
+					severity: "warning",
+					stage: "input",
+					ref,
+					message: `${message} ${dropped.reason === "budget" ? "the diagram's icon budget is spent." : "its mark could not be loaded."}`,
+					hint:
+						dropped.reason === "budget"
+							? "Use fewer distinct icons in one diagram."
+							: "Retry the request; if the icon stays unavailable, omit it.",
+				};
+	}
 	const owner =
 		element?.type === "frame" || (element?.type === "node" && element.rendererRole === "zone")
 			? "group"
@@ -623,8 +835,9 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 	catalog: CodeModeIconCatalog | undefined,
 	options: { readonly exactIcons?: boolean } = {},
 ) {
-	const elements = scene.elements.map((element) =>
-		(element.type === "node" || element.type === "frame") && element.icon
+	const elements = scene.elements.map((element) => {
+		if (element.type === "icon") return { ...element, slug: normalizeIconSlug(element.slug) };
+		return (element.type === "node" || element.type === "frame") && element.icon
 			? {
 					...element,
 					icon: {
@@ -632,14 +845,20 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 						slug: normalizeIconSlug(element.icon.slug),
 					},
 				}
-			: element,
-	);
-	const icons = elements.flatMap((element) =>
-		(element.type === "node" || element.type === "frame") && element.icon ? [element.icon] : [],
-	);
+			: element;
+	});
+	const icons = elements.flatMap((element) => {
+		const icon = canvasElementIcon(element);
+		return icon ? [{ ...icon, standalone: element.type === "icon" }] : [];
+	});
+	// A standalone icon may draw a wordmark; a node's logo may not.
+	const iconFor = (slug: string, standalone: boolean) => {
+		if (!isDiagramIconSlug(slug)) return undefined;
+		return catalog?.get(slug) ?? (standalone ? catalog?.wordmark(slug) : undefined);
+	};
 	const known = new Map(
-		icons.flatMap(({ slug }) => {
-			const icon = isDiagramIconSlug(slug) ? catalog?.get(slug) : undefined;
+		icons.flatMap(({ slug, standalone }) => {
+			const icon = iconFor(slug, standalone);
 			return icon ? [[slug, icon] as const] : [];
 		}),
 	);
@@ -689,8 +908,8 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 		{ concurrency: ICON_LOAD_CONCURRENCY },
 	);
 	const svgs = new Map(loaded.flatMap((entry) => (entry ? [entry] : [])));
-	const assetFor = (slug: string): CanvasIconAsset | undefined => {
-		const icon = known.get(slug);
+	const assetFor = (slug: string, standalone: boolean): CanvasIconAsset | undefined => {
+		const icon = iconFor(slug, standalone);
 		const recipe = recipes.get(slug);
 		const svg = svgs.get(slug);
 		if (!icon || (!recipe && svg === undefined)) return undefined;
@@ -706,7 +925,7 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 			catalog,
 			dropped,
 			element: elements[dropped.index],
-			known: known.has(dropped.slug),
+			known: iconFor(dropped.slug, elements[dropped.index]?.type === "icon") !== undefined,
 		}),
 	);
 	return { issues, scene: embedding.scene };

@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import {
 	DIAGRAM_NODE_SHAPES,
+	DrawnIconSchema,
 	DIAGRAM_ZONE_KINDS,
 	DiagramNodeColorSchema,
 	SKETCHI_DIAGRAM_STYLE,
@@ -53,6 +54,11 @@ export const FlowchartDocumentEdgeSchema = Schema.Tuple([
 ]);
 export type FlowchartDocumentEdge = typeof FlowchartDocumentEdgeSchema.Type;
 
+/** A node's logo: a product name or slug, a drawn icon, or null for none. */
+export const FlowchartNodeIconSchema = Schema.NullOr(
+	Schema.Union([Schema.NonEmptyString, DrawnIconSchema]),
+);
+
 /** A node's details beyond its label. */
 export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
 	label: Label,
@@ -63,8 +69,8 @@ export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
 	 * any step as a decision diamond.
 	 */
 	shape: Schema.optionalKey(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"])),
-	/** A product name or catalog slug whose logo the node draws; null draws none. */
-	icon: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
+	/** A product name or slug whose logo the node draws, or a drawn icon; null draws none. */
+	icon: Schema.optionalKey(FlowchartNodeIconSchema),
 	/** The innermost group containing this node; unioned with groups’ member lists. */
 	group: Schema.optionalKey(Schema.NonEmptyString),
 	/** The id of the lane of whoever does the step, in a flowchart with lanes. */
