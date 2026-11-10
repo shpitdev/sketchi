@@ -1062,3 +1062,28 @@ describe("a step drawn twice where one copy ends", () => {
 		).toEqual([]);
 	});
 });
+
+describe("a named zone the diagram lacks", () => {
+	it("names the zone that holds it and the steps the request puts in it", () => {
+		const issues = checkRequestCoverage(
+			"draw our branch office.\nbranch office: tellers enter deposits in the core banking app, both on the teller network. the app posts to a ledger database in the branch office.",
+			{
+				type: "flowchart",
+				nodes: [
+					{ id: "tellers", label: "Tellers", kind: "start", group: "branch" },
+					{ id: "app", label: "Core banking app", kind: "process", group: "branch" },
+					{ id: "ledger", label: "Ledger database", kind: "end", group: "branch" },
+				],
+				edges: [
+					{ source: "tellers", target: "app" },
+					{ source: "app", target: "ledger" },
+				],
+				groups: [{ id: "branch", label: "Branch office", kind: "datacenter" }],
+			},
+		);
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_container_missing"]);
+		expect(issues[0]?.message).toContain(
+			'"teller network" (holding "Tellers" and "Core banking app")',
+		);
+	});
+});

@@ -8,7 +8,7 @@ export default {
 	title: "Hybrid on-prem and cloud",
 	groups: [
 		{ id: "onprem", label: "On-prem data center", kind: "datacenter" },
-		{ id: "corp", label: "Corporate network", kind: "zone", parent: "onprem" },
+		{ id: "corp", label: "Corporate network", kind: "network", parent: "onprem" },
 		{ id: "aws", label: "AWS", kind: "cloud" },
 		{ id: "region", label: "eu-west-1", kind: "region", parent: "aws" },
 		{ id: "vpc", label: "Production VPC", kind: "vpc", parent: "region" },

@@ -988,18 +988,20 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 		.concat(records(diagram["lanes"]))
 		.map((group) => new Set(stems(`${text(group["label"])} ${text(group["id"])}`)));
 	const missingContainers: string[] = [];
+	const placements = placementStatements(request, nodes);
 	for (const named of namedContainers(request)) {
 		const found = containers.some(
 			(container) =>
 				named.heads.every((head) => holds(container, head)) &&
 				(named.modifiers.length === 0 || named.modifiers.some((word) => holds(container, word))),
 		);
-		if (!found) missingContainers.push(named.phrase);
+		if (!found) missingContainers.push(missingZone(named, placements, nodes, match));
 	}
 	if (missingContainers.length > 0) {
+		const unique = [...new Set(missingContainers)];
 		issues.push({
 			code: "flowchart_container_missing",
-			message: `The request names ${quoteList([...new Set(missingContainers)])}, but no group carries ${missingContainers.length === 1 ? "that name" : "those names"}. Make every named zone a group, nested in the zone that holds it.`,
+			message: `The request names ${listed(unique)}, but no group carries ${unique.length === 1 ? "that name" : "those names"}. Make every named zone a group holding what the request puts in it, nested in the zone that holds it.`,
 		});
 	}
 	issues.push(...containmentIssues(request, nodes, records(diagram["groups"]), match));
@@ -1448,14 +1450,6 @@ function containmentIssues(
 		const node = matchNode(item);
 		return node === undefined ? { groups: [] } : { groups: [], node };
 	};
-	/** Nodes a phrase names in full: "office staff enter orders in the legacy ERP" names both. */
-	const mentioned = (phrase: string) => {
-		const said = new Set(stems(phrase));
-		return nodes.flatMap((node, index) => {
-			const wanted = stems(text(node["label"]));
-			return wanted.length > 0 && wanted.every((word) => holds(said, word)) ? [index] : [];
-		});
-	};
 	/** The longest end of a clause that names a node or zone: "saves files to a file server" names the server. */
 	const namingTail = (phrase: string) => {
 		const parts = phrase.trim().split(/\s+/u);
@@ -1466,72 +1460,7 @@ function containmentIssues(
 		}
 		return phrase;
 	};
-	const stated: { item: string; zone: string; node?: number }[] = [];
-	for (const match of request.matchAll(/([^()→\n,.;:]+?)\s*\(([^()]+)\)/gu)) {
-		if (namedContainers(match[2] ?? "").length === 0 || NEGATED_PLACEMENT.test(match[0])) continue;
-		for (const item of (match[1] ?? "").split(/\s*\+\s*|\s*&\s*/u))
-			stated.push({ item, zone: match[2] ?? "" });
-	}
-	for (const sentence of request.split(/[.;\n]/u).map((part) => part.trim())) {
-		if (NEGATED_PLACEMENT.test(sentence)) continue;
-		// "the VPC, queue and table are all in eu-west-1, in our AWS cloud": each item in the first
-		// zone, and that zone in the second.
-		const located =
-			/^(.*?)\s+(?:are|is|sit|sits|live|lives|run|runs|stay|stays)\s+(?:all\s+|both\s+)?(?:in|inside|within|on)\s+([^,]+)(?:,\s*(?:all\s+)?(?:in|inside|within|on)\s+([^,]+))?/iu.exec(
-				sentence,
-			);
-		if (located && zoneName(located[2] ?? "")) {
-			for (const item of (located[1] ?? "").split(/\s*\+\s*|\s*&\s*|\s*,\s*|\s+and\s+/u))
-				stated.push({ item, zone: located[2] ?? "" });
-			if (zoneName(located[3] ?? ""))
-				stated.push({ item: located[2] ?? "", zone: located[3] ?? "" });
-		}
-		// "office staff enter orders in the legacy ERP, both on the corporate network".
-		const both = /^(.*),\s*both\s+(?:are\s+)?(?:in|inside|within|on)\s+([^,]+)$/iu.exec(sentence);
-		const pair = both ? mentioned(both[1] ?? "") : [];
-		if (both && pair.length === 2 && zoneName(both[2] ?? "")) {
-			for (const node of pair)
-				stated.push({ item: text(nodes[node]?.["label"]), zone: both[2] ?? "", node });
-		}
-	}
-	// "VPN gateway in our production VPC → order API in the VPC's private subnet": each step in the
-	// zone right after it, and a possessive zone in its owner.
-	for (const segment of request.split(/→|->|=>|[\n.;:(),]/u)) {
-		if (NEGATED_PLACEMENT.test(segment)) continue;
-		const pieces = segment.split(/\s+(?:in|inside|within)\s+/iu);
-		for (let index = 1; index < pieces.length; index += 1) {
-			const possessive = /^(.*?)['’]s\s+(.+)$/u.exec(pieces[index] ?? "");
-			const zone = possessive?.[2] ?? pieces[index] ?? "";
-			if (!zoneName(zone)) continue;
-			// "VPC + S3 are in us-east-1" lists its items before the verb.
-			const items = (pieces[index - 1] ?? "")
-				.replace(/\s+(?:are|is|sit|sits|live|lives|run|runs|stay|stays)(?:\s+(?:all|both))?$/iu, "")
-				.split(/\s*\+\s*|\s*&\s*|\s+and\s+/u);
-			for (const item of items) stated.push({ item: namingTail(item), zone });
-			if (possessive && zoneName(possessive[1] ?? ""))
-				stated.push({ item: zone, zone: possessive[1] ?? "" });
-		}
-	}
-	// A line headed by a zone ("on-prem data center: … on the corporate network") puts every zone
-	// it places something in inside that zone.
-	for (const line of request.split("\n")) {
-		const heading = /^\s*([^:\n]{1,60}?)\s*:\s*(.+)$/u.exec(line);
-		const head = heading?.[1] ?? "";
-		const named = zoneName(head);
-		if (
-			!heading ||
-			!named ||
-			!stems(head).every((word) => [...named.heads, ...named.modifiers].includes(word))
-		)
-			continue;
-		for (const clause of (heading[2] ?? "").split(/[,.;]/u)) {
-			if (NEGATED_PLACEMENT.test(clause)) continue;
-			for (const place of clause.matchAll(/\b(?:in|inside|within|on)\s+([^,.;:()→]+)/giu)) {
-				const zone = place[1] ?? "";
-				if (zoneName(zone) && !sameZone(zone, head)) stated.push({ item: zone, zone: head });
-			}
-		}
-	}
+	const stated = placementStatements(request, nodes, namingTail);
 	const outside: string[] = [];
 	const merged: string[] = [];
 	// Two statements of one fact, such as "VPC + S3 are in us-east-1" and "the VPC … in us-east-1".
@@ -1606,6 +1535,139 @@ function containmentIssues(
 			message: `The request puts ${quoteList([...new Set(merged)])}, but one group stands for both zones. Draw each as its own group, the inner zone's parent set to the outer one.`,
 		});
 	return issues;
+}
+
+/**
+ * A named zone the diagram lacks, quoted with the zone the request puts it in and the steps it
+ * puts in it: '"corporate network" (inside "on-prem data center", holding "Office staff" and
+ * "Legacy ERP")', so a repair draws the group whole.
+ */
+function missingZone(
+	named: {
+		readonly phrase: string;
+		readonly heads: readonly string[];
+		readonly modifiers: readonly string[];
+	},
+	placements: readonly Placement[],
+	nodes: readonly Json[],
+	matchNode: (item: string) => number | undefined,
+): string {
+	const names = (phrase: string) => {
+		const zone = zoneName(phrase);
+		return (
+			zone !== undefined &&
+			zone.heads.join(" ") === named.heads.join(" ") &&
+			(named.modifiers.length === 0 ||
+				zone.modifiers.some((word) => named.modifiers.includes(word)))
+		);
+	};
+	const outer = placements.flatMap(({ item, zone }) =>
+		names(item) && !names(zone) ? [zone.trim().replace(/^(?:the|our|a|an)\s+/iu, "")] : [],
+	);
+	const members = placements.flatMap(({ item, zone, node }) => {
+		if (!names(zone) || zoneName(item)) return [];
+		const index = node ?? matchNode(item);
+		return index === undefined ? [] : [text(nodes[index]?.["label"])];
+	});
+	const details = [
+		...(outer[0] ? [`inside "${outer[0]}"`] : []),
+		...(members.length > 0 ? [`holding ${quoteList([...new Set(members)])}`] : []),
+	];
+	return `"${named.phrase}"${details.length > 0 ? ` (${details.join(", ")})` : ""}`;
+}
+
+/** What a request places in a zone: a step or zone, the zone's phrase, and the node it names. */
+interface Placement {
+	readonly item: string;
+	readonly zone: string;
+	readonly node?: number;
+}
+
+/**
+ * Every placement a request states: "ALB (public subnet)", "the VPC and queue are in
+ * eu-west-1", "staff and ERP, both on the corporate network", "gateway in our production VPC",
+ * and a line headed by a zone. `tail` picks the words of a clause's end that name its item.
+ */
+function placementStatements(
+	request: string,
+	nodes: readonly Json[],
+	tail: (phrase: string) => string = (phrase) => phrase,
+): Placement[] {
+	/** Nodes a phrase names in full: "office staff enter orders in the legacy ERP" names both. */
+	const mentioned = (phrase: string) => {
+		const said = new Set(stems(phrase));
+		return nodes.flatMap((node, index) => {
+			const wanted = stems(text(node["label"]));
+			return wanted.length > 0 && wanted.every((word) => holds(said, word)) ? [index] : [];
+		});
+	};
+	const stated: Placement[] = [];
+	for (const match of request.matchAll(/([^()→\n,.;:]+?)\s*\(([^()]+)\)/gu)) {
+		if (namedContainers(match[2] ?? "").length === 0 || NEGATED_PLACEMENT.test(match[0])) continue;
+		for (const item of (match[1] ?? "").split(/\s*\+\s*|\s*&\s*/u))
+			stated.push({ item, zone: match[2] ?? "" });
+	}
+	for (const sentence of request.split(/[.;\n]/u).map((part) => part.trim())) {
+		if (NEGATED_PLACEMENT.test(sentence)) continue;
+		// "the VPC, queue and table are all in eu-west-1, in our AWS cloud": each item in the first
+		// zone, and that zone in the second.
+		const located =
+			/^(.*?)\s+(?:are|is|sit|sits|live|lives|run|runs|stay|stays)\s+(?:all\s+|both\s+)?(?:in|inside|within|on)\s+([^,]+)(?:,\s*(?:all\s+)?(?:in|inside|within|on)\s+([^,]+))?/iu.exec(
+				sentence,
+			);
+		if (located && zoneName(located[2] ?? "")) {
+			for (const item of (located[1] ?? "").split(/\s*\+\s*|\s*&\s*|\s*,\s*|\s+and\s+/u))
+				stated.push({ item, zone: located[2] ?? "" });
+			if (zoneName(located[3] ?? ""))
+				stated.push({ item: located[2] ?? "", zone: located[3] ?? "" });
+		}
+		// "office staff enter orders in the legacy ERP, both on the corporate network".
+		const both = /^(.*),\s*both\s+(?:are\s+)?(?:in|inside|within|on)\s+([^,]+)$/iu.exec(sentence);
+		const pair = both ? mentioned(both[1] ?? "") : [];
+		if (both && pair.length === 2 && zoneName(both[2] ?? "")) {
+			for (const node of pair)
+				stated.push({ item: text(nodes[node]?.["label"]), zone: both[2] ?? "", node });
+		}
+	}
+	// "VPN gateway in our production VPC → order API in the VPC's private subnet": each step in the
+	// zone right after it, and a possessive zone in its owner.
+	for (const segment of request.split(/→|->|=>|[\n.;:(),]/u)) {
+		if (NEGATED_PLACEMENT.test(segment)) continue;
+		const pieces = segment.split(/\s+(?:in|inside|within)\s+/iu);
+		for (let index = 1; index < pieces.length; index += 1) {
+			const possessive = /^(.*?)['’]s\s+(.+)$/u.exec(pieces[index] ?? "");
+			const zone = possessive?.[2] ?? pieces[index] ?? "";
+			if (!zoneName(zone)) continue;
+			// "VPC + S3 are in us-east-1" lists its items before the verb.
+			const items = (pieces[index - 1] ?? "")
+				.replace(/\s+(?:are|is|sit|sits|live|lives|run|runs|stay|stays)(?:\s+(?:all|both))?$/iu, "")
+				.split(/\s*\+\s*|\s*&\s*|\s+and\s+/u);
+			for (const item of items) stated.push({ item: tail(item), zone });
+			if (possessive && zoneName(possessive[1] ?? ""))
+				stated.push({ item: zone, zone: possessive[1] ?? "" });
+		}
+	}
+	// A line headed by a zone ("on-prem data center: … on the corporate network") puts every zone
+	// it places something in inside that zone.
+	for (const line of request.split("\n")) {
+		const heading = /^\s*([^:\n]{1,60}?)\s*:\s*(.+)$/u.exec(line);
+		const head = heading?.[1] ?? "";
+		const named = zoneName(head);
+		if (
+			!heading ||
+			!named ||
+			!stems(head).every((word) => [...named.heads, ...named.modifiers].includes(word))
+		)
+			continue;
+		for (const clause of (heading[2] ?? "").split(/[,.;]/u)) {
+			if (NEGATED_PLACEMENT.test(clause)) continue;
+			for (const place of clause.matchAll(/\b(?:in|inside|within|on)\s+([^,.;:()→]+)/giu)) {
+				const zone = place[1] ?? "";
+				if (zoneName(zone) && !sameZone(zone, head)) stated.push({ item: zone, zone: head });
+			}
+		}
+	}
+	return stated;
 }
 
 /** A zone a phrase names: a container phrase, or a named cloud ("our AWS cloud") where it locates something. */

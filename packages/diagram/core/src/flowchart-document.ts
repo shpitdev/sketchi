@@ -6,6 +6,7 @@ import {
 	DIAGRAM_ZONE_KINDS,
 	DiagramNodeColorSchema,
 	SKETCHI_DIAGRAM_STYLE,
+	type DiagramNodeShape,
 } from "./intermediate.js";
 import {
 	FLOWCHART_MAX_EDGES,
@@ -845,6 +846,23 @@ export function resolveFlowchartReferences(document: FlowchartDocument): {
 	};
 }
 
+/** A label that names a database: "Oracle database", "Orders DB", "Postgres replica". */
+const DATABASE_LABEL =
+	/\b(?:database|db)s?\s*$|\b(?:postgres(?:ql)?|mysql|mariadb|mongodb|dynamodb|cosmos\s?db|sql\s+server|mssql|sqlite|cassandra|couchdb|cockroachdb|firestore|spanner|aurora|cloud\s+sql|neo4j|supabase)\b/iu;
+/** A step that acts on a database rather than being one: "Write to database", "Query Postgres". */
+const ACTS_ON_DATA =
+	/^\s*(?:add|archive|back|backup|call|check|close|connect|copy|create|delete|export|fetch|get|import|insert|load|log|look|lookup|migrate|open|persist|purge|put|query|read|record|remove|replicate|restore|run|save|scan|search|seed|select|send|set|store|sync|update|write)s?\b/iu;
+
+/**
+ * The shape a node draws as when its document gives none: a database cylinder for a node that
+ * names a database, whatever product it is, as every database draws.
+ */
+export function impliedFlowchartNodeShape(label: string): DiagramNodeShape | undefined {
+	return DATABASE_LABEL.test(label) && !ACTS_ON_DATA.test(label) && !label.trim().endsWith("?")
+		? "database"
+		: undefined;
+}
+
 /** A document built into the internal flowchart, or the problems that stop it. */
 export type FlowchartDocumentBuild =
 	| { readonly ok: true; readonly diagram: FlowchartDiagram; readonly notes: readonly string[] }
@@ -1002,12 +1020,17 @@ export function flowchartDiagramFromDocument(
 			const group = contained.nodeGroup.get(id);
 			const lane = contained.nodeLane.get(id);
 			const icon = options.nodeIcons?.get(id);
+			const kind = kinds.get(id) ?? "process";
+			const shape =
+				node.shape === undefined && kind !== "decision"
+					? impliedFlowchartNodeShape(node.label)
+					: node.shape;
 			return {
 				id,
 				label: node.label,
-				kind: kinds.get(id) ?? "process",
+				kind,
 				...(node.note ? { description: node.note } : {}),
-				...(node.shape && node.shape !== "diamond" ? { shape: node.shape } : {}),
+				...(shape && shape !== "diamond" ? { shape } : {}),
 				...(icon ? { icon: { slug: icon } } : {}),
 				...(node.color ? { color: node.color } : {}),
 				...(group ? { group } : {}),

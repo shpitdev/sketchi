@@ -317,6 +317,33 @@ describe("flowchart documents", () => {
 		expect(diagram.nodes.find((node) => node.id === "hotfix")?.shape).toBe("document");
 	});
 
+	it("draws a node that names a database as one when the document gives it no shape", () => {
+		const document: FlowchartDocument = {
+			title: "Ledger",
+			nodes: {
+				entry: "Clerk enters invoice",
+				write: "Write to database",
+				ledger: "Ledger database",
+				replica: { label: "MySQL replica", shape: "storage" },
+				reports: "Reports DB",
+			},
+			edges: [
+				["entry", "write"],
+				["write", "ledger"],
+				["ledger", "replica"],
+				["ledger", "reports"],
+			],
+		};
+		const shapes = Object.fromEntries(build(document).nodes.map((node) => [node.id, node.shape]));
+		expect(shapes).toEqual({
+			entry: undefined,
+			write: undefined,
+			ledger: "database",
+			replica: "storage",
+			reports: "database",
+		});
+	});
+
 	it("asks for a label on every branch of a question", () => {
 		expect(
 			issues({
