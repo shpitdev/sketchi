@@ -318,6 +318,30 @@ export function canvasComposedOnOutline(
 }
 
 /**
+ * Whether a point lies inside a closed outline (canvasShapeOutline), at least
+ * `inset` in from it, so a point on the outline itself is outside.
+ */
+export function canvasOutlineContains(
+	outline: readonly CanvasPoint[],
+	point: CanvasPoint,
+	inset = 0.5,
+): boolean {
+	let inside = false;
+	for (const [index, to] of outline.slice(1).entries()) {
+		const from = outline[index]!;
+		const [dx, dy] = [to.x - from.x, to.y - from.y];
+		const t = Math.max(
+			0,
+			Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / (dx * dx + dy * dy || 1)),
+		);
+		if (Math.hypot(point.x - from.x - t * dx, point.y - from.y - t * dy) < inset) return false;
+		if (from.y > point.y !== to.y > point.y && point.x < from.x + ((point.y - from.y) * dx) / dy)
+			inside = !inside;
+	}
+	return inside;
+}
+
+/**
  * A composed shape's outline as one closed polygon, finely stepped, for the
  * fill a node asks for under its strokes.
  */

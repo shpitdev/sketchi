@@ -1,4 +1,11 @@
-import { canvasFrameNameBox, wrappedLabelWidth, wrapTextToWidth } from "@sketchi/diagram-core";
+import {
+	canvasFrameNameBox,
+	canvasOutlineContains,
+	canvasShapeOutline,
+	isCanvasComposedShape,
+	wrappedLabelWidth,
+	wrapTextToWidth,
+} from "@sketchi/diagram-core";
 import type {
 	ArrowSceneElement,
 	NodeSceneElement,
@@ -204,8 +211,17 @@ function trimmed(points: readonly ScenePoint[], start: number, end: number): Sce
 	return cut(cut(points, start).reverse(), end).reverse();
 }
 
-/** Whether a point lies inside the shape a node draws, not only its box. */
-function insideShape(point: ScenePoint, node: NodeSceneElement): boolean {
+/**
+ * Whether a point lies inside the shape a node draws, not only its box: a
+ * diamond, an ellipse, or a composed shape's outline, whose curved or tapered
+ * sides a line meets inside the box.
+ */
+function insideShape(
+	point: ScenePoint,
+	node: NodeSceneElement,
+	outline?: readonly ScenePoint[],
+): boolean {
+	if (outline) return canvasOutlineContains(outline, point);
 	const [halfWidth, halfHeight] = [node.width / 2, node.height / 2];
 	const dx = Math.abs(point.x - node.x - halfWidth) / halfWidth;
 	const dy = Math.abs(point.y - node.y - halfHeight) / halfHeight;
@@ -218,6 +234,9 @@ function insideShape(point: ScenePoint, node: NodeSceneElement): boolean {
 
 /** Whether a line, followed every 2 units, runs inside a node's shape. */
 function entersShape(points: readonly ScenePoint[], node: NodeSceneElement): boolean {
+	const outline = isCanvasComposedShape(node.shape)
+		? canvasShapeOutline({ ...node, shape: node.shape })
+		: undefined;
 	return points.slice(1).some((point, index) => {
 		const from = points[index]!;
 		const steps = Math.max(1, Math.ceil(distance(from, point) / 2));
@@ -229,6 +248,7 @@ function entersShape(points: readonly ScenePoint[], node: NodeSceneElement): boo
 						y: from.y + ((point.y - from.y) * step) / steps,
 					},
 					node,
+					outline,
 				)
 			)
 				return true;

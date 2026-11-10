@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { groupFixtures, zoneFixtures, zoneStressFixtures } from "@sketchi/diagram-core";
+import {
+	canvasOutlineContains,
+	canvasShapeOutline,
+	groupFixtures,
+	isCanvasComposedShape,
+	parseIntermediateDiagram,
+	zoneFixtures,
+	zoneStressFixtures,
+} from "@sketchi/diagram-core";
 
-import { renderIntermediateDiagram, type RenderedDiagramScene } from "./scene";
+import { renderGraphDiagram, renderIntermediateDiagram, type RenderedDiagramScene } from "./scene";
 
 type Point = { readonly x: number; readonly y: number };
 type Box = {
@@ -30,8 +38,13 @@ const within = (point: Point, box: Box, inset: number) =>
 	point.y > box.y + inset &&
 	point.y < box.y + box.height - inset;
 
-/** Whether a point lies inside the shape a node draws: a diamond's or an ellipse's, else its box. */
+/**
+ * Whether a point lies inside the shape a node draws: a diamond's, an
+ * ellipse's or a composed shape's outline, else its box.
+ */
 function insideNode(point: Point, node: Box & { readonly shape: string }): boolean {
+	if (isCanvasComposedShape(node.shape))
+		return canvasOutlineContains(canvasShapeOutline({ ...node, shape: node.shape }), point);
 	if (node.shape !== "diamond" && node.shape !== "ellipse" && node.shape !== "circle")
 		return within(point, node, 0.5);
 	const [halfWidth, halfHeight] = [node.width / 2, node.height / 2];
@@ -90,6 +103,76 @@ describe("curved routes", () => {
 		});
 		expect(strays(scene)).toEqual([]);
 	});
+
+	// A composed shape's curved or tapered side sits inside its box, up to a
+	// bucket's taper (24 here) at its foot, so a line's straight run there can
+	// end inside the box and still be clear of the shape.
+	it.each([
+		["storage", "right", 65, { x: 600, y: 420 }, "left"],
+		["storage", "left", 65, { x: -560, y: 420 }, "right"],
+		["database", "bottom", 90, { x: 520, y: 520 }, "left"],
+		["database", "top", 90, { x: 520, y: -380 }, "left"],
+		["queue", "right", 60, { x: 600, y: 420 }, "left"],
+		["queue", "left", 60, { x: -560, y: 420 }, "right"],
+		["document", "bottom", 70, { x: 520, y: 520 }, "left"],
+	] as const)(
+		"curves a line leaving a %s's %s side, into neither node's drawn shape",
+		(shape, side, offset, at, targetSide) => {
+			const placement = new Map([
+				["a", { x: 0, y: 0, width: 300, height: 200 }],
+				["b", { ...at, width: 184, height: 72 }],
+			]);
+			const route = (source: string, target: string, anchors: Map<string, object>) =>
+				renderGraphDiagram(
+					parseIntermediateDiagram({
+						id: "composed",
+						title: "Composed",
+						type: "flowchart",
+						nodes: [
+							{ id: "a", label: "Composed", kind: "start", shape },
+							{ id: "b", label: "Step", kind: "end" },
+						],
+						edges: [{ id: "e", source, target }],
+						layout: { direction: "TB", edgeRouting: "curved" },
+					}),
+					{ placement, anchors: anchors as never },
+				);
+			// Leaving the composed side, then arriving at it.
+			for (const scene of [
+				route(
+					"a",
+					"b",
+					new Map([
+						["e:source", { side, offset }],
+						["e:target", { side: targetSide, offset: 0 }],
+					]),
+				),
+				route(
+					"b",
+					"a",
+					new Map([
+						["e:target", { side, offset }],
+						["e:source", { side: targetSide, offset: 0 }],
+					]),
+				),
+			]) {
+				const [line] = scene.elements.flatMap((element) =>
+					element.type === "arrow" ? [element] : [],
+				);
+				expect(line?.curved).toBe(true);
+				// Square lines run only horizontally or vertically; a curved corner does not.
+				expect(
+					line!.points.some(
+						(point, index) =>
+							index > 0 &&
+							Math.abs(point.x - line!.points[index - 1]!.x) > 0.01 &&
+							Math.abs(point.y - line!.points[index - 1]!.y) > 0.01,
+					),
+				).toBe(true);
+				expect(strays(scene)).toEqual([]);
+			}
+		},
+	);
 
 	it("keeps a line out of zones neither end sits in and inside those both do", () => {
 		const scene = renderIntermediateDiagram({

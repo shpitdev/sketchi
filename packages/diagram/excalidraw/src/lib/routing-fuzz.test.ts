@@ -3,12 +3,15 @@ import {
 	candidateRouteQuality,
 	canvasBoundTextBox,
 	canvasBoundTextInset,
+	canvasOutlineContains,
+	canvasShapeOutline,
 	crossingFixtures,
 	embedCanvasIcons,
 	fanInChecksFlowchart,
 	getCanvasValidationIssues,
 	groupFixtures,
 	groupRegionIssues,
+	isCanvasComposedShape,
 	labelFixtures,
 	laneFixtures,
 	laneRegionIssues,
@@ -1548,8 +1551,13 @@ const insideRegion = (point: Point, box: Region, inset: number) =>
 	point.y > box.y + inset &&
 	point.y < box.y + box.height - inset;
 
-/** Whether a point lies inside the shape a node draws: a diamond's or an ellipse's, else its box. */
+/**
+ * Whether a point lies inside the shape a node draws: a diamond's, an
+ * ellipse's or a composed shape's outline, else its box.
+ */
 function insideNodeShape(point: Point, node: Region & { readonly shape: string }): boolean {
+	if (isCanvasComposedShape(node.shape))
+		return canvasOutlineContains(canvasShapeOutline({ ...node, shape: node.shape }), point);
 	if (node.shape !== "diamond" && node.shape !== "ellipse" && node.shape !== "circle")
 		return insideRegion(point, node, 0.5);
 	const [halfWidth, halfHeight] = [node.width / 2, node.height / 2];
