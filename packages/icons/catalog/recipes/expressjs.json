@@ -1,0 +1,12 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "express",
+			"size": 5.5,
+			"color": "ink"
+		}
+	]
+}

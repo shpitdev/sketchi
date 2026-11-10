@@ -1,0 +1,98 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[11.3, 19],
+				[8, 10],
+				[8.5, 5.5],
+				[10.5, 4.2],
+				[11.8, 8]
+			],
+			"closed": true,
+			"stroke": "#c7000b",
+			"fill": "#c7000b"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12.7, 19],
+				[16, 10],
+				[15.5, 5.5],
+				[13.5, 4.2],
+				[12.2, 8]
+			],
+			"closed": true,
+			"stroke": "#c7000b",
+			"fill": "#c7000b"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[10.5, 19.2],
+				[4.5, 13],
+				[4, 9],
+				[5, 7.5]
+			],
+			"closed": true,
+			"stroke": "#c7000b",
+			"fill": "#c7000b"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[13.5, 19.2],
+				[19.5, 13],
+				[20, 9],
+				[19, 7.5]
+			],
+			"closed": true,
+			"stroke": "#c7000b",
+			"fill": "#c7000b"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[10, 19.6],
+				[2.5, 16.5],
+				[1.8, 13.5]
+			],
+			"closed": true,
+			"stroke": "#c7000b",
+			"fill": "#c7000b"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[14, 19.6],
+				[21.5, 16.5],
+				[22.2, 13.5]
+			],
+			"closed": true,
+			"stroke": "#c7000b",
+			"fill": "#c7000b"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[9.8, 20.3],
+				[3.5, 20.3],
+				[3.2, 18.5]
+			],
+			"closed": true,
+			"stroke": "#c7000b",
+			"fill": "#c7000b"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[14.2, 20.3],
+				[20.5, 20.3],
+				[20.8, 18.5]
+			],
+			"closed": true,
+			"stroke": "#c7000b",
+			"fill": "#c7000b"
+		}
+	]
+}

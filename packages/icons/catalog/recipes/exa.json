@@ -1,0 +1,36 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[5, 2],
+				[19, 2],
+				[12, 12],
+				[19, 22],
+				[5, 22],
+				[5, 2]
+			],
+			"closed": true,
+			"stroke": "#1f40ed",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[5, 3],
+				[19, 22]
+			],
+			"stroke": "#1f40ed",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[5, 12],
+				[12, 12]
+			],
+			"stroke": "#1f40ed",
+			"pen": 2
+		}
+	]
+}

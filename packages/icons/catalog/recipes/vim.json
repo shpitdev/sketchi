@@ -1,0 +1,40 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 1],
+				[23, 12],
+				[12, 23],
+				[1, 12]
+			],
+			"closed": true,
+			"stroke": "ink",
+			"fill": "#019833"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[3, 3],
+				[9, 3],
+				[12.5, 14],
+				[16, 3],
+				[22, 3],
+				[14.5, 21],
+				[10, 21]
+			],
+			"closed": true,
+			"stroke": "ink",
+			"fill": "#cccccc",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 18,
+			"cy": 19.5,
+			"text": "im",
+			"size": 7,
+			"color": "ink"
+		}
+	]
+}

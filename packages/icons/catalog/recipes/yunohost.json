@@ -1,0 +1,29 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 1.5,
+			"width": 21,
+			"height": 21,
+			"rounded": true,
+			"fill": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 8,
+			"text": "YUNO",
+			"size": 7,
+			"color": "paper"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 16,
+			"text": "HOST",
+			"size": 7,
+			"color": "paper"
+		}
+	]
+}

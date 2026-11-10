@@ -1,0 +1,37 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 1.5,
+			"width": 21,
+			"height": 21,
+			"stroke": "#0addf8",
+			"fill": "#0addf8"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 6.5,
+			"text": "UNST",
+			"size": 4.5,
+			"color": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "RUCT",
+			"size": 4.5,
+			"color": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 17.5,
+			"text": "URED",
+			"size": 4.5,
+			"color": "ink"
+		}
+	]
+}

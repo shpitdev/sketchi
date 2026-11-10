@@ -1,0 +1,12 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12.5,
+			"text": "GSAP",
+			"size": 9,
+			"color": "ink"
+		}
+	]
+}

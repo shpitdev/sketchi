@@ -4,6 +4,7 @@ import {
 	ICON_RECIPE_LIMITS,
 	ICON_RECIPE_PAPER,
 	type IconRecipe,
+	iconRecipeFitIssues,
 	iconRecipeIssues,
 } from "@sketchi/diagram-core";
 import { colorDistance, hexRgb, normalizeCssColor, type MarkColor } from "@sketchi/icon-catalog";
@@ -310,7 +311,10 @@ export function normalizeRecipe(raw: unknown, palette: readonly string[]): Norma
 		return copy;
 	});
 	const recipe = { parts };
-	const checked = [...issues, ...iconRecipeIssues(recipe)];
+	const drawable = iconRecipeIssues(recipe);
+	// A word wider than the grid clips in every square the icon is drawn in.
+	const fit = drawable.length === 0 ? iconRecipeFitIssues(recipe as unknown as IconRecipe) : [];
+	const checked = [...issues, ...drawable, ...fit];
 	return checked.length === 0
 		? { recipe: recipe as unknown as IconRecipe, issues: [] }
 		: { recipe: undefined, issues: checked };

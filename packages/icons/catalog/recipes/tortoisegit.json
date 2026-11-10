@@ -1,0 +1,84 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[1.5, 12],
+				[5, 15],
+				[17, 15],
+				[20, 12],
+				[22, 10],
+				[21, 7],
+				[18, 7.5],
+				[16, 11],
+				[14, 13],
+				[5, 13]
+			],
+			"smooth": true,
+			"closed": true,
+			"fill": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[4, 14],
+				[6, 8],
+				[11, 5.5],
+				[16, 7],
+				[17.5, 11],
+				[15, 14.5]
+			],
+			"smooth": true,
+			"closed": true,
+			"fill": "#4b8eb4"
+		},
+		{
+			"kind": "text",
+			"cx": 10.8,
+			"cy": 10.5,
+			"text": "Git",
+			"size": 5.5,
+			"color": "ink"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 19,
+			"cy": 7.5,
+			"rx": 1.2,
+			"ry": 1.6,
+			"fill": "#0079bb"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 21.2,
+			"cy": 7.5,
+			"rx": 1.2,
+			"ry": 1.6,
+			"fill": "#0079bb"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 6,
+			"cy": 17,
+			"rx": 2.2,
+			"ry": 2,
+			"fill": "paper"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 11.5,
+			"cy": 17.5,
+			"rx": 2.2,
+			"ry": 2,
+			"fill": "paper"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 16.5,
+			"cy": 17,
+			"rx": 2,
+			"ry": 2,
+			"fill": "paper"
+		}
+	]
+}

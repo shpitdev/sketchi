@@ -1,0 +1,39 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "IBM",
+			"size": 11,
+			"color": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 0,
+			"y": 9,
+			"width": 24,
+			"height": 1.2,
+			"stroke": "none",
+			"fill": "paper"
+		},
+		{
+			"kind": "rect",
+			"x": 0,
+			"y": 12.4,
+			"width": 24,
+			"height": 1.2,
+			"stroke": "none",
+			"fill": "paper"
+		},
+		{
+			"kind": "rect",
+			"x": 0,
+			"y": 15.8,
+			"width": 24,
+			"height": 1.2,
+			"stroke": "none",
+			"fill": "paper"
+		}
+	]
+}

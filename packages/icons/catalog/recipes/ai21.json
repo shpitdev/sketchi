@@ -1,0 +1,20 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 6,
+			"cy": 12,
+			"text": "AI21",
+			"size": 5.5,
+			"color": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 18,
+			"cy": 12,
+			"text": "labs",
+			"size": 5.5,
+			"color": "#e91e63"
+		}
+	]
+}

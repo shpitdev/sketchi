@@ -1,0 +1,36 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 14.5,
+			"cy": 12.5,
+			"text": "GO",
+			"size": 13,
+			"color": "#00acd7"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[1, 9.5],
+				[6, 9.5]
+			],
+			"stroke": "#00acd7"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[0.5, 12],
+				[5.5, 12]
+			],
+			"stroke": "#00acd7"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[2, 14.5],
+				[5.5, 14.5]
+			],
+			"stroke": "#00acd7"
+		}
+	]
+}

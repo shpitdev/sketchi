@@ -59,6 +59,39 @@ describe("home route", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
 		expect(await screen.findByRole("button", { name: /Copy Codex/ })).toBeTruthy();
-		expect(fetchMock).toHaveBeenCalledTimes(2);
+		const manifestLoads = fetchMock.mock.calls.filter(([url]) => url === "/icons-manifest.json");
+		expect(manifestLoads).toHaveLength(2);
+	});
+
+	it("loads the hand-drawn versions after the manifest and shows them in the hand-drawn view", async () => {
+		const drawings = {
+			codex: { parts: [{ kind: "rect", x: 4, y: 4, width: 16, height: 16, fill: "#10a37f" }] },
+		};
+		const fetchMock = vi.fn(async (url: string) =>
+			Response.json(url === "/icon-drawings.json" ? drawings : manifest),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		renderHomeRoute();
+
+		fireEvent.click(await screen.findByRole("button", { name: "Hand-drawn" }));
+		expect(await screen.findByRole("button", { name: "Copy Codex for Excalidraw" })).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Excalidraw library" }).getAttribute("href")).toBe(
+			"/sketchi-icons.excalidrawlib",
+		);
+	});
+
+	it("keeps the SVG library when the drawings cannot load", async () => {
+		const fetchMock = vi.fn(async (url: string) =>
+			url === "/icon-drawings.json"
+				? new Response("unavailable", { status: 503 })
+				: Response.json(manifest),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		renderHomeRoute();
+
+		expect(await screen.findByRole("button", { name: /Copy Codex SVG/ })).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Hand-drawn" })).toBeNull();
 	});
 });

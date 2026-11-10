@@ -72,7 +72,12 @@ pnpm nx draw icon-batch -- promote --run catalog --reject rejected.txt
   per-mark cost, time, tokens, rounds and parts, and the marks staying out).
 - `promote` writes each recognized mark's recipe to
   `packages/icons/catalog/recipes/`, except the slugs in `--reject` and any
-  that already has one. Format the files with `pnpm format` before committing.
+  that already has one. It settles each first: a word too wide or tall for
+  the 24-unit grid is shrunk until it fits, and a monochrome mark's literal
+  near-black (mono-dark) or near-white (mono-light) becomes `ink`, so the
+  drawing follows the theme where the mark's SVG inverts. `normalize` applies
+  the same to the recipes already there. Format the files with `pnpm format`
+  before committing.
 
 A recipe changes diagrams: a node naming that logo draws the recipe by hand
 unless the diagram asks for exact marks (`logos: "exact"`). That is why the

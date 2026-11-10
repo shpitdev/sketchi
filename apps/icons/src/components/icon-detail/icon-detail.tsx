@@ -1,3 +1,4 @@
+import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 import { X } from "lucide-react";
 import { useRef } from "react";
 
@@ -7,11 +8,20 @@ import { formatBytes } from "../../lib/format-bytes.js";
 import { IconMark } from "../icon-mark/index.js";
 import { useDialogFocus } from "../../lib/use-dialog-focus.js";
 import { PreviewToggle } from "../preview-toggle/index.js";
+import { RecipePreview } from "../recipe-preview/index.js";
 
-export type IconDetailAction = "copy-data-uri" | "copy-jsx" | "copy-svg" | "copy-url" | "download";
+export type IconDetailAction =
+	| "copy-data-uri"
+	| "copy-excalidraw"
+	| "copy-jsx"
+	| "copy-svg"
+	| "copy-url"
+	| "download";
 
 export interface IconDetailProps {
 	readonly busyAction?: IconDetailAction;
+	/** The mark's hand-drawn version, shown beside the SVG when it has one. */
+	readonly drawing?: IconRecipe;
 	readonly icon: SketchiIcon;
 	readonly onAction?: (action: IconDetailAction, icon: SketchiIcon) => void;
 	readonly onClose?: () => void;
@@ -23,6 +33,7 @@ export interface IconDetailProps {
 
 const actionLabels: Readonly<Record<IconDetailAction, string>> = {
 	"copy-data-uri": "Copy data URI",
+	"copy-excalidraw": "Copy for Excalidraw",
 	"copy-jsx": "Copy JSX",
 	"copy-svg": "Copy SVG",
 	"copy-url": "Copy URL",
@@ -39,6 +50,7 @@ const detailActions: readonly IconDetailAction[] = [
 
 export function IconDetail({
 	busyAction,
+	drawing,
 	icon,
 	onAction,
 	onClose,
@@ -77,9 +89,31 @@ export function IconDetail({
 				</button>
 			</header>
 
-			<div className="icon-detail__preview" data-preview={previewMode}>
-				<IconMark alt={`${icon.name} preview`} icon={icon} surface={previewMode} />
-			</div>
+			{drawing ? (
+				<div className="icon-detail__previews">
+					<figure className="icon-detail__figure">
+						<div className="icon-detail__preview" data-preview={previewMode}>
+							<IconMark alt={`${icon.name} SVG`} icon={icon} surface={previewMode} />
+						</div>
+						<figcaption>SVG</figcaption>
+					</figure>
+					<figure className="icon-detail__figure">
+						<div className="icon-detail__preview" data-preview={previewMode}>
+							<RecipePreview
+								className="icon-detail__drawing"
+								label={`${icon.name} hand-drawn`}
+								previewMode={previewMode}
+								recipe={drawing}
+							/>
+						</div>
+						<figcaption>Hand-drawn</figcaption>
+					</figure>
+				</div>
+			) : (
+				<div className="icon-detail__preview" data-preview={previewMode}>
+					<IconMark alt={`${icon.name} preview`} icon={icon} surface={previewMode} />
+				</div>
+			)}
 
 			<div className="icon-detail__preview-row">
 				<PreviewToggle onChange={(mode) => onPreviewModeChange?.(mode)} value={previewMode} />
@@ -110,17 +144,19 @@ export function IconDetail({
 			</div>
 
 			<div className="icon-detail__actions">
-				{detailActions.map((action) => (
-					<button
-						className={action === "copy-svg" ? "is-primary" : undefined}
-						disabled={busyAction !== undefined}
-						key={action}
-						onClick={() => onAction?.(action, icon)}
-						type="button"
-					>
-						{busyAction === action ? "Working" : actionLabels[action]}
-					</button>
-				))}
+				{(drawing ? [...detailActions, "copy-excalidraw" as const] : detailActions).map(
+					(action) => (
+						<button
+							className={action === "copy-svg" ? "is-primary" : undefined}
+							disabled={busyAction !== undefined}
+							key={action}
+							onClick={() => onAction?.(action, icon)}
+							type="button"
+						>
+							{busyAction === action ? "Working" : actionLabels[action]}
+						</button>
+					),
+				)}
 			</div>
 
 			{icon.aliases.length ? (

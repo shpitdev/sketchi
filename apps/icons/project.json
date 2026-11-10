@@ -66,8 +66,19 @@
 		"sync-catalog-assets": {
 			"executor": "nx:run-commands",
 			"dependsOn": ["^build"],
-			"inputs": ["{projectRoot}/scripts/sync-catalog-assets.ts", "^production"],
-			"outputs": ["{projectRoot}/public/icons-manifest.json", "{projectRoot}/public/output"],
+			"inputs": [
+				"{projectRoot}/scripts/sync-catalog-assets.ts",
+				"{projectRoot}/src/lib/drawings.ts",
+				"{projectRoot}/src/lib/excalidraw-export.ts",
+				"{projectRoot}/src/lib/recipe-drawing.ts",
+				"^production"
+			],
+			"outputs": [
+				"{projectRoot}/public/icons-manifest.json",
+				"{projectRoot}/public/icon-drawings.json",
+				"{projectRoot}/public/sketchi-icons.excalidrawlib",
+				"{projectRoot}/public/output"
+			],
 			"options": {
 				"command": "jiti apps/icons/scripts/sync-catalog-assets.ts"
 			}

@@ -29,6 +29,19 @@ Public slugs are stable and unique.
 When source collections contain the same raw slug, one keeps the short slug.
 Other icons receive a collection-qualified slug returned by search.
 
+## Hand-drawn marks
+
+Most catalog marks also have a hand-drawn version: a recipe of a few drawing
+parts on a 24-unit grid, the same form as community icons. Diagrams draw a
+node's logo from it unless they ask for exact marks.
+
+GET /icon-drawings.json
+Every hand-drawn recipe, keyed by catalog slug. A slug that is missing has no
+drawing yet.
+
+GET /sketchi-icons.excalidrawlib
+The same drawings as one Excalidraw library, one item per mark.
+
 ## Community icons
 
 Hand-drawn icons anyone publishes, kept apart from the catalog.

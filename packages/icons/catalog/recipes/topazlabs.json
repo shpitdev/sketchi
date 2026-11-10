@@ -1,0 +1,28 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 15.5,
+			"y": 1.5,
+			"width": 7,
+			"height": 7,
+			"fill": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 8.5,
+			"y": 8.5,
+			"width": 7,
+			"height": 7,
+			"fill": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 15.5,
+			"width": 7,
+			"height": 7,
+			"fill": "ink"
+		}
+	]
+}

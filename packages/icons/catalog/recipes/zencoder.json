@@ -1,0 +1,49 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12.8,
+			"cy": 5.5,
+			"rx": 3.6,
+			"ry": 4,
+			"stroke": "#e65c2c",
+			"fill": "#e65c2c"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 19,
+			"cy": 10.5,
+			"rx": 3.2,
+			"ry": 4,
+			"stroke": "#e65c2c",
+			"fill": "#e65c2c"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 15.8,
+			"cy": 18.2,
+			"rx": 4,
+			"ry": 3,
+			"stroke": "#e65c2c",
+			"fill": "#e65c2c"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 7.5,
+			"cy": 17.5,
+			"rx": 3,
+			"ry": 4,
+			"stroke": "#e65c2c",
+			"fill": "#e65c2c"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 5.5,
+			"cy": 9,
+			"rx": 3.8,
+			"ry": 3,
+			"stroke": "#e65c2c",
+			"fill": "#e65c2c"
+		}
+	]
+}

@@ -1,0 +1,31 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 20,
+			"rounded": true,
+			"stroke": "#2f4f4f",
+			"fill": "#faebd7",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 9.5,
+			"text": "JS",
+			"size": 9,
+			"color": "#2f4f4f"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 17.5,
+			"text": "Lint",
+			"size": 6,
+			"color": "#2f4f4f"
+		}
+	]
+}

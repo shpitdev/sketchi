@@ -512,6 +512,19 @@ describe("author", () => {
 			).issues[0],
 		).toContain("is not a source color");
 	});
+
+	it("sends back a word that would clip past the grid", () => {
+		const wide = normalizeRecipe(
+			{ parts: [{ kind: "text", cx: 12, cy: 10.5, text: "tinyhttp", size: 8.5 }] },
+			[],
+		);
+		expect(wide.recipe).toBeUndefined();
+		expect(wide.issues).toEqual([expect.stringContaining('"tinyhttp"')]);
+		expect(
+			normalizeRecipe({ parts: [{ kind: "text", cx: 12, cy: 12, text: "tinyhttp", size: 4 }] }, [])
+				.issues,
+		).toEqual([]);
+	});
 });
 
 describe("judge", () => {

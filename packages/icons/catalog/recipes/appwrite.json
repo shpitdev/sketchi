@@ -1,0 +1,41 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 1.5,
+			"width": 21,
+			"height": 21,
+			"rounded": true,
+			"stroke": "#f02e65",
+			"fill": "#f02e65"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 16.5,
+			"cy": 12,
+			"rx": 5.8,
+			"ry": 5.8,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 9,
+			"cy": 12,
+			"rx": 5,
+			"ry": 5,
+			"stroke": "paper",
+			"fill": "#f02e65",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 9,
+			"cy": 12,
+			"text": "</>",
+			"size": 4,
+			"color": "paper"
+		}
+	]
+}

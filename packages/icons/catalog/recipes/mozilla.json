@@ -1,0 +1,21 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1,
+			"y": 7,
+			"width": 22,
+			"height": 10,
+			"stroke": "ink",
+			"fill": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12.3,
+			"text": "moz://a",
+			"size": 5.5,
+			"color": "paper"
+		}
+	]
+}

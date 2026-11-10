@@ -1,0 +1,80 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[13, 4],
+				[21, 3],
+				[22, 9],
+				[19, 10]
+			],
+			"closed": true,
+			"stroke": "#f0eb18",
+			"fill": "#f0eb18"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[4, 15],
+				[12, 16],
+				[11, 22],
+				[3, 22]
+			],
+			"closed": true,
+			"stroke": "#f0eb18",
+			"fill": "#f0eb18"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[1, 4],
+				[14, 1.5],
+				[22, 12],
+				[19, 23],
+				[8, 23],
+				[6, 16],
+				[2, 13]
+			],
+			"closed": true,
+			"stroke": "#007dfe",
+			"fill": "#007dfe"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[15, 4],
+				[22, 12],
+				[19, 23],
+				[10, 23],
+				[12, 12]
+			],
+			"closed": true,
+			"stroke": "#00c4f4",
+			"fill": "#00c4f4"
+		},
+		{
+			"kind": "rect",
+			"x": 5,
+			"y": 5,
+			"width": 14,
+			"height": 14,
+			"fill": "#000000"
+		},
+		{
+			"kind": "text",
+			"cx": 11.5,
+			"cy": 9.5,
+			"text": "WS",
+			"size": 6,
+			"color": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[7, 16.5],
+				[11, 16.5]
+			],
+			"stroke": "paper"
+		}
+	]
+}

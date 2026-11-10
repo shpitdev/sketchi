@@ -1,0 +1,25 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 20,
+			"rounded": true,
+			"stroke": "#4580e6",
+			"fill": "#4580e6",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[7.5, 12.5],
+				[10.8, 15.8],
+				[16.5, 9]
+			],
+			"stroke": "paper",
+			"pen": 2
+		}
+	]
+}

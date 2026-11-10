@@ -1,0 +1,29 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12,
+			"rx": 11,
+			"ry": 11,
+			"stroke": "#5c2d91",
+			"fill": "#5c2d91"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 10,
+			"text": ".NET",
+			"size": 7.5,
+			"color": "paper"
+		},
+		{
+			"kind": "text",
+			"cx": 12.5,
+			"cy": 16.5,
+			"text": "Core",
+			"size": 4.5,
+			"color": "paper"
+		}
+	]
+}

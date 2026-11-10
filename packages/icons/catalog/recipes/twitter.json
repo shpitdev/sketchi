@@ -1,0 +1,34 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[2, 2.5],
+				[8, 2.5],
+				[21.5, 21.5],
+				[15.5, 21.5]
+			],
+			"closed": true,
+			"stroke": "ink",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[2.5, 21.5],
+				[10.3, 13.2]
+			],
+			"stroke": "ink",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[13.7, 10.6],
+				[21, 2.5]
+			],
+			"stroke": "ink",
+			"pen": 2
+		}
+	]
+}

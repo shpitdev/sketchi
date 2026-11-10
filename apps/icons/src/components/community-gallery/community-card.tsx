@@ -2,7 +2,7 @@ import { Info } from "lucide-react";
 
 import type { CommunityIconEntry } from "../../lib/community-client.js";
 import type { PreviewMode } from "../preview-toggle/index.js";
-import { RecipePreview } from "./recipe-preview.js";
+import { RecipePreview } from "../recipe-preview/index.js";
 
 /** One community icon. The tile copies it as Excalidraw shapes; the corner opens its details. */
 export function CommunityCard({

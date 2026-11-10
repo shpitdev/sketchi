@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { fetchCommunityIcon, type CommunityIconEntry } from "../../lib/community-client";
 import { CommunityGallery } from "./community-gallery";
-import { RecipePreview } from "./recipe-preview";
+import { RecipePreview } from "../recipe-preview/index.js";
 
 const ICONS: CommunityIconEntry[] = [
 	{

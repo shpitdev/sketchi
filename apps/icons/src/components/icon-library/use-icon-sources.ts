@@ -1,3 +1,4 @@
+import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 import { useCallback, useRef, useState } from "react";
 import {
 	copyText,
@@ -14,6 +15,14 @@ import type { IconDetailAction } from "../icon-detail/index.js";
 
 export type SelectionAction = "copy" | "zip";
 const FETCH_CONCURRENCY = 8;
+
+const loadExcalidrawExport = () => import("../../lib/excalidraw-export.js");
+
+/** Excalidraw clipboard text for a mark's drawing; the clipboard write starts before the code loads. */
+const drawingClipboard = (icon: SketchiIcon, drawing: IconRecipe) =>
+	loadExcalidrawExport().then(({ excalidrawClipboard }) =>
+		excalidrawClipboard({ slug: icon.slug, recipe: drawing }, "catalog"),
+	);
 
 export function useIconSources(selectedIcons: readonly SketchiIcon[]) {
 	const [copyingSlug, setCopyingSlug] = useState<string>();
@@ -56,14 +65,18 @@ export function useIconSources(selectedIcons: readonly SketchiIcon[]) {
 		}
 	}, []);
 
+	/** Copies the mark: its drawing for Excalidraw when given one, else its SVG. */
 	const copySvg = useCallback(
-		async (icon: SketchiIcon) => {
+		async (icon: SketchiIcon, drawing?: IconRecipe) => {
 			if (copyingSlug) return;
 			setCopyingSlug(icon.slug);
 			try {
-				await copyText(await getSvg(icon));
+				if (drawing) await copyText(drawingClipboard(icon, drawing));
+				else await copyText(await getSvg(icon));
 				setCopiedSlug(icon.slug);
-				showNotice(`${icon.name} SVG copied.`);
+				showNotice(
+					drawing ? `${icon.name} copied. Paste it into Excalidraw.` : `${icon.name} SVG copied.`,
+				);
 				if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
 				copiedTimerRef.current = window.setTimeout(() => setCopiedSlug(undefined), 1800);
 			} catch {
@@ -75,10 +88,20 @@ export function useIconSources(selectedIcons: readonly SketchiIcon[]) {
 		[copyingSlug, getSvg, showNotice],
 	);
 
-	async function runDetailAction(action: IconDetailAction, icon: SketchiIcon) {
+	async function runDetailAction(
+		action: IconDetailAction,
+		icon: SketchiIcon,
+		drawing?: IconRecipe,
+	) {
 		setBusyDetailAction(action);
 		try {
 			const url = permanentSvgUrl(icon.slug);
+			if (action === "copy-excalidraw") {
+				if (!drawing) throw new Error(`${icon.slug} has no drawing.`);
+				await copyText(drawingClipboard(icon, drawing));
+				showNotice(`${icon.name} copied. Paste it into Excalidraw.`);
+				return;
+			}
 			if (action === "copy-url") {
 				await copyText(url);
 			} else {

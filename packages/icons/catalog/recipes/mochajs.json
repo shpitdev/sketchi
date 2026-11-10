@@ -1,0 +1,49 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 1],
+				[22, 6.5],
+				[22, 17.5],
+				[12, 23],
+				[2, 17.5],
+				[2, 6.5]
+			],
+			"closed": true,
+			"stroke": "#8d6748",
+			"fill": "#8d6748"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 3],
+				[20.2, 7.6],
+				[20.2, 16.4],
+				[12, 21],
+				[3.8, 16.4],
+				[3.8, 7.6]
+			],
+			"closed": true,
+			"stroke": "paper"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12.6,
+			"text": "MOCHA",
+			"size": 5,
+			"color": "paper"
+		},
+		{
+			"kind": "rect",
+			"x": 10.3,
+			"y": 6.6,
+			"width": 3.4,
+			"height": 3,
+			"rounded": true,
+			"stroke": "paper",
+			"fill": "paper"
+		}
+	]
+}

@@ -1,0 +1,91 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[3, 13],
+				[4, 7],
+				[9, 3],
+				[15, 3],
+				[20, 7],
+				[21, 13],
+				[21, 18],
+				[16, 21.5],
+				[8, 21.5],
+				[3, 18]
+			],
+			"smooth": true,
+			"closed": true,
+			"fill": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 1,
+			"y": 12,
+			"width": 3,
+			"height": 7,
+			"rounded": true,
+			"fill": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 20,
+			"y": 12,
+			"width": 3,
+			"height": 7,
+			"rounded": true,
+			"fill": "ink"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 8.5,
+			"cy": 8.5,
+			"rx": 3,
+			"ry": 2,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 15.5,
+			"cy": 8.5,
+			"rx": 3,
+			"ry": 2,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[6, 13],
+				[18, 13],
+				[18.5, 17],
+				[15, 19.5],
+				[9, 19.5],
+				[5.5, 17]
+			],
+			"smooth": true,
+			"closed": true,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "rect",
+			"x": 9,
+			"y": 14.5,
+			"width": 1.5,
+			"height": 3,
+			"rounded": true,
+			"fill": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 13.5,
+			"y": 14.5,
+			"width": 1.5,
+			"height": 3,
+			"rounded": true,
+			"fill": "ink"
+		}
+	]
+}

@@ -1,0 +1,21 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 1.5,
+			"width": 21,
+			"height": 21,
+			"stroke": "#512bd4",
+			"fill": "#512bd4"
+		},
+		{
+			"kind": "text",
+			"cx": 12.5,
+			"cy": 12.5,
+			"text": ".NET",
+			"size": 8,
+			"color": "paper"
+		}
+	]
+}

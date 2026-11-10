@@ -16,6 +16,8 @@ describe("public CORS policy", () => {
 			"/api/*",
 			"/mcp",
 			"/icons-manifest.json",
+			"/icon-drawings.json",
+			"/sketchi-icons.excalidrawlib",
 		]);
 		expect(policy).toContain("Access-Control-Allow-Origin: *");
 		expect(policy).toContain("MCP-Protocol-Version");

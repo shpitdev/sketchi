@@ -1,0 +1,29 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12,
+			"rx": 10.5,
+			"ry": 10.5,
+			"stroke": "#00749a",
+			"fill": "#00749a"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12,
+			"rx": 8.8,
+			"ry": 8.8,
+			"stroke": "paper"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12.3,
+			"text": "W",
+			"size": 15,
+			"color": "paper"
+		}
+	]
+}

@@ -1,0 +1,40 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 2,
+			"width": 2.4,
+			"height": 20,
+			"stroke": "ink",
+			"fill": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 6.3,
+			"y": 2,
+			"width": 3,
+			"height": 20,
+			"stroke": "ink",
+			"fill": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 11.8,
+			"y": 2,
+			"width": 3.8,
+			"height": 20,
+			"stroke": "ink",
+			"fill": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 17.6,
+			"y": 2,
+			"width": 5,
+			"height": 20,
+			"stroke": "ink",
+			"fill": "ink"
+		}
+	]
+}

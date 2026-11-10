@@ -1,0 +1,39 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 8.5,
+			"cy": 12,
+			"rx": 8,
+			"ry": 8,
+			"stroke": "#5300c9",
+			"fill": "#5300c9"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 18.5,
+			"cy": 10,
+			"rx": 4.5,
+			"ry": 4.5,
+			"stroke": "#8900ff",
+			"fill": "#8900ff"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 17.5,
+			"cy": 17.5,
+			"rx": 1.6,
+			"ry": 1.6,
+			"stroke": "#d90067",
+			"fill": "#d90067"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "BRIA",
+			"size": 6.5,
+			"color": "paper"
+		}
+	]
+}

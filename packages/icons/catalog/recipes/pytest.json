@@ -1,0 +1,50 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 3.5,
+			"width": 20,
+			"height": 3,
+			"rounded": true,
+			"stroke": "#696969",
+			"fill": "#696969"
+		},
+		{
+			"kind": "rect",
+			"x": 3.2,
+			"y": 6,
+			"width": 3.8,
+			"height": 17,
+			"stroke": "#009fe3",
+			"fill": "#009fe3"
+		},
+		{
+			"kind": "rect",
+			"x": 8.8,
+			"y": 6,
+			"width": 3.8,
+			"height": 13.5,
+			"stroke": "#c7d302",
+			"fill": "#c7d302"
+		},
+		{
+			"kind": "rect",
+			"x": 14.4,
+			"y": 6,
+			"width": 3.8,
+			"height": 10,
+			"stroke": "#f07e16",
+			"fill": "#f07e16"
+		},
+		{
+			"kind": "rect",
+			"x": 19.4,
+			"y": 6,
+			"width": 3,
+			"height": 6.5,
+			"stroke": "#df2815",
+			"fill": "#df2815"
+		}
+	]
+}

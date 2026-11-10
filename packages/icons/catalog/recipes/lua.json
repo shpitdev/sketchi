@@ -1,0 +1,47 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 11.5,
+			"cy": 12.5,
+			"rx": 10.3,
+			"ry": 10.3,
+			"stroke": "#808080"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 13,
+			"rx": 8.6,
+			"ry": 8.6,
+			"stroke": "#000080",
+			"fill": "#000080"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 19.5,
+			"cy": 3.5,
+			"rx": 3.3,
+			"ry": 3.3,
+			"stroke": "#000080",
+			"fill": "#000080"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 15.2,
+			"cy": 8,
+			"rx": 2.4,
+			"ry": 2.4,
+			"stroke": "#ffffff",
+			"fill": "#ffffff"
+		},
+		{
+			"kind": "text",
+			"cx": 11,
+			"cy": 14.5,
+			"text": "Lua",
+			"size": 7,
+			"color": "#ffffff"
+		}
+	]
+}

@@ -1,0 +1,12 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "BABEL",
+			"size": 8,
+			"color": "#f9dc3e"
+		}
+	]
+}
