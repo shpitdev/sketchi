@@ -69,6 +69,11 @@ describe("crossing scenarios", () => {
 		const checked = flowchartScenarios.filter((scenario) =>
 			evaluateScenarioFixture(scenario).checks.some((check) => check.id === "avoidable-crossings"),
 		);
-		expect(checked.map((scenario) => scenario.id)).toEqual(ids);
+		expect(checked.map((scenario) => scenario.id)).toEqual([
+			...ids,
+			"feedback-triage-curved",
+			"ingest-pipeline-curved-lr",
+			"checkout-services-curved-zones",
+		]);
 	});
 });

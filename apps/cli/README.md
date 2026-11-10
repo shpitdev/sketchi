@@ -224,6 +224,9 @@ Create a canonical flowchart from inline JSON:
 sketchi create --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":{"start":"Change proposed","review":"Review evidence","end":"Release approved"},"edges":[["start","review"],["review","end"]]}}'
 ```
 
+Add `"curved": true` to a flowchart's spec to draw its lines as curves along the
+routes square lines take.
+
 Inspect it, replace it with another complete canonical document, and list the
 local store:
 

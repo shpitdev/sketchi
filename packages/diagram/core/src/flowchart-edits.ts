@@ -65,6 +65,7 @@ export const FlowchartSetEditSchema = Schema.Struct({
 	op: Schema.Literal("set"),
 	title: Schema.optionalKey(Schema.NonEmptyString),
 	direction: Schema.optionalKey(Schema.Literals(FLOWCHART_DIRECTIONS)),
+	curved: Schema.optionalKey(Schema.Boolean),
 	logos: Schema.optionalKey(FlowchartLogosSchema),
 	nodes: Schema.optionalKey(
 		Schema.Record(
@@ -129,6 +130,7 @@ type Mutable = {
 	title: string;
 	id?: string;
 	direction?: FlowchartDocument["direction"];
+	curved?: boolean;
 	logos?: FlowchartDocument["logos"];
 	nodes: [string, FlowchartDocumentNode][];
 	edges: Edge[];
@@ -348,6 +350,7 @@ function toDocument(state: Mutable): FlowchartDocument {
 		...(state.id === undefined ? {} : { id: state.id }),
 		title: state.title,
 		...(state.direction === undefined ? {} : { direction: state.direction }),
+		...(state.curved === true ? { curved: true } : {}),
 		...(state.logos === undefined ? {} : { logos: state.logos }),
 		nodes: Object.fromEntries(state.nodes),
 		edges: documentEdges(state.edges),
@@ -444,6 +447,7 @@ export function applyFlowchartEdits(
 		title: document.title,
 		...(document.id === undefined ? {} : { id: document.id }),
 		...(document.direction === undefined ? {} : { direction: document.direction }),
+		...(document.curved === undefined ? {} : { curved: document.curved }),
 		...(document.logos === undefined ? {} : { logos: document.logos }),
 		nodes: Object.entries(document.nodes),
 		edges: singlePairs(document.edges),
@@ -710,6 +714,7 @@ export function applyFlowchartEdits(
 						: flowchartGroupTree(toDocument(state)).groupParent;
 				if (edit.title !== undefined) state.title = edit.title;
 				if (edit.direction !== undefined) state.direction = edit.direction;
+				if (edit.curved !== undefined) state.curved = edit.curved;
 				if (edit.logos !== undefined) state.logos = edit.logos;
 				for (const [id, change] of Object.entries(edit.nodes ?? {})) {
 					const current = state.nodes.find(([key]) => key === id)?.[1];

@@ -24,6 +24,8 @@ import {
 	sharedSegments,
 	sideFixtures,
 	touchingLines,
+	wrappedLabelWidth,
+	wrapTextToWidth,
 	zoneFixtures,
 	zoneRegionIssues,
 	zoneStressFixtures,
@@ -237,8 +239,9 @@ function randomTallColumns(count: number) {
 
 /**
  * Flowcharts in this set that main (d050809c) already exports with validator
- * issues under straight and curved routing: a single straight segment cannot
- * leave the column or row of nodes between its ends. Never more than these.
+ * issues under straight routing: a single straight segment cannot leave the
+ * column or row of nodes between its ends. Never more than these. Curved
+ * lines follow the orthogonal routes, so none fails.
  */
 const PLAIN_DIRECT_FAILURES: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly number[]>> = {
 	TB: [0, 7, 16, 26, 27, 31, 33, 35, 36, 39],
@@ -1462,16 +1465,93 @@ describe("routing fuzz", () => {
 			).toEqual([]);
 		}, 60_000);
 
-		it.each(["straight", "curved"] as const)(
-			"never exports a %s flowchart with issues that main exports cleanly",
-			(edgeRouting) => {
-				const allowed = PLAIN_DIRECT_FAILURES[direction];
-				expect(
-					failures(direction, edgeRouting).filter((index) => !allowed.includes(index)),
-				).toEqual([]);
-			},
-			60_000,
-		);
+		it("never exports a straight flowchart with issues that main exports cleanly", () => {
+			const allowed = PLAIN_DIRECT_FAILURES[direction];
+			expect(failures(direction, "straight").filter((index) => !allowed.includes(index))).toEqual(
+				[],
+			);
+		}, 60_000);
+
+		it("exports every random flowchart curved without validator issues", () => {
+			expect(failures(direction, "curved")).toEqual([]);
+		}, 60_000);
+
+		it("curves every line along its route, through no node it does not join and no label its route kept clear", () => {
+			const strays = flowcharts.flatMap((spec, index) => {
+				const [curved, square] = (["curved", "orthogonal"] as const).map((edgeRouting) =>
+					renderIntermediateDiagram(
+						parseFlowchartDiagram({
+							...spec,
+							type: "flowchart",
+							layout: { direction, edgeRouting },
+						}),
+					),
+				);
+				const nodes = curved!.elements.flatMap((e) =>
+					e.type === "node" && e.rendererRole === undefined ? [e] : [],
+				);
+				const labels = curved!.elements.flatMap((e) =>
+					e.type === "text" && e.containerId === undefined ? [e] : [],
+				);
+				const squareLines = new Map(
+					square!.elements.flatMap((e) => (e.type === "arrow" ? [[e.id, e.points] as const] : [])),
+				);
+				return curved!.elements.flatMap((arrow) => {
+					if (arrow.type !== "arrow") return [];
+					const found: string[] = [];
+					if (arrow.curved !== true) found.push(`${index} ${arrow.edgeId} drawn square`);
+					// Points every 2 units along a line.
+					const sampled = (points: readonly Point[]) =>
+						points.slice(1).flatMap((point, at) => {
+							const from = points[at]!;
+							const steps = Math.max(
+								1,
+								Math.ceil(Math.hypot(point.x - from.x, point.y - from.y) / 2),
+							);
+							return Array.from({ length: steps }, (_, step) => ({
+								x: from.x + ((point.x - from.x) * (step + 1)) / steps,
+								y: from.y + ((point.y - from.y) * (step + 1)) / steps,
+							}));
+						});
+					const along = sampled(arrow.points);
+					for (const node of nodes) {
+						if (node.nodeId === arrow.sourceNodeId || node.nodeId === arrow.targetNodeId) continue;
+						if (
+							along.some(
+								(p) =>
+									p.x > node.x + 0.5 &&
+									p.x < node.x + node.width - 0.5 &&
+									p.y > node.y + 0.5 &&
+									p.y < node.y + node.height - 0.5,
+							)
+						)
+							found.push(`${index} ${arrow.edgeId} through ${node.nodeId}`);
+					}
+					const inBox = (points: readonly Point[], label: (typeof labels)[number]) => {
+						const maxWidth = label.maxWidth ?? 160;
+						const text = wrapTextToWidth(label.text, maxWidth, label.fontSize);
+						const [width, height] = [
+							wrappedLabelWidth(text, label.fontSize, maxWidth),
+							Math.ceil(text.split("\n").length * label.fontSize * 1.35),
+						];
+						const box = { x: label.x - width / 2, y: label.y - height / 2, width, height };
+						return points.some(
+							(p) =>
+								p.x > box.x + 0.5 &&
+								p.x < box.x + box.width - 0.5 &&
+								p.y > box.y + 0.5 &&
+								p.y < box.y + box.height - 0.5,
+						);
+					};
+					const squareLine = sampled(squareLines.get(arrow.id) ?? []);
+					for (const label of labels)
+						if (inBox(along, label) && !inBox(squareLine, label))
+							found.push(`${index} ${arrow.edgeId} through ${label.id}`);
+					return found;
+				});
+			});
+			expect(strays).toEqual([]);
+		}, 120_000);
 	});
 });
 

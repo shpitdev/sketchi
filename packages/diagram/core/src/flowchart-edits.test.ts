@@ -42,6 +42,17 @@ describe("flowchart edits", () => {
 		expect(Result.isFailure(decodeFlowchartEdits([{ op: "rename", id: "a" }]))).toBe(true);
 	});
 
+	it("curves a flowchart's lines and squares them again, its document and drawing alike", () => {
+		const curved = apply(order, [{ op: "set", curved: true }]);
+		expect(curved.curved).toBe(true);
+		const built = flowchartDiagramFromDocument(curved);
+		expect(built.ok && built.diagram.layout.edgeRouting).toBe("curved");
+		const squared = apply(curved, [{ op: "set", curved: false }]);
+		expect(squared.curved).toBeUndefined();
+		const rebuilt = flowchartDiagramFromDocument(squared);
+		expect(rebuilt.ok && rebuilt.diagram.layout.edgeRouting).toBe("orthogonal");
+	});
+
 	it("inserts a node into an edge, keeping the edge's label on the way in", () => {
 		const edited = apply(order, [
 			{ op: "insert", node: { card: "Check card" }, between: ["approved", "pay"] },

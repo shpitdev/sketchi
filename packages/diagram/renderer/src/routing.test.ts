@@ -253,8 +253,12 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("direct feedback: %s", (directi
 						return q.y > p.y;
 				}
 			}
-			expect(leavesNode(source, start, end)).toBe(true);
-			expect(leavesNode(target, end, start)).toBe(true);
+			// A straight line leaves toward its other end; a curved one follows its
+			// route, so its first and last runs leave their nodes.
+			const [afterStart, beforeEnd] =
+				edgeRouting === "straight" ? [end, start] : [feedback.points[1]!, feedback.points.at(-2)!];
+			expect(leavesNode(source, start, afterStart)).toBe(true);
+			expect(leavesNode(target, end, beforeEnd)).toBe(true);
 		},
 	);
 });

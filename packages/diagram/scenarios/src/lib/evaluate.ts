@@ -1278,8 +1278,25 @@ export function evaluateScenarioDiagram(
 				modelDiagram,
 			),
 		],
-		(scene) => (scenario.assertions.crossingFree ? [flowchartCrossingCheck(diagram, scene)] : []),
+		(scene) => [
+			...(scenario.assertions.crossingFree ? [flowchartCrossingCheck(diagram, scene)] : []),
+			...(scenario.assertions.curved ? [flowchartCurvedCheck(scene)] : []),
+		],
 	);
+}
+
+/** A prompt that asks for curved lines gets them: every line drawn as a curve. */
+function flowchartCurvedCheck(scene: RenderedDiagramScene) {
+	const lines = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
+	const square = lines.filter((line) => line.curved !== true);
+	return {
+		id: "curved-lines",
+		passed: lines.length > 0 && square.length === 0,
+		message:
+			square.length === 0
+				? "Every line is drawn curved, as the prompt asks."
+				: `${square.length} of ${lines.length} lines are drawn square where the prompt asks for curved lines; set curved: true.`,
+	};
 }
 
 /**

@@ -119,6 +119,8 @@ export const FlowchartDocumentSchema = Schema.Struct({
 	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
 	direction: Schema.optionalKey(Schema.Literals(FLOWCHART_DIRECTIONS)),
+	/** Lines drawn as curves along their routes, keeping every routing guarantee. */
+	curved: Schema.optionalKey(Schema.Boolean),
 	logos: Schema.optionalKey(FlowchartLogosSchema),
 	nodes: Schema.Record(Schema.String, FlowchartDocumentNodeSchema),
 	edges: Schema.Array(FlowchartDocumentEdgeSchema),
@@ -1079,7 +1081,10 @@ export function flowchartDiagramFromDocument(
 					lanes: Object.entries(document.lanes ?? {}).map(([id, label]) => ({ id, label })),
 				}
 			: {}),
-		layout: { direction: document.direction ?? "TB", edgeRouting: "orthogonal" },
+		layout: {
+			direction: document.direction ?? "TB",
+			edgeRouting: document.curved === true ? "curved" : "orthogonal",
+		},
 		style: { ...SKETCHI_DIAGRAM_STYLE },
 		metadata: document.logos ? { logos: document.logos === "exact" ? "exact" : "native" } : {},
 	});
