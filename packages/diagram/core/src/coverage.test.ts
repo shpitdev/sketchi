@@ -911,6 +911,30 @@ describe("a step the request gives to some branches", () => {
 		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_step_borrowed"]);
 		expect(issues[0]?.message).toContain('"Production deploy"');
 	});
+
+	it("reads a choice drawn as a chain of decisions", () => {
+		// "Target?" becomes "Test environment?", then "Gradual rollout?" for the rest.
+		const chained: [string, string][] = [
+			...labels.filter(([id]) => id !== "target"),
+			["environment", "Test environment?"],
+			["rollout", "Gradual rollout?"],
+		];
+		const chainedEdges: [string, string, string?][] = [
+			["pick", "environment"],
+			["environment", "staging", "yes"],
+			["environment", "rollout", "no"],
+			["rollout", "canary", "yes"],
+			["rollout", "production", "no"],
+			...edges.filter(([source]) => source !== "pick" && source !== "target"),
+		];
+		expect(codes(request, chart(chained, chainedEdges))).toEqual([]);
+		const borrowed = chart(chained, [...chainedEdges, ["production", "smoke"]]);
+		const issues = checkRequestCoverage(request, borrowed);
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_step_borrowed"]);
+		expect(issues[0]?.message).toContain('"Production deploy"');
+		expect(keepsStatedStructure(request, borrowed, chart(chained, chainedEdges))).toBe(true);
+		expect(codes(`${request} Production also runs smoke tests.`, borrowed)).toEqual([]);
+	});
 });
 
 describe("a step drawn twice where one copy ends", () => {

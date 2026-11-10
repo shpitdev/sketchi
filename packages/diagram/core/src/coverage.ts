@@ -1201,8 +1201,9 @@ const SHARED_BY =
 
 /**
  * A step the request gives to listed branches ("A and B both check stock") that the diagram also
- * gives a sibling branch the request leaves out: a branch of the same decision leads straight
- * into it. Each listed branch and the step must name nodes unmistakably.
+ * gives a sibling branch the request leaves out: a branch of the same decision, or of a decision
+ * chained to it, leads straight into it. Each listed branch and the step must name nodes
+ * unmistakably.
  */
 function borrowedSteps(
 	request: string,
@@ -1273,10 +1274,23 @@ function borrowedSteps(
 						)
 					);
 				});
+		// A choice drawn as a chain of decisions ("Deploy issue?" no to "Code issue?") offers each
+		// later decision's branches beside the earlier ones.
+		const decision = (id: string) => {
+			const node = nodes[ids.indexOf(id)];
+			return node?.["kind"] === "decision" || text(node?.["label"]).trim().endsWith("?");
+		};
+		const branches = (parent: string, seen: Set<string>): string[] =>
+			(targets.get(parent) ?? []).flatMap((child) => {
+				if (seen.has(child)) return [];
+				seen.add(child);
+				const chained = decision(child) && !givenIds.has(child) && !step.has(child);
+				return [child, ...(chained ? branches(child, seen) : [])];
+			});
 		const borrowers = new Set<string>();
 		for (const [parent, children] of targets) {
 			if (!children.some((child) => givenIds.has(child))) continue;
-			for (const child of children) {
+			for (const child of branches(parent, new Set([parent]))) {
 				if (givenIds.has(child) || step.has(child) || child === parent) continue;
 				if ((targets.get(child) ?? []).some((next) => step.has(next)) && !statedElsewhere(child))
 					borrowers.add(child);
