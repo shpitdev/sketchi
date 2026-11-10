@@ -12,6 +12,7 @@ import {
 	type IconDrawResult,
 	IconImaging,
 	IconImagingError,
+	iconAuthorFor,
 	iconAuthorModel,
 	type IconAuthorModel,
 	type IconImagingJob,
@@ -49,9 +50,6 @@ import {
 } from "../runtime/context.server";
 import { readBoundedJson } from "../runtime/request-body.server";
 
-// On the sketchi-icons tuning split, Sonnet 5.5 and Opus 5.5 drew equally recognizable icons (28 and 27 of 28 picked
-// out of their look-alikes by Sol at 28 px) and Sonnet cost about a fifth less per icon.
-const DEFAULT_AUTHOR_MODEL: IconAuthorModel = "anthropic/claude-sonnet-5-5";
 const DEFAULT_JUDGE_MODEL = "google/gemini-3.8-flash";
 
 type IconDrawFailureStatus =
@@ -346,8 +344,8 @@ export interface DrawOutcome {
 
 /**
  * One draw from a decoded request body, for the HTTP route and MCP alike: the author model the
- * body names (or the default), the client's rate limit, the input checks, the day's budget, then
- * the draw.
+ * body names (or one chosen from the source), the client's rate limit, the input checks, the
+ * day's budget, then the draw.
  */
 export const drawIconFromBody = Effect.fn("playground.icons.draw")(function* (
 	body: unknown,
@@ -366,13 +364,14 @@ export const drawIconFromBody = Effect.fn("playground.icons.draw")(function* (
 		typeof body === "object" && body !== null && "model" in body
 			? (body as { model?: unknown }).model
 			: undefined;
-	const authorModel =
+	// The body's model, else the deployment's, else one chosen from the source once it is read.
+	const namedModel: IconAuthorModel | "source" | undefined =
 		requestedModel === undefined
-			? (iconAuthorModel(envString(env.SKETCHI_ICON_AUTHOR_MODEL) ?? "") ?? DEFAULT_AUTHOR_MODEL)
+			? (iconAuthorModel(envString(env.SKETCHI_ICON_AUTHOR_MODEL) ?? "") ?? "source")
 			: typeof requestedModel === "string"
 				? iconAuthorModel(requestedModel)
 				: undefined;
-	if (!authorModel) {
+	if (!namedModel) {
 		return done(
 			failure("unsupported_model", {
 				code: "unsupported_model",
@@ -397,6 +396,7 @@ export const drawIconFromBody = Effect.fn("playground.icons.draw")(function* (
 	if (Result.isFailure(input)) return done(errorFailure(input.failure));
 	const refusal = yield* admitDraw(env);
 	if (refusal) return done(refusal.failure, refusal.retryAfterSeconds);
+	const authorModel = namedModel === "source" ? iconAuthorFor(input.success.source) : namedModel;
 	const outcome = yield* drawIcon(input.success, { authorModel }).pipe(
 		Effect.provide(layer),
 		Effect.result,

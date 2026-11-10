@@ -167,6 +167,24 @@ describe("POST /api/v1/icons/draw", () => {
 		expect(calls.jobs).toEqual([]);
 	});
 
+	it("draws a detailed mark with Opus unless the request names an author", async () => {
+		const curvy = `<svg viewBox="0 0 24 24"><path d="M2 2${" c1 1 2 2 3 1".repeat(40)}z" fill="#632ca6"/></svg>`;
+		const authors = async (body: Record<string, unknown>) => {
+			const calls: Calls = { gateway: [], jobs: [], assets: [] };
+			const replies = [
+				{ accept: false, recipe },
+				{ accept: true, recipe: null },
+				{ accept: true, recipe: null },
+			];
+			expect((await draw(fakeEnv(calls, replies), body)).status).toBe(200);
+			return calls.gateway[0]?.query["model"];
+		};
+		expect(await authors({ name: "Acme", svg: curvy })).toBe("claude-opus-5-5");
+		expect(await authors({ name: "Acme", svg: curvy, model: "claude-sonnet-5-5" })).toBe(
+			"claude-sonnet-5-5",
+		);
+	});
+
 	it("says so when the deployment cannot draw", async () => {
 		const response = await draw({}, { name: "Acme", svg: SVG });
 		expect(response.status).toBe(503);
