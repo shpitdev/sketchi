@@ -44,6 +44,30 @@ export interface IconDrawInput {
 	readonly source: IconSource;
 }
 
+const PATH_DATA = /\sd="([^"]*)"/gu;
+/** A path command and its arguments; `e` is not a command, so an exponent stays in its number. */
+const PATH_COMMAND = /([mzlhvcsqta])([^mzlhvcsqta]*)/giu;
+const PATH_NUMBER = /-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/giu;
+/** Numbers each curve command takes; a command repeats for every further set. */
+const CURVE_ARITY: Readonly<Record<string, number>> = { c: 6, s: 4, q: 4, t: 2, a: 7 };
+
+/**
+ * Curve segments in an SVG's path data, each repeat of a command counted: how
+ * much of a mark is drawn freehand. Geometric marks need a few; an animal, a
+ * face or a detailed emblem needs dozens.
+ */
+export function svgCurveSegments(svg: string): number {
+	let segments = 0;
+	for (const [, data = ""] of svg.matchAll(PATH_DATA)) {
+		for (const [, command = "", args = ""] of data.matchAll(PATH_COMMAND)) {
+			const arity = CURVE_ARITY[command.toLowerCase()];
+			if (arity)
+				segments += Math.max(1, Math.floor((args.match(PATH_NUMBER)?.length ?? 0) / arity));
+		}
+	}
+	return segments;
+}
+
 function inputError(code: string, message: string, hint: string) {
 	return IconInputError.make({ code, message, hint });
 }

@@ -7,9 +7,9 @@ import { describe, expect, it } from "@effect/vitest";
 import { AUTHOR_SYSTEM_PROMPT, decodeAuthorReply, normalizeRecipe } from "./author.js";
 import { drawIcon, ICON_DRAW_BUDGET_MS, IconCatalogSvgs, sourcePalette } from "./draw.js";
 import { IconImaging, type IconImagingJob } from "./imaging.js";
-import { prepareIconInput, rasterHeader } from "./input.js";
+import { prepareIconInput, rasterHeader, svgCurveSegments } from "./input.js";
 import { decodeJudgeReply, judgeLineup } from "./judge.js";
-import { IconDrawModels, type ModelCall } from "./models.js";
+import { DETAILED_MARK_CURVES, iconAuthorFor, IconDrawModels, type ModelCall } from "./models.js";
 
 const SLACK_SVG = `<svg viewBox="0 0 24 24"><rect x="1" y="7" width="10" height="4" fill="#36c5f0"/><rect x="13" y="1" width="4" height="10" fill="#2eb67d"/><rect x="13" y="13" width="10" height="4" fill="#ecb22e"/><rect x="7" y="13" width="4" height="10" fill="#e01e5a"/></svg>`;
 
@@ -437,6 +437,29 @@ describe("prepareIconInput", () => {
 		);
 		webp.set([99, 0, 0, 49, 0, 0], 24);
 		expect(rasterHeader(webp)).toEqual({ mimeType: "image/webp", width: 100, height: 50 });
+	});
+
+	it("counts a mark's curve segments and picks its author by them", () => {
+		const path = (d: string) => `<svg viewBox="0 0 24 24"><path d="${d}"/></svg>`;
+		// Two cubic segments, one quadratic, one arc; lines and moves do not count.
+		expect(svgCurveSegments(path("M0 0C1 1 2 2 3 3 4 4 5 5 6 6Q1 1 2 2L5 5a1 1 0 0 1 2 2z"))).toBe(
+			4,
+		);
+		const curves = (count: number) => path(`M0 0${" c1 1 2 2 3 3".repeat(count)}`);
+		const svg = (markup: string) => ({ kind: "svg", svg: markup, colors: [] }) as const;
+		// Exponents belong to their numbers, so one command's implicit repeats all count.
+		const exponents = path(`M0 0C${" 1e0 1 2 2 3 3".repeat(DETAILED_MARK_CURVES)}`);
+		expect(svgCurveSegments(exponents)).toBe(DETAILED_MARK_CURVES);
+		expect(svgCurveSegments(path("M0 0C1E-1 1 2 2 3 3 4e+1 4 5 5 6 6"))).toBe(2);
+		expect(iconAuthorFor(svg(exponents))).toBe("anthropic/claude-opus-5-5");
+		expect(iconAuthorFor(svg(SLACK_SVG))).toBe("anthropic/claude-sonnet-5-5");
+		expect(iconAuthorFor(svg(curves(DETAILED_MARK_CURVES - 1)))).toBe(
+			"anthropic/claude-sonnet-5-5",
+		);
+		expect(iconAuthorFor(svg(curves(DETAILED_MARK_CURVES)))).toBe("anthropic/claude-opus-5-5");
+		expect(
+			iconAuthorFor({ kind: "raster", mimeType: "image/png", base64: "", width: 64, height: 64 }),
+		).toBe("anthropic/claude-opus-5-5");
 	});
 });
 

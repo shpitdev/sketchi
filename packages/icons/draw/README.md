@@ -31,7 +31,10 @@ flowchart LR
    its ink and squares it at 256 px, quantizing a raster to its palette. Nothing
    is traced or vectorized.
 2. **Author.** One vision model call per round writes a recipe as structured
-   JSON. The fixed instructions and three catalog recipes as examples are
+   JSON. Unless the request names a model, a detailed mark (40 or more curve
+   segments in its SVG paths, such as an animal, a face or an ornate emblem)
+   and any raster get Claude Opus, which draws them closer for about the same
+   cost; geometric marks get Claude Sonnet, which draws them as well for less. The fixed instructions and three catalog recipes as examples are
    cached by the provider. The recipe is normalized (rounding, near-miss source
    colors, black and white the source does not use as ink and paper) and
    checked; a recipe the checker rejects gets one repair turn.

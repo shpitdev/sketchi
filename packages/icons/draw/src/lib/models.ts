@@ -9,6 +9,7 @@ import { Clock, Context, Effect, Layer, Option, Schedule } from "effect";
 
 import { AUTHOR_REPLY_SCHEMA, AUTHOR_SYSTEM_PROMPT } from "./author.js";
 import { IconModelError } from "./errors.js";
+import { type IconSource, svgCurveSegments } from "./input.js";
 import { JUDGE_PROMPT, JUDGE_REPLY_SCHEMA } from "./judge.js";
 
 /** Author models a draw request may name. */
@@ -17,6 +18,24 @@ export const ICON_AUTHOR_MODELS = [
 	"anthropic/claude-opus-5-5",
 ] as const;
 export type IconAuthorModel = (typeof ICON_AUTHOR_MODELS)[number];
+
+/**
+ * Curve segments from which a mark counts as detailed. On such marks (animals,
+ * faces, detailed emblems) Opus draws a closer likeness than Sonnet for about
+ * the same cost, finishing in fewer rounds; on geometric marks the two draw
+ * alike and Sonnet costs less.
+ */
+export const DETAILED_MARK_CURVES = 40;
+
+/**
+ * The author for a source when the request names none: Opus for a detailed
+ * SVG and for a raster, whose outline cannot be measured; Sonnet otherwise.
+ */
+export function iconAuthorFor(source: IconSource): IconAuthorModel {
+	return source.kind === "raster" || svgCurveSegments(source.svg) >= DETAILED_MARK_CURVES
+		? "anthropic/claude-opus-5-5"
+		: "anthropic/claude-sonnet-5-5";
+}
 
 export function iconAuthorModel(model: string): IconAuthorModel | undefined {
 	const prefixed = model.startsWith("anthropic/") ? model : `anthropic/${model}`;
