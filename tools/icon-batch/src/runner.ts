@@ -1,6 +1,6 @@
 import type { IconAuthorModel } from "@sketchi/icon-draw";
 
-import { attemptCeilingUsd, type MarkAttempt } from "./draw-mark.js";
+import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt } from "./draw-mark.js";
 import type { CatalogMark } from "./selection.js";
 import {
 	attemptCost,
@@ -17,16 +17,15 @@ export interface RunOptions {
 	readonly concurrency: number;
 	/** No draw starts once spend, with what is in flight, could pass this. */
 	readonly spendCapUsd: number;
-	/** The service's author; then one retry with the stronger one for a mark the judge did not recognize. */
-	readonly authors: { readonly first: IconAuthorModel; readonly retry: IconAuthorModel };
-	readonly draw: (
-		mark: CatalogMark,
-		author: IconAuthorModel,
-		attempt: number,
-	) => Promise<MarkAttempt>;
+	/**
+	 * The service's author (`"source"`: chosen from the mark, as the service does); then one retry
+	 * with the stronger one for a mark the judge did not recognize.
+	 */
+	readonly authors: { readonly first: BatchAuthor; readonly retry: IconAuthorModel };
+	readonly draw: (mark: CatalogMark, author: BatchAuthor, attempt: number) => Promise<MarkAttempt>;
 	readonly log?: (line: string) => void;
 	/** The most one attempt by this author can cost; the cap holds as long as no attempt exceeds it. */
-	readonly ceilingUsd?: (author: IconAuthorModel) => number;
+	readonly ceilingUsd?: (author: BatchAuthor) => number;
 }
 
 export interface RunOutcome {
@@ -76,7 +75,7 @@ export async function runBatch(options: RunOptions): Promise<RunOutcome> {
 	 * Claim room under the cap for one attempt at its most: wait while attempts in
 	 * flight hold the room it needs, and give up only when nothing is in flight.
 	 */
-	const claim = async (author: IconAuthorModel) => {
+	const claim = async (author: BatchAuthor) => {
 		for (;;) {
 			if (spent + inFlight + ceiling(author) <= options.spendCapUsd) {
 				inFlight += ceiling(author);
@@ -102,7 +101,7 @@ export async function runBatch(options: RunOptions): Promise<RunOutcome> {
 
 	const attempt = async (
 		mark: CatalogMark,
-		author: IconAuthorModel,
+		author: BatchAuthor,
 		index: number,
 	): Promise<StoredAttempt> => {
 		const held = ceiling(author);
@@ -111,7 +110,7 @@ export async function runBatch(options: RunOptions): Promise<RunOutcome> {
 			const { previews, ...stored } = await options
 				.draw(mark, author, index)
 				.catch((cause: unknown): MarkAttempt => ({
-					author,
+					...(author === "source" ? {} : { author }),
 					startedAt,
 					outcome: "failed",
 					error: {
@@ -139,7 +138,7 @@ export async function runBatch(options: RunOptions): Promise<RunOutcome> {
 	/** Settle one mark; false when the cap left it pending. */
 	const work = async (mark: CatalogMark) => {
 		let attempts = [...(existing.get(mark.slug)?.attempts ?? [])];
-		const plan = [options.authors.first, options.authors.retry];
+		const plan: readonly BatchAuthor[] = [options.authors.first, options.authors.retry];
 		while (attempts.length < plan.length) {
 			if (attempts.some((done) => done.judge?.recognizable === true)) break;
 			const author = plan[attempts.length]!;
@@ -149,7 +148,7 @@ export async function runBatch(options: RunOptions): Promise<RunOutcome> {
 			await options.store.save(settle(mark, attempts, final));
 			const last = attempts.at(-1)!;
 			log(
-				`${mark.slug} ${author.replace("anthropic/claude-", "")}: ${last.outcome === "failed" ? `failed (${last.error?.tag})` : last.judge?.recognizable ? "recognized" : `judge picked ${last.judge?.picked ?? "nothing"}`} $${attemptCost(last).toFixed(4)} ${(last.ms / 1000).toFixed(1)}s | spent $${spent.toFixed(2)}`,
+				`${mark.slug} ${(last.author ?? author).replace("anthropic/claude-", "")}: ${last.outcome === "failed" ? `failed (${last.error?.tag})` : last.judge?.recognizable ? "recognized" : `judge picked ${last.judge?.picked ?? "nothing"}`} $${attemptCost(last).toFixed(4)} ${(last.ms / 1000).toFixed(1)}s | spent $${spent.toFixed(2)}`,
 			);
 		}
 		await options.store.save(settle(mark, attempts, true));

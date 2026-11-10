@@ -40,7 +40,7 @@ export function verdictLine(record: MarkRecord): string {
 		const error = record.attempts.at(-1)?.error;
 		return `failed: ${error?.tag ?? "no drawing"}`;
 	}
-	const author = chosen.author.replace("anthropic/claude-", "");
+	const author = (chosen.author ?? "unknown").replace("anthropic/claude-", "");
 	const parts = chosen.recipe?.parts.length ?? 0;
 	const verdict =
 		record.status === "recognized"

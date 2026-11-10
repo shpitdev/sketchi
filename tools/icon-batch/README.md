@@ -7,7 +7,7 @@ sheets.
 
 ```mermaid
 flowchart LR
-  Catalog["catalog marks without a recipe"] --> Draw["drawIcon: Sonnet author"]
+  Catalog["catalog marks without a recipe"] --> Draw["drawIcon: author chosen from the source"]
   Draw -->|"judge missed it, or no drawing"| Retry["one retry: Opus author"]
   Draw --> Ledger["marks/slug.json + previews"]
   Retry --> Ledger
@@ -49,11 +49,14 @@ pnpm nx draw icon-batch -- summary --run catalog
 pnpm nx draw icon-batch -- promote --run catalog --reject rejected.txt
 ```
 
+- `draw` leaves the author to the source, as the draw service does when a
+  request names none: Opus 5.5 for a detailed mark (40 or more curve segments),
+  Sonnet 5.5 otherwise. `--author` names one model for every first draw.
 - `draw` runs 4 draws at a time (`--concurrency`) and starts none that could
   take the run's spend past `--cap` (default $60). Each draw in flight holds
   the most it can cost: every author call the engine allows at its output
-  limit, about $0.42 on Sonnet and $0.81 on Opus, where a typical draw costs
-  $0.02. A draw that does not fit waits for those in flight; the run leaves a
+  limit, about $0.42 on Sonnet and $0.81 on Opus (a draw whose author the
+  source will choose holds Opus's), where a typical draw costs $0.02. A draw that does not fit waits for those in flight; the run leaves a
   mark pending only when nothing is in flight. Every attempt is written to
   `.memory/icon-batch/<run>/marks/<slug>.json` as it finishes, including one
   whose price the gateway's logs could not give (it keeps its log ids and

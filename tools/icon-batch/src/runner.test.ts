@@ -6,7 +6,7 @@ import type { SketchiIcon } from "@sketchi/icon-catalog";
 import type { IconAuthorModel } from "@sketchi/icon-draw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { attemptCeilingUsd, type MarkAttempt, priceLogs } from "./draw-mark.js";
+import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt, priceLogs } from "./draw-mark.js";
 import { initializeResvg, svgPng } from "./excalidraw-export.js";
 import { verdictLine, writeSheets } from "./sheets.js";
 import { promote } from "./promote.js";
@@ -33,12 +33,13 @@ const icon = (slug: string, collection = "devtools-ci"): SketchiIcon => ({
 const recipe = { parts: [{ kind: "rect", x: 4, y: 4, width: 16, height: 16, fill: "#2496ed" }] };
 
 function attempt(
-	author: IconAuthorModel,
+	author: BatchAuthor,
 	verdict: "recognized" | "missed" | "failed",
 	costUsd = 0.02,
 ): MarkAttempt {
 	const base = {
-		author,
+		// A mark left to the source is drawn by Sonnet here, as most are.
+		author: author === "source" ? SONNET : author,
 		startedAt: "2026-11-09T00:00:00.000Z",
 		calls: 3,
 		inputTokens: 10_000,
@@ -173,8 +174,7 @@ describe("runBatch", () => {
 	it("starts no draw that could pass the spend cap, and resumes where it stopped", async () => {
 		const store = new RunStore(root);
 		const marks = ["a", "b", "c", "d", "e"].map((slug) => icon(slug));
-		const draw = async (_mark: unknown, author: IconAuthorModel) =>
-			attempt(author, "recognized", 0.05);
+		const draw = async (_mark: unknown, author: BatchAuthor) => attempt(author, "recognized", 0.05);
 		// Each draw holds its $0.06 ceiling: $0.20 fits three, one at a time.
 		const ceilingUsd = () => 0.06;
 		const stopped = await runBatch({
@@ -263,6 +263,34 @@ describe("runBatch", () => {
 			{ tag: "Defect", message: "logs unreachable" },
 			{ tag: "Defect", message: "logs unreachable" },
 		]);
+	});
+
+	it("leaves the first author to the source, holding the dearer model's ceiling, and retries with Opus", async () => {
+		expect(attemptCeilingUsd("source")).toBe(attemptCeilingUsd(OPUS));
+		const store = new RunStore(root);
+		const calls: BatchAuthor[] = [];
+		const held: BatchAuthor[] = [];
+		const outcome = await runBatch({
+			marks: [icon("missed")],
+			store,
+			concurrency: 1,
+			spendCapUsd: 10,
+			authors: { first: "source", retry: OPUS },
+			ceilingUsd: (author) => {
+				held.push(author);
+				return 1;
+			},
+			draw: async (_mark, author) => {
+				calls.push(author);
+				return attempt(author, "missed");
+			},
+		});
+		expect(outcome).toMatchObject({ settled: 1, capped: false });
+		expect(calls).toEqual(["source", OPUS]);
+		expect(held).toContain("source");
+		const [record] = await store.records();
+		// The attempt records the model the source chose.
+		expect(record?.attempts.map((done) => done.author)).toEqual([SONNET, OPUS]);
 	});
 
 	it("counts a mark the cap left pending in spend and in the ledger", async () => {
