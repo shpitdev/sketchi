@@ -102,6 +102,11 @@ describe("Studio build_flowchart host", () => {
 				target: "draft-2020-12",
 			}),
 		).toEqual(toCodeModeJsonSchema(BuildFlowchartRequestSchema.omit({ options: true })));
+		// The host supplies the request; the model cannot write one.
+		const input = StudioBuildFlowchartInputSchema["~standard"].jsonSchema.input({
+			target: "draft-2020-12",
+		}) as { readonly properties?: Record<string, unknown> };
+		expect(Object.keys(input.properties ?? {})).toEqual(["requestId", "spec"]);
 
 		expect(
 			StudioBuildFlowchartOutputSchema["~standard"].jsonSchema.output({
@@ -272,6 +277,59 @@ describe("Studio build_flowchart host", () => {
 		expect(duplicate).toEqual(first);
 		await expect(Effect.runPromise(executor.attempts)).resolves.toBe(1);
 		expect(counted.writes()).toBe(1);
+	});
+
+	it("checks each build against the user's message and allows one rebuild that fixes a miss", async () => {
+		const counted = countingStore();
+		const builds: unknown[] = [];
+		const build = deterministicRuntime(counted);
+		const executor = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(
+				(input) => {
+					builds.push(input);
+					return build(input);
+				},
+				{ request: 'Draw the release review loop, ending at "Release shipped".' },
+			),
+		);
+
+		const missing = await Effect.runPromise(executor.execute({ spec: acceptedSpec() }));
+		expect(missing.ok).toBe(true);
+		expect(missing.issues).toContainEqual(
+			expect.objectContaining({
+				code: "quoted_text_missing",
+				stage: "coverage",
+				hint: "Call build_flowchart once more with the complete spec, fixing this, before you answer.",
+			}),
+		);
+		expect(builds[0]).toMatchObject({
+			request: 'Draw the release review loop, ending at "Release shipped".',
+		});
+
+		const spec = acceptedSpec();
+		const fixed = await Effect.runPromise(
+			executor.execute({ spec: { ...spec, nodes: { ...spec.nodes, done: "Release shipped" } } }),
+		);
+		expect(fixed.ok).toBe(true);
+		expect(fixed.issues.filter((issue) => issue.stage === "coverage")).toEqual([]);
+		// The rebuild was the last: the turn now answers with it.
+		await expect(Effect.runPromise(executor.execute({ spec: acceptedSpec() }))).resolves.toEqual(
+			fixed,
+		);
+		expect(builds).toHaveLength(2);
+		await expect(Effect.runPromise(executor.attempts)).resolves.toBe(2);
+	});
+
+	it("closes the turn on an accepted build that misses nothing, or one checked against no request", async () => {
+		const executor = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore()), {
+				request: "Draw the release review loop.",
+			}),
+		);
+		const first = await Effect.runPromise(executor.execute({ spec: acceptedSpec() }));
+		expect(first.issues.filter((issue) => issue.stage === "coverage")).toEqual([]);
+		await Effect.runPromise(executor.execute({ spec: acceptedSpec() }));
+		await expect(Effect.runPromise(executor.attempts)).resolves.toBe(1);
 	});
 
 	it("serializes concurrent accepted calls and persists only the first artifact", async () => {

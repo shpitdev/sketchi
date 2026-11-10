@@ -60,6 +60,8 @@ export interface StudioBuildTurn {
 		readonly accepted?: {
 			readonly operation: StudioBuildOperation;
 			readonly result: StudioBuildResult;
+			/** The accepted build lists fixes its own tool may make in one more build this turn. */
+			readonly open?: boolean;
 		};
 		readonly attempts: number;
 	}>;
@@ -175,6 +177,11 @@ export function makeStudioBuildToolExecutor<
 		readonly input: Input;
 		readonly issues: readonly CodeModeIssue[];
 	};
+	/**
+	 * Whether an accepted result leaves the turn open for one more build of this tool, which
+	 * replaces it when accepted: a flowchart that misses what the request states.
+	 */
+	readonly reopens?: (result: Result) => boolean;
 	readonly turn?: StudioBuildTurn;
 }): Effect.Effect<StudioBuildToolExecutor<Input, Result, E, R>> {
 	return Effect.gen(function* () {
@@ -185,14 +192,16 @@ export function makeStudioBuildToolExecutor<
 			semaphore.withPermit(
 				Effect.gen(function* () {
 					const current = yield* Ref.get(state);
-					if (current.accepted) {
-						// The accepted result has this tool's result type when it is this tool's.
-						return current.accepted.operation === options.operation
+					// The accepted result has this tool's result type when it is this tool's.
+					const own =
+						current.accepted?.operation === options.operation
 							? (current.accepted.result as Result)
-							: options.rejected(turnAlreadyAcceptedIssue);
+							: undefined;
+					if (current.accepted && !(current.accepted.open && own)) {
+						return own ?? options.rejected(turnAlreadyAcceptedIssue);
 					}
 					if (current.attempts >= turn.maxAttempts) {
-						return options.rejected(attemptLimitIssue);
+						return own ?? options.rejected(attemptLimitIssue);
 					}
 
 					const attempt = current.attempts + 1;
@@ -224,9 +233,17 @@ export function makeStudioBuildToolExecutor<
 							? { ...built, issues: [...grounded.issues, ...built.issues] }
 							: built;
 					if (result.ok) {
+						// Only a first acceptance reopens: the rebuild it allows is the last.
+						const open = own === undefined && options.reopens?.(result) === true;
 						yield* Ref.update(state, (value) => ({
 							...value,
-							accepted: { operation: options.operation, result },
+							accepted: { operation: options.operation, result, open },
+						}));
+					} else if (current.accepted) {
+						// A failed rebuild leaves the accepted artifact standing, and the turn closed.
+						yield* Ref.update(state, (value) => ({
+							...value,
+							...(value.accepted ? { accepted: { ...value.accepted, open: false } } : {}),
 						}));
 					}
 					return result;
