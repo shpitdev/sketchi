@@ -854,6 +854,36 @@ importers:
         specifier: 1.4.0
         version: 1.4.0
 
+  tools/icon-batch:
+    dependencies:
+      '@excalidraw/excalidraw':
+        specifier: 0.18.1
+        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@resvg/resvg-wasm':
+        specifier: 2.6.2
+        version: 2.6.2
+      '@sketchi/diagram-core':
+        specifier: workspace:*
+        version: link:../../packages/diagram/core
+      '@sketchi/diagram-generation':
+        specifier: workspace:*
+        version: link:../../packages/diagram/generation
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../packages/icons/catalog
+      '@sketchi/icon-draw':
+        specifier: workspace:*
+        version: link:../../packages/icons/draw
+      '@sketchi/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
+      effect:
+        specifier: 4.1.2
+        version: 4.1.2
+      linkedom:
+        specifier: 0.18.14
+        version: 0.18.14
+
   tools/sketchi-generators:
     dependencies:
       '@nx/devkit':

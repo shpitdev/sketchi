@@ -1,0 +1,16 @@
+{
+	"name": "@sketchi/icon-batch",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"@excalidraw/excalidraw": "0.18.1",
+		"@resvg/resvg-wasm": "2.6.2",
+		"@sketchi/diagram-core": "workspace:*",
+		"@sketchi/diagram-generation": "workspace:*",
+		"@sketchi/icon-catalog": "workspace:*",
+		"@sketchi/icon-draw": "workspace:*",
+		"@sketchi/observability": "workspace:*",
+		"effect": "4.1.2",
+		"linkedom": "0.18.14"
+	}
+}

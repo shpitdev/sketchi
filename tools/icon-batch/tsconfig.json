@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "noPropertyAccessFromIndexSignature": true,
+    "types": ["node", "vitest/globals"],
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/diagram/core/tsconfig.lib.json" },
+    { "path": "../../packages/diagram/generation/tsconfig.lib.json" },
+    { "path": "../../packages/icons/catalog/tsconfig.lib.json" },
+    { "path": "../../packages/icons/draw/tsconfig.lib.json" },
+    { "path": "../../packages/observability/tsconfig.lib.json" }
+  ]
+}

@@ -29,6 +29,7 @@ const intendedNxProjectRoots = [
 	"packages/studio/projects",
 	"packages/svg-excalidraw",
 	"packages/ui",
+	"tools/icon-batch",
 	"tools/sketchi-generators",
 ];
 const intendedWorkspacePackageRoots = intendedNxProjectRoots.filter(
@@ -44,6 +45,7 @@ const effectAuthoritativeProjectRoots = [
 	"packages/icons/draw",
 	"packages/observability",
 	"packages/studio/projects",
+	"tools/icon-batch",
 ];
 const effectPureProjectRoots = [
 	"packages/diagram/core",
@@ -106,6 +108,7 @@ const intendedCompositeReferences = [
 	"packages/studio/projects/tsconfig.lib.json",
 	"packages/svg-excalidraw/tsconfig.lib.json",
 	"packages/ui/tsconfig.lib.json",
+	"tools/icon-batch/tsconfig.json",
 	"tools/sketchi-generators/tsconfig.lib.json",
 ];
 const reviewedEffectUnstableAdapterPaths: string[] = [];
@@ -120,6 +123,7 @@ const effectDependencyManifestPaths = [
 	"packages/icons/draw/package.json",
 	"packages/observability/package.json",
 	"packages/studio/projects/package.json",
+	"tools/icon-batch/package.json",
 ];
 const approvedRuntimeBoundaryFiles = [
 	"apps/cli/src/main.ts",
@@ -128,6 +132,8 @@ const approvedRuntimeBoundaryFiles = [
 	"packages/diagram/scenarios/src/cli.ts",
 	// The community icon HTTP API runs its workflows for the Effect-free icons app.
 	"packages/icons/community/src/http.ts",
+	// The catalog batch runs the draw engine once per mark from a Node script.
+	"tools/icon-batch/src/draw-mark.ts",
 ];
 const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/cli/scripts/build.mjs": 27,
@@ -256,6 +262,15 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"packages/studio/projects/src/client-api.ts": 31,
 	"packages/studio/projects/src/server/bucket.ts": 22,
 	"packages/studio/projects/src/server/http.ts": 4,
+	"tools/icon-batch/src/draw-mark.ts": 8,
+	"tools/icon-batch/src/excalidraw-export.ts": 22,
+	"tools/icon-batch/src/gateway.ts": 18,
+	"tools/icon-batch/src/imaging.ts": 7,
+	"tools/icon-batch/src/main.ts": 27,
+	"tools/icon-batch/src/promote.ts": 3,
+	"tools/icon-batch/src/runner.ts": 21,
+	"tools/icon-batch/src/sheets.ts": 19,
+	"tools/icon-batch/src/store.ts": 21,
 	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.spec.ts": 6,
 	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.ts": 3,
 	"tools/sketchi-generators/src/generators/ui-component/ui-component.spec.ts": 3,
