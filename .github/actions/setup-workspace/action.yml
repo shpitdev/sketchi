@@ -12,6 +12,11 @@ runs:
       uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
       with:
         version: 2026.10.3
+        # SHA-256 of the linux-x64 mise binary from that release's minisign-signed
+        # SHASUMS256.txt. With it the cached binary is verified offline; without
+        # it every run downloads the signed checksums from GitHub. Update both
+        # lines together.
+        sha256: 8d48bc510b7d844fad0bc7156c0855c2a1e7230c51e498a7f6b63b021f8b57c5
         add_shims_to_path: false
     - name: Install dependencies
       if: inputs.install-dependencies == 'true'
