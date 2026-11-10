@@ -23,8 +23,15 @@ const ARRIVAL_RUN = 32;
 const CURVE_CLEARANCE = 12;
 /** Each corner's curve is sampled at these points, its ends exact. */
 const SAMPLES = [0.25, 0.5, 0.75] as const;
+/**
+ * Longest run between the points a curved line carries. Excalidraw draws a
+ * smooth spline through them, which overshoots where long runs meet the short
+ * ones a curve is sampled at, and wavers where points crowd a straight run;
+ * runs split this finely keep it on the route.
+ */
+const POINT_SPACING = 40;
 /** Radii tried for a line, as fractions of the widest its corners allow. */
-const SCALES = [1, 0.5, 0.25] as const;
+const SCALES = [1, 0.5, 0.25, 0.125] as const;
 
 const EPSILON = 0.01;
 
@@ -66,14 +73,14 @@ export function curvedPoints(
 	scale = 1,
 ): [ScenePoint, ...ScenePoint[]] {
 	const points = corners(route);
-	if (points.length < 3 || scale <= 0) return points as [ScenePoint, ...ScenePoint[]];
+	if (points.length < 3) return points as [ScenePoint, ...ScenePoint[]];
 	const curved: ScenePoint[] = [points[0]!];
 	for (let index = 1; index < points.length - 1; index += 1) {
 		const [before, at, after] = [points[index - 1]!, points[index]!, points[index + 1]!];
 		const [incoming, outgoing] = [distance(before, at), distance(at, after)];
 		const roomIn = index === 1 ? incoming - DEPARTURE_RUN : incoming / 2;
 		const roomOut = index === points.length - 2 ? outgoing - ARRIVAL_RUN : outgoing / 2;
-		const radius = Math.max(0, Math.min(CURVE_RADIUS, roomIn, roomOut)) * scale;
+		const radius = Math.max(0, Math.min(CURVE_RADIUS, roomIn, roomOut)) * Math.max(0, scale);
 		if (radius < 1) {
 			curved.push(at);
 			continue;
@@ -97,10 +104,20 @@ export function curvedPoints(
 		curved.push(to);
 	}
 	curved.push(points.at(-1)!);
-	return curved.map((point) => ({ x: round(point.x), y: round(point.y) })) as [
-		ScenePoint,
-		...ScenePoint[],
-	];
+	const even: ScenePoint[] = [curved[0]!];
+	for (const [index, point] of curved.slice(1).entries()) {
+		const from = curved[index]!;
+		const steps = Math.ceil(distance(from, point) / POINT_SPACING);
+		for (let step = 1; step <= steps; step += 1)
+			even.push({
+				x: from.x + ((point.x - from.x) * step) / steps,
+				y: from.y + ((point.y - from.y) * step) / steps,
+			});
+	}
+	// The ends stay exact: they sit on the nodes' outlines.
+	return even.map((point, index) =>
+		index === 0 || index === even.length - 1 ? point : { x: round(point.x), y: round(point.y) },
+	) as [ScenePoint, ...ScenePoint[]];
 }
 
 function pointToSegment(point: ScenePoint, a: ScenePoint, b: ScenePoint): number {
@@ -255,7 +272,8 @@ export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
 			const after = meetingsOf(points);
 			return after.crossings <= before.crossings && after.touches <= before.touches;
 		});
-		if (curve) drawn.set(arrow.id, curve);
+		// A line no curve suits stays square, its runs evenly spaced like a curve's.
+		drawn.set(arrow.id, curve ?? curvedPoints(route, 0));
 	}
 	return {
 		...scene,
