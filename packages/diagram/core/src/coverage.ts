@@ -989,13 +989,16 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 		.map((group) => new Set(stems(`${text(group["label"])} ${text(group["id"])}`)));
 	const missingContainers: string[] = [];
 	const placements = placementStatements(request, nodes);
-	for (const named of namedContainers(request)) {
+	const zones = namedContainers(request);
+	for (const named of zones) {
+		// "the VPC" after "our production VPC" is that zone, checked and described under its name.
+		if (named.modifiers.length === 0 && qualifiedZone(zones, named.heads)) continue;
 		const found = containers.some(
 			(container) =>
 				named.heads.every((head) => holds(container, head)) &&
 				(named.modifiers.length === 0 || named.modifiers.some((word) => holds(container, word))),
 		);
-		if (!found) missingContainers.push(missingZone(named, placements, nodes, match));
+		if (!found) missingContainers.push(missingZone(named, zones, placements, nodes, match));
 	}
 	if (missingContainers.length > 0) {
 		const unique = [...new Set(missingContainers)];
@@ -1543,17 +1546,21 @@ function containmentIssues(
  * "Legacy ERP")', so a repair draws the group whole.
  */
 function missingZone(
-	named: {
-		readonly phrase: string;
-		readonly heads: readonly string[];
-		readonly modifiers: readonly string[];
-	},
+	named: NamedZone,
+	zones: readonly NamedZone[],
 	placements: readonly Placement[],
 	nodes: readonly Json[],
 	matchNode: (item: string) => number | undefined,
 ): string {
-	const names = (phrase: string) => {
+	/** The zone a phrase names, a bare "the VPC" standing for the request's one qualified VPC. */
+	const resolved = (phrase: string) => {
 		const zone = zoneName(phrase);
+		if (!zone || zone.modifiers.length > 0) return zone;
+		const qualified = qualifiedZone(zones, zone.heads);
+		return qualified ?? zone;
+	};
+	const names = (phrase: string) => {
+		const zone = resolved(phrase);
 		return (
 			zone !== undefined &&
 			zone.heads.join(" ") === named.heads.join(" ") &&
@@ -1561,8 +1568,13 @@ function missingZone(
 				zone.modifiers.some((word) => named.modifiers.includes(word)))
 		);
 	};
+	const shown = (phrase: string) => {
+		const zone = zoneName(phrase);
+		const qualified = zone?.modifiers.length === 0 ? qualifiedZone(zones, zone.heads) : undefined;
+		return qualified?.phrase ?? phrase.trim().replace(/^(?:the|our|a|an)\s+/iu, "");
+	};
 	const outer = placements.flatMap(({ item, zone }) =>
-		names(item) && !names(zone) ? [zone.trim().replace(/^(?:the|our|a|an)\s+/iu, "")] : [],
+		names(item) && !names(zone) ? [shown(zone)] : [],
 	);
 	const members = placements.flatMap(({ item, zone, node }) => {
 		if (!names(zone) || zoneName(item)) return [];
@@ -1574,6 +1586,28 @@ function missingZone(
 		...(members.length > 0 ? [`holding ${quoteList([...new Set(members)])}`] : []),
 	];
 	return `"${named.phrase}"${details.length > 0 ? ` (${details.join(", ")})` : ""}`;
+}
+
+interface NamedZone {
+	readonly phrase: string;
+	readonly heads: readonly string[];
+	readonly modifiers: readonly string[];
+}
+
+/**
+ * The one qualified zone of a kind the request names ("production VPC"), which a bare mention of
+ * that kind ("the VPC") refers back to; none when the request names several or none.
+ */
+function qualifiedZone(
+	zones: readonly NamedZone[],
+	heads: readonly string[],
+): NamedZone | undefined {
+	const qualified = new Map(
+		zones
+			.filter((zone) => zone.modifiers.length > 0 && zone.heads.join(" ") === heads.join(" "))
+			.map((zone) => [zone.modifiers.join(" "), zone]),
+	);
+	return qualified.size === 1 ? [...qualified.values()][0] : undefined;
 }
 
 /** What a request places in a zone: a step or zone, the zone's phrase, and the node it names. */

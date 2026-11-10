@@ -1086,4 +1086,34 @@ describe("a named zone the diagram lacks", () => {
 			'"teller network" (holding "Tellers" and "Core banking app")',
 		);
 	});
+
+	it("reads a bare mention of a zone as the one named zone of its kind", () => {
+		const request =
+			"bastion host in our staging VPC → app server in the VPC's public subnet → session cache. the VPC and cache are in us-east-1.";
+		const flat = {
+			type: "flowchart",
+			nodes: [
+				{ id: "bastion", label: "Bastion host", kind: "start" },
+				{ id: "app", label: "App server", kind: "process" },
+				{ id: "cache", label: "Session cache", kind: "end" },
+			],
+			edges: [
+				{ source: "bastion", target: "app" },
+				{ source: "app", target: "cache" },
+			],
+		};
+		const issues = checkRequestCoverage(request, flat);
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_container_missing"]);
+		// "the VPC" is the staging VPC, not a second VPC to draw.
+		expect(issues[0]?.message).toContain(
+			'"staging VPC" (inside "us-east-1", holding "Bastion host"), "public subnet" (inside "staging VPC", holding "App server") and "us-east-1" (holding "Session cache")',
+		);
+		expect(issues[0]?.message).not.toContain('"VPC"');
+		// With two VPCs named, a bare "the VPC" stays a zone of its own.
+		const two = checkRequestCoverage(
+			"bastion host in our staging VPC, app server in our production VPC. the VPC is in us-east-1.",
+			flat,
+		);
+		expect(two[0]?.message).toContain('"VPC" (inside "us-east-1"');
+	});
 });
