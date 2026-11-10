@@ -14,7 +14,7 @@ import {
 	toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
 
-import { makeStudioBuildTurn } from "./studio-build-tool.server";
+import { makeStudioBuildTurn, studioTurnOutcome } from "./studio-build-tool.server";
 import {
 	makeStudioFlowchartToolExecutor,
 	STUDIO_COVERAGE_FINAL_HINT,
@@ -369,6 +369,25 @@ describe("Studio build_flowchart host", () => {
 			),
 		});
 		await expect(Effect.runPromise(failed.attempts)).resolves.toBe(2);
+	});
+
+	it("records the turn's last rejection, and whether any build was saved", async () => {
+		const turn = await Effect.runPromise(makeStudioBuildTurn());
+		const executor = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore()), { turn }),
+		);
+		const rejected = await Effect.runPromise(executor.execute({ spec: rejectedSpec() }));
+		expect(rejected.ok).toBe(false);
+		await expect(Effect.runPromise(studioTurnOutcome(turn))).resolves.toEqual({
+			attempts: 1,
+			saved: false,
+			rejected: rejected.issues,
+		});
+		await Effect.runPromise(executor.execute({ spec: acceptedSpec() }));
+		await expect(Effect.runPromise(studioTurnOutcome(turn))).resolves.toMatchObject({
+			attempts: 2,
+			saved: true,
+		});
 	});
 
 	it("closes the turn on an accepted build that misses nothing, or one checked against no request", async () => {
