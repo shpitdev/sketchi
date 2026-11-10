@@ -30,5 +30,5 @@
 /sketchi-icons.excalidrawlib
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=3600
-  Content-Type: application/vnd.excalidrawlib+json
+  Content-Type: application/json
   Content-Disposition: attachment; filename="sketchi-icons.excalidrawlib"
