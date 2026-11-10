@@ -92,7 +92,8 @@ export class IconDrawGatewayConfig extends Context.Service<
 	IconDrawGatewayConfigValue
 >()("@sketchi/icon-draw/IconDrawGatewayConfig") {}
 
-const AUTHOR_MAX_TOKENS = 8_192;
+/** Output tokens one author call may spend; with the round limit, it bounds a draw's cost. */
+export const AUTHOR_MAX_TOKENS = 8_192;
 const AUTHOR_TIMEOUT_MS = 75_000;
 const JUDGE_TIMEOUT_MS = 30_000;
 

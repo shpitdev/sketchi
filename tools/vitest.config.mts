@@ -37,7 +37,7 @@ export default defineConfig({
 		name: "tools",
 		environment: "node",
 		include: ["tools/**/*.test.ts"],
-		exclude: ["tools/*/src/**", "tools/*/tests/**"],
+		exclude: ["**/node_modules/**", "tools/*/src/**", "tools/*/tests/**"],
 		// Hang guard, not a speed budget: the heavy deterministic suites here run several
 		// times slower on loaded CI runners, and only a real hang should fail them.
 		testTimeout: 60_000,

@@ -1,0 +1,38 @@
+{
+	"name": "icon-batch",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"sourceRoot": "tools/icon-batch/src",
+	"projectType": "application",
+	"tags": ["scope:tool", "type:tool"],
+	"targets": {
+		"draw": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
+			"options": {
+				"command": "jiti tools/icon-batch/src/main.ts"
+			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
+			"outputs": ["{workspaceRoot}/coverage/tools/icon-batch"],
+			"options": {
+				"command": "vitest run --config tools/icon-batch/vitest.config.mts"
+			}
+		},
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
+			"options": {
+				"command": "tsc6 -p tools/icon-batch/tsconfig.json --noEmit"
+			}
+		},
+		"typecheck-native": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
+			"options": {
+				"command": "tsc -p tools/icon-batch/tsconfig.json --noEmit"
+			}
+		}
+	}
+}
