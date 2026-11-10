@@ -191,7 +191,8 @@ export async function handleCommunityPublish(
 				CommunityIconInvalidRequestError: (error) =>
 					Effect.succeed(
 						errorJson(
-							400,
+							// A drawable recipe whose word would clip is well-formed but unfit to publish.
+							error.code === "recipe_clips" ? 422 : 400,
 							error.code,
 							error.message,
 							error.issues.length ? { issues: error.issues } : {},

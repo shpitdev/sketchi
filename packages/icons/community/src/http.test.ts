@@ -120,6 +120,17 @@ describe("community icon API", () => {
 		const rejected = await publish({ name: "Ring", recipe: RING }, env, reject);
 		expect(rejected.status).toBe(422);
 		expect(await rejected.json()).toMatchObject({ error: { code: "rejected" } });
+		const clipped = await publish(
+			{
+				name: "Tiny",
+				recipe: { parts: [{ kind: "text", cx: 12, cy: 9, text: "tinyhttp", size: 8.5 }] },
+			},
+			env,
+		);
+		expect(clipped.status).toBe(422);
+		expect(await clipped.json()).toMatchObject({
+			error: { code: "recipe_clips", message: expect.stringContaining('"tinyhttp"') },
+		});
 	});
 
 	it("rate limits by client address and refuses to publish without moderation or a store", async () => {

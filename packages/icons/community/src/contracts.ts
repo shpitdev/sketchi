@@ -63,7 +63,8 @@ export function bareCommunitySlug(slug: string): string {
 export class CommunityIconInvalidRequestError extends Schema.TaggedError<CommunityIconInvalidRequestError>()(
 	"CommunityIconInvalidRequestError",
 	{
-		code: Schema.Literals(["invalid_request", "invalid_recipe"]),
+		/** `recipe_clips`: drawable, but a word is too large for the icon and would be cut off. */
+		code: Schema.Literals(["invalid_request", "invalid_recipe", "recipe_clips"]),
 		message: Schema.String,
 		issues: Schema.Array(Schema.String),
 	},

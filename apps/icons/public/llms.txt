@@ -59,6 +59,8 @@ Body: { "name": "Ring queue", "recipe": { "parts": [...] }, "verdict"?: {...} }
 Returns 201 with the slug and page URL, or 200 with the existing icon when
 the same recipe is already published. Names and recipe text are moderated
 (422 when rejected), and each address may publish 10 icons a minute (429).
+A word too large for the 24-unit grid would be cut off, so it is refused
+with 422 and code recipe_clips, naming the word.
 
 ## MCP
 
