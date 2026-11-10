@@ -11,7 +11,7 @@ import {
 	normalizeIconSlug,
 } from "@sketchi/diagram-agent";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
-import { Effect } from "effect";
+import type { Effect } from "effect";
 
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-build-tool.server";
@@ -111,11 +111,21 @@ function groundSpecIcons(
 }
 
 /** Studio has no editFlowchart: a build that misses what the request states is fixed by one more build. */
-const STUDIO_COVERAGE_HINT =
+export const STUDIO_COVERAGE_HINT =
 	"Call build_flowchart once more with the complete spec, fixing this, before you answer.";
+/** Once that build is spent, the diagram stands as it is. */
+export const STUDIO_COVERAGE_FINAL_HINT =
+	"No build is left this turn: answer with this diagram, and tell the user what it still misses.";
 
 const missesRequest = (result: BuildFlowchartResult) =>
 	result.ok && result.issues.some((issue) => issue.stage === "coverage");
+
+const withCoverageHint =
+	(hint: string) =>
+	(result: BuildFlowchartResult): BuildFlowchartResult => ({
+		...result,
+		issues: result.issues.map((issue) => (issue.stage === "coverage" ? { ...issue, hint } : issue)),
+	});
 
 /**
  * Studio's build_flowchart tool over the shared buildFlowchart vertical. Each build is checked
@@ -134,22 +144,14 @@ export function makeStudioFlowchartToolExecutor<E, R>(
 	const logos = options.logos ?? [];
 	const request = options.request?.trim().slice(0, FLOWCHART_REQUEST_MAX_LENGTH);
 	return makeStudioBuildToolExecutor<StudioBuildFlowchartInput, BuildFlowchartResult, E, R>({
-		build: (input) =>
-			buildFlowchart(request ? { ...(input as object), request } : input).pipe(
-				Effect.map((result) =>
-					missesRequest(result)
-						? {
-								...result,
-								issues: result.issues.map((issue) =>
-									issue.stage === "coverage" ? { ...issue, hint: STUDIO_COVERAGE_HINT } : issue,
-								),
-							}
-						: result,
-				),
-			),
+		build: (input) => buildFlowchart(request ? { ...(input as object), request } : input),
 		rejected: (issue) => ({ ok: false, status: "quality_failed", issues: [issue] }),
 		ground: (input) => groundSpecIcons(input, logos),
-		reopens: missesRequest,
+		reopen: {
+			misses: missesRequest,
+			open: withCoverageHint(STUDIO_COVERAGE_HINT),
+			closed: withCoverageHint(STUDIO_COVERAGE_FINAL_HINT),
+		},
 		operation: "buildFlowchart",
 		...(options.turn ? { turn: options.turn } : {}),
 	});

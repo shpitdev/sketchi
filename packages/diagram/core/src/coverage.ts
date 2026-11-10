@@ -170,12 +170,38 @@ const NEGATED_PLACEMENT = new RegExp(
 	"iu",
 );
 
-/** Quoted text a clause asks to show; a clause that leaves something out asks for none of it. */
+/**
+ * An edit that replaces quoted text: `rename "A" to "B"`, `change the label from "A" to "B"`,
+ * `replace "A" with "B"`, and any further `"C" to "D"` pairs it lists. Group 1 is the text replaced.
+ */
+const REPLACES =
+	/\b(?:rename|replace|change|swap|relabel)\b(?:\s+[^\s"“”]+){0,8}?\s+["“]([^"”\n]+)["”]\s+(?:to|with|into|for)\s+["“][^"”\n]+["”]/giu;
+const REPLACES_NEXT =
+	/\s*(?:,\s*)?(?:and\s+)?["“]([^"”\n]+)["”]\s+(?:to|with|into|for)\s+["“][^"”\n]+["”]/uy;
+
+/** The quoted texts a clause asks to replace, which the diagram no longer shows. */
+function replacedQuotes(clause: string): Set<string> {
+	const replaced = new Set<string>();
+	for (const match of clause.matchAll(REPLACES)) {
+		replaced.add(match[1]?.trim() ?? "");
+		REPLACES_NEXT.lastIndex = match.index + match[0].length;
+		for (let next = REPLACES_NEXT.exec(clause); next; next = REPLACES_NEXT.exec(clause)) {
+			replaced.add(next[1]?.trim() ?? "");
+		}
+	}
+	return replaced;
+}
+
+/**
+ * Quoted text a clause asks to show; a clause that leaves something out asks for none of it,
+ * and an edit that replaces text asks only for the new text.
+ */
 function requiredQuotes(request: string): string[] {
 	return request.split(/[.;!?\n]+/u).flatMap((clause) => {
 		const quotes = [...clause.matchAll(QUOTED)].map((match) => match[1]?.trim() ?? "");
 		if (quotes.length === 0 || LEAVES_OUT.test(clause.replace(QUOTED, " "))) return [];
-		return quotes.filter((quote) => /\p{L}/u.test(quote));
+		const replaced = replacedQuotes(clause);
+		return quotes.filter((quote) => /\p{L}/u.test(quote) && !replaced.has(quote));
 	});
 }
 

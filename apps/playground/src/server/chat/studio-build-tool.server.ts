@@ -178,10 +178,16 @@ export function makeStudioBuildToolExecutor<
 		readonly issues: readonly CodeModeIssue[];
 	};
 	/**
-	 * Whether an accepted result leaves the turn open for one more build of this tool, which
-	 * replaces it when accepted: a flowchart that misses what the request states.
+	 * An accepted result that misses what the request states (a flowchart checked against the
+	 * user's message) leaves the turn open for one more build of this tool, which replaces it
+	 * when accepted. Each such result is returned and kept as `open` while that build remains,
+	 * and as `closed` once it is spent, the attempt budget is spent, or the rebuild fails.
 	 */
-	readonly reopens?: (result: Result) => boolean;
+	readonly reopen?: {
+		readonly misses: (result: Result) => boolean;
+		readonly open: (result: Result) => Result;
+		readonly closed: (result: Result) => Result;
+	};
 	readonly turn?: StudioBuildTurn;
 }): Effect.Effect<StudioBuildToolExecutor<Input, Result, E, R>> {
 	return Effect.gen(function* () {
@@ -228,25 +234,32 @@ export function makeStudioBuildToolExecutor<
 						...grounded.input,
 						options: STUDIO_ARTIFACT_OPTIONS,
 					});
-					const result: Result =
+					const checked: Result =
 						grounded.issues.length > 0
 							? { ...built, issues: [...grounded.issues, ...built.issues] }
 							: built;
-					if (result.ok) {
-						// Only a first acceptance reopens: the rebuild it allows is the last.
-						const open = own === undefined && options.reopens?.(result) === true;
+					const { reopen } = options;
+					if (checked.ok) {
+						const misses = reopen?.misses(checked) === true;
+						// Only a first acceptance with an attempt left reopens: the rebuild is the last.
+						const open = misses && own === undefined && attempt < turn.maxAttempts;
+						const result =
+							!reopen || !misses ? checked : (open ? reopen.open : reopen.closed)(checked);
 						yield* Ref.update(state, (value) => ({
 							...value,
 							accepted: { operation: options.operation, result, open },
 						}));
-					} else if (current.accepted) {
+						return result;
+					}
+					if (own) {
 						// A failed rebuild leaves the accepted artifact standing, and the turn closed.
+						const closed = reopen && reopen.misses(own) ? reopen.closed(own) : own;
 						yield* Ref.update(state, (value) => ({
 							...value,
-							...(value.accepted ? { accepted: { ...value.accepted, open: false } } : {}),
+							accepted: { operation: options.operation, result: closed, open: false },
 						}));
 					}
-					return result;
+					return checked;
 				}),
 			),
 		);
