@@ -23,6 +23,7 @@ const icon = (slug: string, collection = "devtools-ci"): SketchiIcon => ({
 	slug,
 	name: slug.toUpperCase(),
 	collection,
+	colorMode: "multicolor",
 	aliases: [],
 	keywords: [],
 	bytes: 100,
