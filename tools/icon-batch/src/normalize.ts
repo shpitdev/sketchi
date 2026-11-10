@@ -77,7 +77,7 @@ export function settleRecipe(recipe: IconRecipe, mode: IconColorMode): SettledRe
 			const inked = inkFor(value, mode);
 			if (inked !== value) {
 				changes.push(`parts[${index}].${key} ${value} -> ${inked}`);
-				next = { ...next, [key]: inked } as IconRecipePart;
+				next = { ...next, [key]: inked };
 			}
 		};
 		recolor("color");
