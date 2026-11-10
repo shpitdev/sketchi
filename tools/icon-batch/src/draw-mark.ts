@@ -4,6 +4,7 @@ import {
 	AUTHOR_MAX_TOKENS,
 	drawIcon,
 	ICON_DRAW_MAX_ROUNDS,
+	iconAuthorFor,
 	type IconAuthorModel,
 	IconCatalogSvgs,
 	IconDrawGatewayConfig,
@@ -19,6 +20,12 @@ import { Effect, Layer, Result } from "effect";
 
 import { type GatewayAccess, httpGateway, readLogCosts, SKETCHI_GATEWAY_ID } from "./gateway.js";
 import { NodeIconImaging } from "./imaging.js";
+
+/**
+ * An author model, or `"source"`: the engine's own choice from the mark once it
+ * is read (`iconAuthorFor`), as the draw service makes when a request names none.
+ */
+export type BatchAuthor = IconAuthorModel | "source";
 
 /** Studio's judge (`DEFAULT_JUDGE_MODEL` in apps/playground/src/server/icons/draw.server.ts). */
 export const JUDGE_MODEL = "google/gemini-3.8-flash";
@@ -66,9 +73,17 @@ const JUDGE_OUTPUT_TOKENS = 2_000;
  * allows, each reading the instructions, every image so far and every earlier
  * reply at full length, all billed as cache writes, and each replying at its
  * output limit; then both judge calls. Measured draws cost a twentieth of it.
- * A provider error is retried by the engine but not billed.
+ * A provider error is retried by the engine but not billed. An author chosen
+ * from the source is not known until the draw reads it, so it counts at the
+ * dearer model.
  */
-export function attemptCeilingUsd(author: string): number {
+export function attemptCeilingUsd(author: BatchAuthor): number {
+	if (author === "source") {
+		return Math.max(
+			attemptCeilingUsd("anthropic/claude-sonnet-5-5"),
+			attemptCeilingUsd("anthropic/claude-opus-5-5"),
+		);
+	}
 	const price = authorPrice(author);
 	let authorUsd = 0;
 	for (let call = 0; call < ICON_DRAW_MAX_ROUNDS; call += 1) {
@@ -87,7 +102,8 @@ export function attemptCeilingUsd(author: string): number {
 }
 
 export interface MarkAttempt {
-	readonly author: IconAuthorModel;
+	/** The model that drew; undefined when a draw left to the source failed before reading it. */
+	readonly author?: IconAuthorModel;
 	readonly startedAt: string;
 	/** Drawn: a recipe came back (recognized or not). Failed: no recipe. */
 	readonly outcome: "drawn" | "failed";
@@ -115,7 +131,7 @@ export interface DrawMarkRequest {
 	readonly slug: string;
 	readonly name: string;
 	readonly svg: string;
-	readonly author: IconAuthorModel;
+	readonly author: BatchAuthor;
 	/** Tags the attempt's gateway calls, so its logs can be found together. */
 	readonly traceId: string;
 	readonly loadCatalogSvg: (slug: string) => Promise<string | undefined>;
@@ -179,15 +195,17 @@ export async function drawMark(
 	let outcome:
 		| Result.Result<IconDrawResult, { readonly _tag: string; readonly message: string }>
 		| undefined;
+	let author = request.author === "source" ? undefined : request.author;
 	try {
 		outcome = await Effect.runPromise(
 			prepareIconInput({ name: request.name, svg: request.svg }).pipe(
-				Effect.flatMap((input) =>
-					drawIcon(input, {
-						authorModel: request.author,
+				Effect.flatMap((input) => {
+					author ??= iconAuthorFor(input.source);
+					return drawIcon(input, {
+						authorModel: author,
 						...(request.budgetMs === undefined ? {} : { budgetMs: request.budgetMs }),
-					}),
-				),
+					});
+				}),
 				Effect.provide(layer),
 				Effect.provideService(TelemetryCorrelation, { traceId: request.traceId }),
 				Effect.result,
@@ -203,7 +221,7 @@ export async function drawMark(
 	if (Result.isFailure(outcome)) {
 		const error = outcome.failure;
 		return {
-			author: request.author,
+			...(author === undefined ? {} : { author }),
 			startedAt,
 			outcome: "failed",
 			error: { tag: error._tag, message: error.message },
@@ -215,13 +233,14 @@ export async function drawMark(
 			ms: Date.now() - started,
 			...(costUsd === undefined ? {} : { costUsd }),
 			// A failed draw reports no usage: until its logs are priced, count the most it could cost.
-			estimatedCostUsd: costUsd ?? (logIds.length === 0 ? 0 : attemptCeilingUsd(request.author)),
+			estimatedCostUsd:
+				costUsd ?? (logIds.length === 0 ? 0 : attemptCeilingUsd(author ?? request.author)),
 			logIds,
 		};
 	}
 	const result = outcome.success;
 	return {
-		author: request.author,
+		...(author === undefined ? {} : { author }),
 		startedAt,
 		outcome: "drawn",
 		recipe: result.recipe,

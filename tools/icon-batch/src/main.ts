@@ -33,7 +33,7 @@ const { positionals, values } = parseArgs({
 		slugs: { type: "string" },
 		concurrency: { type: "string", default: "4" },
 		cap: { type: "string", default: "60" },
-		author: { type: "string", default: "claude-sonnet-5-5" },
+		author: { type: "string", default: "source" },
 		retry: { type: "string", default: "claude-opus-5-5" },
 		reject: { type: "string" },
 	},
@@ -93,7 +93,10 @@ switch (command) {
 			store,
 			concurrency: positiveNumber(values.concurrency, "concurrency"),
 			spendCapUsd: positiveNumber(values.cap, "cap"),
-			authors: { first: author(values.author), retry: author(values.retry) },
+			authors: {
+				first: values.author === "source" ? "source" : author(values.author),
+				retry: author(values.retry),
+			},
 			draw: async (mark, model, attempt) => {
 				const svg = await loadSvg(mark.slug);
 				if (svg === undefined) throw new Error(`${mark.slug} has no source SVG.`);
@@ -138,7 +141,7 @@ switch (command) {
 	}
 	default:
 		process.stderr.write(
-			"Usage: icon-batch <draw|sheets|summary|promote> [--run name] [--sample n | --slugs a,b] [--concurrency 4] [--cap 60] [--author claude-sonnet-5-5] [--retry claude-opus-5-5] [--reject file]\n",
+			"Usage: icon-batch <draw|sheets|summary|promote> [--run name] [--sample n | --slugs a,b] [--concurrency 4] [--cap 60] [--author source] [--retry claude-opus-5-5] [--reject file]\n",
 		);
 		process.exitCode = 2;
 }
