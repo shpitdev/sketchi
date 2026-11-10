@@ -138,6 +138,16 @@ describe("labelLogos", () => {
 	const possible = (label: string) =>
 		labelLogos(label, nodeLogoIcons).possible.map((icon) => icon.slug);
 
+	it("names the product a label is before the platform it runs on", () => {
+		expect(named("Vercel-hosted Next.js page")).toEqual(["nextjs", "vercel"]);
+		expect(named("Next.js page (Vercel)")).toEqual(["nextjs", "vercel"]);
+		expect(named("On Vercel, a Next.js page answers")).toEqual(["nextjs", "vercel"]);
+		expect(named("Postgres on Supabase")).toEqual(["postgresql", "supabase"]);
+		expect(named("Docker image pushed to GitHub")).toEqual(["docker", "github"]);
+		// Alone, a platform is the product the label names.
+		expect(named("Deploy to Vercel")).toEqual(["vercel"]);
+	});
+
 	it("names every product a label names, unmistakable names first", () => {
 		expect(named("Next.js app hosted on Vercel")).toEqual(["nextjs", "vercel"]);
 		expect(named("Supabase Postgres")).toEqual(["supabase", "postgresql"]);

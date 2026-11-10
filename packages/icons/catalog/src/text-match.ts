@@ -13,6 +13,8 @@ interface TextToken {
 	readonly initial: boolean;
 	/** Inside a Title Case line, where capitals carry no signal. */
 	readonly titleCase: boolean;
+	/** Inside parentheses: "Next.js page (Vercel)". */
+	readonly enclosed: boolean;
 }
 
 /** A catalog icon named in text. */
@@ -33,6 +35,12 @@ export interface IconMention<Icon extends SearchableIcon = SearchableIcon> {
 	readonly labelInitial?: boolean;
 	/** The lowercased word after a label-initial mention ("app" in "React app"), if any. */
 	readonly nextWord?: string;
+	/**
+	 * True when the text names the product as where something else runs: after "on", "to", "in"
+	 * or another such word ("app hosted on Vercel"), in parentheses ("page (Vercel)"), or before
+	 * "hosted" or "based" ("Vercel-hosted page").
+	 */
+	readonly platform?: boolean;
 }
 
 const SEGMENT_BREAK = /(?<=[.!?:])\s+|\n+/u;
@@ -50,14 +58,48 @@ function tokenize(text: string): TextToken[] {
 	return text.split(SEGMENT_BREAK).flatMap((segment) => {
 		const words = wordsOf(segment);
 		const titleCase = isTitleCase(words);
-		return words.map((raw, index) => ({
-			lower: raw.toLocaleLowerCase(),
-			raw,
-			initial: index === 0,
-			titleCase,
-		}));
+		// Where each word starts, to tell whether it sits inside parentheses.
+		let from = 0;
+		return words.map((raw, index) => {
+			const at = segment.indexOf(raw, from);
+			from = at < 0 ? from : at + raw.length;
+			const before = segment.slice(0, Math.max(0, at));
+			return {
+				lower: raw.toLocaleLowerCase(),
+				raw,
+				initial: index === 0,
+				titleCase,
+				enclosed: before.lastIndexOf("(") > before.lastIndexOf(")"),
+			};
+		});
 	});
 }
+
+/** Words that put the product after them as where something runs or goes: "on Vercel". */
+const PLATFORM_BEFORE: ReadonlySet<string> = new Set([
+	"at",
+	"atop",
+	"behind",
+	"from",
+	"in",
+	"into",
+	"on",
+	"onto",
+	"over",
+	"through",
+	"to",
+	"using",
+	"via",
+	"with",
+]);
+/** Words that make the product before them where something runs: "Vercel-hosted". */
+const PLATFORM_AFTER: ReadonlySet<string> = new Set([
+	"backed",
+	"based",
+	"hosted",
+	"managed",
+	"powered",
+]);
 
 function isDistinctive(token: TextToken): boolean {
 	return /[a-z][A-Z]/u.test(token.raw) || isDistinctiveWord(token.lower);
@@ -143,15 +185,21 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 			if (best && earlier === undefined) {
 				seen.set(best.slug, mentions.length);
 				const nextWord = labelInitial ? tokens[start + length]?.lower : undefined;
+				const platform =
+					first?.enclosed === true ||
+					PLATFORM_BEFORE.has(tokens[start - 1]?.lower ?? "") ||
+					PLATFORM_AFTER.has(tokens[start + length]?.lower ?? "");
 				mentions.push({
 					icon: best,
 					distinctive,
 					...(labelInitial ? { labelInitial } : {}),
 					...(nextWord ? { nextWord } : {}),
+					...(platform ? { platform } : {}),
 				});
 			} else if (best && distinctive && earlier !== undefined) {
 				// A later unmistakable mention settles an earlier ambiguous one.
-				mentions[earlier] = { icon: best, distinctive };
+				const { platform } = mentions[earlier] ?? {};
+				mentions[earlier] = { icon: best, distinctive, ...(platform ? { platform } : {}) };
 			}
 			matched = length;
 			break;
@@ -187,9 +235,10 @@ export function logoNamedByLabel<Icon extends SearchableIcon>(
 /** The logos a node label names, for a diagram that asks for logos. */
 export interface LabelLogos<Icon extends SearchableIcon = SearchableIcon> {
 	/**
-	 * Every catalog logo the label names, unmistakable names first ("Next.js app hosted on
-	 * Vercel" names nextjs, then vercel), then names an English word carries only by its
-	 * capitals ("Log errors to Sentry", "Python worker"). The diagram draws the first.
+	 * Every catalog logo the label names: the products it is before the platforms they run on
+	 * ("Vercel-hosted Next.js page" names nextjs, then vercel), unmistakable names first, then
+	 * names an English word carries only by its capitals ("Log errors to Sentry", "Python
+	 * worker"). The diagram draws the first.
 	 */
 	readonly named: readonly Icon[];
 	/**
@@ -263,13 +312,22 @@ export function labelLogos<Icon extends SearchableIcon>(
 	// a name that is no English word ("Kafka", "Kubernetes") is distinctive and always counts.
 	const step = (mention: IconMention<Icon>) =>
 		mention.labelInitial === true && !namesProduct(mention);
+	const names = mentions.filter((mention) => !step(mention));
 	return {
-		named: [
-			...mentions.filter((mention) => mention.distinctive),
-			...mentions.filter((mention) => !mention.distinctive && !step(mention)),
-		].map((mention) => mention.icon),
+		named: primaryFirst(names).map((mention) => mention.icon),
 		possible: mentions.filter(step).map((mention) => mention.icon),
 	};
+}
+
+/**
+ * Mentions in the order a label's logo is chosen from: the product the label is before the
+ * platform it runs on, then unmistakable names before everyday words cased as names. A node
+ * draws one logo, the first: "Next.js page on Vercel" and "Vercel-hosted Next.js page" both
+ * draw Next.js.
+ */
+export function primaryFirst<Mention extends IconMention>(mentions: readonly Mention[]): Mention[] {
+	const rank = (mention: Mention) => (mention.platform ? 2 : 0) + (mention.distinctive ? 0 : 1);
+	return [...mentions].sort((left, right) => rank(left) - rank(right));
 }
 
 /** A logo a text names, as generation offers it to a model. */
