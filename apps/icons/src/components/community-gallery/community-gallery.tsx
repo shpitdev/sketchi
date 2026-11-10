@@ -36,17 +36,10 @@ function plural(count: number, one: string, many: string): string {
 }
 
 const loadExcalidrawExport = () => import("../../lib/excalidraw-export.js");
-const preloadExcalidrawExport = () => void loadExcalidrawExport();
-
-async function downloadLibrary(icons: readonly CommunityIconEntry[], name: string): Promise<void> {
-	const { excalidrawLibrary } = await loadExcalidrawExport();
-	downloadBlob(
-		new Blob([excalidrawLibrary(icons, window.location.origin)], {
-			type: "application/vnd.excalidrawlib+json",
-		}),
-		name,
-	);
-}
+// A failed prefetch is retried by the action that needs the code, which reports it.
+const preloadExcalidrawExport = () => {
+	loadExcalidrawExport().catch(() => undefined);
+};
 
 export function CommunityGallery({
 	errorMessage,
@@ -90,7 +83,7 @@ export function CommunityGallery({
 	}, []);
 
 	const copy = useCallback(
-		async (value: string, done: string, icon: CommunityIconEntry) => {
+		async (value: string | Promise<string>, done: string, icon: CommunityIconEntry) => {
 			try {
 				await copyText(value);
 				setCopiedSlug(icon.slug);
@@ -104,16 +97,34 @@ export function CommunityGallery({
 		[showNotice],
 	);
 
+	// The clipboard write starts inside the click while the export code loads.
 	const copyForExcalidraw = useCallback(
-		async (icon: CommunityIconEntry) => {
-			const { excalidrawClipboard } = await loadExcalidrawExport();
-			await copy(
-				excalidrawClipboard({ slug: bareSlug(icon.slug), recipe: icon.recipe }),
+		(icon: CommunityIconEntry) =>
+			copy(
+				loadExcalidrawExport().then(({ excalidrawClipboard }) =>
+					excalidrawClipboard({ slug: bareSlug(icon.slug), recipe: icon.recipe }),
+				),
 				`${icon.name} copied. Paste it into Excalidraw.`,
 				icon,
-			);
-		},
+			),
 		[copy],
+	);
+
+	const downloadLibrary = useCallback(
+		async (picked: readonly CommunityIconEntry[], name: string) => {
+			try {
+				const { excalidrawLibrary } = await loadExcalidrawExport();
+				downloadBlob(
+					new Blob([excalidrawLibrary(picked, window.location.origin)], {
+						type: "application/vnd.excalidrawlib+json",
+					}),
+					name,
+				);
+			} catch {
+				showNotice("Could not prepare the library. Try again.");
+			}
+		},
+		[showNotice],
 	);
 
 	function runDetailAction(action: CommunityDetailAction, icon: CommunityIconEntry) {

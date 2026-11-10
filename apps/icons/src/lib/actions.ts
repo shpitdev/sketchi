@@ -91,7 +91,25 @@ export function downloadSvg(svg: string, slug: string): void {
 	downloadBlob(new Blob([svg], { type: "image/svg+xml" }), `${slug}.svg`);
 }
 
-export async function copyText(value: string): Promise<void> {
+/**
+ * Copy text, possibly still being prepared. A pending value is written as a
+ * promise-backed ClipboardItem started inside the click, so the browser keeps
+ * the click's permission while the text resolves.
+ */
+export async function copyText(pending: string | Promise<string>): Promise<void> {
+	if (
+		typeof pending !== "string" &&
+		navigator.clipboard?.write &&
+		typeof ClipboardItem === "function"
+	) {
+		await navigator.clipboard.write([
+			new ClipboardItem({
+				"text/plain": pending.then((text) => new Blob([text], { type: "text/plain" })),
+			}),
+		]);
+		return;
+	}
+	const value = await pending;
 	if (navigator.clipboard?.writeText) {
 		await navigator.clipboard.writeText(value);
 		return;

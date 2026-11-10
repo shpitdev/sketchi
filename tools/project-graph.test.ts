@@ -159,7 +159,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/icons/src/cloudflare-workers.d.ts": 4,
 	"apps/icons/src/components/icon-library/icon-library.tsx": 4,
 	"apps/icons/src/components/icon-library/use-icon-sources.ts": 31,
-	"apps/icons/src/lib/actions.ts": 10,
+	"apps/icons/src/lib/actions.ts": 14,
 	"apps/icons/src/lib/api.server.ts": 9,
 	"apps/icons/src/lib/client-rate-limit.server.ts": 8,
 	"apps/icons/src/lib/catalog.server.ts": 6,
