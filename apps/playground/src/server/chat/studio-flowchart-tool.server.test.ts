@@ -14,7 +14,11 @@ import {
 	toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
 
-import { makeStudioBuildTurn, studioTurnOutcome } from "./studio-build-tool.server";
+import {
+	makeStudioBuildTurn,
+	studioBuildModelOutput,
+	studioTurnOutcome,
+} from "./studio-build-tool.server";
 import {
 	makeStudioFlowchartToolExecutor,
 	STUDIO_COVERAGE_FINAL_HINT,
@@ -369,6 +373,23 @@ describe("Studio build_flowchart host", () => {
 			),
 		});
 		await expect(Effect.runPromise(failed.attempts)).resolves.toBe(2);
+	});
+
+	it("gives the model a rejection's every issue and hint, and nothing else", () => {
+		expect(studioBuildModelOutput({ output: repairResult })).toEqual({
+			type: "json",
+			value: {
+				ok: false,
+				status: "invalid_flowchart",
+				issues: repairResult.issues.map(({ code, severity, stage, message, hint }) => ({
+					code,
+					severity,
+					stage,
+					message,
+					...(hint ? { hint } : {}),
+				})),
+			},
+		});
 	});
 
 	it("records the turn's last rejection, and whether any build was saved", async () => {

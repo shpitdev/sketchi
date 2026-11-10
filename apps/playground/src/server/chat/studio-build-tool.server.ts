@@ -8,6 +8,7 @@ import {
 } from "@sketchi/diagram-agent";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
 import { recordMetric } from "@sketchi/observability";
+import type { JSONValue } from "ai";
 import { Effect, Metric, Ref, Semaphore } from "effect";
 
 /** Studio renders the inline scene and offers the Excalidraw download. */
@@ -98,6 +99,68 @@ export function makeStudioBuildTurn(
 			}),
 		};
 	});
+}
+
+/**
+ * What the model reads of a build: whether it was accepted, the saved artifact, and what to fix.
+ * The scene, its files and the normalized spec stay with the client; the model already has the
+ * spec it sent in its own tool call.
+ */
+export interface StudioModelResult {
+	readonly ok: boolean;
+	readonly status?: string;
+	readonly buildId?: string;
+	readonly artifactId?: string;
+	readonly issues: readonly {
+		readonly code: string;
+		readonly severity?: string;
+		readonly stage?: string;
+		readonly message: string;
+		readonly hint?: string;
+	}[];
+}
+
+function field(value: unknown, key: string): unknown {
+	return typeof value === "object" && value !== null
+		? (value as Record<string, unknown>)[key]
+		: undefined;
+}
+
+function text(value: unknown): string | undefined {
+	return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+export function studioModelResult(result: unknown): StudioModelResult {
+	const status = text(field(result, "status"));
+	const buildId = text(field(result, "buildId"));
+	const artifactId = text(field(field(result, "artifact"), "artifactId"));
+	const issues = field(result, "issues");
+	return {
+		ok: field(result, "ok") === true,
+		...(status ? { status } : {}),
+		...(buildId ? { buildId } : {}),
+		...(artifactId ? { artifactId } : {}),
+		issues: (Array.isArray(issues) ? issues : []).map((issue: unknown) => {
+			const severity = text(field(issue, "severity"));
+			const stage = text(field(issue, "stage"));
+			const hint = text(field(issue, "hint"));
+			return {
+				code: text(field(issue, "code")) ?? "issue",
+				...(severity ? { severity } : {}),
+				...(stage ? { stage } : {}),
+				message: text(field(issue, "message")) ?? "",
+				...(hint ? { hint } : {}),
+			};
+		}),
+	};
+}
+
+/** A Studio build tool's toModelOutput: the compact result, in this turn and in replayed history. */
+export function studioBuildModelOutput({ output }: { readonly output: unknown }): {
+	readonly type: "json";
+	readonly value: JSONValue;
+} {
+	return { type: "json", value: { ...studioModelResult(output) } };
 }
 
 export const attemptLimitIssue: CodeModeIssue = {

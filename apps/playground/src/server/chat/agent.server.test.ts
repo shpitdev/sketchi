@@ -1,7 +1,17 @@
 import { describe, expect, it } from "@effect/vitest";
+import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 import { Effect, Option } from "effect";
 
-import type { BuildFlowchartResult } from "@sketchi/diagram-agent";
+import {
+	buildFlowchart,
+	CodeModeArtifactStorage,
+	CodeModeRuntimeEnvironment,
+	makeMemoryArtifactStorage,
+	type BuildFlowchartResult,
+} from "@sketchi/diagram-agent";
+
+import { PlaygroundAiModel } from "../ai/model.server";
+import { PlaygroundCodeMode, type PlaygroundCodeModeShape } from "../codemode/service.server";
 
 import { PlaygroundRequestMetadata } from "../runtime/context.server";
 import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runtime.server";
@@ -157,5 +167,102 @@ describe("chat request boundaries", () => {
 	});
 	it("rejects invalid message structure", async () => {
 		expect((await chat({ messages: [{ role: "not-a-role", parts: [] }] })).status).toBe(400);
+	});
+});
+
+describe("Studio build results the model reads", () => {
+	const spec = {
+		title: "Release review",
+		direction: "TB",
+		nodes: { start: "Open release", review: "Approved?", ship: "Ship release", fix: "Fix release" },
+		edges: [
+			["start", "review"],
+			["review", "ship", "yes"],
+			["review", "fix", "no"],
+			["fix", "review"],
+		],
+	};
+	const build = (input: unknown) =>
+		buildFlowchart(input).pipe(
+			Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
+			Effect.provideService(CodeModeRuntimeEnvironment, {
+				createId: (prefix) => `${prefix}_fixed`,
+			}),
+		);
+	type StreamResult = Awaited<ReturnType<MockLanguageModelV4["doStream"]>>;
+	type StreamPart = StreamResult["stream"] extends ReadableStream<infer Part> ? Part : never;
+	const step = (parts: StreamPart[]): StreamResult => ({
+		stream: convertArrayToReadableStream(parts),
+	});
+	const usage = {
+		inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+		outputTokens: { total: 1, text: 1, reasoning: undefined },
+	};
+
+	it("keeps the scene, its files and the normalized spec out of every model call", async () => {
+		// The history a client replays carries an earlier build's full result, scene and all.
+		const earlier: BuildFlowchartResult = await Effect.runPromise(build({ spec }));
+		expect(JSON.stringify(earlier)).toContain('"elements"');
+		const model = new MockLanguageModelV4({
+			doStream: [
+				step([
+					{ type: "stream-start", warnings: [] },
+					{
+						type: "tool-call",
+						toolCallId: "call-2",
+						toolName: "build_flowchart",
+						input: JSON.stringify({ spec: { ...spec, title: "Release review, revised" } }),
+					},
+					{ type: "finish", usage, finishReason: { unified: "tool-calls", raw: undefined } },
+				]),
+				step([
+					{ type: "stream-start", warnings: [] },
+					{ type: "text-start", id: "t" },
+					{ type: "text-delta", id: "t", delta: "Updated." },
+					{ type: "text-end", id: "t" },
+					{ type: "finish", usage, finishReason: { unified: "stop", raw: undefined } },
+				]),
+			],
+		});
+		const codeMode = { buildFlowchart: build } as unknown as PlaygroundCodeModeShape;
+		const request = new Request("https://studio.test/api/chat", {
+			method: "POST",
+			body: JSON.stringify({
+				messages: [
+					{ id: "u1", role: "user", parts: [{ type: "text", text: "Draw the release review." }] },
+					{
+						id: "a1",
+						role: "assistant",
+						parts: [
+							{
+								type: "tool-build_flowchart",
+								toolCallId: "call-1",
+								state: "output-available",
+								input: { spec },
+								output: earlier,
+							},
+							{ type: "text", text: "Here it is." },
+						],
+					},
+					{ id: "u2", role: "user", parts: [{ type: "text", text: "Retitle it." }] },
+				],
+			}),
+		});
+		const response = await runPlaygroundEffect(
+			handleStudioAgentRequest(request).pipe(
+				Effect.provideService(PlaygroundAiModel, { model: Effect.succeed(model) }),
+				Effect.provideService(PlaygroundCodeMode, codeMode),
+			),
+			{ env: {}, platform: { waitUntilPromise: () => undefined }, request },
+		);
+		const body = await response.text();
+		// The client still gets the scene.
+		expect(body).toContain('"elements"');
+		expect(model.doStreamCalls).toHaveLength(2);
+		const prompts = JSON.stringify(model.doStreamCalls.map((call) => call.prompt));
+		for (const kept of ['"elements"', '"files"', '"inline"', "normalizedSpec", '"formats"'])
+			expect(prompts).not.toContain(kept);
+		expect(prompts).toContain('"artifactId":"artifact_fixed"');
+		expect(prompts).toContain('"status":"accepted"');
 	});
 });
