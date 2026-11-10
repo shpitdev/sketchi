@@ -8,6 +8,7 @@ import {
 } from "@sketchi/diagram-agent";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
 import { recordMetric } from "@sketchi/observability";
+import type { JSONValue } from "ai";
 import { Effect, Metric, Ref, Semaphore } from "effect";
 
 /** Studio renders the inline scene and offers the Excalidraw download. */
@@ -98,6 +99,133 @@ export function makeStudioBuildTurn(
 			}),
 		};
 	});
+}
+
+/**
+ * What the model reads of a build: whether it was accepted, the saved artifact, and what to fix,
+ * each issue and failed quality check with the element it names. The scene, its files and the
+ * normalized spec stay with the client; the model already has the spec it sent in its own tool
+ * call.
+ */
+export interface StudioModelResult {
+	readonly ok: boolean;
+	readonly status?: string;
+	readonly buildId?: string;
+	readonly artifactId?: string;
+	readonly issues: readonly {
+		readonly code: string;
+		readonly severity?: string;
+		readonly stage?: string;
+		readonly ref?: StudioModelRef;
+		readonly message: string;
+		readonly hint?: string;
+	}[];
+	/** The quality gate's verdict and the checks it failed, each with the elements it names. */
+	readonly quality?: {
+		readonly accepted: boolean;
+		readonly score?: number;
+		readonly threshold?: number;
+		readonly failed: readonly {
+			readonly code: string;
+			readonly severity?: string;
+			readonly message: string;
+			readonly refs: readonly StudioModelRef[];
+		}[];
+	};
+}
+
+/** Which element an issue is about: "spec.nodes.blank" says which node to fix. */
+export type StudioModelRef = {
+	readonly kind?: string;
+	readonly id?: string;
+	readonly path?: string;
+};
+
+function field(value: unknown, key: string): unknown {
+	return typeof value === "object" && value !== null
+		? (value as Record<string, unknown>)[key]
+		: undefined;
+}
+
+function text(value: unknown): string | undefined {
+	return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+function compactRef(ref: unknown): StudioModelRef | undefined {
+	const kind = text(field(ref, "kind"));
+	const id = text(field(ref, "id"));
+	const path = text(field(ref, "path"));
+	return kind || id || path
+		? { ...(kind ? { kind } : {}), ...(id ? { id } : {}), ...(path ? { path } : {}) }
+		: undefined;
+}
+
+function number(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function compactQuality(quality: unknown): StudioModelResult["quality"] {
+	if (typeof field(quality, "accepted") !== "boolean") return undefined;
+	const score = number(field(quality, "score"));
+	const threshold = number(field(quality, "threshold"));
+	const checks = field(quality, "checks");
+	return {
+		accepted: field(quality, "accepted") === true,
+		...(score === undefined ? {} : { score }),
+		...(threshold === undefined ? {} : { threshold }),
+		failed: (Array.isArray(checks) ? checks : [])
+			.filter((check: unknown) => field(check, "passed") === false)
+			.map((check: unknown) => {
+				const severity = text(field(check, "severity"));
+				const refs = field(check, "refs");
+				return {
+					code: text(field(check, "code")) ?? "check",
+					...(severity ? { severity } : {}),
+					message: text(field(check, "message")) ?? "",
+					refs: (Array.isArray(refs) ? refs : []).flatMap((ref: unknown) => {
+						const compact = compactRef(ref);
+						return compact ? [compact] : [];
+					}),
+				};
+			}),
+	};
+}
+
+export function studioModelResult(result: unknown): StudioModelResult {
+	const status = text(field(result, "status"));
+	const buildId = text(field(result, "buildId"));
+	const artifactId = text(field(field(result, "artifact"), "artifactId"));
+	const issues = field(result, "issues");
+	const quality = compactQuality(field(result, "quality"));
+	return {
+		ok: field(result, "ok") === true,
+		...(status ? { status } : {}),
+		...(buildId ? { buildId } : {}),
+		...(artifactId ? { artifactId } : {}),
+		issues: (Array.isArray(issues) ? issues : []).map((issue: unknown) => {
+			const severity = text(field(issue, "severity"));
+			const stage = text(field(issue, "stage"));
+			const ref = compactRef(field(issue, "ref"));
+			const hint = text(field(issue, "hint"));
+			return {
+				code: text(field(issue, "code")) ?? "issue",
+				...(severity ? { severity } : {}),
+				...(stage ? { stage } : {}),
+				...(ref ? { ref } : {}),
+				message: text(field(issue, "message")) ?? "",
+				...(hint ? { hint } : {}),
+			};
+		}),
+		...(quality ? { quality } : {}),
+	};
+}
+
+/** A Studio build tool's toModelOutput: the compact result, in this turn and in replayed history. */
+export function studioBuildModelOutput({ output }: { readonly output: unknown }): {
+	readonly type: "json";
+	readonly value: JSONValue;
+} {
+	return { type: "json", value: { ...studioModelResult(output) } };
 }
 
 export const attemptLimitIssue: CodeModeIssue = {

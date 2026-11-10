@@ -14,7 +14,11 @@ import {
 	toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
 
-import { makeStudioBuildTurn, studioTurnOutcome } from "./studio-build-tool.server";
+import {
+	makeStudioBuildTurn,
+	studioBuildModelOutput,
+	studioTurnOutcome,
+} from "./studio-build-tool.server";
 import {
 	makeStudioFlowchartToolExecutor,
 	STUDIO_COVERAGE_FINAL_HINT,
@@ -369,6 +373,75 @@ describe("Studio build_flowchart host", () => {
 			),
 		});
 		await expect(Effect.runPromise(failed.attempts)).resolves.toBe(2);
+	});
+
+	it("gives the model a rejection's every issue, its element and hint, and nothing else", () => {
+		expect(studioBuildModelOutput({ output: repairResult })).toEqual({
+			type: "json",
+			value: {
+				ok: false,
+				status: "invalid_flowchart",
+				issues: repairResult.issues.map(({ code, severity, stage, ref, message, hint }) => ({
+					code,
+					severity,
+					stage,
+					ref,
+					message,
+					...(hint ? { hint } : {}),
+				})),
+			},
+		});
+	});
+
+	it("names the node a label that normalizes to nothing belongs to", async () => {
+		const spec = acceptedSpec();
+		const result = await Effect.runPromise(
+			deterministicRuntime(countingStore())({
+				spec: { ...spec, nodes: { ...spec.nodes, done: "   " } },
+			}),
+		);
+		expect(result.ok).toBe(false);
+		const { value } = studioBuildModelOutput({ output: result });
+		expect(value).toMatchObject({
+			ok: false,
+			issues: [
+				{
+					code: "missing_field",
+					message: "Expected a non-empty label",
+					ref: { kind: "diagram", path: "spec.nodes.done" },
+				},
+			],
+		});
+	});
+
+	it("keeps a failed quality check's elements, but not the scene or the normalized spec", async () => {
+		const spec = acceptedSpec();
+		const result = await Effect.runPromise(
+			deterministicRuntime(countingStore())({
+				spec: { ...spec, nodes: { ...spec.nodes, revise: "Publish release" } },
+			}),
+		);
+		expect(result.ok).toBe(true);
+		const { value } = studioBuildModelOutput({ output: result });
+		expect(value).toMatchObject({
+			ok: true,
+			artifactId: "artifact_fixed",
+			quality: {
+				accepted: true,
+				failed: [
+					{
+						code: "duplicate_label",
+						refs: expect.arrayContaining([
+							{ kind: "node", id: "publish" },
+							{ kind: "node", id: "revise" },
+						]),
+					},
+				],
+			},
+		});
+		const sent = JSON.stringify(value);
+		for (const kept of ['"elements"', '"files"', '"inline"', "normalizedSpec", '"formats"'])
+			expect(sent).not.toContain(kept);
 	});
 
 	it("records the turn's last rejection, and whether any build was saved", async () => {
