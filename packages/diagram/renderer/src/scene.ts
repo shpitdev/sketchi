@@ -59,6 +59,7 @@ import {
 	routingWideBend,
 	sharedSegments,
 	touchingLines,
+	unavoidableCrossings,
 	wrapTextToUnits,
 } from "@sketchi/diagram-core";
 
@@ -132,6 +133,18 @@ interface RoutedEdge {
 	 * across it, `vertical` when the flow runs down the page.
 	 */
 	lane?: { readonly at: number; readonly vertical: boolean };
+	/**
+	 * The lane a line that skips ranks keeps in each rank it passes
+	 * (Arrangement.skipLanes): a line along the flow at `at` across it, which
+	 * the line runs in when that draws as cleanly as any other way.
+	 */
+	skipLane?: {
+		readonly at: number;
+		readonly vertical: boolean;
+		/** Along the flow, midway across the gap after the source's rank and before the target's. */
+		readonly leave: number;
+		readonly enter: number;
+	};
 	/**
 	 * One line of a paired transition and its return: -1 runs on the low side of
 	 * the pair (left or above) and +1 on the high side, its label beside it there.
@@ -554,19 +567,38 @@ function flowFeedback(diagram: IntermediateDiagram): ReadonlySet<string> {
  */
 const levelPrecedence = new WeakMap<IntermediateDiagram, readonly (readonly [string, string])[]>();
 
+/**
+ * Pairs of a level's own nodes, outside its blocks, where a line into a block
+ * leads, through the block's members alone, to a line out of it into the
+ * other, as a queue that feeds workers in a zone that write to a database
+ * beside it: the database ranks after the queue (Arrangement.throughBlocks),
+ * so the lines between them and the block never cross as they would side by
+ * side.
+ */
+const blockPrecedence = new WeakMap<IntermediateDiagram, readonly (readonly [string, string])[]>();
+/** The lines into a block that begin each block precedence pair, by top level. */
+const blockEntries = new WeakMap<IntermediateDiagram, ReadonlySet<string>>();
+
 /** Ranks lifted so each level pair's later member ranks no earlier than the first. */
 function liftRanks(
 	diagram: IntermediateDiagram,
 	ranks: Map<string, number>,
 	feedback: ReadonlySet<string>,
+	throughBlocks = false,
 ): Map<string, number> {
 	const pairs = levelPrecedence.get(diagram);
-	if (!pairs) return ranks;
+	const after = throughBlocks ? (blockPrecedence.get(diagram) ?? []) : [];
+	if (!pairs && after.length === 0) return ranks;
 	for (let changed = true, round = 0; changed && round <= diagram.nodes.length; round += 1) {
 		changed = false;
-		for (const [before, after] of pairs)
+		for (const [before, after] of pairs ?? [])
 			if (ranks.get(after)! < ranks.get(before)!) {
 				ranks.set(after, ranks.get(before)!);
+				changed = true;
+			}
+		for (const [before, later] of after)
+			if (ranks.get(later)! < ranks.get(before)! + 1) {
+				ranks.set(later, ranks.get(before)! + 1);
 				changed = true;
 			}
 		for (const edge of diagram.edges)
@@ -860,6 +892,12 @@ function groupStructure(diagram: IntermediateDiagram): GroupStructure | undefine
 	const topBuckets = edgeBuckets(top.edges);
 	const topFeedback = feedbackEdgeIds(top, topBuckets.incoming, topBuckets.outgoing);
 	flowFeedbacks.set(top, topFeedback);
+	const entries = new Set<string>();
+	const through = zoned ? throughBlockPairs(diagram, top, topFeedback, topUnit, entries) : [];
+	if (through.length > 0) {
+		blockPrecedence.set(top, through);
+		blockEntries.set(top, entries);
+	}
 	for (const id of topFeedback) feedback.add(id);
 	flowFeedbacks.set(diagram, feedback);
 	const structure = {
@@ -873,6 +911,55 @@ function groupStructure(diagram: IntermediateDiagram): GroupStructure | undefine
 	};
 	groupStructures.set(diagram, structure);
 	return structure;
+}
+
+/**
+ * The top level's own node pairs (blockPrecedence): a line from the first
+ * into a block whose member reaches, through the block's members alone, a
+ * line out of the block into the second, where the second does not already
+ * lead to the first and the level ranks them alike.
+ */
+function throughBlockPairs(
+	diagram: IntermediateDiagram,
+	top: IntermediateDiagram,
+	feedback: ReadonlySet<string>,
+	unitOf: (id: string) => string,
+	entries: Set<string>,
+): (readonly [string, string])[] {
+	const own = (id: string) => unitOf(id) === id;
+	const after = new Map<string, string[]>();
+	for (const edge of top.edges)
+		if (!feedback.has(edge.id))
+			after.set(edge.source, [...(after.get(edge.source) ?? []), edge.target]);
+	const leads = (from: string, to: string) => {
+		const reached = new Set([from]);
+		for (const id of reached) for (const next of after.get(id) ?? []) reached.add(next);
+		return reached.has(to);
+	};
+	const inside = new Map<string, string[]>();
+	for (const edge of diagram.edges)
+		if (!own(edge.source) && unitOf(edge.source) === unitOf(edge.target))
+			inside.set(edge.source, [...(inside.get(edge.source) ?? []), edge.target]);
+	const pairs: (readonly [string, string])[] = [];
+	for (const into of diagram.edges) {
+		if (!own(into.source) || own(into.target)) continue;
+		const reached = new Set([into.target]);
+		for (const id of reached) for (const next of inside.get(id) ?? []) reached.add(next);
+		for (const out of diagram.edges) {
+			const [first, later] = [into.source, out.target];
+			if (
+				!reached.has(out.source) ||
+				!own(later) ||
+				first === later ||
+				unitOf(out.source) !== unitOf(into.target) ||
+				leads(later, first)
+			)
+				continue;
+			entries.add(into.id);
+			if (!pairs.some(([a, b]) => a === first && b === later)) pairs.push([first, later]);
+		}
+	}
+	return pairs;
 }
 
 /**
@@ -1018,6 +1105,7 @@ function orderedRankShapes(
 	buckets: EdgeBuckets,
 	feedbackEdges: ReadonlySet<string>,
 	reorder = false,
+	thorough = false,
 ): Map<number, NodeSceneElement[]> {
 	const nodeOrder = nodeOrderMap(diagram.nodes);
 	const rankedShapes = new Map<number, NodeSceneElement[]>();
@@ -1089,7 +1177,7 @@ function orderedRankShapes(
 	}
 
 	return reorder
-		? reduceRankCrossings(rankedShapes, diagram, rankByNodeId, feedbackEdges)
+		? reduceRankCrossings(rankedShapes, diagram, rankByNodeId, feedbackEdges, thorough)
 		: rankedShapes;
 }
 
@@ -1103,7 +1191,28 @@ const CROSSING_REPAIR_MAX_EDGES = 24;
 /** Room past two facing stubs, when spread, for a lane each a corridor's width apart. */
 const FACING_LANES = 2 * ROUTE_STUB_LENGTH;
 /** Reduced rank orders by diagram; they depend on the graph, not on node sizes. */
-const reducedOrders = new WeakMap<IntermediateDiagram, ReadonlyMap<number, readonly string[]>>();
+const reducedOrders = new WeakMap<IntermediateDiagram, LayeredOrder>();
+/** Reduced rank orders searched further, by sifting (Arrangement.skipLanes). */
+const siftedOrders = new WeakMap<IntermediateDiagram, LayeredOrder>();
+/** Sifting passes over every rank, and over the ranks a moved line passes. */
+const SIFT_PASSES = 4;
+/** Lines that skip ranks, as many placeholders, beyond which no line moves whole. */
+const SIFT_MAX_PLACEHOLDERS = 80;
+
+/**
+ * A layered order: each rank's nodes in order, and, with them, a placeholder
+ * for each line that passes the rank on its way to a later one (`full`), with
+ * the links between consecutive ranks that carry each line, keyed by the
+ * upper rank.
+ */
+interface LayeredOrder {
+	/** Crossings between consecutive ranks, a skipping line's at every rank it passes. */
+	readonly crossings: number;
+	readonly real: ReadonlyMap<number, readonly string[]>;
+	readonly full: ReadonlyMap<number, readonly string[]>;
+	readonly links: ReadonlyMap<number, readonly (readonly [string, string])[]>;
+	readonly virtual: ReadonlySet<string>;
+}
 
 /**
  * Reorder ranks where that removes crossings the barycenter pass leaves: loops
@@ -1115,8 +1224,10 @@ function reduceRankCrossings(
 	diagram: IntermediateDiagram,
 	rankByNodeId: ReadonlyMap<string, number>,
 	feedbackEdges: ReadonlySet<string>,
+	thorough = false,
 ): Map<number, NodeSceneElement[]> {
-	let reduced = reducedOrders.get(diagram);
+	const cache = thorough ? siftedOrders : reducedOrders;
+	let reduced = cache.get(diagram);
 	if (!reduced) {
 		reduced = reducedRankOrder(
 			new Map(
@@ -1125,14 +1236,15 @@ function reduceRankCrossings(
 			diagram,
 			rankByNodeId,
 			feedbackEdges,
+			thorough,
 		);
-		reducedOrders.set(diagram, reduced);
+		cache.set(diagram, reduced);
 	}
 	const shapes = new Map([...rankedShapes.values()].flat().map((shape) => [shape.nodeId, shape]));
 	return new Map(
 		[...rankedShapes.keys()].map((rank) => [
 			rank,
-			(reduced.get(rank) ?? []).flatMap((id) => (shapes.has(id) ? [shapes.get(id)!] : [])),
+			(reduced.real.get(rank) ?? []).flatMap((id) => (shapes.has(id) ? [shapes.get(id)!] : [])),
 		]),
 	);
 }
@@ -1142,7 +1254,8 @@ function reducedRankOrder(
 	diagram: IntermediateDiagram,
 	rankByNodeId: ReadonlyMap<string, number>,
 	feedbackEdges: ReadonlySet<string>,
-): ReadonlyMap<number, readonly string[]> {
+	thorough = false,
+): LayeredOrder {
 	// Links between consecutive ranks, keyed by the upper rank. Virtual nodes carry
 	// skipping edges through the ranks between their ends.
 	const links = new Map<number, (readonly [string, string])[]>();
@@ -1192,8 +1305,9 @@ function reducedRankOrder(
 	const initial = total();
 	const real = () =>
 		new Map([...order].map(([rank, ids]) => [rank, ids.filter((id) => !virtual.has(id))]));
+	const full = () => new Map([...order].map(([rank, ids]) => [rank, [...ids]]));
 	const plain = real();
-	if (initial === 0) return plain;
+	if (initial === 0) return { crossings: 0, real: plain, full: full(), links, virtual };
 
 	const neighbors = new Map<string, { above: string[]; below: string[] }>();
 	for (const pairs of links.values())
@@ -1205,7 +1319,7 @@ function reducedRankOrder(
 			down.above.push(upper);
 			neighbors.set(lower, down);
 		}
-	let best = { crossings: initial, order: plain };
+	let best = { crossings: initial, order: plain, full: full() };
 	for (let sweep = 0; sweep < CROSSING_SWEEPS && best.crossings > 0; sweep += 1) {
 		const downward = sweep % 2 === 0;
 		for (const rank of downward ? ranks.slice(1) : ranks.slice(0, -1).reverse()) {
@@ -1242,9 +1356,76 @@ function reducedRankOrder(
 			}
 		}
 		const crossings = total();
-		if (crossings < best.crossings) best = { crossings, order: real() };
+		if (crossings < best.crossings) best = { crossings, order: real(), full: full() };
 	}
-	return best.order;
+	if (thorough && best.crossings > 0) {
+		// Sifting: each node or placeholder moves to the place in its rank that
+		// crosses fewest lines with the ranks beside it; then each skipping line
+		// moves whole to either end of every rank it passes, kept where, sifted
+		// again, the ranks cross fewer lines in all.
+		const restore = (from: ReadonlyMap<number, readonly string[]>) => {
+			for (const [rank, ids] of from) order.set(rank, [...ids]);
+			ranks.forEach(place);
+		};
+		restore(best.full);
+		const rankOf = new Map<string, number>();
+		for (const [rank, ids] of order) for (const id of ids) rankOf.set(id, rank);
+		const near = (rank: number) => between(rank - 1) + between(rank);
+		const sift = (within: readonly number[]) => {
+			let moved = false;
+			for (const rank of within) {
+				const ids = order.get(rank)!;
+				for (const id of [...ids]) {
+					const from = ids.indexOf(id);
+					let [at, fewest] = [from, near(rank)];
+					ids.splice(from, 1);
+					for (let to = 0; to <= ids.length; to += 1) {
+						if (to === from) continue;
+						ids.splice(to, 0, id);
+						place(rank);
+						const crossings = near(rank);
+						if (crossings < fewest) [at, fewest] = [to, crossings];
+						ids.splice(to, 1);
+					}
+					ids.splice(at, 0, id);
+					place(rank);
+					if (at !== from) moved = true;
+				}
+			}
+			return moved;
+		};
+		for (let pass = 0; pass < SIFT_PASSES && sift(ranks); pass += 1);
+		let crossings = total();
+		if (crossings < best.crossings) best = { crossings, order: real(), full: full() };
+		const chains = new Map<string, string[]>();
+		for (const id of virtual) {
+			const edgeId = id.split("\u0000")[1]!;
+			chains.set(edgeId, [...(chains.get(edgeId) ?? []), id]);
+		}
+		if (virtual.size <= SIFT_MAX_PLACEHOLDERS)
+			for (const ids of chains.values())
+				for (const end of ["low", "high"] as const) {
+					if (best.crossings === 0) break;
+					restore(best.full);
+					for (const id of ids) {
+						const row = order.get(rankOf.get(id)!)!;
+						row.splice(row.indexOf(id), 1);
+						if (end === "low") row.unshift(id);
+						else row.push(id);
+					}
+					ranks.forEach(place);
+					const within = [...new Set(ids.map((id) => rankOf.get(id)!))].flatMap((rank) => [
+						rank - 1,
+						rank,
+						rank + 1,
+					]);
+					const passed = ranks.filter((rank) => within.includes(rank));
+					for (let pass = 0; pass < SIFT_PASSES && sift(passed); pass += 1);
+					crossings = total();
+					if (crossings < best.crossings) best = { crossings, order: real(), full: full() };
+				}
+	}
+	return { crossings: best.crossings, real: best.order, full: best.full, links, virtual };
 }
 
 interface RankMetric {
@@ -1337,6 +1518,8 @@ function rankLayout(
 	stubReach: ReadonlyMap<string, number>,
 	reorder = false,
 	spreadFacing = false,
+	thorough = false,
+	throughBlocks = false,
 ) {
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
 	// Neighbors in a rank keep room for the stubs on their facing sides, so a long
@@ -1360,6 +1543,7 @@ function rankLayout(
 		diagram,
 		rankNodes(diagram, buckets, feedbackEdges),
 		feedbackEdges,
+		throughBlocks,
 	);
 	const rankedShapes = orderedRankShapes(
 		diagram,
@@ -1368,6 +1552,7 @@ function rankLayout(
 		buckets,
 		feedbackEdges,
 		reorder,
+		thorough,
 	);
 	const ranks = Array.from(rankedShapes.entries()).sort(([left], [right]) => left - right);
 	const rankMetrics: RankMetric[] = ranks.map(([rank, shapes]) => {
@@ -1516,6 +1701,24 @@ interface Arrangement {
 	readonly groupsAcross?: boolean;
 	/** Reorder ranks to remove the layered crossings the barycenter pass leaves. */
 	readonly reorder: boolean;
+	/**
+	 * In an ungrouped, unwrapped flow, each line that skips ranks, a return
+	 * among them, keeps a lane in every rank it passes, in the layered order,
+	 * and each node sits toward the nodes and lanes it links to (skipLaneCenters),
+	 * so long lines run straight past the ranks they skip, on the side of each
+	 * node the layered order found them crossing fewest lines.
+	 */
+	readonly skipLanes?: boolean;
+	/**
+	 * Ports on a side whose lines run around into the same side of a node
+	 * beyond nest by how far each reaches (PortOrder "nested").
+	 */
+	readonly nestAround?: boolean;
+	/**
+	 * In a zoned flow, a node outside the zones that a zone's members reach
+	 * from another outside node ranks after it (blockPrecedence).
+	 */
+	readonly throughBlocks?: boolean;
 	/** Route each edge, among otherwise equal lanes, across the fewest arrows routed before it. */
 	readonly avoidCrossings?: boolean;
 	/**
@@ -1614,6 +1817,18 @@ function reordersRanks(diagram: IntermediateDiagram): boolean {
 		);
 		return plain !== reordered;
 	});
+}
+
+/**
+ * Whether an ungrouped, unlaned flow has a line, a return among them, that
+ * skips a rank, one a lane of its own could keep straight, and its sifted
+ * layered order crosses fewer than `crossings` (Arrangement.skipLanes).
+ */
+function skipsRanks(diagram: IntermediateDiagram, crossings: number): boolean {
+	if (laned(diagram) || groupStructure(diagram)) return false;
+	rankLayout(diagram, new Map(), new Map(), true, false, true);
+	const sifted = siftedOrders.get(diagram);
+	return sifted !== undefined && sifted.virtual.size > 0 && sifted.crossings < crossings;
 }
 
 /** Width over height, either way up, of content this size in a padded export. */
@@ -2040,26 +2255,210 @@ function bandsUnder(
 	return shifts;
 }
 
+/** Weight of a passing line's place in a rank against a node's, so long lines run straight. */
+const SKIP_LANE_WEIGHT = 8;
+/** Alternating sweeps that settle where each node and passing line sits across the flow. */
+const SKIP_LANE_SWEEPS = 4;
+
+/**
+ * Least-squares places along a line for items kept in order and at least
+ * `gaps[i]` apart from the next, each pulled toward its `wanted` place by its
+ * weight: pool-adjacent-violators over places shifted by the gaps before them.
+ */
+function orderedFit(
+	wanted: readonly number[],
+	weights: readonly number[],
+	gaps: readonly number[],
+): number[] {
+	const before = wanted.map((_, index) => gaps.slice(0, index).reduce((sum, gap) => sum + gap, 0));
+	const blocks: { value: number; weight: number; count: number }[] = [];
+	for (const [index, value] of wanted.entries()) {
+		let block = { value: value - before[index]!, weight: weights[index]!, count: 1 };
+		while (blocks.length > 0 && blocks.at(-1)!.value >= block.value) {
+			const last = blocks.pop()!;
+			const weight = last.weight + block.weight;
+			block = {
+				value: (last.value * last.weight + block.value * block.weight) / weight,
+				weight,
+				count: last.count + block.count,
+			};
+		}
+		blocks.push(block);
+	}
+	return blocks
+		.flatMap((block) => Array.from({ length: block.count }, () => block.value))
+		.map((value, index) => value + before[index]!);
+}
+
+/**
+ * Where each node's middle sits across the flow when every line that passes a
+ * rank on its way to a later one keeps a lane there (Arrangement.skipLanes):
+ * the ranks keep their layered order, passing lines among their nodes, and
+ * each node and lane is pulled toward the nodes and lanes it links to in the
+ * ranks beside it, a lane more strongly, so a long line runs straight past the
+ * ranks it skips instead of around them.
+ */
+function skipLaneCenters(
+	layered: LayeredOrder,
+	rankMetrics: readonly RankMetric[],
+	breadthOf: (shape: NodeSceneElement) => number,
+	gapBetween: (left: NodeSceneElement, right: NodeSceneElement) => number,
+	laneGap: (shape: NodeSceneElement, side: "low" | "high") => number,
+	anchors: ReadonlyMap<string, string>,
+): Map<string, number> {
+	const shapes = new Map(
+		rankMetrics.flatMap((metric) => metric.shapes.map((shape) => [shape.nodeId, shape] as const)),
+	);
+	const ranks = rankMetrics.map((metric) => {
+		const ids = (layered.full.get(metric.rank) ?? []).filter(
+			(id) => shapes.has(id) || layered.virtual.has(id),
+		);
+		// Nodes the layered order lost (none, normally) keep their rank's order at its end.
+		return [...ids, ...metric.shapes.map((s) => s.nodeId).filter((id) => !ids.includes(id))];
+	});
+	const size = (id: string) => (shapes.has(id) ? breadthOf(shapes.get(id)!) : 0);
+	const gap = (left: string, right: string) => {
+		const [a, b] = [shapes.get(left), shapes.get(right)];
+		const lane = HORIZONTAL_GAP / 2;
+		const between =
+			a && b
+				? gapBetween(a, b)
+				: a
+					? Math.max(lane, laneGap(a, "high"))
+					: b
+						? Math.max(lane, laneGap(b, "low"))
+						: ROUTE_STUB_LENGTH;
+		return size(left) / 2 + between + size(right) / 2;
+	};
+	const gaps = ranks.map((ids) => ids.slice(1).map((id, index) => gap(ids[index]!, id)));
+	const center = new Map<string, number>();
+	for (const [index, ids] of ranks.entries()) {
+		const total = gaps[index]!.reduce((sum, value) => sum + value, 0);
+		let at = -total / 2;
+		for (const [position, id] of ids.entries()) {
+			center.set(id, at);
+			at += gaps[index]![position] ?? 0;
+		}
+	}
+	const above = new Map<string, string[]>();
+	const below = new Map<string, string[]>();
+	for (const pairs of layered.links.values())
+		for (const [upper, lower] of pairs) {
+			below.set(upper, [...(below.get(upper) ?? []), lower]);
+			above.set(lower, [...(above.get(lower) ?? []), upper]);
+		}
+	// A node follows the nodes it links to, and a lane only where it links to
+	// none, so a line's lane never draws its ends off their own column.
+	const pulls = (id: string, neighbors: ReadonlyMap<string, readonly string[]>) => {
+		const around = (neighbors.get(id) ?? []).filter((other) => center.has(other));
+		const nodes = around.filter((other) => !layered.virtual.has(other));
+		return layered.virtual.has(id) || nodes.length === 0 ? around : nodes;
+	};
+	const settle = (index: number, neighbors: ReadonlyMap<string, readonly string[]>) => {
+		const ids = ranks[index]!;
+		const wanted = ids.map((id) => {
+			// A forward line's lane runs on in line with the node it leaves.
+			const anchor = anchors.get(id);
+			if (anchor !== undefined && center.has(anchor)) return center.get(anchor)!;
+			const around = pulls(id, neighbors);
+			return around.length > 0
+				? around.reduce((sum, other) => sum + center.get(other)!, 0) / around.length
+				: center.get(id)!;
+		});
+		const weights = ids.map((id) =>
+			layered.virtual.has(id) ? SKIP_LANE_WEIGHT : pulls(id, neighbors).length > 0 ? 1 : 0.01,
+		);
+		const placed = orderedFit(wanted, weights, gaps[index]!);
+		ids.forEach((id, position) => center.set(id, placed[position]!));
+	};
+	for (let sweep = 0; sweep < SKIP_LANE_SWEEPS; sweep += 1) {
+		for (let index = 1; index < ranks.length; index += 1) settle(index, above);
+		for (let index = ranks.length - 2; index >= 0; index -= 1) settle(index, below);
+	}
+	return center;
+}
+
 /**
  * `centers` holds, by unit id, how far a zone block's members sit across the
  * flow from the block's middle, where its header strip (or a side widened for
  * its name) pushes them. A block alone in its rank is placed by its members, so
  * a flow running through nested zones stays straight.
+ * With `skipLaneAt`, each skipping line's lane across the flow is recorded
+ * there by edge id (Arrangement.skipLanes).
  */
 function positionNodes(
 	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }> = new Map(),
 	stubReach: ReadonlyMap<string, number> = new Map(),
-	{ compactGaps, reorder, spreadFacing, widenGaps, wrap }: Arrangement = PLAIN_ARRANGEMENT,
-	centers: ReadonlyMap<string, number> = new Map(),
-): NodeSceneElement[] {
-	const { gapAfter, gapBetween, highSide, lowSide, rankMetrics, reachOf, vertical } = rankLayout(
-		diagram,
-		minimumSizes,
-		stubReach,
+	{
+		compactGaps,
 		reorder,
+		skipLanes,
 		spreadFacing,
-	);
+		throughBlocks,
+		widenGaps,
+		wrap,
+	}: Arrangement = PLAIN_ARRANGEMENT,
+	centers: ReadonlyMap<string, number> = new Map(),
+	skipLaneAt?: Map<string, number>,
+): NodeSceneElement[] {
+	const lanesAcross = skipLanes === true && wrap.continuations.size === 0;
+	const { feedbackEdges, gapAfter, gapBetween, highSide, lowSide, rankMetrics, reachOf, vertical } =
+		rankLayout(
+			diagram,
+			minimumSizes,
+			stubReach,
+			reorder || lanesAcross,
+			spreadFacing,
+			lanesAcross,
+			throughBlocks,
+		);
+	const layered = lanesAcross ? siftedOrders.get(diagram) : undefined;
+	const sources = new Map(diagram.edges.map((edge) => [edge.id, edge.source]));
+	const across = layered
+		? skipLaneCenters(
+				layered,
+				rankMetrics,
+				(shape) => (vertical ? shape.width : shape.height),
+				gapBetween,
+				(shape, side) =>
+					(stubReach.get(portKey(shape.nodeId, side === "low" ? lowSide : highSide)) ?? 0) +
+					PORT_SPACING,
+				new Map(
+					[...layered.virtual].flatMap((id) => {
+						const edgeId = id.split("\u0000")[1]!;
+						return feedbackEdges.has(edgeId) ? [] : [[id, sources.get(edgeId)!] as const];
+					}),
+				),
+			)
+		: undefined;
+	// Lanes shift so the nearest node or lane keeps the padding from the edge.
+	const acrossLow = across
+		? Math.min(
+				...rankMetrics.flatMap((metric) =>
+					metric.shapes.map(
+						(shape) => across.get(shape.nodeId)! - (vertical ? shape.width : shape.height) / 2,
+					),
+				),
+				...[...layered!.virtual].flatMap((id) =>
+					across.has(id) ? [across.get(id)! - HORIZONTAL_GAP / 2] : [],
+				),
+			)
+		: 0;
+	// Each skipping line's lane, where its places in the ranks it passes average.
+	if (across && skipLaneAt) {
+		const places = new Map<string, number[]>();
+		for (const id of layered!.virtual) {
+			const at = across.get(id);
+			const edgeId = id.split("\u0000")[1]!;
+			if (at !== undefined) places.set(edgeId, [...(places.get(edgeId) ?? []), at]);
+		}
+		for (const [edgeId, at] of places)
+			skipLaneAt.set(
+				edgeId,
+				PADDING + at.reduce((sum, value) => sum + value, 0) / at.length - acrossLow,
+			);
+	}
 	const bands: { index: number; metric: RankMetric }[][] = [];
 	for (const [index, metric] of rankMetrics.entries()) {
 		const band = wrap.bandOf.get(metric.shapes[0]!.nodeId) ?? 0;
@@ -2080,6 +2479,12 @@ function positionNodes(
 
 			for (const [shapeIndex, shape] of metric.shapes.entries()) {
 				const next = metric.shapes[shapeIndex + 1];
+				if (across)
+					breadthOffset =
+						bandOffset +
+						across.get(shape.nodeId)! -
+						acrossLow -
+						(vertical ? shape.width : shape.height) / 2;
 				if (vertical) {
 					positioned.push({
 						...shape,
@@ -2145,6 +2550,8 @@ interface PositionedLayout {
 	readonly groups?: GroupLayout;
 	readonly lanes?: LaneLayout;
 	readonly nodes: NodeSceneElement[];
+	/** Each skipping line's lane across the flow (Arrangement.skipLanes), by edge id. */
+	readonly skipLaneAt?: ReadonlyMap<string, number>;
 }
 
 function positionLayout(
@@ -2157,8 +2564,27 @@ function positionLayout(
 	if (laned(diagram)) return positionLanedNodes(diagram, minimumSizes, stubReach, arrangement);
 	const structure = groupStructure(diagram);
 	return structure
-		? positionGroupedNodes(diagram, structure, minimumSizes, stubReach, arrangement, slack)
-		: { nodes: positionNodes(diagram, minimumSizes, stubReach, arrangement) };
+		? positionGroupedNodes(
+				diagram,
+				structure,
+				minimumSizes,
+				stubReach,
+				{ ...arrangement, skipLanes: false },
+				slack,
+			)
+		: positionPlainNodes(diagram, minimumSizes, stubReach, arrangement);
+}
+
+/** An ungrouped, unlaned flow's nodes and, with Arrangement.skipLanes, its skipping lines' lanes. */
+function positionPlainNodes(
+	diagram: IntermediateDiagram,
+	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
+	stubReach: ReadonlyMap<string, number>,
+	arrangement: Arrangement,
+): PositionedLayout {
+	const skipLaneAt = new Map<string, number>();
+	const nodes = positionNodes(diagram, minimumSizes, stubReach, arrangement, new Map(), skipLaneAt);
+	return skipLaneAt.size > 0 ? { nodes, skipLaneAt } : { nodes };
 }
 
 function boundsOf(shapes: readonly Box[]): Box {
@@ -4358,7 +4784,7 @@ function orderedSlots(
 	slots: readonly PortSlot[],
 	preferences: ReadonlyMap<PortSlot, PortPreference>,
 	offsets: ReadonlyMap<string, number>,
-	byApproach: boolean,
+	byApproach: PortOrder,
 ): PortSlot[] {
 	const far = (slot: PortSlot) => {
 		const endpoint = slot.endpoint === "source" ? "target" : "source";
@@ -4376,6 +4802,31 @@ function orderedSlots(
 	const ordered = [...slots].sort(
 		(a, b) => far(a) - far(b) || (a.route.pair ?? 0) - (b.route.pair ?? 0),
 	);
+	// Nested, lines that leave this side and come back into the same side of
+	// another node beyond this one along it run around in lanes, the one
+	// reaching farther outermost: those heading the same way nest, the farthest
+	// reaching leaving from farthest along the way they head, so none crosses
+	// another's turn.
+	const node = slots[0]?.route[slots[0].endpoint];
+	if (byApproach === "nested" && node && slots.length > 1) {
+		const axis = slotAxis(slotSide(slots[0]!));
+		const size = axis === "x" ? "width" : "height";
+		const around = (slot: PortSlot) => {
+			const otherSide = slot.endpoint === "source" ? slot.route.targetEdge : slot.route.sourceEdge;
+			if (isSelfLoop(slot.route) || otherSide !== slotSide(slot)) return 0;
+			const reach = farCoordinate(slot.route, slot.endpoint);
+			return reach < node[axis] ? -1 : reach > node[axis] + node[size] ? 1 : 0;
+		};
+		for (const toward of [1, -1]) {
+			const nesting = ordered
+				.map((slot, index) => ({ index, slot }))
+				.filter(({ slot }) => around(slot) === toward);
+			const nested = [...nesting].sort((a, b) => far(b.slot) - far(a.slot));
+			nesting.forEach(({ index }, at) => {
+				ordered[index] = nested[at]!.slot;
+			});
+		}
+	}
 	for (const toward of [1, -1]) {
 		const lanes = ordered
 			.map((slot, index) => ({ index, lane: preferences.get(slot)!.lane, slot }))
@@ -4395,7 +4846,7 @@ function orderedSlots(
 function alignedPortOffsets(
 	routes: readonly RoutedEdge[],
 	sharedDecisionPitch: boolean,
-	byApproach = false,
+	byApproach: PortOrder = false,
 	arrivalSpacing = ARRIVAL_SPACING,
 ): Map<string, number> {
 	const offsets = portOffsetsForRoutes(routes, sharedDecisionPitch);
@@ -5728,6 +6179,7 @@ function chooseBestRoute(
 	route: RoutedEdge,
 	routed: RoutedSoFar,
 	borders = false,
+	preferred: readonly [ScenePoint, ...ScenePoint[]][] = [],
 ): [ScenePoint, ...ScenePoint[]] {
 	const first = candidates[0];
 	if (!first) {
@@ -5774,6 +6226,17 @@ function chooseBestRoute(
 		if (isLowerScore(score, bestScore)) {
 			best = candidate;
 			bestScore = score;
+		}
+	}
+	// A preferred route wins wherever it is no worse until crossings count: it
+	// may run longer or bend more, and, kept in its lane, it crosses fewer lines.
+	const until = bestScore.length - 6;
+	for (const candidate of preferred) {
+		const score = routeScore(candidate);
+		if (!isLowerScore(bestScore.slice(0, until), score.slice(0, until))) {
+			best = candidate;
+			bestScore = score;
+			break;
 		}
 	}
 	return best;
@@ -7152,6 +7615,38 @@ function exteriorLaneRoute(
 		),
 	];
 
+	// A skipping line's own lane, preferred wherever it draws as cleanly: in
+	// line with either end first, so it runs straight on from its port.
+	const skipLane = route.skipLane;
+	const laneRoute = (at: number) => {
+		const { vertical, leave, enter } = skipLane!;
+		const point = (along: number, across: number) =>
+			vertical ? { x: across, y: along } : { x: along, y: across };
+		const [startAlong, startAcross, endAlong, endAcross] = vertical
+			? [startStub.y, startStub.x, endStub.y, endStub.x]
+			: [startStub.x, startStub.y, endStub.x, endStub.y];
+		// An end that faces along the flow turns midway across its gap; one on a
+		// side turns at its stub.
+		const leavesAlong = slotAxis(route.sourceEdge) === (vertical ? "x" : "y");
+		const entersAlong = slotAxis(route.targetEdge) === (vertical ? "x" : "y");
+		return compactPoints([
+			start,
+			startStub,
+			...(leavesAlong ? [point(leave, startAcross), point(leave, at)] : [point(startAlong, at)]),
+			...(entersAlong ? [point(enter, at), point(enter, endAcross)] : [point(endAlong, at)]),
+			endStub,
+			end,
+		]);
+	};
+	const laneRoutes = skipLane
+		? [
+				...new Set(
+					skipLane.vertical
+						? [startStub.x, endStub.x, skipLane.at]
+						: [startStub.y, endStub.y, skipLane.at],
+				),
+			].map(laneRoute)
+		: [];
 	const ends = [route.source.nodeId, route.target.nodeId];
 	const sharesNode = (arrow: ArrowSceneElement) =>
 		ends.includes(arrow.sourceNodeId) || ends.includes(arrow.targetNodeId);
@@ -7166,7 +7661,15 @@ function exteriorLaneRoute(
 	// Among zones, or between boxes a family placed (tables, classes), a run
 	// along a node's border reads as part of the node.
 	const strict = groups?.zoned === true || route.pinned !== undefined;
-	const first = chooseBestRoute(candidates, shapes, ignoredNodeIds, route, routed, strict);
+	const first = chooseBestRoute(
+		candidates,
+		shapes,
+		ignoredNodeIds,
+		route,
+		routed,
+		strict,
+		laneRoutes,
+	);
 	const gap = readerScale === undefined ? 0 : routingCorridorGap(readerScale);
 	const best = gap
 		? chooseBestRoute(
@@ -7926,8 +8429,8 @@ function assignFrameGutterLanes(
 }
 
 interface DiagramLayout {
-	/** Whether arrivals on a side are ordered by where their routes leave (Arrangement.crossingRepair). */
-	byApproach?: boolean;
+	/** How each side's ports are ordered (portOrderOf). */
+	byApproach?: PortOrder;
 	edgeArrows: ArrowSceneElement[];
 	groups?: GroupLayout;
 	lanes?: LaneLayout;
@@ -8313,11 +8816,24 @@ function pinAnchors(
 		}
 }
 
+/**
+ * How a side's ports are ordered: by the far node along the side, by where
+ * each line leaves the far node (`true`, with the crossing repairs), or so too
+ * with lines that run around into the same side of a node beyond nested by
+ * how far they reach ("nested", Arrangement.nestAround).
+ */
+type PortOrder = boolean | "nested";
+
+/** The port order an arrangement lays its sides out in. */
+function portOrderOf(arrangement: Arrangement): PortOrder {
+	return arrangement.nestAround ? "nested" : arrangement.crossingRepair;
+}
+
 /** Port offsets at a polish: aligned, ordered by approach where `byApproach`, then pinned. */
 function portOffsetsAt(
 	routes: readonly RoutedEdge[],
 	polish: RoutingPolish,
-	byApproach: boolean,
+	byApproach: PortOrder,
 	laned: boolean,
 ): Map<string, number> {
 	return withPinnedOffsets(
@@ -8355,13 +8871,14 @@ function layoutDiagramOnce(
 	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
 	const { anchors, besideShared, endRun, placement } = graphOptions.get(diagram) ?? {};
 	const offsetsFor = (routes: readonly RoutedEdge[]) =>
-		portOffsetsAt(routes, polish, arrangement.crossingRepair, laned(diagram));
+		portOffsetsAt(routes, polish, portOrderOf(arrangement), laned(diagram));
 	const { wrap } = arrangement;
 	const zoneCuts = zoneCutEdges(diagram, arrangement.zoneWraps);
 	let {
 		groups,
 		lanes,
 		nodes: nodeShapes,
+		skipLaneAt,
 	}: PositionedLayout = placement
 		? { nodes: placedNodes(diagram, placement) }
 		: positionLayout(diagram, new Map(), new Map(), arrangement, slack);
@@ -8469,6 +8986,7 @@ function layoutDiagramOnce(
 			groups,
 			lanes,
 			nodes: nodeShapes,
+			skipLaneAt,
 		} = positionLayout(diagram, capacity, reach, arrangement, slack));
 		const resized = new Map(
 			[...nodeShapes, ...compositeShapes(groups)].map((node) => [node.nodeId, node]),
@@ -8492,6 +9010,35 @@ function layoutDiagramOnce(
 		}
 	}
 	nodeShapes = alignMarkers(routedEdges, nodeShapes, groups, portOffsets);
+	if (orthogonal && skipLaneAt) {
+		const vertical = direction === "TB" || direction === "BT";
+		const [along, size] = vertical ? (["y", "height"] as const) : (["x", "width"] as const);
+		const forward = direction === "TB" || direction === "LR" ? 1 : -1;
+		// Midway across the gap beside a node's side facing `toward` along the flow.
+		const gapMid = (node: NodeSceneElement, toward: 1 | -1) => {
+			const side = toward * forward > 0 ? node[along] + node[size] : node[along];
+			const beyond = nodeShapes
+				.map((other) => (toward * forward > 0 ? other[along] : other[along] + other[size]))
+				.filter((edge) => (edge - side) * toward * forward > AXIS_ALIGNED_EPSILON);
+			const next =
+				beyond.length > 0
+					? toward * forward > 0
+						? Math.min(...beyond)
+						: Math.max(...beyond)
+					: side + toward * forward * 2 * ROUTE_STUB_LENGTH;
+			return (side + next) / 2;
+		};
+		for (const route of routedEdges) {
+			const at = skipLaneAt.get(route.edge.id);
+			if (at !== undefined)
+				route.skipLane = {
+					at,
+					vertical,
+					leave: gapMid(route.source, 1),
+					enter: gapMid(route.target, -1),
+				};
+		}
+	}
 	if (lanes) assignLaneContinuations(routedEdges, lanes, wrap);
 	else assignContinuationLanes(routedEdges, nodeShapes, wrap, direction);
 	const frameWrap = groups?.zoned === false ? arrangement.zoneWraps?.get(TOP_LEVEL) : undefined;
@@ -8567,7 +9114,7 @@ function layoutDiagramOnce(
 	if (orthogonal && polish.repair)
 		edgeArrows = rerouteDefects(edgeArrows, routedEdges, portOffsets, nodeShapes, options);
 	return {
-		byApproach: arrangement.crossingRepair,
+		byApproach: portOrderOf(arrangement),
 		edgeArrows,
 		...(groups ? { groups } : {}),
 		...(lanes ? { lanes } : {}),
@@ -8984,6 +9531,16 @@ function clearLabels(layout: DiagramLayout): DiagramLayout {
 	return arrows === layout.edgeArrows ? layout : { ...layout, edgeArrows: arrows };
 }
 
+/**
+ * How much longer a drawing may grow, its text shrinking as much once fitted,
+ * to draw fewer crossings (Arrangement.skipLanes, Arrangement.throughBlocks);
+ * one that still fits a screen's FITTED_LONG_SIDE shrinks no text at all.
+ */
+const LONGER_FOR_CROSSINGS = 1.15;
+/** Crossings a rival may draw beyond the arranged layout's, before repairs, and still be repaired. */
+const RIVAL_CROSSING_SLACK = 2;
+/** Room a branch label may lose, in all, for each crossing a rival removes. */
+const LABEL_ROOM_FOR_CROSSING = 8;
 /** Layouts the crossing repair may try beyond the arrangements, each with one side change. */
 const CROSSING_MOVES = 6;
 /**
@@ -9141,6 +9698,17 @@ function crossingMoves(
 			}) && !(laned(diagram) && mixesRoles());
 		if (valid) moves.push(candidate);
 	};
+	// The side of `node` that faces `other`.
+	const facingSide = (node: NodeSceneElement, other: NodeSceneElement): ConnectionEdge => {
+		const [here, there] = [center(node), center(other)];
+		return Math.abs(there.x - here.x) > Math.abs(there.y - here.y)
+			? there.x > here.x
+				? "right"
+				: "left"
+			: there.y > here.y
+				? "bottom"
+				: "top";
+	};
 	// A loop runs back along one side of the flow or the other, both ends on that side.
 	const sidesAcross: readonly ConnectionEdge[] = vertical ? ["left", "right"] : ["top", "bottom"];
 	for (const route of [first, second].filter(movable)) {
@@ -9165,12 +9733,15 @@ function crossingMoves(
 			}
 	// A decision's branches trade vertices among themselves, and, after every
 	// other move, take its free vertex.
-	const decisionMoves = (free: boolean) => {
+	const decisionMoves = (free: boolean, loops = false) => {
 		for (const source of new Set([first, second].map((route) => route.source))) {
 			if (!branches(source.kind)) continue;
 			const own = routes.filter(
-				(route) => route.source === source && movable(route) && !feedback.has(route.edge.id),
+				(route) =>
+					route.source === source && movable(route) && (loops || !feedback.has(route.edge.id)),
 			);
+			// Trades that move a loop come after every other move.
+			if (loops && !own.some((route) => feedback.has(route.edge.id))) continue;
 			if (own.length < 2 || own.length > 3) continue;
 			const current = own.map((route) => route.sourceEdge);
 			const taken = new Set(
@@ -9210,16 +9781,7 @@ function crossingMoves(
 	for (const { endpoint, route } of ends) {
 		const current = route[sideKey(endpoint)];
 		// The side that faces the route's other end first, then its mirror.
-		const here = center(route[endpoint]);
-		const there = center(route[endpoint === "source" ? "target" : "source"]);
-		const facing: ConnectionEdge =
-			Math.abs(there.x - here.x) > Math.abs(there.y - here.y)
-				? there.x > here.x
-					? "right"
-					: "left"
-				: there.y > here.y
-					? "bottom"
-					: "top";
+		const facing = facingSide(route[endpoint], route[endpoint === "source" ? "target" : "source"]);
 		for (const side of new Set([
 			facing,
 			mirror(current),
@@ -9231,6 +9793,18 @@ function crossingMoves(
 			if (side !== current) add(new Map([[route.edge.id, { [sideKey(endpoint)]: side }]]));
 	}
 	if (!laned(diagram)) decisionMoves(true);
+	// Last, a loop trades vertices with its decision's branches, or runs straight
+	// back between the sides its ends face each other by.
+	decisionMoves(false, true);
+	for (const route of [first, second].filter(movable)) {
+		if (!feedback.has(route.edge.id)) continue;
+		const [back, into] = [
+			facingSide(route.source, route.target),
+			facingSide(route.target, route.source),
+		];
+		if (route.sourceEdge !== back && route.targetEdge !== into)
+			add(new Map([[route.edge.id, { sourceEdge: back, targetEdge: into }]]));
+	}
 	return moves;
 }
 
@@ -9247,7 +9821,7 @@ function screenedCrossings(settled: SettledLayout, move: SideMove, polish: Routi
 	const offsets = portOffsetsAt(
 		routes,
 		polish,
-		settled.arrangement.crossingRepair,
+		portOrderOf(settled.arrangement),
 		layout.lanes !== undefined,
 	);
 	const moved = new Set(
@@ -11978,6 +12552,37 @@ export function renderGraphDiagram(
 			? fresh
 			: (again ?? layout);
 	};
+	// Fewer crossings, each removed outweighing a reader finding added, and
+	// otherwise drawn no worse (drawsNoWorse), but for the findings traded and
+	// a drawing up to LONGER_FOR_CROSSINGS longer, short of an extreme aspect.
+	const straighter = (candidate: DiagramLayout, current: DiagramLayout) => {
+		const [crossings, findings] = routed(candidate, true) as [number, number];
+		const [currentCrossings, currentFindings] = routed(current, true) as [number, number];
+		const [labels, labelRoom] = labelCrowding(candidate);
+		const [currentLabels, currentRoom] = labelCrowding(current);
+		const aspectOf = (drawn: DiagramLayout) => {
+			const { width, height } = drawnExtent(drawn);
+			return exportAspect(width, height);
+		};
+		const aspect = aspectOf(candidate);
+		return (
+			crossings < currentCrossings &&
+			arrowCrossings(candidate.edgeArrows, false) <= arrowCrossings(current.edgeArrows, false) &&
+			crossings + findings <= currentCrossings + currentFindings &&
+			touchingLineCount(candidate) <= touchingLineCount(current) &&
+			!fewer(defectsOf(current), defectsOf(candidate)) &&
+			(aspect < WRAP_EXTREME_ASPECT || aspect <= aspectOf(current) + AXIS_ALIGNED_EPSILON) &&
+			headCrossers(candidate).size <= headCrossers(current).size &&
+			hookedRoutes(candidate) <= hookedRoutes(current) &&
+			detouredLines(candidate.edgeArrows) <= detouredLines(current.edgeArrows) &&
+			dippedArrivals(candidate.edgeArrows).size <= dippedArrivals(current.edgeArrows).size &&
+			labels <= currentLabels &&
+			labelRoom <= currentRoom + (currentCrossings - crossings) * LABEL_ROOM_FOR_CROSSING &&
+			drawnLongSide(candidate) <=
+				Math.max(drawnLongSide(current) * LONGER_FOR_CROSSINGS, FITTED_LONG_SIDE) &&
+			sharedSegmentCount(candidate) <= sharedSegmentCount(current)
+		);
+	};
 	const beforeRepairs = best;
 	({ layout, settled: best } = complete(beforeRepairs));
 	// A decision's branches leave by the vertices that route them best together.
@@ -11991,55 +12596,138 @@ export function renderGraphDiagram(
 			defectsOf,
 			fewer,
 		));
-	// Last, the drawn layout's ends are polished.
-	layout = polished(layout);
-	// A plain flow, untightened and unwrapped, whose polished line still steps
-	// sideways across a rank gap too narrow for the step to clear both its ends
-	// grows that gap (narrowStepGaps), so the step can sit midway: a step within
-	// a jog's reach of an arrowhead or a port reads as jogging into it. The
-	// grown layout keeps the drawn one's sides, its crossing repairs among them,
-	// and is finished and polished like it. Both are judged as they are drawn
-	// at last, after the last clearance: the grown one is kept when it stays
-	// short of tightening (COMPACT_ASPECT), draws fewer port jogs and no more
-	// export defects, crossings, reader findings, lines through a head, hooks,
-	// detours, dips or crowded labels, and passes no nearer a node. It draws
-	// longer only by the gaps it grows.
-	const narrow =
-		arranged &&
-		orthogonal &&
-		!structure &&
+	// The drawn layout polished at last: its ends, a gap grown for a step too
+	// near its ends, and lines that touch cleared.
+	const drawnToTheEnd = (start: CompletedLayout): CompletedLayout => {
+		({ layout, settled: best } = start);
+		// Last, the drawn layout's ends are polished.
+		layout = polished(layout);
+		// A plain flow, untightened and unwrapped, whose polished line still steps
+		// sideways across a rank gap too narrow for the step to clear both its ends
+		// grows that gap (narrowStepGaps), so the step can sit midway: a step within
+		// a jog's reach of an arrowhead or a port reads as jogging into it. The
+		// grown layout keeps the drawn one's sides, its crossing repairs among them,
+		// and is finished and polished like it. Both are judged as they are drawn
+		// at last, after the last clearance: the grown one is kept when it stays
+		// short of tightening (COMPACT_ASPECT), draws fewer port jogs and no more
+		// export defects, crossings, reader findings, lines through a head, hooks,
+		// detours, dips or crowded labels, and passes no nearer a node. It draws
+		// longer only by the gaps it grows.
+		const narrow =
+			arranged &&
+			orthogonal &&
+			!structure &&
+			!laned(diagram) &&
+			best.arrangement.wrap.continuations.size === 0 &&
+			!best.arrangement.compactGaps
+				? narrowStepGaps(diagram, layout)
+				: new Map<number, number>();
+		if (narrow.size > 0) {
+			const drawn = { layout, settled: best };
+			const arrangement = { ...best.arrangement, widenGaps: narrow };
+			const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
+			const settled = { arrangement, defects: defectsOf(attempt), layout: attempt };
+			const [candidate, current] = [polished(finished(attempt)), drawn.layout].map(clearedLast);
+			const [labels, currentLabels] = [candidate!, current!].map(labelCrowding);
+			const grows =
+				!fewer(defectsOf(current!), defectsOf(candidate!)) &&
+				lengthOf(candidate!).aspect < COMPACT_ASPECT &&
+				portJogCount(candidate!) < portJogCount(current!) &&
+				routesNoWorse(candidate!, current!, false, true) &&
+				headCrossers(candidate!).size <= headCrossers(current!).size &&
+				hookedRoutes(candidate!) <= hookedRoutes(current!) &&
+				detouredLines(candidate!.edgeArrows) <= detouredLines(current!.edgeArrows) &&
+				dippedArrivals(candidate!.edgeArrows).size <= dippedArrivals(current!.edgeArrows).size &&
+				labels!.every((count, index) => count <= currentLabels![index]!) &&
+				nearOutlines(candidate!) <= nearOutlines(current!);
+			({ layout, settled: best } = grows
+				? { layout: candidate!, settled }
+				: { layout: current!, settled: drawn.settled });
+		} else layout = clearedLast(layout);
+		// Each round starts from the lines the last one left touching.
+		for (let round = 0; round < TOUCH_ROUNDS; round += 1) {
+			const cleared = clearTouches(layout, round === 0);
+			if (cleared === layout) break;
+			layout = cleared;
+		}
+		return { layout, settled: best };
+	};
+	({ layout, settled: best } = drawnToTheEnd({ layout, settled: best }));
+	// Where the drawing still crosses, lines that run around into the same side
+	// of a node may nest by reach (Arrangement.nestAround), lines that skip
+	// ranks may run straight in lanes of their own (Arrangement.skipLanes), and,
+	// among zones, a node a zone's members reach from another node outside it
+	// may rank after that one (Arrangement.throughBlocks), its line back into
+	// the zone running straight back. Each rival is repaired and drawn to the
+	// end the same way, and kept where it crosses fewer lines, a crossing
+	// removed outweighing a reader finding added, and draws no worse otherwise
+	// (straighter).
+	const backInto = (entries: ReadonlySet<string>): SideOverrides =>
+		new Map(
+			[...entries]
+				.filter((id) => flowFeedback(diagram).has(id))
+				.map((id) => [
+					id,
+					{
+						sourceEdge: OPPOSITE_EDGE[FORWARD_SIDE[diagram.layout.direction]],
+						targetEdge: FORWARD_SIDE[diagram.layout.direction],
+					},
+				]),
+		);
+	// Nesting is tried only where it orders some side's ports otherwise.
+	const nests = () => {
+		const { portOffsets, routedEdges } = layout;
+		if (!portOffsets) return false;
+		const nested = portOffsetsAt(routedEdges, levels[0]!, "nested", laned(diagram));
+		return [...nested].some(([key, offset]) => portOffsets.get(key) !== offset);
+	};
+	const rivals = (): Partial<Arrangement>[] => [
+		...(nests() ? [{ nestAround: true }] : []),
+		...(skipsRanks(diagram, arrowCrossings(layout.edgeArrows)) ? [{ skipLanes: true }] : []),
+		...(structure && blockPrecedence.has(structure.top)
+			? [
+					{
+						throughBlocks: true,
+						sides: new Map([
+							...(beforeRepairs.arrangement.sides ?? []),
+							...backInto(blockEntries.get(structure.top)!),
+						]),
+					},
+				]
+			: []),
+	];
+	// None is tried where the drawing crosses no more than its graph forces, or
+	// in lanes, which order and place their steps by lane.
+	const rivalled =
+		repairable &&
 		!laned(diagram) &&
-		best.arrangement.wrap.continuations.size === 0 &&
-		!best.arrangement.compactGaps
-			? narrowStepGaps(diagram, layout)
-			: new Map<number, number>();
-	if (narrow.size > 0) {
+		beforeRepairs.arrangement.wrap.continuations.size === 0 &&
+		arrowCrossings(layout.edgeArrows) >
+			unavoidableCrossings(diagram.edges.map((edge) => [edge.source, edge.target]));
+	for (const rivalArrangement of rivalled ? rivals() : []) {
+		if (arrowCrossings(layout.edgeArrows) === 0) break;
 		const drawn = { layout, settled: best };
-		const arrangement = { ...best.arrangement, widenGaps: narrow };
+		const arrangement = { ...beforeRepairs.arrangement, ...rivalArrangement };
 		const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
-		const settled = { arrangement, defects: defectsOf(attempt), layout: attempt };
-		const [candidate, current] = [polished(finished(attempt)), drawn.layout].map(clearedLast);
-		const [labels, currentLabels] = [candidate!, current!].map(labelCrowding);
-		const grows =
-			!fewer(defectsOf(current!), defectsOf(candidate!)) &&
-			lengthOf(candidate!).aspect < COMPACT_ASPECT &&
-			portJogCount(candidate!) < portJogCount(current!) &&
-			routesNoWorse(candidate!, current!, false, true) &&
-			headCrossers(candidate!).size <= headCrossers(current!).size &&
-			hookedRoutes(candidate!) <= hookedRoutes(current!) &&
-			detouredLines(candidate!.edgeArrows) <= detouredLines(current!.edgeArrows) &&
-			dippedArrivals(candidate!.edgeArrows).size <= dippedArrivals(current!.edgeArrows).size &&
-			labels!.every((count, index) => count <= currentLabels![index]!) &&
-			nearOutlines(candidate!) <= nearOutlines(current!);
-		({ layout, settled: best } = grows
-			? { layout: candidate!, settled }
-			: { layout: current!, settled: drawn.settled });
-	} else layout = clearedLast(layout);
-	// Each round starts from the lines the last one left touching.
-	for (let round = 0; round < TOUCH_ROUNDS; round += 1) {
-		const cleared = clearTouches(layout, round === 0);
-		if (cleared === layout) break;
-		layout = cleared;
+		const crossings = arrowCrossings(layout.edgeArrows);
+		// A rival that crosses far more before its repairs than the arranged
+		// layout did, or still crosses as many once repaired, is drawn no further.
+		if (
+			arrowCrossings(attempt.edgeArrows) >
+			arrowCrossings(beforeRepairs.layout.edgeArrows) + RIVAL_CROSSING_SLACK
+		)
+			continue;
+		// Completing and drawing the rival draws over the layout in hand.
+		const completed = complete(
+			{ arrangement, defects: defectsOf(attempt), layout: attempt },
+			(candidate) => arrowCrossings(candidate.edgeArrows) >= crossings,
+		);
+		if (arrowCrossings(completed.layout.edgeArrows) >= crossings) {
+			({ layout, settled: best } = drawn);
+			continue;
+		}
+		const rival = drawnToTheEnd(completed);
+		({ layout, settled: best } = straighter(rival.layout, drawn.layout) ? rival : drawn);
 	}
 	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];

@@ -63,6 +63,7 @@ import {
 	parseChartDiagram,
 	parseGanttDiagram,
 	sequenceActivations,
+	unavoidableCrossings,
 } from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
@@ -70,7 +71,11 @@ import {
 	type ExcalidrawScene,
 	type ExcalidrawSceneValidationResult,
 } from "@sketchi/diagram-excalidraw";
-import { renderDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import {
+	arrowCrossings,
+	renderDiagram,
+	type RenderedDiagramScene,
+} from "@sketchi/diagram-renderer";
 import { termTokens } from "@sketchi/icon-catalog";
 
 import type { DiagramScenario } from "./diagram-scenarios.js";
@@ -1258,20 +1263,45 @@ export function evaluateScenarioDiagram(
 	const { checks, ownedNodes } = flowchartChecks(scenario, diagram);
 	const modelOwners =
 		modelDiagram === diagram ? ownedNodes : flowchartChecks(scenario, modelDiagram).ownedNodes;
-	return evaluation(scenario.id, diagram, [
-		...checks,
-		...scenarioLogoChecks(
-			{
-				logos: scenario.logos,
-				prompt: scenario.prompt,
-				requiredIconSlugs: scenario.assertions.requiredIconSlugs,
-				sharedIconEntries: scenario.assertions.requiredNodes.flatMap((step) =>
-					step.entryParts ? [{ parts: step.entryParts, nodeIds: modelOwners.get(step.id)! }] : [],
-				),
-			},
-			modelDiagram,
-		),
-	]);
+	// The drawing reads the scene, so it scores the returned diagram.
+	return evaluation(
+		scenario.id,
+		diagram,
+		[
+			...checks,
+			...scenarioLogoChecks(
+				{
+					logos: scenario.logos,
+					prompt: scenario.prompt,
+					requiredIconSlugs: scenario.assertions.requiredIconSlugs,
+					sharedIconEntries: scenario.assertions.requiredNodes.flatMap((step) =>
+						step.entryParts ? [{ parts: step.entryParts, nodeIds: modelOwners.get(step.id)! }] : [],
+					),
+				},
+				modelDiagram,
+			),
+		],
+		(scene) => (scenario.assertions.crossingFree ? [flowchartCrossingCheck(diagram, scene)] : []),
+	);
+}
+
+/**
+ * Lines the drawing crosses beyond those its graph forces: a planar graph can
+ * be drawn crossing nothing (unavoidableCrossings).
+ */
+function flowchartCrossingCheck(diagram: FlowchartDiagram, scene: RenderedDiagramScene) {
+	const drawn = arrowCrossings(
+		scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : [])),
+	);
+	const forced = unavoidableCrossings(diagram.edges.map((edge) => [edge.source, edge.target]));
+	return {
+		id: "avoidable-crossings",
+		passed: drawn <= forced,
+		message:
+			drawn <= forced
+				? `Lines cross ${drawn} time(s), as few as the graph allows.`
+				: `Lines cross ${drawn} time(s) where the graph allows ${forced}.`,
+	};
 }
 
 export function evaluateScenarioOutput(

@@ -20,6 +20,7 @@ export * from "./routing-fixtures.js";
 export * from "./label-fixtures.js";
 export * from "./group-fixtures.js";
 export * from "./crossing-fixtures.js";
+export * from "./planarity.js";
 
 export * from "./types/timeline.js";
 export * from "./types/chart.js";
