@@ -464,7 +464,9 @@ function worseThanPinned(
  * Main (7460cf29) drew 597 over these sets, now 407: the lines through a head
  * are routed again last, clear of heads first, or, in a graph few enough edges
  * to repair, every line is, each kept only where it routes no worse and draws
- * no longer. A graph may draw no more than pinned.
+ * no longer. A graph may draw no more than pinned. Zoned 26 top to bottom and
+ * grouped 22 right to left draw more than main, which reached their drawings
+ * through a layout or a move that ran a line into its own end node's box.
  */
 const HEADS: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL", string>>>> = {
 	flowcharts: {
@@ -477,10 +479,10 @@ const HEADS: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL", 
 		TB: "0 0 0 0 0 0 0 0 2 0 2 4 0 3 0 0 0 0 0 0 0 0 0 0 0 1 0 2 0 0",
 		BT: "0 0 0 0 0 0 0 0 0 0 2 7 0 4 1 0 0 0 0 2 0 0 0 0 1 1 0 2 1 0",
 		LR: "0 0 0 0 0 0 0 0 2 0 2 1 0 23 0 0 0 0 0 3 0 4 1 0 5 10 0 2 0 0",
-		RL: "0 0 0 0 0 0 0 0 3 0 1 0 1 23 1 0 0 0 0 0 0 5 0 0 4 0 0 2 0 0",
+		RL: "0 0 0 0 0 0 0 0 3 0 1 0 1 23 1 0 0 0 0 0 0 5 1 0 4 0 0 2 0 0",
 	},
 	zoned: {
-		TB: "2 0 0 0 1 0 0 0 1 0 0 0 0 0 0 0 0 0 1 6 0 4 1 2 0 0 1 0 1 0",
+		TB: "2 0 0 0 1 0 0 0 1 0 0 0 0 0 0 0 0 0 1 6 0 4 1 2 0 0 4 0 1 0",
 		BT: "4 0 0 0 0 0 0 0 1 0 0 0 3 0 0 1 0 0 2 7 0 4 4 0 0 0 0 0 4 0",
 		LR: "0 0 0 0 0 0 0 0 2 0 0 0 0 0 0 2 0 0 0 6 0 4 0 3 0 0 0 0 0 0",
 		RL: "6 0 0 1 0 0 0 0 2 0 0 0 0 0 0 2 0 0 2 1 3 4 4 3 0 0 5 0 2 1",
@@ -499,25 +501,27 @@ const HEADS: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL", 
  * drew 468 over these sets, now 432: the polish of the drawn layout's ends no
  * longer moves a step or a port where that draws one line onto another, so a
  * port jog it would trade for one stays. A graph may draw no more than pinned.
+ * Seven graphs draw one or two more than main, which reached their drawings
+ * through a layout or a move that ran a line into its own end node's box.
  */
 const SHARED: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL", string>>>> = {
 	flowcharts: {
-		TB: "9 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0 0",
-		BT: "0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0 5 0 0 0 0 1 0 0",
+		TB: "9 0 0 0 0 0 0 0 3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 0 0 0 1 0 0",
+		BT: "0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0 6 0 0 0 0 1 0 0",
 		LR: "2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 0 1 0 5 1 0 1 0 1 0 0 0 0 1 0 0",
 		RL: "6 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2 0 1 0 5 1 0 1 0 1 0 0 0 0 1 0 0",
 	},
 	grouped: {
 		TB: "0 0 0 0 0 0 0 0 0 0 1 2 0 3 0 0 0 0 0 0 3 1 2 0 2 1 0 1 1 0",
 		BT: "0 0 0 0 0 0 0 0 1 0 2 4 0 5 0 0 0 0 0 0 3 1 0 0 1 1 0 1 0 0",
-		LR: "0 0 0 0 0 0 0 0 0 0 1 5 0 9 1 0 0 1 0 0 2 2 0 0 4 3 0 0 2 0",
-		RL: "0 0 0 0 0 0 0 0 2 0 2 8 0 9 0 1 0 1 0 1 1 0 0 0 4 2 0 0 1 0",
+		LR: "0 0 0 0 0 0 0 0 0 0 1 5 0 10 1 0 0 1 0 0 2 2 0 0 4 3 0 0 2 0",
+		RL: "0 0 0 0 0 0 0 0 2 0 2 8 0 10 0 1 0 1 0 1 1 0 0 0 4 2 0 0 1 0",
 	},
 	zoned: {
 		TB: "4 0 0 0 0 0 0 0 5 2 0 1 0 0 0 0 0 0 2 7 4 7 0 1 0 0 7 0 6 1",
 		BT: "3 0 0 0 0 1 0 0 3 0 0 1 0 0 0 0 0 0 3 2 5 3 1 3 0 0 2 0 5 0",
-		LR: "4 0 1 0 2 1 0 0 1 0 0 2 1 0 0 1 0 0 6 6 7 5 3 4 0 0 10 0 5 4",
-		RL: "3 0 1 1 0 2 0 0 2 0 0 2 2 0 0 1 0 0 4 4 3 8 5 2 0 0 10 0 3 2",
+		LR: "4 0 1 0 2 1 0 0 1 0 0 2 1 0 0 1 0 0 6 6 7 5 3 4 0 0 11 0 5 4",
+		RL: "4 0 1 1 0 2 0 0 2 0 0 2 2 0 0 1 0 0 4 4 3 8 5 2 0 0 12 0 3 2",
 	},
 	laned: {
 		TB: "2 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 6 0 5 0 0 0 0",
@@ -539,25 +543,28 @@ const SHARED: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL",
  * and direction, in order; sets not listed draw none. Main (5434bcc7) drew
  * 2,661 over these sets, now 2,538: where at most six lines touch, they are
  * routed again, clear of other lines' bends, and kept where that touches fewer
- * and draws no more crossings or findings, a touching pair counted as one. No
- * graph touches more than main did. A graph may draw no more than pinned.
+ * and draws no more crossings or findings, a touching pair counted as one. A
+ * graph may draw no more than pinned. Fifteen graphs touch more than main,
+ * which reached their drawings through a layout or a move that ran a line into
+ * its own end node's box: bottom to top, zoned 3's e17 now passes just above
+ * n1's tip instead of cutting through the diamond.
  */
 const TOUCHES: Readonly<Record<string, Readonly<Record<"TB" | "BT" | "LR" | "RL", string>>>> = {
 	flowcharts: {
-		TB: "49 0 0 1 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 3 4 0 8 0 4 6 0 5 0 8 0 0 0 5 5 0 0",
-		BT: "14 0 0 2 0 0 0 0 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 5 0 8 0 4 5 0 6 1 17 0 0 0 5 5 0 0",
-		LR: "38 2 0 0 6 0 0 3 18 0 1 10 0 0 0 0 2 0 0 0 0 0 0 19 7 9 1 16 12 0 14 0 9 1 0 0 9 8 0 2",
+		TB: "49 0 0 1 0 0 0 0 12 0 0 0 0 0 0 0 0 0 0 0 0 0 3 4 0 8 0 4 6 0 5 0 13 0 0 0 5 5 0 0",
+		BT: "14 0 0 2 0 0 0 0 4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 5 0 8 0 4 5 0 6 1 21 0 0 0 5 5 0 0",
+		LR: "38 2 0 0 6 0 0 3 18 0 1 10 0 0 0 0 2 0 0 0 0 0 0 19 7 10 1 16 12 0 14 0 9 1 0 0 9 8 0 2",
 		RL: "31 3 0 0 6 0 0 1 9 0 1 8 0 0 1 0 1 0 0 0 0 0 3 21 6 7 1 16 12 1 13 1 9 1 0 0 11 8 0 0",
 	},
 	grouped: {
-		TB: "0 0 0 0 1 1 0 0 14 0 5 25 0 18 2 0 0 4 1 3 9 12 5 0 8 4 0 8 5 0",
-		BT: "0 0 0 1 0 0 0 0 16 0 7 27 0 27 0 0 3 2 0 3 12 9 0 0 11 5 0 8 4 0",
-		LR: "1 0 0 1 2 0 0 0 18 0 3 24 0 36 2 0 0 5 0 6 4 16 0 0 24 33 0 6 13 0",
-		RL: "1 0 0 0 4 0 0 0 23 0 2 30 3 37 6 0 0 4 0 1 2 20 0 0 22 15 0 8 10 0",
+		TB: "0 0 0 0 1 1 0 0 14 0 5 25 0 20 2 0 0 4 1 3 9 12 5 0 8 4 0 8 5 0",
+		BT: "0 0 0 1 0 0 0 0 16 0 7 27 0 27 0 0 3 3 0 3 12 10 0 0 11 5 0 8 4 0",
+		LR: "1 0 0 1 2 0 0 0 18 0 3 24 0 39 2 0 0 5 0 6 4 16 0 0 24 33 0 6 13 0",
+		RL: "1 0 0 0 4 0 0 0 23 0 3 30 3 38 6 0 0 4 0 1 2 20 0 0 22 15 0 8 11 0",
 	},
 	zoned: {
-		TB: "22 0 0 0 1 1 0 0 17 4 0 3 0 0 0 1 0 0 10 41 18 21 4 8 0 0 33 0 19 1",
-		BT: "21 0 0 0 2 1 0 0 16 1 0 1 3 0 0 1 0 0 8 31 15 15 5 8 0 0 32 0 15 0",
+		TB: "22 0 0 0 1 1 0 0 17 4 0 3 0 0 0 1 0 0 10 41 18 21 4 8 0 0 37 0 19 1",
+		BT: "21 0 0 2 2 1 0 0 16 3 0 5 3 0 0 1 0 0 8 31 17 15 5 8 0 0 32 0 15 0",
 		LR: "22 0 3 0 5 8 1 2 18 2 0 8 3 0 0 10 0 0 13 46 22 18 18 13 0 0 39 0 18 10",
 		RL: "20 0 4 4 4 9 1 1 25 6 0 4 11 0 0 7 0 0 12 29 23 27 18 10 0 3 51 0 19 7",
 	},
@@ -860,11 +867,16 @@ const KNOWN_AROUND_THE_BANDS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonl
 	RL: [9],
 };
 
+/**
+ * Labels the label fuzz still sets nearer another line than their own, on
+ * dense random graphs. Right to left, flowcharts 2 and 16 each gain one where
+ * main ran a line into its own end node's box.
+ */
 const KNOWN_DETACHED_LABELS: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
 	TB: "4:e12>e10 11:e11>e15 16:e26>e13 16:e33>e20 19:e11>e7 19:e11>e16 19:e14>e5 19:e15>e7 19:e17>e5 19:e17>e14 24:e7>e6",
 	BT: "11:e11>e15 16:e27>e13 16:e27>e22 16:e33>e22 16:e33>e27",
 	LR: "0:e13>e20 0:e19>e22 0:e26>e23 6:e11>e9 16:e22>e24 16:e24>e22 16:e26>e13 19:e11>e5 29:e28>e20",
-	RL: "0:e13>e20 0:e19>e22 0:e20>e22 0:e26>e23 6:e11>e1 6:e11>e12 8:e19>e21 13:e22>e18 14:e7>e16 16:e22>e24 16:e24>e22 16:e33>e20 19:e11>e5 23:e14>e10 29:e28>e20",
+	RL: "0:e13>e20 0:e19>e22 0:e20>e22 0:e26>e23 2:e9>e10 6:e11>e1 6:e11>e12 8:e19>e21 13:e22>e18 14:e7>e16 16:e22>e24 16:e24>e22 16:e32>e30 16:e33>e20 19:e11>e5 23:e14>e10 29:e28>e20",
 };
 
 describe("label fuzz", () => {
@@ -2310,7 +2322,10 @@ function withoutLanes(elements: readonly ExportedElement[]): ExportedElement[] {
 /**
  * Label defects the laned fuzz still draws, all on dense random graphs: a
  * decision with up to six long-labeled branches whose labels find no clear
- * spot within reach of their source. Never more than these.
+ * spot within reach of their source. Never more than these. Right to left,
+ * laned 1's e27 label sits on its own line, as it does left to right: main
+ * reached its drawing through a layout or a move that ran a line into its own
+ * end node's box.
  */
 const KNOWN_LANED_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly string[]>> = {
 	TB: ["6: edge:e8:label on edge:e10:label", "6: edge:e10:label crossed by edge:e1"],
@@ -2337,6 +2352,7 @@ const KNOWN_LANED_LABEL_DEFECTS: Readonly<Record<"TB" | "BT" | "LR" | "RL", read
 	RL: [
 		"0: edge:e20:label crossed by edge:e22",
 		"0: edge:e20:label on node:n7",
+		"1: edge:e27:label crossed by edge:e27",
 		"6: edge:e10:label crossed by edge:e8",
 		"6: edge:e10:label on node:n1",
 		"8: edge:e7:label on a lane boundary",
