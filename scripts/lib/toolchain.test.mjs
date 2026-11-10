@@ -142,6 +142,8 @@ test("dependency-installing CI jobs use the shared mise setup", () => {
 	const setup = read(".github/actions/setup-workspace/action.yml");
 	assert.match(setup, /node scripts\/verify-toolchain\.mjs --skip-dependencies/);
 	assert.match(setup, /INSTALL_DEPENDENCIES/);
+	// A pinned binary hash lets a cached mise verify without a GitHub download.
+	assert.match(setup, /^\s+version: \d{4}\.\d+\.\d+\n(?:\s+#.*\n)*\s+sha256: [0-9a-f]{64}$/m);
 });
 
 test("pnpm enforces maturity and build approvals without age exceptions", () => {
