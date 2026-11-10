@@ -1,4 +1,4 @@
-import { wrappedLabelWidth, wrapTextToWidth } from "@sketchi/diagram-core";
+import { canvasFrameNameBox, wrappedLabelWidth, wrapTextToWidth } from "@sketchi/diagram-core";
 import type {
 	ArrowSceneElement,
 	NodeSceneElement,
@@ -183,6 +183,79 @@ function labelBox(label: TextSceneElement): Box {
 	return { x: label.x - width / 2, y: label.y - height / 2, width, height };
 }
 
+/** The line with its first `start` and last `end` units of length cut off. */
+function trimmed(points: readonly ScenePoint[], start: number, end: number): ScenePoint[] {
+	const cut = (line: readonly ScenePoint[], length: number): ScenePoint[] => {
+		let left = length;
+		for (const [index, point] of line.slice(1).entries()) {
+			const from = line[index]!;
+			const run = distance(from, point);
+			if (run > left) {
+				const t = left / run;
+				return [
+					{ x: from.x + (point.x - from.x) * t, y: from.y + (point.y - from.y) * t },
+					...line.slice(index + 1),
+				];
+			}
+			left -= run;
+		}
+		return [];
+	};
+	return cut(cut(points, start).reverse(), end).reverse();
+}
+
+/** Whether a point lies inside the shape a node draws, not only its box. */
+function insideShape(point: ScenePoint, node: NodeSceneElement): boolean {
+	const [halfWidth, halfHeight] = [node.width / 2, node.height / 2];
+	const dx = Math.abs(point.x - node.x - halfWidth) / halfWidth;
+	const dy = Math.abs(point.y - node.y - halfHeight) / halfHeight;
+	const within = 1 - 0.5 / Math.min(halfWidth, halfHeight);
+	if (node.shape === "diamond") return dx + dy < within;
+	if (node.shape === "ellipse" || node.shape === "circle")
+		return dx * dx + dy * dy < within * within;
+	return dx < within && dy < within;
+}
+
+/** Whether a line, followed every 2 units, runs inside a node's shape. */
+function entersShape(points: readonly ScenePoint[], node: NodeSceneElement): boolean {
+	return points.slice(1).some((point, index) => {
+		const from = points[index]!;
+		const steps = Math.max(1, Math.ceil(distance(from, point) / 2));
+		for (let step = 1; step <= steps; step += 1)
+			if (
+				insideShape(
+					{
+						x: from.x + ((point.x - from.x) * step) / steps,
+						y: from.y + ((point.y - from.y) * step) / steps,
+					},
+					node,
+				)
+			)
+				return true;
+		return false;
+	});
+}
+
+/** How a line meets a region: whether it enters or leaves it, and how often it crosses its outline. */
+function regionPassage(points: readonly ScenePoint[], box: Box) {
+	const outside = (point: ScenePoint) =>
+		point.x < box.x - EPSILON ||
+		point.x > box.x + box.width + EPSILON ||
+		point.y < box.y - EPSILON ||
+		point.y > box.y + box.height + EPSILON;
+	const corners = [
+		{ x: box.x, y: box.y },
+		{ x: box.x + box.width, y: box.y },
+		{ x: box.x + box.width, y: box.y + box.height },
+		{ x: box.x, y: box.y + box.height },
+	];
+	let crossings = 0;
+	for (const [index, point] of points.slice(1).entries())
+		for (const [at, corner] of corners.entries())
+			if (segmentsCross(points[index]!, point, corner, corners[(at + 1) % 4]!)) crossings += 1;
+	return { enters: entersBox(points, box), leaves: points.some(outside), crossings };
+}
+
 /** Whether a line runs into a box's interior. */
 function entersBox(points: readonly ScenePoint[], box: Box): boolean {
 	const inside = (point: ScenePoint) =>
@@ -229,10 +302,11 @@ function meetings(a: readonly ScenePoint[], b: readonly ScenePoint[], touch: num
 /**
  * The scene with every line drawn as a curve along its route. A line's
  * corners curve as widely as room allows unless the curve would come nearer a
- * node it passes than its route did (or than CURVE_CLEARANCE), or meet another
- * line more than its route did, or run into a label its route kept clear of;
- * then they curve less, and at worst stay square. Labels stay where the
- * routes put them.
+ * node than its route did (or than CURVE_CLEARANCE), its own ends' nodes
+ * included once it leaves their straight runs; or meet another line more than
+ * its route did; or run into a label its route kept clear of; or enter, leave
+ * or cross a zone, group or lane its route did not. Then they curve less, and
+ * at worst stay square. Labels stay where the routes put them.
  */
 export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
 	const nodes = scene.elements.flatMap((element) =>
@@ -240,7 +314,21 @@ export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
 	);
 	const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 	const labels = scene.elements.flatMap((element) =>
-		element.type === "text" && element.containerId === undefined ? [labelBox(element)] : [],
+		element.type === "text" && element.containerId === undefined
+			? [labelBox(element)]
+			: element.type === "frame"
+				? [canvasFrameNameBox(element)]
+				: [],
+	);
+	// Zones, group frames and lanes: a curve keeps to the regions its route keeps to.
+	const regions = scene.elements.flatMap((element): Box[] =>
+		element.type === "frame" ||
+		(element.type === "node" &&
+			(element.rendererRole === "zone" ||
+				element.rendererRole === "swimlane" ||
+				element.rendererRole === "swimlane-header"))
+			? [element]
+			: [],
 	);
 	const drawn = new Map(arrows.map((arrow) => [arrow.id, arrow.points as readonly ScenePoint[]]));
 	const touchGap = 4;
@@ -249,6 +337,26 @@ export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
 		const passed = nodes.filter(
 			(node) => node.nodeId !== arrow.sourceNodeId && node.nodeId !== arrow.targetNodeId,
 		);
+		// A line meets its own nodes only along the straight runs at its ends.
+		const ends = nodes.flatMap((node) => {
+			const [source, target] = [
+				node.nodeId === arrow.sourceNodeId,
+				node.nodeId === arrow.targetNodeId,
+			];
+			if (!source && !target) return [];
+			const away = (points: readonly ScenePoint[]) =>
+				trimmed(points, source ? DEPARTURE_RUN : 0, target ? ARRIVAL_RUN : 0);
+			const awayRoute = away(route);
+			return [
+				{
+					node,
+					away,
+					gap: Math.min(CURVE_CLEARANCE, gapToNode(awayRoute, node)),
+					enters: entersShape(awayRoute, node),
+				},
+			];
+		});
+		const regionsCrossed = regions.map((box) => ({ box, route: regionPassage(route, box) }));
 		const others = arrows.filter((other) => other !== arrow);
 		const meetingsOf = (points: readonly ScenePoint[]) =>
 			others.reduce(
@@ -269,6 +377,20 @@ export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
 				)
 			)
 				return false;
+			for (const end of ends) {
+				const away = end.away(points);
+				if (gapToNode(away, end.node) < end.gap - EPSILON) return false;
+				if (!end.enters && entersShape(away, end.node)) return false;
+			}
+			for (const { box, route: kept } of regionsCrossed) {
+				const passage = regionPassage(points, box);
+				if (
+					passage.crossings > kept.crossings ||
+					(passage.enters && !kept.enters) ||
+					(passage.leaves && !kept.leaves)
+				)
+					return false;
+			}
 			const after = meetingsOf(points);
 			return after.crossings <= before.crossings && after.touches <= before.touches;
 		});

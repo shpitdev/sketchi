@@ -2,6 +2,7 @@ import { assert, layer } from "@effect/vitest";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
 import { Effect } from "effect";
 
+import { evaluateScenarioDiagram } from "./evaluate";
 import { FixtureGenerationClientLayer } from "./fixture-client";
 import { scenarioFlowchartDocument } from "./flowchart-document";
 import { toDiagramGenerationPrompt } from "./prompt";
@@ -35,6 +36,31 @@ layer(FixtureGenerationClientLayer)("scenario fixture generation client", (it) =
 				drawn.edges.map((edge) => [edge.source, edge.target, edge.label]),
 				scenario.expectedDiagram.edges.map((edge) => [edge.source, edge.target, edge.label]),
 			);
+		}),
+	);
+
+	it.effect("keeps a curved scenario curved through the document a model returns", () =>
+		Effect.gen(function* () {
+			const client = yield* DiagramGenerationClient;
+			for (const id of [
+				"feedback-triage-curved",
+				"ingest-pipeline-curved-lr",
+				"checkout-services-curved-zones",
+			]) {
+				const scenario = getFlowchartScenario(id);
+				const candidate = yield* client.generate({
+					model: "fixture",
+					prompt: toDiagramGenerationPrompt(scenario),
+				});
+				assert.strictEqual(candidate.flowchart?.curved, true);
+				const drawn = candidate.diagram;
+				if (drawn?.type !== "flowchart") throw new Error("Expected a flowchart.");
+				assert.strictEqual(drawn.layout.edgeRouting, "curved");
+				assert.deepEqual(
+					evaluateScenarioDiagram(scenario, drawn).checks.filter((check) => !check.passed),
+					[],
+				);
+			}
 		}),
 	);
 

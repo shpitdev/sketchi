@@ -4,7 +4,7 @@ import type { FlowchartDiagram, FlowchartDocument } from "@sketchi/diagram-core"
  * A scenario's expected flowchart written as the document a model returns: nodes keyed by id,
  * edges as [from, to, label?], each group listing its direct members and each node naming its
  * lane. A decision whose label asks no question keeps its diamond; a node logo becomes its
- * icon, with logos on.
+ * icon, with logos on; curved lines stay curved.
  */
 export function scenarioFlowchartDocument(diagram: FlowchartDiagram): FlowchartDocument {
 	const members = (owner: string) => [
@@ -17,6 +17,7 @@ export function scenarioFlowchartDocument(diagram: FlowchartDiagram): FlowchartD
 		id: diagram.id,
 		title: diagram.title,
 		...(direction === "LR" ? { direction } : {}),
+		...(diagram.layout.edgeRouting === "curved" ? { curved: true } : {}),
 		...(diagram.nodes.some((node) => node.icon) ? { logos: true } : {}),
 		nodes: Object.fromEntries(
 			diagram.nodes.map((node) => {

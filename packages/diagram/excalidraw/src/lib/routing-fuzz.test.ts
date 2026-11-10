@@ -34,6 +34,7 @@ import {
 	renderDiagram,
 	renderGraphDiagram,
 	renderIntermediateDiagram,
+	type RenderedDiagramScene,
 } from "@sketchi/diagram-renderer";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "./convert";
 
@@ -1476,7 +1477,7 @@ describe("routing fuzz", () => {
 			expect(failures(direction, "curved")).toEqual([]);
 		}, 60_000);
 
-		it("curves every line along its route, through no node it does not join and no label its route kept clear", () => {
+		it("curves every line along its route, into no node past the runs that meet it and no label its route kept clear", () => {
 			const strays = flowcharts.flatMap((spec, index) => {
 				const [curved, square] = (["curved", "orthogonal"] as const).map((edgeRouting) =>
 					renderIntermediateDiagram(
@@ -1487,73 +1488,120 @@ describe("routing fuzz", () => {
 						}),
 					),
 				);
-				const nodes = curved!.elements.flatMap((e) =>
-					e.type === "node" && e.rendererRole === undefined ? [e] : [],
-				);
-				const labels = curved!.elements.flatMap((e) =>
-					e.type === "text" && e.containerId === undefined ? [e] : [],
-				);
-				const squareLines = new Map(
-					square!.elements.flatMap((e) => (e.type === "arrow" ? [[e.id, e.points] as const] : [])),
-				);
-				return curved!.elements.flatMap((arrow) => {
-					if (arrow.type !== "arrow") return [];
-					const found: string[] = [];
-					if (arrow.curved !== true) found.push(`${index} ${arrow.edgeId} drawn square`);
-					// Points every 2 units along a line.
-					const sampled = (points: readonly Point[]) =>
-						points.slice(1).flatMap((point, at) => {
-							const from = points[at]!;
-							const steps = Math.max(
-								1,
-								Math.ceil(Math.hypot(point.x - from.x, point.y - from.y) / 2),
-							);
-							return Array.from({ length: steps }, (_, step) => ({
-								x: from.x + ((point.x - from.x) * (step + 1)) / steps,
-								y: from.y + ((point.y - from.y) * (step + 1)) / steps,
-							}));
-						});
-					const along = sampled(arrow.points);
-					for (const node of nodes) {
-						if (node.nodeId === arrow.sourceNodeId || node.nodeId === arrow.targetNodeId) continue;
-						if (
-							along.some(
-								(p) =>
-									p.x > node.x + 0.5 &&
-									p.x < node.x + node.width - 0.5 &&
-									p.y > node.y + 0.5 &&
-									p.y < node.y + node.height - 0.5,
-							)
-						)
-							found.push(`${index} ${arrow.edgeId} through ${node.nodeId}`);
-					}
-					const inBox = (points: readonly Point[], label: (typeof labels)[number]) => {
-						const maxWidth = label.maxWidth ?? 160;
-						const text = wrapTextToWidth(label.text, maxWidth, label.fontSize);
-						const [width, height] = [
-							wrappedLabelWidth(text, label.fontSize, maxWidth),
-							Math.ceil(text.split("\n").length * label.fontSize * 1.35),
-						];
-						const box = { x: label.x - width / 2, y: label.y - height / 2, width, height };
-						return points.some(
-							(p) =>
-								p.x > box.x + 0.5 &&
-								p.x < box.x + box.width - 0.5 &&
-								p.y > box.y + 0.5 &&
-								p.y < box.y + box.height - 0.5,
-						);
-					};
-					const squareLine = sampled(squareLines.get(arrow.id) ?? []);
-					for (const label of labels)
-						if (inBox(along, label) && !inBox(squareLine, label))
-							found.push(`${index} ${arrow.edgeId} through ${label.id}`);
-					return found;
-				});
+				return curvedStrays(curved!, square!).map((stray) => `${index} ${stray}`);
 			});
 			expect(strays).toEqual([]);
 		}, 120_000);
 	});
 });
+
+/** A line's points every 2 units, its first `start` and last `end` units left out. */
+function sampledLine(points: readonly Point[], start = 0, end = 0): Point[] {
+	const samples = points.slice(1).flatMap((point, at) => {
+		const from = points[at]!;
+		const steps = Math.max(1, Math.ceil(Math.hypot(point.x - from.x, point.y - from.y) / 2));
+		return Array.from({ length: steps }, (_, step) => ({
+			x: from.x + ((point.x - from.x) * (step + 1)) / steps,
+			y: from.y + ((point.y - from.y) * (step + 1)) / steps,
+		}));
+	});
+	return samples.slice(Math.ceil(start / 2), samples.length - Math.ceil(end / 2));
+}
+
+type Region = {
+	readonly x: number;
+	readonly y: number;
+	readonly width: number;
+	readonly height: number;
+};
+
+const insideRegion = (point: Point, box: Region, inset: number) =>
+	point.x > box.x + inset &&
+	point.x < box.x + box.width - inset &&
+	point.y > box.y + inset &&
+	point.y < box.y + box.height - inset;
+
+/** Whether a point lies inside the shape a node draws: a diamond's or an ellipse's, else its box. */
+function insideNodeShape(point: Point, node: Region & { readonly shape: string }): boolean {
+	if (node.shape !== "diamond" && node.shape !== "ellipse" && node.shape !== "circle")
+		return insideRegion(point, node, 0.5);
+	const [halfWidth, halfHeight] = [node.width / 2, node.height / 2];
+	const dx = Math.abs(point.x - node.x - halfWidth) / halfWidth;
+	const dy = Math.abs(point.y - node.y - halfHeight) / halfHeight;
+	const inner = 1 - 0.5 / Math.min(halfWidth, halfHeight);
+	return node.shape === "diamond" ? dx + dy < inner : dx * dx + dy * dy < inner * inner;
+}
+
+/**
+ * Where a curved scene's lines stray from what its square routing keeps: a
+ * line drawn square; a line into a node it does not join, or into its own
+ * ends' nodes past the straight runs (18 out, 32 in) that meet them where its
+ * square route keeps out; into a label its square route kept clear of; into a
+ * zone or group neither end sits in; or out of one both ends sit in.
+ */
+function curvedStrays(curved: RenderedDiagramScene, square: RenderedDiagramScene): string[] {
+	const nodes = curved.elements.flatMap((e) =>
+		e.type === "node" && e.rendererRole === undefined ? [e] : [],
+	);
+	const labels = curved.elements.flatMap((e) =>
+		e.type === "text" && e.containerId === undefined ? [e] : [],
+	);
+	const regions = curved.elements.flatMap((e) =>
+		e.type === "frame" || (e.type === "node" && e.rendererRole === "zone") ? [e] : [],
+	);
+	const boxOf = new Map(nodes.map((node) => [node.nodeId, node]));
+	const squareLines = new Map(
+		square.elements.flatMap((e) => (e.type === "arrow" ? [[e.id, e.points] as const] : [])),
+	);
+	const labelBox = (label: (typeof labels)[number]): Region => {
+		const maxWidth = label.maxWidth ?? 160;
+		const text = wrapTextToWidth(label.text, maxWidth, label.fontSize);
+		const [width, height] = [
+			wrappedLabelWidth(text, label.fontSize, maxWidth),
+			Math.ceil(text.split("\n").length * label.fontSize * 1.35),
+		];
+		return { x: label.x - width / 2, y: label.y - height / 2, width, height };
+	};
+	return curved.elements.flatMap((arrow) => {
+		if (arrow.type !== "arrow") return [];
+		const found: string[] = [];
+		if (arrow.curved !== true) found.push(`${arrow.edgeId} drawn square`);
+		const squareRoute = squareLines.get(arrow.id) ?? [];
+		for (const node of nodes) {
+			const [source, target] = [
+				node.nodeId === arrow.sourceNodeId,
+				node.nodeId === arrow.targetNodeId,
+			];
+			const enters = (points: readonly Point[]) =>
+				sampledLine(points, source ? 18 : 0, target ? 32 : 0).some((point) =>
+					insideNodeShape(point, node),
+				);
+			if (enters(arrow.points) && (!(source || target) || !enters(squareRoute)))
+				found.push(`${arrow.edgeId} through ${node.nodeId}`);
+		}
+		const along = sampledLine(arrow.points);
+		const squareLine = sampledLine(squareRoute);
+		for (const label of labels) {
+			const box = labelBox(label);
+			if (
+				along.some((point) => insideRegion(point, box, 0.5)) &&
+				!squareLine.some((point) => insideRegion(point, box, 0.5))
+			)
+				found.push(`${arrow.edgeId} through ${label.id}`);
+		}
+		const [from, to] = [boxOf.get(arrow.sourceNodeId), boxOf.get(arrow.targetNodeId)];
+		for (const region of regions) {
+			const holds = (node: Region | undefined) =>
+				node !== undefined && insideRegion(node, region, -0.5);
+			const [holdsSource, holdsTarget] = [holds(from), holds(to)];
+			if (!holdsSource && !holdsTarget && along.some((point) => insideRegion(point, region, 0.5)))
+				found.push(`${arrow.edgeId} into ${region.id}`);
+			if (holdsSource && holdsTarget && along.some((point) => !insideRegion(point, region, -0.5)))
+				found.push(`${arrow.edgeId} out of ${region.id}`);
+		}
+		return found;
+	});
+}
 
 const GROUP_LABELS = [
 	"Finance",
@@ -1684,6 +1732,22 @@ describe("grouped routing fuzz", () => {
 			expect(moreSharedThanPinned("grouped", direction, counts)).toEqual([]);
 			expect(moreTouchesThanPinned("grouped", direction, counts)).toEqual([]);
 		}, 60_000);
+
+		it("curves every grouped flowchart into no node, no group neither end is in, and out of none both are", () => {
+			const strays = flowcharts.flatMap((spec, index) => {
+				const curved = renderIntermediateDiagram(
+					parseFlowchartDiagram({
+						...spec,
+						type: "flowchart",
+						layout: { direction, edgeRouting: "curved" },
+					}),
+				);
+				return curvedStrays(curved, rendered(direction)[index]!).map(
+					(stray) => `${index} ${stray}`,
+				);
+			});
+			expect(strays).toEqual([]);
+		}, 120_000);
 	});
 
 	it.each(Object.keys(groupFixtures) as (keyof typeof groupFixtures)[])(
@@ -2071,6 +2135,19 @@ describe("zoned routing fuzz", () => {
 			expect(moreHeadsThanPinned("zoned", direction, counts)).toEqual([]);
 			expect(moreSharedThanPinned("zoned", direction, counts)).toEqual([]);
 			expect(moreTouchesThanPinned("zoned", direction, counts)).toEqual([]);
+		}, 120_000);
+
+		it("curves every zoned flowchart into no node, no zone neither end is in, and out of none both are", () => {
+			const strays = parsed(direction).flatMap((diagram, index) =>
+				curvedStrays(
+					renderIntermediateDiagram({
+						...diagram,
+						layout: { ...diagram.layout, edgeRouting: "curved" },
+					}),
+					rendered(direction)[index]!,
+				).map((stray) => `${index} ${stray}`),
+			);
+			expect(strays).toEqual([]);
 		}, 120_000);
 	});
 
