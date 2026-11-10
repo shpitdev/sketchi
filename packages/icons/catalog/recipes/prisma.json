@@ -14,8 +14,8 @@
 				[3.8, 15.5]
 			],
 			"closed": true,
-			"stroke": "#2d3748",
-			"fill": "#2d3748"
+			"stroke": "ink",
+			"fill": "ink"
 		},
 		{
 			"kind": "stroke",

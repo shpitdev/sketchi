@@ -20,8 +20,8 @@
 			],
 			"smooth": true,
 			"closed": true,
-			"stroke": "#000000",
-			"fill": "#000000"
+			"stroke": "ink",
+			"fill": "ink"
 		},
 		{
 			"kind": "stroke",
@@ -34,8 +34,8 @@
 			],
 			"smooth": true,
 			"closed": true,
-			"stroke": "#000000",
-			"fill": "#000000"
+			"stroke": "ink",
+			"fill": "ink"
 		}
 	]
 }

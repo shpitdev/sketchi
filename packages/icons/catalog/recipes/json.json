@@ -6,8 +6,8 @@
 			"cy": 12.5,
 			"rx": 10.5,
 			"ry": 10.5,
-			"stroke": "#313131",
-			"fill": "#313131"
+			"stroke": "ink",
+			"fill": "ink"
 		},
 		{
 			"kind": "stroke",
@@ -45,7 +45,7 @@
 				[19, 6]
 			],
 			"smooth": true,
-			"stroke": "#151515",
+			"stroke": "ink",
 			"pen": 2
 		}
 	]

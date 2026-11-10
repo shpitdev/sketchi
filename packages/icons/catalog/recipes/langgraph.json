@@ -7,8 +7,8 @@
 			"width": 22,
 			"height": 12,
 			"rounded": true,
-			"stroke": "#1c3c3c",
-			"fill": "#1c3c3c"
+			"stroke": "ink",
+			"fill": "ink"
 		},
 		{
 			"kind": "stroke",
