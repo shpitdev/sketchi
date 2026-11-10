@@ -7,13 +7,20 @@ Public SVG search, copy, download, HTTP API, and MCP surface for Sketchi.
 `@sketchi/icon-catalog` (`packages/icons/catalog`) owns the icon pipeline
 output, the SVG sources, the generated manifest, and ranked search. Before
 `dev`, `build`, and Storybook, `pnpm nx sync-catalog-assets icons` publishes
-two ignored copies into `public/`:
+ignored copies into `public/`:
 
 - `public/icons-manifest.json` is the browser contract. It contains only slug,
   display name, collection, aliases, keywords, SVG path, bytes, viewBox, and an
   optional variant.
 - `public/output/upload-ready/svg/` holds the SVG files at their stable public
   URLs. Worker routes read them through the `ASSETS` binding.
+- `public/icon-drawings.json` holds each catalog mark's hand-drawn recipe,
+  keyed by slug (865 marks, about 75 KB with gzip). The page fetches it after
+  the manifest for the grid's hand-drawn view and the drawing on each icon's
+  details; if it fails, the SVG library is unchanged.
+- `public/sketchi-icons.excalidrawlib` is the same set as one Excalidraw
+  library (about 2.5 MB, 200 KB with gzip), built with the elements the
+  "Copy for Excalidraw" actions paste.
 
 The browser fetches one compact metadata manifest, then lazily loads only the
 SVGs visible in the grid. The current 1,412-icon manifest is about 385 KB raw

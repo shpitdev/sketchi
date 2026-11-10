@@ -19,6 +19,8 @@ vitest.config.*.timestamp*
 
 # Generated from @sketchi/icon-catalog by the icons sync-catalog-assets target.
 apps/icons/public/icons-manifest.json
+apps/icons/public/icon-drawings.json
+apps/icons/public/sketchi-icons.excalidrawlib
 apps/icons/public/output/
 apps/playground/public/node-logos/
 .vitest

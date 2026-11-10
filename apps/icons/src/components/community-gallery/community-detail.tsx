@@ -4,7 +4,7 @@ import { useRef } from "react";
 import type { CommunityIconEntry } from "../../lib/community-client.js";
 import { useDialogFocus } from "../../lib/use-dialog-focus.js";
 import { PreviewToggle, type PreviewMode } from "../preview-toggle/index.js";
-import { RecipePreview } from "./recipe-preview.js";
+import { RecipePreview } from "../recipe-preview/index.js";
 
 export type CommunityDetailAction = "copy-excalidraw" | "copy-slug" | "download";
 

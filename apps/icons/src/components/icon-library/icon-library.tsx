@@ -1,8 +1,10 @@
 import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import { useHotkeys, type UseHotkeyDefinition } from "@tanstack/react-hotkeys";
+import { Download } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { formatCollectionLabel, type IconManifest, type SketchiIcon } from "@sketchi/icon-catalog";
+import { DRAWINGS_LIBRARY_PATH, type IconDrawings } from "../../lib/drawings.js";
 import { filterIcons, toggleCollection } from "../../lib/filter.js";
 import { PLAYGROUND_URL, REPO_URL, SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
 import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
@@ -23,6 +25,7 @@ import { IconsChrome } from "./icons-chrome.js";
 import { IconToolbar } from "./icon-toolbar.js";
 import { SelectionBar } from "./selection-bar.js";
 import { type SelectionAction, useIconSources } from "./use-icon-sources.js";
+import { type IconView, ViewSwitch } from "./view-switch.js";
 
 export type { IconManifest, SketchiIcon } from "@sketchi/icon-catalog";
 
@@ -34,12 +37,15 @@ type LoadStatus = "error" | "loading" | "ready";
 
 export interface IconLibraryProps {
 	readonly data?: IconManifest;
+	/** Hand-drawn versions of catalog marks, keyed by slug; the view switch appears once any load. */
+	readonly drawings?: IconDrawings;
 	readonly errorMessage?: string;
 	readonly homeHref?: string;
 	/** Collections to filter by on first render. Empty means all. */
 	readonly initialCollections?: readonly string[];
 	readonly initialPreviewMode?: PreviewMode;
 	readonly initialQuery?: string;
+	readonly initialView?: IconView;
 	readonly onRetry?: () => void;
 	readonly status?: LoadStatus;
 }
@@ -49,6 +55,8 @@ const emptyData: IconManifest = {
 	summary: { collectionCounts: {}, totalIcons: 0 },
 	version: 1,
 };
+
+const noDrawings: IconDrawings = {};
 
 const noCollections: readonly string[] = [];
 
@@ -90,11 +98,13 @@ function plural(count: number, one: string, many: string): string {
 
 export function IconLibrary({
 	data = emptyData,
+	drawings = noDrawings,
 	errorMessage,
 	homeHref = SKETCHI_WEB_HOME_URL,
 	initialCollections = noCollections,
 	initialPreviewMode = "light",
 	initialQuery = "",
+	initialView = "svg",
 	onRetry,
 	status = "ready",
 }: IconLibraryProps) {
@@ -103,6 +113,11 @@ export function IconLibrary({
 		() => new Set(initialCollections),
 	);
 	const [previewMode, setPreviewMode] = useState<PreviewMode>(initialPreviewMode);
+	const hasDrawings = Object.keys(drawings).length > 0;
+	const [chosenView, setView] = useState<IconView>(initialView);
+	// Until the drawings load, every mark shows its SVG.
+	const view: IconView = hasDrawings ? chosenView : "svg";
+	const drawingFor = (icon: SketchiIcon) => (view === "drawn" ? drawings[icon.slug] : undefined);
 	const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 	const [highlightedIndex, setHighlightedIndex] = useState(NO_ACTIVE_INDEX);
 	const [paletteOpen, setPaletteOpen] = useState(false);
@@ -125,10 +140,10 @@ export function IconLibrary({
 			),
 		[data.summary.collectionCounts],
 	);
-	const results = useMemo(
-		() => filterIcons(data.icons, { collections, query }),
-		[collections, data.icons, query],
-	);
+	const results = useMemo(() => {
+		const matches = filterIcons(data.icons, { collections, query });
+		return view === "drawn" ? matches.filter((icon) => drawings[icon.slug]) : matches;
+	}, [collections, data.icons, drawings, query, view]);
 	const filtered = query.trim() !== "" || collections.size > 0;
 	// A highlight past the end of the current results (for example after the
 	// manifest changes) reads as no highlight.
@@ -276,9 +291,17 @@ export function IconLibrary({
 					: results[activeIndex];
 			if (!icon) return;
 			event.preventDefault();
-			void copySvg(icon);
+			void copySvg(icon, view === "drawn" ? drawings[icon.slug] : undefined);
 		},
-		[activeIndex, copySvg, results],
+		[activeIndex, copySvg, drawings, results, view],
+	);
+
+	const changeView = useCallback(
+		(next: IconView) => {
+			setView(next);
+			resetBrowsing();
+		},
+		[resetBrowsing],
 	);
 
 	/**
@@ -343,6 +366,16 @@ export function IconLibrary({
 			id: "clear-filters",
 			name: "Clear search and filters",
 			run: clearFilters,
+		}),
+		...commandsWhen(hasDrawings, {
+			id: "view",
+			name: view === "svg" ? "Show hand-drawn icons" : "Show SVG icons",
+			run: () => changeView(view === "svg" ? "drawn" : "svg"),
+		}),
+		...commandsWhen(hasDrawings, {
+			id: "download-drawings",
+			name: "Download the hand-drawn Excalidraw library",
+			run: () => window.location.assign(DRAWINGS_LIBRARY_PATH),
 		}),
 		{
 			id: "preview",
@@ -539,6 +572,17 @@ export function IconLibrary({
 								<p aria-live="polite" className="icons-results-bar__count" role="status">
 									{status === "ready" ? plural(results.length, "icon", "icons") : ""}
 								</p>
+								{hasDrawings ? (
+									<div className="icons-results-bar__view">
+										<ViewSwitch onChange={changeView} value={view} />
+										{view === "drawn" ? (
+											<a className="icons-download" download href={DRAWINGS_LIBRARY_PATH}>
+												<Download aria-hidden="true" />
+												<span>Excalidraw library</span>
+											</a>
+										) : null}
+									</div>
+								) : null}
 								{showSelectResults ? (
 									<label className="icons-select-results">
 										<input
@@ -607,28 +651,32 @@ export function IconLibrary({
 							{status === "ready" && results.length ? (
 								<>
 									<section aria-label="Icon results" className="icons-grid" id="icon-results">
-										{visibleIcons.map((icon, index) => (
-											<IconCard
-												active={index === activeIndex}
-												copied={copiedSlug === icon.slug}
-												copying={copyingSlug === icon.slug}
-												icon={icon}
-												key={icon.slug}
-												onCopy={(picked) => void copySvg(picked)}
-												onDetails={(picked) => {
-													setDetail({
-														opener:
-															document.activeElement instanceof HTMLElement
-																? document.activeElement
-																: null,
-														slug: picked.slug,
-													});
-												}}
-												onToggleSelected={toggleSelected}
-												previewMode={previewMode}
-												selected={selectedSlugs.has(icon.slug)}
-											/>
-										))}
+										{visibleIcons.map((icon, index) => {
+											const drawing = drawingFor(icon);
+											return (
+												<IconCard
+													active={index === activeIndex}
+													copied={copiedSlug === icon.slug}
+													copying={copyingSlug === icon.slug}
+													{...(drawing ? { drawing } : {})}
+													icon={icon}
+													key={icon.slug}
+													onCopy={(picked) => void copySvg(picked, drawing)}
+													onDetails={(picked) => {
+														setDetail({
+															opener:
+																document.activeElement instanceof HTMLElement
+																	? document.activeElement
+																	: null,
+															slug: picked.slug,
+														});
+													}}
+													onToggleSelected={toggleSelected}
+													previewMode={previewMode}
+													selected={selectedSlugs.has(icon.slug)}
+												/>
+											);
+										})}
 									</section>
 									{visibleIcons.length < results.length ? (
 										<div className="icons-more">
@@ -657,8 +705,9 @@ export function IconLibrary({
 						/>
 						<IconDetail
 							{...(busyDetailAction ? { busyAction: busyDetailAction } : {})}
+							{...(drawings[detailIcon.slug] ? { drawing: drawings[detailIcon.slug] } : {})}
 							icon={detailIcon}
-							onAction={(action, icon) => void runDetailAction(action, icon)}
+							onAction={(action, icon) => void runDetailAction(action, icon, drawings[icon.slug])}
 							onClose={closeDetail}
 							onPreviewModeChange={setPreviewMode}
 							permanentUrl={permanentSvgUrl(detailIcon.slug)}

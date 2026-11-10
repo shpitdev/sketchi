@@ -441,10 +441,104 @@ kbd {
 	width: 17px;
 }
 
-.community-card__drawing {
+.community-card__drawing,
+.icon-card__drawing {
 	display: block;
 	height: 62%;
 	width: 62%;
+}
+
+/* ===================================================================== */
+/* Hand-drawn view                                                       */
+/* ===================================================================== */
+.icons-results-bar__view {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-inline-end: auto;
+}
+
+.view-switch {
+	background: var(--card);
+	border: 1px solid var(--line-2);
+	border-radius: var(--r-sm);
+	display: inline-flex;
+	gap: 2px;
+	padding: 3px;
+}
+
+.view-switch button {
+	background: transparent;
+	border-radius: 6px;
+	color: var(--ink-2);
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 600;
+	height: 30px;
+	padding-inline: 12px;
+}
+
+.view-switch button:hover {
+	color: var(--ink);
+}
+
+.view-switch button[aria-pressed="true"] {
+	background: var(--ink);
+	color: var(--paper-2);
+}
+
+.icons-download {
+	align-items: center;
+	background: var(--card);
+	border: 1px solid var(--line-2);
+	border-radius: var(--r-sm);
+	color: var(--ink);
+	display: inline-flex;
+	font-size: 13px;
+	font-weight: 600;
+	gap: 8px;
+	height: 38px;
+	padding-inline: 12px;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.icons-download:hover {
+	border-color: var(--ink-3);
+}
+
+.icons-download svg {
+	height: 16px;
+	width: 16px;
+}
+
+.icon-detail__previews {
+	display: grid;
+	gap: 10px;
+	grid-template-columns: 1fr 1fr;
+}
+
+.icon-detail__figure {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+}
+
+.icon-detail__figure .icon-detail__preview {
+	aspect-ratio: 1;
+}
+
+.icon-detail__figure figcaption {
+	color: var(--ink-2);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.icon-detail__drawing {
+	display: block;
+	height: 66%;
+	width: 66%;
 }
 
 .community-detail__drawing {
@@ -469,7 +563,8 @@ kbd {
 .icons-results-bar {
 	align-items: center;
 	display: flex;
-	gap: 16px;
+	flex-wrap: wrap;
+	gap: 8px 16px;
 	justify-content: space-between;
 	min-height: 44px;
 	padding-bottom: 8px;

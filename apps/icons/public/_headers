@@ -22,3 +22,13 @@
 
 /icons-manifest.json
   Cache-Control: public, max-age=3600
+
+/icon-drawings.json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+
+/sketchi-icons.excalidrawlib
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+  Content-Type: application/vnd.excalidrawlib+json
+  Content-Disposition: attachment; filename="sketchi-icons.excalidrawlib"

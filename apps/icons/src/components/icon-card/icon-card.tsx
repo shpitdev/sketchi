@@ -1,12 +1,16 @@
+import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 import { Check, Info } from "lucide-react";
 
 import { IconMark } from "../icon-mark/index.js";
+import { RecipePreview } from "../recipe-preview/index.js";
 
 export interface IconCardProps {
 	readonly active?: boolean;
 	readonly copied?: boolean;
 	readonly copying?: boolean;
+	/** The mark's hand-drawn version: shown instead of the SVG, and copied for Excalidraw. */
+	readonly drawing?: IconRecipe;
 	readonly icon: SketchiIcon;
 	readonly onCopy?: (icon: SketchiIcon) => void;
 	readonly onDetails?: (icon: SketchiIcon) => void;
@@ -24,6 +28,7 @@ export function IconCard({
 	active = false,
 	copied = false,
 	copying = false,
+	drawing,
 	icon,
 	onCopy,
 	onDetails,
@@ -38,7 +43,7 @@ export function IconCard({
 			data-selected={selected ? "true" : "false"}
 		>
 			<button
-				aria-label={`Copy ${icon.name} SVG`}
+				aria-label={drawing ? `Copy ${icon.name} for Excalidraw` : `Copy ${icon.name} SVG`}
 				aria-describedby={`icon-meta-${icon.slug}`}
 				className="icon-card__copy"
 				id={`icon-result-${icon.slug}`}
@@ -46,9 +51,17 @@ export function IconCard({
 				type="button"
 			>
 				<span className="icon-card__preview" data-preview={previewMode}>
-					<IconMark icon={icon} lazy surface={previewMode} />
+					{drawing ? (
+						<RecipePreview
+							className="icon-card__drawing"
+							previewMode={previewMode}
+							recipe={drawing}
+						/>
+					) : (
+						<IconMark icon={icon} lazy surface={previewMode} />
+					)}
 					<span className="icon-card__copy-cue">
-						{copying ? "Copying" : copied ? "Copied" : "Copy SVG"}
+						{copying ? "Copying" : copied ? "Copied" : drawing ? "Copy" : "Copy SVG"}
 					</span>
 				</span>
 				<span className="icon-card__name">{icon.name}</span>
