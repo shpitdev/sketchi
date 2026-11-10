@@ -39,6 +39,19 @@ describe("placeNodeLogos", () => {
 		]);
 	});
 
+	it("draws the product a two-product label names, not the platform it runs on", () => {
+		const result = placeNodeLogos(
+			[
+				{ id: "image", label: "Docker image pushed to GitHub" },
+				{ id: "cache", label: "Cloudflare-hosted Redis cache", icon: { slug: "cloudflare" } },
+				{ id: "db", label: "Postgres (Docker)" },
+			],
+			logos,
+		);
+
+		expect(icons(result.nodes)).toEqual(["docker", "redis", "postgresql"]);
+	});
+
 	it("matches aliases and keeps a logo only where its own label names it", () => {
 		const result = placeNodeLogos(
 			[

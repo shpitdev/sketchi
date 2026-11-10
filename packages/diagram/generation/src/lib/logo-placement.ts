@@ -1,4 +1,4 @@
-import { matchIconMentions } from "@sketchi/icon-catalog";
+import { matchIconMentions, primaryFirst } from "@sketchi/icon-catalog";
 
 /** A logo a prompt names: the only slugs a generated node icon may use. */
 export interface OfferedLogo {
@@ -50,9 +50,11 @@ export function placeNodeLogos<Node extends PlaceableNode>(
 		slug: logo.slug,
 	}));
 	const offered = new Map(terms.map((term) => [term.slug, term]));
+	// A label that names two products draws the one it is, not the platform it runs on.
 	const labelSlugs = nodes.map(
 		(node) =>
-			matchIconMentions(node.label, terms).find((mention) => mention.distinctive)?.icon.slug,
+			primaryFirst(matchIconMentions(node.label, terms)).find((mention) => mention.distinctive)
+				?.icon.slug,
 	);
 	const namedByLabels = new Set(labelSlugs.filter(Boolean));
 	const diagnostics: string[] = [];
