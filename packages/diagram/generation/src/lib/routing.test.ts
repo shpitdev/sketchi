@@ -6,9 +6,14 @@ import type { DiagramGenerationCandidate, DiagramGenerationRequest } from "./can
 import type { DiagramFamilyNarrowing, FamilyNarrowing } from "./family-narrowing.js";
 import { buildDiagramGenerationMessages } from "./messages.js";
 import { runDiagramGenerationWithPolicy } from "./policy.js";
-import { routeDiagramFamilies, withFamilyRoute, withNarrowedFamilyRoute } from "./routing.js";
+import {
+	namedDiagramFamilies,
+	routeDiagramFamily,
+	withFamilyRoute,
+	withNarrowedFamilyRoute,
+} from "./routing.js";
 
-describe("routing an untyped request to the families it names", () => {
+describe("routing an untyped request to the family it names", () => {
 	it.each([
 		["Make a flowchart of how a refund is approved", "flowchart"],
 		["swimlane diagram of onboarding: HR, IT, Manager", "flowchart"],
@@ -27,32 +32,29 @@ describe("routing an untyped request to the families it names", () => {
 		["mockup of a settings screen with two toggles", "wireframe"],
 		["2x2 of features by effort and value", "quadrant"],
 	] as const)("routes %j to %s", (request, family) => {
-		expect(routeDiagramFamilies(request)).toEqual({ cue: "named", families: [family] });
+		expect(routeDiagramFamily(request)).toEqual({ cue: "named", family });
 	});
 
-	it("keeps every family a request names, in registry order", () => {
-		expect(
-			routeDiagramFamilies("a gantt chart of the launch, with the timeline of milestones"),
-		).toEqual({
-			cue: "named",
-			families: ["timeline", "gantt"],
-		});
+	it("leaves a request that names several families to Jev, which decides among them", () => {
+		const request = "a gantt chart of the launch, with the timeline of milestones";
+		expect(namedDiagramFamilies(request)).toEqual(["timeline", "gantt"]);
+		expect(routeDiagramFamily(request)).toBeUndefined();
 	});
 
 	it("does not read a family into a generic chart, diagram or code", () => {
-		expect(routeDiagramFamilies("make a chart of this")).toBeUndefined();
-		expect(routeDiagramFamilies("public class Library { private String name; }")).toBeUndefined();
-		expect(routeDiagramFamilies("draw a diagram of how our team works together")).toBeUndefined();
+		expect(routeDiagramFamily("make a chart of this")).toBeUndefined();
+		expect(routeDiagramFamily("public class Library { private String name; }")).toBeUndefined();
+		expect(routeDiagramFamily("draw a diagram of how our team works together")).toBeUndefined();
 	});
 
 	it("sends a process, pipeline or architecture request to the flowchart rules", () => {
-		expect(routeDiagramFamilies("diagram our deploy pipeline")).toEqual({
+		expect(routeDiagramFamily("diagram our deploy pipeline")).toEqual({
 			cue: "shaped",
-			families: ["flowchart"],
+			family: "flowchart",
 		});
-		expect(routeDiagramFamilies("draw our gcp setup: two subnets in one VPC")).toEqual({
+		expect(routeDiagramFamily("draw our gcp setup: two subnets in one VPC")).toEqual({
 			cue: "shaped",
-			families: ["flowchart"],
+			family: "flowchart",
 		});
 	});
 
@@ -90,57 +92,28 @@ describe("the prompt of a routed request", () => {
 		expect(routedMessages.user).not.toContain("Type authority");
 	});
 
-	it("carries only the rules of the two or three families a request names", () => {
-		const prompt = routed("a gantt chart and a timeline of the launch");
-		expect(prompt.routedType).toBeUndefined();
-		expect(prompt.routedTypes).toEqual(["timeline", "gantt"]);
-		const { system, user } = buildDiagramGenerationMessages(prompt);
-		expect(ruleTitles(system)).toEqual(["Timeline IR rules:", "Gantt IR rules:"]);
-		expect(system).toContain(
-			'- Set diagram.type to whichever of "timeline" or "gantt" the scenario requests, or the closest of them.',
-		);
-		expect(system).not.toContain("A swimlane or architecture request");
-		// The rules every family needs, which the full prompt states in other families' sections.
-		expect(system).toContain("Return diagram.id, a short kebab-case id.");
-		expect(system).toContain("Never round a number the scenario states");
-		expect(user).not.toContain("Type authority");
-	});
-
-	it("keeps the full prompt when the request names no family, or more than three", () => {
-		for (const request of [
-			"draw it",
-			"a gantt chart, a timeline, a mind map and a venn of the launch",
-		]) {
+	it("keeps the full prompt when the request names no family, or several", () => {
+		for (const request of ["draw it", "a gantt chart and a timeline of the launch"]) {
 			const prompt = routed(request);
 			expect(prompt.routedType).toBeUndefined();
-			expect(prompt.routedTypes).toBeUndefined();
 			expect(ruleTitles(buildDiagramGenerationMessages(prompt).system)).toHaveLength(
 				DIAGRAM_TYPES.length,
 			);
 		}
 	});
 
-	it("names the swimlane rule and logos only for the narrowed families that draw them", () => {
+	it("names the logos only for a routed family that draws them", () => {
 		const logos = [{ name: "Postgres", slug: "postgresql" }];
-		const withFlowchart = buildDiagramGenerationMessages({
-			id: "x",
-			logos,
-			request: "x",
-			routedTypes: ["flowchart", "er"],
-		});
-		expect(withFlowchart.system).toContain("A swimlane or architecture request");
-		expect(withFlowchart.user).toContain('In a flowchart, set "logos": true');
-		const without = buildDiagramGenerationMessages({
-			id: "x",
-			logos,
-			request: "x",
-			routedTypes: ["er", "class"],
-		});
-		expect(without.system).not.toContain("A swimlane or architecture request");
-		expect(without.user).not.toContain("Available logos");
+		expect(
+			buildDiagramGenerationMessages({ id: "x", logos, request: "x", routedType: "flowchart" })
+				.user,
+		).toContain('In a flowchart, set "logos": true');
+		expect(
+			buildDiagramGenerationMessages({ id: "x", logos, request: "x", routedType: "er" }).user,
+		).not.toContain("Available logos");
 	});
 
-	it.effect("keeps the routed families on a repair", () =>
+	it.effect("keeps the routed family on a repair", () =>
 		Effect.gen(function* () {
 			const seen: DiagramGenerationRequest[] = [];
 			const invalid: DiagramGenerationCandidate = {
@@ -170,84 +143,91 @@ describe("the prompt of a routed request", () => {
 	);
 });
 
-describe("narrowing a request its words cannot place", () => {
+describe("deciding the family of a request its words cannot place", () => {
 	const untyped = (request: string): DiagramGenerationRequest => ({
 		model: "m",
 		prompt: { id: "x", request },
 	});
 	/** A narrowing that answers `result` and records what it was asked. */
 	const narrowingThat = (result: FamilyNarrowing) => {
-		const asked: string[] = [];
+		const asked: [string, readonly string[] | undefined][] = [];
 		const service: DiagramFamilyNarrowing["Service"] = {
-			narrow: (request) => Effect.sync(() => (asked.push(request), result)),
+			narrow: (request, named) => Effect.sync(() => (asked.push([request, named]), result)),
 		};
 		return { asked, service };
 	};
 
-	it.effect("builds the typed prompt of the one family Jev settles", () =>
+	it.effect("builds the typed prompt of the family Jev decides", () =>
 		Effect.gen(function* () {
 			const { asked, service } = narrowingThat({
-				_tag: "Narrowed",
-				families: ["sequence"],
+				_tag: "Decided",
+				family: "sequence",
+				by: "sure",
 				shortlist: ["process_flowchart", "sequence_diagram", "state_machine"],
 			});
 			const routed = yield* withNarrowedFamilyRoute(
 				untyped("The browser asks the API, which asks the database."),
 				service,
 			);
-			expect(asked).toEqual(["The browser asks the API, which asks the database."]);
-			expect(routed.route).toEqual({ cue: "jev", families: ["sequence"] });
+			expect(asked).toEqual([["The browser asks the API, which asks the database.", undefined]]);
+			expect(routed.route).toEqual({ cue: "jev", family: "sequence" });
 			expect(routed.request.prompt.routedType).toBe("sequence");
 		}),
 	);
 
-	it.effect("carries only the few families Jev keeps", () =>
+	it.effect("asks Jev to decide among the families a request names", () =>
 		Effect.gen(function* () {
-			const narrowed: FamilyNarrowing = {
-				_tag: "Narrowed",
-				families: ["flowchart", "sequence"],
-				shortlist: ["process_flowchart", "sequence_diagram", "state_machine"],
+			const decided: FamilyNarrowing = {
+				_tag: "Decided",
+				family: "gantt",
+				by: "separated",
+				shortlist: ["timeline", "gantt_chart"],
 			};
+			const { asked, service } = narrowingThat(decided);
 			const routed = yield* withNarrowedFamilyRoute(
-				untyped("How a pull request gets merged."),
-				narrowingThat(narrowed).service,
+				untyped("a gantt chart and a timeline of the launch"),
+				service,
 			);
-			expect(routed.request.prompt.routedTypes).toEqual(["flowchart", "sequence"]);
-			expect(routed.narrowing).toEqual(narrowed);
+			expect(asked).toEqual([
+				["a gantt chart and a timeline of the launch", ["timeline", "gantt"]],
+			]);
+			expect(routed.route).toEqual({ cue: "jev", family: "gantt" });
+			expect(routed.request.prompt.routedType).toBe("gantt");
+			expect(routed.narrowing).toEqual(decided);
 		}),
 	);
 
 	it.effect("asks Jev about a flowchart-shaped request, which the words alone route", () =>
 		Effect.gen(function* () {
 			const request = untyped("The money that flows from each source to each fund.");
-			expect(withFamilyRoute(request).route).toEqual({ cue: "shaped", families: ["flowchart"] });
+			expect(withFamilyRoute(request).route).toEqual({ cue: "shaped", family: "flowchart" });
 			const { asked, service } = narrowingThat({
-				_tag: "Narrowed",
-				families: ["sankey"],
+				_tag: "Decided",
+				family: "sankey",
+				by: "sure",
 				shortlist: ["process_flowchart", "data_chart", "sankey_diagram"],
 			});
 			const routed = yield* withNarrowedFamilyRoute(request, service);
 			expect(asked).toHaveLength(1);
-			expect(routed.route).toEqual({ cue: "jev", families: ["sankey"] });
+			expect(routed.route).toEqual({ cue: "jev", family: "sankey" });
 		}),
 	);
 
-	it.effect("keeps the full prompt when Jev settles nothing", () =>
+	it.effect("leaves the family to the generation model when no kind fits", () =>
 		Effect.gen(function* () {
 			for (const request of ["The parts of a car engine.", "Our deployment pipeline."]) {
-				const unnarrowed: FamilyNarrowing = {
-					_tag: "Unnarrowed",
+				const undecided: FamilyNarrowing = {
+					_tag: "Undecided",
 					reason: "no kind fits",
 					shortlist: [],
 				};
 				const routed = yield* withNarrowedFamilyRoute(
 					untyped(request),
-					narrowingThat(unnarrowed).service,
+					narrowingThat(undecided).service,
 				);
 				expect(routed.route).toBeUndefined();
 				expect(routed.request.prompt.routedType).toBeUndefined();
-				expect(routed.request.prompt.routedTypes).toBeUndefined();
-				expect(routed.narrowing).toEqual(unnarrowed);
+				expect(routed.narrowing).toEqual(undecided);
 			}
 		}),
 	);
@@ -265,7 +245,7 @@ describe("narrowing a request its words cannot place", () => {
 				untyped("Our deployment pipeline."),
 				narrowingThat(failed).service,
 			);
-			expect(shaped.route).toEqual({ cue: "shaped", families: ["flowchart"] });
+			expect(shaped.route).toEqual({ cue: "shaped", family: "flowchart" });
 			expect(shaped.request.prompt.routedType).toBe("flowchart");
 			expect(shaped.narrowing).toEqual(failed);
 		}),
@@ -274,8 +254,9 @@ describe("narrowing a request its words cannot place", () => {
 	it.effect("asks nothing of a request that is typed, revises a diagram, or names its family", () =>
 		Effect.gen(function* () {
 			const { asked, service } = narrowingThat({
-				_tag: "Narrowed",
-				families: ["venn"],
+				_tag: "Decided",
+				family: "venn",
+				by: "sure",
 				shortlist: ["venn_diagram"],
 			});
 			yield* withNarrowedFamilyRoute(
@@ -288,7 +269,7 @@ describe("narrowing a request its words cannot place", () => {
 			);
 			const named = yield* withNarrowedFamilyRoute(untyped("a sankey of our budget"), service);
 			expect(asked).toEqual([]);
-			expect(named.route).toEqual({ cue: "named", families: ["sankey"] });
+			expect(named.route).toEqual({ cue: "named", family: "sankey" });
 		}),
 	);
 });

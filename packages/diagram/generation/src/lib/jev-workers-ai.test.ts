@@ -99,7 +99,7 @@ describe("Jev on Workers AI", () => {
 		}),
 	);
 
-	it.effect("narrows an untyped request through the binding", () =>
+	it.effect("decides an untyped request's family through the binding", () =>
 		Effect.gen(function* () {
 			// Timeline takes 0.9 of each choice; the other options share the rest.
 			const choice = (labels: readonly string[]) =>
@@ -111,7 +111,7 @@ describe("Jev on Workers AI", () => {
 					Object.entries(questions).map(([key, question]) => [
 						key,
 						question.type === "noul"
-							? { type: "noul", noul: key === "any" || key === "fits::timeline" ? 0.95 : 0.05 }
+							? { type: "noul", noul: key === "any" ? 0.95 : 0.05 }
 							: {
 									type: "choice",
 									choice: "timeline",
@@ -126,7 +126,7 @@ describe("Jev on Workers AI", () => {
 				const narrowing = yield* DiagramFamilyNarrowing;
 				return yield* narrowing.narrow("When each release ships");
 			}).pipe(Effect.provide(workersAiFamilyNarrowingLayer({ ai })));
-			expect(result).toMatchObject({ _tag: "Narrowed", families: ["timeline"] });
+			expect(result).toMatchObject({ _tag: "Decided", family: "timeline", by: "sure" });
 			expect(calls.map((call) => call.model)).toEqual([
 				"typesafe/jev-1.14.0",
 				"typesafe/jev-1.14.0",

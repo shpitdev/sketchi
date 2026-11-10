@@ -3,7 +3,6 @@ import { Effect } from "effect";
 
 import type { DiagramGenerationRequest } from "./candidates.js";
 import type { DiagramFamilyNarrowing, FamilyNarrowing } from "./family-narrowing.js";
-import { FAMILY_THRESHOLDS } from "./family-questions.js";
 
 /**
  * Words that name a family outright. Bare "chart" and "diagram" name none: an
@@ -39,63 +38,62 @@ const FLOWCHART_SHAPED =
 	/\b(?:flows?|pipelines?|process(?:es)?|workflows?|architecture|infrastructure|setup|topology|zones?|subnets?|VPCs?|clusters?|data ?centers?)\b/iu;
 
 export interface DiagramFamilyRoute {
-	/** The families whose rules the prompt carries, in registry order. */
-	readonly families: readonly DiagramTypeValue[];
+	/** The one family whose rules the prompt carries. */
+	readonly family: DiagramTypeValue;
 	/**
-	 * "named": the request names these families; "shaped": it describes a flowchart's subject;
-	 * "jev": Jev narrowed the request to them.
+	 * "named": the request names it; "shaped": it describes a flowchart's subject; "jev": Jev's
+	 * answers decided it.
 	 */
 	readonly cue: "named" | "shaped" | "jev";
 }
 
+/** The families an untyped request names outright, in registry order. */
+export function namedDiagramFamilies(request: string): DiagramTypeValue[] {
+	return DIAGRAM_TYPES.filter((type) => FAMILY_NAMES[type].test(request));
+}
+
 /**
- * The families an untyped request is about, read from its own words, or
- * undefined when it gives no cue. A request that names several families gets
- * all of them, so the model still chooses between them.
+ * The family an untyped request's own words settle: the one family it names, or a flowchart
+ * when it names none and describes a process, a pipeline or an architecture. Undefined when its
+ * words name several families, or give no cue.
  */
-export function routeDiagramFamilies(request: string): DiagramFamilyRoute | undefined {
-	const named = DIAGRAM_TYPES.filter((type) => FAMILY_NAMES[type].test(request));
-	if (named.length > 0) return { cue: "named", families: named };
-	if (FLOWCHART_SHAPED.test(request)) {
-		return { cue: "shaped", families: ["flowchart"] };
+export function routeDiagramFamily(request: string): DiagramFamilyRoute | undefined {
+	const named = namedDiagramFamilies(request);
+	if (named.length === 1 && named[0]) return { cue: "named", family: named[0] };
+	if (named.length === 0 && FLOWCHART_SHAPED.test(request)) {
+		return { cue: "shaped", family: "flowchart" };
 	}
 	return undefined;
 }
 
-/** A request the router may narrow: no type, no routed family, and no diagram to revise. */
+/** A request the router may route: no type, no routed family, and no diagram to revise. */
 function isRoutable(request: DiagramGenerationRequest): boolean {
 	const { prompt } = request;
-	return !prompt.requestedType && !prompt.routedType && !prompt.routedTypes && !prompt.base;
+	return !prompt.requestedType && !prompt.routedType && !prompt.base;
 }
 
-/**
- * The request built for `route`: one family's typed prompt, without requiring the type, or a
- * prompt with only a few families' rules. More families than that leave it whole.
- */
+/** The request built as `route`'s family's typed prompt, without requiring the type. */
 function routed(
 	request: DiagramGenerationRequest,
 	route: DiagramFamilyRoute,
-): { readonly request: DiagramGenerationRequest; readonly route?: DiagramFamilyRoute } {
-	const [only, ...others] = route.families;
-	if (!only || route.families.length > FAMILY_THRESHOLDS.maxFamilies) return { request };
-	const prompt =
-		others.length === 0
-			? { ...request.prompt, routedType: only }
-			: { ...request.prompt, routedTypes: route.families };
-	return { request: { ...request, prompt }, route };
+): { readonly request: DiagramGenerationRequest; readonly route: DiagramFamilyRoute } {
+	return {
+		request: { ...request, prompt: { ...request.prompt, routedType: route.family } },
+		route,
+	};
 }
 
 /**
- * The request built for the families its words name, when it names no type and revises no
- * diagram: one family's typed prompt, or a prompt with only the two or three it names. Repairs
- * keep the same families.
+ * The request built for the family its words settle, when it names no type and revises no
+ * diagram: that family's typed prompt. Otherwise the request as it is, with every family's
+ * rules. Repairs keep the same family.
  */
 export function withFamilyRoute(request: DiagramGenerationRequest): {
 	readonly request: DiagramGenerationRequest;
 	readonly route?: DiagramFamilyRoute;
 } {
 	if (!isRoutable(request)) return { request };
-	const route = routeDiagramFamilies(request.prompt.request);
+	const route = routeDiagramFamily(request.prompt.request);
 	return route ? routed(request, route) : { request };
 }
 
@@ -107,27 +105,31 @@ export interface NarrowedFamilyRoute {
 }
 
 /**
- * As withFamilyRoute when `narrowing` is not given. With it, a request that names no family is
- * narrowed by Jev, a flowchart-shaped one included: Jev reads such a request better than the
- * shape words do. When Jev leaves it unnarrowed, the prompt carries every family's rules; when
- * Jev fails, the words route it as they would without Jev. What Jev decided comes back with
- * it, for the request's span.
+ * As withFamilyRoute when `narrowing` is not given. With it, the family is decided in code: a
+ * request that names one family gets it, and Jev's answers decide every other one's, among the
+ * families it names when it names several, a flowchart-shaped one included, since Jev reads such
+ * a request better than the shape words do. The generation model chooses only when Jev finds
+ * that no kind fits, with every family's rules, or when Jev fails, as the words alone would
+ * route it. What Jev decided comes back with it, for the request's span.
  */
 export const withNarrowedFamilyRoute = Effect.fnUntraced(function* (
 	request: DiagramGenerationRequest,
 	narrowing: DiagramFamilyNarrowing["Service"] | undefined,
 ): Effect.fn.Return<NarrowedFamilyRoute> {
 	if (!narrowing || !isRoutable(request)) return withFamilyRoute(request);
-	const byWords = routeDiagramFamilies(request.prompt.request);
-	if (byWords?.cue === "named") return routed(request, byWords);
-	const narrowed = yield* narrowing.narrow(request.prompt.request);
+	const named = namedDiagramFamilies(request.prompt.request);
+	if (named.length === 1 && named[0]) return routed(request, { cue: "named", family: named[0] });
+	const narrowed = yield* narrowing.narrow(
+		request.prompt.request,
+		named.length > 1 ? named : undefined,
+	);
 	switch (narrowed._tag) {
-		case "Narrowed":
+		case "Decided":
 			return {
-				...routed(request, { cue: "jev", families: narrowed.families }),
+				...routed(request, { cue: "jev", family: narrowed.family }),
 				narrowing: narrowed,
 			};
-		case "Unnarrowed":
+		case "Undecided":
 			return { request, narrowing: narrowed };
 		case "Failed":
 			return { ...withFamilyRoute(request), narrowing: narrowed };

@@ -119,16 +119,14 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 		input: DiagramGenerationRequest,
 		provider: DiagramGenerationProviderId,
 		policy: DiagramGenerationPolicyConfig,
-		/** Jev, for an untyped request whose words name no family. */
+		/** Jev, for an untyped request whose words do not name one family. */
 		narrowing?: DiagramFamilyNarrowing["Service"],
 	) {
 		const startedAt = yield* Clock.currentTimeMillis;
 		const routed = yield* withNarrowedFamilyRoute(input, narrowing);
 		const request = routed.request;
 		yield* Effect.annotateCurrentSpan({
-			family_route: routed.route
-				? `${routed.route.cue}:${routed.route.families.join(",")}`
-				: "none",
+			family_route: routed.route ? `${routed.route.cue}:${routed.route.family}` : "none",
 			...(routed.narrowing ? familyNarrowingAttributes(routed.narrowing) : {}),
 			[SpanContent.input]: request,
 		});

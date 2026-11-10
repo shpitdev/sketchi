@@ -1,8 +1,8 @@
 /**
- * Narrows an untyped request to the diagram families it could mean, by asking Jev, so its
- * prompt carries only their rules. Jev's answers never reach the generation model: code reads
- * them through the truth table below and decides which families' rules the prompt carries.
- * A Jev error or timeout is recorded on its span and narrows nothing.
+ * Decides an untyped request's diagram family by asking Jev, so its prompt carries that one
+ * family's rules. Jev's answers never reach the generation model: code reads them through the
+ * truth table below. Only a request no kind fits, or a Jev error or timeout, is left to the
+ * generation model; each is recorded on its span.
  */
 import { recordMetric, SpanContent } from "@sketchi/observability";
 import { DIAGRAM_TYPES, type DiagramTypeValue } from "@sketchi/diagram-core";
@@ -18,17 +18,25 @@ import {
 	FAMILY_THRESHOLDS,
 	FamilyNarrowingInput,
 	type FamilyOptionName,
-	kindFitsQuestion,
+	separatingQuestion,
 	whichKindQuestion,
 	whichOfShortlistQuestion,
 } from "./family-questions.js";
 
-const { maxFamilies, no, sure, yes } = FAMILY_THRESHOLDS;
+const { no, sure, yes } = FAMILY_THRESHOLDS;
 
-/** What the truth table decides: a few families' rules, or every family's and why. */
+/**
+ * What the truth table decides: one family and the row that decided it, or no family and why.
+ * "sure": the re-check's Choice is sure of it. "separated": the separating question picked it
+ * over the runner-up. "leading": the separating question settled nothing, so the Choice's pick.
+ */
 export type FamilyDecision =
-	| { readonly _tag: "Narrowed"; readonly families: readonly DiagramTypeValue[] }
-	| { readonly _tag: "Unnarrowed"; readonly reason: string };
+	| {
+			readonly _tag: "Decided";
+			readonly family: DiagramTypeValue;
+			readonly by: "sure" | "separated" | "leading";
+	  }
+	| { readonly _tag: "Undecided"; readonly reason: string };
 
 /** What narrowing decided, with the options it re-checked, or the error that stopped it. */
 export type FamilyNarrowing =
@@ -38,12 +46,7 @@ export type FamilyNarrowing =
 /** What the request's span records of a narrowing: its outcome and the options it re-checked. */
 export function familyNarrowingAttributes(narrowing: FamilyNarrowing): Record<string, string> {
 	if (narrowing._tag === "Failed") return { family_narrowing: `failed: ${narrowing.error}` };
-	const outcome =
-		narrowing._tag === "Unnarrowed"
-			? `unnarrowed: ${narrowing.reason}`
-			: narrowing.families.length === 1
-				? "one"
-				: "several";
+	const outcome = narrowing._tag === "Undecided" ? `undecided: ${narrowing.reason}` : narrowing.by;
 	return narrowing.shortlist.length === 0
 		? { family_narrowing: outcome }
 		: { family_narrowing: outcome, family_shortlist: narrowing.shortlist.join(",") };
@@ -52,8 +55,14 @@ export function familyNarrowingAttributes(narrowing: FamilyNarrowing): Record<st
 export class DiagramFamilyNarrowing extends Context.Service<
 	DiagramFamilyNarrowing,
 	{
-		/** Never fails: a Jev error is a `Failed` narrowing, recorded on its span. */
-		readonly narrow: (request: string) => Effect.Effect<FamilyNarrowing>;
+		/**
+		 * Decides `request`'s family among every kind, or among `named`, the several families the
+		 * request names. Never fails: a Jev error is a `Failed` narrowing, recorded on its span.
+		 */
+		readonly narrow: (
+			request: string,
+			named?: readonly DiagramTypeValue[],
+		) => Effect.Effect<FamilyNarrowing>;
 	}
 >()("@sketchi/diagram-generation/DiagramFamilyNarrowing") {}
 
@@ -61,11 +70,6 @@ export class DiagramFamilyNarrowing extends Context.Service<
 // The truth table
 
 const familyOf = (option: FamilyOptionName) => FAMILY_OPTIONS[option].family;
-
-export function inRegistryOrder(families: Iterable<DiagramTypeValue>): DiagramTypeValue[] {
-	const set = new Set(families);
-	return DIAGRAM_TYPES.filter((family) => set.has(family));
-}
 
 /** A Choice's probability per family: a flowchart's two options add up. */
 export function familyProbabilities(
@@ -79,70 +83,60 @@ export function familyProbabilities(
 	return byFamily;
 }
 
-/** A Noul per family: the most likely of its options. */
-export function familyNouls(
-	nouls: ReadonlyMap<FamilyOptionName, number>,
-): Map<DiagramTypeValue, number> {
-	const byFamily = new Map<DiagramTypeValue, number>();
-	for (const [option, p] of nouls) {
-		byFamily.set(familyOf(option), Math.max(byFamily.get(familyOf(option)) ?? 0, p));
-	}
-	return byFamily;
+/** The families of a Choice from most to least likely; a tie keeps registry order. */
+function rankedFamilies(choice: Readonly<Record<string, number>>) {
+	const byFamily = familyProbabilities(choice);
+	return DIAGRAM_TYPES.filter((family) => byFamily.has(family))
+		.map((family) => ({ family, p: byFamily.get(family) ?? 0 }))
+		.sort((a, b) => b.p - a.p);
 }
 
-export function mostLikely(
-	byFamily: ReadonlyMap<DiagramTypeValue, number>,
-): { readonly family: DiagramTypeValue; readonly p: number } | undefined {
-	let best: { family: DiagramTypeValue; p: number } | undefined;
-	for (const [family, p] of byFamily) if (!best || p > best.p) best = { family, p };
+/** A family's most likely option in a Choice: the one a separating question asks about. */
+function leadingOption(
+	family: DiagramTypeValue,
+	choice: Readonly<Record<string, number>>,
+): FamilyOptionName | undefined {
+	let best: FamilyOptionName | undefined;
+	for (const option of FAMILY_OPTION_NAMES) {
+		const p = choice[option];
+		if (familyOf(option) !== family || p === undefined) continue;
+		if (!best || p > (choice[best] ?? 0)) best = option;
+	}
 	return best;
 }
 
-/** One to `maxFamilies` candidates narrow the prompt; none, or more, leave it whole. */
-export function narrowTo(families: Iterable<DiagramTypeValue>, reason: string): FamilyDecision {
-	const ordered = inRegistryOrder(families);
-	return ordered.length >= 1 && ordered.length <= maxFamilies
-		? { _tag: "Narrowed", families: ordered }
-		: {
-				_tag: "Unnarrowed",
-				reason:
-					ordered.length === 0
-						? `${reason}: no family left`
-						: `${reason}: ${ordered.length} families left`,
-			};
-}
+/** How likely `a`, rather than `b`, is the right kind, by the question separating the two. */
+export type Separation = (a: FamilyOptionName, b: FamilyOptionName) => number | undefined;
 
 /**
- * A Choice over some options and a Noul per option. A sure Choice whose Noul is a yes, with no
- * other family a clear yes, settles one family. Otherwise every family no Noul rules out, with
- * the Choice's pick unless it too is unlikely, is a candidate.
+ * One family from a re-check. A Choice at or above `sure` decides its family. Otherwise the
+ * question separating the two most likely families decides: a yes for either one picks it, and
+ * an answer between leaves the Choice's pick.
  */
-export function decideFamilies(
+export function decideFamily(
 	choice: Readonly<Record<string, number>>,
-	nouls: ReadonlyMap<FamilyOptionName, number>,
-	reason: string,
+	separation: Separation,
 ): FamilyDecision {
-	const best = mostLikely(familyProbabilities(choice));
-	if (!best) return { _tag: "Unnarrowed", reason: `${reason}: no choice` };
-	const byFamily = familyNouls(nouls);
-	const clearYes = [...byFamily].filter(([, p]) => p >= yes).map(([family]) => family);
-	if (
-		best.p >= sure &&
-		(byFamily.get(best.family) ?? 0) >= yes &&
-		clearYes.every((family) => family === best.family)
-	) {
-		return { _tag: "Narrowed", families: [best.family] };
+	const [leader, runnerUp] = rankedFamilies(choice);
+	if (!leader) return { _tag: "Undecided", reason: "no choice" };
+	if (!runnerUp || leader.p >= sure) return { _tag: "Decided", family: leader.family, by: "sure" };
+	const a = leadingOption(leader.family, choice);
+	const b = leadingOption(runnerUp.family, choice);
+	const p = a && b ? separation(a, b) : undefined;
+	if (p !== undefined && p >= yes) {
+		return { _tag: "Decided", family: leader.family, by: "separated" };
 	}
-	const candidates = [...byFamily].filter(([, p]) => p >= no).map(([family]) => family);
-	if (best.p >= no) candidates.push(best.family);
-	return narrowTo(candidates, reason);
+	if (p !== undefined && p <= no) {
+		return { _tag: "Decided", family: runnerUp.family, by: "separated" };
+	}
+	return { _tag: "Decided", family: leader.family, by: "leading" };
 }
 
 // ---------------------------------------------------------------------------------------
 // Jev requests, one span each
 
 const narrowings = Metric.counter("sketchi_family_narrowings", {
-	description: "Untyped generate requests narrowed by Jev, by outcome",
+	description: "Untyped generate requests whose family Jev decided, by outcome",
 	incremental: true,
 });
 
@@ -198,8 +192,15 @@ export type { Answers as FamilyAnswers, Question as FamilyQuestion };
 export const makeDiagramFamilyNarrowing = (options: { readonly timeoutMs: number }) =>
 	Effect.gen(function* () {
 		const model = yield* DecisionModel.DecisionModel;
-		const narrow = Effect.fn("diagramGeneration.familyNarrowing")(function* (request: string) {
-			const result = yield* narrowByRankAndRecheck(request, options.timeoutMs).pipe(
+		const narrow = Effect.fn("diagramGeneration.familyNarrowing")(function* (
+			request: string,
+			named?: readonly DiagramTypeValue[],
+		) {
+			const decided =
+				named && named.length > 1
+					? recheck("named", request, optionsOf(named), options.timeoutMs)
+					: rankAndRecheck(request, options.timeoutMs);
+			const result = yield* decided.pipe(
 				Effect.provideService(DecisionModel.DecisionModel, model),
 				Effect.catch((error): Effect.Effect<FamilyNarrowing> =>
 					Effect.succeed({ _tag: "Failed", error: error.message }),
@@ -209,12 +210,10 @@ export const makeDiagramFamilyNarrowing = (options: { readonly timeoutMs: number
 			yield* recordMetric(narrowings, 1, {
 				operation: "generate",
 				outcome:
-					result._tag === "Narrowed"
-						? result.families.length === 1
-							? "one"
-							: "several"
-						: result._tag === "Unnarrowed"
-							? "unnarrowed"
+					result._tag === "Decided"
+						? result.by
+						: result._tag === "Undecided"
+							? "undecided"
 							: "failed",
 				provider: "typesafe",
 			});
@@ -246,19 +245,58 @@ function withTimeout<A>(
 	);
 }
 
-/** The `maxFamilies` options a Choice ranks highest, in the order the options are listed. */
+/** The `shortlist` options a Choice ranks highest, in the order the options are listed. */
 function bestOptions(choice: Readonly<Record<string, number>>): FamilyOptionName[] {
 	const best = [...FAMILY_OPTION_NAMES]
 		.sort((a, b) => (choice[b] ?? 0) - (choice[a] ?? 0))
-		.slice(0, maxFamilies);
+		.slice(0, FAMILY_THRESHOLDS.shortlist);
 	return FAMILY_OPTION_NAMES.filter((option) => best.includes(option));
 }
 
+/** Every option of the given families, in the order the options are listed. */
+function optionsOf(families: readonly DiagramTypeValue[]): FamilyOptionName[] {
+	return FAMILY_OPTION_NAMES.filter((option) => families.includes(familyOf(option)));
+}
+
+const separationKey = (a: FamilyOptionName, b: FamilyOptionName) => `separate::${a}::${b}`;
+
 /**
- * Rank every option, then re-check the best three with what each draws and is not for. A
+ * Re-check `options` with what each draws and is not for, and decide one family. The question
+ * separating each two options of different families goes in the same request, though code reads
+ * one only when the Choice is not sure: the questions cost less time than a second request.
+ */
+const recheck = Effect.fnUntraced(function* (
+	round: string,
+	request: string,
+	options: readonly FamilyOptionName[],
+	timeoutMs: number,
+): Effect.fn.Return<
+	FamilyNarrowing,
+	AiError.AiError | FamilyNarrowingTimeoutError,
+	DecisionModel.DecisionModel
+> {
+	const pairs = options.flatMap((a, i) =>
+		options.slice(i + 1).flatMap((b) => (familyOf(a) === familyOf(b) ? [] : [[a, b] as const])),
+	);
+	const answers = yield* withTimeout(
+		askJev(round, request, {
+			which: whichOfShortlistQuestion(options),
+			...Object.fromEntries(pairs.map(([a, b]) => [separationKey(a, b), separatingQuestion(a, b)])),
+		}),
+		timeoutMs,
+	);
+	const separation: Separation = (a, b) => {
+		const asked = pairs.find((pair) => pair.includes(a) && pair.includes(b));
+		return asked ? distributionOf(answers, separationKey(...asked))[a] : undefined;
+	};
+	return { ...decideFamily(distributionOf(answers, "which"), separation), shortlist: options };
+});
+
+/**
+ * Rank every option, then re-check the best few with what each draws and is not for. A
  * ranking can be sure and still wrong between two near kinds, so even a sure one is re-checked.
  */
-const narrowByRankAndRecheck = Effect.fnUntraced(function* (
+const rankAndRecheck = Effect.fnUntraced(function* (
 	request: string,
 	timeoutMs: number,
 ): Effect.fn.Return<
@@ -271,30 +309,19 @@ const narrowByRankAndRecheck = Effect.fnUntraced(function* (
 		timeoutMs,
 	);
 	if (probabilityOf(ranked, "any") < no) {
-		return { _tag: "Unnarrowed", reason: "no kind fits", shortlist: [] };
+		return { _tag: "Undecided", reason: "no kind fits", shortlist: [] };
 	}
-	const shortlist = bestOptions(distributionOf(ranked, "which"));
-	const rechecked = yield* withTimeout(
-		askJev("recheck", request, {
-			which: whichOfShortlistQuestion(shortlist),
-			...Object.fromEntries(
-				shortlist.map((option) => [`fits::${option}`, kindFitsQuestion(option)]),
-			),
-		}),
+	return yield* recheck(
+		"recheck",
+		request,
+		bestOptions(distributionOf(ranked, "which")),
 		timeoutMs,
 	);
-	const fits = new Map(
-		shortlist.map((option) => [option, probabilityOf(rechecked, `fits::${option}`)]),
-	);
-	if ([...fits.values()].every((p) => p < no)) {
-		return { _tag: "Unnarrowed", reason: "no shortlisted kind fits", shortlist };
-	}
-	return { ...decideFamilies(distributionOf(rechecked, "which"), fits, "re-check"), shortlist };
 });
 
 /**
  * Narrowing by Jev on Workers AI, through the Worker's own AI binding. The call does not retry:
- * a rate limit or any other error narrows nothing, so generation waits for no backoff.
+ * a rate limit or any other error decides nothing, so generation waits for no backoff.
  */
 export const workersAiFamilyNarrowingLayer = (options: {
 	readonly ai: WorkersAiRunner;

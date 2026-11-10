@@ -5,10 +5,11 @@ import { AiError, DecisionModel } from "effect/ai";
 
 import {
 	DiagramFamilyNarrowing,
-	decideFamilies,
+	decideFamily,
 	familyNarrowingAttributes,
 	type FamilyNarrowing,
 	makeDiagramFamilyNarrowing,
+	type Separation,
 } from "./family-narrowing.js";
 import { FAMILY_OPTION_NAMES, type FamilyOptionName } from "./family-questions.js";
 
@@ -58,11 +59,15 @@ const classify = (probabilities: Record<string, number>): Answer => {
 };
 const noul = (probability: number): Answer => ({ _tag: "Probability", probability });
 
-function narrowWith(layer: Layer.Layer<DecisionModel.DecisionModel>, request = "a request") {
+function narrowWith(
+	layer: Layer.Layer<DecisionModel.DecisionModel>,
+	request = "a request",
+	named?: Parameters<DiagramFamilyNarrowing["Service"]["narrow"]>[1],
+) {
 	const { probe, sink } = makeTelemetryTestSink();
 	return Effect.gen(function* () {
 		const narrowing = yield* makeDiagramFamilyNarrowing({ timeoutMs: 1_000 });
-		const result: FamilyNarrowing = yield* narrowing.narrow(request);
+		const result: FamilyNarrowing = yield* narrowing.narrow(request, named);
 		return { probe, result };
 	}).pipe(
 		Effect.provide(layer),
@@ -71,74 +76,96 @@ function narrowWith(layer: Layer.Layer<DecisionModel.DecisionModel>, request = "
 }
 
 describe("the truth table", () => {
-	const nouls = (values: Partial<Record<FamilyOptionName, number>>) =>
-		new Map(FAMILY_OPTION_NAMES.map((option) => [option, values[option] ?? 0.05]));
+	/** A separation that answers `p` and records the two options it was asked about. */
+	const separating = (p: number | undefined) => {
+		const asked: [FamilyOptionName, FamilyOptionName][] = [];
+		const separation: Separation = (a, b) => (asked.push([a, b]), p);
+		return { asked, separation };
+	};
 
-	it("settles one family when the Choice is sure, its Noul agrees, and no other is a clear yes", () => {
+	it("decides the family a sure Choice picks, without the separating question", () => {
+		const { asked, separation } = separating(0.05);
 		expect(
-			decideFamilies(choiceOf({ sequence_diagram: 0.9 }), nouls({ sequence_diagram: 0.9 }), "t"),
-		).toEqual({ _tag: "Narrowed", families: ["sequence"] });
+			decideFamily(
+				{ process_flowchart: 0.15, sequence_diagram: 0.8, state_machine: 0.05 },
+				separation,
+			),
+		).toEqual({ _tag: "Decided", family: "sequence", by: "sure" });
+		expect(asked).toEqual([]);
 	});
 
 	it("adds a flowchart's two options together", () => {
 		expect(
-			decideFamilies(
-				choiceOf({ process_flowchart: 0.4, architecture_diagram: 0.4 }),
-				nouls({ architecture_diagram: 0.8 }),
-				"t",
+			decideFamily(
+				{ process_flowchart: 0.4, architecture_diagram: 0.35, sequence_diagram: 0.25 },
+				separating(0.05).separation,
 			),
-		).toEqual({ _tag: "Narrowed", families: ["flowchart"] });
+		).toEqual({ _tag: "Decided", family: "flowchart", by: "sure" });
 	});
 
-	it("keeps every family no Noul rules out, with the Choice's pick", () => {
-		expect(
-			decideFamilies(
-				choiceOf({ process_flowchart: 0.5, sequence_diagram: 0.4 }),
-				nouls({ process_flowchart: 0.8, sequence_diagram: 0.75, state_machine: 0.4 }),
-				"t",
-			),
-		).toEqual({ _tag: "Narrowed", families: ["flowchart", "sequence", "state-machine"] });
+	it("lets the separating question decide two close families either way", () => {
+		const close = { timeline: 0.55, gantt_chart: 0.45 };
+		expect(decideFamily(close, separating(0.8).separation)).toEqual({
+			_tag: "Decided",
+			family: "timeline",
+			by: "separated",
+		});
+		const { asked, separation } = separating(0.2);
+		expect(decideFamily(close, separation)).toEqual({
+			_tag: "Decided",
+			family: "gantt",
+			by: "separated",
+		});
+		expect(asked).toEqual([["timeline", "gantt_chart"]]);
 	});
 
-	it("leaves the prompt whole when more than three families survive", () => {
+	it("keeps the Choice's pick when the separating question settles nothing", () => {
+		const close = { timeline: 0.55, gantt_chart: 0.45 };
+		for (const p of [0.5, undefined]) {
+			expect(decideFamily(close, separating(p).separation)).toEqual({
+				_tag: "Decided",
+				family: "timeline",
+				by: "leading",
+			});
+		}
+	});
+
+	it("separates a flowchart by its more likely option", () => {
+		const { asked, separation } = separating(0.25);
 		expect(
-			decideFamilies(
-				choiceOf({ process_flowchart: 0.4 }),
-				nouls({
-					process_flowchart: 0.6,
-					sequence_diagram: 0.6,
-					state_machine: 0.6,
-					journey_map: 0.6,
-				}),
-				"t",
+			decideFamily(
+				{ process_flowchart: 0.3, architecture_diagram: 0.25, sequence_diagram: 0.45 },
+				separation,
 			),
-		).toEqual({ _tag: "Unnarrowed", reason: "t: 4 families left" });
+		).toEqual({ _tag: "Decided", family: "sequence", by: "separated" });
+		expect(asked).toEqual([["process_flowchart", "sequence_diagram"]]);
 	});
 });
 
 describe("the request span's record", () => {
-	it("names the outcome and the options the re-check read", () => {
+	it("names the row that decided, and the options the re-check read", () => {
 		expect(
 			familyNarrowingAttributes({
-				_tag: "Narrowed",
-				families: ["flowchart", "sequence"],
+				_tag: "Decided",
+				family: "sequence",
+				by: "separated",
 				shortlist: ["process_flowchart", "architecture_diagram", "sequence_diagram"],
 			}),
 		).toEqual({
-			family_narrowing: "several",
+			family_narrowing: "separated",
 			family_shortlist: "process_flowchart,architecture_diagram,sequence_diagram",
 		});
 		expect(
-			familyNarrowingAttributes({ _tag: "Unnarrowed", reason: "no kind fits", shortlist: [] }),
-		).toEqual({ family_narrowing: "unnarrowed: no kind fits" });
+			familyNarrowingAttributes({ _tag: "Undecided", reason: "no kind fits", shortlist: [] }),
+		).toEqual({ family_narrowing: "undecided: no kind fits" });
 		expect(familyNarrowingAttributes({ _tag: "Failed", error: "Rate limit" })).toEqual({
 			family_narrowing: "failed: Rate limit",
 		});
 	});
 });
 
-describe("narrowing with Jev", () => {
-	it.effect("re-checks even a sure ranking, and settles the family the re-check is sure of", () =>
+describe("deciding with Jev", () => {
+	it.effect("re-checks even a sure ranking, and decides the family the re-check is sure of", () =>
 		Effect.gen(function* () {
 			const { asked, layer } = scriptedJev([
 				() => ({
@@ -147,20 +174,26 @@ describe("narrowing with Jev", () => {
 				}),
 				() => ({
 					which: classify({ data_chart: 0.02, er_diagram: 0.93, class_diagram: 0.05 }),
-					"fits::data_chart": noul(0.05),
-					"fits::er_diagram": noul(0.95),
-					"fits::class_diagram": noul(0.2),
+					"separate::data_chart::er_diagram": classify({ data_chart: 0.02, er_diagram: 0.98 }),
+					"separate::data_chart::class_diagram": classify({ data_chart: 0.1, class_diagram: 0.9 }),
+					"separate::er_diagram::class_diagram": classify({ er_diagram: 0.9, class_diagram: 0.1 }),
 				}),
 			]);
 			const { probe, result } = yield* narrowWith(layer, "create table users (id int)");
 			expect(result).toEqual({
-				_tag: "Narrowed",
-				families: ["er"],
+				_tag: "Decided",
+				family: "er",
+				by: "sure",
 				shortlist: ["data_chart", "er_diagram", "class_diagram"],
 			});
 			expect(asked).toEqual([
 				["which", "any"],
-				["which", "fits::data_chart", "fits::er_diagram", "fits::class_diagram"],
+				[
+					"which",
+					"separate::data_chart::er_diagram",
+					"separate::data_chart::class_diagram",
+					"separate::er_diagram::class_diagram",
+				],
 			]);
 			const [rank, recheck] = probe.spans.filter(
 				(span) => span.name === "diagramGeneration.familyNarrowing.round",
@@ -179,7 +212,7 @@ describe("narrowing with Jev", () => {
 		}),
 	);
 
-	it.effect("keeps the families the re-check cannot tell apart", () =>
+	it.effect("separates two close families with the question asked in the re-check", () =>
 		Effect.gen(function* () {
 			const { asked, layer } = scriptedJev([
 				() => ({
@@ -189,62 +222,73 @@ describe("narrowing with Jev", () => {
 					any: noul(0.95),
 				}),
 				() => ({
-					which: classify({ process_flowchart: 0.55, sequence_diagram: 0.4, state_machine: 0.05 }),
-					"fits::process_flowchart": noul(0.8),
-					"fits::sequence_diagram": noul(0.75),
-					"fits::state_machine": noul(0.1),
+					which: classify({ process_flowchart: 0.5, sequence_diagram: 0.45, state_machine: 0.05 }),
+					"separate::process_flowchart::sequence_diagram": classify({
+						process_flowchart: 0.2,
+						sequence_diagram: 0.8,
+					}),
+					"separate::process_flowchart::state_machine": classify({
+						process_flowchart: 0.9,
+						state_machine: 0.1,
+					}),
+					"separate::sequence_diagram::state_machine": classify({
+						sequence_diagram: 0.9,
+						state_machine: 0.1,
+					}),
 				}),
 			]);
-			const { result } = yield* narrowWith(layer);
-			expect(asked[1]).toEqual([
-				"which",
-				"fits::process_flowchart",
-				"fits::sequence_diagram",
-				"fits::state_machine",
-			]);
+			const { probe, result } = yield* narrowWith(layer);
+			expect(asked).toHaveLength(2);
 			expect(result).toEqual({
-				_tag: "Narrowed",
-				families: ["flowchart", "sequence"],
+				_tag: "Decided",
+				family: "sequence",
+				by: "separated",
 				shortlist: ["process_flowchart", "sequence_diagram", "state_machine"],
 			});
+			expect(probe.metrics.map((event) => event.attributes)).toEqual([
+				{ operation: "generate", outcome: "separated", provider: "typesafe" },
+			]);
 		}),
 	);
 
-	it.effect("narrows nothing when no shortlisted kind fits", () =>
+	it.effect("decides among the families a request names, in one request", () =>
 		Effect.gen(function* () {
-			const { layer } = scriptedJev([
+			const { asked, layer } = scriptedJev([
 				() => ({
-					which: classify(choiceOf({ mind_map: 0.5, org_chart: 0.3, timeline: 0.1 })),
-					any: noul(0.6),
-				}),
-				() => ({
-					which: classify({ mind_map: 0.5, timeline: 0.2, org_chart: 0.3 }),
-					"fits::mind_map": noul(0.2),
-					"fits::timeline": noul(0.05),
-					"fits::org_chart": noul(0.1),
+					which: classify({ timeline: 0.4, gantt_chart: 0.6 }),
+					"separate::timeline::gantt_chart": classify({ timeline: 0.15, gantt_chart: 0.85 }),
 				}),
 			]);
-			const { result } = yield* narrowWith(layer);
+			const { probe, result } = yield* narrowWith(layer, "a gantt chart or a timeline", [
+				"timeline",
+				"gantt",
+			]);
+			expect(asked).toEqual([["which", "separate::timeline::gantt_chart"]]);
 			expect(result).toEqual({
-				_tag: "Unnarrowed",
-				reason: "no shortlisted kind fits",
-				shortlist: ["mind_map", "timeline", "org_chart"],
+				_tag: "Decided",
+				family: "gantt",
+				by: "separated",
+				shortlist: ["timeline", "gantt_chart"],
 			});
+			const [round] = probe.spans.filter(
+				(span) => span.name === "diagramGeneration.familyNarrowing.round",
+			);
+			expect(round?.attributes["sketchi.family_narrowing.round"]).toBe("named");
 		}),
 	);
 
-	it.effect("narrows nothing when no kind fits", () =>
+	it.effect("decides nothing when no kind fits", () =>
 		Effect.gen(function* () {
 			const { asked, layer } = scriptedJev([
 				() => ({ which: classify(choiceOf({ mind_map: 0.4 })), any: noul(0.1) }),
 			]);
 			const { result } = yield* narrowWith(layer);
-			expect(result).toEqual({ _tag: "Unnarrowed", reason: "no kind fits", shortlist: [] });
+			expect(result).toEqual({ _tag: "Undecided", reason: "no kind fits", shortlist: [] });
 			expect(asked).toHaveLength(1);
 		}),
 	);
 
-	it.effect("records a Jev error on its span and narrows nothing", () =>
+	it.effect("records a Jev error on its span and decides nothing", () =>
 		Effect.gen(function* () {
 			const { layer } = scriptedJev(
 				[],
