@@ -14,8 +14,11 @@ import {
 	toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
 
+import { makeStudioBuildTurn } from "./studio-build-tool.server";
 import {
 	makeStudioFlowchartToolExecutor,
+	STUDIO_COVERAGE_FINAL_HINT,
+	STUDIO_COVERAGE_HINT,
 	StudioBuildFlowchartInputSchema,
 	StudioBuildFlowchartOutputSchema,
 	studioSystemPrompt,
@@ -102,6 +105,11 @@ describe("Studio build_flowchart host", () => {
 				target: "draft-2020-12",
 			}),
 		).toEqual(toCodeModeJsonSchema(BuildFlowchartRequestSchema.omit({ options: true })));
+		// The host supplies the request; the model cannot write one.
+		const input = StudioBuildFlowchartInputSchema["~standard"].jsonSchema.input({
+			target: "draft-2020-12",
+		}) as { readonly properties?: Record<string, unknown> };
+		expect(Object.keys(input.properties ?? {})).toEqual(["requestId", "spec"]);
 
 		expect(
 			StudioBuildFlowchartOutputSchema["~standard"].jsonSchema.output({
@@ -272,6 +280,107 @@ describe("Studio build_flowchart host", () => {
 		expect(duplicate).toEqual(first);
 		await expect(Effect.runPromise(executor.attempts)).resolves.toBe(1);
 		expect(counted.writes()).toBe(1);
+	});
+
+	it("checks each build against the user's message and allows one rebuild that fixes a miss", async () => {
+		const counted = countingStore();
+		const builds: unknown[] = [];
+		const build = deterministicRuntime(counted);
+		const executor = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(
+				(input) => {
+					builds.push(input);
+					return build(input);
+				},
+				{ request: 'Draw the release review loop, ending at "Release shipped".' },
+			),
+		);
+
+		const missing = await Effect.runPromise(executor.execute({ spec: acceptedSpec() }));
+		expect(missing.ok).toBe(true);
+		expect(missing.issues).toContainEqual(
+			expect.objectContaining({
+				code: "quoted_text_missing",
+				stage: "coverage",
+				hint: STUDIO_COVERAGE_HINT,
+			}),
+		);
+		expect(builds[0]).toMatchObject({
+			request: 'Draw the release review loop, ending at "Release shipped".',
+		});
+
+		const spec = acceptedSpec();
+		const fixed = await Effect.runPromise(
+			executor.execute({ spec: { ...spec, nodes: { ...spec.nodes, done: "Release shipped" } } }),
+		);
+		expect(fixed.ok).toBe(true);
+		expect(fixed.issues.filter((issue) => issue.stage === "coverage")).toEqual([]);
+		// The rebuild was the last: the turn now answers with it.
+		await expect(Effect.runPromise(executor.execute({ spec: acceptedSpec() }))).resolves.toEqual(
+			fixed,
+		);
+		expect(builds).toHaveLength(2);
+		await expect(Effect.runPromise(executor.attempts)).resolves.toBe(2);
+	});
+
+	it("tells the model no build is left once the rebuild or the budget is spent", async () => {
+		const request = 'Draw the release review loop, ending at "Release shipped".';
+		const coverageHints = (result: BuildFlowchartResult) =>
+			result.issues.filter((issue) => issue.stage === "coverage").map((issue) => issue.hint);
+		const spec = acceptedSpec();
+		const fixedSpec = { ...spec, nodes: { ...spec.nodes, done: "Release shipped" } };
+
+		// The one rebuild still misses: its result, and every later call, says to answer.
+		const rebuilt = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore()), { request }),
+		);
+		const first = await Effect.runPromise(rebuilt.execute({ spec: acceptedSpec() }));
+		expect(coverageHints(first)).toEqual([STUDIO_COVERAGE_HINT]);
+		const second = await Effect.runPromise(rebuilt.execute({ spec: acceptedSpec() }));
+		expect(coverageHints(second)).toEqual([STUDIO_COVERAGE_FINAL_HINT]);
+		await expect(Effect.runPromise(rebuilt.execute({ spec: fixedSpec }))).resolves.toEqual(second);
+		await expect(Effect.runPromise(rebuilt.attempts)).resolves.toBe(2);
+
+		// A first acceptance on the last attempt leaves no rebuild.
+		const lastAttempt = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore()), {
+				request,
+				turn: await Effect.runPromise(makeStudioBuildTurn(1)),
+			}),
+		);
+		const only = await Effect.runPromise(lastAttempt.execute({ spec: acceptedSpec() }));
+		expect(coverageHints(only)).toEqual([STUDIO_COVERAGE_FINAL_HINT]);
+		await expect(Effect.runPromise(lastAttempt.execute({ spec: fixedSpec }))).resolves.toEqual(
+			only,
+		);
+
+		// A failed rebuild leaves the accepted flowchart standing, with the same final word.
+		const failed = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore()), { request }),
+		);
+		const accepted = await Effect.runPromise(failed.execute({ spec: acceptedSpec() }));
+		const rejected = await Effect.runPromise(failed.execute({ spec: rejectedSpec() }));
+		expect(rejected.ok).toBe(false);
+		const standing = await Effect.runPromise(failed.execute({ spec: fixedSpec }));
+		expect(standing).toEqual({
+			...accepted,
+			issues: accepted.issues.map((issue) =>
+				issue.stage === "coverage" ? { ...issue, hint: STUDIO_COVERAGE_FINAL_HINT } : issue,
+			),
+		});
+		await expect(Effect.runPromise(failed.attempts)).resolves.toBe(2);
+	});
+
+	it("closes the turn on an accepted build that misses nothing, or one checked against no request", async () => {
+		const executor = await Effect.runPromise(
+			makeStudioFlowchartToolExecutor(deterministicRuntime(countingStore()), {
+				request: "Draw the release review loop.",
+			}),
+		);
+		const first = await Effect.runPromise(executor.execute({ spec: acceptedSpec() }));
+		expect(first.issues.filter((issue) => issue.stage === "coverage")).toEqual([]);
+		await Effect.runPromise(executor.execute({ spec: acceptedSpec() }));
+		await expect(Effect.runPromise(executor.attempts)).resolves.toBe(1);
 	});
 
 	it("serializes concurrent accepted calls and persists only the first artifact", async () => {

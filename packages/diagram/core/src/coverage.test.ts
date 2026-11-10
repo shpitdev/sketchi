@@ -406,6 +406,44 @@ describe("quoted text", () => {
 		expect(issues.map((issue) => issue.code)).toEqual(["quoted_text_missing"]);
 		expect(issues[0]?.message).toContain('"Sign in"');
 	});
+
+	it("asks an edit that replaces quoted text only for the new text", () => {
+		const flowchart = (label: string) => ({
+			type: "flowchart",
+			nodes: [
+				{ id: "a", label: "Open release" },
+				{ id: "b", label },
+			],
+			edges: [{ source: "a", target: "b" }],
+		});
+		const quoted = (request: string, label: string) =>
+			checkRequestCoverage(request, flowchart(label)).map((issue) => issue.message);
+		for (const request of [
+			'Rename "Release live" to "Release shipped".',
+			'Please change the last step from "Release live" to "Release shipped".',
+			'Replace "Release live" with "Release shipped".',
+		]) {
+			expect(quoted(request, "Release shipped"), request).toEqual([]);
+			expect(quoted(request, "Release live"), request).toEqual([
+				'The request quotes "Release shipped", but the diagram does not show it. Use each quoted text exactly, on the element it belongs to.',
+			]);
+		}
+		// Every pair an edit lists is replaced.
+		expect(
+			quoted(
+				'Rename "Open release" to "Start release" and "Release live" to "Release shipped".',
+				"Release shipped",
+			),
+		).toEqual([
+			'The request quotes "Start release", but the diagram does not show it. Use each quoted text exactly, on the element it belongs to.',
+		]);
+		// A described change of state is no edit: both states stay required.
+		expect(
+			quoted('The status changes from "Release live" to "Release shipped".', "Release shipped"),
+		).toEqual([
+			'The request quotes "Release live", but the diagram does not show it. Use each quoted text exactly, on the element it belongs to.',
+		]);
+	});
 });
 
 describe("review: what the check must not ask for or remove", () => {

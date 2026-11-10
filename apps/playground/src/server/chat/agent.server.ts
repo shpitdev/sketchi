@@ -152,6 +152,20 @@ export function makeStudioBuildToolCallback<Input, Result, E>(
 	return (input: Input) => runToolEffect(executor.execute(input));
 }
 
+/** The text of the user's latest message: what this turn's build is asked to draw. */
+function latestUserText(
+	messages: ReadonlyArray<{
+		readonly role: string;
+		readonly parts: ReadonlyArray<{
+			readonly type: string;
+			readonly text?: unknown;
+		}>;
+	}>,
+): string {
+	const latest = messages.findLast((message) => message.role === "user");
+	return latest ? userText([latest]) : "";
+}
+
 function userText(
 	messages: ReadonlyArray<{
 		readonly role: string;
@@ -228,6 +242,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	const turn = yield* makeStudioBuildTurn();
 	const flowchartExecutor = yield* makeStudioFlowchartToolExecutor(codeMode.buildFlowchart, {
 		logos,
+		request: latestUserText(messages),
 		turn,
 	});
 	const sequenceExecutor = yield* makeStudioSequenceToolExecutor(codeMode.buildSequenceDiagram, {

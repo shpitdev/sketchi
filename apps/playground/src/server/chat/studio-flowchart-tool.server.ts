@@ -4,6 +4,7 @@ import {
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
 	DIAGRAM_AGENT_SYSTEM_PROMPT,
+	FLOWCHART_REQUEST_MAX_LENGTH,
 	type BuildFlowchartResult,
 	type BuildFlowchartToolInput,
 	type CodeModeIssue,
@@ -18,8 +19,9 @@ import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-buil
 export const STUDIO_BUILD_FLOWCHART_TOOL_NAME = "build_flowchart" as const;
 
 export const STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION =
-	"Build and persist one canonical flowchart artifact. Pass { spec } with the flowchart document: nodes as { id: label }, edges as [from, to, label?], optional groups and lanes that list what they contain. The host supplies artifact options. If rejected, repair every structured issue and retry, up to three total attempts.";
+	"Build and persist one canonical flowchart artifact. Pass { spec } with the flowchart document: nodes as { id: label }, edges as [from, to, label?], optional groups and lanes that list what they contain. The host supplies artifact options and the user's request. If rejected, repair every structured issue and retry, up to three total attempts.";
 
+/** The host supplies artifact options, and the user's message as the request a build is checked against. */
 export const StudioBuildFlowchartInputSchema = toPlaygroundStandardSchema(
 	BuildFlowchartRequestSchema.omit({ options: true }),
 );
@@ -108,16 +110,48 @@ function groundSpecIcons(
 		: { input, issues };
 }
 
-/** Studio's build_flowchart tool over the shared buildFlowchart vertical. */
+/** Studio has no editFlowchart: a build that misses what the request states is fixed by one more build. */
+export const STUDIO_COVERAGE_HINT =
+	"Call build_flowchart once more with the complete spec, fixing this, before you answer.";
+/** Once that build is spent, the diagram stands as it is. */
+export const STUDIO_COVERAGE_FINAL_HINT =
+	"No build is left this turn: answer with this diagram, and tell the user what it still misses.";
+
+const missesRequest = (result: BuildFlowchartResult) =>
+	result.ok && result.issues.some((issue) => issue.stage === "coverage");
+
+const withCoverageHint =
+	(hint: string) =>
+	(result: BuildFlowchartResult): BuildFlowchartResult => ({
+		...result,
+		issues: result.issues.map((issue) => (issue.stage === "coverage" ? { ...issue, hint } : issue)),
+	});
+
+/**
+ * Studio's build_flowchart tool over the shared buildFlowchart vertical. Each build is checked
+ * against the user's latest message as its request, so an accepted flowchart that misses what
+ * it states may be rebuilt once in the same turn.
+ */
 export function makeStudioFlowchartToolExecutor<E, R>(
 	buildFlowchart: (input: unknown) => Effect.Effect<BuildFlowchartResult, E, R>,
-	options: { readonly logos?: readonly OfferedLogo[]; readonly turn?: StudioBuildTurn } = {},
+	options: {
+		readonly logos?: readonly OfferedLogo[];
+		/** The user's latest message. */
+		readonly request?: string;
+		readonly turn?: StudioBuildTurn;
+	} = {},
 ) {
 	const logos = options.logos ?? [];
+	const request = options.request?.trim().slice(0, FLOWCHART_REQUEST_MAX_LENGTH);
 	return makeStudioBuildToolExecutor<StudioBuildFlowchartInput, BuildFlowchartResult, E, R>({
-		build: buildFlowchart,
+		build: (input) => buildFlowchart(request ? { ...(input as object), request } : input),
 		rejected: (issue) => ({ ok: false, status: "quality_failed", issues: [issue] }),
 		ground: (input) => groundSpecIcons(input, logos),
+		reopen: {
+			misses: missesRequest,
+			open: withCoverageHint(STUDIO_COVERAGE_HINT),
+			closed: withCoverageHint(STUDIO_COVERAGE_FINAL_HINT),
+		},
 		operation: "buildFlowchart",
 		...(options.turn ? { turn: options.turn } : {}),
 	});
