@@ -150,11 +150,11 @@ export interface CodeModeCommunityIcon {
  */
 export interface CodeModeCommunityIcons {
 	readonly load: (slugs: readonly string[]) => Effect.Effect<readonly CodeModeCommunityIcon[]>;
-	/** Icons whose name or slug contains the query. */
-	readonly search: (
-		query: string,
-		limit: number,
-	) => Effect.Effect<readonly CodeModeCommunityIcon[]>;
+	/**
+	 * A bounded set of icons whose name or slug contains the query, or a bare
+	 * query; the caller ranks and truncates it.
+	 */
+	readonly search: (query: string) => Effect.Effect<readonly CodeModeCommunityIcon[]>;
 }
 
 /** The most community icons, and the most drawn icons, one request resolves. */

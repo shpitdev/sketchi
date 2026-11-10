@@ -79,9 +79,10 @@ function catalog() {
 	});
 }
 
+// Newest first, as the store pages them.
 const PUBLISHED: readonly CodeModeCommunityIcon[] = [
-	{ slug: "community/acme", name: "Acme", recipe: ACME },
 	{ slug: "community/acme-cloud-old", name: "Acme Cloud old", recipe: ACME },
+	{ slug: "community/acme", name: "Acme", recipe: ACME },
 ];
 
 function runtime() {
@@ -92,12 +93,9 @@ function runtime() {
 		icons: catalog(),
 		communityIcons: {
 			load: (slugs) => Effect.succeed(PUBLISHED.filter((icon) => slugs.includes(icon.slug))),
-			search: (query, limit) =>
+			search: (query) =>
 				Effect.succeed(
-					PUBLISHED.filter((icon) => icon.name.toLowerCase().includes(query.toLowerCase())).slice(
-						0,
-						limit,
-					),
+					PUBLISHED.filter((icon) => icon.name.toLowerCase().includes(query.toLowerCase())),
 				),
 		},
 	});
@@ -365,6 +363,13 @@ describe("searchIcons", () => {
 		expect(exact.ok && exact.icons.map(({ slug, match }) => [slug, match])).toEqual([
 			["community/acme", "exact"],
 			["acme-cloud", "weak"],
+			["community/acme-cloud-old", "weak"],
+		]);
+		const top = await run.searchIcons({ q: "Acme", limit: 1 });
+		expect(top.ok && top.icons.map(({ slug }) => slug)).toEqual(["community/acme"]);
+		const bySlug = await run.searchIcons({ q: "community/acme" });
+		expect(bySlug.ok && bySlug.icons.map(({ slug, match }) => [slug, match])).toEqual([
+			["community/acme", "exact"],
 			["community/acme-cloud-old", "weak"],
 		]);
 		const vercel = await run.searchIcons({ q: "vercel" });

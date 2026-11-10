@@ -77,6 +77,7 @@ import {
 	type WireframeDiagram,
 	type WireframeValidationIssueCode,
 	COMMUNITY_ICON_COLLECTION,
+	COMMUNITY_ICON_SLUG_PREFIX,
 	isDrawnIconSlug,
 	isIconRecipe,
 	withoutCanvasElements,
@@ -5953,14 +5954,24 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 	} satisfies Extract<ApplyDiagramPatchResult, { ok: true }>;
 });
 
-/** How a community icon answers a query: exact when its name is the query, else weak. */
-function communityIconMatch(query: string, name: string): "exact" | "weak" {
+/** A query for community icons, without the `community/` prefix of their slugs. */
+function communityIconQuery(query: string): string {
+	return query.toLowerCase().startsWith(COMMUNITY_ICON_SLUG_PREFIX)
+		? query.slice(COMMUNITY_ICON_SLUG_PREFIX.length)
+		: query;
+}
+
+/** How a community icon answers a query: exact when its name or slug is the query, else weak. */
+function communityIconMatch(query: string, icon: CodeModeCommunityIcon): "exact" | "weak" {
 	const words = (text: string) =>
 		text
 			.toLowerCase()
 			.replace(/[^\p{L}\p{N}]+/gu, " ")
 			.trim();
-	return words(name) === words(query) ? "exact" : "weak";
+	const bare = words(communityIconQuery(query));
+	return words(icon.name) === bare || words(icon.slug) === words(`community ${bare}`)
+		? "exact"
+		: "weak";
 }
 
 /**
@@ -5982,11 +5993,11 @@ function rankIconSearch(
 	}));
 	const drawings = community
 		.filter((icon) => !marks.some((mark) => mark.slug === icon.slug))
-		.map(({ name, slug }) => ({
-			slug,
-			name,
+		.map((icon) => ({
+			slug: icon.slug,
+			name: icon.name,
 			collection: COMMUNITY_ICON_COLLECTION,
-			match: communityIconMatch(query, name),
+			match: communityIconMatch(query, icon),
 		}));
 	return [
 		...marks.filter((icon) => icon.match === "exact"),
@@ -6014,7 +6025,7 @@ const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(function*
 	const limit = parsed.success.limit ?? DEFAULT_ICON_SEARCH_LIMIT;
 	const curated = environment.icons?.search(query, limit) ?? [];
 	const community = environment.communityIcons
-		? yield* environment.communityIcons.search(query, limit)
+		? yield* environment.communityIcons.search(communityIconQuery(query))
 		: [];
 	return {
 		ok: true,

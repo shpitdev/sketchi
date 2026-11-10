@@ -2,7 +2,9 @@ import "@tanstack/react-start/server-only";
 
 import {
 	bareCommunitySlug,
+	COMMUNITY_ICON_LIMITS,
 	communityDiagramSlug,
+	communityIconBaseSlug,
 	makeCommunityIconStore,
 	type CommunityIcon,
 	type CommunityIconDatabase,
@@ -40,8 +42,20 @@ export function studioCommunityIcons(database: CommunityIconDatabase): CodeModeC
 		);
 	const source: CodeModeCommunityIcons = {
 		load: (slugs) => forDiagrams(store.getMany(slugs.map(bareCommunitySlug))),
-		search: (query, limit) =>
-			forDiagrams(store.search({ query, limit }).pipe(Effect.map((page) => page.icons))),
+		// The icon named exactly by the query, then the newest page of partial matches:
+		// the caller ranks them, so an exact match never falls behind newer partial ones.
+		search: (query) =>
+			forDiagrams(
+				Effect.all([
+					store.getMany(query.trim() ? [communityIconBaseSlug(query)] : []),
+					store.search({ query, limit: COMMUNITY_ICON_LIMITS.maxPageSize }),
+				]).pipe(
+					Effect.map(([exact, page]) => [
+						...exact,
+						...page.icons.filter((icon) => !exact.some((hit) => hit.slug === icon.slug)),
+					]),
+				),
+			),
 	};
 	sources.set(database, source);
 	return source;

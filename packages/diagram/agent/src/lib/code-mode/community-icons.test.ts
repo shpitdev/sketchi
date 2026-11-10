@@ -73,11 +73,9 @@ function runtime(published = PUBLISHED) {
 					loads.push([...slugs]);
 					return published.filter((icon) => slugs.includes(icon.slug));
 				}),
-			search: (query, limit) =>
+			search: (query) =>
 				Effect.sync(() =>
-					published
-						.filter((icon) => icon.name.toLowerCase().includes(query.toLowerCase()))
-						.slice(0, limit),
+					published.filter((icon) => icon.name.toLowerCase().includes(query.toLowerCase())),
 				),
 		},
 	});
