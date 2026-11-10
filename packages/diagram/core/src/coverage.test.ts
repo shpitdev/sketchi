@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkRequestCoverage } from "./coverage.js";
+import { checkRequestCoverage, keepsStatedStructure } from "./coverage.js";
 
 const codes = (request: string, diagram: unknown) =>
 	checkRequestCoverage(request, diagram).map((issue) => issue.code);
@@ -704,6 +704,227 @@ describe("review: negation and loop conditions are not demands", () => {
 						["check", "done"],
 						["done", "finish"],
 						["done", "check"],
+					],
+				),
+			),
+		).toEqual([]);
+	});
+});
+
+/** A flowchart from [id, label] pairs and [source, target, label?] edges; "?" makes a decision. */
+const chart = (labels: [string, string][], edges: [string, string, string?][]) => ({
+	type: "flowchart",
+	nodes: labels.map(([id, label]) => ({
+		id,
+		label,
+		kind: label.endsWith("?") ? "decision" : "process",
+	})),
+	edges: edges.map(([source, target, label]) => ({ source, target, ...(label ? { label } : {}) })),
+});
+
+describe("a stated check folded into its decision", () => {
+	const request =
+		"Create a building access flowchart. A visitor arrives and the badge is verified. A rejected badge calls security. An accepted badge opens the door.";
+	const ends: [string, string][] = [
+		["security", "Call security"],
+		["door", "Open door"],
+	];
+
+	it("reports a verification drawn only as the decision", () => {
+		const issues = checkRequestCoverage(
+			request,
+			chart(
+				[["arrive", "Visitor arrives"], ["badge", "Verify badge?"], ...ends],
+				[
+					["arrive", "badge"],
+					["badge", "security", "no"],
+					["badge", "door", "yes"],
+				],
+			),
+		);
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_check_step_missing"]);
+		expect(issues[0]?.message).toContain('"the badge is verified"');
+	});
+
+	it("passes the check as its own step before the decision", () => {
+		expect(
+			codes(
+				request,
+				chart(
+					[
+						["arrive", "Visitor arrives"],
+						["verify", "Verify badge"],
+						["badge", "Badge accepted?"],
+						...ends,
+					],
+					[
+						["arrive", "verify"],
+						["verify", "badge"],
+						["badge", "security", "no"],
+						["badge", "door", "yes"],
+					],
+				),
+			),
+		).toEqual([]);
+	});
+
+	it.each([
+		"A visitor arrives. If the badge is verified, open the door; otherwise call security.",
+		"A visitor arrives. Once the badge is verified, open the door. A rejected badge calls security.",
+		"A visitor arrives and the guard checks whether the badge is valid. A rejected badge calls security. An accepted badge opens the door.",
+		"A visitor arrives and the guard verifies that the badge is valid. A rejected badge calls security. An accepted badge opens the door.",
+		"A visitor arrives and the guard checks the badge. A rejected badge calls security. An accepted badge opens the door.",
+	])("asks for no step when the check is only the decision: %s", (prompt) => {
+		expect(
+			codes(
+				prompt,
+				chart(
+					[["arrive", "Visitor arrives"], ["badge", "Badge valid?"], ...ends],
+					[
+						["arrive", "badge"],
+						["badge", "security", "no"],
+						["badge", "door", "yes"],
+					],
+				),
+			),
+		).toEqual([]);
+	});
+
+	it("reads a word of the checked thing's family in the decision", () => {
+		expect(
+			codes(
+				"Inspect seat availability, then book or waitlist the guest.",
+				chart(
+					[
+						["start", "Guest asks"],
+						["seats", "Seats available?"],
+						["book", "Book guest"],
+						["wait", "Waitlist guest"],
+					],
+					[
+						["start", "seats"],
+						["seats", "book", "yes"],
+						["seats", "wait", "no"],
+					],
+				),
+			),
+		).toEqual(["flowchart_check_step_missing"]);
+	});
+});
+
+describe("a step the request gives to some branches", () => {
+	const request =
+		"Create a release flowchart. Pick the target. Staging, canary and production deploys follow. Staging and canary paths both run smoke tests. Passing smoke tests finish; failing ones page the on-call engineer.";
+	const labels: [string, string][] = [
+		["pick", "Pick target"],
+		["target", "Target?"],
+		["staging", "Staging deploy"],
+		["canary", "Canary deploy"],
+		["production", "Production deploy"],
+		["smoke", "Run smoke tests"],
+		["passed", "Smoke tests pass?"],
+		["finish", "Finish"],
+		["page", "Page on-call engineer"],
+	];
+	const edges: [string, string, string?][] = [
+		["pick", "target"],
+		["target", "staging", "staging"],
+		["target", "canary", "canary"],
+		["target", "production", "production"],
+		["staging", "smoke"],
+		["canary", "smoke"],
+		["smoke", "passed"],
+		["passed", "finish", "yes"],
+		["passed", "page", "no"],
+	];
+
+	it("passes the step on the listed branches only", () => {
+		expect(codes(request, chart(labels, edges))).toEqual([]);
+	});
+
+	it("passes a sibling branch another sentence gives the step too", () => {
+		expect(
+			codes(
+				`${request} Production also runs smoke tests.`,
+				chart(labels, [...edges, ["production", "smoke"]]),
+			),
+		).toEqual([]);
+	});
+
+	it("keeps a repair that removes only the borrowing arrow", () => {
+		const borrowed = chart(labels, [...edges, ["production", "smoke"]]);
+		expect(keepsStatedStructure(request, borrowed, chart(labels, edges))).toBe(true);
+		// Deleting a listed branch's arrow too is no fix.
+		const stripped = chart(
+			labels,
+			edges.filter(([source, target]) => !(source === "canary" && target === "smoke")),
+		);
+		expect(keepsStatedStructure(request, borrowed, stripped)).toBe(false);
+	});
+
+	it("reports a sibling branch led into the shared step, even through a copy of it", () => {
+		const issues = checkRequestCoverage(
+			request,
+			chart(
+				[...labels, ["smoke-2", "Run smoke tests"]],
+				[...edges, ["production", "smoke-2"], ["smoke-2", "passed"]],
+			),
+		);
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_step_borrowed"]);
+		expect(issues[0]?.message).toContain('"Production deploy"');
+	});
+});
+
+describe("a step drawn twice where one copy ends", () => {
+	const request =
+		"Create a returns flowchart. Intact items restock the shelf and refund the customer. Items with missing parts are repaired before restocking the shelf.";
+	const labels: [string, string][] = [
+		["arrive", "Return arrives"],
+		["intact", "Item intact?"],
+		["restock", "Restock shelf"],
+		["refund", "Refund customer"],
+		["repair", "Repair item"],
+	];
+
+	it("reports a branch that ends at its own copy of a step that continues elsewhere", () => {
+		const issues = checkRequestCoverage(
+			request,
+			chart(
+				[...labels, ["restock-2", "Restock shelf"]],
+				[
+					["arrive", "intact"],
+					["intact", "restock", "yes"],
+					["restock", "refund"],
+					["intact", "repair", "no"],
+					["repair", "restock-2"],
+				],
+			),
+		);
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_step_split"]);
+		expect(issues[0]?.message).toContain('"Refund customer"');
+	});
+
+	it("passes one node for the step, and copies that end alike", () => {
+		const rejoined: [string, string, string?][] = [
+			["arrive", "intact"],
+			["intact", "restock", "yes"],
+			["restock", "refund"],
+			["intact", "repair", "no"],
+			["repair", "restock"],
+		];
+		expect(codes(request, chart(labels, rejoined))).toEqual([]);
+		expect(
+			codes(
+				"If rejected, notify the requester. If approved, notify the requester.",
+				chart(
+					[
+						["review", "Approved?"],
+						["a", "Notify requester"],
+						["b", "Notify requester"],
+					],
+					[
+						["review", "a", "no"],
+						["review", "b", "yes"],
 					],
 				),
 			),

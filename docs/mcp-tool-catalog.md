@@ -304,10 +304,12 @@ session or another, is one `editFlowchart` call with the edits by id or label;
 the flowchart's drawing is never patched, and `applyDiagramPatch` refuses it.
 
 A build or edit given the user's words as `request` is checked the way generation
-checks its own diagrams: every stated arrow, return step and zone. A miss does not
-fail the build. It comes back as a `coverage` warning on the accepted artifact, and
-`execute` asks for one `editFlowchart` before answering. An edit's own misses
-deliver as usual, so a disputed issue costs at most one call.
+checks its own diagrams: every stated arrow, return step, check and zone, a step
+the request gives only some branches, and one step drawn as a copy that ends
+early. A miss does not fail the build. It comes back as a `coverage` warning on
+the accepted artifact, and `execute` asks for one `editFlowchart` before
+answering. An edit's own misses deliver as usual, so a disputed issue costs at
+most one call.
 
 ```mermaid
 flowchart LR
