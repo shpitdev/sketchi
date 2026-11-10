@@ -6,6 +6,7 @@ import {
 	flowchartDiagramFromDocument,
 	flowchartDocumentPairCount,
 	type FlowchartDocument,
+	impliedFlowchartNodeShape,
 } from "./flowchart-document";
 
 const waitlist: FlowchartDocument = {
@@ -342,6 +343,27 @@ describe("flowchart documents", () => {
 			replica: "storage",
 			reports: "database",
 		});
+	});
+
+	it("infers a cylinder only for a label that is plainly a database", () => {
+		for (const label of [
+			"Oracle",
+			"Postgres",
+			"Orders database",
+			"Customer DB",
+			"Postgres replica",
+			"Supabase Postgres",
+		])
+			expect(impliedFlowchartNodeShape(label), label).toBe("database");
+		for (const label of [
+			"Supabase Edge Functions",
+			"DynamoDB Streams",
+			"Validate database",
+			"Clerk writes to database",
+			"Query Postgres",
+			"Database healthy?",
+		])
+			expect(impliedFlowchartNodeShape(label), label).toBeUndefined();
 	});
 
 	it("asks for a label on every branch of a question", () => {
