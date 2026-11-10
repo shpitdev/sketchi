@@ -11,6 +11,7 @@ const expectedPublicFullPaths = [
 	"/",
 	"/api/chat",
 	"/api/studio/diagrams/$diagramId",
+	"/api/studio/diagrams/$diagramId/drawing",
 	"/api/studio/projects",
 	"/api/studio/projects/$projectId",
 	"/api/studio/projects/from-artifact",
@@ -67,6 +68,7 @@ describe("Playground application structure", () => {
 		expect(routeFiles.map((path) => relative(routesRoot, path))).toEqual([
 			"api/chat.ts",
 			"api/studio/diagrams/$diagramId.ts",
+			"api/studio/diagrams/$diagramId/drawing.ts",
 			"api/studio/projects.ts",
 			"api/studio/projects/from-artifact.ts",
 			"api/studio/projects_/$projectId.ts",

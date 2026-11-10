@@ -55,7 +55,7 @@ function ProjectRoute() {
 									</div>
 									<div className="studio-project-row__actions">
 										<a className="studio__artifact-link" href={studioDiagramUrl(diagram.id)}>
-											Review
+											View
 										</a>
 										<IconActionBar>
 											<IconLink href={diagram.editUrl} icon="edit" label="Edit" />

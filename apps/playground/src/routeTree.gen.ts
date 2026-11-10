@@ -44,6 +44,7 @@ import { Route as ApiV1StateMachinesBuildRouteImport } from "./routes/api/v1/sta
 import { Route as ApiV1TimelinesBuildRouteImport } from "./routes/api/v1/timelines/build";
 import { Route as ApiV1VennDiagramsBuildRouteImport } from "./routes/api/v1/venn-diagrams/build";
 import { Route as ApiV1WireframesBuildRouteImport } from "./routes/api/v1/wireframes/build";
+import { Route as ApiStudioDiagramsDiagramIdDrawingRouteImport } from "./routes/api/studio/diagrams/$diagramId/drawing";
 import { Route as ApiV1ArtifactsArtifactIdPatchRouteImport } from "./routes/api/v1/artifacts/$artifactId/patch";
 
 const IndexRoute = IndexRouteImport.update({
@@ -227,6 +228,12 @@ const ApiV1WireframesBuildRoute = ApiV1WireframesBuildRouteImport.update({
   path: "/api/v1/wireframes/build",
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiStudioDiagramsDiagramIdDrawingRoute =
+  ApiStudioDiagramsDiagramIdDrawingRouteImport.update({
+    id: "/drawing",
+    path: "/drawing",
+    getParentRoute: () => ApiStudioDiagramsDiagramIdRoute,
+  } as any);
 const ApiV1ArtifactsArtifactIdPatchRoute =
   ApiV1ArtifactsArtifactIdPatchRouteImport.update({
     id: "/patch",
@@ -248,7 +255,7 @@ export interface FileRoutesByFullPath {
   "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/diagrams/$diagramId/edit": typeof DiagramsDiagramIdEditRoute;
-  "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRoute;
+  "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
@@ -270,6 +277,7 @@ export interface FileRoutesByFullPath {
   "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
   "/api/v1/venn-diagrams/build": typeof ApiV1VennDiagramsBuildRoute;
   "/api/v1/wireframes/build": typeof ApiV1WireframesBuildRoute;
+  "/api/studio/diagrams/$diagramId/drawing": typeof ApiStudioDiagramsDiagramIdDrawingRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesByTo {
@@ -286,7 +294,7 @@ export interface FileRoutesByTo {
   "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/diagrams/$diagramId/edit": typeof DiagramsDiagramIdEditRoute;
-  "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRoute;
+  "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
@@ -308,6 +316,7 @@ export interface FileRoutesByTo {
   "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
   "/api/v1/venn-diagrams/build": typeof ApiV1VennDiagramsBuildRoute;
   "/api/v1/wireframes/build": typeof ApiV1WireframesBuildRoute;
+  "/api/studio/diagrams/$diagramId/drawing": typeof ApiStudioDiagramsDiagramIdDrawingRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRoutesById {
@@ -325,7 +334,7 @@ export interface FileRoutesById {
   "/api/v1/generate": typeof ApiV1GenerateRoute;
   "/artifacts_/$artifactId/edit": typeof ArtifactsArtifactIdEditRoute;
   "/diagrams_/$diagramId/edit": typeof DiagramsDiagramIdEditRoute;
-  "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRoute;
+  "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects_/$projectId": typeof ApiStudioProjectsProjectIdRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
@@ -347,6 +356,7 @@ export interface FileRoutesById {
   "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
   "/api/v1/venn-diagrams/build": typeof ApiV1VennDiagramsBuildRoute;
   "/api/v1/wireframes/build": typeof ApiV1WireframesBuildRoute;
+  "/api/studio/diagrams/$diagramId/drawing": typeof ApiStudioDiagramsDiagramIdDrawingRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
 export interface FileRouteTypes {
@@ -387,6 +397,7 @@ export interface FileRouteTypes {
     | "/api/v1/timelines/build"
     | "/api/v1/venn-diagrams/build"
     | "/api/v1/wireframes/build"
+    | "/api/studio/diagrams/$diagramId/drawing"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesByTo: FileRoutesByTo;
   to:
@@ -425,6 +436,7 @@ export interface FileRouteTypes {
     | "/api/v1/timelines/build"
     | "/api/v1/venn-diagrams/build"
     | "/api/v1/wireframes/build"
+    | "/api/studio/diagrams/$diagramId/drawing"
     | "/api/v1/artifacts/$artifactId/patch";
   id:
     | "__root__"
@@ -463,6 +475,7 @@ export interface FileRouteTypes {
     | "/api/v1/timelines/build"
     | "/api/v1/venn-diagrams/build"
     | "/api/v1/wireframes/build"
+    | "/api/studio/diagrams/$diagramId/drawing"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesById: FileRoutesById;
 }
@@ -480,7 +493,7 @@ export interface RootRouteChildren {
   ApiV1GenerateRoute: typeof ApiV1GenerateRoute;
   ArtifactsArtifactIdEditRoute: typeof ArtifactsArtifactIdEditRoute;
   DiagramsDiagramIdEditRoute: typeof DiagramsDiagramIdEditRoute;
-  ApiStudioDiagramsDiagramIdRoute: typeof ApiStudioDiagramsDiagramIdRoute;
+  ApiStudioDiagramsDiagramIdRoute: typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   ApiStudioProjectsProjectIdRoute: typeof ApiStudioProjectsProjectIdRoute;
   ApiV1ArtifactsArtifactIdRoute: typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   ApiV1CanvasesCreateRoute: typeof ApiV1CanvasesCreateRoute;
@@ -750,6 +763,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiV1WireframesBuildRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/studio/diagrams/$diagramId/drawing": {
+      id: "/api/studio/diagrams/$diagramId/drawing";
+      path: "/drawing";
+      fullPath: "/api/studio/diagrams/$diagramId/drawing";
+      preLoaderRoute: typeof ApiStudioDiagramsDiagramIdDrawingRouteImport;
+      parentRoute: typeof ApiStudioDiagramsDiagramIdRoute;
+    };
     "/api/v1/artifacts/$artifactId/patch": {
       id: "/api/v1/artifacts/$artifactId/patch";
       path: "/patch";
@@ -770,6 +790,21 @@ const ApiStudioProjectsRouteChildren: ApiStudioProjectsRouteChildren = {
 
 const ApiStudioProjectsRouteWithChildren =
   ApiStudioProjectsRoute._addFileChildren(ApiStudioProjectsRouteChildren);
+
+interface ApiStudioDiagramsDiagramIdRouteChildren {
+  ApiStudioDiagramsDiagramIdDrawingRoute: typeof ApiStudioDiagramsDiagramIdDrawingRoute;
+}
+
+const ApiStudioDiagramsDiagramIdRouteChildren: ApiStudioDiagramsDiagramIdRouteChildren =
+  {
+    ApiStudioDiagramsDiagramIdDrawingRoute:
+      ApiStudioDiagramsDiagramIdDrawingRoute,
+  };
+
+const ApiStudioDiagramsDiagramIdRouteWithChildren =
+  ApiStudioDiagramsDiagramIdRoute._addFileChildren(
+    ApiStudioDiagramsDiagramIdRouteChildren,
+  );
 
 interface ApiV1ArtifactsArtifactIdRouteChildren {
   ApiV1ArtifactsArtifactIdPatchRoute: typeof ApiV1ArtifactsArtifactIdPatchRoute;
@@ -799,7 +834,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1GenerateRoute: ApiV1GenerateRoute,
   ArtifactsArtifactIdEditRoute: ArtifactsArtifactIdEditRoute,
   DiagramsDiagramIdEditRoute: DiagramsDiagramIdEditRoute,
-  ApiStudioDiagramsDiagramIdRoute: ApiStudioDiagramsDiagramIdRoute,
+  ApiStudioDiagramsDiagramIdRoute: ApiStudioDiagramsDiagramIdRouteWithChildren,
   ApiStudioProjectsProjectIdRoute: ApiStudioProjectsProjectIdRoute,
   ApiV1ArtifactsArtifactIdRoute: ApiV1ArtifactsArtifactIdRouteWithChildren,
   ApiV1CanvasesCreateRoute: ApiV1CanvasesCreateRoute,

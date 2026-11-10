@@ -2,13 +2,17 @@ import { Result, Schema } from "effect";
 
 import {
 	CreateStudioProjectFromArtifactResponseSchema,
+	SaveStudioDrawingResponseSchema,
 	StudioDiagramDetailsResponseSchema,
+	StudioDrawingResponseSchema,
 	StudioProjectDetailsResponseSchema,
 	StudioProjectsListResponseSchema,
 	type CreateStudioProjectFromArtifactResponse,
 	type StudioDiagramSummary,
+	type StudioDrawing,
 	type StudioProjectDetails,
 	type StudioProjectSummary,
+	studioDiagramDrawingApiUrl,
 } from "./contracts.js";
 
 export async function fetchStudioProjects(signal?: AbortSignal): Promise<StudioProjectSummary[]> {
@@ -83,4 +87,39 @@ export async function createStudioProjectFromArtifact(
 	}
 
 	return parsed.success;
+}
+
+export async function fetchStudioDiagramDrawing(
+	diagramId: string,
+	signal?: AbortSignal,
+): Promise<StudioDrawing> {
+	const response = await fetch(studioDiagramDrawingApiUrl(diagramId), signal ? { signal } : {});
+	const payload: unknown = await response.json();
+	const parsed = Schema.decodeUnknownResult(StudioDrawingResponseSchema)(payload);
+
+	if (!response.ok || Result.isFailure(parsed)) {
+		throw new Error("Studio drawing could not be loaded.");
+	}
+
+	return parsed.success.drawing;
+}
+
+/** Saves the drawing as the diagram's current drawing and returns the updated diagram. */
+export async function saveStudioDiagramDrawing(
+	diagramId: string,
+	drawing: StudioDrawing,
+): Promise<StudioDiagramSummary> {
+	const response = await fetch(studioDiagramDrawingApiUrl(diagramId), {
+		body: JSON.stringify(drawing),
+		headers: { "Content-Type": "application/json" },
+		method: "PUT",
+	});
+	const payload: unknown = await response.json().catch(() => null);
+	const parsed = Schema.decodeUnknownResult(SaveStudioDrawingResponseSchema)(payload);
+
+	if (!response.ok || Result.isFailure(parsed)) {
+		throw new Error("Drawing could not be saved.");
+	}
+
+	return parsed.success.diagram;
 }

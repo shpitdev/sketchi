@@ -50,6 +50,7 @@ const tanstackFullPathSnapshot = [
 	"/",
 	"/api/chat",
 	"/api/studio/diagrams/$diagramId",
+	"/api/studio/diagrams/$diagramId/drawing",
 	"/api/studio/projects",
 	"/api/studio/projects/$projectId",
 	"/api/studio/projects/from-artifact",

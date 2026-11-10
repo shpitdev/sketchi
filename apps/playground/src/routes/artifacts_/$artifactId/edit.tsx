@@ -22,7 +22,7 @@ function ArtifactEditRoute() {
 			downloadName={artifactId}
 			headerLinks={
 				<a className="studio-header__link" href={urls.review}>
-					Review
+					View
 				</a>
 			}
 			loadingMessage="Loading artifact..."

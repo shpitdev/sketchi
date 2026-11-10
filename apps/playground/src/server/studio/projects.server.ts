@@ -9,8 +9,10 @@ import {
 import {
 	handleCreateFromArtifactRequestEffect,
 	handleGetDiagramRequestEffect,
+	handleGetDrawingRequestEffect,
 	handleGetProjectRequestEffect,
 	handleListProjectsRequestEffect,
+	handleSaveDrawingRequestEffect,
 	isStudioObjectBucket,
 	makeIsoDateString,
 	makeStudioRecordId,
@@ -49,11 +51,19 @@ export interface PlaygroundStudioShape {
 		request: Request,
 		diagramId: string,
 	) => Effect.Effect<Response, never, PlaygroundBindings>;
+	readonly getDrawing: (
+		request: Request,
+		diagramId: string,
+	) => Effect.Effect<Response, never, PlaygroundBindings>;
 	readonly getProject: (
 		request: Request,
 		projectId: string,
 	) => Effect.Effect<Response, never, PlaygroundBindings>;
 	readonly listProjects: (request: Request) => Effect.Effect<Response, never, PlaygroundBindings>;
+	readonly saveDrawing: (
+		request: Request,
+		diagramId: string,
+	) => Effect.Effect<Response, never, PlaygroundBindings>;
 }
 
 export class PlaygroundStudio extends Context.Service<PlaygroundStudio, PlaygroundStudioShape>()(
@@ -189,11 +199,17 @@ export const PlaygroundStudioLayer = Layer.effect(
 			getDiagram: Effect.fn("playground.studio.getDiagram")((request, diagramId) =>
 				runStudioHandler(handleGetDiagramRequestEffect(request, diagramId)),
 			),
+			getDrawing: Effect.fn("playground.studio.getDrawing")((request, diagramId) =>
+				runStudioHandler(handleGetDrawingRequestEffect(request, diagramId)),
+			),
 			getProject: Effect.fn("playground.studio.getProject")((request, projectId) =>
 				runStudioHandler(handleGetProjectRequestEffect(request, projectId)),
 			),
 			listProjects: Effect.fn("playground.studio.listProjects")((request) =>
 				runStudioHandler(handleListProjectsRequestEffect(request)),
+			),
+			saveDrawing: Effect.fn("playground.studio.saveDrawing")((request, diagramId) =>
+				runStudioHandler(handleSaveDrawingRequestEffect(request, diagramId)),
 			),
 		});
 	}),
@@ -224,5 +240,19 @@ export const handleGetStudioDiagramRequest = Effect.fn("playground.http.studio.g
 	function* (request: Request, diagramId: string) {
 		const studio = yield* PlaygroundStudio;
 		return yield* studio.getDiagram(request, diagramId);
+	},
+);
+
+export const handleGetStudioDrawingRequest = Effect.fn("playground.http.studio.getDrawing")(
+	function* (request: Request, diagramId: string) {
+		const studio = yield* PlaygroundStudio;
+		return yield* studio.getDrawing(request, diagramId);
+	},
+);
+
+export const handleSaveStudioDrawingRequest = Effect.fn("playground.http.studio.saveDrawing")(
+	function* (request: Request, diagramId: string) {
+		const studio = yield* PlaygroundStudio;
+		return yield* studio.saveDrawing(request, diagramId);
 	},
 );

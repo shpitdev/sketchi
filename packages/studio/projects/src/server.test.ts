@@ -5,8 +5,10 @@ import { vi } from "vitest";
 import {
 	handleCreateFromArtifactRequestEffect,
 	handleGetDiagramRequestEffect,
+	handleGetDrawingRequestEffect,
 	handleGetProjectRequestEffect,
 	handleListProjectsRequestEffect,
+	handleSaveDrawingRequestEffect,
 	makeIsoDateString,
 	makeStudioRecordId,
 	makeStudioObjectStoreLayer,
@@ -20,6 +22,8 @@ import {
 	StudioSourceArtifactError,
 	StudioSourceArtifactStore,
 	studioDiagramRecordKey,
+	studioDrawingKey,
+	STUDIO_DRAWING_MAX_BYTES,
 	studioOwnerKey,
 	studioOwnerProjectEntryKey,
 	studioProjectRecordKey,
@@ -100,7 +104,9 @@ function createTestServer<
 								((recordKind) => (recordKind === "proj" ? "proj_test" : "dia_test"))
 							)(kind),
 						),
-					now: Effect.succeed(makeIsoDateString(overrides.now?.() ?? "2026-07-20T02:00:00.000Z")),
+					now: Effect.sync(() =>
+						makeIsoDateString(overrides.now?.() ?? "2026-07-20T02:00:00.000Z"),
+					),
 				})
 			: StudioRecordFactoryLive,
 		StudioSessionServiceLive,
@@ -121,6 +127,10 @@ function createTestServer<
 				run(handleGetProjectRequestEffect(request, projectId), request.signal),
 			handleListProjectsRequest: (request: Request) =>
 				run(handleListProjectsRequestEffect(request), request.signal),
+			handleGetDrawingRequest: (request: Request, diagramId: string) =>
+				run(handleGetDrawingRequestEffect(request, diagramId), request.signal),
+			handleSaveDrawingRequest: (request: Request, diagramId: string) =>
+				run(handleSaveDrawingRequestEffect(request, diagramId), request.signal),
 		},
 		sourceArtifacts,
 	};
@@ -544,5 +554,127 @@ describe("Studio project HTTP runtime edge", () => {
 			message: "A playground artifactId is required.",
 			ok: false,
 		});
+	});
+});
+
+describe("Studio drawing Save", () => {
+	const sessionId = "anon_abcdefghijklmnop";
+	const cookie = { Cookie: `sketchi_studio_session=${sessionId}` };
+	const drawingUrl = "https://studio.test/api/studio/diagrams/dia_saved/drawing";
+	const drawing = {
+		appState: { viewBackgroundColor: "#fffdf8" },
+		elements: [{ id: "box", type: "rectangle", version: 3, x: 10, y: 20 }],
+		files: {},
+	};
+
+	function putDrawing(body: unknown, headers: HeadersInit = cookie): Request {
+		return new Request(drawingUrl, {
+			body: typeof body === "string" ? body : JSON.stringify(body),
+			headers: { "Content-Type": "application/json", ...headers },
+			method: "PUT",
+		});
+	}
+
+	async function savedDiagram() {
+		let tick = 0;
+		const test = createTestServer(new MemoryStudioObjectBucket(), new TestSourceArtifacts(), {
+			createId: (kind) => (kind === "proj" ? "proj_saved" : "dia_saved"),
+			now: () => `2026-07-20T02:00:0${tick++}.000Z`,
+		});
+		test.sourceArtifacts.artifacts.set("artifact-saved", { diagramId: "flow", title: "Saved" });
+		const created = await test.server.handleCreateFromArtifactRequest(
+			postRequest(
+				"https://studio.test/api/studio/projects/from-artifact",
+				{ artifactId: "artifact-saved" },
+				cookie,
+			),
+		);
+		expect(created.status).toBe(200);
+		return test;
+	}
+
+	it("has no drawing until the first Save", async () => {
+		const { server } = await savedDiagram();
+		const response = await server.handleGetDrawingRequest(
+			requestWithSession(drawingUrl, sessionId),
+			"dia_saved",
+		);
+		expect(response.status).toBe(404);
+		const diagram = await server.handleGetDiagramRequest(
+			requestWithSession("https://studio.test/api/studio/diagrams/dia_saved", sessionId),
+			"dia_saved",
+		);
+		expect(((await diagram.json()) as { diagram: object }).diagram).not.toHaveProperty("savedAt");
+	});
+
+	it("persists each Save as the diagram's drawing, the same way every time", async () => {
+		const { bucket, server } = await savedDiagram();
+
+		const first = await server.handleSaveDrawingRequest(putDrawing(drawing), "dia_saved");
+		expect(first.status).toBe(200);
+		expect(await first.json()).toMatchObject({
+			diagram: { id: "dia_saved", savedAt: "2026-07-20T02:00:01.000Z" },
+			ok: true,
+		});
+
+		const edited = {
+			...drawing,
+			elements: [...drawing.elements, { id: "label", type: "text", text: "Ship" }],
+		};
+		const second = await server.handleSaveDrawingRequest(putDrawing(edited), "dia_saved");
+		expect(await second.json()).toMatchObject({
+			diagram: { savedAt: "2026-07-20T02:00:02.000Z", updatedAt: "2026-07-20T02:00:02.000Z" },
+		});
+
+		const loaded = await server.handleGetDrawingRequest(
+			requestWithSession(drawingUrl, sessionId),
+			"dia_saved",
+		);
+		expect(loaded.status).toBe(200);
+		expect(await loaded.json()).toMatchObject({ drawing: edited, ok: true });
+		expect(JSON.parse(String(bucket.objects.get(studioDrawingKey("dia_saved"))))).toEqual(edited);
+
+		const projects = await server.handleListProjectsRequest(
+			requestWithSession("https://studio.test/api/studio/projects", sessionId),
+		);
+		expect(await projects.json()).toMatchObject({
+			projects: [{ id: "proj_saved", updatedAt: "2026-07-20T02:00:02.000Z" }],
+		});
+	});
+
+	it("refuses another session's Save and keeps the drawing", async () => {
+		const { bucket, server } = await savedDiagram();
+		await server.handleSaveDrawingRequest(putDrawing(drawing), "dia_saved");
+
+		const other = await server.handleSaveDrawingRequest(
+			putDrawing(
+				{ ...drawing, elements: [] },
+				{ Cookie: "sketchi_studio_session=anon_zyxwvutsrqponmlk" },
+			),
+			"dia_saved",
+		);
+		expect(other.status).toBe(404);
+		expect(JSON.parse(String(bucket.objects.get(studioDrawingKey("dia_saved"))))).toEqual(drawing);
+	});
+
+	it.each([
+		["an element without an id", { ...drawing, elements: [{ type: "rectangle" }] }],
+		["a body that is not JSON", "{"],
+		["a drawing without files", { appState: {}, elements: [] }],
+	])("rejects %s", async (_name, body) => {
+		const { bucket, server } = await savedDiagram();
+		const response = await server.handleSaveDrawingRequest(putDrawing(body), "dia_saved");
+		expect(response.status).toBe(400);
+		expect(bucket.objects.has(studioDrawingKey("dia_saved"))).toBe(false);
+	});
+
+	it("rejects a drawing over the size limit before reading it", async () => {
+		const { server } = await savedDiagram();
+		const response = await server.handleSaveDrawingRequest(
+			putDrawing(drawing, { ...cookie, "Content-Length": String(STUDIO_DRAWING_MAX_BYTES + 1) }),
+			"dia_saved",
+		);
+		expect(response.status).toBe(400);
+		expect(await response.json()).toMatchObject({ message: "The drawing is too large to save." });
 	});
 });

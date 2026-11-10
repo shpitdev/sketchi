@@ -66,11 +66,31 @@ export class StudioDiagramRecord extends Schema.Class<StudioDiagramRecord>("Stud
 	id: StudioRecordIdSchema,
 	owner: StudioOwnerSchema,
 	projectId: StudioRecordIdSchema,
+	savedAt: Schema.optional(IsoDateStringSchema),
 	source: StudioProjectSource,
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
 }) {}
 export const StudioDiagramRecordSchema = StudioDiagramRecord;
+
+const StudioDrawingElement = Schema.Record(Schema.String, Schema.Unknown).check(
+	Schema.makeFilter(
+		(value) =>
+			typeof value["id"] === "string" &&
+			value["id"].length > 0 &&
+			typeof value["type"] === "string" &&
+			value["type"].length > 0,
+		{ message: "Each drawing element needs an id and a type." },
+	),
+);
+
+/** A diagram's saved Excalidraw drawing: its live elements, app state and image files. */
+export class StudioDrawing extends Schema.Class<StudioDrawing>("StudioDrawing")({
+	appState: Schema.Record(Schema.String, Schema.Unknown),
+	elements: Schema.Array(StudioDrawingElement),
+	files: Schema.Record(Schema.String, Schema.Unknown),
+}) {}
+export const StudioDrawingSchema = StudioDrawing;
 
 export class AnonymousStudioAuthStatus extends Schema.Class<AnonymousStudioAuthStatus>(
 	"AnonymousStudioAuthStatus",
@@ -132,6 +152,8 @@ export class StudioDiagramSummary extends Schema.Class<StudioDiagramSummary>(
 	id: StudioRecordIdSchema,
 	projectId: StudioRecordIdSchema,
 	reviewUrl: NonEmptyString,
+	/** When the diagram's drawing was last saved; absent until the first Save. */
+	savedAt: Schema.optional(IsoDateStringSchema),
 	source: StudioProjectSource,
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
@@ -182,6 +204,26 @@ export class StudioDiagramDetailsResponse extends Schema.Class<StudioDiagramDeta
 }) {}
 export const StudioDiagramDetailsResponseSchema = StudioDiagramDetailsResponse;
 
+export class StudioDrawingResponse extends Schema.Class<StudioDrawingResponse>(
+	"StudioDrawingResponse",
+)({
+	auth: StudioAuthStatusSchema,
+	drawing: StudioDrawing,
+	ok: Schema.Literal(true),
+	session: StudioPublicSessionSchema,
+}) {}
+export const StudioDrawingResponseSchema = StudioDrawingResponse;
+
+export class SaveStudioDrawingResponse extends Schema.Class<SaveStudioDrawingResponse>(
+	"SaveStudioDrawingResponse",
+)({
+	auth: StudioAuthStatusSchema,
+	diagram: StudioDiagramSummary,
+	ok: Schema.Literal(true),
+	session: StudioPublicSessionSchema,
+}) {}
+export const SaveStudioDrawingResponseSchema = SaveStudioDrawingResponse;
+
 export class StudioProjectUrls extends Schema.Class<StudioProjectUrls>("StudioProjectUrls")({
 	diagram: NonEmptyString,
 	edit: NonEmptyString,
@@ -211,4 +253,8 @@ export function studioDiagramUrl(diagramId: string): string {
 
 export function studioDiagramEditUrl(diagramId: string): string {
 	return `${studioDiagramUrl(diagramId)}/edit`;
+}
+
+export function studioDiagramDrawingApiUrl(diagramId: string): string {
+	return `/api/studio/diagrams/${encodeURIComponent(diagramId)}/drawing`;
 }

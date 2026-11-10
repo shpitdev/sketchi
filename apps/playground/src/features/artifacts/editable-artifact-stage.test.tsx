@@ -20,6 +20,7 @@ describe("editable artifact stage", () => {
 	it("has a disabled download without a placeholder link while loading", () => {
 		render(
 			<EditableArtifactStage
+				artifactId="artifact"
 				downloadName="drawing"
 				headerLinks={null}
 				loadingMessage="Loading diagram..."

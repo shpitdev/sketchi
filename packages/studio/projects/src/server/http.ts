@@ -3,6 +3,7 @@ import { Context, Effect, Schema } from "effect";
 
 import {
 	CreateStudioProjectFromArtifactRequestSchema,
+	StudioDrawingSchema,
 	StudioRecordIdSchema,
 } from "../contracts.js";
 import { StudioInvalidInputError, StudioNotFoundError, type StudioHttpError } from "./errors.js";
@@ -22,6 +23,41 @@ const readRequestJson = Effect.fn("studioPersistence.http.readJson")(function* (
 	});
 	yield* Effect.annotateCurrentSpan(SpanContent.httpRequestBody, body);
 	return body;
+});
+
+/** A saved drawing carries its image files inline, so it gets more room than a record. */
+export const STUDIO_DRAWING_MAX_BYTES = 16 * 1024 * 1024;
+
+const drawingTooLarge = () =>
+	StudioInvalidInputError.make({ message: "The drawing is too large to save." });
+
+const readDrawingJson = Effect.fn("studioPersistence.http.readDrawing")(function* (
+	request: Request,
+) {
+	const contentLength = Number(request.headers.get("Content-Length"));
+	if (Number.isFinite(contentLength) && contentLength > STUDIO_DRAWING_MAX_BYTES) {
+		return yield* drawingTooLarge();
+	}
+	const text = yield* Effect.tryPromise({
+		try: () => request.text(),
+		catch: (cause) => StudioInvalidInputError.make({ cause, message: "A drawing is required." }),
+	});
+	if (new TextEncoder().encode(text).byteLength > STUDIO_DRAWING_MAX_BYTES) {
+		return yield* drawingTooLarge();
+	}
+	// The drawing is not recorded on the span: it can be megabytes of image data.
+	const body = yield* Effect.try({
+		try: (): unknown => JSON.parse(text),
+		catch: (cause) => StudioInvalidInputError.make({ cause, message: "A drawing is required." }),
+	});
+	return yield* Schema.decodeUnknownEffect(StudioDrawingSchema, { errors: "all" })(body).pipe(
+		Effect.mapError((cause) =>
+			StudioInvalidInputError.make({
+				cause,
+				message: "The drawing is not a valid Excalidraw scene.",
+			}),
+		),
+	);
 });
 
 function responseHeaders(resolution?: StudioSessionResolution): Headers {
@@ -247,6 +283,48 @@ export const handleGetDiagramRequestEffect = Effect.fn("studioPersistence.http.g
 					}),
 				),
 			),
+		);
+	},
+);
+
+function decodeDiagramId(diagramId: string) {
+	return Schema.decodeUnknownEffect(StudioRecordIdSchema)(diagramId).pipe(
+		Effect.mapError(() => StudioNotFoundError.make({ id: diagramId, resource: "diagram" })),
+	);
+}
+
+export const handleGetDrawingRequestEffect = Effect.fn("studioPersistence.http.getDrawing")(
+	function* (request: Request, diagramId: string) {
+		return yield* withStudioSession(request, "diagram", (resolution, projects) =>
+			decodeDiagramId(diagramId).pipe(
+				Effect.flatMap((id) => projects.getDrawing(resolution.session, id)),
+				Effect.map((drawing) =>
+					jsonWithSession(resolution, {
+						auth: resolution.auth,
+						drawing,
+						ok: true,
+						session: resolution.publicSession,
+					}),
+				),
+			),
+		);
+	},
+);
+
+export const handleSaveDrawingRequestEffect = Effect.fn("studioPersistence.http.saveDrawing")(
+	function* (request: Request, diagramId: string) {
+		return yield* withStudioSession(request, "diagram", (resolution, projects) =>
+			Effect.gen(function* () {
+				const id = yield* decodeDiagramId(diagramId);
+				const drawing = yield* readDrawingJson(request);
+				const diagram = yield* projects.saveDrawing(resolution.session, id, drawing);
+				return jsonWithSession(resolution, {
+					auth: resolution.auth,
+					diagram,
+					ok: true,
+					session: resolution.publicSession,
+				});
+			}),
 		);
 	},
 );
