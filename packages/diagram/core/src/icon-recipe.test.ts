@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
 	ICON_RECIPE_LIMITS,
 	iconRecipeByteLength,
+	iconRecipeFitIssues,
 	iconRecipeIssues,
+	iconRecipeTextBox,
 	isIconRecipe,
 	type IconRecipe,
 } from "./icon-recipe";
@@ -80,5 +82,19 @@ describe("icon recipes", () => {
 
 	it("measures serialized bytes for the scene budget", () => {
 		expect(iconRecipeByteLength(DATABASE)).toBe(JSON.stringify(DATABASE).length);
+	});
+
+	it("finds a word that would clip past the grid, across or down", () => {
+		expect(iconRecipeFitIssues(DATABASE)).toEqual([]);
+		const wide: IconRecipe = {
+			parts: [{ kind: "text", cx: 12, cy: 10.5, text: "tinyhttp", size: 8.5 }],
+		};
+		// Still drawable, so a stored recipe keeps loading; only making or accepting one checks the fit.
+		expect(isIconRecipe(wide)).toBe(true);
+		expect(iconRecipeFitIssues(wide)).toEqual([expect.stringContaining('"tinyhttp"')]);
+		const box = iconRecipeTextBox({ kind: "text", cx: 12, cy: 10.5, text: "tinyhttp", size: 8.5 });
+		expect(box.right - box.left).toBeGreaterThan(24);
+		const low: IconRecipe = { parts: [{ kind: "text", cx: 12, cy: 22, text: "db", size: 8 }] };
+		expect(iconRecipeFitIssues(low)).toHaveLength(1);
 	});
 });

@@ -9,12 +9,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { getIconSourceFile, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
+import { getIconSourceFile, iconManifest, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import { iconAuthorModel, type IconAuthorModel } from "@sketchi/icon-draw";
 
 import { drawMark } from "./draw-mark.js";
 import { SKETCHI_ACCOUNT_ID } from "./gateway.js";
-import { promote } from "./promote.js";
+import { promote, settleRecipes } from "./promote.js";
 import { runBatch } from "./runner.js";
 import { marksToDraw } from "./selection.js";
 import { writeSheets } from "./sheets.js";
@@ -58,6 +58,9 @@ function positiveNumber(value: string, flag: string): number {
 		throw new Error(`--${flag} must be a positive number.`);
 	return number;
 }
+
+const colorModes = new Map(iconManifest.icons.map((icon) => [icon.slug, icon.colorMode]));
+const colorModeOf = (slug: string) => colorModes.get(slug);
 
 const recipeSlugs = () =>
 	new Set(
@@ -134,14 +137,27 @@ switch (command) {
 						.filter(Boolean)
 				: [],
 		);
-		const { written, skipped } = await promote(await store.records(), recipesDir, rejected);
+		const { written, skipped } = await promote(
+			await store.records(),
+			recipesDir,
+			rejected,
+			colorModeOf,
+		);
 		process.stdout.write(`Wrote ${written.length} recipes to ${recipesDir}.\n`);
 		for (const { slug, reason } of skipped) process.stdout.write(`skipped ${slug}: ${reason}\n`);
 		break;
 	}
+	case "normalize": {
+		const settled = await settleRecipes(recipesDir, colorModeOf);
+		for (const { slug, changes } of settled) {
+			process.stdout.write(`${slug}: ${changes.join("; ")}\n`);
+		}
+		process.stdout.write(`Settled ${settled.length} recipes in ${recipesDir}.\n`);
+		break;
+	}
 	default:
 		process.stderr.write(
-			"Usage: icon-batch <draw|sheets|summary|promote> [--run name] [--sample n | --slugs a,b] [--concurrency 4] [--cap 60] [--author source] [--retry claude-opus-5-5] [--reject file]\n",
+			"Usage: icon-batch <draw|sheets|summary|promote|normalize> [--run name] [--sample n | --slugs a,b] [--concurrency 4] [--cap 60] [--author source] [--retry claude-opus-5-5] [--reject file]\n",
 		);
 		process.exitCode = 2;
 }

@@ -8,6 +8,8 @@
  * scene's text color, while brand colors stay fixed.
  */
 
+import { estimateTextWidth } from "./text-metrics.js";
+
 export const ICON_RECIPE_GRID = 24;
 
 export const ICON_RECIPE_LIMITS = Object.freeze({
@@ -221,6 +223,44 @@ export function iconRecipeIssues(value: unknown): string[] {
 
 export function isIconRecipe(value: unknown): value is IconRecipe {
 	return iconRecipeIssues(value).length === 0;
+}
+
+/**
+ * The box a text part's word takes on the grid, at the width Excalidraw's
+ * export gives it: the word is centered on (cx, cy) and its glyphs are `size` tall.
+ */
+export function iconRecipeTextBox(part: IconRecipeText): {
+	readonly left: number;
+	readonly right: number;
+	readonly top: number;
+	readonly bottom: number;
+} {
+	const halfWidth = estimateTextWidth(part.text, part.size) / 2;
+	return {
+		left: part.cx - halfWidth,
+		right: part.cx + halfWidth,
+		top: part.cy - part.size / 2,
+		bottom: part.cy + part.size / 2,
+	};
+}
+
+/**
+ * Where a drawable recipe would clip: a word wider or taller than the grid
+ * (with the overhang a stroke may take) is cut off in every square it is drawn
+ * in. Checked when a recipe is made or accepted, not when a stored one is read.
+ */
+export function iconRecipeFitIssues(recipe: IconRecipe): string[] {
+	const low = -ICON_RECIPE_LIMITS.overhang;
+	const high = ICON_RECIPE_GRID + ICON_RECIPE_LIMITS.overhang;
+	return recipe.parts.flatMap((part, index) => {
+		if (part.kind !== "text") return [];
+		const box = iconRecipeTextBox(part);
+		return box.left < low || box.right > high || box.top < low || box.bottom > high
+			? [
+					`recipe.parts[${index}] text "${part.text}" spans ${box.left.toFixed(1)} to ${box.right.toFixed(1)} across and ${box.top.toFixed(1)} to ${box.bottom.toFixed(1)} down, past the ${ICON_RECIPE_GRID}-unit grid; make it smaller or move it inward.`,
+				]
+			: [];
+	});
 }
 
 /** Serialized size, the unit the per-scene icon budget counts. */
