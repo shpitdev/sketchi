@@ -572,6 +572,14 @@ describe("author", () => {
 			{ kind: "rect", x: 0, y: 0, width: 4, height: 4, fill: "ink", stroke: "paper" },
 			{ kind: "rect", x: 4, y: 4, width: 4, height: 4, fill: "#808080" },
 		]);
+		// A gray that is not itself near-black, snapped to a near-black source color, is ink too.
+		expect(
+			normalizeRecipe(
+				{ parts: [{ kind: "rect", x: 0, y: 0, width: 4, height: 4, fill: "#505050" }] },
+				["#333333"],
+				"dark",
+			).recipe?.parts[0],
+		).toMatchObject({ fill: "ink" });
 		// A light mark swaps them.
 		expect(
 			normalizeRecipe({ parts: [parts[0]] }, ["#ffffff"], "light").recipe?.parts[0],

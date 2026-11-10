@@ -327,7 +327,10 @@ export function normalizeRecipe(
 		const nearest = [...palette].sort(
 			(left, right) => colorDistance(left, hex) - colorDistance(right, hex),
 		)[0];
-		if (nearest && colorDistance(nearest, hex) <= COLOR_SNAP_DISTANCE) return nearest;
+		// A near-miss snaps to the source's color, which may itself be the mark's black or white.
+		if (nearest && colorDistance(nearest, hex) <= COLOR_SNAP_DISTANCE) {
+			return toneColor(nearest, tone) ?? nearest;
+		}
 		if (luminance(hex) > 0.92) return ICON_RECIPE_PAPER;
 		if (luminance(hex) < 0.12) return ICON_RECIPE_INK;
 		issues.push(
