@@ -4,7 +4,6 @@ import {
 	type ArtifactProvenance,
 	type GetArtifactResult,
 } from "@sketchi/diagram-agent";
-import { fetchStudioDiagramDetails } from "@sketchi/studio-projects/client";
 import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 
 import type { AsyncResource } from "@/features/resources/use-async-resource";
@@ -76,10 +75,4 @@ export async function fetchArtifactScene(
 	signal?: AbortSignal,
 ): Promise<RenderedDiagramScene> {
 	return (await fetchArtifactReview(artifactId, signal)).scene;
-}
-
-export async function fetchDiagramScene(diagramId: string, signal: AbortSignal) {
-	const details = await fetchStudioDiagramDetails(diagramId, signal);
-	const scene = await fetchArtifactScene(details.diagram.artifactId, signal);
-	return { ...details, scene };
 }

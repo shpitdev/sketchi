@@ -63,7 +63,7 @@ export function useEditedDrawingDownload(scene: RenderedDiagramScene) {
 }
 
 interface EditableArtifactStageProps {
-	artifactId?: string;
+	artifactId: string;
 	downloadName: string;
 	headerLinks: ReactNode;
 	loadingMessage: string;
@@ -136,7 +136,7 @@ export function EditableArtifactStage({
 	showSceneFile = false,
 	state,
 }: EditableArtifactStageProps) {
-	if (state.status === "ready" && artifactId)
+	if (state.status === "ready")
 		return (
 			<ReadyEditor
 				key={artifactId}

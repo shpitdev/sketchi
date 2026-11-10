@@ -23,6 +23,7 @@ import {
 	makeStudioRecordId,
 	StudioDiagramRecord,
 	StudioDiagramRecordSchema,
+	StudioDrawingSchema,
 	StudioProjectRecord,
 	StudioProjectRecordSchema,
 	StudioProjectSource,
@@ -31,6 +32,7 @@ import {
 	studioDiagramUrl,
 	studioProjectUrl,
 	type StudioDiagramSummary,
+	type StudioDrawing,
 	type StudioOwner,
 	type StudioProjectDetails,
 	type StudioProjectSummary,
@@ -59,8 +61,10 @@ const studioPersistenceDuration = Metric.histogram("sketchi_studio_persistence_d
 type StudioPersistenceOperation =
 	| "createFromArtifact"
 	| "getDiagram"
+	| "getDrawing"
 	| "getProject"
-	| "listProjects";
+	| "listProjects"
+	| "saveDrawing";
 
 function observeStudioPersistence<A>(
 	operation: StudioPersistenceOperation,
@@ -137,6 +141,10 @@ export interface StudioProjectsShape {
 		},
 		StudioProjectsError
 	>;
+	readonly getDrawing: (
+		session: StudioOwner,
+		diagramId: string,
+	) => Effect.Effect<StudioDrawing, StudioProjectsError>;
 	readonly getProject: (
 		session: StudioOwner,
 		projectId: string,
@@ -144,6 +152,12 @@ export interface StudioProjectsShape {
 	readonly listProjects: (
 		session: StudioOwner,
 	) => Effect.Effect<StudioProjectSummary[], StudioProjectsError>;
+	/** Replaces the diagram's drawing with this one; every Save is the same overwrite. */
+	readonly saveDrawing: (
+		session: StudioOwner,
+		diagramId: string,
+		drawing: StudioDrawing,
+	) => Effect.Effect<StudioDiagramSummary, StudioProjectsError>;
 }
 
 export class StudioProjects extends Context.Service<StudioProjects, StudioProjectsShape>()(
@@ -207,6 +221,10 @@ export function studioDiagramRecordKey(diagramId: string): string {
 	return `${STUDIO_PREFIX}/diagrams/${keySegment(diagramId)}.json`;
 }
 
+export function studioDrawingKey(diagramId: string): string {
+	return `${STUDIO_PREFIX}/drawings/${keySegment(diagramId)}.json`;
+}
+
 function projectSummary(record: StudioProjectRecord): StudioProjectSummary {
 	return {
 		createdAt: record.createdAt,
@@ -228,6 +246,7 @@ function diagramSummary(record: StudioDiagramRecord): StudioDiagramSummary {
 		id: record.id,
 		projectId: record.projectId,
 		reviewUrl: studioDiagramUrl(record.id),
+		savedAt: record.savedAt,
 		source: record.source,
 		title: record.title,
 		updatedAt: record.updatedAt,
@@ -389,6 +408,49 @@ export const StudioProjectsLive = Layer.effect(
 			};
 		});
 
+		const readOwnedDiagram = Effect.fn("studioPersistence.projects.readOwnedDiagram")(function* (
+			session: StudioOwner,
+			diagramId: string,
+		) {
+			const diagram = yield* readDiagramRecord(diagramId);
+			yield* ensureOwner(diagram.owner, session, "diagram", diagram.id);
+			return diagram;
+		});
+
+		const getDrawing = Effect.fn("studioPersistence.projects.getDrawing")(function* (
+			session: StudioOwner,
+			diagramId: string,
+		) {
+			const diagram = yield* readOwnedDiagram(session, diagramId);
+			return yield* json.read(
+				studioDrawingKey(diagram.id),
+				StudioDrawingSchema,
+				"diagram",
+				diagram.id,
+			);
+		});
+
+		const saveDrawing = Effect.fn("studioPersistence.projects.saveDrawing")(function* (
+			session: StudioOwner,
+			diagramId: string,
+			drawing: StudioDrawing,
+		) {
+			const diagram = yield* readOwnedDiagram(session, diagramId);
+			const project = yield* readProjectRecord(diagram.projectId);
+			yield* ensureOwner(project.owner, session, "project", project.id);
+			const savedAt = yield* recordFactory.now;
+			// The drawing lands before the record that announces it.
+			yield* json.put(studioDrawingKey(diagram.id), StudioDrawingSchema, drawing);
+			const saved = StudioDiagramRecord.make({ ...diagram, savedAt, updatedAt: savedAt });
+			yield* json.put(studioDiagramRecordKey(saved.id), StudioDiagramRecordSchema, saved);
+			yield* json.put(
+				studioProjectRecordKey(project.id),
+				StudioProjectRecordSchema,
+				StudioProjectRecord.make({ ...project, updatedAt: savedAt }),
+			);
+			return diagramSummary(saved);
+		});
+
 		const createFromArtifact = Effect.fn("studioPersistence.projects.createFromArtifact")(
 			function* (input: { readonly artifactId: string; readonly session: StudioOwner }) {
 				const sourceArtifact = yield* sourceArtifacts.load(input.artifactId);
@@ -463,10 +525,14 @@ export const StudioProjectsLive = Layer.effect(
 				),
 			getDiagram: (session, diagramId) =>
 				observeStudioPersistence("getDiagram", {}, getDiagram(session, diagramId)),
+			getDrawing: (session, diagramId) =>
+				observeStudioPersistence("getDrawing", {}, getDrawing(session, diagramId)),
 			getProject: (session, projectId) =>
 				observeStudioPersistence("getProject", { projectId }, getProject(session, projectId)),
 			listProjects: (session) =>
 				observeStudioPersistence("listProjects", {}, listProjects(session)),
+			saveDrawing: (session, diagramId, drawing) =>
+				observeStudioPersistence("saveDrawing", {}, saveDrawing(session, diagramId, drawing)),
 		};
 	}),
 );

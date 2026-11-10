@@ -21,8 +21,10 @@ import { PlaygroundCodeModeUsageLive } from "../codemode/usage-events.server";
 import {
 	handleCreateStudioProjectFromArtifactRequest,
 	handleGetStudioDiagramRequest,
+	handleGetStudioDrawingRequest,
 	handleGetStudioProjectRequest,
 	handleListStudioProjectsRequest,
+	handleSaveStudioDrawingRequest,
 	PlaygroundStudioLayer,
 	PlaygroundStudioLocalBucketLive,
 } from "../studio/projects.server";
@@ -113,8 +115,10 @@ export interface PlaygroundRuntime {
 export {
 	handleCreateStudioProjectFromArtifactRequest,
 	handleGetStudioDiagramRequest,
+	handleGetStudioDrawingRequest,
 	handleGetStudioProjectRequest,
 	handleListStudioProjectsRequest,
+	handleSaveStudioDrawingRequest,
 };
 
 function runWithPlaygroundRuntime<A, E>(

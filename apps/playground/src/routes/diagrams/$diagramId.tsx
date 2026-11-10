@@ -1,8 +1,8 @@
-import { ArtifactCanvas } from "@sketchi/diagram-ui";
+import { ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAsyncResource } from "@/features/resources/use-async-resource";
 
-import { fetchDiagramScene } from "@/features/artifacts/artifact-view-client";
+import { fetchDiagramDrawing } from "@/features/studio/diagram-drawing";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
 import { StudioHeader } from "@/components/studio-header";
 
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/diagrams/$diagramId")({
 function DiagramRoute() {
 	const { diagramId } = Route.useParams();
 	const state = useAsyncResource(
-		(signal) => fetchDiagramScene(diagramId, signal),
+		(signal) => fetchDiagramDrawing(diagramId, signal),
 		[diagramId],
 		"Studio diagram could not be loaded.",
 	);
@@ -43,7 +43,16 @@ function DiagramRoute() {
 				{state.status === "error" ? (
 					<p className="artifact-view__message artifact-view__message--error">{state.message}</p>
 				) : null}
-				{state.status === "ready" ? <ArtifactCanvas scene={state.scene} /> : null}
+				{state.status === "ready" ? (
+					<div className="sketchi-artifact-canvas" data-mode="view">
+						<ExcalidrawSceneCanvas
+							revision={state.diagram.savedAt ?? "generated"}
+							scene={state.scene}
+							title={state.diagram.title}
+							viewModeEnabled
+						/>
+					</div>
+				) : null}
 			</section>
 		</main>
 	);

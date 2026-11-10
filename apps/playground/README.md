@@ -61,6 +61,12 @@ Persisted Studio routes live at `/projects`, `/projects/:projectId`,
 can save a Playground artifact into a Studio project without changing the
 anonymous Playground flow.
 
+The diagram editor captures every edit in the browser's IndexedDB (through
+`idb-keyval`), so a reload or crash restores unsaved work. Save (or Ctrl/Cmd+S)
+writes the current drawing to `studio/drawings/<diagramId>.json` and clears the
+local draft; the diagram then opens from that drawing instead of its generated
+artifact.
+
 Project, diagram, and owner-project membership records are JSON objects under
 the `studio/` prefix in the same `SKETCHI_ARTIFACTS` object bucket that stores
 generated artifact payloads. Project lists are derived by listing the owner's
