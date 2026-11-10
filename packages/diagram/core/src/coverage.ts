@@ -1201,8 +1201,9 @@ const SHARED_BY =
 
 /**
  * A step the request gives to listed branches ("A and B both check stock") that the diagram also
- * gives a sibling branch the request leaves out: a branch of the same decision leads straight
- * into it. Each listed branch and the step must name nodes unmistakably.
+ * gives a sibling branch the request leaves out: a branch of the same decision, or of a decision
+ * chained to it, leads into it through plain steps alone. Each listed branch and the step must
+ * name nodes unmistakably.
  */
 function borrowedSteps(
 	request: string,
@@ -1273,13 +1274,70 @@ function borrowedSteps(
 						)
 					);
 				});
+		// A choice drawn as a chain of decisions ("Deploy issue?" no to "Code issue?") offers each
+		// later decision's branches beside the earlier ones.
+		const decision = (id: string) => {
+			const node = nodes[ids.indexOf(id)];
+			return node?.["kind"] === "decision" || text(node?.["label"]).trim().endsWith("?");
+		};
+		const branches = (parent: string, seen: Set<string>): string[] =>
+			(targets.get(parent) ?? []).flatMap((child) => {
+				if (seen.has(child)) return [];
+				seen.add(child);
+				const chained = decision(child) && !givenIds.has(child) && !step.has(child);
+				return [child, ...(chained ? branches(child, seen) : [])];
+			});
+		// A branch may start a few plain steps before a listed one ("Deploy issue" then "Roll back"),
+		// and a sibling may run a few plain steps before it reaches the shared step.
+		const sources = new Map<string, string[]>();
+		for (const [source, next] of targets)
+			for (const target of next) sources.set(target, [...(sources.get(target) ?? []), source]);
+		const plain = (id: string) => !decision(id) && !givenIds.has(id) && !step.has(id);
+		const branchHead = (id: string) => {
+			let head = id;
+			for (let hops = 0; hops < 4; hops += 1) {
+				const [parent, ...others] = sources.get(head) ?? [];
+				if (!parent || others.length > 0 || !plain(parent) || targets.get(parent)?.length !== 1)
+					break;
+				head = parent;
+			}
+			return head;
+		};
+		// What the listed branches reach on their way to the step: a sibling that merges into it
+		// shares their path rather than borrowing the step.
+		const listedPath = new Set<string>(givenIds);
+		for (const queue = [...givenIds]; queue.length > 0;) {
+			for (const next of targets.get(queue.pop() ?? "") ?? []) {
+				if (step.has(next) || listedPath.has(next)) continue;
+				listedPath.add(next);
+				queue.push(next);
+			}
+		}
+		/** A sibling's own run of plain steps straight into the step, if it shares none of them. */
+		const runInto = (id: string): string[] | undefined => {
+			const run = [id];
+			for (let hops = 0; hops < 4; hops += 1) {
+				const current = run.at(-1) ?? "";
+				if (listedPath.has(current)) return undefined;
+				const next = targets.get(current) ?? [];
+				if (next.some((target) => step.has(target))) return run;
+				const [only, ...others] = next;
+				if (!only || others.length > 0 || !plain(only)) return undefined;
+				run.push(only);
+			}
+			return undefined;
+		};
 		const borrowers = new Set<string>();
-		for (const [parent, children] of targets) {
-			if (!children.some((child) => givenIds.has(child))) continue;
-			for (const child of children) {
-				if (givenIds.has(child) || step.has(child) || child === parent) continue;
-				if ((targets.get(child) ?? []).some((next) => step.has(next)) && !statedElsewhere(child))
-					borrowers.add(child);
+		for (const given of givenIds) {
+			const head = branchHead(given);
+			for (const parent of sources.get(head) ?? []) {
+				for (const child of branches(parent, new Set([parent]))) {
+					if (child === head || givenIds.has(child) || step.has(child) || child === parent)
+						continue;
+					const run = runInto(child);
+					// The request may give the step to that branch elsewhere: "Production also runs smoke tests".
+					if (run && !run.some(statedElsewhere)) borrowers.add(run.at(-1) ?? child);
+				}
 			}
 		}
 		if (borrowers.size === 0) continue;

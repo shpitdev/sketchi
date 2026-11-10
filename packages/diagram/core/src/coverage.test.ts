@@ -911,6 +911,99 @@ describe("a step the request gives to some branches", () => {
 		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_step_borrowed"]);
 		expect(issues[0]?.message).toContain('"Production deploy"');
 	});
+
+	it("leaves a sibling that merges into the listed branches' path before the step", () => {
+		const merged = chart(
+			[...labels, ["prepare", "Prepare test runner"]],
+			[
+				...edges.filter(([source]) => source !== "staging" && source !== "canary"),
+				["staging", "prepare"],
+				["canary", "prepare"],
+				["production", "prepare"],
+				["prepare", "smoke"],
+			],
+		);
+		expect(codes(request, merged)).toEqual([]);
+		// Cutting the shared arrow would cut the listed branches off too: no repair may do it.
+		const cut = chart(
+			[...labels, ["prepare", "Prepare test runner"]],
+			[
+				...edges.filter(([source]) => source !== "staging" && source !== "canary"),
+				["staging", "prepare"],
+				["canary", "prepare"],
+				["production", "prepare"],
+			],
+		);
+		expect(keepsStatedStructure(request, merged, cut)).toBe(false);
+	});
+
+	it("passes a sibling another sentence gives the step, through its own plain steps", () => {
+		const waited = chart(
+			[...labels, ["wait", "Wait for rollout"]],
+			[...edges, ["production", "wait"], ["wait", "smoke"]],
+		);
+		expect(codes(`${request} Production also runs smoke tests.`, waited)).toEqual([]);
+		expect(codes(request, waited)).toEqual(["flowchart_step_borrowed"]);
+	});
+
+	it("reads a choice drawn as a chain of decisions", () => {
+		// "Target?" becomes "Test environment?", then "Gradual rollout?" for the rest.
+		const chained: [string, string][] = [
+			...labels.filter(([id]) => id !== "target"),
+			["environment", "Test environment?"],
+			["rollout", "Gradual rollout?"],
+		];
+		const chainedEdges: [string, string, string?][] = [
+			["pick", "environment"],
+			["environment", "staging", "yes"],
+			["environment", "rollout", "no"],
+			["rollout", "canary", "yes"],
+			["rollout", "production", "no"],
+			...edges.filter(([source]) => source !== "pick" && source !== "target"),
+		];
+		expect(codes(request, chart(chained, chainedEdges))).toEqual([]);
+		const borrowed = chart(chained, [...chainedEdges, ["production", "smoke"]]);
+		const issues = checkRequestCoverage(request, borrowed);
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_step_borrowed"]);
+		expect(issues[0]?.message).toContain('"Production deploy"');
+		expect(keepsStatedStructure(request, borrowed, chart(chained, chainedEdges))).toBe(true);
+		expect(codes(`${request} Production also runs smoke tests.`, borrowed)).toEqual([]);
+	});
+});
+
+describe("a step given to branches that start a step before the listed ones", () => {
+	const request =
+		"Sort each ticket as billing, bug or question. Billing tickets get a refund, bug tickets get a fix. Refund and fix paths both notify the customer. Questions get an answer.";
+	const labels: [string, string][] = [
+		["sort", "Sort ticket"],
+		["billing", "Billing ticket"],
+		["bug", "Bug ticket"],
+		["question", "Question ticket"],
+		["refund", "Issue refund"],
+		["fix", "Ship fix"],
+		["answer", "Send answer"],
+		["notify", "Notify customer"],
+	];
+	const edges: [string, string, string?][] = [
+		["sort", "billing"],
+		["sort", "bug"],
+		["sort", "question"],
+		["billing", "refund"],
+		["bug", "fix"],
+		["question", "answer"],
+		["refund", "notify"],
+		["fix", "notify"],
+	];
+
+	it("passes the step on the listed branches only", () => {
+		expect(codes(request, chart(labels, edges))).toEqual([]);
+	});
+
+	it("reports a sibling branch that reaches the step through its own plain steps", () => {
+		const issues = checkRequestCoverage(request, chart(labels, [...edges, ["answer", "notify"]]));
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_step_borrowed"]);
+		expect(issues[0]?.message).toContain('leads "Send answer" into it');
+	});
 });
 
 describe("a step drawn twice where one copy ends", () => {
