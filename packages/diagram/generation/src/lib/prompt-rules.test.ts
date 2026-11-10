@@ -46,6 +46,11 @@ describe("generation prompt rules", () => {
 		expect(system).toContain(FLOWCHART_RULES.documentFanOut);
 	});
 
+	it("keeps flowcharts top to bottom and square unless the scenario asks otherwise", () => {
+		expect(system).toContain(FLOWCHART_RULES.documentDirection("the scenario"));
+		expect(system).toContain(FLOWCHART_RULES.documentCurved("the scenario"));
+	});
+
 	it("says what a table's columns are and what a footer holds", () => {
 		expect(system).toContain(
 			"table (columns: an array of header strings, rows: placeholder count)",

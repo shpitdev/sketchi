@@ -138,6 +138,7 @@ const FLOWCHART_INSTRUCTIONS = [
 		FLOWCHART_RULES.keepNamed(SCENARIO),
 	].join(" "),
 	FLOWCHART_RULES.documentDirection(SCENARIO),
+	FLOWCHART_RULES.documentCurved(SCENARIO),
 ];
 
 const MINDMAP_IR_INSTRUCTIONS = [

@@ -2726,14 +2726,14 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Make a flowchart of how we triage customer feedback, drawn with curved arrows. A customer submits feedback and the bot tags it. If it is a bug, the support team reproduces it; if they can reproduce it, file a ticket, otherwise ask the customer for details and reproduce it again. If it is not a bug, thank the customer.",
 		nodes: [
-			["submit", "Customer submits feedback", "start", ["submits feedback", "customer submits"]],
-			["tag", "Bot tags feedback", "process", ["bot tags", "tags it"]],
+			["submit", "Customer submits feedback", "start", ["submit"]],
+			["tag", "Bot tags feedback", "process", ["tag"]],
 			["bug", "Is it a bug?", "decision", ["is a bug", "bug"]],
-			["reproduce", "Reproduce it", "process", ["reproduces it", "reproduce it"]],
-			["reproduced", "Can reproduce it?", "decision", ["can reproduce"]],
-			["ticket", "File a ticket", "end", ["file a ticket"]],
-			["details", "Ask the customer for details", "process", ["ask the customer for details"]],
-			["thank", "Thank the customer", "end", ["thank the customer"]],
+			["reproduce", "Reproduce the bug", "process", ["reproduce"]],
+			["reproduced", "Can they reproduce it?", "decision", ["reproduce"]],
+			["ticket", "File a ticket", "end", ["ticket"]],
+			["details", "Ask the customer for details", "process", ["ask", "details"]],
+			["thank", "Thank the customer", "end", ["thank"]],
 		],
 		edges: [
 			["submit-tag", "submit", "tag"],
@@ -2756,12 +2756,15 @@ const flowchartScenarioDefinitions = [
 		description:
 			"A left-to-right ingest pipeline with a quarantine branch and a skip-ahead branch, asked for with curved lines.",
 		prompt:
-			"Draw our data ingest pipeline left to right with curved lines. Files land in the inbox, then a parser reads them. If parsing fails, move the file to quarantine and alert the data team. If it parses, validate the schema: a valid file is loaded straight into the warehouse, an invalid one goes through cleanup first and then into the warehouse. After loading, refresh the dashboards.",
+			"Draw our data ingest pipeline left to right with curved lines. Files land in the inbox, then a parser reads them. If parsing fails, move the file to quarantine and alert the data team. If it parses, validate the schema: a valid file is loaded straight into the warehouse, an invalid one is cleaned up first and then loaded into the warehouse. After loading, refresh the dashboards.",
 		direction: "LR",
+		inverse: {
+			parsed: ["parsing fails"],
+		},
 		nodes: [
 			["inbox", "Files land in inbox", "start", ["land in the inbox", "inbox"]],
 			["parse", "Parse file", "process", ["parser reads them", "parser", "parse"]],
-			["parsed", "Parsing succeeds?", "decision", ["parsing fails", "parses", "parsing"]],
+			["parsed", "Parsing succeeds?", "decision", ["parses", "parsing"]],
 			[
 				"quarantine",
 				"Move to quarantine",
@@ -2771,7 +2774,7 @@ const flowchartScenarioDefinitions = [
 			["alert", "Alert the data team", "end", ["alert the data team"]],
 			["validate", "Validate schema", "process", ["validate the schema"]],
 			["valid", "Schema valid?", "decision", ["valid file", "valid", "invalid"]],
-			["cleanup", "Run cleanup", "process", ["cleanup"]],
+			["cleanup", "Clean up the file", "process", ["clean"]],
 			[
 				"load",
 				"Load into warehouse",

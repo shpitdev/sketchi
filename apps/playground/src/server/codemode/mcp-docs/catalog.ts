@@ -204,7 +204,7 @@ const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: strin
 	],
 	[
 		FLOWCHART_RULES.documentDirection(PROMPT),
-		"Curved lines follow the routes square ones take, so none runs through a node, along another line or through a label.",
+		`${FLOWCHART_RULES.documentCurved(PROMPT)} Curved lines follow the routes square ones take, so none runs through a node, along another line or through a label.`,
 	],
 	[FLOWCHART_RULES.limits, FLOWCHART_RULES.limitsDetail],
 	[FLOWCHART_RULES.summarize],

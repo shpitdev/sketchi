@@ -1308,6 +1308,15 @@ function flowchartCrossingCheck(diagram: FlowchartDiagram, scene: RenderedDiagra
 	const drawn = lineCrossings(
 		scene.elements.flatMap((element) => (element.type === "arrow" ? [element.points] : [])),
 	);
+	// Lanes fix which band each node sits in, so a planar graph may still have
+	// to cross; its planarity says nothing about a laned drawing.
+	if ((diagram.lanes?.length ?? 0) > 0) {
+		return {
+			id: "avoidable-crossings",
+			passed: true,
+			message: `Lanes fix where the nodes sit, so planarity bounds nothing; lines cross ${drawn} time(s).`,
+		};
+	}
 	const forced = unavoidableCrossings(diagram.edges.map((edge) => [edge.source, edge.target]));
 	return {
 		id: "avoidable-crossings",

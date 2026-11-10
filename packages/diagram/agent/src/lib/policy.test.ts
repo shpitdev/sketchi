@@ -92,6 +92,7 @@ describe("Studio chat rules", () => {
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).not.toContain("two different participant ids");
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).not.toContain('"LR" for pipelines and lifecycles');
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain(FLOWCHART_RULES.documentDirection("the user"));
+		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain(FLOWCHART_RULES.documentCurved("the user"));
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).not.toContain("read best");
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain(
 			`Use at most ${SEQUENCE_MAX_PARTICIPANTS} participants and ${SEQUENCE_MAX_MESSAGES} messages.`,

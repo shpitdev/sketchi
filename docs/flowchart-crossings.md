@@ -7,6 +7,8 @@ at least as many as its edges beyond what a plane graph of its nodes holds. Scen
 that set `crossingFree` fail a drawing of a planar graph whose lines cross,
 counted at any angle (`lineCrossings`); for a graph that is not planar the
 bound is only a lower one, so its drawing is not failed (`avoidable-crossings`).
+Nor is a drawing in lanes: lanes fix which band each node sits in, which
+planarity does not account for.
 
 ## Layout
 
