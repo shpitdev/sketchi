@@ -64,7 +64,26 @@ export interface StudioBuildTurn {
 			readonly open?: boolean;
 		};
 		readonly attempts: number;
+		/** The issues of the turn's last rejected build, which the reply shows when nothing was saved. */
+		readonly rejected?: readonly CodeModeIssue[];
 	}>;
+}
+
+/** What one turn's builds came to: whether any was saved, and the last rejection. */
+export interface StudioTurnOutcome {
+	readonly attempts: number;
+	readonly saved: boolean;
+	readonly rejected: readonly CodeModeIssue[];
+}
+
+export function studioTurnOutcome(turn: StudioBuildTurn): Effect.Effect<StudioTurnOutcome> {
+	return Ref.get(turn.state).pipe(
+		Effect.map((value) => ({
+			attempts: value.attempts,
+			saved: value.accepted !== undefined,
+			rejected: value.rejected ?? [],
+		})),
+	);
 }
 
 export function makeStudioBuildTurn(
@@ -251,6 +270,7 @@ export function makeStudioBuildToolExecutor<
 						}));
 						return result;
 					}
+					yield* Ref.update(state, (value) => ({ ...value, rejected: checked.issues }));
 					if (own) {
 						// A failed rebuild leaves the accepted artifact standing, and the turn closed.
 						const closed = reopen && reopen.misses(own) ? reopen.closed(own) : own;

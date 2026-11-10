@@ -20,7 +20,14 @@ import {
 	MAX_AGENT_OUTPUT_TOKENS,
 	MAX_AGENT_STEPS,
 } from "@sketchi/diagram-agent";
-import { convertToModelMessages, stepCountIs, streamText, tool, validateUIMessages } from "ai";
+import {
+	convertToModelMessages,
+	createUIMessageStreamResponse,
+	stepCountIs,
+	streamText,
+	tool,
+	validateUIMessages,
+} from "ai";
 import { Effect, Schema } from "effect";
 
 import { readBoundedJson } from "../runtime/request-body.server";
@@ -47,7 +54,8 @@ import {
 	StudioBuildSequenceInputSchema,
 	StudioBuildSequenceOutputSchema,
 } from "./studio-sequence-tool.server";
-import { makeStudioBuildTurn } from "./studio-build-tool.server";
+import { makeStudioBuildTurn, studioTurnOutcome } from "./studio-build-tool.server";
+import { studioReplyStream, type StudioRun } from "./studio-reply.server";
 import {
 	makeStudioMindmapToolExecutor,
 	STUDIO_BUILD_MINDMAP_TOOL_DESCRIPTION,
@@ -185,6 +193,11 @@ function userText(
 		.join("\n");
 }
 
+/** A retried run reasons first: Gemini then rarely loops inside a tool call it never finishes. */
+const STUDIO_RETRY_PROVIDER_OPTIONS = {
+	google: { thinkingConfig: { thinkingLevel: "low" } },
+} as const;
+
 const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(function* (
 	request: Request,
 ) {
@@ -275,110 +288,119 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	);
 	return yield* Effect.try({
 		try: () => {
-			const result = streamText({
-				model,
-				system: studioSystemPrompt(logos),
-				messages: modelMessages,
-				tools: {
-					[STUDIO_BUILD_TIMELINE_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_TIMELINE_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildTimelineInputSchema,
-						outputSchema: StudioBuildTimelineOutputSchema,
-						execute: makeStudioBuildToolCallback(timelineExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_CHART_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_CHART_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildChartInputSchema,
-						outputSchema: StudioBuildChartOutputSchema,
-						execute: makeStudioBuildToolCallback(chartExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_FLOWCHART_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildFlowchartInputSchema,
-						outputSchema: StudioBuildFlowchartOutputSchema,
-						execute: makeStudioBuildToolCallback(flowchartExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_MINDMAP_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_MINDMAP_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildMindmapInputSchema,
-						outputSchema: StudioBuildMindmapOutputSchema,
-						execute: makeStudioBuildToolCallback(mindmapExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_STATE_MACHINE_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_STATE_MACHINE_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildStateMachineInputSchema,
-						outputSchema: StudioBuildStateMachineOutputSchema,
-						execute: makeStudioBuildToolCallback(stateMachineExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_GANTT_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_GANTT_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildGanttInputSchema,
-						outputSchema: StudioBuildGanttOutputSchema,
-						execute: makeStudioBuildToolCallback(ganttExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_ER_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_ER_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildErInputSchema,
-						outputSchema: StudioBuildErOutputSchema,
-						execute: makeStudioBuildToolCallback(erExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_CLASS_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_CLASS_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildClassInputSchema,
-						outputSchema: StudioBuildClassOutputSchema,
-						execute: makeStudioBuildToolCallback(classExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_ORG_CHART_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_ORG_CHART_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildOrgChartInputSchema,
-						outputSchema: StudioBuildOrgChartOutputSchema,
-						execute: makeStudioBuildToolCallback(orgChartExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_VENN_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_VENN_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildVennInputSchema,
-						outputSchema: StudioBuildVennOutputSchema,
-						execute: makeStudioBuildToolCallback(vennExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_JOURNEY_MAP_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_JOURNEY_MAP_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildJourneyMapInputSchema,
-						outputSchema: StudioBuildJourneyMapOutputSchema,
-						execute: makeStudioBuildToolCallback(journeyExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_SANKEY_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_SANKEY_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildSankeyInputSchema,
-						outputSchema: StudioBuildSankeyOutputSchema,
-						execute: makeStudioBuildToolCallback(sankeyExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_WIREFRAME_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_WIREFRAME_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildWireframeInputSchema,
-						outputSchema: StudioBuildWireframeOutputSchema,
-						execute: makeStudioBuildToolCallback(wireframeExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_QUADRANT_CHART_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_QUADRANT_CHART_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildQuadrantChartInputSchema,
-						outputSchema: StudioBuildQuadrantChartOutputSchema,
-						execute: makeStudioBuildToolCallback(quadrantChartExecutor, callbacks.runPromise),
-					}),
-					[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
-						description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,
-						inputSchema: StudioBuildSequenceInputSchema,
-						outputSchema: StudioBuildSequenceOutputSchema,
-						execute: makeStudioBuildToolCallback(sequenceExecutor, callbacks.runPromise),
-					}),
-				},
-				stopWhen: stepCountIs(MAX_AGENT_STEPS),
-				maxOutputTokens: MAX_AGENT_OUTPUT_TOKENS,
-				temperature: DIAGRAM_AGENT_TEMPERATURE,
-			});
+			const run = ({ messages, retry, abortSignal }: StudioRun) =>
+				streamText({
+					abortSignal,
+					model,
+					system: studioSystemPrompt(logos),
+					messages: [...messages],
+					tools: {
+						[STUDIO_BUILD_TIMELINE_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_TIMELINE_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildTimelineInputSchema,
+							outputSchema: StudioBuildTimelineOutputSchema,
+							execute: makeStudioBuildToolCallback(timelineExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_CHART_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_CHART_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildChartInputSchema,
+							outputSchema: StudioBuildChartOutputSchema,
+							execute: makeStudioBuildToolCallback(chartExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_FLOWCHART_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_FLOWCHART_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildFlowchartInputSchema,
+							outputSchema: StudioBuildFlowchartOutputSchema,
+							execute: makeStudioBuildToolCallback(flowchartExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_MINDMAP_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_MINDMAP_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildMindmapInputSchema,
+							outputSchema: StudioBuildMindmapOutputSchema,
+							execute: makeStudioBuildToolCallback(mindmapExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_STATE_MACHINE_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_STATE_MACHINE_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildStateMachineInputSchema,
+							outputSchema: StudioBuildStateMachineOutputSchema,
+							execute: makeStudioBuildToolCallback(stateMachineExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_GANTT_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_GANTT_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildGanttInputSchema,
+							outputSchema: StudioBuildGanttOutputSchema,
+							execute: makeStudioBuildToolCallback(ganttExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_ER_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_ER_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildErInputSchema,
+							outputSchema: StudioBuildErOutputSchema,
+							execute: makeStudioBuildToolCallback(erExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_CLASS_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_CLASS_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildClassInputSchema,
+							outputSchema: StudioBuildClassOutputSchema,
+							execute: makeStudioBuildToolCallback(classExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_ORG_CHART_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_ORG_CHART_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildOrgChartInputSchema,
+							outputSchema: StudioBuildOrgChartOutputSchema,
+							execute: makeStudioBuildToolCallback(orgChartExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_VENN_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_VENN_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildVennInputSchema,
+							outputSchema: StudioBuildVennOutputSchema,
+							execute: makeStudioBuildToolCallback(vennExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_JOURNEY_MAP_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_JOURNEY_MAP_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildJourneyMapInputSchema,
+							outputSchema: StudioBuildJourneyMapOutputSchema,
+							execute: makeStudioBuildToolCallback(journeyExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_SANKEY_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_SANKEY_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildSankeyInputSchema,
+							outputSchema: StudioBuildSankeyOutputSchema,
+							execute: makeStudioBuildToolCallback(sankeyExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_WIREFRAME_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_WIREFRAME_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildWireframeInputSchema,
+							outputSchema: StudioBuildWireframeOutputSchema,
+							execute: makeStudioBuildToolCallback(wireframeExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_QUADRANT_CHART_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_QUADRANT_CHART_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildQuadrantChartInputSchema,
+							outputSchema: StudioBuildQuadrantChartOutputSchema,
+							execute: makeStudioBuildToolCallback(quadrantChartExecutor, callbacks.runPromise),
+						}),
+						[STUDIO_BUILD_SEQUENCE_TOOL_NAME]: tool({
+							description: STUDIO_BUILD_SEQUENCE_TOOL_DESCRIPTION,
+							inputSchema: StudioBuildSequenceInputSchema,
+							outputSchema: StudioBuildSequenceOutputSchema,
+							execute: makeStudioBuildToolCallback(sequenceExecutor, callbacks.runPromise),
+						}),
+					},
+					stopWhen: stepCountIs(MAX_AGENT_STEPS),
+					maxOutputTokens: MAX_AGENT_OUTPUT_TOKENS,
+					temperature: DIAGRAM_AGENT_TEMPERATURE,
+					// A run that wrote nothing looped inside a tool call; reasoning keeps the retry from it.
+					...(retry ? { providerOptions: STUDIO_RETRY_PROVIDER_OPTIONS } : {}),
+				});
 
-			return result.toUIMessageStreamResponse({
-				sendReasoning: true,
-				onError: (error) => (error instanceof Error ? error.message : "The agent run failed."),
+			return createUIMessageStreamResponse({
+				stream: studioReplyStream({
+					messages: modelMessages,
+					run,
+					outcome: () => callbacks.runPromise(studioTurnOutcome(turn)),
+					abortSignal: request.signal,
+					onError: (error) => (error instanceof Error ? error.message : "The agent run failed."),
+				}),
 			});
 		},
 		catch: (cause) =>
