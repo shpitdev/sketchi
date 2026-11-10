@@ -82,24 +82,28 @@ export async function readLogCosts(
 	const waitMs = options.waitMs ?? 2_000;
 	const read = async (logId: string): Promise<GatewayLogCost> => {
 		for (let attempt = 1; ; attempt += 1) {
-			const response = await send(
-				`https://api.cloudflare.com/client/v4/accounts/${access.accountId}/ai-gateway/gateways/${gatewayId}/logs/${logId}`,
-				{ headers: { authorization: `Bearer ${access.token}` } },
-			);
-			if (response.ok) {
-				const body = (await response.json()) as {
-					readonly result?: { readonly cost?: unknown; readonly model?: unknown };
-				};
-				const cost = body.result?.cost;
-				if (typeof cost === "number" && Number.isFinite(cost)) {
-					return {
-						logId,
-						cost,
-						...(typeof body.result?.model === "string" ? { model: body.result.model } : {}),
+			try {
+				const response = await send(
+					`https://api.cloudflare.com/client/v4/accounts/${access.accountId}/ai-gateway/gateways/${gatewayId}/logs/${logId}`,
+					{ headers: { authorization: `Bearer ${access.token}` } },
+				);
+				if (response.ok) {
+					const body = (await response.json()) as {
+						readonly result?: { readonly cost?: unknown; readonly model?: unknown };
 					};
+					const cost = body.result?.cost;
+					if (typeof cost === "number" && Number.isFinite(cost)) {
+						return {
+							logId,
+							cost,
+							...(typeof body.result?.model === "string" ? { model: body.result.model } : {}),
+						};
+					}
+				} else {
+					await response.body?.cancel();
 				}
-			} else {
-				await response.body?.cancel();
+			} catch {
+				// An unreachable or malformed read is tried again, like a log that has not landed.
 			}
 			if (attempt >= attempts) return { logId };
 			await sleep(waitMs * attempt);

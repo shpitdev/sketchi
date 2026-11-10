@@ -6,7 +6,7 @@ import type { SketchiIcon } from "@sketchi/icon-catalog";
 import type { IconAuthorModel } from "@sketchi/icon-draw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { MarkAttempt } from "./draw-mark.js";
+import { attemptCeilingUsd, type MarkAttempt, priceLogs } from "./draw-mark.js";
 import { initializeResvg, svgPng } from "./excalidraw-export.js";
 import { verdictLine, writeSheets } from "./sheets.js";
 import { promote } from "./promote.js";
@@ -175,7 +175,8 @@ describe("runBatch", () => {
 		const marks = ["a", "b", "c", "d", "e"].map((slug) => icon(slug));
 		const draw = async (_mark: unknown, author: IconAuthorModel) =>
 			attempt(author, "recognized", 0.05);
-		// Each Sonnet draw holds a $0.06 reserve: $0.20 fits three, one at a time.
+		// Each draw holds its $0.06 ceiling: $0.20 fits three, one at a time.
+		const ceilingUsd = () => 0.06;
 		const stopped = await runBatch({
 			marks,
 			store,
@@ -183,13 +184,140 @@ describe("runBatch", () => {
 			spendCapUsd: 0.2,
 			authors,
 			draw,
+			ceilingUsd,
 		});
 		expect(stopped).toMatchObject({ settled: 3, pending: 2, capped: true });
 		expect(stopped.spentUsd).toBeCloseTo(0.15);
 
-		const resumed = await runBatch({ marks, store, concurrency: 2, spendCapUsd: 1, authors, draw });
+		const resumed = await runBatch({
+			marks,
+			store,
+			concurrency: 2,
+			spendCapUsd: 1,
+			authors,
+			draw,
+			ceilingUsd,
+		});
 		expect(resumed).toMatchObject({ settled: 5, pending: 0, capped: false });
 		expect(resumed.spentUsd).toBeCloseTo(0.25);
+	});
+
+	it("bounds each attempt by the most it can cost, so a dear draw never passes the cap", async () => {
+		// A draw at the engine's limits costs far more than a typical one; a $0.10 cap fits none.
+		expect(attemptCeilingUsd(SONNET)).toBeGreaterThan(0.3);
+		expect(attemptCeilingUsd(OPUS)).toBeGreaterThan(attemptCeilingUsd(SONNET));
+		const store = new RunStore(root);
+		let draws = 0;
+		const outcome = await runBatch({
+			marks: [icon("dear")],
+			store,
+			concurrency: 1,
+			spendCapUsd: 0.1,
+			authors,
+			draw: async (_mark, author) => {
+				draws += 1;
+				return attempt(author, "recognized", 0.2);
+			},
+		});
+		expect(draws).toBe(0);
+		expect(outcome).toMatchObject({ settled: 0, pending: 1, capped: true, spentUsd: 0 });
+	});
+
+	it("waits for draws in flight to settle before deciding the cap is reached", async () => {
+		const store = new RunStore(root);
+		// Two $0.10 ceilings fill a $0.20 cap, but each draw costs a cent: all five fit.
+		const outcome = await runBatch({
+			marks: ["a", "b", "c", "d", "e"].map((slug) => icon(slug)),
+			store,
+			concurrency: 4,
+			spendCapUsd: 0.2,
+			authors,
+			ceilingUsd: () => 0.1,
+			draw: async (_mark, author) => {
+				await new Promise((resolve) => setTimeout(resolve, 5));
+				return attempt(author, "recognized", 0.01);
+			},
+		});
+		expect(outcome).toMatchObject({ settled: 5, pending: 0, capped: false });
+		expect(outcome.spentUsd).toBeCloseTo(0.05);
+	});
+
+	it("keeps a draw that throws as a failed attempt counted at its ceiling", async () => {
+		const store = new RunStore(root);
+		const outcome = await runBatch({
+			marks: [icon("broken")],
+			store,
+			concurrency: 1,
+			spendCapUsd: 10,
+			authors,
+			ceilingUsd: (author) => (author === SONNET ? 0.5 : 1),
+			draw: async () => {
+				throw new Error("logs unreachable");
+			},
+		});
+		expect(outcome).toMatchObject({ settled: 1, capped: false });
+		expect(outcome.spentUsd).toBeCloseTo(1.5);
+		const [record] = await store.records();
+		expect(record?.status).toBe("failed");
+		expect(record?.attempts.map((done) => done.error)).toEqual([
+			{ tag: "Defect", message: "logs unreachable" },
+			{ tag: "Defect", message: "logs unreachable" },
+		]);
+	});
+
+	it("counts a mark the cap left pending in spend and in the ledger", async () => {
+		const store = new RunStore(root);
+		// The Sonnet attempt fits; the Opus retry's ceiling does not.
+		const outcome = await runBatch({
+			marks: [icon("halfway")],
+			store,
+			concurrency: 1,
+			spendCapUsd: 0.5,
+			authors,
+			ceilingUsd: (author) => (author === SONNET ? 0.1 : 1),
+			draw: async (_mark, author) => attempt(author, "missed", 0.02),
+		});
+		expect(outcome).toMatchObject({ settled: 0, pending: 1, capped: true });
+		const records = await store.records();
+		expect(summarize(records)).toMatchObject({ settled: 0, pending: 1, attempts: 1 });
+		expect(summarize(records).costUsd).toBeCloseTo(0.02);
+		const [, row] = ledgerCsv(records).split("\n");
+		expect(row).toMatch(/^halfway,HALFWAY,devtools-ci,pending,1,/u);
+	});
+});
+
+describe("priceLogs", () => {
+	const fast = { attempts: 2, waitMs: 1 };
+
+	it("sums the gateway's prices once every log has one", async () => {
+		const access = {
+			accountId: "acct",
+			token: "token",
+			fetch: async (url: string | URL | Request) =>
+				Response.json({
+					result: {
+						cost: (url instanceof Request ? url.url : url.toString()).endsWith("/a") ? 0.01 : 0.02,
+					},
+				}),
+		};
+		expect(await priceLogs(access, ["a", "b"], fast)).toBeCloseTo(0.03);
+	});
+
+	it("leaves the price unresolved, without throwing, when the logs cannot be read", async () => {
+		const unreachable = {
+			accountId: "acct",
+			token: "token",
+			fetch: async () => {
+				throw new Error("network down");
+			},
+		};
+		expect(await priceLogs(unreachable, ["a"], fast)).toBeUndefined();
+		const malformed = {
+			accountId: "acct",
+			token: "token",
+			fetch: async () => new Response("not json"),
+		};
+		expect(await priceLogs(malformed, ["a"], fast)).toBeUndefined();
 	});
 });
 

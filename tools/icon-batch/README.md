@@ -50,10 +50,15 @@ pnpm nx draw icon-batch -- promote --run catalog --reject rejected.txt
 ```
 
 - `draw` runs 4 draws at a time (`--concurrency`) and starts none that could
-  take the run's spend past `--cap` (default $60), counting a reserve for each
-  draw in flight. Every attempt is written to
-  `.memory/icon-batch/<run>/marks/<slug>.json` as it finishes; running again
-  resumes the marks that are not settled.
+  take the run's spend past `--cap` (default $60). Each draw in flight holds
+  the most it can cost: every author call the engine allows at its output
+  limit, about $0.42 on Sonnet and $0.81 on Opus, where a typical draw costs
+  $0.02. A draw that does not fit waits for those in flight; the run leaves a
+  mark pending only when nothing is in flight. Every attempt is written to
+  `.memory/icon-batch/<run>/marks/<slug>.json` as it finishes, including one
+  whose price the gateway's logs could not give (it keeps its log ids and
+  counts at its token estimate, or its ceiling); running again resumes the
+  marks that are not settled.
 - A mark the judge does not pick out of its look-alikes, or one that ends
   without a drawing, gets one retry with `--retry` (Opus 5.5). If that misses
   too, it stays out and the summary lists it.

@@ -2,6 +2,8 @@ import { type MarkRecord, recordCost } from "./store.js";
 
 export interface BatchSummary {
 	readonly settled: number;
+	/** Marks with an attempt that the spend cap left unsettled. */
+	readonly pending: number;
 	readonly recognized: number;
 	/** Recognized on the service's own author, without a retry. */
 	readonly recognizedFirst: number;
@@ -55,36 +57,43 @@ function sumAttempts(
 	return record.attempts.reduce((sum, attempt) => sum + pick(attempt), 0);
 }
 
+/**
+ * Recognition counts settled marks only; spend, time, tokens and drawings
+ * count every mark with an attempt, so a mark the cap left pending still
+ * shows what it cost.
+ */
 export function summarize(records: readonly MarkRecord[]): BatchSummary {
 	const settled = records.filter((record) => record.status !== undefined);
+	const spent = records.filter((record) => record.attempts.length > 0);
 	const recognized = settled.filter((record) => record.status === "recognized");
-	const drawn = settled.flatMap((record) => {
+	const drawn = spent.flatMap((record) => {
 		const chosen = chosenAttempt(record);
 		return chosen?.recipe ? [chosen] : [];
 	});
-	const attempts = settled.flatMap((record) => record.attempts);
+	const attempts = spent.flatMap((record) => record.attempts);
 	return {
 		settled: settled.length,
+		pending: spent.length - settled.length,
 		recognized: recognized.length,
 		recognizedFirst: recognized.filter((record) => record.chosen === 0).length,
 		rescued: recognized.filter((record) => (record.chosen ?? 0) > 0).length,
 		unrecognized: settled.filter((record) => record.status === "unrecognized").length,
 		failed: settled.filter((record) => record.status === "failed").length,
 		attempts: attempts.length,
-		costUsd: settled.reduce((sum, record) => sum + recordCost(record), 0),
+		costUsd: spent.reduce((sum, record) => sum + recordCost(record), 0),
 		pricedAttempts: attempts.filter((attempt) => attempt.costUsd !== undefined).length,
 		perMark: {
-			costUsd: stats(settled.map(recordCost)),
-			seconds: stats(settled.map((record) => sumAttempts(record, (attempt) => attempt.ms) / 1000)),
+			costUsd: stats(spent.map(recordCost)),
+			seconds: stats(spent.map((record) => sumAttempts(record, (attempt) => attempt.ms) / 1000)),
 			rounds: stats(drawn.map((attempt) => attempt.rounds ?? 0)),
 			parts: stats(drawn.map((attempt) => attempt.recipe?.parts.length ?? 0)),
 			recipeBytes: stats(drawn.map((attempt) => JSON.stringify(attempt.recipe).length)),
-			calls: stats(settled.map((record) => sumAttempts(record, (attempt) => attempt.calls))),
+			calls: stats(spent.map((record) => sumAttempts(record, (attempt) => attempt.calls))),
 			inputTokens: stats(
-				settled.map((record) => sumAttempts(record, (attempt) => attempt.inputTokens)),
+				spent.map((record) => sumAttempts(record, (attempt) => attempt.inputTokens)),
 			),
 			outputTokens: stats(
-				settled.map((record) => sumAttempts(record, (attempt) => attempt.outputTokens)),
+				spent.map((record) => sumAttempts(record, (attempt) => attempt.outputTokens)),
 			),
 		},
 	};
@@ -115,17 +124,17 @@ function csvField(value: string | number): string {
 	return /[",\n]/u.test(text) ? `"${text.replace(/"/gu, '""')}"` : text;
 }
 
-/** One row per settled mark, attempts summed. */
+/** One row per mark with an attempt, attempts summed; a mark the cap left unsettled is `pending`. */
 export function ledgerCsv(records: readonly MarkRecord[]): string {
 	const rows = records
-		.filter((record) => record.status !== undefined)
+		.filter((record) => record.attempts.length > 0)
 		.map((record) => {
 			const chosen = chosenAttempt(record);
 			const row: Record<(typeof CSV_COLUMNS)[number], string | number> = {
 				slug: record.slug,
 				name: record.name,
 				collection: record.collection,
-				status: record.status ?? "",
+				status: record.status ?? "pending",
 				attempts: record.attempts.length,
 				author: chosen?.author ?? record.attempts.at(-1)?.author ?? "",
 				judge_picked: chosen?.judge?.picked ?? "",
@@ -167,11 +176,11 @@ export function summaryMarkdown(
 	return [
 		`# Icon batch ledger`,
 		"",
-		`| Marks settled | Recognized | First author | After retry | Unrecognized | Failed |`,
-		`| --- | --- | --- | --- | --- | --- |`,
-		`| ${summary.settled} | ${summary.recognized} (${percent(summary.recognized)}) | ${summary.recognizedFirst} | ${summary.rescued} | ${summary.unrecognized} | ${summary.failed} |`,
+		`| Marks settled | Recognized | First author | After retry | Unrecognized | Failed | Pending (cap) |`,
+		`| --- | --- | --- | --- | --- | --- | --- |`,
+		`| ${summary.settled} | ${summary.recognized} (${percent(summary.recognized)}) | ${summary.recognizedFirst} | ${summary.rescued} | ${summary.unrecognized} | ${summary.failed} | ${summary.pending} |`,
 		"",
-		`Spend: ${money(summary.costUsd)} over ${summary.attempts} attempts (${summary.pricedAttempts} priced by the gateway's logs, the rest estimated from tokens). Marks not yet drawn: ${context.remaining}, about ${money(perMark.costUsd.mean * context.remaining)} at this mean.`,
+		`Spend: ${money(summary.costUsd)} over ${summary.attempts} attempts (${summary.pricedAttempts} priced by the gateway's logs, the rest estimated). Marks not yet settled: ${context.remaining}, about ${money(perMark.costUsd.mean * context.remaining)} at this mean.`,
 		"",
 		`| Per mark | mean | p50 | p90 | max |`,
 		`| --- | --- | --- | --- | --- |`,

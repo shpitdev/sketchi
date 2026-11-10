@@ -1,11 +1,14 @@
 import { CloudflareAiGatewayBinding } from "@sketchi/diagram-generation";
 import type { IconRecipe } from "@sketchi/diagram-core";
 import {
+	AUTHOR_MAX_TOKENS,
 	drawIcon,
+	ICON_DRAW_MAX_ROUNDS,
 	type IconAuthorModel,
 	IconCatalogSvgs,
 	IconDrawGatewayConfig,
 	IconDrawModelsGateway,
+	type IconDrawResult,
 	type IconJudgeVerdict,
 	type ModelCall,
 	prepareIconInput,
@@ -30,12 +33,14 @@ const PRICES: Readonly<
 /** Gemini Flash, rounded up: the judge's share of a draw is small. */
 const JUDGE_PRICE = { input: 0.5, output: 3, cacheRead: 0.05, cacheWrite: 0 };
 
+function authorPrice(model: string) {
+	return (
+		Object.entries(PRICES).find(([name]) => model.includes(name))?.[1] ?? PRICES["claude-opus-5-5"]!
+	);
+}
+
 export function estimateCallCost(call: ModelCall): number {
-	const price =
-		call.role === "judge"
-			? JUDGE_PRICE
-			: (Object.entries(PRICES).find(([model]) => call.model.includes(model))?.[1] ??
-				PRICES["claude-opus-5-5"]!);
+	const price = call.role === "judge" ? JUDGE_PRICE : authorPrice(call.model);
 	return (
 		(call.usage.inputTokens * price.input +
 			call.usage.outputTokens * price.output +
@@ -43,6 +48,42 @@ export function estimateCallCost(call: ModelCall): number {
 			call.usage.cacheWriteTokens * price.cacheWrite) /
 		1_000_000
 	);
+}
+
+/** The author's fixed instructions and example recipes, rounded up (about 4,200 tokens measured). */
+const AUTHOR_FIXED_INPUT_TOKENS = 6_000;
+/** Any image the author or judge sees, rounded up: the largest, a round sheet, is about 240. */
+const IMAGE_INPUT_TOKENS = 1_600;
+/** A turn's request or review text. */
+const TURN_TEXT_TOKENS = 1_000;
+/** The judge's calls per draw (one revision is judged again), the images it sees, and its reply. */
+const JUDGE_CALLS = 2;
+const JUDGE_IMAGES = 6;
+const JUDGE_OUTPUT_TOKENS = 2_000;
+
+/**
+ * The most one draw can cost with this author: every author call the engine
+ * allows, each reading the instructions, every image so far and every earlier
+ * reply at full length, all billed as cache writes, and each replying at its
+ * output limit; then both judge calls. Measured draws cost a twentieth of it.
+ * A provider error is retried by the engine but not billed.
+ */
+export function attemptCeilingUsd(author: string): number {
+	const price = authorPrice(author);
+	let authorUsd = 0;
+	for (let call = 0; call < ICON_DRAW_MAX_ROUNDS; call += 1) {
+		const input =
+			AUTHOR_FIXED_INPUT_TOKENS +
+			(1 + 2 * call) * IMAGE_INPUT_TOKENS +
+			call * AUTHOR_MAX_TOKENS +
+			TURN_TEXT_TOKENS;
+		authorUsd += input * price.cacheWrite + AUTHOR_MAX_TOKENS * price.output;
+	}
+	const judgeUsd =
+		JUDGE_CALLS *
+		((JUDGE_IMAGES * IMAGE_INPUT_TOKENS + TURN_TEXT_TOKENS) * JUDGE_PRICE.input +
+			JUDGE_OUTPUT_TOKENS * JUDGE_PRICE.output);
+	return (authorUsd + judgeUsd) / 1_000_000;
 }
 
 export interface MarkAttempt {
@@ -81,6 +122,26 @@ export interface DrawMarkRequest {
 	readonly budgetMs?: number;
 }
 
+/**
+ * What the gateway's logs priced these calls at, or undefined while any is
+ * unpriced or the logs cannot be read: a paid draw is kept either way, with its
+ * log ids, so its price can be read later.
+ */
+export async function priceLogs(
+	access: GatewayAccess,
+	logIds: readonly string[],
+	options?: { readonly attempts?: number; readonly waitMs?: number },
+): Promise<number | undefined> {
+	try {
+		const costs = await readLogCosts(access, SKETCHI_GATEWAY_ID, logIds, options);
+		return costs.every((entry) => entry.cost !== undefined)
+			? costs.reduce((sum, entry) => sum + (entry.cost ?? 0), 0)
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 /** One draw through the service's engine, with its spend read back from the gateway. */
 export async function drawMark(
 	access: GatewayAccess,
@@ -115,22 +176,30 @@ export async function drawMark(
 			),
 		),
 	);
-	const outcome = await Effect.runPromise(
-		prepareIconInput({ name: request.name, svg: request.svg }).pipe(
-			Effect.flatMap((input) =>
-				drawIcon(input, {
-					authorModel: request.author,
-					...(request.budgetMs === undefined ? {} : { budgetMs: request.budgetMs }),
-				}),
+	let outcome:
+		| Result.Result<IconDrawResult, { readonly _tag: string; readonly message: string }>
+		| undefined;
+	try {
+		outcome = await Effect.runPromise(
+			prepareIconInput({ name: request.name, svg: request.svg }).pipe(
+				Effect.flatMap((input) =>
+					drawIcon(input, {
+						authorModel: request.author,
+						...(request.budgetMs === undefined ? {} : { budgetMs: request.budgetMs }),
+					}),
+				),
+				Effect.provide(layer),
+				Effect.provideService(TelemetryCorrelation, { traceId: request.traceId }),
+				Effect.result,
 			),
-			Effect.provide(layer),
-			Effect.provideService(TelemetryCorrelation, { traceId: request.traceId }),
-			Effect.result,
-		),
-	);
-	const costs = await readLogCosts(access, SKETCHI_GATEWAY_ID, logIds);
-	const priced = costs.every((entry) => entry.cost !== undefined);
-	const costUsd = priced ? costs.reduce((sum, entry) => sum + (entry.cost ?? 0), 0) : undefined;
+		);
+	} catch (cause) {
+		outcome = Result.fail({
+			_tag: "Defect",
+			message: cause instanceof Error ? cause.message : String(cause),
+		});
+	}
+	const costUsd = await priceLogs(access, logIds);
 	if (Result.isFailure(outcome)) {
 		const error = outcome.failure;
 		return {
@@ -145,8 +214,8 @@ export async function drawMark(
 			cacheWriteTokens: 0,
 			ms: Date.now() - started,
 			...(costUsd === undefined ? {} : { costUsd }),
-			// A failed draw reports no usage; its logs are the only measure.
-			estimatedCostUsd: costUsd ?? 0,
+			// A failed draw reports no usage: until its logs are priced, count the most it could cost.
+			estimatedCostUsd: costUsd ?? (logIds.length === 0 ? 0 : attemptCeilingUsd(request.author)),
 			logIds,
 		};
 	}
