@@ -6,6 +6,7 @@ import {
 	flowchartDiagramFromDocument,
 	flowchartDocumentPairCount,
 	type FlowchartDocument,
+	impliedFlowchartNodeShape,
 } from "./flowchart-document";
 
 const waitlist: FlowchartDocument = {
@@ -315,6 +316,54 @@ describe("flowchart documents", () => {
 		expect(kinds(document).cause).toBe("decision");
 		expect(diagram.nodes.find((node) => node.id === "cause")?.shape).toBeUndefined();
 		expect(diagram.nodes.find((node) => node.id === "hotfix")?.shape).toBe("document");
+	});
+
+	it("draws a node that names a database as one when the document gives it no shape", () => {
+		const document: FlowchartDocument = {
+			title: "Ledger",
+			nodes: {
+				entry: "Clerk enters invoice",
+				write: "Write to database",
+				ledger: "Ledger database",
+				replica: { label: "MySQL replica", shape: "storage" },
+				reports: "Reports DB",
+			},
+			edges: [
+				["entry", "write"],
+				["write", "ledger"],
+				["ledger", "replica"],
+				["ledger", "reports"],
+			],
+		};
+		const shapes = Object.fromEntries(build(document).nodes.map((node) => [node.id, node.shape]));
+		expect(shapes).toEqual({
+			entry: undefined,
+			write: undefined,
+			ledger: "database",
+			replica: "storage",
+			reports: "database",
+		});
+	});
+
+	it("infers a cylinder only for a label that is plainly a database", () => {
+		for (const label of [
+			"Oracle",
+			"Postgres",
+			"Orders database",
+			"Customer DB",
+			"Postgres replica",
+			"Supabase Postgres",
+		])
+			expect(impliedFlowchartNodeShape(label), label).toBe("database");
+		for (const label of [
+			"Supabase Edge Functions",
+			"DynamoDB Streams",
+			"Validate database",
+			"Clerk writes to database",
+			"Query Postgres",
+			"Database healthy?",
+		])
+			expect(impliedFlowchartNodeShape(label), label).toBeUndefined();
 	});
 
 	it("asks for a label on every branch of a question", () => {

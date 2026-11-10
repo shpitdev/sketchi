@@ -1062,3 +1062,58 @@ describe("a step drawn twice where one copy ends", () => {
 		).toEqual([]);
 	});
 });
+
+describe("a named zone the diagram lacks", () => {
+	it("names the zone that holds it and the steps the request puts in it", () => {
+		const issues = checkRequestCoverage(
+			"draw our branch office.\nbranch office: tellers enter deposits in the core banking app, both on the teller network. the app posts to a ledger database in the branch office.",
+			{
+				type: "flowchart",
+				nodes: [
+					{ id: "tellers", label: "Tellers", kind: "start", group: "branch" },
+					{ id: "app", label: "Core banking app", kind: "process", group: "branch" },
+					{ id: "ledger", label: "Ledger database", kind: "end", group: "branch" },
+				],
+				edges: [
+					{ source: "tellers", target: "app" },
+					{ source: "app", target: "ledger" },
+				],
+				groups: [{ id: "branch", label: "Branch office", kind: "datacenter" }],
+			},
+		);
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_container_missing"]);
+		expect(issues[0]?.message).toContain(
+			'"teller network" (holding "Tellers" and "Core banking app")',
+		);
+	});
+
+	it("reads a bare mention of a zone as the one named zone of its kind", () => {
+		const request =
+			"bastion host in our staging VPC → app server in the VPC's public subnet → session cache. the VPC and cache are in us-east-1.";
+		const flat = {
+			type: "flowchart",
+			nodes: [
+				{ id: "bastion", label: "Bastion host", kind: "start" },
+				{ id: "app", label: "App server", kind: "process" },
+				{ id: "cache", label: "Session cache", kind: "end" },
+			],
+			edges: [
+				{ source: "bastion", target: "app" },
+				{ source: "app", target: "cache" },
+			],
+		};
+		const issues = checkRequestCoverage(request, flat);
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_container_missing"]);
+		// "the VPC" is the staging VPC, not a second VPC to draw.
+		expect(issues[0]?.message).toContain(
+			'"staging VPC" (inside "us-east-1", holding "Bastion host"), "public subnet" (inside "staging VPC", holding "App server") and "us-east-1" (holding "Session cache")',
+		);
+		expect(issues[0]?.message).not.toContain('"VPC"');
+		// With two VPCs named, a bare "the VPC" stays a zone of its own.
+		const two = checkRequestCoverage(
+			"bastion host in our staging VPC, app server in our production VPC. the VPC is in us-east-1.",
+			flat,
+		);
+		expect(two[0]?.message).toContain('"VPC" (inside "us-east-1"');
+	});
+});

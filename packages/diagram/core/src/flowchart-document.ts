@@ -6,6 +6,7 @@ import {
 	DIAGRAM_ZONE_KINDS,
 	DiagramNodeColorSchema,
 	SKETCHI_DIAGRAM_STYLE,
+	type DiagramNodeShape,
 } from "./intermediate.js";
 import {
 	FLOWCHART_MAX_EDGES,
@@ -845,6 +846,37 @@ export function resolveFlowchartReferences(document: FlowchartDocument): {
 	};
 }
 
+/** A label that names a database: "Oracle database", "Orders DB", "Postgres replica". */
+/** A label whose head noun is a database: "Orders database", "Customer DB", "Datastore". */
+const DATABASE_HEAD = /(?:^|\s)(?:database|db|datastore|data\s+store)s?\s*$/iu;
+/** A database product, and what follows it in the label. */
+const DATABASE_PRODUCT =
+	/\b(?:postgres(?:ql)?|mysql|mariadb|mongodb|dynamodb|cosmos\s?db|sql\s+server|mssql|sqlite|cassandra|couchdb|cockroachdb|firestore|spanner|aurora|cloud\s+sql|neo4j|oracle)\b(.*)$/iu;
+/** Words that can follow a database product and still name the database: "Postgres replica". */
+const STILL_THE_DATABASE =
+	/^(?:\s+(?:database|db|datastore|primary|replica|replicas|cluster|instance|read|write))*\s*$/iu;
+/** A step that acts on a database rather than being one: "Write to database", "Validate database". */
+const ACTS_ON_DATA =
+	/^\s*(?:add|analy[sz]e|apply|archive|audit|back|backup|call|check|clean|close|commit|configure|connect|copy|create|delete|deploy|drop|encrypt|export|fetch|flush|get|import|index|insert|inspect|load|log|look|lookup|migrate|monitor|open|optimi[sz]e|partition|patch|persist|poll|provision|purge|put|query|read|rebuild|record|refresh|remove|replicate|reset|restore|rotate|run|save|scale|scan|search|seed|select|send|set|shard|snapshot|store|sync|test|truncate|tune|update|upgrade|vacuum|validate|verify|write)s?\b/iu;
+/** A label that places or moves something rather than naming it: "Clerk writes to database". */
+const RELATES = /\b(?:to|into|in|from|on|onto|via|through|with|for|by)\b/iu;
+
+/**
+ * The shape a node draws as when its document gives none: a database cylinder for a label that
+ * is plainly a database, whatever product it is, as every database draws. A label is one when
+ * its head noun is a database or it names a database product with nothing after it but words
+ * such as "replica"; a step on one ("Validate database", "Write to Postgres") or a service of a
+ * product ("DynamoDB Streams") is not.
+ */
+export function impliedFlowchartNodeShape(label: string): DiagramNodeShape | undefined {
+	const trimmed = label.trim();
+	if (!trimmed || trimmed.endsWith("?") || ACTS_ON_DATA.test(trimmed) || RELATES.test(trimmed))
+		return undefined;
+	if (DATABASE_HEAD.test(trimmed)) return "database";
+	const product = DATABASE_PRODUCT.exec(trimmed);
+	return product && STILL_THE_DATABASE.test(product[1] ?? "") ? "database" : undefined;
+}
+
 /** A document built into the internal flowchart, or the problems that stop it. */
 export type FlowchartDocumentBuild =
 	| { readonly ok: true; readonly diagram: FlowchartDiagram; readonly notes: readonly string[] }
@@ -1002,12 +1034,17 @@ export function flowchartDiagramFromDocument(
 			const group = contained.nodeGroup.get(id);
 			const lane = contained.nodeLane.get(id);
 			const icon = options.nodeIcons?.get(id);
+			const kind = kinds.get(id) ?? "process";
+			const shape =
+				node.shape === undefined && kind !== "decision"
+					? impliedFlowchartNodeShape(node.label)
+					: node.shape;
 			return {
 				id,
 				label: node.label,
-				kind: kinds.get(id) ?? "process",
+				kind,
 				...(node.note ? { description: node.note } : {}),
-				...(node.shape && node.shape !== "diamond" ? { shape: node.shape } : {}),
+				...(shape && shape !== "diamond" ? { shape } : {}),
 				...(icon ? { icon: { slug: icon } } : {}),
 				...(node.color ? { color: node.color } : {}),
 				...(group ? { group } : {}),

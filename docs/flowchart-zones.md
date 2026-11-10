@@ -1,6 +1,6 @@
 # Architecture zones and infrastructure shapes
 
-Zones are flowchart groups that nest and say what they stand for: a cloud or an on-prem data center, a region, an availability or network zone, a VPC and its subnets, a cluster and its namespaces. Infrastructure shapes draw a node as a database cylinder, a queue, a document or a storage bucket. Together they draw the architecture diagrams developers ask for most, such as an AWS three-tier app, inside the flowchart family.
+Zones are flowchart groups that nest and say what they stand for: a cloud or an on-prem data center, a corporate, on-prem or hybrid network, a region, an availability zone, a VPC and its subnets, a cluster and its namespaces. Infrastructure shapes draw a node as a database cylinder, a queue, a document or a storage bucket. Together they draw the architecture diagrams developers ask for most, such as an AWS three-tier app, inside the flowchart family.
 
 ```json
 {"type":"flowchart","spec":{"title":"AWS three-tier app","direction":"LR","logos":true,"nodes":{"users":"Users","alb":"Application Load Balancer","api":"ECS API service","rds":{"label":"RDS PostgreSQL","shape":"database"},"s3":{"label":"S3 assets bucket","shape":"storage"}},"edges":[["users","alb"],["alb","api"],["api","rds"],["api","s3"]],"groups":{"region":{"label":"us-east-1","kind":"region","contains":["vpc","s3"]},"vpc":{"label":"VPC 10.0.0.0/16","kind":"vpc","contains":["public","private","data"]},"public":{"label":"Public subnet","kind":"subnet","contains":["alb"]},"private":{"label":"Private subnet","kind":"subnet","contains":["api"]},"data":{"label":"Database subnet","kind":"subnet","contains":["rds"]}}}}
@@ -15,8 +15,8 @@ With `logos`, each node whose label names a product draws its logo: `exact` when
 Additive to [flowchart groups](./flowchart-groups.md):
 
 - A group's `contains` may list other groups. Nesting is read from those lists, never out of ids or labels; a group may list members at any depth, so a region can list the bucket beside its VPC and the VPC its subnets, and Sketchi derives the tree. A group no other group lists sits inside the smallest group holding all its nodes.
-- `groups[].kind` is one of `cloud`, `datacenter`, `region`, `zone`, `vpc`, `subnet`, `cluster` or `namespace`. It says what a zone stands for and sets how it draws. It is a closed set so a model picks a drawn treatment, not free text.
-- `nodes[id].shape` is one of `database`, `queue`, `document` or `storage`. A node's role (entry, step, decision, end) comes from its edges whatever its shape, so a database a request ends at needs no more than its shape.
+- `groups[].kind` is one of `cloud`, `datacenter`, `network`, `region`, `zone`, `vpc`, `subnet`, `cluster` or `namespace`. It says what a zone stands for and sets how it draws. It is a closed set so a model picks a drawn treatment, not free text.
+- `nodes[id].shape` is one of `database`, `queue`, `document` or `storage`. A node's role (entry, step, decision, end) comes from its edges whatever its shape, so a database a request ends at needs no more than its shape. A node given no shape whose label names a database ("Oracle database", "Orders DB", "Postgres replica") draws as one; a step that acts on one ("Write to database") does not.
 - A node sits in its named `group`, or the innermost group that lists it when it names none. A list can also place it in an ancestor of its named group; a different direct owner is refused.
 - Zones nest at most 4 deep (a cloud, a region, a VPC and a subnet), and a flowchart keeps at most 8 groups.
 
@@ -32,6 +32,7 @@ A diagram whose groups nest or declare a `kind` draws them as zones. A flowchart
 | --- | --- | --- |
 | `cloud` | dark, dashed, heavy | none |
 | `datacenter` | dark, solid, heavy | none |
+| `network` | dark, solid | none |
 | `region` | accent, dashed | none |
 | `zone` | accent, dotted | none |
 | `vpc`, `cluster` | accent, solid, heavy | none |

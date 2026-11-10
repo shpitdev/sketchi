@@ -131,7 +131,7 @@ const STRESS_ZONES = [
 	{ id: "app", label: "App subnet", kind: "subnet", parent: "vpc" },
 	{ id: "data", label: "Data subnet", kind: "subnet", parent: "vpc" },
 	{ id: "onprem", label: "On-prem data center", kind: "datacenter" },
-	{ id: "corp", label: "Corporate network", kind: "zone", parent: "onprem" },
+	{ id: "corp", label: "Corporate network", kind: "network", parent: "onprem" },
 ] as const;
 
 /** Thirty services in flow order, each with its zone (none for the two outside). */

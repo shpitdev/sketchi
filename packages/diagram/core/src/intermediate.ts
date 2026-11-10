@@ -52,12 +52,14 @@ export const DiagramIconRefSchema = DiagramIconRef;
 
 /**
  * What a group stands for in an architecture: a provider's cloud or an
- * on-premises data center, a region, an availability or network zone, a VPC
- * and its subnets, or a cluster and its namespaces. Each draws its own way.
+ * on-premises data center, a corporate, on-premises or hybrid network, a
+ * region, an availability zone, a VPC and its subnets, or a cluster and its
+ * namespaces. Each draws its own way.
  */
 export const DIAGRAM_ZONE_KINDS = [
 	"cloud",
 	"datacenter",
+	"network",
 	"region",
 	"zone",
 	"vpc",

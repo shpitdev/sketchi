@@ -152,7 +152,7 @@ describe("zone layout", () => {
 		expect(style(k8s, "backend")).toEqual(["namespace", "dashed", 1, "#efe6ec"]);
 		const hybrid = rendered("hybrid-cloud");
 		expect(style(hybrid, "onprem")).toEqual(["datacenter", "solid", 2, "none"]);
-		expect(style(hybrid, "corp")).toEqual(["zone", "dotted", 1, "none"]);
+		expect(style(hybrid, "corp")).toEqual(["network", "solid", 1, "none"]);
 		expect(style(hybrid, "aws")).toEqual(["cloud", "dashed", 2, "none"]);
 	});
 

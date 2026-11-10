@@ -11533,8 +11533,9 @@ const ZONE_FILL: Readonly<Partial<Record<DiagramZoneKind, string>>> = {
 
 /**
  * How each kind of zone draws: outer boundaries (a cloud or a data center) in
- * dark ink, a region dashed, an availability or network zone dotted, a VPC or
- * a cluster in a heavier line, and a subnet or a namespace filled.
+ * dark ink, a network on either side of them in a lighter dark line, a region
+ * dashed, an availability zone dotted, a VPC or a cluster in a heavier line,
+ * and a subnet or a namespace filled.
  */
 function zoneStyle(
 	kind: DiagramZoneKind | undefined,
@@ -11545,7 +11546,8 @@ function zoneStyle(
 > {
 	const fill = kind === undefined ? undefined : ZONE_FILL[kind];
 	return {
-		strokeColor: kind === "cloud" || kind === "datacenter" ? ZONE_LABEL_COLOR : accent,
+		strokeColor:
+			kind === "cloud" || kind === "datacenter" || kind === "network" ? ZONE_LABEL_COLOR : accent,
 		strokeStyle:
 			kind === "cloud" || kind === "region" || kind === "namespace"
 				? "dashed"
