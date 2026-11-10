@@ -92,6 +92,17 @@ const PLATFORM_BEFORE: ReadonlySet<string> = new Set([
 	"via",
 	"with",
 ]);
+/** Participles whose "by" names where something runs: "hosted by Supabase", "run by Cloudflare". */
+const PASSIVE_BY: ReadonlySet<string> = new Set([
+	"backed",
+	"hosted",
+	"managed",
+	"operated",
+	"powered",
+	"provided",
+	"run",
+	"served",
+]);
 /** Words that make the product before them where something runs: "Vercel-hosted". */
 const PLATFORM_AFTER: ReadonlySet<string> = new Set([
 	"backed",
@@ -185,10 +196,16 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 			if (best && earlier === undefined) {
 				seen.set(best.slug, mentions.length);
 				const nextWord = labelInitial ? tokens[start + length]?.lower : undefined;
+				const before = tokens[start - 1]?.lower ?? "";
+				const after = tokens[start + length]?.lower ?? "";
+				// "Vercel-hosted" and "on Vercel" name the platform; so does "hosted by Supabase", while
+				// the name before that clause ("Postgres hosted by Supabase") is the product.
+				const passive = tokens[start + length + 1]?.lower === "by";
 				const platform =
 					first?.enclosed === true ||
-					PLATFORM_BEFORE.has(tokens[start - 1]?.lower ?? "") ||
-					PLATFORM_AFTER.has(tokens[start + length]?.lower ?? "");
+					PLATFORM_BEFORE.has(before) ||
+					(before === "by" && PASSIVE_BY.has(tokens[start - 2]?.lower ?? "")) ||
+					(PLATFORM_AFTER.has(after) && !passive);
 				mentions.push({
 					icon: best,
 					distinctive,
@@ -321,12 +338,19 @@ export function labelLogos<Icon extends SearchableIcon>(
 
 /**
  * Mentions in the order a label's logo is chosen from: the product the label is before the
- * platform it runs on, then unmistakable names before everyday words cased as names. A node
+ * platform it runs on, then unmistakable names before everyday words cased as names, and a
+ * generic product word last. A node
  * draws one logo, the first: "Next.js page on Vercel" and "Vercel-hosted Next.js page" both
  * draw Next.js.
  */
 export function primaryFirst<Mention extends IconMention>(mentions: readonly Mention[]): Mention[] {
-	const rank = (mention: Mention) => (mention.platform ? 2 : 0) + (mention.distinctive ? 0 : 1);
+	// An everyday word that is also a generic product ("Edge function", "Storage service") never
+	// outranks an unmistakable name, even the platform's.
+	const generic = (mention: Mention) =>
+		!mention.distinctive &&
+		(GENERIC_COLLECTIONS.has(mention.icon.collection) || GENERIC_TECH_SLUGS.has(mention.icon.slug));
+	const rank = (mention: Mention) =>
+		generic(mention) ? 4 : (mention.platform ? 2 : 0) + (mention.distinctive ? 0 : 1);
 	return [...mentions].sort((left, right) => rank(left) - rank(right));
 }
 

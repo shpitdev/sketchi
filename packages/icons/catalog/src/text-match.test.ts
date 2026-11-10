@@ -148,6 +148,17 @@ describe("labelLogos", () => {
 		expect(named("Deploy to Vercel")).toEqual(["vercel"]);
 	});
 
+	it("reads the host after a passive clause as the platform", () => {
+		expect(named("Postgres hosted by Supabase")[0]).toBe("postgresql");
+		expect(named("Redis managed by Cloudflare")[0]).toBe("redis");
+		expect(named("Redis run by Cloudflare")[0]).toBe("redis");
+	});
+
+	it("never ranks a generic word that names a product above an unmistakable name", () => {
+		expect(named("Cloudflare-hosted Edge function")[0]).toBe("cloudflare");
+		expect(named("Cloudflare-hosted Storage service")[0]).toBe("cloudflare");
+	});
+
 	it("names every product a label names, unmistakable names first", () => {
 		expect(named("Next.js app hosted on Vercel")).toEqual(["nextjs", "vercel"]);
 		expect(named("Supabase Postgres")).toEqual(["supabase", "postgresql"]);
