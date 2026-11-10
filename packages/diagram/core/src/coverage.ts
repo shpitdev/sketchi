@@ -807,13 +807,12 @@ function arrowChains(request: string): string[] {
 	return flattened.split(/[\n;]/u);
 }
 
-function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
-	const nodes = records(diagram["nodes"]);
-	const edges = records(diagram["edges"]);
+/** The one node an item names, by most of its words, or none when it names none or several. */
+function nodeMatcher(nodes: readonly Json[]): (item: string) => number | undefined {
 	const nodeStems = nodes.map(
 		(node) => new Set(stems(`${text(node["label"])} ${text(node["id"])}`)),
 	);
-	const match = (item: string): number | undefined => {
+	return (item) => {
 		const wanted = stems(item);
 		const scores = nodeStems.map(
 			(shown) => wanted.filter((word) => holds(shown, word)).length / wanted.length,
@@ -823,6 +822,12 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 		const winners = scores.flatMap((score, index) => (score === best ? [index] : []));
 		return winners.length === 1 ? winners[0] : undefined;
 	};
+}
+
+function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
+	const nodes = records(diagram["nodes"]);
+	const edges = records(diagram["edges"]);
+	const match = nodeMatcher(nodes);
 	const outgoing = new Map<string, string[]>();
 	for (const edge of edges) {
 		const source = text(edge["source"]);
@@ -943,7 +948,7 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 	for (const { step, given, borrowers } of borrowedSteps(request, nodes, edges, match)) {
 		issues.push({
 			code: "flowchart_step_borrowed",
-			message: `The request gives "${step}" to ${listed(given)}, but the diagram also leads ${quoteList(borrowers)} into it. Keep that step on the branches the request names; a branch with no stated next step ends at its last step.`,
+			message: `The request gives "${step}" to ${listed(given)}, but the diagram also leads ${quoteList(borrowers)} into it. Remove ${borrowers.length === 1 ? "that arrow" : "those arrows"}, and any copy of "${step}" only it reaches, so ${borrowers.length === 1 ? "that step ends its branch" : "each such step ends its branch"} with no new arrow: a branch with no stated next step ends at its last step.`,
 		});
 	}
 	for (const { step, next } of splitSteps(request, nodes, edges)) {
@@ -1107,9 +1112,13 @@ function foldedChecks(request: string, nodes: readonly Json[], edges: readonly J
 		}
 		for (const match of sentence.matchAll(PASSIVE_CHECK)) {
 			if (/^\s*(?:for\s+)?(?:whether|if|that)\b/iu.test(match[2] ?? "")) continue;
-			// "an order is placed and the badge is verified": the subject is the last phrase.
-			const subject =
-				(match[1] ?? "").split(/,|\b(?:and|then|but|or|once|after|when|if|until)\b/iu).at(-1) ?? "";
+			// "an order is placed and the badge is verified": the subject is the last phrase. In
+			// "if the badge is verified, open the door" the check is the condition, not a step.
+			const parts = (match[1] ?? "").split(
+				/(,|\b(?:and|then|but|or|once|after|before|when|whenever|if|unless|until|while|whether)\b)/iu,
+			);
+			if (CONDITION.test(parts.at(-2) ?? "") || /\bwhether\b/iu.test(parts.at(-2) ?? "")) continue;
+			const subject = parts.at(-1) ?? "";
 			stated.push({
 				phrase: `${subject.trim()} ${match[0]
 					.slice((match[1] ?? "").length)
@@ -1174,14 +1183,25 @@ function borrowedSteps(
 	nodes: readonly Json[],
 	edges: readonly Json[],
 	matchNode: (item: string) => number | undefined,
-): { readonly step: string; readonly given: string[]; readonly borrowers: string[] }[] {
+): {
+	readonly step: string;
+	readonly given: string[];
+	readonly borrowers: string[];
+	/** The arrows a fix removes: each borrower's into the step, and on from a copy only it reaches. */
+	readonly arrows: readonly (readonly [string, string])[];
+}[] {
 	const ids = nodes.map((node) => text(node["id"]));
 	const targets = new Map<string, string[]>();
 	for (const edge of edges) {
 		const source = text(edge["source"]);
 		targets.set(source, [...(targets.get(source) ?? []), text(edge["target"])]);
 	}
-	const found: { step: string; given: string[]; borrowers: string[] }[] = [];
+	const found: {
+		step: string;
+		given: string[];
+		borrowers: string[];
+		arrows: (readonly [string, string])[];
+	}[] = [];
 	for (const sentence of request.split(/[.!?;\n]/u)) {
 		const shared = SHARED_BY.exec(sentence);
 		if (!shared || NEGATED_ACTION.test(sentence)) continue;
@@ -1208,20 +1228,50 @@ function borrowedSteps(
 			named.flatMap((entry) => (entry.label === label ? [ids[entry.index] ?? ""] : [])),
 		);
 		if (step.size === 0) continue;
+		// Another sentence may give the step to a branch too: "production also runs smoke tests"
+		// names the step in full and a word of that branch no listed branch has.
+		const givenWords = new Set(
+			[...givenIds].flatMap((id) => stems(text(nodes[ids.indexOf(id)]?.["label"]))),
+		);
+		const stepWords = stems(text(nodes[ids.indexOf([...step][0] ?? "")]?.["label"]));
+		const statedElsewhere = (id: string) =>
+			request
+				.split(/[.!?;\n]/u)
+				.filter((other) => other !== sentence)
+				.some((other) => {
+					const said = new Set(stems(other));
+					return (
+						stepWords.every((word) => holds(said, word)) &&
+						stems(text(nodes[ids.indexOf(id)]?.["label"])).some(
+							(word) => !givenWords.has(word) && !stepWords.includes(word) && holds(said, word),
+						)
+					);
+				});
 		const borrowers = new Set<string>();
 		for (const [parent, children] of targets) {
 			if (!children.some((child) => givenIds.has(child))) continue;
 			for (const child of children) {
 				if (givenIds.has(child) || step.has(child) || child === parent) continue;
-				if ((targets.get(child) ?? []).some((next) => step.has(next))) borrowers.add(child);
+				if ((targets.get(child) ?? []).some((next) => step.has(next)) && !statedElsewhere(child))
+					borrowers.add(child);
 			}
 		}
 		if (borrowers.size === 0) continue;
 		const labelOf = (id: string) => text(nodes[ids.indexOf(id)]?.["label"]);
+		const into = [...borrowers].flatMap((id) =>
+			(targets.get(id) ?? []).flatMap((next) => (step.has(next) ? [[id, next] as const] : [])),
+		);
+		const onlyBorrowed = [...step].filter((id) =>
+			[...targets].every(([source, next]) => !next.includes(id) || borrowers.has(source)),
+		);
 		found.push({
 			step: labelOf([...step][0] ?? ""),
 			given: [...givenIds].map(labelOf),
 			borrowers: [...borrowers].map(labelOf),
+			arrows: [
+				...into,
+				...onlyBorrowed.flatMap((id) => (targets.get(id) ?? []).map((next) => [id, next] as const)),
+			],
 		});
 	}
 	return found;
@@ -1556,8 +1606,6 @@ const REROUTING_CODES: ReadonlySet<CoverageIssueCode> = new Set([
 	"flowchart_connection_missing",
 	"flowchart_return_step_missing",
 	"flowchart_check_step_missing",
-	"flowchart_step_borrowed",
-	"flowchart_step_split",
 ]);
 
 /** How many words a diagram shows, to tell a repair that drops content from one that adds it. */
@@ -1638,13 +1686,33 @@ export function keepsStatedStructure(
 	};
 	switch (text(original["type"])) {
 		case "flowchart": {
-			// A missing arrow, return step or check, a borrowed step or a split one may need an edge
-			// moved; the steps the request names stay either way.
+			// A missing arrow, return step or check may need an edge moved; the steps the request
+			// names stay either way. A borrowed step loses only the arrows that borrow it, and a
+			// split step's dead-end copy merges into the step by label.
 			const rerouted = flowchartIssues(request, original).some((issue) =>
 				REROUTING_CODES.has(issue.code),
 			);
+			const originalNodes = records(original["nodes"]);
+			const borrowed = borrowedSteps(
+				request,
+				originalNodes,
+				records(original["edges"]),
+				nodeMatcher(originalNodes),
+			).flatMap(({ arrows }) =>
+				links(
+					{
+						...original,
+						edges: arrows.map(([source, target]) => ({ source, target })),
+					},
+					"edges",
+					"source",
+					"target",
+					"nodes",
+				),
+			);
 			return (
-				keeps("nodes", named) && (rerouted || keepsLinks("edges", "source", "target", "nodes"))
+				keeps("nodes", named) &&
+				(rerouted || keepsLinks("edges", "source", "target", "nodes", new Set(borrowed)))
 			);
 		}
 		case "class": {

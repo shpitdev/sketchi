@@ -498,6 +498,42 @@ describe("a repair that moves a borrowed or split step", () => {
 		}),
 	);
 
+	it.effect("is kept when it leaves the borrowed copy behind with no arrows", () =>
+		Effect.gen(function* () {
+			const request =
+				"Pick the target. Staging and canary paths both run smoke tests. Production deploys and ends. Passing smoke tests finish; failing ones page the on-call engineer.";
+			const nodes = {
+				target: "Target?",
+				staging: "Staging deploy",
+				canary: "Canary deploy",
+				production: "Production deploy",
+				smoke: "Run smoke tests",
+				copy: "Run smoke tests",
+				passed: "Smoke tests pass?",
+				finish: "Finish",
+				page: "Page on-call engineer",
+			};
+			const shared = [
+				["target", "staging", "staging"],
+				["target", "canary", "canary"],
+				["target", "production", "production"],
+				["staging", "smoke"],
+				["canary", "smoke"],
+				["smoke", "passed"],
+				["passed", "finish", "yes"],
+				["passed", "page", "no"],
+			];
+			const borrowed = answer(nodes, [...shared, ["production", "copy"], ["copy", "passed"]]);
+			const leftBehind = answer(nodes, shared);
+			const { calls, candidate } = yield* run(request, [borrowed, leftBehind]);
+			expect(calls).toBe(2);
+			expect(candidate.diagnostics.at(-1)).toMatch(/^coverage_repair_succeeded/u);
+			expect(
+				candidate.diagram?.type === "flowchart" && candidate.diagram.nodes.map((node) => node.id),
+			).not.toContain("copy");
+		}),
+	);
+
 	it.effect("is kept when it points a dead-end copy's branch at the step", () =>
 		Effect.gen(function* () {
 			const request =

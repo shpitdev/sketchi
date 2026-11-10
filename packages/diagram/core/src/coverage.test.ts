@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkRequestCoverage } from "./coverage.js";
+import { checkRequestCoverage, keepsStatedStructure } from "./coverage.js";
 
 const codes = (request: string, diagram: unknown) =>
 	checkRequestCoverage(request, diagram).map((issue) => issue.code);
@@ -769,6 +769,8 @@ describe("a stated check folded into its decision", () => {
 	});
 
 	it.each([
+		"A visitor arrives. If the badge is verified, open the door; otherwise call security.",
+		"A visitor arrives. Once the badge is verified, open the door. A rejected badge calls security.",
 		"A visitor arrives and the guard checks whether the badge is valid. A rejected badge calls security. An accepted badge opens the door.",
 		"A visitor arrives and the guard verifies that the badge is valid. A rejected badge calls security. An accepted badge opens the door.",
 		"A visitor arrives and the guard checks the badge. A rejected badge calls security. An accepted badge opens the door.",
@@ -838,6 +840,26 @@ describe("a step the request gives to some branches", () => {
 
 	it("passes the step on the listed branches only", () => {
 		expect(codes(request, chart(labels, edges))).toEqual([]);
+	});
+
+	it("passes a sibling branch another sentence gives the step too", () => {
+		expect(
+			codes(
+				`${request} Production also runs smoke tests.`,
+				chart(labels, [...edges, ["production", "smoke"]]),
+			),
+		).toEqual([]);
+	});
+
+	it("keeps a repair that removes only the borrowing arrow", () => {
+		const borrowed = chart(labels, [...edges, ["production", "smoke"]]);
+		expect(keepsStatedStructure(request, borrowed, chart(labels, edges))).toBe(true);
+		// Deleting a listed branch's arrow too is no fix.
+		const stripped = chart(
+			labels,
+			edges.filter(([source, target]) => !(source === "canary" && target === "smoke")),
+		);
+		expect(keepsStatedStructure(request, borrowed, stripped)).toBe(false);
 	});
 
 	it("reports a sibling branch led into the shared step, even through a copy of it", () => {

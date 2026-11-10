@@ -244,6 +244,69 @@ function withKnownGroupKind(id: string, group: unknown, diagnostics: string[]): 
 }
 
 /**
+ * A flowchart without the nodes no edge reaches whose label another node carries: a copy of a
+ * step left behind when its arrows moved to the step, as a repair that rejoins a branch leaves
+ * it. It draws nothing the step does not, and alone it fails the build.
+ */
+function withoutStrayCopies(
+	input: Record<string, unknown>,
+	diagnostics: string[],
+): Record<string, unknown> {
+	const nodes = input["nodes"];
+	const edges = input["edges"];
+	if (!isUnknownRecord(nodes) || !Array.isArray(edges)) return input;
+	const ends = new Set(
+		edges.flatMap((edge) =>
+			Array.isArray(edge)
+				? edge.slice(0, 2).flatMap((end) => (Array.isArray(end) ? end : [end]))
+				: [],
+		),
+	);
+	const labelOf = (node: unknown) =>
+		(typeof node === "string"
+			? node
+			: isUnknownRecord(node) && typeof node["label"] === "string"
+				? node["label"]
+				: ""
+		)
+			.trim()
+			.toLowerCase();
+	const drawn = new Set(
+		Object.entries(nodes).flatMap(([id, node]) => (ends.has(id) ? [labelOf(node)] : [])),
+	);
+	const stray = Object.entries(nodes).flatMap(([id, node]) =>
+		!ends.has(id) && labelOf(node) && drawn.has(labelOf(node)) ? [id] : [],
+	);
+	if (stray.length === 0) return input;
+	for (const id of stray)
+		diagnostics.push(
+			`node_dropped: node "${id}" repeats another node's label and no edge reaches it.`,
+		);
+	const groups = input["groups"];
+	return {
+		...input,
+		nodes: Object.fromEntries(Object.entries(nodes).filter(([id]) => !stray.includes(id))),
+		...(isUnknownRecord(groups)
+			? {
+					groups: Object.fromEntries(
+						Object.entries(groups).map(([id, group]) => [
+							id,
+							isUnknownRecord(group) && Array.isArray(group["contains"])
+								? {
+										...group,
+										contains: group["contains"].filter(
+											(member) => typeof member !== "string" || !stray.includes(member),
+										),
+									}
+								: group,
+						]),
+					),
+				}
+			: {}),
+	};
+}
+
+/**
  * A generated flowchart document as a build reads it, or the problems that send it back for
  * repair: a node, group or lane key the response repeats (JSON keeps only the last), a schema
  * problem, or a graph the document can't draw. Unsupported shapes and group kinds draw plain, with a diagnostic note.
@@ -268,7 +331,7 @@ function parseGeneratedFlowchart(
 			success: false,
 		};
 	}
-	const { type: _type, style: _style, ...fields } = input;
+	const { type: _type, style: _style, ...fields } = withoutStrayCopies(input, diagnostics);
 	const nodes = fields["nodes"];
 	const groups = fields["groups"];
 	const edges = fields["edges"];
