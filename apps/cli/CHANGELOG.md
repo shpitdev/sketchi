@@ -1,5 +1,15 @@
 # @sketchi/cli
 
+## 0.39.0
+
+### Minor Changes
+
+- [#760](https://github.com/shpitdev/sketchi/pull/760) [`eb71225`](https://github.com/shpitdev/sketchi/commit/eb712259f3ad4b5d8dae296e9565f0a3b4c9b452) Thanks [@anandpant](https://github.com/anandpant)! - Flowcharts can draw their lines as curves. Add `"curved": true` to a flowchart's spec in `sketchi create`, or turn it on and off with `sketchi edit ID --json '{"edits":[{"op":"set","curved":true}]}'`; `generate` draws curves when the prompt asks for them. A curve follows the route a square line takes, so it still passes through no step and runs along no other line. Flowcharts that still crossed after the usual repairs are laid out again and keep the drawing that crosses fewer lines. 890 more catalog logos now draw by hand, a node that names a product and the platform it runs on ("Next.js page on Vercel") draws the product's logo, and `sketchi icon draw` draws a one-color logo in Excalidraw's ink and paper, so it follows dark mode. A corporate, on-premises or hybrid network draws as a network zone, a node whose label names a database ("Orders DB") draws as a database, and `generate` also catches a branch that borrows a step meant for other branches when the choice is drawn as a chain of yes/no decisions.
+
+### Patch Changes
+
+- [#760](https://github.com/shpitdev/sketchi/pull/760) [`eb71225`](https://github.com/shpitdev/sketchi/commit/eb712259f3ad4b5d8dae296e9565f0a3b4c9b452) Thanks [@anandpant](https://github.com/anandpant)! - A flowchart line no longer cuts through a step it leaves or enters. A line moved clear of a label or a nearby step could cross its own decision's tip, the side of a start or end ellipse, or its own box on the way to its arrowhead; each line now meets its steps only along the run that attaches to them, and curved lines keep clear of those shapes too.
+
 ## 0.38.2
 
 ### Patch Changes
