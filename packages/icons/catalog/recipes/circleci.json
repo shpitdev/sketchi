@@ -1,0 +1,38 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12,
+			"rx": 10.5,
+			"ry": 10.5,
+			"fill": "ink"
+		},
+		{
+			"kind": "rect",
+			"x": 0,
+			"y": 9.5,
+			"width": 10,
+			"height": 5,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 14,
+			"cy": 12,
+			"rx": 5.5,
+			"ry": 5.5,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 14,
+			"cy": 12,
+			"rx": 3,
+			"ry": 3,
+			"fill": "ink"
+		}
+	]
+}

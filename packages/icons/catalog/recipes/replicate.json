@@ -1,0 +1,34 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[4, 21],
+				[4, 4],
+				[21, 4]
+			],
+			"stroke": "ink",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[9, 21],
+				[9, 9],
+				[21, 9]
+			],
+			"stroke": "ink",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[14, 21],
+				[14, 14],
+				[21, 14]
+			],
+			"stroke": "ink",
+			"pen": 2
+		}
+	]
+}

@@ -1,0 +1,22 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 2,
+			"width": 21,
+			"height": 20,
+			"rounded": true,
+			"stroke": "#001e36",
+			"fill": "#001e36"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12.5,
+			"text": "Ps",
+			"size": 12,
+			"color": "#31a8ff"
+		}
+	]
+}

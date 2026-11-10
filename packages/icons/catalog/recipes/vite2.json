@@ -1,0 +1,28 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[1.5, 6.5],
+				[8.6, 5],
+				[7, 21.5]
+			],
+			"closed": true,
+			"stroke": "#006bff",
+			"fill": "#006bff",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[10.4, 4.6],
+				[22.5, 2],
+				[8, 21.5]
+			],
+			"closed": true,
+			"stroke": "#006bff",
+			"fill": "#006bff",
+			"pen": 2
+		}
+	]
+}

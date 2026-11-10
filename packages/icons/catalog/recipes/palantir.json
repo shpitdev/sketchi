@@ -1,0 +1,23 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 9.5,
+			"rx": 8,
+			"ry": 8,
+			"stroke": "ink",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[3.5, 18],
+				[12, 22],
+				[20.5, 18]
+			],
+			"stroke": "ink",
+			"pen": 2
+		}
+	]
+}

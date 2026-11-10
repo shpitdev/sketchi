@@ -1,0 +1,28 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 7,
+			"cy": 12,
+			"text": "p5",
+			"size": 11,
+			"color": "#ed225d"
+		},
+		{
+			"kind": "text",
+			"cx": 13,
+			"cy": 14,
+			"text": "*",
+			"size": 7,
+			"color": "#ed225d"
+		},
+		{
+			"kind": "text",
+			"cx": 19,
+			"cy": 12,
+			"text": "js",
+			"size": 11,
+			"color": "#ed225d"
+		}
+	]
+}

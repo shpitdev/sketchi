@@ -1,0 +1,21 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 1.5,
+			"width": 21,
+			"height": 21,
+			"stroke": "#ecdc5a",
+			"fill": "#ecdc5a"
+		},
+		{
+			"kind": "text",
+			"cx": 15,
+			"cy": 16,
+			"text": "un",
+			"size": 9,
+			"color": "#111827"
+		}
+	]
+}

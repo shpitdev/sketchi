@@ -1,0 +1,21 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12,
+			"rx": 10.5,
+			"ry": 10.5,
+			"stroke": "#004e8c",
+			"fill": "#004e8c"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "VB",
+			"size": 11,
+			"color": "paper"
+		}
+	]
+}

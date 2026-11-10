@@ -1,0 +1,47 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 3.5,
+			"cy": 12.5,
+			"text": "a",
+			"size": 8,
+			"color": "ink"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[7, 10],
+				[10.5, 15.5]
+			],
+			"stroke": "#009cd9",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[10.5, 10],
+				[8.75, 12.75]
+			],
+			"stroke": "#eb2084",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[8.75, 12.75],
+				[7, 15.5]
+			],
+			"stroke": "#009cd9",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 17.5,
+			"cy": 12.5,
+			"text": "ure",
+			"size": 8,
+			"color": "ink"
+		}
+	]
+}

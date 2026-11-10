@@ -1,0 +1,76 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 20,
+			"stroke": "#abbfcc",
+			"fill": "#abbfcc"
+		},
+		{
+			"kind": "rect",
+			"x": 3.5,
+			"y": 9,
+			"width": 5,
+			"height": 12,
+			"stroke": "#f5f8fa",
+			"fill": "#f5f8fa"
+		},
+		{
+			"kind": "rect",
+			"x": 9.5,
+			"y": 9,
+			"width": 3.5,
+			"height": 12,
+			"stroke": "#f5f8fa",
+			"fill": "#f5f8fa"
+		},
+		{
+			"kind": "rect",
+			"x": 14.5,
+			"y": 9,
+			"width": 3.5,
+			"height": 12,
+			"stroke": "#f5f8fa",
+			"fill": "#f5f8fa"
+		},
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 6.5,
+			"stroke": "#349dde",
+			"fill": "#349dde"
+		},
+		{
+			"kind": "rect",
+			"x": 9,
+			"y": 10,
+			"width": 4,
+			"height": 2,
+			"stroke": "#db3737",
+			"fill": "#db3737"
+		},
+		{
+			"kind": "rect",
+			"x": 9,
+			"y": 18,
+			"width": 4,
+			"height": 2.5,
+			"stroke": "#db3737",
+			"fill": "#db3737"
+		},
+		{
+			"kind": "rect",
+			"x": 14,
+			"y": 13.5,
+			"width": 4,
+			"height": 4,
+			"stroke": "#db3737",
+			"fill": "#db3737"
+		}
+	]
+}

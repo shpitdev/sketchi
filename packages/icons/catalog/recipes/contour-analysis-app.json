@@ -1,0 +1,34 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 7.5,
+			"stroke": "#e1a468",
+			"fill": "#ffc285",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 5.8,
+			"y": 11.3,
+			"width": 12.4,
+			"height": 5,
+			"stroke": "#e1a468",
+			"fill": "#ffc285",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 8.6,
+			"y": 18.8,
+			"width": 6.8,
+			"height": 3,
+			"stroke": "#e1a468",
+			"fill": "#e1a468",
+			"pen": 2
+		}
+	]
+}

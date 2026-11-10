@@ -1,0 +1,20 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 8,
+			"text": "Xiaomi",
+			"size": 7,
+			"color": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 16.5,
+			"text": "MIMO",
+			"size": 7,
+			"color": "ink"
+		}
+	]
+}

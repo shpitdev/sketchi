@@ -1,0 +1,51 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 3,
+			"width": 20,
+			"height": 18,
+			"rounded": true,
+			"stroke": "#ed1944",
+			"fill": "#ed1944"
+		},
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 9,
+			"width": 21,
+			"height": 2.2,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 13,
+			"width": 21,
+			"height": 2.2,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "rect",
+			"x": 7,
+			"y": 6.5,
+			"width": 10,
+			"height": 11,
+			"rounded": true,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "rect",
+			"x": 8.5,
+			"y": 4.5,
+			"width": 7,
+			"height": 0.5,
+			"stroke": "#ed1944",
+			"fill": "#ed1944"
+		}
+	]
+}

@@ -1,0 +1,21 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 10.5,
+			"text": "tinyhttp",
+			"size": 8.5,
+			"color": "#c75975"
+		},
+		{
+			"kind": "arrow",
+			"points": [
+				[1, 16.5],
+				[21, 16.5]
+			],
+			"stroke": "#9a84cd",
+			"pen": 2
+		}
+	]
+}

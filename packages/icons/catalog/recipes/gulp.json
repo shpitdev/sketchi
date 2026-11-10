@@ -1,0 +1,21 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 1.5,
+			"width": 21,
+			"height": 21,
+			"stroke": "#cf4547",
+			"fill": "#cf4547"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "Gulp",
+			"size": 8,
+			"color": "paper"
+		}
+	]
+}

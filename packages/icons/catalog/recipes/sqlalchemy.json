@@ -1,0 +1,20 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 9,
+			"cy": 12,
+			"text": "SQL",
+			"size": 9,
+			"color": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 20.5,
+			"cy": 12,
+			"text": "A",
+			"size": 10,
+			"color": "#ca2727"
+		}
+	]
+}

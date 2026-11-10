@@ -1,0 +1,20 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 7,
+			"text": "IBM",
+			"size": 10,
+			"color": "#1f70c1"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 17.5,
+			"text": "SPSS",
+			"size": 10,
+			"color": "#cc1e4c"
+		}
+	]
+}

@@ -1,0 +1,22 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 1.5,
+			"width": 21,
+			"height": 21,
+			"rounded": true,
+			"stroke": "ink",
+			"fill": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 13,
+			"text": "pf",
+			"size": 15,
+			"color": "paper"
+		}
+	]
+}
