@@ -132,6 +132,7 @@ export function normalizeFlowchartSpec(
 		id: flowchartDocumentId({ title, ...(id ? { id } : {}) }),
 		title,
 		direction: spec.direction ?? "TB",
+		...(spec.curved === true ? { curved: true } : {}),
 		...(spec.logos === undefined ? {} : { logos: spec.logos }),
 		nodes: Object.fromEntries(
 			Object.entries(spec.nodes).map(([nodeId, node]) => [

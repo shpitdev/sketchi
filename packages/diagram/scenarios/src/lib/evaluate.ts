@@ -1278,8 +1278,25 @@ export function evaluateScenarioDiagram(
 				modelDiagram,
 			),
 		],
-		(scene) => (scenario.assertions.crossingFree ? [flowchartCrossingCheck(diagram, scene)] : []),
+		(scene) => [
+			...(scenario.assertions.crossingFree ? [flowchartCrossingCheck(diagram, scene)] : []),
+			...(scenario.assertions.curved ? [flowchartCurvedCheck(scene)] : []),
+		],
 	);
+}
+
+/** A prompt that asks for curved lines gets them: every line drawn as a curve. */
+function flowchartCurvedCheck(scene: RenderedDiagramScene) {
+	const lines = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
+	const square = lines.filter((line) => line.curved !== true);
+	return {
+		id: "curved-lines",
+		passed: lines.length > 0 && square.length === 0,
+		message:
+			square.length === 0
+				? "Every line is drawn curved, as the prompt asks."
+				: `${square.length} of ${lines.length} lines are drawn square where the prompt asks for curved lines; set curved: true.`,
+	};
 }
 
 /**
@@ -1291,6 +1308,15 @@ function flowchartCrossingCheck(diagram: FlowchartDiagram, scene: RenderedDiagra
 	const drawn = lineCrossings(
 		scene.elements.flatMap((element) => (element.type === "arrow" ? [element.points] : [])),
 	);
+	// Lanes fix which band each node sits in, so a planar graph may still have
+	// to cross; its planarity says nothing about a laned drawing.
+	if ((diagram.lanes?.length ?? 0) > 0) {
+		return {
+			id: "avoidable-crossings",
+			passed: true,
+			message: `Lanes fix where the nodes sit, so planarity bounds nothing; lines cross ${drawn} time(s).`,
+		};
+	}
 	const forced = unavoidableCrossings(diagram.edges.map((edge) => [edge.source, edge.target]));
 	return {
 		id: "avoidable-crossings",

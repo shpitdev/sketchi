@@ -236,10 +236,22 @@ describe("long flows wrap into bands that read in the requested direction", () =
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 	});
 
-	it.each(["straight", "curved"] as const)("keeps %s routing in one row", (edgeRouting) => {
-		const scene = render(chain, "LR", edgeRouting);
+	it("keeps straight routing in one row", () => {
+		const scene = render(chain, "LR", "straight");
 		const ys = new Set(nodesOf(scene).map((node) => Math.round(center(node).y)));
 		expect(ys.size).toBe(1);
+	});
+
+	it("wraps curved routing as it wraps orthogonal routing: curves follow its routes", () => {
+		const [curved, orthogonal] = (["curved", "orthogonal"] as const).map((edgeRouting) =>
+			render(chain, "LR", edgeRouting),
+		);
+		expect(nodesOf(curved!).map((node) => [node.x, node.y])).toEqual(
+			nodesOf(orthogonal!).map((node) => [node.x, node.y]),
+		);
+		expect(
+			new Set(nodesOf(curved!).map((node) => Math.round(center(node).y))).size,
+		).toBeGreaterThan(1);
 	});
 
 	it.each(directions)("keeps a short chain in one row or column in %s", (direction) => {

@@ -24,6 +24,8 @@ import {
 	sharedSegments,
 	sideFixtures,
 	touchingLines,
+	wrappedLabelWidth,
+	wrapTextToWidth,
 	zoneFixtures,
 	zoneRegionIssues,
 	zoneStressFixtures,
@@ -32,6 +34,7 @@ import {
 	renderDiagram,
 	renderGraphDiagram,
 	renderIntermediateDiagram,
+	type RenderedDiagramScene,
 } from "@sketchi/diagram-renderer";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "./convert";
 
@@ -237,8 +240,9 @@ function randomTallColumns(count: number) {
 
 /**
  * Flowcharts in this set that main (d050809c) already exports with validator
- * issues under straight and curved routing: a single straight segment cannot
- * leave the column or row of nodes between its ends. Never more than these.
+ * issues under straight routing: a single straight segment cannot leave the
+ * column or row of nodes between its ends. Never more than these. Curved
+ * lines follow the orthogonal routes, so none fails.
  */
 const PLAIN_DIRECT_FAILURES: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly number[]>> = {
 	TB: [0, 7, 16, 26, 27, 31, 33, 35, 36, 39],
@@ -1462,18 +1466,142 @@ describe("routing fuzz", () => {
 			).toEqual([]);
 		}, 60_000);
 
-		it.each(["straight", "curved"] as const)(
-			"never exports a %s flowchart with issues that main exports cleanly",
-			(edgeRouting) => {
-				const allowed = PLAIN_DIRECT_FAILURES[direction];
-				expect(
-					failures(direction, edgeRouting).filter((index) => !allowed.includes(index)),
-				).toEqual([]);
-			},
-			60_000,
-		);
+		it("never exports a straight flowchart with issues that main exports cleanly", () => {
+			const allowed = PLAIN_DIRECT_FAILURES[direction];
+			expect(failures(direction, "straight").filter((index) => !allowed.includes(index))).toEqual(
+				[],
+			);
+		}, 60_000);
+
+		it("exports every random flowchart curved without validator issues", () => {
+			expect(failures(direction, "curved")).toEqual([]);
+		}, 60_000);
+
+		it("curves every line along its route, into no node past the runs that meet it and no label its route kept clear", () => {
+			const strays = flowcharts.flatMap((spec, index) => {
+				const [curved, square] = (["curved", "orthogonal"] as const).map((edgeRouting) =>
+					renderIntermediateDiagram(
+						parseFlowchartDiagram({
+							...spec,
+							type: "flowchart",
+							layout: { direction, edgeRouting },
+						}),
+					),
+				);
+				return curvedStrays(curved!, square!).map((stray) => `${index} ${stray}`);
+			});
+			expect(strays).toEqual([]);
+		}, 120_000);
 	});
 });
+
+/** A line's points every 2 units, its first `start` and last `end` units left out. */
+function sampledLine(points: readonly Point[], start = 0, end = 0): Point[] {
+	const samples = points.slice(1).flatMap((point, at) => {
+		const from = points[at]!;
+		const steps = Math.max(1, Math.ceil(Math.hypot(point.x - from.x, point.y - from.y) / 2));
+		return Array.from({ length: steps }, (_, step) => ({
+			x: from.x + ((point.x - from.x) * (step + 1)) / steps,
+			y: from.y + ((point.y - from.y) * (step + 1)) / steps,
+		}));
+	});
+	return samples.slice(Math.ceil(start / 2), samples.length - Math.ceil(end / 2));
+}
+
+type Region = {
+	readonly x: number;
+	readonly y: number;
+	readonly width: number;
+	readonly height: number;
+};
+
+const insideRegion = (point: Point, box: Region, inset: number) =>
+	point.x > box.x + inset &&
+	point.x < box.x + box.width - inset &&
+	point.y > box.y + inset &&
+	point.y < box.y + box.height - inset;
+
+/** Whether a point lies inside the shape a node draws: a diamond's or an ellipse's, else its box. */
+function insideNodeShape(point: Point, node: Region & { readonly shape: string }): boolean {
+	if (node.shape !== "diamond" && node.shape !== "ellipse" && node.shape !== "circle")
+		return insideRegion(point, node, 0.5);
+	const [halfWidth, halfHeight] = [node.width / 2, node.height / 2];
+	const dx = Math.abs(point.x - node.x - halfWidth) / halfWidth;
+	const dy = Math.abs(point.y - node.y - halfHeight) / halfHeight;
+	const inner = 1 - 0.5 / Math.min(halfWidth, halfHeight);
+	return node.shape === "diamond" ? dx + dy < inner : dx * dx + dy * dy < inner * inner;
+}
+
+/**
+ * Where a curved scene's lines stray from what its square routing keeps: a
+ * line drawn square; a line into a node it does not join, or into its own
+ * ends' nodes past the straight runs (18 out, 32 in) that meet them where its
+ * square route keeps out; into a label its square route kept clear of; into a
+ * zone or group neither end sits in; or out of one both ends sit in.
+ */
+function curvedStrays(curved: RenderedDiagramScene, square: RenderedDiagramScene): string[] {
+	const nodes = curved.elements.flatMap((e) =>
+		e.type === "node" && e.rendererRole === undefined ? [e] : [],
+	);
+	const labels = curved.elements.flatMap((e) =>
+		e.type === "text" && e.containerId === undefined ? [e] : [],
+	);
+	const regions = curved.elements.flatMap((e) =>
+		e.type === "frame" || (e.type === "node" && e.rendererRole === "zone") ? [e] : [],
+	);
+	const boxOf = new Map(nodes.map((node) => [node.nodeId, node]));
+	const squareLines = new Map(
+		square.elements.flatMap((e) => (e.type === "arrow" ? [[e.id, e.points] as const] : [])),
+	);
+	const labelBox = (label: (typeof labels)[number]): Region => {
+		const maxWidth = label.maxWidth ?? 160;
+		const text = wrapTextToWidth(label.text, maxWidth, label.fontSize);
+		const [width, height] = [
+			wrappedLabelWidth(text, label.fontSize, maxWidth),
+			Math.ceil(text.split("\n").length * label.fontSize * 1.35),
+		];
+		return { x: label.x - width / 2, y: label.y - height / 2, width, height };
+	};
+	return curved.elements.flatMap((arrow) => {
+		if (arrow.type !== "arrow") return [];
+		const found: string[] = [];
+		if (arrow.curved !== true) found.push(`${arrow.edgeId} drawn square`);
+		const squareRoute = squareLines.get(arrow.id) ?? [];
+		for (const node of nodes) {
+			const [source, target] = [
+				node.nodeId === arrow.sourceNodeId,
+				node.nodeId === arrow.targetNodeId,
+			];
+			const enters = (points: readonly Point[]) =>
+				sampledLine(points, source ? 18 : 0, target ? 32 : 0).some((point) =>
+					insideNodeShape(point, node),
+				);
+			if (enters(arrow.points) && (!(source || target) || !enters(squareRoute)))
+				found.push(`${arrow.edgeId} through ${node.nodeId}`);
+		}
+		const along = sampledLine(arrow.points);
+		const squareLine = sampledLine(squareRoute);
+		for (const label of labels) {
+			const box = labelBox(label);
+			if (
+				along.some((point) => insideRegion(point, box, 0.5)) &&
+				!squareLine.some((point) => insideRegion(point, box, 0.5))
+			)
+				found.push(`${arrow.edgeId} through ${label.id}`);
+		}
+		const [from, to] = [boxOf.get(arrow.sourceNodeId), boxOf.get(arrow.targetNodeId)];
+		for (const region of regions) {
+			const holds = (node: Region | undefined) =>
+				node !== undefined && insideRegion(node, region, -0.5);
+			const [holdsSource, holdsTarget] = [holds(from), holds(to)];
+			if (!holdsSource && !holdsTarget && along.some((point) => insideRegion(point, region, 0.5)))
+				found.push(`${arrow.edgeId} into ${region.id}`);
+			if (holdsSource && holdsTarget && along.some((point) => !insideRegion(point, region, -0.5)))
+				found.push(`${arrow.edgeId} out of ${region.id}`);
+		}
+		return found;
+	});
+}
 
 const GROUP_LABELS = [
 	"Finance",
@@ -1604,6 +1732,22 @@ describe("grouped routing fuzz", () => {
 			expect(moreSharedThanPinned("grouped", direction, counts)).toEqual([]);
 			expect(moreTouchesThanPinned("grouped", direction, counts)).toEqual([]);
 		}, 60_000);
+
+		it("curves every grouped flowchart into no node, no group neither end is in, and out of none both are", () => {
+			const strays = flowcharts.flatMap((spec, index) => {
+				const curved = renderIntermediateDiagram(
+					parseFlowchartDiagram({
+						...spec,
+						type: "flowchart",
+						layout: { direction, edgeRouting: "curved" },
+					}),
+				);
+				return curvedStrays(curved, rendered(direction)[index]!).map(
+					(stray) => `${index} ${stray}`,
+				);
+			});
+			expect(strays).toEqual([]);
+		}, 120_000);
 	});
 
 	it.each(Object.keys(groupFixtures) as (keyof typeof groupFixtures)[])(
@@ -1991,6 +2135,19 @@ describe("zoned routing fuzz", () => {
 			expect(moreHeadsThanPinned("zoned", direction, counts)).toEqual([]);
 			expect(moreSharedThanPinned("zoned", direction, counts)).toEqual([]);
 			expect(moreTouchesThanPinned("zoned", direction, counts)).toEqual([]);
+		}, 120_000);
+
+		it("curves every zoned flowchart into no node, no zone neither end is in, and out of none both are", () => {
+			const strays = parsed(direction).flatMap((diagram, index) =>
+				curvedStrays(
+					renderIntermediateDiagram({
+						...diagram,
+						layout: { ...diagram.layout, edgeRouting: "curved" },
+					}),
+					rendered(direction)[index]!,
+				).map((stray) => `${index} ${stray}`),
+			);
+			expect(strays).toEqual([]);
 		}, 120_000);
 	});
 

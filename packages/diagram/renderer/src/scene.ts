@@ -62,6 +62,7 @@ import {
 	unavoidableCrossings,
 	wrapTextToUnits,
 } from "@sketchi/diagram-core";
+import { curvedScene } from "./curved-routes.js";
 
 export type NodeSceneShape = CanvasShapeKind;
 export type SceneElement = CanvasElement;
@@ -11745,6 +11746,14 @@ export function renderGraphDiagram(
 	diagram: IntermediateDiagram,
 	options: GraphRenderOptions = {},
 ): RenderedDiagramScene {
+	// Curved lines follow the orthogonal routes, each corner curved (curvedScene).
+	if (diagram.layout.edgeRouting === "curved")
+		return curvedScene(
+			renderGraphDiagram(
+				{ ...diagram, layout: { ...diagram.layout, edgeRouting: "orthogonal" } },
+				options,
+			),
+		);
 	graphOptions.set(diagram, options);
 	// Export defects come first; inward endpoints only break ties.
 	const defectsOf = (attempt: DiagramLayout) =>

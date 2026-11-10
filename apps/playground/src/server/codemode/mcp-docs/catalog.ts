@@ -169,7 +169,7 @@ function operationTypes(operation: CodeModeOperation): string {
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
 
 const FLOWCHART_COLORS = DIAGRAM_NODE_COLOR_NAMES.map((name) => `"${name}"`).join(" | ");
-const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null, color?: ${FLOWCHART_COLORS} (only when asked), group?: id, lane?: id } }, edges: [[from, to, label?]] (an end may list ids: one edge per id), groups?: { [id]: { label, kind?, contains?: [ids] } }, lanes?: { [id]: label } }`;
+const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", curved?: true, logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null, color?: ${FLOWCHART_COLORS} (only when asked), group?: id, lane?: id } }, edges: [[from, to, label?]] (ends may list ids), groups?: { [id]: { label, kind?, contains?: [ids] } }, lanes?: { [id]: label } }`;
 
 /**
  * What a first flowchart build needs, each rule with any detail only the buildFlowchart topic
@@ -202,7 +202,10 @@ const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: strin
 		FLOWCHART_RULES.documentLogos(PROMPT),
 		"The logo is drawn above the label. An icon naming no logo is dropped with an unknown_icon warning, and a vendor's logo on a label that does not name the vendor with icon_dropped; neither fails the build.",
 	],
-	[FLOWCHART_RULES.documentDirection(PROMPT)],
+	[
+		FLOWCHART_RULES.documentDirection(PROMPT),
+		`${FLOWCHART_RULES.documentCurved(PROMPT)} Curved lines follow the routes square ones take, so none runs through a node, along another line or through a label.`,
+	],
 	[FLOWCHART_RULES.limits, FLOWCHART_RULES.limitsDetail],
 	[FLOWCHART_RULES.summarize],
 	[FLOWCHART_RULES.layers],
@@ -214,7 +217,7 @@ const FLOWCHART_DOC_RULES: readonly (readonly [rule: string, topicDetail?: strin
  * parameter, every flowchart rule with its detail, then the request type.
  */
 const FLOWCHART_DOCS = [
-	"buildFlowchart accepts the flowchart document: title, nodes and edges, with optional direction, logos, groups and lanes. Builds use the fixed Sketchi palette.",
+	"buildFlowchart accepts the flowchart document: title, nodes and edges, with optional direction, curved, logos, groups and lanes. Builds use the fixed Sketchi palette.",
 	FLOWCHART_RULES.documentShape,
 	...FLOWCHART_DOC_RULES.map(([rule, detail]) => (detail ? `${rule} ${detail}` : rule)),
 	"",
@@ -254,7 +257,7 @@ export const EXECUTE_TOOL_DESCRIPTION = [
  * needs live here. Each topic adds what a build only needs once it fails.
  */
 export const EXECUTE_CODE_DESCRIPTION = [
-	"Excalidraw and PNG URLs are default for accepted builds and patches.",
+	"Accepted builds and patches return Excalidraw and PNG URLs.",
 	"",
 	`buildFlowchart (${BUILDERS.buildFlowchart}): ${FLOWCHART_SPEC}.`,
 	...FLOWCHART_DOC_RULES.map(([rule]) => rule),

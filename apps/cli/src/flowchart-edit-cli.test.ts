@@ -85,6 +85,36 @@ describe("sketchi edit with flowchart edits", () => {
 		]);
 	});
 
+	it("draws a curved flowchart's lines as curves, and squares them again on request", () => {
+		const curvedWaitlist = { ...waitlist, spec: { ...waitlist.spec, curved: true } };
+		expect(run("create", "--output", "json", "--json", JSON.stringify(curvedWaitlist)).status).toBe(
+			0,
+		);
+		const lines = () => {
+			const exported = run("export", "waitlist", "--format", "excalidraw", "--dest", "-");
+			expect(exported.status).toBe(0);
+			return (
+				JSON.parse(exported.stdout) as {
+					elements: { type: string; elbowed?: boolean; roundness: unknown }[];
+				}
+			).elements.filter((element) => element.type === "arrow");
+		};
+		const curved = lines();
+		expect(curved.length).toBe(4);
+		expect(curved.every((line) => line.elbowed === false && line.roundness !== null)).toBe(true);
+
+		const squared = run(
+			"edit",
+			"waitlist",
+			"--output",
+			"json",
+			"--json",
+			JSON.stringify({ edits: [{ op: "set", curved: false }] }),
+		);
+		expect(squared.status).toBe(0);
+		expect(lines().some((line) => line.elbowed === true)).toBe(true);
+	});
+
 	it("names an edit that does not apply at its path and keeps the record", () => {
 		expect(run("create", "--output", "json", "--json", JSON.stringify(waitlist)).status).toBe(0);
 

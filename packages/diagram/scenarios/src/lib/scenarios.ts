@@ -35,6 +35,8 @@ export interface FlowchartScenarioAssertions {
 	 * none (unavoidableCrossings).
 	 */
 	crossingFree?: boolean;
+	/** The prompt asks for curved lines: the diagram draws its lines curved. */
+	curved?: boolean;
 }
 
 export interface FlowchartScenarioRequiredLane {
@@ -214,6 +216,8 @@ interface FlowchartScenarioDefinition {
 	outsideGroups?: Readonly<Record<string, readonly string[]>>;
 	/** The drawing may cross no lines but those its graph forces (see FlowchartScenarioAssertions). */
 	crossingFree?: boolean;
+	/** The prompt asks for curved lines; the fixture draws them curved. */
+	curved?: boolean;
 }
 
 const DEFAULT_STYLE = SKETCHI_DIAGRAM_STYLE;
@@ -292,7 +296,7 @@ function buildExpectedDiagram(definition: FlowchartScenarioDefinition): Flowchar
 		})),
 		layout: {
 			direction: definition.direction ?? "TB",
-			edgeRouting: "orthogonal",
+			edgeRouting: definition.curved ? "curved" : "orthogonal",
 		},
 		style: DEFAULT_STYLE,
 	});
@@ -458,6 +462,7 @@ function buildAssertions(
 			return { id, label, labels, members: [...new Set(members.map(stepOf))] };
 		}),
 		...(definition.crossingFree ? { crossingFree: true } : {}),
+		...(definition.curved ? { curved: true } : {}),
 	};
 }
 
@@ -2709,6 +2714,127 @@ const flowchartScenarioDefinitions = [
 			["production-monitor", "production", "monitor"],
 			["monitor-close", "monitor", "close"],
 		],
+		crossingFree: true,
+	},
+	{
+		id: "feedback-triage-curved",
+		title: "Feedback triage with curved arrows",
+		difficulty: "smoke",
+		tags: ["curved", "loop", "customer-response"],
+		description:
+			"A short triage loop the prompt asks to draw with curved arrows: every line curves along its route and crosses nothing.",
+		prompt:
+			"Make a flowchart of how we triage customer feedback, drawn with curved arrows. A customer submits feedback and the bot tags it. If it is a bug, the support team reproduces it; if they can reproduce it, file a ticket, otherwise ask the customer for details and reproduce it again. If it is not a bug, thank the customer.",
+		nodes: [
+			["submit", "Customer submits feedback", "start", ["submit"]],
+			["tag", "Bot tags feedback", "process", ["tag"]],
+			["bug", "Is it a bug?", "decision", ["is a bug", "bug"]],
+			["reproduce", "Reproduce the bug", "process", ["reproduce"]],
+			["reproduced", "Can they reproduce it?", "decision", ["reproduce"]],
+			["ticket", "File a ticket", "end", ["ticket"]],
+			["details", "Ask the customer for details", "process", ["ask", "details"]],
+			["thank", "Thank the customer", "end", ["thank"]],
+		],
+		edges: [
+			["submit-tag", "submit", "tag"],
+			["tag-bug", "tag", "bug"],
+			["bug-reproduce", "bug", "reproduce", "yes", ["yes", "bug"]],
+			["bug-thank", "bug", "thank", "no", ["no", "not"]],
+			["reproduce-reproduced", "reproduce", "reproduced"],
+			["reproduced-ticket", "reproduced", "ticket", "yes", ["yes", "reproduce"]],
+			["reproduced-details", "reproduced", "details", "no", ["no", "otherwise"]],
+			["details-reproduce", "details", "reproduce"],
+		],
+		curved: true,
+		crossingFree: true,
+	},
+	{
+		id: "ingest-pipeline-curved-lr",
+		title: "Ingest pipeline with curved lines, left to right",
+		difficulty: "standard",
+		tags: ["curved", "left-to-right", "pipeline", "long-branch"],
+		description:
+			"A left-to-right ingest pipeline with a quarantine branch and a skip-ahead branch, asked for with curved lines.",
+		prompt:
+			"Draw our data ingest pipeline left to right with curved lines. Files land in the inbox, then a parser reads them. If parsing fails, move the file to quarantine and alert the data team. If it parses, validate the schema: a valid file is loaded straight into the warehouse, an invalid one is cleaned up first and then loaded into the warehouse. After loading, refresh the dashboards.",
+		direction: "LR",
+		inverse: {
+			parsed: ["parsing fails"],
+		},
+		nodes: [
+			["inbox", "Files land in inbox", "start", ["land in the inbox", "inbox"]],
+			["parse", "Parse file", "process", ["parser reads them", "parser", "parse"]],
+			["parsed", "Parsing succeeds?", "decision", ["parses", "parsing"]],
+			[
+				"quarantine",
+				"Move to quarantine",
+				"process",
+				["move the file to quarantine", "quarantine"],
+			],
+			["alert", "Alert the data team", "end", ["alert the data team"]],
+			["validate", "Validate schema", "process", ["validate the schema"]],
+			["valid", "Schema valid?", "decision", ["valid file", "valid", "invalid"]],
+			["cleanup", "Clean up the file", "process", ["clean"]],
+			[
+				"load",
+				"Load into warehouse",
+				"process",
+				["loaded straight into the warehouse", "warehouse"],
+			],
+			["refresh", "Refresh dashboards", "end", ["refresh the dashboards"]],
+		],
+		edges: [
+			["inbox-parse", "inbox", "parse"],
+			["parse-parsed", "parse", "parsed"],
+			["parsed-quarantine", "parsed", "quarantine", "no", ["no", "fails"]],
+			["quarantine-alert", "quarantine", "alert"],
+			["parsed-validate", "parsed", "validate", "yes", ["yes", "parses"]],
+			["validate-valid", "validate", "valid"],
+			["valid-load", "valid", "load", "yes", ["yes", "valid"]],
+			["valid-cleanup", "valid", "cleanup", "no", ["no", "invalid"]],
+			["cleanup-load", "cleanup", "load"],
+			["load-refresh", "load", "refresh"],
+		],
+		curved: true,
+		crossingFree: true,
+	},
+	{
+		id: "checkout-services-curved-zones",
+		architecture: true,
+		title: "Checkout services in zones, curved connectors",
+		difficulty: "standard",
+		tags: ["curved", "zones", "architecture", "shapes", "real-voice"],
+		description:
+			"A checkout service and a payment worker in one namespace sharing a queue and a database outside the cluster, drawn with curved connectors.",
+		prompt:
+			"diagram our checkout backend top to bottom, use curved connectors. the web app calls the checkout service in the shop namespace of our cluster. the checkout service writes orders to the orders database and puts payment jobs on a payments queue. a payment worker, also in the shop namespace, takes jobs from the queue and writes payment results to the same orders database. the namespace is in the cluster; the queue and the database are outside it",
+		nodes: [
+			["web", "Web app", "start", ["web app"]],
+			["checkout", "Checkout service", "process", ["checkout service"]],
+			["queue", "Payments queue", "process", ["payments queue"]],
+			["worker", "Payment worker", "process", ["payment worker"]],
+			["db", "Orders database", "end", ["orders database"]],
+		],
+		edges: [
+			["web-checkout", "web", "checkout"],
+			["checkout-db", "checkout", "db"],
+			["checkout-queue", "checkout", "queue"],
+			["queue-worker", "queue", "worker"],
+			["worker-db", "worker", "db"],
+		],
+		groups: [
+			["cluster", "Cluster", ["cluster"], [], { kinds: ["cluster"] }],
+			[
+				"shop",
+				"Shop namespace",
+				["shop namespace", "shop"],
+				["checkout", "worker"],
+				{ parent: "cluster", kinds: ["namespace"] },
+			],
+		],
+		outsideGroups: { cluster: ["web", "queue", "db"] },
+		shapes: { queue: "queue", db: "database" },
+		curved: true,
 		crossingFree: true,
 	},
 ] satisfies readonly FlowchartScenarioDefinition[];

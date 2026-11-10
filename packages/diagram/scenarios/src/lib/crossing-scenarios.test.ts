@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
+import { candidateFromMcpResult } from "./mcp-results";
 import { flowchartScenarios, getFlowchartScenario } from "./scenarios";
 
 const ids = ["photo-resize-queue-zones", "support-chat-queue", "release-hotfix-rollback"];
@@ -65,10 +66,68 @@ describe("crossing scenarios", () => {
 		});
 	});
 
+	it("bounds nothing by planarity once lanes fix where the nodes sit", () => {
+		// The triage drawn in three lanes, every support step in one: the planar
+		// graph cannot say whether the lanes force its one crossing.
+		const support = { lane: "support" };
+		const candidate = candidateFromMcpResult(
+			{
+				ok: true,
+				status: "accepted",
+				normalizedSpec: {
+					id: "customer-feedback-triage",
+					title: "Customer feedback triage",
+					curved: true,
+					nodes: {
+						submit: { label: "Submit feedback", lane: "customer" },
+						tag: { label: "Tag feedback", lane: "bot" },
+						bug: { label: "Is it a bug?", lane: "bot" },
+						reproduce: { label: "Reproduce bug", ...support },
+						reproduced: { label: "Can reproduce?", ...support },
+						ticket: { label: "File ticket", ...support },
+						details: { label: "Ask customer for details", ...support },
+						again: { label: "Reproduce bug again", ...support },
+						thank: { label: "Thank customer", lane: "bot" },
+					},
+					edges: [
+						["submit", "tag"],
+						["tag", "bug"],
+						["bug", "reproduce", "yes"],
+						["bug", "thank", "no"],
+						["reproduce", "reproduced"],
+						["reproduced", "ticket", "yes"],
+						["reproduced", "details", "no"],
+						["details", "again"],
+						["again", "reproduced"],
+					],
+					lanes: { customer: "Customer", bot: "Bot", support: "Support team" },
+				},
+			},
+			"flowchart",
+		);
+		if (!candidate?.ok) throw new Error("The laned triage build is not a flowchart candidate.");
+		const evaluation = evaluateScenarioDiagram(
+			getFlowchartScenario("feedback-triage-curved"),
+			candidate.diagram,
+		);
+		expect(crossingCheck(evaluation.checks)).toMatchObject({
+			passed: true,
+			message: expect.stringMatching(
+				/^Lanes fix where the nodes sit, so planarity bounds nothing; lines cross 1 time\(s\)\.$/,
+			),
+		});
+		expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
+	});
+
 	it("checks crossings only where a scenario asks for it", () => {
 		const checked = flowchartScenarios.filter((scenario) =>
 			evaluateScenarioFixture(scenario).checks.some((check) => check.id === "avoidable-crossings"),
 		);
-		expect(checked.map((scenario) => scenario.id)).toEqual(ids);
+		expect(checked.map((scenario) => scenario.id)).toEqual([
+			...ids,
+			"feedback-triage-curved",
+			"ingest-pipeline-curved-lr",
+			"checkout-services-curved-zones",
+		]);
 	});
 });

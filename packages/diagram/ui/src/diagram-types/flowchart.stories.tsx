@@ -146,3 +146,28 @@ export const CrossingsWaitlistTableReady: Story = {
 export const CrossingsIncidentProviderLoop: Story = {
 	args: { diagram: crossingFixtures["incident-response-provider-loop"] },
 };
+
+const curved = <Diagram extends { layout: object }>(diagram: Diagram): Diagram => ({
+	...diagram,
+	layout: { ...diagram.layout, edgeRouting: "curved" },
+});
+
+/** Curved lines follow the routes square ones take: through no node, along no other line. */
+export const CurvedIncidentEscalation: Story = {
+	args: { diagram: curved(routingFixtures["incident-escalation"]) },
+};
+
+/** Left to right, each line curves into the lane its square route runs in. */
+export const CurvedIncidentEscalationLeftToRight: Story = {
+	args: { diagram: curved(leftToRightIncidentFlowchart) },
+};
+
+/** Among zones, curves keep to the zones their ends sit in. */
+export const CurvedZonesKubernetesCluster: Story = {
+	args: { diagram: curved(zoneFixtures["kubernetes-cluster"]) },
+};
+
+/** A loop curves back beside the branch that skips ahead. */
+export const CurvedWaitlistTableReady: Story = {
+	args: { diagram: curved(crossingFixtures["restaurant-waitlist-table-ready"]) },
+};

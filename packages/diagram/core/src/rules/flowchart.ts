@@ -70,6 +70,8 @@ export const FLOWCHART_RULES = {
 		`When ${source} names technologies or asks for logos, set logos: true: each node draws the logo of the first product its label names; icon: "Name" picks another and icon: null drops it.`,
 	documentDirection: (source: RuleSource) =>
 		`Set direction: "LR" only when ${source} reads left to right; flowcharts run top to bottom otherwise.`,
+	documentCurved: (source: RuleSource) =>
+		`Set curved: true only when ${source} asks for curved lines.`,
 	documentNoInventedSteps: (source: RuleSource) =>
 		`Do not add decisions, loops, steps, or edges ${source} does not state; a step that handles "any errors" or acts "if needed" stays one step in sequence.`,
 } as const;
