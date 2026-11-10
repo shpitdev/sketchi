@@ -15,11 +15,11 @@ ignored copies into `public/`:
 - `public/output/upload-ready/svg/` holds the SVG files at their stable public
   URLs. Worker routes read them through the `ASSETS` binding.
 - `public/icon-drawings.json` holds each catalog mark's hand-drawn recipe,
-  keyed by slug (865 marks, about 75 KB with gzip). The page fetches it after
+  keyed by slug (910 marks, about 80 KB with gzip). The page fetches it after
   the manifest for the grid's hand-drawn view and the drawing on each icon's
   details; if it fails, the SVG library is unchanged.
 - `public/sketchi-icons.excalidrawlib` is the same set as one Excalidraw
-  library (about 2.5 MB, 200 KB with gzip), built with the elements the
+  library (about 2.7 MB, 215 KB with gzip), built with the elements the
   "Copy for Excalidraw" actions paste.
 
 The browser fetches one compact metadata manifest, then lazily loads only the
