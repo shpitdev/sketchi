@@ -912,6 +912,40 @@ describe("a step the request gives to some branches", () => {
 		expect(issues[0]?.message).toContain('"Production deploy"');
 	});
 
+	it("leaves a sibling that merges into the listed branches' path before the step", () => {
+		const merged = chart(
+			[...labels, ["prepare", "Prepare test runner"]],
+			[
+				...edges.filter(([source]) => source !== "staging" && source !== "canary"),
+				["staging", "prepare"],
+				["canary", "prepare"],
+				["production", "prepare"],
+				["prepare", "smoke"],
+			],
+		);
+		expect(codes(request, merged)).toEqual([]);
+		// Cutting the shared arrow would cut the listed branches off too: no repair may do it.
+		const cut = chart(
+			[...labels, ["prepare", "Prepare test runner"]],
+			[
+				...edges.filter(([source]) => source !== "staging" && source !== "canary"),
+				["staging", "prepare"],
+				["canary", "prepare"],
+				["production", "prepare"],
+			],
+		);
+		expect(keepsStatedStructure(request, merged, cut)).toBe(false);
+	});
+
+	it("passes a sibling another sentence gives the step, through its own plain steps", () => {
+		const waited = chart(
+			[...labels, ["wait", "Wait for rollout"]],
+			[...edges, ["production", "wait"], ["wait", "smoke"]],
+		);
+		expect(codes(`${request} Production also runs smoke tests.`, waited)).toEqual([]);
+		expect(codes(request, waited)).toEqual(["flowchart_step_borrowed"]);
+	});
+
 	it("reads a choice drawn as a chain of decisions", () => {
 		// "Target?" becomes "Test environment?", then "Gradual rollout?" for the rest.
 		const chained: [string, string][] = [

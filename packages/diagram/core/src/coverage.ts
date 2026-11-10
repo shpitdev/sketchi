@@ -1303,14 +1303,27 @@ function borrowedSteps(
 			}
 			return head;
 		};
-		const leadsIn = (id: string): string | undefined => {
-			let current = id;
+		// What the listed branches reach on their way to the step: a sibling that merges into it
+		// shares their path rather than borrowing the step.
+		const listedPath = new Set<string>(givenIds);
+		for (const queue = [...givenIds]; queue.length > 0;) {
+			for (const next of targets.get(queue.pop() ?? "") ?? []) {
+				if (step.has(next) || listedPath.has(next)) continue;
+				listedPath.add(next);
+				queue.push(next);
+			}
+		}
+		/** A sibling's own run of plain steps straight into the step, if it shares none of them. */
+		const runInto = (id: string): string[] | undefined => {
+			const run = [id];
 			for (let hops = 0; hops < 4; hops += 1) {
+				const current = run.at(-1) ?? "";
+				if (listedPath.has(current)) return undefined;
 				const next = targets.get(current) ?? [];
-				if (next.some((target) => step.has(target))) return current;
+				if (next.some((target) => step.has(target))) return run;
 				const [only, ...others] = next;
 				if (!only || others.length > 0 || !plain(only)) return undefined;
-				current = only;
+				run.push(only);
 			}
 			return undefined;
 		};
@@ -1321,8 +1334,9 @@ function borrowedSteps(
 				for (const child of branches(parent, new Set([parent]))) {
 					if (child === head || givenIds.has(child) || step.has(child) || child === parent)
 						continue;
-					const into = leadsIn(child);
-					if (into && !givenIds.has(into) && !statedElsewhere(into)) borrowers.add(into);
+					const run = runInto(child);
+					// The request may give the step to that branch elsewhere: "Production also runs smoke tests".
+					if (run && !run.some(statedElsewhere)) borrowers.add(run.at(-1) ?? child);
 				}
 			}
 		}
