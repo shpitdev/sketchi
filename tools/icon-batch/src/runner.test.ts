@@ -96,6 +96,14 @@ describe("marksToDraw", () => {
 		]);
 	});
 
+	it("skips the older copies of the GCP icons unless one is named", () => {
+		const withLegacy = [...marks, icon("old-bigquery", "gcp-legacy")];
+		expect(marksToDraw(withLegacy, new Set()).map((mark) => mark.slug)).not.toContain(
+			"old-bigquery",
+		);
+		expect(marksToDraw(withLegacy, new Set(), { slugs: ["old-bigquery"] })).toHaveLength(1);
+	});
+
 	it("samples across collections in turn, the same way every time", () => {
 		const sample = marksToDraw(marks, new Set(), { sample: 3 });
 		expect(new Set(sample.map((mark) => mark.collection))).toEqual(

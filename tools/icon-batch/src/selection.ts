@@ -14,6 +14,9 @@ export interface SelectOptions {
 	readonly sample?: number;
 }
 
+/** Collections not drawn: `gcp-legacy` holds older copies of the current `gcp` product icons. */
+export const SKIPPED_COLLECTIONS: ReadonlySet<string> = new Set(["gcp-legacy"]);
+
 /** A stable order that does not follow names, so a sample is not all one letter. */
 function shuffled(icons: readonly SketchiIcon[]): SketchiIcon[] {
 	return [...icons].sort(
@@ -26,14 +29,17 @@ function shuffled(icons: readonly SketchiIcon[]): SketchiIcon[] {
 /**
  * The catalog marks that have no hand-drawn recipe yet. `marks` is the
  * catalog's node logos, so wordmarks are already out: diagrams never embed
- * one in a node, and a recipe's text is at most a short word.
+ * one in a node, and a recipe's text is at most a short word. Skipped
+ * collections are left out unless a slug is named.
  */
 export function marksToDraw(
 	marks: readonly SketchiIcon[],
 	drawn: ReadonlySet<string>,
 	options: SelectOptions = {},
 ): CatalogMark[] {
-	const pending = marks.filter((icon) => !drawn.has(icon.slug));
+	const pending = marks.filter(
+		(icon) => !drawn.has(icon.slug) && !SKIPPED_COLLECTIONS.has(icon.collection),
+	);
 	const mark = (icon: SketchiIcon): CatalogMark => ({
 		slug: icon.slug,
 		name: icon.name,
