@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.38.1
+
+### Patch Changes
+
+- [#743](https://github.com/shpitdev/sketchi/pull/743) [`d963656`](https://github.com/shpitdev/sketchi/commit/d9636568d80a31a687cb6f12c281c0cca7b6a61e) Thanks [@anandpant](https://github.com/anandpant)! - Diagram node logos that vanished on light paper, such as a white mark, now draw inverted or on a dark plate, so they read on the light canvas and in Excalidraw's dark mode.
+
 ## 0.38.0
 
 ### Minor Changes
