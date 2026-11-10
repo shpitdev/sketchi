@@ -46,7 +46,7 @@ export const FAMILY_OPTIONS = {
 			draws:
 				"The steps of a process or workflow in order, the decisions that branch it and its outcomes, as boxes and arrows, optionally in swimlanes for who does each step.",
 			not_for:
-				"messages that named systems send back and forth in time order, which is a sequence diagram; the states one thing moves between, which is a state machine.",
+				"messages that named participants exchange in order, which is a sequence diagram; the states one thing moves between, which is a state machine.",
 		},
 	},
 	architecture_diagram: {
@@ -81,7 +81,7 @@ export const FAMILY_OPTIONS = {
 			draws:
 				"Named participants, such as a user, an app and its services, and the requests, calls and replies they send each other, top to bottom in time order.",
 			not_for:
-				"a process of steps and decisions without participants exchanging messages, which is a flowchart.",
+				"a process with checks or decisions that branch it, such as approve or reject, even when it names the systems that carry it out, which is a flowchart.",
 		},
 	},
 	timeline: {
