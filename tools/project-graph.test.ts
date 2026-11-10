@@ -220,7 +220,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/playground/src/routes/projects_/$projectId.tsx": 3,
 	"apps/playground/src/server/ai/model.server.ts": 2,
 	"apps/playground/src/server/chat/agent.server.ts": 8,
-	"apps/playground/src/server/chat/studio-reply.server.ts": 14,
+	"apps/playground/src/server/chat/studio-reply.server.ts": 26,
 	"apps/playground/src/server/codemode/browser-render-pool.server.ts": 30,
 	"apps/playground/src/server/codemode/browser-renderer.server.ts": 7,
 	"apps/playground/src/server/codemode/effect-mcp-adapter.server.ts": 11,

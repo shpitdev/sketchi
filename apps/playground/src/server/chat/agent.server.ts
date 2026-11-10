@@ -288,8 +288,9 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	);
 	return yield* Effect.try({
 		try: () => {
-			const run = ({ messages, retry }: StudioRun) =>
+			const run = ({ messages, retry, abortSignal }: StudioRun) =>
 				streamText({
+					abortSignal,
 					model,
 					system: studioSystemPrompt(logos),
 					messages: [...messages],
@@ -397,6 +398,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 					messages: modelMessages,
 					run,
 					outcome: () => callbacks.runPromise(studioTurnOutcome(turn)),
+					abortSignal: request.signal,
 					onError: (error) => (error instanceof Error ? error.message : "The agent run failed."),
 				}),
 			});

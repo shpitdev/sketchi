@@ -14,6 +14,8 @@ import type { StudioTurnOutcome } from "./studio-build-tool.server";
 export interface StudioRun {
 	readonly messages: readonly ModelMessage[];
 	readonly retry: boolean;
+	/** Aborts when the reply is cancelled (the user stops it), so no model run outlives it. */
+	readonly abortSignal: AbortSignal;
 }
 
 /** What the reply reads of a model run: its chunks, its steps and the messages it added. */
@@ -22,6 +24,7 @@ export interface StudioRunResult {
 		readonly sendReasoning: boolean;
 		readonly sendStart: boolean;
 		readonly sendFinish: boolean;
+		readonly onError?: (error: unknown) => string;
 	}): ReadableStream<UIMessageChunk>;
 	readonly steps: PromiseLike<
 		readonly {
@@ -30,7 +33,8 @@ export interface StudioRunResult {
 			readonly toolCalls: readonly unknown[];
 		}[]
 	>;
-	readonly response: PromiseLike<{ readonly messages: readonly ModelMessage[] }>;
+	/** Every step's messages, the build calls and their results included. */
+	readonly responseMessages: PromiseLike<readonly ModelMessage[]>;
 }
 
 /** The reply when the model runs out of output twice without finishing anything. */
@@ -76,11 +80,16 @@ async function relayRun(
 	chunks: ReadableStream<UIMessageChunk>,
 	writer: UIMessageStreamWriter,
 	outcome: () => Promise<StudioTurnOutcome>,
+	signal: AbortSignal,
 ): Promise<boolean> {
 	let held: UIMessageChunk[] = [];
 	let calledTool = false;
 	let told = false;
 	const reader = chunks.getReader();
+	// A cancelled reply stops reading the run, and the run's own signal stops the model.
+	const stop = () => void reader.cancel(signal.reason).catch(() => undefined);
+	signal.addEventListener("abort", stop, { once: true });
+	if (signal.aborted) stop();
 	for (;;) {
 		const { done, value: chunk } = await reader.read();
 		if (done) break;
@@ -102,6 +111,8 @@ async function relayRun(
 		}
 		writer.write(chunk);
 	}
+	signal.removeEventListener("abort", stop);
+	if (signal.aborted) return told;
 	for (const text of held) writer.write(text);
 	return told;
 }
@@ -110,34 +121,56 @@ async function relayRun(
  * The UI message stream of one Studio turn. The model runs once; a run whose last step ran out
  * of output having written nothing (a tool call it never finished) runs once more with
  * reasoning on, which keeps it from looping, and a second such run ends with a clear error. A
- * turn whose builds were all rejected never closes by claiming a diagram.
+ * turn whose builds were all rejected never closes by claiming a diagram. Cancelling the stream
+ * aborts the run in progress and never starts another.
  */
 export function studioReplyStream(options: {
 	readonly messages: readonly ModelMessage[];
 	readonly run: (run: StudioRun) => StudioRunResult;
 	readonly outcome: () => Promise<StudioTurnOutcome>;
 	readonly onError?: (error: unknown) => string;
+	/** The request's own signal, which aborts when the client goes away. */
+	readonly abortSignal?: AbortSignal;
 }): ReadableStream<UIMessageChunk> {
-	return createUIMessageStream({
+	const stopped = new AbortController();
+	const stop = (reason?: unknown) => {
+		if (!stopped.signal.aborted) stopped.abort(reason);
+	};
+	if (options.abortSignal?.aborted) stop(options.abortSignal.reason);
+	options.abortSignal?.addEventListener("abort", () => stop(options.abortSignal?.reason), {
+		once: true,
+	});
+	const reply = createUIMessageStream({
 		...(options.onError ? { onError: options.onError } : {}),
 		execute: async ({ writer }) => {
+			const signal = stopped.signal;
 			let messages: readonly ModelMessage[] = options.messages;
 			let told = false;
 			let ranOut = false;
 			for (const retry of [false, true]) {
-				const result = options.run({ messages, retry });
+				if (signal.aborted) return;
+				const result = options.run({ messages, retry, abortSignal: signal });
 				told =
 					(await relayRun(
-						result.toUIMessageStream({ sendReasoning: true, sendStart: !retry, sendFinish: false }),
+						result.toUIMessageStream({
+							sendReasoning: true,
+							sendStart: !retry,
+							sendFinish: false,
+							...(options.onError ? { onError: options.onError } : {}),
+						}),
 						writer,
 						options.outcome,
+						signal,
 					)) || told;
-				const steps = await result.steps;
-				const last = steps.at(-1);
+				// A stopped reply never pays for another run.
+				if (signal.aborted) return;
+				// A run that failed has said so in its own error chunk; there is nothing to retry from.
+				const steps = await Promise.resolve(result.steps).catch(() => undefined);
+				const last = steps?.at(-1);
 				ranOut = last !== undefined && wroteNothing(last);
 				if (!ranOut || retry) break;
-				const response = await result.response;
-				messages = [...messages, ...response.messages.filter(hasContent)];
+				const earlier = await Promise.resolve(result.responseMessages).catch(() => []);
+				messages = [...options.messages, ...earlier.filter(hasContent)];
 			}
 			const turn = await options.outcome();
 			const closing =
@@ -152,6 +185,18 @@ export function studioReplyStream(options: {
 				writer.write({ type: "finish-step" });
 			}
 			writer.write({ type: "finish" });
+		},
+	});
+	const reader = reply.getReader();
+	return new ReadableStream<UIMessageChunk>({
+		async pull(controller) {
+			const { done, value } = await reader.read();
+			if (done) controller.close();
+			else controller.enqueue(value);
+		},
+		async cancel(reason) {
+			stop(reason);
+			await reader.cancel(reason);
 		},
 	});
 }
