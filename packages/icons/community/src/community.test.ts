@@ -200,6 +200,29 @@ describe("publishCommunityIcon", () => {
 		}
 	});
 
+	it("refuses a word that would clip past the grid, naming it, and still reads one stored before", async () => {
+		const wide: IconRecipe = {
+			parts: [
+				{ kind: "rect", x: 2, y: 14, width: 20, height: 4 },
+				{ kind: "text", cx: 12, cy: 9, text: "tinyhttp", size: 8.5 },
+			],
+		};
+		const database = sqliteDatabase();
+		const refused = await run(publishCommunityIcon({ name: "Tiny", recipe: wide }), { database });
+		expect(refused._tag === "Failure" && refused.failure).toMatchObject({
+			_tag: "CommunityIconInvalidRequestError",
+			code: "recipe_clips",
+			message: expect.stringContaining('"tinyhttp"'),
+		});
+
+		const store = makeCommunityIconStore(database);
+		await Effect.runPromise(
+			store.insert({ name: "Tiny", recipe: wide, hash: await communityIconHash(wide) }),
+		);
+		const found = await Effect.runPromise(store.search({ query: "tiny" }));
+		expect(found.icons.map((icon) => icon.recipe)).toEqual([wide]);
+	});
+
 	it("keeps out what moderation rejects and what the owner hid", async () => {
 		const database = sqliteDatabase();
 		const rejected = await run(publishCommunityIcon({ name: "Box", recipe: BOX }), {

@@ -248,12 +248,64 @@ export interface NormalizedRecipe {
 	readonly issues: readonly string[];
 }
 
+/** Channel spread from which a color reads as a hue, not a gray (the catalog's own). */
+const NEUTRAL_CHROMA = 36;
+/** A mark is monochrome while its hues cover less than this share (the catalog's own). */
+const MAX_COLORED_SHARE = 0.04;
+/** Luminance halfway between the dark (#1e1e1e) and light (#ffffff) surfaces. */
+const SURFACE_MIDPOINT = 0.56;
+/** How dark a gray must be to be a dark mark's ink, and how light to be a light mark's. */
+const NEAR_BLACK = 0.25;
+const NEAR_WHITE = 0.85;
+
+function isNeutral(hex: string): boolean {
+	const [red, green, blue] = hexRgb(hex);
+	return Math.max(red, green, blue) - Math.min(red, green, blue) < NEUTRAL_CHROMA;
+}
+
+/**
+ * A monochrome source's tone, from the share each color covers: `dark` for a
+ * black or gray mark, `light` for a white one, undefined for a colored mark.
+ * The catalog classifies its marks the same way, and inverts a monochrome one
+ * on a surface it would vanish into.
+ */
+export type SourceTone = "dark" | "light";
+
+export function sourceTone(palette: readonly MarkColor[]): SourceTone | undefined {
+	const total = palette.reduce((sum, [, share]) => sum + share, 0);
+	if (total <= 0) return undefined;
+	const share = (test: (hex: string) => boolean) =>
+		palette.reduce((sum, [hex, part]) => (test(hex) ? sum + part : sum), 0) / total;
+	if (share((hex) => !isNeutral(hex)) >= MAX_COLORED_SHARE) return undefined;
+	return share((hex) => luminance(hex) < SURFACE_MIDPOINT) >= 0.5 ? "dark" : "light";
+}
+
+/**
+ * A monochrome mark's own gray as the scene's ink or paper, whatever the
+ * source paints it with: its ink side becomes ink and the other side paper, so
+ * the drawing inverts with the theme as the mark does.
+ */
+function toneColor(hex: string, tone: SourceTone | undefined): string | undefined {
+	if (!tone || !isNeutral(hex)) return undefined;
+	const value = luminance(hex);
+	const dark = value <= NEAR_BLACK;
+	const light = value >= NEAR_WHITE;
+	if (tone === "dark") return dark ? ICON_RECIPE_INK : light ? ICON_RECIPE_PAPER : undefined;
+	return light ? ICON_RECIPE_INK : dark ? ICON_RECIPE_PAPER : undefined;
+}
+
 /**
  * Round the numbers, take near-misses of a source color as that color, and
- * check the result. Black and white that the source does not use become ink
- * and paper, which is what the model meant by them.
+ * check the result. A monochrome mark's black and white (white and black for a
+ * light mark) become ink and paper even when the source paints with them, and
+ * for any mark black and white it does not use become ink and paper, which is
+ * what the model meant by them.
  */
-export function normalizeRecipe(raw: unknown, palette: readonly string[]): NormalizedRecipe {
+export function normalizeRecipe(
+	raw: unknown,
+	palette: readonly string[],
+	tone?: SourceTone,
+): NormalizedRecipe {
 	if (
 		typeof raw !== "object" ||
 		raw === null ||
@@ -269,6 +321,8 @@ export function normalizeRecipe(raw: unknown, palette: readonly string[]): Norma
 			issues.push(`${path} ${JSON.stringify(value)} is not a color.`);
 			return value;
 		}
+		const toned = toneColor(hex, tone);
+		if (toned) return toned;
 		if (palette.includes(hex)) return hex;
 		const nearest = [...palette].sort(
 			(left, right) => colorDistance(left, hex) - colorDistance(right, hex),

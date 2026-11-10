@@ -1,4 +1,4 @@
-import { iconRecipeIssues, isIconRecipe } from "@sketchi/diagram-core";
+import { iconRecipeFitIssues, iconRecipeIssues, isIconRecipe } from "@sketchi/diagram-core";
 import { Effect, Schema } from "effect";
 
 import {
@@ -46,6 +46,18 @@ export const publishCommunityIcon = Effect.fn("communityIcons.publish")(function
 			code: "invalid_recipe",
 			message: "The recipe cannot be drawn.",
 			issues: iconRecipeIssues(recipe),
+		});
+	}
+	// Checked on publish only: an icon already stored stays readable.
+	const clipped = recipe.parts.filter(
+		(part) => part.kind === "text" && iconRecipeFitIssues({ parts: [part] }).length > 0,
+	);
+	if (clipped.length > 0) {
+		const words = clipped.map((part) => (part.kind === "text" ? `"${part.text}"` : "")).join(", ");
+		return yield* CommunityIconInvalidRequestError.make({
+			code: "recipe_clips",
+			message: `${words} ${clipped.length === 1 ? "is" : "are"} too large for the icon and would be cut off; make ${clipped.length === 1 ? "it" : "them"} smaller or move ${clipped.length === 1 ? "it" : "them"} inward.`,
+			issues: iconRecipeFitIssues(recipe),
 		});
 	}
 	const hash = yield* Effect.promise(() => communityIconHash(recipe));

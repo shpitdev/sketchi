@@ -8,6 +8,7 @@ import {
 	decodeAuthorReply,
 	draftRequestText,
 	normalizeRecipe,
+	sourceTone,
 	repairRequestText,
 	REVIEW_REQUEST_TEXT,
 } from "./author.js";
@@ -251,6 +252,7 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 	}
 	const palette = sourcePalette(input.source, source.features.palette);
 	const paletteHexes = palette.map(([hex]) => hex);
+	const tone = sourceTone(palette);
 	yield* Effect.annotateCurrentSpan({ "sketchi.icon.palette": paletteHexes.join(" ") });
 
 	// 2. The judge's lineup: the catalog marks the source most resembles, with spares ranked
@@ -351,7 +353,7 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 			turns.push({ outcome: "accepted" });
 			return "accepted" as const;
 		}
-		const normalized = normalizeRecipe(reply.recipe, paletteHexes);
+		const normalized = normalizeRecipe(reply.recipe, paletteHexes, tone);
 		if (!normalized.recipe) {
 			return invalid(reply.recipe === null ? ["A draft needs a recipe."] : normalized.issues);
 		}

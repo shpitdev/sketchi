@@ -4,7 +4,7 @@ import { Effect, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import { describe, expect, it } from "@effect/vitest";
 
-import { AUTHOR_SYSTEM_PROMPT, decodeAuthorReply, normalizeRecipe } from "./author.js";
+import { AUTHOR_SYSTEM_PROMPT, decodeAuthorReply, normalizeRecipe, sourceTone } from "./author.js";
 import { drawIcon, ICON_DRAW_BUDGET_MS, IconCatalogSvgs, sourcePalette } from "./draw.js";
 import { IconImaging, type IconImagingJob } from "./imaging.js";
 import { prepareIconInput, rasterHeader, svgCurveSegments } from "./input.js";
@@ -72,6 +72,8 @@ interface Script {
 	readonly judgeDelayMs?: number;
 	/** Catalog marks that fail to load. */
 	readonly missing?: (slug: string) => boolean;
+	/** The palette every image measures, Slack's when omitted. */
+	readonly palette?: readonly (readonly [string, number])[];
 }
 
 /** Fakes for every service a draw needs, replying from a script and recording what was asked. */
@@ -93,7 +95,12 @@ function fakes(script: Script) {
 						prepared: Object.fromEntries(
 							job.prepare.map((item) => [
 								item.id,
-								{ png: `png:${item.id}`, features: lookAlikeMarks["slack"]! },
+								{
+									png: `png:${item.id}`,
+									features: script.palette
+										? { ...lookAlikeMarks["slack"]!, palette: script.palette }
+										: lookAlikeMarks["slack"]!,
+								},
 							]),
 						),
 						exported: Object.fromEntries(
@@ -189,6 +196,35 @@ describe("drawIcon", () => {
 			status: "published",
 		});
 		expect(icon.palette).toEqual(lookAlikeMarks["slack"]!.palette);
+	});
+
+	it("draws a black mark's own black and white in ink and paper, so it inverts with the theme", async () => {
+		const black = {
+			parts: [
+				{ kind: "rect", x: 3, y: 3, width: 18, height: 18, fill: "#000000", stroke: "#000000" },
+				{ kind: "ellipse", cx: 12, cy: 12, rx: 4, ry: 4, fill: "#ffffff", stroke: "none" },
+			],
+		};
+		const { result } = await run(
+			{
+				author: [
+					{ accept: false, recipe: black },
+					{ accept: true, recipe: null },
+				],
+				judge: ['{"logo": 0}'],
+				palette: [["#000000", 100]],
+			},
+			{
+				name: "Block",
+				svg: '<svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z" fill="#000000"/></svg>',
+			},
+		);
+		expect(result._tag).toBe("Success");
+		if (result._tag !== "Success") return;
+		expect(result.success.recipe.parts).toEqual([
+			{ kind: "rect", x: 3, y: 3, width: 18, height: 18, fill: "ink", stroke: "ink" },
+			{ kind: "ellipse", cx: 12, cy: 12, rx: 4, ry: 4, fill: "paper", stroke: "none" },
+		]);
 	});
 
 	it("asks for a fix when the checker rejects a recipe", async () => {
@@ -511,6 +547,39 @@ describe("author", () => {
 				["#e01e5a"],
 			).issues[0],
 		).toContain("is not a source color");
+	});
+
+	it("tells a monochrome source's tone from its palette, and inks its own black or white", () => {
+		expect(sourceTone([["#000000", 100]])).toBe("dark");
+		expect(
+			sourceTone([
+				["#f5f8fa", 90],
+				["#1c2127", 10],
+			]),
+		).toBe("light");
+		expect(
+			sourceTone([
+				["#000000", 60],
+				["#e01e5a", 40],
+			]),
+		).toBeUndefined();
+		const parts = [
+			{ kind: "rect", x: 0, y: 0, width: 4, height: 4, fill: "#000000", stroke: "#ffffff" },
+			{ kind: "rect", x: 4, y: 4, width: 4, height: 4, fill: "#808080" },
+		];
+		// A dark mark: black is ink, white is paper, and a mid gray stays the source's gray.
+		expect(normalizeRecipe({ parts }, ["#000000", "#808080"], "dark").recipe?.parts).toEqual([
+			{ kind: "rect", x: 0, y: 0, width: 4, height: 4, fill: "ink", stroke: "paper" },
+			{ kind: "rect", x: 4, y: 4, width: 4, height: 4, fill: "#808080" },
+		]);
+		// A light mark swaps them.
+		expect(
+			normalizeRecipe({ parts: [parts[0]] }, ["#ffffff"], "light").recipe?.parts[0],
+		).toMatchObject({ fill: "paper", stroke: "ink" });
+		// A colored mark keeps the black it paints with.
+		expect(
+			normalizeRecipe({ parts: [parts[0]] }, ["#000000", "#e01e5a"]).recipe?.parts[0],
+		).toMatchObject({ fill: "#000000" });
 	});
 
 	it("sends back a word that would clip past the grid", () => {

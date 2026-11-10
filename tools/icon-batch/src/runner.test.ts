@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { iconRecipeFitIssues, type IconRecipe } from "@sketchi/diagram-core";
+import type { IconRecipe } from "@sketchi/diagram-core";
 import type { SketchiIcon } from "@sketchi/icon-catalog";
 import type { IconAuthorModel } from "@sketchi/icon-draw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -10,8 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt, priceLogs } from "./draw-mark.js";
 import { initializeResvg, svgPng } from "./excalidraw-export.js";
 import { verdictLine, writeSheets } from "./sheets.js";
-import { inkFor, settleRecipe } from "./normalize.js";
-import { promote, settleRecipes } from "./promote.js";
+import { promote } from "./promote.js";
 import { runBatch } from "./runner.js";
 import { marksToDraw } from "./selection.js";
 import { RunStore } from "./store.js";
@@ -408,52 +407,29 @@ describe("promote", () => {
 			draw: async (mark, author) => attempt(author, plans[mark.slug]!),
 		});
 		const records = await store.records();
-		const first = await promote(records, root, new Set(["rejected"]), () => "multicolor");
+		const first = await promote(records, root, new Set(["rejected"]));
 		expect(first.written).toEqual(["kept"]);
 		expect(first.skipped).toEqual([{ slug: "rejected", reason: "rejected in review" }]);
-		const again = await promote(records, root, new Set(["rejected"]), () => "multicolor");
+		const again = await promote(records, root, new Set(["rejected"]));
 		expect(again.written).toEqual([]);
 		expect(again.skipped).toContainEqual({ slug: "kept", reason: "already has a recipe" });
 	});
 
-	it("settles what it writes and what is already there: words fit, mono marks draw in ink", async () => {
-		const drawn: IconRecipe = {
-			parts: [
-				{
-					kind: "stroke",
-					points: [
-						[2, 2],
-						[20, 20],
-					],
-					closed: false,
-					stroke: "#000000",
-					fill: "#000000",
-				},
-				{ kind: "text", cx: 12, cy: 10.5, text: "tinyhttp", size: 8.5, color: "#111111" },
-				{ kind: "rect", x: 2, y: 2, width: 4, height: 4, fill: "#c75975" },
-			],
+	it("leaves out a recipe whose word would clip past the grid", async () => {
+		const store = new RunStore(root);
+		const wide: IconRecipe = {
+			parts: [{ kind: "text", cx: 12, cy: 10.5, text: "tinyhttp", size: 8.5 }],
 		};
-		const settled = settleRecipe(drawn, "mono-dark");
-		expect(settled.recipe.parts[0]).toMatchObject({ stroke: "ink", fill: "ink" });
-		expect(settled.recipe.parts[1]).toMatchObject({ color: "ink" });
-		expect(settled.recipe.parts[2]).toMatchObject({ fill: "#c75975" });
-		expect(iconRecipeFitIssues(settled.recipe)).toEqual([]);
-		const text = settled.recipe.parts[1];
-		expect(text?.kind === "text" && text.size).toBeLessThan(8.5);
-
-		// A multicolor mark keeps its black; a mono-light one inks its white, not its mid-gray.
-		expect(settleRecipe(drawn, "multicolor").recipe.parts[0]).toMatchObject({ stroke: "#000000" });
-		expect(inkFor("#f5f8fa", "mono-light")).toBe("ink");
-		expect(inkFor("#8f99a8", "mono-light")).toBe("#8f99a8");
-		expect(inkFor("#000000", "mono-light")).toBe("#000000");
-		expect(inkFor("#1c3c8c", "mono-dark")).toBe("#1c3c8c");
-
-		await writeFile(join(root, "parasail.json"), JSON.stringify(drawn), "utf8");
-		const rewritten = await settleRecipes(root, (slug) =>
-			slug === "parasail" ? "mono-dark" : undefined,
-		);
-		expect(rewritten.map(({ slug }) => slug)).toEqual(["parasail"]);
-		expect(JSON.parse(await readFile(join(root, "parasail.json"), "utf8"))).toEqual(settled.recipe);
-		expect(await settleRecipes(root, () => "mono-dark")).toEqual([]);
+		await runBatch({
+			marks: [icon("tinyhttp")],
+			store,
+			concurrency: 1,
+			spendCapUsd: 10,
+			authors,
+			draw: async (_mark, author) => ({ ...attempt(author, "recognized"), recipe: wide }),
+		});
+		const { written, skipped } = await promote(await store.records(), root, new Set());
+		expect(written).toEqual([]);
+		expect(skipped).toEqual([{ slug: "tinyhttp", reason: expect.stringContaining('"tinyhttp"') }]);
 	});
 });
