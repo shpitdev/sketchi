@@ -435,3 +435,94 @@ describe("a repair that adds the action a return path states", () => {
 		}),
 	);
 });
+
+describe("a repair that moves a borrowed or split step", () => {
+	const policy = {
+		concurrency: 1,
+		maxRepairAttempts: 2,
+		maxRetries: 0,
+		requestTimeoutMs: 1_000,
+		retryDelayMs: 1,
+		totalTimeoutMs: 10_000,
+	};
+	const answer = (nodes: Record<string, string>, edges: string[][]) =>
+		JSON.stringify({
+			title: "Release",
+			diagram: { id: "release", type: "flowchart", nodes, edges },
+		});
+	const run = (request: string, texts: readonly string[]) =>
+		Effect.gen(function* () {
+			let calls = 0;
+			const candidate = yield* runDiagramGenerationWithPolicy(
+				() =>
+					Effect.succeed(
+						candidateFromText({ model: "m", provider: "fixture", text: texts[calls++] ?? "" }),
+					),
+				{ model: "m", prompt: { id: "x", request } },
+				"fixture",
+				policy,
+			);
+			return { calls, candidate };
+		});
+
+	it.effect("is kept when it takes a sibling branch off the shared step", () =>
+		Effect.gen(function* () {
+			const request =
+				"Pick the target. Staging and canary paths both run smoke tests. Production deploys and ends. Passing smoke tests finish; failing ones page the on-call engineer.";
+			const nodes = {
+				target: "Target?",
+				staging: "Staging deploy",
+				canary: "Canary deploy",
+				production: "Production deploy",
+				smoke: "Run smoke tests",
+				passed: "Smoke tests pass?",
+				finish: "Finish",
+				page: "Page on-call engineer",
+			};
+			const shared = [
+				["target", "staging", "staging"],
+				["target", "canary", "canary"],
+				["target", "production", "production"],
+				["staging", "smoke"],
+				["canary", "smoke"],
+				["smoke", "passed"],
+				["passed", "finish", "yes"],
+				["passed", "page", "no"],
+			];
+			const borrowed = answer(nodes, [...shared, ["production", "smoke"]]);
+			const fixed = answer(nodes, shared);
+			const { calls, candidate } = yield* run(request, [borrowed, fixed]);
+			expect(calls).toBe(2);
+			expect(candidate.text).toBe(fixed);
+			expect(candidate.diagnostics.at(-1)).toMatch(/^coverage_repair_succeeded/u);
+		}),
+	);
+
+	it.effect("is kept when it points a dead-end copy's branch at the step", () =>
+		Effect.gen(function* () {
+			const request =
+				"Intact items restock the shelf and refund the customer. Items with missing parts are repaired before restocking the shelf.";
+			const nodes = {
+				intact: "Item intact?",
+				restock: "Restock shelf",
+				refund: "Refund customer",
+				repair: "Repair item",
+			};
+			const split = answer({ ...nodes, again: "Restock shelf" }, [
+				["intact", "restock", "yes"],
+				["restock", "refund"],
+				["intact", "repair", "no"],
+				["repair", "again"],
+			]);
+			const rejoined = answer(nodes, [
+				["intact", "restock", "yes"],
+				["restock", "refund"],
+				["intact", "repair", "no"],
+				["repair", "restock"],
+			]);
+			const { calls, candidate } = yield* run(request, [split, rejoined]);
+			expect(calls).toBe(2);
+			expect(candidate.text).toBe(rejoined);
+		}),
+	);
+});

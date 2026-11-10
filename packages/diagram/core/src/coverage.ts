@@ -11,6 +11,9 @@ export const FLOWCHART_COVERAGE_CODES = [
 	"quoted_text_missing",
 	"flowchart_connection_missing",
 	"flowchart_return_step_missing",
+	"flowchart_check_step_missing",
+	"flowchart_step_borrowed",
+	"flowchart_step_split",
 	"flowchart_container_missing",
 	"flowchart_containment_wrong",
 	"flowchart_containment_unstated",
@@ -930,6 +933,25 @@ function flowchartIssues(request: string, diagram: Json): CoverageIssue[] {
 			message: `The request states ${quoteList(unshown)} before a step repeats, but no node on that loop shows ${unshown.length === 1 ? "it" : "them"}. Give each such action its own node on the return path, then connect it back to the repeated step.`,
 		});
 	}
+	const folded = foldedChecks(request, nodes, edges);
+	if (folded.length > 0) {
+		issues.push({
+			code: "flowchart_check_step_missing",
+			message: `The request states ${quoteList(folded)} as a step, but the diagram folds ${folded.length === 1 ? "it" : "them"} into a decision. Draw each check as its own process node right before the decision that reads its result.`,
+		});
+	}
+	for (const { step, given, borrowers } of borrowedSteps(request, nodes, edges, match)) {
+		issues.push({
+			code: "flowchart_step_borrowed",
+			message: `The request gives "${step}" to ${listed(given)}, but the diagram also leads ${quoteList(borrowers)} into it. Keep that step on the branches the request names; a branch with no stated next step ends at its last step.`,
+		});
+	}
+	for (const { step, next } of splitSteps(request, nodes, edges)) {
+		issues.push({
+			code: "flowchart_step_split",
+			message: `The diagram draws "${step}" more than once, and only some copies continue to ${quoteList(next)}. If the request means one step, draw it once and point every branch that reaches it at that node; if the copies are different steps, label each with the request's own distinguishing words.`,
+		});
+	}
 
 	const containers = records(diagram["groups"])
 		.concat(records(diagram["lanes"]))
@@ -1043,6 +1065,205 @@ function returnActions(request: string, nodes: readonly Json[], edges: readonly 
 		}
 	}
 	return [...new Set(missing)];
+}
+
+/** A label word that names a check: "Verify", "verification", "Check", "validated". */
+const CHECK_WORD = /^(?:check|verif|validat|inspect|audit)/u;
+/**
+ * A verification stated as an action: "verify the badge", "validate the payload". "check the
+ * cache" often names only the decision that follows ("On a hit, …"), so only its passive form,
+ * "stock is checked", states a step.
+ */
+const ACTIVE_CHECK =
+	/\b(?:verify|verifies|verifying|validate|validates|validating|inspect|inspects|inspecting|audit|audits|auditing)\s+([^,.;:!?()\n]+)/giu;
+/** A check stated of its object: "the badge is verified", "stock is checked". */
+const PASSIVE_CHECK =
+	/([^,.;:!?()\n]+?)\s+(?:is|are|gets?|was|were)\s+(?:(?:then|first|also|now)\s+)?(?:checked|verified|validated|inspected|audited)\b([^,.;:!?()\n]*)/giu;
+/** Where a check's object ends: the next clause, step or qualifier. */
+const OBJECT_END =
+	/\s+(?:and|or|then|before|after|to|for|with|if|when|until|so|against|by|while|once|but|on|in|at)\b.*$/iu;
+/** An object that states the result ("the payment is authorized"): the check is that decision alone. */
+const STATES_RESULT = /\b(?:is|are|was|were|has|have|can|will|whether|if|that)\b/iu;
+
+/**
+ * Checks a request states as a step of their own ("verify the badge", "stock is checked") that
+ * the diagram folds into the decision reading their result ("Verify badge?", "Stock low?"): a
+ * decision names the checked thing, and no other node does with a check word or right before it.
+ * "check whether X" states only that decision.
+ */
+function foldedChecks(request: string, nodes: readonly Json[], edges: readonly Json[]): string[] {
+	const stated: { readonly phrase: string; readonly object: string[] }[] = [];
+	const objectStems = (phrase: string) =>
+		stems(phrase.replace(OBJECT_END, "")).filter(
+			(word) => word.length >= 3 && !AUXILIARY.has(word),
+		);
+	for (const sentence of request.split(/[.!?;\n]/u)) {
+		if (NEGATED_ACTION.test(sentence)) continue;
+		for (const match of sentence.matchAll(ACTIVE_CHECK)) {
+			const object = (match[1] ?? "").replace(/^\s*for\s+/iu, "").replace(OBJECT_END, "");
+			if (/^\s*(?:whether|if|that|to\s+see)\b/iu.test(match[1] ?? "") || STATES_RESULT.test(object))
+				continue;
+			stated.push({ phrase: match[0].replace(OBJECT_END, "").trim(), object: objectStems(object) });
+		}
+		for (const match of sentence.matchAll(PASSIVE_CHECK)) {
+			if (/^\s*(?:for\s+)?(?:whether|if|that)\b/iu.test(match[2] ?? "")) continue;
+			// "an order is placed and the badge is verified": the subject is the last phrase.
+			const subject =
+				(match[1] ?? "").split(/,|\b(?:and|then|but|or|once|after|when|if|until)\b/iu).at(-1) ?? "";
+			stated.push({
+				phrase: `${subject.trim()} ${match[0]
+					.slice((match[1] ?? "").length)
+					.replace(OBJECT_END, "")
+					.trim()}`,
+				object: objectStems(subject).slice(-3),
+			});
+		}
+	}
+	const ids = nodes.map((node) => text(node["id"]));
+	const labelStems = nodes.map((node) => [...new Set(stems(text(node["label"])))]);
+	// "availability" and "Available?" name one thing: words that share their first six letters.
+	const names = (index: number, word: string) =>
+		(labelStems[index] ?? []).some(
+			(other) => holds(new Set([other]), word) || sharedPrefix(other, word) >= 6,
+		);
+	const decision = (index: number) =>
+		nodes[index]?.["kind"] === "decision" || text(nodes[index]?.["label"]).trim().endsWith("?");
+	const folded: string[] = [];
+	for (const { phrase, object } of stated) {
+		if (object.length === 0) continue;
+		const decisions = new Set(
+			nodes.flatMap((_, index) =>
+				decision(index) && object.every((word) => names(index, word)) ? [ids[index] ?? ""] : [],
+			),
+		);
+		if (decisions.size === 0) continue;
+		const before = new Set(
+			edges.flatMap((edge) => (decisions.has(text(edge["target"])) ? [text(edge["source"])] : [])),
+		);
+		// The check as a node: a check word on the checked thing, or a step on it right before.
+		const shown = nodes.some(
+			(node, index) =>
+				!decision(index) &&
+				object.some((word) => names(index, word)) &&
+				(before.has(ids[index] ?? "") ||
+					words(text(node["label"])).some((word) => CHECK_WORD.test(word))),
+		);
+		if (!shown) folded.push(phrase);
+	}
+	return [...new Set(folded)];
+}
+
+/** How many leading letters two words share. */
+function sharedPrefix(left: string, right: string): number {
+	let index = 0;
+	while (index < left.length && index < right.length && left[index] === right[index]) index += 1;
+	return index;
+}
+
+/** Branches a request lists as sharing a step: "retry and fallback paths both log the attempt". */
+const SHARED_BY =
+	/^\s*(.+?\s+and\s+.+?)\s+(?:(?:paths?|branches?|routes?|cases?)\s+)?(?:both|each|all)\s+(.+)$/iu;
+
+/**
+ * A step the request gives to listed branches ("A and B both check stock") that the diagram also
+ * gives a sibling branch the request leaves out: a branch of the same decision leads straight
+ * into it. Each listed branch and the step must name nodes unmistakably.
+ */
+function borrowedSteps(
+	request: string,
+	nodes: readonly Json[],
+	edges: readonly Json[],
+	matchNode: (item: string) => number | undefined,
+): { readonly step: string; readonly given: string[]; readonly borrowers: string[] }[] {
+	const ids = nodes.map((node) => text(node["id"]));
+	const targets = new Map<string, string[]>();
+	for (const edge of edges) {
+		const source = text(edge["source"]);
+		targets.set(source, [...(targets.get(source) ?? []), text(edge["target"])]);
+	}
+	const found: { step: string; given: string[]; borrowers: string[] }[] = [];
+	for (const sentence of request.split(/[.!?;\n]/u)) {
+		const shared = SHARED_BY.exec(sentence);
+		if (!shared || NEGATED_ACTION.test(sentence)) continue;
+		const items = (shared[1] ?? "")
+			.split(/\s*,\s*(?:and\s+)?|\s+and\s+/iu)
+			.map((item) => item.replace(/^(?:the|both)\s+/iu, "").trim())
+			.filter(Boolean);
+		const given = items.map(matchNode);
+		if (items.length < 2 || given.some((index) => index === undefined)) continue;
+		const givenIds = new Set(given.map((index) => ids[index ?? -1] ?? ""));
+		// The step: the nodes the rest names in full, the longest such label, every copy of it.
+		const said = new Set(stems(shared[2] ?? ""));
+		const named = nodes.flatMap((node, index) => {
+			const wanted = stems(text(node["label"]));
+			return wanted.length > 0 &&
+				!givenIds.has(ids[index] ?? "") &&
+				wanted.every((word) => holds(said, word))
+				? [{ index, size: wanted.length, label: normalized(text(node["label"])) }]
+				: [];
+		});
+		const size = Math.max(0, ...named.map((entry) => entry.size));
+		const label = named.find((entry) => entry.size === size)?.label;
+		const step = new Set(
+			named.flatMap((entry) => (entry.label === label ? [ids[entry.index] ?? ""] : [])),
+		);
+		if (step.size === 0) continue;
+		const borrowers = new Set<string>();
+		for (const [parent, children] of targets) {
+			if (!children.some((child) => givenIds.has(child))) continue;
+			for (const child of children) {
+				if (givenIds.has(child) || step.has(child) || child === parent) continue;
+				if ((targets.get(child) ?? []).some((next) => step.has(next))) borrowers.add(child);
+			}
+		}
+		if (borrowers.size === 0) continue;
+		const labelOf = (id: string) => text(nodes[ids.indexOf(id)]?.["label"]);
+		found.push({
+			step: labelOf([...step][0] ?? ""),
+			given: [...givenIds].map(labelOf),
+			borrowers: [...borrowers].map(labelOf),
+		});
+	}
+	return found;
+}
+
+/**
+ * A stated step drawn as several nodes of one label where some copies continue and others end
+ * there, as when a branch that should rejoin a step gets a dead-end copy of it instead.
+ */
+function splitSteps(
+	request: string,
+	nodes: readonly Json[],
+	edges: readonly Json[],
+): { readonly step: string; readonly next: string[] }[] {
+	const requested = new Set(stems(request));
+	const labelOf = new Map(nodes.map((node) => [text(node["id"]), normalized(text(node["label"]))]));
+	const successors = new Map<string, string[]>();
+	for (const edge of edges) {
+		const source = text(edge["source"]);
+		successors.set(source, [...(successors.get(source) ?? []), text(edge["target"])]);
+	}
+	const copies = new Map<string, Json[]>();
+	for (const node of nodes) {
+		const label = normalized(text(node["label"]));
+		if (!label || node["kind"] === "decision" || text(node["label"]).trim().endsWith("?")) continue;
+		copies.set(label, [...(copies.get(label) ?? []), node]);
+	}
+	const split: { step: string; next: string[] }[] = [];
+	for (const [label, drawn] of copies) {
+		if (drawn.length < 2) continue;
+		const wanted = stems(label);
+		if (wanted.length === 0 || !wanted.every((word) => holds(requested, word))) continue;
+		const onward = drawn.map((node) =>
+			(successors.get(text(node["id"])) ?? []).filter((next) => labelOf.get(next) !== label),
+		);
+		const ends = drawn.filter((node) => (successors.get(text(node["id"])) ?? []).length === 0);
+		const next = [...new Set(onward.flat())].map((id) =>
+			text(nodes.find((node) => text(node["id"]) === id)?.["label"]),
+		);
+		if (ends.length > 0 && next.length > 0) split.push({ step: text(drawn[0]?.["label"]), next });
+	}
+	return split;
 }
 
 /**
@@ -1330,6 +1551,15 @@ export function checkRequestCoverage(request: string, diagram: unknown): Coverag
 	return [...quotedTextIssues(request, diagram), ...(family ? family(request, diagram) : [])];
 }
 
+/** Flowchart issues whose fix moves edges rather than only adding to the diagram. */
+const REROUTING_CODES: ReadonlySet<CoverageIssueCode> = new Set([
+	"flowchart_connection_missing",
+	"flowchart_return_step_missing",
+	"flowchart_check_step_missing",
+	"flowchart_step_borrowed",
+	"flowchart_step_split",
+]);
+
 /** How many words a diagram shows, to tell a repair that drops content from one that adds it. */
 export function diagramContentSize(diagram: unknown): number {
 	return words(diagramText(diagram)).length;
@@ -1408,12 +1638,10 @@ export function keepsStatedStructure(
 	};
 	switch (text(original["type"])) {
 		case "flowchart": {
-			// A missing arrow or return step may need an edge moved; the steps the request names stay
-			// either way.
-			const rerouted = flowchartIssues(request, original).some(
-				(issue) =>
-					issue.code === "flowchart_connection_missing" ||
-					issue.code === "flowchart_return_step_missing",
+			// A missing arrow, return step or check, a borrowed step or a split one may need an edge
+			// moved; the steps the request names stay either way.
+			const rerouted = flowchartIssues(request, original).some((issue) =>
+				REROUTING_CODES.has(issue.code),
 			);
 			return (
 				keeps("nodes", named) && (rerouted || keepsLinks("edges", "source", "target", "nodes"))
