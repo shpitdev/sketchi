@@ -1473,6 +1473,21 @@ describe("routing fuzz", () => {
 			);
 		}, 60_000);
 
+		it("routes no line into its own end node's drawn shape past the run that meets it", () => {
+			const strays = [...flowcharts, ...(FULL ? longFlows : [])].flatMap((spec, index) =>
+				ownEndStrays(
+					renderIntermediateDiagram(
+						parseFlowchartDiagram({
+							...spec,
+							type: "flowchart",
+							layout: { direction, edgeRouting: "orthogonal" },
+						}),
+					),
+				).map((stray) => `${index} ${stray}`),
+			);
+			expect(strays).toEqual([]);
+		}, 60_000);
+
 		it("exports every random flowchart curved without validator issues", () => {
 			expect(failures(direction, "curved")).toEqual([]);
 		}, 60_000);
@@ -1533,11 +1548,42 @@ function insideNodeShape(point: Point, node: Region & { readonly shape: string }
 }
 
 /**
+ * Square routes that enter their own end node's drawn shape: a diamond's or an
+ * ellipse's anywhere along the line, any other node's box outside the run that
+ * attaches to it, where a composed shape's curve draws in from its box.
+ */
+function ownEndStrays(scene: RenderedDiagramScene): string[] {
+	const nodes = new Map(
+		scene.elements.flatMap((e) =>
+			e.type === "node" && e.rendererRole === undefined ? [[e.nodeId, e] as const] : [],
+		),
+	);
+	return scene.elements.flatMap((arrow) => {
+		if (arrow.type !== "arrow") return [];
+		const line = corners(arrow.points);
+		return [...new Set([arrow.sourceNodeId, arrow.targetNodeId])].flatMap((id) => {
+			const node = nodes.get(id);
+			if (!node) return [];
+			const rounded =
+				node.shape === "diamond" || node.shape === "ellipse" || node.shape === "circle";
+			const [from, to] = [
+				!rounded && id === arrow.sourceNodeId ? 1 : 0,
+				!rounded && id === arrow.targetNodeId ? line.length - 1 : line.length,
+			];
+			const kept = line.slice(from, to);
+			return kept.length > 1 && sampledLine(kept).some((point) => insideNodeShape(point, node))
+				? [`${arrow.edgeId} through own ${id}`]
+				: [];
+		});
+	});
+}
+
+/**
  * Where a curved scene's lines stray from what its square routing keeps: a
  * line drawn square; a line into a node it does not join, or into its own
- * ends' nodes past the straight runs (18 out, 32 in) that meet them where its
- * square route keeps out; into a label its square route kept clear of; into a
- * zone or group neither end sits in; or out of one both ends sit in.
+ * ends' nodes past the straight runs (18 out, 32 in) that meet them; into a
+ * label its square route kept clear of; into a zone or group neither end sits
+ * in; or out of one both ends sit in.
  */
 function curvedStrays(curved: RenderedDiagramScene, square: RenderedDiagramScene): string[] {
 	const nodes = curved.elements.flatMap((e) =>
@@ -1576,8 +1622,7 @@ function curvedStrays(curved: RenderedDiagramScene, square: RenderedDiagramScene
 				sampledLine(points, source ? 18 : 0, target ? 32 : 0).some((point) =>
 					insideNodeShape(point, node),
 				);
-			if (enters(arrow.points) && (!(source || target) || !enters(squareRoute)))
-				found.push(`${arrow.edgeId} through ${node.nodeId}`);
+			if (enters(arrow.points)) found.push(`${arrow.edgeId} through ${node.nodeId}`);
 		}
 		const along = sampledLine(arrow.points);
 		const squareLine = sampledLine(squareRoute);
@@ -1732,6 +1777,14 @@ describe("grouped routing fuzz", () => {
 			expect(moreSharedThanPinned("grouped", direction, counts)).toEqual([]);
 			expect(moreTouchesThanPinned("grouped", direction, counts)).toEqual([]);
 		}, 60_000);
+
+		it("routes no grouped line into its own end node's drawn shape past the run that meets it", () => {
+			expect(
+				rendered(direction).flatMap((scene, index) =>
+					ownEndStrays(scene).map((stray) => `${index} ${stray}`),
+				),
+			).toEqual([]);
+		});
 
 		it("curves every grouped flowchart into no node, no group neither end is in, and out of none both are", () => {
 			const strays = flowcharts.flatMap((spec, index) => {
@@ -2137,6 +2190,14 @@ describe("zoned routing fuzz", () => {
 			expect(moreTouchesThanPinned("zoned", direction, counts)).toEqual([]);
 		}, 120_000);
 
+		it("routes no zoned line into its own end node's drawn shape past the run that meets it", () => {
+			expect(
+				rendered(direction).flatMap((scene, index) =>
+					ownEndStrays(scene).map((stray) => `${index} ${stray}`),
+				),
+			).toEqual([]);
+		}, 120_000);
+
 		it("curves every zoned flowchart into no node, no zone neither end is in, and out of none both are", () => {
 			const strays = parsed(direction).flatMap((diagram, index) =>
 				curvedStrays(
@@ -2150,6 +2211,22 @@ describe("zoned routing fuzz", () => {
 			expect(strays).toEqual([]);
 		}, 120_000);
 	});
+
+	// Lines once drawn through their own end node's shape, each found in one
+	// direction: bottom to top, flowchart 3's e17 into n1's diamond; right to
+	// left, flowchart 0's e28 under n7's diamond tip and flowchart 2's e5
+	// through n6's ellipse. They and every other line keep clear in all four.
+	it.each(["TB", "BT", "LR", "RL"] as const)(
+		"routes zoned flowcharts 0, 2 and 3 clear of their own ends' shapes in %s",
+		(direction) => {
+			expect(
+				[0, 2, 3].flatMap((index) =>
+					ownEndStrays(rendered(direction)[index]!).map((stray) => `${index} ${stray}`),
+				),
+			).toEqual([]);
+		},
+		120_000,
+	);
 
 	it.each([...Object.keys(zoneFixtures), ...(FULL ? Object.keys(zoneStressFixtures) : [])])(
 		"exports the %s fixture with its zones nested, apart and clear",

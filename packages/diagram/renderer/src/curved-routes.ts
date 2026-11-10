@@ -303,7 +303,8 @@ function meetings(a: readonly ScenePoint[], b: readonly ScenePoint[], touch: num
  * The scene with every line drawn as a curve along its route. A line's
  * corners curve as widely as room allows unless the curve would come nearer a
  * node than its route did (or than CURVE_CLEARANCE), its own ends' nodes
- * included once it leaves their straight runs; or meet another line more than
+ * included once it leaves their straight runs, or enter its own ends' drawn
+ * shapes there, which its route never does; or meet another line more than
  * its route did; or run into a label its route kept clear of; or enter, leave
  * or cross a zone, group or lane its route did not. Then they curve less, and
  * at worst stay square. Labels stay where the routes put them.
@@ -346,15 +347,7 @@ export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
 			if (!source && !target) return [];
 			const away = (points: readonly ScenePoint[]) =>
 				trimmed(points, source ? DEPARTURE_RUN : 0, target ? ARRIVAL_RUN : 0);
-			const awayRoute = away(route);
-			return [
-				{
-					node,
-					away,
-					gap: Math.min(CURVE_CLEARANCE, gapToNode(awayRoute, node)),
-					enters: entersShape(awayRoute, node),
-				},
-			];
+			return [{ node, away, gap: Math.min(CURVE_CLEARANCE, gapToNode(away(route), node)) }];
 		});
 		const regionsCrossed = regions.map((box) => ({ box, route: regionPassage(route, box) }));
 		const others = arrows.filter((other) => other !== arrow);
@@ -380,7 +373,7 @@ export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
 			for (const end of ends) {
 				const away = end.away(points);
 				if (gapToNode(away, end.node) < end.gap - EPSILON) return false;
-				if (!end.enters && entersShape(away, end.node)) return false;
+				if (entersShape(away, end.node)) return false;
 			}
 			for (const { box, route: kept } of regionsCrossed) {
 				const passage = regionPassage(points, box);

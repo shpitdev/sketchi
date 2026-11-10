@@ -5497,6 +5497,47 @@ function segmentAlongBorder(segment: AxisAlignedSegment, box: Box): boolean {
 	);
 }
 
+/**
+ * Segments of a line that enter one of its own end nodes' boxes, other than
+ * those of the straight run that attaches the line there. A line meets its
+ * ends only by those runs: elsewhere it cuts a diamond's tip or an ellipse's
+ * side, or runs through the node, inside its box. Routes are chosen clear of
+ * these as of every node (routeNodeCrossingCount); exportRouteDefects keeps
+ * every later move from making one.
+ */
+function ownEndRunCount(
+	points: readonly ScenePoint[],
+	source: NodeSceneElement | undefined,
+	target: NodeSceneElement | undefined,
+): number {
+	const segments = segmentsFromPoints(points);
+	const heading = (segment: AxisAlignedSegment) => {
+		const [from, to] = [points[segment.segmentIndex]!, points[segment.segmentIndex + 1]!];
+		return Math.sign(to.x - from.x + to.y - from.y);
+	};
+	// Segments that run straight on, the same way, from one to the next.
+	const straightOn = (a: AxisAlignedSegment, b: AxisAlignedSegment) =>
+		a.orientation === b.orientation &&
+		Math.abs(a.staticCoordinate - b.staticCoordinate) <= AXIS_ALIGNED_EPSILON &&
+		heading(a) === heading(b);
+	let [leaving, arriving] = [1, 1];
+	while (leaving < segments.length && straightOn(segments[leaving]!, segments[0]!)) leaving += 1;
+	while (arriving < segments.length && straightOn(segments.at(-1 - arriving)!, segments.at(-1)!))
+		arriving += 1;
+	const ends = [source, ...(target?.nodeId === source?.nodeId ? [] : [target])];
+	let count = 0;
+	for (const [index, segment] of segments.entries())
+		for (const node of ends)
+			if (
+				node !== undefined &&
+				!(index < leaving && node.nodeId === source?.nodeId) &&
+				!(index >= segments.length - arriving && node.nodeId === target?.nodeId) &&
+				segmentCrossesBoundsInterior(segment, node)
+			)
+				count += 1;
+	return count;
+}
+
 function routeNodeCrossingCount(
 	points: readonly ScenePoint[],
 	shapes: readonly NodeSceneElement[],
@@ -7952,8 +7993,9 @@ function resideArrivals(
 
 /**
  * Overlapping segments and segments through unbound nodes, counted as
- * validateExcalidrawScene counts them on the export: bound stems that leave or
- * reach one node at one point in one direction may coincide.
+ * validateExcalidrawScene counts them on the export (bound stems that leave or
+ * reach one node at one point in one direction may coincide), and lines that
+ * meet their own end nodes past their attaching runs (ownEndRunCount).
  */
 function exportRouteDefects(
 	arrows: readonly ArrowSceneElement[],
@@ -7996,6 +8038,10 @@ function exportRouteDefects(
 			)
 				defects.push([left.arrowId]);
 	}
+	const byId = new Map(nodes.map((node) => [node.nodeId, node]));
+	for (const arrow of arrows)
+		if (ownEndRunCount(arrow.points, byId.get(arrow.sourceNodeId), byId.get(arrow.targetNodeId)))
+			defects.push([arrow.id]);
 	const grouped = groups ? [...defects, ...groupRouteDefects(arrows, groups)] : defects;
 	return lanes ? [...grouped, ...laneRouteDefects(arrows, lanes)] : grouped;
 }

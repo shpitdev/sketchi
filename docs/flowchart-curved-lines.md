@@ -10,7 +10,8 @@ as wide as room allows, up to 56 px. A departure keeps a straight run from its
 port, and an arrival keeps one into its arrowhead. A corner curves less, and
 at worst stays square, wherever its curve would come nearer a node than its
 route did (or nearer than 12 px), its own ends' nodes included past those
-straight runs; cross or touch another line more than its route did; enter a
+straight runs; enter its own ends' drawn shapes there, which a square route
+never does; cross or touch another line more than its route did; enter a
 label or group name its route kept clear of; or enter, leave or cross a zone,
 group or lane its route did not. Excalidraw draws each line as a smooth curved
 arrow through the sampled points.
