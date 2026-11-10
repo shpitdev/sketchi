@@ -62,6 +62,7 @@ import {
 	parseTimelineDiagram,
 	parseChartDiagram,
 	parseGanttDiagram,
+	lineCrossings,
 	sequenceActivations,
 	unavoidableCrossings,
 } from "@sketchi/diagram-core";
@@ -71,11 +72,7 @@ import {
 	type ExcalidrawScene,
 	type ExcalidrawSceneValidationResult,
 } from "@sketchi/diagram-excalidraw";
-import {
-	arrowCrossings,
-	renderDiagram,
-	type RenderedDiagramScene,
-} from "@sketchi/diagram-renderer";
+import { renderDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { termTokens } from "@sketchi/icon-catalog";
 
 import type { DiagramScenario } from "./diagram-scenarios.js";
@@ -1286,21 +1283,24 @@ export function evaluateScenarioDiagram(
 }
 
 /**
- * Lines the drawing crosses beyond those its graph forces: a planar graph can
- * be drawn crossing nothing (unavoidableCrossings).
+ * Lines the drawing crosses, at any angle, where its graph is planar and so
+ * could be drawn crossing none. A graph that is not planar forces at least
+ * unavoidableCrossings, a lower bound only, so its drawing is not failed.
  */
 function flowchartCrossingCheck(diagram: FlowchartDiagram, scene: RenderedDiagramScene) {
-	const drawn = arrowCrossings(
-		scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : [])),
+	const drawn = lineCrossings(
+		scene.elements.flatMap((element) => (element.type === "arrow" ? [element.points] : [])),
 	);
 	const forced = unavoidableCrossings(diagram.edges.map((edge) => [edge.source, edge.target]));
 	return {
 		id: "avoidable-crossings",
-		passed: drawn <= forced,
+		passed: forced > 0 || drawn === 0,
 		message:
-			drawn <= forced
-				? `Lines cross ${drawn} time(s), as few as the graph allows.`
-				: `Lines cross ${drawn} time(s) where the graph allows ${forced}.`,
+			forced > 0
+				? `The graph is not planar: it forces at least ${forced} crossing(s); lines cross ${drawn} time(s).`
+				: drawn === 0
+					? "Lines cross nothing, as the planar graph allows."
+					: `Lines cross ${drawn} time(s) where the planar graph allows none.`,
 	};
 }
 

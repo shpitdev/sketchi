@@ -191,3 +191,55 @@ export function unavoidableCrossings(edges: readonly (readonly [string, string])
 		0,
 	);
 }
+
+interface LinePoint {
+	readonly x: number;
+	readonly y: number;
+}
+
+const COLLINEAR = 0.01;
+
+/** A line's points with every point that continues a straight run dropped. */
+function bends(points: readonly LinePoint[]): LinePoint[] {
+	const kept: LinePoint[] = [];
+	for (const point of points) {
+		const last = kept.at(-1);
+		if (last && Math.hypot(point.x - last.x, point.y - last.y) < COLLINEAR) continue;
+		const before = kept.at(-2);
+		const turn =
+			before && last
+				? (last.x - before.x) * (point.y - last.y) - (last.y - before.y) * (point.x - last.x)
+				: Infinity;
+		if (Math.abs(turn) < COLLINEAR) kept[kept.length - 1] = point;
+		else kept.push(point);
+	}
+	return kept;
+}
+
+/**
+ * Times the lines cross one another, at any angle: each pair of their runs
+ * that pass strictly through each other. A crossing counts once wherever a
+ * line runs straight on through a point it was drawn through; lines that only
+ * meet, at an end or a bend, do not cross.
+ */
+export function lineCrossings(lines: readonly (readonly LinePoint[])[]): number {
+	const runs = lines.map(bends);
+	const side = (o: LinePoint, p: LinePoint, q: LinePoint) =>
+		(p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+	const strict = (value: number) => Math.abs(value) > COLLINEAR;
+	let crossings = 0;
+	for (const [index, a] of runs.entries())
+		for (const b of runs.slice(index + 1))
+			for (let i = 0; i + 1 < a.length; i += 1)
+				for (let j = 0; j + 1 < b.length; j += 1) {
+					const [p, q, r, u] = [a[i]!, a[i + 1]!, b[j]!, b[j + 1]!];
+					const [s1, s2, s3, s4] = [side(r, u, p), side(r, u, q), side(p, q, r), side(p, q, u)];
+					if (
+						[s1, s2, s3, s4].every(strict) &&
+						Math.sign(s1) !== Math.sign(s2) &&
+						Math.sign(s3) !== Math.sign(s4)
+					)
+						crossings += 1;
+				}
+	return crossings;
+}

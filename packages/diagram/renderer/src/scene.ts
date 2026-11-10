@@ -1190,10 +1190,26 @@ const CROSSING_SWEEPS = 8;
 const CROSSING_REPAIR_MAX_EDGES = 24;
 /** Room past two facing stubs, when spread, for a lane each a corridor's width apart. */
 const FACING_LANES = 2 * ROUTE_STUB_LENGTH;
-/** Reduced rank orders by diagram; they depend on the graph, not on node sizes. */
-const reducedOrders = new WeakMap<IntermediateDiagram, LayeredOrder>();
-/** Reduced rank orders searched further, by sifting (Arrangement.skipLanes). */
-const siftedOrders = new WeakMap<IntermediateDiagram, LayeredOrder>();
+/**
+ * Reduced rank orders by diagram, then by how the order was searched (sifted,
+ * for Arrangement.skipLanes, or not) and the rank each node takes: they depend
+ * on the graph and its ranks, which an arrangement may lift
+ * (Arrangement.throughBlocks), not on node sizes.
+ */
+const layeredOrders = new WeakMap<IntermediateDiagram, Map<string, LayeredOrder>>();
+
+function layeredOrderKey(rankByNodeId: ReadonlyMap<string, number>, thorough: boolean): string {
+	return `${thorough ? "sifted" : "reduced"}:${[...rankByNodeId].map(([id, rank]) => `${id}\u0000${rank}`).join("\u0000")}`;
+}
+
+/** The layered order a rank layout reduced (or sifted) for these ranks, if one did. */
+function layeredOrderFor(
+	diagram: IntermediateDiagram,
+	rankByNodeId: ReadonlyMap<string, number>,
+	thorough: boolean,
+): LayeredOrder | undefined {
+	return layeredOrders.get(diagram)?.get(layeredOrderKey(rankByNodeId, thorough));
+}
 /** Sifting passes over every rank, and over the ranks a moved line passes. */
 const SIFT_PASSES = 4;
 /** Lines that skip ranks, as many placeholders, beyond which no line moves whole. */
@@ -1226,8 +1242,7 @@ function reduceRankCrossings(
 	feedbackEdges: ReadonlySet<string>,
 	thorough = false,
 ): Map<number, NodeSceneElement[]> {
-	const cache = thorough ? siftedOrders : reducedOrders;
-	let reduced = cache.get(diagram);
+	let reduced = layeredOrderFor(diagram, rankByNodeId, thorough);
 	if (!reduced) {
 		reduced = reducedRankOrder(
 			new Map(
@@ -1238,7 +1253,9 @@ function reduceRankCrossings(
 			feedbackEdges,
 			thorough,
 		);
-		cache.set(diagram, reduced);
+		const cache = layeredOrders.get(diagram) ?? new Map<string, LayeredOrder>();
+		cache.set(layeredOrderKey(rankByNodeId, thorough), reduced);
+		layeredOrders.set(diagram, cache);
 	}
 	const shapes = new Map([...rankedShapes.values()].flat().map((shape) => [shape.nodeId, shape]));
 	return new Map(
@@ -1826,8 +1843,8 @@ function reordersRanks(diagram: IntermediateDiagram): boolean {
  */
 function skipsRanks(diagram: IntermediateDiagram, crossings: number): boolean {
 	if (laned(diagram) || groupStructure(diagram)) return false;
-	rankLayout(diagram, new Map(), new Map(), true, false, true);
-	const sifted = siftedOrders.get(diagram);
+	const { rankByNodeId } = rankLayout(diagram, new Map(), new Map(), true, false, true);
+	const sifted = layeredOrderFor(diagram, rankByNodeId, true);
 	return sifted !== undefined && sifted.virtual.size > 0 && sifted.crossings < crossings;
 }
 
@@ -2403,17 +2420,26 @@ function positionNodes(
 	skipLaneAt?: Map<string, number>,
 ): NodeSceneElement[] {
 	const lanesAcross = skipLanes === true && wrap.continuations.size === 0;
-	const { feedbackEdges, gapAfter, gapBetween, highSide, lowSide, rankMetrics, reachOf, vertical } =
-		rankLayout(
-			diagram,
-			minimumSizes,
-			stubReach,
-			reorder || lanesAcross,
-			spreadFacing,
-			lanesAcross,
-			throughBlocks,
-		);
-	const layered = lanesAcross ? siftedOrders.get(diagram) : undefined;
+	const {
+		feedbackEdges,
+		gapAfter,
+		gapBetween,
+		highSide,
+		lowSide,
+		rankByNodeId,
+		rankMetrics,
+		reachOf,
+		vertical,
+	} = rankLayout(
+		diagram,
+		minimumSizes,
+		stubReach,
+		reorder || lanesAcross,
+		spreadFacing,
+		lanesAcross,
+		throughBlocks,
+	);
+	const layered = lanesAcross ? layeredOrderFor(diagram, rankByNodeId, true) : undefined;
 	const sources = new Map(diagram.edges.map((edge) => [edge.id, edge.source]));
 	const across = layered
 		? skipLaneCenters(
@@ -12704,8 +12730,9 @@ export function renderGraphDiagram(
 		beforeRepairs.arrangement.wrap.continuations.size === 0 &&
 		arrowCrossings(layout.edgeArrows) >
 			unavoidableCrossings(diagram.edges.map((edge) => [edge.source, edge.target]));
-	for (const rivalArrangement of rivalled ? rivals() : []) {
-		if (arrowCrossings(layout.edgeArrows) === 0) break;
+	// A rival only ever improves the drawing: one that fails to lay out leaves
+	// the drawing as it was.
+	const rivalFrom = (rivalArrangement: Partial<Arrangement>) => {
 		const drawn = { layout, settled: best };
 		const arrangement = { ...beforeRepairs.arrangement, ...rivalArrangement };
 		const attempt = layoutDiagram(diagram, levels[0]!, arrangement);
@@ -12716,18 +12743,31 @@ export function renderGraphDiagram(
 			arrowCrossings(attempt.edgeArrows) >
 			arrowCrossings(beforeRepairs.layout.edgeArrows) + RIVAL_CROSSING_SLACK
 		)
-			continue;
+			return drawn;
 		// Completing and drawing the rival draws over the layout in hand.
 		const completed = complete(
 			{ arrangement, defects: defectsOf(attempt), layout: attempt },
 			(candidate) => arrowCrossings(candidate.edgeArrows) >= crossings,
 		);
-		if (arrowCrossings(completed.layout.edgeArrows) >= crossings) {
-			({ layout, settled: best } = drawn);
-			continue;
-		}
+		if (arrowCrossings(completed.layout.edgeArrows) >= crossings) return drawn;
 		const rival = drawnToTheEnd(completed);
-		({ layout, settled: best } = straighter(rival.layout, drawn.layout) ? rival : drawn);
+		return straighter(rival.layout, drawn.layout) ? rival : drawn;
+	};
+	const drawnRivals = (() => {
+		try {
+			return rivalled ? rivals() : [];
+		} catch {
+			return [];
+		}
+	})();
+	for (const rivalArrangement of drawnRivals) {
+		if (arrowCrossings(layout.edgeArrows) === 0) break;
+		const drawn = { layout, settled: best };
+		try {
+			({ layout, settled: best } = rivalFrom(rivalArrangement));
+		} catch {
+			({ layout, settled: best } = drawn);
+		}
 	}
 	const { groups, lanes, routedEdges } = layout;
 	const routedArrows = [...layout.edgeArrows];

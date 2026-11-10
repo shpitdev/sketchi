@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { unavoidableCrossings } from "./planarity";
+import { lineCrossings, unavoidableCrossings } from "./planarity";
 
 const graph = (pairs: string) =>
 	pairs.split(" ").map((pair) => pair.split("-") as [string, string]);
@@ -46,5 +46,53 @@ describe("unavoidable crossings", () => {
 			"classify-r1 classify-r2 classify-r3 r1-s1 r2-s2 r3-s3 s1-monitor s1-escalate s2-monitor s2-escalate s3-monitor s3-escalate escalate-collect collect-classify",
 		);
 		expect(unavoidableCrossings(pairs)).toBe(1);
+	});
+});
+
+describe("line crossings", () => {
+	const p = (x: number, y: number) => ({ x, y });
+
+	it("counts crossings at any angle, once each", () => {
+		// Two diagonals of a square, and a plus sign drawn through extra points.
+		expect(
+			lineCrossings([
+				[p(0, 0), p(10, 10)],
+				[p(0, 10), p(10, 0)],
+			]),
+		).toBe(1);
+		expect(
+			lineCrossings([
+				[p(0, 5), p(5, 5), p(10, 5)],
+				[p(5, 0), p(5, 2), p(5, 10)],
+			]),
+		).toBe(1);
+		// An orthogonal route and a straight diagonal line: two crossings.
+		expect(
+			lineCrossings([
+				[p(0, 0), p(0, 10), p(10, 10), p(10, 0)],
+				[p(-5, 2), p(15, 12)],
+			]),
+		).toBe(2);
+	});
+
+	it("counts no crossing where lines only meet, at an end or a bend, or run apart", () => {
+		expect(
+			lineCrossings([
+				[p(0, 0), p(10, 0)],
+				[p(10, 0), p(10, 10)],
+			]),
+		).toBe(0);
+		expect(
+			lineCrossings([
+				[p(0, 0), p(5, 5), p(10, 0)],
+				[p(5, 5), p(5, 10)],
+			]),
+		).toBe(0);
+		expect(
+			lineCrossings([
+				[p(0, 0), p(10, 0)],
+				[p(0, 1), p(10, 1)],
+			]),
+		).toBe(0);
 	});
 });

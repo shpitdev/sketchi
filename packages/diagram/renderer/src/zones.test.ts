@@ -264,6 +264,40 @@ describe("zone layout", () => {
 		expect(arrowCrossings(scene.elements.flatMap((e) => (e.type === "arrow" ? [e] : [])))).toBe(0);
 	});
 
+	it("lays a zoned chain out again with lifted ranks, in each direction, from its own rank order", () => {
+		// A cluster holding the chain's second, third and seventh steps, with
+		// lines from the third to the seventh and from the fifth to the last:
+		// laid out again with ranks a zone's members lift (throughBlocks), after
+		// the reordered layout, it once reused the order cached for the
+		// unlifted ranks and failed to place an empty rank.
+		const ids = ["n0", "n1", "n2", "n3", "n4", "n5", "n6", "n7"];
+		for (const direction of directions) {
+			const chain = parseFlowchartDiagram({
+				id: "lifted-chain",
+				title: "Lifted chain",
+				type: "flowchart",
+				nodes: ids.map((id, index) => ({
+					id,
+					label: `Step ${index}`,
+					kind: index === 0 ? "start" : index === ids.length - 1 ? "end" : "process",
+					...(["n1", "n2", "n6"].includes(id) ? { group: "cluster" } : {}),
+				})),
+				edges: [
+					...ids
+						.slice(1)
+						.map((id, index) => ({ id: `e${index}`, source: ids[index]!, target: id })),
+					{ id: "e7", source: "n2", target: "n6" },
+					{ id: "e8", source: "n4", target: "n7" },
+				],
+				groups: [{ id: "cluster", label: "Cluster", kind: "cluster" }],
+				layout: { direction, edgeRouting: "orthogonal" },
+			});
+			const scene = renderIntermediateDiagram(chain);
+			expect(scene.elements.filter((e) => e.type === "arrow")).toHaveLength(9);
+			expect(zoneRegionIssues(scene, chain)).toEqual([]);
+		}
+	});
+
 	it("never runs a route along a node's border among zones", () => {
 		const along: string[] = [];
 		for (const name of Object.keys(fixtures))

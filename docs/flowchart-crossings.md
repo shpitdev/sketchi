@@ -4,7 +4,9 @@ A crossing is avoidable when the flowchart's graph could be drawn without it.
 `unavoidableCrossings` (diagram-core) reads that bound from planarity: a planar
 graph forces none, and each block that is not planar forces at least one, and
 at least as many as its edges beyond what a plane graph of its nodes holds. Scenarios
-that set `crossingFree` check every drawing against it (`avoidable-crossings`).
+that set `crossingFree` fail a drawing of a planar graph whose lines cross,
+counted at any angle (`lineCrossings`); for a graph that is not planar the
+bound is only a lower one, so its drawing is not failed (`avoidable-crossings`).
 
 ## Layout
 
