@@ -1202,8 +1202,8 @@ const SHARED_BY =
 /**
  * A step the request gives to listed branches ("A and B both check stock") that the diagram also
  * gives a sibling branch the request leaves out: a branch of the same decision, or of a decision
- * chained to it, leads straight into it. Each listed branch and the step must name nodes
- * unmistakably.
+ * chained to it, leads into it through plain steps alone. Each listed branch and the step must
+ * name nodes unmistakably.
  */
 function borrowedSteps(
 	request: string,
@@ -1287,13 +1287,43 @@ function borrowedSteps(
 				const chained = decision(child) && !givenIds.has(child) && !step.has(child);
 				return [child, ...(chained ? branches(child, seen) : [])];
 			});
+		// A branch may start a few plain steps before a listed one ("Deploy issue" then "Roll back"),
+		// and a sibling may run a few plain steps before it reaches the shared step.
+		const sources = new Map<string, string[]>();
+		for (const [source, next] of targets)
+			for (const target of next) sources.set(target, [...(sources.get(target) ?? []), source]);
+		const plain = (id: string) => !decision(id) && !givenIds.has(id) && !step.has(id);
+		const branchHead = (id: string) => {
+			let head = id;
+			for (let hops = 0; hops < 4; hops += 1) {
+				const [parent, ...others] = sources.get(head) ?? [];
+				if (!parent || others.length > 0 || !plain(parent) || targets.get(parent)?.length !== 1)
+					break;
+				head = parent;
+			}
+			return head;
+		};
+		const leadsIn = (id: string): string | undefined => {
+			let current = id;
+			for (let hops = 0; hops < 4; hops += 1) {
+				const next = targets.get(current) ?? [];
+				if (next.some((target) => step.has(target))) return current;
+				const [only, ...others] = next;
+				if (!only || others.length > 0 || !plain(only)) return undefined;
+				current = only;
+			}
+			return undefined;
+		};
 		const borrowers = new Set<string>();
-		for (const [parent, children] of targets) {
-			if (!children.some((child) => givenIds.has(child))) continue;
-			for (const child of branches(parent, new Set([parent]))) {
-				if (givenIds.has(child) || step.has(child) || child === parent) continue;
-				if ((targets.get(child) ?? []).some((next) => step.has(next)) && !statedElsewhere(child))
-					borrowers.add(child);
+		for (const given of givenIds) {
+			const head = branchHead(given);
+			for (const parent of sources.get(head) ?? []) {
+				for (const child of branches(parent, new Set([parent]))) {
+					if (child === head || givenIds.has(child) || step.has(child) || child === parent)
+						continue;
+					const into = leadsIn(child);
+					if (into && !givenIds.has(into) && !statedElsewhere(into)) borrowers.add(into);
+				}
 			}
 		}
 		if (borrowers.size === 0) continue;

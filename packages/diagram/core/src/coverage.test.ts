@@ -937,6 +937,41 @@ describe("a step the request gives to some branches", () => {
 	});
 });
 
+describe("a step given to branches that start a step before the listed ones", () => {
+	const request =
+		"Sort each ticket as billing, bug or question. Billing tickets get a refund, bug tickets get a fix. Refund and fix paths both notify the customer. Questions get an answer.";
+	const labels: [string, string][] = [
+		["sort", "Sort ticket"],
+		["billing", "Billing ticket"],
+		["bug", "Bug ticket"],
+		["question", "Question ticket"],
+		["refund", "Issue refund"],
+		["fix", "Ship fix"],
+		["answer", "Send answer"],
+		["notify", "Notify customer"],
+	];
+	const edges: [string, string, string?][] = [
+		["sort", "billing"],
+		["sort", "bug"],
+		["sort", "question"],
+		["billing", "refund"],
+		["bug", "fix"],
+		["question", "answer"],
+		["refund", "notify"],
+		["fix", "notify"],
+	];
+
+	it("passes the step on the listed branches only", () => {
+		expect(codes(request, chart(labels, edges))).toEqual([]);
+	});
+
+	it("reports a sibling branch that reaches the step through its own plain steps", () => {
+		const issues = checkRequestCoverage(request, chart(labels, [...edges, ["answer", "notify"]]));
+		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_step_borrowed"]);
+		expect(issues[0]?.message).toContain('leads "Send answer" into it');
+	});
+});
+
 describe("a step drawn twice where one copy ends", () => {
 	const request =
 		"Create a returns flowchart. Intact items restock the shelf and refund the customer. Items with missing parts are repaired before restocking the shelf.";
