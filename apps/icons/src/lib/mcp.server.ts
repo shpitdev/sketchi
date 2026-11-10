@@ -12,7 +12,7 @@ const SEARCH_ICONS_TOOL = {
 		readOnlyHint: true,
 	},
 	description:
-		"Search Sketchi icons by slug, name, alias, keyword, or collection. Results are ranked and include stable SVG and JSON URLs.",
+		"Search Sketchi icons by slug, name, alias, keyword, or collection. Results are ranked and include stable SVG and JSON URLs, and colorMode with onDark/onLight (invert or plate) where a mark would vanish on that background.",
 	inputSchema: {
 		additionalProperties: false,
 		properties: {

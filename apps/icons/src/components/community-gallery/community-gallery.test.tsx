@@ -67,6 +67,28 @@ describe("CommunityGallery", () => {
 		expect(screen.queryByRole("dialog")).toBeNull();
 	});
 
+	it("starts the clipboard write inside the click, before the export code has loaded", async () => {
+		const items: { "text/plain": Promise<Blob> }[] = [];
+		const write = vi.fn(async (_items: unknown[]) => {});
+		vi.stubGlobal(
+			"ClipboardItem",
+			class {
+				constructor(item: { "text/plain": Promise<Blob> }) {
+					items.push(item);
+				}
+			},
+		);
+		Object.assign(navigator, { clipboard: { write, writeText: vi.fn() } });
+		gallery();
+		fireEvent.click(screen.getByRole("button", { name: "Copy Ring queue for Excalidraw" }));
+		// Synchronously, while the click's activation still holds.
+		expect(write).toHaveBeenCalledTimes(1);
+		const text = await (await items[0]!["text/plain"]).text();
+		expect(JSON.parse(text)).toMatchObject({ type: "excalidraw/clipboard" });
+		await screen.findByText("Ring queue copied. Paste it into Excalidraw.");
+		vi.unstubAllGlobals();
+	});
+
 	it("opens a linked icon and offers the next useful step when nothing is found", () => {
 		const linked = ICONS[1];
 		if (!linked) throw new Error("fixture");

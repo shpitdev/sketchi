@@ -11,7 +11,7 @@ import { CONCEPT_ICONS } from "@sketchi/icon-catalog/concepts";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import { Effect } from "effect";
 
-/** Static-asset path of normalized node-logo SVGs (see scripts/sync-node-logos.ts). */
+/** Static-asset path of node-logo SVGs ready for diagram paper (see scripts/sync-node-logos.ts). */
 export const NODE_LOGO_ASSET_PATH = "/node-logos/";
 
 /**

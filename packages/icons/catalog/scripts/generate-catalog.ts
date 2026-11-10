@@ -3,13 +3,26 @@ import { dirname, resolve } from "node:path";
 
 import { catalogCommonWords, loadCommonEnglishWords } from "../src/common-words-generation.js";
 import { buildIconCatalog } from "../src/manifest-generation.js";
+import { initIconColorRenderer, measureIconColor } from "../src/icon-color-render.js";
 
 const packageRoot = resolve(import.meta.dirname, "..");
 const sourcePath = resolve(packageRoot, "pipeline-output/review/review-data.json");
 const catalogPath = resolve(packageRoot, "src/generated/icon-catalog.json");
 const commonWordsPath = resolve(packageRoot, "src/generated/common-words.json");
+const SVG_URL_PREFIX = "/output/upload-ready/svg/";
 
-const source: unknown = JSON.parse(await readFile(sourcePath, "utf8"));
+const source = JSON.parse(await readFile(sourcePath, "utf8")) as {
+	icons: { urlPath: string }[];
+};
+// Classify every mark from its SVG, so the manifest says how it meets light and dark surfaces.
+await initIconColorRenderer();
+for (const icon of source.icons) {
+	if (!icon.urlPath.startsWith(SVG_URL_PREFIX)) {
+		throw new Error(`Icon source ${icon.urlPath} is outside the SVG directory.`);
+	}
+	const file = resolve(packageRoot, "svg", icon.urlPath.slice(SVG_URL_PREFIX.length));
+	Object.assign(icon, { color: measureIconColor(await readFile(file, "utf8"), icon.urlPath) });
+}
 const generated = buildIconCatalog(source);
 
 await mkdir(dirname(catalogPath), { recursive: true });

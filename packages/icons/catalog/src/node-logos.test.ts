@@ -1,10 +1,16 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { getIconBySlug, getIconSourceFile, iconManifest, nodeLogoIcons } from "./catalog";
-import { isNodeLogoEligible, NODE_LOGO_MAX_BYTES, normalizeNodeLogoSvg } from "./node-logos";
+import { initIconColorRenderer, measureIconColor } from "./icon-color-render";
+import {
+	isNodeLogoEligible,
+	NODE_LOGO_MAX_BYTES,
+	nodeLogoSvgForPaper,
+	normalizeNodeLogoSvg,
+} from "./node-logos";
 
 const svgRoot = resolve(process.cwd(), "packages/icons/catalog/svg");
 
@@ -97,5 +103,27 @@ describe("icon catalog", () => {
 			expect(getIconSourceFile(slug), slug).toBeUndefined();
 		}
 		expect(readSource("docker")).toContain("<svg");
+	});
+});
+
+describe("node logos on diagram paper", () => {
+	beforeAll(() => initIconColorRenderer());
+
+	it("keeps a mark that reads on paper as it is", () => {
+		const github = getIconBySlug("github");
+		if (!github) throw new Error("github is missing from the catalog.");
+		expect(nodeLogoSvgForPaper(readSource("github"), github)).toBe(
+			normalizeNodeLogoSvg(readSource("github")),
+		);
+	});
+
+	it("inverts or plates every mark lost on paper until it reads there", () => {
+		const lost = nodeLogoIcons.filter((icon) => icon.onLight);
+		expect(lost.map((icon) => icon.slug)).toEqual(expect.arrayContaining(["crystal", "kimi"]));
+		for (const icon of lost) {
+			const svg = nodeLogoSvgForPaper(readSource(icon.slug), icon);
+			expect(svg).toContain(icon.onLight === "plate" ? "<rect" : "feColorMatrix");
+			expect(measureIconColor(svg, icon.slug).onLight).toBeUndefined();
+		}
 	});
 });

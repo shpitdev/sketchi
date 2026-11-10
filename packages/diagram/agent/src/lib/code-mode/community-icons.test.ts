@@ -35,6 +35,7 @@ function catalog() {
 				aliases: [],
 				bytes: 400,
 				collection: "devtools-ci",
+				colorMode: "multicolor",
 				keywords: ["docker"],
 				name: "Docker",
 				slug: "docker",

@@ -10,7 +10,8 @@ export const Route = createFileRoute("/")({
 });
 
 async function loadIconManifest(signal: AbortSignal): Promise<IconManifest> {
-	const response = await fetch("/icons-manifest.json", { signal });
+	// Revalidate: a manifest cached before a deploy may predate fields this page reads.
+	const response = await fetch("/icons-manifest.json", { cache: "no-cache", signal });
 	if (!response.ok) {
 		throw new Error(`Icon library returned HTTP ${response.status}.`);
 	}

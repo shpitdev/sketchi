@@ -1,4 +1,4 @@
-import { searchIcons, type SketchiIcon } from "@sketchi/icon-catalog";
+import { type IconColor, searchIcons, type SketchiIcon } from "@sketchi/icon-catalog";
 import { getIconBySlug, iconManifest } from "@sketchi/icon-catalog/catalog";
 
 import type { IconSourceLoader } from "./catalog.server.js";
@@ -7,7 +7,7 @@ import { corsJson, corsPreflight, corsText } from "./cors-policy.js";
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
-export interface IconSearchResult {
+export interface IconSearchResult extends IconColor {
 	readonly aliases: readonly string[];
 	readonly collection: string;
 	readonly detailUrl: string;
@@ -36,9 +36,12 @@ export function iconSearchResult(icon: SketchiIcon, origin: string): IconSearchR
 	return {
 		aliases: icon.aliases,
 		collection: icon.collection,
+		colorMode: icon.colorMode,
 		...apiUrls(origin, icon.slug),
 		keywords: icon.keywords,
 		name: icon.name,
+		...(icon.onDark ? { onDark: icon.onDark } : {}),
+		...(icon.onLight ? { onLight: icon.onLight } : {}),
 		slug: icon.slug,
 	};
 }

@@ -1,4 +1,4 @@
-import { isIconRecipe, type IconRecipe } from "@sketchi/diagram-core";
+import { isIconRecipe, type IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 
 /** A community icon as the gallery shows it; `slug` is `community/<slug>`. */
 export interface CommunityIconEntry {

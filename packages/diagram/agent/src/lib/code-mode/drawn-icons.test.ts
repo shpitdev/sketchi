@@ -48,6 +48,7 @@ function catalogIcon(slug: string, name: string, variant?: string) {
 		aliases: [],
 		bytes: 400,
 		collection: "cloud-hosting-paas",
+		colorMode: "multicolor" as const,
 		keywords: variant ? [slug, "wordmark"] : [slug],
 		name,
 		slug,

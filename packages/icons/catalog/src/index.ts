@@ -1,3 +1,4 @@
+export * from "./color-mode.js";
 export * from "./concept.js";
 export * from "./manifest.js";
 export * from "./node-logos.js";

@@ -8,6 +8,14 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
+		},
+		"./hash": {
+			"types": "./dist/hash.d.ts",
+			"default": "./dist/hash.js"
+		},
+		"./icon-recipe": {
+			"types": "./dist/icon-recipe.d.ts",
+			"default": "./dist/icon-recipe.js"
 		}
 	},
 	"dependencies": {

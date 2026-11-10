@@ -9,6 +9,7 @@ const manifest = {
 			aliases: [],
 			bytes: 1802,
 			collection: "ai-apps-agents",
+			colorMode: "multicolor",
 			keywords: ["ai"],
 			name: "Codex",
 			slug: "codex",
@@ -40,6 +41,7 @@ describe("home route", () => {
 		expect(screen.getByLabelText("Loading icons")).toBeTruthy();
 		expect(await screen.findByRole("button", { name: /Copy Codex/ })).toBeTruthy();
 		expect(fetchMock).toHaveBeenCalledWith("/icons-manifest.json", {
+			cache: "no-cache",
 			signal: expect.any(AbortSignal),
 		});
 	});

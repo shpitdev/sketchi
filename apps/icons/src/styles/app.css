@@ -590,10 +590,38 @@ kbd {
 	border-color: #3f3931;
 }
 
-.icon-card__preview img {
+.icon-card__preview .icon-mark {
+	height: 50%;
+	width: 50%;
+}
+
+/* A mark that would vanish on its surface: a neutral one inverts, a multicolor one gets a plate. */
+.icon-mark {
+	align-items: center;
+	border-radius: 18%;
+	box-sizing: border-box;
+	display: flex;
+	justify-content: center;
+}
+
+.icon-mark img {
 	display: block;
-	max-height: 50%;
-	max-width: 50%;
+	height: 100%;
+	object-fit: contain;
+	width: 100%;
+}
+
+.icon-mark[data-treatment="invert"] img {
+	filter: invert(1) hue-rotate(180deg);
+}
+
+.icon-mark[data-treatment="plate"] {
+	background: #f6f1e7;
+	padding: 12%;
+}
+
+.icon-mark[data-treatment="plate"][data-surface="light"] {
+	background: #25211c;
 }
 
 .icon-card__copy-cue {
@@ -921,10 +949,9 @@ kbd {
 	aspect-ratio: 1.42;
 }
 
-.icon-detail__preview img {
-	display: block;
-	max-height: 58%;
-	max-width: 58%;
+.icon-detail__preview .icon-mark {
+	height: 58%;
+	aspect-ratio: 1;
 }
 
 .icon-detail__preview-row {

@@ -14,6 +14,7 @@ function icon(
 		aliases,
 		bytes: 100,
 		collection,
+		colorMode: "multicolor",
 		keywords,
 		name,
 		slug,

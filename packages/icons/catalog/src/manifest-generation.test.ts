@@ -12,6 +12,7 @@ function sourceIcon(slug: string, collection: string) {
 	return {
 		bytes: 100,
 		collection,
+		color: { colorMode: "multicolor" as const },
 		slug,
 		urlPath: `/output/upload-ready/svg/${collection}/${slug}.svg`,
 		viewBox: { height: 24, minX: 0, minY: 0, width: 24 },

@@ -11,6 +11,11 @@ Search ranks exact slugs, name prefixes, aliases, substrings, then collections.
 The response includes public slugs, names, collections, keywords, and URLs.
 The limit defaults to 50 and is capped at 100.
 
+Each icon has a colorMode: mono-dark or mono-light (one neutral ink) or
+multicolor (brand colors). onDark and onLight say what keeps a mark visible on
+a background it would vanish into: invert for a neutral mark, or a neutral
+plate behind a multicolor one, whose colors are never changed.
+
 ## Get one icon
 
 GET /api/icons/kubernetes
