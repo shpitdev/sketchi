@@ -40,6 +40,7 @@ infrastructure shapes (database, queue, document); see `docs/flowchart-zones.md`
 So are swimlanes (one band per actor); see `docs/flowchart-lanes.md`. State machines reuse them for composite
 states; see `docs/state-machines.md`. ER diagrams place their own tables and
 route on the graph router with pinned row ends; see `docs/er-diagrams.md`.
+How a flowchart avoids crossing lines is in `docs/flowchart-crossings.md`.
 Class diagrams place their boxes in rows, superclasses above, and route the
 same way with a port for every end; see `docs/class-diagrams.md`. Org charts
 place their own tree, a bus from each manager to their reports, and route only

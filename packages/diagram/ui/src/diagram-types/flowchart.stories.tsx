@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
+	crossingFixtures,
 	describedArchitectureFlowchart,
 	flowchartFixture,
 	groupFixtures,
@@ -75,6 +76,7 @@ export const ZonesAwsThreeTierDescribed: Story = {
 	args: { diagram: describedArchitectureFlowchart },
 };
 
+/** The queue the API publishes to ranks before the database both write to: no line crosses another. */
 export const ZonesKubernetesCluster: Story = {
 	args: { diagram: zoneFixtures["kubernetes-cluster"] },
 };
@@ -133,4 +135,14 @@ export const RoutingPharmaBatchDisposition: Story = {
 
 export const RoutingWarehouseReorder: Story = {
 	args: { diagram: routingFixtures["warehouse-reorder"] },
+};
+
+/** The ready check's loop takes the vertex its other branch had, so it returns past nothing. */
+export const CrossingsWaitlistTableReady: Story = {
+	args: { diagram: crossingFixtures["restaurant-waitlist-table-ready"] },
+};
+
+/** The provider branch keeps a lane of its own past the ranks it skips; the escalation loop runs back on the other side. */
+export const CrossingsIncidentProviderLoop: Story = {
+	args: { diagram: crossingFixtures["incident-response-provider-loop"] },
 };

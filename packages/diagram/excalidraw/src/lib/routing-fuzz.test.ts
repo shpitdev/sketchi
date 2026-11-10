@@ -1900,13 +1900,15 @@ function randomZonedFlowcharts(count: number, start: number) {
  * more than first pinned, and seven crossings fewer: its two pairs of lines
  * that touched run apart. Right to left, where a row hangs a zone only to cross
  * fewer lines, it draws two findings more than it did and a crossing fewer, and
- * three of its four pairs of touching lines run apart.
+ * three of its four pairs of touching lines run apart. Right to left, zoned
+ * flowchart 15, still crossing after its repairs, is laid out again and draws
+ * twelve crossings fewer for two findings more.
  */
 const ZONED_ROUTING: Readonly<Record<"TB" | "BT" | "LR" | "RL", string>> = {
 	TB: "97/31 0/0 17/3 30/5 36/7 36/12 7/0 12/1 68/24 32/8 0/0 28/12 22/5 0/0 0/0 41/9 0/0 0/0 36/24 173/65 77/21 98/44 60/11 33/11 1/0 22/2 138/59 0/0 86/25 62/12",
 	BT: "99/26 0/0 16/2 30/8 21/6 42/7 1/0 9/0 61/25 44/9 0/0 30/16 22/11 0/0 0/0 47/8 0/0 0/0 37/14 184/64 79/24 92/45 60/15 35/16 1/0 14/2 146/59 0/0 94/30 54/7",
 	LR: "77/42 0/1 11/6 23/4 30/12 45/11 11/4 5/4 73/21 37/9 0/1 27/11 24/14 0/0 0/1 44/12 0/0 0/0 38/31 202/68 79/28 102/41 74/25 34/23 0/0 8/2 136/61 0/1 104/34 44/26",
-	RL: "65/49 0/0 10/5 19/8 28/8 49/12 8/4 3/3 72/34 41/7 0/1 25/6 22/17 0/0 0/1 49/10 0/0 0/0 38/22 175/55 86/33 84/41 77/26 35/20 0/0 14/12 157/79 0/1 89/31 44/23",
+	RL: "65/49 0/0 10/5 19/8 28/8 49/12 8/4 3/3 72/34 41/7 0/1 25/6 22/17 0/0 0/1 37/12 0/0 0/0 38/22 175/55 86/33 84/41 77/26 35/20 0/0 14/12 157/79 0/1 89/31 44/23",
 };
 
 /**
@@ -2550,11 +2552,14 @@ const KNOWN_TOUCHING_FAN_INS: Readonly<Record<string, number>> = {
  * `<fixture>:<direction>` with the pairs it draws. Left to right, the incident
  * response stacks its three stability checks in one column: the no branch of
  * one and the yes branch of the next leave by facing vertices into one narrow
- * gap, and no clearing keeps every label nearer its own line. Main drew as
- * many. Never more.
+ * gap, and no clearing keeps every label nearer its own line. Across the page,
+ * the incident response whose provider branch skips to resolution draws one
+ * pair. Main drew as many. Never more.
  */
 const KNOWN_TOUCHING_FIXTURES: Readonly<Record<string, number>> = {
 	"incident-fan-in-checks:LR": 2,
+	"incident-response-provider-loop:LR": 1,
+	"incident-response-provider-loop:RL": 1,
 };
 
 describe("lines that touch", () => {

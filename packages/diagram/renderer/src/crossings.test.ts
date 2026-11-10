@@ -181,8 +181,11 @@ function arrowheadsCrossed(scene: RenderedDiagramScene): string[] {
 const NODE_CLEARANCE = 12;
 
 /**
- * Crossings each fixture drew on main (fd92ae12) and draws now, counting a line
- * that crosses a route where the route runs straight on.
+ * Crossings each fixture drew on main (fd92ae12; the waitlist's table-ready loop
+ * and the incident response's provider loop, f492f6c4) and draws now, counting
+ * a line that crosses a route where the route runs straight on. The loop trades
+ * vertices with the ready check's other branch; the provider branch keeps a
+ * lane of its own past the ranks it skips (Arrangement.skipLanes).
  */
 const CROSSINGS: Readonly<Record<keyof typeof crossingFixtures, readonly [number, number]>> = {
 	"incident-escalation": [3, 0],
@@ -200,6 +203,8 @@ const CROSSINGS: Readonly<Record<keyof typeof crossingFixtures, readonly [number
 	"procurement-vendor-approval-legal": [2, 0],
 	"restaurant-waitlist": [1, 0],
 	"restaurant-waitlist-recheck": [1, 0],
+	"restaurant-waitlist-table-ready": [1, 0],
+	"incident-response-provider-loop": [1, 0],
 	"grouped-expense-approval": [1, 0],
 	"content-moderation": [0, 0],
 };

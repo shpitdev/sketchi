@@ -62,7 +62,9 @@ import {
 	parseTimelineDiagram,
 	parseChartDiagram,
 	parseGanttDiagram,
+	lineCrossings,
 	sequenceActivations,
+	unavoidableCrossings,
 } from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
@@ -1258,20 +1260,48 @@ export function evaluateScenarioDiagram(
 	const { checks, ownedNodes } = flowchartChecks(scenario, diagram);
 	const modelOwners =
 		modelDiagram === diagram ? ownedNodes : flowchartChecks(scenario, modelDiagram).ownedNodes;
-	return evaluation(scenario.id, diagram, [
-		...checks,
-		...scenarioLogoChecks(
-			{
-				logos: scenario.logos,
-				prompt: scenario.prompt,
-				requiredIconSlugs: scenario.assertions.requiredIconSlugs,
-				sharedIconEntries: scenario.assertions.requiredNodes.flatMap((step) =>
-					step.entryParts ? [{ parts: step.entryParts, nodeIds: modelOwners.get(step.id)! }] : [],
-				),
-			},
-			modelDiagram,
-		),
-	]);
+	// The drawing reads the scene, so it scores the returned diagram.
+	return evaluation(
+		scenario.id,
+		diagram,
+		[
+			...checks,
+			...scenarioLogoChecks(
+				{
+					logos: scenario.logos,
+					prompt: scenario.prompt,
+					requiredIconSlugs: scenario.assertions.requiredIconSlugs,
+					sharedIconEntries: scenario.assertions.requiredNodes.flatMap((step) =>
+						step.entryParts ? [{ parts: step.entryParts, nodeIds: modelOwners.get(step.id)! }] : [],
+					),
+				},
+				modelDiagram,
+			),
+		],
+		(scene) => (scenario.assertions.crossingFree ? [flowchartCrossingCheck(diagram, scene)] : []),
+	);
+}
+
+/**
+ * Lines the drawing crosses, at any angle, where its graph is planar and so
+ * could be drawn crossing none. A graph that is not planar forces at least
+ * unavoidableCrossings, a lower bound only, so its drawing is not failed.
+ */
+function flowchartCrossingCheck(diagram: FlowchartDiagram, scene: RenderedDiagramScene) {
+	const drawn = lineCrossings(
+		scene.elements.flatMap((element) => (element.type === "arrow" ? [element.points] : [])),
+	);
+	const forced = unavoidableCrossings(diagram.edges.map((edge) => [edge.source, edge.target]));
+	return {
+		id: "avoidable-crossings",
+		passed: forced > 0 || drawn === 0,
+		message:
+			forced > 0
+				? `The graph is not planar: it forces at least ${forced} crossing(s); lines cross ${drawn} time(s).`
+				: drawn === 0
+					? "Lines cross nothing, as the planar graph allows."
+					: `Lines cross ${drawn} time(s) where the planar graph allows none.`,
+	};
 }
 
 export function evaluateScenarioOutput(

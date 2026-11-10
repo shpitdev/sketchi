@@ -12,6 +12,7 @@ import incidentEscalationMonitoringMerge from "./fixtures/crossings/incident-esc
 import incidentEscalationQueue from "./fixtures/crossings/incident-escalation-queue.js";
 import incidentEscalationSharedResolve from "./fixtures/crossings/incident-escalation-shared-resolve.js";
 import incidentEscalationStraightEscalation from "./fixtures/crossings/incident-escalation-straight-escalation.js";
+import incidentResponseProviderLoop from "./fixtures/crossings/incident-response-provider-loop.js";
 import mediaPlayer from "./fixtures/crossings/media-player.js";
 import mediaPlayerEnded from "./fixtures/crossings/media-player-ended.js";
 import namedFinalRetry from "./fixtures/crossings/named-final-retry.js";
@@ -25,6 +26,7 @@ import procurementVendorApproval from "./fixtures/crossings/procurement-vendor-a
 import procurementVendorApprovalLegal from "./fixtures/crossings/procurement-vendor-approval-legal.js";
 import restaurantWaitlist from "./fixtures/crossings/restaurant-waitlist.js";
 import restaurantWaitlistRecheck from "./fixtures/crossings/restaurant-waitlist-recheck.js";
+import restaurantWaitlistTableReady from "./fixtures/crossings/restaurant-waitlist-table-ready.js";
 import subscriptionRenewalDunning from "./fixtures/crossings/subscription-renewal-dunning.js";
 import subscriptionRenewalGrace from "./fixtures/crossings/subscription-renewal-grace.js";
 
@@ -58,6 +60,8 @@ export const crossingFixtures = {
 	"procurement-vendor-approval-legal": flowchart(procurementVendorApprovalLegal),
 	"restaurant-waitlist": flowchart(restaurantWaitlist),
 	"restaurant-waitlist-recheck": flowchart(restaurantWaitlistRecheck),
+	"restaurant-waitlist-table-ready": flowchart(restaurantWaitlistTableReady),
+	"incident-response-provider-loop": flowchart(incidentResponseProviderLoop),
 	"grouped-expense-approval": flowchart(groupedExpenseApproval),
 	"content-moderation": flowchart(contentModeration),
 };

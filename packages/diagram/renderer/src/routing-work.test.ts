@@ -197,14 +197,17 @@ describe("branch side work", () => {
 	// through three repair layouts, back to the drawn layout: 11 sizings (352)
 	// and 4.81M checks for the same drawing. Its escalation's step across a
 	// rank gap too narrow to clear both ends now grows that gap: one more
-	// layout, finished and polished, 8 sizings (256) and 2.89M checks.
+	// layout, finished and polished, 8 sizings (256) and 2.89M checks. Still
+	// crossing twice, its lines that skip ranks are laid out again in lanes of
+	// their own (Arrangement.skipLanes), repaired and drawn to the end, and kept,
+	// crossing once: 11.5 sizings (368) and 5.09M checks.
 	it("completes no branch assignment the arranged layout already makes", () => {
 		work.checks = 0;
 		work.measures = 0;
 		const scene = renderIntermediateDiagram(denseIncident);
 		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(19);
-		expect(work.measures).toBeLessThanOrEqual(8 * 2 * 16);
-		expect(work.checks).toBeLessThan(3_000_000);
+		expect(work.measures).toBeLessThanOrEqual(12 * 2 * 16);
+		expect(work.checks).toBeLessThan(5_300_000);
 	});
 });
 
@@ -221,11 +224,14 @@ describe("crossing repair work", () => {
 	// Monitoring merge and three patient-intake merges); 20.07M as the drawn
 	// layout's merging lines nest, 1.95M of it the incident-escalation samples and
 	// patient-intake merges whose lines into one end route again in each order.
+	// 22.08M with the waitlist's table-ready loop and the incident response's
+	// provider loop, whose long lines, still crossing, are laid out again in
+	// lanes of their own (Arrangement.skipLanes), repaired and drawn to the end.
 	it("bounds segment checks for the generated diagrams it repairs", () => {
 		work.checks = 0;
 		for (const fixture of Object.values(crossingFixtures)) renderIntermediateDiagram(fixture);
 		for (const machine of Object.values(crossingStateMachines)) renderStateMachineDiagram(machine);
-		expect(work.checks).toBeLessThan(21_000_000);
+		expect(work.checks).toBeLessThan(23_000_000);
 	});
 });
 
@@ -311,7 +317,9 @@ describe("zone routing work", () => {
 	// the two stress cases (zones four deep across two availability zones, and
 	// thirty services in eight zones), each column wrapped where too long and each
 	// row keeping its zones side by side, its plans that hang a zone routed too
-	// where the row crosses lines; 2.22M and 22.4M while rows hung zones under one
+	// where the row crosses lines; 3.16M with the Kubernetes cluster's queue laid
+	// out again ranked before its database (Arrangement.throughBlocks), repaired
+	// and drawn to the end, and kept, crossing nothing; 2.22M and 22.4M while rows hung zones under one
 	// another, 2.08M and 16.3M before ends moved off rounded corners, 1.96M and
 	// 14.6M before the drawn layout's arrival polish. Testing
 	// each grid step only against the shapes its line runs through took the
@@ -330,7 +338,7 @@ describe("zone routing work", () => {
 		const small = render(zoneFixtures);
 		const large = render(zoneStressFixtures);
 		expect(small).toBeGreaterThan(0);
-		expect(small).toBeLessThan(3_000_000);
+		expect(small).toBeLessThan(3_300_000);
 		expect(large).toBeLessThan(26_000_000);
 	});
 });

@@ -30,6 +30,11 @@ export interface FlowchartScenarioAssertions {
 	outsideGroupSteps: { stepId: string; groupId: string }[];
 	/** Lanes the prompt states, in its order, each with the steps it holds. */
 	requiredLanes: FlowchartScenarioRequiredLane[];
+	/**
+	 * The drawing crosses no lines but those its graph forces: a planar graph's
+	 * none (unavoidableCrossings).
+	 */
+	crossingFree?: boolean;
 }
 
 export interface FlowchartScenarioRequiredLane {
@@ -207,6 +212,8 @@ interface FlowchartScenarioDefinition {
 	ungrouped?: readonly string[];
 	/** Stated group id to fixture nodes the prompt keeps outside that group. */
 	outsideGroups?: Readonly<Record<string, readonly string[]>>;
+	/** The drawing may cross no lines but those its graph forces (see FlowchartScenarioAssertions). */
+	crossingFree?: boolean;
 }
 
 const DEFAULT_STYLE = SKETCHI_DIAGRAM_STYLE;
@@ -450,6 +457,7 @@ function buildAssertions(
 			}
 			return { id, label, labels, members: [...new Set(members.map(stepOf))] };
 		}),
+		...(definition.crossingFree ? { crossingFree: true } : {}),
 	};
 }
 
@@ -2573,6 +2581,135 @@ const flowchartScenarioDefinitions = [
 			["feedback-negative-archive", "feedback-negative", "archive", "no"],
 			["archive-close-order", "archive", "close-order"],
 		],
+	},
+	{
+		id: "photo-resize-queue-zones",
+		architecture: true,
+		title: "Photo resizing behind a queue",
+		difficulty: "standard",
+		tags: ["zones", "nesting", "architecture", "shapes", "crossings", "real-voice"],
+		description:
+			"An upload API and resize workers in one subnet of a VPC, sharing a queue and a table outside it: the queue's line into the workers and both writes into the table cross nothing.",
+		prompt:
+			"draw our photo upload backend top to bottom. the mobile app calls the upload API, which runs in the app subnet of our AWS VPC. the upload API saves photo records to a DynamoDB table and sends resize jobs to an SQS queue. resize workers, also in the app subnet, take jobs off the queue and save thumbnails to the same DynamoDB table. the subnet is in the VPC, the queue and the table are outside it",
+		logos: [
+			{
+				aliases: ["AWS", "amazon", "amazon web services"],
+				collection: "cloud-vendors",
+				name: "AWS",
+				slug: "aws",
+			},
+		],
+		nodes: [
+			["app", "Mobile app", "start", ["mobile app"]],
+			["api", "Upload API", "process", ["upload API"]],
+			["queue", "SQS queue", "process", ["SQS queue", "SQS"]],
+			["workers", "Resize workers", "process", ["resize workers"]],
+			["table", "DynamoDB table", "end", ["DynamoDB table", "DynamoDB"]],
+		],
+		edges: [
+			["app-api", "app", "api"],
+			["api-table", "api", "table"],
+			["api-queue", "api", "queue"],
+			["queue-workers", "queue", "workers"],
+			["workers-table", "workers", "table"],
+		],
+		groups: [
+			["vpc", "AWS VPC", ["AWS VPC", "VPC"], [], { kinds: ["vpc"] }],
+			[
+				"subnet",
+				"App subnet",
+				["app subnet"],
+				["api", "workers"],
+				{ parent: "vpc", kinds: ["subnet"] },
+			],
+		],
+		outsideGroups: { vpc: ["app", "queue", "table"] },
+		shapes: { queue: "queue", table: "database" },
+		crossingFree: true,
+	},
+	{
+		id: "support-chat-queue",
+		title: "Support chat queue",
+		difficulty: "standard",
+		tags: ["loop", "customer-response", "crossings"],
+		description:
+			"A chat queue whose hold loop returns to the waiting check beside a branch that skips straight to the chat: the loop and the shortcut cross nothing.",
+		prompt:
+			"Make a flowchart for our support chat queue. A customer opens the chat widget and the bot collects their question. If an agent is free, the chat connects to the agent and ends there. If not, the customer joins the queue. Then check whether the customer is still waiting: if they left, close the ticket. If they are still waiting, check whether an agent became free; if one did, connect the chat to the agent, otherwise play a hold message and check again whether the customer is still waiting.",
+		nodes: [
+			["opens", "Customer opens chat", "start", ["opens the chat widget", "customer opens"]],
+			["collect", "Bot collects question", "process", ["collects their question", "bot collects"]],
+			["agent-free", "Agent free?", "decision", ["agent is free", "agent free"]],
+			[
+				"connect",
+				"Connect to agent",
+				"end",
+				["connects to the agent", "connect the chat to the agent", "connect"],
+			],
+			["join-queue", "Join the queue", "process", ["joins the queue", "join the queue"]],
+			["still-waiting", "Still waiting?", "decision", ["still waiting"]],
+			["close", "Close the ticket", "end", ["close the ticket"]],
+			["became-free", "Agent became free?", "decision", ["agent became free", "became free"]],
+			["hold", "Play hold message", "process", ["hold message"]],
+		],
+		edges: [
+			["opens-collect", "opens", "collect"],
+			["collect-free", "collect", "agent-free"],
+			["free-connect", "agent-free", "connect", "yes", ["yes", "free"]],
+			["free-queue", "agent-free", "join-queue", "no", ["no", "not"]],
+			["queue-waiting", "join-queue", "still-waiting"],
+			["waiting-close", "still-waiting", "close", "no", ["no", "left"]],
+			["waiting-became", "still-waiting", "became-free", "yes", ["yes", "still waiting"]],
+			["became-connect", "became-free", "connect", "yes", ["yes"]],
+			["became-hold", "became-free", "hold", "no", ["no", "otherwise"]],
+			["hold-waiting", "hold", "still-waiting"],
+		],
+		crossingFree: true,
+	},
+	{
+		id: "release-hotfix-rollback",
+		title: "Release with hotfix path and rollback",
+		difficulty: "challenge",
+		tags: ["loop", "deployment", "long-branch", "crossings"],
+		description:
+			"A release whose hotfix branch skips staging into production while a failed staging check rolls back to rebuilding: the shortcut and the loop cross nothing.",
+		prompt:
+			"Draw our release process as a flowchart. A developer merges the change and CI builds it. If tests fail, the developer fixes the code and CI builds again. If tests pass, check the release type: a hotfix deploys straight to production, a regular release deploys to staging first. If staging is healthy, deploy to production; if not, roll back staging and fix the code. After production, monitor the release and close it.",
+		nodes: [
+			["merge", "Merge the change", "start", ["merges the change", "merge"]],
+			["build", "CI builds", "process", ["CI builds", "build"]],
+			["tests", "Tests pass?", "decision", ["tests pass", "tests fail", "tests"]],
+			["fix", "Fix the code", "process", ["fixes the code", "fix the code"]],
+			["type", "Release type?", "decision", ["release type"]],
+			["staging", "Deploy to staging", "process", ["deploys to staging", "staging"]],
+			["healthy", "Staging healthy?", "decision", ["staging is healthy", "healthy"]],
+			["rollback", "Roll back staging", "process", ["roll back staging", "roll back"]],
+			[
+				"production",
+				"Deploy to production",
+				"process",
+				["deploys straight to production", "deploy to production"],
+			],
+			["monitor", "Monitor the release", "process", ["monitor the release", "monitor"]],
+			["close", "Close the release", "end", ["close it", "close"]],
+		],
+		edges: [
+			["merge-build", "merge", "build"],
+			["build-tests", "build", "tests"],
+			["tests-fix", "tests", "fix", "no", ["no", "fail"]],
+			["fix-build", "fix", "build"],
+			["tests-type", "tests", "type", "yes", ["yes", "pass"]],
+			["type-production", "type", "production", "hotfix", ["hotfix"]],
+			["type-staging", "type", "staging", "regular", ["regular"]],
+			["staging-healthy", "staging", "healthy"],
+			["healthy-production", "healthy", "production", "yes", ["yes", "healthy"]],
+			["healthy-rollback", "healthy", "rollback", "no", ["no", "not"]],
+			["rollback-fix", "rollback", "fix"],
+			["production-monitor", "production", "monitor"],
+			["monitor-close", "monitor", "close"],
+		],
+		crossingFree: true,
 	},
 ] satisfies readonly FlowchartScenarioDefinition[];
 
