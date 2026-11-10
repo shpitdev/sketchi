@@ -1,4 +1,11 @@
-import { canvasFrameNameBox, wrappedLabelWidth, wrapTextToWidth } from "@sketchi/diagram-core";
+import {
+	canvasFrameNameBox,
+	canvasOutlineContains,
+	canvasShapeOutline,
+	isCanvasComposedShape,
+	wrappedLabelWidth,
+	wrapTextToWidth,
+} from "@sketchi/diagram-core";
 import type {
 	ArrowSceneElement,
 	NodeSceneElement,
@@ -204,8 +211,17 @@ function trimmed(points: readonly ScenePoint[], start: number, end: number): Sce
 	return cut(cut(points, start).reverse(), end).reverse();
 }
 
-/** Whether a point lies inside the shape a node draws, not only its box. */
-function insideShape(point: ScenePoint, node: NodeSceneElement): boolean {
+/**
+ * Whether a point lies inside the shape a node draws, not only its box: a
+ * diamond, an ellipse, or a composed shape's outline, whose curved or tapered
+ * sides a line meets inside the box.
+ */
+function insideShape(
+	point: ScenePoint,
+	node: NodeSceneElement,
+	outline?: readonly ScenePoint[],
+): boolean {
+	if (outline) return canvasOutlineContains(outline, point);
 	const [halfWidth, halfHeight] = [node.width / 2, node.height / 2];
 	const dx = Math.abs(point.x - node.x - halfWidth) / halfWidth;
 	const dy = Math.abs(point.y - node.y - halfHeight) / halfHeight;
@@ -218,6 +234,9 @@ function insideShape(point: ScenePoint, node: NodeSceneElement): boolean {
 
 /** Whether a line, followed every 2 units, runs inside a node's shape. */
 function entersShape(points: readonly ScenePoint[], node: NodeSceneElement): boolean {
+	const outline = isCanvasComposedShape(node.shape)
+		? canvasShapeOutline({ ...node, shape: node.shape })
+		: undefined;
 	return points.slice(1).some((point, index) => {
 		const from = points[index]!;
 		const steps = Math.max(1, Math.ceil(distance(from, point) / 2));
@@ -229,6 +248,7 @@ function entersShape(points: readonly ScenePoint[], node: NodeSceneElement): boo
 						y: from.y + ((point.y - from.y) * step) / steps,
 					},
 					node,
+					outline,
 				)
 			)
 				return true;
@@ -303,7 +323,8 @@ function meetings(a: readonly ScenePoint[], b: readonly ScenePoint[], touch: num
  * The scene with every line drawn as a curve along its route. A line's
  * corners curve as widely as room allows unless the curve would come nearer a
  * node than its route did (or than CURVE_CLEARANCE), its own ends' nodes
- * included once it leaves their straight runs; or meet another line more than
+ * included once it leaves their straight runs, or enter its own ends' drawn
+ * shapes there, which its route never does; or meet another line more than
  * its route did; or run into a label its route kept clear of; or enter, leave
  * or cross a zone, group or lane its route did not. Then they curve less, and
  * at worst stay square. Labels stay where the routes put them.
@@ -346,15 +367,7 @@ export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
 			if (!source && !target) return [];
 			const away = (points: readonly ScenePoint[]) =>
 				trimmed(points, source ? DEPARTURE_RUN : 0, target ? ARRIVAL_RUN : 0);
-			const awayRoute = away(route);
-			return [
-				{
-					node,
-					away,
-					gap: Math.min(CURVE_CLEARANCE, gapToNode(awayRoute, node)),
-					enters: entersShape(awayRoute, node),
-				},
-			];
+			return [{ node, away, gap: Math.min(CURVE_CLEARANCE, gapToNode(away(route), node)) }];
 		});
 		const regionsCrossed = regions.map((box) => ({ box, route: regionPassage(route, box) }));
 		const others = arrows.filter((other) => other !== arrow);
@@ -380,7 +393,7 @@ export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
 			for (const end of ends) {
 				const away = end.away(points);
 				if (gapToNode(away, end.node) < end.gap - EPSILON) return false;
-				if (!end.enters && entersShape(away, end.node)) return false;
+				if (entersShape(away, end.node)) return false;
 			}
 			for (const { box, route: kept } of regionsCrossed) {
 				const passage = regionPassage(points, box);
