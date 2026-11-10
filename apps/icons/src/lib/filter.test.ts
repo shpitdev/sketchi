@@ -8,6 +8,7 @@ function icon(slug: string, collection: string, aliases: string[] = []): Sketchi
 		aliases,
 		bytes: 100,
 		collection,
+		colorMode: "multicolor",
 		keywords: [],
 		name: slug,
 		slug,

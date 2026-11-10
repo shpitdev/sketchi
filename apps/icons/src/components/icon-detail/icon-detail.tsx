@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 
 import { formatBytes } from "../../lib/format-bytes.js";
+import { IconMark } from "../icon-mark/index.js";
 import { useDialogFocus } from "../../lib/use-dialog-focus.js";
 import { PreviewToggle } from "../preview-toggle/index.js";
 
@@ -77,7 +78,7 @@ export function IconDetail({
 			</header>
 
 			<div className="icon-detail__preview" data-preview={previewMode}>
-				<img alt={`${icon.name} preview`} src={icon.svgPath} />
+				<IconMark alt={`${icon.name} preview`} icon={icon} surface={previewMode} />
 			</div>
 
 			<div className="icon-detail__preview-row">

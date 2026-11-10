@@ -1,7 +1,8 @@
 import type { IconRecipe } from "@sketchi/diagram-core";
 import { describe, expect, it } from "vitest";
 
-import { excalidrawClipboard, excalidrawLibrary, recipePreview } from "./recipe-drawing";
+import { excalidrawClipboard, excalidrawLibrary } from "./excalidraw-export";
+import { recipePreview } from "./recipe-drawing";
 
 const QUEUE: IconRecipe = {
 	parts: [

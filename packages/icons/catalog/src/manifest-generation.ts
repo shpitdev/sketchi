@@ -1,8 +1,11 @@
+import { type IconColor, isIconColor } from "./color-mode.js";
 import type { IconManifest, SketchiIcon, SketchiIconViewBox } from "./manifest.js";
 
 interface SourceIcon {
 	readonly baseSlug?: string;
 	readonly bytes: number;
+	/** Measured from the SVG by the generator, which adds it to the pipeline record. */
+	readonly color: IconColor;
 	readonly collection: string;
 	readonly slug: string;
 	readonly urlPath: string;
@@ -266,6 +269,8 @@ function isViewBox(value: unknown): value is SketchiIconViewBox {
 function isSourceIcon(value: unknown): value is SourceIcon {
 	return (
 		isRecord(value) &&
+		isRecord(value.color) &&
+		isIconColor(value.color) &&
 		typeof value.bytes === "number" &&
 		typeof value.collection === "string" &&
 		typeof value.slug === "string" &&
@@ -362,8 +367,11 @@ export function buildIconCatalog(value: unknown): GeneratedIconCatalog {
 			aliases: aliasesForIcon(icon, slug),
 			bytes: icon.bytes,
 			collection: icon.collection,
+			colorMode: icon.color.colorMode,
 			keywords: keywordsForIcon(icon),
 			name: displayNameForSourceIcon(icon),
+			...(icon.color.onDark ? { onDark: icon.color.onDark } : {}),
+			...(icon.color.onLight ? { onLight: icon.color.onLight } : {}),
 			slug,
 			svgPath: icon.urlPath,
 			...(icon.variant ? { variant: icon.variant } : {}),

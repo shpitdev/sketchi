@@ -113,6 +113,8 @@ function conceptSearchIcon(concept: ConceptIcon): SketchiIcon {
 		aliases: concept.aliases,
 		bytes: 0,
 		collection: CONCEPT_COLLECTION,
+		// Concepts are drawn by hand in the scene's ink, which follows its theme.
+		colorMode: "mono-dark",
 		keywords: [],
 		name: concept.name,
 		slug: concept.slug,

@@ -40,6 +40,7 @@ describe("Sketchi Icons MCP", () => {
 				type: "text",
 			});
 			expect(get.structuredContent).toMatchObject({
+				colorMode: "multicolor",
 				slug: "kubernetes",
 				svgUrl: "https://icons.sketchi.app/api/icons/kubernetes.svg",
 			});

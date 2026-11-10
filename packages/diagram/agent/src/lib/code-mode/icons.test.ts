@@ -29,6 +29,7 @@ function catalogIcon(
 		aliases: [],
 		bytes: 400,
 		collection: "devtools-ci",
+		colorMode: "multicolor",
 		keywords: slug.split("-"),
 		name,
 		slug,

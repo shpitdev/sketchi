@@ -8,6 +8,7 @@ const icon: SketchiIcon = {
 	aliases: [],
 	bytes: 1802,
 	collection: "ai-apps-agents",
+	colorMode: "multicolor",
 	keywords: ["ai", "agents"],
 	name: "Codex",
 	slug: "codex",
@@ -39,5 +40,19 @@ describe("IconCard", () => {
 		fireEvent.click(screen.getByRole("button", { name: /view codex details/i }));
 		expect(onToggleSelected).toHaveBeenCalledWith(icon);
 		expect(onDetails).toHaveBeenCalledWith(icon);
+	});
+
+	it("inverts a neutral mark and plates a multicolor one only on the surface it would vanish into", () => {
+		const { container, rerender } = render(
+			<IconCard icon={{ ...icon, colorMode: "mono-dark", onDark: "invert" }} previewMode="dark" />,
+		);
+		const mark = () => container.querySelector(".icon-mark");
+		expect(mark()?.getAttribute("data-treatment")).toBe("invert");
+		rerender(
+			<IconCard icon={{ ...icon, colorMode: "mono-dark", onDark: "invert" }} previewMode="light" />,
+		);
+		expect(mark()?.hasAttribute("data-treatment")).toBe(false);
+		rerender(<IconCard icon={{ ...icon, onDark: "plate" }} previewMode="dark" />);
+		expect(mark()?.getAttribute("data-treatment")).toBe("plate");
 	});
 });

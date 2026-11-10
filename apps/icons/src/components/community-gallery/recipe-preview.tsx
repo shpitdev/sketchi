@@ -1,4 +1,4 @@
-import type { IconRecipe } from "@sketchi/diagram-core";
+import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 import { useMemo } from "react";
 
 import { RECIPE_PREVIEW_SIZE, recipePreview } from "../../lib/recipe-drawing.js";

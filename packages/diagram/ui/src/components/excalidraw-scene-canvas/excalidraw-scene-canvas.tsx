@@ -58,6 +58,8 @@ export interface ExcalidrawSceneCanvasProps {
 	onSceneChange?: (scene: ExcalidrawScene) => void;
 	revision?: number | string;
 	scene: ExcalidrawCanvasScene;
+	/** Excalidraw's dark theme inverts the canvas and the SVG marks on it. */
+	theme?: "dark" | "light";
 	title: string;
 	viewModeEnabled?: boolean;
 	zenModeEnabled?: boolean;
@@ -94,6 +96,7 @@ export function ExcalidrawSceneCanvas({
 	onSceneChange,
 	revision = "scene",
 	scene,
+	theme = "light",
 	title,
 	viewModeEnabled = false,
 	zenModeEnabled = true,
@@ -189,7 +192,7 @@ export function ExcalidrawSceneCanvas({
 						gridModeEnabled={false}
 						initialData={initialData}
 						name={title}
-						theme="light"
+						theme={theme}
 						UIOptions={{
 							canvasActions: {
 								loadScene: false,

@@ -1,3 +1,5 @@
+import { type IconColor, isIconColor } from "./color-mode.js";
+
 export interface SketchiIconViewBox {
 	readonly height: number;
 	readonly minX: number;
@@ -5,7 +7,7 @@ export interface SketchiIconViewBox {
 	readonly width: number;
 }
 
-export interface SketchiIcon {
+export interface SketchiIcon extends IconColor {
 	readonly aliases: readonly string[];
 	readonly bytes: number;
 	readonly collection: string;
@@ -48,6 +50,7 @@ function isViewBox(value: unknown): value is SketchiIconViewBox {
 function isSketchiIcon(value: unknown): value is SketchiIcon {
 	return (
 		isRecord(value) &&
+		isIconColor(value) &&
 		isStringArray(value.aliases) &&
 		typeof value.bytes === "number" &&
 		typeof value.collection === "string" &&

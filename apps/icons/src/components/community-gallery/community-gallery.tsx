@@ -5,7 +5,6 @@ import { useCallback, useRef, useState } from "react";
 import { copyText, downloadBlob } from "../../lib/actions.js";
 import { bareSlug, type CommunityIconEntry } from "../../lib/community-client.js";
 import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
-import { excalidrawClipboard, excalidrawLibrary } from "../../lib/recipe-drawing.js";
 import { IconsChrome } from "../icon-library/icons-chrome.js";
 import { PreviewToggle, type PreviewMode } from "../preview-toggle/index.js";
 import { CommunityCard } from "./community-card.js";
@@ -36,10 +35,17 @@ function plural(count: number, one: string, many: string): string {
 	return `${count.toLocaleString()} ${count === 1 ? one : many}`;
 }
 
-function libraryFile(icons: readonly CommunityIconEntry[]): Blob {
-	return new Blob([excalidrawLibrary(icons, window.location.origin)], {
-		type: "application/vnd.excalidrawlib+json",
-	});
+const loadExcalidrawExport = () => import("../../lib/excalidraw-export.js");
+const preloadExcalidrawExport = () => void loadExcalidrawExport();
+
+async function downloadLibrary(icons: readonly CommunityIconEntry[], name: string): Promise<void> {
+	const { excalidrawLibrary } = await loadExcalidrawExport();
+	downloadBlob(
+		new Blob([excalidrawLibrary(icons, window.location.origin)], {
+			type: "application/vnd.excalidrawlib+json",
+		}),
+		name,
+	);
 }
 
 export function CommunityGallery({
@@ -99,26 +105,33 @@ export function CommunityGallery({
 	);
 
 	const copyForExcalidraw = useCallback(
-		(icon: CommunityIconEntry) =>
-			void copy(
+		async (icon: CommunityIconEntry) => {
+			const { excalidrawClipboard } = await loadExcalidrawExport();
+			await copy(
 				excalidrawClipboard({ slug: bareSlug(icon.slug), recipe: icon.recipe }),
 				`${icon.name} copied. Paste it into Excalidraw.`,
 				icon,
-			),
+			);
+		},
 		[copy],
 	);
 
 	function runDetailAction(action: CommunityDetailAction, icon: CommunityIconEntry) {
-		if (action === "copy-excalidraw") copyForExcalidraw(icon);
+		if (action === "copy-excalidraw") void copyForExcalidraw(icon);
 		else if (action === "copy-slug") void copy(icon.slug, `${icon.slug} copied.`, icon);
-		else downloadBlob(libraryFile([icon]), `${bareSlug(icon.slug)}.excalidrawlib`);
+		else void downloadLibrary([icon], `${bareSlug(icon.slug)}.excalidrawlib`);
 	}
 
 	const searching = query.trim() !== "";
 
 	return (
 		<TooltipProvider>
-			<div className="icons-product">
+			{/* The first pointer or focus on the page fetches the export code, so a copy never waits on it. */}
+			<div
+				className="icons-product"
+				onFocus={preloadExcalidrawExport}
+				onPointerOver={preloadExcalidrawExport}
+			>
 				<IconsChrome detailOpen={Boolean(detailIcon)} homeHref={homeHref} section="community">
 					<main
 						aria-hidden={detailIcon ? "true" : undefined}
@@ -160,9 +173,7 @@ export function CommunityGallery({
 								<button
 									className="community-download"
 									disabled={icons.length === 0}
-									onClick={() =>
-										downloadBlob(libraryFile(icons), "sketchi-community.excalidrawlib")
-									}
+									onClick={() => void downloadLibrary(icons, "sketchi-community.excalidrawlib")}
 									type="button"
 								>
 									<Download aria-hidden="true" />
@@ -246,7 +257,7 @@ export function CommunityGallery({
 												copied={copiedSlug === icon.slug}
 												icon={icon}
 												key={icon.slug}
-												onCopy={copyForExcalidraw}
+												onCopy={(icon) => void copyForExcalidraw(icon)}
 												onDetails={(picked) =>
 													setDetail({
 														opener:

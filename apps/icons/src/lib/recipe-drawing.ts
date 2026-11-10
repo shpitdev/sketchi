@@ -1,12 +1,13 @@
+// Subpath imports: the package entry point would ship every diagram family to a
+// page that only draws icons.
+import { fnv1a32 } from "@sketchi/diagram-core/hash";
 import {
-	fnv1a32,
 	ICON_RECIPE_GRID,
 	ICON_RECIPE_INK,
 	ICON_RECIPE_PAPER,
 	type IconRecipe,
 	type IconRecipePoint,
-} from "@sketchi/diagram-core";
-import { iconRecipeElements } from "@sketchi/diagram-excalidraw";
+} from "@sketchi/diagram-core/icon-recipe";
 import rough from "roughjs";
 
 /** The preview's square, in SVG units. */
@@ -158,52 +159,4 @@ export function recipePreview(recipe: IconRecipe, palette: RecipePalette): Recip
 		});
 	});
 	return { parts };
-}
-
-/** Where an icon lands in Excalidraw: a 96px square, drawn in the default ink on white. */
-function excalidrawElements(icon: { readonly slug: string; readonly recipe: IconRecipe }) {
-	return iconRecipeElements(icon.recipe, {
-		box: { x: 0, y: 0, size: RECIPE_PREVIEW_SIZE },
-		id: `community-${icon.slug}`,
-		ink: "#1e1e1e",
-		paper: "#ffffff",
-		roughness: 1,
-		customData: { sketchiCommunityIcon: icon.slug },
-	});
-}
-
-/** Clipboard text Excalidraw pastes as editable shapes. */
-export function excalidrawClipboard(icon: {
-	readonly slug: string;
-	readonly recipe: IconRecipe;
-}): string {
-	return JSON.stringify({
-		type: "excalidraw/clipboard",
-		elements: excalidrawElements(icon),
-		files: {},
-	});
-}
-
-/** An Excalidraw library file holding each icon as one item. */
-export function excalidrawLibrary(
-	icons: readonly {
-		readonly slug: string;
-		readonly name: string;
-		readonly recipe: IconRecipe;
-		readonly createdAt: string;
-	}[],
-	source: string,
-): string {
-	return JSON.stringify({
-		type: "excalidrawlib",
-		version: 2,
-		source,
-		libraryItems: icons.map((icon) => ({
-			id: `community-${icon.slug}`,
-			status: "published",
-			name: icon.name,
-			created: Date.parse(icon.createdAt) || 0,
-			elements: excalidrawElements(icon),
-		})),
-	});
 }

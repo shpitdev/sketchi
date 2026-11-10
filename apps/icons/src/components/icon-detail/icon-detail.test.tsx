@@ -8,6 +8,7 @@ const icon: SketchiIcon = {
 	aliases: ["postgres", "psql"],
 	bytes: 1901,
 	collection: "data-storage",
+	colorMode: "multicolor",
 	keywords: ["data", "database"],
 	name: "PostgreSQL",
 	slug: "postgresql",

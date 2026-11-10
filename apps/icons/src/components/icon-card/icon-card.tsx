@@ -1,6 +1,8 @@
 import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 import { Check, Info } from "lucide-react";
 
+import { IconMark } from "../icon-mark/index.js";
+
 export interface IconCardProps {
 	readonly active?: boolean;
 	readonly copied?: boolean;
@@ -44,7 +46,7 @@ export function IconCard({
 				type="button"
 			>
 				<span className="icon-card__preview" data-preview={previewMode}>
-					<img alt="" loading="lazy" src={icon.svgPath} />
+					<IconMark icon={icon} lazy surface={previewMode} />
 					<span className="icon-card__copy-cue">
 						{copying ? "Copying" : copied ? "Copied" : "Copy SVG"}
 					</span>

@@ -97,6 +97,29 @@ export const EditableNodeLogosLeftToRight: Story = {
 	tags: ["test"],
 };
 
+/** Excalidraw's dark theme inverts SVG marks with the canvas: black marks turn light, brand colors keep their hue. */
+export const NodeLogosDark: Story = {
+	args: {
+		scene: convertSceneToExcalidraw(nodeLogoScene("TB")),
+		theme: "dark",
+		title: "Deploy pipeline with node logos in dark mode",
+		viewModeEnabled: true,
+		zenModeEnabled: true,
+	},
+	tags: ["test"],
+};
+
+export const HandDrawnNodeLogosDark: Story = {
+	args: {
+		scene: convertSceneToExcalidraw(handDrawnLogoScene()),
+		theme: "dark",
+		title: "Deploy pipeline with hand-drawn node logos in dark mode",
+		viewModeEnabled: true,
+		zenModeEnabled: true,
+	},
+	tags: ["test"],
+};
+
 /** Catalog marks drawn by hand from their recipes, beside an embedded SVG mark without one. */
 export const HandDrawnNodeLogos: Story = {
 	args: {

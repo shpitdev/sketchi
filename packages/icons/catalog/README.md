@@ -15,8 +15,9 @@ for embedding marks inside diagram nodes.
 ## Entry points
 
 - `@sketchi/icon-catalog`: manifest types and decoding, `searchIcons`,
-  `isNodeLogoEligible`, and `normalizeNodeLogoSvg`. It carries no catalog data,
-  so browser code can import it.
+  `iconColor`, `isNodeLogoEligible`, `normalizeNodeLogoSvg` and
+  `nodeLogoSvgForPaper`. It carries no catalog data, so browser code can
+  import it.
 - `@sketchi/icon-catalog/catalog`: the generated catalog (`iconManifest`,
   `getIconBySlug`, `getIconSourcePath`, `getIconSourceFile`, `nodeLogoIcons`).
 - `@sketchi/icon-catalog/native-icons`: the built map of hand-drawn recipes by
@@ -49,6 +50,13 @@ under that cap, so every mark is a node logo; shrink an oversized source
 rather than raising the cap. `normalizeNodeLogoSvg` adds the intrinsic
 `width` and `height` from the viewBox, because browsers size a viewBox-only SVG
 image as 300x150 and distort it when drawing into a square.
+
+Each mark's `colorMode`, `onDark` and `onLight` come from its pixels (see
+below). The built node logos are ready for diagram paper: `nodeLogoSvgForPaper`
+inverts a neutral mark lost on a light surface and puts a multicolor one on a
+dark plate. Excalidraw's dark theme inverts SVG images with the canvas, so a
+mark that reads on the light canvas reads on the dark one too, with its brand
+colors' lightness flipped.
 
 ## Hand-drawn icons
 
@@ -86,6 +94,17 @@ logo in `src/generated/look-alikes.json` and ranks the marks a new logo most
 resembles, which the icon draw service shows its judge. A test fails when a
 mark's source changes without the index; regenerate it with
 `pnpm nx generate-look-alikes icon-catalog`.
+
+## Light and dark surfaces
+
+`pnpm nx generate-catalog icon-catalog` renders every SVG on a transparent
+canvas and classifies it (`src/color-mode.ts`): `mono-dark` or `mono-light`
+for one neutral ink, `multicolor` for brand colors. `onDark` and `onLight` name
+what keeps a mark visible on a surface it would blend into: `invert` for a
+neutral mark, `plate` for a multicolor one, whose colors are never changed. A
+backdrop tile that blends in leaves the mark drawn on it, and paint enclosed
+by other paint reads as a cutout, so neither alone calls for treatment. A test
+fails when a source changes without the manifest.
 
 ## Commands
 

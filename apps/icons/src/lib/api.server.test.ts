@@ -58,6 +58,7 @@ describe("icon HTTP API", () => {
 		const request = new Request("https://icons.test/api/icons/postgresql");
 		const detail = await handleIconDetailRequest(request, "postgresql", sourceLoader);
 		await expect(detail.json()).resolves.toMatchObject({
+			colorMode: "multicolor",
 			name: "PostgreSQL",
 			slug: "postgresql",
 			svg: '<svg viewBox="0 0 24 24" />',
@@ -71,6 +72,21 @@ describe("icon HTTP API", () => {
 		expect(raw.headers.get("Content-Type")).toContain("image/svg+xml");
 		expect(raw.headers.get("Access-Control-Allow-Origin")).toBe("*");
 		await expect(raw.text()).resolves.toBe('<svg viewBox="0 0 24 24" />');
+	});
+
+	it("says how each mark stays visible on dark and light backgrounds", async () => {
+		const payload = (await handleIconSearchRequest(
+			new Request("https://icons.test/api/icons?q=vercel&limit=1"),
+		).json()) as { results: unknown[] };
+		expect(payload.results[0]).toMatchObject({
+			colorMode: "mono-dark",
+			onDark: "invert",
+			slug: "vercel",
+		});
+		const aws = (await handleIconSearchRequest(
+			new Request("https://icons.test/api/icons?q=aws&limit=1"),
+		).json()) as { results: unknown[] };
+		expect(aws.results[0]).toMatchObject({ colorMode: "multicolor", onDark: "plate", slug: "aws" });
 	});
 
 	it("caps result limits and returns stable 404s", async () => {
