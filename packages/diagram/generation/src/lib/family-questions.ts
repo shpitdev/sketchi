@@ -1,7 +1,7 @@
 /**
- * Every word Jev reads when it narrows an untyped request to the diagram families it could
- * mean, and the thresholds code reads its answers with. Nothing here names a scenario: each
- * option says what a family draws, and what separates it from the families it is confused with.
+ * Every word Jev reads when it decides an untyped request's diagram family, and the thresholds
+ * code reads its answers with. Nothing here names a scenario: each option says what a family
+ * draws, and what separates it from the families it is confused with.
  */
 import type { DiagramTypeValue } from "@sketchi/diagram-core";
 import { Decision } from "effect/ai";
@@ -10,14 +10,14 @@ import { Schema } from "effect";
 /** Pinned, not an alias, so a graded result stays reproducible. */
 export const FAMILY_NARROWING_MODEL = "jev-1.14.0";
 
-/** A Noul above `yes` reads as yes, below `no` as no; between, the question is not settled. */
+/** An answer above `yes` reads as yes, below `no` as no; between, the question is not settled. */
 export const FAMILY_THRESHOLDS = {
-	/** A re-check's Choice at or above this, with its own Noul a yes, settles one family. */
+	/** A re-check's Choice at or above this decides its family without a separating question. */
 	sure: 0.7,
 	yes: 0.7,
 	no: 0.3,
-	/** The most families a narrowed prompt carries; more gets the full prompt. */
-	maxFamilies: 3,
+	/** How many of the ranked options the re-check reads. */
+	shortlist: 3,
 } as const;
 
 export interface FamilyOption {
@@ -87,12 +87,13 @@ export const FAMILY_OPTIONS = {
 	timeline: {
 		family: "timeline",
 		label: "timeline",
-		content: "events or milestones in the order they happen, with or without dates",
+		content:
+			"a chronology of events or a roadmap of milestones, in the order they happen, with or without dates",
 		detail: {
 			draws:
-				"Events, milestones or phases placed along one line in the order they happen, by date or by sequence.",
+				"Events, milestones or stages placed along one line in the order they happen, by date or by sequence, as in a history or a roadmap.",
 			not_for:
-				"tasks with durations and dependencies on a schedule, which is a Gantt chart; numbers over time, which is a line chart.",
+				"a plan of phases or workstreams that each run over dates or a duration, which is a Gantt chart; numbers over time, which is a line chart.",
 		},
 	},
 	data_chart: {
@@ -118,11 +119,12 @@ export const FAMILY_OPTIONS = {
 	gantt_chart: {
 		family: "gantt",
 		label: "Gantt chart",
-		content: "project tasks with start dates, durations or end dates",
+		content: "a plan of phases, tasks or workstreams, each running over dates or a duration",
 		detail: {
 			draws:
-				"A project schedule: tasks with start dates, durations or end dates, grouped in phases, with dependencies and milestones.",
-			not_for: "single dated events without durations, which is a timeline.",
+				"A plan on a time axis: phases, tasks or workstreams, each a bar from its start to its end, optionally in lanes, with milestones.",
+			not_for:
+				"a chronology of events or a roadmap of milestones, each at one point in time or with no dates, which is a timeline.",
 		},
 	},
 	er_diagram: {
@@ -253,17 +255,9 @@ export const whichOfShortlistQuestion = (options: readonly FamilyOptionName[]) =
 		criteria: criteria(options, (option) => ({ kind: option.label, ...option.detail })),
 	});
 
-/** One Noul per shortlisted option: would this kind draw what the request asks for? */
-export const kindFitsQuestion = (option: FamilyOptionName) => {
-	const { detail, label } = FAMILY_OPTIONS[option];
-	return Decision.probability({
-		instructions: {
-			question: `Would a ${label} draw what \`request\` asks for?`,
-			[`a ${label} draws`]: detail.draws,
-		},
-		criteria: {
-			true: `The request states what a ${label} draws.`,
-			false: `The request asks for something else, such as ${detail.not_for}`,
-		},
-	});
-};
+/**
+ * The question that separates two kinds the re-check leaves close: the same Choice over just
+ * those two, so a third option cannot split either one's share.
+ */
+export const separatingQuestion = (a: FamilyOptionName, b: FamilyOptionName) =>
+	whichOfShortlistQuestion([a, b]);

@@ -41,13 +41,16 @@ response, and candidate helpers stay independent of runtime wiring.
 
 ## Family routing
 
-An untyped request carries every family's rules unless routing narrows it.
-`withNarrowedFamilyRoute` reads the request's words first: one named family gets
-that family's typed prompt, two or three get only their rules. When the words
-name no family and the host provides `DiagramFamilyNarrowing`, Jev
-(`typesafe/jev-1.14.0` on Workers AI) picks the families in
-`family-narrowing.ts`, with its questions and thresholds in
-`family-questions.ts`. An error or timeout falls back to the words. Studio
+An untyped request gets one family's typed prompt, and code decides which.
+`withNarrowedFamilyRoute` reads the request's words first: a request that names
+one family gets it. Otherwise, when the host provides `DiagramFamilyNarrowing`,
+Jev (`typesafe/jev-1.14.0` on Workers AI) answers questions about the request
+and `family-narrowing.ts` decides the family from them, among the families the
+request names when it names several. When the re-check leaves two families
+close, a question that separates the two decides. Its questions and thresholds
+live in `family-questions.ts`. The generation model chooses, from every family's
+rules, only when Jev finds no kind fits; an error or timeout falls back to the
+words. Studio
 composes `workersAiFamilyNarrowingLayer` over its `AI` binding, so no API key is
 involved; `jev-workers-ai.ts` answers DecisionModel questions there. The route is internal: it shows only on spans
 (`diagramGeneration.familyNarrowing.round`, and `family_route`,

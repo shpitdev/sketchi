@@ -199,7 +199,7 @@ WITH RECURSIVE
 				FILTER (s.name = 'diagramGeneration.gatewayChat.attempt') AS first_input_messages,
 			arg_min(s.attributes->'sketchi.output', s.start_time)
 				FILTER (s.name = 'diagramGeneration.coverage.check') AS coverage_issues,
-			-- Jev's requests narrowing an untyped request's families, before generation.
+			-- Jev's requests deciding an untyped request's family, before generation.
 			count(*) FILTER (s.name = 'diagramGeneration.familyNarrowing.round') AS jev_rounds,
 			sum(s.duration_ms) FILTER (s.name = 'diagramGeneration.familyNarrowing.round') AS jev_ms,
 			sum((s.attributes->>'gen_ai.usage.input_tokens')::BIGINT)
