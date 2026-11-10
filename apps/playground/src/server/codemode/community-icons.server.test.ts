@@ -45,6 +45,26 @@ describe("Studio community icons", () => {
 		expect(studioCommunityIcons(database)).toBe(source);
 	});
 
+	it("searches visible icons only, under their community slugs", async () => {
+		const database = sqliteDatabase();
+		const source = studioCommunityIcons(database);
+		expect(await Effect.runPromise(source.search("ring", 5))).toEqual([]);
+		for (const [slug, hidden] of [
+			["ring", 0],
+			["ring-hidden", 1],
+		] as const) {
+			await database
+				.prepare(
+					"INSERT INTO community_icons (slug, name, recipe, colors, hash, verdict, created_at, hidden) VALUES (?, ?, ?, '[]', ?, NULL, '2026-11-08T00:00:00.000Z', ?)",
+				)
+				.bind(slug, "Ring", JSON.stringify(RING), slug, hidden)
+				.run();
+		}
+		expect(await Effect.runPromise(source.search("ring", 5))).toEqual([
+			{ slug: "community/ring", name: "Ring", recipe: RING },
+		]);
+	});
+
 	it("draws no community icons when the store cannot be read", async () => {
 		const broken: CommunityIconDatabase = {
 			prepare: () => {
@@ -54,5 +74,6 @@ describe("Studio community icons", () => {
 		expect(await Effect.runPromise(studioCommunityIcons(broken).load(["community/ring"]))).toEqual(
 			[],
 		);
+		expect(await Effect.runPromise(studioCommunityIcons(broken).search("ring", 5))).toEqual([]);
 	});
 });

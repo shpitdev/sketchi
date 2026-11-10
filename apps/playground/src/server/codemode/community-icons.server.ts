@@ -4,6 +4,7 @@ import {
 	bareCommunitySlug,
 	communityDiagramSlug,
 	makeCommunityIconStore,
+	type CommunityIcon,
 	type CommunityIconDatabase,
 } from "@sketchi/community-icons";
 import type { CodeModeCommunityIcons } from "@sketchi/diagram-agent";
@@ -20,22 +21,27 @@ export function studioCommunityIcons(database: CommunityIconDatabase): CodeModeC
 	const cached = sources.get(database);
 	if (cached) return cached;
 	const store = makeCommunityIconStore(database);
-	const source: CodeModeCommunityIcons = {
-		load: (slugs) =>
-			store.getMany(slugs.map(bareCommunitySlug)).pipe(
-				Effect.map((icons) =>
-					icons.map((icon) => ({
-						slug: communityDiagramSlug(icon.slug),
-						name: icon.name,
-						recipe: icon.recipe,
-					})),
-				),
-				Effect.catchTag("CommunityIconStorageError", (error) =>
-					Effect.logWarning("Community icons unavailable", { error_tag: error._tag }).pipe(
-						Effect.as([]),
-					),
+	const forDiagrams = <E extends { readonly _tag: string }>(
+		read: Effect.Effect<readonly CommunityIcon[], E>,
+	) =>
+		read.pipe(
+			Effect.map((icons) =>
+				icons.map((icon) => ({
+					slug: communityDiagramSlug(icon.slug),
+					name: icon.name,
+					recipe: icon.recipe,
+				})),
+			),
+			Effect.catch((error) =>
+				Effect.logWarning("Community icons unavailable", { error_tag: error._tag }).pipe(
+					Effect.as([]),
 				),
 			),
+		);
+	const source: CodeModeCommunityIcons = {
+		load: (slugs) => forDiagrams(store.getMany(slugs.map(bareCommunitySlug))),
+		search: (query, limit) =>
+			forDiagrams(store.search({ query, limit }).pipe(Effect.map((page) => page.icons))),
 	};
 	sources.set(database, source);
 	return source;

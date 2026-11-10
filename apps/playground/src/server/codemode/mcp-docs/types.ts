@@ -1,3 +1,4 @@
+import { DrawnIconSchema } from "@sketchi/diagram-core";
 import { Schema } from "effect";
 import {
 	ApplyDiagramPatchRequestSchema,
@@ -288,6 +289,7 @@ const sharedContracts = [
 	["DiagramSelector", DiagramSelectorSchema],
 	["CanvasElement", SceneElementSchema],
 	["IconRecipe", IconRecipeSchema],
+	["DrawnIcon", DrawnIconSchema],
 	["CanvasSpec", CanvasSpecSchema],
 ] as const;
 

@@ -1,6 +1,6 @@
 import generatedCatalogJson from "./generated/icon-catalog.json" with { type: "json" };
 import { decodeIconManifest, type IconManifest, type SketchiIcon } from "./manifest.js";
-import { isNodeLogoEligible } from "./node-logos.js";
+import { isNodeLogoEligible, isStandaloneWordmark } from "./node-logos.js";
 
 interface IconCatalog {
 	readonly manifest: IconManifest;
@@ -50,6 +50,10 @@ export const iconManifest = catalog.manifest;
 /** Catalog marks that diagrams may embed inside nodes, in manifest order. */
 export const nodeLogoIcons: readonly SketchiIcon[] =
 	catalog.manifest.icons.filter(isNodeLogoEligible);
+
+/** Wordmarks that diagrams may place as standalone icons, in manifest order. */
+export const standaloneWordmarkIcons: readonly SketchiIcon[] =
+	catalog.manifest.icons.filter(isStandaloneWordmark);
 
 export function getIconBySlug(slug: string): SketchiIcon | undefined {
 	return iconBySlug.get(slug);

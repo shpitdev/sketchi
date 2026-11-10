@@ -67,6 +67,7 @@ export function playgroundIconCatalog(
 			}),
 		recipes: nativeIcons,
 		slugLookup: "sketchi.searchIcons({ q })",
+		wordmarks: true,
 	});
 	byOrigin.set(origin, catalog);
 	return catalog;

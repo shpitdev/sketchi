@@ -10,6 +10,8 @@ import {
 	FLOWCHART_COVERAGE_CODES,
 	FLOWCHART_DIRECTIONS,
 	FlowchartDocumentSchema,
+	DrawnIconSchema,
+	IconRecipeSchema as CoreIconRecipeSchema,
 	FlowchartEditsSchema,
 	type FlowchartDocument,
 	CHART_KINDS,
@@ -608,12 +610,14 @@ const IconSlugInput = requiredString(
 );
 
 /**
- * A logo from the Sketchi icon catalog. Use an exact slug returned by
- * sketchi.searchIcons; unknown slugs are dropped with an unknown_icon warning.
+ * A logo: an exact slug returned by sketchi.searchIcons, or a drawn icon (what
+ * sketchi.drawIcon returns, or any name and recipe). Unknown slugs and
+ * undrawable recipes are dropped with a warning.
  */
 export class NodeIconSpec extends Schema.Class<NodeIconSpec>("NodeIconSpec")(
 	{
-		slug: IconSlugInput,
+		slug: optionalContract(IconSlugInput),
+		...DrawnIconSchema.fields,
 	},
 	{ identifier: undefined },
 ) {}
@@ -1788,10 +1792,15 @@ const CanvasPointList = Schema.Array(ScenePoint)
 		}),
 	);
 
-/** A catalog logo drawn top-center inside a node; size is its square edge. */
+/**
+ * A logo drawn top-center inside a node; size is its square edge. It names a
+ * slug, or carries a drawn icon's name and recipe, which the scene embeds
+ * under its drawn slug.
+ */
 export class CanvasNodeIcon extends Schema.Class<CanvasNodeIcon>("CanvasNodeIcon")(
 	{
-		slug: IconSlugInput.pipe(Schema.mutableKey),
+		slug: optionalContract(IconSlugInput).pipe(Schema.mutableKey),
+		...DrawnIconSchema.fields,
 		size: Schema.Number.check(
 			Schema.isFinite(),
 			Schema.isBetween(
@@ -1811,60 +1820,8 @@ export class CanvasNodeIcon extends Schema.Class<CanvasNodeIcon>("CanvasNodeIcon
 ) {}
 export const CanvasNodeIconSchema = CanvasNodeIcon;
 
-const IconRecipePoint = Schema.Tuple([FiniteNumber, FiniteNumber]);
-const IconRecipePoints = Schema.Array(IconRecipePoint);
-const iconRecipePaint = {
-	stroke: optionalContract(Schema.String),
-	fill: optionalContract(Schema.String),
-	pen: optionalContract(literals([1, 2])),
-};
-const IconRecipePart = Schema.Union(
-	[
-		Schema.Struct({
-			kind: stringLiteral("rect"),
-			x: FiniteNumber,
-			y: FiniteNumber,
-			width: FiniteNumber,
-			height: FiniteNumber,
-			rounded: optionalContract(Schema.Boolean),
-			...iconRecipePaint,
-		}),
-		Schema.Struct({
-			kind: stringLiteral("ellipse"),
-			cx: FiniteNumber,
-			cy: FiniteNumber,
-			rx: FiniteNumber,
-			ry: FiniteNumber,
-			...iconRecipePaint,
-		}),
-		Schema.Struct({
-			kind: stringLiteral("stroke"),
-			points: IconRecipePoints,
-			smooth: optionalContract(Schema.Boolean),
-			closed: optionalContract(Schema.Boolean),
-			...iconRecipePaint,
-		}),
-		Schema.Struct({
-			kind: stringLiteral("arrow"),
-			points: IconRecipePoints,
-			smooth: optionalContract(Schema.Boolean),
-			stroke: iconRecipePaint.stroke,
-			pen: iconRecipePaint.pen,
-		}),
-		Schema.Struct({
-			kind: stringLiteral("text"),
-			cx: FiniteNumber,
-			cy: FiniteNumber,
-			text: Schema.String,
-			size: FiniteNumber,
-			color: optionalContract(Schema.String),
-		}),
-	],
-	{ mode: "oneOf" },
-);
-
 /** A hand-drawn icon: a few primitives on a 24-unit grid. */
-export const IconRecipeSchema = Schema.Struct({ parts: Schema.Array(IconRecipePart) });
+export const IconRecipeSchema = CoreIconRecipeSchema;
 
 /**
  * Derived forms of one icon slug, the hand-drawn recipe and the exact SVG;
@@ -2053,13 +2010,41 @@ export class CanvasDistributeLayout extends Schema.Class<CanvasDistributeLayout>
 	{ identifier: undefined },
 ) {}
 
+/**
+ * A mark on its own, drawn in the largest square its box holds: a slug,
+ * wordmarks included, or a drawn icon's name and recipe.
+ */
+export class IconSceneElement extends Schema.Class<IconSceneElement>("IconSceneElement")(
+	{
+		...CanvasCompositionFields,
+		type: stringLiteral("icon"),
+		id: RequiredNonEmptyString,
+		slug: optionalContract(IconSlugInput).pipe(Schema.mutableKey),
+		...DrawnIconSchema.fields,
+		exact: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
+		x: FiniteNumber.pipe(Schema.mutableKey),
+		y: FiniteNumber.pipe(Schema.mutableKey),
+		width: PositiveNumber.pipe(Schema.mutableKey),
+		height: PositiveNumber.pipe(Schema.mutableKey),
+	},
+	{ identifier: undefined },
+) {}
+
 export const NodeSceneElementSchema = NodeSceneElement;
 export const TextSceneElementSchema = TextSceneElement;
 export const ArrowSceneElementSchema = ArrowSceneElement;
 export const LineSceneElementSchema = LineSceneElement;
 export const FrameSceneElementSchema = FrameSceneElement;
+export const IconSceneElementSchema = IconSceneElement;
 export const SceneElementSchema = Schema.Union(
-	[NodeSceneElement, TextSceneElement, ArrowSceneElement, LineSceneElement, FrameSceneElement],
+	[
+		NodeSceneElement,
+		TextSceneElement,
+		ArrowSceneElement,
+		LineSceneElement,
+		FrameSceneElement,
+		IconSceneElement,
+	],
 	{ mode: "oneOf" },
 ).annotate({ [contractOneOfAnnotation]: true });
 

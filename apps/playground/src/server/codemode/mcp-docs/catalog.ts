@@ -1,5 +1,6 @@
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
 import {
+	CANVAS_ICON_ELEMENT,
 	CANVAS_LIMITS,
 	CHART_RULES,
 	CLASS_RULES,
@@ -267,7 +268,7 @@ export const EXECUTE_CODE_DESCRIPTION = [
 		return `- ${operation}${hint ? ` (${hint})` : ""}: ${line}`;
 	}),
 	`- createCanvas: ${BUILDERS.createCanvas}.`,
-	"- drawIcon({ name, svg }) hand-draws a logo: { recipe, judge }",
+	"- drawIcon({ name, svg }) hand-draws a logo; any icon takes it",
 ].join("\n");
 
 const PATCH_OPERATION_SUMMARY = [
@@ -566,9 +567,10 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Find exact logo slugs for nodes and sequence participants before building.",
 		content: [
 			"searchIcons({ q, limit? }) ranks the Sketchi logo catalog by exact slug, name prefix, alias, then substring. Aliases such as k8s and psql work.",
-			"It returns { ok: true, query, icons: [{ slug, name, collection }] }. limit defaults to 10 and is capped at 25.",
+			'It returns { ok: true, query, icons: [{ slug, name, collection }] }. limit defaults to 10 and is capped at 25. Published community icons (collection "community", slug community/…) follow the curated marks.',
 			'Use a returned slug as a SequenceDiagramSpec participant icon ({ icon: { slug: "docker" } }) or a CanvasSpec node icon ({ icon: { slug: "docker", size: 28 } }). A flowchart needs no lookup: logos: true draws the logo each node label names, and a node\'s icon takes a product name or a slug.',
-			"Only compact brand marks are searchable: wordmarks and very large SVGs are excluded because they cannot be drawn inside a node.",
+			"When no mark fits, const logo = await sketchi.drawIcon({ name, svg }) hand-draws one; pass logo in place of any icon (icon: logo in a flowchart, { ...logo, size } on a canvas node). It draws only in this diagram and is never published.",
+			'Wordmarks answer only a query that asks for one ("Vercel wordmark") and draw only as a standalone canvas icon element, never inside a node.',
 			"Search once per technology, then build. Do not invent slugs; a slug that searchIcons did not return is dropped with an unknown_icon warning.",
 			"",
 			operationTypes("searchIcons"),
@@ -1036,7 +1038,8 @@ export const catalog: CatalogEntry[] = [
 		snippet: "Hand-place a layout no builder covers (an illustration) as a versioned CanvasSpec.",
 		content: [
 			"Use createCanvas only for layouts no builder covers, such as illustrations. UI screens and mockups are wireframes (buildWireframe). Processes, request flows and how systems or packages interact are flowcharts (buildFlowchart); database schemas are ER diagrams (buildErDiagram); object models are class diagrams (buildClassDiagram); team structures are org charts (buildOrgChart); overlapping sets are Venn diagrams (buildVennDiagram); weighted flows are Sankey diagrams (buildSankey); 2×2 matrices are quadrant charts (buildQuadrantChart); topic hierarchies, participant interactions, chronologies and bar, line or pie charts have their own builders. createCanvas accepts CanvasSpec v1, never raw Excalidraw JSON.",
-			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
+			"CanvasSpec supports bound and standalone text, rectangle/ellipse/diamond/circle/polygon shapes, lines and bound connectors with arrowheads, frames, icons, groups, layers, explicit back-to-front zOrder, and deterministic row/column/grid/stack/align/distribute layouts.",
+			`An icon element ({ type: "icon", id, slug, x, y, width, height }) draws a mark in the largest square its box holds, ${CANVAS_ICON_ELEMENT.minSize}-${CANVAS_ICON_ELEMENT.maxSize} wide; it may be a wordmark (searchIcons({ q: "Vercel wordmark" })). In place of slug, an icon element or a node's icon takes a drawIcon result.`,
 			"Every element needs a unique stable id. Connectors bind through shape nodeId values; line bindings and text containers use element ids.",
 			"Generic validation enforces size, reference, geometry, and composition invariants. Intentional overlap is allowed.",
 			"CanvasSpec does not accept SVG, HTML, scripts, data URLs, external URLs, or executable payloads. Use only the typed primitives in the contract.",

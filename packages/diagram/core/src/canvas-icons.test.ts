@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+	CANVAS_ICON_ELEMENT,
 	CANVAS_NODE_ICON,
 	CANVAS_SPEC_VERSION,
+	canvasIconElementBox,
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasNodeIconBand,
@@ -11,9 +13,12 @@ import {
 	getCanvasValidationIssues,
 	type CanvasFrameElement,
 	type CanvasIconAsset,
+	type CanvasIconElement,
 	type CanvasShapeElement,
 	type CanvasSpec,
 } from "./canvas";
+import { drawnIconSlug } from "./icon";
+import type { IconRecipe } from "./icon-recipe";
 
 const DOCKER: CanvasIconAsset = {
 	name: "Docker",
@@ -36,7 +41,7 @@ function node(id: string, overrides: Partial<CanvasShapeElement> = {}): CanvasSh
 }
 
 function canvas(
-	elements: (CanvasShapeElement | CanvasFrameElement)[],
+	elements: (CanvasShapeElement | CanvasFrameElement | CanvasIconElement)[],
 	overrides: Partial<CanvasSpec> = {},
 ): CanvasSpec {
 	return {
@@ -432,5 +437,107 @@ describe("node icon validation", () => {
 			expect.objectContaining({ code: "label_overflow" }),
 		]);
 		expect(getCanvasValidationIssues(canvas([node("plain", { height: 50 })]))).toEqual([]);
+	});
+});
+
+describe("standalone icon elements", () => {
+	function icon(id: string, overrides: Partial<CanvasIconElement> = {}): CanvasIconElement {
+		return { type: "icon", id, slug: "docker", x: 10, y: 20, width: 48, height: 48, ...overrides };
+	}
+
+	it("draw their mark in the largest square centered in their box", () => {
+		expect(canvasIconElementBox(icon("wide", { width: 160, height: 40 }))).toEqual({
+			x: 70,
+			y: 20,
+			width: 40,
+			height: 40,
+		});
+	});
+
+	it("embed their mark, and tell assetFor they stand alone", () => {
+		const asked: [string, boolean][] = [];
+		const result = embedCanvasIcons(
+			canvas([icon("a"), node("n", { icon: { slug: "docker", size: 28, exact: true } })]),
+			(slug, standalone) => {
+				asked.push([slug, standalone]);
+				return DOCKER;
+			},
+		);
+		expect(asked).toEqual([
+			["docker", true],
+			["docker", false],
+		]);
+		expect(result.scene.icons).toEqual({ docker: DOCKER });
+		expect(result.dropped).toEqual([]);
+		expect(getCanvasValidationIssues(result.scene)).toEqual([]);
+	});
+
+	it("leave the scene whole, out of zOrder and layouts, when they cannot draw", () => {
+		const result = embedCanvasIcons(
+			canvas([icon("gone", { slug: "made-up" }), icon("kept"), node("n")], {
+				layouts: [
+					{ type: "row", ids: ["gone", "kept"] },
+					{ type: "column", ids: ["gone"] },
+				],
+			}),
+			(slug) => (slug === "docker" ? DOCKER : undefined),
+		);
+		expect(result.scene.elements.map((element) => element.id)).toEqual(["kept", "n"]);
+		expect(result.scene.zOrder).toEqual(["kept", "n"]);
+		expect(result.scene.layouts).toEqual([{ type: "row", ids: ["kept"] }]);
+		expect(result.dropped).toEqual([
+			{ elementId: "gone", index: 0, reason: "unavailable", slug: "made-up" },
+		]);
+	});
+
+	it("validate their size and embedded asset", () => {
+		const scene = canvas([icon("tiny", { width: CANVAS_ICON_ELEMENT.minSize - 1 }), icon("bare")], {
+			icons: {},
+		});
+		expect(
+			getCanvasValidationIssues(scene).map(({ code, elementId, path }) => [code, elementId, path]),
+		).toEqual([
+			["invalid_icon", "tiny", "elements[0].slug"],
+			["invalid_icon", "tiny", "elements[0].width"],
+			["invalid_icon", "bare", "elements[1].slug"],
+		]);
+	});
+});
+
+describe("drawn icons", () => {
+	const RECIPE: IconRecipe = { parts: [{ kind: "ellipse", cx: 12, cy: 12, rx: 9, ry: 9 }] };
+	const DRAWN = drawnIconSlug(RECIPE);
+
+	it("keep the recipe their scene carries; no other slug takes an authored asset", () => {
+		const result = embedCanvasIcons(
+			canvas(
+				[
+					node("a", { icon: { slug: DRAWN, size: 28 } }),
+					node("b", { icon: { slug: "docker", size: 28 } }),
+				],
+				{
+					icons: {
+						[DRAWN]: { name: "Ring", recipe: RECIPE, svg: "<svg/>" },
+						docker: { name: "Forged", recipe: RECIPE },
+					},
+				},
+			),
+			() => undefined,
+		);
+		expect(result.scene.icons).toEqual({ [DRAWN]: { name: "Ring", recipe: RECIPE } });
+		expect(result.dropped).toEqual([
+			{ elementId: "b", index: 1, reason: "unavailable", slug: "docker" },
+		]);
+	});
+
+	it("drop a drawn slug whose carried recipe does not check", () => {
+		const result = embedCanvasIcons(
+			canvas([node("a", { icon: { slug: DRAWN, size: 28 } })], {
+				icons: { [DRAWN]: { name: "Ring", recipe: { parts: [] } } },
+			}),
+			() => undefined,
+		);
+		expect(result.scene.icons).toBeUndefined();
+		expect(result.dropped).toHaveLength(1);
 	});
 });

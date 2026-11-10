@@ -509,6 +509,22 @@ canvases still take `{ slug }` icons found with `sketchi.searchIcons`. Search al
 returns generic concept icons (collection `concepts`: database, queue, user, cloud,
 and others), always drawn by hand; a node's `icon` or a `{ slug }` icon attaches
 one by its slug when the node is that thing. No label fills in a concept icon.
+Published community icons follow the curated marks in search results, under
+`community/<slug>` slugs; hidden ones never appear. A wordmark answers only a query
+that asks for one ("Vercel wordmark").
+
+Wherever a slug works, an icon may instead be a drawn icon: what
+`sketchi.drawIcon` returns, or any `{ name, recipe }`. The core checker checks the
+recipe, which draws only in that diagram, under a `drawn/<hash>` slug of its
+content, and is never published. A scene keeps its drawn icons' recipes through
+edits and patches; no other slug takes an authored asset. A failed drawing (no
+recipe) or an undrawable recipe drops the icon with `icon_dropped`, and the build
+continues.
+
+A canvas `icon` element (`{ type: "icon", id, slug, x, y, width, height }`) places a
+mark on its own, drawn in the largest square its box holds. It may draw a wordmark,
+which a node's logo never does. An icon element that cannot draw is removed, with
+its `zOrder` and layout entries.
 
 ### Flowchart Checks
 

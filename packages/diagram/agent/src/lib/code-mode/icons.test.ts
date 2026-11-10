@@ -133,7 +133,7 @@ type FlowchartBuild = Awaited<ReturnType<ReturnType<typeof runtime>["buildFlowch
 /** The logo each node draws, in node order, from the document as built. */
 function nodeLogos(
 	result: FlowchartBuild | Awaited<ReturnType<ReturnType<typeof runtime>["editFlowchart"]>>,
-): (string | null | undefined)[] {
+): unknown[] {
 	if (!result.ok) throw new Error(JSON.stringify(result.issues));
 	return Object.values(result.normalizedSpec.nodes).map((node) =>
 		typeof node === "string" ? undefined : node.icon,

@@ -98,7 +98,8 @@ export const turnAlreadyAcceptedIssue: CodeModeIssue = {
 };
 
 interface LogoElement {
-	readonly icon?: { readonly slug: string } | undefined;
+	/** Studio's models name logos by slug; an icon without one draws nothing here. */
+	readonly icon?: { readonly slug?: string | undefined } | undefined;
 	readonly id: string;
 	readonly label: string;
 }
@@ -119,7 +120,7 @@ export function groundOfferedLogos<Element extends LogoElement>(
 } {
 	const offered = new Set(logos.map((logo) => logo.slug));
 	const issues: CodeModeIssue[] = elements.flatMap((element) =>
-		element.icon && !offered.has(normalizeIconSlug(element.icon.slug))
+		element.icon && !offered.has(normalizeIconSlug(element.icon.slug ?? ""))
 			? [
 					{
 						code: "unknown_icon" as const,
@@ -130,22 +131,25 @@ export function groundOfferedLogos<Element extends LogoElement>(
 							id: element.id,
 							path: `${owner.path}.icon.slug`,
 						},
-						message: `Icon "${element.icon.slug}" on ${owner.noun} "${element.id}" is not a technology the user named; the ${owner.noun} renders without a logo.`,
+						message: `Icon "${element.icon.slug ?? "drawn"}" on ${owner.noun} "${element.id}" is not a technology the user named; the ${owner.noun} renders without a logo.`,
 						hint: "Only use logos from the NODE LOGOS list.",
 					},
 				]
 			: [],
 	);
 	const placement = placeNodeLogos(
-		elements.map((element) =>
-			element.icon ? { ...element, icon: { slug: normalizeIconSlug(element.icon.slug) } } : element,
-		),
+		elements.map((element) => {
+			const slug = element.icon?.slug;
+			if (slug) return { ...element, icon: { slug: normalizeIconSlug(slug) } };
+			const { icon: _icon, ...rest } = element;
+			return rest;
+		}),
 		logos,
 		owner.noun,
 	);
 	return {
 		changed: placement.diagnostics.length > 0 || issues.length > 0,
-		elements: placement.nodes,
+		elements: placement.nodes as unknown as Element[],
 		issues,
 	};
 }

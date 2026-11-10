@@ -76,6 +76,12 @@ import {
 	type SankeyValidationIssueCode,
 	type WireframeDiagram,
 	type WireframeValidationIssueCode,
+	COMMUNITY_ICON_COLLECTION,
+	isDrawnIconSlug,
+	isIconRecipe,
+	withoutCanvasElements,
+	type CanvasIconAsset,
+	type IconRecipe,
 } from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
@@ -249,8 +255,11 @@ import {
 	catalogForRequest,
 	embedSceneIcons,
 	fillGroupLogos,
+	iconRefSlug,
 	resolveFlowchartLogos,
 	resolveNodeIcons,
+	undrawableIconIssue,
+	type CodeModeCommunityIcon,
 	type CodeModeCommunityIcons,
 	type CodeModeIconCatalog,
 } from "./icons.js";
@@ -774,7 +783,7 @@ function normalizeSequenceDiagramSpec(
 			id: cleanToolString(participant.id),
 			label: cleanToolString(participant.label),
 			...(participant.kind ? { kind: cleanToolString(participant.kind) } : {}),
-			...(participant.icon ? { icon: { slug: participant.icon.slug } } : {}),
+			...(participant.icon ? { icon: participant.icon } : {}),
 		})),
 		messages: spec.messages.map((message, index) => ({
 			id:
@@ -795,7 +804,10 @@ function toSequenceDiagram(spec: NormalizedSequenceDiagramSpec): SequenceDiagram
 		id: spec.id,
 		title: spec.title,
 		type: "sequence",
-		participants: spec.participants,
+		// resolveNodeIcons leaves every icon a slug.
+		participants: spec.participants.map(({ icon, ...participant }) =>
+			icon?.slug ? { ...participant, icon: { slug: icon.slug } } : participant,
+		),
 		messages: spec.messages,
 		style: spec.style,
 	};
@@ -1661,6 +1673,8 @@ type ArtifactExportError = CodeModeArtifactRendererNotConfigured | CodeModeArtif
 
 interface SelectorTargets {
 	arrows: PatchableArrow[];
+	/** Standalone icon elements, which only a translate moves. */
+	icons: Extract<PatchableScene["elements"][number], { type: "icon" }>[];
 	nodes: PatchableNode[];
 	texts: PatchableText[];
 }
@@ -2334,8 +2348,61 @@ function canvasExportIssues(
 	);
 }
 
+/**
+ * A canvas icon's slug: its own, or its drawn icon's under the recipe's drawn
+ * slug, recorded in `drawn`; none when it names no slug and carries no
+ * drawable recipe (undrawableCanvasIconIssues reports those).
+ */
+function canvasIconSlug(
+	ref: { readonly slug?: string; readonly name?: string; readonly recipe?: unknown },
+	drawn: Map<string, CanvasIconAsset>,
+): string | undefined {
+	const found = iconRefSlug(ref);
+	if ("problem" in found) return undefined;
+	if (ref.recipe !== undefined && !drawn.has(found.slug)) {
+		const name = ref.name ? cleanToolString(ref.name) : "";
+		drawn.set(found.slug, { name: name || "Drawn icon", recipe: ref.recipe as IconRecipe });
+	}
+	return found.slug;
+}
+
+/** Warnings for canvas icons that name no slug and carry no drawable recipe. */
+function undrawableCanvasIconIssues(scene: PatchableScene): CodeModeIssue[] {
+	return scene.elements.flatMap((element, index) => {
+		const ref = element.type === "icon" ? element : "icon" in element ? element.icon : undefined;
+		if (!ref) return [];
+		const found = iconRefSlug(ref);
+		if (!("problem" in found)) return [];
+		const owner = element.type === "icon" ? "icon element" : element.type;
+		return [
+			{
+				...undrawableIconIssue({
+					owner,
+					id: element.id,
+					path: element.type === "icon" ? `elements[${index}]` : `elements[${index}].icon`,
+					problem: found.problem,
+				}),
+				ref: {
+					kind: "element" as const,
+					id: element.id,
+					path: element.type === "icon" ? `elements[${index}]` : `elements[${index}].icon`,
+				},
+			},
+		];
+	});
+}
+
 function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | null {
 	const elements: Array<RenderedDiagramScene["elements"][number]> = [];
+	const removed = new Set<string>();
+	// A scene's drawn icons draw only from the recipes it carries, so they travel with it.
+	const drawn = new Map<string, CanvasIconAsset>(
+		Object.entries(scene.icons ?? {}).flatMap(([slug, asset]) =>
+			isDrawnIconSlug(slug) && asset.recipe && isIconRecipe(asset.recipe)
+				? [[slug, { name: asset.name, recipe: asset.recipe }] as const]
+				: [],
+		),
+	);
 
 	for (const element of scene.elements) {
 		if (element.type === "arrow") {
@@ -2370,15 +2437,16 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 			) {
 				return null;
 			}
+			const iconSlug = element.icon ? canvasIconSlug(element.icon, drawn) : undefined;
 			elements.push({
 				type: "node",
 				id: element.id,
 				nodeId: element.nodeId,
 				...(element.kind ? { kind: element.kind } : {}),
-				...(element.icon
+				...(element.icon && iconSlug
 					? {
 							icon: {
-								slug: element.icon.slug,
+								slug: iconSlug,
 								size: element.icon.size,
 								...(element.icon.exact ? { exact: true } : {}),
 							},
@@ -2457,23 +2525,47 @@ function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | 
 			continue;
 		}
 
+		if (element.type === "frame") {
+			const { icon, ...frame } = structuredClone(element);
+			const iconSlug = icon ? canvasIconSlug(icon, drawn) : undefined;
+			elements.push({
+				...frame,
+				...(icon && iconSlug
+					? { icon: { slug: iconSlug, size: icon.size, ...(icon.exact ? { exact: true } : {}) } }
+					: {}),
+			});
+			continue;
+		}
+
+		if (element.type === "icon") {
+			const { slug: _slug, name: _name, recipe: _recipe, ...placed } = structuredClone(element);
+			const slug = canvasIconSlug(element, drawn);
+			if (slug) elements.push({ ...placed, slug });
+			else removed.add(element.id);
+			continue;
+		}
+
 		elements.push(structuredClone(element));
 	}
 
-	return {
-		kind: scene.kind,
-		version: scene.version,
-		diagramId: scene.diagramId,
-		title: scene.title,
-		width: scene.width,
-		height: scene.height,
-		accentColor: scene.accentColor,
-		backgroundColor: scene.backgroundColor,
-		elements,
-		layers: structuredClone(scene.layers),
-		layouts: structuredClone(scene.layouts),
-		zOrder: [...scene.zOrder],
-	};
+	return withoutCanvasElements(
+		{
+			kind: scene.kind,
+			version: scene.version,
+			diagramId: scene.diagramId,
+			title: scene.title,
+			width: scene.width,
+			height: scene.height,
+			accentColor: scene.accentColor,
+			backgroundColor: scene.backgroundColor,
+			elements,
+			...(drawn.size > 0 ? { icons: Object.fromEntries(drawn) } : {}),
+			layers: structuredClone(scene.layers),
+			layouts: structuredClone(scene.layouts),
+			zOrder: [...scene.zOrder],
+		},
+		removed,
+	);
 }
 
 /** The authored view of a scene: node icon references without derived SVG bytes. */
@@ -2592,7 +2684,14 @@ function resolveTargets(
 		);
 	});
 
-	return { arrows, nodes, texts };
+	const icons = scene.elements.filter(
+		(element): element is SelectorTargets["icons"][number] =>
+			element.type === "icon" &&
+			scope === "all" &&
+			(!selector || !hasFilters || ids.has(element.id)),
+	);
+
+	return { arrows, icons, nodes, texts };
 }
 
 function targetIssue(operation: DiagramPatchOperation): CodeModeIssue {
@@ -2788,8 +2887,18 @@ function applyTranslate(
 	operation: Extract<DiagramPatchOperation, { op: "translate" }>,
 ): CodeModeIssue[] {
 	const targets = resolveTargets(scene, operation.selector);
-	if (targets.nodes.length === 0 && targets.arrows.length === 0 && targets.texts.length === 0) {
+	if (
+		targets.nodes.length === 0 &&
+		targets.arrows.length === 0 &&
+		targets.texts.length === 0 &&
+		targets.icons.length === 0
+	) {
 		return [targetIssue(operation)];
+	}
+
+	for (const icon of targets.icons) {
+		icon.x += operation.dx;
+		icon.y += operation.dy;
 	}
 
 	const movedNodeIds = new Set<string>();
@@ -5169,10 +5278,14 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 			},
 		});
 	}
-	const embedded = yield* embedSceneIcons(
+	const compiled = yield* embedSceneIcons(
 		compileCanvasSpec(normalized),
 		yield* catalogForRequest(environment.icons, environment.communityIcons, normalized),
 	);
+	const embedded = {
+		...compiled,
+		issues: [...undrawableCanvasIconIssues(request.spec), ...compiled.issues],
+	};
 	const scene = embedded.scene;
 	const normalizedSpec = withoutIconAssets(scene);
 	const validationIssues = getCanvasValidationIssues(scene);
@@ -5840,6 +5953,49 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 	} satisfies Extract<ApplyDiagramPatchResult, { ok: true }>;
 });
 
+/** How a community icon answers a query: exact when its name is the query, else weak. */
+function communityIconMatch(query: string, name: string): "exact" | "weak" {
+	const words = (text: string) =>
+		text
+			.toLowerCase()
+			.replace(/[^\p{L}\p{N}]+/gu, " ")
+			.trim();
+	return words(name) === words(query) ? "exact" : "weak";
+}
+
+/**
+ * Curated marks first within each match, community icons after them: exact
+ * curated, exact community, the curated vendor and weak marks, then weak
+ * community icons.
+ */
+function rankIconSearch(
+	query: string,
+	curated: ReturnType<CodeModeIconCatalog["search"]>,
+	community: readonly CodeModeCommunityIcon[],
+	limit: number,
+) {
+	const marks = curated.map(({ collection, match, name, slug }) => ({
+		slug,
+		name,
+		collection,
+		match,
+	}));
+	const drawings = community
+		.filter((icon) => !marks.some((mark) => mark.slug === icon.slug))
+		.map(({ name, slug }) => ({
+			slug,
+			name,
+			collection: COMMUNITY_ICON_COLLECTION,
+			match: communityIconMatch(query, name),
+		}));
+	return [
+		...marks.filter((icon) => icon.match === "exact"),
+		...drawings.filter((icon) => icon.match === "exact"),
+		...marks.filter((icon) => icon.match !== "exact"),
+		...drawings.filter((icon) => icon.match !== "exact"),
+	].slice(0, limit);
+}
+
 const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(function* (input: unknown) {
 	const parsed = Schema.decodeUnknownResult(SearchIconsRequestSchema, {
 		errors: "all",
@@ -5855,18 +6011,16 @@ const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(function*
 	}
 	const environment = yield* CodeModeRuntimeEnvironment;
 	const query = cleanToolString(parsed.success.q);
-	const icons =
-		environment.icons?.search(query, parsed.success.limit ?? DEFAULT_ICON_SEARCH_LIMIT) ?? [];
+	const limit = parsed.success.limit ?? DEFAULT_ICON_SEARCH_LIMIT;
+	const curated = environment.icons?.search(query, limit) ?? [];
+	const community = environment.communityIcons
+		? yield* environment.communityIcons.search(query, limit)
+		: [];
 	return {
 		ok: true,
 		status: "accepted",
 		query,
-		icons: icons.map(({ collection, match, name, slug }) => ({
-			collection,
-			name,
-			slug,
-			match,
-		})),
+		icons: rankIconSearch(query, curated, community, limit),
 		issues: environment.icons
 			? []
 			: [

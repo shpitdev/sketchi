@@ -1,6 +1,7 @@
 import {
 	type ArrowSceneElement,
 	type FrameSceneElement,
+	type IconSceneElement,
 	type LineSceneElement,
 	type NodeSceneElement,
 	type RenderedDiagramScene,
@@ -15,6 +16,7 @@ import {
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasGroupIconBox,
+	canvasIconElementBox,
 	canvasIconForm,
 	canvasNodeIconBox,
 	canvasComposedOnOutline,
@@ -452,6 +454,66 @@ function iconElements(input: {
 	});
 }
 
+/**
+ * A standalone icon: its recipe as native elements grouped under the icon's
+ * id, or its embedded SVG as one image, in the largest square its box holds.
+ * Empty when the scene embeds neither form.
+ */
+function standaloneIconElements(input: {
+	element: IconSceneElement;
+	files: Record<string, ExcalidrawBinaryFile>;
+	scene: RenderedDiagramScene;
+	usedElementIds: Set<string>;
+}): ExcalidrawElement[] {
+	const { element, scene } = input;
+	const asset =
+		scene.icons && Object.hasOwn(scene.icons, element.slug) ? scene.icons[element.slug] : undefined;
+	const form = canvasIconForm(element, asset);
+	const box = canvasIconElementBox(element);
+	const customData = { sketchiIcon: element.slug };
+	if (form === "svg" && asset?.svg !== undefined) {
+		const fileId = iconFileId(element.slug, asset.svg);
+		input.files[fileId] ??= iconFile(fileId, asset.svg);
+		// Excalidraw's SVG export selects image symbols by id, so it must be a CSS identifier.
+		const safeId = element.id.replace(/[^\w-]/gu, "-");
+		const id = safeId === element.id ? safeId : claimElementId(safeId, input.usedElementIds);
+		return [
+			{
+				...elementBase(id, element),
+				type: "image",
+				...box,
+				backgroundColor: "transparent",
+				boundElements: null,
+				crop: null,
+				customData,
+				fileId,
+				roughness: 1,
+				roundness: null,
+				scale: [1, 1],
+				status: "saved",
+				strokeColor: "transparent",
+				strokeWidth: 2,
+			},
+		];
+	}
+	if (form !== "recipe" || !asset?.recipe) return [];
+	return iconRecipeElements(asset.recipe, {
+		box: { x: box.x, y: box.y, size: box.width },
+		id: claimElementId(
+			`${element.id.replace(/[^\w-]/gu, "-")}-mark`,
+			input.usedElementIds,
+			asset.recipe.parts.length,
+		),
+		frameId: element.frameId ?? null,
+		groupIds: [...(element.groupIds ?? [])],
+		ink: DEFAULT_TEXT_COLOR,
+		paper: scene.backgroundColor,
+		customData,
+		...(element.locked === undefined ? {} : { locked: element.locked }),
+		...(element.opacity === undefined ? {} : { opacity: element.opacity }),
+	});
+}
+
 function shapeElement(input: {
 	arrowIds: readonly string[];
 	scene: RenderedDiagramScene;
@@ -847,7 +909,11 @@ function iconElementId(
 ): string {
 	// Excalidraw's SVG export selects per-element image symbols by id, so the
 	// id must be a valid CSS identifier fragment (node ids contain colons).
-	const baseId = `${node.id.replace(/[^\w-]/gu, "-")}-icon`;
+	return claimElementId(`${node.id.replace(/[^\w-]/gu, "-")}-icon`, usedElementIds, parts);
+}
+
+/** An unused id from a base, with every `${id}-${part}` id its parts take reserved too. */
+function claimElementId(baseId: string, usedElementIds: Set<string>, parts = 0): string {
 	const claimed = (id: string) => [
 		id,
 		...Array.from({ length: parts }, (_, index) => `${id}-${index}`),
@@ -963,6 +1029,15 @@ function buildElements(
 		});
 		for (const part of icon) generatedSourceIds.set(part.id, frame.id);
 		elements.push(...icon);
+	}
+
+	for (const element of sourceElements) {
+		if (element.type !== "icon") continue;
+		const parts = standaloneIconElements({ element, files, scene, usedElementIds });
+		for (const part of parts) {
+			if (part.id !== element.id) generatedSourceIds.set(part.id, element.id);
+		}
+		elements.push(...parts);
 	}
 
 	for (const text of textElements) {
