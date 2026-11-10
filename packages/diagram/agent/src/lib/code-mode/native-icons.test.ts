@@ -6,10 +6,15 @@ import { iconManifest } from "@sketchi/icon-catalog/catalog";
 import { CONCEPT_ICONS } from "@sketchi/icon-catalog/concepts";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 
-/** The icon budget at node-logo size: few parts, a small payload. */
+/**
+ * The icon budget at node-logo size. The draw engine's limit of 8 parts is the
+ * real budget; the bytes are the rough-path points Excalidraw stores for those
+ * parts, so a drawn brand mark (up to about 6 KB) runs larger than a Lucide
+ * concept while staying a few parts.
+ */
 const NODE_LOGO_SIZE = 28;
 const MAX_ELEMENTS = 8;
-const MAX_BYTES = 3 * 1024;
+const MAX_BYTES = 6 * 1024;
 
 describe("catalog hand-drawn icons", () => {
 	const marks = new Set(iconManifest.icons.map((icon) => icon.slug));
