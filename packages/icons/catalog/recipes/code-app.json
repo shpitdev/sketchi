@@ -6,8 +6,8 @@
 			"y": 3.5,
 			"width": 6,
 			"height": 3,
-			"stroke": "#bfccd6",
-			"fill": "#bfccd6"
+			"stroke": "#7792a8",
+			"fill": "#7792a8"
 		},
 		{
 			"kind": "rect",
@@ -15,8 +15,8 @@
 			"y": 3.5,
 			"width": 6,
 			"height": 3,
-			"stroke": "#bfccd6",
-			"fill": "#bfccd6"
+			"stroke": "#7792a8",
+			"fill": "#7792a8"
 		},
 		{
 			"kind": "rect",
@@ -24,8 +24,8 @@
 			"y": 6.5,
 			"width": 20,
 			"height": 15,
-			"stroke": "#bfccd6",
-			"fill": "#e1e8ed"
+			"stroke": "#7792a8",
+			"fill": "paper"
 		},
 		{
 			"kind": "stroke",

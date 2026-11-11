@@ -7,7 +7,7 @@
 			"width": 16,
 			"height": 16.5,
 			"stroke": "#215db0",
-			"fill": "#dbeaff"
+			"fill": "paper"
 		},
 		{
 			"kind": "stroke",
@@ -19,7 +19,7 @@
 			],
 			"closed": true,
 			"stroke": "#215db0",
-			"fill": "#dbeaff"
+			"fill": "paper"
 		},
 		{
 			"kind": "stroke",
@@ -56,22 +56,6 @@
 			"smooth": true,
 			"stroke": "#215db0",
 			"pen": 2
-		},
-		{
-			"kind": "stroke",
-			"points": [
-				[8.5, 13.5],
-				[8.5, 8],
-				[10.5, 6.5],
-				[12.5, 8],
-				[12.5, 14.5],
-				[14.5, 16],
-				[16.5, 14.5],
-				[16.5, 8],
-				[18.5, 6.5]
-			],
-			"smooth": true,
-			"stroke": "#4c90f0"
 		}
 	]
 }

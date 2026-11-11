@@ -9,7 +9,7 @@
 				[18, 5]
 			],
 			"smooth": true,
-			"stroke": "#a7b6c2",
+			"stroke": "#7b91a3",
 			"pen": 2
 		},
 		{
@@ -21,7 +21,7 @@
 				[18, 19]
 			],
 			"smooth": true,
-			"stroke": "#a7b6c2",
+			"stroke": "#7b91a3",
 			"pen": 2
 		},
 		{
@@ -31,8 +31,8 @@
 			"width": 9,
 			"height": 6,
 			"rounded": true,
-			"stroke": "#a7b6c2",
-			"fill": "#a7b6c2"
+			"stroke": "#7b91a3",
+			"fill": "#7b91a3"
 		},
 		{
 			"kind": "rect",
@@ -41,8 +41,8 @@
 			"width": 9,
 			"height": 6,
 			"rounded": true,
-			"stroke": "#a7b6c2",
-			"fill": "#a7b6c2"
+			"stroke": "#7b91a3",
+			"fill": "#7b91a3"
 		},
 		{
 			"kind": "rect",
@@ -51,8 +51,8 @@
 			"width": 11.5,
 			"height": 6,
 			"rounded": true,
-			"stroke": "#f29d49",
-			"fill": "#f29d49"
+			"stroke": "#d97410",
+			"fill": "#d97410"
 		}
 	]
 }

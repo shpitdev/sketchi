@@ -7,8 +7,8 @@
 			"width": 16.5,
 			"height": 15,
 			"rounded": true,
-			"stroke": "#9881f3",
-			"fill": "#bdadff"
+			"stroke": "#947cf3",
+			"fill": "#9379ff"
 		},
 		{
 			"kind": "stroke",
@@ -16,7 +16,7 @@
 				[6, 7],
 				[22.5, 7]
 			],
-			"stroke": "#9881f3"
+			"stroke": "#947cf3"
 		},
 		{
 			"kind": "rect",
@@ -62,7 +62,7 @@
 			],
 			"closed": true,
 			"stroke": "#5642a6",
-			"fill": "#bdadff",
+			"fill": "#9379ff",
 			"pen": 2
 		},
 		{

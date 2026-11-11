@@ -6,7 +6,7 @@
 			"cy": 12,
 			"rx": 9.5,
 			"ry": 9.5,
-			"stroke": "#8f99a8",
+			"stroke": "#848fa0",
 			"pen": 2
 		},
 		{
@@ -15,8 +15,8 @@
 			"y": 6,
 			"width": 2.8,
 			"height": 7.5,
-			"stroke": "#8f99a8",
-			"fill": "#8f99a8"
+			"stroke": "#848fa0",
+			"fill": "#848fa0"
 		},
 		{
 			"kind": "rect",
@@ -24,8 +24,8 @@
 			"y": 15.5,
 			"width": 2.8,
 			"height": 2.8,
-			"stroke": "#8f99a8",
-			"fill": "#8f99a8"
+			"stroke": "#848fa0",
+			"fill": "#848fa0"
 		}
 	]
 }

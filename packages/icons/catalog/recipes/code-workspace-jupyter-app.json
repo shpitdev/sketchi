@@ -13,8 +13,8 @@
 				[8, 7.2]
 			],
 			"closed": true,
-			"stroke": "#f37726",
-			"fill": "#f37726"
+			"stroke": "#ec650d",
+			"fill": "#ec650d"
 		},
 		{
 			"kind": "stroke",
@@ -29,8 +29,8 @@
 				[6, 18]
 			],
 			"closed": true,
-			"stroke": "#f37726",
-			"fill": "#f37726"
+			"stroke": "#ec650d",
+			"fill": "#ec650d"
 		},
 		{
 			"kind": "ellipse",
@@ -56,8 +56,8 @@
 			"cy": 20.8,
 			"rx": 2,
 			"ry": 2,
-			"stroke": "#9e9e9e",
-			"fill": "#9e9e9e"
+			"stroke": "#8e8e8e",
+			"fill": "#8e8e8e"
 		}
 	]
 }

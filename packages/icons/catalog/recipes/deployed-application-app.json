@@ -7,7 +7,7 @@
 			"width": 19,
 			"height": 19,
 			"rounded": true,
-			"stroke": "#8f99a8"
+			"stroke": "#848fa0"
 		},
 		{
 			"kind": "stroke",
@@ -15,7 +15,7 @@
 				[7.5, 2.5],
 				[7.5, 7.5]
 			],
-			"stroke": "#8f99a8"
+			"stroke": "#848fa0"
 		},
 		{
 			"kind": "stroke",
@@ -23,7 +23,7 @@
 				[2.5, 7.5],
 				[21.5, 7.5]
 			],
-			"stroke": "#8f99a8"
+			"stroke": "#848fa0"
 		},
 		{
 			"kind": "stroke",
@@ -31,7 +31,7 @@
 				[7.5, 7.5],
 				[7.5, 21.5]
 			],
-			"stroke": "#8f99a8"
+			"stroke": "#848fa0"
 		},
 		{
 			"kind": "stroke",
@@ -44,7 +44,7 @@
 				[15.5, 7.5]
 			],
 			"smooth": true,
-			"stroke": "#8f99a8"
+			"stroke": "#848fa0"
 		},
 		{
 			"kind": "stroke",
@@ -57,7 +57,7 @@
 				[7.5, 16.5]
 			],
 			"smooth": true,
-			"stroke": "#8f99a8"
+			"stroke": "#848fa0"
 		},
 		{
 			"kind": "stroke",
@@ -67,8 +67,8 @@
 				[9.5, 19]
 			],
 			"closed": true,
-			"stroke": "#fbb360",
-			"fill": "#fbb360",
+			"stroke": "#d67505",
+			"fill": "#d67505",
 			"pen": 2
 		}
 	]

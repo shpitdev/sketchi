@@ -8,7 +8,7 @@
 			"height": 9,
 			"rounded": true,
 			"stroke": "#2d72d2",
-			"fill": "#8abbff"
+			"fill": "#3c8dff"
 		},
 		{
 			"kind": "rect",
@@ -18,7 +18,7 @@
 			"height": 5,
 			"rounded": true,
 			"stroke": "#2d72d2",
-			"fill": "#8abbff"
+			"fill": "#3c8dff"
 		},
 		{
 			"kind": "stroke",
@@ -32,7 +32,7 @@
 			],
 			"closed": true,
 			"stroke": "#2d72d2",
-			"fill": "#8abbff"
+			"fill": "paper"
 		},
 		{
 			"kind": "stroke",

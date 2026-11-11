@@ -15,8 +15,8 @@
 				[2, 18]
 			],
 			"closed": true,
-			"stroke": "#8f99a8",
-			"fill": "#8f99a8"
+			"stroke": "#848fa0",
+			"fill": "#848fa0"
 		},
 		{
 			"kind": "stroke",
@@ -51,8 +51,8 @@
 				[6.2, 11.5]
 			],
 			"closed": true,
-			"stroke": "#8f99a8",
-			"fill": "#8f99a8"
+			"stroke": "#848fa0",
+			"fill": "#848fa0"
 		}
 	]
 }

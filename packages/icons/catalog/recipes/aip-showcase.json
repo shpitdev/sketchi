@@ -13,8 +13,8 @@
 				[2.5, 20]
 			],
 			"closed": true,
-			"stroke": "#9782f3",
-			"fill": "#9782f3"
+			"stroke": "#937df2",
+			"fill": "#937df2"
 		},
 		{
 			"kind": "stroke",
@@ -28,8 +28,8 @@
 				[15, 15]
 			],
 			"closed": true,
-			"stroke": "#56a5d7",
-			"fill": "#56a5d7"
+			"stroke": "#3a96d0",
+			"fill": "#3a96d0"
 		},
 		{
 			"kind": "stroke",
@@ -41,8 +41,8 @@
 				[10, 21.5]
 			],
 			"closed": true,
-			"stroke": "#1cc3be",
-			"fill": "#1cc3be"
+			"stroke": "#179e9a",
+			"fill": "#179e9a"
 		},
 		{
 			"kind": "rect",
@@ -60,8 +60,8 @@
 			"width": 4.5,
 			"height": 6.5,
 			"rounded": true,
-			"stroke": "#56a5d7",
-			"fill": "#56a5d7"
+			"stroke": "#3a96d0",
+			"fill": "#3a96d0"
 		}
 	]
 }

@@ -7,7 +7,7 @@
 			"width": 21,
 			"height": 21,
 			"rounded": true,
-			"stroke": "#8f99a8",
+			"stroke": "#848fa0",
 			"pen": 2
 		},
 		{
@@ -16,8 +16,8 @@
 			"y": 6,
 			"width": 12,
 			"height": 12,
-			"stroke": "#3fa6da",
-			"fill": "#97dafc"
+			"stroke": "#2897cf",
+			"fill": "#0696e0"
 		},
 		{
 			"kind": "rect",

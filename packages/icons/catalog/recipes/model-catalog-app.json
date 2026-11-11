@@ -17,7 +17,7 @@
 			"width": 14.5,
 			"height": 14,
 			"stroke": "#7961db",
-			"fill": "#e2dbff"
+			"fill": "paper"
 		},
 		{
 			"kind": "rect",
@@ -26,8 +26,8 @@
 			"width": 15,
 			"height": 2.5,
 			"rounded": true,
-			"stroke": "#9881f3",
-			"fill": "#9881f3"
+			"stroke": "paper",
+			"fill": "paper"
 		},
 		{
 			"kind": "stroke",
@@ -44,7 +44,7 @@
 			"smooth": true,
 			"closed": true,
 			"stroke": "#7961db",
-			"fill": "#9881f3",
+			"fill": "#947cf3",
 			"pen": 2
 		}
 	]

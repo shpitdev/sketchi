@@ -6,7 +6,7 @@
 				[4.4, 4.4],
 				[4.4, 19.6]
 			],
-			"stroke": "#8cabd7",
+			"stroke": "#6890ca",
 			"pen": 2
 		},
 		{
@@ -15,7 +15,7 @@
 			"cy": 4.4,
 			"rx": 2.6,
 			"ry": 2.6,
-			"stroke": "#8cabd7",
+			"stroke": "#6890ca",
 			"fill": "#215db0",
 			"pen": 2
 		},
@@ -25,7 +25,7 @@
 			"cy": 19.6,
 			"rx": 2.6,
 			"ry": 2.6,
-			"stroke": "#8cabd7",
+			"stroke": "#6890ca",
 			"fill": "#215db0",
 			"pen": 2
 		},
@@ -35,7 +35,7 @@
 			"cy": 10.2,
 			"rx": 2.6,
 			"ry": 2.6,
-			"stroke": "#8cabd7",
+			"stroke": "#6890ca",
 			"fill": "#215db0",
 			"pen": 2
 		},
@@ -45,7 +45,7 @@
 			"cy": 19.6,
 			"rx": 2.6,
 			"ry": 2.6,
-			"stroke": "#8cabd7",
+			"stroke": "#6890ca",
 			"fill": "#215db0",
 			"pen": 2
 		},
@@ -57,7 +57,7 @@
 				[10, 5]
 			],
 			"smooth": true,
-			"stroke": "#8cabd7",
+			"stroke": "#6890ca",
 			"pen": 2
 		},
 		{
@@ -68,7 +68,7 @@
 				[10, 14.4]
 			],
 			"smooth": true,
-			"stroke": "#8cabd7",
+			"stroke": "#6890ca",
 			"pen": 2
 		}
 	]

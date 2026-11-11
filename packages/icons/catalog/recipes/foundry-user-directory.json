@@ -6,8 +6,8 @@
 			"cy": 8,
 			"rx": 6.5,
 			"ry": 6.5,
-			"stroke": "#8f99a8",
-			"fill": "#8f99a8"
+			"stroke": "#848fa0",
+			"fill": "#848fa0"
 		},
 		{
 			"kind": "ellipse",
@@ -24,7 +24,7 @@
 				[12, 13],
 				[3.5, 21]
 			],
-			"stroke": "#8f99a8",
+			"stroke": "#848fa0",
 			"pen": 2
 		},
 		{
@@ -35,8 +35,8 @@
 				[11, 17.5],
 				[9, 15.5]
 			],
-			"stroke": "#8f99a8",
-			"fill": "#8f99a8",
+			"stroke": "#848fa0",
+			"fill": "#848fa0",
 			"pen": 2
 		},
 		{
@@ -46,8 +46,8 @@
 			"width": 5,
 			"height": 5,
 			"rounded": true,
-			"stroke": "#8f99a8",
-			"fill": "#8f99a8"
+			"stroke": "#848fa0",
+			"fill": "#848fa0"
 		}
 	]
 }
