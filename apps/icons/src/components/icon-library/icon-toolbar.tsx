@@ -33,7 +33,7 @@ export function IconToolbar({
 }) {
 	return (
 		<div className="icons-toolbar">
-			<h1 className="icons-title">Icons</h1>
+			<h2 className="icons-title">Icons</h2>
 			<div className="icons-search">
 				<Search aria-hidden="true" className="icons-search__icon" />
 				<input

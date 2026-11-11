@@ -5,6 +5,8 @@ import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 
 import type { IconManifest, SketchiIcon } from "@sketchi/icon-catalog";
+import type { PackShelfData } from "../../lib/packs-rpc";
+import { TestIntersectionObserver } from "../../test-support/intersection-observer";
 import { IconLibrary } from "./icon-library";
 
 const fixtureData: IconManifest = {
@@ -148,7 +150,8 @@ describe("IconLibrary", () => {
 
 	it("leads with the heading and search, and names its header marks", () => {
 		render(<IconLibrary data={fixtureData} />);
-		expect(screen.getByRole("heading", { level: 1, name: "Icons" })).toBeTruthy();
+		expect(screen.getByRole("heading", { level: 1, name: "Sketchi Icons" })).toBeTruthy();
+		expect(screen.getByRole("heading", { level: 2, name: "Icons" })).toBeTruthy();
 		expect(screen.queryByText(/ready when you are/i)).toBeNull();
 		expect(screen.queryByLabelText("Library summary")).toBeNull();
 		const header = within(screen.getByRole("banner"));
@@ -553,6 +556,79 @@ describe("IconLibrary", () => {
 			"true",
 		);
 		expect(container.querySelectorAll('[data-preview="dark"]')).toHaveLength(3);
+	});
+
+	describe("scrolling", () => {
+		beforeEach(() => {
+			vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+		});
+
+		const rendered = () =>
+			within(screen.getByRole("region", { name: "Icon results" })).getAllByRole("article");
+
+		it("renders a page of results and the next one each time the grid nears the viewport", () => {
+			render(<IconLibrary data={largeData} />);
+			expect(screen.getByText("400 icons")).toBeTruthy();
+			expect(rendered()).toHaveLength(96);
+			expect(screen.queryByRole("button", { name: /more/i })).toBeNull();
+
+			act(() => TestIntersectionObserver.scrollNearEnd());
+			expect(rendered()).toHaveLength(192);
+			act(() => TestIntersectionObserver.scrollNearEnd());
+			act(() => TestIntersectionObserver.scrollNearEnd());
+			act(() => TestIntersectionObserver.scrollNearEnd());
+			expect(rendered()).toHaveLength(400);
+			// Everything is on the page, so nothing is watched any more.
+			expect(TestIntersectionObserver.live.size).toBe(0);
+		});
+
+		it("starts again from the first page when the search changes", () => {
+			render(<IconLibrary data={largeData} />);
+			act(() => TestIntersectionObserver.scrollNearEnd());
+			expect(rendered()).toHaveLength(192);
+			fireEvent.change(search(), { target: { value: "icon-1" } });
+			expect(screen.getByText("100 icons")).toBeTruthy();
+			expect(rendered()).toHaveLength(96);
+		});
+
+		it("selects every result, rendered or not", () => {
+			render(<IconLibrary data={largeData} initialCollections={["even-set"]} />);
+			expect(rendered()).toHaveLength(96);
+			fireEvent.click(screen.getByRole("checkbox", { name: "Select all results" }));
+			expect(selectionBar()?.textContent).toContain("200 selected");
+		});
+
+		it("renders as far as the keyboard highlight goes", () => {
+			render(<IconLibrary data={largeData} />);
+			fireEvent.keyDown(search(), { key: "ArrowLeft" });
+			expect(rendered()).toHaveLength(400);
+			expect(search().getAttribute("aria-activedescendant")).toBe("icon-result-icon-399");
+		});
+	});
+
+	it("shows the packs above the search, drawn in the preview's ink", () => {
+		const packs: PackShelfData = {
+			origin: "https://icons.sketchi.app",
+			packs: [
+				{
+					id: "palantir",
+					name: "Palantir",
+					count: 100,
+					preview: [
+						{
+							slug: "palantir",
+							name: "Palantir",
+							recipe: { parts: [{ kind: "ellipse", cx: 12, cy: 12, rx: 8, ry: 8 }] },
+						},
+					],
+				},
+			],
+		};
+		const { container } = render(<IconLibrary data={fixtureData} packs={packs} />);
+		const shelf = screen.getByRole("region", { name: "Excalidraw libraries" });
+		expect(shelf.compareDocumentPosition(search()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		fireEvent.click(screen.getByRole("button", { name: "Dark preview" }));
+		expect(container.querySelector('.pack-card__strip[data-preview="dark"]')).toBeTruthy();
 	});
 
 	it("renders accessible loading, error, and empty states", () => {

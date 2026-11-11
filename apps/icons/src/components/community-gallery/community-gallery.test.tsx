@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fetchCommunityIcon, type CommunityIconEntry } from "../../lib/community-client";
+import { TestIntersectionObserver } from "../../test-support/intersection-observer";
 import { CommunityGallery } from "./community-gallery";
 import { RecipePreview } from "../recipe-preview/index.js";
 
@@ -37,6 +38,44 @@ function gallery(props: Partial<Parameters<typeof CommunityGallery>[0]> = {}) {
 }
 
 describe("CommunityGallery", () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("loads the next page as the list nears the viewport, once at a time", () => {
+		vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+		const onLoadMore = vi.fn();
+		const { rerender } = render(
+			<CommunityGallery
+				hasMore
+				icons={ICONS}
+				onLoadMore={onLoadMore}
+				onQueryChange={() => undefined}
+				query=""
+				status="ready"
+			/>,
+		);
+		expect(screen.queryByRole("button", { name: /more/i })).toBeNull();
+		act(() => TestIntersectionObserver.scrollNearEnd());
+		expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+		// While that page loads, nothing else is asked for.
+		rerender(
+			<CommunityGallery
+				hasMore
+				icons={ICONS}
+				loadingMore
+				onLoadMore={onLoadMore}
+				onQueryChange={() => undefined}
+				query=""
+				status="ready"
+			/>,
+		);
+		act(() => TestIntersectionObserver.scrollNearEnd());
+		expect(onLoadMore).toHaveBeenCalledTimes(1);
+		expect(TestIntersectionObserver.live.size).toBe(0);
+	});
+
 	it("shows community icons with their diagram slugs under the Community set", () => {
 		gallery();
 		const nav = screen.getByRole("navigation", { name: "Icon sets" });

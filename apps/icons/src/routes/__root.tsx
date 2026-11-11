@@ -12,7 +12,8 @@ export const Route = createRootRoute({
 			},
 			{
 				name: "description",
-				content: "Search, copy, and download more than 1,400 SVG icons and logos.",
+				content:
+					"Hand-drawn icon libraries for Excalidraw, and more than 1,400 SVG icons and logos to search, copy, and download.",
 			},
 			{ name: "theme-color", content: "#f6f1e7" },
 			{ title: "Sketchi Icons" },
@@ -21,7 +22,8 @@ export const Route = createRootRoute({
 			{ property: "og:title", content: "Sketchi Icons" },
 			{
 				property: "og:description",
-				content: "Search, copy, and download more than 1,400 SVG icons and logos.",
+				content:
+					"Hand-drawn icon libraries for Excalidraw, and more than 1,400 SVG icons and logos to search, copy, and download.",
 			},
 			// The site's card: served from sketchi.app because crawlers need an absolute URL.
 			{ property: "og:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
@@ -31,7 +33,8 @@ export const Route = createRootRoute({
 			{ name: "twitter:title", content: "Sketchi Icons" },
 			{
 				name: "twitter:description",
-				content: "Search, copy, and download more than 1,400 SVG icons and logos.",
+				content:
+					"Hand-drawn icon libraries for Excalidraw, and more than 1,400 SVG icons and logos to search, copy, and download.",
 			},
 			{ name: "twitter:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
 		],

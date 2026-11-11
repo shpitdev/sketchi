@@ -1,6 +1,7 @@
 import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 import { Check, Info } from "lucide-react";
+import { memo } from "react";
 
 import { IconMark } from "../icon-mark/index.js";
 import { RecipePreview } from "../recipe-preview/index.js";
@@ -22,9 +23,10 @@ export interface IconCardProps {
 /**
  * One result. The tile copies the SVG; the corner checkbox adds the icon to
  * the selection and is always visible, so gathering several icons never
- * depends on hover.
+ * depends on hover. Memoized: a page of results appended while scrolling leaves
+ * the cards already on screen alone.
  */
-export function IconCard({
+export const IconCard = memo(function IconCard({
 	active = false,
 	copied = false,
 	copying = false,
@@ -91,4 +93,4 @@ export function IconCard({
 			</button>
 		</article>
 	);
-}
+});

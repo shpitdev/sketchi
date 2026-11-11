@@ -3,30 +3,17 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { IconLibrary } from "../components/icon-library/index.js";
-import { decodeDrawings, DRAWINGS_PATH, type IconDrawings } from "../lib/drawings.js";
-import { decodeIconManifest, type IconManifest } from "@sketchi/icon-catalog";
+import { loadDrawings, loadIconManifest } from "../lib/catalog-client.js";
+import { getPackShelf } from "../lib/packs-rpc.js";
 
 export const Route = createFileRoute("/")({
+	// The packs render with the page; without their index the icons still work.
+	loader: () => getPackShelf().catch(() => undefined),
 	component: HomeRoute,
 });
 
-async function loadIconManifest(signal: AbortSignal): Promise<IconManifest> {
-	// Revalidate: a manifest cached before a deploy may predate fields this page reads.
-	const response = await fetch("/icons-manifest.json", { cache: "no-cache", signal });
-	if (!response.ok) {
-		throw new Error(`Icon library returned HTTP ${response.status}.`);
-	}
-	const payload: unknown = await response.json();
-	return decodeIconManifest(payload);
-}
-
-async function loadDrawings(signal: AbortSignal): Promise<IconDrawings> {
-	const response = await fetch(DRAWINGS_PATH, { cache: "no-cache", signal });
-	if (!response.ok) throw new Error(`Drawings returned HTTP ${response.status}.`);
-	return decodeDrawings(await response.json());
-}
-
 function HomeRoute() {
+	const shelf = Route.useLoaderData();
 	const [queryClient] = useState(() => new QueryClient());
 	// Route-local query: unmounting aborts the manifest request, and retry
 	// refetches through the same query instead of a manual attempt counter.
@@ -60,6 +47,7 @@ function HomeRoute() {
 		<IconLibrary
 			{...(manifest.isSuccess ? { data: manifest.data } : {})}
 			{...(drawings.isSuccess ? { drawings: drawings.data } : {})}
+			{...(shelf ? { packs: shelf } : {})}
 			{...(manifest.isError
 				? {
 						errorMessage:

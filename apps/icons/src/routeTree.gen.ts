@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as CommunityIndexRouteImport } from './routes/community/index'
 import { Route as CommunitySlugRouteImport } from './routes/community/$slug'
+import { Route as PacksIdRouteImport } from './routes/packs/$id'
 import { Route as ApiCommunityIndexRouteImport } from './routes/api/community/index'
 import { Route as ApiCommunitySlugRouteImport } from './routes/api/community/$slug'
 import { Route as ApiIconsIndexRouteImport } from './routes/api/icons/index'
@@ -36,6 +37,11 @@ const CommunityIndexRoute = CommunityIndexRouteImport.update({
 const CommunitySlugRoute = CommunitySlugRouteImport.update({
   id: '/community/$slug',
   path: '/community/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacksIdRoute = PacksIdRouteImport.update({
+  id: '/packs/$id',
+  path: '/packs/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCommunityIndexRoute = ApiCommunityIndexRouteImport.update({
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/mcp': typeof McpRoute
   '/community/$slug': typeof CommunitySlugRoute
+  '/packs/$id': typeof PacksIdRoute
   '/community/': typeof CommunityIndexRoute
   '/api/community/$slug': typeof ApiCommunitySlugRoute
   '/api/icons/$slug': typeof ApiIconsSlugRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/mcp': typeof McpRoute
   '/community/$slug': typeof CommunitySlugRoute
+  '/packs/$id': typeof PacksIdRoute
   '/community': typeof CommunityIndexRoute
   '/api/community/$slug': typeof ApiCommunitySlugRoute
   '/api/icons/$slug': typeof ApiIconsSlugRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/mcp': typeof McpRoute
   '/community/$slug': typeof CommunitySlugRoute
+  '/packs/$id': typeof PacksIdRoute
   '/community/': typeof CommunityIndexRoute
   '/api/community/$slug': typeof ApiCommunitySlugRoute
   '/api/icons/$slug': typeof ApiIconsSlugRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/mcp'
     | '/community/$slug'
+    | '/packs/$id'
     | '/community/'
     | '/api/community/$slug'
     | '/api/icons/$slug'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/mcp'
     | '/community/$slug'
+    | '/packs/$id'
     | '/community'
     | '/api/community/$slug'
     | '/api/icons/$slug'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/mcp'
     | '/community/$slug'
+    | '/packs/$id'
     | '/community/'
     | '/api/community/$slug'
     | '/api/icons/$slug'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   McpRoute: typeof McpRoute
   CommunitySlugRoute: typeof CommunitySlugRoute
+  PacksIdRoute: typeof PacksIdRoute
   CommunityIndexRoute: typeof CommunityIndexRoute
   ApiCommunitySlugRoute: typeof ApiCommunitySlugRoute
   ApiIconsSlugRoute: typeof ApiIconsSlugRoute
@@ -164,6 +177,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CommunitySlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/packs/$id': {
+      id: '/packs/$id'
+      path: '/packs/$id'
+      fullPath: '/packs/$id'
+      preLoaderRoute: typeof PacksIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/community/': {
       id: '/api/community/'
       path: '/api/community'
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   McpRoute: McpRoute,
   CommunitySlugRoute: CommunitySlugRoute,
+  PacksIdRoute: PacksIdRoute,
   CommunityIndexRoute: CommunityIndexRoute,
   ApiCommunitySlugRoute: ApiCommunitySlugRoute,
   ApiIconsSlugRoute: ApiIconsSlugRoute,

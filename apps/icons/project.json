@@ -70,6 +70,7 @@
 				"{projectRoot}/scripts/sync-catalog-assets.ts",
 				"{projectRoot}/src/lib/drawings.ts",
 				"{projectRoot}/src/lib/excalidraw-export.ts",
+				"{projectRoot}/src/lib/packs.ts",
 				"{projectRoot}/src/lib/recipe-drawing.ts",
 				"^production"
 			],
@@ -77,6 +78,7 @@
 				"{projectRoot}/public/icons-manifest.json",
 				"{projectRoot}/public/icon-drawings.json",
 				"{projectRoot}/public/sketchi-icons.excalidrawlib",
+				"{projectRoot}/public/packs",
 				"{projectRoot}/public/output"
 			],
 			"options": {

@@ -488,31 +488,6 @@ kbd {
 	color: var(--paper-2);
 }
 
-.icons-download {
-	align-items: center;
-	background: var(--card);
-	border: 1px solid var(--line-2);
-	border-radius: var(--r-sm);
-	color: var(--ink);
-	display: inline-flex;
-	font-size: 13px;
-	font-weight: 600;
-	gap: 8px;
-	height: 38px;
-	padding-inline: 12px;
-	text-decoration: none;
-	white-space: nowrap;
-}
-
-.icons-download:hover {
-	border-color: var(--ink-3);
-}
-
-.icons-download svg {
-	height: 16px;
-	width: 16px;
-}
-
 .icon-detail__previews {
 	display: grid;
 	gap: 10px;
@@ -882,13 +857,6 @@ kbd {
 	}
 }
 
-.icons-more {
-	display: flex;
-	justify-content: center;
-	padding-top: 26px;
-}
-
-.icons-more button,
 .icons-state button {
 	background: var(--card);
 	border: 1px solid var(--line-2);
@@ -900,7 +868,6 @@ kbd {
 	padding: 0 18px;
 }
 
-.icons-more button:hover,
 .icons-state button:hover {
 	border-color: var(--ink);
 }
@@ -911,7 +878,6 @@ kbd {
 	color: var(--paper-2);
 }
 
-.icons-more button:active,
 .icons-state button:active,
 .selection-bar button:active,
 .icon-detail__actions button:active {
@@ -1419,6 +1385,227 @@ kbd {
 }
 
 /* ===================================================================== */
+/* Packs: Excalidraw libraries above the search, and a page per pack      */
+/* ===================================================================== */
+.pack-shelf {
+	padding-top: 20px;
+}
+
+.pack-shelf__title,
+.pack-hero__title {
+	font-family: var(--font-script);
+	font-weight: 400;
+	letter-spacing: 0;
+	line-height: 1.1;
+	margin: 0;
+}
+
+.pack-shelf__title {
+	font-size: 26px;
+	margin-bottom: 12px;
+}
+
+/* One row that scrolls sideways until all eight fit in two rows of four. */
+.pack-shelf__list {
+	display: grid;
+	gap: 12px;
+	grid-auto-columns: clamp(280px, 31%, 340px);
+	grid-auto-flow: column;
+	list-style: none;
+	margin: 0 -24px;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	padding: 2px 24px 10px;
+	scroll-padding-inline: 24px;
+	scroll-snap-type: x mandatory;
+	scrollbar-width: thin;
+}
+
+@media (min-width: 1180px) {
+	.pack-shelf__list {
+		grid-auto-flow: row;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		margin: 0;
+		overflow: visible;
+		padding: 0;
+	}
+}
+
+.pack-card {
+	background: var(--card);
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	display: grid;
+	gap: 10px;
+	min-width: 0;
+	padding: 10px;
+	position: relative;
+	scroll-snap-align: start;
+	transition:
+		border-color 160ms var(--ease),
+		box-shadow 160ms var(--ease);
+}
+
+.pack-card:hover {
+	border-color: var(--line-2);
+	box-shadow: var(--shadow-md);
+}
+
+.pack-card[data-whole-catalog="true"] {
+	background: color-mix(in srgb, var(--accent-wash) 50%, var(--card));
+	border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+
+.pack-card__strip {
+	background: var(--card);
+	border: 1px solid var(--line);
+	border-radius: var(--r-sm);
+	display: grid;
+	gap: 2px;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	padding: 6px;
+	transition: background 160ms var(--ease);
+}
+
+.pack-card__strip[data-preview="dark"] {
+	background: #25211c;
+	border-color: #3f3931;
+}
+
+.pack-card__icon {
+	aspect-ratio: 1;
+	display: block;
+	height: auto;
+	width: 100%;
+}
+
+.pack-card__head {
+	align-items: baseline;
+	display: flex;
+	gap: 8px;
+	justify-content: space-between;
+	min-width: 0;
+	padding-inline: 2px;
+}
+
+.pack-card__name {
+	color: var(--ink);
+	font-size: 15px;
+	font-weight: 700;
+	overflow: hidden;
+	text-decoration: none;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The name's link covers the card; the actions sit above it. */
+.pack-card__name::after {
+	border-radius: var(--r-md);
+	content: "";
+	inset: 0;
+	position: absolute;
+}
+
+.pack-card__name:focus-visible {
+	outline: none;
+}
+
+.pack-card__name:focus-visible::after {
+	outline: 2px solid var(--blueprint);
+	outline-offset: 2px;
+}
+
+.pack-card__count,
+.pack-hero__count {
+	color: var(--ink-2);
+	flex: none;
+	font-family: var(--font-mono);
+	font-size: 12px;
+	margin: 0;
+}
+
+.pack-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	position: relative;
+	z-index: 1;
+}
+
+.pack-actions a {
+	align-items: center;
+	background: var(--card);
+	border: 1px solid var(--line-2);
+	border-radius: var(--r-sm);
+	color: var(--ink);
+	display: inline-flex;
+	font-size: 13px;
+	font-weight: 600;
+	gap: 6px;
+	height: 32px;
+	padding-inline: 9px;
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.pack-actions a:hover {
+	border-color: var(--ink-3);
+}
+
+.pack-actions .pack-actions__download {
+	background: var(--ink);
+	border-color: var(--ink);
+	color: var(--paper-2);
+}
+
+.pack-actions .pack-actions__download:hover {
+	background: color-mix(in srgb, var(--ink) 86%, var(--paper));
+}
+
+.pack-actions a:active {
+	transform: translateY(1px);
+}
+
+.pack-actions svg {
+	flex: none;
+	height: 15px;
+	width: 15px;
+}
+
+.pack-actions[data-size="large"] a {
+	font-size: 14px;
+	gap: 8px;
+	height: 44px;
+	padding-inline: 14px;
+}
+
+.pack-actions[data-size="large"] svg {
+	height: 17px;
+	width: 17px;
+}
+
+.pack-hero {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px 16px;
+	padding-block: 24px 20px;
+}
+
+.pack-hero__title {
+	font-size: 36px;
+}
+
+.pack-hero__count {
+	font-size: 13px;
+	margin-inline-end: auto;
+}
+
+.icons-scroll-sentinel {
+	height: 1px;
+}
+
+/* ===================================================================== */
 /* Responsive                                                            */
 /* ===================================================================== */
 @media (max-width: 860px) {
@@ -1493,6 +1680,26 @@ kbd {
 
 	.icons-title {
 		font-size: 24px;
+	}
+
+	.pack-shelf {
+		padding-top: 14px;
+	}
+
+	.pack-shelf__title {
+		font-size: 22px;
+		margin-bottom: 10px;
+	}
+
+	.pack-shelf__list {
+		grid-auto-columns: 84%;
+		margin-inline: -16px;
+		padding-inline: 16px;
+		scroll-padding-inline: 16px;
+	}
+
+	.pack-hero__title {
+		font-size: 30px;
 	}
 
 	.collection-filter {
@@ -1572,7 +1779,9 @@ kbd {
 
 	.icon-card,
 	.icon-card__copy-cue,
-	.icons-toast {
+	.icons-toast,
+	.pack-card,
+	.pack-card__strip {
 		transition: none;
 	}
 }

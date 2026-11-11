@@ -21,6 +21,7 @@ vitest.config.*.timestamp*
 apps/icons/public/icons-manifest.json
 apps/icons/public/icon-drawings.json
 apps/icons/public/sketchi-icons.excalidrawlib
+apps/icons/public/packs/
 apps/icons/public/output/
 apps/playground/public/node-logos/
 .vitest
