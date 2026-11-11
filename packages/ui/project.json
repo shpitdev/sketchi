@@ -23,6 +23,18 @@
 			"options": {
 				"command": "tsc -p packages/ui/tsconfig.json --noEmit"
 			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "node --test packages/ui/wordmark/write.test.mjs"
+			}
+		},
+		"wordmark": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "node packages/ui/wordmark/write.mjs"
+			}
 		}
 	}
 }

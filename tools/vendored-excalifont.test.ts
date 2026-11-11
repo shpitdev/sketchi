@@ -6,15 +6,15 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * Excalifont is the typeface Sketchi diagrams render in and, since the wordmark
- * moved off Dancing Script, the brand mark too. Each Worker serves assets from
- * its own `public/`, so the vendored subsets exist once per surface. Copies of a
- * binary drift silently: one surface gets re-vendored, the others keep an older
- * face, and the wordmark stops matching the diagrams it is supposed to be an
- * instance of. These tests pin the copies together.
+ * Excalifont is the typeface Sketchi diagrams render in, and the face of the
+ * hand-drawn headings around them, such as pack titles. Each Worker serves
+ * assets from its own `public/`, so the vendored subsets exist once per surface.
+ * Copies of a binary drift silently: one surface gets re-vendored, the others
+ * keep an older face, and the headings stop matching the diagrams. These tests
+ * pin the copies together.
  *
  * The @font-face declarations live in the shared theme, so the obligation is
- * every theme consumer, not just the ones that draw a wordmark today. A surface
+ * every theme consumer, not just the ones that set Excalifont today. A surface
  * that imports the theme without shipping the files requests them and gets a
  * 404, which leaves an errored face in a family the diagram canvas also uses.
  * `themeConsumers()` therefore derives the list from the imports rather than
@@ -141,17 +141,13 @@ describe("vendored Excalifont", () => {
 	});
 
 	it("never asks the browser to synthesise a weight the face lacks", () => {
-		// Excalifont ships Regular only. A bolder wordmark is a faux-bold smear,
+		// Excalifont ships Regular only. A bolder weight is a faux-bold smear,
 		// so no @font-face may claim a weight the file cannot deliver.
 		const declaredWeights = [...themeCss.matchAll(/font-weight:\s*(\d+)/gu)]
 			.map((match) => match[1])
 			.filter((weight, index, all) => all.indexOf(weight) === index);
 
 		expect(declaredWeights).toContain("400");
-
-		const scriptRule = /\.sk-wordmark\s*\{[^}]*\}/u.exec(themeCss)?.[0] ?? "";
-		expect(scriptRule).toContain("var(--font-script)");
-		expect(scriptRule).toMatch(/font-weight:\s*400/u);
 	});
 
 	it("keeps the script token on Excalifont rather than a Google default", () => {

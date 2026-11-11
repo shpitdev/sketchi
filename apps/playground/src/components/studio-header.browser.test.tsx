@@ -8,9 +8,9 @@ import { StudioHeader } from "./studio-header";
 
 afterEach(cleanup);
 
-// The app root loads Hanken Grotesk from Google Fonts and the Excalifont
-// wordmark from /fonts; row measurements are only meaningful with both real
-// faces loaded, not fallback metrics.
+// The app root loads Hanken Grotesk from Google Fonts; row measurements are
+// only meaningful with the real face loaded, not fallback metrics. The wordmark
+// is an SVG path, so it needs no font.
 const HANKEN_STYLESHEET =
 	"https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400..700&display=swap";
 
@@ -27,13 +27,9 @@ beforeAll(async () => {
 
 async function renderWithFonts(ui: Parameters<typeof render>[0]) {
 	render(ui);
-	await Promise.all([
-		document.fonts.load('600 14.5px "Hanken Grotesk"', "Playground Projects"),
-		document.fonts.load("28px Excalifont", "Sketchi"),
-	]);
+	await document.fonts.load('600 14.5px "Hanken Grotesk"', "Playground Projects");
 	await document.fonts.ready;
 	expect(document.fonts.check('600 14.5px "Hanken Grotesk"', "Playground")).toBe(true);
-	expect(document.fonts.check("28px Excalifont", "Sketchi")).toBe(true);
 }
 
 /** Distinct row tops among the header's visible controls. */

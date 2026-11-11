@@ -157,13 +157,6 @@ body {
 	display: block;
 }
 
-.studio-brand__wordmark {
-	font-family: var(--font-script);
-	font-size: 28px;
-	font-weight: 400;
-	line-height: 1;
-}
-
 /* The sample and starter prompts lead into one persistent composer. Short
    empty pages scroll naturally; a conversation uses the fixed workspace. */
 .studio--empty {
@@ -676,6 +669,7 @@ button.studio__artifact-link {
 	}
 
 	.studio-brand {
+		--sketchi-wordmark-height: 26px;
 		gap: 8px;
 	}
 
@@ -686,10 +680,6 @@ button.studio__artifact-link {
 	.studio-brand__tile img {
 		height: 26px;
 		width: 26px;
-	}
-
-	.studio-brand__wordmark {
-		font-size: 24px;
 	}
 
 	.studio--empty .studio__chat {

@@ -10,7 +10,9 @@ describe("SiteHeader", () => {
 		const brand = screen.getByRole("link", { name: "Sketchi home" });
 		expect(brand.getAttribute("href")).toBe("/");
 		expect(brand.querySelector(".site-header__brand-icon")).toBeTruthy();
-		expect(brand.querySelector(".sk-wordmark")?.textContent).toBe("Sketchi");
+		const wordmark = brand.querySelector('[data-slot="sketchi-wordmark"]');
+		expect(wordmark?.getAttribute("aria-hidden")).toBe("true");
+		expect(wordmark?.querySelector("path")?.getAttribute("d")).toBeTruthy();
 		expect(screen.queryByRole("link", { name: "Product" })).toBeNull();
 		expect(screen.getByRole("link", { name: "Playground" }).dataset.variant).toBe("brand");
 		expect(screen.getByRole("link", { name: "Sketchi on GitHub" }).getAttribute("href")).toBe(

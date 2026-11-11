@@ -87,10 +87,6 @@ kbd {
 	text-decoration: none;
 }
 
-.icons-brand .sk-wordmark {
-	font-family: var(--font-script);
-}
-
 .icons-brand__tile {
 	align-items: center;
 	flex: none;
@@ -1344,11 +1340,10 @@ kbd {
 }
 
 .icons-footer__brand {
+	--sketchi-wordmark-height: 24px;
 	align-items: center;
 	color: var(--ink);
 	display: inline-flex;
-	font-family: var(--font-script);
-	font-size: 22px;
 	gap: 8px;
 	text-decoration: none;
 }
@@ -1654,11 +1649,8 @@ kbd {
 		width: 26px;
 	}
 
-	.icons-brand .sk-wordmark {
-		font-size: 24px;
-	}
-
 	.icons-brand {
+		--sketchi-wordmark-height: 26px;
 		gap: 8px;
 	}
 

@@ -1,4 +1,5 @@
 import { GitHubMark, HeaderIconLink } from "@sketchi/ui/components/header-icon-link";
+import { SketchiWordmark } from "@sketchi/ui/components/sketchi-wordmark";
 import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import { cn } from "@sketchi/ui/lib/utils";
 import { BookOpen } from "lucide-react";
@@ -25,7 +26,7 @@ export function StudioHeader({
 				<span className="studio-brand__tile" aria-hidden="true">
 					<img alt="" height="30" src="/icon.svg" width="30" />
 				</span>
-				<span className="studio-brand__wordmark">Sketchi</span>
+				<SketchiWordmark />
 			</a>
 			{children ? <div className="studio-header__route">{children}</div> : null}
 			<TooltipProvider delayDuration={200}>

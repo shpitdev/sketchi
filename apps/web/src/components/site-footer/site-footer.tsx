@@ -1,3 +1,5 @@
+import { SketchiWordmark } from "@sketchi/ui/components/sketchi-wordmark";
+
 import { CLI_NPM_URL, REPO_URL } from "../../lib/cli-package";
 import { DEFAULT_WEB_SURFACE_URLS, type WebSurfaceUrls } from "../../lib/surface-urls";
 
@@ -24,7 +26,7 @@ export function SiteFooter({
 				<div className="site-footer__about">
 					<span className="site-footer__brand">
 						<img alt="" className="sk-icon" height="30" src="/icon.svg" width="30" />
-						<span>Sketchi</span>
+						<SketchiWordmark title="Sketchi" />
 					</span>
 					<a
 						aria-label="Sketchi on GitHub"

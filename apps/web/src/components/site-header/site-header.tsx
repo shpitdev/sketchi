@@ -1,5 +1,6 @@
 import { Button } from "@sketchi/ui/components/button";
 import { GitHubMark, HeaderIconLink } from "@sketchi/ui/components/header-icon-link";
+import { SketchiWordmark } from "@sketchi/ui/components/sketchi-wordmark";
 import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import { BookOpen, Menu, X } from "lucide-react";
 import { useState } from "react";
@@ -45,7 +46,7 @@ export function SiteHeader({
 						src="/icon.svg"
 						width="30"
 					/>
-					<span className="sk-wordmark">Sketchi</span>
+					<SketchiWordmark />
 				</a>
 
 				{navItems.length > 0 ? (
