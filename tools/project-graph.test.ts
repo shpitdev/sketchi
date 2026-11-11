@@ -153,7 +153,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/cli/vitest.config.mts": 1,
 	"apps/excalidraw/src/components/excalidraw-workspace/excalidraw-workspace.tsx": 4,
 	"apps/excalidraw/src/components/svg-icon-workspace/svg-icon-workspace.tsx": 8,
-	"apps/icons/scripts/sync-catalog-assets.ts": 22,
+	"apps/icons/scripts/sync-catalog-assets.ts": 26,
 	"apps/icons/src/components/community-gallery/community-gallery.tsx": 19,
 	"apps/icons/src/components/community-gallery/community-page.tsx": 7,
 	"apps/icons/src/cloudflare-workers.d.ts": 4,
@@ -168,8 +168,8 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/icons/src/lib/community-client.ts": 10,
 	"apps/icons/src/lib/community.server.ts": 12,
 	"apps/icons/src/lib/mcp.server.ts": 8,
-	"apps/icons/src/lib/packs-rpc.ts": 7,
-	"apps/icons/src/lib/packs.server.ts": 6,
+	"apps/icons/src/lib/packs-rpc.ts": 6,
+	"apps/icons/src/lib/packs.server.ts": 11,
 	"apps/icons/src/routes/api/community/$slug.ts": 15,
 	"apps/icons/src/routes/api/community/index.ts": 15,
 	"apps/icons/src/routes/api/icons/$slug.ts": 16,
@@ -284,6 +284,11 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"tools/sketchi-generators/src/generators/ui-component/ui-component.spec.ts": 3,
 	"tools/sketchi-generators/src/generators/ui-component/ui-component.ts": 3,
 	"tools/testing/browserbase.ts": 29,
+	"apps/icons/scripts/pack-preview-image.ts": 18,
+	"apps/icons/src/components/packs/pack-publish-dialog.tsx": 10,
+	"apps/icons/src/lib/excalidraw-publish.server.ts": 72,
+	"apps/icons/src/lib/packs.ts": 3,
+	"apps/icons/src/routes/api/packs/$id/excalidraw.ts": 6,
 };
 const approvedManagedPromiseFiles = Object.keys(approvedManagedPromiseSiteCounts).sort();
 const approvedEffectDependencyVersions = new Set(["4.1.2"]);

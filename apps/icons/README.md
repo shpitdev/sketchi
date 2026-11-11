@@ -23,11 +23,10 @@ ignored copies into `public/`:
   "Copy for Excalidraw" actions paste.
 - `public/packs/` holds the packs `src/lib/packs.ts` defines by collection:
   each as a library (`<id>.excalidrawlib`; the whole catalog keeps the URL
-  above) and as a scene (`<id>.excalidraw`) that excalidraw.com opens by URL,
-  plus `index.json`, which the home page and each `/packs/<id>` page render on
-  the server. The largest pack library is 590 KB raw and 46 KB with gzip.
-  excalidraw.com imports libraries only from its own hosts, so a pack opens
-  there as a scene and downloads as a library.
+  above), a pack listed for Excalidraw's library collection also as its
+  preview (`<id>.preview.jpg`), plus `index.json`, which the home page and
+  each `/packs/<id>` page render on the server with each pack's version (a
+  hash of its library). The largest pack library is 630 KB raw.
 
 The browser fetches one compact metadata manifest, then lazily loads only the
 SVGs visible in the grid. The current 1,412-icon manifest is about 385 KB raw
@@ -61,6 +60,67 @@ never resolves to a community icon.
 
 API and MCP responses have permissive CORS. Source reports and the source data
 used to build the manifest are not copied into the public application.
+
+## Publishing packs to Excalidraw
+
+excalidraw.com adds a library from a link only when the file is in
+Excalidraw's library collection (`excalidraw/excalidraw-libraries`), so a pack
+first goes there the way excalidraw.com's "Publish library" dialog sends one.
+
+- A visitor opens "Publish to Excalidraw" on a pack and gives their name
+  (required, 60 characters), and optionally a Twitter handle and a website
+  (the pack's page by default). There is no GitHub handle: the collection's
+  bot mentions it on GitHub, and nothing here shows the visitor owns it.
+- `POST /api/packs/:id/excalidraw` takes those fields (2 KB at most, 3 a client
+  an hour) and sends the rest itself: the built library pretty-printed, its
+  preview, and the pack's listing (`excalidrawListing` in `src/lib/packs.ts`).
+  The preview is the dialog's: 6 marks a row in 128 px boxes 8 px apart, as a
+  JPEG at most 5000 px a side, each mark drawn as the pages draw it.
+- Each pack version opens at most one pull request. The Worker claims the
+  version in the `excalidraw_library_submissions` table (in the community
+  icons D1 database) before sending. Only a refusal, a 4xx answer without a
+  pull request, frees it. A timeout, a lost connection, a 5xx or any other
+  answer without a pull request may still have opened one (the backend opens
+  it before answering, on a new branch each time), so the row is kept as
+  `unconfirmed` with what came back; a row left `pending` means the Worker
+  stopped mid-send. Neither expires, and both keep the version from being
+  sent again. Once the collection answers with a pull request, the Worker
+  reads it from GitHub's public API and stores its URL, its "Installation
+  link" and what it read, or the error.
+- Every visitor then gets "Add to Excalidraw" with the newest install link,
+  which adds the library on excalidraw.com and leaves the canvas alone. A new
+  pack version can be published again.
+- Publishing is off unless the Worker has `EXCALIDRAW_LIBRARY_SUBMIT=on`;
+  production and previews leave it unset, which hides the button and answers
+  404. `EXCALIDRAW_LIBRARY_BACKEND` and `EXCALIDRAW_LIBRARY_GITHUB_API` point
+  a local Worker at stand-ins for Excalidraw's backend and GitHub's API (in
+  `apps/icons/.dev.vars`).
+
+### Reconciling a held submission
+
+List the versions that are held or missing an install link:
+
+```sh
+pnpm exec wrangler d1 execute sketchi-community-icons --remote --config apps/icons/wrangler.jsonc \
+  --command "SELECT pack_id, version, status, author_name, datetime(created_at / 1000, 'unixepoch') AS sent, pull_request_url, install_url, pull_request FROM excalidraw_library_submissions WHERE status != 'submitted' OR install_url IS NULL"
+```
+
+Look for the pull request in `excalidraw/excalidraw-libraries`, opened around
+`sent` by `excalibot` with the pack's listing name as `feat: new library
+<name>`. If it exists, record it, taking the install link from its
+"Installation link":
+
+```sql
+UPDATE excalidraw_library_submissions
+SET status = 'submitted', pull_request_url = '<pull request URL>', install_url = '<installation link>'
+WHERE pack_id = '<pack>' AND version = '<version>';
+```
+
+If none was opened, free the version for the next visitor:
+
+```sql
+DELETE FROM excalidraw_library_submissions WHERE pack_id = '<pack>' AND version = '<version>';
+```
 
 ## Commands
 

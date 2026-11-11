@@ -1,4 +1,3 @@
-import { estimateTextWidth, fnv1a32, wrapTextToWidth } from "@sketchi/diagram-core";
 import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 import { iconRecipeElements } from "@sketchi/diagram-excalidraw";
 
@@ -60,86 +59,5 @@ export function excalidrawLibrary(
 			created: (icon.createdAt && Date.parse(icon.createdAt)) || 0,
 			elements: excalidrawElements(icon, origin),
 		})),
-	});
-}
-
-type NamedDrawing = ExportedDrawing & { readonly name: string };
-
-const SCENE_CELL_WIDTH = 176;
-const SCENE_ROW_HEIGHT = 184;
-const SCENE_LABEL_SIZE = 16;
-const SCENE_LABEL_GAP = 12;
-const SCENE_LINE_HEIGHT = 1.25;
-/** excalidraw.com opens a scene at the origin, under its toolbar; the first row starts below it. */
-const SCENE_MARGIN = { left: 32, top: 112 } as const;
-
-/** The mark's name under its drawing, wrapped to the cell and centered on it. */
-function sceneLabel(icon: NamedDrawing, centerX: number, top: number) {
-	const id = `catalog-${icon.slug}-name`;
-	const seed = fnv1a32(id, "seed");
-	const text = wrapTextToWidth(icon.name, SCENE_CELL_WIDTH - 16, SCENE_LABEL_SIZE);
-	const width = Math.ceil(estimateTextWidth(text, SCENE_LABEL_SIZE));
-	const height = text.split("\n").length * SCENE_LABEL_SIZE * SCENE_LINE_HEIGHT;
-	return {
-		id,
-		type: "text",
-		x: Math.round(centerX - width / 2),
-		y: top,
-		width,
-		height,
-		angle: 0,
-		strokeColor: INK,
-		backgroundColor: "transparent",
-		fillStyle: "solid",
-		strokeWidth: 1,
-		strokeStyle: "solid",
-		roughness: 0,
-		opacity: 100,
-		groupIds: [],
-		frameId: null,
-		index: null,
-		roundness: null,
-		seed,
-		version: 1,
-		versionNonce: seed + 1,
-		isDeleted: false,
-		boundElements: null,
-		updated: 1,
-		link: null,
-		locked: false,
-		text,
-		originalText: text,
-		fontSize: SCENE_LABEL_SIZE,
-		fontFamily: 5,
-		lineHeight: SCENE_LINE_HEIGHT,
-		textAlign: "center",
-		verticalAlign: "top",
-		containerId: null,
-		autoResize: true,
-		customData: { sketchiIcon: icon.slug },
-	};
-}
-
-/**
- * An Excalidraw scene of the icons in rows, each drawing named underneath, in
- * a grid about as wide as a screen is.
- */
-export function excalidrawScene(icons: readonly NamedDrawing[], source: string): string {
-	const columns = Math.max(4, Math.round(Math.sqrt(icons.length * 1.6)));
-	return JSON.stringify({
-		type: "excalidraw",
-		version: 2,
-		source,
-		elements: icons.flatMap((icon, index) => {
-			const left = SCENE_MARGIN.left + (index % columns) * SCENE_CELL_WIDTH;
-			const top = SCENE_MARGIN.top + Math.floor(index / columns) * SCENE_ROW_HEIGHT;
-			const centerX = left + SCENE_CELL_WIDTH / 2;
-			return [
-				...excalidrawElements(icon, "catalog", centerX - RECIPE_PREVIEW_SIZE / 2, top),
-				sceneLabel(icon, centerX, top + RECIPE_PREVIEW_SIZE + SCENE_LABEL_GAP),
-			];
-		}),
-		appState: { viewBackgroundColor: PAPER },
-		files: {},
 	});
 }

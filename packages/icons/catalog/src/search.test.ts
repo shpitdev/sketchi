@@ -132,17 +132,26 @@ describe("ranked icon search", () => {
 			icon("cloudflare", "Cloudflare", "cloud-vendors"),
 			icon("google", "Google", "cloud-vendors"),
 			icon("gemini", "Gemini", "ai-model-families"),
-			icon("workersai", "Workersai", "ai-infrastructure"),
+			icon("d1", "D1", "data-storage"),
 			icon("flyio", "Flyio", "cloud-hosting-paas"),
 		];
 		const ranked = (query: string) =>
 			searchIcons(icons, { query }).map(({ icon: match, rank }) => [match.slug, rank]);
 
 		expect(ranked("Cloudflare Workers")).toEqual([["cloudflare", PARTIAL_QUERY_RANK]]);
-		expect(ranked("cloudflare workers ai")).toEqual([
-			["workersai", PARTIAL_QUERY_RANK],
+		expect(ranked("cloudflare d1 database")).toEqual([
+			["d1", PARTIAL_QUERY_RANK],
 			["cloudflare", PARTIAL_QUERY_RANK],
 		]);
+		// Words that are each common English still name a product whose slug they spell.
+		const spelled = [
+			icon("redhat", "Red Hat", "operating-systems"),
+			icon("cloud-storage", "Cloud Storage", "gcp"),
+		];
+		expect(
+			searchIcons(spelled, { query: "Red Hat OpenShift" }).map(({ icon: match }) => match.slug),
+		).toEqual(["redhat"]);
+		expect(searchIcons(spelled, { query: "cloud storage bucket" })).toEqual([]);
 		// "google" is common English, but a vendor mark still stands for it.
 		expect(ranked("Google Gemini")).toEqual([
 			["gemini", PARTIAL_QUERY_RANK],

@@ -7,11 +7,12 @@ import { Route } from "./routes/index";
 vi.mock("./lib/packs-rpc", () => ({ getPackShelf: vi.fn() }));
 
 const shelf: PackShelfData = {
-	origin: "https://pr-1-sketchi-icons.example.dev",
+	excalidraw: { palantir: { publishable: false } },
 	packs: [
 		{
 			id: "palantir",
 			name: "Palantir",
+			version: "0123456789abcdef",
 			count: 100,
 			preview: [
 				{
@@ -69,7 +70,7 @@ describe("home route", () => {
 		await expect(loader()).resolves.toBeUndefined();
 	});
 
-	it("leads with the packs: each downloads its library and opens on excalidraw.com", async () => {
+	it("leads with the packs: each downloads its library", async () => {
 		loaderData = shelf;
 		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(manifest)));
 
@@ -79,11 +80,9 @@ describe("home route", () => {
 		expect(download.getAttribute("href")).toBe("/packs/palantir.excalidrawlib");
 		expect(download.getAttribute("download")).toBe("sketchi-palantir.excalidrawlib");
 		expect(download.getAttribute("aria-describedby")).toBe("pack-palantir");
-		const open = screen.getByRole("link", { name: "Open in Excalidraw" });
-		expect(open.getAttribute("href")).toBe(
-			"https://excalidraw.com/#url=https%3A%2F%2Fpr-1-sketchi-icons.example.dev%2Fpacks%2Fpalantir.excalidraw",
-		);
-		expect(open.getAttribute("target")).toBe("_blank");
+		// Publishing is off and nothing is submitted yet: no link to excalidraw.com, nothing to publish.
+		expect(document.querySelector('a[href*="excalidraw.com"]')).toBeNull();
+		expect(screen.queryByRole("button", { name: "Publish to Excalidraw" })).toBeNull();
 		expect(screen.getByRole("link", { name: "Palantir" }).getAttribute("href")).toBe(
 			"/packs/palantir",
 		);

@@ -2,6 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import { env } from "cloudflare:workers";
 
+import { loadPackExcalidrawStates } from "./excalidraw-publish.server.js";
 import { decodePackIndex, PACK_INDEX_PATH, type PackSummary } from "./packs.js";
 
 let cached: Promise<PackSummary[]> | undefined;
@@ -22,4 +23,10 @@ export function loadPackIndex(origin: string): Promise<PackSummary[]> {
 		});
 	cached = pending;
 	return pending;
+}
+
+/** The pack shelf: the build's packs and, from the submissions table, each one's Excalidraw state. */
+export async function loadPackShelf(origin: string) {
+	const packs = await loadPackIndex(origin);
+	return { packs, excalidraw: await loadPackExcalidrawStates(env, packs) };
 }

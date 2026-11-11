@@ -13,7 +13,7 @@ export const Route = createFileRoute("/packs/$id")({
 		const pack = shelf.packs.find((summary) => summary.id === params.id);
 		// oxlint-disable-next-line typescript/only-throw-error -- TanStack Router's 404 is thrown, by design not an Error
 		if (!pack) throw notFound();
-		return { origin: shelf.origin, pack };
+		return { pack, excalidraw: shelf.excalidraw[pack.id] };
 	},
 	head: ({ loaderData }) => ({
 		meta: loaderData ? [{ title: `${loaderData.pack.name} · Sketchi Icons` }] : [],
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/packs/$id")({
 });
 
 function PackRoute() {
-	const { origin, pack } = Route.useLoaderData();
+	const { excalidraw, pack } = Route.useLoaderData();
 	const [queryClient] = useState(() => new QueryClient());
 	const options = { gcTime: 0, refetchOnReconnect: false, refetchOnWindowFocus: false } as const;
 	const manifest = useQuery(
@@ -64,8 +64,8 @@ function PackRoute() {
 						onRetry: () => void failed.refetch(),
 					}
 				: {})}
+			{...(excalidraw ? { excalidraw } : {})}
 			icons={icons}
-			origin={origin}
 			pack={pack}
 			status={
 				manifest.isSuccess && drawings.isSuccess

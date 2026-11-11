@@ -33,11 +33,11 @@
   Content-Type: application/json
   Content-Disposition: attachment; filename="sketchi-icons.excalidrawlib"
 
-# Packs: libraries to download, scenes excalidraw.com opens by URL, and their index.
+# Packs: libraries to download, their previews, and their index.
 /packs/*
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=3600
-  Content-Type: application/json
 
 /packs/*.excalidrawlib
+  Content-Type: application/json
   Content-Disposition: attachment; filename="sketchi-:splat.excalidrawlib"

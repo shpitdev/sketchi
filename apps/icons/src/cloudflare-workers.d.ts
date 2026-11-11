@@ -5,6 +5,9 @@ declare module "cloudflare:workers" {
   export const env: CommunityEnv & {
     ASSETS: IconAssetsBinding;
     SKETCHI_APP_SURFACE?: string;
+    EXCALIDRAW_LIBRARY_SUBMIT?: string;
+    EXCALIDRAW_LIBRARY_BACKEND?: string;
+    EXCALIDRAW_LIBRARY_GITHUB_API?: string;
   };
 
   /** The Durable Object storage calls the icons Worker's objects make. */

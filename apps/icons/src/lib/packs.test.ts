@@ -1,19 +1,19 @@
 import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 import { describe, expect, it } from "vitest";
 
-import { excalidrawLibrary, excalidrawScene } from "./excalidraw-export";
+import { excalidrawLibrary } from "./excalidraw-export";
 import {
 	ALL_ICONS_PACK_ID,
 	decodePackIndex,
 	findPack,
 	ICON_PACKS,
-	openInExcalidrawUrl,
+	isExcalidrawInstallUrl,
 	packIcons,
 	packLibraryFileName,
 	packLibraryPath,
 	packPreview,
-	packScenePath,
 	packSummary,
+	packVersion,
 	type IconPackDefinition,
 } from "./packs";
 
@@ -75,22 +75,57 @@ describe("icon packs", () => {
 			"quiver-app",
 			"aip-document-intelligence-app",
 		]);
-		expect(packSummary(pack, members)).toMatchObject({ id: "palantir", count: 4 });
+		expect(packSummary(pack, members, "v1")).toMatchObject({
+			id: "palantir",
+			version: "v1",
+			count: 4,
+		});
 	});
 
 	it("keeps the catalog library's URL and gives every other pack its own", () => {
 		expect(packLibraryPath(ALL_ICONS_PACK_ID)).toBe("/sketchi-icons.excalidrawlib");
 		expect(packLibraryPath("palantir")).toBe("/packs/palantir.excalidrawlib");
 		expect(packLibraryFileName("palantir")).toBe("sketchi-palantir.excalidrawlib");
-		expect(packScenePath(ALL_ICONS_PACK_ID)).toBe("/packs/all.excalidraw");
 	});
 
-	it("opens a pack on excalidraw.com from the site's own scene URL", () => {
-		const url = new URL(openInExcalidrawUrl("palantir", "https://icons.sketchi.app"));
-		expect(url.origin).toBe("https://excalidraw.com");
-		expect(new URLSearchParams(url.hash.slice(1)).get("url")).toBe(
-			"https://icons.sketchi.app/packs/palantir.excalidraw",
-		);
+	it("links a pack to excalidraw.com only to add its library from Excalidraw's collection", () => {
+		const library =
+			"https://raw.githubusercontent.com/excalidraw/excalidraw-libraries/sketchi-palantir-1/libraries/sketchi/palantir.excalidrawlib?raw=true";
+		expect(
+			isExcalidrawInstallUrl(`https://excalidraw.com/?addLibrary=${encodeURIComponent(library)}`),
+		).toBe(true);
+		for (const href of [
+			// Opening a scene asks to replace whatever is on the canvas.
+			"https://excalidraw.com/#url=https%3A%2F%2Ficons.sketchi.app%2Fpacks%2Fpalantir.excalidraw",
+			`https://excalidraw.com/?addLibrary=${encodeURIComponent("https://icons.sketchi.app/packs/palantir.excalidrawlib")}`,
+			`https://excalidraw.com/?addLibrary=${encodeURIComponent(library.replace(".excalidrawlib", ".png"))}`,
+			`https://example.com/?addLibrary=${encodeURIComponent(library)}`,
+			"not a url",
+		]) {
+			expect(isExcalidrawInstallUrl(href), href).toBe(false);
+		}
+	});
+
+	it("lists every pack but the whole catalog for Excalidraw's collection, in one English sentence", () => {
+		for (const pack of ICON_PACKS) {
+			const listing = pack.excalidrawListing;
+			if (pack.id === ALL_ICONS_PACK_ID) {
+				expect(listing).toBeUndefined();
+				continue;
+			}
+			expect(listing?.name, pack.id).toMatch(/^[A-Z][\x20-\x7e]+$/u);
+			expect(listing?.description, pack.id).toMatch(/^[A-Z][\x20-\x7e]+\.$/u);
+			expect(listing?.description, pack.id).not.toMatch(/\. /u);
+		}
+		const names = ICON_PACKS.flatMap((pack) => pack.excalidrawListing?.name ?? []);
+		expect(new Set(names).size).toBe(names.length);
+	});
+
+	it("versions a pack by the hash of its library", async () => {
+		const version = await packVersion("{}");
+		expect(version).toMatch(/^[0-9a-f]{16}$/u);
+		expect(await packVersion("{}")).toBe(version);
+		expect(await packVersion("{ }")).not.toBe(version);
 	});
 
 	it("decodes the index, keeping only defined packs and recipe-shaped previews", () => {
@@ -99,9 +134,11 @@ describe("icon packs", () => {
 				{
 					id: "palantir",
 					name: "Palantir",
+					version: "v1",
 					count: 3,
 					preview: [{ slug: "palantir", name: "Palantir", recipe: square }, { slug: "x" }],
 				},
+				{ id: "data", name: "Data", count: 3, preview: [] },
 				{ id: "retired", name: "Retired", count: 1, preview: [] },
 				{ id: "cloud", name: "Cloud" },
 			]),
@@ -109,6 +146,7 @@ describe("icon packs", () => {
 			{
 				id: "palantir",
 				name: "Palantir",
+				version: "v1",
 				count: 3,
 				preview: [{ slug: "palantir", name: "Palantir", recipe: square }],
 			},
@@ -131,49 +169,5 @@ describe("pack files", () => {
 			["catalog-palantir", "Palantir"],
 			["catalog-quiver-app", "Quiver"],
 		]);
-	});
-
-	it("lays the pack out as a scene: each drawing on its own cell with its name underneath", () => {
-		const scene = JSON.parse(excalidrawScene(members, "https://icons.sketchi.app")) as {
-			type: string;
-			elements: {
-				id: string;
-				type: string;
-				x: number;
-				y: number;
-				width: number;
-				text?: string;
-				groupIds: string[];
-			}[];
-		};
-		expect(scene.type).toBe("excalidraw");
-		const labels = scene.elements.filter((element) => element.type === "text");
-		// A name wider than its cell wraps; the others stay on one line.
-		expect(labels.map((label) => label.text)).toEqual([
-			"AIP Document\nIntelligence",
-			"Foundry Platform",
-			"Palantir",
-			"Quiver",
-		]);
-		const drawn = scene.elements.filter((element) => element.type !== "text");
-		expect(new Set(drawn.map((element) => element.groupIds[0]))).toEqual(
-			new Set([
-				"catalog-aip-document-intelligence-app",
-				"catalog-foundry-platform",
-				"catalog-palantir",
-				"catalog-quiver-app",
-			]),
-		);
-		// Labels sit under their own drawing and never overlap the next cell.
-		const ids = new Set(scene.elements.map((element) => element.id));
-		expect(ids.size).toBe(scene.elements.length);
-		for (const [index, label] of labels.entries()) {
-			const left = 32 + index * 176;
-			expect(label.x).toBeGreaterThanOrEqual(left);
-			expect(label.x + label.width).toBeLessThanOrEqual(left + 176);
-			// Under its 96px drawing, which starts below excalidraw.com's toolbar.
-			expect(label.y).toBeGreaterThan(112 + 96);
-		}
-		expect(Math.min(...drawn.map((element) => element.y))).toBeGreaterThanOrEqual(112);
 	});
 });

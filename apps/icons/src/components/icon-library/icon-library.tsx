@@ -581,7 +581,11 @@ export function IconLibrary({
 						<div className="icons-shell">
 							<h1 className="sr-only">Sketchi Icons</h1>
 							{packs ? (
-								<PackShelf origin={packs.origin} packs={packs.packs} previewMode={previewMode} />
+								<PackShelf
+									excalidraw={packs.excalidraw}
+									packs={packs.packs}
+									previewMode={previewMode}
+								/>
 							) : null}
 							<IconToolbar
 								activeIcon={results[activeIndex]}

@@ -5,15 +5,17 @@ import { dirname, resolve } from "node:path";
 import { ICON_SOURCE_URL_PREFIX, iconManifest } from "@sketchi/icon-catalog/catalog";
 
 import { catalogDrawings, DRAWINGS_PATH } from "../src/lib/drawings.js";
-import { excalidrawLibrary, excalidrawScene } from "../src/lib/excalidraw-export.js";
+import { excalidrawLibrary } from "../src/lib/excalidraw-export.js";
 import {
 	ICON_PACKS,
 	PACK_INDEX_PATH,
 	packIcons,
 	packLibraryPath,
-	packScenePath,
+	packPreviewImagePath,
 	packSummary,
+	packVersion,
 } from "../src/lib/packs.js";
+import { packPreviewImage } from "./pack-preview-image.js";
 
 // The catalog package owns the manifest, SVG sources and hand-drawn recipes.
 // The app publishes copies at stable public URLs; every output is generated
@@ -42,33 +44,31 @@ const drawings = catalogDrawings(
 	recipes,
 );
 await writeFile(resolve(publicRoot, `.${DRAWINGS_PATH}`), `${JSON.stringify(drawings)}\n`, "utf8");
-// Each pack publishes as a library to download and a scene excalidraw.com
-// opens by URL; the index carries what the pages show before they load more.
+// Each pack publishes as a library to download, versioned by its hash; a pack
+// listed for Excalidraw's library collection also gets the preview a
+// submission sends. The index carries what the pages show before they load more.
 const SOURCE = "https://icons.sketchi.app";
 await rm(resolve(publicRoot, "packs"), { force: true, recursive: true });
 await mkdir(resolve(publicRoot, "packs"), { recursive: true });
-const packs = ICON_PACKS.map((pack) => ({
-	pack,
-	members: packIcons(pack, iconManifest.icons, drawings),
-}));
-for (const { pack, members } of packs) {
-	await writeFile(
-		resolve(publicRoot, `.${packLibraryPath(pack.id)}`),
-		excalidrawLibrary(members, SOURCE, "catalog"),
-		"utf8",
-	);
-	await writeFile(
-		resolve(publicRoot, `.${packScenePath(pack.id)}`),
-		excalidrawScene(members, SOURCE),
-		"utf8",
-	);
+const summaries = [];
+for (const pack of ICON_PACKS) {
+	const members = packIcons(pack, iconManifest.icons, drawings);
+	const library = excalidrawLibrary(members, SOURCE, "catalog");
+	await writeFile(resolve(publicRoot, `.${packLibraryPath(pack.id)}`), library, "utf8");
+	if (pack.excalidrawListing) {
+		await writeFile(
+			resolve(publicRoot, `.${packPreviewImagePath(pack.id)}`),
+			await packPreviewImage(members.map((icon) => icon.recipe)),
+		);
+	}
+	summaries.push(packSummary(pack, members, await packVersion(library)));
 }
 await writeFile(
 	resolve(publicRoot, `.${PACK_INDEX_PATH}`),
-	`${JSON.stringify(packs.map(({ pack, members }) => packSummary(pack, members)))}\n`,
+	`${JSON.stringify(summaries)}\n`,
 	"utf8",
 );
 
 process.stdout.write(
-	`Published ${iconManifest.summary.totalIcons} icons, ${Object.keys(drawings).length} drawings and ${packs.length} packs into apps/icons/public.\n`,
+	`Published ${iconManifest.summary.totalIcons} icons, ${Object.keys(drawings).length} drawings and ${summaries.length} packs into apps/icons/public.\n`,
 );

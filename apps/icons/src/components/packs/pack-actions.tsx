@@ -1,22 +1,23 @@
-import { Download, ExternalLink } from "lucide-react";
+import { Download, ExternalLink, Upload } from "lucide-react";
 
-import {
-	openInExcalidrawUrl,
-	packLibraryFileName,
-	packLibraryPath,
-	type PackSummary,
-} from "../../lib/packs.js";
+import type { PackExcalidrawState } from "../../lib/excalidraw-publish.js";
+import { packLibraryFileName, packLibraryPath, type PackSummary } from "../../lib/packs.js";
 
-/** Download the pack's library, or open the pack on excalidraw.com in a new tab. */
+/**
+ * Download the pack's library; add it to Excalidraw once it has an install
+ * link, or publish it there while its current version can be.
+ */
 export function PackActions({
 	describedBy,
-	origin,
+	excalidraw,
+	onPublish,
 	pack,
 	size = "compact",
 }: {
 	/** The id of the pack's name, so each action reads with the pack it acts on. */
 	readonly describedBy?: string;
-	readonly origin: string;
+	readonly excalidraw?: PackExcalidrawState | undefined;
+	readonly onPublish?: () => void;
 	readonly pack: Pick<PackSummary, "id">;
 	readonly size?: "compact" | "large";
 }) {
@@ -31,15 +32,23 @@ export function PackActions({
 				<Download aria-hidden="true" />
 				<span>Download</span>
 			</a>
-			<a
-				aria-describedby={describedBy}
-				href={openInExcalidrawUrl(pack.id, origin)}
-				rel="noopener noreferrer"
-				target="_blank"
-			>
-				<ExternalLink aria-hidden="true" />
-				<span>Open in Excalidraw</span>
-			</a>
+			{excalidraw?.installUrl ? (
+				<a
+					aria-describedby={describedBy}
+					href={excalidraw.installUrl}
+					rel="noopener noreferrer"
+					target="_blank"
+				>
+					<ExternalLink aria-hidden="true" />
+					<span>Add to Excalidraw</span>
+				</a>
+			) : null}
+			{excalidraw?.publishable && onPublish ? (
+				<button aria-describedby={describedBy} onClick={onPublish} type="button">
+					<Upload aria-hidden="true" />
+					<span>Publish to Excalidraw</span>
+				</button>
+			) : null}
 		</div>
 	);
 }

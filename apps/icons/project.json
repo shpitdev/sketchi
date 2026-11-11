@@ -68,10 +68,13 @@
 			"dependsOn": ["^build"],
 			"inputs": [
 				"{projectRoot}/scripts/sync-catalog-assets.ts",
+				"{projectRoot}/scripts/pack-preview-image.ts",
+				"{projectRoot}/public/fonts/Excalifont/*.woff2",
 				"{projectRoot}/src/lib/drawings.ts",
 				"{projectRoot}/src/lib/excalidraw-export.ts",
 				"{projectRoot}/src/lib/packs.ts",
 				"{projectRoot}/src/lib/recipe-drawing.ts",
+				"{projectRoot}/src/lib/pack-preview.ts",
 				"^production"
 			],
 			"outputs": [
