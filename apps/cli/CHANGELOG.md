@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.39.2
+
+### Patch Changes
+
+- [#768](https://github.com/shpitdev/sketchi/pull/768) [`0808467`](https://github.com/shpitdev/sketchi/commit/08084679972c854f771573645337ddee2da3182d) Thanks [@anandpant](https://github.com/anandpant)! - Icon names now read as their brands do, such as GitHub, Netlify, Vite and AI21 Labs, instead of a capitalized slug. The GitHub Copilot mark that shipped twice now ships once, and its old slug resolves to it.
+
 ## 0.39.1
 
 ### Patch Changes
