@@ -1770,7 +1770,7 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"Diagram our deploy pipeline. A push to GitHub starts it, Docker builds the image, and the test suite runs. If the tests pass, ship to Cloudflare Workers; otherwise notify the team and stop.",
 		logos: [
-			{ collection: "devtools-ci", name: "Github", slug: "github" },
+			{ aliases: ["GitHub"], collection: "devtools-ci", name: "GitHub", slug: "github" },
 			{ collection: "devtools-ci", name: "Docker", slug: "docker" },
 			{
 				aliases: ["Cloudflare"],
@@ -2255,8 +2255,8 @@ const flowchartScenarioDefinitions = [
 				slug: "kubernetes",
 			},
 			{ collection: "gcp", name: "Cloud SQL", slug: "cloud-sql" },
-			{ collection: "data-storage", name: "Rabbitmq", slug: "rabbitmq" },
-			{ collection: "gcp", name: "Gke", slug: "gke" },
+			{ aliases: ["RabbitMQ"], collection: "data-storage", name: "RabbitMQ", slug: "rabbitmq" },
+			{ aliases: ["GKE"], collection: "gcp", name: "GKE", slug: "gke" },
 		],
 		nodes: [
 			["browser", "Browser", "start", ["browser"]],

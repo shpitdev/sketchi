@@ -197,7 +197,7 @@ const sequenceScenarioDefinitions = [
 		title: "OAuth authorization code login",
 		difficulty: "standard",
 		tags: ["sequence", "auth", "redirects"],
-		logos: [{ collection: "auth-identity", name: "Oauth", slug: "oauth" }],
+		logos: [{ aliases: ["OAuth"], collection: "auth-identity", name: "OAuth", slug: "oauth" }],
 		description:
 			"Redirect-based login where the back-channel token exchange must happen before the session is returned.",
 		prompt:
@@ -335,7 +335,7 @@ const sequenceScenarioDefinitions = [
 		prompt:
 			"Sequence diagram of a deploy webhook. A developer pushes a commit to GitHub. GitHub sends a push webhook to a Cloudflare Worker. The Worker asks Docker to build the image and gets the image digest back, then answers the GitHub webhook with 202 Accepted.",
 		logos: [
-			{ collection: "devtools-ci", name: "Github", slug: "github" },
+			{ aliases: ["GitHub"], collection: "devtools-ci", name: "GitHub", slug: "github" },
 			{
 				aliases: ["Cloudflare"],
 				collection: "cloud-vendors",

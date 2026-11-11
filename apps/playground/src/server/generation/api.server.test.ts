@@ -430,7 +430,7 @@ describe("public generate endpoint", () => {
 
 		expect(response.status).toBe(200);
 		const providerRequest = JSON.stringify(observedRuns[0]);
-		expect(providerRequest).toContain("- github: Github");
+		expect(providerRequest).toContain("- github: GitHub");
 		expect(providerRequest).toContain("- docker: Docker");
 		expect(providerRequest).not.toContain("- kubernetes:");
 		const body = (await response.json()) as {
