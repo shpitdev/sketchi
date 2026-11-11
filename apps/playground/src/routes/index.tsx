@@ -149,7 +149,7 @@ function StagePlaceholder({
 						? "Working on your request…"
 						: hasResult
 							? "This version needs a few changes. Ask Sketchi to revise it or try another request."
-							: "Your diagram will appear here."}
+							: null}
 			</p>
 			{ghostLabels.length > 0 ? (
 				<div className="studio__ghosts">
