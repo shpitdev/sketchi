@@ -4,6 +4,13 @@
 
 @source "../";
 
+/* Studio follows the system preference, including shared AI Elements utilities. */
+@custom-variant dark {
+	@media (prefers-color-scheme: dark) {
+		@slot;
+	}
+}
+
 /* sketchbook aliases used by hand-written chrome */
 :root {
 	--muted-ink: var(--ink-3);
@@ -39,7 +46,6 @@ body {
      surface uses, so the playground stops reading as a narrower page. */
 	max-width: var(--shell);
 	margin: 0 auto;
-	transition: max-width 0.5s ease;
 }
 
 .studio--build {
@@ -158,9 +164,8 @@ body {
 	line-height: 1;
 }
 
-/* Empty state: one centred column that reads heading, composer, starters,
-   then a sample. It flows with the page, so short and narrow viewports
-   scroll the document rather than a hidden inner panel. */
+/* The sample and starter prompts lead into one persistent composer. Short
+   empty pages scroll naturally; a conversation uses the fixed workspace. */
 .studio--empty {
 	height: auto;
 	min-height: 100dvh;
@@ -168,7 +173,7 @@ body {
 
 .studio--empty .studio__chat {
 	margin: 0 auto;
-	padding: clamp(24px, 9vh, 96px) 24px 48px;
+	padding: clamp(24px, 5vh, 56px) 24px 32px;
 	width: min(760px, 100%);
 }
 
@@ -176,10 +181,10 @@ body {
 	padding: 0;
 }
 
-/* The composer is the first-visit focus: lift it off the paper. */
+/* Keep the input distinct from the sample without competing shadows. */
 .studio--empty .studio__composer [data-slot="input-group"] {
 	background: var(--card);
-	box-shadow: var(--shadow-md);
+	box-shadow: var(--shadow-sm);
 }
 
 .studio__intro {
@@ -193,9 +198,9 @@ body {
 
 .studio__starters-wrap {
 	display: grid;
-	gap: 28px;
+	gap: 16px;
 	grid-template-columns: minmax(0, 1fr);
-	margin-top: 14px;
+	margin-bottom: 20px;
 }
 
 .studio__starters {
@@ -210,8 +215,8 @@ body {
 	height: auto;
 	max-width: 100%;
 	line-height: 1.35;
-	min-height: 34px;
-	padding-block: 7px;
+	min-height: 40px;
+	padding-block: 9px;
 	text-align: left;
 	white-space: normal;
 }
@@ -236,7 +241,7 @@ body {
 	/* The sample is a wide left-to-right flow, so its height follows the
 	   viewport width. Not aspect-ratio: a minimum height would transfer
 	   through the ratio into a minimum width wider than a phone. */
-	height: clamp(150px, 40vw, 280px);
+	height: clamp(160px, 30vw, 240px);
 	min-width: 0;
 	overflow: hidden;
 	position: relative;
@@ -305,32 +310,30 @@ body {
 	padding: 10px 20px 24px 28px;
 	min-width: 0;
 	min-height: 0;
-	animation: studio-stage-in 0.5s ease;
-}
-
-@keyframes studio-stage-in {
-	from {
-		opacity: 0;
-		transform: translateX(-18px);
-	}
-	to {
-		opacity: 1;
-		transform: none;
-	}
 }
 
 .studio__stage-head {
 	display: flex;
-	align-items: flex-end;
+	min-height: 34px;
+	align-items: center;
 	justify-content: space-between;
 	gap: 16px;
 }
 
+.studio__stage-stop {
+	display: none;
+	margin-left: auto;
+}
+
 .studio__stage-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 	margin: 0;
 	font-family: var(--font-body);
-	font-size: 22px;
-	font-weight: 700;
+	font-size: 18px;
+	font-weight: 600;
 }
 
 .studio__stage-chip {
@@ -355,10 +358,10 @@ body {
 		var(--card);
 	border: 1px solid var(--line);
 	border-radius: var(--r-lg);
-	box-shadow: var(--shadow-lg);
+	box-shadow: var(--shadow-sm);
 	overflow: hidden;
 	display: flex;
-	padding: 18px;
+	padding: 0;
 }
 
 .studio__stage-card .sketchi-diagram-preview {
@@ -396,6 +399,7 @@ body {
 
 .studio__stage-placeholder {
 	margin: auto;
+	padding: 16px;
 	text-align: center;
 	display: flex;
 	flex-direction: column;
@@ -405,10 +409,12 @@ body {
 }
 
 .studio__stage-placeholder-text {
-	color: var(--mauve);
-	font-style: italic;
-	animation: studio-pulse 1.4s ease-in-out infinite;
+	color: var(--ink-3);
 	margin: 0;
+}
+
+.studio__stage-placeholder[aria-busy="true"] .studio__stage-placeholder-text {
+	animation: studio-pulse 1.4s ease-in-out infinite;
 }
 
 .studio__ghosts {
@@ -428,6 +434,15 @@ body {
 	animation: studio-ghost-in 0.35s ease;
 }
 
+.studio__stage-footer {
+	display: flex;
+	flex: 0 0 auto;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	min-height: 70px;
+}
+
 .studio__artifact-actions {
 	display: flex;
 	align-items: center;
@@ -440,6 +455,7 @@ body {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	gap: 6px;
 	min-height: 34px;
 	padding: 7px 12px;
 	border: 1px solid color-mix(in srgb, var(--mauve) 35%, var(--line));
@@ -703,38 +719,85 @@ button.studio__artifact-link {
 	}
 }
 
-/* Narrow build mode: a scrollable stage-then-chat page. Instead of splitting
-   a fixed viewport (which starved the canvas), the stage keeps a genuinely
-   useful canvas height and the chat sits usably below as the page scrolls. */
+/* On phones, the user chooses a panel; incoming content never pushes the
+   composer down the document or switches the view out from under them. */
+.studio__view-switch {
+	display: none;
+}
+
+.studio__ready-dot {
+	background: var(--ok);
+	border-radius: 50%;
+	height: 6px;
+	width: 6px;
+}
+
 @media (max-width: 920px) {
-	.studio--build {
-		height: auto;
-		min-height: 100dvh;
+	.studio__view-switch {
+		display: flex;
+		gap: 4px;
+		padding: 0 16px 12px;
+	}
+
+	.studio__view-switch button {
+		align-items: center;
+		border: 1px solid transparent;
+		border-radius: var(--r-sm);
+		color: var(--ink-2);
+		display: inline-flex;
+		flex: 1;
+		font-size: 14px;
+		gap: 8px;
+		justify-content: center;
+		min-height: 40px;
+	}
+
+	.studio__view-switch button[aria-pressed="true"] {
+		background: var(--card);
+		border-color: var(--line);
+		color: var(--ink);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.studio__view-switch button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
 	}
 
 	.studio--build .studio__body {
-		display: flex;
-		flex-direction: column;
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: minmax(0, 1fr);
 	}
 
 	.studio--build .studio__stage {
-		flex: 0 0 auto;
-		padding: 6px 16px 12px;
+		padding: 4px 16px 16px;
 	}
 
-	/* Definite height (not min-height) so the preview's height:100% resolves
-     and the Excalidraw canvas actually draws at a useful size. */
-	.studio--build .studio__stage-card {
-		flex: 0 0 auto;
-		height: 360px;
-		padding: 12px;
+	.studio__stage-footer {
+		min-height: 120px;
+	}
+
+	.studio__stage-stop {
+		display: inline-flex;
+		padding: 4px 10px;
 	}
 
 	.studio--build .studio__chat {
-		flex: 1 0 auto;
-		min-height: 62dvh;
 		border-left: none;
-		border-top: 1px solid var(--line);
+	}
+
+	.studio[data-mobile-panel="chat"] .studio__stage,
+	.studio--build[data-mobile-panel="diagram"] .studio__chat {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.studio *,
+	.studio *::before,
+	.studio *::after {
+		animation: none !important;
+		transition: none !important;
 	}
 }
 
@@ -889,5 +952,33 @@ button.studio__artifact-link {
 
 	.studio-project-row__actions {
 		justify-content: flex-start;
+	}
+}
+
+/* Studio chrome follows the system preference; diagrams retain their authored
+   paper and colors, just as they do in downloaded artifacts. */
+@media (prefers-color-scheme: dark) {
+	/* Outrank the shared diagram stylesheet's light :root defaults in any load order. */
+	html:root {
+		color-scheme: dark;
+		--paper: #201e20;
+		--paper-2: #2b272b;
+		--card: #302b30;
+		--ink: #f2ecef;
+		--ink-2: #d2c6cd;
+		--ink-3: #b8a9b2;
+		--line: #494047;
+		--line-2: #62525c;
+		--accent: #b990a6;
+		--accent-strong: #c9a7b9;
+		--accent-ink: #e8c5d8;
+		--accent-wash: #44343e;
+		--ok: #85c9a3;
+		--ok-ink: #a5dfbe;
+		--ok-wash: #213c30;
+		--warn-ink: #eac489;
+		--warn-wash: #443721;
+		--danger: #f39b90;
+		--grid-dot: rgb(242 236 239 / 0.045);
 	}
 }

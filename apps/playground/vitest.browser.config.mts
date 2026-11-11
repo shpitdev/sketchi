@@ -50,6 +50,10 @@ export default defineConfig({
 				replacement: source("../../packages/diagram/scenarios/src/index.ts"),
 			},
 			{
+				find: "@sketchi/diagram-ui/styles.css",
+				replacement: source("../../packages/diagram/ui/src/styles.css"),
+			},
+			{
 				find: "@sketchi/diagram-ui",
 				replacement: source("../../packages/diagram/ui/src/index.ts"),
 			},

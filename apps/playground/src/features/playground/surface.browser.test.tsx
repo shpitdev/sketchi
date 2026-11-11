@@ -38,13 +38,13 @@ function EmptyPlayground({ onSelect = () => undefined }: { onSelect?: (prompt: s
 			<div className="studio__body">
 				<section className="studio__chat">
 					<PlaygroundIntro />
+					<PlaygroundStarters onSelect={onSelect} />
 					<PlaygroundComposer
 						buildMode={false}
 						composerRef={createRef<HTMLTextAreaElement>()}
 						onSubmit={() => undefined}
 						status="ready"
 					/>
-					<PlaygroundStarters onSelect={onSelect} />
 				</section>
 			</div>
 		</main>
@@ -95,7 +95,7 @@ describe("playground empty layout", () => {
 		}
 	});
 
-	it("puts the composer under the heading, then the starters, in one centred column", () => {
+	it("puts the sample and starters above the composer in one centred column", () => {
 		render(<EmptyPlayground />);
 
 		const heading = screen.getByRole("heading", { level: 1, name: "What should we draw?" });
@@ -113,8 +113,8 @@ describe("playground empty layout", () => {
 		expect(composer.getBoundingClientRect().top).toBeGreaterThan(
 			heading.getBoundingClientRect().bottom,
 		);
-		expect(starters.getBoundingClientRect().top).toBeGreaterThan(
-			composer.getBoundingClientRect().bottom,
+		expect(composer.getBoundingClientRect().top).toBeGreaterThan(
+			starters.getBoundingClientRect().bottom,
 		);
 		const bounds = column.getBoundingClientRect();
 		expect(bounds.width).toBeLessThanOrEqual(760);
@@ -146,10 +146,10 @@ describe("playground empty layout", () => {
 
 		// The page scrolls, not a hidden inner panel.
 		expect(getComputedStyle(column).overflowY).toBe("visible");
-		expect(composer.getBoundingClientRect().bottom).toBeLessThan(
-			starters[0]?.getBoundingClientRect().top ?? 0,
+		expect(composer.getBoundingClientRect().top).toBeGreaterThan(
+			starters.at(-1)?.getBoundingClientRect().bottom ?? 0,
 		);
-		expect(document.documentElement.scrollHeight).toBeGreaterThan(innerHeight);
+		expect(document.documentElement.scrollHeight).toBeGreaterThanOrEqual(innerHeight);
 		expect(document.documentElement.scrollWidth).toBe(document.documentElement.clientWidth);
 
 		for (const starter of starters) {
