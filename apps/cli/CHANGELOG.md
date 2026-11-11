@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.40.0
+
+### Minor Changes
+
+- [#774](https://github.com/shpitdev/sketchi/pull/774) [`4e156ff`](https://github.com/shpitdev/sketchi/commit/4e156fffb2e584391cd2a1403703b1d65ea0602d) Thanks [@anandpant](https://github.com/anandpant)! - Google Cloud's per-product icons (BigQuery's console set, Pub/Sub, Dataflow, Cloud Functions and about 200 more) are now the "Google Cloud Products" collection and draw by hand in Google's colors, in a new Google Cloud pack. A product in both of Google's sets ships once, as its current icon; its other slug still resolves to it. A node labelled with one everyday word such as "Batch" or "Home" no longer takes the Google Cloud mark of that name.
+
 ## 0.39.3
 
 ### Patch Changes
