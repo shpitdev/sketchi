@@ -32,7 +32,7 @@ describe("icon HTTP API", () => {
 		expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
 	});
 
-	it("keeps duplicate source slugs deterministic and addressable", async () => {
+	it("resolves a folded Google Cloud console slug to the product's core icon", async () => {
 		const sourceLoader = async () => "<svg />";
 		const canonical = await handleIconDetailRequest(
 			new Request("https://icons.test/api/icons/anthos"),
@@ -48,8 +48,8 @@ describe("icon HTTP API", () => {
 			collection: "gcp",
 		});
 		await expect(alternate.json()).resolves.toMatchObject({
-			collection: "gcp-legacy",
-			slug: "anthos-gcp-legacy",
+			collection: "gcp",
+			slug: "anthos",
 		});
 	});
 

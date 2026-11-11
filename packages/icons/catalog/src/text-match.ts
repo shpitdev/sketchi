@@ -297,7 +297,7 @@ const TECH_NOUNS: ReadonlySet<string> = new Set(
  * words name a generic technology before a tech noun ("Edge function", "Stream worker",
  * "Sync function").
  */
-const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set(["gcp", "gcp-legacy"]);
+const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set(["gcp", "gcp-products"]);
 const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
 	"automatic",
 	"edge",

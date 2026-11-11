@@ -55,13 +55,13 @@ interface ReviewData {
 describe("public icon manifest generation", () => {
 	it("keeps an explicit canonical collision slug and qualifies alternates", () => {
 		const catalog = buildIconCatalog({
-			icons: [sourceIcon("anthos", "gcp-legacy"), sourceIcon("anthos", "gcp")],
+			icons: [sourceIcon("amp", "devtools-ci"), sourceIcon("amp", "ai-apps-agents")],
 		});
 		expect(catalog.manifest.icons.map((icon) => [icon.slug, icon.collection])).toEqual([
-			["anthos", "gcp"],
-			["anthos-gcp-legacy", "gcp-legacy"],
+			["amp", "ai-apps-agents"],
+			["amp-devtools-ci", "devtools-ci"],
 		]);
-		expect(catalog.manifest.icons[1]?.aliases).toContain("anthos");
+		expect(catalog.manifest.icons[1]?.aliases).toContain("amp");
 	});
 
 	it("fails closed when a new collision has no product decision", () => {
@@ -72,16 +72,36 @@ describe("public icon manifest generation", () => {
 		).toThrow("Choose a canonical collection");
 	});
 
-	it("keeps explicit alternate collision slugs stable after source removal", () => {
-		const alternateOnly = buildIconCatalog({
-			icons: [sourceIcon("anthos", "gcp-legacy")],
+	it("ships a Google Cloud product once, as its core-product icon", () => {
+		const catalog = buildIconCatalog({
+			icons: [
+				sourceIcon("anthos", "gcp-legacy"),
+				sourceIcon("anthos", "gcp"),
+				sourceIcon("bigquery", "gcp-legacy"),
+				sourceIcon("big-query", "gcp"),
+				sourceIcon("pubsub", "gcp-legacy"),
+				sourceIcon("speech-to-text", "gcp-legacy"),
+			],
 		});
-		expect(alternateOnly.manifest.icons[0]?.slug).toBe("anthos-gcp-legacy");
-
-		const canonicalOnly = buildIconCatalog({
-			icons: [sourceIcon("anthos", "gcp")],
-		});
-		expect(canonicalOnly.manifest.icons[0]?.slug).toBe("anthos");
+		expect(
+			catalog.manifest.icons.map(({ collection, name, slug, variant }) => [
+				slug,
+				name,
+				collection,
+				variant,
+			]),
+		).toEqual([
+			["anthos", "Anthos", "gcp", undefined],
+			["big-query", "BigQuery", "gcp", undefined],
+			["pubsub", "Pub/Sub", "gcp-products", undefined],
+			["speech-to-text", "Speech-to-Text", "gcp-products", undefined],
+		]);
+		// The folded console icon lends its names, never its collection-qualified slug.
+		expect(catalog.manifest.icons[0]?.aliases).not.toContain("anthos-gcp-legacy");
+		expect(catalog.manifest.icons[1]?.aliases).toContain("bigquery");
+		expect(() => buildIconCatalog({ icons: [sourceIcon("anthos", "gcp-legacy")] })).toThrow(
+			"anthos-gcp-legacy folds into anthos, which does not ship.",
+		);
 	});
 
 	it("keeps collection-only tokens below semantic slug matches", () => {
@@ -264,7 +284,7 @@ describe("public icon manifest generation", () => {
 	it("ships a compact clean manifest with aliases and no review fields", () => {
 		const source = JSON.stringify(iconManifest);
 		const manifest = decodeIconManifest(JSON.parse(source));
-		expect(manifest.summary.totalIcons).toBe(1540);
+		expect(manifest.summary.totalIcons).toBe(1528);
 		expect(new Set(manifest.icons.map((icon) => icon.slug)).size).toBe(manifest.icons.length);
 		expect(manifest.icons.find((icon) => icon.slug === "kubernetes")?.aliases).toContain("k8s");
 		expect(manifest.icons.find((icon) => icon.slug === "adobefirefly-text")?.name).toBe(

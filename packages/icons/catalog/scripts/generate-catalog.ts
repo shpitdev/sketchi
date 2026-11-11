@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 import { catalogCommonWords, loadCommonEnglishWords } from "../src/common-words-generation.js";
-import { buildIconCatalog, isShippedSourceIcon } from "../src/manifest-generation.js";
+import { buildIconCatalog, shippedSourceIcons } from "../src/manifest-generation.js";
 import { initIconColorRenderer, measureIconColor } from "../src/icon-color-render.js";
 
 const packageRoot = resolve(import.meta.dirname, "..");
@@ -12,13 +12,13 @@ const commonWordsPath = resolve(packageRoot, "src/generated/common-words.json");
 const SVG_URL_PREFIX = "/output/upload-ready/svg/";
 
 const source = JSON.parse(await readFile(sourcePath, "utf8")) as {
-	icons: { slug: string; urlPath: string }[];
+	icons: { collection: string; slug: string; urlPath: string }[];
 };
 
 // Classify every mark from its SVG, so the manifest says how it meets light and dark surfaces.
 await initIconColorRenderer();
 // A folded mark ships under another product's slug, so only shipped marks are measured.
-for (const icon of source.icons.filter(isShippedSourceIcon)) {
+for (const icon of shippedSourceIcons(source.icons)) {
 	if (!icon.urlPath.startsWith(SVG_URL_PREFIX)) {
 		throw new Error(`Icon source ${icon.urlPath} is outside the SVG directory.`);
 	}

@@ -60,7 +60,7 @@ describe("matchIconsInText", () => {
 			"supabase",
 			"slack",
 		]);
-		expect(slugs("Load events into BigQuery with Dataflow")).toEqual(["bigquery", "dataflow"]);
+		expect(slugs("Load events into BigQuery with Dataflow")).toEqual(["big-query", "dataflow"]);
 		// Sentence starts, line starts, clauses after a colon, Title Case lines,
 		// and all-caps abbreviations carry no signal.
 		expect(slugs("Render it. Swift: delivery. Linear\nGo")).toEqual([]);

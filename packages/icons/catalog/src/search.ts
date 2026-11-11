@@ -1,3 +1,4 @@
+import { canonicalIconSlug } from "./folded-slugs.js";
 import { formatCollectionLabel, type SketchiIcon } from "./manifest.js";
 import { isDistinctiveWord, termTokens } from "./terms.js";
 
@@ -268,7 +269,8 @@ export function searchIcons<Icon extends SearchableIcon = SketchiIcon>(
 	icons: readonly Icon[],
 	options: IconSearchOptions = {},
 ): readonly RankedIcon<Icon>[] {
-	const normalizedQuery = normalizeIconQuery(options.query ?? "");
+	// A folded slug searches as the slug its mark ships under.
+	const normalizedQuery = canonicalIconSlug(normalizeIconQuery(options.query ?? ""));
 	const collection = options.collection?.trim();
 	const limit = Math.max(0, options.limit ?? Number.POSITIVE_INFINITY);
 
