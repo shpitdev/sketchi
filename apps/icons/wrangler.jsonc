@@ -40,7 +40,10 @@
 	],
 	"workers_dev": true,
 	"vars": {
-		"SKETCHI_APP_SURFACE": "icons"
+		"SKETCHI_APP_SURFACE": "icons",
+		// Visitors can publish a category pack to Excalidraw's library collection.
+		// Previews leave it unset, so a preview never opens a real submission.
+		"EXCALIDRAW_LIBRARY_SUBMIT": "on"
 	},
 	"previews": {
 		"vars": {
