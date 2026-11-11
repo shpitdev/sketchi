@@ -660,6 +660,17 @@ kbd {
 	border-color: #3f3931;
 }
 
+/* Recipe tiles use Excalidraw's canvas; source SVG previews retain their own surface. */
+.icon-card__preview:has([data-recipe-preview]),
+.icon-detail__preview:has([data-recipe-preview]) {
+	background: #ffffff;
+}
+
+.icon-card__preview:has([data-recipe-preview="dark"]),
+.icon-detail__preview:has([data-recipe-preview="dark"]) {
+	background: #121212;
+}
+
 .icon-card__preview .icon-mark {
 	height: 50%;
 	width: 50%;
@@ -1457,7 +1468,7 @@ kbd {
 }
 
 .pack-card__strip {
-	background: var(--card);
+	background: #ffffff;
 	border: 1px solid var(--line);
 	border-radius: var(--r-sm);
 	display: grid;
@@ -1468,7 +1479,7 @@ kbd {
 }
 
 .pack-card__strip[data-preview="dark"] {
-	background: #25211c;
+	background: #121212;
 	border-color: #3f3931;
 }
 
