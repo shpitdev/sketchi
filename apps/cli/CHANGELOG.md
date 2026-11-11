@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.39.3
+
+### Patch Changes
+
+- [#772](https://github.com/shpitdev/sketchi/pull/772) [`00e33fc`](https://github.com/shpitdev/sketchi/commit/00e33fc9e867ed0dc9eab80729035d60eee55b16) Thanks [@anandpant](https://github.com/anandpant)! - Improve Palantir icon contrast in light and dark Excalidraw themes, preserve interior details at small sizes, and clarify the MCP Hub and Templates marks.
+
 ## 0.39.2
 
 ### Patch Changes
