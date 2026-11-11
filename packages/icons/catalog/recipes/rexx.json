@@ -1,0 +1,30 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[2, 9],
+				[20, 9]
+			],
+			"stroke": "#d81511"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[18, 13],
+				[22.5, 4],
+				[22, 21]
+			],
+			"stroke": "#d81511",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 11,
+			"cy": 13.5,
+			"text": "Rexx",
+			"size": 8,
+			"color": "#d81511"
+		}
+	]
+}
