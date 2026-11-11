@@ -127,8 +127,9 @@ interface PartialMatch<Icon> {
  * Icons named by part of a query that matches no icon as a whole, as in
  * "Cloudflare Workers" or "AWS Lambda". A part must equal an icon's slug,
  * name, or alias, and must hold a distinctive word unless it names a cloud
- * vendor ("google", "amazon"); so "Edge" or "Lambda" inside a product name
- * never draw a browser or a GPU cloud. Longer parts rank first, then a
+ * vendor ("google", "amazon") or spells a one-word slug across several words
+ * ("Red Hat" for `redhat`, "New Relic" for `newrelic`); so "Edge" or "Lambda"
+ * inside a product name never draw a browser or a GPU cloud. Longer parts rank first, then a
  * product's own mark above its vendor's, then query order.
  */
 function partialQueryMatches<Icon extends SearchableIcon>(
@@ -145,7 +146,8 @@ function partialQueryMatches<Icon extends SearchableIcon>(
 			const distinctive = part.some(isDistinctiveWord);
 			for (const icon of index.get(compactTerm(part.join(""))) ?? []) {
 				const vendor = VENDOR_COLLECTIONS.has(icon.collection);
-				if (matches.has(icon.slug) || (!distinctive && !vendor)) continue;
+				const spellsSlug = part.length > 1 && part.join("") === icon.slug;
+				if (matches.has(icon.slug) || (!distinctive && !vendor && !spellsSlug)) continue;
 				if (collection && icon.collection !== collection) continue;
 				const termRank = iconSearchTermRank(icon, part.join(" ")) ?? PARTIAL_QUERY_RANK;
 				matches.set(icon.slug, { icon, length, start, termRank, vendor });

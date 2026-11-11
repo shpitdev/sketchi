@@ -28,8 +28,6 @@ const PULL_REQUEST_URL =
 
 /** Submissions one client address may send an hour. */
 export const PUBLISHES_PER_CLIENT_HOUR = 3;
-/** A claim whose send never finished frees the version after this long. */
-export const CLAIM_STALE_MS = 10 * 60_000;
 const SUBMIT_TIMEOUT_MS = 30_000;
 const LOOKUP_TIMEOUT_MS = 8_000;
 
@@ -51,10 +49,18 @@ export function publishingEnabled(env: ExcalidrawPublishEnv): boolean {
 }
 
 /**
- * One row per pack version: claimed (`pending`) before the send so two
- * visitors cannot open two pull requests, then `submitted` with whatever the
- * pull request gave. A claim whose send failed is deleted; one whose Worker
- * died goes stale. Created on first use.
+ * One row per pack version, so a version opens at most one pull request:
+ *
+ * - `pending`: claimed before the send. A row left pending means the Worker
+ *   stopped mid-send, and the pull request may exist.
+ * - `unconfirmed`: the send timed out, lost its connection, or got an answer
+ *   other than a pull request or a refusal, so the pull request may exist.
+ *   `pull_request` holds what came back.
+ * - `submitted`: the collection answered with its pull request.
+ *
+ * Only a refusal (a 4xx answer without a pull request) deletes the claim.
+ * Every other row keeps its version from being sent again until someone
+ * reconciles it by hand (see the README). Created on first use.
  */
 const SCHEMA = `CREATE TABLE IF NOT EXISTS excalidraw_library_submissions (
 	pack_id TEXT NOT NULL,
@@ -71,7 +77,7 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS excalidraw_library_submissions (
 interface SubmissionRow {
 	readonly pack_id: string;
 	readonly version: string;
-	readonly status: "pending" | "submitted";
+	readonly status: "pending" | "unconfirmed" | "submitted";
 	readonly install_url: string | null;
 	readonly created_at: number;
 }
@@ -86,22 +92,32 @@ export class ExcalidrawSubmissionStore {
 		return this.ready;
 	}
 
-	/** Take the version for one send; false when it is submitted or another send holds it. */
+	/** Take the version for one send; false when any row already holds it. */
 	async claim(packId: string, version: string, authorName: string, now: number) {
 		await this.schema();
 		const { meta } = await this.db
 			.prepare(
 				`INSERT INTO excalidraw_library_submissions (pack_id, version, status, author_name, created_at)
 				VALUES (?, ?, 'pending', ?, ?)
-				ON CONFLICT (pack_id, version) DO UPDATE SET author_name = excluded.author_name, created_at = excluded.created_at
-				WHERE status = 'pending' AND created_at < ?`,
+				ON CONFLICT (pack_id, version) DO NOTHING`,
 			)
-			.bind(packId, version, authorName, now, now - CLAIM_STALE_MS)
+			.bind(packId, version, authorName, now)
 			.run();
 		return meta.changes === 1;
 	}
 
-	/** Free a claim whose send failed, so the next visitor can try. */
+	/** Hold a version whose send may have opened a pull request, with what came back. */
+	async hold(packId: string, version: string, detail: string) {
+		await this.db
+			.prepare(
+				`UPDATE excalidraw_library_submissions SET status = 'unconfirmed', pull_request = ?
+				WHERE pack_id = ? AND version = ? AND status = 'pending'`,
+			)
+			.bind(detail, packId, version)
+			.run();
+	}
+
+	/** Free a claim the collection refused, so the next visitor can try. */
 	async release(packId: string, version: string) {
 		await this.db
 			.prepare(
@@ -151,17 +167,13 @@ export class ExcalidrawSubmissionStore {
 export function packExcalidrawStates(
 	packs: readonly Pick<PackSummary, "id" | "version">[],
 	rows: readonly SubmissionRow[],
-	options: { readonly enabled: boolean; readonly now: number },
+	options: { readonly enabled: boolean },
 ): Record<string, PackExcalidrawState> {
 	return Object.fromEntries(
 		packs.map((pack) => {
 			const mine = rows.filter((row) => row.pack_id === pack.id);
 			const installUrl = mine.find((row) => row.install_url)?.install_url ?? undefined;
-			const taken = mine.some(
-				(row) =>
-					row.version === pack.version &&
-					(row.status === "submitted" || row.created_at >= options.now - CLAIM_STALE_MS),
-			);
+			const taken = mine.some((row) => row.version === pack.version);
 			const publishable =
 				options.enabled && findPack(pack.id)?.excalidrawListing !== undefined && !taken;
 			return [pack.id, { ...(installUrl ? { installUrl } : {}), publishable }];
@@ -176,11 +188,28 @@ export async function loadPackExcalidrawStates(
 ): Promise<Record<string, PackExcalidrawState>> {
 	if (!env.COMMUNITY_ICONS) return {};
 	const rows = await new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS).rows().catch(() => []);
-	return packExcalidrawStates(packs, rows, { enabled: publishingEnabled(env), now: Date.now() });
+	return packExcalidrawStates(packs, rows, { enabled: publishingEnabled(env) });
 }
 
 function errorJson(status: number, code: string, message: string) {
 	return Response.json({ error: { code, message } }, { status });
+}
+
+function unconfirmed() {
+	return errorJson(
+		502,
+		"upstream_unconfirmed",
+		"Excalidraw's library service did not confirm it. This version is held until it is checked.",
+	);
+}
+
+function parseAnswer(text: string): { url?: unknown; message?: unknown } {
+	try {
+		const value: unknown = JSON.parse(text);
+		return typeof value === "object" && value !== null ? value : {};
+	} catch {
+		return {};
+	}
 }
 
 async function readJson(request: Request): Promise<unknown> {
@@ -288,7 +317,11 @@ export async function handlePackPublish(
 
 	const store = new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS);
 	if (!(await store.claim(packId, version, author.authorName, Date.now()))) {
-		return errorJson(409, "already_submitted", "This version of the pack is already submitted.");
+		return errorJson(
+			409,
+			"already_submitted",
+			"This version of the pack has already been sent to Excalidraw.",
+		);
 	}
 
 	// The dialog's form, part for part; the backend requires every field, empty or not.
@@ -307,26 +340,47 @@ export async function handlePackPublish(
 	form.append("twitterHandle", author.twitterHandle);
 	form.append("website", author.website);
 
-	let pullRequestUrl: string;
+	let status: number;
+	let text: string;
 	try {
 		const response = await fetch(
 			`${env.EXCALIDRAW_LIBRARY_BACKEND ?? EXCALIDRAW_LIBRARY_BACKEND}/submit`,
 			{ method: "POST", body: form, signal: AbortSignal.timeout(SUBMIT_TIMEOUT_MS) },
 		);
-		const answer = (await response.json().catch(() => ({}))) as {
-			url?: unknown;
-			message?: unknown;
-		};
-		if (!response.ok || typeof answer.url !== "string" || !PULL_REQUEST_URL.test(answer.url)) {
-			throw new Error(
-				`HTTP ${response.status}${typeof answer.message === "string" ? `: ${answer.message}` : ""}`,
+		status = response.status;
+		text = await response.text();
+	} catch (error) {
+		// A timeout or lost connection says nothing about whether the pull request was opened.
+		const detail = JSON.stringify({ error: String(error) });
+		await store.hold(packId, version, detail);
+		console.warn("Excalidraw library submission unconfirmed", { packId, version, detail });
+		return unconfirmed();
+	}
+	const answer = parseAnswer(text);
+	const pullRequestUrl =
+		status >= 200 &&
+		status < 300 &&
+		typeof answer.url === "string" &&
+		PULL_REQUEST_URL.test(answer.url)
+			? answer.url
+			: undefined;
+	if (!pullRequestUrl) {
+		const detail = JSON.stringify({ status, body: text.slice(0, 2000) });
+		if (status >= 400 && status < 500) {
+			// A refusal: the collection opened nothing, so the version is free again.
+			await store.release(packId, version);
+			console.warn("Excalidraw library submission refused", { packId, version, detail });
+			return errorJson(
+				502,
+				"upstream_refused",
+				typeof answer.message === "string"
+					? `Excalidraw's library service refused it: ${answer.message}`
+					: "Excalidraw's library service refused it.",
 			);
 		}
-		pullRequestUrl = answer.url;
-	} catch (error) {
-		await store.release(packId, version);
-		console.warn("Excalidraw library submission failed", { packId, version, error: String(error) });
-		return errorJson(502, "upstream_failed", "Excalidraw's library service did not accept it.");
+		await store.hold(packId, version, detail);
+		console.warn("Excalidraw library submission unconfirmed", { packId, version, detail });
+		return unconfirmed();
 	}
 
 	// The pull request exists now, so the version stays taken whatever the lookup finds.

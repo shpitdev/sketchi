@@ -76,14 +76,17 @@ first goes there the way excalidraw.com's "Publish library" dialog sends one.
   preview, and the pack's listing (`excalidrawListing` in `src/lib/packs.ts`).
   The preview is the dialog's: 6 marks a row in 128 px boxes 8 px apart, as a
   JPEG at most 5000 px a side, each mark drawn as the pages draw it.
-- Each pack version is sent once. The Worker claims the version in the
-  `excalidraw_library_submissions` table (in the community icons D1 database)
-  before sending; a send that fails frees it, and a claim left by a Worker
-  that died frees it after 10 minutes. Once the collection answers with a
-  pull request, the version stays taken: the Worker reads the pull request
-  from GitHub's public API and stores its URL, its "Installation link" and
-  what it read, or the error, so a link it could not read can be filled in
-  by hand.
+- Each pack version opens at most one pull request. The Worker claims the
+  version in the `excalidraw_library_submissions` table (in the community
+  icons D1 database) before sending. Only a refusal, a 4xx answer without a
+  pull request, frees it. A timeout, a lost connection, a 5xx or any other
+  answer without a pull request may still have opened one (the backend opens
+  it before answering, on a new branch each time), so the row is kept as
+  `unconfirmed` with what came back; a row left `pending` means the Worker
+  stopped mid-send. Neither expires, and both keep the version from being
+  sent again. Once the collection answers with a pull request, the Worker
+  reads it from GitHub's public API and stores its URL, its "Installation
+  link" and what it read, or the error.
 - Every visitor then gets "Add to Excalidraw" with the newest install link,
   which adds the library on excalidraw.com and leaves the canvas alone. A new
   pack version can be published again.
@@ -92,6 +95,32 @@ first goes there the way excalidraw.com's "Publish library" dialog sends one.
   404. `EXCALIDRAW_LIBRARY_BACKEND` and `EXCALIDRAW_LIBRARY_GITHUB_API` point
   a local Worker at stand-ins for Excalidraw's backend and GitHub's API (in
   `apps/icons/.dev.vars`).
+
+### Reconciling a held submission
+
+List the versions that are held or missing an install link:
+
+```sh
+pnpm exec wrangler d1 execute sketchi-community-icons --remote --config apps/icons/wrangler.jsonc \
+  --command "SELECT pack_id, version, status, author_name, datetime(created_at / 1000, 'unixepoch') AS sent, pull_request_url, install_url, pull_request FROM excalidraw_library_submissions WHERE status != 'submitted' OR install_url IS NULL"
+```
+
+Look for the pull request in `excalidraw/excalidraw-libraries`, opened around
+`sent` by `excalibot` with the pack's listing name as `feat: new library
+<name>`. If it exists, record it, taking the install link from its
+"Installation link":
+
+```sql
+UPDATE excalidraw_library_submissions
+SET status = 'submitted', pull_request_url = '<pull request URL>', install_url = '<installation link>'
+WHERE pack_id = '<pack>' AND version = '<version>';
+```
+
+If none was opened, free the version for the next visitor:
+
+```sql
+DELETE FROM excalidraw_library_submissions WHERE pack_id = '<pack>' AND version = '<version>';
+```
 
 ## Commands
 

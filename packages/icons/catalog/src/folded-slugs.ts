@@ -6,6 +6,7 @@
  */
 export const FOLDED_INTO_SLUG: Readonly<Record<string, string>> = {
 	"aip-assist-tutorials-app": "training-app",
+	copilotgithub: "githubcopilot",
 	"default-app": "foundry-applications-portal",
 	"mindkit-app": "hivemind-app",
 	"ontology-objecttype-app": "palantir-ontology",

@@ -77,7 +77,7 @@ describe("PackPublishDialog", () => {
 					{
 						error: {
 							code: "already_submitted",
-							message: "This version of the pack is already submitted.",
+							message: "This version of the pack has already been sent to Excalidraw.",
 						},
 					},
 					{ status: 409 },
@@ -88,7 +88,7 @@ describe("PackPublishDialog", () => {
 		fireEvent.change(within(dialog).getByLabelText("Your name"), { target: { value: "Jane" } });
 		fireEvent.click(within(dialog).getByRole("button", { name: "Publish" }));
 		expect((await within(dialog).findByRole("alert")).textContent).toBe(
-			"This version of the pack is already submitted.",
+			"This version of the pack has already been sent to Excalidraw.",
 		);
 		expect(within(dialog).getByRole("button", { name: "Publish" })).toBeTruthy();
 	});

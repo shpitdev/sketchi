@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { checkPublishRequest } from "./excalidraw-publish";
 import {
-	CLAIM_STALE_MS,
 	EXCALIDRAW_LIBRARY_BACKEND,
 	type ExcalidrawPublishEnv,
 	ExcalidrawSubmissionStore,
@@ -100,6 +99,15 @@ function backend(
 	return fetchMock;
 }
 
+function submissionRows(env: ExcalidrawPublishEnv) {
+	return env
+		.COMMUNITY_ICONS!.prepare(
+			"SELECT status, pull_request_url, install_url, pull_request FROM excalidraw_library_submissions",
+		)
+		.all<Record<string, string | null>>()
+		.then(({ results }) => results);
+}
+
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.useRealTimers();
@@ -173,9 +181,7 @@ describe("publishing a pack to Excalidraw", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 		const version = await packVersion(LIBRARY);
 		const rows = await new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!).rows();
-		expect(
-			packExcalidrawStates([{ id: "palantir", version }], rows, { enabled: true, now: Date.now() }),
-		).toEqual({
+		expect(packExcalidrawStates([{ id: "palantir", version }], rows, { enabled: true })).toEqual({
 			palantir: { installUrl: INSTALL, publishable: false },
 		});
 	});
@@ -186,18 +192,56 @@ describe("publishing a pack to Excalidraw", () => {
 			submit: () =>
 				Response.json({ message: "Library with this name already exists" }, { status: 422 }),
 		});
-		expect((await publish(env)).status).toBe(502);
+		const response = await publish(env);
+		expect(response.status).toBe(502);
+		await expect(response.json()).resolves.toMatchObject({
+			error: { code: "upstream_refused", message: expect.stringContaining("already exists") },
+		});
 		expect(refused).toHaveBeenCalledTimes(1);
+		expect(await submissionRows(env)).toEqual([]);
 		backend();
 		expect((await publish(env)).status).toBe(201);
 	});
 
-	it("frees the version when the backend answers without a pull request of the collection", async () => {
+	// The collection's backend opens the pull request before it answers, on a fresh branch each
+	// time, so any outcome short of an answer or a refusal may already have opened one.
+	it.each([
+		[
+			"a timeout",
+			() => Promise.reject(new DOMException("The operation timed out.", "TimeoutError")),
+		],
+		["a dropped connection", () => Promise.reject(new TypeError("Network connection lost."))],
+		["a server error", () => Promise.resolve(new Response("upstream error", { status: 503 }))],
+		[
+			"an answer without a pull request of the collection",
+			() => Promise.resolve(Response.json({ url: "https://example.com/pull/1" })),
+		],
+	])("holds the version after %s and never sends it again", async (_case, submit) => {
 		const env = environment();
-		backend({ submit: () => Response.json({ url: "https://example.com/pull/1" }) });
-		expect((await publish(env)).status).toBe(502);
-		backend();
-		expect((await publish(env)).status).toBe(201);
+		const first = vi.fn(async (input: RequestInfo | URL) => {
+			const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+			if (url === `${EXCALIDRAW_LIBRARY_BACKEND}/submit`) return submit();
+			throw new Error(`Unexpected fetch ${url}`);
+		});
+		vi.stubGlobal("fetch", first);
+		const response = await publish(env);
+		expect(response.status).toBe(502);
+		await expect(response.json()).resolves.toMatchObject({
+			error: { code: "upstream_unconfirmed" },
+		});
+		const [held] = await submissionRows(env);
+		expect(held).toMatchObject({ status: "unconfirmed", pull_request_url: null });
+		expect(JSON.parse(String(held?.["pull_request"]))).toBeTypeOf("object");
+
+		const retry = backend();
+		expect((await publish(env)).status).toBe(409);
+		expect(retry).not.toHaveBeenCalled();
+		const rows = await new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!).rows();
+		expect(
+			packExcalidrawStates([{ id: "palantir", version: await packVersion(LIBRARY) }], rows, {
+				enabled: true,
+			}).palantir,
+		).toEqual({ publishable: false });
 	});
 
 	it("keeps the pull request when GitHub cannot be read, without offering the version again", async () => {
@@ -231,28 +275,20 @@ describe("publishing a pack to Excalidraw", () => {
 		});
 	});
 
-	it("lets a stale claim go, but not one still sending", async () => {
+	it("never lets a claim lapse: a Worker that stopped mid-send may have opened a pull request", async () => {
 		const env = environment();
 		const store = new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!);
 		const version = await packVersion(LIBRARY);
-		const now = Date.now();
-		expect(await store.claim("palantir", version, "Someone", now)).toBe(true);
+		const longAgo = Date.now() - 30 * 24 * 3_600_000;
+		expect(await store.claim("palantir", version, "Someone", longAgo)).toBe(true);
 		const fetchMock = backend();
 		expect((await publish(env)).status).toBe(409);
 		expect(fetchMock).not.toHaveBeenCalled();
-		const rows = await store.rows();
+		expect(await store.claim("palantir", version, "Jane", Date.now())).toBe(false);
 		expect(
-			packExcalidrawStates([{ id: "palantir", version }], rows, { enabled: true, now }).palantir,
-		).toEqual({
-			publishable: false,
-		});
-		expect(
-			packExcalidrawStates([{ id: "palantir", version }], rows, {
-				enabled: true,
-				now: now + CLAIM_STALE_MS + 1,
-			}).palantir,
-		).toEqual({ publishable: true });
-		expect(await store.claim("palantir", version, "Jane", now + CLAIM_STALE_MS + 1)).toBe(true);
+			packExcalidrawStates([{ id: "palantir", version }], await store.rows(), { enabled: true })
+				.palantir,
+		).toEqual({ publishable: false });
 	});
 
 	it("refuses a bad or oversized body and a client over its limit", async () => {
@@ -287,14 +323,14 @@ describe("pack states", () => {
 					created_at: 1,
 				},
 			],
-			{ enabled: true, now: Date.now() },
+			{ enabled: true },
 		);
 		expect(states).toEqual({
 			palantir: { installUrl: INSTALL, publishable: true },
 			all: { publishable: false },
 		});
 		expect(
-			packExcalidrawStates([{ id: "palantir", version: "new" }], [], { enabled: false, now: 0 }),
+			packExcalidrawStates([{ id: "palantir", version: "new" }], [], { enabled: false }),
 		).toEqual({ palantir: { publishable: false } });
 	});
 });
