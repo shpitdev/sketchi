@@ -4,8 +4,16 @@ import { dirname, resolve } from "node:path";
 
 import { ICON_SOURCE_URL_PREFIX, iconManifest } from "@sketchi/icon-catalog/catalog";
 
-import { catalogDrawings, DRAWINGS_LIBRARY_PATH, DRAWINGS_PATH } from "../src/lib/drawings.js";
-import { excalidrawLibrary } from "../src/lib/excalidraw-export.js";
+import { catalogDrawings, DRAWINGS_PATH } from "../src/lib/drawings.js";
+import { excalidrawLibrary, excalidrawScene } from "../src/lib/excalidraw-export.js";
+import {
+	ICON_PACKS,
+	PACK_INDEX_PATH,
+	packIcons,
+	packLibraryPath,
+	packScenePath,
+	packSummary,
+} from "../src/lib/packs.js";
 
 // The catalog package owns the manifest, SVG sources and hand-drawn recipes.
 // The app publishes copies at stable public URLs; every output is generated
@@ -34,21 +42,33 @@ const drawings = catalogDrawings(
 	recipes,
 );
 await writeFile(resolve(publicRoot, `.${DRAWINGS_PATH}`), `${JSON.stringify(drawings)}\n`, "utf8");
-const names = new Map(iconManifest.icons.map((icon) => [icon.slug, icon.name]));
+// Each pack publishes as a library to download and a scene excalidraw.com
+// opens by URL; the index carries what the pages show before they load more.
+const SOURCE = "https://icons.sketchi.app";
+await rm(resolve(publicRoot, "packs"), { force: true, recursive: true });
+await mkdir(resolve(publicRoot, "packs"), { recursive: true });
+const packs = ICON_PACKS.map((pack) => ({
+	pack,
+	members: packIcons(pack, iconManifest.icons, drawings),
+}));
+for (const { pack, members } of packs) {
+	await writeFile(
+		resolve(publicRoot, `.${packLibraryPath(pack.id)}`),
+		excalidrawLibrary(members, SOURCE, "catalog"),
+		"utf8",
+	);
+	await writeFile(
+		resolve(publicRoot, `.${packScenePath(pack.id)}`),
+		excalidrawScene(members, SOURCE),
+		"utf8",
+	);
+}
 await writeFile(
-	resolve(publicRoot, `.${DRAWINGS_LIBRARY_PATH}`),
-	excalidrawLibrary(
-		Object.entries(drawings).map(([slug, recipe]) => ({
-			slug,
-			name: names.get(slug) ?? slug,
-			recipe,
-		})),
-		"https://icons.sketchi.app",
-		"catalog",
-	),
+	resolve(publicRoot, `.${PACK_INDEX_PATH}`),
+	`${JSON.stringify(packs.map(({ pack, members }) => packSummary(pack, members)))}\n`,
 	"utf8",
 );
 
 process.stdout.write(
-	`Published ${iconManifest.summary.totalIcons} icons and ${Object.keys(drawings).length} drawings into apps/icons/public.\n`,
+	`Published ${iconManifest.summary.totalIcons} icons, ${Object.keys(drawings).length} drawings and ${packs.length} packs into apps/icons/public.\n`,
 );

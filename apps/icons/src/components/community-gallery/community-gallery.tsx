@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { copyText, downloadBlob } from "../../lib/actions.js";
 import { bareSlug, type CommunityIconEntry } from "../../lib/community-client.js";
 import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
+import { useLoadOnScroll } from "../../lib/use-load-on-scroll.js";
 import { IconsChrome } from "../icon-library/icons-chrome.js";
 import { PreviewToggle, type PreviewMode } from "../preview-toggle/index.js";
 import { CommunityCard } from "./community-card.js";
@@ -75,6 +76,11 @@ export function CommunityGallery({
 			(initialIcon?.slug === detail.slug ? initialIcon : undefined))
 		: undefined;
 	const closeDetail = useCallback(() => setDetail(undefined), []);
+	const loadMore = useCallback(() => onLoadMore?.(), [onLoadMore]);
+	const sentinel = useLoadOnScroll<HTMLDivElement>(
+		status === "ready" && hasMore && !loadingMore && onLoadMore ? icons.length : undefined,
+		loadMore,
+	);
 
 	const showNotice = useCallback((message: string) => {
 		setNotice(message);
@@ -257,40 +263,28 @@ export function CommunityGallery({
 							) : null}
 
 							{status === "ready" && icons.length > 0 ? (
-								<>
-									<section
-										aria-label="Community icons"
-										className="icons-grid"
-										id="community-results"
-									>
-										{icons.map((icon) => (
-											<CommunityCard
-												copied={copiedSlug === icon.slug}
-												icon={icon}
-												key={icon.slug}
-												onCopy={(icon) => void copyForExcalidraw(icon)}
-												onDetails={(picked) =>
-													setDetail({
-														opener:
-															document.activeElement instanceof HTMLElement
-																? document.activeElement
-																: null,
-														slug: picked.slug,
-													})
-												}
-												previewMode={previewMode}
-											/>
-										))}
-									</section>
-									{hasMore && onLoadMore ? (
-										<div className="icons-more">
-											<button disabled={loadingMore} onClick={onLoadMore} type="button">
-												{loadingMore ? "Loading" : "Show more"}
-											</button>
-										</div>
-									) : null}
-								</>
+								<section aria-label="Community icons" className="icons-grid" id="community-results">
+									{icons.map((icon) => (
+										<CommunityCard
+											copied={copiedSlug === icon.slug}
+											icon={icon}
+											key={icon.slug}
+											onCopy={(icon) => void copyForExcalidraw(icon)}
+											onDetails={(picked) =>
+												setDetail({
+													opener:
+														document.activeElement instanceof HTMLElement
+															? document.activeElement
+															: null,
+													slug: picked.slug,
+												})
+											}
+											previewMode={previewMode}
+										/>
+									))}
+								</section>
 							) : null}
+							<div aria-hidden="true" className="icons-scroll-sentinel" ref={sentinel} />
 						</div>
 					</main>
 				</IconsChrome>

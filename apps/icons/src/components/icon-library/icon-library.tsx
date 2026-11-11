@@ -1,13 +1,14 @@
 import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import { useHotkeys, type UseHotkeyDefinition } from "@tanstack/react-hotkeys";
-import { Download } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { formatCollectionLabel, type IconManifest, type SketchiIcon } from "@sketchi/icon-catalog";
 import { DRAWINGS_LIBRARY_PATH, type IconDrawings } from "../../lib/drawings.js";
 import { filterIcons, toggleCollection } from "../../lib/filter.js";
 import { PLAYGROUND_URL, REPO_URL, SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
+import type { PackShelfData } from "../../lib/packs-rpc.js";
 import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
+import { useLoadOnScroll } from "../../lib/use-load-on-scroll.js";
 import { useModifierLabel } from "../../lib/use-modifier-label.js";
 import {
 	createSelectionStore,
@@ -19,6 +20,7 @@ import {
 } from "../../lib/selection.js";
 import { IconCard } from "../icon-card/index.js";
 import { IconDetail } from "../icon-detail/index.js";
+import { PackShelf } from "../packs/pack-shelf.js";
 import type { PreviewMode } from "../preview-toggle/index.js";
 import { CommandPalette, type IconCommand, type PaletteLink } from "./command-palette.js";
 import { IconsChrome } from "./icons-chrome.js";
@@ -29,7 +31,8 @@ import { type IconView, ViewSwitch } from "./view-switch.js";
 
 export type { IconManifest, SketchiIcon } from "@sketchi/icon-catalog";
 
-const PAGE_SIZE = 72;
+/** Results render a page at a time as the grid nears the viewport; 96 fills whole rows at 2–8 columns. */
+const PAGE_SIZE = 96;
 /** Nothing is highlighted until the user actually navigates with the keyboard. */
 const NO_ACTIVE_INDEX = -1;
 
@@ -47,6 +50,8 @@ export interface IconLibraryProps {
 	readonly initialQuery?: string;
 	readonly initialView?: IconView;
 	readonly onRetry?: () => void;
+	/** The Excalidraw library packs shown above the search. */
+	readonly packs?: PackShelfData;
 	readonly status?: LoadStatus;
 }
 
@@ -106,6 +111,7 @@ export function IconLibrary({
 	initialQuery = "",
 	initialView = "svg",
 	onRetry,
+	packs,
 	status = "ready",
 }: IconLibraryProps) {
 	const [query, setQuery] = useState(initialQuery);
@@ -149,6 +155,11 @@ export function IconLibrary({
 	// manifest changes) reads as no highlight.
 	const activeIndex = highlightedIndex < results.length ? highlightedIndex : NO_ACTIVE_INDEX;
 	const visibleIcons = results.slice(0, visibleCount);
+	const showMoreResults = useCallback(() => setVisibleCount((count) => count + PAGE_SIZE), []);
+	const sentinel = useLoadOnScroll<HTMLDivElement>(
+		status === "ready" && visibleCount < results.length ? visibleCount : undefined,
+		showMoreResults,
+	);
 	const detailIcon = detail ? data.icons.find((icon) => icon.slug === detail.slug) : undefined;
 	const selectedIcons = data.icons.filter((icon) => selectedSlugs.has(icon.slug));
 	const capacityLeft = remainingCapacity(selectedSlugs);
@@ -247,6 +258,24 @@ export function IconLibrary({
 		},
 		[selectionStore, showNotice],
 	);
+
+	// Stable per-card handlers keep the memoized cards from re-rendering on every page.
+	const toggleSelected = useCallback(
+		(icon: SketchiIcon) => dispatchSelection({ slug: icon.slug, type: "toggle" }),
+		[dispatchSelection],
+	);
+
+	const copyResult = useCallback(
+		(icon: SketchiIcon) => void copySvg(icon, view === "drawn" ? drawings[icon.slug] : undefined),
+		[copySvg, drawings, view],
+	);
+
+	const openDetails = useCallback((icon: SketchiIcon) => {
+		setDetail({
+			opener: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+			slug: icon.slug,
+		});
+	}, []);
 
 	const selectAllResults = useCallback(() => {
 		dispatchSelection({
@@ -530,10 +559,6 @@ export function IconLibrary({
 		},
 	]);
 
-	function toggleSelected(icon: SketchiIcon) {
-		dispatchSelection({ slug: icon.slug, type: "toggle" });
-	}
-
 	function navigate(link: PaletteLink) {
 		if (link.external) window.open(link.href, "_blank", "noopener,noreferrer");
 		else window.location.assign(link.href);
@@ -554,6 +579,10 @@ export function IconLibrary({
 						inert={detailIcon ? true : undefined}
 					>
 						<div className="icons-shell">
+							<h1 className="sr-only">Sketchi Icons</h1>
+							{packs ? (
+								<PackShelf origin={packs.origin} packs={packs.packs} previewMode={previewMode} />
+							) : null}
 							<IconToolbar
 								activeIcon={results[activeIndex]}
 								collectionOptions={collectionOptions}
@@ -575,12 +604,6 @@ export function IconLibrary({
 								{hasDrawings ? (
 									<div className="icons-results-bar__view">
 										<ViewSwitch onChange={changeView} value={view} />
-										{view === "drawn" ? (
-											<a className="icons-download" download href={DRAWINGS_LIBRARY_PATH}>
-												<Download aria-hidden="true" />
-												<span>Excalidraw library</span>
-											</a>
-										) : null}
 									</div>
 								) : null}
 								{showSelectResults ? (
@@ -649,47 +672,28 @@ export function IconLibrary({
 							) : null}
 
 							{status === "ready" && results.length ? (
-								<>
-									<section aria-label="Icon results" className="icons-grid" id="icon-results">
-										{visibleIcons.map((icon, index) => {
-											const drawing = drawingFor(icon);
-											return (
-												<IconCard
-													active={index === activeIndex}
-													copied={copiedSlug === icon.slug}
-													copying={copyingSlug === icon.slug}
-													{...(drawing ? { drawing } : {})}
-													icon={icon}
-													key={icon.slug}
-													onCopy={(picked) => void copySvg(picked, drawing)}
-													onDetails={(picked) => {
-														setDetail({
-															opener:
-																document.activeElement instanceof HTMLElement
-																	? document.activeElement
-																	: null,
-															slug: picked.slug,
-														});
-													}}
-													onToggleSelected={toggleSelected}
-													previewMode={previewMode}
-													selected={selectedSlugs.has(icon.slug)}
-												/>
-											);
-										})}
-									</section>
-									{visibleIcons.length < results.length ? (
-										<div className="icons-more">
-											<button
-												onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-												type="button"
-											>
-												Show {Math.min(PAGE_SIZE, results.length - visibleCount)} more
-											</button>
-										</div>
-									) : null}
-								</>
+								<section aria-label="Icon results" className="icons-grid" id="icon-results">
+									{visibleIcons.map((icon, index) => {
+										const drawing = drawingFor(icon);
+										return (
+											<IconCard
+												active={index === activeIndex}
+												copied={copiedSlug === icon.slug}
+												copying={copyingSlug === icon.slug}
+												{...(drawing ? { drawing } : {})}
+												icon={icon}
+												key={icon.slug}
+												onCopy={copyResult}
+												onDetails={openDetails}
+												onToggleSelected={toggleSelected}
+												previewMode={previewMode}
+												selected={selectedSlugs.has(icon.slug)}
+											/>
+										);
+									})}
+								</section>
 							) : null}
+							<div aria-hidden="true" className="icons-scroll-sentinel" ref={sentinel} />
 						</div>
 					</main>
 				</IconsChrome>

@@ -19,8 +19,15 @@ ignored copies into `public/`:
   the manifest for the grid's hand-drawn view and the drawing on each icon's
   details; if it fails, the SVG library is unchanged.
 - `public/sketchi-icons.excalidrawlib` is the same set as one Excalidraw
-  library (about 2.7 MB, 215 KB with gzip), built with the elements the
+  library (about 2.7 MB, 200 KB with gzip), built with the elements the
   "Copy for Excalidraw" actions paste.
+- `public/packs/` holds the packs `src/lib/packs.ts` defines by collection:
+  each as a library (`<id>.excalidrawlib`; the whole catalog keeps the URL
+  above) and as a scene (`<id>.excalidraw`) that excalidraw.com opens by URL,
+  plus `index.json`, which the home page and each `/packs/<id>` page render on
+  the server. The largest pack library is 590 KB raw and 46 KB with gzip.
+  excalidraw.com imports libraries only from its own hosts, so a pack opens
+  there as a scene and downloads as a library.
 
 The browser fetches one compact metadata manifest, then lazily loads only the
 SVGs visible in the grid. The current 1,412-icon manifest is about 385 KB raw

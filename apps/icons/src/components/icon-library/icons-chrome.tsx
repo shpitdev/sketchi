@@ -20,8 +20,8 @@ export function IconsChrome({
 	homeHref: string;
 	/** Opens the command palette; a page without one shows no trigger. */
 	onOpenCommands?: () => void;
-	/** Which icon set the page shows. */
-	section?: "catalog" | "community";
+	/** Which icon set the page shows; a pack's page is neither. */
+	section?: "catalog" | "community" | "pack";
 }) {
 	return (
 		<>
