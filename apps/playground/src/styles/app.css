@@ -4,6 +4,13 @@
 
 @source "../";
 
+/* Studio follows the system preference, including shared AI Elements utilities. */
+@custom-variant dark {
+	@media (prefers-color-scheme: dark) {
+		@slot;
+	}
+}
+
 /* sketchbook aliases used by hand-written chrome */
 :root {
 	--muted-ink: var(--ink-3);
@@ -307,9 +314,15 @@ body {
 
 .studio__stage-head {
 	display: flex;
+	min-height: 34px;
 	align-items: center;
 	justify-content: space-between;
 	gap: 16px;
+}
+
+.studio__stage-stop {
+	display: none;
+	margin-left: auto;
 }
 
 .studio__stage-title {
@@ -386,6 +399,7 @@ body {
 
 .studio__stage-placeholder {
 	margin: auto;
+	padding: 16px;
 	text-align: center;
 	display: flex;
 	flex-direction: column;
@@ -421,7 +435,12 @@ body {
 }
 
 .studio__stage-footer {
-	flex: 0 0 70px;
+	display: flex;
+	flex: 0 0 auto;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	min-height: 70px;
 }
 
 .studio__artifact-actions {
@@ -436,6 +455,7 @@ body {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	gap: 6px;
 	min-height: 34px;
 	padding: 7px 12px;
 	border: 1px solid color-mix(in srgb, var(--mauve) 35%, var(--line));
@@ -754,7 +774,12 @@ button.studio__artifact-link {
 	}
 
 	.studio__stage-footer {
-		flex-basis: 120px;
+		min-height: 120px;
+	}
+
+	.studio__stage-stop {
+		display: inline-flex;
+		padding: 4px 10px;
 	}
 
 	.studio--build .studio__chat {
@@ -933,7 +958,7 @@ button.studio__artifact-link {
 /* Studio chrome follows the system preference; diagrams retain their authored
    paper and colors, just as they do in downloaded artifacts. */
 @media (prefers-color-scheme: dark) {
-	:root:has(.studio) {
+	:root {
 		color-scheme: dark;
 		--paper: #201e20;
 		--paper-2: #2b272b;

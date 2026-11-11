@@ -3,7 +3,7 @@ import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { DiagramPreview } from "@sketchi/diagram-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { MessageSquare, PanelsTopLeft } from "lucide-react";
+import { MessageSquare, PanelsTopLeft, Square } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
@@ -134,11 +134,13 @@ function StagePlaceholder({
 	generating,
 	ghostLabels,
 	hasResult,
+	onCompose,
 }: {
 	generating: boolean;
 	hasResult: boolean;
 	pending: boolean;
 	ghostLabels: string[];
+	onCompose: () => void;
 }) {
 	return (
 		<div aria-busy={pending} className="studio__stage-placeholder">
@@ -151,6 +153,7 @@ function StagePlaceholder({
 							? "This version needs a few changes. Ask Sketchi to revise it or try another request."
 							: null}
 			</p>
+			{!pending ? <StageReplyButton onCompose={onCompose} /> : null}
 			{ghostLabels.length > 0 ? (
 				<div className="studio__ghosts">
 					{ghostLabels.map((label) => (
@@ -164,6 +167,14 @@ function StagePlaceholder({
 	);
 }
 
+function StageReplyButton({ onCompose }: { onCompose: () => void }) {
+	return (
+		<button className="studio__artifact-link" onClick={onCompose} type="button">
+			<MessageSquare aria-hidden="true" size={16} /> Reply in conversation
+		</button>
+	);
+}
+
 function DiagramStage({
 	pending,
 	artifact,
@@ -171,6 +182,9 @@ function DiagramStage({
 	ghostLabels,
 	result,
 	scene,
+	needsReply,
+	onCompose,
+	onStop,
 }: {
 	artifact: ReadyPlaygroundArtifact | null;
 	pending: boolean;
@@ -178,15 +192,29 @@ function DiagramStage({
 	ghostLabels: string[];
 	result: StudioBuildResult | undefined;
 	scene: RenderedDiagramScene | null;
+	needsReply: boolean;
+	onCompose: () => void;
+	onStop: () => void;
 }) {
-	const title = scene?.title ?? result?.normalizedSpec?.title ?? "Diagram";
+	const title = scene?.title ?? result?.normalizedSpec?.title ?? "";
 	return (
 		<section aria-label="Diagram" className="studio__stage" id="playground-diagram">
 			<header className="studio__stage-head">
-				<h2 className="studio__stage-title" title={title}>
-					{title}
-				</h2>
+				{title ? (
+					<h2 className="studio__stage-title" title={title}>
+						{title}
+					</h2>
+				) : null}
 				{result && !result.ok ? <span className="studio__stage-chip">Needs changes</span> : null}
+				{pending ? (
+					<button
+						className="studio__artifact-link studio__stage-stop"
+						onClick={onStop}
+						type="button"
+					>
+						<Square aria-hidden="true" size={14} /> Stop
+					</button>
+				) : null}
 			</header>
 			<div className="studio__stage-card">
 				{scene ? (
@@ -197,6 +225,7 @@ function DiagramStage({
 						generating={generating}
 						ghostLabels={ghostLabels}
 						hasResult={Boolean(result)}
+						onCompose={onCompose}
 					/>
 				)}
 				{generating && scene ? (
@@ -207,6 +236,7 @@ function DiagramStage({
 				) : null}
 			</div>
 			<div className="studio__stage-footer">
+				{scene && needsReply ? <StageReplyButton onCompose={onCompose} /> : null}
 				{artifact ? <ArtifactActions artifact={artifact} /> : null}
 			</div>
 		</section>
@@ -245,21 +275,26 @@ function StudioRoute() {
 		[busy, sendMessage],
 	);
 
+	const handleStop = useCallback(() => {
+		void stop();
+	}, [stop]);
+
 	const handleSubmit = useCallback(
 		(message: { text?: string }) => {
 			if (busy) {
-				void stop();
+				handleStop();
 				return;
 			}
 			if (message.text) {
 				send(message.text);
 			}
 		},
-		[busy, send, stop],
+		[busy, send, handleStop],
 	);
 
 	const focusComposer = useCallback(() => {
-		composerRef.current?.focus();
+		setMobilePanel("chat");
+		requestAnimationFrame(() => composerRef.current?.focus());
 	}, []);
 
 	const isEmpty = messages.length === 0;
@@ -296,10 +331,18 @@ function StudioRoute() {
 							type="button"
 						>
 							<PanelsTopLeft aria-hidden="true" size={16} /> Diagram
-							{scene ? <span aria-label="Ready" className="studio__ready-dot" /> : null}
+							{scene ? (
+								<span className="studio__ready-dot">
+									<span className="sr-only">Ready</span>
+								</span>
+							) : null}
 						</button>
 					</div>
 				) : null}
+
+				<p aria-atomic="true" className={error ? "studio__error" : "sr-only"} role="alert">
+					{error ? "Sketchi couldn’t finish that request. Try again." : null}
+				</p>
 
 				<div className="studio__body">
 					{!isEmpty ? (
@@ -311,6 +354,9 @@ function StudioRoute() {
 							ghostLabels={ghostLabels}
 							result={displayResult}
 							scene={scene}
+							needsReply={!busy && Boolean(error || answerableMessageId)}
+							onCompose={focusComposer}
+							onStop={handleStop}
 						/>
 					) : null}
 
@@ -364,12 +410,6 @@ function StudioRoute() {
 								<ConversationScrollButton aria-label="Scroll to latest message" />
 							</Conversation>
 						)}
-
-						{error ? (
-							<p className="studio__error" role="alert">
-								Sketchi couldn’t finish that request. Try again.
-							</p>
-						) : null}
 
 						<PlaygroundComposer
 							buildMode={buildMode}

@@ -98,13 +98,13 @@ export const ToolHeader = ({
   return (
     <CollapsibleTrigger
       className={cn(
-        "flex w-full items-center justify-between gap-4 p-3",
+        "flex w-full items-center justify-between gap-4 p-3 text-left",
         className
       )}
       {...props}
     >
-      <div className="flex items-center gap-2">
-        <WrenchIcon className="size-4 text-muted-foreground" />
+      <div className="flex min-w-0 items-center gap-2">
+        <WrenchIcon className="size-4 shrink-0 text-muted-foreground" />
         <span className="font-medium text-sm">{title ?? derivedName}</span>
         {stopped ? (
           <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
@@ -115,7 +115,7 @@ export const ToolHeader = ({
           getStatusBadge(state)
         )}
       </div>
-      <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
     </CollapsibleTrigger>
   );
 };
