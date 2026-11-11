@@ -104,7 +104,7 @@ export function decodeIconManifest(value: unknown): IconManifest {
 
 export function formatCollectionLabel(collection: string): string {
 	if (collection === "gcp") return "Google Cloud";
-	if (collection === "gcp-legacy") return "Google Cloud Classic";
+	if (collection === "gcp-products") return "Google Cloud Products";
 	return collection
 		.split("-")
 		.map((part) =>

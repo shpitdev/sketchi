@@ -35,8 +35,6 @@ flowchart LR
 - **Wordmarks are not drawn.** The batch draws the catalog's node logos.
   Diagrams never put a `-text` wordmark in a node, a recipe's text is a short
   word, and 286 of the 298 wordmarks have a compact mark that is drawn.
-- **`gcp-legacy` is not drawn.** It holds older copies of the current `gcp`
-  product icons, which are drawn. `--slugs` still draws a named one.
 
 ## A run
 

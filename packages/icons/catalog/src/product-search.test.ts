@@ -24,7 +24,7 @@ export const PRODUCT_NAME_QUERIES: Readonly<Record<string, string>> = {
 	"Google Cloud Run": "cloud-run",
 	"Google Cloud Functions": "cloud-functions",
 	"Google Cloud Platform": "googlecloud",
-	"Google Kubernetes Engine": "google-kubernetes-engine",
+	"Google Kubernetes Engine": "gke",
 	"Google Pub/Sub": "pubsub",
 	"Google Gemini": "gemini",
 	"Vercel Edge Functions": "vercel",

@@ -20,7 +20,7 @@ describe("icon match quality", () => {
 		expect(matchOf("Cloud SQL", "cloud-sql")).toBe("exact");
 		expect(matchOf("RabbitMQ", "rabbitmq")).toBe("exact");
 		expect(matchOf("AWS", "aws")).toBe("exact");
-		expect(matchOf("Google Kubernetes Engine", "google-kubernetes-engine")).toBe("exact");
+		expect(matchOf("Google Kubernetes Engine", "gke")).toBe("exact");
 	});
 
 	it("calls a vendor's or umbrella's logo for one of its products vendor", () => {
@@ -33,7 +33,7 @@ describe("icon match quality", () => {
 
 	it("calls anything fuzzier weak", () => {
 		expect(matchOf("post", "postgresql")).toBe("weak");
-		expect(matchOf("ingress", "google-kubernetes-engine")).toBe("weak");
+		expect(matchOf("ingress", "gke")).toBe("weak");
 	});
 
 	it("tags what search returns for product queries the catalog lacks", () => {

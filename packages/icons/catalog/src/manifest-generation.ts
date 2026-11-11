@@ -5,8 +5,8 @@ import { canonicalIconSlug, FOLDED_INTO_SLUG } from "./folded-slugs.js";
 interface SourceIcon {
 	readonly baseSlug?: string;
 	readonly bytes: number;
-	/** Measured from the SVG by the generator, which adds it to the pipeline record. */
-	readonly color: IconColor;
+	/** Measured from the SVG by the generator for every shipped mark. */
+	readonly color?: IconColor;
 	readonly collection: string;
 	readonly slug: string;
 	readonly urlPath: string;
@@ -38,9 +38,30 @@ export const COLLISION_CANONICAL_COLLECTIONS: Readonly<Record<string, string>> =
 	vertexai: "ai-infrastructure",
 };
 
-/** Whether a source mark ships, or is folded into another product's mark. */
-export function isShippedSourceIcon(icon: { readonly slug: string }): boolean {
-	return canonicalIconSlug(icon.slug) === icon.slug;
+/**
+ * The catalog's name for a pipeline collection where the two differ. Google
+ * distributes its per-product icons as "legacy console icons", yet it is its
+ * only set with an icon for each product (BigQuery, Pub/Sub, Dataflow); its
+ * 2025 core-product set, `gcp`, covers about twenty. The SVGs keep their
+ * published paths, and a slug qualified by collection keeps the pipeline's
+ * name (`anthos-gcp-legacy`).
+ */
+const CATALOG_COLLECTION_BY_SOURCE: Readonly<Record<string, string>> = {
+	"gcp-legacy": "gcp-products",
+};
+
+/** Product marks whose name ends in "-text", which the pipeline reads as wordmarks. */
+const PRODUCTS_NAMED_TEXT: ReadonlySet<string> = new Set(["speech-to-text"]);
+
+type SourceKey = Pick<SourceIcon, "collection" | "slug">;
+
+/** The source marks that ship, leaving out those folded into another product's mark. */
+export function shippedSourceIcons<Icon extends SourceKey>(icons: readonly Icon[]): Icon[] {
+	const slugs = publicSlugs(icons);
+	return icons.filter((icon) => {
+		const slug = slugs.get(icon)!;
+		return canonicalIconSlug(slug) === slug;
+	});
 }
 
 const ALIASES_BY_BASE_SLUG: Readonly<Record<string, readonly string[]>> = {
@@ -106,12 +127,14 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	agnesai: "Agnes AI",
 	agui: "AG-UI",
 	"ai-fde-app": "AI FDE",
+	"ai-machine-learning": "AI & Machine Learning",
 	ai21: "AI21 Labs",
 	ai21labsai: "AI21",
 	ai302: "302.AI",
 	ai360: "360 AI",
 	aihubmix: "AIHubMix",
 	aimlapi: "AI/ML API",
+	aionlabs: "Aion Labs",
 	"aip-analyst-app": "AIP Analyst",
 	"aip-assist-tutorials-app": "Walkthroughs",
 	"aip-autopilot-app": "Autopilot",
@@ -122,6 +145,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	akashchat: "Akash Chat",
 	alephalpha: "Aleph Alpha",
 	alibabacloud: "Alibaba Cloud",
+	"alloy-db": "AlloyDB",
 	alpinejs: "Alpine.js",
 	amdradeoncloud: "AMD Radeon Cloud",
 	amznwebserv: "Amazon Web Services",
@@ -135,6 +159,12 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	atlascloud: "Atlas Cloud",
 	"audit-explorer-app": "Audit Explorer",
 	"automation-app": "Automate",
+	automl: "AutoML",
+	"automl-natural-language": "AutoML Natural Language",
+	"automl-tables": "AutoML Tables",
+	"automl-translation": "AutoML Translation",
+	"automl-video-intelligence": "AutoML Video Intelligence",
+	"automl-vision": "AutoML Vision",
 	avajs: "AVA",
 	aws: "AWS",
 	azureai: "Azure AI",
@@ -142,7 +172,10 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	backbonejs: "Backbone.js",
 	baiducloud: "Baidu Cloud",
 	baseui: "Base UI",
+	beyondcorp: "BeyondCorp",
 	bfl: "Black Forest Labs",
+	"big-query": "BigQuery",
+	bigquery: "BigQuery",
 	bilibiliindex: "Bilibili Index",
 	biomejs: "Biome",
 	blueprintjs: "Blueprint",
@@ -167,6 +200,16 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	circleci: "CircleCI",
 	claudecode: "Claude Code",
 	clickhouse: "ClickHouse",
+	"cloud-apis": "Cloud APIs",
+	"cloud-dns": "Cloud DNS",
+	"cloud-ekm": "Cloud EKM",
+	"cloud-for-marketing": "Cloud for Marketing",
+	"cloud-hsm": "Cloud HSM",
+	"cloud-ids": "Cloud IDS",
+	"cloud-nat": "Cloud NAT",
+	"cloud-run-for-anthos": "Cloud Run for Anthos",
+	"cloud-tpu": "Cloud TPU",
+	"cloud-vpn": "Cloud VPN",
 	cloudflare: "Cloudflare",
 	"code-app": "Code Repositories",
 	"code-workspace-app": "Code Workspaces",
@@ -186,6 +229,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	comfyui: "ComfyUI",
 	commanda: "Command A",
 	commandcode: "Command Code",
+	"container-optimized-os": "Container-Optimized OS",
 	"contour-analysis-app": "Contour",
 	"control-panel-app": "Control Panel",
 	copilotkit: "CopilotKit",
@@ -197,6 +241,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	dalle: "DALL-E",
 	"data-connection-app": "Data Connection",
 	"data-health-app": "Data Health",
+	"data-qna": "Data QnA",
 	dbrx: "DBRX",
 	deepai: "DeepAI",
 	deepcogito: "Deep Cogito",
@@ -207,7 +252,9 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"default-app": "Preview",
 	"deployed-application-app": "Compute Modules",
 	"dev-console-app": "Developer Console",
+	"dev-ops": "DevOps",
 	"developer-branching-app": "Global Branching",
+	"dialogflow-cx": "Dialogflow CX",
 	digitalocean: "DigitalOcean",
 	dlang: "D",
 	doc2x: "Doc2X",
@@ -242,12 +289,14 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"foundry-user-directory": "User Directory",
 	"foundry-vulcan": "Vulcan",
 	"fusion-app": "Fusion",
+	"gce-systems-management": "GCE Systems Management",
 	geminicli: "Gemini CLI",
 	giteeai: "Gitee AI",
 	github: "GitHub",
 	githubcopilot: "GitHub Copilot",
 	gitlab: "GitLab",
 	gke: "GKE",
+	"gke-on-prem": "GKE On-Prem",
 	glmv: "GLM-V",
 	gmicloud: "GMI Cloud",
 	googlecloud: "Google Cloud",
@@ -267,6 +316,8 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"hyperauto-app": "HyperAuto",
 	ibm: "IBM",
 	id: "Adobe InDesign",
+	"identity-and-access-management": "Identity and Access Management",
+	"identity-aware-proxy": "Identity-Aware Proxy",
 	ie: "Internet Explorer",
 	iflytekcloud: "iFlytek Cloud",
 	"inference-app": "Sensitive Data Scanner",
@@ -274,6 +325,8 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"insight-app": "Insight",
 	internlm: "InternLM",
 	ionet: "io.net",
+	"iot-core": "IoT Core",
+	"iot-edge": "IoT Edge",
 	javascript: "JavaScript",
 	"job-tracker-app": "Builds",
 	jquery: "jQuery",
@@ -281,6 +334,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	kilocode: "Kilo Code",
 	knockoutjs: "Knockout",
 	kubernetes: "Kubernetes",
+	kuberun: "KubeRun",
 	langchain: "LangChain",
 	langgraph: "LangGraph",
 	leptonai: "Lepton AI",
@@ -293,11 +347,15 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	llmgateway: "LLM Gateway",
 	lmstudio: "LM Studio",
 	lobehub: "LobeHub",
+	"local-ssd": "Local SSD",
 	"logic-app": "AIP Logic",
 	"logic-flow-app": "Logic Flows",
 	logrocket: "LogRocket",
 	longcat: "LongCat",
 	"machinery-app": "Machinery",
+	"managed-service-for-microsoft-active-directory":
+		"Managed Service for Microsoft Active Directory",
+	"maps-geospatial": "Maps & Geospatial",
 	mariadb: "MariaDB",
 	"marketplace-app": "Marketplace",
 	"marketplace-packaging-app": "DevOps",
@@ -306,6 +364,8 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	mcpso: "MCP.so",
 	metaai: "Meta AI",
 	metagpt: "MetaGPT",
+	"migrate-for-anthos": "Migrate for Anthos",
+	"migrate-for-compute-engine": "Migrate for Compute Engine",
 	"mindkit-app": "Mindkit",
 	minimax: "MiniMax",
 	mobx: "MobX",
@@ -318,6 +378,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	modx: "MODX",
 	mongodb: "MongoDB",
 	"monocle-graph-app": "Data Lineage",
+	msdos: "MS-DOS",
 	myshell: "MyShell",
 	mysql: "MySQL",
 	n8n: "n8n",
@@ -343,6 +404,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	notebooklm: "NotebookLM",
 	"notepad-app": "Notepad",
 	"notifications-app": "Notifications",
+	nousresearch: "Nous Research",
 	novelai: "NovelAI",
 	npm: "npm",
 	nuget: "NuGet",
@@ -397,6 +459,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	processwire: "ProcessWire",
 	prunaai: "Pruna AI",
 	ps: "Adobe Photoshop",
+	pubsub: "Pub/Sub",
 	pugjs: "Pug",
 	purescript: "PureScript",
 	putty: "PuTTY",
@@ -421,6 +484,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	redhat: "Red Hat",
 	reduxsaga: "Redux-Saga",
 	redwoodjs: "RedwoodJS",
+	renpy: "Ren'Py",
 	"resource-management-app": "Resource Management",
 	"restricted-view-app": "Restricted Views",
 	"retention-app": "Retention policies",
@@ -438,6 +502,8 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	search1api: "Search1API",
 	searchapi: "SearchApi",
 	searxng: "SearXNG",
+	"sec-ops": "SecOps",
+	"security-identity": "Security & Identity",
 	semanticui: "Semantic UI",
 	sensenova: "SenseNova",
 	shadcnui: "shadcn/ui",
@@ -448,6 +514,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	solidjs: "Solid",
 	"solution-design-app": "Solution Designer",
 	sonarqube: "SonarQube",
+	"speech-to-text": "Speech-to-Text",
 	spicedb: "SpiceDB",
 	spss: "SPSS",
 	"sql-studio-app": "SQL Studio",
@@ -474,8 +541,10 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"templates-app": "Templates",
 	tencentcloud: "Tencent Cloud",
 	tensorflow: "TensorFlow",
+	"tensorflow-enterprise": "TensorFlow Enterprise",
 	testrail: "TestRail",
 	tex: "TeX",
+	"text-to-speech": "Text-to-Speech",
 	"threads-app": "AIP Threads",
 	threejs: "three.js",
 	tigerbeetle: "TigerBeetle",
@@ -483,6 +552,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"time-series-catalog-app": "Time Series Catalog",
 	titaniumsdk: "Titanium SDK",
 	together: "Together AI",
+	"tools-for-powershell": "Tools for PowerShell",
 	topazlabs: "Topaz Labs",
 	tortoisegit: "TortoiseGit",
 	towergit: "Tower",
@@ -512,6 +582,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	vite2: "Vite (blue)",
 	vitejs: "Vite",
 	vllm: "vLLM",
+	"vmware-engine": "VMware Engine",
 	"vortex-map-app": "Map",
 	"vortex-map-layer-app": "Map Layer",
 	vscode: "Visual Studio Code",
@@ -521,6 +592,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	vuestorefront: "Vue Storefront",
 	wandb: "Weights & Biases",
 	wavespeed: "WaveSpeed",
+	"web-mobile": "Web & Mobile",
 	web3js: "web3.js",
 	webassembly: "WebAssembly",
 	webgpu: "WebGPU",
@@ -600,8 +672,7 @@ function isSourceIcon(value: unknown): value is SourceIcon {
 	return (
 		isRecord(value) &&
 		// A folded mark lends only its names, so it is never measured for color.
-		((typeof value.slug === "string" && !isShippedSourceIcon({ slug: value.slug })) ||
-			(isRecord(value.color) && isIconColor(value.color))) &&
+		(value.color === undefined || (isRecord(value.color) && isIconColor(value.color))) &&
 		typeof value.bytes === "number" &&
 		typeof value.collection === "string" &&
 		typeof value.slug === "string" &&
@@ -623,7 +694,9 @@ function decodeSourceData(value: unknown): SourceData {
 	}
 	return {
 		...(typeof value.generatedAt === "string" ? { generatedAt: value.generatedAt } : {}),
-		icons: value.icons,
+		icons: value.icons.map((icon) =>
+			PRODUCTS_NAMED_TEXT.has(icon.slug) ? { ...icon, baseSlug: icon.slug, variant: null } : icon,
+		),
 	};
 }
 
@@ -638,24 +711,30 @@ export function displayNameForSourceIcon(icon: SourceIcon): string {
 	const baseSlug = icon.baseSlug ?? icon.slug.replace(/-text$/u, "");
 	const baseName =
 		NAME_BY_BASE_SLUG[baseSlug] ?? baseSlug.split("-").filter(Boolean).map(titleWord).join(" ");
-	return icon.variant === "text" || icon.slug.endsWith("-text") ? `${baseName} Wordmark` : baseName;
+	const wordmark =
+		icon.variant === "text" || (icon.slug.endsWith("-text") && !PRODUCTS_NAMED_TEXT.has(icon.slug));
+	return wordmark ? `${baseName} Wordmark` : baseName;
 }
 
-function publicSlugForIcon(
-	icon: SourceIcon,
-	collisions: ReadonlyMap<string, readonly SourceIcon[]>,
-): string {
-	const canonicalCollection = COLLISION_CANONICAL_COLLECTIONS[icon.slug];
-	if (canonicalCollection) {
-		return icon.collection === canonicalCollection ? icon.slug : `${icon.slug}-${icon.collection}`;
-	}
-
-	const collided = collisions.get(icon.slug);
-	if (!collided || collided.length === 1) {
-		return icon.slug;
-	}
-
-	throw new Error(`Choose a canonical collection for duplicate slug ${icon.slug}.`);
+/** A source mark's public slug: its own, or qualified by its source collection where shared. */
+function publicSlugs<Icon extends SourceKey>(icons: readonly Icon[]): Map<Icon, string> {
+	const counts = new Map<string, number>();
+	for (const icon of icons) counts.set(icon.slug, (counts.get(icon.slug) ?? 0) + 1);
+	return new Map(
+		icons.map((icon) => {
+			const canonicalCollection = COLLISION_CANONICAL_COLLECTIONS[icon.slug];
+			if (canonicalCollection) {
+				return [
+					icon,
+					icon.collection === canonicalCollection ? icon.slug : `${icon.slug}-${icon.collection}`,
+				];
+			}
+			if ((counts.get(icon.slug) ?? 0) > 1) {
+				throw new Error(`Choose a canonical collection for duplicate slug ${icon.slug}.`);
+			}
+			return [icon, icon.slug];
+		}),
+	);
 }
 
 function aliasesForIcon(
@@ -666,13 +745,17 @@ function aliasesForIcon(
 	const baseSlug = icon.baseSlug ?? icon.slug.replace(/-text$/u, "");
 	const seeded = ALIASES_BY_BASE_SLUG[baseSlug] ?? [];
 	const curatedName = NAME_BY_BASE_SLUG[baseSlug];
+	// A folded mark lends its source slug, not a collection-qualified one: "anthos-gcp-legacy"
+	// still resolves through the fold, but as an alias it would answer every "gcp" search.
 	const foldedNames = folded.flatMap((other) => [
 		other.slug,
 		displayNameForSourceIcon(other),
 		...(ALIASES_BY_BASE_SLUG[other.slug] ?? []),
 	]);
 	const names = [...seeded, ...(curatedName ? [curatedName] : []), ...foldedNames];
-	return Array.from(new Set(publicSlug === icon.slug ? names : [icon.slug, ...names])).sort();
+	return Array.from(new Set(publicSlug === icon.slug ? names : [icon.slug, ...names]))
+		.filter((name) => name !== publicSlug)
+		.sort();
 }
 
 function keywordsForIcon(icon: SourceIcon): readonly string[] {
@@ -684,34 +767,34 @@ function keywordsForIcon(icon: SourceIcon): readonly string[] {
 
 export function buildIconCatalog(value: unknown): GeneratedIconCatalog {
 	const sourceData = decodeSourceData(value);
-	const shipped = sourceData.icons.filter(isShippedSourceIcon);
+	const slugs = publicSlugs(sourceData.icons);
+	const shipped = shippedSourceIcons(sourceData.icons);
+	const shippedSlugs = new Set(shipped.map((icon) => slugs.get(icon)!));
 	const foldedInto = new Map<string, SourceIcon[]>();
 	for (const icon of sourceData.icons) {
-		const target = FOLDED_INTO_SLUG[icon.slug];
+		const slug = slugs.get(icon)!;
+		const target = FOLDED_INTO_SLUG[slug];
 		if (target === undefined) continue;
-		if (!shipped.some((other) => other.slug === target)) {
-			throw new Error(`${icon.slug} folds into ${target}, which does not ship.`);
+		if (!shippedSlugs.has(target)) {
+			throw new Error(`${slug} folds into ${target}, which does not ship.`);
 		}
 		foldedInto.set(target, [...(foldedInto.get(target) ?? []), icon]);
-	}
-	const collisions = new Map<string, SourceIcon[]>();
-	for (const icon of shipped) {
-		const current = collisions.get(icon.slug) ?? [];
-		current.push(icon);
-		collisions.set(icon.slug, current);
 	}
 
 	const sources: Record<string, string> = {};
 	const icons: SketchiIcon[] = shipped.map((icon) => {
-		const slug = publicSlugForIcon(icon, collisions);
+		const slug = slugs.get(icon)!;
 		if (sources[slug]) {
 			throw new Error(`Generated public slug ${slug} is not unique.`);
 		}
+		if (!icon.color) {
+			throw new Error(`Shipped icon ${slug} has no measured color.`);
+		}
 		sources[slug] = icon.urlPath;
 		return {
-			aliases: aliasesForIcon(icon, slug, foldedInto.get(icon.slug) ?? []),
+			aliases: aliasesForIcon(icon, slug, foldedInto.get(slug) ?? []),
 			bytes: icon.bytes,
-			collection: icon.collection,
+			collection: CATALOG_COLLECTION_BY_SOURCE[icon.collection] ?? icon.collection,
 			colorMode: icon.color.colorMode,
 			keywords: keywordsForIcon(icon),
 			name: displayNameForSourceIcon(icon),
