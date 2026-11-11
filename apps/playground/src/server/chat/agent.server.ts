@@ -30,9 +30,14 @@ import {
 } from "ai";
 import { Effect, Schema } from "effect";
 
+import {
+	MAX_CHAT_MESSAGES,
+	MAX_CHAT_TOTAL_CHARACTERS,
+	savedLogoSlugs,
+} from "../../features/playground/studio-chat-request";
 import { readBoundedJson } from "../runtime/request-body.server";
 import { PlaygroundAiModel } from "../ai/model.server";
-import { logosNamedIn } from "../codemode/icon-catalog.server";
+import { logosNamedIn, logosWithSlugs } from "../codemode/icon-catalog.server";
 import { PlaygroundCodeMode } from "../codemode/service.server";
 import {
 	type PlaygroundCallbackEffect,
@@ -147,8 +152,6 @@ export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentReque
 ) {}
 
 export const MAX_CHAT_REQUEST_BYTES = 128 * 1024;
-export const MAX_CHAT_MESSAGES = 64;
-export const MAX_CHAT_TOTAL_CHARACTERS = 32_000;
 
 const ChatRequestSchema = Schema.Struct({
 	messages: Schema.Array(Schema.Unknown),
@@ -240,8 +243,15 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	const callbacks = yield* PlaygroundRequestCallbacks;
 	const codeMode = yield* PlaygroundCodeMode;
 	const model = yield* ai.model;
-	// Logos come only from what the user wrote, across the conversation.
-	const logos = logosNamedIn(userText(messages));
+	// Logos come only from what the user wrote across the conversation, and the logos its saved
+	// diagrams drew, which were grounded in what the user wrote then.
+	const named = logosNamedIn(userText(messages));
+	const logos = [
+		...named,
+		...logosWithSlugs(savedLogoSlugs(messages)).filter(
+			(logo) => !named.some((known) => known.slug === logo.slug),
+		),
+	];
 	// One budget for the turn: both tools share attempts and the accepted artifact.
 	const turn = yield* makeStudioBuildTurn();
 	const flowchartExecutor = yield* makeStudioFlowchartToolExecutor(codeMode.buildFlowchart, {

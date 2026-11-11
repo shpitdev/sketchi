@@ -39,6 +39,7 @@ import {
 	type DiagramToolPart,
 	type StudioBuildResult,
 } from "@/features/playground/build-result";
+import { studioChatRequestMessages } from "@/features/playground/studio-chat-request";
 import { cn } from "@sketchi/ui/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -193,7 +194,15 @@ function DiagramStage({
 
 function StudioRoute() {
 	const composerRef = useRef<HTMLTextAreaElement>(null);
-	const [transport] = useState(() => new DefaultChatTransport({ api: "/api/chat" }));
+	const [transport] = useState(
+		() =>
+			new DefaultChatTransport({
+				api: "/api/chat",
+				prepareSendMessagesRequest: ({ body, id, messages, messageId, trigger }) => ({
+					body: { ...body, id, messages: studioChatRequestMessages(messages), messageId, trigger },
+				}),
+			}),
+	);
 	const { error, messages, sendMessage, status, stop } = useChat({
 		transport,
 	});
