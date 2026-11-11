@@ -10,6 +10,7 @@ import {
 	ICON_PACKS,
 	PACK_INDEX_PATH,
 	packIcons,
+	packIconsPath,
 	packLibraryPath,
 	packPreviewImagePath,
 	packSummary,
@@ -53,8 +54,15 @@ await mkdir(resolve(publicRoot, "packs"), { recursive: true });
 const summaries = [];
 for (const pack of ICON_PACKS) {
 	const members = packIcons(pack, iconManifest.icons, drawings);
+	// A pack whose marks are not drawn yet is not published.
+	if (members.length === 0) continue;
 	const library = excalidrawLibrary(members, SOURCE, "catalog");
 	await writeFile(resolve(publicRoot, `.${packLibraryPath(pack.id)}`), library, "utf8");
+	await writeFile(
+		resolve(publicRoot, `.${packIconsPath(pack.id)}`),
+		`${JSON.stringify(members)}\n`,
+		"utf8",
+	);
 	if (pack.excalidrawListing) {
 		await writeFile(
 			resolve(publicRoot, `.${packPreviewImagePath(pack.id)}`),

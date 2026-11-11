@@ -1,0 +1,21 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12,
+			"rx": 10.5,
+			"ry": 10.5,
+			"stroke": "#dd344c",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12.5,
+			"text": "MFA",
+			"size": 7.5,
+			"color": "#dd344c"
+		}
+	]
+}

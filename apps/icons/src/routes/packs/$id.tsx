@@ -1,10 +1,9 @@
 import { QueryClient, useQuery } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { PackPage } from "../../components/packs/pack-page.js";
-import { loadDrawings, loadIconManifest } from "../../lib/catalog-client.js";
-import { findPack, packIcons } from "../../lib/packs.js";
+import { loadPackIcons } from "../../lib/catalog-client.js";
 import { getPackShelf } from "../../lib/packs-rpc.js";
 
 export const Route = createFileRoute("/packs/$id")({
@@ -25,33 +24,17 @@ function PackRoute() {
 	const { excalidraw, pack } = Route.useLoaderData();
 	const [queryClient] = useState(() => new QueryClient());
 	const options = { gcTime: 0, refetchOnReconnect: false, refetchOnWindowFocus: false } as const;
-	const manifest = useQuery(
+	// Only this pack's marks: the whole catalog's manifest and drawings are megabytes.
+	const members = useQuery(
 		{
 			...options,
-			queryFn: ({ signal }) => loadIconManifest(signal),
-			queryKey: ["icons-manifest"],
-			retry: false,
-		},
-		queryClient,
-	);
-	const drawings = useQuery(
-		{
-			...options,
-			queryFn: ({ signal }) => loadDrawings(signal),
-			queryKey: ["icon-drawings"],
+			queryFn: ({ signal }) => loadPackIcons(pack.id, signal),
+			queryKey: ["pack-icons", pack.id],
 			retry: 1,
 		},
 		queryClient,
 	);
-	const definition = findPack(pack.id);
-	const icons = useMemo(
-		() =>
-			definition && manifest.data && drawings.data
-				? packIcons(definition, manifest.data.icons, drawings.data)
-				: [],
-		[definition, drawings.data, manifest.data],
-	);
-	const failed = manifest.isError ? manifest : drawings.isError ? drawings : undefined;
+	const failed = members.isError ? members : undefined;
 
 	return (
 		<PackPage
@@ -65,15 +48,9 @@ function PackRoute() {
 					}
 				: {})}
 			{...(excalidraw ? { excalidraw } : {})}
-			icons={icons}
+			icons={members.data ?? []}
 			pack={pack}
-			status={
-				manifest.isSuccess && drawings.isSuccess
-					? "ready"
-					: failed && !failed.isFetching
-						? "error"
-						: "loading"
-			}
+			status={members.isSuccess ? "ready" : failed && !failed.isFetching ? "error" : "loading"}
 		/>
 	);
 }

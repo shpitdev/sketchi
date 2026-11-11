@@ -101,7 +101,9 @@ describe("logoNamedByLabel", () => {
 		expect(named("Cloudflare Worker")).toBe("cloudflare");
 		expect(named("Store the answer in Redis")).toBe("redis");
 		expect(named("Next.js page")).toBe("nextjs");
-		expect(named("AWS ECS web service")).toBe("aws");
+		expect(named("AWS ECS web service")).toBe("amazon-ecs");
+		expect(named("Upload to S3")).toBe("amazon-s3");
+		expect(named("Orders in DynamoDB")).toBe("amazon-dynamodb");
 	});
 
 	it("names nothing for labels that name no product", () => {
@@ -225,6 +227,37 @@ describe("labelLogos", () => {
 		] as const) {
 			expect(named(label), label).toEqual([slug]);
 		}
+	});
+
+	it("keeps plain resource words on concepts, never a cloud vendor's resource", () => {
+		for (const label of [
+			"Database",
+			"Queue",
+			"Function",
+			"User",
+			"Users",
+			"Client",
+			"Bucket",
+			"Instance",
+			"Table",
+			"Database service",
+			"Queue worker",
+			"Storage bucket",
+			"User database",
+			"Backup job",
+			"Glue code",
+		]) {
+			expect(named(label), label).toEqual([]);
+		}
+	});
+
+	it("names a cloud vendor's product only when the label names it", () => {
+		expect(named("Lambda function")).toEqual(["aws-lambda-function"]);
+		expect(named("Lambda")).toEqual(["aws-lambda"]);
+		expect(named("S3 bucket")).toEqual(["amazon-s3-bucket"]);
+		expect(named("SQS queue")).toEqual(["amazon-sqs-queue"]);
+		expect(named("Amazon S3")).toEqual(["amazon-s3"]);
+		expect(named("AWS Glue job")).toEqual(["aws-glue"]);
 	});
 
 	it("keeps generic payment steps clean", () => {

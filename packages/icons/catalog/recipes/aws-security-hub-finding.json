@@ -1,0 +1,86 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 2],
+				[3, 5.5],
+				[3, 14],
+				[5, 18.5],
+				[8, 21],
+				[12, 22]
+			],
+			"stroke": "#dd344c",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 2],
+				[21, 5.5],
+				[21, 11]
+			],
+			"stroke": "#dd344c",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[6.5, 7.5],
+				[6.5, 15],
+				[8, 18.5],
+				[10, 19.5]
+			],
+			"stroke": "#dd344c",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[6.5, 7.5],
+				[12, 5.5],
+				[17.5, 7.5],
+				[17.5, 11]
+			],
+			"stroke": "#dd344c",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 5.5],
+				[12, 17]
+			],
+			"stroke": "#dd344c",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 17,
+			"cy": 17,
+			"rx": 5.5,
+			"ry": 5.5,
+			"stroke": "#dd344c",
+			"fill": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[17, 14],
+				[17, 17.5]
+			],
+			"stroke": "#dd344c",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[17, 19.5],
+				[17, 20]
+			],
+			"stroke": "#dd344c",
+			"pen": 2
+		}
+	]
+}

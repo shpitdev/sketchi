@@ -41,6 +41,15 @@ become the shipped mark's aliases, and `getIconBySlug`, source paths and
 diagram slug lookups follow the folded slug to the shipped mark. Its SVG stays
 under `svg/`, so a URL already published for it keeps working.
 
+Vendor icon sets (AWS: `aws` for services and categories, `aws-resources`)
+come with the vendor's product names and official aliases in the pipeline
+record, which the manifest uses as they are. `src/vendor-aliases.ts` adds the
+names architecture labels use for them: either vendor prefix and the bare name
+of a well-known AWS service ("AWS S3", "S3"), and the commonest resources ("S3
+bucket"). A plain resource word ("Database", "Queue", "Users") never names a
+vendor mark, and a tech noun never rescues an English first word into one
+(`GENERIC_COLLECTIONS` in `text-match.ts`).
+
 Apps publish the SVGs themselves. `apps/icons` copies `svg/` to its public
 `/output/upload-ready/svg/` path at build time.
 

@@ -1,0 +1,30 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 20,
+			"rounded": true,
+			"stroke": "#c925d1",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 11.5,
+			"cy": 7.5,
+			"text": "Amazon",
+			"size": 5,
+			"color": "#c925d1"
+		},
+		{
+			"kind": "text",
+			"cx": 10,
+			"cy": 12.5,
+			"text": "Aurora",
+			"size": 5,
+			"color": "#c925d1"
+		}
+	]
+}

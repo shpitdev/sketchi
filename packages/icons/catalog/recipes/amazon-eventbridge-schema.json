@@ -1,0 +1,81 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 20,
+			"stroke": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 8],
+				[15.5, 10],
+				[15.5, 14],
+				[12, 16],
+				[8.5, 14],
+				[8.5, 10]
+			],
+			"closed": true,
+			"stroke": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 4.5],
+				[12, 6]
+			],
+			"stroke": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 18],
+				[12, 19.5]
+			],
+			"stroke": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[4.5, 12],
+				[6.5, 12]
+			],
+			"stroke": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[17.5, 12],
+				[19.5, 12]
+			],
+			"stroke": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[6, 6],
+				[8, 8]
+			],
+			"stroke": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[16, 16],
+				[18, 18]
+			],
+			"stroke": "#e7157b",
+			"pen": 2
+		}
+	]
+}

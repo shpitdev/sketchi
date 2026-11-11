@@ -292,13 +292,18 @@ const TECH_NOUNS: ReadonlySet<string> = new Set(
 );
 
 /**
- * Marks a tech noun never rescues. Google Cloud's generic service marks ("Storage",
- * "Compute", "Batch") would read "Storage service" as that one product, and some English
- * words name a generic technology before a tech noun ("Edge function", "Stream worker",
- * "Sync function"). Nor does a label that is only the word: a node called "Batch" or "Home"
- * names a step or a page, not Google's product.
+ * Marks a tech noun never rescues. Cloud vendors' generic service marks ("Storage",
+ * "Compute", "Batch", "Glue") would read "Storage service" as that one product, and some
+ * English words name a generic technology before a tech noun ("Edge function", "Stream
+ * worker", "Sync function"). Nor does a label that is only the word: a node called "Batch"
+ * or "Home" names a step or a page, not a cloud vendor's product.
  */
-const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set(["gcp", "gcp-products"]);
+const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set([
+	"aws",
+	"aws-resources",
+	"gcp",
+	"gcp-products",
+]);
 const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
 	"automatic",
 	"edge",

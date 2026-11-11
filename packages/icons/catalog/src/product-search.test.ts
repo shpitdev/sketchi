@@ -15,12 +15,21 @@ export const PRODUCT_NAME_QUERIES: Readonly<Record<string, string>> = {
 	"Workers AI": "workersai",
 	"Cloudflare R2": "cloudflare",
 	"Cloudflare Pages": "cloudflare",
-	"AWS Lambda": "aws",
-	"AWS S3": "aws",
-	"Amazon S3": "aws",
-	"Amazon DynamoDB": "aws",
-	"AWS Bedrock": "bedrock",
-	"Amazon Bedrock": "bedrock",
+	"AWS Lambda": "aws-lambda",
+	Lambda: "aws-lambda",
+	"Lambda function": "aws-lambda-function",
+	"AWS S3": "amazon-s3",
+	"Amazon S3": "amazon-s3",
+	S3: "amazon-s3",
+	"S3 bucket": "amazon-s3-bucket",
+	"Amazon Simple Storage Service": "amazon-s3",
+	"Amazon DynamoDB": "amazon-dynamodb",
+	DynamoDB: "amazon-dynamodb",
+	"AWS SQS": "amazon-sqs",
+	"Amazon EKS": "amazon-eks",
+	"AWS Bedrock": "amazon-bedrock",
+	"Amazon Bedrock": "amazon-bedrock",
+	"Amazon Aurora PostgreSQL": "amazon-aurora-postgresql-instance",
 	"Google Cloud Run": "cloud-run",
 	"Google Cloud Functions": "cloud-functions",
 	"Google Cloud Platform": "googlecloud",
@@ -58,7 +67,6 @@ export const GENERIC_QUERIES: readonly string[] = [
 	"background workers",
 	"edge workers",
 	"actions runner",
-	"lambda function",
 	"stream processing",
 	"render farm",
 	"linear regression",
@@ -85,6 +93,7 @@ describe("product-name icon search", () => {
 		expect(slugs("github", 1)).toEqual(["github"]);
 		expect(slugs("Workers AI")).toEqual(["workersai"]);
 		expect(slugs("edge", 1)).toEqual(["edge"]);
-		expect(slugs("lambda", 1)).toEqual(["lambda"]);
+		// "Lambda" is AWS Lambda's; Lambda's GPU cloud keeps its slug.
+		expect(slugs("lambda", 2)).toEqual(["aws-lambda", "lambda"]);
 	});
 });

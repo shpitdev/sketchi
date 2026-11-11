@@ -42,7 +42,8 @@ describe("icon match quality", () => {
 				icon.slug,
 				iconMatch(icon, query),
 			]);
-		expect(tagged("amazon s3")[0]).toEqual(["aws", "vendor"]);
+		expect(tagged("azure blob storage")[0]).toEqual(["azure", "vendor"]);
+		expect(tagged("amazon s3")[0]).toEqual(["amazon-s3", "exact"]);
 		expect(tagged("PostgreSQL")[0]).toEqual(["postgresql", "exact"]);
 	});
 });

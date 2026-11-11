@@ -261,6 +261,13 @@ export function isStrayVendorLogo(icon: SearchableIcon, label: string): boolean 
 }
 
 /**
+ * Terms two products share, and the mark that answers them: "Lambda" in an
+ * architecture is AWS Lambda far more often than Lambda's GPU cloud, whose
+ * mark keeps its slug.
+ */
+const TERM_OWNERS: ReadonlyMap<string, string> = new Map([["lambda", "aws-lambda"]]);
+
+/**
  * Catalog icons ranked by exact slug, name prefix, alias, substring, then
  * collection. A query no icon matches as a whole falls back to the icons its
  * parts name (see partialQueryMatches); nothing credible returns [].
@@ -274,6 +281,7 @@ export function searchIcons<Icon extends SearchableIcon = SketchiIcon>(
 	const collection = options.collection?.trim();
 	const limit = Math.max(0, options.limit ?? Number.POSITIVE_INFINITY);
 
+	const owner = TERM_OWNERS.get(normalizedQuery);
 	const ranked = icons
 		.flatMap((icon) => {
 			if (collection && icon.collection !== collection) {
@@ -284,6 +292,7 @@ export function searchIcons<Icon extends SearchableIcon = SketchiIcon>(
 		})
 		.sort(
 			(left, right) =>
+				Number(right.icon.slug === owner) - Number(left.icon.slug === owner) ||
 				left.rank - right.rank ||
 				left.icon.name.localeCompare(right.icon.name) ||
 				left.icon.slug.localeCompare(right.icon.slug),

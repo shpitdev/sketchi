@@ -1,0 +1,75 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[7.2, 4.4],
+				[17.5, 4.4],
+				[20, 7],
+				[17.5, 11.7],
+				[14.4, 11.7]
+			],
+			"smooth": true,
+			"stroke": "#8c4fff",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 4.8,
+			"cy": 4.4,
+			"rx": 2.4,
+			"ry": 2.4,
+			"stroke": "#8c4fff",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 4.8,
+			"cy": 4.4,
+			"rx": 0.8,
+			"ry": 0.8,
+			"stroke": "#8c4fff",
+			"fill": "#8c4fff"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 11.7,
+			"rx": 2.4,
+			"ry": 2.4,
+			"stroke": "#8c4fff",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 19.2,
+			"cy": 19,
+			"rx": 2.4,
+			"ry": 2.4,
+			"stroke": "#8c4fff",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 19.2,
+			"cy": 19,
+			"rx": 0.8,
+			"ry": 0.8,
+			"stroke": "#8c4fff",
+			"fill": "#8c4fff"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[9.6, 11.7],
+				[6.5, 11.7],
+				[4, 15],
+				[6.5, 19],
+				[16.8, 19]
+			],
+			"smooth": true,
+			"stroke": "#8c4fff",
+			"pen": 2
+		}
+	]
+}
