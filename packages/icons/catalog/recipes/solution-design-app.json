@@ -67,7 +67,7 @@
 				[9, 8.5],
 				[13.5, 13.5]
 			],
-			"stroke": "#173849"
+			"stroke": "paper"
 		},
 		{
 			"kind": "ellipse",
@@ -75,8 +75,8 @@
 			"cy": 13.5,
 			"rx": 1.5,
 			"ry": 1.5,
-			"stroke": "#173849",
-			"fill": "#173849"
+			"stroke": "paper",
+			"fill": "paper"
 		}
 	]
 }

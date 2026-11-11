@@ -17,8 +17,8 @@
 			"width": 7,
 			"height": 3.5,
 			"rounded": true,
-			"stroke": "#82909f",
-			"fill": "#82909f",
+			"stroke": "#848fa0",
+			"fill": "paper",
 			"pen": 2
 		},
 		{
@@ -70,6 +70,7 @@
 			],
 			"closed": true,
 			"stroke": "#848fa0",
+			"fill": "paper",
 			"pen": 2
 		},
 		{

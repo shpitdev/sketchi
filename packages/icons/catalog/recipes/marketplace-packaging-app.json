@@ -6,7 +6,8 @@
 			"y": 9,
 			"width": 15,
 			"height": 12,
-			"stroke": "#5a90dc"
+			"stroke": "#1c5599",
+			"fill": "#5a90dc"
 		},
 		{
 			"kind": "stroke",
@@ -19,7 +20,8 @@
 				[2, 8]
 			],
 			"closed": true,
-			"stroke": "#5a90dc"
+			"stroke": "#1c5599",
+			"fill": "#5a90dc"
 		},
 		{
 			"kind": "stroke",
@@ -27,7 +29,7 @@
 				[6, 17],
 				[12, 17]
 			],
-			"stroke": "#5a90dc"
+			"stroke": "#143b65"
 		},
 		{
 			"kind": "stroke",
@@ -35,7 +37,7 @@
 				[13, 12],
 				[21, 20]
 			],
-			"stroke": "#2d72d2",
+			"stroke": "#143b65",
 			"pen": 2
 		},
 		{
@@ -49,8 +51,8 @@
 				[13, 16]
 			],
 			"closed": true,
-			"stroke": "#2d72d2",
-			"fill": "#2d72d2"
+			"stroke": "#143b65",
+			"fill": "#143b65"
 		}
 	]
 }

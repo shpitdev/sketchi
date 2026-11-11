@@ -7,16 +7,17 @@
 			"width": 20,
 			"height": 18,
 			"rounded": true,
-			"stroke": "#848fa0"
+			"stroke": "#848fa0",
+			"fill": "#848fa0"
 		},
 		{
 			"kind": "rect",
-			"x": 2,
-			"y": 3,
-			"width": 20,
-			"height": 4,
-			"stroke": "#848fa0",
-			"fill": "#848fa0"
+			"x": 4.2,
+			"y": 8,
+			"width": 15.6,
+			"height": 9.5,
+			"stroke": "paper",
+			"fill": "paper"
 		},
 		{
 			"kind": "stroke",

@@ -55,7 +55,7 @@
 			"rx": 2.8,
 			"ry": 2.8,
 			"stroke": "#0c4439",
-			"fill": "#0c4439",
+			"fill": "paper",
 			"pen": 1
 		},
 		{
@@ -65,7 +65,7 @@
 			"rx": 2.8,
 			"ry": 2.8,
 			"stroke": "#0c4439",
-			"fill": "#0c4439",
+			"fill": "paper",
 			"pen": 1
 		},
 		{
@@ -78,7 +78,7 @@
 			"smooth": true,
 			"closed": true,
 			"stroke": "#0c4439",
-			"fill": "#0c4439"
+			"fill": "paper"
 		}
 	]
 }

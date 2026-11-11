@@ -33,7 +33,7 @@
 			"y": 6,
 			"width": 9,
 			"height": 12,
-			"stroke": "#533100",
+			"stroke": "paper",
 			"fill": "#df7212"
 		},
 		{
@@ -42,7 +42,7 @@
 			"y": 8,
 			"width": 9,
 			"height": 11,
-			"stroke": "#533100",
+			"stroke": "paper",
 			"fill": "#af890b"
 		},
 		{
@@ -51,7 +51,7 @@
 			"y": 9,
 			"width": 9,
 			"height": 11,
-			"stroke": "#533100",
+			"stroke": "paper",
 			"fill": "#a58d00"
 		}
 	]

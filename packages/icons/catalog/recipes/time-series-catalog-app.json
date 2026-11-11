@@ -6,7 +6,8 @@
 			"y": 2.5,
 			"width": 16,
 			"height": 16.5,
-			"stroke": "#215db0"
+			"stroke": "#215db0",
+			"fill": "#4c90f0"
 		},
 		{
 			"kind": "stroke",
@@ -17,7 +18,8 @@
 				[6, 19]
 			],
 			"closed": true,
-			"stroke": "#215db0"
+			"stroke": "#215db0",
+			"fill": "#215db0"
 		},
 		{
 			"kind": "stroke",
@@ -52,7 +54,7 @@
 				[18.5, 6.5]
 			],
 			"smooth": true,
-			"stroke": "#215db0",
+			"stroke": "paper",
 			"pen": 2
 		}
 	]

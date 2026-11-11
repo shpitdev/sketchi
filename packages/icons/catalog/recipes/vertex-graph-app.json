@@ -7,7 +7,7 @@
 				[4, 4]
 			],
 			"stroke": "#4a90e2",
-			"pen": 1
+			"pen": 2
 		},
 		{
 			"kind": "stroke",
@@ -16,7 +16,7 @@
 				[21, 7]
 			],
 			"stroke": "#4a90e2",
-			"pen": 1
+			"pen": 2
 		},
 		{
 			"kind": "stroke",
@@ -25,7 +25,7 @@
 				[6.5, 20]
 			],
 			"stroke": "#4a90e2",
-			"pen": 1
+			"pen": 2
 		},
 		{
 			"kind": "ellipse",
