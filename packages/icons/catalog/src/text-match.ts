@@ -1,5 +1,5 @@
 import { searchIcons, type SearchableIcon } from "./search.js";
-import { isDistinctiveWord, termTokens, wordsOf } from "./terms.js";
+import { isDistinctiveWord, isEnglishWord, termTokens, wordsOf } from "./terms.js";
 
 /** Most catalog terms a prompt can offer one diagram. */
 export const MAX_TEXT_ICON_MATCHES = 24;
@@ -295,7 +295,8 @@ const TECH_NOUNS: ReadonlySet<string> = new Set(
  * Marks a tech noun never rescues. Google Cloud's generic service marks ("Storage",
  * "Compute", "Batch") would read "Storage service" as that one product, and some English
  * words name a generic technology before a tech noun ("Edge function", "Stream worker",
- * "Sync function").
+ * "Sync function"). Nor does a label that is only the word: a node called "Batch" or "Home"
+ * names a step or a page, not Google's product.
  */
 const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set(["gcp", "gcp-products"]);
 const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
@@ -311,12 +312,10 @@ const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
  * a tech noun follows it ("React app", "Spring service").
  */
 function namesProduct(mention: IconMention): boolean {
-	if (mention.nextWord === undefined) return true;
-	return (
-		TECH_NOUNS.has(mention.nextWord) &&
-		!GENERIC_COLLECTIONS.has(mention.icon.collection) &&
-		!GENERIC_TECH_SLUGS.has(mention.icon.slug)
-	);
+	const generic = GENERIC_COLLECTIONS.has(mention.icon.collection);
+	if (mention.nextWord === undefined)
+		return !(generic && isEnglishWord(mention.icon.name.toLowerCase()));
+	return TECH_NOUNS.has(mention.nextWord) && !generic && !GENERIC_TECH_SLUGS.has(mention.icon.slug);
 }
 
 /** The logos a node label names, in a diagram that asks for logos. */

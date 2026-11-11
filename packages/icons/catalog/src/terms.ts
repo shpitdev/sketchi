@@ -36,6 +36,13 @@ const COMMON_TECH_WORDS = [
  */
 const COMMON_WORDS: ReadonlySet<string> = new Set([...commonWordsJson, ...COMMON_TECH_WORDS]);
 
+const ENGLISH_WORDS: ReadonlySet<string> = new Set(commonWordsJson);
+
+/** A lowercased catalog-term word that is common English ("batch", "home"), not a tech word. */
+export function isEnglishWord(lower: string): boolean {
+	return ENGLISH_WORDS.has(lower);
+}
+
 const WORD = /[A-Za-z0-9.+#]+/gu;
 
 /** Words of free text, without sentence dots ("Docker." is "Docker"). */

@@ -353,7 +353,8 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	logrocket: "LogRocket",
 	longcat: "LongCat",
 	"machinery-app": "Machinery",
-	"managed-service-for-microsoft-active-directory": "Managed Service for Microsoft Active Directory",
+	"managed-service-for-microsoft-active-directory":
+		"Managed Service for Microsoft Active Directory",
 	"maps-geospatial": "Maps & Geospatial",
 	mariadb: "MariaDB",
 	"marketplace-app": "Marketplace",

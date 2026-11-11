@@ -211,6 +211,22 @@ describe("labelLogos", () => {
 		}
 	});
 
+	it("reads a lone everyday word as a step, not Google Cloud's product of that name", () => {
+		for (const label of ["Storage", "Batch", "Workflows", "Home", "Support", "Security"]) {
+			expect(named(label), label).toEqual([]);
+			expect(possible(label), label).toHaveLength(1);
+		}
+		for (const [label, slug] of [
+			["Cloud Run", "cloud-run"],
+			["Cloud Functions", "cloud-functions"],
+			["Pub/Sub", "pubsub"],
+			["Dataflow", "dataflow"],
+			["BigQuery", "big-query"],
+		] as const) {
+			expect(named(label), label).toEqual([slug]);
+		}
+	});
+
 	it("keeps generic payment steps clean", () => {
 		for (const label of [
 			"Validate the card",

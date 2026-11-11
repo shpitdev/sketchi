@@ -80,12 +80,23 @@ export const ICON_PACKS: readonly IconPackDefinition[] = [
 	{
 		id: "cloud",
 		name: "Cloud",
-		collections: ["cloud-vendors", "cloud-hosting-paas", "cloud-platforms", "gcp"],
-		featured: ["aws", "azure", "googlecloud", "cloudflare", "vercel", "big-query"],
+		collections: ["cloud-vendors", "cloud-hosting-paas", "cloud-platforms"],
+		featured: ["aws", "azure", "googlecloud", "cloudflare", "vercel", "digitalocean"],
 		excalidrawListing: {
 			name: "Cloud Platform Logos",
 			description:
-				"Hand-drawn logos of cloud vendors and hosting platforms, with Google Cloud's product icons, such as AWS, Azure, Cloudflare, Vercel and BigQuery.",
+				"Hand-drawn logos of cloud vendors and hosting platforms, such as AWS, Azure, Google Cloud, Cloudflare, Vercel and DigitalOcean.",
+		},
+	},
+	{
+		id: "google-cloud",
+		name: "Google Cloud",
+		collections: ["gcp", "gcp-products"],
+		featured: ["big-query", "cloud-run", "gke", "pubsub", "cloud-functions", "vertex-ai"],
+		excalidrawListing: {
+			name: "Google Cloud Icons",
+			description:
+				"Hand-drawn icons for Google Cloud products and categories in Google's colors, such as BigQuery, Cloud Run, GKE, Pub/Sub, Cloud Functions and Vertex AI.",
 		},
 	},
 	{
