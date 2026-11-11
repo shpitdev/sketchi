@@ -1,7 +1,7 @@
 import type { StudioBuildResult } from "./build-result";
 import { DiagramPreview } from "@sketchi/diagram-ui";
 import type { ChatStatus, UIMessage } from "ai";
-import { useCallback, useState, type RefObject } from "react";
+import type { RefObject } from "react";
 
 import {
 	PromptInput,
@@ -260,44 +260,21 @@ export function AssistantFollowUp({ onCompose }: { onCompose: () => void }) {
 	);
 }
 
-/** The first-visit heading; the composer renders directly beneath it. */
+/** The first-visit heading. */
 export function PlaygroundIntro() {
 	return <h1 className="studio__intro">What should we draw?</h1>;
 }
 
-/**
- * Excalidraw fits a scene to its viewport once, on load. When the sample's
- * frame changes width (rotation, window resize) a new revision remounts the
- * preview so the whole diagram fits again.
- */
-function useWidthRevision() {
-	const [revision, setRevision] = useState(0);
-	const observeWidth = useCallback((element: HTMLDivElement | null) => {
-		if (!element || typeof ResizeObserver === "undefined") return;
-		let width = element.getBoundingClientRect().width;
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		const observer = new ResizeObserver(([entry]) => {
-			const next = entry?.contentRect.width ?? width;
-			if (Math.abs(next - width) < 1) return;
-			width = next;
-			clearTimeout(timer);
-			timer = setTimeout(() => setRevision((value) => value + 1), 200);
-		});
-		observer.observe(element);
-		return () => {
-			clearTimeout(timer);
-			observer.disconnect();
-		};
-	}, []);
-
-	return { observeWidth, revision: `deploy-pipeline-${revision}` };
-}
-
-/** Starter prompts and a sample diagram, shown under the empty composer. */
+/** A sample and starter prompts above the empty composer. */
 export function PlaygroundStarters({ onSelect }: { onSelect: (prompt: string) => void }) {
-	const { observeWidth, revision } = useWidthRevision();
 	return (
 		<div className="studio__starters-wrap">
+			<figure className="studio__sample">
+				<figcaption className="studio__sample-caption">Example: deploy pipeline</figcaption>
+				<div className="studio__sample-canvas">
+					<DiagramPreview scene={DEPLOY_PIPELINE_SCENE} />
+				</div>
+			</figure>
 			<div aria-label="Starter prompts" className="studio__starters">
 				{STARTERS.map(({ label, prompt }) => (
 					<Suggestion
@@ -311,13 +288,6 @@ export function PlaygroundStarters({ onSelect }: { onSelect: (prompt: string) =>
 					</Suggestion>
 				))}
 			</div>
-
-			<figure className="studio__sample">
-				<figcaption className="studio__sample-caption">Example: deploy pipeline</figcaption>
-				<div className="studio__sample-canvas" ref={observeWidth}>
-					<DiagramPreview revision={revision} scene={DEPLOY_PIPELINE_SCENE} />
-				</div>
-			</figure>
 		</div>
 	);
 }
