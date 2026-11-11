@@ -22,6 +22,19 @@ export function logosNamedIn(text: string): NamedLogo[] {
 	return logosNamedInText(text, nodeLogoIcons);
 }
 
+/** Catalog logos by slug, for logos an earlier accepted build already drew; unknown slugs drop. */
+export function logosWithSlugs(slugs: readonly string[]): NamedLogo[] {
+	const wanted = new Set(slugs);
+	return nodeLogoIcons
+		.filter((icon) => wanted.has(icon.slug))
+		.map((icon) => ({
+			...(icon.aliases.length > 0 ? { aliases: icon.aliases } : {}),
+			collection: icon.collection,
+			name: icon.name,
+			slug: icon.slug,
+		}));
+}
+
 export interface PlaygroundAssetsBinding {
 	fetch(input: Request | URL | string, init?: RequestInit): Promise<Response>;
 }
