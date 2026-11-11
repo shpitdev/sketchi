@@ -4,51 +4,18 @@
 			"kind": "ellipse",
 			"cx": 7.5,
 			"cy": 12,
-			"rx": 6.5,
-			"ry": 6.5,
+			"rx": 6,
+			"ry": 6,
 			"stroke": "#007067",
-			"fill": "#00a093",
 			"pen": 2
 		},
 		{
 			"kind": "ellipse",
 			"cx": 16.5,
 			"cy": 12,
-			"rx": 6.5,
-			"ry": 6.5,
+			"rx": 6,
+			"ry": 6,
 			"stroke": "#007067",
-			"fill": "#00a093",
-			"pen": 2
-		},
-		{
-			"kind": "stroke",
-			"points": [
-				[12, 6.8],
-				[10, 12],
-				[12, 17.2]
-			],
-			"smooth": true,
-			"stroke": "#007067",
-			"pen": 2
-		},
-		{
-			"kind": "ellipse",
-			"cx": 7.5,
-			"cy": 12,
-			"rx": 2.6,
-			"ry": 3,
-			"stroke": "#007067",
-			"fill": "paper",
-			"pen": 2
-		},
-		{
-			"kind": "ellipse",
-			"cx": 16.5,
-			"cy": 12,
-			"rx": 2.6,
-			"ry": 3,
-			"stroke": "#007067",
-			"fill": "paper",
 			"pen": 2
 		}
 	]

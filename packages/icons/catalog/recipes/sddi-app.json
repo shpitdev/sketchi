@@ -15,7 +15,7 @@
 			"x": 11,
 			"y": 7,
 			"width": 11,
-			"height": 6,
+			"height": 2,
 			"rounded": true,
 			"stroke": "#184a90",
 			"fill": "#184a90"
@@ -24,7 +24,7 @@
 			"kind": "rect",
 			"x": 2,
 			"y": 14,
-			"width": 8,
+			"width": 5,
 			"height": 6,
 			"rounded": true,
 			"stroke": "#184a90",
@@ -57,19 +57,10 @@
 			"kind": "ellipse",
 			"cx": 15.5,
 			"cy": 16.5,
-			"rx": 7.5,
-			"ry": 7.5,
-			"stroke": "paper",
-			"fill": "paper"
-		},
-		{
-			"kind": "ellipse",
-			"cx": 15.5,
-			"cy": 16.5,
 			"rx": 6.3,
 			"ry": 6.3,
 			"stroke": "#184a90",
-			"fill": "#184a90"
+			"pen": 2
 		},
 		{
 			"kind": "stroke",
@@ -82,8 +73,8 @@
 				[16, 15.5]
 			],
 			"closed": true,
-			"stroke": "paper",
-			"fill": "paper"
+			"stroke": "#184a90",
+			"fill": "#184a90"
 		}
 	]
 }

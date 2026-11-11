@@ -26,8 +26,8 @@
 			"width": 3.5,
 			"height": 10,
 			"rounded": true,
-			"stroke": "#534688",
-			"fill": "paper",
+			"stroke": "#34265b",
+			"fill": "#34265b",
 			"pen": 2
 		},
 		{
@@ -41,8 +41,8 @@
 				[11, 18]
 			],
 			"closed": true,
-			"stroke": "#534688",
-			"fill": "paper",
+			"stroke": "#34265b",
+			"fill": "#34265b",
 			"pen": 2
 		}
 	]

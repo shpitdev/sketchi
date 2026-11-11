@@ -59,7 +59,7 @@
 			],
 			"closed": true,
 			"stroke": "#5f6b7c",
-			"fill": "#5f6b7c"
+			"pen": 2
 		},
 		{
 			"kind": "stroke",
@@ -67,8 +67,8 @@
 				[10, 11.5],
 				[10, 16.5]
 			],
-			"stroke": "paper",
-			"pen": 2
+			"stroke": "#5f6b7c",
+			"pen": 1
 		},
 		{
 			"kind": "stroke",
@@ -76,8 +76,8 @@
 				[14, 11.5],
 				[14, 16.5]
 			],
-			"stroke": "paper",
-			"pen": 2
+			"stroke": "#5f6b7c",
+			"pen": 1
 		}
 	]
 }

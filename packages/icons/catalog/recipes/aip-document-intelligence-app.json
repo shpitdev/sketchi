@@ -10,21 +10,7 @@
 				[2, 21.5]
 			],
 			"closed": true,
-			"stroke": "#7961db",
-			"fill": "#7961db"
-		},
-		{
-			"kind": "stroke",
-			"points": [
-				[4.5, 9],
-				[7.5, 6.5],
-				[8.5, 6.5],
-				[8.5, 20],
-				[4.5, 20]
-			],
-			"closed": true,
-			"stroke": "paper",
-			"fill": "paper"
+			"stroke": "#7961db"
 		},
 		{
 			"kind": "rect",
@@ -34,7 +20,6 @@
 			"height": 6,
 			"rounded": true,
 			"stroke": "#7961db",
-			"fill": "paper",
 			"pen": 2
 		},
 		{
@@ -45,7 +30,6 @@
 			"height": 6,
 			"rounded": true,
 			"stroke": "#7961db",
-			"fill": "paper",
 			"pen": 2
 		},
 		{
@@ -56,7 +40,6 @@
 			"height": 5.5,
 			"rounded": true,
 			"stroke": "#7961db",
-			"fill": "paper",
 			"pen": 2
 		},
 		{

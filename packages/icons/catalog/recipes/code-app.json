@@ -24,8 +24,7 @@
 			"y": 6.5,
 			"width": 20,
 			"height": 15,
-			"stroke": "#7792a8",
-			"fill": "paper"
+			"stroke": "#7792a8"
 		},
 		{
 			"kind": "stroke",

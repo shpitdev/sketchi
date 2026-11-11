@@ -7,7 +7,7 @@
 			"rx": 10.5,
 			"ry": 10.5,
 			"stroke": "#5093d1",
-			"fill": "#5093d1"
+			"pen": 2
 		},
 		{
 			"kind": "stroke",
@@ -21,7 +21,7 @@
 				[8.5, 12.5]
 			],
 			"smooth": true,
-			"stroke": "paper"
+			"stroke": "#5093d1"
 		},
 		{
 			"kind": "stroke",
@@ -29,7 +29,7 @@
 				[8.5, 6.5],
 				[8.5, 17.5]
 			],
-			"stroke": "paper"
+			"stroke": "#5093d1"
 		},
 		{
 			"kind": "stroke",
@@ -37,7 +37,7 @@
 				[12, 12.5],
 				[16, 17.5]
 			],
-			"stroke": "paper"
+			"stroke": "#5093d1"
 		},
 		{
 			"kind": "stroke",
@@ -45,7 +45,7 @@
 				[6.5, 17.5],
 				[10.5, 17.5]
 			],
-			"stroke": "paper"
+			"stroke": "#5093d1"
 		}
 	]
 }

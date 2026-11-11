@@ -31,8 +31,7 @@
 				[8.5, 19]
 			],
 			"closed": true,
-			"stroke": "#2d72d2",
-			"fill": "paper"
+			"stroke": "#2d72d2"
 		},
 		{
 			"kind": "stroke",

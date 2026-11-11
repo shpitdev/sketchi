@@ -4,19 +4,10 @@
 			"kind": "ellipse",
 			"cx": 12,
 			"cy": 12.5,
-			"rx": 9.5,
-			"ry": 9.5,
-			"stroke": "#8376f2",
-			"fill": "#8476f3"
-		},
-		{
-			"kind": "ellipse",
-			"cx": 12,
-			"cy": 12.5,
-			"rx": 6.5,
-			"ry": 6.5,
-			"stroke": "paper",
-			"fill": "paper"
+			"rx": 8,
+			"ry": 8,
+			"stroke": "#8476f3",
+			"pen": 2
 		},
 		{
 			"kind": "ellipse",

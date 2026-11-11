@@ -23,25 +23,7 @@
 			"smooth": true,
 			"closed": true,
 			"stroke": "#5b6573",
-			"fill": "#5b6573"
-		},
-		{
-			"kind": "ellipse",
-			"cx": 6.5,
-			"cy": 12,
-			"rx": 2.4,
-			"ry": 2,
-			"stroke": "paper",
-			"fill": "paper"
-		},
-		{
-			"kind": "ellipse",
-			"cx": 17.5,
-			"cy": 12,
-			"rx": 2.4,
-			"ry": 2,
-			"stroke": "paper",
-			"fill": "paper"
+			"pen": 2
 		}
 	]
 }

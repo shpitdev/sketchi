@@ -6,71 +6,49 @@
 			"y": 2,
 			"width": 20,
 			"height": 20,
-			"stroke": "#7b91a3",
-			"fill": "#7b91a3"
+			"stroke": "#7b91a3"
 		},
 		{
 			"kind": "rect",
-			"x": 3.5,
-			"y": 8.5,
-			"width": 3.5,
-			"height": 12,
-			"stroke": "#7f91a0",
-			"fill": "#7f91a0"
-		},
-		{
-			"kind": "rect",
-			"x": 9.5,
-			"y": 8.5,
-			"width": 2,
-			"height": 12,
-			"stroke": "#7f91a0",
-			"fill": "#7f91a0"
-		},
-		{
-			"kind": "rect",
-			"x": 14.5,
-			"y": 8.5,
-			"width": 2,
-			"height": 12,
-			"stroke": "#7f91a0",
-			"fill": "#7f91a0"
-		},
-		{
-			"kind": "rect",
-			"x": 7.5,
-			"y": 8.5,
-			"width": 2,
-			"height": 12,
-			"stroke": "paper",
-			"fill": "paper"
-		},
-		{
-			"kind": "rect",
-			"x": 11.5,
-			"y": 8.5,
-			"width": 3,
-			"height": 12,
-			"stroke": "paper",
-			"fill": "paper"
-		},
-		{
-			"kind": "rect",
-			"x": 16.5,
-			"y": 8.5,
-			"width": 3,
-			"height": 12,
-			"stroke": "paper",
-			"fill": "paper"
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 6,
+			"stroke": "#354f65",
+			"fill": "#354f65"
 		},
 		{
 			"kind": "rect",
 			"x": 3,
-			"y": 3,
-			"width": 18,
-			"height": 5,
+			"y": 9,
+			"width": 4,
+			"height": 12,
 			"stroke": "#7b91a3",
-			"fill": "#7f91a0"
+			"fill": "#7b91a3"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[8, 9],
+				[8, 21]
+			],
+			"stroke": "#7b91a3"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12.5, 9],
+				[12.5, 21]
+			],
+			"stroke": "#7b91a3"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[17, 9],
+				[17, 21]
+			],
+			"stroke": "#7b91a3"
 		}
 	]
 }

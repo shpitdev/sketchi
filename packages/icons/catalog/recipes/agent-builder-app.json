@@ -7,8 +7,7 @@
 			"width": 8,
 			"height": 13,
 			"rounded": true,
-			"stroke": "#947cf3",
-			"fill": "paper"
+			"stroke": "#947cf3"
 		},
 		{
 			"kind": "rect",
@@ -17,8 +16,7 @@
 			"width": 20.5,
 			"height": 5.5,
 			"rounded": true,
-			"stroke": "#947cf3",
-			"fill": "paper"
+			"stroke": "#947cf3"
 		},
 		{
 			"kind": "rect",
@@ -40,7 +38,7 @@
 				[16.8, 13]
 			],
 			"smooth": true,
-			"stroke": "paper",
+			"stroke": "#38206b",
 			"pen": 2
 		},
 		{
@@ -53,7 +51,7 @@
 				[17.2, 13]
 			],
 			"smooth": true,
-			"stroke": "paper",
+			"stroke": "#38206b",
 			"pen": 2
 		}
 	]

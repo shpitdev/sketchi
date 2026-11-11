@@ -48,15 +48,6 @@
 			"closed": true,
 			"stroke": "#ac8b00",
 			"fill": "#ac8b00"
-		},
-		{
-			"kind": "ellipse",
-			"cx": 12,
-			"cy": 12,
-			"rx": 3.8,
-			"ry": 3.8,
-			"stroke": "paper",
-			"fill": "paper"
 		}
 	]
 }

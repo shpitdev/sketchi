@@ -6,8 +6,7 @@
 			"y": 2.5,
 			"width": 16,
 			"height": 16.5,
-			"stroke": "#215db0",
-			"fill": "paper"
+			"stroke": "#215db0"
 		},
 		{
 			"kind": "stroke",
@@ -18,8 +17,7 @@
 				[6, 19]
 			],
 			"closed": true,
-			"stroke": "#215db0",
-			"fill": "paper"
+			"stroke": "#215db0"
 		},
 		{
 			"kind": "stroke",

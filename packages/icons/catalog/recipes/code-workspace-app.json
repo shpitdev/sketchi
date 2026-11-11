@@ -34,7 +34,7 @@
 			"width": 15,
 			"height": 12,
 			"rounded": true,
-			"stroke": "#c87619",
+			"stroke": "#d17914",
 			"fill": "#d17914",
 			"pen": 2
 		},
@@ -45,7 +45,7 @@
 				[10.5, 9],
 				[13.5, 11.5]
 			],
-			"stroke": "paper",
+			"stroke": "#542a08",
 			"pen": 2
 		},
 		{
@@ -55,7 +55,7 @@
 				[20.5, 9],
 				[17.5, 11.5]
 			],
-			"stroke": "paper",
+			"stroke": "#542a08",
 			"pen": 2
 		}
 	]
