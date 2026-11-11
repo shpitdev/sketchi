@@ -7,7 +7,7 @@
 			"width": 18,
 			"height": 19,
 			"rounded": true,
-			"stroke": "#abb3bf"
+			"stroke": "#848fa1"
 		},
 		{
 			"kind": "rect",
@@ -16,8 +16,8 @@
 			"width": 17,
 			"height": 3,
 			"rounded": true,
-			"stroke": "#6dafd0",
-			"fill": "#6dafd0"
+			"stroke": "#4297c2",
+			"fill": "#4297c2"
 		},
 		{
 			"kind": "stroke",
@@ -67,8 +67,8 @@
 			"width": 8,
 			"height": 3.8,
 			"rounded": true,
-			"stroke": "#6dafd0",
-			"fill": "#6dafd0"
+			"stroke": "#4297c2",
+			"fill": "#4297c2"
 		},
 		{
 			"kind": "ellipse",

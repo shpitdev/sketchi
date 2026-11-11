@@ -65,6 +65,35 @@ describe("PackPage", () => {
 		expect(await screen.findByText("App 3 copied. Paste it into Excalidraw.")).toBeTruthy();
 	});
 
+	it("previews dark Excalidraw with a canvas filter, without repainting the recipe", () => {
+		const colored: PackIcon = {
+			slug: "colored",
+			name: "Colored",
+			recipe: {
+				parts: [
+					{ kind: "rect", x: 2, y: 2, width: 20, height: 20, fill: "#c87619" },
+					{ kind: "ellipse", cx: 12, cy: 12, rx: 4, ry: 4, fill: "paper" },
+				],
+			},
+		};
+		render(<PackPage icons={[colored]} pack={pack} status="ready" />);
+		const svg = screen
+			.getByRole("button", { name: "Copy Colored for Excalidraw" })
+			.querySelector("svg")!;
+		const paint = () =>
+			[...svg.querySelectorAll("path")].map((path) => [
+				path.getAttribute("fill"),
+				path.getAttribute("stroke"),
+			]);
+		const light = paint();
+		fireEvent.click(screen.getByRole("button", { name: "Dark preview" }));
+		expect(paint()).toEqual(light);
+		expect(svg.getAttribute("filter")).toBe("invert(93%) hue-rotate(180deg)");
+		fireEvent.click(screen.getByRole("button", { name: "Light preview" }));
+		expect(svg.getAttribute("filter")).toBeNull();
+		expect(paint()).toEqual(light);
+	});
+
 	it("offers a retry when the icons cannot load", () => {
 		const onRetry = vi.fn();
 		render(

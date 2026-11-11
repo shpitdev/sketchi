@@ -21,7 +21,7 @@
 				[13.6, 15.4]
 			],
 			"smooth": true,
-			"stroke": "#8a9ba8",
+			"stroke": "#5b6573",
 			"pen": 2
 		},
 		{
@@ -45,7 +45,7 @@
 				[14, 14.6]
 			],
 			"smooth": true,
-			"stroke": "#8a9ba8",
+			"stroke": "#5b6573",
 			"pen": 2
 		},
 		{
@@ -69,7 +69,7 @@
 				[14.4, 13.8]
 			],
 			"smooth": true,
-			"stroke": "#8a9ba8",
+			"stroke": "#5b6573",
 			"pen": 2
 		}
 	]

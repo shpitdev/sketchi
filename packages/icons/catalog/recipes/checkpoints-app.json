@@ -7,7 +7,7 @@
 			"rx": 9.8,
 			"ry": 2.8,
 			"stroke": "none",
-			"fill": "#fbb360"
+			"fill": "#d67505"
 		},
 		{
 			"kind": "stroke",
@@ -17,8 +17,8 @@
 				[9.5, 12.3]
 			],
 			"closed": true,
-			"stroke": "#fbb360",
-			"fill": "#fbb360"
+			"stroke": "#d67505",
+			"fill": "#d67505"
 		},
 		{
 			"kind": "stroke",

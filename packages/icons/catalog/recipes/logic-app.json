@@ -9,7 +9,7 @@
 				[19.5, 10.5],
 				[19.5, 15]
 			],
-			"stroke": "#abb3bf",
+			"stroke": "#848fa1",
 			"pen": 2
 		},
 		{
@@ -34,8 +34,8 @@
 				[9, 8.5]
 			],
 			"closed": true,
-			"stroke": "#8abaff",
-			"fill": "#8abaff"
+			"stroke": "#235eab",
+			"fill": "#235eab"
 		},
 		{
 			"kind": "rect",

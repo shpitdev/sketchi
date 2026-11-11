@@ -17,7 +17,7 @@
 				[6.5, 3.2]
 			],
 			"closed": true,
-			"stroke": "#5797f1"
+			"stroke": "#498ef0"
 		},
 		{
 			"kind": "stroke",
@@ -26,7 +26,7 @@
 				[12, 7.5],
 				[21, 6.5]
 			],
-			"stroke": "#82b5fc"
+			"stroke": "#3f8dfa"
 		},
 		{
 			"kind": "stroke",
@@ -34,7 +34,7 @@
 				[1.5, 11.5],
 				[22.5, 11.5]
 			],
-			"stroke": "#5797f1"
+			"stroke": "#498ef0"
 		},
 		{
 			"kind": "stroke",
@@ -45,7 +45,7 @@
 				[17, 11.5],
 				[21, 6.5]
 			],
-			"stroke": "#82b5fc"
+			"stroke": "#3f8dfa"
 		},
 		{
 			"kind": "stroke",
@@ -56,7 +56,7 @@
 				[15, 16],
 				[17, 11.5]
 			],
-			"stroke": "#5797f1"
+			"stroke": "#498ef0"
 		},
 		{
 			"kind": "stroke",
@@ -65,7 +65,7 @@
 				[7, 11.5],
 				[3, 17]
 			],
-			"stroke": "#5797f1"
+			"stroke": "#498ef0"
 		},
 		{
 			"kind": "stroke",

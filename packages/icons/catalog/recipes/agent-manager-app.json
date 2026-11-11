@@ -16,8 +16,8 @@
 			],
 			"smooth": true,
 			"closed": true,
-			"stroke": "#bdadff",
-			"fill": "#bdadff"
+			"stroke": "#9379ff",
+			"fill": "#9379ff"
 		},
 		{
 			"kind": "stroke",
@@ -52,8 +52,8 @@
 			],
 			"smooth": true,
 			"closed": true,
-			"stroke": "#bdadff",
-			"fill": "#bdadff"
+			"stroke": "#9379ff",
+			"fill": "#9379ff"
 		},
 		{
 			"kind": "stroke",

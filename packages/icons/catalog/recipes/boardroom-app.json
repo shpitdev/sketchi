@@ -4,19 +4,28 @@
 			"kind": "ellipse",
 			"cx": 12,
 			"cy": 12.5,
-			"rx": 9.5,
-			"ry": 9.5,
+			"rx": 7.7,
+			"ry": 7.7,
 			"stroke": "#8376f2",
-			"fill": "#8476f3"
+			"pen": 2
 		},
 		{
 			"kind": "ellipse",
 			"cx": 12,
 			"cy": 12.5,
-			"rx": 6.5,
-			"ry": 6.5,
-			"stroke": "paper",
-			"fill": "paper"
+			"rx": 8.6,
+			"ry": 8.6,
+			"stroke": "#8376f2",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12.5,
+			"rx": 9.5,
+			"ry": 9.5,
+			"stroke": "#8376f2",
+			"pen": 2
 		},
 		{
 			"kind": "ellipse",
@@ -54,7 +63,7 @@
 				[10.5, 14]
 			],
 			"smooth": true,
-			"stroke": "#33dfd4",
+			"stroke": "#199f97",
 			"pen": 2
 		},
 		{
@@ -66,7 +75,7 @@
 				[12.3, 17.5]
 			],
 			"smooth": true,
-			"stroke": "#33dfd4",
+			"stroke": "#199f97",
 			"pen": 2
 		}
 	]

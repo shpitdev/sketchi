@@ -7,8 +7,8 @@
 			"width": 20,
 			"height": 16,
 			"rounded": true,
-			"stroke": "#2d72d2",
-			"fill": "#8abbff"
+			"stroke": "#215db0",
+			"fill": "#4c90f0"
 		},
 		{
 			"kind": "rect",
@@ -48,7 +48,7 @@
 			],
 			"closed": true,
 			"stroke": "#c87619",
-			"fill": "#fbb360"
+			"fill": "#d67505"
 		}
 	]
 }

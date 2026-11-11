@@ -7,8 +7,8 @@
 			"width": 19,
 			"height": 12,
 			"rounded": true,
-			"stroke": "#8a9ba8",
-			"fill": "#8a9ba8"
+			"stroke": "#7f91a0",
+			"fill": "#7f91a0"
 		},
 		{
 			"kind": "stroke",
@@ -22,22 +22,7 @@
 				[16.5, 11]
 			],
 			"smooth": true,
-			"stroke": "#8a9ba8",
-			"pen": 2
-		},
-		{
-			"kind": "stroke",
-			"points": [
-				[7.5, 11],
-				[7.5, 7.5],
-				[9, 4.5],
-				[12, 3.5],
-				[15, 4.5],
-				[16.5, 7.5],
-				[16.5, 11]
-			],
-			"smooth": true,
-			"stroke": "#8a9ba8",
+			"stroke": "#7f91a0",
 			"pen": 2
 		}
 	]

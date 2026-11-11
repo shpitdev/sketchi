@@ -13,8 +13,8 @@
 			],
 			"smooth": false,
 			"closed": true,
-			"stroke": "#f29d49",
-			"fill": "#f29d49"
+			"stroke": "#d97410",
+			"fill": "#d97410"
 		},
 		{
 			"kind": "ellipse",
@@ -23,7 +23,7 @@
 			"rx": 7.5,
 			"ry": 2.6,
 			"stroke": "paper",
-			"fill": "#f29d49"
+			"fill": "#d97410"
 		},
 		{
 			"kind": "stroke",
@@ -40,8 +40,8 @@
 				[8, 15.4]
 			],
 			"closed": true,
-			"stroke": "#f29d49",
-			"fill": "#f29d49"
+			"stroke": "#d97410",
+			"fill": "#d97410"
 		}
 	]
 }

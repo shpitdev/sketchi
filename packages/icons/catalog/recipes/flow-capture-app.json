@@ -7,7 +7,7 @@
 			"width": 16,
 			"height": 14,
 			"rounded": true,
-			"stroke": "#d3d8de"
+			"stroke": "#8290a1"
 		},
 		{
 			"kind": "rect",
@@ -16,8 +16,8 @@
 			"width": 16,
 			"height": 14,
 			"rounded": true,
-			"stroke": "#8f99a8",
-			"fill": "#d3d8de"
+			"stroke": "#848fa0",
+			"fill": "paper"
 		},
 		{
 			"kind": "rect",
@@ -25,18 +25,18 @@
 			"y": 5,
 			"width": 16,
 			"height": 3,
-			"stroke": "#8f99a8",
-			"fill": "#8f99a8"
+			"stroke": "#848fa0",
+			"fill": "#848fa0"
 		},
 		{
 			"kind": "rect",
 			"x": 4.5,
 			"y": 9.5,
-			"width": 8,
-			"height": 3.5,
+			"width": 6,
+			"height": 2,
 			"rounded": true,
-			"stroke": "#d3d8de",
-			"fill": "#d3d8de"
+			"stroke": "#848fa0",
+			"fill": "#848fa0"
 		},
 		{
 			"kind": "stroke",
@@ -47,28 +47,19 @@
 				[10, 19]
 			],
 			"closed": true,
-			"stroke": "#8f99a8",
-			"fill": "paper",
-			"pen": 2
+			"stroke": "#46566b",
+			"pen": 2,
+			"fill": "paper"
 		},
 		{
 			"kind": "ellipse",
-			"cx": 18.5,
-			"cy": 6,
-			"rx": 4.8,
-			"ry": 4.8,
-			"stroke": "paper",
-			"fill": "#cd4246",
-			"pen": 2
-		},
-		{
-			"kind": "ellipse",
-			"cx": 18.5,
-			"cy": 6,
+			"cx": 19.5,
+			"cy": 5,
 			"rx": 3,
 			"ry": 3,
-			"stroke": "#cd4246",
-			"fill": "#cd4246"
+			"stroke": "paper",
+			"fill": "#cd4246",
+			"pen": 1
 		}
 	]
 }

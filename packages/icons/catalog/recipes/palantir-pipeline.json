@@ -8,7 +8,7 @@
 				[12.5, 18.5],
 				[6, 18.5]
 			],
-			"stroke": "#00a396",
+			"stroke": "#00a093",
 			"pen": 2
 		},
 		{
@@ -17,7 +17,7 @@
 				[12.5, 11.5],
 				[20, 11.5]
 			],
-			"stroke": "#00a396",
+			"stroke": "#00a093",
 			"pen": 2
 		},
 		{
@@ -26,7 +26,7 @@
 				[6, 4.2],
 				[12, 4.2]
 			],
-			"stroke": "#5ad9cf"
+			"stroke": "#249e95"
 		},
 		{
 			"kind": "stroke",
@@ -34,7 +34,7 @@
 				[13, 10.5],
 				[19, 10.5]
 			],
-			"stroke": "#5ad9cf"
+			"stroke": "#249e95"
 		},
 		{
 			"kind": "rect",
@@ -44,7 +44,7 @@
 			"height": 6,
 			"rounded": true,
 			"stroke": "#007067",
-			"fill": "#00a396"
+			"fill": "#00a093"
 		},
 		{
 			"kind": "rect",
@@ -54,7 +54,7 @@
 			"height": 6,
 			"rounded": true,
 			"stroke": "#007067",
-			"fill": "#00a396"
+			"fill": "#00a093"
 		},
 		{
 			"kind": "rect",
@@ -64,7 +64,7 @@
 			"height": 6,
 			"rounded": true,
 			"stroke": "#007067",
-			"fill": "#00a396"
+			"fill": "#00a093"
 		}
 	]
 }

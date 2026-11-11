@@ -8,7 +8,7 @@
 			"height": 21,
 			"rounded": true,
 			"stroke": "none",
-			"fill": "#7ecdba"
+			"fill": "#3d9e87"
 		},
 		{
 			"kind": "rect",
@@ -18,7 +18,7 @@
 			"height": 21,
 			"rounded": true,
 			"stroke": "none",
-			"fill": "#7ecdba"
+			"fill": "#3d9e87"
 		},
 		{
 			"kind": "rect",
@@ -28,7 +28,7 @@
 			"height": 21,
 			"rounded": true,
 			"stroke": "none",
-			"fill": "#7ecdba"
+			"fill": "#3d9e87"
 		},
 		{
 			"kind": "stroke",
@@ -46,7 +46,7 @@
 			"width": 5.4,
 			"height": 3.6,
 			"rounded": true,
-			"fill": "#6fc8b2",
+			"fill": "#3d9e87",
 			"pen": 2
 		},
 		{
@@ -56,7 +56,7 @@
 			"width": 5.4,
 			"height": 3.6,
 			"rounded": true,
-			"fill": "#6fc8b2",
+			"fill": "#3d9e87",
 			"pen": 2
 		},
 		{
@@ -66,7 +66,7 @@
 			"width": 5.4,
 			"height": 3.6,
 			"rounded": true,
-			"fill": "#6fc8b2",
+			"fill": "#3d9e87",
 			"pen": 2
 		}
 	]
