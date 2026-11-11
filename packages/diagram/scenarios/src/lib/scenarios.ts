@@ -2254,9 +2254,14 @@ const flowchartScenarioDefinitions = [
 				name: "Kubernetes",
 				slug: "kubernetes",
 			},
-			{ collection: "gcp", name: "Cloud SQL", slug: "cloud-sql" },
+			{ aliases: ["Cloud SQL"], collection: "gcp", name: "Cloud SQL", slug: "cloud-sql" },
 			{ aliases: ["RabbitMQ"], collection: "data-storage", name: "RabbitMQ", slug: "rabbitmq" },
-			{ aliases: ["GKE"], collection: "gcp", name: "GKE", slug: "gke" },
+			{
+				aliases: ["GKE", "Google Kubernetes Engine", "google-kubernetes-engine"],
+				collection: "gcp",
+				name: "GKE",
+				slug: "gke",
+			},
 		],
 		nodes: [
 			["browser", "Browser", "start", ["browser"]],
