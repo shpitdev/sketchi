@@ -608,11 +608,12 @@ describe("IconLibrary", () => {
 
 	it("shows the packs above the search, drawn in the preview's ink", () => {
 		const packs: PackShelfData = {
-			origin: "https://icons.sketchi.app",
+			excalidraw: {},
 			packs: [
 				{
 					id: "palantir",
 					name: "Palantir",
+					version: "0123456789abcdef",
 					count: 100,
 					preview: [
 						{

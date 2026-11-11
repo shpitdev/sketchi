@@ -23,11 +23,10 @@ ignored copies into `public/`:
   "Copy for Excalidraw" actions paste.
 - `public/packs/` holds the packs `src/lib/packs.ts` defines by collection:
   each as a library (`<id>.excalidrawlib`; the whole catalog keeps the URL
-  above) and as a scene (`<id>.excalidraw`) that excalidraw.com opens by URL,
-  plus `index.json`, which the home page and each `/packs/<id>` page render on
-  the server. The largest pack library is 590 KB raw and 46 KB with gzip.
-  excalidraw.com imports libraries only from its own hosts, so a pack opens
-  there as a scene and downloads as a library.
+  above), a pack listed for Excalidraw's library collection also as its
+  preview (`<id>.preview.jpg`), plus `index.json`, which the home page and
+  each `/packs/<id>` page render on the server with each pack's version (a
+  hash of its library). The largest pack library is 630 KB raw.
 
 The browser fetches one compact metadata manifest, then lazily loads only the
 SVGs visible in the grid. The current 1,412-icon manifest is about 385 KB raw
@@ -61,6 +60,38 @@ never resolves to a community icon.
 
 API and MCP responses have permissive CORS. Source reports and the source data
 used to build the manifest are not copied into the public application.
+
+## Publishing packs to Excalidraw
+
+excalidraw.com adds a library from a link only when the file is in
+Excalidraw's library collection (`excalidraw/excalidraw-libraries`), so a pack
+first goes there the way excalidraw.com's "Publish library" dialog sends one.
+
+- A visitor opens "Publish to Excalidraw" on a pack and gives their name
+  (required, 60 characters), and optionally a Twitter handle and a website
+  (the pack's page by default). There is no GitHub handle: the collection's
+  bot mentions it on GitHub, and nothing here shows the visitor owns it.
+- `POST /api/packs/:id/excalidraw` takes those fields (2 KB at most, 3 a client
+  an hour) and sends the rest itself: the built library pretty-printed, its
+  preview, and the pack's listing (`excalidrawListing` in `src/lib/packs.ts`).
+  The preview is the dialog's: 6 marks a row in 128 px boxes 8 px apart, as a
+  JPEG at most 5000 px a side, each mark drawn as the pages draw it.
+- Each pack version is sent once. The Worker claims the version in the
+  `excalidraw_library_submissions` table (in the community icons D1 database)
+  before sending; a send that fails frees it, and a claim left by a Worker
+  that died frees it after 10 minutes. Once the collection answers with a
+  pull request, the version stays taken: the Worker reads the pull request
+  from GitHub's public API and stores its URL, its "Installation link" and
+  what it read, or the error, so a link it could not read can be filled in
+  by hand.
+- Every visitor then gets "Add to Excalidraw" with the newest install link,
+  which adds the library on excalidraw.com and leaves the canvas alone. A new
+  pack version can be published again.
+- Publishing is off unless the Worker has `EXCALIDRAW_LIBRARY_SUBMIT=on`;
+  production and previews leave it unset, which hides the button and answers
+  404. `EXCALIDRAW_LIBRARY_BACKEND` and `EXCALIDRAW_LIBRARY_GITHUB_API` point
+  a local Worker at stand-ins for Excalidraw's backend and GitHub's API (in
+  `apps/icons/.dev.vars`).
 
 ## Commands
 

@@ -18,6 +18,7 @@ import { Route as ApiCommunityIndexRouteImport } from './routes/api/community/in
 import { Route as ApiCommunitySlugRouteImport } from './routes/api/community/$slug'
 import { Route as ApiIconsIndexRouteImport } from './routes/api/icons/index'
 import { Route as ApiIconsSlugRouteImport } from './routes/api/icons/$slug'
+import { Route as ApiPacksIdExcalidrawRouteImport } from './routes/api/packs/$id/excalidraw'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +65,11 @@ const ApiIconsSlugRoute = ApiIconsSlugRouteImport.update({
   path: '/api/icons/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPacksIdExcalidrawRoute = ApiPacksIdExcalidrawRouteImport.update({
+  id: '/api/packs/$id/excalidraw',
+  path: '/api/packs/$id/excalidraw',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/api/icons/$slug': typeof ApiIconsSlugRoute
   '/api/community/': typeof ApiCommunityIndexRoute
   '/api/icons/': typeof ApiIconsIndexRoute
+  '/api/packs/$id/excalidraw': typeof ApiPacksIdExcalidrawRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/api/icons/$slug': typeof ApiIconsSlugRoute
   '/api/community': typeof ApiCommunityIndexRoute
   '/api/icons': typeof ApiIconsIndexRoute
+  '/api/packs/$id/excalidraw': typeof ApiPacksIdExcalidrawRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/api/icons/$slug': typeof ApiIconsSlugRoute
   '/api/community/': typeof ApiCommunityIndexRoute
   '/api/icons/': typeof ApiIconsIndexRoute
+  '/api/packs/$id/excalidraw': typeof ApiPacksIdExcalidrawRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/api/icons/$slug'
     | '/api/community/'
     | '/api/icons/'
+    | '/api/packs/$id/excalidraw'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/api/icons/$slug'
     | '/api/community'
     | '/api/icons'
+    | '/api/packs/$id/excalidraw'
   id:
     | '__root__'
     | '/'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/api/icons/$slug'
     | '/api/community/'
     | '/api/icons/'
+    | '/api/packs/$id/excalidraw'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +157,7 @@ export interface RootRouteChildren {
   ApiIconsSlugRoute: typeof ApiIconsSlugRoute
   ApiCommunityIndexRoute: typeof ApiCommunityIndexRoute
   ApiIconsIndexRoute: typeof ApiIconsIndexRoute
+  ApiPacksIdExcalidrawRoute: typeof ApiPacksIdExcalidrawRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +225,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIconsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/packs/$id/excalidraw': {
+      id: '/api/packs/$id/excalidraw'
+      path: '/api/packs/$id/excalidraw'
+      fullPath: '/api/packs/$id/excalidraw'
+      preLoaderRoute: typeof ApiPacksIdExcalidrawRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiIconsSlugRoute: ApiIconsSlugRoute,
   ApiCommunityIndexRoute: ApiCommunityIndexRoute,
   ApiIconsIndexRoute: ApiIconsIndexRoute,
+  ApiPacksIdExcalidrawRoute: ApiPacksIdExcalidrawRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -3,13 +3,16 @@ import { useCallback, useRef, useState } from "react";
 
 import { copyText } from "../../lib/actions.js";
 import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
+import type { PackExcalidrawState } from "../../lib/excalidraw-publish.js";
 import type { PackIcon, PackSummary } from "../../lib/packs.js";
 import { useLoadOnScroll } from "../../lib/use-load-on-scroll.js";
 import { IconsChrome } from "../icon-library/icons-chrome.js";
 import { PreviewToggle, type PreviewMode } from "../preview-toggle/index.js";
 import { RecipePreview } from "../recipe-preview/index.js";
 import { PackActions } from "./pack-actions.js";
+import { PackPublishDialog } from "./pack-publish-dialog.js";
 import { iconCount } from "./pack-shelf.js";
+import { usePackPublishing } from "./use-pack-publishing.js";
 
 const PAGE_SIZE = 96;
 
@@ -23,28 +26,29 @@ type LoadStatus = "error" | "loading" | "ready";
 
 export interface PackPageProps {
 	readonly errorMessage?: string;
+	readonly excalidraw?: PackExcalidrawState;
 	readonly homeHref?: string;
 	/** The pack's drawn marks, once the catalog has loaded. */
 	readonly icons?: readonly PackIcon[];
 	readonly initialPreviewMode?: PreviewMode;
 	readonly onRetry?: () => void;
-	readonly origin: string;
 	readonly pack: PackSummary;
 	readonly status: LoadStatus;
 }
 
-/** One pack: every drawing in it with its product name, and the pack's two actions. */
+/** One pack: every drawing in it with its product name, and the pack's actions. */
 export function PackPage({
 	errorMessage,
+	excalidraw,
 	homeHref = SKETCHI_WEB_HOME_URL,
 	icons = [],
 	initialPreviewMode = "light",
 	onRetry,
-	origin,
 	pack,
 	status,
 }: PackPageProps) {
 	const [previewMode, setPreviewMode] = useState<PreviewMode>(initialPreviewMode);
+	const publishing = usePackPublishing(excalidraw ? { [pack.id]: excalidraw } : {});
 	const [shown, setShown] = useState(PAGE_SIZE);
 	const [copiedSlug, setCopiedSlug] = useState<string>();
 	const [notice, setNotice] = useState("");
@@ -100,7 +104,13 @@ export function PackPage({
 								<p className="pack-hero__count">
 									{iconCount(status === "ready" ? icons.length : pack.count)}
 								</p>
-								<PackActions describedBy="pack-title" origin={origin} pack={pack} size="large" />
+								<PackActions
+									describedBy="pack-title"
+									excalidraw={publishing.states[pack.id]}
+									onPublish={() => publishing.open(pack.id)}
+									pack={pack}
+									size="large"
+								/>
 								<PreviewToggle onChange={setPreviewMode} value={previewMode} />
 							</div>
 
@@ -155,6 +165,14 @@ export function PackPage({
 						</div>
 					</main>
 				</IconsChrome>
+
+				{publishing.publishing ? (
+					<PackPublishDialog
+						onClose={publishing.close}
+						onPublished={(result) => publishing.published(pack.id, result)}
+						pack={pack}
+					/>
+				) : null}
 
 				<div aria-live="polite" aria-atomic="true" className="icons-toast" role="status">
 					{notice}

@@ -1532,8 +1532,11 @@ kbd {
 	z-index: 1;
 }
 
-.pack-actions a {
+.pack-actions a,
+.pack-actions button {
 	align-items: center;
+	cursor: pointer;
+	font-family: inherit;
 	background: var(--card);
 	border: 1px solid var(--line-2);
 	border-radius: var(--r-sm);
@@ -1548,7 +1551,8 @@ kbd {
 	white-space: nowrap;
 }
 
-.pack-actions a:hover {
+.pack-actions a:hover,
+.pack-actions button:hover {
 	border-color: var(--ink-3);
 }
 
@@ -1562,7 +1566,8 @@ kbd {
 	background: color-mix(in srgb, var(--ink) 86%, var(--paper));
 }
 
-.pack-actions a:active {
+.pack-actions a:active,
+.pack-actions button:active {
 	transform: translateY(1px);
 }
 
@@ -1572,7 +1577,8 @@ kbd {
 	width: 15px;
 }
 
-.pack-actions[data-size="large"] a {
+.pack-actions[data-size="large"] a,
+.pack-actions[data-size="large"] button {
 	font-size: 14px;
 	gap: 8px;
 	height: 44px;
@@ -1788,4 +1794,87 @@ kbd {
 
 .community-linked {
 	margin-bottom: 16px;
+}
+
+.pack-publish {
+	display: grid;
+	gap: 14px;
+}
+
+.pack-publish__preview {
+	border: 1px solid var(--line-2);
+	border-radius: var(--r-sm);
+	max-height: 160px;
+	object-fit: cover;
+	object-position: top;
+	width: 100%;
+}
+
+.pack-publish__listing {
+	display: grid;
+	gap: 4px;
+	margin: 0;
+}
+
+.pack-publish__listing dt {
+	color: var(--ink-3);
+	font-size: 12px;
+}
+
+.pack-publish__listing dd {
+	color: var(--ink);
+	font-size: 14px;
+	margin: 0 0 6px;
+}
+
+.pack-publish__field {
+	display: grid;
+	font-size: 13px;
+	font-weight: 600;
+	gap: 4px;
+}
+
+.pack-publish__field input {
+	background: var(--card);
+	border: 1px solid var(--line-2);
+	border-radius: var(--r-sm);
+	color: var(--ink);
+	font: inherit;
+	font-weight: 400;
+	height: 36px;
+	padding-inline: 10px;
+}
+
+.pack-publish__note {
+	color: var(--ink-3);
+	font-size: 13px;
+	margin: 0;
+}
+
+.pack-publish__error {
+	color: var(--danger);
+	font-size: 13px;
+	margin: 0;
+}
+
+.pack-publish__submit {
+	background: var(--ink);
+	border: 1px solid var(--ink);
+	border-radius: var(--r-sm);
+	color: var(--paper-2);
+	cursor: pointer;
+	font: inherit;
+	font-weight: 600;
+	height: 40px;
+}
+
+.pack-publish__submit:disabled {
+	cursor: progress;
+	opacity: 0.7;
+}
+
+.pack-publish__links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
 }
