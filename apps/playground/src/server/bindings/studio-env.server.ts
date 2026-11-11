@@ -20,7 +20,7 @@ export interface StudioEnv {
 	SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
 	SKETCHI_AI_GATEWAY_ID?: string;
 	SKETCHI_AI_GENERATE_MODEL?: string;
-	SKETCHI_AI_MODEL?: string;
+	SKETCHI_STUDIO_MODEL?: string;
 	/** The author model icon drawing uses when a request names none. */
 	SKETCHI_ICON_AUTHOR_MODEL?: string;
 	/** The model that judges a drawn icon; another family than the author's. */

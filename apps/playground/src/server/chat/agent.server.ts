@@ -197,11 +197,6 @@ function userText(
 		.join("\n");
 }
 
-/** A retried run reasons first: Gemini then rarely loops inside a tool call it never finishes. */
-const STUDIO_RETRY_PROVIDER_OPTIONS = {
-	google: { thinkingConfig: { thinkingLevel: "low" } },
-} as const;
-
 const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(function* (
 	request: Request,
 ) {
@@ -401,7 +396,7 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 	});
 	return yield* Effect.try({
 		try: () => {
-			const run = ({ messages, retry, abortSignal }: StudioRun) =>
+			const run = ({ messages, abortSignal }: StudioRun) =>
 				streamText({
 					abortSignal,
 					model,
@@ -411,8 +406,6 @@ const handleStudioAgentRequestWorkflow = Effect.fn("playground.http.chat")(funct
 					stopWhen: stepCountIs(MAX_AGENT_STEPS),
 					maxOutputTokens: MAX_AGENT_OUTPUT_TOKENS,
 					temperature: DIAGRAM_AGENT_TEMPERATURE,
-					// A run that wrote nothing looped inside a tool call; reasoning keeps the retry from it.
-					...(retry ? { providerOptions: STUDIO_RETRY_PROVIDER_OPTIONS } : {}),
 				});
 
 			return createUIMessageStreamResponse({

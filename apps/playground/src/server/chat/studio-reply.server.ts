@@ -119,8 +119,8 @@ async function relayRun(
 
 /**
  * The UI message stream of one Studio turn. The model runs once; a run whose last step ran out
- * of output having written nothing (a tool call it never finished) runs once more with
- * reasoning on, which keeps it from looping, and a second such run ends with a clear error. A
+ * of output having written nothing (a tool call it never finished) runs once more with every
+ * earlier step in front of it, and a second such run ends with a clear error. A
  * turn whose builds were all rejected never closes by claiming a diagram. Cancelling the stream
  * aborts the run in progress and never starts another.
  */

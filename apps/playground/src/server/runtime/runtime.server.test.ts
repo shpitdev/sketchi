@@ -62,14 +62,14 @@ describe("Playground request runtime", () => {
 			});
 			const [first, second] = await Promise.all([
 				runPlaygroundEffect(readRequestServices, {
-					env: { SKETCHI_AI_MODEL: "first-model" },
+					env: { SKETCHI_STUDIO_MODEL: "first-model" },
 					platform: {
 						waitUntilPromise: firstWaitUntil,
 					},
 					request: firstRequest,
 				}),
 				runPlaygroundEffect(readRequestServices, {
-					env: { SKETCHI_AI_MODEL: "second-model" },
+					env: { SKETCHI_STUDIO_MODEL: "second-model" },
 					platform: {
 						waitUntilPromise: secondWaitUntil,
 					},
@@ -77,12 +77,12 @@ describe("Playground request runtime", () => {
 				}),
 			]);
 
-			assert.strictEqual(first.bindings.SKETCHI_AI_MODEL, "first-model");
+			assert.strictEqual(first.bindings.SKETCHI_STUDIO_MODEL, "first-model");
 			assert.strictEqual(first.metadata.origin, "https://first.test");
 			assert.strictEqual(first.metadata.path, "/one?value=1");
 			assert.strictEqual(first.metadata.traceId, "trace-first");
 			assert.strictEqual(first.platform.waitUntilPromise, firstWaitUntil);
-			assert.strictEqual(second.bindings.SKETCHI_AI_MODEL, "second-model");
+			assert.strictEqual(second.bindings.SKETCHI_STUDIO_MODEL, "second-model");
 			assert.strictEqual(second.metadata.origin, "https://second.test");
 			assert.strictEqual(second.metadata.path, "/two?value=2");
 			assert.strictEqual(second.metadata.traceId, "trace-second");
