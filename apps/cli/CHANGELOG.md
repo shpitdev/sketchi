@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.39.1
+
+### Patch Changes
+
+- [#763](https://github.com/shpitdev/sketchi/pull/763) [`c718395`](https://github.com/shpitdev/sketchi/commit/c7183955e40729d1d0a2286c95ae3d76a9ff8bf6) Thanks [@anandpant](https://github.com/anandpant)! - The icon catalog adds 105 marks: 58 brand marks (AI labs, inference and gateway providers, and Apache Camel, Solr, Drupal, Fastify, Hibernate, Lodash and others) and 47 wordmarks. Qwen, OpenRouter, Kimi, Copilot and Appwrite take their current artwork. 80 marks gain or get new hand-drawn versions, and a gray mark is no longer drawn in black. Seven Foundry marks that drew the same glyph as another product now ship once, and their old slugs resolve to that mark.
+
 ## 0.39.0
 
 ### Minor Changes
