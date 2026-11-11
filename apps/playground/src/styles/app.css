@@ -958,7 +958,8 @@ button.studio__artifact-link {
 /* Studio chrome follows the system preference; diagrams retain their authored
    paper and colors, just as they do in downloaded artifacts. */
 @media (prefers-color-scheme: dark) {
-	:root {
+	/* Outrank the shared diagram stylesheet's light :root defaults in any load order. */
+	html:root {
 		color-scheme: dark;
 		--paper: #201e20;
 		--paper-2: #2b272b;

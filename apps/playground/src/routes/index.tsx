@@ -182,7 +182,6 @@ function DiagramStage({
 	ghostLabels,
 	result,
 	scene,
-	needsReply,
 	onCompose,
 	onStop,
 }: {
@@ -192,7 +191,6 @@ function DiagramStage({
 	ghostLabels: string[];
 	result: StudioBuildResult | undefined;
 	scene: RenderedDiagramScene | null;
-	needsReply: boolean;
 	onCompose: () => void;
 	onStop: () => void;
 }) {
@@ -236,7 +234,6 @@ function DiagramStage({
 				) : null}
 			</div>
 			<div className="studio__stage-footer">
-				{scene && needsReply ? <StageReplyButton onCompose={onCompose} /> : null}
 				{artifact ? <ArtifactActions artifact={artifact} /> : null}
 			</div>
 		</section>
@@ -354,7 +351,6 @@ function StudioRoute() {
 							ghostLabels={ghostLabels}
 							result={displayResult}
 							scene={scene}
-							needsReply={!busy && Boolean(error || answerableMessageId)}
 							onCompose={focusComposer}
 							onStop={handleStop}
 						/>

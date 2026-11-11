@@ -239,7 +239,13 @@ describe("streaming workspace", () => {
 			.querySelector(".studio__stage-card")!
 			.getBoundingClientRect()
 			.toJSON();
-		chat.messages = [prompt, completed];
+		chat.messages = [
+			prompt,
+			{
+				...completed,
+				parts: [...completed.parts, { type: "text", text: "Would you like to change any steps?" }],
+			},
+		];
 		chat.status = "ready";
 		rerender(<Studio />);
 		await frame();
