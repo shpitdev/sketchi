@@ -1,5 +1,6 @@
 import { type IconColor, isIconColor } from "./color-mode.js";
 import type { IconManifest, SketchiIcon, SketchiIconViewBox } from "./manifest.js";
+import { canonicalIconSlug, FOLDED_INTO_SLUG } from "./folded-slugs.js";
 
 interface SourceIcon {
 	readonly baseSlug?: string;
@@ -37,6 +38,11 @@ export const COLLISION_CANONICAL_COLLECTIONS: Readonly<Record<string, string>> =
 	vertexai: "ai-infrastructure",
 };
 
+/** Whether a source mark ships, or is folded into another product's mark. */
+export function isShippedSourceIcon(icon: { readonly slug: string }): boolean {
+	return canonicalIconSlug(icon.slug) === icon.slug;
+}
+
 const ALIASES_BY_BASE_SLUG: Readonly<Record<string, readonly string[]>> = {
 	"agent-studio-app": ["agent studio"],
 	"ai-fde-app": ["AI forward deployed engineer"],
@@ -58,6 +64,7 @@ const ALIASES_BY_BASE_SLUG: Readonly<Record<string, readonly string[]>> = {
 	"foundry-vulcan": ["3D models"],
 	googlecloud: ["gcp", "google cloud", "google cloud platform"],
 	"hyperauto-app": ["HyperAuto App"],
+	knockoutjs: ["knockout.js"],
 	kubernetes: ["k8s", "kube"],
 	"logic-app": ["function logic", "function-logic"],
 	"mcp-hub-app": ["ontology MCP", "ontology-mcp", "palantir MCP", "palantir-mcp"],
@@ -74,6 +81,7 @@ const ALIASES_BY_BASE_SLUG: Readonly<Record<string, readonly string[]>> = {
 	"palantir-ontology": ["ontology manager", "palantir ontology"],
 	"palantir-pipeline": ["palantir pipeline", "pipeline"],
 	"palantir-workshop": ["palantir workshop"],
+	pi: ["pi coding agent"],
 	"pipeline-builder-graph-app": ["pipeline", "pipeline-builder-graph"],
 	postgresql: ["postgres", "psql", "postgres sql"],
 	"preparation-app": ["data preparation"],
@@ -94,8 +102,10 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"agent-builder-app": "Agent Builder",
 	"agent-manager-app": "Agent Manager",
 	"agent-studio-app": "AIP Chatbot Studio",
+	agnesai: "Agnes AI",
 	"ai-fde-app": "AI FDE",
 	aihubmix: "AIHubMix",
+	aimlapi: "AI/ML API",
 	"aip-analyst-app": "AIP Analyst",
 	"aip-assist-tutorials-app": "Walkthroughs",
 	"aip-autopilot-app": "Autopilot",
@@ -103,6 +113,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"aip-evolve-app": "AIP Evolve",
 	"aip-showcase": "Examples (Build with AIP)",
 	alibabacloud: "Alibaba Cloud",
+	amdradeoncloud: "AMD Radeon Cloud",
 	amznwebserv: "Amazon Web Services",
 	"approvals-app": "Approvals",
 	"arrow-workbook-app": "Code Workbook",
@@ -113,6 +124,8 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	baiducloud: "Baidu Cloud",
 	"boardroom-app": "Boardroom",
 	"carbon-workspace-app": "Carbon workspaces",
+	celestoai: "CelestoAI",
+	cheaperinference: "Cheaper Inference",
 	"checkpoints-app": "Checkpoints",
 	"cipher-channel-app": "Cipher",
 	claudecode: "Claude Code",
@@ -123,6 +136,8 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"code-workspace-rstudio-app": "RStudio",
 	"code-workspace-vscode-app": "VS Code",
 	codex: "Codex",
+	cometd: "CometD",
+	commandcode: "Command Code",
 	"contour-analysis-app": "Contour",
 	"control-panel-app": "Control Panel",
 	"custom-endpoints-app": "Custom Endpoints",
@@ -134,7 +149,11 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"dev-console-app": "Developer Console",
 	"developer-branching-app": "Global Branching",
 	digitalocean: "DigitalOcean",
+	dothoosh: "DotHoosh",
+	dotsstudio: "Dots Studio",
+	empiriolabs: "EmpirioLabs AI",
 	"evals-app": "AIP Evals",
+	flexai: "FlexAI",
 	"flow-capture-app": "Flow Capture",
 	flyio: "Fly.io",
 	"form-app": "Forms",
@@ -150,14 +169,22 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"foundry-vulcan": "Vulcan",
 	"fusion-app": "Fusion",
 	githubcopilot: "GitHub Copilot",
+	gmicloud: "GMI Cloud",
 	googlecloud: "Google Cloud",
+	greenpt: "GreenPT",
+	grokbot: "Grok Bot",
+	happyhorse: "HappyHorse",
 	"hivemind-app": "Hivemind",
 	"hyperauto-app": "HyperAuto",
 	"inference-app": "Sensitive Data Scanner",
+	"ingress-nginx": "Ingress NGINX",
 	"insight-app": "Insight",
+	ionet: "io.net",
 	"job-tracker-app": "Builds",
+	knockoutjs: "Knockout",
 	kubernetes: "Kubernetes",
 	"linter-app": "Linter",
+	llmgateway: "LLM Gateway",
 	lmstudio: "LM Studio",
 	"logic-app": "AIP Logic",
 	"logic-flow-app": "Logic Flows",
@@ -182,6 +209,7 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"palantir-pipeline": "Pipeline Builder",
 	"palantir-workshop": "Workshop",
 	"peer-manager-app": "Peer Manager",
+	pi: "Pi Agent",
 	"pilot-app": "Pilot",
 	"pipeline-builder-graph-app": "Pipeline Builder",
 	postgresql: "PostgreSQL",
@@ -192,16 +220,20 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"restricted-view-app": "Restricted Views",
 	"retention-app": "Retention policies",
 	"sddi-app": "HyperAuto (legacy)",
+	searxng: "SearXNG",
 	"slate-document-app": "Slate",
 	"solution-design-app": "Solution Designer",
 	"sql-studio-app": "SQL Studio",
 	"structured-dataset-app": "Dataset Preview",
+	sub2api: "Sub2API",
 	"symbols-management-app": "Symbols Management",
 	tailwindcss: "Tailwind CSS",
 	"templates-app": "Templates",
 	"threads-app": "AIP Threads",
 	"time-series-catalog-app": "Time Series Catalog",
 	"training-app": "Training",
+	typesafeai: "TypeSafe AI",
+	unionalpha: "Union Alpha",
 	"upgrade-assistant-app": "Upgrade Assistant",
 	"value-types-app": "Value Types",
 	vercel: "Vercel",
@@ -212,6 +244,9 @@ const NAME_BY_BASE_SLUG: Readonly<Record<string, string>> = {
 	"vortex-map-app": "Map",
 	"vortex-map-layer-app": "Map Layer",
 	vscode: "Visual Studio Code",
+	wandb: "Weights & Biases",
+	wavespeed: "WaveSpeed",
+	workbuddy: "WorkBuddy",
 	"workflow-builder-app": "Workflow Lineage",
 	"workflow-builder-write-mode-app": "Workflow Builder",
 	"workshop-module-app": "Workshop",
@@ -269,8 +304,9 @@ function isViewBox(value: unknown): value is SketchiIconViewBox {
 function isSourceIcon(value: unknown): value is SourceIcon {
 	return (
 		isRecord(value) &&
-		isRecord(value.color) &&
-		isIconColor(value.color) &&
+		// A folded mark lends only its names, so it is never measured for color.
+		((typeof value.slug === "string" && !isShippedSourceIcon({ slug: value.slug })) ||
+			(isRecord(value.color) && isIconColor(value.color))) &&
 		typeof value.bytes === "number" &&
 		typeof value.collection === "string" &&
 		typeof value.slug === "string" &&
@@ -327,17 +363,21 @@ function publicSlugForIcon(
 	throw new Error(`Choose a canonical collection for duplicate slug ${icon.slug}.`);
 }
 
-function aliasesForIcon(icon: SourceIcon, publicSlug: string): readonly string[] {
+function aliasesForIcon(
+	icon: SourceIcon,
+	publicSlug: string,
+	folded: readonly SourceIcon[],
+): readonly string[] {
 	const baseSlug = icon.baseSlug ?? icon.slug.replace(/-text$/u, "");
 	const seeded = ALIASES_BY_BASE_SLUG[baseSlug] ?? [];
 	const curatedName = NAME_BY_BASE_SLUG[baseSlug];
-	return Array.from(
-		new Set(
-			publicSlug === icon.slug
-				? [...seeded, ...(curatedName ? [curatedName] : [])]
-				: [icon.slug, ...seeded, ...(curatedName ? [curatedName] : [])],
-		),
-	).sort();
+	const foldedNames = folded.flatMap((other) => [
+		other.slug,
+		displayNameForSourceIcon(other),
+		...(ALIASES_BY_BASE_SLUG[other.slug] ?? []),
+	]);
+	const names = [...seeded, ...(curatedName ? [curatedName] : []), ...foldedNames];
+	return Array.from(new Set(publicSlug === icon.slug ? names : [icon.slug, ...names])).sort();
 }
 
 function keywordsForIcon(icon: SourceIcon): readonly string[] {
@@ -349,22 +389,32 @@ function keywordsForIcon(icon: SourceIcon): readonly string[] {
 
 export function buildIconCatalog(value: unknown): GeneratedIconCatalog {
 	const sourceData = decodeSourceData(value);
-	const collisions = new Map<string, SourceIcon[]>();
+	const shipped = sourceData.icons.filter(isShippedSourceIcon);
+	const foldedInto = new Map<string, SourceIcon[]>();
 	for (const icon of sourceData.icons) {
+		const target = FOLDED_INTO_SLUG[icon.slug];
+		if (target === undefined) continue;
+		if (!shipped.some((other) => other.slug === target)) {
+			throw new Error(`${icon.slug} folds into ${target}, which does not ship.`);
+		}
+		foldedInto.set(target, [...(foldedInto.get(target) ?? []), icon]);
+	}
+	const collisions = new Map<string, SourceIcon[]>();
+	for (const icon of shipped) {
 		const current = collisions.get(icon.slug) ?? [];
 		current.push(icon);
 		collisions.set(icon.slug, current);
 	}
 
 	const sources: Record<string, string> = {};
-	const icons: SketchiIcon[] = sourceData.icons.map((icon) => {
+	const icons: SketchiIcon[] = shipped.map((icon) => {
 		const slug = publicSlugForIcon(icon, collisions);
 		if (sources[slug]) {
 			throw new Error(`Generated public slug ${slug} is not unique.`);
 		}
 		sources[slug] = icon.urlPath;
 		return {
-			aliases: aliasesForIcon(icon, slug),
+			aliases: aliasesForIcon(icon, slug, foldedInto.get(icon.slug) ?? []),
 			bytes: icon.bytes,
 			collection: icon.collection,
 			colorMode: icon.color.colorMode,

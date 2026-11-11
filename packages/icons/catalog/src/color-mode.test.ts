@@ -108,6 +108,6 @@ describe("catalog icon colors", () => {
 		expect(color("aws")).toMatchObject({ colorMode: "multicolor", onDark: "plate" });
 		expect(color("googlecloud")).toEqual({ colorMode: "multicolor" });
 		expect(color("react")).toEqual({ colorMode: "multicolor" });
-		expect(color("kimi")).toMatchObject({ colorMode: "multicolor", onLight: "plate" });
+		expect(color("kwaipilot")).toMatchObject({ colorMode: "multicolor", onLight: "plate" });
 	});
 });

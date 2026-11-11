@@ -1,0 +1,22 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12,
+			"rx": 10.5,
+			"ry": 10.5,
+			"stroke": "#9be755",
+			"fill": "#9be755"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12.3,
+			"cy": 11.3,
+			"rx": 5.6,
+			"ry": 5.6,
+			"stroke": "paper",
+			"fill": "paper"
+		}
+	]
+}

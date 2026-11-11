@@ -47,6 +47,7 @@ pnpm nx draw icon-batch -- draw --run trial --sample 30    # a spread across col
 pnpm nx draw icon-batch -- sheets --run catalog
 pnpm nx draw icon-batch -- summary --run catalog
 pnpm nx draw icon-batch -- promote --run catalog --reject rejected.txt
+pnpm nx draw icon-batch -- recipe-sheets --collection palantir --theme dark
 ```
 
 - `draw` leaves the author to the source, as the draw service does when a
@@ -62,17 +63,24 @@ pnpm nx draw icon-batch -- promote --run catalog --reject rejected.txt
   whose price the gateway's logs could not give (it keeps its log ids and
   counts at its token estimate, or its ceiling); running again resumes the
   marks that are not settled.
+- `--notes notes.json` (`{ "slug": "what the last drawing lost" }`) hands
+  the author a reviewer's note on a mark a review rejected, for a redraw.
 - A mark the judge does not pick out of its look-alikes, or one that ends
   without a drawing, gets one retry with `--retry` (Opus 5.5). If that misses
   too, it stays out and the summary lists it.
 - `sheets` writes `sheets/recognized-NN.png` and `sheets/review-NN.png`: 32
   marks each, the source beside the drawing at 112 and 28 px, with the verdict,
   author, rounds, parts and cost.
+- `recipe-sheets` lays committed recipes out the same way, for a collection
+  (`--collection`) or named marks (`--slugs`), on light paper or in
+  Excalidraw's dark theme (`--theme dark`), under
+  `.memory/icon-batch/recipe-sheets/`.
 - `summary` writes `ledger.csv` (one row per mark) and `summary.md` (totals,
   per-mark cost, time, tokens, rounds and parts, and the marks staying out).
 - `promote` writes each recognized mark's recipe to
   `packages/icons/catalog/recipes/`, except the slugs in `--reject` and any
-  that already has one, and lists any whose word would clip past the 24-unit
+  that already has one (`--replace` replaces it, for a run that redraws marks
+  whose source or drawing changed), and lists any whose word would clip past the 24-unit
   grid. The draw engine already draws a monochrome mark's own black and white
   in `ink` and `paper`, so the drawing follows the theme where the mark's SVG
   inverts. Format the files with `pnpm format` before committing.

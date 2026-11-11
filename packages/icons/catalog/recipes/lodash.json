@@ -1,0 +1,30 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[3, 2.5],
+				[3, 17],
+				[10.5, 17]
+			],
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 16.5,
+			"cy": 13,
+			"rx": 5,
+			"ry": 5,
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 20.2,
+			"width": 21,
+			"height": 2.4,
+			"stroke": "#3492ff",
+			"fill": "#3492ff"
+		}
+	]
+}

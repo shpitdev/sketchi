@@ -6,7 +6,12 @@ import { iconManifest } from "@sketchi/icon-catalog/catalog";
 
 import { makeMemoryArtifactStorage, CodeModeArtifactStorage } from "./artifacts";
 import { RenderedDiagramSceneSchema } from "./contract";
-import { CodeModeIconLoadError, makeCodeModeIconCatalog, type CodeModeIconCatalog } from "./icons";
+import {
+	CodeModeIconLoadError,
+	makeCodeModeIconCatalog,
+	normalizeIconSlug,
+	type CodeModeIconCatalog,
+} from "./icons";
 import {
 	applyDiagramPatch,
 	buildFlowchart,
@@ -195,6 +200,23 @@ describe("Code Mode icon catalog", () => {
 		expect(catalog.get("github-text")).toBeUndefined();
 		expect(catalog.get("heavy-mark")).toBeUndefined();
 		expect(catalog.search("git", 5).map((icon) => icon.slug)).toEqual(["github"]);
+	});
+
+	it("resolves a folded mark's old slug to the mark it ships under", () => {
+		const recipe = { parts: [{ kind: "rect", x: 2, y: 2, width: 20, height: 20 }] };
+		const catalog = makeCodeModeIconCatalog({
+			icons: [catalogIcon("hivemind-app", "Hivemind", { collection: "palantir" })],
+			loadSvg: () => Effect.succeed("<svg/>"),
+			recipes: { "hivemind-app": recipe },
+			slugLookup: "test",
+		});
+		expect(normalizeIconSlug(" Mindkit-App ")).toBe("hivemind-app");
+		expect(catalog.get("mindkit-app")).toEqual({
+			collection: "palantir",
+			name: "Hivemind",
+			slug: "hivemind-app",
+		});
+		expect(catalog.recipe("mindkit-app")).toEqual(recipe);
 	});
 });
 

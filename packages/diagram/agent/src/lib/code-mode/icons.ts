@@ -16,6 +16,7 @@ import {
 	type IconRecipe,
 } from "@sketchi/diagram-core";
 import {
+	canonicalIconSlug,
 	CONCEPT_COLLECTION,
 	iconMatch,
 	isNodeLogoEligible,
@@ -389,11 +390,11 @@ export function makeCodeModeIconCatalog(options: {
 		}),
 	);
 	return {
-		get: (slug) => bySlug.get(slug),
-		wordmark: (slug) => wordmarks.get(slug),
-		recipe: (slug) => recipes.get(slug),
+		get: (slug) => bySlug.get(canonicalIconSlug(slug)),
+		wordmark: (slug) => wordmarks.get(canonicalIconSlug(slug)),
+		recipe: (slug) => recipes.get(canonicalIconSlug(slug)),
 		isStrayVendorLogo: (slug, label) => {
-			const icon = icons.get(slug);
+			const icon = icons.get(canonicalIconSlug(slug));
 			return icon !== undefined && isStrayVendorLogo(icon, label);
 		},
 		logoNamedByLabel: (label) => {
@@ -427,8 +428,9 @@ const SUGGESTION_LIMIT = 3;
 const ICON_LOAD_CONCURRENCY = 8;
 
 /** Agents may vary case or spacing; catalog slugs are lowercase. */
+/** A slug as the catalog ships it: trimmed, lowercase, and a folded mark's slug as the mark it joined. */
 export function normalizeIconSlug(value: string): string {
-	return cleanToolString(value).toLowerCase();
+	return canonicalIconSlug(cleanToolString(value).toLowerCase());
 }
 
 function iconSuggestions(

@@ -3,12 +3,12 @@
 		{
 			"kind": "stroke",
 			"points": [
-				[6, 5.5],
-				[19, 5.5],
-				[21, 7.5],
-				[21, 11],
-				[19, 12],
-				[6, 12]
+				[5, 5],
+				[19, 5],
+				[19, 12.5],
+				[5, 12.5],
+				[5, 19.5],
+				[19, 19.5]
 			],
 			"stroke": "#d69fd6",
 			"pen": 2
@@ -16,60 +16,68 @@
 		{
 			"kind": "stroke",
 			"points": [
-				[7, 8],
-				[19, 8],
-				[19, 11.5],
-				[8, 11.5],
-				[5, 13.5],
-				[5, 18.5],
-				[8, 20],
-				[18, 20]
+				[5, 6.5],
+				[18, 6.5],
+				[18, 13.5],
+				[6, 13.5],
+				[6, 19],
+				[19, 19]
 			],
 			"stroke": "#9d3f9d",
 			"pen": 2
 		},
 		{
-			"kind": "stroke",
-			"points": [
-				[6, 12.5],
-				[20, 12.5]
-			],
+			"kind": "rect",
+			"x": 7.5,
+			"y": 4.2,
+			"width": 11,
+			"height": 3,
 			"stroke": "#9d3f9d",
-			"pen": 2
+			"fill": "#9d3f9d"
 		},
 		{
-			"kind": "stroke",
-			"points": [
-				[6, 16],
-				[6, 19]
-			],
+			"kind": "rect",
+			"x": 16.8,
+			"y": 5,
+			"width": 3,
+			"height": 9,
 			"stroke": "#9d3f9d",
-			"pen": 2
+			"fill": "#9d3f9d"
 		},
 		{
-			"kind": "stroke",
-			"points": [
-				[8, 17],
-				[17, 17]
-			],
-			"stroke": "#d69fd6"
+			"kind": "rect",
+			"x": 4.2,
+			"y": 12,
+			"width": 14,
+			"height": 3,
+			"stroke": "#9d3f9d",
+			"fill": "#9d3f9d"
+		},
+		{
+			"kind": "rect",
+			"x": 4.2,
+			"y": 12,
+			"width": 3,
+			"height": 9,
+			"stroke": "#9d3f9d",
+			"fill": "#9d3f9d"
 		},
 		{
 			"kind": "rect",
 			"x": 1.5,
-			"y": 2,
-			"width": 7,
-			"height": 7,
+			"y": 1.5,
+			"width": 6.5,
+			"height": 6.5,
 			"rounded": true,
 			"stroke": "#7c327c",
 			"fill": "#7c327c"
 		},
 		{
 			"kind": "rect",
-			"x": 16.5,
+			"x": 16,
 			"y": 15.5,
 			"width": 6.5,
-			"height": 7,
+			"height": 6.5,
 			"rounded": true,
 			"stroke": "#7c327c",
 			"fill": "#7c327c"

@@ -1,5 +1,6 @@
 import generatedCatalogJson from "./generated/icon-catalog.json" with { type: "json" };
 import { decodeIconManifest, type IconManifest, type SketchiIcon } from "./manifest.js";
+import { canonicalIconSlug } from "./folded-slugs.js";
 import { isNodeLogoEligible, isStandaloneWordmark } from "./node-logos.js";
 
 interface IconCatalog {
@@ -55,12 +56,14 @@ export const nodeLogoIcons: readonly SketchiIcon[] =
 export const standaloneWordmarkIcons: readonly SketchiIcon[] =
 	catalog.manifest.icons.filter(isStandaloneWordmark);
 
+/** The mark a slug names, following a folded slug to the mark it ships under. */
 export function getIconBySlug(slug: string): SketchiIcon | undefined {
-	return iconBySlug.get(slug);
+	return iconBySlug.get(canonicalIconSlug(slug));
 }
 
 export function getIconSourcePath(slug: string): string | undefined {
-	return Object.hasOwn(catalog.sources, slug) ? catalog.sources[slug] : undefined;
+	const shipped = canonicalIconSlug(slug);
+	return Object.hasOwn(catalog.sources, shipped) ? catalog.sources[shipped] : undefined;
 }
 
 /** Source file of an icon relative to this package's `svg/` directory. */

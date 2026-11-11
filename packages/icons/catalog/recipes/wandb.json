@@ -1,0 +1,76 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 3.8,
+			"cy": 3,
+			"rx": 1.5,
+			"ry": 1.5,
+			"stroke": "#fcbc32",
+			"fill": "#fcbc32"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 3.8,
+			"cy": 8.2,
+			"rx": 2.2,
+			"ry": 2.2,
+			"stroke": "#fcbc32",
+			"fill": "#fcbc32"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 3.8,
+			"cy": 18.9,
+			"rx": 2.2,
+			"ry": 2.2,
+			"stroke": "#fcbc32",
+			"fill": "#fcbc32"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 5,
+			"rx": 1.5,
+			"ry": 1.5,
+			"stroke": "#fcbc32",
+			"fill": "#fcbc32"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 15.5,
+			"rx": 2.2,
+			"ry": 2.2,
+			"stroke": "#fcbc32",
+			"fill": "#fcbc32"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 20.8,
+			"rx": 1.5,
+			"ry": 1.5,
+			"stroke": "#fcbc32",
+			"fill": "#fcbc32"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 20.2,
+			"cy": 3,
+			"rx": 1.5,
+			"ry": 1.5,
+			"stroke": "#fcbc32",
+			"fill": "#fcbc32"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 20.2,
+			"cy": 8.2,
+			"rx": 2.2,
+			"ry": 2.2,
+			"stroke": "#fcbc32",
+			"fill": "#fcbc32"
+		}
+	]
+}

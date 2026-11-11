@@ -50,7 +50,13 @@ describe("catalog hand-drawn icons", () => {
 	});
 
 	it("draws a monochrome mark's own near-black or near-white in the scene's ink", () => {
-		const modes = new Map(iconManifest.icons.map((icon) => [icon.slug, icon.colorMode]));
+		// A light mark inks its white only when it would vanish on white paper; a pale panel keeps its colors.
+		const modes = new Map(
+			iconManifest.icons.map((icon) => [
+				icon.slug,
+				icon.colorMode === "mono-light" && !icon.onLight ? "multicolor" : icon.colorMode,
+			]),
+		);
 		// A neutral literal stays put where the mark inverts, so on a dark scene a black mark stays black.
 		const literalInk = (color: unknown, mode: string) => {
 			if (typeof color !== "string" || !/^#[0-9a-f]{6}$/u.test(color)) return false;
@@ -61,7 +67,8 @@ describe("catalog hand-drawn icons", () => {
 			];
 			if (Math.max(r, g, b) - Math.min(r, g, b) > 32) return false;
 			const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-			return mode === "mono-dark" ? luminance <= 0.25 : mode === "mono-light" && luminance >= 0.85;
+			// Ink takes a black up to #333333; a darker gray than that stays the source's gray.
+			return mode === "mono-dark" ? luminance <= 0.2 : mode === "mono-light" && luminance >= 0.85;
 		};
 		for (const [slug, recipe] of Object.entries(nativeIcons)) {
 			const mode = modes.get(slug);

@@ -1,0 +1,65 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12,
+			"rx": 11,
+			"ry": 11,
+			"stroke": "#feb571",
+			"fill": "#feb571"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 6.5,
+			"text": "GRAILS",
+			"size": 4.5,
+			"color": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[5.5, 10],
+				[18.5, 10],
+				[16, 14.5],
+				[13.2, 15.5],
+				[14.5, 20],
+				[9.5, 20],
+				[10.8, 15.5],
+				[8, 14.5]
+			],
+			"closed": true,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[2.5, 13],
+				[6.5, 13],
+				[6.5, 15.5],
+				[6, 19],
+				[3.8, 19],
+				[4, 16]
+			],
+			"closed": true,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[21.5, 13],
+				[17.5, 13],
+				[17.5, 15.5],
+				[18, 19],
+				[20.2, 19],
+				[20, 16]
+			],
+			"closed": true,
+			"stroke": "paper",
+			"fill": "paper"
+		}
+	]
+}

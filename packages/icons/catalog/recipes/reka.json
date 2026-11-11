@@ -1,0 +1,20 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 6.5,
+			"text": "re",
+			"size": 13,
+			"color": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 17.5,
+			"text": "ka",
+			"size": 13,
+			"color": "ink"
+		}
+	]
+}

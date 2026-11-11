@@ -237,7 +237,13 @@ export function svgPng(svg: string): Uint8Array {
 /** An Excalidraw scene exported on white, as Excalidraw's PNG export frames it. */
 export async function exportScenePng(
 	scene: IconScene,
-	options: { readonly padding: number; readonly scale: number; readonly backgroundColor: string },
+	options: {
+		readonly padding: number;
+		readonly scale: number;
+		readonly backgroundColor: string;
+		/** Excalidraw's dark theme, as its canvas and export draw it. */
+		readonly darkMode?: boolean;
+	},
 ): Promise<Uint8Array> {
 	const [{ exportToSvg, restore }] = await Promise.all([loadExcalidraw(), initializeResvg()]);
 	const restored = restore(
@@ -256,6 +262,7 @@ export async function exportScenePng(
 			exportBackground: true,
 			exportEmbedScene: false,
 			exportScale: options.scale,
+			exportWithDarkMode: options.darkMode ?? false,
 			viewBackgroundColor: options.backgroundColor,
 		},
 		files: restored.files,
