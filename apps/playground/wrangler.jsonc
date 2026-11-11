@@ -88,7 +88,7 @@
 		"SKETCHI_APP_SURFACE": "studio",
 		"SKETCHI_AI_GATEWAY_ID": "google-ai-studio",
 		"SKETCHI_AI_GENERATE_MODEL": "anthropic/claude-haiku-5-5",
-		"SKETCHI_AI_MODEL": "google/gemini-3.1-flash-lite",
+		"SKETCHI_STUDIO_MODEL": "openai/gpt-6-luna",
 		// Icon draws a day across every client: about $0.015 each, $0.06 at most.
 		"SKETCHI_ICON_DAILY_DRAWS": "300"
 	},
@@ -97,7 +97,7 @@
 			"SKETCHI_APP_SURFACE": "studio",
 			"SKETCHI_AI_GATEWAY_ID": "google-ai-studio",
 			"SKETCHI_AI_GENERATE_MODEL": "anthropic/claude-haiku-5-5",
-			"SKETCHI_AI_MODEL": "google/gemini-3.1-flash-lite",
+			"SKETCHI_STUDIO_MODEL": "openai/gpt-6-luna",
 			"SKETCHI_ICON_DAILY_DRAWS": "100"
 		},
 		"ai": {

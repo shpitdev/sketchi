@@ -234,7 +234,7 @@ describe("public generate endpoint", () => {
 		expect(diagram.scene).toBeTruthy();
 		expect(diagram.excalidraw).toBeTruthy();
 		const generation = body.generation as { provider: string };
-		expect(generation.provider).toBe("cloudflare-google-ai-studio");
+		expect(generation.provider).toBe("cloudflare-anthropic");
 	});
 
 	it("generates and returns a native sequence with inline artifacts", async () => {
@@ -1006,7 +1006,7 @@ describe("generation request boundaries", () => {
 				AI: fakeAiGateway(generationText(flowchartAnswer), (input) => {
 					models.push((input.query as { readonly model?: unknown }).model);
 				}),
-				SKETCHI_AI_MODEL: "google/configured-model",
+				SKETCHI_AI_GENERATE_MODEL: "google/configured-model",
 			},
 			{ prompt: "Show release approval", type: "flowchart", model },
 		);
@@ -1025,7 +1025,7 @@ describe("generation request boundaries", () => {
 					runs.push(input);
 				}),
 				SKETCHI_AI_GENERATE_MODEL: "anthropic/claude-haiku-5-5",
-				SKETCHI_AI_MODEL: "google/configured-model",
+				SKETCHI_STUDIO_MODEL: "google/configured-model",
 			},
 			{ prompt: "Show release approval", type: "flowchart", ...requested },
 		);
@@ -1049,15 +1049,15 @@ describe("generation request boundaries", () => {
 	it("does not route chat's model through a Haiku generate model", () => {
 		const environment = aiEnvironment({
 			SKETCHI_AI_GENERATE_MODEL: "anthropic/claude-haiku-5-5",
-			SKETCHI_AI_MODEL: "google/configured-model",
+			SKETCHI_STUDIO_MODEL: "google/configured-model",
 		});
-		expect(environment.model).toBe("google/configured-model");
+		expect(environment.studioModel).toBe("google/configured-model");
 		expect(environment.generateModel).toBe("anthropic/claude-haiku-5-5");
 	});
 
-	it("falls back to the shared model when generate has none of its own", () => {
-		expect(aiEnvironment({ SKETCHI_AI_MODEL: "google/configured-model" }).generateModel).toBe(
-			"google/configured-model",
+	it("keeps generate on Haiku when only Studio's model is configured", () => {
+		expect(aiEnvironment({ SKETCHI_STUDIO_MODEL: "openai/configured-model" }).generateModel).toBe(
+			"anthropic/claude-haiku-5-5",
 		);
 	});
 
@@ -1096,7 +1096,7 @@ describe("generation request boundaries", () => {
 				AI: fakeAiGateway(generationText(flowchartAnswer), (input) => {
 					models.push((input.query as { readonly model?: unknown }).model);
 				}),
-				SKETCHI_AI_MODEL: "google/configured-model",
+				SKETCHI_AI_GENERATE_MODEL: "google/configured-model",
 			},
 			{ prompt: "Show release approval", type: "flowchart" },
 		);

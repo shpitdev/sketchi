@@ -90,9 +90,6 @@ async function turn(
 				abortSignal,
 				messages: [...messages],
 				stopWhen: stepCountIs(8),
-				...(retry
-					? { providerOptions: { google: { thinkingConfig: { thinkingLevel: "low" } } } }
-					: {}),
 				tools: {
 					build_flowchart: tool({
 						inputSchema: jsonSchema<{ saved: boolean }>({
@@ -169,13 +166,10 @@ describe("Studio reply", () => {
 		);
 	});
 
-	it("runs once more, reasoning first, after a run that ran out having written nothing", async () => {
+	it("runs once more after a run that ran out having written nothing", async () => {
 		const { model, runs, text } = await turn([runsOut(), builds(true), says("Here it is.")]);
 		expect(runs).toEqual([false, true]);
-		expect(model.doStreamCalls[0]?.providerOptions).toBeUndefined();
-		expect(model.doStreamCalls[1]?.providerOptions).toEqual({
-			google: { thinkingConfig: { thinkingLevel: "low" } },
-		});
+		expect(model.doStreamCalls).toHaveLength(3);
 		expect(text).toBe("Here it is.");
 	});
 

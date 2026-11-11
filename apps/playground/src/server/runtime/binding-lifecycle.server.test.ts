@@ -104,7 +104,7 @@ describe("binding-dependent host lifecycles", () => {
 					boundary({
 						AI: ai,
 						SKETCHI_AI_GATEWAY_ID: " shared ",
-						SKETCHI_AI_MODEL: "google/model-a",
+						SKETCHI_AI_GENERATE_MODEL: "google/model-a",
 					}),
 				),
 				runtime.run(
@@ -112,7 +112,7 @@ describe("binding-dependent host lifecycles", () => {
 					boundary({
 						AI: ai,
 						SKETCHI_AI_GATEWAY_ID: "shared",
-						SKETCHI_AI_MODEL: "google/model-b",
+						SKETCHI_AI_GENERATE_MODEL: "google/model-b",
 					}),
 				),
 			]);
@@ -121,7 +121,7 @@ describe("binding-dependent host lifecycles", () => {
 				boundary({
 					AI: ai,
 					SKETCHI_AI_GATEWAY_ID: "shared",
-					SKETCHI_AI_MODEL: "google/model-b",
+					SKETCHI_AI_GENERATE_MODEL: "google/model-b",
 				}),
 			);
 			expect(lifecycle.generationBuilt - before.generationBuilt).toBe(1);
@@ -159,7 +159,7 @@ describe("binding-dependent host lifecycles", () => {
 		const calls: { gatewayId: string; model: unknown }[] = [];
 		const ai = fakeAi(calls);
 		const haiku = boundary({ AI: ai, SKETCHI_AI_GENERATE_MODEL: "anthropic/claude-haiku-5-5" });
-		const google = boundary({ AI: ai });
+		const google = boundary({ AI: ai, SKETCHI_AI_GENERATE_MODEL: "google/gemini-3.1-flash-lite" });
 		try {
 			await runtime.run(generate(), haiku);
 			await runtime.run(generate(), google);

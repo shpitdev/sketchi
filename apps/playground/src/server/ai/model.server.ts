@@ -1,13 +1,25 @@
 import "@tanstack/react-start/server-only";
 
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import type { LanguageModel } from "ai";
+import { createOpenAI, type OpenAILanguageModelResponsesOptions } from "@ai-sdk/openai";
+import { defaultSettingsMiddleware, type LanguageModel, wrapLanguageModel } from "ai";
 import { Context, Effect, Layer, Schema } from "effect";
 
 import { aiEnvironment } from "../bindings/ai-env.server";
 import { PlaygroundBindings, PlaygroundRequestMetadata } from "../runtime/context.server";
 
-const SHIM_BASE_URL = "https://sketchi-gateway.invalid/v1beta";
+const SHIM_BASE_URL = "https://sketchi-gateway.invalid";
+
+/**
+ * Studio's model calls tools without reasoning first. Nothing is stored with the provider, and a
+ * step makes one build call at a time, as the turn runs one build at a time.
+ */
+export const STUDIO_PROVIDER_OPTIONS = {
+	openai: {
+		reasoningEffort: "none",
+		parallelToolCalls: false,
+		store: false,
+	} satisfies OpenAILanguageModelResponsesOptions,
+};
 
 export class StudioAiModelError extends Schema.TaggedError<StudioAiModelError>()(
 	"StudioAiModelError",
@@ -29,8 +41,8 @@ export class PlaygroundAiModel extends Context.Service<PlaygroundAiModel, Playgr
 	"@sketchi/playground/PlaygroundAiModel",
 ) {}
 
-function stripGoogleModelPrefix(model: string): string {
-	return model.replace(/^google-ai-studio\//, "").replace(/^google\//, "");
+function stripOpenAiModelPrefix(model: string): string {
+	return model.replace(/^openai\//, "");
 }
 
 const createStudioModel = Effect.fn("playground.ai.model")(function* () {
@@ -43,7 +55,7 @@ const createStudioModel = Effect.fn("playground.ai.model")(function* () {
 			}
 			const config = aiEnvironment(env);
 			const gateway = env.AI.gateway(config.gatewayId);
-			const modelId = stripGoogleModelPrefix(config.model);
+			const modelId = stripOpenAiModelPrefix(config.studioModel);
 			const gatewayFetch: typeof fetch = async (input, init) => {
 				const url = new URL(
 					typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url,
@@ -52,7 +64,7 @@ const createStudioModel = Effect.fn("playground.ai.model")(function* () {
 				return gateway.run(
 					{
 						endpoint: `${url.pathname.replace(/^\//, "")}${url.search}`,
-						provider: "google-ai-studio",
+						provider: "openai",
 						headers: { "Content-Type": "application/json" },
 						query: body,
 					},
@@ -64,15 +76,21 @@ const createStudioModel = Effect.fn("playground.ai.model")(function* () {
 								sketchiTraceId: requestMetadata.traceId,
 							},
 						},
+						...(init?.signal ? { signal: init.signal } : {}),
 					},
 				);
 			};
-			const provider = createGoogleGenerativeAI({
+			const provider = createOpenAI({
 				apiKey: "managed-by-cloudflare-gateway",
 				baseURL: SHIM_BASE_URL,
 				fetch: gatewayFetch,
 			});
-			return provider(modelId);
+			return wrapLanguageModel({
+				model: provider.responses(modelId),
+				middleware: defaultSettingsMiddleware({
+					settings: { providerOptions: STUDIO_PROVIDER_OPTIONS },
+				}),
+			});
 		},
 		catch: (cause) =>
 			StudioAiModelError.make({
