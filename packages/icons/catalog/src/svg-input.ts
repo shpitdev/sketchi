@@ -143,6 +143,7 @@ const ALLOWED_ATTRIBUTES = new Set([
 	"patternTransform",
 	"maskUnits",
 	"maskContentUnits",
+	"mask-type",
 	"clipPathUnits",
 	"display",
 	"visibility",
@@ -500,16 +501,36 @@ interface Paint {
 	readonly stroke: string | undefined;
 	/** What `currentColor` means here: the nearest `color`, black when none is set. */
 	readonly color: string | undefined;
+	/** The product of the `opacity` of this element and its ancestors. */
+	readonly opacity: number;
+	readonly fillOpacity: number;
+	readonly strokeOpacity: number;
+}
+
+function opacityValue(value: string | undefined): number | undefined {
+	if (value === undefined) return undefined;
+	const number = value.trim().endsWith("%")
+		? Number.parseFloat(value) / 100
+		: Number.parseFloat(value);
+	return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : undefined;
+}
+
+/** A paint drawn at some opacity over white paper: the color a viewer sees. */
+function overPaper(color: string, alpha: number): string {
+	if (alpha >= 1) return color;
+	const channels = [1, 3, 5].map((start) => Number.parseInt(color.slice(start, start + 2), 16));
+	return `#${channels.map((channel) => hex2(channel * alpha + 255 * (1 - alpha))).join("")}`;
 }
 
 /**
  * The colors a drawing paints with, counted once per drawn element: the fill
  * a shape inherits (black when nothing sets one), its stroke, and the stops
- * of any gradient it references.
+ * of any gradient it references, each as it shows over white paper at its
+ * opacity.
  */
 function svgPaintColors(tree: XmlNode): string[] {
 	const rules = cssRules(tree);
-	const gradients = new Map<string, string[]>();
+	const gradients = new Map<string, { readonly color: string; readonly alpha: number }[]>();
 	const collectGradients = (node: XmlNode) => {
 		const tag = tagOf(node);
 		if (tag === undefined || tag === "#text") return;
@@ -517,10 +538,10 @@ function svgPaintColors(tree: XmlNode): string[] {
 			const id = attributesOf(node)["id"];
 			const stops = childrenOf(node, tag).flatMap((stop) => {
 				const attributes = attributesOf(stop);
-				const color = normalizeCssColor(
-					declarations(attributes["style"])["stop-color"] ?? attributes["stop-color"],
-				);
-				return color ? [color] : [];
+				const style = declarations(attributes["style"]);
+				const color = normalizeCssColor(style["stop-color"] ?? attributes["stop-color"]);
+				const alpha = opacityValue(style["stop-opacity"] ?? attributes["stop-opacity"]) ?? 1;
+				return color ? [{ color, alpha }] : [];
 			});
 			if (id) gradients.set(id, stops);
 		}
@@ -529,14 +550,18 @@ function svgPaintColors(tree: XmlNode): string[] {
 	collectGradients(tree);
 
 	const counts = new Map<string, number>();
-	const count = (value: string | undefined, currentColor: string | undefined) => {
-		if (!value) return;
+	// A translucent paint counts as the color it shows over paper, so a half-opaque black is a gray.
+	const count = (value: string | undefined, currentColor: string | undefined, alpha: number) => {
+		if (!value || alpha <= 0) return;
 		const paint =
 			value.trim().toLowerCase() === "currentcolor" ? (currentColor ?? "#000000") : value;
 		const reference = /^url\(\s*['"]?#([^'")]+)['"]?\s*\)/u.exec(paint.trim())?.[1];
-		const colors = reference ? (gradients.get(reference) ?? []) : [normalizeCssColor(paint)];
-		for (const color of colors) {
-			if (color) counts.set(color, (counts.get(color) ?? 0) + 1);
+		const color = normalizeCssColor(paint);
+		const stops = reference ? (gradients.get(reference) ?? []) : color ? [{ color, alpha: 1 }] : [];
+		for (const stop of stops) {
+			if (stop.alpha <= 0) continue;
+			const seen = overPaper(stop.color, stop.alpha * alpha);
+			counts.set(seen, (counts.get(seen) ?? 0) + 1);
 		}
 	};
 	const visit = (node: XmlNode, inherited: Paint) => {
@@ -558,6 +583,7 @@ function svgPaintColors(tree: XmlNode): string[] {
 			declarations(attributes["style"]),
 		);
 		const color = element["color"] ?? attributes["color"];
+		const opacity = (name: string) => opacityValue(element[name] ?? attributes[name]);
 		const paint: Paint = {
 			fill: element["fill"] ?? attributes["fill"] ?? inherited.fill,
 			stroke: element["stroke"] ?? attributes["stroke"] ?? inherited.stroke,
@@ -565,14 +591,26 @@ function svgPaintColors(tree: XmlNode): string[] {
 				color === undefined || color.trim().toLowerCase() === "currentcolor"
 					? inherited.color
 					: (normalizeCssColor(color) ?? inherited.color),
+			opacity: inherited.opacity * (opacity("opacity") ?? 1),
+			fillOpacity: opacity("fill-opacity") ?? inherited.fillOpacity,
+			strokeOpacity: opacity("stroke-opacity") ?? inherited.strokeOpacity,
 		};
 		if (DRAWN_ELEMENTS.has(tag) && tag !== "tspan") {
-			if (tag !== "line" && tag !== "polyline") count(paint.fill ?? "#000000", paint.color);
-			count(paint.stroke, paint.color);
+			if (tag !== "line" && tag !== "polyline") {
+				count(paint.fill ?? "#000000", paint.color, paint.opacity * paint.fillOpacity);
+			}
+			count(paint.stroke, paint.color, paint.opacity * paint.strokeOpacity);
 		}
 		childrenOf(node, tag).forEach((child) => visit(child, paint));
 	};
-	visit(tree, { fill: undefined, stroke: undefined, color: undefined });
+	visit(tree, {
+		fill: undefined,
+		stroke: undefined,
+		color: undefined,
+		opacity: 1,
+		fillOpacity: 1,
+		strokeOpacity: 1,
+	});
 	return [...counts.entries()]
 		.sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
 		.map(([color]) => color);

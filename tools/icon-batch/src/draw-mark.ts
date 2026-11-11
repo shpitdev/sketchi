@@ -136,6 +136,8 @@ export interface DrawMarkRequest {
 	readonly traceId: string;
 	readonly loadCatalogSvg: (slug: string) => Promise<string | undefined>;
 	readonly budgetMs?: number;
+	/** A reviewer's note on what an earlier drawing lost. */
+	readonly note?: string;
 }
 
 /**
@@ -204,6 +206,7 @@ export async function drawMark(
 					return drawIcon(input, {
 						authorModel: author,
 						...(request.budgetMs === undefined ? {} : { budgetMs: request.budgetMs }),
+						...(request.note ? { note: request.note } : {}),
 					});
 				}),
 				Effect.provide(layer),

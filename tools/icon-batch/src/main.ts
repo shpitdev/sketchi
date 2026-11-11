@@ -9,12 +9,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { getIconSourceFile, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
+import { getIconSourceFile, iconManifest, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import { iconAuthorModel, type IconAuthorModel } from "@sketchi/icon-draw";
 
 import { drawMark } from "./draw-mark.js";
 import { SKETCHI_ACCOUNT_ID } from "./gateway.js";
 import { promote } from "./promote.js";
+import { readRecipe, type SheetTheme, writeRecipeSheets } from "./recipe-sheets.js";
 import { runBatch } from "./runner.js";
 import { marksToDraw } from "./selection.js";
 import { writeSheets } from "./sheets.js";
@@ -36,6 +37,10 @@ const { positionals, values } = parseArgs({
 		author: { type: "string", default: "source" },
 		retry: { type: "string", default: "claude-opus-5-5" },
 		reject: { type: "string" },
+		replace: { type: "boolean", default: false },
+		collection: { type: "string" },
+		notes: { type: "string" },
+		theme: { type: "string", default: "light" },
 	},
 });
 const command = positionals[0];
@@ -87,6 +92,10 @@ switch (command) {
 		});
 		await mkdir(store.root, { recursive: true });
 		const access = { accountId: SKETCHI_ACCOUNT_ID, token };
+		// Reviewer notes by slug, for redrawing marks a review rejected.
+		const notes = values.notes
+			? (JSON.parse(readFileSync(values.notes, "utf8")) as Record<string, string>)
+			: {};
 		const runId = values.run;
 		const outcome = await runBatch({
 			marks,
@@ -107,6 +116,7 @@ switch (command) {
 					author: model,
 					traceId: `icon-batch-${runId}-${mark.slug}-${attempt}`,
 					loadCatalogSvg: loadSvg,
+					...(Object.hasOwn(notes, mark.slug) ? { note: notes[mark.slug] } : {}),
 				});
 			},
 			log: (line) => process.stdout.write(`${line}\n`),
@@ -122,6 +132,34 @@ switch (command) {
 		process.stdout.write(`${written.join("\n")}\n`);
 		break;
 	}
+	case "recipe-sheets": {
+		const theme = values.theme;
+		if (theme !== "light" && theme !== "dark") throw new Error("--theme must be light or dark.");
+		const drawn = recipeSlugs();
+		const icons = values.slugs
+			? values.slugs.split(",").map((slug) => slug.trim())
+			: iconManifest.icons
+					.filter((icon) => icon.collection === values.collection && drawn.has(icon.slug))
+					.map((icon) => icon.slug);
+		if (icons.length === 0) throw new Error("Name a --collection with recipes, or --slugs.");
+		const marks = await Promise.all(
+			icons.map(async (slug) => ({
+				slug,
+				name: iconManifest.icons.find((icon) => icon.slug === slug)?.name ?? slug,
+				svg: await loadSvg(slug),
+				recipe: await readRecipe(recipesDir, slug),
+			})),
+		);
+		const label = values.collection ?? "recipes";
+		const written = await writeRecipeSheets(
+			marks,
+			theme satisfies SheetTheme,
+			join(workspaceRoot, ".memory/icon-batch/recipe-sheets"),
+			label,
+		);
+		process.stdout.write(`${written.join("\n")}\n`);
+		break;
+	}
 	case "summary": {
 		process.stdout.write(await writeLedger());
 		break;
@@ -134,14 +172,16 @@ switch (command) {
 						.filter(Boolean)
 				: [],
 		);
-		const { written, skipped } = await promote(await store.records(), recipesDir, rejected);
+		const { written, skipped } = await promote(await store.records(), recipesDir, rejected, {
+			replace: values.replace,
+		});
 		process.stdout.write(`Wrote ${written.length} recipes to ${recipesDir}.\n`);
 		for (const { slug, reason } of skipped) process.stdout.write(`skipped ${slug}: ${reason}\n`);
 		break;
 	}
 	default:
 		process.stderr.write(
-			"Usage: icon-batch <draw|sheets|summary|promote> [--run name] [--sample n | --slugs a,b] [--concurrency 4] [--cap 60] [--author source] [--retry claude-opus-5-5] [--reject file]\n",
+			"Usage: icon-batch <draw|sheets|summary|promote|recipe-sheets> [--run name] [--sample n | --slugs a,b] [--concurrency 4] [--cap 60] [--author source] [--retry claude-opus-5-5] [--reject file] [--replace] [--notes notes.json] [--collection c] [--theme light|dark]\n",
 		);
 		process.exitCode = 2;
 }

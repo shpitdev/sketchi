@@ -1,0 +1,20 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12.6,
+			"text": "jetty://",
+			"size": 4.6,
+			"color": "#000000"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "jetty://",
+			"size": 4.6,
+			"color": "#fc390e"
+		}
+	]
+}

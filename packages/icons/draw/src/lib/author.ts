@@ -56,7 +56,7 @@ export const AUTHOR_SYSTEM_PROMPT = [
 	"",
 	"Colors:",
 	'- "ink" is the scene\'s text color, black on a light diagram and white on a dark one. Use it for black or near-black parts,',
-	"  so the mark follows the theme.",
+	"  so the mark follows the theme. A gray is not ink: paint it with its source color.",
 	'- "paper" is whatever the icon sits on. Use it for holes and cutouts drawn on top of a filled shape.',
 	"- Any other color must be one of the exact #rrggbb source colors you are given.",
 	"",
@@ -162,13 +162,18 @@ export const AUTHOR_REPLY_SCHEMA = {
 } as const;
 
 /** The first turn: the logo, its name and its exact colors. */
-export function draftRequestText(name: string, palette: readonly MarkColor[]): string {
+export function draftRequestText(
+	name: string,
+	palette: readonly MarkColor[],
+	note?: string,
+): string {
 	const colors = palette.length
 		? palette.map(([hex, share]) => `${hex} (${share}%)`).join(", ")
 		: "none besides black and white";
 	return [
 		`Draw the ${name} logo shown here.`,
 		`Source colors, with the share of the mark each covers: ${colors}.`,
+		...(note ? [`A reviewer of an earlier drawing asks: ${note}`] : []),
 	].join("\n");
 }
 
@@ -254,8 +259,11 @@ const NEUTRAL_CHROMA = 36;
 const MAX_COLORED_SHARE = 0.04;
 /** Luminance halfway between the dark (#1e1e1e) and light (#ffffff) surfaces. */
 const SURFACE_MIDPOINT = 0.56;
-/** How dark a gray must be to be a dark mark's ink, and how light to be a light mark's. */
-const NEAR_BLACK = 0.25;
+/**
+ * How dark a gray must be to be a dark mark's ink (#333333 at most), and how
+ * light to be a light mark's. A gray between stays the source's gray.
+ */
+const NEAR_BLACK = 0.2;
 const NEAR_WHITE = 0.85;
 
 function isNeutral(hex: string): boolean {
@@ -263,11 +271,15 @@ function isNeutral(hex: string): boolean {
 	return Math.max(red, green, blue) - Math.min(red, green, blue) < NEUTRAL_CHROMA;
 }
 
+/** The most of a light mark that may show on white paper: past it, the mark reads there as drawn. */
+const LIGHT_MARK_VISIBLE_SHARE = 0.05;
+
 /**
  * A monochrome source's tone, from the share each color covers: `dark` for a
- * black or gray mark, `light` for a white one, undefined for a colored mark.
- * The catalog classifies its marks the same way, and inverts a monochrome one
- * on a surface it would vanish into.
+ * black or gray mark, `light` for a white one that would vanish on white
+ * paper, undefined for a colored mark or a light one that reads on paper as it
+ * is (a pale panel with gray lines). The catalog inverts a monochrome mark on
+ * a surface it would vanish into, and on no other.
  */
 export type SourceTone = "dark" | "light";
 
@@ -277,7 +289,10 @@ export function sourceTone(palette: readonly MarkColor[]): SourceTone | undefine
 	const share = (test: (hex: string) => boolean) =>
 		palette.reduce((sum, [hex, part]) => (test(hex) ? sum + part : sum), 0) / total;
 	if (share((hex) => !isNeutral(hex)) >= MAX_COLORED_SHARE) return undefined;
-	return share((hex) => luminance(hex) < SURFACE_MIDPOINT) >= 0.5 ? "dark" : "light";
+	if (share((hex) => luminance(hex) < SURFACE_MIDPOINT) >= 0.5) return "dark";
+	return share((hex) => luminance(hex) < NEAR_WHITE) <= LIGHT_MARK_VISIBLE_SHARE
+		? "light"
+		: undefined;
 }
 
 /**

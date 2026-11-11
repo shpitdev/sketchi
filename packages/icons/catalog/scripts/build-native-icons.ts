@@ -58,8 +58,8 @@ for (const slug of drawnConcepts) {
 
 const brands = jsonSlugs(recipesRoot);
 for (const slug of brands) {
-	if (!getIconBySlug(slug)) {
-		throw new Error(`Recipe ${slug}.json names no catalog icon.`);
+	if (getIconBySlug(slug)?.slug !== slug) {
+		throw new Error(`Recipe ${slug}.json names no shipped catalog icon.`);
 	}
 	recipes[slug] = readRecipe(recipesRoot, slug);
 }

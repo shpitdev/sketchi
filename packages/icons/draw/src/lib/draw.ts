@@ -64,6 +64,8 @@ export interface IconDrawOptions {
 	readonly authorModel: IconAuthorModel;
 	readonly maxRounds?: number;
 	readonly budgetMs?: number;
+	/** A reviewer's note on what an earlier drawing of this mark lost, for a redraw. */
+	readonly note?: string;
 }
 
 export interface IconDrawUsage {
@@ -294,7 +296,10 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 	const messages: AuthorTurn[] = [
 		{
 			role: "user",
-			content: [imageBlock(source.png), textBlock(draftRequestText(input.name, palette))],
+			content: [
+				imageBlock(source.png),
+				textBlock(draftRequestText(input.name, palette, options.note)),
+			],
 		},
 	];
 	let rounds = 0;

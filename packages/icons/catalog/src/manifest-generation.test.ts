@@ -3,9 +3,10 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { iconManifest } from "./catalog";
+import { getIconBySlug, getIconSourceFile, iconManifest } from "./catalog";
 import { decodeIconManifest } from "./manifest";
 import { searchIcons } from "./search";
+import { FOLDED_INTO_SLUG } from "./folded-slugs";
 import { buildIconCatalog, COLLISION_CANONICAL_COLLECTIONS } from "./manifest-generation";
 
 function sourceIcon(slug: string, collection: string) {
@@ -181,7 +182,6 @@ describe("public icon manifest generation", () => {
 			Object.fromEntries(catalog.manifest.icons.map(({ name, slug }) => [slug, name])),
 		).toMatchObject({
 			"aip-autopilot-app": "Autopilot",
-			"ontology-objecttype-app": "Ontology Manager",
 			"palantir-ontology": "Ontology",
 			"palantir-pipeline": "Pipeline Builder",
 			"palantir-workshop": "Workshop",
@@ -198,6 +198,39 @@ describe("public icon manifest generation", () => {
 		);
 	});
 
+	it("ships a glyph several products share once, under every product's name", () => {
+		const catalog = buildIconCatalog({
+			icons: [
+				sourceIcon("ontology-objecttype-app", "palantir"),
+				sourceIcon("palantir-ontology", "palantir"),
+			],
+		});
+		expect(catalog.manifest.icons.map(({ slug }) => slug)).toEqual(["palantir-ontology"]);
+		expect(catalog.manifest.icons[0]?.aliases).toEqual(
+			expect.arrayContaining(["Ontology Manager", "ontology-objecttype-app"]),
+		);
+		expect(() => buildIconCatalog({ icons: [sourceIcon("mindkit-app", "palantir")] })).toThrow(
+			"mindkit-app folds into hivemind-app, which does not ship.",
+		);
+
+		// A folded slug still names its mark wherever a slug is looked up, and in search.
+		const shipped = new Set(iconManifest.icons.map(({ slug }) => slug));
+		for (const [folded, kept] of Object.entries(FOLDED_INTO_SLUG)) {
+			expect(shipped.has(folded), folded).toBe(false);
+			expect(getIconBySlug(folded)?.slug, folded).toBe(kept);
+			expect(getIconSourceFile(folded), folded).toBe(getIconSourceFile(kept));
+			expect(searchIcons(iconManifest.icons, { query: folded })[0]?.icon.slug, folded).toBe(kept);
+		}
+		for (const [query, slug] of [
+			["Mindkit", "hivemind-app"],
+			["Map Layer", "vortex-map-app"],
+			["Walkthroughs", "training-app"],
+			["workshop module", "palantir-workshop"],
+		] as const) {
+			expect(searchIcons(iconManifest.icons, { query })[0]?.icon.slug, query).toBe(slug);
+		}
+	});
+
 	it("does not let Palantir aliases hijack generic icon searches", () => {
 		for (const query of ["calendar", "folder", "sunset"]) {
 			expect(searchIcons(iconManifest.icons, { query })[0]?.icon.collection, query).not.toBe(
@@ -209,7 +242,7 @@ describe("public icon manifest generation", () => {
 		).not.toContain(2);
 	});
 
-	it("accounts for promoted Palantir glyph pairs in review aggregates", () => {
+	it("keeps review aggregates in step with the icons", () => {
 		const path = resolve(
 			process.cwd(),
 			"packages/icons/catalog/pipeline-output/review/review-data.json",
@@ -226,46 +259,12 @@ describe("public icon manifest generation", () => {
 		expect(review.summary.visualDuplicateGroupsCount).toBe(review.visualDuplicateGroups.length);
 		expect(review.summary.rasterDuplicateGroupsCount).toBe(review.rasterDuplicateGroups.length);
 		expect(review.summary.nearSimilarityGroupsCount).toBe(review.nearSimilarityGroups.length);
-
-		const pairs = [
-			["ontology-objecttype-app", "palantir-ontology"],
-			["pipeline-builder-graph-app", "palantir-pipeline"],
-			["workshop-module-app", "palantir-workshop"],
-		] as const;
-		for (const [sourceSlug, canonicalSlug] of pairs) {
-			const source = review.icons.find(({ slug }) => slug === sourceSlug);
-			const canonical = review.icons.find(({ slug }) => slug === canonicalSlug);
-			expect(source).toBeDefined();
-			expect(canonical).toBeDefined();
-			if (!source || !canonical) continue;
-
-			expect(canonical).toMatchObject({
-				flags: ["duplicate-raster", "duplicate-raster-cross-name"],
-				nearSimilarityGroupKey: source.nearSimilarityGroupKey,
-				perceptualHash: source.perceptualHash,
-				rasterHash: source.rasterHash,
-				similarityGroupKey: source.similarityGroupKey,
-				visualHash: source.visualHash,
-			});
-			expect(
-				review.visualDuplicateGroups.find(({ visualHash }) => visualHash === source.visualHash)
-					?.distinctBaseSlugs,
-			).toEqual(expect.arrayContaining([source.baseSlug, canonical.baseSlug]));
-			expect(
-				review.rasterDuplicateGroups.find(({ groupKey }) => groupKey === source.similarityGroupKey)
-					?.distinctBaseSlugs,
-			).toEqual(expect.arrayContaining([source.baseSlug, canonical.baseSlug]));
-			expect(
-				review.nearSimilarityGroups.find(({ key }) => key === source.nearSimilarityGroupKey)
-					?.distinctBaseSlugs,
-			).toEqual(expect.arrayContaining([source.baseSlug, canonical.baseSlug]));
-		}
 	});
 
 	it("ships a compact clean manifest with aliases and no review fields", () => {
 		const source = JSON.stringify(iconManifest);
 		const manifest = decodeIconManifest(JSON.parse(source));
-		expect(manifest.summary.totalIcons).toBe(1443);
+		expect(manifest.summary.totalIcons).toBe(1541);
 		expect(new Set(manifest.icons.map((icon) => icon.slug)).size).toBe(manifest.icons.length);
 		expect(manifest.icons.find((icon) => icon.slug === "kubernetes")?.aliases).toContain("k8s");
 		expect(manifest.icons.find((icon) => icon.slug === "adobefirefly-text")?.name).toBe(

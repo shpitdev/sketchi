@@ -41,6 +41,13 @@ describe("sanitizeSvg", () => {
 		expect(svg).toMatch(/<svg[^>]*viewBox="0 0 24 24"[^>]*width="24"[^>]*height="24"/u);
 	});
 
+	it("keeps a mask's type, which decides whether its alpha or its luminance masks", () => {
+		const { svg } = sanitized(
+			`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><mask id="m" mask-type="alpha"><rect width="24" height="24"/></mask><circle cx="12" cy="12" r="10" mask="url(#m)"/></svg>`,
+		);
+		expect(svg).toContain('mask-type="alpha"');
+	});
+
 	it("reads exact paint colors, inherited fills, classes and gradient stops", () => {
 		const { colors } = sanitized(`<svg viewBox="0 0 10 10">
   <defs><linearGradient id="g"><stop offset="0" stop-color="#4285F4"/><stop offset="1" style="stop-color: rgb(52, 168, 83)"/></linearGradient></defs>
@@ -55,6 +62,17 @@ describe("sanitizeSvg", () => {
 		expect(colors).toEqual(
 			expect.arrayContaining(["#e01e5a", "#000000", "#4285f4", "#34a853", "#ffffff"]),
 		);
+	});
+
+	it("reads a translucent paint as the color it shows over paper", () => {
+		const { colors } = sanitized(`<svg viewBox="0 0 10 10">
+  <defs><linearGradient id="g"><stop offset="0" stop-color="#000000" stop-opacity="0.5"/></linearGradient></defs>
+  <path d="M0 0h1v1z" fill="#10161A" fill-opacity="0.5"/>
+  <g opacity="0.5"><path d="M1 1h1v1z" fill="none" stroke="#000" stroke-opacity="0.6"/></g>
+  <rect width="2" height="2" fill="url(#g)"/>
+  <path d="M3 3h1v1z" fill="#e01e5a" fill-opacity="0"/>
+</svg>`);
+		expect(colors).toEqual(["#808080", "#888b8d", "#b3b3b3"]);
 	});
 
 	it("reads id-selector rules over element rules", () => {

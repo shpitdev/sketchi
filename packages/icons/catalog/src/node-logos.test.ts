@@ -119,7 +119,7 @@ describe("node logos on diagram paper", () => {
 
 	it("inverts or plates every mark lost on paper until it reads there", () => {
 		const lost = nodeLogoIcons.filter((icon) => icon.onLight);
-		expect(lost.map((icon) => icon.slug)).toEqual(expect.arrayContaining(["crystal", "kimi"]));
+		expect(lost.map((icon) => icon.slug)).toEqual(expect.arrayContaining(["crystal", "kwaipilot"]));
 		for (const icon of lost) {
 			const svg = nodeLogoSvgForPaper(readSource(icon.slug), icon);
 			expect(svg).toContain(icon.onLight === "plate" ? "<rect" : "feColorMatrix");

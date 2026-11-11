@@ -1,0 +1,32 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 0.5,
+			"y": 8,
+			"width": 23,
+			"height": 8,
+			"rounded": true,
+			"stroke": "#212121",
+			"fill": "#fbfbfb"
+		},
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 9,
+			"width": 21,
+			"height": 6,
+			"rounded": true,
+			"stroke": "#2ca6c5",
+			"fill": "#2ca6c5"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "cocoon",
+			"size": 5,
+			"color": "#fbfbfb"
+		}
+	]
+}

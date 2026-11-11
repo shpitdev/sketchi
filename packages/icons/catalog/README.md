@@ -35,6 +35,12 @@ slug-to-source map. Duplicate source slugs are resolved by the explicit
 canonical map in `src/manifest-generation.ts`; generation fails when a new
 collision has no explicit choice, so public slugs stay deterministic.
 
+Some products share one glyph. `src/folded-slugs.ts` folds each such mark
+into one shipped slug: the folded mark leaves the manifest, its slug and names
+become the shipped mark's aliases, and `getIconBySlug`, source paths and
+diagram slug lookups follow the folded slug to the shipped mark. Its SVG stays
+under `svg/`, so a URL already published for it keeps working.
+
 Apps publish the SVGs themselves. `apps/icons` copies `svg/` to its public
 `/output/upload-ready/svg/` path at build time.
 

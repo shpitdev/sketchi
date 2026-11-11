@@ -1,41 +1,49 @@
 {
 	"parts": [
 		{
+			"kind": "ellipse",
+			"cx": 11.5,
+			"cy": 12,
+			"rx": 9.5,
+			"ry": 9.5,
+			"stroke": "#fd366e",
+			"fill": "#fd366e"
+		},
+		{
 			"kind": "rect",
-			"x": 1.5,
-			"y": 1.5,
-			"width": 21,
-			"height": 21,
-			"rounded": true,
-			"stroke": "#f02e65",
-			"fill": "#f02e65"
+			"x": 12,
+			"y": 14.5,
+			"width": 10.5,
+			"height": 7.5,
+			"stroke": "#fd366e",
+			"fill": "#fd366e"
 		},
 		{
 			"kind": "ellipse",
-			"cx": 16.5,
+			"cx": 10.5,
 			"cy": 12,
-			"rx": 5.8,
-			"ry": 5.8,
+			"rx": 4.3,
+			"ry": 4.3,
 			"stroke": "paper",
 			"fill": "paper"
 		},
 		{
-			"kind": "ellipse",
-			"cx": 9,
-			"cy": 12,
-			"rx": 5,
-			"ry": 5,
+			"kind": "rect",
+			"x": 13,
+			"y": 9.5,
+			"width": 10,
+			"height": 3.6,
 			"stroke": "paper",
-			"fill": "#f02e65",
-			"pen": 2
+			"fill": "paper"
 		},
 		{
-			"kind": "text",
-			"cx": 9,
-			"cy": 12,
-			"text": "</>",
-			"size": 4,
-			"color": "paper"
+			"kind": "rect",
+			"x": 14,
+			"y": 10.5,
+			"width": 8.5,
+			"height": 3.6,
+			"stroke": "#fd366e",
+			"fill": "#fd366e"
 		}
 	]
 }

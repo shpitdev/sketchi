@@ -1,5 +1,6 @@
 export * from "./color-mode.js";
 export * from "./concept.js";
+export * from "./folded-slugs.js";
 export * from "./manifest.js";
 export * from "./node-logos.js";
 export * from "./search.js";

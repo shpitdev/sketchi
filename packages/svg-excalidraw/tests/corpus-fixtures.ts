@@ -23,6 +23,15 @@ const linuxStressFixture = {
 	sourceName: "operating-systems/linux.svg",
 } as const;
 
+/**
+ * The catalog's earlier Lua mark, whose dashed orbit is a stroke-dasharray.
+ * The current Lua mark has none, and no catalog mark does.
+ */
+const strokeDasharrayFixture = {
+	source: readFileSync(resolve(fixturesRoot, "lua-dashed-orbit.svg"), "utf8"),
+	sourceName: "programming-languages/lua.svg",
+} as const;
+
 export const corpusFixtures = {
 	counter: corpusFixture("ai-model-providers/ai21labsai.svg"),
 	gradient: corpusFixture("programming-languages/kotlin.svg"),
@@ -33,7 +42,7 @@ export const corpusFixtures = {
 	nonzeroZeroAreaContours: corpusFixture("devtools-ci/vitess.svg"),
 	realClip: corpusFixture("ai-ecosystem/jimeng.svg"),
 	strokeOnly: corpusFixture("gcp-legacy/connectivity-test.svg"),
-	strokeDasharray: corpusFixture("programming-languages/lua.svg"),
+	strokeDasharray: strokeDasharrayFixture,
 	stylePaint: corpusFixture("gcp-legacy/cloud-router.svg"),
 	usePath: corpusFixture("gcp-legacy/os-inventory-management.svg"),
 	v1DisjointMultipath: corpusFixture("operating-systems/windows11.svg"),

@@ -1,0 +1,52 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[13, 13],
+				[14, 6],
+				[18, 3],
+				[22, 5],
+				[23.5, 10],
+				[21, 15],
+				[16, 16]
+			],
+			"smooth": true,
+			"closed": true,
+			"stroke": "#d93321",
+			"fill": "#d93321"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[13, 13],
+				[17, 4]
+			],
+			"stroke": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[13, 13],
+				[22, 7]
+			],
+			"stroke": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[13, 13],
+				[22, 14]
+			],
+			"stroke": "paper"
+		},
+		{
+			"kind": "text",
+			"cx": 9,
+			"cy": 15,
+			"text": "Solr",
+			"size": 7,
+			"color": "ink"
+		}
+	]
+}

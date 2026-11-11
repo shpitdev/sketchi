@@ -4,7 +4,13 @@ import { Effect, Fiber, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import { describe, expect, it } from "@effect/vitest";
 
-import { AUTHOR_SYSTEM_PROMPT, decodeAuthorReply, normalizeRecipe, sourceTone } from "./author.js";
+import {
+	AUTHOR_SYSTEM_PROMPT,
+	decodeAuthorReply,
+	draftRequestText,
+	normalizeRecipe,
+	sourceTone,
+} from "./author.js";
 import { drawIcon, ICON_DRAW_BUDGET_MS, IconCatalogSvgs, sourcePalette } from "./draw.js";
 import { IconImaging, type IconImagingJob } from "./imaging.js";
 import { prepareIconInput, rasterHeader, svgCurveSegments } from "./input.js";
@@ -507,6 +513,13 @@ describe("author", () => {
 		for (const line of examples) expect(iconRecipeIssues(JSON.parse(line))).toEqual([]);
 	});
 
+	it("hands the author a reviewer's note on a redraw, and none otherwise", () => {
+		expect(draftRequestText("Hammer", [["#9179f2", 100]])).not.toContain("reviewer");
+		expect(draftRequestText("Hammer", [["#9179f2", 100]], "keep the handle")).toContain(
+			"A reviewer of an earlier drawing asks: keep the handle",
+		);
+	});
+
 	it("reads the reply JSON, prose or fences around it", () => {
 		expect(decodeAuthorReply('```json\n{"accept": true, "recipe": null}\n```')).toEqual({
 			accept: true,
@@ -553,10 +566,17 @@ describe("author", () => {
 		expect(sourceTone([["#000000", 100]])).toBe("dark");
 		expect(
 			sourceTone([
+				["#ffffff", 97],
+				["#cccccc", 3],
+			]),
+		).toBe("light");
+		// A pale panel with dark lines reads on white paper as drawn, so nothing inverts.
+		expect(
+			sourceTone([
 				["#f5f8fa", 90],
 				["#1c2127", 10],
 			]),
-		).toBe("light");
+		).toBeUndefined();
 		expect(
 			sourceTone([
 				["#000000", 60],
@@ -580,6 +600,14 @@ describe("author", () => {
 				"dark",
 			).recipe?.parts[0],
 		).toMatchObject({ fill: "ink" });
+		// A slate gray is not black: it stays the source's gray, in a monochrome mark too.
+		expect(
+			normalizeRecipe(
+				{ parts: [{ kind: "rect", x: 0, y: 0, width: 4, height: 4, fill: "#5c7080" }] },
+				["#5c7080", "#10161a"],
+				"dark",
+			).recipe?.parts[0],
+		).toMatchObject({ fill: "#5c7080" });
 		// A light mark swaps them.
 		expect(
 			normalizeRecipe({ parts: [parts[0]] }, ["#ffffff"], "light").recipe?.parts[0],

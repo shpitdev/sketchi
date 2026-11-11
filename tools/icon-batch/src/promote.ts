@@ -15,12 +15,14 @@ export interface Promotion {
 /**
  * Turn the marks the judge recognized into catalog recipes, except those a
  * reviewer rejected from the sheets and any that cannot be drawn or would
- * clip a word. An existing recipe is never replaced.
+ * clip a word. An existing recipe is replaced only with `replace`, for a run
+ * that redraws marks whose source or drawing changed.
  */
 export async function promote(
 	records: readonly MarkRecord[],
 	recipesDir: string,
 	rejected: ReadonlySet<string>,
+	options: { readonly replace?: boolean } = {},
 ): Promise<Promotion> {
 	const written: string[] = [];
 	const skipped: Array<{ slug: string; reason: string }> = [];
@@ -31,7 +33,8 @@ export async function promote(
 		if (rejected.has(record.slug))
 			skipped.push({ slug: record.slug, reason: "rejected in review" });
 		else if (!recipe) skipped.push({ slug: record.slug, reason: "no recipe" });
-		else if (existsSync(path)) skipped.push({ slug: record.slug, reason: "already has a recipe" });
+		else if (!options.replace && existsSync(path))
+			skipped.push({ slug: record.slug, reason: "already has a recipe" });
 		else {
 			const issues = iconRecipeIssues(recipe);
 			const problems = issues.length > 0 ? issues : iconRecipeFitIssues(recipe);
