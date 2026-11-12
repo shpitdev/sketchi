@@ -71,7 +71,8 @@ describe("placeNodeLogos", () => {
 		]);
 	});
 
-	it("never places everyday-word logos from a label, and keeps the model's where its label names it", () => {
+	it("leaves steps and Title Case labels to the model's choice for everyday-word logos", () => {
+		// Offered without alwaysNamed: the request also writes these words plainly.
 		const result = placeNodeLogos(
 			[
 				{ id: "build", label: "Build the API service", icon: { slug: "go" } },
@@ -80,6 +81,8 @@ describe("placeNodeLogos", () => {
 				{ id: "file", label: "File Ticket In Linear" },
 				{ id: "track", label: "Track work in Linear", icon: { slug: "linear" } },
 				{ id: "page", label: "Render Page" },
+				// Cased mid-label, the word is the name.
+				{ id: "assign", label: "Assign the ticket in Linear" },
 			],
 			[
 				{ slug: "go", name: "Go" },
@@ -95,9 +98,11 @@ describe("placeNodeLogos", () => {
 			undefined,
 			"linear",
 			undefined,
+			"linear",
 		]);
 		expect(result.diagnostics).toEqual([
 			'icon_dropped: node "build" logo "go" is not named by its label "Build the API service".',
+			'icon_placed: node "assign" names linear, so it draws that logo.',
 		]);
 	});
 

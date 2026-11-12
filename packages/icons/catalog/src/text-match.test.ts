@@ -229,6 +229,29 @@ describe("labelLogos", () => {
 		expect(named("Postgres stores the order")).toEqual(["postgresql"]);
 	});
 
+	it("names a product the request writes only as its name wherever a label has the word", () => {
+		const offered = (text: string) =>
+			new Set(
+				logosNamedInText(text, nodeLogoIcons)
+					.filter((logo) => logo.alwaysNamed)
+					.map((logo) => logo.slug),
+			);
+		const brands = offered("Charge cards through Stripe and post each order to Slack.");
+		const drawn = (label: string) =>
+			labelLogos(label, nodeLogoIcons, brands).named.map((icon) => icon.slug);
+		expect(drawn("Stripe charge")).toEqual(["stripe"]);
+		expect(drawn("Slack order post")).toEqual(["slack"]);
+		expect(drawn("Notify Slack")).toEqual(["slack"]);
+		expect(drawn("Stripe webhook to Slack")).toEqual(["stripe", "slack"]);
+		// Without the request's word, the same labels read as steps.
+		expect(named("Stripe charge")).toEqual([]);
+		expect(possible("Stripe charge")).toEqual(["stripe"]);
+		// A request that also writes the word plainly keeps its steps.
+		const plain = offered("Deploy the Go API to Render, then go live and render the page.");
+		expect(plain).toEqual(new Set());
+		expect(labelLogos("Go live", nodeLogoIcons, plain).named).toEqual([]);
+	});
+
 	it("names an English first word only as a whole label or before a tech noun", () => {
 		expect(named("Python worker")).toEqual(["python"]);
 		expect(named("Angular app")).toEqual(["angular"]);
@@ -478,6 +501,40 @@ describe("logosNamedInText", () => {
 		expect(offered("CockroachDB and PlanetScale")).toEqual(["cockroachlabs", "planetscale"]);
 		expect(offered("Fastly and Akamai CDN")).toEqual(["fastly", "akamai"]);
 		expect(offered("WhatsApp and Telegram bots")).toEqual(["whatsapp", "telegram"]);
+	});
+
+	it("marks a product named by an everyday word the text never writes plainly", () => {
+		const always = (text: string) =>
+			logosNamedInText(text, nodeLogoIcons).map((logo) => [logo.slug, logo.alwaysNamed ?? false]);
+		expect(
+			always("Charge cards through Stripe, page the team in Slack, and cache in Redis."),
+		).toEqual([
+			["stripe", true],
+			["slack", true],
+			// An unmistakable name needs no mark: every label that has it names it.
+			["redis", false],
+		]);
+		expect(
+			always("Build the API in Go, deploy it to Render, and sync leads through Make."),
+		).toEqual([
+			["go", true],
+			["render", true],
+			["make", true],
+		]);
+		expect(
+			always(
+				"Build the API in Go, deploy it to Render, and sync leads through Make. After review we go live, render the page, and make a payment.",
+			),
+		).toEqual([
+			["go", false],
+			["render", false],
+			["make", false],
+		]);
+		// A cloud vendor's generic service mark stays a step's word.
+		expect(always("Store uploads in Cloud Storage and run nightly work on Batch.")).toEqual([
+			["cloud-storage", false],
+			["batch", false],
+		]);
 	});
 
 	it("offers each named logo with its aliases and catalog collection", () => {
