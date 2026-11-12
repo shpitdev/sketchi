@@ -15,12 +15,22 @@ const LIVE_TAIL_LINES = 40;
 /** Roughly the lines the live block fits; beyond this its top edge fades. */
 const LIVE_VISIBLE_LINES = 10;
 
-/** The newest lines of a call's pretty-printed input, as it is being written. */
-export function liveInputTail(input: unknown): {
-	readonly clipped: boolean;
-	readonly text: string;
-} {
+/** A line that only closes an object or array. */
+const CLOSING_LINE = /^\s*[\]}],?$/;
+
+/**
+ * The newest lines of a call's pretty-printed input. While the input is still
+ * streaming, the brackets that close its partial objects are left off, so the
+ * tail ends on the value being written.
+ */
+export function liveInputTail(
+	input: unknown,
+	streaming: boolean,
+): { readonly clipped: boolean; readonly text: string } {
 	const lines = (JSON.stringify(input, null, 2) ?? "").split("\n");
+	if (streaming) {
+		while (lines.length > 1 && CLOSING_LINE.test(lines.at(-1) ?? "")) lines.pop();
+	}
 	return {
 		clipped: lines.length > LIVE_VISIBLE_LINES,
 		text: lines.slice(-LIVE_TAIL_LINES).join("\n"),
@@ -28,7 +38,7 @@ export function liveInputTail(input: unknown): {
 }
 
 function LiveToolInput({ input, streaming }: { input: unknown; streaming: boolean }) {
-	const { clipped, text } = liveInputTail(input);
+	const { clipped, text } = liveInputTail(input, streaming);
 	return (
 		<pre className="studio__live-input" data-clipped={clipped || undefined}>
 			<code>

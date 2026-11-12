@@ -441,8 +441,12 @@ body {
 	line-height: 1.5;
 	margin: 0;
 	max-height: calc(1.5em * 10 + 20px);
+	/* Claim the message's full width, so the card keeps its size while the
+	   tail's longest line changes. */
+	max-width: 100%;
 	overflow: hidden;
 	padding: 10px 12px;
+	width: 100vw;
 }
 
 .studio__live-input[data-clipped] {

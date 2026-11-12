@@ -110,15 +110,22 @@ describe("DiagramToolCard", () => {
 describe("liveInputTail", () => {
 	it("keeps the newest lines of a long input", () => {
 		const long = { nodes: Array.from({ length: 200 }, (_, index) => `node ${index}`) };
-		const tail = liveInputTail(long);
+		const tail = liveInputTail(long, false);
 		expect(tail.clipped).toBe(true);
 		expect(tail.text.split("\n")).toHaveLength(40);
 		expect(tail.text).toContain('"node 199"');
 		expect(tail.text).not.toContain('"node 0"');
 	});
 
+	it("ends a streaming input on the value being written", () => {
+		const partial = { spec: { nodes: { api: { label: "API" } } } };
+		expect(liveInputTail(partial, true).text.split("\n").at(-1)).toBe('        "label": "API"');
+		expect(liveInputTail(partial, false).text.split("\n").at(-1)).toBe("}");
+		expect(liveInputTail({}, true).text).toBe("{}");
+	});
+
 	it("shows a short input whole", () => {
-		expect(liveInputTail({ title: "Deploy" })).toEqual({
+		expect(liveInputTail({ title: "Deploy" }, false)).toEqual({
 			clipped: false,
 			text: '{\n  "title": "Deploy"\n}',
 		});
