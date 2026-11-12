@@ -1,25 +1,25 @@
 {
 	"name": "sketchi-code-mode-codex",
-	"version": "0.1.1",
-	"description": "Sketchi Code Mode skills and MCP config for Codex.",
+	"version": "0.2.0",
+	"description": "Sketchi Code Mode skill and MCP config for Codex.",
 	"author": {
 		"name": "Sketchi"
 	},
 	"skills": "./skills/",
 	"interface": {
 		"displayName": "Sketchi Code Mode",
-		"shortDescription": "Build Sketchi diagrams through Code Mode.",
-		"longDescription": "Sketchi Code Mode gives Codex a purpose-built skill and remote MCP server for generating typed Sketchi flowcharts, applying style patches, and retrieving diagram artifacts.",
+		"shortDescription": "Draw editable diagrams with Sketchi.",
+		"longDescription": "Sketchi draws 15 kinds of diagram, from flowcharts and architecture maps to ER diagrams and Gantt charts, as editable Excalidraw scenes with a PNG. The plugin adds its public MCP server and a skill that tells Codex how to use it.",
 		"developerName": "Sketchi",
 		"category": "Developer Tools",
-		"capabilities": ["MCP", "Diagram Generation", "Artifact Retrieval"],
+		"capabilities": ["MCP", "Diagrams", "Excalidraw"],
 		"brandColor": "#2F6FED",
 		"composerIcon": "./assets/codex.svg",
 		"logo": "./assets/mcp.svg",
 		"defaultPrompt": [
-			"Use Sketchi Code Mode to build a diagram.",
-			"Patch the current Sketchi diagram style.",
-			"Retrieve the latest Sketchi artifact."
+			"Use Sketchi to draw our release approval flow as a flowchart.",
+			"Use Sketchi to draw this database schema as an ER diagram.",
+			"Color the approval step purple in the Sketchi flowchart."
 		]
 	},
 	"mcpServers": "./.mcp.json"

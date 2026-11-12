@@ -1,100 +1,75 @@
 ---
 name: sketchi-code-mode
-description: Use Sketchi Code Mode when creating, editing, styling, or retrieving Sketchi flowchart, mindmap, or sequence diagrams through the Sketchi MCP server.
+description: "Draw editable Excalidraw diagrams with the Sketchi MCP server: flowcharts and architecture maps, sequence, state machine, ER, class, Gantt, timeline, chart, mindmap, org chart, Venn, journey map, Sankey, wireframe and quadrant diagrams. Use when the user asks for one of these diagrams, names Sketchi, or wants to change a diagram Sketchi drew."
 ---
 
-# Sketchi Code Mode
+# Sketchi
 
-Use the `sketchi-code-mode` MCP server for Sketchi diagrams instead of raw Excalidraw or ad hoc JSON edits. This follows the Code Mode pattern: call one `execute` tool with generated JavaScript, and use typed host tools exposed inside the sandbox as `sketchi.*`.
+Sketchi draws diagrams as editable Excalidraw scenes with a PNG. Its MCP server, `sketchi-code-mode` at `https://playground.sketchi.app/mcp`, needs no account or API key and has three tools:
 
-## Workflow
+- `execute` runs one async JavaScript function against the `sketchi` client.
+- `docs` returns one topic's request type, rules and example, such as `{ topic: "buildGantt" }`.
+- `search` finds documentation by keyword.
 
-1. Call `docs` or `search` first when you need the current contract for graph input, patch input, artifact retrieval, or supported style fields.
-2. Use `execute` with an async JavaScript arrow function expression.
-3. Build structure with `sketchi.buildFlowchart(input)` for process graphs, `sketchi.buildMindmap(input)` for nested topic hierarchies, or `sketchi.buildSequenceDiagram(input)` for chronological participant interactions.
-4. Change a built flowchart with `sketchi.editFlowchart({ artifactId, edits })`: steps, labels, colors and shapes, by id or label. A flowchart states its colors and shapes in the build and is never patched; apply visual edits to other diagrams with `sketchi.applyDiagramPatch(input)`.
-5. Only retrieve proof or output with `sketchi.getArtifact(input)` when you need raw Excalidraw/PNG metadata; do not fetch `scene` just to summarize the diagram.
-6. If the MCP text content begins with `Sketchi artifact ready.`, paste that first text block as the final chat response and stop.
-7. If the execute result contains `artifactDelivery.finalResponseText`, paste that text as the final chat response and stop.
-8. Otherwise return the accepted Sketchi artifact id, format refs, and Excalidraw/PNG URLs. Do not recreate the accepted diagram as a Markdown or Mermaid artifact.
+## Draw a diagram
 
-## Execute Shape
+1. Choose the builder for what the diagram shows:
 
-```text
-async () => {
-  const built = await sketchi.buildFlowchart({
-    spec: {
-      title: "Approval flow",
-      nodes: { request: "Request", approved: "Approved?", done: "Done", revise: "Revise" },
-      edges: [
-        ["request", "approved"],
-        ["approved", "done", "yes"],
-        ["approved", "revise", "no"],
-      ],
-    },
-    options: {
-      artifactFormats: ["scene", "excalidraw", "png"],
-      inlineArtifacts: [],
-    },
-  });
+   | The diagram shows                                         | Builder                                        |
+   | --------------------------------------------------------- | ---------------------------------------------- |
+   | steps, decisions, how systems connect, architecture zones | `sketchi.buildFlowchart`                       |
+   | messages between participants over time                   | `sketchi.buildSequenceDiagram`                 |
+   | states and the events that move between them              | `sketchi.buildStateMachine`                    |
+   | tables, keys and relationships                            | `sketchi.buildErDiagram`                       |
+   | classes, members and relationships                        | `sketchi.buildClassDiagram`                    |
+   | dated tasks with durations and dependencies               | `sketchi.buildGantt`                           |
+   | dated or ordered events                                   | `sketchi.buildTimeline`                        |
+   | numbers across categories: bar, line or pie               | `sketchi.buildChart`                           |
+   | a topic hierarchy                                         | `sketchi.buildMindmap`                         |
+   | people and reporting lines                                | `sketchi.buildOrgChart`                        |
+   | what overlapping sets share                               | `sketchi.buildVennDiagram`                     |
+   | a user journey scored stage by stage                      | `sketchi.buildJourneyMap`                      |
+   | weighted flows between stages                             | `sketchi.buildSankey`                          |
+   | UI screens                                                | `sketchi.buildWireframe`                       |
+   | items placed on a 2×2 matrix                              | `sketchi.buildQuadrantChart`                   |
+   | a layout no builder covers                                | `sketchi.createCanvas` (read its `docs` first) |
 
-  if (!built.ok) return built;
+2. Call `execute` with one async arrow function in plain JavaScript (no TypeScript or imports). The `code` parameter's description gives every builder's spec and rules. For a flowchart, also pass the user's words as `request`: the result lists anything they state that the drawing misses.
 
-  const edited = await sketchi.editFlowchart({
-    artifactId: built.artifact.artifactId,
-    edits: [{ op: "set", nodes: { approved: { shape: "diamond", color: "purple" } } }],
-    options: {
-      artifactFormats: ["scene", "excalidraw", "png"],
-      inlineArtifacts: [],
-    },
-  });
+   ```js
+   async () =>
+     sketchi.buildFlowchart({
+       request: "Draw our release approval flow: submit a release for review, ship it if approved, revise it if not.",
+       spec: {
+         title: "Release approval",
+         nodes: { submit: "Submit release", review: "Approved?", ship: "Ship release", revise: "Revise release" },
+         edges: [
+           ["submit", "review"],
+           ["review", "ship", "yes"],
+           ["review", "revise", "no"],
+         ],
+       },
+     })
+   ```
 
-  if (!edited.ok) return edited;
+3. If the result is `{ ok: false, issues }`, fix the spec as each issue's `hint` says and call `execute` again.
+4. Copy `artifactDelivery.finalResponseText` as your final answer and stop. It starts with `Sketchi artifact ready.` and gives the artifact id with the Excalidraw and PNG URLs. Do not redraw the diagram as Mermaid, Markdown or a local file, and do not fetch the `scene` format to describe it.
 
-  const excalidraw = await sketchi.getArtifact({
-    artifactId: edited.artifact.artifactId,
-    format: "excalidraw",
-    inline: false,
-  });
-  const png = await sketchi.getArtifact({
-    artifactId: edited.artifact.artifactId,
-    format: "png",
-    inline: false,
-  });
+## Change a diagram
 
-  return {
-    ok: true,
-    artifactId: edited.artifact.artifactId,
-    diagramId: edited.artifact.diagramId,
-    formats: edited.artifact.formats,
-    excalidraw,
-    png,
-  };
-}
-```
+- A flowchart: `sketchi.editFlowchart({ artifactId, edits })` adds, removes, relabels, recolors or reshapes steps by id or label, for example `edits: [{ op: "set", nodes: { review: { color: "purple" } } }]`. Never rebuild or patch a flowchart to change it.
+- Any other diagram: `sketchi.applyDiagramPatch(...)`. Read its `docs` first.
+- `sketchi.getArtifact({ artifactId, format: "document" })` returns a flowchart's current document.
 
-To view the artifact bytes after `execute` returns metadata, fetch:
+Every change returns a new artifact; deliver its `artifactDelivery.finalResponseText` the same way.
 
-```text
-https://playground.sketchi.app/api/v1/artifacts/<artifactId>?format=excalidraw&raw=true
-https://playground.sketchi.app/api/v1/artifacts/<artifactId>?format=png&raw=true
-```
+## Logos
 
-## Guardrails
+`sketchi.searchIcons({ q })` returns logo slugs for named technologies, and `sketchi.drawIcon({ name, svg })` hand-draws a logo the catalog lacks. Each builder's spec says where an icon goes.
 
-- Keep IDs stable and readable.
-- Choose by the relationship being communicated: flowcharts for process paths and decisions, mind maps for topic hierarchy, and sequence diagrams for ordered messages between participants.
-- Express the real workflow semantics, but keep export readability in mind. For broad repo/system prompts, summarize into a readable 8-14 node flowchart with a mostly monotonic spine and short side branches.
-- Group related packages/systems into layers instead of drawing every transitive dependency edge. Prefer labels/descriptions for nuance over dense cross-links.
-- Prefer typed graph generation for adding, removing, or reconnecting nodes.
-- Use patching for style, layout hints, labels, and metadata only when the docs show support.
-- If export reports `arrow_overlap`, keep the semantic graph intact unless the structure is actually wrong. Retry with `rerouteEdges` or report the artifact evidence rather than contorting the workflow solely for layout.
-- Pass the function expression itself. `async () => { ... }` is canonical; outer markdown fences and a trailing semicolon are tolerated by the server, but omit them in generated code.
-- Return the MCP result or artifact metadata so the caller has evidence. Do not make a separate Markdown/Mermaid diagram after Sketchi accepts an artifact.
-- Do not call `sketchi.getArtifact({ format: "scene" })` just to create a local summary or wrapper. `scene` is only for patching/debugging, and the accepted artifact bundle is already the deliverable.
-- When the execute tool returns `artifactDelivery.finalResponseText`, paste that string as the final response instead of digging through nested inline scene or Excalidraw JSON.
-- Request `artifactFormats: ["scene", "excalidraw", "png"]` when visual proof matters. Excalidraw is importable JSON; PNG is hosted binary evidence. `sketchi.getArtifact({ format: "excalidraw" | "png", inline: false })` returns metadata with raw Studio API URLs.
-- Do not install or require a local browser for plugin use; the deployed Studio Worker renders PNG artifacts through Cloudflare Browser Run.
-- Do not prompt the user to authenticate to Sketchi or add credentials; the deployed MCP endpoint is public.
-- Do not pass secrets or credentials into `execute`.
-- Do not treat the deployed Workers MCP endpoint as a private boundary; it is a tool surface for Code Mode operations.
+## Boundaries
+
+- The endpoint is public. Do not ask the user to authenticate to Sketchi, and never put secrets or credentials in `execute` code.
+- Sketchi renders PNGs itself. Do not install or require a local browser.
+- If the PNG fails to render, retry once. If it fails again, give the Excalidraw URL and say the PNG is unavailable.
+- Read the user's files only to learn what to draw. Write files only when asked.

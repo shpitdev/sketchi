@@ -1319,9 +1319,9 @@ export const catalog: CatalogEntry[] = [
 		kind: "non_goal",
 		title: "Managed threads are deferred",
 		topic: "overview",
-		keywords: ["non-goal", "convex", "threads", "managed", "lineage", "history"],
+		keywords: ["non-goal", "threads", "managed", "lineage", "history"],
 		snippet:
-			"Convex threads, message history, artifact lineage, and accepted artifact state are not in this harness surface.",
+			"Sketchi-managed threads, message history, artifact lineage, and accepted artifact state are not in this harness surface.",
 		content:
 			"This MCP is for caller-owned harness state. It does not create Sketchi-managed threads, continue conversations, accept artifacts, list user artifacts, or own version history.",
 	},
