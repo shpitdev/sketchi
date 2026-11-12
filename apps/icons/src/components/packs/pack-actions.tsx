@@ -4,12 +4,13 @@ import type { PackExcalidrawState } from "../../lib/excalidraw-publish.js";
 import { packLibraryFileName, packLibraryPath, type PackSummary } from "../../lib/packs.js";
 
 /**
- * Download the pack's library; add it to Excalidraw once it has an install
- * link, or publish it there while its current version can be.
+ * Download the pack's library, plain or named; add it to Excalidraw once it
+ * has an install link, or publish it there while its current version can be.
  */
 export function PackActions({
 	describedBy,
 	excalidraw,
+	named = false,
 	onPublish,
 	pack,
 	size = "compact",
@@ -17,6 +18,8 @@ export function PackActions({
 	/** The id of the pack's name, so each action reads with the pack it acts on. */
 	readonly describedBy?: string;
 	readonly excalidraw?: PackExcalidrawState | undefined;
+	/** Download the library with each name written under its drawing. */
+	readonly named?: boolean;
 	readonly onPublish?: () => void;
 	readonly pack: Pick<PackSummary, "id">;
 	readonly size?: "compact" | "large";
@@ -26,11 +29,11 @@ export function PackActions({
 			<a
 				aria-describedby={describedBy}
 				className="pack-actions__download"
-				download={packLibraryFileName(pack.id)}
-				href={packLibraryPath(pack.id)}
+				download={packLibraryFileName(pack.id, { named })}
+				href={packLibraryPath(pack.id, { named })}
 			>
 				<Download aria-hidden="true" />
-				<span>Download</span>
+				<span>{named ? "Download with names" : "Download"}</span>
 			</a>
 			{excalidraw?.installUrl ? (
 				<a

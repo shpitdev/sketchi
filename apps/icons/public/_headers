@@ -33,6 +33,12 @@
   Content-Type: application/json
   Content-Disposition: attachment; filename="sketchi-icons.excalidrawlib"
 
+/sketchi-icons-with-names.excalidrawlib
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+  Content-Type: application/json
+  Content-Disposition: attachment; filename="sketchi-icons-with-names.excalidrawlib"
+
 # Packs: libraries to download, their previews, and their index.
 /packs/*
   Access-Control-Allow-Origin: *

@@ -18,6 +18,7 @@ describe("public CORS policy", () => {
 			"/icons-manifest.json",
 			"/icon-drawings.json",
 			"/sketchi-icons.excalidrawlib",
+			"/sketchi-icons-with-names.excalidrawlib",
 			"/packs/*",
 			"/packs/*.excalidrawlib",
 		]);

@@ -7,8 +7,9 @@ import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 import { formatBytes } from "../../lib/format-bytes.js";
 import { IconMark } from "../icon-mark/index.js";
 import { useDialogFocus } from "../../lib/use-dialog-focus.js";
+import { DrawnIcon } from "../drawn-icon/index.js";
+import { NamesToggle } from "../names-toggle/index.js";
 import { PreviewToggle } from "../preview-toggle/index.js";
-import { RecipePreview } from "../recipe-preview/index.js";
 
 export type IconDetailAction =
 	| "copy-data-uri"
@@ -23,8 +24,11 @@ export interface IconDetailProps {
 	/** The mark's hand-drawn version, shown beside the SVG when it has one. */
 	readonly drawing?: IconRecipe;
 	readonly icon: SketchiIcon;
+	/** Write the name under the drawing, and copy it that way. */
+	readonly named?: boolean;
 	readonly onAction?: (action: IconDetailAction, icon: SketchiIcon) => void;
 	readonly onClose?: () => void;
+	readonly onNamedChange?: (named: boolean) => void;
 	readonly onPreviewModeChange?: (mode: "dark" | "light") => void;
 	readonly permanentUrl: string;
 	readonly previewMode?: "dark" | "light";
@@ -52,8 +56,10 @@ export function IconDetail({
 	busyAction,
 	drawing,
 	icon,
+	named = false,
 	onAction,
 	onClose,
+	onNamedChange,
 	onPreviewModeChange,
 	permanentUrl,
 	previewMode = "light",
@@ -99,9 +105,10 @@ export function IconDetail({
 					</figure>
 					<figure className="icon-detail__figure">
 						<div className="icon-detail__preview" data-preview={previewMode}>
-							<RecipePreview
+							<DrawnIcon
 								className="icon-detail__drawing"
 								label={`${icon.name} hand-drawn`}
+								name={named ? icon.name : undefined}
 								previewMode={previewMode}
 								recipe={drawing}
 							/>
@@ -116,6 +123,7 @@ export function IconDetail({
 			)}
 
 			<div className="icon-detail__preview-row">
+				{drawing ? <NamesToggle onChange={(next) => onNamedChange?.(next)} value={named} /> : null}
 				<PreviewToggle onChange={(mode) => onPreviewModeChange?.(mode)} value={previewMode} />
 			</div>
 

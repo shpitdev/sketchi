@@ -4,6 +4,8 @@ import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 export const DRAWINGS_PATH = "/icon-drawings.json";
 /** The same drawings as one Excalidraw library. */
 export const DRAWINGS_LIBRARY_PATH = "/sketchi-icons.excalidrawlib";
+/** The same library with each name written under its drawing. */
+export const DRAWINGS_NAMED_LIBRARY_PATH = "/sketchi-icons-with-names.excalidrawlib";
 
 export type IconDrawings = Readonly<Record<string, IconRecipe>>;
 

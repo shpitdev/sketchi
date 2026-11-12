@@ -427,12 +427,103 @@ kbd {
 	width: 17px;
 }
 
+/* Names: writes each name under its drawing, in the tiles, the copies and the downloads. */
+.names-toggle {
+	align-items: center;
+	background: var(--card);
+	border: 1px solid var(--line-2);
+	border-radius: var(--r-sm);
+	color: var(--ink-2);
+	cursor: pointer;
+	display: inline-flex;
+	flex: none;
+	font-size: var(--type-label);
+	font-weight: 600;
+	gap: 5px;
+	height: 44px;
+	padding-inline: 10px 12px;
+	white-space: nowrap;
+}
+
+.names-toggle:hover {
+	border-color: var(--ink-3);
+	color: var(--ink);
+}
+
+/* On, it reads as a setting, like a filtered collection, not as another action. */
+.names-toggle[aria-pressed="true"] {
+	background: var(--accent-wash);
+	border-color: var(--accent);
+	color: var(--accent-ink);
+}
+
+.names-toggle svg {
+	height: 18px;
+	width: 18px;
+}
+
+/* A drawing with its name under it, in the named library's proportions: the
+   drawing is 96 units of the preview's 104, the name 20 units tall, 8 below
+   it, wrapping at the tile's width. */
+.drawn-icon {
+	align-content: center;
+	container-type: inline-size;
+	display: grid;
+	justify-items: center;
+}
+
+.icon-card__drawing.drawn-icon,
+.community-card__drawing.drawn-icon {
+	height: auto;
+	width: 84%;
+}
+
+.icon-detail__drawing.drawn-icon,
+.community-detail__drawing.drawn-icon {
+	height: auto;
+	width: 80%;
+}
+
+.drawn-icon__drawing {
+	display: block;
+	height: 56cqi;
+	width: 56cqi;
+}
+
+.drawn-icon__name {
+	-webkit-box-orient: vertical;
+	color: #1e1e1e;
+	display: -webkit-box;
+	font-family: var(--font-script);
+	font-size: 10.8cqi;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	line-height: 1.25;
+	margin-top: 2.2cqi;
+	max-width: 100cqi;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+	text-align: center;
+}
+
+/* Excalidraw's dark mode inverts the canvas; the name inverts with the drawing. */
+.drawn-icon[data-preview="dark"] .drawn-icon__name {
+	filter: invert(93%) hue-rotate(180deg);
+}
+
 /* ===================================================================== */
 /* Community view                                                        */
 /* ===================================================================== */
 .icons-toolbar.community-toolbar {
-	grid-template-areas: "search download preview";
+	grid-template-areas: "search download view";
 	grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.community-toolbar__view,
+.pack-hero__view {
+	display: flex;
+	gap: 8px;
+	grid-area: view;
 }
 
 .community-download {
@@ -511,6 +602,12 @@ kbd {
 .view-switch button[aria-pressed="true"] {
 	background: var(--ink);
 	color: var(--paper-2);
+}
+
+/* Beside the view switch, Names matches its height. */
+.icons-results-bar__view .names-toggle {
+	font-size: var(--type-meta);
+	height: 38px;
 }
 
 .icon-detail__previews {
@@ -1049,6 +1146,7 @@ kbd {
 
 .icon-detail__preview-row {
 	display: flex;
+	gap: 8px;
 	justify-content: flex-end;
 }
 
@@ -1649,12 +1747,12 @@ kbd {
 	width: 17px;
 }
 
-/* The pack's name over its count, then its actions and the preview background. */
+/* The pack's name over its count, then its actions, Names and the preview background. */
 .pack-hero {
 	align-items: center;
 	display: grid;
 	gap: 14px 16px;
-	grid-template-areas: "heading actions preview";
+	grid-template-areas: "heading actions view";
 	grid-template-columns: minmax(0, 1fr) auto auto;
 	padding-block: 28px 20px;
 }
@@ -1737,12 +1835,16 @@ kbd {
 	.icons-toolbar.community-toolbar {
 		grid-template-areas:
 			"search search"
-			"download preview";
+			"download view";
 		grid-template-columns: minmax(0, 1fr) auto;
 	}
 
 	.community-download {
 		justify-self: start;
+	}
+
+	.community-download__scope {
+		display: none;
 	}
 
 	.icons-toolbar {
@@ -1769,14 +1871,14 @@ kbd {
 		scroll-padding-inline: 16px;
 	}
 
-	/* The preview background sits beside the name; the actions get their own row. */
+	/* The name, then how the tiles show, then the actions. */
 	.pack-hero {
-		align-items: start;
-		gap: 14px 12px;
+		gap: 14px;
 		grid-template-areas:
-			"heading preview"
-			"actions actions";
-		grid-template-columns: minmax(0, 1fr) auto;
+			"heading"
+			"view"
+			"actions";
+		grid-template-columns: minmax(0, 1fr);
 		padding-block: 20px 16px;
 	}
 

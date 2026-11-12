@@ -82,6 +82,7 @@
 				"{projectRoot}/public/icons-manifest.json",
 				"{projectRoot}/public/icon-drawings.json",
 				"{projectRoot}/public/sketchi-icons.excalidrawlib",
+				"{projectRoot}/public/sketchi-icons-with-names.excalidrawlib",
 				"{projectRoot}/public/packs",
 				"{projectRoot}/public/output",
 				"{projectRoot}/public/card.png"

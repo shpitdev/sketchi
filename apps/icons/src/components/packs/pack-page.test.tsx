@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PackIcon, PackSummary } from "../../lib/packs";
 import { TestIntersectionObserver } from "../../test-support/intersection-observer";
@@ -20,12 +20,17 @@ const pack: PackSummary = {
 };
 
 describe("PackPage", () => {
+	// The page loads the export code on first use; loading it here keeps its
+	// transform time out of the clipboard waits.
+	beforeAll(() => import("../../lib/excalidraw-export"));
+
 	beforeEach(() => {
 		vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
 	});
 
 	afterEach(() => {
 		vi.unstubAllGlobals();
+		window.localStorage.clear();
 	});
 
 	it("names the pack, with its size and its download, before its icons load", () => {
@@ -63,6 +68,48 @@ describe("PackPage", () => {
 			type: "excalidraw/clipboard",
 		});
 		expect(await screen.findByText("App 3 copied. Paste it into Excalidraw.")).toBeTruthy();
+	});
+
+	it("writes names under the drawings, and copies and downloads them that way, until turned off", async () => {
+		const writeText = vi.fn(async (_value: string) => {});
+		Object.assign(navigator, { clipboard: { writeText } });
+		render(
+			<PackPage
+				excalidraw={{ publishable: true }}
+				icons={icons.slice(0, 3)}
+				pack={pack}
+				status="ready"
+			/>,
+		);
+		const names = screen.getByRole("button", { name: "Names", pressed: false });
+		expect(screen.getByRole("button", { name: "Publish to Excalidraw" })).toBeTruthy();
+
+		fireEvent.click(names);
+		expect(names.getAttribute("aria-pressed")).toBe("true");
+		const download = screen.getByRole("link", { name: "Download with names" });
+		expect(download.getAttribute("href")).toBe("/packs/palantir-with-names.excalidrawlib");
+		expect(download.getAttribute("download")).toBe("sketchi-palantir-with-names.excalidrawlib");
+		// Excalidraw's collection only has the plain library.
+		expect(screen.queryByRole("button", { name: "Publish to Excalidraw" })).toBeNull();
+		const tile = screen.getByRole("button", { name: "Copy App 1 for Excalidraw" });
+		expect(tile.querySelector(".drawn-icon__name")?.textContent).toBe("App 1");
+
+		fireEvent.click(tile);
+		await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+		const pasted = JSON.parse(writeText.mock.calls[0]?.[0] ?? "{}") as {
+			elements: { type: string; text?: string; groupIds: string[] }[];
+		};
+		expect(pasted.elements.at(-1)).toMatchObject({
+			type: "text",
+			text: "App 1",
+			groupIds: ["catalog-app-1-named"],
+		});
+
+		fireEvent.click(names);
+		expect(screen.getByRole("link", { name: "Download" }).getAttribute("href")).toBe(
+			"/packs/palantir.excalidrawlib",
+		);
+		expect(tile.querySelector(".drawn-icon__name")).toBeNull();
 	});
 
 	it("previews dark Excalidraw with a canvas filter, without repainting the recipe", () => {
