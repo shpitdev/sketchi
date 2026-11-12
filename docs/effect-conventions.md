@@ -98,6 +98,3 @@ constructions, calls, and thenable member access, including qualified and
 aliased forms. Union/intersection constituents, generic use-site instantiation,
 and nullable/optional consumption are included. Adding a file or a site fails
 the test until its ownership is deliberately classified.
-
-The full rationale and exhaustive glob classification are checked in at
-[Effect v4 program-closure inventory](effect-program-closure-inventory.md).

@@ -54,7 +54,8 @@ columns of bars, label every total and flow, and leave `GRAPH_DIAGRAM_TYPES`;
 see `docs/sankey.md`. Wireframes are no graph at all: screens of nested
 components the renderer boxes like flex layout; see `docs/wireframes.md`.
 Quadrant charts place every dot at its scores and every label clear of the
-rest; see `docs/quadrant-charts.md`.
+rest; see `docs/quadrant-charts.md`. Mindmaps radiate from their central topic; see
+`docs/mindmaps.md`.
 
 Surfaces that offer a family to people also need updating: the playground
 generate API (`apps/playground/src/server/generation/api.server.ts`), Studio

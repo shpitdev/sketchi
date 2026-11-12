@@ -1,28 +1,20 @@
 # diagram-core
 
-Typed diagram contracts, validation, and fixtures for every Sketchi diagram type.
+Typed contracts, validation, shared drawing rules and fixtures for every Sketchi
+diagram family.
 
-```mermaid
-flowchart LR
-  Fixtures["fixtures"] --> Registry["diagram type registry"]
-  Registry --> Flowchart["flowchart contract"]
-  Registry --> Mindmap["mindmap contract"]
-  Registry --> Sequence["sequence contract"]
-  Flowchart --> Consumers["generation, rendering, UI"]
-  Mindmap --> Consumers
-  Sequence --> Consumers
-```
-
-Flowchart and mindmap share the node/edge `IntermediateDiagram` graph.
-Sequence diagrams keep their own `SequenceDiagram` contract: ordered
-participants and chronologically ordered messages, never a graph.
-`CanonicalDiagramSchema` and `parseCanonicalDiagram` accept any family.
+Each family (`DIAGRAM_TYPES` in `src/types.ts`) has an Effect Schema contract
+and semantic validation under `src/types/`. Flowcharts and mindmaps share the node/edge
+`IntermediateDiagram`; every other family keeps its own shape. `CanonicalDiagramSchema`
+and `parseCanonicalDiagram` accept any family. `src/rules/` holds the drawing
+rules that the generate prompt, the MCP docs and Studio chat all read, so the
+three state each rule once.
 
 | Owns                            | Does not own                |
 | ------------------------------- | --------------------------- |
 | diagram type registry           | model calls or prompts      |
 | typed IR shapes and invariants  | layout or scene coordinates |
-| reusable fixtures               | Excalidraw element output   |
+| shared drawing rules, fixtures  | Excalidraw element output   |
 | semantic validation diagnostics | app routes or persistence   |
 
 ## Commands
