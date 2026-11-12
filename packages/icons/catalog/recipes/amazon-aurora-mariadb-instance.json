@@ -17,10 +17,10 @@
 		},
 		{
 			"kind": "text",
-			"cx": 10.5,
+			"cx": 11.75,
 			"cy": 7,
 			"text": "MariaDB",
-			"size": 5,
+			"size": 4,
 			"color": "#c925d1"
 		},
 		{

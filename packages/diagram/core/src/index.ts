@@ -1,6 +1,7 @@
 export * from "./types.js";
 export * from "./fixtures.js";
 export * from "./icon.js";
+export * from "./excalifont-ink.js";
 export * from "./icon-recipe.js";
 export * from "./intermediate.js";
 export * from "./canvas.js";

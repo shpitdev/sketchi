@@ -8,7 +8,7 @@
  * scene's text color, while brand colors stay fixed.
  */
 
-import { estimateTextWidth } from "./text-metrics.js";
+import { excalifontInkBox, type InkBox } from "./excalifont-ink.js";
 
 export const ICON_RECIPE_GRID = 24;
 
@@ -226,40 +226,223 @@ export function isIconRecipe(value: unknown): value is IconRecipe {
 }
 
 /**
- * The box a text part's word takes on the grid, at the width Excalidraw's
- * export gives it: the word is centered on (cx, cy) and its glyphs are `size` tall.
+ * The box a text part's word paints on the grid: the word is centered on
+ * (cx, cy) in Excalifont at `size` grid units, as the drawer lays it out.
  */
-export function iconRecipeTextBox(part: IconRecipeText): {
-	readonly left: number;
-	readonly right: number;
-	readonly top: number;
-	readonly bottom: number;
-} {
-	const halfWidth = estimateTextWidth(part.text, part.size) / 2;
+export function iconRecipeTextBox(part: IconRecipeText): InkBox {
+	const ink = excalifontInkBox(part.text, part.size);
 	return {
-		left: part.cx - halfWidth,
-		right: part.cx + halfWidth,
-		top: part.cy - part.size / 2,
-		bottom: part.cy + part.size / 2,
+		left: part.cx + ink.left,
+		right: part.cx + ink.right,
+		top: part.cy + ink.top,
+		bottom: part.cy + ink.bottom,
 	};
 }
 
 /**
- * Where a drawable recipe would clip: a word wider or taller than the grid
- * (with the overhang a stroke may take) is cut off in every square it is drawn
- * in. Checked when a recipe is made or accepted, not when a stored one is read.
+ * How a word is judged against the shapes around it: at the size reviewers
+ * read icons (112 px), where the 2 px pen is drawn, plus a little paper.
  */
-export function iconRecipeFitIssues(recipe: IconRecipe): string[] {
+export const ICON_RECIPE_TEXT_FIT = Object.freeze({
+	previewSize: 112,
+	penPx: 2,
+	/** Paper kept between a word's ink and the inner edge of its frame's pen. */
+	padding: 0.5,
+	/** The smallest word that still reads at the preview size. */
+	minSize: 3.5,
+});
+
+type Point = readonly [number, number];
+
+/** A shape's outline: the drawn segments and the polygon that bounds its inside. */
+interface Outline {
+	readonly points: readonly Point[];
+	/** A closed outline also draws its last point back to the first. */
+	readonly closed: boolean;
+	/** The outline's color; undefined for a fill drawn without one. */
+	readonly stroke: string | undefined;
+	readonly fill: string | undefined;
+	/**
+	 * How far inside the outline the edge a word must keep within sits, in
+	 * grid units at the preview size: the pen's inner edge, or the fill's
+	 * outer edge for a badge whose pen is its fill's color.
+	 */
+	readonly edge: number;
+}
+
+const ARC_STEPS = 6;
+const ELLIPSE_STEPS = 48;
+/** Outlines are checked at points this far apart along the pen. */
+const SAMPLE_STEP = 0.1;
+
+function arc(cx: number, cy: number, r: number, from: number): Point[] {
+	return Array.from({ length: ARC_STEPS + 1 }, (_, step) => {
+		const angle = from + ((Math.PI / 2) * step) / ARC_STEPS;
+		return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)] as const;
+	});
+}
+
+function shapePoints(part: IconRecipeRect | IconRecipeEllipse): readonly Point[] {
+	if (part.kind === "ellipse") {
+		return Array.from({ length: ELLIPSE_STEPS }, (_, step) => {
+			const angle = (2 * Math.PI * step) / ELLIPSE_STEPS;
+			return [part.cx + part.rx * Math.cos(angle), part.cy + part.ry * Math.sin(angle)] as const;
+		});
+	}
+	const { x, y, width, height } = part;
+	// Excalidraw rounds a corner by a quarter of the shorter side at icon sizes.
+	const r = part.rounded ? Math.min(width, height) / 4 : 0;
+	if (r === 0) {
+		return [
+			[x, y],
+			[x + width, y],
+			[x + width, y + height],
+			[x, y + height],
+		];
+	}
+	return [
+		...arc(x + width - r, y + r, r, -Math.PI / 2),
+		...arc(x + width - r, y + height - r, r, 0),
+		...arc(x + r, y + height - r, r, Math.PI / 2),
+		...arc(x + r, y + r, r, Math.PI),
+	];
+}
+
+function outline(part: IconRecipePart): Outline | undefined {
+	if (part.kind === "text" || part.kind === "arrow") return undefined;
+	const unit = ICON_RECIPE_TEXT_FIT.previewSize / ICON_RECIPE_GRID;
+	const stroke = part.stroke === "none" ? undefined : (part.stroke ?? ICON_RECIPE_INK);
+	const halfPen =
+		stroke === undefined ? 0 : (ICON_RECIPE_TEXT_FIT.penPx * (part.pen ?? 1)) / 2 / unit;
+	const badge = part.fill !== undefined && (stroke === undefined || stroke === part.fill);
+	return {
+		points: part.kind === "stroke" ? part.points : shapePoints(part),
+		closed: part.kind !== "stroke" || part.closed === true,
+		stroke,
+		fill: part.fill,
+		edge: badge ? -halfPen : halfPen,
+	};
+}
+
+function inside([x, y]: Point, polygon: readonly Point[]): boolean {
+	let within = false;
+	for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
+		const [xi, yi] = polygon[index]!;
+		const [xj, yj] = polygon[previous]!;
+		if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) within = !within;
+	}
+	return within;
+}
+
+/** Points along the segments an outline's pen draws. */
+function penPoints(shape: Outline): Point[] {
+	const segments = shape.closed ? shape.points.length : shape.points.length - 1;
+	const points: Point[] = [];
+	for (let index = 0; index < segments; index++) {
+		const [ax, ay] = shape.points[index]!;
+		const [bx, by] = shape.points[(index + 1) % shape.points.length]!;
+		const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / SAMPLE_STEP));
+		for (let step = 0; step <= steps; step++) {
+			points.push([ax + ((bx - ax) * step) / steps, ay + ((by - ay) * step) / steps]);
+		}
+	}
+	return points;
+}
+
+function boxDistance([x, y]: Point, box: InkBox): number {
+	return Math.hypot(
+		Math.max(box.left - x, 0, x - box.right),
+		Math.max(box.top - y, 0, y - box.bottom),
+	);
+}
+
+/**
+ * The part whose outline a word's ink runs into, if one does. A shape frames
+ * a word when the word's center lies inside it (inside the polygon its points
+ * bound, for an open stroke), and the ink must keep the padding inside every
+ * visible stretch of its pen. A stretch is hidden under a fill drawn later, or
+ * inside a fill of its own color, as the backdrop under a badge is.
+ */
+function crowdingFrame(recipe: IconRecipe, part: IconRecipeText): number | undefined {
+	const box = iconRecipeTextBox(part);
+	const center: Point = [(box.left + box.right) / 2, (box.top + box.bottom) / 2];
+	const shapes = recipe.parts.map(outline);
+	for (const [index, frame] of shapes.entries()) {
+		if (!frame || frame.points.length < 3 || !inside(center, frame.points)) continue;
+		const clearance = frame.edge + ICON_RECIPE_TEXT_FIT.padding;
+		const hidden = (point: Point) =>
+			shapes.some(
+				(cover, coverIndex) =>
+					cover !== undefined &&
+					coverIndex !== index &&
+					cover.fill !== undefined &&
+					(coverIndex > index || cover.fill === frame.stroke) &&
+					cover.points.length >= 3 &&
+					inside(point, cover.points),
+			);
+		if (penPoints(frame).some((point) => boxDistance(point, box) < clearance && !hidden(point))) {
+			return index;
+		}
+	}
+	return undefined;
+}
+
+function withinGrid(box: InkBox): boolean {
 	const low = -ICON_RECIPE_LIMITS.overhang;
 	const high = ICON_RECIPE_GRID + ICON_RECIPE_LIMITS.overhang;
+	return box.left >= low && box.right <= high && box.top >= low && box.bottom <= high;
+}
+
+function fits(recipe: IconRecipe, part: IconRecipeText): boolean {
+	return withinGrid(iconRecipeTextBox(part)) && crowdingFrame(recipe, part) === undefined;
+}
+
+/**
+ * The largest size, in quarter units down to the readable minimum, at which a
+ * recipe's word fits where it stands: undefined when even the minimum does not.
+ */
+export function iconRecipeTextFitSize(recipe: IconRecipe, index: number): number | undefined {
+	const part = recipe.parts[index];
+	if (part?.kind !== "text") return undefined;
+	for (
+		let size = Math.floor(part.size * 4) / 4;
+		size >= ICON_RECIPE_TEXT_FIT.minSize;
+		size -= 0.25
+	) {
+		if (fits(recipe, { ...part, size })) return size;
+	}
+	return undefined;
+}
+
+/**
+ * Where a drawable recipe would clip or crowd a word: past the grid (with the
+ * overhang a stroke may take) it is cut off in every square it is drawn in,
+ * and into the shape that frames it, it runs over that shape's pen. Checked
+ * when a recipe is made or accepted, not when a stored one is read.
+ */
+export function iconRecipeFitIssues(recipe: IconRecipe): string[] {
 	return recipe.parts.flatMap((part, index) => {
 		if (part.kind !== "text") return [];
 		const box = iconRecipeTextBox(part);
-		return box.left < low || box.right > high || box.top < low || box.bottom > high
-			? [
-					`recipe.parts[${index}] text "${part.text}" spans ${box.left.toFixed(1)} to ${box.right.toFixed(1)} across and ${box.top.toFixed(1)} to ${box.bottom.toFixed(1)} down, past the ${ICON_RECIPE_GRID}-unit grid; make it smaller or move it inward.`,
-				]
-			: [];
+		const path = `recipe.parts[${index}] text "${part.text}"`;
+		const issues: string[] = [];
+		if (!withinGrid(box)) {
+			issues.push(
+				`${path} spans ${box.left.toFixed(1)} to ${box.right.toFixed(1)} across and ${box.top.toFixed(1)} to ${box.bottom.toFixed(1)} down, past the ${ICON_RECIPE_GRID}-unit grid; make it smaller or move it inward.`,
+			);
+		}
+		const frame = crowdingFrame(recipe, part);
+		if (frame !== undefined) {
+			const size = iconRecipeTextFitSize(recipe, index);
+			const remedy =
+				size === undefined
+					? `even at size ${ICON_RECIPE_TEXT_FIT.minSize} it does not fit: move it, widen the frame, or drop the frame`
+					: `it fits at size ${size} where it stands, or move it inward`;
+			issues.push(
+				`${path} spans ${box.left.toFixed(1)} to ${box.right.toFixed(1)} across and runs into the frame drawn by parts[${frame}]; ${remedy}.`,
+			);
+		}
+		return issues;
 	});
 }
 

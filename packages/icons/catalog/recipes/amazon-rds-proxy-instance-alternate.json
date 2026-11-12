@@ -12,8 +12,8 @@
 		},
 		{
 			"kind": "text",
-			"cx": 8.5,
-			"cy": 6.5,
+			"cx": 8.75,
+			"cy": 7,
 			"text": "RDS",
 			"size": 5,
 			"color": "#c925d1"

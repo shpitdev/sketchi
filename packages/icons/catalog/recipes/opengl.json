@@ -17,10 +17,10 @@
 		},
 		{
 			"kind": "text",
-			"cx": 13,
-			"cy": 12,
+			"cx": 14,
+			"cy": 11.75,
 			"text": "OpenGL",
-			"size": 5.5,
+			"size": 5.25,
 			"color": "#5586a4"
 		}
 	]

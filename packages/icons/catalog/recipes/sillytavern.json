@@ -70,9 +70,9 @@
 		{
 			"kind": "text",
 			"cx": 12,
-			"cy": 12.3,
+			"cy": 12.55,
 			"text": "ST",
-			"size": 10,
+			"size": 7.5,
 			"color": "ink"
 		}
 	]

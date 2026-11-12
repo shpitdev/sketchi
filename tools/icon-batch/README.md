@@ -79,7 +79,7 @@ pnpm nx draw icon-batch -- recipe-sheets --collection palantir --theme dark
   `packages/icons/catalog/recipes/`, except the slugs in `--reject` and any
   that already has one (`--replace` replaces it, for a run that redraws marks
   whose source or drawing changed), and lists any whose word would clip past the 24-unit
-  grid. The draw engine already draws a monochrome mark's own black and white
+  grid or run over the pen of the shape that frames it. The draw engine already draws a monochrome mark's own black and white
   in `ink` and `paper`, so the drawing follows the theme where the mark's SVG
   inverts. Format the files with `pnpm format` before committing.
 

@@ -11,18 +11,18 @@
 		},
 		{
 			"kind": "text",
-			"cx": 11,
+			"cx": 11.75,
 			"cy": 10,
 			"text": "AMERICAN",
-			"size": 4.2,
+			"size": 3.5,
 			"color": "paper"
 		},
 		{
 			"kind": "text",
-			"cx": 14,
+			"cx": 12.75,
 			"cy": 14.8,
 			"text": "EXPRESS",
-			"size": 4.2,
+			"size": 3.75,
 			"color": "paper"
 		}
 	]

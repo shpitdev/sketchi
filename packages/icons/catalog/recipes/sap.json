@@ -14,8 +14,8 @@
 		},
 		{
 			"kind": "text",
-			"cx": 8.5,
-			"cy": 12,
+			"cx": 8.75,
+			"cy": 11.5,
 			"text": "SAP",
 			"size": 7.5,
 			"color": "paper"

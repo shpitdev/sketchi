@@ -13,9 +13,9 @@
 		{
 			"kind": "text",
 			"cx": 12,
-			"cy": 7.5,
+			"cy": 8.5,
 			"text": "MySQL",
-			"size": 5.5,
+			"size": 5.25,
 			"color": "#c925d1"
 		}
 	]

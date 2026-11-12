@@ -93,6 +93,11 @@ Diagram packages validate each recipe and draw it as plain Excalidraw
 elements, and embed the SVG only for marks without one or when a diagram asks
 for exact marks.
 
+A recipe's word is measured as Excalifont paints it, and must sit inside the
+grid and clear of the pen of the shape around it at the 112 px review size
+(`iconRecipeFitIssues`). A test holds every committed recipe to that; shrink
+or move a word that crowds its frame, or redraw the mark.
+
 ## Concept icons
 
 `src/concepts.ts` lists generic concepts diagrams draw by hand: a database, a

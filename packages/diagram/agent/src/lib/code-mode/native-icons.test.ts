@@ -43,7 +43,7 @@ describe("catalog hand-drawn icons", () => {
 		}
 	});
 
-	it("keeps every word inside the grid, so no square clips it", () => {
+	it("keeps every word inside the grid and clear of its frame", () => {
 		for (const [slug, recipe] of Object.entries(nativeIcons)) {
 			expect(iconRecipeFitIssues(recipe as IconRecipe), slug).toEqual([]);
 		}
