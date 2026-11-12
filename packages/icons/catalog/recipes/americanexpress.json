@@ -1,0 +1,29 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 20,
+			"stroke": "#2e77bc",
+			"fill": "#2e77bc"
+		},
+		{
+			"kind": "text",
+			"cx": 11,
+			"cy": 10,
+			"text": "AMERICAN",
+			"size": 4.2,
+			"color": "paper"
+		},
+		{
+			"kind": "text",
+			"cx": 14,
+			"cy": 14.8,
+			"text": "EXPRESS",
+			"size": 4.2,
+			"color": "paper"
+		}
+	]
+}

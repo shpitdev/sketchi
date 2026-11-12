@@ -284,7 +284,7 @@ describe("public icon manifest generation", () => {
 	it("ships a compact clean manifest with aliases and no review fields", () => {
 		const source = JSON.stringify(iconManifest);
 		const manifest = decodeIconManifest(JSON.parse(source));
-		expect(manifest.summary.totalIcons).toBe(2473);
+		expect(manifest.summary.totalIcons).toBe(2904);
 		expect(new Set(manifest.icons.map((icon) => icon.slug)).size).toBe(manifest.icons.length);
 		expect(manifest.icons.find((icon) => icon.slug === "kubernetes")?.aliases).toContain("k8s");
 		expect(manifest.icons.find((icon) => icon.slug === "adobefirefly-text")?.name).toBe(
@@ -325,7 +325,7 @@ describe("public icon manifest generation", () => {
 		}
 		expect(source).not.toContain('"flags"');
 		expect(source).not.toContain('"similarityGroupSize"');
-		// Workers bundle the manifest; the AWS, Databricks and Snowflake sets take it near 750 KB.
-		expect(Buffer.byteLength(source)).toBeLessThan(800_000);
+		// Workers bundle the manifest; the vendor sets and the simple-icons brands take it near 870 KB.
+		expect(Buffer.byteLength(source)).toBeLessThan(900_000);
 	});
 });

@@ -1,0 +1,20 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 10.5,
+			"text": "JUNIPer",
+			"size": 5.2,
+			"color": "#719438"
+		},
+		{
+			"kind": "text",
+			"cx": 13.5,
+			"cy": 15.5,
+			"text": "NETWORKS",
+			"size": 2.6,
+			"color": "#719438"
+		}
+	]
+}

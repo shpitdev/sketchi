@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-11T22:32:31.136Z",
+  "generatedAt": "2026-11-12T02:27:34.569Z",
   "providers": {
     "tech-stack-icons": {
       "name": "tech-stack-icons",
@@ -22,7 +22,7 @@
       },
       "slugCollisions": [],
       "stagedLayout": "input/providers/tech-stack-icons/generated/default/*.svg (+ variants/{dark,grayscale}/*.svg)",
-      "acquiredAt": "2026-11-11T22:32:32.080Z"
+      "acquiredAt": "2026-11-12T02:27:35.311Z"
     },
     "lobe-icons": {
       "name": "@lobehub/icons-static-svg",
@@ -39,17 +39,42 @@
       },
       "chineseWordmarkCount": 10,
       "stagedLayout": "input/providers/lobe-icons/{base,brand,color,text}/*.svg",
-      "acquiredAt": "2026-11-11T22:32:32.945Z"
+      "acquiredAt": "2026-11-12T02:27:36.264Z"
     },
     "simple-icons": {
       "name": "simple-icons",
-      "version": "16.37.0",
-      "publishDate": "2026-11-08T07:14:22.924Z",
-      "sourceShape": "flat icons/*.svg (thousands of generic brand icons)",
-      "svgCount": 3470,
-      "includedInCuration": false,
-      "exclusionReason": "Excluded by policy: no reviewed mapping strategy, duplicate policy, or license review for thousands of generic brand icons.",
-      "acquiredAt": "2026-11-11T22:32:33.784Z"
+      "version": "16.36.0",
+      "publishDate": "2026-10-25T17:25:20.644Z",
+      "sourceShape": "flat icons/*.svg (one black path each) + data/simple-icons.json (title, hex, source, license, guidelines)",
+      "svgCount": 3467,
+      "allowlisted": 415,
+      "excluded": 39,
+      "stagedGroups": {
+        "data-storage": 55,
+        "observability-security": 36,
+        "auth-identity": 12,
+        "devtools-ci": 65,
+        "frameworks-runtimes": 29,
+        "frontend-frameworks": 4,
+        "ai-infrastructure": 4,
+        "ai-devtools": 1,
+        "ai-harness-wrappers": 2,
+        "cloud-platforms": 22,
+        "cloud-hosting-paas": 12,
+        "social-communication": 38,
+        "media-entertainment": 5,
+        "design-productivity": 35,
+        "payments-fintech": 33,
+        "ecommerce-retail": 7,
+        "mobility-logistics": 6,
+        "operating-systems": 7,
+        "hardware-iot": 16,
+        "developer-clients": 15,
+        "programming-languages": 8,
+        "gaming": 3
+      },
+      "stagedLayout": "input/providers/simple-icons/<collection>/<slug>.svg + names.json",
+      "acquiredAt": "2026-11-12T02:27:36.963Z"
     },
     "aws-icons": {
       "name": "AWS Architecture Icons",
@@ -61,7 +86,7 @@
         "categories": 26,
         "resources": 466
       },
-      "acquiredAt": "2026-11-11T22:32:34.156Z"
+      "acquiredAt": "2026-11-12T02:27:37.339Z"
     },
     "databricks-icons": {
       "name": "Databricks product icons",
@@ -80,7 +105,7 @@
       "stagedGroups": {
         "products": 69
       },
-      "acquiredAt": "2026-11-11T22:32:34.163Z"
+      "acquiredAt": "2026-11-12T02:27:37.348Z"
     },
     "snowflake-icons": {
       "name": "Snowflake brand-guidelines template icons",
@@ -105,7 +130,7 @@
         "features": 28,
         "objects": 54
       },
-      "acquiredAt": "2026-11-11T22:32:37.177Z"
+      "acquiredAt": "2026-11-12T02:27:40.036Z"
     },
     "local-snapshots": {
       "note": "gcp/palantir/workos are local-only providers; raw inputs are reconstructed from committed outputs when absent.",

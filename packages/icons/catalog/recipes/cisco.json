@@ -1,0 +1,75 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[2, 9],
+				[2, 12]
+			],
+			"stroke": "#1ba0d7",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[5, 7],
+				[5, 12]
+			],
+			"stroke": "#1ba0d7",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[8, 4],
+				[8, 12]
+			],
+			"stroke": "#1ba0d7",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 9],
+				[12, 12]
+			],
+			"stroke": "#1ba0d7",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[16, 4],
+				[16, 12]
+			],
+			"stroke": "#1ba0d7",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[19, 7],
+				[19, 12]
+			],
+			"stroke": "#1ba0d7",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[22, 9],
+				[22, 12]
+			],
+			"stroke": "#1ba0d7",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 18,
+			"text": "CISCO",
+			"size": 7,
+			"color": "#1ba0d7"
+		}
+	]
+}

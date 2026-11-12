@@ -1,0 +1,12 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "Cal.com",
+			"size": 5.4,
+			"color": "ink"
+		}
+	]
+}

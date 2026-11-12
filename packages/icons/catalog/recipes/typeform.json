@@ -1,0 +1,12 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "Typeform",
+			"size": 4.6,
+			"color": "ink"
+		}
+	]
+}

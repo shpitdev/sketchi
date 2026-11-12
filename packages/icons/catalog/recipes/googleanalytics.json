@@ -1,0 +1,33 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 16.3,
+			"y": 1.8,
+			"width": 5.4,
+			"height": 20.4,
+			"rounded": true,
+			"stroke": "#f9ab00",
+			"fill": "#f9ab00"
+		},
+		{
+			"kind": "rect",
+			"x": 9.5,
+			"y": 9.6,
+			"width": 5.4,
+			"height": 12.6,
+			"rounded": true,
+			"stroke": "#e37400",
+			"fill": "#e37400"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 5.2,
+			"cy": 19.5,
+			"rx": 2.6,
+			"ry": 2.6,
+			"stroke": "#e37400",
+			"fill": "#e37400"
+		}
+	]
+}

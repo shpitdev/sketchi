@@ -263,9 +263,14 @@ export function isStrayVendorLogo(icon: SearchableIcon, label: string): boolean 
 /**
  * Terms two products share, and the mark that answers them: "Lambda" in an
  * architecture is AWS Lambda far more often than Lambda's GPU cloud, whose
- * mark keeps its slug.
+ * mark keeps its slug; "Spark" is Apache Spark, not iFlytek's Spark model, and
+ * "Kafka" is Apache Kafka before Amazon MSK.
  */
-const TERM_OWNERS: ReadonlyMap<string, string> = new Map([["lambda", "aws-lambda"]]);
+const TERM_OWNERS: ReadonlyMap<string, string> = new Map([
+	["kafka", "apachekafka"],
+	["lambda", "aws-lambda"],
+	["spark", "apachespark"],
+]);
 
 /**
  * Catalog icons ranked by exact slug, name prefix, alias, substring, then

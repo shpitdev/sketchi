@@ -1,0 +1,40 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[7, 3.5],
+				[22, 3.5],
+				[17, 8.5],
+				[2, 8.5]
+			],
+			"closed": true,
+			"stroke": "#9945ff",
+			"fill": "#9945ff"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[2, 15.5],
+				[17, 15.5],
+				[22, 10.5],
+				[7, 10.5]
+			],
+			"closed": true,
+			"stroke": "#9945ff",
+			"fill": "#9945ff"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[7, 17.5],
+				[22, 17.5],
+				[17, 22.5],
+				[2, 22.5]
+			],
+			"closed": true,
+			"stroke": "#9945ff",
+			"fill": "#9945ff"
+		}
+	]
+}

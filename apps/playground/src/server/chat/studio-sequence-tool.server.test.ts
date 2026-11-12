@@ -203,7 +203,7 @@ describe("Studio build_sequence_diagram host", () => {
 				},
 				{
 					logos: [
-						{ name: "Stripe", slug: "stripe" },
+						{ name: "PayPal", slug: "paypal" },
 						{ name: "GitHub", slug: "github" },
 					],
 				},
@@ -214,9 +214,9 @@ describe("Studio build_sequence_diagram host", () => {
 				spec: {
 					...checkout.spec,
 					participants: [
-						{ id: "browser", label: "Browser", icon: { slug: "stripe" } },
+						{ id: "browser", label: "Browser", icon: { slug: "paypal" } },
 						{ id: "api", label: "API", icon: { slug: "kubernetes" } },
-						{ id: "payments", label: "Stripe payments" },
+						{ id: "payments", label: "PayPal payments" },
 					],
 				},
 			}),
@@ -226,10 +226,10 @@ describe("Studio build_sequence_diagram host", () => {
 		expect(built.spec.participants.map((participant) => participant.icon?.slug)).toEqual([
 			undefined,
 			undefined,
-			"stripe",
+			"paypal",
 		]);
 		// Grounding reports the unnamed logo; this test runtime has no catalog, so
-		// Code Mode also drops "stripe" with its own warning.
+		// Code Mode also drops "paypal" with its own warning.
 		expect(result.issues.map((issue) => [issue.code, issue.ref?.id])).toEqual([
 			["unknown_icon", "api"],
 			["unknown_icon", "payments"],

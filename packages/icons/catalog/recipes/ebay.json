@@ -1,0 +1,12 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "ebay",
+			"size": 10,
+			"color": "#e53238"
+		}
+	]
+}

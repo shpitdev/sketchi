@@ -9,12 +9,12 @@ function slugs(query: string, limit = Number.POSITIVE_INFINITY): string[] {
 
 /** Product names models search for, and the best mark the catalog has for each. */
 export const PRODUCT_NAME_QUERIES: Readonly<Record<string, string>> = {
-	"Cloudflare Workers": "cloudflare",
-	"cloudflare-workers": "cloudflare",
+	"Cloudflare Workers": "cloudflareworkers",
+	"cloudflare-workers": "cloudflareworkers",
 	"Cloudflare Workers AI": "workersai",
 	"Workers AI": "workersai",
 	"Cloudflare R2": "cloudflare",
-	"Cloudflare Pages": "cloudflare",
+	"Cloudflare Pages": "cloudflarepages",
 	"AWS Lambda": "aws-lambda",
 	Lambda: "aws-lambda",
 	"Lambda function": "aws-lambda-function",
@@ -38,7 +38,7 @@ export const PRODUCT_NAME_QUERIES: Readonly<Record<string, string>> = {
 	"Google Gemini": "gemini",
 	"Vercel Edge Functions": "vercel",
 	"Vercel AI SDK": "vercel",
-	"GitHub Actions": "github",
+	"GitHub Actions": "githubactions",
 	"GitHub Codespaces": "github",
 	"Azure Functions": "azure",
 	"Azure Blob Storage": "azure",
@@ -89,7 +89,7 @@ describe("product-name icon search", () => {
 		expect(slugs("k8s", 1)).toEqual(["kubernetes"]);
 		expect(slugs("psql", 1)).toEqual(["postgresql"]);
 		expect(slugs("gcp", 1)).toEqual(["googlecloud"]);
-		expect(slugs("cloudflare")).toEqual(["cloudflare"]);
+		expect(slugs("cloudflare", 1)).toEqual(["cloudflare"]);
 		expect(slugs("github", 1)).toEqual(["github"]);
 		expect(slugs("Workers AI")).toEqual(["workersai"]);
 		expect(slugs("edge", 1)).toEqual(["edge"]);

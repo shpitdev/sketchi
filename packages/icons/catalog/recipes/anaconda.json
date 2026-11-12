@@ -1,0 +1,40 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 12.5,
+			"cy": 12.5,
+			"rx": 10.5,
+			"ry": 10.5,
+			"stroke": "#44a833",
+			"fill": "#44a833"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 13.5,
+			"cy": 12.5,
+			"rx": 6.5,
+			"ry": 6.5,
+			"stroke": "paper",
+			"fill": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[2.5, 15],
+				[7, 8],
+				[13, 2.5]
+			],
+			"stroke": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[4, 6.5],
+				[5.5, 14],
+				[10, 22]
+			],
+			"stroke": "paper"
+		}
+	]
+}

@@ -557,7 +557,7 @@ describe("scenario CLI candidate decoding", () => {
 		{
 			name: "a model that shifts every logo one node",
 			scenarioId: "deploy-pipeline-logos",
-			icons: { build: "github", tests: "docker", passed: "cloudflare" },
+			icons: { build: "github", tests: "docker", passed: "cloudflareworkers" },
 			failing: ["icons-on-named-steps"],
 		},
 		{

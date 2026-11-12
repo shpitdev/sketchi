@@ -1,0 +1,20 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 7,
+			"cy": 12,
+			"text": "Fed",
+			"size": 7,
+			"color": "#4d148c"
+		},
+		{
+			"kind": "text",
+			"cx": 17.5,
+			"cy": 12.5,
+			"text": "Ex",
+			"size": 6.5,
+			"color": "#4d148c"
+		}
+	]
+}

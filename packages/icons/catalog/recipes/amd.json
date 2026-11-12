@@ -1,0 +1,41 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 8,
+			"cy": 12,
+			"text": "AMD",
+			"size": 8,
+			"color": "#ed1c24"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[17, 8.5],
+				[23, 8.5],
+				[23, 14.5]
+			],
+			"stroke": "#ed1c24",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[17, 11],
+				[17, 16],
+				[22, 16]
+			],
+			"stroke": "#ed1c24",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[17.5, 15.5],
+				[20.5, 12]
+			],
+			"stroke": "#ed1c24",
+			"pen": 2
+		}
+	]
+}

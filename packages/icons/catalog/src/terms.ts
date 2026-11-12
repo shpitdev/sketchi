@@ -14,6 +14,7 @@ const COMMON_TECH_WORDS = [
 	"filestore",
 	"genomics",
 	"json",
+	"jwt",
 	"memorystore",
 	"meta",
 	"nitro",
@@ -23,10 +24,13 @@ const COMMON_TECH_WORDS = [
 	"profiler",
 	"pubsub",
 	"pwa",
+	"readme",
 	"remix",
 	"serverless",
 	"submodel",
 	"turbo",
+	"xml",
+	"yaml",
 ];
 
 /**

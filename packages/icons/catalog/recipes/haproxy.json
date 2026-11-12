@@ -1,0 +1,76 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 9.8,
+			"y": 5.3,
+			"width": 4.4,
+			"height": 4.4,
+			"stroke": "#169bd6",
+			"fill": "#169bd6"
+		},
+		{
+			"kind": "rect",
+			"x": 9.8,
+			"y": 14.3,
+			"width": 4.4,
+			"height": 4.4,
+			"stroke": "#169bd6",
+			"fill": "#169bd6"
+		},
+		{
+			"kind": "rect",
+			"x": 5.3,
+			"y": 9.8,
+			"width": 4.4,
+			"height": 4.4,
+			"stroke": "#169bd6",
+			"fill": "#169bd6"
+		},
+		{
+			"kind": "rect",
+			"x": 14.3,
+			"y": 9.8,
+			"width": 4.4,
+			"height": 4.4,
+			"stroke": "#169bd6",
+			"fill": "#169bd6"
+		},
+		{
+			"kind": "rect",
+			"x": 3.2,
+			"y": 3.2,
+			"width": 3.4,
+			"height": 3.4,
+			"stroke": "#169bd6",
+			"fill": "#169bd6"
+		},
+		{
+			"kind": "rect",
+			"x": 17.4,
+			"y": 3.2,
+			"width": 3.4,
+			"height": 3.4,
+			"stroke": "#169bd6",
+			"fill": "#169bd6"
+		},
+		{
+			"kind": "rect",
+			"x": 3.2,
+			"y": 17.4,
+			"width": 3.4,
+			"height": 3.4,
+			"stroke": "#169bd6",
+			"fill": "#169bd6"
+		},
+		{
+			"kind": "rect",
+			"x": 17.4,
+			"y": 17.4,
+			"width": 3.4,
+			"height": 3.4,
+			"stroke": "#169bd6",
+			"fill": "#169bd6"
+		}
+	]
+}

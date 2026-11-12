@@ -51,6 +51,15 @@ bucket"). A plain resource word ("Database", "Queue", "Users") never names a
 vendor mark, and a tech noun never rescues an English first word into one
 (`GENERIC_COLLECTIONS` in `text-match.ts`).
 
+Brands from the simple-icons set come with the brand's name and the names
+diagrams use for it ("Apache Kafka", "Kafka") in the pipeline record. Some of
+them are English words ("Temporal", "Square", "Zoom"): like any catalog word,
+a label names one only when it is cased as a name or names the product
+("Temporal worker"). Where two marks share a term, `TERM_OWNERS` in
+`search.ts` names the one diagrams mean ("Spark" is Apache Spark). Diagram tools
+(Excalidraw, Mermaid, draw.io, tldraw, Lucidchart) name a request's format or
+source, so text never names their marks.
+
 Apps publish the SVGs themselves. `apps/icons` copies `svg/` to its public
 `/output/upload-ready/svg/` path at build time.
 

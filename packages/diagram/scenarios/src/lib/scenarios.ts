@@ -1773,10 +1773,10 @@ const flowchartScenarioDefinitions = [
 			{ aliases: ["GitHub"], collection: "devtools-ci", name: "GitHub", slug: "github" },
 			{ collection: "devtools-ci", name: "Docker", slug: "docker" },
 			{
-				aliases: ["Cloudflare"],
-				collection: "cloud-vendors",
-				name: "Cloudflare",
-				slug: "cloudflare",
+				aliases: ["Cloudflare Worker"],
+				collection: "cloud-hosting-paas",
+				name: "Cloudflare Workers",
+				slug: "cloudflareworkers",
 			},
 		],
 		nodes: [
@@ -1795,7 +1795,13 @@ const flowchartScenarioDefinitions = [
 				["run the test suite", "run test suite", "test suite runs"],
 			],
 			["passed", "Tests pass?", "decision", ["tests pass"]],
-			["ship", "Ship to Cloudflare Workers", "end", ["ship to Cloudflare Workers"], "cloudflare"],
+			[
+				"ship",
+				"Ship to Cloudflare Workers",
+				"end",
+				["ship to Cloudflare Workers"],
+				"cloudflareworkers",
+			],
 			[
 				"notify",
 				"Notify the team",

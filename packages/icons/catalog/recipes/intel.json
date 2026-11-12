@@ -1,0 +1,12 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12.5,
+			"text": "intel",
+			"size": 7.5,
+			"color": "#0071c5"
+		}
+	]
+}
