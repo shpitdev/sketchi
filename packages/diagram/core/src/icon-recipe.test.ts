@@ -153,6 +153,28 @@ describe("icon recipes", () => {
 		expect(iconRecipeFitIssues(moved as IconRecipe)).toEqual([]);
 	});
 
+	it("follows the curve a smooth stroke draws, not the chords between its points", () => {
+		const diamond = (smooth: boolean): IconRecipe => ({
+			parts: [
+				{
+					kind: "stroke",
+					points: [
+						[12, 2],
+						[22, 12],
+						[12, 22],
+						[2, 12],
+					],
+					closed: true,
+					smooth,
+				},
+				{ kind: "text", cx: 12, cy: 12, text: "CACHE", size: 5 },
+			],
+		});
+		// The curve bows out past the straight sides, leaving the word room.
+		expect(iconRecipeFitIssues(diamond(false))).toHaveLength(1);
+		expect(iconRecipeFitIssues(diamond(true))).toEqual([]);
+	});
+
 	it("lets a word fill a badge drawn in one color, but not cross it", () => {
 		const badge = (size: number): IconRecipe => ({
 			parts: [

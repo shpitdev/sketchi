@@ -308,6 +308,39 @@ function shapePoints(part: IconRecipeRect | IconRecipeEllipse): readonly Point[]
 	];
 }
 
+const CURVE_STEPS = 12;
+
+/**
+ * The path a stroke's pen takes. A smooth stroke is the curve rough.js draws
+ * through its points for Excalidraw: a Catmull-Rom spline whose end points
+ * repeat, so it passes through every point. A closed stroke is drawn back to
+ * its first point, as the drawer draws it.
+ */
+function strokePath(part: IconRecipeStroke): { points: readonly Point[]; closed: boolean } {
+	if (!part.smooth) return { points: part.points, closed: part.closed === true };
+	const through = part.closed ? [...part.points, part.points[0]!] : part.points;
+	const last = through.length - 1;
+	const points: Point[] = [through[0]!];
+	for (let index = 0; index < last; index++) {
+		const [x0, y0] = through[Math.max(index - 1, 0)]!;
+		const [x1, y1] = through[index]!;
+		const [x2, y2] = through[index + 1]!;
+		const [x3, y3] = through[Math.min(index + 2, last)]!;
+		const c1: Point = [x1 + (x2 - x0) / 6, y1 + (y2 - y0) / 6];
+		const c2: Point = [x2 - (x3 - x1) / 6, y2 - (y3 - y1) / 6];
+		for (let step = 1; step <= CURVE_STEPS; step++) {
+			const t = step / CURVE_STEPS;
+			const u = 1 - t;
+			const [a, b, c, d] = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+			points.push([
+				a * x1 + b * c1[0] + c * c2[0] + d * x2,
+				a * y1 + b * c1[1] + c * c2[1] + d * y2,
+			]);
+		}
+	}
+	return { points, closed: false };
+}
+
 function outline(part: IconRecipePart): Outline | undefined {
 	if (part.kind === "text" || part.kind === "arrow") return undefined;
 	const unit = ICON_RECIPE_TEXT_FIT.previewSize / ICON_RECIPE_GRID;
@@ -316,8 +349,7 @@ function outline(part: IconRecipePart): Outline | undefined {
 		stroke === undefined ? 0 : (ICON_RECIPE_TEXT_FIT.penPx * (part.pen ?? 1)) / 2 / unit;
 	const badge = part.fill !== undefined && (stroke === undefined || stroke === part.fill);
 	return {
-		points: part.kind === "stroke" ? part.points : shapePoints(part),
-		closed: part.kind !== "stroke" || part.closed === true,
+		...(part.kind === "stroke" ? strokePath(part) : { points: shapePoints(part), closed: true }),
 		stroke,
 		fill: part.fill,
 		edge: badge ? -halfPen : halfPen,

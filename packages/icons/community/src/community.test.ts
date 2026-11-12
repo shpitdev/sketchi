@@ -223,6 +223,32 @@ describe("publishCommunityIcon", () => {
 		expect(found.icons.map((icon) => icon.recipe)).toEqual([wide]);
 	});
 
+	it("refuses a word that runs over the shape framing it", async () => {
+		const frame = {
+			kind: "rect",
+			x: 2.5,
+			y: 2.5,
+			width: 19,
+			height: 19,
+			rounded: true,
+			pen: 2,
+		} as const;
+		const crowded: IconRecipe = {
+			parts: [frame, { kind: "text", cx: 12, cy: 7.5, text: "CACHE", size: 5.5 }],
+		};
+		const refused = await run(publishCommunityIcon({ name: "Cache", recipe: crowded }));
+		expect(refused._tag === "Failure" && refused.failure).toMatchObject({
+			_tag: "CommunityIconInvalidRequestError",
+			code: "recipe_clips",
+			message: expect.stringContaining('"CACHE" would be cut off or run over the shape around it'),
+		});
+		const clear: IconRecipe = {
+			parts: [frame, { kind: "text", cx: 12, cy: 8.5, text: "CACHE", size: 5 }],
+		};
+		const published = await run(publishCommunityIcon({ name: "Cache", recipe: clear }));
+		expect(published._tag).toBe("Success");
+	});
+
 	it("keeps out what moderation rejects and what the owner hid", async () => {
 		const database = sqliteDatabase();
 		const rejected = await run(publishCommunityIcon({ name: "Box", recipe: BOX }), {
