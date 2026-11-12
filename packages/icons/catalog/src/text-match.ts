@@ -158,6 +158,19 @@ function isAcronym(term: string): boolean {
 	);
 }
 
+/**
+ * Diagram tools. A request to Sketchi that names one ("an Excalidraw diagram", "convert this
+ * Mermaid flowchart", "the Excalidraw export step") names the drawing's format or source, not a
+ * component to draw, so text never names their marks; a document can still attach one by slug.
+ */
+const DIAGRAM_MEDIUM_SLUGS: ReadonlySet<string> = new Set([
+	"diagramsdotnet",
+	"excalidraw",
+	"lucid",
+	"mermaid",
+	"tldraw",
+]);
+
 /** Icons by tokenized slug, name, and alias, built once per icon list. */
 function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): TermIndex<Icon> {
 	const cached = termIndexes.get(icons);
@@ -176,6 +189,7 @@ function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): TermInd
 		index.set(key, entries);
 	};
 	for (const icon of icons) {
+		if (DIAGRAM_MEDIUM_SLUGS.has(icon.slug)) continue;
 		add(icon.slug.replaceAll("-", " "), icon);
 		add(icon.name, icon);
 		for (const alias of icon.aliases) add(alias, icon);

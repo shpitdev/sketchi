@@ -560,7 +560,6 @@ const flowchartScenarioDefinitions = [
 			"A vague package-interaction request recast as a directed flowchart so harnesses keep the six stated stages in order instead of inventing a Mermaid dependency report.",
 		prompt:
 			"Create a diagram that showcases how the various packages in this repo interact. Show the high-level path from an app request through the agent, core diagram model, renderer, Excalidraw export, and hosted artifact response.",
-		logos: [{ collection: "design-productivity", name: "Excalidraw", slug: "excalidraw" }],
 		// The six stages the prompt states, in its order. The prompt names no
 		// packages, so package names or an artifact store are not required.
 		nodes: [

@@ -401,6 +401,14 @@ describe("logosNamedInText", () => {
 		expect(offered("Parse the YAML config and the XML payload.")).toEqual([]);
 	});
 
+	it("offers no diagram tool a request names as its format or source", () => {
+		expect(offered("Draw an Excalidraw diagram of our checkout with Stripe.")).toEqual(["stripe"]);
+		expect(offered("Convert this Mermaid flowchart and the draw.io export.")).toEqual([]);
+		expect(
+			offered("The renderer feeds the Excalidraw export, like tldraw and Lucidchart."),
+		).toEqual([]);
+	});
+
 	it("offers the data, delivery and payment brands a prompt names", () => {
 		expect(
 			offered("Payments go through Stripe and PayPal, events through Kafka into Apache Flink."),
