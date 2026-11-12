@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.42.0
+
+### Minor Changes
+
+- [#781](https://github.com/shpitdev/sketchi/pull/781) [`3e460fc`](https://github.com/shpitdev/sketchi/commit/3e460fcbc4d0fe2d67a0b24a7e3ee4103da6b27e) Thanks [@anandpant](https://github.com/anandpant)! - About 430 more brand logos are in the catalog and draw by hand: data and streaming platforms (Kafka, Airflow, Spark, Flink, Trino, DuckDB, CockroachDB, PlanetScale, Elasticsearch), delivery and platform tools (Helm, Argo, Istio, Envoy, Consul, GitHub Actions), observability (Splunk, PagerDuty, Logstash), messaging and SaaS (Discord, Zoom, WhatsApp, Telegram, Mailgun, Confluence), payments (Stripe, PayPal, Square, Adyen) and CDNs (Fastly, Akamai), plus the real Jupyter and RStudio marks. A label names a brand that is also an English word only when it names the product: "Temporal worker" and "Helm chart" draw Temporal and Helm, while "Temporal data" and "Zoom in" draw nothing.
+
 ## 0.41.0
 
 ### Minor Changes
