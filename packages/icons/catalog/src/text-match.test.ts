@@ -135,6 +135,50 @@ describe("logoNamedByLabel", () => {
 	});
 });
 
+describe("official brand names in diagrams", () => {
+	const offered = (text: string) => logosNamedInText(text, nodeLogoIcons).map((icon) => icon.slug);
+	const named = (text: string) => labelLogos(text, nodeLogoIcons).named.map((icon) => icon.slug);
+
+	it("keeps everyday phrases and an unqualified short token unbranded", () => {
+		for (const text of [
+			"teams",
+			"Teams",
+			"plaid shirt",
+			"Plaid shirt",
+			"honeycomb layout",
+			"Honeycomb layout",
+			"dbt",
+			"DBT therapy",
+			"coordinate teams",
+		]) {
+			expect(offered(text), text).toEqual([]);
+			expect(named(text), text).toEqual([]);
+		}
+	});
+
+	it("recognizes qualified product names through both text entry points", () => {
+		for (const [text, slug] of [
+			["Microsoft Teams", "microsoft-teams"],
+			["dbt models", "dbt"],
+			["Run dbt Core transformations", "dbt"],
+			["dbt Cloud", "dbt"],
+			["Plaid API", "plaid"],
+			["Honeycomb tracing", "honeycomb"],
+			["honeycomb observability", "honeycomb"],
+			["Connect the plaid api", "plaid"],
+			["Microsoft Power BI", "power-bi"],
+			["SendGrid", "sendgrid"],
+			["LaunchDarkly", "launchdarkly"],
+			["Fivetran", "fivetran"],
+			["Tableau dashboard", "tableau"],
+			["Jenkins CI", "jenkins"],
+		] as const) {
+			expect(offered(text), text).toEqual([slug]);
+			expect(named(text), text).toEqual([slug]);
+		}
+	});
+});
+
 describe("labelLogos", () => {
 	const named = (label: string) => labelLogos(label, nodeLogoIcons).named.map((icon) => icon.slug);
 	const possible = (label: string) =>

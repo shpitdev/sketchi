@@ -1,0 +1,60 @@
+{
+	"parts": [
+		{
+			"kind": "ellipse",
+			"cx": 17.5,
+			"cy": 6.5,
+			"rx": 2.8,
+			"ry": 2.8,
+			"stroke": "#5f50e2",
+			"fill": "#5f50e2"
+		},
+		{
+			"kind": "rect",
+			"x": 13,
+			"y": 10.5,
+			"width": 9,
+			"height": 10.5,
+			"rounded": true,
+			"stroke": "#5f50e2",
+			"fill": "#5f50e2"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 11,
+			"cy": 5,
+			"rx": 3.5,
+			"ry": 3.5,
+			"stroke": "#7588ff",
+			"fill": "#7588ff"
+		},
+		{
+			"kind": "rect",
+			"x": 6,
+			"y": 10,
+			"width": 11,
+			"height": 12.5,
+			"rounded": true,
+			"stroke": "#85c2ff",
+			"fill": "#85c2ff"
+		},
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 11,
+			"width": 10.5,
+			"height": 10.5,
+			"rounded": true,
+			"stroke": "#3c2cb8",
+			"fill": "#3c2cb8"
+		},
+		{
+			"kind": "text",
+			"cx": 6.75,
+			"cy": 16.3,
+			"text": "T",
+			"size": 8,
+			"color": "paper"
+		}
+	]
+}

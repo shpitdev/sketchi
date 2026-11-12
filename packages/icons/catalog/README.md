@@ -140,3 +140,5 @@ pnpm nx test icon-catalog
 pnpm nx typecheck icon-catalog
 pnpm nx build icon-catalog
 ```
+
+Artwork attribution and mark-removal policy: [NOTICE.md](./NOTICE.md).
