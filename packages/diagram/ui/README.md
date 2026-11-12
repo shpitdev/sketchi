@@ -32,3 +32,6 @@ pnpm nx build-storybook diagram-ui
 Apps compose this package when they need a diagram preview or an Excalidraw
 canvas. Keep reusable state and component
 coverage here; app-specific routing and service calls stay inside `apps/*`.
+
+Storybook, Chromatic and the Storybook MCP endpoint are described in
+[docs/storybook-chromatic.md](../../../docs/storybook-chromatic.md).

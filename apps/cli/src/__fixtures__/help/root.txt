@@ -1,5 +1,5 @@
   sketchi
-  Editable diagrams from a prompt.
+  Excalidraw diagrams from a description.
 
 START HERE
   sketchi generate  interactive

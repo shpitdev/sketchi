@@ -5,14 +5,14 @@
 <h1 align="center">Sketchi</h1>
 
 <p align="center">
-  <strong>Typed, deterministic diagrams for people and AI agents.</strong><br />
-  Prompt to validated IR to editable Excalidraw and hosted PNG artifacts.
+  <strong>Excalidraw diagrams from a description.</strong><br />
+  Describe a system or a process in a sentence. Sketchi draws it with each product's logo, and every part stays editable.
 </p>
 
 <p align="center">
   <a href="https://sketchi.app/"><img alt="Website" src="https://img.shields.io/badge/sketchi.app-live-765264" /></a>
   <a href="https://www.npmjs.com/package/sketchi"><img alt="npm version" src="https://img.shields.io/npm/v/sketchi?logo=npm&color=CB3837" /></a>
-  <a href="https://nx.dev/"><img alt="Nx" src="https://img.shields.io/badge/Nx-23-143055?logo=nx" /></a>
+  <a href="https://nx.dev/"><img alt="Nx" src="https://img.shields.io/badge/Nx-24-143055?logo=nx" /></a>
   <a href="https://workers.cloudflare.com/"><img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white" /></a>
   <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white" /></a>
   <a href="https://excalidraw.com/"><img alt="Excalidraw" src="https://img.shields.io/badge/output-Excalidraw-6965DB" /></a>
@@ -25,348 +25,105 @@
   <img src="apps/web/public/media/sketchi-card.png" alt="The Sketchi wordmark beside a hand-drawn architecture diagram Sketchi made: a Next.js app on Vercel and a GitHub webhook call an API on Cloudflare Workers, which reads Postgres and caches in Redis." width="1000" />
 </p>
 
-Sketchi is the canonical Nx and Cloudflare workspace for generating reliable,
-editable diagrams. Model output is never treated as a finished drawing: it is
-parsed into a typed intermediate representation, validated, laid out by code,
-converted to real Excalidraw elements, and persisted as an artifact with PNG and
-scene representations.
+Sketchi works from a sentence, or from a typed spec that an agent or the CLI
+writes. A model's answer is never the drawing: it is parsed into a typed
+diagram, validated, laid out by code, converted to real Excalidraw elements,
+and stored with a PNG. It draws flowcharts (with groups, swimlanes and
+architecture zones), mindmaps, sequence diagrams, timelines, bar, line and pie
+charts, state machines, Gantt charts, ER diagrams, UML class diagrams, org
+charts, Venn diagrams, user journey maps, Sankey diagrams, UI wireframes and
+quadrant charts.
 
-## What Sketchi Does
+## Use it
 
-- Creates hosted flowcharts, mindmaps, sequence diagrams, timelines, state machines, Gantt charts, ER diagrams, UML class diagrams, org charts, Venn diagrams, user journey maps, Sankey diagrams, UI wireframes, quadrant charts, and bar, line, and pie charts from natural-language prompts.
-- Produces validated, editable Excalidraw scenes instead of opaque images.
-- Exposes Code Mode through MCP and versioned HTTP artifact endpoints.
-- Keeps layout, bindings, wrapping, and scene conversion deterministic in code.
-- Tests diagram contracts with fixtures, maintained scenarios, real-scene
-  validation, component tests, and Storybook.
-- Converts a curated SVG corpus into native Excalidraw elements and libraries.
-
-## CLI
-
-Install Sketchi from npm, or use the noninteractive installer to install the
-same package and configure Zsh, Bash, or Fish completions:
+**CLI.** Install the [`sketchi`](https://www.npmjs.com/package/sketchi) command
+and turn a description into a PNG you can revise later. Generation needs no
+account or API key; authoring, editing and export work offline.
 
 ```sh
-npm install -g sketchi
-
-# Or install and configure completions in one step:
-curl -fsSL https://raw.githubusercontent.com/shpitdev/sketchi/main/install.sh | sh
+curl -fsSL https://sketchi.app/install.sh | sh   # or: npm install -g sketchi
+sketchi generate --prompt "Deploy with GitHub Actions, Docker and Cloudflare Workers"
 ```
 
-Turn a prompt into a validated PNG and editable local record:
+The [CLI guide](apps/cli/README.md) covers every command, and the
+[changelog](apps/cli/CHANGELOG.md) what changed.
 
-```sh
-sketchi generate
+**Agents.** Codex, Claude Code, Antigravity and OpenCode draw through the public
+MCP server at `https://playground.sketchi.app/mcp`, with no login or local
+browser. The [agent quickstart](docs/code-mode-agent-plugins.md) installs the
+plugin or skill for each, and the [Code Mode API](docs/mcp-tool-catalog.md) page
+describes the server.
 
-# Direct and noninteractive:
-sketchi generate --prompt "Map release approval with pass and revise branches"
-```
+**Browser.** [playground.sketchi.app](https://playground.sketchi.app) drafts and
+edits diagrams in chat, and [icons.sketchi.app](https://icons.sketchi.app) is the
+icon library diagrams draw their logos from.
 
-Bare `sketchi generate` opens a short wizard only in a human text TTY. Scripts,
-pipes, redirects, CI, and JSON output never prompt and must pass `--prompt`.
-Explicit `--type` and file `--dest` values preset their wizard questions;
-interactive generation remains PNG-only, so other formats and `--dest -` also
-require `--prompt`.
-Without `--type`, the model selects a supported native type. Explicit flowchart,
-mindmap, sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, or quadrant selection is authoritative; architecture and
-swimlane requests fail clearly instead of being coerced.
-The default file is `<generated-id>.png` in the current directory. Use
-`--format excalidraw` or `--format scene` for another artifact, and `--dest`
-to choose its path or stream bytes with `--dest -`.
-After writing the PNG, `generate` copies it to the desktop clipboard so it is
-ready to paste; `--no-copy` skips that. `sketchi copy` copies the newest diagram
-again, `sketchi list checkout` finds past diagrams by title or prompt, and every
-id argument accepts `latest` or a unique prefix.
-
-For manual offline authoring, create a canonical document, inspect and revise
-it, list the local store, then export another artifact:
-
-```sh
-sketchi create --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
-sketchi show release-flow
-sketchi edit release-flow --json '{"type":"flowchart","spec":{"id":"release-flow","title":"Release approval revised","nodes":[{"id":"start","label":"Change proposed","kind":"start"},{"id":"review","label":"Review complete evidence","kind":"process"},{"id":"end","label":"Release approved","kind":"end"}],"edges":[{"source":"start","target":"review"},{"source":"review","target":"end"}]}}'
-sketchi patch release-flow --json '{"operations":[{"op":"setStyle","selector":{"nodeIds":["review"]},"style":{"fillColor":"#dbeafe","strokeColor":"#2563eb"}}]}'
-sketchi list
-sketchi export release-flow --format excalidraw --dest release-flow.excalidraw
-sketchi export release-flow --format png --dest release-flow.png
-sketchi restore release-flow --revision 1
-```
-
-`create`, `patch`, `show`, `edit`, `list`, `export`, and `restore` are deterministic,
-fully offline, and need no credentials. `generate`, `share`, and `pull` are
-explicit credential-free network commands, each making one HTTPS request.
-Share an immutable encrypted snapshot with `sketchi share release-flow`; after
-browser edits are exported to a new Excalidraw link, apply it with
-`sketchi pull release-flow --link URL`. All commands support `--output json`.
-PNG export renders on demand through Excalidraw plus bundled fonts and WASM when
-no PNG is stored, without modifying the record. PNG file exports include a
-generic inline-Markdown display hint for calling agents; export status uses
-stderr and `--dest -` keeps stdout byte-only.
-Generate completions directly with `sketchi --completions zsh`,
-`sketchi --completions bash`, or `sketchi --completions fish`. See the
-[complete CLI guide](apps/cli/README.md) for file/stdin input, completion setup,
-storage details, and agent-oriented usage.
-The progressive `sketchi --help` leads with prompt-to-PNG and the next human
-actions; `sketchi docs` prints the complete command map plus agent and
-automation contracts from the packaged binary.
-
-See the CLI [changelog](apps/cli/CHANGELOG.md) for what changed, or browse
-published versions on [GitHub Releases](https://github.com/shpitdev/sketchi/releases).
-
-### Shell completions
-
-The installer configures Zsh, Bash, or Fish completions for the detected shell.
-Generated Bash completions require Bash 4 or newer; the installed source block
-silently skips them on the stock macOS Bash 3.2. Bash login shells may not read
-`.bashrc`, so `.bash_profile` may need to source `.bashrc` for completions to be
-available.
-
-## Code Mode
-
-Codex, Claude Code, Agy, and OpenCode can create hosted diagrams through the
-public Code Mode MCP endpoint. The [agent quickstart](docs/code-mode-agent-plugins.md)
-contains installation, verification, and first-diagram instructions for every
-supported harness. The public flow does not require a Sketchi login, API key, or
-local browser installation.
+## How it works
 
 ```text
-prompt or revision
-        ↓
-model candidate → typed diagram IR → deterministic scene → Excalidraw artifact
-        ↓                                      ↓                  ↓
- maintained scenarios                    validation          hosted PNG
+prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout ─▶ Excalidraw scene ─▶ stored artifact + PNG
+                                  ▲
+                       spec from the CLI or MCP
 ```
 
-## Architecture
+| Package                       | Owns                                                                    |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `packages/diagram/core`       | diagram contracts (Effect Schema), semantic validation, shared rules    |
+| `packages/diagram/generation` | model prompts, gateway calls, candidate parsing and repair              |
+| `packages/diagram/agent`      | the Code Mode build: normalize, validate, render, export, store         |
+| `packages/diagram/renderer`   | deterministic layout and routing for every family                       |
+| `packages/diagram/excalidraw` | Excalidraw conversion and real-scene validation                         |
+| `packages/diagram/scenarios`  | maintained scenarios and the scenario CLI                               |
+| `packages/diagram/ui`         | shared React canvas and preview components, and the diagram Storybook   |
+| `packages/icons/*`            | the icon catalog and search, community icons, and hand-drawn logos      |
+| `packages/svg-excalidraw`     | SVG to native Excalidraw elements and libraries                         |
+| `packages/studio/projects`    | Studio project and diagram persistence                                  |
+| `packages/observability`      | span telemetry for every Worker request                                 |
+| `packages/ui`                 | shadcn primitives and tokens for the Tailwind apps                      |
 
-| Boundary                      | Responsibility                                                  |
-| ----------------------------- | --------------------------------------------------------------- |
-| `packages/diagram/core`       | Typed diagram contracts, semantic validation, fixtures          |
-| `packages/diagram/generation` | Provider messages, responses, and candidate parsing             |
-| `packages/diagram/agent`      | Canonical build runtime, quality checks, artifact orchestration |
-| `packages/diagram/renderer`   | Deterministic layout and scene generation                       |
-| `packages/diagram/excalidraw` | Persistable Excalidraw conversion and real-scene validation     |
-| `packages/diagram/scenarios`  | Maintained prompts, assertions, and local/live evals            |
-| `packages/diagram/ui`         | Shared React diagram, review, and eval UI states                |
-| `packages/icons/catalog`      | Icon manifest, ranked search, SVG sources, node-logo rules      |
-| `packages/studio/projects`    | Studio project/diagram contracts and object-bucket persistence  |
-| `packages/svg-excalidraw`     | Native SVG-to-Excalidraw conversion and library serialization   |
-| `packages/ui`                 | Shared shadcn primitives and tokens for the Tailwind apps       |
+| App          | Serves                                                                 |
+| ------------ | ---------------------------------------------------------------------- |
+| `cli`        | the `sketchi` command                                                  |
+| `playground` | playground.sketchi.app: Studio, the HTTP API and the MCP server       |
+| `web`        | sketchi.app: home, docs and agent setup                                |
+| `icons`      | icons.sketchi.app                                                      |
+| `excalidraw` | an internal Excalidraw workspace for checking real scenes              |
 
-The first high-reliability target is decision-heavy flowchart generation.
-`flowchart`, `mindmap`, `sequence`, `timeline`, `chart`, `state-machine`, `gantt`, `er`, `class`, `org-chart`, `venn`, `journey`, `sankey`, `wireframe`, and `quadrant` are explicit diagram families; unsupported families do
-not silently fall back to a generic template. See the full
-[architecture guide](docs/architecture.md) and the
-[MCP-first generation boundary](docs/mcp-first-generation.md).
-
-## Product Surfaces
-
-| Surface        | Role                                                               | Local command               |
-| -------------- | ------------------------------------------------------------------ | --------------------------- |
-| `cli`          | Offline local authoring plus credential-free public generation     | `pnpm nx build sketchi-cli` |
-| `web`          | `sketchi.app` home, docs, and setup                                | `pnpm nx dev web`           |
-| `playground`   | Public Playground, Code Mode API/MCP, artifacts, Studio foundation | `pnpm nx dev playground`    |
-| `icons`        | `icons.sketchi.app` curated icon browser                           | `pnpm nx dev icons`         |
-| `excalidraw`   | Internal real-canvas rendering and editing workspace               | `pnpm nx dev excalidraw`    |
-
-The public host is `playground`, while
-its durable Worker identity remains `sketchi-studio` and the extracted Studio
-persistence boundary remains `packages/studio/projects`. The completed
-repository migration and its historical before tree are recorded in the
-[repository structure proposal](docs/repository-structure-proposal.html).
-
-## Quick Start
-
-The project-local [mise](https://mise.jdx.dev/) configuration pins Node 26.13.0
-and native pnpm 12.16.1. The workspace uses stable native TypeScript 7.0.2 as
-`tsc` while the `typescript` module and `tsc6` expose the supported TypeScript
-6.0.3 compiler API for Nx and the repository tooling tests through the official
-`@typescript/typescript6@6.0.2` compatibility package. Activate mise in your
-shell, then install the exact tools and dependencies:
-
-```sh
-mise trust
-mise install
-mise exec -- pnpm install
-pnpm dev
-```
-
-Run one surface with `pnpm nx dev <project>`. `pnpm dev` starts every Nx app with
-a `dev` target in parallel through Portless.
+Every app except the CLI is a Cloudflare Worker. See the
+[architecture guide](docs/architecture.md) and, for each family,
+[adding a diagram family](docs/diagram-families.md).
 
 ## Development
 
-Required workspace proof:
+[mise](https://mise.jdx.dev/) pins Node and pnpm:
 
 ```sh
-pnpm run toolchain:verify
-pnpm run test:deploy-scripts
-pnpm run test:tools
-pnpm nx run-many -t typecheck,test,build
-pnpm run check
-pnpm nx run-many -t typecheck-native
-pnpm run test:wrangler-dry-runs
-pnpm nx build-storybook diagram-ui
-pnpm exec tsc6 -b --pretty false
+mise trust && mise install
+pnpm install
+pnpm dev                    # every app, through Portless
+pnpm nx dev playground      # one app
 ```
 
-`pnpm run check` is the local quality gate: lint, format check, and the custom
-lint-rule tests.
+`pnpm ci:local` is the gate: lint and format, typecheck (TypeScript 6 and the
+native TypeScript 7 compiler), build and test for every project the change
+affects, plus the tooling, deploy and Storybook checks. Remote CI on a pull
+request is one Nx-affected typecheck. [AGENTS.md](AGENTS.md#proof) lists the
+fuzz suites and other checks to run locally when their inputs change.
 
-- `pnpm run lint` builds the package declarations that type-aware rules resolve,
-  then runs [Oxlint](https://oxc.rs/docs/guide/usage/linter) over the whole
-  repository with zero warnings allowed. `.oxlintrc.json` holds the rule set, the
-  Nx module boundaries, and the Effect and Zod import policy; Sketchi's own rules
-  live in `tools/oxlint` and run with `pnpm run test:lint-rules`. `@shadcn/lint`
-  holds the Tailwind apps to their shared primitives; see
-  [UI style contracts](docs/ui-style-contracts.md). Every
-  suppression is a single-line `oxlint-disable-next-line <rule> -- <reason>`.
-- `pnpm run format` applies [Oxfmt](https://oxc.rs/docs/guide/usage/formatter):
-  tabs, 100 columns, double quotes, semicolons, trailing commas, and spaces in
-  `tsconfig` files, with no import or `package.json` sorting.
-  `pnpm run format:check` verifies it.
-- Oxfmt never touches generated output (route trees, Wrangler types, changeset
-  changelogs, the lockfile, the generated icon catalog), byte-exact fixtures
-  and frozen compatibility corpora, vendored shadcn and AI Elements components,
-  raw icon pipeline artifacts, files rewritten by editor or agent tools, or prose
-  (Markdown and `docs/`). `.oxfmtrc.json` lists the exact paths, and
-  `tools/formatting.test.ts` proves each exclusion matches real files and is never
-  formatted.
+A CLI change that should ship gets a changeset (`pnpm changeset`); merging the
+Version Packages pull request publishes it.
 
-The [MCP SDK compatibility note](docs/mcp-sdk-compatibility.md) records the
-bounded server-only exception that keeps the deployed handlers on the patched
-SDK while Cloudflare's exact peer metadata remains stale.
-
-For a CLI change that should ship, run `pnpm changeset` and commit the generated
-changeset with the change. Changesets maintains a Version Packages PR on `main`;
-merging that PR updates the CLI version and causes the existing release workflow
-to publish it.
-
-Run the canonical deterministic scenario:
-
-```sh
-pnpm nx scenario diagram-scenarios -- \
-  --scenario pharma-batch-disposition \
-  --fixture \
-  --out .memory/pharma-batch.excalidraw
-```
-
-Use a local model command by setting `SKETCHI_GENERATOR_COMMAND`; it receives the
-scenario prompt on stdin and writes candidate IR JSON to stdout.
-
-Generate new owned surfaces through the workspace plugin:
-
-```sh
-pnpm nx g @sketchi/generators:ui-component StatusBadge
-pnpm nx g @sketchi/generators:diagram-type mindmap --title "Sketchi mindmap fixture"
-```
-
-## Evals
-
-Graded evals live in Frontierclimb, a separate private repository. Its
-`sketchi` catalog grades agents building through the hosted MCP, and its
-`sketchi-generate` catalog grades `sketchi generate`. Both read their cases from
-this repository's scenarios (`packages/diagram/scenarios`) through the scenario
-CLI. Prompt and routing changes are measured there.
-
-This repository keeps only those scenarios and a hand-run sanity check: a typed
-generate, an untyped generate that must come back as the right kind, and one MCP
-`execute`. CI never runs it.
-
-```sh
-pnpm sanity                                                     # production
-pnpm sanity --endpoint https://pr-<N>-sketchi-studio.dimethyl.workers.dev
-```
-
-Its requests carry `x-sketchi-client: sketchi-sanity` and a `sanity_` run ID,
-which it prints with the DuckDB queries that find them.
+Graded evals run outside this repository against the scenarios in
+`packages/diagram/scenarios`. `pnpm sanity` runs three end-to-end checks
+against production or a preview.
 
 ## Deployment
 
-Eligible same-repository pull requests build and deploy app-specific Cloudflare
-Workers when Cloudflare credentials are configured, then maintain one preview
-comment per app. Relevant merges to `main` deploy production Workers when those
-credentials are available; custom domain attachment remains an explicit
-operator action. Forks and unconfigured environments retain build proof without
-a Worker deploy. The standalone Excalidraw workspace is an internal surface.
-
-Worker builds are isolated under `dist/apps/<app>` and resolved through an
-explicit Nx-project-to-Worker map, so parallel builds and later repository
-renames cannot overwrite or implicitly rename durable Worker deployments.
-
-See [preview deployments](docs/preview-deploys.md) and the guarded
+Merging to `main` deploys the Worker apps a change affects. A pull request gets
+preview Workers when it carries the `preview` label; see
+[preview deployments](docs/preview-deploys.md) and the
 [production domain runbook](docs/production-domain-cutover.md).
-
-```sh
-pnpm deploy:playground
-pnpm deploy:web
-pnpm deploy:excalidraw
-pnpm deploy:icons
-```
-
-## Repository Map
-
-```text
-apps/
-├── cli/                          local authoring and generation CLI
-├── excalidraw/                   internal real-canvas workspace
-├── icons/                        public icon browser
-├── native-conversion-storybook/ explicit cross-app Storybook composition
-├── playground/                   public Playground, API/MCP, Studio adapter
-└── web/                          public home, docs, and setup
-packages/
-├── diagram/{agent,core,excalidraw,generation,renderer,scenarios,ui}/
-├── studio/projects/              persistence contract and service
-├── svg-excalidraw/               native SVG conversion
-└── ui/                           shared shadcn primitives
-tools/sketchi-generators/         Nx generators and tests
-scripts/                          deploy, cutover, and pipeline operations
-plugins/                          Codex and Claude Code distribution payloads
-docs/                             architecture, boundaries, and runbooks
-```
-
-pnpm, Nx, and the root TypeScript solution all cover the same package-backed
-projects. Nx tags plus Oxlint enforce package/app, runtime/eval, persistence/UI,
-and explicit composition boundaries across source, config, and Storybook
-files. Every pull request deploys each mapped Worker as a real preview, and
-`pnpm run test:wrangler-dry-runs` dry-runs them locally from their generated
-build configuration; see the
-[architecture guide](docs/architecture.md#workspace-enforcement).
-
-## Documentation
-
-- [Agent plugin quickstart](docs/code-mode-agent-plugins.md)
-- [Architecture](docs/architecture.md)
-- [UI style contracts](docs/ui-style-contracts.md)
-- [Agentic generation](docs/agentic-generation.md)
-- [MCP-first generation](docs/mcp-first-generation.md)
-- [SVG conversion plan](docs/svg-excalidraw-conversion-plan.md)
-- [Repository replacement record](docs/replacement.md)
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-Native timelines: use `buildTimeline` (Code Mode) or `generate --type timeline` (CLI). Supply events with unique IDs, labels, and ISO dates at the source's precision (year, month, day, or instant with Z or offset) or explicit numeric order; optional `end` (phase), `kind: "milestone"`, `lane`, `today`, and concise descriptions are preserved. Dates and order cannot be mixed. The renderer spaces events by elapsed time, humanizes dates, and wraps long chronologies. No dependency scheduling.
-
-Native charts: use `buildChart` (Code Mode) or `generate --type chart` (CLI). Supply `kind` (`bar`, `line`, or `pie`), `categories`, and `series: [{ name, values }]` with one value per category; optional `unit`, `categoryAxisTitle`, `valueAxisTitle`, `stacked` and `orientation` (bars), and `donut` (pies). The renderer draws nice-tick axes from zero for bars, value and percentage labels, a legend for several series, and leader lines for thin pie slices. Never supply coordinates.
-
-Native state machines: use `buildStateMachine` (Code Mode) or `generate --type state-machine` (CLI). Supply `initial`, states with unique ids and labels (`kind: "final"` for an end, `"choice"` for a guarded branch; states naming a `parent` form a composite with its own `initial`), and transitions with `source`, `target` and optional `event`, `guard` and `action`, drawn as `event [guard] / action`. Self-loops and transitions into or out of a composite are supported; composites do not nest.
-
-Native Gantt charts: use `buildGantt` (Code Mode) or `generate --type gantt` (CLI). Supply tasks with unique ids, labels, a `start` day (`YYYY-MM-DD`) and either `end` (last day, inclusive) or `duration` (calendar days); `milestone: true` draws a diamond. Optional `dependsOn` (finish-to-start predecessor ids), `phase` on every task (`phases` sets their order), `progress` (percent) and `today`. The renderer draws a to-scale date axis with day, week, month, quarter or year ticks, one row per task under phase headers, a date column, and dependency arrows routed clear of every bar and label. Never supply coordinates.
-
-Native ER diagrams: use `buildErDiagram` (Code Mode) or `generate --type er` (CLI). Supply entities with unique ids (no dots) and fields written `"name type markers"` (`"id uuid PK"`, `"customer_id uuid FK"`, `"email text UK"`, `"note text?"` for nullable), and relationships whose `from` and `to` name `entity.field` or an entity, each end with a cardinality (`one`, `zero-or-one`, `many`, `one-or-many` or `zero-or-many`) and an optional label. The renderer draws each entity as a table and each relationship as an orthogonal line between the rows it joins, with crow's-foot ends; it owns every coordinate.
-
-Native class diagrams: use `buildClassDiagram` (Code Mode) or `generate --type class` (CLI). Supply classes with unique ids (no colons or spaces), an optional `kind` (`abstract`, `interface` or `enum`) and members written as UML does (`"- radius: double"`, `"+ area(): double {abstract}"`), and relationships with a `kind`: `inheritance` or `realization` (`from` extends or implements `to`), `composition` or `aggregation` (`from` is the whole), `association` (`navigable: true` adds an arrow) or `dependency` (`from` uses `to`). Associations, compositions and aggregations take multiplicities and roles at each end. The renderer draws three-compartment boxes with superclasses above their subclasses and each relationship's UML head; it owns every coordinate.
-
-Native org charts: use `buildOrgChart` (Code Mode) or `generate --type org-chart` (CLI). Supply people with unique ids (no colons), a `name`, an optional `title` and `department`, and `manager`: the id of the person they report to (only the top person has none; `forest: true` allows several). `assistant: true` places an assistant beside their manager, `avatar: true` draws an initials placeholder, `dottedLines: [{ report, manager, label? }]` adds dotted-line or matrix reports (a stated scope or reason, such as "for clinical systems", goes in `label`), and `groupByDepartment: true` draws each department below the top as a labeled region. The renderer draws a card per person top-down, a bus line from each manager to their reports, long lists of reports stacked in one or two columns, and dotted lines dashed with a head at the second manager and their label beside them; it owns every coordinate.
-
-Native Venn diagrams: use `buildVennDiagram` (Code Mode) or `generate --type venn` (CLI). Supply two or three `sets: [{ id, label, color? }]` and `regions: [{ sets, items }]`, one region per overlap: `["a"]` holds what is only in a, `["a", "b"]` what is in a and b but not c. A region holds `items` (short phrases) or a `count`, and an optional `label` naming the overlap; omit empty regions. A set may instead list its whole membership as `items`, and each item then lands in the region of exactly the sets that list it. The renderer draws equal, overlapping translucent circles in the standard symmetric arrangement, each set's label outside its circle, and each region's text centred inside exactly that region; it sizes the circles until every region fits and owns every coordinate.
-
-Native journey maps: use `buildJourneyMap` (Code Mode) or `generate --type journey` (CLI). Supply `stages` in order, each `{ name, steps: [{ label, score, actor?, touchpoint? }], painPoints?, opportunities? }`, with an optional `persona` (whose journey it is) and `actors`. `score` is a whole number from 1 (very negative) to 5 (very positive); 3 is neutral. The renderer draws the stages as headers across the top, each step's card under its stage, an emotion curve through a face per step at its score over a dashed neutral baseline, and each stage's pain points and opportunities in rows beneath it; a journey too wide to read wraps into bands of whole stages with the curve running on between them. It owns every coordinate.
-
-Native Sankey diagrams: use `buildSankey` (Code Mode) or `generate --type sankey` (CLI). Supply `nodes: [{ id, label }]` (ids without colons) and `links: [{ source, target, value, label? }]` with every stated amount (`value` > 0), plus an optional `unit` formatted as charts format it (`$k` gives $310k; a word unit such as `visits` reads on node totals). Links run one way: no cycles, self-links or repeated pairs, and no invented balancing node. The renderer places each node one column past the longest run of links into it (a sink fed by several nodes aligns with the last column), draws each node as a bar as tall as the larger of its inflow and outflow with its label and total, and each link as a band as wide as its value in its source's color with its value written; a band under 3 px draws at 3 px and keeps its exact value. It owns every coordinate.
-
-Native wireframes: use `buildWireframe` (Code Mode) or `generate --type wireframe` (CLI). Supply `screens`, each with a `name`, a `device` (`desktop`, `tablet` or `mobile`, which sets the frame's size) and `children`: a tree of components in reading order. Containers hold children: `header`, `footer`, `sidebar` (`side: "left" | "right"`), `main`, `section`, `card` and `modal` (with a `title`), `row`, `column` and `grid` (`columns: n`); `align` spreads, centers or ends a row's children. Widgets draw from their own fields: `heading`, `text` (or `lines` of placeholder copy), `link`, `badge` and `button` show `text`; `input`, `textarea`, `select` and `search` take a `label`, a `placeholder` or the `value` they show; `checkbox`, `radio` and `toggle` take a `label`; `tabs`, `nav`, `breadcrumbs` and `list` take `items`; and `avatar`, `icon`, `image`, `chart`, `table` (`columns` of headers) and `divider` draw placeholders. State: `variant: "primary"` on the main action, `checked: true` on what is on, and `active` on the selected tab or nav item; `target` on a button or link names the screen it opens, drawn as an arrow to that screen's frame. The renderer draws each screen as an Excalidraw frame, its header across the top, footer along the bottom, sidebars down their sides and modals over a dimmed backdrop, with every component a group it places: rows wrap and grids drop columns before anything overflows, and text wraps at whole words; it owns every coordinate.
-
-Native quadrant charts: use `buildQuadrantChart` (Code Mode) or `generate --type quadrant` (CLI). Supply `xAxis` and `yAxis` as `{ title, low, high }` (the end labels, x left to right and y bottom to top, as the source words them), `quadrants` as `{ topLeft, topRight, bottomLeft, bottomRight }`, and up to 30 `points: [{ label, x, y, group? }]` with `x` and `y` from 0 (the low end) to 1 (the high end); a score out of 100 is score / 100. `group` colors points and adds a legend. The renderer draws a square plot of four tinted quadrants with their names in their corners, axis arrows carrying the end labels, and each point as a dot at its exact position with its label beside it, or on a leader line where the plot is crowded; it owns every coordinate.

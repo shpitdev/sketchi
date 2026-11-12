@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
 
 import ts from "typescript";
 import { catalog } from "./mcp-docs/catalog";
@@ -213,28 +212,25 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		);
 	});
 
-	it("keeps the published catalog complete for bounded build failures", () => {
-		const catalog = readFileSync("docs/mcp-tool-catalog.md", "utf8");
-		for (const declaration of [
-			"interface BuildMindmapRequest",
-			"type BuildMindmapResult",
-			"interface BuildSequenceDiagramRequest",
-			"buildSequenceDiagram",
-			"createCanvas",
-			"CreateCanvasRequest",
-			'"request_too_large"',
-			'"nonterminating_node"',
-			'"flowchart_too_large"',
-			'"mindmap_too_deep"',
-			'"mindmap_too_large"',
-		]) {
-			expect(catalog).toContain(declaration);
+	it("declares every operation and bounded build failure the published docs point to", () => {
+		for (const operation of CODE_MODE_OPERATIONS) {
+			expect(SKETCHI_CODE_MODE_TYPES).toContain(`  ${operation}(input: `);
 		}
-		expect(catalog).toContain("arbitrary typed canvas artifact");
-		expect(catalog).toContain("CanvasSpec v1");
-		expect(catalog).toContain(`${FLOWCHART_MAX_NODES} nodes`);
-		expect(catalog).toContain(`${FLOWCHART_MAX_EDGES} edges`);
-		expect(catalog).toContain("256 KiB");
+		for (const code of [
+			"request_too_large",
+			"nonterminating_node",
+			"flowchart_too_large",
+			"mindmap_too_deep",
+			"mindmap_too_large",
+			"canvas_limit_exceeded",
+		]) {
+			expect(SKETCHI_CODE_MODE_TYPES).toContain(`"${code}"`);
+		}
+		const flowchart = getCodeModeDocs({ topic: "buildFlowchart" }).content;
+		expect(flowchart).toContain(`${FLOWCHART_MAX_NODES} nodes`);
+		expect(flowchart).toContain(`${FLOWCHART_MAX_EDGES} edges`);
+		expect(getCodeModeDocs({ topic: "issues" }).content).toContain("256 KiB");
+		expect(getCodeModeDocs({ topic: "createCanvas" }).content).toContain("CanvasSpec");
 	});
 
 	it("searches operation guidance and non-goals", () => {

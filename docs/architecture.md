@@ -67,8 +67,7 @@ The CLI imports the stable `effect/cli` surface through the package-internal
 Effect imports. Process management uses stable core Effect APIs plus a scoped
 Node adapter.
 
-See [Effect conventions](effect-conventions.md), the
-[program-closure inventory](effect-program-closure-inventory.md), and
+See [Effect conventions](effect-conventions.md) and
 [ADR 0004](adr/0004-effect-v4-cloudflare-architecture.md).
 
 ## Generation and gateway routing
