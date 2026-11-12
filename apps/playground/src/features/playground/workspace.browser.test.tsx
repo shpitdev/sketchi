@@ -12,7 +12,10 @@ const chat = vi.hoisted(() => ({
 	stop: vi.fn(),
 }));
 vi.mock("@ai-sdk/react", () => ({ useChat: () => chat }));
-vi.mock("@excalidraw/excalidraw", () => ({ Excalidraw: () => <div className="excalidraw" /> }));
+vi.mock("@excalidraw/excalidraw", () => ({
+	Excalidraw: () => <div className="excalidraw" />,
+	getCommonBounds: () => [0, 0, 0, 0],
+}));
 
 import "@sketchi/diagram-ui/styles.css";
 import "../../styles/app.css";

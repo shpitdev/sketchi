@@ -8,6 +8,7 @@ const excalidrawMock = vi.hoisted(() => ({
 }));
 
 vi.mock("@excalidraw/excalidraw", () => ({
+	getCommonBounds: () => [0, 0, 0, 0],
 	Excalidraw: (props: {
 		initialData?: {
 			appState?: Record<string, unknown>;
