@@ -255,6 +255,19 @@
 	position: absolute;
 }
 
+.home-diagram__frame {
+	height: 100%;
+}
+
+/* Excalidraw opens its dialogs (Export image, Save to, Help) in a container at
+   the end of <body>, placed for an editor that fills the page. Here the editor
+   sits partway down a scrolling page, so the container is pinned to the
+   viewport instead of the top of the document. */
+body > .excalidraw.excalidraw-modal-container {
+	inset: 0;
+	position: fixed;
+}
+
 .home-diagram__error {
 	border-top: 1px solid var(--line);
 	color: var(--danger-ink);
