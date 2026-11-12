@@ -333,6 +333,17 @@ describe("the words that name a zone", () => {
 			'"production VPC"',
 		);
 	});
+
+	it("keeps the words before a number in a zone's name", () => {
+		for (const [request, zone, label] of [
+			["The ALB sits in the Layer 2 network.", '"Layer 2 network"', "Layer 2 network"],
+			["ECS runs inside the Tier 3 subnet.", '"Tier 3 subnet"', "Tier 3 subnet"],
+			["The ALB sits in our Edge 2 zone.", '"Edge 2 zone"', "Edge 2 zone"],
+		] as const) {
+			expect(missing(request, ["Network", "Subnet", "Zone"])[0], request).toContain(zone);
+			expect(missing(request, [label]), request).toEqual([]);
+		}
+	});
 });
 
 describe("key markers and nullable columns in SQL", () => {

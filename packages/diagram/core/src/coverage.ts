@@ -1711,7 +1711,9 @@ function zoneName(
 	const named = namedContainers(phrase)[0];
 	if (named) return named;
 	const cloud = /\b((?:[\w-]+\s+){1,2})clouds?\b/iu.exec(phrase);
-	const modifiers = words(zoneNameWords(cloud?.[1] ?? "").join(" ")).map(stemWord);
+	const modifiers = words(zoneNameWords(cloud?.[1] ?? "").join(" "))
+		.filter((word) => !NOT_A_NAME.has(word))
+		.map(stemWord);
 	return modifiers.length > 0 ? { heads: ["cloud"], modifiers } : undefined;
 }
 
@@ -1734,7 +1736,9 @@ const NOT_A_NAME = new Set(
 		" ",
 	),
 );
-/** Words that place or point at a zone: whatever precedes one in a zone phrase is not its name. */
+/** Words that point at a zone: whatever precedes one in a zone phrase is not its name. */
+const DETERMINERS = new Set("a an the our your their its this that each every all both".split(" "));
+/** Words that place a zone: whatever precedes one in a zone phrase is not its name. */
 const LOCATIVE = new Set(
 	"in on at for with by from into onto of to inside within across outside throughout behind under over between among beyond through via near beside around toward towards against past upon below above beneath alongside".split(
 		" ",
@@ -1744,7 +1748,8 @@ const LOCATIVE = new Set(
 /**
  * The words of a zone phrase's lead that name the zone: those after its last preposition or
  * determiner, so "an ALB inside one VPC" names a VPC and "users reach the VPC" no "reach VPC". A
- * capitalized preposition before another capitalized word starts a name ("Inside Sales network").
+ * number stays part of the name ("Layer 2 network"), and a capitalized preposition before another
+ * capitalized word starts one ("Inside Sales network").
  */
 function zoneNameWords(lead: string): string[] {
 	const tokens = lead.trim().split(/\s+/u).filter(Boolean);
@@ -1755,11 +1760,15 @@ function zoneNameWords(lead: string): string[] {
 		const next = tokens[index + 1];
 		const titled =
 			capitalized(token) && capitalized(next) && !NOT_A_NAME.has(next?.toLowerCase() ?? "");
-		if (NOT_A_NAME.has(word) || (LOCATIVE.has(word) && !titled)) start = index + 1;
+		if (DETERMINERS.has(word) || (LOCATIVE.has(word) && !titled)) start = index + 1;
 	});
 	return tokens
 		.slice(start)
-		.filter((word) => !NOT_A_NAME.has(word.toLowerCase()) && !STOP_WORDS.has(word.toLowerCase()));
+		.filter(
+			(word) =>
+				/^\d+$/u.test(word) ||
+				(!NOT_A_NAME.has(word.toLowerCase()) && !STOP_WORDS.has(word.toLowerCase())),
+		);
 }
 
 function namedContainers(
@@ -1776,7 +1785,9 @@ function namedContainers(
 		const headStems = stems(head);
 		const joinedHead = headStems.join(" ");
 		const named = zoneNameWords(match[1] ?? "");
-		const modifiers = words(named.join(" ")).map(stemWord);
+		const modifiers = words(named.join(" "))
+			.filter((word) => !NOT_A_NAME.has(word))
+			.map(stemWord);
 		const specific = CONTAINER_HEADS.test(joinedHead);
 		if (!specific && (!QUALIFIED_HEADS.test(joinedHead) || modifiers.length === 0)) return [];
 		const phrase = [...named, head].join(" ");
