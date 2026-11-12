@@ -22,17 +22,14 @@ import {
 	makeIsoDateString,
 	makeStudioRecordId,
 	StudioDiagramRecord,
-	StudioDiagramRecordSchema,
-	StudioDrawingSchema,
+	StudioDrawing,
 	StudioProjectRecord,
-	StudioProjectRecordSchema,
 	StudioProjectSource,
 	StudioRecordIdSchema,
 	studioDiagramEditUrl,
 	studioDiagramUrl,
 	studioProjectUrl,
 	type StudioDiagramSummary,
-	type StudioDrawing,
 	type StudioOwner,
 	type StudioProjectDetails,
 	type StudioProjectSummary,
@@ -271,7 +268,7 @@ export const StudioProjectsLive = Layer.effect(
 		) {
 			return yield* json.read(
 				studioProjectRecordKey(projectId),
-				StudioProjectRecordSchema,
+				StudioProjectRecord,
 				"project",
 				projectId,
 			);
@@ -282,7 +279,7 @@ export const StudioProjectsLive = Layer.effect(
 		) {
 			return yield* json.read(
 				studioDiagramRecordKey(diagramId),
-				StudioDiagramRecordSchema,
+				StudioDiagramRecord,
 				"diagram",
 				diagramId,
 			);
@@ -422,12 +419,7 @@ export const StudioProjectsLive = Layer.effect(
 			diagramId: string,
 		) {
 			const diagram = yield* readOwnedDiagram(session, diagramId);
-			return yield* json.read(
-				studioDrawingKey(diagram.id),
-				StudioDrawingSchema,
-				"diagram",
-				diagram.id,
-			);
+			return yield* json.read(studioDrawingKey(diagram.id), StudioDrawing, "diagram", diagram.id);
 		});
 
 		const saveDrawing = Effect.fn("studioPersistence.projects.saveDrawing")(function* (
@@ -440,12 +432,12 @@ export const StudioProjectsLive = Layer.effect(
 			yield* ensureOwner(project.owner, session, "project", project.id);
 			const savedAt = yield* recordFactory.now;
 			// The drawing lands before the record that announces it.
-			yield* json.put(studioDrawingKey(diagram.id), StudioDrawingSchema, drawing);
+			yield* json.put(studioDrawingKey(diagram.id), StudioDrawing, drawing);
 			const saved = StudioDiagramRecord.make({ ...diagram, savedAt, updatedAt: savedAt });
-			yield* json.put(studioDiagramRecordKey(saved.id), StudioDiagramRecordSchema, saved);
+			yield* json.put(studioDiagramRecordKey(saved.id), StudioDiagramRecord, saved);
 			yield* json.put(
 				studioProjectRecordKey(project.id),
-				StudioProjectRecordSchema,
+				StudioProjectRecord,
 				StudioProjectRecord.make({ ...project, updatedAt: savedAt }),
 			);
 			return diagramSummary(saved);
@@ -484,8 +476,8 @@ export const StudioProjectsLive = Layer.effect(
 
 				yield* withTelemetryCorrelation(
 					Effect.gen(function* () {
-						yield* json.put(studioDiagramRecordKey(diagram.id), StudioDiagramRecordSchema, diagram);
-						yield* json.put(studioProjectRecordKey(project.id), StudioProjectRecordSchema, project);
+						yield* json.put(studioDiagramRecordKey(diagram.id), StudioDiagramRecord, diagram);
+						yield* json.put(studioProjectRecordKey(project.id), StudioProjectRecord, project);
 						yield* writeOwnerProjectEntry(input.session, project.id, createdAt);
 					}).pipe(
 						Effect.onError(() =>

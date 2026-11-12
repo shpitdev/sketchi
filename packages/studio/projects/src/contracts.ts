@@ -46,7 +46,6 @@ export class StudioProjectSource extends Schema.Class<StudioProjectSource>("Stud
 	artifactId: NonEmptyString,
 	kind: Schema.Literal("playground-artifact"),
 }) {}
-export const StudioProjectSourceSchema = StudioProjectSource;
 
 export class StudioProjectRecord extends Schema.Class<StudioProjectRecord>("StudioProjectRecord")({
 	createdAt: IsoDateStringSchema,
@@ -57,7 +56,6 @@ export class StudioProjectRecord extends Schema.Class<StudioProjectRecord>("Stud
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
 }) {}
-export const StudioProjectRecordSchema = StudioProjectRecord;
 
 export class StudioDiagramRecord extends Schema.Class<StudioDiagramRecord>("StudioDiagramRecord")({
 	artifactDiagramId: Schema.optional(NonEmptyString),
@@ -71,7 +69,6 @@ export class StudioDiagramRecord extends Schema.Class<StudioDiagramRecord>("Stud
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
 }) {}
-export const StudioDiagramRecordSchema = StudioDiagramRecord;
 
 const StudioDrawingElement = Schema.Record(Schema.String, Schema.Unknown).check(
 	Schema.makeFilter(
@@ -90,7 +87,6 @@ export class StudioDrawing extends Schema.Class<StudioDrawing>("StudioDrawing")(
 	elements: Schema.Array(StudioDrawingElement),
 	files: Schema.Record(Schema.String, Schema.Unknown),
 }) {}
-export const StudioDrawingSchema = StudioDrawing;
 
 export class AnonymousStudioAuthStatus extends Schema.Class<AnonymousStudioAuthStatus>(
 	"AnonymousStudioAuthStatus",
@@ -140,7 +136,6 @@ export class StudioProjectSummary extends Schema.Class<StudioProjectSummary>(
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
 }) {}
-export const StudioProjectSummarySchema = StudioProjectSummary;
 
 export class StudioDiagramSummary extends Schema.Class<StudioDiagramSummary>(
 	"StudioDiagramSummary",
@@ -158,7 +153,6 @@ export class StudioDiagramSummary extends Schema.Class<StudioDiagramSummary>(
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
 }) {}
-export const StudioDiagramSummarySchema = StudioDiagramSummary;
 
 export class StudioProjectDetails extends Schema.Class<StudioProjectDetails>(
 	"StudioProjectDetails",
@@ -166,12 +160,10 @@ export class StudioProjectDetails extends Schema.Class<StudioProjectDetails>(
 	diagrams: Schema.Array(StudioDiagramSummary).pipe(Schema.mutable),
 	project: StudioProjectSummary,
 }) {}
-export const StudioProjectDetailsSchema = StudioProjectDetails;
 
 export class CreateStudioProjectFromArtifactRequest extends Schema.Class<CreateStudioProjectFromArtifactRequest>(
 	"CreateStudioProjectFromArtifactRequest",
 )({ artifactId: NonEmptyString }) {}
-export const CreateStudioProjectFromArtifactRequestSchema = CreateStudioProjectFromArtifactRequest;
 
 export class StudioProjectsListResponse extends Schema.Class<StudioProjectsListResponse>(
 	"StudioProjectsListResponse",
@@ -181,7 +173,6 @@ export class StudioProjectsListResponse extends Schema.Class<StudioProjectsListR
 	projects: Schema.Array(StudioProjectSummary).pipe(Schema.mutable),
 	session: StudioPublicSessionSchema,
 }) {}
-export const StudioProjectsListResponseSchema = StudioProjectsListResponse;
 
 export class StudioProjectDetailsResponse extends Schema.Class<StudioProjectDetailsResponse>(
 	"StudioProjectDetailsResponse",
@@ -191,7 +182,6 @@ export class StudioProjectDetailsResponse extends Schema.Class<StudioProjectDeta
 	ok: Schema.Literal(true),
 	session: StudioPublicSessionSchema,
 }) {}
-export const StudioProjectDetailsResponseSchema = StudioProjectDetailsResponse;
 
 export class StudioDiagramDetailsResponse extends Schema.Class<StudioDiagramDetailsResponse>(
 	"StudioDiagramDetailsResponse",
@@ -202,7 +192,6 @@ export class StudioDiagramDetailsResponse extends Schema.Class<StudioDiagramDeta
 	project: StudioProjectSummary,
 	session: StudioPublicSessionSchema,
 }) {}
-export const StudioDiagramDetailsResponseSchema = StudioDiagramDetailsResponse;
 
 export class StudioDrawingResponse extends Schema.Class<StudioDrawingResponse>(
 	"StudioDrawingResponse",
@@ -212,7 +201,6 @@ export class StudioDrawingResponse extends Schema.Class<StudioDrawingResponse>(
 	ok: Schema.Literal(true),
 	session: StudioPublicSessionSchema,
 }) {}
-export const StudioDrawingResponseSchema = StudioDrawingResponse;
 
 export class SaveStudioDrawingResponse extends Schema.Class<SaveStudioDrawingResponse>(
 	"SaveStudioDrawingResponse",
@@ -222,7 +210,6 @@ export class SaveStudioDrawingResponse extends Schema.Class<SaveStudioDrawingRes
 	ok: Schema.Literal(true),
 	session: StudioPublicSessionSchema,
 }) {}
-export const SaveStudioDrawingResponseSchema = SaveStudioDrawingResponse;
 
 export class StudioProjectUrls extends Schema.Class<StudioProjectUrls>("StudioProjectUrls")({
 	diagram: NonEmptyString,

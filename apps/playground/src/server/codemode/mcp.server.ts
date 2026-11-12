@@ -3,7 +3,7 @@ import "@tanstack/react-start/server-only";
 import { isDeepStrictEqual } from "node:util";
 
 import {
-	CodeModeIssueSchema,
+	CodeModeIssue,
 	type ArtifactBundle,
 	type PartialArtifactBundle,
 	type BuildFlowchartResult,
@@ -24,7 +24,6 @@ import {
 	type BuildChartResult,
 	type CreateCanvasResult,
 	type ApplyDiagramPatchResult,
-	type CodeModeIssue,
 } from "@sketchi/diagram-agent";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { ICON_DRAW_BUDGET_MS } from "@sketchi/icon-draw";
@@ -174,7 +173,7 @@ const ExecuteBuildContract = Schema.Struct({
 	partial: Schema.optionalKey(ExecuteBuildArtifactContract),
 	/** The edits an editFlowchart applied. */
 	edits: Schema.optionalKey(Schema.Unknown),
-	issues: Schema.Array(CodeModeIssueSchema).pipe(Schema.mutable),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
 });
 type ExecuteBuild = typeof ExecuteBuildContract.Type;
 interface BuildObserver {

@@ -48,7 +48,6 @@ export class DiagramIconRef extends Schema.Class<DiagramIconRef>("DiagramIconRef
 		Schema.isMaxLength(DIAGRAM_ICON_SLUG_MAX_LENGTH),
 	),
 }) {}
-export const DiagramIconRefSchema = DiagramIconRef;
 
 /**
  * What a group stands for in an architecture: a provider's cloud or an
@@ -86,7 +85,6 @@ export class DiagramGroup extends Schema.Class<DiagramGroup>("DiagramGroup")({
 	/** A catalog mark drawn before the group's label, such as its platform's logo. */
 	icon: Schema.optional(DiagramIconRef),
 }) {}
-export const DiagramGroupSchema = DiagramGroup;
 
 /**
  * A swimlane: a full-length band for one actor, such as a customer, a team or
@@ -97,7 +95,6 @@ export class DiagramLane extends Schema.Class<DiagramLane>("DiagramLane")({
 	id: NonEmptyString,
 	label: NonEmptyString,
 }) {}
-export const DiagramLaneSchema = DiagramLane;
 
 /**
  * Shapes an infrastructure node draws as in place of its kind's: a database
@@ -142,7 +139,6 @@ export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
 	color: Schema.optional(DiagramNodeColorSchema),
 	metadata: withDefault(Metadata, {}),
 }) {}
-export const DiagramNodeSchema = DiagramNode;
 
 /**
  * A node of a laid-out graph. Its description draws as a smaller, muted
@@ -151,7 +147,6 @@ export const DiagramNodeSchema = DiagramNode;
 export class GraphNode extends DiagramNode.extend<GraphNode>("GraphNode")({
 	description: Schema.optional(NonEmptyString),
 }) {}
-export const GraphNodeSchema = GraphNode;
 
 export class DiagramEdge extends Schema.Class<DiagramEdge>("DiagramEdge")({
 	id: NonEmptyString,
@@ -160,7 +155,6 @@ export class DiagramEdge extends Schema.Class<DiagramEdge>("DiagramEdge")({
 	label: Schema.optional(NonEmptyString),
 	metadata: withDefault(Metadata, {}),
 }) {}
-export const DiagramEdgeSchema = DiagramEdge;
 
 const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/));
 
@@ -168,13 +162,11 @@ export class DiagramStyle extends Schema.Class<DiagramStyle>("DiagramStyle")({
 	accentColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.accentColor),
 	backgroundColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.backgroundColor),
 }) {}
-export const DiagramStyleSchema = DiagramStyle;
 
 export class DiagramLayout extends Schema.Class<DiagramLayout>("DiagramLayout")({
 	direction: withDefault(LayoutDirectionSchema, "LR"),
 	edgeRouting: withDefault(EdgeRoutingSchema, "orthogonal"),
 }) {}
-export const DiagramLayoutSchema = DiagramLayout;
 
 export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>("IntermediateDiagram")({
 	id: NonEmptyString,
@@ -191,7 +183,6 @@ export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>("Inte
 	style: withDefault(DiagramStyle, SKETCHI_DIAGRAM_STYLE),
 	metadata: withDefault(Metadata, {}),
 }) {}
-export const IntermediateDiagramSchema = IntermediateDiagram;
 
 export class DiagramValidationError extends Error {
 	constructor(message: string) {

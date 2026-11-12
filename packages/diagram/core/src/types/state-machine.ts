@@ -35,7 +35,6 @@ export class StateMachineState extends Schema.Class<StateMachineState>("StateMac
 	/** For a composite: entry substate; omitted values use the first listed regular child. */
 	initial: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const StateMachineStateSchema = StateMachineState;
 
 /**
  * A transition, drawn with one compact label `event [guard] / action`. Every
@@ -52,7 +51,6 @@ export class StateMachineTransition extends Schema.Class<StateMachineTransition>
 	guard: Schema.optionalKey(Schema.NonEmptyString),
 	action: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const StateMachineTransitionSchema = StateMachineTransition;
 
 export class StateMachineLayout extends Schema.Class<StateMachineLayout>("StateMachineLayout")({
 	direction: Schema.Literals(STATE_MACHINE_DIRECTIONS),
@@ -80,7 +78,6 @@ export class StateMachineDiagram extends Schema.Class<StateMachineDiagram>("Stat
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const StateMachineDiagramSchema = StateMachineDiagram;
 
 export const StateMachineValidationIssueCodeSchema = Schema.Literals([
 	"state_machine_too_large",

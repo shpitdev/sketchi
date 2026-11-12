@@ -74,14 +74,12 @@ export class ClassAttribute extends Schema.Class<ClassAttribute>("ClassAttribute
 	visibility: Schema.optionalKey(ClassVisibilitySchema),
 	static: Schema.optionalKey(Schema.Boolean),
 }) {}
-export const ClassAttributeSchema = ClassAttribute;
 
 /** One parameter of a method: `name: Type`. */
 export class ClassParameter extends Schema.Class<ClassParameter>("ClassParameter")({
 	name: Schema.NonEmptyString,
 	type: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const ClassParameterSchema = ClassParameter;
 
 /** A method: `+ name(params): Return`, marked `{abstract}` or `{static}`. */
 export class ClassMethod extends Schema.Class<ClassMethod>("ClassMethod")({
@@ -95,7 +93,6 @@ export class ClassMethod extends Schema.Class<ClassMethod>("ClassMethod")({
 	static: Schema.optionalKey(Schema.Boolean),
 	abstract: Schema.optionalKey(Schema.Boolean),
 }) {}
-export const ClassMethodSchema = ClassMethod;
 
 /**
  * One class, interface or enum, drawn as a box of three compartments: its
@@ -118,7 +115,6 @@ export class ClassNode extends Schema.Class<ClassNode>("ClassNode")({
 		Schema.withDecodingDefault(Effect.succeed([])),
 	),
 }) {}
-export const ClassNodeSchema = ClassNode;
 
 /**
  * A relationship between two classes (see CLASS_RELATIONSHIP_KINDS for what
@@ -140,7 +136,6 @@ export class ClassRelationship extends Schema.Class<ClassRelationship>("ClassRel
 	navigable: Schema.optionalKey(Schema.Boolean),
 	label: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const ClassRelationshipSchema = ClassRelationship;
 
 /**
  * The canonical UML class diagram: classes with their members, and the
@@ -161,7 +156,6 @@ export class ClassDiagram extends Schema.Class<ClassDiagram>("ClassDiagram")({
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const ClassDiagramSchema = ClassDiagram;
 
 export const ClassValidationIssueCodeSchema = Schema.Literals([
 	"class_too_large",

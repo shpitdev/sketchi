@@ -29,6 +29,6 @@ pnpm nx build-storybook diagram-ui
 
 ## Usage
 
-Apps compose this package when they need diagram previews, build reports, or
-an Excalidraw canvas. Keep reusable state and component
+Apps compose this package when they need a diagram preview or an Excalidraw
+canvas. Keep reusable state and component
 coverage here; app-specific routing and service calls stay inside `apps/*`.

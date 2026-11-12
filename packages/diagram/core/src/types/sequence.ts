@@ -43,7 +43,6 @@ export class SequenceParticipant extends Schema.Class<SequenceParticipant>("Sequ
 	/** The participant's logo, drawn in its header; shared with flowchart nodes. */
 	icon: Schema.optionalKey(DiagramIconRef),
 }) {}
-export const SequenceParticipantSchema = SequenceParticipant;
 
 /**
  * One message row. Array order is chronological order. A message whose source
@@ -57,7 +56,6 @@ export class SequenceMessage extends Schema.Class<SequenceMessage>("SequenceMess
 	type: Schema.optionalKey(SequenceMessageTypeSchema),
 	style: Schema.optionalKey(SequenceMessageStyleSchema),
 }) {}
-export const SequenceMessageSchema = SequenceMessage;
 
 /**
  * The canonical sequence diagram: ordered participants (left to right) and
@@ -80,7 +78,6 @@ export class SequenceDiagram extends Schema.Class<SequenceDiagram>("SequenceDiag
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const SequenceDiagramSchema = SequenceDiagram;
 
 export const SequenceValidationIssueCodeSchema = Schema.Literals([
 	"sequence_too_large",

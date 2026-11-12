@@ -1,4 +1,4 @@
-import { CanvasSpec, CreateCanvasRequestSchema } from "@sketchi/diagram-agent";
+import { CanvasSpec, CreateCanvasRequest } from "@sketchi/diagram-agent";
 import { afterEach, assert, describe, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect";
 import { TestClock } from "effect/testing";
@@ -214,11 +214,11 @@ describe("Universal Canvas public API client", () => {
 
 	it.effect("submits CanvasSpec and preserves the validated built diagram", () => {
 		const created: BuiltDiagram[] = [];
-		let decodedRequest: typeof CreateCanvasRequestSchema.Type | undefined;
+		let decodedRequest: typeof CreateCanvasRequest.Type | undefined;
 		globalThis.fetch = (input, init) => {
 			const request = new Request(input, init);
 			return request.json().then((body) => {
-				decodedRequest = Schema.decodeUnknownSync(CreateCanvasRequestSchema, {
+				decodedRequest = Schema.decodeUnknownSync(CreateCanvasRequest, {
 					errors: "all",
 					reportInput: true,
 				})(body);

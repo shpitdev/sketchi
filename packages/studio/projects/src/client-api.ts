@@ -2,11 +2,11 @@ import { Result, Schema } from "effect";
 
 import {
 	CreateStudioProjectFromArtifactResponseSchema,
-	SaveStudioDrawingResponseSchema,
-	StudioDiagramDetailsResponseSchema,
-	StudioDrawingResponseSchema,
-	StudioProjectDetailsResponseSchema,
-	StudioProjectsListResponseSchema,
+	SaveStudioDrawingResponse,
+	StudioDiagramDetailsResponse,
+	StudioDrawingResponse,
+	StudioProjectDetailsResponse,
+	StudioProjectsListResponse,
 	type CreateStudioProjectFromArtifactResponse,
 	type StudioDiagramSummary,
 	type StudioDrawing,
@@ -18,7 +18,7 @@ import {
 export async function fetchStudioProjects(signal?: AbortSignal): Promise<StudioProjectSummary[]> {
 	const response = await fetch("/api/studio/projects", signal ? { signal } : {});
 	const payload: unknown = await response.json();
-	const parsed = Schema.decodeUnknownResult(StudioProjectsListResponseSchema)(payload);
+	const parsed = Schema.decodeUnknownResult(StudioProjectsListResponse)(payload);
 
 	if (!response.ok || Result.isFailure(parsed)) {
 		throw new Error("Studio projects could not be loaded.");
@@ -36,7 +36,7 @@ export async function fetchStudioProjectDetails(
 		signal ? { signal } : {},
 	);
 	const payload: unknown = await response.json();
-	const parsed = Schema.decodeUnknownResult(StudioProjectDetailsResponseSchema)(payload);
+	const parsed = Schema.decodeUnknownResult(StudioProjectDetailsResponse)(payload);
 
 	if (!response.ok || Result.isFailure(parsed)) {
 		throw new Error("Studio project could not be loaded.");
@@ -57,7 +57,7 @@ export async function fetchStudioDiagramDetails(
 		signal ? { signal } : {},
 	);
 	const payload: unknown = await response.json();
-	const parsed = Schema.decodeUnknownResult(StudioDiagramDetailsResponseSchema)(payload);
+	const parsed = Schema.decodeUnknownResult(StudioDiagramDetailsResponse)(payload);
 
 	if (!response.ok || Result.isFailure(parsed)) {
 		throw new Error("Studio diagram could not be loaded.");
@@ -95,7 +95,7 @@ export async function fetchStudioDiagramDrawing(
 ): Promise<StudioDrawing> {
 	const response = await fetch(studioDiagramDrawingApiUrl(diagramId), signal ? { signal } : {});
 	const payload: unknown = await response.json();
-	const parsed = Schema.decodeUnknownResult(StudioDrawingResponseSchema)(payload);
+	const parsed = Schema.decodeUnknownResult(StudioDrawingResponse)(payload);
 
 	if (!response.ok || Result.isFailure(parsed)) {
 		throw new Error("Studio drawing could not be loaded.");
@@ -115,7 +115,7 @@ export async function saveStudioDiagramDrawing(
 		method: "PUT",
 	});
 	const payload: unknown = await response.json().catch(() => null);
-	const parsed = Schema.decodeUnknownResult(SaveStudioDrawingResponseSchema)(payload);
+	const parsed = Schema.decodeUnknownResult(SaveStudioDrawingResponse)(payload);
 
 	if (!response.ok || Result.isFailure(parsed)) {
 		throw new Error("Drawing could not be saved.");

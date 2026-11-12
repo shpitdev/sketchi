@@ -4,34 +4,34 @@ import {
 	DiagramNodeShapeSchema,
 	DiagramZoneKindSchema,
 	DiagramValidationError,
-	ClassDiagramSchema,
+	ClassDiagram,
 	ClassValidationError,
-	ErDiagramSchema,
+	ErDiagram,
 	ErValidationError,
 	isDiagramIconSlug,
-	OrgChartDiagramSchema,
+	OrgChartDiagram,
 	OrgChartValidationError,
-	QuadrantDiagramSchema,
+	QuadrantDiagram,
 	QuadrantValidationError,
 	validateQuadrantDiagram,
 	resolveOrgChartShorthand,
 	splitContinuingFinalStates,
 	validateOrgChartDiagram,
-	VennDiagramSchema,
+	VennDiagram,
 	VennValidationError,
 	resolveVennShorthand,
 	validateVennDiagram,
-	JourneyDiagramSchema,
+	JourneyDiagram,
 	JourneyValidationError,
 	resolveJourneyShorthand,
 	validateJourneyDiagram,
-	SankeyDiagramSchema,
+	SankeyDiagram,
 	SankeyValidationError,
 	resolveSankeyShorthand,
 	validateSankeyDiagram,
 	resolveWireframeShorthand,
 	validateWireframeDiagram,
-	WireframeDiagramSchema,
+	WireframeDiagram,
 	WireframeValidationError,
 	resolveClassShorthand,
 	resolveErShorthand,
@@ -48,20 +48,20 @@ import {
 	resolveFlowchartReferences,
 	FlowchartDocumentSchema,
 	type FlowchartDocument,
-	MindmapDiagramSchema,
+	MindmapDiagram,
 	SKETCHI_DIAGRAM_STYLE,
-	SequenceDiagramSchema,
-	StateMachineDiagramSchema,
+	SequenceDiagram,
+	StateMachineDiagram,
 	StateMachineValidationError,
 	getStateMachineDefaultWarnings,
 	StateMachineDefaultWarningSchema,
 	type StateMachineDefaultWarning,
-	TimelineDiagramSchema,
+	TimelineDiagram,
 	TimelineValidationError,
 	validateTimelineDiagram,
-	ChartDiagramSchema,
+	ChartDiagram,
 	ChartValidationError,
-	GanttDiagramSchema,
+	GanttDiagram,
 	GanttValidationError,
 	validateGanttDiagram,
 	validateChartDiagram,
@@ -822,14 +822,10 @@ function parseCandidateDiagram(
 	const warnings: StateMachineDefaultWarning[] = [];
 	const parsers = {
 		chart: () =>
-			decodeAndValidate(
-				ChartDiagramSchema,
-				withSketchiDiagramStyle(titledDiagram),
-				validateChartDiagram,
-			),
+			decodeAndValidate(ChartDiagram, withSketchiDiagramStyle(titledDiagram), validateChartDiagram),
 		timeline: () =>
 			decodeAndValidate(
-				TimelineDiagramSchema,
+				TimelineDiagram,
 				withSketchiDiagramStyle(titledDiagram),
 				validateTimelineDiagram,
 			),
@@ -843,19 +839,15 @@ function parseCandidateDiagram(
 						"Generated mindmap schema validation failed.",
 					)
 				: decodeAndValidate(
-						MindmapDiagramSchema,
+						MindmapDiagram,
 						withSketchiDiagramStyle(titledDiagram),
 						validateMindmapDiagram,
 					),
 		gantt: () =>
-			decodeAndValidate(
-				GanttDiagramSchema,
-				withSketchiDiagramStyle(titledDiagram),
-				validateGanttDiagram,
-			),
+			decodeAndValidate(GanttDiagram, withSketchiDiagramStyle(titledDiagram), validateGanttDiagram),
 		"state-machine": () => {
 			const result = decodeAndValidate(
-				StateMachineDiagramSchema,
+				StateMachineDiagram,
 				normalizeGeneratedStateMachineInput(titledDiagram),
 				(diagram) => {
 					warnings.push(...getStateMachineDefaultWarnings(diagram));
@@ -865,56 +857,52 @@ function parseCandidateDiagram(
 			return result.success && warnings.length > 0 ? { ...result, warnings } : result;
 		},
 		er: () =>
-			decodeAndValidate(
-				ErDiagramSchema,
-				normalizeGeneratedErInput(titledDiagram),
-				validateErDiagram,
-			),
+			decodeAndValidate(ErDiagram, normalizeGeneratedErInput(titledDiagram), validateErDiagram),
 		class: () =>
 			decodeAndValidate(
-				ClassDiagramSchema,
+				ClassDiagram,
 				normalizeGeneratedClassInput(titledDiagram),
 				validateClassDiagram,
 			),
 		sankey: () =>
 			decodeAndValidate(
-				SankeyDiagramSchema,
+				SankeyDiagram,
 				resolveSankeyShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateSankeyDiagram,
 			),
 		"org-chart": () =>
 			decodeAndValidate(
-				OrgChartDiagramSchema,
+				OrgChartDiagram,
 				resolveOrgChartShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateOrgChartDiagram,
 			),
 		venn: () =>
 			decodeAndValidate(
-				VennDiagramSchema,
+				VennDiagram,
 				resolveVennShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateVennDiagram,
 			),
 		journey: () =>
 			decodeAndValidate(
-				JourneyDiagramSchema,
+				JourneyDiagram,
 				resolveJourneyShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateJourneyDiagram,
 			),
 		wireframe: () =>
 			decodeAndValidate(
-				WireframeDiagramSchema,
+				WireframeDiagram,
 				resolveWireframeShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateWireframeDiagram,
 			),
 		quadrant: () =>
 			decodeAndValidate(
-				QuadrantDiagramSchema,
+				QuadrantDiagram,
 				withSketchiDiagramStyle(titledDiagram),
 				validateQuadrantDiagram,
 			),
 		sequence: () => {
 			const result = decodeAndValidate(
-				SequenceDiagramSchema,
+				SequenceDiagram,
 				normalizeGeneratedSequenceInput(titledDiagram, repairs),
 				validateSequenceDiagram,
 			);
@@ -1121,13 +1109,13 @@ function groundDiagramIcons(
 			: { diagnostics: [], diagram, flowchart: candidate.flowchart };
 	}
 	if (diagram.type === "sequence") {
-		const encoded = Schema.encodeSync(SequenceDiagramSchema)(diagram);
+		const encoded = Schema.encodeSync(SequenceDiagram)(diagram);
 		const placement = placeNodeLogos(encoded.participants, logos, "participant");
 		return placement.diagnostics.length === 0
 			? { diagnostics: [], diagram }
 			: {
 					diagnostics: placement.diagnostics,
-					diagram: Schema.decodeUnknownSync(SequenceDiagramSchema)({
+					diagram: Schema.decodeUnknownSync(SequenceDiagram)({
 						...encoded,
 						participants: placement.nodes,
 					}),

@@ -42,7 +42,6 @@ export class ErField extends Schema.Class<ErField>("ErField")({
 	/** May be empty; drawn as `?` after the type. */
 	nullable: Schema.optionalKey(Schema.Boolean),
 }) {}
-export const ErFieldSchema = ErField;
 
 /** One entity, drawn as a table: a band with its name over a row per field. */
 export class ErEntity extends Schema.Class<ErEntity>("ErEntity")({
@@ -54,7 +53,6 @@ export class ErEntity extends Schema.Class<ErEntity>("ErEntity")({
 		Schema.withDecodingDefault(Effect.succeed([])),
 	),
 }) {}
-export const ErEntitySchema = ErEntity;
 
 /**
  * A relationship between two entities. Each end names an entity id or, when
@@ -70,7 +68,6 @@ export class ErRelationship extends Schema.Class<ErRelationship>("ErRelationship
 	toCardinality: ErCardinalitySchema,
 	label: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const ErRelationshipSchema = ErRelationship;
 
 /**
  * The canonical entity-relationship diagram: entities with their fields, and
@@ -91,7 +88,6 @@ export class ErDiagram extends Schema.Class<ErDiagram>("ErDiagram")({
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const ErDiagramSchema = ErDiagram;
 
 export const ErValidationIssueCodeSchema = Schema.Literals([
 	"er_too_large",

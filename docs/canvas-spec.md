@@ -78,7 +78,3 @@ seconds. A build, patch or generate request over any of these limits
 fails with `canvas_limit_exceeded` and status `limit_exceeded` (HTTP 413). The
 HTTP canvas and patch endpoints accept request bodies up to the serialized limit
 plus 64 KB; the other builders keep their 256 KB.
-
-Executable Code Mode examples for ERD, architecture map, timeline,
-dashboard/chart, wireframe, and a dense 120-element matrix live in
-`examples/code-mode/create-canvas-matrix.mjs`.

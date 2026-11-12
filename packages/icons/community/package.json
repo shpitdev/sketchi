@@ -12,7 +12,6 @@
 	},
 	"dependencies": {
 		"@sketchi/diagram-core": "workspace:*",
-		"effect": "4.1.2",
-		"tslib": "^2.9.1"
+		"effect": "4.1.2"
 	}
 }

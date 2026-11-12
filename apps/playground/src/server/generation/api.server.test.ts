@@ -1,6 +1,6 @@
 import {
 	CANONICAL_DOCUMENT_SPECS,
-	ExcalidrawFileSchema,
+	ExcalidrawFile,
 	RenderedDiagramSceneSchema,
 } from "@sketchi/diagram-agent";
 import {
@@ -176,7 +176,7 @@ describe("generate responses installed CLIs can decode", () => {
 			const decode = (schema: Schema.Top & { readonly DecodingServices: never }, value: unknown) =>
 				Schema.decodeUnknownSync(schema)(value);
 			expect(() => decode(RenderedDiagramSceneSchema, body.diagram?.scene)).not.toThrow();
-			expect(() => decode(ExcalidrawFileSchema, body.diagram?.excalidraw)).not.toThrow();
+			expect(() => decode(ExcalidrawFile, body.diagram?.excalidraw)).not.toThrow();
 			expect(() =>
 				decode(CANONICAL_DOCUMENT_SPECS[diagram.type], body.diagram?.document.spec),
 			).not.toThrow();

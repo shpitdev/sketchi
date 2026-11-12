@@ -173,7 +173,6 @@ export class WireframeScreen extends Schema.Class<WireframeScreen>("WireframeScr
 	align: Schema.optionalKey(Schema.Literals(WIREFRAME_ALIGNMENTS)),
 	children: Schema.Array(WireframeComponentReference).pipe(Schema.mutable),
 }) {}
-export const WireframeScreenSchema = WireframeScreen;
 
 /**
  * The canonical wireframe: low-fidelity screens, each a tree of components.
@@ -189,7 +188,6 @@ export class WireframeDiagram extends Schema.Class<WireframeDiagram>("WireframeD
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const WireframeDiagramSchema = WireframeDiagram;
 
 export const WireframeValidationIssueCodeSchema = Schema.Literals([
 	"wireframe_too_large",

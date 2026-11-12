@@ -15,8 +15,7 @@ import {
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_LANES,
 	FLOWCHART_MAX_NODES,
-	FlowchartDiagramSchema,
-	type FlowchartDiagram,
+	FlowchartDiagram,
 	type FlowchartNodeKind,
 	type FlowchartValidationIssue,
 } from "./types/flowchart.js";
@@ -1027,7 +1026,7 @@ export function flowchartDiagramFromDocument(
 
 	if (issues.length > 0) return { ok: false, issues: issues.slice(0, FLOWCHART_MAX_ISSUES) };
 
-	const diagram = Schema.decodeUnknownSync(FlowchartDiagramSchema)({
+	const diagram = Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: flowchartDocumentId(document),
 		title: document.title,
 		type: "flowchart",

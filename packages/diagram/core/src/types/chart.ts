@@ -51,7 +51,6 @@ export class ChartDiagram extends Schema.Class<ChartDiagram>("ChartDiagram")({
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const ChartDiagramSchema = ChartDiagram;
 
 export interface ChartValidationIssue {
 	readonly code:

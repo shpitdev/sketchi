@@ -2,8 +2,8 @@ import { SpanContent } from "@sketchi/observability";
 import { Context, Effect, Schema } from "effect";
 
 import {
-	CreateStudioProjectFromArtifactRequestSchema,
-	StudioDrawingSchema,
+	CreateStudioProjectFromArtifactRequest,
+	StudioDrawing,
 	StudioRecordIdSchema,
 } from "../contracts.js";
 import { StudioInvalidInputError, StudioNotFoundError, type StudioHttpError } from "./errors.js";
@@ -50,7 +50,7 @@ const readDrawingJson = Effect.fn("studioPersistence.http.readDrawing")(function
 		try: (): unknown => JSON.parse(text),
 		catch: (cause) => StudioInvalidInputError.make({ cause, message: "A drawing is required." }),
 	});
-	return yield* Schema.decodeUnknownEffect(StudioDrawingSchema, { errors: "all" })(body).pipe(
+	return yield* Schema.decodeUnknownEffect(StudioDrawing, { errors: "all" })(body).pipe(
 		Effect.mapError((cause) =>
 			StudioInvalidInputError.make({
 				cause,
@@ -219,10 +219,9 @@ export const handleCreateFromArtifactRequestEffect = Effect.fn(
 	return yield* withStudioSession(request, undefined, (resolution, projects) =>
 		Effect.gen(function* () {
 			const body = yield* readRequestJson(request);
-			const parsed = yield* Schema.decodeUnknownEffect(
-				CreateStudioProjectFromArtifactRequestSchema,
-				{ errors: "all" },
-			)(body).pipe(
+			const parsed = yield* Schema.decodeUnknownEffect(CreateStudioProjectFromArtifactRequest, {
+				errors: "all",
+			})(body).pipe(
 				Effect.mapError((cause) =>
 					StudioInvalidInputError.make({
 						cause,

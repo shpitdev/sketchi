@@ -28,7 +28,6 @@ export class QuadrantAxis extends Schema.Class<QuadrantAxis>("QuadrantAxis")({
 	low: Schema.NonEmptyString,
 	high: Schema.NonEmptyString,
 }) {}
-export const QuadrantAxisSchema = QuadrantAxis;
 
 /** The four quadrant names, by corner. */
 export class QuadrantNames extends Schema.Class<QuadrantNames>("QuadrantNames")({
@@ -37,7 +36,6 @@ export class QuadrantNames extends Schema.Class<QuadrantNames>("QuadrantNames")(
 	bottomLeft: Schema.NonEmptyString,
 	bottomRight: Schema.NonEmptyString,
 }) {}
-export const QuadrantNamesSchema = QuadrantNames;
 
 /**
  * One item placed on the chart. `x` and `y` run from 0 (the low end) to 1 (the
@@ -50,7 +48,6 @@ export class QuadrantPoint extends Schema.Class<QuadrantPoint>("QuadrantPoint")(
 	/** Points of one group share a color, and the legend names the group. */
 	group: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const QuadrantPointSchema = QuadrantPoint;
 
 /**
  * A quadrant chart: two axes split a square plot into four named quadrants,
@@ -68,7 +65,6 @@ export class QuadrantDiagram extends Schema.Class<QuadrantDiagram>("QuadrantDiag
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const QuadrantDiagramSchema = QuadrantDiagram;
 
 export type QuadrantValidationIssueCode =
 	| "quadrant_too_large"

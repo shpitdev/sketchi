@@ -11,7 +11,7 @@ import { CodeModeArtifactStorageMemory } from "./artifacts";
 import {
 	formatContractSchemaError,
 	BuildFlowchartRequestSchema,
-	BuildSequenceDiagramRequestSchema,
+	BuildSequenceDiagramRequest,
 	DIAGRAM_PATCH_OPERATION_NAMES,
 	DiagramPatchOperationSchema,
 	MindmapTopicSchema,
@@ -99,7 +99,7 @@ describe("structured contract issue metadata", () => {
 	it("does not attach parser facades to contract schemas", () => {
 		for (const schema of [
 			BuildFlowchartRequestSchema,
-			BuildSequenceDiagramRequestSchema,
+			BuildSequenceDiagramRequest,
 			MindmapTopicSchema,
 			RenderedDiagramSceneSchema,
 		]) {
@@ -196,7 +196,7 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 
 	it.effect("validates and defaults the sequence diagram contract", () =>
 		Effect.gen(function* () {
-			const decoded = yield* Schema.decodeUnknownEffect(BuildSequenceDiagramRequestSchema, {
+			const decoded = yield* Schema.decodeUnknownEffect(BuildSequenceDiagramRequest, {
 				errors: "all",
 				reportInput: true,
 			})({
@@ -216,7 +216,7 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 					],
 				},
 			});
-			const encoded = yield* Schema.encodeEffect(BuildSequenceDiagramRequestSchema)(decoded);
+			const encoded = yield* Schema.encodeEffect(BuildSequenceDiagramRequest)(decoded);
 			assert.deepStrictEqual(encoded, {
 				spec: {
 					title: "Checkout",
@@ -236,7 +236,7 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 				},
 			});
 
-			const malformed = Schema.decodeUnknownResult(BuildSequenceDiagramRequestSchema, {
+			const malformed = Schema.decodeUnknownResult(BuildSequenceDiagramRequest, {
 				errors: "all",
 				reportInput: true,
 			})({

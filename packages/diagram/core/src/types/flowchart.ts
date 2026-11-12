@@ -61,7 +61,6 @@ export class FlowchartValidationIssueRef extends Schema.Class<FlowchartValidatio
 	id: Schema.optional(Schema.NonEmptyString),
 	path: Schema.optional(Schema.NonEmptyString),
 }) {}
-export const FlowchartValidationIssueRefSchema = FlowchartValidationIssueRef;
 
 export class FlowchartValidationIssue extends Schema.Class<FlowchartValidationIssue>(
 	"FlowchartValidationIssue",
@@ -71,19 +70,16 @@ export class FlowchartValidationIssue extends Schema.Class<FlowchartValidationIs
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
 }) {}
-export const FlowchartValidationIssueSchema = FlowchartValidationIssue;
 
 export const FlowchartNodeKindSchema = Schema.Literals(["start", "process", "decision", "end"]);
 
 export class FlowchartNode extends GraphNode.extend<FlowchartNode>("FlowchartNode")({
 	kind: FlowchartNodeKindSchema,
 }) {}
-export const FlowchartNodeSchema = FlowchartNode;
 
 export class FlowchartEdge extends DiagramEdge.extend<FlowchartEdge>("FlowchartEdge")({
 	label: Schema.optional(Schema.NonEmptyString),
 }) {}
-export const FlowchartEdgeSchema = FlowchartEdge;
 
 export class FlowchartDiagram extends IntermediateDiagram.extend<FlowchartDiagram>(
 	"FlowchartDiagram",
@@ -92,7 +88,6 @@ export class FlowchartDiagram extends IntermediateDiagram.extend<FlowchartDiagra
 	nodes: Schema.Array(FlowchartNode).pipe(Schema.mutable).check(Schema.isMinLength(2)),
 	edges: Schema.Array(FlowchartEdge).pipe(Schema.mutable).check(Schema.isMinLength(1)),
 }) {}
-export const FlowchartDiagramSchema = FlowchartDiagram;
 
 export type FlowchartNodeKind = typeof FlowchartNodeKindSchema.Type;
 export type FlowchartValidationIssueCode = typeof FlowchartValidationIssueCodeSchema.Type;

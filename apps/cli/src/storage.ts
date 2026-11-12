@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { ExcalidrawFileSchema, RenderedDiagramSceneSchema } from "@sketchi/diagram-agent";
+import { ExcalidrawFile, RenderedDiagramSceneSchema } from "@sketchi/diagram-agent";
 import { Clock, Context, Effect, Layer, Result, Schedule, Schema } from "effect";
 
 import {
@@ -1226,7 +1226,7 @@ const DiagramStoreLive = Layer.effect(
 								})(value),
 							)
 						: Result.isSuccess(
-								Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+								Schema.decodeUnknownResult(ExcalidrawFile, {
 									errors: "all",
 									reportInput: true,
 								})(value),

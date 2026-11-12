@@ -44,7 +44,6 @@ export class JourneyStep extends Schema.Class<JourneyStep>("JourneyStep")({
 	/** Where it happens: the channel or touchpoint, such as Website, Email or Phone. */
 	touchpoint: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const JourneyStepSchema = JourneyStep;
 
 /** A column of the map: its steps in order, and the pain points and opportunities found there. */
 export class JourneyStage extends Schema.Class<JourneyStage>("JourneyStage")({
@@ -53,7 +52,6 @@ export class JourneyStage extends Schema.Class<JourneyStage>("JourneyStage")({
 	painPoints: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
 	opportunities: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
 }) {}
-export const JourneyStageSchema = JourneyStage;
 
 /**
  * The canonical user journey map: ordered stages of ordered steps, each scored
@@ -74,7 +72,6 @@ export class JourneyDiagram extends Schema.Class<JourneyDiagram>("JourneyDiagram
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const JourneyDiagramSchema = JourneyDiagram;
 
 export const JourneyValidationIssueCodeSchema = Schema.Literals([
 	"journey_too_large",
