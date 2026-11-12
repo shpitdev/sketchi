@@ -9,7 +9,7 @@ import {
 	FLOWCHART_MAX_LANES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
-	FlowchartDiagramSchema,
+	FlowchartDiagram,
 	FlowchartValidationError,
 	flowchartDiagramType,
 	flowchartEvaluationFixtures,
@@ -21,7 +21,7 @@ import {
 
 function validationIssues(input: unknown) {
 	return getFlowchartValidationIssues(
-		Schema.decodeUnknownSync(FlowchartDiagramSchema, { errors: "all" })(input),
+		Schema.decodeUnknownSync(FlowchartDiagram, { errors: "all" })(input),
 	);
 }
 

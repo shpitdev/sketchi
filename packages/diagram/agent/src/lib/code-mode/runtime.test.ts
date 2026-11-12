@@ -27,8 +27,8 @@ import {
 	type CodeModeObjectBucketObject,
 } from "./artifacts";
 import {
-	CanvasSpecSchema,
-	CreateCanvasRequestSchema,
+	CanvasSpec as CanvasSpecContract,
+	CreateCanvasRequest,
 	toCodeModeJsonSchema,
 	RenderedDiagramSceneSchema,
 	type ApplyDiagramPatchResult,
@@ -2988,7 +2988,7 @@ describe("canvas geometry and input bounds", () => {
 			const scene = geometryCanvas([geometryNode("a", 0, 0)]);
 			expect(
 				Result.isSuccess(
-					Schema.decodeUnknownResult(CanvasSpecSchema, {
+					Schema.decodeUnknownResult(CanvasSpecContract, {
 						errors: "all",
 						reportInput: true,
 					})({
@@ -2999,7 +2999,7 @@ describe("canvas geometry and input bounds", () => {
 			).toBe(true);
 			expect(
 				Result.isSuccess(
-					Schema.decodeUnknownResult(CanvasSpecSchema, {
+					Schema.decodeUnknownResult(CanvasSpecContract, {
 						errors: "all",
 						reportInput: true,
 					})({
@@ -3008,7 +3008,7 @@ describe("canvas geometry and input bounds", () => {
 					}),
 				),
 			).toBe(true);
-			expect(toCodeModeJsonSchema(CreateCanvasRequestSchema)).toMatchObject({
+			expect(toCodeModeJsonSchema(CreateCanvasRequest)).toMatchObject({
 				properties: {
 					spec: {
 						properties: {
@@ -3029,13 +3029,13 @@ describe("canvas geometry and input bounds", () => {
 		]);
 		expect(
 			Result.isSuccess(
-				Schema.decodeUnknownResult(CanvasSpecSchema, {
+				Schema.decodeUnknownResult(CanvasSpecContract, {
 					errors: "all",
 					reportInput: true,
 				})(scene),
 			),
 		).toBe(true);
-		expect(JSON.stringify(toCodeModeJsonSchema(CreateCanvasRequestSchema))).toContain(
+		expect(JSON.stringify(toCodeModeJsonSchema(CreateCanvasRequest))).toContain(
 			`"maxItems":${CANVAS_LIMITS.maxGroupsPerElement}`,
 		);
 	});

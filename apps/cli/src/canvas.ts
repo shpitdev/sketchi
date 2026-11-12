@@ -2,7 +2,7 @@ import {
 	formatContractSchemaError,
 	CanvasSpec,
 	CreateCanvasResultSchema,
-	ExcalidrawFileSchema,
+	ExcalidrawFile,
 } from "@sketchi/diagram-agent";
 import { Effect, Schema, SchemaIssue, Result } from "effect";
 
@@ -241,7 +241,7 @@ export const createCanvasDiagram = Effect.fn("sketchi.cli.canvas.create")(functi
 	if (excalidrawReference?.inline === undefined) {
 		return yield* malformedResponse(["artifact.formats.excalidraw.inline"]);
 	}
-	const decodedExcalidraw = Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+	const decodedExcalidraw = Schema.decodeUnknownResult(ExcalidrawFile, {
 		errors: "all",
 		reportInput: true,
 	})(excalidrawReference.inline);

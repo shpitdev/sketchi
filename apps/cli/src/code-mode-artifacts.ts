@@ -2,7 +2,7 @@ import {
 	formatContractSchemaError,
 	CodeModeArtifactStorage,
 	CodeModeRuntimeEnvironment,
-	ExcalidrawFileSchema,
+	ExcalidrawFile,
 	RenderedDiagramSceneSchema,
 	type CodeModeIssue,
 } from "@sketchi/diagram-agent";
@@ -128,7 +128,7 @@ const decodeArtifacts = Effect.fn("sketchi.cli.codeMode.decodeArtifacts")(functi
 			hint,
 			details: formatContractSchemaError(scene.failure).issues.map((issue) => issue.message),
 		});
-	const excalidraw = Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+	const excalidraw = Schema.decodeUnknownResult(ExcalidrawFile, {
 		errors: "all",
 		reportInput: true,
 	})(yield* inline("excalidraw"));

@@ -2,10 +2,9 @@ import {
 	ApplyDiagramPatchRequest,
 	type CANONICAL_DOCUMENT_TYPES,
 	type CanonicalDiagramDocument,
-	ExcalidrawFileSchema,
-	CodeModeIssueSchema,
+	ExcalidrawFile,
+	CodeModeIssue,
 	RenderedDiagramSceneSchema,
-	type ExcalidrawFile,
 	type PatchableScene,
 } from "@sketchi/diagram-agent";
 import { Effect, Schema, Result } from "effect";
@@ -154,7 +153,7 @@ const PresentValue = Schema.Unknown.check(Schema.makeFilter((value) => value !==
 
 const GenerateApiSuccess = Schema.Struct({
 	ok: Schema.Literal(true),
-	issues: Schema.optionalKey(Schema.Array(CodeModeIssueSchema)),
+	issues: Schema.optionalKey(Schema.Array(CodeModeIssue)),
 	diagram: Schema.Struct({
 		document: PresentValue,
 		scene: PresentValue,
@@ -197,7 +196,7 @@ function decodeScene(value: unknown): Effect.Effect<PatchableScene, CliGeneratio
 }
 
 function decodeExcalidraw(value: unknown): Effect.Effect<ExcalidrawFile, CliGenerationError> {
-	const decoded = Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+	const decoded = Schema.decodeUnknownResult(ExcalidrawFile, {
 		errors: "all",
 		reportInput: true,
 	})(value);

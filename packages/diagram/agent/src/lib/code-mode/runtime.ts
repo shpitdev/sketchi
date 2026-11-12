@@ -162,32 +162,31 @@ import {
 	CreateCanvasRejected,
 	GetArtifactRejected,
 	ApplyDiagramPatchRejected,
-	ApplyDiagramPatchRequestSchema,
+	ApplyDiagramPatchRequest,
 	BuildFlowchartRequestSchema,
-	EditFlowchartRequestSchema,
+	EditFlowchartRequest,
 	BuildMindmapRequestSchema,
-	BuildSequenceDiagramRequestSchema,
-	BuildStateMachineRequestSchema,
-	BuildErDiagramRequestSchema,
-	BuildClassDiagramRequestSchema,
-	BuildOrgChartRequestSchema,
-	BuildVennDiagramRequestSchema,
-	BuildJourneyMapRequestSchema,
-	BuildSankeyRequestSchema,
-	BuildWireframeRequestSchema,
-	BuildQuadrantChartRequestSchema,
-	BuildTimelineRequestSchema,
-	BuildChartRequestSchema,
-	BuildGanttRequestSchema,
-	CreateCanvasRequestSchema,
+	BuildSequenceDiagramRequest,
+	BuildStateMachineRequest,
+	BuildErDiagramRequest,
+	BuildClassDiagramRequest,
+	BuildOrgChartRequest,
+	BuildVennDiagramRequest,
+	BuildJourneyMapRequest,
+	BuildSankeyRequest,
+	BuildWireframeRequest,
+	BuildQuadrantChartRequest,
+	BuildTimelineRequest,
+	BuildChartRequest,
+	BuildGanttRequest,
+	CreateCanvasRequest,
 	DEFAULT_ICON_SEARCH_LIMIT,
 	SearchIconsRejected,
-	SearchIconsRequestSchema,
+	SearchIconsRequest,
 	type SearchIconsResult,
 	DIAGRAM_PATCH_OPERATION_NAMES,
-	GetArtifactRequestSchema,
+	GetArtifactRequest,
 	RenderedDiagramSceneSchema,
-	type ApplyDiagramPatchRequest,
 	type ApplyDiagramPatchResult,
 	type ArtifactBundle,
 	type ArtifactFormat,
@@ -195,19 +194,6 @@ import {
 	type BuildFlowchartResult,
 	type EditFlowchartResult,
 	type BuildMindmapResult,
-	type BuildSequenceDiagramRequest,
-	type BuildStateMachineRequest,
-	type BuildErDiagramRequest,
-	type BuildClassDiagramRequest,
-	type BuildOrgChartRequest,
-	type BuildVennDiagramRequest,
-	type BuildJourneyMapRequest,
-	type BuildSankeyRequest,
-	type BuildWireframeRequest,
-	type BuildQuadrantChartRequest,
-	type BuildTimelineRequest,
-	type BuildChartRequest,
-	type BuildGanttRequest,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildErDiagramResult,
@@ -222,9 +208,8 @@ import {
 	type BuildChartResult,
 	type BuildGanttResult,
 	type CreateCanvasResult,
-	CodeModeIssueSchema,
+	CodeModeIssue,
 	type ContractSchemaIssue,
-	type CodeModeIssue,
 	type CodeModeIssueCode,
 	type CodeModeIssueRef,
 	type ContractSchemaError,
@@ -1681,7 +1666,7 @@ interface SelectorTargets {
 }
 
 const FailureContextSchema = Schema.Struct({
-	issues: Schema.Array(Schema.toEncoded(CodeModeIssueSchema)).pipe(Schema.mutable),
+	issues: Schema.Array(Schema.toEncoded(CodeModeIssue)).pipe(Schema.mutable),
 });
 
 class ArtifactExportFailure extends Schema.TaggedError<ArtifactExportFailure>()(
@@ -3694,7 +3679,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildSequenceDiagramRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildSequenceDiagramRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);
@@ -3819,7 +3804,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildStateMachineRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildStateMachineRequest, {
 		errors: "all",
 		reportInput: true,
 	})(resolveStateMachineRequest(input));
@@ -3937,7 +3922,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildErDiagramRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildErDiagramRequest, {
 		errors: "all",
 		reportInput: true,
 	})(resolveErRequest(input));
@@ -4046,7 +4031,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildClassDiagramRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildClassDiagramRequest, {
 		errors: "all",
 		reportInput: true,
 	})(resolveClassRequest(input));
@@ -4156,7 +4141,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildOrgChartRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildOrgChartRequest, {
 		errors: "all",
 		reportInput: true,
 	})(resolveOrgChartRequest(input));
@@ -4265,7 +4250,7 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildVennDiagramRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildVennDiagramRequest, {
 		errors: "all",
 		reportInput: true,
 	})(resolveVennRequest(input));
@@ -4375,7 +4360,7 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildJourneyMapRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildJourneyMapRequest, {
 		errors: "all",
 		reportInput: true,
 	})(resolveJourneyRequest(input));
@@ -4483,7 +4468,7 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 });
 
 const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function* (input: unknown) {
-	const parsed = Schema.decodeUnknownResult(BuildSankeyRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildSankeyRequest, {
 		errors: "all",
 		reportInput: true,
 	})(resolveSankeyRequest(input));
@@ -4618,7 +4603,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildWireframeRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildWireframeRequest, {
 		errors: "all",
 		reportInput: true,
 	})(resolveWireframeRequest(input));
@@ -4727,7 +4712,7 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildQuadrantChartRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildQuadrantChartRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);
@@ -4845,7 +4830,7 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(BuildTimelineRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildTimelineRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);
@@ -4954,7 +4939,7 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 });
 
 const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (input: unknown) {
-	const parsed = Schema.decodeUnknownResult(BuildChartRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildChartRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);
@@ -5062,7 +5047,7 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 });
 
 const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (input: unknown) {
-	const parsed = Schema.decodeUnknownResult(BuildGanttRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(BuildGanttRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);
@@ -5230,7 +5215,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 			});
 		}
 	}
-	const parsed = Schema.decodeUnknownResult(CreateCanvasRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(CreateCanvasRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);
@@ -5597,7 +5582,7 @@ const storedFlowchartDocument = Effect.fn("codeMode.editFlowchart.readDocument")
 const editFlowchartWorkflow = Effect.fn("codeMode.editFlowchart.workflow")(function* (
 	input: unknown,
 ) {
-	const parsed = Schema.decodeUnknownResult(EditFlowchartRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(EditFlowchartRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);
@@ -5655,7 +5640,7 @@ const editFlowchartWorkflow = Effect.fn("codeMode.editFlowchart.workflow")(funct
 });
 
 const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function* (input: unknown) {
-	const parsed = Schema.decodeUnknownResult(GetArtifactRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(GetArtifactRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);
@@ -5781,7 +5766,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 			context: { issues: [rawIssue] },
 		});
 	}
-	const parsed = Schema.decodeUnknownResult(ApplyDiagramPatchRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(ApplyDiagramPatchRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);
@@ -6008,7 +5993,7 @@ function rankIconSearch(
 }
 
 const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(function* (input: unknown) {
-	const parsed = Schema.decodeUnknownResult(SearchIconsRequestSchema, {
+	const parsed = Schema.decodeUnknownResult(SearchIconsRequest, {
 		errors: "all",
 		reportInput: true,
 	})(input);

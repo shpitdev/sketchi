@@ -1,11 +1,10 @@
 import { Clock, Context, Effect, Layer, Schema, Result } from "effect";
 
 import {
-	ArtifactProvenanceSchema,
+	ArtifactProvenance,
 	type ArtifactBundle,
 	type ArtifactFormat,
 	type ArtifactFormatRef,
-	type ArtifactProvenance,
 	type CodeModeIssue,
 	type CodeModeIssueCode,
 	type InlineArtifactFormat,
@@ -277,7 +276,7 @@ function isStoredArtifactManifest(value: unknown): value is StoredArtifactManife
 
 function isArtifactProvenance(value: unknown): value is ArtifactProvenance {
 	return Result.isSuccess(
-		Schema.decodeUnknownResult(ArtifactProvenanceSchema, {
+		Schema.decodeUnknownResult(ArtifactProvenance, {
 			errors: "all",
 			reportInput: true,
 		})(value),

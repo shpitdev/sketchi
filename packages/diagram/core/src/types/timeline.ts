@@ -37,7 +37,6 @@ export class TimelineDiagram extends Schema.Class<TimelineDiagram>("TimelineDiag
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const TimelineDiagramSchema = TimelineDiagram;
 
 export type TimelineDateGranularity = "year" | "month" | "day" | "instant";
 

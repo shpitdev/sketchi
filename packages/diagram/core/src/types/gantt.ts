@@ -48,7 +48,6 @@ export class GanttDiagram extends Schema.Class<GanttDiagram>("GanttDiagram")({
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const GanttDiagramSchema = GanttDiagram;
 
 /** A calendar day as whole days since 1970-01-01 (UTC), or undefined unless `YYYY-MM-DD`. */
 export function parseGanttDay(value: string): number | undefined {

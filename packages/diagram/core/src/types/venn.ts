@@ -40,7 +40,6 @@ export class VennSet extends Schema.Class<VennSet>("VennSet")({
 	/** A palette name (blue, orange, green, yellow, pink, violet, red, gray) or a #rrggbb hex. */
 	color: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const VennSetSchema = VennSet;
 
 /**
  * One region: the items in every listed set and in no other. `["a"]` is only
@@ -56,7 +55,6 @@ export class VennRegion extends Schema.Class<VennRegion>("VennRegion")({
 	items: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
 	count: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 }) {}
-export const VennRegionSchema = VennRegion;
 
 /**
  * The canonical Venn diagram: two or three sets and what sits in each of
@@ -76,7 +74,6 @@ export class VennDiagram extends Schema.Class<VennDiagram>("VennDiagram")({
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const VennDiagramSchema = VennDiagram;
 
 export const VennValidationIssueCodeSchema = Schema.Literals([
 	"venn_set_count",

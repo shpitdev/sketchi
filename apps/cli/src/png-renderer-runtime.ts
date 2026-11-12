@@ -1,5 +1,5 @@
 import { Schema, Result } from "effect";
-import { formatContractSchemaError, ExcalidrawFileSchema } from "@sketchi/diagram-agent";
+import { formatContractSchemaError, ExcalidrawFile } from "@sketchi/diagram-agent";
 import { Resvg, initWasm, type ResvgRenderOptions } from "@resvg/resvg-wasm";
 import * as Linkedom from "linkedom";
 
@@ -418,7 +418,7 @@ function bannerTitle(scene: PngRenderInput["scene"]): string | undefined {
 
 export async function renderPngBytes(input: PngRenderInput): Promise<Uint8Array> {
 	const title = bannerTitle(input.scene);
-	const decodedExcalidraw = Schema.decodeUnknownResult(ExcalidrawFileSchema, {
+	const decodedExcalidraw = Schema.decodeUnknownResult(ExcalidrawFile, {
 		errors: "all",
 		reportInput: true,
 	})(input.excalidraw);

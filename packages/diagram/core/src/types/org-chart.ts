@@ -35,7 +35,6 @@ export class OrgPerson extends Schema.Class<OrgPerson>("OrgPerson")({
 	/** Draw an initials placeholder for a photo. */
 	avatar: Schema.optionalKey(Schema.Boolean),
 }) {}
-export const OrgPersonSchema = OrgPerson;
 
 /**
  * A secondary, dotted-line or matrix report: `report` also answers to
@@ -47,7 +46,6 @@ export class OrgDottedLine extends Schema.Class<OrgDottedLine>("OrgDottedLine")(
 	manager: Schema.NonEmptyString,
 	label: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const OrgDottedLineSchema = OrgDottedLine;
 
 /**
  * The canonical org chart: people and the managers they report to, with
@@ -72,7 +70,6 @@ export class OrgChartDiagram extends Schema.Class<OrgChartDiagram>("OrgChartDiag
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const OrgChartDiagramSchema = OrgChartDiagram;
 
 export const OrgChartValidationIssueCodeSchema = Schema.Literals([
 	"org_chart_too_large",

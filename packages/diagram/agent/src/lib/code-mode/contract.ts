@@ -359,8 +359,6 @@ function hexColor(defaultValue?: string) {
 }
 const HexColor = hexColor();
 
-export const HexColorSchema = HexColor;
-
 /** Formats a build can export. */
 export const BUILD_ARTIFACT_FORMATS = ["excalidraw", "scene", "png"] as const;
 /**
@@ -388,7 +386,6 @@ export class ArtifactProvenance extends Schema.Class<ArtifactProvenance>("Artifa
 	},
 	{ identifier: undefined },
 ) {}
-export const ArtifactProvenanceSchema = ArtifactProvenance;
 
 export const CODE_MODE_ISSUE_CODES = [
 	"missing_field",
@@ -560,7 +557,6 @@ export class CodeModeIssueRef extends Schema.Class<CodeModeIssueRef>("CodeModeIs
 	},
 	{ identifier: undefined },
 ) {}
-export const CodeModeIssueRefSchema = CodeModeIssueRef;
 
 export class CodeModeIssue extends Schema.Class<CodeModeIssue>("CodeModeIssue")(
 	{
@@ -574,7 +570,6 @@ export class CodeModeIssue extends Schema.Class<CodeModeIssue>("CodeModeIssue")(
 	},
 	{ identifier: undefined },
 ) {}
-export const CodeModeIssueSchema = CodeModeIssue;
 
 export const FLOWCHART_NODE_KINDS = ["start", "process", "decision", "end"] as const;
 export const FlowchartNodeKindSchema = Object.assign(literals(FLOWCHART_NODE_KINDS), {
@@ -621,7 +616,6 @@ export class NodeIconSpec extends Schema.Class<NodeIconSpec>("NodeIconSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const NodeIconSpecSchema = NodeIconSpec;
 
 const defaultAccentColor = SKETCHI_DIAGRAM_STYLE.accentColor;
 const DefaultAccentColor = hexColor(defaultAccentColor).pipe(
@@ -640,7 +634,6 @@ export class DiagramSpecStyle extends Schema.Class<DiagramSpecStyle>("DiagramSpe
 	},
 	{ identifier: undefined },
 ) {}
-export const DiagramSpecStyleSchema = DiagramSpecStyle;
 
 const diagramStyleDefault = {
 	accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
@@ -659,7 +652,6 @@ const DiagramStyleWithDefault = DiagramSpecStyle.annotate({
  */
 export const FlowchartSpec = FlowchartDocumentSchema;
 export type FlowchartSpec = FlowchartDocument;
-export const FlowchartSpecSchema = FlowchartSpec;
 
 /**
  * The authoring form of diagram-core's canonical SequenceDiagram: message ids
@@ -705,9 +697,6 @@ export class SequenceDiagramSpec extends Schema.Class<SequenceDiagramSpec>("Sequ
 	},
 	{ identifier: undefined },
 ) {}
-export const SequenceDiagramSpecSchema = SequenceDiagramSpec;
-export const SequenceParticipantSpecSchema = SequenceParticipantSpec;
-export const SequenceMessageSpecSchema = SequenceMessageSpec;
 
 /** Author semantic points only; layout and date ordering belong to the renderer. */
 export class TimelineEventSpec extends Schema.Class<TimelineEventSpec>("TimelineEventSpec")(
@@ -734,7 +723,6 @@ export class TimelineSpec extends Schema.Class<TimelineSpec>("TimelineSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const TimelineSpecSchema = TimelineSpec;
 
 /** Author categories and values only; scales, ticks and label placement belong to the renderer. */
 export class ChartSeriesSpec extends Schema.Class<ChartSeriesSpec>("ChartSeriesSpec")(
@@ -761,7 +749,6 @@ export class ChartSpec extends Schema.Class<ChartSpec>("ChartSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const ChartSpecSchema = ChartSpec;
 
 /**
  * The authoring form of diagram-core's canonical StateMachineDiagram:
@@ -816,7 +803,6 @@ export class StateMachineSpec extends Schema.Class<StateMachineSpec>("StateMachi
 	},
 	{ identifier: undefined },
 ) {}
-export const StateMachineSpecSchema = StateMachineSpec;
 
 /** Author dates, durations and dependencies only; the axis, rows and routes belong to the renderer. */
 export class GanttTaskSpec extends Schema.Class<GanttTaskSpec>("GanttTaskSpec")(
@@ -844,7 +830,6 @@ export class GanttSpec extends Schema.Class<GanttSpec>("GanttSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const GanttSpecSchema = GanttSpec;
 /**
  * The authoring form of diagram-core's canonical ErDiagram: a field may be one
  * string (`"id uuid PK"`), relationship ids are optional and style is
@@ -903,7 +888,6 @@ export class ErSpec extends Schema.Class<ErSpec>("ErSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const ErSpecSchema = ErSpec;
 
 /**
  * The authoring form of diagram-core's canonical ClassDiagram: a member may be
@@ -996,7 +980,6 @@ export class ClassSpec extends Schema.Class<ClassSpec>("ClassSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const ClassSpecSchema = ClassSpec;
 
 /**
  * The authoring form of diagram-core's canonical OrgChartDiagram: dotted-line
@@ -1043,7 +1026,6 @@ export class OrgChartSpec extends Schema.Class<OrgChartSpec>("OrgChartSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const OrgChartSpecSchema = OrgChartSpec;
 
 /**
  * The authoring form of diagram-core's canonical VennDiagram: regions default
@@ -1088,7 +1070,6 @@ export class VennSpec extends Schema.Class<VennSpec>("VennSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const VennSpecSchema = VennSpec;
 
 /**
  * The authoring form of diagram-core's canonical JourneyDiagram: style is
@@ -1127,7 +1108,6 @@ export class JourneySpec extends Schema.Class<JourneySpec>("JourneySpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const JourneySpecSchema = JourneySpec;
 
 /**
  * The authoring form of diagram-core's canonical SankeyDiagram: the id is
@@ -1164,7 +1144,6 @@ export class SankeySpec extends Schema.Class<SankeySpec>("SankeySpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const SankeySpecSchema = SankeySpec;
 
 /** One component of a wireframe screen, as a model writes it. */
 export interface WireframeComponentInput {
@@ -1255,7 +1234,6 @@ export class WireframeSpec extends Schema.Class<WireframeSpec>("WireframeSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const WireframeSpecSchema = WireframeSpec;
 
 /**
  * The authoring form of diagram-core's canonical QuadrantDiagram: style is
@@ -1300,7 +1278,6 @@ export class QuadrantChartSpec extends Schema.Class<QuadrantChartSpec>("Quadrant
 	},
 	{ identifier: undefined },
 ) {}
-export const QuadrantChartSpecSchema = QuadrantChartSpec;
 
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(BuildArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
@@ -1369,7 +1346,6 @@ export class EditFlowchartRequest extends Schema.Class<EditFlowchartRequest>(
 	},
 	{ identifier: undefined },
 ) {}
-export const EditFlowchartRequestSchema = EditFlowchartRequest;
 
 /** The document Studio's model writes: the same one every other surface takes. */
 const BuildFlowchartToolInputContract = Schema.Struct({
@@ -1408,7 +1384,6 @@ export class BuildSequenceDiagramRequest extends Schema.Class<BuildSequenceDiagr
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildSequenceDiagramRequestSchema = BuildSequenceDiagramRequest;
 
 /**
  * What a chat model passes to a sequence build tool: the host supplies artifact
@@ -1437,7 +1412,6 @@ export class BuildTimelineRequest extends Schema.Class<BuildTimelineRequest>(
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildTimelineRequestSchema = BuildTimelineRequest;
 export const BuildTimelineToolInputSchema = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(
@@ -1460,7 +1434,6 @@ export class BuildChartRequest extends Schema.Class<BuildChartRequest>("BuildCha
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildChartRequestSchema = BuildChartRequest;
 /** The chart spec a model authors; style is always the Sketchi palette. */
 export const ChartToolSpecSchema = ChartSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildChartToolInputSchema = Schema.Struct({
@@ -1479,7 +1452,6 @@ export class BuildStateMachineRequest extends Schema.Class<BuildStateMachineRequ
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildStateMachineRequestSchema = BuildStateMachineRequest;
 export const BuildStateMachineToolInputSchema = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(
@@ -1503,7 +1475,6 @@ export class BuildGanttRequest extends Schema.Class<BuildGanttRequest>("BuildGan
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildGanttRequestSchema = BuildGanttRequest;
 /** The Gantt spec a model authors; style is always the Sketchi palette. */
 export const GanttToolSpecSchema = GanttSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildGanttToolInputSchema = Schema.Struct({
@@ -1521,7 +1492,6 @@ export class BuildErDiagramRequest extends Schema.Class<BuildErDiagramRequest>(
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildErDiagramRequestSchema = BuildErDiagramRequest;
 /** The ER spec a model authors; style is always the Sketchi palette. */
 export const ErToolSpecSchema = ErSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildErDiagramToolInputSchema = Schema.Struct({
@@ -1539,7 +1509,6 @@ export class BuildClassDiagramRequest extends Schema.Class<BuildClassDiagramRequ
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildClassDiagramRequestSchema = BuildClassDiagramRequest;
 /** The class diagram spec a model authors; style is always the Sketchi palette. */
 export const ClassToolSpecSchema = ClassSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildClassDiagramToolInputSchema = Schema.Struct({
@@ -1557,7 +1526,6 @@ export class BuildOrgChartRequest extends Schema.Class<BuildOrgChartRequest>(
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildOrgChartRequestSchema = BuildOrgChartRequest;
 /** The org chart spec a model authors; style is always the Sketchi palette. */
 export const OrgChartToolSpecSchema = OrgChartSpec.mapFields(
 	({ style: _style, ...fields }) => fields,
@@ -1577,7 +1545,6 @@ export class BuildVennDiagramRequest extends Schema.Class<BuildVennDiagramReques
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildVennDiagramRequestSchema = BuildVennDiagramRequest;
 /** The Venn diagram spec a model authors; style is always the Sketchi palette. */
 export const VennToolSpecSchema = VennSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildVennDiagramToolInputSchema = Schema.Struct({
@@ -1595,7 +1562,6 @@ export class BuildJourneyMapRequest extends Schema.Class<BuildJourneyMapRequest>
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildJourneyMapRequestSchema = BuildJourneyMapRequest;
 /** The journey map spec a model authors; style is always the Sketchi palette. */
 export const JourneyToolSpecSchema = JourneySpec.mapFields(
 	({ style: _style, ...fields }) => fields,
@@ -1613,7 +1579,6 @@ export class BuildSankeyRequest extends Schema.Class<BuildSankeyRequest>("BuildS
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildSankeyRequestSchema = BuildSankeyRequest;
 /** The Sankey spec a model authors; style is always the Sketchi palette. */
 export const SankeyToolSpecSchema = SankeySpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildSankeyToolInputSchema = Schema.Struct({
@@ -1631,7 +1596,6 @@ export class BuildWireframeRequest extends Schema.Class<BuildWireframeRequest>(
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildWireframeRequestSchema = BuildWireframeRequest;
 /** The wireframe spec a model authors; style is always the Sketchi palette. */
 export const WireframeToolSpecSchema = WireframeSpec.mapFields(
 	({ style: _style, ...fields }) => fields,
@@ -1651,7 +1615,6 @@ export class BuildQuadrantChartRequest extends Schema.Class<BuildQuadrantChartRe
 	},
 	{ identifier: undefined },
 ) {}
-export const BuildQuadrantChartRequestSchema = BuildQuadrantChartRequest;
 /** The quadrant chart spec a model authors; style is always the Sketchi palette. */
 export const QuadrantChartToolSpecSchema = QuadrantChartSpec.mapFields(
 	({ style: _style, ...fields }) => fields,
@@ -1720,7 +1683,6 @@ const MindmapSpecContract = Schema.Struct({
 export class MindmapSpec extends Schema.Class<MindmapSpec>("MindmapSpec")(MindmapSpecContract, {
 	identifier: undefined,
 }) {}
-export const MindmapSpecSchema = MindmapSpec;
 
 const BuildMindmapRequestContract = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
@@ -1749,7 +1711,6 @@ export class ScenePoint extends Schema.Class<ScenePoint>("ScenePoint")(
 	},
 	{ identifier: undefined },
 ) {}
-export const ScenePointSchema = ScenePoint;
 
 // Count limits are advertised here and enforced before compilation/patching by
 // the runtime's canvas validator, preserving limit-specific failure responses.
@@ -1818,7 +1779,6 @@ export class CanvasNodeIcon extends Schema.Class<CanvasNodeIcon>("CanvasNodeIcon
 	},
 	{ identifier: undefined },
 ) {}
-export const CanvasNodeIconSchema = CanvasNodeIcon;
 
 /** A hand-drawn icon: a few primitives on a 24-unit grid. */
 export const IconRecipeSchema = CoreIconRecipeSchema;
@@ -1835,7 +1795,6 @@ export class CanvasIconAsset extends Schema.Class<CanvasIconAsset>("CanvasIconAs
 	},
 	{ identifier: undefined },
 ) {}
-export const CanvasIconAssetSchema = CanvasIconAsset;
 
 export class NodeSceneElement extends Schema.Class<NodeSceneElement>("NodeSceneElement")(
 	{
@@ -2030,12 +1989,6 @@ export class IconSceneElement extends Schema.Class<IconSceneElement>("IconSceneE
 	{ identifier: undefined },
 ) {}
 
-export const NodeSceneElementSchema = NodeSceneElement;
-export const TextSceneElementSchema = TextSceneElement;
-export const ArrowSceneElementSchema = ArrowSceneElement;
-export const LineSceneElementSchema = LineSceneElement;
-export const FrameSceneElementSchema = FrameSceneElement;
-export const IconSceneElementSchema = IconSceneElement;
 export const SceneElementSchema = Schema.Union(
 	[
 		NodeSceneElement,
@@ -2088,9 +2041,8 @@ export class CanvasSpec extends Schema.Class<CanvasSpec>("CanvasSpec")(
 	},
 	{ identifier: undefined },
 ) {}
-export const CanvasSpecSchema = CanvasSpec;
 export type RenderedDiagramScene = CanvasSpec;
-export const RenderedDiagramSceneSchema = CanvasSpecSchema;
+export const RenderedDiagramSceneSchema = CanvasSpec;
 export type PatchableScene = CanvasSpec;
 
 export class CreateCanvasRequest extends Schema.Class<CreateCanvasRequest>("CreateCanvasRequest")(
@@ -2101,7 +2053,6 @@ export class CreateCanvasRequest extends Schema.Class<CreateCanvasRequest>("Crea
 	},
 	{ identifier: undefined },
 ) {}
-export const CreateCanvasRequestSchema = CreateCanvasRequest;
 
 const ExcalidrawElement = Schema.Record(Schema.String, Schema.Unknown).check(
 	Schema.makeFilter(
@@ -2113,7 +2064,6 @@ const ExcalidrawElement = Schema.Record(Schema.String, Schema.Unknown).check(
 		{ message: "Invalid input" },
 	),
 );
-export const ExcalidrawElementSchema = ExcalidrawElement;
 
 export class ExcalidrawScene extends Schema.Class<ExcalidrawScene>("ExcalidrawScene")(
 	{
@@ -2122,7 +2072,6 @@ export class ExcalidrawScene extends Schema.Class<ExcalidrawScene>("ExcalidrawSc
 	},
 	{ identifier: undefined },
 ) {}
-export const ExcalidrawSceneSchema = ExcalidrawScene;
 
 export class ExcalidrawFile extends ExcalidrawScene.extend<ExcalidrawFile>("ExcalidrawFile")(
 	{
@@ -2133,7 +2082,6 @@ export class ExcalidrawFile extends ExcalidrawScene.extend<ExcalidrawFile>("Exca
 	},
 	{ identifier: undefined },
 ) {}
-export const ExcalidrawFileSchema = ExcalidrawFile;
 
 export class GetArtifactRequest extends Schema.Class<GetArtifactRequest>("GetArtifactRequest")(
 	{
@@ -2143,7 +2091,6 @@ export class GetArtifactRequest extends Schema.Class<GetArtifactRequest>("GetArt
 	},
 	{ identifier: undefined },
 ) {}
-export const GetArtifactRequestSchema = GetArtifactRequest;
 
 export class DiagramSelector extends Schema.Class<DiagramSelector>("DiagramSelector")(
 	{
@@ -2156,7 +2103,6 @@ export class DiagramSelector extends Schema.Class<DiagramSelector>("DiagramSelec
 	},
 	{ identifier: undefined },
 ) {}
-export const DiagramSelectorSchema = DiagramSelector;
 
 export class DiagramStylePatch extends Schema.Class<DiagramStylePatch>("DiagramStylePatch")(
 	{
@@ -2167,7 +2113,6 @@ export class DiagramStylePatch extends Schema.Class<DiagramStylePatch>("DiagramS
 	},
 	{ identifier: undefined },
 ) {}
-export const DiagramStylePatchSchema = DiagramStylePatch;
 
 export const DIAGRAM_SHAPES = ["rectangle", "diamond", "ellipse", "circle", "polygon"] as const;
 export const DiagramShapeSchema = Object.assign(literals(DIAGRAM_SHAPES), {
@@ -2371,7 +2316,6 @@ export class ApplyDiagramPatchRequest extends Schema.Class<ApplyDiagramPatchRequ
 	},
 	{ identifier: undefined },
 ) {}
-export const ApplyDiagramPatchRequestSchema = ApplyDiagramPatchRequest;
 
 export type NormalizedFlowchartSpec = typeof NormalizedFlowchartSpecSchema.Type;
 export type NormalizedMindmapSpec = typeof NormalizedMindmapSpecSchema.Type;
@@ -3444,7 +3388,6 @@ export class SearchIconsRequest extends Schema.Class<SearchIconsRequest>("Search
 	},
 	{ identifier: undefined },
 ) {}
-export const SearchIconsRequestSchema = SearchIconsRequest;
 
 export class SearchIconsMatch extends Schema.Class<SearchIconsMatch>("SearchIconsMatch")(
 	{

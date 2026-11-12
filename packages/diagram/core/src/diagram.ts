@@ -1,56 +1,20 @@
 import { Schema } from "effect";
 
-import { type ChartDiagram, ChartDiagramSchema, validateChartDiagram } from "./types/chart.js";
-import {
-	type FlowchartDiagram,
-	FlowchartDiagramSchema,
-	validateFlowchartDiagram,
-} from "./types/flowchart.js";
-import {
-	type MindmapDiagram,
-	MindmapDiagramSchema,
-	validateMindmapDiagram,
-} from "./types/mindmap.js";
-import {
-	type SequenceDiagram,
-	SequenceDiagramSchema,
-	validateSequenceDiagram,
-} from "./types/sequence.js";
-import {
-	type TimelineDiagram,
-	TimelineDiagramSchema,
-	validateTimelineDiagram,
-} from "./types/timeline.js";
-import {
-	type StateMachineDiagram,
-	StateMachineDiagramSchema,
-	validateStateMachineDiagram,
-} from "./types/state-machine.js";
-import { type GanttDiagram, GanttDiagramSchema, validateGanttDiagram } from "./types/gantt.js";
-import { type ErDiagram, ErDiagramSchema, validateErDiagram } from "./types/er.js";
-import { type ClassDiagram, ClassDiagramSchema, validateClassDiagram } from "./types/class.js";
-import {
-	type OrgChartDiagram,
-	OrgChartDiagramSchema,
-	validateOrgChartDiagram,
-} from "./types/org-chart.js";
-import { type VennDiagram, VennDiagramSchema, validateVennDiagram } from "./types/venn.js";
-import {
-	type JourneyDiagram,
-	JourneyDiagramSchema,
-	validateJourneyDiagram,
-} from "./types/journey.js";
-import { type SankeyDiagram, SankeyDiagramSchema, validateSankeyDiagram } from "./types/sankey.js";
-import {
-	type WireframeDiagram,
-	WireframeDiagramSchema,
-	validateWireframeDiagram,
-} from "./types/wireframe.js";
-import {
-	type QuadrantDiagram,
-	QuadrantDiagramSchema,
-	validateQuadrantDiagram,
-} from "./types/quadrant.js";
+import { ChartDiagram, validateChartDiagram } from "./types/chart.js";
+import { FlowchartDiagram, validateFlowchartDiagram } from "./types/flowchart.js";
+import { MindmapDiagram, validateMindmapDiagram } from "./types/mindmap.js";
+import { SequenceDiagram, validateSequenceDiagram } from "./types/sequence.js";
+import { TimelineDiagram, validateTimelineDiagram } from "./types/timeline.js";
+import { StateMachineDiagram, validateStateMachineDiagram } from "./types/state-machine.js";
+import { GanttDiagram, validateGanttDiagram } from "./types/gantt.js";
+import { ErDiagram, validateErDiagram } from "./types/er.js";
+import { ClassDiagram, validateClassDiagram } from "./types/class.js";
+import { OrgChartDiagram, validateOrgChartDiagram } from "./types/org-chart.js";
+import { VennDiagram, validateVennDiagram } from "./types/venn.js";
+import { JourneyDiagram, validateJourneyDiagram } from "./types/journey.js";
+import { SankeyDiagram, validateSankeyDiagram } from "./types/sankey.js";
+import { WireframeDiagram, validateWireframeDiagram } from "./types/wireframe.js";
+import { QuadrantDiagram, validateQuadrantDiagram } from "./types/quadrant.js";
 import type { DiagramTypeValue } from "./types.js";
 
 /** One diagram of any canonical family, discriminated by `type`. */
@@ -73,21 +37,21 @@ export type CanonicalDiagram =
 
 // A family added to DIAGRAM_TYPES without a contract here fails to compile.
 const familySchemas = {
-	flowchart: FlowchartDiagramSchema,
-	mindmap: MindmapDiagramSchema,
-	sequence: SequenceDiagramSchema,
-	timeline: TimelineDiagramSchema,
-	chart: ChartDiagramSchema,
-	"state-machine": StateMachineDiagramSchema,
-	gantt: GanttDiagramSchema,
-	er: ErDiagramSchema,
-	class: ClassDiagramSchema,
-	"org-chart": OrgChartDiagramSchema,
-	venn: VennDiagramSchema,
-	journey: JourneyDiagramSchema,
-	sankey: SankeyDiagramSchema,
-	wireframe: WireframeDiagramSchema,
-	quadrant: QuadrantDiagramSchema,
+	flowchart: FlowchartDiagram,
+	mindmap: MindmapDiagram,
+	sequence: SequenceDiagram,
+	timeline: TimelineDiagram,
+	chart: ChartDiagram,
+	"state-machine": StateMachineDiagram,
+	gantt: GanttDiagram,
+	er: ErDiagram,
+	class: ClassDiagram,
+	"org-chart": OrgChartDiagram,
+	venn: VennDiagram,
+	journey: JourneyDiagram,
+	sankey: SankeyDiagram,
+	wireframe: WireframeDiagram,
+	quadrant: QuadrantDiagram,
 } satisfies Record<DiagramTypeValue, Schema.Top>;
 
 export const CanonicalDiagramSchema = Schema.Union([

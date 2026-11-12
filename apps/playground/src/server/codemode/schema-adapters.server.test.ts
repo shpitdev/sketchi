@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
-import { BuildFlowchartResultSchema, GetArtifactRequestSchema } from "@sketchi/diagram-agent";
+import { BuildFlowchartResultSchema, GetArtifactRequest } from "@sketchi/diagram-agent";
 
 import { CodeModeSearchRequestSchema } from "./mcp-docs.server";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
@@ -40,7 +40,7 @@ describe("Playground Effect schema adapters", () => {
 		({ input }) =>
 			Effect.promise(async () => {
 				const result =
-					await toPlaygroundStandardSchema(GetArtifactRequestSchema)["~standard"].validate(input);
+					await toPlaygroundStandardSchema(GetArtifactRequest)["~standard"].validate(input);
 				if ("issues" in result) return assert.fail("Expected a valid package input.");
 				const decoded = result.value;
 				if (decoded === null || typeof decoded !== "object") {

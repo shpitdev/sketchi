@@ -22,7 +22,6 @@ export class SankeyNode extends Schema.Class<SankeyNode>("SankeyNode")({
 	/** Colors the bar and every flow leaving it; a stable palette color when omitted. */
 	color: Schema.optionalKey(HexColor),
 }) {}
-export const SankeyNodeSchema = SankeyNode;
 
 /** A flow of `value` from one node to another, drawn as a band as wide as its value. */
 export class SankeyLink extends Schema.Class<SankeyLink>("SankeyLink")({
@@ -32,7 +31,6 @@ export class SankeyLink extends Schema.Class<SankeyLink>("SankeyLink")({
 	/** Drawn with the flow's value, such as what the flow carries. */
 	label: Schema.optionalKey(Schema.NonEmptyString),
 }) {}
-export const SankeyLinkSchema = SankeyLink;
 
 /**
  * A Sankey diagram: nodes and the weighted flows between them, running one
@@ -51,7 +49,6 @@ export class SankeyDiagram extends Schema.Class<SankeyDiagram>("SankeyDiagram")(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
 }) {}
-export const SankeyDiagramSchema = SankeyDiagram;
 
 export const SankeyValidationIssueCodeSchema = Schema.Literals([
 	"sankey_too_large",

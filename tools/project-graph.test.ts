@@ -419,9 +419,6 @@ const promiseTypeCheckingSourcePaths: Record<string, string[]> = {
 	"@sketchi/diagram-generation": ["packages/diagram/generation/src/index.ts"],
 	"@sketchi/diagram-renderer": ["packages/diagram/renderer/src/index.ts"],
 	"@sketchi/diagram-scenarios": ["packages/diagram/scenarios/src/index.ts"],
-	"@sketchi/diagram-scenarios/internal/tool-process": [
-		"packages/diagram/scenarios/src/internal/tool-process.ts",
-	],
 	"@sketchi/diagram-ui": ["packages/diagram/ui/src/index.ts"],
 	"@sketchi/observability": ["packages/observability/src/index.ts"],
 	"@sketchi/svg-excalidraw": ["packages/svg-excalidraw/src/index.ts"],

@@ -19,7 +19,6 @@ export class MindmapNode extends DiagramNode.extend<MindmapNode>("MindmapNode")(
 	kind: Schema.Literals(["root", "topic"]),
 	metadata: MindmapNodeMetadata,
 }) {}
-export const MindmapNodeSchema = MindmapNode;
 
 export class MindmapEdgeMetadata extends Schema.Class<MindmapEdgeMetadata>("MindmapEdgeMetadata")({
 	depth: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -29,14 +28,12 @@ export class MindmapEdgeMetadata extends Schema.Class<MindmapEdgeMetadata>("Mind
 export class MindmapEdge extends DiagramEdge.extend<MindmapEdge>("MindmapEdge")({
 	metadata: MindmapEdgeMetadata,
 }) {}
-export const MindmapEdgeSchema = MindmapEdge;
 
 export class MindmapDiagram extends IntermediateDiagram.extend<MindmapDiagram>("MindmapDiagram")({
 	type: Schema.Literal(mindmapDiagramType),
 	nodes: Schema.Array(MindmapNode).pipe(Schema.mutable).check(Schema.isMinLength(2)),
 	edges: Schema.Array(MindmapEdge).pipe(Schema.mutable).check(Schema.isMinLength(1)),
 }) {}
-export const MindmapDiagramSchema = MindmapDiagram;
 
 export function validateMindmapDiagram(diagram: MindmapDiagram): MindmapDiagram {
 	validateIntermediateDiagram(diagram);

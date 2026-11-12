@@ -1,5 +1,5 @@
 import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import { StudioDrawingSchema } from "@sketchi/studio-projects/client";
+import { StudioDrawing } from "@sketchi/studio-projects/client";
 import { Result, Schema } from "effect";
 import { createStore, del, get, set, type UseStore } from "idb-keyval";
 
@@ -25,7 +25,7 @@ export async function readDrawingDraft(diagramId: string): Promise<ExcalidrawSce
 	try {
 		const stored: unknown = await get(draftKey(diagramId), drafts());
 		if (stored === undefined) return undefined;
-		const drawing = Schema.decodeUnknownResult(StudioDrawingSchema)(stored);
+		const drawing = Schema.decodeUnknownResult(StudioDrawing)(stored);
 		return Result.isSuccess(drawing) ? sceneFromDrawing(drawing.success) : undefined;
 	} catch {
 		return undefined;
