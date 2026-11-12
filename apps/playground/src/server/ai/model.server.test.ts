@@ -27,34 +27,41 @@ const responsesAnswer = {
 	usage: { input_tokens: 10, output_tokens: 3, total_tokens: 13 },
 };
 
+type GatewayCall = { gatewayId: string; data: GatewayRun[0]; options: GatewayRun[1] };
+
+/** The Studio model over a fake gateway binding that records every call. */
+function studioModel(runs: GatewayCall[]) {
+	const ai = {
+		gateway: (gatewayId: string): CloudflareAiGateway => ({
+			getUrl: async () => "",
+			run: async (data, options) => {
+				runs.push({ gatewayId, data, options });
+				return Response.json(responsesAnswer);
+			},
+		}),
+	};
+	return Effect.gen(function* () {
+		return yield* (yield* PlaygroundAiModel).model;
+	}).pipe(
+		Effect.provide(PlaygroundAiModelLive),
+		Effect.provideService(PlaygroundBindings, { AI: ai }),
+		Effect.provideService(PlaygroundRequestMetadata, {
+			attemptId: "attempt_1",
+			method: "POST",
+			origin: "https://studio.test",
+			path: "/api/chat",
+			request: new Request("https://studio.test/api/chat"),
+			runId: "run_1",
+			traceId: "trace_1",
+		}),
+	);
+}
+
 describe("Studio model", () => {
 	it.effect("calls gpt-6-luna on OpenAI's Responses API through the gateway binding", () =>
 		Effect.gen(function* () {
-			const runs: { gatewayId: string; data: GatewayRun[0]; options: GatewayRun[1] }[] = [];
-			const ai = {
-				gateway: (gatewayId: string): CloudflareAiGateway => ({
-					getUrl: async () => "",
-					run: async (data, options) => {
-						runs.push({ gatewayId, data, options });
-						return Response.json(responsesAnswer);
-					},
-				}),
-			};
-			const model = yield* Effect.gen(function* () {
-				return yield* (yield* PlaygroundAiModel).model;
-			}).pipe(
-				Effect.provide(PlaygroundAiModelLive),
-				Effect.provideService(PlaygroundBindings, { AI: ai }),
-				Effect.provideService(PlaygroundRequestMetadata, {
-					attemptId: "attempt_1",
-					method: "POST",
-					origin: "https://studio.test",
-					path: "/api/chat",
-					request: new Request("https://studio.test/api/chat"),
-					runId: "run_1",
-					traceId: "trace_1",
-				}),
-			);
+			const runs: GatewayCall[] = [];
+			const model = yield* studioModel(runs);
 			const result = yield* Effect.promise(() =>
 				generateText({
 					model,
@@ -85,7 +92,21 @@ describe("Studio model", () => {
 			expect(run?.options?.gateway).toEqual({
 				collectLog: true,
 				metadata: { sketchiSurface: "studio-agent", sketchiTraceId: "trace_1" },
+				skipCache: true,
 			});
+		}),
+	);
+
+	it.effect("asks the gateway for a new answer each time the same message is sent", () =>
+		Effect.gen(function* () {
+			const runs: GatewayCall[] = [];
+			const model = yield* studioModel(runs);
+			for (const _ of [1, 2]) {
+				yield* Effect.promise(() => generateText({ model, prompt: "Draw the release review." }));
+			}
+			expect(runs).toHaveLength(2);
+			expect(runs[1]?.data.query).toEqual(runs[0]?.data.query);
+			expect(runs.map((run) => run.options?.gateway?.skipCache)).toEqual([true, true]);
 		}),
 	);
 });
