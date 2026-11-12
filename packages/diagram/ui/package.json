@@ -13,11 +13,11 @@
 	},
 	"dependencies": {
 		"@excalidraw/excalidraw": "0.18.1",
-		"@sketchi/diagram-agent": "workspace:*",
 		"@sketchi/diagram-core": "workspace:*",
 		"@sketchi/diagram-excalidraw": "workspace:*",
-		"@sketchi/diagram-generation": "workspace:*",
-		"@sketchi/diagram-renderer": "workspace:*",
+		"@sketchi/diagram-renderer": "workspace:*"
+	},
+	"devDependencies": {
 		"@sketchi/diagram-scenarios": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*"
 	},

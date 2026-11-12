@@ -73,6 +73,7 @@ when their inputs change:
 - `pnpm nx run diagram-excalidraw:sankey-fuzz` (1,200 random flows across three seeds; the gate runs 10)
 - `pnpm nx run diagram-excalidraw:wireframe-fuzz` (1,200 random wireframes across three seeds; the gate runs 8)
 - `pnpm nx run diagram-excalidraw:sequence-fuzz` (400 sequences with self-messages; the gate runs 12)
+- `pnpm nx run diagram-excalidraw:quadrant-fuzz` (700 random quadrant charts; the gate runs 14)
 - `pnpm run test:wrangler-dry-runs` after app builds
 
 Worker Previews are opt-in. Add the `preview` label to a PR to deploy the Worker
