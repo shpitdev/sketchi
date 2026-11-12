@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.41.0
+
+### Minor Changes
+
+- [#779](https://github.com/shpitdev/sketchi/pull/779) [`411ae32`](https://github.com/shpitdev/sketchi/commit/411ae32e081e2af9f9fce52a1c3c47b1b24f63f7) Thanks [@anandpant](https://github.com/anandpant)! - Databricks product icons (Unity Catalog, Delta Lake, Databricks SQL, Lakeflow, MLflow and about 60 more) and Snowflake's product and reference-architecture icons (warehouses, dynamic and Iceberg tables, Snowpark, Cortex, roles, policies) are in the catalog and draw by hand, Snowflake's in its brand colors. A label names one only when it names the product ("Unity Catalog", "Snowflake dynamic table"); plain words such as "Notebooks", "Workspace" or "Task" still draw nothing. The CLI now carries its bundled node-logo SVGs compressed, so the package stays small as the catalog grows.
+
 ## 0.40.0
 
 ### Minor Changes
