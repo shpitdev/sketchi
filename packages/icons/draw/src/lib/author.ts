@@ -50,7 +50,7 @@ export const AUTHOR_SYSTEM_PROMPT = [
 	"- ellipse: cx, cy, rx, ry.",
 	`- stroke: points [[x, y], ...] (2-${ICON_RECIPE_LIMITS.maxPointsPerPart}); smooth curves through them; closed returns to the first point and can be filled.`,
 	"- arrow: points, smooth; a stroke that ends in an arrowhead.",
-	`- text: cx, cy, text (1-${ICON_RECIPE_LIMITS.maxTextLength} characters), size (grid units), color; a short word in the hand-drawn font.`,
+	`- text: cx, cy, text (1-${ICON_RECIPE_LIMITS.maxTextLength} characters), size (grid units), color; a short word in the hand-drawn font, clear of the pen of any shape that frames it.`,
 	"Every part but text also takes stroke (the outline color, ink when omitted; none draws only the fill, so it needs a",
 	"fill), fill (omit it for an open outline) and pen (2 draws twice as bold).",
 	"",
@@ -384,7 +384,7 @@ export function normalizeRecipe(
 	});
 	const recipe = { parts };
 	const drawable = iconRecipeIssues(recipe);
-	// A word wider than the grid clips in every square the icon is drawn in.
+	// A word past the grid clips in every square; one over its frame's pen is unreadable.
 	const fit = drawable.length === 0 ? iconRecipeFitIssues(recipe as unknown as IconRecipe) : [];
 	const checked = [...issues, ...drawable, ...fit];
 	return checked.length === 0

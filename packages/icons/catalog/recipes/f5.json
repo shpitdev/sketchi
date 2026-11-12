@@ -11,10 +11,10 @@
 		},
 		{
 			"kind": "text",
-			"cx": 12,
-			"cy": 12.5,
+			"cx": 12.25,
+			"cy": 13.75,
 			"text": "f5",
-			"size": 17,
+			"size": 15,
 			"color": "paper"
 		}
 	]

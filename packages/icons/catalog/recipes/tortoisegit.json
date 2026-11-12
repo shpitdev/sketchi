@@ -34,8 +34,8 @@
 		},
 		{
 			"kind": "text",
-			"cx": 10.8,
-			"cy": 10.5,
+			"cx": 11.05,
+			"cy": 10.75,
 			"text": "Git",
 			"size": 5.5,
 			"color": "ink"

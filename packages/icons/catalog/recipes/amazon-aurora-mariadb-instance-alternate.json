@@ -13,9 +13,9 @@
 		{
 			"kind": "text",
 			"cx": 12,
-			"cy": 7,
+			"cy": 7.5,
 			"text": "MariaDB",
-			"size": 4.5,
+			"size": 4.25,
 			"color": "#c925d1"
 		}
 	]

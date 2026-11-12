@@ -17,10 +17,10 @@
 		},
 		{
 			"kind": "text",
-			"cx": 10.5,
+			"cx": 11.5,
 			"cy": 6.5,
 			"text": "MySQL",
-			"size": 6,
+			"size": 5.25,
 			"color": "#c925d1"
 		},
 		{

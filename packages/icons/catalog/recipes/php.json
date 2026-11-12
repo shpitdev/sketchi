@@ -12,9 +12,9 @@
 		{
 			"kind": "text",
 			"cx": 12,
-			"cy": 12,
+			"cy": 11.75,
 			"text": "php",
-			"size": 9,
+			"size": 7.75,
 			"color": "ink"
 		}
 	]

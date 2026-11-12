@@ -49,15 +49,18 @@ export const publishCommunityIcon = Effect.fn("communityIcons.publish")(function
 		});
 	}
 	// Checked on publish only: an icon already stored stays readable.
-	const clipped = recipe.parts.filter(
-		(part) => part.kind === "text" && iconRecipeFitIssues({ parts: [part] }).length > 0,
+	const fit = iconRecipeFitIssues(recipe);
+	const clipped = recipe.parts.flatMap((part, index) =>
+		part.kind === "text" && fit.some((issue) => issue.startsWith(`recipe.parts[${index}] `))
+			? [`"${part.text}"`]
+			: [],
 	);
 	if (clipped.length > 0) {
-		const words = clipped.map((part) => (part.kind === "text" ? `"${part.text}"` : "")).join(", ");
+		const them = clipped.length === 1 ? "it" : "them";
 		return yield* CommunityIconInvalidRequestError.make({
 			code: "recipe_clips",
-			message: `${words} ${clipped.length === 1 ? "is" : "are"} too large for the icon and would be cut off; make ${clipped.length === 1 ? "it" : "them"} smaller or move ${clipped.length === 1 ? "it" : "them"} inward.`,
-			issues: iconRecipeFitIssues(recipe),
+			message: `${clipped.join(", ")} would be cut off or run over the shape around ${them}; make ${them} smaller or move ${them} inward.`,
+			issues: fit,
 		});
 	}
 	const hash = yield* Effect.promise(() => communityIconHash(recipe));
