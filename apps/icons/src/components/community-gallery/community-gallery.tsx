@@ -140,6 +140,7 @@ export function CommunityGallery({
 	}
 
 	const searching = query.trim() !== "";
+	const empty = status === "ready" && icons.length === 0;
 
 	return (
 		<TooltipProvider>
@@ -199,13 +200,22 @@ export function CommunityGallery({
 								<PreviewToggle onChange={setPreviewMode} value={previewMode} />
 							</div>
 
-							<div className="icons-results-bar">
-								<p aria-live="polite" className="icons-results-bar__count" role="status">
-									{status === "ready"
-										? hasMore
-											? `${icons.length.toLocaleString()}+ icons`
-											: plural(icons.length, "icon", "icons")
-										: ""}
+							{/* An empty gallery's state says what a zero count would. */}
+							<div className="icons-results-bar" data-empty={empty ? "true" : undefined}>
+								<p
+									aria-live="polite"
+									className={empty ? "sr-only" : "icons-results-bar__count"}
+									role="status"
+								>
+									{status !== "ready"
+										? ""
+										: empty
+											? searching
+												? "No icons found"
+												: "No community icons yet"
+											: hasMore
+												? `${icons.length.toLocaleString()}+ icons`
+												: plural(icons.length, "icon", "icons")}
 								</p>
 							</div>
 
@@ -245,7 +255,7 @@ export function CommunityGallery({
 								</section>
 							) : null}
 
-							{status === "ready" && icons.length === 0 ? (
+							{empty ? (
 								<section className="icons-state">
 									<h2>{searching ? "No icons found" : "No community icons yet"}</h2>
 									{searching ? (

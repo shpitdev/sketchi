@@ -602,8 +602,19 @@ export function IconLibrary({
 							/>
 
 							<div className="icons-results-bar">
-								<p aria-live="polite" className="icons-results-bar__count" role="status">
-									{status === "ready" ? plural(results.length, "icon", "icons") : ""}
+								{/* "No icons found" below says what a zero count would. */}
+								<p
+									aria-live="polite"
+									className={
+										status === "ready" && !results.length ? "sr-only" : "icons-results-bar__count"
+									}
+									role="status"
+								>
+									{status !== "ready"
+										? ""
+										: results.length
+											? plural(results.length, "icon", "icons")
+											: "No icons found"}
 								</p>
 								{hasDrawings ? (
 									<div className="icons-results-bar__view">

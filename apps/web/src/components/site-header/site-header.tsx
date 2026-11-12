@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { CLI_NPM_URL, REPO_URL } from "../../lib/cli-package";
 import { DEFAULT_WEB_SURFACE_URLS, type WebSurfaceUrls } from "../../lib/surface-urls";
+import { IconsGlyph } from "./icons-glyph";
 
 export interface SiteHeaderNavItem {
 	href: string;
@@ -65,10 +66,10 @@ export function SiteHeader({
 				) : null}
 
 				<div className="site-header__actions">
-					<a className="site-header__link" href={surfaceUrls.icons}>
-						Icons
-					</a>
 					<TooltipProvider>
+						<HeaderIconLink href={surfaceUrls.icons} label="Icons">
+							<IconsGlyph />
+						</HeaderIconLink>
 						<HeaderIconLink current={activePath === docsHref} href={docsHref} label="Docs">
 							<BookOpen aria-hidden="true" />
 						</HeaderIconLink>
@@ -119,7 +120,10 @@ export function SiteHeader({
 							</a>
 						</Button>
 						<Button asChild className="w-full" size="xl" variant="outline">
-							<a href={surfaceUrls.icons}>Icons</a>
+							<a href={surfaceUrls.icons}>
+								<IconsGlyph />
+								Icons
+							</a>
 						</Button>
 						<Button asChild className="w-full" size="xl" variant="outline">
 							<a href={repoUrl} rel="noreferrer" target="_blank">
