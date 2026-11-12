@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.42.1
+
+### Patch Changes
+
+- [#783](https://github.com/shpitdev/sketchi/pull/783) [`694976a`](https://github.com/shpitdev/sketchi/commit/694976a3a889befa26fee4695c0cbe687368c5d0) Thanks [@anandpant](https://github.com/anandpant)! - Refresh the icon provider with ten product marks and hand-drawn versions. Recognize qualified product names without branding everyday phrases such as “plaid shirt” or “honeycomb layout”.
+
 ## 0.42.0
 
 ### Minor Changes
