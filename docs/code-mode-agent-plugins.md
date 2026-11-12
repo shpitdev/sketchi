@@ -1,7 +1,8 @@
 # Sketchi Code Mode agent quickstart
 
-Sketchi Code Mode gives an agent one remote MCP surface for typed flowcharts and
-mindmaps, visual patches, and hosted Excalidraw and PNG artifacts.
+Sketchi Code Mode gives an agent one remote MCP server that draws 15 kinds of
+diagram, from flowcharts to Gantt charts, as hosted Excalidraw and PNG
+artifacts, and edits them afterwards.
 
 The supported public endpoint is:
 
@@ -47,8 +48,8 @@ Start `codex`, then send:
 Use Sketchi to draw our release approval flow as a flowchart.
 ```
 
-The skill discovers the current contract, calls the `execute` tool, and returns
-the accepted artifact ID plus raw Excalidraw and PNG URLs.
+The agent calls the `execute` tool and answers with the accepted artifact ID
+plus raw Excalidraw and PNG URLs.
 
 ## Claude Code
 

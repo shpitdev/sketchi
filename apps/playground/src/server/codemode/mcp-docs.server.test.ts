@@ -251,7 +251,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		);
 
 		const managedResults = searchCodeModeDocs({
-			query: "convex managed threads",
+			query: "managed threads",
 		});
 		expect(managedResults.results.map((result) => result.id)).toContain("managed-thread-non-goal");
 

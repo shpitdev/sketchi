@@ -1,8 +1,8 @@
 {
 	"name": "sketchi-code-mode-claude",
 	"displayName": "Sketchi Code Mode",
-	"version": "0.1.1",
-	"description": "Sketchi Code Mode skills and MCP config for Claude Code.",
+	"version": "0.2.0",
+	"description": "Sketchi Code Mode skill and MCP config for Claude Code.",
 	"author": {
 		"name": "Sketchi"
 	},

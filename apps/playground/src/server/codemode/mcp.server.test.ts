@@ -1303,7 +1303,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			const search = structuredContent(
 				await client.callTool({
 					name: "search",
-					arguments: { query: "managed convex threads" },
+					arguments: { query: "managed threads" },
 				}),
 			);
 			expect(JSON.stringify(search)).toContain("managed-thread-non-goal");
