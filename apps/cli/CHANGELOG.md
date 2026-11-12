@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.42.2
+
+### Patch Changes
+
+- [#792](https://github.com/shpitdev/sketchi/pull/792) [`c517d0c`](https://github.com/shpitdev/sketchi/commit/c517d0c22976aa80ec658728e2da6912ab5f5f5c) Thanks [@anandpant](https://github.com/anandpant)! - `sketchi --help` describes Sketchi in the same words as sketchi.app: Excalidraw diagrams from a description.
+
 ## 0.42.1
 
 ### Patch Changes
