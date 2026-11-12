@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { getIconBySlug, getIconSourceFile, iconManifest } from "./catalog";
+import { isNodeLogoEligible, isStandaloneWordmark } from "./node-logos";
 import { decodeIconManifest } from "./manifest";
 import { searchIcons } from "./search";
 import { FOLDED_INTO_SLUG } from "./folded-slugs";
@@ -53,6 +54,21 @@ interface ReviewData {
 }
 
 describe("public icon manifest generation", () => {
+	it("keeps named provider lockups out of node logos when variant metadata is absent", () => {
+		const catalog = buildIconCatalog({
+			icons: [
+				{ ...sourceIcon("plaid-text", "payments-fintech"), name: "Plaid", variant: null },
+				sourceIcon("plaid", "payments-fintech"),
+			],
+		});
+		const lockup = catalog.manifest.icons.find((icon) => icon.slug === "plaid-text")!;
+		expect(lockup.name).toBe("Plaid Wordmark");
+		expect(isStandaloneWordmark(lockup)).toBe(true);
+		expect(catalog.manifest.icons.filter(isNodeLogoEligible).map((icon) => icon.slug)).toEqual([
+			"plaid",
+		]);
+	});
+
 	it("keeps an explicit canonical collision slug and qualifies alternates", () => {
 		const catalog = buildIconCatalog({
 			icons: [sourceIcon("amp", "devtools-ci"), sourceIcon("amp", "ai-apps-agents")],
@@ -284,7 +300,7 @@ describe("public icon manifest generation", () => {
 	it("ships a compact clean manifest with aliases and no review fields", () => {
 		const source = JSON.stringify(iconManifest);
 		const manifest = decodeIconManifest(JSON.parse(source));
-		expect(manifest.summary.totalIcons).toBe(2904);
+		expect(manifest.summary.totalIcons).toBe(manifest.icons.length);
 		expect(new Set(manifest.icons.map((icon) => icon.slug)).size).toBe(manifest.icons.length);
 		expect(manifest.icons.find((icon) => icon.slug === "kubernetes")?.aliases).toContain("k8s");
 		expect(manifest.icons.find((icon) => icon.slug === "adobefirefly-text")?.name).toBe(

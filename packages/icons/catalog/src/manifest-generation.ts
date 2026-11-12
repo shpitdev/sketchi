@@ -729,9 +729,20 @@ function decodeSourceData(value: unknown): SourceData {
 	}
 	return {
 		...(typeof value.generatedAt === "string" ? { generatedAt: value.generatedAt } : {}),
-		icons: value.icons.map((icon) =>
-			PRODUCTS_NAMED_TEXT.has(icon.slug) ? { ...icon, baseSlug: icon.slug, variant: null } : icon,
-		),
+		icons: value.icons.map((icon) => {
+			if (PRODUCTS_NAMED_TEXT.has(icon.slug))
+				return { ...icon, baseSlug: icon.slug, variant: null };
+			// Named provider lockups can omit variant metadata; the suffix still makes them wordmarks.
+			if (icon.slug.endsWith("-text") && !icon.variant) {
+				return {
+					...icon,
+					baseSlug: icon.slug.slice(0, -5),
+					variant: "text",
+					...(icon.name ? { name: `${icon.name} Wordmark` } : {}),
+				};
+			}
+			return icon;
+		}),
 	};
 }
 

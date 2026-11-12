@@ -146,6 +146,17 @@ interface TermIndex<Icon> {
 
 const termIndexes = new WeakMap<readonly SearchableIcon[], TermIndex<SearchableIcon>>();
 
+/** Product-qualified aliases disambiguate names that are also ordinary words. */
+const QUALIFIED_PRODUCT_TERMS: ReadonlySet<string> = new Set([
+	"plaid api",
+	"honeycomb tracing",
+	"honeycomb observability",
+	"tableau dashboard",
+	"dbt models",
+	"dbt core",
+	"dbt cloud",
+]);
+
 /**
  * A term spelled in capitals, such as "ALB" or "EC2": in capitals in text, it
  * is that name. Generic technical acronyms ("API", "JSON") never are.
@@ -183,7 +194,8 @@ function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): TermInd
 	const add = (term: string, icon: Icon) => {
 		const words = termTokens(term);
 		const key = phraseKey(words);
-		if (!key) return;
+		// This short token also names a therapy; require a qualified product alias.
+		if (!key || (icon.slug === "dbt" && words.length === 1)) return;
 		longest = Math.max(longest, words.length);
 		if (isAcronym(term)) acronyms.add(key);
 		const entries = index.get(key) ?? [];
@@ -231,7 +243,8 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 			if (!entries) continue;
 			const acronym =
 				phraseTokens.length === 1 && acronyms.has(key) && isAcronym(phraseTokens[0]!.raw);
-			const distinctive = acronym || phraseTokens.some(isDistinctive);
+			const distinctive =
+				acronym || QUALIFIED_PRODUCT_TERMS.has(key) || phraseTokens.some(isDistinctive);
 			const cased = phraseTokens.some(isCasedAsName);
 			const first = phraseTokens[0];
 			const labelInitial =
