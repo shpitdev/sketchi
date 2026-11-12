@@ -15,6 +15,7 @@
 	},
 	"devDependencies": {
 		"@resvg/resvg-wasm": "2.6.2",
+		"@sketchi/social-card": "workspace:*",
 		"@tailwindcss/vite": "4.3.3",
 		"sharp": "0.35.5",
 		"tailwindcss": "4.3.3"

@@ -3,6 +3,14 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import "@sketchi/diagram-ui/styles.css";
 import appStyles from "../styles/app.css?url";
 
+const DESCRIPTION =
+	"Describe a diagram in chat and Sketchi draws it in Excalidraw. Ask for changes, edit it by hand, then export a PNG or an Excalidraw file.";
+
+const CARD = {
+	url: "https://sketchi.app/media/sketchi-card.png",
+	alt: "The Sketchi wordmark beside a hand-drawn architecture diagram Sketchi made: a Next.js app on Vercel and a GitHub webhook call an API on Cloudflare Workers, which reads Postgres and caches in Redis.",
+} as const;
+
 export const Route = createRootRoute({
 	head: () => ({
 		meta: [
@@ -11,33 +19,30 @@ export const Route = createRootRoute({
 				name: "viewport",
 				content: "width=device-width, initial-scale=1",
 			},
-			{ name: "description", content: "Describe a diagram in chat, then edit or export it." },
+			{ name: "description", content: DESCRIPTION },
 			{ name: "theme-color", content: "#f6f1e7" },
 			{ title: "Sketchi Playground" },
 			{ property: "og:type", content: "website" },
 			{ property: "og:site_name", content: "Sketchi" },
 			{ property: "og:title", content: "Sketchi Playground" },
-			{
-				property: "og:description",
-				content: "Describe a diagram in chat, then edit or export it.",
-			},
-			// The site's card: served from sketchi.app because crawlers need an absolute URL.
-			{ property: "og:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
+			{ property: "og:description", content: DESCRIPTION },
+			{ property: "og:url", content: "https://playground.sketchi.app/" },
+			// sketchi.app's card (apps/web/src/lib/site-meta.ts), by absolute URL for crawlers.
+			{ property: "og:image", content: CARD.url },
+			{ property: "og:image:type", content: "image/png" },
 			{ property: "og:image:width", content: "1200" },
 			{ property: "og:image:height", content: "630" },
+			{ property: "og:image:alt", content: CARD.alt },
 			{ name: "twitter:card", content: "summary_large_image" },
 			{ name: "twitter:title", content: "Sketchi Playground" },
-			{
-				name: "twitter:description",
-				content: "Describe a diagram in chat, then edit or export it.",
-			},
-			{ name: "twitter:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
+			{ name: "twitter:description", content: DESCRIPTION },
+			{ name: "twitter:image", content: CARD.url },
+			{ name: "twitter:image:alt", content: CARD.alt },
 		],
 		links: [
 			{ rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
-			// Excalifont's Latin subset backs the wordmark; preload it so the
-			// lockup paints in the product's own hand instead of reflowing
-			// through the sans fallback.
+			// Excalifont's Latin subset is the face Excalidraw draws diagram text
+			// in; preload it so a diagram paints in it without reflowing.
 			{
 				rel: "preload",
 				as: "font",

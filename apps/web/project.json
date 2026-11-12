@@ -77,6 +77,13 @@
 			"options": {
 				"command": "tsc -p apps/web/tsconfig.json --noEmit"
 			}
+		},
+		"social-card": {
+			"executor": "nx:run-commands",
+			"dependsOn": ["^build"],
+			"options": {
+				"command": "jiti apps/web/scripts/social-card.ts"
+			}
 		}
 	}
 }

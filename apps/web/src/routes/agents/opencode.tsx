@@ -10,7 +10,8 @@ export const Route = createFileRoute("/agents/opencode")({
 	head: () =>
 		pageMeta({
 			title: "OpenCode setup – Sketchi",
-			description: "Connect OpenCode to the Sketchi MCP server.",
+			description:
+				"Connect OpenCode to the Sketchi MCP server so it can draw Excalidraw diagrams when you ask for one.",
 			path: "/agents/opencode",
 		}),
 	component: OpenCodeRoute,

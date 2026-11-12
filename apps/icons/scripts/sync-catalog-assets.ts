@@ -7,16 +7,22 @@ import { ICON_SOURCE_URL_PREFIX, iconManifest } from "@sketchi/icon-catalog/cata
 import { catalogDrawings, DRAWINGS_PATH } from "../src/lib/drawings.js";
 import { excalidrawLibrary } from "../src/lib/excalidraw-export.js";
 import {
+	ALL_ICONS_PACK_ID,
 	ICON_PACKS,
 	PACK_INDEX_PATH,
+	type PackIcon,
+	SITE_CARD_PATH,
+	packCardPath,
 	packIcons,
 	packIconsPath,
 	packLibraryPath,
+	packPreview,
 	packPreviewImagePath,
 	packSummary,
 	packVersion,
 } from "../src/lib/packs.js";
 import { packPreviewImage } from "./pack-preview-image.js";
+import { packCard, siteCard } from "./social-cards.js";
 
 // The catalog package owns the manifest, SVG sources and hand-drawn recipes.
 // The app publishes copies at stable public URLs; every output is generated
@@ -52,6 +58,7 @@ const SOURCE = "https://icons.sketchi.app";
 await rm(resolve(publicRoot, "packs"), { force: true, recursive: true });
 await mkdir(resolve(publicRoot, "packs"), { recursive: true });
 const summaries = [];
+const featured = new Map<string, PackIcon[]>();
 for (const pack of ICON_PACKS) {
 	const members = packIcons(pack, iconManifest.icons, drawings);
 	// A pack whose marks are not drawn yet is not published.
@@ -69,8 +76,36 @@ for (const pack of ICON_PACKS) {
 			await packPreviewImage(members.map((icon) => icon.recipe)),
 		);
 	}
+	await writeFile(
+		resolve(publicRoot, `.${packCardPath(pack.id)}`),
+		await packCard({
+			id: pack.id,
+			name: pack.name,
+			icons: members.length,
+			marks: packPreview(pack, members),
+		}),
+	);
+	featured.set(pack.id, packPreview(pack, members));
 	summaries.push(packSummary(pack, members, await packVersion(library)));
 }
+// The site's card mixes the packs' featured marks, the named packs first.
+const CARD_PACKS = ["palantir", "google-cloud", "aws", "ai-models", "cloud", "devtools", "data"];
+const marks: PackIcon[] = [];
+for (let round = 0; marks.length < 12 && round < 6; round++) {
+	for (const id of CARD_PACKS) {
+		const mark = featured.get(id)?.[round];
+		if (mark && marks.length < 12 && !marks.some((shown) => shown.slug === mark.slug))
+			marks.push(mark);
+	}
+}
+await writeFile(
+	resolve(publicRoot, `.${SITE_CARD_PATH}`),
+	await siteCard({
+		icons: summaries.find((summary) => summary.id === ALL_ICONS_PACK_ID)?.count ?? 0,
+		packs: summaries.filter((summary) => summary.id !== ALL_ICONS_PACK_ID).length,
+		marks,
+	}),
+);
 await writeFile(
 	resolve(publicRoot, `.${PACK_INDEX_PATH}`),
 	`${JSON.stringify(summaries)}\n`,

@@ -69,6 +69,7 @@
 			"inputs": [
 				"{projectRoot}/scripts/sync-catalog-assets.ts",
 				"{projectRoot}/scripts/pack-preview-image.ts",
+				"{projectRoot}/scripts/social-cards.ts",
 				"{projectRoot}/public/fonts/Excalifont/*.woff2",
 				"{projectRoot}/src/lib/drawings.ts",
 				"{projectRoot}/src/lib/excalidraw-export.ts",
@@ -82,7 +83,8 @@
 				"{projectRoot}/public/icon-drawings.json",
 				"{projectRoot}/public/sketchi-icons.excalidrawlib",
 				"{projectRoot}/public/packs",
-				"{projectRoot}/public/output"
+				"{projectRoot}/public/output",
+				"{projectRoot}/public/card.png"
 			],
 			"options": {
 				"command": "jiti apps/icons/scripts/sync-catalog-assets.ts"

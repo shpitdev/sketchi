@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { OG_IMAGE, SITE_URL, siteSocialMeta } from "./site-meta";
+import { OG_IMAGE, SITE_DESCRIPTION, SITE_URL, siteSocialMeta } from "./site-meta";
 
 describe("siteSocialMeta", () => {
 	it("publishes a static 1200x630 raster as an absolute social image", () => {
 		expect(OG_IMAGE).toMatchObject({
-			url: `${SITE_URL}/media/sketchi-og-card.png`,
+			url: `${SITE_URL}/media/sketchi-card.png`,
 			width: "1200",
 			height: "630",
 			type: "image/png",
@@ -24,5 +24,9 @@ describe("siteSocialMeta", () => {
 				{ name: "twitter:image:alt", content: OG_IMAGE.alt },
 			]),
 		);
+	});
+
+	it("describes the site in one short, plain sentence pair", () => {
+		expect(SITE_DESCRIPTION.length).toBeLessThanOrEqual(155);
 	});
 });

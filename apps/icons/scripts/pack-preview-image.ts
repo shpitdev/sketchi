@@ -14,7 +14,12 @@ const fontDirectory = resolve(import.meta.dirname, "../public/fonts/Excalifont")
 let ready: Promise<Uint8Array[]> | undefined;
 function fonts(): Promise<Uint8Array[]> {
 	ready ??= (async () => {
-		await initWasm(await readFile(require.resolve("@resvg/resvg-wasm/index_bg.wasm")));
+		try {
+			await initWasm(await readFile(require.resolve("@resvg/resvg-wasm/index_bg.wasm")));
+		} catch (error) {
+			// The link-preview cards share the process and may have loaded it first.
+			if (!String(error).includes("Already initialized")) throw error;
+		}
 		const files = (await readdir(fontDirectory)).filter((file) => file.endsWith(".woff2")).sort();
 		return Promise.all(
 			files.map(async (file) => new Uint8Array(await readFile(resolve(fontDirectory, file)))),

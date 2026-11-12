@@ -232,6 +232,7 @@
 				"packages/diagram/renderer/**",
 				"packages/diagram/ui/**",
 				"packages/icons/catalog/**",
+				"packages/social-card/**",
 				"packages/svg-excalidraw/**",
 				"packages/ui/**",
 				"tools/sketchi-generators/**"

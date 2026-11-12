@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 
+import { pageMeta, SITE_DESCRIPTION, SITE_IMAGE, SITE_TITLE } from "../lib/site-meta.js";
 import appStyles from "../styles/app.css?url";
 
 export const Route = createRootRoute({
@@ -10,39 +11,21 @@ export const Route = createRootRoute({
 				name: "viewport",
 				content: "width=device-width, initial-scale=1",
 			},
-			{
-				name: "description",
-				content:
-					"Hand-drawn icon libraries for Excalidraw, and more than 1,400 SVG icons and logos to search, copy, and download.",
-			},
 			{ name: "theme-color", content: "#f6f1e7" },
-			{ title: "Sketchi Icons" },
 			{ property: "og:type", content: "website" },
 			{ property: "og:site_name", content: "Sketchi" },
-			{ property: "og:title", content: "Sketchi Icons" },
-			{
-				property: "og:description",
-				content:
-					"Hand-drawn icon libraries for Excalidraw, and more than 1,400 SVG icons and logos to search, copy, and download.",
-			},
-			// The site's card: served from sketchi.app because crawlers need an absolute URL.
-			{ property: "og:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
-			{ property: "og:image:width", content: "1200" },
-			{ property: "og:image:height", content: "630" },
-			{ name: "twitter:card", content: "summary_large_image" },
-			{ name: "twitter:title", content: "Sketchi Icons" },
-			{
-				name: "twitter:description",
-				content:
-					"Hand-drawn icon libraries for Excalidraw, and more than 1,400 SVG icons and logos to search, copy, and download.",
-			},
-			{ name: "twitter:image", content: "https://sketchi.app/media/sketchi-og-card.png" },
+			...pageMeta({
+				title: SITE_TITLE,
+				description: SITE_DESCRIPTION,
+				path: "/",
+				image: SITE_IMAGE,
+			}),
 		],
 		links: [
 			{ rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
-			// Excalifont's Latin subset backs the wordmark; preload it so the
-			// lockup paints in the product's own hand instead of reflowing
-			// through the sans fallback.
+			// Excalifont's Latin subset backs the pack titles; preload it so they
+			// paint in the product's own hand instead of reflowing through the
+			// sans fallback.
 			{
 				rel: "preload",
 				as: "font",

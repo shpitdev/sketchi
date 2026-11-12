@@ -9,6 +9,7 @@
     { "path": "./packages/diagram/agent/tsconfig.lib.json" },
     { "path": "./packages/diagram/scenarios/tsconfig.lib.json" },
     { "path": "./packages/observability/tsconfig.lib.json" },
+    { "path": "./packages/social-card/tsconfig.lib.json" },
     { "path": "./packages/studio/projects/tsconfig.lib.json" },
     { "path": "./packages/svg-excalidraw/tsconfig.lib.json" },
     { "path": "./packages/diagram/ui/tsconfig.lib.json" },

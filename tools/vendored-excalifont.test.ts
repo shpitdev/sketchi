@@ -124,16 +124,6 @@ describe("vendored Excalifont", () => {
 		expect(storybookConfig).toMatch(/staticDirs:\s*\["\.\.\/public"\]/u);
 	});
 
-	it("keeps the social card wordmark off the retired face", () => {
-		// The card is a static PNG, so a token swap cannot reach it. Its wordmark
-		// is Excalifont outlines; the one thing that must never come back is a
-		// <text> element naming a font the renderer may not have.
-		const card = readFileSync(join(repoRoot, "apps/web/public/media/sketchi-og-card.svg"), "utf8");
-
-		expect(card).not.toContain("Dancing Script");
-		expect(card).not.toContain("NaN");
-	});
-
 	it("declares an @font-face for every vendored subset", () => {
 		for (const name of Object.keys(referenceDigests)) {
 			expect(themeCss).toContain(`/fonts/Excalifont/${name}`);

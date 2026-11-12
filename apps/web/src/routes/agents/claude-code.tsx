@@ -10,7 +10,8 @@ export const Route = createFileRoute("/agents/claude-code")({
 	head: () =>
 		pageMeta({
 			title: "Claude Code setup – Sketchi",
-			description: "Install the Sketchi plugin in Claude Code.",
+			description:
+				"Install the Sketchi plugin in Claude Code so it can draw Excalidraw diagrams when you ask for one.",
 			path: "/agents/claude-code",
 		}),
 	component: ClaudeCodeRoute,

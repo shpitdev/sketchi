@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { PackPage } from "../../components/packs/pack-page.js";
 import { loadPackIcons } from "../../lib/catalog-client.js";
+import { packPagePath } from "../../lib/packs.js";
+import { packDescription, packImage, pageMeta } from "../../lib/site-meta.js";
 import { getPackShelf } from "../../lib/packs-rpc.js";
 
 export const Route = createFileRoute("/packs/$id")({
@@ -15,7 +17,14 @@ export const Route = createFileRoute("/packs/$id")({
 		return { pack, excalidraw: shelf.excalidraw[pack.id] };
 	},
 	head: ({ loaderData }) => ({
-		meta: loaderData ? [{ title: `${loaderData.pack.name} · Sketchi Icons` }] : [],
+		meta: loaderData
+			? pageMeta({
+					title: `${loaderData.pack.name} · Sketchi Icons`,
+					description: packDescription(loaderData.pack),
+					path: packPagePath(loaderData.pack.id),
+					image: packImage(loaderData.pack),
+				})
+			: [],
 	}),
 	component: PackRoute,
 });
