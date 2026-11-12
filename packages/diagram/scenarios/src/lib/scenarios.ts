@@ -109,6 +109,7 @@ export type DiagramScenarioDifficulty = "smoke" | "standard" | "challenge";
  */
 export interface DiagramScenarioLogo {
 	readonly aliases?: readonly string[];
+	readonly alwaysNamed?: true;
 	readonly collection?: string;
 	readonly name: string;
 	readonly slug: string;
@@ -1842,7 +1843,7 @@ const flowchartScenarioDefinitions = [
 			},
 			{ collection: "data-storage", name: "Redis", slug: "redis" },
 			{ aliases: ["OpenAI"], collection: "ai-model-labs", name: "OpenAI", slug: "openai" },
-			{ collection: "observability-security", name: "Sentry", slug: "sentry" },
+			{ alwaysNamed: true, collection: "observability-security", name: "Sentry", slug: "sentry" },
 		],
 		// The prompt's first event, `A Next.js page on Vercel receives the
 		// question`, states no order between Vercel and the page: one entry step
@@ -2354,7 +2355,7 @@ const flowchartScenarioDefinitions = [
 		prompt:
 			"draw our hybrid setup left to right.\non-prem data center: office staff enter orders in the legacy ERP, both on the corporate network. the ERP stores records in an Oracle database in the data center.\nERP → site-to-site VPN gateway in our production VPC → order API in the VPC's private subnet → order queue → sync function → orders table. the sync function also saves each invoice as a PDF in the invoice archive.\nthe VPC, queue, sync function, table and archive are all in eu-west-1, in our AWS cloud",
 		logos: [
-			{ collection: "cloud-vendors", name: "Oracle", slug: "oracle" },
+			{ alwaysNamed: true, collection: "cloud-vendors", name: "Oracle", slug: "oracle" },
 			{
 				aliases: ["AWS", "amazon", "amazon web services"],
 				collection: "cloud-vendors",

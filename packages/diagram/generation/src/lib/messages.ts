@@ -37,6 +37,8 @@ export class DiagramGenerationLogo extends Schema.Class<DiagramGenerationLogo>(
 	"DiagramGenerationLogo",
 )({
 	aliases: Schema.optionalKey(Schema.Array(Schema.String)),
+	/** The product's everyday-word name means it in every label (see NamedLogo.alwaysNamed). */
+	alwaysNamed: Schema.optionalKey(Schema.Literal(true)),
 	/** The catalog collection, which marks cloud vendors. */
 	collection: Schema.optionalKey(Schema.String),
 	name: Schema.String,

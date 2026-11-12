@@ -55,7 +55,10 @@ Brands from the simple-icons set come with the brand's name and the names
 diagrams use for it ("Apache Kafka", "Kafka") in the pipeline record. Some of
 them are English words ("Temporal", "Square", "Zoom"): like any catalog word,
 a label names one only when it is cased as a name or names the product
-("Temporal worker"). Where two marks share a term, `TERM_OWNERS` in
+("Temporal worker"). When a request writes one only as a name cased
+mid-sentence, never in lowercase or first in a sentence, `logosNamedInText`
+marks its offer `alwaysNamed`, and every label in that diagram with the name
+draws it ("Stripe charge" after "charges cards through Stripe"). Where two marks share a term, `TERM_OWNERS` in
 `search.ts` names the one diagrams mean ("Spark" is Apache Spark). Diagram tools
 (Excalidraw, Mermaid, draw.io, tldraw, Lucidchart) name a request's format or
 source, so text never names their marks.

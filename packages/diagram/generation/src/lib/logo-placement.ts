@@ -1,8 +1,13 @@
-import { matchIconMentions, primaryFirst } from "@sketchi/icon-catalog";
+import { labelLogos, matchIconMentions } from "@sketchi/icon-catalog";
 
 /** A logo a prompt names: the only slugs a generated node icon may use. */
 export interface OfferedLogo {
 	readonly aliases?: readonly string[];
+	/**
+	 * The text names this product by an everyday word it never uses otherwise, so every label
+	 * with the word names it (see NamedLogo.alwaysNamed).
+	 */
+	readonly alwaysNamed?: true;
 	/** The catalog collection, which marks cloud vendors (see isVendorLogo). */
 	readonly collection?: string;
 	readonly name: string;
@@ -15,17 +20,6 @@ interface PlaceableNode {
 	readonly label: string;
 }
 
-/**
- * Put each offered logo on the node whose label unmistakably names that
- * technology, and keep a model-chosen logo only on a node whose own label names
- * it, so a logo never sits on a generic step ("Return answer") or stands in for
- * a technology the label leaves out ("Check cache" with Redis's logo). Small
- * models often shift logos by a node, while labels say exactly which step a
- * technology belongs to. Everyday-word names ("Go", "Linear", "Render") never
- * place a logo from a label, where Title Case makes every word look like a
- * name; for those the model's choice stays where its label names it.
- * Deterministic for given nodes and logos.
- */
 /** Whether a label names a logo's technology, by a catalog mention or its name or alias as words. */
 function labelNames(
 	label: string,
@@ -36,6 +30,19 @@ function labelNames(
 	return [logo.name, ...logo.aliases].some((name) => words.includes(` ${name.toLowerCase()} `));
 }
 
+/**
+ * Put each offered logo on the node whose label names that technology, and keep
+ * a model-chosen logo only on a node whose own label names it, so a logo never
+ * sits on a generic step ("Return answer") or stands in for a technology the
+ * label leaves out ("Check cache" with Redis's logo). Small models often shift
+ * logos by a node, while labels say exactly which step a technology belongs to.
+ * A label names a product as a diagram's build reads it (see labelLogos): an
+ * everyday-word name ("Go", "Linear", "Render") counts mid-label ("Track work in
+ * Linear") or before a tech noun ("Go service"), and anywhere in the label when
+ * the request only ever wrote it as the name ("Stripe charge" after "charges
+ * cards through Stripe"). A step it starts ("Go live", "Render page") draws
+ * nothing unless the model chose that logo. Deterministic for given nodes and logos.
+ */
 export function placeNodeLogos<Node extends PlaceableNode>(
 	nodes: readonly Node[],
 	logos: readonly OfferedLogo[],
@@ -50,12 +57,9 @@ export function placeNodeLogos<Node extends PlaceableNode>(
 		slug: logo.slug,
 	}));
 	const offered = new Map(terms.map((term) => [term.slug, term]));
+	const alwaysNamed = new Set(logos.filter((logo) => logo.alwaysNamed).map((logo) => logo.slug));
 	// A label that names two products draws the one it is, not the platform it runs on.
-	const labelSlugs = nodes.map(
-		(node) =>
-			primaryFirst(matchIconMentions(node.label, terms)).find((mention) => mention.distinctive)
-				?.icon.slug,
-	);
+	const labelSlugs = nodes.map((node) => labelLogos(node.label, terms, alwaysNamed).named[0]?.slug);
 	const namedByLabels = new Set(labelSlugs.filter(Boolean));
 	const diagnostics: string[] = [];
 	const placed = nodes.map((node, index) => {

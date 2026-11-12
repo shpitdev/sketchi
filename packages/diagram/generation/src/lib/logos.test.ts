@@ -1,3 +1,5 @@
+import { logosNamedInText } from "@sketchi/icon-catalog";
+import { nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -164,6 +166,137 @@ describe("generated node icons", () => {
 				ship: { label: "Ship it", icon: null },
 			},
 		});
+	});
+});
+
+/**
+ * The logo each node draws once a logos-on flowchart for this request is grounded in the logos
+ * the request offers, as /api/v1/generate grounds it; null draws none.
+ */
+function groundedLogos(text: string, labels: Record<string, string>) {
+	const ids = Object.keys(labels);
+	const enforced = enforceCandidateRequestRequirements(
+		candidateFromText({
+			model: "gemini-test",
+			provider: "fixture",
+			text: JSON.stringify({
+				title: "Flow",
+				diagram: {
+					id: "flow",
+					type: "flowchart",
+					logos: true,
+					nodes: labels,
+					edges: ids.slice(1).map((id, index) => [ids[index], id]),
+				},
+			}),
+		}),
+		{
+			model: "gemini-test",
+			prompt: { id: "flow", request: text, logos: logosNamedInText(text, nodeLogoIcons) },
+		},
+	);
+	if (!enforced.flowchart) throw new Error("Expected a flowchart document.");
+	return Object.fromEntries(
+		Object.entries(enforced.flowchart.nodes).map(([id, node]) => [
+			id,
+			typeof node === "string" ? undefined : node.icon,
+		]),
+	);
+}
+
+describe("logos for products named by everyday words", () => {
+	it("draws each offered brand on the labels that name it, wherever the word stands", () => {
+		expect(
+			groundedLogos(
+				"Flowchart of our checkout: a Next.js storefront on Vercel signs shoppers in with Clerk, charges cards through Stripe, emails receipts with Resend, posts each order to Slack, and reports failures to Sentry.",
+				{
+					storefront: "Next.js storefront",
+					hosting: "Vercel",
+					auth: "Clerk sign-in",
+					charge: "Stripe charge",
+					receipt: "Resend receipt email",
+					order: "Slack order post",
+					failure: "Sentry failure report",
+				},
+			),
+		).toEqual({
+			storefront: "nextjs",
+			hosting: "vercel",
+			auth: "clerk",
+			charge: "stripe",
+			receipt: "resend",
+			order: "slack",
+			failure: "sentry",
+		});
+		expect(
+			groundedLogos(
+				"Draw the analytics architecture: a React dashboard calls a Cloudflare Worker API, which reads cached metrics from Redis and falls back to querying Snowflake. Nightly, a GitHub Actions job loads Postgres exports into Snowflake.",
+				{
+					dashboard: "React dashboard",
+					worker: "Cloudflare Worker API",
+					cache: "Redis cached metrics",
+					query: "Query Snowflake",
+					job: "GitHub Actions nightly job",
+					exports: "Postgres exports",
+					load: "Load into Snowflake",
+				},
+			),
+		).toEqual({
+			dashboard: "react",
+			worker: "cloudflareworkers",
+			cache: "redis",
+			query: "snowflake",
+			job: "githubactions",
+			exports: "postgresql",
+			load: "snowflake",
+		});
+		expect(
+			groundedLogos(
+				"Incident flow: Sentry raises an alert, the on-call engineer is paged in Slack, they open a Linear ticket, deploy a fix to Vercel, and Stripe refunds affected customers.",
+				{
+					page: "Slack pages on-call engineer",
+					ticket: "Open Linear ticket",
+					deploy: "Deploy fix to Vercel",
+					refund: "Stripe refunds affected customers",
+					close: "Close incident",
+				},
+			),
+		).toEqual({
+			page: "slack",
+			ticket: "linear",
+			deploy: "vercel",
+			refund: "stripe",
+			close: null,
+		});
+	});
+
+	it("keeps a step an everyday word starts when the request also writes the word plainly", () => {
+		const labels = {
+			live: "Go live",
+			page: "Render page",
+			pay: "Make payment",
+			build: "Compile Go binary",
+		};
+		expect(
+			groundedLogos(
+				"Build the API in Go, deploy it to Render, and sync leads through Make. After review we go live, render the page, and make a payment.",
+				labels,
+			),
+		).toEqual({ live: null, page: null, pay: null, build: "go" });
+		// A sentence's first word may be the verb too.
+		expect(
+			groundedLogos(
+				"Build the API in Go and deploy it to Render. Go live after review. Render the page and verify it.",
+				{ live: "Go live", page: "Render page", build: "Compile Go binary" },
+			),
+		).toEqual({ live: null, page: null, build: "go" });
+		expect(
+			groundedLogos("Build the API in Go, deploy it to Render, and sync leads through Make.", {
+				build: "Go build",
+				deploy: "Render deploy",
+				sync: "Make sync",
+			}),
+		).toEqual({ build: "go", deploy: "render", sync: "make" });
 	});
 });
 

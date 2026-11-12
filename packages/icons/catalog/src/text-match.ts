@@ -227,8 +227,15 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 	text: string,
 	icons: readonly Icon[],
 	limit = MAX_TEXT_ICON_MATCHES,
-	/** Count a capitalized first word too, as a label in a diagram that asks for logos. */
-	options: { readonly labelInitial?: boolean } = {},
+	options: {
+		/** Count a capitalized first word too, as a label in a diagram that asks for logos. */
+		readonly labelInitial?: boolean;
+		/**
+		 * Slugs whose everyday-word name counts however the text writes it: the request names
+		 * that product and never uses the word otherwise (see NamedLogo.alwaysNamed).
+		 */
+		readonly alwaysNamed?: ReadonlySet<string>;
+	} = {},
 ): IconMention<Icon>[] {
 	const { icons: index, longest, acronyms } = termIndex(icons);
 	const tokens = tokenize(text);
@@ -245,7 +252,15 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 				phraseTokens.length === 1 && acronyms.has(key) && isAcronym(phraseTokens[0]!.raw);
 			const distinctive =
 				acronym || QUALIFIED_PRODUCT_TERMS.has(key) || phraseTokens.some(isDistinctive);
-			const cased = phraseTokens.some(isCasedAsName);
+			// A product the request names by an everyday word it never uses otherwise is that
+			// product here, however the phrase is cased; its name counts, not a looser alias.
+			const cased =
+				phraseTokens.some(isCasedAsName) ||
+				entries.some(
+					(icon) =>
+						options.alwaysNamed?.has(icon.slug) === true &&
+						phraseKey(termTokens(icon.name)) === key,
+				);
 			const first = phraseTokens[0];
 			const labelInitial =
 				!distinctive &&
@@ -382,6 +397,11 @@ const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
 	"sync",
 ]);
 
+/** A cloud vendor's generic service mark ("Storage", "Batch") or a generic technology ("Edge"). */
+function isGenericMark(icon: SearchableIcon): boolean {
+	return GENERIC_COLLECTIONS.has(icon.collection) || GENERIC_TECH_SLUGS.has(icon.slug);
+}
+
 /**
  * Whether an English first word names the product: the label is only the name ("Python"), or
  * a tech noun follows it ("React app", "Spring service").
@@ -397,8 +417,13 @@ function namesProduct(mention: IconMention): boolean {
 export function labelLogos<Icon extends SearchableIcon>(
 	label: string,
 	icons: readonly Icon[],
+	/** Products the request names by an everyday word it never uses otherwise (see NamedLogo.alwaysNamed). */
+	alwaysNamed?: ReadonlySet<string>,
 ): LabelLogos<Icon> {
-	const mentions = matchIconMentions(label, icons, MAX_TEXT_ICON_MATCHES, { labelInitial: true });
+	const mentions = matchIconMentions(label, icons, MAX_TEXT_ICON_MATCHES, {
+		labelInitial: true,
+		...(alwaysNamed ? { alwaysNamed } : {}),
+	});
 	// A first word that is an English word reads as a step unless the label shows it is a name;
 	// a name that is no English word ("Kafka", "Kubernetes") is distinctive and always counts.
 	const step = (mention: IconMention<Icon>) =>
@@ -420,9 +445,7 @@ export function labelLogos<Icon extends SearchableIcon>(
 export function primaryFirst<Mention extends IconMention>(mentions: readonly Mention[]): Mention[] {
 	// An everyday word that is also a generic product ("Edge function", "Storage service") never
 	// outranks an unmistakable name, even the platform's.
-	const generic = (mention: Mention) =>
-		!mention.distinctive &&
-		(GENERIC_COLLECTIONS.has(mention.icon.collection) || GENERIC_TECH_SLUGS.has(mention.icon.slug));
+	const generic = (mention: Mention) => !mention.distinctive && isGenericMark(mention.icon);
 	const rank = (mention: Mention) =>
 		generic(mention) ? 4 : (mention.platform ? 2 : 0) + (mention.distinctive ? 0 : 1);
 	return [...mentions].sort((left, right) => rank(left) - rank(right));
@@ -435,6 +458,35 @@ export interface NamedLogo {
 	readonly collection: string;
 	readonly name: string;
 	readonly slug: string;
+	/**
+	 * True when the product's name is an everyday word that the text writes only as a name, cased
+	 * mid-sentence ("posts each order to Slack"). A diagram of that text means the product
+	 * wherever a label has the word, so "Slack order post" draws the logo. One use that may be
+	 * the plain word, in lowercase, first in a sentence or line, or in a Title Case line ("go
+	 * live", "Render the page and verify it"), leaves "Go live" and "Render page" as steps.
+	 * Never set on a cloud vendor's generic service mark ("Storage", "Batch").
+	 */
+	readonly alwaysNamed?: true;
+}
+
+/**
+ * Whether the text writes one of an icon's terms where it may be the everyday word: anywhere
+ * its capitals don't mark a name, in lowercase ("go live"), first in a sentence or line ("Go
+ * live after review"), or in a Title Case line.
+ */
+function usesAsWord(tokens: readonly TextToken[], icon: SearchableIcon): boolean {
+	return [icon.slug.replaceAll("-", " "), icon.name, ...icon.aliases].some((term) => {
+		const words = termTokens(term);
+		const key = phraseKey(words);
+		return tokens.some((_, start) => {
+			const phrase = tokens.slice(start, start + words.length);
+			return (
+				phrase.length === words.length &&
+				!phrase.some(isCasedAsName) &&
+				phraseKey(phrase.map((token) => token.lower)) === key
+			);
+		});
+	});
 }
 
 /**
@@ -443,10 +495,16 @@ export interface NamedLogo {
  * evals all offer exactly this list.
  */
 export function logosNamedInText(text: string, icons: readonly SearchableIcon[]): NamedLogo[] {
+	const tokens = tokenize(text);
 	return matchIconsInText(text, icons).map((icon) => ({
 		...(icon.aliases.length > 0 ? { aliases: icon.aliases } : {}),
 		collection: icon.collection,
 		name: icon.name,
 		slug: icon.slug,
+		...(!termTokens(icon.name).some(isDistinctiveWord) &&
+		!isGenericMark(icon) &&
+		!usesAsWord(tokens, icon)
+			? { alwaysNamed: true as const }
+			: {}),
 	}));
 }
