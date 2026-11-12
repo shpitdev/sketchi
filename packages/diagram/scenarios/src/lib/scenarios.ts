@@ -2192,10 +2192,34 @@ const flowchartScenarioDefinitions = [
 				slug: "aws",
 			},
 			{
+				aliases: ["ALB"],
+				collection: "aws-resources",
+				name: "Elastic Load Balancing Application Load Balancer",
+				slug: "elastic-load-balancing-application-load-balancer",
+			},
+			{
+				aliases: ["AWS ECS", "Amazon Elastic Container Service", "ECS"],
+				collection: "aws",
+				name: "Amazon ECS",
+				slug: "amazon-ecs",
+			},
+			{
+				aliases: ["AWS RDS", "Amazon Relational Database Service", "RDS"],
+				collection: "aws",
+				name: "Amazon RDS",
+				slug: "amazon-rds",
+			},
+			{
 				aliases: ["PostgreSQL", "postgres", "postgres sql", "psql"],
 				collection: "data-storage",
 				name: "PostgreSQL",
 				slug: "postgresql",
+			},
+			{
+				aliases: ["AWS S3", "Amazon Simple Storage Service", "S3"],
+				collection: "aws",
+				name: "Amazon S3",
+				slug: "amazon-s3",
 			},
 		],
 		nodes: [
@@ -2608,6 +2632,18 @@ const flowchartScenarioDefinitions = [
 				collection: "cloud-vendors",
 				name: "AWS",
 				slug: "aws",
+			},
+			{
+				aliases: ["DynamoDB table"],
+				collection: "aws-resources",
+				name: "Amazon DynamoDB Table",
+				slug: "amazon-dynamodb-table",
+			},
+			{
+				aliases: ["SQS queue"],
+				collection: "aws-resources",
+				name: "Amazon SQS Queue",
+				slug: "amazon-sqs-queue",
 			},
 		],
 		nodes: [

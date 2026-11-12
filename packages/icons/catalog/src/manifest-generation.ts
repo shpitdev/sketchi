@@ -1,13 +1,18 @@
 import { type IconColor, isIconColor } from "./color-mode.js";
 import type { IconManifest, SketchiIcon, SketchiIconViewBox } from "./manifest.js";
 import { canonicalIconSlug, FOLDED_INTO_SLUG } from "./folded-slugs.js";
+import { vendorAliases } from "./vendor-aliases.js";
 
 interface SourceIcon {
+	/** Other official names a vendor icon set gives the product ("Amazon Simple Storage Service"). */
+	readonly aliases?: readonly string[];
 	readonly baseSlug?: string;
 	readonly bytes: number;
 	/** Measured from the SVG by the generator for every shipped mark. */
 	readonly color?: IconColor;
 	readonly collection: string;
+	/** The product name a vendor icon set gives the mark ("Amazon S3"); others derive it from the slug. */
+	readonly name?: string;
 	readonly slug: string;
 	readonly urlPath: string;
 	readonly variant?: string | null;
@@ -72,7 +77,6 @@ const ALIASES_BY_BASE_SLUG: Readonly<Record<string, readonly string[]>> = {
 	"automation-app": ["object monitor", "object-monitor"],
 	aws: ["amazon", "amazon web services"],
 	azure: ["microsoft azure"],
-	bedrock: ["amazon bedrock", "aws bedrock"],
 	"code-app": ["code repository", "code-repository", "python repository", "typescript repository"],
 	"code-workspace-jupyter-app": ["code workspace", "code-workspace-jupyter", "jupyter notebook"],
 	"code-workspace-rstudio-app": ["R Studio", "code workspace", "code-workspace-rstudio"],
@@ -678,6 +682,10 @@ function isSourceIcon(value: unknown): value is SourceIcon {
 		typeof value.slug === "string" &&
 		typeof value.urlPath === "string" &&
 		(value.baseSlug === undefined || typeof value.baseSlug === "string") &&
+		(value.name === undefined || typeof value.name === "string") &&
+		(value.aliases === undefined ||
+			(Array.isArray(value.aliases) &&
+				value.aliases.every((alias) => typeof alias === "string"))) &&
 		(value.variant === undefined || value.variant === null || typeof value.variant === "string") &&
 		isViewBox(value.viewBox)
 	);
@@ -708,6 +716,7 @@ function titleWord(word: string): string {
 }
 
 export function displayNameForSourceIcon(icon: SourceIcon): string {
+	if (icon.name) return icon.name;
 	const baseSlug = icon.baseSlug ?? icon.slug.replace(/-text$/u, "");
 	const baseName =
 		NAME_BY_BASE_SLUG[baseSlug] ?? baseSlug.split("-").filter(Boolean).map(titleWord).join(" ");
@@ -752,7 +761,17 @@ function aliasesForIcon(
 		displayNameForSourceIcon(other),
 		...(ALIASES_BY_BASE_SLUG[other.slug] ?? []),
 	]);
-	const names = [...seeded, ...(curatedName ? [curatedName] : []), ...foldedNames];
+	const names = [
+		...seeded,
+		...(curatedName ? [curatedName] : []),
+		...(icon.aliases ?? []),
+		...vendorAliases({
+			collection: icon.collection,
+			name: displayNameForSourceIcon(icon),
+			slug: publicSlug,
+		}),
+		...foldedNames,
+	];
 	return Array.from(new Set(publicSlug === icon.slug ? names : [icon.slug, ...names]))
 		.filter((name) => name !== publicSlug)
 		.sort();

@@ -101,7 +101,9 @@ describe("logoNamedByLabel", () => {
 		expect(named("Cloudflare Worker")).toBe("cloudflare");
 		expect(named("Store the answer in Redis")).toBe("redis");
 		expect(named("Next.js page")).toBe("nextjs");
-		expect(named("AWS ECS web service")).toBe("aws");
+		expect(named("AWS ECS web service")).toBe("amazon-ecs");
+		expect(named("Upload to S3")).toBe("amazon-s3");
+		expect(named("Orders in DynamoDB")).toBe("amazon-dynamodb");
 	});
 
 	it("names nothing for labels that name no product", () => {
@@ -227,6 +229,37 @@ describe("labelLogos", () => {
 		}
 	});
 
+	it("keeps plain resource words on concepts, never a cloud vendor's resource", () => {
+		for (const label of [
+			"Database",
+			"Queue",
+			"Function",
+			"User",
+			"Users",
+			"Client",
+			"Bucket",
+			"Instance",
+			"Table",
+			"Database service",
+			"Queue worker",
+			"Storage bucket",
+			"User database",
+			"Backup job",
+			"Glue code",
+		]) {
+			expect(named(label), label).toEqual([]);
+		}
+	});
+
+	it("names a cloud vendor's product only when the label names it", () => {
+		expect(named("Lambda function")).toEqual(["aws-lambda-function"]);
+		expect(named("Lambda")).toEqual(["aws-lambda"]);
+		expect(named("S3 bucket")).toEqual(["amazon-s3-bucket"]);
+		expect(named("SQS queue")).toEqual(["amazon-sqs-queue"]);
+		expect(named("Amazon S3")).toEqual(["amazon-s3"]);
+		expect(named("AWS Glue job")).toEqual(["aws-glue"]);
+	});
+
 	it("keeps generic payment steps clean", () => {
 		for (const label of [
 			"Validate the card",
@@ -247,6 +280,39 @@ describe("labelLogos", () => {
 });
 
 describe("logosNamedInText", () => {
+	const offered = (text: string) => logosNamedInText(text, nodeLogoIcons).map((logo) => logo.slug);
+
+	it("reads an acronym the catalog writes in capitals only in capitals", () => {
+		expect(offered("Draw an AWS architecture with ALB and ECS services")).toEqual([
+			"aws",
+			"elastic-load-balancing-application-load-balancer",
+			"amazon-ecs",
+		]);
+		expect(
+			offered("NLB in front of EKS, events on SQS and SNS, jobs on EMR, MSK and MWAA"),
+		).toEqual([
+			"elastic-load-balancing-network-load-balancer",
+			"amazon-eks",
+			"amazon-sqs",
+			"amazon-sns",
+			"amazon-emr",
+			"amazon-msk",
+			"amazon-mwaa",
+		]);
+		expect(offered("we use an alb for routing")).toEqual([]);
+		// Other clouds have them too, so these name no AWS mark alone.
+		expect(offered("a VPC with IAM roles and KMS keys")).toEqual([]);
+	});
+
+	it("matches a vendor's full product name however many words it has", () => {
+		expect(offered("Use Amazon Managed Streaming for Apache Kafka in the diagram.")).toEqual([
+			"amazon-msk",
+		]);
+		expect(offered("Schedule jobs on Amazon Managed Workflows for Apache Airflow.")).toEqual([
+			"amazon-mwaa",
+		]);
+	});
+
 	it("offers each named logo with its aliases and catalog collection", () => {
 		expect(
 			logosNamedInText("Ship to Cloudflare Workers behind a Kubernetes ingress.", nodeLogoIcons),

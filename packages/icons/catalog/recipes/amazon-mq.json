@@ -1,0 +1,88 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1,
+			"y": 1,
+			"width": 22,
+			"height": 22,
+			"stroke": "none",
+			"fill": "#e7157b"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12,
+			"rx": 7,
+			"ry": 7,
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[9.5, 9.5],
+				[12, 10.5],
+				[14.5, 9.5],
+				[13.5, 12],
+				[14.5, 14.5],
+				[12, 13.5],
+				[9.5, 14.5],
+				[10.5, 12]
+			],
+			"closed": true,
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 7.5,
+			"cy": 7,
+			"rx": 1.8,
+			"ry": 1.8,
+			"stroke": "paper",
+			"fill": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 16.5,
+			"cy": 7,
+			"rx": 1.8,
+			"ry": 1.8,
+			"stroke": "paper",
+			"fill": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 7.5,
+			"cy": 17,
+			"rx": 1.8,
+			"ry": 1.8,
+			"stroke": "paper",
+			"fill": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 16.5,
+			"cy": 17,
+			"rx": 1.8,
+			"ry": 1.8,
+			"stroke": "paper",
+			"fill": "#e7157b",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 5,
+			"cy": 12,
+			"rx": 1.8,
+			"ry": 1.8,
+			"stroke": "paper",
+			"fill": "#e7157b",
+			"pen": 2
+		}
+	]
+}

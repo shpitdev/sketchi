@@ -1,0 +1,38 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 0,
+			"y": 0,
+			"width": 24,
+			"height": 24,
+			"stroke": "none",
+			"fill": "#dd344c"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 3],
+				[20, 7.5],
+				[20, 16.5],
+				[12, 21],
+				[4, 16.5],
+				[4, 7.5]
+			],
+			"closed": true,
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[4, 13.5],
+				[11, 9.5],
+				[11, 13.5],
+				[20, 9]
+			],
+			"stroke": "paper",
+			"pen": 2
+		}
+	]
+}

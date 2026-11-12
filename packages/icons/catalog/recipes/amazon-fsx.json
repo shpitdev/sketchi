@@ -1,0 +1,21 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 1.5,
+			"width": 21,
+			"height": 21,
+			"stroke": "none",
+			"fill": "#7aa116"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12.5,
+			"text": "FSx",
+			"size": 10,
+			"color": "paper"
+		}
+	]
+}

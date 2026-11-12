@@ -1,0 +1,80 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 6,
+			"width": 4,
+			"height": 4,
+			"stroke": "#8c4fff"
+		},
+		{
+			"kind": "rect",
+			"x": 8,
+			"y": 2,
+			"width": 4,
+			"height": 4,
+			"stroke": "#8c4fff"
+		},
+		{
+			"kind": "rect",
+			"x": 13,
+			"y": 2,
+			"width": 4,
+			"height": 4,
+			"stroke": "#8c4fff"
+		},
+		{
+			"kind": "rect",
+			"x": 18,
+			"y": 6,
+			"width": 4,
+			"height": 4,
+			"stroke": "#8c4fff"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[6, 8],
+				[12, 11],
+				[10, 6],
+				[12, 11],
+				[15, 6],
+				[12, 11],
+				[18, 8],
+				[12, 11],
+				[12, 14.5]
+			],
+			"stroke": "#8c4fff"
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 14,
+			"rx": 7,
+			"ry": 2.5,
+			"stroke": "#8c4fff"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[5, 14],
+				[5, 21],
+				[7, 22.5],
+				[12, 23.3],
+				[17, 22.5],
+				[19, 21],
+				[19, 14]
+			],
+			"stroke": "#8c4fff"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 19.8,
+			"text": "RA3",
+			"size": 5,
+			"color": "#8c4fff"
+		}
+	]
+}

@@ -1,0 +1,35 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[5, 2],
+				[15, 2],
+				[20, 7],
+				[20, 22],
+				[5, 22]
+			],
+			"closed": true,
+			"stroke": "ink",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[15, 2],
+				[15, 7],
+				[20, 7]
+			],
+			"stroke": "ink",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 12.5,
+			"cy": 14,
+			"text": "{;}",
+			"size": 7,
+			"color": "ink"
+		}
+	]
+}

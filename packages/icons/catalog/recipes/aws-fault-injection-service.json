@@ -1,0 +1,82 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1,
+			"y": 1,
+			"width": 22,
+			"height": 22,
+			"stroke": "none",
+			"fill": "#c925d1"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[8, 15],
+				[5.5, 14.5],
+				[4.5, 12.5],
+				[5.5, 10],
+				[7.5, 9.5],
+				[8, 7],
+				[10.5, 4.5],
+				[14, 5],
+				[15.5, 7.5],
+				[17.5, 8],
+				[18.5, 10],
+				[20, 11],
+				[20, 13.5],
+				[18, 15],
+				[11.5, 15]
+			],
+			"smooth": true,
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 7.5,
+			"y": 13,
+			"width": 3,
+			"height": 7,
+			"rounded": true,
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[6.5, 13],
+				[11.5, 13]
+			],
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 10.5,
+			"cy": 8.5,
+			"rx": 1.2,
+			"ry": 1.2,
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[13.5, 10.5],
+				[16, 13]
+			],
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[16, 10.5],
+				[13.5, 13]
+			],
+			"stroke": "paper",
+			"pen": 2
+		}
+	]
+}

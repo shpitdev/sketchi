@@ -13,6 +13,8 @@ export interface IconPackDefinition {
 	readonly name: string;
 	/** Collections the pack draws from; omitted, it holds every drawn mark. */
 	readonly collections?: readonly string[];
+	/** Marks from other collections the pack also holds, such as the vendor's own logo. */
+	readonly marks?: readonly string[];
 	/** Marks its preview shows, in order; missing or undrawn ones are skipped. */
 	readonly featured: readonly string[];
 	/**
@@ -100,6 +102,43 @@ export const ICON_PACKS: readonly IconPackDefinition[] = [
 		},
 	},
 	{
+		id: "aws",
+		name: "AWS",
+		collections: ["aws"],
+		marks: ["aws"],
+		featured: [
+			"aws-lambda",
+			"amazon-s3",
+			"amazon-ec2",
+			"amazon-dynamodb",
+			"amazon-sqs",
+			"amazon-cloudfront",
+		],
+		excalidrawListing: {
+			name: "AWS Architecture Icons",
+			description:
+				"Hand-drawn AWS service icons for architecture diagrams, such as Lambda, S3, EC2, DynamoDB, SQS and CloudFront.",
+		},
+	},
+	{
+		id: "aws-resources",
+		name: "AWS resources",
+		collections: ["aws-resources"],
+		featured: [
+			"amazon-s3-bucket",
+			"aws-lambda-function",
+			"amazon-ec2-instance",
+			"amazon-dynamodb-table",
+			"amazon-sqs-queue",
+			"amazon-sns-topic",
+		],
+		excalidrawListing: {
+			name: "AWS Architecture Resource Icons",
+			description:
+				"Hand-drawn AWS resource icons for architecture diagrams, such as S3 buckets, Lambda functions, EC2 instances, DynamoDB tables and SQS queues.",
+		},
+	},
+	{
 		id: "data",
 		name: "Data & backend",
 		collections: ["data-storage", "auth-identity", "observability-security"],
@@ -166,9 +205,11 @@ export function packIcons(
 	drawings: IconDrawings,
 ): PackIcon[] {
 	const collections = pack.collections ? new Set(pack.collections) : undefined;
+	const marks = new Set(pack.marks);
 	return icons.flatMap((icon) => {
 		const recipe = drawings[icon.slug];
-		if (!recipe || (collections && !collections.has(icon.collection))) return [];
+		const member = !collections || collections.has(icon.collection) || marks.has(icon.slug);
+		if (!recipe || !member) return [];
 		return [{ slug: icon.slug, name: icon.name, recipe }];
 	});
 }
@@ -201,6 +242,17 @@ export function packSummary(
 
 export function packPagePath(id: string): string {
 	return `/packs/${id}`;
+}
+
+/** The pack's drawn marks, which its page loads instead of the whole catalog. */
+export function packIconsPath(id: string): string {
+	return `/packs/${id}.icons.json`;
+}
+
+/** A pack's published marks; entries that are not drawn marks are dropped. */
+export function decodePackIcons(payload: unknown): PackIcon[] {
+	if (!Array.isArray(payload)) throw new Error("Pack icons are not a list.");
+	return payload.filter(isPackIcon);
 }
 
 /** The pack as an Excalidraw library; the whole catalog keeps its original URL. */

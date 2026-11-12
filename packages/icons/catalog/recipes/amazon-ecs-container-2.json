@@ -1,0 +1,40 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 4.5,
+			"width": 21,
+			"height": 15,
+			"stroke": "#ed7100",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[4.5, 7.5],
+				[4.5, 16.5]
+			],
+			"stroke": "#ed7100",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[19.5, 7.5],
+				[19.5, 16.5]
+			],
+			"stroke": "#ed7100",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 8,
+			"y": 8,
+			"width": 8,
+			"height": 8,
+			"stroke": "#ed7100",
+			"pen": 2
+		}
+	]
+}

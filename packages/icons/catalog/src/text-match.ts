@@ -1,9 +1,14 @@
 import { searchIcons, type SearchableIcon } from "./search.js";
-import { isDistinctiveWord, isEnglishWord, termTokens, wordsOf } from "./terms.js";
+import {
+	isDistinctiveWord,
+	isEnglishWord,
+	isGenericTechWord,
+	termTokens,
+	wordsOf,
+} from "./terms.js";
 
 /** Most catalog terms a prompt can offer one diagram. */
 export const MAX_TEXT_ICON_MATCHES = 24;
-const MAX_PHRASE_TOKENS = 4;
 
 /** One word of free text, with the context that decides how much it says. */
 interface TextToken {
@@ -130,16 +135,42 @@ function phraseKey(words: readonly string[]): string {
 	return words.map((word) => word.replace(/(?<=[a-z0-9]{2})\.(?=[a-z0-9]{2})/gu, "")).join(" ");
 }
 
-const termIndexes = new WeakMap<readonly SearchableIcon[], Map<string, SearchableIcon[]>>();
+/** The catalog's terms as free text is matched against them. */
+interface TermIndex<Icon> {
+	readonly icons: Map<string, Icon[]>;
+	/** Words in the longest term, so a vendor's full product name is one phrase. */
+	readonly longest: number;
+	/** One-word terms the catalog writes in capitals ("ALB", "SQS"), keyed as phrases. */
+	readonly acronyms: ReadonlySet<string>;
+}
+
+const termIndexes = new WeakMap<readonly SearchableIcon[], TermIndex<SearchableIcon>>();
+
+/**
+ * A term spelled in capitals, such as "ALB" or "EC2": in capitals in text, it
+ * is that name. Generic technical acronyms ("API", "JSON") never are.
+ */
+function isAcronym(term: string): boolean {
+	return (
+		/^[A-Z0-9]+$/u.test(term) &&
+		/[A-Z].*[A-Z]/u.test(term) &&
+		!isGenericTechWord(term.toLowerCase())
+	);
+}
 
 /** Icons by tokenized slug, name, and alias, built once per icon list. */
-function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): Map<string, Icon[]> {
+function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): TermIndex<Icon> {
 	const cached = termIndexes.get(icons);
-	if (cached) return cached as Map<string, Icon[]>;
+	if (cached) return cached as TermIndex<Icon>;
 	const index = new Map<string, Icon[]>();
+	const acronyms = new Set<string>();
+	let longest = 1;
 	const add = (term: string, icon: Icon) => {
-		const key = phraseKey(termTokens(term));
+		const words = termTokens(term);
+		const key = phraseKey(words);
 		if (!key) return;
+		longest = Math.max(longest, words.length);
+		if (isAcronym(term)) acronyms.add(key);
 		const entries = index.get(key) ?? [];
 		if (!entries.includes(icon)) entries.push(icon);
 		index.set(key, entries);
@@ -149,16 +180,19 @@ function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): Map<str
 		add(icon.name, icon);
 		for (const alias of icon.aliases) add(alias, icon);
 	}
-	termIndexes.set(icons, index);
-	return index;
+	const built = { icons: index, longest, acronyms };
+	termIndexes.set(icons, built);
+	return built;
 }
 
 /**
  * Catalog icons named in free text, in order of first mention. Each phrase is
- * the longest run of up to four words matching an icon's slug, name, or
- * alias; when several icons share a phrase, the ranked search breaks the tie.
- * Everyday words count only when cased as a name mid-sentence, so "stream
- * events" or "Sync Order" name nothing while "tickets in Linear" names Linear.
+ * the longest run of words matching an icon's slug, name, or alias, up to the
+ * longest term ("Amazon Managed Streaming for Apache Kafka"); when several icons
+ * share a phrase, the ranked search breaks the tie. Everyday words count only
+ * when cased as a name: mid-sentence, so "stream events" or "Sync Order" name
+ * nothing while "tickets in Linear" names Linear, or in the capitals the catalog
+ * writes an acronym in, so "ALB" names the load balancer and "alb" nothing.
  * Deterministic for a given text and icon list.
  */
 export function matchIconMentions<Icon extends SearchableIcon>(
@@ -168,17 +202,20 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 	/** Count a capitalized first word too, as a label in a diagram that asks for logos. */
 	options: { readonly labelInitial?: boolean } = {},
 ): IconMention<Icon>[] {
-	const index = termIndex(icons);
+	const { icons: index, longest, acronyms } = termIndex(icons);
 	const tokens = tokenize(text);
 	const mentions: IconMention<Icon>[] = [];
 	const seen = new Map<string, number>();
 	for (let start = 0; start < tokens.length && mentions.length < limit;) {
 		let matched = 0;
-		for (let length = Math.min(MAX_PHRASE_TOKENS, tokens.length - start); length > 0; length -= 1) {
+		for (let length = Math.min(longest, tokens.length - start); length > 0; length -= 1) {
 			const phraseTokens = tokens.slice(start, start + length);
-			const entries = index.get(phraseKey(phraseTokens.map((token) => token.lower)));
+			const key = phraseKey(phraseTokens.map((token) => token.lower));
+			const entries = index.get(key);
 			if (!entries) continue;
-			const distinctive = phraseTokens.some(isDistinctive);
+			const acronym =
+				phraseTokens.length === 1 && acronyms.has(key) && isAcronym(phraseTokens[0]!.raw);
+			const distinctive = acronym || phraseTokens.some(isDistinctive);
 			const cased = phraseTokens.some(isCasedAsName);
 			const first = phraseTokens[0];
 			const labelInitial =
@@ -292,13 +329,18 @@ const TECH_NOUNS: ReadonlySet<string> = new Set(
 );
 
 /**
- * Marks a tech noun never rescues. Google Cloud's generic service marks ("Storage",
- * "Compute", "Batch") would read "Storage service" as that one product, and some English
- * words name a generic technology before a tech noun ("Edge function", "Stream worker",
- * "Sync function"). Nor does a label that is only the word: a node called "Batch" or "Home"
- * names a step or a page, not Google's product.
+ * Marks a tech noun never rescues. Cloud vendors' generic service marks ("Storage",
+ * "Compute", "Batch", "Glue") would read "Storage service" as that one product, and some
+ * English words name a generic technology before a tech noun ("Edge function", "Stream
+ * worker", "Sync function"). Nor does a label that is only the word: a node called "Batch"
+ * or "Home" names a step or a page, not a cloud vendor's product.
  */
-const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set(["gcp", "gcp-products"]);
+const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set([
+	"aws",
+	"aws-resources",
+	"gcp",
+	"gcp-products",
+]);
 const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
 	"automatic",
 	"edge",

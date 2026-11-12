@@ -10,6 +10,7 @@ import {
 	IconDrawGatewayConfig,
 	IconDrawModelsGateway,
 	type IconDrawResult,
+	ICON_NAME_MAX_LENGTH,
 	type IconJudgeVerdict,
 	type ModelCall,
 	prepareIconInput,
@@ -127,6 +128,18 @@ export interface MarkAttempt {
 	readonly previews?: { readonly png28: string; readonly png112: string };
 }
 
+/**
+ * A product name the draw input accepts. A few vendor names run past its
+ * limit ("Amazon OpenSearch Service Cluster Administrator Node"): the vendor
+ * prefix goes first, then whole words from the end.
+ */
+export function drawName(name: string): string {
+	if (name.length <= ICON_NAME_MAX_LENGTH) return name;
+	const words = name.replace(/^(?:Amazon|AWS) /u, "").split(" ");
+	while (words.join(" ").length > ICON_NAME_MAX_LENGTH && words.length > 1) words.pop();
+	return words.join(" ").slice(0, ICON_NAME_MAX_LENGTH);
+}
+
 export interface DrawMarkRequest {
 	readonly slug: string;
 	readonly name: string;
@@ -200,7 +213,7 @@ export async function drawMark(
 	let author = request.author === "source" ? undefined : request.author;
 	try {
 		outcome = await Effect.runPromise(
-			prepareIconInput({ name: request.name, svg: request.svg }).pipe(
+			prepareIconInput({ name: drawName(request.name), svg: request.svg }).pipe(
 				Effect.flatMap((input) => {
 					author ??= iconAuthorFor(input.source);
 					return drawIcon(input, {

@@ -1,0 +1,32 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[2.5, 13.5],
+				[2.5, 2.5],
+				[21.5, 2.5],
+				[21.5, 13.5]
+			],
+			"stroke": "#7aa116",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 2.5,
+			"y": 15.5,
+			"width": 19,
+			"height": 6.5,
+			"stroke": "#7aa116",
+			"pen": 2
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 18.8,
+			"text": "LoRaWAN",
+			"size": 3.6,
+			"color": "#7aa116"
+		}
+	]
+}
