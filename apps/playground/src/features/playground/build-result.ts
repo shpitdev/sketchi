@@ -278,28 +278,31 @@ const FAMILY_NAMES: Readonly<Record<DiagramToolFamily, string>> = {
 };
 
 /**
- * The tool card heading. A call still waiting for input when its run is no
- * longer active was stopped, and never finishes drawing.
+ * The tool card heading, and whether the call is still being written or
+ * checked. A call still waiting for input when its run is no longer active was
+ * stopped, and never finishes drawing.
  */
 export function diagramToolCardStatus(
 	part: DiagramToolPart,
 	active: boolean,
-): { readonly stopped: boolean; readonly title: string } {
+): { readonly stopped: boolean; readonly title: string; readonly writing: boolean } {
 	const family = FAMILY_NAMES[diagramToolFamily(part)];
 	if (part.state === "input-streaming" || part.state === "input-available") {
-		if (!active) return { stopped: true, title: `Stopped drawing your ${family}` };
+		if (!active) return { stopped: true, title: `Stopped drawing your ${family}`, writing: false };
 		return {
 			stopped: false,
 			title:
 				part.state === "input-streaming" ? `Drawing your ${family}` : `Checking your ${family}`,
+			writing: true,
 		};
 	}
 	if (part.state === "output-error") {
-		return { stopped: false, title: "Couldn’t finish the diagram" };
+		return { stopped: false, title: "Couldn’t finish the diagram", writing: false };
 	}
 	return {
 		stopped: false,
 		title: buildResultOf(part)?.ok ? "Diagram ready" : "Diagram needs changes",
+		writing: false,
 	};
 }
 
