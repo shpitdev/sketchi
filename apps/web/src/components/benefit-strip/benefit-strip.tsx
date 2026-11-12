@@ -31,8 +31,8 @@ export function BenefitStrip() {
 	return (
 		<section aria-label="Why Sketchi" className="benefit-strip">
 			<ul className="sk-shell benefit-strip__list">
-				{benefits.map(({ id, title, visual }, index) => (
-					<li className="benefit sk-rise" key={id} style={{ "--i": index + 2 } as CSSProperties}>
+				{benefits.map(({ id, title, visual }) => (
+					<li className="benefit" key={id}>
 						<span className="benefit__visual" data-benefit={id}>
 							{visual}
 						</span>

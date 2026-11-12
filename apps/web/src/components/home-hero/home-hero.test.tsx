@@ -4,21 +4,29 @@ import { describe, expect, it } from "vitest";
 import { HomeHero } from "./home-hero";
 
 describe("HomeHero", () => {
-	it("renders the headline and primary actions", () => {
+	it("says what Sketchi makes and offers the two ways to start", () => {
 		render(<HomeHero />);
 
 		expect(
-			screen.getByRole("heading", { name: "Editable diagrams from a prompt", level: 1 }),
+			screen.getByRole("heading", { name: "Excalidraw diagrams from a description", level: 1 }),
 		).toBeTruthy();
-		const primaryAction = screen.getByRole("link", {
-			name: "Open playground",
-		});
+		const primaryAction = screen.getByRole("link", { name: "Open Playground" });
 		expect(primaryAction).toHaveProperty("href", "https://playground.sketchi.app/");
 		expect(primaryAction.dataset.variant).toBe("brand");
 		expect(screen.getByRole("link", { name: "Add to your agent" })).toHaveProperty(
 			"href",
 			"http://localhost:3000/agents",
 		);
+	});
+
+	/** The paragraph adds what the heading does not say: logos, and that it stays editable. */
+	it("adds logos and editing to the heading, without repeating it", () => {
+		const { container } = render(<HomeHero />);
+
+		const lead = container.querySelector(".home-hero__lead")?.textContent ?? "";
+		expect(lead).toMatch(/logo/);
+		expect(lead).toMatch(/editable/);
+		expect(lead).not.toMatch(/Excalidraw diagrams/);
 	});
 
 	/**
@@ -37,24 +45,10 @@ describe("HomeHero", () => {
 		expect(action.querySelector(".agent-action__stack")?.getAttribute("aria-hidden")).toBe("true");
 	});
 
-	it("lets the headline and the board say what Sketchi is, without a subtitle", () => {
-		const { container } = render(<HomeHero />);
-
-		expect(container.querySelector(".home-hero__copy p")).toBeNull();
-	});
-
-	it("labels the sketched diagram illustration", () => {
+	it("shows a diagram Sketchi made, ready to edit", () => {
 		render(<HomeHero />);
 
-		expect(screen.getByRole("img", { name: /hand-drawn flowchart/i })).toBeTruthy();
-	});
-
-	it("draws four complete connectors behind the flowchart nodes", () => {
-		const { container } = render(<HomeHero />);
-
-		const connectors = container.querySelectorAll(".sketch-board__wires .wire");
-		expect(connectors).toHaveLength(4);
-		expect(connectors[3]?.getAttribute("d")).toContain("L34 36");
-		expect(connectors[3]?.getAttribute("d")).toContain("L52 21");
+		expect(screen.getByRole("img", { name: /hand-drawn architecture diagram/i })).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Edit diagram" })).toBeTruthy();
 	});
 });

@@ -7,12 +7,14 @@ describe("MarketingHome", () => {
 	it("composes the hero, benefits, CLI, and icons", () => {
 		render(<MarketingHome />);
 
-		expect(screen.getByRole("heading", { name: "Editable diagrams from a prompt" })).toBeTruthy();
+		expect(
+			screen.getByRole("heading", { name: "Excalidraw diagrams from a description" }),
+		).toBeTruthy();
 		expect(screen.getByRole("region", { name: "Why Sketchi" })).toBeTruthy();
 		expect(screen.queryByRole("heading", { name: "Built on Excalidraw" })).toBeNull();
 		expect(
 			screen.getByRole("heading", {
-				name: "Logos for your stack",
+				name: "Product logos and icon packs",
 			}),
 		).toBeTruthy();
 		// The hero carries the call to action; no closing band repeats it.
@@ -44,7 +46,7 @@ describe("MarketingHome", () => {
 		);
 
 		for (const link of screen.getAllByRole("link", {
-			name: "Open playground",
+			name: "Open Playground",
 		})) {
 			expect(link.getAttribute("href")).toBe("https://pr-42-sketchi-studio.dimethyl.workers.dev");
 		}

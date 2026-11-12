@@ -37,6 +37,6 @@ export const CLI_NPM_INSTALL_COMMAND = `npm install -g ${CLI_PACKAGE_NAME}`;
 /** From the published package's `engines.node`. */
 export const CLI_NODE_REQUIREMENT = "Node.js 24.13.0 or newer";
 
-/** One command worth showing as proof that it does real work. */
+/** One command worth showing as proof that it does real work; every box it draws gets a logo. */
 export const CLI_EXAMPLE_COMMAND = `sketchi generate \\
-  --prompt "Map release approval with pass and revise branches"`;
+  --prompt "Deploy with GitHub Actions, Docker and Cloudflare Workers"`;

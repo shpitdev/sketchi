@@ -70,6 +70,8 @@ const RENDERERS = new Set([EXCALIDRAW, "@sketchi/diagram-ui"]);
 const RUNTIME_IMPORT_EXCEPTIONS = new Set([
 	"packages/diagram/ui/src/lib/load-excalidraw.ts",
 	"apps/cli/src/png-renderer-runtime.ts",
+	// Node, at build time: Excalidraw's SVG export of the home diagram.
+	"apps/web/scripts/home-diagram.ts",
 ]);
 
 function trackedFiles(...patterns) {
@@ -123,7 +125,7 @@ test("every Worker app that renders Excalidraw serves and caches its fonts", () 
 	const surfaces = workerProjectIds.filter((id) =>
 		reachesExcalidraw(workerProjectConfig(id).projectRoot),
 	);
-	assert.deepEqual([...surfaces].sort(), ["excalidraw", "playground"]);
+	assert.deepEqual([...surfaces].sort(), ["excalidraw", "playground", "web"]);
 	for (const id of surfaces) {
 		const root = workerProjectConfig(id).projectRoot;
 		assert.ok(
@@ -151,6 +153,7 @@ test("every Storybook that renders Excalidraw serves its fonts", () => {
 	assert.deepEqual(surfaces.sort(), [
 		"apps/excalidraw/.storybook/main.ts",
 		"apps/native-conversion-storybook/.storybook/main.ts",
+		"apps/web/.storybook/main.ts",
 		"packages/diagram/ui/.storybook/main.ts",
 	]);
 	for (const path of surfaces) {

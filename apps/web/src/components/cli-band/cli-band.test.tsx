@@ -62,15 +62,25 @@ describe("CliBand", () => {
 
 	/**
 	 * Every install command carried a sentence explaining it. The commands are
-	 * self-evident, so the terminal card is commands and the Node floor, nothing
-	 * else.
+	 * self-evident, so the column is commands and the Node floor, nothing else.
 	 */
 	it("captions none of the commands", () => {
 		const { container } = render(<CliBand />);
 
 		expect(
-			[...container.querySelectorAll(".cli-band__body p")].map((element) => element.textContent),
+			[...container.querySelectorAll(".cli-band__commands p")].map(
+				(element) => element.textContent,
+			),
 		).toEqual([`Requires ${CLI_NODE_REQUIREMENT}.`]);
+	});
+
+	/** The lead says what the main command leaves behind, not a slogan about it. */
+	it("says what generate writes", () => {
+		const { container } = render(<CliBand />);
+
+		expect(container.querySelector(".cli-band__lead")?.textContent).toMatch(
+			/sketchi generate writes a PNG and keeps the diagram.s \.excalidraw file/,
+		);
 	});
 
 	it("links to the real npm package page with the npm mark", () => {

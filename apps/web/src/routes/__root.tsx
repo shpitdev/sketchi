@@ -24,16 +24,6 @@ export const Route = createRootRoute({
 		],
 		links: [
 			{ rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
-			// Excalifont's Latin subset backs the hand-drawn labels on the home
-			// page; preload it so they paint in the product's own hand instead of
-			// reflowing through the sans fallback.
-			{
-				rel: "preload",
-				as: "font",
-				type: "font/woff2",
-				href: "/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2",
-				crossOrigin: "anonymous",
-			},
 			{ rel: "preconnect", href: "https://fonts.googleapis.com" },
 			{
 				rel: "preconnect",
