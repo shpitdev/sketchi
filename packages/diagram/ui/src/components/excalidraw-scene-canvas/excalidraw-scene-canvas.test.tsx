@@ -246,7 +246,7 @@ describe("ExcalidrawSceneCanvas", () => {
 		);
 	});
 
-	it("fits a read-only diagram clear of Excalidraw's menu", async () => {
+	it("fits a read-only diagram exactly, clear of Excalidraw's menu", async () => {
 		excalidrawMock.viewport = { height: 564, width: 820 };
 		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
 		render(<ExcalidrawSceneCanvas scene={scene} title="Wide diagram" viewModeEnabled />);
@@ -254,9 +254,13 @@ describe("ExcalidrawSceneCanvas", () => {
 		drawMenuAtTopLeft();
 
 		loadEditor(0, [{ isDeleted: false }]);
+		// The menu alone costs this wide diagram least as a strip beside it, and the
+		// zoom stays exact rather than rounded down to a tenth.
 		expect(excalidrawMock.scrollToContent).toHaveBeenCalledExactlyOnceWith(undefined, {
 			...fitToViewport,
-			canvasOffsets: { left: 60, right: 0 },
+			canvasOffsets: { bottom: 16, left: 60, right: 16, top: 16 },
+			maxZoom: 744 / 1500,
+			minZoom: 744 / 1500,
 		});
 	});
 

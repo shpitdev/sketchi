@@ -1,5 +1,5 @@
 import { createBranchLabelSynchronizer } from "./branch-labels";
-import { fitClearOfControls, measureCanvasControls } from "./fit-clear-of-controls";
+import { measureCanvasControls, readOnlyFit } from "./read-only-fit";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type {
 	BinaryFiles,
@@ -44,10 +44,10 @@ const LazyExcalidraw = lazy<ComponentType<ExcalidrawProps>>(() =>
 );
 
 /**
- * Where a read-only fit must leave room so Excalidraw's menu and zoom controls
- * never sit over the diagram, or `undefined` when the plain fit is clear.
+ * The exact fit of a read-only diagram, clear of Excalidraw's menu and zoom
+ * controls, or `undefined` before the scene's bounds can be measured.
  */
-function readOnlyFitOffsets(
+function fitReadOnlyScene(
 	root: HTMLElement | null,
 	elements: Parameters<NonNullable<ExcalidrawProps["onChange"]>>[0],
 	appState: Parameters<NonNullable<ExcalidrawProps["onChange"]>>[1],
@@ -55,7 +55,7 @@ function readOnlyFitOffsets(
 	const visible = elements.filter((element) => !element.isDeleted);
 	if (!root || !sceneBounds || visible.length === 0) return undefined;
 	const [x1, y1, x2, y2] = sceneBounds(visible);
-	return fitClearOfControls(
+	return readOnlyFit(
 		appState,
 		{ height: y2 - y1, width: x2 - x1 },
 		measureCanvasControls(root, appState),
@@ -163,14 +163,18 @@ export function ExcalidrawSceneCanvas({
 					(fitted.width !== appState.width || fitted.height !== appState.height);
 				if (fitted?.api !== api || (viewModeEnabled && resized)) {
 					fittedRef.current = { api, height: appState.height, width: appState.width };
-					const canvasOffsets = viewModeEnabled
-						? readOnlyFitOffsets(rootRef.current, elements, appState)
+					const fit = viewModeEnabled
+						? fitReadOnlyScene(rootRef.current, elements, appState)
 						: undefined;
+					// Excalidraw rounds a fit's zoom down to a tenth and then clamps it to
+					// minZoom and maxZoom, so pinning both keeps the exact zoom.
 					api.scrollToContent(undefined, {
 						animate: false,
 						fitToViewport: true,
 						viewportZoomFactor: 1,
-						...(canvasOffsets ? { canvasOffsets } : {}),
+						...(fit
+							? { canvasOffsets: fit.canvasOffsets, maxZoom: fit.zoom, minZoom: fit.zoom }
+							: {}),
 					});
 				}
 			}
