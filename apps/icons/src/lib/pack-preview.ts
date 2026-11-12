@@ -1,6 +1,6 @@
 import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 
-import { RECIPE_PREVIEW_SIZE, recipePreview } from "./recipe-drawing.js";
+import { RECIPE_PREVIEW_SIZE, type RecipePalette, recipePreview } from "./recipe-drawing.js";
 
 /**
  * The preview excalidraw.com's "Publish library" dialog draws for a library
@@ -39,14 +39,13 @@ export function packPreviewLayout(count: number) {
 	};
 }
 
-/** The preview as one SVG, ready to rasterize with Excalifont as its font. */
-export function packPreviewSvg(recipes: readonly IconRecipe[]): string {
-	const { border, borderColor, box, padding } = PACK_PREVIEW_GRID;
-	const layout = packPreviewLayout(recipes.length);
-	const inset = padding + (box - RECIPE_PREVIEW_SIZE) / 2;
-	const cells = recipes.map((recipe, index) => {
-		const { x, y } = layout.boxes[index]!;
-		const parts = recipePreview(recipe, PALETTE).parts.map((part) =>
+/**
+ * One drawn mark as SVG markup in its RECIPE_PREVIEW_SIZE square, the way the
+ * pages draw it. Its text needs Excalifont when rasterized.
+ */
+export function recipeSvg(recipe: IconRecipe, palette: RecipePalette = PALETTE): string {
+	return recipePreview(recipe, palette)
+		.parts.map((part) =>
 			part.kind === "text"
 				? `<text x="${part.x}" y="${part.y}" font-family="Excalifont" font-size="${part.size}" fill="${part.fill}" text-anchor="middle" dominant-baseline="central">${escapeXml(part.text)}</text>`
 				: part.paths
@@ -55,8 +54,18 @@ export function packPreviewSvg(recipes: readonly IconRecipe[]): string {
 								`<path d="${path.d}" fill="${path.fill}" stroke="${path.stroke}" stroke-width="${path.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>`,
 						)
 						.join(""),
-		);
-		return `<rect x="${x + padding / 2}" y="${y + padding / 2}" width="${box + padding}" height="${box + padding}" fill="none" stroke="${borderColor}" stroke-width="${border}"/><g transform="translate(${x + inset} ${y + inset})">${parts.join("")}</g>`;
+		)
+		.join("");
+}
+
+/** The preview as one SVG, ready to rasterize with Excalifont as its font. */
+export function packPreviewSvg(recipes: readonly IconRecipe[]): string {
+	const { border, borderColor, box, padding } = PACK_PREVIEW_GRID;
+	const layout = packPreviewLayout(recipes.length);
+	const inset = padding + (box - RECIPE_PREVIEW_SIZE) / 2;
+	const cells = recipes.map((recipe, index) => {
+		const { x, y } = layout.boxes[index]!;
+		return `<rect x="${x + padding / 2}" y="${y + padding / 2}" width="${box + padding}" height="${box + padding}" fill="none" stroke="${borderColor}" stroke-width="${border}"/><g transform="translate(${x + inset} ${y + inset})">${recipeSvg(recipe)}</g>`;
 	});
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}"><rect width="100%" height="100%" fill="${PALETTE.paper}"/>${cells.join("")}</svg>`;
 }

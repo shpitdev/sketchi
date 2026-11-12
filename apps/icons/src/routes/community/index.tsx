@@ -1,8 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { CommunityPage } from "../../components/community-gallery/community-page.js";
+import { COMMUNITY_DESCRIPTION, pageMeta } from "../../lib/site-meta.js";
 
 export const Route = createFileRoute("/community/")({
 	component: () => <CommunityPage />,
-	head: () => ({ meta: [{ title: "Community icons · Sketchi Icons" }] }),
+	head: () => ({
+		meta: pageMeta({
+			title: "Community icons · Sketchi Icons",
+			description: COMMUNITY_DESCRIPTION,
+			path: "/community",
+		}),
+	}),
 });

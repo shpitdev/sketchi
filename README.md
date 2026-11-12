@@ -22,7 +22,7 @@
 ---
 
 <p align="center">
-  <img src="apps/web/public/media/sketchi-og-card.png" alt="Editable diagrams from a prompt, beside a deploy flowchart with GitHub, Docker, and Cloudflare logos." width="1000" />
+  <img src="apps/web/public/media/sketchi-card.png" alt="The Sketchi wordmark beside a hand-drawn architecture diagram Sketchi made: a Next.js app on Vercel and a GitHub webhook call an API on Cloudflare Workers, which reads Postgres and caches in Redis." width="1000" />
 </p>
 
 Sketchi is the canonical Nx and Cloudflare workspace for generating reliable,

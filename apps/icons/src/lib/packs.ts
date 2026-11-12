@@ -255,6 +255,14 @@ export function decodePackIcons(payload: unknown): PackIcon[] {
 	return payload.filter(isPackIcon);
 }
 
+/** The site's link-preview card. */
+export const SITE_CARD_PATH = "/card.png";
+
+/** The pack's link-preview card: its name, its count and a strip of its marks. */
+export function packCardPath(id: string): string {
+	return `/packs/${id}.card.png`;
+}
+
 /** The pack as an Excalidraw library; the whole catalog keeps its original URL. */
 export function packLibraryPath(id: string): string {
 	return id === ALL_ICONS_PACK_ID ? DRAWINGS_LIBRARY_PATH : `/packs/${id}.excalidrawlib`;

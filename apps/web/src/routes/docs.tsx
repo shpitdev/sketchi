@@ -9,7 +9,8 @@ export const Route = createFileRoute("/docs")({
 	head: () =>
 		pageMeta({
 			title: "Docs – Sketchi",
-			description: "Use Sketchi in the playground, a coding agent, or the sketchi CLI.",
+			description:
+				"Make diagrams with Sketchi in the browser playground, from a coding agent, or with the sketchi command-line tool.",
 			path: "/docs",
 		}),
 	loader: () => getWebSurfaceUrls(),

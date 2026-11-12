@@ -1,15 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { MarketingHome } from "../components/marketing-home/index.js";
-import { pageMeta } from "../lib/site-meta";
+import { pageMeta, SITE_DESCRIPTION } from "../lib/site-meta";
 import { getWebSurfaceUrls } from "../lib/surface-urls-rpc";
 
 export const Route = createFileRoute("/")({
 	head: () =>
 		pageMeta({
-			title: "Sketchi: editable diagrams from a prompt",
-			description:
-				"Describe a diagram and get an editable Excalidraw sketch with real tech logos. Use it in the browser, your coding agent, or the terminal.",
+			title: "Sketchi: Excalidraw diagrams from a description",
+			description: SITE_DESCRIPTION,
 			path: "/",
 		}),
 	loader: () => getWebSurfaceUrls(),

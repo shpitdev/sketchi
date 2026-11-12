@@ -4,13 +4,20 @@ export const SITE_URL = "https://sketchi.app";
 /** Site name used for og:site_name. */
 export const SITE_NAME = "Sketchi";
 
-/** Static raster used by link previews and social crawlers. */
+/** What the home page and pages without their own copy say Sketchi does. */
+export const SITE_DESCRIPTION =
+	"Describe a diagram and Sketchi draws it in Excalidraw, with product logos, ready to edit. Use it in the browser, a coding agent or the terminal.";
+
+/**
+ * The link-preview card crawlers show for every page, and the Playground's too.
+ * `pnpm nx run web:social-card` draws it; its diagram is real Sketchi output.
+ */
 export const OG_IMAGE = {
-	url: `${SITE_URL}/media/sketchi-og-card.png`,
+	url: `${SITE_URL}/media/sketchi-card.png`,
 	width: "1200",
 	height: "630",
 	type: "image/png",
-	alt: "Editable diagrams from a prompt, beside a deploy flowchart with GitHub, Docker, and Cloudflare logos.",
+	alt: "The Sketchi wordmark beside a hand-drawn architecture diagram Sketchi made: a Next.js app on Vercel and a GitHub webhook call an API on Cloudflare Workers, which reads Postgres and caches in Redis.",
 } as const;
 
 /** A route-head meta entry (subset of what TanStack Router accepts). */
