@@ -37,9 +37,9 @@ describe("SiteHeader", () => {
 			/>,
 		);
 
-		expect(screen.getByRole("link", { name: "Icons" }).getAttribute("href")).toBe(
-			"https://pr-42-sketchi-icons.dimethyl.workers.dev",
-		);
+		const icons = screen.getByRole("link", { name: "Icons" });
+		expect(icons.getAttribute("href")).toBe("https://pr-42-sketchi-icons.dimethyl.workers.dev");
+		expect(icons.querySelector('svg[data-slot="icons-glyph"]')).toBeTruthy();
 		expect(screen.getByRole("link", { name: "Playground" }).getAttribute("href")).toBe(
 			"https://pr-42-sketchi-studio.dimethyl.workers.dev",
 		);
@@ -91,6 +91,10 @@ describe("SiteHeader", () => {
 		render(<SiteHeader />);
 
 		fireEvent.click(screen.getByRole("button", { name: "Toggle menu" }));
+
+		const icons = screen.getAllByRole("link", { name: "Icons" });
+		expect(icons).toHaveLength(2);
+		expect(icons.every((link) => link.querySelector('svg[data-slot="icons-glyph"]'))).toBe(true);
 
 		expect(screen.getByRole("link", { name: "GitHub" }).getAttribute("href")).toBe(
 			"https://github.com/shpitdev/sketchi",

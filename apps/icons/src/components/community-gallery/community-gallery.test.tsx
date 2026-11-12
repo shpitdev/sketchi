@@ -135,6 +135,15 @@ describe("CommunityGallery", () => {
 		expect(screen.getByRole("dialog", { name: "Box details" })).toBeTruthy();
 	});
 
+	it("lets an empty gallery's state stand in for a zero count", () => {
+		gallery({ icons: [] });
+		expect(screen.getByRole("heading", { name: "No community icons yet" })).toBeTruthy();
+		expect(screen.queryByText("0 icons")).toBeNull();
+		expect(screen.getAllByRole("status").map((status) => status.textContent)).toContain(
+			"No community icons yet",
+		);
+	});
+
 	it("clears a search that finds nothing", () => {
 		const { onQueryChange } = gallery({ icons: [], query: "zzz" });
 		expect(screen.getByRole("heading", { name: "No icons found" })).toBeTruthy();

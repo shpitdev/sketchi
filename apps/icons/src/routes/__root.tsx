@@ -23,9 +23,8 @@ export const Route = createRootRoute({
 		],
 		links: [
 			{ rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
-			// Excalifont's Latin subset backs the pack titles; preload it so they
-			// paint in the product's own hand instead of reflowing through the
-			// sans fallback.
+			// Excalifont's Latin subset letters the drawn marks, such as a wordmark's
+			// name; preload it so they never paint through a fallback first.
 			{
 				rel: "preload",
 				as: "font",

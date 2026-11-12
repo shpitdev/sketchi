@@ -641,5 +641,7 @@ describe("IconLibrary", () => {
 		expect(screen.getByRole("alert").textContent).toContain("Connection failed.");
 		rerender(<IconLibrary data={fixtureData} initialQuery="missing" key="empty" />);
 		expect(screen.getByRole("heading", { name: "No icons found" })).toBeTruthy();
+		// The empty state stands in for a zero count.
+		expect(screen.queryByText("0 icons")).toBeNull();
 	});
 });

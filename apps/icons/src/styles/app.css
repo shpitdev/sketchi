@@ -5,6 +5,17 @@
 :root {
 	--icons-shell: 1360px;
 	--icons-header-height: 64px;
+
+	/* One type scale. Excalifont belongs to the wordmark and the drawings, so
+	   page text is the UI sans, and the mono is kept for code: slugs, URLs,
+	   commands and keys. Counts are sans with tabular figures. */
+	--type-page: 28px; /* a page's title */
+	--type-dialog: 24px; /* an icon's name in its details */
+	--type-section: 20px; /* section headings and empty states */
+	--type-card: 15px; /* a pack card's name */
+	--type-label: 14px; /* icon names, controls, a page title's count */
+	--type-meta: 13px; /* counts, collections, captions */
+	--type-code: 12px; /* slugs, URLs, keys */
 }
 
 button,
@@ -34,6 +45,27 @@ h1,
 h2 {
 	font-weight: 700;
 	letter-spacing: -0.02em;
+}
+
+/* The section headings share one size: the shelf's, the grid's and an empty state's. */
+.pack-shelf__title,
+.icons-title,
+.icons-state h2 {
+	font-size: var(--type-section);
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	margin: 0;
+}
+
+/* Counts read as numbers beside their words, not as code. */
+.icons-results-bar__count,
+.pack-card__count,
+.pack-hero__count {
+	color: var(--ink-2);
+	font-size: var(--type-meta);
+	font-variant-numeric: tabular-nums;
+	line-height: 1.3;
+	margin: 0;
 }
 
 kbd {
@@ -213,10 +245,7 @@ kbd {
 }
 
 .icons-title {
-	font-size: 28px;
 	grid-area: title;
-	line-height: 1;
-	margin: 0;
 	padding-inline-end: 8px;
 }
 
@@ -357,9 +386,9 @@ kbd {
 }
 
 .collection-filter__count {
-	color: var(--ink-3);
-	font-family: var(--font-mono);
-	font-size: 12px;
+	color: var(--ink-2);
+	font-size: var(--type-meta);
+	font-variant-numeric: tabular-nums;
 }
 
 .preview-toggle {
@@ -502,8 +531,7 @@ kbd {
 
 .icon-detail__figure figcaption {
 	color: var(--ink-2);
-	font-size: 12px;
-	font-weight: 600;
+	font-size: var(--type-meta);
 }
 
 .icon-detail__drawing {
@@ -520,12 +548,13 @@ kbd {
 
 .community-card__slug {
 	font-family: var(--font-mono);
-	font-size: 11px;
+	font-size: var(--type-code);
 }
 
 .icons-state code {
 	font-family: var(--font-mono);
-	font-size: 13px;
+	font-size: 0.9em;
+	white-space: nowrap;
 }
 
 /* ===================================================================== */
@@ -541,11 +570,10 @@ kbd {
 	padding-bottom: 8px;
 }
 
-.icons-results-bar__count {
-	color: var(--ink-2);
-	font-family: var(--font-mono);
-	font-size: 12px;
-	margin: 0;
+/* With nothing to count, the empty state says so and the bar keeps no space. */
+.icons-results-bar[data-empty="true"] {
+	min-height: 0;
+	padding: 0;
 }
 
 .icons-select-results {
@@ -706,8 +734,8 @@ kbd {
 	border-radius: 6px;
 	bottom: 8px;
 	color: var(--paper-2);
-	font-size: 11px;
-	font-weight: 700;
+	font-size: var(--type-code);
+	font-weight: 600;
 	opacity: 0;
 	padding: 4px 8px;
 	pointer-events: none;
@@ -726,9 +754,9 @@ kbd {
 
 .icon-card__name {
 	color: var(--ink);
-	font-size: 14px;
-	font-weight: 700;
-	line-height: 1.25;
+	font-size: var(--type-label);
+	font-weight: 600;
+	line-height: 1.3;
 	overflow: hidden;
 	padding-inline: 2px;
 	text-overflow: ellipsis;
@@ -737,7 +765,7 @@ kbd {
 
 .icon-card__collection {
 	color: var(--ink-2);
-	font-size: 12px;
+	font-size: var(--type-code);
 	line-height: 1.3;
 	overflow: hidden;
 	padding-inline: 2px;
@@ -870,7 +898,8 @@ kbd {
 	border-radius: var(--r-sm);
 	color: var(--ink);
 	cursor: pointer;
-	font-weight: 700;
+	font-size: var(--type-label);
+	font-weight: 600;
 	min-height: 44px;
 	padding: 0 18px;
 }
@@ -902,13 +931,9 @@ kbd {
 	padding: clamp(24px, 5vw, 48px);
 }
 
-.icons-state h2 {
-	font-size: 22px;
-	margin: 0;
-}
-
 .icons-state p {
 	color: var(--ink-2);
+	font-size: 15px;
 	margin: 0;
 }
 
@@ -984,13 +1009,13 @@ kbd {
 
 .icon-detail__collection {
 	color: var(--ink-2);
-	font-size: 14px;
-	margin: 6px 0 0;
+	font-size: var(--type-label);
+	margin: 4px 0 0;
 }
 
 .icon-detail h2 {
-	font-size: clamp(26px, 5vw, 36px);
-	line-height: 1.05;
+	font-size: var(--type-dialog);
+	line-height: 1.15;
 	margin: 0;
 }
 
@@ -1047,14 +1072,14 @@ kbd {
 .icon-detail__meta dt,
 .icon-detail__url > span {
 	color: var(--ink-2);
-	font-size: 12px;
-	font-weight: 600;
+	font-size: var(--type-meta);
 }
 
 .icon-detail__meta dd {
 	color: var(--ink);
-	font-family: var(--font-mono);
-	font-size: 12px;
+	font-size: var(--type-label);
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
 	margin: 0;
 }
 
@@ -1069,7 +1094,7 @@ kbd {
 	border-radius: var(--r-sm);
 	color: var(--ink-2);
 	font-family: var(--font-mono);
-	font-size: 11px;
+	font-size: var(--type-code);
 	overflow-wrap: anywhere;
 	padding: 11px;
 }
@@ -1086,8 +1111,8 @@ kbd {
 	border-radius: var(--r-sm);
 	color: var(--ink);
 	cursor: pointer;
-	font-size: 13px;
-	font-weight: 700;
+	font-size: var(--type-label);
+	font-weight: 600;
 	min-height: 44px;
 	padding-inline: 10px;
 }
@@ -1110,7 +1135,7 @@ kbd {
 
 .icon-detail__aliases {
 	color: var(--ink-2);
-	font-size: 12px;
+	font-size: var(--type-meta);
 	margin: 0;
 }
 
@@ -1168,8 +1193,8 @@ kbd {
 	color: var(--paper-2);
 	cursor: pointer;
 	display: inline-flex;
-	font-size: 13px;
-	font-weight: 700;
+	font-size: var(--type-meta);
+	font-weight: 600;
 	gap: 7px;
 	height: 40px;
 	justify-content: center;
@@ -1306,8 +1331,8 @@ kbd {
 	border-radius: var(--r-sm);
 	bottom: 20px;
 	color: #fff;
-	font-size: 13px;
-	font-weight: 700;
+	font-size: var(--type-meta);
+	font-weight: 600;
 	left: 20px;
 	max-width: min(360px, calc(100% - 40px));
 	opacity: 0;
@@ -1397,17 +1422,7 @@ kbd {
 	padding-top: 20px;
 }
 
-.pack-shelf__title,
-.pack-hero__title {
-	font-family: var(--font-script);
-	font-weight: 400;
-	letter-spacing: 0;
-	line-height: 1.1;
-	margin: 0;
-}
-
 .pack-shelf__title {
-	font-size: 26px;
 	margin-bottom: 12px;
 }
 
@@ -1456,11 +1471,11 @@ kbd {
 	background: transparent;
 	border: 1px dashed var(--line-2);
 	border-radius: var(--r-md);
-	color: var(--ink-2, var(--ink));
+	color: var(--ink-2);
 	cursor: pointer;
 	display: flex;
 	font: inherit;
-	font-size: 15px;
+	font-size: var(--type-label);
 	font-weight: 600;
 	justify-content: center;
 	min-height: 100%;
@@ -1539,8 +1554,8 @@ kbd {
 
 .pack-card__name {
 	color: var(--ink);
-	font-size: 15px;
-	font-weight: 700;
+	font-size: var(--type-card);
+	font-weight: 600;
 	overflow: hidden;
 	text-decoration: none;
 	text-overflow: ellipsis;
@@ -1564,13 +1579,8 @@ kbd {
 	outline-offset: 2px;
 }
 
-.pack-card__count,
-.pack-hero__count {
-	color: var(--ink-2);
+.pack-card__count {
 	flex: none;
-	font-family: var(--font-mono);
-	font-size: 12px;
-	margin: 0;
 }
 
 .pack-actions {
@@ -1639,21 +1649,35 @@ kbd {
 	width: 17px;
 }
 
+/* The pack's name over its count, then its actions and the preview background. */
 .pack-hero {
 	align-items: center;
-	display: flex;
-	flex-wrap: wrap;
-	gap: 12px 16px;
-	padding-block: 24px 20px;
+	display: grid;
+	gap: 14px 16px;
+	grid-template-areas: "heading actions preview";
+	grid-template-columns: minmax(0, 1fr) auto auto;
+	padding-block: 28px 20px;
+}
+
+.pack-hero__heading {
+	grid-area: heading;
+	min-width: 0;
+}
+
+.pack-hero .pack-actions {
+	grid-area: actions;
 }
 
 .pack-hero__title {
-	font-size: 36px;
+	font-size: var(--type-page);
+	letter-spacing: -0.02em;
+	line-height: 1.15;
+	margin: 0;
 }
 
 .pack-hero__count {
-	font-size: 13px;
-	margin-inline-end: auto;
+	font-size: var(--type-label);
+	margin-top: 4px;
 }
 
 .icons-scroll-sentinel {
@@ -1730,16 +1754,11 @@ kbd {
 		padding-top: 16px;
 	}
 
-	.icons-title {
-		font-size: 24px;
-	}
-
 	.pack-shelf {
-		padding-top: 14px;
+		padding-top: 16px;
 	}
 
 	.pack-shelf__title {
-		font-size: 22px;
 		margin-bottom: 10px;
 	}
 
@@ -1750,8 +1769,19 @@ kbd {
 		scroll-padding-inline: 16px;
 	}
 
+	/* The preview background sits beside the name; the actions get their own row. */
+	.pack-hero {
+		align-items: start;
+		gap: 14px 12px;
+		grid-template-areas:
+			"heading preview"
+			"actions actions";
+		grid-template-columns: minmax(0, 1fr) auto;
+		padding-block: 20px 16px;
+	}
+
 	.pack-hero__title {
-		font-size: 30px;
+		font-size: 24px;
 	}
 
 	.collection-filter {

@@ -98,12 +98,14 @@ export function PackPage({
 					<main className="icons-main">
 						<div className="icons-shell">
 							<div className="pack-hero">
-								<h1 className="pack-hero__title" id="pack-title">
-									{pack.name}
-								</h1>
-								<p className="pack-hero__count">
-									{iconCount(status === "ready" ? icons.length : pack.count)}
-								</p>
+								<div className="pack-hero__heading">
+									<h1 className="pack-hero__title" id="pack-title">
+										{pack.name}
+									</h1>
+									<p className="pack-hero__count">
+										{iconCount(status === "ready" ? icons.length : pack.count)}
+									</p>
+								</div>
 								<PackActions
 									describedBy="pack-title"
 									excalidraw={publishing.states[pack.id]}
