@@ -8,6 +8,7 @@ import { filterIcons, toggleCollection } from "../../lib/filter.js";
 import { PLAYGROUND_URL, REPO_URL, SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
 import type { PackShelfData } from "../../lib/packs-rpc.js";
 import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
+import { useDrawnNames } from "../../lib/use-drawn-names.js";
 import { useLoadOnScroll } from "../../lib/use-load-on-scroll.js";
 import { useModifierLabel } from "../../lib/use-modifier-label.js";
 import {
@@ -20,6 +21,7 @@ import {
 } from "../../lib/selection.js";
 import { IconCard } from "../icon-card/index.js";
 import { IconDetail } from "../icon-detail/index.js";
+import { NamesToggle } from "../names-toggle/index.js";
 import { PackShelf } from "../packs/pack-shelf.js";
 import type { PreviewMode } from "../preview-toggle/index.js";
 import { CommandPalette, type IconCommand, type PaletteLink } from "./command-palette.js";
@@ -121,6 +123,7 @@ export function IconLibrary({
 	const [previewMode, setPreviewMode] = useState<PreviewMode>(initialPreviewMode);
 	const hasDrawings = Object.keys(drawings).length > 0;
 	const [chosenView, setView] = useState<IconView>(initialView);
+	const [named, setNamed] = useDrawnNames();
 	// Until the drawings load, every mark shows its SVG.
 	const view: IconView = hasDrawings ? chosenView : "svg";
 	const drawingFor = (icon: SketchiIcon) => (view === "drawn" ? drawings[icon.slug] : undefined);
@@ -193,7 +196,7 @@ export function IconLibrary({
 		runSelectionAction,
 		selectionProgress,
 		showNotice,
-	} = useIconSources(selectedIcons);
+	} = useIconSources(selectedIcons, { named });
 
 	// Changing the filter starts browsing from the top of the new results.
 	// The selection is deliberately left alone.
@@ -619,6 +622,7 @@ export function IconLibrary({
 								{hasDrawings ? (
 									<div className="icons-results-bar__view">
 										<ViewSwitch onChange={changeView} value={view} />
+										{view === "drawn" ? <NamesToggle onChange={setNamed} value={named} /> : null}
 									</div>
 								) : null}
 								{showSelectResults ? (
@@ -698,6 +702,7 @@ export function IconLibrary({
 												{...(drawing ? { drawing } : {})}
 												icon={icon}
 												key={icon.slug}
+												named={named}
 												onCopy={copyResult}
 												onDetails={openDetails}
 												onToggleSelected={toggleSelected}
@@ -726,8 +731,10 @@ export function IconLibrary({
 							{...(busyDetailAction ? { busyAction: busyDetailAction } : {})}
 							{...(drawings[detailIcon.slug] ? { drawing: drawings[detailIcon.slug] } : {})}
 							icon={detailIcon}
+							named={named}
 							onAction={(action, icon) => void runDetailAction(action, icon, drawings[icon.slug])}
 							onClose={closeDetail}
+							onNamedChange={setNamed}
 							onPreviewModeChange={setPreviewMode}
 							permanentUrl={permanentSvgUrl(detailIcon.slug)}
 							previewMode={previewMode}

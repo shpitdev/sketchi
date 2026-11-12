@@ -51,7 +51,8 @@ const drawings = catalogDrawings(
 	recipes,
 );
 await writeFile(resolve(publicRoot, `.${DRAWINGS_PATH}`), `${JSON.stringify(drawings)}\n`, "utf8");
-// Each pack publishes as a library to download, versioned by its hash; a pack
+// Each pack publishes as a library to download, versioned by its hash, and as
+// the same library with names; a pack
 // listed for Excalidraw's library collection also gets the preview a
 // submission sends. The index carries what the pages show before they load more.
 const SOURCE = "https://icons.sketchi.app";
@@ -64,7 +65,15 @@ for (const pack of ICON_PACKS) {
 	// A pack whose marks are not drawn yet is not published.
 	if (members.length === 0) continue;
 	const library = excalidrawLibrary(members, SOURCE, "catalog");
-	await writeFile(resolve(publicRoot, `.${packLibraryPath(pack.id)}`), library, "utf8");
+	// The same library with each name under its drawing, to download; only the
+	// plain one is versioned and published to Excalidraw's collection.
+	const named = excalidrawLibrary(members, SOURCE, "catalog", { named: true });
+	for (const [path, content] of [
+		[packLibraryPath(pack.id), library],
+		[packLibraryPath(pack.id, { named: true }), named],
+	] as const) {
+		await writeFile(resolve(publicRoot, `.${path}`), content, "utf8");
+	}
 	await writeFile(
 		resolve(publicRoot, `.${packIconsPath(pack.id)}`),
 		`${JSON.stringify(members)}\n`,

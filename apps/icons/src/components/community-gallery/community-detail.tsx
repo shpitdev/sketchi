@@ -3,8 +3,9 @@ import { useRef } from "react";
 
 import type { CommunityIconEntry } from "../../lib/community-client.js";
 import { useDialogFocus } from "../../lib/use-dialog-focus.js";
+import { DrawnIcon } from "../drawn-icon/index.js";
+import { NamesToggle } from "../names-toggle/index.js";
 import { PreviewToggle, type PreviewMode } from "../preview-toggle/index.js";
-import { RecipePreview } from "../recipe-preview/index.js";
 
 export type CommunityDetailAction = "copy-excalidraw" | "copy-slug" | "download";
 
@@ -16,15 +17,20 @@ const actions: readonly { readonly action: CommunityDetailAction; readonly label
 
 export function CommunityDetail({
 	icon,
+	named,
 	onAction,
 	onClose,
+	onNamedChange,
 	onPreviewModeChange,
 	previewMode,
 	returnFocusTo,
 }: {
 	readonly icon: CommunityIconEntry;
+	/** Write the name under the drawing, and copy and download it that way. */
+	readonly named: boolean;
 	readonly onAction: (action: CommunityDetailAction, icon: CommunityIconEntry) => void;
 	readonly onClose: () => void;
+	readonly onNamedChange: (named: boolean) => void;
 	readonly onPreviewModeChange: (mode: PreviewMode) => void;
 	readonly previewMode: PreviewMode;
 	readonly returnFocusTo: HTMLElement | null;
@@ -66,15 +72,17 @@ export function CommunityDetail({
 			</header>
 
 			<div className="icon-detail__preview" data-preview={previewMode}>
-				<RecipePreview
+				<DrawnIcon
 					className="community-detail__drawing"
 					label={`${icon.name} preview`}
+					name={named ? icon.name : undefined}
 					previewMode={previewMode}
 					recipe={icon.recipe}
 				/>
 			</div>
 
 			<div className="icon-detail__preview-row">
+				<NamesToggle onChange={onNamedChange} value={named} />
 				<PreviewToggle onChange={onPreviewModeChange} value={previewMode} />
 			</div>
 

@@ -86,6 +86,15 @@ describe("icon packs", () => {
 		expect(packLibraryPath(ALL_ICONS_PACK_ID)).toBe("/sketchi-icons.excalidrawlib");
 		expect(packLibraryPath("palantir")).toBe("/packs/palantir.excalidrawlib");
 		expect(packLibraryFileName("palantir")).toBe("sketchi-palantir.excalidrawlib");
+		expect(packLibraryPath(ALL_ICONS_PACK_ID, { named: true })).toBe(
+			"/sketchi-icons-with-names.excalidrawlib",
+		);
+		expect(packLibraryPath("palantir", { named: true })).toBe(
+			"/packs/palantir-with-names.excalidrawlib",
+		);
+		expect(packLibraryFileName(ALL_ICONS_PACK_ID, { named: true })).toBe(
+			"sketchi-icons-with-names.excalidrawlib",
+		);
 	});
 
 	it("links a pack to excalidraw.com only to add its library from Excalidraw's collection", () => {

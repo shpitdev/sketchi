@@ -19,12 +19,18 @@ const FETCH_CONCURRENCY = 8;
 const loadExcalidrawExport = () => import("../../lib/excalidraw-export.js");
 
 /** Excalidraw clipboard text for a mark's drawing; the clipboard write starts before the code loads. */
-const drawingClipboard = (icon: SketchiIcon, drawing: IconRecipe) =>
+const drawingClipboard = (icon: SketchiIcon, drawing: IconRecipe, named: boolean) =>
 	loadExcalidrawExport().then(({ excalidrawClipboard }) =>
-		excalidrawClipboard({ slug: icon.slug, recipe: drawing }, "catalog"),
+		excalidrawClipboard({ slug: icon.slug, name: icon.name, recipe: drawing }, "catalog", {
+			named,
+		}),
 	);
 
-export function useIconSources(selectedIcons: readonly SketchiIcon[]) {
+/** Copies and downloads for the catalog; a drawing copies with its name when `named`. */
+export function useIconSources(
+	selectedIcons: readonly SketchiIcon[],
+	{ named }: { readonly named: boolean },
+) {
 	const [copyingSlug, setCopyingSlug] = useState<string>();
 	const [copiedSlug, setCopiedSlug] = useState<string>();
 	const [busyDetailAction, setBusyDetailAction] = useState<IconDetailAction>();
@@ -71,7 +77,7 @@ export function useIconSources(selectedIcons: readonly SketchiIcon[]) {
 			if (copyingSlug) return;
 			setCopyingSlug(icon.slug);
 			try {
-				if (drawing) await copyText(drawingClipboard(icon, drawing));
+				if (drawing) await copyText(drawingClipboard(icon, drawing, named));
 				else await copyText(await getSvg(icon));
 				setCopiedSlug(icon.slug);
 				showNotice(
@@ -85,7 +91,7 @@ export function useIconSources(selectedIcons: readonly SketchiIcon[]) {
 				setCopyingSlug(undefined);
 			}
 		},
-		[copyingSlug, getSvg, showNotice],
+		[copyingSlug, getSvg, named, showNotice],
 	);
 
 	async function runDetailAction(
@@ -98,7 +104,7 @@ export function useIconSources(selectedIcons: readonly SketchiIcon[]) {
 			const url = permanentSvgUrl(icon.slug);
 			if (action === "copy-excalidraw") {
 				if (!drawing) throw new Error(`${icon.slug} has no drawing.`);
-				await copyText(drawingClipboard(icon, drawing));
+				await copyText(drawingClipboard(icon, drawing, named));
 				showNotice(`${icon.name} copied. Paste it into Excalidraw.`);
 				return;
 			}

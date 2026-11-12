@@ -61,7 +61,9 @@ describe("recipe drawing", () => {
 	});
 
 	it("copies Excalidraw clipboard shapes and builds a library item per icon", () => {
-		const clipboard = JSON.parse(excalidrawClipboard({ slug: "queue", recipe: QUEUE }));
+		const clipboard = JSON.parse(
+			excalidrawClipboard({ slug: "queue", name: "Queue", recipe: QUEUE }),
+		);
 		expect(clipboard).toMatchObject({ type: "excalidraw/clipboard", files: {} });
 		expect(clipboard.elements.map((element: { type: string }) => element.type)).toEqual([
 			"rectangle",
@@ -90,5 +92,57 @@ describe("recipe drawing", () => {
 			],
 		});
 		expect(library.libraryItems[0].elements).toHaveLength(4);
+	});
+
+	it("writes the name under a named drawing, grouped with it as one item", () => {
+		const icon = { slug: "queue", name: "Amazon Simple Queue Service", recipe: QUEUE };
+		const { elements } = JSON.parse(excalidrawClipboard(icon, "catalog", { named: true })) as {
+			elements: {
+				type: string;
+				id: string;
+				groupIds: string[];
+				x: number;
+				y: number;
+				width: number;
+				text?: string;
+				fontFamily?: number;
+				fontSize?: number;
+				textAlign?: string;
+			}[];
+		};
+		expect(elements.map((element) => element.type)).toEqual([
+			"rectangle",
+			"line",
+			"arrow",
+			"text",
+			"text",
+		]);
+		// The drawing keeps its own group inside the item's, so it is a double-click away.
+		for (const part of elements.slice(0, 4)) {
+			expect(part.groupIds).toEqual(["catalog-queue", "catalog-queue-named"]);
+		}
+		const name = elements.at(-1)!;
+		expect(name).toMatchObject({
+			id: "catalog-queue-named-name",
+			groupIds: ["catalog-queue-named"],
+			fontFamily: 5,
+			fontSize: 20,
+			textAlign: "center",
+			y: 104,
+		});
+		// A long name wraps, and every line stays centered under the 96px drawing.
+		expect(name.text).toContain("\n");
+		expect(name.text?.replace(/\n/g, " ")).toBe("Amazon Simple Queue Service");
+		expect(name.width).toBeLessThanOrEqual(192);
+		expect(name.x + name.width / 2).toBeCloseTo(48, 1);
+
+		const library = JSON.parse(
+			excalidrawLibrary([icon], "https://icons.sketchi.app", "catalog", { named: true }),
+		);
+		expect(library.libraryItems[0]).toMatchObject({
+			id: "catalog-queue-named",
+			name: "Amazon Simple Queue Service",
+		});
+		expect(library.libraryItems[0].elements).toHaveLength(5);
 	});
 });

@@ -54,7 +54,7 @@ describe("catalog drawings", () => {
 		});
 
 		const clipboard = JSON.parse(
-			excalidrawClipboard({ slug: "docker", recipe: square }, "catalog"),
+			excalidrawClipboard({ slug: "docker", name: "Docker", recipe: square }, "catalog"),
 		) as {
 			readonly type: string;
 			readonly elements: readonly unknown[];

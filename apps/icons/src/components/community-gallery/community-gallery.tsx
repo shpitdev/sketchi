@@ -5,8 +5,10 @@ import { useCallback, useRef, useState } from "react";
 import { copyText, downloadBlob } from "../../lib/actions.js";
 import { bareSlug, type CommunityIconEntry } from "../../lib/community-client.js";
 import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
+import { useDrawnNames } from "../../lib/use-drawn-names.js";
 import { useLoadOnScroll } from "../../lib/use-load-on-scroll.js";
 import { IconsChrome } from "../icon-library/icons-chrome.js";
+import { NamesToggle } from "../names-toggle/index.js";
 import { PreviewToggle, type PreviewMode } from "../preview-toggle/index.js";
 import { CommunityCard } from "./community-card.js";
 import { CommunityDetail, type CommunityDetailAction } from "./community-detail.js";
@@ -59,6 +61,8 @@ export function CommunityGallery({
 	status,
 }: CommunityGalleryProps) {
 	const [previewMode, setPreviewMode] = useState<PreviewMode>(initialPreviewMode);
+	const [named, setNamed] = useDrawnNames();
+	const namedSuffix = named ? "-with-names" : "";
 	const [detail, setDetail] = useState<
 		| {
 				readonly opener: HTMLElement | null;
@@ -108,12 +112,16 @@ export function CommunityGallery({
 		(icon: CommunityIconEntry) =>
 			copy(
 				loadExcalidrawExport().then(({ excalidrawClipboard }) =>
-					excalidrawClipboard({ slug: bareSlug(icon.slug), recipe: icon.recipe }),
+					excalidrawClipboard(
+						{ slug: bareSlug(icon.slug), name: icon.name, recipe: icon.recipe },
+						"community",
+						{ named },
+					),
 				),
 				`${icon.name} copied. Paste it into Excalidraw.`,
 				icon,
 			),
-		[copy],
+		[copy, named],
 	);
 
 	const downloadLibrary = useCallback(
@@ -121,7 +129,7 @@ export function CommunityGallery({
 			try {
 				const { excalidrawLibrary } = await loadExcalidrawExport();
 				downloadBlob(
-					new Blob([excalidrawLibrary(picked, window.location.origin)], {
+					new Blob([excalidrawLibrary(picked, window.location.origin, "community", { named })], {
 						type: "application/vnd.excalidrawlib+json",
 					}),
 					name,
@@ -130,13 +138,13 @@ export function CommunityGallery({
 				showNotice("Could not prepare the library. Try again.");
 			}
 		},
-		[showNotice],
+		[named, showNotice],
 	);
 
 	function runDetailAction(action: CommunityDetailAction, icon: CommunityIconEntry) {
 		if (action === "copy-excalidraw") void copyForExcalidraw(icon);
 		else if (action === "copy-slug") void copy(icon.slug, `${icon.slug} copied.`, icon);
-		else void downloadLibrary([icon], `${bareSlug(icon.slug)}.excalidrawlib`);
+		else void downloadLibrary([icon], `${bareSlug(icon.slug)}${namedSuffix}.excalidrawlib`);
 	}
 
 	const searching = query.trim() !== "";
@@ -191,13 +199,24 @@ export function CommunityGallery({
 								<button
 									className="community-download"
 									disabled={icons.length === 0}
-									onClick={() => void downloadLibrary(icons, "sketchi-community.excalidrawlib")}
+									onClick={() =>
+										void downloadLibrary(icons, `sketchi-community${namedSuffix}.excalidrawlib`)
+									}
 									type="button"
 								>
 									<Download aria-hidden="true" />
-									<span>Download library</span>
+									{/* A phone keeps the verb; Names beside it says which. */}
+									<span>
+										{"Download "}
+										<span className="community-download__scope">
+											{named ? "with names" : "library"}
+										</span>
+									</span>
 								</button>
-								<PreviewToggle onChange={setPreviewMode} value={previewMode} />
+								<div className="community-toolbar__view">
+									<NamesToggle onChange={setNamed} value={named} />
+									<PreviewToggle onChange={setPreviewMode} value={previewMode} />
+								</div>
 							</div>
 
 							{/* An empty gallery's state says what a zero count would. */}
@@ -279,6 +298,7 @@ export function CommunityGallery({
 											copied={copiedSlug === icon.slug}
 											icon={icon}
 											key={icon.slug}
+											named={named}
 											onCopy={(icon) => void copyForExcalidraw(icon)}
 											onDetails={(picked) =>
 												setDetail({
@@ -310,8 +330,10 @@ export function CommunityGallery({
 						/>
 						<CommunityDetail
 							icon={detailIcon}
+							named={named}
 							onAction={runDetailAction}
 							onClose={closeDetail}
+							onNamedChange={setNamed}
 							onPreviewModeChange={setPreviewMode}
 							previewMode={previewMode}
 							returnFocusTo={detail?.opener ?? null}

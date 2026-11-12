@@ -51,10 +51,10 @@ devtools and languages. GET /packs/index.json lists every pack with its count.
 GET /packs/palantir.excalidrawlib
 The pack as an Excalidraw library.
 
-GET /packs/palantir.excalidraw
-The pack as an Excalidraw scene, each drawing named underneath; all.excalidraw
-holds the whole catalog. excalidraw.com opens one from
-https://excalidraw.com/#url=<encoded scene URL>.
+GET /packs/palantir-with-names.excalidrawlib
+The same library with each product's name written under its drawing, grouped
+with it as one item. /sketchi-icons-with-names.excalidrawlib is the whole
+catalog.
 
 ## Community icons
 

@@ -3,8 +3,8 @@ import { formatCollectionLabel, type SketchiIcon } from "@sketchi/icon-catalog";
 import { Check, Info } from "lucide-react";
 import { memo } from "react";
 
+import { DrawnIcon } from "../drawn-icon/index.js";
 import { IconMark } from "../icon-mark/index.js";
-import { RecipePreview } from "../recipe-preview/index.js";
 
 export interface IconCardProps {
 	readonly active?: boolean;
@@ -13,6 +13,8 @@ export interface IconCardProps {
 	/** The mark's hand-drawn version: shown instead of the SVG, and copied for Excalidraw. */
 	readonly drawing?: IconRecipe;
 	readonly icon: SketchiIcon;
+	/** Write the name under the drawing, as its copy will. */
+	readonly named?: boolean;
 	readonly onCopy?: (icon: SketchiIcon) => void;
 	readonly onDetails?: (icon: SketchiIcon) => void;
 	readonly onToggleSelected?: (icon: SketchiIcon) => void;
@@ -32,12 +34,14 @@ export const IconCard = memo(function IconCard({
 	copying = false,
 	drawing,
 	icon,
+	named = false,
 	onCopy,
 	onDetails,
 	onToggleSelected,
 	previewMode = "light",
 	selected = false,
 }: IconCardProps) {
+	const drawnName = drawing && named ? icon.name : undefined;
 	return (
 		<article
 			className="icon-card"
@@ -54,8 +58,9 @@ export const IconCard = memo(function IconCard({
 			>
 				<span className="icon-card__preview" data-preview={previewMode}>
 					{drawing ? (
-						<RecipePreview
+						<DrawnIcon
 							className="icon-card__drawing"
+							name={drawnName}
 							previewMode={previewMode}
 							recipe={drawing}
 						/>
@@ -66,7 +71,8 @@ export const IconCard = memo(function IconCard({
 						{copying ? "Copying" : copied ? "Copied" : drawing ? "Copy" : "Copy SVG"}
 					</span>
 				</span>
-				<span className="icon-card__name">{icon.name}</span>
+				{/* Named, the tile already writes the name. */}
+				{drawnName ? null : <span className="icon-card__name">{icon.name}</span>}
 				<span className="icon-card__collection" id={`icon-meta-${icon.slug}`}>
 					{formatCollectionLabel(icon.collection)}
 				</span>

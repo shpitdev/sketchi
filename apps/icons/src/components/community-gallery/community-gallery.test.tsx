@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { fetchCommunityIcon, type CommunityIconEntry } from "../../lib/community-client";
 import { TestIntersectionObserver } from "../../test-support/intersection-observer";
@@ -38,8 +38,13 @@ function gallery(props: Partial<Parameters<typeof CommunityGallery>[0]> = {}) {
 }
 
 describe("CommunityGallery", () => {
+	// The gallery loads the export code on first use; loading it here keeps its
+	// transform time out of the clipboard waits.
+	beforeAll(() => import("../../lib/excalidraw-export"));
+
 	afterEach(() => {
 		vi.unstubAllGlobals();
+		window.localStorage.clear();
 	});
 
 	it("loads the next page as the list nears the viewport, once at a time", () => {
@@ -126,6 +131,26 @@ describe("CommunityGallery", () => {
 		expect(JSON.parse(text)).toMatchObject({ type: "excalidraw/clipboard" });
 		await screen.findByText("Ring queue copied. Paste it into Excalidraw.");
 		vi.unstubAllGlobals();
+	});
+
+	it("copies and downloads drawings with their names once Names is on", async () => {
+		const writeText = vi.fn(async (_value: string) => {});
+		Object.assign(navigator, { clipboard: { writeText } });
+		gallery();
+		fireEvent.click(screen.getByRole("button", { name: "Names", pressed: false }));
+		expect(screen.getByRole("button", { name: "Download with names" })).toBeTruthy();
+		const tile = screen.getByRole("button", { name: "Copy Ring queue for Excalidraw" });
+		expect(tile.querySelector(".drawn-icon__name")?.textContent).toBe("Ring queue");
+		fireEvent.click(tile);
+		await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+		const { elements } = JSON.parse(writeText.mock.calls[0]?.[0] ?? "{}") as {
+			elements: { type: string; text?: string; groupIds: string[] }[];
+		};
+		expect(elements.at(-1)).toMatchObject({
+			type: "text",
+			text: "Ring queue",
+			groupIds: ["community-ring-queue-named"],
+		});
 	});
 
 	it("opens a linked icon and offers the next useful step when nothing is found", () => {

@@ -1,7 +1,11 @@
 import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
 import type { SketchiIcon } from "@sketchi/icon-catalog";
 
-import { DRAWINGS_LIBRARY_PATH, type IconDrawings } from "./drawings.js";
+import {
+	DRAWINGS_LIBRARY_PATH,
+	DRAWINGS_NAMED_LIBRARY_PATH,
+	type IconDrawings,
+} from "./drawings.js";
 
 /**
  * A pack is a ready-made Excalidraw library: the drawn marks of some catalog
@@ -330,14 +334,23 @@ export function packCardPath(id: string): string {
 	return `/packs/${id}.card.png`;
 }
 
+/** Which build of a pack's library: the drawings alone, or each named underneath. */
+export interface LibraryStyle {
+	readonly named?: boolean;
+}
+
+const NAMED_SUFFIX = "-with-names";
+
 /** The pack as an Excalidraw library; the whole catalog keeps its original URL. */
-export function packLibraryPath(id: string): string {
-	return id === ALL_ICONS_PACK_ID ? DRAWINGS_LIBRARY_PATH : `/packs/${id}.excalidrawlib`;
+export function packLibraryPath(id: string, { named = false }: LibraryStyle = {}): string {
+	if (id === ALL_ICONS_PACK_ID) return named ? DRAWINGS_NAMED_LIBRARY_PATH : DRAWINGS_LIBRARY_PATH;
+	return `/packs/${id}${named ? NAMED_SUFFIX : ""}.excalidrawlib`;
 }
 
 /** The name a downloaded library is saved under. */
-export function packLibraryFileName(id: string): string {
-	return id === ALL_ICONS_PACK_ID ? "sketchi-icons.excalidrawlib" : `sketchi-${id}.excalidrawlib`;
+export function packLibraryFileName(id: string, { named = false }: LibraryStyle = {}): string {
+	const base = id === ALL_ICONS_PACK_ID ? "sketchi-icons" : `sketchi-${id}`;
+	return `${base}${named ? NAMED_SUFFIX : ""}.excalidrawlib`;
 }
 
 const EXCALIDRAW_LIBRARIES_RAW =
