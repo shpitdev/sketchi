@@ -147,7 +147,7 @@ export const ICON_PACKS: readonly IconPackDefinition[] = [
 		excalidrawListing: {
 			name: "Snowflake Icons",
 			description:
-				"Hand-drawn Snowflake icons in Snowflake's colors for data platform diagrams, such as warehouses, dynamic tables, Snowpark, Cortex and Streamlit in Snowflake.",
+				"Hand-drawn Snowflake icons in Snowflake's colors, such as warehouses, dynamic tables, Snowpark, Cortex and Streamlit in Snowflake.",
 		},
 	},
 	{
