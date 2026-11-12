@@ -302,6 +302,10 @@ describe("labelLogos", () => {
 		expect(named("Helm chart")).toEqual(["helm"]);
 		expect(named("Discord bot")).toEqual(["discord"]);
 		expect(named("Envoy")).toEqual(["envoyproxy"]);
+		expect(named("README file")).toEqual([]);
+		expect(named("Update the README")).toEqual([]);
+		expect(named("ReadMe API docs")).toEqual(["readme"]);
+		expect(named("Validate the JWT")).toEqual([]);
 		expect(named("Stripe payments")).toEqual([]);
 		expect(possible("Stripe payments")).toEqual(["stripe"]);
 		expect(named("Square webhook")).toEqual(["square"]);
@@ -407,6 +411,12 @@ describe("logosNamedInText", () => {
 		expect(
 			offered("The renderer feeds the Excalidraw export, like tldraw and Lucidchart."),
 		).toEqual([]);
+	});
+
+	it("reads README, JWT and UML as files, formats and notations, and ReadMe as the product", () => {
+		expect(offered("Update the README and validate the JWT.")).toEqual([]);
+		expect(offered("Draw a UML class diagram of the order service.")).toEqual([]);
+		expect(offered("Publish the API reference to ReadMe docs.")).toEqual(["readme"]);
 	});
 
 	it("offers the data, delivery and payment brands a prompt names", () => {

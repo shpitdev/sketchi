@@ -159,9 +159,10 @@ function isAcronym(term: string): boolean {
 }
 
 /**
- * Diagram tools. A request to Sketchi that names one ("an Excalidraw diagram", "convert this
- * Mermaid flowchart", "the Excalidraw export step") names the drawing's format or source, not a
- * component to draw, so text never names their marks; a document can still attach one by slug.
+ * Diagram tools and notations. A request to Sketchi that names one ("an Excalidraw diagram",
+ * "convert this Mermaid flowchart", "a UML class diagram") names the drawing's format or source,
+ * not a component to draw, so text never names their marks; a document can still attach one by
+ * slug.
  */
 const DIAGRAM_MEDIUM_SLUGS: ReadonlySet<string> = new Set([
 	"diagramsdotnet",
@@ -169,6 +170,7 @@ const DIAGRAM_MEDIUM_SLUGS: ReadonlySet<string> = new Set([
 	"lucid",
 	"mermaid",
 	"tldraw",
+	"uml",
 ]);
 
 /** Icons by tokenized slug, name, and alias, built once per icon list. */
