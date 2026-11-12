@@ -14,7 +14,9 @@ describe("StudioHeader", () => {
 		const home = screen.getByRole("link", { name: "Sketchi home" });
 		expect(home.getAttribute("href")).toBe("https://sketchi.app");
 		expect(home.querySelector("img")?.getAttribute("src")).toBe("/icon.svg");
-		expect(home.textContent).toBe("Sketchi");
+		expect(home.querySelector('[data-slot="sketchi-wordmark"]')?.getAttribute("aria-hidden")).toBe(
+			"true",
+		);
 		expect(screen.queryByText(/playground/i)).toBeNull();
 
 		expect(screen.getByRole("link", { name: "Projects" }).getAttribute("href")).toBe("/projects");

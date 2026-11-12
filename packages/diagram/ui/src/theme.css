@@ -260,16 +260,6 @@ img {
 	display: block;
 }
 
-/* 400, not 700: Excalifont has a single Regular, so anything bolder is a
-   synthetic smear that thickens the strokes without widening the letters and
-   closes up the counters in "e" and "c". Regular is the real hand. */
-.sk-wordmark {
-	font-family: var(--font-script);
-	font-size: 28px;
-	font-weight: 400;
-	line-height: 1;
-}
-
 .sk-btn {
 	align-items: center;
 	border: 1px solid transparent;

@@ -1306,12 +1306,10 @@
 }
 
 .site-footer__brand {
+	--sketchi-wordmark-height: 28px;
 	align-items: center;
 	color: var(--paper-2);
 	display: inline-flex;
-	font-family: var(--font-script);
-	font-size: 26px;
-	font-weight: 400;
 	gap: 9px;
 }
 

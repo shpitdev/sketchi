@@ -1,4 +1,5 @@
 import { GitHubMark, HeaderIconLink } from "@sketchi/ui/components/header-icon-link";
+import { SketchiWordmark } from "@sketchi/ui/components/sketchi-wordmark";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@sketchi/ui/components/tooltip";
 import { BookOpen, Command } from "lucide-react";
 import type { ReactNode } from "react";
@@ -35,7 +36,7 @@ export function IconsChrome({
 						<span className="icons-brand__tile">
 							<img alt="" height="30" src="/icon.svg" width="30" />
 						</span>
-						<span className="sk-wordmark">Sketchi</span>
+						<SketchiWordmark />
 					</a>
 					<nav aria-label="Icon sets" className="icons-sets">
 						<a aria-current={section === "catalog" ? "page" : undefined} href="/">
@@ -83,7 +84,7 @@ export function IconsChrome({
 				<div className="icons-shell icons-footer__inner">
 					<a className="icons-footer__brand" href={homeHref}>
 						<img alt="" height="24" src="/icon.svg" width="24" />
-						<span>Sketchi</span>
+						<SketchiWordmark title="Sketchi" />
 					</a>
 					<nav aria-label="Footer">
 						<a href={`${homeHref}/docs`}>Docs</a>
