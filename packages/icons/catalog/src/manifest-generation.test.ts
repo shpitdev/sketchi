@@ -284,7 +284,7 @@ describe("public icon manifest generation", () => {
 	it("ships a compact clean manifest with aliases and no review fields", () => {
 		const source = JSON.stringify(iconManifest);
 		const manifest = decodeIconManifest(JSON.parse(source));
-		expect(manifest.summary.totalIcons).toBe(2322);
+		expect(manifest.summary.totalIcons).toBe(2473);
 		expect(new Set(manifest.icons.map((icon) => icon.slug)).size).toBe(manifest.icons.length);
 		expect(manifest.icons.find((icon) => icon.slug === "kubernetes")?.aliases).toContain("k8s");
 		expect(manifest.icons.find((icon) => icon.slug === "adobefirefly-text")?.name).toBe(

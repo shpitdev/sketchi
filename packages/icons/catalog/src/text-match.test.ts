@@ -246,6 +246,19 @@ describe("labelLogos", () => {
 			"User database",
 			"Backup job",
 			"Glue code",
+			"Notebooks",
+			"Workspace",
+			"Jobs",
+			"Lakehouse",
+			"Feature store",
+			"Model serving",
+			"Dynamic table",
+			"Virtual warehouse",
+			"Task",
+			"Role",
+			"Policy",
+			"View",
+			"File",
 		]) {
 			expect(named(label), label).toEqual([]);
 		}
@@ -302,6 +315,37 @@ describe("logosNamedInText", () => {
 		expect(offered("we use an alb for routing")).toEqual([]);
 		// Other clouds have them too, so these name no AWS mark alone.
 		expect(offered("a VPC with IAM roles and KMS keys")).toEqual([]);
+	});
+
+	it("offers Databricks products a prompt names, and nothing for its generic words", () => {
+		expect(
+			offered(
+				"Ingest with Auto Loader into Delta Lake, govern with Unity Catalog, serve with Databricks SQL and track models in MLflow on Databricks.",
+			),
+		).toEqual([
+			"auto-loader",
+			"delta-lake",
+			"unity-catalog",
+			"databricks-sql",
+			"managed-mlflow",
+			"databricks",
+		]);
+		expect(
+			offered("Notebooks run jobs in the workspace over a lakehouse with delta tables"),
+		).toEqual([]);
+	});
+
+	it("offers Snowflake products a prompt names, and nothing for its object words", () => {
+		expect(
+			offered(
+				"Load files into a Snowflake dynamic table, transform with Snowpark and ask questions with Snowflake Cortex.",
+			),
+		).toEqual(["snowflake-dynamic-table", "snowpark", "snowflake-cortex"]);
+		expect(offered("Data lands in Snowflake and a Streamlit in Snowflake app reads it")).toEqual([
+			"snowflake",
+			"streamlit-in-snowflake",
+		]);
+		expect(offered("tables, views, stages, tasks and roles in the warehouse")).toEqual([]);
 	});
 
 	it("matches a vendor's full product name however many words it has", () => {

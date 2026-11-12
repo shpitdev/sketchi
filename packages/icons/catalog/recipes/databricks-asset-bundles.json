@@ -1,0 +1,37 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 8.5,
+			"y": 2.5,
+			"width": 7,
+			"height": 5,
+			"rounded": true,
+			"stroke": "#ff3621",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 2.5,
+			"y": 7.5,
+			"width": 19,
+			"height": 14,
+			"rounded": true,
+			"stroke": "#ff3621",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[3, 10.5],
+				[8, 15],
+				[12, 16],
+				[16, 15],
+				[21, 10.5]
+			],
+			"smooth": true,
+			"stroke": "#ff3621",
+			"pen": 2
+		}
+	]
+}

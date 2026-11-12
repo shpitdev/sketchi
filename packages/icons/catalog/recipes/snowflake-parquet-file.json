@@ -1,0 +1,46 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[7, 9],
+				[7, 3],
+				[15.5, 3],
+				[20, 7.5],
+				[20, 21],
+				[7, 21],
+				[7, 17]
+			],
+			"stroke": "#28b5e8",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[15.5, 3],
+				[15.5, 7.5],
+				[20, 7.5]
+			],
+			"stroke": "#28b5e8",
+			"fill": "#28b5e8"
+		},
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 9.5,
+			"width": 19,
+			"height": 7.5,
+			"rounded": true,
+			"stroke": "#11567f",
+			"fill": "#11567f"
+		},
+		{
+			"kind": "text",
+			"cx": 11,
+			"cy": 13.3,
+			"text": "PARQ",
+			"size": 5.5,
+			"color": "paper"
+		}
+	]
+}

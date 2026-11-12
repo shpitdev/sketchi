@@ -1,76 +1,129 @@
 {
-  "generatedAt": "2026-06-06T10:25:56.174Z",
+  "generatedAt": "2026-11-11T22:32:31.136Z",
   "providers": {
     "tech-stack-icons": {
       "name": "tech-stack-icons",
-      "version": "3.7.1",
-      "publishDate": "2026-03-05T18:45:20.321Z",
+      "version": "3.7.4",
+      "publishDate": "2026-10-31T20:05:19.698Z",
       "sourceShape": "bundled-js-icon-map (dist/index.js -> { name: { svg: { light, dark, grayscale } } })",
-      "iconKeyCount": 694,
+      "iconKeyCount": 709,
       "variants": [
         "light",
         "dark",
         "grayscale"
       ],
       "defaultVariant": "light",
-      "stagedDefaultFiles": 694,
-      "stagedReviewVariantFiles": 1388,
+      "stagedDefaultFiles": 709,
+      "stagedReviewVariantFiles": 1418,
       "stagedVariantCounts": {
-        "light": 694,
-        "dark": 694,
-        "grayscale": 694
+        "light": 709,
+        "dark": 709,
+        "grayscale": 709
       },
       "slugCollisions": [],
       "stagedLayout": "input/providers/tech-stack-icons/generated/default/*.svg (+ variants/{dark,grayscale}/*.svg)",
-      "acquiredAt": "2026-06-06T10:25:57.042Z"
+      "acquiredAt": "2026-11-11T22:32:32.080Z"
     },
     "lobe-icons": {
       "name": "@lobehub/icons-static-svg",
-      "version": "1.91.0",
-      "publishDate": "2026-05-28T08:18:16.703Z",
+      "version": "1.102.0",
+      "publishDate": "2026-11-02T03:22:01.528Z",
       "sourceShape": "flat icons/*.svg with variant suffixes (-color, -brand, -text, -brand-color, -text-cn, -text-color)",
-      "flatFileCount": 871,
-      "stagedFileCount": 852,
+      "flatFileCount": 994,
+      "stagedFileCount": 975,
       "stagedCategoryCounts": {
-        "base": 309,
-        "text": 316,
-        "color": 209,
+        "base": 357,
+        "text": 364,
+        "color": 236,
         "brand": 18
       },
       "chineseWordmarkCount": 10,
       "stagedLayout": "input/providers/lobe-icons/{base,brand,color,text}/*.svg",
-      "acquiredAt": "2026-06-06T10:25:58.146Z"
+      "acquiredAt": "2026-11-11T22:32:32.945Z"
     },
     "simple-icons": {
       "name": "simple-icons",
-      "version": "16.22.0",
-      "publishDate": "2026-05-31T02:33:05.132Z",
+      "version": "16.37.0",
+      "publishDate": "2026-11-08T07:14:22.924Z",
       "sourceShape": "flat icons/*.svg (thousands of generic brand icons)",
-      "svgCount": 3438,
+      "svgCount": 3470,
       "includedInCuration": false,
       "exclusionReason": "Excluded by policy: no reviewed mapping strategy, duplicate policy, or license review for thousands of generic brand icons.",
-      "acquiredAt": "2026-06-06T10:25:59.194Z"
+      "acquiredAt": "2026-11-11T22:32:33.784Z"
+    },
+    "aws-icons": {
+      "name": "AWS Architecture Icons",
+      "release": "07312026",
+      "url": "https://d1.awsstatic.com/onedam/marketing-channels/website/public/shared/architecture-icon-release/Icon-package_07312026.5846e92413caa21490223536cc97f1269e44fa92.zip",
+      "sha256": "d2d166c453526471749d520e0db022c459abef759d2946cf2dd1d1c992dc6526",
+      "stagedGroups": {
+        "services": 302,
+        "categories": 26,
+        "resources": 466
+      },
+      "acquiredAt": "2026-11-11T22:32:34.156Z"
+    },
+    "databricks-icons": {
+      "name": "Databricks product icons",
+      "release": "index 5a8e0da",
+      "index": {
+        "repository": "https://github.com/oieduardorabelo/databricks-architecture-icons",
+        "commit": "5a8e0da62193ad374e860c9887d17a266e003131",
+        "file": "icons/catalog.json",
+        "license": "MIT",
+        "note": "Used only to find which databricks.com artwork names each product; the artwork itself is fetched from databricks.com."
+      },
+      "excluded": {
+        "apache-spark": "Apache Spark wordmark lockup, not a Databricks mark",
+        "apache-iceberg": "Apache Iceberg wordmark lockup, not a Databricks mark"
+      },
+      "stagedGroups": {
+        "products": 69
+      },
+      "acquiredAt": "2026-11-11T22:32:34.163Z"
+    },
+    "snowflake-icons": {
+      "name": "Snowflake brand-guidelines template icons",
+      "release": "Snowflake_Template_2026 (REV 3.5.26)",
+      "url": "https://www.snowflake.com/wp-content/themes/snowflake/assets/img/brand-guidelines/downloads/Snowflake_Template_2026.potx.zip",
+      "sha256": "fe3e5f7a34a0bd414b11912b61e4b41b10d6f826e1b14ec250bc7a224801ad96",
+      "slides": [
+        {
+          "slide": 74,
+          "group": "features"
+        },
+        {
+          "slide": 80,
+          "group": "objects"
+        },
+        {
+          "slide": 81,
+          "group": "objects"
+        }
+      ],
+      "stagedGroups": {
+        "features": 28,
+        "objects": 54
+      },
+      "acquiredAt": "2026-11-11T22:32:37.177Z"
     },
     "local-snapshots": {
       "note": "gcp/palantir/workos are local-only providers; raw inputs are reconstructed from committed outputs when absent.",
       "groups": {
         "gcp": {
-          "restored": true,
-          "source": "committed-output-reconstruction",
-          "files": 261,
-          "missingOutputs": []
+          "restored": false,
+          "reason": "local snapshot already present",
+          "source": "existing-input"
         },
         "palantir": {
-          "restored": true,
-          "source": "committed-output-reconstruction",
-          "files": 68,
-          "missingOutputs": []
+          "restored": false,
+          "reason": "local snapshot already present",
+          "source": "existing-input"
         },
         "workos": {
-          "restored": true,
-          "source": "committed-output-reconstruction",
-          "files": 2,
-          "missingOutputs": []
+          "restored": false,
+          "reason": "local snapshot already present",
+          "source": "existing-input"
         }
       }
     }

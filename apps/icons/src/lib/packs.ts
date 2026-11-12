@@ -139,6 +139,43 @@ export const ICON_PACKS: readonly IconPackDefinition[] = [
 		},
 	},
 	{
+		id: "databricks",
+		name: "Databricks",
+		collections: ["databricks"],
+		featured: [
+			"databricks",
+			"unity-catalog",
+			"delta-lake",
+			"databricks-sql",
+			"lakeflow",
+			"managed-mlflow",
+		],
+		excalidrawListing: {
+			name: "Databricks Icons",
+			description:
+				"Hand-drawn Databricks product icons for data platform diagrams, such as Unity Catalog, Delta Lake, Databricks SQL, Lakeflow and MLflow.",
+		},
+	},
+	{
+		id: "snowflake",
+		name: "Snowflake",
+		collections: ["snowflake"],
+		marks: ["snowflake"],
+		featured: [
+			"snowflake",
+			"snowflake-virtual-warehouse",
+			"snowflake-dynamic-table",
+			"snowpark",
+			"snowflake-cortex",
+			"streamlit-in-snowflake",
+		],
+		excalidrawListing: {
+			name: "Snowflake Icons",
+			description:
+				"Hand-drawn Snowflake icons in Snowflake's colors for data platform diagrams, such as warehouses, dynamic tables, Snowpark, Cortex and Streamlit in Snowflake.",
+		},
+	},
+	{
 		id: "data",
 		name: "Data & backend",
 		collections: ["data-storage", "auth-identity", "observability-security"],
