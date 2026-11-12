@@ -1,5 +1,12 @@
+import { useState } from "react";
+
 import type { PackExcalidrawState } from "../../lib/excalidraw-publish.js";
-import { ALL_ICONS_PACK_ID, packPagePath, type PackSummary } from "../../lib/packs.js";
+import {
+	ALL_ICONS_PACK_ID,
+	packPagePath,
+	SHELF_FIRST_PACK_IDS,
+	type PackSummary,
+} from "../../lib/packs.js";
 import type { PreviewMode } from "../preview-toggle/index.js";
 import { RecipePreview } from "../recipe-preview/index.js";
 import { PackActions } from "./pack-actions.js";
@@ -21,17 +28,26 @@ export function PackShelf({
 	readonly previewMode: PreviewMode;
 }) {
 	const publishing = usePackPublishing(excalidraw);
+	const [expanded, setExpanded] = useState(false);
 	if (!packs.length) return null;
+	// A wide shelf shows the catalog and the vendor packs first; the rest wait behind "More packs".
+	// A narrow one scrolls sideways and shows them all.
+	const more = packs.filter((pack) => !SHELF_FIRST_PACK_IDS.has(pack.id)).length;
 	const publishingPack = packs.find((pack) => pack.id === publishing.publishing);
 	return (
-		<section aria-labelledby="pack-shelf-title" className="pack-shelf">
+		<section
+			aria-labelledby="pack-shelf-title"
+			className="pack-shelf"
+			data-expanded={expanded ? "true" : "false"}
+		>
 			<h2 className="pack-shelf__title" id="pack-shelf-title">
 				Excalidraw libraries
 			</h2>
-			<ul className="pack-shelf__list">
+			<ul className="pack-shelf__list" id="pack-shelf-list">
 				{packs.map((pack) => (
 					<li
 						className="pack-card"
+						data-more={SHELF_FIRST_PACK_IDS.has(pack.id) ? undefined : "true"}
 						data-whole-catalog={pack.id === ALL_ICONS_PACK_ID ? "true" : undefined}
 						key={pack.id}
 					>
@@ -59,6 +75,19 @@ export function PackShelf({
 						/>
 					</li>
 				))}
+				{more > 0 ? (
+					<li className="pack-shelf__more">
+						<button
+							aria-controls="pack-shelf-list"
+							aria-expanded={expanded}
+							className="pack-shelf__more-button"
+							onClick={() => setExpanded((open) => !open)}
+							type="button"
+						>
+							{expanded ? "Fewer packs" : `${String(more)} more packs`}
+						</button>
+					</li>
+				) : null}
 			</ul>
 			{publishingPack ? (
 				<PackPublishDialog

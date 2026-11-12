@@ -27,6 +27,20 @@ export interface IconPackDefinition {
 
 export const ALL_ICONS_PACK_ID = "all";
 
+/**
+ * Packs a wide shelf shows before "More packs": the whole catalog and the
+ * vendor packs, two rows on a laptop so the icons stay on the first screen.
+ */
+export const SHELF_FIRST_PACK_IDS: ReadonlySet<string> = new Set([
+	ALL_ICONS_PACK_ID,
+	"palantir",
+	"google-cloud",
+	"aws",
+	"aws-resources",
+	"databricks",
+	"snowflake",
+]);
+
 export const ICON_PACKS: readonly IconPackDefinition[] = [
 	{
 		id: ALL_ICONS_PACK_ID,
@@ -49,45 +63,6 @@ export const ICON_PACKS: readonly IconPackDefinition[] = [
 			name: "Palantir Platform Icons",
 			description:
 				"Hand-drawn icons for Palantir's platforms and Foundry applications, such as Ontology, Workshop, Pipeline Builder, Quiver and AIP.",
-		},
-	},
-	{
-		id: "ai-models",
-		name: "AI labs & models",
-		collections: ["ai-model-labs", "ai-model-families", "ai-model-providers"],
-		featured: ["anthropic", "claude", "gemini", "mistral", "deepseek", "qwen"],
-		excalidrawListing: {
-			name: "AI Labs and Models Logos",
-			description:
-				"Hand-drawn logos of AI labs and model families, such as Anthropic, Claude, Gemini, Mistral, DeepSeek and Qwen.",
-		},
-	},
-	{
-		id: "ai-tools",
-		name: "AI tools & agents",
-		collections: [
-			"ai-apps-agents",
-			"ai-devtools",
-			"ai-harness-wrappers",
-			"ai-ecosystem",
-			"ai-infrastructure",
-		],
-		featured: ["cursor", "huggingface", "langchain", "ollama", "n8n", "mcp"],
-		excalidrawListing: {
-			name: "AI Tools and Agents Logos",
-			description:
-				"Hand-drawn logos of AI apps, coding agents, inference providers and frameworks, such as Cursor, Hugging Face, LangChain, Ollama and n8n.",
-		},
-	},
-	{
-		id: "cloud",
-		name: "Cloud",
-		collections: ["cloud-vendors", "cloud-hosting-paas", "cloud-platforms"],
-		featured: ["aws", "azure", "googlecloud", "cloudflare", "vercel", "digitalocean"],
-		excalidrawListing: {
-			name: "Cloud Platform Logos",
-			description:
-				"Hand-drawn logos of cloud vendors and hosting platforms, such as AWS, Azure, Google Cloud, Cloudflare, Vercel and DigitalOcean.",
 		},
 	},
 	{
@@ -173,6 +148,45 @@ export const ICON_PACKS: readonly IconPackDefinition[] = [
 			name: "Snowflake Icons",
 			description:
 				"Hand-drawn Snowflake icons in Snowflake's colors for data platform diagrams, such as warehouses, dynamic tables, Snowpark, Cortex and Streamlit in Snowflake.",
+		},
+	},
+	{
+		id: "ai-models",
+		name: "AI labs & models",
+		collections: ["ai-model-labs", "ai-model-families", "ai-model-providers"],
+		featured: ["anthropic", "claude", "gemini", "mistral", "deepseek", "qwen"],
+		excalidrawListing: {
+			name: "AI Labs and Models Logos",
+			description:
+				"Hand-drawn logos of AI labs and model families, such as Anthropic, Claude, Gemini, Mistral, DeepSeek and Qwen.",
+		},
+	},
+	{
+		id: "ai-tools",
+		name: "AI tools & agents",
+		collections: [
+			"ai-apps-agents",
+			"ai-devtools",
+			"ai-harness-wrappers",
+			"ai-ecosystem",
+			"ai-infrastructure",
+		],
+		featured: ["cursor", "huggingface", "langchain", "ollama", "n8n", "mcp"],
+		excalidrawListing: {
+			name: "AI Tools and Agents Logos",
+			description:
+				"Hand-drawn logos of AI apps, coding agents, inference providers and frameworks, such as Cursor, Hugging Face, LangChain, Ollama and n8n.",
+		},
+	},
+	{
+		id: "cloud",
+		name: "Cloud",
+		collections: ["cloud-vendors", "cloud-hosting-paas", "cloud-platforms"],
+		featured: ["aws", "azure", "googlecloud", "cloudflare", "vercel", "digitalocean"],
+		excalidrawListing: {
+			name: "Cloud Platform Logos",
+			description:
+				"Hand-drawn logos of cloud vendors and hosting platforms, such as AWS, Azure, Google Cloud, Cloudflare, Vercel and DigitalOcean.",
 		},
 	},
 	{
