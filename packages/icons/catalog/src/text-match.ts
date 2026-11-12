@@ -459,17 +459,22 @@ export interface NamedLogo {
 	readonly name: string;
 	readonly slug: string;
 	/**
-	 * True when the product's name is an everyday word that the text writes only as the name
-	 * ("posts each order to Slack", and no lowercase "slack"). A diagram of that text means the
-	 * product wherever a label has the word, so "Slack order post" draws the logo, while a text
-	 * that also writes "go live" or "render the page" leaves "Go live" and "Render page" as steps.
+	 * True when the product's name is an everyday word that the text writes only as a name, cased
+	 * mid-sentence ("posts each order to Slack"). A diagram of that text means the product
+	 * wherever a label has the word, so "Slack order post" draws the logo. One use that may be
+	 * the plain word, in lowercase, first in a sentence or line, or in a Title Case line ("go
+	 * live", "Render the page and verify it"), leaves "Go live" and "Render page" as steps.
 	 * Never set on a cloud vendor's generic service mark ("Storage", "Batch").
 	 */
 	readonly alwaysNamed?: true;
 }
 
-/** Whether the text writes one of an icon's terms in lowercase, as an everyday word ("go live"). */
-function writesPlainly(tokens: readonly TextToken[], icon: SearchableIcon): boolean {
+/**
+ * Whether the text writes one of an icon's terms where it may be the everyday word: anywhere
+ * its capitals don't mark a name, in lowercase ("go live"), first in a sentence or line ("Go
+ * live after review"), or in a Title Case line.
+ */
+function usesAsWord(tokens: readonly TextToken[], icon: SearchableIcon): boolean {
 	return [icon.slug.replaceAll("-", " "), icon.name, ...icon.aliases].some((term) => {
 		const words = termTokens(term);
 		const key = phraseKey(words);
@@ -477,7 +482,7 @@ function writesPlainly(tokens: readonly TextToken[], icon: SearchableIcon): bool
 			const phrase = tokens.slice(start, start + words.length);
 			return (
 				phrase.length === words.length &&
-				phrase.every((token) => token.raw === token.lower) &&
+				!phrase.some(isCasedAsName) &&
 				phraseKey(phrase.map((token) => token.lower)) === key
 			);
 		});
@@ -498,7 +503,7 @@ export function logosNamedInText(text: string, icons: readonly SearchableIcon[])
 		slug: icon.slug,
 		...(!termTokens(icon.name).some(isDistinctiveWord) &&
 		!isGenericMark(icon) &&
-		!writesPlainly(tokens, icon)
+		!usesAsWord(tokens, icon)
 			? { alwaysNamed: true as const }
 			: {}),
 	}));

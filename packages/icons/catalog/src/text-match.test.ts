@@ -530,6 +530,18 @@ describe("logosNamedInText", () => {
 			["render", false],
 			["make", false],
 		]);
+		// First in a sentence or a Title Case line, the word may be the verb.
+		expect(
+			always(
+				"Build the API in Go and deploy it to Render. Go live after review. Render the page and verify it.",
+			),
+		).toEqual([
+			["go", false],
+			["render", false],
+		]);
+		expect(always("Payments run through Stripe.\nDeploy With Go And Stripe")).toEqual([
+			["stripe", false],
+		]);
 		// A cloud vendor's generic service mark stays a step's word.
 		expect(always("Store uploads in Cloud Storage and run nightly work on Batch.")).toEqual([
 			["cloud-storage", false],

@@ -283,6 +283,13 @@ describe("logos for products named by everyday words", () => {
 				labels,
 			),
 		).toEqual({ live: null, page: null, pay: null, build: "go" });
+		// A sentence's first word may be the verb too.
+		expect(
+			groundedLogos(
+				"Build the API in Go and deploy it to Render. Go live after review. Render the page and verify it.",
+				{ live: "Go live", page: "Render page", build: "Compile Go binary" },
+			),
+		).toEqual({ live: null, page: null, build: "go" });
 		expect(
 			groundedLogos("Build the API in Go, deploy it to Render, and sync leads through Make.", {
 				build: "Go build",
