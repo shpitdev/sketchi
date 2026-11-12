@@ -18,11 +18,35 @@ import { DEPLOY_PIPELINE_SCENE } from "./deploy-pipeline-sample";
 
 /** Each chip shows a short label and sends the full prompt. */
 const STARTERS = [
-	{ label: "Login flow", prompt: "Sketch a login flow with retries and a fraud check" },
-	{ label: "CI/CD pipeline", prompt: "Diagram a CI/CD pipeline from commit to production" },
 	{
-		label: "Checkout sequence",
-		prompt: "Show checkout as a sequence diagram: browser, API, payments",
+		label: "AWS architecture",
+		prompt:
+			"Draw our AWS architecture with the VPC and its subnets as boxes: Route 53 and CloudFront in front, an ALB in the public subnet, ECS Fargate services, RDS Postgres and ElastiCache Redis in the private subnet, and S3 for uploads.",
+	},
+	{
+		label: "Data platform",
+		prompt:
+			"Map our data platform: Fivetran loads Salesforce and Postgres into Snowflake, dbt models build the marts, Airflow schedules the runs, and Tableau dashboards read the marts.",
+	},
+	{
+		label: "Palantir Foundry",
+		prompt:
+			"Show how a supply chain team uses Palantir Foundry: ERP and IoT feeds land in Pipeline Builder, become objects in the Ontology, and power a Workshop app and an AIP agent that flags late shipments.",
+	},
+	{
+		label: "Stripe checkout",
+		prompt:
+			"Sequence diagram of checkout with Stripe: the browser posts the cart to our API, the API creates a PaymentIntent in Stripe, Stripe sends a payment_intent.succeeded webhook, and the API saves the order in Postgres and emails a receipt through SendGrid.",
+	},
+	{
+		label: "Launch Gantt",
+		prompt:
+			"Gantt chart for launching a mobile app in 10 weeks from March 2: design, iOS and Android builds in parallel, the backend API, beta testing, App Store review, and launch day.",
+	},
+	{
+		label: "Revenue Sankey",
+		prompt:
+			"Sankey of where our $12M ARR goes: $4.8M salaries, $2.4M cloud, $1.8M sales and marketing, $1.2M G&A and $1.8M profit, with cloud split into $1.4M compute, $0.6M storage and $0.4M data transfer.",
 	},
 ];
 
