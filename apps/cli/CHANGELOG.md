@@ -1,5 +1,11 @@
 # @sketchi/cli
 
+## 0.42.3
+
+### Patch Changes
+
+- [#796](https://github.com/shpitdev/sketchi/pull/796) [`11cd8e3`](https://github.com/shpitdev/sketchi/commit/11cd8e391948ff650b43a7a3a98bf77a2e54a854) Thanks [@anandpant](https://github.com/anandpant)! - Keep the words in hand-drawn icons inside the shapes that frame them: AWS database instances and brand marks whose word ran over its frame now draw it smaller or nudged inward, and new icon drawings are held to the same fit.
+
 ## 0.42.2
 
 ### Patch Changes
