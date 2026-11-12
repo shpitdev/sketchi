@@ -35,6 +35,12 @@ const COMMON_TECH_WORDS = [
  * "Segment" are products, but in prose they are usually just words.
  */
 const COMMON_WORDS: ReadonlySet<string> = new Set([...commonWordsJson, ...COMMON_TECH_WORDS]);
+const GENERIC_TECH_WORDS: ReadonlySet<string> = new Set(COMMON_TECH_WORDS);
+
+/** A generic technical word ("api", "json"): it names no product, even in capitals. */
+export function isGenericTechWord(lower: string): boolean {
+	return GENERIC_TECH_WORDS.has(lower);
+}
 
 const ENGLISH_WORDS: ReadonlySet<string> = new Set(commonWordsJson);
 

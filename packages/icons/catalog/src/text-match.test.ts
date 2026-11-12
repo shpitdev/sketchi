@@ -280,6 +280,39 @@ describe("labelLogos", () => {
 });
 
 describe("logosNamedInText", () => {
+	const offered = (text: string) => logosNamedInText(text, nodeLogoIcons).map((logo) => logo.slug);
+
+	it("reads an acronym the catalog writes in capitals only in capitals", () => {
+		expect(offered("Draw an AWS architecture with ALB and ECS services")).toEqual([
+			"aws",
+			"elastic-load-balancing-application-load-balancer",
+			"amazon-ecs",
+		]);
+		expect(
+			offered("NLB in front of EKS, events on SQS and SNS, jobs on EMR, MSK and MWAA"),
+		).toEqual([
+			"elastic-load-balancing-network-load-balancer",
+			"amazon-eks",
+			"amazon-sqs",
+			"amazon-sns",
+			"amazon-emr",
+			"amazon-msk",
+			"amazon-mwaa",
+		]);
+		expect(offered("we use an alb for routing")).toEqual([]);
+		// Other clouds have them too, so these name no AWS mark alone.
+		expect(offered("a VPC with IAM roles and KMS keys")).toEqual([]);
+	});
+
+	it("matches a vendor's full product name however many words it has", () => {
+		expect(offered("Use Amazon Managed Streaming for Apache Kafka in the diagram.")).toEqual([
+			"amazon-msk",
+		]);
+		expect(offered("Schedule jobs on Amazon Managed Workflows for Apache Airflow.")).toEqual([
+			"amazon-mwaa",
+		]);
+	});
+
 	it("offers each named logo with its aliases and catalog collection", () => {
 		expect(
 			logosNamedInText("Ship to Cloudflare Workers behind a Kubernetes ingress.", nodeLogoIcons),
