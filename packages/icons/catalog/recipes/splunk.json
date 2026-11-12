@@ -1,0 +1,22 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 10,
+			"cy": 12,
+			"text": "splunk",
+			"size": 5.5,
+			"color": "ink"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[20, 9.5],
+				[23, 12],
+				[20, 14.5]
+			],
+			"stroke": "ink",
+			"pen": 2
+		}
+	]
+}

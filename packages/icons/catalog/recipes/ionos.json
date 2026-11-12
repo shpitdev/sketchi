@@ -1,0 +1,12 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 12,
+			"text": "IONOS",
+			"size": 8,
+			"color": "#003d8f"
+		}
+	]
+}

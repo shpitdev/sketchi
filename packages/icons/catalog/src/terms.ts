@@ -27,6 +27,8 @@ const COMMON_TECH_WORDS = [
 	"serverless",
 	"submodel",
 	"turbo",
+	"xml",
+	"yaml",
 ];
 
 /**

@@ -1,0 +1,20 @@
+{
+	"parts": [
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 9,
+			"text": "sumo",
+			"size": 9,
+			"color": "#000099"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 17,
+			"text": "logic",
+			"size": 8,
+			"color": "#000099"
+		}
+	]
+}

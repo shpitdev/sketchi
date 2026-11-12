@@ -491,7 +491,7 @@ describe("paraphrased generations pass", () => {
 				["build", "process", "Docker builds the image", "docker"],
 				["tests", "process", "Run the test suite"],
 				["pass", "decision", "Do the tests pass?"],
-				["ship", "end", "Ship to Cloudflare Workers", "cloudflare"],
+				["ship", "end", "Ship to Cloudflare Workers", "cloudflareworkers"],
 				["notify", "process", "Notify the team"],
 				["stop", "end", "Stop the pipeline"],
 			],

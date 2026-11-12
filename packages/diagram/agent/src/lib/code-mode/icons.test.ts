@@ -464,9 +464,9 @@ describe("named logo fill", () => {
 		expect(nodeLogos(edited)).toEqual([
 			"github",
 			undefined,
-			"github",
+			"githubactions",
 			undefined,
-			"cloudflare",
+			"cloudflareworkers",
 			undefined,
 		]);
 	});
@@ -479,7 +479,7 @@ describe("named logo fill", () => {
 			"docker",
 			undefined,
 			undefined,
-			"cloudflare",
+			"cloudflareworkers",
 			undefined,
 		]);
 		expect(result.issues.map((issue) => [issue.code, issue.ref?.id])).toEqual([
@@ -493,7 +493,7 @@ describe("named logo fill", () => {
 			stage: "input",
 			ref: { kind: "node", id: "deploy", path: "nodes.deploy.icon" },
 			message:
-				'Node "deploy" draws the "cloudflare" logo because its label "Ship to Cloudflare Workers" names Cloudflare.',
+				'Node "deploy" draws the "cloudflareworkers" logo because its label "Ship to Cloudflare Workers" names Cloudflare Workers.',
 			hint: "No action needed.",
 		});
 	});
@@ -513,7 +513,7 @@ describe("named logo fill", () => {
 				["ship", "Ship to Cloudflare Workers"],
 			]),
 		});
-		expect(nodeLogos(result)).toEqual(["docker", "cloudflare"]);
+		expect(nodeLogos(result)).toEqual(["docker", "cloudflareworkers"]);
 
 		const dropped = await production().buildFlowchart({
 			spec: {
@@ -695,7 +695,7 @@ describe("named logo fill", () => {
 		if (!result.ok) throw new Error(JSON.stringify(result.issues));
 
 		expect(result.normalizedSpec.participants.map((participant) => participant.icon?.slug)).toEqual(
-			[undefined, "github", "cloudflare", "docker"],
+			[undefined, "github", "cloudflareworkers", "docker"],
 		);
 		expect(result.issues).toEqual([
 			expect.objectContaining({
@@ -703,7 +703,7 @@ describe("named logo fill", () => {
 				severity: "info",
 				ref: { kind: "node", id: "worker", path: "participants.icon.slug" },
 				message:
-					'Participant "worker" draws the "cloudflare" logo because its label "Cloudflare Worker" names Cloudflare.',
+					'Participant "worker" draws the "cloudflareworkers" logo because its label "Cloudflare Worker" names Cloudflare Workers.',
 			}),
 		]);
 	});
@@ -921,7 +921,7 @@ describe("named logo fill", () => {
 					},
 					[
 						["push", "Push to GitHub"],
-						["worker", "Cloudflare Workers"],
+						["worker", "Cloudflare R2"],
 						["queue", "Enqueue the job"],
 					],
 				),

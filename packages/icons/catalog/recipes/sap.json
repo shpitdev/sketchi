@@ -1,0 +1,24 @@
+{
+	"parts": [
+		{
+			"kind": "stroke",
+			"points": [
+				[1, 6],
+				[23, 6],
+				[13, 18],
+				[1, 18]
+			],
+			"closed": true,
+			"stroke": "#0faaff",
+			"fill": "#0faaff"
+		},
+		{
+			"kind": "text",
+			"cx": 8.5,
+			"cy": 12,
+			"text": "SAP",
+			"size": 7.5,
+			"color": "paper"
+		}
+	]
+}

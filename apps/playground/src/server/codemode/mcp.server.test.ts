@@ -1685,7 +1685,9 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
   options: { artifactFormats: ["scene"] }
 })`);
 
-			expect(text).toContain('"deploy":{"label":"Ship to Cloudflare Workers","icon":"cloudflare"}');
+			expect(text).toContain(
+				'"deploy":{"label":"Ship to Cloudflare Workers","icon":"cloudflareworkers"}',
+			);
 			expect(text).toContain('"code":"icon_filled","severity":"info"');
 		});
 	});

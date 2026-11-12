@@ -196,12 +196,16 @@ describe("sequence participant logo evals", () => {
 	});
 
 	it("requires each named technology's logo on the participant that is that technology", () => {
-		expect(scenario.assertions.requiredIconSlugs).toEqual(["github", "cloudflare", "docker"]);
+		expect(scenario.assertions.requiredIconSlugs).toEqual([
+			"github",
+			"cloudflareworkers",
+			"docker",
+		]);
 		expect(
 			evaluateScenarioFixture(scenario).checks.filter((check) => check.id.startsWith("icon")),
 		).toEqual([
 			expect.objectContaining({ id: "icon:github", passed: true }),
-			expect.objectContaining({ id: "icon:cloudflare", passed: true }),
+			expect.objectContaining({ id: "icon:cloudflareworkers", passed: true }),
 			expect.objectContaining({ id: "icon:docker", passed: true }),
 			expect.objectContaining({ id: "icons-grounded", passed: true }),
 			expect.objectContaining({ id: "icons-on-named-steps", passed: true }),
@@ -210,7 +214,7 @@ describe("sequence participant logo evals", () => {
 
 	it("fails recall, grounding, and placement on the model's own participants", () => {
 		expect(
-			failedChecks(scenario.id, withIcons({ github: "github", worker: "cloudflare" })),
+			failedChecks(scenario.id, withIcons({ github: "github", worker: "cloudflareworkers" })),
 		).toEqual(["icon:docker"]);
 		expect(
 			failedChecks(
@@ -218,14 +222,19 @@ describe("sequence participant logo evals", () => {
 				withIcons({
 					developer: "github",
 					github: "github",
-					worker: "cloudflare",
+					worker: "cloudflareworkers",
 					docker: "kubernetes",
 				}),
 			),
 		).toEqual(["icon:docker", "icons-grounded", "icons-on-named-steps"]);
 		const placement = evaluateScenarioDiagram(
 			scenario,
-			withIcons({ developer: "github", github: "github", worker: "cloudflare", docker: "docker" }),
+			withIcons({
+				developer: "github",
+				github: "github",
+				worker: "cloudflareworkers",
+				docker: "docker",
+			}),
 		).checks.find((check) => check.id === "icons-on-named-steps");
 		expect(placement?.message).toBe(
 			'Logos on participants that do not name them: "Developer" (github).',

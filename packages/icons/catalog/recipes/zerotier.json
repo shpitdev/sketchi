@@ -1,0 +1,41 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 2,
+			"y": 2,
+			"width": 20,
+			"height": 20,
+			"rounded": true,
+			"stroke": "#ffb441",
+			"fill": "#ffb441"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[5.5, 5.2],
+				[18.5, 5.2]
+			],
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "ellipse",
+			"cx": 12,
+			"cy": 12.3,
+			"rx": 5.2,
+			"ry": 5.2,
+			"stroke": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[12, 5.5],
+				[12, 19.5]
+			],
+			"stroke": "paper",
+			"pen": 2
+		}
+	]
+}

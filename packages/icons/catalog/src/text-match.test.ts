@@ -23,7 +23,7 @@ describe("matchIconsInText", () => {
 			slugs(
 				"Diagram our deploy pipeline: push to GitHub, build with Docker, run tests, ship to Cloudflare Workers.",
 			),
-		).toEqual(["github", "docker", "cloudflare"]);
+		).toEqual(["github", "docker", "cloudflareworkers"]);
 		expect(
 			slugs("User signs up with Clerk, data stored in Postgres via Prisma, emails via Resend."),
 		).toEqual(["clerk", "postgresql", "prisma", "resend"]);
@@ -97,8 +97,8 @@ describe("logoNamedByLabel", () => {
 	const named = (label: string) => logoNamedByLabel(label, nodeLogoIcons)?.slug;
 
 	it("names the one logo a label unmistakably names", () => {
-		expect(named("Ship to Cloudflare Workers")).toBe("cloudflare");
-		expect(named("Cloudflare Worker")).toBe("cloudflare");
+		expect(named("Ship to Cloudflare Workers")).toBe("cloudflareworkers");
+		expect(named("Cloudflare Worker")).toBe("cloudflareworkers");
 		expect(named("Store the answer in Redis")).toBe("redis");
 		expect(named("Next.js page")).toBe("nextjs");
 		expect(named("AWS ECS web service")).toBe("amazon-ecs");
@@ -164,7 +164,7 @@ describe("labelLogos", () => {
 	it("names every product a label names, unmistakable names first", () => {
 		expect(named("Next.js app hosted on Vercel")).toEqual(["nextjs", "vercel"]);
 		expect(named("Supabase Postgres")).toEqual(["supabase", "postgresql"]);
-		expect(named("Redis cache on Upstash")).toEqual(["redis"]);
+		expect(named("Redis cache on Upstash")).toEqual(["redis", "upstash"]);
 		expect(named("Docker build tickets in Linear")).toEqual(["docker", "linear"]);
 		expect(named("Log errors to Sentry")).toEqual(["sentry"]);
 	});
@@ -290,6 +290,36 @@ describe("labelLogos", () => {
 		}
 		expect(possible("Sync the order to the warehouse")).toEqual(["sync"]);
 	});
+
+	it("reads a brand named by an English word as a step unless the label names it", () => {
+		for (const label of ["Temporal data", "Zoom in", "Square root", "Line chart"]) {
+			expect(named(label), label).toEqual([]);
+		}
+		expect(possible("Temporal data")).toEqual(["temporal"]);
+		expect(named("Temporal worker")).toEqual(["temporal"]);
+		expect(named("Temporal")).toEqual(["temporal"]);
+		expect(named("Celery workers")).toEqual(["celery"]);
+		expect(named("Helm chart")).toEqual(["helm"]);
+		expect(named("Discord bot")).toEqual(["discord"]);
+		expect(named("Envoy")).toEqual(["envoyproxy"]);
+		expect(named("Stripe payments")).toEqual([]);
+		expect(possible("Stripe payments")).toEqual(["stripe"]);
+		expect(named("Square webhook")).toEqual(["square"]);
+	});
+
+	it("draws the brands' own marks, not a vendor's or a Foundry app's", () => {
+		expect(named("Kafka")).toEqual(["apachekafka"]);
+		expect(named("Spark job")).toEqual(["apachespark"]);
+		expect(named("Flink job")).toEqual(["apacheflink"]);
+		expect(named("Argo CD")).toEqual(["argo"]);
+		expect(named("Apollo Server")).toEqual(["apollographql"]);
+		expect(named("GitHub Actions")).toEqual(["githubactions"]);
+		expect(named("Cloudflare Workers AI")).toEqual(["workersai"]);
+		expect(named("Stripe API")).toEqual(["stripe"]);
+		expect(named("Jupyter notebook")).toEqual(["jupyter"]);
+		expect(named("RStudio")).toEqual(["rstudio"]);
+		expect(named("Foundry Jupyter")).toEqual(["code-workspace-jupyter-app"]);
+	});
 });
 
 describe("logosNamedInText", () => {
@@ -357,15 +387,46 @@ describe("logosNamedInText", () => {
 		]);
 	});
 
+	it("offers brands named by English words only when the text names them", () => {
+		expect(offered("We store temporal data and zoom in on helm charts.")).toEqual([]);
+		expect(offered("Use a square and a circle.")).toEqual([]);
+		expect(offered("Run Temporal workflows on Kubernetes with Helm.")).toEqual([
+			"temporal",
+			"kubernetes",
+			"helm",
+		]);
+		expect(offered("The Square POS sends sales to QuickBooks.")).toEqual(["square", "quickbooks"]);
+		expect(offered("Notify the team on Discord and in Zoom.")).toEqual(["discord", "zoom"]);
+		// YAML and XML are formats, like JSON: they name no logo.
+		expect(offered("Parse the YAML config and the XML payload.")).toEqual([]);
+	});
+
+	it("offers the data, delivery and payment brands a prompt names", () => {
+		expect(
+			offered("Payments go through Stripe and PayPal, events through Kafka into Apache Flink."),
+		).toEqual(["stripe", "paypal", "apachekafka", "apacheflink"]);
+		expect(
+			offered("logs flow from Logstash to Elasticsearch and Splunk; alerts page via PagerDuty"),
+		).toEqual(["logstash", "elasticsearch", "splunk", "pagerduty"]);
+		expect(offered("Airflow DAGs load Trino and DuckDB")).toEqual([
+			"apacheairflow",
+			"trino",
+			"duckdb",
+		]);
+		expect(offered("CockroachDB and PlanetScale")).toEqual(["cockroachlabs", "planetscale"]);
+		expect(offered("Fastly and Akamai CDN")).toEqual(["fastly", "akamai"]);
+		expect(offered("WhatsApp and Telegram bots")).toEqual(["whatsapp", "telegram"]);
+	});
+
 	it("offers each named logo with its aliases and catalog collection", () => {
 		expect(
 			logosNamedInText("Ship to Cloudflare Workers behind a Kubernetes ingress.", nodeLogoIcons),
 		).toEqual([
 			{
-				aliases: ["Cloudflare"],
-				collection: "cloud-vendors",
-				name: "Cloudflare",
-				slug: "cloudflare",
+				aliases: ["Cloudflare Worker"],
+				collection: "cloud-hosting-paas",
+				name: "Cloudflare Workers",
+				slug: "cloudflareworkers",
 			},
 			{
 				aliases: ["Kubernetes", "k8s", "kube"],

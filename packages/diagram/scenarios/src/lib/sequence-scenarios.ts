@@ -337,17 +337,17 @@ const sequenceScenarioDefinitions = [
 		logos: [
 			{ aliases: ["GitHub"], collection: "devtools-ci", name: "GitHub", slug: "github" },
 			{
-				aliases: ["Cloudflare"],
-				collection: "cloud-vendors",
-				name: "Cloudflare",
-				slug: "cloudflare",
+				aliases: ["Cloudflare Worker"],
+				collection: "cloud-hosting-paas",
+				name: "Cloudflare Workers",
+				slug: "cloudflareworkers",
 			},
 			{ collection: "devtools-ci", name: "Docker", slug: "docker" },
 		],
 		participants: [
 			["developer", "Developer"],
 			["github", "GitHub", "github"],
-			["worker", "Cloudflare Worker", "cloudflare"],
+			["worker", "Cloudflare Worker", "cloudflareworkers"],
 			["docker", "Docker", "docker"],
 		],
 		messages: [

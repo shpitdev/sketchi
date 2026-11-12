@@ -1,0 +1,25 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 4.8,
+			"width": 21,
+			"height": 14.4,
+			"rounded": true,
+			"stroke": "#ff0000",
+			"fill": "#ff0000"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[9.8, 8.6],
+				[16, 12],
+				[9.8, 15.4]
+			],
+			"closed": true,
+			"stroke": "paper",
+			"fill": "paper"
+		}
+	]
+}

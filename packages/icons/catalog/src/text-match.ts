@@ -308,6 +308,7 @@ const TECH_NOUNS: ReadonlySet<string> = new Set(
 		"api",
 		"app",
 		"backend",
+		"bot",
 		"broker",
 		"bucket",
 		"cache",
@@ -324,6 +325,7 @@ const TECH_NOUNS: ReadonlySet<string> = new Set(
 		"server",
 		"service",
 		"topic",
+		"webhook",
 		"worker",
 	].flatMap((noun) => [noun, `${noun}s`]),
 );

@@ -560,6 +560,7 @@ const flowchartScenarioDefinitions = [
 			"A vague package-interaction request recast as a directed flowchart so harnesses keep the six stated stages in order instead of inventing a Mermaid dependency report.",
 		prompt:
 			"Create a diagram that showcases how the various packages in this repo interact. Show the high-level path from an app request through the agent, core diagram model, renderer, Excalidraw export, and hosted artifact response.",
+		logos: [{ collection: "design-productivity", name: "Excalidraw", slug: "excalidraw" }],
 		// The six stages the prompt states, in its order. The prompt names no
 		// packages, so package names or an artifact store are not required.
 		nodes: [
@@ -1773,10 +1774,10 @@ const flowchartScenarioDefinitions = [
 			{ aliases: ["GitHub"], collection: "devtools-ci", name: "GitHub", slug: "github" },
 			{ collection: "devtools-ci", name: "Docker", slug: "docker" },
 			{
-				aliases: ["Cloudflare"],
-				collection: "cloud-vendors",
-				name: "Cloudflare",
-				slug: "cloudflare",
+				aliases: ["Cloudflare Worker"],
+				collection: "cloud-hosting-paas",
+				name: "Cloudflare Workers",
+				slug: "cloudflareworkers",
 			},
 		],
 		nodes: [
@@ -1795,7 +1796,13 @@ const flowchartScenarioDefinitions = [
 				["run the test suite", "run test suite", "test suite runs"],
 			],
 			["passed", "Tests pass?", "decision", ["tests pass"]],
-			["ship", "Ship to Cloudflare Workers", "end", ["ship to Cloudflare Workers"], "cloudflare"],
+			[
+				"ship",
+				"Ship to Cloudflare Workers",
+				"end",
+				["ship to Cloudflare Workers"],
+				"cloudflareworkers",
+			],
 			[
 				"notify",
 				"Notify the team",

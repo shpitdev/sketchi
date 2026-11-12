@@ -1,0 +1,29 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 1.5,
+			"width": 21,
+			"height": 21,
+			"fill": "ink"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 9.5,
+			"text": "GO",
+			"size": 10,
+			"color": "paper"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[5, 19],
+				[11, 19]
+			],
+			"stroke": "paper",
+			"pen": 2
+		}
+	]
+}

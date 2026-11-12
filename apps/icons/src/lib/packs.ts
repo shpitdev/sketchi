@@ -212,6 +212,22 @@ export const ICON_PACKS: readonly IconPackDefinition[] = [
 		},
 	},
 	{
+		id: "saas-payments",
+		name: "SaaS & payments",
+		collections: [
+			"payments-fintech",
+			"social-communication",
+			"design-productivity",
+			"ecommerce-retail",
+		],
+		featured: ["stripe", "slack", "shopify", "paypal", "notion", "figma"],
+		excalidrawListing: {
+			name: "SaaS and Payments Logos",
+			description:
+				"Hand-drawn logos of payment providers, messaging apps and business software, such as Stripe, Slack, Shopify, PayPal, Notion and Figma.",
+		},
+	},
+	{
 		id: "languages",
 		name: "Languages & frameworks",
 		collections: ["programming-languages", "frontend-frameworks", "frameworks-runtimes"],
