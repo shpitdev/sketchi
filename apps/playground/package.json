@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"dependencies": {
-		"@ai-sdk/openai": "4.0.103",
+		"@ai-sdk/openai": "4.0.104",
 		"@ai-sdk/react": "4.0.163",
 		"@cloudflare/playwright": "1.3.6",
 		"@excalidraw/excalidraw": "0.18.1",
@@ -14,7 +14,6 @@
 		"@sketchi/diagram-excalidraw": "workspace:*",
 		"@sketchi/diagram-generation": "workspace:*",
 		"@sketchi/diagram-renderer": "workspace:*",
-		"@sketchi/diagram-scenarios": "workspace:*",
 		"@sketchi/diagram-ui": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/icon-draw": "workspace:*",
@@ -34,6 +33,7 @@
 		"use-stick-to-bottom": "1.1.6"
 	},
 	"devDependencies": {
+		"@sketchi/diagram-scenarios": "workspace:*",
 		"@tailwindcss/vite": "4.3.3",
 		"tailwindcss": "4.3.3"
 	}

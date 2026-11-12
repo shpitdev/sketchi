@@ -18,9 +18,7 @@ export default defineConfig({
 				"@excalidraw/excalidraw/types",
 				"@sketchi/diagram-core",
 				"@sketchi/diagram-excalidraw",
-				"@sketchi/diagram-generation",
 				"@sketchi/diagram-renderer",
-				"@sketchi/diagram-scenarios",
 			],
 		},
 	},
@@ -29,10 +27,7 @@ export default defineConfig({
 			"@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url).pathname,
 			"@sketchi/diagram-excalidraw": new URL("../excalidraw/src/index.ts", import.meta.url)
 				.pathname,
-			"@sketchi/diagram-generation": new URL("../generation/src/index.ts", import.meta.url)
-				.pathname,
 			"@sketchi/diagram-renderer": new URL("../renderer/src/index.ts", import.meta.url).pathname,
-			"@sketchi/diagram-scenarios": new URL("../scenarios/src/index.ts", import.meta.url).pathname,
 		},
 	},
 });

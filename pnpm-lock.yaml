@@ -467,8 +467,8 @@ importers:
   apps/playground:
     dependencies:
       '@ai-sdk/openai':
-        specifier: 4.0.103
-        version: 4.0.103(zod@4.6.5)
+        specifier: 4.0.104
+        version: 4.0.104(zod@4.6.5)
       '@ai-sdk/react':
         specifier: 4.0.163
         version: 4.0.163(react@19.3.1)(zod@4.6.5)
@@ -499,9 +499,6 @@ importers:
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../../packages/diagram/renderer
-      '@sketchi/diagram-scenarios':
-        specifier: workspace:*
-        version: link:../../packages/diagram/scenarios
       '@sketchi/diagram-ui':
         specifier: workspace:*
         version: link:../../packages/diagram/ui
@@ -554,6 +551,9 @@ importers:
         specifier: 1.1.6
         version: 1.1.6(react@19.3.1)
     devDependencies:
+      '@sketchi/diagram-scenarios':
+        specifier: workspace:*
+        version: link:../../packages/diagram/scenarios
       '@tailwindcss/vite':
         specifier: 4.3.3
         version: 4.3.3(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
@@ -675,33 +675,28 @@ importers:
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@sketchi/diagram-agent':
-        specifier: workspace:*
-        version: link:../agent
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../core
       '@sketchi/diagram-excalidraw':
         specifier: workspace:*
         version: link:../excalidraw
-      '@sketchi/diagram-generation':
-        specifier: workspace:*
-        version: link:../generation
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../renderer
-      '@sketchi/diagram-scenarios':
-        specifier: workspace:*
-        version: link:../scenarios
-      '@sketchi/icon-catalog':
-        specifier: workspace:*
-        version: link:../../icons/catalog
       react:
         specifier: ^19.0.0
         version: 19.3.1
       react-dom:
         specifier: ^19.0.0
         version: 19.3.1(react@19.3.1)
+    devDependencies:
+      '@sketchi/diagram-scenarios':
+        specifier: workspace:*
+        version: link:../scenarios
+      '@sketchi/icon-catalog':
+        specifier: workspace:*
+        version: link:../../icons/catalog
 
   packages/icons/catalog:
     dependencies:
@@ -913,14 +908,14 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/openai@4.0.103':
-    resolution: {integrity: sha512-ZaMITn2RBzILNzrpXxJDMPRpNHGwZdq77GWqd9UBuz5VAA8EOu9JPy8hTk5OVhPMzDZbNgpb/D/1G+NbeVP22w==}
+  '@ai-sdk/openai@4.0.104':
+    resolution: {integrity: sha512-8oPwGh/zAdFrgyeGjTHlJMRm+DBwby3GkdGzN3vcNv4OwVtc1767mcM+7B2+gOxtloasZH+03gl+HPngQyQTMg==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/provider-utils@5.0.69':
-    resolution: {integrity: sha512-oGCXIoBKLpNrrAzJvltFHdBl20FJMyT+7edD9D4nwxoI8Scbj3y1EgKzjoF2XFhNYkMTcv1oTFDgUzLxdjqSKg==}
+  '@ai-sdk/provider-utils@5.0.70':
+    resolution: {integrity: sha512-nU213UNVHWDoEKIZ5Hm3uGPmfW7EBHC2GkIJJEDKh4HLQWgh/eizrW2jmY4efxWf7Tf/yTzKD0t6sd4kVUKlyQ==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -9929,13 +9924,13 @@ snapshots:
       pkce-challenge: 5.0.1
       zod: 4.6.5
 
-  '@ai-sdk/openai@4.0.103(zod@4.6.5)':
+  '@ai-sdk/openai@4.0.104(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 4.0.34
-      '@ai-sdk/provider-utils': 5.0.69(zod@4.6.5)
+      '@ai-sdk/provider-utils': 5.0.70(zod@4.6.5)
       zod: 4.6.5
 
-  '@ai-sdk/provider-utils@5.0.69(zod@4.6.5)':
+  '@ai-sdk/provider-utils@5.0.70(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 4.0.34
       '@standard-schema/spec': 1.1.0
