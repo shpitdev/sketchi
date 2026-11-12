@@ -179,6 +179,20 @@ describe("official brand names in diagrams", () => {
 	});
 });
 
+describe("labels read against offered logos", () => {
+	const dbt = nodeLogoIcons.filter((icon) => icon.slug === "dbt");
+
+	it("names a short product bare only once the request offers it", () => {
+		expect(labelLogos("dbt", dbt).named).toEqual([]);
+		expect(logosNamedInText("dbt", dbt)).toEqual([]);
+		for (const label of ["dbt", "dbt run", "Run dbt"])
+			expect(
+				labelLogos(label, dbt, { offered: true }).named.map((icon) => icon.slug),
+				label,
+			).toEqual(["dbt"]);
+	});
+});
+
 describe("labelLogos", () => {
 	const named = (label: string) => labelLogos(label, nodeLogoIcons).named.map((icon) => icon.slug);
 	const possible = (label: string) =>
@@ -238,7 +252,7 @@ describe("labelLogos", () => {
 			);
 		const brands = offered("Charge cards through Stripe and post each order to Slack.");
 		const drawn = (label: string) =>
-			labelLogos(label, nodeLogoIcons, brands).named.map((icon) => icon.slug);
+			labelLogos(label, nodeLogoIcons, { alwaysNamed: brands }).named.map((icon) => icon.slug);
 		expect(drawn("Stripe charge")).toEqual(["stripe"]);
 		expect(drawn("Slack order post")).toEqual(["slack"]);
 		expect(drawn("Notify Slack")).toEqual(["slack"]);
@@ -249,7 +263,7 @@ describe("labelLogos", () => {
 		// A request that also writes the word plainly keeps its steps.
 		const plain = offered("Deploy the Go API to Render, then go live and render the page.");
 		expect(plain).toEqual(new Set());
-		expect(labelLogos("Go live", nodeLogoIcons, plain).named).toEqual([]);
+		expect(labelLogos("Go live", nodeLogoIcons, { alwaysNamed: plain }).named).toEqual([]);
 	});
 
 	it("names an English first word only as a whole label or before a tech noun", () => {

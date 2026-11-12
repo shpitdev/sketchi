@@ -59,7 +59,9 @@ export function placeNodeLogos<Node extends PlaceableNode>(
 	const offered = new Map(terms.map((term) => [term.slug, term]));
 	const alwaysNamed = new Set(logos.filter((logo) => logo.alwaysNamed).map((logo) => logo.slug));
 	// A label that names two products draws the one it is, not the platform it runs on.
-	const labelSlugs = nodes.map((node) => labelLogos(node.label, terms, alwaysNamed).named[0]?.slug);
+	const labelSlugs = nodes.map(
+		(node) => labelLogos(node.label, terms, { alwaysNamed, offered: true }).named[0]?.slug,
+	);
 	const namedByLabels = new Set(labelSlugs.filter(Boolean));
 	const diagnostics: string[] = [];
 	const placed = nodes.map((node, index) => {

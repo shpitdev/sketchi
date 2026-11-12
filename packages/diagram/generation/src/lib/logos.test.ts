@@ -300,6 +300,33 @@ describe("logos for products named by everyday words", () => {
 	});
 });
 
+describe("logos for short names that free text needs qualified", () => {
+	it("draws dbt on a bare dbt label once the request names dbt models", () => {
+		const request =
+			"Diagram the warehouse pipeline: Fivetran syncs Postgres into BigQuery, dbt models clean the tables, and Looker reads them.";
+		expect(
+			groundedLogos(request, {
+				sync: "Fivetran",
+				transform: "dbt",
+				job: "dbt nightly run",
+				read: "Looker",
+			}),
+		).toEqual({ sync: "fivetran", transform: "dbt", job: "dbt", read: "looker" });
+	});
+
+	it("offers no dbt logo when the request never names the product", () => {
+		expect(
+			groundedLogos(
+				"Flowchart of the clinic intake: assess the patient, then start DBT sessions.",
+				{
+					assess: "Assess patient",
+					therapy: "DBT",
+				},
+			),
+		).toEqual({ assess: null, therapy: null });
+	});
+});
+
 function sequenceCandidate(icons: Record<string, unknown>) {
 	const participant = (id: string, label: string) => ({
 		id,

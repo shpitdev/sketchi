@@ -142,9 +142,18 @@ interface TermIndex<Icon> {
 	readonly longest: number;
 	/** One-word terms the catalog writes in capitals ("ALB", "SQS"), keyed as phrases. */
 	readonly acronyms: ReadonlySet<string>;
+	/** Terms that name their product in free text only with a qualifier (see QUALIFIED_ONLY). */
+	readonly qualifiedOnly: ReadonlySet<string>;
 }
 
 const termIndexes = new WeakMap<readonly SearchableIcon[], TermIndex<SearchableIcon>>();
+
+/**
+ * Short names that also mean something else ("DBT" is a therapy): free text names the product
+ * only with a qualifier ("dbt models", "dbt Cloud"), while a label read against logos the
+ * request already offers names it bare ("dbt").
+ */
+const QUALIFIED_ONLY: ReadonlySet<string> = new Set(["dbt"]);
 
 /** Product-qualified aliases disambiguate names that are also ordinary words. */
 const QUALIFIED_PRODUCT_TERMS: ReadonlySet<string> = new Set([
@@ -190,14 +199,15 @@ function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): TermInd
 	if (cached) return cached as TermIndex<Icon>;
 	const index = new Map<string, Icon[]>();
 	const acronyms = new Set<string>();
+	const qualifiedOnly = new Set<string>();
 	let longest = 1;
 	const add = (term: string, icon: Icon) => {
 		const words = termTokens(term);
 		const key = phraseKey(words);
-		// This short token also names a therapy; require a qualified product alias.
-		if (!key || (icon.slug === "dbt" && words.length === 1)) return;
+		if (!key) return;
 		longest = Math.max(longest, words.length);
 		if (isAcronym(term)) acronyms.add(key);
+		if (QUALIFIED_ONLY.has(key)) qualifiedOnly.add(key);
 		const entries = index.get(key) ?? [];
 		if (!entries.includes(icon)) entries.push(icon);
 		index.set(key, entries);
@@ -208,7 +218,7 @@ function termIndex<Icon extends SearchableIcon>(icons: readonly Icon[]): TermInd
 		add(icon.name, icon);
 		for (const alias of icon.aliases) add(alias, icon);
 	}
-	const built = { icons: index, longest, acronyms };
+	const built = { icons: index, longest, acronyms, qualifiedOnly };
 	termIndexes.set(icons, built);
 	return built;
 }
@@ -235,9 +245,14 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 		 * that product and never uses the word otherwise (see NamedLogo.alwaysNamed).
 		 */
 		readonly alwaysNamed?: ReadonlySet<string>;
+		/**
+		 * The icons are logos the request already names, so a name that free text needs qualified
+		 * counts bare ("dbt" once the request said "dbt models").
+		 */
+		readonly offered?: boolean;
 	} = {},
 ): IconMention<Icon>[] {
-	const { icons: index, longest, acronyms } = termIndex(icons);
+	const { icons: index, longest, acronyms, qualifiedOnly } = termIndex(icons);
 	const tokens = tokenize(text);
 	const mentions: IconMention<Icon>[] = [];
 	const seen = new Map<string, number>();
@@ -247,7 +262,7 @@ export function matchIconMentions<Icon extends SearchableIcon>(
 			const phraseTokens = tokens.slice(start, start + length);
 			const key = phraseKey(phraseTokens.map((token) => token.lower));
 			const entries = index.get(key);
-			if (!entries) continue;
+			if (!entries || (qualifiedOnly.has(key) && options.offered !== true)) continue;
 			const acronym =
 				phraseTokens.length === 1 && acronyms.has(key) && isAcronym(phraseTokens[0]!.raw);
 			const distinctive =
@@ -417,12 +432,14 @@ function namesProduct(mention: IconMention): boolean {
 export function labelLogos<Icon extends SearchableIcon>(
 	label: string,
 	icons: readonly Icon[],
-	/** Products the request names by an everyday word it never uses otherwise (see NamedLogo.alwaysNamed). */
-	alwaysNamed?: ReadonlySet<string>,
+	options: Pick<
+		NonNullable<Parameters<typeof matchIconMentions>[3]>,
+		"alwaysNamed" | "offered"
+	> = {},
 ): LabelLogos<Icon> {
 	const mentions = matchIconMentions(label, icons, MAX_TEXT_ICON_MATCHES, {
+		...options,
 		labelInitial: true,
-		...(alwaysNamed ? { alwaysNamed } : {}),
 	});
 	// A first word that is an English word reads as a step unless the label shows it is a name;
 	// a name that is no English word ("Kafka", "Kubernetes") is distinctive and always counts.
