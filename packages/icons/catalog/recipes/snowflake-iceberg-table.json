@@ -1,0 +1,41 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 5,
+			"y": 2,
+			"width": 14,
+			"height": 12,
+			"rounded": true,
+			"stroke": "#29b5e8",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[5, 6.5],
+				[19, 6.5]
+			],
+			"stroke": "#29b5e8",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 3,
+			"y": 15.5,
+			"width": 18,
+			"height": 7,
+			"rounded": true,
+			"stroke": "#11567f",
+			"fill": "#11567f"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 19,
+			"text": "ICE",
+			"size": 5.5,
+			"color": "paper"
+		}
+	]
+}

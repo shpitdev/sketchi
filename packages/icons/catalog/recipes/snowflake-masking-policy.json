@@ -1,0 +1,71 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 5,
+			"y": 1,
+			"width": 11,
+			"height": 13,
+			"rounded": true,
+			"stroke": "#29b5e8",
+			"pen": 2
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[8, 5],
+				[13, 5]
+			],
+			"stroke": "#29b5e8"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[8, 8],
+				[12, 8]
+			],
+			"stroke": "#29b5e8"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[8, 11],
+				[11, 11]
+			],
+			"stroke": "#29b5e8"
+		},
+		{
+			"kind": "stroke",
+			"points": [
+				[17, 8],
+				[20.5, 10],
+				[20, 13.5],
+				[17, 15.5],
+				[14, 13.5],
+				[13.5, 10]
+			],
+			"closed": true,
+			"stroke": "#29b5e8",
+			"fill": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 1,
+			"y": 16,
+			"width": 22,
+			"height": 7.5,
+			"rounded": true,
+			"stroke": "#11567f",
+			"fill": "#11567f"
+		},
+		{
+			"kind": "text",
+			"cx": 12,
+			"cy": 19.8,
+			"text": "MASK",
+			"size": 6,
+			"color": "paper"
+		}
+	]
+}

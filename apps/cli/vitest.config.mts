@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { gzipSync } from "node:zlib";
 import { defineConfig } from "vitest/config";
 
 const excalifontDirectory = new URL(
@@ -50,6 +52,13 @@ export default defineConfig(() => ({
 			excalifontFiles.map((file) =>
 				readFileSync(new URL(file, excalifontDirectory)).toString("base64"),
 			),
+		),
+		__SKETCHI_NODE_LOGOS_GZIP_BASE64__: JSON.stringify(
+			gzipSync(
+				readFileSync(
+					createRequire(import.meta.url).resolve("@sketchi/icon-catalog/node-logo-svgs"),
+				),
+			).toString("base64"),
 		),
 		__SKETCHI_RESVG_WASM_BASE64__: JSON.stringify(
 			readFileSync(

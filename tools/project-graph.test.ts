@@ -139,7 +139,7 @@ const approvedRuntimeBoundaryFiles = [
 	"tools/icon-batch/src/draw-mark.ts",
 ];
 const approvedManagedPromiseSiteCounts: Record<string, number> = {
-	"apps/cli/scripts/build.mjs": 27,
+	"apps/cli/scripts/build.mjs": 29,
 	"apps/cli/scripts/bundle-report.mjs": 8,
 	"apps/cli/scripts/package.mjs": 8,
 	"apps/cli/scripts/smoke.mjs": 221,

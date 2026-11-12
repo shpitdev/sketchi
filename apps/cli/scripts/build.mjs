@@ -1,6 +1,8 @@
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 
 import { BannerPlugin, DefinePlugin, IgnorePlugin, optimize, rspack } from "@rspack/core";
 
@@ -32,6 +34,15 @@ const excalifontBase64 = await Promise.all(
 		(await readFile(resolve(excalifontDirectory, file))).toString("base64"),
 	),
 );
+
+// Every node logo's SVG, gzipped: as a JSON module its quotes are escaped twice
+// and it takes more than a quarter of the published JavaScript.
+const nodeLogoSvgs = await readFile(
+	createRequire(resolve(projectRoot, "package.json")).resolve(
+		"@sketchi/icon-catalog/node-logo-svgs",
+	),
+);
+const nodeLogosGzipBase64 = gzipSync(nodeLogoSvgs, { level: 9 }).toString("base64");
 
 await rm(outputDirectory, { force: true, recursive: true });
 await mkdir(outputDirectory, { recursive: true });
@@ -87,6 +98,7 @@ const compiler = rspack({
 	plugins: [
 		new DefinePlugin({
 			__SKETCHI_EXCALIFONT_BASE64__: JSON.stringify(excalifontBase64),
+			__SKETCHI_NODE_LOGOS_GZIP_BASE64__: JSON.stringify(nodeLogosGzipBase64),
 			__SKETCHI_RESVG_WASM_BASE64__: JSON.stringify(resvgWasm.toString("base64")),
 			__SKETCHI_VERSION__: JSON.stringify(version),
 		}),

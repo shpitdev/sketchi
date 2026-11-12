@@ -338,8 +338,10 @@ const TECH_NOUNS: ReadonlySet<string> = new Set(
 const GENERIC_COLLECTIONS: ReadonlySet<string> = new Set([
 	"aws",
 	"aws-resources",
+	"databricks",
 	"gcp",
 	"gcp-products",
+	"snowflake",
 ]);
 const GENERIC_TECH_SLUGS: ReadonlySet<string> = new Set([
 	"automatic",

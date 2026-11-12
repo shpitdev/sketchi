@@ -1,0 +1,35 @@
+{
+	"parts": [
+		{
+			"kind": "rect",
+			"x": 6,
+			"y": 2.5,
+			"width": 15.5,
+			"height": 19,
+			"rounded": true,
+			"stroke": "#28b5e8",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 14.5,
+			"y": 2.5,
+			"width": 7,
+			"height": 6,
+			"rounded": true,
+			"stroke": "#28b5e8",
+			"fill": "paper",
+			"pen": 2
+		},
+		{
+			"kind": "rect",
+			"x": 1.5,
+			"y": 10.5,
+			"width": 16.5,
+			"height": 7,
+			"rounded": true,
+			"stroke": "#11567f",
+			"fill": "#11567f"
+		}
+	]
+}

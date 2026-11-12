@@ -41,7 +41,8 @@ become the shipped mark's aliases, and `getIconBySlug`, source paths and
 diagram slug lookups follow the folded slug to the shipped mark. Its SVG stays
 under `svg/`, so a URL already published for it keeps working.
 
-Vendor icon sets (AWS: `aws` for services and categories, `aws-resources`)
+Vendor icon sets (AWS: `aws` for services and categories, `aws-resources`;
+Databricks: `databricks`; Snowflake: `snowflake`)
 come with the vendor's product names and official aliases in the pipeline
 record, which the manifest uses as they are. `src/vendor-aliases.ts` adds the
 names architecture labels use for them: either vendor prefix and the bare name
