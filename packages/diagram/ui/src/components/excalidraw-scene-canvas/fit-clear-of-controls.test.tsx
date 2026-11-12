@@ -35,6 +35,14 @@ describe("fitClearOfControls", () => {
 		});
 	});
 
+	it("keeps the plain fit when no fit clears the controls", () => {
+		// At Excalidraw's smallest zoom this scene still reaches the zoom bar, and
+		// insetting it would only clip its far edge.
+		expect(
+			fitClearOfControls(stage, { height: 4500, width: 7000 }, [menu, zoomBar]),
+		).toBeUndefined();
+	});
+
 	it("clears the menu alone when it is the only control", () => {
 		// A strip beside the menu costs this wide diagram less than bands above and below.
 		expect(fitClearOfControls(stage, { height: 1070, width: 1500 }, [menu])).toEqual({

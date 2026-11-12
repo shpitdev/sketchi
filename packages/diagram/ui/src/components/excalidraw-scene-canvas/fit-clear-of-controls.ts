@@ -82,10 +82,11 @@ const overlaps = (a: CanvasRect, b: CanvasRect) =>
 
 /**
  * The canvas offsets that fit a diagram as large as it can be without any of
- * `controls` drawn over it, or `undefined` when the plain fit already clears
- * them. The diagram either keeps clear of the bands above and below the
- * controls or of the side they sit on, whichever leaves it larger; at the
- * same size the bands win, as they keep the diagram centred across.
+ * `controls` drawn over it, or `undefined` for the plain fit: when it already
+ * clears them, or when no fit can. The diagram either keeps clear of the
+ * bands above and below the controls or of the side they sit on, whichever
+ * leaves it larger; at the same size the bands win, as they keep the diagram
+ * centred across.
  */
 export function fitClearOfControls(
 	viewport: { readonly height: number; readonly width: number },
@@ -112,5 +113,6 @@ export function fitClearOfControls(
 		.map((offsets) => place(viewport, content, offsets))
 		.filter(clear)
 		.sort((a, b) => b.zoom - a.zoom);
-	return candidates[0]?.offsets ?? { ...sides, ...bands };
+	// A scene too large to clear them even at Excalidraw's smallest zoom keeps the plain fit.
+	return candidates[0]?.offsets;
 }
