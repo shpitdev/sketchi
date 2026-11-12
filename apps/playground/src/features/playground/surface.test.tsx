@@ -161,12 +161,17 @@ describe("playground surface", () => {
 
 		const starters = screen.getByLabelText("Starter prompts");
 		expect([...starters.children].map((starter) => starter.textContent)).toEqual([
-			"Login flow",
-			"CI/CD pipeline",
-			"Checkout sequence",
+			"AWS architecture",
+			"Data platform",
+			"Palantir Foundry",
+			"Stripe checkout",
+			"Launch Gantt",
+			"Revenue Sankey",
 		]);
-		fireEvent.click(screen.getByRole("button", { name: "Login flow" }));
-		expect(selections).toEqual(["Sketch a login flow with retries and a fraud check"]);
+		fireEvent.click(screen.getByRole("button", { name: "Stripe checkout" }));
+		expect(selections).toEqual([
+			"Sequence diagram of checkout with Stripe: the browser posts the cart to our API, the API creates a PaymentIntent in Stripe, Stripe sends a payment_intent.succeeded webhook, and the API saves the order in Postgres and emails a receipt through SendGrid.",
+		]);
 		expect(screen.queryByText(/mind map/i)).toBeNull();
 		expect(screen.queryByRole("link")).toBeNull();
 	});
