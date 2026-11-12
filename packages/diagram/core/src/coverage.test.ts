@@ -294,6 +294,58 @@ describe("flowchart connections and containers", () => {
 	});
 });
 
+describe("the words that name a zone", () => {
+	const diagram = (labels: readonly string[]) => ({
+		type: "flowchart",
+		nodes: [
+			{ id: "alb", label: "ALB" },
+			{ id: "ecs", label: "ECS" },
+		],
+		edges: [{ source: "alb", target: "ecs" }],
+		groups: labels.map((label, index) => ({ id: `g${index}`, label })),
+	});
+	const missing = (request: string, labels: readonly string[]) =>
+		checkRequestCoverage(request, diagram(labels))
+			.filter((issue) => issue.code === "flowchart_container_missing")
+			.map((issue) => issue.message);
+
+	it("reads no preposition, determiner or word before them as part of a zone's name", () => {
+		const vpc = ["VPC", "Public subnet", "Private subnet"];
+		for (const request of [
+			"Inside one VPC, the ALB in the public subnet sends traffic to ECS in the private subnet.",
+			"Within our VPC, the ALB in the public subnet sends traffic to ECS in the private subnet.",
+			"The ALB in VPC sends traffic to ECS throughout the private subnet.",
+			"Users reach the VPC, where the ALB behind the public subnet calls ECS.",
+		])
+			expect(missing(request, vpc), request).toEqual([]);
+		expect(missing("ECS sits outside the DMZ.", ["DMZ"])).toEqual([]);
+	});
+
+	it("keeps a capitalized name that starts with a preposition", () => {
+		expect(missing("Our Inside Sales network calls ECS.", ["Network"])[0]).toContain(
+			'"Inside Sales network"',
+		);
+		expect(missing("Our Inside Sales network calls ECS.", ["Inside Sales network"])).toEqual([]);
+		expect(missing("The ALB sits in the Edge Network.", ["Network"])[0]).toContain(
+			'"Edge Network"',
+		);
+		expect(missing("Inside the production VPC, the ALB calls ECS.", ["VPC"])[0]).toContain(
+			'"production VPC"',
+		);
+	});
+
+	it("keeps the words before a number in a zone's name", () => {
+		for (const [request, zone, label] of [
+			["The ALB sits in the Layer 2 network.", '"Layer 2 network"', "Layer 2 network"],
+			["ECS runs inside the Tier 3 subnet.", '"Tier 3 subnet"', "Tier 3 subnet"],
+			["The ALB sits in our Edge 2 zone.", '"Edge 2 zone"', "Edge 2 zone"],
+		] as const) {
+			expect(missing(request, ["Network", "Subnet", "Zone"])[0], request).toContain(zone);
+			expect(missing(request, [label]), request).toEqual([]);
+		}
+	});
+});
+
 describe("key markers and nullable columns in SQL", () => {
 	it("reports a unique, key or nullable column the entity marks otherwise", () => {
 		const request = `ER diagram

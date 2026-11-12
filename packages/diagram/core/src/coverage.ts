@@ -1711,8 +1711,8 @@ function zoneName(
 	const named = namedContainers(phrase)[0];
 	if (named) return named;
 	const cloud = /\b((?:[\w-]+\s+){1,2})clouds?\b/iu.exec(phrase);
-	const modifiers = words(cloud?.[1] ?? "")
-		.filter((word) => !NOT_A_NAME.has(word) && !STOP_WORDS.has(word))
+	const modifiers = words(zoneNameWords(cloud?.[1] ?? "").join(" "))
+		.filter((word) => !NOT_A_NAME.has(word))
 		.map(stemWord);
 	return modifiers.length > 0 ? { heads: ["cloud"], modifiers } : undefined;
 }
@@ -1736,6 +1736,40 @@ const NOT_A_NAME = new Set(
 		" ",
 	),
 );
+/** Words that point at a zone: whatever precedes one in a zone phrase is not its name. */
+const DETERMINERS = new Set("a an the our your their its this that each every all both".split(" "));
+/** Words that place a zone: whatever precedes one in a zone phrase is not its name. */
+const LOCATIVE = new Set(
+	"in on at for with by from into onto of to inside within across outside throughout behind under over between among beyond through via near beside around toward towards against past upon below above beneath alongside".split(
+		" ",
+	),
+);
+
+/**
+ * The words of a zone phrase's lead that name the zone: those after its last preposition or
+ * determiner, so "an ALB inside one VPC" names a VPC and "users reach the VPC" no "reach VPC". A
+ * number stays part of the name ("Layer 2 network"), and a capitalized preposition before another
+ * capitalized word starts one ("Inside Sales network").
+ */
+function zoneNameWords(lead: string): string[] {
+	const tokens = lead.trim().split(/\s+/u).filter(Boolean);
+	const capitalized = (word: string | undefined) => word !== undefined && /^[A-Z]/u.test(word);
+	let start = 0;
+	tokens.forEach((token, index) => {
+		const word = token.toLowerCase();
+		const next = tokens[index + 1];
+		const titled =
+			capitalized(token) && capitalized(next) && !NOT_A_NAME.has(next?.toLowerCase() ?? "");
+		if (DETERMINERS.has(word) || (LOCATIVE.has(word) && !titled)) start = index + 1;
+	});
+	return tokens
+		.slice(start)
+		.filter(
+			(word) =>
+				/^\d+$/u.test(word) ||
+				(!NOT_A_NAME.has(word.toLowerCase()) && !STOP_WORDS.has(word.toLowerCase())),
+		);
+}
 
 function namedContainers(
 	request: string,
@@ -1750,18 +1784,12 @@ function namedContainers(
 		if (/s$/iu.test(head) && !/^(?:dmz|vpc)$/iu.test(head)) return [];
 		const headStems = stems(head);
 		const joinedHead = headStems.join(" ");
-		const modifiers = words(match[1] ?? "")
-			.filter((word) => !NOT_A_NAME.has(word) && !STOP_WORDS.has(word))
+		const named = zoneNameWords(match[1] ?? "");
+		const modifiers = words(named.join(" "))
+			.filter((word) => !NOT_A_NAME.has(word))
 			.map(stemWord);
 		const specific = CONTAINER_HEADS.test(joinedHead);
 		if (!specific && (!QUALIFIED_HEADS.test(joinedHead) || modifiers.length === 0)) return [];
-		const named = (match[1] ?? "")
-			.trim()
-			.split(/\s+/u)
-			.filter(
-				(word) =>
-					word && !NOT_A_NAME.has(word.toLowerCase()) && !STOP_WORDS.has(word.toLowerCase()),
-			);
 		const phrase = [...named, head].join(" ");
 		return [{ phrase, heads: headStems, modifiers }];
 	});
