@@ -1,5 +1,7 @@
 import type { StorybookConfig } from "@storybook/react-vite";
 
+import { excalidrawFonts } from "../../../scripts/lib/excalidraw-fonts.mjs";
+
 const config: StorybookConfig = {
 	stories: ["../src/**/*.stories.tsx"],
 	staticDirs: ["../public"],
@@ -11,6 +13,11 @@ const config: StorybookConfig = {
 				viteConfigPath: new URL("vite.config.ts", import.meta.url).pathname,
 			},
 		},
+	},
+	// The home diagram's editor draws with Excalidraw's fonts from /fonts/.
+	viteFinal: async (config) => {
+		config.plugins = [...(config.plugins ?? []), excalidrawFonts()];
+		return config;
 	},
 };
 

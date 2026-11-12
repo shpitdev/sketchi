@@ -563,6 +563,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@excalidraw/excalidraw':
+        specifier: 0.18.1
+        version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@sketchi/diagram-ui':
+        specifier: workspace:*
+        version: link:../../packages/diagram/ui
       '@sketchi/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -576,6 +582,9 @@ importers:
       '@tailwindcss/vite':
         specifier: 4.3.3
         version: 4.3.3(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
+      linkedom:
+        specifier: 0.18.14
+        version: 0.18.14
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3

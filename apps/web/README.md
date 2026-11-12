@@ -27,6 +27,8 @@ pnpm nx build web
 pnpm nx storybook web
 pnpm nx build-storybook web
 pnpm nx deploy web
+pnpm nx run web:social-card    # redraw the link-preview card
+pnpm nx run web:home-diagram   # re-export the home diagram after replacing its scene
 ```
 
 ## Usage

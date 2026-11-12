@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 import { localInspectorPort, localViteCacheDir } from "../../tools/local-dev-ports";
+import { excalidrawFonts } from "../../scripts/lib/excalidraw-fonts.mjs";
 import { workerProjectConfig } from "../../scripts/lib/worker-apps.mjs";
 
 const workerProject = workerProjectConfig("web");
@@ -18,6 +19,8 @@ export default defineConfig({
 	cacheDir: localViteCacheDir("web"),
 	publicDir: new URL("./public", import.meta.url).pathname,
 	plugins: [
+		// The home diagram's editor draws with Excalidraw's fonts from /fonts/.
+		excalidrawFonts(),
 		cloudflare({
 			configPath: new URL("./wrangler.jsonc", import.meta.url).pathname,
 			inspectorPort: localInspectorPort(6201),

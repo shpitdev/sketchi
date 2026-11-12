@@ -11,6 +11,17 @@
 	--breakpoint-nav: 860px;
 }
 
+/* One type scale. Excalifont belongs to the wordmark and the drawings, so page
+   text is the UI sans, and the mono is kept for commands and code. */
+:root {
+	--type-display: clamp(36px, 4.4vw, 54px); /* the page's heading */
+	--type-section: clamp(26px, 3vw, 34px); /* section headings */
+	--type-lead: 18px; /* the paragraph under a heading */
+	--type-body: 16px; /* running text */
+	--type-label: 15px; /* short titles */
+	--type-meta: 13px; /* captions and requirements */
+}
+
 /* Preflight strips link underlines. Restore the browser default for links in
    running text; components that style their own links set it themselves. */
 @layer base {
@@ -150,41 +161,34 @@
 /* ===================================================================== */
 /* Home hero                                                             */
 /* ===================================================================== */
-.home-hero {
-	overflow: hidden;
-	position: relative;
-}
-
 .home-hero__inner {
 	align-items: center;
 	display: grid;
-	gap: 52px;
-	grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
-	padding-block: clamp(44px, 8vw, 88px);
+	gap: clamp(40px, 6vw, 80px);
+	grid-template-columns: minmax(0, 1fr) minmax(0, 516px);
+	padding-block: clamp(32px, 5vw, 56px) clamp(48px, 7vw, 80px);
 }
 
 .home-hero__copy {
 	min-width: 0;
 }
 
-/* Sized so "Editable diagrams" holds one line in the desktop column. */
 .home-hero__title {
-	font-size: clamp(36px, 4.6vw, 56px);
-	letter-spacing: -0.025em;
-	line-height: 1.08;
+	font-size: var(--type-display);
+	letter-spacing: -0.03em;
+	line-height: 1.05;
 	margin: 0;
+	max-width: 11em;
 	text-wrap: balance;
 }
 
-/* A real underline, so it breaks around the descenders in "prompt". */
-.home-hero__title em {
-	color: var(--accent-ink);
-	font-style: normal;
-	text-decoration: underline;
-	text-decoration-color: var(--accent);
-	text-decoration-skip-ink: auto;
-	text-decoration-thickness: 0.08em;
-	text-underline-offset: 0.16em;
+.home-hero__lead {
+	color: var(--ink-2);
+	font-size: var(--type-lead);
+	line-height: 1.55;
+	margin: 20px 0 0;
+	max-width: 30em;
+	text-wrap: pretty;
 }
 
 .home-hero__actions {
@@ -195,250 +199,81 @@
 	margin-top: 32px;
 }
 
-.home-hero__visual {
-	min-width: 0;
-	position: relative;
-}
-
-/* ---- the signature: a sketched diagram on graph paper ---------------- */
-.sketch-board {
+/* ---- the diagram, under the prompt that made it ---------------------- */
+/* The board is never wider than the export plus its border, so on a laptop
+   the drawing shows at its own size and its labels stay readable. */
+.home-diagram {
 	background: var(--card);
 	border: 1px solid var(--line-2);
 	border-radius: var(--r-lg);
 	box-shadow: var(--shadow-lg);
+	margin: 0;
+	max-width: 516px;
+	min-width: 0;
 	overflow: hidden;
-	position: relative;
-}
-
-.sketch-board__bar {
-	align-items: center;
-	background: color-mix(in srgb, var(--card) 86%, var(--paper));
-	border-bottom: 1px solid var(--line);
-	display: flex;
-	gap: 10px;
-	justify-content: space-between;
-	padding: 11px 15px;
-}
-
-.sketch-board__dots {
-	display: inline-flex;
-	gap: 6px;
-}
-
-.sketch-board__dots i {
-	background: var(--line-2);
-	block-size: 9px;
-	border-radius: 999px;
-	inline-size: 9px;
-}
-
-.sketch-board__dots i:first-child {
-	background: var(--accent);
-}
-
-.sketch-board__file {
-	color: var(--ink-3);
-	font-size: 12.5px;
-}
-
-.sketch-board__prompt {
-	align-items: center;
-	background: var(--paper-2);
-	border-bottom: 1px solid var(--line);
-	color: var(--ink);
-	display: flex;
-	gap: 9px;
-	padding: 12px 16px;
-}
-
-.sketch-board__pencil {
-	color: var(--accent);
-	flex: none;
-}
-
-.sketch-board__typed {
-	font-size: 14.5px;
-	overflow: hidden;
-	white-space: nowrap;
-}
-
-.sketch-board__caret {
-	animation: sk-blink 1.1s steps(1) infinite;
-	background: var(--accent);
-	block-size: 15px;
-	flex: none;
-	inline-size: 2px;
-}
-
-@keyframes sk-blink {
-	50% {
-		opacity: 0;
-	}
-}
-
-.sketch-board__canvas {
-	aspect-ratio: 14 / 10;
-	background-color: var(--paper);
-	background-image:
-		linear-gradient(color-mix(in srgb, var(--line) 65%, transparent) 1px, transparent 1px),
-		linear-gradient(90deg, color-mix(in srgb, var(--line) 65%, transparent) 1px, transparent 1px);
-	background-size: 22px 22px;
-	position: relative;
-}
-
-/* The node + wire layer. Positioned as the anchor box for the absolutely
-   placed nodes and wires so the whole composition scales as one unit. */
-.sketch-board__scene {
-	inset: 0;
-	position: absolute;
-	translate: 0 12%;
-}
-
-.sketch-board__wires {
-	height: 100%;
-	inset: 0;
-	overflow: visible;
-	position: absolute;
 	width: 100%;
 }
 
-.wire,
-.wire-head {
-	fill: none;
-	stroke: var(--accent-ink);
-	stroke-linecap: round;
-	stroke-linejoin: round;
-	stroke-width: 2;
-	vector-effect: non-scaling-stroke;
-}
-
-.wire {
-	animation: sk-draw 0.7s var(--ease) both;
-	animation-delay: var(--delay, 0s);
-	stroke-dasharray: var(--wire-length);
-	stroke-dashoffset: var(--wire-length);
-}
-
-.wire-head {
-	animation: wire-head-appear 0.01s step-end both;
-	animation-delay: calc(var(--delay, 0s) + 0.7s);
-}
-
-@keyframes wire-head-appear {
-	from {
-		opacity: 0;
-	}
-	to {
-		opacity: 1;
-	}
-}
-
-.sketch-node {
+.home-diagram__bar {
 	align-items: center;
-	animation: sketch-node-rise 0.5s var(--ease) both;
+	background: var(--paper-2);
+	border-bottom: 1px solid var(--line);
+	display: flex;
+	gap: 14px;
+	justify-content: space-between;
+	padding: 10px 10px 10px 16px;
+}
+
+.home-diagram__prompt {
+	color: var(--ink-2);
+	font-size: var(--type-meta);
+	line-height: 1.45;
+	min-width: 0;
+	text-wrap: pretty;
+}
+
+/* Edit and Reset share one width, so swapping them never re-wraps the prompt
+   and moves the drawing. */
+.home-diagram__bar [data-slot="button"] {
 	background: var(--card);
-	border: 1.5px solid var(--ink);
-	border-radius: 10px;
-	box-shadow: 2px 3px 0 rgba(26, 23, 18, 0.13);
-	display: inline-flex;
-	gap: 7px;
-	left: var(--node-x);
-	padding: 8px 11px;
-	position: absolute;
-	top: var(--node-y);
-	transform: translate(-50%, -50%) rotate(var(--tilt, -1.5deg));
-	white-space: nowrap;
-	/* Without this, a node near the right edge shrinks to the space left of
-	   its anchor and the label spills past its border. */
-	width: max-content;
-	z-index: 2;
+	flex: none;
+	min-width: 5.5rem;
 }
 
-@keyframes sketch-node-rise {
-	from {
-		opacity: 0;
-		transform: translate(-50%, calc(-50% + 14px)) rotate(var(--tilt, -1.5deg));
-	}
-	to {
-		opacity: 1;
-		transform: translate(-50%, -50%) rotate(var(--tilt, -1.5deg));
-	}
+.home-diagram__paper {
+	position: relative;
 }
 
-.sketch-node:nth-of-type(2n) {
-	--tilt: 1.5deg;
-}
-
-.sketch-node__icon {
-	block-size: 22px;
+.home-diagram__image {
 	display: block;
-	inline-size: 22px;
-	object-fit: contain;
+	height: auto;
+	width: 100%;
 }
 
-.sketch-node__label {
-	color: var(--ink);
-	font-family: var(--font-script);
-	font-size: 16px;
-	line-height: 1.2;
-}
-
-.sketch-node--ship {
-	border-color: var(--ok);
-}
-
-.sketch-node--decision {
-	--tilt: 0deg;
-	background: transparent;
-	border: none;
-	box-shadow: none;
-	padding: 0;
-}
-
-.sketch-node--decision::before {
-	background: var(--accent-wash);
-	block-size: 66px;
-	border: 1.5px solid var(--accent);
-	border-radius: 9px;
-	box-shadow: 2px 3px 0 rgba(106, 78, 92, 0.16);
-	content: "";
-	inline-size: 66px;
-	inset: 50% auto auto 50%;
+.home-diagram__editor {
+	inset: 0;
 	position: absolute;
-	rotate: 45deg;
-	translate: -50% -50%;
-	z-index: -1;
 }
 
-.sketch-node--decision .sketch-node__label {
-	color: var(--accent-ink);
-	line-height: 1.05;
-	max-width: 54px;
-	text-align: center;
-	white-space: normal;
+.home-diagram__frame {
+	height: 100%;
 }
 
-.sketch-tag {
-	color: var(--accent-ink);
-	font-family: var(--font-script);
-	font-size: 17px;
-	position: absolute;
-	z-index: 3;
+/* Excalidraw opens its dialogs (Export image, Save to, Help) in a container at
+   the end of <body>, placed for an editor that fills the page. Here the editor
+   sits partway down a scrolling page, so the container is pinned to the
+   viewport instead of the top of the document. */
+body > .excalidraw.excalidraw-modal-container {
+	inset: 0;
+	position: fixed;
 }
 
-/* Centred in the gap between the decision and ship nodes at every width. */
-.sketch-tag--yes {
-	left: 67.5%;
-	top: 43%;
-	transform: translateX(-50%) rotate(-6deg);
-}
-
-/* Right-aligned just outside the "no" wire, which runs down x = 34%. */
-.sketch-tag--no {
-	color: var(--ink-3);
-	left: 34%;
-	top: 39%;
-	transform: translateX(calc(-100% - 6px)) rotate(-6deg);
+.home-diagram__error {
+	border-top: 1px solid var(--line);
+	color: var(--danger-ink);
+	font-size: var(--type-meta);
+	margin: 0;
+	padding: 10px 16px;
 }
 
 /* ===================================================================== */
@@ -639,15 +474,17 @@
 
 .benefit__price {
 	color: var(--accent-ink);
-	font-family: var(--font-script);
-	font-size: 38px;
+	font-size: 30px;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	letter-spacing: -0.02em;
 	line-height: 1;
 }
 
 .benefit__title {
 	color: var(--ink);
-	font-size: 16px;
-	font-weight: 700;
+	font-size: var(--type-label);
+	font-weight: 600;
 	line-height: 1.3;
 	min-width: 0;
 }
@@ -697,28 +534,28 @@
 }
 
 /* ===================================================================== */
-/* CLI band — the terminal as a peer of the playground and the agent      */
-/* route, so the install command is the section rather than a link to it. */
+/* CLI band — the install command is the section, not a link to it.      */
 /* ===================================================================== */
-/* The copy column is now a title, a line, and a link, so it centers against
-   the terminal card rather than hanging from its top edge. */
+.cli-band__title,
+.icon-wall__title {
+	font-size: var(--type-section);
+	letter-spacing: -0.02em;
+	margin: 0;
+}
+
 .cli-band__inner {
 	align-items: center;
 	display: grid;
 	gap: 44px;
-	grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
-}
-
-.cli-band__title {
-	max-width: 18ch;
+	grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
 }
 
 .cli-band__lead {
 	color: var(--ink-2);
-	font-size: 17px;
+	font-size: var(--type-body);
 	line-height: 1.6;
 	margin: 16px 0 0;
-	max-width: 46ch;
+	max-width: 44ch;
 }
 
 .cli-band__lead code {
@@ -736,7 +573,7 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: 12px 20px;
-	margin-top: 30px;
+	margin-top: 28px;
 }
 
 /* The npm mark is a solid red tile; round it a touch so it sits in the button
@@ -746,64 +583,23 @@
 	flex: none;
 }
 
-/* Terminal card: same chrome as the hero board, dark body like a codeblock. */
-.cli-band__terminal {
-	background: var(--card);
-	border: 1px solid var(--line);
-	border-radius: var(--r-lg);
-	box-shadow: var(--shadow-md);
+.cli-band__commands {
 	min-width: 0;
-	overflow: hidden;
 }
 
-.cli-band__bar {
-	align-items: center;
-	background: color-mix(in srgb, var(--card) 86%, var(--paper));
-	border-bottom: 1px solid var(--line);
-	display: flex;
-	gap: 10px;
-	justify-content: space-between;
-	padding: 11px 15px;
-}
-
-.cli-band__dots {
-	display: inline-flex;
-	gap: 6px;
-}
-
-.cli-band__dots i {
-	background: var(--line-2);
-	block-size: 9px;
-	border-radius: 999px;
-	inline-size: 9px;
-}
-
-.cli-band__dots i:first-child {
-	background: var(--accent);
-}
-
-.cli-band__shell {
-	color: var(--ink-3);
-	font-size: 12.5px;
-}
-
-.cli-band__body {
-	padding: 18px 18px 20px;
-}
-
-.cli-band__body .command-block:first-child {
+.cli-band__commands .command-block:first-child {
 	margin-top: 0;
 }
 
-/* The example command is a different kind of line from the two installers, so
-   it gets a wider gap rather than a label. */
+/* The example command is a different kind of line from the installer, so it
+   gets a wider gap rather than a label. */
 .cli-band__example {
-	margin-top: 24px;
+	margin-top: 20px;
 }
 
 .cli-band__req {
 	color: var(--ink-3);
-	font-size: 13px;
+	font-size: var(--type-meta);
 	margin: 12px 0 0;
 }
 
@@ -822,8 +618,46 @@
 	justify-content: space-between;
 }
 
-.icon-wall__title {
-	max-width: 20ch;
+.icon-wall__copy {
+	max-width: 640px;
+}
+
+.icon-wall__lead {
+	color: var(--ink-2);
+	font-size: var(--type-body);
+	line-height: 1.6;
+	margin: 16px 0 0;
+}
+
+.icon-wall__packs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	list-style: none;
+	margin: 18px 0 0;
+	padding: 0;
+}
+
+.icon-wall__pack {
+	background: var(--card);
+	border: 1px solid var(--line-2);
+	border-radius: 999px;
+	color: var(--ink);
+	display: inline-flex;
+	font-size: 14px;
+	font-weight: 600;
+	padding: 5px 13px;
+	text-decoration: none;
+	transition: border-color 0.16s var(--ease);
+}
+
+.icon-wall__pack:hover {
+	border-color: var(--ink);
+}
+
+.icon-wall__pack:focus-visible {
+	outline: 2px solid var(--blueprint);
+	outline-offset: 2px;
 }
 
 /* A contained "icon tray" — same dot-grid motif as the hero board, so the
@@ -1396,14 +1230,17 @@
 		text-align: center;
 	}
 
+	.home-hero__title,
+	.home-hero__lead {
+		margin-inline: auto;
+	}
+
 	.home-hero__actions {
 		justify-content: center;
 	}
 
-	.home-hero__visual {
+	.home-diagram {
 		justify-self: center;
-		max-width: 620px;
-		width: 100%;
 	}
 
 	/* Still three equal columns, each centred with its visual on top. */
@@ -1423,7 +1260,6 @@
 		grid-template-columns: 1fr;
 	}
 
-	.cli-band__title,
 	.cli-band__lead {
 		max-width: none;
 	}
@@ -1478,6 +1314,20 @@
 	/* Phones: left-aligned copy over two full-width actions of equal size. */
 	.home-hero__copy {
 		text-align: start;
+	}
+
+	.home-hero__title,
+	.home-hero__lead {
+		margin-inline: 0;
+	}
+
+	.home-hero__lead {
+		font-size: var(--type-body);
+		margin-top: 14px;
+	}
+
+	.home-diagram__bar {
+		padding-inline-start: 12px;
 	}
 
 	.home-hero__actions {
@@ -1540,37 +1390,5 @@
 
 	.docs-article .sk-section__title {
 		font-size: 26px;
-	}
-}
-
-/* Phones: the sketch nodes are fixed-size but placed by percentage, so on a
-   narrow canvas they shrink to keep clear of each other and the frame. */
-@media (max-width: 600px) {
-	.sketch-node {
-		gap: 4px;
-		padding: 4px 7px;
-	}
-
-	.sketch-node__icon {
-		block-size: 14px;
-		inline-size: 14px;
-	}
-
-	.sketch-node__label {
-		font-size: 13px;
-	}
-
-	.sketch-node--decision::before {
-		block-size: 48px;
-		inline-size: 48px;
-	}
-
-	.sketch-node--decision .sketch-node__label {
-		font-size: 12px;
-		max-width: 40px;
-	}
-
-	.sketch-tag {
-		font-size: 14px;
 	}
 }

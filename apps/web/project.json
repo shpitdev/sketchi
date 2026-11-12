@@ -10,6 +10,7 @@
 			"inputs": [
 				"production",
 				"^production",
+				"{workspaceRoot}/scripts/lib/excalidraw-fonts.mjs",
 				"{workspaceRoot}/scripts/lib/worker-apps.mjs",
 				"{workspaceRoot}/tools/local-dev-ports.ts"
 			],
@@ -83,6 +84,12 @@
 			"dependsOn": ["^build"],
 			"options": {
 				"command": "jiti apps/web/scripts/social-card.ts"
+			}
+		},
+		"home-diagram": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "jiti apps/web/scripts/home-diagram.ts"
 			}
 		}
 	}

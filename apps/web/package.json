@@ -3,12 +3,15 @@
 	"private": true,
 	"type": "module",
 	"dependencies": {
+		"@excalidraw/excalidraw": "0.18.1",
+		"@sketchi/diagram-ui": "workspace:*",
 		"@sketchi/ui": "workspace:*",
 		"lucide-react": "1.65.0"
 	},
 	"devDependencies": {
 		"@sketchi/social-card": "workspace:*",
 		"@tailwindcss/vite": "4.3.3",
+		"linkedom": "0.18.14",
 		"tailwindcss": "4.3.3"
 	}
 }
