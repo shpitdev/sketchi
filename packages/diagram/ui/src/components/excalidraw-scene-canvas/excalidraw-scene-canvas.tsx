@@ -1,4 +1,5 @@
 import { createBranchLabelSynchronizer } from "./branch-labels";
+import { fitClearOfControls, measureCanvasControls } from "./fit-clear-of-controls";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type {
 	BinaryFiles,
@@ -29,12 +30,37 @@ function CanvasUnavailable() {
 
 // Excalidraw reads browser globals at import time, so the editor module is only
 // requested once the canvas renders in the browser.
+// The loaded module also measures scene bounds for a read-only fit.
+let sceneBounds: typeof import("@excalidraw/excalidraw").getCommonBounds | undefined;
+
 const LazyExcalidraw = lazy<ComponentType<ExcalidrawProps>>(() =>
 	loadExcalidraw().then(
-		(module) => ({ default: module.Excalidraw }),
+		(module) => {
+			sceneBounds = module.getCommonBounds;
+			return { default: module.Excalidraw };
+		},
 		() => ({ default: CanvasUnavailable }),
 	),
 );
+
+/**
+ * Where a read-only fit must leave room so Excalidraw's menu and zoom controls
+ * never sit over the diagram, or `undefined` when the plain fit is clear.
+ */
+function readOnlyFitOffsets(
+	root: HTMLElement | null,
+	elements: Parameters<NonNullable<ExcalidrawProps["onChange"]>>[0],
+	appState: Parameters<NonNullable<ExcalidrawProps["onChange"]>>[1],
+) {
+	const visible = elements.filter((element) => !element.isDeleted);
+	if (!root || !sceneBounds || visible.length === 0) return undefined;
+	const [x1, y1, x2, y2] = sceneBounds(visible);
+	return fitClearOfControls(
+		appState,
+		{ height: y2 - y1, width: x2 - x1 },
+		measureCanvasControls(root, appState),
+	);
+}
 
 const subscribeToNothing = () => () => undefined;
 const inBrowser = () => true;
@@ -102,6 +128,7 @@ export function ExcalidrawSceneCanvas({
 	zenModeEnabled = true,
 }: ExcalidrawSceneCanvasProps) {
 	const hydrated = useHydrated();
+	const rootRef = useRef<HTMLElement | null>(null);
 	// Excalidraw hands over its API from its constructor, while it renders, so
 	// this only records the newest instance. Each scene revision remounts the
 	// editor with a fresh API.
@@ -136,10 +163,14 @@ export function ExcalidrawSceneCanvas({
 					(fitted.width !== appState.width || fitted.height !== appState.height);
 				if (fitted?.api !== api || (viewModeEnabled && resized)) {
 					fittedRef.current = { api, height: appState.height, width: appState.width };
+					const canvasOffsets = viewModeEnabled
+						? readOnlyFitOffsets(rootRef.current, elements, appState)
+						: undefined;
 					api.scrollToContent(undefined, {
 						animate: false,
 						fitToViewport: true,
 						viewportZoomFactor: 1,
+						...(canvasOffsets ? { canvasOffsets } : {}),
 					});
 				}
 			}
@@ -179,6 +210,7 @@ export function ExcalidrawSceneCanvas({
 		<section
 			aria-label={title}
 			className="sketchi-excalidraw-scene-canvas"
+			ref={rootRef}
 			data-view-mode={viewModeEnabled}
 			data-testid="excalidraw-scene-canvas"
 		>

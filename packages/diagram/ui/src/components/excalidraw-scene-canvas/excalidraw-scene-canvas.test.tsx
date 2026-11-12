@@ -3,17 +3,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const excalidrawMock = vi.hoisted(() => ({
 	editors: [] as Array<{
-		readonly load: () => void;
+		readonly load: (elements?: readonly unknown[]) => void;
 		readonly resize: (width: number, height: number) => void;
 	}>,
 	props: vi.fn(),
 	scrollToContent: vi.fn(),
+	viewport: { height: 400, width: 1280 },
 }));
 
 vi.mock("@excalidraw/excalidraw", async () => {
 	const React = await import("react");
 
 	return {
+		// Every mocked scene spans a wide 1500 by 1070 diagram.
+		getCommonBounds: () => [0, 0, 1500, 1070],
 		Excalidraw: (props: {
 			excalidrawAPI?: (api: {
 				getAppState: () => object;
@@ -29,22 +32,27 @@ vi.mock("@excalidraw/excalidraw", async () => {
 			// scene (`load` stands in for that). A resize commits a new app state
 			// with the new viewport size and reports it the same way.
 			React.useState(() => {
-				let appState = { height: 400, width: 1280 };
+				let appState = { ...excalidrawMock.viewport, offsetLeft: 0, offsetTop: 0 };
 				props.excalidrawAPI?.({
 					getAppState: () => appState,
 					scrollToContent: excalidrawMock.scrollToContent,
 				});
 				excalidrawMock.editors.push({
-					load: () => props.onChange?.([], appState, {}),
+					load: (elements = []) => props.onChange?.(elements, appState, {}),
 					resize: (width, height) => {
-						appState = { height, width };
+						appState = { height, offsetLeft: 0, offsetTop: 0, width };
 						props.onChange?.([], appState, {});
 					},
 				});
 				return null;
 			});
 
-			return <div data-testid="mock-excalidraw">Mock Excalidraw</div>;
+			return (
+				<div data-testid="mock-excalidraw">
+					Mock Excalidraw
+					<button aria-label="Menu" className="main-menu-trigger" type="button" />
+				</div>
+			);
 		},
 	};
 });
@@ -65,10 +73,19 @@ const fitToViewport = {
 	viewportZoomFactor: 1,
 };
 
-function loadEditor(index: number) {
+function loadEditor(index: number, elements?: readonly unknown[]) {
 	const editor = excalidrawMock.editors[index];
 	if (!editor) throw new Error(`Editor ${index} was never constructed.`);
-	act(() => editor.load());
+	act(() => editor.load(elements));
+}
+
+/** Place Excalidraw's menu button where it sits on a laptop stage. */
+function drawMenuAtTopLeft() {
+	const menu = document.querySelector(".main-menu-trigger");
+	if (!menu) throw new Error("The mocked editor draws no menu button.");
+	vi.spyOn(menu, "getBoundingClientRect").mockReturnValue(
+		DOMRect.fromRect({ height: 36, width: 36, x: 16, y: 16 }),
+	);
 }
 
 describe("ExcalidrawSceneCanvas", () => {
@@ -77,6 +94,7 @@ describe("ExcalidrawSceneCanvas", () => {
 		excalidrawMock.editors.length = 0;
 		excalidrawMock.props.mockReset();
 		excalidrawMock.scrollToContent.mockReset();
+		excalidrawMock.viewport = { height: 400, width: 1280 };
 	});
 
 	it("renders a client-only Excalidraw shell", () => {
@@ -225,6 +243,34 @@ describe("ExcalidrawSceneCanvas", () => {
 					}),
 				}),
 			}),
+		);
+	});
+
+	it("fits a read-only diagram clear of Excalidraw's menu", async () => {
+		excalidrawMock.viewport = { height: 564, width: 820 };
+		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		render(<ExcalidrawSceneCanvas scene={scene} title="Wide diagram" viewModeEnabled />);
+		await screen.findByTestId("mock-excalidraw");
+		drawMenuAtTopLeft();
+
+		loadEditor(0, [{ isDeleted: false }]);
+		expect(excalidrawMock.scrollToContent).toHaveBeenCalledExactlyOnceWith(undefined, {
+			...fitToViewport,
+			canvasOffsets: { left: 60, right: 0 },
+		});
+	});
+
+	it("leaves an editable diagram's first fit to Excalidraw", async () => {
+		excalidrawMock.viewport = { height: 564, width: 820 };
+		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		render(<ExcalidrawSceneCanvas scene={scene} title="Wide diagram" />);
+		await screen.findByTestId("mock-excalidraw");
+		drawMenuAtTopLeft();
+
+		loadEditor(0, [{ isDeleted: false }]);
+		expect(excalidrawMock.scrollToContent).toHaveBeenCalledExactlyOnceWith(
+			undefined,
+			fitToViewport,
 		);
 	});
 });

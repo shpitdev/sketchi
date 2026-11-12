@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@excalidraw/excalidraw", async () => {
 	const { useState } = await import("react");
 	return {
+		getCommonBounds: () => [0, 0, 0, 0],
 		Excalidraw: ({ initialData }: { initialData?: { elements?: readonly unknown[] } }) => {
 			const [initialScene] = useState(() => initialData);
 			return <div data-testid="revision-editor" data-scene={JSON.stringify(initialScene)} />;
