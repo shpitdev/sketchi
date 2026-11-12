@@ -75,6 +75,9 @@ const createStudioModel = Effect.fn("playground.ai.model")(function* () {
 								sketchiSurface: "studio-agent",
 								sketchiTraceId: requestMetadata.traceId,
 							},
+							// Someone who sends the same message again wants a new run, not a replay of
+							// the answer the gateway cached for an identical request.
+							skipCache: true,
 						},
 						...(init?.signal ? { signal: init.signal } : {}),
 					},
