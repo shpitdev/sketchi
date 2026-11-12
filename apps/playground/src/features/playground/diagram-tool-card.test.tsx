@@ -55,6 +55,7 @@ describe("DiagramToolCard", () => {
 
 		rerender(view(part("input-streaming", { input: { spec: { title: "Deploy" } } })));
 		expect(trigger().getAttribute("aria-expanded")).toBe("true");
+		expect(trigger().textContent).toBe("Drawing your flowchart");
 		expect(liveBlock()?.textContent).toContain('"title": "Deploy"');
 		expect(liveBlock()?.querySelector(".studio__live-caret")).not.toBeNull();
 
@@ -64,7 +65,7 @@ describe("DiagramToolCard", () => {
 
 		rerender(view(part("output-available")));
 		expect(trigger().getAttribute("aria-expanded")).toBe("false");
-		expect(screen.getByText("Diagram ready")).toBeTruthy();
+		expect(trigger().textContent).toBe("Diagram ready");
 	});
 
 	it("opens a finished card on its result and full input", () => {
@@ -96,6 +97,10 @@ describe("DiagramToolCard", () => {
 				: view(part("output-error", { errorText: "boom" }), false),
 		);
 		expect(trigger().getAttribute("aria-expanded")).toBe("false");
+		expect(trigger().textContent).toBe(
+			ending === "stopped" ? "Stopped drawing your flowchart" : "Couldn’t finish the diagram",
+		);
+		expect(trigger().querySelector('svg[style*="--danger"]') === null).toBe(ending === "stopped");
 		fireEvent.click(trigger());
 		expect(liveBlock()).toBeNull();
 		expect(screen.getByText("Parameters")).toBeTruthy();

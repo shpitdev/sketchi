@@ -71,7 +71,13 @@ export function DiagramToolCard({
 
 	return (
 		<Tool className="bg-card" onOpenChange={setChosenOpen} open={chosenOpen ?? live}>
-			<ToolHeader state={part.state} stopped={stopped} title={title} type={part.type} />
+			<ToolHeader
+				badge={false}
+				state={part.state}
+				stopped={stopped}
+				title={title}
+				type={part.type}
+			/>
 			{/* Collapsing on its own, the card closes at once rather than flashing
 			    the finished details on the way out. */}
 			<ToolContent data-auto-collapse={chosenOpen === undefined || undefined}>
