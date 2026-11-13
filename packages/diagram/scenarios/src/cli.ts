@@ -18,6 +18,7 @@ import {
 } from "./lib/evaluate.js";
 import { candidateFromMcpResult } from "./lib/mcp-results.js";
 import { buildScenarioPrompt, toDiagramGenerationPrompt } from "./lib/prompt.js";
+import { editabilityMetrics } from "./lib/scene-editability.js";
 import {
 	type DiagramScenario,
 	diagramScenarios,
@@ -380,8 +381,11 @@ export const runScenarioCli = Effect.fn("diagramScenarios.cli")(function* (
 						? writeJson(out, result.evaluation.excalidrawScene)
 						: Effect.void,
 					candidateOut ? writeText(candidateOut, result.candidateOutput) : Effect.void,
+					result.evaluation
+						? editabilityMetrics(result.evaluation.excalidrawScene.elements)
+						: Effect.succeed(undefined),
 				]).pipe(
-					Effect.as({
+					Effect.map(([, , metrics]) => ({
 						scenarioId: scenario.id,
 						runIndex,
 						runNumber: runIndex + 1,
@@ -389,9 +393,10 @@ export const runScenarioCli = Effect.fn("diagramScenarios.cli")(function* (
 						...(result.error ? { error: result.error, errorTag: "ScenarioToolError" } : {}),
 						checks: result.evaluation?.checks ?? result.checks ?? [],
 						excalidrawIssues: result.evaluation?.excalidrawValidation.issues ?? [],
+						...(metrics ? { metrics } : {}),
 						candidateOut,
 						out: result.evaluation ? out : undefined,
-					}),
+					})),
 				);
 			}),
 		),

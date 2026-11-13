@@ -1,19 +1,33 @@
 import {
 	type CanvasSpec,
-	canvasShapeOutline,
 	deployPipelineLogoFlowchart,
 	embedCanvasIcons,
 	flowchartFixture,
-	isCanvasComposedShape,
 	parseFlowchartDiagram,
 	zoneStressFixtures,
 } from "@sketchi/diagram-core";
-import { convertSceneToExcalidraw, routeEntersShape } from "@sketchi/diagram-excalidraw";
+import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderDiagram, renderIntermediateDiagram } from "@sketchi/diagram-renderer";
-import { diagramScenarios } from "@sketchi/diagram-scenarios";
+import {
+	createEditSession,
+	DRAG_OFFSETS,
+	diagramScenarios,
+	distance,
+	type EditorElement,
+	type EditorScene,
+	type ExcalidrawEditor,
+	endDetached,
+	endInside,
+	type EditabilityMetrics,
+	FIXED_BINDING_DISTANCE,
+	isBoundArrow,
+	isCurved,
+	keptAsDrawn,
+	measureEditability,
+	type Point,
+} from "@sketchi/diagram-scenarios";
 import * as excalidraw from "@sketchi/excalidraw-internals";
 import { describe, expect, it } from "vitest";
-import { createRouteRelease, routeReleased } from "./route-release";
 
 /**
  * Arrows in an exported diagram, edited with Excalidraw 0.18.1's own code: the
@@ -25,257 +39,26 @@ import { createRouteRelease, routeReleased } from "./route-release";
  * its own shape to Excalidraw's elbow routing.
  */
 
-type Point = [number, number];
-interface Binding {
-	readonly elementId: string;
-	readonly fixedPoint?: Point | null;
-	readonly focus: number;
-	readonly gap: number;
-}
-interface Element {
-	readonly id: string;
-	readonly type: string;
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-	angle: number;
-	points?: Point[];
-	startBinding?: Binding | null;
-	endBinding?: Binding | null;
-	boundElements?: { id: string; type: string }[] | null;
-	groupIds: string[];
-	frameId?: string | null;
-	containerId?: string | null;
-	customData?: Record<string, unknown>;
-	elbowed?: boolean;
-	fixedSegments?: readonly unknown[] | null;
-	isDeleted: boolean;
-	roundness: { type: number; value?: number } | null;
-}
-interface Scene {
-	replaceAllElements(elements: readonly Element[]): void;
-	getElementsIncludingDeleted(): readonly Element[];
-	getNonDeletedElements(): readonly Element[];
-	getNonDeletedElementsMap(): Map<string, Element>;
-	getElementsMapIncludingDeleted(): Map<string, Element>;
-}
-interface Internals {
-	Scene_default: new () => Scene;
-	dragSelectedElements(
-		pointerDownState: { originalElements: Map<string, Element> },
-		selected: readonly Element[],
-		offset: { x: number; y: number },
-		scene: Scene,
-		snapOffset: { x: number; y: number },
-		gridSize: number | null,
-	): void;
-	isBindableElement(element: Element): boolean;
-	LinearElementEditor: {
-		getPointsGlobalCoordinates(element: Element, elementsMap: Map<string, Element>): Point[];
-	};
-	mutateElement: (element: Element, updates: { points: readonly Point[] }) => Element;
-	restoreElements(
-		elements: readonly unknown[],
-		local: null,
-		options: { refreshDimensions: boolean; repairBindings: boolean },
-	): Element[];
-	setCustomTextMetricsProvider(provider: {
-		getLineWidth(text: string, font: string): number;
-	}): void;
-	transformElements(
-		originalElements: Map<string, Element>,
-		handle: string,
-		selected: readonly Element[],
-		elementsMap: Map<string, Element>,
-		scene: Scene,
-		rotateWithDiscreteAngle: boolean,
-		resizeFromCenter: boolean,
-		maintainAspectRatio: boolean,
-		pointerX: number,
-		pointerY: number,
-		centerX: number,
-		centerY: number,
-	): boolean;
-	updateBoundElements(element: Element, elementsMap: Map<string, Element>): void;
-}
+const internals = excalidraw as ExcalidrawEditor;
+const session = createEditSession(internals);
+const {
+	absolute,
+	boundShapes,
+	change: canvasChange,
+	drag,
+	ends,
+	keptWithin,
+	open: openInExcalidraw,
+	resize,
+	routesAndShapes,
+	snapshot,
+} = session;
 
-const internals = excalidraw as Internals;
-
-// Text measurement only places labels; any monospace stand-in leaves arrows alone.
-internals.setCustomTextMetricsProvider({
-	getLineWidth: (text, font) => text.length * (Number.parseFloat(font) || 16) * 0.55,
-});
-
-/** How far Excalidraw keeps an elbow arrow end it has to re-place off its outline. */
-const FIXED_BINDING_DISTANCE = 5;
-/**
- * How far inside a rounded corner Excalidraw may leave an end: its curve
- * intersection finds one root, sometimes where the line leaves the corner, and
- * then drops the end on the focus point just inside it.
- */
-const CORNER_SOLVE_SLACK = 1.5;
 /** First-touch ends must match to float precision. */
 const KEPT = 1e-9;
 
-/**
- * How close Excalidraw's update keeps an end to where it is drawn: to float
- * precision, except an elbow end at a side's middle, whose fixed point
- * Excalidraw reads as 0.5001 of the side, a ten-thousandth across.
- */
-function keptWithin(
-	arrow: Element,
-	key: "startBinding" | "endBinding",
-	elements: Map<string, Element>,
-): number {
-	const binding = arrow[key];
-	const shape = binding ? elements.get(binding.elementId) : undefined;
-	const fixedPoint = arrow.elbowed ? binding?.fixedPoint : undefined;
-	if (!shape || !fixedPoint) return KEPT;
-	const middle = (ratio: number, size: number) =>
-		Math.abs(ratio - 0.5001) < 1e-9 ? 1e-4 * size : 0;
-	return KEPT + Math.hypot(middle(fixedPoint[0], shape.width), middle(fixedPoint[1], shape.height));
-}
-
-const releases = new WeakMap<Scene, ReturnType<typeof createRouteRelease>>();
-
-/**
- * What the canvas does after each change, with what is selected: release the
- * routes it folded through their own shapes and have Excalidraw route them.
- * Returns the released ids.
- */
-function canvasChange(scene: Scene, selected: readonly Element[] = []): string[] {
-	const release = releases.get(scene)!;
-	const { elements, released } = release(
-		scene.getElementsIncludingDeleted() as never,
-		Object.fromEntries(selected.map((element) => [element.id, true as const])),
-	);
-	if (released.length === 0) return [];
-	scene.replaceAllElements(elements as unknown as Element[]);
-	for (const arrow of released) routeReleased(internals.mutateElement as never, arrow);
-	return released.map((arrow) => arrow.id);
-}
-
-/** The scene as Excalidraw's editor loads it from initial data, and the canvas sees it. */
-function openInExcalidraw(elements: readonly unknown[]): Scene {
-	const scene = new internals.Scene_default();
-	scene.replaceAllElements(
-		internals.restoreElements(structuredClone(elements), null, {
-			refreshDimensions: false,
-			repairBindings: true,
-		}),
-	);
-	releases.set(scene, createRouteRelease());
-	canvasChange(scene);
-	return scene;
-}
-
-const isBoundArrow = (element: Element) =>
-	element.type === "arrow" &&
-	!element.isDeleted &&
-	Boolean(element.startBinding || element.endBinding);
-
-/** An arrow's points in the scene, turned with the arrow as Excalidraw draws them. */
-const absolute = (arrow: Element): Point[] =>
-	arrow.points?.length
-		? internals.LinearElementEditor.getPointsGlobalCoordinates(arrow, new Map())
-		: [];
-
-function ends(arrow: Element): [Point, Point] {
-	const points = absolute(arrow);
-	return [points[0] ?? [arrow.x, arrow.y], points.at(-1) ?? [arrow.x, arrow.y]];
-}
-
-const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-
-function snapshot(scene: Scene) {
-	return new Map(
-		scene
-			.getNonDeletedElements()
-			.filter(isBoundArrow)
-			.map((arrow) => [arrow.id, ends(arrow)] as const),
-	);
-}
-
-/** Excalidraw's adaptive and proportional corner radius. */
-function cornerRadius(shape: Element): number {
-	const size = Math.min(shape.width, shape.height);
-	const roundness = shape.roundness;
-	if (roundness?.type === 1 || roundness?.type === 2) return size * 0.25;
-	if (roundness?.type === 3) {
-		const fixed = roundness.value ?? 32;
-		return size <= fixed / 0.25 ? size * 0.25 : fixed;
-	}
-	return 0;
-}
-
-/**
- * The outline Excalidraw draws for a shape, as a closed polyline: a box with
- * its quadratic corners, a diamond on Excalidraw's corners (a pixel past the
- * box's middle), an ellipse.
- */
-function drawnOutline(shape: Element): Point[] {
-	const { x, y, width: w, height: h } = shape;
-	if (shape.type === "ellipse") {
-		return Array.from({ length: 721 }, (_, step) => {
-			const angle = (step / 720) * 2 * Math.PI;
-			return [x + w / 2 + (w / 2) * Math.cos(angle), y + h / 2 + (h / 2) * Math.sin(angle)];
-		});
-	}
-	if (shape.type === "diamond") {
-		const topX = x + Math.floor(w / 2) + 1;
-		const sideY = y + Math.floor(h / 2) + 1;
-		return [
-			[topX, y],
-			[x + w, sideY],
-			[topX, y + h],
-			[x, sideY],
-			[topX, y],
-		];
-	}
-	const r = cornerRadius(shape);
-	const corner = (from: Point, at: Point, to: Point): Point[] =>
-		Array.from({ length: 33 }, (_, step) => {
-			const t = step / 32;
-			return [
-				(1 - t) ** 2 * from[0] + 2 * (1 - t) * t * at[0] + t ** 2 * to[0],
-				(1 - t) ** 2 * from[1] + 2 * (1 - t) * t * at[1] + t ** 2 * to[1],
-			];
-		});
-	return [
-		...corner([x, y + r], [x, y], [x + r, y]),
-		...corner([x + w - r, y], [x + w, y], [x + w, y + r]),
-		...corner([x + w, y + h - r], [x + w, y + h], [x + w - r, y + h]),
-		...corner([x + r, y + h], [x, y + h], [x, y + h - r]),
-		[x, y + r],
-	];
-}
-
-/** Distance from a closed polyline, negative inside it. */
-function signedDistance(point: Point, outline: readonly Point[]): number {
-	let nearest = Infinity;
-	let inside = false;
-	for (let index = 1; index < outline.length; index += 1) {
-		const [from, to] = [outline[index - 1]!, outline[index]!];
-		const [dx, dy] = [to[0] - from[0], to[1] - from[1]];
-		const t = Math.max(
-			0,
-			Math.min(
-				1,
-				((point[0] - from[0]) * dx + (point[1] - from[1]) * dy) / (dx * dx + dy * dy || 1),
-			),
-		);
-		nearest = Math.min(
-			nearest,
-			Math.hypot(point[0] - from[0] - t * dx, point[1] - from[1] - t * dy),
-		);
-		// A ray just off the point's height never runs through a vertex.
-		const rayY = point[1] + 1e-7;
-		if (from[1] > rayY !== to[1] > rayY && point[0] < from[0] + ((rayY - from[1]) * dx) / dy)
-			inside = !inside;
-	}
-	return inside ? -nearest : nearest;
-}
+const originals = (scene: EditorScene) =>
+	new Map(scene.getNonDeletedElements().map((element) => [element.id, structuredClone(element)]));
 
 /**
  * Every bound end in the scene sits outside the outline a person sees, no
@@ -287,64 +70,27 @@ function signedDistance(point: Point, outline: readonly Point[]): number {
  * over, and the canvas leaves curves as they are.
  */
 function expectEndsOnOutlines(
-	scene: Scene,
+	scene: EditorScene,
 	context: string,
 	grown: ReadonlyMap<string, number> = new Map(),
 ) {
-	const elements = scene.getNonDeletedElementsMap();
 	let checked = 0;
 	let crowded = 0;
-	for (const arrow of scene.getNonDeletedElements().filter(isBoundArrow)) {
-		const points = absolute(arrow);
-		for (const [key, end, neighbour] of [
-			["startBinding", points[0]!, points[1]!],
-			["endBinding", points[points.length - 1]!, points[points.length - 2]!],
-		] as const) {
-			const binding = arrow[key];
-			if (!binding) continue;
-			const shape = elements.get(binding.elementId);
-			const where = `${context}: ${arrow.id} ${key} on ${binding.elementId}`;
-			expect(shape, where).toBeDefined();
-			if (!shape || !internals.isBindableElement(shape)) continue;
-			expect(
-				shape.boundElements?.some((bound) => bound.id === arrow.id),
-				`${where} is listed on its shape`,
-			).toBe(true);
-			// An end that is not elbowed sits on Excalidraw's outline grown by its gap,
-			// whose corners stay square on a sharp box: up to the gap's diagonal out. An
-			// elbow end sits on the outline or FIXED_BINDING_DISTANCE out, a distance
-			// that grows with its shape when Excalidraw scales the fixed point.
-			const reach = arrow.elbowed
-				? FIXED_BINDING_DISTANCE * (grown.get(shape.id) ?? 1)
-				: binding.gap * Math.SQRT2;
-			const other = elements.get(
-				(key === "startBinding" ? arrow.endBinding : arrow.startBinding)?.elementId ?? "",
-			);
-			const curved = !arrow.elbowed && arrow.roundness !== null && (arrow.points?.length ?? 0) > 2;
-			if (
-				(curved && within(neighbour, shape, reach)) ||
-				(other && other !== shape && overlap(shape, other, reach))
-			) {
-				crowded += 1;
-				continue;
-			}
-			checked += 1;
-			const off = signedDistance(end, drawnOutline(shape));
-			const slack = inRoundedCorner(end, shape, reach) ? CORNER_SOLVE_SLACK : 0.05;
-			expect(off, `${where} stays outside its outline`).toBeGreaterThanOrEqual(-slack);
-			expect(off, `${where} stays within its gap`).toBeLessThanOrEqual(reach + 0.05);
-			const composed = shape.customData?.["sketchiShape"];
-			if (typeof composed === "string" && isCanvasComposedShape(composed) && shape.angle === 0) {
-				const drawn = canvasShapeOutline({ ...shape, shape: composed }).map(({ x, y }): Point => [
-					x,
-					y,
-				]);
-				expect(
-					signedDistance(end, drawn),
-					`${where} stays outside the drawn shape`,
-				).toBeGreaterThan(-0.05);
-			}
+	for (const end of session.readEnds(scene, { grown })) {
+		const where = `${context}: ${end.arrow.id} ${end.key} on ${end.shapeId}`;
+		expect(end.shape, where).toBeDefined();
+		if (!end.shape) continue;
+		expect(end.listed, `${where} is listed on its shape`).toBe(true);
+		if (end.crowded) {
+			crowded += 1;
+			continue;
 		}
+		checked += 1;
+		expect(end.off, `${where} stays outside its outline`).toBeGreaterThanOrEqual(-end.slack);
+		expect(end.off, `${where} stays within its gap`).toBeLessThanOrEqual(end.reach + 0.05);
+		if (end.drawnOff !== undefined)
+			expect(end.drawnOff, `${where} stays outside the drawn shape`).toBeGreaterThan(-0.05);
+		expect(endInside(end) || endDetached(end), `${where} reads as on its edge`).toBe(false);
 	}
 	expect(
 		checked,
@@ -352,142 +98,14 @@ function expectEndsOnOutlines(
 	).toBeGreaterThan(0);
 }
 
-/** A route Excalidraw keeps as drawn: a sharp polyline, or an elbow arrow with pinned runs. */
-const keptAsDrawn = (arrow: Element) =>
-	arrow.elbowed
-		? (arrow.fixedSegments?.length ?? 0) > 0
-		: (arrow.points?.length ?? 0) > 2 && arrow.roundness === null;
-
 /**
  * No route Excalidraw still keeps as drawn passes through a shape it is bound
  * to: one a drag folds through its shape is released to Excalidraw's elbow
  * routing, which goes around it.
  */
-function expectRoutesClearOfTheirShapes(scene: Scene, context: string) {
-	const elements = scene.getNonDeletedElementsMap();
-	for (const arrow of scene.getNonDeletedElements().filter(isBoundArrow)) {
-		if (!keptAsDrawn(arrow)) continue;
-		for (const end of ["start", "end"] as const) {
-			const binding = end === "start" ? arrow.startBinding : arrow.endBinding;
-			const shape = binding ? elements.get(binding.elementId) : undefined;
-			if (!shape) continue;
-			expect(
-				routeEntersShape(absolute(arrow), shape, end),
-				`${context}: ${arrow.id} runs through ${shape.id}`,
-			).toBe(false);
-		}
-	}
+function expectRoutesClearOfTheirShapes(scene: EditorScene, context: string) {
+	expect(session.routesThroughShapes(scene), `${context}: routes through their shapes`).toEqual([]);
 }
-
-/** Every bound route and the shapes it binds to, as they stand. */
-function routesAndShapes(scene: Scene) {
-	const elements = scene.getNonDeletedElementsMap();
-	return new Map(
-		scene
-			.getNonDeletedElements()
-			.filter(isBoundArrow)
-			.map((arrow) => {
-				const shapes = [arrow.startBinding, arrow.endBinding].map((binding) => {
-					const shape = binding ? elements.get(binding.elementId) : undefined;
-					return shape ? [shape.x, shape.y, shape.width, shape.height].join(",") : "";
-				});
-				return [arrow.id, { route: absolute(arrow), shapes: shapes.join("|") }] as const;
-			}),
-	);
-}
-
-function inRoundedCorner(point: Point, shape: Element, pad: number): boolean {
-	const radius = shape.type === "rectangle" ? cornerRadius(shape) : 0;
-	if (radius === 0) return false;
-	const reach = radius + pad;
-	const nearX = point[0] < shape.x + reach || point[0] > shape.x + shape.width - reach;
-	const nearY = point[1] < shape.y + reach || point[1] > shape.y + shape.height - reach;
-	return nearX && nearY;
-}
-
-const within = (point: Point, shape: Element, pad: number) =>
-	point[0] > shape.x - pad &&
-	point[0] < shape.x + shape.width + pad &&
-	point[1] > shape.y - pad &&
-	point[1] < shape.y + shape.height + pad;
-
-const overlap = (a: Element, b: Element, pad: number) =>
-	a.x - pad < b.x + b.width &&
-	b.x - pad < a.x + a.width &&
-	a.y - pad < b.y + b.height &&
-	b.y - pad < a.y + a.height;
-
-/** What a click on a shape selects: its outermost group, else the shape. */
-function selection(scene: Scene, shape: Element): Element[] {
-	const group = shape.groupIds.at(-1);
-	return group
-		? scene.getNonDeletedElements().filter((element) => element.groupIds.includes(group))
-		: [shape];
-}
-
-const originals = (scene: Scene) =>
-	new Map(scene.getNonDeletedElements().map((element) => [element.id, structuredClone(element)]));
-
-/**
- * A pointer drag of what a click on `shape` selects, through Excalidraw's drag,
- * one pointer move every two pixels or so. Returns the routes it released.
- */
-function drag(scene: Scene, shape: Element, offset: Point): string[] {
-	const steps = Math.max(1, Math.ceil(Math.hypot(offset[0], offset[1]) / 2));
-	const pointerDownState = { originalElements: originals(scene) };
-	const selected = selection(scene, shape);
-	const released: string[] = [];
-	for (let step = 1; step <= steps; step += 1) {
-		internals.dragSelectedElements(
-			pointerDownState,
-			selected,
-			{ x: (offset[0] * step) / steps, y: (offset[1] * step) / steps },
-			scene,
-			{ x: 0, y: 0 },
-			null,
-		);
-		released.push(...canvasChange(scene));
-	}
-	return released;
-}
-
-/** A pointer drag of a selection handle, through Excalidraw's resize. */
-function resize(scene: Scene, shape: Element, handle: "nw" | "se", offset: Point) {
-	const steps = Math.max(1, Math.ceil(Math.hypot(offset[0], offset[1]) / 2));
-	const originalElements = originals(scene);
-	const selected = selection(scene, shape);
-	const left = Math.min(...selected.map((element) => element.x));
-	const top = Math.min(...selected.map((element) => element.y));
-	const right = Math.max(...selected.map((element) => element.x + element.width));
-	const bottom = Math.max(...selected.map((element) => element.y + element.height));
-	const [cornerX, cornerY] = handle === "se" ? [right, bottom] : [left, top];
-	for (let step = 1; step <= steps; step += 1) {
-		internals.transformElements(
-			originalElements,
-			handle,
-			selected,
-			scene.getNonDeletedElementsMap(),
-			scene,
-			false,
-			false,
-			false,
-			cornerX + (offset[0] * step) / steps,
-			cornerY + (offset[1] * step) / steps,
-			(left + right) / 2,
-			(top + bottom) / 2,
-		);
-		canvasChange(scene);
-	}
-}
-
-const boundShapes = (scene: Scene) =>
-	scene
-		.getNonDeletedElements()
-		.filter(
-			(element) =>
-				internals.isBindableElement(element) &&
-				element.boundElements?.some((bound) => bound.type === "arrow"),
-		);
 
 const exported = (scene: ReturnType<typeof renderDiagram>) =>
 	convertSceneToExcalidraw(scene).elements;
@@ -669,15 +287,7 @@ const shapeKinds = [
 	{ id: "agent canvas", elements: convertSceneToExcalidraw(canvas).elements },
 ];
 
-const offsets: readonly Point[] = [
-	[48, 0],
-	[0, 36],
-	[-52, 0],
-	[0, -44],
-	[64, 40],
-	[-70, -30],
-	[180, 140],
-];
+const offsets = DRAG_OFFSETS;
 
 describe("arrows in a diagram a person edits in Excalidraw", () => {
 	it.each([...scenarios, ...shapeKinds].map((scene) => [scene.id, scene.elements] as const))(
@@ -690,7 +300,7 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 						(element) =>
 							element.type === "arrow" && (element["startBinding"] || element["endBinding"]),
 					)
-					.map((element) => [element.id, ends(element as unknown as Element)] as const),
+					.map((element) => [element.id, ends(element as unknown as EditorElement)] as const),
 			);
 			const routes = new Map(
 				elements
@@ -698,7 +308,7 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 						(element) =>
 							element.type === "arrow" && (element["startBinding"] || element["endBinding"]),
 					)
-					.map((element) => [element.id, absolute(element as unknown as Element)] as const),
+					.map((element) => [element.id, absolute(element as unknown as EditorElement)] as const),
 			);
 			// Loading changes no end.
 			for (const [id, loaded] of snapshot(scene)) {
@@ -706,10 +316,7 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 				expect(distance(loaded[0], start), `${id} start on load`).toBeLessThanOrEqual(KEPT);
 				expect(distance(loaded[1], end), `${id} end on load`).toBeLessThanOrEqual(KEPT);
 			}
-			for (const shape of boundShapes(scene)) {
-				internals.updateBoundElements(shape, scene.getNonDeletedElementsMap());
-			}
-			expect(canvasChange(scene), "routes released by the first touch").toEqual([]);
+			expect(session.touch(scene), "routes released by the first touch").toEqual([]);
 			const loaded = scene.getNonDeletedElementsMap();
 			for (const [id, touched] of snapshot(scene)) {
 				const [start, end] = drawn.get(id)!;
@@ -739,14 +346,74 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 		},
 	);
 
+	/**
+	 * What these drags do to a few scenarios, as the scenario CLI's editability
+	 * metrics count it with every bound shape dragged. The scenarios package's
+	 * editability.test.ts reads the same numbers from Excalidraw loaded into
+	 * plain Node, as the CLI loads it; change both together.
+	 */
+	const measured: Record<string, EditabilityMetrics> = {
+		"sketchi-onboarding-decision-flow": {
+			editBoundRoutes: 5,
+			editDragErrors: 0,
+			editDrags: 5,
+			editEndsInside: 0,
+			editEndsOffEdge: 0,
+			editFirstTouchMoves: 0,
+			editReleasedRoutes: 0,
+			editRouteMoves: 10,
+			editRoutesThroughShape: 0,
+			editStrayRouteMoves: 0,
+		},
+		"whole-company-org-chart-large": {
+			editBoundRoutes: 79,
+			editDragErrors: 0,
+			editDrags: 80,
+			editEndsInside: 0,
+			editEndsOffEdge: 0,
+			editFirstTouchMoves: 0,
+			editReleasedRoutes: 30,
+			editRouteMoves: 158,
+			editRoutesThroughShape: 5,
+			editStrayRouteMoves: 0,
+		},
+		"warehouse-automation-gantt-large": {
+			editBoundRoutes: 74,
+			editDragErrors: 0,
+			editDrags: 60,
+			editEndsInside: 0,
+			editEndsOffEdge: 0,
+			editFirstTouchMoves: 0,
+			editReleasedRoutes: 35,
+			editRouteMoves: 148,
+			editRoutesThroughShape: 3,
+			editStrayRouteMoves: 0,
+		},
+		"photosynthesis-study-mindmap-v2": {
+			editBoundRoutes: 21,
+			editDragErrors: 0,
+			editDrags: 22,
+			editEndsInside: 0,
+			editEndsOffEdge: 0,
+			editFirstTouchMoves: 0,
+			editReleasedRoutes: 0,
+			editRouteMoves: 164,
+			editRoutesThroughShape: 0,
+			editStrayRouteMoves: 0,
+		},
+	};
+
 	it.each(scenarios.map((scene) => [scene.id, scene.elements] as const))(
 		"keeps every arrow of %s on its outlines while each shape is dragged",
-		(_id, elements) => {
+		(id, elements) => {
+			const tally = { drags: 0, dragErrors: 0, released: 0, routeMoves: 0, through: 0 };
 			for (const [index, target] of boundShapes(openInExcalidraw(elements)).entries()) {
+				tally.drags += 1;
 				const scene = openInExcalidraw(elements);
 				const before = routesAndShapes(scene);
+				let released: string[];
 				try {
-					drag(
+					released = drag(
 						scene,
 						scene.getNonDeletedElementsMap().get(target.id)!,
 						offsets[index % offsets.length]!,
@@ -755,17 +422,40 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 					// Excalidraw 0.18.1's elbow router finds no route for a few gantt bar drags
 					// and throws, whatever the bindings.
 					expect(String((error as Error).stack)).toContain("elbowArrow");
+					tally.dragErrors += 1;
 					continue;
 				}
 				expectEndsOnOutlines(scene, `after dragging ${target.id}`);
 				expectRoutesClearOfTheirShapes(scene, `after dragging ${target.id}`);
 				// A route whose shapes stayed put stays put.
+				const moved = new Set<string>();
 				for (const [id, after] of routesAndShapes(scene)) {
 					const drawn = before.get(id)!;
-					if (after.shapes !== drawn.shapes) continue;
+					if (after.shapes !== drawn.shapes) {
+						moved.add(id);
+						continue;
+					}
 					expect(after.route, `${id} untouched by dragging ${target.id}`).toEqual(drawn.route);
 				}
+				tally.routeMoves += moved.size;
+				tally.released += new Set(released).size;
+				// Straight and elbow routes, released ones included, may still cross their shapes.
+				tally.through += new Set(
+					session
+						.routesThroughShapes(scene, (arrow) => moved.has(arrow.id) && !isCurved(arrow))
+						.map(([route]) => route),
+				).size;
 			}
+			const expected = measured[id];
+			if (!expected) return;
+			expect(tally).toEqual({
+				drags: expected.editDrags,
+				dragErrors: expected.editDragErrors,
+				released: expected.editReleasedRoutes,
+				routeMoves: expected.editRouteMoves,
+				through: expected.editRoutesThroughShape,
+			});
+			expect(measureEditability(session, elements, { cap: Infinity })).toEqual(expected);
 		},
 	);
 
@@ -777,7 +467,7 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 				(element) =>
 					element.type === "arrow" &&
 					(element["startBinding"] || element["endBinding"]) &&
-					keptAsDrawn(element as unknown as Element),
+					keptAsDrawn(element as unknown as EditorElement),
 			),
 	);
 
@@ -872,7 +562,7 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 					const scene = openInExcalidraw(elements);
 					const shape = scene.getNonDeletedElementsMap().get(table.id)!;
 					// Where each end bound to the table meets it, along the table.
-					const place = (scene: Scene) =>
+					const place = (scene: EditorScene) =>
 						new Map(
 							scene
 								.getNonDeletedElements()
