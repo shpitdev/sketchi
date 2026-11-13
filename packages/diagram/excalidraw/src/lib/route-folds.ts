@@ -53,17 +53,18 @@ function clip(
  * it lies deeper inside the outline Excalidraw draws than a bound end or a
  * hugging run ever does. A route whose other end the shape holds, as a line
  * from a node in a zone to the zone's border, belongs inside it and never
- * counts.
+ * counts. A route read only to within `slack` pixels must run that much deeper.
  */
 export function routeEntersShape(
 	route: readonly Point[],
 	shape: BindableShape,
 	boundEnd: "end" | "start",
+	slack = 0,
 ): boolean {
 	if (route.length < 2) return false;
 	const inside = (point: Point) => {
 		const offset = excalidrawOutlineDistance(shape, point);
-		return offset !== null && offset < -FOLD_DEPTH;
+		return offset !== null && offset < -(FOLD_DEPTH + slack);
 	};
 	if (inside(boundEnd === "start" ? route.at(-1)! : route[0]!)) return false;
 	const box = bounds(shape);

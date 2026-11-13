@@ -73,6 +73,18 @@ describe("routeEntersShape", () => {
 		).toBe(true);
 	});
 
+	it("asks a route read only to within some slack to run that much deeper", () => {
+		// A run 4px inside the top side.
+		const shallow: [number, number][] = [
+			[20, -1],
+			[20, 4],
+			[80, 4],
+			[80, -20],
+		];
+		expect(routeEntersShape(shallow, box, "start")).toBe(true);
+		expect(routeEntersShape(shallow, box, "start", 3)).toBe(false);
+	});
+
 	it("leaves a route the shape holds at its other end, as a line inside a zone", () => {
 		const zone = { type: "rectangle", x: 0, y: 0, width: 300, height: 200, roundness: null };
 		expect(
