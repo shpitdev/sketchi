@@ -2,11 +2,12 @@
  * Writes public/media/home-diagram.svg, the diagram the home page shows
  * before a visitor edits it.
  *
- * home-diagram.excalidraw is real Sketchi output, unchanged:
+ * home-diagram.excalidraw is real Sketchi output, unchanged. `sketchi generate`
+ * drew it for the prompt in home-diagram-data.ts; scripts/diagrams/home-diagram.json
+ * is the document it drew, so a new export keeps the drawing:
  *
- *   sketchi generate --format excalidraw --prompt "A Next.js app on Vercel and a
- *     GitHub webhook call a Cloudflare Workers API, which reads Postgres and
- *     caches in Redis."
+ *   sketchi create --file apps/web/scripts/diagrams/home-diagram.json
+ *   sketchi export latest --format excalidraw --dest apps/web/public/media/home-diagram.excalidraw
  *
  * The SVG is Excalidraw's own export of that scene, so it matches the canvas the
  * page loads in its place. Excalidraw subsets and inlines Excalifont into it,

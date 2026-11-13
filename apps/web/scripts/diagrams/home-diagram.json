@@ -1,0 +1,24 @@
+{
+	"type": "flowchart",
+	"spec": {
+		"id": "nextjs-and-github-api-flow",
+		"title": "Next.js and GitHub API flow",
+		"direction": "TB",
+		"logos": true,
+		"nodes": {
+			"nextjs": { "label": "Next.js app", "icon": "nextjs" },
+			"github": { "label": "GitHub webhook", "icon": "github" },
+			"vercel": { "label": "Vercel", "note": "hosts the Next.js app", "icon": "vercel" },
+			"api": { "label": "Cloudflare Workers API", "icon": "cloudflareworkers" },
+			"db": { "label": "PostgreSQL", "shape": "database", "icon": "postgresql" },
+			"cache": { "label": "Redis", "shape": "database", "icon": "redis" }
+		},
+		"edges": [
+			["nextjs", "vercel"],
+			["vercel", "api", "calls"],
+			["github", "api", "calls"],
+			["api", "db", "reads"],
+			["api", "cache", "caches in"]
+		]
+	}
+}
