@@ -120,10 +120,11 @@ describe("authored node geometry", () => {
 			width: 200,
 			height: 30,
 		});
-		expect(firstGlobalPoint(converted.elements.find(({ id }) => id === "ab"))).toEqual({
-			x: 120,
-			y: 50,
-		});
+		// The arrow leaves the node's foot where Excalidraw keeps it, a binding gap below.
+		const start = firstGlobalPoint(converted.elements.find(({ id }) => id === "ab"));
+		expect(start.x).toBeCloseTo(120, 9);
+		expect(start.y).toBeGreaterThan(50);
+		expect(start.y).toBeLessThanOrEqual(51);
 		expect(validateExcalidrawScene(converted).issues.map(({ code }) => code)).not.toContain(
 			"arrow-endpoint-off-shape",
 		);
@@ -1539,7 +1540,7 @@ describe("convertSceneToExcalidraw", () => {
 		});
 	});
 
-	it("exports boundary-bound arrows with zero binding gaps", () => {
+	it("binds straight arrows at Excalidraw's least gap and elbow arrows on the outline", () => {
 		const diagrams = [flowchartFixture, pharmaBatchDispositionFlowchart];
 
 		for (const diagram of diagrams) {
@@ -1547,10 +1548,27 @@ describe("convertSceneToExcalidraw", () => {
 			const arrows = scene.elements.filter((element) => element.type === "arrow");
 
 			for (const arrow of arrows) {
-				expect(bindingGap(arrow, "startBinding")).toBe(0);
-				expect(bindingGap(arrow, "endBinding")).toBe(0);
+				const gap = arrow.elbowed === true ? 0 : 1;
+				expect(bindingGap(arrow, "startBinding"), arrow.id).toBe(gap);
+				expect(bindingGap(arrow, "endBinding"), arrow.id).toBe(gap);
 			}
+			expect(validateExcalidrawScene(scene).issues).toEqual([]);
 		}
+	});
+
+	it("reports a straight arrow end Excalidraw would move on the first touch", () => {
+		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const straight = scene.elements.find(
+			(element) => element.type === "arrow" && element.elbowed === false,
+		);
+		if (!straight) throw new Error("Expected a straight arrow.");
+		// Bound as before, at no gap: Excalidraw drops the end on the shape's middle.
+		const binding = straight["endBinding"] as Record<string, unknown>;
+		straight["endBinding"] = { ...binding, gap: 0 };
+
+		expect(validateExcalidrawScene(scene).issues).toContainEqual(
+			expect.objectContaining({ code: "arrow-endpoint-off-shape", elementId: straight.id }),
+		);
 	});
 
 	it("accepts Excalidraw-edited elbow arrows with null fixed segments", () => {
@@ -2283,7 +2301,7 @@ describe("architecture zones and infrastructure shapes", () => {
 		expect(filled).toHaveLength(6);
 	});
 
-	it("binds a line to a bucket's tapered side, not its box", () => {
+	it("binds a line to a bucket's box, outside its tapered side, where Excalidraw keeps it", () => {
 		const scene = renderIntermediateDiagram(
 			parseFlowchartDiagram({
 				id: "bucket",
@@ -2303,17 +2321,22 @@ describe("architecture zones and infrastructure shapes", () => {
 		const arrow = exported.elements.find((element) => element.id === "edge:e1")!;
 		const points = arrow["points"] as [number, number][];
 		const end = points.at(-1)!;
-		// The line ends in from the box, on the side the bucket leans in by.
-		expect((arrow["x"] as number) + end[0]).toBeGreaterThan((box["x"] as number) + 1);
-		// Stopped at the box's edge instead, it no longer lands on the shape.
-		const short = {
+		// Excalidraw binds the line to the bucket's box and re-places it on the box's
+		// outline, so the line ends there, a binding gap out, never inside the bucket.
+		const endX = (arrow["x"] as number) + end[0];
+		expect(endX).toBeLessThanOrEqual(box["x"] as number);
+		expect(endX).toBeGreaterThanOrEqual((box["x"] as number) - 1);
+		// Carried on to the tapered side, Excalidraw would move it back on the first touch.
+		const tapered = {
 			...arrow,
-			points: [...points.slice(0, -1), [(box["x"] as number) - (arrow["x"] as number), end[1]]],
+			points: [...points.slice(0, -1), [(box["x"] as number) + 6 - (arrow["x"] as number), end[1]]],
 		};
 		expect(
 			validateExcalidrawScene({
 				...exported,
-				elements: exported.elements.map((element) => (element.id === "edge:e1" ? short : element)),
+				elements: exported.elements.map((element) =>
+					element.id === "edge:e1" ? tapered : element,
+				),
 			}).issues.map((issue) => issue.code),
 		).toContain("arrow-endpoint-off-shape");
 	});

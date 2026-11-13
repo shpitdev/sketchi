@@ -1867,8 +1867,6 @@ export class ArrowSceneElement extends Schema.Class<ArrowSceneElement>("ArrowSce
 export class CanvasLineBinding extends Schema.Class<CanvasLineBinding>("CanvasLineBinding")(
 	{
 		elementId: RequiredNonEmptyString,
-		focus: optionalContract(FiniteNumber),
-		gap: optionalContract(FiniteNumber),
 	},
 	{ identifier: undefined },
 ) {}

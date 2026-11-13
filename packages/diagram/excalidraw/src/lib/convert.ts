@@ -19,7 +19,6 @@ import {
 	canvasIconElementBox,
 	canvasIconForm,
 	canvasNodeIconBox,
-	canvasComposedOnOutline,
 	canvasShapeOutline,
 	canvasShapeStrokes,
 	fnv1a32,
@@ -39,6 +38,17 @@ import {
 } from "@sketchi/diagram-core";
 import { generateKeyBetween } from "fractional-indexing";
 
+import { fixedBoundEnds, focusBoundEnds } from "./bound-ends.js";
+import {
+	type BindableShape,
+	EXCALIDRAW_BINDING_GAP,
+	excalidrawBoundPoint,
+	excalidrawFixedGlobalPoint,
+	excalidrawKeepsElbowEnd,
+	type FocusBinding,
+	isExcalidrawBindableType,
+	type Point,
+} from "./excalidraw-binding.js";
 import { iconRecipeElements } from "./icon-recipe.js";
 
 export type ExcalidrawElement = Record<string, unknown> & {
@@ -139,32 +149,82 @@ function elementBounds(element: ExcalidrawElement): ElementBounds | null {
 		: { x, y, width, height };
 }
 
-function normalizedFixedPoint(value: number): number {
-	return Math.abs(value - 0.5) < 0.0001 ? 0.5001 : value;
-}
-
-function fixedPointForShape(
-	shape: ExcalidrawElement,
-	point: { x: number; y: number },
-): [number, number] | null {
-	const bounds = elementBounds(shape);
-
-	if (!bounds || bounds.width === 0 || bounds.height === 0) {
-		return null;
-	}
-
-	return [
-		normalizedFixedPoint((point.x - bounds.x) / bounds.width),
-		normalizedFixedPoint((point.y - bounds.y) / bounds.height),
-	];
-}
-
-function bindingForShape(shape: ExcalidrawElement | undefined, point: { x: number; y: number }) {
+/** An exported shape as the binding geometry reads it; null without a box. */
+function bindableShape(element: ExcalidrawElement | undefined): BindableShape | undefined {
+	const bounds = element ? elementBounds(element) : null;
+	if (!element || !bounds) return undefined;
+	const roundness = element.roundness;
 	return {
-		elementId: shape?.id ?? "",
-		focus: 0,
-		gap: 0,
-		fixedPoint: shape ? fixedPointForShape(shape, point) : null,
+		...bounds,
+		type: element.type,
+		angle: numericValue(element.angle) ?? 0,
+		roundness:
+			roundness !== null &&
+			typeof roundness === "object" &&
+			typeof (roundness as { type?: unknown }).type === "number"
+				? (roundness as { type: number; value?: number })
+				: null,
+	};
+}
+
+type RoutePoint = { x: number; y: number };
+
+/**
+ * A connector's absolute points and its two bindings, each end placed where
+ * Excalidraw keeps it: an elbow arrow's at its fixed point on the outline, any
+ * other arrow's at its gap outside it, aimed by its focus.
+ */
+function boundRoute(input: {
+	elbowed: boolean;
+	/** Whether the route may be drawn as an elbow arrow: not a curve. */
+	straight: boolean;
+	endShape: ExcalidrawElement | undefined;
+	endId: string | undefined;
+	points: readonly RoutePoint[];
+	startShape: ExcalidrawElement | undefined;
+	startId: string | undefined;
+}) {
+	const route = input.points.map((point): Point => [point.x, point.y]);
+	const [startShape, endShape] = [bindableShape(input.startShape), bindableShape(input.endShape)];
+	const binding = <Body extends object>(elementId: string | undefined, body: Body) =>
+		elementId === undefined ? null : { elementId, ...body };
+	const elbow = () => {
+		const bound = fixedBoundEnds(route, startShape, endShape);
+		return {
+			elbowed: true,
+			points: bound.points,
+			startBinding: binding(input.startId, {
+				focus: 0,
+				gap: 0,
+				fixedPoint: bound.start ? [...bound.start] : null,
+			}),
+			endBinding: binding(input.endId, {
+				focus: 0,
+				gap: 0,
+				fixedPoint: bound.end ? [...bound.end] : null,
+			}),
+		};
+	};
+	if (input.elbowed) return elbow();
+	const bound = focusBoundEnds(route, startShape, endShape);
+	// A straight run along its shape's side binds at fixed points, which Excalidraw keeps.
+	const [first, last] = [route[0], route[route.length - 1]];
+	if (
+		!bound.kept &&
+		input.straight &&
+		route.length === 2 &&
+		first &&
+		last &&
+		(first[0] === last[0] || first[1] === last[1])
+	) {
+		return elbow();
+	}
+	const unbound = { focus: 0, gap: EXCALIDRAW_BINDING_GAP };
+	return {
+		elbowed: false,
+		points: bound.points,
+		startBinding: binding(input.startId, bound.start ?? unbound),
+		endBinding: binding(input.endId, bound.end ?? unbound),
 	};
 }
 
@@ -615,27 +675,37 @@ function arrowElement(input: {
 	targetShape: ExcalidrawElement | undefined;
 	text?: TextSceneElement;
 }): ExcalidrawElement {
-	const start = input.arrow.points[0];
-	const end = lastArrowPoint(input.arrow);
 	// Excalidraw resolves a straight arrow's binding against its target's outline,
 	// which a frame lacks, and re-aims it at a table's or class's middle; an elbow
 	// arrow keeps its fixed point on a moved frame, and on the row of a moved table
 	// or the port of a moved class. A curved connector stays a curved arrow through
 	// its points.
-	const elbowed =
+	const forcedElbow =
 		input.arrow.curved !== true &&
 		(input.arrow.points.length > 2 ||
 			[input.sourceShape, input.targetShape].some(
 				(shape) => shape?.type === "frame" || isTableShape(shape),
 			));
+	const route = boundRoute({
+		elbowed: forcedElbow,
+		straight: input.arrow.curved !== true,
+		points: input.arrow.points,
+		startShape: input.sourceShape,
+		startId: input.sourceShape?.id ?? "",
+		endShape: input.targetShape,
+		endId: input.targetShape?.id ?? "",
+	});
+	const { elbowed } = route;
+	const [start] = route.points as [Point, ...Point[]];
+	const end = route.points[route.points.length - 1] ?? start;
 
 	return {
 		...elementBase(input.arrow.id, input.arrow),
 		type: "arrow",
-		x: start.x,
-		y: start.y,
-		width: end.x - start.x,
-		height: end.y - start.y,
+		x: start[0],
+		y: start[1],
+		width: end[0] - start[0],
+		height: end[1] - start[1],
 		backgroundColor: "transparent",
 		boundElements: input.text
 			? input.text.containerId === input.arrow.id
@@ -646,7 +716,7 @@ function arrowElement(input: {
 				: null,
 		elbowed,
 		endArrowhead: input.arrow.endArrowhead === undefined ? "arrow" : input.arrow.endArrowhead,
-		endBinding: bindingForShape(input.targetShape, end),
+		endBinding: route.endBinding,
 		...(elbowed
 			? {
 					fixedSegments: [],
@@ -654,28 +724,12 @@ function arrowElement(input: {
 					endIsSpecial: null,
 				}
 			: {}),
-		points: input.arrow.points.map((point) => [point.x - start.x, point.y - start.y]),
+		points: route.points.map((point) => [point[0] - start[0], point[1] - start[1]]),
 		roundness: elbowed ? null : { type: 2 },
 		startArrowhead: input.arrow.startArrowhead ?? null,
-		startBinding: bindingForShape(input.sourceShape, start),
+		startBinding: route.startBinding,
 		strokeColor: input.arrow.strokeColor ?? input.scene.accentColor,
 		strokeStyle: input.arrow.strokeStyle ?? "solid",
-	};
-}
-
-function bindingForLine(
-	binding: LineSceneElement["startBinding"],
-	elementsById: ReadonlyMap<string, ExcalidrawElement>,
-	point: { x: number; y: number },
-) {
-	if (!binding) return null;
-	const shape = elementsById.get(binding.elementId);
-	if (!shape) return null;
-	return {
-		elementId: binding.elementId,
-		focus: binding.focus ?? 0,
-		gap: binding.gap ?? 0,
-		fixedPoint: fixedPointForShape(shape, point),
 	};
 }
 
@@ -684,26 +738,41 @@ function lineElement(input: {
 	elementsById: ReadonlyMap<string, ExcalidrawElement>;
 	scene: RenderedDiagramScene;
 }): ExcalidrawElement {
-	const [start, ...rest] = input.element.points;
-	const end = rest[rest.length - 1] ?? start;
 	const hasArrow =
 		input.element.startArrowhead !== undefined ||
 		input.element.endArrowhead !== undefined ||
 		input.element.startBinding !== undefined ||
 		input.element.endBinding !== undefined;
-	const elbowed = hasArrow && input.element.points.length > 2;
+	const boundTo = (binding: LineSceneElement["startBinding"]) =>
+		binding ? input.elementsById.get(binding.elementId) : undefined;
+	const [startShape, endShape] = [
+		boundTo(input.element.startBinding),
+		boundTo(input.element.endBinding),
+	];
+	const route = boundRoute({
+		elbowed: hasArrow && input.element.points.length > 2,
+		straight: hasArrow,
+		points: input.element.points,
+		startShape,
+		startId: startShape?.id,
+		endShape,
+		endId: endShape?.id,
+	});
+	const { elbowed } = route;
+	const [start] = route.points as [Point, ...Point[]];
+	const end = route.points[route.points.length - 1] ?? start;
 	return {
 		...elementBase(input.element.id, input.element),
 		type: hasArrow ? "arrow" : "line",
-		x: start.x,
-		y: start.y,
-		width: end.x - start.x,
-		height: end.y - start.y,
+		x: start[0],
+		y: start[1],
+		width: end[0] - start[0],
+		height: end[1] - start[1],
 		backgroundColor: input.element.fillColor ?? "transparent",
 		boundElements: null,
 		...(hasArrow ? { elbowed } : {}),
 		endArrowhead: input.element.endArrowhead ?? null,
-		endBinding: bindingForLine(input.element.endBinding, input.elementsById, end),
+		endBinding: route.endBinding,
 		...(elbowed
 			? {
 					fixedSegments: [],
@@ -711,10 +780,10 @@ function lineElement(input: {
 					endIsSpecial: null,
 				}
 			: {}),
-		points: input.element.points.map((point) => [point.x - start.x, point.y - start.y]),
+		points: route.points.map((point) => [point[0] - start[0], point[1] - start[1]]),
 		roundness: input.element.points.length > 2 && !elbowed ? { type: 2 } : null,
 		startArrowhead: input.element.startArrowhead ?? null,
-		startBinding: bindingForLine(input.element.startBinding, input.elementsById, start),
+		startBinding: route.startBinding,
 		strokeColor: input.element.strokeColor ?? input.scene.accentColor,
 	};
 }
@@ -1249,6 +1318,24 @@ function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
 }
 
 /**
+ * Whether two arrows' ends bound at one point of a shape coincide: across the
+ * stem they leave or reach it by, and along it within the binding gap, which
+ * puts an end that is not elbowed that much further out than an elbow end.
+ */
+function sameBoundEnd(
+	a: { readonly x: number; readonly y: number },
+	b: { readonly x: number; readonly y: number },
+	orientation: AxisAlignedSegment["orientation"],
+): boolean {
+	const [along, across] =
+		orientation === "horizontal" ? [a.x - b.x, a.y - b.y] : [a.y - b.y, a.x - b.x];
+	return (
+		Math.abs(across) <= AXIS_ALIGNED_EPSILON &&
+		Math.abs(along) <= EXCALIDRAW_BINDING_GAP + AXIS_ALIGNED_EPSILON
+	);
+}
+
+/**
  * Arrows that leave one shape at one point may run together before they part,
  * as the bus from an org chart's manager to their reports does: a run both take
  * from the same corner in the same direction, after the same route up to it, is
@@ -1264,13 +1351,18 @@ function sharesTrunk(left: ArrowSegment, right: ArrowSegment): boolean {
 	for (let index = 0; index <= left.segmentIndex; index += 1) {
 		const a = left.route[index];
 		const b = right.route[index];
-		if (
-			!a ||
-			!b ||
-			Math.abs(a.x - b.x) > AXIS_ALIGNED_EPSILON ||
-			Math.abs(a.y - b.y) > AXIS_ALIGNED_EPSILON
-		)
-			return false;
+		if (!a || !b) return false;
+		const first = left.route[1];
+		const same =
+			index === 0 && first
+				? sameBoundEnd(
+						a,
+						b,
+						Math.abs(first.x - a.x) > Math.abs(first.y - a.y) ? "horizontal" : "vertical",
+					)
+				: Math.abs(a.x - b.x) <= AXIS_ALIGNED_EPSILON &&
+					Math.abs(a.y - b.y) <= AXIS_ALIGNED_EPSILON;
+		if (!same) return false;
 	}
 	return (
 		Math.sign(left.endCoordinate - left.startCoordinate) ===
@@ -1289,7 +1381,7 @@ function sharesDirectedEndpoint(left: ArrowSegment, right: ArrowSegment): boolea
 	const leftEndpoint = departure ? left.startCoordinate : left.endCoordinate;
 	const rightEndpoint = departure ? right.startCoordinate : right.endCoordinate;
 	return (
-		Math.abs(leftEndpoint - rightEndpoint) <= AXIS_ALIGNED_EPSILON &&
+		Math.abs(leftEndpoint - rightEndpoint) <= EXCALIDRAW_BINDING_GAP + AXIS_ALIGNED_EPSILON &&
 		Math.sign(left.endCoordinate - left.startCoordinate) ===
 			Math.sign(right.endCoordinate - right.startCoordinate)
 	);
@@ -1307,8 +1399,7 @@ function sharesArrivalStem(left: ArrowSegment, right: ArrowSegment): boolean {
 		left.endBindingId !== right.endBindingId ||
 		!leftEnd ||
 		!rightEnd ||
-		Math.abs(leftEnd.x - rightEnd.x) > AXIS_ALIGNED_EPSILON ||
-		Math.abs(leftEnd.y - rightEnd.y) > AXIS_ALIGNED_EPSILON
+		!sameBoundEnd(leftEnd, rightEnd, left.orientation)
 	)
 		return false;
 	const onStem = (segment: ArrowSegment) =>
@@ -1568,64 +1659,72 @@ function near(value: number, target: number): boolean {
 	return Math.abs(value - target) <= AXIS_ALIGNED_EPSILON;
 }
 
-function pointOnShapeBoundary(point: { x: number; y: number }, shape: ExcalidrawElement): boolean {
-	const bounds = elementBounds(shape);
+/** A connector end's neighbouring point, the one Excalidraw aims the end from. */
+function arrowNeighbour(element: ExcalidrawElement, key: BindingKey): Point | null {
+	const points = absoluteArrowPoints(element);
+	const neighbour = key === "startBinding" ? points[1] : points[points.length - 2];
+	return neighbour ? [neighbour.x, neighbour.y] : null;
+}
 
-	if (!bounds) {
-		return false;
+function bindingFocus(element: ExcalidrawElement, key: BindingKey): FocusBinding | null {
+	const binding = element[key];
+	if (!(binding && typeof binding === "object")) return null;
+	const focus = numericValue((binding as { focus?: unknown }).focus);
+	const gap = numericValue((binding as { gap?: unknown }).gap);
+	return focus === null || gap === null ? null : { focus, gap };
+}
+
+/** Within this of where Excalidraw re-places an end, the end reads as kept. */
+const KEPT_END_TOLERANCE = 0.01;
+
+/**
+ * Whether Excalidraw leaves a bound end where it is drawn when it updates the
+ * arrow: an elbow end on the outline at its fixed point, any other end where
+ * its focus and gap place it. A shape Excalidraw cannot bind keeps any end on
+ * its box.
+ */
+function excalidrawKeepsEnd(
+	element: ExcalidrawElement,
+	key: BindingKey,
+	shape: ExcalidrawElement,
+	endpoint: { x: number; y: number },
+): boolean {
+	const target = bindableShape(shape);
+	const point: Point = [endpoint.x, endpoint.y];
+	if (!target || !isExcalidrawBindableType(target.type)) {
+		return target !== undefined && pointOnBox(endpoint, target);
 	}
-
-	// A composed shape's box only binds; a line ends on the outline its strokes draw.
-	const composed =
-		shape.customData && typeof shape.customData === "object"
-			? (shape.customData as Record<string, unknown>)["sketchiShape"]
-			: undefined;
-	if (typeof composed === "string" && isCanvasComposedShape(composed)) {
-		return canvasComposedOnOutline({ ...bounds, shape: composed }, point);
+	if (element.elbowed === true) {
+		const fixedPoint = bindingFixedPoint(element, key);
+		return (
+			fixedPoint !== null &&
+			excalidrawKeepsElbowEnd(target, excalidrawFixedGlobalPoint(target, fixedPoint))
+		);
 	}
+	const binding = bindingFocus(element, key);
+	const neighbour = arrowNeighbour(element, key);
+	if (!binding || !neighbour) return false;
+	const placed = excalidrawBoundPoint(target, binding, neighbour, point);
+	return (
+		placed !== null && Math.hypot(placed[0] - point[0], placed[1] - point[1]) <= KEPT_END_TOLERANCE
+	);
+}
 
-	if (shape.type === "diamond") {
-		const halfWidth = bounds.width / 2;
-		const halfHeight = bounds.height / 2;
-
-		if (halfWidth === 0 || halfHeight === 0) {
-			return false;
-		}
-
-		const centerX = bounds.x + halfWidth;
-		const centerY = bounds.y + halfHeight;
-		const boundaryValue =
-			Math.abs(point.x - centerX) / halfWidth + Math.abs(point.y - centerY) / halfHeight;
-
-		return near(boundaryValue, 1);
-	}
-
-	if (shape.type === "ellipse") {
-		const halfWidth = bounds.width / 2;
-		const halfHeight = bounds.height / 2;
-
-		if (halfWidth === 0 || halfHeight === 0) {
-			return false;
-		}
-
-		const centerX = bounds.x + halfWidth;
-		const centerY = bounds.y + halfHeight;
-		const boundaryValue =
-			((point.x - centerX) / halfWidth) ** 2 + ((point.y - centerY) / halfHeight) ** 2;
-
-		return near(boundaryValue, 1);
-	}
-
+function pointOnBox(point: { x: number; y: number }, bounds: ElementBounds): boolean {
 	const onVerticalSide =
 		(near(point.x, bounds.x) || near(point.x, bounds.x + bounds.width)) &&
 		between(point.y, bounds.y, bounds.y + bounds.height);
 	const onHorizontalSide =
 		(near(point.y, bounds.y) || near(point.y, bounds.y + bounds.height)) &&
 		between(point.x, bounds.x, bounds.x + bounds.width);
-
 	return onVerticalSide || onHorizontalSide;
 }
 
+/**
+ * Whether a fixed point lands on the end drawn for it. Excalidraw reads a
+ * side's middle as 0.5001, a ten-thousandth of the side across, so 0.5001 reads
+ * as the middle here.
+ */
 function fixedPointResolvesToEndpoint(
 	fixedPoint: [number, number],
 	point: { x: number; y: number },
@@ -1768,11 +1867,11 @@ export function validateExcalidrawScene(scene: ExcalidrawScene): ExcalidrawScene
 				}
 
 				const endpoint = arrowEndpoint(element, bindingKey);
-				if (shape && endpoint && !pointOnShapeBoundary(endpoint, shape)) {
+				if (shape && endpoint && !excalidrawKeepsEnd(element, bindingKey, shape, endpoint)) {
 					issues.push({
 						code: "arrow-endpoint-off-shape",
 						elementId: element.id,
-						message: `Arrow "${element.id}" ${bindingKey} endpoint does not land on "${shape.id}".`,
+						message: `Arrow "${element.id}" ${bindingKey} endpoint is not where Excalidraw keeps it on "${shape.id}".`,
 					});
 				}
 
