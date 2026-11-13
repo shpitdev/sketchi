@@ -78,8 +78,8 @@ Excalidraw's library collection (`excalidraw/excalidraw-libraries`), so a pack
 first goes there the way excalidraw.com's "Publish library" dialog sends one.
 
 - A visitor opens "Publish to Excalidraw" on a pack and gives their name
-  (required, 60 characters), and optionally a Twitter handle and a website
-  (the pack's page by default). There is no GitHub handle: the collection's
+  (required, 60 characters), and optionally an X handle (a profile link is
+  read as its handle) and a website (the pack's page by default). There is no GitHub handle: the collection's
   bot mentions it on GitHub, and nothing here shows the visitor owns it.
 - `POST /api/packs/:id/excalidraw` takes those fields (2 KB at most, 3 a client
   an hour) and sends the rest itself: the built library pretty-printed, its

@@ -45,9 +45,12 @@ describe("PackPublishDialog", () => {
 		expect([name.required, name.maxLength]).toEqual([true, 60]);
 
 		fireEvent.change(name, { target: { value: "Jane" } });
-		fireEvent.change(within(dialog).getByLabelText("Twitter handle (optional)"), {
-			target: { value: "jane" },
+		const handle = within(dialog).getByLabelText("X handle (optional)") as HTMLInputElement;
+		// A pasted profile link shows as its handle, unclipped.
+		fireEvent.paste(handle, {
+			clipboardData: { getData: () => "https://x.com/dimethylpant" },
 		});
+		expect(handle.value).toBe("dimethylpant");
 		fireEvent.click(within(dialog).getByRole("button", { name: "Publish" }));
 
 		expect(await within(dialog).findByRole("link", { name: "View pull request" })).toBeTruthy();
@@ -56,7 +59,7 @@ describe("PackPublishDialog", () => {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				authorName: "Jane",
-				twitterHandle: "jane",
+				xHandle: "dimethylpant",
 				website: "https://icons.sketchi.app/packs/data",
 			}),
 		});
@@ -67,6 +70,26 @@ describe("PackPublishDialog", () => {
 			INSTALL,
 		);
 		expect(screen.queryByRole("button", { name: "Publish to Excalidraw" })).toBeNull();
+	});
+
+	it("reads a typed profile link as its handle and refuses a link that is not a profile", async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+		const dialog = openDialog();
+		const handle = within(dialog).getByLabelText("X handle (optional)") as HTMLInputElement;
+		fireEvent.change(handle, { target: { value: "twitter.com/dimethylpant/" } });
+		fireEvent.blur(handle);
+		expect(handle.value).toBe("dimethylpant");
+
+		fireEvent.change(within(dialog).getByLabelText("Your name"), { target: { value: "Jane" } });
+		fireEvent.change(handle, { target: { value: "https://x.com/dimethylpant/status/1" } });
+		fireEvent.blur(handle);
+		expect(handle.value).toBe("https://x.com/dimethylpant/status/1");
+		fireEvent.click(within(dialog).getByRole("button", { name: "Publish" }));
+		expect((await within(dialog).findByRole("alert")).textContent).toBe(
+			"That X link is not a profile; use one like x.com/yourname.",
+		);
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
 	it("shows why a submission failed and keeps the form", async () => {

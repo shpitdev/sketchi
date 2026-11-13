@@ -268,7 +268,7 @@ export function installLinkFromPullRequest(body: string): string | undefined {
 }
 
 /**
- * `POST /api/packs/:id/excalidraw` with `{ authorName, twitterHandle?, website? }`:
+ * `POST /api/packs/:id/excalidraw` with `{ authorName, xHandle?, website? }`:
  * send the pack's current version to Excalidraw's library collection, once.
  */
 export async function handlePackPublish(
@@ -337,7 +337,8 @@ export async function handlePackPublish(
 	form.append("githubHandle", "");
 	form.append("name", listing.name);
 	form.append("description", listing.description);
-	form.append("twitterHandle", author.twitterHandle);
+	// The collection still names the field for Twitter.
+	form.append("twitterHandle", author.xHandle);
 	form.append("website", author.website);
 
 	let status: number;

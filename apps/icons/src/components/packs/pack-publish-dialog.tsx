@@ -4,11 +4,12 @@ import {
 	DialogDescription,
 	DialogTitle,
 } from "@sketchi/ui/components/dialog";
-import { useState, type FormEvent } from "react";
+import { useState, type ClipboardEvent, type FormEvent } from "react";
 
 import {
 	AUTHOR_NAME_MAX_LENGTH,
 	packPublishPath,
+	parseXHandle,
 	type PublishResult,
 	WEBSITE_MAX_LENGTH,
 } from "../../lib/excalidraw-publish.js";
@@ -21,12 +22,15 @@ type Status =
 	| { readonly kind: "sent"; readonly result: PublishResult };
 
 async function publish(packId: string, form: FormData): Promise<PublishResult> {
+	const typed = form.get("xHandle");
+	const xHandle = parseXHandle(typeof typed === "string" ? typed : "");
+	if (!xHandle.ok) throw new Error(xHandle.message);
 	const response = await fetch(packPublishPath(packId), {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
 			authorName: form.get("authorName"),
-			twitterHandle: form.get("twitterHandle"),
+			xHandle: xHandle.handle,
 			website: form.get("website"),
 		}),
 	});
@@ -40,6 +44,22 @@ async function publish(packId: string, form: FormData): Promise<PublishResult> {
 		pullRequestUrl: body.pullRequestUrl,
 		...(body.installUrl ? { installUrl: body.installUrl } : {}),
 	};
+}
+
+/** Shows a pasted or typed profile link as the handle it names. */
+function showHandle(input: HTMLInputElement, value: string): boolean {
+	const parsed = parseXHandle(value);
+	if (!parsed.ok || parsed.handle === input.value) return false;
+	input.value = parsed.handle;
+	return true;
+}
+
+function pasteHandle(event: ClipboardEvent<HTMLInputElement>) {
+	const input = event.currentTarget;
+	const replacesAll = input.selectionStart === 0 && input.selectionEnd === input.value.length;
+	if (replacesAll && showHandle(input, event.clipboardData.getData("text"))) {
+		event.preventDefault();
+	}
 }
 
 /**
@@ -121,8 +141,13 @@ export function PackPublishDialog({
 							/>
 						</label>
 						<label className="pack-publish__field">
-							Twitter handle (optional)
-							<input maxLength={16} name="twitterHandle" />
+							X handle (optional)
+							<input
+								name="xHandle"
+								onBlur={(event) => showHandle(event.currentTarget, event.currentTarget.value)}
+								onPaste={pasteHandle}
+								spellCheck={false}
+							/>
 						</label>
 						<label className="pack-publish__field">
 							Website (optional)

@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { CommunityIconDatabase, CommunityIconStatement } from "@sketchi/community-icons";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { checkPublishRequest } from "./excalidraw-publish";
+import { checkPublishRequest, parseXHandle } from "./excalidraw-publish";
 import {
 	EXCALIDRAW_LIBRARY_BACKEND,
 	type ExcalidrawPublishEnv,
@@ -133,7 +133,7 @@ describe("publishing a pack to Excalidraw", () => {
 		const env = environment();
 		const response = await publish(env, {
 			authorName: "  Jane Doe ",
-			twitterHandle: "@jane_d",
+			xHandle: "https://x.com/jane_d",
 			website: "",
 		});
 		expect(response.status).toBe(201);
@@ -341,7 +341,7 @@ describe("author fields", () => {
 	it("takes a name, an optional handle and an https website", () => {
 		expect(checkPublishRequest({ authorName: "Jane" }, site)).toEqual({
 			ok: true,
-			author: { authorName: "Jane", twitterHandle: "", website: site },
+			author: { authorName: "Jane", xHandle: "", website: site },
 		});
 		expect(
 			checkPublishRequest({ authorName: "Jane", website: "https://jane.dev" }, site),
@@ -352,12 +352,62 @@ describe("author fields", () => {
 		for (const body of [
 			{ authorName: "x".repeat(61) },
 			{ authorName: "Jane\nDoe" },
-			{ authorName: "Jane", twitterHandle: "not a handle" },
+			{ authorName: "Jane", xHandle: "not a handle" },
+			{ authorName: "Jane", xHandle: "https://x.com/jane/status/1" },
 			{ authorName: "Jane", website: "http://jane.dev" },
 			{ authorName: "Jane", website: "javascript:alert(1)" },
 			[],
 		]) {
 			expect(checkPublishRequest(body, site).ok, JSON.stringify(body)).toBe(false);
+		}
+	});
+
+	it("reads an X handle however it is pasted", () => {
+		for (const input of [
+			"dimethylpant",
+			" @dimethylpant ",
+			"https://x.com/dimethylpant",
+			"http://twitter.com/dimethylpant/",
+			"x.com/dimethylpant",
+			"www.x.com/dimethylpant",
+			"https://mobile.twitter.com/dimethylpant?s=21&t=abc",
+			"https://X.com/dimethylpant#top",
+		]) {
+			expect(parseXHandle(input), input).toEqual({ ok: true, handle: "dimethylpant" });
+		}
+		expect(parseXHandle("  ")).toEqual({ ok: true, handle: "" });
+	});
+
+	it("refuses what is not an X handle or profile link, and says which", () => {
+		const message = (input: string) => {
+			const parsed = parseXHandle(input);
+			return parsed.ok ? undefined : parsed.message;
+		};
+		for (const input of ["not a handle", "@", "sixteen_letters_", "jane-doe", "@@jane"]) {
+			expect(message(input), input).toBe("An X handle is 1 to 15 letters, digits or underscores.");
+		}
+		for (const input of [
+			"https://github.com/jane",
+			"jane.dev",
+			"ftp://x.com/jane",
+			"javascript:alert(1)",
+			"https://x.com.evil.dev/jane",
+		]) {
+			expect(message(input), input).toBe("Enter an X handle or a link to an X profile.");
+		}
+		for (const input of [
+			"https://x.com",
+			"https://x.com/",
+			"https://x.com/jane/status/123",
+			"https://x.com/home",
+			"https://twitter.com/i/lists/1",
+			"https://x.com/Explore",
+			"https://x.com/search?q=sketchi",
+			"x.com/sixteen_letters_",
+		]) {
+			expect(message(input), input).toBe(
+				"That X link is not a profile; use one like x.com/yourname.",
+			);
 		}
 	});
 
