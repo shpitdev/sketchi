@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import { env } from "cloudflare:workers";
+import { env, waitUntil } from "cloudflare:workers";
 
 import { loadPackExcalidrawStates } from "./excalidraw-publish.server.js";
 import { decodePackIndex, PACK_INDEX_PATH, type PackSummary } from "./packs.js";
@@ -25,8 +25,12 @@ export function loadPackIndex(origin: string): Promise<PackSummary[]> {
 	return pending;
 }
 
-/** The pack shelf: the build's packs and, from the submissions table, each one's Excalidraw state. */
+/**
+ * The pack shelf: the build's packs and, from the submissions table, each
+ * one's Excalidraw state. Pull request states due a read refresh after the
+ * response.
+ */
 export async function loadPackShelf(origin: string) {
 	const packs = await loadPackIndex(origin);
-	return { packs, excalidraw: await loadPackExcalidrawStates(env, packs) };
+	return { packs, excalidraw: await loadPackExcalidrawStates(env, packs, { waitUntil }) };
 }

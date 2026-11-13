@@ -9,6 +9,7 @@ import {
 	type PackExcalidrawState,
 	PUBLISH_MAX_BODY_BYTES,
 	type PublishResult,
+	type PullRequestState,
 } from "./excalidraw-publish.js";
 import {
 	findPack,
@@ -30,6 +31,16 @@ const PULL_REQUEST_URL =
 export const PUBLISHES_PER_CLIENT_HOUR = 3;
 const SUBMIT_TIMEOUT_MS = 30_000;
 const LOOKUP_TIMEOUT_MS = 8_000;
+const STATE_TIMEOUT_MS = 5_000;
+/** How long a pull request's state stands before a page load reads GitHub again; a merge is final. */
+export const PULL_REQUEST_RECHECK_MS: Readonly<Record<PullRequestState | "unread", number>> = {
+	unread: 10 * 60_000,
+	open: 10 * 60_000,
+	closed: 6 * 3_600_000,
+	merged: Number.POSITIVE_INFINITY,
+};
+/** Pull requests one page load may refresh. */
+const PULL_REQUESTS_PER_REFRESH = 10;
 
 export interface ExcalidrawPublishEnv {
 	readonly ASSETS: { fetch(request: Request | URL | string): Promise<Response> };
@@ -74,12 +85,27 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS excalidraw_library_submissions (
 	PRIMARY KEY (pack_id, version)
 )`;
 
-interface SubmissionRow {
+/**
+ * Each submitted pull request's state as GitHub last gave it, with the ETag
+ * that makes an unchanged answer free of GitHub's rate limit. A missing
+ * `state` means GitHub has not been read yet.
+ */
+const PULL_REQUEST_SCHEMA = `CREATE TABLE IF NOT EXISTS excalidraw_library_pull_requests (
+	url TEXT PRIMARY KEY,
+	state TEXT,
+	etag TEXT,
+	checked_at INTEGER NOT NULL
+)`;
+
+export interface SubmissionRow {
 	readonly pack_id: string;
 	readonly version: string;
 	readonly status: "pending" | "unconfirmed" | "submitted";
+	readonly pull_request_url: string | null;
 	readonly install_url: string | null;
 	readonly created_at: number;
+	readonly pull_request_state: PullRequestState | null;
+	readonly pull_request_checked_at: number | null;
 }
 
 export class ExcalidrawSubmissionStore {
@@ -88,7 +114,10 @@ export class ExcalidrawSubmissionStore {
 	constructor(private readonly db: CommunityIconDatabase) {}
 
 	private schema() {
-		this.ready ??= this.db.prepare(SCHEMA).run();
+		this.ready ??= Promise.all([
+			this.db.prepare(SCHEMA).run(),
+			this.db.prepare(PULL_REQUEST_SCHEMA).run(),
+		]);
 		return this.ready;
 	}
 
@@ -153,16 +182,83 @@ export class ExcalidrawSubmissionStore {
 		await this.schema();
 		const { results } = await this.db
 			.prepare(
-				"SELECT pack_id, version, status, install_url, created_at FROM excalidraw_library_submissions ORDER BY created_at DESC",
+				`SELECT s.pack_id, s.version, s.status, s.pull_request_url, s.install_url, s.created_at,
+					p.state AS pull_request_state, p.checked_at AS pull_request_checked_at
+				FROM excalidraw_library_submissions s
+				LEFT JOIN excalidraw_library_pull_requests p ON p.url = s.pull_request_url
+				ORDER BY s.created_at DESC`,
 			)
 			.all<SubmissionRow>();
 		return results;
 	}
+
+	/**
+	 * Take a pull request's next read: true, with the ETag of its last answer,
+	 * for one caller once its state is due, so concurrent page loads read
+	 * GitHub once between them.
+	 */
+	async claimCheck(url: string, now: number) {
+		await this.schema();
+		const current = await this.db
+			.prepare("SELECT state, etag, checked_at FROM excalidraw_library_pull_requests WHERE url = ?")
+			.bind(url)
+			.first<{ state: PullRequestState | null; etag: string | null; checked_at: number }>();
+		const wait = PULL_REQUEST_RECHECK_MS[current?.state ?? "unread"];
+		if (current && now - current.checked_at < wait) return undefined;
+		const { meta } = await this.db
+			.prepare(
+				`INSERT INTO excalidraw_library_pull_requests (url, checked_at) VALUES (?, ?)
+				ON CONFLICT (url) DO UPDATE SET checked_at = excluded.checked_at
+				WHERE checked_at = ?`,
+			)
+			// A new row conflicts only with another reader's claim, which no checked_at matches.
+			.bind(url, now, current?.checked_at ?? -1)
+			.run();
+		return meta.changes === 1 ? { etag: current?.etag ?? undefined } : undefined;
+	}
+
+	async recordState(url: string, state: PullRequestState, etag: string | undefined) {
+		await this.db
+			.prepare("UPDATE excalidraw_library_pull_requests SET state = ?, etag = ? WHERE url = ?")
+			.bind(state, etag ?? null, url)
+			.run();
+	}
 }
 
 /**
- * Each pack's state for the pages: the newest submission's install link, and
- * whether its current version is still open to submit.
+ * A merged library's install link: the collection deletes a pull request's
+ * branch when it merges, so the link reads the library from `main` instead.
+ */
+export function mergedInstallUrl(installUrl: string): string | undefined {
+	const url = URL.parse(installUrl);
+	const library = mergedLibraryUrl(installUrl);
+	if (!url || !library) return undefined;
+	url.searchParams.set("addLibrary", library);
+	return isExcalidrawInstallUrl(url.href) ? url.href : undefined;
+}
+
+/** Where the library an install link adds sits on `main` once it merges. */
+function mergedLibraryUrl(installUrl: string): string | undefined {
+	const library = URL.parse(URL.parse(installUrl)?.searchParams.get("addLibrary") ?? "");
+	if (!library) return undefined;
+	const path = library.pathname.split("/");
+	// ["", "excalidraw", "excalidraw-libraries", branch, "libraries", author, file]
+	if (path.length < 5 || path[4] !== "libraries") return undefined;
+	path[3] = "main";
+	library.pathname = path.join("/");
+	return library.href;
+}
+
+/** What a submission's install link adds now: a closed pull request's branch may be gone. */
+function reachableInstallUrl(row: SubmissionRow): string | undefined {
+	if (!row.install_url || row.pull_request_state === "closed") return undefined;
+	return row.pull_request_state === "merged" ? mergedInstallUrl(row.install_url) : row.install_url;
+}
+
+/**
+ * Each pack's state for the pages: the newest install link still in reach,
+ * the newest submission's pull request, and whether its current version is
+ * still open to submit.
  */
 export function packExcalidrawStates(
 	packs: readonly Pick<PackSummary, "id" | "version">[],
@@ -172,23 +268,129 @@ export function packExcalidrawStates(
 	return Object.fromEntries(
 		packs.map((pack) => {
 			const mine = rows.filter((row) => row.pack_id === pack.id);
-			const installUrl = mine.find((row) => row.install_url)?.install_url ?? undefined;
+			const installUrl = mine.map(reachableInstallUrl).find(Boolean);
+			const latest = mine.find((row) => row.pull_request_url);
+			const pullRequest = latest?.pull_request_url
+				? {
+						url: latest.pull_request_url,
+						...(latest.pull_request_state ? { state: latest.pull_request_state } : {}),
+					}
+				: undefined;
 			const taken = mine.some((row) => row.version === pack.version);
 			const publishable =
 				options.enabled && findPack(pack.id)?.excalidrawListing !== undefined && !taken;
-			return [pack.id, { ...(installUrl ? { installUrl } : {}), publishable }];
+			const state: PackExcalidrawState = {
+				...(installUrl ? { installUrl } : {}),
+				...(pullRequest ? { pullRequest } : {}),
+				publishable,
+			};
+			return [pack.id, state];
 		}),
 	);
 }
 
-/** The states the pages render; without the table every pack only downloads. */
+/**
+ * The states the pages render; without the table every pack only downloads.
+ * Pull requests whose state is due are read from GitHub after the response,
+ * through `waitUntil`, so a page never waits on GitHub and shows the state
+ * the last read stored.
+ */
 export async function loadPackExcalidrawStates(
 	env: ExcalidrawPublishEnv,
 	packs: readonly Pick<PackSummary, "id" | "version">[],
+	options: { readonly waitUntil?: (promise: Promise<unknown>) => void; readonly now?: number } = {},
 ): Promise<Record<string, PackExcalidrawState>> {
 	if (!env.COMMUNITY_ICONS) return {};
-	const rows = await new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS).rows().catch(() => []);
+	const store = new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS);
+	const rows = await store.rows().catch(() => []);
+	const now = options.now ?? Date.now();
+	const due = new Map<string, string | undefined>();
+	for (const row of rows) {
+		if (
+			row.pull_request_url &&
+			(row.pull_request_checked_at === null ||
+				now - row.pull_request_checked_at >=
+					PULL_REQUEST_RECHECK_MS[row.pull_request_state ?? "unread"])
+		) {
+			due.set(row.pull_request_url, due.get(row.pull_request_url) ?? row.install_url ?? undefined);
+		}
+	}
+	if (due.size && options.waitUntil) {
+		const pulls = [...due].map(([url, installUrl]) => ({ url, installUrl }));
+		options.waitUntil(
+			refreshPullRequests(env, store, pulls.slice(0, PULL_REQUESTS_PER_REFRESH), now),
+		);
+	}
 	return packExcalidrawStates(packs, rows, { enabled: publishingEnabled(env) });
+}
+
+/**
+ * Read each due pull request's state from GitHub. GitHub's unauthenticated
+ * API limits each address, and a Worker shares its address, so when the API
+ * refuses, a library file on the collection's `main` still shows the merge.
+ * A failed read keeps the last state.
+ */
+export async function refreshPullRequests(
+	env: ExcalidrawPublishEnv,
+	store: ExcalidrawSubmissionStore,
+	pulls: readonly { readonly url: string; readonly installUrl?: string | undefined }[],
+	now: number,
+) {
+	await Promise.all(
+		pulls.map(async ({ url, installUrl }) => {
+			const number = PULL_REQUEST_URL.exec(url)?.groups?.["number"];
+			if (!number) return;
+			try {
+				const claim = await store.claimCheck(url, now);
+				if (!claim) return;
+				let read: { state: PullRequestState; etag?: string | undefined } | undefined;
+				try {
+					read = await readPullRequestState(env, number, claim.etag);
+				} catch (error) {
+					const library = installUrl ? mergedLibraryUrl(installUrl) : undefined;
+					if (!library || !(await onMain(library))) throw error;
+					read = { state: "merged" };
+				}
+				if (read) await store.recordState(url, read.state, read.etag);
+			} catch (error) {
+				console.warn("Excalidraw pull request state not read", { url, error: String(error) });
+			}
+		}),
+	);
+}
+
+/** Whether a library file is on the collection's `main`, read past GitHub's API. */
+async function onMain(library: string) {
+	const response = await fetch(library, {
+		method: "HEAD",
+		headers: { "User-Agent": "sketchi-icons" },
+		signal: AbortSignal.timeout(STATE_TIMEOUT_MS),
+	}).catch(() => undefined);
+	return response?.ok === true;
+}
+
+/**
+ * The pull request's state from GitHub's public API, or nothing when GitHub
+ * answers 304 to the ETag: the stored state still stands.
+ */
+async function readPullRequestState(env: ExcalidrawPublishEnv, number: string, etag?: string) {
+	const response = await fetch(
+		`${env.EXCALIDRAW_LIBRARY_GITHUB_API ?? GITHUB_API}/repos/excalidraw/excalidraw-libraries/pulls/${number}`,
+		{
+			headers: {
+				Accept: "application/vnd.github+json",
+				"User-Agent": "sketchi-icons",
+				...(etag ? { "If-None-Match": etag } : {}),
+			},
+			signal: AbortSignal.timeout(STATE_TIMEOUT_MS),
+		},
+	);
+	if (response.status === 304) return undefined;
+	if (!response.ok) throw new Error(`GitHub answered HTTP ${response.status}.`);
+	const pull = (await response.json()) as { state?: unknown; merged_at?: unknown };
+	const state: PullRequestState =
+		typeof pull.merged_at === "string" ? "merged" : pull.state === "closed" ? "closed" : "open";
+	return { state, etag: response.headers.get("ETag") ?? undefined };
 }
 
 function errorJson(status: number, code: string, message: string) {
