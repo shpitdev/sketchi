@@ -304,40 +304,50 @@ export async function loadPackExcalidrawStates(
 	const store = new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS);
 	const rows = await store.rows().catch(() => []);
 	const now = options.now ?? Date.now();
-	const due = new Map<string, string | undefined>();
-	for (const row of rows) {
-		if (
-			row.pull_request_url &&
-			(row.pull_request_checked_at === null ||
-				now - row.pull_request_checked_at >=
-					PULL_REQUEST_RECHECK_MS[row.pull_request_state ?? "unread"])
-		) {
-			due.set(row.pull_request_url, due.get(row.pull_request_url) ?? row.install_url ?? undefined);
-		}
-	}
-	if (due.size && options.waitUntil) {
-		const pulls = [...due].map(([url, installUrl]) => ({ url, installUrl }));
-		options.waitUntil(
-			refreshPullRequests(env, store, pulls.slice(0, PULL_REQUESTS_PER_REFRESH), now),
-		);
+	// Each version has its own pull request. The longest unchecked go first,
+	// unread before all, so a busy shelf still reaches every pull request.
+	const due = rows
+		.filter(
+			(row) =>
+				row.pull_request_url &&
+				(row.pull_request_checked_at === null ||
+					now - row.pull_request_checked_at >=
+						PULL_REQUEST_RECHECK_MS[row.pull_request_state ?? "unread"]),
+		)
+		.toSorted((a, b) => (a.pull_request_checked_at ?? -1) - (b.pull_request_checked_at ?? -1))
+		.slice(0, PULL_REQUESTS_PER_REFRESH)
+		.map((row) => ({
+			url: row.pull_request_url ?? "",
+			version: row.version,
+			...(row.install_url ? { installUrl: row.install_url } : {}),
+		}));
+	if (due.length && options.waitUntil) {
+		options.waitUntil(refreshPullRequests(env, store, due, now));
 	}
 	return packExcalidrawStates(packs, rows, { enabled: publishingEnabled(env) });
+}
+
+/** A due pull request, with the pack version it carries and its install link. */
+export interface DuePullRequest {
+	readonly url: string;
+	readonly version: string;
+	readonly installUrl?: string;
 }
 
 /**
  * Read each due pull request's state from GitHub. GitHub's unauthenticated
  * API limits each address, and a Worker shares its address, so when the API
- * refuses, a library file on the collection's `main` still shows the merge.
- * A failed read keeps the last state.
+ * refuses, the library file on the collection's `main` still shows the merge
+ * when it is this pull request's version. A failed read keeps the last state.
  */
 export async function refreshPullRequests(
 	env: ExcalidrawPublishEnv,
 	store: ExcalidrawSubmissionStore,
-	pulls: readonly { readonly url: string; readonly installUrl?: string | undefined }[],
+	pulls: readonly DuePullRequest[],
 	now: number,
 ) {
 	await Promise.all(
-		pulls.map(async ({ url, installUrl }) => {
+		pulls.map(async ({ url, version, installUrl }) => {
 			const number = PULL_REQUEST_URL.exec(url)?.groups?.["number"];
 			if (!number) return;
 			try {
@@ -348,7 +358,7 @@ export async function refreshPullRequests(
 					read = await readPullRequestState(env, number, claim.etag);
 				} catch (error) {
 					const library = installUrl ? mergedLibraryUrl(installUrl) : undefined;
-					if (!library || !(await onMain(library))) throw error;
+					if (!library || !(await versionOnMain(library, version))) throw error;
 					read = { state: "merged" };
 				}
 				if (read) await store.recordState(url, read.state, read.etag);
@@ -359,14 +369,23 @@ export async function refreshPullRequests(
 	);
 }
 
-/** Whether a library file is on the collection's `main`, read past GitHub's API. */
-async function onMain(library: string) {
-	const response = await fetch(library, {
-		method: "HEAD",
-		headers: { "User-Agent": "sketchi-icons" },
-		signal: AbortSignal.timeout(STATE_TIMEOUT_MS),
-	}).catch(() => undefined);
-	return response?.ok === true;
+/**
+ * Whether the collection's `main` holds this pack version, read past GitHub's
+ * API. The collection commits the library as it was sent, pretty-printed, so
+ * the version is the file's hash once compacted again; a path alone could be
+ * an earlier or later version of the pack.
+ */
+async function versionOnMain(library: string, version: string) {
+	try {
+		const response = await fetch(library, {
+			headers: { "User-Agent": "sketchi-icons" },
+			signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+		});
+		if (!response.ok) return false;
+		return (await packVersion(JSON.stringify(await response.json()))) === version;
+	} catch {
+		return false;
+	}
 }
 
 /**

@@ -108,7 +108,9 @@ first goes there the way excalidraw.com's "Publish library" dialog sends one.
   does not count against GitHub's limit; one reader claims each read, and a
   failed read keeps the last state. That API limits each address and a Worker
   shares Cloudflare's, so when it refuses, the library file on the
-  collection's `main` still shows a merge. The collection deletes a pull request's
+  collection's `main` shows the merge if it is that submission's version
+  (the file compacted hashes to it). Due reads go longest-unchecked first,
+  at most 10 a page load. The collection deletes a pull request's
   branch when it merges, so a merged library's install link reads from
   `main`; a closed one's branch may be gone, so it loses "Add to Excalidraw".
 - Publishing is off unless the Worker has `EXCALIDRAW_LIBRARY_SUBMIT=on`;

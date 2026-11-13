@@ -401,11 +401,11 @@ describe("pack states", () => {
 describe("pull request states", () => {
 	const OTHER = "https://github.com/excalidraw/excalidraw-libraries/pull/4243";
 
-	async function seeded() {
+	async function seeded(version = "v1") {
 		const env = environment();
 		const store = new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!);
-		await store.claim("palantir", "v1", "Jane", 1);
-		await store.complete("palantir", "v1", {
+		await store.claim("palantir", version, "Jane", 1);
+		await store.complete("palantir", version, {
 			pullRequestUrl: PR,
 			installUrl: INSTALL,
 			pullRequest: "{}",
@@ -498,20 +498,25 @@ describe("pull request states", () => {
 		expect(after.states["databricks"]?.pullRequest?.state).toBe("closed");
 	});
 
-	it("sees a merge on the collection's main when GitHub's API refuses", async () => {
-		const env = await seeded();
-		const main =
-			"https://raw.githubusercontent.com/excalidraw/excalidraw-libraries/main/libraries/jane/palantir-platform-icons.excalidrawlib?raw=true";
-		const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+	const MAIN_LIBRARY =
+		"https://raw.githubusercontent.com/excalidraw/excalidraw-libraries/main/libraries/jane/palantir-platform-icons.excalidrawlib?raw=true";
+
+	/** GitHub's API refuses; `main` holds the given library text. */
+	function refusingApi(mainLibrary: string) {
+		const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
 			const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-			if (url === main) {
-				expect(init?.method).toBe("HEAD");
-				return new Response(null, { status: 200 });
-			}
+			if (url === MAIN_LIBRARY) return new Response(mainLibrary);
 			return new Response("rate limited", { status: 403 });
 		});
 		vi.stubGlobal("fetch", fetchMock);
 		vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		return fetchMock;
+	}
+
+	it("sees a merge on the collection's main when GitHub's API refuses", async () => {
+		const env = await seeded(await packVersion(LIBRARY));
+		// The collection commits the library pretty-printed.
+		refusingApi(JSON.stringify(JSON.parse(LIBRARY), null, 2));
 		await load(env, 1_000);
 		const after = await load(env, 2_000);
 		expect(after.states["palantir"]).toMatchObject({
@@ -520,6 +525,53 @@ describe("pull request states", () => {
 		});
 		// Without an install link there is no file to look for; the state stays unread.
 		expect(after.states["databricks"]?.pullRequest).toEqual({ url: OTHER });
+	});
+
+	it("never takes another version of the pack on main for this pull request's merge", async () => {
+		const env = await seeded(await packVersion(LIBRARY));
+		const earlier = JSON.parse(LIBRARY) as { libraryItems: unknown[] };
+		earlier.libraryItems = [];
+		refusingApi(JSON.stringify(earlier, null, 2));
+		await load(env, 1_000);
+		const after = await load(env, 1_000 + PULL_REQUEST_RECHECK_MS.unread);
+		// Still unread, and still adding this version from its own branch.
+		expect(after.states["palantir"]?.pullRequest).toEqual({ url: PR });
+		expect(after.states["palantir"]?.installUrl).toBe(INSTALL);
+	});
+
+	it("checks the longest unchecked pull requests first, so every one is reached", async () => {
+		const env = environment();
+		const store = new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!);
+		const numbers = Array.from({ length: 11 }, (_, index) => String(5000 + index));
+		for (const [index, number] of numbers.entries()) {
+			await store.claim(`pack-${index}`, "v1", "Jane", index);
+			await store.complete(`pack-${index}`, "v1", {
+				pullRequestUrl: `https://github.com/excalidraw/excalidraw-libraries/pull/${number}`,
+				pullRequest: "{}",
+			});
+		}
+		const read: string[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (input: RequestInfo | URL) => {
+				const url =
+					typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+				read.push(url.replace(/.*\/pulls\//u, ""));
+				return Response.json({ state: "open", merged_at: null });
+			}),
+		);
+		const visit = async (now: number) => {
+			const later: Promise<unknown>[] = [];
+			await loadPackExcalidrawStates(env, [], { now, waitUntil: (promise) => later.push(promise) });
+			await Promise.all(later);
+		};
+		// Ten a visit: the first takes the ten newest, the next the one left unread first.
+		await visit(1_000);
+		expect(read).toHaveLength(10);
+		expect(read).not.toContain("5000");
+		await visit(1_000 + PULL_REQUEST_RECHECK_MS.open);
+		expect(read).toHaveLength(20);
+		expect(new Set(read)).toEqual(new Set(numbers));
 	});
 });
 
