@@ -42,9 +42,11 @@ import { fixedBoundEnds, focusBoundEnds } from "./bound-ends.js";
 import {
 	type BindableShape,
 	EXCALIDRAW_BINDING_GAP,
+	EXCALIDRAW_ELBOW_DISTANCE,
 	excalidrawBoundPoint,
 	excalidrawFixedGlobalPoint,
 	excalidrawKeepsElbowEnd,
+	excalidrawOutlineDistance,
 	type FocusBinding,
 	isExcalidrawBindableType,
 	type Point,
@@ -1677,11 +1679,19 @@ function bindingFocus(element: ExcalidrawElement, key: BindingKey): FocusBinding
 /** Within this of where Excalidraw re-places an end, the end reads as kept. */
 const KEPT_END_TOLERANCE = 0.01;
 
+/** Within this of its binding's reach, a bound end reads as meeting its shape. */
+const REACH_TOLERANCE = 0.05;
+
 /**
- * Whether Excalidraw leaves a bound end where it is drawn when it updates the
- * arrow: an elbow end on the outline at its fixed point, any other end where
- * its focus and gap place it. A shape Excalidraw cannot bind keeps any end on
- * its box.
+ * Whether a bound end meets its shape and Excalidraw leaves it where it is
+ * drawn when it updates the arrow. It must lie outside the outline Excalidraw
+ * draws and no farther out than the binding reaches: its gap for an arrow that
+ * is not elbowed, the outline itself for an elbow end (or the distance
+ * Excalidraw re-places one at). And Excalidraw's update must map it to itself:
+ * an elbow end at its fixed point, any other end where its focus and gap place
+ * it. Excalidraw keeps an end whose aim misses the shape where it is, so update
+ * stability alone would pass an arrow left floating beside its shape. A shape
+ * Excalidraw cannot bind keeps any end on its box.
  */
 function excalidrawKeepsEnd(
 	element: ExcalidrawElement,
@@ -1694,14 +1704,20 @@ function excalidrawKeepsEnd(
 	if (!target || !isExcalidrawBindableType(target.type)) {
 		return target !== undefined && pointOnBox(endpoint, target);
 	}
-	if (element.elbowed === true) {
+	const elbowed = element.elbowed === true;
+	const binding = bindingFocus(element, key);
+	const reach = elbowed ? EXCALIDRAW_ELBOW_DISTANCE : (binding?.gap ?? 0);
+	const offset = excalidrawOutlineDistance(target, point);
+	if (offset === null || offset < -REACH_TOLERANCE || offset > reach + REACH_TOLERANCE) {
+		return false;
+	}
+	if (elbowed) {
 		const fixedPoint = bindingFixedPoint(element, key);
 		return (
 			fixedPoint !== null &&
 			excalidrawKeepsElbowEnd(target, excalidrawFixedGlobalPoint(target, fixedPoint))
 		);
 	}
-	const binding = bindingFocus(element, key);
 	const neighbour = arrowNeighbour(element, key);
 	if (!binding || !neighbour) return false;
 	const placed = excalidrawBoundPoint(target, binding, neighbour, point);

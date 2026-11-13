@@ -1571,6 +1571,62 @@ describe("convertSceneToExcalidraw", () => {
 		);
 	});
 
+	it("reports a bound line whose aim misses both of its shapes", () => {
+		// Excalidraw keeps an end it cannot aim at its shape where it is, so the
+		// end must also meet the outline it is bound to.
+		const node = (id: string, x: number) => ({
+			type: "node" as const,
+			id,
+			nodeId: id,
+			shape: "rectangle" as const,
+			x,
+			y: 0,
+			width: 100,
+			height: 100,
+			label: id,
+		});
+		const scene = convertSceneToExcalidraw({
+			kind: "canvas",
+			version: 1,
+			diagramId: "floating-line",
+			title: "Floating line",
+			width: 460,
+			height: 220,
+			accentColor: "#111827",
+			backgroundColor: "#ffffff",
+			elements: [
+				node("a", 0),
+				node("b", 300),
+				{
+					type: "line",
+					id: "a-b",
+					points: [
+						{ x: 100, y: 150 },
+						{ x: 300, y: 150 },
+					],
+					startBinding: { elementId: "a" },
+					endBinding: { elementId: "b" },
+					endArrowhead: "arrow",
+				},
+			],
+			layers: [],
+			layouts: [],
+			zOrder: ["a", "b", "a-b"],
+		});
+
+		expect(
+			validateExcalidrawScene(scene).issues.filter(
+				(issue) => issue.code === "arrow-endpoint-off-shape",
+			),
+		).toEqual([
+			expect.objectContaining({
+				elementId: "a-b",
+				message: expect.stringContaining("startBinding"),
+			}),
+			expect.objectContaining({ elementId: "a-b", message: expect.stringContaining("endBinding") }),
+		]);
+	});
+
 	it("accepts Excalidraw-edited elbow arrows with null fixed segments", () => {
 		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
 		const branchArrow = scene.elements.find((element) => element.id === "edge:clear-review");

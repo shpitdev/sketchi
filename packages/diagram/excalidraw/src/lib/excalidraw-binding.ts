@@ -644,6 +644,70 @@ export function excalidrawOutlineHit(
 	return hits.sort((g, h) => pointDistanceSq(g, from) - pointDistanceSq(h, from))[0]!;
 }
 
+/** Excalidraw's outline for a shape as a closed polyline, its curves finely stepped. */
+function outlinePolyline(shape: BindableShape): Point[] | null {
+	const center = shapeCenter(shape);
+	const angle = shape.angle ?? 0;
+	const back = (p: Point) => pointRotateRads(p, center, angle);
+	if (shape.type === "ellipse") {
+		const steps = 720;
+		return Array.from({ length: steps + 1 }, (_, step) => {
+			const turn = (step / steps) * 2 * Math.PI;
+			return back([
+				center[0] + (shape.width / 2) * Math.cos(turn),
+				center[1] + (shape.height / 2) * Math.sin(turn),
+			]);
+		});
+	}
+	if (shape.type === "diamond") {
+		const sides = diamondSides(shape, 0);
+		return sides ? [...sides.map(([from]) => back(from)), back(sides[0]![0])] : null;
+	}
+	if (!RECTANGULOIDS.has(shape.type)) return null;
+	const [, corners] = rectanguloidParts(shape, 0);
+	if (corners.length === 0) {
+		const { x, y, width, height } = shape;
+		return [
+			pointFrom(x, y),
+			pointFrom(x + width, y),
+			pointFrom(x + width, y + height),
+			pointFrom(x, y + height),
+			pointFrom(x, y),
+		].map(back);
+	}
+	const points = corners.flatMap((corner) =>
+		Array.from({ length: 65 }, (_, step) => back(bezierEquation(corner, step / 64))),
+	);
+	return [...points, points[0]!];
+}
+
+/**
+ * How far a point lies outside the outline Excalidraw draws for a shape,
+ * negative inside it. Null for a shape it has no outline for.
+ */
+export function excalidrawOutlineDistance(shape: BindableShape, point: Point): number | null {
+	const outline = outlinePolyline(shape);
+	if (!outline) return null;
+	let nearest = Infinity;
+	let inside = false;
+	// A ray a hair off the point's height never runs through a vertex.
+	const rayY = point[1] + 1e-7;
+	for (let index = 1; index < outline.length; index += 1) {
+		const from = outline[index - 1]!;
+		const to = outline[index]!;
+		nearest = Math.min(nearest, distanceToLineSegment(point, [from, to]));
+		if (
+			from[1] > rayY !== to[1] > rayY &&
+			point[0] < from[0] + ((rayY - from[1]) * (to[0] - from[0])) / (to[1] - from[1])
+		)
+			inside = !inside;
+	}
+	return inside ? -nearest : nearest;
+}
+
+/** How far out Excalidraw re-places an elbow arrow end that is not on the outline. */
+export const EXCALIDRAW_ELBOW_DISTANCE = FIXED_BINDING_DISTANCE;
+
 /**
  * Whether Excalidraw keeps an elbow arrow end that sits on the shape's outline
  * when it re-routes the arrow. getGlobalPoint hands any fixed point that is not

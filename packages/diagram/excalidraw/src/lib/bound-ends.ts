@@ -6,6 +6,7 @@ import {
 	excalidrawFixedPoint,
 	excalidrawFocusThrough,
 	excalidrawKeepsElbowEnd,
+	excalidrawOutlineDistance,
 	excalidrawOutlineHit,
 	type FocusBinding,
 	isExcalidrawBindableType,
@@ -22,6 +23,9 @@ const AXIS_TILT = 1e-6;
 
 /** Ends re-placed by Excalidraw within this of where they are drawn count as kept. */
 const KEPT = 1e-9;
+
+/** Within this of the outline, or of the binding gap outside it, an end meets its shape. */
+const OUTLINE_TOLERANCE = 0.05;
 
 export interface FocusBoundEnds {
 	readonly end?: FocusBinding;
@@ -175,12 +179,22 @@ export function focusBoundEnds(
 		}
 		return { focus, points };
 	};
+	// Kept, and on the outline: Excalidraw also keeps an end it cannot aim at the
+	// outline, on its focus point inside the shape or wherever its aim misses.
 	const kept = ({ focus, points }: { focus: Focus; points: readonly Point[] }) =>
 		!missing(focus).some(Boolean) &&
-		ends.every(({ index }) => {
+		ends.every(({ index }, side) => {
+			const shape = shapes[side as 0 | 1];
+			if (!shape) return true;
 			const placed = place(points, focus)[index]!;
 			const point = points[index]!;
-			return distance(placed, point) <= KEPT * Math.max(1, Math.abs(point[0]), Math.abs(point[1]));
+			const offset = excalidrawOutlineDistance(shape, point);
+			return (
+				distance(placed, point) <= KEPT * Math.max(1, Math.abs(point[0]), Math.abs(point[1])) &&
+				offset !== null &&
+				offset >= -OUTLINE_TOLERANCE &&
+				offset <= EXCALIDRAW_BINDING_GAP + OUTLINE_TOLERANCE
+			);
 		});
 	const withBindings = (
 		{ focus, points }: { focus: Focus; points: Point[] },
