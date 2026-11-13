@@ -778,6 +778,13 @@ function labelDefects(
 const LABEL_OWN_MARGIN = 8;
 
 /**
+ * Distances within this read as equal. An export turns a straight line a
+ * millionth of a pixel off its axis so Excalidraw can aim it, which shaves as
+ * much off a label's distance from it.
+ */
+const LABEL_DISTANCE_TOLERANCE = 1e-3;
+
+/**
  * Edge labels that read as another line's, as `<edge>><other edge>`: an
  * unbound edge label whose box sits no clearer of some other arrow than of its
  * own, by `LABEL_OWN_MARGIN`.
@@ -813,7 +820,7 @@ function detachedLabels(elements: readonly ExportedElement[]): string[] {
 		return arrows.flatMap((arrow) => {
 			if (arrow === own) return [];
 			const other = distance(arrow);
-			return other < mine + LABEL_OWN_MARGIN
+			return other < mine + LABEL_OWN_MARGIN - LABEL_DISTANCE_TOLERANCE
 				? [`${own.id.slice("edge:".length)}>${arrow.id.slice("edge:".length)}`]
 				: [];
 		});
