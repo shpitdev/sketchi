@@ -2,6 +2,7 @@ import {
 	DRAG_OFFSETS,
 	distance,
 	type EditorElement,
+	type EditorScene,
 	type EditSession,
 	endDetached,
 	endInside,
@@ -76,6 +77,20 @@ export function measureEditability(
 	{ cap = EDIT_DRAG_CAP }: { readonly cap?: number } = {},
 ): EditabilityMetrics {
 	const scene = session.open(elements);
+	try {
+		return measureOpened(session, scene, elements, cap);
+	} finally {
+		session.close(scene);
+	}
+}
+
+/** The metrics of a scene `measureEditability` opened, which it closes after. */
+function measureOpened(
+	session: EditSession,
+	scene: EditorScene,
+	elements: readonly unknown[],
+	cap: number,
+): EditabilityMetrics {
 	const routes = scene.getNonDeletedElements().filter(isBoundArrow);
 	if (routes.length === 0) return { editBoundRoutes: 0 };
 
@@ -101,7 +116,7 @@ export function measureEditability(
 		if (moved) firstTouchMoves += 1;
 	}
 
-	const counts = {
+	const counts: DragCounts = {
 		editDragErrors: 0,
 		editDrags: 0,
 		editEndsInside: 0,
@@ -114,36 +129,54 @@ export function measureEditability(
 	for (const [index, target] of schedule(session.boundShapes(scene), cap)) {
 		counts.editDrags += 1;
 		const dragged = session.open(elements);
-		const before = session.routesAndShapes(dragged);
-		let released: string[];
 		try {
-			released = session.drag(
-				dragged,
-				dragged.getNonDeletedElementsMap().get(target.id)!,
-				DRAG_OFFSETS[index % DRAG_OFFSETS.length]!,
-			);
-		} catch (error) {
-			if (!isElbowRouterError(error)) throw error;
-			counts.editDragErrors += 1;
-			continue;
+			measureDrag(session, dragged, target, DRAG_OFFSETS[index % DRAG_OFFSETS.length]!, counts);
+		} finally {
+			session.close(dragged);
 		}
-		const moved = new Set<string>();
-		for (const [id, after] of session.routesAndShapes(dragged)) {
-			const drawnRoute = before.get(id);
-			if (!drawnRoute) continue;
-			if (after.shapes !== drawnRoute.shapes) moved.add(id);
-			else if (!sameRoute(after.route, drawnRoute.route)) counts.editStrayRouteMoves += 1;
-		}
-		counts.editRouteMoves += moved.size;
-		const ends = session.readEnds(dragged, { which: (arrow) => moved.has(arrow.id) });
-		counts.editEndsInside += new Set(ends.filter(endInside).map((end) => end.arrow.id)).size;
-		counts.editEndsOffEdge += new Set(ends.filter(endDetached).map((end) => end.arrow.id)).size;
-		counts.editRoutesThroughShape += new Set(
-			session
-				.routesThroughShapes(dragged, (arrow) => moved.has(arrow.id) && !isCurved(arrow))
-				.map(([id]) => id),
-		).size;
-		counts.editReleasedRoutes += new Set(released).size;
 	}
 	return { editBoundRoutes: routes.length, editFirstTouchMoves: firstTouchMoves, ...counts };
+}
+
+/** The counts a drag adds to. */
+type DragCounts = {
+	-readonly [
+		Key in Exclude<keyof EditabilityMetrics, "editBoundRoutes" | "editFirstTouchMoves">
+	]-?: number;
+};
+
+/** Drags `target` in a freshly opened scene and adds what the drag did to the counts. */
+function measureDrag(
+	session: EditSession,
+	dragged: EditorScene,
+	target: EditorElement,
+	offset: Point,
+	counts: DragCounts,
+) {
+	const before = session.routesAndShapes(dragged);
+	let released: string[];
+	try {
+		released = session.drag(dragged, dragged.getNonDeletedElementsMap().get(target.id)!, offset);
+	} catch (error) {
+		if (!isElbowRouterError(error)) throw error;
+		counts.editDragErrors += 1;
+		return;
+	}
+	const moved = new Set<string>();
+	for (const [id, after] of session.routesAndShapes(dragged)) {
+		const drawnRoute = before.get(id);
+		if (!drawnRoute) continue;
+		if (after.shapes !== drawnRoute.shapes) moved.add(id);
+		else if (!sameRoute(after.route, drawnRoute.route)) counts.editStrayRouteMoves += 1;
+	}
+	counts.editRouteMoves += moved.size;
+	const ends = session.readEnds(dragged, { which: (arrow) => moved.has(arrow.id) });
+	counts.editEndsInside += new Set(ends.filter(endInside).map((end) => end.arrow.id)).size;
+	counts.editEndsOffEdge += new Set(ends.filter(endDetached).map((end) => end.arrow.id)).size;
+	counts.editRoutesThroughShape += new Set(
+		session
+			.routesThroughShapes(dragged, (arrow) => moved.has(arrow.id) && !isCurved(arrow))
+			.map(([id]) => id),
+	).size;
+	counts.editReleasedRoutes += new Set(released).size;
 }

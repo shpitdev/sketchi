@@ -46,6 +46,8 @@ export interface EditorElement {
 
 /** Excalidraw's Scene, which holds the elements an edit changes. */
 export interface EditorScene {
+	/** Empties the scene and drops it from Excalidraw's static map of element ids to scenes. */
+	destroy(): void;
 	replaceAllElements(elements: readonly EditorElement[]): void;
 	getElementsIncludingDeleted(): readonly EditorElement[];
 	getNonDeletedElements(): readonly EditorElement[];
@@ -313,8 +315,9 @@ export function createEditSession(editor: ExcalidrawEditor) {
 	}
 
 	/**
-	 * What the canvas does after each change, with what is selected: release the
-	 * routes it folded through their own shapes and have Excalidraw route them.
+	 * What the canvas does after each change, with what is selected, as the editor
+	 * passes its selectedElementIds: release the routes it folded through their own
+	 * shapes and have Excalidraw route them, leaving a selected route alone.
 	 * Returns the released ids.
 	 */
 	function change(scene: EditorScene, selected: readonly EditorElement[] = []): string[] {
@@ -347,6 +350,15 @@ export function createEditSession(editor: ExcalidrawEditor) {
 		return scene;
 	}
 
+	/**
+	 * Lets an opened scene go. Excalidraw maps every element id to its scene in a
+	 * static map, so a scene that is never destroyed stays reachable after use.
+	 */
+	function close(scene: EditorScene) {
+		releases.delete(scene);
+		scene.destroy();
+	}
+
 	/** Shapes a person can drag that hold a bound arrow. */
 	const boundShapes = (scene: EditorScene) =>
 		scene
@@ -370,7 +382,8 @@ export function createEditSession(editor: ExcalidrawEditor) {
 
 	/**
 	 * A pointer drag of what a click on `shape` selects, through Excalidraw's drag,
-	 * one pointer move every two pixels or so. Returns the routes it released.
+	 * one pointer move every two pixels or so, with the canvas's step after each
+	 * move seeing that selection. Returns the routes it released.
 	 */
 	function drag(scene: EditorScene, shape: EditorElement, offset: Point): string[] {
 		const steps = Math.max(1, Math.ceil(Math.hypot(offset[0], offset[1]) / 2));
@@ -386,7 +399,7 @@ export function createEditSession(editor: ExcalidrawEditor) {
 				{ x: 0, y: 0 },
 				null,
 			);
-			released.push(...change(scene));
+			released.push(...change(scene, selected));
 		}
 		return released;
 	}
@@ -416,7 +429,7 @@ export function createEditSession(editor: ExcalidrawEditor) {
 				(left + right) / 2,
 				(top + bottom) / 2,
 			);
-			change(scene);
+			change(scene, selected);
 		}
 	}
 
@@ -576,6 +589,7 @@ export function createEditSession(editor: ExcalidrawEditor) {
 		absolute,
 		boundShapes,
 		change,
+		close,
 		drag,
 		editor,
 		ends,
