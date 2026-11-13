@@ -72,6 +72,9 @@ const Report = Schema.fromJsonString(
 				passed: Schema.Boolean,
 			}),
 		),
+		metrics: Schema.optionalKey(
+			Schema.Record(Schema.String, Schema.Union([Schema.Number, Schema.String])),
+		),
 	}),
 );
 
@@ -315,6 +318,8 @@ describe("scenario CLI candidate decoding", () => {
 					assert.strictEqual(report.checks[0]?.id, "mcp-build-accepted");
 					assert.isFalse(report.checks[0]?.passed);
 					assert.include(report.checks[0]?.message ?? "", message);
+					// No scene was delivered, so there is nothing to drag.
+					assert.isUndefined(report.metrics);
 					assert.strictEqual(process.exitCode, 1);
 				}),
 			),
@@ -679,6 +684,33 @@ describe("scenario CLI candidate decoding", () => {
 			),
 		);
 	}
+});
+
+describe("scenario CLI editability metrics", () => {
+	it.live("reports how the delivered scene holds up when its shapes are dragged", () =>
+		withCandidate("", (directory) =>
+			Effect.gen(function* () {
+				const reportPath = path.join(directory, "report.json");
+				yield* runScenarioCli(["--scenario", scenario.id, "--fixture", "--report-out", reportPath]);
+				const report = yield* Schema.decodeUnknownEffect(Report)(
+					yield* Effect.tryPromise(() => readFile(reportPath, "utf8")),
+				);
+				assert.isTrue(report.ok);
+				assert.deepStrictEqual(report.metrics, {
+					editBoundRoutes: 5,
+					editDragErrors: 0,
+					editDrags: 5,
+					editEndsInside: 0,
+					editEndsOffEdge: 0,
+					editFirstTouchMoves: 0,
+					editReleasedRoutes: 0,
+					editRouteMoves: 10,
+					editRoutesThroughShape: 0,
+					editStrayRouteMoves: 0,
+				});
+			}),
+		),
+	);
 });
 
 describe("scenario CLI expected failures", () => {

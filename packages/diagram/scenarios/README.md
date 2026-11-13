@@ -405,7 +405,8 @@ Accepted builds add a passing `mcp-build-accepted` check and run the same
 guarantee that the scenario passes.
 
 The single-scenario stdout object retains `ok` and
-`checks: [{ id, passed, message }]`, alongside its existing result metadata.
+`checks: [{ id, passed, message }]`, alongside its existing result metadata and
+the scene's [editability metrics](#editability-metrics).
 Exit code 0 means every gating check passed; 1 means evaluation failed; 2 means invalid
 CLI usage. `--report-out <file>` saves the same JSON report.
 
@@ -415,6 +416,38 @@ spec: the MCP runtime can normalize slugs and drop unknown logos. Logo checks
 therefore describe the retained normalized logos, not pre-normalization model
 precision. The adapter does not add, move, or repair logos; use a generation
 response envelope when pre-enforcement model-quality evidence is needed.
+
+### Editability metrics
+
+Each result with a delivered Excalidraw scene carries `metrics`: how the scene
+holds up when a person drags its shapes in the editor. The scene runs through
+Excalidraw 0.18.1's own restore, drag and binding code, with the canvas's
+release step (`createRouteRelease`, diagram-excalidraw) after every pointer
+move. `edit-session.ts` is that session; diagram-ui's `arrow-edits.test.tsx`
+drags every maintained scenario through it too. `excalidraw-editor.ts` loads
+Excalidraw's editor module into plain Node with a linkedom DOM. The first touch
+re-places every bound arrow before anything moves. Then each shape holding a
+bound arrow is dragged from a freshly opened scene by one of seven offsets
+(36-76px, one in seven 228px), one pointer move per 2px. A scene with more than
+16 such shapes drags 16, spread evenly through it.
+
+| Metric                   | Counts                                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| `editBoundRoutes`        | arrows bound to a shape at one end or both                                                   |
+| `editDrags`              | shape drags run                                                                              |
+| `editRouteMoves`         | routes the drags carried: each route bound to a shape that moved, per drag                   |
+| `editFirstTouchMoves`    | routes the first touch moves off their drawing                                               |
+| `editEndsInside`         | route moves that leave an end inside its shape's outline                                     |
+| `editEndsOffEdge`        | route moves that leave an end farther out than its binding keeps it, or unbound              |
+| `editRoutesThroughShape` | route moves that leave a straight, polyline or elbow route running through a shape it binds to |
+| `editStrayRouteMoves`    | routes a drag moves although neither of their shapes moved                                   |
+| `editReleasedRoutes`     | route moves the canvas released to Excalidraw's elbow routing                                |
+| `editDragErrors`         | drags Excalidraw's elbow router threw on                                                     |
+
+They are metrics, not checks: `ok` and the exit code ignore them. A scene with
+no bound arrow (charts, Venn diagrams, journeys and the like) reports only
+`editBoundRoutes: 0`. A scene the editor can't open or edit reports only
+`editUnavailable`, the reason. The same scene always gives the same counts.
 
 ## Testing
 

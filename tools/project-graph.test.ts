@@ -256,6 +256,9 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"packages/diagram/generation/src/lib/cloudflare-gateway-chat.ts": 5,
 	"packages/diagram/generation/src/lib/jev-workers-ai.ts": 3,
 	"packages/diagram/scenarios/src/cli.ts": 10,
+	// Excalidraw's editor module loads once per process, for the editability metrics.
+	"packages/diagram/scenarios/src/lib/excalidraw-editor.ts": 5,
+	"packages/diagram/scenarios/src/lib/scene-editability.ts": 2,
 	"packages/diagram/scenarios/vitest.config.mts": 1,
 	"packages/diagram/ui/src/components/excalidraw-scene-canvas/excalidraw-scene-canvas.tsx": 3,
 	"packages/diagram/ui/src/lib/browser-actions.ts": 3,
