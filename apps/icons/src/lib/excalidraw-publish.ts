@@ -7,10 +7,21 @@
  * sent once.
  */
 
+/** Where a pull request in Excalidraw's library collection stands, as GitHub last said. */
+export type PullRequestState = "open" | "merged" | "closed";
+
+export interface PackPullRequest {
+	readonly url: string;
+	/** Absent until GitHub has been read. */
+	readonly state?: PullRequestState;
+}
+
 /** What the pages know about a pack on Excalidraw. */
 export interface PackExcalidrawState {
-	/** Adds the pack's latest submitted version to someone's Excalidraw library. */
+	/** Adds the pack's newest library still in reach to someone's Excalidraw library. */
 	readonly installUrl?: string;
+	/** The newest submitted version's pull request. */
+	readonly pullRequest?: PackPullRequest;
 	/** Whether a visitor may submit the pack's current version. */
 	readonly publishable: boolean;
 }

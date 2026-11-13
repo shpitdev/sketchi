@@ -1713,13 +1713,13 @@ kbd {
 	border-color: var(--ink-3);
 }
 
-.pack-actions .pack-actions__download {
+.pack-actions .pack-actions__primary {
 	background: var(--ink);
 	border-color: var(--ink);
 	color: var(--paper-2);
 }
 
-.pack-actions .pack-actions__download:hover {
+.pack-actions .pack-actions__primary:hover {
 	background: color-mix(in srgb, var(--ink) 86%, var(--paper));
 }
 
@@ -1745,6 +1745,52 @@ kbd {
 .pack-actions[data-size="large"] svg {
 	height: 17px;
 	width: 17px;
+}
+
+/* A pull request's state: open in green, merged in Excalidraw's violet, closed muted. */
+.pack-actions__pull-request {
+	--state: var(--ink-3);
+	--state-ink: var(--ink-2);
+	--state-wash: var(--line);
+}
+
+.pack-actions__pull-request[data-state="open"] {
+	--state: var(--ok);
+	--state-ink: var(--ok-ink);
+	--state-wash: var(--ok-wash);
+}
+
+.pack-actions__pull-request[data-state="merged"] {
+	--state: #6965db;
+	--state-ink: #4a46b0;
+	--state-wash: #ecebfb;
+}
+
+.pack-actions .pack-actions__pull-request[data-compact] {
+	justify-content: center;
+	padding-inline: 0;
+	position: relative;
+	width: 32px;
+}
+
+.pack-actions__state-dot {
+	background: var(--state);
+	border: 2px solid var(--card);
+	border-radius: 50%;
+	height: 10px;
+	position: absolute;
+	right: 3px;
+	top: 3px;
+	width: 10px;
+}
+
+.pack-actions__state {
+	background: var(--state-wash);
+	border-radius: 999px;
+	color: var(--state-ink);
+	font-size: 12px;
+	line-height: 1;
+	padding: 4px 8px;
 }
 
 /* The pack's name over its count, then its actions, Names and the preview background. */
@@ -2049,10 +2095,4 @@ kbd {
 .pack-publish__submit:disabled {
 	cursor: progress;
 	opacity: 0.7;
-}
-
-.pack-publish__links {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 12px;
 }

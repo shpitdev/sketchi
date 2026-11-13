@@ -14,6 +14,7 @@ import {
 	WEBSITE_MAX_LENGTH,
 } from "../../lib/excalidraw-publish.js";
 import { findPack, packPreviewImagePath, type PackSummary } from "../../lib/packs.js";
+import { AddToExcalidrawLink, PullRequestLink } from "./pack-actions.js";
 import { iconCount } from "./pack-shelf.js";
 
 type Status =
@@ -102,16 +103,15 @@ export function PackPublishDialog({
 				{status.kind === "sent" ? (
 					<div className="pack-publish">
 						<DialogDescription>{listing.name} is submitted.</DialogDescription>
-						<p className="pack-publish__links">
-							<a href={status.result.pullRequestUrl} rel="noopener noreferrer" target="_blank">
-								View pull request
-							</a>
+						<div className="pack-actions" data-size="large">
 							{status.result.installUrl ? (
-								<a href={status.result.installUrl} rel="noopener noreferrer" target="_blank">
-									Add to Excalidraw
-								</a>
+								<AddToExcalidrawLink
+									className="pack-actions__primary"
+									href={status.result.installUrl}
+								/>
 							) : null}
-						</p>
+							<PullRequestLink pullRequest={{ url: status.result.pullRequestUrl, state: "open" }} />
+						</div>
 					</div>
 				) : (
 					<form className="pack-publish" onSubmit={(event) => void submit(event)}>

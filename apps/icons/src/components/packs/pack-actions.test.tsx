@@ -6,6 +6,8 @@ import { PackActions } from "./pack-actions";
 const INSTALL_URL =
 	"https://excalidraw.com/?addLibrary=https%3A%2F%2Fraw.githubusercontent.com%2Fexcalidraw%2Fexcalidraw-libraries%2Fjane-palantir-1%2Flibraries%2Fjane%2Fpalantir.excalidrawlib%3Fraw%3Dtrue";
 
+const PR_URL = "https://github.com/excalidraw/excalidraw-libraries/pull/3004";
+
 describe("PackActions", () => {
 	it("adds a submitted pack to Excalidraw's library in a new tab, and does not offer it again", () => {
 		render(
@@ -35,6 +37,35 @@ describe("PackActions", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Publish to Excalidraw" }));
 		expect(onPublish).toHaveBeenCalledTimes(1);
 		expect(screen.queryByRole("link", { name: "Add to Excalidraw" })).toBeNull();
+	});
+
+	it("follows a submitted pack's pull request, with its state once GitHub has been read", () => {
+		const pullRequest = { url: PR_URL, state: "merged" } as const;
+		const { unmount } = render(
+			<PackActions
+				describedBy="pack-palantir"
+				excalidraw={{ installUrl: INSTALL_URL, pullRequest, publishable: false }}
+				pack={{ id: "palantir" }}
+			/>,
+		);
+		// A card shows the marks with a short label: the names say the rest.
+		const compact = screen.getByRole("link", { name: "Pull request, merged" });
+		expect(compact.getAttribute("href")).toBe(PR_URL);
+		expect(compact.getAttribute("target")).toBe("_blank");
+		expect(compact.getAttribute("title")).toBe("Pull request, merged");
+		expect(compact.getAttribute("aria-describedby")).toBe("pack-palantir");
+		expect(screen.getByRole("link", { name: "Add to Excalidraw" }).textContent).toBe("Add");
+		unmount();
+
+		render(
+			<PackActions
+				excalidraw={{ pullRequest: { url: PR_URL }, publishable: false }}
+				pack={{ id: "palantir" }}
+				size="large"
+			/>,
+		);
+		// Unread, the pull request shows no state.
+		expect(screen.getByRole("link", { name: "Pull request" }).getAttribute("href")).toBe(PR_URL);
 	});
 
 	it("only downloads a pack with neither", () => {

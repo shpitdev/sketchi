@@ -53,7 +53,11 @@ describe("PackPublishDialog", () => {
 		expect(handle.value).toBe("dimethylpant");
 		fireEvent.click(within(dialog).getByRole("button", { name: "Publish" }));
 
-		expect(await within(dialog).findByRole("link", { name: "View pull request" })).toBeTruthy();
+		const pullRequest = await within(dialog).findByRole("link", { name: "Pull request, open" });
+		expect(pullRequest.getAttribute("href")).toBe(PR);
+		expect(
+			within(dialog).getByRole("link", { name: "Add to Excalidraw" }).getAttribute("href"),
+		).toBe(INSTALL);
 		expect(fetchMock).toHaveBeenCalledWith("/api/packs/data/excalidraw", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -69,6 +73,7 @@ describe("PackPublishDialog", () => {
 		expect(screen.getByRole("link", { name: "Add to Excalidraw" }).getAttribute("href")).toBe(
 			INSTALL,
 		);
+		expect(screen.getByRole("link", { name: "Pull request, open" }).getAttribute("href")).toBe(PR);
 		expect(screen.queryByRole("button", { name: "Publish to Excalidraw" })).toBeNull();
 	});
 

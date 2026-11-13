@@ -4,8 +4,8 @@ import type { PackExcalidrawState, PublishResult } from "../../lib/excalidraw-pu
 
 /**
  * The packs' Excalidraw states as the server rendered them, updated when a
- * visitor publishes one here: it gets its install link and is not offered
- * again.
+ * visitor publishes one here: it gets its install link and its open pull
+ * request, and is not offered again.
  */
 export function usePackPublishing(initial: Readonly<Record<string, PackExcalidrawState>> = {}) {
 	const [states, setStates] = useState(initial);
@@ -13,7 +13,12 @@ export function usePackPublishing(initial: Readonly<Record<string, PackExcalidra
 	const published = useCallback((id: string, result: PublishResult) => {
 		setStates((current) => {
 			const installUrl = result.installUrl ?? current[id]?.installUrl;
-			return { ...current, [id]: { ...(installUrl ? { installUrl } : {}), publishable: false } };
+			const state: PackExcalidrawState = {
+				...(installUrl ? { installUrl } : {}),
+				pullRequest: { url: result.pullRequestUrl, state: "open" },
+				publishable: false,
+			};
+			return { ...current, [id]: state };
 		});
 	}, []);
 	return {

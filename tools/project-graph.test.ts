@@ -295,7 +295,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"tools/testing/browserbase.ts": 29,
 	"apps/icons/scripts/pack-preview-image.ts": 18,
 	"apps/icons/src/components/packs/pack-publish-dialog.tsx": 10,
-	"apps/icons/src/lib/excalidraw-publish.server.ts": 72,
+	"apps/icons/src/lib/excalidraw-publish.server.ts": 109,
 	"apps/icons/src/lib/packs.ts": 3,
 	"apps/icons/src/routes/api/packs/$id/excalidraw.ts": 6,
 };

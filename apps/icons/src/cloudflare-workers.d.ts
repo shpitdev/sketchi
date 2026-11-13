@@ -10,6 +10,9 @@ declare module "cloudflare:workers" {
     EXCALIDRAW_LIBRARY_GITHUB_API?: string;
   };
 
+  /** Keeps the Worker running for the promise after the response is sent. */
+  export function waitUntil(promise: Promise<unknown>): void;
+
   /** The Durable Object storage calls the icons Worker's objects make. */
   export interface DurableObjectStorage {
     get<T>(key: string): Promise<T | undefined>;

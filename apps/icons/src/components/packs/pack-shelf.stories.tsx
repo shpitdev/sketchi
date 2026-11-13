@@ -76,13 +76,36 @@ type Story = StoryObj<typeof meta>;
 export const Light: Story = {};
 export const Dark: Story = { args: { previewMode: "dark" } };
 
-/** A submitted pack adds to Excalidraw; one still open offers to publish. */
+/**
+ * A submitted pack adds to Excalidraw and links its pull request, merged,
+ * open or closed; one still open offers to publish.
+ */
 export const OnExcalidraw: Story = {
 	args: {
 		excalidraw: {
 			palantir: {
 				installUrl:
-					"https://excalidraw.com/?addLibrary=https%3A%2F%2Fraw.githubusercontent.com%2Fexcalidraw%2Fexcalidraw-libraries%2Fjane-palantir-platform-icons-1%2Flibraries%2Fjane%2Fpalantir-platform-icons.excalidrawlib%3Fraw%3Dtrue",
+					"https://excalidraw.com/?addLibrary=https%3A%2F%2Fraw.githubusercontent.com%2Fexcalidraw%2Fexcalidraw-libraries%2Fmain%2Flibraries%2Fjane%2Fpalantir-platform-icons.excalidrawlib%3Fraw%3Dtrue",
+				pullRequest: {
+					url: "https://github.com/excalidraw/excalidraw-libraries/pull/3002",
+					state: "merged",
+				},
+				publishable: false,
+			},
+			data: {
+				installUrl:
+					"https://excalidraw.com/?addLibrary=https%3A%2F%2Fraw.githubusercontent.com%2Fexcalidraw%2Fexcalidraw-libraries%2Fjane-databricks-icons-1%2Flibraries%2Fjane%2Fdatabricks-icons.excalidrawlib%3Fraw%3Dtrue",
+				pullRequest: {
+					url: "https://github.com/excalidraw/excalidraw-libraries/pull/3003",
+					state: "open",
+				},
+				publishable: false,
+			},
+			devtools: {
+				pullRequest: {
+					url: "https://github.com/excalidraw/excalidraw-libraries/pull/3004",
+					state: "closed",
+				},
 				publishable: false,
 			},
 			cloud: { publishable: true },
