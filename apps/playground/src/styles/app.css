@@ -427,6 +427,57 @@ body {
 	animation: studio-ghost-in 0.35s ease;
 }
 
+/* A build call's input as it is written: the newest lines, pinned to the
+   bottom of a capped block so the chat keeps its place. */
+.studio__live-input {
+	background: var(--paper-2);
+	border: 1px solid var(--line);
+	border-radius: var(--r-sm);
+	color: var(--ink-2);
+	display: flex;
+	flex-direction: column-reverse;
+	font-family: var(--font-mono);
+	font-size: 12px;
+	line-height: 1.5;
+	margin: 0;
+	max-height: calc(1.5em * 10 + 20px);
+	/* Claim the message's full width, so the card keeps its size while the
+	   tail's longest line changes. */
+	max-width: 100%;
+	overflow: hidden;
+	padding: 10px 12px;
+	width: 100vw;
+}
+
+.studio__live-input[data-clipped] {
+	mask-image: linear-gradient(to bottom, transparent, #000 3em);
+}
+
+.studio__live-input code {
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+
+.studio__live-caret {
+	animation: studio-caret 1s steps(1) infinite;
+	background: var(--mauve);
+	display: inline-block;
+	height: 1.15em;
+	margin-left: 1px;
+	vertical-align: text-bottom;
+	width: 0.55em;
+}
+
+.studio [data-auto-collapse][data-state="closed"] {
+	animation: none;
+}
+
+@keyframes studio-caret {
+	50% {
+		opacity: 0;
+	}
+}
+
 .studio__stage-footer {
 	display: flex;
 	flex: 0 0 auto;

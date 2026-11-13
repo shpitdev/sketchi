@@ -13,19 +13,11 @@ import {
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
-import {
-	Tool,
-	ToolContent,
-	ToolHeader,
-	ToolInput,
-	ToolOutput,
-} from "@/components/ai-elements/tool";
 import { StudioHeader } from "@/components/studio-header";
 import { TooltipProvider } from "@sketchi/ui/components/tooltip";
 import {
 	ArtifactActions,
 	AssistantFollowUp,
-	BuildResultDetails,
 	PlaygroundComposer,
 	PlaygroundIntro,
 	PlaygroundStarters,
@@ -33,48 +25,17 @@ import {
 	type ReadyPlaygroundArtifact,
 } from "@/features/playground/surface";
 import {
-	buildResultOf,
 	deriveBuildState,
-	diagramToolCardStatus,
 	isDiagramToolPart,
-	type DiagramToolPart,
 	type StudioBuildResult,
 } from "@/features/playground/build-result";
+import { DiagramToolCard } from "@/features/playground/diagram-tool-card";
 import { studioChatRequestMessages } from "@/features/playground/studio-chat-request";
 import { cn } from "@sketchi/ui/lib/utils";
 
 export const Route = createFileRoute("/")({
 	component: StudioRoute,
 });
-
-function DiagramToolCard({
-	active,
-	attempt,
-	part,
-}: {
-	active: boolean;
-	attempt: number;
-	part: DiagramToolPart;
-}) {
-	const result = buildResultOf(part);
-	const { stopped, title } = diagramToolCardStatus(part, active);
-
-	return (
-		<Tool className="bg-card" defaultOpen={false}>
-			<ToolHeader state={part.state} stopped={stopped} title={title} type={part.type} />
-			<ToolContent>
-				{result ? <BuildResultDetails pass={attempt} result={result} /> : null}
-				{part.input === undefined ? null : <ToolInput input={part.input} />}
-				{part.state === "output-error" ? (
-					<ToolOutput
-						errorText="Sketchi couldn’t finish this diagram. Try again, or simplify the request."
-						output={undefined}
-					/>
-				) : null}
-			</ToolContent>
-		</Tool>
-	);
-}
 
 function renderAssistantParts(
 	message: UIMessage,

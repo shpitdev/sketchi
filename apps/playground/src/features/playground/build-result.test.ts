@@ -222,10 +222,12 @@ describe("build result selectors", () => {
 				expect(diagramToolCardStatus(part, false)).toEqual({
 					stopped: true,
 					title: `Stopped drawing your ${family}`,
+					writing: false,
 				});
 				expect(diagramToolCardStatus(part, true)).toEqual({
 					stopped: false,
 					title: `${state === "input-streaming" ? "Drawing" : "Checking"} your ${family}`,
+					writing: true,
 				});
 			}
 		}
@@ -239,6 +241,6 @@ describe("build result selectors", () => {
 				},
 				false,
 			),
-		).toEqual({ stopped: false, title: "Diagram needs changes" });
+		).toEqual({ stopped: false, title: "Diagram needs changes", writing: false });
 	});
 });

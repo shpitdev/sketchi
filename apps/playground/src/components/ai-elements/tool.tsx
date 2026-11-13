@@ -37,6 +37,11 @@ export type ToolHeaderProps = {
   className?: string;
   /** The run ended before this call finished; show that instead of its live state. */
   stopped?: boolean;
+  /**
+   * Show the status badge. Without it, the status icon takes the tool icon's
+   * place, for titles that already say the state.
+   */
+  badge?: boolean;
 } & (
   | { type: ToolUIPart["type"]; state: ToolUIPart["state"]; toolName?: never }
   | {
@@ -89,6 +94,7 @@ export const ToolHeader = ({
   type,
   state,
   stopped,
+  badge = true,
   toolName,
   ...props
 }: ToolHeaderProps) => {
@@ -104,9 +110,15 @@ export const ToolHeader = ({
       {...props}
     >
       <div className="flex min-w-0 items-center gap-2">
-        <WrenchIcon className="size-4 shrink-0 text-muted-foreground" />
+        {badge ? (
+          <WrenchIcon className="size-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <span aria-hidden="true" className="shrink-0 text-muted-foreground">
+            {stopped ? <CircleIcon className="size-4" /> : statusIcons[state]}
+          </span>
+        )}
         <span className="font-medium text-sm">{title ?? derivedName}</span>
-        {stopped ? (
+        {!badge ? null : stopped ? (
           <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
             <CircleIcon className="size-4" />
             Stopped
