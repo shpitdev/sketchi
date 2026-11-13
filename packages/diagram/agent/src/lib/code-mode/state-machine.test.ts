@@ -525,9 +525,14 @@ describe("Code Mode native state machine", () => {
 		const frame = excalidraw.elements.find((element) => element.type === "frame")!;
 		const bound = (frame["boundElements"] as { id: string }[]).map((entry) => entry.id).sort();
 		expect(bound).toEqual(["edge:transition-1-stopped-active", "edge:transition-5-active-stopped"]);
-		// A straight arrow cannot keep its binding to a moved frame; these are elbow arrows.
-		for (const id of bound)
-			expect(excalidraw.elements.find((element) => element.id === id)?.["elbowed"], id).toBe(true);
+		// Each of those transitions binds back to the frame.
+		for (const id of bound) {
+			const arrow = excalidraw.elements.find((element) => element.id === id);
+			const ends = [arrow?.["startBinding"], arrow?.["endBinding"]].map(
+				(binding) => (binding as { elementId?: string } | null)?.elementId,
+			);
+			expect(ends, id).toContain(frame.id);
+		}
 		const patched = await run(
 			applyDiagramPatch({
 				source: { artifactId: built.artifact.artifactId },

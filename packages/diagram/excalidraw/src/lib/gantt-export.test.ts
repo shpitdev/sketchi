@@ -90,7 +90,9 @@ describe("Gantt export", () => {
 			const [x, y] = (arrow.points as [number, number][]).at(-1)!;
 			return { x: (arrow.x as number) + x, y: (arrow.y as number) + y };
 		});
-		expect(ends[0]).toEqual(ends[1]);
+		// One arrowhead: the two ends meet, to within the millionth of a pixel an end
+		// turns off its axis so Excalidraw can aim it.
+		expect(Math.hypot(ends[0]!.x - ends[1]!.x, ends[0]!.y - ends[1]!.y)).toBeLessThanOrEqual(1e-6);
 		// Stems that part even 2 px before their ends still lie on one another.
 		const [, later] = arrivals;
 		const points = later!.points as [number, number][];

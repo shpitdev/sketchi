@@ -1,0 +1,44 @@
+{
+	"type": "flowchart",
+	"spec": {
+		"id": "nextjs-webhook-cloudflare-api",
+		"title": "Next.js and webhook on Cloudflare Workers",
+		"direction": "TB",
+		"logos": true,
+		"nodes": {
+			"nextjs": {
+				"label": "Next.js app",
+				"icon": "nextjs"
+			},
+			"vercel": {
+				"label": "Vercel",
+				"icon": "vercel"
+			},
+			"webhook": {
+				"label": "GitHub webhook",
+				"icon": "github"
+			},
+			"api": {
+				"label": "API on Cloudflare Workers",
+				"icon": "cloudflare"
+			},
+			"postgres": {
+				"label": "Postgres",
+				"shape": "database",
+				"icon": "postgresql"
+			},
+			"redis": {
+				"label": "Redis cache",
+				"shape": "queue",
+				"icon": "redis"
+			}
+		},
+		"edges": [
+			["nextjs", "vercel"],
+			["vercel", "api", "calls"],
+			["webhook", "api", "calls"],
+			["api", "postgres", "reads"],
+			["api", "redis", "caches in"]
+		]
+	}
+}

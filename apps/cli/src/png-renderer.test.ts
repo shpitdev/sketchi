@@ -352,7 +352,7 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 		}),
 	);
 
-	it.effect("exports a class diagram whose lines bind elbowed with their UML heads", () =>
+	it.effect("exports a class diagram whose lines bind to their classes with their UML heads", () =>
 		Effect.gen(function* () {
 			const builder = yield* DiagramBuilder;
 			const renderer = yield* CliPngRenderer;
@@ -381,7 +381,10 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG renderer",
 			);
 			const arrows = built.excalidraw.elements.filter((element) => element["type"] === "arrow");
 			assert.lengthOf(arrows, 2);
-			for (const arrow of arrows) assert.isTrue(arrow["elbowed"]);
+			for (const arrow of arrows) {
+				assert.isNotNull(arrow["startBinding"]);
+				assert.isNotNull(arrow["endBinding"]);
+			}
 			assert.sameMembers(
 				arrows.map(
 					(arrow) => `${String(arrow["startArrowhead"])}>${String(arrow["endArrowhead"])}`,

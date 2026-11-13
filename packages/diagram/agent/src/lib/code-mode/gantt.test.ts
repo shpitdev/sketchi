@@ -76,7 +76,6 @@ describe("Code Mode native Gantt chart", () => {
 		expect(arrow).toMatchObject({
 			startBinding: { elementId: "node:gantt:task:design" },
 			endBinding: { elementId: "node:gantt:task:api" },
-			elbowed: true,
 		});
 		const patched = await run(
 			applyDiagramPatch({

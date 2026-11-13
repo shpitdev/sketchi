@@ -93,14 +93,12 @@ describe("Code Mode native class diagram", () => {
 			startArrowhead: null,
 			endArrowhead: "triangle_outline",
 			strokeStyle: "solid",
-			elbowed: true,
 		});
 		expect(
 			excalidraw.elements.find((element) => element.id === "edge:relationship-2"),
 		).toMatchObject({
 			startArrowhead: "diamond_outline",
 			endArrowhead: null,
-			elbowed: true,
 		});
 		// Every element of a class moves together, its end labels with it.
 		const shape = excalidraw.elements.filter((element) =>

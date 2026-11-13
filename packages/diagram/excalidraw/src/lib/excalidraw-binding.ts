@@ -645,7 +645,34 @@ export function excalidrawOutlineHit(
 }
 
 /** Excalidraw's outline for a shape as a closed polyline, its curves finely stepped. */
-function outlinePolyline(shape: BindableShape): Point[] | null {
+/**
+ * Sampled outlines by shape geometry, so the many distance checks an export or
+ * an edit makes against one shape sample it once, whichever arrow asks. Keyed
+ * by geometry, not by element, since Excalidraw moves its elements in place.
+ */
+const outlines = new Map<string, readonly Point[] | null>();
+const OUTLINE_CACHE_SIZE = 512;
+
+function outlinePolyline(shape: BindableShape): readonly Point[] | null {
+	const key = [
+		shape.type,
+		shape.x,
+		shape.y,
+		shape.width,
+		shape.height,
+		shape.angle ?? 0,
+		shape.roundness?.type ?? "",
+		shape.roundness?.value ?? "",
+	].join(",");
+	const cached = outlines.get(key);
+	if (cached !== undefined) return cached;
+	const outline = sampledOutline(shape);
+	if (outlines.size >= OUTLINE_CACHE_SIZE) outlines.clear();
+	outlines.set(key, outline);
+	return outline;
+}
+
+function sampledOutline(shape: BindableShape): Point[] | null {
 	const center = shapeCenter(shape);
 	const angle = shape.angle ?? 0;
 	const back = (p: Point) => pointRotateRads(p, center, angle);
@@ -709,11 +736,11 @@ export function excalidrawOutlineDistance(shape: BindableShape, point: Point): n
 export const EXCALIDRAW_ELBOW_DISTANCE = FIXED_BINDING_DISTANCE;
 
 /**
- * Whether Excalidraw keeps an elbow arrow end that sits on the shape's outline
- * when it re-routes the arrow. getGlobalPoint hands any fixed point that is not
- * FIXED_BINDING_DISTANCE out to bindPointToSnapToElementOutline, which keeps a
- * point within a hundredth of the outline, along the ray from the middle, and
- * moves any other.
+ * Whether Excalidraw keeps an elbow arrow end where its fixed point puts it
+ * when it re-routes the arrow. getGlobalPoint keeps a point exactly
+ * FIXED_BINDING_DISTANCE out, and hands any other to
+ * bindPointToSnapToElementOutline, which keeps a point within a hundredth of
+ * the outline, along the ray from the middle, and moves any other.
  */
 export function excalidrawKeepsElbowEnd(shape: BindableShape, point: Point): boolean {
 	const center = shapeCenter(shape);
@@ -732,6 +759,8 @@ export function excalidrawKeepsElbowEnd(shape: BindableShape, point: Point): boo
 		0,
 	)?.[0];
 	if (!hit) return false;
+	const outside = excalidrawOutlineDistance(shape, point);
+	if (outside !== null && Math.abs(outside - FIXED_BINDING_DISTANCE) <= 0.01) return true;
 	const currentDistance = pointDistance(point, center);
 	const fullDistance = Math.max(pointDistance(hit, center), PRECISION);
 	return (
@@ -739,4 +768,109 @@ export function excalidrawKeepsElbowEnd(shape: BindableShape, point: Point): boo
 		(currentDistance - fullDistance > FIXED_BINDING_DISTANCE ||
 			pointDistanceSq(point, hit) < PRECISION)
 	);
+}
+
+/** A heading, as Excalidraw's elbow router names one: a unit step on one axis. */
+export type Heading = readonly [number, number];
+
+const HEADING_UP: Heading = [0, -1];
+const HEADING_RIGHT: Heading = [1, 0];
+const HEADING_DOWN: Heading = [0, 1];
+const HEADING_LEFT: Heading = [-1, 0];
+
+export function excalidrawVectorHeading([x, y]: Point): Heading {
+	const absX = Math.abs(x);
+	const absY = Math.abs(y);
+	if (x > absY) return HEADING_RIGHT;
+	if (x <= -absY) return HEADING_LEFT;
+	if (y > absX) return HEADING_DOWN;
+	return HEADING_UP;
+}
+
+function triangleIncludesPoint([a, b, c]: readonly [Point, Point, Point], p: Point): boolean {
+	const sign = (p1: Point, p2: Point, p3: Point) =>
+		(p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
+	const d1 = sign(p, a, b);
+	const d2 = sign(p, b, c);
+	const d3 = sign(p, c, a);
+	return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+}
+
+function headingForDiamond(a: Point, b: Point): Heading {
+	const angle = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+	if (angle >= 315 || angle < 45) return HEADING_UP;
+	if (angle >= 45 && angle < 135) return HEADING_RIGHT;
+	if (angle >= 135 && angle < 225) return HEADING_DOWN;
+	return HEADING_LEFT;
+}
+
+/** The binding gap Excalidraw reads an elbow end's heading off the shape within. */
+function maxBindingGap(shape: BindableShape): number {
+	const ratio = shape.type === "diamond" ? 1 / Math.sqrt(2) : 1;
+	return Math.max(16, Math.min(0.25 * ratio * Math.min(shape.width, shape.height), 32));
+}
+
+/**
+ * The heading Excalidraw's elbow router gives an end bound to an unrotated
+ * shape (getBindPointHeading). Within the binding gap it reads the heading off
+ * the side the point faces; an end exactly on the outline, at no distance, it
+ * reads by the bare direction from the middle instead, as it does for one
+ * beyond the gap.
+ */
+export function excalidrawElbowHeading(shape: BindableShape, point: Point): Heading {
+	const center = shapeCenter(shape);
+	const distance = excalidrawOutlineDistance(shape, point);
+	if (!distance || Math.abs(distance) > maxBindingGap(shape)) {
+		return excalidrawVectorHeading(vectorFromPoint(point, center));
+	}
+	const { x, y, width, height } = shape;
+	const scaled = (corner: Point) =>
+		pointFromVector(vectorScale(vectorFromPoint(corner, center), 2), center);
+	if (shape.type === "diamond") {
+		if (point[0] < x) return HEADING_LEFT;
+		if (point[1] < y) return HEADING_UP;
+		if (point[0] > x + width) return HEADING_RIGHT;
+		if (point[1] > y + height) return HEADING_DOWN;
+		const top = scaled([x + width / 2, y]);
+		const right = scaled([x + width, y + height / 2]);
+		const bottom = scaled([x + width / 2, y + height]);
+		const left = scaled([x, y + height / 2]);
+		if (triangleIncludesPoint([top, right, center], point)) return headingForDiamond(top, right);
+		if (triangleIncludesPoint([right, bottom, center], point))
+			return headingForDiamond(right, bottom);
+		if (triangleIncludesPoint([bottom, left, center], point))
+			return headingForDiamond(bottom, left);
+		return headingForDiamond(left, top);
+	}
+	const out = Math.abs(distance);
+	const [minX, minY, maxX, maxY] = [x - out, y - out, x + width + out, y + height + out];
+	const topLeft = scaled([minX, minY]);
+	const topRight = scaled([maxX, minY]);
+	const bottomLeft = scaled([minX, maxY]);
+	const bottomRight = scaled([maxX, maxY]);
+	if (triangleIncludesPoint([topLeft, topRight, center], point)) return HEADING_UP;
+	if (triangleIncludesPoint([topRight, bottomRight, center], point)) return HEADING_RIGHT;
+	if (triangleIncludesPoint([bottomRight, bottomLeft, center], point)) return HEADING_DOWN;
+	return HEADING_LEFT;
+}
+
+/** The point FIXED_BINDING_DISTANCE out from the outline along a ray, where Excalidraw keeps an elbow end. */
+export function excalidrawElbowOutset(
+	shape: BindableShape,
+	onOutline: Point,
+	outward: Point,
+): Point | null {
+	const length = Math.hypot(outward[0], outward[1]);
+	if (length === 0) return null;
+	const unit: Point = [outward[0] / length, outward[1] / length];
+	const at = (t: number): Point => [onOutline[0] + unit[0] * t, onOutline[1] + unit[1] * t];
+	let [low, high] = [0, FIXED_BINDING_DISTANCE * 4];
+	const reach = (t: number) => excalidrawOutlineDistance(shape, at(t)) ?? 0;
+	if (reach(high) < FIXED_BINDING_DISTANCE) return null;
+	for (let step = 0; step < 60; step += 1) {
+		const middle = (low + high) / 2;
+		if (reach(middle) < FIXED_BINDING_DISTANCE) low = middle;
+		else high = middle;
+	}
+	return at((low + high) / 2);
 }

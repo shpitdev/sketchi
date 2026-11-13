@@ -2,9 +2,11 @@
  * Writes sketchi.app's link-preview card, public/media/sketchi-card.png.
  *
  * The diagram on the card is real Sketchi output: sketchi-card.excalidraw came
- * from `sketchi generate`, and sketchi-card-diagram.png is Excalidraw's own PNG
- * export of it (`sketchi export <id> --format png`). Re-export that PNG if you
- * replace the diagram, then run `pnpm nx run web:social-card`.
+ * from `sketchi generate`, and scripts/diagrams/sketchi-card.json is the document
+ * it drew (`sketchi create --file` draws it again). sketchi-card-diagram.png is
+ * Excalidraw's own PNG export of it (`sketchi export <id> --format png`).
+ * Re-export that PNG if you replace the diagram, then run
+ * `pnpm nx run web:social-card`.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";

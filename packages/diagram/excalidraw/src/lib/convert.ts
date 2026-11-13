@@ -172,29 +172,84 @@ function bindableShape(element: ExcalidrawElement | undefined): BindableShape | 
 type RoutePoint = { x: number; y: number };
 
 /**
- * A connector's absolute points and its two bindings, each end placed where
- * Excalidraw keeps it: an elbow arrow's at its fixed point on the outline, any
- * other arrow's at its gap outside it, aimed by its focus.
+ * A route without repeated points and without the points that lie on a
+ * straight run between their neighbours. Repeats go first: a bend drawn twice
+ * would otherwise read as two points on straight runs, and both would go.
+ */
+function withoutStraightThroughPoints(route: readonly Point[]): Point[] {
+	const distinct = route.filter(
+		(point, index) =>
+			index === 0 || point[0] !== route[index - 1]![0] || point[1] !== route[index - 1]![1],
+	);
+	if (distinct.length < 2) return [route[0]!, route.at(-1)!];
+	return distinct.filter((point, index) => {
+		const [before, after] = [distinct[index - 1], distinct[index + 1]];
+		if (!before || !after) return true;
+		return !(
+			(before[0] === point[0] && after[0] === point[0]) ||
+			(before[1] === point[1] && after[1] === point[1])
+		);
+	});
+}
+
+/**
+ * Whether a shape's ports carry meaning: an ER table's rows, or a class box's
+ * sides. Only an elbow arrow's fixed point keeps an end on its row when the
+ * shape moves off the line's axis; a focus keeps only the line's aim.
+ */
+function holdsRows(element: ExcalidrawElement | undefined): boolean {
+	const customData = element?.customData;
+	if (customData === null || typeof customData !== "object") return false;
+	const role = (customData as Record<string, unknown>)["sketchiRendererRole"];
+	return role === "er-table" || role === "class-box";
+}
+
+/**
+ * A connector's absolute points, its bindings and its kind, so a person's first
+ * touch in Excalidraw leaves the whole route where it is drawn and later drags
+ * move only the runs into the moved shape:
+ * - A curve stays a curved arrow through its points.
+ * - A straight route is an arrow that is not elbowed, which Excalidraw moves
+ *   whole with either end, aimed by focus.
+ * - A longer route is an elbow arrow whose inner runs are pinned
+ *   (fixedSegments): Excalidraw keeps them and redraws only the runs into a
+ *   moved shape, square.
+ * - A route with one bend, which has no inner run to pin and which Excalidraw
+ *   would route afresh on the first touch, and a route Excalidraw would read
+ *   leaving a shape some other way than drawn, which it would redraw with a
+ *   detour, are sharp polylines: Excalidraw keeps every bend and re-aims only
+ *   the run into a moved shape.
+ * A line to an ER table or a class box is an elbow arrow at fixed points, so
+ * each end keeps its row; its inner runs are pinned where it has them. An end
+ * Excalidraw cannot keep on a straight route or a polyline, as on a run along
+ * its shape's side, binds as an elbow end instead.
  */
 function boundRoute(input: {
-	elbowed: boolean;
-	/** Whether the route may be drawn as an elbow arrow: not a curve. */
-	straight: boolean;
+	/** Whether the route is a curve, drawn smooth through its points. */
+	curved: boolean;
 	endShape: ExcalidrawElement | undefined;
 	endId: string | undefined;
 	points: readonly RoutePoint[];
 	startShape: ExcalidrawElement | undefined;
 	startId: string | undefined;
 }) {
-	const route = input.points.map((point): Point => [point.x, point.y]);
+	const drawn = input.points.map((point): Point => [point.x, point.y]);
+	const route = input.curved ? drawn : withoutStraightThroughPoints(drawn);
 	const [startShape, endShape] = [bindableShape(input.startShape), bindableShape(input.endShape)];
 	const binding = <Body extends object>(elementId: string | undefined, body: Body) =>
 		elementId === undefined ? null : { elementId, ...body };
-	const elbow = () => {
-		const bound = fixedBoundEnds(route, startShape, endShape);
+	const elbow = (bound = fixedBoundEnds(route, startShape, endShape)) => {
+		const [origin] = bound.points as [Point, ...Point[]];
+		const local = bound.points.map((point): Point => [point[0] - origin[0], point[1] - origin[1]]);
 		return {
 			elbowed: true,
+			fixedSegments: local.slice(2, -1).map((end, offset) => ({
+				index: offset + 2,
+				start: [...local[offset + 1]!],
+				end: [...end],
+			})),
 			points: bound.points,
+			roundness: null,
 			startBinding: binding(input.startId, {
 				focus: 0,
 				gap: 0,
@@ -207,24 +262,21 @@ function boundRoute(input: {
 			}),
 		};
 	};
-	if (input.elbowed) return elbow();
+	if (!input.curved && [input.startShape, input.endShape].some(holdsRows)) return elbow();
+	const pinned =
+		!input.curved && route.length > 3 ? fixedBoundEnds(route, startShape, endShape) : undefined;
+	if (pinned?.readsAsDrawn) return elbow(pinned);
 	const bound = focusBoundEnds(route, startShape, endShape);
-	// A straight run along its shape's side binds at fixed points, which Excalidraw keeps.
-	const [first, last] = [route[0], route[route.length - 1]];
-	if (
-		!bound.kept &&
-		input.straight &&
-		route.length === 2 &&
-		first &&
-		last &&
-		(first[0] === last[0] || first[1] === last[1])
-	) {
-		return elbow();
-	}
+	const square = route
+		.slice(1)
+		.every((point, index) => point[0] === route[index]![0] || point[1] === route[index]![1]);
+	if (!bound.kept && !input.curved && square) return elbow(pinned);
 	const unbound = { focus: 0, gap: EXCALIDRAW_BINDING_GAP };
 	return {
 		elbowed: false,
+		fixedSegments: null,
 		points: bound.points,
+		roundness: input.curved ? { type: 2 } : route.length > 2 ? null : { type: 2 },
 		startBinding: binding(input.startId, bound.start ?? unbound),
 		endBinding: binding(input.endId, bound.end ?? unbound),
 	};
@@ -658,14 +710,6 @@ function shapeElement(input: {
 	};
 }
 
-/** A table or a class box: lines bound to one keep their fixed points when it moves. */
-function isTableShape(element: ExcalidrawElement | undefined): boolean {
-	const customData = element?.customData;
-	if (customData === null || typeof customData !== "object") return false;
-	const role = (customData as Record<string, unknown>)["sketchiRendererRole"];
-	return role === "er-table" || role === "class-box";
-}
-
 function lastArrowPoint(arrow: ArrowSceneElement) {
 	return arrow.points[arrow.points.length - 1] ?? arrow.points[0];
 }
@@ -677,20 +721,8 @@ function arrowElement(input: {
 	targetShape: ExcalidrawElement | undefined;
 	text?: TextSceneElement;
 }): ExcalidrawElement {
-	// Excalidraw resolves a straight arrow's binding against its target's outline,
-	// which a frame lacks, and re-aims it at a table's or class's middle; an elbow
-	// arrow keeps its fixed point on a moved frame, and on the row of a moved table
-	// or the port of a moved class. A curved connector stays a curved arrow through
-	// its points.
-	const forcedElbow =
-		input.arrow.curved !== true &&
-		(input.arrow.points.length > 2 ||
-			[input.sourceShape, input.targetShape].some(
-				(shape) => shape?.type === "frame" || isTableShape(shape),
-			));
 	const route = boundRoute({
-		elbowed: forcedElbow,
-		straight: input.arrow.curved !== true,
+		curved: input.arrow.curved === true,
 		points: input.arrow.points,
 		startShape: input.sourceShape,
 		startId: input.sourceShape?.id ?? "",
@@ -721,13 +753,13 @@ function arrowElement(input: {
 		endBinding: route.endBinding,
 		...(elbowed
 			? {
-					fixedSegments: [],
+					fixedSegments: route.fixedSegments,
 					startIsSpecial: null,
 					endIsSpecial: null,
 				}
 			: {}),
 		points: route.points.map((point) => [point[0] - start[0], point[1] - start[1]]),
-		roundness: elbowed ? null : { type: 2 },
+		roundness: route.roundness,
 		startArrowhead: input.arrow.startArrowhead ?? null,
 		startBinding: route.startBinding,
 		strokeColor: input.arrow.strokeColor ?? input.scene.accentColor,
@@ -751,15 +783,25 @@ function lineElement(input: {
 		boundTo(input.element.startBinding),
 		boundTo(input.element.endBinding),
 	];
-	const route = boundRoute({
-		elbowed: hasArrow && input.element.points.length > 2,
-		straight: hasArrow,
-		points: input.element.points,
-		startShape,
-		startId: startShape?.id,
-		endShape,
-		endId: endShape?.id,
-	});
+	const drawn = input.element.points.map((point): Point => [point.x, point.y]);
+	// A plain line keeps its points and binds nothing.
+	const route = hasArrow
+		? boundRoute({
+				curved: false,
+				points: input.element.points,
+				startShape,
+				startId: startShape?.id,
+				endShape,
+				endId: endShape?.id,
+			})
+		: {
+				elbowed: false,
+				fixedSegments: null,
+				points: drawn,
+				roundness: drawn.length > 2 ? { type: 2 } : null,
+				startBinding: null,
+				endBinding: null,
+			};
 	const { elbowed } = route;
 	const [start] = route.points as [Point, ...Point[]];
 	const end = route.points[route.points.length - 1] ?? start;
@@ -777,13 +819,13 @@ function lineElement(input: {
 		endBinding: route.endBinding,
 		...(elbowed
 			? {
-					fixedSegments: [],
+					fixedSegments: route.fixedSegments,
 					startIsSpecial: null,
 					endIsSpecial: null,
 				}
 			: {}),
 		points: route.points.map((point) => [point[0] - start[0], point[1] - start[1]]),
-		roundness: input.element.points.length > 2 && !elbowed ? { type: 2 } : null,
+		roundness: route.roundness,
 		startArrowhead: input.element.startArrowhead ?? null,
 		startBinding: route.startBinding,
 		strokeColor: input.element.strokeColor ?? input.scene.accentColor,
@@ -1761,17 +1803,6 @@ function fixedPointResolvesToEndpoint(
 	);
 }
 
-/** A non-elbow arrow Excalidraw draws as a smooth curve through its points. */
-function isCurved(element: ExcalidrawElement): boolean {
-	const roundness = element.roundness;
-	return (
-		element.elbowed !== true &&
-		roundness !== null &&
-		typeof roundness === "object" &&
-		(roundness as { type?: unknown }).type === 2
-	);
-}
-
 function absoluteArrowPoints(element: ExcalidrawElement): { x: number; y: number }[] {
 	const x = numericValue(element.x) ?? 0;
 	const y = numericValue(element.y) ?? 0;
@@ -1841,15 +1872,6 @@ export function validateExcalidrawScene(scene: ExcalidrawScene): ExcalidrawScene
 
 		if (isConnector(element)) {
 			const isElbowed = element.elbowed === true;
-			const points = Array.isArray(element.points) ? element.points : [];
-
-			if (points.length > 2 && !isElbowed && !isCurved(element)) {
-				issues.push({
-					code: "invalid-elbow-binding",
-					elementId: element.id,
-					message: `Arrow "${element.id}" has an orthogonal route but is not marked elbowed.`,
-				});
-			}
 
 			if (isElbowed && element.fixedSegments !== null && !Array.isArray(element.fixedSegments)) {
 				issues.push({

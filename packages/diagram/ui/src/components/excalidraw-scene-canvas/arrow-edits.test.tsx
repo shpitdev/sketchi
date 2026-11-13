@@ -156,6 +156,9 @@ function ends(arrow: Element): [Point, Point] {
 
 const distance = (a: Point, b: Point) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
+const absolute = (arrow: Element): Point[] =>
+	(arrow.points ?? []).map(([x, y]): Point => [arrow.x + x, arrow.y + y]);
+
 function snapshot(scene: Scene) {
 	return new Map(
 		scene
@@ -252,7 +255,11 @@ function signedDistance(point: Point, outline: readonly Point[]): number {
  * still lists the arrow. An end Excalidraw aims from inside its own shape, or
  * whose shapes overlap, has no outline to meet and is left out.
  */
-function expectEndsOnOutlines(scene: Scene, context: string) {
+function expectEndsOnOutlines(
+	scene: Scene,
+	context: string,
+	grown: ReadonlyMap<string, number> = new Map(),
+) {
 	const elements = scene.getNonDeletedElementsMap();
 	let checked = 0;
 	let crowded = 0;
@@ -272,7 +279,13 @@ function expectEndsOnOutlines(scene: Scene, context: string) {
 				shape.boundElements?.some((bound) => bound.id === arrow.id),
 				`${where} is listed on its shape`,
 			).toBe(true);
-			const reach = arrow.elbowed ? FIXED_BINDING_DISTANCE : binding.gap;
+			// An end that is not elbowed sits on Excalidraw's outline grown by its gap,
+			// whose corners stay square on a sharp box: up to the gap's diagonal out. An
+			// elbow end sits on the outline or FIXED_BINDING_DISTANCE out, a distance
+			// that grows with its shape when Excalidraw scales the fixed point.
+			const reach = arrow.elbowed
+				? FIXED_BINDING_DISTANCE * (grown.get(shape.id) ?? 1)
+				: binding.gap * Math.SQRT2;
 			const other = elements.get(
 				(key === "startBinding" ? arrow.endBinding : arrow.startBinding)?.elementId ?? "",
 			);
@@ -588,7 +601,7 @@ const offsets: readonly Point[] = [
 
 describe("arrows in a diagram a person edits in Excalidraw", () => {
 	it.each([...scenarios, ...shapeKinds].map((scene) => [scene.id, scene.elements] as const))(
-		"leaves every bound end of %s where it is drawn on the first touch",
+		"leaves every bound arrow of %s where it is drawn on the first touch",
 		(_id, elements) => {
 			const scene = openInExcalidraw(elements);
 			const drawn = new Map(
@@ -598,6 +611,14 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 							element.type === "arrow" && (element["startBinding"] || element["endBinding"]),
 					)
 					.map((element) => [element.id, ends(element as unknown as Element)] as const),
+			);
+			const routes = new Map(
+				elements
+					.filter(
+						(element) =>
+							element.type === "arrow" && (element["startBinding"] || element["endBinding"]),
+					)
+					.map((element) => [element.id, absolute(element as unknown as Element)] as const),
 			);
 			// Loading changes no end.
 			for (const [id, loaded] of snapshot(scene)) {
@@ -618,6 +639,20 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 				expect(distance(touched[1], end), `${id} end after a touch`).toBeLessThanOrEqual(
 					keptWithin(arrow, "endBinding", loaded),
 				);
+				// And the route between them, every bend where it is drawn.
+				const route = routes.get(id)!;
+				const after = absolute(arrow);
+				expect(after, `${id} keeps its points`).toHaveLength(route.length);
+				const slack = Math.max(
+					keptWithin(arrow, "startBinding", loaded),
+					keptWithin(arrow, "endBinding", loaded),
+				);
+				for (const [index, point] of route.entries()) {
+					expect(
+						distance(after[index]!, point),
+						`${id} point ${index} after a touch`,
+					).toBeLessThanOrEqual(slack);
+				}
 			}
 			expectEndsOnOutlines(scene, "untouched");
 		},
@@ -641,6 +676,72 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 					continue;
 				}
 				expectEndsOnOutlines(scene, `after dragging ${target.id}`);
+			}
+		},
+	);
+
+	/** ER tables and class boxes, whose rows and sides an end is drawn to. */
+	const rowScenarios = scenarios.filter(({ elements }) =>
+		elements.some((element) =>
+			["er-table", "class-box"].includes(
+				String(
+					(element["customData"] as Record<string, unknown> | undefined)?.["sketchiRendererRole"],
+				),
+			),
+		),
+	);
+
+	it.each(rowScenarios.map((scene) => [scene.id, scene.elements] as const))(
+		"keeps every line of %s on its row when a table or class moves off the line's axis",
+		(_id, elements) => {
+			const tables = boundShapes(openInExcalidraw(elements)).filter((shape) =>
+				["er-table", "class-box"].includes(String(shape.customData?.["sketchiRendererRole"])),
+			);
+			expect(tables.length).toBeGreaterThan(0);
+			for (const table of tables) {
+				for (const offset of [
+					[30, 120],
+					[-40, -90],
+				] as Point[]) {
+					const scene = openInExcalidraw(elements);
+					const shape = scene.getNonDeletedElementsMap().get(table.id)!;
+					// Where each end bound to the table meets it, along the table.
+					const place = (scene: Scene) =>
+						new Map(
+							scene
+								.getNonDeletedElements()
+								.filter(isBoundArrow)
+								.flatMap((arrow) => {
+									const [start, end] = ends(arrow);
+									const moved = scene.getNonDeletedElementsMap().get(table.id)!;
+									return (
+										[
+											["startBinding", start],
+											["endBinding", end],
+										] as const
+									)
+										.filter(([key]) => arrow[key]?.elementId === table.id)
+										.map(
+											([key, point]) =>
+												[`${arrow.id} ${key}`, [point[0] - moved.x, point[1] - moved.y]] as const,
+										);
+								}),
+						);
+					const before = place(scene);
+					drag(scene, shape, offset);
+					for (const [end, [x, y]] of place(scene)) {
+						const [drawnX, drawnY] = before.get(end)!;
+						// The row is the end's height on a side, and its place across a top or bottom.
+						const onSide = Math.abs(drawnX) < 6 || Math.abs(drawnX - shape.width) < 6;
+						const along = onSide ? [y, drawnY] : [x, drawnX];
+						// Excalidraw reads a side's middle as 0.5001 of it, a ten-thousandth across.
+						const middle = 1e-4 * (onSide ? shape.height : shape.width);
+						expect(
+							Math.abs(along[0]! - along[1]!),
+							`${end} keeps its row after ${table.id} moves ${offset.join(",")}`,
+						).toBeLessThanOrEqual(middle + 1e-6);
+					}
+				}
 			}
 		},
 	);
@@ -674,8 +775,15 @@ describe("arrows in a diagram a person edits in Excalidraw", () => {
 					["nw", [0, -28]],
 				] as const) {
 					const scene = openInExcalidraw(elements);
+					const before = { ...scene.getNonDeletedElementsMap().get(target.id)! };
 					resize(scene, scene.getNonDeletedElementsMap().get(target.id)!, handle, [...offset]);
-					expectEndsOnOutlines(scene, `${target.id} resized from ${handle} by ${offset.join(",")}`);
+					const after = scene.getNonDeletedElementsMap().get(target.id)!;
+					const growth = Math.max(after.width / before.width, after.height / before.height, 1);
+					expectEndsOnOutlines(
+						scene,
+						`${target.id} resized from ${handle} by ${offset.join(",")}`,
+						new Map([[target.id, growth]]),
+					);
 				}
 			}
 		},

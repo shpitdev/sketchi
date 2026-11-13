@@ -2,12 +2,15 @@ import {
 	type BindableShape,
 	EXCALIDRAW_BINDING_GAP,
 	excalidrawBoundPoint,
+	excalidrawElbowHeading,
+	excalidrawElbowOutset,
 	excalidrawFixedGlobalPoint,
 	excalidrawFixedPoint,
 	excalidrawFocusThrough,
 	excalidrawKeepsElbowEnd,
 	excalidrawOutlineDistance,
 	excalidrawOutlineHit,
+	excalidrawVectorHeading,
 	type FocusBinding,
 	isExcalidrawBindableType,
 	type Point,
@@ -42,6 +45,13 @@ export interface FocusBoundEnds {
 export interface FixedBoundEnds {
 	readonly end?: Point;
 	readonly points: Point[];
+	/**
+	 * Whether Excalidraw reads every bound end, on the outline, leaving the way
+	 * its run is drawn. It reads a diamond's side as leaving square to the axis
+	 * nearest the side, so a level run into a wide diamond's side corner reads as
+	 * leaving up or down unless it ends FIXED_BINDING_DISTANCE out.
+	 */
+	readonly readsAsDrawn: boolean;
 	readonly start?: Point;
 }
 
@@ -228,13 +238,25 @@ export function focusBoundEnds(
 }
 
 /**
- * Ends and fixed points for an elbow arrow, so Excalidraw keeps each end when
- * it re-routes the arrow: an end on the outline Excalidraw draws stays, and any
- * other moves along its last run onto that outline. Excalidraw reads a fixed
- * point at a side's middle as 0.5001 of the side, so an end there reads back a
- * ten-thousandth of the side across; the route stays square where it is drawn.
- * Excalidraw draws a diamond's corners a pixel past its box's middle
- * (floor(size / 2) + 1), so a run into a corner ends on the side beside it.
+ * How far out from the outline an elbow end sits. Excalidraw reads the heading
+ * of an end exactly on the outline from the shape's middle, so an end near a
+ * corner reads as leaving sideways; a ten-thousandth of a pixel out (a
+ * millionth beside a thin shape's long side) it reads the side it leaves, and
+ * is still where Excalidraw keeps it.
+ */
+const ELBOW_OUTSETS = [1e-4, 1e-6] as const;
+
+/**
+ * Ends and fixed points for an elbow arrow, so Excalidraw keeps each end and
+ * reads it leaving the way it is drawn when it re-routes the arrow: each end
+ * sits on its last run just outside the outline Excalidraw draws. Where
+ * Excalidraw would read that end as leaving along the shape's side, as at a
+ * diamond's side corner, which it draws a pixel past the box's middle
+ * (floor(size / 2) + 1), the end sits 5px out along the run (FIXED_BINDING_DISTANCE),
+ * where Excalidraw's own elbow ends sit and it reads the heading square.
+ * Excalidraw reads a fixed point at a side's middle as 0.5001 of the side, so
+ * an end there reads back a ten-thousandth of the side across; the route stays
+ * square where it is drawn.
  */
 export function fixedBoundEnds(
 	route: readonly Point[],
@@ -242,8 +264,9 @@ export function fixedBoundEnds(
 	endShape: BindableShape | undefined,
 ): FixedBoundEnds {
 	const points = [...route];
-	if (points.length < 2) return { points };
+	if (points.length < 2) return { points, readsAsDrawn: true };
 	const last = points.length - 1;
+	let readsAsDrawn = true;
 	const place = (
 		index: number,
 		step: 1 | -1,
@@ -260,29 +283,61 @@ export function fixedBoundEnds(
 		const neighbour = points[index + step]!;
 		// Which coordinate a square run into the end keeps: x for a vertical run.
 		const square = end[0] === neighbour[0] ? 0 : end[1] === neighbour[1] ? 1 : undefined;
-		const fixed = excalidrawFixedPoint(ratio(end));
-		const read = excalidrawFixedGlobalPoint(target, fixed);
-		if (excalidrawKeepsElbowEnd(target, read)) return fixed;
-		// Find the outline along the run where Excalidraw reads across it, a side's
-		// middle at 0.5001; the drawn end moves only along the run, to meet it.
-		const across = (point: Point): Point =>
-			square === 0 ? [read[0], point[1]] : square === 1 ? [point[0], read[1]] : point;
-		const hit = excalidrawOutlineHit(target, across(neighbour), across(end));
-		if (!hit) {
+		const keepSquare = (point: Point): Point =>
+			square === 0 ? [end[0], point[1]] : square === 1 ? [point[0], end[1]] : point;
+		const read = (point: Point) =>
+			excalidrawFixedGlobalPoint(target, excalidrawFixedPoint(ratio(point)));
+		const onOutline = (): Point => {
+			if (excalidrawKeepsElbowEnd(target, read(end))) return end;
+			// Find the outline along the run where Excalidraw reads across it, a side's
+			// middle at 0.5001; the drawn end moves only along the run, to meet it.
+			const at = read(end);
+			const across = (point: Point): Point =>
+				square === 0 ? [at[0], point[1]] : square === 1 ? [point[0], at[1]] : point;
+			const hit = excalidrawOutlineHit(target, across(neighbour), across(end));
 			// A run that misses the outline ends where Excalidraw would snap it to:
 			// on the outline toward the shape's middle.
-			const snapped = excalidrawOutlineHit(target, center(target), end);
-			if (!snapped) return fixed;
-			points[index] = snapped;
-			return excalidrawFixedPoint(ratio(snapped));
-		}
-		points[index] = square === 0 ? [end[0], hit[1]] : square === 1 ? [hit[0], end[1]] : hit;
-		return excalidrawFixedPoint(ratio(hit));
+			return hit ? keepSquare(hit) : (excalidrawOutlineHit(target, center(target), end) ?? end);
+		};
+		const outline = onOutline();
+		const outward: Point = [neighbour[0] - outline[0], neighbour[1] - outline[1]];
+		const length = Math.hypot(outward[0], outward[1]);
+		const leaving = excalidrawVectorHeading(outward);
+		const readsLeaving = (point: Point) => {
+			const heading = excalidrawElbowHeading(target, read(point));
+			return heading[0] === leaving[0] && heading[1] === leaving[1];
+		};
+		const keeps = (point: Point) => excalidrawKeepsElbowEnd(target, read(point));
+		const out = (distance: number): Point =>
+			length === 0
+				? outline
+				: keepSquare([
+						outline[0] + (outward[0] / length) * distance,
+						outline[1] + (outward[1] / length) * distance,
+					]);
+		// Along a thin shape's long side the ray from its middle runs nearly along the
+		// side, so only a smaller step out stays within Excalidraw's hundredth.
+		const near = ELBOW_OUTSETS.map(out);
+		// An end Excalidraw reads leaving as drawn only FIXED_BINDING_DISTANCE out
+		// leaves a gap a polyline's end does not, so it counts as misread too.
+		const reading = near.find((point) => keeps(point) && readsLeaving(point));
+		if (!reading) readsAsDrawn = false;
+		// The far place is a search along the run; only a misread end needs it.
+		const far = () => {
+			if (length === 0) return undefined;
+			const found = excalidrawElbowOutset(target, outline, outward);
+			const point = found && keepSquare(found);
+			return point && keeps(point) && readsLeaving(point) ? point : undefined;
+		};
+		const placed = reading ?? far() ?? near.find(keeps) ?? outline;
+		points[index] = placed;
+		return excalidrawFixedPoint(ratio(placed));
 	};
 	const start = place(0, 1, startShape);
 	const end = place(last, -1, endShape);
 	return {
 		points,
+		readsAsDrawn,
 		...(start ? { start } : {}),
 		...(end ? { end } : {}),
 	};
