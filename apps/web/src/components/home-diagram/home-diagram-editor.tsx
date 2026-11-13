@@ -4,6 +4,7 @@ import type {
 	ExcalidrawInitialDataState,
 	ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
+import type { createFoldedRouteRelease } from "@sketchi/diagram-ui";
 import { type ComponentType, useCallback, useRef } from "react";
 
 import {
@@ -18,6 +19,8 @@ import { HOME_DIAGRAM } from "./home-diagram-data.js";
 export interface HomeDiagramEditorProps {
 	/** Excalidraw's editor, from diagram-ui's loader. */
 	Excalidraw: ComponentType<ExcalidrawProps>;
+	/** Makes the step that releases a route a drag folds through its own shape. */
+	releaseRoutes: () => ReturnType<typeof createFoldedRouteRelease>;
 	/** The committed .excalidraw file, parsed. */
 	scene: ExcalidrawInitialDataState;
 	/** Rendered width of the image this editor replaces. */
@@ -32,8 +35,16 @@ const SETTLE_MS = 320;
  * zoom and position, so nothing jumps, then eases the drawing into the space
  * its toolbars leave free, so every box is in view.
  */
-export function HomeDiagramEditor({ Excalidraw, scene, width }: HomeDiagramEditorProps) {
+export function HomeDiagramEditor({
+	Excalidraw,
+	releaseRoutes,
+	scene,
+	width,
+}: HomeDiagramEditorProps) {
 	const frameElement = useRef<HTMLDivElement | null>(null);
+	// One per mount: Reset remounts the editor on the original scene.
+	const release = useRef<ReturnType<typeof createFoldedRouteRelease> | null>(null);
+	release.current ??= releaseRoutes();
 	const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
 	const settle = useRef<{ started: boolean; cancel: () => void }>({
 		started: false,
@@ -43,18 +54,22 @@ export function HomeDiagramEditor({ Excalidraw, scene, width }: HomeDiagramEdito
 
 	// Excalidraw reports its first change once the scene is loaded; a frame later its
 	// toolbars are laid out and can be measured.
-	const onChange = useCallback(() => {
-		const api = apiRef.current;
-		const frame = frameElement.current;
-		if (settle.current.started || !api || !frame) return;
-		settle.current.started = true;
-		const measure = requestAnimationFrame(() => {
-			const box = frame.getBoundingClientRect();
-			const target = cameraBetweenToolbars(box.width, box.height, toolbarInsets(frame));
-			settle.current.cancel = moveCamera(api, imageCamera(width), target, frame);
-		});
-		settle.current.cancel = () => cancelAnimationFrame(measure);
-	}, [width]);
+	const onChange = useCallback<NonNullable<ExcalidrawProps["onChange"]>>(
+		(elements, appState) => {
+			const api = apiRef.current;
+			if (api) release.current?.(api, elements, appState.selectedElementIds);
+			const frame = frameElement.current;
+			if (settle.current.started || !api || !frame) return;
+			settle.current.started = true;
+			const measure = requestAnimationFrame(() => {
+				const box = frame.getBoundingClientRect();
+				const target = cameraBetweenToolbars(box.width, box.height, toolbarInsets(frame));
+				settle.current.cancel = moveCamera(api, imageCamera(width), target, frame);
+			});
+			settle.current.cancel = () => cancelAnimationFrame(measure);
+		},
+		[width],
+	);
 	// Reset remounts the editor; a move still running stops with the old one.
 	const frameRef = useCallback((frame: HTMLDivElement | null) => {
 		frameElement.current = frame;

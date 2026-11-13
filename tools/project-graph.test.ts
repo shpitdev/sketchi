@@ -246,7 +246,7 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/web/scripts/home-diagram.ts": 4,
 	"apps/web/scripts/social-card.ts": 2,
 	"apps/web/src/components/copy-button/copy-button.tsx": 4,
-	"apps/web/src/components/home-diagram/home-diagram.tsx": 17,
+	"apps/web/src/components/home-diagram/home-diagram.tsx": 18,
 	"apps/web/src/lib/surface-urls-rpc.ts": 3,
 	"apps/web/src/routes/agents.tsx": 2,
 	"apps/web/src/routes/docs.tsx": 2,
