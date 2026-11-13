@@ -605,10 +605,9 @@ export interface CanvasConnectorElement extends CanvasElementComposition, Canvas
 	readonly label?: string;
 }
 
+/** A line end bound to a node or frame; the export derives where Excalidraw keeps it. */
 export interface CanvasLineBinding {
 	readonly elementId: string;
-	readonly focus?: number;
-	readonly gap?: number;
 }
 
 export interface CanvasLineElement extends CanvasElementComposition, CanvasStrokeStyleFields {
