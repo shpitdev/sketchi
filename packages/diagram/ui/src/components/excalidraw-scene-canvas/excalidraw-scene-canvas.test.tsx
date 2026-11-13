@@ -3,10 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const excalidrawMock = vi.hoisted(() => ({
 	editors: [] as Array<{
+		readonly change: (elements: readonly unknown[]) => void;
 		readonly load: (elements?: readonly unknown[]) => void;
 		readonly resize: (width: number, height: number) => void;
 	}>,
+	mutateElement: vi.fn(),
 	props: vi.fn(),
+	updateScene: vi.fn(),
 	scrollToContent: vi.fn(),
 	viewport: { height: 400, width: 1280 },
 }));
@@ -17,10 +20,13 @@ vi.mock("@excalidraw/excalidraw", async () => {
 	return {
 		// Every mocked scene spans a wide 1500 by 1070 diagram.
 		getCommonBounds: () => [0, 0, 1500, 1070],
+		mutateElement: excalidrawMock.mutateElement,
 		Excalidraw: (props: {
 			excalidrawAPI?: (api: {
 				getAppState: () => object;
+				getSceneElementsIncludingDeleted: () => readonly unknown[];
 				scrollToContent: typeof excalidrawMock.scrollToContent;
+				updateScene: (scene: { elements?: readonly unknown[] }) => void;
 			}) => void;
 			gridModeEnabled?: boolean;
 			initialData?: { appState?: Record<string, unknown> };
@@ -33,12 +39,25 @@ vi.mock("@excalidraw/excalidraw", async () => {
 			// with the new viewport size and reports it the same way.
 			React.useState(() => {
 				let appState = { ...excalidrawMock.viewport, offsetLeft: 0, offsetTop: 0 };
+				let sceneElements: readonly unknown[] = [];
 				props.excalidrawAPI?.({
 					getAppState: () => appState,
+					getSceneElementsIncludingDeleted: () => sceneElements,
 					scrollToContent: excalidrawMock.scrollToContent,
+					updateScene: (scene) => {
+						excalidrawMock.updateScene(scene);
+						if (scene.elements) sceneElements = scene.elements;
+					},
 				});
 				excalidrawMock.editors.push({
-					load: (elements = []) => props.onChange?.(elements, appState, {}),
+					change: (elements) => {
+						sceneElements = elements;
+						props.onChange?.(elements, appState, {});
+					},
+					load: (elements = []) => {
+						sceneElements = elements;
+						props.onChange?.(elements, appState, {});
+					},
 					resize: (width, height) => {
 						appState = { height, offsetLeft: 0, offsetTop: 0, width };
 						props.onChange?.([], appState, {});
@@ -92,8 +111,10 @@ describe("ExcalidrawSceneCanvas", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 		excalidrawMock.editors.length = 0;
+		excalidrawMock.mutateElement.mockReset();
 		excalidrawMock.props.mockReset();
 		excalidrawMock.scrollToContent.mockReset();
+		excalidrawMock.updateScene.mockReset();
 		excalidrawMock.viewport = { height: 400, width: 1280 };
 	});
 
@@ -276,5 +297,58 @@ describe("ExcalidrawSceneCanvas", () => {
 			undefined,
 			fitToViewport,
 		);
+	});
+	it("releases a route a drag folds through its own shape to Excalidraw's elbow routing", async () => {
+		const shape = (id: string, x: number) => ({
+			id,
+			type: "rectangle",
+			x,
+			y: 0,
+			width: 100,
+			height: 60,
+			angle: 0,
+			isDeleted: false,
+			roundness: null,
+			version: 1,
+		});
+		const route = (x: number, version: number) => ({
+			id: "route",
+			type: "arrow",
+			x,
+			y: 30,
+			points: [
+				[0, 0],
+				[250 - x, 0],
+				[250 - x, 169],
+			],
+			angle: 0,
+			elbowed: false,
+			roundness: null,
+			isDeleted: false,
+			version,
+			startBinding: { elementId: "a", focus: 0, gap: 1 },
+			endBinding: { elementId: "b", focus: 0, gap: 1 },
+		});
+		const b = { ...shape("b", 200), y: 200 };
+		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+
+		render(<ExcalidrawSceneCanvas scene={scene} title="Folded route" />);
+		await screen.findByTestId("mock-excalidraw");
+		loadEditor(0, [shape("a", 0), b, route(101, 1)]);
+		expect(excalidrawMock.updateScene).not.toHaveBeenCalled();
+
+		// Dragged right past its route's bend, a's end is aimed from inside it.
+		act(() => excalidrawMock.editors[0]!.change([shape("a", 180), b, route(230, 2)]));
+
+		const released = expect.objectContaining({ id: "route", elbowed: true, fixedSegments: [] });
+		expect(excalidrawMock.updateScene).toHaveBeenCalledWith({
+			elements: expect.arrayContaining([released]),
+		});
+		expect(excalidrawMock.mutateElement).toHaveBeenCalledWith(released, {
+			points: [
+				[0, 0],
+				[20, 169],
+			],
+		});
 	});
 });

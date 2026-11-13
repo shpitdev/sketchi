@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@excalidraw/excalidraw", () => ({
 	Excalidraw: () => <div data-testid="mock-excalidraw">Mock Excalidraw</div>,
 	getCommonBounds: () => [0, 0, 0, 0],
+	mutateElement: vi.fn(),
 }));
 
 import * as renderer from "@sketchi/diagram-renderer";

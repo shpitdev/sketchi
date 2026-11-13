@@ -11,8 +11,10 @@ const editor = vi.hoisted(() => ({ mounts: 0 }));
 
 // diagram-ui's loader sets Excalidraw's asset path and imports it; this stands in for both.
 vi.mock("@sketchi/diagram-ui", () => ({
+	createFoldedRouteRelease: () => () => undefined,
 	loadExcalidraw: () => {
 		return Promise.resolve({
+			mutateElement: () => undefined,
 			Excalidraw: ({
 				initialData,
 			}: {

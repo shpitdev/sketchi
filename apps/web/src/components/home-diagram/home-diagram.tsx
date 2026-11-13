@@ -1,4 +1,5 @@
 import type { ExcalidrawInitialDataState, ExcalidrawProps } from "@excalidraw/excalidraw/types";
+import type { createFoldedRouteRelease } from "@sketchi/diagram-ui";
 import { Button } from "@sketchi/ui/components/button";
 import { Spinner } from "@sketchi/ui/components/spinner";
 import { Pencil, RotateCcw } from "lucide-react";
@@ -9,6 +10,8 @@ import { HOME_DIAGRAM } from "./home-diagram-data.js";
 
 interface LoadedEditor {
 	Excalidraw: ComponentType<ExcalidrawProps>;
+	/** A fresh release of folded routes, for each editor that mounts. */
+	releaseRoutes: () => ReturnType<typeof createFoldedRouteRelease>;
 	scene: ExcalidrawInitialDataState;
 }
 
@@ -23,12 +26,17 @@ let editorLoad: Promise<LoadedEditor> | undefined;
 function loadEditor(): Promise<LoadedEditor> {
 	editorLoad ??= Promise.all([
 		import("@sketchi/diagram-ui").then(({ loadExcalidraw }) => loadExcalidraw()),
+		import("@sketchi/diagram-ui"),
 		import("@excalidraw/excalidraw/index.css"),
 		fetch(HOME_DIAGRAM.scene).then((response) => {
 			if (!response.ok) throw new Error(`${HOME_DIAGRAM.scene} returned ${response.status}`);
 			return response.json() as Promise<ExcalidrawInitialDataState>;
 		}),
-	]).then(([{ Excalidraw }, , scene]) => ({ Excalidraw, scene }));
+	]).then(([{ Excalidraw, mutateElement }, { createFoldedRouteRelease }, , scene]) => ({
+		Excalidraw,
+		releaseRoutes: () => createFoldedRouteRelease(mutateElement),
+		scene,
+	}));
 	editorLoad.catch(() => {
 		editorLoad = undefined;
 	});
@@ -108,6 +116,7 @@ export function HomeDiagram() {
 						<HomeDiagramEditor
 							Excalidraw={state.Excalidraw}
 							key={state.revision}
+							releaseRoutes={state.releaseRoutes}
 							scene={state.scene}
 							width={state.width}
 						/>

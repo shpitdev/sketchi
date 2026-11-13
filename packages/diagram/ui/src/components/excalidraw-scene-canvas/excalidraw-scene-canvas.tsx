@@ -1,5 +1,6 @@
 import { createBranchLabelSynchronizer } from "./branch-labels";
 import { measureCanvasControls, readOnlyFit } from "./read-only-fit";
+import { createFoldedRouteRelease } from "./route-release";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type {
 	BinaryFiles,
@@ -32,11 +33,14 @@ function CanvasUnavailable() {
 // requested once the canvas renders in the browser.
 // The loaded module also measures scene bounds for a read-only fit.
 let sceneBounds: typeof import("@excalidraw/excalidraw").getCommonBounds | undefined;
+// And its mutateElement has Excalidraw route an arrow a drag releases.
+let mutateElement: typeof import("@excalidraw/excalidraw").mutateElement | undefined;
 
 const LazyExcalidraw = lazy<ComponentType<ExcalidrawProps>>(() =>
 	loadExcalidraw().then(
 		(module) => {
 			sceneBounds = module.getCommonBounds;
+			mutateElement = module.mutateElement;
 			return { default: module.Excalidraw };
 		},
 		() => ({ default: CanvasUnavailable }),
@@ -139,9 +143,13 @@ export function ExcalidrawSceneCanvas({
 		readonly width: number;
 	} | null>(null);
 	const synchronizeLabels = useRef(createBranchLabelSynchronizer());
+	const releaseRoutes = useRef<ReturnType<typeof createFoldedRouteRelease> | undefined>(undefined);
 	const handleApiChange = useCallback(
 		(api: ExcalidrawImperativeAPI) => {
-			if (apiRef.current !== api) synchronizeLabels.current = createBranchLabelSynchronizer();
+			if (apiRef.current !== api) {
+				synchronizeLabels.current = createBranchLabelSynchronizer();
+				releaseRoutes.current = mutateElement ? createFoldedRouteRelease(mutateElement) : undefined;
+			}
 			apiRef.current = api;
 			onApiChange?.(api);
 		},
@@ -178,8 +186,12 @@ export function ExcalidrawSceneCanvas({
 					});
 				}
 			}
-			const synchronized = synchronizeLabels.current(elements);
-			if (api && synchronized !== elements) api.updateScene({ elements: synchronized });
+			const labeled = synchronizeLabels.current(elements);
+			if (api && labeled !== elements) api.updateScene({ elements: labeled });
+			const synchronized =
+				api && releaseRoutes.current
+					? releaseRoutes.current(api, labeled, appState.selectedElementIds)
+					: labeled;
 			onChange?.(synchronized, appState, files);
 			onSceneChange?.(sceneFromExcalidrawChange(synchronized, appState, files));
 		},
