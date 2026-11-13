@@ -137,6 +137,22 @@ describe("authored node geometry", () => {
 	});
 });
 
+/** An exported scene that draws a pinned elbow arrow, and that arrow. */
+function elbowExport() {
+	for (const diagram of [
+		flowchartFixture,
+		pharmaBatchDispositionFlowchart,
+		...Object.values(zoneFixtures),
+	]) {
+		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(diagram));
+		const arrow = scene.elements.find(
+			(element) => element.type === "arrow" && element.elbowed === true,
+		);
+		if (arrow) return { scene, arrow };
+	}
+	throw new Error("Expected a fixture with an elbow arrow.");
+}
+
 function bindingFixedPoint(
 	element: ExcalidrawElement | undefined,
 	key: "startBinding" | "endBinding",
@@ -284,6 +300,66 @@ describe("convertSceneToExcalidraw", () => {
 			ok: true,
 			issues: [],
 		});
+	});
+
+	it("keeps a bend an authored arrow repeats as one bend, not a diagonal", () => {
+		const node = (id: string, x: number, y: number) => ({
+			type: "node" as const,
+			id,
+			nodeId: id,
+			shape: "rectangle" as const,
+			x,
+			y,
+			width: 80,
+			height: 60,
+			label: id,
+		});
+		const scene: CanvasSpec = {
+			kind: "canvas",
+			version: 1,
+			diagramId: "repeated-bend",
+			title: "Repeated bend",
+			width: 400,
+			height: 400,
+			accentColor: "#111827",
+			backgroundColor: "#ffffff",
+			layers: [],
+			layouts: [],
+			elements: [
+				node("a", 20, 70),
+				node("b", 160, 200),
+				{
+					type: "line",
+					id: "a-b",
+					points: [
+						{ x: 100, y: 100 },
+						{ x: 200, y: 100 },
+						{ x: 200, y: 100 },
+						{ x: 200, y: 200 },
+					],
+					startBinding: { elementId: "a" },
+					endBinding: { elementId: "b" },
+					endArrowhead: "arrow",
+				},
+			],
+			zOrder: ["a", "b", "a-b"],
+		};
+
+		const converted = convertSceneToExcalidraw(scene);
+		const arrow = converted.elements.find((element) => element.id === "a-b")!;
+		const points = (arrow["points"] as [number, number][]).map(([x, y]): [number, number] => [
+			Number(arrow["x"]) + x,
+			Number(arrow["y"]) + y,
+		]);
+
+		// One bend, square on both sides of it.
+		expect(points).toHaveLength(3);
+		const [start, bend, end] = points as [[number, number], [number, number], [number, number]];
+		expect(bend[0]).toBeCloseTo(200, 3);
+		expect(bend[1]).toBeCloseTo(100, 3);
+		expect(start[1]).toBeCloseTo(100, 3);
+		expect(end[0]).toBeCloseTo(200, 3);
+		expect(validateExcalidrawScene(converted)).toEqual({ ok: true, issues: [] });
 	});
 
 	it("converts CanvasSpec polygons, frames, standalone text, bound lines, and z-order", () => {
@@ -469,10 +545,13 @@ describe("convertSceneToExcalidraw", () => {
 			startBinding: { elementId: "left" },
 			endBinding: null,
 		});
-		expect(exported.elements.find((element) => element.id === "bound-polyline")).toMatchObject({
+		// Its inner run is pinned, so Excalidraw keeps it when either end's shape moves.
+		const polyline = exported.elements.find((element) => element.id === "bound-polyline")!;
+		const local = (polyline["points"] as [number, number][]).slice(1, 3);
+		expect(polyline).toMatchObject({
 			type: "arrow",
 			elbowed: true,
-			fixedSegments: [],
+			fixedSegments: [{ index: 2, start: local[0], end: local[1] }],
 			roundness: null,
 		});
 		expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
@@ -648,15 +727,6 @@ describe("convertSceneToExcalidraw", () => {
 		expect(byId.get("label:topic-0-0-1")?.groupIds).toEqual(["branch:topic-0-0"]);
 	});
 
-	it("still reports a multi-point arrow that is neither an elbow nor a curve", () => {
-		const exported = convertSceneToExcalidraw(renderMindmapDiagram(mindmapFixture));
-		const curve = exported.elements.find((element) => element.id === "edge:branch-0-0-0")!;
-		curve.roundness = null;
-		expect(validateExcalidrawScene(exported).issues).toContainEqual(
-			expect.objectContaining({ code: "invalid-elbow-binding", elementId: "edge:branch-0-0-0" }),
-		);
-	});
-
 	it("wraps scenes as importable Excalidraw files", () => {
 		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
 		const file = createExcalidrawFile(scene, {
@@ -675,11 +745,11 @@ describe("convertSceneToExcalidraw", () => {
 
 	it("creates bound arrows that validate as real Excalidraw elements", () => {
 		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
-		const branchArrow = scene.elements.find((element) => element.id === "edge:clear-review");
+		const elbow = elbowExport();
+		const branchArrow = elbow.arrow;
 
-		const validation = validateExcalidrawScene(scene);
-
-		expect(validation).toEqual({ ok: true, issues: [] });
+		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
+		expect(validateExcalidrawScene(elbow.scene)).toEqual({ ok: true, issues: [] });
 		expect(scene.appState).toMatchObject({
 			viewBackgroundColor: "#fffdf8",
 			zoom: {
@@ -696,12 +766,15 @@ describe("convertSceneToExcalidraw", () => {
 			type: "arrow",
 			points: expect.arrayContaining([expect.any(Array), expect.any(Array), expect.any(Array)]),
 			elbowed: true,
-			fixedSegments: [],
 			roundness: null,
 			startBinding: expect.objectContaining({
 				fixedPoint: expect.arrayContaining([expect.any(Number)]),
 			}),
 		});
+		// Every inner run is pinned, so Excalidraw keeps the route when shapes move.
+		expect(branchArrow["fixedSegments"]).toHaveLength(
+			(branchArrow["points"] as unknown[]).length - 3,
+		);
 	});
 
 	it("opens maintained vertical flowcharts at an embedded-canvas friendly zoom", () => {
@@ -1500,9 +1573,10 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("uses fixed elbow bindings so Excalidraw can preserve connectors when shapes move", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
-		const branchArrow = scene.elements.find((element) => element.id === "edge:clear-review");
-		const sourceShape = scene.elements.find((element) => element.id === "node:clear");
+		const { scene, arrow: branchArrow } = elbowExport();
+		const bound = (key: "startBinding" | "endBinding") =>
+			(branchArrow[key] as { elementId: string }).elementId;
+		const sourceShape = scene.elements.find((element) => element.id === bound("startBinding"));
 		const startFixedPoint = bindingFixedPoint(branchArrow, "startBinding");
 		const originalStart = firstGlobalPoint(branchArrow);
 		const fixedStart = globalPointFromFixedPoint(sourceShape, startFixedPoint);
@@ -1519,17 +1593,9 @@ describe("convertSceneToExcalidraw", () => {
 
 		expect(branchArrow).toMatchObject({
 			elbowed: true,
-			fixedSegments: [],
-			startBinding: expect.objectContaining({
-				elementId: "node:clear",
-				fixedPoint: expect.any(Array),
-				gap: 0,
-			}),
-			endBinding: expect.objectContaining({
-				elementId: "node:review",
-				fixedPoint: expect.any(Array),
-				gap: 0,
-			}),
+			fixedSegments: expect.any(Array),
+			startBinding: expect.objectContaining({ fixedPoint: expect.any(Array), gap: 0 }),
+			endBinding: expect.objectContaining({ fixedPoint: expect.any(Array), gap: 0 }),
 		});
 		expect(bindingGap(branchArrow, "startBinding")).toBe(0);
 		expect(bindingGap(branchArrow, "endBinding")).toBe(0);
@@ -1820,22 +1886,21 @@ describe("convertSceneToExcalidraw", () => {
 		);
 	});
 
-	it("reports orthogonal routes missing Excalidraw elbow metadata", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
-		const branchArrow = scene.elements.find((element) => element.id === "edge:clear-review");
+	it("reports an elbow route stripped of its elbow metadata", () => {
+		const { scene, arrow: branchArrow } = elbowExport();
 
-		if (branchArrow) {
-			branchArrow.elbowed = false;
-			delete branchArrow.fixedSegments;
-		}
+		branchArrow.elbowed = false;
+		delete branchArrow.fixedSegments;
 
+		// Read as an arrow that is not elbowed, its gap-0 bindings drop its ends on
+		// their shapes' middles.
 		const validation = validateExcalidrawScene(scene);
 
 		expect(validation.ok).toBe(false);
 		expect(validation.issues).toContainEqual(
 			expect.objectContaining({
-				code: "invalid-elbow-binding",
-				elementId: "edge:clear-review",
+				code: "arrow-endpoint-off-shape",
+				elementId: branchArrow.id,
 			}),
 		);
 	});
@@ -1912,16 +1977,16 @@ describe("convertSceneToExcalidraw", () => {
 		expect(loop).toMatchObject({
 			type: "arrow",
 			elbowed: true,
-			startBinding: {
-				elementId: "node:idp:lifeline:activation:authorize",
-				fixedPoint: [1, expect.any(Number)],
-			},
-			endBinding: {
-				elementId: "node:idp:lifeline:activation:validate",
-				fixedPoint: [1, expect.any(Number)],
-			},
+			startBinding: { elementId: "node:idp:lifeline:activation:authorize" },
+			endBinding: { elementId: "node:idp:lifeline:activation:validate" },
 			boundElements: null,
 		});
+		// Both ends leave the bars' right sides, a hair out so Excalidraw reads them leaving right.
+		for (const key of ["startBinding", "endBinding"] as const) {
+			const [x] = (loop[key] as { fixedPoint: [number, number] }).fixedPoint;
+			expect(x).toBeGreaterThan(1);
+			expect(x).toBeLessThan(1.001);
+		}
 		expect(element("node:idp:lifeline:activation:validate").boundElements).toEqual(
 			expect.arrayContaining([{ id: "arrow:validate", type: "arrow" }]),
 		);
@@ -2580,8 +2645,14 @@ describe("entity tables and crow's-foot ends", () => {
 			elbowed: true,
 		});
 		// The row sits 60 of the table's 108 units down; a moved table keeps it there.
-		expect((arrow["startBinding"] as { fixedPoint: number[] }).fixedPoint).toEqual([1, 60 / 108]);
-		expect((arrow["endBinding"] as { fixedPoint: number[] }).fixedPoint).toEqual([0, 60 / 108]);
+		// Each end sits a ten-thousandth of a pixel off its side, where Excalidraw
+		// reads which way it leaves.
+		const [startX, startY] = (arrow["startBinding"] as { fixedPoint: number[] }).fixedPoint;
+		const [endX, endY] = (arrow["endBinding"] as { fixedPoint: number[] }).fixedPoint;
+		expect(startX).toBeCloseTo(1, 5);
+		expect(endX).toBeCloseTo(0, 5);
+		expect(startY).toBe(60 / 108);
+		expect(endY).toBe(60 / 108);
 	});
 
 	it("keeps a column's rows at its line height", () => {

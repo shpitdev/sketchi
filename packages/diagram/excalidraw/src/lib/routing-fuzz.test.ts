@@ -2636,13 +2636,9 @@ describe("state graph fuzz", () => {
 					const expected = [element.sourceNodeId, element.targetNodeId].map((id) =>
 						id === "c" ? "group:c" : `node:${id}`,
 					);
-					// A frame keeps a bound arrow's end only as an elbow arrow's fixed point.
-					const straightToFrame = expected.includes("group:c") && arrow?.["elbowed"] !== true;
-					return JSON.stringify(ends) === JSON.stringify(expected) && !straightToFrame
+					return JSON.stringify(ends) === JSON.stringify(expected)
 						? []
-						: [
-								`${element.id} binds ${JSON.stringify(ends)}${straightToFrame ? " as a straight arrow" : ""}`,
-							];
+						: [`${element.id} binds ${JSON.stringify(ends)}`];
 				});
 				const authored = new Map(graph.nodes.map((node) => [`node:${node.id}`, node.label]));
 				return [

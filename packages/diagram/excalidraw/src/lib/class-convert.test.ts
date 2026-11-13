@@ -25,9 +25,8 @@ describe("class diagram Excalidraw export", () => {
 			expect(text["text"], text.id).toBe(text["originalText"]);
 	});
 
-	it("binds every relationship as an elbow arrow to its classes' outlines, with UML heads and dashes", () => {
+	it("binds every relationship to fixed points on its classes, with UML heads and dashes", () => {
 		expect(element("edge:shape-draws")).toMatchObject({
-			elbowed: true,
 			startArrowhead: null,
 			endArrowhead: "triangle_outline",
 			strokeStyle: "dashed",
@@ -35,17 +34,25 @@ describe("class diagram Excalidraw export", () => {
 			endBinding: { elementId: "node:Drawable" },
 		});
 		expect(element("edge:circle-is-shape")).toMatchObject({
-			elbowed: true,
 			endArrowhead: "triangle_outline",
 			strokeStyle: "solid",
 		});
 		expect(element("edge:canvas-holds")).toMatchObject({
-			elbowed: true,
 			startArrowhead: "diamond_outline",
 			endArrowhead: null,
 			startBinding: { elementId: "node:Canvas" },
 			endBinding: { elementId: "node:Shape" },
 		});
+		// Each is an elbow arrow at fixed points, so an end keeps its place on its class
+		// when the class moves, with every inner run pinned.
+		for (const id of ["edge:shape-draws", "edge:circle-is-shape", "edge:canvas-holds"]) {
+			const arrow = element(id);
+			const points = arrow["points"] as unknown[];
+			expect(arrow["elbowed"], id).toBe(true);
+			expect(arrow["fixedSegments"], id).toHaveLength(Math.max(0, points.length - 3));
+			expect(arrow["startBinding"], id).toMatchObject({ fixedPoint: expect.any(Array) });
+			expect(arrow["endBinding"], id).toMatchObject({ fixedPoint: expect.any(Array) });
+		}
 		// A multiplicity or role moves with its class.
 		expect(element("relationship:canvas-holds:to:role")).toMatchObject({
 			type: "text",
