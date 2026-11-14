@@ -303,7 +303,8 @@ const approvedManagedPromiseSiteCounts: Record<string, number> = {
 	"apps/icons/src/routes/api/packs/$id/excalidraw.ts": 6,
 };
 const approvedManagedPromiseFiles = Object.keys(approvedManagedPromiseSiteCounts).sort();
-const approvedEffectDependencyVersions = new Set(["4.1.2"]);
+// pnpm resolves the exact runtime versions from the shared workspace catalog.
+const approvedEffectDependencySpecifiers = new Set(["catalog:"]);
 const diagramPackages = [
 	{
 		name: "diagram-agent",
@@ -660,7 +661,7 @@ function invalidEffectDependencyPins(
 		for (const [dependency, version] of Object.entries(dependencies ?? {})) {
 			if (
 				(dependency === "effect" || dependency.startsWith("@effect/")) &&
-				!approvedEffectDependencyVersions.has(version)
+				!approvedEffectDependencySpecifiers.has(version)
 			) {
 				invalid.push({ dependency, version });
 			}
@@ -984,8 +985,8 @@ describe("diagram generation project boundaries", () => {
 		expect(actualEffectManifestPaths).toEqual(effectDependencyManifestPaths);
 
 		const rootManifest = readJsonFile<PackageManifest>(path.join(workspaceRoot, "package.json"));
-		expect(rootManifest.dependencies?.["effect"]).toBe("4.1.2");
-		expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("4.1.2");
+		expect(rootManifest.dependencies?.["effect"]).toBe("catalog:");
+		expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("catalog:");
 		expect(readFileSync(path.join(workspaceRoot, "pnpm-lock.yaml"), "utf8")).not.toContain(
 			"effect@3.",
 		);
@@ -1201,8 +1202,8 @@ describe("Effect structural guards", () => {
 			invalidEffectDependencyPins({
 				dependencies: {
 					"@effect/platform": "^4.0.0",
-					"@effect/platform-node": "4.1.2",
-					effect: "4.1.2",
+					"@effect/platform-node": "catalog:",
+					effect: "catalog:",
 				},
 			}),
 		).toEqual([{ dependency: "@effect/platform", version: "^4.0.0" }]);

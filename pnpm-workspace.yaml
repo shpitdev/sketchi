@@ -4,6 +4,12 @@ packages:
   - "packages/*/*"
   - "tools/*"
 
+catalog:
+  effect: 4.1.4
+  "@effect/ai-openai-compat": 4.1.4
+  "@effect/platform-node": 4.1.4
+  "@effect/vitest": 4.1.4
+
 saveExact: true
 minimumReleaseAge: 1440
 minimumReleaseAgeStrict: true

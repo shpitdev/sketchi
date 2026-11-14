@@ -12,6 +12,6 @@
 	},
 	"dependencies": {
 		"@sketchi/diagram-core": "workspace:*",
-		"effect": "4.1.2"
+		"effect": "catalog:"
 	}
 }

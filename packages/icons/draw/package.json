@@ -16,7 +16,7 @@
 		"@sketchi/diagram-generation": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/observability": "workspace:*",
-		"effect": "4.1.2"
+		"effect": "catalog:"
 	},
 	"devDependencies": {
 		"@excalidraw/excalidraw": "0.18.1"

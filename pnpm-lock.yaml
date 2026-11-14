@@ -162,6 +162,21 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@effect/ai-openai-compat':
+      specifier: 4.1.4
+      version: 4.1.4
+    '@effect/platform-node':
+      specifier: 4.1.4
+      version: 4.1.4
+    '@effect/vitest':
+      specifier: 4.1.4
+      version: 4.1.4
+    effect:
+      specifier: 4.1.4
+      version: 4.1.4
+
 overrides:
   lodash-es@>=4.0.0 <4.18.1: 4.18.1
   nanoid@>=3.0.0 <3.3.18: 3.3.18
@@ -203,8 +218,8 @@ importers:
         specifier: 0.32.0
         version: 0.32.0(@ai-sdk/provider@4.0.35)(@ai-sdk/react@4.0.163(react@19.3.1)(zod@4.6.5))(@babel/core@8.0.10)(@babel/runtime@7.29.7)(@cloudflare/codemode@0.5.6(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5))(ai@7.0.159(zod@4.6.5))(zod@4.6.5))(@modelcontextprotocol/client@2.4.0)(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5))(@modelcontextprotocol/server@2.4.0)(ai@7.0.159(zod@4.6.5))(react@19.3.1)(rolldown@1.2.16)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))(zod@4.6.5)
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
       react:
         specifier: 19.3.1
         version: 19.3.1
@@ -228,11 +243,11 @@ importers:
         specifier: 1.66.0
         version: 1.66.0(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))(workerd@1.20261023.1)(wrangler@4.156.0(@types/node@26.6.6))
       '@effect/platform-node':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))
       '@effect/vitest':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)(vitest@5.0.5)
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)(vitest@5.0.5)
       '@nx/devkit':
         specifier: 24.0.3
         version: 24.0.3(nx@24.0.3(@swc-node/register@1.12.1(@swc/core@1.16.21(@swc/helpers@0.5.23))(@swc/types@0.1.28)(@typescript/typescript6@6.0.2)(supports-color@10.2.2))(@swc/core@1.16.21(@swc/helpers@0.5.23)))
@@ -354,8 +369,8 @@ importers:
         specifier: 1.8.1
         version: 1.8.1
       '@effect/platform-node':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -372,8 +387,8 @@ importers:
         specifier: 6.0.1
         version: 6.0.1
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
       is-ci:
         specifier: 4.1.0
         version: 4.1.0
@@ -610,14 +625,14 @@ importers:
         specifier: 1.1.0
         version: 1.1.0
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
 
   packages/diagram/core:
     dependencies:
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
 
   packages/diagram/excalidraw:
     dependencies:
@@ -634,8 +649,8 @@ importers:
   packages/diagram/generation:
     dependencies:
       '@effect/ai-openai-compat':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../core
@@ -646,8 +661,8 @@ importers:
         specifier: workspace:*
         version: link:../../observability
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
 
   packages/diagram/renderer:
     dependencies:
@@ -658,8 +673,8 @@ importers:
   packages/diagram/scenarios:
     dependencies:
       '@effect/platform-node':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -679,8 +694,8 @@ importers:
         specifier: workspace:*
         version: link:../../icons/catalog
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
       linkedom:
         specifier: 0.18.14
         version: 0.18.14
@@ -738,8 +753,8 @@ importers:
         specifier: workspace:*
         version: link:../../diagram/core
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
 
   packages/icons/draw:
     dependencies:
@@ -759,8 +774,8 @@ importers:
         specifier: workspace:*
         version: link:../../observability
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
     devDependencies:
       '@excalidraw/excalidraw':
         specifier: 0.18.1
@@ -769,8 +784,8 @@ importers:
   packages/observability:
     dependencies:
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
 
   packages/social-card:
     dependencies:
@@ -790,8 +805,8 @@ importers:
         specifier: workspace:*
         version: link:../../observability
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
       nanoid:
         specifier: ^6.0.2
         version: 6.0.2
@@ -891,8 +906,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/observability
       effect:
-        specifier: 4.1.2
-        version: 4.1.2
+        specifier: 'catalog:'
+        version: 4.1.4
       linkedom:
         specifier: 0.18.14
         version: 0.18.14
@@ -1865,28 +1880,28 @@ packages:
   '@dual-bundle/import-meta-resolve@4.2.1':
     resolution: {integrity: sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==}
 
-  '@effect/ai-openai-compat@4.1.2':
-    resolution: {integrity: sha512-6NRpW6GTLoCIuGcs0mCX3cBSZZKJRX1Fo0oDA6NwUKraaAoYJM1gw8/P2vRfi0+G9xXS7EqO2Asgf7ecJb5/AQ==}
+  '@effect/ai-openai-compat@4.1.4':
+    resolution: {integrity: sha512-Rmb6tcV/5zv7PFHvZt08eSqSI5G8JyEGOBeIwyKKz1mBes9WAgeYv7Kplzy5rBSWH1LtUA4CIuREzS7ovXDhRw==}
     peerDependencies:
-      effect: ^4.1.2
+      effect: ^4.1.4
 
-  '@effect/platform-node-shared@4.1.2':
-    resolution: {integrity: sha512-wSwl9A/G1hcVvF8nLI+YfB3EyOIDvWS6+lsTZBkmgDnPBL7m8YWZF+1HD+mdEsb52SUGfukip46Q3gRwSdk3QA==}
+  '@effect/platform-node-shared@4.1.4':
+    resolution: {integrity: sha512-DWdfphHGOFJNj/mYadgpT3jIm8aRXDcPrQiGXFBH4p2H4XmA7iYMrPsI8NxVgZ7kNX0q1+FGJZJama0tINHRAg==}
     engines: {node: '>=22.19.0'}
     peerDependencies:
-      effect: ^4.1.2
+      effect: ^4.1.4
 
-  '@effect/platform-node@4.1.2':
-    resolution: {integrity: sha512-ye0UjxORdd5Qu3paZ1LljgGOALWHt7muP9VTpjUSCNfcesiB/Hm7wPJIvZeu4gnwpTe5BtEnO1VHngWqjJp8mA==}
+  '@effect/platform-node@4.1.4':
+    resolution: {integrity: sha512-h7QExTPq/RfYtHP/8tMlgfBvqYsuJKhxfkU6w0+NaF/ihqQ8Y3GH9t28ltupQjoqMM7P6W5gy8rOji7F0qVrmg==}
     engines: {node: '>=22.19.0'}
     peerDependencies:
-      effect: ^4.1.2
+      effect: ^4.1.4
       redis: '>=5.1.0 <7.0.0'
 
-  '@effect/vitest@4.1.2':
-    resolution: {integrity: sha512-JJPwAHkJHxvM/woW9mMW/khjasAHcmwWdOMAgMy16rfqsxcVhFDnrRsvN9VI2+kMv8zDCCyBE2q1n5hzZlfE0w==}
+  '@effect/vitest@4.1.4':
+    resolution: {integrity: sha512-AKpZ6zKihCRhY7hDbiQ2yp/krw+afIkxDRjFMwwzMiyhd0iYk0WaHa9J6GGC7TUF/C7HP2dZyMVq5xC0Qm/2/g==}
     peerDependencies:
-      effect: ^4.1.2
+      effect: ^4.1.4
       vitest: '>=5.0.0 <6.0.0'
 
   '@emnapi/core@1.11.0':
@@ -6909,8 +6924,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  effect@4.1.2:
-    resolution: {integrity: sha512-d3Oah1WyKxFLFh19yWheS5IXIVaITzxZ71JkE1rkUozq/6EcJSU5nPk5bF2QrSygZ3SQoiNQB8TsxFriyMeMaQ==}
+  effect@4.1.4:
+    resolution: {integrity: sha512-Tgrv/9FN+TZYyOn8XSli+fVqAfwDrDAkiX5Uu9vztINb675VTQdhD0gWI5Kzvhlh9QqzjZvw72iugqw5pwoghQ==}
 
   ejs@5.0.1:
     resolution: {integrity: sha512-COqBPFMxuPTPspXl2DkVYaDS3HtrD1GpzOGkNTJ1IYkifq/r9h8SVEFrjA3D9/VJGOEoMQcrlhpntcSUrM8k6A==}
@@ -9430,6 +9445,10 @@ packages:
     resolution: {integrity: sha512-+fdndUTwBP86cVjihTp21hZHo7d6oj1c/47XPA3lL8mM0XHs+C4EkcjmgRsFnFk2f/UONGDy9ItBItmXsLOQHw==}
     engines: {node: '>=22.19.0'}
 
+  undici@8.12.4:
+    resolution: {integrity: sha512-8Mx+uNKKER2bA4AdtedkqRbwUCIJFr2nJckXRe5yrDqzePqwLP7VNcctN8/XdmDSbF7mS+jJKIszlL+vbam1VA==}
+    engines: {node: '>=22.19.0'}
+
   unenv@2.0.0-rc.24:
     resolution: {integrity: sha512-i7qRCmY42zmCwnYlh9H2SvLEypEFGye5iRmEMKjcGi7zk9UquigRjFtTLz0TYqr0ZGLZhaMHl/foy1bZR+Cwlw==}
 
@@ -11125,32 +11144,32 @@ snapshots:
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
-  '@effect/ai-openai-compat@4.1.2(effect@4.1.2)':
+  '@effect/ai-openai-compat@4.1.4(effect@4.1.4)':
     dependencies:
-      effect: 4.1.2
+      effect: 4.1.4
 
-  '@effect/platform-node-shared@4.1.2(effect@4.1.2)':
+  '@effect/platform-node-shared@4.1.4(effect@4.1.4)':
     dependencies:
       '@types/ws': 8.18.2
-      effect: 4.1.2
+      effect: 4.1.4
       ws: 8.22.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.1.2(effect@4.1.2)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))':
+  '@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0))':
     dependencies:
-      '@effect/platform-node-shared': 4.1.2(effect@4.1.2)
-      effect: 4.1.2
+      '@effect/platform-node-shared': 4.1.4(effect@4.1.4)
+      effect: 4.1.4
       redis: 6.3.0(@node-rs/xxhash@1.7.8)(@opentelemetry/api@1.10.0)
-      undici: 8.12.3
+      undici: 8.12.4
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.1.2(effect@4.1.2)(vitest@5.0.5)':
+  '@effect/vitest@4.1.4(effect@4.1.4)(vitest@5.0.5)':
     dependencies:
-      effect: 4.1.2
+      effect: 4.1.4
       vitest: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(@vitest/browser-playwright@5.0.5)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(jsdom@30.1.3)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
 
   '@emnapi/core@1.11.0':
@@ -15818,7 +15837,7 @@ snapshots:
 
   ee-first@1.1.1: {}
 
-  effect@4.1.2: {}
+  effect@4.1.4: {}
 
   ejs@5.0.1: {}
 
@@ -18936,6 +18955,8 @@ snapshots:
   undici@7.30.1: {}
 
   undici@8.12.3: {}
+
+  undici@8.12.4: {}
 
   unenv@2.0.0-rc.24:
     dependencies:

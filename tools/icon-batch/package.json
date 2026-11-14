@@ -10,7 +10,7 @@
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/icon-draw": "workspace:*",
 		"@sketchi/observability": "workspace:*",
-		"effect": "4.1.2",
+		"effect": "catalog:",
 		"linkedom": "0.18.14"
 	}
 }

@@ -14,7 +14,7 @@
 	},
 	"dependencies": {
 		"@sketchi/observability": "workspace:*",
-		"effect": "4.1.2",
+		"effect": "catalog:",
 		"nanoid": "^6.0.2"
 	}
 }
