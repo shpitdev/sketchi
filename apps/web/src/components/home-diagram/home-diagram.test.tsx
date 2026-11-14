@@ -1,19 +1,21 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { HomeDiagram } from "./home-diagram";
 import { HOME_DIAGRAM } from "./home-diagram-data";
 
-const editor = vi.hoisted(() => ({ mounts: 0 }));
+const editor = vi.hoisted(() => ({ loads: 0, mounts: 0, ready: Promise.withResolvers<void>() }));
 
 // diagram-ui's loader sets Excalidraw's asset path and imports it; this stands in for both.
 vi.mock("@sketchi/diagram-ui", () => ({
 	createFoldedRouteRelease: () => () => undefined,
-	loadExcalidraw: () => {
-		return Promise.resolve({
+	loadExcalidraw: async () => {
+		editor.loads += 1;
+		await editor.ready.promise;
+		return {
 			mutateElement: () => undefined,
 			Excalidraw: ({
 				initialData,
@@ -31,12 +33,18 @@ vi.mock("@sketchi/diagram-ui", () => ({
 					</div>
 				);
 			},
-		});
+		};
 	},
 }));
 
 const media = (file: string) =>
 	readFileSync(resolve(process.cwd(), "apps/web/public/media", file), "utf8");
+
+beforeAll(async () => {
+	// Initialize the mock before the component's parallel imports. The editor
+	// loader stays pending until the test releases it after Edit.
+	await vi.importMock("@sketchi/diagram-ui");
+});
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -104,15 +112,31 @@ describe("HomeDiagram", () => {
 
 	it("swaps in Excalidraw on the same scene, and Reset starts it over", async () => {
 		const scene = JSON.parse(media("home-diagram.excalidraw")) as { elements: unknown[] };
-		const fetch = vi.fn(() => Promise.resolve(Response.json(scene)));
+		const response = Promise.withResolvers<Response>();
+		const fetch = vi.fn(() => response.promise);
 		vi.stubGlobal("fetch", fetch);
 		render(<HomeDiagram />);
 
+		const loads = editor.loads;
 		const button = screen.getByRole("button", { name: "Edit diagram" });
 		button.focus();
 		fireEvent.click(button);
 
-		const canvas = await screen.findByTestId("editor");
+		expect(screen.getByRole("figure").getAttribute("aria-busy")).toBe("true");
+		expect(screen.queryByTestId("editor")).toBeNull();
+		expect(screen.getByRole("img", { name: HOME_DIAGRAM.alt })).toBeDefined();
+		await act(async () => {
+			response.resolve(Response.json(scene));
+			await vi.dynamicImportSettled();
+		});
+		expect(editor.loads).toBe(loads + 1);
+		expect(screen.getByRole("figure").getAttribute("aria-busy")).toBe("true");
+		expect(screen.queryByTestId("editor")).toBeNull();
+		await act(async () => {
+			editor.ready.resolve();
+			await vi.dynamicImportSettled();
+		});
+		const canvas = screen.getByTestId("editor");
 		// The same button becomes Reset, so a keyboard user is not dropped back to the page.
 		expect(document.activeElement).toBe(screen.getByRole("button", { name: "Reset diagram" }));
 		expect(fetch).toHaveBeenCalledWith(HOME_DIAGRAM.scene);
