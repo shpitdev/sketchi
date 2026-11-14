@@ -1631,10 +1631,10 @@ function quadrantChartQuality(spec: NormalizedQuadrantChartSpec, threshold: numb
 	};
 }
 
-export class CodeModeArtifactRenderFailed extends Schema.TaggedError<CodeModeArtifactRenderFailed>()(
-	"CodeModeArtifactRenderFailed",
-	{ cause: Schema.Defect(), message: Schema.String },
-) {}
+export class CodeModeArtifactRenderFailed extends Schema.TaggedError<
+	CodeModeArtifactRenderFailed,
+	{ readonly brand: unique symbol }
+>()("CodeModeArtifactRenderFailed", { cause: Schema.Defect(), message: Schema.String }) {}
 
 /** Implementations may retain their own tagged renderer failures. */
 type TaggedArtifactRenderFailure = Pick<CodeModeArtifactRenderFailed, "message"> & {
@@ -1650,10 +1650,10 @@ export interface CodeModeArtifactRenderer<
 	}): Effect.Effect<ArrayBuffer | Uint8Array, E>;
 }
 
-class CodeModeArtifactRendererNotConfigured extends Schema.TaggedError<CodeModeArtifactRendererNotConfigured>()(
-	"CodeModeArtifactRendererNotConfigured",
-	{ message: Schema.String },
-) {}
+class CodeModeArtifactRendererNotConfigured extends Schema.TaggedError<
+	CodeModeArtifactRendererNotConfigured,
+	{ readonly brand: unique symbol }
+>()("CodeModeArtifactRendererNotConfigured", { message: Schema.String }) {}
 
 type ArtifactExportError = CodeModeArtifactRendererNotConfigured | CodeModeArtifactRenderFailed;
 
@@ -1669,36 +1669,39 @@ const FailureContextSchema = Schema.Struct({
 	issues: Schema.Array(Schema.toEncoded(CodeModeIssue)).pipe(Schema.mutable),
 });
 
-class ArtifactExportFailure extends Schema.TaggedError<ArtifactExportFailure>()(
-	"ArtifactExportFailure",
-	{
-		status: Schema.Literals(["export_failed", "limit_exceeded"]),
-		issues: FailureContextSchema.fields.issues,
-	},
-) {}
+class ArtifactExportFailure extends Schema.TaggedError<
+	ArtifactExportFailure,
+	{ readonly brand: unique symbol }
+>()("ArtifactExportFailure", {
+	status: Schema.Literals(["export_failed", "limit_exceeded"]),
+	issues: FailureContextSchema.fields.issues,
+}) {}
 
-class ArtifactStorageFailure extends Schema.TaggedError<ArtifactStorageFailure>()(
-	"ArtifactStorageFailure",
-	{
-		status: Schema.Literal("storage_failed"),
-		cause: Schema.Defect(),
-		issues: FailureContextSchema.fields.issues,
-	},
-) {}
+class ArtifactStorageFailure extends Schema.TaggedError<
+	ArtifactStorageFailure,
+	{ readonly brand: unique symbol }
+>()("ArtifactStorageFailure", {
+	status: Schema.Literal("storage_failed"),
+	cause: Schema.Defect(),
+	issues: FailureContextSchema.fields.issues,
+}) {}
 
 function workflowFailure<
 	const Tag extends string,
 	const Statuses extends readonly string[],
 	C extends { readonly issues: CodeModeIssue[] },
 >(tag: Tag, status: Schema.Literals<Statuses>, context: Schema.Codec<C, unknown>) {
-	class WorkflowFailure extends Schema.TaggedError<WorkflowFailure>()(tag, {
+	class WorkflowFailure extends Schema.TaggedError<
+		WorkflowFailure,
+		{ readonly brand: unique symbol }
+	>()(tag, {
 		message: Schema.String,
 		status,
 		context,
 	}) {
-		constructor(input: { readonly status: Statuses[number]; readonly context: C }) {
+		static new(input: { readonly status: Statuses[number]; readonly context: C }): WorkflowFailure {
 			// Failure context can contain the normalized input that failed validation.
-			super(
+			return WorkflowFailure.make(
 				{
 					...input,
 					message: input.context.issues[0]?.message ?? input.status,
@@ -3298,14 +3301,13 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
 
 	const store = yield* CodeModeArtifactStorage;
 	const manifest = yield* store.readManifest(input.source.artifactId).pipe(
-		Effect.mapError(
-			(error) =>
-				new ApplyDiagramPatchFailure({
-					status: "storage_failed",
-					context: {
-						issues: [storageIssue(error.message, "storage_read_failed")],
-					},
-				}),
+		Effect.mapError((error) =>
+			ApplyDiagramPatchFailure.new({
+				status: "storage_failed",
+				context: {
+					issues: [storageIssue(error.message, "storage_read_failed")],
+				},
+			}),
 		),
 	);
 	if (
@@ -3313,7 +3315,7 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
 		manifest.artifactId !== input.source.artifactId ||
 		!manifest.formats.some((format) => format.format === "scene")
 	) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status: "source_unavailable",
 			context: {
 				issues: [
@@ -3331,7 +3333,7 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
 
 	// A flowchart is changed through its document, so its drawing is never patched.
 	if (manifest.formats.some((format) => format.format === "document")) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status: "unsupported_operation",
 			context: {
 				issues: [
@@ -3348,18 +3350,17 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
 	}
 
 	const artifact = yield* store.read(input.source.artifactId, "scene").pipe(
-		Effect.mapError(
-			(error) =>
-				new ApplyDiagramPatchFailure({
-					status: "storage_failed",
-					context: {
-						issues: [storageIssue(error.message, "storage_read_failed")],
-					},
-				}),
+		Effect.mapError((error) =>
+			ApplyDiagramPatchFailure.new({
+				status: "storage_failed",
+				context: {
+					issues: [storageIssue(error.message, "storage_read_failed")],
+				},
+			}),
 		),
 	);
 	if (!artifact) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status: "source_unavailable",
 			context: {
 				issues: [
@@ -3380,7 +3381,7 @@ const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
 		reportInput: true,
 	})(artifact.data);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status: "source_unavailable",
 			context: {
 				issues: [
@@ -3552,7 +3553,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 ) {
 	const preflightIssues = preflightMindmapInput(input);
 	if (preflightIssues.length > 0) {
-		return yield* new BuildMindmapFailure({
+		return yield* BuildMindmapFailure.new({
 			status: "invalid_mindmap",
 			context: { issues: preflightIssues },
 		});
@@ -3563,7 +3564,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildMindmapFailure({
+		return yield* BuildMindmapFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -3583,7 +3584,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 	};
 	const validationIssues = validateNormalizedMindmap(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildMindmapFailure({
+		return yield* BuildMindmapFailure.new({
 			status: "invalid_mindmap",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -3592,7 +3593,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 	const diagram = yield* Effect.try({
 		try: () => toMindmapDiagram(normalizedSpec),
 		catch: (cause) =>
-			new BuildMindmapFailure({
+			BuildMindmapFailure.new({
 				status: "invalid_mindmap",
 				context: {
 					...baseContext,
@@ -3614,7 +3615,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildMindmapFailure({
+		return yield* BuildMindmapFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -3623,7 +3624,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 	const scene = yield* Effect.try({
 		try: () => renderMindmapDiagram(diagram),
 		catch: (cause) =>
-			new BuildMindmapFailure({
+			BuildMindmapFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -3647,20 +3648,19 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildMindmapFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed"
-							? exportContext
-							: {
-									...qualityContext,
-									partial: { diagramId: scene.diagramId },
-								}),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildMindmapFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed"
+						? exportContext
+						: {
+								...qualityContext,
+								partial: { diagramId: scene.diagramId },
+							}),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -3684,7 +3684,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildSequenceDiagramFailure({
+		return yield* BuildSequenceDiagramFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -3716,7 +3716,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	};
 	const validationIssues = validateNormalizedSequenceDiagram(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildSequenceDiagramFailure({
+		return yield* BuildSequenceDiagramFailure.new({
 			status: "invalid_sequence",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -3728,7 +3728,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildSequenceDiagramFailure({
+		return yield* BuildSequenceDiagramFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -3737,7 +3737,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	const renderedScene = yield* Effect.try({
 		try: () => renderSequenceDiagram(toSequenceDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildSequenceDiagramFailure({
+			BuildSequenceDiagramFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -3758,7 +3758,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 	const scene = embedded.scene;
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildSequenceDiagramFailure({
+		return yield* BuildSequenceDiagramFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -3777,15 +3777,14 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildSequenceDiagramFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildSequenceDiagramFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -3809,7 +3808,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 		reportInput: true,
 	})(resolveStateMachineRequest(input));
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildStateMachineFailure({
+		return yield* BuildStateMachineFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -3836,7 +3835,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 	};
 	const validationIssues = validateNormalizedStateMachine(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildStateMachineFailure({
+		return yield* BuildStateMachineFailure.new({
 			status: "invalid_state_machine",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -3848,7 +3847,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildStateMachineFailure({
+		return yield* BuildStateMachineFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -3857,7 +3856,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 	const scene = yield* Effect.try({
 		try: () => renderStateMachineDiagram(toStateMachineDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildStateMachineFailure({
+			BuildStateMachineFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -3876,7 +3875,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 	}).pipe(Effect.withSpan("codeMode.buildStateMachine.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildStateMachineFailure({
+		return yield* BuildStateMachineFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -3895,15 +3894,14 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildStateMachineFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildStateMachineFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -3927,7 +3925,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 		reportInput: true,
 	})(resolveErRequest(input));
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildErDiagramFailure({
+		return yield* BuildErDiagramFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -3946,7 +3944,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 	};
 	const validationIssues = validateNormalizedEr(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildErDiagramFailure({
+		return yield* BuildErDiagramFailure.new({
 			status: "invalid_er_diagram",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -3958,7 +3956,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildErDiagramFailure({
+		return yield* BuildErDiagramFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -3967,7 +3965,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 	const scene = yield* Effect.try({
 		try: () => renderErDiagram(toErDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildErDiagramFailure({
+			BuildErDiagramFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -3985,7 +3983,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 	}).pipe(Effect.withSpan("codeMode.buildErDiagram.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildErDiagramFailure({
+		return yield* BuildErDiagramFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -4004,15 +4002,14 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildErDiagramFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildErDiagramFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -4036,7 +4033,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 		reportInput: true,
 	})(resolveClassRequest(input));
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildClassDiagramFailure({
+		return yield* BuildClassDiagramFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -4055,7 +4052,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 	};
 	const validationIssues = validateNormalizedClass(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildClassDiagramFailure({
+		return yield* BuildClassDiagramFailure.new({
 			status: "invalid_class_diagram",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -4067,7 +4064,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildClassDiagramFailure({
+		return yield* BuildClassDiagramFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -4076,7 +4073,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 	const scene = yield* Effect.try({
 		try: () => renderClassDiagram(toClassDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildClassDiagramFailure({
+			BuildClassDiagramFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -4095,7 +4092,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 	}).pipe(Effect.withSpan("codeMode.buildClassDiagram.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildClassDiagramFailure({
+		return yield* BuildClassDiagramFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -4114,15 +4111,14 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildClassDiagramFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildClassDiagramFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -4146,7 +4142,7 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 		reportInput: true,
 	})(resolveOrgChartRequest(input));
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildOrgChartFailure({
+		return yield* BuildOrgChartFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -4165,7 +4161,7 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 	};
 	const validationIssues = validateNormalizedOrgChart(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildOrgChartFailure({
+		return yield* BuildOrgChartFailure.new({
 			status: "invalid_org_chart",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -4177,7 +4173,7 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildOrgChartFailure({
+		return yield* BuildOrgChartFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -4186,7 +4182,7 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 	const scene = yield* Effect.try({
 		try: () => renderOrgChartDiagram(toOrgChartDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildOrgChartFailure({
+			BuildOrgChartFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -4204,7 +4200,7 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 	}).pipe(Effect.withSpan("codeMode.buildOrgChart.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildOrgChartFailure({
+		return yield* BuildOrgChartFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -4223,15 +4219,14 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildOrgChartFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildOrgChartFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -4255,7 +4250,7 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 		reportInput: true,
 	})(resolveVennRequest(input));
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildVennDiagramFailure({
+		return yield* BuildVennDiagramFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -4274,7 +4269,7 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 	};
 	const validationIssues = validateNormalizedVenn(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildVennDiagramFailure({
+		return yield* BuildVennDiagramFailure.new({
 			status: "invalid_venn_diagram",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -4286,7 +4281,7 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildVennDiagramFailure({
+		return yield* BuildVennDiagramFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -4295,7 +4290,7 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 	const scene = yield* Effect.try({
 		try: () => renderVennDiagram(toVennDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildVennDiagramFailure({
+			BuildVennDiagramFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -4314,7 +4309,7 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 	}).pipe(Effect.withSpan("codeMode.buildVennDiagram.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildVennDiagramFailure({
+		return yield* BuildVennDiagramFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -4333,15 +4328,14 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildVennDiagramFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildVennDiagramFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -4365,7 +4359,7 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 		reportInput: true,
 	})(resolveJourneyRequest(input));
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildJourneyMapFailure({
+		return yield* BuildJourneyMapFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -4384,7 +4378,7 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 	};
 	const validationIssues = validateNormalizedJourney(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildJourneyMapFailure({
+		return yield* BuildJourneyMapFailure.new({
 			status: "invalid_journey",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -4396,7 +4390,7 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildJourneyMapFailure({
+		return yield* BuildJourneyMapFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -4405,7 +4399,7 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 	const scene = yield* Effect.try({
 		try: () => renderJourneyDiagram(toJourneyDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildJourneyMapFailure({
+			BuildJourneyMapFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -4424,7 +4418,7 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 	}).pipe(Effect.withSpan("codeMode.buildJourneyMap.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildJourneyMapFailure({
+		return yield* BuildJourneyMapFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -4443,15 +4437,14 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildJourneyMapFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildJourneyMapFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -4473,7 +4466,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 		reportInput: true,
 	})(resolveSankeyRequest(input));
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildSankeyFailure({
+		return yield* BuildSankeyFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -4492,7 +4485,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 	};
 	const validationIssues = validateNormalizedSankey(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildSankeyFailure({
+		return yield* BuildSankeyFailure.new({
 			status: "invalid_sankey",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -4504,7 +4497,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildSankeyFailure({
+		return yield* BuildSankeyFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -4513,7 +4506,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 	const scene = yield* Effect.try({
 		try: () => renderSankeyDiagram(toSankeyDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildSankeyFailure({
+			BuildSankeyFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -4531,7 +4524,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 	}).pipe(Effect.withSpan("codeMode.buildSankey.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildSankeyFailure({
+		return yield* BuildSankeyFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -4546,7 +4539,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 	const layoutIssues = sankeyLayoutIssues(scene);
 	if (layoutIssues.length > 0) {
 		const message = `${layoutIssues.length} labels, values or leaders would overlap another label or cover another flow, so the diagram would not read.`;
-		return yield* new BuildSankeyFailure({
+		return yield* BuildSankeyFailure.new({
 			status: "quality_failed",
 			context: {
 				...baseContext,
@@ -4576,15 +4569,14 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildSankeyFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildSankeyFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -4608,7 +4600,7 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 		reportInput: true,
 	})(resolveWireframeRequest(input));
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildWireframeFailure({
+		return yield* BuildWireframeFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -4627,7 +4619,7 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 	};
 	const validationIssues = validateNormalizedWireframe(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildWireframeFailure({
+		return yield* BuildWireframeFailure.new({
 			status: "invalid_wireframe",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -4639,7 +4631,7 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildWireframeFailure({
+		return yield* BuildWireframeFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -4648,7 +4640,7 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 	const scene = yield* Effect.try({
 		try: () => renderWireframeDiagram(toWireframeDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildWireframeFailure({
+			BuildWireframeFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -4666,7 +4658,7 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 	}).pipe(Effect.withSpan("codeMode.buildWireframe.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildWireframeFailure({
+		return yield* BuildWireframeFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -4685,15 +4677,14 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildWireframeFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildWireframeFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -4717,7 +4708,7 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildQuadrantChartFailure({
+		return yield* BuildQuadrantChartFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -4736,7 +4727,7 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 	};
 	const validationIssues = validateNormalizedQuadrantChart(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildQuadrantChartFailure({
+		return yield* BuildQuadrantChartFailure.new({
 			status: "invalid_quadrant_chart",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -4748,7 +4739,7 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildQuadrantChartFailure({
+		return yield* BuildQuadrantChartFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -4759,11 +4750,11 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 		catch: (cause) =>
 			// A chart whose labels cannot all sit clear is rejected with its repair hint, never drawn.
 			cause instanceof QuadrantValidationError
-				? new BuildQuadrantChartFailure({
+				? BuildQuadrantChartFailure.new({
 						status: "invalid_quadrant_chart",
 						context: { ...qualityContext, issues: quadrantIssues(cause.issues) },
 					})
-				: new BuildQuadrantChartFailure({
+				: BuildQuadrantChartFailure.new({
 						status: "render_failed",
 						context: {
 							...qualityContext,
@@ -4784,7 +4775,7 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 	}).pipe(Effect.withSpan("codeMode.buildQuadrantChart.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildQuadrantChartFailure({
+		return yield* BuildQuadrantChartFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -4803,15 +4794,14 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildQuadrantChartFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildQuadrantChartFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -4835,7 +4825,7 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildTimelineFailure({
+		return yield* BuildTimelineFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -4855,7 +4845,7 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 	};
 	const validationIssues = validateNormalizedTimeline(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildTimelineFailure({
+		return yield* BuildTimelineFailure.new({
 			status: "invalid_timeline",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -4867,7 +4857,7 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildTimelineFailure({
+		return yield* BuildTimelineFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -4876,7 +4866,7 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 	const renderedScene = yield* Effect.try({
 		try: () => renderTimelineDiagram(toTimelineDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildTimelineFailure({
+			BuildTimelineFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -4895,7 +4885,7 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 	const scene = renderedScene;
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildTimelineFailure({
+		return yield* BuildTimelineFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -4914,15 +4904,14 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildTimelineFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildTimelineFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -4944,7 +4933,7 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildChartFailure({
+		return yield* BuildChartFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -4964,7 +4953,7 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 	};
 	const validationIssues = validateNormalizedChart(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildChartFailure({
+		return yield* BuildChartFailure.new({
 			status: "invalid_chart",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -4976,7 +4965,7 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildChartFailure({
+		return yield* BuildChartFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -4985,7 +4974,7 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 	const scene = yield* Effect.try({
 		try: () => renderChartDiagram(toChartDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildChartFailure({
+			BuildChartFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -5003,7 +4992,7 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 	}).pipe(Effect.withSpan("codeMode.buildChart.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildChartFailure({
+		return yield* BuildChartFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -5022,15 +5011,14 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildChartFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildChartFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -5052,7 +5040,7 @@ const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildGanttFailure({
+		return yield* BuildGanttFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -5072,7 +5060,7 @@ const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (
 	};
 	const validationIssues = validateNormalizedGantt(normalizedSpec);
 	if (validationIssues.length > 0) {
-		return yield* new BuildGanttFailure({
+		return yield* BuildGanttFailure.new({
 			status: "invalid_gantt",
 			context: { ...baseContext, issues: validationIssues },
 		});
@@ -5084,7 +5072,7 @@ const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildGanttFailure({
+		return yield* BuildGanttFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -5093,7 +5081,7 @@ const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (
 	const scene = yield* Effect.try({
 		try: () => renderGanttDiagram(toGanttDiagram(normalizedSpec)),
 		catch: (cause) =>
-			new BuildGanttFailure({
+			BuildGanttFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -5111,7 +5099,7 @@ const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (
 	}).pipe(Effect.withSpan("codeMode.buildGantt.render"));
 	const canvasIssues = getCanvasValidationIssues(scene);
 	if (canvasIssues.length > 0) {
-		return yield* new BuildGanttFailure({
+		return yield* BuildGanttFailure.new({
 			status: canvasFailureStatus(canvasIssues),
 			context: {
 				...qualityContext,
@@ -5130,15 +5118,14 @@ const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildGanttFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildGanttFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -5205,7 +5192,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 	if (rawInput) {
 		const rawIssue = yield* serializedCanvasLimitIssue(rawInput.spec, "spec");
 		if (rawIssue) {
-			return yield* new CreateCanvasFailure({
+			return yield* CreateCanvasFailure.new({
 				status: rawIssue.code === "canvas_limit_exceeded" ? "limit_exceeded" : "invalid_input",
 				context: {
 					buildId,
@@ -5220,7 +5207,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new CreateCanvasFailure({
+		return yield* CreateCanvasFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -5235,7 +5222,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 	};
 	const normalized = normalizePatchableScene(request.spec);
 	if (!normalized) {
-		return yield* new CreateCanvasFailure({
+		return yield* CreateCanvasFailure.new({
 			status: "invalid_canvas",
 			context: {
 				...baseContext,
@@ -5256,7 +5243,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 		(entry) => entry.code === "limit_exceeded",
 	);
 	if (inputLimits.length > 0) {
-		return yield* new CreateCanvasFailure({
+		return yield* CreateCanvasFailure.new({
 			status: "limit_exceeded",
 			context: {
 				...baseContext,
@@ -5277,7 +5264,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 	const validationIssues = getCanvasValidationIssues(scene);
 	if (validationIssues.length > 0) {
 		const issues = canvasValidationIssues(validationIssues);
-		return yield* new CreateCanvasFailure({
+		return yield* CreateCanvasFailure.new({
 			status: issues.some((entry) => entry.code === "canvas_limit_exceeded")
 				? "limit_exceeded"
 				: "invalid_canvas",
@@ -5301,15 +5288,14 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 		...(request.requestId ? { requestId: request.requestId } : {}),
 		validationIssues: canvasExportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new CreateCanvasFailure({
-					status: error.status,
-					context: {
-						...exportContext,
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			CreateCanvasFailure.new({
+				status: error.status,
+				context: {
+					...exportContext,
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -5347,7 +5333,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 		reportInput: true,
 	})(requestBesideSpec(input));
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildFlowchartFailure({
+		return yield* BuildFlowchartFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -5362,7 +5348,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	const buildId = yield* Effect.sync(() => environment.createId("build"));
 	const normalized = normalizeFlowchartSpec(request.spec);
 	if (!normalized.ok) {
-		return yield* new BuildFlowchartFailure({
+		return yield* BuildFlowchartFailure.new({
 			status: "invalid_flowchart",
 			context: {
 				buildId,
@@ -5380,7 +5366,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	// Cleaning can empty a string the request held, so the cleaned document is checked again.
 	const cleaned = decodeFlowchartDocument(authoredSpec);
 	if (!Result.isSuccess(cleaned)) {
-		return yield* new BuildFlowchartFailure({
+		return yield* BuildFlowchartFailure.new({
 			status: "invalid_flowchart",
 			context: {
 				buildId,
@@ -5412,7 +5398,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	};
 	const built = flowchartDiagramFromDocument(normalizedSpec, { nodeIcons: logos.icons });
 	if (!built.ok) {
-		return yield* new BuildFlowchartFailure({
+		return yield* BuildFlowchartFailure.new({
 			// A document past the size limits answers as a limit, as an oversized canvas does.
 			status: built.issues.some((entry) => entry.code === "flowchart_too_large")
 				? "limit_exceeded"
@@ -5444,7 +5430,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 				})
 			: built;
 	if (!rebuilt.ok) {
-		return yield* new BuildFlowchartFailure({
+		return yield* BuildFlowchartFailure.new({
 			status: "invalid_flowchart",
 			context: { ...baseContext, issues: flowchartDocumentIssues(rebuilt.issues) },
 		});
@@ -5457,7 +5443,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	);
 	const qualityContext = { ...baseContext, quality };
 	if (!quality.accepted) {
-		return yield* new BuildFlowchartFailure({
+		return yield* BuildFlowchartFailure.new({
 			status: "quality_failed",
 			context: { ...qualityContext, issues: qualityIssues(quality) },
 		});
@@ -5466,7 +5452,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 	const renderedScene = yield* Effect.try({
 		try: () => renderIntermediateDiagram(diagram),
 		catch: (cause) =>
-			new BuildFlowchartFailure({
+			BuildFlowchartFailure.new({
 				status: "render_failed",
 				context: {
 					...qualityContext,
@@ -5499,15 +5485,14 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 		document: { type: "flowchart", spec: authoredSpec },
 		validationIssues: exportIssues,
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new BuildFlowchartFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : qualityContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			BuildFlowchartFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -5544,7 +5529,7 @@ const storedFlowchartDocument = Effect.fn("codeMode.editFlowchart.readDocument")
 ) {
 	const store = yield* CodeModeArtifactStorage;
 	const readFailure = (error: CodeModeArtifactStorageError) =>
-		new BuildFlowchartFailure({
+		BuildFlowchartFailure.new({
 			status: "storage_failed",
 			context: { issues: [storageFailureIssue(error, "storage_read_failed")] },
 		});
@@ -5556,7 +5541,7 @@ const storedFlowchartDocument = Effect.fn("codeMode.editFlowchart.readDocument")
 	const manifest = stored
 		? undefined
 		: yield* store.readManifest(artifactId).pipe(Effect.mapError(readFailure));
-	return yield* new EditFlowchartFailure({
+	return yield* EditFlowchartFailure.new({
 		status: "not_found",
 		context: {
 			issues: [
@@ -5587,7 +5572,7 @@ const editFlowchartWorkflow = Effect.fn("codeMode.editFlowchart.workflow")(funct
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new BuildFlowchartFailure({
+		return yield* BuildFlowchartFailure.new({
 			status: "invalid_input",
 			context: { issues: inputIssues(formatContractSchemaError(parsed.failure)) },
 		});
@@ -5596,7 +5581,7 @@ const editFlowchartWorkflow = Effect.fn("codeMode.editFlowchart.workflow")(funct
 	const document = yield* storedFlowchartDocument(request.artifactId);
 	const edited = applyFlowchartEdits(document, request.edits);
 	if (!edited.ok) {
-		return yield* new EditFlowchartFailure({
+		return yield* EditFlowchartFailure.new({
 			status: "invalid_edit",
 			context: {
 				...responseRequestId(request.requestId),
@@ -5645,7 +5630,7 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function*
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new GetArtifactFailure({
+		return yield* GetArtifactFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -5657,18 +5642,17 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function*
 	const store = yield* CodeModeArtifactStorage;
 	const request = parsed.success;
 	const manifest = yield* store.readManifest(request.artifactId).pipe(
-		Effect.mapError(
-			(error) =>
-				new GetArtifactFailure({
-					status: "storage_failed",
-					context: {
-						issues: [storageFailureIssue(error, "storage_read_failed")],
-					},
-				}),
+		Effect.mapError((error) =>
+			GetArtifactFailure.new({
+				status: "storage_failed",
+				context: {
+					issues: [storageFailureIssue(error, "storage_read_failed")],
+				},
+			}),
 		),
 	);
 	if (!manifest) {
-		return yield* new GetArtifactFailure({
+		return yield* GetArtifactFailure.new({
 			status: "not_found",
 			context: {
 				issues: [
@@ -5686,7 +5670,7 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function*
 
 	const format = request.format ?? "scene";
 	if (!manifest.formats.some((entry) => entry.format === format)) {
-		return yield* new GetArtifactFailure({
+		return yield* GetArtifactFailure.new({
 			status: "format_unavailable",
 			context: {
 				issues: [
@@ -5703,18 +5687,17 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function*
 	}
 
 	const artifact = yield* store.read(request.artifactId, format).pipe(
-		Effect.mapError(
-			(error) =>
-				new GetArtifactFailure({
-					status: "storage_failed",
-					context: {
-						issues: [storageFailureIssue(error, "storage_read_failed")],
-					},
-				}),
+		Effect.mapError((error) =>
+			GetArtifactFailure.new({
+				status: "storage_failed",
+				context: {
+					issues: [storageFailureIssue(error, "storage_read_failed")],
+				},
+			}),
 		),
 	);
 	if (!artifact) {
-		return yield* new GetArtifactFailure({
+		return yield* GetArtifactFailure.new({
 			status: "format_unavailable",
 			context: {
 				issues: [
@@ -5761,7 +5744,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 		? yield* serializedCanvasLimitIssue(raw.success.source.scene, "source.scene")
 		: undefined;
 	if (rawIssue) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status: "invalid_input",
 			context: { issues: [rawIssue] },
 		});
@@ -5771,7 +5754,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),
@@ -5789,12 +5772,11 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 	};
 
 	const source = yield* resolvePatchSource(request).pipe(
-		Effect.mapError(
-			(error) =>
-				new ApplyDiagramPatchFailure({
-					status: error.status,
-					context: { ...baseContext, ...error.context },
-				}),
+		Effect.mapError((error) =>
+			ApplyDiagramPatchFailure.new({
+				status: error.status,
+				context: { ...baseContext, ...error.context },
+			}),
 		),
 	);
 	const sourceContext = {
@@ -5821,7 +5803,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 			: [];
 	}
 	if (sourceLimits.length > 0) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status: "invalid_input",
 			context: {
 				...sourceContext,
@@ -5836,7 +5818,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 		if (patchIssues.length > 0) break;
 	}
 	if (patchIssues.length > 0) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status:
 				patchIssues[0]?.code === "unknown_patch_target"
 					? "target_not_found"
@@ -5848,7 +5830,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 	if (request.options?.preserveConnectivity !== false) {
 		const afterConnectivity = sourceConnectivity(scene);
 		if (!sameConnectivity(beforeConnectivity, afterConnectivity)) {
-			return yield* new ApplyDiagramPatchFailure({
+			return yield* ApplyDiagramPatchFailure.new({
 				status: "connectivity_changed",
 				context: {
 					...sourceContext,
@@ -5868,7 +5850,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 
 	const renderedScene = normalizePatchableScene(scene);
 	if (!renderedScene) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status: "render_failed",
 			context: {
 				...sourceContext,
@@ -5892,7 +5874,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 	const patchedScene = embedded.scene;
 	const structuralIssues = getCanvasValidationIssues(patchedScene);
 	if (structuralIssues.length > 0) {
-		return yield* new ApplyDiagramPatchFailure({
+		return yield* ApplyDiagramPatchFailure.new({
 			status: canvasFailureStatus(structuralIssues),
 			context: {
 				...sourceContext,
@@ -5916,15 +5898,14 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 			? { provenance: { sourceArtifactId: source.sourceArtifactId } }
 			: {}),
 	}).pipe(
-		Effect.mapError(
-			(error) =>
-				new ApplyDiagramPatchFailure({
-					status: error.status,
-					context: {
-						...(error.status === "export_failed" ? exportContext : sourceContext),
-						issues: error.issues,
-					},
-				}),
+		Effect.mapError((error) =>
+			ApplyDiagramPatchFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : sourceContext),
+					issues: error.issues,
+				},
+			}),
 		),
 	);
 
@@ -5998,7 +5979,7 @@ const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(function*
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* new SearchIconsFailure({
+		return yield* SearchIconsFailure.new({
 			status: "invalid_input",
 			context: {
 				issues: inputIssues(formatContractSchemaError(parsed.failure)),

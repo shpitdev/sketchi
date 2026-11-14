@@ -35,14 +35,14 @@ export interface ArtifactWriteInput {
 
 const ArtifactStorageOperationSchema = Schema.Literals(["read", "readManifest", "write"]);
 
-export class CodeModeArtifactStorageError extends Schema.TaggedError<CodeModeArtifactStorageError>()(
-	"CodeModeArtifactStorageError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		operation: ArtifactStorageOperationSchema,
-	},
-) {}
+export class CodeModeArtifactStorageError extends Schema.TaggedError<
+	CodeModeArtifactStorageError,
+	{ readonly brand: unique symbol }
+>()("CodeModeArtifactStorageError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+	operation: ArtifactStorageOperationSchema,
+}) {}
 
 export interface CodeModeArtifactStorageShape {
 	readonly read: (

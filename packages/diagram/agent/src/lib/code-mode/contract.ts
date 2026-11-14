@@ -35,31 +35,30 @@ import {
 
 import { cleanToolString } from "../clean-tool-string.js";
 
-export class ContractSchemaIssue extends Schema.Class<ContractSchemaIssue>("ContractSchemaIssue")(
-	{
-		code: stringLiteral("custom"),
-		issueTag: Schema.Literals([
-			"Filter",
-			"InvalidType",
-			"InvalidValue",
-			"MissingKey",
-			"UnexpectedKey",
-			"Forbidden",
-			"OneOf",
-			"AnyOf",
-		]),
-		astKind: Schema.optionalKey(Schema.String),
-		missingKeyCode: Schema.optionalKey(Schema.Literal("invalid_type")),
-		message: Schema.String,
-		path: Schema.Array(Schema.PropertyKey),
-	},
-	{ identifier: undefined },
-) {}
+export const ContractSchemaIssue = Schema.Struct({
+	code: stringLiteral("custom"),
+	issueTag: Schema.Literals([
+		"Filter",
+		"InvalidType",
+		"InvalidValue",
+		"MissingKey",
+		"UnexpectedKey",
+		"Forbidden",
+		"OneOf",
+		"AnyOf",
+	]),
+	astKind: Schema.optionalKey(Schema.String),
+	missingKeyCode: Schema.optionalKey(Schema.Literal("invalid_type")),
+	message: Schema.String,
+	path: Schema.Array(Schema.PropertyKey),
+}).annotate({ identifier: undefined });
 
-export class ContractSchemaError extends Schema.TaggedError<ContractSchemaError>()(
-	"ContractSchemaError",
-	{ issues: Schema.Array(Schema.toEncoded(ContractSchemaIssue)) },
-) {}
+export interface ContractSchemaIssue extends Schema.Schema.Type<typeof ContractSchemaIssue> {}
+
+export class ContractSchemaError extends Schema.TaggedError<
+	ContractSchemaError,
+	{ readonly brand: unique symbol }
+>()("ContractSchemaError", { issues: Schema.Array(Schema.toEncoded(ContractSchemaIssue)) }) {}
 
 function actualType(value: unknown): string {
 	if (value === null) return "null";
@@ -380,12 +379,11 @@ export const InlineArtifactFormatSchema = Object.assign(literals(INLINE_ARTIFACT
 export type ArtifactFormat = typeof ArtifactFormatSchema.Type;
 export type InlineArtifactFormat = typeof InlineArtifactFormatSchema.Type;
 
-export class ArtifactProvenance extends Schema.Class<ArtifactProvenance>("ArtifactProvenance")(
-	{
-		sourceArtifactId: RequiredNonEmptyString.pipe(Schema.mutableKey),
-	},
-	{ identifier: undefined },
-) {}
+export const ArtifactProvenance = Schema.Struct({
+	sourceArtifactId: RequiredNonEmptyString.pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface ArtifactProvenance extends Schema.Schema.Type<typeof ArtifactProvenance> {}
 
 export const CODE_MODE_ISSUE_CODES = [
 	"missing_field",
@@ -549,27 +547,25 @@ const CodeModeIssueStageSchema = literals([
 	"coverage",
 ]);
 
-export class CodeModeIssueRef extends Schema.Class<CodeModeIssueRef>("CodeModeIssueRef")(
-	{
-		kind: CodeModeIssueKindSchema,
-		id: optionalContract(NonEmptyString),
-		path: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export const CodeModeIssueRef = Schema.Struct({
+	kind: CodeModeIssueKindSchema,
+	id: optionalContract(NonEmptyString),
+	path: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
 
-export class CodeModeIssue extends Schema.Class<CodeModeIssue>("CodeModeIssue")(
-	{
-		code: CodeModeIssueCodeSchema,
-		/** info notes report what a build did for the caller; nothing to fix. */
-		severity: literals(["error", "warning", "info"]),
-		stage: CodeModeIssueStageSchema,
-		ref: optionalContract(CodeModeIssueRef),
-		message: RequiredNonEmptyString,
-		hint: RequiredNonEmptyString,
-	},
-	{ identifier: undefined },
-) {}
+export interface CodeModeIssueRef extends Schema.Schema.Type<typeof CodeModeIssueRef> {}
+
+export const CodeModeIssue = Schema.Struct({
+	code: CodeModeIssueCodeSchema,
+	/** info notes report what a build did for the caller; nothing to fix. */
+	severity: literals(["error", "warning", "info"]),
+	stage: CodeModeIssueStageSchema,
+	ref: optionalContract(CodeModeIssueRef),
+	message: RequiredNonEmptyString,
+	hint: RequiredNonEmptyString,
+}).annotate({ identifier: undefined });
+
+export interface CodeModeIssue extends Schema.Schema.Type<typeof CodeModeIssue> {}
 
 export const FLOWCHART_NODE_KINDS = ["start", "process", "decision", "end"] as const;
 export const FlowchartNodeKindSchema = Object.assign(literals(FLOWCHART_NODE_KINDS), {
@@ -609,13 +605,12 @@ const IconSlugInput = requiredString(
  * sketchi.drawIcon returns, or any name and recipe). Unknown slugs and
  * undrawable recipes are dropped with a warning.
  */
-export class NodeIconSpec extends Schema.Class<NodeIconSpec>("NodeIconSpec")(
-	{
-		slug: optionalContract(IconSlugInput),
-		...DrawnIconSchema.fields,
-	},
-	{ identifier: undefined },
-) {}
+export const NodeIconSpec = Schema.Struct({
+	slug: optionalContract(IconSlugInput),
+	...DrawnIconSchema.fields,
+}).annotate({ identifier: undefined });
+
+export interface NodeIconSpec extends Schema.Schema.Type<typeof NodeIconSpec> {}
 
 const defaultAccentColor = SKETCHI_DIAGRAM_STYLE.accentColor;
 const DefaultAccentColor = hexColor(defaultAccentColor).pipe(
@@ -627,13 +622,12 @@ const DefaultBackgroundColor = hexColor(defaultBackgroundColor).pipe(
 );
 
 /** The fixed Sketchi palette a spec may still carry; builds always draw it. */
-export class DiagramSpecStyle extends Schema.Class<DiagramSpecStyle>("DiagramSpecStyle")(
-	{
-		accentColor: DefaultAccentColor,
-		backgroundColor: DefaultBackgroundColor,
-	},
-	{ identifier: undefined },
-) {}
+export const DiagramSpecStyle = Schema.Struct({
+	accentColor: DefaultAccentColor,
+	backgroundColor: DefaultBackgroundColor,
+}).annotate({ identifier: undefined });
+
+export interface DiagramSpecStyle extends Schema.Schema.Type<typeof DiagramSpecStyle> {}
 
 const diagramStyleDefault = {
 	accentColor: SKETCHI_DIAGRAM_STYLE.accentColor,
@@ -658,236 +652,220 @@ export type FlowchartSpec = FlowchartDocument;
  * are optional and style is defaulted. buildSequenceDiagram normalizes it into
  * the core contract, which owns every sequence invariant.
  */
-export class SequenceParticipantSpec extends Schema.Class<SequenceParticipantSpec>(
-	"SequenceParticipantSpec",
-)(
-	{
-		id: RequiredNonEmptyString,
-		label: RequiredNonEmptyString,
-		kind: optionalContract(NonEmptyString),
-		icon: optionalContract(NodeIconSpec),
-	},
-	{ identifier: undefined },
-) {}
+export const SequenceParticipantSpec = Schema.Struct({
+	id: RequiredNonEmptyString,
+	label: RequiredNonEmptyString,
+	kind: optionalContract(NonEmptyString),
+	icon: optionalContract(NodeIconSpec),
+}).annotate({ identifier: undefined });
 
-export class SequenceMessageSpec extends Schema.Class<SequenceMessageSpec>("SequenceMessageSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		source: RequiredNonEmptyString,
-		target: RequiredNonEmptyString,
-		label: RequiredNonEmptyString,
-		type: optionalContract(literals(SEQUENCE_MESSAGE_TYPES)),
-		style: optionalContract(literals(SEQUENCE_MESSAGE_STYLES)),
-	},
-	{ identifier: undefined },
-) {}
+export interface SequenceParticipantSpec extends Schema.Schema.Type<
+	typeof SequenceParticipantSpec
+> {}
+
+export const SequenceMessageSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	source: RequiredNonEmptyString,
+	target: RequiredNonEmptyString,
+	label: RequiredNonEmptyString,
+	type: optionalContract(literals(SEQUENCE_MESSAGE_TYPES)),
+	style: optionalContract(literals(SEQUENCE_MESSAGE_STYLES)),
+}).annotate({ identifier: undefined });
+
+export interface SequenceMessageSpec extends Schema.Schema.Type<typeof SequenceMessageSpec> {}
 
 const sequenceMessagesDefault: Array<typeof SequenceMessageSpec.Encoded> = [];
 const SequenceMessagesWithDefault = Schema.Array(SequenceMessageSpec)
 	.pipe(Schema.mutable)
 	.annotate({ default: sequenceMessagesDefault })
 	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(sequenceMessagesDefault)));
-export class SequenceDiagramSpec extends Schema.Class<SequenceDiagramSpec>("SequenceDiagramSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		participants: requiredArray(nonEmptyArray(SequenceParticipantSpec)),
-		messages: SequenceMessagesWithDefault,
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const SequenceDiagramSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	participants: requiredArray(nonEmptyArray(SequenceParticipantSpec)),
+	messages: SequenceMessagesWithDefault,
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface SequenceDiagramSpec extends Schema.Schema.Type<typeof SequenceDiagramSpec> {}
 
 /** Author semantic points only; layout and date ordering belong to the renderer. */
-export class TimelineEventSpec extends Schema.Class<TimelineEventSpec>("TimelineEventSpec")(
-	{
-		id: RequiredNonEmptyString,
-		label: RequiredNonEmptyString,
-		date: optionalContract(NonEmptyString),
-		end: optionalContract(NonEmptyString),
-		order: optionalContract(FiniteNumber),
-		kind: optionalContract(literals(TIMELINE_EVENT_KINDS)),
-		lane: optionalContract(NonEmptyString),
-		description: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
-export class TimelineSpec extends Schema.Class<TimelineSpec>("TimelineSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		events: requiredArray(nonEmptyArray(TimelineEventSpec)),
-		lanes: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		today: optionalContract(NonEmptyString),
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const TimelineEventSpec = Schema.Struct({
+	id: RequiredNonEmptyString,
+	label: RequiredNonEmptyString,
+	date: optionalContract(NonEmptyString),
+	end: optionalContract(NonEmptyString),
+	order: optionalContract(FiniteNumber),
+	kind: optionalContract(literals(TIMELINE_EVENT_KINDS)),
+	lane: optionalContract(NonEmptyString),
+	description: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface TimelineEventSpec extends Schema.Schema.Type<typeof TimelineEventSpec> {}
+export const TimelineSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	events: requiredArray(nonEmptyArray(TimelineEventSpec)),
+	lanes: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	today: optionalContract(NonEmptyString),
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface TimelineSpec extends Schema.Schema.Type<typeof TimelineSpec> {}
 
 /** Author categories and values only; scales, ticks and label placement belong to the renderer. */
-export class ChartSeriesSpec extends Schema.Class<ChartSeriesSpec>("ChartSeriesSpec")(
-	{
-		name: optionalContract(NonEmptyString),
-		values: requiredArray(Schema.Array(FiniteNumber).pipe(Schema.mutable)),
-	},
-	{ identifier: undefined },
-) {}
-export class ChartSpec extends Schema.Class<ChartSpec>("ChartSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		kind: literals(CHART_KINDS),
-		categories: requiredArray(nonEmptyArray(NonEmptyString)),
-		series: requiredArray(nonEmptyArray(ChartSeriesSpec)),
-		unit: optionalContract(NonEmptyString),
-		categoryAxisTitle: optionalContract(NonEmptyString),
-		valueAxisTitle: optionalContract(NonEmptyString),
-		stacked: optionalContract(Schema.Boolean),
-		donut: optionalContract(Schema.Boolean),
-		orientation: optionalContract(literals(CHART_ORIENTATIONS)),
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const ChartSeriesSpec = Schema.Struct({
+	name: optionalContract(NonEmptyString),
+	values: requiredArray(Schema.Array(FiniteNumber).pipe(Schema.mutable)),
+}).annotate({ identifier: undefined });
+
+export interface ChartSeriesSpec extends Schema.Schema.Type<typeof ChartSeriesSpec> {}
+export const ChartSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	kind: literals(CHART_KINDS),
+	categories: requiredArray(nonEmptyArray(NonEmptyString)),
+	series: requiredArray(nonEmptyArray(ChartSeriesSpec)),
+	unit: optionalContract(NonEmptyString),
+	categoryAxisTitle: optionalContract(NonEmptyString),
+	valueAxisTitle: optionalContract(NonEmptyString),
+	stacked: optionalContract(Schema.Boolean),
+	donut: optionalContract(Schema.Boolean),
+	orientation: optionalContract(literals(CHART_ORIENTATIONS)),
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface ChartSpec extends Schema.Schema.Type<typeof ChartSpec> {}
 
 /**
  * The authoring form of diagram-core's canonical StateMachineDiagram:
  * transition ids are optional and style is defaulted. buildStateMachine
  * normalizes it into the core contract, which owns every invariant.
  */
-export class StateMachineStateSpec extends Schema.Class<StateMachineStateSpec>(
-	"StateMachineStateSpec",
-)(
-	{
-		id: RequiredNonEmptyString,
-		label: optionalContract(NonEmptyString),
-		kind: optionalContract(literals(STATE_MACHINE_STATE_KINDS)),
-		parent: optionalContract(NonEmptyString),
-		initial: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export const StateMachineStateSpec = Schema.Struct({
+	id: RequiredNonEmptyString,
+	label: optionalContract(NonEmptyString),
+	kind: optionalContract(literals(STATE_MACHINE_STATE_KINDS)),
+	parent: optionalContract(NonEmptyString),
+	initial: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
 
-export class StateMachineTransitionSpec extends Schema.Class<StateMachineTransitionSpec>(
-	"StateMachineTransitionSpec",
-)(
-	{
-		id: optionalContract(NonEmptyString),
-		source: RequiredNonEmptyString,
-		target: RequiredNonEmptyString,
-		event: optionalContract(NonEmptyString),
-		guard: optionalContract(NonEmptyString),
-		action: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export interface StateMachineStateSpec extends Schema.Schema.Type<typeof StateMachineStateSpec> {}
 
-export class StateMachineSpecLayout extends Schema.Class<StateMachineSpecLayout>(
-	"StateMachineSpecLayout",
-)({ direction: literals(STATE_MACHINE_DIRECTIONS) }, { identifier: undefined }) {}
+export const StateMachineTransitionSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	source: RequiredNonEmptyString,
+	target: RequiredNonEmptyString,
+	event: optionalContract(NonEmptyString),
+	guard: optionalContract(NonEmptyString),
+	action: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface StateMachineTransitionSpec extends Schema.Schema.Type<
+	typeof StateMachineTransitionSpec
+> {}
+
+export const StateMachineSpecLayout = Schema.Struct({
+	direction: literals(STATE_MACHINE_DIRECTIONS),
+}).annotate({ identifier: undefined });
+
+export interface StateMachineSpecLayout extends Schema.Schema.Type<typeof StateMachineSpecLayout> {}
 
 const stateMachineTransitionsDefault: Array<typeof StateMachineTransitionSpec.Encoded> = [];
 const StateMachineTransitionsWithDefault = Schema.Array(StateMachineTransitionSpec)
 	.pipe(Schema.mutable)
 	.annotate({ default: stateMachineTransitionsDefault })
 	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(stateMachineTransitionsDefault)));
-export class StateMachineSpec extends Schema.Class<StateMachineSpec>("StateMachineSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		initial: RequiredNonEmptyString,
-		states: requiredArray(nonEmptyArray(StateMachineStateSpec)),
-		transitions: StateMachineTransitionsWithDefault,
-		layout: optionalContract(StateMachineSpecLayout),
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const StateMachineSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	initial: RequiredNonEmptyString,
+	states: requiredArray(nonEmptyArray(StateMachineStateSpec)),
+	transitions: StateMachineTransitionsWithDefault,
+	layout: optionalContract(StateMachineSpecLayout),
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface StateMachineSpec extends Schema.Schema.Type<typeof StateMachineSpec> {}
 
 /** Author dates, durations and dependencies only; the axis, rows and routes belong to the renderer. */
-export class GanttTaskSpec extends Schema.Class<GanttTaskSpec>("GanttTaskSpec")(
-	{
-		id: RequiredNonEmptyString,
-		label: RequiredNonEmptyString,
-		start: RequiredNonEmptyString,
-		end: optionalContract(NonEmptyString),
-		duration: optionalContract(FiniteNumber),
-		milestone: optionalContract(Schema.Boolean),
-		phase: optionalContract(NonEmptyString),
-		dependsOn: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		progress: optionalContract(FiniteNumber),
-	},
-	{ identifier: undefined },
-) {}
-export class GanttSpec extends Schema.Class<GanttSpec>("GanttSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		tasks: requiredArray(nonEmptyArray(GanttTaskSpec)),
-		phases: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		today: optionalContract(NonEmptyString),
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const GanttTaskSpec = Schema.Struct({
+	id: RequiredNonEmptyString,
+	label: RequiredNonEmptyString,
+	start: RequiredNonEmptyString,
+	end: optionalContract(NonEmptyString),
+	duration: optionalContract(FiniteNumber),
+	milestone: optionalContract(Schema.Boolean),
+	phase: optionalContract(NonEmptyString),
+	dependsOn: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	progress: optionalContract(FiniteNumber),
+}).annotate({ identifier: undefined });
+
+export interface GanttTaskSpec extends Schema.Schema.Type<typeof GanttTaskSpec> {}
+export const GanttSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	tasks: requiredArray(nonEmptyArray(GanttTaskSpec)),
+	phases: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	today: optionalContract(NonEmptyString),
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface GanttSpec extends Schema.Schema.Type<typeof GanttSpec> {}
 /**
  * The authoring form of diagram-core's canonical ErDiagram: a field may be one
  * string (`"id uuid PK"`), relationship ids are optional and style is
  * defaulted. buildErDiagram normalizes it into the core contract, which owns
  * every invariant.
  */
-export class ErFieldSpec extends Schema.Class<ErFieldSpec>("ErFieldSpec")(
-	{
-		name: RequiredNonEmptyString,
-		type: optionalContract(NonEmptyString),
-		pk: optionalContract(Schema.Boolean),
-		fk: optionalContract(Schema.Boolean),
-		unique: optionalContract(Schema.Boolean),
-		nullable: optionalContract(Schema.Boolean),
-	},
-	{ identifier: undefined },
-) {}
+export const ErFieldSpec = Schema.Struct({
+	name: RequiredNonEmptyString,
+	type: optionalContract(NonEmptyString),
+	pk: optionalContract(Schema.Boolean),
+	fk: optionalContract(Schema.Boolean),
+	unique: optionalContract(Schema.Boolean),
+	nullable: optionalContract(Schema.Boolean),
+}).annotate({ identifier: undefined });
+
+export interface ErFieldSpec extends Schema.Schema.Type<typeof ErFieldSpec> {}
 
 const erFieldsDefault: Array<string | typeof ErFieldSpec.Encoded> = [];
-export class ErEntitySpec extends Schema.Class<ErEntitySpec>("ErEntitySpec")(
-	{
-		id: RequiredNonEmptyString,
-		name: optionalContract(NonEmptyString),
-		fields: Schema.Array(Schema.Union([NonEmptyString, ErFieldSpec]))
-			.pipe(Schema.mutable)
-			.annotate({ default: erFieldsDefault })
-			.pipe(Schema.withDecodingDefaultKey(Effect.succeed(erFieldsDefault))),
-	},
-	{ identifier: undefined },
-) {}
+export const ErEntitySpec = Schema.Struct({
+	id: RequiredNonEmptyString,
+	name: optionalContract(NonEmptyString),
+	fields: Schema.Array(Schema.Union([NonEmptyString, ErFieldSpec]))
+		.pipe(Schema.mutable)
+		.annotate({ default: erFieldsDefault })
+		.pipe(Schema.withDecodingDefaultKey(Effect.succeed(erFieldsDefault))),
+}).annotate({ identifier: undefined });
 
-export class ErRelationshipSpec extends Schema.Class<ErRelationshipSpec>("ErRelationshipSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		from: RequiredNonEmptyString,
-		to: RequiredNonEmptyString,
-		fromCardinality: literals(ER_CARDINALITIES),
-		toCardinality: literals(ER_CARDINALITIES),
-		label: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export interface ErEntitySpec extends Schema.Schema.Type<typeof ErEntitySpec> {}
+
+export const ErRelationshipSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	from: RequiredNonEmptyString,
+	to: RequiredNonEmptyString,
+	fromCardinality: literals(ER_CARDINALITIES),
+	toCardinality: literals(ER_CARDINALITIES),
+	label: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface ErRelationshipSpec extends Schema.Schema.Type<typeof ErRelationshipSpec> {}
 
 const erRelationshipsDefault: Array<typeof ErRelationshipSpec.Encoded> = [];
 const ErRelationshipsWithDefault = Schema.Array(ErRelationshipSpec)
 	.pipe(Schema.mutable)
 	.annotate({ default: erRelationshipsDefault })
 	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(erRelationshipsDefault)));
-export class ErSpec extends Schema.Class<ErSpec>("ErSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		entities: requiredArray(nonEmptyArray(ErEntitySpec)),
-		relationships: ErRelationshipsWithDefault,
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const ErSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	entities: requiredArray(nonEmptyArray(ErEntitySpec)),
+	relationships: ErRelationshipsWithDefault,
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface ErSpec extends Schema.Schema.Type<typeof ErSpec> {}
 
 /**
  * The authoring form of diagram-core's canonical ClassDiagram: a member may be
@@ -895,255 +873,238 @@ export class ErSpec extends Schema.Class<ErSpec>("ErSpec")(
  * optional and style is defaulted. buildClassDiagram normalizes it into the
  * core contract, which owns every invariant.
  */
-export class ClassAttributeSpec extends Schema.Class<ClassAttributeSpec>("ClassAttributeSpec")(
-	{
-		name: RequiredNonEmptyString,
-		type: optionalContract(NonEmptyString),
-		visibility: optionalContract(literals(CLASS_VISIBILITIES)),
-		static: optionalContract(Schema.Boolean),
-	},
-	{ identifier: undefined },
-) {}
+export const ClassAttributeSpec = Schema.Struct({
+	name: RequiredNonEmptyString,
+	type: optionalContract(NonEmptyString),
+	visibility: optionalContract(literals(CLASS_VISIBILITIES)),
+	static: optionalContract(Schema.Boolean),
+}).annotate({ identifier: undefined });
 
-export class ClassParameterSpec extends Schema.Class<ClassParameterSpec>("ClassParameterSpec")(
-	{ name: RequiredNonEmptyString, type: optionalContract(NonEmptyString) },
-	{ identifier: undefined },
-) {}
+export interface ClassAttributeSpec extends Schema.Schema.Type<typeof ClassAttributeSpec> {}
+
+export const ClassParameterSpec = Schema.Struct({
+	name: RequiredNonEmptyString,
+	type: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface ClassParameterSpec extends Schema.Schema.Type<typeof ClassParameterSpec> {}
 
 const classParamsDefault: Array<string | typeof ClassParameterSpec.Encoded> = [];
-export class ClassMethodSpec extends Schema.Class<ClassMethodSpec>("ClassMethodSpec")(
-	{
-		name: RequiredNonEmptyString,
-		params: Schema.Array(Schema.Union([NonEmptyString, ClassParameterSpec]))
-			.pipe(Schema.mutable)
-			.annotate({ default: classParamsDefault })
-			.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classParamsDefault))),
-		returns: optionalContract(NonEmptyString),
-		visibility: optionalContract(literals(CLASS_VISIBILITIES)),
-		static: optionalContract(Schema.Boolean),
-		abstract: optionalContract(Schema.Boolean),
-	},
-	{ identifier: undefined },
-) {}
+export const ClassMethodSpec = Schema.Struct({
+	name: RequiredNonEmptyString,
+	params: Schema.Array(Schema.Union([NonEmptyString, ClassParameterSpec]))
+		.pipe(Schema.mutable)
+		.annotate({ default: classParamsDefault })
+		.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classParamsDefault))),
+	returns: optionalContract(NonEmptyString),
+	visibility: optionalContract(literals(CLASS_VISIBILITIES)),
+	static: optionalContract(Schema.Boolean),
+	abstract: optionalContract(Schema.Boolean),
+}).annotate({ identifier: undefined });
+
+export interface ClassMethodSpec extends Schema.Schema.Type<typeof ClassMethodSpec> {}
 
 const classAttributesDefault: Array<string | typeof ClassAttributeSpec.Encoded> = [];
 // No member is the same decoded or encoded, so one empty list serves both.
 const classMethodsDefault: never[] = [];
-export class ClassNodeSpec extends Schema.Class<ClassNodeSpec>("ClassNodeSpec")(
-	{
-		id: RequiredNonEmptyString,
-		name: optionalContract(NonEmptyString),
-		kind: optionalContract(literals(CLASS_KINDS)),
-		stereotype: optionalContract(NonEmptyString),
-		attributes: Schema.Array(Schema.Union([NonEmptyString, ClassAttributeSpec]))
-			.pipe(Schema.mutable)
-			.annotate({ default: classAttributesDefault })
-			.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classAttributesDefault))),
-		methods: Schema.Array(Schema.Union([NonEmptyString, ClassMethodSpec]))
-			.pipe(Schema.mutable)
-			.annotate({ default: classMethodsDefault })
-			.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classMethodsDefault))),
-	},
-	{ identifier: undefined },
-) {}
+export const ClassNodeSpec = Schema.Struct({
+	id: RequiredNonEmptyString,
+	name: optionalContract(NonEmptyString),
+	kind: optionalContract(literals(CLASS_KINDS)),
+	stereotype: optionalContract(NonEmptyString),
+	attributes: Schema.Array(Schema.Union([NonEmptyString, ClassAttributeSpec]))
+		.pipe(Schema.mutable)
+		.annotate({ default: classAttributesDefault })
+		.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classAttributesDefault))),
+	methods: Schema.Array(Schema.Union([NonEmptyString, ClassMethodSpec]))
+		.pipe(Schema.mutable)
+		.annotate({ default: classMethodsDefault })
+		.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classMethodsDefault))),
+}).annotate({ identifier: undefined });
 
-export class ClassRelationshipSpec extends Schema.Class<ClassRelationshipSpec>(
-	"ClassRelationshipSpec",
-)(
-	{
-		id: optionalContract(NonEmptyString),
-		kind: literals(CLASS_RELATIONSHIP_KINDS),
-		from: RequiredNonEmptyString,
-		to: RequiredNonEmptyString,
-		fromMultiplicity: optionalContract(NonEmptyString),
-		toMultiplicity: optionalContract(NonEmptyString),
-		fromRole: optionalContract(NonEmptyString),
-		toRole: optionalContract(NonEmptyString),
-		navigable: optionalContract(Schema.Boolean),
-		label: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export interface ClassNodeSpec extends Schema.Schema.Type<typeof ClassNodeSpec> {}
+
+export const ClassRelationshipSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	kind: literals(CLASS_RELATIONSHIP_KINDS),
+	from: RequiredNonEmptyString,
+	to: RequiredNonEmptyString,
+	fromMultiplicity: optionalContract(NonEmptyString),
+	toMultiplicity: optionalContract(NonEmptyString),
+	fromRole: optionalContract(NonEmptyString),
+	toRole: optionalContract(NonEmptyString),
+	navigable: optionalContract(Schema.Boolean),
+	label: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface ClassRelationshipSpec extends Schema.Schema.Type<typeof ClassRelationshipSpec> {}
 
 const classRelationshipsDefault: Array<typeof ClassRelationshipSpec.Encoded> = [];
 const ClassRelationshipsWithDefault = Schema.Array(ClassRelationshipSpec)
 	.pipe(Schema.mutable)
 	.annotate({ default: classRelationshipsDefault })
 	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(classRelationshipsDefault)));
-export class ClassSpec extends Schema.Class<ClassSpec>("ClassSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		classes: requiredArray(nonEmptyArray(ClassNodeSpec)),
-		relationships: ClassRelationshipsWithDefault,
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const ClassSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	classes: requiredArray(nonEmptyArray(ClassNodeSpec)),
+	relationships: ClassRelationshipsWithDefault,
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface ClassSpec extends Schema.Schema.Type<typeof ClassSpec> {}
 
 /**
  * The authoring form of diagram-core's canonical OrgChartDiagram: dotted-line
  * ids are optional and style is defaulted. buildOrgChart normalizes it into the
  * core contract, which owns every invariant.
  */
-export class OrgPersonSpec extends Schema.Class<OrgPersonSpec>("OrgPersonSpec")(
-	{
-		id: RequiredNonEmptyString,
-		name: RequiredNonEmptyString,
-		title: optionalContract(NonEmptyString),
-		department: optionalContract(NonEmptyString),
-		manager: optionalContract(NonEmptyString),
-		assistant: optionalContract(Schema.Boolean),
-		avatar: optionalContract(Schema.Boolean),
-	},
-	{ identifier: undefined },
-) {}
+export const OrgPersonSpec = Schema.Struct({
+	id: RequiredNonEmptyString,
+	name: RequiredNonEmptyString,
+	title: optionalContract(NonEmptyString),
+	department: optionalContract(NonEmptyString),
+	manager: optionalContract(NonEmptyString),
+	assistant: optionalContract(Schema.Boolean),
+	avatar: optionalContract(Schema.Boolean),
+}).annotate({ identifier: undefined });
 
-export class OrgDottedLineSpec extends Schema.Class<OrgDottedLineSpec>("OrgDottedLineSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		report: RequiredNonEmptyString,
-		manager: RequiredNonEmptyString,
-		label: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export interface OrgPersonSpec extends Schema.Schema.Type<typeof OrgPersonSpec> {}
+
+export const OrgDottedLineSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	report: RequiredNonEmptyString,
+	manager: RequiredNonEmptyString,
+	label: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface OrgDottedLineSpec extends Schema.Schema.Type<typeof OrgDottedLineSpec> {}
 
 const orgDottedLinesDefault: Array<typeof OrgDottedLineSpec.Encoded> = [];
 const OrgDottedLinesWithDefault = Schema.Array(OrgDottedLineSpec)
 	.pipe(Schema.mutable)
 	.annotate({ default: orgDottedLinesDefault })
 	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(orgDottedLinesDefault)));
-export class OrgChartSpec extends Schema.Class<OrgChartSpec>("OrgChartSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		people: requiredArray(nonEmptyArray(OrgPersonSpec)),
-		dottedLines: OrgDottedLinesWithDefault,
-		groupByDepartment: optionalContract(Schema.Boolean),
-		forest: optionalContract(Schema.Boolean),
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const OrgChartSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	people: requiredArray(nonEmptyArray(OrgPersonSpec)),
+	dottedLines: OrgDottedLinesWithDefault,
+	groupByDepartment: optionalContract(Schema.Boolean),
+	forest: optionalContract(Schema.Boolean),
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface OrgChartSpec extends Schema.Schema.Type<typeof OrgChartSpec> {}
 
 /**
  * The authoring form of diagram-core's canonical VennDiagram: regions default
  * to none and style is defaulted. buildVennDiagram normalizes it into the core
  * contract, which owns every invariant.
  */
-export class VennSetSpec extends Schema.Class<VennSetSpec>("VennSetSpec")(
-	{
-		id: RequiredNonEmptyString,
-		label: RequiredNonEmptyString,
-		color: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export const VennSetSpec = Schema.Struct({
+	id: RequiredNonEmptyString,
+	label: RequiredNonEmptyString,
+	color: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
 
-export class VennRegionSpec extends Schema.Class<VennRegionSpec>("VennRegionSpec")(
-	{
-		sets: requiredArray(nonEmptyArray(NonEmptyString)),
-		label: optionalContract(NonEmptyString),
-		items: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		count: optionalContract(
-			Schema.Int.check(
-				Schema.isGreaterThanOrEqualTo(0, { message: "Too small: expected number to be >=0" }),
-			),
+export interface VennSetSpec extends Schema.Schema.Type<typeof VennSetSpec> {}
+
+export const VennRegionSpec = Schema.Struct({
+	sets: requiredArray(nonEmptyArray(NonEmptyString)),
+	label: optionalContract(NonEmptyString),
+	items: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	count: optionalContract(
+		Schema.Int.check(
+			Schema.isGreaterThanOrEqualTo(0, { message: "Too small: expected number to be >=0" }),
 		),
-	},
-	{ identifier: undefined },
-) {}
+	),
+}).annotate({ identifier: undefined });
+
+export interface VennRegionSpec extends Schema.Schema.Type<typeof VennRegionSpec> {}
 
 const vennRegionsDefault: Array<typeof VennRegionSpec.Encoded> = [];
 const VennRegionsWithDefault = Schema.Array(VennRegionSpec)
 	.pipe(Schema.mutable)
 	.annotate({ default: vennRegionsDefault })
 	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(vennRegionsDefault)));
-export class VennSpec extends Schema.Class<VennSpec>("VennSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		sets: requiredArray(nonEmptyArray(VennSetSpec)),
-		regions: VennRegionsWithDefault,
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const VennSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	sets: requiredArray(nonEmptyArray(VennSetSpec)),
+	regions: VennRegionsWithDefault,
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface VennSpec extends Schema.Schema.Type<typeof VennSpec> {}
 
 /**
  * The authoring form of diagram-core's canonical JourneyDiagram: style is
  * defaulted. buildJourneyMap normalizes it into the core contract, which owns
  * every invariant.
  */
-export class JourneyStepSpec extends Schema.Class<JourneyStepSpec>("JourneyStepSpec")(
-	{
-		label: RequiredNonEmptyString,
-		/** A whole number from 1 (very negative) to 5 (very positive); 3 is neutral. */
-		score: FiniteNumber,
-		actor: optionalContract(NonEmptyString),
-		touchpoint: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export const JourneyStepSpec = Schema.Struct({
+	label: RequiredNonEmptyString,
+	/** A whole number from 1 (very negative) to 5 (very positive); 3 is neutral. */
+	score: FiniteNumber,
+	actor: optionalContract(NonEmptyString),
+	touchpoint: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
 
-export class JourneyStageSpec extends Schema.Class<JourneyStageSpec>("JourneyStageSpec")(
-	{
-		name: RequiredNonEmptyString,
-		steps: requiredArray(Schema.Array(JourneyStepSpec).pipe(Schema.mutable)),
-		painPoints: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		opportunities: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	},
-	{ identifier: undefined },
-) {}
+export interface JourneyStepSpec extends Schema.Schema.Type<typeof JourneyStepSpec> {}
 
-export class JourneySpec extends Schema.Class<JourneySpec>("JourneySpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		persona: optionalContract(NonEmptyString),
-		actors: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		stages: requiredArray(nonEmptyArray(JourneyStageSpec)),
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const JourneyStageSpec = Schema.Struct({
+	name: RequiredNonEmptyString,
+	steps: requiredArray(Schema.Array(JourneyStepSpec).pipe(Schema.mutable)),
+	painPoints: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	opportunities: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+}).annotate({ identifier: undefined });
+
+export interface JourneyStageSpec extends Schema.Schema.Type<typeof JourneyStageSpec> {}
+
+export const JourneySpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	persona: optionalContract(NonEmptyString),
+	actors: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	stages: requiredArray(nonEmptyArray(JourneyStageSpec)),
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface JourneySpec extends Schema.Schema.Type<typeof JourneySpec> {}
 
 /**
  * The authoring form of diagram-core's canonical SankeyDiagram: the id is
  * optional and style is defaulted. buildSankey normalizes it into the core
  * contract, which owns every invariant.
  */
-export class SankeyNodeSpec extends Schema.Class<SankeyNodeSpec>("SankeyNodeSpec")(
-	{
-		id: RequiredNonEmptyString,
-		label: RequiredNonEmptyString,
-		color: optionalContract(HexColor),
-	},
-	{ identifier: undefined },
-) {}
+export const SankeyNodeSpec = Schema.Struct({
+	id: RequiredNonEmptyString,
+	label: RequiredNonEmptyString,
+	color: optionalContract(HexColor),
+}).annotate({ identifier: undefined });
 
-export class SankeyLinkSpec extends Schema.Class<SankeyLinkSpec>("SankeyLinkSpec")(
-	{
-		source: RequiredNonEmptyString,
-		target: RequiredNonEmptyString,
-		value: FiniteNumber,
-		label: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export interface SankeyNodeSpec extends Schema.Schema.Type<typeof SankeyNodeSpec> {}
 
-export class SankeySpec extends Schema.Class<SankeySpec>("SankeySpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		nodes: requiredArray(nonEmptyArray(SankeyNodeSpec)),
-		links: requiredArray(nonEmptyArray(SankeyLinkSpec)),
-		unit: optionalContract(NonEmptyString),
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const SankeyLinkSpec = Schema.Struct({
+	source: RequiredNonEmptyString,
+	target: RequiredNonEmptyString,
+	value: FiniteNumber,
+	label: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface SankeyLinkSpec extends Schema.Schema.Type<typeof SankeyLinkSpec> {}
+
+export const SankeySpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	nodes: requiredArray(nonEmptyArray(SankeyNodeSpec)),
+	links: requiredArray(nonEmptyArray(SankeyLinkSpec)),
+	unit: optionalContract(NonEmptyString),
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface SankeySpec extends Schema.Schema.Type<typeof SankeySpec> {}
 
 /** One component of a wireframe screen, as a model writes it. */
 export interface WireframeComponentInput {
@@ -1210,74 +1171,68 @@ export const WireframeComponentSpec: Schema.Codec<
 });
 export const WireframeComponentSpecSchema = WireframeComponentReference;
 
-export class WireframeScreenSpec extends Schema.Class<WireframeScreenSpec>("WireframeScreenSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		name: RequiredNonEmptyString,
-		device: optionalContract(literals(WIREFRAME_DEVICES)),
-		align: optionalContract(literals(WIREFRAME_ALIGNMENTS)),
-		children: requiredArray(nonEmptyArray(WireframeComponentReference)),
-	},
-	{ identifier: undefined },
-) {}
+export const WireframeScreenSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	name: RequiredNonEmptyString,
+	device: optionalContract(literals(WIREFRAME_DEVICES)),
+	align: optionalContract(literals(WIREFRAME_ALIGNMENTS)),
+	children: requiredArray(nonEmptyArray(WireframeComponentReference)),
+}).annotate({ identifier: undefined });
+
+export interface WireframeScreenSpec extends Schema.Schema.Type<typeof WireframeScreenSpec> {}
 
 /**
  * The authoring form of diagram-core's canonical WireframeDiagram: screen ids
  * and devices are optional and style is defaulted.
  */
-export class WireframeSpec extends Schema.Class<WireframeSpec>("WireframeSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		screens: requiredArray(nonEmptyArray(WireframeScreenSpec)),
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const WireframeSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	screens: requiredArray(nonEmptyArray(WireframeScreenSpec)),
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface WireframeSpec extends Schema.Schema.Type<typeof WireframeSpec> {}
 
 /**
  * The authoring form of diagram-core's canonical QuadrantDiagram: style is
  * defaulted. buildQuadrantChart normalizes it into the core contract, which
  * owns every invariant.
  */
-export class QuadrantAxisSpec extends Schema.Class<QuadrantAxisSpec>("QuadrantAxisSpec")(
-	{
-		title: RequiredNonEmptyString,
-		low: RequiredNonEmptyString,
-		high: RequiredNonEmptyString,
-	},
-	{ identifier: undefined },
-) {}
-export class QuadrantNamesSpec extends Schema.Class<QuadrantNamesSpec>("QuadrantNamesSpec")(
-	{
-		topLeft: RequiredNonEmptyString,
-		topRight: RequiredNonEmptyString,
-		bottomLeft: RequiredNonEmptyString,
-		bottomRight: RequiredNonEmptyString,
-	},
-	{ identifier: undefined },
-) {}
-export class QuadrantPointSpec extends Schema.Class<QuadrantPointSpec>("QuadrantPointSpec")(
-	{
-		label: RequiredNonEmptyString,
-		x: FiniteNumber,
-		y: FiniteNumber,
-		group: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
-export class QuadrantChartSpec extends Schema.Class<QuadrantChartSpec>("QuadrantChartSpec")(
-	{
-		id: optionalContract(NonEmptyString),
-		title: RequiredNonEmptyString,
-		xAxis: requiredObject(QuadrantAxisSpec),
-		yAxis: requiredObject(QuadrantAxisSpec),
-		quadrants: requiredObject(QuadrantNamesSpec),
-		points: requiredArray(Schema.Array(QuadrantPointSpec).pipe(Schema.mutable)),
-		style: DiagramStyleWithDefault,
-	},
-	{ identifier: undefined },
-) {}
+export const QuadrantAxisSpec = Schema.Struct({
+	title: RequiredNonEmptyString,
+	low: RequiredNonEmptyString,
+	high: RequiredNonEmptyString,
+}).annotate({ identifier: undefined });
+
+export interface QuadrantAxisSpec extends Schema.Schema.Type<typeof QuadrantAxisSpec> {}
+export const QuadrantNamesSpec = Schema.Struct({
+	topLeft: RequiredNonEmptyString,
+	topRight: RequiredNonEmptyString,
+	bottomLeft: RequiredNonEmptyString,
+	bottomRight: RequiredNonEmptyString,
+}).annotate({ identifier: undefined });
+
+export interface QuadrantNamesSpec extends Schema.Schema.Type<typeof QuadrantNamesSpec> {}
+export const QuadrantPointSpec = Schema.Struct({
+	label: RequiredNonEmptyString,
+	x: FiniteNumber,
+	y: FiniteNumber,
+	group: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface QuadrantPointSpec extends Schema.Schema.Type<typeof QuadrantPointSpec> {}
+export const QuadrantChartSpec = Schema.Struct({
+	id: optionalContract(NonEmptyString),
+	title: RequiredNonEmptyString,
+	xAxis: requiredObject(QuadrantAxisSpec),
+	yAxis: requiredObject(QuadrantAxisSpec),
+	quadrants: requiredObject(QuadrantNamesSpec),
+	points: requiredArray(Schema.Array(QuadrantPointSpec).pipe(Schema.mutable)),
+	style: DiagramStyleWithDefault,
+}).annotate({ identifier: undefined });
+
+export interface QuadrantChartSpec extends Schema.Schema.Type<typeof QuadrantChartSpec> {}
 
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(BuildArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
@@ -1297,16 +1252,13 @@ const QualityScoreOption = optionalContract(
 	),
 );
 
-export class BuildFlowchartOptions extends Schema.Class<BuildFlowchartOptions>(
-	"BuildFlowchartOptions",
-)(
-	{
-		artifactFormats: ArtifactFormatsOption,
-		inlineArtifacts: InlineArtifactsOption,
-		minQualityScore: QualityScoreOption,
-	},
-	{ identifier: undefined },
-) {}
+export const BuildFlowchartOptions = Schema.Struct({
+	artifactFormats: ArtifactFormatsOption,
+	inlineArtifacts: InlineArtifactsOption,
+	minQualityScore: QualityScoreOption,
+}).annotate({ identifier: undefined });
+
+export interface BuildFlowchartOptions extends Schema.Schema.Type<typeof BuildFlowchartOptions> {}
 export const BuildFlowchartOptionsSchema = optionalContract(BuildFlowchartOptions);
 
 /** The request a flowchart draws, in the user's words, as long as a generate prompt may be. */
@@ -1317,35 +1269,29 @@ const FlowchartRequestText = NonEmptyString.check(
 	}),
 );
 
-export class BuildFlowchartRequest extends Schema.Class<BuildFlowchartRequest>(
-	"BuildFlowchartRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(FlowchartSpec),
-		/** The user's words: an accepted build lists what they state that it misses. */
-		request: optionalContract(FlowchartRequestText),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildFlowchartRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(FlowchartSpec),
+	/** The user's words: an accepted build lists what they state that it misses. */
+	request: optionalContract(FlowchartRequestText),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildFlowchartRequest extends Schema.Schema.Type<typeof BuildFlowchartRequest> {}
 
 /**
  * A change to a built flowchart: the artifact it starts from and the edits, by id. The edited
  * document builds as a new artifact.
  */
-export class EditFlowchartRequest extends Schema.Class<EditFlowchartRequest>(
-	"EditFlowchartRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		artifactId: RequiredNonEmptyString,
-		edits: requiredObject(FlowchartEditsSchema),
-		request: optionalContract(FlowchartRequestText),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const EditFlowchartRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	artifactId: RequiredNonEmptyString,
+	edits: requiredObject(FlowchartEditsSchema),
+	request: optionalContract(FlowchartRequestText),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface EditFlowchartRequest extends Schema.Schema.Type<typeof EditFlowchartRequest> {}
 
 /** The document Studio's model writes: the same one every other surface takes. */
 const BuildFlowchartToolInputContract = Schema.Struct({
@@ -1374,16 +1320,15 @@ export const BuildFlowchartRequestSchema = Object.assign(BuildFlowchartRequest, 
 	omit: (_keys: { readonly options: true }) => BuildFlowchartToolInputSchema,
 });
 
-export class BuildSequenceDiagramRequest extends Schema.Class<BuildSequenceDiagramRequest>(
-	"BuildSequenceDiagramRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(SequenceDiagramSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildSequenceDiagramRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(SequenceDiagramSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildSequenceDiagramRequest extends Schema.Schema.Type<
+	typeof BuildSequenceDiagramRequest
+> {}
 
 /**
  * What a chat model passes to a sequence build tool: the host supplies artifact
@@ -1402,16 +1347,13 @@ export const BuildSequenceDiagramToolInputSchema = Schema.Struct({
 });
 export type BuildSequenceDiagramToolInput = typeof BuildSequenceDiagramToolInputSchema.Type;
 
-export class BuildTimelineRequest extends Schema.Class<BuildTimelineRequest>(
-	"BuildTimelineRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(TimelineSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildTimelineRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(TimelineSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildTimelineRequest extends Schema.Schema.Type<typeof BuildTimelineRequest> {}
 export const BuildTimelineToolInputSchema = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(
@@ -1426,14 +1368,13 @@ export const BuildTimelineToolInputSchema = Schema.Struct({
 });
 export type BuildTimelineToolInput = typeof BuildTimelineToolInputSchema.Type;
 
-export class BuildChartRequest extends Schema.Class<BuildChartRequest>("BuildChartRequest")(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(ChartSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildChartRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(ChartSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildChartRequest extends Schema.Schema.Type<typeof BuildChartRequest> {}
 /** The chart spec a model authors; style is always the Sketchi palette. */
 export const ChartToolSpecSchema = ChartSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildChartToolInputSchema = Schema.Struct({
@@ -1442,16 +1383,15 @@ export const BuildChartToolInputSchema = Schema.Struct({
 });
 export type BuildChartToolInput = typeof BuildChartToolInputSchema.Type;
 
-export class BuildStateMachineRequest extends Schema.Class<BuildStateMachineRequest>(
-	"BuildStateMachineRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(StateMachineSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildStateMachineRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(StateMachineSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildStateMachineRequest extends Schema.Schema.Type<
+	typeof BuildStateMachineRequest
+> {}
 export const BuildStateMachineToolInputSchema = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(
@@ -1467,14 +1407,13 @@ export const BuildStateMachineToolInputSchema = Schema.Struct({
 });
 export type BuildStateMachineToolInput = typeof BuildStateMachineToolInputSchema.Type;
 
-export class BuildGanttRequest extends Schema.Class<BuildGanttRequest>("BuildGanttRequest")(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(GanttSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildGanttRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(GanttSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildGanttRequest extends Schema.Schema.Type<typeof BuildGanttRequest> {}
 /** The Gantt spec a model authors; style is always the Sketchi palette. */
 export const GanttToolSpecSchema = GanttSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildGanttToolInputSchema = Schema.Struct({
@@ -1482,16 +1421,13 @@ export const BuildGanttToolInputSchema = Schema.Struct({
 	spec: requiredObject(GanttToolSpecSchema),
 });
 export type BuildGanttToolInput = typeof BuildGanttToolInputSchema.Type;
-export class BuildErDiagramRequest extends Schema.Class<BuildErDiagramRequest>(
-	"BuildErDiagramRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(ErSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildErDiagramRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(ErSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildErDiagramRequest extends Schema.Schema.Type<typeof BuildErDiagramRequest> {}
 /** The ER spec a model authors; style is always the Sketchi palette. */
 export const ErToolSpecSchema = ErSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildErDiagramToolInputSchema = Schema.Struct({
@@ -1499,16 +1435,15 @@ export const BuildErDiagramToolInputSchema = Schema.Struct({
 	spec: requiredObject(ErToolSpecSchema),
 });
 export type BuildErDiagramToolInput = typeof BuildErDiagramToolInputSchema.Type;
-export class BuildClassDiagramRequest extends Schema.Class<BuildClassDiagramRequest>(
-	"BuildClassDiagramRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(ClassSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildClassDiagramRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(ClassSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildClassDiagramRequest extends Schema.Schema.Type<
+	typeof BuildClassDiagramRequest
+> {}
 /** The class diagram spec a model authors; style is always the Sketchi palette. */
 export const ClassToolSpecSchema = ClassSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildClassDiagramToolInputSchema = Schema.Struct({
@@ -1516,16 +1451,13 @@ export const BuildClassDiagramToolInputSchema = Schema.Struct({
 	spec: requiredObject(ClassToolSpecSchema),
 });
 export type BuildClassDiagramToolInput = typeof BuildClassDiagramToolInputSchema.Type;
-export class BuildOrgChartRequest extends Schema.Class<BuildOrgChartRequest>(
-	"BuildOrgChartRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(OrgChartSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildOrgChartRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(OrgChartSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildOrgChartRequest extends Schema.Schema.Type<typeof BuildOrgChartRequest> {}
 /** The org chart spec a model authors; style is always the Sketchi palette. */
 export const OrgChartToolSpecSchema = OrgChartSpec.mapFields(
 	({ style: _style, ...fields }) => fields,
@@ -1535,16 +1467,15 @@ export const BuildOrgChartToolInputSchema = Schema.Struct({
 	spec: requiredObject(OrgChartToolSpecSchema),
 });
 export type BuildOrgChartToolInput = typeof BuildOrgChartToolInputSchema.Type;
-export class BuildVennDiagramRequest extends Schema.Class<BuildVennDiagramRequest>(
-	"BuildVennDiagramRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(VennSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildVennDiagramRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(VennSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildVennDiagramRequest extends Schema.Schema.Type<
+	typeof BuildVennDiagramRequest
+> {}
 /** The Venn diagram spec a model authors; style is always the Sketchi palette. */
 export const VennToolSpecSchema = VennSpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildVennDiagramToolInputSchema = Schema.Struct({
@@ -1552,16 +1483,13 @@ export const BuildVennDiagramToolInputSchema = Schema.Struct({
 	spec: requiredObject(VennToolSpecSchema),
 });
 export type BuildVennDiagramToolInput = typeof BuildVennDiagramToolInputSchema.Type;
-export class BuildJourneyMapRequest extends Schema.Class<BuildJourneyMapRequest>(
-	"BuildJourneyMapRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(JourneySpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildJourneyMapRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(JourneySpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildJourneyMapRequest extends Schema.Schema.Type<typeof BuildJourneyMapRequest> {}
 /** The journey map spec a model authors; style is always the Sketchi palette. */
 export const JourneyToolSpecSchema = JourneySpec.mapFields(
 	({ style: _style, ...fields }) => fields,
@@ -1571,14 +1499,13 @@ export const BuildJourneyMapToolInputSchema = Schema.Struct({
 	spec: requiredObject(JourneyToolSpecSchema),
 });
 export type BuildJourneyMapToolInput = typeof BuildJourneyMapToolInputSchema.Type;
-export class BuildSankeyRequest extends Schema.Class<BuildSankeyRequest>("BuildSankeyRequest")(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(SankeySpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildSankeyRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(SankeySpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildSankeyRequest extends Schema.Schema.Type<typeof BuildSankeyRequest> {}
 /** The Sankey spec a model authors; style is always the Sketchi palette. */
 export const SankeyToolSpecSchema = SankeySpec.mapFields(({ style: _style, ...fields }) => fields);
 export const BuildSankeyToolInputSchema = Schema.Struct({
@@ -1586,16 +1513,13 @@ export const BuildSankeyToolInputSchema = Schema.Struct({
 	spec: requiredObject(SankeyToolSpecSchema),
 });
 export type BuildSankeyToolInput = typeof BuildSankeyToolInputSchema.Type;
-export class BuildWireframeRequest extends Schema.Class<BuildWireframeRequest>(
-	"BuildWireframeRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(WireframeSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildWireframeRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(WireframeSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildWireframeRequest extends Schema.Schema.Type<typeof BuildWireframeRequest> {}
 /** The wireframe spec a model authors; style is always the Sketchi palette. */
 export const WireframeToolSpecSchema = WireframeSpec.mapFields(
 	({ style: _style, ...fields }) => fields,
@@ -1605,16 +1529,15 @@ export const BuildWireframeToolInputSchema = Schema.Struct({
 	spec: requiredObject(WireframeToolSpecSchema),
 });
 export type BuildWireframeToolInput = typeof BuildWireframeToolInputSchema.Type;
-export class BuildQuadrantChartRequest extends Schema.Class<BuildQuadrantChartRequest>(
-	"BuildQuadrantChartRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(QuadrantChartSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildQuadrantChartRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(QuadrantChartSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface BuildQuadrantChartRequest extends Schema.Schema.Type<
+	typeof BuildQuadrantChartRequest
+> {}
 /** The quadrant chart spec a model authors; style is always the Sketchi palette. */
 export const QuadrantChartToolSpecSchema = QuadrantChartSpec.mapFields(
 	({ style: _style, ...fields }) => fields,
@@ -1655,14 +1578,13 @@ export const MindmapTopic: Schema.Codec<MindmapTopicInput, MindmapTopicInput> = 
 });
 export const MindmapTopicSchema = MindmapTopicReference;
 
-export class MindmapSpecLayout extends Schema.Class<MindmapSpecLayout>("MindmapSpecLayout")(
-	{
-		direction: literals(["LR", "RL"])
-			.annotate({ default: "LR" })
-			.pipe(Schema.withDecodingDefaultKey(Effect.succeed("LR"))),
-	},
-	{ identifier: undefined },
-) {}
+export const MindmapSpecLayout = Schema.Struct({
+	direction: literals(["LR", "RL"])
+		.annotate({ default: "LR" })
+		.pipe(Schema.withDecodingDefaultKey(Effect.succeed("LR"))),
+}).annotate({ identifier: undefined });
+
+export interface MindmapSpecLayout extends Schema.Schema.Type<typeof MindmapSpecLayout> {}
 
 const mindmapLayoutDefault: { readonly direction: "LR" } = {
 	direction: "LR",
@@ -1680,19 +1602,20 @@ const MindmapSpecContract = Schema.Struct({
 	layout: MindmapLayoutWithDefault,
 	style: DiagramStyleWithDefault,
 });
-export class MindmapSpec extends Schema.Class<MindmapSpec>("MindmapSpec")(MindmapSpecContract, {
+export const MindmapSpec = MindmapSpecContract.annotate({
 	identifier: undefined,
-}) {}
+});
+
+export interface MindmapSpec extends Schema.Schema.Type<typeof MindmapSpec> {}
 
 const BuildMindmapRequestContract = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(MindmapSpecContract),
 	options: optionalContract(BuildFlowchartOptions),
 });
-export class BuildMindmapRequest extends Schema.Class<BuildMindmapRequest>("BuildMindmapRequest")(
-	BuildMindmapRequestContract,
-	{ identifier: undefined },
-) {}
+export const BuildMindmapRequest = BuildMindmapRequestContract.annotate({ identifier: undefined });
+
+export interface BuildMindmapRequest extends Schema.Schema.Type<typeof BuildMindmapRequest> {}
 export const BuildMindmapRequestSchema = BuildMindmapRequestContract;
 /** The mindmap spec a model authors; style is always the Sketchi palette. */
 export const MindmapToolSpecSchema = MindmapSpecContract.mapFields(
@@ -1704,13 +1627,12 @@ export const BuildMindmapToolInputSchema = Schema.Struct({
 });
 export type BuildMindmapToolInput = typeof BuildMindmapToolInputSchema.Type;
 
-export class ScenePoint extends Schema.Class<ScenePoint>("ScenePoint")(
-	{
-		x: FiniteNumber.pipe(Schema.mutableKey),
-		y: FiniteNumber.pipe(Schema.mutableKey),
-	},
-	{ identifier: undefined },
-) {}
+export const ScenePoint = Schema.Struct({
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface ScenePoint extends Schema.Schema.Type<typeof ScenePoint> {}
 
 // Count limits are advertised here and enforced before compilation/patching by
 // the runtime's canvas validator, preserving limit-specific failure responses.
@@ -1758,27 +1680,26 @@ const CanvasPointList = Schema.Array(ScenePoint)
  * slug, or carries a drawn icon's name and recipe, which the scene embeds
  * under its drawn slug.
  */
-export class CanvasNodeIcon extends Schema.Class<CanvasNodeIcon>("CanvasNodeIcon")(
-	{
-		slug: optionalContract(IconSlugInput).pipe(Schema.mutableKey),
-		...DrawnIconSchema.fields,
-		size: Schema.Number.check(
-			Schema.isFinite(),
-			Schema.isBetween(
-				{
-					minimum: CANVAS_NODE_ICON.minSize,
-					maximum: CANVAS_NODE_ICON.maxSize,
-				},
-				{
-					message: `Expected a number between ${CANVAS_NODE_ICON.minSize} and ${CANVAS_NODE_ICON.maxSize}`,
-				},
-			),
-		).pipe(Schema.mutableKey),
-		/** Embed the catalog's exact SVG instead of the hand-drawn mark. */
-		exact: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
-	},
-	{ identifier: undefined },
-) {}
+export const CanvasNodeIcon = Schema.Struct({
+	slug: optionalContract(IconSlugInput).pipe(Schema.mutableKey),
+	...DrawnIconSchema.fields,
+	size: Schema.Number.check(
+		Schema.isFinite(),
+		Schema.isBetween(
+			{
+				minimum: CANVAS_NODE_ICON.minSize,
+				maximum: CANVAS_NODE_ICON.maxSize,
+			},
+			{
+				message: `Expected a number between ${CANVAS_NODE_ICON.minSize} and ${CANVAS_NODE_ICON.maxSize}`,
+			},
+		),
+	).pipe(Schema.mutableKey),
+	/** Embed the catalog's exact SVG instead of the hand-drawn mark. */
+	exact: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface CanvasNodeIcon extends Schema.Schema.Type<typeof CanvasNodeIcon> {}
 
 /** A hand-drawn icon: a few primitives on a 24-unit grid. */
 export const IconRecipeSchema = CoreIconRecipeSchema;
@@ -1787,205 +1708,190 @@ export const IconRecipeSchema = CoreIconRecipeSchema;
  * Derived forms of one icon slug, the hand-drawn recipe and the exact SVG;
  * Sketchi replaces any authored value.
  */
-export class CanvasIconAsset extends Schema.Class<CanvasIconAsset>("CanvasIconAsset")(
-	{
-		name: Schema.String,
-		recipe: optionalContract(IconRecipeSchema),
-		svg: optionalContract(Schema.String),
-	},
-	{ identifier: undefined },
-) {}
+export const CanvasIconAsset = Schema.Struct({
+	name: Schema.String,
+	recipe: optionalContract(IconRecipeSchema),
+	svg: optionalContract(Schema.String),
+}).annotate({ identifier: undefined });
 
-export class NodeSceneElement extends Schema.Class<NodeSceneElement>("NodeSceneElement")(
-	{
-		...CanvasCompositionFields,
-		...CanvasStrokeFields,
-		type: stringLiteral("node"),
-		id: RequiredNonEmptyString,
-		nodeId: RequiredNonEmptyString,
-		kind: optionalContract(NonEmptyString),
-		icon: optionalContract(CanvasNodeIcon).pipe(Schema.mutableKey),
-		rendererRole: optionalContract(literals(CANVAS_RENDERER_ROLES)),
-		shape: literals([
-			"rectangle",
-			"ellipse",
-			"diamond",
-			"circle",
-			"polygon",
-			...CANVAS_COMPOSED_SHAPES,
-		]).pipe(Schema.mutableKey),
-		points: optionalContract(CanvasPointList).pipe(Schema.mutableKey),
-		textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-		x: FiniteNumber.pipe(Schema.mutableKey),
-		y: FiniteNumber.pipe(Schema.mutableKey),
-		width: PositiveNumber.pipe(Schema.mutableKey),
-		height: PositiveNumber.pipe(Schema.mutableKey),
-		label: RequiredNonEmptyString.pipe(Schema.mutableKey),
-	},
-	{ identifier: undefined },
-) {}
+export interface CanvasIconAsset extends Schema.Schema.Type<typeof CanvasIconAsset> {}
 
-export class TextSceneElement extends Schema.Class<TextSceneElement>("TextSceneElement")(
-	{
-		...CanvasCompositionFields,
-		type: stringLiteral("text"),
-		id: RequiredNonEmptyString,
-		containerId: optionalContract(NonEmptyString),
-		textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-		x: FiniteNumber.pipe(Schema.mutableKey),
-		y: FiniteNumber.pipe(Schema.mutableKey),
-		text: RequiredNonEmptyString.pipe(Schema.mutableKey),
-		fontSize: PositiveNumber,
-		fontFamily: optionalContract(literals(["hand", "mono", "sans"])),
-		lineHeight: optionalContract(PositiveNumber),
-		maxWidth: optionalContract(PositiveNumber),
-		textAlign: optionalContract(literals(["center", "left", "right"])),
-		verticalAlign: optionalContract(literals(["bottom", "middle", "top"])),
-	},
-	{ identifier: undefined },
-) {}
+export const NodeSceneElement = Schema.Struct({
+	...CanvasCompositionFields,
+	...CanvasStrokeFields,
+	type: stringLiteral("node"),
+	id: RequiredNonEmptyString,
+	nodeId: RequiredNonEmptyString,
+	kind: optionalContract(NonEmptyString),
+	icon: optionalContract(CanvasNodeIcon).pipe(Schema.mutableKey),
+	rendererRole: optionalContract(literals(CANVAS_RENDERER_ROLES)),
+	shape: literals([
+		"rectangle",
+		"ellipse",
+		"diamond",
+		"circle",
+		"polygon",
+		...CANVAS_COMPOSED_SHAPES,
+	]).pipe(Schema.mutableKey),
+	points: optionalContract(CanvasPointList).pipe(Schema.mutableKey),
+	textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+	width: PositiveNumber.pipe(Schema.mutableKey),
+	height: PositiveNumber.pipe(Schema.mutableKey),
+	label: RequiredNonEmptyString.pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
 
-export class ArrowSceneElement extends Schema.Class<ArrowSceneElement>("ArrowSceneElement")(
-	{
-		...CanvasCompositionFields,
-		...CanvasStrokeFields,
-		type: stringLiteral("arrow"),
-		id: RequiredNonEmptyString,
-		edgeId: RequiredNonEmptyString,
-		sourceNodeId: RequiredNonEmptyString,
-		targetNodeId: RequiredNonEmptyString.pipe(Schema.mutableKey),
-		startArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
-		endArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
-		textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-		points: requiredArray(CanvasPointList).pipe(Schema.mutableKey),
-		curved: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
-		label: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
-	},
-	{ identifier: undefined },
-) {}
+export interface NodeSceneElement extends Schema.Schema.Type<typeof NodeSceneElement> {}
 
-export class CanvasLineBinding extends Schema.Class<CanvasLineBinding>("CanvasLineBinding")(
-	{
-		elementId: RequiredNonEmptyString,
-	},
-	{ identifier: undefined },
-) {}
+export const TextSceneElement = Schema.Struct({
+	...CanvasCompositionFields,
+	type: stringLiteral("text"),
+	id: RequiredNonEmptyString,
+	containerId: optionalContract(NonEmptyString),
+	textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+	text: RequiredNonEmptyString.pipe(Schema.mutableKey),
+	fontSize: PositiveNumber,
+	fontFamily: optionalContract(literals(["hand", "mono", "sans"])),
+	lineHeight: optionalContract(PositiveNumber),
+	maxWidth: optionalContract(PositiveNumber),
+	textAlign: optionalContract(literals(["center", "left", "right"])),
+	verticalAlign: optionalContract(literals(["bottom", "middle", "top"])),
+}).annotate({ identifier: undefined });
 
-export class LineSceneElement extends Schema.Class<LineSceneElement>("LineSceneElement")(
-	{
-		...CanvasCompositionFields,
-		...CanvasStrokeFields,
-		type: stringLiteral("line"),
-		id: RequiredNonEmptyString,
-		points: requiredArray(CanvasPointList).pipe(Schema.mutableKey),
-		startBinding: optionalContract(CanvasLineBinding).pipe(Schema.mutableKey),
-		endBinding: optionalContract(CanvasLineBinding).pipe(Schema.mutableKey),
-		startArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
-		endArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
-		label: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
-		textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
-	},
-	{ identifier: undefined },
-) {}
+export interface TextSceneElement extends Schema.Schema.Type<typeof TextSceneElement> {}
 
-export class FrameSceneElement extends Schema.Class<FrameSceneElement>("FrameSceneElement")(
-	{
-		...CanvasCompositionFields,
-		...CanvasStrokeFields,
-		type: stringLiteral("frame"),
-		id: RequiredNonEmptyString,
-		nodeId: optionalContract(NonEmptyString),
-		name: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
-		icon: optionalContract(CanvasNodeIcon).pipe(Schema.mutableKey),
-		x: FiniteNumber.pipe(Schema.mutableKey),
-		y: FiniteNumber.pipe(Schema.mutableKey),
-		width: PositiveNumber.pipe(Schema.mutableKey),
-		height: PositiveNumber.pipe(Schema.mutableKey),
-	},
-	{ identifier: undefined },
-) {}
+export const ArrowSceneElement = Schema.Struct({
+	...CanvasCompositionFields,
+	...CanvasStrokeFields,
+	type: stringLiteral("arrow"),
+	id: RequiredNonEmptyString,
+	edgeId: RequiredNonEmptyString,
+	sourceNodeId: RequiredNonEmptyString,
+	targetNodeId: RequiredNonEmptyString.pipe(Schema.mutableKey),
+	startArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
+	endArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
+	textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+	points: requiredArray(CanvasPointList).pipe(Schema.mutableKey),
+	curved: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
+	label: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
 
-export class CanvasLayer extends Schema.Class<CanvasLayer>("CanvasLayer")(
-	{
-		id: RequiredNonEmptyString,
-		name: optionalContract(NonEmptyString),
-		locked: optionalContract(Schema.Boolean),
-		visible: optionalContract(Schema.Boolean),
-	},
-	{ identifier: undefined },
-) {}
+export interface ArrowSceneElement extends Schema.Schema.Type<typeof ArrowSceneElement> {}
+
+export const CanvasLineBinding = Schema.Struct({
+	elementId: RequiredNonEmptyString,
+}).annotate({ identifier: undefined });
+
+export interface CanvasLineBinding extends Schema.Schema.Type<typeof CanvasLineBinding> {}
+
+export const LineSceneElement = Schema.Struct({
+	...CanvasCompositionFields,
+	...CanvasStrokeFields,
+	type: stringLiteral("line"),
+	id: RequiredNonEmptyString,
+	points: requiredArray(CanvasPointList).pipe(Schema.mutableKey),
+	startBinding: optionalContract(CanvasLineBinding).pipe(Schema.mutableKey),
+	endBinding: optionalContract(CanvasLineBinding).pipe(Schema.mutableKey),
+	startArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
+	endArrowhead: optionalContract(CanvasArrowhead).pipe(Schema.mutableKey),
+	label: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
+	textColor: optionalContract(HexColor).pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface LineSceneElement extends Schema.Schema.Type<typeof LineSceneElement> {}
+
+export const FrameSceneElement = Schema.Struct({
+	...CanvasCompositionFields,
+	...CanvasStrokeFields,
+	type: stringLiteral("frame"),
+	id: RequiredNonEmptyString,
+	nodeId: optionalContract(NonEmptyString),
+	name: optionalContract(NonEmptyString).pipe(Schema.mutableKey),
+	icon: optionalContract(CanvasNodeIcon).pipe(Schema.mutableKey),
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+	width: PositiveNumber.pipe(Schema.mutableKey),
+	height: PositiveNumber.pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface FrameSceneElement extends Schema.Schema.Type<typeof FrameSceneElement> {}
+
+export const CanvasLayer = Schema.Struct({
+	id: RequiredNonEmptyString,
+	name: optionalContract(NonEmptyString),
+	locked: optionalContract(Schema.Boolean),
+	visible: optionalContract(Schema.Boolean),
+}).annotate({ identifier: undefined });
+
+export interface CanvasLayer extends Schema.Schema.Type<typeof CanvasLayer> {}
 
 const CanvasLayoutIds = requiredArray(nonEmptyArray(NonEmptyString));
 
-export class CanvasFlowLayout extends Schema.Class<CanvasFlowLayout>("CanvasFlowLayout")(
-	{
-		type: literals(["row", "column", "stack"]),
-		ids: CanvasLayoutIds,
-		x: optionalContract(FiniteNumber),
-		y: optionalContract(FiniteNumber),
-		gap: optionalContract(FiniteNumber),
-	},
-	{ identifier: undefined },
-) {}
+export const CanvasFlowLayout = Schema.Struct({
+	type: literals(["row", "column", "stack"]),
+	ids: CanvasLayoutIds,
+	x: optionalContract(FiniteNumber),
+	y: optionalContract(FiniteNumber),
+	gap: optionalContract(FiniteNumber),
+}).annotate({ identifier: undefined });
 
-export class CanvasGridLayout extends Schema.Class<CanvasGridLayout>("CanvasGridLayout")(
-	{
-		type: stringLiteral("grid"),
-		ids: CanvasLayoutIds,
-		columns: Schema.Int.check(
-			Schema.isGreaterThanOrEqualTo(1, {
-				message: "Too small: expected number to be >=1",
-			}),
-		),
-		x: optionalContract(FiniteNumber),
-		y: optionalContract(FiniteNumber),
-		columnGap: optionalContract(FiniteNumber),
-		rowGap: optionalContract(FiniteNumber),
-	},
-	{ identifier: undefined },
-) {}
+export interface CanvasFlowLayout extends Schema.Schema.Type<typeof CanvasFlowLayout> {}
 
-export class CanvasAlignLayout extends Schema.Class<CanvasAlignLayout>("CanvasAlignLayout")(
-	{
-		type: stringLiteral("align"),
-		ids: CanvasLayoutIds,
-		axis: literals(["x", "y"]),
-		alignment: literals(["center", "end", "start"]),
-	},
-	{ identifier: undefined },
-) {}
+export const CanvasGridLayout = Schema.Struct({
+	type: stringLiteral("grid"),
+	ids: CanvasLayoutIds,
+	columns: Schema.Int.check(
+		Schema.isGreaterThanOrEqualTo(1, {
+			message: "Too small: expected number to be >=1",
+		}),
+	),
+	x: optionalContract(FiniteNumber),
+	y: optionalContract(FiniteNumber),
+	columnGap: optionalContract(FiniteNumber),
+	rowGap: optionalContract(FiniteNumber),
+}).annotate({ identifier: undefined });
 
-export class CanvasDistributeLayout extends Schema.Class<CanvasDistributeLayout>(
-	"CanvasDistributeLayout",
-)(
-	{
-		type: stringLiteral("distribute"),
-		ids: CanvasLayoutIds,
-		axis: literals(["x", "y"]),
-		gap: optionalContract(FiniteNumber),
-	},
-	{ identifier: undefined },
-) {}
+export interface CanvasGridLayout extends Schema.Schema.Type<typeof CanvasGridLayout> {}
+
+export const CanvasAlignLayout = Schema.Struct({
+	type: stringLiteral("align"),
+	ids: CanvasLayoutIds,
+	axis: literals(["x", "y"]),
+	alignment: literals(["center", "end", "start"]),
+}).annotate({ identifier: undefined });
+
+export interface CanvasAlignLayout extends Schema.Schema.Type<typeof CanvasAlignLayout> {}
+
+export const CanvasDistributeLayout = Schema.Struct({
+	type: stringLiteral("distribute"),
+	ids: CanvasLayoutIds,
+	axis: literals(["x", "y"]),
+	gap: optionalContract(FiniteNumber),
+}).annotate({ identifier: undefined });
+
+export interface CanvasDistributeLayout extends Schema.Schema.Type<typeof CanvasDistributeLayout> {}
 
 /**
  * A mark on its own, drawn in the largest square its box holds: a slug,
  * wordmarks included, or a drawn icon's name and recipe.
  */
-export class IconSceneElement extends Schema.Class<IconSceneElement>("IconSceneElement")(
-	{
-		...CanvasCompositionFields,
-		type: stringLiteral("icon"),
-		id: RequiredNonEmptyString,
-		slug: optionalContract(IconSlugInput).pipe(Schema.mutableKey),
-		...DrawnIconSchema.fields,
-		exact: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
-		x: FiniteNumber.pipe(Schema.mutableKey),
-		y: FiniteNumber.pipe(Schema.mutableKey),
-		width: PositiveNumber.pipe(Schema.mutableKey),
-		height: PositiveNumber.pipe(Schema.mutableKey),
-	},
-	{ identifier: undefined },
-) {}
+export const IconSceneElement = Schema.Struct({
+	...CanvasCompositionFields,
+	type: stringLiteral("icon"),
+	id: RequiredNonEmptyString,
+	slug: optionalContract(IconSlugInput).pipe(Schema.mutableKey),
+	...DrawnIconSchema.fields,
+	exact: optionalContract(Schema.Boolean).pipe(Schema.mutableKey),
+	x: FiniteNumber.pipe(Schema.mutableKey),
+	y: FiniteNumber.pipe(Schema.mutableKey),
+	width: PositiveNumber.pipe(Schema.mutableKey),
+	height: PositiveNumber.pipe(Schema.mutableKey),
+}).annotate({ identifier: undefined });
+
+export interface IconSceneElement extends Schema.Schema.Type<typeof IconSceneElement> {}
 
 export const SceneElementSchema = Schema.Union(
 	[
@@ -2017,40 +1923,38 @@ const EmptyCanvasZOrder = Schema.Array(NonEmptyString)
 	.annotate({ default: [], maxItems: CANVAS_LIMITS.maxZOrderEntries })
 	.pipe(Schema.withDecodingDefaultKey(Effect.succeed([])));
 
-export class CanvasSpec extends Schema.Class<CanvasSpec>("CanvasSpec")(
-	{
-		kind: stringLiteral("canvas"),
-		version: numberLiteral(CANVAS_SPEC_VERSION),
-		diagramId: RequiredNonEmptyString,
-		title: RequiredNonEmptyString,
-		width: PositiveNumber.pipe(Schema.mutableKey),
-		height: PositiveNumber.pipe(Schema.mutableKey),
-		accentColor: HexColor.pipe(Schema.mutableKey),
-		backgroundColor: HexColor.pipe(Schema.mutableKey),
-		elements: requiredArray(
-			Schema.Array(SceneElementSchema)
-				.pipe(Schema.mutable)
-				.annotate({ maxItems: CANVAS_LIMITS.maxElements }),
-		),
-		icons: optionalContract(Schema.Record(Schema.String, CanvasIconAsset)).pipe(Schema.mutableKey),
-		layers: EmptyCanvasLayers,
-		layouts: EmptyCanvasLayouts,
-		zOrder: EmptyCanvasZOrder,
-	},
-	{ identifier: undefined },
-) {}
+export const CanvasSpec = Schema.Struct({
+	kind: stringLiteral("canvas"),
+	version: numberLiteral(CANVAS_SPEC_VERSION),
+	diagramId: RequiredNonEmptyString,
+	title: RequiredNonEmptyString,
+	width: PositiveNumber.pipe(Schema.mutableKey),
+	height: PositiveNumber.pipe(Schema.mutableKey),
+	accentColor: HexColor.pipe(Schema.mutableKey),
+	backgroundColor: HexColor.pipe(Schema.mutableKey),
+	elements: requiredArray(
+		Schema.Array(SceneElementSchema)
+			.pipe(Schema.mutable)
+			.annotate({ maxItems: CANVAS_LIMITS.maxElements }),
+	),
+	icons: optionalContract(Schema.Record(Schema.String, CanvasIconAsset)).pipe(Schema.mutableKey),
+	layers: EmptyCanvasLayers,
+	layouts: EmptyCanvasLayouts,
+	zOrder: EmptyCanvasZOrder,
+}).annotate({ identifier: undefined });
+
+export interface CanvasSpec extends Schema.Schema.Type<typeof CanvasSpec> {}
 export type RenderedDiagramScene = CanvasSpec;
 export const RenderedDiagramSceneSchema = CanvasSpec;
 export type PatchableScene = CanvasSpec;
 
-export class CreateCanvasRequest extends Schema.Class<CreateCanvasRequest>("CreateCanvasRequest")(
-	{
-		requestId: optionalContract(NonEmptyString),
-		spec: requiredObject(CanvasSpec),
-		options: optionalContract(BuildFlowchartOptions),
-	},
-	{ identifier: undefined },
-) {}
+export const CreateCanvasRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	spec: requiredObject(CanvasSpec),
+	options: optionalContract(BuildFlowchartOptions),
+}).annotate({ identifier: undefined });
+
+export interface CreateCanvasRequest extends Schema.Schema.Type<typeof CreateCanvasRequest> {}
 
 const ExcalidrawElement = Schema.Record(Schema.String, Schema.Unknown).check(
 	Schema.makeFilter(
@@ -2063,54 +1967,50 @@ const ExcalidrawElement = Schema.Record(Schema.String, Schema.Unknown).check(
 	),
 );
 
-export class ExcalidrawScene extends Schema.Class<ExcalidrawScene>("ExcalidrawScene")(
-	{
-		appState: Schema.Record(Schema.String, Schema.Unknown),
-		elements: Schema.Array(ExcalidrawElement).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const ExcalidrawScene = Schema.Struct({
+	appState: Schema.Record(Schema.String, Schema.Unknown),
+	elements: Schema.Array(ExcalidrawElement).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
 
-export class ExcalidrawFile extends ExcalidrawScene.extend<ExcalidrawFile>("ExcalidrawFile")(
-	{
-		files: Schema.Record(Schema.String, Schema.Unknown),
-		source: RequiredNonEmptyString,
-		type: stringLiteral("excalidraw"),
-		version: numberLiteral(2),
-	},
-	{ identifier: undefined },
-) {}
+export interface ExcalidrawScene extends Schema.Schema.Type<typeof ExcalidrawScene> {}
 
-export class GetArtifactRequest extends Schema.Class<GetArtifactRequest>("GetArtifactRequest")(
-	{
-		artifactId: RequiredNonEmptyString,
-		format: optionalContract(ArtifactFormatSchema),
-		inline: optionalContract(Schema.Boolean),
-	},
-	{ identifier: undefined },
-) {}
+export const ExcalidrawFile = Schema.Struct({
+	...ExcalidrawScene.fields,
+	files: Schema.Record(Schema.String, Schema.Unknown),
+	source: RequiredNonEmptyString,
+	type: stringLiteral("excalidraw"),
+	version: numberLiteral(2),
+}).annotate({ identifier: "ExcalidrawFile" });
 
-export class DiagramSelector extends Schema.Class<DiagramSelector>("DiagramSelector")(
-	{
-		ids: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		nodeIds: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		edgeIds: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		kinds: optionalContract(Schema.Array(FlowchartNodeKindSchema).pipe(Schema.mutable)),
-		labels: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-		scope: optionalContract(literals(["all", "nodes", "edges"])),
-	},
-	{ identifier: undefined },
-) {}
+export interface ExcalidrawFile extends Schema.Schema.Type<typeof ExcalidrawFile> {}
 
-export class DiagramStylePatch extends Schema.Class<DiagramStylePatch>("DiagramStylePatch")(
-	{
-		strokeColor: optionalContract(HexColor),
-		fillColor: optionalContract(HexColor),
-		textColor: optionalContract(HexColor),
-		backgroundColor: optionalContract(HexColor),
-	},
-	{ identifier: undefined },
-) {}
+export const GetArtifactRequest = Schema.Struct({
+	artifactId: RequiredNonEmptyString,
+	format: optionalContract(ArtifactFormatSchema),
+	inline: optionalContract(Schema.Boolean),
+}).annotate({ identifier: undefined });
+
+export interface GetArtifactRequest extends Schema.Schema.Type<typeof GetArtifactRequest> {}
+
+export const DiagramSelector = Schema.Struct({
+	ids: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	nodeIds: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	edgeIds: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	kinds: optionalContract(Schema.Array(FlowchartNodeKindSchema).pipe(Schema.mutable)),
+	labels: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
+	scope: optionalContract(literals(["all", "nodes", "edges"])),
+}).annotate({ identifier: undefined });
+
+export interface DiagramSelector extends Schema.Schema.Type<typeof DiagramSelector> {}
+
+export const DiagramStylePatch = Schema.Struct({
+	strokeColor: optionalContract(HexColor),
+	fillColor: optionalContract(HexColor),
+	textColor: optionalContract(HexColor),
+	backgroundColor: optionalContract(HexColor),
+}).annotate({ identifier: undefined });
+
+export interface DiagramStylePatch extends Schema.Schema.Type<typeof DiagramStylePatch> {}
 
 export const DIAGRAM_SHAPES = ["rectangle", "diamond", "ellipse", "circle", "polygon"] as const;
 export const DiagramShapeSchema = Object.assign(literals(DIAGRAM_SHAPES), {
@@ -2118,128 +2018,110 @@ export const DiagramShapeSchema = Object.assign(literals(DIAGRAM_SHAPES), {
 });
 export type DiagramShape = typeof DiagramShapeSchema.Type;
 
-export class SetDefaultStyleOperation extends Schema.Class<SetDefaultStyleOperation>(
-	"SetDefaultStyleOperation",
-)(
-	{
-		op: stringLiteral("setDefaultStyle"),
-		style: requiredObject(DiagramStylePatch),
-	},
-	{ identifier: undefined },
-) {}
-export class SetStyleOperation extends Schema.Class<SetStyleOperation>("SetStyleOperation")(
-	{
-		op: stringLiteral("setStyle"),
-		selector: requiredObject(DiagramSelector),
-		style: requiredObject(DiagramStylePatch),
-	},
-	{ identifier: undefined },
-) {}
-export class SetShapeOperation extends Schema.Class<SetShapeOperation>("SetShapeOperation")(
-	{
-		op: stringLiteral("setShape"),
-		selector: requiredObject(DiagramSelector),
-		shape: DiagramShapeSchema,
-	},
-	{ identifier: undefined },
-) {}
-export class TranslateOperation extends Schema.Class<TranslateOperation>("TranslateOperation")(
-	{
-		op: stringLiteral("translate"),
-		selector: requiredObject(DiagramSelector),
-		dx: FiniteNumber,
-		dy: FiniteNumber,
-	},
-	{ identifier: undefined },
-) {}
-export class ReplaceTextOperation extends Schema.Class<ReplaceTextOperation>(
-	"ReplaceTextOperation",
-)(
-	{
-		op: stringLiteral("replaceText"),
-		selector: requiredObject(DiagramSelector),
-		text: RequiredNonEmptyString,
-	},
-	{ identifier: undefined },
-) {}
-export class RerouteEdgesOperation extends Schema.Class<RerouteEdgesOperation>(
-	"RerouteEdgesOperation",
-)(
-	{
-		op: stringLiteral("rerouteEdges"),
-		selector: optionalContract(DiagramSelector),
-	},
-	{ identifier: undefined },
-) {}
+export const SetDefaultStyleOperation = Schema.Struct({
+	op: stringLiteral("setDefaultStyle"),
+	style: requiredObject(DiagramStylePatch),
+}).annotate({ identifier: undefined });
+
+export interface SetDefaultStyleOperation extends Schema.Schema.Type<
+	typeof SetDefaultStyleOperation
+> {}
+export const SetStyleOperation = Schema.Struct({
+	op: stringLiteral("setStyle"),
+	selector: requiredObject(DiagramSelector),
+	style: requiredObject(DiagramStylePatch),
+}).annotate({ identifier: undefined });
+
+export interface SetStyleOperation extends Schema.Schema.Type<typeof SetStyleOperation> {}
+export const SetShapeOperation = Schema.Struct({
+	op: stringLiteral("setShape"),
+	selector: requiredObject(DiagramSelector),
+	shape: DiagramShapeSchema,
+}).annotate({ identifier: undefined });
+
+export interface SetShapeOperation extends Schema.Schema.Type<typeof SetShapeOperation> {}
+export const TranslateOperation = Schema.Struct({
+	op: stringLiteral("translate"),
+	selector: requiredObject(DiagramSelector),
+	dx: FiniteNumber,
+	dy: FiniteNumber,
+}).annotate({ identifier: undefined });
+
+export interface TranslateOperation extends Schema.Schema.Type<typeof TranslateOperation> {}
+export const ReplaceTextOperation = Schema.Struct({
+	op: stringLiteral("replaceText"),
+	selector: requiredObject(DiagramSelector),
+	text: RequiredNonEmptyString,
+}).annotate({ identifier: undefined });
+
+export interface ReplaceTextOperation extends Schema.Schema.Type<typeof ReplaceTextOperation> {}
+export const RerouteEdgesOperation = Schema.Struct({
+	op: stringLiteral("rerouteEdges"),
+	selector: optionalContract(DiagramSelector),
+}).annotate({ identifier: undefined });
+
+export interface RerouteEdgesOperation extends Schema.Schema.Type<typeof RerouteEdgesOperation> {}
 
 const PatchElementIds = requiredArray(nonEmptyArray(NonEmptyString));
 
-export class InsertElementsOperation extends Schema.Class<InsertElementsOperation>(
-	"InsertElementsOperation",
-)(
-	{
-		op: stringLiteral("insert"),
-		elements: requiredArray(nonEmptyArray(SceneElementSchema)),
-		beforeId: optionalContract(NonEmptyString),
-		afterId: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export const InsertElementsOperation = Schema.Struct({
+	op: stringLiteral("insert"),
+	elements: requiredArray(nonEmptyArray(SceneElementSchema)),
+	beforeId: optionalContract(NonEmptyString),
+	afterId: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
 
-export class RemoveElementsOperation extends Schema.Class<RemoveElementsOperation>(
-	"RemoveElementsOperation",
-)(
-	{
-		op: stringLiteral("remove"),
-		selector: requiredObject(DiagramSelector),
-	},
-	{ identifier: undefined },
-) {}
+export interface InsertElementsOperation extends Schema.Schema.Type<
+	typeof InsertElementsOperation
+> {}
 
-export class ReplaceElementOperation extends Schema.Class<ReplaceElementOperation>(
-	"ReplaceElementOperation",
-)(
-	{
-		op: stringLiteral("replace"),
-		id: RequiredNonEmptyString,
-		element: requiredObject(SceneElementSchema),
-	},
-	{ identifier: undefined },
-) {}
+export const RemoveElementsOperation = Schema.Struct({
+	op: stringLiteral("remove"),
+	selector: requiredObject(DiagramSelector),
+}).annotate({ identifier: undefined });
 
-export class ReorderElementsOperation extends Schema.Class<ReorderElementsOperation>(
-	"ReorderElementsOperation",
-)(
-	{
-		op: stringLiteral("reorder"),
-		ids: PatchElementIds,
-		beforeId: optionalContract(NonEmptyString),
-		afterId: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export interface RemoveElementsOperation extends Schema.Schema.Type<
+	typeof RemoveElementsOperation
+> {}
 
-export class GroupElementsOperation extends Schema.Class<GroupElementsOperation>(
-	"GroupElementsOperation",
-)(
-	{
-		op: stringLiteral("group"),
-		ids: PatchElementIds,
-		groupId: RequiredNonEmptyString,
-	},
-	{ identifier: undefined },
-) {}
+export const ReplaceElementOperation = Schema.Struct({
+	op: stringLiteral("replace"),
+	id: RequiredNonEmptyString,
+	element: requiredObject(SceneElementSchema),
+}).annotate({ identifier: undefined });
 
-export class UngroupElementsOperation extends Schema.Class<UngroupElementsOperation>(
-	"UngroupElementsOperation",
-)(
-	{
-		op: stringLiteral("ungroup"),
-		ids: PatchElementIds,
-		groupId: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export interface ReplaceElementOperation extends Schema.Schema.Type<
+	typeof ReplaceElementOperation
+> {}
+
+export const ReorderElementsOperation = Schema.Struct({
+	op: stringLiteral("reorder"),
+	ids: PatchElementIds,
+	beforeId: optionalContract(NonEmptyString),
+	afterId: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface ReorderElementsOperation extends Schema.Schema.Type<
+	typeof ReorderElementsOperation
+> {}
+
+export const GroupElementsOperation = Schema.Struct({
+	op: stringLiteral("group"),
+	ids: PatchElementIds,
+	groupId: RequiredNonEmptyString,
+}).annotate({ identifier: undefined });
+
+export interface GroupElementsOperation extends Schema.Schema.Type<typeof GroupElementsOperation> {}
+
+export const UngroupElementsOperation = Schema.Struct({
+	op: stringLiteral("ungroup"),
+	ids: PatchElementIds,
+	groupId: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface UngroupElementsOperation extends Schema.Schema.Type<
+	typeof UngroupElementsOperation
+> {}
 
 export const DiagramPatchOperationSchema = Schema.Union(
 	[
@@ -2266,71 +2148,62 @@ export const DiagramPatchOperationSchema = Schema.Union(
 });
 export type DiagramPatchOperation = typeof DiagramPatchOperationSchema.Type;
 
-export class ArtifactPatchSource extends Schema.Class<ArtifactPatchSource>("ArtifactPatchSource")(
-	{
-		artifactId: RequiredNonEmptyString,
-		format: optionalContract(stringLiteral("scene")),
-	},
-	{ identifier: undefined },
-) {}
+export const ArtifactPatchSource = Schema.Struct({
+	artifactId: RequiredNonEmptyString,
+	format: optionalContract(stringLiteral("scene")),
+}).annotate({ identifier: undefined });
 
-export class InlineScenePatchSource extends Schema.Class<InlineScenePatchSource>(
-	"InlineScenePatchSource",
-)(
-	{
-		scene: requiredObject(CanvasSpec),
-	},
-	{ identifier: undefined },
-) {}
+export interface ArtifactPatchSource extends Schema.Schema.Type<typeof ArtifactPatchSource> {}
+
+export const InlineScenePatchSource = Schema.Struct({
+	scene: requiredObject(CanvasSpec),
+}).annotate({ identifier: undefined });
+
+export interface InlineScenePatchSource extends Schema.Schema.Type<typeof InlineScenePatchSource> {}
 export const DiagramPatchSourceSchema = Schema.Union([
 	ArtifactPatchSource,
 	InlineScenePatchSource,
 ]).annotate({ message: "Invalid input" });
 export type DiagramPatchSource = typeof DiagramPatchSourceSchema.Type;
 
-export class ApplyDiagramPatchOptions extends Schema.Class<ApplyDiagramPatchOptions>(
-	"ApplyDiagramPatchOptions",
-)(
-	{
-		artifactFormats: ArtifactFormatsOption,
-		inlineArtifacts: InlineArtifactsOption,
-		preserveConnectivity: optionalContract(Schema.Boolean),
-	},
-	{ identifier: undefined },
-) {}
+export const ApplyDiagramPatchOptions = Schema.Struct({
+	artifactFormats: ArtifactFormatsOption,
+	inlineArtifacts: InlineArtifactsOption,
+	preserveConnectivity: optionalContract(Schema.Boolean),
+}).annotate({ identifier: undefined });
+
+export interface ApplyDiagramPatchOptions extends Schema.Schema.Type<
+	typeof ApplyDiagramPatchOptions
+> {}
 export const ApplyDiagramPatchOptionsSchema = optionalContract(ApplyDiagramPatchOptions);
 
-export class ApplyDiagramPatchRequest extends Schema.Class<ApplyDiagramPatchRequest>(
-	"ApplyDiagramPatchRequest",
-)(
-	{
-		requestId: optionalContract(NonEmptyString),
-		source: DiagramPatchSourceSchema.annotateKey({
-			messageMissingKey: "Invalid input",
-		}),
-		operations: requiredArray(nonEmptyArray(DiagramPatchOperationSchema)),
-		options: optionalContract(ApplyDiagramPatchOptions),
-		intent: optionalContract(NonEmptyString),
-	},
-	{ identifier: undefined },
-) {}
+export const ApplyDiagramPatchRequest = Schema.Struct({
+	requestId: optionalContract(NonEmptyString),
+	source: DiagramPatchSourceSchema.annotateKey({
+		messageMissingKey: "Invalid input",
+	}),
+	operations: requiredArray(nonEmptyArray(DiagramPatchOperationSchema)),
+	options: optionalContract(ApplyDiagramPatchOptions),
+	intent: optionalContract(NonEmptyString),
+}).annotate({ identifier: undefined });
+
+export interface ApplyDiagramPatchRequest extends Schema.Schema.Type<
+	typeof ApplyDiagramPatchRequest
+> {}
 
 export type NormalizedFlowchartSpec = typeof NormalizedFlowchartSpecSchema.Type;
 export type NormalizedMindmapSpec = typeof NormalizedMindmapSpecSchema.Type;
 export type NormalizedSequenceDiagramSpec = typeof NormalizedSequenceDiagramSpecSchema.Type;
 
-export class NormalizedMindmapTopic extends Schema.Class<NormalizedMindmapTopic>(
-	"NormalizedMindmapTopic",
-)(
-	{
-		id: NonEmptyString,
-		label: NonEmptyString,
-		children: Schema.Array(
-			Schema.suspend((): Schema.Codec<NormalizedMindmapTopic> => NormalizedMindmapTopic),
-		).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const NormalizedMindmapTopic = Schema.Struct({
+	id: NonEmptyString,
+	label: NonEmptyString,
+	children: Schema.Array(
+		Schema.suspend((): Schema.Codec<NormalizedMindmapTopic> => NormalizedMindmapTopic),
+	).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface NormalizedMindmapTopic extends Schema.Schema.Type<typeof NormalizedMindmapTopic> {}
 
 export interface QualityCheck {
 	readonly code: string;
@@ -2570,44 +2443,38 @@ const PartialArtifactBundleSchema = Schema.Struct({
 	formats: optionalContract(Schema.Array(ArtifactFormatRefSchema).pipe(Schema.mutable)),
 });
 
-export class BuildFlowchartAccepted extends Schema.Class<BuildFlowchartAccepted>(
-	"BuildFlowchartAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedFlowchartSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildFlowchartRejected extends Schema.Class<BuildFlowchartRejected>(
-	"BuildFlowchartRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_flowchart",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedFlowchartSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildFlowchartAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedFlowchartSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildFlowchartAccepted extends Schema.Schema.Type<typeof BuildFlowchartAccepted> {}
+export const BuildFlowchartRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_flowchart",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedFlowchartSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildFlowchartRejected extends Schema.Schema.Type<typeof BuildFlowchartRejected> {}
 export const BuildFlowchartResultSchema = Schema.Union([
 	BuildFlowchartAccepted,
 	BuildFlowchartRejected,
@@ -2615,742 +2482,674 @@ export const BuildFlowchartResultSchema = Schema.Union([
 export type BuildFlowchartResult = typeof BuildFlowchartResultSchema.Type;
 
 /** An edited flowchart, built as a new artifact whose provenance names the one it changed. */
-export class EditFlowchartAccepted extends Schema.Class<EditFlowchartAccepted>(
-	"EditFlowchartAccepted",
-)(
-	{
-		...BuildFlowchartAccepted.fields,
-		/** The edits as applied. */
-		edits: FlowchartEditsSchema,
-	},
-	{ identifier: undefined },
-) {}
+export const EditFlowchartAccepted = Schema.Struct({
+	...BuildFlowchartAccepted.fields,
+	/** The edits as applied. */
+	edits: FlowchartEditsSchema,
+}).annotate({ identifier: undefined });
+
+export interface EditFlowchartAccepted extends Schema.Schema.Type<typeof EditFlowchartAccepted> {}
 /**
  * An edit that stored nothing: no flowchart document to start from, an edit naming what the
  * document lacks, or an edited document that does not build.
  */
-export class EditFlowchartRejected extends Schema.Class<EditFlowchartRejected>(
-	"EditFlowchartRejected",
-)(
-	{
-		...BuildFlowchartRejected.fields,
-		status: literals([
-			...BuildFlowchartRejected.fields.status.literals,
-			"not_found",
-			"invalid_edit",
-		]),
-	},
-	{ identifier: undefined },
-) {}
+export const EditFlowchartRejected = Schema.Struct({
+	...BuildFlowchartRejected.fields,
+	status: literals([...BuildFlowchartRejected.fields.status.literals, "not_found", "invalid_edit"]),
+}).annotate({ identifier: undefined });
+
+export interface EditFlowchartRejected extends Schema.Schema.Type<typeof EditFlowchartRejected> {}
 export const EditFlowchartResultSchema = Schema.Union([
 	EditFlowchartAccepted,
 	EditFlowchartRejected,
 ]);
 export type EditFlowchartResult = typeof EditFlowchartResultSchema.Type;
 
-export class BuildMindmapAccepted extends Schema.Class<BuildMindmapAccepted>(
-	"BuildMindmapAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedMindmapSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildMindmapRejected extends Schema.Class<BuildMindmapRejected>(
-	"BuildMindmapRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_mindmap",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedMindmapSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildMindmapAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedMindmapSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildMindmapAccepted extends Schema.Schema.Type<typeof BuildMindmapAccepted> {}
+export const BuildMindmapRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_mindmap",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedMindmapSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildMindmapRejected extends Schema.Schema.Type<typeof BuildMindmapRejected> {}
 export const BuildMindmapResultSchema = Schema.Union([BuildMindmapAccepted, BuildMindmapRejected]);
 export type BuildMindmapResult = typeof BuildMindmapResultSchema.Type;
 
-export class BuildSequenceDiagramAccepted extends Schema.Class<BuildSequenceDiagramAccepted>(
-	"BuildSequenceDiagramAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedSequenceDiagramSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildSequenceDiagramRejected extends Schema.Class<BuildSequenceDiagramRejected>(
-	"BuildSequenceDiagramRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_sequence",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedSequenceDiagramSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildSequenceDiagramAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedSequenceDiagramSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildSequenceDiagramAccepted extends Schema.Schema.Type<
+	typeof BuildSequenceDiagramAccepted
+> {}
+export const BuildSequenceDiagramRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_sequence",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedSequenceDiagramSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildSequenceDiagramRejected extends Schema.Schema.Type<
+	typeof BuildSequenceDiagramRejected
+> {}
 export const BuildSequenceDiagramResultSchema = Schema.Union([
 	BuildSequenceDiagramAccepted,
 	BuildSequenceDiagramRejected,
 ]);
 export type BuildSequenceDiagramResult = typeof BuildSequenceDiagramResultSchema.Type;
 
-export class BuildTimelineAccepted extends Schema.Class<BuildTimelineAccepted>(
-	"BuildTimelineAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedTimelineSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildTimelineRejected extends Schema.Class<BuildTimelineRejected>(
-	"BuildTimelineRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_timeline",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedTimelineSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildTimelineAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedTimelineSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildTimelineAccepted extends Schema.Schema.Type<typeof BuildTimelineAccepted> {}
+export const BuildTimelineRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_timeline",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedTimelineSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildTimelineRejected extends Schema.Schema.Type<typeof BuildTimelineRejected> {}
 export const BuildTimelineResultSchema = Schema.Union([
 	BuildTimelineAccepted,
 	BuildTimelineRejected,
 ]);
 export type BuildTimelineResult = typeof BuildTimelineResultSchema.Type;
 
-export class BuildChartAccepted extends Schema.Class<BuildChartAccepted>("BuildChartAccepted")(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedChartSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildChartRejected extends Schema.Class<BuildChartRejected>("BuildChartRejected")(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_chart",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedChartSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildChartAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedChartSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildChartAccepted extends Schema.Schema.Type<typeof BuildChartAccepted> {}
+export const BuildChartRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_chart",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedChartSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildChartRejected extends Schema.Schema.Type<typeof BuildChartRejected> {}
 export const BuildChartResultSchema = Schema.Union([BuildChartAccepted, BuildChartRejected]);
 export type BuildChartResult = typeof BuildChartResultSchema.Type;
 
-export class BuildStateMachineAccepted extends Schema.Class<BuildStateMachineAccepted>(
-	"BuildStateMachineAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedStateMachineSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildStateMachineRejected extends Schema.Class<BuildStateMachineRejected>(
-	"BuildStateMachineRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_state_machine",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedStateMachineSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildStateMachineAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedStateMachineSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildStateMachineAccepted extends Schema.Schema.Type<
+	typeof BuildStateMachineAccepted
+> {}
+export const BuildStateMachineRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_state_machine",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedStateMachineSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildStateMachineRejected extends Schema.Schema.Type<
+	typeof BuildStateMachineRejected
+> {}
 export const BuildStateMachineResultSchema = Schema.Union([
 	BuildStateMachineAccepted,
 	BuildStateMachineRejected,
 ]);
 export type BuildStateMachineResult = typeof BuildStateMachineResultSchema.Type;
 
-export class BuildGanttAccepted extends Schema.Class<BuildGanttAccepted>("BuildGanttAccepted")(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedGanttSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildGanttRejected extends Schema.Class<BuildGanttRejected>("BuildGanttRejected")(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_gantt",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedGanttSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildGanttAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedGanttSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildGanttAccepted extends Schema.Schema.Type<typeof BuildGanttAccepted> {}
+export const BuildGanttRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_gantt",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedGanttSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildGanttRejected extends Schema.Schema.Type<typeof BuildGanttRejected> {}
 export const BuildGanttResultSchema = Schema.Union([BuildGanttAccepted, BuildGanttRejected]);
 export type BuildGanttResult = typeof BuildGanttResultSchema.Type;
-export class BuildErDiagramAccepted extends Schema.Class<BuildErDiagramAccepted>(
-	"BuildErDiagramAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedErSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildErDiagramRejected extends Schema.Class<BuildErDiagramRejected>(
-	"BuildErDiagramRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_er_diagram",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedErSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildErDiagramAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedErSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildErDiagramAccepted extends Schema.Schema.Type<typeof BuildErDiagramAccepted> {}
+export const BuildErDiagramRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_er_diagram",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedErSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildErDiagramRejected extends Schema.Schema.Type<typeof BuildErDiagramRejected> {}
 export const BuildErDiagramResultSchema = Schema.Union([
 	BuildErDiagramAccepted,
 	BuildErDiagramRejected,
 ]);
 export type BuildErDiagramResult = typeof BuildErDiagramResultSchema.Type;
 
-export class BuildClassDiagramAccepted extends Schema.Class<BuildClassDiagramAccepted>(
-	"BuildClassDiagramAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedClassSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildClassDiagramRejected extends Schema.Class<BuildClassDiagramRejected>(
-	"BuildClassDiagramRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_class_diagram",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedClassSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildClassDiagramAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedClassSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildClassDiagramAccepted extends Schema.Schema.Type<
+	typeof BuildClassDiagramAccepted
+> {}
+export const BuildClassDiagramRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_class_diagram",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedClassSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildClassDiagramRejected extends Schema.Schema.Type<
+	typeof BuildClassDiagramRejected
+> {}
 export const BuildClassDiagramResultSchema = Schema.Union([
 	BuildClassDiagramAccepted,
 	BuildClassDiagramRejected,
 ]);
 export type BuildClassDiagramResult = typeof BuildClassDiagramResultSchema.Type;
 
-export class BuildOrgChartAccepted extends Schema.Class<BuildOrgChartAccepted>(
-	"BuildOrgChartAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedOrgChartSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildOrgChartRejected extends Schema.Class<BuildOrgChartRejected>(
-	"BuildOrgChartRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_org_chart",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedOrgChartSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildOrgChartAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedOrgChartSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildOrgChartAccepted extends Schema.Schema.Type<typeof BuildOrgChartAccepted> {}
+export const BuildOrgChartRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_org_chart",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedOrgChartSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildOrgChartRejected extends Schema.Schema.Type<typeof BuildOrgChartRejected> {}
 export const BuildOrgChartResultSchema = Schema.Union([
 	BuildOrgChartAccepted,
 	BuildOrgChartRejected,
 ]);
 export type BuildOrgChartResult = typeof BuildOrgChartResultSchema.Type;
 
-export class BuildVennDiagramAccepted extends Schema.Class<BuildVennDiagramAccepted>(
-	"BuildVennDiagramAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedVennSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildVennDiagramRejected extends Schema.Class<BuildVennDiagramRejected>(
-	"BuildVennDiagramRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_venn_diagram",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedVennSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildVennDiagramAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedVennSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildVennDiagramAccepted extends Schema.Schema.Type<
+	typeof BuildVennDiagramAccepted
+> {}
+export const BuildVennDiagramRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_venn_diagram",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedVennSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildVennDiagramRejected extends Schema.Schema.Type<
+	typeof BuildVennDiagramRejected
+> {}
 export const BuildVennDiagramResultSchema = Schema.Union([
 	BuildVennDiagramAccepted,
 	BuildVennDiagramRejected,
 ]);
 export type BuildVennDiagramResult = typeof BuildVennDiagramResultSchema.Type;
 
-export class BuildJourneyMapAccepted extends Schema.Class<BuildJourneyMapAccepted>(
-	"BuildJourneyMapAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedJourneySpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildJourneyMapRejected extends Schema.Class<BuildJourneyMapRejected>(
-	"BuildJourneyMapRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_journey",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedJourneySpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildJourneyMapAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedJourneySpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildJourneyMapAccepted extends Schema.Schema.Type<
+	typeof BuildJourneyMapAccepted
+> {}
+export const BuildJourneyMapRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_journey",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedJourneySpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildJourneyMapRejected extends Schema.Schema.Type<
+	typeof BuildJourneyMapRejected
+> {}
 export const BuildJourneyMapResultSchema = Schema.Union([
 	BuildJourneyMapAccepted,
 	BuildJourneyMapRejected,
 ]);
 export type BuildJourneyMapResult = typeof BuildJourneyMapResultSchema.Type;
 
-export class BuildSankeyAccepted extends Schema.Class<BuildSankeyAccepted>("BuildSankeyAccepted")(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedSankeySpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildSankeyRejected extends Schema.Class<BuildSankeyRejected>("BuildSankeyRejected")(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_sankey",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedSankeySpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildSankeyAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedSankeySpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildSankeyAccepted extends Schema.Schema.Type<typeof BuildSankeyAccepted> {}
+export const BuildSankeyRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_sankey",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedSankeySpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildSankeyRejected extends Schema.Schema.Type<typeof BuildSankeyRejected> {}
 export const BuildSankeyResultSchema = Schema.Union([BuildSankeyAccepted, BuildSankeyRejected]);
 export type BuildSankeyResult = typeof BuildSankeyResultSchema.Type;
 
-export class BuildWireframeAccepted extends Schema.Class<BuildWireframeAccepted>(
-	"BuildWireframeAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedWireframeSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildWireframeRejected extends Schema.Class<BuildWireframeRejected>(
-	"BuildWireframeRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_wireframe",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedWireframeSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildWireframeAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedWireframeSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildWireframeAccepted extends Schema.Schema.Type<typeof BuildWireframeAccepted> {}
+export const BuildWireframeRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_wireframe",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedWireframeSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildWireframeRejected extends Schema.Schema.Type<typeof BuildWireframeRejected> {}
 export const BuildWireframeResultSchema = Schema.Union([
 	BuildWireframeAccepted,
 	BuildWireframeRejected,
 ]);
 export type BuildWireframeResult = typeof BuildWireframeResultSchema.Type;
 
-export class BuildQuadrantChartAccepted extends Schema.Class<BuildQuadrantChartAccepted>(
-	"BuildQuadrantChartAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: NormalizedQuadrantChartSpecSchema,
-		quality: QualityReportSchema,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class BuildQuadrantChartRejected extends Schema.Class<BuildQuadrantChartRejected>(
-	"BuildQuadrantChartRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_quadrant_chart",
-			"quality_failed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(NormalizedQuadrantChartSpecSchema),
-		quality: optionalContract(QualityReportSchema),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const BuildQuadrantChartAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: NormalizedQuadrantChartSpecSchema,
+	quality: QualityReportSchema,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildQuadrantChartAccepted extends Schema.Schema.Type<
+	typeof BuildQuadrantChartAccepted
+> {}
+export const BuildQuadrantChartRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_quadrant_chart",
+		"quality_failed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(NormalizedQuadrantChartSpecSchema),
+	quality: optionalContract(QualityReportSchema),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface BuildQuadrantChartRejected extends Schema.Schema.Type<
+	typeof BuildQuadrantChartRejected
+> {}
 export const BuildQuadrantChartResultSchema = Schema.Union([
 	BuildQuadrantChartAccepted,
 	BuildQuadrantChartRejected,
 ]);
 export type BuildQuadrantChartResult = typeof BuildQuadrantChartResultSchema.Type;
 
-export class GetArtifactAccepted extends Schema.Class<GetArtifactAccepted>("GetArtifactAccepted")(
-	{
-		ok: booleanLiteral(true),
-		artifactId: Schema.String,
-		diagramId: Schema.String,
-		format: ArtifactFormatSchema,
-		mimeType: Schema.String,
-		url: optionalContract(Schema.String),
-		expiresAt: optionalContract(Schema.String),
-		inline: optionalContract(Schema.Unknown),
-		sizeBytes: optionalContract(Schema.Number),
-		provenance: optionalContract(ArtifactProvenance),
-	},
-	{ identifier: undefined },
-) {}
-export class GetArtifactRejected extends Schema.Class<GetArtifactRejected>("GetArtifactRejected")(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"not_found",
-			"format_unavailable",
-			"expired",
-			"storage_failed",
-		]),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const GetArtifactAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	artifactId: Schema.String,
+	diagramId: Schema.String,
+	format: ArtifactFormatSchema,
+	mimeType: Schema.String,
+	url: optionalContract(Schema.String),
+	expiresAt: optionalContract(Schema.String),
+	inline: optionalContract(Schema.Unknown),
+	sizeBytes: optionalContract(Schema.Number),
+	provenance: optionalContract(ArtifactProvenance),
+}).annotate({ identifier: undefined });
+
+export interface GetArtifactAccepted extends Schema.Schema.Type<typeof GetArtifactAccepted> {}
+export const GetArtifactRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"not_found",
+		"format_unavailable",
+		"expired",
+		"storage_failed",
+	]),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface GetArtifactRejected extends Schema.Schema.Type<typeof GetArtifactRejected> {}
 export const GetArtifactResultSchema = Schema.Union([GetArtifactAccepted, GetArtifactRejected]);
 export type GetArtifactResult = typeof GetArtifactResultSchema.Type;
 
-export class ApplyDiagramPatchAccepted extends Schema.Class<ApplyDiagramPatchAccepted>(
-	"ApplyDiagramPatchAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		patchId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		sourceArtifactId: optionalContract(Schema.String),
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
-export class ApplyDiagramPatchRejected extends Schema.Class<ApplyDiagramPatchRejected>(
-	"ApplyDiagramPatchRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"source_unavailable",
-			"target_not_found",
-			"unsupported_operation",
-			"connectivity_changed",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		patchId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		sourceArtifactId: optionalContract(Schema.String),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const ApplyDiagramPatchAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	patchId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	sourceArtifactId: optionalContract(Schema.String),
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface ApplyDiagramPatchAccepted extends Schema.Schema.Type<
+	typeof ApplyDiagramPatchAccepted
+> {}
+export const ApplyDiagramPatchRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"source_unavailable",
+		"target_not_found",
+		"unsupported_operation",
+		"connectivity_changed",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	patchId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	sourceArtifactId: optionalContract(Schema.String),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface ApplyDiagramPatchRejected extends Schema.Schema.Type<
+	typeof ApplyDiagramPatchRejected
+> {}
 export const ApplyDiagramPatchResultSchema = Schema.Union([
 	ApplyDiagramPatchAccepted,
 	ApplyDiagramPatchRejected,
 ]);
 export type ApplyDiagramPatchResult = typeof ApplyDiagramPatchResultSchema.Type;
 
-export class CreateCanvasAccepted extends Schema.Class<CreateCanvasAccepted>(
-	"CreateCanvasAccepted",
-)(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		buildId: Schema.String,
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: CanvasSpec,
-		artifact: ArtifactBundleSchema,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const CreateCanvasAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	buildId: Schema.String,
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: CanvasSpec,
+	artifact: ArtifactBundleSchema,
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
 
-export class CreateCanvasRejected extends Schema.Class<CreateCanvasRejected>(
-	"CreateCanvasRejected",
-)(
-	{
-		ok: booleanLiteral(false),
-		status: literals([
-			"invalid_input",
-			"invalid_canvas",
-			"limit_exceeded",
-			"render_failed",
-			"export_failed",
-			"storage_failed",
-		]),
-		buildId: optionalContract(Schema.String),
-		requestId: optionalContract(Schema.String),
-		normalizedSpec: optionalContract(CanvasSpec),
-		partial: optionalContract(PartialArtifactBundleSchema),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export interface CreateCanvasAccepted extends Schema.Schema.Type<typeof CreateCanvasAccepted> {}
+
+export const CreateCanvasRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals([
+		"invalid_input",
+		"invalid_canvas",
+		"limit_exceeded",
+		"render_failed",
+		"export_failed",
+		"storage_failed",
+	]),
+	buildId: optionalContract(Schema.String),
+	requestId: optionalContract(Schema.String),
+	normalizedSpec: optionalContract(CanvasSpec),
+	partial: optionalContract(PartialArtifactBundleSchema),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface CreateCanvasRejected extends Schema.Schema.Type<typeof CreateCanvasRejected> {}
 
 export const CreateCanvasResultSchema = Schema.Union([CreateCanvasAccepted, CreateCanvasRejected]);
 export type CreateCanvasResult = typeof CreateCanvasResultSchema.Type;
@@ -3361,62 +3160,58 @@ const maximumIconSearchLimit = 25;
 export const DEFAULT_ICON_SEARCH_LIMIT = 10;
 
 /** Ranked search over the logos a node may carry (see NodeIconSpec). */
-export class SearchIconsRequest extends Schema.Class<SearchIconsRequest>("SearchIconsRequest")(
-	{
-		q: requiredString(
-			nonEmptyString().check(
-				Schema.isMaxLength(maximumIconQueryLength, {
-					message: `Too big: expected string to have <=${maximumIconQueryLength} characters`,
-				}),
+export const SearchIconsRequest = Schema.Struct({
+	q: requiredString(
+		nonEmptyString().check(
+			Schema.isMaxLength(maximumIconQueryLength, {
+				message: `Too big: expected string to have <=${maximumIconQueryLength} characters`,
+			}),
+		),
+	),
+	limit: optionalContract(
+		Schema.Int.check(
+			Schema.isBetween(
+				{
+					minimum: minimumIconSearchLimit,
+					maximum: maximumIconSearchLimit,
+				},
+				{
+					message: `Expected an integer between ${minimumIconSearchLimit} and ${maximumIconSearchLimit}`,
+				},
 			),
 		),
-		limit: optionalContract(
-			Schema.Int.check(
-				Schema.isBetween(
-					{
-						minimum: minimumIconSearchLimit,
-						maximum: maximumIconSearchLimit,
-					},
-					{
-						message: `Expected an integer between ${minimumIconSearchLimit} and ${maximumIconSearchLimit}`,
-					},
-				),
-			),
-		),
-	},
-	{ identifier: undefined },
-) {}
+	),
+}).annotate({ identifier: undefined });
 
-export class SearchIconsMatch extends Schema.Class<SearchIconsMatch>("SearchIconsMatch")(
-	{
-		slug: Schema.String,
-		name: Schema.String,
-		collection: Schema.String,
-		/** exact: the product's own mark; vendor: its vendor's or platform's; weak: fuzzier. */
-		match: literals(["exact", "vendor", "weak"]),
-	},
-	{ identifier: undefined },
-) {}
+export interface SearchIconsRequest extends Schema.Schema.Type<typeof SearchIconsRequest> {}
 
-export class SearchIconsAccepted extends Schema.Class<SearchIconsAccepted>("SearchIconsAccepted")(
-	{
-		ok: booleanLiteral(true),
-		status: stringLiteral("accepted"),
-		query: Schema.String,
-		icons: Schema.Array(SearchIconsMatch).pipe(Schema.mutable),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export const SearchIconsMatch = Schema.Struct({
+	slug: Schema.String,
+	name: Schema.String,
+	collection: Schema.String,
+	/** exact: the product's own mark; vendor: its vendor's or platform's; weak: fuzzier. */
+	match: literals(["exact", "vendor", "weak"]),
+}).annotate({ identifier: undefined });
 
-export class SearchIconsRejected extends Schema.Class<SearchIconsRejected>("SearchIconsRejected")(
-	{
-		ok: booleanLiteral(false),
-		status: literals(["invalid_input"]),
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-	},
-	{ identifier: undefined },
-) {}
+export interface SearchIconsMatch extends Schema.Schema.Type<typeof SearchIconsMatch> {}
+
+export const SearchIconsAccepted = Schema.Struct({
+	ok: booleanLiteral(true),
+	status: stringLiteral("accepted"),
+	query: Schema.String,
+	icons: Schema.Array(SearchIconsMatch).pipe(Schema.mutable),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface SearchIconsAccepted extends Schema.Schema.Type<typeof SearchIconsAccepted> {}
+
+export const SearchIconsRejected = Schema.Struct({
+	ok: booleanLiteral(false),
+	status: literals(["invalid_input"]),
+	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+}).annotate({ identifier: undefined });
+
+export interface SearchIconsRejected extends Schema.Schema.Type<typeof SearchIconsRejected> {}
 
 export const SearchIconsResultSchema = Schema.Union([SearchIconsAccepted, SearchIconsRejected]);
 export type SearchIconsResult = typeof SearchIconsResultSchema.Type;
