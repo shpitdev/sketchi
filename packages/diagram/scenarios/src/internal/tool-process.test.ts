@@ -1,4 +1,4 @@
-import { assert, describe, it } from "@effect/vitest";
+import { assert, describe, it, vi } from "@effect/vitest";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { Cause, Deferred, Effect, Exit, Fiber, Layer } from "effect";
@@ -241,6 +241,112 @@ describe("runToolProcess", { timeout: 60_000 }, () => {
 						const cleaned = yield* Effect.tryPromise(() => readFile(cleanedFile, "utf8"));
 						assert.strictEqual(cleaned, "cleaned");
 					}),
+				),
+		);
+	}
+	it.live.runIf(process.platform !== "win32")(
+		"preserves descendant cleanup when a group existence probe returns EPERM",
+		() =>
+			withProcessFixture(({ pidFile }) =>
+				Effect.scoped(
+					Effect.gen(function* () {
+						const cleanedFile = `${pidFile}.cleaned`;
+						const descendantScript = [
+							"const { writeFileSync } = require('node:fs');",
+							`process.on('SIGTERM', () => setTimeout(() => { writeFileSync(${JSON.stringify(cleanedFile)}, 'cleaned'); process.exit(0); }, 200));`,
+							"process.stdout.write('READY\\n');",
+							"setInterval(() => {}, 1000);",
+						].join("");
+						const parentScript = [
+							"const { spawn } = require('node:child_process');",
+							"const { writeFileSync } = require('node:fs');",
+							`const child = spawn(process.execPath, ['-e', ${JSON.stringify(descendantScript)}], { stdio: ['ignore', 'pipe', 'inherit'] });`,
+							`child.stdout.once('data', () => writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)));`,
+							"process.on('SIGTERM', () => process.exit(0));",
+							"setInterval(() => {}, 1000);",
+						].join("");
+						let groupId: number | undefined;
+						let denied = false;
+						const kill = process.kill.bind(process);
+						yield* Effect.acquireRelease(
+							Effect.sync(() =>
+								vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+									if (groupId !== undefined && pid === -groupId && signal === 0 && !denied) {
+										denied = true;
+										throw Object.assign(new Error("Probe permission denied"), { code: "EPERM" });
+									}
+									return kill(pid, signal);
+								}),
+							),
+							(spy) => Effect.sync(() => spy.mockRestore()),
+						);
+						const fiber = yield* runToolProcess(
+							{ command: process.execPath, args: ["-e", parentScript], env: process.env },
+							{ ...realProcessPolicy, hardKillGraceMs: 1_000 },
+						).pipe(Effect.provide(ToolProcessSpawnerLive), Effect.forkChild);
+						groupId = yield* waitForPid(pidFile);
+						const result = yield* Fiber.join(fiber);
+						assert.isTrue(denied);
+						assert.isTrue(result.timedOut);
+						assert.strictEqual(
+							yield* Effect.tryPromise(() => readFile(cleanedFile, "utf8")),
+							"cleaned",
+						);
+					}),
+				),
+			),
+	);
+	for (const deniedSignal of ["SIGTERM", "SIGKILL"] as const) {
+		it.live.runIf(process.platform !== "win32")(
+			`returns a typed ${deniedSignal} permission failure instead of a successful timeout`,
+			() =>
+				withProcessFixture(({ pidFile }) =>
+					Effect.scoped(
+						Effect.gen(function* () {
+							let groupId: number | undefined;
+							let denied = false;
+							const kill = process.kill.bind(process);
+							yield* Effect.acquireRelease(
+								Effect.sync(() =>
+									vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+										if (
+											groupId !== undefined &&
+											pid === -groupId &&
+											signal === deniedSignal &&
+											!denied
+										) {
+											denied = true;
+											throw Object.assign(new Error("Signal permission denied"), { code: "EPERM" });
+										}
+										return kill(pid, signal);
+									}),
+								),
+								(spy) => Effect.sync(() => spy.mockRestore()),
+							);
+							const childScript = [
+								"process.on('SIGTERM', () => {});",
+								`require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));`,
+								"setInterval(() => {}, 1000);",
+							].join("");
+							const fiber = yield* runToolProcess(
+								{ command: process.execPath, args: ["-e", childScript], env: process.env },
+								realProcessPolicy,
+							).pipe(Effect.provide(ToolProcessSpawnerLive), Effect.exit, Effect.forkChild);
+							groupId = yield* waitForPid(pidFile);
+							const exit = yield* Fiber.join(fiber);
+							assert.isTrue(denied);
+							assert.isTrue(Exit.isFailure(exit));
+							if (Exit.isFailure(exit)) {
+								const error = Cause.findError(exit.cause);
+								assert.strictEqual(error._tag, "Success");
+								if (error._tag === "Success" && error.success._tag === "ToolProcessControlError") {
+									assert.strictEqual(error.success.signal, deniedSignal);
+									assert.deepInclude(error.success.cause, { code: "EPERM" });
+								} else assert.fail("Expected a typed process control failure.");
+							}
+							yield* waitForProcessExit(groupId);
+						}),
+					),
 				),
 		);
 	}

@@ -305,6 +305,8 @@ function makeRunningToolProcess(state: NodeProcessState): RunningToolProcess {
 							return true;
 						} catch (cause) {
 							if (errorCode(cause) === "ESRCH") return false;
+							// A denied existence probe does not establish that the group is gone.
+							if (errorCode(cause) === "EPERM") return true;
 							throw cause;
 						}
 					},
