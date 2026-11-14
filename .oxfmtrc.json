@@ -31,6 +31,7 @@
 		// Raw pipeline artifacts, and state that editor and agent tools rewrite
 		"packages/icons/catalog/pipeline-output/**",
 		".agents/**",
+		".claude/**",
 		".memory/**",
 		".vscode/**",
 		// Prose
