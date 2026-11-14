@@ -255,6 +255,20 @@ function lintProbes(probes: Readonly<Record<string, string>>): Record<string, st
 	}
 }
 
+function unreasonedSuppressions(source: string): string[] {
+	const directives = [
+		/(?:oxlint|eslint)-disable(?:-next-line|-line)?\b(.*)/g,
+		/(?:\/\/|\/\*+|^\s*\*)\s*@effect-diagnostics(?:-next-line)?\b([^\r\n]*?)(?=\*\/|[\r\n]|$)/gm,
+	];
+	const unreasoned: string[] = [];
+	for (const directive of directives) {
+		for (const match of source.matchAll(directive)) {
+			if (!/\s--\s+\S/.test(match[1] ?? "")) unreasoned.push(match[0].trim());
+		}
+	}
+	return unreasoned;
+}
+
 describe("diagram package layout", () => {
 	it("discovers the existing Nx projects at their nested roots", async () => {
 		const graph = await createProjectGraphAsync({ exitOnError: true });
@@ -494,10 +508,6 @@ describe("workspace project membership", () => {
 	});
 
 	it("requires a reason on lint and Effect diagnostic directives", () => {
-		const directives = [
-			/(?:oxlint|eslint)-disable(?:-next-line|-line)?\b(.*)/g,
-			/^\s*(?:\/\/|\/\*|\*)\s*@effect-diagnostics(?:-next-line)?\b(.*)/gm,
-		];
 		const unreasoned: string[] = [];
 		for (const sourceFile of globSync(
 			["apps", "packages", "scripts", "tools"].map(
@@ -515,14 +525,31 @@ describe("workspace project membership", () => {
 			},
 		)) {
 			const source = readFileSync(path.join(workspaceRoot, sourceFile), "utf8");
-			for (const directive of directives) {
-				for (const match of source.matchAll(directive)) {
-					if (!/\s--\s+\S/.test(match[1] ?? "")) {
-						unreasoned.push(`${sourceFile}: ${match[0].trim()}`);
-					}
-				}
+			for (const directive of unreasonedSuppressions(source)) {
+				unreasoned.push(`${sourceFile}: ${directive}`);
 			}
 		}
 		expect(unreasoned).toEqual([]);
 	});
 });
+
+// Compose directive fixtures so this file does not itself contain suppressions.
+const nextLineDirective = "@effect-diagnostics-next-line floatingEffect:off";
+const fileDirective = "@effect-diagnostics floatingEffect:off";
+
+it.each([
+	["standalone line", "// ", nextLineDirective, "\nEffect.succeed(1);"],
+	["trailing line", "export const marker = 1; // ", nextLineDirective, "\nEffect.succeed(1);"],
+	["trailing file-wide", "export const marker = 1; // ", fileDirective, "\nEffect.succeed(1);"],
+	["block", "/* ", nextLineDirective, " */\nEffect.succeed(1);"],
+	["one-line JSDoc", "/** ", nextLineDirective, " */\nEffect.succeed(1);"],
+	["multiline JSDoc", "/**\n * ", fileDirective, "\n */\nEffect.succeed(1);"],
+])(
+	"requires a nonempty reason in %s Effect diagnostic comments",
+	(_name, prefix, directive, suffix) => {
+		const source = (reason: string) => `${prefix}${directive}${reason}${suffix}`;
+		expect(unreasonedSuppressions(source(""))).toHaveLength(1);
+		expect(unreasonedSuppressions(source(" -- "))).toHaveLength(1);
+		expect(unreasonedSuppressions(source(" -- Required synchronous host boundary"))).toEqual([]);
+	},
+);
