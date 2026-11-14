@@ -398,6 +398,7 @@ async function main(argv) {
 			command("pnpm-install", ["pnpm", "install", "--frozen-lockfile", "--prefer-offline"]),
 		],
 		["affected scope", resolveScope],
+		["TypeScript reference sync", command("sync", ["pnpm", "nx", "sync:check"])],
 		["lint, format, and custom-rule checks", command("check", ["pnpm", "run", "check"])],
 		// `pnpm run check` already built every package, including the scenarios CLI.
 		[

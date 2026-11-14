@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../packages/observability/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/icons/draw/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/icons/catalog/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagram/generation/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagram/core/tsconfig.lib.json"
+    }
+  ]
+}

@@ -4,7 +4,7 @@
     "composite": true,
     "outDir": "../../dist/out-tsc/tools/sketchi-generators",
     "rootDir": "src",
-    "tsBuildInfoFile": "../../dist/out-tsc/tools/sketchi-generators/tsconfig.lib.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
     "declaration": true,
     "types": ["node"]
   },
@@ -22,5 +22,6 @@
     "src/**/*.spec.js",
     "src/**/*.test.jsx",
     "src/**/*.spec.jsx"
-  ]
+  ],
+  "references": []
 }

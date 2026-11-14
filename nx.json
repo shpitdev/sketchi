@@ -75,5 +75,8 @@
 				"testStorybookTargetName": "test-storybook"
 			}
 		}
-	]
+	],
+	"sync": {
+		"globalGenerators": ["@nx/js:typescript-sync"]
+	}
 }

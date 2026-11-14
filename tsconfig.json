@@ -2,28 +2,72 @@
   "extends": "./tsconfig.base.json",
   "files": [],
   "references": [
-    { "path": "./packages/diagram/core/tsconfig.lib.json" },
-    { "path": "./packages/diagram/generation/tsconfig.lib.json" },
-    { "path": "./packages/diagram/renderer/tsconfig.lib.json" },
-    { "path": "./packages/diagram/excalidraw/tsconfig.lib.json" },
-    { "path": "./packages/diagram/agent/tsconfig.lib.json" },
-    { "path": "./packages/diagram/scenarios/tsconfig.lib.json" },
-    { "path": "./packages/observability/tsconfig.lib.json" },
-    { "path": "./packages/social-card/tsconfig.lib.json" },
-    { "path": "./packages/studio/projects/tsconfig.lib.json" },
-    { "path": "./packages/svg-excalidraw/tsconfig.lib.json" },
-    { "path": "./packages/diagram/ui/tsconfig.lib.json" },
-    { "path": "./packages/ui/tsconfig.lib.json" },
-    { "path": "./packages/icons/catalog/tsconfig.lib.json" },
-    { "path": "./packages/icons/community/tsconfig.lib.json" },
-    { "path": "./packages/icons/draw/tsconfig.lib.json" },
-    { "path": "./tools/icon-batch" },
-    { "path": "./tools/sketchi-generators/tsconfig.lib.json" },
-    { "path": "./apps/cli" },
-    { "path": "./apps/excalidraw" },
-    { "path": "./apps/icons" },
-    { "path": "./apps/playground" },
-    { "path": "./apps/web" }
+    {
+      "path": "./packages/diagram/core"
+    },
+    {
+      "path": "./packages/diagram/generation"
+    },
+    {
+      "path": "./packages/diagram/renderer"
+    },
+    {
+      "path": "./packages/diagram/excalidraw"
+    },
+    {
+      "path": "./packages/diagram/agent"
+    },
+    {
+      "path": "./packages/diagram/scenarios"
+    },
+    {
+      "path": "./packages/observability"
+    },
+    {
+      "path": "./packages/social-card"
+    },
+    {
+      "path": "./packages/studio/projects"
+    },
+    {
+      "path": "./packages/svg-excalidraw"
+    },
+    {
+      "path": "./packages/diagram/ui"
+    },
+    {
+      "path": "./packages/ui"
+    },
+    {
+      "path": "./packages/icons/catalog"
+    },
+    {
+      "path": "./packages/icons/community"
+    },
+    {
+      "path": "./packages/icons/draw"
+    },
+    {
+      "path": "./tools/icon-batch"
+    },
+    {
+      "path": "./tools/sketchi-generators"
+    },
+    {
+      "path": "./apps/cli"
+    },
+    {
+      "path": "./apps/excalidraw"
+    },
+    {
+      "path": "./apps/icons"
+    },
+    {
+      "path": "./apps/playground"
+    },
+    {
+      "path": "./apps/web"
+    }
   ],
   "compilerOptions": {
     "ignoreDeprecations": "6.0"

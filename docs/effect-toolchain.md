@@ -45,10 +45,12 @@ Do not replace this acknowledged gap with another syntax inventory.
 
 The `typescript` module remains the official `@typescript/typescript6` 6.0.2
 compatibility package (its API reports 6.0.3). Nx 24's `@nx/js:tsc` executor
-builds `sketchi-generators` using `createProgram`/`createCompilerHost`. The custom
-project-graph compiler walker was removed in slice 1c. TypeScript 7's package-root
+builds `sketchi-generators` using `createProgram`/`createCompilerHost`, and the
+reference-sync generator parses configurations through the TS6 API. The custom
+project-graph compiler walker was removed in slice 1c; the existing formatting and
+generator title-escaping checks still use the TS6 API. TypeScript 7's package-root
 export exposes its version, not that compiler API. Remove this dependency only
-when the remaining Nx consumer migrates to supported APIs; native CLI availability
+when the remaining compiler-API consumers migrate to supported APIs; native CLI availability
 does not establish API compatibility.
 
 Existing TS6 declaration emit, root build mode, and paired TS6 checks are retained
@@ -72,3 +74,30 @@ emit incompatibility. Detailed one-time evidence belongs in
 configuration: error/warning exit behavior, executable emit, and a separate
 consumer that succeeds with the correct declaration type and fails with the
 wrong one after the original source has been removed.
+
+## Nx references and generation
+
+Root references name project directories. Libraries expose empty solution configs
+referencing their emitting lib config and no-emit spec config; apps and Node tools
+have empty solutions over no-emit app/spec configs. Empty solutions allow emit but
+contain no source, so consumers can reference them without TS6310. Spec configs use
+`composite: false` and include the existing source/test surface and config files;
+this avoids requiring unrelated imported test helpers to be emitted as one project.
+
+`@nx/js:typescript-sync` owns dependency references. `pnpm nx sync` repairs drift;
+`pnpm nx sync:check` rejects it and runs in the local gate. The old hardcoded
+project-root/reference arrays are removed. Project boundary lint and meaningful
+host restrictions remain. Vitest/Worker/Storybook/browser/corpus targets retain
+their existing executors and behavior; no new inference plugin replaces them.
+
+`disableSourceOfProjectReferenceRedirect` makes checks consume built declarations.
+On the installed TS7 runner, referenced packages with empty solution configs otherwise
+resolve their source files yet report missing re-exported bindings (for example
+`SketchiIcon` from icon-catalog). TS6 accepts those sources, and the native check passes
+against the emitted declarations. Each project's own source remains checked; dependency
+build ordering and native declaration integration proof remain required.
+
+Existing TS6 builds and paired checks remain while this configuration migration is
+reviewed. New packages use the native build/typecheck targets from the thin
+[Effect library composition](../tools/sketchi-generators/README.md). Its compiler
+version comes from the root package pin; runtime versions remain in the pnpm catalog.

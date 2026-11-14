@@ -3,9 +3,13 @@
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
     "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node", "vitest"],
-    "rootDir": "."
+    "rootDir": "../..",
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.spec.tsbuildinfo"
   },
   "include": [
+    "src/**/*.ts",
     "vite.config.ts",
     "vite.config.mts",
     "vitest.config.ts",

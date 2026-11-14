@@ -5,7 +5,26 @@
     "declarationMap": true,
     "emitDeclarationOnly": true,
     "noEmit": false,
-    "outDir": "dist"
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo"
   },
-  "exclude": ["src/**/*.test.tsx", "src/**/*.stories.tsx"]
+  "exclude": ["src/**/*.test.tsx", "src/**/*.stories.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "../renderer/tsconfig.lib.json"
+    },
+    {
+      "path": "../excalidraw/tsconfig.lib.json"
+    },
+    {
+      "path": "../core/tsconfig.lib.json"
+    },
+    {
+      "path": "../../icons/catalog/tsconfig.lib.json"
+    },
+    {
+      "path": "../scenarios/tsconfig.lib.json"
+    }
+  ]
 }

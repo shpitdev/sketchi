@@ -5,7 +5,17 @@
     "declaration": true,
     "emitDeclarationOnly": false,
     "noEmit": false,
-    "outDir": "dist"
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo"
   },
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../core/tsconfig.lib.json"
+    },
+    {
+      "path": "../renderer/tsconfig.lib.json"
+    }
+  ]
 }

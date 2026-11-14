@@ -1,24 +1,34 @@
-# sketchi-generators
+# Sketchi generators
 
-Workspace Nx generators for Sketchi UI components and diagram types.
+Use the workspace plugin for an Effect package, a UI component, or a diagram family.
 
-```mermaid
-flowchart LR
-  CLI["pnpm nx g @sketchi/generators:*"] --> Generator["generator implementation"]
-  Generator --> Templates["EJS templates"]
-  Templates --> Components["component files"]
-  Templates --> DiagramTypes["diagram type files"]
-  DiagramTypes --> Tests["registry tests"]
+```sh
+pnpm nx g @sketchi/generators:effect-library packages/example \
+  --name=example --importPath=@sketchi/example --tags=scope:package,type:lib
+pnpm nx g @sketchi/generators:ui-component StatusBadge
+pnpm nx g @sketchi/generators:diagram-type timeline --title "Sketchi timeline fixture"
+pnpm nx sync
+pnpm nx sync:check
 ```
 
-| Owns                                  | Does not own                     |
-| ------------------------------------- | -------------------------------- |
-| generator schemas and implementations | runtime diagram behavior         |
-| UI component file templates           | component styling decisions      |
-| diagram type scaffold templates       | final semantic diagram contracts |
-| workspace export and coverage wiring  | app-specific route composition   |
+`effect-library` composes the installed `@nx/js:library` generator. Nx owns package
+exports, ESM configuration and references; the composition selects the workspace's
+pinned `effect-tsgo` runner, adds `effect` through the pnpm catalog, and creates an
+empty export entrypoint. It removes upstream's sample function and unused `tslib`
+dependency (`importHelpers` is false). It refuses an existing destination before
+writing anything. Directory, import identity, name and boundary tags are explicit.
 
-## Commands
+New packages build and typecheck with the native compiler. Root Oxlint and oxfmt
+already cover them; no package-local lint/format config or sample test is generated.
+Add a test runner when the package first has an application behavior to test. This
+composition creates no service abstraction or business implementation.
+
+The UI generator creates a component, story and export. The diagram generator
+registers a Struct contract and fixture, a renderer behavior test and a story.
+Neither generates the former trivial component-render or fixture-equality test.
+Complete the actual family pipeline described in
+[adding a diagram family](../../docs/diagram-families.md); its compiler and behavioral
+checks remain required.
 
 ```sh
 pnpm nx test sketchi-generators
@@ -26,18 +36,7 @@ pnpm nx typecheck sketchi-generators
 pnpm nx build sketchi-generators
 ```
 
-## Usage
-
-Use these generators when adding owned workspace surfaces so tests, stories,
-barrel exports, and registry coverage move together.
-
-```sh
-pnpm nx g @sketchi/generators:ui-component StatusBadge
-pnpm nx g @sketchi/generators:diagram-type timeline --title "Sketchi timeline fixture"
-```
-
-The diagram-type generator scaffolds and registers a new family's contract,
-tests, and story. It is the first step of
-[docs/diagram-families.md](../../docs/diagram-families.md); the compiler and
-`tools/diagram-families.test.ts` fail until the family completes every
-pipeline stage.
+The integration test generates two packages in a disposable workspace, builds their
+real exports, runs a consumer, checks a type error and affected dependency discovery,
+and verifies that repeat generation cannot overwrite user source. Title escaping
+coverage remains where the diagram template interpolates user input.

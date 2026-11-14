@@ -65,13 +65,15 @@
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "tsc6 -p apps/playground/tsconfig.json --noEmit"
+				"commands": ["tsc6 -p apps/playground/tsconfig.app.json --noEmit"],
+				"parallel": false
 			}
 		},
 		"typecheck-native": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "effect-tsgo tsc@7.0.2 -p apps/playground/tsconfig.json --noEmit"
+				"commands": ["effect-tsgo tsc@7.0.2 -p apps/playground/tsconfig.app.json --noEmit"],
+				"parallel": false
 			}
 		},
 		"sync-node-logos": {

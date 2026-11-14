@@ -95,6 +95,8 @@
           "unstableApiUsage": "off"
         }
       }
-    ]
+    ],
+    "composite": true,
+    "disableSourceOfProjectReferenceRedirect": true
   }
 }

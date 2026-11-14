@@ -11,7 +11,8 @@
       "@sketchi/diagram-scenarios": ["../packages/diagram/scenarios/src/index.ts"],
       "@sketchi/icon-catalog": ["../packages/icons/catalog/src/index.ts"],
       "@sketchi/observability": ["../packages/observability/src/index.ts"]
-    }
+    },
+    "composite": false
   },
   "include": ["*.ts", "*.mts", "oxlint/*.ts", "testing/browserbase.ts"]
 }

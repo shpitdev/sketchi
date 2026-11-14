@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-export default defineConfig(() => ({
+export default defineConfig({
 	root: import.meta.dirname,
 	cacheDir: "../../node_modules/.vite/packages/observability",
 	test: {
@@ -15,4 +15,4 @@ export default defineConfig(() => ({
 			provider: "v8",
 		},
 	},
-}));
+});
