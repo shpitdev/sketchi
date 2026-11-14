@@ -35,7 +35,7 @@ export function journeySentiment(score: number): (typeof SENTIMENTS)[number] {
  * One thing the persona does or experiences, drawn as a card under its stage,
  * with a face on the experience curve at its score. Never coordinates.
  */
-export class JourneyStep extends Schema.Class<JourneyStep>("JourneyStep")({
+export const JourneyStep = Schema.Struct({
 	label: Schema.NonEmptyString,
 	/** A whole number from 1 (very negative) to 5 (very positive); 3 is neutral. */
 	score: Schema.Finite,
@@ -43,15 +43,19 @@ export class JourneyStep extends Schema.Class<JourneyStep>("JourneyStep")({
 	actor: Schema.optionalKey(Schema.NonEmptyString),
 	/** Where it happens: the channel or touchpoint, such as Website, Email or Phone. */
 	touchpoint: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "JourneyStep" });
+
+export interface JourneyStep extends Schema.Schema.Type<typeof JourneyStep> {}
 
 /** A column of the map: its steps in order, and the pain points and opportunities found there. */
-export class JourneyStage extends Schema.Class<JourneyStage>("JourneyStage")({
+export const JourneyStage = Schema.Struct({
 	name: Schema.NonEmptyString,
 	steps: Schema.Array(JourneyStep).pipe(Schema.mutable),
 	painPoints: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
 	opportunities: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
-}) {}
+}).annotate({ identifier: "JourneyStage" });
+
+export interface JourneyStage extends Schema.Schema.Type<typeof JourneyStage> {}
 
 /**
  * The canonical user journey map: ordered stages of ordered steps, each scored
@@ -59,7 +63,7 @@ export class JourneyStage extends Schema.Class<JourneyStage>("JourneyStage")({
  * renderer owns every coordinate. Every surface that accepts, generates,
  * renders or evaluates a journey map uses this shape.
  */
-export class JourneyDiagram extends Schema.Class<JourneyDiagram>("JourneyDiagram")({
+export const JourneyDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(journeyDiagramType),
@@ -71,7 +75,9 @@ export class JourneyDiagram extends Schema.Class<JourneyDiagram>("JourneyDiagram
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "JourneyDiagram" });
+
+export interface JourneyDiagram extends Schema.Schema.Type<typeof JourneyDiagram> {}
 
 export const JourneyValidationIssueCodeSchema = Schema.Literals([
 	"journey_too_large",
@@ -85,15 +91,15 @@ export const JourneyValidationIssueCodeSchema = Schema.Literals([
 ]);
 export type JourneyValidationIssueCode = typeof JourneyValidationIssueCodeSchema.Type;
 
-export class JourneyValidationIssue extends Schema.Class<JourneyValidationIssue>(
-	"JourneyValidationIssue",
-)({
+export const JourneyValidationIssue = Schema.Struct({
 	code: JourneyValidationIssueCodeSchema,
 	/** Dotted path into the diagram, for example `stages.[1].steps.[0].score`. */
 	path: Schema.NonEmptyString,
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "JourneyValidationIssue" });
+
+export interface JourneyValidationIssue extends Schema.Schema.Type<typeof JourneyValidationIssue> {}
 
 const sameName = (name: string) => name.trim().toLocaleLowerCase();
 

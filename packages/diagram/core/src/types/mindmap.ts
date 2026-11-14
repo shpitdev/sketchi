@@ -10,30 +10,43 @@ import {
 
 export const mindmapDiagramType = "mindmap" as const;
 
-export class MindmapNodeMetadata extends Schema.Class<MindmapNodeMetadata>("MindmapNodeMetadata")({
+export const MindmapNodeMetadata = Schema.Struct({
 	depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 	siblingIndex: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-}) {}
+}).annotate({ identifier: "MindmapNodeMetadata" });
 
-export class MindmapNode extends DiagramNode.extend<MindmapNode>("MindmapNode")({
+export interface MindmapNodeMetadata extends Schema.Schema.Type<typeof MindmapNodeMetadata> {}
+
+export const MindmapNode = Schema.Struct({
+	...DiagramNode.fields,
 	kind: Schema.Literals(["root", "topic"]),
 	metadata: MindmapNodeMetadata,
-}) {}
+}).annotate({ identifier: "MindmapNode" });
 
-export class MindmapEdgeMetadata extends Schema.Class<MindmapEdgeMetadata>("MindmapEdgeMetadata")({
+export interface MindmapNode extends Schema.Schema.Type<typeof MindmapNode> {}
+
+export const MindmapEdgeMetadata = Schema.Struct({
 	depth: Schema.Int.check(Schema.isGreaterThan(0)),
 	siblingIndex: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-}) {}
+}).annotate({ identifier: "MindmapEdgeMetadata" });
 
-export class MindmapEdge extends DiagramEdge.extend<MindmapEdge>("MindmapEdge")({
+export interface MindmapEdgeMetadata extends Schema.Schema.Type<typeof MindmapEdgeMetadata> {}
+
+export const MindmapEdge = Schema.Struct({
+	...DiagramEdge.fields,
 	metadata: MindmapEdgeMetadata,
-}) {}
+}).annotate({ identifier: "MindmapEdge" });
 
-export class MindmapDiagram extends IntermediateDiagram.extend<MindmapDiagram>("MindmapDiagram")({
+export interface MindmapEdge extends Schema.Schema.Type<typeof MindmapEdge> {}
+
+export const MindmapDiagram = Schema.Struct({
+	...IntermediateDiagram.fields,
 	type: Schema.Literal(mindmapDiagramType),
 	nodes: Schema.Array(MindmapNode).pipe(Schema.mutable).check(Schema.isMinLength(2)),
 	edges: Schema.Array(MindmapEdge).pipe(Schema.mutable).check(Schema.isMinLength(1)),
-}) {}
+}).annotate({ identifier: "MindmapDiagram" });
+
+export interface MindmapDiagram extends Schema.Schema.Type<typeof MindmapDiagram> {}
 
 export function validateMindmapDiagram(diagram: MindmapDiagram): MindmapDiagram {
 	validateIntermediateDiagram(diagram);

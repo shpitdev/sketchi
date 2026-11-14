@@ -25,7 +25,7 @@ export type StateMachineStateKind = typeof StateMachineStateKindSchema.Type;
  * drawn as a frame around them, and its `initial` names the substate it enters
  * first. Composites hold states but never another composite.
  */
-export class StateMachineState extends Schema.Class<StateMachineState>("StateMachineState")({
+export const StateMachineState = Schema.Struct({
 	id: Schema.NonEmptyString,
 	/** Omitted labels use the id for regular states and meaningfully named finals. */
 	label: Schema.optionalKey(Schema.NonEmptyString),
@@ -34,34 +34,38 @@ export class StateMachineState extends Schema.Class<StateMachineState>("StateMac
 	parent: Schema.optionalKey(Schema.NonEmptyString),
 	/** For a composite: entry substate; omitted values use the first listed regular child. */
 	initial: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "StateMachineState" });
+
+export interface StateMachineState extends Schema.Schema.Type<typeof StateMachineState> {}
 
 /**
  * A transition, drawn with one compact label `event [guard] / action`. Every
  * part is optional; a transition without any is a completion transition. A
  * transition may leave or enter a composite, and may return to its own state.
  */
-export class StateMachineTransition extends Schema.Class<StateMachineTransition>(
-	"StateMachineTransition",
-)({
+export const StateMachineTransition = Schema.Struct({
 	id: Schema.NonEmptyString,
 	source: Schema.NonEmptyString,
 	target: Schema.NonEmptyString,
 	event: Schema.optionalKey(Schema.NonEmptyString),
 	guard: Schema.optionalKey(Schema.NonEmptyString),
 	action: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "StateMachineTransition" });
 
-export class StateMachineLayout extends Schema.Class<StateMachineLayout>("StateMachineLayout")({
+export interface StateMachineTransition extends Schema.Schema.Type<typeof StateMachineTransition> {}
+
+export const StateMachineLayout = Schema.Struct({
 	direction: Schema.Literals(STATE_MACHINE_DIRECTIONS),
-}) {}
+}).annotate({ identifier: "StateMachineLayout" });
+
+export interface StateMachineLayout extends Schema.Schema.Type<typeof StateMachineLayout> {}
 
 /**
  * The canonical state machine: states (some composite), the state the machine
  * starts in, and transitions. Every surface that accepts, generates, renders
  * or evaluates a state machine uses this shape.
  */
-export class StateMachineDiagram extends Schema.Class<StateMachineDiagram>("StateMachineDiagram")({
+export const StateMachineDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(stateMachineDiagramType),
@@ -77,7 +81,9 @@ export class StateMachineDiagram extends Schema.Class<StateMachineDiagram>("Stat
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "StateMachineDiagram" });
+
+export interface StateMachineDiagram extends Schema.Schema.Type<typeof StateMachineDiagram> {}
 
 export const StateMachineValidationIssueCodeSchema = Schema.Literals([
 	"state_machine_too_large",
@@ -99,15 +105,17 @@ export const StateMachineValidationIssueCodeSchema = Schema.Literals([
 ]);
 export type StateMachineValidationIssueCode = typeof StateMachineValidationIssueCodeSchema.Type;
 
-export class StateMachineValidationIssue extends Schema.Class<StateMachineValidationIssue>(
-	"StateMachineValidationIssue",
-)({
+export const StateMachineValidationIssue = Schema.Struct({
 	code: StateMachineValidationIssueCodeSchema,
 	/** Dotted path into the diagram, for example `states.[1].parent`. */
 	path: Schema.NonEmptyString,
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "StateMachineValidationIssue" });
+
+export interface StateMachineValidationIssue extends Schema.Schema.Type<
+	typeof StateMachineValidationIssue
+> {}
 
 /** The kind a state draws as; states default to "state". */
 export function stateKind(state: Pick<StateMachineState, "kind">): StateMachineStateKind {

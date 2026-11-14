@@ -45,7 +45,7 @@ import {
 import {
 	type CanonicalDiagram,
 	type SequenceDiagram,
-	FlowchartDiagram,
+	type FlowchartDiagram,
 	parseFlowchartDiagram,
 	parseMindmapDiagram,
 	parseSequenceDiagram,
@@ -1252,11 +1252,9 @@ export function evaluateScenarioDiagram(
 			),
 		]);
 	}
-	// A flowchart built from its document is already checked; an IR candidate is parsed here.
-	const flowchart = (value: unknown) =>
-		value instanceof FlowchartDiagram ? value : parseFlowchartDiagram(value);
-	const diagram = flowchart(candidate);
-	const modelDiagram = modelCandidate === candidate ? diagram : flowchart(modelCandidate);
+	const diagram = parseFlowchartDiagram(candidate);
+	const modelDiagram =
+		modelCandidate === candidate ? diagram : parseFlowchartDiagram(modelCandidate);
 	const { checks, ownedNodes } = flowchartChecks(scenario, diagram);
 	const modelOwners =
 		modelDiagram === diagram ? ownedNodes : flowchartChecks(scenario, modelDiagram).ownedNodes;

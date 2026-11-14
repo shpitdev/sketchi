@@ -16,28 +16,32 @@ export const SANKEY_MAX_ISSUES = 20;
 const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/u));
 
 /** One stage of a flow, drawn as a bar as tall as the larger of its in and out totals. */
-export class SankeyNode extends Schema.Class<SankeyNode>("SankeyNode")({
+export const SankeyNode = Schema.Struct({
 	id: Schema.NonEmptyString,
 	label: Schema.NonEmptyString,
 	/** Colors the bar and every flow leaving it; a stable palette color when omitted. */
 	color: Schema.optionalKey(HexColor),
-}) {}
+}).annotate({ identifier: "SankeyNode" });
+
+export interface SankeyNode extends Schema.Schema.Type<typeof SankeyNode> {}
 
 /** A flow of `value` from one node to another, drawn as a band as wide as its value. */
-export class SankeyLink extends Schema.Class<SankeyLink>("SankeyLink")({
+export const SankeyLink = Schema.Struct({
 	source: Schema.NonEmptyString,
 	target: Schema.NonEmptyString,
 	value: Schema.Finite,
 	/** Drawn with the flow's value, such as what the flow carries. */
 	label: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "SankeyLink" });
+
+export interface SankeyLink extends Schema.Schema.Type<typeof SankeyLink> {}
 
 /**
  * A Sankey diagram: nodes and the weighted flows between them, running one
  * way from sources to sinks. The renderer owns every coordinate, column and
  * band width.
  */
-export class SankeyDiagram extends Schema.Class<SankeyDiagram>("SankeyDiagram")({
+export const SankeyDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(sankeyDiagramType),
@@ -48,7 +52,9 @@ export class SankeyDiagram extends Schema.Class<SankeyDiagram>("SankeyDiagram")(
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "SankeyDiagram" });
+
+export interface SankeyDiagram extends Schema.Schema.Type<typeof SankeyDiagram> {}
 
 export const SankeyValidationIssueCodeSchema = Schema.Literals([
 	"sankey_too_large",
@@ -65,15 +71,15 @@ export const SankeyValidationIssueCodeSchema = Schema.Literals([
 ]);
 export type SankeyValidationIssueCode = typeof SankeyValidationIssueCodeSchema.Type;
 
-export class SankeyValidationIssue extends Schema.Class<SankeyValidationIssue>(
-	"SankeyValidationIssue",
-)({
+export const SankeyValidationIssue = Schema.Struct({
 	code: SankeyValidationIssueCodeSchema,
 	/** Dotted path into the diagram, for example `links.[3].target`. */
 	path: Schema.NonEmptyString,
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "SankeyValidationIssue" });
+
+export interface SankeyValidationIssue extends Schema.Schema.Type<typeof SankeyValidationIssue> {}
 
 /** Ids on one cycle of links, in flow order, or undefined when the flows run one way. */
 export function sankeyCycle(

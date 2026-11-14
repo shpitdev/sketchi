@@ -16,17 +16,19 @@ export const CHART_MAX_VALUES = 120;
 export const CHART_MAX_PIE_SLICES = 8;
 
 /** One named run of values, in category order. */
-export class ChartSeries extends Schema.Class<ChartSeries>("ChartSeries")({
+export const ChartSeries = Schema.Struct({
 	/** Required when a chart has more than one series; the legend shows it. */
 	name: Schema.optionalKey(Schema.NonEmptyString),
 	values: Schema.Array(Schema.Finite).pipe(Schema.mutable),
-}) {}
+}).annotate({ identifier: "ChartSeries" });
+
+export interface ChartSeries extends Schema.Schema.Type<typeof ChartSeries> {}
 
 /**
  * A bar, line or pie chart from categories and named series. The renderer
  * owns every coordinate, tick and label position.
  */
-export class ChartDiagram extends Schema.Class<ChartDiagram>("ChartDiagram")({
+export const ChartDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(chartDiagramType),
@@ -50,7 +52,9 @@ export class ChartDiagram extends Schema.Class<ChartDiagram>("ChartDiagram")({
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "ChartDiagram" });
+
+export interface ChartDiagram extends Schema.Schema.Type<typeof ChartDiagram> {}
 
 export interface ChartValidationIssue {
 	readonly code:

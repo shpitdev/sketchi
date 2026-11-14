@@ -59,6 +59,7 @@ export const GRAPH_DIAGRAM_TYPES = [
 				if (specifier === "effect") {
 					return {
 						Schema: {
+							Struct: () => ({ annotate: () => ({}) }),
 							Literal: (value: string) => value,
 							decodeUnknownSync: () => (input: unknown) => input,
 						},
@@ -66,7 +67,7 @@ export const GRAPH_DIAGRAM_TYPES = [
 				}
 				expect(specifier).toBe("../intermediate.js");
 				return {
-					IntermediateDiagram: { extend: () => () => class {} },
+					IntermediateDiagram: { fields: {} },
 					validateIntermediateDiagram: (diagram: unknown) => diagram,
 				};
 			},
@@ -93,7 +94,6 @@ export const GRAPH_DIAGRAM_TYPES = [
 		);
 
 		const source = tree.read("packages/diagram/core/src/types/timeline.ts", "utf-8") ?? "";
-		expect(source).toContain("export class TimelineDiagram extends IntermediateDiagram.extend");
 		expect(runGeneratedModule(source).timelineFixture?.title).toBe(title);
 
 		const info = vi.spyOn(console, "info").mockImplementation(() => undefined);

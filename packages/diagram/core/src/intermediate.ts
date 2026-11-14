@@ -42,12 +42,14 @@ export type EdgeRouting = typeof EdgeRoutingSchema.Type;
  * family shares this shape; resolving the slug against the catalog happens at
  * the build boundary, so this contract checks only the slug format.
  */
-export class DiagramIconRef extends Schema.Class<DiagramIconRef>("DiagramIconRef")({
+export const DiagramIconRef = Schema.Struct({
 	slug: NonEmptyString.check(
 		Schema.isPattern(DIAGRAM_ICON_SLUG_PATTERN),
 		Schema.isMaxLength(DIAGRAM_ICON_SLUG_MAX_LENGTH),
 	),
-}) {}
+}).annotate({ identifier: "DiagramIconRef" });
+
+export interface DiagramIconRef extends Schema.Schema.Type<typeof DiagramIconRef> {}
 
 /**
  * What a group stands for in an architecture: a provider's cloud or an
@@ -76,7 +78,7 @@ export type DiagramZoneKind = typeof DiagramZoneKindSchema.Type;
  * with a parent or a kind draws as a zone: an outline styled by its kind, with
  * its label in a header strip inside it. Other groups draw as frames.
  */
-export class DiagramGroup extends Schema.Class<DiagramGroup>("DiagramGroup")({
+export const DiagramGroup = Schema.Struct({
 	id: NonEmptyString,
 	label: NonEmptyString,
 	/** The id of the declared group this group sits inside. */
@@ -84,17 +86,21 @@ export class DiagramGroup extends Schema.Class<DiagramGroup>("DiagramGroup")({
 	kind: Schema.optional(DiagramZoneKindSchema),
 	/** A catalog mark drawn before the group's label, such as its platform's logo. */
 	icon: Schema.optional(DiagramIconRef),
-}) {}
+}).annotate({ identifier: "DiagramGroup" });
+
+export interface DiagramGroup extends Schema.Schema.Type<typeof DiagramGroup> {}
 
 /**
  * A swimlane: a full-length band for one actor, such as a customer, a team or
  * a system, drawn in declared order. Nodes join one by setting `lane` to its
  * id; a diagram with lanes puts every node in one, and declares no groups.
  */
-export class DiagramLane extends Schema.Class<DiagramLane>("DiagramLane")({
+export const DiagramLane = Schema.Struct({
 	id: NonEmptyString,
 	label: NonEmptyString,
-}) {}
+}).annotate({ identifier: "DiagramLane" });
+
+export interface DiagramLane extends Schema.Schema.Type<typeof DiagramLane> {}
 
 /**
  * Shapes an infrastructure node draws as in place of its kind's: a database
@@ -125,7 +131,7 @@ export const DIAGRAM_NODE_COLOR_NAMES = Object.keys(DIAGRAM_NODE_COLORS) as [
 export const DiagramNodeColorSchema = Schema.Literals(DIAGRAM_NODE_COLOR_NAMES);
 export type DiagramNodeColor = typeof DiagramNodeColorSchema.Type;
 
-export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
+export const DiagramNode = Schema.Struct({
 	id: NonEmptyString,
 	label: NonEmptyString,
 	/** The id of the declared group this node belongs to. */
@@ -138,37 +144,48 @@ export class DiagramNode extends Schema.Class<DiagramNode>("DiagramNode")({
 	/** A palette color the node draws in, its stroke over a pale tint. */
 	color: Schema.optional(DiagramNodeColorSchema),
 	metadata: withDefault(Metadata, {}),
-}) {}
+}).annotate({ identifier: "DiagramNode" });
+
+export interface DiagramNode extends Schema.Schema.Type<typeof DiagramNode> {}
 
 /**
  * A node of a laid-out graph. Its description draws as a smaller, muted
  * subtitle under its label, inside the node.
  */
-export class GraphNode extends DiagramNode.extend<GraphNode>("GraphNode")({
+export const GraphNode = Schema.Struct({
+	...DiagramNode.fields,
 	description: Schema.optional(NonEmptyString),
-}) {}
+}).annotate({ identifier: "GraphNode" });
 
-export class DiagramEdge extends Schema.Class<DiagramEdge>("DiagramEdge")({
+export interface GraphNode extends Schema.Schema.Type<typeof GraphNode> {}
+
+export const DiagramEdge = Schema.Struct({
 	id: NonEmptyString,
 	source: NonEmptyString,
 	target: NonEmptyString,
 	label: Schema.optional(NonEmptyString),
 	metadata: withDefault(Metadata, {}),
-}) {}
+}).annotate({ identifier: "DiagramEdge" });
+
+export interface DiagramEdge extends Schema.Schema.Type<typeof DiagramEdge> {}
 
 const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/));
 
-export class DiagramStyle extends Schema.Class<DiagramStyle>("DiagramStyle")({
+export const DiagramStyle = Schema.Struct({
 	accentColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.accentColor),
 	backgroundColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.backgroundColor),
-}) {}
+}).annotate({ identifier: "DiagramStyle" });
 
-export class DiagramLayout extends Schema.Class<DiagramLayout>("DiagramLayout")({
+export interface DiagramStyle extends Schema.Schema.Type<typeof DiagramStyle> {}
+
+export const DiagramLayout = Schema.Struct({
 	direction: withDefault(LayoutDirectionSchema, "LR"),
 	edgeRouting: withDefault(EdgeRoutingSchema, "orthogonal"),
-}) {}
+}).annotate({ identifier: "DiagramLayout" });
 
-export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>("IntermediateDiagram")({
+export interface DiagramLayout extends Schema.Schema.Type<typeof DiagramLayout> {}
+
+export const IntermediateDiagram = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
 	type: withDefault(GraphDiagramTypeSchema, "flowchart"),
@@ -182,7 +199,9 @@ export class IntermediateDiagram extends Schema.Class<IntermediateDiagram>("Inte
 	}),
 	style: withDefault(DiagramStyle, SKETCHI_DIAGRAM_STYLE),
 	metadata: withDefault(Metadata, {}),
-}) {}
+}).annotate({ identifier: "IntermediateDiagram" });
+
+export interface IntermediateDiagram extends Schema.Schema.Type<typeof IntermediateDiagram> {}
 
 export class DiagramValidationError extends Error {
 	constructor(message: string) {

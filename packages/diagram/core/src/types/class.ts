@@ -68,21 +68,25 @@ export const CLASS_MAX_MEMBER_LENGTH = 96;
 export const CLASS_MAX_ISSUES = 20;
 
 /** An attribute: `+ name: Type`, a class-wide one marked `{static}`. */
-export class ClassAttribute extends Schema.Class<ClassAttribute>("ClassAttribute")({
+export const ClassAttribute = Schema.Struct({
 	name: Schema.NonEmptyString,
 	type: Schema.optionalKey(Schema.NonEmptyString),
 	visibility: Schema.optionalKey(ClassVisibilitySchema),
 	static: Schema.optionalKey(Schema.Boolean),
-}) {}
+}).annotate({ identifier: "ClassAttribute" });
+
+export interface ClassAttribute extends Schema.Schema.Type<typeof ClassAttribute> {}
 
 /** One parameter of a method: `name: Type`. */
-export class ClassParameter extends Schema.Class<ClassParameter>("ClassParameter")({
+export const ClassParameter = Schema.Struct({
 	name: Schema.NonEmptyString,
 	type: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "ClassParameter" });
+
+export interface ClassParameter extends Schema.Schema.Type<typeof ClassParameter> {}
 
 /** A method: `+ name(params): Return`, marked `{abstract}` or `{static}`. */
-export class ClassMethod extends Schema.Class<ClassMethod>("ClassMethod")({
+export const ClassMethod = Schema.Struct({
 	name: Schema.NonEmptyString,
 	params: Schema.Array(ClassParameter).pipe(
 		Schema.mutable,
@@ -92,14 +96,16 @@ export class ClassMethod extends Schema.Class<ClassMethod>("ClassMethod")({
 	visibility: Schema.optionalKey(ClassVisibilitySchema),
 	static: Schema.optionalKey(Schema.Boolean),
 	abstract: Schema.optionalKey(Schema.Boolean),
-}) {}
+}).annotate({ identifier: "ClassMethod" });
+
+export interface ClassMethod extends Schema.Schema.Type<typeof ClassMethod> {}
 
 /**
  * One class, interface or enum, drawn as a box of three compartments: its
  * name (under any keyword or stereotype), its attributes and its methods. An
  * enum lists its values as attributes.
  */
-export class ClassNode extends Schema.Class<ClassNode>("ClassNode")({
+export const ClassNode = Schema.Struct({
 	id: Schema.NonEmptyString,
 	/** The name the box shows; the id when omitted. */
 	name: Schema.optionalKey(Schema.NonEmptyString),
@@ -114,14 +120,16 @@ export class ClassNode extends Schema.Class<ClassNode>("ClassNode")({
 		Schema.mutable,
 		Schema.withDecodingDefault(Effect.succeed([])),
 	),
-}) {}
+}).annotate({ identifier: "ClassNode" });
+
+export interface ClassNode extends Schema.Schema.Type<typeof ClassNode> {}
 
 /**
  * A relationship between two classes (see CLASS_RELATIONSHIP_KINDS for what
  * `from` and `to` mean in each kind). Associations, compositions and
  * aggregations carry a multiplicity and a role name at either end.
  */
-export class ClassRelationship extends Schema.Class<ClassRelationship>("ClassRelationship")({
+export const ClassRelationship = Schema.Struct({
 	id: Schema.NonEmptyString,
 	kind: ClassRelationshipKindSchema,
 	from: Schema.NonEmptyString,
@@ -135,7 +143,9 @@ export class ClassRelationship extends Schema.Class<ClassRelationship>("ClassRel
 	/** `from` follows the line to `to`: an open arrow at `to` (associations, compositions, aggregations). */
 	navigable: Schema.optionalKey(Schema.Boolean),
 	label: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "ClassRelationship" });
+
+export interface ClassRelationship extends Schema.Schema.Type<typeof ClassRelationship> {}
 
 /**
  * The canonical UML class diagram: classes with their members, and the
@@ -143,7 +153,7 @@ export class ClassRelationship extends Schema.Class<ClassRelationship>("ClassRel
  * surface that accepts, generates, renders or evaluates a class diagram uses
  * this shape.
  */
-export class ClassDiagram extends Schema.Class<ClassDiagram>("ClassDiagram")({
+export const ClassDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(classDiagramType),
@@ -155,7 +165,9 @@ export class ClassDiagram extends Schema.Class<ClassDiagram>("ClassDiagram")({
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "ClassDiagram" });
+
+export interface ClassDiagram extends Schema.Schema.Type<typeof ClassDiagram> {}
 
 export const ClassValidationIssueCodeSchema = Schema.Literals([
 	"class_too_large",
@@ -174,15 +186,15 @@ export const ClassValidationIssueCodeSchema = Schema.Literals([
 ]);
 export type ClassValidationIssueCode = typeof ClassValidationIssueCodeSchema.Type;
 
-export class ClassValidationIssue extends Schema.Class<ClassValidationIssue>(
-	"ClassValidationIssue",
-)({
+export const ClassValidationIssue = Schema.Struct({
 	code: ClassValidationIssueCodeSchema,
 	/** Dotted path into the diagram, for example `relationships.[1].to`. */
 	path: Schema.NonEmptyString,
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "ClassValidationIssue" });
+
+export interface ClassValidationIssue extends Schema.Schema.Type<typeof ClassValidationIssue> {}
 
 /** The name a class box shows. */
 export function classNodeName(node: Pick<ClassNode, "id" | "name">): string {

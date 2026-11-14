@@ -163,7 +163,7 @@ export const WireframeComponentSchema: Schema.Codec<WireframeComponent> = Schema
  * top, its footer the bottom, a sidebar one side between them, a modal floats
  * over the rest, and every other component stacks down the content area.
  */
-export class WireframeScreen extends Schema.Class<WireframeScreen>("WireframeScreen")({
+export const WireframeScreen = Schema.Struct({
 	id: Schema.NonEmptyString,
 	name: Schema.NonEmptyString,
 	device: Schema.Literals(WIREFRAME_DEVICES).pipe(
@@ -172,14 +172,16 @@ export class WireframeScreen extends Schema.Class<WireframeScreen>("WireframeScr
 	/** Where the content area's children sit, as a column's align does. */
 	align: Schema.optionalKey(Schema.Literals(WIREFRAME_ALIGNMENTS)),
 	children: Schema.Array(WireframeComponentReference).pipe(Schema.mutable),
-}) {}
+}).annotate({ identifier: "WireframeScreen" });
+
+export interface WireframeScreen extends Schema.Schema.Type<typeof WireframeScreen> {}
 
 /**
  * The canonical wireframe: low-fidelity screens, each a tree of components.
  * The renderer owns every coordinate. Every surface that accepts, generates,
  * renders or evaluates a wireframe uses this shape.
  */
-export class WireframeDiagram extends Schema.Class<WireframeDiagram>("WireframeDiagram")({
+export const WireframeDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(wireframeDiagramType),
@@ -187,7 +189,9 @@ export class WireframeDiagram extends Schema.Class<WireframeDiagram>("WireframeD
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "WireframeDiagram" });
+
+export interface WireframeDiagram extends Schema.Schema.Type<typeof WireframeDiagram> {}
 
 export const WireframeValidationIssueCodeSchema = Schema.Literals([
 	"wireframe_too_large",
@@ -202,15 +206,17 @@ export const WireframeValidationIssueCodeSchema = Schema.Literals([
 ]);
 export type WireframeValidationIssueCode = typeof WireframeValidationIssueCodeSchema.Type;
 
-export class WireframeValidationIssue extends Schema.Class<WireframeValidationIssue>(
-	"WireframeValidationIssue",
-)({
+export const WireframeValidationIssue = Schema.Struct({
 	code: WireframeValidationIssueCodeSchema,
 	/** Dotted path into the diagram, for example `screens.[0].children.[2].text`. */
 	path: Schema.NonEmptyString,
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "WireframeValidationIssue" });
+
+export interface WireframeValidationIssue extends Schema.Schema.Type<
+	typeof WireframeValidationIssue
+> {}
 
 const CONTAINERS: ReadonlySet<string> = new Set(WIREFRAME_CONTAINER_TYPES);
 

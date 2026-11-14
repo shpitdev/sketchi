@@ -54,40 +54,51 @@ export const FlowchartValidationIssueCodeSchema = Schema.Literals([
 	"flowchart_too_small",
 ]);
 
-export class FlowchartValidationIssueRef extends Schema.Class<FlowchartValidationIssueRef>(
-	"FlowchartValidationIssueRef",
-)({
+export const FlowchartValidationIssueRef = Schema.Struct({
 	kind: Schema.Literals(["diagram", "node", "edge", "group", "lane"]),
 	id: Schema.optional(Schema.NonEmptyString),
 	path: Schema.optional(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "FlowchartValidationIssueRef" });
 
-export class FlowchartValidationIssue extends Schema.Class<FlowchartValidationIssue>(
-	"FlowchartValidationIssue",
-)({
+export interface FlowchartValidationIssueRef extends Schema.Schema.Type<
+	typeof FlowchartValidationIssueRef
+> {}
+
+export const FlowchartValidationIssue = Schema.Struct({
 	code: FlowchartValidationIssueCodeSchema,
 	ref: Schema.optional(FlowchartValidationIssueRef),
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "FlowchartValidationIssue" });
+
+export interface FlowchartValidationIssue extends Schema.Schema.Type<
+	typeof FlowchartValidationIssue
+> {}
 
 export const FlowchartNodeKindSchema = Schema.Literals(["start", "process", "decision", "end"]);
 
-export class FlowchartNode extends GraphNode.extend<FlowchartNode>("FlowchartNode")({
+export const FlowchartNode = Schema.Struct({
+	...GraphNode.fields,
 	kind: FlowchartNodeKindSchema,
-}) {}
+}).annotate({ identifier: "FlowchartNode" });
 
-export class FlowchartEdge extends DiagramEdge.extend<FlowchartEdge>("FlowchartEdge")({
+export interface FlowchartNode extends Schema.Schema.Type<typeof FlowchartNode> {}
+
+export const FlowchartEdge = Schema.Struct({
+	...DiagramEdge.fields,
 	label: Schema.optional(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "FlowchartEdge" });
 
-export class FlowchartDiagram extends IntermediateDiagram.extend<FlowchartDiagram>(
-	"FlowchartDiagram",
-)({
+export interface FlowchartEdge extends Schema.Schema.Type<typeof FlowchartEdge> {}
+
+export const FlowchartDiagram = Schema.Struct({
+	...IntermediateDiagram.fields,
 	type: Schema.Literal(flowchartDiagramType),
 	nodes: Schema.Array(FlowchartNode).pipe(Schema.mutable).check(Schema.isMinLength(2)),
 	edges: Schema.Array(FlowchartEdge).pipe(Schema.mutable).check(Schema.isMinLength(1)),
-}) {}
+}).annotate({ identifier: "FlowchartDiagram" });
+
+export interface FlowchartDiagram extends Schema.Schema.Type<typeof FlowchartDiagram> {}
 
 export type FlowchartNodeKind = typeof FlowchartNodeKindSchema.Type;
 export type FlowchartValidationIssueCode = typeof FlowchartValidationIssueCodeSchema.Type;
