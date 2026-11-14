@@ -14,13 +14,13 @@ export const PngRenderFailureStage = Schema.Literals([
 	"rasterization",
 ]);
 
-export class HeadlessPngRenderError extends Schema.TaggedError<HeadlessPngRenderError>()(
-	"HeadlessPngRenderError",
-	{
-		cause: Schema.Defect(),
-		code: PngRenderFailureCode,
-		stage: PngRenderFailureStage,
-		message: Schema.String,
-		details: Schema.Array(Schema.String),
-	},
-) {}
+export class HeadlessPngRenderError extends Schema.TaggedError<
+	HeadlessPngRenderError,
+	{ readonly brand: unique symbol }
+>()("HeadlessPngRenderError", {
+	cause: Schema.Defect(),
+	code: PngRenderFailureCode,
+	stage: PngRenderFailureStage,
+	message: Schema.String,
+	details: Schema.Array(Schema.String),
+}) {}

@@ -20,9 +20,7 @@ export type DiagramFormat = "scene" | "excalidraw" | "png";
 export type OutputFormat = "text" | "json";
 export type DiagramAuthority = "canonical" | "patched" | "detached";
 
-export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
-	"DiagramRecordManifest",
-)({
+export const DiagramRecordManifest = Schema.Struct({
 	schemaVersion: Schema.Literal(RECORD_SCHEMA_VERSION),
 	id: Schema.String,
 	type: Schema.Literals(["canvas", ...CANONICAL_DOCUMENT_TYPES]),
@@ -38,7 +36,9 @@ export class DiagramRecordManifest extends Schema.Class<DiagramRecordManifest>(
 	 */
 	createdAt: Schema.optionalKey(Schema.String),
 	prompt: Schema.optionalKey(Schema.String),
-}) {}
+}).annotate({ identifier: "DiagramRecordManifest" });
+
+export interface DiagramRecordManifest extends Schema.Schema.Type<typeof DiagramRecordManifest> {}
 
 /** Creation provenance every later revision of a record keeps. */
 export function recordProvenance(manifest: DiagramRecordManifest): {

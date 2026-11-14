@@ -33,44 +33,44 @@ export interface ToolProcessPolicy {
 	readonly timeoutMs: number;
 }
 
-export class ToolProcessPolicyError extends Schema.TaggedError<ToolProcessPolicyError>()(
-	"ToolProcessPolicyError",
-	{
-		field: Schema.String,
-		message: Schema.String,
-		value: Schema.Number,
-	},
-) {}
+export class ToolProcessPolicyError extends Schema.TaggedError<
+	ToolProcessPolicyError,
+	{ readonly brand: unique symbol }
+>()("ToolProcessPolicyError", {
+	field: Schema.String,
+	message: Schema.String,
+	value: Schema.Number,
+}) {}
 
-export class ToolProcessSpawnError extends Schema.TaggedError<ToolProcessSpawnError>()(
-	"ToolProcessSpawnError",
-	{
-		cause: Schema.Defect(),
-		command: Schema.String,
-		message: Schema.String,
-	},
-) {}
+export class ToolProcessSpawnError extends Schema.TaggedError<
+	ToolProcessSpawnError,
+	{ readonly brand: unique symbol }
+>()("ToolProcessSpawnError", {
+	cause: Schema.Defect(),
+	command: Schema.String,
+	message: Schema.String,
+}) {}
 
-export class ToolProcessControlError extends Schema.TaggedError<ToolProcessControlError>()(
-	"ToolProcessControlError",
-	{
-		cause: Schema.Defect(),
-		command: Schema.String,
-		message: Schema.String,
-		signal: Schema.String,
-	},
-) {}
+export class ToolProcessControlError extends Schema.TaggedError<
+	ToolProcessControlError,
+	{ readonly brand: unique symbol }
+>()("ToolProcessControlError", {
+	cause: Schema.Defect(),
+	command: Schema.String,
+	message: Schema.String,
+	signal: Schema.String,
+}) {}
 
-export class ToolProcessExitError extends Schema.TaggedError<ToolProcessExitError>()(
-	"ToolProcessExitError",
-	{
-		command: Schema.String,
-		exitCode: Schema.NullOr(Schema.Int),
-		message: Schema.String,
-		signal: Schema.NullOr(Schema.String),
-		stderr: Schema.String,
-	},
-) {}
+export class ToolProcessExitError extends Schema.TaggedError<
+	ToolProcessExitError,
+	{ readonly brand: unique symbol }
+>()("ToolProcessExitError", {
+	command: Schema.String,
+	exitCode: Schema.NullOr(Schema.Int),
+	message: Schema.String,
+	signal: Schema.NullOr(Schema.String),
+	stderr: Schema.String,
+}) {}
 
 export interface RunningToolProcess {
 	/** Owned tree lifetime, independent of the leader's exit and stdio close. */

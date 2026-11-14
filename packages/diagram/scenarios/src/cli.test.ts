@@ -28,9 +28,9 @@ function generatedEnvelope() {
 	return JSON.stringify({ title, diagram: { type: "flowchart", ...document } });
 }
 
-function withCandidate(
+function withCandidate<E>(
 	output: string,
-	use: (directory: string) => Effect.Effect<void, unknown, ToolProcessSpawner>,
+	use: (directory: string) => Effect.Effect<void, E, ToolProcessSpawner>,
 ) {
 	const terminal = Effect.succeed({ exitCode: 0, signal: null });
 	const layer = Layer.succeed(ToolProcessSpawner, {

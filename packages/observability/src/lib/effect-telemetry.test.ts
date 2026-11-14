@@ -30,10 +30,13 @@ const requestCounter = Metric.counter("sketchi_test_requests", {
 	incremental: true,
 });
 
-class TestFailure extends Schema.TaggedError<TestFailure>()("TestFailure", {
-	detail: Schema.String,
-	message: Schema.String,
-}) {}
+class TestFailure extends Schema.TaggedError<TestFailure, { readonly brand: unique symbol }>()(
+	"TestFailure",
+	{
+		detail: Schema.String,
+		message: Schema.String,
+	},
+) {}
 
 interface StreamField {
 	readonly name: string;

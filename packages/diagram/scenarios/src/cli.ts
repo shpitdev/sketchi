@@ -35,18 +35,21 @@ import {
 	ToolProcessSpawnError,
 } from "./internal/tool-process.js";
 
-class ScenarioToolError extends Schema.TaggedError<ScenarioToolError>()("ScenarioToolError", {
+class ScenarioToolError extends Schema.TaggedError<
+	ScenarioToolError,
+	{ readonly brand: unique symbol }
+>()("ScenarioToolError", {
 	cause: Schema.optionalKey(Schema.Defect()),
 	message: Schema.String,
 }) {}
 
-export class ScenarioCliUsageError extends Schema.TaggedError<ScenarioCliUsageError>()(
-	"ScenarioCliUsageError",
-	{
-		cause: Schema.optionalKey(Schema.Defect()),
-		message: Schema.String,
-	},
-) {}
+export class ScenarioCliUsageError extends Schema.TaggedError<
+	ScenarioCliUsageError,
+	{ readonly brand: unique symbol }
+>()("ScenarioCliUsageError", {
+	cause: Schema.optionalKey(Schema.Defect()),
+	message: Schema.String,
+}) {}
 
 const processPolicy = {
 	closeGraceMs: 1_000,

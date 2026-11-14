@@ -1,14 +1,20 @@
 import { Schema } from "effect";
 
 /** The caller sent something the service cannot draw from. */
-export class IconInputError extends Schema.TaggedError<IconInputError>()("IconInputError", {
+export class IconInputError extends Schema.TaggedError<
+	IconInputError,
+	{ readonly brand: unique symbol }
+>()("IconInputError", {
 	code: Schema.String,
 	message: Schema.String,
 	hint: Schema.String,
 }) {}
 
 /** A model call failed: the gateway, the upstream provider, or an unreadable reply. */
-export class IconModelError extends Schema.TaggedError<IconModelError>()("IconModelError", {
+export class IconModelError extends Schema.TaggedError<
+	IconModelError,
+	{ readonly brand: unique symbol }
+>()("IconModelError", {
 	cause: Schema.Defect(),
 	message: Schema.String,
 	model: Schema.String,
@@ -18,20 +24,29 @@ export class IconModelError extends Schema.TaggedError<IconModelError>()("IconMo
 }) {}
 
 /** The browser could not decode, measure or export an image. */
-export class IconImagingError extends Schema.TaggedError<IconImagingError>()("IconImagingError", {
+export class IconImagingError extends Schema.TaggedError<
+	IconImagingError,
+	{ readonly brand: unique symbol }
+>()("IconImagingError", {
 	cause: Schema.Defect(),
 	message: Schema.String,
 	stage: Schema.Literals(["prepare", "export"]),
 }) {}
 
 /** No round produced a recipe that passes the checker. */
-export class IconRecipeError extends Schema.TaggedError<IconRecipeError>()("IconRecipeError", {
+export class IconRecipeError extends Schema.TaggedError<
+	IconRecipeError,
+	{ readonly brand: unique symbol }
+>()("IconRecipeError", {
 	issues: Schema.Array(Schema.String),
 	message: Schema.String,
 }) {}
 
 /** The draw used up its time budget before it had a drawing to return. */
-export class IconTimeoutError extends Schema.TaggedError<IconTimeoutError>()("IconTimeoutError", {
+export class IconTimeoutError extends Schema.TaggedError<
+	IconTimeoutError,
+	{ readonly brand: unique symbol }
+>()("IconTimeoutError", {
 	message: Schema.String,
 	stage: Schema.Literals(["source", "lineup", "author", "render", "judge"]),
 }) {}

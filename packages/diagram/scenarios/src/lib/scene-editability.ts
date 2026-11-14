@@ -4,7 +4,10 @@ import { createEditSession } from "./edit-session.js";
 import { type EditabilityMetrics, measureEditability } from "./editability.js";
 import { loadExcalidrawEditor, withoutHeldTimers } from "./excalidraw-editor.js";
 
-class EditabilityError extends Schema.TaggedError<EditabilityError>()("EditabilityError", {
+class EditabilityError extends Schema.TaggedError<
+	EditabilityError,
+	{ readonly brand: unique symbol }
+>()("EditabilityError", {
 	cause: Schema.optionalKey(Schema.Defect()),
 	message: Schema.String,
 }) {}

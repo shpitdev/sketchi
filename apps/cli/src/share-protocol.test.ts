@@ -57,7 +57,7 @@ describe("Excalidraw share-link protocol", () => {
 		Effect.gen(function* () {
 			const body = Buffer.from(upstreamFixtureBase64, "base64");
 			body[body.length - 1] = (body[body.length - 1] ?? 0) ^ 1;
-			const failure = yield* Effect.flip(decodeSharePayload(body, fixtureKey));
+			const failure = yield* Effect.flip(decodeSharePayload(body, fixtureKey).pipe(Effect.asVoid));
 			assert.equal(failure.code, "share_crypto_failed");
 			assert.equal(failure.message.includes(fixtureKey), false);
 		}),
@@ -140,7 +140,7 @@ describe("Excalidraw share-link protocol", () => {
 				{ ...base, appState: { gridSize: Infinity } },
 				{ ...base, appState: { lockedMultiSelections: { group: false } } },
 			]) {
-				const failure = yield* Effect.flip(validateShareScene(scene));
+				const failure = yield* Effect.flip(validateShareScene(scene).pipe(Effect.asVoid));
 				assert.equal(failure.code, "unsupported_scene");
 			}
 
@@ -149,7 +149,7 @@ describe("Excalidraw share-link protocol", () => {
 				validateShareScene({
 					...base,
 					elements: [{ ...element, type: secretType }],
-				}),
+				}).pipe(Effect.asVoid),
 			);
 			assert.equal(JSON.stringify(failure).includes(secretType), false);
 		}),
@@ -180,7 +180,10 @@ describe("Excalidraw share-link protocol", () => {
 				{ ...base, elements: [{ ...element, type: "text", fontFamily: 1 }] },
 				{ ...base, elements: [{ ...element, link: "https://example.com" }] },
 			]) {
-				assert.equal((yield* Effect.flip(validateShareScene(scene))).code, "unsupported_scene");
+				assert.equal(
+					(yield* Effect.flip(validateShareScene(scene).pipe(Effect.asVoid))).code,
+					"unsupported_scene",
+				);
 			}
 		}),
 	);
@@ -204,12 +207,16 @@ describe("Excalidraw share-link protocol", () => {
 		Effect.gen(function* () {
 			const zeroLengthChunks = new Uint8Array(16);
 			new DataView(zeroLengthChunks.buffer).setUint32(0, 1);
-			const zeroFailure = yield* Effect.flip(decodeSharePayload(zeroLengthChunks, fixtureKey));
+			const zeroFailure = yield* Effect.flip(
+				decodeSharePayload(zeroLengthChunks, fixtureKey).pipe(Effect.asVoid),
+			);
 			assert.equal(zeroFailure.code, "share_crypto_failed");
 
 			const highCountProbe = new Uint8Array(2 * 1024 * 1024);
 			new DataView(highCountProbe.buffer).setUint32(0, 1);
-			const highCountFailure = yield* Effect.flip(decodeSharePayload(highCountProbe, fixtureKey));
+			const highCountFailure = yield* Effect.flip(
+				decodeSharePayload(highCountProbe, fixtureKey).pipe(Effect.asVoid),
+			);
 			assert.equal(highCountFailure.code, "share_crypto_failed");
 		}),
 	);

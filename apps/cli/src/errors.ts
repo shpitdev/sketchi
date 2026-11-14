@@ -1,53 +1,62 @@
 import { Schema } from "effect";
 
-export class CliFilesystemError extends Schema.TaggedError<CliFilesystemError>()(
-	"CliFilesystemError",
-	{
-		cause: Schema.Defect(),
-		operation: Schema.String,
-		path: Schema.String,
-		message: Schema.String,
-	},
-) {}
+export class CliFilesystemError extends Schema.TaggedError<
+	CliFilesystemError,
+	{ readonly brand: unique symbol }
+>()("CliFilesystemError", {
+	cause: Schema.Defect(),
+	operation: Schema.String,
+	path: Schema.String,
+	message: Schema.String,
+}) {}
 
-export class CliInputError extends Schema.TaggedError<CliInputError>()("CliInputError", {
+export class CliInputError extends Schema.TaggedError<
+	CliInputError,
+	{ readonly brand: unique symbol }
+>()("CliInputError", {
 	code: Schema.Literals(["input_read_failed", "invalid_json", "interactive_stdin"]),
 	message: Schema.String,
 	hint: Schema.String,
 }) {}
 
-export class CliValidationError extends Schema.TaggedError<CliValidationError>()(
-	"CliValidationError",
-	{
-		message: Schema.String,
-		hint: Schema.String,
-		details: Schema.Array(Schema.String),
-	},
-) {}
+export class CliValidationError extends Schema.TaggedError<
+	CliValidationError,
+	{ readonly brand: unique symbol }
+>()("CliValidationError", {
+	message: Schema.String,
+	hint: Schema.String,
+	details: Schema.Array(Schema.String),
+}) {}
 
-export class CliBuildError extends Schema.TaggedError<CliBuildError>()("CliBuildError", {
+export class CliBuildError extends Schema.TaggedError<
+	CliBuildError,
+	{ readonly brand: unique symbol }
+>()("CliBuildError", {
 	status: Schema.String,
 	message: Schema.String,
 	hint: Schema.String,
 	details: Schema.Array(Schema.String),
 }) {}
 
-export class CliGenerationError extends Schema.TaggedError<CliGenerationError>()(
-	"CliGenerationError",
-	{
-		code: Schema.Literals([
-			"provider_failure",
-			"generation_timeout",
-			"malformed_output",
-			"invalid_generated_document",
-		]),
-		message: Schema.String,
-		hint: Schema.String,
-		details: Schema.Array(Schema.String),
-	},
-) {}
+export class CliGenerationError extends Schema.TaggedError<
+	CliGenerationError,
+	{ readonly brand: unique symbol }
+>()("CliGenerationError", {
+	code: Schema.Literals([
+		"provider_failure",
+		"generation_timeout",
+		"malformed_output",
+		"invalid_generated_document",
+	]),
+	message: Schema.String,
+	hint: Schema.String,
+	details: Schema.Array(Schema.String),
+}) {}
 
-export class CliCanvasError extends Schema.TaggedError<CliCanvasError>()("CliCanvasError", {
+export class CliCanvasError extends Schema.TaggedError<
+	CliCanvasError,
+	{ readonly brand: unique symbol }
+>()("CliCanvasError", {
 	code: Schema.Literals([
 		"canvas_rejected",
 		"canvas_timeout",
@@ -61,7 +70,10 @@ export class CliCanvasError extends Schema.TaggedError<CliCanvasError>()("CliCan
 }) {}
 
 /** Drawing an icon through the hosted service, or publishing it to the community store. */
-export class CliIconError extends Schema.TaggedError<CliIconError>()("CliIconError", {
+export class CliIconError extends Schema.TaggedError<
+	CliIconError,
+	{ readonly brand: unique symbol }
+>()("CliIconError", {
 	code: Schema.Literals([
 		"icon_input",
 		"icon_rejected",
@@ -78,16 +90,19 @@ export class CliIconError extends Schema.TaggedError<CliIconError>()("CliIconErr
 	details: Schema.Array(Schema.String),
 }) {}
 
-export class CliInteractiveError extends Schema.TaggedError<CliInteractiveError>()(
-	"CliInteractiveError",
-	{
-		code: Schema.Literals(["cancelled", "prompt_failed"]),
-		message: Schema.String,
-		hint: Schema.String,
-	},
-) {}
+export class CliInteractiveError extends Schema.TaggedError<
+	CliInteractiveError,
+	{ readonly brand: unique symbol }
+>()("CliInteractiveError", {
+	code: Schema.Literals(["cancelled", "prompt_failed"]),
+	message: Schema.String,
+	hint: Schema.String,
+}) {}
 
-export class CliStorageError extends Schema.TaggedError<CliStorageError>()("CliStorageError", {
+export class CliStorageError extends Schema.TaggedError<
+	CliStorageError,
+	{ readonly brand: unique symbol }
+>()("CliStorageError", {
 	code: Schema.Literals([
 		"diagram_not_found",
 		"ambiguous_diagram_id",
@@ -110,7 +125,10 @@ export class CliStorageError extends Schema.TaggedError<CliStorageError>()("CliS
 	hint: Schema.String,
 }) {}
 
-export class CliShareError extends Schema.TaggedError<CliShareError>()("CliShareError", {
+export class CliShareError extends Schema.TaggedError<
+	CliShareError,
+	{ readonly brand: unique symbol }
+>()("CliShareError", {
 	code: Schema.Literals([
 		"invalid_share_link",
 		"unsupported_scene",
@@ -126,7 +144,10 @@ export class CliShareError extends Schema.TaggedError<CliShareError>()("CliShare
 	details: Schema.Array(Schema.String),
 }) {}
 
-export class CliExportError extends Schema.TaggedError<CliExportError>()("CliExportError", {
+export class CliExportError extends Schema.TaggedError<
+	CliExportError,
+	{ readonly brand: unique symbol }
+>()("CliExportError", {
 	code: Schema.Literals([
 		"format_unavailable",
 		"invalid_destination",

@@ -7,6 +7,7 @@ import {
 	COMMUNITY_ICON_LIMITS,
 	communityDiagramSlug,
 	type CommunityIcon,
+	type CommunityIconStorageError,
 } from "./contracts.js";
 import {
 	CommunityIconModeration,
@@ -81,7 +82,7 @@ function storeUnavailable() {
 /** Runs a store read and answers 503 when the store cannot be read. */
 async function withStore(
 	env: CommunityEnv,
-	read: Effect.Effect<Response, unknown, CommunityIconStore>,
+	read: Effect.Effect<Response, CommunityIconStorageError, CommunityIconStore>,
 ): Promise<Response> {
 	const layer = storeLayer(env);
 	if (!layer) return storeUnavailable();

@@ -60,32 +60,35 @@ export function bareCommunitySlug(slug: string): string {
 		: slug;
 }
 
-export class CommunityIconInvalidRequestError extends Schema.TaggedError<CommunityIconInvalidRequestError>()(
-	"CommunityIconInvalidRequestError",
-	{
-		/** `recipe_clips`: drawable, but a word is too large for the icon and would be cut off. */
-		code: Schema.Literals(["invalid_request", "invalid_recipe", "recipe_clips"]),
-		message: Schema.String,
-		issues: Schema.Array(Schema.String),
-	},
-) {}
+export class CommunityIconInvalidRequestError extends Schema.TaggedError<
+	CommunityIconInvalidRequestError,
+	{ readonly brand: unique symbol }
+>()("CommunityIconInvalidRequestError", {
+	/** `recipe_clips`: drawable, but a word is too large for the icon and would be cut off. */
+	code: Schema.Literals(["invalid_request", "invalid_recipe", "recipe_clips"]),
+	message: Schema.String,
+	issues: Schema.Array(Schema.String),
+}) {}
 
 /** Moderation found the name or the recipe's words unfit to publish, or the owner hid the icon. */
-export class CommunityIconRejectedError extends Schema.TaggedError<CommunityIconRejectedError>()(
-	"CommunityIconRejectedError",
-	{ message: Schema.String },
-) {}
+export class CommunityIconRejectedError extends Schema.TaggedError<
+	CommunityIconRejectedError,
+	{ readonly brand: unique symbol }
+>()("CommunityIconRejectedError", { message: Schema.String }) {}
 
-export class CommunityIconModerationUnavailableError extends Schema.TaggedError<CommunityIconModerationUnavailableError>()(
-	"CommunityIconModerationUnavailableError",
-	{ cause: Schema.Defect(), message: Schema.String },
-) {}
+export class CommunityIconModerationUnavailableError extends Schema.TaggedError<
+	CommunityIconModerationUnavailableError,
+	{ readonly brand: unique symbol }
+>()("CommunityIconModerationUnavailableError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+}) {}
 
-export class CommunityIconStorageError extends Schema.TaggedError<CommunityIconStorageError>()(
-	"CommunityIconStorageError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		operation: Schema.Literals(["read", "write", "schema"]),
-	},
-) {}
+export class CommunityIconStorageError extends Schema.TaggedError<
+	CommunityIconStorageError,
+	{ readonly brand: unique symbol }
+>()("CommunityIconStorageError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+	operation: Schema.Literals(["read", "write", "schema"]),
+}) {}

@@ -15,7 +15,10 @@ export class OutputWriter extends Context.Service<
 	}
 >()("@sketchi/cli/OutputWriter") {}
 
-export class CliCommandExit extends Schema.TaggedError<CliCommandExit>()("CliCommandExit", {
+export class CliCommandExit extends Schema.TaggedError<
+	CliCommandExit,
+	{ readonly brand: unique symbol }
+>()("CliCommandExit", {
 	exitCode: Schema.Number,
 }) {}
 
