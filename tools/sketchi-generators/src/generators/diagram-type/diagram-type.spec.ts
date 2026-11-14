@@ -86,7 +86,6 @@ export const GRAPH_DIAGRAM_TYPES = [
 
 		expect(registry("DIAGRAM_TYPES")).toEqual(["flowchart", "mindmap", "sequence", "timeline"]);
 		expect(registry("GRAPH_DIAGRAM_TYPES")).toEqual(["flowchart", "mindmap", "timeline"]);
-		expect(tree.exists("packages/diagram/core/src/types/timeline.test.ts")).toBe(true);
 		expect(tree.exists("packages/diagram/renderer/src/diagram-types/timeline.test.ts")).toBe(true);
 		expect(tree.exists("packages/diagram/ui/src/diagram-types/timeline.stories.tsx")).toBe(true);
 		expect(tree.read("packages/diagram/core/src/index.ts", "utf-8")).toContain(

@@ -1,7 +1,11 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["vitest/globals", "node"]
+    "types": ["vitest/globals", "node"],
+    "composite": false,
+    "noEmit": true,
+    "rootDir": "../../..",
+    "tsBuildInfoFile": "dist/tsconfig.spec.tsbuildinfo"
   },
-  "include": ["src/**/*.test.ts", "src/**/*.d.ts"]
+  "include": ["src/**/*.ts", "src/**/*.test.ts", "src/**/*.d.ts"]
 }

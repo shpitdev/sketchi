@@ -9,6 +9,11 @@
 			"factory": "./src/generators/diagram-type/diagram-type",
 			"schema": "./src/generators/diagram-type/schema.json",
 			"description": "Create a typed Sketchi diagram type"
+		},
+		"effect-library": {
+			"factory": "./src/generators/effect-library/effect-library",
+			"schema": "./src/generators/effect-library/schema.json",
+			"description": "Create an ESM Effect package with the native compiler and no sample tests"
 		}
 	}
 }

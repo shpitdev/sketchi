@@ -49,13 +49,21 @@
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "tsc6 -p packages/diagram/ui/tsconfig.json --noEmit"
+				"commands": [
+					"tsc6 -p packages/diagram/ui/tsconfig.spec.json --noEmit",
+					"tsc6 -p packages/diagram/ui/tsconfig.lib.json --noEmit"
+				],
+				"parallel": false
 			}
 		},
 		"typecheck-native": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "effect-tsgo tsc@7.0.2 -p packages/diagram/ui/tsconfig.json --noEmit"
+				"commands": [
+					"effect-tsgo tsc@7.0.2 -p packages/diagram/ui/tsconfig.spec.json --noEmit",
+					"effect-tsgo tsc@7.0.2 -p packages/diagram/ui/tsconfig.lib.json --noEmit"
+				],
+				"parallel": false
 			}
 		}
 	}

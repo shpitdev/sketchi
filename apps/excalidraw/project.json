@@ -79,13 +79,15 @@
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "tsc6 -p apps/excalidraw/tsconfig.json --noEmit"
+				"commands": ["tsc6 -p apps/excalidraw/tsconfig.app.json --noEmit"],
+				"parallel": false
 			}
 		},
 		"typecheck-native": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "effect-tsgo tsc@7.0.2 -p apps/excalidraw/tsconfig.json --noEmit"
+				"commands": ["effect-tsgo tsc@7.0.2 -p apps/excalidraw/tsconfig.app.json --noEmit"],
+				"parallel": false
 			}
 		}
 	}

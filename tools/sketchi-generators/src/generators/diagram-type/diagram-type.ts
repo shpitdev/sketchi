@@ -108,7 +108,7 @@ export async function diagramTypeGenerator(tree: Tree, options: DiagramTypeGener
 	return () => {
 		logger.info(
 			[
-				`Scaffolded the "${typeValue}" contract, its tests, and a Storybook story.`,
+				`Scaffolded the "${typeValue}" contract, renderer test, and Storybook story.`,
 				"The compiler and tools/diagram-families.test.ts now fail until every pipeline stage exists:",
 				"contract registry, renderer, Excalidraw conversion, generation prompt and parsing,",
 				"Code Mode build, CLI dispatch, maintained scenarios, and Storybook.",

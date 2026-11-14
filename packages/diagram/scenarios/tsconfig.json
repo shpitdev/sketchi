@@ -4,12 +4,17 @@
     "composite": true,
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
-    "ignoreDeprecations": "6.0"
+    "ignoreDeprecations": "6.0",
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "include": [],
   "references": [
-    { "path": "../core/tsconfig.lib.json" },
-    { "path": "../renderer/tsconfig.lib.json" },
-    { "path": "../excalidraw/tsconfig.lib.json" }
-  ]
+    {
+      "path": "./tsconfig.lib.json"
+    },
+    {
+      "path": "./tsconfig.spec.json"
+    }
+  ],
+  "files": []
 }

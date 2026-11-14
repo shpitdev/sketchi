@@ -2,9 +2,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../../dist/out-tsc",
-    "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node", "vitest"]
+    "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node", "vitest"],
+    "composite": false,
+    "noEmit": true,
+    "rootDir": "../../..",
+    "tsBuildInfoFile": "dist/tsconfig.spec.tsbuildinfo"
   },
   "include": [
+    "src/**/*.ts",
     "vite.config.ts",
     "vite.config.mts",
     "vitest.config.ts",

@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../packages/icons/catalog/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagram/agent/tsconfig.lib.json"
+    }
+  ]
+}

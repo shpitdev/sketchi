@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "tsBuildInfoFile": ".output/tsconfig.tsbuildinfo"
+  },
+  "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "../../packages/svg-excalidraw/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagram/renderer/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagram/excalidraw/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagram/core/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagram/ui/tsconfig.lib.json"
+    }
+  ]
+}

@@ -22,7 +22,7 @@ stage exists.
 
 | Stage | Where | Guard |
 | --- | --- | --- |
-| core contract and fixture | `packages/diagram/core/src/types/<name>.ts`: Effect Schema contract, semantic validation, `parse<Name>Diagram`, and a fixture in `diagramFixtures`. Add it to `CanonicalDiagramSchema` in `diagram.ts`, and add the file to the Effect schema-boundary lists in `.oxlintrc.json` and `tools/project-graph.test.ts`. If the family is not nodes and edges, replace the scaffold with its own contract (as `sequence.ts` does) and remove it from `GRAPH_DIAGRAM_TYPES`. | compile (`satisfies Record<DiagramTypeValue, …>`), pipeline test |
+| core contract and fixture | `packages/diagram/core/src/types/<name>.ts`: Effect Schema contract, semantic validation, `parse<Name>Diagram`, and a fixture in `diagramFixtures`. Add it to `CanonicalDiagramSchema` in `diagram.ts`, following the shared Effect diagnostic policy. If the family is not nodes and edges, replace the scaffold with its own contract (as `sequence.ts` does) and remove it from `GRAPH_DIAGRAM_TYPES`. | compile (`satisfies Record<DiagramTypeValue, …>`), pipeline test |
 | deterministic renderer | A `renderDiagram` case in `packages/diagram/renderer/src/diagram.ts`, plus `diagram-types/<name>.test.ts`. | compile, `type-structure.test.ts`, pipeline test |
 | Excalidraw conversion | `packages/diagram/excalidraw`. Any new renderer role must convert and validate. | pipeline test |
 | generation prompt | `IR_INSTRUCTIONS` and `FAMILY_EXAMPLES` in `packages/diagram/generation/src/lib/messages.ts`. Remove the name from `UnsupportedDiagramIntentKindSchema` (`intent.ts`); the prompt's refusal list is built from it. | compile, pipeline test |

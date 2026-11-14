@@ -5,6 +5,8 @@
     "declarationMap": true,
     "emitDeclarationOnly": false,
     "noEmit": false,
-    "outDir": "dist"
-  }
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

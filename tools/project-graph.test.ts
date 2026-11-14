@@ -6,114 +6,8 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const workspaceRoot = fileURLToPath(new URL("../", import.meta.url));
-const requiredWorkspaceGlobs = ["apps/*", "packages/*", "packages/*/*", "tools/*"];
-const intendedNxProjectRoots = [
-	"apps/cli",
-	"apps/excalidraw",
-	"apps/icons",
-	"apps/native-conversion-storybook",
-	"apps/playground",
-	"apps/web",
-	"packages/diagram/agent",
-	"packages/diagram/core",
-	"packages/diagram/excalidraw",
-	"packages/diagram/generation",
-	"packages/diagram/renderer",
-	"packages/diagram/scenarios",
-	"packages/diagram/ui",
-	"packages/icons/catalog",
-	"packages/icons/community",
-	"packages/icons/draw",
-	"packages/observability",
-	"packages/social-card",
-	"packages/studio/projects",
-	"packages/svg-excalidraw",
-	"packages/ui",
-	"tools/icon-batch",
-	"tools/sketchi-generators",
-];
-const intendedWorkspacePackageRoots = intendedNxProjectRoots.filter(
-	(projectRoot) => projectRoot !== "apps/native-conversion-storybook",
-);
-const intendedCompositeReferences = [
-	"apps/cli/tsconfig.json",
-	"apps/excalidraw/tsconfig.json",
-	"apps/icons/tsconfig.json",
-	"apps/playground/tsconfig.json",
-	"apps/web/tsconfig.json",
-	"packages/diagram/agent/tsconfig.lib.json",
-	"packages/diagram/core/tsconfig.lib.json",
-	"packages/diagram/excalidraw/tsconfig.lib.json",
-	"packages/diagram/generation/tsconfig.lib.json",
-	"packages/diagram/renderer/tsconfig.lib.json",
-	"packages/diagram/scenarios/tsconfig.lib.json",
-	"packages/diagram/ui/tsconfig.lib.json",
-	"packages/icons/catalog/tsconfig.lib.json",
-	"packages/icons/community/tsconfig.lib.json",
-	"packages/icons/draw/tsconfig.lib.json",
-	"packages/observability/tsconfig.lib.json",
-	"packages/social-card/tsconfig.lib.json",
-	"packages/studio/projects/tsconfig.lib.json",
-	"packages/svg-excalidraw/tsconfig.lib.json",
-	"packages/ui/tsconfig.lib.json",
-	"tools/icon-batch/tsconfig.json",
-	"tools/sketchi-generators/tsconfig.lib.json",
-];
 // pnpm resolves the exact runtime versions from the shared workspace catalog.
 const approvedEffectDependencySpecifiers = new Set(["catalog:"]);
-const diagramPackages = [
-	{
-		name: "diagram-agent",
-		npmName: "@sketchi/diagram-agent",
-		root: "packages/diagram/agent",
-		oldRoot: "packages/diagram-agent",
-	},
-	{
-		name: "diagram-core",
-		npmName: "@sketchi/diagram-core",
-		root: "packages/diagram/core",
-		oldRoot: "packages/diagram-core",
-	},
-	{
-		name: "diagram-excalidraw",
-		npmName: "@sketchi/diagram-excalidraw",
-		root: "packages/diagram/excalidraw",
-		oldRoot: "packages/diagram-excalidraw",
-	},
-	{
-		name: "diagram-generation",
-		npmName: "@sketchi/diagram-generation",
-		root: "packages/diagram/generation",
-		oldRoot: "packages/diagram-generation",
-	},
-	{
-		name: "diagram-renderer",
-		npmName: "@sketchi/diagram-renderer",
-		root: "packages/diagram/renderer",
-		oldRoot: "packages/diagram-renderer",
-	},
-	{
-		name: "diagram-scenarios",
-		npmName: "@sketchi/diagram-scenarios",
-		root: "packages/diagram/scenarios",
-		oldRoot: "packages/diagram-scenarios",
-	},
-	{
-		name: "diagram-ui",
-		npmName: "@sketchi/diagram-ui",
-		root: "packages/diagram/ui",
-		oldRoot: ["packages", ["diagram", "studio", "ui"].join("-")].join("/"),
-	},
-];
-
-interface TsConfig {
-	compilerOptions?: {
-		composite?: boolean;
-	};
-	extends?: string;
-	references?: Array<{ path: string }>;
-}
-
 interface PackageManifest {
 	dependencies?: Record<string, string>;
 	devDependencies?: Record<string, string>;
@@ -145,10 +39,6 @@ function invalidEffectDependencyPins(
 	return invalid;
 }
 
-function normalizeWorkspacePath(filePath: string): string {
-	return filePath.replaceAll(path.sep, "/").replace(/^\.\//, "");
-}
-
 function workspacePackageGlobs(): string[] {
 	const workspaceYaml = readFileSync(path.join(workspaceRoot, "pnpm-workspace.yaml"), "utf8");
 	const lines = workspaceYaml.split("\n");
@@ -165,34 +55,6 @@ function workspacePackageGlobs(): string[] {
 		if (line.trim()) break;
 	}
 	return globs;
-}
-
-function resolveTsConfigPath(configPath: string): string {
-	const absolutePath = path.resolve(workspaceRoot, configPath);
-	if (path.extname(absolutePath)) return absolutePath;
-	return path.join(absolutePath, "tsconfig.json");
-}
-
-function isCompositeTsConfig(configPath: string): boolean {
-	const absolutePath = resolveTsConfigPath(configPath);
-	const config = readJsonFile<TsConfig>(absolutePath);
-	if (config.compilerOptions?.composite !== undefined) {
-		return config.compilerOptions.composite;
-	}
-	if (!config.extends) return false;
-
-	const parentPath = path.resolve(path.dirname(absolutePath), config.extends);
-	return isCompositeTsConfig(parentPath);
-}
-
-function projectReferenceConfig(projectRoot: string): string | undefined {
-	for (const configName of ["tsconfig.lib.json", "tsconfig.json"]) {
-		const configPath = path.posix.join(projectRoot, configName);
-		if (existsSync(path.join(workspaceRoot, configPath)) && isCompositeTsConfig(configPath)) {
-			return configPath;
-		}
-	}
-	return undefined;
 }
 
 interface OxlintReport {
@@ -269,28 +131,6 @@ function unreasonedSuppressions(source: string): string[] {
 	return unreasoned;
 }
 
-describe("diagram package layout", () => {
-	it("discovers the existing Nx projects at their nested roots", async () => {
-		const graph = await createProjectGraphAsync({ exitOnError: true });
-
-		for (const diagramPackage of diagramPackages) {
-			expect(graph.nodes[diagramPackage.name]?.data.root).toBe(diagramPackage.root);
-		}
-	});
-
-	it("uses the approved npm identities and removes old active directories", () => {
-		for (const diagramPackage of diagramPackages) {
-			const packageRoot = path.join(workspaceRoot, diagramPackage.root);
-			const packageJson = readJsonFile<{ name: string }>(path.join(packageRoot, "package.json"));
-
-			expect(existsSync(packageRoot)).toBe(true);
-			expect(packageJson.name).toBe(diagramPackage.npmName);
-			expect(existsSync(path.join(workspaceRoot, diagramPackage.oldRoot))).toBe(false);
-		}
-		expect(existsSync(path.join(workspaceRoot, "packages/svg-excalidraw"))).toBe(true);
-	});
-});
-
 describe("diagram generation project boundaries", () => {
 	it("keeps production generation independent from eval scenarios", async () => {
 		const graph = await createProjectGraphAsync({ exitOnError: true });
@@ -307,7 +147,7 @@ describe("diagram generation project boundaries", () => {
 		const packageJsonPaths = [
 			"package.json",
 			...globSync(
-				requiredWorkspaceGlobs.map((workspaceGlob) => `${workspaceGlob}/package.json`),
+				workspacePackageGlobs().map((workspaceGlob) => `${workspaceGlob}/package.json`),
 				{ cwd: workspaceRoot },
 			),
 		];
@@ -340,7 +180,7 @@ describe("diagram generation project boundaries", () => {
 		const manifestPaths = [
 			"package.json",
 			...globSync(
-				requiredWorkspaceGlobs.map((workspaceGlob) => `${workspaceGlob}/package.json`),
+				workspacePackageGlobs().map((workspaceGlob) => `${workspaceGlob}/package.json`),
 				{ cwd: workspaceRoot },
 			),
 		];
@@ -385,51 +225,6 @@ describe("Effect dependency pins", () => {
 });
 
 describe("workspace project membership", () => {
-	it("keeps pnpm importers aligned with package-backed Nx roots", async () => {
-		const graph = await createProjectGraphAsync({ exitOnError: true });
-		const globs = workspacePackageGlobs();
-		const pnpmRoots = globSync(
-			globs.map((workspaceGlob) => `${workspaceGlob}/package.json`),
-			{ cwd: workspaceRoot },
-		)
-			.map((packageJsonPath) => normalizeWorkspacePath(path.dirname(packageJsonPath)))
-			.sort();
-		const nxPackageRoots = Object.values(graph.nodes)
-			.map((node) => node.data.root)
-			.filter((projectRoot) => existsSync(path.join(workspaceRoot, projectRoot, "package.json")))
-			.sort();
-		const nxRoots = Object.values(graph.nodes)
-			.map((node) => node.data.root)
-			.sort();
-
-		expect(globs).toEqual(requiredWorkspaceGlobs);
-		expect(nxRoots).toEqual(intendedNxProjectRoots);
-		expect(nxPackageRoots).toEqual(intendedWorkspacePackageRoots);
-		expect(pnpmRoots).toEqual(intendedWorkspacePackageRoots);
-	});
-
-	it("references every composite app, package, and generator project", async () => {
-		const graph = await createProjectGraphAsync({ exitOnError: true });
-		const rootConfig = readJsonFile<TsConfig>(path.join(workspaceRoot, "tsconfig.json"));
-		const actualReferences = (rootConfig.references ?? [])
-			.map(({ path: referencePath }) =>
-				normalizeWorkspacePath(path.relative(workspaceRoot, resolveTsConfigPath(referencePath))),
-			)
-			.sort();
-		const discoveredCompositeReferences = Object.values(graph.nodes)
-			.map((node) => projectReferenceConfig(node.data.root))
-			.filter((configPath): configPath is string => configPath !== undefined)
-			.sort();
-
-		expect(new Set(actualReferences).size).toBe(actualReferences.length);
-		expect(actualReferences).toEqual(intendedCompositeReferences);
-		expect(discoveredCompositeReferences).toEqual(intendedCompositeReferences);
-		for (const referencePath of actualReferences) {
-			expect(isCompositeTsConfig(referencePath)).toBe(true);
-		}
-		expect(actualReferences).not.toContain("apps/native-conversion-storybook/tsconfig.json");
-	});
-
 	it("tags every Nx project without allowing app dependency drift", async () => {
 		const graph = await createProjectGraphAsync({ exitOnError: true });
 

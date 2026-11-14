@@ -5,7 +5,9 @@
     "declarationMap": true,
     "emitDeclarationOnly": false,
     "noEmit": false,
-    "outDir": "dist"
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo"
   },
-  "exclude": ["src/**/*.test.ts", "src/icon-color-render.ts"]
+  "exclude": ["src/**/*.test.ts", "src/icon-color-render.ts"],
+  "include": ["src/**/*.ts", "src/generated/*.json"]
 }

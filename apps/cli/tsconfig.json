@@ -11,12 +11,17 @@
     "noPropertyAccessFromIndexSignature": true,
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
-    "ignoreDeprecations": "6.0"
+    "ignoreDeprecations": "6.0",
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "include": [],
   "references": [
-    { "path": "../../packages/diagram/agent/tsconfig.lib.json" },
-    { "path": "../../packages/diagram/core/tsconfig.lib.json" },
-    { "path": "../../packages/diagram/generation/tsconfig.lib.json" }
-  ]
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.spec.json"
+    }
+  ],
+  "files": []
 }

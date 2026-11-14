@@ -1,7 +1,17 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node"]
+    "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node"],
+    "composite": false,
+    "noEmit": true,
+    "rootDir": "../..",
+    "tsBuildInfoFile": "dist/tsconfig.spec.tsbuildinfo"
   },
-  "include": ["vitest.config.mts", "vitest.browser.config.mts", "src/**/*.test.ts", "tests/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "vitest.config.mts",
+    "vitest.browser.config.mts",
+    "src/**/*.test.ts"
+  ]
 }

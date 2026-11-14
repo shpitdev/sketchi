@@ -82,7 +82,7 @@ export default defineConfig(() => ({
 		reporters: ["default"],
 		coverage: {
 			reportsDirectory: "../../coverage/apps/cli",
-			provider: "v8",
+			provider: "v8" as const,
 		},
 	},
 }));
