@@ -1670,7 +1670,8 @@ describe("diagram storage", () => {
 		withTestRoot((root) =>
 			Effect.gen(function* () {
 				const store = yield* DiagramStore;
-				const ids = ["a_", "a.", "Z", "A-", "z", "A", "0", "a-", "a", "A_", "A."];
+				// Distinct after case-folding so this also exercises real storage on macOS.
+				const ids = ["b_", "b.", "Z", "A-", "y", "A", "0", "b-", "b", "A_", "A."];
 				for (const id of ids) {
 					const document = canonicalDocument({
 						...canonicalDocument(),
@@ -1682,7 +1683,7 @@ describe("diagram storage", () => {
 				const listed = yield* store.list();
 				assert.deepStrictEqual(
 					listed.map(({ id }) => id),
-					["0", "A", "A-", "A.", "A_", "Z", "a", "a-", "a.", "a_", "z"],
+					["0", "A", "A-", "A.", "A_", "Z", "b", "b-", "b.", "b_", "y"],
 				);
 			}).pipe(Effect.provide(storeLayer(root))),
 		),
