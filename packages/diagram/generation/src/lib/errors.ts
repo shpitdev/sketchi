@@ -8,78 +8,78 @@ import type {
 } from "./candidates.js";
 import { DiagramGenerationProviderIdSchema } from "./candidates.js";
 
-export class DiagramGenerationConfigurationError extends Schema.TaggedError<DiagramGenerationConfigurationError>()(
-	"DiagramGenerationConfigurationError",
-	{
-		message: Schema.String,
-		provider: DiagramGenerationProviderIdSchema,
-	},
-) {}
+export class DiagramGenerationConfigurationError extends Schema.TaggedError<
+	DiagramGenerationConfigurationError,
+	{ readonly brand: unique symbol }
+>()("DiagramGenerationConfigurationError", {
+	message: Schema.String,
+	provider: DiagramGenerationProviderIdSchema,
+}) {}
 
-export class DiagramGenerationInputError extends Schema.TaggedError<DiagramGenerationInputError>()(
-	"DiagramGenerationInputError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		provider: DiagramGenerationProviderIdSchema,
-		scenarioId: Schema.String,
-	},
-) {}
+export class DiagramGenerationInputError extends Schema.TaggedError<
+	DiagramGenerationInputError,
+	{ readonly brand: unique symbol }
+>()("DiagramGenerationInputError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+	provider: DiagramGenerationProviderIdSchema,
+	scenarioId: Schema.String,
+}) {}
 
-export class DiagramGenerationTransportError extends Schema.TaggedError<DiagramGenerationTransportError>()(
-	"DiagramGenerationTransportError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		operation: Schema.String,
-		provider: DiagramGenerationProviderIdSchema,
-		retryable: Schema.Boolean,
-	},
-) {}
+export class DiagramGenerationTransportError extends Schema.TaggedError<
+	DiagramGenerationTransportError,
+	{ readonly brand: unique symbol }
+>()("DiagramGenerationTransportError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+	operation: Schema.String,
+	provider: DiagramGenerationProviderIdSchema,
+	retryable: Schema.Boolean,
+}) {}
 
-export class DiagramGenerationHttpError extends Schema.TaggedError<DiagramGenerationHttpError>()(
-	"DiagramGenerationHttpError",
-	{
-		diagnostics: Schema.Array(Schema.String),
-		durationMs: Schema.Number,
-		provider: DiagramGenerationProviderIdSchema,
-		raw: Schema.Unknown,
-		retryable: Schema.Boolean,
-		status: Schema.Number,
-	},
-) {}
+export class DiagramGenerationHttpError extends Schema.TaggedError<
+	DiagramGenerationHttpError,
+	{ readonly brand: unique symbol }
+>()("DiagramGenerationHttpError", {
+	diagnostics: Schema.Array(Schema.String),
+	durationMs: Schema.Number,
+	provider: DiagramGenerationProviderIdSchema,
+	raw: Schema.Unknown,
+	retryable: Schema.Boolean,
+	status: Schema.Number,
+}) {}
 
-export class DiagramGenerationResponseError extends Schema.TaggedError<DiagramGenerationResponseError>()(
-	"DiagramGenerationResponseError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		provider: DiagramGenerationProviderIdSchema,
-	},
-) {}
+export class DiagramGenerationResponseError extends Schema.TaggedError<
+	DiagramGenerationResponseError,
+	{ readonly brand: unique symbol }
+>()("DiagramGenerationResponseError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+	provider: DiagramGenerationProviderIdSchema,
+}) {}
 
-export class DiagramGenerationTimeoutError extends Schema.TaggedError<DiagramGenerationTimeoutError>()(
-	"DiagramGenerationTimeoutError",
-	{
-		message: Schema.String,
-		provider: DiagramGenerationProviderIdSchema,
-		/** One model call, retried while time remains, or the whole request, which ends it. */
-		scope: Schema.Literals(["attempt", "request"]),
-		timeoutMs: Schema.Number,
-	},
-) {}
+export class DiagramGenerationTimeoutError extends Schema.TaggedError<
+	DiagramGenerationTimeoutError,
+	{ readonly brand: unique symbol }
+>()("DiagramGenerationTimeoutError", {
+	message: Schema.String,
+	provider: DiagramGenerationProviderIdSchema,
+	/** One model call, retried while time remains, or the whole request, which ends it. */
+	scope: Schema.Literals(["attempt", "request"]),
+	timeoutMs: Schema.Number,
+}) {}
 
 /** The request needs more than Sketchi draws or than one answer may hold. */
-export class DiagramGenerationLimitError extends Schema.TaggedError<DiagramGenerationLimitError>()(
-	"DiagramGenerationLimitError",
-	{
-		diagnostics: Schema.Array(Schema.String),
-		/** `output_tokens`: the answer reached the output budget. `diagram_size`: a family limit. */
-		limit: Schema.Literals(["output_tokens", "diagram_size"]),
-		message: Schema.String,
-		provider: DiagramGenerationProviderIdSchema,
-	},
-) {}
+export class DiagramGenerationLimitError extends Schema.TaggedError<
+	DiagramGenerationLimitError,
+	{ readonly brand: unique symbol }
+>()("DiagramGenerationLimitError", {
+	diagnostics: Schema.Array(Schema.String),
+	/** `output_tokens`: the answer reached the output budget. `diagram_size`: a family limit. */
+	limit: Schema.Literals(["output_tokens", "diagram_size"]),
+	message: Schema.String,
+	provider: DiagramGenerationProviderIdSchema,
+}) {}
 
 export type DiagramGenerationError =
 	| DiagramGenerationConfigurationError

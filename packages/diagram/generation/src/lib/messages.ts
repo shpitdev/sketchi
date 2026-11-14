@@ -33,9 +33,7 @@ export function listAlternatives(values: readonly string[]): string {
 const NATIVE_KINDS = DIAGRAM_TYPES.map((type) => `"${type}"`);
 
 /** A catalog logo the prompt names; the only slugs a node icon may use. */
-export class DiagramGenerationLogo extends Schema.Class<DiagramGenerationLogo>(
-	"DiagramGenerationLogo",
-)({
+export const DiagramGenerationLogo = Schema.Struct({
 	aliases: Schema.optionalKey(Schema.Array(Schema.String)),
 	/** The product's everyday-word name means it in every label (see NamedLogo.alwaysNamed). */
 	alwaysNamed: Schema.optionalKey(Schema.Literal(true)),
@@ -43,11 +41,11 @@ export class DiagramGenerationLogo extends Schema.Class<DiagramGenerationLogo>(
 	collection: Schema.optionalKey(Schema.String),
 	name: Schema.String,
 	slug: Schema.String,
-}) {}
+}).annotate({ identifier: "DiagramGenerationLogo" });
 
-export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPrompt>(
-	"DiagramGenerationPrompt",
-)({
+export interface DiagramGenerationLogo extends Schema.Schema.Type<typeof DiagramGenerationLogo> {}
+
+export const DiagramGenerationPrompt = Schema.Struct({
 	id: Schema.String,
 	/** Logos for technologies the prompt names, in order of mention. */
 	logos: Schema.optionalKey(Schema.Array(DiagramGenerationLogo)),
@@ -65,15 +63,21 @@ export class DiagramGenerationPrompt extends Schema.Class<DiagramGenerationPromp
 	base: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
 	/** The request asks for colors or shapes (see asksForStyling), so the prompt says how to return them. */
 	styling: Schema.optionalKey(Schema.Boolean),
-}) {}
+}).annotate({ identifier: "DiagramGenerationPrompt" });
+
+export interface DiagramGenerationPrompt extends Schema.Schema.Type<
+	typeof DiagramGenerationPrompt
+> {}
 
 /** Provider adapters map these onto their own system and user channels. */
-export class DiagramGenerationMessages extends Schema.Class<DiagramGenerationMessages>(
-	"DiagramGenerationMessages",
-)({
+export const DiagramGenerationMessages = Schema.Struct({
 	system: Schema.String,
 	user: Schema.String,
-}) {}
+}).annotate({ identifier: "DiagramGenerationMessages" });
+
+export interface DiagramGenerationMessages extends Schema.Schema.Type<
+	typeof DiagramGenerationMessages
+> {}
 
 const SWIMLANE_KIND =
 	'A swimlane or architecture request is a "flowchart" with lanes or zone groups.';

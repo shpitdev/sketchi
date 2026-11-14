@@ -17,9 +17,7 @@ export class DiagramGenerationClient extends Context.Service<
 	}
 >()("@sketchi/diagram-generation/DiagramGenerationClient") {}
 
-export class DiagramGenerationPolicyConfig extends Schema.Class<DiagramGenerationPolicyConfig>(
-	"DiagramGenerationPolicyConfig",
-)({
+export const DiagramGenerationPolicyConfig = Schema.Struct({
 	concurrency: Schema.Number,
 	maxRepairAttempts: Schema.Number,
 	maxRetries: Schema.Number,
@@ -28,7 +26,11 @@ export class DiagramGenerationPolicyConfig extends Schema.Class<DiagramGeneratio
 	retryDelayMs: Schema.Number,
 	/** Every call, retry and repair for one request. Callers wait for this long. */
 	totalTimeoutMs: Schema.Number,
-}) {}
+}).annotate({ identifier: "DiagramGenerationPolicyConfig" });
+
+export interface DiagramGenerationPolicyConfig extends Schema.Schema.Type<
+	typeof DiagramGenerationPolicyConfig
+> {}
 
 export class DiagramGenerationPolicy extends Context.Service<
 	DiagramGenerationPolicy,
