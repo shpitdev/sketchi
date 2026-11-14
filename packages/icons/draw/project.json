@@ -28,7 +28,7 @@
 		"typecheck-native": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "tsc -p packages/icons/draw/tsconfig.json --noEmit"
+				"command": "effect-tsgo tsc@7.0.2 -p packages/icons/draw/tsconfig.json --noEmit"
 			}
 		}
 	}

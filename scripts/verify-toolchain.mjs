@@ -71,6 +71,15 @@ if (!skipDependencies) {
 	assert.equal(run("pnpm", ["exec", "tsc6", "--version"]), `Version ${typeScriptApiVersion}`);
 	assert.equal(run("pnpm", ["exec", "tsc", "--version"]), `Version ${nativeTypeScriptVersion}`);
 	assert.equal(
+		run("pnpm", ["exec", "effect-tsgo", `tsc@${nativeTypeScriptVersion}`, "--version"]),
+		`Version ${nativeTypeScriptVersion}+effect-tsgo.${manifest.devDependencies["@effect/tsgo"]}`,
+	);
+	assert.equal(
+		run("pnpm", ["exec", "effect-tsgo", "oxlint", "--version"]),
+		`Version: ${manifest.devDependencies.oxlint}`,
+	);
+	assert.equal(manifest.devDependencies["@oxlint/plugins"], manifest.devDependencies.oxlint);
+	assert.equal(
 		run("node", [
 			"--input-type=module",
 			"--eval",

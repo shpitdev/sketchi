@@ -422,7 +422,7 @@ async function main(argv) {
 			"repository tooling contracts",
 			command(
 				"tools",
-				["pnpm", "exec", "tsc", "-p", "tools/tsconfig.json", "--noEmit"],
+				["pnpm", "exec", "effect-tsgo", "tsc@7.0.2", "-p", "tools/tsconfig.json", "--noEmit"],
 				[
 					"pnpm",
 					"exec",

@@ -226,9 +226,9 @@ describe("playground surface", () => {
 			/>,
 		);
 
-		const composer = screen.getByRole("textbox", {
+		const composer = screen.getByRole<HTMLTextAreaElement>("textbox", {
 			name: "Describe your diagram",
-		}) as HTMLTextAreaElement;
+		});
 		fireEvent.change(composer, { target: { value: "Map a release flow" } });
 		expect(screen.getByLabelText("Describe your diagram")).toBe(composer);
 		expect(composer.value).toBe("Map a release flow");

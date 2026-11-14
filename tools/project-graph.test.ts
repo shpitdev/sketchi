@@ -659,10 +659,12 @@ function invalidEffectDependencyPins(
 		manifest.peerDependencies,
 	]) {
 		for (const [dependency, version] of Object.entries(dependencies ?? {})) {
-			if (
-				(dependency === "effect" || dependency.startsWith("@effect/")) &&
-				!approvedEffectDependencySpecifiers.has(version)
-			) {
+			// The native compiler has its own release line, separate from the runtime catalog.
+			const approved =
+				dependency === "@effect/tsgo"
+					? /^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version)
+					: approvedEffectDependencySpecifiers.has(version);
+			if ((dependency === "effect" || dependency.startsWith("@effect/")) && !approved) {
 				invalid.push({ dependency, version });
 			}
 		}
@@ -1203,10 +1205,17 @@ describe("Effect structural guards", () => {
 				dependencies: {
 					"@effect/platform": "^4.0.0",
 					"@effect/platform-node": "catalog:",
+					"@effect/tsgo": "^0.69.0",
 					effect: "catalog:",
 				},
 			}),
-		).toEqual([{ dependency: "@effect/platform", version: "^4.0.0" }]);
+		).toEqual([
+			{ dependency: "@effect/platform", version: "^4.0.0" },
+			{ dependency: "@effect/tsgo", version: "^0.69.0" },
+		]);
+		expect(invalidEffectDependencyPins({ devDependencies: { "@effect/tsgo": "0.69.0" } })).toEqual(
+			[],
+		);
 	});
 });
 
