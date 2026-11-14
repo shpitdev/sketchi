@@ -71,7 +71,7 @@ const noReactEffects = defineRule({
 		},
 		messages: {
 			reactEffect:
-				"Avoid {{name}} in product code. Derive values during render, react to changes in event handlers, load data with TanStack Query or Router, or subscribe with useSyncExternalStore. Isolate unavoidable third-party synchronization behind a reasoned `oxlint-disable-next-line sketchi/no-react-effects -- <why>`.",
+				"Avoid {{name}} in product code. Derive values during render, react to changes in event handlers, compose state and workflows with Effect atoms, or subscribe with useSyncExternalStore. Isolate unavoidable third-party synchronization behind a reasoned `oxlint-disable-next-line sketchi/no-react-effects -- <why>`.",
 			reactEffectReexport:
 				"Do not re-export React effect hooks; a local re-export would hide {{name}} from this rule.",
 			reactNamespaceEscape:

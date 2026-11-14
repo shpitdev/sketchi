@@ -92,9 +92,9 @@ Slice 2 can consume one typed, deterministic canonical document for native
 construction and serialization. Capability policy is centralized in
 `inspectSvgCapabilities`; product code does not need feature sniffing.
 
-The core stays synchronous, pure, and DOM-free. Effect is used elsewhere in the
-repository for service workflows, but adding an Effect runtime to deterministic
-in-memory SVG normalization would add no typed dependency or resource boundary.
+The core stays synchronous and DOM-free. Revised ADR 0004 permits Effect data
+APIs here. Synchronous normalization does not need an Effect runtime merely to
+use those APIs; add a runtime only for an actual workflow or resource boundary.
 
 Real clip intersection, masks, filters, patterns, embedded raster, exact SVG
 group compositing semantics, and product UI remain outside Slice 1.

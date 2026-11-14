@@ -1,77 +1,78 @@
 # ADR 0004: Effect v4 on Cloudflare Workers
 
-- Status: accepted
-- Date: 2026-07-20
+- Status: accepted; revised by the Effect-everywhere plan
+- Original decision: 2026-07-20
+- Policy revision: 2026-11-14
 
 ## Context
 
-Sketchi needs one architecture for model generation, Code Mode, artifact and
-Studio persistence, Browser Rendering, evaluation, and telemetry. These flows
-need typed failures, cancellation, time, retry, concurrency, scoped resources,
-and substitutable tests. The product already relies on Cloudflare Workers, AI
-Gateway, Browser Rendering, R2, Pipelines, and R2 SQL.
+Sketchi needs typed data and failures, cancellation, concurrency, scoped resources and
+substitutable dependencies across diagram generation, rendering, browser state,
+persistence, CLI and telemetry. The previous pure/UI exclusions and exact Promise-site
+inventory divided that ownership and required a custom TypeScript checker. Upstream
+Effect diagnostics now supply correctness and native-operation checks.
 
 ## Decision
 
-Effect v4 is authoritative for non-trivial effectful work. Services and layers
-express dependencies; Effect Schema owns domain and protocol contracts;
-schema-backed tagged errors represent expected failures; interruption and
-defects remain distinct; resources are scoped; runtime execution occurs only
-at approved host edges.
+Use Effect v4 and its ecosystem throughout the application and tools. Reuse upstream
+data structures, schemas, algorithms, state and workflow facilities where they meet
+the requirement. Keep Sketchi-specific geometry/layout and foreign renderers. React
+owns rendering; Effect atoms and services own application state and workflows.
+TanStack retains the navigation/SSR/build shell until a supported replacement is
+proved. A native host callback is a boundary, not an exemption for the code around it.
 
-Cloudflare Workers remain the application runtime. This is not a temporary
-bridge. Provider calls use the Cloudflare AI Gateway binding server-side; the
-binding authenticates the request and supplies the stored provider key. The CLI
-holds no gateway credential. Its explicit network commands are `generate`,
-`share`, and `pull`; `create`, `show`, `edit`, `list`, `restore`, and `export`
-are strictly offline.
+Cloudflare Workers and Durable Objects remain the hosting platform. Services and
+layers express dependencies, expected failures use typed tagged errors, and
+interruption stays distinct from defects. Runtimes belong to explicit host/resource
+lifecycles; imports must not start I/O or timers or capture request-owned state.
+Use the supported scoped Node and browser services rather than parallel lifecycle
+implementations. Retain only adapters for demonstrated upstream capability gaps.
 
-Deterministic IR validation, layout, geometry, rendering transformations, and
-formatting stay plain TypeScript. React view state and rendering stay React.
-TanStack, AI SDK, MCP, Cloudflare, Storybook, browser, and Nx adapters may use
-their native Promise contracts only at the outer edge.
+Provider calls retain the Cloudflare AI Gateway binding and stored-key identity.
+The CLI holds no gateway credential. Existing offline commands, released wire
+contracts, stored data and quotas remain intact until their owning slice proves an
+intentional change. Adoption is not permission to reset data or alter model policy.
 
-Node tooling follows the same rule. Shell-backed commands own a dedicated
-process group/tree so timeout and interruption terminate descendants, not only
-the immediate shell. Remote provisioning, including the R2 Data Catalog smoke
-lifecycle, registers cleanup before its first mutation and uses scoped,
-interruptible Effect polling and fetch boundaries. Executable Node hosts use
-`NodeRuntime.runMain`, which translates SIGINT/SIGTERM into fiber interruption
-and lets scoped process-tree and remote-resource finalizers finish before exit.
+The workspace catalog pins the synchronized Effect runtime packages. Compiler/lint
+packages have independent compatible pins. Supported experimental/unstable APIs are
+permitted; maturity alone does not require a wrapper or forbid adoption. Read installed
+source contracts before relying on a capability.
 
-The repository exact-pins `effect` and every `@effect/*` dependency to the
-approved `4.1.1` stable version. Upgrades are dedicated changes, never
-incidental range movement. The repository currently has no unstable Effect
-imports; any future unstable module requires one reviewed package-internal
-adapter.
+## Enforcement and migration
+
+The explicit upstream rule policy in `tsconfig.base.json` applies to domain, server,
+React and tooling code. Correctness is error everywhere. The native-operation and
+collection group starts as warnings in unconverted scopes and is promoted to error
+as each scope is proved. Maturity rejection is off; style suggestions are not all
+errors. [Effect conventions](../effect-conventions.md) define purpose-specific
+expectations and local exception requirements.
+
+Remove the obsolete pure/UI import bans, unstable-path adapter rules, exact Promise
+counts and custom runtime/Promise compiler walkers. Nx and existing lint rules retain
+dependency isolation, Promise misuse, schema and React synchronization boundaries.
+The upstream diagnostics do not detect every Promise or outer runtime expression;
+review host ownership and test actual resource/cancellation/isolation behavior rather
+than preserving a syntax census. A green lint result is not lifecycle proof.
+
+This policy revision changes enforcement and documentation, not application behavior
+or domain models. Follow the [accepted implementation sequence](../plans/effect-everywhere.md):
+correctness repairs, domain/family migrations, runtime proofs and Nx reference/generator
+work keep their separate owners. No gate passes by downgrading correctness or blanket
+suppression. Temporary diagnostic counts and removed-title receipts stay in `.memory/`.
 
 ## Consequences
 
-- Business APIs return Effect rather than Promise facades.
-- Tests substitute layers and use `@effect/vitest` and `TestClock` for time,
-  interruption, and cleanup.
-- Structural tests enumerate package rings, runtime boundaries, unstable
-  imports, and reviewed native Promise files and TypeScript type-identity site
-  counts, and reject Zod re-entry. The checker resolves Promise/PromiseLike
-  assignability across qualified, aliased, import-renamed, and re-exported
-  forms rather than matching spellings, and examines every union/intersection
-  constituent after generic instantiation and nullable/optional handling.
-- This gate is structural drift protection, not an adversarial-code sandbox.
-  Only genuinely unresolvable type-level constructs remain outside automation:
-  deliberate `any`/`unknown` laundering, `eval`, and generated runtime code.
-  They must be rejected in code review.
-- Worker bundle and runtime cost are measured with each meaningful change.
-- The repository carries no retired Convex, Next.js, Vercel runtime, Bun, or
-  Turborepo compatibility path.
+- Business APIs and internal workflows use Effect rather than Promise facades.
+- Tests protect application invariants, meaningful boundaries and historical defects;
+  they use upstream Effect test facilities where applicable.
+- Runtime changes require real host, cancellation and ownership proof. Data changes
+  require actual-shape inspection and migration, not hypothetical compatibility.
+- Rendering quality and generation/build/runtime cost remain acceptance criteria.
+- No retired Convex, Next.js, Vercel, Bun or Turborepo architecture returns.
 
 ## Revisit criteria
 
-Revisit Cloudflare only when a proven product requirement cannot be implemented
-correctly with Workers and Durable Objects, such as a durable long-running
-workflow whose correctness or operating envelope demonstrably exceeds those
-primitives. General preference, framework novelty, or Effect compatibility is
-not sufficient.
-
-Revisit pure/UI exclusions only when code begins to own real I/O, time,
-concurrency, resources, or expected failures. Do not introduce Effect into
-deterministic algorithms or React state for uniformity alone.
+Revisit a host or adapter when a demonstrated product requirement cannot be met by
+its supported capability and operating envelope. Revisit a diagnostic exception when
+upstream supports the missing operation or the relevant application boundary changes.
+Pure/UI identity and API maturity are not exclusion criteria.
