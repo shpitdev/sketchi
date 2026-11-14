@@ -19,10 +19,10 @@ describe("canonical document decoding", () => {
 			assert.strictEqual(flowchart.type, "flowchart");
 			assert.isTrue(Schema.is(FlowchartSpec)(flowchart.spec));
 			assert.strictEqual(mindmap.type, "mindmap");
-			assert.instanceOf(mindmap.spec, MindmapSpec);
+			assert(Schema.is(MindmapSpec)(mindmap.spec));
 			assert.strictEqual(mindmap.spec.layout.direction, "LR");
 			assert.strictEqual(sequence.type, "sequence");
-			assert.instanceOf(sequence.spec, SequenceDiagramSpec);
+			assert(Schema.is(SequenceDiagramSpec)(sequence.spec));
 			assert.strictEqual(sequence.spec.messages.length, 4);
 		}),
 	);

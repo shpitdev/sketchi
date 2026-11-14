@@ -42,14 +42,14 @@ export interface CodeModeCatalogIcon {
 	readonly slug: string;
 }
 
-export class CodeModeIconLoadError extends Schema.TaggedError<CodeModeIconLoadError>()(
-	"CodeModeIconLoadError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		slug: Schema.String,
-	},
-) {}
+export class CodeModeIconLoadError extends Schema.TaggedError<
+	CodeModeIconLoadError,
+	{ readonly brand: unique symbol }
+>()("CodeModeIconLoadError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+	slug: Schema.String,
+}) {}
 
 /**
  * Node-logo catalog seen by Code Mode. Hosts supply SVG bytes from wherever
