@@ -16,7 +16,7 @@ const DAY = 86_400_000;
  * One scheduled row: a bar from `start` through `end` (or for `duration`
  * calendar days), or a milestone diamond on `start`. Never coordinates.
  */
-export class GanttTask extends Schema.Class<GanttTask>("GanttTask")({
+export const GanttTask = Schema.Struct({
 	id: Schema.NonEmptyString,
 	label: Schema.NonEmptyString,
 	/** First day, YYYY-MM-DD. */
@@ -33,9 +33,11 @@ export class GanttTask extends Schema.Class<GanttTask>("GanttTask")({
 	dependsOn: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
 	/** Percent complete, 0–100. */
 	progress: Schema.optionalKey(Schema.Finite),
-}) {}
+}).annotate({ identifier: "GanttTask" });
 
-export class GanttDiagram extends Schema.Class<GanttDiagram>("GanttDiagram")({
+export interface GanttTask extends Schema.Schema.Type<typeof GanttTask> {}
+
+export const GanttDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(ganttDiagramType),
@@ -47,7 +49,9 @@ export class GanttDiagram extends Schema.Class<GanttDiagram>("GanttDiagram")({
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "GanttDiagram" });
+
+export interface GanttDiagram extends Schema.Schema.Type<typeof GanttDiagram> {}
 
 /** A calendar day as whole days since 1970-01-01 (UTC), or undefined unless `YYYY-MM-DD`. */
 export function parseGanttDay(value: string): number | undefined {

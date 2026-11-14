@@ -23,37 +23,43 @@ export const QUADRANT_KEYS = ["topLeft", "topRight", "bottomLeft", "bottomRight"
 export type QuadrantKey = (typeof QUADRANT_KEYS)[number];
 
 /** An axis: its title, the label at its low end (left or bottom) and at its high end. */
-export class QuadrantAxis extends Schema.Class<QuadrantAxis>("QuadrantAxis")({
+export const QuadrantAxis = Schema.Struct({
 	title: Schema.NonEmptyString,
 	low: Schema.NonEmptyString,
 	high: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "QuadrantAxis" });
+
+export interface QuadrantAxis extends Schema.Schema.Type<typeof QuadrantAxis> {}
 
 /** The four quadrant names, by corner. */
-export class QuadrantNames extends Schema.Class<QuadrantNames>("QuadrantNames")({
+export const QuadrantNames = Schema.Struct({
 	topLeft: Schema.NonEmptyString,
 	topRight: Schema.NonEmptyString,
 	bottomLeft: Schema.NonEmptyString,
 	bottomRight: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "QuadrantNames" });
+
+export interface QuadrantNames extends Schema.Schema.Type<typeof QuadrantNames> {}
 
 /**
  * One item placed on the chart. `x` and `y` run from 0 (the low end) to 1 (the
  * high end) of their axes; 0.5 sits on the line between two quadrants.
  */
-export class QuadrantPoint extends Schema.Class<QuadrantPoint>("QuadrantPoint")({
+export const QuadrantPoint = Schema.Struct({
 	label: Schema.NonEmptyString,
 	x: Schema.Finite,
 	y: Schema.Finite,
 	/** Points of one group share a color, and the legend names the group. */
 	group: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "QuadrantPoint" });
+
+export interface QuadrantPoint extends Schema.Schema.Type<typeof QuadrantPoint> {}
 
 /**
  * A quadrant chart: two axes split a square plot into four named quadrants,
  * and each point sits at its `x`, `y`. The renderer owns every position.
  */
-export class QuadrantDiagram extends Schema.Class<QuadrantDiagram>("QuadrantDiagram")({
+export const QuadrantDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(quadrantDiagramType),
@@ -64,7 +70,9 @@ export class QuadrantDiagram extends Schema.Class<QuadrantDiagram>("QuadrantDiag
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "QuadrantDiagram" });
+
+export interface QuadrantDiagram extends Schema.Schema.Type<typeof QuadrantDiagram> {}
 
 export type QuadrantValidationIssueCode =
 	| "quadrant_too_large"

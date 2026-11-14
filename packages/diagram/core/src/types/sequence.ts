@@ -36,33 +36,37 @@ export const SequenceMessageStyleSchema = Schema.Literals(SEQUENCE_MESSAGE_STYLE
 export type SequenceMessageType = typeof SequenceMessageTypeSchema.Type;
 export type SequenceMessageStyle = typeof SequenceMessageStyleSchema.Type;
 
-export class SequenceParticipant extends Schema.Class<SequenceParticipant>("SequenceParticipant")({
+export const SequenceParticipant = Schema.Struct({
 	id: Schema.NonEmptyString,
 	label: Schema.NonEmptyString,
 	kind: Schema.optionalKey(Schema.NonEmptyString),
 	/** The participant's logo, drawn in its header; shared with flowchart nodes. */
 	icon: Schema.optionalKey(DiagramIconRef),
-}) {}
+}).annotate({ identifier: "SequenceParticipant" });
+
+export interface SequenceParticipant extends Schema.Schema.Type<typeof SequenceParticipant> {}
 
 /**
  * One message row. Array order is chronological order. A message whose source
  * is its target is a self-message: the participant acting on itself.
  */
-export class SequenceMessage extends Schema.Class<SequenceMessage>("SequenceMessage")({
+export const SequenceMessage = Schema.Struct({
 	id: Schema.NonEmptyString,
 	source: Schema.NonEmptyString,
 	target: Schema.NonEmptyString,
 	label: Schema.NonEmptyString,
 	type: Schema.optionalKey(SequenceMessageTypeSchema),
 	style: Schema.optionalKey(SequenceMessageStyleSchema),
-}) {}
+}).annotate({ identifier: "SequenceMessage" });
+
+export interface SequenceMessage extends Schema.Schema.Type<typeof SequenceMessage> {}
 
 /**
  * The canonical sequence diagram: ordered participants (left to right) and
  * chronologically ordered messages between their lifelines. Every surface that
  * accepts, generates, renders, or evaluates a sequence diagram uses this shape.
  */
-export class SequenceDiagram extends Schema.Class<SequenceDiagram>("SequenceDiagram")({
+export const SequenceDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(sequenceDiagramType),
@@ -77,7 +81,9 @@ export class SequenceDiagram extends Schema.Class<SequenceDiagram>("SequenceDiag
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "SequenceDiagram" });
+
+export interface SequenceDiagram extends Schema.Schema.Type<typeof SequenceDiagram> {}
 
 export const SequenceValidationIssueCodeSchema = Schema.Literals([
 	"sequence_too_large",
@@ -89,15 +95,17 @@ export const SequenceValidationIssueCodeSchema = Schema.Literals([
 ]);
 export type SequenceValidationIssueCode = typeof SequenceValidationIssueCodeSchema.Type;
 
-export class SequenceValidationIssue extends Schema.Class<SequenceValidationIssue>(
-	"SequenceValidationIssue",
-)({
+export const SequenceValidationIssue = Schema.Struct({
 	code: SequenceValidationIssueCodeSchema,
 	/** Dotted path into the diagram, for example `participants.[1].id`. */
 	path: Schema.NonEmptyString,
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "SequenceValidationIssue" });
+
+export interface SequenceValidationIssue extends Schema.Schema.Type<
+	typeof SequenceValidationIssue
+> {}
 
 export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceValidationIssue[] {
 	const issues: SequenceValidationIssue[] = [];

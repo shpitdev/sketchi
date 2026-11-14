@@ -30,7 +30,7 @@ export const ER_MAX_NAME_LENGTH = 64;
 export const ER_MAX_ISSUES = 20;
 
 /** One column of an entity: its name, optional type, and key and null markers. */
-export class ErField extends Schema.Class<ErField>("ErField")({
+export const ErField = Schema.Struct({
 	name: Schema.NonEmptyString,
 	type: Schema.optionalKey(Schema.NonEmptyString),
 	/** Part of the primary key. */
@@ -41,10 +41,12 @@ export class ErField extends Schema.Class<ErField>("ErField")({
 	unique: Schema.optionalKey(Schema.Boolean),
 	/** May be empty; drawn as `?` after the type. */
 	nullable: Schema.optionalKey(Schema.Boolean),
-}) {}
+}).annotate({ identifier: "ErField" });
+
+export interface ErField extends Schema.Schema.Type<typeof ErField> {}
 
 /** One entity, drawn as a table: a band with its name over a row per field. */
-export class ErEntity extends Schema.Class<ErEntity>("ErEntity")({
+export const ErEntity = Schema.Struct({
 	id: Schema.NonEmptyString,
 	/** The name the table shows; the id when omitted. */
 	name: Schema.optionalKey(Schema.NonEmptyString),
@@ -52,7 +54,9 @@ export class ErEntity extends Schema.Class<ErEntity>("ErEntity")({
 		Schema.mutable,
 		Schema.withDecodingDefault(Effect.succeed([])),
 	),
-}) {}
+}).annotate({ identifier: "ErEntity" });
+
+export interface ErEntity extends Schema.Schema.Type<typeof ErEntity> {}
 
 /**
  * A relationship between two entities. Each end names an entity id or, when
@@ -60,14 +64,16 @@ export class ErEntity extends Schema.Class<ErEntity>("ErEntity")({
  * one end and the key it references at the other. Each end's cardinality is
  * how many rows of that end's entity relate to one row of the other.
  */
-export class ErRelationship extends Schema.Class<ErRelationship>("ErRelationship")({
+export const ErRelationship = Schema.Struct({
 	id: Schema.NonEmptyString,
 	from: Schema.NonEmptyString,
 	to: Schema.NonEmptyString,
 	fromCardinality: ErCardinalitySchema,
 	toCardinality: ErCardinalitySchema,
 	label: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "ErRelationship" });
+
+export interface ErRelationship extends Schema.Schema.Type<typeof ErRelationship> {}
 
 /**
  * The canonical entity-relationship diagram: entities with their fields, and
@@ -75,7 +81,7 @@ export class ErRelationship extends Schema.Class<ErRelationship>("ErRelationship
  * surface that accepts, generates, renders or evaluates an ER diagram uses
  * this shape.
  */
-export class ErDiagram extends Schema.Class<ErDiagram>("ErDiagram")({
+export const ErDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(erDiagramType),
@@ -87,7 +93,9 @@ export class ErDiagram extends Schema.Class<ErDiagram>("ErDiagram")({
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "ErDiagram" });
+
+export interface ErDiagram extends Schema.Schema.Type<typeof ErDiagram> {}
 
 export const ErValidationIssueCodeSchema = Schema.Literals([
 	"er_too_large",
@@ -104,13 +112,15 @@ export const ErValidationIssueCodeSchema = Schema.Literals([
 ]);
 export type ErValidationIssueCode = typeof ErValidationIssueCodeSchema.Type;
 
-export class ErValidationIssue extends Schema.Class<ErValidationIssue>("ErValidationIssue")({
+export const ErValidationIssue = Schema.Struct({
 	code: ErValidationIssueCodeSchema,
 	/** Dotted path into the diagram, for example `relationships.[1].to`. */
 	path: Schema.NonEmptyString,
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "ErValidationIssue" });
+
+export interface ErValidationIssue extends Schema.Schema.Type<typeof ErValidationIssue> {}
 
 /** The name an entity's table shows. */
 export function erEntityName(entity: Pick<ErEntity, "id" | "name">): string {

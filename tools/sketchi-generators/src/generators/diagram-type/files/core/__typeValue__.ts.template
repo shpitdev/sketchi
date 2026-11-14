@@ -9,11 +9,12 @@ export const <%= propertyName %>DiagramType = "<%= typeValue %>" as const;
  * Replace it with the family's own shape (see sequence.ts) when nodes and
  * edges do not describe it, and follow docs/diagram-families.md.
  */
-export class <%= className %>Diagram extends IntermediateDiagram.extend<<%= className %>Diagram>(
-  "<%= className %>Diagram",
-)({
+export const <%= className %>Diagram = Schema.Struct({
+  ...IntermediateDiagram.fields,
   type: Schema.Literal(<%= propertyName %>DiagramType),
-}) {}
+}).annotate({ identifier: "<%= className %>Diagram" });
+
+export interface <%= className %>Diagram extends Schema.Schema.Type<typeof <%= className %>Diagram> {}
 export const <%= className %>DiagramSchema = <%= className %>Diagram;
 
 export function validate<%= className %>Diagram(diagram: <%= className %>Diagram): <%= className %>Diagram {

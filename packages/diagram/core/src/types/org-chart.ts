@@ -21,7 +21,7 @@ export const ORG_CHART_MAX_ISSUES = 20;
  * person has none. An assistant sits beside their manager instead of among
  * the manager's reports.
  */
-export class OrgPerson extends Schema.Class<OrgPerson>("OrgPerson")({
+export const OrgPerson = Schema.Struct({
 	id: Schema.NonEmptyString,
 	name: Schema.NonEmptyString,
 	/** Job title or position, drawn under the name. */
@@ -34,18 +34,22 @@ export class OrgPerson extends Schema.Class<OrgPerson>("OrgPerson")({
 	assistant: Schema.optionalKey(Schema.Boolean),
 	/** Draw an initials placeholder for a photo. */
 	avatar: Schema.optionalKey(Schema.Boolean),
-}) {}
+}).annotate({ identifier: "OrgPerson" });
+
+export interface OrgPerson extends Schema.Schema.Type<typeof OrgPerson> {}
 
 /**
  * A secondary, dotted-line or matrix report: `report` also answers to
  * `manager`, outside the solid reporting line.
  */
-export class OrgDottedLine extends Schema.Class<OrgDottedLine>("OrgDottedLine")({
+export const OrgDottedLine = Schema.Struct({
 	id: Schema.NonEmptyString,
 	report: Schema.NonEmptyString,
 	manager: Schema.NonEmptyString,
 	label: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "OrgDottedLine" });
+
+export interface OrgDottedLine extends Schema.Schema.Type<typeof OrgDottedLine> {}
 
 /**
  * The canonical org chart: people and the managers they report to, with
@@ -53,7 +57,7 @@ export class OrgDottedLine extends Schema.Class<OrgDottedLine>("OrgDottedLine")(
  * surface that accepts, generates, renders or evaluates an org chart uses this
  * shape.
  */
-export class OrgChartDiagram extends Schema.Class<OrgChartDiagram>("OrgChartDiagram")({
+export const OrgChartDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(orgChartDiagramType),
@@ -69,7 +73,9 @@ export class OrgChartDiagram extends Schema.Class<OrgChartDiagram>("OrgChartDiag
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "OrgChartDiagram" });
+
+export interface OrgChartDiagram extends Schema.Schema.Type<typeof OrgChartDiagram> {}
 
 export const OrgChartValidationIssueCodeSchema = Schema.Literals([
 	"org_chart_too_large",
@@ -86,15 +92,17 @@ export const OrgChartValidationIssueCodeSchema = Schema.Literals([
 ]);
 export type OrgChartValidationIssueCode = typeof OrgChartValidationIssueCodeSchema.Type;
 
-export class OrgChartValidationIssue extends Schema.Class<OrgChartValidationIssue>(
-	"OrgChartValidationIssue",
-)({
+export const OrgChartValidationIssue = Schema.Struct({
 	code: OrgChartValidationIssueCodeSchema,
 	/** Dotted path into the diagram, for example `people.[3].manager`. */
 	path: Schema.NonEmptyString,
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "OrgChartValidationIssue" });
+
+export interface OrgChartValidationIssue extends Schema.Schema.Type<
+	typeof OrgChartValidationIssue
+> {}
 
 /** People with no manager: the top of each tree. */
 export function orgChartRoots(diagram: Pick<OrgChartDiagram, "people">): OrgPerson[] {

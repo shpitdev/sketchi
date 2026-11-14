@@ -34,18 +34,20 @@ const VENN_DEFAULT_COLORS: readonly VennColorName[] = ["blue", "orange", "green"
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/u;
 
 /** One set: a circle with its label outside it. */
-export class VennSet extends Schema.Class<VennSet>("VennSet")({
+export const VennSet = Schema.Struct({
 	id: Schema.NonEmptyString,
 	label: Schema.NonEmptyString,
 	/** A palette name (blue, orange, green, yellow, pink, violet, red, gray) or a #rrggbb hex. */
 	color: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "VennSet" });
+
+export interface VennSet extends Schema.Schema.Type<typeof VennSet> {}
 
 /**
  * One region: the items in every listed set and in no other. `["a"]` is only
  * in a, `["a", "b"]` in a and b but not c. A region holds items or a count.
  */
-export class VennRegion extends Schema.Class<VennRegion>("VennRegion")({
+export const VennRegion = Schema.Struct({
 	sets: Schema.Array(Schema.NonEmptyString).pipe(
 		Schema.mutable,
 		Schema.check(Schema.isMinLength(1)),
@@ -54,14 +56,16 @@ export class VennRegion extends Schema.Class<VennRegion>("VennRegion")({
 	label: Schema.optionalKey(Schema.NonEmptyString),
 	items: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
 	count: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-}) {}
+}).annotate({ identifier: "VennRegion" });
+
+export interface VennRegion extends Schema.Schema.Type<typeof VennRegion> {}
 
 /**
  * The canonical Venn diagram: two or three sets and what sits in each of
  * their regions. The renderer owns every position and size. Every surface
  * that accepts, generates, renders or evaluates a Venn diagram uses this shape.
  */
-export class VennDiagram extends Schema.Class<VennDiagram>("VennDiagram")({
+export const VennDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(vennDiagramType),
@@ -73,7 +77,9 @@ export class VennDiagram extends Schema.Class<VennDiagram>("VennDiagram")({
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "VennDiagram" });
+
+export interface VennDiagram extends Schema.Schema.Type<typeof VennDiagram> {}
 
 export const VennValidationIssueCodeSchema = Schema.Literals([
 	"venn_set_count",
@@ -87,13 +93,15 @@ export const VennValidationIssueCodeSchema = Schema.Literals([
 ]);
 export type VennValidationIssueCode = typeof VennValidationIssueCodeSchema.Type;
 
-export class VennValidationIssue extends Schema.Class<VennValidationIssue>("VennValidationIssue")({
+export const VennValidationIssue = Schema.Struct({
 	code: VennValidationIssueCodeSchema,
 	/** Dotted path into the diagram, for example `regions.[2].sets`. */
 	path: Schema.NonEmptyString,
 	message: Schema.NonEmptyString,
 	hint: Schema.NonEmptyString,
-}) {}
+}).annotate({ identifier: "VennValidationIssue" });
+
+export interface VennValidationIssue extends Schema.Schema.Type<typeof VennValidationIssue> {}
 
 const sameText = (text: string) => text.trim().toLowerCase();
 /** A palette name, read from the palette's own keys so inherited ones ("constructor") never match. */
@@ -120,7 +128,7 @@ export function vennRegionKey(
 export function getVennValidationIssues(diagram: VennDiagram): VennValidationIssue[] {
 	const issues: VennValidationIssue[] = [];
 	const push = (code: VennValidationIssueCode, path: string, message: string, hint: string) =>
-		issues.push(new VennValidationIssue({ code, path, message, hint }));
+		issues.push(VennValidationIssue.make({ code, path, message, hint }));
 	const { sets, regions } = diagram;
 	if (sets.length < VENN_MIN_SETS || sets.length > VENN_MAX_SETS)
 		push(

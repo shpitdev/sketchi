@@ -9,7 +9,7 @@ export const TimelineEventKindSchema = Schema.Literals(TIMELINE_EVENT_KINDS);
 export type TimelineEventKind = (typeof TIMELINE_EVENT_KINDS)[number];
 
 /** A dated or ordered point, or a dated span when `end` is present. Never a dependency. */
-export class TimelineEvent extends Schema.Class<TimelineEvent>("TimelineEvent")({
+export const TimelineEvent = Schema.Struct({
 	id: Schema.NonEmptyString,
 	label: Schema.NonEmptyString,
 	/** Year, month, day, or zoned instant, preserved exactly as supplied. */
@@ -22,9 +22,11 @@ export class TimelineEvent extends Schema.Class<TimelineEvent>("TimelineEvent")(
 	/** Track name; every event names one when any does. */
 	lane: Schema.optionalKey(Schema.NonEmptyString),
 	description: Schema.optionalKey(Schema.NonEmptyString),
-}) {}
+}).annotate({ identifier: "TimelineEvent" });
 
-export class TimelineDiagram extends Schema.Class<TimelineDiagram>("TimelineDiagram")({
+export interface TimelineEvent extends Schema.Schema.Type<typeof TimelineEvent> {}
+
+export const TimelineDiagram = Schema.Struct({
 	id: Schema.NonEmptyString,
 	title: Schema.NonEmptyString,
 	type: Schema.Literal(timelineDiagramType),
@@ -36,7 +38,9 @@ export class TimelineDiagram extends Schema.Class<TimelineDiagram>("TimelineDiag
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}) {}
+}).annotate({ identifier: "TimelineDiagram" });
+
+export interface TimelineDiagram extends Schema.Schema.Type<typeof TimelineDiagram> {}
 
 export type TimelineDateGranularity = "year" | "month" | "day" | "instant";
 
