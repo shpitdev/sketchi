@@ -28,6 +28,12 @@ function completions(shell: "bash" | "zsh"): string {
 	});
 }
 
+function scriptArguments(command: string): string[] {
+	return process.platform === "darwin"
+		? ["-q", "/dev/null", "/bin/bash", "-c", command]
+		: ["--quiet", "--return", "--command", command, "/dev/null"];
+}
+
 function ttyHelp({
 	colorForegroundBackground,
 	colorTerminal = "truecolor",
@@ -56,9 +62,11 @@ function ttyHelp({
 			? `stty cols 80; env -u COLORFGBG ${command}`
 			: `stty cols 80; ${command}`;
 
-	return spawnSync("script", ["--quiet", "--return", "--command", terminalCommand, "/dev/null"], {
+	return spawnSync("script", scriptArguments(terminalCommand), {
 		encoding: "utf8",
 		env: environment,
+		// Darwin script accepts /dev/null, but rejects Node's socket-backed stdin.
+		stdio: ["ignore", "pipe", "pipe"],
 	}).stdout;
 }
 
@@ -361,14 +369,11 @@ describe("golden product help", () => {
 			"json",
 		].join(" ");
 		try {
-			const result = spawnSync(
-				"script",
-				["--quiet", "--return", "--command", command, "/dev/null"],
-				{
-					encoding: "utf8",
-					env: { ...cliEnvironment(), HOME: ttyHome },
-				},
-			);
+			const result = spawnSync("script", scriptArguments(command), {
+				encoding: "utf8",
+				env: { ...cliEnvironment(), HOME: ttyHome },
+				stdio: ["ignore", "pipe", "pipe"],
+			});
 
 			expect(result.status).toBe(5);
 			expect(result.stdout).toContain('"code": "diagram_not_found"');

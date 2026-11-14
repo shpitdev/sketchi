@@ -75,7 +75,18 @@ const TTY_PROMPT_TIMEOUT_MS = 30_000;
  */
 function runTty(file, args, options = {}) {
 	const command = ["stty cols 100", [file, ...args].map(shellQuote).join(" ")].join("; ");
-	const child = spawn("script", ["--quiet", "--return", "--command", command, "/dev/null"], {
+	const scriptArgs =
+		process.platform === "darwin"
+			? ["-q", "/dev/null", "/bin/bash", "-c", command]
+			: ["--quiet", "--return", "--command", command, "/dev/null"];
+	// Darwin script rejects Node's socket-backed stdin. Give it a POSIX pipe
+	// while keeping script as the child process whose exit status we observe.
+	const runner = process.platform === "darwin" ? "/bin/bash" : "script";
+	const runnerArgs =
+		process.platform === "darwin"
+			? ["-c", 'exec script "$@" < <(cat)', "script", ...scriptArgs]
+			: scriptArgs;
+	const child = spawn(runner, runnerArgs, {
 		cwd: options.cwd ?? workspaceRoot,
 		env: { ...(options.env ?? process.env), SHELL: "/bin/bash" },
 		stdio: ["pipe", "pipe", "pipe"],
