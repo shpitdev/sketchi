@@ -9,7 +9,7 @@
 			"executor": "nx:run-commands",
 			"outputs": ["{projectRoot}/dist"],
 			"options": {
-				"command": "tsc6 -p packages/icons/catalog/tsconfig.lib.json && jiti packages/icons/catalog/scripts/build-node-logos.ts && jiti packages/icons/catalog/scripts/build-native-icons.ts"
+				"command": "effect-tsgo tsc@7.0.2 -p packages/icons/catalog/tsconfig.lib.json && jiti packages/icons/catalog/scripts/build-node-logos.ts && jiti packages/icons/catalog/scripts/build-native-icons.ts"
 			}
 		},
 		"generate-catalog": {
@@ -46,16 +46,6 @@
 			}
 		},
 		"typecheck": {
-			"executor": "nx:run-commands",
-			"options": {
-				"commands": [
-					"tsc6 -p packages/icons/catalog/tsconfig.spec.json --noEmit",
-					"tsc6 -p packages/icons/catalog/tsconfig.lib.json --noEmit"
-				],
-				"parallel": false
-			}
-		},
-		"typecheck-native": {
 			"executor": "nx:run-commands",
 			"options": {
 				"commands": [

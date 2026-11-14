@@ -65,13 +65,6 @@
 		"typecheck": {
 			"executor": "nx:run-commands",
 			"options": {
-				"commands": ["tsc6 -p apps/playground/tsconfig.app.json --noEmit"],
-				"parallel": false
-			}
-		},
-		"typecheck-native": {
-			"executor": "nx:run-commands",
-			"options": {
 				"commands": ["effect-tsgo tsc@7.0.2 -p apps/playground/tsconfig.app.json --noEmit"],
 				"parallel": false
 			}

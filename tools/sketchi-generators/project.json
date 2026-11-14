@@ -43,16 +43,6 @@
 			"executor": "nx:run-commands",
 			"options": {
 				"commands": [
-					"tsc6 -p tools/sketchi-generators/tsconfig.spec.json --noEmit",
-					"tsc6 -p tools/sketchi-generators/tsconfig.lib.json --noEmit"
-				],
-				"parallel": false
-			}
-		},
-		"typecheck-native": {
-			"executor": "nx:run-commands",
-			"options": {
-				"commands": [
 					"effect-tsgo tsc@7.0.2 -p tools/sketchi-generators/tsconfig.spec.json --noEmit",
 					"effect-tsgo tsc@7.0.2 -p tools/sketchi-generators/tsconfig.lib.json --noEmit"
 				],

@@ -12,7 +12,7 @@ export function ciScope({ all, projects, changedFiles }) {
 	const affected = new Set(projects);
 	const code = all || affected.size > 0 || changedFiles.some((file) => WORKSPACE_FILE.test(file));
 	return {
-		// Root `tsc6 -b` and the project-graph structural tests read every project.
+		// Root native `tsc -b` and the project-graph structural tests read every project.
 		code,
 		storybook: all || affected.has("diagram-ui"),
 	};

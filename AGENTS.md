@@ -40,8 +40,8 @@ the change locally and slim CI instead of adding to it.
 `pnpm ci:local` is the local CI gate (`scripts/ci-local.mjs`). Against
 `origin/main`, including uncommitted changes, it runs actionlint when workflows
 change, a frozen install, `pnpm run check`, the scenario CLI smoke, the deploy
-and tooling contracts, the Nx-affected `typecheck`, `typecheck-native`, `build`
-and `test` targets, the root `tsc6 -b` and project-graph test, and
+and tooling contracts, the Nx-affected native `typecheck`, `build`
+and `test` targets, the root `effect-tsgo tsc@7.0.2 -b` and project-graph test, and
 `pnpm nx build-storybook diagram-ui` when `diagram-ui` is affected.
 
 - Run `pnpm ci:local --no-signoff` before every `gt submit` or push.
