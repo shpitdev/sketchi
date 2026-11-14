@@ -24,14 +24,6 @@
 			"executor": "nx:run-commands",
 			"dependsOn": ["^build"],
 			"options": {
-				"commands": ["tsc6 -p tools/icon-batch/tsconfig.app.json --noEmit"],
-				"parallel": false
-			}
-		},
-		"typecheck-native": {
-			"executor": "nx:run-commands",
-			"dependsOn": ["^build"],
-			"options": {
 				"commands": ["effect-tsgo tsc@7.0.2 -p tools/icon-batch/tsconfig.app.json --noEmit"],
 				"parallel": false
 			}

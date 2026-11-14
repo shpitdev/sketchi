@@ -9,7 +9,7 @@
 			"executor": "nx:run-commands",
 			"outputs": ["{projectRoot}/dist"],
 			"options": {
-				"command": "tsc6 -p packages/diagram/agent/tsconfig.lib.json"
+				"command": "effect-tsgo tsc@7.0.2 -p packages/diagram/agent/tsconfig.lib.json"
 			}
 		},
 		"test": {
@@ -20,16 +20,6 @@
 			}
 		},
 		"typecheck": {
-			"executor": "nx:run-commands",
-			"options": {
-				"commands": [
-					"tsc6 -p packages/diagram/agent/tsconfig.spec.json --noEmit",
-					"tsc6 -p packages/diagram/agent/tsconfig.lib.json --noEmit"
-				],
-				"parallel": false
-			}
-		},
-		"typecheck-native": {
 			"executor": "nx:run-commands",
 			"options": {
 				"commands": [

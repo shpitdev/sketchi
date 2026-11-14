@@ -443,7 +443,7 @@ async function main(argv) {
 				"nx",
 				...nxScope,
 				"-t",
-				"typecheck,typecheck-native,build",
+				"typecheck,build",
 				"--outputStyle=static",
 			]),
 		],
@@ -455,7 +455,7 @@ async function main(argv) {
 				"root project references and project graph",
 				command(
 					"graph",
-					["pnpm", "exec", "tsc6", "-b", "--pretty", "false"],
+					["pnpm", "exec", "effect-tsgo", "tsc@7.0.2", "-b", "--pretty", "false"],
 					[
 						"pnpm",
 						"exec",

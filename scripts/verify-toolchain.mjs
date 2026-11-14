@@ -68,7 +68,6 @@ assert.equal(
 );
 
 if (!skipDependencies) {
-	assert.equal(run("pnpm", ["exec", "tsc6", "--version"]), `Version ${typeScriptApiVersion}`);
 	assert.equal(run("pnpm", ["exec", "tsc", "--version"]), `Version ${nativeTypeScriptVersion}`);
 	assert.equal(
 		run("pnpm", ["exec", "effect-tsgo", `tsc@${nativeTypeScriptVersion}`, "--version"]),

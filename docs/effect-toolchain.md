@@ -1,6 +1,7 @@
 # Effect compiler and lint toolchain
 
-The native check uses `effect-tsgo tsc@7.0.2`. Lint uses `effect-tsgo oxlint`.
+Package emit, project `typecheck`, and the root reference build use
+`effect-tsgo tsc@7.0.2`. Lint uses `effect-tsgo oxlint`.
 These are upstream direct runners: they select the packaged compiler and load
 the matching Oxlint binding without patching `node_modules` or pnpm's store.
 Do not run `effect-tsgo patch` in this workspace.
@@ -53,22 +54,26 @@ export exposes its version, not that compiler API. Remove this dependency only
 when the remaining compiler-API consumers migrate to supported APIs; native CLI availability
 does not establish API compatibility.
 
-Existing TS6 declaration emit, root build mode, and paired TS6 checks are retained
-at this staging checkpoint. Native emit was exercised for all 15 package builds:
-373 declarations were emitted, 338 byte-identical to TS6, but seven builds exit
-nonzero on existing Effect correctness diagnostics. All 15 package entrypoint
-exports are mutually assignable between the two emitted outputs under both
-compilers; an actual observability consumer also compiles and runs. Retaining the
-old commands does not bypass the native gate: `ci:local` still requires both checks. It also
-does not make the slice accepted while native diagnostics fail.
+The duplicate TS6 CLI checks and emit commands are retired. Each project's
+`typecheck` target runs the native compiler over the same source/spec configs in
+the same order; dependency builds still run first. Package emit uses the native
+runner, including the declaration step after the diagram UI Vite build and the
+compiler step before icon asset generation. The local gate runs native
+`typecheck,build` targets and native root build mode. There is no separate paired
+`typecheck-native` target or compatibility script alias.
 
-Remove the TS6 CLI build/check commands after the affected native builds and
-checks pass, their real consumers accept the generated declarations, and root
-reference builds pass through the native runner. Keep only Nx's demonstrated
-compiler-API consumer after that transition. Do not claim TS7 cannot emit:
-the current blockers are application diagnostics, not a demonstrated native
-emit incompatibility. Detailed one-time evidence belongs in
-`.memory/effect-toolchain/receipt.md`, not in a permanent source inventory.
+The existing `sketchi-generators:build` target retains the real upstream
+`@nx/js:tsc` executor and its TS6 API dependency, including asset handling. Its
+standalone typecheck is native. No direct TS6 CLI command remains. Replace that
+executor only when upstream supports the required compiler API or a supported
+replacement preserves its actual output/assets contract; do not emulate it in a
+custom executor merely to remove TS6.
+
+Retirement follows successful native root forced emit, all 15 package outputs,
+affected builds/checks and real downstream declaration/runtime consumers. The
+previous two-compiler declaration-assignability proof remains useful evidence;
+it is not a permanent duplicate gate. Receipts are in
+`.memory/effect-native-retirement/receipt.md` and `.memory/effect-nx/receipt.md`.
 
 `scripts/lib/effect-toolchain.test.mjs` exercises the actual workspace compiler
 configuration: error/warning exit behavior, executable emit, and a separate
@@ -97,7 +102,6 @@ resolve their source files yet report missing re-exported bindings (for example
 against the emitted declarations. Each project's own source remains checked; dependency
 build ordering and native declaration integration proof remain required.
 
-Existing TS6 builds and paired checks remain while this configuration migration is
-reviewed. New packages use the native build/typecheck targets from the thin
+New packages use the same native build/typecheck targets through the thin
 [Effect library composition](../tools/sketchi-generators/README.md). Its compiler
 version comes from the root package pin; runtime versions remain in the pnpm catalog.

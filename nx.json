@@ -33,10 +33,6 @@
 			"inputs": ["default", "^production"],
 			"dependsOn": ["^build"]
 		},
-		"typecheck-native": {
-			"inputs": ["default", "^production"],
-			"dependsOn": ["^build"]
-		},
 		"@nx/js:tsc": {
 			"cache": true,
 			"dependsOn": ["^build"],

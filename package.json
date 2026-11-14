@@ -39,8 +39,7 @@
 		"test:wrangler-dry-runs": "node scripts/06-dry-run-worker-apps.mjs",
 		"test:onboarding": "node --test scripts/lib/code-mode-onboarding.test.mjs",
 		"toolchain:verify": "node scripts/verify-toolchain.mjs",
-		"typecheck": "nx run-many -t typecheck",
-		"typecheck:native": "nx run-many -t typecheck-native"
+		"typecheck": "nx run-many -t typecheck"
 	},
 	"dependencies": {
 		"@cloudflare/codemode": "0.5.6",
