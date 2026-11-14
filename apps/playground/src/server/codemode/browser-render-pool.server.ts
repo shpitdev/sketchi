@@ -53,6 +53,7 @@ const browserRenderingRetries = Metric.counter("sketchi_browser_rendering_retrie
 
 const BrowserRenderingOperationSchema = Schema.Literals([
 	"base64",
+	"close",
 	"durableObject",
 	"evaluate",
 	"goto",
@@ -63,14 +64,14 @@ const BrowserRenderingOperationSchema = Schema.Literals([
 
 export type BrowserRenderingOperation = typeof BrowserRenderingOperationSchema.Type;
 
-export class BrowserRenderingFailure extends Schema.TaggedError<BrowserRenderingFailure>()(
-	"BrowserRenderingFailure",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		operation: BrowserRenderingOperationSchema,
-	},
-) {}
+export class BrowserRenderingFailure extends Schema.TaggedError<
+	BrowserRenderingFailure,
+	{ readonly brand: unique symbol }
+>()("BrowserRenderingFailure", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+	operation: BrowserRenderingOperationSchema,
+}) {}
 
 export function browserFailure(operation: BrowserRenderingOperation) {
 	return (cause: unknown) =>
@@ -138,16 +139,16 @@ function tryBrowserPromise<A>(
 	);
 }
 
-function closeBrowser(browser: Browser, exit: Exit.Exit<unknown, unknown>): Effect.Effect<void> {
+function closeBrowser<A, E>(browser: Browser, exit: Exit.Exit<A, E>): Effect.Effect<void> {
 	const interrupted = Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause);
 	return Effect.tryPromise({
 		try: () =>
 			browser.close(interrupted ? { reason: "Code Mode PNG render interrupted" } : undefined),
-		catch: (cause) => cause,
+		catch: browserFailure("close"),
 	}).pipe(
-		Effect.catch((cause) =>
+		Effect.catch((error) =>
 			Effect.logWarning("Browser Rendering session cleanup failed", {
-				error_tag: cause instanceof Error ? cause.name : "BrowserCleanupFailure",
+				error_tag: error.cause instanceof Error ? error.cause.name : "BrowserCleanupFailure",
 				operation: "close",
 			}),
 		),
@@ -378,7 +379,10 @@ const runHarnessIconJob = Effect.fnUntraced(function* (
 	);
 });
 
-class StaleHarnessPage extends Schema.TaggedError<StaleHarnessPage>()("StaleHarnessPage", {
+class StaleHarnessPage extends Schema.TaggedError<
+	StaleHarnessPage,
+	{ readonly brand: unique symbol }
+>()("StaleHarnessPage", {
 	cause: Schema.Defect(),
 }) {}
 

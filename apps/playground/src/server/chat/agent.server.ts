@@ -143,13 +143,13 @@ import {
 	StudioBuildQuadrantChartOutputSchema,
 } from "./studio-quadrant-chart-tool.server";
 
-export class StudioAgentRequestError extends Schema.TaggedError<StudioAgentRequestError>()(
-	"StudioAgentRequestError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-	},
-) {}
+export class StudioAgentRequestError extends Schema.TaggedError<
+	StudioAgentRequestError,
+	{ readonly brand: unique symbol }
+>()("StudioAgentRequestError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+}) {}
 
 export const MAX_CHAT_REQUEST_BYTES = 128 * 1024;
 

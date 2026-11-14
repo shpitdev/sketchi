@@ -44,13 +44,13 @@ export const MAX_CODE_MODE_BUILD_REQUEST_BYTES = 256 * 1024;
  */
 export const MAX_CANVAS_REQUEST_BYTES = CANVAS_LIMITS.maxSerializedBytes + 64 * 1024;
 
-export class CodeModeHttpRequestError extends Schema.TaggedError<CodeModeHttpRequestError>()(
-	"CodeModeHttpRequestError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-	},
-) {}
+export class CodeModeHttpRequestError extends Schema.TaggedError<
+	CodeModeHttpRequestError,
+	{ readonly brand: unique symbol }
+>()("CodeModeHttpRequestError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+}) {}
 
 function jsonResponse(body: unknown, status: number, extraHeaders: HeadersInit = {}): Response {
 	const headers = new Headers(extraHeaders);
@@ -458,31 +458,28 @@ export const handleGetArtifactRequest = Effect.fn("playground.http.getArtifact")
 	}
 	const artifact = readResult.artifact;
 
-	return yield* Effect.try({
-		try: () => rawArtifactResponse({ artifact, artifactId }),
-		catch: (error) => error,
-	}).pipe(
-		Effect.catch((error) =>
-			Effect.succeed(
-				jsonResponse(
-					{
-						ok: false,
-						status: "storage_failed",
-						issues: [
-							{
-								code: "storage_read_failed",
-								severity: "error",
-								stage: "storage",
-								message: error instanceof Error ? error.message : "Artifact read failed.",
-								hint: "Retry retrieval or rebuild the artifact.",
-							},
-						],
-					},
-					500,
-				),
-			),
-		),
-	);
+	return yield* Effect.sync(() => {
+		try {
+			return rawArtifactResponse({ artifact, artifactId });
+		} catch (error) {
+			return jsonResponse(
+				{
+					ok: false,
+					status: "storage_failed",
+					issues: [
+						{
+							code: "storage_read_failed",
+							severity: "error",
+							stage: "storage",
+							message: error instanceof Error ? error.message : "Artifact read failed.",
+							hint: "Retry retrieval or rebuild the artifact.",
+						},
+					],
+				},
+				500,
+			);
+		}
+	});
 });
 
 export const handlePatchArtifactRequest = Effect.fn("playground.http.patchArtifact")(function* (

@@ -21,13 +21,13 @@ export const STUDIO_PROVIDER_OPTIONS = {
 	} satisfies OpenAILanguageModelResponsesOptions,
 };
 
-export class StudioAiModelError extends Schema.TaggedError<StudioAiModelError>()(
-	"StudioAiModelError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-	},
-) {}
+export class StudioAiModelError extends Schema.TaggedError<
+	StudioAiModelError,
+	{ readonly brand: unique symbol }
+>()("StudioAiModelError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+}) {}
 
 export interface PlaygroundAiModelShape {
 	readonly model: Effect.Effect<

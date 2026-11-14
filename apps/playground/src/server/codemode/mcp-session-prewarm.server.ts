@@ -3,6 +3,8 @@ import "@tanstack/react-start/server-only";
 import { SpanContent } from "@sketchi/observability";
 import { Effect, Schema } from "effect";
 
+import { RequestBodyReadError } from "../runtime/request-body.server";
+
 /** JSON-RPC messages a harness sends while starting a session, before its first execute. */
 const SessionStartMessage = Schema.Union([
 	Schema.Struct({ method: Schema.Literals(["initialize", "tools/list"]) }),
@@ -23,12 +25,10 @@ export function readMcpMessage(request: Request): Effect.Effect<unknown> {
 	const body = request.clone();
 	return Effect.tryPromise({
 		try: (): Promise<string> => body.text(),
-		catch: (cause) => cause,
+		catch: (cause) => RequestBodyReadError.make({ cause, message: "Unable to read MCP message." }),
 	}).pipe(
 		Effect.tap((text) => Effect.annotateCurrentSpan(SpanContent.httpRequestBody, text)),
-		Effect.flatMap((text) =>
-			Effect.try({ try: (): unknown => JSON.parse(text), catch: (cause) => cause }),
-		),
+		Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))),
 		Effect.orElseSucceed(() => undefined),
 	);
 }

@@ -42,13 +42,13 @@ const browserRenderingDuration = Metric.histogram("sketchi_browser_rendering_dur
 	]),
 });
 
-export class BrowserRenderingTimeout extends Schema.TaggedError<BrowserRenderingTimeout>()(
-	"BrowserRenderingTimeout",
-	{
-		durationMs: Schema.Number,
-		message: Schema.String,
-	},
-) {}
+export class BrowserRenderingTimeout extends Schema.TaggedError<
+	BrowserRenderingTimeout,
+	{ readonly brand: unique symbol }
+>()("BrowserRenderingTimeout", {
+	durationMs: Schema.Number,
+	message: Schema.String,
+}) {}
 
 /** The `CODEMODE_PNG_RENDERER` Durable Object namespace, narrowed to what the Worker calls. */
 export interface CodeModePngRendererNamespace {

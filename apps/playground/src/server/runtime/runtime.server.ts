@@ -7,12 +7,21 @@ import {
 	withTelemetryCorrelation,
 	withTelemetryExport,
 } from "@sketchi/observability";
-import { Context, Deferred, Effect, FiberSet, Layer, ManagedRuntime, pipe } from "effect";
+import {
+	Context,
+	Deferred,
+	Effect,
+	FiberSet,
+	Layer,
+	ManagedRuntime,
+	pipe,
+	Predicate,
+} from "effect";
 
 import type { CodeModeHttpRequestError } from "../codemode/api.server";
 import type { McpTransportError } from "../codemode/mcp.server";
 import { correlationIdHeader } from "./correlation.server";
-import type { RequestBodyReadError } from "./request-body.server";
+import { RequestBodyReadError } from "./request-body.server";
 import type { StudioEnv } from "../bindings/studio-env.server";
 import { PlaygroundAiModelLive } from "../ai/model.server";
 import { PlaygroundCodeModeLive } from "../codemode/service.server";
@@ -205,10 +214,9 @@ function runWithPlaygroundRuntime<A, E>(
 			}),
 		);
 
-		const httpEffect: PlaygroundRequestEffect<A, unknown> = effect;
-		const errorResponse = (error: PlaygroundHttpError, status: number, message: string) =>
+		const errorResponse = (tag: PlaygroundHttpError["_tag"], status: number, message: string) =>
 			Effect.logError("Playground HTTP request failed", {
-				error_tag: error._tag,
+				error_tag: tag,
 			}).pipe(
 				Effect.as(
 					Response.json(
@@ -217,15 +225,16 @@ function runWithPlaygroundRuntime<A, E>(
 					),
 				),
 			);
-		const result = yield* httpEffect.pipe(
-			Effect.catchTags({
-				CodeModeHttpRequestError: (error: CodeModeHttpRequestError) =>
-					errorResponse(error, 400, "The request could not be decoded."),
-				McpTransportError: (error: McpTransportError) =>
-					errorResponse(error, 500, "The MCP transport failed."),
-				RequestBodyReadError: (error: RequestBodyReadError) =>
-					errorResponse(error, 400, "The request body could not be read."),
-			}),
+		const result = yield* effect.pipe(
+			Effect.catchIf(Predicate.isTagged("CodeModeHttpRequestError"), () =>
+				errorResponse("CodeModeHttpRequestError", 400, "The request could not be decoded."),
+			),
+			Effect.catchIf(Predicate.isTagged("McpTransportError"), () =>
+				errorResponse("McpTransportError", 500, "The MCP transport failed."),
+			),
+			Effect.catchIf(Predicate.isTagged("RequestBodyReadError"), () =>
+				errorResponse("RequestBodyReadError", 400, "The request body could not be read."),
+			),
 			Effect.provideService(PlaygroundRequestCallbacks, {
 				runPromise: runRequestEffect,
 			}),
@@ -350,10 +359,12 @@ function recordBody(message: Response, attribute: string): Effect.Effect<void> {
 	return Effect.tryPromise({
 		try: async (): Promise<string | Uint8Array> =>
 			text ? copy.text() : new Uint8Array(await copy.arrayBuffer()),
-		catch: (cause) => cause,
+		catch: (cause) =>
+			RequestBodyReadError.make({ cause, message: "Unable to record response body." }),
 	}).pipe(
 		Effect.matchEffect({
-			onFailure: (cause) => Effect.annotateCurrentSpan(`${attribute}_error`, toJsonValue(cause)),
+			onFailure: (error) =>
+				Effect.annotateCurrentSpan(`${attribute}_error`, toJsonValue(error.cause)),
 			onSuccess: (body) => Effect.annotateCurrentSpan(attribute, body),
 		}),
 	);

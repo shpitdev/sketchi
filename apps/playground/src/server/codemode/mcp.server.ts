@@ -532,14 +532,14 @@ function artifactDeliveryFrom(
 
 const CodeModeExecutionStageSchema = Schema.Literals(["configuration", "execute", "input"]);
 
-export class CodeModeExecutionError extends Schema.TaggedError<CodeModeExecutionError>()(
-	"CodeModeExecutionError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-		stage: CodeModeExecutionStageSchema,
-	},
-) {}
+export class CodeModeExecutionError extends Schema.TaggedError<
+	CodeModeExecutionError,
+	{ readonly brand: unique symbol }
+>()("CodeModeExecutionError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+	stage: CodeModeExecutionStageSchema,
+}) {}
 
 function createDefaultCodeModeExecutor() {
 	return Effect.gen(function* () {
@@ -1027,13 +1027,13 @@ function createExecutionContext(
 	};
 }
 
-export class McpTransportError extends Schema.TaggedError<McpTransportError>()(
-	"McpTransportError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-	},
-) {}
+export class McpTransportError extends Schema.TaggedError<
+	McpTransportError,
+	{ readonly brand: unique symbol }
+>()("McpTransportError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+}) {}
 
 export const handleSketchiMcpRequest = Effect.fn("playground.http.mcp")(function* (
 	request: Request,

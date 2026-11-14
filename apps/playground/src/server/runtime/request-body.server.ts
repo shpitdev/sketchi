@@ -3,13 +3,13 @@ import "@tanstack/react-start/server-only";
 import { SpanContent } from "@sketchi/observability";
 import { Effect, Schema } from "effect";
 
-export class RequestBodyReadError extends Schema.TaggedError<RequestBodyReadError>()(
-	"RequestBodyReadError",
-	{
-		cause: Schema.Defect(),
-		message: Schema.String,
-	},
-) {}
+export class RequestBodyReadError extends Schema.TaggedError<
+	RequestBodyReadError,
+	{ readonly brand: unique symbol }
+>()("RequestBodyReadError", {
+	cause: Schema.Defect(),
+	message: Schema.String,
+}) {}
 
 export type BoundedJson =
 	| { readonly _tag: "TooLarge" }
