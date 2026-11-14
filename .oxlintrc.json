@@ -47,10 +47,6 @@
 					{
 						"group": ["zod/**"],
 						"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-					},
-					{
-						"group": ["effect/unstable/**"],
-						"message": "Unstable Effect modules require a reviewed adapter under src/internal/effect-unstable-*.ts."
 					}
 				]
 			}
@@ -76,10 +72,6 @@
 					{
 						"name": "zod",
 						"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-					},
-					{
-						"name": "effect/unstable",
-						"message": "Unstable Effect modules require a reviewed adapter under src/internal/effect-unstable-*.ts."
 					}
 				]
 			}
@@ -214,175 +206,6 @@
 							}
 						],
 						"enforceBuildableLibDependency": true
-					}
-				]
-			}
-		},
-		{
-			// Pure and framework-native projects keep Effect at its owning
-			// orchestration boundary. tools/project-graph.test.ts keeps this list in
-			// sync with the project classification.
-			"files": [
-				"apps/excalidraw/**",
-				"apps/icons/**",
-				"apps/native-conversion-storybook/**",
-				"apps/web/**",
-				"packages/diagram/core/**",
-				"packages/diagram/excalidraw/**",
-				"packages/diagram/renderer/**",
-				"packages/diagram/ui/**",
-				"packages/icons/catalog/**",
-				"packages/social-card/**",
-				"packages/svg-excalidraw/**",
-				"packages/ui/**",
-				"tools/sketchi-generators/**"
-			],
-			"rules": {
-				"eslint/no-restricted-imports": [
-					"error",
-					{
-						"paths": [
-							{
-								"name": "zod",
-								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-							},
-							{
-								"name": "effect",
-								"message": "This project is pure or framework-native; keep Effect at its owning orchestration boundary."
-							}
-						],
-						"patterns": [
-							{
-								"group": ["zod/**"],
-								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-							},
-							{
-								"group": ["effect/**", "@effect/**"],
-								"message": "This project is pure or framework-native; keep Effect at its owning orchestration boundary."
-							}
-						]
-					}
-				],
-				"sketchi/no-restricted-import-types": [
-					"error",
-					{
-						"modules": [
-							{
-								"name": "zod",
-								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-							},
-							{
-								"name": "effect",
-								"message": "This project is pure or framework-native; keep Effect at its owning orchestration boundary."
-							},
-							{
-								"name": "@effect",
-								"message": "This project is pure or framework-native; keep Effect at its owning orchestration boundary."
-							}
-						]
-					}
-				]
-			}
-		},
-		{
-			// Diagram-core's schema boundary files may use stable Effect Schema.
-			"files": [
-				"packages/diagram/core/src/diagram.ts",
-				"packages/diagram/core/src/intermediate.ts",
-				"packages/diagram/core/src/types/flowchart.ts",
-				"packages/diagram/core/src/types/flowchart.test.ts",
-				"packages/diagram/core/src/flowchart-document.ts",
-				"packages/diagram/core/src/flowchart-document.test.ts",
-				"packages/diagram/core/src/flowchart-edits.ts",
-				"packages/diagram/core/src/flowchart-edits.test.ts",
-				"packages/diagram/core/src/types/mindmap.ts",
-				"packages/diagram/core/src/types/sequence.ts",
-				"packages/diagram/core/src/types/timeline.ts",
-				"packages/diagram/core/src/types/chart.ts",
-				"packages/diagram/core/src/types/state-machine.ts",
-				"packages/diagram/core/src/types/gantt.ts",
-				"packages/diagram/core/src/types/er.ts",
-				"packages/diagram/core/src/types/class.ts",
-				"packages/diagram/core/src/types/org-chart.ts",
-				"packages/diagram/core/src/types/venn.ts",
-				"packages/diagram/core/src/types/journey.ts",
-				"packages/diagram/core/src/types/sankey.ts",
-				"packages/diagram/core/src/types/wireframe.ts",
-				"packages/diagram/core/src/types/quadrant.ts"
-			],
-			"rules": {
-				"eslint/no-restricted-imports": [
-					"error",
-					{
-						"paths": [
-							{
-								"name": "zod",
-								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-							}
-						],
-						"patterns": [
-							{
-								"group": ["zod/**"],
-								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-							},
-							{
-								"group": ["effect/unstable/**"],
-								"message": "Unstable Effect modules require a reviewed adapter under src/internal/effect-unstable-*.ts."
-							}
-						]
-					}
-				],
-				"sketchi/no-restricted-import-types": [
-					"error",
-					{
-						"modules": [
-							{
-								"name": "zod",
-								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-							},
-							{
-								"name": "effect/unstable",
-								"message": "Unstable Effect modules require a reviewed adapter under src/internal/effect-unstable-*.ts."
-							}
-						]
-					}
-				]
-			}
-		},
-		{
-			// Reviewed adapters are the only place unstable Effect modules may enter.
-			"files": [
-				"apps/**/src/internal/effect-unstable-*.ts",
-				"packages/**/src/internal/effect-unstable-*.ts",
-				"tools/**/src/internal/effect-unstable-*.ts"
-			],
-			"rules": {
-				"eslint/no-restricted-imports": [
-					"error",
-					{
-						"paths": [
-							{
-								"name": "zod",
-								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-							}
-						],
-						"patterns": [
-							{
-								"group": ["zod/**"],
-								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-							}
-						]
-					}
-				],
-				"sketchi/no-restricted-import-types": [
-					"error",
-					{
-						"modules": [
-							{
-								"name": "zod",
-								"message": "Sketchi models data with Effect Schema; decode with Schema instead of Zod."
-							}
-						]
 					}
 				]
 			}

@@ -31,23 +31,24 @@ is not needed. All native project targets and the tooling compiler use it.
 Effect diagnostics run in the compiler. Oxlint retains its existing
 type-aware rules, custom plugins, and `denyWarnings` gate; it does not duplicate
 the Effect rules. This keeps migration warnings visible without relaxing the
-existing lint gate. The checked-in diagnostic levels are the starting point for
-slice 1c's per-scope promotions, not permission to disable findings to pass CI.
+existing lint gate. The checked-in levels are the fixed policy for domain, server,
+React and tooling purposes in [Effect conventions](effect-conventions.md). Converted
+scopes promote the applicable native group; they do not narrow correctness.
 
-The old Effect import bans and Promise/runtime inventories remain owned by
-slice 1c. The new compiler is not complete coverage of that inventory: a probe
-detects `async`, `new Promise`, and nested Effect runners, but does not flag
-assigned `Promise.resolve`, `.then`, or an outer `Effect.runPromise`. Do not
-delete those checks on an assumption of equivalent coverage.
+Slice 1c removes the old Effect exclusions and Promise/runtime syntax census after
+live diagnostic proof. Coverage is not identical: assigned `Promise.resolve`, `.then`
+and outer runtime runners may have no Effect diagnostic. Retain real lifecycle tests,
+Nx dependency constraints and existing Promise misuse lint; review host ownership.
+Do not replace this acknowledged gap with another syntax inventory.
 
 ## Remaining TypeScript 6 consumers
 
 The `typescript` module remains the official `@typescript/typescript6` 6.0.2
 compatibility package (its API reports 6.0.3). Nx 24's `@nx/js:tsc` executor
-builds `sketchi-generators` using `createProgram`/`createCompilerHost`, and
-`tools/project-graph.test.ts` also consumes that API. TypeScript 7's package-root
+builds `sketchi-generators` using `createProgram`/`createCompilerHost`. The custom
+project-graph compiler walker was removed in slice 1c. TypeScript 7's package-root
 export exposes its version, not that compiler API. Remove this dependency only
-when those real consumers migrate to supported APIs; native CLI availability
+when the remaining Nx consumer migrates to supported APIs; native CLI availability
 does not establish API compatibility.
 
 Existing TS6 declaration emit, root build mode, and paired TS6 checks are retained
@@ -56,8 +57,7 @@ at this staging checkpoint. Native emit was exercised for all 15 package builds:
 nonzero on existing Effect correctness diagnostics. All 15 package entrypoint
 exports are mutually assignable between the two emitted outputs under both
 compilers; an actual observability consumer also compiles and runs. Retaining the
-old commands
-does not bypass the native gate: `ci:local` still requires both checks. It also
+old commands does not bypass the native gate: `ci:local` still requires both checks. It also
 does not make the slice accepted while native diagnostics fail.
 
 Remove the TS6 CLI build/check commands after the affected native builds and

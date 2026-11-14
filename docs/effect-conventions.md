@@ -1,100 +1,103 @@
 # Effect conventions
 
-Sketchi exact-pins `effect` and every `@effect/*` package to the approved
-`4.1.1` stable substrate. Effect owns
-effectful orchestration in `diagram-generation`, `diagram-agent`,
-`diagram-scenarios`, `studio/projects`, `observability`, and the Worker runtime
-boundary in `playground`. Parsing, formatting, IR
-validation, rendering, React/TanStack surfaces, and generators stay pure or
-framework-native.
+Effect v4 owns application data, algorithms for which it supplies an implementation,
+state, workflows, I/O, concurrency, persistence and observability throughout Sketchi.
+Domain, renderer, React and tooling packages may all import Effect. Use its synchronous
+data and collection APIs for synchronous work; ordinary arithmetic does not need a
+runtime. Keep Sketchi's geometry and rendering algorithms where upstream has no
+replacement.
 
-There is no separate `@effect/cli` dependency; the CLI uses the stable
-`effect/cli` export. Effect upgrades happen only in dedicated changes with full
-proof.
+The workspace catalog pins the synchronized runtime line. Compiler and lint tools have
+independent versions; see [the toolchain](effect-toolchain.md). Experimental or unstable
+status alone is not a reason to reject a supported API. Use current package exports;
+there is no special adapter directory for API maturity.
 
-## Operations and observability
+## Services and runtime ownership
 
-- Reusable effectful operations use `Effect.fn` with stable dotted identities
-  such as `diagramGeneration.generate`. Add nested spans only for meaningful
-  upstream or persistence boundaries.
-- Span/log fields are bounded metadata: operation, provider, model, scenario or
-  artifact ID, attempt, cache mode, and error tag. Never attach prompts,
-  responses, credentials, or unbounded payloads.
-- Count work at boundaries (requests, upstream attempts, retries, failures), not
-  inside pure helpers. Configure exporters at the application layer.
-- Correlation uses `withTelemetryCorrelation`; nested calls merge request,
-  run, attempt, scenario, project, and artifact identifiers through Effect
-  context and annotations. Correlation identifiers link events but are never
-  metric attributes.
-- Logs inside the Effect ring use `Effect.log*` with a message and a record of
-  fields. Content, such as a prompt, a model's answer or a request body, goes on
-  the span as an attribute (`SpanContent` names the common ones) rather than in
-  a log message.
+- Public and nontrivial service operations use `Effect.fn` with stable dotted names.
+  External capabilities are explicit `Context.Service` contracts supplied through layers.
+- Business operations return Effect. Compose layers at an application, test or resource
+  boundary, not inside business methods. Do not retain a parallel Promise implementation.
+- Node entrypoints use `NodeRuntime.runMain`; Worker handlers and browser integrations
+  use a lifecycle-owned runtime. A required native callback belongs in a small adapter
+  with a concrete reason. Module imports must not start I/O, timers or a shared request
+  runtime. Review cancellation, request isolation and finalization at that boundary.
+- React renders and consumes Effect atoms. Atoms and Effect services own application
+  state and workflows. TanStack retains its navigation/SSR/build responsibilities until
+  an actual supported replacement is proved. Foreign renderer synchronization stays in
+  one reviewed adapter; direct React effect hooks still require a local reason.
+- Foreign calls propagate cancellation when supported. Use scoped process/resource
+  services and upstream concurrency, cache and schedule primitives. Keep only the host
+  integration upstream cannot provide; an Effect wrapper alone is not a conversion.
 
-## Workers telemetry
+## Contracts, failures and tests
 
-`@sketchi/observability` installs one tracer, logger, and isolated metric
-registry in an application-owned Effect scope. Each finished span becomes a row,
-with every attribute, its logs and metric updates, and the full cause of a
-failure; a request's rows go to the `TELEMETRY_SPANS` Pipeline stream when the
-request ends. The package performs no module-scope I/O, starts no timers, and
-owns no global mutable correlation state. It does not change AI Gateway
-`collectLog`.
+- Model ordinary records with `Schema.Struct` and a same-name interface. Use current
+  tagged error constructors for expected failures. Do not assert plain objects into
+  Schema class instances or erase error/requirement types to silence diagnostics.
+- Decode unknown boundaries effectfully in server and asynchronous workflows. A
+  deliberate synchronous domain decoder or trusted constructor is local and reasoned;
+  it is not an exemption for every schema call in a package.
+- Interruption is cancellation, distinct from expected failure and defects. Retry only
+  known transient, safely repeatable operations, with bounded schedules and concurrency.
+- Use `@effect/vitest`, explicit test layers and `TestClock` from `effect/testing` for
+  Effect workflows. Test useful outcomes, including interruption, ownership, resource
+  cleanup and persistence races. Preserve existing user data and wire contracts.
+- Domain/family conversions retain deterministic geometry, rendering and cost proof.
+  A test of framework behavior, emitted scaffolding, source spelling or a syntax count
+  does not replace an application invariant.
 
-## Services, layers, and runtimes
+## Diagnostic ratchet
 
-- External capabilities are `Context.Service` contracts. Production and test
-  implementations are `Layer` values; business logic requires services and
-  never provisions them locally.
-- Compose layers once at an application or test boundary. A framework adapter
-  may call `Effect.runPromise`; package and business APIs return `Effect`.
-  Do not preserve a parallel Promise-primary implementation.
-- Executable Node entrypoints use `NodeRuntime.runMain`, so SIGINT and SIGTERM
-  interrupt the main fiber and wait for scoped process-tree and remote-resource
-  finalizers before exit. `Effect.runPromise` is not a Node main-loop adapter.
-- Parameterized layer construction is restricted to runtime bindings. Build it
-  once at the edge and reuse the resulting layer.
-- Node child processes are scoped resources. Timeout is measured until process
-  exit; close receives a separate bounded grace for inherited stdio. Timeout or
-  interruption targets the owned process group/tree with SIGTERM, escalates to
-  SIGKILL, force-settles after a final bound, and always releases descendants,
-  listeners, and streams.
-- Provisioning scripts that create remote resources are Effect-authoritative,
-  not ordinary deployment plumbing. Register cleanup in a scope before the
-  first mutation, use interruptible Effect polling, forward fetch cancellation,
-  and make finalizers best-effort and complete.
+`tsconfig.base.json` is the single executable policy for the pinned native compiler.
+Its explicit correctness and Effect-native rule lists are shared by all four purposes;
+no package is exempt because it is pure, UI, server or tooling. The following levels
+apply before a scope is converted:
 
-## Failures, resilience, and cancellation
+| Purpose | Correctness | Native operations and collections | Synchronous schema calls | Maturity |
+| --- | --- | --- | --- | --- |
+| Domain and rendering | error | warning | warning; deliberate synchronous boundaries need a local reason | off |
+| Server and persistence | error | warning | warning during migration; converted I/O uses effectful decoding | off |
+| React application | error | warning | warning; renderer callbacks do not exempt application workflows | off |
+| Tooling and Node | error | warning | warning; native Nx/bootstrap callbacks remain narrow | off |
 
-- Expected failures use `Schema.TaggedError`. Wrap an SDK, fetch, or other
-  foreign failure once at its boundary and retain the original cause.
-- Retry only errors explicitly classified as transient. Policies use bounded
-  `Schedule` retries, per-attempt timeouts, and bounded `Effect.forEach`
-  concurrency. Permanent HTTP/configuration/decode failures fail immediately.
-- Interruption is cancellation, not a domain error. Do not catch a full cause
-  and translate interrupts; `tryPromise` adapters pass an `AbortSignal` when
-  the foreign API supports it.
+The native list includes both inside/outside-Effect variants supplied by upstream,
+collection/string preferences, `runEffectInsideEffect`, `strictEffectProvide` and
+`schemaSyncInEffect`. Correctness errors fail the compiler; migration warnings remain
+visible and do not affect its exit code. Maturity checks (`experimentalApiUsage`,
+`unstableApiUsage`, `apiStabilityLeak`) are off. Style rules keep their pinned upstream
+defaults; they are not all promoted to errors.
 
-## Imports and tests
+Each converted project or family promotes this applicable native group to error using
+upstream configuration overrides. Preserve the base correctness list and unrelated
+scopes; a narrower list or lower severity requires independent review. Verify the
+resolved policy on a real source probe before accepting a promotion. Final adoption
+requires errors throughout and a concrete reason for every necessary native operation.
+Record counts temporarily in `.memory/`; there is no allowed-count baseline in CI.
 
-- Stable `effect` and `effect/testing` imports are allowed in
-  Effect-authoritative projects. `effect/unstable/*` is allowed only in a
-  reviewed `src/internal/effect-unstable-*.ts` adapter with a documented reason.
-- Use `@effect/vitest` for Effect tests, `TestClock` from `effect/testing` for
-  retry/timeout timing, and explicit layers for success and failure variants.
-  Test interruption and layer substitution whenever a new external service is
-  introduced.
-- Pure helpers and framework-native projects do not import Effect. Keep their
-  ordinary unit tests and deterministic contracts intact.
+Prefer a local `@effect-diagnostics-next-line rule:off -- <concrete capability gap>`
+only for an actual host contract or deliberate synchronous boundary. Do not suppress
+correctness findings to make a migration pass, add package-wide suppressions, or use
+an exception to preserve a duplicate implementation. Lint and Effect diagnostic
+comments require reasons. Existing Nx dependency boundaries, Promise misuse checks,
+Zod restrictions and React synchronization restrictions remain enforced.
 
-## Structural closure
+Upstream diagnostics are not a census of Promise syntax. Assigned `Promise.resolve`
+and `.then` calls and outer runtime runners can escape those diagnostics. Review
+whether those operations have an actual host owner; prove lifecycle behavior with
+relevant application tests. Do not recreate the removed compiler walker or exact file
+counts to pretend coverage is identical. Nx isolates dependencies; it does not prove
+that a runtime invocation inside a permitted package has the right owner.
 
-`tools/project-graph.test.ts` is the executable boundary inventory. It pins the
-allowed manifests and unstable imports, rejects Effect v3 and Zod source
-imports, enumerates runtime host edges, and enumerates the remaining native
-Promise sites and counts. The TypeScript type-checker gate resolves
-Promise/PromiseLike identity and assignability for async returns, awaits,
-constructions, calls, and thenable member access, including qualified and
-aliased forms. Union/intersection constituents, generic use-site instantiation,
-and nullable/optional consumption are included. Adding a file or a site fails
-the test until its ownership is deliberately classified.
+## Observability
+
+Reusable operations have stable span names. Logs carry bounded metadata, while
+intentional prompt/model/body content belongs in span attributes using the existing
+content policy and redaction boundary. Never record credentials. Correlation uses
+`withTelemetryCorrelation`; request, run, attempt, scenario, project and artifact IDs
+join retained events but are not metric attributes.
+
+`@sketchi/observability` provides the request-owned tracer, logger and metric registry.
+Preserve the existing Pipeline row/content/cause format, correlation and request-end
+flush behavior during conversion. Verify emitted, retained and queryable evidence
+separately; configuring telemetry is not proof that a request was recorded.

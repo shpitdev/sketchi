@@ -226,17 +226,14 @@ if (!noRestrictedImportTypes) {
 	throw new Error("sketchi/no-restricted-import-types is not registered.");
 }
 
-const effectFree = [
+const schemaImports = [
 	{
-		modules: [
-			{ name: "effect", message: "Keep Effect out." },
-			{ name: "@effect", message: "Keep Effect out." },
-		],
+		modules: [{ name: "zod", message: "Use Effect Schema." }],
 	},
 ];
 const restricted = (specifier: string) => ({
 	messageId: "restricted",
-	data: { message: "Keep Effect out.", specifier },
+	data: { message: "Use Effect Schema.", specifier },
 });
 
 tester.run("no-restricted-import-types", noRestrictedImportTypes, {
@@ -244,17 +241,17 @@ tester.run("no-restricted-import-types", noRestrictedImportTypes, {
 		{
 			name: "unrestricted import types",
 			code: 'type Local = import("./local").Value; type Node = typeof import("node:fs");',
-			options: effectFree,
+			options: schemaImports,
 		},
 		{
 			name: "a package whose name only starts like a restricted one",
-			code: 'type Polyfill = typeof import("effects-polyfill"); type Scoped = import("@effective/tools").T;',
-			options: effectFree,
+			code: 'type Polyfill = typeof import("zodiac"); type Scoped = import("@schema/tools").T;',
+			options: schemaImports,
 		},
 		{
 			name: "type-only import declarations are no-restricted-imports' job",
-			code: 'import type { Effect } from "effect"; export type E = Effect.Effect<number>;',
-			options: effectFree,
+			code: 'import type { ZodType } from "zod"; export type Z = ZodType;',
+			options: schemaImports,
 		},
 		{
 			name: "no configured modules",
@@ -264,27 +261,21 @@ tester.run("no-restricted-import-types", noRestrictedImportTypes, {
 	invalid: [
 		{
 			name: "type query of a restricted module",
-			code: 'type EffectModule = typeof import("effect");',
-			options: effectFree,
-			errors: [restricted("effect")],
+			code: 'type ZodModule = typeof import("zod");',
+			options: schemaImports,
+			errors: [restricted("zod")],
 		},
 		{
 			name: "deep subpath of a restricted module",
-			code: 'let run: import("effect/Effect").Effect<number>;',
-			options: effectFree,
-			errors: [restricted("effect/Effect")],
-		},
-		{
-			name: "deep path inside a restricted scope",
-			code: 'type Runtime = typeof import("@effect/platform-node/NodeRuntime");',
-			options: effectFree,
-			errors: [restricted("@effect/platform-node/NodeRuntime")],
+			code: 'let schema: import("zod/v4/core").$ZodType;',
+			options: schemaImports,
+			errors: [restricted("zod/v4/core")],
 		},
 		{
 			name: "qualified and generic import types",
-			code: 'type Layer = import("effect").Layer.Layer<never>; type Many = Array<typeof import("@effect/vitest")>;',
-			options: effectFree,
-			errors: [restricted("effect"), restricted("@effect/vitest")],
+			code: 'type Schema = import("zod").ZodType<string>; type Many = Array<typeof import("zod/v4")>;',
+			options: schemaImports,
+			errors: [restricted("zod"), restricted("zod/v4")],
 		},
 	],
 });

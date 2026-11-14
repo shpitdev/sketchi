@@ -3,7 +3,6 @@ import { spawnSync } from "node:child_process";
 import { existsSync, globSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const workspaceRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -36,60 +35,6 @@ const intendedNxProjectRoots = [
 const intendedWorkspacePackageRoots = intendedNxProjectRoots.filter(
 	(projectRoot) => projectRoot !== "apps/native-conversion-storybook",
 );
-const effectAuthoritativeProjectRoots = [
-	"apps/cli",
-	"apps/playground",
-	"packages/diagram/agent",
-	"packages/diagram/generation",
-	"packages/diagram/scenarios",
-	"packages/icons/community",
-	"packages/icons/draw",
-	"packages/observability",
-	"packages/studio/projects",
-	"tools/icon-batch",
-];
-const effectPureProjectRoots = [
-	"packages/diagram/core",
-	"packages/diagram/excalidraw",
-	"packages/diagram/renderer",
-	"packages/icons/catalog",
-	"packages/social-card",
-	"packages/svg-excalidraw",
-];
-const effectMigrationReadyProjectRoots: string[] = [];
-const effectSchemaBoundaryFiles = new Set([
-	"packages/diagram/core/src/diagram.ts",
-	"packages/diagram/core/src/intermediate.ts",
-	"packages/diagram/core/src/types/flowchart.ts",
-	"packages/diagram/core/src/types/flowchart.test.ts",
-	"packages/diagram/core/src/flowchart-document.ts",
-	"packages/diagram/core/src/flowchart-document.test.ts",
-	"packages/diagram/core/src/flowchart-edits.ts",
-	"packages/diagram/core/src/flowchart-edits.test.ts",
-	"packages/diagram/core/src/types/mindmap.ts",
-	"packages/diagram/core/src/types/sequence.ts",
-	"packages/diagram/core/src/types/state-machine.ts",
-	"packages/diagram/core/src/types/timeline.ts",
-	"packages/diagram/core/src/types/chart.ts",
-	"packages/diagram/core/src/types/gantt.ts",
-	"packages/diagram/core/src/types/er.ts",
-	"packages/diagram/core/src/types/class.ts",
-	"packages/diagram/core/src/types/org-chart.ts",
-	"packages/diagram/core/src/types/venn.ts",
-	"packages/diagram/core/src/types/journey.ts",
-	"packages/diagram/core/src/types/sankey.ts",
-	"packages/diagram/core/src/types/wireframe.ts",
-	"packages/diagram/core/src/types/quadrant.ts",
-]);
-const frameworkNativeProjectRoots = [
-	"apps/excalidraw",
-	"apps/icons",
-	"apps/native-conversion-storybook",
-	"apps/web",
-	"packages/diagram/ui",
-	"packages/ui",
-	"tools/sketchi-generators",
-];
 const intendedCompositeReferences = [
 	"apps/cli/tsconfig.json",
 	"apps/excalidraw/tsconfig.json",
@@ -114,195 +59,6 @@ const intendedCompositeReferences = [
 	"tools/icon-batch/tsconfig.json",
 	"tools/sketchi-generators/tsconfig.lib.json",
 ];
-const reviewedEffectUnstableAdapterPaths: string[] = [];
-const effectDependencyManifestPaths = [
-	"apps/cli/package.json",
-	"package.json",
-	"packages/diagram/agent/package.json",
-	"packages/diagram/core/package.json",
-	"packages/diagram/generation/package.json",
-	"packages/diagram/scenarios/package.json",
-	"packages/icons/community/package.json",
-	"packages/icons/draw/package.json",
-	"packages/observability/package.json",
-	"packages/studio/projects/package.json",
-	"tools/icon-batch/package.json",
-];
-const approvedRuntimeBoundaryFiles = [
-	"apps/cli/src/main.ts",
-	"apps/playground/src/server/codemode/png-renderer-object.server.ts",
-	"apps/playground/src/server/runtime/runtime.server.ts",
-	"packages/diagram/scenarios/src/cli.ts",
-	// The community icon HTTP API runs its workflows for the Effect-free icons app.
-	"packages/icons/community/src/http.ts",
-	// The catalog batch runs the draw engine once per mark from a Node script.
-	"tools/icon-batch/src/draw-mark.ts",
-];
-const approvedManagedPromiseSiteCounts: Record<string, number> = {
-	"apps/cli/scripts/build.mjs": 29,
-	"apps/cli/scripts/bundle-report.mjs": 8,
-	"apps/cli/scripts/package.mjs": 8,
-	"apps/cli/scripts/smoke.mjs": 221,
-	"apps/cli/src/canvas.ts": 2,
-	"apps/cli/src/filesystem.ts": 41,
-	"apps/cli/src/generate-wizard.ts": 8,
-	"apps/cli/src/generation.ts": 2,
-	"apps/cli/src/icon-draw.ts": 2,
-	"apps/cli/src/png-renderer-runtime.ts": 30,
-	"apps/cli/src/png-renderer.ts": 8,
-	"apps/cli/src/response-body.ts": 2,
-	"apps/cli/src/share-protocol.ts": 12,
-	"apps/cli/src/share.ts": 2,
-	"apps/cli/vitest.config.mts": 1,
-	"apps/excalidraw/src/components/excalidraw-workspace/excalidraw-workspace.tsx": 4,
-	"apps/excalidraw/src/components/svg-icon-workspace/svg-icon-workspace.tsx": 8,
-	"apps/icons/scripts/sync-catalog-assets.ts": 36,
-	"apps/icons/scripts/social-cards.ts": 17,
-	"apps/icons/src/components/community-gallery/community-gallery.tsx": 19,
-	"apps/icons/src/components/community-gallery/community-page.tsx": 7,
-	"apps/icons/src/cloudflare-workers.d.ts": 4,
-	"apps/icons/src/components/icon-library/icon-library.tsx": 4,
-	"apps/icons/src/components/icon-library/use-icon-sources.ts": 42,
-	"apps/icons/src/components/packs/pack-page.tsx": 10,
-	"apps/icons/src/lib/actions.ts": 14,
-	"apps/icons/src/lib/api.server.ts": 9,
-	"apps/icons/src/lib/client-rate-limit.server.ts": 8,
-	"apps/icons/src/lib/catalog.server.ts": 6,
-	"apps/icons/src/lib/catalog-client.ts": 13,
-	"apps/icons/src/lib/community-client.ts": 10,
-	"apps/icons/src/lib/community.server.ts": 12,
-	"apps/icons/src/lib/mcp.server.ts": 8,
-	"apps/icons/src/lib/packs-rpc.ts": 6,
-	"apps/icons/src/lib/packs.server.ts": 11,
-	"apps/icons/src/routes/api/community/$slug.ts": 15,
-	"apps/icons/src/routes/api/community/index.ts": 15,
-	"apps/icons/src/routes/api/icons/$slug.ts": 16,
-	"apps/icons/src/routes/api/icons/index.ts": 6,
-	"apps/icons/src/routes/index.tsx": 8,
-	"apps/icons/src/routes/mcp.ts": 15,
-	"apps/icons/src/routes/packs/$id.tsx": 6,
-	"apps/playground/scripts/sync-node-logos.ts": 4,
-	"apps/playground/src/cloudflare-workers.d.ts": 6,
-	"apps/playground/src/components/ai-elements/conversation.tsx": 1,
-	"apps/playground/src/components/ai-elements/prompt-input.tsx": 16,
-	"apps/playground/src/components/ai-elements/reasoning.tsx": 2,
-	"apps/playground/src/features/artifacts/artifact-view-client.ts": 8,
-	"apps/playground/src/features/artifacts/excalidraw-png-export.ts": 1,
-	"apps/playground/src/features/icons/icon-job.ts": 12,
-	"apps/playground/src/features/resources/use-async-resource.ts": 3,
-	"apps/playground/src/features/studio/diagram-drawing.ts": 5,
-	"apps/playground/src/features/studio/diagram-editor.tsx": 6,
-	"apps/playground/src/features/studio/drawing-drafts.ts": 17,
-	"apps/playground/src/routes/api/chat.ts": 6,
-	"apps/playground/src/routes/api/studio/diagrams/$diagramId.ts": 5,
-	"apps/playground/src/routes/api/studio/diagrams/$diagramId/drawing.ts": 10,
-	"apps/playground/src/routes/api/studio/projects.ts": 5,
-	"apps/playground/src/routes/api/studio/projects/from-artifact.ts": 5,
-	"apps/playground/src/routes/api/studio/projects_/$projectId.ts": 5,
-	"apps/playground/src/routes/api/v1/artifacts/$artifactId.ts": 6,
-	"apps/playground/src/routes/api/v1/artifacts/$artifactId/patch.ts": 6,
-	"apps/playground/src/routes/api/v1/canvases/create.ts": 6,
-	"apps/playground/src/routes/api/v1/charts/build.ts": 6,
-	"apps/playground/src/routes/api/v1/class-diagrams/build.ts": 6,
-	"apps/playground/src/routes/api/v1/er-diagrams/build.ts": 6,
-	"apps/playground/src/routes/api/v1/flowcharts/build.ts": 6,
-	"apps/playground/src/routes/api/v1/flowcharts/edit.ts": 6,
-	"apps/playground/src/routes/api/v1/gantts/build.ts": 6,
-	"apps/playground/src/routes/api/v1/generate.ts": 6,
-	"apps/playground/src/routes/api/v1/icons/draw.ts": 6,
-	"apps/playground/src/routes/api/v1/journey-maps/build.ts": 6,
-	"apps/playground/src/routes/api/v1/mindmaps/build.ts": 6,
-	"apps/playground/src/routes/api/v1/org-charts/build.ts": 6,
-	"apps/playground/src/routes/api/v1/quadrant-charts/build.ts": 6,
-	"apps/playground/src/routes/api/v1/sankey-diagrams/build.ts": 6,
-	"apps/playground/src/routes/api/v1/sequences/build.ts": 6,
-	"apps/playground/src/routes/api/v1/state-machines/build.ts": 6,
-	"apps/playground/src/routes/api/v1/timelines/build.ts": 6,
-	"apps/playground/src/routes/api/v1/venn-diagrams/build.ts": 6,
-	"apps/playground/src/routes/api/v1/wireframes/build.ts": 6,
-	"apps/playground/src/routes/artifacts/$artifactId.tsx": 3,
-	"apps/playground/src/routes/codemode-export-harness.tsx": 5,
-	"apps/playground/src/routes/diagrams_/$diagramId/edit.tsx": 3,
-	"apps/playground/src/routes/index.tsx": 2,
-	"apps/playground/src/routes/mcp.ts": 14,
-	"apps/playground/src/routes/projects.tsx": 3,
-	"apps/playground/src/routes/projects_/$projectId.tsx": 3,
-	"apps/playground/src/server/ai/model.server.ts": 2,
-	"apps/playground/src/server/chat/agent.server.ts": 8,
-	"apps/playground/src/server/chat/studio-reply.server.ts": 26,
-	"apps/playground/src/server/codemode/browser-render-pool.server.ts": 30,
-	"apps/playground/src/server/codemode/browser-renderer.server.ts": 7,
-	"apps/playground/src/server/codemode/effect-mcp-adapter.server.ts": 11,
-	"apps/playground/src/server/codemode/icon-catalog.server.ts": 5,
-	"apps/playground/src/server/codemode/mcp-session-prewarm.server.ts": 2,
-	"apps/playground/src/server/codemode/mcp.server.ts": 58,
-	"apps/playground/src/server/codemode/png-renderer-object.server.ts": 4,
-	"apps/playground/src/server/icons/budget-object.server.ts": 8,
-	"apps/playground/src/server/icons/client-rate-limit.server.ts": 8,
-	"apps/playground/src/server/icons/draw.server.ts": 10,
-	"apps/playground/src/server/runtime/request-body.server.ts": 9,
-	"apps/playground/src/server/runtime/runtime.server.ts": 26,
-	"apps/playground/src/server/studio/projects.server.ts": 3,
-	"apps/web/scripts/home-diagram.ts": 4,
-	"apps/web/scripts/social-card.ts": 2,
-	"apps/web/src/components/copy-button/copy-button.tsx": 4,
-	"apps/web/src/components/home-diagram/home-diagram.tsx": 18,
-	"apps/web/src/lib/surface-urls-rpc.ts": 3,
-	"apps/web/src/routes/agents.tsx": 2,
-	"apps/web/src/routes/docs.tsx": 2,
-	"apps/web/src/routes/index.tsx": 2,
-	"packages/diagram/agent/src/lib/code-mode/artifacts.ts": 16,
-	"packages/diagram/generation/src/lib/cloudflare-ai-gateway.ts": 2,
-	"packages/diagram/generation/src/lib/cloudflare-gateway-chat.ts": 5,
-	"packages/diagram/generation/src/lib/jev-workers-ai.ts": 3,
-	"packages/diagram/scenarios/src/cli.ts": 10,
-	// Excalidraw's editor module loads once per process, for the editability metrics.
-	"packages/diagram/scenarios/src/lib/excalidraw-editor.ts": 5,
-	"packages/diagram/scenarios/src/lib/scene-editability.ts": 2,
-	"packages/diagram/scenarios/vitest.config.mts": 1,
-	"packages/diagram/ui/src/components/excalidraw-scene-canvas/excalidraw-scene-canvas.tsx": 3,
-	"packages/diagram/ui/src/lib/browser-actions.ts": 3,
-	"packages/diagram/ui/src/lib/load-excalidraw.ts": 2,
-	"packages/icons/catalog/scripts/build-node-logos.ts": 14,
-	"packages/icons/catalog/scripts/generate-look-alikes.ts": 8,
-	"packages/icons/catalog/scripts/generate-catalog.ts": 12,
-	"packages/icons/catalog/src/icon-color-render.ts": 5,
-	"packages/icons/community/src/client-limit.ts": 10,
-	"packages/icons/community/src/http.ts": 25,
-	"packages/icons/community/src/moderation.ts": 3,
-	"packages/icons/community/src/publish.ts": 2,
-	"packages/icons/community/src/recipe.ts": 3,
-	"packages/icons/community/src/store.ts": 20,
-	"packages/icons/draw/src/lib/models.ts": 5,
-	"packages/observability/src/lib/effect-telemetry.ts": 5,
-	"packages/observability/vitest.config.mts": 1,
-	"packages/social-card/src/index.ts": 8,
-	"packages/social-card/vitest.config.mts": 1,
-	"packages/studio/projects/src/client-api.ts": 31,
-	"packages/studio/projects/src/server/bucket.ts": 22,
-	"packages/studio/projects/src/server/http.ts": 4,
-	"tools/icon-batch/src/draw-mark.ts": 11,
-	"tools/icon-batch/src/excalidraw-export.ts": 22,
-	"tools/icon-batch/src/gateway.ts": 18,
-	"tools/icon-batch/src/imaging.ts": 7,
-	"tools/icon-batch/src/main.ts": 36,
-	"tools/icon-batch/src/promote.ts": 3,
-	"tools/icon-batch/src/recipe-sheets.ts": 17,
-	"tools/icon-batch/src/runner.ts": 27,
-	"tools/icon-batch/src/sheets.ts": 19,
-	"tools/icon-batch/src/store.ts": 21,
-	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.spec.ts": 6,
-	"tools/sketchi-generators/src/generators/diagram-type/diagram-type.ts": 3,
-	"tools/sketchi-generators/src/generators/ui-component/ui-component.spec.ts": 3,
-	"tools/sketchi-generators/src/generators/ui-component/ui-component.ts": 3,
-	"tools/testing/browserbase.ts": 29,
-	"apps/icons/scripts/pack-preview-image.ts": 18,
-	"apps/icons/src/components/packs/pack-publish-dialog.tsx": 10,
-	"apps/icons/src/lib/excalidraw-publish.server.ts": 109,
-	"apps/icons/src/lib/packs.ts": 3,
-	"apps/icons/src/routes/api/packs/$id/excalidraw.ts": 6,
-};
-const approvedManagedPromiseFiles = Object.keys(approvedManagedPromiseSiteCounts).sort();
 // pnpm resolves the exact runtime versions from the shared workspace catalog.
 const approvedEffectDependencySpecifiers = new Set(["catalog:"]);
 const diagramPackages = [
@@ -363,289 +119,6 @@ interface PackageManifest {
 	devDependencies?: Record<string, string>;
 	optionalDependencies?: Record<string, string>;
 	peerDependencies?: Record<string, string>;
-}
-
-type PromiseOrchestrationKind =
-	| "async function"
-	| "await expression"
-	| "Promise construction"
-	| "Promise-producing call"
-	| "Promise static call"
-	| "thenable member access";
-
-interface PromiseOrchestrationSite {
-	readonly column: number;
-	readonly kind: PromiseOrchestrationKind;
-	readonly line: number;
-}
-
-function memberName(expression: ts.Expression): string | undefined {
-	if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
-	if (
-		ts.isElementAccessExpression(expression) &&
-		expression.argumentExpression &&
-		(ts.isStringLiteral(expression.argumentExpression) ||
-			ts.isNoSubstitutionTemplateLiteral(expression.argumentExpression))
-	) {
-		return expression.argumentExpression.text;
-	}
-	return undefined;
-}
-
-function memberReceiver(expression: ts.Expression): ts.Expression | undefined {
-	return ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)
-		? expression.expression
-		: undefined;
-}
-
-const promiseTypeAnchorPath = path.join(workspaceRoot, ".memory", "promise-type-anchor.d.ts");
-const runtimeExports: Record<string, readonly string[]> = {
-	__runtimeEffect: [
-		"runSync",
-		"runSyncExit",
-		"runPromise",
-		"runPromiseExit",
-		"runFork",
-		"runCallback",
-	],
-	__runtimeManaged: ["make", "makeEffect"],
-	__runtimeNode: ["runMain"],
-};
-const promiseTypeAnchorSource = [
-	'import * as __runtimeEffect from "effect/Effect";',
-	'import * as __runtimeManaged from "effect/ManagedRuntime";',
-	'import * as __runtimeNode from "@effect/platform-node/NodeRuntime";',
-	"declare const __promiseLikeAnchor: PromiseLike<any>;",
-	"declare const __promiseConstructorAnchor: PromiseConstructor;",
-].join("\n");
-const promiseTypeCheckingSourcePaths: Record<string, string[]> = {
-	"@sketchi/diagram-agent": ["packages/diagram/agent/src/index.ts"],
-	"@sketchi/diagram-core": ["packages/diagram/core/src/index.ts"],
-	"@sketchi/diagram-excalidraw": ["packages/diagram/excalidraw/src/index.ts"],
-	"@sketchi/diagram-generation": ["packages/diagram/generation/src/index.ts"],
-	"@sketchi/diagram-renderer": ["packages/diagram/renderer/src/index.ts"],
-	"@sketchi/diagram-scenarios": ["packages/diagram/scenarios/src/index.ts"],
-	"@sketchi/diagram-ui": ["packages/diagram/ui/src/index.ts"],
-	"@sketchi/observability": ["packages/observability/src/index.ts"],
-	"@sketchi/svg-excalidraw": ["packages/svg-excalidraw/src/index.ts"],
-};
-
-function createTypeCheckedProgram(
-	rootNames: readonly string[],
-	virtualSources: ReadonlyMap<string, string> = new Map(),
-): ts.Program {
-	const configPath = path.join(workspaceRoot, "tsconfig.base.json");
-	const config = ts.readConfigFile(configPath, (fileName) => ts.sys.readFile(fileName));
-	if (config.error) {
-		throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, "\n"));
-	}
-	const parsed = ts.parseJsonConfigFileContent(
-		config.config,
-		ts.sys,
-		workspaceRoot,
-		{ allowJs: true, checkJs: false, noEmit: true },
-		configPath,
-	);
-	const compilerOptions: ts.CompilerOptions = {
-		...parsed.options,
-		baseUrl: workspaceRoot,
-		paths: {
-			...parsed.options.paths,
-			...promiseTypeCheckingSourcePaths,
-		},
-	};
-	const sources = new Map(virtualSources);
-	sources.set(promiseTypeAnchorPath, promiseTypeAnchorSource);
-	const host = ts.createCompilerHost(compilerOptions, true);
-	const defaultDirectoryExists = host.directoryExists?.bind(host);
-	const defaultFileExists = host.fileExists.bind(host);
-	const defaultGetSourceFile = host.getSourceFile.bind(host);
-	const defaultReadFile = host.readFile.bind(host);
-	host.fileExists = (fileName) =>
-		sources.has(path.resolve(fileName)) || defaultFileExists(fileName);
-	host.directoryExists = (directoryName) => {
-		const resolvedDirectory = `${path.resolve(directoryName)}${path.sep}`;
-		return (
-			[...sources.keys()].some((fileName) =>
-				path.resolve(fileName).startsWith(resolvedDirectory),
-			) || defaultDirectoryExists?.(directoryName) === true
-		);
-	};
-	host.readFile = (fileName) => sources.get(path.resolve(fileName)) ?? defaultReadFile(fileName);
-	host.getSourceFile = (fileName, languageVersion, onError, shouldCreate) => {
-		const sourceText = sources.get(path.resolve(fileName));
-		return sourceText === undefined
-			? defaultGetSourceFile(fileName, languageVersion, onError, shouldCreate)
-			: ts.createSourceFile(fileName, sourceText, languageVersion, true);
-	};
-	return ts.createProgram({
-		host,
-		options: compilerOptions,
-		rootNames: [...rootNames, promiseTypeAnchorPath],
-	});
-}
-
-function declaredVariableType(
-	checker: ts.TypeChecker,
-	sourceFile: ts.SourceFile,
-	variableName: string,
-): ts.Type {
-	for (const statement of sourceFile.statements) {
-		if (!ts.isVariableStatement(statement)) continue;
-		for (const declaration of statement.declarationList.declarations) {
-			if (ts.isIdentifier(declaration.name) && declaration.name.text === variableName) {
-				return checker.getTypeAtLocation(declaration.name);
-			}
-		}
-	}
-	throw new Error(`Missing type-checker anchor ${variableName}.`);
-}
-
-function promiseOrchestrationSites(
-	program: ts.Program,
-	sourceFile: ts.SourceFile,
-): PromiseOrchestrationSite[] {
-	const checker = program.getTypeChecker();
-	const anchorFile = program.getSourceFile(promiseTypeAnchorPath);
-	if (!anchorFile) throw new Error("Promise type-checker anchor was not loaded.");
-	const promiseLikeType = declaredVariableType(checker, anchorFile, "__promiseLikeAnchor");
-	const promiseConstructorType = declaredVariableType(
-		checker,
-		anchorFile,
-		"__promiseConstructorAnchor",
-	);
-	const sites: PromiseOrchestrationSite[] = [];
-	const record = (node: ts.Node, kind: PromiseOrchestrationKind): void => {
-		const location = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-		sites.push({
-			column: location.character + 1,
-			kind,
-			line: location.line + 1,
-		});
-	};
-	const isUsableType = (type: ts.Type): boolean =>
-		(type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never)) === 0;
-	const isPromiseLikeType = (type: ts.Type): boolean => {
-		if (!isUsableType(type)) return false;
-		if (type.isUnionOrIntersection()) {
-			return type.types.some(isPromiseLikeType);
-		}
-		const nonNullableType = checker.getNonNullableType(type);
-		return (
-			isUsableType(nonNullableType) && checker.isTypeAssignableTo(nonNullableType, promiseLikeType)
-		);
-	};
-	const isPromiseLike = (node: ts.Node): boolean =>
-		isPromiseLikeType(checker.getTypeAtLocation(node));
-	const isPromiseConstructor = (node: ts.Node): boolean => {
-		const type = checker.getTypeAtLocation(node);
-		return isUsableType(type) && checker.isTypeAssignableTo(type, promiseConstructorType);
-	};
-
-	const visit = (node: ts.Node): void => {
-		if (ts.isFunctionLike(node)) {
-			const signature = checker.getSignatureFromDeclaration(node);
-			if (signature && isPromiseLikeType(checker.getReturnTypeOfSignature(signature))) {
-				record(node, "async function");
-			}
-		}
-		if (ts.isAwaitExpression(node) && isPromiseLike(node.expression)) {
-			record(node, "await expression");
-		}
-		if (
-			ts.isNewExpression(node) &&
-			(isPromiseLike(node) || isPromiseConstructor(node.expression))
-		) {
-			record(node, "Promise construction");
-		}
-		if (ts.isCallExpression(node)) {
-			const expression = node.expression;
-			const receiver = memberReceiver(expression);
-			if (receiver && isPromiseConstructor(receiver)) {
-				record(node, "Promise static call");
-			} else if (
-				receiver &&
-				["then", "catch", "finally"].includes(memberName(expression) ?? "") &&
-				isPromiseLike(receiver)
-			) {
-				record(node, "thenable member access");
-			} else if (isPromiseLike(node)) {
-				record(node, "Promise-producing call");
-			}
-		}
-		if (
-			(ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
-			["then", "catch", "finally"].includes(memberName(node) ?? "") &&
-			isPromiseLike(node.expression) &&
-			!(ts.isCallExpression(node.parent) && node.parent.expression === node)
-		) {
-			record(node, "thenable member access");
-		}
-		ts.forEachChild(node, visit);
-	};
-	visit(sourceFile);
-	return sites;
-}
-
-function runtimeBoundaryCalls(program: ts.Program, sourceFile: ts.SourceFile): ts.CallExpression[] {
-	const checker = program.getTypeChecker();
-	const anchor = program.getSourceFile(promiseTypeAnchorPath);
-	if (!anchor) throw new Error("Runtime type-checker anchor was not loaded.");
-	const declarations = new Set<ts.SignatureDeclaration>();
-	for (const statement of anchor.statements) {
-		if (!ts.isImportDeclaration(statement)) continue;
-		const binding = statement.importClause?.namedBindings;
-		if (!binding || !ts.isNamespaceImport(binding)) continue;
-		const names = runtimeExports[binding.name.text];
-		if (!names) continue;
-		const alias = checker.getSymbolAtLocation(binding.name);
-		if (!alias) throw new Error(`Unresolved runtime anchor ${binding.name.text}.`);
-		const module = checker.getAliasedSymbol(alias);
-		for (const symbol of checker.getExportsOfModule(module)) {
-			if (!names.includes(symbol.name)) continue;
-			const type = checker.getTypeOfSymbolAtLocation(symbol, binding.name);
-			for (const signature of checker.getSignaturesOfType(type, ts.SignatureKind.Call)) {
-				const declaration = signature.getDeclaration();
-				if (declaration) declarations.add(declaration);
-			}
-		}
-	}
-	const calls: ts.CallExpression[] = [];
-	const visit = (node: ts.Node): void => {
-		if (ts.isCallExpression(node)) {
-			const declaration = checker.getResolvedSignature(node)?.getDeclaration();
-			if (declaration && declarations.has(declaration)) calls.push(node);
-		}
-		ts.forEachChild(node, visit);
-	};
-	visit(sourceFile);
-	return calls;
-}
-
-function runtimeProbeCalls(sourceText: string): ts.CallExpression[] {
-	const probePath = path.join(workspaceRoot, ".memory", "runtime-probe.ts");
-	const program = createTypeCheckedProgram([probePath], new Map([[probePath, sourceText]]));
-	const source = program.getSourceFile(probePath);
-	if (!source) throw new Error("Runtime probe source was not loaded.");
-	return runtimeBoundaryCalls(program, source);
-}
-
-function promiseProbeSites(
-	sourceText: string,
-	supportingSources: Readonly<Record<string, string>> = {},
-): PromiseOrchestrationSite[] {
-	const probeDirectory = path.join(workspaceRoot, ".memory", "promise-probe");
-	const probePath = path.join(probeDirectory, "probe.ts");
-	const virtualSources = new Map<string, string>([
-		[probePath, sourceText],
-		...Object.entries(supportingSources).map(
-			([fileName, contents]) => [path.join(probeDirectory, fileName), contents] as const,
-		),
-	]);
-	const program = createTypeCheckedProgram([...virtualSources.keys()], virtualSources);
-	const sourceFile = program.getSourceFile(probePath);
-	if (!sourceFile) throw new Error("Promise probe source was not loaded.");
-	return promiseOrchestrationSites(program, sourceFile);
 }
 
 function invalidEffectDependencyPins(
@@ -722,81 +195,11 @@ function projectReferenceConfig(projectRoot: string): string | undefined {
 	return undefined;
 }
 
-interface OxlintOverride {
-	readonly files: readonly string[];
-	readonly rules?: Readonly<Record<string, unknown>>;
-}
-
-interface OxlintRestrictedImportOptions {
-	readonly paths?: ReadonlyArray<{ readonly name: string }>;
-	readonly patterns?: ReadonlyArray<{ readonly group: readonly string[] }>;
-}
-
-interface OxlintRestrictedImportTypeOptions {
-	readonly modules?: ReadonlyArray<{ readonly name: string }>;
-}
-
-interface OxlintConfig {
-	readonly overrides?: readonly OxlintOverride[];
-	readonly rules?: Readonly<Record<string, unknown>>;
-}
-
 interface OxlintReport {
 	readonly diagnostics: ReadonlyArray<{
 		readonly code?: string | null;
 		readonly filename: string;
 	}>;
-}
-
-function readOxlintConfig(): OxlintConfig {
-	const configPath = path.join(workspaceRoot, ".oxlintrc.json");
-	const parsed = ts.parseConfigFileTextToJson(configPath, readFileSync(configPath, "utf8"));
-	if (parsed.error) {
-		throw new Error(ts.flattenDiagnosticMessageText(parsed.error.messageText, "\n"));
-	}
-	const config: OxlintConfig = parsed.config;
-	return config;
-}
-
-function readOxlintOverrides(): readonly OxlintOverride[] {
-	return readOxlintConfig().overrides ?? [];
-}
-
-function ruleOptions<Options>(rule: unknown): Options | undefined {
-	if (!Array.isArray(rule)) return undefined;
-	const options: Options | undefined = rule[1];
-	return options;
-}
-
-/**
- * Modules a `no-restricted-imports` configuration blocks, as bare names:
- * `paths` entries plus `patterns` groups without their trailing `/**`.
- */
-function restrictedImportModules(rule: unknown): string[] {
-	const options = ruleOptions<OxlintRestrictedImportOptions>(rule);
-	return [
-		...new Set([
-			...(options?.paths ?? []).map(({ name }) => name),
-			...(options?.patterns ?? []).flatMap(({ group }) =>
-				group.map((pattern) => pattern.replace(/\/\*\*$/, "")),
-			),
-		]),
-	].sort();
-}
-
-/** Files of the overrides whose `no-restricted-imports` patterns match. */
-function restrictedImportOverrideFiles(
-	matches: (patterns: readonly string[]) => boolean,
-): string[] {
-	return readOxlintOverrides()
-		.filter((override) => {
-			const rule = override.rules?.["eslint/no-restricted-imports"];
-			if (!Array.isArray(rule)) return false;
-			const options: OxlintRestrictedImportOptions | undefined = rule[1];
-			return matches((options?.patterns ?? []).flatMap((pattern) => pattern.group));
-		})
-		.flatMap((override) => override.files)
-		.sort();
 }
 
 function firstMissingDirectory(directory: string): string | undefined {
@@ -827,8 +230,8 @@ function lintProbes(probes: Readonly<Record<string, string>>): Record<string, st
 			writeFileSync(absolutePath, `${source}\n`);
 		}
 		const result = spawnSync(
-			path.join(workspaceRoot, "node_modules", ".bin", "oxlint"),
-			["--format", "json", ...files.map(({ probePath }) => probePath)],
+			path.join(workspaceRoot, "node_modules", ".bin", "effect-tsgo"),
+			["oxlint", "--format", "json", ...files.map(({ probePath }) => probePath)],
 			{ cwd: workspaceRoot, encoding: "utf8" },
 		);
 		if (result.error) throw result.error;
@@ -886,65 +289,7 @@ describe("diagram generation project boundaries", () => {
 		expect(scenarioTargets).toContain("diagram-generation");
 	});
 
-	it("classifies every project and lints Effect out of pure and framework-native code", () => {
-		const classifiedRoots = [
-			...effectAuthoritativeProjectRoots,
-			...effectPureProjectRoots,
-			...effectMigrationReadyProjectRoots,
-			...frameworkNativeProjectRoots,
-		].sort();
-		expect(classifiedRoots).toEqual(intendedNxProjectRoots);
-		expect(new Set(classifiedRoots).size).toBe(classifiedRoots.length);
-
-		// Oxlint enforces the import restriction; these overrides must track the
-		// classification above exactly.
-		expect(restrictedImportOverrideFiles((patterns) => patterns.includes("@effect/**"))).toEqual(
-			[...effectPureProjectRoots, ...frameworkNativeProjectRoots]
-				.sort()
-				.map((projectRoot) => `${projectRoot}/**`),
-		);
-		expect(
-			restrictedImportOverrideFiles(
-				(patterns) => patterns.includes("effect/unstable/**") && !patterns.includes("@effect/**"),
-			),
-		).toEqual([...effectSchemaBoundaryFiles].sort());
-
-		// Patterns must cover deep subpaths such as @effect/platform-node/NodeRuntime.
-		const config = readOxlintConfig();
-		const scopes = [
-			{ name: "base rules", rules: config.rules },
-			...(config.overrides ?? []).map((override) => ({
-				name: override.files.join(", "),
-				rules: override.rules,
-			})),
-		].filter(({ rules }) => rules?.["eslint/no-restricted-imports"]);
-		expect(scopes.length).toBeGreaterThan(1);
-		for (const { name, rules } of scopes) {
-			const patterns = (
-				ruleOptions<OxlintRestrictedImportOptions>(rules?.["eslint/no-restricted-imports"])
-					?.patterns ?? []
-			).flatMap(({ group }) => group);
-			expect(
-				patterns.filter((pattern) => !pattern.endsWith("/**")),
-				`${name} has a single-segment pattern`,
-			).toEqual([]);
-
-			// `import("…")` types bypass no-restricted-imports, so the Sketchi rule
-			// must restrict exactly the same modules in the same scope.
-			expect(
-				(
-					ruleOptions<OxlintRestrictedImportTypeOptions>(
-						rules?.["sketchi/no-restricted-import-types"],
-					)?.modules ?? []
-				)
-					.map((module) => module.name)
-					.sort(),
-				`${name} import-type restrictions`,
-			).toEqual(restrictedImportModules(rules?.["eslint/no-restricted-imports"]));
-		}
-	});
-
-	it("pins one Effect v4 substrate and rejects unreviewed unstable imports", () => {
+	it("pins the runtime catalog and independently versioned Effect tooling", () => {
 		const packageJsonPaths = [
 			"package.json",
 			...globSync(
@@ -969,38 +314,12 @@ describe("diagram generation project boundaries", () => {
 			}
 		}
 
-		const actualEffectManifestPaths = packageJsonPaths
-			.filter((packageJsonPath) => {
-				const manifest = readJsonFile<PackageManifest>(path.join(workspaceRoot, packageJsonPath));
-				return [
-					manifest.dependencies,
-					manifest.devDependencies,
-					manifest.optionalDependencies,
-					manifest.peerDependencies,
-				].some((dependencies) =>
-					Object.keys(dependencies ?? {}).some(
-						(dependency) => dependency === "effect" || dependency.startsWith("@effect/"),
-					),
-				);
-			})
-			.sort();
-		expect(actualEffectManifestPaths).toEqual(effectDependencyManifestPaths);
-
 		const rootManifest = readJsonFile<PackageManifest>(path.join(workspaceRoot, "package.json"));
 		expect(rootManifest.dependencies?.["effect"]).toBe("catalog:");
 		expect(rootManifest.devDependencies?.["@effect/vitest"]).toBe("catalog:");
 		expect(readFileSync(path.join(workspaceRoot, "pnpm-lock.yaml"), "utf8")).not.toContain(
 			"effect@3.",
 		);
-
-		// Oxlint rejects unstable Effect imports everywhere except reviewed
-		// adapters; every adapter that exists must be on the reviewed list.
-		expect(
-			globSync(
-				["apps", "packages", "tools"].map((root) => `${root}/**/src/internal/effect-unstable-*.ts`),
-				{ cwd: workspaceRoot, exclude: ["**/node_modules/**"] },
-			).sort(),
-		).toEqual(reviewedEffectUnstableAdapterPaths);
 	});
 
 	it("keeps Zod out of every workspace manifest", () => {
@@ -1028,177 +347,9 @@ describe("diagram generation project boundaries", () => {
 			}
 		}
 	});
-
-	it("prevents unmanaged Promise and runtime regressions", () => {
-		const sourceFiles = globSync(
-			["apps", "packages", "tools"].map((root) => `${root}/**/*.{ts,tsx,mts,cts,js,mjs}`),
-			{
-				cwd: workspaceRoot,
-				exclude: [
-					"**/dist/**",
-					"**/.output/**",
-					"**/.wrangler/**",
-					"**/*.test.*",
-					"**/*.stories.*",
-					"**/__tests__/**",
-					"**/routeTree.gen.ts",
-				],
-			},
-		);
-
-		const promiseProgram = createTypeCheckedProgram(
-			sourceFiles.map((sourceFile) => path.join(workspaceRoot, sourceFile)),
-		);
-		const managedPromiseSites = Object.fromEntries(
-			sourceFiles
-				.map((sourceFile) => {
-					const absolutePath = path.join(workspaceRoot, sourceFile);
-					const parsedSource = promiseProgram.getSourceFile(absolutePath);
-					if (!parsedSource) {
-						throw new Error(`Type checker did not load ${sourceFile}.`);
-					}
-					return [sourceFile, promiseOrchestrationSites(promiseProgram, parsedSource)] as const;
-				})
-				.filter(([, sites]) => sites.length > 0),
-		);
-		const managedPromiseFiles = Object.keys(managedPromiseSites).sort();
-		const managedPromiseSiteCounts = Object.fromEntries(
-			managedPromiseFiles.map((sourceFile) => [
-				sourceFile,
-				managedPromiseSites[sourceFile]?.length ?? 0,
-			]),
-		);
-		expect(managedPromiseFiles).toEqual(approvedManagedPromiseFiles);
-		expect(managedPromiseSiteCounts).toEqual(approvedManagedPromiseSiteCounts);
-
-		const runtimeBoundaryFiles = sourceFiles
-			.filter((sourceFile) => {
-				const parsedSource = promiseProgram.getSourceFile(path.join(workspaceRoot, sourceFile));
-				if (!parsedSource) throw new Error(`Type checker did not load ${sourceFile}.`);
-				return runtimeBoundaryCalls(promiseProgram, parsedSource).length > 0;
-			})
-			.sort();
-		expect(runtimeBoundaryFiles).toEqual(approvedRuntimeBoundaryFiles);
-	}, 60_000);
 });
 
-describe("Effect structural guards", () => {
-	it.each([
-		["aliased runSync", 'import { Effect as E } from "effect"; E.runSync(E.succeed(1));'],
-		["aliased runPromise", 'import { Effect as E } from "effect"; E.runPromise(E.succeed(1));'],
-		[
-			"destructured runSync",
-			'import { Effect } from "effect"; const { runSync: execute } = Effect; execute(Effect.succeed(1));',
-		],
-		["computed runFork", 'import { Effect as E } from "effect"; E["runFork"](E.succeed(1));'],
-		[
-			"detached runCallback",
-			'import { Effect as E } from "effect"; const execute = E.runCallback; execute(E.succeed(1));',
-		],
-		[
-			"aliased ManagedRuntime.make",
-			'import { ManagedRuntime as M, Layer } from "effect"; M.make(Layer.empty);',
-		],
-		[
-			"destructured ManagedRuntime.make",
-			'import { ManagedRuntime as M, Layer } from "effect"; const { make: create } = M; create(Layer.empty);',
-		],
-		[
-			"computed ManagedRuntime.make",
-			'import { ManagedRuntime as M, Layer } from "effect"; M["make"](Layer.empty);',
-		],
-		[
-			"aliased NodeRuntime.runMain",
-			'import { NodeRuntime as N } from "@effect/platform-node"; import { Effect as E } from "effect"; N.runMain(E.void);',
-		],
-	])("detects %s runtime boundary by resolved signature", (_name, sourceText) => {
-		expect(runtimeProbeCalls(sourceText)).toHaveLength(1);
-	});
-
-	it("does not confuse unrelated same-named functions with Effect runtimes", () => {
-		expect(
-			runtimeProbeCalls(
-				"const Effect = { runSync: (value: number) => value }; const ManagedRuntime = { make: () => 1 }; Effect.runSync(1); ManagedRuntime.make();",
-			),
-		).toEqual([]);
-	});
-
-	it.each([
-		["top-level await fetch", "await fetch('https://example.test')"],
-		[
-			"exported arrow returning fetch",
-			"export const request = () => fetch('https://example.test')",
-		],
-		[
-			"computed then consumer",
-			'declare function foreign(): PromiseLike<number>; foreign()["then"]((value) => value)',
-		],
-		["async function", "export async function request() {}"],
-		["Promise construction", "new Promise(() => {})"],
-		["qualified Promise construction", "new globalThis.Promise(() => {})"],
-		["Promise resolve", "Promise.resolve(1)"],
-		["aliased Promise resolve", "const NativePromise = Promise; NativePromise.resolve(1)"],
-		["Promise withResolvers", "Promise.withResolvers()"],
-		[
-			"direct then consumer",
-			"declare const pending: Promise<number>; pending.then((value) => value)",
-		],
-		[
-			"computed catch consumer",
-			'declare const pending: Promise<number>; pending["catch"](() => 0)',
-		],
-		[
-			"direct finally consumer",
-			"declare const pending: Promise<number>; pending.finally(() => {})",
-		],
-		[
-			"indirect thenable",
-			'declare function foreign(): PromiseLike<number>; const indirect = foreign; indirect()["then"]((value) => value)',
-		],
-		[
-			"detached thenable member access",
-			"declare const pending: PromiseLike<number>; const detachedThen = pending.then",
-		],
-		[
-			"Promise-containing call union",
-			"declare function maybe(): number | Promise<number>; maybe()",
-		],
-		[
-			"optional-chained Promise union consumer",
-			"declare const pending: Promise<number> | undefined; pending?.then((value) => value)",
-		],
-		[
-			"MaybePromise alias",
-			"type MaybePromise<T> = T | Promise<T>; declare function maybe(): MaybePromise<number>; maybe()",
-		],
-		[
-			"generic instantiated to a Promise union",
-			"declare function instantiate<T>(): T; instantiate<string | Promise<number>>()",
-		],
-		["dynamic import", "import('./foreign.js')"],
-	])("detects %s orchestration", (_name, sourceText) => {
-		expect(promiseProbeSites(sourceText)).not.toEqual([]);
-	});
-
-	it("detects an import-renamed Promise constructor by type identity", () => {
-		expect(
-			promiseProbeSites(
-				'import { ReexportedPromise as ImportedPromise } from "./promise-reexport.js"; ImportedPromise.resolve(1)',
-				{
-					"promise-source.ts": "export const NativePromise = globalThis.Promise;",
-					"promise-reexport.ts":
-						'export { NativePromise as ReexportedPromise } from "./promise-source.js";',
-				},
-			),
-		).not.toEqual([]);
-	});
-
-	it("does not confuse Effect error operators with Promise consumers", () => {
-		expect(
-			promiseProbeSites("Effect.catch(program, recover); Effect['finally'](program, cleanup)"),
-		).toEqual([]);
-	});
-
+describe("Effect dependency pins", () => {
 	it("rejects a ranged pin for any @effect package", () => {
 		expect(
 			invalidEffectDependencyPins({
@@ -1313,34 +464,17 @@ describe("workspace project membership", () => {
 		expect(results["apps/web/vite.boundary-allowed-probe.ts"]).toEqual([]);
 	});
 
-	it("enforces Effect, Zod, and React effect policy through Oxlint", () => {
+	it("permits Effect across projects while enforcing schema and React boundaries", () => {
 		const results = lintProbes({
 			"packages/diagram/core/src/effect-probe.ts": 'import { Effect } from "effect";\nvoid Effect;',
-			"packages/svg-excalidraw/src/effect-probe.ts":
-				'import * as Node from "@effect/platform-node";\nvoid Node;',
-			"packages/diagram/agent/src/stable-effect-probe.ts":
-				'import { Effect } from "effect";\nvoid Effect;',
-			"packages/diagram/agent/src/unstable-effect-probe.ts":
-				'import * as Http from "effect/unstable/http";\nvoid Http;',
-			"packages/diagram/agent/src/internal/effect-unstable-probe.ts":
-				'import * as Http from "effect/unstable/http";\nvoid Http;',
-			"packages/diagram/renderer/src/deep-effect-probe.ts": [
-				'import * as NodeRuntime from "@effect/platform-node/NodeRuntime";',
-				'import * as HttpClient from "effect/http/HttpClient";',
-				"void NodeRuntime;",
-				"void HttpClient;",
-			].join("\n"),
-			"packages/diagram/renderer/src/effect-type-probe.ts": [
-				'export type EffectModule = typeof import("effect");',
-				'export type Runtime = typeof import("@effect/platform-node/NodeRuntime");',
-			].join("\n"),
-			"packages/diagram/agent/src/deep-unstable-effect-probe.ts": [
-				'import * as Client from "effect/unstable/http/HttpClient";',
-				'export type Unstable = typeof import("effect/unstable/http");',
-				"void Client;",
-			].join("\n"),
+			"packages/diagram/renderer/src/effect-probe.ts":
+				'import * as Schema from "effect/Schema";\nvoid Schema;',
+			"apps/icons/src/effect-probe.ts":
+				'import * as Atom from "effect/reactivity/Atom";\nvoid Atom;',
+			"tools/sketchi-generators/src/effect-probe.ts": 'export type E = typeof import("effect");',
 			"scripts/zod-probe.ts": 'import { z } from "zod";\nvoid z;',
 			"scripts/deep-zod-probe.ts": 'import * as Core from "zod/v4/core";\nvoid Core;',
+			"scripts/zod-type-probe.ts": 'export type Zod = typeof import("zod");',
 			"apps/web/src/react-effect-probe.tsx": [
 				'import { useEffect as useMountEffect } from "react";',
 				"export function Probe() {",
@@ -1349,37 +483,21 @@ describe("workspace project membership", () => {
 				"}",
 			].join("\n"),
 		});
-
-		expect(results["packages/diagram/core/src/effect-probe.ts"]).toEqual([
-			"eslint(no-restricted-imports)",
-		]);
-		expect(results["packages/svg-excalidraw/src/effect-probe.ts"]).toEqual([
-			"eslint(no-restricted-imports)",
-		]);
-		expect(results["packages/diagram/agent/src/stable-effect-probe.ts"]).toEqual([]);
-		expect(results["packages/diagram/agent/src/unstable-effect-probe.ts"]).toEqual([
-			"eslint(no-restricted-imports)",
-		]);
-		expect(results["packages/diagram/agent/src/internal/effect-unstable-probe.ts"]).toEqual([]);
-		expect(results["packages/diagram/renderer/src/deep-effect-probe.ts"]).toEqual([
-			"eslint(no-restricted-imports)",
-			"eslint(no-restricted-imports)",
-		]);
-		expect(results["packages/diagram/renderer/src/effect-type-probe.ts"]).toEqual([
-			"sketchi(no-restricted-import-types)",
-			"sketchi(no-restricted-import-types)",
-		]);
-		expect(results["packages/diagram/agent/src/deep-unstable-effect-probe.ts"]).toEqual([
-			"eslint(no-restricted-imports)",
-			"sketchi(no-restricted-import-types)",
-		]);
+		expect(results["packages/diagram/core/src/effect-probe.ts"]).toEqual([]);
+		expect(results["packages/diagram/renderer/src/effect-probe.ts"]).toEqual([]);
+		expect(results["apps/icons/src/effect-probe.ts"]).toEqual([]);
+		expect(results["tools/sketchi-generators/src/effect-probe.ts"]).toEqual([]);
 		expect(results["scripts/zod-probe.ts"]).toEqual(["eslint(no-restricted-imports)"]);
 		expect(results["scripts/deep-zod-probe.ts"]).toEqual(["eslint(no-restricted-imports)"]);
+		expect(results["scripts/zod-type-probe.ts"]).toEqual(["sketchi(no-restricted-import-types)"]);
 		expect(results["apps/web/src/react-effect-probe.tsx"]).toEqual(["sketchi(no-react-effects)"]);
 	});
 
-	it("requires a reason on every lint suppression", () => {
-		const directive = /(?:oxlint|eslint)-disable(?:-next-line|-line)?\b(.*)/g;
+	it("requires a reason on lint and Effect diagnostic directives", () => {
+		const directives = [
+			/(?:oxlint|eslint)-disable(?:-next-line|-line)?\b(.*)/g,
+			/^\s*(?:\/\/|\/\*|\*)\s*@effect-diagnostics(?:-next-line)?\b(.*)/gm,
+		];
 		const unreasoned: string[] = [];
 		for (const sourceFile of globSync(
 			["apps", "packages", "scripts", "tools"].map(
@@ -1397,9 +515,11 @@ describe("workspace project membership", () => {
 			},
 		)) {
 			const source = readFileSync(path.join(workspaceRoot, sourceFile), "utf8");
-			for (const match of source.matchAll(directive)) {
-				if (!/\s--\s+\S/.test(match[1] ?? "")) {
-					unreasoned.push(`${sourceFile}: ${match[0].trim()}`);
+			for (const directive of directives) {
+				for (const match of source.matchAll(directive)) {
+					if (!/\s--\s+\S/.test(match[1] ?? "")) {
+						unreasoned.push(`${sourceFile}: ${match[0].trim()}`);
+					}
 				}
 			}
 		}

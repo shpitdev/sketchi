@@ -95,8 +95,8 @@ anchors the byte-identical Node/Chromium decomposition assertion.
 Apps consume one fail-closed API and never infer support from partial elements.
 Native output contains no image elements and remains grouped per icon,
 selectable, recolorable, scalable, and serializable. The core conversion and
-serializer stay synchronous, pure, and DOM-free; Effect and hosted rendering
-infrastructure are unnecessary.
+serializer stay synchronous and DOM-free; ADR 0004 permits Effect data APIs here.
+In-memory conversion does not require a hosted renderer or an Effect runtime.
 
 Real clips, masks, filters, patterns, embedded raster, integer-unsafe nonzero
 decomposition, and unsafe keyhole bridges remain blocked. Sketch-SVG remains

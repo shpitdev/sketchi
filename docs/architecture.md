@@ -56,16 +56,17 @@ internal tool, or test boundary. Expected failures use schema-backed tagged
 errors; interruption and defects remain distinct. Foreign Promise APIs are
 wrapped once and receive an `AbortSignal` when supported.
 
-The approved runtime edges are mechanically checked:
+Effect is permitted throughout domain, renderer, React and tooling packages.
+Application state and workflows adopt Effect atoms and services; React renders and
+TanStack provides the navigation/SSR/build shell. The accepted migration plan assigns
+existing implementations to focused proof units; this policy does not claim those
+conversions have already shipped.
 
-- the Node CLI entrypoint;
-- the Playground Worker runtime composition root;
-- the internal scenario CLI entrypoint.
-
-The CLI imports the stable `effect/cli` surface through the package-internal
-`apps/cli/src/internal/effect-cli.ts` adapter. The repository has no unstable
-Effect imports. Process management uses stable core Effect APIs plus a scoped
-Node adapter.
+Runtime entry belongs at Worker, Node, browser or test lifecycle boundaries. Node
+entrypoints use `NodeRuntime.runMain`. Foreign callbacks stay in a narrow adapter with
+a demonstrated capability gap. Upstream diagnostics catch nested runtime misuse but
+do not prove ownership of every outer runtime invocation; review and behavioral
+resource/cancellation tests establish that boundary. API maturity is not a ban.
 
 See [Effect conventions](effect-conventions.md) and
 [ADR 0004](adr/0004-effect-v4-cloudflare-architecture.md).
@@ -202,15 +203,14 @@ to the Cloudflare execution context where required.
 
 ## Workspace enforcement and proof
 
-pnpm, Nx, TypeScript project references, and the Oxlint Nx boundary rule agree
-on one explicit project inventory. Type-aware Oxlint enforces package rings,
-Effect-free pure and framework-native projects, reviewed unstable Effect
-adapters, no Zod, and no direct React effects outside reasoned synchronization
-adapters. Structural tests keep that lint configuration in sync with the project
-classification, prove each rule rejects a real violation, and enforce exact
-Effect pins, runtime-boundary ownership, and no unmanaged Promise orchestration
-outside reviewed framework/foreign edges. Wrangler dry-runs cover every mapped
-Worker.
+Nx and type-aware Oxlint enforce dependency direction, including imports from
+configuration and Storybook files. Existing schema, Promise misuse and React
+synchronization restrictions remain. Upstream native Effect diagnostics enforce the
+fixed correctness policy and report native-operation migration warnings across all
+project purposes. Converted scopes promote the native group to error. Reasoned local
+exceptions describe a real host requirement; exact Promise-site counts and Effect-free
+project inventories are not gates. Project/reference inventory normalization remains
+slice 2 work. Wrangler dry-runs cover every mapped Worker.
 
 Meaningful changes run the full Nx typecheck/test/build graph, repository-wide
 type-aware Oxlint, the composite TypeScript build, Storybook,
