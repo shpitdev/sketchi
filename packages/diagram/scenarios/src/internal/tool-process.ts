@@ -292,11 +292,11 @@ function makeRunningToolProcess(state: NodeProcessState): RunningToolProcess {
 	const awaitInput = waitForEvent(() => state.inputEvent, state.inputSubscribers);
 	return {
 		awaitTreeExit: Effect.gen(function* () {
+			// Reap the leader before probing its group: macOS reports EPERM while
+			// the signalled leader is a zombie and Node has not emitted exit yet.
+			yield* waitForEvent(() => state.exitEvent, state.exitSubscribers).pipe(Effect.ignore);
 			const processGroupId = state.processGroupId;
-			if (processGroupId === undefined) {
-				yield* waitForEvent(() => state.exitEvent, state.exitSubscribers).pipe(Effect.ignore);
-				return;
-			}
+			if (processGroupId === undefined) return;
 			while (
 				yield* Effect.try({
 					try: () => {
