@@ -83,10 +83,10 @@ const largeData: IconManifest = (() => {
 })();
 
 const search = () =>
-	screen.getByRole("searchbox", { hidden: true, name: "Search icons" }) as HTMLInputElement;
+	screen.getByRole<HTMLInputElement>("searchbox", { hidden: true, name: "Search icons" });
 const selectionBar = () => screen.queryByRole("region", { name: "Selected icons" });
 const cardCheckbox = (name: string) =>
-	screen.getByRole("checkbox", { name: `Select ${name}` }) as HTMLInputElement;
+	screen.getByRole<HTMLInputElement>("checkbox", { name: `Select ${name}` });
 const resultNames = () =>
 	within(screen.getByRole("region", { name: "Icon results" }))
 		.getAllByRole("button", { name: /^Copy .* SVG$/ })
@@ -262,9 +262,9 @@ describe("IconLibrary", () => {
 			render(<IconLibrary data={fixtureData} />);
 			fireEvent.click(cardCheckbox("Codex"));
 			fireEvent.change(search(), { target: { value: "psql" } });
-			const selectAll = screen.getByRole("checkbox", {
+			const selectAll = screen.getByRole<HTMLInputElement>("checkbox", {
 				name: "Select all results",
-			}) as HTMLInputElement;
+			});
 			expect(resultNames()).not.toContain("Codex");
 			fireEvent.click(selectAll);
 			expect(selectAll.checked).toBe(true);

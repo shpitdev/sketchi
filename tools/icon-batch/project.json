@@ -31,7 +31,7 @@
 			"executor": "nx:run-commands",
 			"dependsOn": ["^build"],
 			"options": {
-				"command": "tsc -p tools/icon-batch/tsconfig.json --noEmit"
+				"command": "effect-tsgo tsc@7.0.2 -p tools/icon-batch/tsconfig.json --noEmit"
 			}
 		}
 	}

@@ -38,14 +38,14 @@ describe("PackPublishDialog", () => {
 				.getByRole("img", { name: "Data and Backend Logos preview" })
 				.getAttribute("src"),
 		).toBe("/packs/data.preview.jpg");
-		const website = within(dialog).getByLabelText("Website (optional)") as HTMLInputElement;
+		const website = within(dialog).getByLabelText<HTMLInputElement>("Website (optional)");
 		expect(website.value).toBe("https://icons.sketchi.app/packs/data");
 		expect(within(dialog).queryByLabelText(/GitHub/u)).toBeNull();
-		const name = within(dialog).getByLabelText("Your name") as HTMLInputElement;
+		const name = within(dialog).getByLabelText<HTMLInputElement>("Your name");
 		expect([name.required, name.maxLength]).toEqual([true, 60]);
 
 		fireEvent.change(name, { target: { value: "Jane" } });
-		const handle = within(dialog).getByLabelText("X handle (optional)") as HTMLInputElement;
+		const handle = within(dialog).getByLabelText<HTMLInputElement>("X handle (optional)");
 		// A pasted profile link shows as its handle, unclipped.
 		fireEvent.paste(handle, {
 			clipboardData: { getData: () => "https://x.com/dimethylpant" },
@@ -81,7 +81,7 @@ describe("PackPublishDialog", () => {
 		const fetchMock = vi.fn();
 		vi.stubGlobal("fetch", fetchMock);
 		const dialog = openDialog();
-		const handle = within(dialog).getByLabelText("X handle (optional)") as HTMLInputElement;
+		const handle = within(dialog).getByLabelText<HTMLInputElement>("X handle (optional)");
 		fireEvent.change(handle, { target: { value: "twitter.com/dimethylpant/" } });
 		fireEvent.blur(handle);
 		expect(handle.value).toBe("dimethylpant");

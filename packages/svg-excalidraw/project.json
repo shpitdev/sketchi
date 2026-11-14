@@ -38,7 +38,7 @@
 		"typecheck-native": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "tsc -p packages/svg-excalidraw/tsconfig.json --noEmit"
+				"command": "effect-tsgo tsc@7.0.2 -p packages/svg-excalidraw/tsconfig.json --noEmit"
 			}
 		}
 	}

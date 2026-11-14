@@ -34,7 +34,7 @@
 		"typecheck-native": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "tsc -p packages/diagram/renderer/tsconfig.json --noEmit"
+				"command": "effect-tsgo tsc@7.0.2 -p packages/diagram/renderer/tsconfig.json --noEmit"
 			}
 		},
 		"chart-fuzz": {

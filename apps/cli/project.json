@@ -32,7 +32,7 @@
 			"executor": "nx:run-commands",
 			"dependsOn": ["^build"],
 			"options": {
-				"command": "tsc -p apps/cli/tsconfig.json --noEmit"
+				"command": "effect-tsgo tsc@7.0.2 -p apps/cli/tsconfig.json --noEmit"
 			}
 		},
 		"package": {

@@ -53,8 +53,8 @@
 			"executor": "nx:run-commands",
 			"options": {
 				"commands": [
-					"tsc -p tools/sketchi-generators/tsconfig.lib.json --noEmit",
-					"tsc -p tools/sketchi-generators/tsconfig.spec.json --noEmit"
+					"effect-tsgo tsc@7.0.2 -p tools/sketchi-generators/tsconfig.lib.json --noEmit",
+					"effect-tsgo tsc@7.0.2 -p tools/sketchi-generators/tsconfig.spec.json --noEmit"
 				],
 				"parallel": false
 			}
