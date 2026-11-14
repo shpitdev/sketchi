@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 const workspaceRoot = fileURLToPath(new URL("../", import.meta.url));
 // Gitignored, so no tracked file can match it.
-const untrackedExclusions = new Set([".memory/**"]);
+const untrackedExclusions = new Set([".memory/**", ".claude/**"]);
 // One representative per exclusion class that must never be reformatted.
 const requiredExclusions = [
 	"apps/web/src/routeTree.gen.ts",
