@@ -21,16 +21,14 @@ export const GeneratedMindmapTopicSchema: Schema.Codec<GeneratedMindmapTopic> = 
 	label: Schema.NonEmptyString,
 });
 
-export class GeneratedMindmapLayout extends Schema.Class<GeneratedMindmapLayout>(
-	"GeneratedMindmapLayout",
-)({
+export const GeneratedMindmapLayout = Schema.Struct({
 	direction: Schema.Literals(["LR", "RL"]),
 	edgeRouting: Schema.Literal("curved"),
-}) {}
+}).annotate({ identifier: "GeneratedMindmapLayout" });
 
-export class GeneratedMindmapTree extends Schema.Class<GeneratedMindmapTree>(
-	"GeneratedMindmapTree",
-)({
+export interface GeneratedMindmapLayout extends Schema.Schema.Type<typeof GeneratedMindmapLayout> {}
+
+export const GeneratedMindmapTree = Schema.Struct({
 	id: Schema.NonEmptyString,
 	layout: GeneratedMindmapLayout,
 	root: Schema.Struct({
@@ -39,7 +37,9 @@ export class GeneratedMindmapTree extends Schema.Class<GeneratedMindmapTree>(
 	}),
 	title: Schema.NonEmptyString,
 	type: Schema.Literal("mindmap"),
-}) {}
+}).annotate({ identifier: "GeneratedMindmapTree" });
+
+export interface GeneratedMindmapTree extends Schema.Schema.Type<typeof GeneratedMindmapTree> {}
 
 /** Derive graph identity and parentage from the model's nested hierarchy. */
 export function generatedMindmapTreeToDiagram(tree: GeneratedMindmapTree): MindmapDiagram {

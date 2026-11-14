@@ -222,10 +222,10 @@ export const makeDiagramFamilyNarrowing = (options: { readonly timeoutMs: number
 		return DiagramFamilyNarrowing.of({ narrow });
 	});
 
-export class FamilyNarrowingTimeoutError extends Schema.TaggedError<FamilyNarrowingTimeoutError>()(
-	"FamilyNarrowingTimeoutError",
-	{ message: Schema.String, timeoutMs: Schema.Number },
-) {}
+export class FamilyNarrowingTimeoutError extends Schema.TaggedError<
+	FamilyNarrowingTimeoutError,
+	{ readonly brand: unique symbol }
+>()("FamilyNarrowingTimeoutError", { message: Schema.String, timeoutMs: Schema.Number }) {}
 
 function withTimeout<A>(
 	effect: Effect.Effect<A, AiError.AiError, DecisionModel.DecisionModel>,

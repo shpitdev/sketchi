@@ -18,13 +18,15 @@ const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/u));
  * One styling request the model returns beside its diagram: the elements it targets, by id or
  * label, and what to change on them. The host applies it as a patch after the build.
  */
-export class DiagramStyle extends Schema.Class<DiagramStyle>("DiagramStyle")({
+export const DiagramStyle = Schema.Struct({
 	targets: Schema.Array(Schema.String).check(Schema.isMinLength(1)),
 	fillColor: Schema.optionalKey(HexColor),
 	strokeColor: Schema.optionalKey(HexColor),
 	textColor: Schema.optionalKey(HexColor),
 	shape: Schema.optionalKey(Schema.Literals(DIAGRAM_STYLE_SHAPES)),
-}) {}
+}).annotate({ identifier: "DiagramStyle" });
+
+export interface DiagramStyle extends Schema.Schema.Type<typeof DiagramStyle> {}
 
 /** Words that ask for a color or a shape; only a request that uses one gets the styling rules. */
 const STYLE_WORDS =
@@ -122,9 +124,9 @@ export function flowchartStylesAsNodeColors(
 			...(style.textColor ? { textColor: style.textColor } : {}),
 			...(style.shape && !diamond ? { shape: style.shape } : {}),
 		};
-		if (kept.length > 0) rest.push(new DiagramStyle({ ...style, targets: kept }));
+		if (kept.length > 0) rest.push(DiagramStyle.make({ ...style, targets: kept }));
 		if (moved.length > 0 && Object.keys(leftover).length > 0)
-			rest.push(new DiagramStyle({ targets: moved, ...leftover }));
+			rest.push(DiagramStyle.make({ targets: moved, ...leftover }));
 	}
 	return { document: { ...document, nodes }, styles: rest };
 }

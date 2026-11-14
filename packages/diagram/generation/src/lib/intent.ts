@@ -6,16 +6,18 @@ export const DiagramGenerationTypeSchema = Schema.Literals(DIAGRAM_TYPES);
 export type DiagramGenerationType = DiagramTypeValue;
 
 /** The sole provider response shape. Diagram parsing happens after this envelope decodes. */
-export class GeneratedDiagramResponse extends Schema.Class<GeneratedDiagramResponse>(
-	"GeneratedDiagramResponse",
-)({
+export const GeneratedDiagramResponse = Schema.Struct({
 	diagram: Schema.optionalKey(Schema.Unknown),
 	/** Colors and shapes the request asks for, applied after the build; read by generatedStyles. */
 	styles: Schema.optionalKey(Schema.Unknown),
 	/** A flowchart revision's edits to the current document, in place of a whole diagram. */
 	edits: Schema.optionalKey(Schema.Unknown),
 	title: Schema.optionalKey(Schema.String),
-}) {}
+}).annotate({ identifier: "GeneratedDiagramResponse" });
+
+export interface GeneratedDiagramResponse extends Schema.Schema.Type<
+	typeof GeneratedDiagramResponse
+> {}
 
 export const GeneratedDiagramTitleSchema = Schema.String.pipe(
 	Schema.check(Schema.isMinLength(1)),

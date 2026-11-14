@@ -24,30 +24,34 @@ export function makeIsoDateString(input: string): IsoDateString {
 	return Schema.decodeUnknownSync(IsoDateStringSchema)(input);
 }
 
-export class AnonymousStudioOwner extends Schema.Class<AnonymousStudioOwner>(
-	"AnonymousStudioOwner",
-)({
+export const AnonymousStudioOwner = Schema.Struct({
 	kind: Schema.Literal("anonymous"),
 	sessionId: AnonymousStudioSessionIdSchema,
-}) {}
+}).annotate({ identifier: "AnonymousStudioOwner" });
 
-export class AuthenticatedStudioOwner extends Schema.Class<AuthenticatedStudioOwner>(
-	"AuthenticatedStudioOwner",
-)({
+export interface AnonymousStudioOwner extends Schema.Schema.Type<typeof AnonymousStudioOwner> {}
+
+export const AuthenticatedStudioOwner = Schema.Struct({
 	displayName: Schema.optional(NonEmptyString),
 	kind: Schema.Literal("authenticated"),
 	subjectId: NonEmptyString,
-}) {}
+}).annotate({ identifier: "AuthenticatedStudioOwner" });
+
+export interface AuthenticatedStudioOwner extends Schema.Schema.Type<
+	typeof AuthenticatedStudioOwner
+> {}
 
 export const StudioOwnerSchema = Schema.Union([AnonymousStudioOwner, AuthenticatedStudioOwner]);
 export type StudioOwner = typeof StudioOwnerSchema.Type;
 
-export class StudioProjectSource extends Schema.Class<StudioProjectSource>("StudioProjectSource")({
+export const StudioProjectSource = Schema.Struct({
 	artifactId: NonEmptyString,
 	kind: Schema.Literal("playground-artifact"),
-}) {}
+}).annotate({ identifier: "StudioProjectSource" });
 
-export class StudioProjectRecord extends Schema.Class<StudioProjectRecord>("StudioProjectRecord")({
+export interface StudioProjectSource extends Schema.Schema.Type<typeof StudioProjectSource> {}
+
+export const StudioProjectRecord = Schema.Struct({
 	createdAt: IsoDateStringSchema,
 	diagramIds: Schema.Array(StudioRecordIdSchema).pipe(Schema.mutable),
 	id: StudioRecordIdSchema,
@@ -55,9 +59,11 @@ export class StudioProjectRecord extends Schema.Class<StudioProjectRecord>("Stud
 	source: StudioProjectSource,
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
-}) {}
+}).annotate({ identifier: "StudioProjectRecord" });
 
-export class StudioDiagramRecord extends Schema.Class<StudioDiagramRecord>("StudioDiagramRecord")({
+export interface StudioProjectRecord extends Schema.Schema.Type<typeof StudioProjectRecord> {}
+
+export const StudioDiagramRecord = Schema.Struct({
 	artifactDiagramId: Schema.optional(NonEmptyString),
 	artifactId: NonEmptyString,
 	createdAt: IsoDateStringSchema,
@@ -68,7 +74,9 @@ export class StudioDiagramRecord extends Schema.Class<StudioDiagramRecord>("Stud
 	source: StudioProjectSource,
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
-}) {}
+}).annotate({ identifier: "StudioDiagramRecord" });
+
+export interface StudioDiagramRecord extends Schema.Schema.Type<typeof StudioDiagramRecord> {}
 
 const StudioDrawingElement = Schema.Record(Schema.String, Schema.Unknown).check(
 	Schema.makeFilter(
@@ -82,25 +90,31 @@ const StudioDrawingElement = Schema.Record(Schema.String, Schema.Unknown).check(
 );
 
 /** A diagram's saved Excalidraw drawing: its live elements, app state and image files. */
-export class StudioDrawing extends Schema.Class<StudioDrawing>("StudioDrawing")({
+export const StudioDrawing = Schema.Struct({
 	appState: Schema.Record(Schema.String, Schema.Unknown),
 	elements: Schema.Array(StudioDrawingElement),
 	files: Schema.Record(Schema.String, Schema.Unknown),
-}) {}
+}).annotate({ identifier: "StudioDrawing" });
 
-export class AnonymousStudioAuthStatus extends Schema.Class<AnonymousStudioAuthStatus>(
-	"AnonymousStudioAuthStatus",
-)({
+export interface StudioDrawing extends Schema.Schema.Type<typeof StudioDrawing> {}
+
+export const AnonymousStudioAuthStatus = Schema.Struct({
 	message: NonEmptyString,
 	status: Schema.Literal("anonymous"),
-}) {}
+}).annotate({ identifier: "AnonymousStudioAuthStatus" });
 
-export class AuthenticatedStudioAuthStatus extends Schema.Class<AuthenticatedStudioAuthStatus>(
-	"AuthenticatedStudioAuthStatus",
-)({
+export interface AnonymousStudioAuthStatus extends Schema.Schema.Type<
+	typeof AnonymousStudioAuthStatus
+> {}
+
+export const AuthenticatedStudioAuthStatus = Schema.Struct({
 	displayName: Schema.optional(NonEmptyString),
 	status: Schema.Literal("authenticated"),
-}) {}
+}).annotate({ identifier: "AuthenticatedStudioAuthStatus" });
+
+export interface AuthenticatedStudioAuthStatus extends Schema.Schema.Type<
+	typeof AuthenticatedStudioAuthStatus
+> {}
 
 export const StudioAuthStatusSchema = Schema.Union([
 	AnonymousStudioAuthStatus,
@@ -108,16 +122,22 @@ export const StudioAuthStatusSchema = Schema.Union([
 ]);
 export type StudioAuthStatus = typeof StudioAuthStatusSchema.Type;
 
-export class AnonymousStudioPublicSession extends Schema.Class<AnonymousStudioPublicSession>(
-	"AnonymousStudioPublicSession",
-)({ kind: Schema.Literal("anonymous") }) {}
+export const AnonymousStudioPublicSession = Schema.Struct({
+	kind: Schema.Literal("anonymous"),
+}).annotate({ identifier: "AnonymousStudioPublicSession" });
 
-export class AuthenticatedStudioPublicSession extends Schema.Class<AuthenticatedStudioPublicSession>(
-	"AuthenticatedStudioPublicSession",
-)({
+export interface AnonymousStudioPublicSession extends Schema.Schema.Type<
+	typeof AnonymousStudioPublicSession
+> {}
+
+export const AuthenticatedStudioPublicSession = Schema.Struct({
 	displayName: Schema.optional(NonEmptyString),
 	kind: Schema.Literal("authenticated"),
-}) {}
+}).annotate({ identifier: "AuthenticatedStudioPublicSession" });
+
+export interface AuthenticatedStudioPublicSession extends Schema.Schema.Type<
+	typeof AuthenticatedStudioPublicSession
+> {}
 
 export const StudioPublicSessionSchema = Schema.Union([
 	AnonymousStudioPublicSession,
@@ -125,9 +145,7 @@ export const StudioPublicSessionSchema = Schema.Union([
 ]);
 export type StudioPublicSession = typeof StudioPublicSessionSchema.Type;
 
-export class StudioProjectSummary extends Schema.Class<StudioProjectSummary>(
-	"StudioProjectSummary",
-)({
+export const StudioProjectSummary = Schema.Struct({
 	createdAt: IsoDateStringSchema,
 	diagramCount: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 	id: StudioRecordIdSchema,
@@ -135,11 +153,11 @@ export class StudioProjectSummary extends Schema.Class<StudioProjectSummary>(
 	source: StudioProjectSource,
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
-}) {}
+}).annotate({ identifier: "StudioProjectSummary" });
 
-export class StudioDiagramSummary extends Schema.Class<StudioDiagramSummary>(
-	"StudioDiagramSummary",
-)({
+export interface StudioProjectSummary extends Schema.Schema.Type<typeof StudioProjectSummary> {}
+
+export const StudioDiagramSummary = Schema.Struct({
 	artifactDiagramId: Schema.optional(NonEmptyString),
 	artifactId: NonEmptyString,
 	createdAt: IsoDateStringSchema,
@@ -152,81 +170,99 @@ export class StudioDiagramSummary extends Schema.Class<StudioDiagramSummary>(
 	source: StudioProjectSource,
 	title: NonEmptyString,
 	updatedAt: IsoDateStringSchema,
-}) {}
+}).annotate({ identifier: "StudioDiagramSummary" });
 
-export class StudioProjectDetails extends Schema.Class<StudioProjectDetails>(
-	"StudioProjectDetails",
-)({
+export interface StudioDiagramSummary extends Schema.Schema.Type<typeof StudioDiagramSummary> {}
+
+export const StudioProjectDetails = Schema.Struct({
 	diagrams: Schema.Array(StudioDiagramSummary).pipe(Schema.mutable),
 	project: StudioProjectSummary,
-}) {}
+}).annotate({ identifier: "StudioProjectDetails" });
 
-export class CreateStudioProjectFromArtifactRequest extends Schema.Class<CreateStudioProjectFromArtifactRequest>(
-	"CreateStudioProjectFromArtifactRequest",
-)({ artifactId: NonEmptyString }) {}
+export interface StudioProjectDetails extends Schema.Schema.Type<typeof StudioProjectDetails> {}
 
-export class StudioProjectsListResponse extends Schema.Class<StudioProjectsListResponse>(
-	"StudioProjectsListResponse",
-)({
+export const CreateStudioProjectFromArtifactRequest = Schema.Struct({
+	artifactId: NonEmptyString,
+}).annotate({ identifier: "CreateStudioProjectFromArtifactRequest" });
+
+export interface CreateStudioProjectFromArtifactRequest extends Schema.Schema.Type<
+	typeof CreateStudioProjectFromArtifactRequest
+> {}
+
+export const StudioProjectsListResponse = Schema.Struct({
 	auth: StudioAuthStatusSchema,
 	ok: Schema.Literal(true),
 	projects: Schema.Array(StudioProjectSummary).pipe(Schema.mutable),
 	session: StudioPublicSessionSchema,
-}) {}
+}).annotate({ identifier: "StudioProjectsListResponse" });
 
-export class StudioProjectDetailsResponse extends Schema.Class<StudioProjectDetailsResponse>(
-	"StudioProjectDetailsResponse",
-)({
+export interface StudioProjectsListResponse extends Schema.Schema.Type<
+	typeof StudioProjectsListResponse
+> {}
+
+export const StudioProjectDetailsResponse = Schema.Struct({
 	auth: StudioAuthStatusSchema,
 	details: StudioProjectDetails,
 	ok: Schema.Literal(true),
 	session: StudioPublicSessionSchema,
-}) {}
+}).annotate({ identifier: "StudioProjectDetailsResponse" });
 
-export class StudioDiagramDetailsResponse extends Schema.Class<StudioDiagramDetailsResponse>(
-	"StudioDiagramDetailsResponse",
-)({
+export interface StudioProjectDetailsResponse extends Schema.Schema.Type<
+	typeof StudioProjectDetailsResponse
+> {}
+
+export const StudioDiagramDetailsResponse = Schema.Struct({
 	auth: StudioAuthStatusSchema,
 	diagram: StudioDiagramSummary,
 	ok: Schema.Literal(true),
 	project: StudioProjectSummary,
 	session: StudioPublicSessionSchema,
-}) {}
+}).annotate({ identifier: "StudioDiagramDetailsResponse" });
 
-export class StudioDrawingResponse extends Schema.Class<StudioDrawingResponse>(
-	"StudioDrawingResponse",
-)({
+export interface StudioDiagramDetailsResponse extends Schema.Schema.Type<
+	typeof StudioDiagramDetailsResponse
+> {}
+
+export const StudioDrawingResponse = Schema.Struct({
 	auth: StudioAuthStatusSchema,
 	drawing: StudioDrawing,
 	ok: Schema.Literal(true),
 	session: StudioPublicSessionSchema,
-}) {}
+}).annotate({ identifier: "StudioDrawingResponse" });
 
-export class SaveStudioDrawingResponse extends Schema.Class<SaveStudioDrawingResponse>(
-	"SaveStudioDrawingResponse",
-)({
+export interface StudioDrawingResponse extends Schema.Schema.Type<typeof StudioDrawingResponse> {}
+
+export const SaveStudioDrawingResponse = Schema.Struct({
 	auth: StudioAuthStatusSchema,
 	diagram: StudioDiagramSummary,
 	ok: Schema.Literal(true),
 	session: StudioPublicSessionSchema,
-}) {}
+}).annotate({ identifier: "SaveStudioDrawingResponse" });
 
-export class StudioProjectUrls extends Schema.Class<StudioProjectUrls>("StudioProjectUrls")({
+export interface SaveStudioDrawingResponse extends Schema.Schema.Type<
+	typeof SaveStudioDrawingResponse
+> {}
+
+export const StudioProjectUrls = Schema.Struct({
 	diagram: NonEmptyString,
 	edit: NonEmptyString,
 	project: NonEmptyString,
-}) {}
+}).annotate({ identifier: "StudioProjectUrls" });
 
-export class CreateStudioProjectFromArtifactResponse extends Schema.Class<CreateStudioProjectFromArtifactResponse>(
-	"CreateStudioProjectFromArtifactResponse",
-)({
+export interface StudioProjectUrls extends Schema.Schema.Type<typeof StudioProjectUrls> {}
+
+export const CreateStudioProjectFromArtifactResponse = Schema.Struct({
 	auth: StudioAuthStatusSchema,
 	diagram: StudioDiagramSummary,
 	ok: Schema.Literal(true),
 	project: StudioProjectSummary,
 	session: StudioPublicSessionSchema,
 	urls: StudioProjectUrls,
-}) {}
+}).annotate({ identifier: "CreateStudioProjectFromArtifactResponse" });
+
+export interface CreateStudioProjectFromArtifactResponse extends Schema.Schema.Type<
+	typeof CreateStudioProjectFromArtifactResponse
+> {}
 export const CreateStudioProjectFromArtifactResponseSchema =
 	CreateStudioProjectFromArtifactResponse;
 

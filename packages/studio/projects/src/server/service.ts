@@ -102,13 +102,13 @@ function observeStudioPersistence<A>(
 	return withTelemetryCorrelation(observed, correlation);
 }
 
-class StudioProjectIndexEntry extends Schema.Class<StudioProjectIndexEntry>(
-	"StudioProjectIndexEntry",
-)({
+const StudioProjectIndexEntry = Schema.Struct({
 	ownerKey: Schema.NonEmptyString,
 	projectId: StudioRecordIdSchema,
 	updatedAt: IsoDateStringSchema,
-}) {}
+}).annotate({ identifier: "StudioProjectIndexEntry" });
+
+interface StudioProjectIndexEntry extends Schema.Schema.Type<typeof StudioProjectIndexEntry> {}
 
 const StudioProjectIndexEntrySchema = StudioProjectIndexEntry;
 
@@ -161,9 +161,13 @@ export class StudioProjects extends Context.Service<StudioProjects, StudioProjec
 	"@sketchi/studio-projects/StudioProjects",
 ) {}
 
-export class StudioPersistencePolicyConfig extends Schema.Class<StudioPersistencePolicyConfig>(
-	"StudioPersistencePolicyConfig",
-)({ listingConcurrency: Schema.Int.check(Schema.isGreaterThan(0)) }) {}
+export const StudioPersistencePolicyConfig = Schema.Struct({
+	listingConcurrency: Schema.Int.check(Schema.isGreaterThan(0)),
+}).annotate({ identifier: "StudioPersistencePolicyConfig" });
+
+export interface StudioPersistencePolicyConfig extends Schema.Schema.Type<
+	typeof StudioPersistencePolicyConfig
+> {}
 
 export class StudioPersistencePolicy extends Context.Service<
 	StudioPersistencePolicy,

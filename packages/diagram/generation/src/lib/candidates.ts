@@ -94,17 +94,15 @@ export const diagramGenerationProviderIds: readonly [
 export const DiagramGenerationProviderIdSchema = Schema.Literals(diagramGenerationProviderIds);
 export type DiagramGenerationProviderId = typeof DiagramGenerationProviderIdSchema.Type;
 
-export class DiagramGenerationUsage extends Schema.Class<DiagramGenerationUsage>(
-	"DiagramGenerationUsage",
-)({
+export const DiagramGenerationUsage = Schema.Struct({
 	inputTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
 	outputTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
 	totalTokens: Schema.optional(Schema.Number).pipe(Schema.mutableKey),
-}) {}
+}).annotate({ identifier: "DiagramGenerationUsage" });
 
-export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCandidate>(
-	"DiagramGenerationCandidate",
-)({
+export interface DiagramGenerationUsage extends Schema.Schema.Type<typeof DiagramGenerationUsage> {}
+
+export const DiagramGenerationCandidate = Schema.Struct({
 	/** Model calls the request made, counting retries and repairs. */
 	attempts: Schema.optional(Schema.Number),
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
@@ -123,11 +121,13 @@ export class DiagramGenerationCandidate extends Schema.Class<DiagramGenerationCa
 	styles: Schema.optional(Schema.Array(DiagramStyle).pipe(Schema.mutable)),
 	text: Schema.String,
 	usage: Schema.optional(DiagramGenerationUsage),
-}) {}
+}).annotate({ identifier: "DiagramGenerationCandidate" });
 
-export class DiagramGenerationCandidateSummary extends Schema.Class<DiagramGenerationCandidateSummary>(
-	"DiagramGenerationCandidateSummary",
-)({
+export interface DiagramGenerationCandidate extends Schema.Schema.Type<
+	typeof DiagramGenerationCandidate
+> {}
+
+export const DiagramGenerationCandidateSummary = Schema.Struct({
 	attempts: Schema.optional(Schema.Number),
 	diagnostics: Schema.Array(Schema.String).pipe(Schema.mutable),
 	warnings: Schema.optionalKey(Schema.Array(StateMachineDefaultWarningSchema).pipe(Schema.mutable)),
@@ -139,26 +139,34 @@ export class DiagramGenerationCandidateSummary extends Schema.Class<DiagramGener
 	provider: DiagramGenerationProviderIdSchema,
 	text: Schema.String,
 	usage: Schema.optional(DiagramGenerationUsage),
-}) {}
+}).annotate({ identifier: "DiagramGenerationCandidateSummary" });
 
-export class DiagramGenerationScenarioOutput extends Schema.Class<DiagramGenerationScenarioOutput>(
-	"DiagramGenerationScenarioOutput",
-)({
+export interface DiagramGenerationCandidateSummary extends Schema.Schema.Type<
+	typeof DiagramGenerationCandidateSummary
+> {}
+
+export const DiagramGenerationScenarioOutput = Schema.Struct({
 	candidates: Schema.Array(DiagramGenerationCandidateSummary).pipe(Schema.mutable),
 	model: Schema.String,
 	scenarioId: Schema.String,
-}) {}
+}).annotate({ identifier: "DiagramGenerationScenarioOutput" });
 
-export class DiagramGenerationRequest extends Schema.Class<DiagramGenerationRequest>(
-	"DiagramGenerationRequest",
-)({
+export interface DiagramGenerationScenarioOutput extends Schema.Schema.Type<
+	typeof DiagramGenerationScenarioOutput
+> {}
+
+export const DiagramGenerationRequest = Schema.Struct({
 	maxOutputTokens: Schema.optional(Schema.Number),
 	model: Schema.String.check(
 		Schema.isPattern(/^(?:(?:anthropic|google|google-ai-studio)\/)?[A-Za-z0-9._-]{1,128}$/),
 	),
 	prompt: DiagramGenerationPrompt,
 	temperature: Schema.optional(Schema.Number),
-}) {}
+}).annotate({ identifier: "DiagramGenerationRequest" });
+
+export interface DiagramGenerationRequest extends Schema.Schema.Type<
+	typeof DiagramGenerationRequest
+> {}
 
 export function extractJsonObject(text: string): unknown {
 	try {
