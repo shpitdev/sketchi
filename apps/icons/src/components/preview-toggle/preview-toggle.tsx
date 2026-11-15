@@ -1,3 +1,4 @@
+import { Array } from "effect";
 import { Moon, Sun } from "lucide-react";
 
 export type PreviewMode = "dark" | "light";
@@ -17,7 +18,7 @@ export function PreviewToggle({
 }) {
 	return (
 		<div aria-label="Preview background" className="preview-toggle" role="group">
-			{modes.map(({ Icon, label, mode }) => (
+			{Array.map(modes, ({ Icon, label, mode }) => (
 				<button
 					aria-label={label}
 					aria-pressed={value === mode}

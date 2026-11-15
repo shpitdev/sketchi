@@ -5,7 +5,7 @@ import { FetchHttpClient } from "effect/http";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-import { CommunityPage } from "./components/community-gallery/community-page";
+import { CommunityPage } from "./features/community/community-page";
 import { queryHttpLayer } from "./lib/query-atoms";
 import { TestIntersectionObserver } from "./test-support/intersection-observer";
 

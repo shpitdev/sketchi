@@ -1,7 +1,7 @@
 import { type IconRecipe } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 
-import { excalidrawLibrary } from "./excalidraw-export";
+import { excalidrawLibrary } from "../features/export/excalidraw-export";
 import {
 	ALL_ICONS_PACK_ID,
 	decodePackIndex,

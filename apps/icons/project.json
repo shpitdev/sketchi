@@ -72,7 +72,7 @@
 				"{projectRoot}/scripts/social-cards.ts",
 				"{projectRoot}/public/fonts/Excalifont/*.woff2",
 				"{projectRoot}/src/lib/drawings.ts",
-				"{projectRoot}/src/lib/excalidraw-export.ts",
+				"{projectRoot}/src/features/export/excalidraw-export.ts",
 				"{projectRoot}/src/lib/packs.ts",
 				"{projectRoot}/src/lib/recipe-drawing.ts",
 				"{projectRoot}/src/lib/pack-preview.ts",

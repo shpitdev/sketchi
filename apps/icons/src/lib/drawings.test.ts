@@ -2,7 +2,7 @@ import { type IconRecipe } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 
 import { catalogDrawings, decodeDrawings } from "./drawings";
-import { excalidrawClipboard, excalidrawLibrary } from "./excalidraw-export";
+import { excalidrawClipboard, excalidrawLibrary } from "../features/export/excalidraw-export";
 
 const square: IconRecipe = {
 	parts: [{ kind: "rect", x: 4, y: 4, width: 16, height: 16, fill: "#2496ed" }],

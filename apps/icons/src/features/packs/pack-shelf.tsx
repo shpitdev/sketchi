@@ -1,0 +1,108 @@
+import { Array as Arr, Option as Opt } from "effect";
+import { useState } from "react";
+import { useAtom } from "@effect/atom-react";
+import { Atom } from "effect/reactivity";
+
+import type { PackExcalidrawState } from "../../lib/excalidraw-publish.js";
+import {
+	ALL_ICONS_PACK_ID,
+	packPagePath,
+	SHELF_FIRST_PACK_IDS,
+	type PackSummary,
+} from "../../lib/packs.js";
+import type { PreviewMode } from "../../components/preview-toggle/preview-toggle.js";
+import { RecipePreview } from "../../components/recipe-preview/recipe-preview.js";
+import { PackActions } from "./pack-actions.js";
+import { PackPublishDialog } from "./pack-publish-dialog.js";
+import { usePackPublishing } from "./use-pack-publishing.js";
+
+export function iconCount(count: number): string {
+	return `${count.toLocaleString("en-US")} ${count === 1 ? "icon" : "icons"}`;
+}
+
+/** The packs, each a strip of its own drawings, its size, and its actions. */
+export function PackShelf({
+	excalidraw,
+	packs,
+	previewMode,
+}: {
+	readonly excalidraw?: Readonly<Record<string, PackExcalidrawState>>;
+	readonly packs: readonly PackSummary[];
+	readonly previewMode: PreviewMode;
+}) {
+	const publishing = usePackPublishing(excalidraw);
+	const [expansion] = useState(() => Atom.make(false));
+	const [expanded, setExpanded] = useAtom(expansion);
+	if (!packs.length) return null;
+	// A wide shelf shows the catalog and the vendor packs first; the rest wait behind "More packs".
+	// A narrow one scrolls sideways and shows them all.
+	const more = Arr.filter(packs, (pack) => !SHELF_FIRST_PACK_IDS.has(pack.id)).length;
+	const publishingPack = Opt.getOrElse(
+		Arr.findFirst(packs, (pack) => pack.id === publishing.publishing),
+		() => undefined,
+	);
+	return (
+		<section
+			aria-labelledby="pack-shelf-title"
+			className="pack-shelf"
+			data-expanded={expanded ? "true" : "false"}
+		>
+			<h2 className="pack-shelf__title" id="pack-shelf-title">
+				Excalidraw libraries
+			</h2>
+			<ul className="pack-shelf__list" id="pack-shelf-list">
+				{Arr.map(packs, (pack) => (
+					<li
+						className="pack-card"
+						data-more={SHELF_FIRST_PACK_IDS.has(pack.id) ? undefined : "true"}
+						data-whole-catalog={pack.id === ALL_ICONS_PACK_ID ? "true" : undefined}
+						key={pack.id}
+					>
+						<span aria-hidden="true" className="pack-card__strip" data-preview={previewMode}>
+							{Arr.map(pack.preview, (icon) => (
+								<RecipePreview
+									className="pack-card__icon"
+									key={icon.slug}
+									previewMode={previewMode}
+									recipe={icon.recipe}
+								/>
+							))}
+						</span>
+						<span className="pack-card__head">
+							<a className="pack-card__name" href={packPagePath(pack.id)} id={`pack-${pack.id}`}>
+								{pack.name}
+							</a>
+							<span className="pack-card__count">{iconCount(pack.count)}</span>
+						</span>
+						<PackActions
+							describedBy={`pack-${pack.id}`}
+							excalidraw={publishing.states[pack.id]}
+							onPublish={() => publishing.open(pack.id)}
+							pack={pack}
+						/>
+					</li>
+				))}
+				{more > 0 ? (
+					<li className="pack-shelf__more">
+						<button
+							aria-controls="pack-shelf-list"
+							aria-expanded={expanded}
+							className="pack-shelf__more-button"
+							onClick={() => setExpanded((open) => !open)}
+							type="button"
+						>
+							{expanded ? "Fewer packs" : `${String(more)} more packs`}
+						</button>
+					</li>
+				) : null}
+			</ul>
+			{publishingPack ? (
+				<PackPublishDialog
+					onClose={publishing.close}
+					onPublished={(result) => publishing.published(publishingPack.id, result)}
+					pack={publishingPack}
+				/>
+			) : null}
+		</section>
+	);
+}

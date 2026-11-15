@@ -1,0 +1,131 @@
+import { decodeJson } from "../../test-support/json";
+import { render } from "../../test-support/render";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import type { PackSummary } from "../../lib/packs";
+import { PackShelf } from "./pack-shelf";
+
+const PR = "https://github.com/excalidraw/excalidraw-libraries/pull/4242";
+const INSTALL =
+	"https://excalidraw.com/?addLibrary=https%3A%2F%2Fraw.githubusercontent.com%2Fexcalidraw%2Fexcalidraw-libraries%2Fjane-1%2Flibraries%2Fjane%2Fdata-and-backend-logos.excalidrawlib%3Fraw%3Dtrue";
+
+const packs: PackSummary[] = [
+	{ id: "data", name: "Data & backend", version: "0123456789abcdef", count: 67, preview: [] },
+];
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
+
+function openDialog() {
+	render(
+		<PackShelf excalidraw={{ data: { publishable: true } }} packs={packs} previewMode="light" />,
+	);
+	fireEvent.click(screen.getByRole("button", { name: "Publish to Excalidraw" }));
+	return screen.getByRole("dialog", { name: "Publish to Excalidraw" });
+}
+
+describe("PackPublishDialog", () => {
+	// @effect-diagnostics-next-line asyncFunction:off -- React act, hydration and Testing Library await native DOM callbacks at the test host.
+	it("fills in the listing and sends only the author's fields", async () => {
+		// @effect-diagnostics-next-line asyncFunction:off -- React and Testing Library callbacks await native DOM or Blob promises at this test host.
+		const fetchMock = vi.fn(async () =>
+			Response.json({ pullRequestUrl: PR, installUrl: INSTALL }, { status: 201 }),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const dialog = openDialog();
+		expect(within(dialog).getByText(/Data and Backend Logos/u)).toBeTruthy();
+		expect(within(dialog).getByText(/^Hand-drawn logos of databases/u)).toBeTruthy();
+		expect(
+			within(dialog)
+				.getByRole("img", { name: "Data and Backend Logos preview" })
+				.getAttribute("src"),
+		).toBe("/packs/data.preview.jpg");
+		const website = within(dialog).getByLabelText<HTMLInputElement>("Website (optional)");
+		expect(website.value).toBe("https://icons.sketchi.app/packs/data");
+		expect(within(dialog).queryByLabelText(/GitHub/u)).toBeNull();
+		const name = within(dialog).getByLabelText<HTMLInputElement>("Your name");
+		expect([name.required, name.maxLength]).toEqual([true, 60]);
+
+		fireEvent.change(name, { target: { value: "Jane" } });
+		const handle = within(dialog).getByLabelText<HTMLInputElement>("X handle (optional)");
+		// A pasted profile link shows as its handle, unclipped.
+		fireEvent.paste(handle, {
+			clipboardData: { getData: () => "https://x.com/dimethylpant" },
+		});
+		expect(handle.value).toBe("dimethylpant");
+		fireEvent.click(within(dialog).getByRole("button", { name: "Publish" }));
+
+		const pullRequest = await within(dialog).findByRole("link", { name: "Pull request, open" });
+		expect(pullRequest.getAttribute("href")).toBe(PR);
+		expect(
+			within(dialog).getByRole("link", { name: "Add to Excalidraw" }).getAttribute("href"),
+		).toBe(INSTALL);
+		const [url, request] = vi.mocked(fetch).mock.calls[0]!;
+		expect(new URL(url instanceof Request ? url.url : url).pathname).toBe(
+			"/api/packs/data/excalidraw",
+		);
+		expect(request?.method).toBe("POST");
+		expect(decodeJson(new TextDecoder().decode(request?.body as Uint8Array))).toEqual({
+			authorName: "Jane",
+			xHandle: "dimethylpant",
+			website: "https://icons.sketchi.app/packs/data",
+		});
+		fireEvent.keyDown(dialog, { key: "Escape" });
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		// The card now adds the pack to Excalidraw and no longer offers to publish it.
+		expect(screen.getByRole("link", { name: "Add to Excalidraw" }).getAttribute("href")).toBe(
+			INSTALL,
+		);
+		expect(screen.getByRole("link", { name: "Pull request, open" }).getAttribute("href")).toBe(PR);
+		expect(screen.queryByRole("button", { name: "Publish to Excalidraw" })).toBeNull();
+	});
+
+	// @effect-diagnostics-next-line asyncFunction:off -- React act, hydration and Testing Library await native DOM callbacks at the test host.
+	it("reads a typed profile link as its handle and refuses a link that is not a profile", async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+		const dialog = openDialog();
+		const handle = within(dialog).getByLabelText<HTMLInputElement>("X handle (optional)");
+		fireEvent.change(handle, { target: { value: "twitter.com/dimethylpant/" } });
+		fireEvent.blur(handle);
+		expect(handle.value).toBe("dimethylpant");
+
+		fireEvent.change(within(dialog).getByLabelText("Your name"), { target: { value: "Jane" } });
+		fireEvent.change(handle, { target: { value: "https://x.com/dimethylpant/status/1" } });
+		fireEvent.blur(handle);
+		expect(handle.value).toBe("https://x.com/dimethylpant/status/1");
+		fireEvent.click(within(dialog).getByRole("button", { name: "Publish" }));
+		expect((await within(dialog).findByRole("alert")).textContent).toBe(
+			"That X link is not a profile; use one like x.com/yourname.",
+		);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	// @effect-diagnostics-next-line asyncFunction:off -- React act, hydration and Testing Library await native DOM callbacks at the test host.
+	it("shows why a submission failed and keeps the form", async () => {
+		vi.stubGlobal(
+			"fetch",
+			// @effect-diagnostics-next-line asyncFunction:off -- React and Testing Library callbacks await native DOM or Blob promises at this test host.
+			vi.fn(async () =>
+				Response.json(
+					{
+						error: {
+							code: "already_submitted",
+							message: "This version of the pack has already been sent to Excalidraw.",
+						},
+					},
+					{ status: 409 },
+				),
+			),
+		);
+		const dialog = openDialog();
+		fireEvent.change(within(dialog).getByLabelText("Your name"), { target: { value: "Jane" } });
+		fireEvent.click(within(dialog).getByRole("button", { name: "Publish" }));
+		expect((await within(dialog).findByRole("alert")).textContent).toBe(
+			"This version of the pack has already been sent to Excalidraw.",
+		);
+		expect(within(dialog).getByRole("button", { name: "Publish" })).toBeTruthy();
+	});
+});

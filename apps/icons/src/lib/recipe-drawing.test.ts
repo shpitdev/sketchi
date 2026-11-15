@@ -1,7 +1,7 @@
 import { type IconRecipe } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 
-import { excalidrawClipboard, excalidrawLibrary } from "./excalidraw-export";
+import { excalidrawClipboard, excalidrawLibrary } from "../features/export/excalidraw-export";
 import { recipePreview } from "./recipe-drawing";
 
 const QUEUE: IconRecipe = {

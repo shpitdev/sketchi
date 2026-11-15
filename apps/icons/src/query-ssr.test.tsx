@@ -6,7 +6,7 @@ import { createContext, useContext } from "react";
 import { renderToReadableStream } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 
-import { CommunityPage } from "./components/community-gallery/community-page";
+import { CommunityPage } from "./features/community/community-page";
 import { communitySearch } from "./lib/community-atoms";
 import { queryHttpLayer } from "./lib/query-atoms";
 import { Route } from "./routes/__root";
@@ -56,6 +56,9 @@ function Pages() {
 it("renders concurrent Icons pages with isolated search state and no query transport or resource acquisition", async () => {
 	const Root = Route.options.component;
 	if (!Root) throw new Error("Missing Icons root");
+	const readStorage = vi.spyOn(Storage.prototype, "getItem");
+	const writeStorage = vi.spyOn(Storage.prototype, "setItem");
+	const browserListeners = vi.spyOn(window, "addEventListener");
 	const home = vi.spyOn(HomeRoute, "useLoaderData").mockReturnValue(undefined);
 	const pack = vi.spyOn(PackRoute, "useLoaderData").mockReturnValue({
 		pack: {
@@ -90,10 +93,16 @@ it("renders concurrent Icons pages with isolated search state and no query trans
 		}
 		expect(owners).toHaveLength(2);
 		expect(owners[0]).not.toBe(owners[1]);
+		expect(readStorage).not.toHaveBeenCalled();
+		expect(writeStorage).not.toHaveBeenCalled();
+		expect(browserListeners.mock.calls.filter(([name]) => name === "storage")).toHaveLength(0);
 		expect(transport).not.toHaveBeenCalled();
 		expect(opened).not.toHaveBeenCalled();
 		expect(closed).not.toHaveBeenCalled();
 	} finally {
+		readStorage.mockRestore();
+		writeStorage.mockRestore();
+		browserListeners.mockRestore();
 		home.mockRestore();
 		pack.mockRestore();
 		owners.forEach((registry) => registry.dispose());

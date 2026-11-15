@@ -1,8 +1,9 @@
+import { Array } from "effect";
 import { type IconRecipe } from "@sketchi/drawing";
 import { useMemo } from "react";
 
 import { RECIPE_PREVIEW_SIZE, recipePreview } from "../../lib/recipe-drawing.js";
-import { type PreviewMode } from "../preview-toggle/index.js";
+import { type PreviewMode } from "../preview-toggle/preview-toggle.js";
 
 /** Excalidraw inverts the entire light canvas, including brand colors, in dark mode. */
 const PALETTE = { ink: "#1e1e1e", paper: "#ffffff" } as const;
@@ -33,7 +34,7 @@ export function RecipePreview({
 			role={label ? "img" : undefined}
 			viewBox={`${-pad} ${-pad} ${RECIPE_PREVIEW_SIZE + pad * 2} ${RECIPE_PREVIEW_SIZE + pad * 2}`}
 		>
-			{drawing.parts.map((part, index) =>
+			{Array.map(drawing.parts, (part, index) =>
 				part.kind === "text" ? (
 					<text
 						dominantBaseline="central"
@@ -49,7 +50,7 @@ export function RecipePreview({
 					</text>
 				) : (
 					<g key={index}>
-						{part.paths.map((path, pathIndex) => (
+						{Array.map(part.paths, (path, pathIndex) => (
 							<path
 								d={path.d}
 								fill={path.fill}

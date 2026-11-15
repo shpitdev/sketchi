@@ -3,7 +3,7 @@ import { Array, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
-import { PackPage } from "../../components/packs/pack-page.js";
+import { PackPage } from "../../features/packs/pack-page.js";
 import { packQuery, queryError, queryStatus } from "../../lib/query-atoms.js";
 import { packPagePath } from "../../lib/packs.js";
 import { packDescription, packImage, pageMeta } from "../../lib/site-meta.js";

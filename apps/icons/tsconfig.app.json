@@ -19,9 +19,6 @@
       "path": "../../packages/drawing/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/diagrams/tsconfig.lib.json"
-    },
-    {
       "path": "../../packages/icons/community/tsconfig.lib.json"
     },
     {

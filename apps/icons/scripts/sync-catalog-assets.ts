@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { ICON_SOURCE_URL_PREFIX, iconManifest } from "@sketchi/icon-catalog/catalog";
 
 import { catalogDrawings, DRAWINGS_PATH } from "../src/lib/drawings.js";
-import { excalidrawLibrary } from "../src/lib/excalidraw-export.js";
+import { excalidrawLibrary } from "../src/features/export/excalidraw-export.js";
 import {
 	ALL_ICONS_PACK_ID,
 	ICON_PACKS,

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { CommunityPage } from "../../components/community-gallery/community-page.js";
+import { CommunityPage } from "../../features/community/community-page.js";
 import { COMMUNITY_DESCRIPTION, pageMeta } from "../../lib/site-meta.js";
 
 export const Route = createFileRoute("/community/$slug")({

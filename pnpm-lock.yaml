@@ -477,12 +477,12 @@ importers:
       '@effect/atom-react':
         specifier: 'catalog:'
         version: 4.1.4(effect@4.1.4)(react@19.3.1)(scheduler@0.28.0)
+      '@effect/platform-browser':
+        specifier: 4.1.4
+        version: 4.1.4(effect@4.1.4)
       '@sketchi/community-icons':
         specifier: workspace:*
         version: link:../../packages/icons/community
-      '@sketchi/diagrams':
-        specifier: workspace:*
-        version: link:../../packages/diagrams
       '@sketchi/drawing':
         specifier: workspace:*
         version: link:../../packages/drawing
@@ -507,6 +507,9 @@ importers:
       lucide-react:
         specifier: 1.65.0
         version: 1.65.0(@types/react@19.3.0)(react@19.3.1)
+      radix-ui:
+        specifier: 1.8.1
+        version: 1.8.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       roughjs:
         specifier: 4.6.6
         version: 4.6.6
@@ -1925,6 +1928,11 @@ packages:
       effect: ^4.1.4
       react: '>=19.0.0 <20.0.0'
       scheduler: '>=0.25.0 <0.29.0'
+
+  '@effect/platform-browser@4.1.4':
+    resolution: {integrity: sha512-oh6SxR62VaU8xzpVloHRJwK4ADBXCzlnjgcvV6zHc9h4PwmdhQvlfrXFu38tvqJTgK31Z1VnzbkLtymWHbEUSA==}
+    peerDependencies:
+      effect: ^4.1.4
 
   '@effect/platform-node-shared@4.1.4':
     resolution: {integrity: sha512-DWdfphHGOFJNj/mYadgpT3jIm8aRXDcPrQiGXFBH4p2H4XmA7iYMrPsI8NxVgZ7kNX0q1+FGJZJama0tINHRAg==}
@@ -11362,6 +11370,10 @@ snapshots:
       effect: 4.1.4
       react: 19.3.1
       scheduler: 0.28.0
+
+  '@effect/platform-browser@4.1.4(effect@4.1.4)':
+    dependencies:
+      effect: 4.1.4
 
   '@effect/platform-node-shared@4.1.4(effect@4.1.4)':
     dependencies:
