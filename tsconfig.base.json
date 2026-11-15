@@ -612,6 +612,42 @@
                 "strictEffectProvide": "error"
               }
             }
+          },
+          {
+            "include": [
+              "packages/diagrams/src/families/*/layout.ts",
+              "packages/diagrams/src/families/*/layout/**/*.ts",
+              "packages/diagrams/src/families/*/render.ts",
+              "packages/diagrams/src/families/*/render/**/*.ts",
+              "packages/diagrams/src/families/*/readout.ts",
+              "packages/diagrams/src/families/*/readout/**/*.ts",
+              "packages/diagrams/src/graph/**/*.ts",
+              "packages/drawing/src/boxes.ts",
+              "packages/drawing/src/curves.ts",
+              "packages/drawing/src/excalifont-ink.ts",
+              "packages/drawing/src/group-regions.ts",
+              "packages/drawing/src/hash.ts",
+              "packages/drawing/src/icon.ts",
+              "packages/drawing/src/icon-recipe.ts",
+              "packages/drawing/src/lane-regions.ts",
+              "packages/drawing/src/routing-quality.ts",
+              "packages/drawing/src/scene.ts",
+              "packages/drawing/src/segments.ts",
+              "packages/drawing/src/text-metrics.ts",
+              "packages/drawing/src/zone-regions.ts",
+              "packages/drawing/src/excalidraw/bound-ends.ts",
+              "packages/drawing/src/excalidraw/convert.ts",
+              "packages/drawing/src/excalidraw/excalidraw-binding.ts",
+              "packages/drawing/src/excalidraw/icon-recipe.ts",
+              "packages/drawing/src/excalidraw/route-folds.ts",
+              "packages/drawing/src/excalidraw/route-release.ts"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "preferEffectArray": "off",
+                "preferEffectString": "off"
+              }
+            }
           }
         ]
       }
