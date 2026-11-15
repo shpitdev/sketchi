@@ -1336,48 +1336,42 @@ function arrowSegments(element: ExcalidrawElement, points: readonly RoutePoint[]
 }
 
 /**
- * Compare shared endpoint runs in native fixed-point coordinates: an untouched
- * midpoint and its native-normalized port describe the same branch departure.
- * This is only the overlap readout; stored points and obstacle checks stay exact.
+ * Compare one shared endpoint run in native fixed-point coordinates. Only a
+ * pair with that actual shared binding may use this readout; exact stored
+ * geometry owns every unrelated comparison.
  */
 function overlapRoute(
 	element: ExcalidrawElement,
+	key: BindingKey,
 	elementsById: ReadonlyMap<string, ExcalidrawElement>,
 ): RoutePoint[] {
 	const points = absoluteArrowPoints(element);
 	if (element.elbowed !== true) return points;
-	for (const [key, index, step] of [
-		["startBinding", 0, 1],
-		["endBinding", points.length - 1, -1],
-	] as const) {
-		const point = points[index];
-		const neighbour = points[index + step];
-		const id = bindingElementId(element, key);
-		const shape = id ? elementsById.get(id) : undefined;
-		const target = bindableShape(shape);
-		const fixedPoint = bindingFixedPoint(element, key);
-		if (
-			!point ||
-			!neighbour ||
-			!shape ||
-			!target ||
-			!fixedPoint ||
-			!fixedPointResolvesToEndpoint(fixedPoint, point, shape)
-		)
-			continue;
-		const [x, y] = excalidrawFixedGlobalPoint(
-			target,
-			elbowFixedPointAt(target, [point.x, point.y]),
-		);
-		for (let at = index + step; at > 0 && at < points.length - 1; at += step) {
-			const current = points[at]!;
-			if (near(point.x, neighbour.x) && near(current.x, point.x)) points[at] = { ...current, x };
-			else if (near(point.y, neighbour.y) && near(current.y, point.y))
-				points[at] = { ...current, y };
-			else break;
-		}
-		points[index] = { x, y };
+	const index = key === "startBinding" ? 0 : points.length - 1;
+	const step = key === "startBinding" ? 1 : -1;
+	const point = points[index];
+	const neighbour = points[index + step];
+	const id = bindingElementId(element, key);
+	const shape = id ? elementsById.get(id) : undefined;
+	const target = bindableShape(shape);
+	const fixedPoint = bindingFixedPoint(element, key);
+	if (
+		!point ||
+		!neighbour ||
+		!shape ||
+		!target ||
+		!fixedPoint ||
+		!fixedPointResolvesToEndpoint(fixedPoint, point, shape)
+	)
+		return points;
+	const [x, y] = excalidrawFixedGlobalPoint(target, elbowFixedPointAt(target, [point.x, point.y]));
+	for (let at = index + step; at > 0 && at < points.length - 1; at += step) {
+		const current = points[at]!;
+		if (near(point.x, neighbour.x) && near(current.x, point.x)) points[at] = { ...current, x };
+		else if (near(point.y, neighbour.y) && near(current.y, point.y)) points[at] = { ...current, y };
+		else break;
 	}
+	points[index] = { x, y };
 	return points;
 }
 
@@ -1399,13 +1393,8 @@ function sameBoundEnd(
 	);
 }
 
-/**
- * Arrows that leave one shape at one point may run together before they part,
- * as the bus from an org chart's manager to their reports does: a run both take
- * from the same corner in the same direction, after the same route up to it, is
- * one trunk drawn once.
- */
-function sharesTrunk(left: ArrowSegment, right: ArrowSegment): boolean {
+/** The common route from a bound source to the start of these runs. */
+function sameTrunkPrefix(left: ArrowSegment, right: ArrowSegment): boolean {
 	if (
 		left.startBindingId === null ||
 		left.startBindingId !== right.startBindingId ||
@@ -1428,9 +1417,15 @@ function sharesTrunk(left: ArrowSegment, right: ArrowSegment): boolean {
 					Math.abs(a.y - b.y) <= AXIS_ALIGNED_EPSILON;
 		if (!same) return false;
 	}
+	return true;
+}
+
+/** A common departure prefix continuing in the same direction is one trunk. */
+function sharesTrunk(left: ArrowSegment, right: ArrowSegment): boolean {
 	return (
+		sameTrunkPrefix(left, right) &&
 		Math.sign(left.endCoordinate - left.startCoordinate) ===
-		Math.sign(right.endCoordinate - right.startCoordinate)
+			Math.sign(right.endCoordinate - right.startCoordinate)
 	);
 }
 
@@ -1482,13 +1477,43 @@ function sharesArrivalStem(left: ArrowSegment, right: ArrowSegment): boolean {
 	);
 }
 
+/** Native port equivalence can exempt only a common departure prefix or arrival stem. */
+function sharesNativeBoundRun(
+	left: ArrowSegment,
+	right: ArrowSegment,
+	elementsById: ReadonlyMap<string, ExcalidrawElement>,
+): boolean {
+	const leftArrow = elementsById.get(left.arrowId);
+	const rightArrow = elementsById.get(right.arrowId);
+	if (!leftArrow || !rightArrow) return false;
+	for (const key of ["startBinding", "endBinding"] as const) {
+		const id = bindingElementId(leftArrow, key);
+		if (id === null || id !== bindingElementId(rightArrow, key)) continue;
+		const a = arrowSegments(leftArrow, overlapRoute(leftArrow, key, elementsById)).find(
+			(segment) => segment.segmentIndex === left.segmentIndex,
+		);
+		const b = arrowSegments(rightArrow, overlapRoute(rightArrow, key, elementsById)).find(
+			(segment) => segment.segmentIndex === right.segmentIndex,
+		);
+		if (!a || !b) continue;
+		if (
+			key === "startBinding" &&
+			sameTrunkPrefix(a, b) &&
+			(!segmentsOverlapInterior(a, b) || sharesTrunk(a, b))
+		)
+			return true;
+		if (key === "endBinding" && sharesArrivalStem(a, b)) return true;
+	}
+	return false;
+}
+
 function overlappingArrowSegments(
 	elements: readonly ExcalidrawElement[],
 	elementsById: ReadonlyMap<string, ExcalidrawElement>,
 ): ExcalidrawSceneValidationIssue[] {
 	const segments = elements
 		.filter(isConnector)
-		.flatMap((element) => arrowSegments(element, overlapRoute(element, elementsById)));
+		.flatMap((element) => arrowSegments(element, absoluteArrowPoints(element)));
 	const issues: ExcalidrawSceneValidationIssue[] = [];
 	const seen = new Set<string>();
 
@@ -1509,7 +1534,8 @@ function overlappingArrowSegments(
 				sharesDirectedEndpoint(left, right) ||
 				sharesTrunk(left, right) ||
 				sharesArrivalStem(left, right) ||
-				!segmentsOverlapInterior(left, right)
+				!segmentsOverlapInterior(left, right) ||
+				sharesNativeBoundRun(left, right, elementsById)
 			) {
 				continue;
 			}
