@@ -1,9 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result } from "effect";
 import { parseFlowchartDiagram } from "./document.js";
-import { parseStateMachineDiagram, stateMachineDiagramType } from "../state-machine/document.js";
-import connectionRetry from "./fixtures/crossings/connection-retry.js";
-import connectionRetryDisconnect from "./fixtures/crossings/connection-retry-disconnect.js";
 import contentModeration from "./fixtures/crossings/content-moderation.js";
 import expenseOutOfPolicy from "./fixtures/crossings/expense-out-of-policy.js";
 import groupedExpenseApproval from "./fixtures/crossings/grouped-expense-approval.js";
@@ -15,11 +12,6 @@ import incidentEscalationQueue from "./fixtures/crossings/incident-escalation-qu
 import incidentEscalationSharedResolve from "./fixtures/crossings/incident-escalation-shared-resolve.js";
 import incidentEscalationStraightEscalation from "./fixtures/crossings/incident-escalation-straight-escalation.js";
 import incidentResponseProviderLoop from "./fixtures/crossings/incident-response-provider-loop.js";
-import mediaPlayer from "./fixtures/crossings/media-player.js";
-import mediaPlayerEnded from "./fixtures/crossings/media-player-ended.js";
-import namedFinalRetry from "./fixtures/crossings/named-final-retry.js";
-import orderLifecycle from "./fixtures/crossings/order-lifecycle.js";
-import orderLifecycleEnded from "./fixtures/crossings/order-lifecycle-ended.js";
 import patientIntakeMergeCrossing from "./fixtures/crossings/patient-intake-merge-crossing.js";
 import patientIntakeMergeDetour from "./fixtures/crossings/patient-intake-merge-detour.js";
 import patientIntakeMergeLong from "./fixtures/crossings/patient-intake-merge-long.js";
@@ -78,26 +70,4 @@ export const sideFixtures = {
 	"incident-escalation-queue": flowchart(incidentEscalationQueue),
 	"incident-escalation-straight-escalation": flowchart(incidentEscalationStraightEscalation),
 	"expense-out-of-policy": flowchart(expenseOutOfPolicy),
-};
-
-function stateMachine(fixture: object) {
-	return parseStateMachineDiagram({ ...fixture, type: stateMachineDiagramType }).pipe(
-		Result.getOrThrow,
-	);
-}
-
-/**
- * Generated state machines whose layouts drew avoidable crossings, a guard
- * label between two lines, a return label nearer another line than its own or
- * a label moved out past the drawing, each laid out in whichever direction
- * reads better.
- */
-export const crossingStateMachines = {
-	"media-player": stateMachine(mediaPlayer),
-	"media-player-ended": stateMachine(mediaPlayerEnded),
-	"connection-retry": stateMachine(connectionRetry),
-	"connection-retry-disconnect": stateMachine(connectionRetryDisconnect),
-	"order-lifecycle": stateMachine(orderLifecycle),
-	"order-lifecycle-ended": stateMachine(orderLifecycleEnded),
-	"named-final-retry": stateMachine(namedFinalRetry),
 };

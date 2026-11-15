@@ -63,7 +63,12 @@ export function defineBuild<
 	readonly issues: (error: E) => CodeModeIssue[];
 	readonly inputIssues?: (error: Schema.SchemaError) => CodeModeIssue[];
 	readonly counts: (document: C) => DiagramCounts;
-	readonly warnings?: (document: C, request: string | undefined, scene: CanvasSpec) => P["Type"][];
+	readonly warnings?: (
+		document: C,
+		request: string | undefined,
+		scene: CanvasSpec,
+		authored: D,
+	) => P["Type"][];
 	readonly assess?: (document: C, threshold: number) => QualityReport;
 	readonly assessScene?: (document: C, scene: CanvasSpec, quality: QualityReport) => QualityReport;
 	readonly qualityIssue?: { readonly code: CodeModeIssueCode; readonly hint: string };
@@ -354,6 +359,7 @@ export function defineBuild<
 					checked,
 					"request" in request && typeof request.request === "string" ? request.request : undefined,
 					scene,
+					request.spec,
 				) ?? []),
 			],
 		} satisfies typeof Accepted.Type;

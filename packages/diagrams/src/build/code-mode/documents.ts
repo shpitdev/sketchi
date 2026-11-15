@@ -61,18 +61,7 @@ export function canonicalDocumentFromDiagram(
 				},
 			};
 		case "state-machine":
-			return {
-				type: "state-machine",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					initial: diagram.initial,
-					states: diagram.states.map((state) => ({ ...state })),
-					transitions: diagram.transitions.map((transition) => ({ ...transition })),
-					...(diagram.layout ? { layout: { direction: diagram.layout.direction } } : {}),
-					style: diagram.style,
-				},
-			};
+			return familyForType("state-machine").toDocument(diagram);
 		case "er":
 			return {
 				type: "er",

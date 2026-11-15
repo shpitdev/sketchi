@@ -39,6 +39,7 @@ import { docs as sequenceFamilyDocs } from "./families/sequence/docs.js";
 
 import { docs as stateMachineFamilyDocs } from "./families/state-machine/docs.js";
 import * as stateMachineFamily from "./families/state-machine/document.js";
+import { stateMachineBuild } from "./families/state-machine/build.js";
 import { renderStateMachineDiagram } from "./families/state-machine/render.js";
 import { docs as timelineFamilyDocs } from "./families/timeline/docs.js";
 import * as timelineFamily from "./families/timeline/document.js";
@@ -261,41 +262,22 @@ const chartDescriptor = family({
 	docs: chartFamilyDocs,
 });
 
-const stateMachineDescriptor = legacyFamily({
-	type: stateMachineFamily.stateMachineFixture.type,
+const stateMachineDescriptor = family({
 	operation: "buildStateMachine",
 	label: "State machine",
 	path: "/api/v1/state-machines/build",
+	build: stateMachineBuild,
+	// Canonical State validation materializes omitted composite entries for CLI/generator callers.
 	canonical: canonical(
 		stateMachineFamily.StateMachineDiagram,
 		stateMachineFamily.stateMachineFixture.type,
 		stateMachineFamily.validateStateMachineDiagram,
-		renderStateMachineDiagram,
+		(diagram) => Result.succeed(renderStateMachineDiagram(diagram)),
 		stateMachineFamily.counts,
 	),
 	validationError: stateMachineFamily.StateMachineValidationError,
+	toDocument: ({ type, ...spec }: stateMachineFamily.StateMachineDiagram) => ({ type, spec }),
 	fixture: stateMachineFamily.stateMachineFixture,
-	spec: Build.StateMachineSpec,
-	request: Build.BuildStateMachineRequest,
-	contracts: {
-		input: Schema.Struct({
-			...Build.BuildStateMachineRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: Build.StateMachineSpec.mapFields(
-				({ id, title, initial, states, transitions, layout }) => ({
-					id,
-					title,
-					initial,
-					states,
-					transitions,
-					layout,
-				}),
-			),
-		}),
-		output: Build.BuildStateMachineResultSchema,
-	},
-	studioInput: Build.BuildStateMachineToolInputSchema,
-	build: (runtime: typeof Runtime) => runtime.buildStateMachine,
 	docs: stateMachineFamilyDocs,
 });
 

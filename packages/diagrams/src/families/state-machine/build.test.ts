@@ -1,13 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
 import { groupRegionIssues, type CanvasSpec } from "@sketchi/drawing";
-import { mediaPlayerStateMachine } from "../../families/state-machine/document.js";
+import { mediaPlayerStateMachine } from "./document.js";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildStateMachineResultSchema } from "./contract.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
-import { applyDiagramPatch, buildStateMachine, CodeModeRuntimeEnvironment } from "./runtime.js";
+import {
+	CodeModeArtifactStorage,
+	CodeModeArtifactStorageError,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
+import { stateMachineBuild } from "./build.js";
+import { buildResponse } from "../../build/operation.js";
+import { canonicalDocumentFromDiagram } from "../../build/code-mode/documents.js";
+import {
+	applyDiagramPatch,
+	buildStateMachine,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
 
 const storage = makeMemoryArtifactStorage();
 function run<A>(
@@ -30,7 +39,7 @@ function build(spec: unknown) {
 				inlineArtifacts: ["scene", "excalidraw"],
 				artifactFormats: ["scene", "excalidraw"],
 			},
-		}),
+		}).pipe(buildResponse),
 	);
 }
 
@@ -66,11 +75,111 @@ describe("Code Mode native state machine", () => {
 		expect(result.ok).toBe(false);
 		expect(result.issues).toContainEqual(
 			expect.objectContaining({
-				code: "invalid_composite",
+				code: "missing_composite_initial",
 				message: 'Composite "active" has no regular substate to enter.',
 			}),
 		);
 	});
+
+	it.each([false, true])(
+		"reports defaults in authored order after text cleanup (reversed %j)",
+		async (reversed) => {
+			const states = [
+				{ id: " first " },
+				{ id: "second" },
+				{ id: "one", parent: " first " },
+				{ id: "two", parent: "first" },
+				{ id: "three", parent: "second" },
+				{ id: "four", parent: "second" },
+			];
+			const spec = {
+				title: "Two composites",
+				initial: "first",
+				states: reversed ? states.toReversed() : states,
+				transitions: [
+					{ source: "one", target: "two" },
+					{ source: "two", target: "one" },
+					{ source: "first", target: "second" },
+					{ source: "three", target: "four" },
+					{ source: "four", target: "three" },
+				],
+			};
+			const original = structuredClone(spec);
+			const built = await build(spec);
+			if (!built.ok) throw new Error(JSON.stringify(built.issues));
+			expect(spec).toEqual(original);
+			expect(
+				built.normalizedSpec.states
+					.filter((state) => state.initial)
+					.map(({ id, initial }) => ({ id, initial })),
+			).toEqual(
+				reversed
+					? [
+							{ id: "second", initial: "four" },
+							{ id: "first", initial: "two" },
+						]
+					: [
+							{ id: "first", initial: "one" },
+							{ id: "second", initial: "three" },
+						],
+			);
+			expect(built.issues.map(({ code, ref, message }) => ({ code, ref, message }))).toEqual(
+				(reversed
+					? [
+							[4, "second", "four"],
+							[5, "first", "two"],
+						]
+					: [
+							[0, "first", "one"],
+							[1, "second", "three"],
+						]
+				).map(([index, id, initial]) => ({
+					code: "composite_initial_defaulted",
+					ref: { kind: "request", path: `spec.states.[${index}].initial` },
+					message: `Composite "${id}" has no initial; defaulted to its first listed regular substate "${initial}".`,
+				})),
+			);
+		},
+	);
+
+	it.each(["storage", "export"] as const)(
+		"keeps default warnings out of failed %s delivery",
+		async (failure) => {
+			let writes = 0;
+			const result = await run(
+				buildStateMachine({
+					spec: {
+						...playerSpec,
+						states: playerSpec.states.map(({ initial: _initial, ...state }) => state),
+					},
+					options: { artifactFormats: failure === "export" ? ["png"] : ["scene", "excalidraw"] },
+				}).pipe(
+					buildResponse,
+					Effect.provideService(CodeModeArtifactStorage, {
+						...storage,
+						write: () => {
+							writes++;
+							return Effect.fail(
+								CodeModeArtifactStorageError.make({
+									operation: "write",
+									message: "Storage unavailable",
+									cause: new Error("Storage unavailable"),
+								}),
+							);
+						},
+					}),
+				),
+			);
+			expect(result.status).toBe(failure === "export" ? "export_failed" : "storage_failed");
+			expect(result.issues.some(({ code }) => code === "composite_initial_defaulted")).toBe(false);
+			expect(writes).toBe(failure === "export" ? 0 : 1);
+			if (result.ok) return expect.fail("Expected failed delivery");
+			expect(result.partial?.diagramId).toBe("media-player");
+			expect(result.normalizedSpec?.states.find(({ id }) => id === "active")?.initial).toBe(
+				"playing",
+			);
+		},
+	);
 
 	it("accepts Sonnet round 18 first build and reports the chosen composite entry", async () => {
 		// eval-20261020-030559-j3ng, sample 1, run 20261020-030559-2azp.
@@ -144,7 +253,7 @@ describe("Code Mode native state machine", () => {
 					'Composite "Active" has no initial; defaulted to its first listed regular substate "Playing".',
 			}),
 		]);
-		expect(() => Schema.decodeUnknownSync(BuildStateMachineResultSchema)(built)).not.toThrow();
+		expect(() => Schema.decodeUnknownSync(stateMachineBuild.result)(built)).not.toThrow();
 	});
 
 	it.each([
@@ -485,28 +594,29 @@ describe("Code Mode native state machine", () => {
 	);
 
 	it.each([
-		["", "invalid_input"],
-		["   ", "invalid_state_machine"],
-	])("rejects an explicitly blank label %j instead of defaulting it", async (label, status) => {
-		const built = await build({
-			title: "Blank label",
-			initial: "start",
-			states: [{ id: "start", label }],
-			transitions: [],
-		});
-		expect(built.ok).toBe(false);
-		expect(built.status).toBe(status);
-		expect(built.issues).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({ ref: { kind: "request", path: "spec.states.[0].label" } }),
-			]),
-		);
-	});
+		["", "invalid_input", "spec.states.0.label"],
+		["   ", "invalid_state_machine", "spec.states.[0].label"],
+	])(
+		"rejects an explicitly blank label %j instead of defaulting it",
+		async (label, status, path) => {
+			const built = await build({
+				title: "Blank label",
+				initial: "start",
+				states: [{ id: "start", label }],
+				transitions: [],
+			});
+			expect(built.ok).toBe(false);
+			expect(built.status).toBe(status);
+			expect(built.issues).toEqual(
+				expect.arrayContaining([expect.objectContaining({ ref: { kind: "request", path } })]),
+			);
+		},
+	);
 
 	it("builds the documented spec into an editable artifact with a bound composite frame", async () => {
 		const built = await build(playerSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildStateMachineResultSchema)(built)).not.toThrow();
+		expect(() => Schema.decodeUnknownSync(stateMachineBuild.result)(built)).not.toThrow();
 		expect(built.normalizedSpec.transitions.map((transition) => transition.id)).toEqual([
 			"transition-1-stopped-active",
 			"transition-2-playing-paused",
@@ -516,6 +626,8 @@ describe("Code Mode native state machine", () => {
 			"transition-6-stopped-ejected",
 		]);
 		expect(built.quality.summary).toEqual({ nodeCount: 5, edgeCount: 6 });
+		expect(built.issues).toEqual([]);
+		expect(built.artifact.formats.map(({ format }) => format)).toEqual(["scene", "excalidraw"]);
 		const formats = new Map(built.artifact.formats.map((format) => [format.format, format.inline]));
 		const scene = formats.get("scene") as CanvasSpec;
 		expect(groupRegionIssues(scene)).toEqual([]);
@@ -650,7 +762,7 @@ describe("Code Mode native state machine", () => {
 		],
 		[
 			{ transitions: [...playerSpec.transitions, { source: "stopped", target: "gone" }] },
-			"missing_edge_target",
+			"missing_transition_target",
 		],
 	])("rejects %j with a structured repair issue", async (change, code) => {
 		const result = await build({ ...playerSpec, ...change });

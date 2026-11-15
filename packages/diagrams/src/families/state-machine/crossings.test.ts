@@ -1,9 +1,7 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test data.
-import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { crossingStateMachines } from "../families/flowchart/crossing-fixtures.js";
-import { renderStateMachineDiagram } from "../families/state-machine/render.js";
-import { crossings, cornerEnds, ambiguousLabels } from "../../test/readability-helpers.js";
+import { crossingStateMachines } from "./crossing-fixtures.js";
+import { renderStateMachineDiagram } from "./render.js";
+import { crossings, cornerEnds, ambiguousLabels } from "../../../test/readability-helpers.js";
 
 describe("avoidable crossings in generated state machines", () => {
 	const machines = Object.keys(crossingStateMachines) as (keyof typeof crossingStateMachines)[];
@@ -15,7 +13,7 @@ describe("avoidable crossings in generated state machines", () => {
 				direction
 					? { ...crossingStateMachines[name], layout: { direction } }
 					: crossingStateMachines[name],
-			).pipe(Result.getOrThrow),
+			),
 		})),
 	);
 

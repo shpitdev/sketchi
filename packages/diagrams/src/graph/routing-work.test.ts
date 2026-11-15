@@ -4,10 +4,8 @@ import * as drawing from "@sketchi/drawing";
 import { FlowchartDiagram } from "../families/flowchart/document.js";
 import { classFixture } from "../families/class/document.js";
 import { classStressFixtures } from "../families/class/fixtures.js";
-import {
-	crossingFixtures,
-	crossingStateMachines,
-} from "../families/flowchart/crossing-fixtures.js";
+import { crossingFixtures } from "../families/flowchart/crossing-fixtures.js";
+import { crossingStateMachines } from "../families/state-machine/crossing-fixtures.js";
 import { erFixture, orgChartEr } from "../families/er/document.js";
 import { erStressFixtures } from "../families/er/fixtures.js";
 import { flowchartFixture } from "../families/flowchart/fixtures.js";
@@ -233,8 +231,7 @@ describe("crossing repair work", () => {
 	it("bounds segment checks for the generated diagrams it repairs", () => {
 		work.checks = 0;
 		for (const fixture of Object.values(crossingFixtures)) renderFlowchartDiagram(fixture);
-		for (const machine of Object.values(crossingStateMachines))
-			renderStateMachineDiagram(machine).pipe(Result.getOrThrow);
+		for (const machine of Object.values(crossingStateMachines)) renderStateMachineDiagram(machine);
 		expect(work.checks).toBeLessThan(23_000_000);
 	});
 });
@@ -244,9 +241,7 @@ describe("crossed paired-return work", () => {
 	// removed whole-machine fallback. Only crossed pairs may lose their lanes.
 	it("bounds the crossed named-final retry repair", () => {
 		work.checks = 0;
-		const scene = renderStateMachineDiagram(crossingStateMachines["named-final-retry"]).pipe(
-			Result.getOrThrow,
-		);
+		const scene = renderStateMachineDiagram(crossingStateMachines["named-final-retry"]);
 		expect(
 			scene.elements.some((element) => element.type === "text" && element.text === "Failed"),
 		).toBe(true);

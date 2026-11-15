@@ -3,13 +3,10 @@ import { sequenceBuild } from "@sketchi/diagrams/families/sequence/build";
 import { familyForType } from "@sketchi/diagrams/family";
 import { stateLabel } from "@sketchi/diagrams/families/state-machine/document";
 import {
-	BuildStateMachineResultSchema,
-	BuildStateMachineToolInputSchema,
 	BuildErDiagramResultSchema,
 	BuildErDiagramToolInputSchema,
 	BuildClassDiagramResultSchema,
 	BuildClassDiagramToolInputSchema,
-	type BuildStateMachineResult,
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
@@ -31,7 +28,7 @@ export type StudioBuildResult =
 	| typeof sequenceBuild.result.Type
 	| ReturnType<typeof familyForType<"timeline">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"chart">>["contracts"]["output"]["Type"]
-	| BuildStateMachineResult
+	| ReturnType<typeof familyForType<"state-machine">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"gantt">>["contracts"]["output"]["Type"]
 	| BuildErDiagramResult
 	| BuildClassDiagramResult
@@ -116,9 +113,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_state_machine": {
 		family: "state-machine",
-		decodeResult: Schema.decodeUnknownResult(BuildStateMachineResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("state-machine").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildStateMachineToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("state-machine").studioInput)(input);
 			return Result.isSuccess(decoded)
 				? decoded.success.spec.states.flatMap((state) => {
 						const label = stateLabel(state);

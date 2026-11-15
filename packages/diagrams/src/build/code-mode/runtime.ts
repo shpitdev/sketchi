@@ -52,16 +52,6 @@ import { decodeFlowchartDocument } from "../../families/flowchart/document.js";
 import { applyFlowchartEdits } from "../../families/flowchart/edits.js";
 
 import {
-	getStateMachineDefaultWarnings,
-	getStateMachineValidationIssues,
-	resolveStateMachineInitials,
-	splitContinuingFinalStates,
-	stateLabel,
-	type StateMachineDiagram,
-	type StateMachineValidationIssueCode,
-} from "../../families/state-machine/document.js";
-
-import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
 	validateExcalidrawScene,
@@ -82,7 +72,6 @@ import {
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
 } from "../../families/sequence/render.js";
-import { renderStateMachineDiagram } from "../../families/state-machine/render.js";
 import { isStructurallyValidTimelineMarker } from "../../families/timeline/render.js";
 import { isStructurallyValidVennSet } from "../../families/venn/render.js";
 import { isStructurallyValidStateMarker } from "../../graph/compose.js";
@@ -110,8 +99,6 @@ import {
 	BuildClassDiagramRequest,
 	BuildErDiagramRejected,
 	BuildErDiagramRequest,
-	BuildStateMachineRejected,
-	BuildStateMachineRequest,
 	CreateCanvasRejected,
 	CreateCanvasRequest,
 	DEFAULT_ICON_SEARCH_LIMIT,
@@ -125,7 +112,6 @@ import {
 	type ApplyDiagramPatchResult,
 	type BuildClassDiagramResult,
 	type BuildErDiagramResult,
-	type BuildStateMachineResult,
 	type CreateCanvasResult,
 	type DiagramPatchOperation,
 	type DiagramSelector,
@@ -133,7 +119,6 @@ import {
 	type GetArtifactResult,
 	type NormalizedClassSpec,
 	type NormalizedErSpec,
-	type NormalizedStateMachineSpec,
 	type SearchIconsResult,
 } from "./contract.js";
 import { type BuildFlowchartRequest } from "../../families/flowchart/build.js";
@@ -318,89 +303,6 @@ export function observeCodeModeBoundary<
 	return withTelemetryCorrelation(observed, codeModeCorrelation(input));
 }
 
-function normalizeStateMachineSpec(
-	spec: BuildStateMachineRequest["spec"],
-): NormalizedStateMachineSpec {
-	const title = cleanToolString(spec.title);
-	const optional = (key: string, value: string | undefined) =>
-		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
-	return {
-		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-state-machine"),
-		title,
-		initial: cleanToolString(spec.initial),
-		states: spec.states.map((state) => {
-			const id = cleanToolString(state.id);
-			const label = stateLabel({ ...state, id });
-			return {
-				id,
-				...(label !== undefined ? { label } : {}),
-				...(state.kind ? { kind: state.kind } : {}),
-				...optional("parent", state.parent),
-				...(state.initial !== undefined ? { initial: cleanToolString(state.initial) } : {}),
-			};
-		}),
-		transitions: spec.transitions.map((transition, index) => ({
-			id:
-				cleanOptional(transition.id) ??
-				`transition-${index + 1}-${slug(transition.source)}-${slug(transition.target)}`,
-			source: cleanToolString(transition.source),
-			target: cleanToolString(transition.target),
-			...optional("event", transition.event),
-			...optional("guard", transition.guard),
-			...optional("action", transition.action),
-		})),
-		...(spec.layout ? { layout: { direction: spec.layout.direction } } : {}),
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-	};
-}
-
-function toStateMachineDiagram(spec: NormalizedStateMachineSpec): StateMachineDiagram {
-	return { ...spec, type: "state-machine" };
-}
-
-/** Code Mode's published issue codes for diagram-core's state-machine invariants. */
-const STATE_MACHINE_ISSUE_CODES = {
-	state_machine_too_large: "state_machine_too_large",
-	invalid_state_id: "invalid_state",
-	duplicate_state_id: "duplicate_node_id",
-	duplicate_transition_id: "duplicate_edge_id",
-	missing_state_label: "invalid_state",
-	unknown_initial_state: "unknown_initial_state",
-	unknown_parent_state: "invalid_composite",
-	nested_composite: "invalid_composite",
-	missing_transition_source: "missing_edge_source",
-	missing_transition_target: "missing_edge_target",
-	final_has_outgoing: "final_has_outgoing",
-	composite_member_transition: "invalid_composite",
-	missing_composite_initial: "invalid_composite",
-	underbranched_choice: "underbranched_choice",
-	unguarded_choice_branch: "unlabeled_decision_branch",
-	unreachable_state: "unreachable_node",
-} as const satisfies Record<StateMachineValidationIssueCode, CodeModeIssueCode>;
-
-function validateNormalizedStateMachine(spec: NormalizedStateMachineSpec): CodeModeIssue[] {
-	return getStateMachineValidationIssues(toStateMachineDiagram(spec)).map((entry) =>
-		issue({
-			code: STATE_MACHINE_ISSUE_CODES[entry.code],
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-			message: entry.message,
-			hint: entry.hint,
-		}),
-	);
-}
-
-function stateMachineQuality(spec: NormalizedStateMachineSpec, threshold: number): QualityReport {
-	const score = 10;
-	return {
-		accepted: score >= threshold,
-		score,
-		threshold,
-		summary: { nodeCount: spec.states.length, edgeCount: spec.transitions.length },
-		checks: [],
-	};
-}
-
 function normalizeErSpec(spec: BuildErDiagramRequest["spec"]): NormalizedErSpec {
 	const title = cleanToolString(spec.title);
 	const optional = (key: string, value: string | undefined) =>
@@ -490,12 +392,6 @@ function erQuality(spec: NormalizedErSpec, threshold: number): QualityReport {
 		summary: { nodeCount: spec.entities.length, edgeCount: spec.relationships.length },
 		checks: [],
 	};
-}
-
-/** A final state that something leaves becomes a regular state that ends in its own final state. */
-function resolveStateMachineRequest(input: unknown): unknown {
-	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
-	return { ...input, spec: splitContinuingFinalStates(input.spec) };
 }
 
 /** Read one-line fields, cardinality aliases and from/to aliases before the request is decoded. */
@@ -711,15 +607,6 @@ const EditFlowchartFailure = workflowFailure(
 	"EditFlowchartFailure",
 	EditFlowchartRejected.fields.status,
 	EditFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildStateMachineFailure = workflowFailure(
-	"BuildStateMachineFailure",
-	BuildStateMachineRejected.fields.status,
-	BuildStateMachineRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -2239,123 +2126,6 @@ export const artifactBuildCapabilities = Effect.gen(function* () {
 	} satisfies ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>;
 });
 
-const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow")(function* (
-	input: unknown,
-) {
-	const parsed = Schema.decodeUnknownResult(BuildStateMachineRequest, {
-		errors: "all",
-		reportInput: true,
-	})(resolveStateMachineRequest(input));
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildStateMachineFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: codeModeInputIssues(parsed.failure),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-	const request = parsed.success;
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const authoredSpec = normalizeStateMachineSpec(request.spec);
-	const warnings = getStateMachineDefaultWarnings(authoredSpec).map((entry) =>
-		issue({
-			...entry,
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-		}),
-	);
-	const normalizedSpec = resolveStateMachineInitials(authoredSpec);
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedStateMachine(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildStateMachineFailure.new({
-			status: "invalid_state_machine",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const quality = stateMachineQuality(
-		normalizedSpec,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildStateMachineFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const scene = yield* validatedDomainResult({
-		try: () => renderStateMachineDiagram(toStateMachineDiagram(normalizedSpec)),
-		catch: (cause) =>
-			BuildStateMachineFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message:
-								cause instanceof Error ? cause.message : "Unable to render state machine scene.",
-							hint: "Repair the state and transition structure and retry.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildStateMachine.render"));
-	const canvasIssues = getCanvasValidationIssues(scene);
-	if (canvasIssues.length > 0) {
-		return yield* BuildStateMachineFailure.new({
-			status: canvasFailureStatus(canvasIssues),
-			context: {
-				...qualityContext,
-				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
-					...entry,
-					hint: "Shorten state labels or split the machine and retry buildStateMachine.",
-				})),
-			},
-		});
-	}
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildStateMachineFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: warnings,
-	} satisfies Extract<BuildStateMachineResult, { ok: true }>;
-});
-
 const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(function* (
 	input: unknown,
 ) {
@@ -3300,13 +3070,7 @@ export const buildMindmap = familyForType("mindmap").build({ bindBuild });
 export const buildSequenceDiagram = familyForType("sequence").build({ bindBuild });
 export const buildVennDiagram = familyForType("venn").build({ bindBuild });
 
-export const buildStateMachine: (
-	input: unknown,
-) => CodeModeWorkflowEffect<BuildStateMachineResult> = boundary(
-	"buildStateMachine",
-	buildStateMachineWorkflow,
-	failureResult,
-);
+export const buildStateMachine = familyForType("state-machine").build({ bindBuild });
 
 export const buildErDiagram: (input: unknown) => CodeModeWorkflowEffect<BuildErDiagramResult> =
 	boundary("buildErDiagram", buildErDiagramWorkflow, failureResult);

@@ -34,10 +34,6 @@ import {
 	CLASS_VISIBILITIES,
 } from "../../families/class/document.js";
 import { ER_CARDINALITIES } from "../../families/er/document.js";
-import {
-	STATE_MACHINE_DIRECTIONS,
-	STATE_MACHINE_STATE_KINDS,
-} from "../../families/state-machine/document.js";
 
 const codeModeJsonSchemaAnnotationKeys = new Set([
 	"x-sketchi-default",
@@ -305,56 +301,6 @@ const DiagramStyleWithDefault = DiagramSpecStyle.annotate({
  */
 
 /**
- * The authoring form of diagram-core's canonical StateMachineDiagram:
- * transition ids are optional and style is defaulted. buildStateMachine
- * normalizes it into the core contract, which owns every invariant.
- */
-export const StateMachineStateSpec = Schema.Struct({
-	id: RequiredNonEmptyString,
-	label: optionalContract(NonEmptyString),
-	kind: optionalContract(literals(STATE_MACHINE_STATE_KINDS)),
-	parent: optionalContract(NonEmptyString),
-	initial: optionalContract(NonEmptyString),
-}).annotate({ identifier: undefined });
-
-export interface StateMachineStateSpec extends Schema.Schema.Type<typeof StateMachineStateSpec> {}
-
-export const StateMachineTransitionSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	source: RequiredNonEmptyString,
-	target: RequiredNonEmptyString,
-	event: optionalContract(NonEmptyString),
-	guard: optionalContract(NonEmptyString),
-	action: optionalContract(NonEmptyString),
-}).annotate({ identifier: undefined });
-
-export interface StateMachineTransitionSpec extends Schema.Schema.Type<
-	typeof StateMachineTransitionSpec
-> {}
-
-export const StateMachineSpecLayout = Schema.Struct({
-	direction: literals(STATE_MACHINE_DIRECTIONS),
-}).annotate({ identifier: undefined });
-
-export interface StateMachineSpecLayout extends Schema.Schema.Type<typeof StateMachineSpecLayout> {}
-
-const stateMachineTransitionsDefault: Array<typeof StateMachineTransitionSpec.Encoded> = [];
-const StateMachineTransitionsWithDefault = Schema.Array(StateMachineTransitionSpec)
-	.pipe(Schema.mutable)
-	.annotate({ default: stateMachineTransitionsDefault })
-	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(stateMachineTransitionsDefault)));
-export const StateMachineSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	initial: RequiredNonEmptyString,
-	states: requiredArray(nonEmptyArray(StateMachineStateSpec)),
-	transitions: StateMachineTransitionsWithDefault,
-	layout: optionalContract(StateMachineSpecLayout),
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface StateMachineSpec extends Schema.Schema.Type<typeof StateMachineSpec> {}
-/**
  * The authoring form of diagram-core's canonical ErDiagram: a field may be one
  * string (`"id uuid PK"`), relationship ids are optional and style is
  * defaulted. buildErDiagram normalizes it into the core contract, which owns
@@ -515,29 +461,6 @@ export const EditFlowchartRequest = Schema.Struct({
 
 export interface EditFlowchartRequest extends Schema.Schema.Type<typeof EditFlowchartRequest> {}
 
-export const BuildStateMachineRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(StateMachineSpec),
-	options: optionalContract(BuildOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildStateMachineRequest extends Schema.Schema.Type<
-	typeof BuildStateMachineRequest
-> {}
-export const BuildStateMachineToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(
-		StateMachineSpec.mapFields(({ id, title, initial, states, transitions, layout }) => ({
-			id,
-			title,
-			initial,
-			states,
-			transitions,
-			layout,
-		})),
-	),
-});
-export type BuildStateMachineToolInput = typeof BuildStateMachineToolInputSchema.Type;
 export const BuildErDiagramRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(ErSpec),
@@ -831,18 +754,6 @@ export interface ApplyDiagramPatchRequest extends Schema.Schema.Type<
 	typeof ApplyDiagramPatchRequest
 > {}
 
-const NormalizedStateMachineSpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	initial: NonEmptyString,
-	states: Schema.Array(StateMachineStateSpec).pipe(Schema.mutable),
-	transitions: Schema.Array(
-		StateMachineTransitionSpec.mapFields((fields) => ({ ...fields, id: NonEmptyString })),
-	).pipe(Schema.mutable),
-	layout: optionalContract(StateMachineSpecLayout),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
-export type NormalizedStateMachineSpec = typeof NormalizedStateMachineSpecSchema.Type;
 const NormalizedErSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -911,47 +822,6 @@ export const EditFlowchartResultSchema = Schema.Union([
 ]);
 export type EditFlowchartResult = typeof EditFlowchartResultSchema.Type;
 
-export const BuildStateMachineAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedStateMachineSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildStateMachineAccepted extends Schema.Schema.Type<
-	typeof BuildStateMachineAccepted
-> {}
-export const BuildStateMachineRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_state_machine",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedStateMachineSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildStateMachineRejected extends Schema.Schema.Type<
-	typeof BuildStateMachineRejected
-> {}
-export const BuildStateMachineResultSchema = Schema.Union([
-	BuildStateMachineAccepted,
-	BuildStateMachineRejected,
-]);
-export type BuildStateMachineResult = typeof BuildStateMachineResultSchema.Type;
 export const BuildErDiagramAccepted = Schema.Struct({
 	ok: booleanLiteral(true),
 	status: stringLiteral("accepted"),

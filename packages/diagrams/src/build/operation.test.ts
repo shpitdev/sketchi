@@ -42,6 +42,11 @@ it.effect(
 				};
 				const operation = defineBuild({
 					...sankeyBuild,
+					warnings: (_document, _request, _scene, authored) => {
+						calls.push("warnings");
+						expect(authored).toBe(request.spec);
+						return [];
+					},
 					assess: (_document, threshold) => ({
 						...assessedQuality,
 						accepted: mode !== "threshold",
@@ -90,7 +95,9 @@ it.effect(
 							? ["render"]
 							: mode === "readability"
 								? ["render", "assess"]
-								: ["render", "assess", "export"],
+								: mode === "accepted"
+									? ["render", "assess", "export", "warnings"]
+									: ["render", "assess", "export"],
 				);
 				expect(result.status, mode).toBe(
 					(

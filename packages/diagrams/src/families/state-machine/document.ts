@@ -1,5 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { cleanToolString, slug } from "../../clean-text.js";
 
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
@@ -85,6 +86,55 @@ export const StateMachineDiagram = Schema.Struct({
 }).annotate({ identifier: "StateMachineDiagram" });
 
 export interface StateMachineDiagram extends Schema.Schema.Type<typeof StateMachineDiagram> {}
+
+/** Authored State input shares the canonical fields; only machine/transition ids may be omitted. */
+export const StateMachineDocument = StateMachineDiagram.mapFields(({ type: _type, ...fields }) => ({
+	...fields,
+	id: Schema.optionalKey(StateMachineDiagram.fields.id),
+	transitions: Schema.Array(
+		StateMachineTransition.mapFields((transition) => ({
+			...transition,
+			id: Schema.optionalKey(transition.id),
+		})),
+	).pipe(Schema.mutable, Schema.withDecodingDefaultKey(Effect.succeed([]))),
+})).annotate({ identifier: "StateMachineDocument" });
+export interface StateMachineDocument extends Schema.Schema.Type<typeof StateMachineDocument> {}
+
+/** Normalize authored text once, then materialize composite entries in authored state order. */
+export function normalizeStateMachine(spec: StateMachineDocument): StateMachineDiagram {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	return resolveStateMachineInitials({
+		id: (spec.id && cleanToolString(spec.id)) || slug(title) || "sketchi-state-machine",
+		title,
+		type: stateMachineDiagramType,
+		initial: cleanToolString(spec.initial),
+		states: Arr.map(spec.states, (state) => {
+			const id = cleanToolString(state.id);
+			const label = stateLabel({ ...state, id });
+			return {
+				id,
+				...(label !== undefined ? { label } : {}),
+				...(state.kind ? { kind: state.kind } : {}),
+				...optional("parent", state.parent),
+				...(state.initial !== undefined ? { initial: cleanToolString(state.initial) } : {}),
+			};
+		}),
+		transitions: Arr.map(spec.transitions, (transition, index) => ({
+			id:
+				(transition.id && cleanToolString(transition.id)) ||
+				`transition-${index + 1}-${slug(transition.source)}-${slug(transition.target)}`,
+			source: cleanToolString(transition.source),
+			target: cleanToolString(transition.target),
+			...optional("event", transition.event),
+			...optional("guard", transition.guard),
+			...optional("action", transition.action),
+		})),
+		...(spec.layout ? { layout: { direction: spec.layout.direction } } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	});
+}
 
 export const StateMachineValidationIssueCodeSchema = Schema.Literals([
 	"state_machine_too_large",
@@ -193,10 +243,11 @@ export type StateMachineDefaultWarning = typeof StateMachineDefaultWarningSchema
 /** Non-blocking defaults, separate from semantic errors so all consumers can expose them. */
 export function getStateMachineDefaultWarnings(
 	diagram: Pick<StateMachineDiagram, "states">,
+	authored: Pick<StateMachineDocument, "states"> = diagram,
 ): StateMachineDefaultWarning[] {
 	return diagram.states.flatMap((state, index) => {
 		const initial = stateInitial(state, diagram.states);
-		return state.initial === undefined && initial !== undefined
+		return authored.states[index]?.initial === undefined && initial !== undefined
 			? [
 					{
 						code: "composite_initial_defaulted" as const,

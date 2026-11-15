@@ -8,7 +8,7 @@ import {
 	wrappedLabelWidth,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { crossingStateMachines } from "../flowchart/crossing-fixtures.js";
+import { crossingStateMachines } from "./crossing-fixtures.js";
 import {
 	mediaPlayerStateMachine,
 	parseStateMachineDiagram,
