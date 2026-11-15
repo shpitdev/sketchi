@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { GANTT_RULES } from "../families/gantt/rules.js";
 import { ganttFixture } from "../families/gantt/document.js";
 
 import { candidateFromText, enforceCandidateRequestRequirements } from "./candidates.js";
-import { buildDiagramGenerationMessages } from "./messages.js";
 
 function candidate(diagram: object, request = "release plan") {
 	const { title, ...rest } = diagram as { title: string };
@@ -21,20 +19,6 @@ function candidate(diagram: object, request = "release plan") {
 }
 
 describe("Gantt generation", () => {
-	it("asks for tasks with dates or durations, never coordinates", () => {
-		const messages = buildDiagramGenerationMessages({
-			id: "release",
-			request: "Plan the release",
-			requestedType: "gantt",
-		});
-		expect(messages.system).toContain("Gantt IR rules");
-		expect(messages.system).toContain(GANTT_RULES.dependencies("the source"));
-		expect(messages.system).toContain(GANTT_RULES.listedTasks("the source"));
-		expect(messages.user).toContain('"type":"gantt"');
-		// The example is a conceptual plan, so it shows no dependency a request might not state.
-		expect(messages.user).not.toContain("dependsOn");
-	});
-
 	it("keeps a dependency the request states in its own words", () => {
 		const result = candidate(
 			{

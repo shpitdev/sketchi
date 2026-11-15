@@ -6,8 +6,6 @@ import {
 	BuildFlowchartResultSchema,
 	BuildStateMachineResultSchema,
 	BuildStateMachineToolInputSchema,
-	BuildGanttResultSchema,
-	BuildGanttToolInputSchema,
 	BuildErDiagramResultSchema,
 	BuildErDiagramToolInputSchema,
 	BuildClassDiagramResultSchema,
@@ -19,7 +17,6 @@ import {
 	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
 	type BuildStateMachineResult,
-	type BuildGanttResult,
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
@@ -41,7 +38,7 @@ export type StudioBuildResult =
 	| ReturnType<typeof familyForType<"timeline">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"chart">>["contracts"]["output"]["Type"]
 	| BuildStateMachineResult
-	| BuildGanttResult
+	| ReturnType<typeof familyForType<"gantt">>["contracts"]["output"]["Type"]
 	| BuildErDiagramResult
 	| BuildClassDiagramResult
 	| BuildOrgChartResult
@@ -117,9 +114,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_gantt": {
 		family: "gantt",
-		decodeResult: Schema.decodeUnknownResult(BuildGanttResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("gantt").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildGanttToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("gantt").studioInput)(input);
 			return Result.isSuccess(decoded) ? decoded.success.spec.tasks.map((task) => task.label) : [];
 		},
 	},

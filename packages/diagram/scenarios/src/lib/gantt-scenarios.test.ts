@@ -166,7 +166,7 @@ describe("prompt-grounded Gantt scenarios", () => {
 	it.each(ganttScenarios.map((scenario) => [scenario.id, scenario.expectedDiagram] as const))(
 		"routes %s with no fallback and under 2,000 search steps per dependency per layout",
 		(id, diagram) => {
-			const { work } = layoutGanttDiagram(diagram).pipe(Result.getOrThrow);
+			const { work } = layoutGanttDiagram(diagram);
 			const dependencies = diagram.tasks.reduce(
 				(sum, task) => sum + (task.dependsOn?.length ?? 0),
 				0,

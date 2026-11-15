@@ -1,5 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { DateTime, Effect, Graph, Schema, Array as Arr, Option, Result } from "effect";
+import { cleanToolString, slug } from "../../clean-text.js";
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import { parseTimelineDate } from "../timeline/document.js";
 
@@ -38,21 +39,53 @@ export const GanttTask = Schema.Struct({
 
 export interface GanttTask extends Schema.Schema.Type<typeof GanttTask> {}
 
-export const GanttDiagram = Schema.Struct({
-	id: Schema.NonEmptyString,
+export const GanttDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
-	type: Schema.Literal(ganttDiagramType),
 	tasks: Schema.Array(GanttTask).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
 	/** Phase order, top to bottom; defaults to first use in task order. */
 	phases: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
 	/** Draws a Today line at this date. There is no ambient clock. */
 	today: Schema.optionalKey(Schema.NonEmptyString),
 	style: DiagramStyle.pipe(
-		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
+		Schema.withDecodingDefaultKey(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}).annotate({ identifier: "GanttDiagram" });
+});
+export interface GanttDocument extends Schema.Schema.Type<typeof GanttDocument> {}
+
+/** Authored fields have one owner; rendering adds only the stable id and family tag. */
+export const GanttDiagram = GanttDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+	type: Schema.Literal(ganttDiagramType),
+})).annotate({ identifier: "GanttDiagram" });
 
 export interface GanttDiagram extends Schema.Schema.Type<typeof GanttDiagram> {}
+
+/** Normalize authoring once, preserving task, phase and dependency order. */
+export function normalizeGantt(document: GanttDocument): GanttDiagram {
+	const title = cleanToolString(document.title);
+	return {
+		id: (document.id && cleanToolString(document.id)) || slug(title) || "sketchi-gantt",
+		title,
+		type: ganttDiagramType,
+		tasks: Arr.map(document.tasks, (task) => {
+			const phase = task.phase && cleanToolString(task.phase);
+			return {
+				...task,
+				id: cleanToolString(task.id),
+				label: cleanToolString(task.label),
+				start: cleanToolString(task.start),
+				...(task.end !== undefined ? { end: cleanToolString(task.end) } : {}),
+				...(phase ? { phase } : {}),
+				...(task.dependsOn ? { dependsOn: Arr.map(task.dependsOn, cleanToolString) } : {}),
+			};
+		}),
+		...(document.phases ? { phases: Arr.map(document.phases, cleanToolString) } : {}),
+		...(document.today ? { today: cleanToolString(document.today) } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
 
 /** A calendar day as whole days since 1970-01-01 (UTC), or undefined unless `YYYY-MM-DD`. */
 export function parseGanttDay(value: string): number | undefined {
@@ -62,7 +95,7 @@ export function parseGanttDay(value: string): number | undefined {
 
 /** The `YYYY-MM-DD` of a day number. */
 export function formatGanttDay(day: number): string {
-	return new Date(day * DAY).toISOString().slice(0, 10);
+	return DateTime.formatIsoDateUtc(DateTime.makeUnsafe(day * DAY));
 }
 
 export function isGanttMilestone(task: GanttTask): boolean {
@@ -92,10 +125,10 @@ export function ganttTaskSchedule(task: GanttTask): GanttSchedule | undefined {
 
 /** The phase order a Gantt renders: explicit `phases`, else first use in task order. */
 export function ganttPhases(diagram: GanttDiagram): string[] {
-	if (diagram.phases) return [...diagram.phases];
+	if (diagram.phases) return Arr.copy(diagram.phases);
 	const phases: string[] = [];
 	for (const task of diagram.tasks)
-		if (task.phase !== undefined && !phases.includes(task.phase)) phases.push(task.phase);
+		if (task.phase !== undefined && !Arr.contains(phases, task.phase)) phases.push(task.phase);
 	return phases;
 }
 
@@ -106,9 +139,9 @@ export function ganttRows(diagram: GanttDiagram): {
 }[] {
 	const phases = ganttPhases(diagram);
 	if (phases.length === 0) return [{ tasks: diagram.tasks }];
-	return phases.map((phase) => ({
+	return Arr.map(phases, (phase) => ({
 		phase,
-		tasks: diagram.tasks.filter((task) => task.phase === phase),
+		tasks: Arr.filter(diagram.tasks, (task) => task.phase === phase),
 	}));
 }
 
@@ -137,28 +170,26 @@ const DATE_HINT = "Use YYYY-MM-DD, copied from the source.";
 
 /** Task ids on one dependency cycle, in order, or undefined when the graph is acyclic. */
 function dependencyCycle(tasks: readonly GanttTask[]): string[] | undefined {
-	const byId = new Map(tasks.map((task) => [task.id, task]));
-	const state = new Map<string, "open" | "done">();
-	const stack: string[] = [];
-	const visit = (id: string): string[] | undefined => {
-		if (state.get(id) === "done") return undefined;
-		if (state.get(id) === "open") return [...stack.slice(stack.indexOf(id)), id];
-		state.set(id, "open");
-		stack.push(id);
-		for (const next of byId.get(id)?.dependsOn ?? []) {
-			if (next === id || !byId.has(next)) continue;
-			const cycle = visit(next);
-			if (cycle) return cycle;
+	const byId = new Map(Arr.map(tasks, (task) => [task.id, task] as const));
+	const graph = Graph.directed<string, undefined>((mutable) => {
+		const indices = new Map(
+			Arr.map(Arr.fromIterable(byId.keys()), (id) => [id, Graph.addNode(mutable, id)] as const),
+		);
+		for (const task of byId.values()) {
+			const from = indices.get(task.id);
+			if (from === undefined) continue;
+			for (const target of task.dependsOn ?? []) {
+				const to = indices.get(target);
+				// Self and unknown dependencies have their own actionable issues.
+				if (to !== undefined && target !== task.id) Graph.addEdge(mutable, from, to, undefined);
+			}
 		}
-		stack.pop();
-		state.set(id, "done");
-		return undefined;
-	};
-	for (const task of tasks) {
-		const cycle = visit(task.id);
-		if (cycle) return cycle.toReversed();
-	}
-	return undefined;
+	});
+	return Option.getOrUndefined(
+		Option.map(Graph.findCycle(graph), (cycle) =>
+			Arr.reverse(Arr.map(cycle.path, (index) => Option.getOrThrow(Graph.getNode(graph, index)))),
+		),
+	);
 }
 
 export function getGanttValidationIssues(diagram: GanttDiagram): GanttValidationIssue[] {
@@ -182,9 +213,10 @@ export function getGanttValidationIssues(diagram: GanttDiagram): GanttValidation
 			});
 		ids.add(task.id);
 	}
-	const phased = diagram.phases !== undefined || tasks.some((task) => task.phase !== undefined);
+	const phased =
+		diagram.phases !== undefined || Arr.some(tasks, (task) => task.phase !== undefined);
 	let dependencies = 0;
-	tasks.forEach((task, index) => {
+	Arr.forEach(tasks, (task, index) => {
 		const path = `tasks.[${index}]`;
 		const start = parseGanttDay(task.start);
 		if (start === undefined)
@@ -256,7 +288,7 @@ export function getGanttValidationIssues(diagram: GanttDiagram): GanttValidation
 			});
 		if (
 			phased &&
-			(task.phase === undefined || (diagram.phases && !diagram.phases.includes(task.phase)))
+			(task.phase === undefined || (diagram.phases && !Arr.contains(diagram.phases, task.phase)))
 		)
 			issues.push({
 				code: "invalid_gantt_phase",
@@ -265,7 +297,7 @@ export function getGanttValidationIssues(diagram: GanttDiagram): GanttValidation
 				hint: "Give every task a phase listed in phases, or omit phases everywhere.",
 			});
 		const seen = new Set<string>();
-		(task.dependsOn ?? []).forEach((target, targetIndex) => {
+		Arr.forEach(task.dependsOn ?? [], (target, targetIndex) => {
 			dependencies += 1;
 			const targetPath = `${path}.dependsOn.[${targetIndex}]`;
 			if (target === task.id)
@@ -303,8 +335,11 @@ export function getGanttValidationIssues(diagram: GanttDiagram): GanttValidation
 	if (cycle)
 		issues.push({
 			code: "gantt_dependency_cycle",
-			path: `tasks.[${tasks.findIndex((task) => task.id === cycle[0])}].dependsOn`,
-			message: `Dependencies form a cycle: ${cycle.join(" → ")}.`,
+			path: `tasks.[${Option.getOrElse(
+				Arr.findFirstIndex(tasks, (task) => task.id === cycle[0]),
+				() => -1,
+			)}].dependsOn`,
+			message: `Dependencies form a cycle: ${Arr.join(cycle, " → ")}.`,
 			hint: "A task cannot wait, directly or indirectly, for itself. Remove one dependency on the cycle.",
 		});
 	if (diagram.phases) {
@@ -315,8 +350,8 @@ export function getGanttValidationIssues(diagram: GanttDiagram): GanttValidation
 				message: "Phase names must be unique.",
 				hint: "List each phase once, in top-to-bottom order.",
 			});
-		diagram.phases.forEach((phase, index) => {
-			if (!tasks.some((task) => task.phase === phase))
+		Arr.forEach(diagram.phases, (phase, index) => {
+			if (!Arr.some(tasks, (task) => task.phase === phase))
 				issues.push({
 					code: "invalid_gantt_phase",
 					path: `phases.[${index}]`,
@@ -341,7 +376,7 @@ export function getGanttValidationIssues(diagram: GanttDiagram): GanttValidation
 			hint: `${DATE_HINT} Omit today unless the source states it.`,
 		});
 	const days = [
-		...tasks.flatMap((task) => {
+		...Arr.flatMap(tasks, (task) => {
 			const schedule = ganttTaskSchedule(task);
 			return schedule && Number.isFinite(schedule.end) ? [schedule.start, schedule.end] : [];
 		}),
@@ -354,7 +389,7 @@ export function getGanttValidationIssues(diagram: GanttDiagram): GanttValidation
 			message: `A Gantt chart spans at most ${GANTT_MAX_SPAN_DAYS} days, first task through last and Today.`,
 			hint: "Check the dates for a typo, or split a longer plan into several charts.",
 		});
-	return issues.slice(0, 20);
+	return Arr.take(issues, 20);
 }
 
 /** A finish-to-start dependency whose successor starts before its predecessor finishes. */
@@ -372,10 +407,10 @@ export interface GanttScheduleConflict {
  * milestone may fall on its predecessor's last day.
  */
 export function ganttScheduleConflicts(diagram: GanttDiagram): GanttScheduleConflict[] {
-	const byId = new Map(diagram.tasks.map((task) => [task.id, task]));
-	return diagram.tasks.flatMap((task, index) => {
+	const byId = new Map(Arr.map(diagram.tasks, (task) => [task.id, task] as const));
+	return Arr.flatMap(diagram.tasks, (task, index) => {
 		const schedule = ganttTaskSchedule(task);
-		return (task.dependsOn ?? []).flatMap((target, targetIndex) => {
+		return Arr.flatMap(task.dependsOn ?? [], (target, targetIndex) => {
 			const predecessor = byId.get(target);
 			const before = predecessor && ganttTaskSchedule(predecessor);
 			if (!schedule || !before) return [];
@@ -474,7 +509,7 @@ export function counts(diagram: GanttDiagram) {
 	return {
 		nodeCount: diagram.tasks.length,
 		nodeNoun: "tasks",
-		edgeCount: diagram.tasks.reduce((count, task) => count + (task.dependsOn?.length ?? 0), 0),
+		edgeCount: Arr.reduce(diagram.tasks, 0, (count, task) => count + (task.dependsOn?.length ?? 0)),
 		edgeNoun: "dependencies",
 	};
 }

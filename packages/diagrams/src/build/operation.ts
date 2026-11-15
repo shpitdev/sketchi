@@ -55,6 +55,7 @@ export function defineBuild<
 	readonly check: (document: N) => Result.Result<unknown, E>;
 	readonly issues: (error: E) => CodeModeIssue[];
 	readonly counts: (document: N) => DiagramCounts;
+	readonly warnings?: (document: N) => CodeModeIssue[];
 	readonly assess?: (document: N, threshold: number) => QualityReport;
 	readonly assessScene?: (document: N, scene: CanvasSpec, quality: QualityReport) => QualityReport;
 	readonly qualityIssue?: { readonly code: CodeModeIssueCode; readonly hint: string };
@@ -304,7 +305,11 @@ export function defineBuild<
 			...context,
 			quality: finalQuality,
 			artifact,
-			issues: [...(resolved?.issues ?? []), ...embedded.issues],
+			issues: [
+				...(resolved?.issues ?? []),
+				...embedded.issues,
+				...(policy.warnings?.(normalizedSpec) ?? []),
+			],
 		} satisfies typeof Accepted.Type;
 	});
 	return {

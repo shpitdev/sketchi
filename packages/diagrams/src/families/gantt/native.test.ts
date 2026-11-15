@@ -1,11 +1,6 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import {
-	formatGanttDay,
-	parseGanttDay,
-	parseGanttDiagram,
-	type GanttDiagram,
-} from "@sketchi/diagrams/families/gantt/document";
-import { renderDiagram } from "@sketchi/diagrams/family";
+import { formatGanttDay, parseGanttDay, parseGanttDiagram, type GanttDiagram } from "./document.js";
+import { renderDiagram } from "../../family.js";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";

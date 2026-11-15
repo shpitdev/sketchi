@@ -43,20 +43,8 @@ export function canonicalDocumentFromDiagram(
 	diagram: Exclude<CanonicalDiagram, FlowchartDiagram>,
 ): CanonicalDiagramDocument {
 	switch (diagram.type) {
-		case "gantt": {
-			const { type: _type, ...spec } = diagram;
-			return {
-				type: "gantt",
-				spec: {
-					...spec,
-					tasks: spec.tasks.map((task) => ({
-						...task,
-						...(task.dependsOn ? { dependsOn: [...task.dependsOn] } : {}),
-					})),
-					...(spec.phases ? { phases: [...spec.phases] } : {}),
-				},
-			};
-		}
+		case "gantt":
+			return familyForType("gantt").toDocument(diagram);
 		case "chart":
 			return familyForType("chart").toDocument(diagram);
 		case "timeline":

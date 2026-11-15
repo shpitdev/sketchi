@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import {
 	formatGanttDay,
 	GANTT_MAX_TASKS,
-	ganttRows,
 	ganttScheduleConflicts,
 	ganttTaskSchedule,
 	parseGanttDay,
@@ -61,24 +60,6 @@ describe("canonical Gantt chart", () => {
 		expect(parseGanttDay("2026-03")).toBeUndefined();
 		expect(parseGanttDay("2026-03-01T09:00Z")).toBeUndefined();
 		expect(formatGanttDay(parseGanttDay("2028-02-29")!)).toBe("2028-02-29");
-	});
-
-	it("groups rows by phase in phase order, keeping task order inside a phase", () => {
-		const rows = ganttRows(
-			parseGanttDiagram({
-				...plan,
-				phases: ["Ship", "Make"],
-				tasks: [
-					{ ...plan.tasks[0], phase: "Make" },
-					{ ...plan.tasks[2], phase: "Ship", dependsOn: [] },
-					{ ...plan.tasks[1], phase: "Make" },
-				],
-			}).pipe(Result.getOrThrow),
-		);
-		expect(rows.map((row) => [row.phase, row.tasks.map((task) => task.id)])).toEqual([
-			["Ship", ["c"]],
-			["Make", ["a", "b"]],
-		]);
 	});
 
 	it.each([

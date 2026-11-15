@@ -500,31 +500,6 @@ export const StateMachineSpec = Schema.Struct({
 }).annotate({ identifier: undefined });
 
 export interface StateMachineSpec extends Schema.Schema.Type<typeof StateMachineSpec> {}
-
-/** Author dates, durations and dependencies only; the axis, rows and routes belong to the renderer. */
-export const GanttTaskSpec = Schema.Struct({
-	id: RequiredNonEmptyString,
-	label: RequiredNonEmptyString,
-	start: RequiredNonEmptyString,
-	end: optionalContract(NonEmptyString),
-	duration: optionalContract(FiniteNumber),
-	milestone: optionalContract(Schema.Boolean),
-	phase: optionalContract(NonEmptyString),
-	dependsOn: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	progress: optionalContract(FiniteNumber),
-}).annotate({ identifier: undefined });
-
-export interface GanttTaskSpec extends Schema.Schema.Type<typeof GanttTaskSpec> {}
-export const GanttSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	tasks: requiredArray(nonEmptyArray(GanttTaskSpec)),
-	phases: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	today: optionalContract(NonEmptyString),
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface GanttSpec extends Schema.Schema.Type<typeof GanttSpec> {}
 /**
  * The authoring form of diagram-core's canonical ErDiagram: a field may be one
  * string (`"id uuid PK"`), relationship ids are optional and style is
@@ -907,21 +882,6 @@ export const BuildStateMachineToolInputSchema = Schema.Struct({
 	),
 });
 export type BuildStateMachineToolInput = typeof BuildStateMachineToolInputSchema.Type;
-
-export const BuildGanttRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(GanttSpec),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildGanttRequest extends Schema.Schema.Type<typeof BuildGanttRequest> {}
-/** The Gantt spec a model authors; style is always the Sketchi palette. */
-export const GanttToolSpecSchema = GanttSpec.mapFields(({ style: _style, ...fields }) => fields);
-export const BuildGanttToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(GanttToolSpecSchema),
-});
-export type BuildGanttToolInput = typeof BuildGanttToolInputSchema.Type;
 export const BuildErDiagramRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(ErSpec),
@@ -1533,13 +1493,6 @@ const NormalizedStateMachineSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedStateMachineSpec = typeof NormalizedStateMachineSpecSchema.Type;
-const NormalizedGanttSpecSchema = GanttSpec.mapFields((fields) => ({
-	...fields,
-	id: NonEmptyString,
-	title: NonEmptyString,
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-}));
-export type NormalizedGanttSpec = typeof NormalizedGanttSpecSchema.Type;
 const NormalizedErSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -1710,41 +1663,6 @@ export const BuildStateMachineResultSchema = Schema.Union([
 	BuildStateMachineRejected,
 ]);
 export type BuildStateMachineResult = typeof BuildStateMachineResultSchema.Type;
-
-export const BuildGanttAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedGanttSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildGanttAccepted extends Schema.Schema.Type<typeof BuildGanttAccepted> {}
-export const BuildGanttRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_gantt",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedGanttSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildGanttRejected extends Schema.Schema.Type<typeof BuildGanttRejected> {}
-export const BuildGanttResultSchema = Schema.Union([BuildGanttAccepted, BuildGanttRejected]);
-export type BuildGanttResult = typeof BuildGanttResultSchema.Type;
 export const BuildErDiagramAccepted = Schema.Struct({
 	ok: booleanLiteral(true),
 	status: stringLiteral("accepted"),

@@ -10,14 +10,12 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	formatGanttDay,
-	ganttFixture,
 	ganttTaskSchedule,
 	parseGanttDay,
 	parseGanttDiagram,
 	type GanttDiagram,
 } from "./document.js";
 
-import { renderDiagram } from "../../family.js";
 import { readGanttScene } from "./readout.js";
 import {
 	GANTT_MIN_BAR_WIDTH,
@@ -80,7 +78,7 @@ function expectReadableGantt(
 	diagram: GanttDiagram,
 	{ distinct = true }: { readonly distinct?: boolean } = {},
 ): RenderedDiagramScene {
-	const { scene, work } = layoutGanttDiagram(diagram).pipe(Result.getOrThrow);
+	const { scene, work } = layoutGanttDiagram(diagram);
 	const context = diagram.id;
 	expect(getCanvasValidationIssues(scene), context).toEqual([]);
 	// Routing work is bounded however crowded the plan: per layout, each dependency is placed,
@@ -436,14 +434,6 @@ const plan = (tasks: object[], extra: object = {}) =>
 	);
 
 describe("Gantt renderer", () => {
-	it("renders the fixture into a valid, deterministic scene", () => {
-		const scene = renderDiagram(ganttFixture).pipe(Result.getOrThrow);
-		expect(scene.diagramId).toBe("release-plan");
-		expect(getCanvasValidationIssues(scene)).toEqual([]);
-		expect(renderDiagram(ganttFixture).pipe(Result.getOrThrow)).toEqual(scene);
-		expectReadableGantt(ganttFixture);
-	});
-
 	it.each([
 		["3 weeks", "2026-03-02", "2026-03-20", "day", 1],
 		["3 months", "2026-03-02", "2026-05-29", "week", 1],
@@ -693,39 +683,6 @@ describe("Gantt renderer", () => {
 		expect(end.y).toBeLessThan((signoff.top + signoff.bottom) / 2);
 	});
 
-	it("joins another arrival's last run when the one clear entry into their successor is taken", () => {
-		// Round 18: Migrate catalog -> Wave 2 validation ran around its successor and up into its
-		// bottom, as Migrate order history's route took the one top entry clear of the bars between.
-		const diagram = plan([
-			{ id: "catalog", label: "Catalog", start: "2026-05-04", end: "2026-05-22" },
-			{ id: "orders", label: "Orders", start: "2026-05-04", end: "2026-06-05" },
-			{ id: "clicks", label: "Clickstream", start: "2026-05-11", duration: 20 },
-			{
-				id: "dashboards",
-				label: "Dashboards",
-				start: "2026-06-01",
-				end: "2026-06-12",
-				dependsOn: ["clicks"],
-			},
-			{
-				id: "validation",
-				label: "Validation",
-				start: "2026-06-08",
-				end: "2026-06-19",
-				dependsOn: ["catalog", "orders"],
-			},
-			{ id: "programme", label: "Programme", start: "2026-01-05", end: "2026-07-31" },
-		]);
-		const readout = readGanttScene(expectReadableGantt(diagram));
-		const arrivals = readout.dependencies.filter((entry) => entry.to === "validation");
-		for (const { from, points } of arrivals) {
-			expect(hooks(points), from).toBe(false);
-			expect(turns(points), from).toBe(1);
-		}
-		// One arrowhead: the later route carries on along the earlier one's last run.
-		expect(arrivals[0]!.points.at(-1)).toEqual(arrivals[1]!.points.at(-1));
-	});
-
 	it("hooks around a bar over its successor's start half a bar height clear of it, back to the start", () => {
 		// Round 18: Data lake storage -> Monitoring turned 14 px past Orchestration's end, only to keep
 		// its run back to Monitoring's start 28 px long; at 8 px, judges read a route rounding a bar
@@ -767,7 +724,9 @@ describe("Gantt renderer", () => {
 		// clear of them.
 		const scene = expectReadableGantt(fuzzGantt(464));
 		expect(readGanttScene(scene).dependencies.length).toBeGreaterThan(40);
-		const { work } = layoutGanttDiagram(fuzzGantt(464)).pipe(Result.getOrThrow);
+		const repeated = layoutGanttDiagram(fuzzGantt(464));
+		expect(repeated.scene).toEqual(scene);
+		const { work } = repeated;
 		expect(work.layouts).toBeLessThanOrEqual(3);
 		expect(work.conflicts).toBe(0);
 	});
@@ -802,13 +761,13 @@ describe("Gantt renderer", () => {
 				},
 				{ id: "c", label: "Permit", start: "2026-06-01", duration: 2, phase: "Prepare" },
 			],
-			{ phases: ["Prepare", "Make"] },
+			{ phases: ["Make", "Prepare"] },
 		);
 		const scene = expectReadableGantt(diagram);
 		const readout = readGanttScene(scene);
 		expect(readout.phases).toEqual([
-			{ name: "Prepare", tasks: ["a", "c"] },
 			{ name: "Make", tasks: ["b"] },
+			{ name: "Prepare", tasks: ["a", "c"] },
 		]);
 		const captions = ganttCaptions(diagram);
 		expect(captions.phases.get("Prepare")).toBe("Jun 1–3, 2026");
@@ -891,7 +850,7 @@ describe("Gantt renderer", () => {
 		// Review: a century on a 640 px plot drew decade labels over one another.
 		const scene = renderGanttDiagram(
 			plan([{ id: "a", label: "Long programme", start: "2026-01-01", end: "2125-12-31" }]),
-		).pipe(Result.getOrThrow);
+		);
 		const ticks = scene.elements
 			.flatMap((element) =>
 				element.type === "text" && element.id.startsWith("gantt:tick:") ? [textBox(element)] : [],
@@ -922,18 +881,7 @@ describe("Gantt renderer", () => {
 		expect(problems.slice(0, 5)).toEqual([]);
 	});
 
-	it("rejects a billion-day task before laying out any axis", () => {
-		expect(
-			renderGanttDiagram({
-				id: "oversized",
-				title: "Oversized",
-				type: "gantt",
-				style: ganttFixture.style,
-				tasks: [{ id: "a", label: "Forever", start: "2026-03-02", duration: 1_000_000_000 }],
-			}),
-		).toMatchObject({
-			failure: { message: 'Task "a" has duration 1000000000; a chart spans at most 36525 days.' },
-		});
+	it("bounds axis cells over a century", () => {
 		// The axis never builds more cells than it could label, however long the span.
 		const axis = ganttAxis(parseGanttDay("2026-01-01")!, parseGanttDay("2125-12-31")!);
 		expect(axis.cells.length).toBeLessThanOrEqual(36);

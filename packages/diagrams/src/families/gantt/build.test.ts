@@ -1,16 +1,22 @@
-import { buildResponse, type BuildRejection } from "../operation.js";
+import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { describe, expect, it } from "vitest";
-import { Effect, Schema } from "effect";
-import { ganttFixture } from "../../families/gantt/document.js";
+import { Effect, Result } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { applyDiagramPatch, buildGantt, CodeModeRuntimeEnvironment } from "./runtime.js";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildGanttResultSchema } from "./contract.js";
-import { buildCanonicalDocument, canonicalDocumentFromDiagram } from "./documents.js";
+import {
+	applyDiagramPatch,
+	buildGantt,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+	CodeModeArtifactStorageError,
+} from "../../build/code-mode/artifacts.js";
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(
 	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+	artifactStorage = storage,
 ) {
 	let id = 0;
 	return Effect.runPromise(
@@ -18,7 +24,7 @@ function run<A, E extends BuildRejection<unknown>>(
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_gantt_${(id += 1)}`,
 			}),
-			Effect.provideService(CodeModeArtifactStorage, storage),
+			Effect.provideService(CodeModeArtifactStorage, artifactStorage),
 		),
 	);
 }
@@ -56,7 +62,6 @@ describe("Code Mode native Gantt chart", () => {
 	it("builds a plan into a validated, patchable artifact with bound dependency arrows", async () => {
 		const built = await build(plan);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildGanttResultSchema)(built)).not.toThrow();
 		expect(built.normalizedSpec).toMatchObject({ id: "release-plan", tasks: plan.tasks });
 		expect(built.quality.summary).toEqual({ nodeCount: 3, edgeCount: 2 });
 		expect(built.issues).toEqual([]);
@@ -124,17 +129,20 @@ describe("Code Mode native Gantt chart", () => {
 				severity: "warning",
 				ref: { kind: "request", path: "spec.tasks.[1].dependsOn.[0]" },
 				message: 'Task "api" starts before "design" finishes on 2026-03-06.',
+				stage: "input",
+				hint: 'Keep dates the prompt states; otherwise start "api" after 2026-03-06.',
 			}),
 		]);
 	});
 
 	it.each([
-		[{ dependsOn: ["nowhere"] }, "missing_edge_source"],
-		[{ dependsOn: ["api"] }, "self_loop"],
+		[{ dependsOn: ["nowhere"] }, "missing_dependency"],
+		[{ dependsOn: ["api"] }, "self_dependency"],
 		[{ end: "2026-03-01", duration: undefined }, "invalid_gantt_span"],
 		[{ start: "March 9" }, "invalid_gantt_date"],
 		[{ phase: undefined }, "invalid_gantt_phase"],
 		[{ progress: 140 }, "invalid_gantt_progress"],
+		[{ duration: 1_000_000_000 }, "invalid_gantt_span"],
 	])("rejects invalid plans with structured repair issues", async (patch, code) => {
 		const tasks = plan.tasks.map((task) =>
 			task.id === "api"
@@ -148,16 +156,27 @@ describe("Code Mode native Gantt chart", () => {
 		expect(result.status).toBe("invalid_gantt");
 		expect(result.issues.map((issue) => issue.code)).toContain(code);
 		expect(result.issues.every((issue) => issue.hint && issue.stage === "input")).toBe(true);
-		expect(() => Schema.decodeUnknownSync(BuildGanttResultSchema)(result)).not.toThrow();
 	});
 
 	it("rejects a dependency cycle", async () => {
-		const result = await build({
-			...plan,
-			tasks: plan.tasks.map((task) =>
-				task.id === "design" ? { ...task, dependsOn: ["launch"] } : task,
+		const typed = await run(
+			Effect.result(
+				buildGantt({
+					spec: {
+						...plan,
+						tasks: plan.tasks.map((task) =>
+							task.id === "design" ? { ...task, dependsOn: ["launch"] } : task,
+						),
+					},
+				}),
 			),
+		);
+		if (Result.isSuccess(typed)) throw new Error("Expected dependency refusal");
+		expect(typed.failure.reason).toMatchObject({
+			_tag: "Document",
+			error: { _tag: "GanttValidationError" },
 		});
+		const result = typed.failure.toResult();
 		expect(result.status).toBe("invalid_gantt");
 		expect(result.issues.map((issue) => issue.code)).toEqual(["gantt_dependency_cycle"]);
 	});
@@ -167,14 +186,55 @@ describe("Code Mode native Gantt chart", () => {
 		expect(result.ok).toBe(false);
 		expect(result.status).toBe("invalid_input");
 	});
-
-	it("round-trips the canonical fixture through its document", async () => {
-		const result = await run(
-			buildCanonicalDocument(canonicalDocumentFromDiagram(ganttFixture), {
-				artifactFormats: ["scene"],
-			}),
-		);
-		if (!result.ok) throw new Error(JSON.stringify(result.issues));
-		expect(result.normalizedSpec).toMatchObject({ id: ganttFixture.id, tasks: ganttFixture.tasks });
-	});
+	it.each(["input", "semantic", "export", "storage"] as const)(
+		"does not emit schedule warnings when %s fails",
+		async (mode) => {
+			const conflicting = {
+				...plan,
+				tasks: plan.tasks.map((task) =>
+					task.id === "api" ? { ...task, start: "2026-03-05" } : task,
+				),
+			};
+			const memory = makeMemoryArtifactStorage();
+			const result = await run(
+				buildGantt({
+					spec:
+						mode === "input"
+							? { ...conflicting, tasks: null }
+							: mode === "semantic"
+								? {
+										...conflicting,
+										tasks: conflicting.tasks.map((task) =>
+											task.id === "api" ? { ...task, progress: 140 } : task,
+										),
+									}
+								: conflicting,
+					options: mode === "export" ? { artifactFormats: ["png"] } : options,
+				}),
+				mode === "storage"
+					? {
+							...memory,
+							write: () =>
+								Effect.fail(
+									new CodeModeArtifactStorageError({
+										operation: "write",
+										message: "Deliberate storage refusal",
+										cause: "test",
+									}),
+								),
+						}
+					: memory,
+			);
+			expect(result.ok).toBe(false);
+			expect(result.status).toBe(
+				{
+					input: "invalid_input",
+					semantic: "invalid_gantt",
+					export: "export_failed",
+					storage: "storage_failed",
+				}[mode],
+			);
+			expect(result.issues.some((issue) => issue.code === "gantt_schedule_conflict")).toBe(false);
+		},
+	);
 });

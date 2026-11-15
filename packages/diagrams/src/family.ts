@@ -18,7 +18,7 @@ import * as flowchartFamily from "./families/flowchart/diagram.js";
 import { docs as flowchartFamilyDocs } from "./families/flowchart/docs.js";
 import { docs as ganttFamilyDocs } from "./families/gantt/docs.js";
 import * as ganttFamily from "./families/gantt/document.js";
-import { renderGanttDiagram } from "./families/gantt/render.js";
+import { ganttBuild } from "./families/gantt/build.js";
 import { docs as journeyFamilyDocs } from "./families/journey/docs.js";
 import * as journeyFamily from "./families/journey/document.js";
 import { journeyBuild } from "./families/journey/build.js";
@@ -274,32 +274,12 @@ export const families = [
 		build: (runtime: typeof Runtime) => runtime.buildStateMachine,
 		docs: stateMachineFamilyDocs,
 	}),
-	legacyFamily({
-		type: ganttFamily.ganttFixture.type,
+	family({
 		operation: "buildGantt",
 		label: "Gantt chart",
 		path: "/api/v1/gantts/build",
-		canonical: canonical(
-			ganttFamily.GanttDiagram,
-			ganttFamily.ganttFixture.type,
-			ganttFamily.validateGanttDiagram,
-			renderGanttDiagram,
-			ganttFamily.counts,
-		),
-		validationError: ganttFamily.GanttValidationError,
+		build: ganttBuild,
 		fixture: ganttFamily.ganttFixture,
-		spec: Build.GanttSpec,
-		request: Build.BuildGanttRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildGanttRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.GanttToolSpecSchema,
-			}),
-			output: Build.BuildGanttResultSchema,
-		},
-		studioInput: Build.BuildGanttToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildGantt,
 		docs: ganttFamilyDocs,
 	}),
 	legacyFamily({
