@@ -1,3 +1,6 @@
+import { Array } from "effect";
+import { AsyncResult } from "effect/reactivity";
+import { resourceError } from "../projects/client";
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
@@ -22,7 +25,7 @@ export function useEditedDrawingDownload(scene: RenderedDiagramScene) {
 			setDirty(
 				next.appState.viewBackgroundColor !== baseScene.appState.viewBackgroundColor ||
 					next.elements.length !== baseScene.elements.length ||
-					next.elements.some((element, index) => {
+					Array.some(next.elements, (element, index) => {
 						const original = baseScene.elements[index];
 						return (
 							!original ||
@@ -45,6 +48,7 @@ export function useEditedDrawingDownload(scene: RenderedDiagramScene) {
 				source: window.location.origin,
 			});
 			const url = URL.createObjectURL(
+				// @effect-diagnostics-next-line globalJson:off -- The synchronous download click serializes the native Excalidraw export before the anchor default action.
 				new Blob([JSON.stringify(file, null, 2)], {
 					type: "application/vnd.excalidraw+json",
 				}),
@@ -126,7 +130,7 @@ function ReadyEditor({
 			<DrawingEditor
 				onSceneChange={onSceneChange}
 				title={scene.title}
-				revision={JSON.stringify(scene)}
+				revision={artifactId}
 				scene={convertSceneToExcalidraw(scene)}
 				viewModeEnabled={false}
 				zenModeEnabled={false}
@@ -143,14 +147,14 @@ export function EditableArtifactStage({
 	showSceneFile = false,
 	state,
 }: EditableArtifactStageProps) {
-	if (state.status === "ready")
+	if (AsyncResult.isSuccess(state))
 		return (
 			<ReadyEditor
 				key={artifactId}
 				artifactId={artifactId}
 				downloadName={downloadName}
 				headerLinks={headerLinks}
-				scene={state.scene}
+				scene={state.value.scene}
 				showSceneFile={showSceneFile}
 			/>
 		);
@@ -160,9 +164,11 @@ export function EditableArtifactStage({
 			actions={<IconButton disabled icon="download" label="Drawing file" />}
 		>
 			<p
-				className={`artifact-view__message${state.status === "error" ? " artifact-view__message--error" : ""}`}
+				className={`artifact-view__message${AsyncResult.isFailure(state) ? " artifact-view__message--error" : ""}`}
 			>
-				{state.status === "error" ? state.message : loadingMessage}
+				{AsyncResult.isFailure(state)
+					? resourceError(state, "Artifact could not be loaded.")
+					: loadingMessage}
 			</p>
 		</EditorFrame>
 	);

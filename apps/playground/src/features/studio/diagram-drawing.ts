@@ -1,13 +1,20 @@
 import { convertSceneToExcalidraw, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import {
-	fetchStudioDiagramDetails,
-	fetchStudioDiagramDrawing,
-	type StudioDiagramSummary,
-	type StudioDrawing,
-	type StudioProjectSummary,
-} from "@sketchi/studio-projects/client";
-
-import { fetchArtifactScene } from "@/features/artifacts/artifact-view-client";
+import { Effect, Array, Record } from "effect";
+import { HttpApiClient } from "effect/http-api";
+import { StudioHttpApi } from "../projects/http-api";
+const decodeDrawing = HttpApiClient.decodeResponse(StudioHttpApi, {
+	group: "projects",
+	endpoint: "drawing",
+});
+import { Atom } from "effect/reactivity";
+import type {
+	StudioDiagramSummary,
+	StudioDrawing,
+	StudioProjectSummary,
+} from "../projects/contracts";
+import { StudioApi, projectsRuntime } from "../projects/client";
+import { loadArtifactReview } from "../artifacts/artifact-view-client";
+import { readDrawingDraft } from "./drawing-drafts";
 
 export interface DiagramDrawing {
 	diagram: StudioDiagramSummary;
@@ -16,16 +23,38 @@ export interface DiagramDrawing {
 }
 
 /** The diagram's saved drawing, or its generated scene before the first Save. */
-export async function fetchDiagramDrawing(
+export const loadDiagramDrawing = Effect.fn("Studio.diagram.drawing")(function* (
 	diagramId: string,
-	signal: AbortSignal,
-): Promise<DiagramDrawing> {
-	const details = await fetchStudioDiagramDetails(diagramId, signal);
-	const scene = details.diagram.savedAt
-		? sceneFromDrawing(await fetchStudioDiagramDrawing(diagramId, signal))
-		: convertSceneToExcalidraw(await fetchArtifactScene(details.diagram.artifactId, signal));
-	return { ...details, scene };
-}
+) {
+	const api = yield* StudioApi;
+	const details = yield* api.projects.diagram({ params: { diagramId } });
+	const stored = yield* api.projects.drawing({
+		params: { diagramId },
+		responseMode: "response-only",
+	});
+	// A saved drawing is authoritative, including drawings written before metadata
+	// publication changed. Only an actual 404 falls back to the generated artifact.
+	const scene =
+		stored.status === 404
+			? convertSceneToExcalidraw((yield* loadArtifactReview(details.diagram.artifactId)).scene)
+			: sceneFromDrawing((yield* decodeDrawing(stored)).drawing);
+	return { diagram: details.diagram, project: details.project, scene };
+});
+export const diagramDrawing = Atom.family((diagramId: string) =>
+	projectsRuntime
+		.atom(loadDiagramDrawing(diagramId))
+		.pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial),
+);
+export const editableDiagramDrawing = Atom.family((diagramId: string) =>
+	projectsRuntime
+		.atom(
+			Effect.all(
+				{ drawing: loadDiagramDrawing(diagramId), draft: readDrawingDraft(diagramId) },
+				{ concurrency: 2 },
+			).pipe(Effect.map(({ drawing, draft }) => ({ ...drawing, draft }))),
+		)
+		.pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial),
+);
 
 export function sceneFromDrawing(drawing: StudioDrawing): ExcalidrawScene {
 	return {
@@ -38,12 +67,14 @@ export function sceneFromDrawing(drawing: StudioDrawing): ExcalidrawScene {
 
 /** What a Save stores: live elements, the background, and the image files they use. */
 export function drawingFromScene(scene: ExcalidrawScene): StudioDrawing {
-	const elements = scene.elements.filter((element) => !element.isDeleted);
+	const elements = Array.filter(scene.elements, (element) => !element.isDeleted);
 	const fileIds = new Set(
-		elements.flatMap((element) => (typeof element.fileId === "string" ? [element.fileId] : [])),
+		Array.flatMap(elements, (element) =>
+			typeof element.fileId === "string" ? [element.fileId] : [],
+		),
 	);
-	const files = Object.fromEntries(
-		Object.entries(scene.files ?? {}).filter(([fileId]) => fileIds.has(fileId)),
+	const files = Record.fromEntries(
+		Array.filter(Record.toEntries(scene.files ?? {}), ([fileId]) => fileIds.has(fileId)),
 	);
 	const background = scene.appState.viewBackgroundColor;
 	return {

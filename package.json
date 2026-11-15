@@ -44,7 +44,6 @@
 	"dependencies": {
 		"@cloudflare/codemode": "0.5.6",
 		"@standard-schema/spec": "1.1.0",
-		"@tanstack/react-query": "5.105.0",
 		"@tanstack/react-router": "1.170.46",
 		"@tanstack/react-start": "1.169.4",
 		"effect": "catalog:",

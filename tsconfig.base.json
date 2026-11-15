@@ -23,9 +23,7 @@
     "types": ["node"],
     "useDefineForClassFields": true,
     "paths": {
-      "@sketchi/generators": ["./tools/sketchi-generators/src/index.ts"],
-      "@sketchi/studio-projects/client": ["./packages/studio/projects/src/client.ts"],
-      "@sketchi/studio-projects/server": ["./packages/studio/projects/src/server.ts"]
+      "@sketchi/generators": ["./tools/sketchi-generators/src/index.ts"]
     },
     "noUncheckedSideEffectImports": false,
     "plugins": [
@@ -398,6 +396,27 @@
           {
             "include": [
               "apps/icons/src/lib/query-atoms.ts",
+              "apps/playground/src/features/artifacts/artifact-view-client.ts",
+              "apps/playground/src/features/artifacts/editable-artifact-stage.tsx",
+              "apps/playground/src/features/projects/bucket.server.ts",
+              "apps/playground/src/features/projects/client.ts",
+              "apps/playground/src/features/projects/contracts.ts",
+              "apps/playground/src/features/projects/errors.server.ts",
+              "apps/playground/src/features/projects/http-api.ts",
+              "apps/playground/src/features/projects/http.server.ts",
+              "apps/playground/src/features/projects/service.server.ts",
+              "apps/playground/src/features/projects/session.server.ts",
+              "apps/playground/src/features/projects/source-artifacts.server.ts",
+              "apps/playground/src/features/studio/diagram-drawing.ts",
+              "apps/playground/src/features/studio/diagram-editor.tsx",
+              "apps/playground/src/features/studio/drawing-drafts.ts",
+              "apps/playground/src/routes/artifacts/$artifactId.tsx",
+              "apps/playground/src/routes/artifacts_/$artifactId/edit.tsx",
+              "apps/playground/src/routes/diagrams/$diagramId.tsx",
+              "apps/playground/src/routes/diagrams_/$diagramId/edit.tsx",
+              "apps/playground/src/routes/projects.tsx",
+              "apps/playground/src/routes/projects_/$projectId.tsx",
+              "apps/playground/src/server/studio/projects.server.ts",
               "apps/icons/src/lib/community-atoms.ts",
               "apps/icons/src/routes/index.tsx",
               "apps/icons/src/routes/packs/$id.tsx",

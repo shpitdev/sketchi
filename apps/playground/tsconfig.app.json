@@ -16,9 +16,6 @@
       "path": "../../packages/ui/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/studio/projects/tsconfig.lib.json"
-    },
-    {
       "path": "../../packages/observability/tsconfig.lib.json"
     },
     {

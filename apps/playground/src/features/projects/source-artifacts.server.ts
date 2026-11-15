@@ -1,6 +1,6 @@
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect } from "effect";
 
-import { StudioSourceArtifactError } from "./errors.js";
+import { StudioSourceArtifactError } from "./errors.server.js";
 
 export interface StudioSourceArtifact {
 	diagramId: string;
@@ -16,8 +16,4 @@ export interface StudioSourceArtifactStoreShape {
 export class StudioSourceArtifactStore extends Context.Service<
 	StudioSourceArtifactStore,
 	StudioSourceArtifactStoreShape
->()("@sketchi/studio-projects/StudioSourceArtifactStore") {}
-
-export function makeStudioSourceArtifactStoreTestLayer(service: StudioSourceArtifactStoreShape) {
-	return Layer.succeed(StudioSourceArtifactStore, service);
-}
+>()("@sketchi/studio/projects/StudioSourceArtifactStore") {}

@@ -1,3 +1,4 @@
+import { RegistryProvider } from "@effect/atom-react";
 import { type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,10 +21,26 @@ vi.mock("@sketchi/editor", () => ({
 	},
 }));
 const studio = vi.hoisted(() => ({ save: vi.fn() }));
-vi.mock("@sketchi/studio-projects/client", () => ({ saveStudioDiagramDrawing: studio.save }));
-const drafts = vi.hoisted(() => ({ clear: vi.fn(async () => undefined), write: vi.fn() }));
-vi.mock("./drawing-drafts", () => ({ createDrawingDraftCapture: () => drafts }));
 
+const drafts = vi.hoisted(() => ({ clear: vi.fn(async () => undefined), write: vi.fn() }));
+vi.mock("./drawing-drafts", async () => {
+	const { Atom } = await import("effect/reactivity");
+	const { Effect, Stream } = await import("effect");
+	return {
+		drawingDraft: Atom.family(() =>
+			Atom.fn((drawing: unknown) =>
+				Stream.fromEffect(
+					Effect.promise(async () => {
+						if (drawing === undefined) await drafts.clear();
+						else drafts.write(drawing);
+					}),
+				),
+			),
+		),
+	};
+});
+
+import { drawingFromScene } from "./diagram-drawing";
 import { DiagramEditor } from "./diagram-editor";
 
 const saved: ExcalidrawScene = {
@@ -45,13 +62,15 @@ function edit(scene: ExcalidrawScene, id: string, version: number): ExcalidrawSc
 
 function renderEditor(draft?: ExcalidrawScene) {
 	render(
-		<DiagramEditor
-			diagramId="dia_test"
-			draft={draft}
-			headerLinks={null}
-			scene={saved}
-			title="Test diagram"
-		/>,
+		<RegistryProvider>
+			<DiagramEditor
+				diagramId="dia_test"
+				draft={draft}
+				headerLinks={null}
+				scene={saved}
+				title="Test diagram"
+			/>
+		</RegistryProvider>,
 	);
 }
 
@@ -59,13 +78,36 @@ const saveButton = (name: string) => screen.getByRole("button", { name });
 
 beforeEach(() => {
 	studio.save.mockResolvedValue({});
+	vi.stubGlobal(
+		"fetch",
+		vi.fn(async (_url: unknown, init: RequestInit) => {
+			await studio.save("dia_test", JSON.parse(String(init.body)));
+			return Response.json({
+				ok: true,
+				auth: { status: "anonymous", message: "Anonymous" },
+				session: { kind: "anonymous" },
+				diagram: {
+					id: "dia_test",
+					projectId: "proj_test",
+					artifactId: "artifact",
+					title: "Saved",
+					createdAt: "2026-11-15",
+					updatedAt: "2026-11-15",
+					source: { kind: "playground-artifact", artifactId: "artifact" },
+					editUrl: "/diagrams/dia_test/edit",
+					reviewUrl: "/diagrams/dia_test",
+				},
+			});
+		}),
+	);
 });
 afterEach(() => {
 	vi.clearAllMocks();
+	vi.unstubAllGlobals();
 });
 
 describe("Studio diagram editor", () => {
-	it("captures each content edit, but not selection or scrolling", () => {
+	it("captures each content edit, but not selection or scrolling", async () => {
 		renderEditor();
 		act(() => canvas.change?.(saved));
 		expect(saveButton("Saved")).toHaveProperty("disabled", true);
@@ -79,7 +121,9 @@ describe("Studio diagram editor", () => {
 		const movedAgain = edit(moved, "box", 3);
 		act(() => canvas.change?.(movedAgain));
 
-		expect(drafts.write.mock.calls.map(([scene]) => scene)).toEqual([moved, movedAgain]);
+		await waitFor(() =>
+			expect(drafts.write).toHaveBeenLastCalledWith(drawingFromScene(movedAgain)),
+		);
 		expect(saveButton("Save")).toHaveProperty("disabled", false);
 	});
 
@@ -137,7 +181,7 @@ describe("Studio diagram editor", () => {
 		// Back to the previous Save while the request still carries the added ellipse.
 		act(() => canvas.change?.(saved));
 		expect(drafts.clear).not.toHaveBeenCalled();
-		expect(drafts.write).toHaveBeenLastCalledWith(saved);
+		await waitFor(() => expect(drafts.write).toHaveBeenLastCalledWith(drawingFromScene(saved)));
 
 		await act(async () => finish({}));
 		expect(studio.save).toHaveBeenCalledWith(
@@ -145,7 +189,7 @@ describe("Studio diagram editor", () => {
 			expect.objectContaining({ elements: added.elements }),
 		);
 		expect(drafts.clear).not.toHaveBeenCalled();
-		expect(drafts.write).toHaveBeenLastCalledWith(saved);
+		await waitFor(() => expect(drafts.write).toHaveBeenLastCalledWith(drawingFromScene(saved)));
 		expect(saveButton("Save")).toHaveProperty("disabled", false);
 	});
 
@@ -164,7 +208,7 @@ describe("Studio diagram editor", () => {
 		act(() => canvas.change?.(newer));
 		await act(async () => dropped());
 
-		expect(drafts.write).toHaveBeenLastCalledWith(newer);
+		expect(drafts.write).toHaveBeenLastCalledWith(drawingFromScene(newer));
 		expect(saveButton("Save")).toHaveProperty("disabled", false);
 	});
 

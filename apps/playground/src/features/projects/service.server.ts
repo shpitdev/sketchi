@@ -6,7 +6,9 @@ import {
 import { nanoid } from "nanoid";
 import {
 	Cause,
-	Clock,
+	DateTime,
+	Array,
+	String as Str,
 	Context,
 	Duration,
 	Effect,
@@ -34,11 +36,15 @@ import {
 	type StudioProjectDetails,
 	type StudioProjectSummary,
 	type IsoDateString,
-} from "../contracts.js";
-import { makeStudioJsonPersistence, StudioObjectStore } from "./bucket.js";
-import type { StudioProjectsError } from "./errors.js";
-import { ensureOwner } from "./session.js";
-import { StudioSourceArtifactStore } from "./source-artifacts.js";
+} from "./contracts.js";
+import {
+	makeStudioJsonPersistence,
+	StudioObjectStore,
+	type StudioObjectMetadata,
+} from "./bucket.server.js";
+import { StudioNotFoundError, type StudioProjectsError } from "./errors.server.js";
+import { ensureOwner } from "./session.server.js";
+import { StudioSourceArtifactStore } from "./source-artifacts.server.js";
 
 const STUDIO_PREFIX = "studio";
 
@@ -149,7 +155,7 @@ export interface StudioProjectsShape {
 	readonly listProjects: (
 		session: StudioOwner,
 	) => Effect.Effect<StudioProjectSummary[], StudioProjectsError>;
-	/** Replaces the diagram's drawing with this one; every Save is the same overwrite. */
+	/** One authoritative atomic R2 drawing replacement; native metadata owns its save time. */
 	readonly saveDrawing: (
 		session: StudioOwner,
 		diagramId: string,
@@ -158,7 +164,7 @@ export interface StudioProjectsShape {
 }
 
 export class StudioProjects extends Context.Service<StudioProjects, StudioProjectsShape>()(
-	"@sketchi/studio-projects/StudioProjects",
+	"@sketchi/studio/projects/StudioProjects",
 ) {}
 
 export const StudioPersistencePolicyConfig = Schema.Struct({
@@ -172,7 +178,7 @@ export interface StudioPersistencePolicyConfig extends Schema.Schema.Type<
 export class StudioPersistencePolicy extends Context.Service<
 	StudioPersistencePolicy,
 	StudioPersistencePolicyConfig
->()("@sketchi/studio-projects/StudioPersistencePolicy") {}
+>()("@sketchi/studio/projects/StudioPersistencePolicy") {}
 
 export const StudioPersistencePolicyLive = Layer.succeed(
 	StudioPersistencePolicy,
@@ -187,13 +193,11 @@ export interface StudioRecordFactoryShape {
 export class StudioRecordFactory extends Context.Service<
 	StudioRecordFactory,
 	StudioRecordFactoryShape
->()("@sketchi/studio-projects/StudioRecordFactory") {}
+>()("@sketchi/studio/projects/StudioRecordFactory") {}
 
 export const StudioRecordFactoryLive = Layer.succeed(StudioRecordFactory, {
 	createId: (kind) => makeStudioRecordId(`${kind}_${nanoid(14)}`),
-	now: Clock.currentTimeMillis.pipe(
-		Effect.map((millis) => makeIsoDateString(new Date(millis).toISOString())),
-	),
+	now: DateTime.now.pipe(Effect.map((now) => makeIsoDateString(DateTime.formatIso(now)))),
 });
 
 function keySegment(value: string): string {
@@ -238,7 +242,10 @@ function projectSummary(record: StudioProjectRecord): StudioProjectSummary {
 	};
 }
 
-function diagramSummary(record: StudioDiagramRecord): StudioDiagramSummary {
+function diagramSummary(
+	record: StudioDiagramRecord,
+	drawing: StudioObjectMetadata | null,
+): StudioDiagramSummary {
 	return {
 		artifactDiagramId: record.artifactDiagramId,
 		artifactId: record.artifactId,
@@ -247,15 +254,15 @@ function diagramSummary(record: StudioDiagramRecord): StudioDiagramSummary {
 		id: record.id,
 		projectId: record.projectId,
 		reviewUrl: studioDiagramUrl(record.id),
-		savedAt: record.savedAt,
+		savedAt: drawing ? makeIsoDateString(drawing.uploaded.toISOString()) : undefined,
 		source: record.source,
 		title: record.title,
-		updatedAt: record.updatedAt,
+		updatedAt: drawing ? makeIsoDateString(drawing.uploaded.toISOString()) : record.updatedAt,
 	};
 }
 
 function sortedProjects(projects: StudioProjectSummary[]): StudioProjectSummary[] {
-	return [...projects].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+	return [...projects].sort((left, right) => Str.localeCompare(left.updatedAt)(right.updatedAt));
 }
 
 export const StudioProjectsLive = Layer.effect(
@@ -297,7 +304,7 @@ export const StudioProjectsLive = Layer.effect(
 
 				do {
 					const result = yield* objectStore.list(cursor ? { cursor, prefix } : { prefix });
-					keys.push(...result.objects.map((object) => object.key));
+					keys.push(...Array.map(result.objects, (object) => object.key));
 					cursor = result.truncated === true && result.cursor ? result.cursor : undefined;
 				} while (cursor);
 
@@ -319,7 +326,7 @@ export const StudioProjectsLive = Layer.effect(
 				{ concurrency: policy.listingConcurrency },
 			);
 
-			return entries.flatMap((entry) =>
+			return Array.flatMap(entries, (entry) =>
 				entry && entry.ownerKey === ownerKey ? [entry.projectId] : [],
 			);
 		});
@@ -347,10 +354,8 @@ export const StudioProjectsLive = Layer.effect(
 			const records = yield* Effect.forEach(
 				projectIds,
 				(projectId) =>
-					readProjectRecord(projectId).pipe(
-						Effect.flatMap((record) =>
-							ensureOwner(record.owner, session, "project", record.id).pipe(Effect.as(record)),
-						),
+					getProject(session, projectId, 1).pipe(
+						Effect.map((details) => details.project),
 						Effect.catchTags({
 							StudioNotFoundError: () => Effect.succeed(null),
 							StudioOwnershipError: () => Effect.succeed(null),
@@ -359,14 +364,13 @@ export const StudioProjectsLive = Layer.effect(
 				{ concurrency: policy.listingConcurrency },
 			);
 
-			return sortedProjects(
-				records.flatMap((record) => (record === null ? [] : [projectSummary(record)])),
-			);
+			return sortedProjects(Array.flatMap(records, (record) => (record === null ? [] : [record])));
 		});
 
 		const getProject = Effect.fn("studioPersistence.projects.getProject")(function* (
 			session: StudioOwner,
 			projectId: string,
+			diagramConcurrency = policy.listingConcurrency,
 		) {
 			const project = yield* readProjectRecord(projectId);
 			yield* ensureOwner(project.owner, session, "project", project.id);
@@ -376,21 +380,32 @@ export const StudioProjectsLive = Layer.effect(
 				(diagramId) =>
 					readDiagramRecord(diagramId).pipe(
 						Effect.flatMap((diagram) =>
-							ensureOwner(diagram.owner, session, "diagram", diagram.id).pipe(Effect.as(diagram)),
+							ensureOwner(diagram.owner, session, "diagram", diagram.id).pipe(
+								Effect.andThen(
+									Effect.map(objectStore.head(studioDrawingKey(diagram.id)), (metadata) =>
+										diagramSummary(diagram, metadata),
+									),
+								),
+							),
 						),
 						Effect.catchTags({
 							StudioNotFoundError: () => Effect.succeed(null),
 							StudioOwnershipError: () => Effect.succeed(null),
 						}),
 					),
-				{ concurrency: policy.listingConcurrency },
+				{ concurrency: diagramConcurrency },
 			);
 
 			return {
-				diagrams: diagrams.flatMap((diagram) =>
-					diagram === null ? [] : [diagramSummary(diagram)],
-				),
-				project: projectSummary(project),
+				diagrams: Array.flatMap(diagrams, (diagram) => (diagram === null ? [] : [diagram])),
+				project: {
+					...projectSummary(project),
+					updatedAt: makeIsoDateString(
+						Array.reduce(diagrams, project.updatedAt, (latest, diagram) =>
+							diagram && diagram.updatedAt > latest ? diagram.updatedAt : latest,
+						),
+					),
+				},
 			};
 		});
 
@@ -403,9 +418,16 @@ export const StudioProjectsLive = Layer.effect(
 			const project = yield* readProjectRecord(diagram.projectId);
 			yield* ensureOwner(project.owner, session, "project", project.id);
 
+			if (!project.diagramIds.includes(diagram.id))
+				return yield* StudioNotFoundError.make({ id: diagramId, resource: "diagram" });
+			const metadata = yield* objectStore.head(studioDrawingKey(diagram.id));
+			const summary = diagramSummary(diagram, metadata);
 			return {
-				diagram: diagramSummary(diagram),
-				project: projectSummary(project),
+				diagram: summary,
+				project: {
+					...projectSummary(project),
+					updatedAt: summary.updatedAt > project.updatedAt ? summary.updatedAt : project.updatedAt,
+				},
 			};
 		});
 
@@ -415,6 +437,10 @@ export const StudioProjectsLive = Layer.effect(
 		) {
 			const diagram = yield* readDiagramRecord(diagramId);
 			yield* ensureOwner(diagram.owner, session, "diagram", diagram.id);
+			const project = yield* readProjectRecord(diagram.projectId);
+			yield* ensureOwner(project.owner, session, "project", project.id);
+			if (!project.diagramIds.includes(diagram.id))
+				return yield* StudioNotFoundError.make({ id: diagramId, resource: "diagram" });
 			return diagram;
 		});
 
@@ -432,19 +458,8 @@ export const StudioProjectsLive = Layer.effect(
 			drawing: StudioDrawing,
 		) {
 			const diagram = yield* readOwnedDiagram(session, diagramId);
-			const project = yield* readProjectRecord(diagram.projectId);
-			yield* ensureOwner(project.owner, session, "project", project.id);
-			const savedAt = yield* recordFactory.now;
-			// The drawing lands before the record that announces it.
-			yield* json.put(studioDrawingKey(diagram.id), StudioDrawing, drawing);
-			const saved = StudioDiagramRecord.make({ ...diagram, savedAt, updatedAt: savedAt });
-			yield* json.put(studioDiagramRecordKey(saved.id), StudioDiagramRecord, saved);
-			yield* json.put(
-				studioProjectRecordKey(project.id),
-				StudioProjectRecord,
-				StudioProjectRecord.make({ ...project, updatedAt: savedAt }),
-			);
-			return diagramSummary(saved);
+			const metadata = yield* json.put(studioDrawingKey(diagram.id), StudioDrawing, drawing);
+			return diagramSummary(diagram, metadata);
 		});
 
 		const createFromArtifact = Effect.fn("studioPersistence.projects.createFromArtifact")(
@@ -481,8 +496,8 @@ export const StudioProjectsLive = Layer.effect(
 				yield* withTelemetryCorrelation(
 					Effect.gen(function* () {
 						yield* json.put(studioDiagramRecordKey(diagram.id), StudioDiagramRecord, diagram);
-						yield* json.put(studioProjectRecordKey(project.id), StudioProjectRecord, project);
 						yield* writeOwnerProjectEntry(input.session, project.id, createdAt);
+						yield* json.put(studioProjectRecordKey(project.id), StudioProjectRecord, project);
 					}).pipe(
 						Effect.onError(() =>
 							Effect.forEach(
@@ -500,7 +515,7 @@ export const StudioProjectsLive = Layer.effect(
 				);
 
 				return {
-					diagram: diagramSummary(diagram),
+					diagram: diagramSummary(diagram, null),
 					ok: true,
 					project: projectSummary(project),
 					urls: {

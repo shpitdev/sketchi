@@ -2,37 +2,38 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { vi } from "vitest";
 
+import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
 import {
-	handleCreateFromArtifactRequestEffect,
-	handleGetDiagramRequestEffect,
-	handleGetDrawingRequestEffect,
-	handleGetProjectRequestEffect,
-	handleListProjectsRequestEffect,
-	handleSaveDrawingRequestEffect,
 	makeIsoDateString,
 	makeStudioRecordId,
+	type StudioOwner,
+	type StudioProjectRecord,
+} from "./contracts";
+import {
 	makeStudioObjectStoreLayer,
+	MemoryStudioObjectBucket,
+	type StudioObjectBucketListOptions,
+	type StudioObjectBucketListResult,
+} from "./bucket.server";
+import {
 	makeStudioPersistencePolicyLayer,
 	makeStudioRecordFactoryLayer,
-	MemoryStudioObjectBucket,
 	StudioPersistencePolicyLive,
 	StudioProjectsLive,
 	StudioRecordFactoryLive,
-	StudioSessionServiceLive,
-	StudioSourceArtifactError,
-	StudioSourceArtifactStore,
 	studioDiagramRecordKey,
 	studioDrawingKey,
-	STUDIO_DRAWING_MAX_BYTES,
 	studioOwnerKey,
 	studioOwnerProjectEntryKey,
 	studioProjectRecordKey,
-	type StudioObjectBucketListOptions,
-	type StudioObjectBucketListResult,
-	type StudioOwner,
-	type StudioProjectRecord,
+} from "./service.server";
+import { StudioSessionServiceLive } from "./session.server";
+import { StudioSourceArtifactError } from "./errors.server";
+import {
+	StudioSourceArtifactStore,
 	type StudioSourceArtifactStoreShape,
-} from "./server.js";
+} from "./source-artifacts.server";
+import { studioHttp, STUDIO_DRAWING_MAX_BYTES } from "./http.server";
 
 class TestSourceArtifacts implements StudioSourceArtifactStoreShape {
 	readonly artifacts = new Map<string, { diagramId: string; title: string }>();
@@ -112,25 +113,31 @@ function createTestServer<
 		StudioSessionServiceLive,
 	);
 	const appLayer = StudioProjectsLive.pipe(Layer.provideMerge(dependencies));
-	const run = <A>(
-		effect: Effect.Effect<A, never, Layer.Success<typeof appLayer>>,
-		signal: AbortSignal,
-	) => Effect.runPromise(effect.pipe(Effect.provide(appLayer)), { signal });
+	const run = (request: Request) =>
+		Effect.runPromise(
+			Effect.scoped(
+				Effect.gen(function* () {
+					const handler = yield* studioHttp;
+					const response = yield* handler.pipe(
+						Effect.provideService(
+							HttpServerRequest.HttpServerRequest,
+							HttpServerRequest.fromWeb(request),
+						),
+					);
+					return HttpServerResponse.toWeb(response);
+				}),
+			).pipe(Effect.provide(appLayer)),
+			{ signal: request.signal },
+		);
 	return {
 		bucket,
 		server: {
-			handleCreateFromArtifactRequest: (request: Request) =>
-				run(handleCreateFromArtifactRequestEffect(request), request.signal),
-			handleGetDiagramRequest: (request: Request, diagramId: string) =>
-				run(handleGetDiagramRequestEffect(request, diagramId), request.signal),
-			handleGetProjectRequest: (request: Request, projectId: string) =>
-				run(handleGetProjectRequestEffect(request, projectId), request.signal),
-			handleListProjectsRequest: (request: Request) =>
-				run(handleListProjectsRequestEffect(request), request.signal),
-			handleGetDrawingRequest: (request: Request, diagramId: string) =>
-				run(handleGetDrawingRequestEffect(request, diagramId), request.signal),
-			handleSaveDrawingRequest: (request: Request, diagramId: string) =>
-				run(handleSaveDrawingRequestEffect(request, diagramId), request.signal),
+			handleCreateFromArtifactRequest: run,
+			handleGetDiagramRequest: (request: Request, _id: string) => run(request),
+			handleGetProjectRequest: (request: Request, _id: string) => run(request),
+			handleListProjectsRequest: run,
+			handleGetDrawingRequest: (request: Request, _id: string) => run(request),
+			handleSaveDrawingRequest: (request: Request, _id: string) => run(request),
 		},
 		sourceArtifacts,
 	};
@@ -344,9 +351,14 @@ describe("Studio project HTTP runtime edge", () => {
 		async (id) => {
 			const { bucket, server } = createTestServer();
 			const read = vi.spyOn(bucket, "get");
-			const request = new Request("https://studio.test/api/studio/projects");
-			const project = await server.handleGetProjectRequest(request, id);
-			const diagram = await server.handleGetDiagramRequest(request, id);
+			const project = await server.handleGetProjectRequest(
+				new Request(`https://studio.test/api/studio/projects/${encodeURIComponent(id)}`),
+				id,
+			);
+			const diagram = await server.handleGetDiagramRequest(
+				new Request(`https://studio.test/api/studio/diagrams/${encodeURIComponent(id)}`),
+				id,
+			);
 
 			expect(project.status).toBe(404);
 			expect(diagram.status).toBe(404);
@@ -593,6 +605,46 @@ describe("Studio drawing Save", () => {
 		return test;
 	}
 
+ it("publishes Create only after complete metadata and conceals prepublication reads", async () => {
+  const bucket=new MemoryStudioObjectBucket();
+  const beforePublish=Promise.withResolvers<void>(); const publish=Promise.withResolvers<void>();
+  const original=bucket.put.bind(bucket);
+  vi.spyOn(bucket,"put").mockImplementation(async(key,value)=>{
+   if(key===studioProjectRecordKey("proj_saved")){beforePublish.resolve();await publish.promise;}
+   return original(key,value);
+  });
+  const {server,sourceArtifacts}=createTestServer(bucket,new TestSourceArtifacts(),{createId:(kind)=>kind==="proj"?"proj_saved":"dia_saved"});
+  sourceArtifacts.artifacts.set("artifact-saved",{diagramId:"flow",title:"Saved"});
+  const creating=server.handleCreateFromArtifactRequest(postRequest("https://studio.test/api/studio/projects/from-artifact",{artifactId:"artifact-saved"},cookie));
+  await beforePublish.promise;
+  const hiddenDiagram=await server.handleGetDiagramRequest(requestWithSession("https://studio.test/api/studio/diagrams/dia_saved",sessionId),"dia_saved");
+  const hiddenProject=await server.handleGetProjectRequest(requestWithSession("https://studio.test/api/studio/projects/proj_saved",sessionId),"proj_saved");
+  const list=await server.handleListProjectsRequest(requestWithSession("https://studio.test/api/studio/projects",sessionId));
+  expect(hiddenDiagram.status).toBe(404);expect(hiddenProject.status).toBe(404);expect(await list.json()).toMatchObject({projects:[]});
+  publish.resolve();expect((await creating).status).toBe(200);
+  const visible=await server.handleGetDiagramRequest(requestWithSession("https://studio.test/api/studio/diagrams/dia_saved",sessionId),"dia_saved");expect(visible.status).toBe(200);
+ });
+
+ it("keeps the previous drawing when the one atomic Save write is rejected", async()=>{
+  const {bucket,server}=await savedDiagram();
+  expect((await server.handleSaveDrawingRequest(putDrawing(drawing),"dia_saved")).status).toBe(200);
+  const metadataBefore=new Map(bucket.metadata);const bytesBefore=new Map(bucket.objects);
+  const write=vi.spyOn(bucket,"put").mockRejectedValue(new Error("R2 write rejected"));
+  const rejected={...drawing,elements:[{id:"rejected",type:"text",text:"NOT SAVED"}]};
+  const result=await server.handleSaveDrawingRequest(putDrawing(rejected),"dia_saved");expect(result.status).toBe(500);
+  expect(write.mock.calls.map(([key])=>key)).toEqual([studioDrawingKey("dia_saved")]);
+  const read=await server.handleGetDrawingRequest(requestWithSession(drawingUrl,sessionId),"dia_saved");expect(await read.json()).toMatchObject({ok:true,drawing});
+  expect(bucket.objects).toEqual(bytesBefore);expect(bucket.metadata).toEqual(metadataBefore);
+ });
+
+ it("observes a complete drawing and native metadata after a commit with an ambiguous response",async()=>{
+  const {bucket,server}=await savedDiagram();
+  const put=bucket.put.bind(bucket);vi.spyOn(bucket,"put").mockImplementation(async(key,value)=>{await put(key,value);throw new Error("response lost after commit");});
+  const response=await server.handleSaveDrawingRequest(putDrawing(drawing),"dia_saved");expect(response.status).toBe(500);
+  const read=await server.handleGetDrawingRequest(requestWithSession(drawingUrl,sessionId),"dia_saved");expect(await read.json()).toMatchObject({drawing});
+  const details=await server.handleGetDiagramRequest(requestWithSession("https://studio.test/api/studio/diagrams/dia_saved",sessionId),"dia_saved");expect(await details.json()).toMatchObject({diagram:{savedAt:bucket.metadata.get(studioDrawingKey("dia_saved"))?.uploaded.toISOString()}});
+ });
+
 	it("has no drawing until the first Save", async () => {
 		const { server } = await savedDiagram();
 		const response = await server.handleGetDrawingRequest(
@@ -613,7 +665,10 @@ describe("Studio drawing Save", () => {
 		const first = await server.handleSaveDrawingRequest(putDrawing(drawing), "dia_saved");
 		expect(first.status).toBe(200);
 		expect(await first.json()).toMatchObject({
-			diagram: { id: "dia_saved", savedAt: "2026-07-20T02:00:01.000Z" },
+			diagram: {
+				id: "dia_saved",
+				savedAt: bucket.metadata.get(studioDrawingKey("dia_saved"))?.uploaded.toISOString(),
+			},
 			ok: true,
 		});
 
@@ -623,7 +678,10 @@ describe("Studio drawing Save", () => {
 		};
 		const second = await server.handleSaveDrawingRequest(putDrawing(edited), "dia_saved");
 		expect(await second.json()).toMatchObject({
-			diagram: { savedAt: "2026-07-20T02:00:02.000Z", updatedAt: "2026-07-20T02:00:02.000Z" },
+			diagram: {
+				savedAt: bucket.metadata.get(studioDrawingKey("dia_saved"))?.uploaded.toISOString(),
+				updatedAt: bucket.metadata.get(studioDrawingKey("dia_saved"))?.uploaded.toISOString(),
+			},
 		});
 
 		const loaded = await server.handleGetDrawingRequest(
@@ -638,7 +696,12 @@ describe("Studio drawing Save", () => {
 			requestWithSession("https://studio.test/api/studio/projects", sessionId),
 		);
 		expect(await projects.json()).toMatchObject({
-			projects: [{ id: "proj_saved", updatedAt: "2026-07-20T02:00:02.000Z" }],
+			projects: [
+				{
+					id: "proj_saved",
+					updatedAt: bucket.metadata.get(studioDrawingKey("dia_saved"))?.uploaded.toISOString(),
+				},
+			],
 		});
 	});
 
@@ -670,11 +733,19 @@ describe("Studio drawing Save", () => {
 
 	it("rejects a drawing over the size limit before reading it", async () => {
 		const { server } = await savedDiagram();
-		const response = await server.handleSaveDrawingRequest(
-			putDrawing(drawing, { ...cookie, "Content-Length": String(STUDIO_DRAWING_MAX_BYTES + 1) }),
-			"dia_saved",
-		);
+  const request=putDrawing(drawing,{...cookie,"Content-Length":String(STUDIO_DRAWING_MAX_BYTES+1)});
+  const read=vi.spyOn(request,"text");
+  const response=await server.handleSaveDrawingRequest(request,"dia_saved");
+  expect(read).not.toHaveBeenCalled();
 		expect(response.status).toBe(400);
 		expect(await response.json()).toMatchObject({ message: "The drawing is too large to save." });
 	});
+ it("bounds actual UTF-8 drawing bytes when Content-Length is absent", async()=>{
+  const {bucket,server}=await savedDiagram();
+  const request=putDrawing("é".repeat(STUDIO_DRAWING_MAX_BYTES/2+1));
+  expect(request.headers.has("content-length")).toBe(false);
+  const response=await server.handleSaveDrawingRequest(request,"dia_saved");
+  expect(response.status).toBe(400);expect(await response.json()).toMatchObject({code:"invalid_input",message:"The drawing is too large to save."});expect(bucket.objects.has(studioDrawingKey("dia_saved"))).toBe(false);
+ });
+
 });

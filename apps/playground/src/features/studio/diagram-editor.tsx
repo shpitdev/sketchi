@@ -1,13 +1,16 @@
 import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { downloadBlob, DrawingEditor } from "@sketchi/editor";
-import { saveStudioDiagramDrawing } from "@sketchi/studio-projects/client";
-import { useCallback, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { RegistryContext, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react";
+import { Effect, Stream, String as Str } from "effect";
+import { Atom, AsyncResult } from "effect/reactivity";
+import { StudioApi, projectsRuntime } from "../projects/client";
+import { useCallback, useContext, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { IconActionBar, IconButton } from "@/components/sketch-icons";
 import { StudioHeader } from "@/components/studio-header";
 
 import { drawingFromScene, drawingSignature } from "./diagram-drawing";
-import { createDrawingDraftCapture } from "./drawing-drafts";
+import { drawingDraft } from "./drawing-drafts";
 
 export type DrawingSaveStatus = "error" | "saved" | "saving" | "unsaved";
 
@@ -29,79 +32,91 @@ export function useDrawingSession({
 	diagramId: string;
 	draft: ExcalidrawScene | undefined;
 }) {
-	const [capture] = useState(() => createDrawingDraftCapture(diagramId));
-	const latest = useRef<ExcalidrawScene | undefined>(draft);
-	// What the server holds, as the editor reports it. A restored draft starts unsaved;
-	// a saved drawing takes its signature from the editor's first report of it.
-	const savedSignature = useRef<string | null>(draft ? "" : null);
-	const capturedSignature = useRef<string | null>(null);
-	const [status, setStatus] = useState<DrawingSaveStatus>(draft ? "unsaved" : "saved");
-	const saving = useRef(false);
-
-	// One rule for the draft and the button, run after every change and every Save. While
-	// a Save is in flight the draft keeps the newest drawing whatever it matches: the
-	// request may persist a drawing the user has since undone.
-	const reconcile = useCallback(() => {
-		const scene = latest.current;
-		if (!scene) return;
-		const signature = drawingSignature(scene);
-		if (!saving.current && signature === savedSignature.current) {
-			if (capturedSignature.current !== null) void capture.clear();
-			capturedSignature.current = null;
-			setStatus("saved");
-			return;
-		}
-		if (signature !== capturedSignature.current) {
-			capturedSignature.current = signature;
-			capture.write(scene);
-		}
-		if (!saving.current) setStatus((current) => (current === "error" ? current : "unsaved"));
-	}, [capture]);
-
-	const onSceneChange = useCallback(
-		(scene: ExcalidrawScene) => {
-			latest.current = scene;
-			savedSignature.current ??= drawingSignature(scene);
-			reconcile();
-		},
-		[reconcile],
-	);
-
-	const save = useCallback(async () => {
-		const scene = latest.current;
-		if (!scene || saving.current) return;
-		const signature = drawingSignature(scene);
-		if (signature === savedSignature.current) return;
-		saving.current = true;
-		setStatus("saving");
-		try {
-			await saveStudioDiagramDrawing(diagramId, drawingFromScene(scene));
-		} catch {
-			saving.current = false;
-			setStatus("error");
-			return;
-		}
-		saving.current = false;
-		savedSignature.current = signature;
-		reconcile();
-	}, [diagramId, reconcile]);
-
-	const download = useCallback((fileName: string) => {
-		const scene = latest.current;
-		if (!scene) return;
-		const file = createExcalidrawFile(scene, { source: window.location.origin });
-		downloadBlob(
-			new Blob([JSON.stringify(file, null, 2)], { type: "application/vnd.excalidraw+json" }),
-			`${fileName}.excalidraw`,
+	const registry = useContext(RegistryContext);
+	const [session] = useState(() => {
+		const latest = Atom.make<ExcalidrawScene | undefined>(draft);
+		const savedSignature = Atom.make<string | null>(draft ? "" : null);
+		const persistedDraft = drawingDraft(diagramId);
+		const save = projectsRuntime
+			.fn((_value: void, get) =>
+				Stream.fromEffect(
+					Effect.gen(function* () {
+						const scene = get(latest);
+						if (!scene) return;
+						const signature = drawingSignature(scene);
+						if (signature === get(savedSignature)) return;
+						const api = yield* StudioApi;
+						yield* api.projects.save({ params: { diagramId }, payload: drawingFromScene(scene) });
+						get.set(savedSignature, signature);
+						const current = get(latest);
+						if (current && drawingSignature(current) === signature)
+							get.set(persistedDraft, undefined);
+					}),
+				),
+			)
+			.pipe(
+				Atom.setIdleTTL(0),
+				Atom.withServerValue(() => AsyncResult.initial()),
+			);
+		const change = Atom.writable(
+			(get) => get(latest),
+			(context, scene: ExcalidrawScene) => {
+				const previous = context.get(latest);
+				const signature = drawingSignature(scene);
+				if (context.get(savedSignature) === null) {
+					context.set(savedSignature, signature);
+					context.set(latest, scene);
+					return;
+				}
+				context.set(latest, scene);
+				if (previous && drawingSignature(previous) === signature) return;
+				context.set(
+					persistedDraft,
+					!context.get(save).waiting && signature === context.get(savedSignature)
+						? undefined
+						: drawingFromScene(scene),
+				);
+			},
 		);
-	}, []);
-
-	return { download, onSceneChange, save, status };
+		const status = Atom.make((get): DrawingSaveStatus => {
+			const result = get(save);
+			if (result.waiting) return "saving";
+			const scene = get(latest);
+			if (!scene || drawingSignature(scene) === get(savedSignature)) return "saved";
+			return AsyncResult.isFailure(result) ? "error" : "unsaved";
+		});
+		return { latest, persistedDraft, save, change, status };
+	});
+	useAtomMount(session.persistedDraft);
+	const onSceneChange = useAtomSet(session.change);
+	const save = useAtomSet(session.save);
+	const status = useAtomValue(session.status);
+	const download = useCallback(
+		(fileName: string) => {
+			const scene = registry.get(session.latest);
+			if (!scene) return;
+			const file = createExcalidrawFile(scene, { source: window.location.origin });
+			downloadBlob(
+				// @effect-diagnostics-next-line globalJson:off -- Synchronous native file download serializes the Excalidraw payload during the user action.
+				new Blob([JSON.stringify(file, null, 2)], { type: "application/vnd.excalidraw+json" }),
+				`${fileName}.excalidraw`,
+			);
+		},
+		[registry, session],
+	);
+	return {
+		download,
+		onSceneChange,
+		save: () => {
+			if (registry.get(session.status) !== "saving") save();
+		},
+		status,
+	};
 }
 
 /** Ctrl/Cmd+S saves to the diagram, ahead of Excalidraw's save-to-file. */
 function isSaveShortcut(event: KeyboardEvent<HTMLElement>): boolean {
-	return event.key.toLowerCase() === "s" && (event.metaKey || event.ctrlKey) && !event.altKey;
+	return Str.toLowerCase(event.key) === "s" && (event.metaKey || event.ctrlKey) && !event.altKey;
 }
 
 export function DiagramEditor({

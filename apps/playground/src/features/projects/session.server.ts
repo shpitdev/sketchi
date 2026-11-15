@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { Context, Effect, Layer, Option, Schema } from "effect";
+import { Context, Effect, Layer, Option, Schema, String as Str, Array } from "effect";
 
 import {
 	AnonymousStudioAuthStatus,
@@ -11,13 +11,13 @@ import {
 	type StudioAuthStatus,
 	type StudioOwner,
 	type StudioPublicSession,
-} from "../contracts.js";
+} from "./contracts.js";
 import {
 	failureMessage,
 	StudioOwnershipError,
 	type StudioResourceKind,
 	StudioSessionError,
-} from "./errors.js";
+} from "./errors.server.js";
 
 const STUDIO_SESSION_COOKIE = "sketchi_studio_session";
 const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -38,7 +38,7 @@ export interface StudioSessionServiceShape {
 export class StudioSessionService extends Context.Service<
 	StudioSessionService,
 	StudioSessionServiceShape
->()("@sketchi/studio-projects/StudioSessionService") {}
+>()("@sketchi/studio/projects/StudioSessionService") {}
 
 function publicSession(session: StudioOwner): StudioPublicSession {
 	if (session.kind === "authenticated") {
@@ -75,10 +75,10 @@ function cookieValue(request: Request, name: string): string | undefined {
 		return undefined;
 	}
 
-	for (const part of cookie.split(";")) {
-		const [rawName, ...rawValue] = part.trim().split("=");
+	for (const part of Str.split(cookie, ";")) {
+		const [rawName, ...rawValue] = Str.split(Str.trim(part), "=");
 		if (rawName === name) {
-			const value = rawValue.join("=");
+			const value = Array.join(rawValue, "=");
 			return value.length > 0 ? value : undefined;
 		}
 	}
@@ -129,7 +129,7 @@ export function resolveStudioSession(
 
 	const session = AnonymousStudioOwner.make({
 		kind: "anonymous",
-		sessionId: Schema.decodeUnknownSync(AnonymousStudioSessionIdSchema)(createSessionId()),
+		sessionId: AnonymousStudioSessionIdSchema.make(createSessionId()),
 	});
 
 	return {

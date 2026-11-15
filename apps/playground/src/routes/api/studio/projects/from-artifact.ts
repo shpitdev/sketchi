@@ -6,14 +6,16 @@ export const Route = createFileRoute("/api/studio/projects/from-artifact")({
 			POST: async ({ request }) => {
 				const [
 					{ getPlaygroundRequestBoundary },
-					{ handleCreateStudioProjectFromArtifactRequest, runPlaygroundEffect },
+					{ runPlaygroundEffect },
+					{ handleStudioProjectsRequest },
 				] = await Promise.all([
 					import("@/server/bindings/cloudflare-bindings.server"),
 					import("@/server/runtime/runtime.server"),
+					import("@/server/studio/projects.server"),
 				]);
 
 				return runPlaygroundEffect(
-					handleCreateStudioProjectFromArtifactRequest(request),
+					handleStudioProjectsRequest(request),
 					getPlaygroundRequestBoundary(request),
 				);
 			},

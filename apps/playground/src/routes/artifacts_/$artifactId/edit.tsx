@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useAsyncResource } from "@/features/resources/use-async-resource";
-import { artifactRouteUrls, fetchArtifactScene } from "@/features/artifacts/artifact-view-client";
+import { useAtomValue } from "@effect/atom-react";
+import { AsyncResult } from "effect/reactivity";
+import { resourceError } from "@/features/projects/client";
+import { artifactRouteUrls, artifactReview } from "@/features/artifacts/artifact-view-client";
 import { EditableArtifactStage } from "@/features/artifacts/editable-artifact-stage";
 
 export const Route = createFileRoute("/artifacts_/$artifactId/edit")({
@@ -9,11 +11,7 @@ export const Route = createFileRoute("/artifacts_/$artifactId/edit")({
 
 function ArtifactEditRoute() {
 	const { artifactId } = Route.useParams();
-	const state = useAsyncResource(
-		(signal) => fetchArtifactScene(artifactId, signal).then((scene) => ({ scene })),
-		[artifactId],
-		"Artifact could not be loaded.",
-	);
+	const state = useAtomValue(artifactReview(artifactId));
 	const urls = artifactRouteUrls(artifactId);
 
 	return (

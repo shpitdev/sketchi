@@ -1,11 +1,11 @@
+import { Array } from "effect";
+import { projectsQuery } from "@/features/projects/client";
 import { createFileRoute } from "@tanstack/react-router";
-import { useAsyncResource } from "@/features/resources/use-async-resource";
+import { useAtomValue } from "@effect/atom-react";
+import { AsyncResult } from "effect/reactivity";
+import { resourceError } from "@/features/projects/client";
 
-import {
-	fetchStudioProjects,
-	studioDiagramUrl,
-	studioProjectUrl,
-} from "@sketchi/studio-projects/client";
+import { studioDiagramUrl, studioProjectUrl } from "@/features/projects/contracts";
 import { StudioHeader } from "@/components/studio-header";
 
 export const Route = createFileRoute("/projects")({
@@ -13,12 +13,7 @@ export const Route = createFileRoute("/projects")({
 });
 
 function ProjectsRoute() {
-	const state = useAsyncResource(
-		(signal) => fetchStudioProjects(signal).then((projects) => ({ projects })),
-		[],
-		"Studio projects could not be loaded.",
-	);
-
+	const state = useAtomValue(projectsQuery);
 	return (
 		<main className="studio-workspace">
 			<StudioHeader className="studio-header--ruled">
@@ -30,20 +25,17 @@ function ProjectsRoute() {
 			<section className="studio-workspace__body">
 				<div className="studio-workspace__intro">
 					<h1 className="studio-workspace__title">Projects</h1>
-					<p className="studio__note">
-						Saved to this browser only. No account yet — treat as temporary.
-					</p>
 				</div>
 
-				{state.status === "loading" ? (
+				{AsyncResult.isInitial(state) ? (
 					<p className="studio-workspace__message">Loading projects...</p>
 				) : null}
-				{state.status === "error" ? (
+				{AsyncResult.isFailure(state) ? (
 					<p className="studio-workspace__message studio-workspace__message--error">
-						{state.message}
+						{resourceError(state, "Studio projects could not be loaded.")}
 					</p>
 				) : null}
-				{state.status === "ready" && state.projects.length === 0 ? (
+				{AsyncResult.isSuccess(state) && state.value.projects.length === 0 ? (
 					<div className="studio-workspace__empty">
 						<p>No saved projects yet.</p>
 						<a className="studio__artifact-link" href="/">
@@ -51,9 +43,9 @@ function ProjectsRoute() {
 						</a>
 					</div>
 				) : null}
-				{state.status === "ready" && state.projects.length > 0 ? (
+				{AsyncResult.isSuccess(state) && state.value.projects.length > 0 ? (
 					<div className="studio-workspace__grid">
-						{state.projects.map((project) => (
+						{Array.map(state.value.projects,(project) => (
 							<article className="studio-project-row" key={project.id}>
 								<div className="studio-project-row__content">
 									<h2>{project.title}</h2>

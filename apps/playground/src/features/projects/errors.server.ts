@@ -50,7 +50,7 @@ export class StudioStorageError extends Schema.TaggedError<
 >()("StudioStorageError", {
 	cause: Schema.Defect(),
 	message: Schema.String,
-	operation: Schema.Literals(["delete", "get", "list", "put"]),
+	operation: Schema.Literals(["delete", "get", "head", "list", "put"]),
 	target: Schema.String,
 }) {}
 

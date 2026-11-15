@@ -1,33 +1,40 @@
+import { Effect } from "effect";
+import { FetchHttpClient } from "effect/http";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchArtifactReview } from "./artifact-view-client";
+import { loadArtifactReview } from "./artifact-view-client";
 import { DEPLOY_PIPELINE_SCENE } from "../playground/deploy-pipeline-sample";
 
+const load = (id: string, signal?: AbortSignal) =>
+	Effect.runPromise(
+		loadArtifactReview(id).pipe(
+			Effect.provide(FetchHttpClient.layer),
+			Effect.provideService(FetchHttpClient.Fetch, globalThis.fetch),
+		),
+		signal ? { signal } : {},
+	);
 afterEach(() => vi.unstubAllGlobals());
-describe("artifact review fetch", () => {
-	it("reports HTTP failures without parsing an error page", async () => {
-		const json = vi.fn().mockRejectedValue(new SyntaxError("Unexpected token"));
-		vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json }));
-		await expect(fetchArtifactReview("missing")).rejects.toThrow("Artifact could not be loaded.");
-		expect(json).not.toHaveBeenCalled();
+describe("artifact review HTTP boundary", () => {
+	it("reports HTTP errors before attempting to decode their body", async () => {
+		const response = new Response("not JSON", { status: 404 });
+		const text = vi.spyOn(response, "text");
+		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+		await expect(load("missing")).rejects.toThrow("Artifact could not be loaded.");
+		expect(text).not.toHaveBeenCalled();
 	});
-	it("reports invalid JSON with a friendly message", async () => {
-		vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not JSON")));
-		await expect(fetchArtifactReview("broken")).rejects.toThrow("Artifact could not be loaded.");
-	});
-	it("forwards cancellation to the artifact fetch", async () => {
-		const signal = new AbortController().signal;
+	it("reports malformed JSON and invalid scenes with useful errors", async () => {
 		const fetcher = vi
 			.fn()
-			.mockResolvedValue(Response.json({ ok: true, inline: DEPLOY_PIPELINE_SCENE }));
+			.mockResolvedValueOnce(new Response("not JSON"))
+			.mockResolvedValueOnce(Response.json({ ok: true, inline: {} }));
 		vi.stubGlobal("fetch", fetcher);
-		await fetchArtifactReview("valid", signal);
-		expect(fetcher).toHaveBeenCalledWith(expect.any(String), { signal });
+		await expect(load("broken")).rejects.toThrow("Artifact could not be loaded.");
+		await expect(load("invalid")).rejects.toThrow("Artifact scene could not be rendered.");
 	});
-	it("still loads a valid scene", async () => {
+	it("loads a valid artifact scene through the real HTTP decoder", async () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn().mockResolvedValue(Response.json({ ok: true, inline: DEPLOY_PIPELINE_SCENE })),
 		);
-		expect((await fetchArtifactReview("valid")).scene).toEqual(DEPLOY_PIPELINE_SCENE);
+		expect((await load("valid")).scene).toEqual(DEPLOY_PIPELINE_SCENE);
 	});
 });

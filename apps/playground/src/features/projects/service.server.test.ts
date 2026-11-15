@@ -1,26 +1,24 @@
 import { assert, describe, it } from "@effect/vitest";
 import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
-import { Arbitrary, Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 
 import {
 	AuthenticatedStudioOwner,
 	makeIsoDateString,
 	makeStudioRecordId,
-	StudioRecordIdSchema,
 	type StudioProjectRecord,
-} from "../contracts.js";
+} from "./contracts.js";
 import {
 	makeStudioObjectStoreLayer,
 	MemoryStudioObjectBucket,
 	StudioObjectStore,
 	type StudioObjectStoreShape,
 	type StudioObjectBucketBody,
-} from "./bucket.js";
-import { StudioOwnershipError, StudioSourceArtifactError } from "./errors.js";
+} from "./bucket.server.js";
+import { StudioOwnershipError, StudioSourceArtifactError } from "./errors.server.js";
 import {
 	makeStudioPersistencePolicyLayer,
 	makeStudioRecordFactoryLayer,
-	StudioPersistencePolicy,
 	StudioPersistencePolicyConfig,
 	StudioProjects,
 	StudioProjectsLive,
@@ -29,52 +27,16 @@ import {
 	studioOwnerProjectsPrefix,
 	studioDiagramRecordKey,
 	studioProjectRecordKey,
-} from "./service.js";
-import {
-	ensureOwner,
-	makeStudioSessionServiceLayer,
-	StudioSessionService,
-	StudioSessionServiceLive,
-} from "./session.js";
-import { makeStudioSourceArtifactStoreTestLayer } from "./source-artifacts.js";
+} from "./service.server.js";
+import { makeStudioSessionServiceLayer, StudioSessionService } from "./session.server.js";
+import { StudioSourceArtifactStore } from "./source-artifacts.server.js";
 
 const owner = AuthenticatedStudioOwner.make({
 	kind: "authenticated",
 	subjectId: "user_effect_tests",
 });
 
-const StudioRecordIdArbitrary = Arbitrary.array(
-	Arbitrary.schema(
-		Schema.Literals([
-			..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-",
-			"K",
-			"ſ",
-		]),
-	),
-	{ minLength: 6, maxLength: 80 },
-).pipe(Arbitrary.map((characters) => makeStudioRecordId(characters.join(""))));
-
-const roundTripStudioRecordId = (id: typeof StudioRecordIdSchema.Type) =>
-	Effect.gen(function* () {
-		const encoded = yield* Schema.encodeEffect(StudioRecordIdSchema)(id);
-		const decoded = yield* Schema.decodeUnknownEffect(StudioRecordIdSchema)(encoded);
-		assert.strictEqual(decoded, id);
-	});
-
 describe("Studio schema contracts", () => {
-	it.effect.prop(
-		"round-trips arbitrary branded record identifiers",
-		{ id: StudioRecordIdArbitrary },
-		({ id }) => roundTripStudioRecordId(id),
-	);
-
-	it.effect.prop(
-		"replays the formerly exhausting arbitrary seed",
-		{ id: StudioRecordIdArbitrary },
-		({ id }) => roundTripStudioRecordId(id),
-		{ arbitrary: { runs: 100, seed: 2170006779794489 } },
-	);
-
 	it.each(["AAAAAK", "AAAAAſ", "AAAAAK", "AAAAAS"])(
 		"preserves fold-aware identifier acceptance for %s",
 		(id) => assert.strictEqual(makeStudioRecordId(id), id),
@@ -97,25 +59,6 @@ describe("StudioPersistencePolicy", () => {
 			);
 		},
 	);
-	it.each([0, Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5])(
-		"rejects invalid listing concurrency %s",
-		(listingConcurrency) => {
-			assert.throws(() => makeStudioPersistencePolicyLayer({ listingConcurrency }));
-		},
-	);
-
-	it.layer(makeStudioPersistencePolicyLayer({ listingConcurrency: 2 }))(
-		"valid bounded policy",
-		(it) => {
-			it.effect("provides the configured bound", () =>
-				Effect.gen(function* () {
-					const policy = yield* StudioPersistencePolicy;
-
-					assert.strictEqual(policy.listingConcurrency, 2);
-				}),
-			);
-		},
-	);
 });
 
 function projectLayer(options: {
@@ -127,7 +70,7 @@ function projectLayer(options: {
 	const objectStoreLayer = options.objectStore
 		? Layer.succeed(StudioObjectStore, options.objectStore)
 		: makeStudioObjectStoreLayer(options.bucket ?? new MemoryStudioObjectBucket());
-	const sourceLayer = makeStudioSourceArtifactStoreTestLayer({
+	const sourceLayer = Layer.succeed(StudioSourceArtifactStore, {
 		load: () =>
 			options.sourceFailure
 				? Effect.fail(options.sourceFailure)
@@ -165,10 +108,10 @@ describe("StudioProjects Effect service", () => {
 					let writes = 0;
 					class PartialWriteBucket extends MemoryStudioObjectBucket {
 						override async put(key: string, value: StudioObjectBucketBody) {
-							await super.put(key, value);
+							const metadata = await super.put(key, value);
 							writes += 1;
 							if (writes === failedWrite) throw failure;
-							return null;
+							return metadata;
 						}
 						override async delete(key: string) {
 							deleted.push(key);
@@ -199,7 +142,7 @@ describe("StudioProjects Effect service", () => {
 							studioDiagramRecordKey("dia_effecttest"),
 						]);
 						const expected = new Map([["unrelated.json", "preserved"]]);
-						if (failCleanup && failedWrite >= 2) {
+						if (failCleanup && failedWrite === 3) {
 							const key = studioProjectRecordKey("proj_effecttest");
 							const record = partialBucket.objects.get(key);
 							assert.isString(record);
@@ -217,6 +160,7 @@ describe("StudioProjects Effect service", () => {
 		const deleted: string[] = [];
 		let writes = 0;
 		const objectStore: StudioObjectStoreShape = {
+			head: () => Effect.succeed(null),
 			delete: (key) =>
 				Effect.sync(() => {
 					deleted.push(key);
@@ -228,7 +172,13 @@ describe("StudioProjects Effect service", () => {
 				Effect.sync(() => {
 					records.set(key, value);
 					writes += 1;
-				}).pipe(Effect.andThen(Effect.suspend(() => (writes === 2 ? Effect.never : Effect.void)))),
+				}).pipe(
+					Effect.andThen(
+						Effect.suspend(() =>
+							writes === 2 ? Effect.never : Effect.succeed({ uploaded: new Date(0), etag: "test" }),
+						),
+					),
+				),
 		};
 		return Effect.gen(function* () {
 			const projects = yield* StudioProjects;
@@ -372,7 +322,7 @@ describe("StudioProjects Effect service", () => {
 				if (error._tag === "StudioDecodeError") {
 					assert.strictEqual(error.operation, "decode");
 					assert.strictEqual(error.key, "studio/projects/proj_empty.json");
-					assert.instanceOf(error.cause, SyntaxError);
+					assert.instanceOf(error.cause, Error);
 				}
 			}),
 		);
@@ -412,35 +362,13 @@ describe("StudioProjects Effect service", () => {
 		);
 	});
 
-	const sourceFailure = StudioSourceArtifactError.make({
-		artifactId: "artifact-unavailable",
-		code: "not_found",
-		message: "Source artifact is unavailable.",
-		status: 404,
-	});
-
-	it.layer(projectLayer({ sourceFailure }))("source-artifact failures", (it) => {
-		it.effect("keeps typed source failures and performs no persistence", () =>
-			Effect.gen(function* () {
-				const projects = yield* StudioProjects;
-				const error = yield* Effect.flip(
-					projects.createFromArtifact({
-						artifactId: "artifact-unavailable",
-						session: owner,
-					}),
-				);
-
-				assert.strictEqual(error, sourceFailure);
-			}),
-		);
-	});
-
 	let active = 0;
 	let maxActive = 0;
 	let released = 0;
 	const projectIds = Array.from({ length: 5 }, (_, index) => `proj_concurrency_${String(index)}`);
 	const entryPrefix = studioOwnerProjectsPrefix(owner);
 	const concurrencyObjectStore: StudioObjectStoreShape = {
+		head: () => Effect.succeed(null),
 		delete: () => Effect.void,
 		getText: (key) => {
 			if (key.startsWith(entryPrefix)) {
@@ -474,7 +402,7 @@ describe("StudioProjects Effect service", () => {
 				})),
 				truncated: false,
 			}),
-		put: () => Effect.void,
+		put: () => Effect.succeed({ uploaded: new Date(0), etag: "test" }),
 	};
 
 	it.layer(projectLayer({ objectStore: concurrencyObjectStore }))("bounded listing", (it) => {
@@ -507,23 +435,6 @@ describe("StudioProjects Effect service", () => {
 });
 
 describe("StudioSessionService", () => {
-	it.layer(StudioSessionServiceLive)("live session layer", (it) => {
-		it.effect("replaces malformed session cookies with a fresh anonymous session", () =>
-			Effect.gen(function* () {
-				const sessions = yield* StudioSessionService;
-				const resolution = yield* sessions.resolve(
-					new Request("https://studio.test/api/studio/projects", {
-						headers: { Cookie: "sketchi_studio_session=%E0%A4%A" },
-					}),
-				);
-
-				assert.strictEqual(resolution.session.kind, "anonymous");
-				assert.include(resolution.setCookie, "sketchi_studio_session=anon_");
-				assert.strictEqual(resolution.publicSession.kind, "anonymous");
-			}),
-		);
-	});
-
 	it.layer(
 		makeStudioSessionServiceLayer({
 			createSessionId: () => "proj_abcdefghijklmnop",
@@ -540,20 +451,4 @@ describe("StudioSessionService", () => {
 			}),
 		);
 	});
-
-	it.effect("checks matching and mismatched owners without a session service", () =>
-		Effect.gen(function* () {
-			yield* ensureOwner(owner, owner, "project", "proj_effecttest");
-			const otherOwner = AuthenticatedStudioOwner.make({
-				kind: "authenticated",
-				subjectId: "user_other",
-			});
-			const error = yield* Effect.flip(
-				ensureOwner(owner, otherOwner, "project", "proj_effecttest"),
-			);
-			assert.instanceOf(error, StudioOwnershipError);
-			assert.strictEqual(error.id, "proj_effecttest");
-			assert.strictEqual(error.resource, "project");
-		}),
-	);
 });

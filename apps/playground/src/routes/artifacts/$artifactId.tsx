@@ -1,12 +1,13 @@
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { useAsyncResource } from "@/features/resources/use-async-resource";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { AsyncResult } from "effect/reactivity";
+import { createProject, resourceError } from "@/features/projects/client";
 import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 
-import { artifactRouteUrls, fetchArtifactReview } from "@/features/artifacts/artifact-view-client";
+import { artifactRouteUrls, artifactReview } from "@/features/artifacts/artifact-view-client";
 import { ArtifactSourceLink } from "@/components/artifact-source-link";
-import { createStudioProjectFromArtifact } from "@sketchi/studio-projects/client";
 import { IconActionBar, IconButton, IconLink } from "@/components/sketch-icons";
 import { StudioHeader } from "@/components/studio-header";
 
@@ -14,46 +15,17 @@ export const Route = createFileRoute("/artifacts/$artifactId")({
 	component: ArtifactRoute,
 });
 
-type StudioSaveState =
-	| { status: "idle" }
-	| { status: "saving" }
-	| { message: string; status: "error" }
-	| { projectUrl: string; status: "ready" };
-
 function ArtifactRoute() {
 	const { artifactId } = Route.useParams();
-	const state = useAsyncResource(
-		(signal) => fetchArtifactReview(artifactId, signal),
-		[artifactId],
-		"Artifact could not be loaded.",
-	);
-	const [saveState, setSaveState] = useState<StudioSaveState>({
-		status: "idle",
-	});
-	const urls = useMemo(() => artifactRouteUrls(artifactId), [artifactId]);
-	const saveToStudio = useCallback(() => {
-		setSaveState({ status: "saving" });
-		void createStudioProjectFromArtifact(artifactId)
-			.then((created) => {
-				setSaveState({
-					projectUrl: created.urls.project,
-					status: "ready",
-				});
-			})
-			.catch((caught) => {
-				setSaveState({
-					message:
-						caught instanceof Error ? caught.message : "Artifact could not be saved to Studio.",
-					status: "error",
-				});
-			});
-	}, [artifactId]);
-
-	const [saveArtifactId, setSaveArtifactId] = useState(artifactId);
-	if (saveArtifactId !== artifactId) {
-		setSaveArtifactId(artifactId);
-		setSaveState({ status: "idle" });
-	}
+	const state = useAtomValue(artifactReview(artifactId));
+	const mutation = useMemo(() => createProject(artifactId), [artifactId]);
+	const saveState = useAtomValue(mutation);
+	const save = useAtomSet(mutation);
+	const available = AsyncResult.isSuccess(state) && !state.waiting;
+	const urls = artifactRouteUrls(artifactId);
+	const saveToStudio = () => {
+		if (available && !saveState.waiting) save();
+	};
 
 	return (
 		<main className="artifact-view">
@@ -62,51 +34,65 @@ function ArtifactRoute() {
 					Playground
 				</a>
 				<IconActionBar>
-					{state.status === "ready" && state.provenance ? (
-						<ArtifactSourceLink provenance={state.provenance} />
+					{AsyncResult.isSuccess(state) && state.value.provenance ? (
+						<ArtifactSourceLink provenance={state.value.provenance} />
 					) : null}
-					{saveState.status === "ready" ? (
+					{AsyncResult.isSuccess(saveState) ? (
 						<IconLink
-							href={saveState.projectUrl}
+							href={saveState.value.urls.project}
 							icon="project"
 							label="Open project"
 							tone="primary"
 						/>
 					) : (
 						<IconButton
-							disabled={saveState.status === "saving"}
+							disabled={!available || saveState.waiting}
 							icon="save"
-							label={saveState.status === "saving" ? "Saving…" : "Save to Studio"}
+							label={saveState.waiting ? "Saving…" : "Save to Studio"}
 							onClick={saveToStudio}
 							tone="primary"
 						/>
 					)}
-					<IconLink href={urls.edit} icon="edit" label="Edit" />
-					<IconLink href={urls.scene} icon="scene" label="Scene file" />
-					<IconLink href={urls.drawing} icon="drawing" label="Drawing file" />
+					{available ? (
+						<IconLink href={urls.edit} icon="edit" label="Edit" />
+					) : (
+						<IconButton disabled icon="edit" label="Edit" />
+					)}
+					{available ? (
+						<IconLink href={urls.scene} icon="scene" label="Scene file" />
+					) : (
+						<IconButton disabled icon="scene" label="Scene file" />
+					)}
+					{available ? (
+						<IconLink href={urls.drawing} icon="drawing" label="Drawing file" />
+					) : (
+						<IconButton disabled icon="drawing" label="Drawing file" />
+					)}
 				</IconActionBar>
-				{saveState.status === "ready" ? (
-					<span className="studio__note">Saved to this browser · no account yet</span>
+				{AsyncResult.isSuccess(saveState) ? (
+					<span className="studio__note">Saved to Studio</span>
 				) : null}
 			</StudioHeader>
 
 			<section className="artifact-view__stage">
-				{saveState.status === "error" ? (
+				{AsyncResult.isFailure(saveState) ? (
 					<p className="artifact-view__message artifact-view__message--error">
-						{saveState.message}
+						{resourceError(saveState, "Artifact could not be saved to Studio.")}
 					</p>
 				) : null}
-				{state.status === "loading" ? (
+				{AsyncResult.isInitial(state) ? (
 					<p className="artifact-view__message">Loading artifact...</p>
 				) : null}
-				{state.status === "error" ? (
-					<p className="artifact-view__message artifact-view__message--error">{state.message}</p>
+				{AsyncResult.isFailure(state) ? (
+					<p className="artifact-view__message artifact-view__message--error">
+						{resourceError(state, "Artifact could not be loaded.")}
+					</p>
 				) : null}
-				{state.status === "ready" ? (
+				{AsyncResult.isSuccess(state) ? (
 					<DrawingEditor
-						title={state.scene.title}
-						revision={JSON.stringify(state.scene)}
-						scene={convertSceneToExcalidraw(state.scene)}
+						title={state.value.scene.title}
+						revision={artifactId}
+						scene={convertSceneToExcalidraw(state.value.scene)}
 						viewModeEnabled={true}
 						zenModeEnabled={true}
 					/>

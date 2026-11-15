@@ -14,13 +14,11 @@
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/icon-draw": "workspace:*",
 		"@sketchi/observability": "workspace:*",
-		"@sketchi/studio-projects": "workspace:*",
 		"@sketchi/ui": "workspace:*",
 		"@streamdown/cjk": "1.0.4",
 		"@streamdown/code": "2.0.0",
 		"@streamdown/math": "1.0.3",
 		"ai": "7.0.159",
-		"idb-keyval": "6.3.0",
 		"katex": "0.19.1",
 		"lucide-react": "1.65.0",
 		"motion": "14.9.0",
@@ -28,7 +26,9 @@
 		"streamdown": "2.7.1",
 		"use-stick-to-bottom": "1.1.6",
 		"@sketchi/diagrams": "workspace:*",
-		"@sketchi/cloudflare": "workspace:*"
+		"@sketchi/cloudflare": "workspace:*",
+		"@effect/atom-react": "catalog:",
+		"@effect/platform-browser": "catalog:"
 	},
 	"devDependencies": {
 		"@sketchi/diagram-scenarios": "workspace:*",

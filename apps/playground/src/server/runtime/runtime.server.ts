@@ -30,12 +30,6 @@ import {
 import { PlaygroundGenerationLive } from "../generation/service.server";
 import { PlaygroundCodeModeUsageLive } from "../../features/build/usage-events.server";
 import {
-	handleCreateStudioProjectFromArtifactRequest,
-	handleGetStudioDiagramRequest,
-	handleGetStudioDrawingRequest,
-	handleGetStudioProjectRequest,
-	handleListStudioProjectsRequest,
-	handleSaveStudioDrawingRequest,
 	PlaygroundStudioLayer,
 	PlaygroundStudioLocalBucketLive,
 } from "../studio/projects.server";
@@ -111,14 +105,6 @@ export interface PlaygroundRuntime {
 		boundary: PlaygroundRequestBoundary,
 	) => Promise<PlaygroundRequestResult<A, E>>;
 }
-export {
-	handleCreateStudioProjectFromArtifactRequest,
-	handleGetStudioDiagramRequest,
-	handleGetStudioDrawingRequest,
-	handleGetStudioProjectRequest,
-	handleListStudioProjectsRequest,
-	handleSaveStudioDrawingRequest,
-};
 function runWithPlaygroundRuntime<A, E>(
 	runtime: ManagedRuntime.ManagedRuntime<PlaygroundHostServices, never>,
 	effect: PlaygroundRequestEffect<A, E>,

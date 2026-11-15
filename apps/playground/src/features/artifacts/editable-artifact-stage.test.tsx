@@ -1,3 +1,4 @@
+import { AsyncResult } from "effect/reactivity";
 import { convertSceneToExcalidraw, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -24,7 +25,7 @@ describe("editable artifact stage", () => {
 				downloadName="drawing"
 				headerLinks={null}
 				loadingMessage="Loading diagram..."
-				state={{ status: "loading" }}
+				state={AsyncResult.initial()}
 			/>,
 		);
 		expect(screen.getByRole("button", { name: "Drawing file" })).toHaveProperty("disabled", true);
@@ -38,7 +39,7 @@ describe("editable artifact stage", () => {
 				downloadName="drawing"
 				headerLinks={null}
 				loadingMessage="Loading..."
-				state={{ status: "ready", scene: DEPLOY_PIPELINE_SCENE }}
+				state={AsyncResult.success({ scene: DEPLOY_PIPELINE_SCENE })}
 			/>,
 		);
 		const base = convertSceneToExcalidraw(DEPLOY_PIPELINE_SCENE);
@@ -82,7 +83,7 @@ describe("editable artifact stage", () => {
 				downloadName="drawing"
 				headerLinks={null}
 				loadingMessage="Loading..."
-				state={{ status: "ready", scene: DEPLOY_PIPELINE_SCENE }}
+				state={AsyncResult.success({ scene: DEPLOY_PIPELINE_SCENE })}
 			/>,
 		);
 		const base = convertSceneToExcalidraw(DEPLOY_PIPELINE_SCENE);

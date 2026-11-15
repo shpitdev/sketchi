@@ -1,4 +1,7 @@
-import { Schema, Result } from "effect";
+import { Effect, Schema, Result } from "effect";
+import { HttpClient } from "effect/http";
+import { AsyncResult, Atom } from "effect/reactivity";
+import { projectsRuntime, StudioRequestError } from "../projects/client";
 import {
 	RenderedDiagramSceneSchema,
 	type GetArtifactResult,
@@ -6,9 +9,7 @@ import {
 import { type ArtifactProvenance } from "@sketchi/drawing/artifacts";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import { type AsyncResource } from "@/features/resources/use-async-resource";
-
-export type ArtifactViewState = AsyncResource<ArtifactReview>;
+export type ArtifactViewState = AsyncResult.AsyncResult<ArtifactReview, unknown>;
 
 export interface ArtifactReview {
 	provenance?: ArtifactProvenance;
@@ -36,43 +37,37 @@ export function artifactRouteUrls(artifactId: string): ArtifactRouteUrls {
 	};
 }
 
-export async function fetchArtifactReview(
+export const loadArtifactReview = Effect.fn("Studio.artifact.review")(function* (
 	artifactId: string,
-	signal?: AbortSignal,
-): Promise<ArtifactReview> {
-	const response = await fetch(
-		`/api/v1/artifacts/${encodeURIComponent(artifactId)}?format=scene&inline=true`,
-		signal ? { signal } : {},
+) {
+	const client = yield* HttpClient.HttpClient;
+	const response = yield* client.get(
+		new URL(
+			`/api/v1/artifacts/${encodeURIComponent(artifactId)}?format=scene&inline=true`,
+			window.location.origin,
+		).href,
 	);
-	if (!response.ok) throw new Error("Artifact could not be loaded.");
-	let payload: unknown;
-	try {
-		payload = await response.json();
-	} catch {
-		throw new Error("Artifact could not be loaded.");
-	}
-
-	if (!isGetArtifactResult(payload) || !payload.ok) {
-		throw new Error("Artifact could not be loaded.");
-	}
-
-	const parsed = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
-		errors: "all",
-		reportInput: true,
-	})(payload.inline);
-	if (!Result.isSuccess(parsed)) {
-		throw new Error("Artifact scene could not be rendered.");
-	}
-
+	if (response.status < 200 || response.status >= 300)
+		return yield* new StudioRequestError({ message: "Artifact could not be loaded." });
+	const payload: unknown = yield* response.json.pipe(
+		Effect.mapError(
+			(cause) => new StudioRequestError({ message: "Artifact could not be loaded.", cause }),
+		),
+	);
+	if (!isGetArtifactResult(payload) || !payload.ok)
+		return yield* new StudioRequestError({ message: "Artifact could not be loaded." });
+	const parsed = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, { errors: "all" })(
+		payload.inline,
+	);
+	if (!Result.isSuccess(parsed))
+		return yield* new StudioRequestError({ message: "Artifact scene could not be rendered." });
 	return {
 		scene: parsed.success as RenderedDiagramScene,
 		...(payload.provenance ? { provenance: payload.provenance } : {}),
 	};
-}
-
-export async function fetchArtifactScene(
-	artifactId: string,
-	signal?: AbortSignal,
-): Promise<RenderedDiagramScene> {
-	return (await fetchArtifactReview(artifactId, signal)).scene;
-}
+});
+export const artifactReview = Atom.family((artifactId: string) =>
+	projectsRuntime
+		.atom(loadArtifactReview(artifactId))
+		.pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial),
+);

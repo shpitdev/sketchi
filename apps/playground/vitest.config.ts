@@ -58,16 +58,6 @@ export default defineConfig({
 				replacement: new URL("../../packages/icons/draw/src/index.ts", import.meta.url).pathname,
 			},
 			{
-				find: "@sketchi/studio-projects/client",
-				replacement: new URL("../../packages/studio/projects/src/client.ts", import.meta.url)
-					.pathname,
-			},
-			{
-				find: "@sketchi/studio-projects/server",
-				replacement: new URL("../../packages/studio/projects/src/server.ts", import.meta.url)
-					.pathname,
-			},
-			{
 				find: "@sketchi/drawing/excalidraw",
 				replacement: new URL("../../packages/drawing/src/excalidraw/index.ts", import.meta.url)
 					.pathname,

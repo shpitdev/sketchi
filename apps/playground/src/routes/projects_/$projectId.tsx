@@ -1,7 +1,11 @@
+import { Array } from "effect";
+import { projectQuery } from "@/features/projects/client";
 import { createFileRoute } from "@tanstack/react-router";
-import { useAsyncResource } from "@/features/resources/use-async-resource";
+import { useAtomValue } from "@effect/atom-react";
+import { AsyncResult } from "effect/reactivity";
+import { resourceError } from "@/features/projects/client";
 
-import { fetchStudioProjectDetails, studioDiagramUrl } from "@sketchi/studio-projects/client";
+import { studioDiagramUrl } from "@/features/projects/contracts";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
 import { StudioHeader } from "@/components/studio-header";
 
@@ -11,15 +15,7 @@ export const Route = createFileRoute("/projects_/$projectId")({
 
 function ProjectRoute() {
 	const { projectId } = Route.useParams();
-	const state = useAsyncResource(
-		(signal) =>
-			fetchStudioProjectDetails(projectId, signal).then((details) => ({
-				details,
-			})),
-		[projectId],
-		"Studio project could not be loaded.",
-	);
-
+	const state = useAtomValue(projectQuery(projectId));
 	return (
 		<main className="studio-workspace">
 			<StudioHeader className="studio-header--ruled">
@@ -32,22 +28,22 @@ function ProjectRoute() {
 			</StudioHeader>
 
 			<section className="studio-workspace__body">
-				{state.status === "loading" ? (
+				{AsyncResult.isInitial(state) ? (
 					<p className="studio-workspace__message">Loading project...</p>
 				) : null}
-				{state.status === "error" ? (
+				{AsyncResult.isFailure(state) ? (
 					<p className="studio-workspace__message studio-workspace__message--error">
-						{state.message}
+						{resourceError(state, "Studio project could not be loaded.")}
 					</p>
 				) : null}
-				{state.status === "ready" ? (
+				{AsyncResult.isSuccess(state) ? (
 					<>
 						<div className="studio-workspace__intro">
-							<h1 className="studio-workspace__title">{state.details.project.title}</h1>
+							<h1 className="studio-workspace__title">{state.value.details.project.title}</h1>
 						</div>
 
 						<div className="studio-workspace__grid">
-							{state.details.diagrams.map((diagram) => (
+							{Array.map(state.value.details.diagrams,(diagram) => (
 								<article className="studio-project-row" key={diagram.id}>
 									<div className="studio-project-row__content">
 										<h2>{diagram.title}</h2>

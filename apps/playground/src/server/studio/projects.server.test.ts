@@ -3,16 +3,14 @@ import { familyForType } from "@sketchi/diagrams/family";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
+import { MemoryStudioObjectBucket } from "../../features/projects/bucket.server";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
 import * as Build from "@sketchi/diagrams/build/code-mode/runtime";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
-import {
-	handleCreateStudioProjectFromArtifactRequest as handleCreateStudioProjectFromArtifactRequestEffect,
-	handleListStudioProjectsRequest as handleListStudioProjectsRequestEffect,
-} from "./projects.server";
+import { handleStudioProjectsRequest } from "./projects.server";
+import { makePlaygroundRuntime } from "../runtime/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
 	return {
@@ -27,17 +25,11 @@ function testBoundary(env: StudioEnv, request: Request) {
 }
 
 function handleCreateStudioProjectFromArtifactRequest(env: StudioEnv, request: Request) {
-	return runPlaygroundEffect(
-		handleCreateStudioProjectFromArtifactRequestEffect(request),
-		testBoundary(env, request),
-	);
+	return runPlaygroundEffect(handleStudioProjectsRequest(request), testBoundary(env, request));
 }
 
 function handleListStudioProjectsRequest(env: StudioEnv, request: Request) {
-	return runPlaygroundEffect(
-		handleListStudioProjectsRequestEffect(request),
-		testBoundary(env, request),
-	);
+	return runPlaygroundEffect(handleStudioProjectsRequest(request), testBoundary(env, request));
 }
 
 function flowchartSpec(title: string): FlowchartDocument {
@@ -169,5 +161,90 @@ describe("Studio project app adapter", () => {
 			message: "Studio persistence failed.",
 			ok: false,
 		});
+	});
+	it("keeps project data and request ownership across bindings and origins", async () => {
+		const runtime = makePlaygroundRuntime();
+		const firstBucket = new MemoryStudioObjectBucket();
+		const secondBucket = new MemoryStudioObjectBucket();
+		const env = { SKETCHI_ARTIFACTS: firstBucket };
+		const list = (cookie: string, origin = "https://studio.test") =>
+			new Request(`${origin}/api/studio/projects`, {
+				headers: { Cookie: cookie },
+			});
+		const cookie = "sketchi_studio_session=anon_lifecycle_owner";
+		try {
+			const built = await runtime.run(
+				Effect.gen(function* () {
+					return yield* buildResponse(
+						familyForType("flowchart").build(Build)({
+							spec: {
+								title: "Lifecycle source",
+								nodes: {
+									start: "Change proposed",
+									review: "Review evidence",
+									end: "Change recorded",
+								},
+								edges: [
+									["start", "review"],
+									["review", "end"],
+								],
+							},
+							options: { artifactFormats: ["scene"], inlineArtifacts: ["scene"] },
+						}),
+					);
+				}),
+				testBoundary(env, new Request("https://studio.test/build")),
+			);
+			if (!built.ok) throw new Error("Expected the offline artifact to be accepted.");
+			const request = new Request("https://first.test/api/studio/projects/from-artifact", {
+				method: "POST",
+				headers: { Cookie: cookie, "Content-Type": "application/json" },
+				body: JSON.stringify({ artifactId: built.artifact.artifactId }),
+			});
+			const created = await runtime.run(
+				handleStudioProjectsRequest(request),
+				testBoundary(env, request),
+			);
+			expect(created.status).toBe(200);
+			const [first, second] = await Promise.all([
+				runtime.run(
+					handleStudioProjectsRequest(list(cookie)),
+					testBoundary({ ...env }, list(cookie)),
+				),
+				runtime.run(
+					handleStudioProjectsRequest(list(cookie, "https://second.test")),
+					testBoundary({ ...env }, list(cookie, "https://second.test")),
+				),
+			]);
+			for (const response of [first, second]) {
+				expect(await response.json()).toMatchObject({
+					ok: true,
+					projects: [{ title: "Lifecycle source" }],
+				});
+			}
+			const otherOwner = list("sketchi_studio_session=anon_other_owner");
+			const privateList = await runtime.run(
+				handleStudioProjectsRequest(otherOwner),
+				testBoundary(env, otherOwner),
+			);
+			expect(await privateList.json()).toMatchObject({ projects: [] });
+			const otherBucket = list(cookie);
+			const isolated = await runtime.run(
+				handleStudioProjectsRequest(otherBucket),
+				testBoundary({ SKETCHI_ARTIFACTS: secondBucket }, otherBucket),
+			);
+			expect(await isolated.json()).toMatchObject({ projects: [] });
+			await Promise.all(
+				[{}, {}].map((localEnv) => {
+					const localRequest = list(cookie);
+					return runtime.run(
+						handleStudioProjectsRequest(localRequest),
+						testBoundary(localEnv, localRequest),
+					);
+				}),
+			);
+		} finally {
+			await runtime.dispose();
+		}
 	});
 });

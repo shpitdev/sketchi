@@ -9,7 +9,7 @@ export const StudioRecordIdSchema = Schema.String.check(
 export type StudioRecordId = typeof StudioRecordIdSchema.Type;
 
 export function makeStudioRecordId(input: string): StudioRecordId {
-	return Schema.decodeUnknownSync(StudioRecordIdSchema)(input);
+	return StudioRecordIdSchema.make(input);
 }
 
 export const AnonymousStudioSessionIdSchema = StudioRecordIdSchema.check(
@@ -21,7 +21,7 @@ export const IsoDateStringSchema = NonEmptyString.pipe(Schema.brand("IsoDateStri
 export type IsoDateString = typeof IsoDateStringSchema.Type;
 
 export function makeIsoDateString(input: string): IsoDateString {
-	return Schema.decodeUnknownSync(IsoDateStringSchema)(input);
+	return IsoDateStringSchema.make(input);
 }
 
 export const AnonymousStudioOwner = Schema.Struct({
@@ -263,8 +263,6 @@ export const CreateStudioProjectFromArtifactResponse = Schema.Struct({
 export interface CreateStudioProjectFromArtifactResponse extends Schema.Schema.Type<
 	typeof CreateStudioProjectFromArtifactResponse
 > {}
-export const CreateStudioProjectFromArtifactResponseSchema =
-	CreateStudioProjectFromArtifactResponse;
 
 export function studioProjectUrl(projectId: string): string {
 	return `/projects/${encodeURIComponent(projectId)}`;
@@ -276,8 +274,4 @@ export function studioDiagramUrl(diagramId: string): string {
 
 export function studioDiagramEditUrl(diagramId: string): string {
 	return `${studioDiagramUrl(diagramId)}/edit`;
-}
-
-export function studioDiagramDrawingApiUrl(diagramId: string): string {
-	return `/api/studio/diagrams/${encodeURIComponent(diagramId)}/drawing`;
 }
