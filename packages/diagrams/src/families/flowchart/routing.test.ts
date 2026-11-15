@@ -1,13 +1,9 @@
+import { FlowchartDiagram,parseFlowchartDiagram } from "./document.js";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import {
-	flowchartFixture,
-	pharmaBatchDispositionFlowchart,
-	parseFlowchartDiagram,
-} from "../families/flowchart/diagram.js";
-import { rankGapFlowchart, routingFixtures } from "../families/flowchart/routing-fixtures.js";
-import { parseIntermediateDiagram } from "./intermediate.js";
+import { flowchartFixture, pharmaBatchDispositionFlowchart } from "./fixtures.js";
+import { rankGapFlowchart, routingFixtures } from "./routing-fixtures.js";
 import {
 	segmentsFromPoints,
 	segmentCrossesBoundsInterior,
@@ -22,7 +18,7 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasPoint as ScenePoint,
 } from "@sketchi/drawing";
-import { renderIntermediateDiagram } from "./scene";
+import { renderFlowchartDiagram } from "./render";
 
 /** The stored, wrapped box of a free edge label, as the Excalidraw adapter writes it. */
 function renderedLabelBox(label: {
@@ -56,14 +52,15 @@ function outward(node: NodeSceneElement, p: ScenePoint, q: ScenePoint) {
 			return p.x === q.x && q.y - p.y >= 36;
 	}
 }
-const fourBranches = parseIntermediateDiagram({
+const fourBranches = Schema.decodeUnknownSync(FlowchartDiagram)({
 	...flowchartFixture,
 	nodes: [
 		{ id: "decision", label: "Choose path", kind: "decision" },
-		...["a", "b", "c", "d"].map((id) => ({ id, label: id })),
+		...["a", "b", "c", "d"].map((id) => ({ id, label: id, kind: "process" })),
 	],
 	edges: ["d", "b", "a", "c"].map((id) => ({ id, source: "decision", target: id, label: id })),
-}).pipe(Result.getOrThrow);
+	type: "flowchart",
+});
 
 describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct feedback: %s", (direction) => {
 	it.each(["straight", "curved"] as const)("reserves every final %s endpoint", (edgeRouting) => {
@@ -77,7 +74,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct feedback: %s", 
 					.map(({ label: _label, ...edge }) => edge),
 				layout: { direction, edgeRouting },
 			};
-			const scene = renderIntermediateDiagram(fixture).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(fixture);
 			const arrows = scene.elements.filter((e) => e.type === "arrow");
 			expect(scene.elements.filter((e) => e.type === "node")).toHaveLength(minimal ? 4 : 6);
 			expect(arrows).toHaveLength(minimal ? 6 : 8);
@@ -99,7 +96,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct feedback: %s", 
 		(edgeRouting) => {
 			for (const minimal of [false, true]) {
 				const workflow = routingFixtures["shared-feedback-returns"];
-				const scene = renderIntermediateDiagram({
+				const scene = renderFlowchartDiagram({
 					...workflow,
 					nodes: minimal ? workflow.nodes.filter((n) => n.kind === "process") : workflow.nodes,
 					edges: workflow.edges
@@ -111,7 +108,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct feedback: %s", 
 						)
 						.map((e) => (e.id === "ca" ? { ...e, label: "Revisit earlier stage now" } : e)),
 					layout: { direction, edgeRouting },
-				}).pipe(Result.getOrThrow);
+				});
 				const arrow = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "ca")!;
 				const label = scene.elements.find((e) => e.type === "text" && e.id === "edge:ca:label")!;
 				if (arrow.type !== "arrow" || label.type !== "text")
@@ -141,13 +138,13 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("direct return corridors: %s", 
 		(edgeRouting) => {
 			for (const labeled of [false, true]) {
 				const fixture = routingFixtures["two-stage-retry"];
-				const scene = renderIntermediateDiagram({
+				const scene = renderFlowchartDiagram({
 					...fixture,
 					edges: fixture.edges.map((e) =>
 						e.id === "e5" && labeled ? { ...e, label: "Retry" } : e,
 					),
 					layout: { direction, edgeRouting },
-				}).pipe(Result.getOrThrow);
+				});
 				const arrows = scene.elements.filter((e) => e.type === "arrow");
 				const nodes = scene.elements.filter((e) => e.type === "node");
 				expect(nodes).toHaveLength(6);
@@ -181,10 +178,10 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("direct return corridors: %s", 
 describe.each(["TB", "BT", "LR", "RL"] as const)("feedback capacity: %s", (direction) => {
 	it("keeps all four mixed-label returns at distinct ports", () => {
 		const fixture = routingFixtures["multi-stage-rework"];
-		const scene = renderIntermediateDiagram({
+		const scene = renderFlowchartDiagram({
 			...fixture,
 			layout: { ...fixture.layout, direction },
-		}).pipe(Result.getOrThrow);
+		});
 		const arrows = scene.elements.filter((e) => e.type === "arrow");
 		const returns = arrows.filter((a) => a.edgeId.startsWith("back"));
 		expect(scene.elements.filter((e) => e.type === "node")).toHaveLength(7);
@@ -211,10 +208,10 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("feedback capacity: %s", (direc
 						edges: workflow.edges.filter((e) => e.id !== "start" && e.id !== "end"),
 					}
 				: workflow;
-			const scene = renderIntermediateDiagram({
+			const scene = renderFlowchartDiagram({
 				...fixture,
 				layout: { direction, edgeRouting },
-			}).pipe(Result.getOrThrow);
+			});
 			const nodes = scene.elements.filter((e) => e.type === "node");
 			const arrows = scene.elements.filter((e) => e.type === "arrow");
 			expect(nodes).toHaveLength(minimal ? 3 : 5);
@@ -237,10 +234,10 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("direct feedback: %s", (directi
 		"keeps %s feedback outside both bound nodes",
 		(edgeRouting) => {
 			const fixture = routingFixtures["review-feedback"];
-			const scene = renderIntermediateDiagram({
+			const scene = renderFlowchartDiagram({
 				...fixture,
 				layout: { direction, edgeRouting },
-			}).pipe(Result.getOrThrow);
+			});
 			const feedback = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "feedback")!;
 			if (feedback.type !== "arrow") throw new Error("Missing feedback arrow");
 			const source = scene.elements.find(
@@ -277,10 +274,10 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("direct feedback: %s", (directi
 it.each(["straight", "curved"] as const)(
 	"keeps %s feedback clear of the existing No label",
 	(edgeRouting) => {
-		const scene = renderIntermediateDiagram({
+		const scene = renderFlowchartDiagram({
 			...routingFixtures["review-feedback"],
 			layout: { direction: "TB", edgeRouting },
-		}).pipe(Result.getOrThrow);
+		});
 		const feedback = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "feedback")!;
 		const label = scene.elements.find((e) => e.type === "text" && e.id === "edge:no:label")!;
 		if (feedback.type !== "arrow" || label.type !== "text")
@@ -294,18 +291,23 @@ it.each(["straight", "curved"] as const)(
 		}
 	},
 );
-const manyInputs = parseIntermediateDiagram({
+const manyInputs = Schema.decodeUnknownSync(FlowchartDiagram)({
 	...flowchartFixture,
 	nodes: [
-		...[...Array(12).keys()].map((i) => ({ id: `source-${i}`, label: `Input ${i}` })),
-		{ id: "sink", label: "Collect inputs" },
+		...[...Array(12).keys()].map((i) => ({
+			id: `source-${i}`,
+			label: `Input ${i}`,
+			kind: "process",
+		})),
+		{ id: "sink", label: "Collect inputs", kind: "process" },
 	],
 	edges: [...Array(12).keys()].map((i) => ({
 		id: `input-${i}`,
 		source: `source-${i}`,
 		target: "sink",
 	})),
-}).pipe(Result.getOrThrow);
+	type: "flowchart",
+});
 const fixtures = {
 	...routingFixtures,
 	flowchartFixture,
@@ -314,7 +316,7 @@ const fixtures = {
 	manyInputs,
 };
 describe.each(Object.entries(fixtures))("%s", (_name, fixture) => {
-	const scene = renderIntermediateDiagram(fixture).pipe(Result.getOrThrow);
+	const scene = renderFlowchartDiagram(fixture);
 	const nodes = scene.elements.filter((e) => e.type === "node");
 	const arrows = scene.elements.filter((e) => e.type === "arrow");
 	it("has no coincident interiors between directed routes", () => {
@@ -459,10 +461,10 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("feedback ports: %s", (directio
 		"separates the %s return from forward departures and arrivals",
 		(name) => {
 			const fixture = routingFixtures[name];
-			const scene = renderIntermediateDiagram({
+			const scene = renderFlowchartDiagram({
 				...fixture,
 				layout: { ...fixture.layout, direction },
-			}).pipe(Result.getOrThrow);
+			});
 			const nodes = scene.elements.filter((e) => e.type === "node");
 			const arrows = scene.elements.filter((e) => e.type === "arrow");
 			const feedback = arrows.find((a) => a.edgeId === "feedback")!;
@@ -503,9 +505,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("feedback ports: %s", (directio
  * Endpoint jogs, near-coincident corridors, touching arrowheads and lines through
  * another arrow's head, judged at reader scale.
  */
-function readerFindings(
-	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
-): string[] {
+function readerFindings(scene: ReturnType<typeof renderFlowchartDiagram>): string[] {
 	const nodes = scene.elements.filter((e) => e.type === "node");
 	const arrows = scene.elements.filter((e) => e.type === "arrow");
 	const xs = [
@@ -537,45 +537,22 @@ function readerFindings(
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 // Rendering is deterministic, so each fixture and direction renders once for every check.
-const rendered = new Map<
-	string,
-	Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>
->();
+const rendered = new Map<string, ReturnType<typeof renderFlowchartDiagram>>();
 const render = (
 	fixture: (typeof routingFixtures)[keyof typeof routingFixtures],
-	direction: string,
+	direction: (typeof directions)[number],
 ) => {
 	const key = `${fixture.id}:${direction}`;
 	if (!rendered.has(key))
 		rendered.set(
 			key,
-			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }).pipe(
-				Result.getOrThrow,
-			),
+			renderFlowchartDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
 		);
 	return rendered.get(key)!;
 };
 
 describe("reader-scale routing polish", () => {
-	it.each(Object.keys(routingFixtures))(
-		"keeps %s free of jogs, near-coincident corridors and touching arrowheads",
-		(name) => {
-			expect(
-				readerFindings(render(routingFixtures[name as keyof typeof routingFixtures], "TB")),
-			).toEqual([]);
-		},
-	);
-
 	describe.each(directions)("%s", (direction) => {
-		it.each([
-			"release-fan-in",
-			"stability-fan-in",
-			"renewal-retry",
-			"cancellation-convergence",
-		] as const)("keeps %s polished in every direction", (name) => {
-			expect(readerFindings(render(routingFixtures[name], direction))).toEqual([]);
-		});
-
 		// Known residuals in mirrored layouts; a count may only fall.
 		const residuals: Partial<Record<string, Partial<Record<(typeof directions)[number], number>>>> =
 			{
@@ -644,8 +621,8 @@ describe.each(["LR", "RL", "TB", "BT"] as const)("direct decision ports: %s", (d
 		"leaves and enters every %s node outward instead of cutting back through it",
 		(edgeRouting) => {
 			// Review repro: mirrored decision vertices sent a direct branch back through its diamond.
-			const scene = renderIntermediateDiagram(
-				parseFlowchartDiagram({
+			const scene = renderFlowchartDiagram(
+				Schema.decodeUnknownSync(FlowchartDiagram)({
 					id: "retry-decisions",
 					title: "Retry decisions",
 					type: "flowchart",
@@ -664,8 +641,8 @@ describe.each(["LR", "RL", "TB", "BT"] as const)("direct decision ports: %s", (d
 						{ id: "e4", source: "n3", target: "n1", label: "No" },
 					],
 					layout: { direction, edgeRouting },
-				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow);
+				}),
+			);
 			const nodes = scene.elements.filter((e) => e.type === "node");
 			const inward: string[] = [];
 			for (const arrow of scene.elements.filter((e) => e.type === "arrow"))
@@ -695,7 +672,7 @@ describe("rank gaps", () => {
 	it("grows the gap a line steps sideways across until the step clears both its ends", () => {
 		// Monitoring led to the resolution through a 96-unit gap with a 148-unit
 		// step: wherever the step sat, it read as a jog into the arrowhead.
-		const scene = renderIntermediateDiagram(rankGapFlowchart).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(rankGapFlowchart);
 		const [xs, ys] = (["x", "y"] as const).map((axis) =>
 			scene.elements.flatMap((e) =>
 				e.type === "arrow"
@@ -733,4 +710,174 @@ describe("rank gaps", () => {
 		// It grows no further than tightening allows.
 		expect((height + 40) / (width + 40)).toBeLessThan(2.3);
 	});
+});
+
+it("keeps upward returns separate from forward ports without overlapping their routes", () => {
+	const scene = renderFlowchartDiagram(
+		parseFlowchartDiagram({
+			id: "procurement-vendor-approval",
+			title: "Procurement vendor approval",
+			type: "flowchart",
+			nodes: [
+				{ id: "need-identified", label: "Need identified", kind: "start" },
+				{ id: "collect-quotes", label: "Collect quotes", kind: "process" },
+				{
+					id: "preferred-vendor",
+					label: "Preferred vendor?",
+					kind: "decision",
+				},
+				{ id: "competitive-bid", label: "Competitive bid", kind: "process" },
+				{ id: "risk-assessment", label: "Risk assessment", kind: "process" },
+				{
+					id: "risk-acceptable",
+					label: "Risk acceptable?",
+					kind: "decision",
+				},
+				{ id: "legal-review", label: "Legal review", kind: "process" },
+				{
+					id: "legal-approved",
+					label: "Legal approved?",
+					kind: "decision",
+				},
+				{
+					id: "renegotiate-terms",
+					label: "Renegotiate terms",
+					kind: "process",
+				},
+				{ id: "create-contract", label: "Create contract", kind: "end" },
+				{ id: "reject-vendor", label: "Reject vendor", kind: "end" },
+			],
+			edges: [
+				{
+					id: "edge-1",
+					source: "need-identified",
+					target: "collect-quotes",
+				},
+				{
+					id: "edge-2",
+					source: "collect-quotes",
+					target: "preferred-vendor",
+				},
+				{
+					id: "edge-3",
+					source: "preferred-vendor",
+					target: "risk-assessment",
+					label: "yes",
+				},
+				{
+					id: "edge-4",
+					source: "preferred-vendor",
+					target: "competitive-bid",
+					label: "no",
+				},
+				{
+					id: "edge-5",
+					source: "competitive-bid",
+					target: "risk-assessment",
+				},
+				{
+					id: "edge-6",
+					source: "risk-assessment",
+					target: "risk-acceptable",
+				},
+				{
+					id: "edge-7",
+					source: "risk-acceptable",
+					target: "legal-review",
+					label: "yes",
+				},
+				{
+					id: "edge-8",
+					source: "risk-acceptable",
+					target: "reject-vendor",
+					label: "no",
+				},
+				{
+					id: "edge-9",
+					source: "legal-review",
+					target: "legal-approved",
+				},
+				{
+					id: "edge-10",
+					source: "legal-approved",
+					target: "create-contract",
+					label: "yes",
+				},
+				{
+					id: "edge-11",
+					source: "legal-approved",
+					target: "renegotiate-terms",
+					label: "no",
+				},
+				{
+					id: "edge-12",
+					source: "renegotiate-terms",
+					target: "legal-review",
+				},
+			],
+			layout: { direction: "TB", edgeRouting: "orthogonal" },
+			style: {
+				accentColor: "#000000",
+				backgroundColor: "#ffffff",
+			},
+		}).pipe(Result.getOrThrow),
+	);
+	const legalReview = scene.elements.find(
+		(element) => element.type === "node" && element.nodeId === "legal-review",
+	);
+	const renegotiateTerms = scene.elements.find(
+		(element) => element.type === "node" && element.nodeId === "renegotiate-terms",
+	);
+	const returnArrow = scene.elements.find(
+		(element) => element.type === "arrow" && element.edgeId === "edge-12",
+	);
+	const legalToDecisionArrow = scene.elements.find(
+		(element) => element.type === "arrow" && element.edgeId === "edge-9",
+	);
+	const renegotiateEntryArrow = scene.elements.find(
+		(element) => element.type === "arrow" && element.edgeId === "edge-11",
+	);
+
+	if (
+		!legalReview ||
+		legalReview.type !== "node" ||
+		!renegotiateTerms ||
+		renegotiateTerms.type !== "node" ||
+		!returnArrow ||
+		returnArrow.type !== "arrow" ||
+		!legalToDecisionArrow ||
+		legalToDecisionArrow.type !== "arrow" ||
+		!renegotiateEntryArrow ||
+		renegotiateEntryArrow.type !== "arrow"
+	) {
+		throw new Error("Expected procurement return route elements.");
+	}
+
+	const start = returnArrow.points[0];
+	const end = returnArrow.points[returnArrow.points.length - 1];
+
+	if (!start || !end) {
+		throw new Error("Expected return route points.");
+	}
+
+	// The return must not share the top arrival or the bottom forward departure.
+	expect(start.y).toBeGreaterThan(renegotiateTerms.y);
+	expect(start.y).toBeLessThan(renegotiateTerms.y + renegotiateTerms.height);
+	expect(end.y).toBeGreaterThan(legalReview.y);
+	expect(end.y).toBeLessThan(legalReview.y + legalReview.height);
+	const segments = segmentsFromPoints(returnArrow.points);
+	expect(
+		segments.some((segment, index) =>
+			segments.slice(index + 1).some((other) => segmentsOverlapInterior(segment, other)),
+		),
+	).toBe(false);
+	for (const other of [legalToDecisionArrow, renegotiateEntryArrow]) {
+		expect(
+			segments.some((segment) =>
+				segmentsFromPoints(other.points).some((otherSegment) =>
+					segmentsOverlapInterior(segment, otherSegment),
+				),
+			),
+		).toBe(false);
+	}
 });

@@ -1,15 +1,14 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import { loadFromBlob, MIME_TYPES } from "@excalidraw/excalidraw";
 import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
+import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
 import { embedCanvasIcons } from "@sketchi/drawing";
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
 	type ExcalidrawScene,
 } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { DrawingEditor } from "@sketchi/editor";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -35,13 +34,10 @@ function solidLogo([red, green, blue]: readonly [number, number, number]) {
 
 function logoScene(): ExcalidrawScene {
 	return convertSceneToExcalidraw(
-		embedCanvasIcons(
-			renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
-			(slug) => {
-				const color = LOGO_COLORS[slug];
-				return color ? { name: slug, svg: solidLogo(color) } : undefined;
-			},
-		).scene,
+		embedCanvasIcons(renderFlowchartDiagram(deployPipelineLogoFlowchart), (slug) => {
+			const color = LOGO_COLORS[slug];
+			return color ? { name: slug, svg: solidLogo(color) } : undefined;
+		}).scene,
 	);
 }
 

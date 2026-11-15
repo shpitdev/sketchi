@@ -16,9 +16,9 @@ import {
 	makeMemoryArtifactStorage,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
 import {
-	BuildFlowchartRequestSchema,
+	flowchartBuild,
 	type BuildFlowchartResult,
-} from "@sketchi/diagrams/build/code-mode/contract";
+} from "@sketchi/diagrams/families/flowchart/build";
 import {
 	buildFlowchart,
 	CodeModeRuntimeEnvironment,
@@ -190,11 +190,11 @@ describe("Studio build_flowchart host", () => {
 	});
 
 	it("injects artifact options instead of exposing them to the model", async () => {
-		let request: typeof BuildFlowchartRequestSchema.Type | undefined;
+		let request: typeof flowchartBuild.request.Type | undefined;
 		const executor = await Effect.runPromise(
 			makeStudioFlowchartToolExecutor((input) =>
 				Effect.sync(() => {
-					request = Schema.decodeUnknownSync(BuildFlowchartRequestSchema, {
+					request = Schema.decodeUnknownSync(flowchartBuild.request, {
 						errors: "all",
 						reportInput: true,
 					})(input);
@@ -514,7 +514,7 @@ describe("Studio build_flowchart host", () => {
 		const executor = await Effect.runPromise(
 			makeStudioFlowchartToolExecutor((input) =>
 				Effect.gen(function* () {
-					const request = Schema.decodeUnknownSync(BuildFlowchartRequestSchema, {
+					const request = Schema.decodeUnknownSync(flowchartBuild.request, {
 						errors: "all",
 						reportInput: true,
 					})(input);

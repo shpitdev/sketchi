@@ -1,25 +1,17 @@
-import { type CanvasSpec } from "@sketchi/drawing";
-import { type ExcalidrawScene, convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import {
-	type DiagramValidationError,
-	type IntermediateDiagram,
-} from "@sketchi/diagrams/graph/intermediate";
+	type CanonicalDiagram,
+	familyForType,
+	parseCanonicalDiagram,
+	renderDiagram,
+} from "@sketchi/diagrams/family";
 import {
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagrams/families/flowchart/diagram";
-import {
-	type MindmapInputError,
-	type Mindmap,
-	mindmapTopics,
-	validateMindmap,
-	renderMindmap,
-} from "@sketchi/diagrams/families/mindmap/index";
-import { type Schema, Result } from "effect";
+} from "@sketchi/diagrams/families/flowchart/fixtures";
+import { Result } from "effect";
 
 import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
-
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 
 import { copyText, DrawingEditor } from "@sketchi/editor";
 import { useMemo, useState } from "react";
@@ -28,7 +20,7 @@ import { DiagramInspector } from "../diagram-inspector/index.js";
 import { type DiagramOption, DiagramSwitcher } from "../diagram-switcher/index.js";
 import { WorkspaceTopBar, type WorkspaceStatus } from "../workspace-top-bar/index.js";
 
-const defaultDiagrams: readonly (IntermediateDiagram | Mindmap)[] = [
+const defaultDiagrams: readonly CanonicalDiagram[] = [
 	pharmaBatchDispositionFlowchart,
 	flowchartFixture,
 	mindmapFixture,
@@ -42,7 +34,7 @@ interface CopyFeedback {
 }
 
 export interface ExcalidrawWorkspaceProps {
-	diagrams?: readonly (IntermediateDiagram | Mindmap)[];
+	diagrams?: readonly CanonicalDiagram[];
 	errorMessage?: string;
 	initialDiagramId?: string;
 	status?: WorkspaceStatus;
@@ -63,34 +55,18 @@ export function ExcalidrawWorkspace({
 	const copyState: CopyState =
 		copyFeedback && copyFeedback.diagramId === active?.id ? copyFeedback.state : "idle";
 
-	const rendered = useMemo<
-		Result.Result<
-			ExcalidrawScene | null,
-			MindmapInputError | DiagramValidationError | Schema.SchemaError
-		>
-	>(() => {
+	const rendered = useMemo(() => {
 		if (!active) return Result.succeed(null);
-		const scene: Result.Result<
-			CanvasSpec,
-			MindmapInputError | DiagramValidationError | Schema.SchemaError
-		> =
-			active.type === "mindmap" && "root" in active
-				? Result.map(validateMindmap(active), renderMindmap)
-				: renderIntermediateDiagram(active);
-		return Result.map(scene, convertSceneToExcalidraw);
+		return parseCanonicalDiagram(active).pipe(
+			Result.flatMap(renderDiagram),
+			Result.map(convertSceneToExcalidraw),
+		);
 	}, [active]);
 	const scene = Result.getOrElse(rendered, () => null);
 
 	const options: DiagramOption[] = diagrams.map((item) => ({
-		edgeCount:
-			item.type === "mindmap" && "root" in item
-				? [...mindmapTopics(item.root)].length - 1
-				: item.edges.length,
+		...familyForType(item.type).counts(item),
 		id: item.id,
-		nodeCount:
-			item.type === "mindmap" && "root" in item
-				? [...mindmapTopics(item.root)].length
-				: item.nodes.length,
 		title: item.title,
 		type: item.type,
 	}));
@@ -102,7 +78,7 @@ export function ExcalidrawWorkspace({
 				? "error"
 				: status;
 
-	const irJson = useMemo(() => (active ? JSON.stringify(active, null, 2) : ""), [active]);
+	const documentJson = useMemo(() => (active ? JSON.stringify(active, null, 2) : ""), [active]);
 
 	const sceneJson = useMemo(() => (scene ? JSON.stringify(scene, null, 2) : ""), [scene]);
 
@@ -110,14 +86,14 @@ export function ExcalidrawWorkspace({
 		? `data:application/json;charset=utf-8,${encodeURIComponent(sceneJson)}`
 		: undefined;
 
-	async function copyIr() {
+	async function copyDocument() {
 		if (!active) {
 			return;
 		}
 
 		const diagramId = active.id;
 		try {
-			await copyText(irJson);
+			await copyText(documentJson);
 			setCopyFeedback({ diagramId, state: "copied" });
 		} catch {
 			setCopyFeedback({ diagramId, state: "error" });
@@ -133,12 +109,16 @@ export function ExcalidrawWorkspace({
 							<a className="workspace-action" href="#workspace-canvas">
 								Canvas
 							</a>
-							<button className="workspace-action" onClick={() => void copyIr()} type="button">
+							<button
+								className="workspace-action"
+								onClick={() => void copyDocument()}
+								type="button"
+							>
 								{copyState === "copied"
 									? "Copied"
 									: copyState === "error"
 										? "Copy failed"
-										: "Copy IR"}
+										: "Copy document"}
 							</button>
 							<a
 								className="workspace-action workspace-action--primary"

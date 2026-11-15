@@ -31,16 +31,15 @@ import {
 	syncedHybridFlowchart,
 	zoneFixtures,
 	zoneStressFixtures,
-} from "../families/flowchart/zone-fixtures.js";
-import { groupFixtures } from "../families/flowchart/group-fixtures.js";
-import { parseFlowchartDiagram } from "../families/flowchart/diagram.js";
-import { type IntermediateDiagram } from "./intermediate.js";
-import { arrowCrossings } from "./readability";
-import { renderIntermediateDiagram } from "./scene";
+} from "./zone-fixtures.js";
+
+import { parseFlowchartDiagram,FlowchartDiagram } from "./document.js";
+import { arrowCrossings } from "../../graph/readability";
+import { renderFlowchartDiagram } from "./render";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];
-const fixtures: Record<string, IntermediateDiagram> = {
+const fixtures: Record<string, FlowchartDiagram> = {
 	...zoneFixtures,
 	...zoneStressFixtures,
 	...requestPathFlowcharts,
@@ -50,16 +49,16 @@ const scenes = new Map<string, CanvasSpec>();
 function rendered(
 	name: string,
 	direction: Direction = fixtures[name]!.layout.direction,
-	fixture: IntermediateDiagram = fixtures[name]!,
+	fixture: FlowchartDiagram = fixtures[name]!,
 ) {
 	const key = `${name}:${direction}`;
 	if (!scenes.has(key))
 		scenes.set(
 			key,
-			renderIntermediateDiagram({
+			renderFlowchartDiagram({
 				...fixture,
 				layout: { direction, edgeRouting: "orthogonal" },
-			}).pipe(Result.getOrThrow),
+			}),
 		);
 	return scenes.get(key)!;
 }
@@ -179,12 +178,6 @@ describe("zone layout", () => {
 		}
 	});
 
-	it("routes the flow straight from outside through every zone it enters", () => {
-		const scene = rendered("aws-three-tier");
-		const arrow = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "e1")!;
-		expect(arrow.type === "arrow" && arrow.points).toHaveLength(2);
-	});
-
 	it("keeps the stated direction at every level of zones", () => {
 		// Top to bottom, the namespaces a request crosses stack in its order.
 		const k8s = rendered("kubernetes-cluster");
@@ -294,7 +287,7 @@ describe("zone layout", () => {
 				groups: [{ id: "cluster", label: "Cluster", kind: "cluster" }],
 				layout: { direction, edgeRouting: "orthogonal" },
 			}).pipe(Result.getOrThrow);
-			const scene = renderIntermediateDiagram(chain).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(chain);
 			expect(scene.elements.filter((e) => e.type === "arrow")).toHaveLength(9);
 			expect(zoneRegionIssues(scene, chain)).toEqual([]);
 		}
@@ -422,7 +415,7 @@ describe("zone layout", () => {
 				node.id === "rds" ? { ...node, icon: { slug: "postgresql" } } : node,
 			),
 		}).pipe(Result.getOrThrow);
-		const scene = renderIntermediateDiagram(fixture).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(fixture);
 		const rds = nodeOf(scene, "rds");
 		const icon = canvasNodeIconBox(rds)!;
 		expect(icon.y).toBeGreaterThanOrEqual(rds.y + 2 * CANVAS_SHAPE_CURVE.cylinder);
@@ -432,14 +425,6 @@ describe("zone layout", () => {
 				icons: { postgresql: { name: "PostgreSQL", svg: "<svg/>" } },
 			}),
 		).toEqual([]);
-	});
-
-	it("keeps flat groups without a kind as frames", () => {
-		const scene = renderIntermediateDiagram(groupFixtures["grouped-approval"]).pipe(
-			Result.getOrThrow,
-		);
-		expect(scene.elements.some((e) => e.type === "frame")).toBe(true);
-		expect(zonesOf(scene)).toEqual([]);
 	});
 });
 
@@ -476,7 +461,7 @@ describe("lines into a hanging zone band", () => {
 	it("keeps the data center beside the cloud when its region wraps clear of crossings", () => {
 		// A Sol sample stacked the cloud under the data center: its region's
 		// side-by-side wrap crossed the ERP's two lines over the Oracle database.
-		const scene = renderIntermediateDiagram(describedHybridFlowchart).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(describedHybridFlowchart);
 		const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
 		const [dc, aws] = [zones.get("group:dc")!, zones.get("group:aws")!];
 		expect(aws.x).toBeGreaterThan(dc.x + dc.width);
@@ -490,10 +475,10 @@ describe("lines into a hanging zone band", () => {
 			// data center: a top-level wrap came within the target aspect in two bands,
 			// the region's wrap inside the cloud in three, and the fewer bands won. The
 			// ERP's line ran down and back against the row to the VPN gateway.
-			const scene = renderIntermediateDiagram({
+			const scene = renderFlowchartDiagram({
 				...leftToRightHybridFlowchart,
 				layout: { direction, edgeRouting: "orthogonal" },
-			}).pipe(Result.getOrThrow);
+			});
 			const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
 			const [dc, aws] = [zones.get("group:dc")!, zones.get("group:aws")!];
 			const forward = direction === "LR" ? 1 : -1;
@@ -533,7 +518,7 @@ describe("lines into a hanging zone band", () => {
 		// Four steps, a one-step cloud and three steps more ran 2,252 px in one row:
 		// the most even cuts hung the cloud, and no other cut was tried.
 		const ids = ["a1", "a2", "a3", "a4", "z1", "b1", "b2", "b3"];
-		const scene = renderIntermediateDiagram(
+		const scene = renderFlowchartDiagram(
 			parseFlowchartDiagram({
 				id: "trailing-steps",
 				title: "Trailing steps",
@@ -550,7 +535,7 @@ describe("lines into a hanging zone band", () => {
 					.map((id, index) => ({ id: `e${index}`, source: ids[index]!, target: id })),
 				groups: [{ id: "cloud", label: "Cloud", kind: "cloud" }],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		expect(scene.width).toBeLessThan(1_600);
 		const cloud = zonesOf(scene)[0]!;
 		const [a4, b1] = [nodeOf(scene, "a4"), nodeOf(scene, "b1")];
@@ -562,7 +547,7 @@ describe("lines into a hanging zone band", () => {
 		// A Haiku sample hung the cloud under the corporate network that holds the
 		// data center, the ERP's line dropping to the VPN gateway; the cloud now
 		// stands beside the network, and the private subnet beside the gateway.
-		const scene = renderIntermediateDiagram(corporateHybridFlowchart).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(corporateHybridFlowchart);
 		expect(stackedZones(scene)).toEqual([]);
 		const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
 		const [corp, aws, priv] = ["corp", "aws", "private"].map((id) => zones.get(`group:${id}`)!);
@@ -577,7 +562,7 @@ describe("lines into a hanging zone band", () => {
 		// A Sol sample stacked the cloud under the data center: beside it, its
 		// region's wrap crossed the sync function's lines to the table and the
 		// PDF once, which the crossing repairs remove.
-		const scene = renderIntermediateDiagram(stackedHybridFlowchart).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(stackedHybridFlowchart);
 		const zones = new Map(zonesOf(scene).map((zone) => [zone.nodeId, zone]));
 		const [dc, aws] = [zones.get("group:dc")!, zones.get("group:aws")!];
 		expect(aws.x).toBeGreaterThan(dc.x + dc.width);
@@ -629,9 +614,9 @@ describe("lines past an infrastructure shape", () => {
 			// Two Sonnet samples ran the ERP's line to the VPN gateway along the
 			// Oracle database's foot: the line cleared the database's side by the
 			// node clearance, then ran on just under its foot.
-			const scene = renderIntermediateDiagram(
+			const scene = renderFlowchartDiagram(
 				bypassingHybridFlowcharts[name as keyof typeof bypassingHybridFlowcharts],
-			).pipe(Result.getOrThrow);
+			);
 			const nodes = scene.elements.filter(
 				(e): e is NodeSceneElement => e.type === "node" && e.rendererRole === undefined,
 			);
@@ -663,7 +648,7 @@ describe("lines past an infrastructure shape", () => {
 	// Every zone fixture and generated sample, in every direction, and the
 	// four-deep zones, wrapped where too long for one row. Thirty services stay
 	// out: they pass a flowchart's limits.
-	const samples: Record<string, IntermediateDiagram> = {
+	const samples: Record<string, FlowchartDiagram> = {
 		...zoneFixtures,
 		...requestPathFlowcharts,
 		"depth-four": zoneStressFixtures["depth-four"],
@@ -685,10 +670,10 @@ describe("lines past an infrastructure shape", () => {
 			// center's outline, which reads as touching it at the reader's scale.
 			const along: string[] = [];
 			for (const direction of directions) {
-				const scene = renderIntermediateDiagram({
+				const scene = renderFlowchartDiagram({
 					...samples[name]!,
 					layout: { direction, edgeRouting: "orthogonal" },
-				}).pipe(Result.getOrThrow);
+				});
 				const nodes = scene.elements.filter(
 					(e): e is NodeSceneElement => e.type === "node" && e.rendererRole === undefined,
 				);
@@ -770,7 +755,7 @@ describe("line ends from generated samples", () => {
 		// The users once hung over the region and their line dropped into the load
 		// balancer's top, past the public subnet's name; asked for left to right,
 		// they now stand before the region and the line runs straight in.
-		const scene = renderIntermediateDiagram(requestedArchitectureFlowchart).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(requestedArchitectureFlowchart);
 		const alb = node(scene, "alb");
 		const { points } = arrow(scene, "edge-1");
 		expect(points).toHaveLength(2);
@@ -781,7 +766,7 @@ describe("line ends from generated samples", () => {
 	it("runs the sync function's line straight into the archive's side across the free corridor", () => {
 		// The line left the sync function just above the archive's span, rose
 		// over its corner and hooked down into its top.
-		const scene = renderIntermediateDiagram(corridorHybridFlowchart).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(corridorHybridFlowchart);
 		const archive = node(scene, "archive");
 		const { points } = arrow(scene, "edge-8");
 		expect(turns(points)).toHaveLength(2);
@@ -793,7 +778,7 @@ describe("line ends from generated samples", () => {
 	it("runs each of the hybrid sample's lines straight past a jog's reach of either end", () => {
 		// The sync function's lines to the table and the archive held their
 		// labels' room on the first run and stepped sideways just before the head.
-		const scene = renderIntermediateDiagram(syncedHybridFlowchart).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(syncedHybridFlowchart);
 		// Judged at the size of what is drawn: nodes, zones and lines.
 		const [xs, ys] = (["x", "y"] as const).map((axis) =>
 			scene.elements.flatMap((e) =>

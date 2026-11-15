@@ -3,7 +3,7 @@ import { type Meta, type StoryObj } from "@storybook/react-vite";
 import {
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/fixtures";
 
 import { GenerationWorkspace } from "./generation-workspace";
 import "../../styles.css";

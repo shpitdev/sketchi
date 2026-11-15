@@ -1,17 +1,16 @@
 import { type FamilyBuildOperation } from "@sketchi/diagrams/family";
 import "@tanstack/react-start/server-only";
 
-import { type BuildFlowchartOptions } from "@sketchi/diagrams/build/code-mode/contract";
+import { type BuildOptions,type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";
 import { MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
-import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import { recordMetric } from "@sketchi/observability";
 import { type JSONValue } from "ai";
 import { Effect, Metric, Ref, Semaphore } from "effect";
 
 /** Studio renders the inline scene and offers the Excalidraw download. */
-export const STUDIO_ARTIFACT_OPTIONS: NonNullable<BuildFlowchartOptions> = {
+export const STUDIO_ARTIFACT_OPTIONS: NonNullable<BuildOptions> = {
 	artifactFormats: ["scene", "excalidraw"],
 	inlineArtifacts: ["scene"],
 };

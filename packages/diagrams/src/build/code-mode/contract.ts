@@ -1,4 +1,7 @@
-import { NormalizedFlowchartSpecSchema } from "../../families/flowchart/spec.js";
+import { contractDiscriminatorAnnotation, contractMissingKeyCodeAnnotation } from "../input.js";
+import { flowchartBuild, FlowchartRequestText } from "../../families/flowchart/build.js";
+import { BuildOptions,CodeModeIssue,QualityReportSchema } from "../result.js";
+
 import {
 	BuildArtifactFormatSchema,
 	ArtifactFormatSchema,
@@ -7,9 +10,8 @@ import {
 	ArtifactBundleSchema,
 	PartialArtifactBundleSchema,
 } from "@sketchi/drawing/artifacts";
-import { CodeModeIssue, QualityReportSchema } from "../result.js";
 import { Effect, Schema, SchemaAST, SchemaGetter, SchemaIssue } from "effect";
-import { type StandardJSONSchemaV1, type StandardSchemaV1 } from "@standard-schema/spec";
+
 import {
 	CANVAS_LIMITS,
 	CanvasSpec,
@@ -25,7 +27,7 @@ import {
 	DrawnIconSchema,
 } from "@sketchi/drawing";
 
-import { FlowchartDocumentSchema } from "../../families/flowchart/document.js";
+
 import { FlowchartEditsSchema } from "../../families/flowchart/edits.js";
 import {
 	CLASS_KINDS,
@@ -37,136 +39,6 @@ import {
 	STATE_MACHINE_DIRECTIONS,
 	STATE_MACHINE_STATE_KINDS,
 } from "../../families/state-machine/document.js";
-
-export const ContractSchemaIssue = Schema.Struct({
-	code: stringLiteral("custom"),
-	issueTag: Schema.Literals([
-		"Filter",
-		"InvalidType",
-		"InvalidValue",
-		"MissingKey",
-		"UnexpectedKey",
-		"Forbidden",
-		"OneOf",
-		"AnyOf",
-	]),
-	astKind: Schema.optionalKey(Schema.String),
-	missingKeyCode: Schema.optionalKey(Schema.Literal("invalid_type")),
-	message: Schema.String,
-	path: Schema.Array(Schema.PropertyKey),
-}).annotate({ identifier: undefined });
-
-export interface ContractSchemaIssue extends Schema.Schema.Type<typeof ContractSchemaIssue> {}
-
-export class ContractSchemaError extends Schema.TaggedError<
-	ContractSchemaError,
-	{ readonly brand: unique symbol }
->()("ContractSchemaError", { issues: Schema.Array(Schema.toEncoded(ContractSchemaIssue)) }) {}
-
-function actualType(value: unknown): string {
-	if (value === null) return "null";
-	if (Array.isArray(value)) return "array";
-	return typeof value;
-}
-
-function expectedType(ast: SchemaAST.AST): string {
-	if (SchemaAST.isString(ast)) return "string";
-	if (SchemaAST.isNumber(ast)) return "number";
-	if (SchemaAST.isBoolean(ast)) return "boolean";
-	if (SchemaAST.isArrays(ast)) return "array";
-	if (SchemaAST.isObjects(ast)) return "object";
-	if (SchemaAST.isLiteral(ast)) return JSON.stringify(ast.literal);
-	return "value";
-}
-
-const contractLeafHook: SchemaIssue.LeafHook = (issue) => {
-	if (issue._tag !== "InvalidType") {
-		return SchemaIssue.defaultLeafHook(issue);
-	}
-	const actual = SchemaIssue.hasInput(issue) ? issue.input : undefined;
-	return `Invalid input: expected ${expectedType(issue.ast)}, received ${actualType(actual)}`;
-};
-
-const contractFormatter = SchemaIssue.makeFormatterStandardSchemaV1({
-	leafHook: contractLeafHook,
-});
-
-function contractIssues(
-	error: Schema.SchemaError,
-): ReadonlyArray<typeof ContractSchemaIssue.Encoded> {
-	const issues: Array<typeof ContractSchemaIssue.Encoded> = [];
-	const visit = (
-		node: SchemaIssue.Issue,
-		path: readonly PropertyKey[],
-		ast?: SchemaAST.AST,
-	): void => {
-		switch (node._tag) {
-			case "Pointer":
-				return visit(node.issue, [...path, ...node.path], ast);
-			case "Encoding":
-				return visit(node.issue, path, ast);
-			case "Composite":
-				for (const child of node.issues) visit(child, path, node.ast);
-				return;
-			case "AnyOf":
-				if (node.issues.length > 0) {
-					for (const child of node.issues) visit(child, path, node.ast);
-					return;
-				}
-				break;
-			case "Filter":
-				if (
-					SchemaIssue.defaultCheckHook(node) === undefined &&
-					node.issue._tag !== "InvalidValue"
-				) {
-					return visit(node.issue, path, ast);
-				}
-				break;
-			default:
-				// Leaf issues are formatted below.
-				break;
-		}
-		const nodeAst = "ast" in node ? node.ast : ast;
-		const missingKeyCode =
-			node._tag === "MissingKey" &&
-			node.annotations?.[contractMissingKeyCodeAnnotation] === "invalid_type"
-				? ("invalid_type" as const)
-				: undefined;
-		const astKind =
-			nodeAst && SchemaAST.isUnion(nodeAst) && nodeAst.types.every(SchemaAST.isLiteral)
-				? "LiteralUnion"
-				: nodeAst?._tag;
-		const discriminator = nodeAst?.annotations?.[contractDiscriminatorAnnotation];
-		const issuePath = typeof discriminator === "string" ? [...path, discriminator] : path;
-		for (const formatted of contractFormatter(node).issues) {
-			issues.push({
-				code: "custom",
-				issueTag: node._tag,
-				...(missingKeyCode ? { missingKeyCode } : {}),
-				...(astKind ? { astKind } : {}),
-				message: formatted.message,
-				path: issuePath,
-			});
-		}
-	};
-	visit(error.issue, []);
-	if (issues.length > 1 && issues.every((issue) => issue.path[0] === "source")) {
-		return [
-			{
-				code: "custom",
-				issueTag: "AnyOf",
-				astKind: "Union",
-				message: "Invalid input",
-				path: ["source"],
-			},
-		];
-	}
-	return issues;
-}
-
-export function formatContractSchemaError(error: Schema.SchemaError): ContractSchemaError {
-	return new ContractSchemaError({ issues: contractIssues(error) });
-}
 
 const codeModeJsonSchemaAnnotationKeys = new Set([
 	"x-sketchi-default",
@@ -185,8 +57,6 @@ const codeModeJsonSchemaAnnotationKeys = new Set([
 
 const contractDefaultAnnotation = "x-sketchi-default";
 const contractOneOfAnnotation = "x-sketchi-one-of";
-const contractDiscriminatorAnnotation = "codeModeDiscriminator";
-const contractMissingKeyCodeAnnotation = "codeModeMissingKeyCode";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -631,46 +501,7 @@ const ArtifactFormatsOption = optionalContract(nonEmptyArray(BuildArtifactFormat
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
 );
-const minimumQualityScore = 0;
-const maximumQualityScore = 10;
-const QualityScoreOption = optionalContract(
-	Schema.Number.check(
-		Schema.isFinite(),
-		Schema.isGreaterThanOrEqualTo(minimumQualityScore, {
-			message: `Too small: expected number to be >=${minimumQualityScore}`,
-		}),
-		Schema.isLessThanOrEqualTo(maximumQualityScore, {
-			message: `Too big: expected number to be <=${maximumQualityScore}`,
-		}),
-	),
-);
 
-export const BuildFlowchartOptions = Schema.Struct({
-	artifactFormats: ArtifactFormatsOption,
-	inlineArtifacts: InlineArtifactsOption,
-	minQualityScore: QualityScoreOption,
-}).annotate({ identifier: undefined });
-
-export interface BuildFlowchartOptions extends Schema.Schema.Type<typeof BuildFlowchartOptions> {}
-export const BuildFlowchartOptionsSchema = optionalContract(BuildFlowchartOptions);
-
-/** The request a flowchart draws, in the user's words, as long as a generate prompt may be. */
-export const FLOWCHART_REQUEST_MAX_LENGTH = 20_000;
-const FlowchartRequestText = NonEmptyString.check(
-	Schema.isMaxLength(FLOWCHART_REQUEST_MAX_LENGTH, {
-		message: `request must be at most ${FLOWCHART_REQUEST_MAX_LENGTH} characters.`,
-	}),
-);
-
-export const BuildFlowchartRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(FlowchartDocumentSchema),
-	/** The user's words: an accepted build lists what they state that it misses. */
-	request: optionalContract(FlowchartRequestText),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildFlowchartRequest extends Schema.Schema.Type<typeof BuildFlowchartRequest> {}
 
 /**
  * A change to a built flowchart: the artifact it starts from and the edits, by id. The edited
@@ -681,42 +512,15 @@ export const EditFlowchartRequest = Schema.Struct({
 	artifactId: RequiredNonEmptyString,
 	edits: requiredObject(FlowchartEditsSchema),
 	request: optionalContract(FlowchartRequestText),
-	options: optionalContract(BuildFlowchartOptions),
+	options: optionalContract(BuildOptions),
 }).annotate({ identifier: undefined });
 
 export interface EditFlowchartRequest extends Schema.Schema.Type<typeof EditFlowchartRequest> {}
 
-/** The document Studio's model writes: the same one every other surface takes. */
-const BuildFlowchartToolInputContract = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(FlowchartDocumentSchema),
-});
-export type BuildFlowchartToolInput = typeof BuildFlowchartToolInputContract.Type;
-const BuildFlowchartToolInputStandardSchema = Schema.toStandardSchemaV1(
-	BuildFlowchartToolInputContract,
-	{ leafHook: contractLeafHook, parseOptions: { errors: "all" } },
-);
-export const BuildFlowchartToolInputSchema = Object.assign(BuildFlowchartToolInputStandardSchema, {
-	"~standard": {
-		...BuildFlowchartToolInputStandardSchema["~standard"],
-		jsonSchema: {
-			input: () => toCodeModeJsonSchema(BuildFlowchartToolInputContract),
-			output: () => toCodeModeJsonSchema(BuildFlowchartToolInputContract),
-		},
-	},
-}) satisfies StandardSchemaV1<
-	typeof BuildFlowchartToolInputContract.Encoded,
-	BuildFlowchartToolInput
-> &
-	StandardJSONSchemaV1<typeof BuildFlowchartToolInputContract.Encoded, BuildFlowchartToolInput>;
-export const BuildFlowchartRequestSchema = Object.assign(BuildFlowchartRequest, {
-	omit: (_keys: { readonly options: true }) => BuildFlowchartToolInputSchema,
-});
-
 export const BuildStateMachineRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(StateMachineSpec),
-	options: optionalContract(BuildFlowchartOptions),
+	options: optionalContract(BuildOptions),
 }).annotate({ identifier: undefined });
 
 export interface BuildStateMachineRequest extends Schema.Schema.Type<
@@ -739,7 +543,7 @@ export type BuildStateMachineToolInput = typeof BuildStateMachineToolInputSchema
 export const BuildErDiagramRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(ErSpec),
-	options: optionalContract(BuildFlowchartOptions),
+	options: optionalContract(BuildOptions),
 }).annotate({ identifier: undefined });
 
 export interface BuildErDiagramRequest extends Schema.Schema.Type<typeof BuildErDiagramRequest> {}
@@ -753,7 +557,7 @@ export type BuildErDiagramToolInput = typeof BuildErDiagramToolInputSchema.Type;
 export const BuildClassDiagramRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(ClassSpec),
-	options: optionalContract(BuildFlowchartOptions),
+	options: optionalContract(BuildOptions),
 }).annotate({ identifier: undefined });
 
 export interface BuildClassDiagramRequest extends Schema.Schema.Type<
@@ -817,7 +621,7 @@ const CanvasInput = CanvasSpec.mapFields((fields) => ({
 export const CreateCanvasRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(CanvasInput),
-	options: optionalContract(BuildFlowchartOptions),
+	options: optionalContract(BuildOptions),
 }).annotate({ identifier: undefined });
 
 export interface CreateCanvasRequest extends Schema.Schema.Type<typeof CreateCanvasRequest> {}
@@ -1081,47 +885,9 @@ const NormalizedClassSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedClassSpec = typeof NormalizedClassSpecSchema.Type;
-export const BuildFlowchartAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedFlowchartSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildFlowchartAccepted extends Schema.Schema.Type<typeof BuildFlowchartAccepted> {}
-export const BuildFlowchartRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_flowchart",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedFlowchartSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildFlowchartRejected extends Schema.Schema.Type<typeof BuildFlowchartRejected> {}
-export const BuildFlowchartResultSchema = Schema.Union([
-	BuildFlowchartAccepted,
-	BuildFlowchartRejected,
-]);
-export type BuildFlowchartResult = typeof BuildFlowchartResultSchema.Type;
-
 /** An edited flowchart, built as a new artifact whose provenance names the one it changed. */
 export const EditFlowchartAccepted = Schema.Struct({
-	...BuildFlowchartAccepted.fields,
+	...flowchartBuild.accepted.fields,
 	/** The edits as applied. */
 	edits: FlowchartEditsSchema,
 }).annotate({ identifier: undefined });
@@ -1132,8 +898,12 @@ export interface EditFlowchartAccepted extends Schema.Schema.Type<typeof EditFlo
  * document lacks, or an edited document that does not build.
  */
 export const EditFlowchartRejected = Schema.Struct({
-	...BuildFlowchartRejected.fields,
-	status: literals([...BuildFlowchartRejected.fields.status.literals, "not_found", "invalid_edit"]),
+	...flowchartBuild.rejected.fields,
+	status: literals([
+		...flowchartBuild.rejected.fields.status.literals,
+		"not_found",
+		"invalid_edit",
+	]),
 }).annotate({ identifier: undefined });
 
 export interface EditFlowchartRejected extends Schema.Schema.Type<typeof EditFlowchartRejected> {}

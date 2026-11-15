@@ -3,7 +3,6 @@ import { Result, Schema } from "effect";
 
 import { describe, expect, it } from "vitest";
 
-import { parseIntermediateDiagram } from "../../graph/intermediate";
 import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_GROUP_DEPTH,
@@ -13,10 +12,10 @@ import {
 	FLOWCHART_MAX_NODES,
 	FlowchartDiagram,
 	FlowchartValidationError,
-	flowchartFixture,
 	getFlowchartValidationIssues,
 	parseFlowchartDiagram,
-} from "./diagram";
+} from "./document";
+import { flowchartFixture } from "./fixtures";
 
 function validationIssues(input: unknown) {
 	return getFlowchartValidationIssues(
@@ -346,9 +345,16 @@ describe("flowchart zones", () => {
 			'Set parent to the id of the declared group that encloses it ("region", "vpc", "public", "private"), or remove parent.',
 		);
 		expect(
-			parseIntermediateDiagram({ ...zoned, groups: [{ id: "a", label: "A", parent: "a" }] }),
+			parseFlowchartDiagram({ ...zoned, groups: [{ id: "a", label: "A", parent: "a" }] }),
 		).toMatchObject({
-			failure: { message: expect.stringContaining('Group "a" is nested inside itself.') },
+			failure: {
+				issues: expect.arrayContaining([
+					expect.objectContaining({
+						code: "group_cycle",
+						ref: { kind: "group", id: "a", path: "groups.parent" },
+					}),
+				]),
+			},
 		});
 	});
 
@@ -457,5 +463,36 @@ describe("flowchart lanes", () => {
 		});
 		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_too_large"]);
 		expect(issues[0]?.ref).toEqual({ kind: "diagram", id: "linear-9", path: "lanes" });
+	});
+});
+
+describe("canonical flowchart identities", () => {
+	it("rejects duplicate node identities and dangling edge references before layout", () => {
+		for (const [input, code, ref] of [
+			[
+				{
+					...flowchartFixture,
+					nodes: [...flowchartFixture.nodes, { id: "prompt", label: "Duplicate", kind: "process" }],
+				},
+				"duplicate_node_id",
+				{ kind: "node", id: "prompt", path: "nodes" },
+			],
+			[
+				{
+					...flowchartFixture,
+					edges: [
+						...flowchartFixture.edges,
+						{ id: "missing-edge", source: "prompt", target: "missing", label: "bad" },
+					],
+				},
+				"missing_edge_target",
+				{ kind: "edge", id: "missing-edge", path: "edges.target" },
+			],
+		] as const) {
+			const parsed = parseFlowchartDiagram(input);
+			expect(parsed).toMatchObject({
+				failure: { issues: expect.arrayContaining([expect.objectContaining({ code, ref })]) },
+			});
+		}
 	});
 });

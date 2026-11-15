@@ -1,13 +1,12 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import { describe, expect, it } from "vitest";
-import { crossingFixtures, sideFixtures } from "../families/flowchart/crossing-fixtures.js";
+import { crossingFixtures, sideFixtures } from "./crossing-fixtures.js";
 import {
 	leftToRightIncidentFlowchart,
 	receiptReturnFlowchart,
 	routingFixtures,
-} from "../families/flowchart/routing-fixtures.js";
-import { queriedArchitectureFlowchart } from "../families/flowchart/zone-fixtures.js";
+} from "./routing-fixtures.js";
+import { queriedArchitectureFlowchart } from "./zone-fixtures.js";
 import {
 	routingQualityScale,
 	sharedSegments,
@@ -15,8 +14,8 @@ import {
 	wrapTextToWidth,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { arrowCrossings } from "./readability";
-import { renderIntermediateDiagram } from "./scene";
+import { arrowCrossings } from "../../graph/readability";
+import { renderFlowchartDiagram } from "./render";
 
 type Point = { readonly x: number; readonly y: number };
 type Side = "top" | "right" | "bottom" | "left";
@@ -63,9 +62,7 @@ describe("decision branch sides", () => {
 	it("sends the fix check's escalation down to the bridge's side and its fix down the far side, crossing nothing", () => {
 		// The yes branch once left right, jogged back left and crossed the no
 		// branch, which left the other way and wrapped back under the check.
-		const scene = renderIntermediateDiagram(
-			crossingFixtures["incident-escalation-shared-resolve"],
-		).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(crossingFixtures["incident-escalation-shared-resolve"]);
 		expect(sides(scene, "edge-11")).toEqual(["bottom", "left"]);
 		expect(sides(scene, "edge-10")[0]).toBe("left");
 		expect(
@@ -80,7 +77,7 @@ describe("decision branch sides", () => {
 		(name, edgeId) => {
 			// The branch once left by the vertex facing away, wrapped down the
 			// outside and turned back into its target's top beside another head.
-			const scene = renderIntermediateDiagram(routingFixtures[name]).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(routingFixtures[name]);
 			expect(sides(scene, edgeId)).toEqual(["bottom", "right"]);
 			expect(bends(line(scene, edgeId).points)).toBe(1);
 		},
@@ -91,7 +88,7 @@ describe("returns into a decision", () => {
 	it("raises the receipt request's return into the check's free bottom vertex, not round to its far side", () => {
 		// The check sends its branches out by its side vertices; the return once
 		// wound right, up and back left into the far face, beside the right branch.
-		const scene = renderIntermediateDiagram(receiptReturnFlowchart).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(receiptReturnFlowchart);
 		const check = scene.elements.find(
 			(element) => element.type === "node" && element.nodeId === "receipt",
 		);
@@ -104,7 +101,7 @@ describe("returns into a decision", () => {
 });
 
 describe("arrival sides", () => {
-	const scene = renderIntermediateDiagram(queriedArchitectureFlowchart).pipe(Result.getOrThrow);
+	const scene = renderFlowchartDiagram(queriedArchitectureFlowchart);
 
 	it("enters the database from the side both queries approach, without dipping below it", () => {
 		// The API's queries once ran past the database's foot, dipped and hooked up into it.
@@ -133,9 +130,7 @@ describe("live incident samples", () => {
 	it("draws the queued triage sample with one crossing where main drew two", () => {
 		// Monitoring's line once crossed the triage connector, and the high line
 		// crossed the fix check's yes beside the bridge.
-		const scene = renderIntermediateDiagram(sideFixtures["incident-escalation-queue"]).pipe(
-			Result.getOrThrow,
-		);
+		const scene = renderFlowchartDiagram(sideFixtures["incident-escalation-queue"]);
 		expect(arrowCrossings(arrowsOf(scene))).toBeLessThanOrEqual(1);
 	});
 
@@ -144,7 +139,7 @@ describe("live incident samples", () => {
 		(name) => {
 			// The escalation once left by the check's bottom, swung left and turned
 			// back into the bridge's left side, though the bridge stands straight below.
-			const scene = renderIntermediateDiagram(sideFixtures[name]).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(sideFixtures[name]);
 			expect(sides(scene, "edge-11")).toEqual(["bottom", "top"]);
 			expect(bends(line(scene, "edge-11").points)).toBe(0);
 		},
@@ -183,7 +178,7 @@ describe("branches merging into one end", () => {
 			// With round 29's shorter labels the self-pay branch once ran down past
 			// routine scheduling, along its foot and round into its far side, or,
 			// a little narrower, crossed the insurance branch into its top.
-			const scene = renderIntermediateDiagram(crossingFixtures[name]).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(crossingFixtures[name]);
 			expect(arrowCrossings(arrowsOf(scene))).toBe(0);
 			for (const edgeId of ["edge-6", "edge-8"]) {
 				const { points, sourceNodeId, targetNodeId } = line(scene, edgeId);
@@ -214,9 +209,7 @@ describe("branches merging into one end", () => {
 		// Monitoring's line runs down outside the yes branch. It once turned in
 		// over Resolve incident's top and crossed the yes branch on its way, in
 		// every sample of rounds 27, 28 and 29.
-		const scene = renderIntermediateDiagram(
-			crossingFixtures["incident-escalation-monitoring-merge"],
-		).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(crossingFixtures["incident-escalation-monitoring-merge"]);
 		expect(arrowCrossings(arrowsOf(scene))).toBe(0);
 		const [yes, monitoring] = [line(scene, "edge-10").points, line(scene, "edge-12").points];
 		expect(arrivalSide(yes)).toBe("right");
@@ -229,7 +222,7 @@ describe("branches merging into one end", () => {
 		// midway, clear of its port, and ran along the yes branch one unit from
 		// it for about 500 units: two lines drawn as one. Round 30, two of five
 		// Sonnet samples.
-		const scene = renderIntermediateDiagram(leftToRightIncidentFlowchart).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(leftToRightIncidentFlowchart);
 		const routes = arrowsOf(scene).map((arrow) => ({ id: arrow.edgeId, points: arrow.points }));
 		expect(arrowCrossings(arrowsOf(scene))).toBe(0);
 		expect(sharedSegments(routes, routingQualityScale(scene))).toEqual([]);
@@ -243,9 +236,7 @@ describe("branches merging into one end", () => {
 
 describe("branch labels", () => {
 	it("keeps a short branch's label clear of its own arrowhead's wing", () => {
-		const scene = renderIntermediateDiagram(sideFixtures["expense-out-of-policy"]).pipe(
-			Result.getOrThrow,
-		);
+		const scene = renderFlowchartDiagram(sideFixtures["expense-out-of-policy"]);
 		const label = scene.elements.find(
 			(element) => element.type === "text" && element.id === "edge:edge-6:label",
 		);

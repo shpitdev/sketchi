@@ -1,3 +1,4 @@
+import { buildResponse } from "../operation.js";
 import { type IconRecipe, CanvasSpec } from "@sketchi/drawing";
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
@@ -91,7 +92,7 @@ function runtime(published = PUBLISHED) {
 		);
 	return {
 		loads,
-		buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
+		buildFlowchart: (input: unknown) => provide(buildResponse(buildFlowchart(input))),
 		createCanvas: (input: unknown) => provide(createCanvas(input)),
 		editFlowchart: (input: unknown) => provide(editFlowchart(input)),
 	};

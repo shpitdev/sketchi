@@ -1,7 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Result } from "effect";
-import { parseIntermediateDiagram, type IntermediateDiagram } from "../../graph/intermediate.js";
-import { parseFlowchartDiagram } from "./diagram.js";
+import { Result, Schema } from "effect";
+import { FlowchartDiagram,parseFlowchartDiagram } from "./document.js";
 import hiring from "./fixtures/lanes/hiring.js";
 import incidentResponse from "./fixtures/lanes/incident-response.js";
 import incidentResponseShortLabels from "./fixtures/lanes/incident-response-short-labels.js";
@@ -64,9 +63,9 @@ const STRESS_WALK = Array.from({ length: 30 }).reduce<number[]>((walk, _, index)
  * steps, and a dense graph whose loops return across several lanes.
  */
 export const laneStressFixtures: Readonly<
-	Record<"six-lanes-thirty-steps" | "cross-lane-loops", IntermediateDiagram>
+	Record<"six-lanes-thirty-steps" | "cross-lane-loops", FlowchartDiagram>
 > = {
-	"six-lanes-thirty-steps": parseIntermediateDiagram({
+	"six-lanes-thirty-steps": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "six-lanes-thirty-steps",
 		title: "Thirty steps across six lanes",
 		type: "flowchart",
@@ -95,8 +94,8 @@ export const laneStressFixtures: Readonly<
 				})),
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-	}).pipe(Result.getOrThrow),
-	"cross-lane-loops": parseIntermediateDiagram({
+	}),
+	"cross-lane-loops": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "cross-lane-loops",
 		title: "Loops across lanes",
 		type: "flowchart",
@@ -123,5 +122,5 @@ export const laneStressFixtures: Readonly<
 			})),
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-	}).pipe(Result.getOrThrow),
+	}),
 };

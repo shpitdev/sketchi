@@ -7,7 +7,7 @@ import {
 	SKETCHI_DIAGRAM_STYLE,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { type IntermediateDiagram } from "./intermediate.js";
+import { type GraphInput } from "./input.js";
 
 import { type GraphAnchor } from "./options.js";
 import { renderGraphDiagram } from "./scene.js";
@@ -16,32 +16,29 @@ import { renderGraphDiagram } from "./scene.js";
  * Three boxes a family placed itself: one on the left whose middle row feeds
  * two on the right, and a lower one beneath them.
  */
-function placedGraph(labels = false): IntermediateDiagram {
+function placedGraph(labels = false): GraphInput {
 	return {
-		id: "placed",
-		title: "Placed",
-		type: "flowchart",
 		nodes: ["left", "upper", "lower"].map((id) => ({
 			id,
 			label: id,
 			kind: "entity",
-			metadata: {},
+			shape: "rectangle",
 		})),
 		edges: [
 			{
 				id: "a",
 				source: "left",
 				target: "upper",
-				metadata: {},
+
 				...(labels ? { label: "feeds" } : {}),
 			},
-			{ id: "b", source: "left", target: "lower", metadata: {} },
+			{ id: "b", source: "left", target: "lower" },
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-		style: SKETCHI_DIAGRAM_STYLE,
-		metadata: {},
 	};
 }
+
+const presentation = { id: "placed", title: "Placed", style: SKETCHI_DIAGRAM_STYLE };
 
 const placement = new Map([
 	["left", { x: 0, y: 100, width: 200, height: 160 }],
@@ -68,7 +65,7 @@ const boxes = (scene: CanvasSpec) =>
 
 describe("placed graphs", () => {
 	it("draws each node at the box its family placed it in, keeping relative positions", () => {
-		const scene = renderGraphDiagram(placedGraph(), { placement, anchors });
+		const scene = renderGraphDiagram(placedGraph(), presentation, { placement, anchors });
 		const drawn = boxes(scene);
 		const left = drawn.get("left")!;
 		for (const [id, box] of placement) {
@@ -79,7 +76,7 @@ describe("placed graphs", () => {
 	});
 
 	it("pins each anchored end to its side and offset, and keeps only a pinned line's corners", () => {
-		const scene = renderGraphDiagram(placedGraph(), { placement, anchors });
+		const scene = renderGraphDiagram(placedGraph(), presentation, { placement, anchors });
 		const drawn = boxes(scene);
 		const [left, upper, lower] = ["left", "upper", "lower"].map((id) => drawn.get(id)!);
 		for (const arrow of arrows(scene)) {
@@ -105,7 +102,7 @@ describe("placed graphs", () => {
 	});
 
 	it("lets ends pinned to one point share their stem and nothing more", () => {
-		const scene = renderGraphDiagram(placedGraph(), { placement, anchors });
+		const scene = renderGraphDiagram(placedGraph(), presentation, { placement, anchors });
 		const [a, b] = arrows(scene).map((arrow) => segmentsFromPoints(arrow.points));
 		const overlaps = a!.flatMap((left) =>
 			b!.filter((right) => segmentsOverlapInterior(left, right)).map((right) => [left, right]),
@@ -124,7 +121,10 @@ describe("placed graphs", () => {
 			["a:source", { side: "right", offset: 10, run: 48 }],
 			["b:source", { side: "right", offset: 10, run: 80 }],
 		]);
-		const scene = renderGraphDiagram(placedGraph(), { placement, anchors: staggered });
+		const scene = renderGraphDiagram(placedGraph(), presentation, {
+			placement,
+			anchors: staggered,
+		});
 		const left = boxes(scene).get("left")!;
 		const [a, b] = ["a", "b"].map((id) => arrows(scene).find((arrow) => arrow.edgeId === id)!);
 		// Each first run ends where its line turns: 48 and 80 out from the shared port.
@@ -133,7 +133,11 @@ describe("placed graphs", () => {
 	});
 
 	it("keeps every line straight for its end run at each end, its label past the run", () => {
-		const scene = renderGraphDiagram(placedGraph(true), { placement, anchors, endRun: 48 });
+		const scene = renderGraphDiagram(placedGraph(true), presentation, {
+			placement,
+			anchors,
+			endRun: 48,
+		});
 		for (const arrow of arrows(scene)) {
 			const runs = segmentsFromPoints(arrow.points);
 			expect(runs[0]!.max - runs[0]!.min, arrow.id).toBeGreaterThanOrEqual(48);
@@ -157,11 +161,11 @@ describe("placed graphs", () => {
 				id,
 				label: id,
 				kind: "entity",
-				metadata: {},
+				shape: "rectangle",
 			})),
-			edges: [{ id: "long", source: "left", target: "far", metadata: {} }],
-		} as IntermediateDiagram;
-		const scene = renderGraphDiagram(graph, {
+			edges: [{ id: "long", source: "left", target: "far" }],
+		} satisfies GraphInput;
+		const scene = renderGraphDiagram(graph, presentation, {
 			placement: new Map([
 				["left", { x: 0, y: 0, width: 200, height: 120 }],
 				["middle", { x: 400, y: 0, width: 200, height: 400 }],
@@ -194,14 +198,11 @@ describe("lines kept clear of arrowheads in a placed graph", () => {
 		const box = (x: number, y: number) => ({ x, y, width: 184, height: 72 });
 		const scene = renderGraphDiagram(
 			{
-				id: "placed-heads",
-				title: "Placed",
-				type: "flowchart",
 				nodes: ["n0", "n1", "n2", "n3", "n4", "n5", "n6"].map((id) => ({
 					id,
 					label: `Node ${id.slice(1)}`,
 					kind: "process",
-					metadata: {},
+					shape: "rectangle",
 				})),
 				edges: (
 					[
@@ -217,11 +218,10 @@ describe("lines kept clear of arrowheads in a placed graph", () => {
 						["n3", "n1"],
 						["n6", "n4"],
 					] as const
-				).map(([source, target], index) => ({ id: `e${index}`, source, target, metadata: {} })),
+				).map(([source, target], index) => ({ id: `e${index}`, source, target })),
 				layout: { direction: "TB", edgeRouting: "orthogonal" },
-				style: SKETCHI_DIAGRAM_STYLE,
-				metadata: {},
 			},
+			{ ...presentation, id: "placed-heads" },
 			{
 				placement: new Map([
 					["n0", box(0, 480)],

@@ -1,6 +1,6 @@
 /** Owns shape-side geometry, port coordinates, endpoint reservations and shared spacing. */
 import { type ConnectionEdge, type RoutedEdge } from "./layout-types.js";
-import { type IntermediateDiagram } from "./intermediate.js";
+import { type GraphInput } from "./input.js";
 import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasPoint as ScenePoint,
@@ -20,9 +20,7 @@ export const ROUTE_STUB_LENGTH = 36;
 /** Room past two facing stubs, when spread, for a lane each a corridor's width apart. */
 export const FACING_LANES = 2 * ROUTE_STUB_LENGTH;
 
-export const FORWARD_SIDE: Readonly<
-	Record<IntermediateDiagram["layout"]["direction"], ConnectionEdge>
-> = {
+export const FORWARD_SIDE: Readonly<Record<GraphInput["layout"]["direction"], ConnectionEdge>> = {
 	TB: "bottom",
 	BT: "top",
 	LR: "right",
@@ -45,7 +43,7 @@ function horizontalRangesOverlap(source: NodeSceneElement, target: NodeSceneElem
 export function connectionEdges(
 	source: NodeSceneElement,
 	target: NodeSceneElement,
-	direction: IntermediateDiagram["layout"]["direction"],
+	direction: GraphInput["layout"]["direction"],
 ): {
 	sourceEdge: ConnectionEdge;
 	targetEdge: ConnectionEdge;

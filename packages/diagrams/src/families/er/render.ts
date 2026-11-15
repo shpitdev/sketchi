@@ -20,7 +20,7 @@ import {
 	erNameKey,
 	parseErEnd,
 } from "./document.js";
-import { type IntermediateDiagram } from "../../graph/intermediate.js";
+import { type GraphInput } from "../../graph/input.js";
 
 import {
 	ER_FAN_STEP,
@@ -521,27 +521,22 @@ function routedScene(
 		}),
 	);
 	const graph = {
-		id: diagram.id,
-		title: diagram.title,
-		type: "flowchart",
 		nodes: diagram.entities.map((entity) => ({
 			id: entity.id,
 			label: erEntityName(entity),
 			kind: "entity",
-			metadata: {},
+			shape: "rectangle" as const,
 		})),
 		edges: links.map((link) => ({
 			id: link.relationship.id,
 			source: link.parent.entity,
 			target: link.child.entity,
-			metadata: {},
+
 			...(link.relationship.label ? { label: link.relationship.label } : {}),
 		})),
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-		style: diagram.style,
-		metadata: {},
-	} satisfies IntermediateDiagram;
-	return renderGraphDiagram(graph, {
+	} satisfies GraphInput;
+	return renderGraphDiagram(graph, diagram, {
 		placement: placement.boxes,
 		anchors,
 		endRun: END_RUN,

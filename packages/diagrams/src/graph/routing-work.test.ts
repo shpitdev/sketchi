@@ -1,7 +1,7 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 import * as drawing from "@sketchi/drawing";
-import { type IntermediateDiagram, parseIntermediateDiagram } from "./intermediate.js";
+import { FlowchartDiagram } from "../families/flowchart/document.js";
 import { classFixture } from "../families/class/document.js";
 import { classStressFixtures } from "../families/class/fixtures.js";
 import {
@@ -10,13 +10,13 @@ import {
 } from "../families/flowchart/crossing-fixtures.js";
 import { erFixture, orgChartEr } from "../families/er/document.js";
 import { erStressFixtures } from "../families/er/fixtures.js";
-import { flowchartFixture } from "../families/flowchart/diagram.js";
+import { flowchartFixture } from "../families/flowchart/fixtures.js";
 import { laneFixtures, laneStressFixtures } from "../families/flowchart/lane-fixtures.js";
 import { zoneFixtures, zoneStressFixtures } from "../families/flowchart/zone-fixtures.js";
 
 import { describe, expect, it, vi } from "vitest";
 import { arrowCrossings } from "./readability";
-import { renderIntermediateDiagram } from "./scene";
+import { renderFlowchartDiagram } from "../families/flowchart/render";
 import { renderErDiagram } from "../families/er/render";
 import { renderClassDiagram } from "../families/class/render";
 import { renderStateMachineDiagram } from "../families/state-machine/render";
@@ -46,7 +46,7 @@ vi.mock("@sketchi/drawing", async (importOriginal) => {
 });
 
 /** A dense release flow: 24 nodes, 32 labeled edges, five decisions with returns. */
-const denseRelease = parseIntermediateDiagram({
+const denseRelease = Schema.decodeUnknownSync(FlowchartDiagram)({
 	...flowchartFixture,
 	id: "production-release-rollback",
 	nodes: [
@@ -109,7 +109,8 @@ const denseRelease = parseIntermediateDiagram({
 		["manual_recovery", "rollback_gate", "re-verify"],
 		["postmortem", "done", "closed"],
 	].map(([source, target, label], index) => ({ id: `edge-${index + 1}`, source, target, label })),
-}).pipe(Result.getOrThrow);
+	type: "flowchart",
+});
 
 describe("routing work", () => {
 	// Measured: 3.77M checks TB and 6.83M LR with A* grid search, aligned ports,
@@ -125,10 +126,10 @@ describe("routing work", () => {
 		["LR", 9_000_000],
 	] as const)("bounds segment checks for a dense %s release flow", (direction, limit) => {
 		work.checks = 0;
-		const scene = renderIntermediateDiagram({
+		const scene = renderFlowchartDiagram({
 			...denseRelease,
 			layout: { ...denseRelease.layout, direction },
-		}).pipe(Result.getOrThrow);
+		});
 		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(32);
 		expect(work.checks).toBeGreaterThan(0);
 		expect(work.checks).toBeLessThan(limit);
@@ -139,7 +140,7 @@ describe("routing work", () => {
  * A dense incident response: 16 nodes, 19 edges, four decisions, one with three
  * severity branches, and two returns. From the Code Mode runtime's dense export.
  */
-const denseIncident = parseIntermediateDiagram({
+const denseIncident = Schema.decodeUnknownSync(FlowchartDiagram)({
 	...flowchartFixture,
 	id: "incident-escalation-ops",
 	nodes: [
@@ -187,7 +188,8 @@ const denseIncident = parseIntermediateDiagram({
 		...(label ? { label } : {}),
 	})),
 	layout: { direction: "TB", edgeRouting: "orthogonal" },
-}).pipe(Result.getOrThrow);
+	type: "flowchart",
+});
 
 describe("branch side work", () => {
 	// Every layout sizes each of the 16 nodes from its label twice, and the
@@ -205,7 +207,7 @@ describe("branch side work", () => {
 	it("completes no branch assignment the arranged layout already makes", () => {
 		work.checks = 0;
 		work.measures = 0;
-		const scene = renderIntermediateDiagram(denseIncident).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(denseIncident);
 		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(19);
 		expect(work.measures).toBeLessThanOrEqual(12 * 2 * 16);
 		expect(work.checks).toBeLessThan(5_300_000);
@@ -230,8 +232,7 @@ describe("crossing repair work", () => {
 	// lanes of their own (Arrangement.skipLanes), repaired and drawn to the end.
 	it("bounds segment checks for the generated diagrams it repairs", () => {
 		work.checks = 0;
-		for (const fixture of Object.values(crossingFixtures))
-			renderIntermediateDiagram(fixture).pipe(Result.getOrThrow);
+		for (const fixture of Object.values(crossingFixtures)) renderFlowchartDiagram(fixture);
 		for (const machine of Object.values(crossingStateMachines))
 			renderStateMachineDiagram(machine).pipe(Result.getOrThrow);
 		expect(work.checks).toBeLessThan(23_000_000);
@@ -299,14 +300,14 @@ describe("swimlane routing work", () => {
 	// 2.51M with round 29's short-label incident row, and 2.56M as that row, still
 	// past 2.4:1, lays out again with its thinner lanes level.
 	it("bounds segment checks for the lane fixtures and stress cases", () => {
-		const render = (fixtures: Record<string, IntermediateDiagram>) => {
+		const render = (fixtures: Record<string, FlowchartDiagram>) => {
 			work.checks = 0;
 			for (const fixture of Object.values(fixtures))
 				for (const direction of ["LR", "TB"] as const)
-					renderIntermediateDiagram({
+					renderFlowchartDiagram({
 						...fixture,
 						layout: { direction, edgeRouting: "orthogonal" },
-					}).pipe(Result.getOrThrow);
+					});
 			return work.checks;
 		};
 		const small = render(laneFixtures);
@@ -330,14 +331,14 @@ describe("zone routing work", () => {
 	// each grid step only against the shapes its line runs through took the
 	// stress cases from 27.5M.
 	it("bounds segment checks for the zone fixtures and stress cases", () => {
-		const render = (fixtures: Record<string, IntermediateDiagram>) => {
+		const render = (fixtures: Record<string, FlowchartDiagram>) => {
 			work.checks = 0;
 			for (const fixture of Object.values(fixtures))
 				for (const direction of ["LR", "TB"] as const)
-					renderIntermediateDiagram({
+					renderFlowchartDiagram({
 						...fixture,
 						layout: { direction, edgeRouting: "orthogonal" },
-					}).pipe(Result.getOrThrow);
+					});
 			return work.checks;
 		};
 		const small = render(zoneFixtures);

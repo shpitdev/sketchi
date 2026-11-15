@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { type FlowchartDiagram } from "../../families/flowchart/diagram.js";
+import { type FlowchartDiagram } from "../../families/flowchart/document.js";
 import {
 	DIAGRAM_TYPES,
 	familyForType,
@@ -11,7 +11,7 @@ import {
 import * as Runtime from "./runtime.js";
 import { type CodeModeRuntimeEnvironment } from "./runtime.js";
 
-import { type BuildFlowchartOptions } from "./contract.js";
+import { type BuildOptions } from "../result.js";
 
 import { type CodeModeArtifactStorage } from "./artifacts.js";
 
@@ -22,7 +22,7 @@ export function isCanonicalDocumentType(value: unknown): value is DiagramTypeVal
 /** Build an authored document using the family's existing operation. */
 export function buildCanonicalDocument(
 	document: CanonicalDiagramDocument,
-	options?: BuildFlowchartOptions,
+	options?: BuildOptions,
 ): Effect.Effect<
 	FamilyBuildResult,
 	import("../operation.js").BuildRejection<FamilyBuildResult>,

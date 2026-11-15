@@ -1,19 +1,19 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import {
-	parseFlowchartDiagram,
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagrams/families/flowchart/diagram";
-import { parseIntermediateDiagram } from "@sketchi/diagrams/graph/intermediate";
-import { routingFixtures } from "@sketchi/diagrams/families/flowchart/routing-fixtures";
-import {
+} from "@sketchi/diagrams/families/flowchart/fixtures";
+import { type GraphInput } from "@sketchi/diagrams/graph/input";
+import { renderGraphDiagram } from "@sketchi/diagrams/graph/scene";
+import { SKETCHI_DIAGRAM_STYLE,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
-	segmentCrossesBoundsInterior,
-} from "@sketchi/drawing";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+	segmentCrossesBoundsInterior } from "@sketchi/drawing";
+import { routingFixtures } from "@sketchi/diagrams/families/flowchart/routing-fixtures";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
@@ -25,16 +25,12 @@ describe.each(
 	Object.entries({ ...routingFixtures, flowchartFixture, pharmaBatchDispositionFlowchart }),
 )("routing export: %s", (_name, fixture) => {
 	it("preserves binding, text fit, and non-overlapping segments", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(fixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(fixture));
 		expect(validateExcalidrawScene(scene).issues).toEqual([]);
 	});
 
 	it("exports no endpoint jogs, near-coincident corridors or touching arrowheads", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(fixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(fixture));
 		const file = createExcalidrawFile(scene);
 		expect(
 			exportedRoutingQualityFindings({ ...scene, elements: file.elements }).map(
@@ -51,13 +47,13 @@ describe.each(["TB", "BT", "LR", "RL"] as const)(
 			// Review repro: shifting one lane clear of a neighbor left a later edge only an overlap.
 			const decisions = new Set(["n0", "n3", "n6", "n9"]);
 			const scene = convertSceneToExcalidraw(
-				renderIntermediateDiagram(
-					parseIntermediateDiagram({
-						...flowchartFixture,
+				renderGraphDiagram(
+					{
 						nodes: ["n0", "n1", "n2", "n3", "n4", "n5", "n6", "n8", "n9"].map((id) => ({
 							id,
 							label: `Stage ${id.slice(1)}`,
 							kind: decisions.has(id) ? "decision" : "process",
+							shape: decisions.has(id) ? ("diamond" as const) : ("rectangle" as const),
 						})),
 						edges: [
 							["n0", "n8", "No"],
@@ -72,8 +68,9 @@ describe.each(["TB", "BT", "LR", "RL"] as const)(
 							...(label ? { label } : {}),
 						})),
 						layout: { ...flowchartFixture.layout, direction, edgeRouting: "orthogonal" },
-					}).pipe(Result.getOrThrow),
-				).pipe(Result.getOrThrow),
+					},
+					flowchartFixture,
+				),
 			);
 			expect(validateExcalidrawScene(scene).issues).toEqual([]);
 		});
@@ -85,7 +82,7 @@ describe.each(["TB", "BT"] as const)("wide decision export: %s", (direction) => 
 		// Review repro: label room on a shared decision side pushed mandatory stubs into nodes.
 		const branches = [0, 1, 2, 3, 4, 5];
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(
+			renderFlowchartDiagram(
 				parseFlowchartDiagram({
 					id: "six-branches",
 					title: "Six branches",
@@ -110,7 +107,7 @@ describe.each(["TB", "BT"] as const)("wide decision export: %s", (direction) => 
 					],
 					layout: { direction, edgeRouting: "orthogonal" },
 				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow),
+			),
 		);
 		expect(validateExcalidrawScene(scene).issues).toEqual([]);
 	});
@@ -125,9 +122,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("polished fan-in export: %s", (
 	] as const)("exports %s without reader-scale routing defects", (name) => {
 		const fixture = routingFixtures[name];
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }).pipe(
-				Result.getOrThrow,
-			),
+			renderFlowchartDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
 		);
 		expect(validateExcalidrawScene(scene).issues).toEqual([]);
 		expect(exportedRoutingQualityFindings(scene).map((finding) => finding.message)).toEqual([]);
@@ -140,14 +135,14 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct export: %s", (d
 		(edgeRouting) => {
 			for (const minimal of [false, true]) {
 				const workflow = routingFixtures["shared-feedback-returns"];
-				const rendered = renderIntermediateDiagram({
+				const rendered = renderFlowchartDiagram({
 					...workflow,
 					nodes: minimal ? workflow.nodes.filter((n) => n.kind === "process") : workflow.nodes,
 					edges: workflow.edges
 						.filter((e) => !minimal || (e.id !== "entry" && e.id !== "release"))
 						.map(({ label: _label, ...edge }) => edge),
 					layout: { direction, edgeRouting },
-				}).pipe(Result.getOrThrow);
+				});
 				const scene = convertSceneToExcalidraw(rendered),
 					file = createExcalidrawFile(scene),
 					arrows = file.elements.filter((e) => e.type === "arrow");
@@ -188,7 +183,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct export: %s", (d
 			for (const minimal of [false, true]) {
 				const workflow = routingFixtures["shared-feedback-returns"];
 				const scene = convertSceneToExcalidraw(
-					renderIntermediateDiagram({
+					renderFlowchartDiagram({
 						...workflow,
 						nodes: minimal ? workflow.nodes.filter((n) => n.kind === "process") : workflow.nodes,
 						edges: workflow.edges
@@ -200,7 +195,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct export: %s", (d
 							)
 							.map((e) => (e.id === "ca" ? { ...e, label: "Revisit earlier stage now" } : e)),
 						layout: { direction, edgeRouting },
-					}).pipe(Result.getOrThrow),
+					}),
 				);
 				const file = createExcalidrawFile(scene),
 					arrow = file.elements.find((e) => e.id === "edge:ca")!,
@@ -237,13 +232,13 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("direct return export: %s", (di
 			for (const labeled of [false, true]) {
 				const fixture = routingFixtures["two-stage-retry"];
 				const scene = convertSceneToExcalidraw(
-					renderIntermediateDiagram({
+					renderFlowchartDiagram({
 						...fixture,
 						edges: fixture.edges.map((e) =>
 							e.id === "e5" && labeled ? { ...e, label: "Retry" } : e,
 						),
 						layout: { direction, edgeRouting },
-					}).pipe(Result.getOrThrow),
+					}),
 				);
 				const file = createExcalidrawFile(scene);
 				const arrows = file.elements.filter((e) => e.type === "arrow");
@@ -281,9 +276,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("complete feedback export: %s",
 						}
 					: workflow;
 				const scene = convertSceneToExcalidraw(
-					renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } }).pipe(
-						Result.getOrThrow,
-					),
+					renderFlowchartDiagram({ ...fixture, layout: { direction, edgeRouting } }),
 				);
 				const file = createExcalidrawFile(scene);
 				const nodes = file.elements.filter((e) => e.id.startsWith("node:"));
@@ -314,9 +307,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("complete feedback export: %s",
 	it("exports all four mixed-label returns without collapsing departures", () => {
 		const fixture = routingFixtures["multi-stage-rework"];
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }).pipe(
-				Result.getOrThrow,
-			),
+			renderFlowchartDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
 		);
 		const file = createExcalidrawFile(scene);
 		expect(file.elements.filter((e) => e.id.startsWith("node:"))).toHaveLength(7);
@@ -340,10 +331,10 @@ it.each(["TB", "BT", "LR", "RL"] as const)(
 	(direction) => {
 		const fixture = routingFixtures["feedback-skip-stubs"];
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram({
+			renderFlowchartDiagram({
 				...fixture,
 				layout: { ...fixture.layout, direction },
-			}).pipe(Result.getOrThrow),
+			}),
 		);
 		const file = createExcalidrawFile(scene);
 		expect(validateExcalidrawScene({ ...scene, elements: file.elements }).issues).toEqual([]);
@@ -355,10 +346,10 @@ it.each(["straight", "curved"] as const)(
 	(edgeRouting) => {
 		const fixture = routingFixtures["review-feedback"];
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram({
+			renderFlowchartDiagram({
 				...fixture,
 				layout: { direction: "TB", edgeRouting },
-			}).pipe(Result.getOrThrow),
+			}),
 		);
 		const file = createExcalidrawFile(scene);
 		const arrow = file.elements.find((e) => e.id === "edge:feedback")!;
@@ -400,11 +391,13 @@ const skipEdges = [
 	["B", "D"],
 ];
 it.each(["LR", "RL"] as const)("exports labeled skip edges in %s", (direction) => {
-	const spec = parseIntermediateDiagram({
-		id: "horizontal-skips",
-		title: "Paths",
-		type: "flowchart",
-		nodes: ["A", "B", "C", "D"].map((id) => ({ id, label: id, kind: "process" })),
+	const spec: GraphInput = {
+		nodes: ["A", "B", "C", "D"].map((id) => ({
+			id,
+			label: id,
+			kind: "process",
+			shape: "rectangle" as const,
+		})),
 		edges: skipEdges.map(([source, target], i) => ({
 			id: `path-${i}`,
 			source,
@@ -412,20 +405,28 @@ it.each(["LR", "RL"] as const)("exports labeled skip edges in %s", (direction) =
 			label: `Path ${i}`,
 		})),
 		layout: { direction, edgeRouting: "orthogonal" },
-	}).pipe(Result.getOrThrow);
+	};
 	expect(
 		validateExcalidrawScene(
-			convertSceneToExcalidraw(renderIntermediateDiagram(spec).pipe(Result.getOrThrow)),
+			convertSceneToExcalidraw(
+				renderGraphDiagram(spec, {
+					id: "horizontal-skips",
+					title: "Paths",
+					style: SKETCHI_DIAGRAM_STYLE,
+				}),
+			),
 		).issues,
 	).toEqual([]);
 });
 
 it("keeps process fan-out labels and departure stubs disjoint", () => {
-	const spec = parseIntermediateDiagram({
-		id: "fanout",
-		title: "Fan out",
-		type: "flowchart",
-		nodes: ["A", "B", "C"].map((id) => ({ id, label: id, kind: "process" })),
+	const spec: GraphInput = {
+		nodes: ["A", "B", "C"].map((id) => ({
+			id,
+			label: id,
+			kind: "process",
+			shape: "rectangle" as const,
+		})),
 		edges: ["B", "C"].map((target, i) => ({
 			id: target,
 			source: "A",
@@ -433,8 +434,12 @@ it("keeps process fan-out labels and departure stubs disjoint", () => {
 			label: ["First", "Second"][i],
 		})),
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
-	}).pipe(Result.getOrThrow);
-	const rendered = renderIntermediateDiagram(spec).pipe(Result.getOrThrow);
+	};
+	const rendered = renderGraphDiagram(spec, {
+		id: "fanout",
+		title: "Fan out",
+		style: SKETCHI_DIAGRAM_STYLE,
+	});
 	const exported = convertSceneToExcalidraw(rendered);
 	const labels = exported.elements
 		.filter((e) => e.type === "text" && e.containerId === null)
@@ -466,9 +471,7 @@ it("keeps process fan-out labels and departure stubs disjoint", () => {
 });
 
 it("exports exactly one positioned label after clearing groups", () => {
-	const scene = renderIntermediateDiagram(routingFixtures["pharma-batch-disposition"]).pipe(
-		Result.getOrThrow,
-	);
+	const scene = renderFlowchartDiagram(routingFixtures["pharma-batch-disposition"]);
 	const exported = convertSceneToExcalidraw({
 		...scene,
 		elements: scene.elements.map((e) => ({ ...e, groupIds: [] })),
@@ -478,9 +481,7 @@ it("exports exactly one positioned label after clearing groups", () => {
 
 describe.each(["departure", "arrival"] as const)("shared bound %s stems", (endpoint) => {
 	function validation(offset: number) {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const first = [
 			{ x: 0, y: 0 },
 			{ x: 0, y: 100 },
@@ -516,9 +517,7 @@ describe.each(["departure", "arrival"] as const)("shared bound %s stems", (endpo
 });
 
 it("allows straight merges with unbound starts and the same directed arrival", () => {
-	const scene = convertSceneToExcalidraw(
-		renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-	);
+	const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 	const elements = [0, 20].map((y, i) => ({
 		id: `merge-${i}`,
 		type: "arrow",

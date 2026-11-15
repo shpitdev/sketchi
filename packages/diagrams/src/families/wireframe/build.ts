@@ -1,3 +1,4 @@
+import { PublishedBuildIssue } from "../../build/result.js";
 import { Array } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import {
@@ -13,6 +14,7 @@ import {
 import { renderWireframeDiagram } from "./render.js";
 
 export const wireframeBuild = defineBuild({
+	publishedIssues: PublishedBuildIssue,
 	name: "wireframe",
 	document: WireframeDocument,
 	normalized: WireframeDiagram,

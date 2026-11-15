@@ -1,3 +1,4 @@
+import { PublishedBuildIssue } from "../../build/result.js";
 import { Array, Result } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import {
@@ -13,6 +14,7 @@ import {
 import { renderVennDiagram } from "./render.js";
 
 export const vennBuild = defineBuild({
+	publishedIssues: PublishedBuildIssue,
 	name: "venn",
 	document: VennDocument,
 	normalized: VennDiagram,

@@ -1,23 +1,31 @@
-import { type Mindmap, mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
-import { type IntermediateDiagram } from "@sketchi/diagrams/graph/intermediate";
+import { type CanonicalDiagram, familyForType } from "@sketchi/diagrams/family";
 import { type ExcalidrawScene, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { useMemo, useState } from "react";
 
 export interface DiagramInspectorProps {
-	diagram: IntermediateDiagram | Mindmap;
+	diagram: CanonicalDiagram;
 	scene: ExcalidrawScene;
 }
 
-type InspectorTab = "ir" | "overview" | "scene";
+type InspectorTab = "document" | "overview" | "scene";
 
 const tabs: readonly { id: InspectorTab; label: string }[] = [
 	{ id: "overview", label: "Overview" },
-	{ id: "ir", label: "Typed IR" },
+	{ id: "document", label: "Document" },
 	{ id: "scene", label: "Scene" },
 ];
 
 export function DiagramInspector({ diagram, scene }: DiagramInspectorProps) {
 	const [active, setActive] = useState<InspectorTab>("overview");
+	const counts = familyForType(diagram.type).counts(diagram);
+	const layout = "layout" in diagram ? diagram.layout : undefined;
+	const direction = layout && "direction" in layout ? layout.direction : undefined;
+	const edgeRouting =
+		diagram.type === "mindmap"
+			? "curved"
+			: layout && "edgeRouting" in layout
+				? layout.edgeRouting
+				: undefined;
 
 	const elementCounts = useMemo(() => {
 		const counts = new Map<string, number>();
@@ -54,27 +62,25 @@ export function DiagramInspector({ diagram, scene }: DiagramInspectorProps) {
 							<dt>Type</dt>
 							<dd>{diagram.type}</dd>
 						</div>
-						<div>
-							<dt>Direction</dt>
-							<dd>{diagram.layout.direction}</dd>
-						</div>
-						<div>
-							<dt>Edge routing</dt>
-							<dd>{"root" in diagram ? "curved" : diagram.layout.edgeRouting}</dd>
-						</div>
+						{direction ? (
+							<div>
+								<dt>Direction</dt>
+								<dd>{direction}</dd>
+							</div>
+						) : null}
+						{edgeRouting ? (
+							<div>
+								<dt>Edge routing</dt>
+								<dd>{edgeRouting}</dd>
+							</div>
+						) : null}
 						<div>
 							<dt>Nodes</dt>
-							<dd>
-								{"root" in diagram ? [...mindmapTopics(diagram.root)].length : diagram.nodes.length}
-							</dd>
+							<dd>{counts.nodeCount}</dd>
 						</div>
 						<div>
 							<dt>Edges</dt>
-							<dd>
-								{"root" in diagram
-									? [...mindmapTopics(diagram.root)].length - 1
-									: diagram.edges.length}
-							</dd>
+							<dd>{counts.edgeCount}</dd>
 						</div>
 						<div>
 							<dt>Accent</dt>
@@ -89,7 +95,7 @@ export function DiagramInspector({ diagram, scene }: DiagramInspectorProps) {
 					</dl>
 				) : null}
 
-				{active === "ir" ? (
+				{active === "document" ? (
 					<pre className="diagram-inspector__code">{JSON.stringify(diagram, null, 2)}</pre>
 				) : null}
 

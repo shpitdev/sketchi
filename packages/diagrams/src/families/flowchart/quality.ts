@@ -1,4 +1,4 @@
-import { type FlowchartDiagram } from "./diagram.js";
+import { type FlowchartDiagram } from "./document.js";
 
 import { type QualityCheck, type QualityReport } from "../../build/result.js";
 

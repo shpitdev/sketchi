@@ -6,11 +6,12 @@ import {
 	type ExcalidrawTextElement,
 } from "@excalidraw/excalidraw/element/types";
 import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { type CanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
-import { parseIntermediateDiagram } from "@sketchi/diagrams/graph/intermediate";
+import { type CanvasSpec, getCanvasValidationIssues,SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
+import { type GraphInput } from "@sketchi/diagrams/graph/input";
+import { renderGraphDiagram } from "@sketchi/diagrams/graph/scene";
 import { convertSceneToExcalidraw, createExcalidrawFile } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 import { DrawingEditor } from "@sketchi/editor";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
@@ -419,17 +420,11 @@ async function expectLabelsPaintFully(
 
 describe("Excalidraw labels", () => {
 	it("paint flowchart labels fully and do not reflow when selected", async () => {
-		await expectLabelsPaintFully(
-			convertSceneToExcalidraw(renderIntermediateDiagram(diagram).pipe(Result.getOrThrow)),
-			15,
-		);
+		await expectLabelsPaintFully(convertSceneToExcalidraw(renderFlowchartDiagram(diagram)), 15);
 	}, 60_000);
 
 	it("paint node descriptions fully under their labels", async () => {
-		await expectLabelsPaintFully(
-			convertSceneToExcalidraw(renderIntermediateDiagram(described).pipe(Result.getOrThrow)),
-			11,
-		);
+		await expectLabelsPaintFully(convertSceneToExcalidraw(renderFlowchartDiagram(described)), 11);
 	}, 60_000);
 
 	it("paint agent canvas node and line labels fully", async () => {
@@ -487,9 +482,7 @@ it("keeps sequence self-message loops bound through reload and inside the export
 }, 30_000);
 
 it("keeps node descriptions grouped and in place through reload, drag and export", async () => {
-	const scene = convertSceneToExcalidraw(
-		renderIntermediateDiagram(described).pipe(Result.getOrThrow),
-	);
+	const scene = convertSceneToExcalidraw(renderFlowchartDiagram(described));
 	const file = JSON.parse(JSON.stringify(createExcalidrawFile(scene))) as {
 		elements: ExcalidrawElement[];
 	};
@@ -565,22 +558,25 @@ it("keeps node descriptions grouped and in place through reload, drag and export
 
 it("moves authored branch labels with a source node dragged on the real canvas", async () => {
 	await page.viewport(1280, 960);
-	const spec = parseIntermediateDiagram({
-		id: "drag-label",
-		title: "Drag",
-		type: "flowchart",
+	const spec: GraphInput = {
 		nodes: [
-			{ id: "a", label: "Source", kind: "process" },
-			{ id: "b", label: "Target", kind: "process" },
+			{ id: "a", label: "Source", kind: "process", shape: "rectangle" },
+			{ id: "b", label: "Target", kind: "process", shape: "rectangle" },
 		],
 		edges: [{ id: "ab", source: "a", target: "b", label: "Continue" }],
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
-	}).pipe(Result.getOrThrow);
+	};
 	let editorApi: ExcalidrawImperativeAPI | undefined;
 	const view = render(
 		<div style={{ height: 960, width: 1280 }}>
 			<DrawingEditor
-				scene={convertSceneToExcalidraw(renderIntermediateDiagram(spec).pipe(Result.getOrThrow))}
+				scene={convertSceneToExcalidraw(
+					renderGraphDiagram(spec, {
+						id: "drag-label",
+						title: "Drag",
+						style: SKETCHI_DIAGRAM_STYLE,
+					}),
+				)}
 				title="Drag labels"
 				onApiChange={(api) => {
 					editorApi = api;

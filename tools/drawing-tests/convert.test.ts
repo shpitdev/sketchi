@@ -4,15 +4,15 @@ import { describe, expect, it } from "vitest";
 
 import { generateKeyBetween } from "fractional-indexing";
 
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import {
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-	parseFlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/fixtures";
 import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
 import { zoneFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
 import { type CanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 
 import {
 	convertSceneToExcalidraw,
@@ -102,9 +102,7 @@ function elbowExport() {
 		pharmaBatchDispositionFlowchart,
 		...Object.values(zoneFixtures),
 	]) {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(diagram).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(diagram));
 		const arrow = scene.elements.find(
 			(element) => element.type === "arrow" && element.elbowed === true,
 		);
@@ -212,9 +210,7 @@ function expectValidOrderKeys(elements: readonly ExcalidrawElement[]) {
 
 function expectFlowchartExportValid(input: Parameters<typeof parseFlowchartDiagram>[0]) {
 	const scene = convertSceneToExcalidraw(
-		renderIntermediateDiagram(parseFlowchartDiagram(input).pipe(Result.getOrThrow)).pipe(
-			Result.getOrThrow,
-		),
+		renderFlowchartDiagram(parseFlowchartDiagram(input).pipe(Result.getOrThrow)),
 	);
 
 	expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
@@ -671,9 +667,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("wraps scenes as importable Excalidraw files", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const file = createExcalidrawFile(scene, {
 			source: "https://studio.sketchi.app",
 		});
@@ -689,9 +683,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("creates bound arrows that validate as real Excalidraw elements", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const elbow = elbowExport();
 		const branchArrow = elbow.arrow;
 
@@ -725,9 +717,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("opens maintained vertical flowcharts at an embedded-canvas friendly zoom", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 
 		expect(scene.appState.zoom).toEqual({
 			value: expect.any(Number),
@@ -738,9 +728,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("keeps wrapped flowchart text inside real shape containers", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(pharmaBatchDispositionFlowchart).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(pharmaBatchDispositionFlowchart));
 
 		const validation = validateExcalidrawScene(scene);
 		const qaText = scene.elements.find((element) => element.id === "label:qa-review");
@@ -755,7 +743,7 @@ describe("convertSceneToExcalidraw", () => {
 
 	it("keeps maintained flowchart arrow routes from overlapping", () => {
 		const maintainedScenes = [flowchartFixture, pharmaBatchDispositionFlowchart].map((diagram) =>
-			convertSceneToExcalidraw(renderIntermediateDiagram(diagram).pipe(Result.getOrThrow)),
+			convertSceneToExcalidraw(renderFlowchartDiagram(diagram)),
 		);
 
 		for (const scene of maintainedScenes) {
@@ -1004,7 +992,7 @@ describe("convertSceneToExcalidraw", () => {
 
 	it("routes same-rank branch arrows without crossing nodes in other ranks", () => {
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram({
+			renderFlowchartDiagram({
 				id: "ecommerce-return-process",
 				title: "Ecommerce returns with 18 steps",
 				type: "flowchart",
@@ -1105,7 +1093,7 @@ describe("convertSceneToExcalidraw", () => {
 					},
 				],
 				layout: { direction: "TB", edgeRouting: "orthogonal" },
-			}).pipe(Result.getOrThrow),
+			}),
 		);
 
 		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
@@ -1235,7 +1223,7 @@ describe("convertSceneToExcalidraw", () => {
 
 	it("allows shared bound stems when decision branches diverge", () => {
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(
+			renderFlowchartDiagram(
 				parseFlowchartDiagram({
 					id: "shared-stem-branch",
 					title: "Shared stem branch",
@@ -1256,7 +1244,7 @@ describe("convertSceneToExcalidraw", () => {
 					],
 					layout: { direction: "TB", edgeRouting: "orthogonal" },
 				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow),
+			),
 		);
 
 		expect(validateExcalidrawScene(scene).issues).not.toContainEqual(
@@ -1266,7 +1254,7 @@ describe("convertSceneToExcalidraw", () => {
 
 	it("emits valid Excalidraw order keys for dense scenes past 90 elements", () => {
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(
+			renderFlowchartDiagram(
 				parseFlowchartDiagram({
 					id: "production-release-incident-response-rollback-de",
 					title: "Production Release, Incident Response & Rollback Decision Flow",
@@ -1513,7 +1501,7 @@ describe("convertSceneToExcalidraw", () => {
 					],
 					layout: { direction: "TB", edgeRouting: "orthogonal" },
 				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow),
+			),
 		);
 
 		expect(scene.elements.length).toBeGreaterThan(90);
@@ -1559,9 +1547,7 @@ describe("convertSceneToExcalidraw", () => {
 		const diagrams = [flowchartFixture, pharmaBatchDispositionFlowchart];
 
 		for (const diagram of diagrams) {
-			const scene = convertSceneToExcalidraw(
-				renderIntermediateDiagram(diagram).pipe(Result.getOrThrow),
-			);
+			const scene = convertSceneToExcalidraw(renderFlowchartDiagram(diagram));
 			const arrows = scene.elements.filter((element) => element.type === "arrow");
 
 			for (const arrow of arrows) {
@@ -1574,9 +1560,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports a straight arrow end Excalidraw would move on the first touch", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const straight = scene.elements.find(
 			(element) => element.type === "arrow" && element.elbowed === false,
 		);
@@ -1647,9 +1631,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("accepts Excalidraw-edited elbow arrows with null fixed segments", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const branchArrow = scene.elements.find((element) => element.id === "edge:clear-review");
 
 		if (branchArrow) {
@@ -1660,9 +1642,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports broken reciprocal arrow bindings", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const firstShape = scene.elements.find((element) => element.id === "node:prompt");
 
 		if (firstShape) {
@@ -1681,9 +1661,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports overlapping arrow route segments", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const promptArrow = scene.elements.find((element) => element.id === "edge:prompt-requirements");
 		const requirementsArrow = scene.elements.find(
 			(element) => element.id === "edge:requirements-clear",
@@ -1780,9 +1758,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports arrow endpoints that no longer land on their bound shapes", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const promptArrow = scene.elements.find((element) => element.id === "edge:prompt-requirements");
 
 		if (promptArrow) {
@@ -1801,9 +1777,7 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports diamond endpoints that only land on the bounding box", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const branchArrow = scene.elements.find((element) => element.id === "edge:clear-review");
 		const decisionShape = scene.elements.find((element) => element.id === "node:clear");
 
@@ -1873,7 +1847,7 @@ describe("bound label first paint", () => {
 	// Excalidraw paints restored bound text at its stored size and wrap, so
 	// anything wider than the stored width is clipped until the label is edited.
 	const converted = convertSceneToExcalidraw(
-		renderIntermediateDiagram(
+		renderFlowchartDiagram(
 			parseFlowchartDiagram({
 				id: "label-metrics",
 				title: "Label metrics",
@@ -1894,7 +1868,7 @@ describe("bound label first paint", () => {
 				],
 				layout: { direction: "TB", edgeRouting: "orthogonal" },
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow),
+		),
 	);
 	const text = (id: string) => {
 		const element = converted.elements.find((entry) => entry.id === id);
@@ -1923,7 +1897,7 @@ describe("bound label first paint", () => {
 
 	it("keeps wrapped unbound line labels at their stored width on edit", () => {
 		const scene = convertSceneToExcalidraw({
-			...renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+			...renderFlowchartDiagram(flowchartFixture),
 			elements: [
 				{
 					type: "line",
@@ -1947,7 +1921,7 @@ describe("bound label first paint", () => {
 describe("group frames", () => {
 	it("exports each group as a named frame that holds its members", () => {
 		const exported = convertSceneToExcalidraw(
-			renderIntermediateDiagram(groupFixtures["grouped-approval"]).pipe(Result.getOrThrow),
+			renderFlowchartDiagram(groupFixtures["grouped-approval"]),
 		);
 		const frames = exported.elements.filter((element) => element.type === "frame");
 		expect(frames.map((frame) => [frame.id, frame.name])).toEqual([
@@ -2123,7 +2097,7 @@ describe("group frames", () => {
 });
 
 describe("architecture zones and infrastructure shapes", () => {
-	const aws = renderIntermediateDiagram(zoneFixtures["aws-three-tier"]).pipe(Result.getOrThrow);
+	const aws = renderFlowchartDiagram(zoneFixtures["aws-three-tier"]);
 	const exported = convertSceneToExcalidraw(aws);
 	const byId = new Map(exported.elements.map((element) => [element.id, element]));
 
@@ -2204,7 +2178,7 @@ describe("architecture zones and infrastructure shapes", () => {
 	});
 
 	it("binds a line to a bucket's box, outside its tapered side, where Excalidraw keeps it", () => {
-		const scene = renderIntermediateDiagram(
+		const scene = renderFlowchartDiagram(
 			parseFlowchartDiagram({
 				id: "bucket",
 				title: "Bucket",
@@ -2216,7 +2190,7 @@ describe("architecture zones and infrastructure shapes", () => {
 				],
 				edges: [{ id: "e1", source: "api", target: "assets" }],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		const exported = convertSceneToExcalidraw(scene);
 		expect(validateExcalidrawScene(exported).issues).toEqual([]);
 		const box = exported.elements.find((element) => element.id === "node:assets")!;
@@ -2244,9 +2218,7 @@ describe("architecture zones and infrastructure shapes", () => {
 	});
 
 	it("exports queues and documents as valid composed shapes", () => {
-		const hybrid = convertSceneToExcalidraw(
-			renderIntermediateDiagram(zoneFixtures["hybrid-cloud"]).pipe(Result.getOrThrow),
-		);
+		const hybrid = convertSceneToExcalidraw(renderFlowchartDiagram(zoneFixtures["hybrid-cloud"]));
 		const shapes = new Map(
 			hybrid.elements.flatMap((element) =>
 				element.customData && typeof element.customData === "object"

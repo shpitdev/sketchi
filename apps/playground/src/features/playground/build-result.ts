@@ -3,19 +3,20 @@ import { sequenceBuild } from "@sketchi/diagrams/families/sequence/build";
 import { familyForType } from "@sketchi/diagrams/family";
 import { stateLabel } from "@sketchi/diagrams/families/state-machine/document";
 import {
-	BuildFlowchartRequestSchema,
-	BuildFlowchartResultSchema,
 	BuildStateMachineResultSchema,
 	BuildStateMachineToolInputSchema,
 	BuildErDiagramResultSchema,
 	BuildErDiagramToolInputSchema,
 	BuildClassDiagramResultSchema,
 	BuildClassDiagramToolInputSchema,
-	type BuildFlowchartResult,
 	type BuildStateMachineResult,
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
+import {
+	flowchartBuild,
+	type BuildFlowchartResult,
+} from "@sketchi/diagrams/families/flowchart/build";
 
 import { Result, Schema } from "effect";
 import { type UIMessage } from "ai";
@@ -79,9 +80,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_flowchart": {
 		family: "flowchart",
-		decodeResult: Schema.decodeUnknownResult(BuildFlowchartResultSchema),
+		decodeResult: Schema.decodeUnknownResult(flowchartBuild.result),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
+			const decoded = Schema.decodeUnknownResult(flowchartBuild.request, {
 				errors: "all",
 				reportInput: true,
 			})(input);

@@ -7,11 +7,7 @@ import {
 	stateLabel,
 	stateTransitionLabel,
 } from "./document.js";
-import {
-	type DiagramEdge,
-	type DiagramNode,
-	type IntermediateDiagram,
-} from "../../graph/intermediate.js";
+import { type GraphEdge, type GraphNode, type GraphInput } from "../../graph/input.js";
 import {
 	routingQualityFindings,
 	routingQualityScale,
@@ -41,20 +37,26 @@ const READABLE_ASPECT = 2.2;
 export function stateMachineGraph(
 	diagram: StateMachineDiagram,
 	direction: "TB" | "LR",
-): IntermediateDiagram {
+): GraphInput {
 	const composites = compositeStateIds(diagram);
-	const node = (id: string, label: string, kind: string, group?: string): DiagramNode => ({
+	const node = (id: string, label: string, kind: string, group?: string): GraphNode => ({
 		id,
 		label,
 		kind,
-		metadata: {},
+		shape:
+			kind === "initial" || kind === "final"
+				? "circle"
+				: kind === "choice"
+					? "diamond"
+					: "rectangle",
+
 		...(group ? { group } : {}),
 	});
-	const edge = (id: string, source: string, target: string, label?: string): DiagramEdge => ({
+	const edge = (id: string, source: string, target: string, label?: string): GraphEdge => ({
 		id,
 		source,
 		target,
-		metadata: {},
+
 		...(label ? { label } : {}),
 	});
 	// The graph's own edges take ids no authored transition uses.
@@ -65,8 +67,8 @@ export function stateMachineGraph(
 		taken.add(id);
 		return id;
 	};
-	const nodes: DiagramNode[] = [node(INITIAL_ID, "", "initial")];
-	const edges: DiagramEdge[] = [edge(fresh(INITIAL_ID), INITIAL_ID, diagram.initial)];
+	const nodes: GraphNode[] = [node(INITIAL_ID, "", "initial")];
+	const edges: GraphEdge[] = [edge(fresh(INITIAL_ID), INITIAL_ID, diagram.initial)];
 	// Each transition into an unlabeled final state ends at a bullseye of its own.
 	const bullseyes = new Map<string, string>();
 	const finals = new Map<string, string[]>();
@@ -113,17 +115,12 @@ export function stateMachineGraph(
 		);
 	}
 	return {
-		id: diagram.id,
-		title: diagram.title,
-		type: "flowchart",
 		nodes,
 		edges,
 		groups: diagram.states
 			.filter((state) => composites.has(state.id))
 			.map((state) => ({ id: state.id, label: stateLabel(state) ?? "" })),
 		layout: { direction, edgeRouting: "orthogonal" },
-		style: diagram.style,
-		metadata: {},
 	};
 }
 
@@ -152,7 +149,7 @@ function routingCost(scene: CanvasSpec): number {
  */
 export function renderStateMachineDiagram(diagram: StateMachineDiagram): Result.Result<CanvasSpec> {
 	const render = (direction: "TB" | "LR") =>
-		renderGraphDiagram(stateMachineGraph(diagram, direction), { pairedReturns: true });
+		renderGraphDiagram(stateMachineGraph(diagram, direction), diagram, { pairedReturns: true });
 	if (diagram.layout) return Result.succeed(render(diagram.layout.direction));
 	const candidates = (["LR", "TB"] as const).map((direction) => {
 		const scene = render(direction);

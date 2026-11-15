@@ -1,6 +1,6 @@
 import { type FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
-import { Result } from "effect";
-import { flowchartDiagramFromSpec } from "@sketchi/diagrams/families/flowchart/spec";
+
+import { flowchartDiagramFromSpec } from "@sketchi/diagrams/families/flowchart/document";
 
 import {
 	canvasBoundTextBox,
@@ -12,7 +12,7 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 } from "@sketchi/drawing";
 
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { normalizeNodeLogoSvg } from "@sketchi/icon-catalog";
 import cloudflareSvg from "@sketchi/icon-catalog/svg/cloud-vendors/cloudflare.svg?raw";
 import dockerSvg from "@sketchi/icon-catalog/svg/devtools-ci/docker.svg?raw";
@@ -43,7 +43,7 @@ const SAMPLE_LOGOS: ReadonlyMap<string, CanvasIconAsset> = new Map([
 
 const generatedDeployPipelineScene = embedCanvasIcons(
 	// This bundled sample is authored fixture data; invalid construction is a startup defect.
-	renderIntermediateDiagram(flowchartDiagramFromSpec(DEPLOY_PIPELINE_SPEC)).pipe(Result.getOrThrow),
+	renderFlowchartDiagram(flowchartDiagramFromSpec(DEPLOY_PIPELINE_SPEC)),
 	(slug) => SAMPLE_LOGOS.get(slug),
 ).scene;
 

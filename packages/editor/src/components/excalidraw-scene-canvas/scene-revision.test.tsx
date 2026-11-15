@@ -2,11 +2,9 @@ import { DrawingEditor } from "./excalidraw-scene-canvas";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
-import {
-	flowchartFixture,
-	parseFlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
+import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/fixtures";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -25,7 +23,7 @@ vi.mock("@excalidraw/excalidraw", async () => {
 	};
 });
 
-const firstScene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
+const firstScene = renderFlowchartDiagram(flowchartFixture);
 const followUpDiagram = parseFlowchartDiagram({
 	...flowchartFixture,
 	nodes: [...flowchartFixture.nodes, { id: "proof", label: "Verify follow-up", kind: "process" }],
@@ -35,7 +33,7 @@ const followUpDiagram = parseFlowchartDiagram({
 		{ id: "proof-review", source: "proof", target: "review" },
 	],
 }).pipe(Result.getOrThrow);
-const nextScene = renderIntermediateDiagram(followUpDiagram).pipe(Result.getOrThrow);
+const nextScene = renderFlowchartDiagram(followUpDiagram);
 
 describe("source scene revisions", () => {
 	it("passes an explicit artifact revision through the studio preview", async () => {

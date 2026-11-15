@@ -1,3 +1,4 @@
+import { PublishedBuildIssue } from "../../build/result.js";
 import { Array, Effect } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import { BuildIconSource, resolveNodeIcons, embedSceneIcons } from "../../build/code-mode/icons.js";
@@ -13,6 +14,7 @@ import {
 import { renderSequenceDiagram } from "./render.js";
 
 export const sequenceBuild = defineBuild({
+	publishedIssues: PublishedBuildIssue,
 	name: "sequence",
 	document: SequenceDocument,
 	normalized: SequenceDiagram,

@@ -1,6 +1,5 @@
 import { deployWebhookLogoSequence } from "@sketchi/diagrams/families/sequence/fixtures";
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,9 +9,9 @@ import {
 	embedCanvasIcons,
 	type CanvasShapeElement,
 } from "@sketchi/drawing";
-import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
+import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
 
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 
 import {
@@ -26,9 +25,8 @@ const svgFor = (slug: string) =>
 	`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><title>${slug} ✓</title></svg>`;
 
 function logoScene(available: (slug: string) => boolean = () => true) {
-	return embedCanvasIcons(
-		renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
-		(slug) => (available(slug) ? { name: slug, svg: svgFor(slug) } : undefined),
+	return embedCanvasIcons(renderFlowchartDiagram(deployPipelineLogoFlowchart), (slug) =>
+		available(slug) ? { name: slug, svg: svgFor(slug) } : undefined,
 	).scene;
 }
 

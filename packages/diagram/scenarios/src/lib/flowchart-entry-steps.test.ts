@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
 	parseFlowchartDiagram,
 	type FlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/document";
 
 import { evaluateScenarioDiagram } from "./evaluate";
 import { specToFlowchartCandidate } from "./mcp-results";

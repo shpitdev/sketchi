@@ -15,7 +15,7 @@ import { TIMELINE_RULES } from "../families/timeline/rules.js";
 import { VENN_RULES } from "../families/venn/rules.js";
 import { WIREFRAME_RULES } from "../families/wireframe/rules.js";
 import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family.js";
-import { DIAGRAM_NODE_COLOR_NAMES } from "../graph/intermediate.js";
+import { FLOWCHART_NODE_COLOR_NAMES } from "../families/flowchart/document.js";
 
 import { CURATED_EXAMPLES } from "./examples.js";
 import { DiagramGenerationTypeSchema } from "./intent.js";
@@ -549,7 +549,7 @@ export function revisesFlowchartWithEdits(prompt: DiagramGenerationPrompt): bool
 const STYLING_INSTRUCTIONS = [
 	'When the scenario asks for colors or shapes, also return styles: [{ "targets", "fillColor"?, "strokeColor"?, "textColor"?, "shape"? }] beside diagram, and nothing else when it does not.',
 	'targets lists the ids or labels of the nodes and edges a style applies to; a flowchart edge\'s id is "from->to". Colors are #rrggbb: a colored node takes the color as strokeColor and its pale tint as fillColor, so its label stays readable (red #dc2626 on #fee2e2, orange #ea580c on #ffedd5, yellow #ca8a04 on #fef9c3, green #16a34a on #dcfce7, blue #2563eb on #dbeafe, purple #7c3aed on #ede9fe, gray #6b7280 on #f3f4f6); a colored edge takes strokeColor alone. shape is "rectangle", "diamond", "ellipse" or "circle".',
-	`A flowchart colors a node with its own color field instead: { "label", "color" }, color ${listAlternatives(DIAGRAM_NODE_COLOR_NAMES.map((name) => `"${name}"`))}; styles then cover only its edges and shapes.`,
+	`A flowchart colors a node with its own color field instead: { "label", "color" }, color ${listAlternatives(FLOWCHART_NODE_COLOR_NAMES.map((name) => `"${name}"`))}; styles then cover only its edges and shapes.`,
 	"Style exactly what the scenario asks for; the diagram's content stays as the other rules say.",
 ];
 

@@ -1,7 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Result } from "effect";
-import { parseIntermediateDiagram, type IntermediateDiagram } from "../../graph/intermediate.js";
-import { parseFlowchartDiagram } from "./diagram.js";
+import { Result, Schema } from "effect";
+import { FlowchartDiagram,parseFlowchartDiagram } from "./document.js";
 import awsThreeTier from "./fixtures/zones/aws-three-tier.js";
 import awsThreeTierDescribed from "./fixtures/zones/aws-three-tier-described.js";
 import awsThreeTierQueries from "./fixtures/zones/aws-three-tier-queries.js";
@@ -212,9 +211,9 @@ const STRESS_EDGES: readonly (readonly [number, number])[] = [
  * data center.
  */
 export const zoneStressFixtures: Readonly<
-	Record<"depth-four" | "thirty-services", IntermediateDiagram>
+	Record<"depth-four" | "thirty-services", FlowchartDiagram>
 > = {
-	"depth-four": parseIntermediateDiagram({
+	"depth-four": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "depth-four",
 		title: "Two availability zones, four zones deep",
 		type: "flowchart",
@@ -251,8 +250,8 @@ export const zoneStressFixtures: Readonly<
 			{ id: "e9", source: "db-a", target: "s3", label: "backs up" },
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-	}).pipe(Result.getOrThrow),
-	"thirty-services": parseIntermediateDiagram({
+	}),
+	"thirty-services": Schema.decodeUnknownSync(FlowchartDiagram)({
 		id: "thirty-services",
 		title: "Thirty services in eight zones",
 		type: "flowchart",
@@ -270,5 +269,5 @@ export const zoneStressFixtures: Readonly<
 			target: `s${target}`,
 		})),
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-	}).pipe(Result.getOrThrow),
+	}),
 };

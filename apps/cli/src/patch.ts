@@ -1,8 +1,6 @@
 import { type CanvasSpec } from "@sketchi/drawing";
-import {
-	formatContractSchemaError,
-	ApplyDiagramPatchRequest,
-} from "@sketchi/diagrams/build/code-mode/contract";
+import { formatContractSchemaError } from "@sketchi/diagrams/build/input";
+import { ApplyDiagramPatchRequest } from "@sketchi/diagrams/build/code-mode/contract";
 import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
 import {
 	CodeModeRuntimeEnvironment,

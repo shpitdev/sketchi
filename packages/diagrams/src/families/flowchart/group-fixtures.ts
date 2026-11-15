@@ -1,6 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result } from "effect";
-import { parseFlowchartDiagram } from "./diagram.js";
+import { parseFlowchartDiagram } from "./document.js";
 import expenseApprovalByTeam from "./fixtures/groups/expense-approval-by-team.js";
 import expenseApprovalResubmit from "./fixtures/groups/expense-approval-resubmit.js";
 import fiveTeamRow from "./fixtures/groups/five-team-row.js";

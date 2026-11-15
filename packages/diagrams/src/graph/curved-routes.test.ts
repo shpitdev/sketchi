@@ -1,17 +1,18 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import { describe, expect, it } from "vitest";
 import {
 	canvasOutlineContains,
 	canvasShapeOutline,
 	isCanvasComposedShape,
 	type CanvasSpec,
+	SKETCHI_DIAGRAM_STYLE,
 } from "@sketchi/drawing";
 import { groupFixtures } from "../families/flowchart/group-fixtures.js";
-import { parseIntermediateDiagram } from "./intermediate.js";
+import { type GraphAnchor } from "./options.js";
 import { zoneFixtures, zoneStressFixtures } from "../families/flowchart/zone-fixtures.js";
 
-import { renderGraphDiagram, renderIntermediateDiagram } from "./scene";
+import { renderFlowchartDiagram } from "../families/flowchart/render";
+import { renderGraphDiagram } from "./scene";
 
 type Point = { readonly x: number; readonly y: number };
 type Box = {
@@ -96,26 +97,16 @@ function strays(scene: CanvasSpec): string[] {
 }
 
 describe("curved routes", () => {
-	it("keeps a line out of its own nodes past the runs that meet them", () => {
-		// Left to right, the revision loop leaves Revise's foot and turns back up
-		// past it; a corner curved too widely cut back through Revise.
-		const scene = renderIntermediateDiagram({
-			...groupFixtures["grouped-approval"],
-			layout: { direction: "LR", edgeRouting: "curved" },
-		}).pipe(Result.getOrThrow);
-		expect(strays(scene)).toEqual([]);
-	});
-
 	// A composed shape's curved or tapered side sits inside its box, up to a
 	// bucket's taper (24 here) at its foot, so a line's straight run there can
 	// end inside the box and still be clear of the shape.
 	it.each([
-		["storage", "right", 65, { x: 600, y: 420 }, "left"],
-		["storage", "left", 65, { x: -560, y: 420 }, "right"],
-		["database", "bottom", 90, { x: 520, y: 520 }, "left"],
-		["database", "top", 90, { x: 520, y: -380 }, "left"],
-		["queue", "right", 60, { x: 600, y: 420 }, "left"],
-		["queue", "left", 60, { x: -560, y: 420 }, "right"],
+		["bucket", "right", 65, { x: 600, y: 420 }, "left"],
+		["bucket", "left", 65, { x: -560, y: 420 }, "right"],
+		["cylinder", "bottom", 90, { x: 520, y: 520 }, "left"],
+		["cylinder", "top", 90, { x: 520, y: -380 }, "left"],
+		["pipe", "right", 60, { x: 600, y: 420 }, "left"],
+		["pipe", "left", 60, { x: -560, y: 420 }, "right"],
 		["document", "bottom", 70, { x: 520, y: 520 }, "left"],
 	] as const)(
 		"curves a line leaving a %s's %s side, into neither node's drawn shape",
@@ -124,20 +115,18 @@ describe("curved routes", () => {
 				["a", { x: 0, y: 0, width: 300, height: 200 }],
 				["b", { ...at, width: 184, height: 72 }],
 			]);
-			const route = (source: string, target: string, anchors: Map<string, object>) =>
+			const route = (source: string, target: string, anchors: Map<string, GraphAnchor>) =>
 				renderGraphDiagram(
-					parseIntermediateDiagram({
-						id: "composed",
-						title: "Composed",
-						type: "flowchart",
+					{
 						nodes: [
 							{ id: "a", label: "Composed", kind: "start", shape },
-							{ id: "b", label: "Step", kind: "end" },
+							{ id: "b", label: "Step", kind: "end", shape: "ellipse" },
 						],
 						edges: [{ id: "e", source, target }],
 						layout: { direction: "TB", edgeRouting: "curved" },
-					}).pipe(Result.getOrThrow),
-					{ placement, anchors: anchors as never },
+					},
+					{ id: "composed", title: "Composed", style: SKETCHI_DIAGRAM_STYLE },
+					{ placement, anchors },
 				);
 			// Leaving the composed side, then arriving at it.
 			for (const scene of [
@@ -176,14 +165,6 @@ describe("curved routes", () => {
 		},
 	);
 
-	it("keeps a line out of zones neither end sits in and inside those both do", () => {
-		const scene = renderIntermediateDiagram({
-			...zoneStressFixtures["depth-four"],
-			layout: { direction: "TB", edgeRouting: "curved" },
-		}).pipe(Result.getOrThrow);
-		expect(strays(scene)).toEqual([]);
-	});
-
 	it.each(["TB", "BT", "LR", "RL"] as const)(
 		"curves every group and zone fixture %s without straying",
 		(direction) => {
@@ -191,10 +172,10 @@ describe("curved routes", () => {
 			expect(
 				Object.entries(fixtures).flatMap(([name, fixture]) =>
 					strays(
-						renderIntermediateDiagram({
+						renderFlowchartDiagram({
 							...fixture,
 							layout: { direction, edgeRouting: "curved" },
-						}).pipe(Result.getOrThrow),
+						}),
 					).map((stray) => `${name}: ${stray}`),
 				),
 			).toEqual([]);

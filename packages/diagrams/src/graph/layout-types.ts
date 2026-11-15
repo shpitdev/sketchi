@@ -1,10 +1,5 @@
 /** Owns trusted per-render measurement, placement, routing and candidate records. */
-import {
-	type DiagramEdge,
-	type DiagramZoneKind,
-	type IntermediateDiagram,
-	type DiagramGroup,
-} from "./intermediate.js";
+import { type GraphEdge, type GraphInput, type GraphGroup } from "./input.js";
 import {
 	type CanvasShapeElement as NodeSceneElement,
 	type AxisAlignedSegment,
@@ -19,7 +14,7 @@ import {
 export type ConnectionEdge = "top" | "right" | "bottom" | "left";
 
 /** Measured geometry attached to the topology edge for this render only. */
-export interface LayoutEdge extends DiagramEdge {
+export interface LayoutEdge extends GraphEdge {
 	readonly labelSize: { readonly width: number; readonly height: number };
 	readonly branchLabelSize?: { readonly width: number; readonly height: number };
 }
@@ -108,7 +103,7 @@ export interface GroupFrame {
 	readonly icon?: CanvasNodeIcon;
 	readonly id: string;
 	/** A zone's kind, which sets its outline and fill. */
-	readonly kind?: DiagramZoneKind;
+	readonly kind?: string;
 	readonly label: string;
 	readonly labelBox: Box;
 	/** A frame's logo inside its top-left corner, padded by the name's clearance. */
@@ -272,7 +267,7 @@ export type SideOverrides = ReadonlyMap<
 	{ readonly sourceEdge?: ConnectionEdge; readonly targetEdge?: ConnectionEdge }
 >;
 
-export type LayoutDirection = IntermediateDiagram["layout"]["direction"];
+export type LayoutDirection = GraphInput["layout"]["direction"];
 
 /** How one level of a zoned flow wraps (see planZoneWraps). */
 export interface ZoneWrapOptions {
@@ -300,7 +295,7 @@ export interface PositionedLayout {
 /** A group laid out on its own, before the level around it places it. */
 export interface GroupBlock {
 	readonly content: Box;
-	readonly group: DiagramGroup;
+	readonly group: GraphGroup;
 	readonly height: number;
 	readonly nodes: readonly NodeSceneElement[];
 	readonly padding: {

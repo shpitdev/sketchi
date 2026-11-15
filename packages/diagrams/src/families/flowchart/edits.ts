@@ -1,10 +1,10 @@
 import { Schema } from "effect";
 
 import {
-	DIAGRAM_NODE_SHAPES,
-	DIAGRAM_ZONE_KINDS,
-	DiagramNodeColorSchema,
-} from "../../graph/intermediate.js";
+	FLOWCHART_NODE_SHAPES,
+	FLOWCHART_ZONE_KINDS,
+	FlowchartNodeColorSchema,
+} from "../../families/flowchart/document.js";
 import {
 	FLOWCHART_DIRECTIONS,
 	FlowchartDocumentEdgeSchema,
@@ -24,9 +24,8 @@ import {
 	type FlowchartDocumentGroup,
 	type FlowchartDocumentLane,
 	type FlowchartDocumentNode,
-	type FlowchartDocumentNodeDetails,
+	type FlowchartDocumentNodeDetails,FLOWCHART_MAX_EDGES
 } from "./document.js";
-import { FLOWCHART_MAX_EDGES } from "./diagram.js";
 
 /**
  * Edits to a flowchart document, each addressing nodes, groups and lanes by id
@@ -40,18 +39,18 @@ const Label = Schema.NonEmptyString;
 const NodeChangeSchema = Schema.Struct({
 	label: Schema.optionalKey(Label),
 	note: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
-	shape: Schema.optionalKey(Schema.NullOr(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"]))),
+	shape: Schema.optionalKey(Schema.NullOr(Schema.Literals([...FLOWCHART_NODE_SHAPES, "diamond"]))),
 	icon: Schema.optionalKey(FlowchartNodeIconSchema),
 	/** The node’s innermost group; null clears it. */
 	group: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
 	/** The lane of whoever does the step. */
 	lane: Schema.optionalKey(Schema.NullOr(Schema.NonEmptyString)),
-	color: Schema.optionalKey(Schema.NullOr(DiagramNodeColorSchema)),
+	color: Schema.optionalKey(Schema.NullOr(FlowchartNodeColorSchema)),
 });
 
 const GroupChangeSchema = Schema.Struct({
 	label: Schema.optionalKey(Label),
-	kind: Schema.optionalKey(Schema.NullOr(Schema.Literals(DIAGRAM_ZONE_KINDS))),
+	kind: Schema.optionalKey(Schema.NullOr(Schema.Literals(FLOWCHART_ZONE_KINDS))),
 	/** Replaces what the group lists. */
 	contains: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
 });

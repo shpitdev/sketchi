@@ -112,7 +112,7 @@ function runtime() {
 		);
 	return {
 		applyDiagramPatch: (input: unknown) => provide(applyDiagramPatch(input)),
-		buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
+		buildFlowchart: (input: unknown) => provide(buildResponse(buildFlowchart(input))),
 		buildSequenceDiagram: (input: unknown) => provide(buildResponse(buildSequenceDiagram(input))),
 		createCanvas: (input: unknown) => provide(createCanvas(input)),
 		editFlowchart: (input: unknown) => provide(editFlowchart(input)),

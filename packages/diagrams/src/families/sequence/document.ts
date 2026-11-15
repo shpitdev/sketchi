@@ -9,8 +9,7 @@ import {
 	Result,
 } from "effect";
 
-import { DiagramIconRef } from "../../graph/intermediate.js";
-import { DiagramStyle, DrawnIconSchema, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
+import { DiagramIconRef,DiagramStyle,DrawnIconSchema,SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 export const sequenceDiagramType = "sequence" as const;
 

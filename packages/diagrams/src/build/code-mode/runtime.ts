@@ -1,14 +1,15 @@
-import { canvasFailureStatus, canvasValidationIssues } from "../scene.js";
-import { FLOWCHART_COVERAGE_CODES } from "../../families/flowchart/coverage-codes.js";
-import { families, familyForType, type FamilyBuildOperation } from "../../family.js";
-import {
+import { inputIssues, formatContractSchemaError } from "../input.js";
+import { flowchartBuild } from "../../families/flowchart/build.js";
+import { qualityIssues,
 	CodeModeIssue,
 	type ArtifactBuildCapabilities,
 	type BuildDelivery,
 	type CodeModeIssueCode,
 	type CodeModeIssueRef,
-	type QualityReport,
-} from "../result.js";
+	type QualityReport } from "../result.js";
+import { canvasFailureStatus, canvasValidationIssues } from "../scene.js";
+
+import { families, familyForType, type FamilyBuildOperation } from "../../family.js";
 
 import {
 	CANVAS_LIMITS,
@@ -45,16 +46,7 @@ import {
 	type ErDiagram,
 	type ErValidationIssueCode,
 } from "../../families/er/document.js";
-import {
-	FLOWCHART_MAX_ISSUES,
-	type FlowchartDiagram,
-	type FlowchartValidationIssue,
-	type FlowchartValidationIssueRef,
-} from "../../families/flowchart/diagram.js";
-import {
-	decodeFlowchartDocument,
-	flowchartDiagramFromDocument,
-} from "../../families/flowchart/document.js";
+import { decodeFlowchartDocument } from "../../families/flowchart/document.js";
 import { applyFlowchartEdits } from "../../families/flowchart/edits.js";
 
 import {
@@ -67,7 +59,7 @@ import {
 	type StateMachineValidationIssueCode,
 } from "../../families/state-machine/document.js";
 
-import { checkRequestCoverage, type CoverageIssueCode } from "../../generate/coverage.js";
+
 
 import {
 	convertSceneToExcalidraw,
@@ -93,9 +85,9 @@ import {
 import { renderStateMachineDiagram } from "../../families/state-machine/render.js";
 import { isStructurallyValidTimelineMarker } from "../../families/timeline/render.js";
 import { isStructurallyValidVennSet } from "../../families/venn/render.js";
-import { isStructurallyValidStateMarker, longNodeDescriptions } from "../../graph/compose.js";
-import { NODE_DESCRIPTION_MAX_LINES } from "../../graph/measure.js";
-import { renderIntermediateDiagram } from "../../graph/scene.js";
+import { isStructurallyValidStateMarker } from "../../graph/compose.js";
+
+
 
 import {
 	recordMetric,
@@ -120,8 +112,6 @@ import {
 	BuildClassDiagramRequest,
 	BuildErDiagramRejected,
 	BuildErDiagramRequest,
-	BuildFlowchartRejected,
-	BuildFlowchartRequestSchema,
 	BuildStateMachineRejected,
 	BuildStateMachineRequest,
 	CreateCanvasRejected,
@@ -130,7 +120,6 @@ import {
 	DIAGRAM_PATCH_OPERATION_NAMES,
 	EditFlowchartRejected,
 	EditFlowchartRequest,
-	formatContractSchemaError,
 	GetArtifactRejected,
 	GetArtifactRequest,
 	SearchIconsRejected,
@@ -138,11 +127,7 @@ import {
 	type ApplyDiagramPatchResult,
 	type BuildClassDiagramResult,
 	type BuildErDiagramResult,
-	type BuildFlowchartRequest,
-	type BuildFlowchartResult,
 	type BuildStateMachineResult,
-	type ContractSchemaError,
-	type ContractSchemaIssue,
 	type CreateCanvasResult,
 	type DiagramPatchOperation,
 	type DiagramSelector,
@@ -153,6 +138,7 @@ import {
 	type NormalizedStateMachineSpec,
 	type SearchIconsResult,
 } from "./contract.js";
+import { type BuildFlowchartRequest } from "../../families/flowchart/build.js";
 
 import {
 	type ArtifactBundle,
@@ -162,20 +148,8 @@ import {
 } from "@sketchi/drawing/artifacts";
 
 import { cleanToolString, slug } from "../../clean-text.js";
-import { assessFlowchartQuality } from "../../families/flowchart/quality.js";
-import { normalizeFlowchartSpec } from "../../families/flowchart/spec.js";
-import {
-	BuildIconSource,
-	catalogForRequest,
-	embedSceneIcons,
-	fillGroupLogos,
-	iconRefSlug,
-	resolveFlowchartLogos,
-	undrawableIconIssue,
-	type CodeModeCommunityIcon,
-	type CodeModeCommunityIcons,
-	type CodeModeIconCatalog,
-} from "./icons.js";
+
+import { BuildIconSource, catalogForRequest, embedSceneIcons, iconRefSlug, undrawableIconIssue, type CodeModeCommunityIcon, type CodeModeCommunityIcons, type CodeModeIconCatalog } from "./icons.js";
 
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
@@ -183,8 +157,6 @@ const DEFAULT_MIN_QUALITY_SCORE = 8;
 const SCENE_PADDING = 48;
 
 // A 200-topic map lays out with no overlapping topics or crossing curves.
-
-const MAX_INPUT_ISSUES = 20;
 
 const codeModeRequests = Metric.counter("sketchi_codemode_requests", {
 	description: "Code Mode boundary requests by terminal outcome",
@@ -728,15 +700,6 @@ function workflowFailure<
 	return WorkflowFailure;
 }
 
-const BuildFlowchartFailure = workflowFailure(
-	"BuildFlowchartFailure",
-	BuildFlowchartRejected.fields.status,
-	BuildFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
 const EditFlowchartFailure = workflowFailure(
 	"EditFlowchartFailure",
 	EditFlowchartRejected.fields.status,
@@ -837,74 +800,6 @@ function issue(input: {
 	};
 }
 
-const FLOWCHART_COVERAGE = new Set<CoverageIssueCode>(FLOWCHART_COVERAGE_CODES);
-const isFlowchartCoverageCode = (
-	code: CoverageIssueCode,
-): code is (typeof FLOWCHART_COVERAGE_CODES)[number] => FLOWCHART_COVERAGE.has(code);
-
-/**
- * What the caller's request states that an accepted flowchart misses, checked as generation
- * checks its own diagrams. The build still stands; one edit can add what is missing.
- */
-function flowchartCoverageIssues(
-	request: string | undefined,
-	diagram: FlowchartDiagram,
-): CodeModeIssue[] {
-	if (request === undefined) return [];
-	return checkRequestCoverage(request, diagram).flatMap((entry) =>
-		isFlowchartCoverageCode(entry.code)
-			? [
-					issue({
-						code: entry.code,
-						severity: "warning",
-						stage: "coverage",
-						ref: { kind: "diagram" },
-						message: entry.message,
-						hint: "Fix it with editFlowchart({ artifactId, edits }) before you answer.",
-					}),
-				]
-			: [],
-	);
-}
-
-/** A description past its line limit still draws in full; the build warns so it can be shortened. */
-function longDescriptionIssues(scene: CanvasSpec): CodeModeIssue[] {
-	return longNodeDescriptions(scene).map((id) =>
-		issue({
-			code: "label_too_long",
-			severity: "warning",
-			stage: "render",
-			ref: { kind: "node", id, path: "spec.nodes.description" },
-			message: `Node "${id}" has a description longer than ${NODE_DESCRIPTION_MAX_LINES} lines; it draws in full under the label.`,
-			hint: "Keep a description to a short subtitle, and name technologies in the label.",
-		}),
-	);
-}
-
-function pathForContractIssue(path: readonly PropertyKey[]): string {
-	if (path.length === 0) {
-		return "input";
-	}
-	return path.map((part) => (typeof part === "number" ? `[${part}]` : String(part))).join(".");
-}
-
-type ContractIssueLike = typeof ContractSchemaIssue.Encoded;
-type ContractErrorLike = ContractSchemaError;
-
-function codeForContractIssue(contractIssue: ContractIssueLike): CodeModeIssueCode {
-	const path = pathForContractIssue(contractIssue.path);
-	if (isPatchOperationNamePath(path)) return "unsupported_patch_operation";
-	if (
-		contractIssue.issueTag === "InvalidType" ||
-		(contractIssue.issueTag === "MissingKey" && contractIssue.missingKeyCode === "invalid_type")
-	)
-		return "invalid_type";
-	if (contractIssue.astKind === "LiteralUnion" && contractIssue.issueTag === "AnyOf")
-		return "invalid_enum";
-	if (path.toLowerCase().includes("color")) return "invalid_color";
-	return path === "input" ? "invalid_type" : "missing_field";
-}
-
 function isPatchOperationNamePath(path: string): boolean {
 	return /^operations\.\[\d+\]\.op$/.test(path);
 }
@@ -924,32 +819,10 @@ function hintForContractIssue(path: string): string {
 	return `Fix ${path} so it matches the Code Mode API contract.`;
 }
 
-function inputIssues(
-	error: ContractSchemaError,
-	hintFor: (path: string) => string = hintForContractIssue,
-): CodeModeIssue[] {
-	const issues = error.issues.slice(0, MAX_INPUT_ISSUES).map((contractIssue) => {
-		const path = pathForContractIssue(contractIssue.path);
-		return issue({
-			code: codeForContractIssue(contractIssue),
-			stage: "input",
-			ref: { kind: "request", path },
-			message: contractIssue.message,
-			hint: hintFor(path),
-		});
-	});
-	if (error.issues.length > MAX_INPUT_ISSUES) {
-		issues.push(
-			issue({
-				code: "invalid_type",
-				stage: "input",
-				ref: { kind: "request", path: "input" },
-				message: `${error.issues.length - MAX_INPUT_ISSUES} additional input issues were omitted.`,
-				hint: "Fix the summarized request shape before retrying.",
-			}),
-		);
-	}
-	return issues;
+function codeModeInputIssues(error: Schema.SchemaError): CodeModeIssue[] {
+	return inputIssues(formatContractSchemaError(error), hintForContractIssue, (path) =>
+		isPatchOperationNamePath(path) ? "unsupported_patch_operation" : undefined,
+	);
 }
 
 function cleanOptional(value: string | undefined): string | undefined {
@@ -958,71 +831,6 @@ function cleanOptional(value: string | undefined): string | undefined {
 	}
 	const cleaned = cleanToolString(value);
 	return cleaned.length > 0 ? cleaned : undefined;
-}
-
-function codeModeRefForFlowchart(
-	ref: FlowchartValidationIssueRef | undefined,
-): CodeModeIssueRef | undefined {
-	if (!ref) {
-		return undefined;
-	}
-	return {
-		kind: ref.kind,
-		...(ref.id ? { id: ref.id } : {}),
-		...(ref.path ? { path: `spec.${ref.path}` } : {}),
-	};
-}
-
-/** Problems in a document once its strings are cleaned, each at its spec path. */
-function cleanedFlowchartIssues(error: ContractErrorLike): CodeModeIssue[] {
-	return error.issues.slice(0, FLOWCHART_MAX_ISSUES).map((contractIssue) => {
-		const path = pathForContractIssue(contractIssue.path);
-		return issue({
-			code: codeForContractIssue(contractIssue),
-			stage: "flowchart",
-			ref: { kind: "diagram", path: path === "input" ? "spec" : `spec.${path}` },
-			message: contractIssue.message,
-			hint: "Give every title, label, id and note visible text, not only spaces or tool-call debris.",
-		});
-	});
-}
-
-/** A document's build problems, each at its spec path. */
-function flowchartDocumentIssues(
-	validationIssues: readonly FlowchartValidationIssue[],
-): CodeModeIssue[] {
-	return validationIssues.map((validationIssue) => {
-		const ref = codeModeRefForFlowchart(validationIssue.ref);
-		return issue({
-			code: validationIssue.code,
-			stage: "flowchart",
-			...(ref ? { ref } : {}),
-			message: validationIssue.message,
-			hint: validationIssue.hint,
-		});
-	});
-}
-
-function qualityIssues(quality: QualityReport): CodeModeIssue[] {
-	return quality.checks.map((check) =>
-		issue({
-			code: CodeModeIssueCodeFromString(check.code),
-			severity: check.severity,
-			stage: "quality",
-			message: check.message,
-			hint:
-				check.severity === "error"
-					? "Repair the structural issue and call buildFlowchart again."
-					: "Improve the labels or scope before styling the artifact.",
-		}),
-	);
-}
-
-function CodeModeIssueCodeFromString(value: string): CodeModeIssueCode {
-	if (value === "generic_label" || value === "label_too_long" || value === "disconnected_graph") {
-		return value;
-	}
-	return "quality_below_threshold";
 }
 
 function requestedFormats(
@@ -2408,6 +2216,8 @@ export const artifactBuildCapabilities = Effect.gen(function* () {
 				formats: requestedFormats(request.options),
 				inlineFormats: requestedInlineFormats(request.options),
 				...(request.requestId ? { requestId: request.requestId } : {}),
+				...(request.provenance ? { provenance: request.provenance } : {}),
+				...(request.document === undefined ? {} : { document: request.document }),
 				validationIssues: exportIssues,
 			}).pipe(
 				Effect.mapError((error) => ({
@@ -2433,7 +2243,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 		return yield* BuildStateMachineFailure.new({
 			status: "invalid_input",
 			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+				issues: codeModeInputIssues(parsed.failure),
 			},
 		});
 	}
@@ -2550,7 +2360,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 		return yield* BuildErDiagramFailure.new({
 			status: "invalid_input",
 			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+				issues: codeModeInputIssues(parsed.failure),
 			},
 		});
 	}
@@ -2658,7 +2468,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 		return yield* BuildClassDiagramFailure.new({
 			status: "invalid_input",
 			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+				issues: codeModeInputIssues(parsed.failure),
 			},
 		});
 	}
@@ -2825,7 +2635,7 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 		return yield* CreateCanvasFailure.new({
 			status: "invalid_input",
 			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+				issues: codeModeInputIssues(parsed.failure),
 			},
 		});
 	}
@@ -2925,226 +2735,13 @@ const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(functio
 	} satisfies Extract<CreateCanvasResult, { ok: true }>;
 });
 
-/**
- * Agents write the request inside the spec as often as beside it, where the spec would drop it
- * unread; it describes the whole build, so it moves beside the spec.
- */
-function requestBesideSpec(input: unknown): unknown {
-	const request = unknownRecord(input);
-	const spec = unknownRecord(request?.["spec"]);
-	if (!request || !spec || request["request"] !== undefined || typeof spec["request"] !== "string")
-		return input;
-	const { request: text, ...document } = spec;
-	return { ...request, spec: document, request: text };
-}
-
-const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(function* (
-	input: unknown,
-	/** The artifact an edit started from, recorded on the one this build stores. */
-	provenance?: ArtifactBundle["provenance"],
-) {
-	const parsed = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
-		errors: "all",
-		reportInput: true,
-	})(requestBesideSpec(input));
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildFlowchartFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-
-	const request = parsed.success;
-
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalized = normalizeFlowchartSpec(request.spec);
-	if (!normalized.ok) {
-		return yield* BuildFlowchartFailure.new({
-			status: "invalid_flowchart",
-			context: {
-				buildId,
-				...responseRequestId(request.requestId),
-				issues: flowchartDocumentIssues(normalized.issues),
-			},
-		});
-	}
-	const authoredSpec = normalized.spec;
-	const icons = yield* catalogForRequest(
-		environment.icons,
-		environment.communityIcons,
-		authoredSpec,
-	);
-	// Cleaning can empty a string the request held, so the cleaned document is checked again.
-	const cleaned = decodeFlowchartDocument(authoredSpec);
-	if (!Result.isSuccess(cleaned)) {
-		return yield* BuildFlowchartFailure.new({
-			status: "invalid_flowchart",
-			context: {
-				buildId,
-				...responseRequestId(request.requestId),
-				issues: cleanedFlowchartIssues(formatContractSchemaError(cleaned.failure)),
-			},
-		});
-	}
-	const logos = resolveFlowchartLogos(authoredSpec, icons);
-	// The document as drawn: each node that draws a logo names its slug, and an icon
-	// that named none is gone.
-	const normalizedSpec = {
-		...authoredSpec,
-		nodes: Object.fromEntries(
-			Object.entries(authoredSpec.nodes).map(([id, node]) => {
-				const slug = logos.icons.get(id);
-				if (typeof node === "string") return [id, slug ? { label: node, icon: slug } : node];
-				if (slug) return [id, { ...node, icon: slug }];
-				if (typeof node.icon !== "string") return [id, node];
-				const { icon: _icon, ...rest } = node;
-				return [id, Object.keys(rest).length === 1 ? rest.label : rest];
-			}),
-		),
-	};
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const built = flowchartDiagramFromDocument(normalizedSpec, { nodeIcons: logos.icons });
-	if (!built.ok) {
-		return yield* BuildFlowchartFailure.new({
-			// A document past the size limits answers as a limit, as an oversized canvas does.
-			status: built.issues.some((entry) => entry.code === "flowchart_too_large")
-				? "limit_exceeded"
-				: "invalid_flowchart",
-			context: { ...baseContext, issues: flowchartDocumentIssues(built.issues) },
-		});
-	}
-	// A group whose label names a product draws its logo once its nodes draw theirs.
-	const groupLogos = normalizedSpec.logos
-		? fillGroupLogos(
-				built.diagram.groups?.map((group) => ({
-					id: group.id,
-					label: group.label,
-					...(group.parent ? { parent: group.parent } : {}),
-				})),
-				built.diagram.nodes.map((node) => ({
-					...(node.group ? { group: node.group } : {}),
-					...(node.icon ? { icon: { slug: node.icon.slug } } : {}),
-				})),
-				icons,
-				{ fillNamedLogos: true },
-			)
-		: { issues: [], logos: new Map<string, string>() };
-	const rebuilt =
-		groupLogos.logos.size > 0
-			? flowchartDiagramFromDocument(normalizedSpec, {
-					nodeIcons: logos.icons,
-					groupIcons: groupLogos.logos,
-				})
-			: built;
-	if (!rebuilt.ok) {
-		return yield* BuildFlowchartFailure.new({
-			status: "invalid_flowchart",
-			context: { ...baseContext, issues: flowchartDocumentIssues(rebuilt.issues) },
-		});
-	}
-	const diagram = rebuilt.diagram;
-
-	const quality = assessFlowchartQuality(
-		diagram,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildFlowchartFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const renderedScene = yield* validatedDomainResult({
-		try: () => renderIntermediateDiagram(diagram),
-		catch: (cause) =>
-			BuildFlowchartFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message: cause instanceof Error ? cause.message : "Unable to render flowchart scene.",
-							hint: "Simplify the graph or retry with a smaller flowchart.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildFlowchart.render"));
-	// logos: "exact" embeds every mark's catalog SVG instead of its hand-drawn recipe.
-	const embedded = yield* embedSceneIcons(renderedScene, icons, {
-		exactIcons: diagram.metadata["logos"] === "exact",
-	});
-	const scene = embedded.scene;
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		...(provenance ? { provenance } : {}),
-		// The document as written, not as drawn: an edit that renames a node draws the logo
-		// its new label names.
-		document: { type: "flowchart", spec: authoredSpec },
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildFlowchartFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [
-			...normalized.notes.map((message) =>
-				issue({
-					code: "reference_resolved",
-					hint: "Use the resolved declared id in future references.",
-					severity: "info",
-					stage: "flowchart",
-					message,
-				}),
-			),
-			...logos.issues,
-			...groupLogos.issues,
-			...embedded.issues,
-			...longDescriptionIssues(scene),
-			...flowchartCoverageIssues(request.request, diagram),
-		],
-	} satisfies Extract<BuildFlowchartResult, { ok: true }>;
-});
-
 /** The flowchart document an artifact was built from, or why there is none. */
 const storedFlowchartDocument = Effect.fn("codeMode.editFlowchart.readDocument")(function* (
 	artifactId: string,
 ) {
 	const store = yield* CodeModeArtifactStorage;
 	const readFailure = (error: CodeModeArtifactStorageError) =>
-		BuildFlowchartFailure.new({
+		EditFlowchartFailure.new({
 			status: "storage_failed",
 			context: { issues: [storageFailureIssue(error, "storage_read_failed")] },
 		});
@@ -3187,9 +2784,9 @@ const editFlowchartWorkflow = Effect.fn("codeMode.editFlowchart.workflow")(funct
 		reportInput: true,
 	})(input);
 	if (!Result.isSuccess(parsed)) {
-		return yield* BuildFlowchartFailure.new({
+		return yield* EditFlowchartFailure.new({
 			status: "invalid_input",
-			context: { issues: inputIssues(formatContractSchemaError(parsed.failure)) },
+			context: { issues: codeModeInputIssues(parsed.failure) },
 		});
 	}
 	const request = parsed.success;
@@ -3212,28 +2809,27 @@ const editFlowchartWorkflow = Effect.fn("codeMode.editFlowchart.workflow")(funct
 			},
 		});
 	}
-	const built = yield* buildFlowchartWorkflow(
+	const built = yield* runFamilyBuild(
+		flowchartBuild,
 		{
 			spec: edited.document,
 			...(request.request ? { request: request.request } : {}),
 			...(request.options ? { options: request.options } : {}),
 			...(request.requestId ? { requestId: request.requestId } : {}),
 		},
-		{ sourceArtifactId: request.artifactId },
+		{ provenance: { sourceArtifactId: request.artifactId } },
 	);
 	return {
 		...built,
 		edits: request.edits,
 		issues: [
-			...edited.notes.map((message) =>
-				issue({
-					code: "reference_resolved",
-					hint: "Use the resolved id in later edits.",
-					severity: "info",
-					stage: "input",
-					message,
-				}),
-			),
+			...edited.notes.map((message): typeof import("../result.js").PublishedBuildIssue.Type => ({
+				code: "reference_resolved",
+				hint: "Use the resolved id in later edits.",
+				severity: "info",
+				stage: "input",
+				message,
+			})),
 			...built.issues,
 		],
 	} satisfies Extract<EditFlowchartResult, { ok: true }>;
@@ -3248,7 +2844,7 @@ const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function*
 		return yield* GetArtifactFailure.new({
 			status: "invalid_input",
 			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+				issues: codeModeInputIssues(parsed.failure),
 			},
 		});
 	}
@@ -3372,7 +2968,7 @@ const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow
 		return yield* ApplyDiagramPatchFailure.new({
 			status: "invalid_input",
 			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+				issues: codeModeInputIssues(parsed.failure),
 			},
 		});
 	}
@@ -3597,7 +3193,7 @@ const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(function*
 		return yield* SearchIconsFailure.new({
 			status: "invalid_input",
 			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+				issues: codeModeInputIssues(parsed.failure),
 			},
 		});
 	}
@@ -3650,47 +3246,48 @@ function boundary<A extends ObservableCodeModeResult, E, B extends ObservableCod
 	);
 }
 
-export const buildFlowchart: (input: unknown) => CodeModeWorkflowEffect<BuildFlowchartResult> =
-	boundary("buildFlowchart", buildFlowchartWorkflow, failureResult);
+export const buildFlowchart = familyForType("flowchart").build({ bindBuild });
 
 export const editFlowchart: (input: unknown) => CodeModeWorkflowEffect<EditFlowchartResult> =
-	boundary("editFlowchart", editFlowchartWorkflow, failureResult);
+	boundary("editFlowchart", editFlowchartWorkflow, (error) =>
+		"toResult" in error ? error.toResult() : failureResult(error),
+	);
 
-/** Bind the shared operation to host capabilities once, retaining typed errors to the host. */
+/** The host supplies one catalog and artifact boundary to both builds and edits. */
+interface HostedBuild<A, E, R> {
+	readonly decode: (input: unknown) => Effect.Effect<A, E>;
+	readonly build: (
+		request: A,
+		capabilities: ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+		delivery?: Pick<BuildDelivery, "provenance">,
+	) => Effect.Effect<R, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage | BuildIconSource>;
+}
+function runFamilyBuild<A, E, R>(
+	build: HostedBuild<A, E, R>,
+	input: unknown,
+	delivery?: Pick<BuildDelivery, "provenance">,
+) {
+	return Effect.gen(function* () {
+		const request = yield* build.decode(input);
+		const environment = yield* CodeModeRuntimeEnvironment;
+		return yield* build.build(request, yield* artifactBuildCapabilities, delivery).pipe(
+			Effect.provideService(BuildIconSource, {
+				catalog: (document) =>
+					catalogForRequest(environment.icons, environment.communityIcons, document),
+				fillNamedLogos: environment.fillNamedLogos === true,
+			}),
+		);
+	});
+}
+
+/** Bind the shared operation once, retaining typed errors to the host. */
 export function bindBuild<
 	A,
 	E extends { readonly status: string },
 	R extends ObservableCodeModeResult,
->(
-	operation: string,
-	build: {
-		readonly decode: (input: unknown) => Effect.Effect<A, E>;
-		readonly build: (
-			request: A,
-			capabilities: ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
-		) => Effect.Effect<
-			R,
-			E,
-			CodeModeRuntimeEnvironment | CodeModeArtifactStorage | BuildIconSource
-		>;
-	},
-) {
+>(operation: string, build: HostedBuild<A, E, R>) {
 	return (input: unknown) =>
-		observeCodeModeBoundary(
-			operation,
-			input,
-			Effect.gen(function* () {
-				const request = yield* build.decode(input);
-				const environment = yield* CodeModeRuntimeEnvironment;
-				return yield* build.build(request, yield* artifactBuildCapabilities).pipe(
-					Effect.provideService(BuildIconSource, {
-						catalog: (document) =>
-							catalogForRequest(environment.icons, environment.communityIcons, document),
-						fillNamedLogos: environment.fillNamedLogos === true,
-					}),
-				);
-			}),
-		);
+		observeCodeModeBoundary(operation, input, runFamilyBuild(build, input));
 }
 export const buildMindmap = familyForType("mindmap").build({ bindBuild });
 export const buildSequenceDiagram = familyForType("sequence").build({ bindBuild });

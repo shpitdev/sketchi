@@ -41,7 +41,7 @@ import {
 	routeTargetOvershootDistance,
 	routeTouchCount,
 } from "./route-geometry.js";
-import { type IntermediateDiagram } from "./intermediate.js";
+import { type GraphInput } from "./input.js";
 import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasConnectorElement as ArrowSceneElement,
@@ -79,7 +79,7 @@ import { type GraphLayout } from "./topology.js";
 
 function arrowForRoute(
 	route: RoutedEdge,
-	edgeRouting: IntermediateDiagram["layout"]["edgeRouting"],
+	edgeRouting: GraphInput["layout"]["edgeRouting"],
 	portOffsets: ReadonlyMap<string, number>,
 	shapes: readonly NodeSceneElement[],
 	existingArrows: readonly ArrowSceneElement[],
@@ -836,7 +836,7 @@ function exteriorLaneRoute(
 /** Route every edge in order; each avoids earlier routes and every reserved endpoint stub. */
 export function routeAllEdges(
 	routes: readonly RoutedEdge[],
-	edgeRouting: IntermediateDiagram["layout"]["edgeRouting"],
+	edgeRouting: GraphInput["layout"]["edgeRouting"],
 	portOffsets: ReadonlyMap<string, number>,
 	nodeShapes: readonly NodeSceneElement[],
 	options: RouteOptions,
@@ -980,10 +980,10 @@ export function resideArrivals(
 	layoutGraph: GraphLayout,
 	routes: readonly RoutedEdge[],
 	arrows: readonly ArrowSceneElement[],
-	diagram: IntermediateDiagram,
 	scale: number,
 	trigger: "hooked" | "crossed" | "cornered",
 ): { route: RoutedEdge; side: ConnectionEdge }[] {
+	
 	const feedback = layoutGraph.feedback;
 	const ends = sideEnds(routes);
 	const used = new Set(ends.keys());

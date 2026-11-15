@@ -3,9 +3,9 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { describedArchitectureFlowchart } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import { embedCanvasIcons } from "@sketchi/drawing";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 
 import {
 	convertSceneToExcalidraw,
@@ -55,13 +55,10 @@ const diagram = parseFlowchartDiagram({
 }).pipe(Result.getOrThrow);
 
 describe("node descriptions in Excalidraw", () => {
-	const { scene } = embedCanvasIcons(
-		renderIntermediateDiagram(diagram).pipe(Result.getOrThrow),
-		(slug) => ({
-			name: slug,
-			svg: SVG,
-		}),
-	);
+	const { scene } = embedCanvasIcons(renderFlowchartDiagram(diagram), (slug) => ({
+		name: slug,
+		svg: SVG,
+	}));
 	const elements = convertSceneToExcalidraw(scene).elements as Placed[];
 	const byId = new Map(elements.map((element) => [element.id, element]));
 
@@ -109,10 +106,10 @@ describe("node descriptions in Excalidraw", () => {
 		"exports the described architecture valid in %s",
 		(direction) => {
 			const described = embedCanvasIcons(
-				renderIntermediateDiagram({
+				renderFlowchartDiagram({
 					...describedArchitectureFlowchart,
 					layout: { ...describedArchitectureFlowchart.layout, direction },
-				}).pipe(Result.getOrThrow),
+				}),
 				(slug) => ({ name: slug, svg: SVG }),
 			).scene;
 			const exported = convertSceneToExcalidraw(described);

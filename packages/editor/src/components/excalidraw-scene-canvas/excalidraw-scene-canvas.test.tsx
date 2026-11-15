@@ -1,5 +1,4 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -88,9 +87,9 @@ import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import {
 	deployPipelineLogoFlowchart,
 	flowchartFixture,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/fixtures";
 import { embedCanvasIcons } from "@sketchi/drawing";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 
 import { DrawingEditor } from "./excalidraw-scene-canvas";
 
@@ -127,9 +126,7 @@ describe("DrawingEditor", () => {
 	});
 
 	it("renders a client-only Excalidraw shell", () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 
 		render(<DrawingEditor scene={scene} title="Sketchi onboarding decision flow" />);
 
@@ -143,9 +140,7 @@ describe("DrawingEditor", () => {
 	});
 
 	it("fits the scene once the editor has loaded it, and only once", async () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 
 		render(<DrawingEditor scene={scene} title="Sketchi onboarding decision flow" />);
 
@@ -167,9 +162,7 @@ describe("DrawingEditor", () => {
 	});
 
 	it("does not remount or refit on geometry and viewport changes without a new revision", async () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		const { rerender } = render(<DrawingEditor scene={scene} revision={1} title="Stable canvas" />);
 		const canvas = await screen.findByTestId("mock-excalidraw");
 		loadEditor(0);
@@ -193,9 +186,7 @@ describe("DrawingEditor", () => {
 	});
 
 	it("refits a read-only canvas when its viewport resizes", async () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		render(<DrawingEditor scene={scene} title="Read-only canvas" viewModeEnabled />);
 		await screen.findByTestId("mock-excalidraw");
 		loadEditor(0);
@@ -212,9 +203,7 @@ describe("DrawingEditor", () => {
 	});
 
 	it("keeps the user's camera when an editable canvas resizes", async () => {
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 		render(<DrawingEditor scene={scene} title="Editable canvas" />);
 		await screen.findByTestId("mock-excalidraw");
 		loadEditor(0);
@@ -244,13 +233,10 @@ describe("DrawingEditor", () => {
 
 	it("hands node-logo files to Excalidraw with the first frame and on change", async () => {
 		const scene = convertSceneToExcalidraw(
-			embedCanvasIcons(
-				renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
-				(slug) => ({
-					name: slug,
-					svg: '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"/>',
-				}),
-			).scene,
+			embedCanvasIcons(renderFlowchartDiagram(deployPipelineLogoFlowchart), (slug) => ({
+				name: slug,
+				svg: '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"/>',
+			})).scene,
 		);
 		const onSceneChange = vi.fn();
 		render(<DrawingEditor onSceneChange={onSceneChange} scene={scene} title="Deploy pipeline" />);
@@ -286,9 +272,7 @@ describe("DrawingEditor", () => {
 		"fits a diagram clear of its controls (read-only: %s)",
 		async (readOnly) => {
 			excalidrawMock.viewport = { height: 564, width: 820 };
-			const scene = convertSceneToExcalidraw(
-				renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-			);
+			const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 			render(<DrawingEditor scene={scene} title="Wide diagram" viewModeEnabled={readOnly} />);
 			await screen.findByTestId("mock-excalidraw");
 			drawMenuAtTopLeft();
@@ -353,9 +337,7 @@ describe("DrawingEditor", () => {
 			endBinding: { elementId: "b", focus: 0, gap: 1 },
 		});
 		const b = { ...shape("b", 200), y: 200 };
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
+		const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 
 		render(<DrawingEditor scene={scene} title="Folded route" />);
 		await screen.findByTestId("mock-excalidraw");

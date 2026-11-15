@@ -1,8 +1,5 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
-import { describe, expect, it } from "vitest";
-
-import {
+import { renderGraphDiagram } from "../../graph/scene.js";
+import { SKETCHI_DIAGRAM_STYLE,
 	CANVAS_NODE_ICON,
 	canvasBoundTextInset,
 	canvasNodeIconBox,
@@ -13,21 +10,23 @@ import {
 	segmentsOverlapInterior,
 	type CanvasShapeElement,
 	type CanvasSpec,
-	type CanvasTextElement,
-} from "@sketchi/drawing";
+	type CanvasTextElement } from "@sketchi/drawing";
+
+import { describe, expect, it } from "vitest";
+
 import {
 	deployPipelineLogoFlowchart,
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "../families/flowchart/diagram.js";
-import { type LayoutDirection } from "./intermediate.js";
+} from "./fixtures.js";
+import { type GraphInput } from "../../graph/input.js";
 
-import { renderIntermediateDiagram } from "./scene";
+import { renderFlowchartDiagram } from "./render";
 
 const LABEL_LINE_HEIGHT = 1.35;
 const LABEL_WIDTH_FACTOR = 0.62;
 
-function deployPipeline(direction: LayoutDirection) {
+function deployPipeline(direction: GraphInput["layout"]["direction"]) {
 	return {
 		...deployPipelineLogoFlowchart,
 		layout: { ...deployPipelineLogoFlowchart.layout, direction },
@@ -76,7 +75,7 @@ function labelSize(label: CanvasTextElement) {
 describe("node logo layout", () => {
 	for (const direction of ["TB", "LR"] as const) {
 		it(`stacks each logo above a bottom-aligned label inside the text box (${direction})`, () => {
-			const scene = renderIntermediateDiagram(deployPipeline(direction)).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(deployPipeline(direction));
 			const sizes = Object.fromEntries(nodes(scene).map((node) => [node.nodeId, node.icon?.size]));
 			expect(sizes).toEqual({
 				push: 24,
@@ -86,7 +85,18 @@ describe("node logo layout", () => {
 				ship: 24,
 			});
 
-			for (const node of nodes(scene).filter((entry) => entry.icon)) {
+			const { scene: embedded, dropped } = embedCanvasIcons(scene, (slug) => ({
+				name: slug,
+				svg: '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"/>',
+			}));
+			expect(dropped).toEqual([]);
+			expect(getCanvasValidationIssues(embedded)).toEqual([]);
+			for (const node of nodes(scene)) {
+				if (!node.icon) {
+					expect(node.icon).toBeUndefined();
+					expect(labelFor(scene, node).verticalAlign).toBeUndefined();
+					continue;
+				}
 				const icon = canvasNodeIconBox(node);
 				const label = labelFor(scene, node);
 				const inset = canvasBoundTextInset(node);
@@ -112,7 +122,7 @@ describe("node logo layout", () => {
 		});
 
 		it(`routes around logo nodes without crossings or overlaps (${direction})`, () => {
-			const scene = renderIntermediateDiagram(deployPipeline(direction)).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(deployPipeline(direction));
 			const arrows = scene.elements.filter((element) => element.type === "arrow");
 			const sceneNodes = nodes(scene);
 
@@ -141,19 +151,6 @@ describe("node logo layout", () => {
 		});
 	}
 
-	it("validates once assets are embedded and renders deterministically", () => {
-		const diagram = deployPipeline("TB");
-		const scene = renderIntermediateDiagram(diagram).pipe(Result.getOrThrow);
-		const { scene: embedded, dropped } = embedCanvasIcons(scene, (slug) => ({
-			name: slug,
-			svg: '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"/>',
-		}));
-
-		expect(dropped).toEqual([]);
-		expect(getCanvasValidationIssues(embedded)).toEqual([]);
-		expect(renderIntermediateDiagram(diagram).pipe(Result.getOrThrow)).toEqual(scene);
-	});
-
 	it("keeps every logo when Excalidraw rounds its text box", () => {
 		const svg =
 			'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"/>';
@@ -165,12 +162,22 @@ describe("node logo layout", () => {
 		}
 		for (const kind of ["start", "process", "decision"] as const) {
 			for (const [index, label] of labels.entries()) {
-				const scene = renderIntermediateDiagram({
-					id: "rounding",
-					title: "Rounding",
-					nodes: [{ id: `n${index}`, label, kind, icon: { slug: "github" } }],
-					edges: [],
-				}).pipe(Result.getOrThrow);
+				const scene = renderGraphDiagram(
+					{
+						nodes: [
+							{
+								id: `n${index}`,
+								label,
+								kind,
+								shape: kind === "start" ? "ellipse" : kind === "decision" ? "diamond" : "rectangle",
+								icon: { slug: "github" },
+							},
+						],
+						edges: [],
+						layout: { direction: "LR", edgeRouting: "orthogonal" },
+					},
+					{ id: "rounding", title: "rounding", style: SKETCHI_DIAGRAM_STYLE },
+				);
 				const { scene: embedded, dropped } = embedCanvasIcons(scene, () => ({
 					name: "GitHub",
 					svg,
@@ -180,20 +187,12 @@ describe("node logo layout", () => {
 			}
 		}
 	});
-
-	it("keeps plain nodes free of icons and middle-aligned labels", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
-		for (const node of nodes(scene)) {
-			expect(node.icon).toBeUndefined();
-			expect(labelFor(scene, node).verticalAlign).toBeUndefined();
-		}
-	});
 });
 
 describe("decision label sizing", () => {
 	it("sizes diamonds so an Excalidraw edit keeps the stored wrap", () => {
 		for (const fixture of [flowchartFixture, pharmaBatchDispositionFlowchart]) {
-			const scene = renderIntermediateDiagram(fixture).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(fixture);
 			for (const node of nodes(scene).filter((entry) => entry.shape === "diamond")) {
 				const box = excalidrawBoundTextBox(node);
 				const text = labelSize(labelFor(scene, node));
@@ -204,12 +203,12 @@ describe("decision label sizing", () => {
 	});
 
 	it("wraps long decision labels to the narrower diamond measure", () => {
-		const scene = renderIntermediateDiagram({
+		const scene = renderFlowchartDiagram({
 			...flowchartFixture,
 			nodes: flowchartFixture.nodes.map((node) =>
 				node.id === "clear" ? { ...node, label: "Is the requested scope clear enough?" } : node,
 			),
-		}).pipe(Result.getOrThrow);
+		});
 		const diamond = nodes(scene).find((node) => node.nodeId === "clear");
 		if (!diamond) throw new Error("Missing decision node.");
 

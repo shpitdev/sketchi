@@ -14,7 +14,7 @@ import {
 	crossingStateMachines,
 } from "../families/flowchart/crossing-fixtures.js";
 import { routingFixtures } from "../families/flowchart/routing-fixtures.js";
-import { renderIntermediateDiagram } from "./scene";
+import { renderFlowchartDiagram } from "../families/flowchart/render";
 
 import { renderStateMachineDiagram } from "../families/state-machine/render";
 
@@ -217,10 +217,7 @@ const CROSSINGS: Readonly<Record<keyof typeof crossingFixtures, readonly [number
 
 const flowcharts = Object.keys(crossingFixtures) as (keyof typeof crossingFixtures)[];
 const scenes = new Map(
-	flowcharts.map(
-		(name) =>
-			[name, renderIntermediateDiagram(crossingFixtures[name]).pipe(Result.getOrThrow)] as const,
-	),
+	flowcharts.map((name) => [name, renderFlowchartDiagram(crossingFixtures[name])] as const),
 );
 
 describe("avoidable crossings in generated flowcharts", () => {
@@ -233,19 +230,15 @@ describe("avoidable crossings in generated flowcharts", () => {
 		expect(now).toBeLessThanOrEqual(Math.max(0, main - 1));
 	});
 
-	it.each(flowcharts)("keeps every line of %s clear of every other line's arrowhead", (name) => {
-		expect(arrowheadsCrossed(scenes.get(name)!)).toEqual([]);
-	});
-
 	it.each(["TB", "BT", "LR", "RL"] as const)(
 		"keeps every line of each crossing fixture clear of other arrowheads in %s",
 		(direction) => {
 			const crossed = flowcharts.flatMap((name) =>
 				arrowheadsCrossed(
-					renderIntermediateDiagram({
+					renderFlowchartDiagram({
 						...crossingFixtures[name],
 						layout: { direction, edgeRouting: "orthogonal" },
-					}).pipe(Result.getOrThrow),
+					}),
 				).map((finding) => `${name}: ${finding}`),
 			);
 			expect(crossed).toEqual([]);
@@ -270,10 +263,10 @@ describe("avoidable crossings in generated flowcharts", () => {
 		(direction) => {
 			const close = Object.entries(routingFixtures).flatMap(([name, fixture]) =>
 				outlineGaps(
-					renderIntermediateDiagram({
+					renderFlowchartDiagram({
 						...fixture,
 						layout: { direction, edgeRouting: "orthogonal" },
-					}).pipe(Result.getOrThrow),
+					}),
 				)
 					.filter(({ gap }) => gap < NODE_CLEARANCE)
 					.map(({ edge, gap, node }) => `${name}: ${edge} ${gap.toFixed(1)} px from ${node}`),

@@ -2,7 +2,7 @@
 import { Result, Effect } from "effect";
 import { assert, layer } from "@effect/vitest";
 import { type SequenceDiagram } from "@sketchi/diagrams/families/sequence/document";
-import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/diagram";
+import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/fixtures";
 import { DiagramGenerationClient } from "@sketchi/diagrams/generate/client";
 import { logosNamedInText } from "@sketchi/icon-catalog";
 import { nodeLogoIcons } from "@sketchi/icon-catalog/catalog";

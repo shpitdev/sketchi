@@ -1,6 +1,6 @@
+import { flowchartBuild } from "./families/flowchart/build.js";
 import { sequenceFixture } from "./families/sequence/fixtures.js";
 import { sequenceBuild } from "./families/sequence/build.js";
-import { FlowchartDocumentSchema } from "./families/flowchart/document.js";
 import { vennBuild } from "./families/venn/build.js";
 import { Effect, Result, Schema } from "effect";
 import * as Build from "./build/code-mode/contract.js";
@@ -14,7 +14,7 @@ import { renderClassDiagram } from "./families/class/render.js";
 import { docs as erFamilyDocs } from "./families/er/docs.js";
 import * as erFamily from "./families/er/document.js";
 import { renderErDiagram } from "./families/er/render.js";
-import * as flowchartFamily from "./families/flowchart/diagram.js";
+import * as flowchartFamily from "./families/flowchart/document.js";
 import { docs as flowchartFamilyDocs } from "./families/flowchart/docs.js";
 import { docs as ganttFamilyDocs } from "./families/gantt/docs.js";
 import * as ganttFamily from "./families/gantt/document.js";
@@ -49,8 +49,8 @@ import * as vennFamily from "./families/venn/document.js";
 import { docs as wireframeFamilyDocs } from "./families/wireframe/docs.js";
 import * as wireframeFamily from "./families/wireframe/document.js";
 import { wireframeBuild } from "./families/wireframe/build.js";
-import { DiagramValidationError } from "./graph/intermediate.js";
-import { renderIntermediateDiagram } from "./graph/scene.js";
+import { renderFlowchartDiagram } from "./families/flowchart/render.js";
+import { flowchartFixture } from "./families/flowchart/fixtures.js";
 
 function canonical<S extends Schema.Top & { readonly Type: { readonly type: string } }, E, RE>(
 	schema: S,
@@ -114,39 +114,69 @@ function legacyFamily<
 	};
 }
 
+/** Canonical documents already owned by a build need only the dispatch tag removed for storage. */
+function fromBuild<
+	D,
+	N extends { readonly type: string },
+	E,
+	const S extends string,
+	T extends Schema.Top,
+	R,
+>(build: ReturnType<typeof import("./build/operation.js").defineBuild<D, N, E, S, T, R>>) {
+	return {
+		canonical: canonical(
+			build.normalized,
+			build.name,
+			(diagram) => Result.map(build.check(diagram), () => diagram),
+			(diagram) => {
+				const rendered = build.render(diagram);
+				return Result.isResult(rendered) ? rendered : Result.succeed(rendered);
+			},
+			build.counts,
+		),
+		validationError: build.error,
+		toDocument: (diagram: N) => {
+			const { type: _type, ...spec } = diagram;
+			const type: N["type"] = diagram.type;
+			return { type, spec };
+		},
+	};
+}
+
 function family<
 	const O extends string,
 	D,
-	N extends { readonly type: string },
-	E extends { readonly message: string },
+	N,
+	C,
+	E,
 	const S extends string,
 	T extends Schema.Top,
+	P extends Schema.Codec<import("./build/result.js").CodeModeIssue>,
 	R extends import("./build/code-mode/icons.js").BuildIconSource,
 	const F extends {
 		readonly operation: O;
 		readonly label: string;
 		readonly path: string;
-		readonly fixture: N;
+		readonly fixture: { readonly type: string };
+		readonly canonical: {
+			readonly schema: Schema.Top;
+			readonly counts: (diagram: {
+				readonly type: string;
+			}) => import("./build/result.js").DiagramCounts;
+		};
+		readonly validationError: Schema.Top;
 		readonly docs: unknown;
 	},
 >(
 	definition: F & {
-		readonly build: ReturnType<typeof import("./build/operation.js").defineBuild<D, N, E, S, T, R>>;
+		readonly build: ReturnType<
+			typeof import("./build/operation.js").defineBuild<D, N, E, S, T, R, C, P>
+		>;
 	},
 ) {
 	const build = definition.build;
-	const type = build.name;
+	const type: F["fixture"]["type"] = definition.fixture.type;
 	const document = Schema.Struct({ type: Schema.Literal(type), spec: build.document });
-	const ownedCanonical = canonical(
-		build.normalized,
-		type,
-		(diagram) => Result.map(build.check(diagram), () => diagram),
-		(diagram) => {
-			const rendered = build.render(diagram);
-			return Result.isResult(rendered) ? rendered : Result.succeed(rendered);
-		},
-		build.counts,
-	);
 	return {
 		...definition,
 		type,
@@ -154,14 +184,8 @@ function family<
 		request: build.request,
 		contracts: { input: build.input, output: build.result },
 		studioInput: build.toolInput,
-		canonical: ownedCanonical,
-		validationError: build.error,
-		counts: ownedCanonical.counts,
+		counts: definition.canonical.counts,
 		prepare: build.prepare,
-		toDocument: (diagram: N) => {
-			const { type: _type, ...spec } = diagram;
-			return { type, spec };
-		},
 		document,
 		decodeDocument: (input: unknown) =>
 			Effect.fromResult(build.prepare({ spec: input })).pipe(
@@ -180,213 +204,262 @@ function family<
 }
 
 /** One composition of the existing family owners. Runtime selection is bound by the server host. */
-export const families = [
-	legacyFamily({
-		type: flowchartFamily.flowchartFixture.type,
-		operation: "buildFlowchart",
-		label: "Flowchart",
-		path: "/api/v1/flowcharts/build",
-		canonical: canonical(
-			flowchartFamily.FlowchartDiagram,
-			flowchartFamily.flowchartFixture.type,
-			flowchartFamily.validateFlowchartDiagram,
-			renderIntermediateDiagram,
-			flowchartFamily.counts,
-		),
-		validationError: flowchartFamily.FlowchartValidationError,
-		fixture: flowchartFamily.flowchartFixture,
-		spec: FlowchartDocumentSchema,
-		request: Build.BuildFlowchartRequestSchema,
-		contracts: {
-			input: Build.BuildFlowchartRequestSchema,
-			output: Build.BuildFlowchartResultSchema,
-		},
-		studioInput: Build.BuildFlowchartRequestSchema.omit({ options: true }),
-		build: (runtime: typeof Runtime) => runtime.buildFlowchart,
-		docs: flowchartFamilyDocs,
-	}),
-	family({
-		operation: "buildMindmap",
-		label: "Mindmap",
-		path: "/api/v1/mindmaps/build",
-		build: mindmapBuild,
-		fixture: mindmapFixture,
-		docs: mindmapFamilyDocs,
-	}),
-	family({
-		operation: "buildSequenceDiagram",
-		label: "Sequence diagram",
-		path: "/api/v1/sequences/build",
-		build: sequenceBuild,
-		fixture: sequenceFixture,
-		docs: sequenceFamilyDocs,
-	}),
-	family({
-		operation: "buildTimeline",
-		label: "Timeline",
-		path: "/api/v1/timelines/build",
-		build: timelineBuild,
-		fixture: timelineFamily.timelineFixture,
-		docs: timelineFamilyDocs,
-	}),
-	family({
-		operation: "buildChart",
-		label: "Chart",
-		path: "/api/v1/charts/build",
-		build: chartBuild,
-		fixture: chartFamily.chartFixture,
-		docs: chartFamilyDocs,
-	}),
-	legacyFamily({
-		type: stateMachineFamily.stateMachineFixture.type,
-		operation: "buildStateMachine",
-		label: "State machine",
-		path: "/api/v1/state-machines/build",
-		canonical: canonical(
-			stateMachineFamily.StateMachineDiagram,
-			stateMachineFamily.stateMachineFixture.type,
-			stateMachineFamily.validateStateMachineDiagram,
-			renderStateMachineDiagram,
-			stateMachineFamily.counts,
-		),
-		validationError: stateMachineFamily.StateMachineValidationError,
-		fixture: stateMachineFamily.stateMachineFixture,
-		spec: Build.StateMachineSpec,
-		request: Build.BuildStateMachineRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildStateMachineRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.StateMachineSpec.mapFields(
-					({ id, title, initial, states, transitions, layout }) => ({
-						id,
-						title,
-						initial,
-						states,
-						transitions,
-						layout,
-					}),
-				),
-			}),
-			output: Build.BuildStateMachineResultSchema,
-		},
-		studioInput: Build.BuildStateMachineToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildStateMachine,
-		docs: stateMachineFamilyDocs,
-	}),
-	family({
-		operation: "buildGantt",
-		label: "Gantt chart",
-		path: "/api/v1/gantts/build",
-		build: ganttBuild,
-		fixture: ganttFamily.ganttFixture,
-		docs: ganttFamilyDocs,
-	}),
-	legacyFamily({
-		type: erFamily.erFixture.type,
-		operation: "buildErDiagram",
-		label: "ER diagram",
-		path: "/api/v1/er-diagrams/build",
-		canonical: canonical(
-			erFamily.ErDiagram,
-			erFamily.erFixture.type,
-			erFamily.validateErDiagram,
-			renderErDiagram,
-			erFamily.counts,
-		),
-		validationError: erFamily.ErValidationError,
-		fixture: erFamily.erFixture,
-		spec: Build.ErSpec,
-		request: Build.BuildErDiagramRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildErDiagramRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.ErToolSpecSchema,
-			}),
-			output: Build.BuildErDiagramResultSchema,
-		},
-		studioInput: Build.BuildErDiagramToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildErDiagram,
-		docs: erFamilyDocs,
-	}),
-	legacyFamily({
-		type: classFamily.classFixture.type,
-		operation: "buildClassDiagram",
-		label: "Class diagram",
-		path: "/api/v1/class-diagrams/build",
-		canonical: canonical(
-			classFamily.ClassDiagram,
-			classFamily.classFixture.type,
-			classFamily.validateClassDiagram,
-			renderClassDiagram,
-			classFamily.counts,
-		),
-		validationError: classFamily.ClassValidationError,
-		fixture: classFamily.classFixture,
-		spec: Build.ClassSpec,
-		request: Build.BuildClassDiagramRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildClassDiagramRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.ClassToolSpecSchema,
-			}),
-			output: Build.BuildClassDiagramResultSchema,
-		},
-		studioInput: Build.BuildClassDiagramToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildClassDiagram,
-		docs: classFamilyDocs,
-	}),
-	family({
-		operation: "buildOrgChart",
-		label: "Org chart",
-		path: "/api/v1/org-charts/build",
-		build: orgChartBuild,
-		fixture: orgChartFamily.orgChartFixture,
-		docs: orgChartFamilyDocs,
-	}),
-	family({
-		operation: "buildVennDiagram",
-		label: "Venn diagram",
-		path: "/api/v1/venn-diagrams/build",
-		build: vennBuild,
-		fixture: vennFamily.vennFixture,
-		docs: vennFamilyDocs,
-	}),
-	family({
-		operation: "buildJourneyMap",
-		label: "Journey map",
-		path: "/api/v1/journey-maps/build",
-		build: journeyBuild,
-		fixture: journeyFamily.journeyFixture,
-		docs: journeyFamilyDocs,
-	}),
-	family({
-		operation: "buildSankey",
-		label: "Sankey diagram",
-		path: "/api/v1/sankey-diagrams/build",
-		build: sankeyBuild,
-		fixture: sankeyFamily.sankeyFixture,
-		docs: sankeyFamilyDocs,
-	}),
-	family({
-		operation: "buildWireframe",
-		label: "Wireframe",
-		path: "/api/v1/wireframes/build",
-		build: wireframeBuild,
-		fixture: wireframeFamily.wireframeFixture,
-		docs: wireframeFamilyDocs,
-	}),
-	family({
-		operation: "buildQuadrantChart",
-		label: "Quadrant chart",
-		path: "/api/v1/quadrant-charts/build",
-		build: quadrantBuild,
-		fixture: quadrantFamily.quadrantFixture,
-		docs: quadrantFamilyDocs,
-	}),
-] as const;
+const flowchartDescriptor = family({
+	operation: "buildFlowchart",
+	label: "Flowchart",
+	path: "/api/v1/flowcharts/build",
+	canonical: canonical(
+		flowchartFamily.FlowchartDiagram,
+		flowchartFixture.type,
+		flowchartFamily.validateFlowchartDiagram,
+		(diagram) => Result.succeed(renderFlowchartDiagram(diagram)),
+		flowchartFamily.counts,
+	),
+	validationError: flowchartFamily.FlowchartValidationError,
+	fixture: flowchartFixture,
+	build: flowchartBuild,
+	docs: flowchartFamilyDocs,
+});
+
+const mindmapDescriptor = family({
+	operation: "buildMindmap",
+	label: "Mindmap",
+	path: "/api/v1/mindmaps/build",
+	build: mindmapBuild,
+	...fromBuild(mindmapBuild),
+	fixture: mindmapFixture,
+	docs: mindmapFamilyDocs,
+});
+
+const sequenceDiagramDescriptor = family({
+	operation: "buildSequenceDiagram",
+	label: "Sequence diagram",
+	path: "/api/v1/sequences/build",
+	build: sequenceBuild,
+	...fromBuild(sequenceBuild),
+	fixture: sequenceFixture,
+	docs: sequenceFamilyDocs,
+});
+
+const timelineDescriptor = family({
+	operation: "buildTimeline",
+	label: "Timeline",
+	path: "/api/v1/timelines/build",
+	build: timelineBuild,
+	...fromBuild(timelineBuild),
+	fixture: timelineFamily.timelineFixture,
+	docs: timelineFamilyDocs,
+});
+
+const chartDescriptor = family({
+	operation: "buildChart",
+	label: "Chart",
+	path: "/api/v1/charts/build",
+	build: chartBuild,
+	...fromBuild(chartBuild),
+	fixture: chartFamily.chartFixture,
+	docs: chartFamilyDocs,
+});
+
+const stateMachineDescriptor = legacyFamily({
+	type: stateMachineFamily.stateMachineFixture.type,
+	operation: "buildStateMachine",
+	label: "State machine",
+	path: "/api/v1/state-machines/build",
+	canonical: canonical(
+		stateMachineFamily.StateMachineDiagram,
+		stateMachineFamily.stateMachineFixture.type,
+		stateMachineFamily.validateStateMachineDiagram,
+		renderStateMachineDiagram,
+		stateMachineFamily.counts,
+	),
+	validationError: stateMachineFamily.StateMachineValidationError,
+	fixture: stateMachineFamily.stateMachineFixture,
+	spec: Build.StateMachineSpec,
+	request: Build.BuildStateMachineRequest,
+	contracts: {
+		input: Schema.Struct({
+			...Build.BuildStateMachineRequest.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: Build.StateMachineSpec.mapFields(
+				({ id, title, initial, states, transitions, layout }) => ({
+					id,
+					title,
+					initial,
+					states,
+					transitions,
+					layout,
+				}),
+			),
+		}),
+		output: Build.BuildStateMachineResultSchema,
+	},
+	studioInput: Build.BuildStateMachineToolInputSchema,
+	build: (runtime: typeof Runtime) => runtime.buildStateMachine,
+	docs: stateMachineFamilyDocs,
+});
+
+const ganttDescriptor = family({
+	operation: "buildGantt",
+	label: "Gantt chart",
+	path: "/api/v1/gantts/build",
+	build: ganttBuild,
+	...fromBuild(ganttBuild),
+	fixture: ganttFamily.ganttFixture,
+	docs: ganttFamilyDocs,
+});
+
+const erDiagramDescriptor = legacyFamily({
+	type: erFamily.erFixture.type,
+	operation: "buildErDiagram",
+	label: "ER diagram",
+	path: "/api/v1/er-diagrams/build",
+	canonical: canonical(
+		erFamily.ErDiagram,
+		erFamily.erFixture.type,
+		erFamily.validateErDiagram,
+		renderErDiagram,
+		erFamily.counts,
+	),
+	validationError: erFamily.ErValidationError,
+	fixture: erFamily.erFixture,
+	spec: Build.ErSpec,
+	request: Build.BuildErDiagramRequest,
+	contracts: {
+		input: Schema.Struct({
+			...Build.BuildErDiagramRequest.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: Build.ErToolSpecSchema,
+		}),
+		output: Build.BuildErDiagramResultSchema,
+	},
+	studioInput: Build.BuildErDiagramToolInputSchema,
+	build: (runtime: typeof Runtime) => runtime.buildErDiagram,
+	docs: erFamilyDocs,
+});
+
+const classDiagramDescriptor = legacyFamily({
+	type: classFamily.classFixture.type,
+	operation: "buildClassDiagram",
+	label: "Class diagram",
+	path: "/api/v1/class-diagrams/build",
+	canonical: canonical(
+		classFamily.ClassDiagram,
+		classFamily.classFixture.type,
+		classFamily.validateClassDiagram,
+		renderClassDiagram,
+		classFamily.counts,
+	),
+	validationError: classFamily.ClassValidationError,
+	fixture: classFamily.classFixture,
+	spec: Build.ClassSpec,
+	request: Build.BuildClassDiagramRequest,
+	contracts: {
+		input: Schema.Struct({
+			...Build.BuildClassDiagramRequest.fields,
+			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
+			spec: Build.ClassToolSpecSchema,
+		}),
+		output: Build.BuildClassDiagramResultSchema,
+	},
+	studioInput: Build.BuildClassDiagramToolInputSchema,
+	build: (runtime: typeof Runtime) => runtime.buildClassDiagram,
+	docs: classFamilyDocs,
+});
+
+const orgChartDescriptor = family({
+	operation: "buildOrgChart",
+	label: "Org chart",
+	path: "/api/v1/org-charts/build",
+	build: orgChartBuild,
+	...fromBuild(orgChartBuild),
+	fixture: orgChartFamily.orgChartFixture,
+	docs: orgChartFamilyDocs,
+});
+
+const vennDiagramDescriptor = family({
+	operation: "buildVennDiagram",
+	label: "Venn diagram",
+	path: "/api/v1/venn-diagrams/build",
+	build: vennBuild,
+	...fromBuild(vennBuild),
+	fixture: vennFamily.vennFixture,
+	docs: vennFamilyDocs,
+});
+
+const journeyMapDescriptor = family({
+	operation: "buildJourneyMap",
+	label: "Journey map",
+	path: "/api/v1/journey-maps/build",
+	build: journeyBuild,
+	...fromBuild(journeyBuild),
+	fixture: journeyFamily.journeyFixture,
+	docs: journeyFamilyDocs,
+});
+
+const sankeyDescriptor = family({
+	operation: "buildSankey",
+	label: "Sankey diagram",
+	path: "/api/v1/sankey-diagrams/build",
+	build: sankeyBuild,
+	...fromBuild(sankeyBuild),
+	fixture: sankeyFamily.sankeyFixture,
+	docs: sankeyFamilyDocs,
+});
+
+const wireframeDescriptor = family({
+	operation: "buildWireframe",
+	label: "Wireframe",
+	path: "/api/v1/wireframes/build",
+	build: wireframeBuild,
+	...fromBuild(wireframeBuild),
+	fixture: wireframeFamily.wireframeFixture,
+	docs: wireframeFamilyDocs,
+});
+
+const quadrantChartDescriptor = family({
+	operation: "buildQuadrantChart",
+	label: "Quadrant chart",
+	path: "/api/v1/quadrant-charts/build",
+	build: quadrantBuild,
+	...fromBuild(quadrantBuild),
+	fixture: quadrantFamily.quadrantFixture,
+	docs: quadrantFamilyDocs,
+});
+
+export const families: readonly [
+	typeof flowchartDescriptor,
+	typeof mindmapDescriptor,
+	typeof sequenceDiagramDescriptor,
+	typeof timelineDescriptor,
+	typeof chartDescriptor,
+	typeof stateMachineDescriptor,
+	typeof ganttDescriptor,
+	typeof erDiagramDescriptor,
+	typeof classDiagramDescriptor,
+	typeof orgChartDescriptor,
+	typeof vennDiagramDescriptor,
+	typeof journeyMapDescriptor,
+	typeof sankeyDescriptor,
+	typeof wireframeDescriptor,
+	typeof quadrantChartDescriptor,
+] = [
+	flowchartDescriptor,
+	mindmapDescriptor,
+	sequenceDiagramDescriptor,
+	timelineDescriptor,
+	chartDescriptor,
+	stateMachineDescriptor,
+	ganttDescriptor,
+	erDiagramDescriptor,
+	classDiagramDescriptor,
+	orgChartDescriptor,
+	vennDiagramDescriptor,
+	journeyMapDescriptor,
+	sankeyDescriptor,
+	wireframeDescriptor,
+	quadrantChartDescriptor,
+];
 
 export type DiagramFamily = (typeof families)[number];
 export type DiagramTypeValue = DiagramFamily["type"];
@@ -398,11 +471,8 @@ export const CanonicalDiagramSchema = Schema.Union(
 	families.map((family) => family.canonical.schema),
 ).pipe(Schema.toTaggedUnion("type"));
 export type CanonicalDiagram = DiagramFamily["canonical"]["schema"]["Type"];
-export type CanonicalValidationError =
-	| DiagramFamily["validationError"]["Type"]
-	| DiagramValidationError;
+export type CanonicalValidationError = DiagramFamily["validationError"]["Type"];
 export const CanonicalValidationErrorSchema = Schema.Union([
-	DiagramValidationError,
 	...families.map((family) => family.validationError),
 ]);
 export const diagramFixtures = families.map((family) => family.fixture);
@@ -427,9 +497,10 @@ export function parseCanonicalDiagram(
 	if (typeof input === "object" && input !== null && "type" in input) {
 		const owner = families.find((entry) => entry.type === input.type);
 		if (owner && "prepare" in owner) {
-			const prepared: Result.Result<unknown, CanonicalValidationError> = owner.prepare({
-				spec: input,
-			});
+			const prepared: Result.Result<unknown, CanonicalValidationError | Schema.SchemaError> =
+				owner.prepare({
+					spec: input,
+				});
 			if (Result.isFailure(prepared)) return Result.fail(prepared.failure);
 		}
 	}

@@ -1,5 +1,6 @@
 import { CanvasSpec } from "@sketchi/drawing";
-import { formatContractSchemaError } from "@sketchi/diagrams/build/code-mode/contract";
+import { formatContractSchemaError } from "@sketchi/diagrams/build/input";
+
 import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
 import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";

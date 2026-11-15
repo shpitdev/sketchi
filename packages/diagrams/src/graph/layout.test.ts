@@ -9,9 +9,10 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasPoint as ScenePoint,
 } from "@sketchi/drawing";
-import { flowchartFixture, parseFlowchartDiagram } from "../families/flowchart/diagram.js";
+import { parseFlowchartDiagram } from "../families/flowchart/document.js";
+import { flowchartFixture } from "../families/flowchart/fixtures.js";
 import { routingFixtures } from "../families/flowchart/routing-fixtures.js";
-import { renderIntermediateDiagram } from "./scene";
+import { renderFlowchartDiagram } from "../families/flowchart/render";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];
@@ -21,24 +22,18 @@ const render = (
 	fixture: Fixture,
 	direction: Direction,
 	edgeRouting: "orthogonal" | "straight" | "curved" = "orthogonal",
-) =>
-	renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } }).pipe(
-		Result.getOrThrow,
-	);
+) => renderFlowchartDiagram({ ...fixture, layout: { direction, edgeRouting } });
 
-const scenes = new Map<
-	string,
-	Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>
->();
+const scenes = new Map<string, ReturnType<typeof renderFlowchartDiagram>>();
 const rendered = (name: keyof typeof routingFixtures, direction: Direction) => {
 	const key = `${name}:${direction}`;
 	if (!scenes.has(key)) scenes.set(key, render(routingFixtures[name], direction));
 	return scenes.get(key)!;
 };
 
-const nodesOf = (scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>) =>
+const nodesOf = (scene: ReturnType<typeof renderFlowchartDiagram>) =>
 	scene.elements.filter((e): e is NodeSceneElement => e.type === "node");
-const arrowsOf = (scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>) =>
+const arrowsOf = (scene: ReturnType<typeof renderFlowchartDiagram>) =>
 	scene.elements.filter((e) => e.type === "arrow");
 const center = (node: NodeSceneElement) => ({
 	x: node.x + node.width / 2,
@@ -46,9 +41,7 @@ const center = (node: NodeSceneElement) => ({
 });
 
 /** Long side over short side of the drawn nodes and arrows, with Sketchi's 20-unit export padding. */
-function exportAspect(
-	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
-): number {
+function exportAspect(scene: ReturnType<typeof renderFlowchartDiagram>): number {
 	const points = [
 		...nodesOf(scene).flatMap((n) => [
 			{ x: n.x, y: n.y },
@@ -70,9 +63,7 @@ function corners(points: readonly ScenePoint[]): ScenePoint[] {
 }
 
 /** Interior crossings between the axis-aligned runs of different arrows. */
-function crossings(
-	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
-): string[] {
+function crossings(scene: ReturnType<typeof renderFlowchartDiagram>): string[] {
 	const arrows = arrowsOf(scene).flatMap((a) =>
 		a.type === "arrow" ? [{ ...a, points: corners(a.points) }] : [],
 	);
@@ -98,9 +89,7 @@ function crossings(
 }
 
 /** Jogs, near-coincident corridors, touching arrowheads and lines through an arrowhead. */
-function readerFindings(
-	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
-): number {
+function readerFindings(scene: ReturnType<typeof renderFlowchartDiagram>): number {
 	const nodes = nodesOf(scene);
 	const arrows = arrowsOf(scene).flatMap((a) => (a.type === "arrow" ? [a] : []));
 	const points = [
@@ -145,7 +134,7 @@ function axes(direction: Direction) {
 
 /** Runs of an arrow beyond every node along the flow: around the outer margins. */
 function marginRuns(
-	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
+	scene: ReturnType<typeof renderFlowchartDiagram>,
 	arrow: { points: readonly ScenePoint[] },
 	direction: Direction,
 ): ScenePoint[][] {
@@ -367,7 +356,7 @@ const expenseRows = parseFlowchartDiagram({
 }).pipe(Result.getOrThrow);
 
 describe("continuations step through the gap between bands", () => {
-	const arrowsIn = (scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>) =>
+	const arrowsIn = (scene: ReturnType<typeof renderFlowchartDiagram>) =>
 		arrowsOf(scene).flatMap((a) => (a.type === "arrow" ? [a] : []));
 
 	it.each(directions)(
@@ -471,10 +460,7 @@ function gatedRelease(checks: number) {
 }
 
 /** Every edge of a loop-free flow runs forward along it only when nothing wrapped. */
-function runsForward(
-	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
-	direction: Direction,
-) {
+function runsForward(scene: ReturnType<typeof renderFlowchartDiagram>, direction: Direction) {
 	const { along, sign } = axes(direction);
 	const nodes = new Map(nodesOf(scene).map((node) => [node.nodeId, node]));
 	return arrowsOf(scene).every(

@@ -1,3 +1,4 @@
+import { flowchartBuild } from "../../families/flowchart/build.js";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { assert, describe, it, layer } from "@effect/vitest";
 
@@ -5,12 +6,8 @@ import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/obser
 import { Cause, Effect, Exit, Fiber, Layer, Schema, Result } from "effect";
 
 import { CodeModeArtifactStorageMemory } from "./artifacts";
-import {
-	formatContractSchemaError,
-	BuildFlowchartRequestSchema,
-	DIAGRAM_PATCH_OPERATION_NAMES,
-	DiagramPatchOperationSchema,
-} from "./contract";
+import { formatContractSchemaError } from "../input.js";
+import { DIAGRAM_PATCH_OPERATION_NAMES, DiagramPatchOperationSchema } from "./contract";
 import { applyDiagramPatch, buildFlowchart, makeCodeModeRuntimeEnvironmentLayer } from "./runtime";
 
 const renderingStarted = Promise.withResolvers<void>();
@@ -65,7 +62,7 @@ describe("Code Mode telemetry", () => {
 				spans.find((span) => span.name === "codeMode.artifacts.store")?.attributes,
 				{ "sketchi.request_id": "request-effect-telemetry" },
 			);
-			assert.isTrue(spans.some((span) => span.name === "codeMode.buildFlowchart.render"));
+			assert.isTrue(spans.some((span) => span.name === "flowchart.render"));
 			assert.isTrue(spans.some((span) => span.name === "codeMode.artifacts.exportAndStore"));
 			assert.isFalse(
 				spans.some((span) =>
@@ -140,14 +137,14 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 					edges: [["start", "done"] as [string, string]],
 				},
 			};
-			const decoded = yield* Schema.decodeUnknownEffect(BuildFlowchartRequestSchema, {
+			const decoded = yield* Schema.decodeUnknownEffect(flowchartBuild.request, {
 				errors: "all",
 				reportInput: true,
 			})(request);
-			const encoded = yield* Schema.encodeEffect(BuildFlowchartRequestSchema)(decoded);
+			const encoded = yield* Schema.encodeEffect(flowchartBuild.request)(decoded);
 			assert.deepStrictEqual(encoded, request);
 
-			const failure = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
+			const failure = Schema.decodeUnknownResult(flowchartBuild.request, {
 				errors: "all",
 				reportInput: true,
 			})({

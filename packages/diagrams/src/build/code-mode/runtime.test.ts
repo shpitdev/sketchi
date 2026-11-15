@@ -1,3 +1,4 @@
+import { type BuildFlowchartResult } from "../../families/flowchart/build.js";
 import { buildResponse, type BuildRejection } from "../operation.js";
 import { ExcalidrawFile, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
@@ -10,7 +11,7 @@ import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
-} from "../../families/flowchart/diagram.js";
+} from "../../families/flowchart/document.js";
 import { parseChartDiagram } from "../../families/chart/document.js";
 import { mindmapFixture } from "../../families/mindmap/fixtures.js";
 import { mindmapLayoutIssues, renderMindmap } from "../../families/mindmap/index.js";
@@ -29,7 +30,6 @@ import {
 	CreateCanvasRequest,
 	toCodeModeJsonSchema,
 	type ApplyDiagramPatchResult,
-	type BuildFlowchartResult,
 	type CreateCanvasResult,
 	type GetArtifactResult,
 } from "./contract";
@@ -3415,7 +3415,11 @@ describe("shared artifact export-and-store boundary", () => {
 				],
 			});
 			expect(writeCalls).toBe(1);
-			if (operation === "buildMindmap" || operation === "buildSequenceDiagram")
+			if (
+				operation === "buildFlowchart" ||
+				operation === "buildMindmap" ||
+				operation === "buildSequenceDiagram"
+			)
 				expect(result).toHaveProperty("partial", {
 					diagramId: expect.any(String),
 				});

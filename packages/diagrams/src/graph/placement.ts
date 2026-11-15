@@ -1,6 +1,6 @@
 /** Owns rank, group, zone and lane positions, including flow/pool/zone wrap plans. */
 import { Graph } from "effect";
-import { type DiagramGroup, type IntermediateDiagram, type DiagramEdge } from "./intermediate.js";
+import { type GraphGroup, type GraphInput, type GraphEdge } from "./input.js";
 import {
 	type CanvasNodeIcon,
 	CANVAS_GROUP_ICON,
@@ -92,7 +92,7 @@ const GROUP_PADDING = 40;
 const ZONE_PADDING = 24;
 
 /** The logo a group draws before its label. */
-function groupIcon(group: DiagramGroup): CanvasNodeIcon | undefined {
+function groupIcon(group: GraphGroup): CanvasNodeIcon | undefined {
 	return group.icon ? { slug: group.icon.slug, size: CANVAS_GROUP_ICON.size } : undefined;
 }
 
@@ -321,7 +321,8 @@ export const ACROSS_DIRECTION: Readonly<Record<LayoutDirection, LayoutDirection>
 };
 
 /** Whether reordering ranks for fewer layered crossings changes this diagram's order. */
-export function reordersRanks(layoutGraph: GraphLayout, diagram: IntermediateDiagram): boolean {
+export function reordersRanks(layoutGraph: GraphLayout): boolean {
+	const diagram = layoutGraph.input;
 	// A laned diagram orders each lane's cells as it lays them out.
 	if (laned(diagram)) return false;
 	const structure = layoutGraph.groups;
@@ -344,11 +345,8 @@ export function reordersRanks(layoutGraph: GraphLayout, diagram: IntermediateDia
  * skips a rank, one a lane of its own could keep straight, and its sifted
  * layered order crosses fewer than `crossings` (Arrangement.skipLanes).
  */
-export function skipsRanks(
-	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
-	crossings: number,
-): boolean {
+export function skipsRanks(layoutGraph: GraphLayout, crossings: number): boolean {
+	const diagram = layoutGraph.input;
 	if (laned(diagram) || layoutGraph.groups) return false;
 	const sifted = layoutGraph.ranks?.order.sifted;
 	return sifted !== undefined && sifted.virtual.size > 0 && sifted.crossings < crossings;
@@ -369,7 +367,7 @@ export function skipsRanks(
  */
 export function planWrap(
 	flow: RankedFlow,
-	layout: IntermediateDiagram["layout"],
+	layout: GraphInput["layout"],
 	reorder: boolean,
 	balance = 0,
 	zone?: ZoneWrapOptions,
@@ -412,7 +410,7 @@ export function planWrap(
 				Math.min(rankOf(edge.source), rankOf(edge.target)) <= metric.rank &&
 				Math.max(rankOf(edge.source), rankOf(edge.target)) > metric.rank,
 		);
-		const joins = (edge: DiagramEdge) =>
+		const joins = (edge: GraphEdge) =>
 			rankOf(edge.source) === metric.rank && rankOf(edge.target) === metric.rank + 1;
 		// A cut may also carry a forward edge that skips ranks, as a cached page's
 		// line to a response past the private subnet: its line is searched around
@@ -610,13 +608,13 @@ export const ZONE_WRAP_ROUNDS = 2;
  */
 export function planZoneWraps(
 	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
 	structure: GroupStructure,
 	arrangement: Arrangement,
 	balance: number,
 	drawn: { readonly width: number; readonly height: number },
 	hangZones = false,
 ): ReadonlyMap<string, Wrap>[] {
+	const diagram = layoutGraph.input;
 	const levels = new Map<string, RankedFlow>([
 		[TOP_LEVEL, structure.top],
 		...(structure.zoned
@@ -625,7 +623,7 @@ export function planZoneWraps(
 	]);
 	const weights = zoneFlowRanks(structure);
 	const unrouted = (zoneWraps: ReadonlyMap<string, Wrap>) => {
-		const placed = positionLayout(layoutGraph, diagram, new Map(), new Map(), {
+		const placed = positionLayout(layoutGraph, new Map(), new Map(), {
 			...arrangement,
 			zoneWraps,
 		});
@@ -1057,14 +1055,13 @@ function positionNodes(
 
 export function positionLayout(
 	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }> = new Map(),
 	stubReach: ReadonlyMap<string, number> = new Map(),
 	arrangement: Arrangement = PLAIN_ARRANGEMENT,
 	slack: ReadonlyMap<string, number> = new Map(),
 ): PositionedLayout {
-	if (laned(diagram))
-		return positionLanedNodes(layoutGraph, diagram, minimumSizes, stubReach, arrangement);
+	const diagram = layoutGraph.input;
+	if (laned(diagram)) return positionLanedNodes(layoutGraph, minimumSizes, stubReach, arrangement);
 	const structure = layoutGraph.groups;
 	return structure
 		? positionGroupedNodes(
@@ -1075,17 +1072,17 @@ export function positionLayout(
 				{ ...arrangement, skipLanes: false },
 				slack,
 			)
-		: positionPlainNodes(layoutGraph, diagram, minimumSizes, stubReach, arrangement);
+		: positionPlainNodes(layoutGraph, minimumSizes, stubReach, arrangement);
 }
 
 /** An ungrouped, unlaned flow's nodes and, with Arrangement.skipLanes, its skipping lines' lanes. */
 function positionPlainNodes(
 	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
 	stubReach: ReadonlyMap<string, number>,
 	arrangement: Arrangement,
 ): PositionedLayout {
+	const diagram = layoutGraph.input;
 	const skipLaneAt = new Map<string, number>();
 	const nodes = positionNodes(
 		layoutGraph.ranks!,
@@ -1109,7 +1106,7 @@ function positionPlainNodes(
  * its top, so there the group widens until the top row's ports clear its name.
  */
 function positionGroupedNodes(
-	diagram: IntermediateDiagram,
+	diagram: GraphInput,
 	structure: GroupStructure,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
 	stubReach: ReadonlyMap<string, number>,
@@ -1539,7 +1536,7 @@ const LANE_HEADER_MIN_HEIGHT = 44;
 export const LANE_ASPECT = 2.4;
 
 /** Whether a diagram declares lanes; a laned diagram puts every node in one. */
-export function laned(diagram: IntermediateDiagram): boolean {
+export function laned(diagram: GraphInput): boolean {
 	return (diagram.lanes ?? []).length > 0;
 }
 
@@ -1554,11 +1551,8 @@ export function laned(diagram: IntermediateDiagram): boolean {
  * column too, running straight across the lanes between, where none of their
  * steps stands in that column.
  */
-export function laneColumns(
-	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
-	through = false,
-): Map<string, number> {
+export function laneColumns(layoutGraph: GraphLayout, through = false): Map<string, number> {
+	const diagram = layoutGraph.input;
 	const lanes = diagram.lanes ?? [];
 	const laneIndex = new Map(lanes.map((lane, index) => [lane.id, index]));
 	const laneOf = new Map(
@@ -1636,12 +1630,12 @@ export function laneColumns(
  */
 function laneGeometry(
 	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
 	stubReach: ReadonlyMap<string, number>,
 	through = false,
 	minimumBreadth = 0,
 ) {
+	const diagram = layoutGraph.input;
 	const lanes = diagram.lanes!;
 	const { direction } = diagram.layout;
 	const vertical = direction === "TB" || direction === "BT";
@@ -1667,7 +1661,7 @@ function laneGeometry(
 				LANE_MIN_NODE_WIDTH,
 				MAX_DIAMOND_LABEL_LINE_UNITS,
 			);
-	const columns = laneColumns(layoutGraph, diagram, through);
+	const columns = laneColumns(layoutGraph, through);
 	const laneIndex = new Map(lanes.map((lane, index) => [lane.id, index]));
 	const laneOf = new Map(diagram.nodes.map((node) => [node.id, node.lane!]));
 	const columnCount = Math.max(0, ...columns.values()) + 1;
@@ -1843,16 +1837,16 @@ const MAX_LANE_CONTINUATIONS = 2;
  * long and as even as the cuts allow, and the fewest pools that bring the
  * drawing within the target aspect win.
  */
-export function planLaneWrap(layoutGraph: GraphLayout, diagram: IntermediateDiagram): Wrap {
+export function planLaneWrap(layoutGraph: GraphLayout): Wrap {
+	const diagram = layoutGraph.input;
 	const { columnCount, columns, depth, gapAfter, headerSize, poolBreadth } = laneGeometry(
 		layoutGraph,
-		diagram,
 		new Map(),
 		new Map(),
 	);
 	if (columnCount < 2 * 2) return NO_WRAP;
 	const feedback = layoutGraph.feedback;
-	const span = (edge: DiagramEdge) => {
+	const span = (edge: GraphEdge) => {
 		const [from, to] = [columns.get(edge.source)!, columns.get(edge.target)!];
 		return [Math.min(from, to), Math.max(from, to)] as const;
 	};
@@ -1946,11 +1940,11 @@ function lanePoolGap(continuations: number): number {
  */
 function positionLanedNodes(
 	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
 	minimumSizes: ReadonlyMap<string, { width: number; height: number }>,
 	stubReach: ReadonlyMap<string, number>,
 	arrangement: Arrangement = PLAIN_ARRANGEMENT,
 ): PositionedLayout {
+	const diagram = layoutGraph.input;
 	const { compactGaps, wrap } = arrangement;
 	const lanes = diagram.lanes!;
 	const { direction } = diagram.layout;
@@ -1979,7 +1973,6 @@ function positionLanedNodes(
 		wrapped,
 	} = laneGeometry(
 		layoutGraph,
-		diagram,
 		minimumSizes,
 		stubReach,
 		arrangement.throughHandoffs,

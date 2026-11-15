@@ -1,3 +1,4 @@
+import { PublishedBuildIssue } from "../../build/result.js";
 import { Array } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import {
@@ -13,6 +14,7 @@ import {
 import { renderGanttDiagram } from "./render.js";
 
 export const ganttBuild = defineBuild({
+	publishedIssues: PublishedBuildIssue,
 	name: "gantt",
 	document: GanttDocument,
 	normalized: GanttDiagram,

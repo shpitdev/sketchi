@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
+import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import type { UIMessage } from "ai";
 import {
 	buildResultOf,

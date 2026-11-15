@@ -1,5 +1,4 @@
-import type { FlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
-import type { FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
+import type { FlowchartDiagram,FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
 
 /**
  * A scenario's expected flowchart written as the document a model returns: nodes keyed by id,

@@ -1,7 +1,7 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
 import { specToFlowchartCandidate } from "./mcp-results";

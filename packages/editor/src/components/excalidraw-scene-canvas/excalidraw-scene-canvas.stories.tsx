@@ -3,13 +3,13 @@ import { Result } from "effect";
 import { type ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import {
-	flowchartFixture,
-	parseFlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
-import { parseIntermediateDiagram } from "@sketchi/diagrams/graph/intermediate";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
+import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/fixtures";
+
+import { renderGraphDiagram } from "@sketchi/diagrams/graph/scene";
+import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 
 import { DrawingEditor } from "./excalidraw-scene-canvas";
 import {
@@ -19,9 +19,7 @@ import {
 	participantLogoScene,
 } from "./node-logo-scene.fixtures";
 
-const scene = convertSceneToExcalidraw(
-	renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-);
+const scene = convertSceneToExcalidraw(renderFlowchartDiagram(flowchartFixture));
 
 const meta = {
 	title: "Diagram UI/Components/DrawingEditor",
@@ -39,7 +37,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 const wideFlowchartScene = convertSceneToExcalidraw(
-	renderIntermediateDiagram(
+	renderFlowchartDiagram(
 		parseFlowchartDiagram({
 			id: "wide-left-to-right-flow",
 			title: "Wide left-to-right flow",
@@ -57,7 +55,7 @@ const wideFlowchartScene = convertSceneToExcalidraw(
 			],
 			layout: { direction: "LR", edgeRouting: "orthogonal" },
 		}).pipe(Result.getOrThrow),
-	).pipe(Result.getOrThrow),
+	),
 );
 
 export const WideLeftToRight: Story = {
@@ -229,12 +227,14 @@ export const LabeledHorizontalSkips: Story = {
 		viewModeEnabled: false,
 		zenModeEnabled: false,
 		scene: convertSceneToExcalidraw(
-			renderIntermediateDiagram(
-				parseIntermediateDiagram({
-					id: "horizontal-skips",
-					title: "Paths",
-					type: "flowchart",
-					nodes: ["A", "B", "C", "D"].map((id) => ({ id, label: id, kind: "process" })),
+			renderGraphDiagram(
+				{
+					nodes: ["A", "B", "C", "D"].map((id) => ({
+						id,
+						label: id,
+						kind: "process",
+						shape: "rectangle" as const,
+					})),
 					edges: [
 						["A", "B"],
 						["B", "C"],
@@ -243,8 +243,9 @@ export const LabeledHorizontalSkips: Story = {
 						["B", "D"],
 					].map(([source, target], i) => ({ id: `path-${i}`, source, target, label: `Path ${i}` })),
 					layout: { direction: "LR", edgeRouting: "orthogonal" },
-				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow),
+				},
+				{ id: "horizontal-skips", title: "Paths", style: SKETCHI_DIAGRAM_STYLE },
+			),
 		),
 	},
 };
@@ -254,12 +255,14 @@ export const LabeledProcessFanOut: Story = {
 		viewModeEnabled: false,
 		zenModeEnabled: false,
 		scene: convertSceneToExcalidraw(
-			renderIntermediateDiagram(
-				parseIntermediateDiagram({
-					id: "process-fanout",
-					title: "Fan-out",
-					type: "flowchart",
-					nodes: ["A", "B", "C"].map((id) => ({ id, label: id, kind: "process" })),
+			renderGraphDiagram(
+				{
+					nodes: ["A", "B", "C"].map((id) => ({
+						id,
+						label: id,
+						kind: "process",
+						shape: "rectangle" as const,
+					})),
 					edges: ["B", "C"].map((target, i) => ({
 						id: target,
 						source: "A",
@@ -267,8 +270,9 @@ export const LabeledProcessFanOut: Story = {
 						label: ["First", "Second"][i],
 					})),
 					layout: { direction: "TB", edgeRouting: "orthogonal" },
-				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow),
+				},
+				{ id: "process-fanout", title: "Fan-out", style: SKETCHI_DIAGRAM_STYLE },
+			),
 		),
 	},
 };

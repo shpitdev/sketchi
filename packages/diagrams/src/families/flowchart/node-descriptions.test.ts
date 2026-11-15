@@ -1,8 +1,5 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
-import { describe, expect, it } from "vitest";
-
-import {
+import { renderGraphDiagram } from "../../graph/scene.js";
+import { SKETCHI_DIAGRAM_STYLE,
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasNodeIconBox,
@@ -12,14 +9,18 @@ import {
 	type CanvasShapeElement,
 	type CanvasSpec,
 	type CanvasTextElement,
-	zoneRegionIssues,
-} from "@sketchi/drawing";
-import { describedArchitectureFlowchart } from "../families/flowchart/zone-fixtures.js";
-import { type LayoutDirection } from "./intermediate.js";
+	zoneRegionIssues } from "@sketchi/drawing";
+import { FlowchartDiagram } from "./document.js";
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Schema } from "effect";
+import { describe, expect, it } from "vitest";
 
-import { longNodeDescriptions } from "./compose";
-import { NODE_DESCRIPTION_MAX_LINES } from "./measure";
-import { renderIntermediateDiagram } from "./scene";
+import { describedArchitectureFlowchart } from "./zone-fixtures.js";
+import { type GraphInput } from "../../graph/input.js";
+
+import { longNodeDescriptions } from "../../graph/compose";
+import { NODE_DESCRIPTION_MAX_LINES } from "../../graph/measure";
+import { renderFlowchartDiagram } from "./render";
 
 const LABEL_LINE_HEIGHT = 1.35;
 
@@ -48,7 +49,7 @@ function textBox(text: CanvasTextElement, lineHeight = text.lineHeight ?? LABEL_
 }
 
 /** The described architecture the round-16 Sonnet samples drew without ECS. */
-function awsThreeTier(direction: LayoutDirection = "LR") {
+function awsThreeTier(direction: GraphInput["layout"]["direction"] = "LR") {
 	return {
 		...describedArchitectureFlowchart,
 		layout: { ...describedArchitectureFlowchart.layout, direction },
@@ -102,7 +103,7 @@ describe("node descriptions", () => {
 	for (const direction of ["LR", "TB", "RL", "BT"] as const) {
 		it(`draws each description as a subtitle under its label (${direction})`, () => {
 			const diagram = awsThreeTier(direction);
-			const scene = renderIntermediateDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(diagram);
 			const described = new Map(
 				diagram.nodes.flatMap((node) =>
 					node.description ? [[node.id, node.description] as const] : [],
@@ -123,24 +124,26 @@ describe("node descriptions", () => {
 	it("fits a description in every node shape", () => {
 		const description = "Checks the order total against the customer's approved credit limit";
 		const kinds = [
-			{ kind: "start" },
-			{ kind: "process" },
-			{ kind: "decision" },
-			{ kind: "process", shape: "database" },
-			{ kind: "process", shape: "queue" },
+			{ kind: "start", shape: "ellipse" },
+			{ kind: "process", shape: "rectangle" },
+			{ kind: "decision", shape: "diamond" },
+			{ kind: "process", shape: "cylinder" },
+			{ kind: "process", shape: "pipe" },
 			{ kind: "process", shape: "document" },
-			{ kind: "process", shape: "storage" },
-			{ kind: "process", icon: { slug: "github" } },
-			{ kind: "decision", icon: { slug: "github" } },
-			{ kind: "end", icon: { slug: "github" } },
+			{ kind: "process", shape: "bucket" },
+			{ kind: "process", shape: "rectangle", icon: { slug: "github" } },
+			{ kind: "decision", shape: "diamond", icon: { slug: "github" } },
+			{ kind: "end", shape: "ellipse", icon: { slug: "github" } },
 		] as const;
 		for (const [index, extra] of kinds.entries()) {
-			const scene = renderIntermediateDiagram({
-				id: "shapes",
-				title: "Shapes",
-				nodes: [{ id: `n${index}`, label: "Credit check", description, ...extra }],
-				edges: [],
-			}).pipe(Result.getOrThrow);
+			const scene = renderGraphDiagram(
+				{
+					nodes: [{ id: `n${index}`, label: "Credit check", description, ...extra }],
+					edges: [],
+					layout: { direction: "LR", edgeRouting: "orthogonal" },
+				},
+				{ id: "shapes", title: "shapes", style: SKETCHI_DIAGRAM_STYLE },
+			);
 			expectDescriptionsFit(scene, new Map([[`n${index}`, description]]));
 		}
 	});
@@ -150,19 +153,22 @@ describe("node descriptions", () => {
 		const long = "Interprets the request and orchestrates diagram creation";
 		const essay =
 			"Application entry point; package names have not been verified against repository source, so this node stands for the conceptual boundary only and every caller reaches it first";
-		const scene = renderIntermediateDiagram({
-			id: "long",
-			title: "Long",
-			nodes: [
-				{ id: "a", label: "Web", kind: "start", description: short },
-				{ id: "b", label: "Agent", kind: "process", description: long },
-				{ id: "c", label: "App", kind: "end", description: essay },
-			],
-			edges: [
-				{ id: "e1", source: "a", target: "b" },
-				{ id: "e2", source: "b", target: "c" },
-			],
-		}).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(
+			Schema.decodeUnknownSync(FlowchartDiagram)({
+				id: "long",
+				title: "Long",
+				nodes: [
+					{ id: "a", label: "Web", kind: "start", description: short },
+					{ id: "b", label: "Agent", kind: "process", description: long },
+					{ id: "c", label: "App", kind: "end", description: essay },
+				],
+				edges: [
+					{ id: "e1", source: "a", target: "b" },
+					{ id: "e2", source: "b", target: "c" },
+				],
+				type: "flowchart",
+			}),
+		);
 		expectDescriptionsFit(
 			scene,
 			new Map([
@@ -190,7 +196,7 @@ describe("node descriptions", () => {
 			...diagram,
 			nodes: diagram.nodes.map(({ description: _description, ...node }) => node),
 		};
-		const scene = renderIntermediateDiagram(plain).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(plain);
 		expect(texts(scene).some((text) => text.id.startsWith("description:"))).toBe(false);
 		expect(nodes(scene).every((node) => node.groupIds === undefined)).toBe(true);
 	});

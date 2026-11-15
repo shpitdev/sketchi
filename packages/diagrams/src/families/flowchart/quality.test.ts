@@ -2,7 +2,7 @@
 import { Result } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 
-import { FLOWCHART_MAX_NODES, type FlowchartDiagram, parseFlowchartDiagram } from "./diagram.js";
+import { FLOWCHART_MAX_NODES, type FlowchartDiagram, parseFlowchartDiagram } from "./document.js";
 
 import { assessFlowchartQuality } from "./quality";
 

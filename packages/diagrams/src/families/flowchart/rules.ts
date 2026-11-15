@@ -1,8 +1,11 @@
-import { DIAGRAM_NODE_COLOR_NAMES, DIAGRAM_ZONE_KINDS } from "../../graph/intermediate.js";
+import {
+	FLOWCHART_NODE_COLOR_NAMES,
+	FLOWCHART_ZONE_KINDS,
+} from "../../families/flowchart/document.js";
 import type { RuleSource } from "../../rule-source.js";
-import { FLOWCHART_MAX_EDGES, FLOWCHART_MAX_NODES } from "./diagram.js";
+import { FLOWCHART_MAX_EDGES, FLOWCHART_MAX_NODES } from "./document.js";
 
-const zoneKinds = `${DIAGRAM_ZONE_KINDS.slice(0, -1).join(", ")} or ${DIAGRAM_ZONE_KINDS.at(-1)}`;
+const zoneKinds = `${FLOWCHART_ZONE_KINDS.slice(0, -1).join(", ")} or ${FLOWCHART_ZONE_KINDS.at(-1)}`;
 
 /**
  * How a request becomes a flowchart. The generation prompt, the MCP docs and Studio chat each
@@ -83,5 +86,5 @@ export const FLOWCHART_RULES = {
 export const FLOWCHART_EDIT_RULES = {
 	ops: 'edits: [{ op: "insert", node: { id: label }, between: [from, to] } | { op: "set", nodes?: { [id]: label | { ...node fields } | null }, groups?: { [id]: { ...group fields } | null }, lanes?: { [id]: label | null }, title?, direction? } | { op: "connect", edges } | { op: "disconnect", edges: [[from, to]] }].',
 	refs: "Name nodes, groups and lanes by id or exact label. insert splits an existing edge. set merges, adds new ids and removes with null, bridging a removed step. connect adds or relabels edges. What edits do not name stays.",
-	colors: `Color a node only when asked, as set: { nodes: { id: { color } } } with color ${DIAGRAM_NODE_COLOR_NAMES.map((name) => `"${name}"`).join(", ")}; null clears it.`,
+	colors: `Color a node only when asked, as set: { nodes: { id: { color } } } with color ${FLOWCHART_NODE_COLOR_NAMES.map((name) => `"${name}"`).join(", ")}; null clears it.`,
 } as const;

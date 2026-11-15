@@ -1,11 +1,12 @@
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
-import { type DiagramNodeShape, type DiagramZoneKind } from "@sketchi/diagrams/graph/intermediate";
 import {
+	type FlowchartNodeShape,
+	type FlowchartZoneKind,
 	type FlowchartDiagram,
 	type FlowchartNodeKind,
-	parseFlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+	parseFlowchartDiagram
+} from "@sketchi/diagrams/families/flowchart/document";
 import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 import { flowchartLabelWords } from "./flowchart-labels.js";
@@ -61,7 +62,7 @@ export interface FlowchartScenarioRequiredGroup {
 	/** The stated group this zone sits inside, at any depth. */
 	parent?: string;
 	/** The kinds that read as what the prompt calls this zone. */
-	kinds?: readonly DiagramZoneKind[];
+	kinds?: readonly FlowchartZoneKind[];
 }
 
 interface EquivalentOutcome {
@@ -88,9 +89,9 @@ export interface FlowchartScenarioRequiredNode {
 	/** Prompt-grounded alternatives for a yes/no decision asked by its opposite condition. */
 	inverseLabels?: readonly string[];
 	/** The infrastructure shape the prompt makes this step: a database, queue or document. */
-	shape?: DiagramNodeShape;
+	shape?: FlowchartNodeShape;
 	/** Every shape that reads as what the prompt calls this step, `shape` first. */
-	shapes?: readonly DiagramNodeShape[];
+	shapes?: readonly FlowchartNodeShape[];
 }
 
 export interface FlowchartScenarioRequiredEdge {
@@ -142,7 +143,7 @@ type FlowchartNodeDefinition = readonly [
 interface FlowchartZoneDefinition {
 	readonly parent?: string;
 	/** Kinds that read as what the prompt calls the zone; the first is the fixture's. */
-	readonly kinds?: readonly [DiagramZoneKind, ...DiagramZoneKind[]];
+	readonly kinds?: readonly [FlowchartZoneKind, ...FlowchartZoneKind[]];
 }
 
 /** A group, its direct members (none for a zone that holds only zones), and its zone. */
@@ -207,7 +208,7 @@ interface FlowchartScenarioDefinition {
 	 * shapes that each read as what it calls the node, the fixture's first.
 	 */
 	shapes?: Readonly<
-		Record<string, DiagramNodeShape | readonly [DiagramNodeShape, ...DiagramNodeShape[]]>
+		Record<string, FlowchartNodeShape | readonly [FlowchartNodeShape, ...FlowchartNodeShape[]]>
 	>;
 	prompt: string;
 	tags: readonly string[];
@@ -234,7 +235,7 @@ const FLOWCHART_NODE_KIND_ORDER: readonly FlowchartNodeKind[] = [
 function shapesOf(
 	definition: FlowchartScenarioDefinition,
 	id: string,
-): readonly [DiagramNodeShape, ...DiagramNodeShape[]] | undefined {
+): readonly [FlowchartNodeShape, ...FlowchartNodeShape[]] | undefined {
 	const shapes = definition.shapes?.[id];
 	return shapes === undefined ? undefined : typeof shapes === "string" ? [shapes] : shapes;
 }

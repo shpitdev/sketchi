@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { page } from "vitest/browser";
 import { type ChatStatus, type UIMessage } from "ai";
-import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
+import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const chat = vi.hoisted(() => ({

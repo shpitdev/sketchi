@@ -52,7 +52,7 @@ import {
 import { laned, ACROSS_DIRECTION, CROSSING_REPAIR_MAX_EDGES } from "./placement.js";
 import { branches } from "./measure.js";
 import { type GraphLayout } from "./topology.js";
-import { type IntermediateDiagram } from "./intermediate.js";
+import { type GraphInput } from "./input.js";
 import { portOffsetsAt, portOrderOf, layoutDiagram, portJogCount } from "./layout.js";
 import { routeAllEdges, sideEnds, turnsCorner, resideArrivals, keepsStubs } from "./routing.js";
 import {
@@ -183,11 +183,11 @@ function crossingMoves(
 	first: RoutedEdge,
 	second: RoutedEdge,
 	at: ScenePoint,
-	diagram: IntermediateDiagram,
 	portOffsets: ReadonlyMap<string, number>,
 	routes: readonly RoutedEdge[],
 	groups: GroupLayout | undefined,
 ): SideMove[] {
+	
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
 	const along = vertical ? "y" : "x";
 	const lateral = (side: ConnectionEdge) => slotAxis(side) === along;
@@ -410,12 +410,12 @@ function screenedCrossings(settled: SettledLayout, move: SideMove, polish: Routi
 export function repairCrossings(
 	layoutGraph: GraphLayout,
 	renderOptions: GraphRenderOptions,
-	diagram: IntermediateDiagram,
 	polish: RoutingPolish,
 	settled: SettledLayout,
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): SettledLayout {
+	
 	let best = settled;
 	const tried = new Set<string>();
 
@@ -429,7 +429,6 @@ export function repairCrossings(
 				best.layout.routedEdges[first]!,
 				best.layout.routedEdges[second]!,
 				at,
-				diagram,
 				best.layout.portOffsets ?? new Map(),
 				best.layout.routedEdges,
 				best.layout.groups,
@@ -447,7 +446,7 @@ export function repairCrossings(
 			if (screenedCrossings(best, move, polish) >= crossings) continue;
 			[layouts, round] = [layouts - 1, round - 1];
 			const arrangement = { ...best.arrangement, sides, avoidCrossings: true };
-			const layout = layoutDiagram(layoutGraph, renderOptions, diagram, polish, arrangement);
+			const layout = layoutDiagram(layoutGraph, renderOptions, polish, arrangement);
 			const defects = defectsOf(layout);
 			if (
 				!fewer(best.defects, defects) &&
@@ -471,7 +470,7 @@ export function lowerScore(left: readonly number[], right: readonly number[]): b
 
 /** The direction a node reads in: across the flow inside a group laid out across it. */
 function nodeFlow(
-	diagram: IntermediateDiagram,
+	diagram: GraphInput,
 	groups: GroupLayout | undefined,
 	nodeId: string,
 ): LayoutDirection {
@@ -564,7 +563,6 @@ function branchReach(route: RoutedEdge, side: ConnectionEdge): number {
 export function chooseBranchSides(
 	layoutGraph: GraphLayout,
 	renderOptions: GraphRenderOptions,
-	diagram: IntermediateDiagram,
 	polish: RoutingPolish,
 	arranged: SettledLayout,
 	drawn: CompletedLayout,
@@ -575,6 +573,7 @@ export function chooseBranchSides(
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): CompletedLayout {
+	
 	const feedback = layoutGraph.feedback;
 	const { continuations } = arranged.arrangement.wrap;
 	// A loop shows in the length it adds.
@@ -678,7 +677,7 @@ export function chooseBranchSides(
 					sides.set(route.edge.id, { ...sides.get(route.edge.id), sourceEdge: order[index]! }),
 				);
 				const arrangement = { ...base.arrangement, sides };
-				const layout = layoutDiagram(layoutGraph, renderOptions, diagram, polish, arrangement);
+				const layout = layoutDiagram(layoutGraph, renderOptions, polish, arrangement);
 				return { arrangement, defects: defectsOf(layout), layout, score: score(layout) };
 			})
 			// Before its repairs, it must cross and flaw no more than the arranged layout did.
@@ -723,12 +722,12 @@ export function chooseBranchSides(
 export function nestSharedArrivals(
 	layoutGraph: GraphLayout,
 	renderOptions: GraphRenderOptions,
-	diagram: IntermediateDiagram,
 	layout: DiagramLayout,
 	finished: (layout: DiagramLayout) => DiagramLayout,
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): DiagramLayout {
+	
 	const { lanes, polish, routeOptions } = layout;
 	if (
 		!polish?.sides ||
@@ -910,12 +909,12 @@ export function nestSharedArrivals(
 export function returnsToNearVertices(
 	layoutGraph: GraphLayout,
 	renderOptions: GraphRenderOptions,
-	diagram: IntermediateDiagram,
 	layout: DiagramLayout,
 	finished: (layout: DiagramLayout) => DiagramLayout,
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): DiagramLayout {
+	
 	const { lanes, polish, routeOptions } = layout;
 	if (!polish?.sides || !layout.portOffsets || !routeOptions || lanes || renderOptions.placement)
 		return layout;
@@ -1030,19 +1029,19 @@ export function returnsToNearVertices(
  */
 export function polishArrivals(
 	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
 	layout: DiagramLayout,
 	finished: (layout: DiagramLayout) => DiagramLayout,
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): DiagramLayout {
+	
 	const { edgeArrows, lanes, nodeShapes, polish, portOffsets, routeOptions } = layout;
 	if (!polish?.sides || !portOffsets || !routeOptions?.readerScale || lanes) return layout;
 	const routes = layout.routedEdges.map((route) => ({ ...route }));
 	const drawn = [...nodeShapes, ...groupBlocks(layout.groups)];
 	const scale = routingQualityScale(drawnSize(drawn, edgeArrows));
 	const changed = new Set(
-		resideArrivals(layoutGraph, routes, edgeArrows, diagram, scale, "cornered").map(
+		resideArrivals(layoutGraph, routes, edgeArrows, scale, "cornered").map(
 			({ route }) => route.edge.id,
 		),
 	);
@@ -1377,7 +1376,7 @@ export function straightenArrivals(
  */
 export function endsOffCorners(
 	renderOptions: GraphRenderOptions,
-	diagram: IntermediateDiagram,
+	diagram: GraphInput,
 	layout: DiagramLayout,
 	finished: (layout: DiagramLayout) => DiagramLayout,
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
@@ -1482,7 +1481,7 @@ const CENTERED_PORT_TRIES = 3;
  */
 export function centerLoneArrivals(
 	renderOptions: GraphRenderOptions,
-	diagram: IntermediateDiagram,
+	diagram: GraphInput,
 	layout: DiagramLayout,
 	finished: (layout: DiagramLayout) => DiagramLayout,
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
@@ -1704,7 +1703,7 @@ function withStepMoved(
  */
 export function stepsClearOfEnds(
 	renderOptions: GraphRenderOptions,
-	diagram: IntermediateDiagram,
+	diagram: GraphInput,
 	layout: DiagramLayout,
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
@@ -1844,4 +1843,55 @@ export function drawnExtent(settled: DiagramLayout): { width: number; height: nu
 export function drawnLongSide(settled: DiagramLayout): number {
 	const { width, height } = drawnExtent(settled);
 	return Math.max(width, height);
+}
+
+/**
+ * A steep straight line at a diamond's side vertex has a tangent focus: the
+ * native binding can settle inside the shape. Half a drawing unit along the
+ * facing diagonal gives it an interior focus without taking a neighboring
+ * port's space. A full port inset can make nearby arrival heads touch.
+ * Square departures and explicitly pinned ports keep their chosen point.
+ */
+function straightDiamondPort(
+	node: NodeSceneElement,
+	point: ScenePoint,
+	toward: ScenePoint,
+): ScenePoint {
+	if (node.shape !== "diamond") return point;
+	const middle = center(node);
+	if (
+		point.y !== middle.y ||
+		Math.abs(Math.abs(point.x - middle.x) - node.width / 2) > AXIS_ALIGNED_EPSILON ||
+		Math.abs(toward.y - point.y) * node.width <= Math.abs(toward.x - point.x) * node.height
+	)
+		return point;
+	return pointOnEdge(
+		node,
+		point.x < middle.x ? "left" : "right",
+		Math.sign(toward.y - point.y) * Math.min(0.5, node.height / 4),
+	);
+}
+
+/** Resolve native-stable straight endpoints once after choosing and polishing the layout.
+ * Re-ranking on subpixel endpoint clearance changes otherwise unrelated ports and lanes. */
+export function straightEndsOffVertices(
+	layout: DiagramLayout,
+	options: GraphRenderOptions,
+): ArrowSceneElement[] {
+	const nodes = new Map(layout.nodeShapes.map((node) => [node.nodeId, node]));
+	return layout.edgeArrows.map((arrow) => {
+		if (arrow.points.length !== 2) return arrow;
+		const [start, end] = arrow.points;
+		const source = nodes.get(arrow.sourceNodeId);
+		const target = nodes.get(arrow.targetNodeId);
+		const from =
+			source && !options.anchors?.has(`${arrow.edgeId}:source`)
+				? straightDiamondPort(source, start, end!)
+				: start;
+		const to =
+			target && !options.anchors?.has(`${arrow.edgeId}:target`)
+				? straightDiamondPort(target, end!, start)
+				: end!;
+		return from === start && to === end ? arrow : { ...arrow, points: [from, to] };
+	});
 }

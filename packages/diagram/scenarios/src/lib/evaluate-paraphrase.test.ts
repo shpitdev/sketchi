@@ -2,7 +2,7 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import type { FlowchartNodeKind } from "@sketchi/diagrams/families/flowchart/diagram";
+import type { FlowchartNodeKind } from "@sketchi/diagrams/families/flowchart/document";
 
 import { evaluateScenarioDiagram } from "./evaluate";
 import { getFlowchartScenario } from "./scenarios";

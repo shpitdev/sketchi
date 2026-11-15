@@ -1,17 +1,14 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { pharmaBatchDispositionFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
+import { pharmaBatchDispositionFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 
 import { DiagramInspector } from "./diagram-inspector";
 import "../../styles/app.css";
 
-const scene = convertSceneToExcalidraw(
-	renderIntermediateDiagram(pharmaBatchDispositionFlowchart).pipe(Result.getOrThrow),
-);
+const scene = convertSceneToExcalidraw(renderFlowchartDiagram(pharmaBatchDispositionFlowchart));
 
 const meta = {
 	title: "Excalidraw/Components/DiagramInspector",

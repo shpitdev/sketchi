@@ -25,7 +25,7 @@ import {
 	hasClassEnds,
 	isClassGeneralization,
 } from "./document.js";
-import { type IntermediateDiagram } from "../../graph/intermediate.js";
+import { type GraphInput } from "../../graph/input.js";
 
 import {
 	CLASS_END_RUN,
@@ -249,17 +249,19 @@ function routedScene(
 ): CanvasSpec {
 	const rooms = labelRooms(diagram, placement);
 	const graph = {
-		id: diagram.id,
-		title: diagram.title,
-		type: "flowchart",
 		nodes: [
 			...diagram.classes.map((node) => ({
 				id: node.id,
 				label: boxes.get(node.id)!.name,
 				kind: "class",
-				metadata: {},
+				shape: "rectangle" as const,
 			})),
-			...[...rooms.keys()].map((id) => ({ id, label: "·", kind: "class", metadata: {} })),
+			...[...rooms.keys()].map((id) => ({
+				id,
+				label: "·",
+				kind: "class",
+				shape: "rectangle" as const,
+			})),
 		],
 		// Lines between neighboring rows route first, so a line spanning rows sees them and
 		// keeps to its own corridor instead of cutting across them through another gap.
@@ -268,7 +270,6 @@ function routedScene(
 				id: relationship.id,
 				source: relationship.from.trim(),
 				target: relationship.to.trim(),
-				metadata: {},
 			}))
 			.map((edge, index) => ({
 				edge,
@@ -280,10 +281,8 @@ function routedScene(
 			.sort((a, b) => Math.min(a.span, 2) - Math.min(b.span, 2) || a.index - b.index)
 			.map(({ edge }) => edge),
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
-		style: diagram.style,
-		metadata: {},
-	} satisfies IntermediateDiagram;
-	return renderGraphDiagram(graph, {
+	} satisfies GraphInput;
+	return renderGraphDiagram(graph, diagram, {
 		placement: new Map([...placement.boxes, ...rooms]),
 		anchors: placement.anchors,
 		endRun: CLASS_END_RUN,

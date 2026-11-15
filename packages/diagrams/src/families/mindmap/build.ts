@@ -1,3 +1,4 @@
+import { PublishedBuildIssue } from "../../build/result.js";
 import { String as Str, Array as Arr, Result } from "effect";
 import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import { defineBuild } from "../../build/operation.js";
@@ -40,6 +41,7 @@ function assess(document: Mindmap, threshold: number): QualityReport {
 	};
 }
 export const mindmapBuild = defineBuild({
+	publishedIssues: PublishedBuildIssue,
 	name: "mindmap",
 	document: MindmapDocument,
 	normalized: Mindmap,
@@ -55,7 +57,7 @@ export const mindmapBuild = defineBuild({
 		return Result.map(checkMindmapSize(root), () => input);
 	},
 	normalize: (document) => normalizeMindmap({ ...document, style: SKETCHI_DIAGRAM_STYLE }),
-	check: (document) => checkMindmapRoot(document.root),
+	check: (document) => Result.map(checkMindmapRoot(document.root), () => document),
 	issues: (error) => [
 		{
 			code: error.code,

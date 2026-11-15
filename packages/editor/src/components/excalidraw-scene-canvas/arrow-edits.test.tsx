@@ -17,14 +17,14 @@ import {
 	measureEditability,
 	type Point,
 } from "@sketchi/diagram-scenarios";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import {
 	deployPipelineLogoFlowchart,
 	flowchartFixture,
-	parseFlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/fixtures";
 import { zoneStressFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
 import { renderDiagram } from "@sketchi/diagrams/family";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { type CanvasSpec, embedCanvasIcons } from "@sketchi/drawing";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import * as excalidraw from "@sketchi/excalidraw-internals";
@@ -245,30 +245,25 @@ const canvas: CanvasSpec = {
 const shapeKinds = [
 	{
 		id: "flowchart",
-		elements: exported(renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow)),
+		elements: exported(renderFlowchartDiagram(flowchartFixture)),
 	},
 	{
 		id: "zones with a database and a bucket",
-		elements: exported(
-			renderIntermediateDiagram(zoneStressFixtures["depth-four"]).pipe(Result.getOrThrow),
-		),
+		elements: exported(renderFlowchartDiagram(zoneStressFixtures["depth-four"])),
 	},
 	{
 		id: "logo nodes",
 		elements: exported(
-			embedCanvasIcons(
-				renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
-				(slug) => ({
-					name: slug,
-					svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>${slug}</title></svg>`,
-				}),
-			).scene,
+			embedCanvasIcons(renderFlowchartDiagram(deployPipelineLogoFlowchart), (slug) => ({
+				name: slug,
+				svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>${slug}</title></svg>`,
+			})).scene,
 		),
 	},
 	{
 		id: "fan-out to infrastructure",
 		elements: exported(
-			renderIntermediateDiagram(
+			renderFlowchartDiagram(
 				parseFlowchartDiagram({
 					id: "fan-out-infrastructure",
 					title: "Fan-out to infrastructure",
@@ -288,7 +283,7 @@ const shapeKinds = [
 					],
 					layout: { direction: "TB", edgeRouting: "orthogonal" },
 				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow),
+			),
 		),
 	},
 	{ id: "agent canvas", elements: convertSceneToExcalidraw(canvas).elements },

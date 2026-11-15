@@ -6,7 +6,7 @@ import { parseErDiagram } from "@sketchi/diagrams/families/er/document";
 import {
 	type FlowchartDiagram,
 	parseFlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/document";
 import { parseGanttDiagram } from "@sketchi/diagrams/families/gantt/document";
 import { parseJourneyDiagram } from "@sketchi/diagrams/families/journey/document";
 import { type MindmapInputError, parseMindmap } from "@sketchi/diagrams/families/mindmap/index";

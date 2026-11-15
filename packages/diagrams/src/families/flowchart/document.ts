@@ -1,25 +1,695 @@
-import { slug } from "../../clean-text.js";
-import { Schema } from "effect";
-
+/** Owns authored Flowchart documents, their canonical wire shape and domain validation. */
+import { slug, cleanToolString } from "../../clean-text.js";
+import { Schema, Effect, Array as Arr, Option, Result } from "effect";
 import {
-	DIAGRAM_NODE_SHAPES,
-	DIAGRAM_ZONE_KINDS,
-	DiagramNodeColorSchema,
-	type DiagramNodeShape,
-} from "../../graph/intermediate.js";
-import { DrawnIconSchema, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
+	DiagramIconRef,
+	DiagramStyle,
+	DrawnIconSchema,
+	SKETCHI_DIAGRAM_STYLE,
+} from "@sketchi/drawing";
 
-import {
-	FLOWCHART_MAX_EDGES,
-	FLOWCHART_MAX_GROUP_DEPTH,
-	FLOWCHART_MAX_GROUPS,
-	FLOWCHART_MAX_ISSUES,
-	FLOWCHART_MAX_LANES,
-	FLOWCHART_MAX_NODES,
-	FlowchartDiagram,
-	type FlowchartNodeKind,
-	type FlowchartValidationIssue,
-} from "./diagram.js";
+function withDefault<S extends Schema.Top>(schema: S, value: S["Encoded"]) {
+	return schema.pipe(Schema.withDecodingDefault(Effect.succeed(value)));
+}
+const NonEmptyString = Schema.NonEmptyString;
+const Metadata = Schema.Record(Schema.String, Schema.Unknown);
+const LayoutDirectionSchema = Schema.Literals(["TB", "BT", "LR", "RL"]);
+const EdgeRoutingSchema = Schema.Literals(["straight", "orthogonal", "curved"]);
+
+/**
+ * What a group stands for in an architecture: a provider's cloud or an
+ * on-premises data center, a corporate, on-premises or hybrid network, a
+ * region, an availability zone, a VPC and its subnets, or a cluster and its
+ * namespaces. Each draws its own way.
+ */
+export const FLOWCHART_ZONE_KINDS = [
+	"cloud",
+	"datacenter",
+	"network",
+	"region",
+	"zone",
+	"vpc",
+	"subnet",
+	"cluster",
+	"namespace",
+] as const;
+export const FlowchartZoneKindSchema = Schema.Literals(FLOWCHART_ZONE_KINDS);
+export type FlowchartZoneKind = typeof FlowchartZoneKindSchema.Type;
+
+/**
+ * A labeled region that holds nodes together, such as a team, a phase, or a
+ * zone of an architecture. Nodes join one by setting `group` to its id, and a
+ * group sits inside another by setting `parent` to that group's id. A group
+ * with a parent or a kind draws as a zone: an outline styled by its kind, with
+ * its label in a header strip inside it. Other groups draw as frames.
+ */
+export const FlowchartGroup = Schema.Struct({
+	id: NonEmptyString,
+	label: NonEmptyString,
+	/** The id of the declared group this group sits inside. */
+	parent: Schema.optional(NonEmptyString),
+	kind: Schema.optional(FlowchartZoneKindSchema),
+	/** A catalog mark drawn before the group's label, such as its platform's logo. */
+	icon: Schema.optional(DiagramIconRef),
+}).annotate({ identifier: "FlowchartGroup" });
+
+export interface FlowchartGroup extends Schema.Schema.Type<typeof FlowchartGroup> {}
+
+/**
+ * A swimlane: a full-length band for one actor, such as a customer, a team or
+ * a system, drawn in declared order. Nodes join one by setting `lane` to its
+ * id; a diagram with lanes puts every node in one, and declares no groups.
+ */
+export const FlowchartLane = Schema.Struct({
+	id: NonEmptyString,
+	label: NonEmptyString,
+}).annotate({ identifier: "FlowchartLane" });
+
+export interface FlowchartLane extends Schema.Schema.Type<typeof FlowchartLane> {}
+
+/**
+ * Shapes an infrastructure node draws as in place of its kind's: a database
+ * cylinder, a queue lying on its side, a document with a wavy foot, or object
+ * storage as a bucket.
+ */
+export const FLOWCHART_NODE_SHAPES = ["database", "queue", "document", "storage"] as const;
+export const FlowchartNodeShapeSchema = Schema.Literals(FLOWCHART_NODE_SHAPES);
+export type FlowchartNodeShape = typeof FlowchartNodeShapeSchema.Type;
+
+/**
+ * Colors a node may take, each drawn as its stroke over a pale tint of it, so the label
+ * stays readable.
+ */
+export const FLOWCHART_NODE_COLORS = {
+	red: { stroke: "#dc2626", fill: "#fee2e2" },
+	orange: { stroke: "#ea580c", fill: "#ffedd5" },
+	yellow: { stroke: "#ca8a04", fill: "#fef9c3" },
+	green: { stroke: "#16a34a", fill: "#dcfce7" },
+	blue: { stroke: "#2563eb", fill: "#dbeafe" },
+	purple: { stroke: "#7c3aed", fill: "#ede9fe" },
+	gray: { stroke: "#6b7280", fill: "#f3f4f6" },
+} as const;
+export const FLOWCHART_NODE_COLOR_NAMES = Object.keys(
+	FLOWCHART_NODE_COLORS,
+) as (keyof typeof FLOWCHART_NODE_COLORS)[];
+export const FlowchartNodeColorSchema = Schema.Literals(FLOWCHART_NODE_COLOR_NAMES);
+export type FlowchartNodeColor = typeof FlowchartNodeColorSchema.Type;
+
+export const FlowchartLayout = Schema.Struct({
+	direction: withDefault(LayoutDirectionSchema, "LR"),
+	edgeRouting: withDefault(EdgeRoutingSchema, "orthogonal"),
+}).annotate({ identifier: "FlowchartLayout" });
+
+export interface FlowchartLayout extends Schema.Schema.Type<typeof FlowchartLayout> {}
+
+export const flowchartDiagramType = "flowchart" as const;
+
+// A 60-step process with its start and ends, and room for the nodes a model adds.
+export const FLOWCHART_MAX_NODES = 80;
+export const FLOWCHART_MAX_EDGES = 120;
+export const FLOWCHART_MAX_GROUPS = 8;
+/** Zones nest at most this deep: a cloud, a region, a VPC and a subnet. */
+export const FLOWCHART_MAX_GROUP_DEPTH = 4;
+export const FLOWCHART_MAX_LANES = 8;
+export const FLOWCHART_MAX_ISSUES = 20;
+
+export const FlowchartValidationIssueCodeSchema = Schema.Literals([
+	"duplicate_node_id",
+	"duplicate_edge_id",
+	"missing_edge_source",
+	"missing_edge_target",
+	"self_loop",
+	"missing_start",
+	"multiple_starts",
+	"missing_end",
+	"start_has_incoming",
+	"end_has_outgoing",
+	"unreachable_node",
+	"missing_outgoing_edge",
+	"underbranched_decision",
+	"unlabeled_decision_branch",
+	"duplicate_decision_branch_label",
+	"nonterminating_node",
+	"flowchart_too_large",
+	"duplicate_group_id",
+	"unknown_node_group",
+	"empty_group",
+	"unknown_group_parent",
+	"group_cycle",
+	"shaped_decision",
+	"duplicate_lane_id",
+	"unknown_node_lane",
+	"lanes_with_groups",
+	"invalid_id",
+	"duplicate_edge",
+	"isolated_node",
+	"unknown_member",
+	"overlapping_containers",
+	"node_without_lane",
+	"flowchart_too_small",
+]);
+
+export const FlowchartValidationIssueRef = Schema.Struct({
+	kind: Schema.Literals(["diagram", "node", "edge", "group", "lane"]),
+	id: Schema.optional(Schema.NonEmptyString),
+	path: Schema.optional(Schema.NonEmptyString),
+}).annotate({ identifier: "FlowchartValidationIssueRef" });
+
+export interface FlowchartValidationIssueRef extends Schema.Schema.Type<
+	typeof FlowchartValidationIssueRef
+> {}
+
+export const FlowchartValidationIssue = Schema.Struct({
+	code: FlowchartValidationIssueCodeSchema,
+	ref: Schema.optional(FlowchartValidationIssueRef),
+	message: Schema.NonEmptyString,
+	hint: Schema.NonEmptyString,
+}).annotate({ identifier: "FlowchartValidationIssue" });
+
+export interface FlowchartValidationIssue extends Schema.Schema.Type<
+	typeof FlowchartValidationIssue
+> {}
+
+export const FlowchartNodeKindSchema = Schema.Literals(["start", "process", "decision", "end"]);
+
+export const FlowchartNode = Schema.Struct({
+	id: NonEmptyString,
+	label: NonEmptyString,
+	/** The id of the declared group this node belongs to. */
+	group: Schema.optional(NonEmptyString),
+	/** The id of the declared lane this node sits in. */
+	lane: Schema.optional(NonEmptyString),
+	shape: Schema.optional(FlowchartNodeShapeSchema),
+	icon: Schema.optional(DiagramIconRef),
+	/** A palette color the node draws in, its stroke over a pale tint. */
+	color: Schema.optional(FlowchartNodeColorSchema),
+	metadata: withDefault(Metadata, {}),
+	description: Schema.optional(NonEmptyString),
+	kind: FlowchartNodeKindSchema,
+}).annotate({ identifier: "FlowchartNode" });
+
+export interface FlowchartNode extends Schema.Schema.Type<typeof FlowchartNode> {}
+
+export const FlowchartEdge = Schema.Struct({
+	id: NonEmptyString,
+	source: NonEmptyString,
+	target: NonEmptyString,
+	label: Schema.optional(NonEmptyString),
+	metadata: withDefault(Metadata, {}),
+}).annotate({ identifier: "FlowchartEdge" });
+
+export interface FlowchartEdge extends Schema.Schema.Type<typeof FlowchartEdge> {}
+
+export const FlowchartDiagram = Schema.Struct({
+	id: NonEmptyString,
+	title: NonEmptyString,
+	groups: Schema.optional(Schema.Array(FlowchartGroup).pipe(Schema.mutable)),
+	lanes: Schema.optional(Schema.Array(FlowchartLane).pipe(Schema.mutable)),
+	layout: withDefault(FlowchartLayout, {
+		direction: "LR",
+		edgeRouting: "orthogonal",
+	}),
+	style: withDefault(DiagramStyle, SKETCHI_DIAGRAM_STYLE),
+	metadata: withDefault(Metadata, {}),
+	type: Schema.Literal(flowchartDiagramType),
+	nodes: Schema.Array(FlowchartNode).pipe(Schema.mutable).check(Schema.isMinLength(2)),
+	edges: Schema.Array(FlowchartEdge).pipe(Schema.mutable).check(Schema.isMinLength(1)),
+}).annotate({ identifier: "FlowchartDiagram" });
+
+export interface FlowchartDiagram extends Schema.Schema.Type<typeof FlowchartDiagram> {}
+
+export type FlowchartNodeKind = typeof FlowchartNodeKindSchema.Type;
+export type FlowchartValidationIssueCode = typeof FlowchartValidationIssueCodeSchema.Type;
+
+function edgeBuckets(edges: readonly FlowchartEdge[]) {
+	const incoming = new Map<string, FlowchartEdge[]>();
+	const outgoing = new Map<string, FlowchartEdge[]>();
+
+	for (const edge of edges) {
+		incoming.set(edge.target, [...(incoming.get(edge.target) ?? []), edge]);
+		outgoing.set(edge.source, [...(outgoing.get(edge.source) ?? []), edge]);
+	}
+
+	return { incoming, outgoing };
+}
+
+function duplicateValues(values: readonly string[]): string[] {
+	const seen = new Set<string>();
+	const duplicates = new Set<string>();
+	for (const value of values) {
+		if (seen.has(value)) {
+			duplicates.add(value);
+		} else {
+			seen.add(value);
+		}
+	}
+	return [...duplicates];
+}
+
+function validateDecisionBranches(
+	node: FlowchartNode,
+	outgoingEdges: readonly FlowchartEdge[],
+): FlowchartValidationIssue[] {
+	const issues: FlowchartValidationIssue[] = [];
+	if (outgoingEdges.length < 2) {
+		issues.push({
+			code: "underbranched_decision",
+			ref: { kind: "node", id: node.id },
+			message: `Decision node "${node.id}" must have at least two outgoing branches.`,
+			hint: "Add at least two outgoing edges for the decision outcomes.",
+		});
+	}
+
+	const labels = outgoingEdges.map((edge) => edge.label?.trim() ?? "");
+	for (const edge of outgoingEdges.filter((edge) => !edge.label?.trim())) {
+		issues.push({
+			code: "unlabeled_decision_branch",
+			ref: { kind: "edge", id: edge.id, path: "edges.label" },
+			message: `Decision node "${node.id}" has an outgoing branch without a label.`,
+			hint: 'Add a short branch label such as "yes", "no", "approved", or "rejected".',
+		});
+	}
+
+	for (const label of duplicateValues(
+		labels.filter((value) => value.length > 0).map((value) => value.toLowerCase()),
+	)) {
+		issues.push({
+			code: "duplicate_decision_branch_label",
+			ref: { kind: "node", id: node.id },
+			message: `Decision node "${node.id}" repeats branch label "${label}".`,
+			hint: "Make every outgoing branch label from the same decision unique.",
+		});
+	}
+
+	return issues;
+}
+
+function reachableFrom(
+	initialNodeIds: readonly string[],
+	adjacency: ReadonlyMap<string, readonly FlowchartEdge[]>,
+	nextNodeId: (edge: FlowchartEdge) => string,
+): Set<string> {
+	const reached = new Set<string>();
+	const queue = [...initialNodeIds];
+	for (let index = 0; index < queue.length; index += 1) {
+		const current = queue[index];
+		if (current === undefined || reached.has(current)) {
+			continue;
+		}
+		reached.add(current);
+		for (const edge of adjacency.get(current) ?? []) {
+			queue.push(nextNodeId(edge));
+		}
+	}
+	return reached;
+}
+
+/**
+ * Nesting problems, each with its repair: a parent nobody declared, a group
+ * inside itself, and zones nested deeper than FLOWCHART_MAX_GROUP_DEPTH.
+ */
+function groupNestingIssues(diagram: FlowchartDiagram): FlowchartValidationIssue[] {
+	const groups = diagram.groups ?? [];
+	const groupIds = new Set(groups.map((group) => group.id));
+	const parentOf = new Map(
+		groups.flatMap((group) =>
+			group.parent !== undefined && groupIds.has(group.parent)
+				? [[group.id, group.parent] as const]
+				: [],
+		),
+	);
+	const issues: FlowchartValidationIssue[] = [];
+	let deepest = 0;
+	for (const group of groups) {
+		if (group.parent !== undefined && !groupIds.has(group.parent)) {
+			issues.push({
+				code: "unknown_group_parent",
+				ref: { kind: "group", id: group.id, path: "groups.parent" },
+				message: `Group "${group.id}" references undeclared parent group "${group.parent}".`,
+				hint: `Set parent to the id of the declared group that encloses it (${[...groupIds].map((id) => `"${id}"`).join(", ")}), or remove parent.`,
+			});
+			continue;
+		}
+		const chain = [group.id];
+		let looped = false;
+		for (let ancestor = parentOf.get(group.id); ancestor !== undefined;) {
+			if (chain.includes(ancestor)) {
+				looped = true;
+				// A group under a loop is not in it; only the groups in the loop are named.
+				if (ancestor === group.id)
+					issues.push({
+						code: "group_cycle",
+						ref: { kind: "group", id: group.id, path: "groups.parent" },
+						message: `Group "${group.id}" is nested inside itself through ${[...chain, ancestor].map((id) => `"${id}"`).join(" in ")}.`,
+						hint: "Set each group's parent to the group that encloses it; the outermost group has no parent.",
+					});
+				break;
+			}
+			chain.push(ancestor);
+			ancestor = parentOf.get(ancestor);
+		}
+		if (!looped) deepest = Math.max(deepest, chain.length);
+	}
+	if (deepest > FLOWCHART_MAX_GROUP_DEPTH) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", id: diagram.id, path: "groups.parent" },
+			message: `Groups nest ${deepest} deep; the supported maximum is ${FLOWCHART_MAX_GROUP_DEPTH}.`,
+			hint: "Drop an intermediate zone, or merge a zone into its parent.",
+		});
+	}
+	return issues;
+}
+
+/**
+ * Lane problems, each with its repair: too many lanes, a repeated lane id, a
+ * node in an undeclared lane or in none, and lanes
+ * declared together with groups.
+ */
+function laneIssues(diagram: FlowchartDiagram): FlowchartValidationIssue[] {
+	const lanes = diagram.lanes ?? [];
+	// Without lanes, a node that names one names a lane nobody declared.
+	if (lanes.length === 0)
+		return diagram.nodes.flatMap((node): FlowchartValidationIssue[] =>
+			node.lane === undefined
+				? []
+				: [
+						{
+							code: "unknown_node_lane",
+							ref: { kind: "node", id: node.id, path: "nodes.lane" },
+							message: `Node "${node.id}" references undeclared lane "${node.lane}".`,
+							hint: `Declare "${node.lane}" in lanes as { id, label }, or remove the node's lane.`,
+						},
+					],
+		);
+	const issues: FlowchartValidationIssue[] = [];
+	if (lanes.length > FLOWCHART_MAX_LANES) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", id: diagram.id, path: "lanes" },
+			message: `Flowchart has ${lanes.length} lanes; the supported maximum is ${FLOWCHART_MAX_LANES}.`,
+			hint: "Merge related actors into one lane.",
+		});
+	}
+	if ((diagram.groups ?? []).length > 0) {
+		issues.push({
+			code: "lanes_with_groups",
+			ref: { kind: "diagram", id: diagram.id, path: "groups" },
+			message: "A flowchart with lanes cannot also declare groups.",
+			hint: "Keep lanes for the actors and remove groups and every node's group.",
+		});
+	}
+	for (const laneId of duplicateValues(lanes.map((lane) => lane.id))) {
+		issues.push({
+			code: "duplicate_lane_id",
+			ref: { kind: "lane", id: laneId, path: "lanes" },
+			message: `Lane id "${laneId}" is used more than once.`,
+			hint: "Give every lane a stable unique id.",
+		});
+	}
+	const laneIds = new Set(lanes.map((lane) => lane.id));
+	const declared = [...laneIds].map((id) => `"${id}"`).join(", ");
+	for (const node of diagram.nodes) {
+		if (node.lane !== undefined && laneIds.has(node.lane)) continue;
+		issues.push({
+			code: "unknown_node_lane",
+			ref: { kind: "node", id: node.id, path: "nodes.lane" },
+			message:
+				node.lane === undefined
+					? `Node "${node.id}" has no lane.`
+					: `Node "${node.id}" references undeclared lane "${node.lane}".`,
+			hint:
+				node.lane === undefined
+					? `Set lane to the declared lane id (${declared}) of the actor that does this step.`
+					: `Set lane to a declared lane id (${declared}) or declare "${node.lane}" in lanes.`,
+		});
+	}
+	return issues;
+}
+
+export function getFlowchartValidationIssues(
+	diagram: FlowchartDiagram,
+): FlowchartValidationIssue[] {
+	const issues: FlowchartValidationIssue[] = [];
+	const nodeIds = new Set(diagram.nodes.map((node) => node.id));
+	const { incoming, outgoing } = edgeBuckets(diagram.edges);
+
+	if (diagram.nodes.length > FLOWCHART_MAX_NODES) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", id: diagram.id, path: "nodes" },
+			message: `Flowchart has ${diagram.nodes.length} nodes; the supported maximum is ${FLOWCHART_MAX_NODES}.`,
+			hint: "Split the workflow or combine lower-signal steps.",
+		});
+	}
+	if (diagram.edges.length > FLOWCHART_MAX_EDGES) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", id: diagram.id, path: "edges" },
+			message: `Flowchart has ${diagram.edges.length} edges; the supported maximum is ${FLOWCHART_MAX_EDGES}.`,
+			hint: "Split the workflow or remove lower-signal connections.",
+		});
+	}
+
+	const groups = diagram.groups ?? [];
+	if (groups.length > FLOWCHART_MAX_GROUPS) {
+		issues.push({
+			code: "flowchart_too_large",
+			ref: { kind: "diagram", id: diagram.id, path: "groups" },
+			message: `Flowchart has ${groups.length} groups; the supported maximum is ${FLOWCHART_MAX_GROUPS}.`,
+			hint: "Merge related groups or leave minor steps ungrouped.",
+		});
+	}
+	for (const groupId of duplicateValues(groups.map((group) => group.id))) {
+		issues.push({
+			code: "duplicate_group_id",
+			ref: { kind: "group", id: groupId, path: "groups" },
+			message: `Group id "${groupId}" is used more than once.`,
+			hint: "Give every group a stable unique id.",
+		});
+	}
+	const groupIds = new Set(groups.map((group) => group.id));
+	for (const node of diagram.nodes) {
+		if (node.group !== undefined && !groupIds.has(node.group)) {
+			issues.push({
+				code: "unknown_node_group",
+				ref: { kind: "node", id: node.id, path: "nodes.group" },
+				message: `Node "${node.id}" references undeclared group "${node.group}".`,
+				hint:
+					groupIds.size > 0
+						? `Set group to a declared group id (${[...groupIds].map((id) => `"${id}"`).join(", ")}) or declare "${node.group}" in groups.`
+						: `Declare "${node.group}" in groups as { id, label }, or remove the node's group.`,
+			});
+		}
+	}
+	issues.push(...groupNestingIssues(diagram));
+	const memberGroups = new Set([
+		...diagram.nodes.map((node) => node.group),
+		...groups.map((group) => group.parent),
+	]);
+	for (const group of groups.filter((group) => !memberGroups.has(group.id))) {
+		issues.push({
+			code: "empty_group",
+			ref: { kind: "group", id: group.id, path: "groups" },
+			message: `Group "${group.id}" has no nodes.`,
+			hint: "Set group on the nodes it holds, or remove the group.",
+		});
+	}
+	for (const node of diagram.nodes) {
+		if (node.kind === "decision" && node.shape !== undefined) {
+			issues.push({
+				code: "shaped_decision",
+				ref: { kind: "node", id: node.id, path: "nodes.shape" },
+				message: `Decision node "${node.id}" cannot draw as a ${node.shape}.`,
+				hint: "Remove shape from the decision; a decision always draws as a diamond.",
+			});
+		}
+	}
+
+	issues.push(...laneIssues(diagram));
+
+	for (const nodeId of duplicateValues(diagram.nodes.map((node) => node.id))) {
+		issues.push({
+			code: "duplicate_node_id",
+			ref: { kind: "node", id: nodeId, path: "nodes" },
+			message: `Node id "${nodeId}" is used more than once.`,
+			hint: "Give every node a stable unique id.",
+		});
+	}
+	for (const edgeId of duplicateValues(diagram.edges.map((edge) => edge.id))) {
+		issues.push({
+			code: "duplicate_edge_id",
+			ref: { kind: "edge", id: edgeId, path: "edges" },
+			message: `Edge id "${edgeId}" is used more than once.`,
+			hint: "Give every edge a stable unique id.",
+		});
+	}
+
+	for (const edge of diagram.edges) {
+		if (!nodeIds.has(edge.source)) {
+			issues.push({
+				code: "missing_edge_source",
+				ref: { kind: "edge", id: edge.id, path: "edges.source" },
+				message: `Edge "${edge.id}" references missing source node "${edge.source}".`,
+				hint: "Set edge.source to one of the diagram node ids.",
+			});
+		}
+		if (!nodeIds.has(edge.target)) {
+			issues.push({
+				code: "missing_edge_target",
+				ref: { kind: "edge", id: edge.id, path: "edges.target" },
+				message: `Edge "${edge.id}" references missing target node "${edge.target}".`,
+				hint: "Set edge.target to one of the diagram node ids.",
+			});
+		}
+		if (edge.source === edge.target) {
+			issues.push({
+				code: "self_loop",
+				ref: { kind: "edge", id: edge.id },
+				message: `Edge "${edge.id}" connects node "${edge.source}" to itself.`,
+				hint: "Connect the edge to a different target node.",
+			});
+		}
+	}
+
+	const startNodes = diagram.nodes.filter((node) => node.kind === "start");
+	const endNodes = diagram.nodes.filter((node) => node.kind === "end");
+	if (startNodes.length === 0) {
+		issues.push({
+			code: "missing_start",
+			ref: { kind: "diagram", id: diagram.id, path: "nodes" },
+			message: "Flowchart must contain exactly one start node.",
+			hint: 'Mark the first node in the flow with kind: "start".',
+		});
+	} else if (startNodes.length > 1) {
+		issues.push({
+			code: "multiple_starts",
+			ref: { kind: "diagram", id: diagram.id, path: "nodes" },
+			message: `Flowchart has ${startNodes.length} start nodes.`,
+			hint: "Keep one start node and change the others to process, decision, or end.",
+		});
+	}
+	if (endNodes.length === 0) {
+		issues.push({
+			code: "missing_end",
+			ref: { kind: "diagram", id: diagram.id, path: "nodes" },
+			message: "Flowchart must contain at least one end node.",
+			hint: 'Add an end node or mark terminal outcomes with kind: "end".',
+		});
+	}
+
+	for (const node of diagram.nodes) {
+		const incomingEdges = incoming.get(node.id) ?? [];
+		const outgoingEdges = outgoing.get(node.id) ?? [];
+		if (node.kind === "start" && incomingEdges.length > 0) {
+			issues.push({
+				code: "start_has_incoming",
+				ref: { kind: "node", id: node.id },
+				message: `Start node "${node.id}" cannot have incoming edges.`,
+				hint: "Route the start node only to later nodes.",
+			});
+		}
+		if (node.kind === "end" && outgoingEdges.length > 0) {
+			issues.push({
+				code: "end_has_outgoing",
+				ref: { kind: "node", id: node.id },
+				message: `End node "${node.id}" cannot have outgoing edges.`,
+				hint: "End nodes must be terminal outcomes.",
+			});
+		}
+		if (node.kind !== "end" && outgoingEdges.length === 0) {
+			issues.push({
+				code: "missing_outgoing_edge",
+				ref: { kind: "node", id: node.id },
+				message: `Node "${node.id}" must have at least one outgoing edge.`,
+				hint: 'Connect it to the next step, or mark it as kind: "end".',
+			});
+		}
+		if (node.kind === "decision") {
+			issues.push(...validateDecisionBranches(node, outgoingEdges));
+		}
+	}
+
+	const start = startNodes.length === 1 ? startNodes[0] : undefined;
+	if (start) {
+		const reachable = reachableFrom([start.id], outgoing, (edge) => edge.target);
+		for (const node of diagram.nodes) {
+			if (!reachable.has(node.id)) {
+				issues.push({
+					code: "unreachable_node",
+					ref: { kind: "node", id: node.id },
+					message: `Node "${node.id}" is not reachable from the start node.`,
+					hint: "Connect every node to the flow that begins at the single start node.",
+				});
+			}
+		}
+
+		if (endNodes.length > 0) {
+			const reachesEnd = reachableFrom(
+				endNodes.map((node) => node.id),
+				incoming,
+				(edge) => edge.source,
+			);
+			for (const node of diagram.nodes) {
+				if (
+					reachable.has(node.id) &&
+					!reachesEnd.has(node.id) &&
+					(outgoing.get(node.id)?.length ?? 0) > 0
+				) {
+					issues.push({
+						code: "nonterminating_node",
+						ref: { kind: "node", id: node.id },
+						message: `Node "${node.id}" cannot reach an end node.`,
+						hint: "Add an eventual exit from this path to an end node; retry loops are valid when they retain an exit.",
+					});
+				}
+			}
+		}
+	}
+
+	return issues.slice(0, FLOWCHART_MAX_ISSUES);
+}
+
+export class FlowchartValidationError extends Schema.TaggedError<
+	FlowchartValidationError,
+	{ readonly brand: unique symbol }
+>()("FlowchartValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(FlowchartValidationIssue),
+}) {
+	static fromIssues(issues: readonly FlowchartValidationIssue[]): FlowchartValidationError {
+		return FlowchartValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Flowchart failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
+	}
+}
+
+export function validateFlowchartDiagram(
+	diagram: FlowchartDiagram,
+): Result.Result<FlowchartDiagram, FlowchartValidationError> {
+	const issues = getFlowchartValidationIssues(diagram);
+	return issues.length > 0
+		? Result.fail(FlowchartValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
+}
+
+export function parseFlowchartDiagram(
+	input: unknown,
+): Result.Result<FlowchartDiagram, Schema.SchemaError | FlowchartValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(FlowchartDiagram, { errors: "all" })(input),
+		validateFlowchartDiagram,
+	);
+}
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: FlowchartDiagram) {
+	return { nodeCount: diagram.nodes.length, edgeCount: diagram.edges.length };
+}
 
 /**
  * The flowchart document: the one shape every surface reads and writes. MCP's
@@ -69,7 +739,7 @@ export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
 	 * Draw an infrastructure node as a database, queue, document or storage bucket, or
 	 * any step as a decision diamond.
 	 */
-	shape: Schema.optionalKey(Schema.Literals([...DIAGRAM_NODE_SHAPES, "diamond"])),
+	shape: Schema.optionalKey(Schema.Literals([...FLOWCHART_NODE_SHAPES, "diamond"])),
 	/** A product name or slug whose logo the node draws, or a drawn icon; null draws none. */
 	icon: Schema.optionalKey(FlowchartNodeIconSchema),
 	/** The innermost group containing this node; unioned with groups’ member lists. */
@@ -77,7 +747,7 @@ export const FlowchartDocumentNodeDetailsSchema = Schema.Struct({
 	/** The id of the lane of whoever does the step, in a flowchart with lanes. */
 	lane: Schema.optionalKey(Schema.NonEmptyString),
 	/** A palette color the node draws in: red, orange, yellow, green, blue, purple or gray. */
-	color: Schema.optionalKey(DiagramNodeColorSchema),
+	color: Schema.optionalKey(FlowchartNodeColorSchema),
 });
 export interface FlowchartDocumentNodeDetails extends Schema.Schema.Type<
 	typeof FlowchartDocumentNodeDetailsSchema
@@ -93,7 +763,7 @@ export type FlowchartDocumentNode = typeof FlowchartDocumentNodeSchema.Type;
 /** A labeled region that holds nodes and other groups; kind says what an architecture zone stands for. */
 export const FlowchartDocumentGroupSchema = Schema.Struct({
 	label: Label,
-	kind: Schema.optionalKey(Schema.Literals(DIAGRAM_ZONE_KINDS)),
+	kind: Schema.optionalKey(Schema.Literals(FLOWCHART_ZONE_KINDS)),
 	/** The node and group ids inside it, at any depth. */
 	contains: Schema.optionalKey(Schema.Array(Id)),
 });
@@ -862,7 +1532,7 @@ const RELATES = /\b(?:to|into|in|from|on|onto|via|through|with|for|by)\b/iu;
  * such as "replica"; a step on one ("Validate database", "Write to Postgres") or a service of a
  * product ("DynamoDB Streams") is not.
  */
-export function impliedFlowchartNodeShape(label: string): DiagramNodeShape | undefined {
+export function impliedFlowchartNodeShape(label: string): FlowchartNodeShape | undefined {
 	const trimmed = label.trim();
 	if (!trimmed || trimmed.endsWith("?") || ACTS_ON_DATA.test(trimmed) || RELATES.test(trimmed))
 		return undefined;
@@ -1019,7 +1689,7 @@ export function flowchartDiagramFromDocument(
 
 	if (issues.length > 0) return { ok: false, issues: issues.slice(0, FLOWCHART_MAX_ISSUES) };
 
-	const diagram = Schema.decodeUnknownSync(FlowchartDiagram)({
+	const diagram: FlowchartDiagram = {
 		id: flowchartDocumentId(document),
 		title: document.title,
 		type: "flowchart",
@@ -1079,7 +1749,7 @@ export function flowchartDiagramFromDocument(
 		},
 		style: { ...SKETCHI_DIAGRAM_STYLE },
 		metadata: document.logos ? { logos: document.logos === "exact" ? "exact" : "native" } : {},
-	});
+	};
 	return { ok: true, diagram, notes };
 }
 
@@ -1087,3 +1757,166 @@ export function flowchartDiagramFromDocument(
 export const decodeFlowchartDocument = Schema.decodeUnknownResult(FlowchartDocumentSchema, {
 	errors: "all",
 });
+
+/** A flowchart document as the build read it: strings cleaned, id and direction filled. */
+export const NormalizedFlowchartSpecSchema = Schema.Struct({
+	...FlowchartDocumentSchema.fields,
+	id: Schema.NonEmptyString,
+	direction: Schema.Literals(FLOWCHART_DIRECTIONS),
+});
+export type NormalizedFlowchartSpec = typeof NormalizedFlowchartSpecSchema.Type;
+
+function cleanOptional(value: string | undefined): string | undefined {
+	if (value === undefined) return undefined;
+	const cleaned = cleanToolString(value);
+	return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function cleanNode(node: FlowchartDocumentNode): FlowchartDocumentNode {
+	if (typeof node === "string") return cleanToolString(node);
+	const details = flowchartNodeDetails(node);
+	const note = cleanOptional(details.note);
+	return {
+		label: cleanToolString(details.label),
+		...(note ? { note } : {}),
+		...(details.shape ? { shape: details.shape } : {}),
+		...(details.group ? { group: cleanToolString(details.group) } : {}),
+		...(details.lane ? { lane: cleanToolString(details.lane) } : {}),
+		...(details.color ? { color: details.color } : {}),
+		...(details.icon === null
+			? { icon: null }
+			: typeof details.icon === "string"
+				? { icon: cleanToolString(details.icon) }
+				: details.icon
+					? { icon: details.icon }
+					: {}),
+	};
+}
+
+const cleanEnd = (end: FlowchartEdgeEnd): FlowchartEdgeEnd =>
+	typeof end === "string" ? cleanToolString(end) : end.map((id) => cleanToolString(id));
+
+function cleanEdge([from, to, label]: FlowchartDocumentEdge): FlowchartDocumentEdge {
+	const cleaned = cleanOptional(label);
+	return cleaned === undefined
+		? [cleanEnd(from), cleanEnd(to)]
+		: [cleanEnd(from), cleanEnd(to), cleaned];
+}
+
+const cleanContainers = <
+	C extends { readonly label: string; readonly contains?: readonly string[] },
+>(
+	containers: Readonly<Record<string, C>> | undefined,
+): Record<string, C> | undefined =>
+	containers === undefined
+		? undefined
+		: Object.fromEntries(
+				Object.entries(containers).map(([id, container]) => [
+					cleanToolString(id),
+					{
+						...container,
+						label: cleanToolString(container.label),
+						...(container.contains === undefined
+							? {}
+							: { contains: container.contains.map((member) => cleanToolString(member)) }),
+					},
+				]),
+			);
+
+const DUPLICATE_ID_CODES = {
+	node: "duplicate_node_id",
+	group: "duplicate_group_id",
+	lane: "duplicate_lane_id",
+} as const;
+
+/** Ids that cleaning makes one ("a" and " a "), which would otherwise keep one entry and drop the other. */
+function collidingIds(
+	kind: keyof typeof DUPLICATE_ID_CODES,
+	entries: Readonly<Record<string, unknown>> | undefined,
+): FlowchartValidationIssue[] {
+	const first = new Map<string, string>();
+	const issues: FlowchartValidationIssue[] = [];
+	for (const id of Object.keys(entries ?? {})) {
+		const cleaned = cleanToolString(id);
+		const earlier = first.get(cleaned);
+		if (earlier === undefined) {
+			first.set(cleaned, id);
+			continue;
+		}
+		issues.push({
+			code: DUPLICATE_ID_CODES[kind],
+			ref: { kind, ...(cleaned ? { id: cleaned } : {}), path: `${kind}s.${id}` },
+			message: `${JSON.stringify(earlier)} and ${JSON.stringify(id)} are one ${kind} id once trimmed.`,
+			hint: `Give each ${kind} its own id.`,
+		});
+	}
+	return issues;
+}
+
+/**
+ * The document as a build reads it: every string cleaned of tool-output debris, the id
+ * taken from the title when absent, and the direction filled in. Two ids that clean to
+ * the same one are refused rather than merged.
+ */
+export function normalizeFlowchartSpec(
+	spec: FlowchartDocument,
+):
+	| { readonly ok: true; readonly spec: NormalizedFlowchartSpec; readonly notes: readonly string[] }
+	| { readonly ok: false; readonly issues: readonly FlowchartValidationIssue[] } {
+	const collisions = [
+		...collidingIds("node", spec.nodes),
+		...collidingIds("group", spec.groups),
+		...collidingIds("lane", spec.lanes),
+	];
+	if (collisions.length > 0) return { ok: false, issues: collisions };
+	const title = cleanToolString(spec.title);
+	const id = cleanOptional(spec.id);
+	const groups = cleanContainers(spec.groups);
+	const lanes =
+		spec.lanes === undefined
+			? undefined
+			: Object.fromEntries(
+					Object.entries(spec.lanes).map(([id, label]) => [
+						cleanToolString(id),
+						cleanToolString(label),
+					]),
+				);
+	const cleaned: NormalizedFlowchartSpec = {
+		id: flowchartDocumentId({ title, ...(id ? { id } : {}) }),
+		title,
+		direction: spec.direction ?? "TB",
+		...(spec.curved === true ? { curved: true } : {}),
+		...(spec.logos === undefined ? {} : { logos: spec.logos }),
+		nodes: Object.fromEntries(
+			Object.entries(spec.nodes).map(([nodeId, node]) => [
+				cleanToolString(nodeId),
+				cleanNode(node),
+			]),
+		),
+		edges: spec.edges.map(cleanEdge),
+		...(groups ? { groups } : {}),
+		...(lanes ? { lanes } : {}),
+	};
+	const resolved = resolveFlowchartReferences(cleaned);
+	return { ok: true, spec: { ...cleaned, ...resolved.document }, notes: resolved.notes };
+}
+
+/**
+ * The drawing a curated, non-persisting view renders: a valid document only, each
+ * node icon read as the catalog slug it names, without a catalog lookup.
+ */
+export function flowchartDiagramFromSpec(spec: FlowchartDocument): FlowchartDiagram {
+	const result = normalizeFlowchartSpec(spec);
+	if (!result.ok) throw new Error(result.issues.map((issue) => issue.message).join("\n"));
+	const normalized = result.spec;
+	const nodeIcons = new Map(
+		Object.entries(normalized.nodes).flatMap(([id, node]) =>
+			typeof node !== "string" && typeof node.icon === "string"
+				? [[id, node.icon.toLowerCase()] as const]
+				: [],
+		),
+	);
+	const built = flowchartDiagramFromDocument(normalized, { nodeIcons });
+	if (!built.ok) throw new Error(built.issues.map((issue) => issue.message).join("\n"));
+	return built.diagram;
+}

@@ -1,5 +1,4 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import { describe, expect, it } from "vitest";
 import {
 	CANVAS_FRAME_NAME,
@@ -13,10 +12,10 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { flowchartFixture } from "../families/flowchart/diagram.js";
-import { groupFixtures } from "../families/flowchart/group-fixtures.js";
-import { arrowCrossings } from "./readability";
-import { renderIntermediateDiagram } from "./scene";
+import { flowchartFixture } from "./fixtures.js";
+import { groupFixtures } from "./group-fixtures.js";
+import { arrowCrossings } from "../../graph/readability";
+import { renderFlowchartDiagram } from "./render";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];
@@ -29,10 +28,10 @@ function rendered(name: Name, direction: Direction = groupFixtures[name].layout.
 	if (!scenes.has(key))
 		scenes.set(
 			key,
-			renderIntermediateDiagram({
+			renderFlowchartDiagram({
 				...groupFixtures[name],
 				layout: { direction, edgeRouting: "orthogonal" },
-			}).pipe(Result.getOrThrow),
+			}),
 		);
 	return scenes.get(key)!;
 }
@@ -60,6 +59,7 @@ describe.each(directions)("grouped flowcharts %s", (direction) => {
 			const label = scene.elements.find((e) => e.type === "text" && e.containerId === node.id);
 			expect(label?.frameId).toBe(node.frameId);
 		}
+		expect(nodesOf(scene).some((node) => node.rendererRole === "zone")).toBe(false);
 		expect(groupRegionIssues(scene)).toEqual([]);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		// Frames sit under everything they hold.
@@ -133,14 +133,14 @@ describe("grouped flowchart layout", () => {
 		// Helvetica W glyphs at 14 px paint 30 x 14 x 0.944 px wide.
 		const label = "W".repeat(30);
 		const fixture = groupFixtures["three-zone-service"];
-		const scene = renderIntermediateDiagram({
+		const scene = renderFlowchartDiagram({
 			...fixture,
 			// The one-node internet zone is narrower than its name.
 			groups: fixture.groups!.map((group) =>
 				group.id === "internet" ? { ...group, label } : group,
 			),
 			layout: { direction, edgeRouting: "orthogonal" },
-		}).pipe(Result.getOrThrow);
+		});
 		const [frame] = framesOf(scene);
 		expect(frame!.width).toBeGreaterThanOrEqual(30 * 14 * 0.944);
 		expect(frame!.width).toBeGreaterThanOrEqual(canvasFrameNameWidth(label));
@@ -253,12 +253,8 @@ describe("grouped flowchart layout", () => {
 			),
 		).toEqual([]);
 	});
+});
 
-	it("renders an ungrouped flowchart exactly as before", () => {
-		const { groups: _groups, ...ungrouped } = flowchartFixture;
-		expect(renderIntermediateDiagram({ ...ungrouped, groups: [] }).pipe(Result.getOrThrow)).toEqual(
-			renderIntermediateDiagram(ungrouped).pipe(Result.getOrThrow),
-		);
-		expect(framesOf(renderIntermediateDiagram(ungrouped).pipe(Result.getOrThrow))).toEqual([]);
-	});
+it("draws no frames for a flowchart without groups", () => {
+	expect(framesOf(renderFlowchartDiagram(flowchartFixture))).toEqual([]);
 });

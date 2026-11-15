@@ -1,3 +1,4 @@
+import { PublishedBuildIssue } from "../../build/result.js";
 import { Array } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import {
@@ -13,6 +14,7 @@ import {
 import { renderOrgChartDiagram } from "./render.js";
 
 export const orgChartBuild = defineBuild({
+	publishedIssues: PublishedBuildIssue,
 	name: "org-chart",
 	document: OrgChartDocument,
 	normalized: OrgChartDiagram,

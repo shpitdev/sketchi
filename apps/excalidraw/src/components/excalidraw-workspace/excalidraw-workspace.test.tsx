@@ -11,7 +11,7 @@ vi.mock("@sketchi/editor", async (original) => ({
 import {
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/fixtures";
 import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 
 import { ExcalidrawWorkspace } from "./excalidraw-workspace";

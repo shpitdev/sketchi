@@ -2,7 +2,7 @@ import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
 import { crossingFixtures } from "@sketchi/diagrams/families/flowchart/crossing-fixtures";
-import { pharmaBatchDispositionFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
+import { pharmaBatchDispositionFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
 import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
 import { laneFixtures } from "@sketchi/diagrams/families/flowchart/lane-fixtures";
 import {

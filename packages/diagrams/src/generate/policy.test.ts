@@ -2,7 +2,7 @@
 import { Result, Effect, Fiber } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { mediaPlayerStateMachine } from "../families/state-machine/document.js";
-import { parseFlowchartDiagram } from "../families/flowchart/diagram.js";
+import { parseFlowchartDiagram } from "../families/flowchart/document.js";
 
 import { TestClock } from "effect/testing";
 

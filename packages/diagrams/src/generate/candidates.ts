@@ -15,6 +15,8 @@ import {
 	flowchartNodeDetails,
 	resolveFlowchartReferences,
 	type FlowchartDocument,
+	FlowchartNodeShapeSchema,
+	FlowchartZoneKindSchema
 } from "../families/flowchart/document.js";
 import {
 	applyFlowchartEdits,
@@ -66,7 +68,6 @@ import {
 	type CanonicalDiagram,
 	type CanonicalValidationError,
 } from "../family.js";
-import { DiagramNodeShapeSchema, DiagramZoneKindSchema } from "../graph/intermediate.js";
 
 import {
 	DiagramGenerationTypeSchema,
@@ -226,7 +227,8 @@ function sanitizeGeneratedNodeIcons(
 /** Models name shapes such as "ellipse" that Sketchi doesn't draw; such a node draws plain. */
 function withKnownShape(id: string, node: unknown, diagnostics: string[]): unknown {
 	if (!isUnknownRecord(node) || node["shape"] === undefined) return node;
-	if (node["shape"] === "diamond" || Schema.is(DiagramNodeShapeSchema)(node["shape"])) return node;
+	if (node["shape"] === "diamond" || Schema.is(FlowchartNodeShapeSchema)(node["shape"]))
+		return node;
 	const { shape, ...withoutShape } = node;
 	diagnostics.push(
 		`shape_dropped: node "${id}" shape ${JSON.stringify(shape)} is not a Sketchi shape; the node draws plain.`,
@@ -239,7 +241,7 @@ function withKnownGroupKind(id: string, group: unknown, diagnostics: string[]): 
 	if (
 		!isUnknownRecord(group) ||
 		group["kind"] === undefined ||
-		Schema.is(DiagramZoneKindSchema)(group["kind"])
+		Schema.is(FlowchartZoneKindSchema)(group["kind"])
 	)
 		return group;
 	const { kind, ...plain } = group;
@@ -608,7 +610,6 @@ function diagramValidationFailure(
 	});
 	return Match.value(error).pipe(
 		Match.tagsExhaustive({
-			DiagramValidationError: generic,
 			MindmapInputError: generic,
 			FlowchartValidationError: generic,
 			SchemaError: generic,

@@ -1,8 +1,8 @@
-import { DIAGRAM_NODE_COLOR_NAMES } from "../../graph/intermediate.js";
+import { FLOWCHART_NODE_COLOR_NAMES } from "../../families/flowchart/document.js";
 import { FLOWCHART_RULES } from "./rules.js";
 const PROMPT = "the prompt";
 const DELIVERY_OPTIONS = `{ artifactFormats: ["scene", "excalidraw", "png"], inlineArtifacts: [] }`;
-const FLOWCHART_COLORS = DIAGRAM_NODE_COLOR_NAMES.map((name) => `"${name}"`).join(" | ");
+const FLOWCHART_COLORS = FLOWCHART_NODE_COLOR_NAMES.map((name) => `"${name}"`).join(" | ");
 const FLOWCHART_SPEC = `spec: { title, direction?: "TB" | "LR", curved?: true, logos?: true | "exact", nodes: { [id]: label | { label, note?, shape?: "database" | "queue" | "document" | "storage" | "diamond", icon?: name | null, color?: ${FLOWCHART_COLORS} (only when asked), group?: id, lane?: id } }, edges: [[from, to, label?]] (ends may list ids), groups?: { [id]: { label, kind?, contains?: [ids] } }, lanes?: { [id]: label } }`;
 const FLOWCHART_DOC_RULES = [
 	[

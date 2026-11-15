@@ -1,9 +1,6 @@
 import {
 	ApplyDiagramPatchRequest,
 	ApplyDiagramPatchResultSchema,
-	BuildFlowchartAccepted,
-	BuildFlowchartOptionsSchema,
-	BuildFlowchartRejected,
 	CreateCanvasRequest,
 	CreateCanvasResultSchema,
 	DiagramSelector,
@@ -15,11 +12,11 @@ import {
 	SearchIconsResultSchema,
 	toCodeModeJsonSchema,
 } from "@sketchi/diagrams/build/code-mode/contract";
-import {
+import { flowchartBuild } from "@sketchi/diagrams/families/flowchart/build";
+import { BuildOptions,
 	CodeModeIssue,
 	CodeModeIssueCodeSchema,
-	CodeModeIssueRef,
-} from "@sketchi/diagrams/build/result";
+	CodeModeIssueRef } from "@sketchi/diagrams/build/result";
 import { families } from "@sketchi/diagrams/family";
 import { DrawnIconSchema, IconRecipeSchema } from "@sketchi/drawing";
 import { Schema } from "effect";
@@ -83,11 +80,11 @@ const sharedContracts = [
 	["IssueCode", CodeModeIssueCodeSchema],
 	["IssueRef", CodeModeIssueRef],
 	["Issue", CodeModeIssue],
-	["BuildOptions", BuildFlowchartOptionsSchema.schema],
-	["Quality", BuildFlowchartAccepted.fields.quality],
-	["ArtifactFormatRef", BuildFlowchartAccepted.fields.artifact.fields.formats.schema.value],
-	["Artifact", BuildFlowchartAccepted.fields.artifact],
-	["PartialArtifact", BuildFlowchartRejected.fields.partial.schema],
+	["BuildOptions", BuildOptions],
+	["Quality", flowchartBuild.accepted.fields.quality],
+	["ArtifactFormatRef", flowchartBuild.accepted.fields.artifact.fields.formats.schema.value],
+	["Artifact", flowchartBuild.accepted.fields.artifact],
+	["PartialArtifact", flowchartBuild.rejected.fields.partial.schema],
 	["DiagramSelector", DiagramSelector],
 	["CanvasElement", CreateCanvasRequest.fields.spec.fields.elements.schema.value],
 	["IconRecipe", IconRecipeSchema],

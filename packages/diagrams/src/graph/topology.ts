@@ -2,21 +2,16 @@
 import { measureEdges } from "./measure.js";
 import { type LayoutEdge } from "./layout-types.js";
 import { Graph, Option } from "effect";
-import type {
-	DiagramEdge,
-	DiagramGroup,
-	DiagramNode,
-	IntermediateDiagram,
-} from "./intermediate.js";
+import type { GraphEdge, GraphGroup, GraphNode, GraphInput } from "./input.js";
 
 /** Native adjacency plus the declared nodes whose labels and kinds are measured.
  * Composite group endpoints may be graph vertices without being placed nodes. */
 export interface FlowGraph {
-	readonly nodes: readonly DiagramNode[];
+	readonly nodes: readonly GraphNode[];
 	readonly graph: Graph.DirectedGraph<string, LayoutEdge>;
 	readonly indices: ReadonlyMap<string, Graph.NodeIndex>;
 }
-export function flowGraph(nodes: readonly DiagramNode[], edges: readonly LayoutEdge[]): FlowGraph {
+export function flowGraph(nodes: readonly GraphNode[], edges: readonly LayoutEdge[]): FlowGraph {
 	const indices = new Map<string, Graph.NodeIndex>();
 	const graph = Graph.directed<string, LayoutEdge>((mutable) => {
 		const index = (id: string) => {
@@ -92,7 +87,7 @@ function rankNodes(flow: FlowGraph, feedback: ReadonlySet<string>): Map<string, 
 	return ranks;
 }
 
-export function nodeOrderMap(nodes: readonly DiagramNode[]): Map<string, number> {
+export function nodeOrderMap(nodes: readonly GraphNode[]): Map<string, number> {
 	return new Map(nodes.map((node, index) => [node.id, index]));
 }
 export const RANK_SWEEP_COUNT = 4;
@@ -505,7 +500,7 @@ export interface GroupLevel {
 	readonly children: readonly string[];
 	readonly crossing: ReadonlySet<string>;
 	readonly flow: RankedFlow;
-	readonly group: DiagramGroup;
+	readonly group: GraphGroup;
 }
 export interface GroupStructure {
 	readonly composites: ReadonlySet<string>;
@@ -517,16 +512,18 @@ export interface GroupStructure {
 	readonly zoned: boolean;
 }
 export interface GraphLayout {
+	readonly input: GraphInput;
 	readonly flow: FlowGraph;
 	readonly ranks?: RankedFlow;
 	readonly feedback: ReadonlySet<string>;
 	readonly groups?: GroupStructure;
 }
-export function prepareGraph(diagram: IntermediateDiagram, place: boolean): GraphLayout {
+export function prepareGraph(diagram: GraphInput, place: boolean): GraphLayout {
 	const flow = flowGraph(diagram.nodes, measureEdges(diagram.nodes, diagram.edges));
 	const global = feedbackEdgeIds(flow);
 	const groups = groupStructure(diagram, flow, global);
 	return {
+		input: diagram,
 		flow,
 		feedback: groups?.feedback ?? global,
 		...(groups
@@ -539,7 +536,7 @@ export function prepareGraph(diagram: IntermediateDiagram, place: boolean): Grap
 
 /** The nested layouts of a diagram whose declared groups hold nodes; undefined otherwise. */
 function groupStructure(
-	diagram: IntermediateDiagram,
+	diagram: GraphInput,
 	whole: FlowGraph,
 	global: ReadonlySet<string>,
 ): { readonly structure: GroupStructure; readonly feedback: ReadonlySet<string> } | undefined {
@@ -595,11 +592,11 @@ function groupStructure(
 		if (index < 0 || (index === 0 && composites.has(id))) return undefined;
 		return index === 0 ? id : groupUnitId(chain[index - 1]!);
 	};
-	const unitNode = (group: DiagramGroup, unit: string): DiagramNode => ({
+	const unitNode = (group: GraphGroup, unit: string): GraphNode => ({
 		id: unit,
 		label: group.label,
 		kind: "process",
-		metadata: {},
+		shape: "rectangle",
 	});
 	// Inside a group, loops break where the whole flow breaks them, so a group
 	// reads in the same direction as the diagram around it.
@@ -618,7 +615,7 @@ function groupStructure(
 				source === edge.source && target === edge.target ? edge : { ...edge, source, target },
 			];
 		});
-		const units: DiagramNode[] = [];
+		const units: GraphNode[] = [];
 		for (const node of diagram.nodes) {
 			const unit = unitAt(group.id, node.id);
 			if (unit === undefined || units.some((placed) => placed.id === unit)) continue;
@@ -657,7 +654,7 @@ function groupStructure(
 			group,
 		};
 	});
-	const units: DiagramNode[] = [];
+	const units: GraphNode[] = [];
 	const placed = new Set<string>();
 	for (const node of diagram.nodes) {
 		const unit = unitAt(undefined, node.id)!;
@@ -767,7 +764,7 @@ function loopsThroughOutside(
 		new Set(Graph.values(Graph.dfs(outgoing, { start: [flow.indices.get(start)!] })));
 	// Added precedence links carry no rendered edge; they only prevent a later
 	// pair from introducing a cycle among the dependencies already accepted.
-	const after = Graph.beginMutation<string, DiagramEdge | undefined, "directed">(level.graph);
+	const after = Graph.beginMutation<string, GraphEdge | undefined, "directed">(level.graph);
 	Graph.filterEdges(after, (edge) => edge !== undefined && !feedback.has(edge.id));
 	const leads = (from: string, to: string) =>
 		Graph.hasPath(after, level.indices.get(from)!, level.indices.get(to)!);

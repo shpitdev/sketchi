@@ -1,3 +1,4 @@
+import { PublishedBuildIssue } from "../../build/result.js";
 import { Array } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import {
@@ -12,6 +13,7 @@ import {
 import { renderTimelineDiagram } from "./render.js";
 
 export const timelineBuild = defineBuild({
+	publishedIssues: PublishedBuildIssue,
 	name: "timeline",
 	document: TimelineDocument,
 	normalized: TimelineDiagram,

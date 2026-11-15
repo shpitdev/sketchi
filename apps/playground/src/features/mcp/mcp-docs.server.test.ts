@@ -9,7 +9,7 @@ import { ER_RULES } from "@sketchi/diagrams/families/er/rules";
 import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_NODES,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/document";
 import { SANKEY_RULES } from "@sketchi/diagrams/families/sankey/rules";
 import { STATE_MACHINE_RULES } from "@sketchi/diagrams/families/state-machine/rules";
 import { WIREFRAME_RULES } from "@sketchi/diagrams/families/wireframe/rules";

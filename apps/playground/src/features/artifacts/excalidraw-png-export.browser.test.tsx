@@ -1,10 +1,9 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import { exportToBlob } from "@excalidraw/excalidraw";
-import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
+import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
 import { embedCanvasIcons } from "@sketchi/drawing";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { describe, expect, it } from "vitest";
 
 import { exportDimensions, exportExcalidrawPngBase64 } from "./excalidraw-png-export";
@@ -19,18 +18,15 @@ const LOGO_COLORS: Readonly<Record<string, readonly [number, number, number]>> =
 
 function logoScene(withFiles: boolean) {
 	const excalidraw = convertSceneToExcalidraw(
-		embedCanvasIcons(
-			renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
-			(slug) => {
-				const color = LOGO_COLORS[slug];
-				return color
-					? {
-							name: slug,
-							svg: `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="rgb(${color.join(",")})"/></svg>`,
-						}
-					: undefined;
-			},
-		).scene,
+		embedCanvasIcons(renderFlowchartDiagram(deployPipelineLogoFlowchart), (slug) => {
+			const color = LOGO_COLORS[slug];
+			return color
+				? {
+						name: slug,
+						svg: `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="rgb(${color.join(",")})"/></svg>`,
+					}
+				: undefined;
+		}).scene,
 	);
 	return withFiles ? excalidraw : { ...excalidraw, files: {} };
 }

@@ -1,3 +1,4 @@
+import { PublishedBuildIssue } from "../../build/result.js";
 import { Array, Result } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import {
@@ -13,6 +14,7 @@ import {
 import { renderJourneyDiagram } from "./render.js";
 
 export const journeyBuild = defineBuild({
+	publishedIssues: PublishedBuildIssue,
 	name: "journey",
 	document: JourneyDocument,
 	normalized: JourneyDiagram,

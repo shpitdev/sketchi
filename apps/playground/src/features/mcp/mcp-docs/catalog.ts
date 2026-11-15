@@ -3,7 +3,7 @@ import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/document";
 import { FLOWCHART_EDIT_RULES } from "@sketchi/diagrams/families/flowchart/rules";
 import { families, familyForType } from "@sketchi/diagrams/family";
 import { CANVAS_ICON_ELEMENT, CANVAS_LIMITS } from "@sketchi/drawing";

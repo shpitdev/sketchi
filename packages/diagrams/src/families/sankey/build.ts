@@ -1,3 +1,4 @@
+import { PublishedBuildIssue } from "../../build/result.js";
 import { Array, Result } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import {
@@ -14,6 +15,7 @@ import { renderSankeyDiagram } from "./render.js";
 import { sankeyLayoutIssues } from "./readout.js";
 
 export const sankeyBuild = defineBuild({
+	publishedIssues: PublishedBuildIssue,
 	name: "sankey",
 	document: SankeyDocument,
 	normalized: SankeyDiagram,

@@ -1,5 +1,5 @@
+import { formatContractSchemaError } from "@sketchi/diagrams/build/input";
 import {
-	formatContractSchemaError,
 	CreateCanvasRequest,
 	CreateCanvasResultSchema,
 } from "@sketchi/diagrams/build/code-mode/contract";

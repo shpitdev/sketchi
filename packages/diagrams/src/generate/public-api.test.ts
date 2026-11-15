@@ -2,7 +2,7 @@
 import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
 import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
-import { FLOWCHART_MAX_NODES } from "../families/flowchart/diagram.js";
+import { FLOWCHART_MAX_NODES } from "../families/flowchart/document.js";
 import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 import { TestClock } from "effect/testing";

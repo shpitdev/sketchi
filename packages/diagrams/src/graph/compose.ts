@@ -34,7 +34,6 @@ import {
 	ZONE_HEADER,
 	insideBox,
 } from "./containers.js";
-import { type DiagramZoneKind } from "./intermediate.js";
 
 function textForNode(shape: NodeSceneElement, described = false): TextSceneElement {
 	return {
@@ -356,7 +355,7 @@ export function laneElements(lanes: LaneLayout): (NodeSceneElement | TextSceneEl
 const ZONE_LABEL_COLOR = "#4c4639";
 
 /** Fills that set a subnet or a namespace apart from the zone around it. */
-const ZONE_FILL: Readonly<Partial<Record<DiagramZoneKind, string>>> = {
+const ZONE_FILL: Readonly<Record<string, string | undefined>> = {
 	subnet: "#f6f1e7",
 	namespace: "#efe6ec",
 };
@@ -368,7 +367,7 @@ const ZONE_FILL: Readonly<Partial<Record<DiagramZoneKind, string>>> = {
  * and a subnet or a namespace filled.
  */
 function zoneStyle(
-	kind: DiagramZoneKind | undefined,
+	kind: string | undefined,
 	accent: string,
 ): Pick<
 	NodeSceneElement,

@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
+import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@sketchi/editor", () => ({

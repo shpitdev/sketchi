@@ -1,9 +1,9 @@
+import { FlowchartDiagram } from "./document.js";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { flowchartFixture } from "../families/flowchart/diagram.js";
-import { laneFixtures, laneStressFixtures } from "../families/flowchart/lane-fixtures.js";
-import { parseIntermediateDiagram } from "./intermediate.js";
+import { flowchartFixture } from "./fixtures.js";
+import { laneFixtures, laneStressFixtures } from "./lane-fixtures.js";
 import {
 	getCanvasValidationIssues,
 	laneRegionIssues,
@@ -13,8 +13,8 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { arrowCrossings } from "./readability";
-import { renderIntermediateDiagram } from "./scene";
+import { arrowCrossings } from "../../graph/readability";
+import { renderFlowchartDiagram } from "./render";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];
@@ -27,10 +27,13 @@ function rendered(name: Name, direction: Direction = laneFixtures[name].layout.d
 	if (!scenes.has(key))
 		scenes.set(
 			key,
-			renderIntermediateDiagram({
-				...laneFixtures[name],
-				layout: { direction, edgeRouting: "orthogonal" },
-			}).pipe(Result.getOrThrow),
+			renderFlowchartDiagram(
+				Schema.decodeUnknownSync(FlowchartDiagram)({
+					...laneFixtures[name],
+					layout: { direction, edgeRouting: "orthogonal" },
+					type: "flowchart",
+				}),
+			),
 		);
 	return scenes.get(key)!;
 }
@@ -76,12 +79,13 @@ describe("swimlane layout", () => {
 	it.each(["TB", "LR"] as const)(
 		"draws an empty recipient lane with finite bounds, %s",
 		(direction) => {
-			const diagram = parseIntermediateDiagram({
+			const diagram = Schema.decodeUnknownSync(FlowchartDiagram)({
 				...laneFixtures.hiring,
 				layout: { direction, edgeRouting: "orthogonal" },
 				lanes: [...laneFixtures.hiring.lanes!, { id: "customer", label: "Customer" }],
-			}).pipe(Result.getOrThrow);
-			const scene = renderIntermediateDiagram(diagram).pipe(Result.getOrThrow);
+				type: "flowchart",
+			});
+			const scene = renderFlowchartDiagram(diagram);
 			expect(getCanvasValidationIssues(scene)).toEqual([]);
 			expect(laneRegionIssues(scene, diagram)).toEqual([]);
 			expect(node(scene, "lane:customer")).toMatchObject({ label: "Customer", locked: true });
@@ -213,10 +217,13 @@ describe("swimlane layout", () => {
 	it("keeps every stress case's steps in their lanes and its routes clear", () => {
 		for (const fixture of Object.values(laneStressFixtures))
 			for (const direction of ["LR", "TB"] as const) {
-				const scene = renderIntermediateDiagram({
-					...fixture,
-					layout: { direction, edgeRouting: "orthogonal" },
-				}).pipe(Result.getOrThrow);
+				const scene = renderFlowchartDiagram(
+					Schema.decodeUnknownSync(FlowchartDiagram)({
+						...fixture,
+						layout: { direction, edgeRouting: "orthogonal" },
+						type: "flowchart",
+					}),
+				);
 				expect(laneRegionIssues(scene, fixture)).toEqual([]);
 				expect(getCanvasValidationIssues(scene)).toEqual([]);
 			}
@@ -224,20 +231,23 @@ describe("swimlane layout", () => {
 
 	it("draws lanes whose ids extend each other under ids of their own", () => {
 		// Lane "a" draws a header and lane "a:header" a band; a node may be named like either.
-		const scene = renderIntermediateDiagram({
-			id: "colliding-lanes",
-			title: "Colliding lane ids",
-			lanes: [
-				{ id: "a", label: "First" },
-				{ id: "a:header", label: "Second" },
-			],
-			nodes: [
-				{ id: "lane:a", label: "Start", kind: "start", lane: "a" },
-				{ id: "done", label: "Done", kind: "end", lane: "a:header" },
-			],
-			edges: [{ id: "e1", source: "lane:a", target: "done" }],
-			layout: { direction: "LR", edgeRouting: "orthogonal" },
-		}).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(
+			Schema.decodeUnknownSync(FlowchartDiagram)({
+				id: "colliding-lanes",
+				title: "Colliding lane ids",
+				lanes: [
+					{ id: "a", label: "First" },
+					{ id: "a:header", label: "Second" },
+				],
+				nodes: [
+					{ id: "lane:a", label: "Start", kind: "start", lane: "a" },
+					{ id: "done", label: "Done", kind: "end", lane: "a:header" },
+				],
+				edges: [{ id: "e1", source: "lane:a", target: "done" }],
+				layout: { direction: "LR", edgeRouting: "orthogonal" },
+				type: "flowchart",
+			}),
+		);
 		const ids = scene.elements.map((element) => element.id);
 		const nodeIds = nodesOf(scene).map((shape) => shape.nodeId);
 		expect(new Set(ids).size).toBe(ids.length);
@@ -255,41 +265,16 @@ describe("swimlane layout", () => {
 		).toEqual([]);
 	});
 
-	it("renders a flowchart without lanes exactly as before", () => {
+	it("draws no lane regions for a flowchart without lanes", () => {
 		const { lanes: _lanes, ...unlaned } = flowchartFixture;
-		expect(renderIntermediateDiagram({ ...unlaned, lanes: [] }).pipe(Result.getOrThrow)).toEqual(
-			renderIntermediateDiagram(unlaned).pipe(Result.getOrThrow),
-		);
 		expect(
-			nodesOf(renderIntermediateDiagram(unlaned).pipe(Result.getOrThrow)).filter(
-				(shape) => shape.rendererRole,
+			renderFlowchartDiagram(
+				Schema.decodeUnknownSync(FlowchartDiagram)({ ...unlaned, lanes: [], type: "flowchart" }),
 			),
-		).toEqual([]);
-	});
-
-	it("rejects lanes with groups, an undeclared lane and a node without one", () => {
-		const fixture = laneFixtures.hiring;
-		expect(
-			parseIntermediateDiagram({ ...fixture, groups: [{ id: "g", label: "G" }] }),
-		).toMatchObject({
-			failure: {
-				message: expect.stringContaining("A diagram with lanes cannot also declare groups."),
-			},
-		});
-		expect(
-			parseIntermediateDiagram({
-				...fixture,
-				nodes: fixture.nodes.map((n) => (n.id === "hire" ? { ...n, lane: "board" } : n)),
-			}),
-		).toMatchObject({
-			failure: { message: expect.stringContaining('Node "hire" references missing lane "board".') },
-		});
-		expect(
-			parseIntermediateDiagram({
-				...fixture,
-				nodes: fixture.nodes.map(({ lane: _lane, ...n }) => n),
-			}),
-		).toMatchObject({ failure: { message: expect.stringContaining('Node "apply" has no lane.') } });
+		).toEqual(renderFlowchartDiagram(unlaned));
+		expect(nodesOf(renderFlowchartDiagram(unlaned)).filter((shape) => shape.rendererRole)).toEqual(
+			[],
+		);
 	});
 });
 
@@ -384,13 +369,17 @@ function expectIntactLanes(scene: CanvasSpec, fixture: typeof INCIDENT | typeof 
 
 describe("long rows of lanes", () => {
 	it("closes up round 19's incident response to within 2.4:1", () => {
-		const scene = renderIntermediateDiagram(INCIDENT).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(
+			Schema.decodeUnknownSync(FlowchartDiagram)({ type: "flowchart", ...INCIDENT }),
+		);
 		expect(exportAspect(scene)).toBeLessThanOrEqual(2.4);
 		expectIntactLanes(scene, INCIDENT);
 	});
 
 	it("hands a step off straight across lanes that stand empty in its column", () => {
-		const scene = renderIntermediateDiagram(ORDER).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(
+			Schema.decodeUnknownSync(FlowchartDiagram)({ ...ORDER, type: "flowchart" }),
+		);
 		// Pay invoice (Customer) to Record payment (Finance), past Sales and Warehouse.
 		expect(arrow(scene, "edge-9").points).toHaveLength(2);
 		const middle = (id: string) => node(scene, id).x + node(scene, id).width / 2;
@@ -405,7 +394,9 @@ describe("long rows of lanes", () => {
 			nodes: ORDER.nodes.filter((step) => step.id !== "pay" && step.id !== "record"),
 			edges: ORDER.edges.filter((edge) => edge.id !== "edge-8" && edge.id !== "edge-9"),
 		};
-		const scene = renderIntermediateDiagram(short).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(
+			Schema.decodeUnknownSync(FlowchartDiagram)({ ...short, type: "flowchart" }),
+		);
 		expect(exportAspect(scene)).toBeLessThan(2.3);
 		// Pack and ship keep two stubs and a port's spacing between them, not a compacted 56.
 		expect(

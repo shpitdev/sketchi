@@ -1,19 +1,18 @@
 import { deployWebhookLogoSequence } from "@sketchi/diagrams/families/sequence/fixtures";
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import {
 	deployPipelineLogoFlowchart,
 	requestFlowGroupLogoFlowchart,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+} from "@sketchi/diagrams/families/flowchart/fixtures";
 
-import { type LayoutDirection } from "@sketchi/diagrams/graph/intermediate";
+import { type GraphInput } from "@sketchi/diagrams/graph/input";
 import {
 	embedCanvasIcons,
 	isIconRecipe,
 	type CanvasIconAsset,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 
 import { normalizeNodeLogoSvg } from "@sketchi/icon-catalog";
@@ -45,12 +44,12 @@ function nodeLogo(slug: string): CanvasIconAsset | undefined {
 }
 
 /** The deploy-pipeline fixture with real catalog marks embedded. */
-export function nodeLogoScene(direction: LayoutDirection = "TB"): CanvasSpec {
+export function nodeLogoScene(direction: GraphInput["layout"]["direction"] = "TB"): CanvasSpec {
 	return embedCanvasIcons(
-		renderIntermediateDiagram({
+		renderFlowchartDiagram({
 			...deployPipelineLogoFlowchart,
 			layout: { ...deployPipelineLogoFlowchart.layout, direction },
-		}).pipe(Result.getOrThrow),
+		}),
 		nodeLogo,
 	).scene;
 }
@@ -60,14 +59,11 @@ export function nodeLogoScene(direction: LayoutDirection = "TB"): CanvasSpec {
  * drawn by hand, the rest as their embedded SVG.
  */
 export function handDrawnLogoScene(): CanvasSpec {
-	return embedCanvasIcons(
-		renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
-		(slug) => {
-			const asset = nodeLogo(slug);
-			const recipe = Object.hasOwn(nativeIcons, slug) ? nativeIcons[slug] : undefined;
-			return asset && isIconRecipe(recipe) ? { ...asset, recipe } : asset;
-		},
-	).scene;
+	return embedCanvasIcons(renderFlowchartDiagram(deployPipelineLogoFlowchart), (slug) => {
+		const asset = nodeLogo(slug);
+		const recipe = Object.hasOwn(nativeIcons, slug) ? nativeIcons[slug] : undefined;
+		return asset && isIconRecipe(recipe) ? { ...asset, recipe } : asset;
+	}).scene;
 }
 
 /** The deploy-webhook sequence with real catalog marks in its participant headers. */
@@ -84,10 +80,10 @@ export function groupLogoScene(zoned = false): CanvasSpec {
 		zoned ? { ...group, kind: "cloud" as const } : group,
 	);
 	return embedCanvasIcons(
-		renderIntermediateDiagram({
+		renderFlowchartDiagram({
 			...requestFlowGroupLogoFlowchart,
 			...(groups ? { groups } : {}),
-		}).pipe(Result.getOrThrow),
+		}),
 		nodeLogo,
 	).scene;
 }

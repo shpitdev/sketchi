@@ -11,39 +11,37 @@ import {
 	type CanvasTextElement as TextSceneElement,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { type IntermediateDiagram } from "./intermediate.js";
+import { type GraphInput, type GraphNode } from "./input.js";
 import { isStructurallyValidStateMarker } from "./compose";
 import { renderGraphDiagram } from "./scene";
 
 /**
  * Graphs as a state machine draws them: pseudostates (an initial dot, final
  * bullseyes, an unlabeled choice), self-loops, a transition and its return,
- * and transitions into and out of a composite state's frame. The graph contract
- * rejects these, so they render through renderGraphDiagram.
+ * and transitions into and out of a composite state's frame. Families supply
+ * these resolved drawing traits directly to the graph engine.
  */
-const node = (id: string, label: string, kind: string, group?: string) => ({
+const node = (id: string, label: string, kind: string, group?: string): GraphNode => ({
 	id,
 	label,
 	kind,
-	metadata: {},
+	shape:
+		kind === "initial" || kind === "final" ? "circle" : kind === "choice" ? "diamond" : "rectangle",
 	...(group ? { group } : {}),
 });
 const edge = (id: string, source: string, target: string, label?: string) => ({
 	id,
 	source,
 	target,
-	metadata: {},
 	...(label ? { label } : {}),
 });
-const graph = (input: Pick<IntermediateDiagram, "edges" | "id" | "nodes" | "groups">) =>
-	({
-		title: input.id,
-		type: "flowchart",
-		style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-		metadata: {},
-		layout: { direction: "TB", edgeRouting: "orthogonal" },
-		...input,
-	}) as IntermediateDiagram;
+const graph = ({
+	id,
+	...input
+}: Pick<GraphInput, "edges" | "nodes" | "groups"> & { id: string }) => ({
+	id,
+	input: { ...input, layout: { direction: "TB", edgeRouting: "orthogonal" } } satisfies GraphInput,
+});
 
 const order = graph({
 	id: "order",
@@ -108,9 +106,14 @@ const light = graph({
 });
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
-const render = (diagram: IntermediateDiagram, direction: (typeof directions)[number]) =>
+const render = (diagram: ReturnType<typeof graph>, direction: (typeof directions)[number]) =>
 	renderGraphDiagram(
-		{ ...diagram, layout: { direction, edgeRouting: "orthogonal" } },
+		{ ...diagram.input, layout: { direction, edgeRouting: "orthogonal" } },
+		{
+			id: diagram.id,
+			title: diagram.id,
+			style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
+		},
 		{ pairedReturns: true },
 	);
 const nodesOf = (scene: CanvasSpec) =>

@@ -8,7 +8,7 @@ import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
+import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import {
 	buildFlowchart,
 	CodeModeRuntimeEnvironment,

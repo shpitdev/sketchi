@@ -46,7 +46,7 @@ import {
 	canvasFrameNameBox,
 	type CanvasConnectorElement as ArrowSceneElement,
 } from "@sketchi/drawing";
-import { type IntermediateDiagram } from "./intermediate.js";
+import { type GraphInput } from "./input.js";
 import { type GraphLayout } from "./topology.js";
 import { labelBox } from "./label-geometry.js";
 import { groupChain, obstacleBox } from "./containers.js";
@@ -618,7 +618,7 @@ export function routeForEdge(
 	edge: LayoutEdge,
 	index: number,
 	shapesByNodeId: ReadonlyMap<string, NodeSceneElement>,
-	direction: IntermediateDiagram["layout"]["direction"],
+	direction: GraphInput["layout"]["direction"],
 	continuation = false,
 ): RoutedEdge {
 	const source = shapesByNodeId.get(edge.source);
@@ -746,10 +746,10 @@ function directSegmentsOverlap(
 export function assignDirectFeedbackPorts(
 	layoutGraph: GraphLayout,
 	routes: RoutedEdge[],
-	diagram: IntermediateDiagram,
 	nodes: readonly NodeSceneElement[],
 	repairForward = false,
 ): { offsets: Map<string, number>; minimumSizes: Map<string, { width: number; height: number }> } {
+	
 	const minimumSizes = new Map<string, { width: number; height: number }>();
 	const feedback = layoutGraph.feedback;
 	const sides: ConnectionEdge[] =
@@ -1064,7 +1064,7 @@ function choiceStubRoom(route: RoutedEdge, point: ScenePoint): number {
  */
 export function assignDecisionSides(
 	routes: RoutedEdge[],
-	direction: IntermediateDiagram["layout"]["direction"],
+	direction: GraphInput["layout"]["direction"],
 	mirrored = false,
 ): void {
 	const vertical = direction === "TB" || direction === "BT";
@@ -1123,9 +1123,9 @@ export function assignDecisionSides(
 export function assignFeedbackSides(
 	layoutGraph: GraphLayout,
 	routes: RoutedEdge[],
-	diagram: IntermediateDiagram,
-	directionOf: (route: RoutedEdge) => LayoutDirection = () => diagram.layout.direction,
+	directionOf: (route: RoutedEdge) => LayoutDirection = () => layoutGraph.input.layout.direction,
 ): void {
+	
 	const feedback = layoutGraph.feedback;
 	for (const route of routes.filter((r) => feedback.has(r.edge.id) && !isSelfLoop(r))) {
 		const direction = directionOf(route);

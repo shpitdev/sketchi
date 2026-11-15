@@ -3,7 +3,6 @@ import {
 	flowchartDiagramFromDocument,
 } from "@sketchi/diagrams/families/flowchart/document";
 import { families, familyForType } from "@sketchi/diagrams/family";
-import { type DiagramValidationError } from "@sketchi/diagrams/graph/intermediate";
 
 import { Option, Result, Schema } from "effect";
 
@@ -201,10 +200,7 @@ function failureDetails(value: Record<string, unknown>): string {
 export function candidateFromMcpResult(
 	value: unknown,
 	diagramType: DiagramScenario["diagramType"],
-): Result.Result<
-	Option.Option<McpScenarioCandidate>,
-	DiagramValidationError | Schema.SchemaError | ScenarioMcpCandidateError
-> {
+): Result.Result<Option.Option<McpScenarioCandidate>, ScenarioMcpCandidateError> {
 	return Result.gen(function* () {
 		if (
 			!isRecord(value) ||

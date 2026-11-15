@@ -1,19 +1,20 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
-import { describe, expect, it } from "vitest";
-import { flowchartFixture } from "../families/flowchart/diagram.js";
-import { parseClassDiagram } from "../families/class/document.js";
-import { parseTimelineDiagram } from "../families/timeline/document.js";
-import {
+import { renderGraphDiagram } from "./scene.js";
+import { SKETCHI_DIAGRAM_STYLE,
 	routingQualityFindings,
 	routingQualityScale,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec,
-} from "@sketchi/drawing";
+	type CanvasSpec } from "@sketchi/drawing";
+import { FlowchartDiagram } from "../families/flowchart/document.js";
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Schema } from "effect";
+import { describe, expect, it } from "vitest";
+import { flowchartFixture } from "../families/flowchart/fixtures.js";
+import { parseClassDiagram } from "../families/class/document.js";
+import { parseTimelineDiagram } from "../families/timeline/document.js";
 import { renderClassDiagram } from "../families/class/render";
 import { renderTimelineDiagram } from "../families/timeline/render";
 import { arrowCrossings } from "./readability";
-import { renderIntermediateDiagram } from "./scene";
+import { renderFlowchartDiagram } from "../families/flowchart/render";
 
 /**
  * Width over height, either way up, of a scene in the hosted PNG's 20-unit
@@ -131,13 +132,16 @@ describe("tall flowchart columns", () => {
 	it.each(Object.keys(TALL_COLUMNS) as (keyof typeof TALL_COLUMNS)[])(
 		"draws %s within 2.45:1 with no crossing or reader finding",
 		(name) => {
-			const scene = renderIntermediateDiagram({
-				...flowchartFixture,
-				id: name,
-				title: name,
-				...TALL_COLUMNS[name],
-				layout: { direction: "TB", edgeRouting: "orthogonal" },
-			}).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(
+				Schema.decodeUnknownSync(FlowchartDiagram)({
+					...flowchartFixture,
+					id: name,
+					title: name,
+					...TALL_COLUMNS[name],
+					layout: { direction: "TB", edgeRouting: "orthogonal" },
+					type: "flowchart",
+				}),
+			);
 			const arrows = scene.elements.flatMap((element) =>
 				element.type === "arrow" ? [element] : [],
 			);
@@ -153,15 +157,17 @@ describe("tall flowchart columns", () => {
 	);
 
 	it("keeps a short column at the full rank gap", () => {
-		const scene = renderIntermediateDiagram({
-			...flowchartFixture,
-			nodes: ["A", "B", "C"].map((id) => ({ id, label: id })),
-			edges: [
-				{ id: "ab", source: "A", target: "B" },
-				{ id: "bc", source: "B", target: "C" },
-			],
-			layout: { direction: "TB", edgeRouting: "orthogonal" },
-		}).pipe(Result.getOrThrow);
+		const scene = renderGraphDiagram(
+			{
+				nodes: ["A", "B", "C"].map((id) => ({ id, label: id, shape: "rectangle" })),
+				edges: [
+					{ id: "ab", source: "A", target: "B" },
+					{ id: "bc", source: "B", target: "C" },
+				],
+				layout: { direction: "TB", edgeRouting: "orthogonal" },
+			},
+			{ id: "geometry", title: "Geometry", style: SKETCHI_DIAGRAM_STYLE },
+		);
 		const ys = scene.elements.flatMap((element) => (element.type === "node" ? [element.y] : []));
 		expect(ys).toEqual([48, 216, 384]);
 	});
@@ -308,19 +314,22 @@ const ORDER_TO_CASH_EDGES: readonly (readonly [string, string, string?])[] = [
 
 describe("long flowcharts", () => {
 	it("wraps a 61-step process into columns that read at a screen's size", () => {
-		const scene = renderIntermediateDiagram({
-			...flowchartFixture,
-			id: "order-to-cash",
-			title: "Order-to-cash process",
-			nodes: ORDER_TO_CASH_NODES.map(([id, label, kind]) => ({ id, label, kind })),
-			edges: ORDER_TO_CASH_EDGES.map(([source, target, label], index) => ({
-				id: `e${index + 1}`,
-				source,
-				target,
-				...(label ? { label } : {}),
-			})),
-			layout: { direction: "TB", edgeRouting: "orthogonal" },
-		}).pipe(Result.getOrThrow);
+		const scene = renderFlowchartDiagram(
+			Schema.decodeUnknownSync(FlowchartDiagram)({
+				...flowchartFixture,
+				id: "order-to-cash",
+				title: "Order-to-cash process",
+				nodes: ORDER_TO_CASH_NODES.map(([id, label, kind]) => ({ id, label, kind })),
+				edges: ORDER_TO_CASH_EDGES.map(([source, target, label], index) => ({
+					id: `e${index + 1}`,
+					source,
+					target,
+					...(label ? { label } : {}),
+				})),
+				layout: { direction: "TB", edgeRouting: "orthogonal" },
+				type: "flowchart",
+			}),
+		);
 		const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 		// A column 1631 wide and 7277 tall fitted its text to a screen at 4 px:
 		// a few more lines crossing where branches meet cost less than that. Its

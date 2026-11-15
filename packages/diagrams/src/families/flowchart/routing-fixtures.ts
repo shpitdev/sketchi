@@ -1,6 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result } from "effect";
-import { parseFlowchartDiagram } from "./diagram.js";
+import { parseFlowchartDiagram } from "./document.js";
 import fixture0 from "./fixtures/routing/content-moderation.js";
 import fixture1 from "./fixtures/routing/data-import-validation.js";
 import fixture2 from "./fixtures/routing/incident-escalation.js";

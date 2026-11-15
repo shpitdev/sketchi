@@ -754,6 +754,7 @@ describe("flowchart documents", () => {
 		if (!result.ok) return;
 		expect(result.diagram.metadata).toEqual({ logos: "exact" });
 		expect(result.diagram.nodes.find((node) => node.id === "seat")?.icon?.slug).toBe("opentable");
+		expect(result.diagram.nodes.find((node) => node.id === "arrive")?.icon).toBeUndefined();
 	});
 
 	it("rejects a document too small to draw", () => {

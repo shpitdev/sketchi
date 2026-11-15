@@ -248,6 +248,8 @@ import { type CanvasSpec } from "@sketchi/drawing";
 export interface BuildDelivery {
 	readonly requestId?: string;
 	readonly options?: BuildOptions;
+	readonly provenance?: ArtifactBundle["provenance"];
+	readonly document?: unknown;
 }
 /** The existing export/store workflow and ID source, supplied by the real host. */
 export interface ArtifactBuildCapabilities<R> {
@@ -264,4 +266,24 @@ export interface ArtifactBuildCapabilities<R> {
 		},
 		R
 	>;
+}
+
+export function qualityIssues(quality: QualityReport): CodeModeIssue[] {
+	return quality.checks.map((check) => ({
+		code: CodeModeIssueCodeFromString(check.code),
+		severity: check.severity,
+		stage: "quality",
+		message: check.message,
+		hint:
+			check.severity === "error"
+				? "Repair the structural issue and call buildFlowchart again."
+				: "Improve the labels or scope before styling the artifact.",
+	}));
+}
+
+function CodeModeIssueCodeFromString(value: string): CodeModeIssueCode {
+	if (value === "generic_label" || value === "label_too_long" || value === "disconnected_graph") {
+		return value;
+	}
+	return "quality_below_threshold";
 }

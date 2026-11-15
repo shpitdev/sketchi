@@ -12,7 +12,7 @@ import {
 	type PositionedLayout,
 	type RouteOptions,
 } from "./layout-types.js";
-import { type IntermediateDiagram, type DiagramEdge } from "./intermediate.js";
+import { type GraphInput, type GraphEdge } from "./input.js";
 import {
 	markerSize,
 	branches,
@@ -106,7 +106,7 @@ const PLAIN: RoutingPolish = { ports: false, reader: false, sides: false, repair
  * router, so a layout never has more export defects or inward endpoints than
  * #405 would draw. Straight and curved routing only repair their port choices.
  */
-export function polishLevels(edgeRouting: IntermediateDiagram["layout"]["edgeRouting"]) {
+export function polishLevels(edgeRouting: GraphInput["layout"]["edgeRouting"]) {
 	return edgeRouting === "orthogonal"
 		? [
 				{ ports: true, reader: true, sides: true, repair: true },
@@ -181,9 +181,9 @@ function alignMarkers(
 /** The edges that cross a cut of a wrapped zoned level, by edge id. */
 export function zoneCutEdges(
 	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
 	zoneWraps: ReadonlyMap<string, Wrap> | undefined,
 ): ReadonlySet<string> {
+	
 	const structure = zoneWraps ? layoutGraph.groups : undefined;
 	if (!structure || !zoneWraps) return new Set();
 	const levels = new Map<string, RankedFlow>([
@@ -469,15 +469,15 @@ export function zonesWithoutAlongsideRoom(layout: DiagramLayout): Set<string> {
  */
 export function compactGaps(
 	layoutGraph: GraphLayout,
-	diagram: IntermediateDiagram,
 	layout: DiagramLayout,
 	arrangement: Arrangement,
 	straight = false,
 ): Map<number, number> {
+	
 	const placed = new Map(layout.nodeShapes.map((shape) => [shape.nodeId, shape]));
 	// Ranks or columns, each as the ids of its steps, in order along the flow.
 	const columns = laned(diagram)
-		? [...laneColumns(layoutGraph, diagram, arrangement.throughHandoffs)].reduce<string[][]>(
+		? [...laneColumns(layoutGraph, arrangement.throughHandoffs)].reduce<string[][]>(
 				(list, [id, column]) => {
 					(list[column] ??= []).push(id);
 					return list;
@@ -580,10 +580,7 @@ export function laneBreadthFor(
  * Both are judged at the scale the grown drawing reads at, which reads more
  * steps as jogs and lengthens the reach, so the gaps grow until none is left.
  */
-export function narrowStepGaps(
-	diagram: IntermediateDiagram,
-	layout: DiagramLayout,
-): Map<number, number> {
+export function narrowStepGaps(diagram: GraphInput, layout: DiagramLayout): Map<number, number> {
 	const { edgeArrows, groups, nodeShapes } = layout;
 	const { direction } = diagram.layout;
 	const vertical = direction === "TB" || direction === "BT";
@@ -702,12 +699,12 @@ export function behindRankStep(
 export function layoutDiagram(
 	layoutGraph: GraphLayout,
 	renderOptions: GraphRenderOptions,
-	diagram: IntermediateDiagram,
 	polish: RoutingPolish,
 	arrangement: Arrangement = PLAIN_ARRANGEMENT,
 ): DiagramLayout {
+	
 	let slack = new Map(arrangement.zoneSlack ?? []);
-	let layout = layoutDiagramOnce(layoutGraph, renderOptions, diagram, polish, arrangement, slack);
+	let layout = layoutDiagramOnce(layoutGraph, renderOptions, polish, arrangement, slack);
 	if (!layout.groups) return layout;
 	const defects = (attempt: DiagramLayout) =>
 		exportRouteDefects(attempt.edgeArrows, attempt.nodeShapes, attempt.groups).length +
@@ -720,14 +717,7 @@ export function layoutDiagram(
 			...slack,
 			...[...crowded].map((id) => [id, (slack.get(id) ?? 0) + GROUP_SLACK] as const),
 		]);
-		const retry = layoutDiagramOnce(
-			layoutGraph,
-			renderOptions,
-			diagram,
-			polish,
-			arrangement,
-			slack,
-		);
+		const retry = layoutDiagramOnce(layoutGraph, renderOptions, polish, arrangement, slack);
 		const retryScore = defects(retry);
 		if (retryScore < score) [layout, score] = [retry, retryScore];
 	}
@@ -736,7 +726,7 @@ export function layoutDiagram(
 
 /** Each node at the box its family placed it in. */
 function placedNodes(
-	diagram: IntermediateDiagram,
+	diagram: GraphInput,
 	placement: NonNullable<GraphRenderOptions["placement"]>,
 ): NodeSceneElement[] {
 	return diagram.nodes.map((node) => {
@@ -803,17 +793,17 @@ function withPinnedOffsets(
 function layoutDiagramOnce(
 	layoutGraph: GraphLayout,
 	renderOptions: GraphRenderOptions,
-	diagram: IntermediateDiagram,
 	polish: RoutingPolish,
 	arrangement: Arrangement,
 	slack: ReadonlyMap<string, number>,
 ): DiagramLayout {
+	
 	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
 	const { anchors, besideShared, endRun, placement } = renderOptions;
 	const offsetsFor = (routes: readonly RoutedEdge[]) =>
 		portOffsetsAt(routes, polish, portOrderOf(arrangement), laned(diagram));
 	const { wrap } = arrangement;
-	const zoneCuts = zoneCutEdges(layoutGraph, diagram, arrangement.zoneWraps);
+	const zoneCuts = zoneCutEdges(layoutGraph, arrangement.zoneWraps);
 	let {
 		groups,
 		lanes,
@@ -821,7 +811,7 @@ function layoutDiagramOnce(
 		skipLaneAt,
 	}: PositionedLayout = placement
 		? { nodes: placedNodes(diagram, placement) }
-		: positionLayout(layoutGraph, diagram, new Map(), new Map(), arrangement, slack);
+		: positionLayout(layoutGraph, new Map(), new Map(), arrangement, slack);
 	// Groups laid out across the flow read in their own direction inside.
 	const { direction } = diagram.layout;
 	// A node reads in its group's direction, and an edge in the direction of the
@@ -830,7 +820,7 @@ function layoutDiagramOnce(
 		group !== undefined && groups !== undefined && groups.across.has(group);
 	const nodeDirection = (nodeId: string) =>
 		turned(groups?.groupOf.get(nodeId)) ? ACROSS_DIRECTION[direction] : direction;
-	const edgeDirection = (edge: DiagramEdge) =>
+	const edgeDirection = (edge: GraphEdge) =>
 		groups && turned(sharedGroup(groups, edge.source, edge.target))
 			? ACROSS_DIRECTION[direction]
 			: direction;
@@ -884,7 +874,7 @@ function layoutDiagramOnce(
 	let capacity: Map<string, { width: number; height: number }>;
 	if (orthogonal) {
 		assignLoopSides(routedEdges, (route) => edgeDirection(route.edge));
-		assignFeedbackSides(layoutGraph, routedEdges, diagram, (route) => edgeDirection(route.edge));
+		assignFeedbackSides(layoutGraph, routedEdges, (route) => edgeDirection(route.edge));
 		if (renderOptions.pairedReturns)
 			assignPairedReturns(
 				routedEdges,
@@ -903,13 +893,7 @@ function layoutDiagramOnce(
 		portOffsets = offsetsFor(routedEdges);
 		capacity = portCapacityForRoutes(routedEdges, portOffsets);
 	} else {
-		const direct = assignDirectFeedbackPorts(
-			layoutGraph,
-			routedEdges,
-			diagram,
-			nodeShapes,
-			polish.repair,
-		);
+		const direct = assignDirectFeedbackPorts(layoutGraph, routedEdges, nodeShapes, polish.repair);
 		portOffsets = direct.offsets;
 		capacity = direct.minimumSizes;
 	}
@@ -933,7 +917,7 @@ function layoutDiagramOnce(
 			lanes,
 			nodes: nodeShapes,
 			skipLaneAt,
-		} = positionLayout(layoutGraph, diagram, capacity, reach, arrangement, slack));
+		} = positionLayout(layoutGraph, capacity, reach, arrangement, slack));
 		const resized = new Map(
 			[...nodeShapes, ...compositeShapes(groups)].map((node) => [node.nodeId, node]),
 		);
@@ -950,7 +934,6 @@ function layoutDiagramOnce(
 			portOffsets = assignDirectFeedbackPorts(
 				layoutGraph,
 				routedEdges,
-				diagram,
 				nodeShapes,
 				polish.repair,
 			).offsets;
@@ -1020,7 +1003,7 @@ function layoutDiagramOnce(
 		options,
 	);
 	if (orthogonal && polish.sides) {
-		const resided = resideArrivals(layoutGraph, routedEdges, edgeArrows, diagram, scale, "hooked");
+		const resided = resideArrivals(layoutGraph, routedEdges, edgeArrows, scale, "hooked");
 		if (resided.length > 0) {
 			const offsets = offsetsFor(routedEdges);
 			const retry = routeAllEdges(routedEdges, "orthogonal", offsets, nodeShapes, options);
@@ -1034,7 +1017,7 @@ function layoutDiagramOnce(
 		// Then arrivals crossed on their final approach, kept only if crossings drop
 		// and nothing else grows.
 		const crossed = arrangement.crossingRepair
-			? resideArrivals(layoutGraph, routedEdges, edgeArrows, diagram, scale, "crossed")
+			? resideArrivals(layoutGraph, routedEdges, edgeArrows, scale, "crossed")
 			: [];
 		if (crossed.length > 0) {
 			const offsets = offsetsFor(routedEdges);

@@ -1,17 +1,13 @@
 /** Owns the six-phase arrangement search and final Canvas assembly.
  * Candidate routing lives in layout; geometric repairs live in polish. */
-import { Result, Schema } from "effect";
 import {
 	type CanvasSpec,
+	type DiagramStyle,
 	AXIS_ALIGNED_EPSILON,
 	type CanvasFrameElement as FrameSceneElement,
 	CANVAS_SPEC_VERSION,
 } from "@sketchi/drawing";
-import {
-	type DiagramValidationError,
-	parseIntermediateDiagram,
-	type IntermediateDiagram,
-} from "./intermediate.js";
+import { type GraphInput } from "./input.js";
 import { type GraphRenderOptions } from "./options.js";
 import {
 	type DiagramLayout,
@@ -75,6 +71,7 @@ import { placedBranchLabels, branchLabels, clearLabels, clearOutlines } from "./
 import { EXPORT_PADDING, NODE_LABEL_FONT_SIZE } from "./measure.js";
 import {
 	stepsClearOfEnds,
+	straightEndsOffVertices,
 	centerLoneArrivals,
 	endsOffCorners,
 	straightenArrivals,
@@ -119,20 +116,10 @@ import {
 } from "./topology.js";
 import { unavoidableCrossings } from "./planarity.js";
 
-export function renderIntermediateDiagram(
-	input: unknown,
-): Result.Result<CanvasSpec, Schema.SchemaError | DiagramValidationError> {
-	return Result.map(parseIntermediateDiagram(input), renderGraphDiagram);
-}
-
-/**
- * Lay out and route an already validated graph. Families that build their own
- * graph call this directly: a state machine's graph has self-loops, edges that
- * start or end at a group (a composite state) and nodes without labels (its
- * pseudostates), which the graph contract alone does not accept.
- */
+/** Lay out and route the trusted geometry supplied by a validated family. */
 export function renderGraphDiagram(
-	diagram: IntermediateDiagram,
+	diagram: GraphInput,
+	presentation: { readonly id: string; readonly title: string; readonly style: DiagramStyle },
 	renderOptions: GraphRenderOptions = {},
 ): CanvasSpec {
 	// Curved lines follow the orthogonal routes, each corner curved (curvedScene).
@@ -140,6 +127,7 @@ export function renderGraphDiagram(
 		return curvedScene(
 			renderGraphDiagram(
 				{ ...diagram, layout: { ...diagram.layout, edgeRouting: "orthogonal" } },
+				presentation,
 				renderOptions,
 			),
 		);
@@ -150,7 +138,10 @@ export function renderGraphDiagram(
 	wrapZones(search);
 	const layout = polishAndClear(search);
 	const { groups, lanes, routedEdges } = layout;
-	const routedArrows = [...layout.edgeArrows];
+	const routedArrows =
+		diagram.layout.edgeRouting === "straight"
+			? straightEndsOffVertices(layout, renderOptions)
+			: [...layout.edgeArrows];
 	const descriptions = new Map(
 		diagram.nodes.flatMap((node) =>
 			node.description ? [[node.id, node.description] as const] : [],
@@ -168,13 +159,15 @@ export function renderGraphDiagram(
 	};
 	const framed = groups && !groups.zoned ? withGroupFrames(groups, drawn, routedEdges) : drawn;
 	const { arrows: edgeArrows, frames, labels } = framed;
-	const nodeShapes = framed.nodes.flatMap((shape) => drawnMarker(shape, diagram.style.accentColor));
+	const nodeShapes = framed.nodes.flatMap((shape) =>
+		drawnMarker(shape, presentation.style.accentColor),
+	);
 	// Lanes sit under everything, each band, then its header and the header's name;
 	// zones likewise, outermost first, each outline then its label.
 	const lane = lanes
 		? laneElements(lanes)
 		: groups?.zoned
-			? zoneElements(groups, diagram.style.accentColor)
+			? zoneElements(groups, presentation.style.accentColor)
 			: [];
 	const elements = normalizeSceneOrigin([
 		...lane,
@@ -195,12 +188,12 @@ export function renderGraphDiagram(
 	return {
 		kind: "canvas",
 		version: CANVAS_SPEC_VERSION,
-		diagramId: diagram.id,
-		title: diagram.title,
+		diagramId: presentation.id,
+		title: presentation.title,
 		width: bounds.width,
 		height: bounds.height,
-		accentColor: diagram.style.accentColor,
-		backgroundColor: diagram.style.backgroundColor,
+		accentColor: presentation.style.accentColor,
+		backgroundColor: presentation.style.backgroundColor,
 		elements,
 		layers: [],
 		layouts: [],
@@ -210,7 +203,6 @@ export function renderGraphDiagram(
 
 /** One render's search data. Only the prepared rank variants and chosen candidate change. */
 interface LayoutSearch {
-	readonly diagram: IntermediateDiagram;
 	readonly renderOptions: GraphRenderOptions;
 	readonly levels: ReturnType<typeof polishLevels>;
 	readonly arranged: boolean;
@@ -266,8 +258,9 @@ const consider = (
 	cleanerOnly = false,
 	readable = false,
 ) => {
-	const { diagram, renderOptions, levels } = search;
-	const layout = layoutDiagram(search.layoutGraph, renderOptions, diagram, levels[0]!, arrangement);
+	const { renderOptions, levels } = search;
+	
+	const layout = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 	const defects = defectsOf(layout);
 	if (
 		!fewer(search.best.defects, defects) &&
@@ -321,7 +314,8 @@ const finished = (search: LayoutSearch, settled: DiagramLayout) =>
 // an end are polished where that draws no worse: last, after every choice.
 // The ends' polish, from the straight runs on:
 const polished = (search: LayoutSearch, drawn: DiagramLayout, nest = true) => {
-	const { diagram, renderOptions, orthogonal } = search;
+	const { renderOptions, orthogonal } = search;
+	
 	const finish = (layout: DiagramLayout) => finished(search, layout);
 	const polishedEnds = (arrived: DiagramLayout) =>
 		stepsClearOfEnds(
@@ -349,16 +343,7 @@ const polished = (search: LayoutSearch, drawn: DiagramLayout, nest = true) => {
 	if (!orthogonal) return drawn;
 	const arrived = polishArrivals(
 		search.layoutGraph,
-		diagram,
-		returnsToNearVertices(
-			search.layoutGraph,
-			renderOptions,
-			diagram,
-			drawn,
-			finish,
-			defectsOf,
-			fewer,
-		),
+		returnsToNearVertices(search.layoutGraph, renderOptions, drawn, finish, defectsOf, fewer),
 		finish,
 		defectsOf,
 		fewer,
@@ -371,7 +356,6 @@ const polished = (search: LayoutSearch, drawn: DiagramLayout, nest = true) => {
 	const nested = nestSharedArrivals(
 		search.layoutGraph,
 		renderOptions,
-		diagram,
 		arrived,
 		finish,
 		defectsOf,
@@ -398,7 +382,7 @@ const clearedLast = (search: LayoutSearch, settled: DiagramLayout) => {
 
 /** 1. Settle the plain arrangement, dropping polish only to recover a valid export. */
 function settleWithPolishFallback(
-	diagram: IntermediateDiagram,
+	diagram: GraphInput,
 	renderOptions: GraphRenderOptions,
 ): LayoutSearch {
 	const layoutGraph = prepareGraph(diagram, renderOptions.placement === undefined);
@@ -407,11 +391,11 @@ function settleWithPolishFallback(
 	const levels = polishLevels(diagram.layout.edgeRouting);
 	const settle = (arrangement: Arrangement) => {
 		const [first, ...fallbacks] = levels;
-		let layout = layoutDiagram(layoutGraph, renderOptions, diagram, first!, arrangement);
+		let layout = layoutDiagram(layoutGraph, renderOptions, first!, arrangement);
 		let defects = defectsOf(layout);
 		for (const polish of fallbacks) {
 			if (defects[0] === 0 && defects[1] === 0) break;
-			const candidate = layoutDiagram(layoutGraph, renderOptions, diagram, polish, arrangement);
+			const candidate = layoutDiagram(layoutGraph, renderOptions, polish, arrangement);
 			const candidateDefects = defectsOf(candidate);
 			if (fewer(candidateDefects, defects)) [layout, defects] = [candidate, candidateDefects];
 		}
@@ -425,7 +409,6 @@ function settleWithPolishFallback(
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
 	const repairable = arranged && orthogonal && diagram.edges.length <= CROSSING_REPAIR_MAX_EDGES;
 	return {
-		diagram,
 		renderOptions,
 		layoutGraph,
 		levels,
@@ -439,7 +422,8 @@ function settleWithPolishFallback(
 
 /** 2. Try crossing repair, then reduced ranks only while crossings remain. */
 function repairInitialCrossings(search: LayoutSearch): void {
-	const { diagram, repairable } = search;
+	const { repairable } = search;
+	
 	// Crossing repairs are tried only where the polished router crossed: arrival
 	// order and moved arrivals stay when they route no worse, and reordered ranks
 	// only when they route with fewer crossings.
@@ -447,14 +431,15 @@ function repairInitialCrossings(search: LayoutSearch): void {
 		consider(search, { ...search.best.arrangement, crossingRepair: true }, false);
 	if (repairable && !laned(diagram) && arrowCrossings(search.best.layout.edgeArrows, false) > 0) {
 		search.layoutGraph = withReducedRanks(search.layoutGraph);
-		if (reordersRanks(search.layoutGraph, diagram))
+		if (reordersRanks(search.layoutGraph))
 			consider(search, { ...search.best.arrangement, reorder: true }, true);
 	}
 }
 
 /** 3. Wrap long flows or lane pools, then compare gap and line-break continuations. */
 function wrapFlow(search: LayoutSearch): boolean {
-	const { diagram, arranged, orthogonal, repairable } = search;
+	const { arranged, orthogonal, repairable } = search;
+	
 	const { aspect, balance, tooLong } = lengthOf(search, search.best.layout);
 	// Lanes wrap into pools only past the extreme aspect: a pool split apart reads
 	// worse than one long pool.
@@ -462,7 +447,7 @@ function wrapFlow(search: LayoutSearch): boolean {
 		arranged && orthogonal && tooLong
 			? laned(diagram)
 				? aspect >= WRAP_EXTREME_ASPECT
-					? planLaneWrap(search.layoutGraph, diagram)
+					? planLaneWrap(search.layoutGraph)
 					: NO_WRAP
 				: !search.layoutGraph.ranks
 					? NO_WRAP
@@ -532,7 +517,8 @@ function layGroupsAcrossFlow(search: LayoutSearch, tooLong: boolean): void {
 
 /** 5. Compare zone/frame bands, around-rank routes and room for outline clearance. */
 function wrapZones(search: LayoutSearch): void {
-	const { diagram, renderOptions, levels, arranged, orthogonal, repairable } = search;
+	const { renderOptions, levels, arranged, orthogonal, repairable } = search;
+	
 	const structure = search.layoutGraph.groups;
 	// A grouped flow still too long wraps level by level, each band reading in the
 	// stated direction and each group a whole block of its level, since a band cut
@@ -613,7 +599,6 @@ function wrapZones(search: LayoutSearch): void {
 		const plans = [false, ...(rowOfZones ? [true] : [])].flatMap((hangs) =>
 			planZoneWraps(
 				search.layoutGraph,
-				diagram,
 				structure,
 				kept.arrangement,
 				length.balance,
@@ -627,7 +612,7 @@ function wrapZones(search: LayoutSearch): void {
 				crossingRepair: repairable || kept.arrangement.crossingRepair,
 				zoneWraps,
 			};
-			const drawn = layoutDiagram(search.layoutGraph, renderOptions, diagram, levels[0]!, planned);
+			const drawn = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, planned);
 			// A plan that crosses more than the layout it replaces routes each line
 			// across the fewest lines before it, so a crossing the plain router draws
 			// does not alone push sibling zones apart. One still refused that keeps
@@ -643,7 +628,7 @@ function wrapZones(search: LayoutSearch): void {
 				!planned.avoidCrossings &&
 				arrowCrossings(drawn.edgeArrows, false) > arrowCrossings(kept.layout.edgeArrows, false);
 			const rerouted = crossed
-				? layoutDiagram(search.layoutGraph, renderOptions, diagram, levels[0]!, {
+				? layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, {
 						...planned,
 						avoidCrossings: true,
 					})
@@ -667,7 +652,6 @@ function wrapZones(search: LayoutSearch): void {
 					? repairCrossings(
 							search.layoutGraph,
 							renderOptions,
-							diagram,
 							levels[0]!,
 							unrepaired,
 							defectsOf,
@@ -736,7 +720,7 @@ function wrapZones(search: LayoutSearch): void {
 			zoneWraps: new Map([...chosen.arrangement.zoneWraps!, [TOP_LEVEL, { ...top, rise: true }]]),
 		};
 		const planned = (option: Arrangement) =>
-			positionLayout(search.layoutGraph, diagram, new Map(), new Map(), option)
+			positionLayout(search.layoutGraph, new Map(), new Map(), option)
 				.nodes.map((node) => `${node.x},${node.y}`)
 				.join(" ");
 		if (
@@ -746,13 +730,7 @@ function wrapZones(search: LayoutSearch): void {
 			!top.rise &&
 			planned(arrangement) !== planned(chosen.arrangement)
 		) {
-			const layout = layoutDiagram(
-				search.layoutGraph,
-				renderOptions,
-				diagram,
-				levels[0]!,
-				arrangement,
-			);
+			const layout = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 			const defects = defectsOf(layout);
 			if (
 				!fewer(chosen.defects, defects) &&
@@ -766,7 +744,7 @@ function wrapZones(search: LayoutSearch): void {
 	// A line into a hanging band that runs around a step of the target's rank
 	// to reach it is kept when that routes no worse, hooks or detours no line
 	// more, and draws the lines shorter in total.
-	const cuts = zoneCutEdges(search.layoutGraph, diagram, search.best.arrangement.zoneWraps);
+	const cuts = zoneCutEdges(search.layoutGraph, search.best.arrangement.zoneWraps);
 	if (
 		search.best.arrangement.zoneWraps &&
 		!search.best.arrangement.aroundRanks &&
@@ -777,13 +755,7 @@ function wrapZones(search: LayoutSearch): void {
 		)
 	) {
 		const arrangement = { ...search.best.arrangement, aroundRanks: true };
-		const layout = layoutDiagram(
-			search.layoutGraph,
-			renderOptions,
-			diagram,
-			levels[0]!,
-			arrangement,
-		);
+		const layout = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 		const defects = defectsOf(layout);
 		const total = ({ edgeArrows }: DiagramLayout) =>
 			edgeArrows.reduce((sum, arrow) => sum + routeLength(arrow.points), 0);
@@ -808,13 +780,7 @@ function wrapZones(search: LayoutSearch): void {
 		const zoneSlack = new Map(search.best.arrangement.zoneSlack ?? []);
 		for (const id of roomless) zoneSlack.set(id, (zoneSlack.get(id) ?? 0) + GROUP_SLACK);
 		const arrangement = { ...search.best.arrangement, zoneSlack };
-		const layout = layoutDiagram(
-			search.layoutGraph,
-			renderOptions,
-			diagram,
-			levels[0]!,
-			arrangement,
-		);
+		const layout = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 		const defects = defectsOf(layout);
 		if (
 			!fewer(search.best.defects, defects) &&
@@ -827,7 +793,8 @@ function wrapZones(search: LayoutSearch): void {
 
 /** 6. Repair and tighten the winner, clear heads/touches, then judge fully drawn rivals. */
 function polishAndClear(search: LayoutSearch): DiagramLayout {
-	const { diagram, renderOptions, levels, arranged, orthogonal, vertical, repairable } = search;
+	const { renderOptions, levels, arranged, orthogonal, vertical, repairable } = search;
+	
 	const structure = search.layoutGraph.groups;
 	// In lanes a step takes lines in and sends them out by different sides, when
 	// that routes no worse.
@@ -837,15 +804,7 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 	const repaired = (settled: SettledLayout) => {
 		const crossings = arrowCrossings(settled.layout.edgeArrows);
 		return repairable && crossings > 0 && crossings <= CROSSING_REPAIR_MAX_CROSSINGS
-			? repairCrossings(
-					search.layoutGraph,
-					renderOptions,
-					diagram,
-					levels[0]!,
-					settled,
-					defectsOf,
-					fewer,
-				)
+			? repairCrossings(search.layoutGraph, renderOptions, levels[0]!, settled, defectsOf, fewer)
 			: settled;
 	};
 	let layout: DiagramLayout;
@@ -870,13 +829,7 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 			arrowCrossings(search.best.layout.edgeArrows) > 0
 		) {
 			const arrangement = { ...unrepaired.arrangement, wrap: { ...gapWrap, lineBreaks: true } };
-			const layout = layoutDiagram(
-				search.layoutGraph,
-				renderOptions,
-				diagram,
-				levels[0]!,
-				arrangement,
-			);
+			const layout = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 			const around = repaired({ arrangement, defects: defectsOf(layout), layout });
 			if (
 				!fewer(search.best.defects, around.defects) &&
@@ -922,7 +875,6 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 					search.best = repairCrossings(
 						search.layoutGraph,
 						renderOptions,
-						diagram,
 						levels[0]!,
 						search.best,
 						defectsOf,
@@ -977,13 +929,7 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 				: lengthOf(search, layout).aspect >= COMPACT_ASPECT) &&
 			(!laned(diagram) || headCrossers(layout).size === 0);
 		const tighten = (arrangement: Arrangement) => {
-			const attempt = layoutDiagram(
-				search.layoutGraph,
-				renderOptions,
-				diagram,
-				levels[0]!,
-				arrangement,
-			);
+			const attempt = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 			const compact = repaired({ arrangement, defects: defectsOf(attempt), layout: attempt });
 			const candidate = finished(search, compact.layout);
 			const lengths = new Map(
@@ -1010,22 +956,12 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 			return false;
 		};
 		if (laned(diagram) && tightenable()) {
-			const through = laneColumns(search.layoutGraph, diagram, true);
-			if (
-				[...laneColumns(search.layoutGraph, diagram)].some(
-					([id, column]) => through.get(id) !== column,
-				)
-			)
+			const through = laneColumns(search.layoutGraph, true);
+			if ([...laneColumns(search.layoutGraph)].some(([id, column]) => through.get(id) !== column))
 				tighten({ ...search.best.arrangement, throughHandoffs: true });
 		}
 		for (const straight of tightenable() ? [false, true] : []) {
-			const gaps = compactGaps(
-				search.layoutGraph,
-				diagram,
-				layout,
-				search.best.arrangement,
-				straight,
-			);
+			const gaps = compactGaps(search.layoutGraph, layout, search.best.arrangement, straight);
 			if (gaps.size > 0 && tighten({ ...search.best.arrangement, compactGaps: gaps })) break;
 		}
 		// A row of lanes still longer than LANE_ASPECT for its breadth raises its
@@ -1042,13 +978,7 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 				: undefined;
 		if (breadth !== undefined) {
 			const arrangement = { ...search.best.arrangement, laneBreadth: breadth };
-			const attempt = layoutDiagram(
-				search.layoutGraph,
-				renderOptions,
-				diagram,
-				levels[0]!,
-				arrangement,
-			);
+			const attempt = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 			const broad = repaired({ arrangement, defects: defectsOf(attempt), layout: attempt });
 			const candidate = finished(search, broad.layout);
 			if (
@@ -1108,13 +1038,7 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 		}
 		if (repairable && crossers.size > 0) {
 			const arrangement = { ...search.best.arrangement, clearHeads: true };
-			const attempt = layoutDiagram(
-				search.layoutGraph,
-				renderOptions,
-				diagram,
-				levels[0]!,
-				arrangement,
-			);
+			const attempt = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 			clearings.push(
 				finished(
 					search,
@@ -1223,7 +1147,7 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 		const arrangement = { ...search.best.arrangement, clearTouches: true, spreadFacing: true };
 		const attempt =
 			repairable && scratch && !laned(diagram)
-				? layoutDiagram(search.layoutGraph, renderOptions, diagram, levels[0]!, arrangement)
+				? layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement)
 				: undefined;
 		const fresh = attempt
 			? clearest([repaired({ arrangement, defects: defectsOf(attempt), layout: attempt }).layout])
@@ -1270,7 +1194,6 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 		({ layout, settled: search.best } = chooseBranchSides(
 			search.layoutGraph,
 			renderOptions,
-			diagram,
 			levels[0]!,
 			beforeRepairs,
 			{ layout, settled: search.best },
@@ -1307,13 +1230,7 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 		if (narrow.size > 0) {
 			const drawn = { layout, settled: search.best };
 			const arrangement = { ...search.best.arrangement, widenGaps: narrow };
-			const attempt = layoutDiagram(
-				search.layoutGraph,
-				renderOptions,
-				diagram,
-				levels[0]!,
-				arrangement,
-			);
+			const attempt = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 			const settled = { arrangement, defects: defectsOf(attempt), layout: attempt };
 			const [candidate, current] = [polished(search, finished(search, attempt)), drawn.layout].map(
 				(layout) => clearedLast(search, layout),
@@ -1378,7 +1295,7 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 		const through = search.layoutGraph.groups?.top.through;
 		return [
 			...(nests() ? [{ nestAround: true }] : []),
-			...(skipsRanks(search.layoutGraph, diagram, arrowCrossings(layout.edgeArrows))
+			...(skipsRanks(search.layoutGraph, arrowCrossings(layout.edgeArrows))
 				? [{ skipLanes: true }]
 				: []),
 			...(through !== undefined
@@ -1407,13 +1324,7 @@ function polishAndClear(search: LayoutSearch): DiagramLayout {
 	const rivalFrom = (rivalArrangement: Partial<Arrangement>) => {
 		const drawn = { layout, settled: search.best };
 		const arrangement = { ...beforeRepairs.arrangement, ...rivalArrangement };
-		const attempt = layoutDiagram(
-			search.layoutGraph,
-			renderOptions,
-			diagram,
-			levels[0]!,
-			arrangement,
-		);
+		const attempt = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 		const crossings = arrowCrossings(layout.edgeArrows);
 		// A rival that crosses far more before its repairs than the arranged
 		// layout did, or still crosses as many once repaired, is drawn no further.

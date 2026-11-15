@@ -1,10 +1,10 @@
 import { type CanvasSpec } from "@sketchi/drawing";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
-import { flowchartDiagramFromSpec } from "@sketchi/diagrams/families/flowchart/spec";
+import { flowchartDiagramFromSpec } from "@sketchi/diagrams/families/flowchart/document";
 import { type FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
 import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { renderMindmap } from "@sketchi/diagrams/families/mindmap/index";
 
 import { DrawingEditor } from "@sketchi/editor";
@@ -74,7 +74,7 @@ function useCuratedScene(example: CuratedExample | undefined): CanvasSpec | null
 				example.scene ??
 				(example.spec
 					? Result.getOrElse(
-							renderIntermediateDiagram(flowchartDiagramFromSpec(example.spec)),
+							renderFlowchartDiagram(flowchartDiagramFromSpec(example.spec)),
 							() => null,
 						)
 					: null)

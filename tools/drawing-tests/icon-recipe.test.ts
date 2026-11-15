@@ -1,5 +1,4 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -11,8 +10,8 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasElement as SceneElement,
 } from "@sketchi/drawing";
-import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 
 import {
 	convertSceneToExcalidraw,
@@ -110,7 +109,7 @@ describe("drawing icon recipes", () => {
 describe("hand-drawn node logos in Excalidraw output", () => {
 	const scene = (exactIcons = false) =>
 		embedCanvasIcons(
-			renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
+			renderFlowchartDiagram(deployPipelineLogoFlowchart),
 			(slug) => ({
 				name: slug,
 				recipe: RECIPE,
@@ -172,7 +171,7 @@ describe("hand-drawn node logos in Excalidraw output", () => {
 		convertSceneToExcalidraw(
 			embedCanvasIcons(
 				{
-					...renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
+					...renderFlowchartDiagram(deployPipelineLogoFlowchart),
 					elements,
 					zOrder: elements.map((element) => element.id),
 				},
@@ -212,7 +211,7 @@ describe("hand-drawn node logos in Excalidraw output", () => {
 		const excalidraw = convertSceneToExcalidraw(
 			embedCanvasIcons(
 				{
-					...renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
+					...renderFlowchartDiagram(deployPipelineLogoFlowchart),
 					elements: [logoNode(), authored],
 					zOrder: ["n", "n-icon-0"],
 				},
@@ -263,7 +262,7 @@ describe("hand-drawn node logos in Excalidraw output", () => {
 		const excalidraw = convertSceneToExcalidraw(
 			embedCanvasIcons(
 				{
-					...renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
+					...renderFlowchartDiagram(deployPipelineLogoFlowchart),
 					elements: [frame],
 					zOrder: ["zone"],
 				},
@@ -316,7 +315,7 @@ describe("inverted marks on light-on-dark nodes", () => {
 		const excalidraw = convertSceneToExcalidraw(
 			embedCanvasIcons(
 				{
-					...renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
+					...renderFlowchartDiagram(deployPipelineLogoFlowchart),
 					backgroundColor,
 					elements: [shape],
 					zOrder: ["n"],

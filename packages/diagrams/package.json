@@ -75,10 +75,6 @@
 			"types": "./dist/families/flowchart/crossing-fixtures.d.ts",
 			"default": "./dist/families/flowchart/crossing-fixtures.js"
 		},
-		"./families/flowchart/diagram": {
-			"types": "./dist/families/flowchart/diagram.d.ts",
-			"default": "./dist/families/flowchart/diagram.js"
-		},
 		"./families/flowchart/document": {
 			"types": "./dist/families/flowchart/document.d.ts",
 			"default": "./dist/families/flowchart/document.js"
@@ -106,10 +102,6 @@
 		"./families/flowchart/rules": {
 			"types": "./dist/families/flowchart/rules.d.ts",
 			"default": "./dist/families/flowchart/rules.js"
-		},
-		"./families/flowchart/spec": {
-			"types": "./dist/families/flowchart/spec.d.ts",
-			"default": "./dist/families/flowchart/spec.js"
 		},
 		"./families/flowchart/zone-fixtures": {
 			"types": "./dist/families/flowchart/zone-fixtures.d.ts",
@@ -351,10 +343,6 @@
 			"types": "./dist/generate/styling.d.ts",
 			"default": "./dist/generate/styling.js"
 		},
-		"./graph/intermediate": {
-			"types": "./dist/graph/intermediate.d.ts",
-			"default": "./dist/graph/intermediate.js"
-		},
 		"./graph/planarity": {
 			"types": "./dist/graph/planarity.d.ts",
 			"default": "./dist/graph/planarity.js"
@@ -394,6 +382,26 @@
 		"./families/flowchart/issues": {
 			"types": "./dist/families/flowchart/issues.d.ts",
 			"default": "./dist/families/flowchart/issues.js"
+		},
+		"./families/flowchart/fixtures": {
+			"types": "./dist/families/flowchart/diagram.d.ts",
+			"default": "./dist/families/flowchart/diagram.js"
+		},
+		"./families/flowchart/render": {
+			"types": "./dist/families/flowchart/spec.d.ts",
+			"default": "./dist/families/flowchart/spec.js"
+		},
+		"./graph/input": {
+			"types": "./dist/graph/intermediate.d.ts",
+			"default": "./dist/graph/intermediate.js"
+		},
+		"./families/flowchart/build": {
+			"types": "./dist/families/flowchart/build.d.ts",
+			"default": "./dist/families/flowchart/build.js"
+		},
+		"./build/input": {
+			"types": "./dist/build/input.d.ts",
+			"default": "./dist/build/input.js"
 		}
 	},
 	"dependencies": {

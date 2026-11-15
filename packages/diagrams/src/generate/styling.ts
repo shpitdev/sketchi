@@ -1,9 +1,7 @@
-import { DIAGRAM_NODE_COLORS, type DiagramNodeColor } from "../graph/intermediate.js";
-import {
+import { FLOWCHART_NODE_COLORS, type FlowchartNodeColor,
 	flowchartNodeDetails,
 	resolveFlowchartReference,
-	type FlowchartDocument,
-} from "../families/flowchart/document.js";
+	type FlowchartDocument } from "../families/flowchart/document.js";
 import { Result, Schema } from "effect";
 
 import { isUnknownRecord } from "./unknown-record.js";
@@ -68,10 +66,10 @@ export function generatedStyles(raw: unknown, diagnostics: string[]): DiagramSty
 const hexRgb = (hex: string) => [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
 
 /** The palette color a #rrggbb names: its stroke or tint exactly, else the nearest stroke. */
-function paletteColor(hex: string): DiagramNodeColor {
+function paletteColor(hex: string): FlowchartNodeColor {
 	const wanted = hex.toLowerCase();
-	const entries = Object.entries(DIAGRAM_NODE_COLORS) as [
-		DiagramNodeColor,
+	const entries = Object.entries(FLOWCHART_NODE_COLORS) as [
+		FlowchartNodeColor,
 		{ readonly stroke: string; readonly fill: string },
 	][];
 	const exact = entries.find(([, { stroke, fill }]) => stroke === wanted || fill === wanted);

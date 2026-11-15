@@ -9,7 +9,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 }));
 
 import { chartFixture } from "@sketchi/diagrams/families/chart/document";
-import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/diagram";
+import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/fixtures";
 import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 
 import { timelineFixture } from "@sketchi/diagrams/families/timeline/document";

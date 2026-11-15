@@ -3,7 +3,7 @@ import {
 	FLOWCHART_REQUEST_MAX_LENGTH,
 	type BuildFlowchartResult,
 	type BuildFlowchartToolInput,
-} from "@sketchi/diagrams/build/code-mode/contract";
+} from "@sketchi/diagrams/families/flowchart/build";
 import "@tanstack/react-start/server-only";
 
 import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";

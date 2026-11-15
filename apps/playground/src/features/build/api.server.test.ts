@@ -16,7 +16,7 @@ import {
 	type CodeModeObjectBucket,
 	type CodeModeObjectBucketObject,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
+import { type BuildFlowchartResult } from "@sketchi/diagrams/families/flowchart/build";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 
 import { type StudioEnv } from "../../server/bindings/studio-env.server";

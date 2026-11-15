@@ -2,7 +2,6 @@
 import {
 	DEFAULT_GLYPH_UNITS,
 	type CanvasShapeKind as NodeSceneShape,
-	type CanvasComposedShapeKind,
 	wrapTextToUnits,
 	estimateTextWidth,
 	CANVAS_NODE_ICON,
@@ -15,12 +14,7 @@ import {
 	wrapTextToWidth,
 	wrappedLabelWidth,
 } from "@sketchi/drawing";
-import {
-	type DiagramNode,
-	type DiagramEdge,
-	type GraphNode,
-	DIAGRAM_NODE_COLORS,
-} from "./intermediate.js";
+import { type GraphNode, type GraphEdge } from "./input.js";
 import { type LayoutEdge, type LabelMetrics, type DescriptionMetrics } from "./layout-types.js";
 
 export const MIN_NODE_WIDTH = 184;
@@ -58,11 +52,6 @@ const NODE_ICON_SIZE: Readonly<Record<NodeSceneShape, number>> = {
 	polygon: 28,
 	rectangle: 28,
 };
-
-/** The canvas shape each infrastructure node shape draws as. */
-const COMPOSED_SHAPES: Readonly<
-	Record<NonNullable<DiagramNode["shape"]>, CanvasComposedShapeKind>
-> = { database: "cylinder", queue: "pipe", document: "document", storage: "bucket" };
 
 /** Excalidraw draws an arrowhead this long, at most half its final run. */
 export const ARROWHEAD_LENGTH = 25;
@@ -223,36 +212,12 @@ export function branches(kind: string | undefined): boolean {
 	return kind === "decision" || kind === "choice";
 }
 
-function shapeForNode(node: DiagramNode): NodeSceneShape {
-	if (node.shape !== undefined) return COMPOSED_SHAPES[node.shape];
-	const kind = node.kind?.toLowerCase();
-	if (kind === "start" || kind === "end") {
-		return "ellipse";
-	}
-	if (kind === "initial" || kind === "final") {
-		return "circle";
-	}
-	if (branches(kind)) {
-		return "diamond";
-	}
-	return "rectangle";
-}
-
-/** A colored node's stroke and its pale fill, so its label stays readable. */
-function nodeColorStyle(
-	node: GraphNode,
-): Pick<NodeSceneElement, "fillColor" | "fillStyle" | "strokeColor"> {
-	if (!node.color) return {};
-	const { stroke, fill } = DIAGRAM_NODE_COLORS[node.color];
-	return { strokeColor: stroke, fillColor: fill, fillStyle: "solid" };
-}
-
 export function createNodeShape(
 	node: GraphNode,
 	minimumWidth = MIN_NODE_WIDTH,
 	lineUnits = MAX_LABEL_LINE_UNITS,
 ): NodeSceneElement {
-	return { ...createUncoloredNodeShape(node, minimumWidth, lineUnits), ...nodeColorStyle(node) };
+	return { ...createUncoloredNodeShape(node, minimumWidth, lineUnits), ...node.paint };
 }
 
 function createUncoloredNodeShape(
@@ -260,7 +225,7 @@ function createUncoloredNodeShape(
 	minimumWidth: number,
 	lineUnits: number,
 ): NodeSceneElement {
-	const shape = shapeForNode(node);
+	const shape = node.shape;
 	const marker = markerSize(node);
 	if (marker !== undefined || (node.kind === "choice" && !node.label)) {
 		const size = marker ?? CHOICE_SIZE;
@@ -369,8 +334,8 @@ function freeLabelSize(
 /** Each edge carries its label measurements through every arrangement and route.
  * A decision's compact label and its wide shared-port pitch are distinct sizes. */
 export function measureEdges(
-	nodes: readonly DiagramNode[],
-	edges: readonly DiagramEdge[],
+	nodes: readonly GraphNode[],
+	edges: readonly GraphEdge[],
 ): LayoutEdge[] {
 	const labels = new Set(edges.flatMap((edge) => (edge.label ? [edge.label] : [])));
 	const decisions = new Set(nodes.filter((node) => branches(node.kind)).map((node) => node.id));

@@ -1,5 +1,6 @@
 import { fnv1a32 } from "./hash.js";
 import { type IconRecipe } from "./icon-recipe.js";
+import { Schema } from "effect";
 
 /**
  * Community icons live under their own namespace, so a catalog slug always
@@ -27,6 +28,16 @@ export const DRAWN_ICON_COLLECTION = "drawn";
 export const DIAGRAM_ICON_SLUG_PATTERN =
 	/^(?:community\/|drawn\/)?(?=[a-z0-9-]{1,64}$)[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 export const DIAGRAM_ICON_SLUG_MAX_LENGTH = 64 + COMMUNITY_ICON_SLUG_PREFIX.length;
+
+/** A catalog mark; hosts resolve its slug before composing a drawing. */
+export const DiagramIconRef = Schema.Struct({
+	slug: Schema.NonEmptyString.check(
+		Schema.isPattern(DIAGRAM_ICON_SLUG_PATTERN),
+		Schema.isMaxLength(DIAGRAM_ICON_SLUG_MAX_LENGTH),
+	),
+}).annotate({ identifier: "DiagramIconRef" });
+
+export interface DiagramIconRef extends Schema.Schema.Type<typeof DiagramIconRef> {}
 
 export function isDiagramIconSlug(value: string): boolean {
 	return value.length <= DIAGRAM_ICON_SLUG_MAX_LENGTH && DIAGRAM_ICON_SLUG_PATTERN.test(value);
