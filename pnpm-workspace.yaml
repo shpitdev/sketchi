@@ -7,6 +7,7 @@ packages:
 catalog:
   effect: 4.1.4
   "@effect/atom-react": 4.1.4
+  "@effect/platform-browser": 4.1.4
   scheduler: 0.28.0
   "@google/genai": 3.3.0
   google-auth-library: 10.9.1

@@ -15,7 +15,7 @@
 		"@effect/atom-react": "catalog:",
 		"effect": "catalog:",
 		"scheduler": "catalog:",
-		"@effect/platform-browser": "4.1.4",
+		"@effect/platform-browser": "catalog:",
 		"radix-ui": "1.8.1"
 	},
 	"devDependencies": {
