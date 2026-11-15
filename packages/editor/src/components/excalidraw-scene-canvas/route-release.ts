@@ -35,7 +35,7 @@ export function createFoldedRouteRelease(mutateElement: MutateElement) {
 		);
 		for (const { id } of released) {
 			const arrow = live.get(id);
-			if (arrow && isArrow(arrow)) routeReleased(mutateElement, arrow);
+			if (arrow && isArrow(arrow)) routeReleased(mutateElement, arrow, live);
 		}
 		return api.getSceneElementsIncludingDeleted();
 	};

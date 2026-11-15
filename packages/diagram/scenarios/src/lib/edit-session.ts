@@ -73,7 +73,14 @@ export interface ExcalidrawEditor {
 			elementsMap: Map<string, EditorElement>,
 		): Point[];
 	};
-	mutateElement(element: EditorElement, updates: { points: Point[] }): EditorElement;
+	mutateElement(
+		element: EditorElement,
+		updates: {
+			points?: Point[];
+			startBinding?: EditorBinding | null;
+			endBinding?: EditorBinding | null;
+		},
+	): EditorElement;
 	restoreElements(
 		elements: readonly unknown[],
 		local: null,
@@ -331,7 +338,12 @@ export function createEditSession(editor: ExcalidrawEditor) {
 		for (const arrow of released)
 			routeReleased(
 				(element, updates) => editor.mutateElement(element, updates),
-				arrow as EditorElement & { points: Point[] },
+				arrow as EditorElement & {
+					points: Point[];
+					startBinding: EditorBinding | null;
+					endBinding: EditorBinding | null;
+				},
+				scene.getNonDeletedElementsMap(),
 			);
 		return released.map((arrow) => arrow.id);
 	}

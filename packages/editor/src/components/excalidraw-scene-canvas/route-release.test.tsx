@@ -119,6 +119,27 @@ describe("createFoldedRouteRelease", () => {
 			expect(expectNativeEnds()).toEqual(bindings);
 			move("node:check", [12, 8]);
 			expect(expectNativeEnds()).toEqual(bindings);
+			const beforeReload = structuredClone(read());
+			scene.replaceAllElements(
+				native.restoreElements(beforeReload, null, {
+					refreshDimensions: false,
+					repairBindings: true,
+				}),
+			);
+			for (const shape of scene.getNonDeletedElements()) {
+				if (native.isBindableElement(shape))
+					native.updateBoundElements(shape, scene.getNonDeletedElementsMap());
+			}
+			expect(expectNativeEnds()).toEqual(bindings);
+			const beforeArrow = beforeReload.find((element) => element.id === "edge:check->start");
+			const afterArrow = read().find((element) => element.id === "edge:check->start");
+			if (beforeArrow?.type !== "arrow" || afterArrow?.type !== "arrow")
+				throw new Error("Missing retry route after reload");
+			expect([afterArrow.x, afterArrow.y, afterArrow.points]).toEqual([
+				beforeArrow.x,
+				beforeArrow.y,
+				beforeArrow.points,
+			]);
 		} finally {
 			scene.destroy();
 		}
@@ -163,7 +184,8 @@ describe("createFoldedRouteRelease", () => {
 		expect(api.updateScene).toHaveBeenCalledOnce();
 		expect(next).toBe(scene);
 		expect(next.find((element) => element.id === "route")?.x).toBe(999);
-		expect(mutateElement).toHaveBeenCalledExactlyOnceWith(
+		expect(mutateElement).toHaveBeenNthCalledWith(
+			1,
 			expect.objectContaining({ id: "route", elbowed: true }),
 			{ points: [expect.any(Array), expect.any(Array)] },
 		);

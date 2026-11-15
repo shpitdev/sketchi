@@ -1,4 +1,10 @@
-import { type Point } from "./excalidraw-binding.js";
+import {
+	EXCALIDRAW_ELBOW_DISTANCE,
+	excalidrawFixedGlobalPoint,
+	excalidrawKeepsElbowEnd,
+	excalidrawOutlineHit,
+	type Point,
+} from "./excalidraw-binding.js";
 import { elbowFixedPointAt, routeEntersShape } from "./route-folds.js";
 
 /** The fields of an Excalidraw element the release step reads. */
@@ -213,11 +219,67 @@ export function createRouteRelease() {
 /**
  * Has Excalidraw route a released arrow, once it is in the editor's scene: an
  * elbow arrow with nothing pinned is routed afresh from its bindings whenever
- * its ends move. Takes the mutateElement of the Excalidraw module the editor runs.
+ * its ends move. Native routing snaps endpoints without rewriting fixed-point
+ * metadata. Keep the drawn ports, adapt their gap to native elbow snapping,
+ * and route the points and bindings together so later moves read the same ports.
+ * Takes the mutateElement of the Excalidraw module the editor runs and its live shapes.
  */
-export function routeReleased<Arrow extends { readonly points: readonly unknown[] }>(
-	mutateElement: (arrow: Arrow, updates: { points: Arrow["points"] }) => unknown,
+export function routeReleased<
+	Arrow extends {
+		readonly points: readonly Point[];
+		readonly x: number;
+		readonly y: number;
+		readonly startBinding: ReleasableBinding | null;
+		readonly endBinding: ReleasableBinding | null;
+	},
+>(
+	mutateElement: (
+		arrow: Arrow,
+		updates: {
+			points?: Arrow["points"];
+			startBinding?: Arrow["startBinding"];
+			endBinding?: Arrow["endBinding"];
+		},
+	) => unknown,
 	arrow: Arrow,
+	shapes: ReadonlyMap<string, ReleasableElement>,
 ): void {
+	const binding = <Binding extends ReleasableBinding | null>(bound: Binding) => {
+		const shape = bound && shapes.get(bound.elementId);
+		if (!bound?.fixedPoint || !shape || shape.width <= 0 || shape.height <= 0) return undefined;
+		const point = excalidrawFixedGlobalPoint(shape, bound.fixedPoint);
+		if (excalidrawKeepsElbowEnd(shape, point)) return undefined;
+		const center: Point = [shape.x + shape.width / 2, shape.y + shape.height / 2];
+		const outline = excalidrawOutlineHit(shape, point, center) ?? point;
+		const dx = point[0] - center[0],
+			dy = point[1] - center[1];
+		const length = Math.hypot(dx, dy);
+		// Native bindPointToSnapToElementOutline uses a radial 5px gap. Its
+		// strict greater-than branch needs the native PRECISION (1e-4) margin
+		// when roundoff would otherwise snap an already-routed port again.
+		const gap = EXCALIDRAW_ELBOW_DISTANCE + 1e-4;
+		const snapped: Point = length
+			? [outline[0] + (dx / length) * gap, outline[1] + (dy / length) * gap]
+			: point;
+		const [x, y] = elbowFixedPointAt(shape, snapped);
+		return { ...bound, fixedPoint: [x, y] as [number, number] };
+	};
+	const startBinding = binding(arrow.startBinding);
+	const endBinding = binding(arrow.endBinding);
 	mutateElement(arrow, { points: [arrow.points[0], arrow.points.at(-1)] as Arrow["points"] });
+	if (!startBinding && !endBinding) return;
+	const endpoint = (bound: typeof startBinding, point: Point): Point => {
+		const shape = bound && shapes.get(bound.elementId);
+		if (!bound || !shape) return point;
+		const [x, y] = excalidrawFixedGlobalPoint(shape, bound.fixedPoint);
+		return [x - arrow.x, y - arrow.y];
+	};
+	mutateElement(arrow, {
+		points: [
+			endpoint(startBinding, arrow.points[0]!),
+			endpoint(endBinding, arrow.points.at(-1)!),
+		] as Arrow["points"],
+		...(startBinding ? { startBinding } : {}),
+		...(endBinding ? { endBinding } : {}),
+	});
 }
