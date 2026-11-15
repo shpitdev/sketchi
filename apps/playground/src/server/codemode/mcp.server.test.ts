@@ -4,7 +4,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
-import { Context, Effect, Option, Schema } from "effect";
+import { Array as EffectArray, Context, Effect, Option, Schema, Stream } from "effect";
+import { Tool, Toolkit } from "effect/ai";
 
 import type { CodeModeObjectBucket, CodeModeObjectBucketObject } from "@sketchi/diagram-agent";
 import { normalizedSpecFrom } from "@sketchi/diagram-scenarios";
@@ -16,7 +17,6 @@ import type { StudioEnv } from "../bindings/studio-env.server";
 import type { PngRenderResult } from "./png-renderer-object.server";
 import { PlaygroundRequestMetadata } from "../runtime/context.server";
 import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runtime.server";
-import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { PlaygroundCodeMode } from "./service.server";
 import {
 	formatCodeModeDocs,
@@ -31,14 +31,16 @@ import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "./usage-events.se
 import {
 	ExecuteRequestSchema,
 	ExecuteResultSchema,
-	createSketchiMcpServer as createSketchiMcpServerEffect,
 	executeSketchiCodeMode as executeSketchiCodeModeEffect,
-	handleSketchiMcpRequest as handleSketchiMcpRequestEffect,
 	makeSketchiCodeModeProvider,
 	normalizeSketchiExecuteCode,
 	type CodeModeMcpOptions,
 	type SketchiCodeModeExecutor,
 	type SketchiCodeModeProvider,
+} from "./execute.server";
+import {
+	createSketchiMcpServer as createSketchiMcpServerEffect,
+	handleSketchiMcpRequest as handleSketchiMcpRequestEffect,
 } from "./mcp.server";
 
 function stubPngRenderer() {
@@ -1332,17 +1334,38 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 	});
 
 	it("returns Standard Schema issues for invalid tool output", async () => {
-		const invalidOutput = makeEffectMcpTool("invalid-output", {
-			title: "Invalid output fixture",
+		const invalidTool = Tool.make("invalid-output", {
 			description: "Exercises MCP output validation.",
-			inputSchema: toPlaygroundStandardSchema(
-				Schema.Struct({ ok: Schema.optionalKey(Schema.Boolean) }),
-			),
-			outputSchema: toPlaygroundStandardSchema(Schema.Struct({ value: Schema.String })),
-		}).bind(() => ({
-			content: [{ type: "text", text: "invalid" }],
-			structuredContent: { value: 1 },
-		}));
+			parameters: Schema.Struct({ ok: Schema.optionalKey(Schema.Boolean) }),
+			success: Schema.Struct({ value: Schema.String }),
+		}).annotate(Tool.Title, "Invalid output fixture");
+		const toolkit = Toolkit.make(invalidTool);
+		const invalidOutput = makeEffectMcpTool(invalidTool, (result) =>
+			Effect.succeed({
+				content: [{ type: "text", text: "invalid" }],
+				structuredContent: result,
+			}),
+		).bind(
+			(input) =>
+				Effect.gen(function* () {
+					const handlers = yield* toolkit;
+					const results = yield* (yield* handlers.handle("invalid-output", input)).pipe(
+						Stream.runCollect,
+					);
+					return yield* Schema.decodeUnknownEffect(invalidTool.successSchema)(
+						Option.getOrThrow(EffectArray.head(results)).result,
+					).pipe(Effect.orDie);
+				}).pipe(
+					Effect.provide(
+						toolkit.toLayer({
+							// Intentionally malformed external result: the public Toolkit must reject it at runtime.
+							"invalid-output": () => Effect.succeed({ value: 1 } as unknown as { value: string }),
+						}),
+					),
+				),
+			Effect.runPromise,
+		);
+
 		const server = createEffectMcpServer({
 			name: "effect-mcp-output-validation-test",
 			tools: [invalidOutput],
