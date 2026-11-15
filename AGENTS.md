@@ -11,24 +11,33 @@ Convex, Vercel, Bun, or Turborepo stack.
 - Prefer readable, tested package boundaries over compatibility layers.
 - Treat diagram generation as product-critical infrastructure: deterministic inputs, typed intermediate representation, functional tests, and Storybook coverage.
 - Delete obsolete approaches when replacing them. Do not carry parallel systems unless a migration step explicitly requires it.
-- Graded evals live in Frontierclimb (catalogs `sketchi` and `sketchi-generate`); do not add eval suites or case sets here.
+- Frontierclimb owns the graded catalogs `sketchi` and `sketchi-generate`, and currently calls Sketchi's scenario CLI for case discovery and deterministic grading. Preserve those real callers when moving scenarios to tools; do not add a parallel eval system or assume the existing graders are already copied to Frontierclimb.
 - Generation cost is product quality. A diagram that reads badly is a failure, and so is one that takes excess tokens, tool calls, retries or wall time to produce. Measure both before claiming an improvement.
 - Diagrams are Excalidraw sketches: keep them simple and readable at a glance. Prefer fewer elements and standard stroke widths to fine detail or thin lines. Size limits are ceilings, not targets: draw what the request needs, and keep each family to the size that still reads as a sketch.
 
 ## Delegated agents
 
-- A Claude orchestrator in the canonical root plans the work, creates and cleans
-  Herdr worktrees, launches and steers agents, routes review findings, manages
-  GitHub issues and Graphite PRs, merges green slices, and verifies main and
-  production. It does not implement product, source or test changes itself.
-- Implementation: one Claude Opus 5.5 agent per slice (`--model claude-opus-5-5`)
-  in its own Herdr worktree, with effort set explicitly (`high`, or `xhigh` for
-  routing and layout).
-- Independent review: a Codex `gpt-6.1-sol` session separate from the author,
-  with reasoning effort set explicitly, running `codex review --base <parent>`.
-  Findings go back to the implementer once; the orchestrator then decides.
-- Browser and render verification: Codex `gpt-6.1-sol`.
-- Never select a Fable model.
+- One Codex primary in the canonical root owns the plan, Herdr coordination,
+  review routing, integration and staging PR. It does not implement product or
+  test changes. The current agreed primary model is `gpt-6-astra` with `high`
+  reasoning. The user will review and merge the final staging PR; do not merge
+  main autonomously during this restructure.
+- Authors use isolated Herdr worktrees and Codex models: `gpt-6.1-sol` with `high`
+  reasoning for straightforward work, `gpt-6-astra` with `xhigh` where the agreed
+  plan calls for architectural or graph work. Preserve explicit assignments.
+- Follow [the product structure plan](docs/plans/product-structure.md). Units
+  0–3 are serial. Afterwards use at most two authors and four active agents
+  total, including the primary and reviewers, with disjoint ownership.
+- Independent code review uses a separate read-only session, normally
+  `gpt-6.1-sol` with `high` reasoning and `codex review --base <parent>`.
+  Findings go back to the author once; the primary decides after recheck.
+  The same model in separate sessions is not self-review.
+- The existing user-selected Fable collaborator reviews the architecture after
+  unit 1, after units 2–3, after the shared graph split and before PR readiness.
+  This is a read-only role; do not spawn another Fable agent.
+- Browser and render verification uses Codex `gpt-6.1-sol` and the actual
+  product entrypoint. Preserve unfinished branches, worker evidence and user
+  focus when transferring ownership.
 
 ## Proof
 
@@ -42,7 +51,7 @@ the change locally and slim CI instead of adding to it.
 change, a frozen install, `pnpm run check`, the scenario CLI smoke, the deploy
 and tooling contracts, the Nx-affected native `typecheck`, `build`
 and `test` targets, the root `effect-tsgo tsc@7.0.2 -b` and project-graph test, and
-`pnpm nx build-storybook diagram-ui` when `diagram-ui` is affected.
+`pnpm nx build-storybook editor` when `editor` is affected.
 
 - Run `pnpm ci:local --no-signoff` before every `gt submit` or push.
 - After the push, run `pnpm ci:local` on the pushed head. It refuses a dirty
