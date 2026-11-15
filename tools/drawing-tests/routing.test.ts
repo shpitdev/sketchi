@@ -385,7 +385,7 @@ it.each(["straight", "curved"] as const)(
 	},
 );
 
-const skipEdges = [
+const skipEdges: readonly [string, string][] = [
 	["A", "B"],
 	["B", "C"],
 	["C", "D"],
@@ -422,6 +422,10 @@ it.each(["LR", "RL"] as const)("exports labeled skip edges in %s", (direction) =
 });
 
 it("keeps process fan-out labels and departure stubs disjoint", () => {
+	const branches: readonly [string, string][] = [
+		["B", "First"],
+		["C", "Second"],
+	];
 	const spec: GraphInput = {
 		nodes: ["A", "B", "C"].map((id) => ({
 			id,
@@ -429,11 +433,11 @@ it("keeps process fan-out labels and departure stubs disjoint", () => {
 			kind: "process",
 			shape: "rectangle" as const,
 		})),
-		edges: ["B", "C"].map((target, i) => ({
+		edges: branches.map(([target, label]) => ({
 			id: target,
 			source: "A",
 			target,
-			label: ["First", "Second"][i],
+			label,
 		})),
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
 	};

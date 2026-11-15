@@ -30,7 +30,7 @@ describe("state graph fuzz", () => {
 					{
 						nodes: graph.nodes,
 						edges: graph.edges,
-						groups: graph.groups,
+						...(graph.groups ? { groups: graph.groups } : {}),
 						layout: { direction, edgeRouting: "orthogonal" },
 					},
 					graph,
@@ -73,7 +73,7 @@ describe("state graph fuzz", () => {
 							{
 								nodes: graph.nodes,
 								edges: graph.edges,
-								groups: graph.groups,
+								...(graph.groups ? { groups: graph.groups } : {}),
 								layout: { direction, edgeRouting: "orthogonal" },
 							},
 							graph,
@@ -92,7 +92,7 @@ describe("state graph fuzz", () => {
 						{
 							nodes: graph.nodes,
 							edges: graph.edges,
-							groups: graph.groups,
+							...(graph.groups ? { groups: graph.groups } : {}),
 							layout: { direction, edgeRouting: "orthogonal" },
 						},
 						graph,

@@ -1,10 +1,13 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
+import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { generateKeyBetween } from "fractional-indexing";
 
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
+import {
+	FlowchartDiagram,
+	parseFlowchartDiagram,
+} from "@sketchi/diagrams/families/flowchart/document";
 import {
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
@@ -992,108 +995,110 @@ describe("convertSceneToExcalidraw", () => {
 
 	it("routes same-rank branch arrows without crossing nodes in other ranks", () => {
 		const scene = convertSceneToExcalidraw(
-			renderFlowchartDiagram({
-				id: "ecommerce-return-process",
-				title: "Ecommerce returns with 18 steps",
-				type: "flowchart",
-				nodes: [
-					{ id: "end-reject", label: "Closure: Rejected", kind: "end" },
-					{
-						id: "notify-final",
-						label: "Notify Customer: Finalized",
-						kind: "process",
-					},
-					{
-						id: "restock-dec",
-						label: "Restocking Decision",
-						kind: "decision",
-					},
-					{
-						id: "partial-refund",
-						label: "Process Partial Refund",
-						kind: "process",
-					},
-					{
-						id: "notify-label",
-						label: "Notify Customer: Label Ready",
-						kind: "process",
-					},
-					{
-						id: "refund-method",
-						label: "Refund Method Decision",
-						kind: "decision",
-					},
-					{
-						id: "notify-receipt",
-						label: "Notify Customer: Received",
-						kind: "process",
-					},
-					{ id: "restock", label: "Restock Item", kind: "process" },
-					{ id: "pickup", label: "Carrier Pickup", kind: "process" },
-					{
-						id: "start",
-						label: "Initiate Return Request",
-						kind: "start",
-					},
-					{ id: "end-success", label: "Closure: Success", kind: "end" },
-					{
-						id: "notify-reject",
-						label: "Notify Customer: Rejected",
-						kind: "process",
-					},
-					{
-						id: "eligibility",
-						label: "Eligibility Check",
-						kind: "decision",
-					},
-					{ id: "receipt", label: "Warehouse Receipt", kind: "process" },
-					{ id: "fraud-check", label: "Fraud Review", kind: "decision" },
-					{
-						id: "label-gen",
-						label: "Generate Return Label",
-						kind: "process",
-					},
-				],
-				edges: [
-					{ id: "e19", source: "notify-final", target: "end-success" },
-					{
-						id: "e15",
-						source: "refund-method",
-						target: "partial-refund",
-						label: "refund",
-					},
-					{
-						id: "e2",
-						source: "eligibility",
-						target: "label-gen",
-						label: "eligible",
-					},
-					{
-						id: "e12",
-						source: "restock-dec",
-						target: "restock",
-						label: "restockable",
-					},
-					{ id: "e17", source: "partial-refund", target: "notify-final" },
-					{ id: "e6", source: "pickup", target: "receipt" },
-					{ id: "e20", source: "notify-reject", target: "end-reject" },
-					{ id: "e1", source: "start", target: "eligibility" },
-					{
-						id: "e10",
-						source: "fraud-check",
-						target: "restock-dec",
-						label: "pass",
-					},
-					{ id: "e5", source: "notify-label", target: "pickup" },
-					{
-						id: "e13",
-						source: "restock-dec",
-						target: "refund-method",
-						label: "damaged",
-					},
-				],
-				layout: { direction: "TB", edgeRouting: "orthogonal" },
-			}),
+			renderFlowchartDiagram(
+				Schema.decodeUnknownSync(FlowchartDiagram)({
+					id: "ecommerce-return-process",
+					title: "Ecommerce returns with 18 steps",
+					type: "flowchart",
+					nodes: [
+						{ id: "end-reject", label: "Closure: Rejected", kind: "end" },
+						{
+							id: "notify-final",
+							label: "Notify Customer: Finalized",
+							kind: "process",
+						},
+						{
+							id: "restock-dec",
+							label: "Restocking Decision",
+							kind: "decision",
+						},
+						{
+							id: "partial-refund",
+							label: "Process Partial Refund",
+							kind: "process",
+						},
+						{
+							id: "notify-label",
+							label: "Notify Customer: Label Ready",
+							kind: "process",
+						},
+						{
+							id: "refund-method",
+							label: "Refund Method Decision",
+							kind: "decision",
+						},
+						{
+							id: "notify-receipt",
+							label: "Notify Customer: Received",
+							kind: "process",
+						},
+						{ id: "restock", label: "Restock Item", kind: "process" },
+						{ id: "pickup", label: "Carrier Pickup", kind: "process" },
+						{
+							id: "start",
+							label: "Initiate Return Request",
+							kind: "start",
+						},
+						{ id: "end-success", label: "Closure: Success", kind: "end" },
+						{
+							id: "notify-reject",
+							label: "Notify Customer: Rejected",
+							kind: "process",
+						},
+						{
+							id: "eligibility",
+							label: "Eligibility Check",
+							kind: "decision",
+						},
+						{ id: "receipt", label: "Warehouse Receipt", kind: "process" },
+						{ id: "fraud-check", label: "Fraud Review", kind: "decision" },
+						{
+							id: "label-gen",
+							label: "Generate Return Label",
+							kind: "process",
+						},
+					],
+					edges: [
+						{ id: "e19", source: "notify-final", target: "end-success" },
+						{
+							id: "e15",
+							source: "refund-method",
+							target: "partial-refund",
+							label: "refund",
+						},
+						{
+							id: "e2",
+							source: "eligibility",
+							target: "label-gen",
+							label: "eligible",
+						},
+						{
+							id: "e12",
+							source: "restock-dec",
+							target: "restock",
+							label: "restockable",
+						},
+						{ id: "e17", source: "partial-refund", target: "notify-final" },
+						{ id: "e6", source: "pickup", target: "receipt" },
+						{ id: "e20", source: "notify-reject", target: "end-reject" },
+						{ id: "e1", source: "start", target: "eligibility" },
+						{
+							id: "e10",
+							source: "fraud-check",
+							target: "restock-dec",
+							label: "pass",
+						},
+						{ id: "e5", source: "notify-label", target: "pickup" },
+						{
+							id: "e13",
+							source: "restock-dec",
+							target: "refund-method",
+							label: "damaged",
+						},
+					],
+					layout: { direction: "TB", edgeRouting: "orthogonal" },
+				}),
+			),
 		);
 
 		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
