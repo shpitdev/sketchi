@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
+import { buildResponse } from "../operation.js";
 import { flowchartDiagramFromDocument } from "../../families/flowchart/document.js";
 import { zoneRegionIssues, type CanvasSpec } from "@sketchi/drawing";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
@@ -16,6 +17,7 @@ function build(spec: unknown) {
 				artifactFormats: ["scene", "excalidraw"],
 			},
 		}).pipe(
+			buildResponse,
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_zones`,
 			}),
