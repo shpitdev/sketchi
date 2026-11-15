@@ -7,7 +7,7 @@ const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");
 describe("offline state-machine input failures", () => {
 	it.each([
 		{ name: "unknown initial state", issue: "unknown_initial_state", initial: "nowhere" },
-		{ name: "unreachable state", issue: "unreachable_node", initial: "locked", orphan: true },
+		{ name: "unreachable state", issue: "unreachable_state", initial: "locked", orphan: true },
 	])("reports $name as invalid_document with exit 3", ({ initial, issue, orphan }) => {
 		const environment = { ...process.env };
 		delete environment["FORCE_COLOR"];
