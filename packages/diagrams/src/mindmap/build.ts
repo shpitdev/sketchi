@@ -135,9 +135,10 @@ export const decodeMindmapRequest = Effect.fn("Mindmap.decodeRequest")(function*
 								stage: "input" as const,
 								ref: {
 									kind: "request" as const,
-									path: (entry.path ?? [])
-										.map((part) => (typeof part === "object" ? String(part.key) : String(part)))
-										.join("."),
+									path:
+										(entry.path ?? [])
+											.map((part) => (typeof part === "object" ? String(part.key) : String(part)))
+											.join(".") || "input",
 								},
 								message: entry.message,
 								hint: "Repair the request using the mindmap document schema.",

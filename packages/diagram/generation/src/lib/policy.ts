@@ -227,6 +227,14 @@ export const runDiagramGenerationWithPolicy = Effect.fn("diagramGeneration.runWi
 			);
 			yield* Effect.annotateCurrentSpan(SpanContent.output, candidate);
 			// Repair could only meet a family limit by dropping what the request states.
+			if (candidate.mindmapError?.code === "mindmap_too_large") {
+				return yield* DiagramGenerationLimitError.make({
+					diagnostics: candidate.diagnostics,
+					limit: "diagram_size",
+					message: candidate.mindmapError.message,
+					provider,
+				});
+			}
 			const tooLarge = candidate.diagnostics.filter(isDiagramSizeLimitDiagnostic);
 			if (tooLarge.length > 0) {
 				return yield* DiagramGenerationLimitError.make({

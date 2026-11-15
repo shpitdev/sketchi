@@ -1,25 +1,20 @@
-# Adding a diagram family
+# Diagram families
 
 Sketchi supports a fixed set of canonical diagram families: flowchart, mindmap,
 sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, and quadrant. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
-registry. A family is supported only when it completes every stage below, and
-only supported families are advertised. Swimlanes and architecture diagrams are
+registry of advertised families. Each supported family has a complete document-to-export
+path. Swimlanes and architecture diagrams are
 flowchart features. A prompt for anything else generates the closest family, and
 a request whose `type` names no family is invalid input.
 
-Start with the generator, then work down the list:
+Family work follows the [product structure](plans/product-structure.md).
+Mindmap is the first complete family owner under `packages/diagrams/src/mindmap`.
+The remaining boundaries below describe the existing families. The former generic
+node/edge scaffold is retired; it does not represent the family-owned document,
+layout and build structure.
 
-```sh
-pnpm nx g @sketchi/generators:diagram-type <name> --title "<Fixture title>"
-pnpm run format
-```
-
-The generator registers the name in `DIAGRAM_TYPES` (and in
-`GRAPH_DIAGRAM_TYPES`, since it scaffolds a node/edge contract) and creates the
-core contract, its test, a renderer test, and a Storybook story. The compiler
-checks the exhaustive family maps. `tools/diagram-families.test.ts` exercises
-each family's generated-response ingestion and offline document build; it does
-not require particular source, story, scenario or test files to exist.
+`tools/diagram-families.test.ts` exercises generated-response ingestion and offline
+document builds without requiring particular source, story or test filenames.
 
 | Stage | Where | Guard |
 | --- | --- | --- |
@@ -74,4 +69,4 @@ elements represent named technologies.
 
 Verify with `pnpm nx affected -t typecheck,test --base=origin/main`,
 `pnpm run test:tools`, `pnpm run check`, and
-`pnpm nx build-storybook diagram-ui`.
+`pnpm nx build-storybook editor`.

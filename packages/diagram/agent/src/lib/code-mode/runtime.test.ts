@@ -519,6 +519,18 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 describe("Code Mode runtime", () => {
+	it.each([null, 17, "not a request"])(
+		"returns typed invalid_input for a root request %j",
+		async (input) => {
+			const result = await createTestRuntime().buildMindmap(input);
+			expect(result).toMatchObject({
+				ok: false,
+				status: "invalid_input",
+				issues: [{ code: "invalid_type", stage: "input", ref: { kind: "request", path: "input" } }],
+			});
+		},
+	);
+
 	it("builds a nested mindmap with deterministic hierarchy ids and exports", async () => {
 		const runtime = createTestRuntime();
 		const built = await runtime.buildMindmap({

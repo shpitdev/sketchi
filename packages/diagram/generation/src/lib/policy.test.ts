@@ -200,6 +200,61 @@ describe("generation repair prompts", () => {
 });
 
 describe("generation size limits", () => {
+	it.effect("refuses an oversized generated mindmap without another model call", () =>
+		Effect.gen(function* () {
+			let calls = 0;
+			const result = yield* Effect.result(
+				runDiagramGenerationWithPolicy(
+					() =>
+						Effect.sync(() => {
+							calls++;
+							return candidateFromText({
+								model: "deterministic-mindmap",
+								provider: "fixture",
+								text: JSON.stringify({
+									title: `Every topic attempt ${calls}`,
+									diagram: {
+										type: "mindmap",
+										root: {
+											label: "Plan",
+											children: Array.from({ length: 210 }, (_, index) => ({
+												label: `Topic ${index}`,
+											})),
+										},
+									},
+								}),
+							});
+						}),
+					{
+						model: "deterministic-mindmap",
+						prompt: {
+							id: "oversized-mindmap",
+							request: "Map every topic.",
+							requestedType: "mindmap",
+						},
+					},
+					"fixture",
+					{
+						concurrency: 1,
+						maxRepairAttempts: 2,
+						maxRetries: 0,
+						requestTimeoutMs: 1_000,
+						retryDelayMs: 1,
+						totalTimeoutMs: 60_000,
+					},
+				),
+			);
+			expect(calls).toBe(1);
+			expect(result).toMatchObject({
+				failure: {
+					_tag: "DiagramGenerationLimitError",
+					limit: "diagram_size",
+					message: "Mindmap exceeds the supported maximum of 200 topic slots.",
+				},
+			});
+		}),
+	);
+
 	it.effect("repairs a layout bound, which restructuring meets without dropping content", () =>
 		Effect.gen(function* () {
 			const { candidate, requests } = yield* runRepairs([

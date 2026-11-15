@@ -1,12 +1,11 @@
 # Sketchi generators
 
-Use the workspace plugin for an Effect package, a UI component, or a diagram family.
+Use the workspace plugin for an Effect package or a UI component.
 
 ```sh
 pnpm nx g @sketchi/generators:effect-library packages/example \
   --name=example --importPath=@sketchi/example --tags=scope:package,type:lib
 pnpm nx g @sketchi/generators:ui-component StatusBadge
-pnpm nx g @sketchi/generators:diagram-type timeline --title "Sketchi timeline fixture"
 pnpm nx sync
 pnpm nx sync:check
 ```
@@ -23,12 +22,9 @@ already cover them; no package-local lint/format config or sample test is genera
 Add a test runner when the package first has an application behavior to test. This
 composition creates no service abstraction or business implementation.
 
-The UI generator creates a component, story and export. The diagram generator
-registers a Struct contract and fixture, a renderer behavior test and a story.
-Neither generates the former trivial component-render or fixture-equality test.
-Complete the actual family pipeline described in
-[adding a diagram family](../../docs/diagram-families.md); its compiler and behavioral
-checks remain required.
+The UI generator creates a component, story and export. Family ownership follows
+[the product structure](../../docs/plans/product-structure.md); the former node/edge
+family scaffold has been removed.
 
 ```sh
 pnpm nx test sketchi-generators
@@ -38,5 +34,4 @@ pnpm nx build sketchi-generators
 
 The integration test generates two packages in a disposable workspace, builds their
 real exports, runs a consumer, checks a type error and affected dependency discovery,
-and verifies that repeat generation cannot overwrite user source. Title escaping
-coverage remains where the diagram template interpolates user input.
+and verifies that repeat generation cannot overwrite user source.

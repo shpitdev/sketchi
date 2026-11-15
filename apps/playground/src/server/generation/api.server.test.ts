@@ -608,7 +608,7 @@ describe("public generate endpoint", () => {
 		});
 	});
 
-	it("reports a build's size limit as a limit, not a defect", async () => {
+	it("reports a generated mindmap's size limit without another model call", async () => {
 		const wide = JSON.stringify({
 			title: "Every idea",
 			diagram: {
@@ -623,13 +623,25 @@ describe("public generate endpoint", () => {
 				},
 			},
 		});
-		const env: StudioEnv = { AI: fakeAiGateway(wide) };
+		let modelCalls = 0;
+		const env: StudioEnv = {
+			AI: fakeAiGateway(wide, () => {
+				modelCalls++;
+			}),
+		};
 		const response = await generateRequest(env, { prompt: "Map every idea", type: "mindmap" });
 
 		expect(response.status).toBe(413);
+		expect(modelCalls).toBe(1);
 		expect(await response.json()).toMatchObject({
 			status: "limit_exceeded",
-			issues: [{ code: "mindmap_too_large", stage: "build" }],
+			issues: [
+				{
+					code: "diagram_too_large",
+					stage: "generation",
+					message: "Mindmap exceeds the supported maximum of 200 topic slots.",
+				},
+			],
 		});
 	});
 
