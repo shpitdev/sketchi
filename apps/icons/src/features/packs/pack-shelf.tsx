@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useAtom } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 
-import type { PackExcalidrawState } from "../../lib/excalidraw-publish.js";
+import type { PackExcalidrawState } from "./publication.js";
 import {
 	ALL_ICONS_PACK_ID,
 	packPagePath,

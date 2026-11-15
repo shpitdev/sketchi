@@ -1,7 +1,7 @@
 import { String as Str } from "effect";
 import { Download, Upload } from "lucide-react";
 
-import type { PackExcalidrawState, PackPullRequest } from "../../lib/excalidraw-publish.js";
+import type { PackExcalidrawState, PackPullRequest } from "./publication.js";
 import { packLibraryFileName, packLibraryPath, type PackSummary } from "../../lib/packs.js";
 import { ExcalidrawGlyph, GitHubGlyph } from "./brand-glyphs.js";
 

@@ -330,7 +330,14 @@
               "packages/icons/catalog/src/http-api.ts",
               "apps/icons/src/lib/api.server.ts",
               "apps/icons/src/lib/catalog-http.server.ts",
-              "apps/icons/src/lib/catalog.server.ts"
+              "apps/icons/src/lib/catalog.server.ts",
+              "packages/icons/community/src/store.ts",
+              "apps/icons/src/features/packs/publication.ts",
+              "apps/icons/src/features/packs/publication.server.ts",
+              "apps/icons/src/features/packs/publication-api.ts",
+              "apps/icons/src/features/packs/publication-client.ts",
+              "apps/icons/src/features/packs/shelf.server.ts",
+              "apps/playground/src/features/build/community-icons.server.ts"
             ],
             "options": {
               "diagnosticSeverity": {

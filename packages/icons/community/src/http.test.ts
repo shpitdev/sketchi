@@ -1,14 +1,13 @@
-import { DatabaseSync } from "node:sqlite";
+import { openD1 } from "../tests/d1.js";
 
 import { Context, Effect, Layer } from "effect";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { HttpRouter, HttpServer } from "effect/http";
 import { HttpApiBuilder, HttpApiTest } from "effect/http-api";
 import { CommunityHttpHandlers, CommunityHttpRequest, type CommunityEnv } from "./http.js";
 import { CommunityHttpApi } from "./http-api.js";
 import { CommunityIconModeration } from "./moderation.js";
-import type { CommunityIconDatabase, CommunityIconStatement } from "./store.js";
 
 const runtime = HttpRouter.toWebHandler(
 	HttpApiBuilder.layer(CommunityHttpApi).pipe(
@@ -36,20 +35,14 @@ function handleCommunityDetail(request: Request, env: CommunityEnv, slug: string
 }
 const handleCommunityVisibility = handleCommunityDetail;
 
-function sqliteDatabase(): CommunityIconDatabase {
-	const sqlite = new DatabaseSync(":memory:");
-	const statement = (query: string, values: unknown[] = []): CommunityIconStatement => {
-		const params = values as (string | number | null)[];
-		return {
-			bind: (...next) => statement(query, next),
-			first: async <T>() => (sqlite.prepare(query).get(...params) as T | undefined) ?? null,
-			all: async <T>() => ({ results: sqlite.prepare(query).all(...params) as T[] }),
-			run: async () => ({
-				meta: { changes: Number(sqlite.prepare(query).run(...params).changes) },
-			}),
-		};
-	};
-	return { prepare: (query) => statement(query) };
+const fixtures: (() => Promise<void>)[] = [];
+afterEach(async () => {
+	for (const dispose of fixtures.splice(0)) await dispose();
+});
+async function nativeDatabase() {
+	const fixture = await openD1();
+	fixtures.push(fixture.dispose);
+	return fixture.database;
 }
 
 const allow = Layer.succeed(
@@ -84,7 +77,7 @@ function publish(body: unknown, env: CommunityEnv, moderation = allow, headers: 
 
 describe("community icon API", () => {
 	it("serves published recipes and typed missing outcomes through the generated client", async () => {
-		const env = { COMMUNITY_ICONS: sqliteDatabase() };
+		const env = { COMMUNITY_ICONS: await nativeDatabase() };
 		const requestLayer = Layer.succeed(CommunityHttpRequest, {
 			env,
 			origin: ORIGIN,
@@ -125,7 +118,7 @@ describe("community icon API", () => {
 	});
 
 	it("uses the first repeated query value and retains blank/default pagination behavior", async () => {
-		const env = { COMMUNITY_ICONS: sqliteDatabase() };
+		const env = { COMMUNITY_ICONS: await nativeDatabase() };
 		await publish({ name: "Ring queue", recipe: RING }, env);
 		const page = await handleCommunityList(
 			new Request(`${ORIGIN}/api/community?q=%20Ring%20&q=missing&limit=bad&limit=1`),
@@ -140,7 +133,7 @@ describe("community icon API", () => {
 	});
 
 	it("publishes an icon, then finds it by slug and in search", async () => {
-		const env = { COMMUNITY_ICONS: sqliteDatabase() };
+		const env = { COMMUNITY_ICONS: await nativeDatabase() };
 		const created = await publish({ name: "Ring queue", recipe: RING }, env);
 		expect(created.status).toBe(201);
 		expect(await created.json()).toEqual({
@@ -179,7 +172,7 @@ describe("community icon API", () => {
 	});
 
 	it("answers bad bodies, bad recipes and rejected names with their codes", async () => {
-		const env = { COMMUNITY_ICONS: sqliteDatabase() };
+		const env = { COMMUNITY_ICONS: await nativeDatabase() };
 		const cases: [unknown, number, string][] = [
 			["not json", 400, "invalid_request"],
 			[{ name: "Ring" }, 400, "invalid_request"],
@@ -217,7 +210,7 @@ describe("community icon API", () => {
 		const limited = await publish(
 			{ name: "Ring", recipe: RING },
 			{
-				COMMUNITY_ICONS: sqliteDatabase(),
+				COMMUNITY_ICONS: await nativeDatabase(),
 				COMMUNITY_CLIENT_LIMIT: {
 					getByName: (name) => ({
 						take: async (limit, windowMs) => (
@@ -239,7 +232,7 @@ describe("community icon API", () => {
 				method: "POST",
 				body: JSON.stringify({ name: "Ring", recipe: RING }),
 			}),
-			{ COMMUNITY_ICONS: sqliteDatabase() },
+			{ COMMUNITY_ICONS: await nativeDatabase() },
 		);
 		expect(unmoderated.status).toBe(503);
 
@@ -247,7 +240,7 @@ describe("community icon API", () => {
 	});
 
 	it("hides an icon only with the admin token", async () => {
-		const env = { COMMUNITY_ICONS: sqliteDatabase(), COMMUNITY_ADMIN_TOKEN: "owner-token" };
+		const env = { COMMUNITY_ICONS: await nativeDatabase(), COMMUNITY_ADMIN_TOKEN: "owner-token" };
 		await publish({ name: "Ring queue", recipe: RING }, env);
 		const patch = (token: string | undefined, body: unknown, slug = "ring-queue") =>
 			handleCommunityVisibility(
@@ -296,6 +289,20 @@ describe("community icon API", () => {
 		expect(noToken.status).toBe(401);
 	});
 
+	it("recovers native D1 initialization after a failed request without caching failure", async () => {
+		const database = await nativeDatabase();
+		await database.exec("CREATE VIEW community_icons AS SELECT 1;");
+		const env = { COMMUNITY_ICONS: database };
+		expect((await handleCommunityList(new Request(`${ORIGIN}/api/community`), env)).status).toBe(
+			503,
+		);
+		await database.exec("DROP VIEW community_icons;");
+		expect((await handleCommunityList(new Request(`${ORIGIN}/api/community`), env)).status).toBe(
+			200,
+		);
+		expect((await publish({ name: "Recovered ring", recipe: RING }, env)).status).toBe(201);
+	});
+
 	it("stops reading a body without Content-Length once it passes the limit", async () => {
 		const chunk = new TextEncoder().encode("x".repeat(1024));
 		let pulled = 0;
@@ -318,7 +325,7 @@ describe("community icon API", () => {
 		expect(request.headers.get("Content-Length")).toBeNull();
 		const response = await handleCommunityPublish(
 			request,
-			{ COMMUNITY_ICONS: sqliteDatabase() },
+			{ COMMUNITY_ICONS: await nativeDatabase() },
 			{ moderation: allow },
 		);
 		expect(response.status).toBe(413);

@@ -1,7 +1,6 @@
 // @vitest-environment node
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
+import { openD1 } from "../test-support/d1.js";
 
-import type { CommunityIconDatabase, CommunityIconStatement } from "@sketchi/community-icons";
 import { makeTelemetryTestSink } from "@sketchi/observability";
 import { afterEach, expect, it } from "vitest";
 
@@ -11,26 +10,10 @@ const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
 	for (const cleanup of cleanups.splice(0)) await cleanup();
 });
-function database(): CommunityIconDatabase {
-	const sqlite = new DatabaseSync(":memory:");
-	cleanups.push(() => sqlite.close());
-	function statement(sql: string, values: SQLInputValue[] = []): CommunityIconStatement {
-		return {
-			bind: (...args) =>
-				statement(
-					sql,
-					args.map((value) => {
-						if (typeof value === "string" || typeof value === "number" || value === null)
-							return value;
-						throw new Error("Unexpected D1 fixture value");
-					}),
-				),
-			first: async <T>() => (sqlite.prepare(sql).get(...values) as T | undefined) ?? null,
-			all: async <T>() => ({ results: sqlite.prepare(sql).all(...values) as T[] }),
-			run: async () => ({ meta: { changes: Number(sqlite.prepare(sql).run(...values).changes) } }),
-		};
-	}
-	return { prepare: (sql) => statement(sql) };
+async function database() {
+	const fixture = await openD1();
+	cleanups.push(fixture.dispose);
+	return fixture.database;
 }
 
 it("isolates overlapping bindings, origins and telemetry exports until each response completes", async () => {
@@ -44,7 +27,7 @@ it("isolates overlapping bindings, origins and telemetry exports until each resp
 		rowsB: unknown[] = [];
 	const envA = {
 		ASSETS: { fetch: async () => new Response("not used", { status: 404 }) },
-		COMMUNITY_ICONS: database(),
+		COMMUNITY_ICONS: await database(),
 		TELEMETRY_SPANS: {
 			send: async (rows: readonly unknown[]) => {
 				rowsA.push(...rows);
@@ -60,7 +43,7 @@ it("isolates overlapping bindings, origins and telemetry exports until each resp
 	};
 	const envB = {
 		ASSETS: { fetch: async () => new Response("not used", { status: 404 }) },
-		COMMUNITY_ICONS: database(),
+		COMMUNITY_ICONS: await database(),
 		TELEMETRY_SPANS: {
 			send: async (rows: readonly unknown[]) => {
 				rowsB.push(...rows);

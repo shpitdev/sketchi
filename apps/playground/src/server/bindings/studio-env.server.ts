@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import type { ClientLimitNamespace, CommunityIconDatabase } from "@sketchi/community-icons";
+import type { ClientLimitNamespace, CommunityEnv } from "@sketchi/community-icons";
 import type { CodeModeObjectBucket } from "@sketchi/diagrams/build/code-mode/artifacts";
 import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
 import type { WorkersAiRunner } from "@sketchi/diagrams/generate/jev-workers-ai";
@@ -17,7 +17,7 @@ export interface StudioEnv {
 	CODEMODE_PNG_RENDERER?: CodeModePngRendererNamespace;
 	STUDIO_MCP_SESSION?: import("@sketchi/cloudflare/mcp-session").McpSessionNamespace;
 	/** D1: the community icons the icons app publishes, which diagrams draw by slug. */
-	COMMUNITY_ICONS?: CommunityIconDatabase;
+	COMMUNITY_ICONS?: CommunityEnv["COMMUNITY_ICONS"];
 	LOADER?: import("../../features/mcp/sandbox.server").SketchiWorkerLoader;
 	SKETCHI_ARTIFACTS?: CodeModeObjectBucket;
 	SKETCHI_AI_GATEWAY_ID?: string;

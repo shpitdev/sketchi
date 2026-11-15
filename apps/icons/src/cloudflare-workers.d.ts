@@ -12,6 +12,7 @@ declare module "cloudflare:workers" {
     EXCALIDRAW_LIBRARY_SUBMIT?: string;
     EXCALIDRAW_LIBRARY_BACKEND?: string;
     EXCALIDRAW_LIBRARY_GITHUB_API?: string;
+    EXCALIDRAW_LIBRARY_RAW_ORIGIN?: string;
   };
 
   /** Keeps the Worker running for the promise after the response is sent. */

@@ -1,3 +1,4 @@
+import { publishPack } from "./publication-client.js";
 import {
 	Dialog,
 	DialogContent,
@@ -6,64 +7,19 @@ import {
 } from "@sketchi/ui/components/dialog";
 import { useState, type ClipboardEvent, type FormEvent } from "react";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
-import { Effect, Schema } from "effect";
-import { HttpBody, HttpClient } from "effect/http";
+import { Effect } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
-import { IconQueryError, queryError, queryRuntime } from "../../lib/query-atoms.js";
+import { queryError, queryRuntime } from "../../lib/query-atoms.js";
 
 import {
 	AUTHOR_NAME_MAX_LENGTH,
-	packPublishPath,
 	parseXHandle,
 	type PublishResult,
 	WEBSITE_MAX_LENGTH,
-} from "../../lib/excalidraw-publish.js";
+} from "./publication.js";
 import { findPack, packPreviewImagePath, type PackSummary } from "../../lib/packs.js";
 import { AddToExcalidrawLink, PullRequestLink } from "./pack-actions.js";
 import { iconCount } from "./pack-shelf.js";
-
-const PublishResponse = Schema.Struct({
-	pullRequestUrl: Schema.optionalKey(Schema.NonEmptyString),
-	installUrl: Schema.optionalKey(Schema.String),
-	error: Schema.optionalKey(Schema.Struct({ message: Schema.optionalKey(Schema.String) })),
-});
-const publish = Effect.fn("Icons.packs.publish")(function* (packId: string, form: FormData) {
-	const typed = form.get("xHandle");
-	const xHandle = parseXHandle(typeof typed === "string" ? typed : "");
-	if (!xHandle.ok) return yield* Effect.fail(new IconQueryError({ message: xHandle.message }));
-	const client = yield* HttpClient.HttpClient;
-	const response = yield* client.post(
-		new URL(packPublishPath(packId), window.location.origin).href,
-		{
-			body: HttpBody.jsonUnsafe({
-				authorName: form.get("authorName"),
-				xHandle: xHandle.handle,
-				website: form.get("website"),
-			}),
-		},
-	);
-	const fallback = `Publishing failed with HTTP ${response.status}.`;
-	const body = yield* response.json.pipe(
-		Effect.flatMap(Schema.decodeUnknownEffect(PublishResponse)),
-		Effect.catch(() => Effect.succeed({})),
-	);
-	if (
-		response.status < 200 ||
-		response.status >= 300 ||
-		!("pullRequestUrl" in body) ||
-		!body.pullRequestUrl
-	) {
-		return yield* Effect.fail(
-			new IconQueryError({
-				message: "error" in body ? (body.error?.message ?? fallback) : fallback,
-			}),
-		);
-	}
-	return {
-		pullRequestUrl: body.pullRequestUrl,
-		...("installUrl" in body && body.installUrl ? { installUrl: body.installUrl } : {}),
-	};
-});
 
 /** Shows a pasted or typed profile link as the handle it names. */
 function showHandle(input: HTMLInputElement, value: string): boolean {
@@ -98,7 +54,7 @@ export function PackPublishDialog({
 		queryRuntime
 			.fn(
 				Effect.fn("Icons.packs.submit")(function* (form: FormData) {
-					const result = yield* publish(pack.id, form);
+					const result = yield* publishPack(pack.id, form);
 					onPublished(result);
 					return result;
 				}),

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 
 import { copyText } from "../export/actions.js";
 import { SKETCHI_WEB_HOME_URL } from "../../lib/home-url.js";
-import type { PackExcalidrawState } from "../../lib/excalidraw-publish.js";
+import type { PackExcalidrawState } from "./publication.js";
 import type { PackIcon, PackSummary } from "../../lib/packs.js";
 import { useAtom, useAtomSet } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";

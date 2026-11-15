@@ -1,8 +1,8 @@
-import { DatabaseSync } from "node:sqlite";
+import { openD1 } from "../tests/d1.js";
 
 import { isDiagramIconSlug, type IconRecipe } from "@sketchi/drawing";
-import { Effect, Layer } from "effect";
-import { describe, expect, it } from "vitest";
+import { Effect, Layer, ManagedRuntime } from "effect";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
 	CommunityIconModeration,
@@ -12,28 +12,25 @@ import {
 	communityIconSlugCandidates,
 	communityIconStoreLayer,
 	CommunityIconStore,
-	makeCommunityIconStore,
 	publishCommunityIcon,
-	type CommunityIconDatabase,
+	type CommunityEnv,
 	type CommunityIconModerationInput,
-	type CommunityIconStatement,
 	workersAiCommunityModeration,
 } from "./index.js";
 
-/** D1's statement API over node:sqlite, so the store's SQL runs for real. */
-function sqliteDatabase(): CommunityIconDatabase & { readonly sqlite: DatabaseSync } {
-	const sqlite = new DatabaseSync(":memory:");
-	const statement = (query: string, values: unknown[] = []): CommunityIconStatement => {
-		const prepared = () => sqlite.prepare(query);
-		const params = values as (string | number | null)[];
-		return {
-			bind: (...next) => statement(query, next),
-			first: async <T>() => (prepared().get(...params) as T | undefined) ?? null,
-			all: async <T>() => ({ results: prepared().all(...params) as T[] }),
-			run: async () => ({ meta: { changes: Number(prepared().run(...params).changes) } }),
-		};
-	};
-	return { sqlite, prepare: (query) => statement(query) };
+const cleanups: (() => Promise<void>)[] = [];
+afterEach(async () => {
+	for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
+});
+async function nativeDatabase() {
+	const fixture = await openD1();
+	cleanups.push(fixture.dispose);
+	return fixture.database;
+}
+async function openStore(database: NonNullable<CommunityEnv["COMMUNITY_ICONS"]>) {
+	const runtime = ManagedRuntime.make(communityIconStoreLayer(database));
+	cleanups.push(() => runtime.dispose());
+	return runtime.runPromise(CommunityIconStore);
 }
 
 const BOX: IconRecipe = {
@@ -55,21 +52,19 @@ function moderationLayer(reviewed: CommunityIconModerationInput[], allowed = tru
 	);
 }
 
-function run<A, E>(
+async function run<A, E>(
 	effect: Effect.Effect<A, E, CommunityIconStore | CommunityIconModeration>,
 	options: {
-		readonly database?: CommunityIconDatabase;
+		readonly database?: NonNullable<CommunityEnv["COMMUNITY_ICONS"]>;
 		readonly reviewed?: CommunityIconModerationInput[];
 		readonly allowed?: boolean;
 	} = {},
 ) {
-	let tick = 0;
-	const now = () => new Date(Date.UTC(2026, 10, 8, 12, 0, tick++));
 	return Effect.runPromise(
 		Effect.result(effect).pipe(
 			Effect.provide(
 				Layer.merge(
-					communityIconStoreLayer(options.database ?? sqliteDatabase(), { now }),
+					communityIconStoreLayer(options.database ?? (await nativeDatabase())),
 					moderationLayer(options.reviewed ?? [], options.allowed),
 				),
 			),
@@ -135,7 +130,7 @@ describe("publishCommunityIcon", () => {
 	});
 
 	it("returns the published icon for the same recipe without moderating again", async () => {
-		const database = sqliteDatabase();
+		const database = await nativeDatabase();
 		const reviewed: CommunityIconModerationInput[] = [];
 		const first = await run(publishCommunityIcon({ name: "Box", recipe: BOX }), {
 			database,
@@ -154,7 +149,7 @@ describe("publishCommunityIcon", () => {
 	});
 
 	it("falls back to a longer hash suffix when the name and its short suffix are taken", async () => {
-		const database = sqliteDatabase();
+		const database = await nativeDatabase();
 		const name = "q".repeat(48);
 		const hash = await communityIconHash(RING);
 		const [base, short, longer] = communityIconSlugCandidates(name, hash);
@@ -164,11 +159,12 @@ describe("publishCommunityIcon", () => {
 			{ database },
 		);
 		for (const [index, slug] of [base, short].entries()) {
-			database.sqlite
+			await database
 				.prepare(
 					"INSERT INTO community_icons (slug, name, recipe, colors, hash, verdict, created_at, hidden) VALUES (?, 'Taken', ?, '[]', ?, NULL, '2026-01-01T00:00:00.000Z', 0)",
 				)
-				.run(slug ?? "", JSON.stringify(BOX), `taken-${index}`);
+				.bind(slug ?? "", JSON.stringify(BOX), `taken-${index}`)
+				.run();
 		}
 		const result = await run(publishCommunityIcon({ name, recipe: RING }), { database });
 		expect(result._tag === "Success" && result.success.icon.slug).toBe(longer);
@@ -176,7 +172,7 @@ describe("publishCommunityIcon", () => {
 	});
 
 	it("suffixes the slug when another recipe has the name", async () => {
-		const database = sqliteDatabase();
+		const database = await nativeDatabase();
 		await run(publishCommunityIcon({ name: "Box", recipe: BOX }), { database });
 		const second = await run(publishCommunityIcon({ name: "Box", recipe: RING }), { database });
 		const hash = await communityIconHash(RING);
@@ -207,7 +203,7 @@ describe("publishCommunityIcon", () => {
 				{ kind: "text", cx: 12, cy: 9, text: "tinyhttp", size: 8.5 },
 			],
 		};
-		const database = sqliteDatabase();
+		const database = await nativeDatabase();
 		const refused = await run(publishCommunityIcon({ name: "Tiny", recipe: wide }), { database });
 		expect(refused._tag === "Failure" && refused.failure).toMatchObject({
 			_tag: "CommunityIconInvalidRequestError",
@@ -215,7 +211,7 @@ describe("publishCommunityIcon", () => {
 			message: expect.stringContaining('"tinyhttp"'),
 		});
 
-		const store = makeCommunityIconStore(database);
+		const store = await openStore(database);
 		await Effect.runPromise(
 			store.insert({ name: "Tiny", recipe: wide, hash: await communityIconHash(wide) }),
 		);
@@ -250,7 +246,7 @@ describe("publishCommunityIcon", () => {
 	});
 
 	it("keeps out what moderation rejects and what the owner hid", async () => {
-		const database = sqliteDatabase();
+		const database = await nativeDatabase();
 		const rejected = await run(publishCommunityIcon({ name: "Box", recipe: BOX }), {
 			database,
 			allowed: false,
@@ -270,11 +266,8 @@ describe("publishCommunityIcon", () => {
 
 describe("CommunityIconStore", () => {
 	async function seeded() {
-		const database = sqliteDatabase();
-		let tick = 0;
-		const store = makeCommunityIconStore(database, {
-			now: () => new Date(Date.UTC(2026, 10, 8, 12, 0, tick++)),
-		});
+		const database = await nativeDatabase();
+		const store = await openStore(database);
 		for (const [index, name] of ["Kafka topic", "Queue", "Database", "Kafka broker"].entries()) {
 			const recipe: IconRecipe = {
 				parts: [{ kind: "rect", x: index, y: 4, width: 8, height: 8 }],
@@ -282,6 +275,13 @@ describe("CommunityIconStore", () => {
 			await Effect.runPromise(
 				store.insert({ name, recipe, hash: await communityIconHash(recipe) }),
 			);
+			await database
+				.prepare("UPDATE community_icons SET created_at = ? WHERE hash = ?")
+				.bind(
+					new Date(Date.UTC(2026, 10, 8, 12, 0, index)).toISOString(),
+					await communityIconHash(recipe),
+				)
+				.run();
 		}
 		return { database, store };
 	}
@@ -306,7 +306,10 @@ describe("CommunityIconStore", () => {
 		expect(first.icons).toHaveLength(3);
 		expect(first.nextCursor).toBeDefined();
 		const rest = await Effect.runPromise(
-			store.search({ limit: 3, ...(first.nextCursor ? { cursor: first.nextCursor } : {}) }),
+			store.search({
+				limit: 3,
+				...(first.nextCursor ? { ...(first.nextCursor ? { cursor: first.nextCursor } : {}) } : {}),
+			}),
 		);
 		expect(rest.icons.map((icon) => icon.slug)).toEqual(["kafka-topic"]);
 		expect(rest.nextCursor).toBeUndefined();
@@ -327,9 +330,45 @@ describe("CommunityIconStore", () => {
 		expect((await Effect.runPromise(store.get("queue")))?.name).toBe("Queue");
 	});
 
+	it("keeps native D1 hash and slug authority under overlapping writers", async () => {
+		const database = await nativeDatabase();
+		const a = await openStore(database),
+			b = await openStore(database);
+		const hash = await communityIconHash(RING);
+		const same = await Promise.all([
+			Effect.runPromise(a.insert({ name: "Ring", recipe: RING, hash })),
+			Effect.runPromise(b.insert({ name: "Other ring", recipe: RING, hash })),
+		]);
+		expect(same.filter((result) => result.created)).toHaveLength(1);
+		expect(new Set(same.map((result) => result.icon.slug)).size).toBe(1);
+		const different = await Promise.all([
+			Effect.runPromise(a.insert({ name: "Box", recipe: BOX, hash: await communityIconHash(BOX) })),
+			Effect.runPromise(b.insert({ name: "Box", recipe: RING, hash: "deliberate-distinct-hash" })),
+		]);
+		expect(new Set(different.map((result) => result.icon.slug)).size).toBe(2);
+	});
+	it("pages equal timestamps without gaps and treats LIKE wildcards literally", async () => {
+		const { database, store } = await seeded();
+		await database
+			.prepare("UPDATE community_icons SET created_at='2026-11-08T12:00:00.000Z'")
+			.run();
+		const first = await Effect.runPromise(store.search({ limit: 2 }));
+		const second = await Effect.runPromise(
+			store.search({ limit: 2, ...(first.nextCursor ? { cursor: first.nextCursor } : {}) }),
+		);
+		expect([...first.icons, ...second.icons].map((icon) => icon.slug)).toEqual([
+			"queue",
+			"kafka-topic",
+			"kafka-broker",
+			"database",
+		]);
+		expect((await Effect.runPromise(store.search({ query: "kafka%" }))).icons).toEqual([]);
+		expect((await Effect.runPromise(store.search({ query: "kafka_" }))).icons).toEqual([]);
+	});
+
 	it("skips rows whose recipe no longer draws", async () => {
 		const { database, store } = await seeded();
-		database.sqlite.prepare("UPDATE community_icons SET recipe = '{}' WHERE slug = 'queue'").run();
+		await database.prepare("UPDATE community_icons SET recipe = '{}' WHERE slug = 'queue'").run();
 		expect(await Effect.runPromise(store.get("queue"))).toBeUndefined();
 		expect((await Effect.runPromise(store.search({}))).icons).toHaveLength(3);
 	});

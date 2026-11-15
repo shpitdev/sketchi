@@ -1,3 +1,5 @@
+import { Array, Effect, Schema, SchemaGetter, SchemaIssue, String } from "effect";
+
 /**
  * Publishing a pack to Excalidraw's library collection: a visitor names
  * themselves as its author and the icons Worker sends the pack, as
@@ -31,7 +33,7 @@ export const WEBSITE_MAX_LENGTH = 200;
 /** X's own handle rule: 1 to 15 letters, digits or underscores. */
 const X_HANDLE = /^[A-Za-z0-9_]{1,15}$/u;
 const X_HOSTS = new Set(
-	["x.com", "twitter.com"].flatMap((host) => [host, `www.${host}`, `mobile.${host}`]),
+	Array.flatMap(["x.com", "twitter.com"], (host) => [host, `www.${host}`, `mobile.${host}`]),
 );
 /** X's own pages, whose paths look like a profile's. */
 const X_PAGES = new Set([
@@ -66,10 +68,10 @@ export type XHandleCheck =
  * input is no handle.
  */
 export function parseXHandle(input: string): XHandleCheck {
-	const value = input.trim();
+	const value = String.trim(input);
 	if (!value) return { ok: true, handle: "" };
 	if (!/[/.:]/u.test(value)) {
-		const handle = value.replace(/^@/u, "");
+		const handle = String.replace(/^@/u, "")(value);
 		return X_HANDLE.test(handle)
 			? { ok: true, handle }
 			: { ok: false, message: "An X handle is 1 to 15 letters, digits or underscores." };
@@ -78,61 +80,62 @@ export function parseXHandle(input: string): XHandleCheck {
 	if (!url || !/^https?:$/u.test(url.protocol) || !X_HOSTS.has(url.hostname)) {
 		return { ok: false, message: "Enter an X handle or a link to an X profile." };
 	}
-	const path = url.pathname.split("/").filter(Boolean);
+	const path = Array.filter(String.split("/")(url.pathname), (part) => part.length > 0);
 	const handle = path.length === 1 ? path[0] : undefined;
-	return handle && X_HANDLE.test(handle) && !X_PAGES.has(handle.toLowerCase())
+	return handle && X_HANDLE.test(handle) && !X_PAGES.has(String.toLowerCase(handle))
 		? { ok: true, handle }
 		: { ok: false, message: "That X link is not a profile; use one like x.com/yourname." };
 }
 
-export interface PublishAuthor {
-	readonly authorName: string;
-	readonly xHandle: string;
-	readonly website: string;
-}
+const XHandle = Schema.String.pipe(
+	Schema.decodeTo(Schema.String, {
+		decode: SchemaGetter.transformEffect((input) => {
+			const parsed = parseXHandle(input);
+			return parsed.ok
+				? Effect.succeed(parsed.handle)
+				: Effect.fail(new SchemaIssue.InvalidValue({ message: parsed.message }, input));
+		}),
+		encode: SchemaGetter.transform((value) => value),
+	}),
+);
+/** One payload codec for the native handler and generated client. Attribution is unverified. */
+export const PublishPayload = Schema.Struct({
+	authorName: Schema.Trim.check(
+		Schema.makeFilter((value: string) =>
+			!value
+				? "Add your name."
+				: // oxlint-disable-next-line no-control-regex -- Publication author names must refuse control characters.
+					value.length > AUTHOR_NAME_MAX_LENGTH || /[\u0000-\u001f\u007f]/u.test(value)
+					? `Your name must be at most ${AUTHOR_NAME_MAX_LENGTH} characters on one line.`
+					: undefined,
+		),
+	),
+	xHandle: Schema.optionalKey(XHandle),
+	website: Schema.optionalKey(
+		Schema.Trim.pipe(
+			Schema.decodeTo(Schema.String, {
+				decode: SchemaGetter.transformEffect((value) => {
+					if (!value) return Effect.succeed("");
+					const url = URL.parse(value);
+					return value.length <= WEBSITE_MAX_LENGTH && url?.protocol === "https:"
+						? Effect.succeed(url.href)
+						: Effect.fail(
+								new SchemaIssue.InvalidValue(
+									{
+										message: `The website must be an https:// address of at most ${WEBSITE_MAX_LENGTH} characters.`,
+									},
+									value,
+								),
+							);
+				}),
+				encode: SchemaGetter.transform((value) => value),
+			}),
+		),
+	),
+});
 
-export type PublishRequestCheck =
-	| { readonly ok: true; readonly author: PublishAuthor }
-	| { readonly ok: false; readonly message: string };
-
-/**
- * The author fields a visitor sends: a name (required), an X handle and a
- * website. No GitHub handle: the collection's bot mentions it on GitHub,
- * and nothing here can show the visitor owns it.
- */
-export function checkPublishRequest(body: unknown, defaultWebsite: string): PublishRequestCheck {
-	if (typeof body !== "object" || body === null || Array.isArray(body)) {
-		return { ok: false, message: "Send { authorName, xHandle?, website? }." };
-	}
-	const fields = body as Record<string, unknown>;
-	const text = (key: string) => (typeof fields[key] === "string" ? fields[key].trim() : undefined);
-	const authorName = text("authorName");
-	if (!authorName) return { ok: false, message: "Add your name." };
-	// oxlint-disable-next-line no-control-regex -- control characters are what this refuses
-	if (authorName.length > AUTHOR_NAME_MAX_LENGTH || /[\u0000-\u001f\u007f]/u.test(authorName)) {
-		return {
-			ok: false,
-			message: `Your name must be at most ${AUTHOR_NAME_MAX_LENGTH} characters on one line.`,
-		};
-	}
-	const xHandle = parseXHandle(text("xHandle") ?? "");
-	if (!xHandle.ok) return xHandle;
-	const website = text("website") || defaultWebsite;
-	const url = URL.parse(website);
-	if (website.length > WEBSITE_MAX_LENGTH || url?.protocol !== "https:") {
-		return {
-			ok: false,
-			message: `The website must be an https:// address of at most ${WEBSITE_MAX_LENGTH} characters.`,
-		};
-	}
-	return { ok: true, author: { authorName, xHandle: xHandle.handle, website: url.href } };
-}
-
-export function packPublishPath(id: string): string {
-	return `/api/packs/${encodeURIComponent(id)}/excalidraw`;
-}
-
-export interface PublishResult {
-	readonly pullRequestUrl: string;
-	readonly installUrl?: string;
-}
+export const PublishResult = Schema.Struct({
+	pullRequestUrl: Schema.String,
+	installUrl: Schema.optionalKey(Schema.String),
+});
+export interface PublishResult extends Schema.Schema.Type<typeof PublishResult> {}

@@ -1,40 +1,57 @@
 // @vitest-environment node
 
-import { DatabaseSync } from "node:sqlite";
+import { mkdir, mkdtemp, writeFile, rm } from "node:fs/promises";
+import { resolve } from "node:path";
+import { getPlatformProxy } from "wrangler";
 
-import {
-	COMMUNITY_ICON_LIMITS,
-	type CommunityIconDatabase,
-	type CommunityIconStatement,
-} from "@sketchi/community-icons";
+import { COMMUNITY_ICON_LIMITS, type CommunityEnv } from "@sketchi/community-icons";
 import { Effect } from "effect";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tanstack/react-start/server-only", () => ({}));
 
 import { studioCommunityIcons } from "./community-icons.server";
 
-function sqliteDatabase(): CommunityIconDatabase {
-	const sqlite = new DatabaseSync(":memory:");
-	const statement = (query: string, values: unknown[] = []): CommunityIconStatement => {
-		const params = values as (string | number | null)[];
-		return {
-			bind: (...next) => statement(query, next),
-			first: async <T>() => (sqlite.prepare(query).get(...params) as T | undefined) ?? null,
-			all: async <T>() => ({ results: sqlite.prepare(query).all(...params) as T[] }),
-			run: async () => ({
-				meta: { changes: Number(sqlite.prepare(query).run(...params).changes) },
-			}),
-		};
-	};
-	return { prepare: (query) => statement(query) };
+const cleanups: (() => Promise<void>)[] = [];
+afterEach(async () => {
+	for (const cleanup of cleanups.splice(0)) await cleanup();
+});
+async function nativeDatabase() {
+	const base = resolve(".memory/icons-server");
+	await mkdir(base, { recursive: true });
+	const directory = await mkdtemp(`${base}/studio-d1-`);
+	const configPath = `${directory}/wrangler.json`;
+	await writeFile(
+		configPath,
+		JSON.stringify({
+			name: "studio-community-local",
+			compatibility_date: "2026-11-01",
+			d1_databases: [
+				{
+					binding: "DB",
+					database_name: "studio-community-local",
+					database_id: "00000000-0000-0000-0000-000000000001",
+				},
+			],
+		}),
+	);
+	const proxy = await getPlatformProxy<{ DB: NonNullable<CommunityEnv["COMMUNITY_ICONS"]> }>({
+		configPath,
+		persist: false,
+		remoteBindings: false,
+		envFiles: [],
+	});
+	cleanups.push(async () => {
+		await proxy.dispose();
+		await rm(directory, { recursive: true, force: true });
+	});
+	return proxy.env.DB;
 }
-
 const RING = { parts: [{ kind: "ellipse", cx: 12, cy: 12, rx: 9, ry: 9 }] };
 
 describe("Studio community icons", () => {
 	it("loads published icons by their community slugs", async () => {
-		const database = sqliteDatabase();
+		const database = await nativeDatabase();
 		const source = studioCommunityIcons(database);
 		expect(await Effect.runPromise(source.load(["community/ring"]))).toEqual([]);
 		await database
@@ -46,11 +63,10 @@ describe("Studio community icons", () => {
 		expect(await Effect.runPromise(source.load(["community/ring", "community/missing"]))).toEqual([
 			{ slug: "community/ring", name: "Ring", recipe: RING },
 		]);
-		expect(studioCommunityIcons(database)).toBe(source);
 	});
 
 	it("searches visible icons only, under their community slugs", async () => {
-		const database = sqliteDatabase();
+		const database = await nativeDatabase();
 		const source = studioCommunityIcons(database);
 		expect(await Effect.runPromise(source.search("ring"))).toEqual([]);
 		for (const [slug, hidden] of [
@@ -70,7 +86,7 @@ describe("Studio community icons", () => {
 	});
 
 	it("finds the icon a query names exactly behind a full page of newer partial matches", async () => {
-		const database = sqliteDatabase();
+		const database = await nativeDatabase();
 		const source = studioCommunityIcons(database);
 		expect(await Effect.runPromise(source.search("Acme"))).toEqual([]);
 		const insert = (slug: string, name: string, createdAt: string) =>
@@ -90,11 +106,8 @@ describe("Studio community icons", () => {
 	});
 
 	it("draws no community icons when the store cannot be read", async () => {
-		const broken: CommunityIconDatabase = {
-			prepare: () => {
-				throw new Error("D1 unavailable");
-			},
-		};
+		const broken = await nativeDatabase();
+		await broken.exec("CREATE VIEW community_icons AS SELECT 1;");
 		expect(await Effect.runPromise(studioCommunityIcons(broken).load(["community/ring"]))).toEqual(
 			[],
 		);

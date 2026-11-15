@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useAtom } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 
-import type { PackExcalidrawState, PublishResult } from "../../lib/excalidraw-publish.js";
+import type { PackExcalidrawState, PublishResult } from "./publication.js";
 
 /**
  * The packs' Excalidraw states as the server rendered them, updated when a

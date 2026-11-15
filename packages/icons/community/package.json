@@ -16,6 +16,7 @@
 	},
 	"dependencies": {
 		"effect": "catalog:",
-		"@sketchi/drawing": "workspace:*"
+		"@sketchi/drawing": "workspace:*",
+		"@effect/sql-d1": "catalog:"
 	}
 }

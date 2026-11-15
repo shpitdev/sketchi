@@ -1,3 +1,4 @@
+import { D1Client } from "@effect/sql-d1";
 import { Array, ByteSize, Context, Effect, Layer, Schema, String } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
@@ -26,15 +27,11 @@ import {
 	type CommunityModerationAi,
 } from "./moderation.js";
 import { publishCommunityIcon } from "./publish.js";
-import {
-	communityIconStoreLayer,
-	CommunityIconStore,
-	type CommunityIconDatabase,
-} from "./store.js";
+import { communityIconStoreLayer, CommunityIconStore } from "./store.js";
 
 export const COMMUNITY_PUBLISHES_PER_CLIENT_MINUTE = 10;
 export interface CommunityEnv {
-	readonly COMMUNITY_ICONS?: CommunityIconDatabase;
+	readonly COMMUNITY_ICONS?: D1Client.D1ClientConfig["db"];
 	readonly COMMUNITY_CLIENT_LIMIT?: ClientLimitNamespace;
 	readonly AI?: CommunityModerationAi;
 	readonly COMMUNITY_ADMIN_TOKEN?: string;
@@ -159,6 +156,8 @@ const publish = Effect.fn("CommunityHttp.publish")(function* () {
 				{ status: created ? 201 : 200 },
 			).pipe(Effect.orDie),
 		),
+		// @effect-diagnostics-next-line strictEffectProvide:off -- This publish entry point scopes the actual request D1 and moderation bindings together.
+		Effect.provide(Layer.merge(communityIconStoreLayer(env.COMMUNITY_ICONS), moderation)),
 		Effect.catchTags({
 			CommunityIconInvalidRequestError: (error) =>
 				Effect.succeed(
@@ -180,8 +179,6 @@ const publish = Effect.fn("CommunityHttp.publish")(function* () {
 					Effect.as(storeUnavailable()),
 				),
 		}),
-		// @effect-diagnostics-next-line strictEffectProvide:off -- This publish entry point scopes the actual request D1 and moderation bindings together.
-		Effect.provide(Layer.merge(communityIconStoreLayer(env.COMMUNITY_ICONS), moderation)),
 	);
 });
 

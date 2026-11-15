@@ -1,15 +1,14 @@
 // @vitest-environment node
 
-import { DatabaseSync } from "node:sqlite";
+import { openD1 } from "../../test-support/d1.js";
+import { Effect } from "effect";
 
-import type { CommunityIconDatabase, CommunityIconStatement } from "@sketchi/community-icons";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
-import { checkPublishRequest, parseXHandle } from "./excalidraw-publish";
+import { parseXHandle } from "./publication";
 import {
 	EXCALIDRAW_LIBRARY_BACKEND,
 	type ExcalidrawPublishEnv,
-	ExcalidrawSubmissionStore,
 	handlePackPublish,
 	installLinkFromPullRequest,
 	loadPackExcalidrawStates,
@@ -17,25 +16,68 @@ import {
 	packExcalidrawStates,
 	PULL_REQUEST_RECHECK_MS,
 	type SubmissionRow,
-} from "./excalidraw-publish.server";
-import { packVersion } from "./packs";
+} from "./publication.server";
+import { packVersion } from "../../lib/packs";
 
-function sqliteDatabase(): CommunityIconDatabase {
-	const sqlite = new DatabaseSync(":memory:");
-	const statement = (query: string, values: unknown[] = []): CommunityIconStatement => {
-		const params = values as (string | number | null)[];
-		return {
-			bind: (...next) => statement(query, next),
-			first: async <T>() => (sqlite.prepare(query).get(...params) as T | undefined) ?? null,
-			all: async <T>() => ({ results: sqlite.prepare(query).all(...params) as T[] }),
-			run: async () => ({
-				meta: { changes: Number(sqlite.prepare(query).run(...params).changes) },
-			}),
-		};
-	};
-	return { prepare: (query) => statement(query) };
+// Native Fetch references keep one transport identity; dispatch stays local to this suite.
+let activeFetch: typeof fetch = async () => {
+	throw new Error("Unexpected upstream call");
+};
+const dispatch: typeof fetch = (input, init) => activeFetch(input, init);
+vi.stubGlobal("fetch", dispatch);
+const setFetch = (fetch: typeof globalThis.fetch) => {
+	activeFetch = fetch;
+};
+afterAll(() => vi.unstubAllGlobals());
+const requestHref = (input: RequestInfo | URL | undefined) =>
+	typeof input === "string" ? input : input instanceof URL ? input.href : (input?.url ?? "");
+const cleanup: (() => Promise<void>)[] = [];
+async function nativeDatabase() {
+	const fixture = await openD1();
+	cleanup.push(fixture.dispose);
+	const db = fixture.database;
+	await db.batch([
+		db.prepare(
+			"CREATE TABLE excalidraw_library_submissions(pack_id TEXT NOT NULL,version TEXT NOT NULL,status TEXT NOT NULL,author_name TEXT NOT NULL,pull_request_url TEXT,install_url TEXT,pull_request TEXT,created_at INTEGER NOT NULL,PRIMARY KEY(pack_id,version))",
+		),
+		db.prepare(
+			"CREATE TABLE excalidraw_library_pull_requests(url TEXT PRIMARY KEY,state TEXT,etag TEXT,checked_at INTEGER NOT NULL)",
+		),
+	]);
+	return db;
 }
-
+type Database = NonNullable<ExcalidrawPublishEnv["COMMUNITY_ICONS"]>;
+async function claim(db: Database, packId: string, version: string, author: string, now: number) {
+	const result = await db
+		.prepare(
+			"INSERT INTO excalidraw_library_submissions(pack_id,version,status,author_name,created_at) VALUES(?,?,'pending',?,?) ON CONFLICT DO NOTHING",
+		)
+		.bind(packId, version, author, now)
+		.run();
+	return result.meta.changes === 1;
+}
+async function recordSubmission(
+	db: Database,
+	packId: string,
+	version: string,
+	result: { pullRequestUrl: string; installUrl?: string; pullRequest: string },
+) {
+	await db
+		.prepare(
+			"UPDATE excalidraw_library_submissions SET status='submitted',pull_request_url=?,install_url=?,pull_request=? WHERE pack_id=? AND version=?",
+		)
+		.bind(result.pullRequestUrl, result.installUrl ?? null, result.pullRequest, packId, version)
+		.run();
+}
+async function readSubmissionRows(db: Database) {
+	return (
+		await db
+			.prepare(
+				"SELECT s.pack_id,s.version,s.status,s.pull_request_url,s.install_url,s.created_at,p.state AS pull_request_state,p.checked_at AS pull_request_checked_at FROM excalidraw_library_submissions s LEFT JOIN excalidraw_library_pull_requests p ON p.url=s.pull_request_url ORDER BY s.created_at DESC",
+			)
+			.all<SubmissionRow>()
+	).results;
+}
 const LIBRARY = JSON.stringify({
 	type: "excalidrawlib",
 	version: 2,
@@ -47,7 +89,9 @@ const PR = "https://github.com/excalidraw/excalidraw-libraries/pull/4242";
 const INSTALL =
 	"https://excalidraw.com/?addLibrary=https%3A%2F%2Fraw.githubusercontent.com%2Fexcalidraw%2Fexcalidraw-libraries%2Fjane-palantir-platform-icons-1%2Flibraries%2Fjane%2Fpalantir-platform-icons.excalidrawlib%3Fraw%3Dtrue";
 
-function environment(overrides: Partial<ExcalidrawPublishEnv> = {}): ExcalidrawPublishEnv {
+async function environment(
+	overrides: Partial<ExcalidrawPublishEnv> = {},
+): Promise<ExcalidrawPublishEnv> {
 	return {
 		ASSETS: {
 			fetch: async (input) => {
@@ -57,7 +101,7 @@ function environment(overrides: Partial<ExcalidrawPublishEnv> = {}): ExcalidrawP
 				return new Response("", { status: 404 });
 			},
 		},
-		COMMUNITY_ICONS: sqliteDatabase(),
+		COMMUNITY_ICONS: await nativeDatabase(),
 		EXCALIDRAW_LIBRARY_SUBMIT: "on",
 		...overrides,
 	};
@@ -75,7 +119,6 @@ function publish(
 			body: typeof body === "string" ? body : JSON.stringify(body),
 		}),
 		env,
-		pack,
 	);
 }
 
@@ -99,7 +142,7 @@ function backend(
 		}
 		throw new Error(`Unexpected fetch ${url}`);
 	});
-	vi.stubGlobal("fetch", fetchMock);
+	setFetch(fetchMock);
 	return fetchMock;
 }
 
@@ -112,15 +155,18 @@ function submissionRows(env: ExcalidrawPublishEnv) {
 		.then(({ results }) => results);
 }
 
-afterEach(() => {
-	vi.unstubAllGlobals();
+afterEach(async () => {
+	for (const dispose of cleanup.splice(0)) await dispose();
+	activeFetch = async () => {
+		throw new Error("Unexpected upstream call");
+	};
 	vi.useRealTimers();
 });
 
 describe("publishing a pack to Excalidraw", () => {
 	it("is off unless the Worker turns it on, and never reaches the backend then", async () => {
 		const fetchMock = backend();
-		const { EXCALIDRAW_LIBRARY_SUBMIT: _on, ...off } = environment();
+		const { EXCALIDRAW_LIBRARY_SUBMIT: _on, ...off } = await environment();
 		const response = await publish(off);
 		expect(response.status).toBe(404);
 		expect(fetchMock).not.toHaveBeenCalled();
@@ -128,13 +174,13 @@ describe("publishing a pack to Excalidraw", () => {
 
 	it("only publishes a pack with a listing", async () => {
 		const fetchMock = backend();
-		expect((await publish(environment(), { authorName: "Jane" }, "all")).status).toBe(404);
+		expect((await publish(await environment(), { authorName: "Jane" }, "all")).status).toBe(404);
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
 	it("sends the dialog's form once, records the pull request and its install link", async () => {
 		const fetchMock = backend();
-		const env = environment();
+		const env = await environment();
 		const response = await publish(env, {
 			authorName: "  Jane Doe ",
 			xHandle: "https://x.com/jane_d",
@@ -184,14 +230,14 @@ describe("publishing a pack to Excalidraw", () => {
 		expect((await publish(env)).status).toBe(409);
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 		const version = await packVersion(LIBRARY);
-		const rows = await new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!).rows();
+		const rows = await readSubmissionRows(env.COMMUNITY_ICONS!);
 		expect(packExcalidrawStates([{ id: "palantir", version }], rows, { enabled: true })).toEqual({
 			palantir: { installUrl: INSTALL, pullRequest: { url: PR }, publishable: false },
 		});
 	});
 
 	it("frees the version when the backend refuses, so the next visitor can try", async () => {
-		const env = environment();
+		const env = await environment();
 		const refused = backend({
 			submit: () =>
 				Response.json({ message: "Library with this name already exists" }, { status: 422 }),
@@ -221,13 +267,13 @@ describe("publishing a pack to Excalidraw", () => {
 			() => Promise.resolve(Response.json({ url: "https://example.com/pull/1" })),
 		],
 	])("holds the version after %s and never sends it again", async (_case, submit) => {
-		const env = environment();
+		const env = await environment();
 		const first = vi.fn(async (input: RequestInfo | URL) => {
 			const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
 			if (url === `${EXCALIDRAW_LIBRARY_BACKEND}/submit`) return submit();
 			throw new Error(`Unexpected fetch ${url}`);
 		});
-		vi.stubGlobal("fetch", first);
+		setFetch(first);
 		const response = await publish(env);
 		expect(response.status).toBe(502);
 		await expect(response.json()).resolves.toMatchObject({
@@ -240,7 +286,7 @@ describe("publishing a pack to Excalidraw", () => {
 		const retry = backend();
 		expect((await publish(env)).status).toBe(409);
 		expect(retry).not.toHaveBeenCalled();
-		const rows = await new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!).rows();
+		const rows = await readSubmissionRows(env.COMMUNITY_ICONS!);
 		expect(
 			packExcalidrawStates([{ id: "palantir", version: await packVersion(LIBRARY) }], rows, {
 				enabled: true,
@@ -249,7 +295,7 @@ describe("publishing a pack to Excalidraw", () => {
 	});
 
 	it("keeps the pull request when GitHub cannot be read, without offering the version again", async () => {
-		const env = environment();
+		const env = await environment();
 		backend({ pull: () => new Response("rate limited", { status: 403 }) });
 		const response = await publish(env);
 		expect(response.status).toBe(201);
@@ -267,7 +313,7 @@ describe("publishing a pack to Excalidraw", () => {
 	});
 
 	it("stores the pull request's text when its install link cannot be read from it", async () => {
-		const env = environment();
+		const env = await environment();
 		backend({ pull: () => Response.json({ head: { ref: "jane-x-1" }, body: "edited by hand" }) });
 		await expect((await publish(env)).json()).resolves.toEqual({ pullRequestUrl: PR });
 		const stored = await env
@@ -279,35 +325,116 @@ describe("publishing a pack to Excalidraw", () => {
 		});
 	});
 
+	it.each(["reported refusal with an existing PR", { detail: "non-string backend metadata" }])(
+		"retains trusted PR evidence on a contradictory refusal without a second send: %j",
+		async (message) => {
+			const env = await environment();
+			const fetchMock = backend({
+				submit: () => Response.json({ url: PR, message }, { status: 422 }),
+			});
+			const first = await publish(env);
+			expect(first.status).toBe(201);
+			expect(await first.json()).toMatchObject({ pullRequestUrl: PR });
+			expect((await publish(env)).status).toBe(409);
+			expect(
+				fetchMock.mock.calls.filter(([input]) => requestHref(input).endsWith("/submit")),
+			).toHaveLength(1);
+			expect(await submissionRows(env)).toMatchObject([
+				{ status: "submitted", pull_request_url: PR },
+			]);
+		},
+	);
+	it("returns the confirmed PR when actual D1 refuses completion and still prevents replay", async () => {
+		const env = await environment();
+		await env.COMMUNITY_ICONS!.exec(
+			"CREATE TRIGGER completion_refusal BEFORE UPDATE ON excalidraw_library_submissions BEGIN SELECT RAISE(ABORT, 'local completion write refused'); END;",
+		);
+		backend();
+		const first = await publish(env);
+		expect(first.status).toBe(201);
+		expect(await first.json()).toMatchObject({ pullRequestUrl: PR });
+		expect((await publish(env)).status).toBe(409);
+		expect(await submissionRows(env)).toMatchObject([{ status: "pending" }]);
+	});
+	it("lets one native D1 claimant send while an overlapping request observes the taken version", async () => {
+		const env = await environment();
+		const started = Promise.withResolvers<void>();
+		const release = Promise.withResolvers<void>();
+		const fetchMock = backend();
+		setFetch(async (input, init) => {
+			if (requestHref(input).endsWith("/submit")) {
+				started.resolve();
+				await release.promise;
+			}
+			return Reflect.apply(fetchMock, undefined, [input, init]);
+		});
+		const first = publish(env);
+		try {
+			await started.promise;
+			expect((await publish(env)).status).toBe(409);
+		} finally {
+			release.resolve();
+		}
+		expect((await first).status).toBe(201);
+		expect(
+			fetchMock.mock.calls.filter(([input]) => requestHref(input).endsWith("/submit")),
+		).toHaveLength(1);
+	});
+
 	it("never lets a claim lapse: a Worker that stopped mid-send may have opened a pull request", async () => {
-		const env = environment();
-		const store = new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!);
+		const env = await environment();
 		const version = await packVersion(LIBRARY);
 		const longAgo = Date.now() - 30 * 24 * 3_600_000;
-		expect(await store.claim("palantir", version, "Someone", longAgo)).toBe(true);
+		expect(await claim(env.COMMUNITY_ICONS!, "palantir", version, "Someone", longAgo)).toBe(true);
 		const fetchMock = backend();
 		expect((await publish(env)).status).toBe(409);
 		expect(fetchMock).not.toHaveBeenCalled();
-		expect(await store.claim("palantir", version, "Jane", Date.now())).toBe(false);
+		expect(await claim(env.COMMUNITY_ICONS!, "palantir", version, "Jane", Date.now())).toBe(false);
 		expect(
-			packExcalidrawStates([{ id: "palantir", version }], await store.rows(), { enabled: true })
-				.palantir,
+			packExcalidrawStates(
+				[{ id: "palantir", version }],
+				await readSubmissionRows(env.COMMUNITY_ICONS!),
+				{ enabled: true },
+			).palantir,
 		).toEqual({ publishable: false });
 	});
 
 	it("refuses a bad or oversized body and a client over its limit", async () => {
 		backend();
-		const env = environment();
+		const env = await environment();
+		for (const body of [
+			{ authorName: "x".repeat(61) },
+			{ authorName: "Jane\nDoe" },
+			{ authorName: "Jane", xHandle: "not a handle" },
+			{ authorName: "Jane", xHandle: "https://x.com/jane/status/1" },
+			{ authorName: "Jane", website: "http://jane.dev" },
+			{ authorName: "Jane", website: "javascript:alert(1)" },
+			[],
+		]) {
+			const response = await publish(env, body);
+			expect(response.status).toBe(400);
+			expect(await response.json()).toMatchObject({
+				error: { code: "invalid_request", message: expect.any(String) },
+			});
+		}
+
 		expect((await publish(env, { authorName: "" })).status).toBe(400);
 		expect((await publish(env, "not json")).status).toBe(400);
 		expect((await publish(env, { authorName: "x".repeat(4000) })).status).toBe(413);
 		const take = vi.fn(async () => ({ allowed: false, retryAfterSeconds: 1200 }));
 		const limited = await publish(
-			environment({ COMMUNITY_CLIENT_LIMIT: { getByName: () => ({ take }) } }),
+			await environment({ COMMUNITY_CLIENT_LIMIT: { getByName: () => ({ take }) } }),
 		);
 		expect(limited.status).toBe(429);
 		expect(limited.headers.get("Retry-After")).toBe("1200");
 		expect(take).toHaveBeenCalledWith(3, 3_600_000);
+		const accepted = backend();
+		expect((await publish(env, { authorName: " Jane ", website: "https://jane.dev" })).status).toBe(
+			201,
+		);
+		const form = accepted.mock.calls[0]?.[1]?.body as FormData;
+		expect(form.get("authorName")).toBe("Jane");
+		expect(form.get("website")).toBe("https://jane.dev/");
 	});
 });
 
@@ -402,16 +529,18 @@ describe("pull request states", () => {
 	const OTHER = "https://github.com/excalidraw/excalidraw-libraries/pull/4243";
 
 	async function seeded(version = "v1") {
-		const env = environment();
-		const store = new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!);
-		await store.claim("palantir", version, "Jane", 1);
-		await store.complete("palantir", version, {
+		const env = await environment();
+		await claim(env.COMMUNITY_ICONS!, "palantir", version, "Jane", 1);
+		await recordSubmission(env.COMMUNITY_ICONS!, "palantir", version, {
 			pullRequestUrl: PR,
 			installUrl: INSTALL,
 			pullRequest: "{}",
 		});
-		await store.claim("databricks", "v1", "Jane", 2);
-		await store.complete("databricks", "v1", { pullRequestUrl: OTHER, pullRequest: "{}" });
+		await claim(env.COMMUNITY_ICONS!, "databricks", "v1", "Jane", 2);
+		await recordSubmission(env.COMMUNITY_ICONS!, "databricks", "v1", {
+			pullRequestUrl: OTHER,
+			pullRequest: "{}",
+		});
 		return env;
 	}
 
@@ -426,7 +555,7 @@ describe("pull request states", () => {
 			if (!answer) throw new Error(`Unexpected fetch ${url}`);
 			return answer();
 		});
-		vi.stubGlobal("fetch", fetchMock);
+		setFetch(fetchMock);
 		return fetchMock;
 	}
 
@@ -435,13 +564,15 @@ describe("pull request states", () => {
 
 	async function load(env: ExcalidrawPublishEnv, now: number) {
 		const later: Promise<unknown>[] = [];
-		const states = await loadPackExcalidrawStates(
-			env,
-			[
-				{ id: "palantir", version: "v1" },
-				{ id: "databricks", version: "v1" },
-			],
-			{ now, waitUntil: (promise) => later.push(promise) },
+		const states = await Effect.runPromise(
+			loadPackExcalidrawStates(
+				env,
+				[
+					{ id: "palantir", version: "v1" },
+					{ id: "databricks", version: "v1" },
+				],
+				{ now, waitUntil: (promise) => later.push(promise) },
+			),
 		);
 		await Promise.all(later);
 		return { states, refreshed: later.length > 0 };
@@ -472,7 +603,7 @@ describe("pull request states", () => {
 		const third = await load(env, 1_000 + PULL_REQUEST_RECHECK_MS.open);
 		expect(third.refreshed).toBe(true);
 		expect(fetchMock).toHaveBeenCalledTimes(3);
-		expect(fetchMock.mock.calls[2]?.[0]).toContain("/pulls/4243");
+		expect(requestHref(fetchMock.mock.calls[2]?.[0])).toContain("/pulls/4243");
 		expect(third.states["databricks"]?.pullRequest?.state).toBe("open");
 	});
 
@@ -508,7 +639,7 @@ describe("pull request states", () => {
 			if (url === MAIN_LIBRARY) return new Response(mainLibrary);
 			return new Response("rate limited", { status: 403 });
 		});
-		vi.stubGlobal("fetch", fetchMock);
+		setFetch(fetchMock);
 		vi.spyOn(console, "warn").mockImplementation(() => undefined);
 		return fetchMock;
 	}
@@ -540,19 +671,17 @@ describe("pull request states", () => {
 	});
 
 	it("checks the longest unchecked pull requests first, so every one is reached", async () => {
-		const env = environment();
-		const store = new ExcalidrawSubmissionStore(env.COMMUNITY_ICONS!);
+		const env = await environment();
 		const numbers = Array.from({ length: 11 }, (_, index) => String(5000 + index));
 		for (const [index, number] of numbers.entries()) {
-			await store.claim(`pack-${index}`, "v1", "Jane", index);
-			await store.complete(`pack-${index}`, "v1", {
+			await claim(env.COMMUNITY_ICONS!, `pack-${index}`, "v1", "Jane", index);
+			await recordSubmission(env.COMMUNITY_ICONS!, `pack-${index}`, "v1", {
 				pullRequestUrl: `https://github.com/excalidraw/excalidraw-libraries/pull/${number}`,
 				pullRequest: "{}",
 			});
 		}
 		const read: string[] = [];
-		vi.stubGlobal(
-			"fetch",
+		setFetch(
 			vi.fn(async (input: RequestInfo | URL) => {
 				const url =
 					typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -562,7 +691,9 @@ describe("pull request states", () => {
 		);
 		const visit = async (now: number) => {
 			const later: Promise<unknown>[] = [];
-			await loadPackExcalidrawStates(env, [], { now, waitUntil: (promise) => later.push(promise) });
+			await Effect.runPromise(
+				loadPackExcalidrawStates(env, [], { now, waitUntil: (promise) => later.push(promise) }),
+			);
 			await Promise.all(later);
 		};
 		// Ten a visit: the first takes the ten newest, the next the one left unread first.
@@ -576,32 +707,6 @@ describe("pull request states", () => {
 });
 
 describe("author fields", () => {
-	const site = "https://icons.sketchi.app/packs/data";
-
-	it("takes a name, an optional handle and an https website", () => {
-		expect(checkPublishRequest({ authorName: "Jane" }, site)).toEqual({
-			ok: true,
-			author: { authorName: "Jane", xHandle: "", website: site },
-		});
-		expect(
-			checkPublishRequest({ authorName: "Jane", website: "https://jane.dev" }, site),
-		).toMatchObject({ ok: true, author: { website: "https://jane.dev/" } });
-	});
-
-	it("refuses a long or multi-line name, a bad handle and a non-https website", () => {
-		for (const body of [
-			{ authorName: "x".repeat(61) },
-			{ authorName: "Jane\nDoe" },
-			{ authorName: "Jane", xHandle: "not a handle" },
-			{ authorName: "Jane", xHandle: "https://x.com/jane/status/1" },
-			{ authorName: "Jane", website: "http://jane.dev" },
-			{ authorName: "Jane", website: "javascript:alert(1)" },
-			[],
-		]) {
-			expect(checkPublishRequest(body, site).ok, JSON.stringify(body)).toBe(false);
-		}
-	});
-
 	it("reads an X handle however it is pasted", () => {
 		for (const input of [
 			"dimethylpant",
