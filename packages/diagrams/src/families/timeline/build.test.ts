@@ -1,25 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
+import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
-import {
-	TIMELINE_MAX_EVENTS,
-	TIMELINE_MAX_LANES,
-	timelineFixture,
-} from "../../families/timeline/document.js";
+import { TIMELINE_MAX_EVENTS, TIMELINE_MAX_LANES } from "./document.js";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { applyDiagramPatch, buildTimeline, CodeModeRuntimeEnvironment } from "./runtime.js";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildTimelineResultSchema } from "./contract.js";
+import {
+	applyDiagramPatch,
+	buildTimeline,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
 
 function build(spec: unknown) {
 	return Effect.runPromise(
-		buildTimeline({
-			spec,
-			options: {
-				inlineArtifacts: ["scene", "excalidraw"],
-				artifactFormats: ["scene", "excalidraw"],
-			},
-		}).pipe(
+		buildResponse(
+			buildTimeline({
+				spec,
+				options: {
+					inlineArtifacts: ["scene", "excalidraw"],
+					artifactFormats: ["scene", "excalidraw"],
+				},
+			}),
+		).pipe(
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_timeline`,
 			}),
@@ -41,11 +46,11 @@ const phasedSpec = {
 describe("Code Mode native timeline", () => {
 	it("carries spans, milestones, lanes and today into a patchable editable artifact", async () => {
 		const storage = makeMemoryArtifactStorage();
-		const run = <A>(
-			effect: Effect.Effect<A, never, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+		const run = <A, E extends BuildRejection<unknown>>(
+			effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
 		) =>
 			Effect.runPromise(
-				effect.pipe(
+				buildResponse(effect).pipe(
 					Effect.provideService(CodeModeRuntimeEnvironment, {
 						createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 					}),
@@ -54,7 +59,10 @@ describe("Code Mode native timeline", () => {
 			);
 		const built = await run(
 			buildTimeline({
-				spec: phasedSpec,
+				spec: {
+					...phasedSpec,
+					events: [phasedSpec.events[1], phasedSpec.events[0], phasedSpec.events[2]],
+				},
 				options: {
 					inlineArtifacts: ["scene", "excalidraw"],
 					artifactFormats: ["scene", "excalidraw"],
@@ -67,7 +75,7 @@ describe("Code Mode native timeline", () => {
 			lanes: ["Product", "Marketing"],
 			events: phasedSpec.events,
 		});
-		expect(built.quality.summary).toEqual({ nodeCount: 3, edgeCount: 0 });
+		expect(built.quality.summary).toEqual({ nodeCount: 3, edgeCount: 1 });
 		const excalidraw = built.artifact.formats.find((format) => format.format === "excalidraw")
 			?.inline as Parameters<typeof validateExcalidrawScene>[0];
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
@@ -88,31 +96,44 @@ describe("Code Mode native timeline", () => {
 				],
 			}),
 		);
-		expect(patched.ok, JSON.stringify(patched.issues)).toBe(true);
-	});
-	it("rejects a span on an ordered timeline with a structured repair issue", async () => {
-		const result = await build({
-			title: "Ordered",
-			events: [{ id: "a", label: "A", order: 1, end: "2026-01-01" }],
+		if (!patched.ok) throw new Error(JSON.stringify(patched.issues));
+		const stored = await Effect.runPromise(storage.read(patched.artifact.artifactId, "scene"));
+		expect(stored?.data).toMatchObject({
+			elements: expect.arrayContaining([
+				expect.objectContaining({ id: "node:event:launch", fillColor: "#c0392b" }),
+			]),
 		});
-		expect(result.ok).toBe(false);
-		expect(result.issues.map((issue) => issue.code)).toContain("invalid_timeline_span");
 	});
-	it("builds chronological events into validated editable exports without losing content", async () => {
-		const result = await build({
-			...timelineFixture,
-			events: [...timelineFixture.events].reverse(),
+	it("retains an invalid span's owning error until the host projects its repair issue", async () => {
+		const failure = await Effect.runPromise(
+			buildTimeline({
+				spec: {
+					title: "Ordered",
+					events: [{ id: "a", label: "A", order: 1, end: "2026-01-01" }],
+				},
+			}).pipe(
+				Effect.flip,
+				Effect.provideService(CodeModeRuntimeEnvironment, {
+					createId: (prefix) => `${prefix}_timeline`,
+				}),
+				Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
+			),
+		);
+		expect(failure.reason).toMatchObject({
+			_tag: "Document",
+			error: { _tag: "TimelineValidationError" },
 		});
-		expect(result.ok).toBe(true);
-		expect(() => Schema.decodeUnknownSync(BuildTimelineResultSchema)(result)).not.toThrow();
-		if (!result.ok) throw new Error(JSON.stringify(result.issues));
-		expect(result.normalizedSpec.events).toEqual(timelineFixture.events);
-		const exported = result.artifact.formats.find(
-			(format) => format.format === "excalidraw",
-		)?.inline;
-		expect(
-			validateExcalidrawScene(exported as Parameters<typeof validateExcalidrawScene>[0]),
-		).toEqual({ ok: true, issues: [] });
+		expect(failure.toResult()).toMatchObject({
+			ok: false,
+			status: "invalid_timeline",
+			issues: [
+				{
+					code: "invalid_timeline_span",
+					ref: { kind: "request", path: "spec.events.[0].end" },
+					hint: expect.any(String),
+				},
+			],
+		});
 	});
 	it.each([
 		{ events: [] },
@@ -134,7 +155,6 @@ describe("Code Mode native timeline", () => {
 		expect(result.ok).toBe(false);
 		expect(result.issues.length).toBeGreaterThan(0);
 		expect(result.issues.every((issue) => issue.hint && issue.stage === "input")).toBe(true);
-		expect(() => Schema.decodeUnknownSync(BuildTimelineResultSchema)(result)).not.toThrow();
 	});
 });
 
@@ -165,5 +185,10 @@ describe("Code Mode timeline size", () => {
 		expect(scene.elements.length).toBeLessThanOrEqual(CANVAS_LIMITS.maxElements);
 		// The pair now takes one break of its own.
 		expect(scene.elements.length).toBeLessThan(400);
+		const exported = result.artifact.formats.find((format) => format.format === "excalidraw")
+			?.inline as Parameters<typeof validateExcalidrawScene>[0];
+		expect(
+			exported.elements.filter((element) => element.id.startsWith("node:event:")),
+		).toHaveLength(TIMELINE_MAX_EVENTS);
 	});
 });

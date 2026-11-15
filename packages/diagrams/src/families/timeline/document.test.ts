@@ -5,7 +5,6 @@ import {
 	orderedTimelineEvents,
 	parseTimelineDate,
 	parseTimelineDiagram,
-	timelineLanes,
 	TimelineValidationError,
 } from "./document.js";
 
@@ -20,26 +19,6 @@ const input = {
 	],
 };
 describe("canonical timeline", () => {
-	it("orders chronologically, retains equal-date input order and preserves authored content", () => {
-		const diagram = parseTimelineDiagram(input).pipe(Result.getOrThrow);
-		expect(orderedTimelineEvents(diagram).map((event) => event.id)).toEqual([
-			"plan",
-			"ship",
-			"review",
-		]);
-		expect(diagram.events).toEqual(input.events);
-	});
-	it("supports explicit order without inventing calendar dates", () => {
-		const diagram = parseTimelineDiagram({
-			...input,
-			events: [
-				{ id: "later", label: "Later", order: 2 },
-				{ id: "first", label: "First", order: 1 },
-			],
-		}).pipe(Result.getOrThrow);
-		expect(orderedTimelineEvents(diagram).map((event) => event.label)).toEqual(["First", "Later"]);
-		expect(diagram.events.every((event) => event.date === undefined)).toBe(true);
-	});
 	it.each([
 		"2026-02-30",
 		"2025-02-29",
@@ -129,34 +108,12 @@ describe("canonical timeline", () => {
 			"launch",
 		]);
 	});
-	it("accepts dated spans, milestones, lanes and a stated today, preserving them", () => {
-		const events = [
-			{ id: "build", label: "Build", date: "2026-02", end: "2026-05", lane: "Eng" },
-			{ id: "ship", label: "Ship", date: "2026-06-01", kind: "milestone", lane: "Eng" },
-			{ id: "blog", label: "Blog", date: "2026-06-01", lane: "Marketing" },
-		];
-		const diagram = parseTimelineDiagram({ ...input, events, today: "2026-03-10" }).pipe(
-			Result.getOrThrow,
-		);
-		expect(diagram.events).toEqual(events);
-		expect(diagram.today).toBe("2026-03-10");
-		expect(timelineLanes(diagram)).toEqual(["Eng", "Marketing"]);
-		expect(
-			timelineLanes(
-				parseTimelineDiagram({ ...input, events, lanes: ["Marketing", "Eng"] }).pipe(
-					Result.getOrThrow,
-				),
-			),
-		).toEqual(["Marketing", "Eng"]);
-		// A one-month phase: start and inclusive end name the same month.
-		expect(
-			Result.isSuccess(
-				parseTimelineDiagram({
-					...input,
-					events: [{ id: "m", label: "M", date: "2026-09", end: "2026-09" }],
-				}),
-			),
-		).toBe(true);
+	it("accepts a phase whose inclusive start and end name the same month", () => {
+		const diagram = parseTimelineDiagram({
+			...input,
+			events: [{ id: "m", label: "M", date: "2026-09", end: "2026-09" }],
+		}).pipe(Result.getOrThrow);
+		expect(diagram.events[0]).toMatchObject({ date: "2026-09", end: "2026-09" });
 	});
 	it.each([
 		{

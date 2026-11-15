@@ -35,7 +35,6 @@ import {
 	STATE_MACHINE_DIRECTIONS,
 	STATE_MACHINE_STATE_KINDS,
 } from "../../families/state-machine/document.js";
-import { TIMELINE_EVENT_KINDS } from "../../families/timeline/document.js";
 import {
 	WIREFRAME_ALIGNMENTS,
 	WIREFRAME_CHART_KINDS,
@@ -451,35 +450,6 @@ const DiagramStyleWithDefault = DiagramSpecStyle.annotate({
  * A flowchart is diagram-core's flowchart document: nodes as an id → label map,
  * edges as [from, to, label?], and groups and lanes that list what they contain.
  */
-
-/**
- * The authoring form of diagram-core's canonical SequenceDiagram: message ids
- * are optional and style is defaulted. buildSequenceDiagram normalizes it into
- * the core contract, which owns every sequence invariant.
- */
-/** Author semantic points only; layout and date ordering belong to the renderer. */
-export const TimelineEventSpec = Schema.Struct({
-	id: RequiredNonEmptyString,
-	label: RequiredNonEmptyString,
-	date: optionalContract(NonEmptyString),
-	end: optionalContract(NonEmptyString),
-	order: optionalContract(FiniteNumber),
-	kind: optionalContract(literals(TIMELINE_EVENT_KINDS)),
-	lane: optionalContract(NonEmptyString),
-	description: optionalContract(NonEmptyString),
-}).annotate({ identifier: undefined });
-
-export interface TimelineEventSpec extends Schema.Schema.Type<typeof TimelineEventSpec> {}
-export const TimelineSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	events: requiredArray(nonEmptyArray(TimelineEventSpec)),
-	lanes: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	today: optionalContract(NonEmptyString),
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface TimelineSpec extends Schema.Schema.Type<typeof TimelineSpec> {}
 
 /** Author categories and values only; scales, ticks and label placement belong to the renderer. */
 export const ChartSeriesSpec = Schema.Struct({
@@ -1046,27 +1016,6 @@ export const BuildFlowchartToolInputSchema = Object.assign(BuildFlowchartToolInp
 export const BuildFlowchartRequestSchema = Object.assign(BuildFlowchartRequest, {
 	omit: (_keys: { readonly options: true }) => BuildFlowchartToolInputSchema,
 });
-
-export const BuildTimelineRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(TimelineSpec),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildTimelineRequest extends Schema.Schema.Type<typeof BuildTimelineRequest> {}
-export const BuildTimelineToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(
-		TimelineSpec.mapFields(({ id, title, events, lanes, today }) => ({
-			id,
-			title,
-			events,
-			lanes,
-			today,
-		})),
-	),
-});
-export type BuildTimelineToolInput = typeof BuildTimelineToolInputSchema.Type;
 
 export const BuildChartRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
@@ -1769,15 +1718,6 @@ export interface ApplyDiagramPatchRequest extends Schema.Schema.Type<
 	typeof ApplyDiagramPatchRequest
 > {}
 
-const NormalizedTimelineSpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	events: Schema.Array(TimelineEventSpec).pipe(Schema.mutable),
-	lanes: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	today: optionalContract(NonEmptyString),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
-export type NormalizedTimelineSpec = typeof NormalizedTimelineSpecSchema.Type;
 const NormalizedStateMachineSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -1961,44 +1901,6 @@ export const EditFlowchartResultSchema = Schema.Union([
 	EditFlowchartRejected,
 ]);
 export type EditFlowchartResult = typeof EditFlowchartResultSchema.Type;
-
-export const BuildTimelineAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedTimelineSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildTimelineAccepted extends Schema.Schema.Type<typeof BuildTimelineAccepted> {}
-export const BuildTimelineRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_timeline",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedTimelineSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildTimelineRejected extends Schema.Schema.Type<typeof BuildTimelineRejected> {}
-export const BuildTimelineResultSchema = Schema.Union([
-	BuildTimelineAccepted,
-	BuildTimelineRejected,
-]);
-export type BuildTimelineResult = typeof BuildTimelineResultSchema.Type;
 
 export const BuildChartAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

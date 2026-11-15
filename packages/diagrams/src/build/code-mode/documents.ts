@@ -69,17 +69,7 @@ export function canonicalDocumentFromDiagram(
 			};
 		}
 		case "timeline":
-			return {
-				type: "timeline",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					events: diagram.events.map((event) => ({ ...event })),
-					...(diagram.lanes ? { lanes: [...diagram.lanes] } : {}),
-					...(diagram.today ? { today: diagram.today } : {}),
-					style: diagram.style,
-				},
-			};
+			return familyForType("timeline").toDocument(diagram);
 		case "mindmap":
 			return {
 				type: "mindmap",

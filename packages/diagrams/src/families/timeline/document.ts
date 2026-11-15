@@ -1,5 +1,15 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import {
+	DateTime,
+	Effect,
+	Schema,
+	Array as Arr,
+	String as Str,
+	MutableHashSet as Set,
+	Option,
+	Result,
+} from "effect";
+import { cleanToolString, slug } from "../../clean-text.js";
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 export const timelineDiagramType = "timeline" as const;
@@ -27,21 +37,42 @@ export const TimelineEvent = Schema.Struct({
 
 export interface TimelineEvent extends Schema.Schema.Type<typeof TimelineEvent> {}
 
-export const TimelineDiagram = Schema.Struct({
-	id: Schema.NonEmptyString,
+export const TimelineDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
-	type: Schema.Literal(timelineDiagramType),
 	events: Schema.Array(TimelineEvent).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
 	/** Track order, top to bottom; defaults to first chronological appearance. */
 	lanes: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
 	/** Draws a Today marker at this date. There is no ambient clock. */
 	today: Schema.optionalKey(Schema.NonEmptyString),
 	style: DiagramStyle.pipe(
-		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
+		Schema.withDecodingDefaultKey(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}).annotate({ identifier: "TimelineDiagram" });
+});
+export interface TimelineDocument extends Schema.Schema.Type<typeof TimelineDocument> {}
+
+/** Rendering adds only its stable id and family tag; authored fields have one owner. */
+export const TimelineDiagram = TimelineDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+	type: Schema.Literal(timelineDiagramType),
+})).annotate({ identifier: "TimelineDiagram" });
 
 export interface TimelineDiagram extends Schema.Schema.Type<typeof TimelineDiagram> {}
+
+/** Normalize authoring once, retaining dates at their supplied precision and stable ties. */
+export function normalizeTimeline(document: TimelineDocument): TimelineDiagram {
+	const title = cleanToolString(document.title);
+	return {
+		id: (document.id && cleanToolString(document.id)) || slug(title) || "sketchi-timeline",
+		title,
+		type: timelineDiagramType,
+		events: orderedTimelineEvents(document),
+		...(document.lanes ? { lanes: Arr.copy(document.lanes) } : {}),
+		...(document.today ? { today: document.today } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
 
 export type TimelineDateGranularity = "year" | "month" | "day" | "instant";
 
@@ -78,14 +109,13 @@ function utc(
 	second = 0,
 	millisecond = 0,
 ) {
-	const date = new Date(0);
-	date.setUTCFullYear(year, month - 1, day);
-	date.setUTCHours(hour, minute, second, millisecond);
-	return date.getTime();
+	return DateTime.toEpochMillis(
+		DateTime.makeUnsafe({ year, month, day, hour, minute, second, millisecond }),
+	);
 }
 
 function daysInMonth(year: number, month: number): number {
-	return new Date(utc(year, month + 1, 0)).getUTCDate();
+	return DateTime.getPartUtc(DateTime.makeUnsafe(utc(year, month + 1, 0)), "day");
 }
 
 /**
@@ -120,14 +150,14 @@ export function parseTimelineDate(value: string): TimelineDate | undefined {
 	const hour = Number(h);
 	const minute = Number(mi);
 	const second = s === undefined ? 0 : Number(s);
-	const millisecond = ms === undefined ? 0 : Number(ms.padEnd(3, "0"));
+	const millisecond = ms === undefined ? 0 : Number(Str.padEnd(3, "0")(ms));
 	if (hour > 23 || minute > 59 || second > 59 || zone === undefined) return undefined;
 	let offsetMinutes = 0;
 	if (zone !== "Z") {
-		const offsetHours = Number(zone.slice(1, 3));
-		const offsetRest = Number(zone.slice(4, 6));
+		const offsetHours = Number(Str.slice(1, 3)(zone));
+		const offsetRest = Number(Str.slice(4, 6)(zone));
 		if (offsetHours > 14 || offsetRest > 59) return undefined;
-		offsetMinutes = (zone.startsWith("-") ? -1 : 1) * (offsetHours * 60 + offsetRest);
+		offsetMinutes = (Str.startsWith("-")(zone) ? -1 : 1) * (offsetHours * 60 + offsetRest);
 	}
 	const start = utc(year, month, day, hour, minute, second, millisecond) - offsetMinutes * 60_000;
 	return {
@@ -167,10 +197,10 @@ const DATE_HINT =
 
 /** The lane order a timeline renders: explicit `lanes`, else first chronological use. */
 export function timelineLanes(diagram: TimelineDiagram): string[] {
-	if (diagram.lanes) return [...diagram.lanes];
+	if (diagram.lanes) return Arr.copy(diagram.lanes);
 	const lanes: string[] = [];
 	for (const event of orderedTimelineEvents(diagram))
-		if (event.lane !== undefined && !lanes.includes(event.lane)) lanes.push(event.lane);
+		if (event.lane !== undefined && !Arr.contains(lanes, event.lane)) lanes.push(event.lane);
 	return lanes;
 }
 
@@ -183,19 +213,20 @@ export function getTimelineValidationIssues(diagram: TimelineDiagram): TimelineV
 			message: `Timeline needs 1–${TIMELINE_MAX_EVENTS} events.`,
 			hint: "Provide at least one event, or split a longer chronology into timelines.",
 		});
-	const ids = new Set<string>();
+	const ids = Set.empty<string>();
 	const dated = diagram.events[0]?.date !== undefined;
-	const laned = diagram.lanes !== undefined || diagram.events.some((event) => event.lane);
-	diagram.events.forEach((event, index) => {
+	const laned =
+		diagram.lanes !== undefined || Arr.some(diagram.events, (event) => event.lane !== undefined);
+	Arr.forEach(diagram.events, (event, index) => {
 		const path = `events.[${index}]`;
-		if (ids.has(event.id))
+		if (Set.has(ids, event.id))
 			issues.push({
 				code: "duplicate_event_id",
 				path: `${path}.id`,
 				message: `Event id "${event.id}" is duplicated.`,
 				hint: "Give each event a unique stable id.",
 			});
-		ids.add(event.id);
+		Set.add(ids, event.id);
 		const start = event.date === undefined ? undefined : parseTimelineDate(event.date);
 		if (event.date !== undefined && !start)
 			issues.push({
@@ -238,7 +269,7 @@ export function getTimelineValidationIssues(diagram: TimelineDiagram): TimelineV
 		}
 		if (
 			laned &&
-			(event.lane === undefined || (diagram.lanes && !diagram.lanes.includes(event.lane)))
+			(event.lane === undefined || (diagram.lanes && !Arr.contains(diagram.lanes, event.lane)))
 		)
 			issues.push({
 				code: "invalid_timeline_lane",
@@ -247,7 +278,7 @@ export function getTimelineValidationIssues(diagram: TimelineDiagram): TimelineV
 				hint: "Give every event a lane listed in lanes, or omit lanes everywhere.",
 			});
 	});
-	if (diagram.lanes && new Set(diagram.lanes).size !== diagram.lanes.length)
+	if (diagram.lanes && Set.size(Set.fromIterable(diagram.lanes)) !== diagram.lanes.length)
 		issues.push({
 			code: "invalid_timeline_lane",
 			path: "lanes",
@@ -268,7 +299,7 @@ export function getTimelineValidationIssues(diagram: TimelineDiagram): TimelineV
 			message: `Today "${diagram.today}" must be a valid date on a dated timeline.`,
 			hint: `${DATE_HINT} Omit today unless the source states it.`,
 		});
-	return issues.slice(0, 20);
+	return Arr.take(issues, 20);
 }
 
 export class TimelineValidationError extends Schema.TaggedError<
@@ -311,8 +342,11 @@ export function timelineEventTime(event: TimelineEvent): number {
 		: (event.order ?? 0);
 }
 /** Equal timestamps/orders keep input order. Authored arrays are never mutated. */
-export function orderedTimelineEvents(diagram: TimelineDiagram): TimelineEvent[] {
-	return diagram.events.toSorted((a, b) => timelineEventTime(a) - timelineEventTime(b) || 0);
+export function orderedTimelineEvents(diagram: Pick<TimelineDocument, "events">): TimelineEvent[] {
+	return Arr.sort(diagram.events, (a: TimelineEvent, b: TimelineEvent) => {
+		const delta = timelineEventTime(a) - timelineEventTime(b);
+		return delta < 0 ? -1 : delta > 0 ? 1 : 0;
+	});
 }
 export const timelineFixture = parseTimelineDiagram({
 	id: "release-timeline",
@@ -335,7 +369,7 @@ export function counts(diagram: TimelineDiagram) {
 	return {
 		nodeCount: diagram.events.length,
 		nodeNoun: "events",
-		edgeCount: diagram.events.filter((event) => event.end !== undefined).length,
+		edgeCount: Arr.filter(diagram.events, (event) => event.end !== undefined).length,
 		edgeNoun: "phases",
 	};
 }

@@ -22,8 +22,6 @@ import {
 	BuildWireframeToolInputSchema,
 	BuildQuadrantChartResultSchema,
 	BuildQuadrantChartToolInputSchema,
-	BuildTimelineResultSchema,
-	BuildTimelineToolInputSchema,
 	BuildChartResultSchema,
 	BuildChartToolInputSchema,
 	RenderedDiagramSceneSchema,
@@ -37,7 +35,6 @@ import {
 	type BuildSankeyResult,
 	type BuildWireframeResult,
 	type BuildQuadrantChartResult,
-	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
 
@@ -53,7 +50,7 @@ export type StudioBuildResult =
 	| BuildFlowchartResult
 	| ReturnType<typeof familyForType<"mindmap">>["contracts"]["output"]["Type"]
 	| typeof sequenceBuild.result.Type
-	| BuildTimelineResult
+	| ReturnType<typeof familyForType<"timeline">>["contracts"]["output"]["Type"]
 	| BuildChartResult
 	| BuildStateMachineResult
 	| BuildGanttResult
@@ -94,9 +91,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_timeline": {
 		family: "timeline",
-		decodeResult: Schema.decodeUnknownResult(BuildTimelineResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("timeline").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildTimelineToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("timeline").studioInput)(input);
 			return Result.isSuccess(decoded)
 				? decoded.success.spec.events.map((event) => event.label)
 				: [];

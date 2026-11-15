@@ -98,11 +98,6 @@ import {
 	type StateMachineDiagram,
 	type StateMachineValidationIssueCode,
 } from "../../families/state-machine/document.js";
-import {
-	getTimelineValidationIssues,
-	orderedTimelineEvents,
-	type TimelineDiagram,
-} from "../../families/timeline/document.js";
 
 import {
 	getWireframeValidationIssues,
@@ -146,10 +141,7 @@ import {
 	isStructurallyValidSequenceLifeline,
 } from "../../families/sequence/render.js";
 import { renderStateMachineDiagram } from "../../families/state-machine/render.js";
-import {
-	isStructurallyValidTimelineMarker,
-	renderTimelineDiagram,
-} from "../../families/timeline/render.js";
+import { isStructurallyValidTimelineMarker } from "../../families/timeline/render.js";
 import { isStructurallyValidVennSet } from "../../families/venn/render.js";
 import { renderWireframeDiagram } from "../../families/wireframe/render.js";
 import {
@@ -198,8 +190,6 @@ import {
 	BuildSankeyRequest,
 	BuildStateMachineRejected,
 	BuildStateMachineRequest,
-	BuildTimelineRejected,
-	BuildTimelineRequest,
 	BuildWireframeRejected,
 	BuildWireframeRequest,
 	CreateCanvasRejected,
@@ -226,7 +216,6 @@ import {
 	type BuildQuadrantChartResult,
 	type BuildSankeyResult,
 	type BuildStateMachineResult,
-	type BuildTimelineResult,
 	type BuildWireframeResult,
 	type ContractSchemaError,
 	type ContractSchemaIssue,
@@ -244,7 +233,6 @@ import {
 	type NormalizedQuadrantChartSpec,
 	type NormalizedSankeySpec,
 	type NormalizedStateMachineSpec,
-	type NormalizedTimelineSpec,
 	type NormalizedWireframeSpec,
 	type PatchableScene,
 	type SearchIconsResult,
@@ -434,48 +422,6 @@ export function observeCodeModeBoundary<
 		return yield* Effect.fromResult(outcomeResult);
 	});
 	return withTelemetryCorrelation(observed, codeModeCorrelation(input));
-}
-
-function normalizeTimelineSpec(spec: BuildTimelineRequest["spec"]): NormalizedTimelineSpec {
-	const title = cleanToolString(spec.title);
-	const diagram: TimelineDiagram = {
-		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-timeline"),
-		title,
-		type: "timeline",
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-		events: spec.events.map((event) => ({ ...event })),
-	};
-	return {
-		id: diagram.id,
-		title,
-		events: orderedTimelineEvents(diagram),
-		...(spec.lanes ? { lanes: [...spec.lanes] } : {}),
-		...(spec.today ? { today: spec.today } : {}),
-		style: diagram.style,
-	};
-}
-function toTimelineDiagram(spec: NormalizedTimelineSpec): TimelineDiagram {
-	return { ...spec, type: "timeline" };
-}
-function validateNormalizedTimeline(spec: NormalizedTimelineSpec): CodeModeIssue[] {
-	return getTimelineValidationIssues(toTimelineDiagram(spec)).map((entry) =>
-		issue({
-			code: entry.code,
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-			message: entry.message,
-			hint: entry.hint,
-		}),
-	);
-}
-function timelineQuality(spec: NormalizedTimelineSpec, threshold: number): QualityReport {
-	return {
-		accepted: 10 >= threshold,
-		score: 10,
-		threshold,
-		summary: { nodeCount: spec.events.length, edgeCount: 0 },
-		checks: [],
-	};
 }
 
 function normalizeChartSpec(spec: BuildChartRequest["spec"]): NormalizedChartSpec {
@@ -1481,15 +1427,6 @@ const BuildWireframeFailure = workflowFailure(
 	"BuildWireframeFailure",
 	BuildWireframeRejected.fields.status,
 	BuildWireframeRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildTimelineFailure = workflowFailure(
-	"BuildTimelineFailure",
-	BuildTimelineRejected.fields.status,
-	BuildTimelineRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -4077,116 +4014,6 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 	} satisfies Extract<BuildQuadrantChartResult, { ok: true }>;
 });
 
-const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
-	input: unknown,
-) {
-	const parsed = Schema.decodeUnknownResult(BuildTimelineRequest, {
-		errors: "all",
-		reportInput: true,
-	})(input);
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildTimelineFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-
-	const request = parsed.success;
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeTimelineSpec(request.spec);
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedTimeline(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildTimelineFailure.new({
-			status: "invalid_timeline",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const quality = timelineQuality(
-		normalizedSpec,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildTimelineFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const renderedScene = yield* validatedDomainResult({
-		try: () => renderTimelineDiagram(toTimelineDiagram(normalizedSpec)),
-		catch: (cause) =>
-			BuildTimelineFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message: cause instanceof Error ? cause.message : "Unable to render timeline scene.",
-							hint: "Repair the event dates and ordering and retry.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildTimeline.render"));
-	const scene = renderedScene;
-	const canvasIssues = getCanvasValidationIssues(scene);
-	if (canvasIssues.length > 0) {
-		return yield* BuildTimelineFailure.new({
-			status: canvasFailureStatus(canvasIssues),
-			context: {
-				...qualityContext,
-				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
-					...entry,
-					hint: "Split the chronology into smaller timelines and retry buildTimeline.",
-				})),
-			},
-		});
-	}
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildTimelineFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [],
-	} satisfies Extract<BuildTimelineResult, { ok: true }>;
-});
-
 const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (input: unknown) {
 	const parsed = Schema.decodeUnknownResult(BuildChartRequest, {
 		errors: "all",
@@ -5388,8 +5215,7 @@ export const buildQuadrantChart: (
 	failureResult,
 );
 
-export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTimelineResult> =
-	boundary("buildTimeline", buildTimelineWorkflow, failureResult);
+export const buildTimeline = familyForType("timeline").build({ bindBuild });
 
 /** A bar, line or pie chart from categories and named series of numbers. */
 export const buildChart: (input: unknown) => CodeModeWorkflowEffect<BuildChartResult> = boundary(

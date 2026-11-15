@@ -531,7 +531,9 @@
               "packages/diagrams/src/families/venn/render.ts",
               "packages/diagrams/src/families/venn/readout.ts",
               "packages/diagrams/src/families/sequence/document.ts",
-              "packages/diagrams/src/families/sequence/build.ts"
+              "packages/diagrams/src/families/sequence/build.ts",
+              "packages/diagrams/src/families/timeline/document.ts",
+              "packages/diagrams/src/families/timeline/build.ts"
             ],
             "options": {
               "diagnosticSeverity": {

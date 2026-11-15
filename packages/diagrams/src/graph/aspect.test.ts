@@ -383,7 +383,7 @@ describe("wide single-row timelines", () => {
 		(name) => {
 			const scene = renderTimelineDiagram(
 				parseTimelineDiagram({ ...WIDE_ROWS[name], type: "timeline" }).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow);
+			);
 			expect(exportAspect(scene, 40)).toBeLessThanOrEqual(2.3);
 			// Every label still hangs from a stem that meets the axis.
 			const stems = scene.elements.filter((element) => element.type === "line");

@@ -42,7 +42,7 @@ import * as stateMachineFamily from "./families/state-machine/document.js";
 import { renderStateMachineDiagram } from "./families/state-machine/render.js";
 import { docs as timelineFamilyDocs } from "./families/timeline/docs.js";
 import * as timelineFamily from "./families/timeline/document.js";
-import { renderTimelineDiagram } from "./families/timeline/render.js";
+import { timelineBuild } from "./families/timeline/build.js";
 import { docs as vennFamilyDocs } from "./families/venn/docs.js";
 import * as vennFamily from "./families/venn/document.js";
 
@@ -218,38 +218,12 @@ export const families = [
 		fixture: sequenceFixture,
 		docs: sequenceFamilyDocs,
 	}),
-	legacyFamily({
-		type: timelineFamily.timelineFixture.type,
+	family({
 		operation: "buildTimeline",
 		label: "Timeline",
 		path: "/api/v1/timelines/build",
-		canonical: canonical(
-			timelineFamily.TimelineDiagram,
-			timelineFamily.timelineFixture.type,
-			timelineFamily.validateTimelineDiagram,
-			renderTimelineDiagram,
-			timelineFamily.counts,
-		),
-		validationError: timelineFamily.TimelineValidationError,
+		build: timelineBuild,
 		fixture: timelineFamily.timelineFixture,
-		spec: Build.TimelineSpec,
-		request: Build.BuildTimelineRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildTimelineRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.TimelineSpec.mapFields(({ id, title, events, lanes, today }) => ({
-					id,
-					title,
-					events,
-					lanes,
-					today,
-				})),
-			}),
-			output: Build.BuildTimelineResultSchema,
-		},
-		studioInput: Build.BuildTimelineToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildTimeline,
 		docs: timelineFamilyDocs,
 	}),
 	legacyFamily({
@@ -570,7 +544,9 @@ export const CanonicalValidationErrorSchema = Schema.Union([
 ]);
 export const diagramFixtures = families.map((family) => family.fixture);
 
-export function familyForType<Type extends DiagramTypeValue>(type: Type) {
+export function familyForType<Type extends DiagramTypeValue>(
+	type: Type,
+): Extract<DiagramFamily, { readonly type: Type }> {
 	const family = families.find(
 		(family): family is Extract<DiagramFamily, { readonly type: Type }> => family.type === type,
 	);

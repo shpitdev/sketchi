@@ -482,15 +482,20 @@ describe("native timeline layout", () => {
 	});
 
 	it("spaces ordered events evenly without captions", () => {
-		const scene = renderDiagram(
-			timeline(
-				["Discovery", "Prototype", "Pilot", "Launch", "Retrospective"].map((label, order) => ({
+		const labels = ["Discovery", "Prototype", "Pilot", "Launch", "Retrospective"];
+		const diagram = timeline(
+			labels
+				.map((label, order) => ({
 					id: label.toLowerCase(),
 					label,
 					order,
-				})),
-			),
-		).pipe(Result.getOrThrow);
+				}))
+				.reverse(),
+		);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+		expect(diagram.events.every((event) => event.date === undefined)).toBe(true);
+		const chronological = labels.map((label) => centerX(marker(scene, label.toLowerCase())));
+		expect(chronological).toEqual([...chronological].sort((a, b) => a - b));
 		const xs = markers(scene)
 			.map(centerX)
 			.toSorted((a, b) => a - b);

@@ -42,7 +42,7 @@ describe("timeline stem work", () => {
 			],
 		}).pipe(Result.getOrThrow);
 		work.measures = 0;
-		renderTimelineDiagram(diagram).pipe(Result.getOrThrow);
+		renderTimelineDiagram(diagram);
 		expect(work.measures).toBeGreaterThan(0);
 		expect(work.measures).toBeLessThan(900);
 	});
