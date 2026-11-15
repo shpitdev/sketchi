@@ -6,15 +6,13 @@ const WORKSPACE_FILE =
 	/^(?:tools\/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|nx\.json$|tsconfig(?:\.base)?\.json$|mise\.toml$|\.oxlintrc\.json$)/;
 
 // Routing imports graph + flowchart fixtures and drawing's Canvas/text/native adapters.
-// Flowchart crossing fixtures eagerly parse state-machine documents at module load.
 // Other families keep their cross-family text-fit assertions in drawing:test. Changes to
 // shared diagrams contracts/registry and runtime configuration conservatively select routing.
 function routingInput(file) {
 	if (file.startsWith("packages/diagrams/")) {
 		return (
 			!file.startsWith("packages/diagrams/src/families/") ||
-			file.startsWith("packages/diagrams/src/families/flowchart/") ||
-			file === "packages/diagrams/src/families/state-machine/document.ts"
+			file.startsWith("packages/diagrams/src/families/flowchart/")
 		);
 	}
 	return (

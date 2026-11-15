@@ -107,9 +107,23 @@ type BuildChartResult_DiagramStyle = { accentColor: string; backgroundColor: str
 
 type BuildChartResult_ChartDiagram = { id: string; title: string; kind: "bar" | "line" | "pie"; categories: Array<string>; series: Array<BuildChartResult_ChartSeries>; unit?: string; categoryAxisTitle?: string; valueAxisTitle?: string; stacked?: boolean; donut?: boolean; orientation?: "vertical" | "horizontal"; style: BuildChartResult_DiagramStyle; type: "chart"; };
 
-type BuildStateMachineRequest = { requestId?: string; spec: { id?: string; title: string; initial: string; states: Array<{ id: string; label?: string; kind?: "state" | "final" | "choice"; parent?: string; initial?: string; }>; transitions?: Array<{ id?: string; source: string; target: string; event?: string; guard?: string; action?: string; }>; layout?: { direction: "TB" | "LR"; }; }; options?: BuildOptions; };
+type BuildStateMachineRequest = { requestId?: string; spec: { id?: string; title: string; initial: string; states: Array<BuildStateMachineRequest_StateMachineState>; transitions?: Array<{ id?: string; source: string; target: string; event?: string; guard?: string; action?: string; }>; layout?: BuildStateMachineRequest_StateMachineLayout; }; options?: BuildOptions; };
 
-type BuildStateMachineResult = { ok: true; status: "accepted"; buildId: string; requestId?: string; normalizedSpec: { id: string; title: string; initial: string; states: Array<{ id: string; label?: string; kind?: "state" | "final" | "choice"; parent?: string; initial?: string; }>; transitions: Array<{ id: string; source: string; target: string; event?: string; guard?: string; action?: string; }>; layout?: { direction: "TB" | "LR"; }; style: { accentColor: string; backgroundColor: string; }; }; quality: Quality; artifact: Artifact; issues: Array<Issue>; } | { ok: false; status: "invalid_input" | "invalid_state_machine" | "quality_failed" | "limit_exceeded" | "render_failed" | "export_failed" | "storage_failed"; buildId?: string; requestId?: string; normalizedSpec?: { id: string; title: string; initial: string; states: Array<{ id: string; label?: string; kind?: "state" | "final" | "choice"; parent?: string; initial?: string; }>; transitions: Array<{ id: string; source: string; target: string; event?: string; guard?: string; action?: string; }>; layout?: { direction: "TB" | "LR"; }; style: { accentColor: string; backgroundColor: string; }; }; quality?: Quality; partial?: PartialArtifact; issues: Array<Issue>; };
+type BuildStateMachineRequest_StateMachineState = { id: string; label?: string; kind?: "state" | "final" | "choice"; parent?: string; initial?: string; };
+
+type BuildStateMachineRequest_StateMachineLayout = { direction: "TB" | "LR"; };
+
+type BuildStateMachineResult = { ok: true; status: "accepted"; buildId: string; requestId?: string; normalizedSpec: BuildStateMachineResult_StateMachineDiagram; quality: Quality; artifact: Artifact; issues: Array<{ code: IssueCode; severity: "error" | "warning" | "info"; stage: "input" | "canvas" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage" | "coverage"; ref?: IssueRef; message: string; hint: string; }>; } | { ok: false; status: "invalid_input" | "invalid_state_machine" | "quality_failed" | "limit_exceeded" | "render_failed" | "export_failed" | "storage_failed"; buildId?: string; requestId?: string; normalizedSpec?: BuildStateMachineResult_StateMachineDiagram; quality?: Quality; partial?: PartialArtifact; issues: Array<{ code: IssueCode | "state_machine_too_large" | "invalid_state_id" | "duplicate_state_id" | "duplicate_transition_id" | "missing_state_label" | "unknown_initial_state" | "unknown_parent_state" | "nested_composite" | "missing_transition_source" | "missing_transition_target" | "final_has_outgoing" | "composite_member_transition" | "missing_composite_initial" | "underbranched_choice" | "unguarded_choice_branch" | "unreachable_state"; severity: "error" | "warning" | "info"; stage: "input" | "canvas" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage" | "coverage"; ref?: IssueRef; message: string; hint: string; }>; };
+
+type BuildStateMachineResult_StateMachineState = { id: string; label?: string; kind?: "state" | "final" | "choice"; parent?: string; initial?: string; };
+
+type BuildStateMachineResult_StateMachineTransition = { id: string; source: string; target: string; event?: string; guard?: string; action?: string; };
+
+type BuildStateMachineResult_StateMachineLayout = { direction: "TB" | "LR"; };
+
+type BuildStateMachineResult_DiagramStyle = { accentColor: string; backgroundColor: string; };
+
+type BuildStateMachineResult_StateMachineDiagram = { id: string; title: string; type: "state-machine"; initial: string; states: Array<BuildStateMachineResult_StateMachineState>; transitions: Array<BuildStateMachineResult_StateMachineTransition>; layout?: BuildStateMachineResult_StateMachineLayout; style: BuildStateMachineResult_DiagramStyle; };
 
 type BuildGanttRequest = { requestId?: string; spec: { id?: string; title: string; tasks: Array<BuildGanttRequest_GanttTask>; phases?: Array<string>; today?: string; }; options?: BuildOptions; };
 

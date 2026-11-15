@@ -30,9 +30,8 @@ test("root workspace and tooling files count as code without an affected project
 test("routing follows graph, drawing, font, shared contract and execution inputs", () => {
 	for (const file of [
 		"packages/diagrams/src/graph/routing.ts",
-		"packages/diagrams/src/graph/intermediate.ts",
-		"packages/diagrams/src/families/flowchart/diagram.ts",
-		"packages/diagrams/src/families/state-machine/document.ts",
+		"packages/diagrams/src/graph/input.ts",
+		"packages/diagrams/src/families/flowchart/document.ts",
 		"packages/diagrams/src/families/flowchart/fixtures/routing/retry.ts",
 		"packages/diagrams/src/family.ts",
 		"packages/diagrams/src/build/result.ts",
@@ -68,6 +67,7 @@ test("plain-family and unrelated unit changes do not run graph routing even if d
 		"packages/diagrams/src/families/mindmap/layout.ts",
 		"packages/diagrams/src/families/timeline/render.ts",
 		"packages/diagrams/src/families/sequence/build.ts",
+		"packages/diagrams/src/families/state-machine/document.ts",
 		"packages/diagrams/src/families/state-machine/render.ts",
 		"packages/diagrams/src/families/chart/render.ts",
 		"tools/drawing-tests/text-fit-fuzz.test.ts",

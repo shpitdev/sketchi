@@ -562,6 +562,7 @@
               "packages/diagrams/src/build/operation.ts",
               "packages/diagrams/src/build/scene.ts",
               "packages/diagrams/src/families/flowchart/build.ts",
+              "packages/diagrams/src/families/state-machine/build.ts",
               "packages/diagrams/src/families/mindmap/build.ts",
               "packages/diagrams/src/families/venn/document.ts",
               "packages/diagrams/src/families/venn/build.ts",

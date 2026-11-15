@@ -383,7 +383,7 @@ test("unit gates use the committed merge base, not a direct diff of divergent re
 	assert.equal(fixture.run(["--no-signoff", "--base", "verified"]).routing.length, 1);
 });
 
-test("an edited state parser selects routing through eager crossing fixtures", (t) => {
+test("an edited state document retains default tests without selecting sampled routing", (t) => {
 	const fixture = gateFixture(t);
 	const parser = "packages/diagrams/src/families/state-machine/document.ts";
 	fixture.write(parser, "// original state parser\n");
@@ -392,8 +392,14 @@ test("an edited state parser selects routing through eager crossing fixtures", (
 	const base = fixture.head();
 	fixture.write(parser, "// changed state parser\n");
 	const result = fixture.run(["--no-signoff", "--base", base]);
-	assert.equal(result.routing.length, 1);
-	assert.match(result.output, /✓ sampled routing/);
+	assert.equal(result.routing.length, 0);
+	assert.match(result.output, /sampled routing: not affected/);
+	for (const target of ["test", "typecheck,build"]) {
+		assert.ok(
+			result.commands.some(({ args }) => args.includes("affected") && args.includes(target)),
+			target,
+		);
+	}
 });
 
 test("a plain-family unit gate retains default tests without running sampled routing", (t) => {
