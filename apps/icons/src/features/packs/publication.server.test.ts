@@ -47,6 +47,39 @@ async function nativeDatabase() {
 	return db;
 }
 type Database = NonNullable<ExcalidrawPublishEnv["COMMUNITY_ICONS"]>;
+// Delay settlement only: every statement and result still comes from native D1.
+function delaySettlement(
+	database: Database,
+	sqlPattern: RegExp,
+	committed: PromiseWithResolvers<void>,
+	settle: PromiseWithResolvers<void>,
+): Database {
+	const statement = (prepared: ReturnType<Database["prepare"]>, sql: string): typeof prepared =>
+		new Proxy(prepared, {
+			get(target, key) {
+				if (key === "bind")
+					return (...values: Parameters<typeof target.bind>) =>
+						statement(target.bind(...values), sql);
+				if (key === "all" && sqlPattern.test(sql))
+					return async () => {
+						const result = await target.all();
+						committed.resolve();
+						await settle.promise;
+						return result;
+					};
+				const value = Reflect.get(target, key);
+				return typeof value === "function" ? value.bind(target) : value;
+			},
+		});
+
+	return new Proxy(database, {
+		get(target, key) {
+			if (key === "prepare") return (sql: string) => statement(target.prepare(sql), sql);
+			const value = Reflect.get(target, key);
+			return typeof value === "function" ? value.bind(target) : value;
+		},
+	});
+}
 async function claim(db: Database, packId: string, version: string, author: string, now: number) {
 	const result = await db
 		.prepare(
@@ -111,10 +144,12 @@ function publish(
 	env: ExcalidrawPublishEnv,
 	body: unknown = { authorName: "Jane" },
 	pack = "palantir",
+	signal?: AbortSignal,
 ) {
 	return handlePackPublish(
 		new Request(`https://icons.sketchi.app/api/packs/${pack}/excalidraw`, {
 			method: "POST",
+			...(signal ? { signal } : {}),
 			headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.9" },
 			body: typeof body === "string" ? body : JSON.stringify(body),
 		}),
@@ -164,6 +199,145 @@ afterEach(async () => {
 });
 
 describe("publishing a pack to Excalidraw", () => {
+	it("does not hold a replacement claim when interrupted after a refusal DELETE commits", async () => {
+		const env = await environment();
+		const database = env.COMMUNITY_ICONS!;
+		const deleted = Promise.withResolvers<void>();
+		const settleDelete = Promise.withResolvers<void>();
+		const replacementSent = Promise.withResolvers<void>();
+		const refuseReplacement = Promise.withResolvers<void>();
+		const delayed = delaySettlement(
+			database,
+			/^DELETE FROM excalidraw_library_submissions/u,
+			deleted,
+			settleDelete,
+		);
+		let submissions = 0;
+		setFetch(async (input) => {
+			if (!requestHref(input).endsWith("/submit")) return Response.json({ body: null });
+			submissions++;
+			if (submissions === 2) {
+				replacementSent.resolve();
+				await refuseReplacement.promise;
+			}
+			return submissions < 3
+				? Response.json({ message: "Refused" }, { status: 422 })
+				: Response.json({ url: PR });
+		});
+		const controller = new AbortController();
+		const first = publish(
+			{ ...env, COMMUNITY_ICONS: delayed },
+			{ authorName: "A" },
+			"palantir",
+			controller.signal,
+		).catch(() => undefined);
+		await deleted.promise;
+		controller.abort();
+		const second = publish(env, { authorName: "B" });
+		await replacementSent.promise;
+		settleDelete.resolve();
+		await first;
+		const replacement = await submissionRows(env);
+		refuseReplacement.resolve();
+		const refusal = await second;
+		const afterRefusal = await submissionRows(env);
+		const retry = await publish(env, { authorName: "C" });
+		console.info(
+			"replacement-claim receipt",
+			JSON.stringify({
+				replacement,
+				refusal: refusal.status,
+				afterRefusal,
+				retry: retry.status,
+				submissions,
+			}),
+		);
+		expect(replacement).toMatchObject([{ status: "pending" }]);
+		expect(refusal.status).toBe(502);
+		expect(afterRefusal).toEqual([]);
+		expect(retry.status).toBe(201);
+		expect(submissions).toBe(3);
+	});
+
+	it("keeps a committed claim closed if cancellation arrives before sending", async () => {
+		const env = await environment();
+		const committed = Promise.withResolvers<void>();
+		const settle = Promise.withResolvers<void>();
+		const delayed = delaySettlement(
+			env.COMMUNITY_ICONS!,
+			/^INSERT INTO excalidraw_library_submissions/u,
+			committed,
+			settle,
+		);
+		const fetchMock = backend();
+		const controller = new AbortController();
+		const first = publish(
+			{ ...env, COMMUNITY_ICONS: delayed },
+			undefined,
+			"palantir",
+			controller.signal,
+		).catch(() => undefined);
+		await committed.promise;
+		controller.abort();
+		settle.resolve();
+		await first;
+		expect(await submissionRows(env)).toMatchObject([{ status: "pending" }]);
+		expect((await publish(env)).status).toBe(409);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it.each([false, true])(
+		"keeps interrupted sends closed, including a failed hold write: %s",
+		async (failHold) => {
+			const env = await environment();
+			if (failHold)
+				await env
+					.COMMUNITY_ICONS!.prepare(
+						"CREATE TRIGGER refuse_hold BEFORE UPDATE OF status ON excalidraw_library_submissions WHEN NEW.status='unconfirmed' BEGIN SELECT RAISE(ABORT, 'controlled hold failure'); END",
+					)
+					.run();
+			const sent = Promise.withResolvers<void>();
+			let submissions = 0;
+			setFetch(async (_input, init) => {
+				submissions++;
+				sent.resolve();
+				return new Promise<Response>((_resolve, reject) => {
+					init?.signal?.addEventListener(
+						"abort",
+						() => reject(new DOMException("Aborted", "AbortError")),
+						{ once: true },
+					);
+				});
+			});
+			const controller = new AbortController();
+			const first = publish(env, undefined, "palantir", controller.signal).catch(() => undefined);
+			await sent.promise;
+			controller.abort();
+			await first;
+			expect(await submissionRows(env)).toMatchObject([
+				{ status: failHold ? "pending" : "unconfirmed" },
+			]);
+			expect((await publish(env)).status).toBe(409);
+			expect(submissions).toBe(1);
+		},
+	);
+
+	it("retains its own claim if a definite refusal DELETE fails", async () => {
+		const env = await environment();
+		await env
+			.COMMUNITY_ICONS!.prepare(
+				"CREATE TRIGGER refuse_delete BEFORE DELETE ON excalidraw_library_submissions BEGIN SELECT RAISE(ABORT, 'controlled delete failure'); END",
+			)
+			.run();
+		const fetchMock = backend({
+			submit: () => Response.json({ message: "Refused" }, { status: 422 }),
+		});
+		expect((await publish(env)).status).toBe(500);
+		expect(await submissionRows(env)).toMatchObject([{ status: "pending" }]);
+		expect((await publish(env)).status).toBe(409);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
 	it("is off unless the Worker turns it on, and never reaches the backend then", async () => {
 		const fetchMock = backend();
 		const { EXCALIDRAW_LIBRARY_SUBMIT: _on, ...off } = await environment();
@@ -577,6 +751,43 @@ describe("pull request states", () => {
 		await Promise.all(later);
 		return { states, refreshed: later.length > 0 };
 	}
+
+	it("refreshes a nullable GitHub description to closed without retaining its open install link", async () => {
+		const env = await seeded();
+		github({
+			"4242": () => pull("4242", { state: "open", body: "Description", merged_at: null }),
+			"4243": () => pull("4243", { state: "closed", body: null, merged_at: null }),
+		});
+		await load(env, 1_000);
+		setFetch(async () => Response.json({ state: "closed", body: null, merged_at: null }));
+		const due = 1_000 + PULL_REQUEST_RECHECK_MS.open;
+		await load(env, due);
+		const after = await load(env, due + 1);
+		expect(after.states["palantir"]).toEqual({
+			pullRequest: { url: PR, state: "closed" },
+			publishable: false,
+		});
+	});
+
+	it("reads a merged nullable description without requiring install enrichment", async () => {
+		const env = await seeded();
+		github({
+			"4242": () =>
+				pull("4242", { state: "closed", body: null, merged_at: "2026-11-12T10:00:00Z" }),
+			"4243": () =>
+				pull("4243", { state: "closed", body: null, merged_at: "2026-11-12T10:00:00Z" }),
+		});
+		await load(env, 1_000);
+		const after = await load(env, 2_000);
+		expect(after.states["palantir"]).toMatchObject({
+			pullRequest: { url: PR, state: "merged" },
+			installUrl: MAIN_INSTALL,
+		});
+		expect(after.states["databricks"]).toEqual({
+			pullRequest: { url: OTHER, state: "merged" },
+			publishable: false,
+		});
+	});
 
 	it("reads GitHub after the page, once per interval, and shows what it read next time", async () => {
 		const env = await seeded();

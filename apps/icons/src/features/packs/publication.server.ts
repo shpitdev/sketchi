@@ -217,7 +217,7 @@ const safeAnswer = Schema.decodeUnknownOption(
 	}),
 );
 const Pull = Schema.Struct({
-	body: Schema.optionalKey(Schema.String),
+	body: Schema.optionalKey(Schema.NullOr(Schema.String)),
 	head: Schema.optionalKey(Schema.Struct({ ref: Schema.optionalKey(Schema.String) })),
 	state: Schema.optionalKey(Schema.String),
 	merged_at: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -544,112 +544,120 @@ const publish = Effect.fn("Icons.publication.publish")(function* (
 		form.append("description", listing.description);
 		form.append("twitterHandle", author.xHandle);
 		form.append("website", author.website);
-		const outcome = Effect.gen(function* () {
-			const sent = yield* readHttp(
-				HttpClientRequest.post(
-					`${env.EXCALIDRAW_LIBRARY_BACKEND ?? EXCALIDRAW_LIBRARY_BACKEND}/submit`,
-				).pipe(HttpClientRequest.bodyFormData(form)),
-				30_000,
-			).pipe(Effect.result);
-			if (sent._tag === "Failure") {
-				const detail = yield* encodeJson({ error: globalThis.String(sent.failure) });
-				yield* hold(packId, version, detail);
-				yield* Effect.logWarning("Excalidraw library submission unconfirmed", {
-					packId,
-					version,
-					detail,
-				});
-				return yield* Effect.fail(unconfirmed());
-			}
-			const read = sent.success;
-			const decoded = yield* decodeJson(read.text).pipe(Effect.option);
-			const answer = Option.isSome(decoded) ? safeAnswer(decoded.value) : Option.none();
-			const parsedAnswer = Option.getOrUndefined(answer);
-			const pr =
-				typeof parsedAnswer?.url === "string" && PULL_REQUEST_URL.test(parsedAnswer.url)
-					? parsedAnswer.url
-					: undefined;
-			const detail = yield* encodeJson({
-				status: read.status,
-				body: String.slice(0, 2000)(read.text),
-			});
-			if (!pr) {
-				if (read.status >= 400 && read.status < 500) {
-					yield* sql`DELETE FROM excalidraw_library_submissions WHERE pack_id=${packId} AND version=${version} AND status='pending'`.pipe(
-						Effect.uninterruptible,
-					);
-					return yield* Effect.fail(
-						publicationFailure(
-							502,
-							"upstream_refused",
-							typeof parsedAnswer?.message === "string"
-								? `Excalidraw's library service refused it: ${parsedAnswer.message}`
-								: "Excalidraw's library service refused it.",
-						),
-					);
-				}
-				yield* hold(packId, version, detail);
-				return yield* Effect.fail(unconfirmed());
-			}
-			// Trusted PR evidence takes precedence over a contradictory status, and is recorded before lookup.
-			const confirmed = { pullRequestUrl: pr };
-			yield* complete(packId, version, confirmed, detail).pipe(
-				Effect.catch((error) =>
-					Effect.logError("Excalidraw library submission not recorded", {
-						packId,
-						version,
-						...confirmed,
-						error,
-					}),
-				),
-			);
-			const lookup = yield* pullRequest(
-				env,
-				PULL_REQUEST_URL.exec(pr)?.groups?.["number"] ?? "",
-				8_000,
-			).pipe(Effect.result);
-			const installUrl =
-				lookup._tag === "Success" && lookup.success
-					? installLinkFromPullRequest(lookup.success.pull.body ?? "")
-					: undefined;
-			const pullDetail = yield* encodeJson(
-				lookup._tag === "Success" && lookup.success
-					? {
-							...(lookup.success.pull.head?.ref ? { branch: lookup.success.pull.head.ref } : {}),
-							body: String.slice(0, 4000)(lookup.success.pull.body ?? ""),
-						}
-					: {
-							error: globalThis.String(
-								lookup._tag === "Failure" ? lookup.failure : "No pull request body",
-							),
-						},
-			);
-			const result: PublishResult = { pullRequestUrl: pr, ...(installUrl ? { installUrl } : {}) };
-			yield* complete(packId, version, result, pullDetail).pipe(
-				Effect.catch((error) =>
-					Effect.logError("Excalidraw library submission not recorded", {
-						packId,
-						version,
-						...result,
-						pullDetail,
-						error,
-					}),
-				),
-			);
-			return result;
-		});
-		return yield* outcome.pipe(
-			Effect.onInterrupt(() =>
-				hold(packId, version, "Interrupted after version claim; submission outcome unknown.").pipe(
-					Effect.catch((error) =>
-						Effect.logError("Excalidraw interrupted claim remains pending", {
+		// Keep the claim's terminal decision masked. Only sending owns interruption cleanup;
+		// after a definite refusal DELETE commits, another request may own this version.
+		return yield* Effect.uninterruptibleMask((restore) =>
+			Effect.gen(function* () {
+				const sent = yield* restore(
+					readHttp(
+						HttpClientRequest.post(
+							`${env.EXCALIDRAW_LIBRARY_BACKEND ?? EXCALIDRAW_LIBRARY_BACKEND}/submit`,
+						).pipe(HttpClientRequest.bodyFormData(form)),
+						30_000,
+					),
+				).pipe(
+					Effect.onInterrupt(() =>
+						hold(
 							packId,
 							version,
+							"Interrupted after version claim; submission outcome unknown.",
+						).pipe(
+							Effect.catch((error) =>
+								Effect.logError("Excalidraw interrupted claim remains pending", {
+									packId,
+									version,
+									error,
+								}),
+							),
+						),
+					),
+					Effect.result,
+				);
+				if (sent._tag === "Failure") {
+					const detail = yield* encodeJson({ error: globalThis.String(sent.failure) });
+					yield* hold(packId, version, detail);
+					yield* Effect.logWarning("Excalidraw library submission unconfirmed", {
+						packId,
+						version,
+						detail,
+					});
+					return yield* Effect.fail(unconfirmed());
+				}
+				const read = sent.success;
+				const decoded = yield* decodeJson(read.text).pipe(Effect.option);
+				const answer = Option.isSome(decoded) ? safeAnswer(decoded.value) : Option.none();
+				const parsedAnswer = Option.getOrUndefined(answer);
+				const pr =
+					typeof parsedAnswer?.url === "string" && PULL_REQUEST_URL.test(parsedAnswer.url)
+						? parsedAnswer.url
+						: undefined;
+				const detail = yield* encodeJson({
+					status: read.status,
+					body: String.slice(0, 2000)(read.text),
+				});
+				if (!pr) {
+					if (read.status >= 400 && read.status < 500) {
+						yield* sql`DELETE FROM excalidraw_library_submissions WHERE pack_id=${packId} AND version=${version} AND status='pending'`.pipe(
+							Effect.uninterruptible,
+						);
+						return yield* Effect.fail(
+							publicationFailure(
+								502,
+								"upstream_refused",
+								typeof parsedAnswer?.message === "string"
+									? `Excalidraw's library service refused it: ${parsedAnswer.message}`
+									: "Excalidraw's library service refused it.",
+							),
+						);
+					}
+					yield* hold(packId, version, detail);
+					return yield* Effect.fail(unconfirmed());
+				}
+				// Trusted PR evidence takes precedence over a contradictory status, and is recorded before lookup.
+				const confirmed = { pullRequestUrl: pr };
+				yield* complete(packId, version, confirmed, detail).pipe(
+					Effect.catch((error) =>
+						Effect.logError("Excalidraw library submission not recorded", {
+							packId,
+							version,
+							...confirmed,
 							error,
 						}),
 					),
-				),
-			),
+				);
+				const lookup = yield* restore(
+					pullRequest(env, PULL_REQUEST_URL.exec(pr)?.groups?.["number"] ?? "", 8_000),
+				).pipe(Effect.result);
+				const installUrl =
+					lookup._tag === "Success" && lookup.success
+						? installLinkFromPullRequest(lookup.success.pull.body ?? "")
+						: undefined;
+				const pullDetail = yield* encodeJson(
+					lookup._tag === "Success" && lookup.success
+						? {
+								...(lookup.success.pull.head?.ref ? { branch: lookup.success.pull.head.ref } : {}),
+								body: String.slice(0, 4000)(lookup.success.pull.body ?? ""),
+							}
+						: {
+								error: globalThis.String(
+									lookup._tag === "Failure" ? lookup.failure : "No pull request body",
+								),
+							},
+				);
+				const result: PublishResult = { pullRequestUrl: pr, ...(installUrl ? { installUrl } : {}) };
+				yield* complete(packId, version, result, pullDetail).pipe(
+					Effect.catch((error) =>
+						Effect.logError("Excalidraw library submission not recorded", {
+							packId,
+							version,
+							...result,
+							pullDetail,
+							error,
+						}),
+					),
+				);
+				return result;
+			}),
 		);
 	}).pipe(
 		// @effect-diagnostics-next-line strictEffectProvide:off -- Publication HTTP entry point owns request-bound D1 and HTTP lifetimes.
