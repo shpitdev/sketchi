@@ -4,11 +4,13 @@ Replace the technical layers with product ownership, and remove the custom mecha
 
 PR 810 remains staging. The user will review and merge it. A structural checkpoint is useful progress, but does not complete the Effect migration. The primary continues through the full plan, reporting actual gaps rather than promising a finishing date.
 
-Units 0–3 are accepted and integrated. The shared family list and build operation are in place, with mindmap, Venn and sequence converted. The remaining families, host state and resource ownership, app/tool moves and final preview proof remain open. This is the structural checkpoint, not final PR readiness.
+Units 0–3 are accepted and integrated. The shared family list and build operation are in place, with mindmap, Venn, sequence and timeline converted. The remaining families, host state and resource ownership, app/tool moves and final preview proof remain open. This is the structural checkpoint, not final PR readiness.
 
 The Icons client feature unit is also accepted locally: native atoms, Cache, streams, browser storage and Radix now own its state, action lifetimes and modal behavior. Real local preference recovery, cross-tab changes, exports and warm-cache failure/retry flows passed. The native IntersectionObserver and clipboard activation boundaries are named gaps. Icons server/domain work and shared diagnostic promotion remain open; this client acceptance is not final preview or production proof.
 
 Sequence also removes its duplicate contract, normalization/projection and runtime workflow. The first plain-family unit derives descriptors from build policy, binds host capabilities once, exposes generic preparation, shares family counts and slug policy, and preserves the released CLI’s accepted warning codec. Seven immutable cases retain identical scene/native/file artifacts, full sequence fuzz and real local edit/save/reload/export passed, and malformed CLI document paths were corrected. Its measured build/export cost increased 3.17%; layout timing was unchanged within the paired runs. Other plain and graph families remain open.
+
+Timeline now owns its document, date and build policy, with duplicate contracts and runtime workflow removed. All ten corpus cases preserve scene/native/file bytes; the full timeline matrix and real local editor/project persistence passed. Paired layout time rose 0.27% and build/export time 0.92%, within the original layout time and memory bounds. The independent review passed. Its generated-document synchronization and host mock projection remain explicit MCP integration work; this family acceptance does not imply a passing combined gate.
 
 ## Target structure
 
