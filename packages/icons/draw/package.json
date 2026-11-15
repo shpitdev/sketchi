@@ -11,6 +11,7 @@
 		}
 	},
 	"dependencies": {
+		"@effect/ai-anthropic": "catalog:",
 		"@sketchi/diagram-core": "workspace:*",
 		"@sketchi/diagram-excalidraw": "workspace:*",
 		"@sketchi/diagram-generation": "workspace:*",

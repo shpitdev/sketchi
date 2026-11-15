@@ -1,6 +1,7 @@
 import { iconRecipeIssues } from "@sketchi/diagram-core";
 import { lookAlikeMarks, rankLookAlikes } from "@sketchi/icon-catalog/look-alikes";
 import { Effect, Fiber, Layer } from "effect";
+import { Prompt } from "effect/ai";
 import { TestClock } from "effect/testing";
 import { describe, expect, it } from "@effect/vitest";
 
@@ -129,10 +130,14 @@ function fakes(script: Script) {
 				Effect.sleep(script.authorDelayMs ?? 0).pipe(
 					Effect.andThen(
 						Effect.sync(() => {
-							seen.authorTurns.push(messages.length);
+							seen.authorTurns.push(messages.content.length);
 							const reply = authorReplies.shift();
 							const text = typeof reply === "string" ? reply : JSON.stringify(reply);
-							return { content: [{ type: "text", text }], text, call: call("author") };
+							return {
+								content: Prompt.make([{ role: "assistant", content: text }]),
+								text,
+								call: call("author"),
+							};
 						}),
 					),
 				),
