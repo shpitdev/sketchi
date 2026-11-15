@@ -17,7 +17,13 @@
 			"outputs": ["{workspaceRoot}/coverage/packages/diagrams"],
 			"options": {
 				"command": "vitest run --config packages/diagrams/vitest.config.ts"
-			}
+			},
+			"inputs": [
+				"default",
+				"^production",
+				"testEnvironment",
+				"{workspaceRoot}/packages/editor/src/theme.css"
+			]
 		},
 		"typecheck": {
 			"executor": "nx:run-commands",

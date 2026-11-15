@@ -42,11 +42,33 @@
 				"command": "vitest run --config packages/drawing/vitest.routing.config.ts tools/drawing-tests/routing"
 			},
 			"inputs": [
-				"default",
+				"production",
 				"^production",
-				"testEnvironment",
-				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagrams/src/**/*"
+				{
+					"env": "ROUTING_FUZZ"
+				},
+				{
+					"env": "PRINT_ROUTING"
+				},
+				{
+					"env": "LANG"
+				},
+				{
+					"env": "LC_ALL"
+				},
+				{
+					"env": "TZ"
+				},
+				"{workspaceRoot}/tools/drawing-tests/routing*-fuzz.test.ts",
+				"{workspaceRoot}/tools/drawing-tests/routing-fuzz-helpers.ts",
+				"{workspaceRoot}/tools/drawing-tests/text-fit-helpers.ts",
+				"{workspaceRoot}/packages/diagrams/src/graph/**/*",
+				"{workspaceRoot}/packages/diagrams/src/families/flowchart/**/*",
+				"{workspaceRoot}/packages/diagrams/src/*.ts",
+				"{workspaceRoot}/packages/diagrams/project.json",
+				"{workspaceRoot}/packages/diagrams/tsconfig*.json",
+				"{workspaceRoot}/packages/diagrams/vitest.config.ts",
+				"{workspaceRoot}/packages/editor/public/fonts/**/*"
 			],
 			"cache": true,
 			"outputs": []
