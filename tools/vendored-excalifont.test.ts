@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
  * `themeConsumers()` therefore derives the list from the imports rather than
  * hardcoding it, so a new surface fails here instead of in production.
  *
- * diagram-ui declares the face, so it holds the reference copy and serves it to
+ * editor declares the face, so it holds the reference copy and serves it to
  * Storybook through `staticDirs`; every surface must match that copy byte for
  * byte.
  *
@@ -29,7 +29,7 @@ import { describe, expect, it } from "vitest";
  * That obligation is a per-copy fact, not a repo-root one, so it is asserted
  * per copy here.
  */
-const THEME_PACKAGE = "packages/diagram/ui";
+const THEME_PACKAGE = "packages/editor";
 
 const THEME_CSS = `${THEME_PACKAGE}/src/theme.css`;
 
@@ -58,7 +58,7 @@ function themeConsumers(): string[] {
 
 			// @sketchi/ui's stylesheet imports the theme for its Tailwind apps.
 			return (
-				appCss.includes("diagram/ui/src/theme.css") || appCss.includes("packages/ui/src/styles.css")
+				appCss.includes("editor/src/theme.css") || appCss.includes("packages/ui/src/styles.css")
 			);
 		})
 		.map((app) => `apps/${app}`)

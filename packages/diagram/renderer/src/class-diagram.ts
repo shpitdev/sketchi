@@ -3,6 +3,17 @@ import {
 	type AxisAlignedSegment,
 	type CanvasArrowhead,
 	type CanvasStrokeStyle,
+	estimateTextWidth,
+	routingQualityFindings,
+	routingQualityScale,
+	segmentsFromPoints,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
+import {
 	type ClassDiagram,
 	type ClassNode,
 	type ClassRelationship,
@@ -11,13 +22,9 @@ import {
 	classKeywordLine,
 	classMethodText,
 	classNodeName,
-	estimateTextWidth,
 	hasClassEnds,
 	type IntermediateDiagram,
 	isClassGeneralization,
-	routingQualityFindings,
-	routingQualityScale,
-	segmentsFromPoints,
 } from "@sketchi/diagram-core";
 
 import {
@@ -27,15 +34,7 @@ import {
 	type ClassPlacementOptions,
 	placeClasses,
 } from "./class-layout.js";
-import {
-	arrowCrossings,
-	type ArrowSceneElement,
-	type NodeSceneElement,
-	type RenderedDiagramScene,
-	renderGraphDiagram,
-	type SceneElement,
-	type TextSceneElement,
-} from "./scene.js";
+import { arrowCrossings, renderGraphDiagram } from "./scene.js";
 
 /** The name compartment: one 16 px line for the name, another over it for a keyword. */
 const NAME_FONT_SIZE = 16;

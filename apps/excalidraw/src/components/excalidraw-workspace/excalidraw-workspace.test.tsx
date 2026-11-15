@@ -1,18 +1,15 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@sketchi/diagram-ui", async (original) => ({
-	...(await original<typeof import("@sketchi/diagram-ui")>()),
-	ExcalidrawSceneCanvas: ({ title, revision }: { title: string; revision?: string | number }) => (
+vi.mock("@sketchi/editor", async (original) => ({
+	...(await original<typeof import("@sketchi/editor")>()),
+	DrawingEditor: ({ title, revision }: { title: string; revision?: string | number }) => (
 		<section aria-label={title} data-testid="mock-excalidraw-canvas" data-revision={revision} />
 	),
 }));
 
-import {
-	flowchartFixture,
-	mindmapFixture,
-	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagram-core";
+import { flowchartFixture, pharmaBatchDispositionFlowchart } from "@sketchi/diagram-core";
+import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
 
 import { ExcalidrawWorkspace } from "./excalidraw-workspace";
 
@@ -83,24 +80,11 @@ describe("ExcalidrawWorkspace", () => {
 		expect(screen.getByText("No diagram selected")).toBeTruthy();
 	});
 	it("keeps loading authoritative and recovers from a typed scene failure by switching diagrams", () => {
-		const invalid = {
-			...mindmapFixture,
-			edges: [
-				...mindmapFixture.edges,
-				{
-					id: "broken",
-					source: "topic-0",
-					target: "missing",
-					metadata: { depth: 1, siblingIndex: 0 },
-				},
-			],
-		};
+		const invalid = { ...mindmapFixture, root: { label: "Empty mindmap", children: [] } };
 		const diagrams = [invalid, flowchartFixture];
 		const { rerender } = render(<ExcalidrawWorkspace diagrams={diagrams} />);
 		expect(screen.getByText("Scene unavailable")).toBeTruthy();
-		expect(
-			screen.getByText('Edge "broken" references missing target node "missing".'),
-		).toBeTruthy();
+		expect(screen.getByText("Mindmap root must contain at least one child topic.")).toBeTruthy();
 		expect(screen.queryByTestId("mock-excalidraw-canvas")).toBeNull();
 		rerender(<ExcalidrawWorkspace diagrams={diagrams} status="loading" />);
 		expect(screen.getByText("Generating scene")).toBeTruthy();

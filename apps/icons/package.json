@@ -5,7 +5,7 @@
 	"dependencies": {
 		"@sketchi/community-icons": "workspace:*",
 		"@sketchi/diagram-core": "workspace:*",
-		"@sketchi/diagram-excalidraw": "workspace:*",
+		"@sketchi/drawing": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/ui": "workspace:*",
 		"@tanstack/react-hotkeys": "0.19.0",

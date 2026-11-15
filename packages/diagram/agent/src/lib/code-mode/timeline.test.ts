@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
-import {
-	CANVAS_LIMITS,
-	TIMELINE_MAX_EVENTS,
-	TIMELINE_MAX_LANES,
-	timelineFixture,
-} from "@sketchi/diagram-core";
-import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { CANVAS_LIMITS } from "@sketchi/drawing";
+import { TIMELINE_MAX_EVENTS, TIMELINE_MAX_LANES, timelineFixture } from "@sketchi/diagram-core";
+import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { applyDiagramPatch, buildTimeline, CodeModeRuntimeEnvironment } from "./runtime.js";
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
 import { BuildTimelineResultSchema } from "./contract.js";

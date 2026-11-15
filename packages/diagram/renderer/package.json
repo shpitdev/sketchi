@@ -11,6 +11,8 @@
 		}
 	},
 	"dependencies": {
-		"@sketchi/diagram-core": "workspace:*"
+		"@sketchi/diagram-core": "workspace:*",
+		"@sketchi/drawing": "workspace:*",
+		"@sketchi/diagrams": "workspace:*"
 	}
 }

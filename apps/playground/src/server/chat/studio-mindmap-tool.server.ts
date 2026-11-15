@@ -4,8 +4,8 @@ import {
 	BuildMindmapToolInputSchema,
 	type BuildMindmapResult,
 	type BuildMindmapToolInput,
-} from "@sketchi/diagram-agent";
-import type { Effect } from "effect";
+} from "@sketchi/diagrams/mindmap/build";
+import { type Effect } from "effect";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-build-tool.server";
 

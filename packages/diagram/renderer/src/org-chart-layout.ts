@@ -1,4 +1,4 @@
-import { clearanceLeft, clearanceRight, type EdgeBox } from "@sketchi/diagram-core";
+import { clearanceLeft, clearanceRight, type EdgeBox } from "@sketchi/drawing";
 
 /**
  * Deterministic org-chart placement: a compact top-down tree whose managers

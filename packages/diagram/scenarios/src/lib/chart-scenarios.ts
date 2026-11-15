@@ -1,19 +1,11 @@
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
-import {
-	estimateTextWidth,
-	parseChartDiagram,
-	type ChartDiagram,
-	type ChartKind,
-} from "@sketchi/diagram-core";
-import {
-	formatValue,
-	readChartMarks,
-	unitParts,
-	type RenderedDiagramScene,
-} from "@sketchi/diagram-renderer";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
-import type { ScenarioCheck } from "./evaluate.js";
+import { estimateTextWidth, type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import { parseChartDiagram, type ChartDiagram, type ChartKind } from "@sketchi/diagram-core";
+import { formatValue, readChartMarks, unitParts } from "@sketchi/diagram-renderer";
+
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
 
 export interface ChartScenarioSeries {
 	/** Accepted series names; empty for a lone series the prompt does not name. */

@@ -1,5 +1,5 @@
-import { fnv1a32 } from "@sketchi/diagram-core";
-import type { ExcalidrawLinearElement } from "@excalidraw/excalidraw/element/types";
+import { fnv1a32 } from "@sketchi/drawing";
+import { type ExcalidrawLinearElement } from "@excalidraw/excalidraw/element/types";
 import { generateKeyBetween } from "fractional-indexing";
 
 import {
@@ -10,16 +10,16 @@ import {
 	regionsFromRings,
 	triangulateRegion,
 } from "./geometry";
-import type {
-	CanonicalShape,
-	CanonicalSvgDocument,
-	FilledRegion,
-	NativeTraceOptions,
-	NativeTraceResult,
-	Point,
-	ProvisionalPointBudget,
-	NativeFillStyle,
-	NativeRoughness,
+import {
+	type CanonicalShape,
+	type CanonicalSvgDocument,
+	type FilledRegion,
+	type NativeTraceOptions,
+	type NativeTraceResult,
+	type Point,
+	type ProvisionalPointBudget,
+	type NativeFillStyle,
+	type NativeRoughness,
 } from "./types";
 
 export const PROVISIONAL_POINT_BUDGET: ProvisionalPointBudget = {

@@ -16,8 +16,8 @@ const editor = vi.hoisted(() => ({
 	stylesheetReady: Promise.withResolvers<void>(),
 }));
 
-// diagram-ui's loader sets Excalidraw's asset path and imports it; this stands in for both.
-vi.mock("@sketchi/diagram-ui", () => ({
+// editor's loader sets Excalidraw's asset path and imports it; this stands in for both.
+vi.mock("@sketchi/editor", () => ({
 	createFoldedRouteRelease: () => () => undefined,
 	loadExcalidraw: async () => {
 		editor.loads += 1;
@@ -58,7 +58,7 @@ const media = (file: string) =>
 beforeAll(async () => {
 	// Initialize the mock before the component's parallel imports. The editor
 	// loader stays pending until the test releases it after Edit.
-	await vi.importMock("@sketchi/diagram-ui");
+	await vi.importMock("@sketchi/editor");
 });
 
 afterEach(() => {

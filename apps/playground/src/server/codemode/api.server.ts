@@ -1,10 +1,9 @@
 import "@tanstack/react-start/server-only";
 
+import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import {
-	type ArtifactFormat,
 	type BuildFlowchartResult,
 	type EditFlowchartResult,
-	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildGanttResult,
@@ -20,9 +19,10 @@ import {
 	type BuildChartResult,
 	type CreateCanvasResult,
 	type StoredArtifactFormat,
-	CANVAS_LIMITS,
 } from "@sketchi/diagram-agent";
-import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { CANVAS_LIMITS } from "@sketchi/drawing";
+import { type BuildMindmapResult } from "@sketchi/diagrams/mindmap/build";
+import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Context, Effect, Schema } from "effect";
 

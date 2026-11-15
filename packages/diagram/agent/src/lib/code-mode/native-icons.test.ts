@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { iconRecipeFitIssues, iconRecipeIssues, type IconRecipe } from "@sketchi/diagram-core";
-import { iconRecipeElements } from "@sketchi/diagram-excalidraw";
+import { iconRecipeFitIssues, iconRecipeIssues, type IconRecipe } from "@sketchi/drawing";
+import { iconRecipeElements } from "@sketchi/drawing/excalidraw";
 import { iconManifest } from "@sketchi/icon-catalog/catalog";
 import { CONCEPT_ICONS } from "@sketchi/icon-catalog/concepts";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";

@@ -3,8 +3,8 @@ import { defineConfig } from "vitest/config";
 
 const aliases = [
 	{
-		find: "@sketchi/diagram-ui/styles.css",
-		replacement: new URL("../../packages/diagram/ui/src/styles.css", import.meta.url).pathname,
+		find: "@sketchi/editor/styles.css",
+		replacement: new URL("../../packages/editor/src/styles.css", import.meta.url).pathname,
 	},
 	{
 		find: "@sketchi/diagram-core",
@@ -15,13 +15,13 @@ const aliases = [
 		replacement: new URL("../../packages/diagram/renderer/src/index.ts", import.meta.url).pathname,
 	},
 	{
-		find: "@sketchi/diagram-excalidraw",
-		replacement: new URL("../../packages/diagram/excalidraw/src/index.ts", import.meta.url)
+		find: "@sketchi/drawing/excalidraw",
+		replacement: new URL("../../packages/drawing/src/excalidraw/index.ts", import.meta.url)
 			.pathname,
 	},
 	{
-		find: "@sketchi/diagram-ui",
-		replacement: new URL("../../packages/diagram/ui/src/index.ts", import.meta.url).pathname,
+		find: "@sketchi/editor",
+		replacement: new URL("../../packages/editor/src/index.ts", import.meta.url).pathname,
 	},
 ];
 

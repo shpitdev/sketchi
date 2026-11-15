@@ -1,14 +1,23 @@
 import { Result } from "effect";
 import {
 	type ChartValidationError,
-	CANVAS_SPEC_VERSION,
-	estimateTextWidth,
-	SKETCHI_DIAGRAM_PALETTE,
 	validateChartDiagram,
-	wrapTextToWidth,
 	type ChartDiagram,
 	type ChartOrientation,
 } from "@sketchi/diagram-core";
+import {
+	CANVAS_SPEC_VERSION,
+	estimateTextWidth,
+	SKETCHI_DIAGRAM_PALETTE,
+	wrapTextToWidth,
+	type CanvasLineElement as LineSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasPoint as ScenePoint,
+	type CanvasTextElement as TextSceneElement,
+	CHART_SERIES_COLORS,
+} from "@sketchi/drawing";
 
 import {
 	extendScale,
@@ -22,14 +31,7 @@ import {
 	type UnitParts,
 	type ValueScale,
 } from "./chart-scale.js";
-import type {
-	LineSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	SceneElement,
-	ScenePoint,
-	TextSceneElement,
-} from "./scene.js";
+
 import { breakRulesUnderText } from "./scene-rules.js";
 
 export const CHART_MARK_ROLE = "chart-mark";
@@ -52,16 +54,6 @@ export function isStructurallyValidChartMark(element: {
  * for common color-vision deficiencies on the card surface; series also carry
  * a legend, direct labels or marker shapes, so color never works alone.
  */
-export const CHART_SERIES_COLORS = [
-	"#2a78d6",
-	"#eb6834",
-	"#1baf7a",
-	"#eda100",
-	"#e87ba4",
-	"#008300",
-	"#6250d6",
-	"#e34948",
-] as const;
 
 const PADDING = 40;
 const LINE_HEIGHT = 1.35;

@@ -5,14 +5,12 @@ import {
 	isCanvasComposedShape,
 	wrappedLabelWidth,
 	wrapTextToWidth,
-} from "@sketchi/diagram-core";
-import type {
-	ArrowSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	ScenePoint,
-	TextSceneElement,
-} from "./scene.js";
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasPoint as ScenePoint,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
 /**
  * Curved lines follow the orthogonal routes, so they keep every guarantee those

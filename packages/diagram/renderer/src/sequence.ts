@@ -1,8 +1,6 @@
 import { Result } from "effect";
 import {
 	type SequenceValidationError,
-	canvasNodeIconBand,
-	CANVAS_SPEC_VERSION,
 	SEQUENCE_LIFELINE_SUFFIX,
 	type SequenceActivation,
 	type SequenceDiagram,
@@ -10,16 +8,18 @@ import {
 	sequenceActivations,
 	sequenceLifelineId,
 	validateSequenceDiagram,
+} from "@sketchi/diagram-core";
+import {
+	canvasNodeIconBand,
+	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
 	wrapTextToWidth,
 	wrappedLabelWidth,
-} from "@sketchi/diagram-core";
-import type {
-	ArrowSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	TextSceneElement,
-} from "./scene.js";
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
 const PADDING = 48;
 const HEADER_WIDTH = 180;

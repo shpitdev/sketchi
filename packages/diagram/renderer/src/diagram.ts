@@ -9,8 +9,9 @@ import { renderChartDiagram } from "./chart.js";
 import { renderGanttDiagram } from "./gantt.js";
 import { renderTimelineDiagram } from "./timeline.js";
 
-import { renderMindmapDiagram } from "./mindmap.js";
-import { type RenderedDiagramScene, renderIntermediateDiagram } from "./scene.js";
+import { renderMindmap } from "@sketchi/diagrams/mindmap";
+import { renderIntermediateDiagram } from "./scene.js";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { renderSequenceDiagram } from "./sequence.js";
 import { renderStateMachineDiagram } from "./state-machine.js";
 import { renderErDiagram } from "./er.js";
@@ -28,7 +29,7 @@ export function renderDiagram(
 ): Result.Result<RenderedDiagramScene, CanonicalValidationError | Schema.SchemaError> {
 	return CanonicalDiagramSchema.match(diagram, {
 		flowchart: renderIntermediateDiagram,
-		mindmap: renderMindmapDiagram,
+		mindmap: (document) => Result.succeed(renderMindmap(document)),
 		sequence: renderSequenceDiagram,
 		timeline: renderTimelineDiagram,
 		chart: renderChartDiagram,

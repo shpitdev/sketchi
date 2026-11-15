@@ -1,14 +1,11 @@
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import { type JourneyDiagram, journeyStepActors, parseJourneyDiagram } from "@sketchi/diagram-core";
-import {
-	journeyLayoutIssues,
-	readJourneyScene,
-	type RenderedDiagramScene,
-} from "@sketchi/diagram-renderer";
+import { journeyLayoutIssues, readJourneyScene } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
 
 /** A step the prompt states: its label, score, and the actor or touchpoint it names. */
 export interface JourneyScenarioStep {

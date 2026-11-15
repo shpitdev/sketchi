@@ -4,14 +4,14 @@ import { describe, expect, it } from "vitest";
 import {
 	candidateRouteQuality,
 	canvasCornerRadius,
-	crossingFixtures,
-	crossingStateMachines,
-	routingFixtures,
 	routingQualityScale,
 	wrappedLabelWidth,
 	wrapTextToWidth,
-} from "@sketchi/diagram-core";
-import { renderIntermediateDiagram, type RenderedDiagramScene } from "./scene";
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import { crossingFixtures, crossingStateMachines, routingFixtures } from "@sketchi/diagram-core";
+import { renderIntermediateDiagram } from "./scene";
+
 import { renderStateMachineDiagram } from "./state-machine";
 
 type Point = { readonly x: number; readonly y: number };

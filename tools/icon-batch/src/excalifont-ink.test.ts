@@ -1,5 +1,5 @@
 import { Resvg } from "@resvg/resvg-wasm";
-import { EXCALIFONT_GLYPHS, excalifontInkBox } from "@sketchi/diagram-core";
+import { EXCALIFONT_GLYPHS, excalifontInkBox } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 
 import { excalifontOptions, initializeResvg } from "./excalidraw-export.js";

@@ -2,13 +2,11 @@
 import { Result, Option } from "effect";
 import { describe, expect, it } from "vitest";
 import { ganttTaskSchedule, type GanttDiagram, type GanttTask } from "@sketchi/diagram-core";
+import { layoutGanttDiagram, readGanttScene, renderDiagram } from "@sketchi/diagram-renderer";
 import {
-	layoutGanttDiagram,
-	readGanttScene,
-	renderDiagram,
-	type RenderedDiagramScene,
-	type ScenePoint,
-} from "@sketchi/diagram-renderer";
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasPoint as ScenePoint,
+} from "@sketchi/drawing";
 import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,

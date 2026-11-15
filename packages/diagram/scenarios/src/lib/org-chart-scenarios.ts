@@ -7,10 +7,11 @@ import {
 	orgChartRoots,
 	parseOrgChartDiagram,
 } from "@sketchi/diagram-core";
-import { orgChartLayoutIssues, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import { orgChartLayoutIssues } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
 
 /** A person the prompt names: the names and titles they may go by, and whom they report to. */
 export interface OrgChartScenarioPerson {

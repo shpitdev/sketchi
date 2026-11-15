@@ -1,25 +1,21 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { exportToSvg, restoreElements } from "@excalidraw/excalidraw";
-import type {
-	ExcalidrawElement,
-	ExcalidrawTextElement,
-} from "@excalidraw/excalidraw/element/types";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import {
-	type CanvasSpec,
-	getCanvasValidationIssues,
-	parseFlowchartDiagram,
-	parseIntermediateDiagram,
-} from "@sketchi/diagram-core";
-import { convertSceneToExcalidraw, createExcalidrawFile } from "@sketchi/diagram-excalidraw";
+	type ExcalidrawElement,
+	type ExcalidrawTextElement,
+} from "@excalidraw/excalidraw/element/types";
+import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { type CanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
+import { parseFlowchartDiagram, parseIntermediateDiagram } from "@sketchi/diagram-core";
+import { convertSceneToExcalidraw, createExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { renderIntermediateDiagram, renderSequenceDiagram } from "@sketchi/diagram-renderer";
-import { ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
+import { DrawingEditor } from "@sketchi/editor";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { page, userEvent } from "vitest/browser";
 
-import "@sketchi/diagram-ui/styles.css";
+import "@sketchi/editor/styles.css";
 import "../../styles/app.css";
 
 afterEach(cleanup);
@@ -312,7 +308,7 @@ async function expectLabelsPaintFully(
 	let editorApi: ExcalidrawImperativeAPI | null = null;
 	const view = render(
 		<div style={{ height: 960, width: 1280 }}>
-			<ExcalidrawSceneCanvas
+			<DrawingEditor
 				onApiChange={(api) => {
 					editorApi = api;
 				}}
@@ -527,7 +523,7 @@ it("keeps node descriptions grouped and in place through reload, drag and export
 	let editorApi: ExcalidrawImperativeAPI | undefined;
 	const view = render(
 		<div style={{ height: 960, width: 1280 }}>
-			<ExcalidrawSceneCanvas
+			<DrawingEditor
 				scene={scene}
 				title="Drag descriptions"
 				onApiChange={(api) => {
@@ -581,7 +577,7 @@ it("moves authored branch labels with a source node dragged on the real canvas",
 	let editorApi: ExcalidrawImperativeAPI | undefined;
 	const view = render(
 		<div style={{ height: 960, width: 1280 }}>
-			<ExcalidrawSceneCanvas
+			<DrawingEditor
 				scene={convertSceneToExcalidraw(renderIntermediateDiagram(spec).pipe(Result.getOrThrow))}
 				title="Drag labels"
 				onApiChange={(api) => {

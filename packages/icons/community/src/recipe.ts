@@ -5,7 +5,7 @@ import {
 	ICON_RECIPE_PAPER,
 	type IconRecipe,
 	type IconRecipePart,
-} from "@sketchi/diagram-core";
+} from "@sketchi/drawing";
 
 /** The longest name a community icon keeps; also bounds its slug. */
 export const COMMUNITY_ICON_NAME_MAX_LENGTH = 48;

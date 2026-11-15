@@ -2,6 +2,11 @@
 import { Result } from "effect";
 import {
 	getCanvasValidationIssues,
+	CHART_SERIES_COLORS,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+} from "@sketchi/drawing";
+import {
 	parseQuadrantDiagram,
 	quadrantFixture,
 	QuadrantValidationError,
@@ -9,10 +14,8 @@ import {
 } from "@sketchi/diagram-core";
 import { describe, expect, it } from "vitest";
 
-import { CHART_SERIES_COLORS } from "../chart.js";
 import { QUADRANT_PLOT_SIZES, renderQuadrantDiagram } from "../quadrant.js";
 import { quadrantLayoutIssues, readQuadrantScene } from "../quadrant-readout.js";
-import type { RenderedDiagramScene, SceneElement } from "../scene.js";
 
 type NodeElement = Extract<SceneElement, { type: "node" }>;
 type LineElement = Extract<SceneElement, { type: "line" }>;

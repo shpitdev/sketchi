@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import {
 	getCanvasValidationIssues,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+} from "@sketchi/drawing";
+import {
 	type JourneyDiagram,
 	journeyFixture,
 	journeyStressFixtures,
@@ -13,7 +17,6 @@ import {
 import { renderDiagram } from "../diagram.js";
 import { JOURNEY_MAX_ASPECT, renderJourneyDiagram } from "../journey.js";
 import { journeyLayoutIssues, readJourneyScene } from "../journey-readout.js";
-import type { RenderedDiagramScene, SceneElement } from "../scene.js";
 
 const aspect = (scene: RenderedDiagramScene) => (scene.width - 80) / (scene.height - 80);
 const find = (scene: RenderedDiagramScene, id: string) => {

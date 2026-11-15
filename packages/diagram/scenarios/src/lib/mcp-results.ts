@@ -2,13 +2,12 @@ import {
 	type DiagramValidationError,
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
-	type MindmapTopicTree,
-	mindmapDiagramFromTree,
 } from "@sketchi/diagram-core";
+
 import { Option, Result, Schema } from "effect";
 
-import type { DiagramScenario } from "./diagram-scenarios.js";
-import type { ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenario } from "./diagram-scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -182,20 +181,6 @@ export function specToFlowchartCandidate(
 	return Result.succeed(built.diagram);
 }
 
-/** Map a Code Mode mindmap's nested topics to the canonical mindmap IR. */
-export function specToMindmapCandidate(
-	spec: unknown,
-): Result.Result<unknown, DiagramValidationError | Schema.SchemaError> {
-	if (!isRecord(spec) || !isRecord(spec.root)) return Result.succeed(spec);
-	const layout = isRecord(spec.layout) ? spec.layout : {};
-	return mindmapDiagramFromTree({
-		id: typeof spec.id === "string" ? spec.id : "mindmap",
-		title: typeof spec.title === "string" ? spec.title : "Mindmap",
-		root: spec.root as unknown as MindmapTopicTree,
-		...(layout.direction === "RL" ? { direction: "RL" as const } : {}),
-	});
-}
-
 /** Sequence normalized specs already carry canonical participants and messages. */
 export function specToSequenceCandidate(spec: unknown): unknown {
 	if (!isRecord(spec)) return spec;
@@ -357,7 +342,7 @@ export function candidateFromMcpResult(
 								  diagramType === "quadrant"
 								? { ...build.normalizedSpec, type: diagramType }
 								: diagramType === "mindmap"
-									? yield* specToMindmapCandidate(build.normalizedSpec)
+									? { ...build.normalizedSpec, type: "mindmap" }
 									: diagramType === "sequence"
 										? specToSequenceCandidate(build.normalizedSpec)
 										: yield* specToFlowchartCandidate(

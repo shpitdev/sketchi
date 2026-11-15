@@ -1,8 +1,8 @@
-import { loadExcalidraw } from "@sketchi/diagram-ui";
+import { loadExcalidraw } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-import type { IconImagingJob, IconImagingResult } from "@sketchi/icon-draw";
+import { type IconImagingJob, type IconImagingResult } from "@sketchi/icon-draw";
 
 import {
 	exportExcalidrawPngBase64,

@@ -1,5 +1,5 @@
-import { canvasShapeOutline, isCanvasComposedShape } from "@sketchi/diagram-core";
-import { createRouteRelease, routeEntersShape, routeReleased } from "@sketchi/diagram-excalidraw";
+import { canvasShapeOutline, isCanvasComposedShape } from "@sketchi/drawing";
+import { createRouteRelease, routeEntersShape, routeReleased } from "@sketchi/drawing/excalidraw";
 
 /**
  * A person's edits of an exported diagram, run through Excalidraw 0.18.1's own

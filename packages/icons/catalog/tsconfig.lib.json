@@ -9,5 +9,6 @@
     "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo"
   },
   "exclude": ["src/**/*.test.ts", "src/icon-color-render.ts"],
-  "include": ["src/**/*.ts", "src/generated/*.json"]
+  "include": ["src/**/*.ts", "src/generated/*.json"],
+  "references": []
 }

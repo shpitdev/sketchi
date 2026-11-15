@@ -1,9 +1,10 @@
 import {
 	estimateTextWidth,
-	QUADRANT_KEYS,
-	type QuadrantDiagram,
-	type QuadrantKey,
-} from "@sketchi/diagram-core";
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasPoint as ScenePoint,
+} from "@sketchi/drawing";
+import { QUADRANT_KEYS, type QuadrantDiagram, type QuadrantKey } from "@sketchi/diagram-core";
 
 import {
 	QUADRANT_NEAREST_MARGIN,
@@ -15,7 +16,6 @@ import {
 	quadrantSegmentsCross,
 	type QuadrantBox,
 } from "./quadrant.js";
-import type { RenderedDiagramScene, SceneElement, ScenePoint } from "./scene.js";
 
 type NodeElement = Extract<SceneElement, { type: "node" }>;
 type TextElement = Extract<SceneElement, { type: "text" }>;

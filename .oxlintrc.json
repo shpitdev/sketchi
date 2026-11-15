@@ -169,6 +169,8 @@
 						// inputs. Keep the exceptions exact so every project-to-project
 						// import is still checked, including imports from config files.
 						"allow": [
+							// Storybook composes the Studio-owned workspace and its stylesheet.
+							"^@sketchi/playground/styles\\.css$",
 							"^\\.\\./\\.\\./scripts/lib/worker-apps\\.mjs$",
 							"^(\\.\\./){2,4}scripts/lib/excalidraw-fonts\\.mjs$",
 							"^\\.\\./\\.\\./tools/local-dev-ports$",

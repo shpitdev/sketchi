@@ -10,7 +10,7 @@
       "path": "../../packages/ui/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/diagram/ui/tsconfig.lib.json"
+      "path": "../../packages/editor/tsconfig.lib.json"
     },
     {
       "path": "../../packages/social-card/tsconfig.lib.json"

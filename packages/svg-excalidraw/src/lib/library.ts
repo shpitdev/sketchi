@@ -1,6 +1,6 @@
-import { fnv1a32 } from "@sketchi/diagram-core";
+import { fnv1a32 } from "@sketchi/drawing";
 
-import type { ExcalidrawLibraryItemInput, SerializeExcalidrawLibraryOptions } from "./types";
+import { type ExcalidrawLibraryItemInput, type SerializeExcalidrawLibraryOptions } from "./types";
 
 const DEFAULT_LIBRARY_SOURCE = "https://sketchi.app";
 

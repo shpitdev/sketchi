@@ -1,4 +1,4 @@
-import { drawnIconSlug, ICON_RECIPE_LIMITS, type IconRecipe } from "@sketchi/diagram-core";
+import { drawnIconSlug, ICON_RECIPE_LIMITS, type IconRecipe } from "@sketchi/drawing";
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 

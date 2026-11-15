@@ -1,5 +1,5 @@
-import { fnv1a32 } from "@sketchi/diagram-core";
-import type { SketchiIcon } from "@sketchi/icon-catalog";
+import { fnv1a32 } from "@sketchi/drawing";
+import { type SketchiIcon } from "@sketchi/icon-catalog";
 
 export interface CatalogMark {
 	readonly slug: string;

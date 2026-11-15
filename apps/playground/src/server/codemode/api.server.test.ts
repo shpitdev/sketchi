@@ -1,13 +1,13 @@
-import type { TelemetrySpanRow } from "@sketchi/observability";
+import { type TelemetrySpanRow } from "@sketchi/observability";
 import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
 
 import {
 	type BuildFlowchartResult,
-	CANVAS_LIMITS,
 	type CodeModeObjectBucket,
 	type CodeModeObjectBucketObject,
 } from "@sketchi/diagram-agent";
+import { CANVAS_LIMITS } from "@sketchi/drawing";
 
 import {
 	MAX_CANVAS_REQUEST_BYTES,
@@ -21,7 +21,7 @@ import {
 	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./api.server";
 import { PlaygroundCodeMode } from "./service.server";
-import type { StudioEnv } from "../bindings/studio-env.server";
+import { type StudioEnv } from "../bindings/studio-env.server";
 import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "./usage-events.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 
@@ -394,8 +394,8 @@ describe("Code Mode API handlers", () => {
 			status: "accepted",
 			normalizedSpec: {
 				root: {
-					id: "topic-0",
-					children: [{ id: "topic-0-0" }, { id: "topic-0-1" }],
+					label: "Release",
+					children: [{ label: "Engineering" }, { label: "Launch" }],
 				},
 			},
 		});

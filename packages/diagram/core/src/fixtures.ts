@@ -1,7 +1,7 @@
 import { chartFixture } from "./types/chart.js";
 import { timelineFixture } from "./types/timeline.js";
 import { flowchartFixture } from "./types/flowchart.js";
-import { mindmapFixture } from "./types/mindmap.js";
+import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
 import { sequenceFixture } from "./types/sequence.js";
 import { stateMachineFixture } from "./types/state-machine.js";
 import { ganttFixture } from "./types/gantt.js";
@@ -13,7 +13,7 @@ import { journeyFixture } from "./types/journey.js";
 import { sankeyFixture } from "./types/sankey.js";
 import { wireframeFixture } from "./types/wireframe.js";
 import { quadrantFixture } from "./types/quadrant.js";
-import type { CanonicalDiagram } from "./diagram.js";
+import { type CanonicalDiagram } from "./diagram.js";
 
 /** One maintained fixture per canonical family. */
 export const diagramFixtures: readonly CanonicalDiagram[] = [

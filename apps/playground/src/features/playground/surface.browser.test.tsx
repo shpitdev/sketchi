@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -53,7 +53,7 @@ function EmptyPlayground({ onSelect = () => undefined }: { onSelect?: (prompt: s
 }
 
 describe("playground empty layout", () => {
-	it("routes the genuine deploy scene through the DiagramPreview canvas contract", async () => {
+	it("routes the genuine deploy scene through the DrawingEditor canvas contract", async () => {
 		render(<EmptyPlayground />);
 
 		expect(await screen.findByTestId("mock-excalidraw")).toBeTruthy();

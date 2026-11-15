@@ -1,7 +1,8 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
-import * as diagramCore from "@sketchi/diagram-core";
+import * as drawing from "@sketchi/drawing";
 import {
+	type IntermediateDiagram,
 	classFixture,
 	classStressFixtures,
 	crossingFixtures,
@@ -16,6 +17,7 @@ import {
 	zoneFixtures,
 	zoneStressFixtures,
 } from "@sketchi/diagram-core";
+
 import { describe, expect, it, vi } from "vitest";
 import { arrowCrossings, renderIntermediateDiagram } from "./scene";
 import { renderErDiagram } from "./er";
@@ -26,8 +28,8 @@ import { renderStateMachineDiagram } from "./state-machine";
 // the node labels it measures: every layout sizes each node from its label. Both
 // counts are deterministic, so they bound routing work without a wall-clock timer.
 const work = vi.hoisted(() => ({ checks: 0, measures: 0 }));
-vi.mock("@sketchi/diagram-core", async (importOriginal) => {
-	const core = await importOriginal<typeof diagramCore>();
+vi.mock("@sketchi/drawing", async (importOriginal) => {
+	const core = await importOriginal<typeof drawing>();
 	const counted =
 		<Args extends unknown[], Result>(check: (...args: Args) => Result) =>
 		(...args: Args): Result => {
@@ -300,7 +302,7 @@ describe("swimlane routing work", () => {
 	// 2.51M with round 29's short-label incident row, and 2.56M as that row, still
 	// past 2.4:1, lays out again with its thinner lanes level.
 	it("bounds segment checks for the lane fixtures and stress cases", () => {
-		const render = (fixtures: Record<string, diagramCore.IntermediateDiagram>) => {
+		const render = (fixtures: Record<string, IntermediateDiagram>) => {
 			work.checks = 0;
 			for (const fixture of Object.values(fixtures))
 				for (const direction of ["LR", "TB"] as const)
@@ -331,7 +333,7 @@ describe("zone routing work", () => {
 	// each grid step only against the shapes its line runs through took the
 	// stress cases from 27.5M.
 	it("bounds segment checks for the zone fixtures and stress cases", () => {
-		const render = (fixtures: Record<string, diagramCore.IntermediateDiagram>) => {
+		const render = (fixtures: Record<string, IntermediateDiagram>) => {
 			work.checks = 0;
 			for (const fixture of Object.values(fixtures))
 				for (const direction of ["LR", "TB"] as const)

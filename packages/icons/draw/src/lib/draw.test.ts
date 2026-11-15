@@ -1,9 +1,9 @@
-import { iconRecipeIssues } from "@sketchi/diagram-core";
+import { iconRecipeIssues } from "@sketchi/drawing";
 import { lookAlikeMarks, rankLookAlikes } from "@sketchi/icon-catalog/look-alikes";
 import { Effect, Fiber, Layer, Schedule } from "effect";
 import { TelemetryCorrelation } from "@sketchi/observability";
 import { makeJudgeCall } from "./google-judge.js";
-import type { IconModelError } from "./errors.js";
+import { type IconModelError } from "./errors.js";
 import { Prompt } from "effect/ai";
 import { TestClock } from "effect/testing";
 import { describe, expect, it } from "@effect/vitest";

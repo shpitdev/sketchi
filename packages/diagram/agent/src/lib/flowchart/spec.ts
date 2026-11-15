@@ -10,8 +10,8 @@ import {
 	type FlowchartValidationIssue,
 } from "@sketchi/diagram-core";
 
-import type { FlowchartSpec, NormalizedFlowchartSpec } from "../code-mode/contract.js";
-import { cleanToolString } from "../clean-tool-string.js";
+import { type FlowchartSpec, type NormalizedFlowchartSpec } from "../code-mode/contract.js";
+import { cleanToolString } from "@sketchi/diagrams/generate/clean-text";
 
 function cleanOptional(value: string | undefined): string | undefined {
 	if (value === undefined) return undefined;

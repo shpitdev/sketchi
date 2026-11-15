@@ -2,8 +2,6 @@ import { stateLabel } from "@sketchi/diagram-core";
 import {
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
-	BuildMindmapResultSchema,
-	BuildMindmapToolInputSchema,
 	BuildSequenceDiagramResultSchema,
 	BuildStateMachineResultSchema,
 	BuildStateMachineToolInputSchema,
@@ -32,7 +30,6 @@ import {
 	BuildSequenceDiagramToolInputSchema,
 	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
-	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildGanttResult,
@@ -47,10 +44,15 @@ import {
 	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagram-agent";
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import {
+	BuildMindmapResultSchema,
+	BuildMindmapToolInputSchema,
+	type BuildMindmapResult,
+} from "@sketchi/diagrams/mindmap/build";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { Result, Schema } from "effect";
-import type { UIMessage } from "ai";
-import type { ReadyPlaygroundArtifact } from "./surface";
+import { type UIMessage } from "ai";
+import { type ReadyPlaygroundArtifact } from "./surface";
 
 type MessagePart = UIMessage["parts"][number];
 

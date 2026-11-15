@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
-import {
-	flowchartDiagramFromDocument,
-	laneRegionIssues,
-	type CanvasSpec,
-} from "@sketchi/diagram-core";
-import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { flowchartDiagramFromDocument } from "@sketchi/diagram-core";
+import { laneRegionIssues, type CanvasSpec } from "@sketchi/drawing";
+import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
 import { buildFlowchart, CodeModeRuntimeEnvironment } from "./runtime.js";

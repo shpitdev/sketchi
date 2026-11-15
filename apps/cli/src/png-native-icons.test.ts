@@ -102,9 +102,7 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG hand-drawn
 			const renderer = yield* CliPngRenderer;
 			const built = yield* builder.build(canonicalDocument(flowchart));
 			const elements = built.excalidraw.elements;
-			const parts = elements.filter((element) =>
-				String(element["id"]).startsWith("node-build-icon-"),
-			);
+			const parts = elements.filter((element) => element["id"].startsWith("node-build-icon-"));
 			const images = elements.filter((element) => element["type"] === "image");
 
 			assert.deepStrictEqual(

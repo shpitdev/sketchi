@@ -4,10 +4,10 @@ import {
 	type BuildFlowchartOptions,
 	CANONICAL_DOCUMENT_SPECS,
 	type CanonicalBuildResult,
-	type CodeModeIssue,
 	type CanonicalDiagramDocument,
 	canonicalDocumentFromDiagram,
 } from "@sketchi/diagram-agent";
+import { type CodeModeIssue } from "@sketchi/diagrams/build";
 import {
 	type DiagramStyle,
 	extractJsonObject,
@@ -181,6 +181,16 @@ function malformedCandidateFailure(
 	if (candidate.diagram) {
 		return undefined;
 	}
+	if (candidate.mindmapError?.code === "mindmap_too_large") {
+		return failure("limit_exceeded", [
+			issue(
+				candidate.mindmapError.code,
+				"build",
+				candidate.mindmapError.message,
+				candidate.mindmapError.hint,
+			),
+		]);
+	}
 	const canParse = (() => {
 		try {
 			extractJsonObject(candidate.text);
@@ -331,39 +341,7 @@ function buildWithCodeMode(
 	document: CanonicalDiagramDocument,
 	options: NonNullable<BuildFlowchartOptions>,
 ) {
-	const request = { spec: document.spec, options };
-	switch (document.type) {
-		case "flowchart":
-			return codeMode.buildFlowchart(request);
-		case "mindmap":
-			return codeMode.buildMindmap(request);
-		case "timeline":
-			return codeMode.buildTimeline(request);
-		case "chart":
-			return codeMode.buildChart(request);
-		case "sequence":
-			return codeMode.buildSequenceDiagram(request);
-		case "state-machine":
-			return codeMode.buildStateMachine(request);
-		case "gantt":
-			return codeMode.buildGantt(request);
-		case "er":
-			return codeMode.buildErDiagram(request);
-		case "class":
-			return codeMode.buildClassDiagram(request);
-		case "org-chart":
-			return codeMode.buildOrgChart(request);
-		case "venn":
-			return codeMode.buildVennDiagram(request);
-		case "journey":
-			return codeMode.buildJourneyMap(request);
-		case "sankey":
-			return codeMode.buildSankey(request);
-		case "wireframe":
-			return codeMode.buildWireframe(request);
-		case "quadrant":
-			return codeMode.buildQuadrantChart(request);
-	}
+	return codeMode.buildDocument(document, options);
 }
 
 export const handleGenerateDiagramRequest = Effect.fn("playground.http.generate")(function* (

@@ -1,8 +1,8 @@
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { type IconRecipe } from "@sketchi/drawing";
 import { useMemo } from "react";
 
 import { RECIPE_PREVIEW_SIZE, recipePreview } from "../../lib/recipe-drawing.js";
-import type { PreviewMode } from "../preview-toggle/index.js";
+import { type PreviewMode } from "../preview-toggle/index.js";
 
 /** Excalidraw inverts the entire light canvas, including brand colors, in dark mode. */
 const PALETTE = { ink: "#1e1e1e", paper: "#ffffff" } as const;

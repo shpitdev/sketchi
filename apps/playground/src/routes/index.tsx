@@ -1,6 +1,7 @@
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { useChat } from "@ai-sdk/react";
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
-import { DiagramPreview } from "@sketchi/diagram-ui";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { MessageSquare, PanelsTopLeft, Square } from "lucide-react";
@@ -177,7 +178,13 @@ function DiagramStage({
 			</header>
 			<div className="studio__stage-card">
 				{scene ? (
-					<DiagramPreview {...(artifact ? { revision: artifact.artifactId } : {})} scene={scene} />
+					<DrawingEditor
+						{...(artifact ? { revision: artifact.artifactId } : {})}
+						title={scene.title}
+						scene={convertSceneToExcalidraw(scene)}
+						viewModeEnabled={true}
+						zenModeEnabled={true}
+					/>
 				) : (
 					<StagePlaceholder
 						pending={pending}

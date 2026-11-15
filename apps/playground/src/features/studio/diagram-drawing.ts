@@ -1,4 +1,4 @@
-import { convertSceneToExcalidraw, type ExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { convertSceneToExcalidraw, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import {
 	fetchStudioDiagramDetails,
 	fetchStudioDiagramDrawing,
@@ -32,7 +32,7 @@ export function sceneFromDrawing(drawing: StudioDrawing): ExcalidrawScene {
 		appState: { ...drawing.appState },
 		// Stored drawings are validated Excalidraw elements; this is the one cast back.
 		elements: drawing.elements as unknown as ExcalidrawScene["elements"],
-		files: drawing.files as NonNullable<ExcalidrawScene["files"]>,
+		files: drawing.files,
 	};
 }
 

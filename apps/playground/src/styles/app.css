@@ -240,8 +240,6 @@ body {
 	position: relative;
 }
 
-.studio__sample-canvas .sketchi-diagram-preview,
-.studio__sample-canvas .sketchi-artifact-canvas,
 .studio__sample-canvas .sketchi-excalidraw-scene-canvas {
 	border: 0;
 	height: 100%;
@@ -357,7 +355,7 @@ body {
 	padding: 0;
 }
 
-.studio__stage-card .sketchi-diagram-preview {
+.studio__stage-card .sketchi-excalidraw-scene-canvas {
 	flex: 1;
 	height: 100%;
 	min-height: 0;
@@ -959,12 +957,12 @@ button.studio__artifact-link {
 		var(--card);
 }
 
-.artifact-view__stage .sketchi-diagram-preview {
+.artifact-view__stage .sketchi-excalidraw-scene-canvas {
 	height: 100%;
 	min-height: 0;
 }
 
-.artifact-view__stage .sketchi-artifact-canvas {
+.artifact-view__stage .sketchi-excalidraw-scene-canvas {
 	height: 100%;
 	min-height: 0;
 }
@@ -1021,5 +1019,66 @@ button.studio__artifact-link {
 		--warn-wash: #443721;
 		--danger: #f39b90;
 		--grid-dot: rgb(242 236 239 / 0.045);
+	}
+}
+
+/* Development workspace panels belong to Studio, not the shared editor. */
+@utility sketchi-generation-workspace {
+	background: var(--paper-2);
+	color: var(--ink);
+	display: grid;
+	gap: 20px;
+	min-height: 100vh;
+	padding: 28px;
+	@media (max-width: 780px) {
+		padding: 18px;
+	}
+}
+@utility sketchi-generation-workspace__header {
+	align-items: start;
+	display: flex;
+	gap: 16px;
+	justify-content: space-between;
+	& h1 {
+		font-size: 28px;
+		line-height: 1.1;
+		margin: 4px 0 0;
+	}
+	@media (max-width: 780px) {
+		display: grid;
+		& h1 {
+			font-size: 23px;
+		}
+	}
+}
+@utility sketchi-generation-workspace__status {
+	background: var(--accent-wash);
+	border: 1px solid var(--accent);
+	border-radius: 999px;
+	color: var(--accent-ink);
+	font-size: 13px;
+	font-weight: 700;
+	padding: 7px 12px;
+	white-space: nowrap;
+}
+@utility sketchi-flowchart-validation-panel {
+	background: var(--card);
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	color: var(--ink-2);
+	display: grid;
+	font-size: 14px;
+	gap: 10px;
+	padding: 12px;
+	& div {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 10px;
+	}
+	& span {
+		background: var(--paper-2);
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		padding: 8px 10px;
 	}
 }

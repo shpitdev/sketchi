@@ -59,7 +59,7 @@ describe("diagram agent policy", () => {
 
 	it("routes mindmaps to the mindmap build tool", () => {
 		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain('"mindmap" or "mind map" means build_mindmap');
-		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain("build_mindmap with { spec: MindmapSpec }");
+		expect(DIAGRAM_AGENT_SYSTEM_PROMPT).toContain("build_mindmap with { spec: MindmapDocument }");
 	});
 });
 

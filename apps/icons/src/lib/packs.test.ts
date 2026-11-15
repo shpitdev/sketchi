@@ -1,4 +1,4 @@
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { type IconRecipe } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 
 import { excalidrawLibrary } from "./excalidraw-export";

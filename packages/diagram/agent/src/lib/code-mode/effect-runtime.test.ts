@@ -1,10 +1,8 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { assert, describe, it, layer } from "@effect/vitest";
-import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
-import {
-	renderSequenceDiagram,
-	type RenderedDiagramScene as RendererScene,
-} from "@sketchi/diagram-renderer";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
+import { renderSequenceDiagram } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RendererScene } from "@sketchi/drawing";
 import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { Cause, Effect, Exit, Fiber, Layer, Schema, Result } from "effect";
 
@@ -15,7 +13,6 @@ import {
 	BuildSequenceDiagramRequest,
 	DIAGRAM_PATCH_OPERATION_NAMES,
 	DiagramPatchOperationSchema,
-	MindmapTopicSchema,
 	RenderedDiagramSceneSchema,
 } from "./contract";
 import { applyDiagramPatch, buildFlowchart, makeCodeModeRuntimeEnvironmentLayer } from "./runtime";
@@ -97,18 +94,6 @@ describe("Code Mode telemetry", () => {
 });
 
 describe("structured contract issue metadata", () => {
-	it("does not attach parser facades to contract schemas", () => {
-		for (const schema of [
-			BuildFlowchartRequestSchema,
-			BuildSequenceDiagramRequest,
-			MindmapTopicSchema,
-			RenderedDiagramSceneSchema,
-		]) {
-			assert.isFalse("parse" in schema);
-			assert.isFalse("safeParse" in schema);
-		}
-	});
-
 	it("retains literal-union kind when display wording changes", () => {
 		const result = Schema.decodeUnknownResult(
 			Schema.Literals(["scene", "png"]).annotate({
@@ -182,17 +167,6 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 				[["requestId"], ["spec", "title"], ["spec", "nodes"], ["spec", "edges"]],
 			);
 		}),
-	);
-
-	it.effect.prop(
-		"round-trips arbitrary recursive mindmap topics",
-		{ topic: MindmapTopicSchema },
-		({ topic }) =>
-			Effect.gen(function* () {
-				const encoded = yield* Schema.encodeEffect(MindmapTopicSchema)(topic);
-				const decoded = yield* Schema.decodeUnknownEffect(MindmapTopicSchema)(encoded);
-				assert.deepStrictEqual(decoded, topic);
-			}),
 	);
 
 	it.effect("validates and defaults the sequence diagram contract", () =>

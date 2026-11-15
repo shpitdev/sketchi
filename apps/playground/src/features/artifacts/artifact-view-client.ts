@@ -1,12 +1,9 @@
 import { Schema, Result } from "effect";
-import {
-	RenderedDiagramSceneSchema,
-	type ArtifactProvenance,
-	type GetArtifactResult,
-} from "@sketchi/diagram-agent";
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import { RenderedDiagramSceneSchema, type GetArtifactResult } from "@sketchi/diagram-agent";
+import { type ArtifactProvenance } from "@sketchi/drawing/artifacts";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import type { AsyncResource } from "@/features/resources/use-async-resource";
+import { type AsyncResource } from "@/features/resources/use-async-resource";
 
 export type ArtifactViewState = AsyncResource<ArtifactReview>;
 

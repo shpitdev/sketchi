@@ -13,7 +13,6 @@ export * from "./lib/family-questions.js";
 export * from "./lib/intent.js";
 export * from "./lib/logo-placement.js";
 export * from "./lib/messages.js";
-export * from "./lib/mindmap-tree.js";
 export * from "./lib/models.js";
 export * from "./lib/policy.js";
 export * from "./lib/routing.js";

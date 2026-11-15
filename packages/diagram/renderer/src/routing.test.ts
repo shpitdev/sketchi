@@ -6,20 +6,24 @@ import {
 	pharmaBatchDispositionFlowchart,
 	rankGapFlowchart,
 	routingFixtures,
+	parseFlowchartDiagram,
+	parseIntermediateDiagram,
+} from "@sketchi/diagram-core";
+import {
 	segmentsFromPoints,
 	segmentCrossesBoundsInterior,
 	segmentsOverlapInterior,
 	wrappedLabelWidth,
 	wrapTextToWidth,
-	parseFlowchartDiagram,
-	parseIntermediateDiagram,
 	candidateRouteQuality,
 	routingJogReach,
 	routingQualityFindings,
 	routingQualityScale,
 	routingWideBend,
-} from "@sketchi/diagram-core";
-import { renderIntermediateDiagram, type NodeSceneElement, type ScenePoint } from "./scene";
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasPoint as ScenePoint,
+} from "@sketchi/drawing";
+import { renderIntermediateDiagram } from "./scene";
 
 /** The stored, wrapped box of a free edge label, as the Excalidraw adapter writes it. */
 function renderedLabelBox(label: {

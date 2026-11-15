@@ -32,8 +32,8 @@ export default defineConfig(() => ({
 			).pathname,
 			"@sketchi/diagram-core": new URL("../../packages/diagram/core/src/index.ts", import.meta.url)
 				.pathname,
-			"@sketchi/diagram-excalidraw": new URL(
-				"../../packages/diagram/excalidraw/src/index.ts",
+			"@sketchi/drawing/excalidraw": new URL(
+				"../../packages/drawing/src/excalidraw/index.ts",
 				import.meta.url,
 			).pathname,
 			"@sketchi/diagram-generation": new URL(

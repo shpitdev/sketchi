@@ -1,4 +1,4 @@
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { type IconRecipe } from "@sketchi/drawing";
 
 import { RECIPE_PREVIEW_SIZE, type RecipePalette, recipePreview } from "./recipe-drawing.js";
 

@@ -1,3 +1,5 @@
+import { ExcalidrawFile, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
+
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { describe, expect, it } from "vitest";
 import { Context, Effect, Schema, Result } from "effect";
@@ -6,18 +8,18 @@ import {
 	CANVAS_LIMITS,
 	type CanvasSpec,
 	type CanvasShapeElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
-	mindmapFixture,
 	parseChartDiagram,
 } from "@sketchi/diagram-core";
-import {
-	mindmapLayoutIssues,
-	renderChartDiagram,
-	renderMindmapDiagram,
-	type RenderedDiagramScene,
-} from "@sketchi/diagram-renderer";
+import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
+import { mindmapLayoutIssues, renderMindmap } from "@sketchi/diagrams/mindmap";
+import { renderChartDiagram } from "@sketchi/diagram-renderer";
+
 import {
 	CodeModeArtifactStorageError,
 	CodeModeArtifactStorage,
@@ -33,11 +35,11 @@ import {
 	toCodeModeJsonSchema,
 	RenderedDiagramSceneSchema,
 	type ApplyDiagramPatchResult,
-	type ArtifactFormat,
 	type BuildFlowchartResult,
 	type CreateCanvasResult,
 	type GetArtifactResult,
 } from "./contract";
+import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import {
 	applyDiagramPatch,
 	buildFlowchart,
@@ -521,15 +523,13 @@ describe("Code Mode runtime", () => {
 		const runtime = createTestRuntime();
 		const built = await runtime.buildMindmap({
 			requestId: "mindmap-request",
+			options: { inlineArtifacts: ["scene", "excalidraw"] },
 			spec: {
 				title: "Launch strategy",
 				root: {
 					label: "Launch",
 					children: [
-						{
-							label: "Product",
-							children: [{ label: "Scope" }, { label: "Quality" }],
-						},
+						{ label: "Product", children: [{ label: "Scope" }, { label: "Quality" }] },
 						{ label: "Go to market", children: [{ label: "Docs" }] },
 					],
 				},
@@ -542,88 +542,41 @@ describe("Code Mode runtime", () => {
 			normalizedSpec: {
 				id: "launch-strategy",
 				root: {
-					id: "topic-0",
+					label: "Launch",
 					children: [
-						{
-							id: "topic-0-0",
-							children: [{ id: "topic-0-0-0" }, { id: "topic-0-0-1" }],
-						},
-						{ id: "topic-0-1" },
+						{ label: "Product", children: [{ label: "Scope" }, { label: "Quality" }] },
+						{ label: "Go to market", children: [{ label: "Docs" }] },
 					],
 				},
 			},
 		});
 		if (!built.ok) throw new Error("Expected accepted mindmap");
 		expect(built.artifact.formats.map((format) => format.format)).toEqual(["excalidraw", "scene"]);
-	});
+		const exported = Schema.decodeUnknownSync(ExcalidrawFile)(
+			built.artifact.formats.find((format) => format.format === "excalidraw")?.inline,
+		);
 
-	it("returns typed mindmap hierarchy failures", async () => {
-		const result = await createTestRuntime().buildMindmap({
-			spec: { title: "Empty", root: { label: "Only root" } },
-		});
-		expect(result).toMatchObject({
-			ok: false,
-			status: "invalid_mindmap",
-			issues: [{ code: "disconnected_graph", stage: "mindmap" }],
-		});
-	});
-
-	it("preflights extreme mindmap depth before recursive schema decoding", async () => {
-		const root: { label: string; children?: unknown[] } = { label: "root" };
-		let current = root;
-		for (let depth = 0; depth < 2_000; depth += 1) {
-			const child: { label: string; children?: unknown[] } = {
-				label: `depth ${depth}`,
-			};
-			current.children = [child];
-			current = child;
+		const byId = new Map(exported.elements.map((element) => [element.id, element]));
+		expect(byId.get("node:topic-0")).toMatchObject({ type: "ellipse" });
+		const arrows = exported.elements.filter((element) => element.type === "arrow");
+		expect(arrows).toHaveLength(5);
+		for (const arrow of arrows) {
+			const target = arrow.id.replace(/^edge:branch/, "node:topic");
+			const source = target.slice(0, target.lastIndexOf("-"));
+			expect(arrow).toMatchObject({
+				elbowed: false,
+				roundness: { type: 2 },
+				endArrowhead: null,
+				startBinding: expect.objectContaining({ elementId: source }),
+				endBinding: expect.objectContaining({ elementId: target }),
+			});
+			expect(Array.isArray(arrow["points"]) && arrow["points"].length).toBeGreaterThan(2);
+			expect(byId.get(source)?.["boundElements"]).toContainEqual({ id: arrow.id, type: "arrow" });
+			expect(byId.get(target)?.["boundElements"]).toContainEqual({ id: arrow.id, type: "arrow" });
 		}
-		const result = await createTestRuntime().buildMindmap({
-			spec: { title: "Deep", root },
-		});
-		expect(result).toMatchObject({
-			ok: false,
-			status: "invalid_mindmap",
-			issues: [{ code: "mindmap_too_deep", stage: "mindmap" }],
-		});
-	});
-
-	it("preflights overly wide mindmaps", async () => {
-		const result = await createTestRuntime().buildMindmap({
-			spec: {
-				title: "Wide",
-				root: {
-					label: "root",
-					children: Array.from({ length: 201 }, (_, index) => ({
-						label: `topic ${index}`,
-					})),
-				},
-			},
-		});
-		expect(result).toMatchObject({
-			ok: false,
-			status: "invalid_mindmap",
-			issues: [{ code: "mindmap_too_large" }],
-		});
-	});
-
-	it("counts malformed child slots and keeps extreme-width failures bounded", async () => {
-		const result = await createTestRuntime().buildMindmap({
-			spec: {
-				title: "Malformed width",
-				root: {
-					label: "root",
-					children: Array.from({ length: 100_000 }, () => null),
-				},
-			},
-		});
-		expect(result).toMatchObject({
-			ok: false,
-			status: "invalid_mindmap",
-			issues: [{ code: "mindmap_too_large" }],
-		});
-		expect(result.issues).toHaveLength(1);
-		expect(JSON.stringify(result).length).toBeLessThan(2_000);
+		expect(byId.get("node:topic-0-0-1")?.["groupIds"]).toEqual(["branch:topic-0-0"]);
+		expect(byId.get("label:topic-0-0-1")?.["groupIds"]).toEqual(["branch:topic-0-0"]);
+		expect(validateExcalidrawScene(exported).issues).toEqual([]);
 	});
 
 	it("caps schema issue amplification for every Code Mode operation", async () => {
@@ -638,37 +591,6 @@ describe("Code Mode runtime", () => {
 		expect(result.issues).toHaveLength(21);
 		expect(result.issues.at(-1)?.message).toContain("additional input issues were omitted");
 	});
-
-	it.each([
-		[
-			"title",
-			{ title: "  ", root: { label: "Root", children: [{ label: "Child" }] } },
-			"spec.title",
-		],
-		[
-			"topic",
-			{ title: "Valid", root: { label: "Root", children: [{ label: "''" }] } },
-			"spec.root.children.[0].label",
-		],
-		[
-			"tool-cleaned topic",
-			{
-				title: "Valid",
-				root: { label: "Root", children: [{ label: " , title:" }] },
-			},
-			"spec.root.children.[0].label",
-		],
-	])(
-		"returns precise invalid_input paths for empty semantic %s strings",
-		async (_name, spec, path) => {
-			const result = await createTestRuntime().buildMindmap({ spec });
-			expect(result).toMatchObject({
-				ok: false,
-				status: "invalid_input",
-				issues: [{ stage: "input", ref: { path } }],
-			});
-		},
-	);
 
 	it("renders and exports right-to-left mindmaps", async () => {
 		const result = await createTestRuntime().buildMindmap({
@@ -2703,18 +2625,18 @@ describe("curved mindmap connectors", () => {
 		);
 
 	it("keeps a mindmap's curves when its scene is reused as a canvas", async () => {
-		const scene = renderMindmapDiagram(mindmapFixture).pipe(Result.getOrThrow);
+		const scene = renderMindmap(mindmapFixture);
 		const result = await createTestRuntime().createCanvas({ spec: scene });
 		if (!result.ok) throw new Error(`Expected accepted canvas: ${JSON.stringify(result.issues)}`);
 		const canvas = sceneOf(result.normalizedSpec);
 		expect(mindmapLayoutIssues(canvas)).toEqual([]);
-		expect(curves(canvas).map((arrow) => arrow.points)).toEqual(
-			curves(scene).map((arrow) => arrow.points),
+		expect(curves(canvas).map((arrow) => arrow["points"])).toEqual(
+			curves(scene).map((arrow) => arrow["points"]),
 		);
 	});
 
 	it("redraws the curves of a moved branch as curves clear of every topic", async () => {
-		const scene = renderMindmapDiagram(mindmapFixture).pipe(Result.getOrThrow);
+		const scene = renderMindmap(mindmapFixture);
 		const result = await createTestRuntime().applyDiagramPatch({
 			source: { scene },
 			operations: [
@@ -2733,7 +2655,7 @@ describe("curved mindmap connectors", () => {
 			["topic-0-1", "topic-0-1-0", "topic-0-1-1"].includes(arrow.targetNodeId),
 		);
 		expect(moved).toHaveLength(3);
-		for (const arrow of moved) expect(orthogonal(arrow.points), arrow.id).toBe(false);
+		for (const arrow of moved) expect(orthogonal(arrow["points"]), arrow.id).toBe(false);
 		expect(mindmapLayoutIssues(patched)).toEqual([]);
 	});
 });
@@ -2765,8 +2687,8 @@ describe("canvas geometry and input bounds", () => {
 		const scene = parseInlineScene(result.artifact.formats[0]?.inline);
 		const arrow = scene.elements.find(({ id }) => id === "ab");
 		if (!arrow || arrow.type !== "arrow") throw new Error("Expected ab arrow");
-		expect(arrow.points[0]).toEqual(start);
-		expect(arrow.points.at(-1)).toEqual(end);
+		expect(arrow["points"][0]).toEqual(start);
+		expect(arrow["points"].at(-1)).toEqual(end);
 	});
 
 	it("cascades removal through an inserted label ordered before its arrow", async () => {
@@ -3346,9 +3268,9 @@ describe("bot-reviewed canvas limits and coincident routes", () => {
 		);
 		const arrow = scene.elements.find(({ id }) => id === "ab");
 		if (!arrow || arrow.type !== "arrow") throw new Error("Expected ab arrow");
-		expect(arrow.points[0]).toEqual({ x: 50, y: 60 });
-		expect(arrow.points.at(-1)).toEqual({ x: 50, y: 0 });
-		expect(new Set(arrow.points.map(({ x, y }) => `${x},${y}`)).size).toBeGreaterThan(1);
+		expect(arrow["points"][0]).toEqual({ x: 50, y: 60 });
+		expect(arrow["points"].at(-1)).toEqual({ x: 50, y: 0 });
+		expect(new Set(arrow["points"].map(({ x, y }) => `${x},${y}`)).size).toBeGreaterThan(1);
 	});
 });
 

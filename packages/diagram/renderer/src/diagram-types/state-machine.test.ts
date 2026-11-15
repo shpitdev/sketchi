@@ -4,17 +4,20 @@ import { describe, expect, it } from "vitest";
 
 import {
 	crossingStateMachines,
-	getCanvasValidationIssues,
-	groupRegionIssues,
 	mediaPlayerStateMachine,
 	parseStateMachineDiagram,
 	type StateMachineDiagram,
 	stateMachineFixture,
-	wrappedLabelWidth,
 } from "@sketchi/diagram-core";
+import {
+	getCanvasValidationIssues,
+	groupRegionIssues,
+	wrappedLabelWidth,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
 
 import { renderDiagram } from "../diagram.js";
-import { arrowCrossings, type RenderedDiagramScene } from "../scene.js";
+import { arrowCrossings } from "../scene.js";
 
 const nodes = (scene: RenderedDiagramScene) =>
 	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));

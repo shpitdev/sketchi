@@ -4,11 +4,11 @@ import {
 	MAX_DIAGRAM_BUILD_ATTEMPTS,
 	normalizeIconSlug,
 	type BuildFlowchartOptions,
-	type CodeModeIssue,
 } from "@sketchi/diagram-agent";
+import { type CodeModeIssue } from "@sketchi/diagrams/build";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
 import { recordMetric } from "@sketchi/observability";
-import type { JSONValue } from "ai";
+import { type JSONValue } from "ai";
 import { Effect, Metric, Ref, Semaphore } from "effect";
 
 /** Studio renders the inline scene and offers the Excalidraw download. */

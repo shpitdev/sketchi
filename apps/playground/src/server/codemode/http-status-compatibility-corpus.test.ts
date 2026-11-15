@@ -5,9 +5,9 @@ import {
 	makeMemoryArtifactStorage,
 	type ApplyDiagramPatchResult,
 	type BuildFlowchartResult,
-	type BuildMindmapResult,
 	type GetArtifactResult,
 } from "@sketchi/diagram-agent";
+import { type BuildMindmapResult } from "@sketchi/diagrams/mindmap/build";
 
 const runtimeResults = vi.hoisted(() => {
 	let buildFlowchartResult: unknown;
@@ -40,6 +40,7 @@ vi.mock("./service.server", async (importOriginal) => {
 	return {
 		...actual,
 		PlaygroundCodeModeLive: Layer.succeed(actual.PlaygroundCodeMode, {
+			buildDocument: () => Effect.die("Internal document builds are outside the HTTP corpus."),
 			applyDiagramPatch: () =>
 				Effect.succeed(runtimeResults.getApplyDiagramPatch() as ApplyDiagramPatchResult),
 			buildFlowchart: () =>
@@ -77,7 +78,7 @@ import {
 	handleGetArtifactRequest as handleGetArtifactRequestEffect,
 	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
 } from "./api.server";
-import type { StudioEnv } from "../bindings/studio-env.server";
+import { type StudioEnv } from "../bindings/studio-env.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {

@@ -1,4 +1,4 @@
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { type IconRecipe } from "@sketchi/drawing";
 
 /** Every catalog mark's hand-drawn recipe, keyed by slug, published beside the manifest. */
 export const DRAWINGS_PATH = "/icon-drawings.json";

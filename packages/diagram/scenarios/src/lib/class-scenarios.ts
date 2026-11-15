@@ -11,17 +11,20 @@ import {
 	classMethodText,
 	classNodeKind,
 	classNodeName,
-	estimateTextWidth,
 	parseClassAttributeShorthand,
 	parseClassDiagram,
 	parseClassMethodShorthand,
 	resolveClassMultiplicity,
-	segmentsFromPoints,
 } from "@sketchi/diagram-core";
-import { classRelationshipHeads, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import {
+	estimateTextWidth,
+	segmentsFromPoints,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import { classRelationshipHeads } from "@sketchi/diagram-renderer";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
 
 /** An attribute the prompt states: its name, accepted types and the markers it states. */
 export interface ClassScenarioAttribute {

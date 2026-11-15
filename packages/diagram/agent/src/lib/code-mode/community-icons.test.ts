@@ -1,4 +1,4 @@
-import type { IconRecipe } from "@sketchi/diagram-core";
+import { type IconRecipe } from "@sketchi/drawing";
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 

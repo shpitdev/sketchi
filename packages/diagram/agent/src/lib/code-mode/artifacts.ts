@@ -5,10 +5,9 @@ import {
 	type ArtifactBundle,
 	type ArtifactFormat,
 	type ArtifactFormatRef,
-	type CodeModeIssue,
-	type CodeModeIssueCode,
 	type InlineArtifactFormat,
-} from "./contract.js";
+} from "@sketchi/drawing/artifacts";
+import { type CodeModeIssue, type CodeModeIssueCode } from "@sketchi/diagrams/build";
 
 export interface StoredArtifactFormat {
 	format: ArtifactFormat;

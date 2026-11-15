@@ -4,21 +4,20 @@ import {
 	type DiagramEdge,
 	type DiagramNode,
 	type IntermediateDiagram,
-	routingQualityFindings,
-	routingQualityScale,
 	type StateMachineDiagram,
 	stateKind,
 	stateInitial,
 	stateLabel,
 	stateTransitionLabel,
 } from "@sketchi/diagram-core";
-
 import {
-	type ArrowSceneElement,
-	arrowCrossings,
-	type RenderedDiagramScene,
-	renderGraphDiagram,
-} from "./scene.js";
+	routingQualityFindings,
+	routingQualityScale,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+
+import { arrowCrossings, renderGraphDiagram } from "./scene.js";
 
 /** The machine's own initial pseudostate; state ids never contain ":". */
 const INITIAL_ID = ":initial";

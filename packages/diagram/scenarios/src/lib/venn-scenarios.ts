@@ -5,13 +5,13 @@ import {
 	insideClearance,
 	outsideClearance,
 	readVennScene,
-	type RenderedDiagramScene,
 	vennLayoutIssues,
 	vennTextLineBoxes,
 } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
 
 /** A set the prompt names: the labels it may go by. */
 export interface VennScenarioSet {

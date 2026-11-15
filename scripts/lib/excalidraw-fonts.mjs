@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 /**
  * Excalidraw resolves every font face against `window.EXCALIDRAW_ASSET_PATH`
- * (set to "/" by `loadExcalidraw` in diagram-ui) and falls back to esm.sh only
+ * (set to "/" by `loadExcalidraw` in editor) and falls back to esm.sh only
  * when that URL fails. This plugin makes "/fonts/<Family>/<file>" resolve on
  * every surface that renders Excalidraw: it serves the installed package's
  * font files in dev and emits them into the client build, so the CDN fallback
@@ -20,10 +20,10 @@ function byCodeUnit(left, right) {
 	return left < right ? -1 : left > right ? 1 : 0;
 }
 
-const diagramUi = createRequire(new URL("../../packages/diagram/ui/package.json", import.meta.url));
+const diagramUi = createRequire(new URL("../../packages/editor/package.json", import.meta.url));
 
 export function excalidrawFontsDirectory() {
-	// Resolve through diagram-ui, which owns the Excalidraw dependency.
+	// Resolve through editor, which owns the Excalidraw dependency.
 	return join(dirname(diagramUi.resolve("@excalidraw/excalidraw")), "fonts");
 }
 

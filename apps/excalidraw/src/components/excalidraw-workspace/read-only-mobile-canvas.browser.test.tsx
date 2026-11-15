@@ -1,15 +1,15 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { flowchartFixture } from "@sketchi/diagram-core";
-import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
-import { ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
+import { DrawingEditor } from "@sketchi/editor";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { page, userEvent } from "vitest/browser";
 
-import "@sketchi/diagram-ui/styles.css";
+import "@sketchi/editor/styles.css";
 import "../../styles/app.css";
 
 afterEach(cleanup);
@@ -26,7 +26,7 @@ describe("read-only canvas on a phone", () => {
 		let editorApi: ExcalidrawImperativeAPI | null = null;
 		render(
 			<div style={{ height: 500, width: 390 }}>
-				<ExcalidrawSceneCanvas
+				<DrawingEditor
 					onApiChange={(api) => {
 						editorApi = api;
 					}}

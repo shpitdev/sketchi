@@ -14,7 +14,7 @@ import {
 	type CanvasSpec,
 	type DroppedCanvasIcon,
 	type IconRecipe,
-} from "@sketchi/diagram-core";
+} from "@sketchi/drawing";
 import {
 	canonicalIconSlug,
 	CONCEPT_COLLECTION,
@@ -32,8 +32,8 @@ import {
 } from "@sketchi/icon-catalog";
 import { Effect, Schema } from "effect";
 
-import { cleanToolString } from "../clean-tool-string.js";
-import type { CodeModeIssue } from "./contract.js";
+import { cleanToolString } from "@sketchi/diagrams/generate/clean-text";
+import { type CodeModeIssue } from "@sketchi/diagrams/build";
 
 /** One catalog mark that diagrams may draw inside a node. */
 export interface CodeModeCatalogIcon {

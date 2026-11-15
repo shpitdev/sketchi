@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import type { CodeModeIssue } from "@sketchi/diagram-agent";
+import { type CodeModeIssue } from "@sketchi/diagrams/build";
 import {
 	createUIMessageStream,
 	type ModelMessage,
@@ -8,7 +8,7 @@ import {
 	type UIMessageStreamWriter,
 } from "ai";
 
-import type { StudioTurnOutcome } from "./studio-build-tool.server";
+import { type StudioTurnOutcome } from "./studio-build-tool.server";
 
 /** One model run of a Studio turn: the first, or the one retry after a run that wrote nothing. */
 export interface StudioRun {

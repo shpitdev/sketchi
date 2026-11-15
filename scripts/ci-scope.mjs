@@ -14,6 +14,6 @@ export function ciScope({ all, projects, changedFiles }) {
 	return {
 		// Root native `tsc -b` and the project-graph structural tests read every project.
 		code,
-		storybook: all || affected.has("diagram-ui"),
+		storybook: all || affected.has("editor"),
 	};
 }

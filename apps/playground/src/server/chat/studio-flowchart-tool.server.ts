@@ -7,11 +7,11 @@ import {
 	FLOWCHART_REQUEST_MAX_LENGTH,
 	type BuildFlowchartResult,
 	type BuildFlowchartToolInput,
-	type CodeModeIssue,
 	normalizeIconSlug,
 } from "@sketchi/diagram-agent";
+import { type CodeModeIssue } from "@sketchi/diagrams/build";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
-import type { Effect } from "effect";
+import { type Effect } from "effect";
 
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-build-tool.server";

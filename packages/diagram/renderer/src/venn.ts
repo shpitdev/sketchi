@@ -1,19 +1,19 @@
 import { Result } from "effect";
 import {
 	type VennValidationError,
-	CANVAS_SPEC_VERSION,
-	SKETCHI_DIAGRAM_PALETTE,
 	validateVennDiagram,
 	vennSetColor,
 	type VennDiagram,
 } from "@sketchi/diagram-core";
+import {
+	CANVAS_SPEC_VERSION,
+	SKETCHI_DIAGRAM_PALETTE,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
-import type {
-	NodeSceneElement,
-	RenderedDiagramScene,
-	SceneElement,
-	TextSceneElement,
-} from "./scene.js";
 import {
 	layoutVennDiagram,
 	VENN_SET_LABEL_FONT,

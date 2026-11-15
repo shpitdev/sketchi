@@ -1,5 +1,6 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
-import { mindmapFixture } from "@sketchi/diagram-core";
+import { mindmapTopics } from "@sketchi/diagrams/mindmap";
+import { type Meta, type StoryObj } from "@storybook/react-vite";
+import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
 
 import { DiagramSwitcher } from "./diagram-switcher";
 import "../../styles/app.css";
@@ -25,9 +26,9 @@ const meta = {
 				type: "flowchart",
 			},
 			{
-				edgeCount: mindmapFixture.edges.length,
+				edgeCount: [...mindmapTopics(mindmapFixture.root)].length - 1,
 				id: mindmapFixture.id,
-				nodeCount: mindmapFixture.nodes.length,
+				nodeCount: [...mindmapTopics(mindmapFixture.root)].length,
 				title: mindmapFixture.title,
 				type: mindmapFixture.type,
 			},

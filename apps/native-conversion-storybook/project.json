@@ -4,7 +4,7 @@
 	"sourceRoot": "apps/native-conversion-storybook",
 	"projectType": "application",
 	"tags": ["scope:composition", "type:composition"],
-	"implicitDependencies": ["diagram-ui", "excalidraw", "icons"],
+	"implicitDependencies": ["editor", "excalidraw", "icons", "playground"],
 	"targets": {
 		"build-storybook": {
 			"outputs": ["{workspaceRoot}/storybook-static/native-conversion"],

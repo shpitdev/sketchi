@@ -1,4 +1,7 @@
-import type { RenderedDiagramScene, SceneElement } from "./scene.js";
+import {
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+} from "@sketchi/drawing";
 
 type NodeElement = Extract<SceneElement, { type: "node" }>;
 

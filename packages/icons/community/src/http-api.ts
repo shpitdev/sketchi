@@ -1,4 +1,4 @@
-import { IconRecipeSchema } from "@sketchi/diagram-core";
+import { IconRecipeSchema } from "@sketchi/drawing";
 import { Schema, SchemaGetter } from "effect";
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 

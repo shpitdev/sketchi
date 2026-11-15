@@ -1,4 +1,4 @@
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { type IconRecipe } from "@sketchi/drawing";
 import { X } from "lucide-react";
 import { useRef } from "react";
 

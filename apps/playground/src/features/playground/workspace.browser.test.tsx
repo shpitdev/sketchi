@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { page } from "vitest/browser";
-import type { ChatStatus, UIMessage } from "ai";
-import type { BuildFlowchartResult } from "@sketchi/diagram-agent";
+import { type ChatStatus, type UIMessage } from "ai";
+import { type BuildFlowchartResult } from "@sketchi/diagram-agent";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const chat = vi.hoisted(() => ({
@@ -17,7 +17,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 	getCommonBounds: () => [0, 0, 0, 0],
 }));
 
-import "@sketchi/diagram-ui/styles.css";
+import "@sketchi/editor/styles.css";
 import "../../styles/app.css";
 import { Route } from "../../routes/index";
 import { DEPLOY_PIPELINE_SCENE, DEPLOY_PIPELINE_SPEC } from "./deploy-pipeline-sample";

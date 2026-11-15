@@ -1,7 +1,11 @@
 import { parseGanttDay } from "@sketchi/diagram-core";
 
 import { GANTT_MARK_ROLE } from "./gantt.js";
-import type { RenderedDiagramScene, SceneElement, ScenePoint } from "./scene.js";
+import {
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasPoint as ScenePoint,
+} from "@sketchi/drawing";
 
 type TextElement = Extract<SceneElement, { type: "text" }>;
 

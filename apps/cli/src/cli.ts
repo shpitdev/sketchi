@@ -2,11 +2,11 @@ import {
 	applyFlowchartEdits,
 	CANONICAL_DOCUMENT_TYPES,
 	CodeModeArtifactStorageMemory,
-	type CodeModeIssue,
 	makeCodeModeRuntimeEnvironmentLayer,
 } from "@sketchi/diagram-agent";
+import { type CodeModeIssue } from "@sketchi/diagrams/build";
 import { Cause, Clock, Effect, type FileSystem, Layer, Option } from "effect";
-import type { Stdio } from "effect/Stdio";
+import { type Stdio } from "effect/Stdio";
 import isCI from "is-ci";
 import stringWidth from "string-width";
 

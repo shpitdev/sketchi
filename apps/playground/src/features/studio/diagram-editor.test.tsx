@@ -1,13 +1,13 @@
-import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const canvas = vi.hoisted(
 	(): { change?: (scene: ExcalidrawScene) => void; initial?: ExcalidrawScene } => ({}),
 );
-vi.mock("@sketchi/diagram-ui", () => ({
+vi.mock("@sketchi/editor", () => ({
 	downloadBlob: vi.fn(),
-	ExcalidrawSceneCanvas: ({
+	DrawingEditor: ({
 		onSceneChange,
 		scene,
 	}: {

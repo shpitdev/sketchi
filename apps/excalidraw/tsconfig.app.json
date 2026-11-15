@@ -13,13 +13,16 @@
       "path": "../../packages/diagram/renderer/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/diagram/excalidraw/tsconfig.lib.json"
+      "path": "../../packages/drawing/tsconfig.lib.json"
     },
     {
       "path": "../../packages/diagram/core/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/diagram/ui/tsconfig.lib.json"
+      "path": "../../packages/editor/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagrams/tsconfig.lib.json"
     }
   ]
 }

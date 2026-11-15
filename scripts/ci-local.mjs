@@ -229,7 +229,7 @@ const HELP = `Usage: pnpm ci:local [--no-signoff] [--all]
 Runs actionlint when workflows changed, a frozen install, lint/format/custom-rule checks, the
 scenario CLI smoke, the deploy and tooling contracts, the Nx-affected typecheck, build and test
 targets, the root TypeScript project references, and the diagram UI Storybook build when
-diagram-ui is affected. Changes are compared with origin/main, including uncommitted ones. Logs
+editor is affected. Changes are compared with origin/main, including uncommitted ones. Logs
 go to .memory/ci-local/.
 
 On success it posts a "${STATUS_CONTEXT}" commit status on the pushed PR head.
@@ -473,7 +473,7 @@ async function main(argv) {
 			conditional(
 				() => scope.storybook,
 				"diagram UI Storybook",
-				command("storybook", ["pnpm", "nx", "build-storybook", "diagram-ui"]),
+				command("storybook", ["pnpm", "nx", "build-storybook", "editor"]),
 			),
 		],
 	].filter(Boolean);

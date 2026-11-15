@@ -2,6 +2,11 @@
 import { Result } from "effect";
 import {
 	getCanvasValidationIssues,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
+import {
 	parseWireframeDiagram,
 	wireframeComponents,
 	wireframeElementEstimate,
@@ -11,7 +16,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { renderDiagram } from "../diagram.js";
-import type { NodeSceneElement, RenderedDiagramScene, TextSceneElement } from "../scene.js";
+
 import {
 	layoutWireframeDiagram,
 	renderWireframeDiagram,

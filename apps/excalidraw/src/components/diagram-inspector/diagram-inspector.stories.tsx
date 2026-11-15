@@ -1,9 +1,9 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import { type Meta, type StoryObj } from "@storybook/react-vite";
 
 import { pharmaBatchDispositionFlowchart } from "@sketchi/diagram-core";
-import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 
 import { DiagramInspector } from "./diagram-inspector";

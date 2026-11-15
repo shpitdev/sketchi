@@ -1,20 +1,21 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { loadFromBlob, MIME_TYPES } from "@excalidraw/excalidraw";
-import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { deployPipelineLogoFlowchart, embedCanvasIcons } from "@sketchi/diagram-core";
+import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { deployPipelineLogoFlowchart } from "@sketchi/diagram-core";
+import { embedCanvasIcons } from "@sketchi/drawing";
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
 	type ExcalidrawScene,
-} from "@sketchi/diagram-excalidraw";
+} from "@sketchi/drawing/excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
-import { ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
+import { DrawingEditor } from "@sketchi/editor";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
 
-import "@sketchi/diagram-ui/styles.css";
+import "@sketchi/editor/styles.css";
 import "../../styles/app.css";
 
 afterEach(cleanup);
@@ -49,7 +50,7 @@ async function renderCanvas(scene: ExcalidrawScene) {
 	let editorApi: ExcalidrawImperativeAPI | null = null;
 	const view = render(
 		<div style={{ height: 960, width: 1280 }}>
-			<ExcalidrawSceneCanvas
+			<DrawingEditor
 				onApiChange={(api) => {
 					editorApi = api;
 				}}

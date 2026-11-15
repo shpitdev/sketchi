@@ -1,5 +1,5 @@
-import { fnv1a32, type IconRecipe } from "@sketchi/diagram-core";
-import { type ExcalidrawElement, iconRecipeElements } from "@sketchi/diagram-excalidraw";
+import { fnv1a32, type IconRecipe } from "@sketchi/drawing";
+import { type ExcalidrawElement, iconRecipeElements } from "@sketchi/drawing/excalidraw";
 
 /** The Excalidraw file a scene export reads. */
 export interface IconScene {

@@ -1,10 +1,10 @@
-import type {
-	AppState,
-	ExcalidrawImperativeAPI,
-	ExcalidrawInitialDataState,
-	ExcalidrawProps,
+import {
+	type AppState,
+	type ExcalidrawImperativeAPI,
+	type ExcalidrawInitialDataState,
+	type ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
-import type { createFoldedRouteRelease } from "@sketchi/diagram-ui";
+import type { createFoldedRouteRelease } from "@sketchi/editor";
 import { type ComponentType, useCallback, useRef } from "react";
 
 import {
@@ -17,7 +17,7 @@ import {
 import { HOME_DIAGRAM } from "./home-diagram-data.js";
 
 export interface HomeDiagramEditorProps {
-	/** Excalidraw's editor, from diagram-ui's loader. */
+	/** Excalidraw's editor, from editor's loader. */
 	Excalidraw: ComponentType<ExcalidrawProps>;
 	/** Makes the step that releases a route a drag folds through its own shape. */
 	releaseRoutes: () => ReturnType<typeof createFoldedRouteRelease>;

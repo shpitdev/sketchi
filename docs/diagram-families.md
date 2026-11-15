@@ -25,7 +25,7 @@ not require particular source, story, scenario or test files to exist.
 | --- | --- | --- |
 | core contract and fixture | `packages/diagram/core/src/types/<name>.ts`: Effect Schema contract, semantic validation, `parse<Name>Diagram`, and a fixture in `diagramFixtures`. Add it to `CanonicalDiagramSchema` in `diagram.ts`, following the shared Effect diagnostic policy. If the family is not nodes and edges, replace the scaffold with its own contract (as `sequence.ts` does) and remove it from `GRAPH_DIAGRAM_TYPES`. | compile (`satisfies Record<DiagramTypeValue, …>`), generated-response pipeline |
 | deterministic renderer | A `renderDiagram` case in `packages/diagram/renderer/src/diagram.ts`, plus `diagram-types/<name>.test.ts`. | family renderer regressions, generated-response pipeline |
-| Excalidraw conversion | `packages/diagram/excalidraw`. Any new renderer role must convert and validate. | offline-build pipeline |
+| Excalidraw conversion | `packages/drawing`. Any new renderer role must convert and validate. | offline-build pipeline |
 | generation prompt | `IR_INSTRUCTIONS` and `FAMILY_EXAMPLES` in `packages/diagram/generation/src/lib/messages.ts`. Remove the name from `UnsupportedDiagramIntentKindSchema` (`intent.ts`); the prompt's refusal list is built from it. | compile, message-builder tests; generated quality in Frontierclimb |
 | generation output parsing | The `parsers` entry and requirement targets in `candidates.ts`. Diagnostics should carry repair hints. | compile, generated-response pipeline |
 | Code Mode build | A Code Mode authoring spec and build operation in `packages/diagram/agent`, registered in `CANONICAL_DOCUMENT_SPECS`, `buildCanonicalDocument`, and `canonicalDocumentFromDiagram` (`documents.ts`), plus MCP docs in `apps/playground/src/server/codemode/mcp-docs/catalog.ts`. | compile, offline-build pipeline |
@@ -33,7 +33,7 @@ not require particular source, story, scenario or test files to exist.
 | CLI generate type | `generate --type` reads the registry, and the wizard choice comes from `GENERATION_TYPE_CHOICES` in `apps/cli/src/generation-types.ts`. | compile, CLI behavior tests |
 | generate API request | `POST /api/v1/generate` accepts every registered family (`apps/playground/src/server/generation/request.ts`). Unsupported kinds come from `UnsupportedDiagramIntentKindSchema`. | request schema |
 | maintained scenarios | `packages/diagram/scenarios`: scenarios with checks scored on the model's own diagram, registered in `diagramScenarios` or the reliability scenarios. | scenario regressions and Frontierclimb |
-| Storybook story | `packages/diagram/ui/src/diagram-types/<name>.stories.tsx`. | Storybook build and review |
+| Storybook story | `tools/storybook/families/<name>.stories.tsx`. | Storybook build and review |
 
 The offline-build pipeline parses document JSON through the CLI, builds it with
 Code Mode (which validates its Excalidraw conversion), checks the returned scene

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cleanToolString } from "./clean-tool-string";
+import { cleanToolString } from "@sketchi/diagrams/generate/clean-text";
 
 describe("cleanToolString", () => {
 	it("strips welded trailing key fragments seen in flash-lite tool calls", () => {

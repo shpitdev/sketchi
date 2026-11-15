@@ -14,10 +14,10 @@ import {
 	readTimelineAxis,
 	readTimelineGaps,
 	readTimelineMomentGaps,
-	type RenderedDiagramScene,
 } from "@sketchi/diagram-renderer";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
-import type { ScenarioCheck } from "./evaluate.js";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
 
 export interface TimelineScenarioEvent {
 	readonly labels: readonly string[];

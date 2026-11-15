@@ -2,14 +2,14 @@ import {
 	ApplyDiagramPatchRequest,
 	type CANONICAL_DOCUMENT_TYPES,
 	type CanonicalDiagramDocument,
-	ExcalidrawFile,
-	CodeModeIssue,
 	RenderedDiagramSceneSchema,
 	type PatchableScene,
 } from "@sketchi/diagram-agent";
+import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
+import { CodeModeIssue } from "@sketchi/diagrams/build";
 import { Effect, Schema, Result } from "effect";
 
-import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
+import { type BuiltDiagram, type StoredDiagram } from "./contracts.js";
 import { decodeCanonicalDiagramDocument, documentId, validateStorageId } from "./document.js";
 import { CliGenerationError, CliValidationError } from "./errors.js";
 import { DiagramPatcher } from "./patch.js";

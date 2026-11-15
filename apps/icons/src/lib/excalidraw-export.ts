@@ -1,6 +1,6 @@
-import { estimateTextWidth, fnv1a32, wrapTextToWidth } from "@sketchi/diagram-core";
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
-import { type ExcalidrawElement, iconRecipeElements } from "@sketchi/diagram-excalidraw";
+import { estimateTextWidth, fnv1a32, wrapTextToWidth, type IconRecipe } from "@sketchi/drawing";
+
+import { type ExcalidrawElement, iconRecipeElements } from "@sketchi/drawing/excalidraw";
 
 import { RECIPE_PREVIEW_SIZE } from "./recipe-drawing.js";
 import { DRAWN_NAME_FONT_SIZE, DRAWN_NAME_GAP, DRAWN_NAME_MAX_WIDTH } from "./drawn-name.js";

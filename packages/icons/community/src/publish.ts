@@ -1,4 +1,4 @@
-import { iconRecipeFitIssues, iconRecipeIssues, isIconRecipe } from "@sketchi/diagram-core";
+import { iconRecipeFitIssues, iconRecipeIssues, isIconRecipe } from "@sketchi/drawing";
 import { Effect, Schema } from "effect";
 
 import {

@@ -1,3 +1,4 @@
+import { decodeMindmapDocument } from "@sketchi/diagrams/mindmap";
 import {
 	CANONICAL_DOCUMENT_SPECS,
 	CANONICAL_DOCUMENT_TYPES,
@@ -93,6 +94,16 @@ export const decodeCanonicalDiagramDocument = Effect.fn("sketchi.cli.document.de
 		const fields = documentFields(input);
 		if (!fields) {
 			return yield* validationError(["document: Expected an object with type and spec."]);
+		}
+		if (fields.type === "mindmap") {
+			const spec = yield* Effect.fromResult(decodeMindmapDocument(fields.spec)).pipe(
+				Effect.mapError((error) =>
+					validationError(
+						error._tag === "SchemaError" ? schemaDetails(error.issue) : [error.message],
+					),
+				),
+			);
+			return { type: "mindmap" as const, spec };
 		}
 		if (isCanonicalDocumentType(fields.type)) {
 			const type = fields.type;

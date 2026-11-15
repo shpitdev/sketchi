@@ -11,6 +11,7 @@
 		"@sketchi/icon-draw": "workspace:*",
 		"@sketchi/observability": "workspace:*",
 		"effect": "catalog:",
-		"linkedom": "0.18.14"
+		"linkedom": "0.18.14",
+		"@sketchi/drawing": "workspace:*"
 	}
 }

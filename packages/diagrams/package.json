@@ -1,0 +1,31 @@
+{
+	"name": "@sketchi/diagrams",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./mindmap": {
+			"types": "./dist/mindmap/index.d.ts",
+			"default": "./dist/mindmap/index.js"
+		},
+		"./mindmap/fixtures": {
+			"types": "./dist/mindmap/fixtures.d.ts",
+			"default": "./dist/mindmap/fixtures.js"
+		},
+		"./build": {
+			"types": "./dist/build.d.ts",
+			"default": "./dist/build.js"
+		},
+		"./generate/clean-text": {
+			"types": "./dist/generate/clean-text.d.ts",
+			"default": "./dist/generate/clean-text.js"
+		},
+		"./mindmap/build": {
+			"types": "./dist/mindmap/build.d.ts",
+			"default": "./dist/mindmap/build.js"
+		}
+	},
+	"dependencies": {
+		"effect": "catalog:",
+		"@sketchi/drawing": "workspace:*"
+	}
+}

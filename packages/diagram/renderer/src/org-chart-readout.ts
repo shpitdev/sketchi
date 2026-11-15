@@ -2,9 +2,10 @@ import {
 	estimateTextWidth,
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
-} from "@sketchi/diagram-core";
-
-import type { ArrowSceneElement, NodeSceneElement, RenderedDiagramScene } from "./scene.js";
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
 
 export interface OrgChartLayoutIssue {
 	readonly code:

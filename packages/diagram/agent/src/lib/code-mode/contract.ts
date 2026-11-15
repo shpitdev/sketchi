@@ -1,5 +1,14 @@
+import {
+	BuildArtifactFormatSchema,
+	ArtifactFormatSchema,
+	InlineArtifactFormatSchema,
+	ArtifactProvenance,
+	ArtifactBundleSchema,
+	PartialArtifactBundleSchema,
+} from "@sketchi/drawing/artifacts";
+import { CodeModeIssue, QualityReportSchema } from "@sketchi/diagrams/build";
 import { Effect, Schema, SchemaAST, SchemaGetter, SchemaIssue } from "effect";
-import type { StandardJSONSchemaV1, StandardSchemaV1 } from "@standard-schema/spec";
+import { type StandardJSONSchemaV1, type StandardSchemaV1 } from "@standard-schema/spec";
 import {
 	CANVAS_LIMITS,
 	CANVAS_NODE_ICON,
@@ -7,11 +16,14 @@ import {
 	CANVAS_COMPOSED_SHAPES,
 	CANVAS_RENDERER_ROLES,
 	CANVAS_SPEC_VERSION,
-	FLOWCHART_COVERAGE_CODES,
+	SKETCHI_DIAGRAM_STYLE,
+	DrawnIconSchema,
+	IconRecipeSchema,
+} from "@sketchi/drawing";
+
+import {
 	FLOWCHART_DIRECTIONS,
 	FlowchartDocumentSchema,
-	DrawnIconSchema,
-	IconRecipeSchema as CoreIconRecipeSchema,
 	FlowchartEditsSchema,
 	type FlowchartDocument,
 	CHART_KINDS,
@@ -22,7 +34,6 @@ import {
 	ER_CARDINALITIES,
 	SEQUENCE_MESSAGE_STYLES,
 	SEQUENCE_MESSAGE_TYPES,
-	SKETCHI_DIAGRAM_STYLE,
 	STATE_MACHINE_DIRECTIONS,
 	STATE_MACHINE_STATE_KINDS,
 	TIMELINE_EVENT_KINDS,
@@ -32,8 +43,6 @@ import {
 	WIREFRAME_DEVICES,
 	WIREFRAME_IMAGE_ASPECTS,
 } from "@sketchi/diagram-core";
-
-import { cleanToolString } from "../clean-tool-string.js";
 
 export const ContractSchemaIssue = Schema.Struct({
 	code: stringLiteral("custom"),
@@ -359,213 +368,11 @@ function hexColor(defaultValue?: string) {
 const HexColor = hexColor();
 
 /** Formats a build can export. */
-export const BUILD_ARTIFACT_FORMATS = ["excalidraw", "scene", "png"] as const;
+
 /**
  * Formats an artifact can hold: what its build exported, and for a flowchart its
  * document, which editFlowchart starts from.
  */
-export const ARTIFACT_FORMATS = [...BUILD_ARTIFACT_FORMATS, "document"] as const;
-export const INLINE_ARTIFACT_FORMATS = ["excalidraw", "scene", "document"] as const;
-
-export const BuildArtifactFormatSchema = Object.assign(literals(BUILD_ARTIFACT_FORMATS), {
-	options: BUILD_ARTIFACT_FORMATS,
-});
-export const ArtifactFormatSchema = Object.assign(literals(ARTIFACT_FORMATS), {
-	options: ARTIFACT_FORMATS,
-});
-export const InlineArtifactFormatSchema = Object.assign(literals(INLINE_ARTIFACT_FORMATS), {
-	options: INLINE_ARTIFACT_FORMATS,
-});
-export type ArtifactFormat = typeof ArtifactFormatSchema.Type;
-export type InlineArtifactFormat = typeof InlineArtifactFormatSchema.Type;
-
-export const ArtifactProvenance = Schema.Struct({
-	sourceArtifactId: RequiredNonEmptyString.pipe(Schema.mutableKey),
-}).annotate({ identifier: undefined });
-
-export interface ArtifactProvenance extends Schema.Schema.Type<typeof ArtifactProvenance> {}
-
-export const CODE_MODE_ISSUE_CODES = [
-	"missing_field",
-	"invalid_type",
-	"invalid_enum",
-	"invalid_color",
-	"duplicate_node_id",
-	"duplicate_edge_id",
-	"missing_edge_source",
-	"missing_edge_target",
-	"self_loop",
-	"missing_start",
-	"multiple_starts",
-	"missing_end",
-	"start_has_incoming",
-	"end_has_outgoing",
-	"unreachable_node",
-	"nonterminating_node",
-	"missing_outgoing_edge",
-	"underbranched_decision",
-	"unlabeled_decision_branch",
-	"duplicate_decision_branch_label",
-	"disconnected_graph",
-	"flowchart_too_large",
-	"duplicate_group_id",
-	"unknown_node_group",
-	"empty_group",
-	"unknown_group_parent",
-	"group_cycle",
-	"shaped_decision",
-	"duplicate_lane_id",
-	"unknown_node_lane",
-	"lanes_with_groups",
-	"invalid_id",
-	"duplicate_edge",
-	"isolated_node",
-	"unknown_member",
-	"overlapping_containers",
-	"node_without_lane",
-	"flowchart_too_small",
-	"unknown_edit_target",
-	"invalid_edit",
-	"mindmap_too_deep",
-	"mindmap_too_large",
-	"sequence_too_large",
-	"invalid_timeline_date",
-	"duplicate_event_id",
-	"invalid_timeline_order",
-	"timeline_too_large",
-	"invalid_timeline_span",
-	"invalid_timeline_lane",
-	"chart_too_large",
-	"chart_series_mismatch",
-	"duplicate_chart_category",
-	"invalid_chart_series",
-	"invalid_chart_value",
-	"invalid_chart_option",
-	"state_machine_too_large",
-	"invalid_state",
-	"unknown_initial_state",
-	"invalid_composite",
-	"composite_initial_defaulted",
-	"final_has_outgoing",
-	"underbranched_choice",
-	"gantt_too_large",
-	"invalid_gantt_date",
-	"invalid_gantt_span",
-	"invalid_gantt_phase",
-	"invalid_gantt_progress",
-	"gantt_dependency_cycle",
-	"gantt_schedule_conflict",
-	"er_too_large",
-	"invalid_entity",
-	"invalid_field",
-	"unknown_relationship_field",
-	"invalid_relationship",
-	"class_too_large",
-	"invalid_class",
-	"invalid_member",
-	"invalid_generalization",
-	"org_chart_too_large",
-	"invalid_person",
-	"invalid_reporting_line",
-	"venn_too_large",
-	"invalid_venn_set",
-	"invalid_venn_region",
-	"journey_too_large",
-	"invalid_journey_stage",
-	"invalid_journey_step",
-	"sankey_too_large",
-	"invalid_sankey_node",
-	"invalid_sankey_flow",
-	"sankey_cycle",
-	"wireframe_too_large",
-	"invalid_screen",
-	"invalid_component",
-	"quadrant_too_large",
-	"invalid_quadrant_point",
-	"invalid_quadrant_text",
-	"request_too_large",
-	"generic_label",
-	"label_too_long",
-	"quality_below_threshold",
-	"render_failed",
-	"png_unavailable",
-	"text_overflow",
-	"arrow_binding_invalid",
-	"arrow_overlap",
-	"export_invalid_scene",
-	"storage_read_failed",
-	"storage_write_failed",
-	"unsupported_artifact_format",
-	"patch_source_unavailable",
-	"unknown_patch_target",
-	"unsupported_patch_operation",
-	"patch_preserve_connectivity_failed",
-	"patch_output_invalid",
-	"duplicate_element_id",
-	"duplicate_layer_id",
-	"invalid_canvas_binding",
-	"invalid_canvas_composition",
-	"invalid_canvas_geometry",
-	"invalid_polygon",
-	"canvas_limit_exceeded",
-	"invalid_z_order",
-	"unknown_layout_target",
-	"unknown_icon",
-	"invalid_canvas_icon",
-	"reference_resolved",
-	"icon_dropped",
-	"icon_filled",
-	"icon_possible",
-	...FLOWCHART_COVERAGE_CODES,
-] as const;
-
-export const CodeModeIssueCodeSchema = Object.assign(literals(CODE_MODE_ISSUE_CODES), {
-	options: CODE_MODE_ISSUE_CODES,
-});
-export type CodeModeIssueCode = typeof CodeModeIssueCodeSchema.Type;
-
-const CodeModeIssueKindSchema = literals([
-	"request",
-	"diagram",
-	"node",
-	"edge",
-	"group",
-	"lane",
-	"element",
-	"layer",
-	"artifact",
-]);
-const CodeModeIssueStageSchema = literals([
-	"input",
-	"canvas",
-	"flowchart",
-	"mindmap",
-	"quality",
-	"render",
-	"export",
-	"storage",
-	"coverage",
-]);
-
-export const CodeModeIssueRef = Schema.Struct({
-	kind: CodeModeIssueKindSchema,
-	id: optionalContract(NonEmptyString),
-	path: optionalContract(NonEmptyString),
-}).annotate({ identifier: undefined });
-
-export interface CodeModeIssueRef extends Schema.Schema.Type<typeof CodeModeIssueRef> {}
-
-export const CodeModeIssue = Schema.Struct({
-	code: CodeModeIssueCodeSchema,
-	/** info notes report what a build did for the caller; nothing to fix. */
-	severity: literals(["error", "warning", "info"]),
-	stage: CodeModeIssueStageSchema,
-	ref: optionalContract(CodeModeIssueRef),
-	message: RequiredNonEmptyString,
-	hint: RequiredNonEmptyString,
-}).annotate({ identifier: undefined });
-
-export interface CodeModeIssue extends Schema.Schema.Type<typeof CodeModeIssue> {}
 
 export const FLOWCHART_NODE_KINDS = ["start", "process", "decision", "end"] as const;
 export const FlowchartNodeKindSchema = Object.assign(literals(FLOWCHART_NODE_KINDS), {
@@ -1548,84 +1355,7 @@ export const BuildQuadrantChartToolInputSchema = Schema.Struct({
 });
 export type BuildQuadrantChartToolInput = typeof BuildQuadrantChartToolInputSchema.Type;
 
-export interface MindmapTopicInput {
-	label: string;
-	children?: MindmapTopicInput[] | undefined;
-}
-
-function hasSemanticText(value: string): boolean {
-	const cleaned = cleanToolString(value);
-	return cleaned.length > 0 && !/^(?:""|''|``)$/.test(cleaned);
-}
-
-const semanticTextMinimumLength = 1;
-const MindmapSemanticString = Schema.String.check(
-	Schema.isMinLength(semanticTextMinimumLength, {
-		message: `Too small: expected string to have >=${semanticTextMinimumLength} characters`,
-	}),
-	Schema.makeFilter(hasSemanticText, {
-		message: "Must contain semantic text after normalization.",
-	}),
-);
-
-const MindmapTopicReference: Schema.Codec<MindmapTopicInput, MindmapTopicInput> = requiredObject(
-	Schema.suspend(() => MindmapTopic).annotate({ identifier: "__schema0" }),
-);
-
-export const MindmapTopic: Schema.Codec<MindmapTopicInput, MindmapTopicInput> = Schema.Struct({
-	label: requiredString(MindmapSemanticString),
-	children: Schema.optionalKey(Schema.Array(MindmapTopicReference).pipe(Schema.mutable)),
-});
-export const MindmapTopicSchema = MindmapTopicReference;
-
-export const MindmapSpecLayout = Schema.Struct({
-	direction: literals(["LR", "RL"])
-		.annotate({ default: "LR" })
-		.pipe(Schema.withDecodingDefaultKey(Effect.succeed("LR"))),
-}).annotate({ identifier: undefined });
-
-export interface MindmapSpecLayout extends Schema.Schema.Type<typeof MindmapSpecLayout> {}
-
-const mindmapLayoutDefault: { readonly direction: "LR" } = {
-	direction: "LR",
-};
-const MindmapLayoutWithDefault = MindmapSpecLayout.annotate({
-	default: mindmapLayoutDefault,
-}).pipe(
-	Schema.withDecodingDefaultKey(Effect.succeed(mindmapLayoutDefault)),
-	Schema.annotateKey({ [contractDefaultAnnotation]: mindmapLayoutDefault }),
-);
-const MindmapSpecContract = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: requiredString(MindmapSemanticString),
-	root: MindmapTopicReference,
-	layout: MindmapLayoutWithDefault,
-	style: DiagramStyleWithDefault,
-});
-export const MindmapSpec = MindmapSpecContract.annotate({
-	identifier: undefined,
-});
-
-export interface MindmapSpec extends Schema.Schema.Type<typeof MindmapSpec> {}
-
-const BuildMindmapRequestContract = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(MindmapSpecContract),
-	options: optionalContract(BuildFlowchartOptions),
-});
-export const BuildMindmapRequest = BuildMindmapRequestContract.annotate({ identifier: undefined });
-
-export interface BuildMindmapRequest extends Schema.Schema.Type<typeof BuildMindmapRequest> {}
-export const BuildMindmapRequestSchema = BuildMindmapRequestContract;
 /** The mindmap spec a model authors; style is always the Sketchi palette. */
-export const MindmapToolSpecSchema = MindmapSpecContract.mapFields(
-	({ style: _style, ...fields }) => fields,
-);
-export const BuildMindmapToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(MindmapToolSpecSchema),
-});
-export type BuildMindmapToolInput = typeof BuildMindmapToolInputSchema.Type;
 
 export const ScenePoint = Schema.Struct({
 	x: FiniteNumber.pipe(Schema.mutableKey),
@@ -1702,7 +1432,6 @@ export const CanvasNodeIcon = Schema.Struct({
 export interface CanvasNodeIcon extends Schema.Schema.Type<typeof CanvasNodeIcon> {}
 
 /** A hand-drawn icon: a few primitives on a 24-unit grid. */
-export const IconRecipeSchema = CoreIconRecipeSchema;
 
 /**
  * Derived forms of one icon slug, the hand-drawn recipe and the exact SVG;
@@ -1956,34 +1685,6 @@ export const CreateCanvasRequest = Schema.Struct({
 
 export interface CreateCanvasRequest extends Schema.Schema.Type<typeof CreateCanvasRequest> {}
 
-const ExcalidrawElement = Schema.Record(Schema.String, Schema.Unknown).check(
-	Schema.makeFilter(
-		(value) =>
-			typeof value["id"] === "string" &&
-			value["id"].length > 0 &&
-			typeof value["type"] === "string" &&
-			value["type"].length > 0,
-		{ message: "Invalid input" },
-	),
-);
-
-export const ExcalidrawScene = Schema.Struct({
-	appState: Schema.Record(Schema.String, Schema.Unknown),
-	elements: Schema.Array(ExcalidrawElement).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface ExcalidrawScene extends Schema.Schema.Type<typeof ExcalidrawScene> {}
-
-export const ExcalidrawFile = Schema.Struct({
-	...ExcalidrawScene.fields,
-	files: Schema.Record(Schema.String, Schema.Unknown),
-	source: RequiredNonEmptyString,
-	type: stringLiteral("excalidraw"),
-	version: numberLiteral(2),
-}).annotate({ identifier: "ExcalidrawFile" });
-
-export interface ExcalidrawFile extends Schema.Schema.Type<typeof ExcalidrawFile> {}
-
 export const GetArtifactRequest = Schema.Struct({
 	artifactId: RequiredNonEmptyString,
 	format: optionalContract(ArtifactFormatSchema),
@@ -2192,56 +1893,8 @@ export interface ApplyDiagramPatchRequest extends Schema.Schema.Type<
 > {}
 
 export type NormalizedFlowchartSpec = typeof NormalizedFlowchartSpecSchema.Type;
-export type NormalizedMindmapSpec = typeof NormalizedMindmapSpecSchema.Type;
+
 export type NormalizedSequenceDiagramSpec = typeof NormalizedSequenceDiagramSpecSchema.Type;
-
-export const NormalizedMindmapTopic = Schema.Struct({
-	id: NonEmptyString,
-	label: NonEmptyString,
-	children: Schema.Array(
-		Schema.suspend((): Schema.Codec<NormalizedMindmapTopic> => NormalizedMindmapTopic),
-	).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface NormalizedMindmapTopic extends Schema.Schema.Type<typeof NormalizedMindmapTopic> {}
-
-export interface QualityCheck {
-	readonly code: string;
-	readonly passed: boolean;
-	readonly severity: "error" | "warning";
-	readonly message: string;
-	readonly refs: CodeModeIssueRef[];
-}
-
-export interface QualityReport {
-	readonly accepted: boolean;
-	readonly score: number;
-	readonly threshold: number;
-	readonly summary: { readonly nodeCount: number; readonly edgeCount: number };
-	readonly checks: QualityCheck[];
-}
-
-export interface ArtifactFormatRef {
-	readonly format: ArtifactFormat;
-	readonly mimeType: string;
-	readonly url?: string;
-	readonly expiresAt?: string;
-	readonly inline?: unknown;
-	readonly sizeBytes?: number;
-}
-
-export interface ArtifactBundle {
-	readonly artifactId: string;
-	readonly diagramId: string;
-	readonly formats: ArtifactFormatRef[];
-	readonly provenance?: ArtifactProvenance;
-}
-
-export interface PartialArtifactBundle {
-	readonly artifactId?: string;
-	readonly diagramId?: string;
-	readonly formats?: ArtifactFormatRef[];
-}
 
 /** A flowchart document as the build read it: strings cleaned, id and direction filled. */
 const NormalizedFlowchartSpecSchema = Schema.Struct({
@@ -2249,13 +1902,7 @@ const NormalizedFlowchartSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	direction: literals(FLOWCHART_DIRECTIONS),
 });
-const NormalizedMindmapSpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	root: NormalizedMindmapTopic,
-	layout: Schema.Struct({ direction: literals(["LR", "RL"]) }),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
+
 const NormalizedSequenceDiagramSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -2406,42 +2053,6 @@ const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 }));
 export type NormalizedChartSpec = typeof NormalizedChartSpecSchema.Type;
-const QualityCheckSchema = Schema.Struct({
-	code: Schema.String,
-	passed: Schema.Boolean,
-	severity: literals(["error", "warning"]),
-	message: Schema.String,
-	refs: Schema.Array(CodeModeIssueRef).pipe(Schema.mutable),
-});
-const QualityReportSchema = Schema.Struct({
-	accepted: Schema.Boolean,
-	score: Schema.Number,
-	threshold: Schema.Number,
-	summary: Schema.Struct({
-		nodeCount: Schema.Number,
-		edgeCount: Schema.Number,
-	}),
-	checks: Schema.Array(QualityCheckSchema).pipe(Schema.mutable),
-});
-const ArtifactFormatRefSchema = Schema.Struct({
-	format: ArtifactFormatSchema,
-	mimeType: Schema.String,
-	url: optionalContract(Schema.String),
-	expiresAt: optionalContract(Schema.String),
-	inline: optionalContract(Schema.Unknown),
-	sizeBytes: optionalContract(Schema.Number),
-});
-const ArtifactBundleSchema = Schema.Struct({
-	artifactId: Schema.String,
-	diagramId: Schema.String,
-	formats: Schema.Array(ArtifactFormatRefSchema).pipe(Schema.mutable),
-	provenance: optionalContract(ArtifactProvenance),
-});
-const PartialArtifactBundleSchema = Schema.Struct({
-	artifactId: optionalContract(Schema.String),
-	diagramId: optionalContract(Schema.String),
-	formats: optionalContract(Schema.Array(ArtifactFormatRefSchema).pipe(Schema.mutable)),
-});
 
 export const BuildFlowchartAccepted = Schema.Struct({
 	ok: booleanLiteral(true),
@@ -2504,41 +2115,6 @@ export const EditFlowchartResultSchema = Schema.Union([
 	EditFlowchartRejected,
 ]);
 export type EditFlowchartResult = typeof EditFlowchartResultSchema.Type;
-
-export const BuildMindmapAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedMindmapSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildMindmapAccepted extends Schema.Schema.Type<typeof BuildMindmapAccepted> {}
-export const BuildMindmapRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_mindmap",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedMindmapSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildMindmapRejected extends Schema.Schema.Type<typeof BuildMindmapRejected> {}
-export const BuildMindmapResultSchema = Schema.Union([BuildMindmapAccepted, BuildMindmapRejected]);
-export type BuildMindmapResult = typeof BuildMindmapResultSchema.Type;
 
 export const BuildSequenceDiagramAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

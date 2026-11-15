@@ -9,11 +9,11 @@ import {
 	sankeyLayoutIssues,
 	sankeyNodeText,
 	sankeyWeightedCrossings,
-	type RenderedDiagramScene,
 } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
 
 /** A node the prompt names, by every form its label may take. */
 export interface SankeyScenarioNode {

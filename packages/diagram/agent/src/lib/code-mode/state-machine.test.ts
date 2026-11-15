@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
-import { groupRegionIssues, mediaPlayerStateMachine } from "@sketchi/diagram-core";
-import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import { groupRegionIssues, type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import { mediaPlayerStateMachine } from "@sketchi/diagram-core";
+import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
 import { BuildStateMachineResultSchema } from "./contract.js";

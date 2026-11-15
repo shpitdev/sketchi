@@ -1,8 +1,5 @@
-import {
-	CANONICAL_DOCUMENT_SPECS,
-	ExcalidrawFile,
-	RenderedDiagramSceneSchema,
-} from "@sketchi/diagram-agent";
+import { CANONICAL_DOCUMENT_SPECS, RenderedDiagramSceneSchema } from "@sketchi/diagram-agent";
+import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import {
 	diagramFixtures,
 	FLOWCHART_MAX_NODES,
@@ -12,11 +9,14 @@ import {
 } from "@sketchi/diagram-core";
 import { diagramScenarios, scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
 import { Schema } from "effect";
-import type { CloudflareAiGateway, CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
+import {
+	type CloudflareAiGateway,
+	type CloudflareAiGatewayProvider,
+} from "@sketchi/diagram-generation";
 import { describe, expect, it } from "vitest";
 
 import { aiEnvironment } from "../bindings/ai-env.server";
-import type { StudioEnv } from "../bindings/studio-env.server";
+import { type StudioEnv } from "../bindings/studio-env.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 import { resultHttpStatus } from "../runtime/http-status.server";
 import { buildFailure, handleGenerateDiagramRequest } from "./api.server";

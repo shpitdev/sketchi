@@ -1,22 +1,30 @@
 import { Result } from "effect";
 import {
 	type GanttValidationError,
-	CANVAS_SPEC_VERSION,
-	estimateTextWidth,
 	formatGanttDay,
 	ganttRows,
 	ganttTaskSchedule,
 	parseGanttDay,
-	SKETCHI_DIAGRAM_PALETTE,
 	validateGanttDiagram,
-	wrapTextToWidth,
 	type GanttDiagram,
 	type GanttSchedule,
 	type GanttTask,
 	type TimelineDiagram,
 } from "@sketchi/diagram-core";
+import {
+	CANVAS_SPEC_VERSION,
+	estimateTextWidth,
+	SKETCHI_DIAGRAM_PALETTE,
+	wrapTextToWidth,
+	CHART_SERIES_COLORS,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasLineElement as LineSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
-import { CHART_SERIES_COLORS } from "./chart.js";
 import {
 	GANTT_BAND_FONT_SIZE,
 	GANTT_TICK_FONT_SIZE,
@@ -50,14 +58,7 @@ import {
 	type RouteRequest,
 	type RouteSegment,
 } from "./gantt-routing.js";
-import type {
-	ArrowSceneElement,
-	LineSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	SceneElement,
-	TextSceneElement,
-} from "./scene.js";
+
 import { breakRulesUnderText } from "./scene-rules.js";
 import { timelineCaptions } from "./timeline-captions.js";
 

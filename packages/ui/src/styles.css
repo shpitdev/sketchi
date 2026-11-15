@@ -1,7 +1,7 @@
 /* =====================================================================
    @sketchi/ui — shadcn semantic tokens on the shared "Drafting Studio"
    palette. Every neutral, accent, line, radius, and shadow value lives in
-   packages/diagram/ui/src/theme.css; this file only maps shadcn's names onto
+   packages/editor/src/theme.css; this file only maps shadcn's names onto
    those tokens so the primitives in ./components inherit the same system.
 
    Each Tailwind app imports this file first, then adds `@source` for its
@@ -12,7 +12,7 @@
 @import "tw-animate-css";
 /* The theme's element and .sk-* rules sit in the base layer so Tailwind
    utilities, such as a Button's text colour, win over them. */
-@import "../../diagram/ui/src/theme.css" layer(base);
+@import "../../editor/src/theme.css" layer(base);
 
 @source "./components";
 

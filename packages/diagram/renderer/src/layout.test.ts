@@ -3,14 +3,14 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	candidateRouteQuality,
-	flowchartFixture,
 	getCanvasValidationIssues,
-	parseFlowchartDiagram,
-	routingFixtures,
 	routingQualityFindings,
 	routingQualityScale,
-} from "@sketchi/diagram-core";
-import { renderIntermediateDiagram, type NodeSceneElement, type ScenePoint } from "./scene";
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasPoint as ScenePoint,
+} from "@sketchi/drawing";
+import { flowchartFixture, parseFlowchartDiagram, routingFixtures } from "@sketchi/diagram-core";
+import { renderIntermediateDiagram } from "./scene";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];

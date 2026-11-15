@@ -1,12 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { BuildFlowchartResult } from "@sketchi/diagram-agent";
+import { type BuildFlowchartResult } from "@sketchi/diagram-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@sketchi/diagram-ui", () => ({
-	DiagramPreview: () => <div data-testid="diagram-preview" />,
+vi.mock("@sketchi/editor", () => ({
+	DrawingEditor: () => <div data-testid="diagram-preview" />,
 }));
 
-import type { DiagramToolPart } from "./build-result";
+import { type DiagramToolPart } from "./build-result";
 import { DEPLOY_PIPELINE_SPEC } from "./deploy-pipeline-sample";
 import { DiagramToolCard, liveInputTail } from "./diagram-tool-card";
 

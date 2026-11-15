@@ -3,7 +3,7 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
-import { parseIntermediateDiagram, SKETCHI_DIAGRAM_STYLE } from "../intermediate";
+import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import {
 	type SequenceDiagram,
 	SEQUENCE_MAX_ISSUES,
@@ -112,27 +112,6 @@ describe("Sequence diagram type", () => {
 		expect(parseSequenceDiagram(input)).toMatchObject({
 			failure: expect.any(SequenceValidationError),
 		});
-	});
-
-	it("is not a node/edge graph: the graph IR refuses the sequence type", () => {
-		expect(
-			parseIntermediateDiagram({
-				id: "sequence-as-graph",
-				title: "Sequence as graph",
-				type: "sequence",
-				nodes: [{ id: "a", label: "A" }],
-			}),
-		).toMatchObject({
-			failure: { message: expect.stringMatching(/Expected "flowchart" \| "mindmap"/u) },
-		});
-		expect(
-			parseSequenceDiagram({
-				id: "graph-as-sequence",
-				title: "Graph as sequence",
-				type: "sequence",
-				nodes: [{ id: "a", label: "A" }],
-			}),
-		).toMatchObject({ failure: { message: expect.stringMatching(/participants/u) } });
 	});
 
 	it("derives activations from answered calls and nests re-entrant ones", () => {

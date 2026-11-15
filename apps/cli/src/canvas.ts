@@ -2,14 +2,14 @@ import {
 	formatContractSchemaError,
 	CanvasSpec,
 	CreateCanvasResultSchema,
-	ExcalidrawFile,
 } from "@sketchi/diagram-agent";
+import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema, SchemaIssue, Result } from "effect";
 
-import type { BuiltDiagram, StoredDiagram } from "./contracts.js";
+import { type BuiltDiagram, type StoredDiagram } from "./contracts.js";
 import { validateStorageId } from "./document.js";
 import { CliCanvasError, CliInputError, CliValidationError } from "./errors.js";
-import type { InputSource } from "./internal/effect-cli.js";
+import { type InputSource } from "./internal/effect-cli.js";
 import { InputReader } from "./input.js";
 import { DiagramStore } from "./storage.js";
 import { API_REQUEST_TIMEOUT, MAX_API_RESPONSE_BYTES, readBoundedText } from "./response-body.js";

@@ -1,10 +1,5 @@
-import {
-	estimateTextWidth,
-	sankeyColumns,
-	sankeyNodeTotals,
-	wrapTextToWidth,
-	type SankeyDiagram,
-} from "@sketchi/diagram-core";
+import { estimateTextWidth, wrapTextToWidth } from "@sketchi/drawing";
+import { sankeyColumns, sankeyNodeTotals, type SankeyDiagram } from "@sketchi/diagram-core";
 
 import { formatValue, unitParts } from "./chart-scale.js";
 

@@ -10,10 +10,10 @@ import {
 	parseErEnd,
 	parseErFieldShorthand,
 } from "@sketchi/diagram-core";
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
 
 /** A field the prompt states, with every marker it states. */
 export interface ErScenarioField {

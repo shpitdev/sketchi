@@ -1,6 +1,10 @@
-import { boundLabelWidth } from "@sketchi/diagram-core";
+import {
+	boundLabelWidth,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
-import type { RenderedDiagramScene, SceneElement, TextSceneElement } from "./scene.js";
 import {
 	isWireframeInteractive,
 	WIREFRAME_SPACING,

@@ -5,6 +5,12 @@ import { describe, expect, it } from "vitest";
 import {
 	getCanvasValidationIssues,
 	groupRegionIssues,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
+import {
 	type OrgChartDiagram,
 	orgChartFixture,
 	orgChartStressFixtures,
@@ -15,12 +21,6 @@ import {
 import { renderDiagram } from "../diagram.js";
 import { layoutOrgChartDiagram, renderOrgChartDiagram } from "../org-chart.js";
 import { orgChartLayoutIssues } from "../org-chart-readout.js";
-import type {
-	ArrowSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	TextSceneElement,
-} from "../scene.js";
 
 const chart = (people: unknown[], extra: Record<string, unknown> = {}): OrgChartDiagram =>
 	parseOrgChartDiagram(

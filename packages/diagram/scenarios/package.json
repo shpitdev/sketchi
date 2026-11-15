@@ -14,11 +14,12 @@
 		"@effect/platform-node": "catalog:",
 		"@excalidraw/excalidraw": "0.18.1",
 		"@sketchi/diagram-core": "workspace:*",
-		"@sketchi/diagram-excalidraw": "workspace:*",
+		"@sketchi/drawing": "workspace:*",
 		"@sketchi/diagram-generation": "workspace:*",
 		"@sketchi/diagram-renderer": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"effect": "catalog:",
-		"linkedom": "0.18.14"
+		"linkedom": "0.18.14",
+		"@sketchi/diagrams": "workspace:*"
 	}
 }

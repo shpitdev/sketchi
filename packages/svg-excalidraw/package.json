@@ -17,7 +17,8 @@
 		"earcut": "3.2.4",
 		"fast-xml-parser": "5.11.2",
 		"fractional-indexing": "4.0.0",
-		"svg-pathdata": "9.0.0"
+		"svg-pathdata": "9.0.0",
+		"@sketchi/drawing": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/clipper-lib": "6.4.0",

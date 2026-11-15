@@ -1,12 +1,11 @@
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
 import { flowchartDiagramFromSpec, type FlowchartSpec } from "@sketchi/diagram-agent";
-import { mindmapFixture } from "@sketchi/diagram-core";
-import {
-	renderIntermediateDiagram,
-	renderMindmapDiagram,
-	type RenderedDiagramScene,
-} from "@sketchi/diagram-renderer";
-import { ArtifactCanvas } from "@sketchi/diagram-ui";
+import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
+import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderMindmap } from "@sketchi/diagrams/mindmap";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 
@@ -34,7 +33,7 @@ const EXAMPLES: Record<string, CuratedExample> = {
 		title: "Public mindmap generation",
 		blurb: "Generated from a semantic nested topic hierarchy — pan and zoom to inspect it.",
 		// This curated fixture is maintained in source; a render failure is a fixture defect.
-		scene: renderMindmapDiagram(mindmapFixture).pipe(Result.getOrThrow),
+		scene: renderMindmap(mindmapFixture),
 	},
 	"how-it-works": {
 		title: "How Sketchi works",
@@ -100,7 +99,13 @@ function ExampleRoute() {
 
 			<section className="artifact-view__stage">
 				{example && scene ? (
-					<ArtifactCanvas mode="view" scene={scene} title={example.title} />
+					<DrawingEditor
+						title={example.title}
+						revision={JSON.stringify(scene)}
+						scene={convertSceneToExcalidraw(scene)}
+						viewModeEnabled={true}
+						zenModeEnabled={true}
+					/>
 				) : (
 					<p className="artifact-view__message artifact-view__message--error">
 						That example doesn&rsquo;t exist.

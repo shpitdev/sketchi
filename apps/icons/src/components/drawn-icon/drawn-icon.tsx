@@ -1,6 +1,6 @@
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { type IconRecipe } from "@sketchi/drawing";
 
-import type { PreviewMode } from "../preview-toggle/index.js";
+import { type PreviewMode } from "../preview-toggle/index.js";
 import { RecipePreview } from "../recipe-preview/index.js";
 
 /**

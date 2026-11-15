@@ -4,8 +4,12 @@ import { describe, expect, it } from "vitest";
 
 import {
 	getCanvasValidationIssues,
-	parseVennDiagram,
 	SKETCHI_DIAGRAM_PALETTE,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
+import {
+	parseVennDiagram,
 	VENN_COLORS,
 	vennFixture,
 	vennStressFixtures,
@@ -13,7 +17,7 @@ import {
 } from "@sketchi/diagram-core";
 
 import { renderDiagram } from "../diagram.js";
-import type { RenderedDiagramScene, TextSceneElement } from "../scene.js";
+
 import {
 	contrastRatio,
 	renderVennDiagram,

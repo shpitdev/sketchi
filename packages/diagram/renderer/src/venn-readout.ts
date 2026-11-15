@@ -1,6 +1,10 @@
-import { estimateTextWidth } from "@sketchi/diagram-core";
+import {
+	estimateTextWidth,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
-import type { RenderedDiagramScene, SceneElement, TextSceneElement } from "./scene.js";
 import {
 	insideClearance,
 	outsideClearance,

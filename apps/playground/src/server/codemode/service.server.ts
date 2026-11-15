@@ -1,6 +1,10 @@
 import "@tanstack/react-start/server-only";
 
 import {
+	buildCanonicalDocument,
+	type CanonicalDiagramDocument,
+	type CanonicalBuildResult,
+	type BuildFlowchartOptions,
 	applyDiagramPatch,
 	buildFlowchart,
 	editFlowchart,
@@ -26,10 +30,8 @@ import {
 	searchIcons,
 	makeObjectBucketArtifactStorage,
 	type ApplyDiagramPatchResult,
-	type ArtifactFormat,
 	type BuildFlowchartResult,
 	type EditFlowchartResult,
-	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildGanttResult,
@@ -51,6 +53,9 @@ import {
 	type SearchIconsResult,
 	type StoredArtifactFormat,
 } from "@sketchi/diagram-agent";
+
+import { type BuildMindmapResult } from "@sketchi/diagrams/mindmap/build";
+import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { withSpanContent } from "@sketchi/observability";
 import { Context, Effect, Layer } from "effect";
 
@@ -71,6 +76,11 @@ import { playgroundIconCatalog } from "./icon-catalog.server";
 export type CodeModeRequestContext = PlaygroundBindings | PlaygroundIds | PlaygroundRequestMetadata;
 
 export interface PlaygroundCodeModeShape {
+	readonly buildDocument: (
+		document: CanonicalDiagramDocument,
+		options?: BuildFlowchartOptions,
+	) => Effect.Effect<CanonicalBuildResult, never, CodeModeRequestContext>;
+
 	readonly applyDiagramPatch: (
 		input: unknown,
 	) => Effect.Effect<ApplyDiagramPatchResult, never, CodeModeRequestContext>;
@@ -251,6 +261,13 @@ export const PlaygroundCodeModeLive = Layer.effect(
 		);
 
 		return PlaygroundCodeMode.of({
+			buildDocument: Effect.fn("playground.codeMode.buildDocument")((document, options) =>
+				withSpanContent(
+					{ document, options },
+					provideRequestCodeMode(buildCanonicalDocument(document, options)),
+				),
+			),
+
 			applyDiagramPatch: Effect.fn("playground.codeMode.applyDiagramPatch")((input) =>
 				withSpanContent(input, provideRequestCodeMode(applyDiagramPatch(input))),
 			),

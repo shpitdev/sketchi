@@ -1,5 +1,8 @@
-import type { ExcalidrawInitialDataState, ExcalidrawProps } from "@excalidraw/excalidraw/types";
-import type { createFoldedRouteRelease } from "@sketchi/diagram-ui";
+import {
+	type ExcalidrawInitialDataState,
+	type ExcalidrawProps,
+} from "@excalidraw/excalidraw/types";
+import type { createFoldedRouteRelease } from "@sketchi/editor";
 import { Button } from "@sketchi/ui/components/button";
 import { Spinner } from "@sketchi/ui/components/spinner";
 import { Pencil, RotateCcw } from "lucide-react";
@@ -19,14 +22,14 @@ let editorLoad: Promise<LoadedEditor> | undefined;
 
 /**
  * Fetches Excalidraw, its stylesheet and the scene together, once. Excalidraw
- * comes through diagram-ui's loader, which serves its fonts from this site;
- * diagram-ui itself loads here too, so none of it is on the page before Edit.
+ * comes through editor's loader, which serves its fonts from this site;
+ * editor itself loads here too, so none of it is on the page before Edit.
  * A failed load is forgotten so a retry starts over.
  */
 function loadEditor(): Promise<LoadedEditor> {
 	editorLoad ??= Promise.all([
-		import("@sketchi/diagram-ui").then(({ loadExcalidraw }) => loadExcalidraw()),
-		import("@sketchi/diagram-ui"),
+		import("@sketchi/editor").then(({ loadExcalidraw }) => loadExcalidraw()),
+		import("@sketchi/editor"),
 		import("@excalidraw/excalidraw/index.css"),
 		fetch(HOME_DIAGRAM.scene).then((response) => {
 			if (!response.ok) throw new Error(`${HOME_DIAGRAM.scene} returned ${response.status}`);

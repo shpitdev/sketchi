@@ -33,7 +33,7 @@ from `scripts/lib/worker-apps.mjs`.
 | ------------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
 | Diagram contracts   | `packages/diagram/core`                  | Effect Schema IR plus pure semantic validation                                   |
 | Layout              | `packages/diagram/renderer`              | deterministic scene construction                                                 |
-| Excalidraw          | `packages/diagram/excalidraw`            | deterministic conversion and real-scene validation                               |
+| Excalidraw          | `packages/drawing`            | deterministic conversion and real-scene validation                               |
 | Model generation    | `packages/diagram/generation`            | typed provider service, retry, timeout, decode, and candidate summaries          |
 | Product build       | `packages/diagram/agent`                 | canonical normalize, validate, quality, render, export, and artifact transaction |
 | Scenario evaluation | `packages/diagram/scenarios`             | maintained scenarios, pure grading, and internal Effect tooling                  |
@@ -41,7 +41,7 @@ from `scripts/lib/worker-apps.mjs`.
 | Icon drawing        | `packages/icons/draw`                    | a logo in, a judged hand-drawn recipe out: author rounds, renders, and the judge |
 | Studio persistence  | `packages/studio/projects`               | typed ownership and scoped R2 persistence services                               |
 | Telemetry           | `packages/observability`                 | span rows with full content, batched per request to a Pipelines stream           |
-| UI                  | `packages/diagram/ui` and app components | React rendering and local view state                                             |
+| UI                  | `packages/editor` and app components | React rendering and local view state                                             |
 | UI primitives       | `packages/ui`                            | shared shadcn primitives and tokens for the Tailwind apps                        |
 
 Studio chat, HTTP `buildFlowchart`, and MCP `execute` call the same

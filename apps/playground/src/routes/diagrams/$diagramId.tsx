@@ -1,4 +1,4 @@
-import { ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
+import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAsyncResource } from "@/features/resources/use-async-resource";
 
@@ -44,14 +44,14 @@ function DiagramRoute() {
 					<p className="artifact-view__message artifact-view__message--error">{state.message}</p>
 				) : null}
 				{state.status === "ready" ? (
-					<div className="sketchi-artifact-canvas" data-mode="view">
-						<ExcalidrawSceneCanvas
+					<>
+						<DrawingEditor
 							revision={state.diagram.savedAt ?? "generated"}
 							scene={state.scene}
 							title={state.diagram.title}
 							viewModeEnabled
 						/>
-					</div>
+					</>
 				) : null}
 			</section>
 		</main>

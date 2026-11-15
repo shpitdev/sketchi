@@ -19,6 +19,8 @@
 		}
 	},
 	"dependencies": {
-		"effect": "catalog:"
+		"effect": "catalog:",
+		"@sketchi/drawing": "workspace:*",
+		"@sketchi/diagrams": "workspace:*"
 	}
 }

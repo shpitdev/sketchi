@@ -1,7 +1,6 @@
 import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
+import { CANVAS_ICON_ELEMENT, CANVAS_LIMITS } from "@sketchi/drawing";
 import {
-	CANVAS_ICON_ELEMENT,
-	CANVAS_LIMITS,
 	CHART_RULES,
 	CLASS_RULES,
 	DIAGRAM_NODE_COLOR_NAMES,
@@ -24,8 +23,8 @@ import {
 	WIREFRAME_RULES,
 } from "@sketchi/diagram-core";
 import SKETCHI_CODE_MODE_TYPES from "./code-mode-types.generated.txt?raw";
-import type { CodeModeOperation } from "./types";
-import type { CodeExample, DocsResult, SearchHit } from "../mcp-docs.server";
+import { type CodeModeOperation } from "./types";
+import { type CodeExample, type DocsResult, type SearchHit } from "../mcp-docs.server";
 
 export interface CatalogEntry {
 	id: string;
@@ -587,7 +586,7 @@ export const catalog: CatalogEntry[] = [
 		keywords: ["build", "mindmap", "topic", "hierarchy", "tree", "branch"],
 		snippet: "Create a mindmap from a semantic nested topic hierarchy.",
 		content: [
-			"buildMindmap accepts a semantic MindmapSpec with one nested root topic. Do not supply coordinates, edges, or Excalidraw JSON. Builds use the fixed Sketchi palette.",
+			"buildMindmap accepts a semantic MindmapDocument with one nested root topic. Do not supply coordinates, edges, or Excalidraw JSON. Builds use the fixed Sketchi palette.",
 			"The semantic-input restriction does not limit outputs: scene, Excalidraw, and PNG remain intentional output formats selected through artifact options.",
 			"Children remain in caller order and receive deterministic path identifiers such as topic-0-1-0.",
 			"Use nested children to express branches and depth. The public boundary supports LR or RL hierarchy layout.",
@@ -1310,9 +1309,9 @@ export const catalog: CatalogEntry[] = [
 		topic: "overview",
 		keywords: ["non-goal", "excalidraw", "raw", "json", "structural"],
 		snippet:
-			"Native Excalidraw is an output format. Prefer a semantic flowchart document, MindmapSpec, SequenceDiagramSpec, TimelineSpec, or ChartSpec input.",
+			"Native Excalidraw is an output format. Prefer a semantic flowchart document, MindmapDocument, SequenceDiagramSpec, TimelineSpec, or ChartSpec input.",
 		content:
-			"Do not use native Excalidraw JSON as build input. Use the flowchart document, nested MindmapSpec, SequenceDiagramSpec, TimelineSpec, ChartSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats; editFlowchart changes a flowchart and applyDiagramPatch any other diagram.",
+			"Do not use native Excalidraw JSON as build input. Use the flowchart document, nested MindmapDocument, SequenceDiagramSpec, TimelineSpec, ChartSpec, or the renderer-independent CanvasSpec v1; scene and Excalidraw remain intentional output formats; editFlowchart changes a flowchart and applyDiagramPatch any other diagram.",
 	},
 	{
 		id: "managed-thread-non-goal",

@@ -1,8 +1,13 @@
-import { Result, Schema } from "effect";
 import {
-	type DiagramValidationError,
+	type CanvasShapeKind as NodeSceneShape,
+	type CanvasElement as SceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasTextElement as TextSceneElement,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasFrameElement as FrameSceneElement,
+	type CanvasPoint as ScenePoint,
+	type CanvasSpec as RenderedDiagramScene,
 	CANVAS_NODE_ICON,
-	DIAGRAM_NODE_COLORS,
 	CANVAS_SPEC_VERSION,
 	AXIS_ALIGNED_EPSILON,
 	canvasBoundTextBox,
@@ -26,29 +31,12 @@ import {
 	segmentOverlapLength,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
-	type CanvasConnectorElement,
-	type CanvasElement,
-	type CanvasFrameElement,
-	type CanvasIconElement,
-	type CanvasLineElement,
 	type CanvasNodeIcon,
-	type CanvasPoint,
-	type CanvasShapeElement,
-	type CanvasShapeKind,
-	type CanvasSpec,
-	type CanvasTextElement,
 	DEFAULT_GLYPH_UNITS,
-	type DiagramEdge,
-	type DiagramGroup,
-	type DiagramNode,
-	type DiagramZoneKind,
-	type GraphNode,
 	boundLabelWidth,
 	estimateTextWidth,
 	wrapTextToWidth,
 	wrappedLabelWidth,
-	type IntermediateDiagram,
-	parseIntermediateDiagram,
 	arrowheadsNear,
 	candidateRouteQuality,
 	candidateTouches,
@@ -61,21 +49,23 @@ import {
 	routingWideBend,
 	sharedSegments,
 	touchingLines,
-	unavoidableCrossings,
 	wrapTextToUnits,
+} from "@sketchi/drawing";
+import { Result, Schema } from "effect";
+import {
+	type DiagramValidationError,
+	DIAGRAM_NODE_COLORS,
+	type DiagramEdge,
+	type DiagramGroup,
+	type DiagramNode,
+	type DiagramZoneKind,
+	type GraphNode,
+	type IntermediateDiagram,
+	parseIntermediateDiagram,
+	unavoidableCrossings,
 } from "@sketchi/diagram-core";
-import { curvedScene } from "./curved-routes.js";
 
-export type NodeSceneShape = CanvasShapeKind;
-export type SceneElement = CanvasElement;
-export type NodeSceneElement = CanvasShapeElement;
-export type TextSceneElement = CanvasTextElement;
-export type ArrowSceneElement = CanvasConnectorElement;
-export type LineSceneElement = CanvasLineElement;
-export type FrameSceneElement = CanvasFrameElement;
-export type IconSceneElement = CanvasIconElement;
-export type ScenePoint = CanvasPoint;
-export type RenderedDiagramScene = CanvasSpec;
+import { curvedScene } from "./curved-routes.js";
 
 const MIN_NODE_WIDTH = 184;
 const MIN_NODE_HEIGHT = 72;

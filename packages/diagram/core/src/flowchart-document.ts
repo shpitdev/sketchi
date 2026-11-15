@@ -2,12 +2,12 @@ import { Schema } from "effect";
 
 import {
 	DIAGRAM_NODE_SHAPES,
-	DrawnIconSchema,
 	DIAGRAM_ZONE_KINDS,
 	DiagramNodeColorSchema,
-	SKETCHI_DIAGRAM_STYLE,
 	type DiagramNodeShape,
 } from "./intermediate.js";
+import { DrawnIconSchema, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
+
 import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_GROUP_DEPTH,

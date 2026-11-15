@@ -1,4 +1,4 @@
-import type { IconRecipe } from "@sketchi/diagram-core";
+import { type IconRecipe } from "@sketchi/drawing";
 import { colorDistance, hexRgb, type MarkColor, sanitizeSvg } from "@sketchi/icon-catalog";
 import { rankLookAlikes } from "@sketchi/icon-catalog/look-alikes";
 import { Clock, Context, Effect, Result } from "effect";
@@ -15,7 +15,7 @@ import {
 } from "./author.js";
 import { IconInputError, IconRecipeError, IconTimeoutError } from "./errors.js";
 import { IconImaging, type IconImageExport, type IconImagePrepare } from "./imaging.js";
-import type { IconDrawInput, IconSource } from "./input.js";
+import { type IconDrawInput, type IconSource } from "./input.js";
 import {
 	decodeJudgeReply,
 	type IconJudgeVerdict,

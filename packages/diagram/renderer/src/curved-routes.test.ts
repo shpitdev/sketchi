@@ -4,14 +4,17 @@ import { describe, expect, it } from "vitest";
 import {
 	canvasOutlineContains,
 	canvasShapeOutline,
-	groupFixtures,
 	isCanvasComposedShape,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import {
+	groupFixtures,
 	parseIntermediateDiagram,
 	zoneFixtures,
 	zoneStressFixtures,
 } from "@sketchi/diagram-core";
 
-import { renderGraphDiagram, renderIntermediateDiagram, type RenderedDiagramScene } from "./scene";
+import { renderGraphDiagram, renderIntermediateDiagram } from "./scene";
 
 type Point = { readonly x: number; readonly y: number };
 type Box = {

@@ -6,9 +6,9 @@
  * sideways between two rows does so on a track of its own in the channel
  * between them, so no two lines share a run.
  */
-import { routingCorridorGap, routingQualityScale } from "@sketchi/diagram-core";
+import { routingCorridorGap, routingQualityScale } from "@sketchi/drawing";
 
-import type { GraphAnchor } from "./scene.js";
+import { type GraphAnchor } from "./scene.js";
 
 /** A class box to place: its size. */
 export interface ClassLayoutBox {

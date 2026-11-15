@@ -2,26 +2,25 @@ import { Result } from "effect";
 import {
 	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
+	SKETCHI_DIAGRAM_PALETTE,
+	wrapTextToWidth,
+	CHART_SERIES_COLORS,
+	type CanvasLineElement as LineSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasPoint as ScenePoint,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
+import {
 	quadrantGroupKey,
 	quadrantGroups,
 	QUADRANT_KEYS,
 	QuadrantValidationError,
-	SKETCHI_DIAGRAM_PALETTE,
 	validateQuadrantDiagram,
-	wrapTextToWidth,
 	type QuadrantDiagram,
 	type QuadrantKey,
 } from "@sketchi/diagram-core";
-
-import { CHART_SERIES_COLORS } from "./chart.js";
-import type {
-	LineSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	SceneElement,
-	ScenePoint,
-	TextSceneElement,
-} from "./scene.js";
 
 export const QUADRANT_MARK_ROLE = "quadrant-mark";
 

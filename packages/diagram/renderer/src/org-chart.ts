@@ -1,23 +1,31 @@
 import { Result } from "effect";
 import {
 	type OrgChartValidationError,
-	CANVAS_SPEC_VERSION,
-	canvasFrameNameBox,
-	canvasFrameNameWidth,
-	GROUP_OUTLINE_CLEARANCE,
-	estimateTextWidth,
 	type OrgChartDiagram,
 	type OrgPerson,
 	orgChartReports,
 	orgChartRoots,
 	orgPersonInitials,
-	SKETCHI_DIAGRAM_PALETTE,
 	validateOrgChartDiagram,
+} from "@sketchi/diagram-core";
+import {
+	CANVAS_SPEC_VERSION,
+	canvasFrameNameBox,
+	canvasFrameNameWidth,
+	GROUP_OUTLINE_CLEARANCE,
+	estimateTextWidth,
+	SKETCHI_DIAGRAM_PALETTE,
 	wrappedLabelWidth,
 	wrapTextToWidth,
-} from "@sketchi/diagram-core";
+	CHART_SERIES_COLORS,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasFrameElement as FrameSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
-import { CHART_SERIES_COLORS } from "./chart.js";
 import {
 	ROUTE_BUDGET,
 	routeOrthogonal,
@@ -35,14 +43,6 @@ import {
 	type OrgTreeNode,
 	simplifyPolyline,
 } from "./org-chart-layout.js";
-import type {
-	ArrowSceneElement,
-	FrameSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	SceneElement,
-	TextSceneElement,
-} from "./scene.js";
 
 const NAME_FONT_SIZE = 16;
 const DETAIL_FONT_SIZE = 13;

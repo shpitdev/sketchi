@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { IconRecipe } from "@sketchi/diagram-core";
+import { type IconRecipe } from "@sketchi/drawing";
 import { LARGE_ICON_SIZE, NODE_ICON_SIZE, previewScene } from "@sketchi/icon-draw";
 
 import { exportScenePng, initializeResvg, svgPng } from "./excalidraw-export.js";

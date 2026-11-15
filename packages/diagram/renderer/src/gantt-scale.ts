@@ -1,4 +1,5 @@
-import { estimateTextWidth, formatGanttDay } from "@sketchi/diagram-core";
+import { estimateTextWidth } from "@sketchi/drawing";
+import { formatGanttDay } from "@sketchi/diagram-core";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

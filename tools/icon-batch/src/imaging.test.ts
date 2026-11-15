@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import type { IconRecipe } from "@sketchi/diagram-core";
+import { type IconRecipe } from "@sketchi/drawing";
 import { lookAlikeMarks } from "@sketchi/icon-catalog/look-alikes";
 import { getIconSourceFile } from "@sketchi/icon-catalog/catalog";
 import { previewScene, roundSheet } from "@sketchi/icon-draw";

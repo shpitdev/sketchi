@@ -1,9 +1,9 @@
 import { formatFiles, generateFiles, joinPathFragments, names, type Tree } from "@nx/devkit";
 import path from "node:path";
 
-import type { UiComponentGeneratorSchema } from "./schema";
+import { type UiComponentGeneratorSchema } from "./schema";
 
-const DEFAULT_PROJECT_ROOT = "packages/diagram/ui";
+const DEFAULT_PROJECT_ROOT = "packages/editor";
 const DEFAULT_DIRECTORY = "components";
 
 function appendExport(tree: Tree, indexPath: string, exportPath: string) {

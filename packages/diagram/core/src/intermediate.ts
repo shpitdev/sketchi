@@ -1,4 +1,10 @@
 import {
+	DiagramStyle,
+	SKETCHI_DIAGRAM_STYLE,
+	DIAGRAM_ICON_SLUG_MAX_LENGTH,
+	DIAGRAM_ICON_SLUG_PATTERN,
+} from "@sketchi/drawing";
+import {
 	Array,
 	Effect,
 	MutableHashMap,
@@ -9,32 +15,19 @@ import {
 	Schema,
 } from "effect";
 
-import { DIAGRAM_ICON_SLUG_MAX_LENGTH, DIAGRAM_ICON_SLUG_PATTERN } from "./icon.js";
 import { DIAGRAM_TYPES, GRAPH_DIAGRAM_TYPES } from "./types.js";
-
-const NonEmptyString = Schema.NonEmptyString;
-const Metadata = Schema.Record(Schema.String, Schema.Unknown);
-
-/**
- * Server/runtime mirror of the canonical CSS tokens in diagram-ui/theme.css.
- * intermediate.test.ts fails if these values drift from that source of truth.
- */
-export const SKETCHI_DIAGRAM_PALETTE = Object.freeze({
-	paper: "#f6f1e7",
-	card: "#fffdf8",
-	ink: "#1a1712",
-	accent: "#8f707f",
-});
-
-export const SKETCHI_DIAGRAM_STYLE = Object.freeze({
-	accentColor: SKETCHI_DIAGRAM_PALETTE.accent,
-	backgroundColor: SKETCHI_DIAGRAM_PALETTE.card,
-});
 
 function withDefault<S extends Schema.Top>(schema: S, value: S["Encoded"]) {
 	return schema.pipe(Schema.withDecodingDefault(Effect.succeed(value)));
 }
 
+const NonEmptyString = Schema.NonEmptyString;
+const Metadata = Schema.Record(Schema.String, Schema.Unknown);
+
+/**
+ * Server/runtime mirror of the canonical CSS tokens in editor/theme.css.
+ * intermediate.test.ts fails if these values drift from that source of truth.
+ */
 export const DiagramTypeSchema = Schema.Literals(DIAGRAM_TYPES);
 /** Sequence diagrams have their own contract; only graph families use nodes and edges. */
 export const GraphDiagramTypeSchema = Schema.Literals(GRAPH_DIAGRAM_TYPES);
@@ -174,15 +167,6 @@ export const DiagramEdge = Schema.Struct({
 }).annotate({ identifier: "DiagramEdge" });
 
 export interface DiagramEdge extends Schema.Schema.Type<typeof DiagramEdge> {}
-
-const HexColor = Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/));
-
-export const DiagramStyle = Schema.Struct({
-	accentColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.accentColor),
-	backgroundColor: withDefault(HexColor, SKETCHI_DIAGRAM_STYLE.backgroundColor),
-}).annotate({ identifier: "DiagramStyle" });
-
-export interface DiagramStyle extends Schema.Schema.Type<typeof DiagramStyle> {}
 
 export const DiagramLayout = Schema.Struct({
 	direction: withDefault(LayoutDirectionSchema, "LR"),
@@ -358,77 +342,3 @@ export function parseIntermediateDiagram(
 		validateIntermediateDiagram,
 	);
 }
-
-const RecipeNumber = Schema.Finite;
-const RecipePoints = Schema.Array(Schema.Tuple([RecipeNumber, RecipeNumber]));
-const recipePaint = {
-	stroke: Schema.optionalKey(Schema.String),
-	fill: Schema.optionalKey(Schema.String),
-	pen: Schema.optionalKey(Schema.Literals([1, 2])),
-};
-
-/**
- * A recipe's shape. Decoding checks only types; iconRecipeIssues checks the
- * grid, the limits and the colors.
- */
-export const IconRecipeSchema = Schema.Struct({
-	parts: Schema.Array(
-		Schema.Union(
-			[
-				Schema.Struct({
-					kind: Schema.Literal("rect"),
-					x: RecipeNumber,
-					y: RecipeNumber,
-					width: RecipeNumber,
-					height: RecipeNumber,
-					rounded: Schema.optionalKey(Schema.Boolean),
-					...recipePaint,
-				}),
-				Schema.Struct({
-					kind: Schema.Literal("ellipse"),
-					cx: RecipeNumber,
-					cy: RecipeNumber,
-					rx: RecipeNumber,
-					ry: RecipeNumber,
-					...recipePaint,
-				}),
-				Schema.Struct({
-					kind: Schema.Literal("stroke"),
-					points: RecipePoints,
-					smooth: Schema.optionalKey(Schema.Boolean),
-					closed: Schema.optionalKey(Schema.Boolean),
-					...recipePaint,
-				}),
-				Schema.Struct({
-					kind: Schema.Literal("arrow"),
-					points: RecipePoints,
-					smooth: Schema.optionalKey(Schema.Boolean),
-					stroke: recipePaint.stroke,
-					pen: recipePaint.pen,
-				}),
-				Schema.Struct({
-					kind: Schema.Literal("text"),
-					cx: RecipeNumber,
-					cy: RecipeNumber,
-					text: Schema.String,
-					size: RecipeNumber,
-					color: Schema.optionalKey(Schema.String),
-				}),
-			],
-			{ mode: "oneOf" },
-		),
-	),
-});
-
-/**
- * An icon drawn for one diagram and never published: what sketchi.drawIcon
- * returns, or any `{ name, recipe }`. It draws wherever a slug does, under
- * its drawnIconSlug. A missing or undrawable recipe drops the icon with a
- * warning instead of failing the diagram, so a failed drawing (no recipe)
- * still builds.
- */
-export const DrawnIconSchema = Schema.Struct({
-	name: Schema.optionalKey(Schema.String),
-	recipe: Schema.optionalKey(IconRecipeSchema),
-});
-export type DrawnIcon = typeof DrawnIconSchema.Type;

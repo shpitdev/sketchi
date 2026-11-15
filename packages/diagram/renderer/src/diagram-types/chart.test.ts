@@ -2,20 +2,19 @@
 import { Result } from "effect";
 import {
 	CANVAS_LIMITS,
-	chartFixture,
 	estimateTextWidth,
 	getCanvasValidationIssues,
-	parseChartDiagram,
-	type ChartDiagram,
 	type CanvasPoint,
-} from "@sketchi/diagram-core";
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+} from "@sketchi/drawing";
+import { chartFixture, parseChartDiagram, type ChartDiagram } from "@sketchi/diagram-core";
 import { describe, expect, it } from "vitest";
 
 import { chartBarOrientation, renderChartDiagram } from "../chart.js";
 import { readChartMarks } from "../chart-readout.js";
 import { formatValue, piePercentages, unitParts } from "../chart-scale.js";
 import { renderDiagram } from "../diagram.js";
-import type { RenderedDiagramScene, SceneElement } from "../scene.js";
 
 interface Box {
 	readonly left: number;

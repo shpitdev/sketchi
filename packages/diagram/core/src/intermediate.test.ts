@@ -1,3 +1,4 @@
+import { SKETCHI_DIAGRAM_PALETTE, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { readFileSync } from "node:fs";
@@ -5,27 +6,23 @@ import { describe, expect, it } from "vitest";
 
 import {
 	DiagramValidationError,
-	SKETCHI_DIAGRAM_PALETTE,
-	SKETCHI_DIAGRAM_STYLE,
 	flowchartFixture,
-	mindmapFixture,
 	parseFlowchartDiagram,
 	parseIntermediateDiagram,
-	parseMindmapDiagram,
 } from "./index";
 
-const themeCss = readFileSync(new URL("../../ui/src/theme.css", import.meta.url), "utf8");
+const themeCss = readFileSync(new URL("../../../editor/src/theme.css", import.meta.url), "utf8");
 
 function themeToken(name: string): string {
 	const value = new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, "iu").exec(themeCss)?.[1];
 	if (!value) {
-		throw new Error(`Missing canonical --${name} token in diagram-ui/theme.css`);
+		throw new Error(`Missing canonical --${name} token in editor/theme.css`);
 	}
 	return value.toLowerCase();
 }
 
 describe("parseIntermediateDiagram", () => {
-	it("keeps the runtime palette synchronized with diagram-ui/theme.css", () => {
+	it("keeps the runtime palette synchronized with editor/theme.css", () => {
 		expect(SKETCHI_DIAGRAM_PALETTE).toEqual({
 			paper: themeToken("paper"),
 			card: themeToken("card"),
@@ -63,14 +60,6 @@ describe("parseIntermediateDiagram", () => {
 				),
 			}).pipe(Result.getOrThrow).nodes[0]?.icon,
 		).toEqual({ slug: "github" });
-		expect(
-			parseMindmapDiagram({
-				...mindmapFixture,
-				nodes: mindmapFixture.nodes.map((node, index) =>
-					index === 0 ? { ...node, icon: { slug: "cloudflare" } } : node,
-				),
-			}).pipe(Result.getOrThrow).nodes[0]?.icon,
-		).toEqual({ slug: "cloudflare" });
 	});
 
 	it("accepts community icon slugs under their namespace", () => {

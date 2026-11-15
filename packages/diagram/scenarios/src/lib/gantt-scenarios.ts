@@ -2,6 +2,10 @@
 import { Result } from "effect";
 import {
 	estimateTextWidth,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasPoint as ScenePoint,
+} from "@sketchi/drawing";
+import {
 	formatGanttDay,
 	ganttPhases,
 	ganttTaskSchedule,
@@ -10,15 +14,10 @@ import {
 	type GanttDiagram,
 	type GanttTask,
 } from "@sketchi/diagram-core";
-import {
-	GANTT_MIN_BAR_WIDTH,
-	ganttCaptions,
-	readGanttScene,
-	type RenderedDiagramScene,
-	type ScenePoint,
-} from "@sketchi/diagram-renderer";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
-import type { ScenarioCheck } from "./evaluate.js";
+import { GANTT_MIN_BAR_WIDTH, ganttCaptions, readGanttScene } from "@sketchi/diagram-renderer";
+
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
 
 /** One task the prompt states, with everything about it the prompt fixes. */
 export interface GanttScenarioTask {

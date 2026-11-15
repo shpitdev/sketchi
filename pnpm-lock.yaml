@@ -311,6 +311,9 @@ importers:
       '@swc/helpers':
         specifier: 0.5.23
         version: 0.5.23
+      '@tailwindcss/vite':
+        specifier: 4.3.3
+        version: 4.3.3(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
       '@tanstack/router-plugin':
         specifier: 1.168.48
         version: 1.168.48(@rspack/core@2.3.0(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.46(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(esbuild@0.28.2)(rolldown@1.2.16)(supports-color@10.2.2)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0))
@@ -344,6 +347,9 @@ importers:
       eslint-plugin-better-tailwindcss:
         specifier: 4.10.0
         version: 4.10.0(@typescript/typescript6@6.0.2)(eslint@10.12.0(jiti@2.7.0)(supports-color@10.2.2))(oxlint@1.93.0(oxlint-tsgolint@7.0.2007))(tailwindcss@4.3.3)
+      fractional-indexing:
+        specifier: 4.0.0
+        version: 4.0.0
       jiti:
         specifier: 2.7.0
         version: 2.7.0
@@ -404,6 +410,12 @@ importers:
       '@sketchi/diagram-agent':
         specifier: workspace:*
         version: link:../../packages/diagram/agent
+      '@sketchi/diagrams':
+        specifier: workspace:*
+        version: link:../../packages/diagrams
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../packages/drawing
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../../packages/icons/catalog
@@ -447,15 +459,18 @@ importers:
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../../packages/diagram/core
-      '@sketchi/diagram-excalidraw':
-        specifier: workspace:*
-        version: link:../../packages/diagram/excalidraw
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../../packages/diagram/renderer
-      '@sketchi/diagram-ui':
+      '@sketchi/diagrams':
         specifier: workspace:*
-        version: link:../../packages/diagram/ui
+        version: link:../../packages/diagrams
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../packages/drawing
+      '@sketchi/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
       '@sketchi/svg-excalidraw':
         specifier: workspace:*
         version: link:../../packages/svg-excalidraw
@@ -477,9 +492,9 @@ importers:
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../../packages/diagram/core
-      '@sketchi/diagram-excalidraw':
+      '@sketchi/drawing':
         specifier: workspace:*
-        version: link:../../packages/diagram/excalidraw
+        version: link:../../packages/drawing
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../../packages/icons/catalog
@@ -550,18 +565,21 @@ importers:
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../../packages/diagram/core
-      '@sketchi/diagram-excalidraw':
-        specifier: workspace:*
-        version: link:../../packages/diagram/excalidraw
       '@sketchi/diagram-generation':
         specifier: workspace:*
         version: link:../../packages/diagram/generation
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../../packages/diagram/renderer
-      '@sketchi/diagram-ui':
+      '@sketchi/diagrams':
         specifier: workspace:*
-        version: link:../../packages/diagram/ui
+        version: link:../../packages/diagrams
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../packages/drawing
+      '@sketchi/editor':
+        specifier: workspace:*
+        version: link:../../packages/editor
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../../packages/icons/catalog
@@ -626,9 +644,9 @@ importers:
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@sketchi/diagram-ui':
+      '@sketchi/editor':
         specifier: workspace:*
-        version: link:../../packages/diagram/ui
+        version: link:../../packages/editor
       '@sketchi/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -654,12 +672,15 @@ importers:
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../core
-      '@sketchi/diagram-excalidraw':
-        specifier: workspace:*
-        version: link:../excalidraw
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../renderer
+      '@sketchi/diagrams':
+        specifier: workspace:*
+        version: link:../../diagrams
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../drawing
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../../icons/catalog
@@ -675,21 +696,15 @@ importers:
 
   packages/diagram/core:
     dependencies:
+      '@sketchi/diagrams':
+        specifier: workspace:*
+        version: link:../../diagrams
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../drawing
       effect:
         specifier: 'catalog:'
         version: 4.1.4
-
-  packages/diagram/excalidraw:
-    dependencies:
-      '@sketchi/diagram-core':
-        specifier: workspace:*
-        version: link:../core
-      '@sketchi/diagram-renderer':
-        specifier: workspace:*
-        version: link:../renderer
-      fractional-indexing:
-        specifier: 4.0.0
-        version: 4.0.0
 
   packages/diagram/generation:
     dependencies:
@@ -702,6 +717,12 @@ importers:
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../core
+      '@sketchi/diagrams':
+        specifier: workspace:*
+        version: link:../../diagrams
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../drawing
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../../icons/catalog
@@ -717,6 +738,12 @@ importers:
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../core
+      '@sketchi/diagrams':
+        specifier: workspace:*
+        version: link:../../diagrams
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../drawing
 
   packages/diagram/scenarios:
     dependencies:
@@ -729,15 +756,18 @@ importers:
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../core
-      '@sketchi/diagram-excalidraw':
-        specifier: workspace:*
-        version: link:../excalidraw
       '@sketchi/diagram-generation':
         specifier: workspace:*
         version: link:../generation
       '@sketchi/diagram-renderer':
         specifier: workspace:*
         version: link:../renderer
+      '@sketchi/diagrams':
+        specifier: workspace:*
+        version: link:../../diagrams
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../drawing
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../../icons/catalog
@@ -748,20 +778,32 @@ importers:
         specifier: 0.18.14
         version: 0.18.14
 
-  packages/diagram/ui:
+  packages/diagrams:
+    dependencies:
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../drawing
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+
+  packages/drawing:
+    dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+      fractional-indexing:
+        specifier: 4.0.0
+        version: 4.0.0
+
+  packages/editor:
     dependencies:
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@sketchi/diagram-core':
+      '@sketchi/drawing':
         specifier: workspace:*
-        version: link:../core
-      '@sketchi/diagram-excalidraw':
-        specifier: workspace:*
-        version: link:../excalidraw
-      '@sketchi/diagram-renderer':
-        specifier: workspace:*
-        version: link:../renderer
+        version: link:../drawing
       react:
         specifier: ^19.0.0
         version: 19.3.1
@@ -769,12 +811,21 @@ importers:
         specifier: ^19.0.0
         version: 19.3.1(react@19.3.1)
     devDependencies:
+      '@sketchi/diagram-core':
+        specifier: workspace:*
+        version: link:../diagram/core
+      '@sketchi/diagram-renderer':
+        specifier: workspace:*
+        version: link:../diagram/renderer
       '@sketchi/diagram-scenarios':
         specifier: workspace:*
-        version: link:../scenarios
+        version: link:../diagram/scenarios
+      '@sketchi/diagrams':
+        specifier: workspace:*
+        version: link:../diagrams
       '@sketchi/icon-catalog':
         specifier: workspace:*
-        version: link:../../icons/catalog
+        version: link:../icons/catalog
 
   packages/icons/catalog:
     dependencies:
@@ -800,9 +851,9 @@ importers:
 
   packages/icons/community:
     dependencies:
-      '@sketchi/diagram-core':
+      '@sketchi/drawing':
         specifier: workspace:*
-        version: link:../../diagram/core
+        version: link:../../drawing
       effect:
         specifier: 'catalog:'
         version: 4.1.4
@@ -815,15 +866,12 @@ importers:
       '@google/genai':
         specifier: 'catalog:'
         version: 3.3.0(@modelcontextprotocol/sdk@1.32.2(@cfworker/json-schema@4.1.1)(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)
-      '@sketchi/diagram-core':
-        specifier: workspace:*
-        version: link:../../diagram/core
-      '@sketchi/diagram-excalidraw':
-        specifier: workspace:*
-        version: link:../../diagram/excalidraw
       '@sketchi/diagram-generation':
         specifier: workspace:*
         version: link:../../diagram/generation
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../drawing
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../catalog
@@ -879,6 +927,9 @@ importers:
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../diagram/core
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../drawing
       clipper-lib:
         specifier: 6.4.2
         version: 6.4.2
@@ -956,6 +1007,9 @@ importers:
       '@sketchi/diagram-generation':
         specifier: workspace:*
         version: link:../../packages/diagram/generation
+      '@sketchi/drawing':
+        specifier: workspace:*
+        version: link:../../packages/drawing
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../../packages/icons/catalog

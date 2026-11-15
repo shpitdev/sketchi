@@ -6,16 +6,15 @@ import {
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasNodeIconBox,
-	describedArchitectureFlowchart,
 	embedCanvasIcons,
 	estimateTextWidth,
 	getCanvasValidationIssues,
 	type CanvasShapeElement,
 	type CanvasSpec,
 	type CanvasTextElement,
-	type LayoutDirection,
 	zoneRegionIssues,
-} from "@sketchi/diagram-core";
+} from "@sketchi/drawing";
+import { describedArchitectureFlowchart, type LayoutDirection } from "@sketchi/diagram-core";
 
 import {
 	longNodeDescriptions,

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { loadLibraryFromBlob, restoreElements } from "@excalidraw/excalidraw";
-import { type IconRecipe, iconRecipeIssues } from "@sketchi/diagram-core";
+import { type IconRecipe, iconRecipeIssues } from "@sketchi/drawing";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 import { describe, expect, it } from "vitest";
 

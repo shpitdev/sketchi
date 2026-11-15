@@ -1,3 +1,4 @@
+import { FLOWCHART_COVERAGE_CODES } from "@sketchi/diagrams/build";
 /**
  * Deterministic checks of a generated diagram against what its request states
  * outright: the classes, fields and tables pasted as code, quoted text, the
@@ -7,18 +8,6 @@
  */
 
 /** What a flowchart can miss of its request, which every surface that builds one can check. */
-export const FLOWCHART_COVERAGE_CODES = [
-	"quoted_text_missing",
-	"flowchart_connection_missing",
-	"flowchart_return_step_missing",
-	"flowchart_check_step_missing",
-	"flowchart_step_borrowed",
-	"flowchart_step_split",
-	"flowchart_container_missing",
-	"flowchart_containment_wrong",
-	"flowchart_containment_unstated",
-	"flowchart_zone_merged",
-] as const;
 
 export const COVERAGE_ISSUE_CODES = [
 	...FLOWCHART_COVERAGE_CODES,

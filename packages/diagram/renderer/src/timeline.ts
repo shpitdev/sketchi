@@ -1,25 +1,26 @@
 import { Result } from "effect";
 import {
 	type TimelineValidationError,
-	boundLabelWidth,
-	CANVAS_SPEC_VERSION,
-	estimateTextWidth,
 	orderedTimelineEvents,
 	parseTimelineDate,
-	SKETCHI_DIAGRAM_PALETTE,
 	timelineLanes,
 	validateTimelineDiagram,
-	wrapTextToWidth,
 	type TimelineDiagram,
 	type TimelineEvent,
 } from "@sketchi/diagram-core";
-import type {
-	LineSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	SceneElement,
-	TextSceneElement,
-} from "./scene.js";
+import {
+	boundLabelWidth,
+	CANVAS_SPEC_VERSION,
+	estimateTextWidth,
+	SKETCHI_DIAGRAM_PALETTE,
+	wrapTextToWidth,
+	type CanvasLineElement as LineSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
+
 import { timelineCaptions, timelineDurationCaption } from "./timeline-captions.js";
 
 export const TIMELINE_MARKER_ROLE = "timeline-marker";

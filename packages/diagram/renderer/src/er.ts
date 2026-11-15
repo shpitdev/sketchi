@@ -1,6 +1,16 @@
 import { Result } from "effect";
 import {
 	type CanvasArrowhead,
+	estimateTextWidth,
+	routingQualityFindings,
+	routingQualityScale,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
+import {
 	type ErCardinality,
 	type ErDiagram,
 	type ErEntity,
@@ -8,11 +18,8 @@ import {
 	erEntityName,
 	erFieldKeys,
 	erNameKey,
-	estimateTextWidth,
 	type IntermediateDiagram,
 	parseErEnd,
-	routingQualityFindings,
-	routingQualityScale,
 } from "@sketchi/diagram-core";
 
 import {
@@ -22,16 +29,7 @@ import {
 	type ErPlacementOptions,
 	placeErTables,
 } from "./er-layout.js";
-import {
-	arrowCrossings,
-	type ArrowSceneElement,
-	type GraphAnchor,
-	type NodeSceneElement,
-	type RenderedDiagramScene,
-	renderGraphDiagram,
-	type SceneElement,
-	type TextSceneElement,
-} from "./scene.js";
+import { arrowCrossings, type GraphAnchor, renderGraphDiagram } from "./scene.js";
 
 /** The band at a table's top that carries its name. */
 const HEADER_HEIGHT = 40;

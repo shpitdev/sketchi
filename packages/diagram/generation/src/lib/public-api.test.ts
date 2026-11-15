@@ -1,8 +1,9 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result, Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
 import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
-import { FLOWCHART_MAX_NODES, SKETCHI_DIAGRAM_STYLE } from "@sketchi/diagram-core";
+import { FLOWCHART_MAX_NODES } from "@sketchi/diagram-core";
+import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 import { TestClock } from "effect/testing";
 
@@ -25,7 +26,6 @@ import {
 	DiagramGenerationPrompt,
 } from "./messages.js";
 import { stripGoogleModelPrefix } from "./models.js";
-import { GeneratedMindmapTree, generatedMindmapTreeToDiagram } from "./mindmap-tree.js";
 
 const prompt: DiagramGenerationPrompt = {
 	id: "pharma-batch-disposition",
@@ -139,22 +139,6 @@ describe("diagram generation prompt mapping", () => {
 		});
 	});
 
-	it("maps mindmap requests to the mindmap IR contract", () => {
-		const messages = buildDiagramGenerationMessages({
-			...prompt,
-			requestedType: "mindmap",
-		});
-
-		expect(messages.system).toContain('Use diagram type "mindmap".');
-		expect(messages.system).toContain("one nested root topic");
-		expect(messages.system).toContain("Return the diagram id");
-		expect(messages.system).toContain("Do not return flat nodes");
-		expect(messages.system).toContain("derived ids");
-		expect(messages.system).not.toContain("2-4 children per major topic");
-		expect(messages.system).toContain("Children keep their order.");
-		expect(messages.user).toContain('"type":"mindmap"');
-	});
-
 	it("maps sequence requests to the native sequence contract", () => {
 		const messages = buildDiagramGenerationMessages({
 			...prompt,
@@ -235,20 +219,6 @@ describe("pure candidate behavior", () => {
 			),
 		).toEqual({ label: "Review {draft}", nested: { ok: true } });
 	});
-
-	it.effect.prop(
-		"derives a valid flat mindmap from every generated nested hierarchy",
-		{ tree: GeneratedMindmapTree },
-		({ tree }) =>
-			Effect.gen(function* () {
-				const diagram = generatedMindmapTreeToDiagram(tree).pipe(Result.getOrThrow);
-				const root = diagram.nodes.find((node) => node.kind === "root");
-
-				assert.strictEqual(root?.id, "topic-0");
-				assert.strictEqual(diagram.edges.length, diagram.nodes.length - 1);
-				assert.isTrue(diagram.nodes.length >= 2);
-			}),
-	);
 
 	it("preserves explicit provider errors instead of replacing them with parse errors", () => {
 		const candidate = candidateFromText({
@@ -392,89 +362,6 @@ describe("pure candidate behavior", () => {
 		expect(candidate.diagram?.type).toBe("flowchart");
 		if (candidate.diagram?.type === "flowchart") {
 			expect(candidate.diagram.edges[0]?.label).toBeUndefined();
-		}
-	});
-
-	it("parses validated mindmap candidates through diagram-core", () => {
-		const candidate = candidateFromText({
-			model: "fixture",
-			provider: "fixture",
-			text: generationResponseText({
-				id: "launch-map",
-				title: "Launch map",
-				type: "mindmap",
-				nodes: [
-					{
-						id: "root",
-						label: "Launch",
-						kind: "root",
-						metadata: { depth: 0, siblingIndex: 0 },
-					},
-					{
-						id: "product",
-						label: "Product",
-						kind: "topic",
-						metadata: { depth: 1, siblingIndex: 0 },
-					},
-				],
-				edges: [
-					{
-						id: "root-product",
-						source: "root",
-						target: "product",
-						metadata: { depth: 1, siblingIndex: 0 },
-					},
-				],
-				layout: { direction: "LR", edgeRouting: "curved" },
-				style: { accentColor: "#7c3aed", backgroundColor: "#ffffff" },
-			}),
-		});
-
-		expect(candidate.diagram?.type).toBe("mindmap");
-		expect(candidate.diagram?.style).toEqual({
-			accentColor: "#8f707f",
-			backgroundColor: "#fffdf8",
-		});
-		expect(candidate.error).toBeUndefined();
-	});
-
-	it("derives deterministic graph metadata from nested mindmap output", () => {
-		const candidate = candidateFromText({
-			model: "fixture",
-			provider: "fixture",
-			text: generationResponseText({
-				id: "launch-map",
-				layout: { direction: "LR", edgeRouting: "curved" },
-				root: {
-					children: [
-						{
-							children: [{ children: [], label: "Positioning" }],
-							label: "Product",
-						},
-						{ children: [], label: "Go to market" },
-					],
-					label: "Launch",
-				},
-				title: "Launch map",
-				type: "mindmap",
-			}),
-		});
-
-		expect(candidate.error).toBeUndefined();
-		expect(candidate.diagram?.type).toBe("mindmap");
-		if (candidate.diagram?.type === "mindmap") {
-			expect(candidate.diagram.nodes.map((node) => node.id)).toEqual([
-				"topic-0",
-				"topic-0-0",
-				"topic-0-0-0",
-				"topic-0-1",
-			]);
-			expect(candidate.diagram.edges[1]).toMatchObject({
-				id: "branch-0-0-0",
-				metadata: { depth: 2, siblingIndex: 0 },
-				source: "topic-0-0",
-				target: "topic-0-0-0",
-			});
 		}
 	});
 

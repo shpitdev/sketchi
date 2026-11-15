@@ -13,8 +13,8 @@ export default defineConfig({
 	resolve: {
 		alias: [
 			{
-				find: "@sketchi/diagram-ui/styles.css",
-				replacement: source("../../packages/diagram/ui/src/styles.css"),
+				find: "@sketchi/editor/styles.css",
+				replacement: source("../../packages/editor/src/styles.css"),
 			},
 			{
 				find: "@sketchi/diagram-core",
@@ -25,12 +25,12 @@ export default defineConfig({
 				replacement: source("../../packages/diagram/renderer/src/index.ts"),
 			},
 			{
-				find: "@sketchi/diagram-excalidraw",
-				replacement: source("../../packages/diagram/excalidraw/src/index.ts"),
+				find: "@sketchi/drawing/excalidraw",
+				replacement: source("../../packages/drawing/src/excalidraw/index.ts"),
 			},
 			{
-				find: "@sketchi/diagram-ui",
-				replacement: source("../../packages/diagram/ui/src/index.ts"),
+				find: "@sketchi/editor",
+				replacement: source("../../packages/editor/src/index.ts"),
 			},
 			{
 				find: "@sketchi/svg-excalidraw",

@@ -20,7 +20,7 @@ import { TILE_PATHS } from "./tile.js";
 export const CARD_WIDTH = 1200;
 export const CARD_HEIGHT = 630;
 
-/** The site's light palette (packages/diagram/ui/src/theme.css). */
+/** The site's light palette (packages/editor/src/theme.css). */
 export const CARD_COLORS = {
 	paper: "#f6f1e7",
 	card: "#fffdf8",

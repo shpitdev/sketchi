@@ -4,17 +4,20 @@ import { describe, expect, it } from "vitest";
 import {
 	boundLabelWidth,
 	getCanvasValidationIssues,
-	parseTimelineDate,
-	parseTimelineDiagram,
-	timelineFixture,
 	type CanvasLineElement,
 	type CanvasShapeElement,
 	type CanvasTextElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import {
+	parseTimelineDate,
+	parseTimelineDiagram,
+	timelineFixture,
 	type TimelineDiagram,
 } from "@sketchi/diagram-core";
 import { renderDiagram } from "../diagram.js";
 import { timelineDurationCaption } from "../timeline-captions.js";
-import type { RenderedDiagramScene } from "../scene.js";
+
 import { readTimelineAxis, readTimelineGaps, readTimelineMomentGaps } from "../timeline-readout.js";
 
 function timeline(events: unknown[], extra: Record<string, unknown> = {}) {

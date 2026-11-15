@@ -5,17 +5,21 @@ import {
 	type SequenceDiagram,
 	apiRequestSequence,
 	deployWebhookLogoSequence,
+	parseSequenceDiagram,
+	sequenceFixture,
+} from "@sketchi/diagram-core";
+import {
 	embedCanvasIcons,
 	estimateTextWidth,
 	getCanvasValidationIssues,
-	parseSequenceDiagram,
-	sequenceFixture,
 	wrapTextToWidth,
 	wrappedLabelWidth,
-} from "@sketchi/diagram-core";
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
 
 import { renderDiagram } from "../diagram";
-import type { NodeSceneElement, RenderedDiagramScene } from "../scene";
+
 import {
 	SEQUENCE_ACTIVATION_ROLE,
 	isStructurallyValidSequenceActivation,

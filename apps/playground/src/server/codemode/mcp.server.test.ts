@@ -1056,7 +1056,9 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 				{
 					ok: true,
 					status: "accepted",
-					normalizedSpec: { root: { id: "topic-0" } },
+					normalizedSpec: {
+						root: { label: "Mindmap", children: [{ label: "Branches" }, { label: "Artifacts" }] },
+					},
 				},
 			],
 			result: { buildId: expect.any(String), ok: true, artifactId: expect.any(String) },

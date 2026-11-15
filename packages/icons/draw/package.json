@@ -13,8 +13,7 @@
 	"dependencies": {
 		"@effect/ai-anthropic": "catalog:",
 		"@google/genai": "catalog:",
-		"@sketchi/diagram-core": "workspace:*",
-		"@sketchi/diagram-excalidraw": "workspace:*",
+		"@sketchi/drawing": "workspace:*",
 		"@sketchi/diagram-generation": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/observability": "workspace:*",

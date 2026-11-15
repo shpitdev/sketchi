@@ -1,0 +1,1956 @@
+import { type ExcalidrawElement, type ExcalidrawScene, type ExcalidrawFile } from "./scene.js";
+import {
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasFrameElement as FrameSceneElement,
+	type CanvasIconElement as IconSceneElement,
+	type CanvasLineElement as LineSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+	AXIS_ALIGNED_EPSILON,
+	boundLabelWidth,
+	CANVAS_CROSSABLE_RENDERER_ROLES,
+	CANVAS_WIREFRAME_CORNER_RADIUS,
+	canvasBoundTextBox,
+	canvasBoundTextInset,
+	canvasGroupIconBox,
+	canvasIconElementBox,
+	canvasIconForm,
+	canvasNodeIconBox,
+	canvasShapeOutline,
+	canvasShapeStrokes,
+	fnv1a32,
+	canvasRoundsCorners,
+	isCanvasComposedShape,
+	type AxisAlignedSegment,
+	isSharedBoundStem,
+	routingQualityFindings,
+	type RoutingQualityFinding,
+	routingQualityScale,
+	segmentCrossesBoundsInterior,
+	segmentsFromPoints,
+	segmentsOverlapInterior,
+	SKETCHI_DIAGRAM_PALETTE,
+	wrappedLabelWidth,
+	wrapTextToWidth,
+} from "../index.js";
+
+import { generateKeyBetween } from "fractional-indexing";
+
+import { fixedBoundEnds, focusBoundEnds } from "./bound-ends.js";
+import {
+	type BindableShape,
+	EXCALIDRAW_BINDING_GAP,
+	EXCALIDRAW_ELBOW_DISTANCE,
+	excalidrawBoundPoint,
+	excalidrawFixedGlobalPoint,
+	excalidrawKeepsElbowEnd,
+	excalidrawOutlineDistance,
+	type FocusBinding,
+	isExcalidrawBindableType,
+	type Point,
+} from "./excalidraw-binding.js";
+import { iconRecipeElements } from "./icon-recipe.js";
+
+/** Excalidraw BinaryFileData: the image bytes an `image` element points at. */
+export interface ExcalidrawBinaryFile {
+	created: number;
+	dataURL: string;
+	id: string;
+	lastRetrieved?: number;
+	mimeType: string;
+	version?: number;
+}
+
+export interface ExcalidrawSceneValidationIssue {
+	code:
+		| "arrow-endpoint-off-shape"
+		| "empty-scene"
+		| "invalid-elbow-binding"
+		| "arrow-segment-through-node"
+		| "missing-image-file"
+		| "missing-arrow-binding"
+		| "missing-bound-arrow"
+		| "missing-container"
+		| "overlapping-arrow-segment"
+		| "text-overflow";
+	elementId?: string;
+	message: string;
+}
+
+export interface ExcalidrawSceneValidationResult {
+	issues: ExcalidrawSceneValidationIssue[];
+	ok: boolean;
+}
+
+const SHAPE_TYPES = new Set(["rectangle", "ellipse", "diamond"]);
+const TEXT_LINE_HEIGHT = 1.35;
+const TEXT_HORIZONTAL_PADDING = 24;
+const TEXT_VERTICAL_PADDING = 18;
+const ARROW_LABEL_WIDTH = 160;
+const FIT_TARGET_WIDTH = 860;
+const FIT_TARGET_HEIGHT = 340;
+const MIN_INITIAL_ZOOM = 0.42;
+const DEFAULT_TEXT_COLOR = SKETCHI_DIAGRAM_PALETTE.ink;
+const DEFAULT_EXCALIDRAW_EXPORT_SOURCE = "https://sketchi.app";
+
+type BindingKey = "startBinding" | "endBinding";
+
+interface ElementBounds {
+	height: number;
+	width: number;
+	x: number;
+	y: number;
+}
+
+function numericValue(value: unknown): number | null {
+	return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function finitePointTuple(value: unknown): [number, number] | null {
+	if (!Array.isArray(value) || value.length < 2) {
+		return null;
+	}
+
+	const x = numericValue(value[0]);
+	const y = numericValue(value[1]);
+
+	return x === null || y === null ? null : [x, y];
+}
+
+function elementBounds(element: ExcalidrawElement): ElementBounds | null {
+	const x = numericValue(element.x);
+	const y = numericValue(element.y);
+	const width = numericValue(element.width);
+	const height = numericValue(element.height);
+
+	return x === null || y === null || width === null || height === null
+		? null
+		: { x, y, width, height };
+}
+
+/** An exported shape as the binding geometry reads it; null without a box. */
+function bindableShape(element: ExcalidrawElement | undefined): BindableShape | undefined {
+	const bounds = element ? elementBounds(element) : null;
+	if (!element || !bounds) return undefined;
+	const roundness = element.roundness;
+	return {
+		...bounds,
+		type: element.type,
+		angle: numericValue(element.angle) ?? 0,
+		roundness:
+			roundness !== null &&
+			typeof roundness === "object" &&
+			typeof (roundness as { type?: unknown }).type === "number"
+				? (roundness as { type: number; value?: number })
+				: null,
+	};
+}
+
+type RoutePoint = { x: number; y: number };
+
+/**
+ * A route without repeated points and without the points that lie on a
+ * straight run between their neighbours. Repeats go first: a bend drawn twice
+ * would otherwise read as two points on straight runs, and both would go.
+ */
+function withoutStraightThroughPoints(route: readonly Point[]): Point[] {
+	const distinct = route.filter(
+		(point, index) =>
+			index === 0 || point[0] !== route[index - 1]![0] || point[1] !== route[index - 1]![1],
+	);
+	if (distinct.length < 2) return [route[0]!, route.at(-1)!];
+	return distinct.filter((point, index) => {
+		const [before, after] = [distinct[index - 1], distinct[index + 1]];
+		if (!before || !after) return true;
+		return !(
+			(before[0] === point[0] && after[0] === point[0]) ||
+			(before[1] === point[1] && after[1] === point[1])
+		);
+	});
+}
+
+/**
+ * Whether a shape's ports carry meaning: an ER table's rows, or a class box's
+ * sides. Only an elbow arrow's fixed point keeps an end on its row when the
+ * shape moves off the line's axis; a focus keeps only the line's aim.
+ */
+function holdsRows(element: ExcalidrawElement | undefined): boolean {
+	const customData = element?.customData;
+	if (customData === null || typeof customData !== "object") return false;
+	const role = (customData as Record<string, unknown>)["sketchiRendererRole"];
+	return role === "er-table" || role === "class-box";
+}
+
+/**
+ * A connector's absolute points, its bindings and its kind, so a person's first
+ * touch in Excalidraw leaves the whole route where it is drawn and later drags
+ * move only the runs into the moved shape:
+ * - A curve stays a curved arrow through its points.
+ * - A straight route is an arrow that is not elbowed, which Excalidraw moves
+ *   whole with either end, aimed by focus.
+ * - A longer route is an elbow arrow whose inner runs are pinned
+ *   (fixedSegments): Excalidraw keeps them and redraws only the runs into a
+ *   moved shape, square.
+ * - A route with one bend, which has no inner run to pin and which Excalidraw
+ *   would route afresh on the first touch, and a route Excalidraw would read
+ *   leaving a shape some other way than drawn, which it would redraw with a
+ *   detour, are sharp polylines: Excalidraw keeps every bend and re-aims only
+ *   the run into a moved shape.
+ * A line to an ER table or a class box is an elbow arrow at fixed points, so
+ * each end keeps its row; its inner runs are pinned where it has them. An end
+ * Excalidraw cannot keep on a straight route or a polyline, as on a run along
+ * its shape's side, binds as an elbow end instead.
+ */
+function boundRoute(input: {
+	/** Whether the route is a curve, drawn smooth through its points. */
+	curved: boolean;
+	endShape: ExcalidrawElement | undefined;
+	endId: string | undefined;
+	points: readonly RoutePoint[];
+	startShape: ExcalidrawElement | undefined;
+	startId: string | undefined;
+}) {
+	const drawn = input.points.map((point): Point => [point.x, point.y]);
+	const route = input.curved ? drawn : withoutStraightThroughPoints(drawn);
+	const [startShape, endShape] = [bindableShape(input.startShape), bindableShape(input.endShape)];
+	const binding = <Body extends object>(elementId: string | undefined, body: Body) =>
+		elementId === undefined ? null : { elementId, ...body };
+	const elbow = (bound = fixedBoundEnds(route, startShape, endShape)) => {
+		const [origin] = bound.points as [Point, ...Point[]];
+		const local = bound.points.map((point): Point => [point[0] - origin[0], point[1] - origin[1]]);
+		return {
+			elbowed: true,
+			fixedSegments: local.slice(2, -1).map((end, offset) => ({
+				index: offset + 2,
+				start: [...local[offset + 1]!],
+				end: [...end],
+			})),
+			points: bound.points,
+			roundness: null,
+			startBinding: binding(input.startId, {
+				focus: 0,
+				gap: 0,
+				fixedPoint: bound.start ? [...bound.start] : null,
+			}),
+			endBinding: binding(input.endId, {
+				focus: 0,
+				gap: 0,
+				fixedPoint: bound.end ? [...bound.end] : null,
+			}),
+		};
+	};
+	if (!input.curved && [input.startShape, input.endShape].some(holdsRows)) return elbow();
+	const pinned =
+		!input.curved && route.length > 3 ? fixedBoundEnds(route, startShape, endShape) : undefined;
+	if (pinned?.readsAsDrawn) return elbow(pinned);
+	const bound = focusBoundEnds(route, startShape, endShape);
+	const square = route
+		.slice(1)
+		.every((point, index) => point[0] === route[index]![0] || point[1] === route[index]![1]);
+	if (!bound.kept && !input.curved && square) return elbow(pinned);
+	const unbound = { focus: 0, gap: EXCALIDRAW_BINDING_GAP };
+	return {
+		elbowed: false,
+		fixedSegments: null,
+		points: bound.points,
+		roundness: input.curved ? { type: 2 } : route.length > 2 ? null : { type: 2 },
+		startBinding: binding(input.startId, bound.start ?? unbound),
+		endBinding: binding(input.endId, bound.end ?? unbound),
+	};
+}
+
+function initialZoomForScene(scene: RenderedDiagramScene): number {
+	const zoom = Math.min(
+		1,
+		FIT_TARGET_WIDTH / Math.max(scene.width, 1),
+		FIT_TARGET_HEIGHT / Math.max(scene.height, 1),
+	);
+
+	return Math.max(MIN_INITIAL_ZOOM, Math.round(zoom * 100) / 100);
+}
+
+function elementBase(id: string, element?: RenderedDiagramScene["elements"][number]) {
+	const seed = fnv1a32(id, "seed");
+	return {
+		id,
+		angle: 0,
+		fillStyle: element && "fillStyle" in element ? (element.fillStyle ?? "solid") : "solid",
+		frameId: element?.frameId ?? null,
+		groupIds: [...(element?.groupIds ?? [])],
+		// Reserve the serialized property position; assign only after z-order sorting.
+		index: null,
+		isDeleted: false,
+		link: null,
+		locked: element?.locked ?? false,
+		opacity: element?.opacity ?? 100,
+		roughness: element && "roughness" in element ? (element.roughness ?? 1) : 1,
+		seed,
+		strokeStyle: element && "strokeStyle" in element ? (element.strokeStyle ?? "solid") : "solid",
+		strokeWidth: element && "strokeWidth" in element ? (element.strokeWidth ?? 2) : 2,
+		updated: 1,
+		version: 1,
+		versionNonce: seed + 1,
+	};
+}
+
+function textHeight(text: string, fontSize: number, lineHeight = TEXT_LINE_HEIGHT): number {
+	return Math.ceil(text.split("\n").length * fontSize * lineHeight);
+}
+
+/** Excalidraw computeBoundTextPosition for top- and bottom-aligned labels. */
+function boundTextTop(
+	container: NodeSceneElement,
+	height: number,
+	verticalAlign: "bottom" | "top",
+): number {
+	const top = container.y + canvasBoundTextInset(container).y;
+	return verticalAlign === "top" ? top : top + canvasBoundTextBox(container).height - height;
+}
+
+function textElement(input: {
+	container?: NodeSceneElement;
+	containerId?: string;
+	element?: TextSceneElement;
+	fontSize: number;
+	id: string;
+	locked?: boolean;
+	maxWidth: number;
+	textColor?: string;
+	text: string;
+	wrap?: boolean;
+	x: number;
+	y: number;
+}): ExcalidrawElement {
+	// Excalidraw paints restored text at its stored wrap and size until the text
+	// is edited, so a line wider than its stored box is clipped on first paint.
+	// Connector labels have no container height to respect and wrap to fit; node
+	// labels arrive wrapped and their nodes sized by the renderer or the author.
+	const text = input.wrap
+		? wrapTextToWidth(input.text, input.maxWidth, input.fontSize)
+		: input.text;
+	const width = input.wrap
+		? wrappedLabelWidth(text, input.fontSize, input.maxWidth)
+		: boundLabelWidth(text, input.fontSize, input.maxWidth);
+	const lineHeight = input.element?.lineHeight ?? TEXT_LINE_HEIGHT;
+	const height = textHeight(text, input.fontSize, lineHeight);
+	const verticalAlign = input.element?.verticalAlign;
+
+	return {
+		...elementBase(input.id, input.element),
+		...(input.locked === undefined ? {} : { locked: input.locked }),
+		type: "text",
+		x: input.x - width / 2,
+		y:
+			input.container && (verticalAlign === "bottom" || verticalAlign === "top")
+				? boundTextTop(input.container, height, verticalAlign)
+				: input.y - height / 2,
+		width,
+		height,
+		backgroundColor: "transparent",
+		boundElements: null,
+		containerId: input.containerId ?? null,
+		fontFamily:
+			input.element?.fontFamily === "mono" ? 3 : input.element?.fontFamily === "sans" ? 2 : 5,
+		fontSize: input.fontSize,
+		lineHeight,
+		originalText: input.text,
+		roundness: null,
+		strokeColor: input.textColor ?? DEFAULT_TEXT_COLOR,
+		text,
+		textAlign: input.element?.textAlign ?? "center",
+		verticalAlign: input.element?.verticalAlign ?? "middle",
+		// Unbound text with autoResize re-flows to one line on edit; keep wrapped
+		// connector labels at their stored width instead.
+		autoResize: !(input.wrap && !input.containerId),
+	};
+}
+
+function utf8Base64(text: string): string {
+	const bytes = new TextEncoder().encode(text);
+	let binary = "";
+	for (let index = 0; index < bytes.length; index += 0x8000) {
+		binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+	}
+	return btoa(binary);
+}
+
+/** Content-addressed so equal artwork shares one file across scenes. */
+function iconFileId(slug: string, svg: string): string {
+	return `sketchi-icon-${slug}-${fnv1a32(svg, "hex", "utf16")}`;
+}
+
+function iconFile(id: string, svg: string): ExcalidrawBinaryFile {
+	return {
+		id,
+		mimeType: "image/svg+xml",
+		dataURL: `data:image/svg+xml;base64,${utf8Base64(svg)}`,
+		created: 1,
+		lastRetrieved: 1,
+	};
+}
+
+/** Group that moves a node's shape, label, logo and outline strokes together. */
+function logoGroupId(node: NodeSceneElement): string {
+	return isCanvasComposedShape(node.shape) ? `${node.id}:shape` : `${node.id}:logo`;
+}
+
+/**
+ * The strokes that draw a composed shape (a cylinder, pipe or document) over
+ * its bindable box, each a line, smooth along an arc; under them, when the
+ * node asks for a fill, its outline as one filled line with no stroke. None of
+ * them binds, so lines meet the shape only at its box.
+ */
+function shapeStrokeElements(input: {
+	id: (index: number) => string;
+	scene: RenderedDiagramScene;
+	shape: NodeSceneElement;
+}): ExcalidrawElement[] {
+	const { shape } = input;
+	if (!isCanvasComposedShape(shape.shape)) return [];
+	const composed = { ...shape, shape: shape.shape };
+	const strokes = [
+		...(shape.fillColor
+			? [{ fill: shape.fillColor, points: canvasShapeOutline(composed), smooth: false }]
+			: []),
+		...canvasShapeStrokes(composed).map((stroke) => ({ ...stroke, fill: undefined })),
+	];
+	return strokes.map((stroke, index) => {
+		const [start] = stroke.points;
+		const xs = stroke.points.map((point) => point.x);
+		const ys = stroke.points.map((point) => point.y);
+		return {
+			...elementBase(input.id(index), shape),
+			groupIds: [logoGroupId(shape), ...(shape.groupIds ?? [])],
+			type: "line",
+			x: start!.x,
+			y: start!.y,
+			width: Math.max(...xs) - Math.min(...xs),
+			height: Math.max(...ys) - Math.min(...ys),
+			backgroundColor: stroke.fill ?? "transparent",
+			boundElements: null,
+			customData: { sketchiShapeStroke: shape.shape },
+			endArrowhead: null,
+			endBinding: null,
+			lastCommittedPoint: null,
+			points: stroke.points.map((point) => [point.x - start!.x, point.y - start!.y]),
+			// Hand-drawn jitter along a short arc reads as a dent; the outline stays
+			// crisp unless the node asks for a rougher hand.
+			roughness: shape.roughness ?? 0,
+			roundness: stroke.smooth ? { type: 2 } : null,
+			startArrowhead: null,
+			startBinding: null,
+			strokeColor: stroke.fill ? "transparent" : (shape.strokeColor ?? input.scene.accentColor),
+		};
+	});
+}
+
+/** What a logo sits on: its node's own solid fill, else the canvas. */
+function iconPaper(
+	node: NodeSceneElement | FrameSceneElement,
+	scene: RenderedDiagramScene,
+): string {
+	const solid = (node.fillStyle ?? "solid") === "solid";
+	return node.fillColor && node.fillColor !== "transparent" && solid
+		? node.fillColor
+		: scene.backgroundColor;
+}
+
+function iconBox(node: NodeSceneElement | FrameSceneElement) {
+	const group = node.type === "frame" || node.rendererRole === "zone";
+	return group ? canvasGroupIconBox(node) : canvasNodeIconBox(node);
+}
+
+function iconImageElement(input: {
+	fileId: string;
+	id: string;
+	node: NodeSceneElement | FrameSceneElement;
+}): ExcalidrawElement | null {
+	const { node } = input;
+	const group = node.type === "frame" || node.rendererRole === "zone";
+	const box = iconBox(node);
+	if (!box || !node.icon) return null;
+	return {
+		...elementBase(input.id, node),
+		// A frame's logo is one of its children, so it moves with the frame;
+		// Excalidraw cannot group a frame. Other logos share their shape's group.
+		...(node.type === "frame"
+			? { frameId: node.id, groupIds: [] }
+			: { groupIds: [logoGroupId(node), ...(node.groupIds ?? [])] }),
+		type: "image",
+		x: box.x,
+		y: box.y,
+		width: box.width,
+		height: box.height,
+		backgroundColor: "transparent",
+		boundElements: null,
+		crop: null,
+		customData: group ? { sketchiGroupIcon: node.icon.slug } : { sketchiNodeIcon: node.icon.slug },
+		fileId: input.fileId,
+		roundness: null,
+		scale: [1, 1],
+		status: "saved",
+		strokeColor: "transparent",
+	};
+}
+
+/**
+ * A node's or frame's logo: its hand-drawn recipe as native elements, or the
+ * embedded SVG as one image when the icon asks for its exact mark or the
+ * slug has no recipe. Empty when the scene embeds neither.
+ */
+function iconElements(input: {
+	files: Record<string, ExcalidrawBinaryFile>;
+	ink: string;
+	node: NodeSceneElement | FrameSceneElement;
+	scene: RenderedDiagramScene;
+	usedElementIds: Set<string>;
+}): ExcalidrawElement[] {
+	const { node, scene } = input;
+	const asset =
+		node.icon && scene.icons && Object.hasOwn(scene.icons, node.icon.slug)
+			? scene.icons[node.icon.slug]
+			: undefined;
+	const form = node.icon ? canvasIconForm(node.icon, asset) : undefined;
+	if (!node.icon || !asset || !form) return [];
+	if (form === "svg" && asset.svg !== undefined) {
+		const fileId = iconFileId(node.icon.slug, asset.svg);
+		const image = iconImageElement({
+			fileId,
+			id: iconElementId(node, input.usedElementIds),
+			node,
+		});
+		if (!image) return [];
+		input.files[fileId] ??= iconFile(fileId, asset.svg);
+		return [image];
+	}
+	const box = iconBox(node);
+	if (!box || !asset.recipe) return [];
+	const group = node.type === "frame" || node.rendererRole === "zone";
+	return iconRecipeElements(asset.recipe, {
+		box: { x: box.x, y: box.y, size: box.width },
+		id: iconElementId(node, input.usedElementIds, asset.recipe.parts.length),
+		// A frame's logo is one of its children; a node's sits in the node's frame.
+		...(node.type === "frame"
+			? { frameId: node.id, groupIds: [] }
+			: {
+					frameId: node.frameId ?? null,
+					groupIds: [logoGroupId(node), ...(node.groupIds ?? [])],
+				}),
+		ink: input.ink,
+		paper: iconPaper(node, scene),
+		customData: group ? { sketchiGroupIcon: node.icon.slug } : { sketchiNodeIcon: node.icon.slug },
+		...(node.roughness === undefined ? {} : { roughness: node.roughness }),
+		...(node.locked === undefined ? {} : { locked: node.locked }),
+		...(node.opacity === undefined ? {} : { opacity: node.opacity }),
+	});
+}
+
+/**
+ * A standalone icon: its recipe as native elements grouped under the icon's
+ * id, or its embedded SVG as one image, in the largest square its box holds.
+ * Empty when the scene embeds neither form.
+ */
+function standaloneIconElements(input: {
+	element: IconSceneElement;
+	files: Record<string, ExcalidrawBinaryFile>;
+	scene: RenderedDiagramScene;
+	usedElementIds: Set<string>;
+}): ExcalidrawElement[] {
+	const { element, scene } = input;
+	const asset =
+		scene.icons && Object.hasOwn(scene.icons, element.slug) ? scene.icons[element.slug] : undefined;
+	const form = canvasIconForm(element, asset);
+	const box = canvasIconElementBox(element);
+	const customData = { sketchiIcon: element.slug };
+	if (form === "svg" && asset?.svg !== undefined) {
+		const fileId = iconFileId(element.slug, asset.svg);
+		input.files[fileId] ??= iconFile(fileId, asset.svg);
+		// Excalidraw's SVG export selects image symbols by id, so it must be a CSS identifier.
+		const safeId = element.id.replace(/[^\w-]/gu, "-");
+		const id = safeId === element.id ? safeId : claimElementId(safeId, input.usedElementIds);
+		return [
+			{
+				...elementBase(id, element),
+				type: "image",
+				...box,
+				backgroundColor: "transparent",
+				boundElements: null,
+				crop: null,
+				customData,
+				fileId,
+				roughness: 1,
+				roundness: null,
+				scale: [1, 1],
+				status: "saved",
+				strokeColor: "transparent",
+				strokeWidth: 2,
+			},
+		];
+	}
+	if (form !== "recipe" || !asset?.recipe) return [];
+	return iconRecipeElements(asset.recipe, {
+		box: { x: box.x, y: box.y, size: box.width },
+		id: claimElementId(
+			`${element.id.replace(/[^\w-]/gu, "-")}-mark`,
+			input.usedElementIds,
+			asset.recipe.parts.length,
+		),
+		frameId: element.frameId ?? null,
+		groupIds: [...(element.groupIds ?? [])],
+		ink: DEFAULT_TEXT_COLOR,
+		paper: scene.backgroundColor,
+		customData,
+		...(element.locked === undefined ? {} : { locked: element.locked }),
+		...(element.opacity === undefined ? {} : { opacity: element.opacity }),
+	});
+}
+
+function shapeElement(input: {
+	arrowIds: readonly string[];
+	scene: RenderedDiagramScene;
+	shape: NodeSceneElement;
+	text?: TextSceneElement;
+}): ExcalidrawElement {
+	const height = input.shape.height;
+	const shapeType = input.shape.shape === "circle" ? "ellipse" : input.shape.shape;
+	const boundElements = [
+		...(input.text && input.shape.shape !== "polygon" ? [{ id: input.text.id, type: "text" }] : []),
+		...input.arrowIds.map((id) => ({ id, type: "arrow" })),
+	];
+
+	if (input.shape.shape === "polygon") {
+		const points = input.shape.points ?? [
+			{ x: input.shape.width / 2, y: 0 },
+			{ x: input.shape.width, y: input.shape.height },
+			{ x: 0, y: input.shape.height },
+		];
+		const [first] = points;
+		return {
+			...elementBase(input.shape.id, input.shape),
+			type: "line",
+			x: input.shape.x,
+			y: input.shape.y,
+			width: input.shape.width,
+			height: input.shape.height,
+			backgroundColor: input.shape.fillColor ?? "transparent",
+			boundElements: input.arrowIds.map((id) => ({ id, type: "arrow" })),
+			customData: {
+				sketchiShape: "polygon",
+				...(input.shape.rendererRole ? { sketchiRendererRole: input.shape.rendererRole } : {}),
+			},
+			endArrowhead: null,
+			endBinding: null,
+			lastCommittedPoint: null,
+			points: [...points, first].map((point) => [point.x, point.y]),
+			roundness: null,
+			startArrowhead: null,
+			startBinding: null,
+			strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
+		};
+	}
+
+	// A composed shape's box only binds its label and lines; its strokes draw it.
+	if (isCanvasComposedShape(input.shape.shape))
+		return {
+			...elementBase(input.shape.id, input.shape),
+			groupIds: [logoGroupId(input.shape), ...(input.shape.groupIds ?? [])],
+			type: "rectangle",
+			x: input.shape.x,
+			y: input.shape.y,
+			width: input.shape.width,
+			height,
+			backgroundColor: "transparent",
+			boundElements: boundElements.length > 0 ? boundElements : null,
+			customData: { sketchiShape: input.shape.shape },
+			roundness: null,
+			strokeColor: "transparent",
+		};
+
+	return {
+		...elementBase(input.shape.id, input.shape),
+		type: shapeType,
+		x: input.shape.x,
+		y: input.shape.y,
+		width: input.shape.width,
+		height,
+		backgroundColor: input.shape.fillColor ?? "transparent",
+		boundElements: boundElements.length > 0 ? boundElements : null,
+		roundness: canvasRoundsCorners(input.shape)
+			? input.shape.rendererRole === "wireframe-widget"
+				? { type: 3, value: CANVAS_WIREFRAME_CORNER_RADIUS }
+				: { type: 3 }
+			: null,
+		strokeColor: input.shape.strokeColor ?? input.scene.accentColor,
+		...(input.shape.rendererRole
+			? { customData: { sketchiRendererRole: input.shape.rendererRole } }
+			: {}),
+	};
+}
+
+function lastArrowPoint(arrow: ArrowSceneElement) {
+	return arrow.points[arrow.points.length - 1] ?? arrow.points[0];
+}
+
+function arrowElement(input: {
+	arrow: ArrowSceneElement;
+	scene: RenderedDiagramScene;
+	sourceShape: ExcalidrawElement | undefined;
+	targetShape: ExcalidrawElement | undefined;
+	text?: TextSceneElement;
+}): ExcalidrawElement {
+	const route = boundRoute({
+		curved: input.arrow.curved === true,
+		points: input.arrow.points,
+		startShape: input.sourceShape,
+		startId: input.sourceShape?.id ?? "",
+		endShape: input.targetShape,
+		endId: input.targetShape?.id ?? "",
+	});
+	const { elbowed } = route;
+	const [start] = route.points as [Point, ...Point[]];
+	const end = route.points[route.points.length - 1] ?? start;
+
+	return {
+		...elementBase(input.arrow.id, input.arrow),
+		type: "arrow",
+		x: start[0],
+		y: start[1],
+		width: end[0] - start[0],
+		height: end[1] - start[1],
+		backgroundColor: "transparent",
+		boundElements: input.text
+			? input.text.containerId === input.arrow.id
+				? [{ id: input.text.id, type: "text" }]
+				: null
+			: input.arrow.label
+				? [{ id: `${input.arrow.id}:label`, type: "text" }]
+				: null,
+		elbowed,
+		endArrowhead: input.arrow.endArrowhead === undefined ? "arrow" : input.arrow.endArrowhead,
+		endBinding: route.endBinding,
+		...(elbowed
+			? {
+					fixedSegments: route.fixedSegments,
+					startIsSpecial: null,
+					endIsSpecial: null,
+				}
+			: {}),
+		points: route.points.map((point) => [point[0] - start[0], point[1] - start[1]]),
+		roundness: route.roundness,
+		startArrowhead: input.arrow.startArrowhead ?? null,
+		startBinding: route.startBinding,
+		strokeColor: input.arrow.strokeColor ?? input.scene.accentColor,
+		strokeStyle: input.arrow.strokeStyle ?? "solid",
+	};
+}
+
+function lineElement(input: {
+	element: LineSceneElement;
+	elementsById: ReadonlyMap<string, ExcalidrawElement>;
+	scene: RenderedDiagramScene;
+}): ExcalidrawElement {
+	const hasArrow =
+		input.element.startArrowhead !== undefined ||
+		input.element.endArrowhead !== undefined ||
+		input.element.startBinding !== undefined ||
+		input.element.endBinding !== undefined;
+	const boundTo = (binding: LineSceneElement["startBinding"]) =>
+		binding ? input.elementsById.get(binding.elementId) : undefined;
+	const [startShape, endShape] = [
+		boundTo(input.element.startBinding),
+		boundTo(input.element.endBinding),
+	];
+	const drawn = input.element.points.map((point): Point => [point.x, point.y]);
+	// A plain line keeps its points and binds nothing.
+	const route = hasArrow
+		? boundRoute({
+				curved: false,
+				points: input.element.points,
+				startShape,
+				startId: startShape?.id,
+				endShape,
+				endId: endShape?.id,
+			})
+		: {
+				elbowed: false,
+				fixedSegments: null,
+				points: drawn,
+				roundness: drawn.length > 2 ? { type: 2 } : null,
+				startBinding: null,
+				endBinding: null,
+			};
+	const { elbowed } = route;
+	const [start] = route.points as [Point, ...Point[]];
+	const end = route.points[route.points.length - 1] ?? start;
+	return {
+		...elementBase(input.element.id, input.element),
+		type: hasArrow ? "arrow" : "line",
+		x: start[0],
+		y: start[1],
+		width: end[0] - start[0],
+		height: end[1] - start[1],
+		backgroundColor: input.element.fillColor ?? "transparent",
+		boundElements: null,
+		...(hasArrow ? { elbowed } : {}),
+		endArrowhead: input.element.endArrowhead ?? null,
+		endBinding: route.endBinding,
+		...(elbowed
+			? {
+					fixedSegments: route.fixedSegments,
+					startIsSpecial: null,
+					endIsSpecial: null,
+				}
+			: {}),
+		points: route.points.map((point) => [point[0] - start[0], point[1] - start[1]]),
+		roundness: route.roundness,
+		startArrowhead: input.element.startArrowhead ?? null,
+		startBinding: route.startBinding,
+		strokeColor: input.element.strokeColor ?? input.scene.accentColor,
+	};
+}
+
+function frameElement(input: {
+	element: FrameSceneElement;
+	scene: RenderedDiagramScene;
+}): ExcalidrawElement {
+	return {
+		...elementBase(input.element.id, input.element),
+		type: "frame",
+		x: input.element.x,
+		y: input.element.y,
+		width: input.element.width,
+		height: input.element.height,
+		backgroundColor: input.element.fillColor ?? "transparent",
+		boundElements: null,
+		name: input.element.name ?? null,
+		roundness: null,
+		strokeColor: input.element.strokeColor ?? input.scene.accentColor,
+	};
+}
+
+function arrowLabelElement(input: { arrow: ArrowSceneElement }): ExcalidrawElement | null {
+	if (!input.arrow.label) {
+		return null;
+	}
+
+	const start = input.arrow.points[0];
+	const end = lastArrowPoint(input.arrow);
+	return textElement({
+		id: `${input.arrow.id}:label`,
+		containerId: input.arrow.id,
+		fontSize: 13,
+		...(input.arrow.locked === undefined ? {} : { locked: input.arrow.locked }),
+		maxWidth: ARROW_LABEL_WIDTH,
+		...(input.arrow.textColor ? { textColor: input.arrow.textColor } : {}),
+		text: input.arrow.label,
+		wrap: true,
+		x: (start.x + end.x) / 2,
+		y: (start.y + end.y) / 2 - 10,
+	});
+}
+
+function collectBoundArrowsByElement(
+	nodes: readonly NodeSceneElement[],
+	frames: readonly FrameSceneElement[],
+	arrows: readonly ArrowSceneElement[],
+	lines: readonly LineSceneElement[],
+): Map<string, string[]> {
+	const result = new Map<string, string[]>();
+	const elementIdByNodeId = new Map([
+		...nodes.map((node) => [node.nodeId, node.id] as const),
+		...frames.flatMap((frame) =>
+			frame.nodeId === undefined ? [] : [[frame.nodeId, frame.id] as const],
+		),
+	]);
+
+	for (const arrow of arrows) {
+		for (const nodeId of [arrow.sourceNodeId, arrow.targetNodeId]) {
+			const shapeId = elementIdByNodeId.get(nodeId);
+			if (!shapeId) continue;
+			result.set(shapeId, [...(result.get(shapeId) ?? []), arrow.id]);
+		}
+	}
+	for (const line of lines) {
+		for (const binding of [line.startBinding, line.endBinding]) {
+			if (!binding) continue;
+			result.set(binding.elementId, [...(result.get(binding.elementId) ?? []), line.id]);
+		}
+	}
+
+	return result;
+}
+
+function isNode(element: RenderedDiagramScene["elements"][number]): element is NodeSceneElement {
+	return element.type === "node";
+}
+
+function isText(element: RenderedDiagramScene["elements"][number]): element is TextSceneElement {
+	return element.type === "text";
+}
+
+function isArrow(element: RenderedDiagramScene["elements"][number]): element is ArrowSceneElement {
+	return element.type === "arrow";
+}
+
+function isLine(element: RenderedDiagramScene["elements"][number]): element is LineSceneElement {
+	return element.type === "line";
+}
+
+function isFrame(element: RenderedDiagramScene["elements"][number]): element is FrameSceneElement {
+	return element.type === "frame";
+}
+
+function applyLayerSemantics(scene: RenderedDiagramScene): SceneElement[] {
+	const layersById = new Map(scene.layers.map((layer) => [layer.id, layer]));
+	const layerVisibleElements = scene.elements.filter((element) => {
+		const layer = element.layerId ? layersById.get(element.layerId) : undefined;
+		return layer?.visible !== false;
+	});
+	// Connectors end at nodes, or at frames that carry a node id (composite states).
+	const visibleNodeIds = new Set(
+		layerVisibleElements.flatMap((element) =>
+			element.type === "node"
+				? [element.nodeId]
+				: element.type === "frame" && element.nodeId !== undefined
+					? [element.nodeId]
+					: [],
+		),
+	);
+	const connectionSafeElements = layerVisibleElements.filter(
+		(element) =>
+			element.type !== "arrow" ||
+			(visibleNodeIds.has(element.sourceNodeId) && visibleNodeIds.has(element.targetNodeId)),
+	);
+	const visibleContainerIds = new Set(
+		connectionSafeElements.flatMap((element) => (element.type === "text" ? [] : [element.id])),
+	);
+	const visibleElements = connectionSafeElements.filter(
+		(element) =>
+			element.type !== "text" ||
+			!element.containerId ||
+			visibleContainerIds.has(element.containerId),
+	);
+	const visibleElementIds = new Set(visibleElements.map((element) => element.id));
+
+	return visibleElements.map((element) => {
+		const layer = element.layerId ? layersById.get(element.layerId) : undefined;
+		const { frameId: _frameId, ...withoutFrame } = element;
+		const visibleElement =
+			element.frameId && !visibleElementIds.has(element.frameId) ? withoutFrame : element;
+		return {
+			...visibleElement,
+			...(layer?.locked === true ? { locked: true } : {}),
+		};
+	});
+}
+
+function synthesizeNodeLabels(sourceElements: readonly SceneElement[]): {
+	textElements: TextSceneElement[];
+	generatedLabelSourceIds: Map<string, string>;
+} {
+	const nodes = sourceElements.filter(isNode);
+	const textElements = sourceElements.filter(isText);
+	const usedElementIds = new Set(sourceElements.map((element) => element.id));
+	const generatedLabelSourceIds = new Map<string, string>();
+	const explicitlyLabeledNodeIds = new Set(
+		textElements.flatMap((element) => (element.containerId ? [element.containerId] : [])),
+	);
+	for (const node of nodes) {
+		if (explicitlyLabeledNodeIds.has(node.id) || node.rendererRole) {
+			continue;
+		}
+		const baseId = `__sketchi_node_label__${node.id}`;
+		let id = baseId;
+		let suffix = 2;
+		while (usedElementIds.has(id)) {
+			id = `${baseId}:${suffix}`;
+			suffix += 1;
+		}
+		usedElementIds.add(id);
+		generatedLabelSourceIds.set(id, node.id);
+		textElements.push({
+			type: "text",
+			id,
+			containerId: node.id,
+			...(node.frameId ? { frameId: node.frameId } : {}),
+			...(node.groupIds ? { groupIds: [...node.groupIds] } : {}),
+			...(node.layerId ? { layerId: node.layerId } : {}),
+			...(node.locked !== undefined ? { locked: node.locked } : {}),
+			...(node.opacity !== undefined ? { opacity: node.opacity } : {}),
+			...(node.textColor ? { textColor: node.textColor } : {}),
+			x: node.x + node.width / 2,
+			y: node.y + node.height / 2,
+			text: node.label,
+			fontSize: 16,
+			maxWidth: Math.max(1, node.width - TEXT_HORIZONTAL_PADDING),
+		});
+	}
+	return { textElements, generatedLabelSourceIds };
+}
+
+/**
+ * A logo's id, unique in the scene with every `${id}-${part}` id its hand-drawn
+ * parts take, all reserved before any is emitted.
+ */
+function iconElementId(
+	node: NodeSceneElement | FrameSceneElement,
+	usedElementIds: Set<string>,
+	parts = 0,
+): string {
+	// Excalidraw's SVG export selects per-element image symbols by id, so the
+	// id must be a valid CSS identifier fragment (node ids contain colons).
+	return claimElementId(`${node.id.replace(/[^\w-]/gu, "-")}-icon`, usedElementIds, parts);
+}
+
+/** An unused id from a base, with every `${id}-${part}` id its parts take reserved too. */
+function claimElementId(baseId: string, usedElementIds: Set<string>, parts = 0): string {
+	const claimed = (id: string) => [
+		id,
+		...Array.from({ length: parts }, (_, index) => `${id}-${index}`),
+	];
+	let id = baseId;
+	let suffix = 2;
+	while (claimed(id).some((candidate) => usedElementIds.has(candidate))) {
+		id = `${baseId}-${suffix}`;
+		suffix += 1;
+	}
+	for (const candidate of claimed(id)) usedElementIds.add(candidate);
+	return id;
+}
+
+/** An id for a composed shape's stroke, unique in the scene. */
+function strokeElementId(
+	node: NodeSceneElement,
+	index: number,
+	usedElementIds: Set<string>,
+): string {
+	const baseId = `${node.id}:stroke-${index}`;
+	let id = baseId;
+	let suffix = 2;
+	while (usedElementIds.has(id)) {
+		id = `${baseId}-${suffix}`;
+		suffix += 1;
+	}
+	usedElementIds.add(id);
+	return id;
+}
+
+function buildElements(
+	scene: RenderedDiagramScene,
+	sourceElements: readonly SceneElement[],
+	textElements: readonly TextSceneElement[],
+	files: Record<string, ExcalidrawBinaryFile>,
+	generatedSourceIds: Map<string, string>,
+): ExcalidrawElement[] {
+	const nodes = sourceElements.filter(isNode);
+	const usedElementIds = new Set([
+		...sourceElements.map((element) => element.id),
+		...textElements.map((element) => element.id),
+	]);
+	const logoNodesById = new Map<string, NodeSceneElement>();
+	const textByContainerId = new Map<string, TextSceneElement>();
+	for (const text of textElements) {
+		if (text.containerId) textByContainerId.set(text.containerId, text);
+	}
+	const arrows = sourceElements.filter(isArrow);
+	const lines = sourceElements.filter(isLine);
+	const arrowsByElement = collectBoundArrowsByElement(
+		nodes,
+		sourceElements.filter(isFrame),
+		arrows,
+		lines,
+	);
+	const shapeElementsByNodeId = new Map<string, ExcalidrawElement>();
+	const elements: ExcalidrawElement[] = [];
+	for (const node of nodes) {
+		const text = textByContainerId.get(node.id);
+		const shape = shapeElement({
+			scene,
+			shape: node,
+			arrowIds: arrowsByElement.get(node.id) ?? [],
+			...(text ? { text } : {}),
+		});
+
+		shapeElementsByNodeId.set(node.nodeId, shape);
+		elements.push(shape);
+		if (isCanvasComposedShape(node.shape)) {
+			const strokes = shapeStrokeElements({
+				id: (index) => strokeElementId(node, index, usedElementIds),
+				scene,
+				shape: node,
+			});
+			for (const stroke of strokes) generatedSourceIds.set(stroke.id, node.id);
+			elements.push(...strokes);
+			logoNodesById.set(node.id, node);
+		}
+
+		const icon = iconElements({
+			files,
+			ink: text?.textColor ?? node.textColor ?? DEFAULT_TEXT_COLOR,
+			node,
+			scene,
+			usedElementIds,
+		});
+		if (icon.length === 0) continue;
+		shape.groupIds = [logoGroupId(node), ...(node.groupIds ?? [])];
+		for (const part of icon) generatedSourceIds.set(part.id, node.id);
+		logoNodesById.set(node.id, node);
+		elements.push(...icon);
+	}
+
+	for (const frame of sourceElements.filter(isFrame)) {
+		const renderedFrame = frameElement({
+			element: frame,
+			scene,
+		});
+		const arrowIds = arrowsByElement.get(frame.id) ?? [];
+		renderedFrame.boundElements = arrowIds.length
+			? arrowIds.map((id) => ({ id, type: "arrow" }))
+			: null;
+		// A composite state's transitions bind to its frame.
+		if (frame.nodeId !== undefined) shapeElementsByNodeId.set(frame.nodeId, renderedFrame);
+		elements.push(renderedFrame);
+		const icon = iconElements({
+			files,
+			ink: DEFAULT_TEXT_COLOR,
+			node: frame,
+			scene,
+			usedElementIds,
+		});
+		for (const part of icon) generatedSourceIds.set(part.id, frame.id);
+		elements.push(...icon);
+	}
+
+	for (const element of sourceElements) {
+		if (element.type !== "icon") continue;
+		const parts = standaloneIconElements({ element, files, scene, usedElementIds });
+		for (const part of parts) {
+			if (part.id !== element.id) generatedSourceIds.set(part.id, element.id);
+		}
+		elements.push(...parts);
+	}
+
+	for (const text of textElements) {
+		const containerNode = nodes.find(
+			(node) => node.id === text.containerId && node.shape !== "polygon",
+		);
+		const arrowContainer = arrows.some((arrow) => arrow.id === text.containerId);
+		const positionedArrow = arrows.find((arrow) => text.id === `${arrow.id}:label`);
+		const supportedContainer = text.containerId && (containerNode || arrowContainer);
+		const textColor = text.textColor ?? positionedArrow?.textColor;
+		const label = textElement({
+			...(containerNode ? { container: containerNode } : {}),
+			element: text,
+			id: text.id,
+			...(supportedContainer ? { containerId: text.containerId } : {}),
+			fontSize: text.fontSize,
+			maxWidth: text.maxWidth ?? 160,
+			...(textColor ? { textColor } : {}),
+			text: text.text,
+			wrap: arrowContainer || Boolean(positionedArrow),
+			x: text.x,
+			y: text.y,
+		});
+		const logoNode = containerNode ? logoNodesById.get(containerNode.id) : undefined;
+		if (logoNode) {
+			label.groupIds = [logoGroupId(logoNode), ...(text.groupIds ?? [])];
+		}
+		elements.push(label);
+	}
+
+	for (const arrow of arrows) {
+		const text =
+			textByContainerId.get(arrow.id) ??
+			textElements.find((text) => text.id === `${arrow.id}:label`);
+		elements.push(
+			arrowElement({
+				arrow,
+				scene,
+				sourceShape: shapeElementsByNodeId.get(arrow.sourceNodeId),
+				targetShape: shapeElementsByNodeId.get(arrow.targetNodeId),
+				...(text ? { text } : {}),
+			}),
+		);
+		const label = arrow.label && !text ? arrowLabelElement({ arrow }) : null;
+		if (label) {
+			elements.push(label);
+		}
+	}
+
+	const excalidrawElementsById = new Map(elements.map((element) => [element.id, element]));
+	for (const line of lines) {
+		elements.push(
+			lineElement({
+				element: line,
+				elementsById: excalidrawElementsById,
+				scene,
+			}),
+		);
+		if (line.label) {
+			const start = line.points[0];
+			const end = line.points[line.points.length - 1] ?? start;
+			elements.push(
+				textElement({
+					id: `${line.id}:label`,
+					fontSize: 13,
+					...(line.locked === undefined ? {} : { locked: line.locked }),
+					maxWidth: ARROW_LABEL_WIDTH,
+					...(line.textColor ? { textColor: line.textColor } : {}),
+					text: line.label,
+					wrap: true,
+					x: (start.x + end.x) / 2,
+					y: (start.y + end.y) / 2 - 10,
+				}),
+			);
+		}
+	}
+
+	return elements;
+}
+
+function applyZOrder(
+	scene: RenderedDiagramScene,
+	elements: ExcalidrawElement[],
+	generatedSourceIds: ReadonlyMap<string, string>,
+): void {
+	const zOrder = new Map(scene.zOrder.map((id, index) => [id, index]));
+	const sourceIdForElement = (element: ExcalidrawElement): string => {
+		if (zOrder.has(element.id)) return element.id;
+		const generatedSourceId = generatedSourceIds.get(element.id);
+		if (generatedSourceId) return generatedSourceId;
+		return element.id.endsWith(":label") ? element.id.slice(0, -":label".length) : element.id;
+	};
+	elements.sort((left, right) => {
+		const leftOrder = zOrder.get(sourceIdForElement(left)) ?? Number.MAX_SAFE_INTEGER;
+		const rightOrder = zOrder.get(sourceIdForElement(right)) ?? Number.MAX_SAFE_INTEGER;
+		return leftOrder - rightOrder;
+	});
+	let previousIndex: string | null = null;
+	for (const element of elements) {
+		const index = generateKeyBetween(previousIndex, null);
+		element.index = index;
+		previousIndex = index;
+	}
+}
+
+export function convertSceneToExcalidraw(scene: RenderedDiagramScene): ExcalidrawScene & {
+	files: Record<string, ExcalidrawBinaryFile>;
+} {
+	const sourceElements = applyLayerSemantics(scene);
+	const { textElements, generatedLabelSourceIds } = synthesizeNodeLabels(sourceElements);
+	const files: Record<string, ExcalidrawBinaryFile> = {};
+	// Generated labels and logos sort with the scene element they belong to.
+	const generatedSourceIds = new Map(generatedLabelSourceIds);
+	const elements = buildElements(scene, sourceElements, textElements, files, generatedSourceIds);
+	applyZOrder(scene, elements, generatedSourceIds);
+	return {
+		appState: {
+			viewBackgroundColor: scene.backgroundColor,
+			zoom: {
+				value: initialZoomForScene(scene),
+			},
+		},
+		elements,
+		files,
+	};
+}
+
+export function createExcalidrawFile(
+	scene: ExcalidrawScene,
+	options: { source?: string } = {},
+): ExcalidrawFile {
+	return {
+		type: "excalidraw",
+		version: 2,
+		source: options.source ?? DEFAULT_EXCALIDRAW_EXPORT_SOURCE,
+		elements: scene.elements,
+		appState: scene.appState,
+		files: scene.files ?? {},
+	};
+}
+
+function hasBoundElement(element: ExcalidrawElement, id: string, type: string): boolean {
+	const boundElements = element.boundElements;
+	if (!Array.isArray(boundElements)) {
+		return false;
+	}
+
+	return boundElements.some((bound) => {
+		if (!(bound && typeof bound === "object")) {
+			return false;
+		}
+		return (bound as { id?: unknown }).id === id && (bound as { type?: unknown }).type === type;
+	});
+}
+
+function bindingElementId(element: ExcalidrawElement, key: string): string | null {
+	const binding = element[key];
+	if (!(binding && typeof binding === "object")) {
+		return null;
+	}
+
+	const elementId = (binding as { elementId?: unknown }).elementId;
+	return typeof elementId === "string" ? elementId : null;
+}
+
+function bindingFixedPoint(element: ExcalidrawElement, key: BindingKey): [number, number] | null {
+	const binding = element[key];
+	if (!(binding && typeof binding === "object")) {
+		return null;
+	}
+
+	return finitePointTuple((binding as { fixedPoint?: unknown }).fixedPoint);
+}
+
+interface ArrowSegment extends AxisAlignedSegment {
+	arrowId: string;
+	startBindingId: string | null;
+	endBindingId: string | null;
+	startCoordinate: number;
+	endCoordinate: number;
+	/** The whole route, in scene coordinates. */
+	route: readonly { readonly x: number; readonly y: number }[];
+}
+
+function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
+	const originX = numericValue(element.x) ?? 0;
+	const originY = numericValue(element.y) ?? 0;
+	const startBindingId = bindingElementId(element, "startBinding");
+	const endBindingId = bindingElementId(element, "endBinding");
+	const points = Array.isArray(element.points)
+		? element.points
+				.map(finitePointTuple)
+				.filter((point): point is [number, number] => point !== null)
+				.map(([x, y]) => ({ x: originX + x, y: originY + y }))
+		: [];
+	return segmentsFromPoints(points).map((segment) => ({
+		...segment,
+		arrowId: element.id,
+		startBindingId,
+		endBindingId,
+		startCoordinate:
+			segment.orientation === "horizontal"
+				? points[segment.segmentIndex]!.x
+				: points[segment.segmentIndex]!.y,
+		endCoordinate:
+			segment.orientation === "horizontal"
+				? points[segment.segmentIndex + 1]!.x
+				: points[segment.segmentIndex + 1]!.y,
+		route: points,
+	}));
+}
+
+/**
+ * Whether two arrows' ends bound at one point of a shape coincide: across the
+ * stem they leave or reach it by, and along it within the binding gap, which
+ * puts an end that is not elbowed that much further out than an elbow end.
+ */
+function sameBoundEnd(
+	a: { readonly x: number; readonly y: number },
+	b: { readonly x: number; readonly y: number },
+	orientation: AxisAlignedSegment["orientation"],
+): boolean {
+	const [along, across] =
+		orientation === "horizontal" ? [a.x - b.x, a.y - b.y] : [a.y - b.y, a.x - b.x];
+	return (
+		Math.abs(across) <= AXIS_ALIGNED_EPSILON &&
+		Math.abs(along) <= EXCALIDRAW_BINDING_GAP + AXIS_ALIGNED_EPSILON
+	);
+}
+
+/**
+ * Arrows that leave one shape at one point may run together before they part,
+ * as the bus from an org chart's manager to their reports does: a run both take
+ * from the same corner in the same direction, after the same route up to it, is
+ * one trunk drawn once.
+ */
+function sharesTrunk(left: ArrowSegment, right: ArrowSegment): boolean {
+	if (
+		left.startBindingId === null ||
+		left.startBindingId !== right.startBindingId ||
+		left.segmentIndex !== right.segmentIndex
+	)
+		return false;
+	for (let index = 0; index <= left.segmentIndex; index += 1) {
+		const a = left.route[index];
+		const b = right.route[index];
+		if (!a || !b) return false;
+		const first = left.route[1];
+		const same =
+			index === 0 && first
+				? sameBoundEnd(
+						a,
+						b,
+						Math.abs(first.x - a.x) > Math.abs(first.y - a.y) ? "horizontal" : "vertical",
+					)
+				: Math.abs(a.x - b.x) <= AXIS_ALIGNED_EPSILON &&
+					Math.abs(a.y - b.y) <= AXIS_ALIGNED_EPSILON;
+		if (!same) return false;
+	}
+	return (
+		Math.sign(left.endCoordinate - left.startCoordinate) ===
+		Math.sign(right.endCoordinate - right.startCoordinate)
+	);
+}
+
+/** A common binding alone cannot exempt unrelated portions of two routes. */
+function sharesDirectedEndpoint(left: ArrowSegment, right: ArrowSegment): boolean {
+	if (!isSharedBoundStem(left, right)) return false;
+	const departure =
+		left.isFirstSegment &&
+		right.isFirstSegment &&
+		left.startBindingId !== null &&
+		left.startBindingId === right.startBindingId;
+	const leftEndpoint = departure ? left.startCoordinate : left.endCoordinate;
+	const rightEndpoint = departure ? right.startCoordinate : right.endCoordinate;
+	return (
+		Math.abs(leftEndpoint - rightEndpoint) <= EXCALIDRAW_BINDING_GAP + AXIS_ALIGNED_EPSILON &&
+		Math.sign(left.endCoordinate - left.startCoordinate) ===
+			Math.sign(right.endCoordinate - right.startCoordinate)
+	);
+}
+
+/**
+ * Arrows bound into one shape at one point may share their whole last straight stretch, as a Gantt
+ * dependency that joins another's last run into their successor does: both segments lie on it and
+ * head the same way.
+ */
+function sharesArrivalStem(left: ArrowSegment, right: ArrowSegment): boolean {
+	const [leftEnd, rightEnd] = [left.route.at(-1), right.route.at(-1)];
+	if (
+		left.endBindingId === null ||
+		left.endBindingId !== right.endBindingId ||
+		!leftEnd ||
+		!rightEnd ||
+		!sameBoundEnd(leftEnd, rightEnd, left.orientation)
+	)
+		return false;
+	const onStem = (segment: ArrowSegment) =>
+		segment.route
+			.slice(segment.segmentIndex)
+			.every((point) =>
+				segment.orientation === "horizontal"
+					? Math.abs(point.y - segment.route[segment.segmentIndex]!.y) <= AXIS_ALIGNED_EPSILON
+					: Math.abs(point.x - segment.route[segment.segmentIndex]!.x) <= AXIS_ALIGNED_EPSILON,
+			);
+	return (
+		onStem(left) &&
+		onStem(right) &&
+		Math.sign(left.endCoordinate - left.startCoordinate) ===
+			Math.sign(right.endCoordinate - right.startCoordinate)
+	);
+}
+
+function overlappingArrowSegments(
+	elements: readonly ExcalidrawElement[],
+): ExcalidrawSceneValidationIssue[] {
+	const segments = elements.filter(isConnector).flatMap(arrowSegments);
+	const issues: ExcalidrawSceneValidationIssue[] = [];
+	const seen = new Set<string>();
+
+	for (let leftIndex = 0; leftIndex < segments.length; leftIndex += 1) {
+		const left = segments[leftIndex];
+		if (!left) {
+			continue;
+		}
+
+		for (let rightIndex = leftIndex + 1; rightIndex < segments.length; rightIndex += 1) {
+			const right = segments[rightIndex];
+			if (!right) {
+				continue;
+			}
+
+			if (
+				left.arrowId === right.arrowId ||
+				sharesDirectedEndpoint(left, right) ||
+				sharesTrunk(left, right) ||
+				sharesArrivalStem(left, right) ||
+				!segmentsOverlapInterior(left, right)
+			) {
+				continue;
+			}
+
+			const key = [
+				left.arrowId,
+				String(left.segmentIndex),
+				right.arrowId,
+				String(right.segmentIndex),
+			]
+				.sort()
+				.join(":");
+			if (seen.has(key)) {
+				continue;
+			}
+
+			seen.add(key);
+			issues.push({
+				code: "overlapping-arrow-segment",
+				elementId: left.arrowId,
+				message: `Arrow "${left.arrowId}" overlaps arrow "${right.arrowId}".`,
+			});
+		}
+	}
+
+	return issues;
+}
+
+/** A part of a hand-drawn icon: drawing, never a connector or a shape to bind or avoid. */
+function isIconPart(element: ExcalidrawElement): boolean {
+	const customData = element.customData;
+	return (
+		customData !== null &&
+		typeof customData === "object" &&
+		(customData as Record<string, unknown>)["sketchiIconPart"] !== undefined
+	);
+}
+
+function isConnector(element: ExcalidrawElement): boolean {
+	return element.type === "arrow" && !isIconPart(element);
+}
+
+function isBindableShape(element: ExcalidrawElement): boolean {
+	if (isIconPart(element)) return false;
+	if (SHAPE_TYPES.has(element.type) || element.type === "frame") return true;
+	const customData = element.customData;
+	return (
+		element.type === "line" &&
+		customData !== null &&
+		typeof customData === "object" &&
+		(customData as Record<string, unknown>)["sketchiShape"] === "polygon"
+	);
+}
+
+function arrowSegmentsThroughShapes(
+	elements: readonly ExcalidrawElement[],
+): ExcalidrawSceneValidationIssue[] {
+	const segments = elements.filter(isConnector).flatMap(arrowSegments);
+	const shapes = elements.filter(isBindableShape);
+	const boundsById = new Map(elements.map((element) => [element.id, elementBounds(element)]));
+	const order = new Map(elements.map((element, index) => [element.id, index]));
+	const frameOf = new Map(
+		elements.flatMap((element) =>
+			typeof element.frameId === "string" ? [[element.id, element.frameId] as const] : [],
+		),
+	);
+	const issues: ExcalidrawSceneValidationIssue[] = [];
+	const seen = new Set<string>();
+
+	for (const segment of segments) {
+		// Shapes holding an end of this arrow, such as the card its button sits in.
+		const holders = shapes.filter((shape) => holdsBoundEnd(shape, segment, boundsById));
+		for (const shape of shapes) {
+			if (
+				isSequenceStructureShape(shape) ||
+				hiddenUnder(shape, holders, boundsById, order) ||
+				shape.id === segment.startBindingId ||
+				shape.id === segment.endBindingId ||
+				containsArrowEnd(shape, segment, frameOf) ||
+				holdsBoundEnd(shape, segment, boundsById)
+			) {
+				continue;
+			}
+
+			const bounds = elementBounds(shape);
+			if (!bounds || !segmentCrossesBoundsInterior(segment, bounds)) {
+				continue;
+			}
+
+			const key = `${segment.arrowId}:${segment.segmentIndex}:${shape.id}`;
+			if (seen.has(key)) {
+				continue;
+			}
+
+			seen.add(key);
+			issues.push({
+				code: "arrow-segment-through-node",
+				elementId: segment.arrowId,
+				message: `Arrow "${segment.arrowId}" passes through shape "${shape.id}".`,
+			});
+		}
+	}
+
+	return issues;
+}
+
+/**
+ * A frame holds an arrow that belongs to it or is bound to one of its children:
+ * that arrow has to cross into the frame. Every other frame stays an obstacle.
+ */
+function containsArrowEnd(
+	shape: ExcalidrawElement,
+	segment: ArrowSegment,
+	frameOf: ReadonlyMap<string, string>,
+): boolean {
+	return (
+		shape.type === "frame" &&
+		[segment.arrowId, segment.startBindingId, segment.endBindingId].some(
+			(id) => id !== null && frameOf.get(id) === shape.id,
+		)
+	);
+}
+
+/**
+ * A shape around the one an arrow binds to, such as the card a button sits
+ * in, has to be crossed on the way out; every other shape stays an obstacle.
+ */
+function holdsBoundEnd(
+	shape: ExcalidrawElement,
+	segment: ArrowSegment,
+	boundsById: ReadonlyMap<string, ElementBounds | null>,
+): boolean {
+	const outer = boundsById.get(shape.id);
+	if (!outer) return false;
+	return [segment.startBindingId, segment.endBindingId].some((id) => {
+		const inner = id === null ? undefined : boundsById.get(id);
+		return (
+			inner !== undefined &&
+			inner !== null &&
+			id !== shape.id &&
+			inner.x >= outer.x &&
+			inner.y >= outer.y &&
+			inner.x + inner.width <= outer.x + outer.width &&
+			inner.y + inner.height <= outer.y + outer.height
+		);
+	});
+}
+
+/**
+ * A shape drawn under one that holds the arrow's end and covers it, as a
+ * modal's backdrop covers the screen beneath, is hidden from the arrow. Only a
+ * filled shape covers anything: a frame or a transparent box hides nothing.
+ */
+function hiddenUnder(
+	shape: ExcalidrawElement,
+	holders: readonly ExcalidrawElement[],
+	boundsById: ReadonlyMap<string, ElementBounds | null>,
+	order: ReadonlyMap<string, number>,
+): boolean {
+	const inner = boundsById.get(shape.id);
+	if (!inner) return false;
+	return holders.some((holder) => {
+		const outer = boundsById.get(holder.id);
+		return (
+			holder.id !== shape.id &&
+			masks(holder) &&
+			outer !== undefined &&
+			outer !== null &&
+			(order.get(holder.id) ?? 0) > (order.get(shape.id) ?? 0) &&
+			inner.x >= outer.x &&
+			inner.y >= outer.y &&
+			inner.x + inner.width <= outer.x + outer.width &&
+			inner.y + inner.height <= outer.y + outer.height
+		);
+	});
+}
+
+/** Whether a shape paints over what lies beneath it. */
+function masks(element: ExcalidrawElement): boolean {
+	return (
+		element.type !== "frame" &&
+		typeof element.backgroundColor === "string" &&
+		element.backgroundColor !== "transparent" &&
+		(typeof element.opacity !== "number" || element.opacity > 0)
+	);
+}
+
+/** Messages may cross other participants' lifelines and activation bars. */
+function isSequenceStructureShape(element: ExcalidrawElement): boolean {
+	const customData = element.customData;
+	if (customData === null || typeof customData !== "object") return false;
+	const role = (customData as Record<string, unknown>)["sketchiRendererRole"];
+	return CANVAS_CROSSABLE_RENDERER_ROLES.some((candidate) => candidate === role);
+}
+
+function arrowEndpoint(element: ExcalidrawElement, key: BindingKey) {
+	const x = numericValue(element.x) ?? 0;
+	const y = numericValue(element.y) ?? 0;
+	const points = Array.isArray(element.points)
+		? element.points
+				.map(finitePointTuple)
+				.filter((point): point is [number, number] => Boolean(point))
+		: [];
+	const point = key === "startBinding" ? points[0] : points[points.length - 1];
+
+	return point ? { x: x + point[0], y: y + point[1] } : null;
+}
+
+function between(value: number, min: number, max: number): boolean {
+	return value >= min - AXIS_ALIGNED_EPSILON && value <= max + AXIS_ALIGNED_EPSILON;
+}
+
+function near(value: number, target: number): boolean {
+	return Math.abs(value - target) <= AXIS_ALIGNED_EPSILON;
+}
+
+/** A connector end's neighbouring point, the one Excalidraw aims the end from. */
+function arrowNeighbour(element: ExcalidrawElement, key: BindingKey): Point | null {
+	const points = absoluteArrowPoints(element);
+	const neighbour = key === "startBinding" ? points[1] : points[points.length - 2];
+	return neighbour ? [neighbour.x, neighbour.y] : null;
+}
+
+function bindingFocus(element: ExcalidrawElement, key: BindingKey): FocusBinding | null {
+	const binding = element[key];
+	if (!(binding && typeof binding === "object")) return null;
+	const focus = numericValue((binding as { focus?: unknown }).focus);
+	const gap = numericValue((binding as { gap?: unknown }).gap);
+	return focus === null || gap === null ? null : { focus, gap };
+}
+
+/** Within this of where Excalidraw re-places an end, the end reads as kept. */
+const KEPT_END_TOLERANCE = 0.01;
+
+/** Within this of its binding's reach, a bound end reads as meeting its shape. */
+const REACH_TOLERANCE = 0.05;
+
+/**
+ * Whether a bound end meets its shape and Excalidraw leaves it where it is
+ * drawn when it updates the arrow. It must lie outside the outline Excalidraw
+ * draws and no farther out than the binding reaches: its gap for an arrow that
+ * is not elbowed, the outline itself for an elbow end (or the distance
+ * Excalidraw re-places one at). And Excalidraw's update must map it to itself:
+ * an elbow end at its fixed point, any other end where its focus and gap place
+ * it. Excalidraw keeps an end whose aim misses the shape where it is, so update
+ * stability alone would pass an arrow left floating beside its shape. A shape
+ * Excalidraw cannot bind keeps any end on its box.
+ */
+function excalidrawKeepsEnd(
+	element: ExcalidrawElement,
+	key: BindingKey,
+	shape: ExcalidrawElement,
+	endpoint: { x: number; y: number },
+): boolean {
+	const target = bindableShape(shape);
+	const point: Point = [endpoint.x, endpoint.y];
+	if (!target || !isExcalidrawBindableType(target.type)) {
+		return target !== undefined && pointOnBox(endpoint, target);
+	}
+	const elbowed = element.elbowed === true;
+	const binding = bindingFocus(element, key);
+	const reach = elbowed ? EXCALIDRAW_ELBOW_DISTANCE : (binding?.gap ?? 0);
+	const offset = excalidrawOutlineDistance(target, point);
+	if (offset === null || offset < -REACH_TOLERANCE || offset > reach + REACH_TOLERANCE) {
+		return false;
+	}
+	if (elbowed) {
+		const fixedPoint = bindingFixedPoint(element, key);
+		return (
+			fixedPoint !== null &&
+			excalidrawKeepsElbowEnd(target, excalidrawFixedGlobalPoint(target, fixedPoint))
+		);
+	}
+	const neighbour = arrowNeighbour(element, key);
+	if (!binding || !neighbour) return false;
+	const placed = excalidrawBoundPoint(target, binding, neighbour, point);
+	return (
+		placed !== null && Math.hypot(placed[0] - point[0], placed[1] - point[1]) <= KEPT_END_TOLERANCE
+	);
+}
+
+function pointOnBox(point: { x: number; y: number }, bounds: ElementBounds): boolean {
+	const onVerticalSide =
+		(near(point.x, bounds.x) || near(point.x, bounds.x + bounds.width)) &&
+		between(point.y, bounds.y, bounds.y + bounds.height);
+	const onHorizontalSide =
+		(near(point.y, bounds.y) || near(point.y, bounds.y + bounds.height)) &&
+		between(point.x, bounds.x, bounds.x + bounds.width);
+	return onVerticalSide || onHorizontalSide;
+}
+
+/**
+ * Whether a fixed point lands on the end drawn for it. Excalidraw reads a
+ * side's middle as 0.5001, a ten-thousandth of the side across, so 0.5001 reads
+ * as the middle here.
+ */
+function fixedPointResolvesToEndpoint(
+	fixedPoint: [number, number],
+	point: { x: number; y: number },
+	shape: ExcalidrawElement,
+): boolean {
+	const bounds = elementBounds(shape);
+
+	if (!bounds) {
+		return false;
+	}
+
+	const fixedX = Math.abs(fixedPoint[0] - 0.5001) < 0.0001 ? 0.5 : fixedPoint[0];
+	const fixedY = Math.abs(fixedPoint[1] - 0.5001) < 0.0001 ? 0.5 : fixedPoint[1];
+
+	return (
+		near(bounds.x + fixedX * bounds.width, point.x) &&
+		near(bounds.y + fixedY * bounds.height, point.y)
+	);
+}
+
+function absoluteArrowPoints(element: ExcalidrawElement): { x: number; y: number }[] {
+	const x = numericValue(element.x) ?? 0;
+	const y = numericValue(element.y) ?? 0;
+	return Array.isArray(element.points)
+		? element.points
+				.map(finitePointTuple)
+				.filter((point): point is [number, number] => point !== null)
+				.map(([px, py]) => ({ x: x + px, y: y + py }))
+		: [];
+}
+
+/**
+ * Reader-scale routing polish on the exported geometry: endpoint jogs,
+ * near-coincident corridors and touching arrowheads, judged at the size of the
+ * PNG a reader sees.
+ */
+export function exportedRoutingQualityFindings(scene: ExcalidrawScene): RoutingQualityFinding[] {
+	const elements = scene.elements.filter((element) => element.isDeleted !== true);
+	const arrows = elements.filter(isConnector);
+	const corners = elements.flatMap((element) => {
+		if (element.type === "arrow" || element.type === "line") return absoluteArrowPoints(element);
+		const bounds = elementBounds(element);
+		return bounds ? [bounds, { x: bounds.x + bounds.width, y: bounds.y + bounds.height }] : [];
+	});
+	const xs = corners.map((point) => point.x);
+	const ys = corners.map((point) => point.y);
+	return routingQualityFindings(
+		arrows.map((element) => ({
+			id: element.id,
+			points: absoluteArrowPoints(element),
+			sourceId: bindingElementId(element, "startBinding"),
+			targetId: bindingElementId(element, "endBinding"),
+			endArrowhead: element.endArrowhead !== null && element.endArrowhead !== undefined,
+		})),
+		routingQualityScale({
+			width: Math.max(...xs) - Math.min(...xs),
+			height: Math.max(...ys) - Math.min(...ys),
+		}),
+	);
+}
+
+export function validateExcalidrawScene(scene: ExcalidrawScene): ExcalidrawSceneValidationResult {
+	const issues: ExcalidrawSceneValidationIssue[] = [];
+	const elementsById = new Map(scene.elements.map((element) => [element.id, element]));
+	const shapeIds = new Set(scene.elements.filter(isBindableShape).map((element) => element.id));
+
+	if (scene.elements.length === 0) {
+		issues.push({
+			code: "empty-scene",
+			message: "Excalidraw scene must contain at least one shape.",
+		});
+	}
+
+	for (const element of scene.elements) {
+		if (
+			element.type === "image" &&
+			(typeof element.fileId !== "string" ||
+				!scene.files ||
+				!Object.hasOwn(scene.files, element.fileId))
+		) {
+			issues.push({
+				code: "missing-image-file",
+				elementId: element.id,
+				message: `Image "${element.id}" references a file missing from the scene.`,
+			});
+		}
+
+		if (isConnector(element)) {
+			const isElbowed = element.elbowed === true;
+
+			if (isElbowed && element.fixedSegments !== null && !Array.isArray(element.fixedSegments)) {
+				issues.push({
+					code: "invalid-elbow-binding",
+					elementId: element.id,
+					message: `Elbow arrow "${element.id}" is missing fixedSegments metadata.`,
+				});
+			}
+
+			for (const bindingKey of ["startBinding", "endBinding"] as const) {
+				if (element[bindingKey] === null || element[bindingKey] === undefined) {
+					continue;
+				}
+				const shapeId = bindingElementId(element, bindingKey);
+				if (!(shapeId && shapeIds.has(shapeId))) {
+					issues.push({
+						code: "missing-arrow-binding",
+						elementId: element.id,
+						message: `Arrow "${element.id}" has invalid ${bindingKey}.`,
+					});
+					continue;
+				}
+
+				const shape = elementsById.get(shapeId);
+				if (shape && !hasBoundElement(shape, element.id, "arrow")) {
+					issues.push({
+						code: "missing-bound-arrow",
+						elementId: shape.id,
+						message: `Shape "${shape.id}" does not include bound arrow "${element.id}".`,
+					});
+				}
+
+				const endpoint = arrowEndpoint(element, bindingKey);
+				if (shape && endpoint && !excalidrawKeepsEnd(element, bindingKey, shape, endpoint)) {
+					issues.push({
+						code: "arrow-endpoint-off-shape",
+						elementId: element.id,
+						message: `Arrow "${element.id}" ${bindingKey} endpoint is not where Excalidraw keeps it on "${shape.id}".`,
+					});
+				}
+
+				if (shape && endpoint && isElbowed) {
+					const fixedPoint = bindingFixedPoint(element, bindingKey);
+					if (!fixedPoint || !fixedPointResolvesToEndpoint(fixedPoint, endpoint, shape)) {
+						issues.push({
+							code: "invalid-elbow-binding",
+							elementId: element.id,
+							message: `Elbow arrow "${element.id}" has invalid ${bindingKey} fixedPoint metadata.`,
+						});
+					}
+				}
+			}
+		}
+
+		if (element.type === "text") {
+			const containerId = element.containerId;
+			if (typeof containerId !== "string") {
+				continue;
+			}
+
+			const container = elementsById.get(containerId);
+			if (!container) {
+				issues.push({
+					code: "missing-container",
+					elementId: element.id,
+					message: `Text "${element.id}" references missing container "${containerId}".`,
+				});
+				continue;
+			}
+
+			// A label box may reach into the fontSize/2 canvas padding on each side
+			// (see boundLabelWidth) without its glyphs leaving the container.
+			const textWidth =
+				(typeof element.width === "number" ? element.width : 0) -
+				(typeof element.fontSize === "number" ? element.fontSize : 0);
+			const textHeightValue = typeof element.height === "number" ? element.height : 0;
+			const containerWidth = typeof container.width === "number" ? container.width : 0;
+			const containerHeight = typeof container.height === "number" ? container.height : 0;
+
+			if (
+				isBindableShape(container) &&
+				(textWidth + TEXT_HORIZONTAL_PADDING > containerWidth ||
+					textHeightValue + TEXT_VERTICAL_PADDING > containerHeight)
+			) {
+				issues.push({
+					code: "text-overflow",
+					elementId: element.id,
+					message: `Text "${element.id}" does not fit inside "${containerId}".`,
+				});
+			}
+		}
+	}
+
+	issues.push(...arrowSegmentsThroughShapes(scene.elements));
+	issues.push(...overlappingArrowSegments(scene.elements));
+
+	return {
+		ok: issues.length === 0,
+		issues,
+	};
+}

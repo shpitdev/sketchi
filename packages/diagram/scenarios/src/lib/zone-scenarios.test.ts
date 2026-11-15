@@ -1,7 +1,7 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { zoneRegionIssues } from "@sketchi/diagram-core";
+import { zoneRegionIssues } from "@sketchi/drawing";
 
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
 import { getFlowchartScenario } from "./scenarios";

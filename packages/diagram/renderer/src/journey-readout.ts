@@ -1,12 +1,11 @@
-import { estimateTextWidth } from "@sketchi/diagram-core";
-
-import type {
-	LineSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	ScenePoint,
-	TextSceneElement,
-} from "./scene.js";
+import {
+	estimateTextWidth,
+	type CanvasLineElement as LineSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasPoint as ScenePoint,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
 interface Box {
 	readonly left: number;

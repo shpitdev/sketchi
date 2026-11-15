@@ -21,10 +21,13 @@
       "path": "../generation/tsconfig.lib.json"
     },
     {
-      "path": "../excalidraw/tsconfig.lib.json"
+      "path": "../../drawing/tsconfig.lib.json"
     },
     {
       "path": "../core/tsconfig.lib.json"
+    },
+    {
+      "path": "../../diagrams/tsconfig.lib.json"
     }
   ]
 }

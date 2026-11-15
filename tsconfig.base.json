@@ -244,8 +244,11 @@
             "include": [
               "packages/diagram/core/src/intermediate.ts",
               "packages/diagram/core/src/diagram.ts",
-              "packages/diagram/core/src/types/mindmap.ts",
-              "packages/diagram/core/src/planarity.ts"
+              "packages/diagram/core/src/planarity.ts",
+              "packages/diagrams/src/mindmap/document.ts",
+              "packages/drawing/src/style.ts",
+              "packages/drawing/src/recipe-schema.ts",
+              "packages/drawing/src/excalidraw/scene.ts"
             ],
             "options": {
               "diagnosticSeverity": {

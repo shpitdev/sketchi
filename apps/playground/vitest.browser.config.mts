@@ -42,20 +42,20 @@ export default defineConfig({
 				replacement: source("../../packages/diagram/generation/src/index.ts"),
 			},
 			{
-				find: "@sketchi/diagram-excalidraw",
-				replacement: source("../../packages/diagram/excalidraw/src/index.ts"),
+				find: "@sketchi/drawing/excalidraw",
+				replacement: source("../../packages/drawing/src/excalidraw/index.ts"),
 			},
 			{
 				find: "@sketchi/diagram-scenarios",
 				replacement: source("../../packages/diagram/scenarios/src/index.ts"),
 			},
 			{
-				find: "@sketchi/diagram-ui/styles.css",
-				replacement: source("../../packages/diagram/ui/src/styles.css"),
+				find: "@sketchi/editor/styles.css",
+				replacement: source("../../packages/editor/src/styles.css"),
 			},
 			{
-				find: "@sketchi/diagram-ui",
-				replacement: source("../../packages/diagram/ui/src/index.ts"),
+				find: "@sketchi/editor",
+				replacement: source("../../packages/editor/src/index.ts"),
 			},
 		],
 	},

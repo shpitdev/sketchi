@@ -2,9 +2,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { IconRecipe } from "@sketchi/diagram-core";
-import type { SketchiIcon } from "@sketchi/icon-catalog";
-import type { IconAuthorModel } from "@sketchi/icon-draw";
+import { type IconRecipe } from "@sketchi/drawing";
+import { type SketchiIcon } from "@sketchi/icon-catalog";
+import { type IconAuthorModel } from "@sketchi/icon-draw";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { attemptCeilingUsd, type BatchAuthor, type MarkAttempt, priceLogs } from "./draw-mark.js";

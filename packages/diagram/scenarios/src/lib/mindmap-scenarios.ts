@@ -1,14 +1,17 @@
+import {
+	mindmapTopics,
+	type Mindmap,
+	type MindmapTopic,
+	parseMindmap,
+	mindmapLayoutIssues,
+} from "@sketchi/diagrams/mindmap";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
-import {
-	type MindmapDiagram,
-	type MindmapTopicTree,
-	mindmapDiagramFromTree,
-} from "@sketchi/diagram-core";
-import { mindmapLayoutIssues, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+
+import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
 
 /**
  * A topic the prompt states, with any-of label alternatives made of its words,
@@ -29,7 +32,7 @@ export interface MindmapScenario {
 	readonly description: string;
 	readonly diagramType: "mindmap";
 	readonly difficulty: DiagramScenarioDifficulty;
-	readonly expectedDiagram: MindmapDiagram;
+	readonly expectedDiagram: Mindmap;
 	readonly id: string;
 	readonly logos: readonly [];
 	readonly prompt: string;
@@ -89,12 +92,11 @@ export function mindmapAlternativesGrounded(
  * that best matches its words, preferring one under the topic its parent took,
  * then the tightest match, then the first drawn.
  */
-function assignTopics(
-	scenario: MindmapScenario,
-	diagram: MindmapDiagram,
-): ReadonlyMap<string, string> {
-	const parentOf = new Map(diagram.edges.map((edge) => [edge.target, edge.source]));
-	const root = diagram.nodes.find((node) => node.kind === "root");
+function assignTopics(scenario: MindmapScenario, diagram: Mindmap): ReadonlyMap<string, string> {
+	const parentOf = new Map(
+		[...mindmapTopics(diagram.root)].map((topic) => [topic.id, topic.parent]),
+	);
+	const root = { id: "topic-0", label: diagram.root.label };
 	const assigned = new Map<string, string>();
 	const claimed = new Set<string>();
 	const { topics } = scenario.assertions;
@@ -108,8 +110,8 @@ function assignTopics(
 			continue;
 		}
 		const parent = assigned.get(topic.parent);
-		const candidates = diagram.nodes
-			.filter((node) => node.kind !== "root" && !claimed.has(node.id))
+		const candidates = [...mindmapTopics(diagram.root)]
+			.filter((node) => node.parent !== undefined && !claimed.has(node.id))
 			.map((node, order) => ({
 				id: node.id,
 				order,
@@ -136,14 +138,18 @@ function assignTopics(
  */
 export function mindmapScenarioChecks(
 	scenario: MindmapScenario,
-	diagram: MindmapDiagram,
+	diagram: Mindmap,
 ): ScenarioCheck[] {
 	const { root, topics } = scenario.assertions;
 	const assigned = assignTopics(scenario, diagram);
-	const parentOf = new Map(diagram.edges.map((edge) => [edge.target, edge.source]));
-	const labelOf = new Map(diagram.nodes.map((node) => [node.id, node.label]));
+	const parentOf = new Map(
+		[...mindmapTopics(diagram.root)].map((topic) => [topic.id, topic.parent]),
+	);
+	const labelOf = new Map([...mindmapTopics(diagram.root)].map((node) => [node.id, node.label]));
 	const describe = (key: string) => topics[key]!.labels.join("|");
-	const invented = diagram.nodes.filter((node) => ![...assigned.values()].includes(node.id));
+	const invented = [...mindmapTopics(diagram.root)].filter(
+		(node) => ![...assigned.values()].includes(node.id),
+	);
 	return [
 		{
 			id: "root",
@@ -243,7 +249,7 @@ function defineMindmapScenario(definition: MindmapScenarioDefinition): MindmapSc
 		for (const child of entry.children ?? []) visit(child, key);
 	};
 	visit(root);
-	const tree = (entry: TopicDefinition): MindmapTopicTree => ({
+	const tree = (entry: TopicDefinition): MindmapTopic => ({
 		label: entry.label,
 		...(entry.children ? { children: entry.children.map(tree) } : {}),
 	});
@@ -252,7 +258,7 @@ function defineMindmapScenario(definition: MindmapScenarioDefinition): MindmapSc
 		diagramType: "mindmap",
 		logos: [],
 		assertions: { root: keyOf(root.label), topics },
-		expectedDiagram: mindmapDiagramFromTree({
+		expectedDiagram: parseMindmap({
 			id: definition.id,
 			title: definition.title,
 			root: tree(root),

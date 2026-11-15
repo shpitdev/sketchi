@@ -1,9 +1,10 @@
-import type { IntermediateDiagram } from "@sketchi/diagram-core";
-import { type ExcalidrawScene, validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { type Mindmap, mindmapTopics } from "@sketchi/diagrams/mindmap";
+import { type IntermediateDiagram } from "@sketchi/diagram-core";
+import { type ExcalidrawScene, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { useMemo, useState } from "react";
 
 export interface DiagramInspectorProps {
-	diagram: IntermediateDiagram;
+	diagram: IntermediateDiagram | Mindmap;
 	scene: ExcalidrawScene;
 }
 
@@ -59,15 +60,21 @@ export function DiagramInspector({ diagram, scene }: DiagramInspectorProps) {
 						</div>
 						<div>
 							<dt>Edge routing</dt>
-							<dd>{diagram.layout.edgeRouting}</dd>
+							<dd>{"root" in diagram ? "curved" : diagram.layout.edgeRouting}</dd>
 						</div>
 						<div>
 							<dt>Nodes</dt>
-							<dd>{diagram.nodes.length}</dd>
+							<dd>
+								{"root" in diagram ? [...mindmapTopics(diagram.root)].length : diagram.nodes.length}
+							</dd>
 						</div>
 						<div>
 							<dt>Edges</dt>
-							<dd>{diagram.edges.length}</dd>
+							<dd>
+								{"root" in diagram
+									? [...mindmapTopics(diagram.root)].length - 1
+									: diagram.edges.length}
+							</dd>
 						</div>
 						<div>
 							<dt>Accent</dt>

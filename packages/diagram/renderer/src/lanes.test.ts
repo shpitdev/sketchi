@@ -3,21 +3,20 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	flowchartFixture,
-	getCanvasValidationIssues,
 	laneFixtures,
-	laneRegionIssues,
 	laneStressFixtures,
 	parseIntermediateDiagram,
-	routingQualityFindings,
-	routingQualityScale,
 } from "@sketchi/diagram-core";
 import {
-	arrowCrossings,
-	renderIntermediateDiagram,
-	type ArrowSceneElement,
-	type NodeSceneElement,
-	type RenderedDiagramScene,
-} from "./scene";
+	getCanvasValidationIssues,
+	laneRegionIssues,
+	routingQualityFindings,
+	routingQualityScale,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import { arrowCrossings, renderIntermediateDiagram } from "./scene";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];

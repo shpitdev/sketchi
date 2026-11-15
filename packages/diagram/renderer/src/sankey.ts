@@ -1,13 +1,20 @@
 import { Result } from "effect";
 import {
 	type SankeyValidationError,
-	CANVAS_SPEC_VERSION,
-	SKETCHI_DIAGRAM_PALETTE,
 	validateSankeyDiagram,
-	wrapTextToWidth,
-	estimateTextWidth,
 	type SankeyDiagram,
 } from "@sketchi/diagram-core";
+import {
+	CANVAS_SPEC_VERSION,
+	SKETCHI_DIAGRAM_PALETTE,
+	wrapTextToWidth,
+	estimateTextWidth,
+	type CanvasLineElement as LineSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
 import { formatValue, unitParts } from "./chart-scale.js";
 import {
@@ -18,13 +25,6 @@ import {
 	type SankeyLayout,
 	type SankeyText,
 } from "./sankey-layout.js";
-import type {
-	LineSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	SceneElement,
-	TextSceneElement,
-} from "./scene.js";
 
 export const SANKEY_MARK_ROLE = "sankey-mark";
 

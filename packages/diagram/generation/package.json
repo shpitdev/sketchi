@@ -16,6 +16,8 @@
 		"@sketchi/diagram-core": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/observability": "workspace:*",
-		"effect": "catalog:"
+		"effect": "catalog:",
+		"@sketchi/drawing": "workspace:*",
+		"@sketchi/diagrams": "workspace:*"
 	}
 }

@@ -5,9 +5,9 @@ import {
 	type DiagramZoneKind,
 	type FlowchartDiagram,
 	type FlowchartNodeKind,
-	SKETCHI_DIAGRAM_STYLE,
 	parseFlowchartDiagram,
 } from "@sketchi/diagram-core";
+import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 import { flowchartLabelWords } from "./flowchart-labels.js";
 

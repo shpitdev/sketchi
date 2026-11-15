@@ -1,14 +1,14 @@
 import { RegistryProvider } from "@effect/atom-react";
 import { Layer, Tracer } from "effect";
 import { FetchHttpClient } from "effect/http";
-import type { ReactNode } from "react";
-import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import { type ReactNode } from "react";
+import { type ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@sketchi/diagram-ui", async (original) => ({
-	...(await original<typeof import("@sketchi/diagram-ui")>()),
-	ExcalidrawSceneCanvas: ({
+vi.mock("@sketchi/editor", async (original) => ({
+	...(await original<typeof import("@sketchi/editor")>()),
+	DrawingEditor: ({
 		onChange,
 		scene,
 		title,
@@ -43,7 +43,7 @@ vi.mock("@sketchi/diagram-ui", async (original) => ({
 	),
 }));
 
-import type { SvgHandoff } from "../../lib/svg-handoff";
+import { type SvgHandoff } from "../../lib/svg-handoff";
 import { svgHttpLayer } from "../../lib/svg-source-atom";
 import { SvgIconWorkspace, type SvgIconWorkspaceProps } from "./svg-icon-workspace";
 

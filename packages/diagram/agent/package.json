@@ -12,11 +12,12 @@
 	},
 	"dependencies": {
 		"@sketchi/diagram-core": "workspace:*",
-		"@sketchi/diagram-excalidraw": "workspace:*",
+		"@sketchi/drawing": "workspace:*",
 		"@sketchi/diagram-renderer": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/observability": "workspace:*",
 		"@standard-schema/spec": "1.1.0",
-		"effect": "catalog:"
+		"effect": "catalog:",
+		"@sketchi/diagrams": "workspace:*"
 	}
 }

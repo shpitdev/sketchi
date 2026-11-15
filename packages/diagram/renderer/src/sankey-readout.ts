@@ -1,4 +1,9 @@
-import { estimateTextWidth } from "@sketchi/diagram-core";
+import {
+	estimateTextWidth,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
 import {
 	polygonBounds,
@@ -10,7 +15,6 @@ import {
 	segmentMeetsBox,
 	type SankeyBox,
 } from "./sankey-layout.js";
-import type { NodeSceneElement, RenderedDiagramScene, TextSceneElement } from "./scene.js";
 
 type Point = { readonly x: number; readonly y: number };
 

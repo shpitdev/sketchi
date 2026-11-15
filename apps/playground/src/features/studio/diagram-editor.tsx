@@ -1,5 +1,5 @@
-import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import { downloadBlob, ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
+import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
+import { downloadBlob, DrawingEditor } from "@sketchi/editor";
 import { saveStudioDiagramDrawing } from "@sketchi/studio-projects/client";
 import { useCallback, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
@@ -144,8 +144,8 @@ export function DiagramEditor({
 				</IconActionBar>
 			</StudioHeader>
 			<section className="artifact-view__stage">
-				<div className="sketchi-artifact-canvas" data-mode="edit">
-					<ExcalidrawSceneCanvas
+				<>
+					<DrawingEditor
 						onSceneChange={onSceneChange}
 						revision={diagramId}
 						scene={initialScene}
@@ -153,7 +153,7 @@ export function DiagramEditor({
 						viewModeEnabled={false}
 						zenModeEnabled={false}
 					/>
-				</div>
+				</>
 			</section>
 		</main>
 	);

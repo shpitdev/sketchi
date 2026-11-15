@@ -6,14 +6,11 @@ import {
 	type QuadrantDiagram,
 	type QuadrantKey,
 } from "@sketchi/diagram-core";
-import {
-	quadrantLayoutIssues,
-	readQuadrantScene,
-	type RenderedDiagramScene,
-} from "@sketchi/diagram-renderer";
+import { quadrantLayoutIssues, readQuadrantScene } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
 
 type End = "low" | "high";
 

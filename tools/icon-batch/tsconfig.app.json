@@ -20,6 +20,9 @@
     },
     {
       "path": "../../packages/diagram/core/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/drawing/tsconfig.lib.json"
     }
   ]
 }

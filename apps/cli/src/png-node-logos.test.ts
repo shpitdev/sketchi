@@ -141,7 +141,7 @@ layer(Layer.mergeAll(builderLayer, CliPngRendererLive))("headless PNG node logos
 			// Hand-edited and third-party drawings may use ids like node:a:icon.
 			const elements = built.excalidraw.elements.map((element) =>
 				element["type"] === "image"
-					? { ...element, id: String(element["id"]).replaceAll("-", ":") }
+					? { ...element, id: element["id"].replaceAll("-", ":") }
 					: element,
 			);
 

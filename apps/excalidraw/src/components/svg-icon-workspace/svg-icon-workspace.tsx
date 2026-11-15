@@ -1,9 +1,5 @@
-import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
-import {
-	downloadBlob,
-	ExcalidrawSceneCanvas,
-	type ExcalidrawSceneCanvasProps,
-} from "@sketchi/diagram-ui";
+import { type ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+import { downloadBlob, DrawingEditor, type DrawingEditorProps } from "@sketchi/editor";
 import {
 	convertSvgToExcalidraw,
 	parseSvg,
@@ -16,13 +12,13 @@ import { Cause, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { useCallback, useMemo, useState } from "react";
 
-import type { SvgHandoff } from "../../lib/svg-handoff";
+import { type SvgHandoff } from "../../lib/svg-handoff";
 import { svgSourceAtom } from "../../lib/svg-source-atom";
 import { WorkspaceTopBar } from "../workspace-top-bar/index.js";
 
 export interface SvgIconWorkspaceProps {
 	handoff: SvgHandoff;
-	onEditorApi?: ExcalidrawSceneCanvasProps["onApiChange"];
+	onEditorApi?: DrawingEditorProps["onApiChange"];
 	/** Deterministic Storybook/test source; production fetches the handoff URL. */
 	initialSource?: string;
 }
@@ -207,7 +203,7 @@ export function SvgIconWorkspace({ handoff, initialSource, onEditorApi }: SvgIco
 							Loading source SVG…
 						</div>
 					) : ready ? (
-						<ExcalidrawSceneCanvas
+						<DrawingEditor
 							{...(onEditorApi ? { onApiChange: onEditorApi } : {})}
 							onChange={handleSceneChange}
 							revision={revision}

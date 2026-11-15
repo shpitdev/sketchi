@@ -1,4 +1,4 @@
-import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { StudioDrawing } from "@sketchi/studio-projects/client";
 import { Result, Schema } from "effect";
 import { createStore, del, get, set, type UseStore } from "idb-keyval";

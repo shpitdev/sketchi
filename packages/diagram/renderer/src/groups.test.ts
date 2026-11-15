@@ -4,21 +4,17 @@ import { describe, expect, it } from "vitest";
 import {
 	CANVAS_FRAME_NAME,
 	canvasFrameNameWidth,
-	flowchartFixture,
 	getCanvasValidationIssues,
-	groupFixtures,
 	groupRegionIssues,
 	routingQualityFindings,
 	routingQualityScale,
-} from "@sketchi/diagram-core";
-import {
-	arrowCrossings,
-	renderIntermediateDiagram,
-	type ArrowSceneElement,
-	type FrameSceneElement,
-	type NodeSceneElement,
-	type RenderedDiagramScene,
-} from "./scene";
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasFrameElement as FrameSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import { flowchartFixture, groupFixtures } from "@sketchi/diagram-core";
+import { arrowCrossings, renderIntermediateDiagram } from "./scene";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];

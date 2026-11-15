@@ -552,7 +552,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 		}
 		for (const [topic, types] of [
 			["buildFlowchart", ["BuildFlowchartRequest", "BuildOptions"]],
-			["buildMindmap", ["BuildMindmapRequest", "BuildMindmapRequest___schema0"]],
+			["buildMindmap", ["BuildMindmapRequest", "BuildMindmapRequest_MindmapTopic"]],
 			["buildSequenceDiagram", ["BuildSequenceDiagramRequest"]],
 			["buildTimeline", ["BuildTimelineRequest"]],
 			["buildGantt", ["BuildGanttRequest"]],

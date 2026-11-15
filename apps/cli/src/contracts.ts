@@ -1,12 +1,9 @@
-import {
-	CANONICAL_DOCUMENT_TYPES,
-	type ExcalidrawFile,
-	type CodeModeIssue,
-	type PatchableScene,
-} from "@sketchi/diagram-agent";
+import { CANONICAL_DOCUMENT_TYPES, type PatchableScene } from "@sketchi/diagram-agent";
+import { type ExcalidrawFile } from "@sketchi/drawing/excalidraw";
+import { type CodeModeIssue } from "@sketchi/diagrams/build";
 import { Effect, Schema } from "effect";
 
-import type { DiagramDocument } from "./document.js";
+import { type DiagramDocument } from "./document.js";
 
 export const RECORD_SCHEMA_VERSION = 1;
 export const MANIFEST_FILE = "manifest.json";

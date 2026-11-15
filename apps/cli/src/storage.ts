@@ -1,7 +1,8 @@
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { ExcalidrawFile, RenderedDiagramSceneSchema } from "@sketchi/diagram-agent";
+import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
+import { RenderedDiagramSceneSchema } from "@sketchi/diagram-agent";
 import { Clock, Context, Effect, Layer, Result, Schedule, Schema } from "effect";
 
 import {

@@ -1,57 +1,44 @@
+import {
+	mindmapTopics,
+	type Mindmap,
+	type MindmapTopic,
+	parseMindmap,
+} from "@sketchi/diagrams/mindmap";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Option } from "effect";
 import { describe, expect, it } from "vitest";
-
-import {
-	type MindmapDiagram,
-	type MindmapTopicTree,
-	mindmapDiagramFromTree,
-} from "@sketchi/diagram-core";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { candidateFromMcpResult } from "./mcp-results.js";
 import { mindmapAlternativesGrounded, mindmapScenarios } from "./mindmap-scenarios.js";
 
 const scenario = (id: string) => mindmapScenarios.find((entry) => entry.id === id)!;
-const failed = (id: string, diagram: MindmapDiagram) =>
+const failed = (id: string, diagram: Mindmap) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
 		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 
 /** The scenario's expected map as a nested tree, to edit and rebuild. */
-function treeOf(diagram: MindmapDiagram): MindmapTopicTree {
-	const children = (id: string): MindmapTopicTree[] =>
-		diagram.edges
-			.filter((edge) => edge.source === id)
-			.toSorted((a, b) => a.metadata.siblingIndex - b.metadata.siblingIndex)
-			.map((edge) => ({
-				label: diagram.nodes.find((node) => node.id === edge.target)!.label,
-				children: children(edge.target),
-			}));
-	const root = diagram.nodes.find((node) => node.kind === "root")!;
-	return { label: root.label, children: children(root.id) };
-}
 
-/** Rebuild the scenario's map with `edit` applied to its tree. */
-function edited(id: string, edit: (root: MindmapTopicTree) => MindmapTopicTree): MindmapDiagram {
-	return mindmapDiagramFromTree({
+function edited(id: string, edit: (root: MindmapTopic) => MindmapTopic): Mindmap {
+	return parseMindmap({
 		id,
 		title: scenario(id).title,
-		root: edit(treeOf(scenario(id).expectedDiagram)),
+		root: edit(scenario(id).expectedDiagram.root),
 	}).pipe(Result.getOrThrow);
 }
 
-const children = (topic: MindmapTopicTree) => [...(topic.children ?? [])];
-const depth = (topic: MindmapTopicTree): number => 1 + Math.max(0, ...children(topic).map(depth));
+const children = (topic: MindmapTopic) => [...(topic.children ?? [])];
+const depth = (topic: MindmapTopic): number => 1 + Math.max(0, ...children(topic).map(depth));
 
 describe("prompt-grounded mindmap scenarios", () => {
 	it("covers a brainstorm, three-level notes, a wide plan and three large maps", () => {
 		const sizes = mindmapScenarios.map((entry) => ({
 			id: entry.id,
-			topics: entry.expectedDiagram.nodes.length,
-			main: entry.expectedDiagram.edges.filter((edge) => edge.metadata.depth === 1).length,
-			levels: depth(treeOf(entry.expectedDiagram)) - 1,
+			topics: [...mindmapTopics(entry.expectedDiagram.root)].length,
+			main: entry.expectedDiagram.root.children?.length ?? 0,
+			levels: depth(entry.expectedDiagram.root) - 1,
 		}));
 		expect(sizes).toEqual([
 			{ id: "team-offsite-mindmap-v2", topics: 14, main: 4, levels: 2 },
@@ -67,7 +54,7 @@ describe("prompt-grounded mindmap scenarios", () => {
 		it(`${entry.id}: grounds every topic in the prompt`, () => {
 			for (const [key, topic] of Object.entries(entry.assertions.topics))
 				expect(mindmapAlternativesGrounded(entry.prompt, topic.labels), key).toBe(true);
-			for (const node of entry.expectedDiagram.nodes)
+			for (const node of [...mindmapTopics(entry.expectedDiagram.root)])
 				expect(entry.prompt, node.label).toContain(node.label);
 		});
 
@@ -81,7 +68,7 @@ describe("prompt-grounded mindmap scenarios", () => {
 		});
 
 		it(`${entry.id}: requires every stated topic`, () => {
-			const root = treeOf(entry.expectedDiagram);
+			const root = entry.expectedDiagram.root;
 			// Drop each main branch's last child in turn.
 			children(root).forEach((branch, index) => {
 				const last = children(branch).at(-1);
@@ -172,7 +159,7 @@ describe("prompt-grounded mindmap scenarios", () => {
 
 	it("grades a Code Mode build from its nested normalized spec", () => {
 		const entry = scenario("team-offsite-mindmap-v2");
-		const normalize = (topic: MindmapTopicTree, path: number[]): unknown => ({
+		const normalize = (topic: MindmapTopic, path: number[]): unknown => ({
 			id: `topic-${path.join("-")}`,
 			label: topic.label,
 			children: children(topic).map((child, index) => normalize(child, [...path, index])),
@@ -186,7 +173,7 @@ describe("prompt-grounded mindmap scenarios", () => {
 				normalizedSpec: {
 					id: "team-offsite",
 					title: "Team offsite",
-					root: normalize(treeOf(entry.expectedDiagram), [0]),
+					root: normalize(entry.expectedDiagram.root, [0]),
 					layout: { direction: "LR" },
 					style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
 				},

@@ -1,3 +1,4 @@
+import { type MindmapInputError, parseMindmap } from "@sketchi/diagrams/mindmap";
 import { Result, Schema } from "effect";
 import {
 	type CanonicalValidationError,
@@ -5,7 +6,6 @@ import {
 	type SequenceDiagram,
 	type FlowchartDiagram,
 	parseFlowchartDiagram,
-	parseMindmapDiagram,
 	parseSequenceDiagram,
 	parseStateMachineDiagram,
 	parseErDiagram,
@@ -24,6 +24,7 @@ import {
 	sequenceActivations,
 	unavoidableCrossings,
 } from "@sketchi/diagram-core";
+
 import {
 	chartClearRulesCheck,
 	chartDrawnDataCheck,
@@ -73,18 +74,19 @@ import {
 	validateExcalidrawScene,
 	type ExcalidrawScene,
 	type ExcalidrawSceneValidationResult,
-} from "@sketchi/diagram-excalidraw";
-import { renderDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
+} from "@sketchi/drawing/excalidraw";
+import { renderDiagram } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { termTokens } from "@sketchi/icon-catalog";
 
-import type { DiagramScenario } from "./diagram-scenarios.js";
+import { type DiagramScenario } from "./diagram-scenarios.js";
 import { flowchartLabelMatches } from "./flowchart-labels.js";
-import type {
-	FlowchartScenario,
-	FlowchartScenarioRequiredNode,
-	DiagramScenarioLogo,
+import {
+	type FlowchartScenario,
+	type FlowchartScenarioRequiredNode,
+	type DiagramScenarioLogo,
 } from "./scenarios.js";
-import type { SequenceScenario, SequenceScenarioMessage } from "./sequence-scenarios.js";
+import { type SequenceScenario, type SequenceScenarioMessage } from "./sequence-scenarios.js";
 import {
 	type BranchMatcher,
 	type ExpectedEdge,
@@ -924,7 +926,7 @@ function evaluation(
 	diagram: CanonicalDiagram,
 	familyChecks: readonly ScenarioCheck[],
 	sceneChecks: (scene: RenderedDiagramScene) => readonly ScenarioCheck[] = () => [],
-): Result.Result<ScenarioEvaluation, ScenarioEvaluationError> {
+): Result.Result<ScenarioEvaluation, ScenarioEvaluationError | MindmapInputError> {
 	return Result.map(renderDiagram(diagram), (scene) => {
 		const { check, excalidrawScene, excalidrawValidation } = excalidrawCheck(scene);
 		const checks = [...familyChecks, ...sceneChecks(scene), check];
@@ -1090,7 +1092,7 @@ export function evaluateScenarioDiagram(
 	scenario: DiagramScenario,
 	candidate: unknown,
 	modelCandidate: unknown = candidate,
-): Result.Result<ScenarioEvaluation, ScenarioEvaluationError> {
+): Result.Result<ScenarioEvaluation, ScenarioEvaluationError | MindmapInputError> {
 	return Result.gen(function* () {
 		if (scenario.diagramType === "chart") {
 			const diagram = yield* parseChartDiagram(candidate);
@@ -1145,9 +1147,9 @@ export function evaluateScenarioDiagram(
 			);
 		}
 		if (scenario.diagramType === "mindmap") {
-			const diagram = yield* parseMindmapDiagram(candidate);
+			const diagram = yield* parseMindmap(candidate);
 			const modelDiagram =
-				modelCandidate === candidate ? diagram : yield* parseMindmapDiagram(modelCandidate);
+				modelCandidate === candidate ? diagram : yield* parseMindmap(modelCandidate);
 			// The layout check reads the drawn scene, so it scores the returned diagram.
 			return yield* evaluation(
 				scenario.id,
@@ -1370,7 +1372,7 @@ export function evaluateScenarioOutput(
 
 export function evaluateScenarioFixture(
 	scenario: DiagramScenario,
-): Result.Result<ScenarioEvaluation, ScenarioEvaluationError> {
+): Result.Result<ScenarioEvaluation, ScenarioEvaluationError | MindmapInputError> {
 	return evaluateScenarioDiagram(scenario, scenario.expectedDiagram);
 }
 

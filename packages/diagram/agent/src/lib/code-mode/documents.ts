@@ -1,50 +1,11 @@
 import {
-	type CanonicalDiagram,
-	DIAGRAM_TYPES,
-	type DiagramTypeValue,
-	type FlowchartDiagram,
-} from "@sketchi/diagram-core";
-import type { Effect } from "effect";
-
-import {
-	type BuildChartResult,
-	type BuildGanttResult,
-	type BuildFlowchartOptions,
-	type BuildFlowchartResult,
+	buildMindmap as buildMindmapDocument,
 	type BuildMindmapResult,
-	type BuildSequenceDiagramResult,
-	type BuildStateMachineResult,
-	type BuildErDiagramResult,
-	type BuildClassDiagramResult,
-	type BuildOrgChartResult,
-	type BuildVennDiagramResult,
-	type BuildJourneyMapResult,
-	type BuildSankeyResult,
-	type BuildWireframeResult,
-	type BuildQuadrantChartResult,
-	type BuildTimelineResult,
-	ClassSpec,
-	ErSpec,
-	FlowchartSpec,
-	MindmapSpec,
-	type MindmapTopicInput,
-	SequenceDiagramSpec,
-	StateMachineSpec,
-	TimelineSpec,
-	ChartSpec,
-	GanttSpec,
-	OrgChartSpec,
-	VennSpec,
-	JourneySpec,
-	SankeySpec,
-	WireframeSpec,
-	type WireframeComponentInput,
-	QuadrantChartSpec,
-} from "./contract.js";
-import type { CodeModeArtifactStorage } from "./artifacts.js";
+} from "@sketchi/diagrams/mindmap/build";
 import {
+	artifactBuildCapabilities,
+	observeCodeModeBoundary,
 	buildFlowchart,
-	buildMindmap,
 	buildSequenceDiagram,
 	buildStateMachine,
 	buildErDiagram,
@@ -60,6 +21,49 @@ import {
 	buildGantt,
 	type CodeModeRuntimeEnvironment,
 } from "./runtime.js";
+import {
+	type CanonicalDiagram,
+	DIAGRAM_TYPES,
+	type DiagramTypeValue,
+	type FlowchartDiagram,
+} from "@sketchi/diagram-core";
+import { Effect } from "effect";
+
+import {
+	type BuildChartResult,
+	type BuildGanttResult,
+	type BuildFlowchartOptions,
+	type BuildFlowchartResult,
+	type BuildSequenceDiagramResult,
+	type BuildStateMachineResult,
+	type BuildErDiagramResult,
+	type BuildClassDiagramResult,
+	type BuildOrgChartResult,
+	type BuildVennDiagramResult,
+	type BuildJourneyMapResult,
+	type BuildSankeyResult,
+	type BuildWireframeResult,
+	type BuildQuadrantChartResult,
+	type BuildTimelineResult,
+	ClassSpec,
+	ErSpec,
+	FlowchartSpec,
+	SequenceDiagramSpec,
+	StateMachineSpec,
+	TimelineSpec,
+	ChartSpec,
+	GanttSpec,
+	OrgChartSpec,
+	VennSpec,
+	JourneySpec,
+	SankeySpec,
+	WireframeSpec,
+	type WireframeComponentInput,
+	QuadrantChartSpec,
+} from "./contract.js";
+import { MindmapDocument } from "@sketchi/diagrams/mindmap";
+
+import { type CodeModeArtifactStorage } from "./artifacts.js";
 
 /** Every canonical family has one Code Mode document type. */
 export const CANONICAL_DOCUMENT_TYPES = DIAGRAM_TYPES;
@@ -67,7 +71,7 @@ export const CANONICAL_DOCUMENT_TYPES = DIAGRAM_TYPES;
 /** The Code Mode authoring spec each canonical family's document carries. */
 export const CANONICAL_DOCUMENT_SPECS = {
 	flowchart: FlowchartSpec,
-	mindmap: MindmapSpec,
+	mindmap: MindmapDocument,
 	sequence: SequenceDiagramSpec,
 	timeline: TimelineSpec,
 	chart: ChartSpec,
@@ -125,8 +129,21 @@ export function buildCanonicalDocument(
 	switch (document.type) {
 		case "flowchart":
 			return buildFlowchart(request);
-		case "mindmap":
-			return buildMindmap(request);
+		case "mindmap": {
+			const typedRequest = { spec: document.spec, ...(options ? { options } : {}) };
+			return observeCodeModeBoundary(
+				"buildMindmap",
+				typedRequest,
+				Effect.gen(function* () {
+					return yield* buildMindmapDocument(typedRequest, yield* artifactBuildCapabilities);
+				}).pipe(
+					Effect.match({
+						onFailure: (error) => ({ ok: false as const, status: error.status, ...error.context }),
+						onSuccess: (result) => result,
+					}),
+				),
+			);
+		}
 		case "sequence":
 			return buildSequenceDiagram(request);
 		case "timeline":
@@ -154,25 +171,6 @@ export function buildCanonicalDocument(
 		case "quadrant":
 			return buildQuadrantChart(request);
 	}
-}
-
-function mindmapRoot(diagram: Extract<CanonicalDiagram, { type: "mindmap" }>): MindmapTopicInput {
-	const nodes = new Map(diagram.nodes.map((node) => [node.id, node]));
-	const children = new Map<string, (typeof diagram.edges)[number][]>();
-	for (const edge of diagram.edges) {
-		children.set(edge.source, [...(children.get(edge.source) ?? []), edge]);
-	}
-	const topic = (nodeId: string): MindmapTopicInput => {
-		const nested = [...(children.get(nodeId) ?? [])]
-			.sort((left, right) => left.metadata.siblingIndex - right.metadata.siblingIndex)
-			.map((edge) => topic(edge.target));
-		return {
-			label: nodes.get(nodeId)?.label ?? nodeId,
-			...(nested.length > 0 ? { children: nested } : {}),
-		};
-	};
-	const root = diagram.nodes.find((node) => node.kind === "root") ?? diagram.nodes[0];
-	return topic(root?.id ?? "");
 }
 
 /**
@@ -227,7 +225,7 @@ export function canonicalDocumentFromDiagram(
 				spec: {
 					id: diagram.id,
 					title: diagram.title,
-					root: mindmapRoot(diagram),
+					root: diagram.root,
 					layout: { direction: diagram.layout.direction === "RL" ? "RL" : "LR" },
 					style: diagram.style,
 				},

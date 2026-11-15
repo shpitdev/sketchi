@@ -2,9 +2,9 @@ import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { iconRecipeFitIssues, iconRecipeIssues } from "@sketchi/diagram-core";
+import { iconRecipeFitIssues, iconRecipeIssues } from "@sketchi/drawing";
 
-import type { MarkRecord } from "./store.js";
+import { type MarkRecord } from "./store.js";
 
 export interface Promotion {
 	readonly written: readonly string[];

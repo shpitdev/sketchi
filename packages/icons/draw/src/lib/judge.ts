@@ -1,4 +1,4 @@
-import { fnv1a32 } from "@sketchi/diagram-core";
+import { fnv1a32 } from "@sketchi/drawing";
 
 /**
  * The judge: a model from another family, shown only the 28 px drawing and

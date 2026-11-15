@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 
-import { isDiagramIconSlug, type IconRecipe } from "@sketchi/diagram-core";
+import { isDiagramIconSlug, type IconRecipe } from "@sketchi/drawing";
 import { Effect, Layer } from "effect";
 import { describe, expect, it } from "vitest";
 

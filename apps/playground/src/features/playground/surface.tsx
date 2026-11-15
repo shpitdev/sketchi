@@ -1,7 +1,9 @@
-import type { StudioBuildResult } from "./build-result";
-import { DiagramPreview } from "@sketchi/diagram-ui";
-import type { ChatStatus, UIMessage } from "ai";
-import type { RefObject } from "react";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
+import { mindmapTopics } from "@sketchi/diagrams/mindmap";
+import { type StudioBuildResult } from "./build-result";
+import { DrawingEditor } from "@sketchi/editor";
+import { type ChatStatus, type UIMessage } from "ai";
+import { type RefObject } from "react";
 
 import {
 	PromptInput,
@@ -144,15 +146,7 @@ function resultSummary(result: StudioBuildResult): {
 			itemCount: spec.stages.reduce((count, stage) => count + stage.steps.length, 0),
 		};
 	if ("quadrants" in spec) return { itemCount: spec.points.length };
-	if ("root" in spec) {
-		const topics = (topic: { readonly children?: readonly unknown[] }): number =>
-			1 +
-			(topic.children ?? []).reduce<number>(
-				(sum, child) => sum + topics(child as { readonly children?: readonly unknown[] }),
-				0,
-			);
-		return { itemCount: topics(spec.root) };
-	}
+	if ("root" in spec) return { itemCount: mindmapTopics(spec.root).length };
 	return "participants" in spec
 		? { connectionCount: spec.messages.length, itemCount: spec.participants.length }
 		: {
@@ -296,7 +290,13 @@ export function PlaygroundStarters({ onSelect }: { onSelect: (prompt: string) =>
 			<figure className="studio__sample">
 				<figcaption className="studio__sample-caption">Example: deploy pipeline</figcaption>
 				<div className="studio__sample-canvas">
-					<DiagramPreview scene={DEPLOY_PIPELINE_SCENE} />
+					<DrawingEditor
+						title={DEPLOY_PIPELINE_SCENE.title}
+						revision={JSON.stringify(DEPLOY_PIPELINE_SCENE)}
+						scene={convertSceneToExcalidraw(DEPLOY_PIPELINE_SCENE)}
+						viewModeEnabled={true}
+						zenModeEnabled={true}
+					/>
 				</div>
 			</figure>
 			<div aria-label="Starter prompts" className="studio__starters">

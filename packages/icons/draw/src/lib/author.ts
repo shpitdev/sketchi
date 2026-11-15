@@ -6,7 +6,7 @@ import {
 	type IconRecipe,
 	iconRecipeFitIssues,
 	iconRecipeIssues,
-} from "@sketchi/diagram-core";
+} from "@sketchi/drawing";
 import { colorDistance, hexRgb, normalizeCssColor, type MarkColor } from "@sketchi/icon-catalog";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 

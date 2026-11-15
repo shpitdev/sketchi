@@ -13,7 +13,7 @@ test("a docs-only change skips every conditional gate", () => {
 test("an affected project runs workspace-wide type and graph checks", () => {
 	const scope = ciScope({
 		all: false,
-		projects: ["diagram-renderer", "diagram-ui"],
+		projects: ["diagram-renderer", "editor"],
 		changedFiles: ["packages/diagram/renderer/src/index.ts"],
 	});
 	assert.equal(scope.code, true);

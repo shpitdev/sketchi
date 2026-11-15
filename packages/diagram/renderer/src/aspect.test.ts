@@ -1,21 +1,16 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
+import { flowchartFixture, parseClassDiagram, parseTimelineDiagram } from "@sketchi/diagram-core";
 import {
-	flowchartFixture,
-	parseClassDiagram,
-	parseTimelineDiagram,
 	routingQualityFindings,
 	routingQualityScale,
-} from "@sketchi/diagram-core";
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
 import { renderClassDiagram } from "./class-diagram";
 import { renderTimelineDiagram } from "./timeline";
-import {
-	arrowCrossings,
-	type NodeSceneElement,
-	renderIntermediateDiagram,
-	type RenderedDiagramScene,
-} from "./scene";
+import { arrowCrossings, renderIntermediateDiagram } from "./scene";
 
 /**
  * Width over height, either way up, of a scene in the hosted PNG's 20-unit

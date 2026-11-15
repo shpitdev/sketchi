@@ -1,30 +1,30 @@
 import { Result } from "effect";
 import {
 	type JourneyValidationError,
-	CANVAS_SPEC_VERSION,
-	estimateTextWidth,
 	JOURNEY_MAX_SCORE,
 	JOURNEY_MIN_SCORE,
 	JOURNEY_NEUTRAL_SCORE,
 	type JourneyDiagram,
-	LONG_WORD_UNITS,
 	journeySentiment,
+	validateJourneyDiagram,
+} from "@sketchi/diagram-core";
+import {
+	CANVAS_SPEC_VERSION,
+	estimateTextWidth,
+	LONG_WORD_UNITS,
 	SKETCHI_DIAGRAM_PALETTE,
 	textLineUnits,
-	validateJourneyDiagram,
 	wrapTextToWidth,
-} from "@sketchi/diagram-core";
+	CHART_SERIES_COLORS,
+	type CanvasLineElement as LineSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasPoint as ScenePoint,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
-import { CHART_SERIES_COLORS } from "./chart.js";
 import { breakRulesUnderText, type RuleBox } from "./scene-rules.js";
-import type {
-	LineSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	SceneElement,
-	ScenePoint,
-	TextSceneElement,
-} from "./scene.js";
 
 export const JOURNEY_MARK_ROLE = "journey-mark";
 

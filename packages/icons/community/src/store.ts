@@ -1,4 +1,4 @@
-import { isIconRecipe, type IconRecipe } from "@sketchi/diagram-core";
+import { isIconRecipe, type IconRecipe } from "@sketchi/drawing";
 import { Context, Effect, Layer, Schema } from "effect";
 
 import {

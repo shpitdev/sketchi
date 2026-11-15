@@ -1,9 +1,10 @@
 import { Schema, Result } from "effect";
-import { formatContractSchemaError, ExcalidrawFile } from "@sketchi/diagram-agent";
+import { formatContractSchemaError } from "@sketchi/diagram-agent";
+import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Resvg, initWasm, type ResvgRenderOptions } from "@resvg/resvg-wasm";
 import * as Linkedom from "linkedom";
 
-import type { PngRenderInput } from "./png-renderer.js";
+import { type PngRenderInput } from "./png-renderer.js";
 import { HeadlessPngRenderError } from "./render-diagnostics.js";
 import { withSelectorSafeImageIds } from "./render-image-ids.js";
 import {

@@ -3,19 +3,16 @@ import {
 	AXIS_ALIGNED_EPSILON,
 	getCanvasValidationIssues,
 	groupRegionIssues,
-	type IntermediateDiagram,
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
-} from "@sketchi/diagram-core";
-import {
-	isStructurallyValidStateMarker,
-	type ArrowSceneElement,
-	type FrameSceneElement,
-	type NodeSceneElement,
-	type RenderedDiagramScene,
-	renderGraphDiagram,
-	type TextSceneElement,
-} from "./scene";
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasFrameElement as FrameSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
+import { type IntermediateDiagram } from "@sketchi/diagram-core";
+import { isStructurallyValidStateMarker, renderGraphDiagram } from "./scene";
 
 /**
  * Graphs as a state machine draws them: pseudostates (an initial dot, final

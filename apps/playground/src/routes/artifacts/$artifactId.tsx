@@ -1,5 +1,6 @@
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { useAsyncResource } from "@/features/resources/use-async-resource";
-import { ArtifactCanvas } from "@sketchi/diagram-ui";
+import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 
@@ -101,7 +102,15 @@ function ArtifactRoute() {
 				{state.status === "error" ? (
 					<p className="artifact-view__message artifact-view__message--error">{state.message}</p>
 				) : null}
-				{state.status === "ready" ? <ArtifactCanvas scene={state.scene} /> : null}
+				{state.status === "ready" ? (
+					<DrawingEditor
+						title={state.scene.title}
+						revision={JSON.stringify(state.scene)}
+						scene={convertSceneToExcalidraw(state.scene)}
+						viewModeEnabled={true}
+						zenModeEnabled={true}
+					/>
+				) : null}
 			</section>
 		</main>
 	);

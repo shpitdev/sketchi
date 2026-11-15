@@ -1,8 +1,7 @@
-import { DrawnIconSchema } from "@sketchi/diagram-core";
+import { DrawnIconSchema, IconRecipeSchema } from "@sketchi/drawing";
 import { Schema } from "effect";
 import {
 	ApplyDiagramPatchRequest,
-	IconRecipeSchema,
 	ApplyDiagramPatchResultSchema,
 	BuildFlowchartAccepted,
 	BuildFlowchartOptionsSchema,
@@ -11,8 +10,6 @@ import {
 	BuildFlowchartResultSchema,
 	EditFlowchartRequest,
 	EditFlowchartResultSchema,
-	BuildMindmapRequestSchema,
-	BuildMindmapResultSchema,
 	BuildSequenceDiagramRequest,
 	BuildStateMachineRequest,
 	BuildStateMachineResultSchema,
@@ -48,15 +45,11 @@ import {
 	BuildChartRequest,
 	BuildChartResultSchema,
 	ChartToolSpecSchema,
-	CodeModeIssueCodeSchema,
-	CodeModeIssueRef,
-	CodeModeIssue,
 	CanvasSpec,
 	CreateCanvasRequest,
 	CreateCanvasResultSchema,
 	DiagramSelector,
 	ErToolSpecSchema,
-	MindmapSpec,
 	SequenceDiagramSpec,
 	StateMachineSpec,
 	TimelineSpec,
@@ -67,6 +60,10 @@ import {
 	SearchIconsResultSchema,
 	toCodeModeJsonSchema,
 } from "@sketchi/diagram-agent";
+
+import { MindmapDocument } from "@sketchi/diagrams/mindmap";
+import { BuildMindmapRequest, BuildMindmapResultSchema } from "@sketchi/diagrams/mindmap/build";
+import { CodeModeIssueCodeSchema, CodeModeIssueRef, CodeModeIssue } from "@sketchi/diagrams/build";
 
 /** sketchi.drawIcon: a logo and its name in, the hand-drawn recipe and the judge's verdict out. */
 const DrawIconRequestSchema = Schema.Struct({
@@ -113,9 +110,9 @@ export const codeModeContracts = {
 	},
 	buildMindmap: {
 		input: Schema.Struct({
-			...BuildMindmapRequestSchema.fields,
+			...BuildMindmapRequest.fields,
 			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: MindmapSpec.mapFields(({ id, title, root, layout }) => ({
+			spec: MindmapDocument.mapFields(({ id, title, root, layout }) => ({
 				id,
 				title,
 				root,

@@ -1,14 +1,17 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { BuildFlowchartResult } from "@sketchi/diagram-agent";
-import { getCanvasValidationIssues } from "@sketchi/diagram-core";
-import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import type { UIMessage } from "ai";
+import { type BuildFlowchartResult } from "@sketchi/diagram-agent";
+import { getCanvasValidationIssues } from "@sketchi/drawing";
+import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
+import { type UIMessage } from "ai";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@sketchi/diagram-ui", () => ({
-	DiagramPreview: ({ scene }: { scene: { diagramId: string } }) => (
-		<div data-diagram-id={scene.diagramId} data-testid="diagram-preview" />
+vi.mock("@sketchi/editor", () => ({
+	DrawingEditor: ({ scene }: { scene: import("@sketchi/drawing/excalidraw").ExcalidrawScene }) => (
+		<div
+			data-image-count={scene.elements.filter((element) => element.type === "image").length}
+			data-testid="diagram-preview"
+		/>
 	),
 }));
 
@@ -84,9 +87,7 @@ describe("playground surface", () => {
 		// One caption names the sample; it sits on the figure that carries the real scene.
 		expect(screen.getByText("Example: deploy pipeline").closest("figcaption")).not.toBeNull();
 		expect(screen.queryByText("Rendered in Sketchi")).toBeNull();
-		expect(screen.getByTestId("diagram-preview").getAttribute("data-diagram-id")).toBe(
-			DEPLOY_PIPELINE_SCENE.diagramId,
-		);
+		expect(screen.getByTestId("diagram-preview").getAttribute("data-image-count")).toBe("3");
 		// The marks live in the scene now, not in a caption beside it.
 		expect(screen.queryAllByRole("img", { name: /logo$/u })).toHaveLength(0);
 		expect(

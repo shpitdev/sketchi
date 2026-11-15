@@ -65,7 +65,7 @@ const groupedRoute = (suffix = "") => {
 };
 
 /**
- * The numbers diagram-ui's arrow-edits.test.tsx reads from its own drags, with
+ * The numbers editor's arrow-edits.test.tsx reads from its own drags, with
  * Excalidraw's editor loaded by Vite into jsdom; change both together.
  */
 const harness: Record<string, EditabilityMetrics> = {

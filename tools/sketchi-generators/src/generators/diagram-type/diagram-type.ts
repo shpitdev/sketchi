@@ -8,11 +8,11 @@ import {
 } from "@nx/devkit";
 import path from "node:path";
 
-import type { DiagramTypeGeneratorSchema } from "./schema";
+import { type DiagramTypeGeneratorSchema } from "./schema";
 
 const CORE_ROOT = "packages/diagram/core/src";
 const RENDERER_ROOT = "packages/diagram/renderer/src";
-const UI_ROOT = "packages/diagram/ui/src";
+const UI_ROOT = "packages/editor/src";
 
 function appendExport(tree: Tree, indexPath: string, exportPath: string) {
 	const exportLine = `export * from "${exportPath}";`;

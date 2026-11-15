@@ -1,21 +1,32 @@
-import { Result } from "effect";
+import { type CanvasSpec } from "@sketchi/drawing";
+import { type ExcalidrawScene, convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import {
+	type DiagramValidationError,
 	flowchartFixture,
 	type IntermediateDiagram,
-	mindmapFixture,
-	parseMindmapDiagram,
 	pharmaBatchDispositionFlowchart,
 } from "@sketchi/diagram-core";
-import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
-import { renderIntermediateDiagram, renderMindmapDiagram } from "@sketchi/diagram-renderer";
-import { copyText, ExcalidrawSceneCanvas } from "@sketchi/diagram-ui";
+import {
+	type MindmapInputError,
+	type Mindmap,
+	mindmapTopics,
+	validateMindmap,
+	renderMindmap,
+} from "@sketchi/diagrams/mindmap";
+import { type Schema, Result } from "effect";
+
+import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
+
+import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+
+import { copyText, DrawingEditor } from "@sketchi/editor";
 import { useMemo, useState } from "react";
 
 import { DiagramInspector } from "../diagram-inspector/index.js";
 import { type DiagramOption, DiagramSwitcher } from "../diagram-switcher/index.js";
 import { WorkspaceTopBar, type WorkspaceStatus } from "../workspace-top-bar/index.js";
 
-const defaultDiagrams: readonly IntermediateDiagram[] = [
+const defaultDiagrams: readonly (IntermediateDiagram | Mindmap)[] = [
 	pharmaBatchDispositionFlowchart,
 	flowchartFixture,
 	mindmapFixture,
@@ -29,7 +40,7 @@ interface CopyFeedback {
 }
 
 export interface ExcalidrawWorkspaceProps {
-	diagrams?: readonly IntermediateDiagram[];
+	diagrams?: readonly (IntermediateDiagram | Mindmap)[];
 	errorMessage?: string;
 	initialDiagramId?: string;
 	status?: WorkspaceStatus;
@@ -50,20 +61,34 @@ export function ExcalidrawWorkspace({
 	const copyState: CopyState =
 		copyFeedback && copyFeedback.diagramId === active?.id ? copyFeedback.state : "idle";
 
-	const rendered = useMemo(() => {
+	const rendered = useMemo<
+		Result.Result<
+			ExcalidrawScene | null,
+			MindmapInputError | DiagramValidationError | Schema.SchemaError
+		>
+	>(() => {
 		if (!active) return Result.succeed(null);
-		const scene =
-			active.type === "mindmap"
-				? Result.flatMap(parseMindmapDiagram(active), renderMindmapDiagram)
+		const scene: Result.Result<
+			CanvasSpec,
+			MindmapInputError | DiagramValidationError | Schema.SchemaError
+		> =
+			active.type === "mindmap" && "root" in active
+				? Result.map(validateMindmap(active), renderMindmap)
 				: renderIntermediateDiagram(active);
 		return Result.map(scene, convertSceneToExcalidraw);
 	}, [active]);
 	const scene = Result.getOrElse(rendered, () => null);
 
 	const options: DiagramOption[] = diagrams.map((item) => ({
-		edgeCount: item.edges.length,
+		edgeCount:
+			item.type === "mindmap" && "root" in item
+				? [...mindmapTopics(item.root)].length - 1
+				: item.edges.length,
 		id: item.id,
-		nodeCount: item.nodes.length,
+		nodeCount:
+			item.type === "mindmap" && "root" in item
+				? [...mindmapTopics(item.root)].length
+				: item.nodes.length,
 		title: item.title,
 		type: item.type,
 	}));
@@ -155,7 +180,7 @@ export function ExcalidrawWorkspace({
 							}
 						/>
 					) : active && scene ? (
-						<ExcalidrawSceneCanvas
+						<DrawingEditor
 							revision={active.id}
 							scene={scene}
 							title={`${active.title} canvas`}

@@ -11,10 +11,10 @@
 		"@sketchi/community-icons": "workspace:*",
 		"@sketchi/diagram-agent": "workspace:*",
 		"@sketchi/diagram-core": "workspace:*",
-		"@sketchi/diagram-excalidraw": "workspace:*",
+		"@sketchi/drawing": "workspace:*",
 		"@sketchi/diagram-generation": "workspace:*",
 		"@sketchi/diagram-renderer": "workspace:*",
-		"@sketchi/diagram-ui": "workspace:*",
+		"@sketchi/editor": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/icon-draw": "workspace:*",
 		"@sketchi/observability": "workspace:*",
@@ -30,11 +30,15 @@
 		"motion": "14.9.0",
 		"nanoid": "6.0.2",
 		"streamdown": "2.7.1",
-		"use-stick-to-bottom": "1.1.6"
+		"use-stick-to-bottom": "1.1.6",
+		"@sketchi/diagrams": "workspace:*"
 	},
 	"devDependencies": {
 		"@sketchi/diagram-scenarios": "workspace:*",
 		"@tailwindcss/vite": "4.3.3",
 		"tailwindcss": "4.3.3"
+	},
+	"exports": {
+		"./styles.css": "./src/styles/app.css"
 	}
 }

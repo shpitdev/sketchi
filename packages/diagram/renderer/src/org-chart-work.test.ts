@@ -1,12 +1,13 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
-import * as diagramCore from "@sketchi/diagram-core";
+import * as drawing from "@sketchi/drawing";
 import {
 	orgChartFixture,
 	orgChartStressFixtures,
 	parseOrgChartDiagram,
 	resolveOrgChartShorthand,
 } from "@sketchi/diagram-core";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { layoutOrgChartDiagram, renderOrgChartDiagram } from "./org-chart";
@@ -15,8 +16,8 @@ import { layoutOrgChartDiagram, renderOrgChartDiagram } from "./org-chart";
 // measures with, through diagram-core. Both are deterministic, so they bound layout work
 // without a wall-clock timer, as does the number of placements the search tries.
 const work = vi.hoisted(() => ({ comparisons: 0, wraps: 0 }));
-vi.mock("@sketchi/diagram-core", async (importOriginal) => {
-	const core = await importOriginal<typeof diagramCore>();
+vi.mock("@sketchi/drawing", async (importOriginal) => {
+	const core = await importOriginal<typeof drawing>();
 	const counted =
 		<A extends readonly [readonly unknown[], readonly unknown[], ...unknown[]], R>(
 			pack: (...args: A) => R,

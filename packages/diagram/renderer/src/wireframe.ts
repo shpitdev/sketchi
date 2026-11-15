@@ -1,13 +1,8 @@
 import { Result } from "effect";
 import {
 	type WireframeValidationError,
-	CANVAS_SPEC_VERSION,
-	canvasBoundTextBox,
-	canvasFrameNameBox,
-	estimateTextWidth,
 	isWireframeContainer,
 	orgPersonInitials,
-	SKETCHI_DIAGRAM_PALETTE,
 	validateWireframeDiagram,
 	WIREFRAME_DEFAULT_TABLE_ROWS,
 	WIREFRAME_DEFAULT_TEXT_LINES,
@@ -17,20 +12,25 @@ import {
 	type WireframeDevice,
 	type WireframeDiagram,
 	type WireframeScreen,
-	wrapTextToWidth,
 } from "@sketchi/diagram-core";
+import {
+	CANVAS_SPEC_VERSION,
+	canvasBoundTextBox,
+	canvasFrameNameBox,
+	estimateTextWidth,
+	SKETCHI_DIAGRAM_PALETTE,
+	wrapTextToWidth,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasFrameElement as FrameSceneElement,
+	type CanvasLineElement as LineSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasPoint as ScenePoint,
+	type CanvasTextElement as TextSceneElement,
+} from "@sketchi/drawing";
 
 import { routeNavigations, type NavigationBox } from "./wireframe-navigation.js";
-import type {
-	ArrowSceneElement,
-	FrameSceneElement,
-	LineSceneElement,
-	NodeSceneElement,
-	RenderedDiagramScene,
-	SceneElement,
-	ScenePoint,
-	TextSceneElement,
-} from "./scene.js";
 
 /** Every gap between siblings, and every container's padding, comes from this scale. */
 export const WIREFRAME_SPACING = [4, 8, 12, 16, 24, 32] as const;

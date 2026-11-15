@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
-import { FlowchartSpec, MindmapSpec, SequenceDiagramSpec } from "@sketchi/diagram-agent";
+import { FlowchartSpec, SequenceDiagramSpec } from "@sketchi/diagram-agent";
+import { MindmapDocument } from "@sketchi/diagrams/mindmap";
 import { Effect, Schema } from "effect";
 
 import { documentId, parseJsonDocument, validateStorageId } from "./document.js";
@@ -19,7 +20,7 @@ describe("canonical document decoding", () => {
 			assert.strictEqual(flowchart.type, "flowchart");
 			assert.isTrue(Schema.is(FlowchartSpec)(flowchart.spec));
 			assert.strictEqual(mindmap.type, "mindmap");
-			assert(Schema.is(MindmapSpec)(mindmap.spec));
+			assert(Schema.is(MindmapDocument)(mindmap.spec));
 			assert.strictEqual(mindmap.spec.layout.direction, "LR");
 			assert.strictEqual(sequence.type, "sequence");
 			assert(Schema.is(SequenceDiagramSpec)(sequence.spec));

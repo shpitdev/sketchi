@@ -4,18 +4,22 @@ import { describe, expect, it } from "vitest";
 
 import {
 	type AxisAlignedSegment,
+	getCanvasValidationIssues,
+	segmentCrossesBoundsInterior,
+	segmentsFromPoints,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import {
 	erFixture,
 	erStressFixtures,
-	getCanvasValidationIssues,
 	orgChartEr,
 	parseErDiagram,
 	parseErFieldShorthand,
-	segmentCrossesBoundsInterior,
-	segmentsFromPoints,
 } from "@sketchi/diagram-core";
 
 import { renderDiagram } from "../diagram.js";
-import type { ArrowSceneElement, NodeSceneElement, RenderedDiagramScene } from "../scene.js";
 
 const nodes = (scene: RenderedDiagramScene) =>
 	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));

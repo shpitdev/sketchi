@@ -7,13 +7,16 @@ import {
 	queriedArchitectureFlowchart,
 	receiptReturnFlowchart,
 	routingFixtures,
+	sideFixtures,
+} from "@sketchi/diagram-core";
+import {
 	routingQualityScale,
 	sharedSegments,
-	sideFixtures,
 	wrappedLabelWidth,
 	wrapTextToWidth,
-} from "@sketchi/diagram-core";
-import { arrowCrossings, renderIntermediateDiagram, type RenderedDiagramScene } from "./scene";
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import { arrowCrossings, renderIntermediateDiagram } from "./scene";
 
 type Point = { readonly x: number; readonly y: number };
 type Side = "top" | "right" | "bottom" | "left";

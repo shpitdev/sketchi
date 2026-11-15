@@ -72,9 +72,9 @@ prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout �
 | `packages/diagram/generation` | model prompts, gateway calls, candidate parsing and repair              |
 | `packages/diagram/agent`      | the Code Mode build: normalize, validate, render, export, store         |
 | `packages/diagram/renderer`   | deterministic layout and routing for every family                       |
-| `packages/diagram/excalidraw` | Excalidraw conversion and real-scene validation                         |
+| `packages/drawing` | Excalidraw conversion and real-scene validation                         |
 | `packages/diagram/scenarios`  | maintained scenarios and the scenario CLI                               |
-| `packages/diagram/ui`         | shared React canvas and preview components, and the diagram Storybook   |
+| `packages/editor`         | native React drawing editor; family compositions live in tools/storybook   |
 | `packages/icons/*`            | the icon catalog and search, community icons, and hand-drawn logos      |
 | `packages/svg-excalidraw`     | SVG to native Excalidraw elements and libraries                         |
 | `packages/studio/projects`    | Studio project and diagram persistence                                  |

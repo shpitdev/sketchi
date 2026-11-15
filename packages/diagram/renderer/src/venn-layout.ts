@@ -1,9 +1,5 @@
-import {
-	estimateTextWidth,
-	vennRegionKey,
-	wrapTextToWidth,
-	type VennDiagram,
-} from "@sketchi/diagram-core";
+import { estimateTextWidth, wrapTextToWidth } from "@sketchi/drawing";
+import { vennRegionKey, type VennDiagram } from "@sketchi/diagram-core";
 
 export const VENN_ITEM_FONT = 15;
 export const VENN_REGION_LABEL_FONT = 17;

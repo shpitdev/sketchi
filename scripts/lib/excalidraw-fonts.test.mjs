@@ -28,7 +28,7 @@ test("lists every Excalidraw font family the editor can request", () => {
 });
 
 test("vendored Excalifont subsets are the package's own files", () => {
-	const vendored = "packages/diagram/ui/public/fonts/Excalifont";
+	const vendored = "packages/editor/public/fonts/Excalifont";
 	for (const file of excalidrawFontFiles().filter((name) => name.startsWith("Excalifont/"))) {
 		assert.deepEqual(
 			readFileSync(new URL(`${vendored}/${file.slice(11)}`, repoRoot)),
@@ -60,15 +60,15 @@ test("emits fonts into the client build except files public already ships", () =
 });
 
 const EXCALIDRAW = "@excalidraw/excalidraw";
-const RENDERERS = new Set([EXCALIDRAW, "@sketchi/diagram-ui"]);
+const RENDERERS = new Set([EXCALIDRAW, "@sketchi/editor"]);
 
 /**
- * Runtime Excalidraw imports allowed outside diagram-ui's loader. The CLI's
+ * Runtime Excalidraw imports allowed outside editor's loader. The CLI's
  * headless PNG renderer runs in Node and embeds its own bundled Excalifont, so
  * it never resolves fonts against an asset path.
  */
 const RUNTIME_IMPORT_EXCEPTIONS = new Set([
-	"packages/diagram/ui/src/lib/load-excalidraw.ts",
+	"packages/editor/src/lib/load-excalidraw.ts",
 	"apps/cli/src/png-renderer-runtime.ts",
 	// Node, at build time: Excalidraw's SVG export of the home diagram.
 	"apps/web/scripts/home-diagram.ts",
@@ -145,7 +145,7 @@ test("every Storybook that renders Excalidraw serves its fonts", () => {
 		const project = path.slice(0, -"/.storybook/main.ts".length);
 		return (
 			reachesExcalidraw(project) ||
-			/diagram-ui|excalidraw/i.test(
+			/editor|excalidraw/i.test(
 				code(read(path)).replaceAll(/excalidrawFonts|excalidraw-fonts\.mjs/g, ""),
 			)
 		);
@@ -154,14 +154,14 @@ test("every Storybook that renders Excalidraw serves its fonts", () => {
 		"apps/excalidraw/.storybook/main.ts",
 		"apps/native-conversion-storybook/.storybook/main.ts",
 		"apps/web/.storybook/main.ts",
-		"packages/diagram/ui/.storybook/main.ts",
+		"packages/editor/.storybook/main.ts",
 	]);
 	for (const path of surfaces) {
 		assert.ok(registersFonts(path), `${path} must register excalidrawFonts`);
 	}
 });
 
-test("Excalidraw loads at runtime only through diagram-ui's loader", () => {
+test("Excalidraw loads at runtime only through editor's loader", () => {
 	const runtimeImport = new RegExp(
 		[
 			`(?<!typeof\\s*)\\bimport\\s*\\(\\s*["']${EXCALIDRAW}["']`,

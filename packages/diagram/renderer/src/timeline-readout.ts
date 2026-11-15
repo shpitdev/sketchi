@@ -1,4 +1,4 @@
-import type { RenderedDiagramScene } from "./scene.js";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { TIMELINE_MARKER_ROLE } from "./timeline.js";
 import { TIMELINE_DURATION_UNITS } from "./timeline-captions.js";
 

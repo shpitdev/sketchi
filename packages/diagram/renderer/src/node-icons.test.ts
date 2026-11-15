@@ -6,17 +6,19 @@ import {
 	CANVAS_NODE_ICON,
 	canvasBoundTextInset,
 	canvasNodeIconBox,
-	deployPipelineLogoFlowchart,
 	embedCanvasIcons,
-	flowchartFixture,
 	getCanvasValidationIssues,
-	pharmaBatchDispositionFlowchart,
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
 	type CanvasShapeElement,
 	type CanvasSpec,
 	type CanvasTextElement,
+} from "@sketchi/drawing";
+import {
+	deployPipelineLogoFlowchart,
+	flowchartFixture,
+	pharmaBatchDispositionFlowchart,
 	type LayoutDirection,
 } from "@sketchi/diagram-core";
 

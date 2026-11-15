@@ -248,7 +248,7 @@ describe("workspace project membership", () => {
 				.map((dependency) => dependency.target)
 				.filter((target) => graph.nodes[target]?.data.tags?.includes("scope:app")),
 		);
-		expect([...composedApps].sort()).toEqual(["excalidraw", "icons"]);
+		expect([...composedApps].sort()).toEqual(["excalidraw", "icons", "playground"]);
 	});
 
 	it("enforces project boundaries in source, config, and Storybook files", () => {

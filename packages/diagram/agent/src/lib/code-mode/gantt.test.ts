@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
 import { ganttFixture } from "@sketchi/diagram-core";
-import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { applyDiagramPatch, buildGantt, CodeModeRuntimeEnvironment } from "./runtime.js";
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
 import { BuildGanttResultSchema } from "./contract.js";

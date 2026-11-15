@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
 import { initWasm, Resvg } from "@resvg/resvg-wasm";
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { type IconRecipe } from "@sketchi/drawing";
 import sharp from "sharp";
 
 import { PACK_PREVIEW_GRID, packPreviewSvg } from "../src/lib/pack-preview.js";

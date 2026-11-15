@@ -3,40 +3,39 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	CANVAS_SHAPE_CURVE,
-	bypassingHybridFlowcharts,
-	corporateHybridFlowchart,
-	corridorHybridFlowchart,
-	describedArchitectureFlowchart,
-	describedHybridFlowchart,
 	canvasBoundTextBox,
 	canvasShapeOutline,
 	isCanvasComposedShape,
 	canvasNodeIconBox,
 	getCanvasValidationIssues,
+	routingJogReach,
+	routingCorridorGap,
+	routingCorridorRun,
+	routingQualityScale,
+	routingWideBend,
+	zoneRegionIssues,
+	type CanvasShapeElement as NodeSceneElement,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import {
+	bypassingHybridFlowcharts,
+	corporateHybridFlowchart,
+	corridorHybridFlowchart,
+	describedArchitectureFlowchart,
+	describedHybridFlowchart,
 	groupFixtures,
 	leftToRightHybridFlowchart,
 	parseFlowchartDiagram,
 	queriedArchitectureFlowchart,
 	requestPathFlowcharts,
 	requestedArchitectureFlowchart,
-	routingJogReach,
-	routingCorridorGap,
-	routingCorridorRun,
-	routingQualityScale,
-	routingWideBend,
 	stackedHybridFlowchart,
 	syncedHybridFlowchart,
 	zoneFixtures,
-	zoneRegionIssues,
 	zoneStressFixtures,
 	type IntermediateDiagram,
 } from "@sketchi/diagram-core";
-import {
-	arrowCrossings,
-	renderIntermediateDiagram,
-	type NodeSceneElement,
-	type RenderedDiagramScene,
-} from "./scene";
+import { arrowCrossings, renderIntermediateDiagram } from "./scene";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];

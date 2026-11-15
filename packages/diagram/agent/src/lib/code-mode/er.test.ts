@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
 import { erFixture, orgChartEr } from "@sketchi/diagram-core";
-import { validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
 import { BuildErDiagramResultSchema, RenderedDiagramSceneSchema } from "./contract.js";

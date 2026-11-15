@@ -1,8 +1,8 @@
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { type IconRecipe } from "@sketchi/drawing";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { SketchiIcon } from "@sketchi/icon-catalog";
+import { type SketchiIcon } from "@sketchi/icon-catalog";
 import { IconDetail } from "./icon-detail";
 
 const icon: SketchiIcon = {

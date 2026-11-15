@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
 	estimateTextWidth,
-	type IntermediateDiagram,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
 	SKETCHI_DIAGRAM_STYLE,
-} from "@sketchi/diagram-core";
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+import { type IntermediateDiagram } from "@sketchi/diagram-core";
 
-import { type GraphAnchor, renderGraphDiagram, type RenderedDiagramScene } from "./scene.js";
+import { type GraphAnchor, renderGraphDiagram } from "./scene.js";
 
 /**
  * Three boxes a family placed itself: one on the left whose middle row feeds

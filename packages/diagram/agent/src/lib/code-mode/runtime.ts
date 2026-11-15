@@ -1,10 +1,39 @@
 import {
+	decodeMindmapRequest,
+	buildMindmap as buildMindmapDocument,
+	type BuildMindmapResult,
+} from "@sketchi/diagrams/mindmap/build";
+import {
+	type BuildDelivery,
+	type ArtifactBuildCapabilities,
+	FLOWCHART_COVERAGE_CODES,
+	CodeModeIssue,
+	type CodeModeIssueCode,
+	type CodeModeIssueRef,
+	type QualityReport,
+} from "@sketchi/diagrams/build";
+
+import {
 	CANVAS_LIMITS,
-	FLOWCHART_MAX_ISSUES,
 	SKETCHI_DIAGRAM_STYLE,
 	compileCanvasSpec,
 	curvedConnectorBetween,
 	getCanvasValidationIssues,
+	wrappedLabelWidth,
+	wrapTextToWidth,
+	type CanvasValidationIssue,
+	COMMUNITY_ICON_COLLECTION,
+	COMMUNITY_ICON_SLUG_PREFIX,
+	isDrawnIconSlug,
+	isIconRecipe,
+	withoutCanvasElements,
+	type CanvasIconAsset,
+	type IconRecipe,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasPoint as ScenePoint,
+} from "@sketchi/drawing";
+import {
+	FLOWCHART_MAX_ISSUES,
 	getSequenceValidationIssues,
 	getStateMachineValidationIssues,
 	stateLabel,
@@ -42,21 +71,14 @@ import {
 	type GanttValidationIssueCode,
 	type ChartDiagram,
 	type TimelineDiagram,
-	mindmapDiagramFromTree,
-	wrappedLabelWidth,
-	wrapTextToWidth,
 	applyFlowchartEdits,
 	checkRequestCoverage,
 	type CoverageIssueCode,
 	decodeFlowchartDocument,
-	FLOWCHART_COVERAGE_CODES,
 	type FlowchartDiagram,
 	flowchartDiagramFromDocument,
 	type FlowchartValidationIssue,
 	type FlowchartValidationIssueRef,
-	type MindmapDiagram,
-	type DiagramValidationError,
-	type CanvasValidationIssue,
 	type SequenceDiagram,
 	type SequenceValidationIssueCode,
 	type StateMachineDiagram,
@@ -77,25 +99,18 @@ import {
 	type SankeyValidationIssueCode,
 	type WireframeDiagram,
 	type WireframeValidationIssueCode,
-	COMMUNITY_ICON_COLLECTION,
-	COMMUNITY_ICON_SLUG_PREFIX,
-	isDrawnIconSlug,
-	isIconRecipe,
-	withoutCanvasElements,
-	type CanvasIconAsset,
-	type IconRecipe,
 } from "@sketchi/diagram-core";
+
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
 	type ExcalidrawScene,
 	validateExcalidrawScene,
-} from "@sketchi/diagram-excalidraw";
+} from "@sketchi/drawing/excalidraw";
 import {
 	longNodeDescriptions,
 	NODE_DESCRIPTION_MAX_LINES,
 	renderIntermediateDiagram,
-	renderMindmapDiagram,
 	renderSequenceDiagram,
 	renderStateMachineDiagram,
 	renderErDiagram,
@@ -123,9 +138,8 @@ import {
 	isStructurallyValidErTable,
 	isStructurallyValidClassBox,
 	isStructurallyValidTimelineMarker,
-	type RenderedDiagramScene,
-	type ScenePoint,
 } from "@sketchi/diagram-renderer";
+
 import {
 	recordMetric,
 	withTelemetryCorrelation,
@@ -146,7 +160,6 @@ import {
 	formatContractSchemaError,
 	BuildFlowchartRejected,
 	EditFlowchartRejected,
-	BuildMindmapRejected,
 	BuildSequenceDiagramRejected,
 	BuildStateMachineRejected,
 	BuildErDiagramRejected,
@@ -166,7 +179,6 @@ import {
 	ApplyDiagramPatchRequest,
 	BuildFlowchartRequestSchema,
 	EditFlowchartRequest,
-	BuildMindmapRequestSchema,
 	BuildSequenceDiagramRequest,
 	BuildStateMachineRequest,
 	BuildErDiagramRequest,
@@ -189,12 +201,9 @@ import {
 	GetArtifactRequest,
 	RenderedDiagramSceneSchema,
 	type ApplyDiagramPatchResult,
-	type ArtifactBundle,
-	type ArtifactFormat,
 	type BuildFlowchartRequest,
 	type BuildFlowchartResult,
 	type EditFlowchartResult,
-	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildErDiagramResult,
@@ -209,17 +218,11 @@ import {
 	type BuildChartResult,
 	type BuildGanttResult,
 	type CreateCanvasResult,
-	CodeModeIssue,
 	type ContractSchemaIssue,
-	type CodeModeIssueCode,
-	type CodeModeIssueRef,
 	type ContractSchemaError,
 	type DiagramPatchOperation,
 	type DiagramSelector,
 	type GetArtifactResult,
-	type InlineArtifactFormat,
-	type MindmapSpec,
-	type NormalizedMindmapSpec,
 	type NormalizedSequenceDiagramSpec,
 	type NormalizedStateMachineSpec,
 	type NormalizedErSpec,
@@ -234,10 +237,16 @@ import {
 	type NormalizedTimelineSpec,
 	type NormalizedChartSpec,
 	type NormalizedGanttSpec,
-	type PartialArtifactBundle,
 	type PatchableScene,
-	type QualityReport,
 } from "./contract.js";
+
+import {
+	type ArtifactBundle,
+	type ArtifactFormat,
+	type InlineArtifactFormat,
+	type PartialArtifactBundle,
+} from "@sketchi/drawing/artifacts";
+
 import {
 	catalogForRequest,
 	embedSceneIcons,
@@ -250,7 +259,7 @@ import {
 	type CodeModeCommunityIcons,
 	type CodeModeIconCatalog,
 } from "./icons.js";
-import { cleanToolString } from "../clean-tool-string.js";
+import { cleanToolString } from "@sketchi/diagrams/generate/clean-text";
 import { assessFlowchartQuality } from "../flowchart/quality.js";
 import { normalizeFlowchartSpec } from "../flowchart/spec.js";
 
@@ -258,9 +267,9 @@ const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
 const DEFAULT_MIN_QUALITY_SCORE = 8;
 const SCENE_PADDING = 48;
-const MAX_MINDMAP_DEPTH = 8;
+
 // A 200-topic map lays out with no overlapping topics or crossing curves.
-const MAX_MINDMAP_TOPICS = 200;
+
 const MAX_INPUT_ISSUES = 20;
 
 const codeModeRequests = Metric.counter("sketchi_codemode_requests", {
@@ -399,7 +408,7 @@ function artifactKindForOperation(operation: CodeModeBoundaryOperation): string 
 	return undefined;
 }
 
-function observeCodeModeBoundary<A extends ObservableCodeModeResult, R>(
+export function observeCodeModeBoundary<A extends ObservableCodeModeResult, R>(
 	operation: CodeModeBoundaryOperation,
 	input: unknown,
 	effect: Effect.Effect<A, never, R>,
@@ -440,158 +449,6 @@ function observeCodeModeBoundary<A extends ObservableCodeModeResult, R>(
 		return result;
 	});
 	return withTelemetryCorrelation(observed, codeModeCorrelation(input));
-}
-
-function preflightMindmapInput(input: unknown): CodeModeIssue[] {
-	const root = unknownRecord(unknownRecord(unknownRecord(input)?.["spec"])?.["root"]);
-	if (!root) return [];
-
-	const stack: Array<{ depth: number; topic: Record<string, unknown> }> = [
-		{ depth: 0, topic: root },
-	];
-	let discoveredSlots = 1;
-	while (stack.length > 0) {
-		const current = stack.pop();
-		if (!current) continue;
-		if (current.depth > MAX_MINDMAP_DEPTH) {
-			return [
-				issue({
-					code: "mindmap_too_deep",
-					stage: "mindmap",
-					ref: { kind: "request", path: "spec.root.children" },
-					message: `Mindmap depth exceeds the supported maximum of ${MAX_MINDMAP_DEPTH}.`,
-					hint: "Combine overly deep topics into a shallower hierarchy.",
-				}),
-			];
-		}
-		const children = current.topic["children"];
-		if (!Array.isArray(children)) continue;
-		discoveredSlots += children.length;
-		if (discoveredSlots > MAX_MINDMAP_TOPICS) {
-			return [
-				issue({
-					code: "mindmap_too_large",
-					stage: "mindmap",
-					ref: { kind: "request", path: "spec.root" },
-					message: `Mindmap exceeds the supported maximum of ${MAX_MINDMAP_TOPICS} topic slots.`,
-					hint: "Split this hierarchy into smaller focused mindmaps.",
-				}),
-			];
-		}
-		for (let index = children.length - 1; index >= 0; index -= 1) {
-			const child = unknownRecord(children[index]);
-			if (child) stack.push({ depth: current.depth + 1, topic: child });
-		}
-	}
-	return [];
-}
-
-function normalizeMindmapSpec(spec: MindmapSpec): NormalizedMindmapSpec {
-	const normalizeTopic = (
-		topic: MindmapSpec["root"],
-		path: readonly number[],
-	): NormalizedMindmapSpec["root"] => ({
-		id: `topic-${path.join("-")}`,
-		label: cleanToolString(topic.label),
-		children: (topic.children ?? []).map((child, index) => normalizeTopic(child, [...path, index])),
-	});
-	const title = cleanToolString(spec.title);
-	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-mindmap"),
-		title,
-		root: normalizeTopic(spec.root, [0]),
-		layout: { direction: spec.layout.direction },
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-	};
-}
-
-function mindmapStats(spec: NormalizedMindmapSpec): {
-	count: number;
-	depth: number;
-} {
-	let count = 0;
-	let depth = 0;
-	const visit = (topic: NormalizedMindmapSpec["root"], currentDepth: number) => {
-		count += 1;
-		depth = Math.max(depth, currentDepth);
-		topic.children.forEach((child) => visit(child, currentDepth + 1));
-	};
-	visit(spec.root, 0);
-	return { count, depth };
-}
-
-function validateNormalizedMindmap(spec: NormalizedMindmapSpec): CodeModeIssue[] {
-	const stats = mindmapStats(spec);
-	const issues: CodeModeIssue[] = [];
-	if (stats.count < 2) {
-		issues.push(
-			issue({
-				code: "disconnected_graph",
-				stage: "mindmap",
-				ref: { kind: "diagram", id: spec.id },
-				message: "Mindmap root must contain at least one child topic.",
-				hint: "Add one or more nested topics under spec.root.children.",
-			}),
-		);
-	}
-	if (stats.depth > MAX_MINDMAP_DEPTH) {
-		issues.push(
-			issue({
-				code: "mindmap_too_deep",
-				stage: "mindmap",
-				ref: { kind: "diagram", id: spec.id },
-				message: `Mindmap depth ${stats.depth} exceeds the supported maximum of ${MAX_MINDMAP_DEPTH}.`,
-				hint: "Combine overly deep topics into a shallower hierarchy.",
-			}),
-		);
-	}
-	if (stats.count > MAX_MINDMAP_TOPICS) {
-		issues.push(
-			issue({
-				code: "mindmap_too_large",
-				stage: "mindmap",
-				ref: { kind: "diagram", id: spec.id },
-				message: `Mindmap has ${stats.count} topics; the supported maximum is ${MAX_MINDMAP_TOPICS}.`,
-				hint: "Split this hierarchy into smaller focused mindmaps.",
-			}),
-		);
-	}
-	return issues;
-}
-
-function toMindmapDiagram(
-	spec: NormalizedMindmapSpec,
-): Result.Result<MindmapDiagram, Schema.SchemaError | DiagramValidationError> {
-	return mindmapDiagramFromTree({
-		id: spec.id,
-		title: spec.title,
-		root: spec.root,
-		direction: spec.layout.direction,
-		style: SKETCHI_DIAGRAM_STYLE,
-	});
-}
-
-function mindmapQuality(diagram: MindmapDiagram, threshold: number): QualityReport {
-	const generic = diagram.nodes.filter((node) =>
-		/^(topic|branch|item|mindmap)$/i.test(node.label.trim()),
-	);
-	const score = Math.max(0, 10 - generic.length * 2);
-	return {
-		accepted: score >= threshold,
-		score,
-		threshold,
-		summary: {
-			nodeCount: diagram.nodes.length,
-			edgeCount: diagram.edges.length,
-		},
-		checks: generic.map((node) => ({
-			code: "generic_label",
-			passed: false,
-			severity: "warning",
-			message: `Topic "${node.label}" is too generic.`,
-			refs: [{ kind: "node", id: node.id }],
-		})),
-	};
 }
 
 function normalizeTimelineSpec(spec: BuildTimelineRequest["spec"]): NormalizedTimelineSpec {
@@ -1729,15 +1586,6 @@ const EditFlowchartFailure = workflowFailure(
 	"EditFlowchartFailure",
 	EditFlowchartRejected.fields.status,
 	EditFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildMindmapFailure = workflowFailure(
-	"BuildMindmapFailure",
-	BuildMindmapRejected.fields.status,
-	BuildMindmapRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -3551,133 +3399,35 @@ const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore")(funct
 	return withArtifactUrls(artifact, environment.artifactUrl);
 });
 
-const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(function* (
-	input: unknown,
-) {
-	const preflightIssues = preflightMindmapInput(input);
-	if (preflightIssues.length > 0) {
-		return yield* BuildMindmapFailure.new({
-			status: "invalid_mindmap",
-			context: { issues: preflightIssues },
-		});
-	}
-
-	const parsed = Schema.decodeUnknownResult(BuildMindmapRequestSchema, {
-		errors: "all",
-		reportInput: true,
-	})(input);
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildMindmapFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
-			},
-		});
-	}
-
+export const artifactBuildCapabilities = Effect.gen(function* () {
 	const environment = yield* CodeModeRuntimeEnvironment;
-
-	const request = parsed.success;
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeMindmapSpec(request.spec);
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedMindmap(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildMindmapFailure.new({
-			status: "invalid_mindmap",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const diagram = yield* validatedDomainResult({
-		try: () => toMindmapDiagram(normalizedSpec),
-		catch: (cause) =>
-			BuildMindmapFailure.new({
-				status: "invalid_mindmap",
-				context: {
-					...baseContext,
-					issues: [
-						issue({
-							code: "disconnected_graph",
-							stage: "mindmap",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message: cause instanceof Error ? cause.message : "Mindmap failed core validation.",
-							hint: "Repair the nested topic hierarchy and call buildMindmap again.",
-						}),
-					],
-				},
-			}),
-	});
-	const quality = mindmapQuality(
-		diagram,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildMindmapFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const scene = yield* validatedDomainResult({
-		try: () => renderMindmapDiagram(diagram),
-		catch: (cause) =>
-			BuildMindmapFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message: cause instanceof Error ? cause.message : "Unable to render mindmap scene.",
-							hint: "Simplify the hierarchy or retry with a smaller mindmap.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildMindmap.render"));
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildMindmapFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed"
-						? exportContext
-						: {
-								...qualityContext,
-								partial: { diagramId: scene.diagramId },
-							}),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
 	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [],
-	} satisfies Extract<BuildMindmapResult, { ok: true }>;
+		createId: environment.createId,
+		exportScene: (scene: RenderedDiagramScene, request: BuildDelivery) =>
+			exportAndStoreScene({
+				scene,
+				formats: requestedFormats(request.options),
+				inlineFormats: requestedInlineFormats(request.options),
+				...(request.requestId ? { requestId: request.requestId } : {}),
+				validationIssues: exportIssues,
+			}).pipe(
+				Effect.mapError((error) => ({
+					status: error.status,
+					issues: error.issues,
+					partial:
+						error.status === "storage_failed"
+							? { diagramId: scene.diagramId }
+							: scenePartial(scene),
+				})),
+			),
+	} satisfies ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>;
 });
+
+const buildMindmapWorkflow = (input: unknown) =>
+	Effect.gen(function* () {
+		const request = yield* decodeMindmapRequest(input);
+		return yield* buildMindmapDocument(request, yield* artifactBuildCapabilities);
+	});
 
 const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.workflow")(function* (
 	input: unknown,

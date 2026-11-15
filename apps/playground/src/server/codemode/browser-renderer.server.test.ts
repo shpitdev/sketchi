@@ -4,18 +4,18 @@ import {
 	makeWorkersTelemetryLayer,
 	withTelemetryCorrelation,
 } from "@sketchi/observability";
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { TestClock } from "effect/testing";
 import { vi } from "vitest";
 
-import type { PngRenderRequest } from "./browser-render-pool.server";
+import { type PngRenderRequest } from "./browser-render-pool.server";
 import {
 	BROWSER_RENDER_TIMEOUT_MS,
 	createCloudflareBrowserRunArtifactRenderer,
 	type CodeModePngRendererNamespace,
 } from "./browser-renderer.server";
-import type { PngRenderResult } from "./png-renderer-object.server";
+import { type PngRenderResult } from "./png-renderer-object.server";
 
 function renderInput(): {
 	scene: RenderedDiagramScene;

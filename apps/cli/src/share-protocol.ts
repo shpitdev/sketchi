@@ -1,6 +1,6 @@
 import { inflateSync } from "node:zlib";
 
-import { CANVAS_LIMITS } from "@sketchi/diagram-agent";
+import { CANVAS_LIMITS } from "@sketchi/drawing";
 import { Effect } from "effect";
 import { Deflate } from "pako";
 

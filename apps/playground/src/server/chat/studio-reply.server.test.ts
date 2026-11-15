@@ -1,9 +1,9 @@
-import type { CodeModeIssue } from "@sketchi/diagram-agent";
+import { type CodeModeIssue } from "@sketchi/diagrams/build";
 import { jsonSchema, stepCountIs, streamText, tool, type UIMessageChunk } from "ai";
 import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vitest";
 
-import type { StudioTurnOutcome } from "./studio-build-tool.server";
+import { type StudioTurnOutcome } from "./studio-build-tool.server";
 import {
 	STUDIO_RAN_OUT_REPLY,
 	studioRejectedReply,

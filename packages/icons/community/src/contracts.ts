@@ -1,4 +1,4 @@
-import { COMMUNITY_ICON_SLUG_PREFIX, type IconRecipe } from "@sketchi/diagram-core";
+import { COMMUNITY_ICON_SLUG_PREFIX, type IconRecipe } from "@sketchi/drawing";
 import { Schema } from "effect";
 
 import { COMMUNITY_ICON_NAME_MAX_LENGTH } from "./recipe.js";

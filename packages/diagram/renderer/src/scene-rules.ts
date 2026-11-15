@@ -1,4 +1,7 @@
-import type { LineSceneElement, SceneElement } from "./scene.js";
+import {
+	type CanvasLineElement as LineSceneElement,
+	type CanvasElement as SceneElement,
+} from "@sketchi/drawing";
 
 export interface RuleBox {
 	readonly left: number;

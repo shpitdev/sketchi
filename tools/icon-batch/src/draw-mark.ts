@@ -1,5 +1,5 @@
 import { CloudflareAiGatewayBinding } from "@sketchi/diagram-generation";
-import type { IconRecipe } from "@sketchi/diagram-core";
+import { type IconRecipe } from "@sketchi/drawing";
 import {
 	AUTHOR_MAX_TOKENS,
 	drawIcon,

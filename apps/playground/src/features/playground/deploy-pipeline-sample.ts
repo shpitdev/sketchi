@@ -7,8 +7,10 @@ import {
 	embedCanvasIcons,
 	type CanvasIconAsset,
 	type CanvasShapeElement,
-} from "@sketchi/diagram-core";
-import { type ArrowSceneElement, renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+	type CanvasConnectorElement as ArrowSceneElement,
+} from "@sketchi/drawing";
+
+import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
 import { normalizeNodeLogoSvg } from "@sketchi/icon-catalog";
 import cloudflareSvg from "@sketchi/icon-catalog/svg/cloud-vendors/cloudflare.svg?raw";
 import dockerSvg from "@sketchi/icon-catalog/svg/devtools-ci/docker.svg?raw";
@@ -93,7 +95,7 @@ function compactArrowPoints(points: ArrowSceneElement["points"]): ArrowSceneElem
 	];
 }
 
-// DiagramPreview fits the full renderer scene into this fixed-size sample card.
+// DrawingEditor fits the full renderer scene into this fixed-size sample card.
 // Compact its horizontal coordinates and preserve readable text sizes so both
 // node and edge labels survive fit-to-content without substituting hand-built
 // diagram markup.

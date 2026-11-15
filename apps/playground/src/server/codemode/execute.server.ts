@@ -2,13 +2,11 @@ import "@tanstack/react-start/server-only";
 
 import { isDeepStrictEqual } from "node:util";
 
+import { CodeModeIssue } from "@sketchi/diagrams/build";
+import { type ArtifactBundle, type PartialArtifactBundle } from "@sketchi/drawing/artifacts";
 import {
-	CodeModeIssue,
-	type ArtifactBundle,
-	type PartialArtifactBundle,
 	type BuildFlowchartResult,
 	type EditFlowchartResult,
-	type BuildMindmapResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildGanttResult,
@@ -25,6 +23,7 @@ import {
 	type CreateCanvasResult,
 	type ApplyDiagramPatchResult,
 } from "@sketchi/diagram-agent";
+import { type BuildMindmapResult } from "@sketchi/diagrams/mindmap/build";
 import { ICON_DRAW_BUDGET_MS } from "@sketchi/icon-draw";
 import { withTelemetryCorrelation, type TelemetryCorrelationInput } from "@sketchi/observability";
 import { Clock, Context, Deferred, Effect, Schema } from "effect";
@@ -34,7 +33,7 @@ import {
 	PlaygroundClock,
 	PlaygroundRequestMetadata,
 } from "../runtime/context.server";
-import type { PlaygroundRequestRunner } from "../runtime/runtime.server";
+import { type PlaygroundRequestRunner } from "../runtime/runtime.server";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import {
 	PlaygroundCodeMode,

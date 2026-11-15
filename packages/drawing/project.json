@@ -1,0 +1,170 @@
+{
+	"name": "drawing",
+	"$schema": "../../node_modules/nx/schemas/project-schema.json",
+	"sourceRoot": "packages/drawing/src",
+	"projectType": "library",
+	"tags": ["scope:package", "type:runtime"],
+	"targets": {
+		"build": {
+			"executor": "nx:run-commands",
+			"outputs": ["{projectRoot}/dist"],
+			"options": {
+				"command": "effect-tsgo tsc@7.0.2 -p packages/drawing/tsconfig.lib.json"
+			}
+		},
+		"test": {
+			"executor": "nx:run-commands",
+			"outputs": ["{workspaceRoot}/coverage/packages/drawing"],
+			"options": {
+				"command": "vitest run --config packages/drawing/vitest.config.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"typecheck": {
+			"executor": "nx:run-commands",
+			"options": {
+				"commands": [
+					"effect-tsgo tsc@7.0.2 -p packages/drawing/tsconfig.spec.json --noEmit",
+					"effect-tsgo tsc@7.0.2 -p packages/drawing/tsconfig.lib.json --noEmit"
+				],
+				"parallel": false
+			}
+		},
+		"routing-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "ROUTING_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/routing-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"er-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "ER_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/er-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"class-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "CLASS_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/class-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"sequence-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "SEQUENCE_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/sequence-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"venn-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "VENN_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/venn-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"org-chart-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "ORG_CHART_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/org-chart-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"journey-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "JOURNEY_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/journey-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"sankey-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "SANKEY_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/sankey-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"wireframe-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "WIREFRAME_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/wireframe-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		},
+		"quadrant-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "QUADRANT_FUZZ=full vitest run --config packages/drawing/vitest.config.ts tools/drawing-tests/quadrant-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagram/core/src/**/*",
+				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
+		}
+	}
+}

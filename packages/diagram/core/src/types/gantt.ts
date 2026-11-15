@@ -1,6 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Effect, Schema, Array as Arr, Option, Result } from "effect";
-import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import { parseTimelineDate } from "./timeline.js";
 
 export const ganttDiagramType = "gantt" as const;

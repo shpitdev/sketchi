@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import type { ArtifactFormat, ArtifactFormatRef } from "@sketchi/diagram-agent";
+import { type ArtifactFormat, type ArtifactFormatRef } from "@sketchi/drawing/artifacts";
 import { SpanContent } from "@sketchi/observability";
 import { Context, Effect, Layer } from "effect";
 

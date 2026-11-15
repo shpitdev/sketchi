@@ -1,3 +1,9 @@
+import {
+	MindmapInputError,
+	parseMindmap,
+	validateMindmap,
+	Mindmap,
+} from "@sketchi/diagrams/mindmap";
 import { DiagramValidationError } from "./intermediate.js";
 import { Result, Schema } from "effect";
 
@@ -7,7 +13,7 @@ import {
 	FlowchartDiagram,
 	validateFlowchartDiagram,
 } from "./types/flowchart.js";
-import { MindmapDiagram, validateMindmapDiagram } from "./types/mindmap.js";
+
 import {
 	SequenceValidationError,
 	SequenceDiagram,
@@ -44,12 +50,12 @@ import {
 	QuadrantDiagram,
 	validateQuadrantDiagram,
 } from "./types/quadrant.js";
-import type { DiagramTypeValue } from "./types.js";
+import { type DiagramTypeValue } from "./types.js";
 
 // A family added to DIAGRAM_TYPES without a contract here fails to compile.
 const familySchemas = {
 	flowchart: FlowchartDiagram,
-	mindmap: MindmapDiagram,
+	mindmap: Mindmap,
 	sequence: SequenceDiagram,
 	timeline: TimelineDiagram,
 	chart: ChartDiagram,
@@ -85,6 +91,7 @@ export const CanonicalDiagramSchema = Schema.Union([
 
 export type CanonicalDiagram = typeof CanonicalDiagramSchema.Type;
 export const CanonicalValidationErrorSchema = Schema.Union([
+	MindmapInputError,
 	DiagramValidationError,
 	ChartValidationError,
 	FlowchartValidationError,
@@ -109,7 +116,7 @@ export function validateCanonicalDiagram(
 ): Result.Result<CanonicalDiagram, CanonicalValidationError> {
 	return CanonicalDiagramSchema.match(diagram, {
 		flowchart: validateFlowchartDiagram,
-		mindmap: validateMindmapDiagram,
+		mindmap: validateMindmap,
 		sequence: validateSequenceDiagram,
 		timeline: validateTimelineDiagram,
 		chart: validateChartDiagram,
@@ -128,6 +135,8 @@ export function validateCanonicalDiagram(
 export function parseCanonicalDiagram(
 	input: unknown,
 ): Result.Result<CanonicalDiagram, Schema.SchemaError | CanonicalValidationError> {
+	if (typeof input === "object" && input !== null && "type" in input && input.type === "mindmap")
+		return parseMindmap(input);
 	return Result.flatMap(
 		Schema.decodeUnknownResult(CanonicalDiagramSchema, { errors: "all" })(input),
 		validateCanonicalDiagram,

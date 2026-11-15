@@ -11,13 +11,13 @@ import {
 } from "@sketchi/diagram-core";
 import {
 	layoutWireframeDiagram,
-	type RenderedDiagramScene,
 	wireframeFrameName,
 	wireframeLayoutIssues,
 } from "@sketchi/diagram-renderer";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import type { ScenarioCheck } from "./evaluate.js";
-import type { DiagramScenarioDifficulty } from "./scenarios.js";
+import { type ScenarioCheck } from "./evaluate.js";
+import { type DiagramScenarioDifficulty } from "./scenarios.js";
 
 /** A screen the prompt states: the names it may go by (any, when it names none) and its device. */
 export interface WireframeScenarioScreen {

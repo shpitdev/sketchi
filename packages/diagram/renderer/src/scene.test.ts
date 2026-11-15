@@ -5,21 +5,26 @@ import { describe, expect, it } from "vitest";
 import {
 	DIAGRAM_NODE_COLORS,
 	flowchartFixture,
-	mindmapFixture,
 	pharmaBatchDispositionFlowchart,
 	parseFlowchartDiagram,
-	getCanvasValidationIssues,
 } from "@sketchi/diagram-core";
+import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
+import {
+	getCanvasValidationIssues,
+	type CanvasConnectorElement as ArrowSceneElement,
+	type CanvasShapeElement as NodeSceneElement,
+} from "@sketchi/drawing";
 
-import { renderMindmapDiagram } from "./mindmap";
-import { type ArrowSceneElement, renderIntermediateDiagram, type NodeSceneElement } from "./scene";
+import { renderMindmap } from "@sketchi/diagrams/mindmap";
+import { renderIntermediateDiagram } from "./scene";
+
 import { renderSequenceDiagram } from "./sequence";
 
 describe("geometry bounds regressions", () => {
 	it("keeps renderer-produced flowchart, mindmap, and sequence labels valid", () => {
 		const scenes = [
 			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-			renderMindmapDiagram(mindmapFixture).pipe(Result.getOrThrow),
+			renderMindmap(mindmapFixture),
 			renderIntermediateDiagram(pharmaBatchDispositionFlowchart).pipe(Result.getOrThrow),
 			renderSequenceDiagram({
 				type: "sequence",

@@ -1,5 +1,5 @@
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
-import type { SketchiIcon } from "@sketchi/icon-catalog";
+import { type IconRecipe } from "@sketchi/drawing";
+import { type SketchiIcon } from "@sketchi/icon-catalog";
 
 import {
 	DRAWINGS_LIBRARY_PATH,

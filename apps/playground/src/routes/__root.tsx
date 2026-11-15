@@ -1,6 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 
-import "@sketchi/diagram-ui/styles.css";
+import "@sketchi/editor/styles.css";
 import appStyles from "../styles/app.css?url";
 
 const DESCRIPTION =

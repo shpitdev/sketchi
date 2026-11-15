@@ -2,8 +2,8 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
+import { getCanvasValidationIssues } from "@sketchi/drawing";
 import {
-	getCanvasValidationIssues,
 	parseSankeyDiagram,
 	sankeyFixture,
 	sankeyStressFixtures,

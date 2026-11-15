@@ -9,5 +9,13 @@
     "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo"
   },
   "exclude": ["src/**/*.test.ts"],
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../drawing/tsconfig.lib.json"
+    },
+    {
+      "path": "../../diagrams/tsconfig.lib.json"
+    }
+  ]
 }

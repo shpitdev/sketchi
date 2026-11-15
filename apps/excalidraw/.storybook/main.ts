@@ -1,4 +1,4 @@
-import type { StorybookConfig } from "@storybook/react-vite";
+import { type StorybookConfig } from "@storybook/react-vite";
 
 import { excalidrawFonts } from "../../../scripts/lib/excalidraw-fonts.mjs";
 
@@ -22,20 +22,19 @@ const config: StorybookConfig = {
 				"../../../packages/diagram/core/src/index.ts",
 				import.meta.url,
 			).pathname,
-			"@sketchi/diagram-excalidraw": new URL(
-				"../../../packages/diagram/excalidraw/src/index.ts",
+			"@sketchi/drawing/excalidraw": new URL(
+				"../../../packages/drawing/src/excalidraw/index.ts",
 				import.meta.url,
 			).pathname,
 			"@sketchi/diagram-renderer": new URL(
 				"../../../packages/diagram/renderer/src/index.ts",
 				import.meta.url,
 			).pathname,
-			"@sketchi/diagram-ui/styles.css": new URL(
-				"../../../packages/diagram/ui/src/styles.css",
+			"@sketchi/editor/styles.css": new URL(
+				"../../../packages/editor/src/styles.css",
 				import.meta.url,
 			).pathname,
-			"@sketchi/diagram-ui": new URL("../../../packages/diagram/ui/src/index.ts", import.meta.url)
-				.pathname,
+			"@sketchi/editor": new URL("../../../packages/editor/src/index.ts", import.meta.url).pathname,
 		};
 
 		return config;

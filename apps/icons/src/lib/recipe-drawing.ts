@@ -1,13 +1,14 @@
 // Subpath imports: the package entry point would ship every diagram family to a
 // page that only draws icons.
-import { fnv1a32 } from "@sketchi/diagram-core/hash";
 import {
+	fnv1a32,
 	ICON_RECIPE_GRID,
 	ICON_RECIPE_INK,
 	ICON_RECIPE_PAPER,
 	type IconRecipe,
 	type IconRecipePoint,
-} from "@sketchi/diagram-core/icon-recipe";
+} from "@sketchi/drawing";
+
 import rough from "roughjs";
 
 /** The preview's square, in SVG units. */

@@ -1,4 +1,4 @@
-import type { ArtifactProvenance } from "@sketchi/diagram-agent";
+import { type ArtifactProvenance } from "@sketchi/drawing/artifacts";
 
 import { IconLink } from "@/components/sketch-icons";
 import { artifactRouteUrls } from "@/features/artifacts/artifact-view-client";

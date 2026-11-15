@@ -7,7 +7,6 @@ import {
 	DiagramZoneKindSchema,
 	ClassDiagram,
 	ErDiagram,
-	isDiagramIconSlug,
 	OrgChartDiagram,
 	QuadrantDiagram,
 	validateQuadrantDiagram,
@@ -41,8 +40,6 @@ import {
 	resolveFlowchartReferences,
 	FlowchartDocumentSchema,
 	type FlowchartDocument,
-	MindmapDiagram,
-	SKETCHI_DIAGRAM_STYLE,
 	SequenceDiagram,
 	StateMachineDiagram,
 	getStateMachineDefaultWarnings,
@@ -54,10 +51,11 @@ import {
 	GanttDiagram,
 	validateGanttDiagram,
 	validateChartDiagram,
-	validateMindmapDiagram,
 	validateSequenceDiagram,
 	validateStateMachineDiagram,
 } from "@sketchi/diagram-core";
+import { MindmapInputError, parseMindmap } from "@sketchi/diagrams/mindmap";
+import { isDiagramIconSlug, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 import {
 	DiagramGenerationTypeSchema,
@@ -67,7 +65,7 @@ import {
 import { placeNodeLogos, type OfferedLogo } from "./logo-placement.js";
 import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import { DiagramGenerationPrompt } from "./messages.js";
-import { GeneratedMindmapTree, generatedMindmapTreeToDiagram } from "./mindmap-tree.js";
+
 import { repeatedJsonKeys } from "./repeated-keys.js";
 import { DiagramStyle, flowchartStylesAsNodeColors, generatedStyles } from "./styling.js";
 
@@ -101,6 +99,8 @@ export const DiagramGenerationCandidate = Schema.Struct({
 	edits: Schema.optional(FlowchartEditsSchema),
 	durationMs: Schema.optional(Schema.Number),
 	error: Schema.optional(Schema.String),
+	/** A family policy failure, retained for the host's truthful error response. */
+	mindmapError: Schema.optionalKey(MindmapInputError),
 	model: Schema.String,
 	provider: DiagramGenerationProviderIdSchema,
 	raw: Schema.optional(Schema.Unknown),
@@ -401,22 +401,6 @@ function drawnFlowchart(
 	};
 }
 
-/** A leaf topic may omit its empty children, and a mindmap its only layout. */
-function normalizeGeneratedMindmapTree(input: Record<string, unknown>): Record<string, unknown> {
-	const topic = (value: unknown): unknown => {
-		if (!isUnknownRecord(value)) return value;
-		const children = value["children"];
-		if (children === undefined) return { ...value, children: [] };
-		// Anything else malformed reaches the schema, so its content can be repaired and not lost.
-		return Array.isArray(children) ? { ...value, children: children.map(topic) } : value;
-	};
-	return {
-		layout: { direction: "LR", edgeRouting: "curved" },
-		...input,
-		root: topic(input["root"]),
-	};
-}
-
 function normalizeGeneratedSequenceInput(input: unknown, diagnostics: string[]): unknown {
 	const styled = withSketchiDiagramStyle(input);
 	if (!isUnknownRecord(styled)) return styled;
@@ -553,6 +537,7 @@ export function responseErrorDiagnostic(raw: unknown): string | undefined {
 }
 
 interface CandidateParseFailure {
+	readonly mindmapError?: MindmapInputError;
 	readonly diagnostics: readonly string[];
 	readonly error: string;
 	readonly success: false;
@@ -613,6 +598,7 @@ function diagramValidationFailure(
 	return Match.value(error).pipe(
 		Match.tagsExhaustive({
 			DiagramValidationError: generic,
+			MindmapInputError: generic,
 			FlowchartValidationError: generic,
 			SchemaError: generic,
 			SequenceValidationError: (error) => family("sequence", error),
@@ -811,19 +797,19 @@ function parseCandidateDiagram(
 				validateTimelineDiagram,
 			),
 		flowchart: () => parseGeneratedFlowchart(titledDiagram, repeatedJsonKeys(text), repairs),
-		mindmap: () =>
-			"root" in titledDiagram
-				? decodeAndValidate(
-						GeneratedMindmapTree,
-						normalizeGeneratedMindmapTree(titledDiagram),
-						generatedMindmapTreeToDiagram,
-						"Generated mindmap schema validation failed.",
-					)
-				: decodeAndValidate(
-						MindmapDiagram,
-						withSketchiDiagramStyle(titledDiagram),
-						validateMindmapDiagram,
-					),
+		mindmap: (): CandidateParseResult => {
+			const parsed = parseMindmap(withSketchiDiagramStyle(titledDiagram));
+			return Result.isSuccess(parsed)
+				? { success: true as const, diagram: parsed.success }
+				: {
+						success: false as const,
+						error: parsed.failure.message,
+						diagnostics: [parsed.failure.message],
+						...(parsed.failure instanceof MindmapInputError
+							? { mindmapError: parsed.failure }
+							: {}),
+					};
+		},
 		gantt: () =>
 			decodeAndValidate(GanttDiagram, withSketchiDiagramStyle(titledDiagram), validateGanttDiagram),
 		"state-machine": () => {
@@ -1005,6 +991,7 @@ export function candidateFromText(
 		...input,
 		diagnostics,
 		error: parsed.error,
+		...(parsed.mindmapError ? { mindmapError: parsed.mindmapError } : {}),
 	};
 }
 

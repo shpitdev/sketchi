@@ -1,11 +1,11 @@
 import { Result, Schema } from "effect";
 import { createTreeWithEmptyWorkspace } from "@nx/devkit/testing";
-import type { Tree } from "@nx/devkit";
+import { type Tree } from "@nx/devkit";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 
 import { diagramTypeGenerator } from "./diagram-type";
-import type { DiagramTypeGeneratorSchema } from "./schema";
+import { type DiagramTypeGeneratorSchema } from "./schema";
 
 describe("diagram-type generator", () => {
 	let tree: Tree;
@@ -81,7 +81,7 @@ export const GRAPH_DIAGRAM_TYPES = [
 		expect(registry("DIAGRAM_TYPES")).toEqual(["flowchart", "mindmap", "sequence", "timeline"]);
 		expect(registry("GRAPH_DIAGRAM_TYPES")).toEqual(["flowchart", "mindmap", "timeline"]);
 		expect(tree.exists("packages/diagram/renderer/src/diagram-types/timeline.test.ts")).toBe(true);
-		expect(tree.exists("packages/diagram/ui/src/diagram-types/timeline.stories.tsx")).toBe(true);
+		expect(tree.exists("packages/editor/src/diagram-types/timeline.stories.tsx")).toBe(true);
 		expect(tree.read("packages/diagram/core/src/index.ts", "utf-8")).toContain(
 			'export * from "./types/timeline.js";',
 		);

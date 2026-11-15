@@ -1,4 +1,4 @@
-import type { IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { type IconRecipe } from "@sketchi/drawing";
 import { useCallback, useRef, useState } from "react";
 import {
 	copyText,
@@ -9,9 +9,9 @@ import {
 	svgDataUri,
 	svgToJsxComponent,
 } from "../../lib/actions.js";
-import type { SketchiIcon } from "@sketchi/icon-catalog";
+import { type SketchiIcon } from "@sketchi/icon-catalog";
 import { permanentSvgUrl } from "../../lib/permanent-svg-url.js";
-import type { IconDetailAction } from "../icon-detail/index.js";
+import { type IconDetailAction } from "../icon-detail/index.js";
 
 export type SelectionAction = "copy" | "zip";
 const FETCH_CONCURRENCY = 8;

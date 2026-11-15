@@ -1,0 +1,25 @@
+{
+	"name": "@sketchi/drawing",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./excalidraw": {
+			"types": "./dist/excalidraw/index.d.ts",
+			"default": "./dist/excalidraw/index.js"
+		},
+		"./artifacts": {
+			"types": "./dist/artifacts.d.ts",
+			"default": "./dist/artifacts.js"
+		}
+	},
+	"dependencies": {
+		"effect": "catalog:",
+		"fractional-indexing": "4.0.0"
+	}
+}

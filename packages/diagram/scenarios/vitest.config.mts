@@ -6,8 +6,10 @@ export default defineConfig(() => ({
 	resolve: {
 		alias: {
 			"@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url).pathname,
-			"@sketchi/diagram-excalidraw": new URL("../excalidraw/src/index.ts", import.meta.url)
-				.pathname,
+			"@sketchi/drawing/excalidraw": new URL(
+				"../../drawing/src/excalidraw/index.ts",
+				import.meta.url,
+			).pathname,
 			"@sketchi/diagram-generation": new URL("../generation/src/index.ts", import.meta.url)
 				.pathname,
 			"@sketchi/diagram-renderer": new URL("../renderer/src/index.ts", import.meta.url).pathname,

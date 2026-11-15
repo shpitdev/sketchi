@@ -24,7 +24,4 @@ export const DIAGRAM_TYPES = [
 export type DiagramTypeValue = (typeof DIAGRAM_TYPES)[number];
 
 /** Families expressed as the node/edge `IntermediateDiagram` graph. */
-export const GRAPH_DIAGRAM_TYPES = [
-	"flowchart",
-	"mindmap",
-] as const satisfies readonly DiagramTypeValue[];
+export const GRAPH_DIAGRAM_TYPES = ["flowchart"] as const satisfies readonly DiagramTypeValue[];

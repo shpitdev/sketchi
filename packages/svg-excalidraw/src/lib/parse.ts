@@ -1,4 +1,4 @@
-import { fnv1a32 } from "@sketchi/diagram-core";
+import { fnv1a32 } from "@sketchi/drawing";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 
 import { flattenPrimitive, isNonRenderingPrimitive } from "./flatten";
@@ -24,19 +24,19 @@ import {
 	parseTransform,
 	transformedStrokeScale,
 } from "./transform";
-import type {
-	CanonicalShape,
-	CanonicalSvgDocument,
-	EffectiveAdaptiveFlatteningOptions,
-	EffectiveUseExpansionOptions,
-	Matrix,
-	Point,
-	SvgDiagnostic,
-	SvgFeature,
-	SvgFeatureCounts,
-	SvgParseOptions,
-	SvgParseResult,
-	SvgPrimitiveName,
+import {
+	type CanonicalShape,
+	type CanonicalSvgDocument,
+	type EffectiveAdaptiveFlatteningOptions,
+	type EffectiveUseExpansionOptions,
+	type Matrix,
+	type Point,
+	type SvgDiagnostic,
+	type SvgFeature,
+	type SvgFeatureCounts,
+	type SvgParseOptions,
+	type SvgParseResult,
+	type SvgPrimitiveName,
 } from "./types";
 
 interface SvgNode {

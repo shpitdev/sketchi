@@ -2,9 +2,9 @@ import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
 	type ExcalidrawScene,
-} from "@sketchi/diagram-excalidraw";
-import type { RenderedDiagramScene } from "@sketchi/diagram-renderer";
-import { ArtifactCanvas } from "@sketchi/diagram-ui";
+} from "@sketchi/drawing/excalidraw";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import { DrawingEditor } from "@sketchi/editor";
 import { useCallback, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { IconActionBar, IconButton, IconLink } from "@/components/sketch-icons";
 import { StudioHeader } from "@/components/studio-header";
@@ -12,7 +12,7 @@ import { artifactRouteUrls, type ArtifactViewState } from "./artifact-view-clien
 
 export function useEditedDrawingDownload(scene: RenderedDiagramScene) {
 	const baseScene = useMemo(() => convertSceneToExcalidraw(scene), [scene]);
-	const latestScene = useRef(baseScene);
+	const latestScene = useRef<ExcalidrawScene>(baseScene);
 	const [dirty, setDirty] = useState(false);
 	const onSceneChange = useCallback(
 		(next: ExcalidrawScene) => {
@@ -123,7 +123,14 @@ function ReadyEditor({
 				</>
 			}
 		>
-			<ArtifactCanvas mode="edit" onSceneChange={onSceneChange} scene={scene} />
+			<DrawingEditor
+				onSceneChange={onSceneChange}
+				title={scene.title}
+				revision={JSON.stringify(scene)}
+				scene={convertSceneToExcalidraw(scene)}
+				viewModeEnabled={false}
+				zenModeEnabled={false}
+			/>
 		</EditorFrame>
 	);
 }

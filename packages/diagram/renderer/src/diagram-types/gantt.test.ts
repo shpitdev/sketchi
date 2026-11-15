@@ -2,10 +2,15 @@
 import { Result } from "effect";
 import {
 	estimateTextWidth,
+	getCanvasValidationIssues,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasElement as SceneElement,
+	type CanvasPoint as ScenePoint,
+} from "@sketchi/drawing";
+import {
 	formatGanttDay,
 	ganttFixture,
 	ganttTaskSchedule,
-	getCanvasValidationIssues,
 	parseGanttDay,
 	parseGanttDiagram,
 	type GanttDiagram,
@@ -24,7 +29,6 @@ import {
 import { ROUTE_BUDGET, ROUTE_CHART_BUDGET, ROUTE_KINK_BUDGET } from "../gantt-routing.js";
 import { readGanttScene } from "../gantt-readout.js";
 import { GANTT_TICK_FONT_SIZE, ganttAxis } from "../gantt-scale.js";
-import type { RenderedDiagramScene, SceneElement, ScenePoint } from "../scene.js";
 
 interface Box {
 	readonly id: string;

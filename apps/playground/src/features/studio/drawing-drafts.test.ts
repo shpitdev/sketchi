@@ -1,4 +1,4 @@
-import type { ExcalidrawScene } from "@sketchi/diagram-excalidraw";
+import { type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const idb = vi.hoisted(() => {

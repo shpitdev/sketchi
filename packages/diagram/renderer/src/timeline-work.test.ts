@@ -1,6 +1,6 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
-import type * as diagramCore from "@sketchi/diagram-core";
+import type * as drawing from "@sketchi/drawing";
 import { parseTimelineDiagram } from "@sketchi/diagram-core";
 import { describe, expect, it, vi } from "vitest";
 import { renderTimelineDiagram } from "./timeline";
@@ -8,8 +8,8 @@ import { renderTimelineDiagram } from "./timeline";
 // Count label measurements: each layout of the row measures every label once,
 // so the count bounds how many layouts a render tries, without a wall-clock timer.
 const work = vi.hoisted(() => ({ measures: 0 }));
-vi.mock("@sketchi/diagram-core", async (importOriginal) => {
-	const core = await importOriginal<typeof diagramCore>();
+vi.mock("@sketchi/drawing", async (importOriginal) => {
+	const core = await importOriginal<typeof drawing>();
 	return {
 		...core,
 		boundLabelWidth: (...args: Parameters<typeof core.boundLabelWidth>) => {

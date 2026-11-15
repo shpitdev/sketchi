@@ -63,17 +63,17 @@ when their inputs change:
 - `pnpm nx run svg-excalidraw:corpus-renderer`
 - `pnpm nx run diagram-renderer:gantt-fuzz` (300 plans per Gantt fuzz; the gate runs 4)
 - `pnpm nx run diagram-renderer:chart-fuzz` (300 chart seeds; the gate runs 1–12 plus decimal seed 27)
-- `pnpm nx run diagram-renderer:mindmap-fuzz` (2,000 mindmap seeds; the gate runs 8)
-- `pnpm nx run diagram-excalidraw:routing-fuzz` (full flowchart, grouped, state, label and text-fit matrices; the gate samples 4–8 cases, retaining all 30 wrapping cases)
-- `pnpm nx run diagram-excalidraw:er-fuzz` (240 schemas; the gate runs 16)
-- `pnpm nx run diagram-excalidraw:class-fuzz` (240 models and 120 text-fit rounds; the gate runs 16 and 12)
-- `pnpm nx run diagram-excalidraw:org-chart-fuzz` (900 random charts across three seeds; the gate runs 6)
-- `pnpm nx run diagram-excalidraw:venn-fuzz` (900 random Venn diagrams across three seeds; the gate runs 12)
-- `pnpm nx run diagram-excalidraw:journey-fuzz` (900 random journeys across three seeds; the gate runs 8)
-- `pnpm nx run diagram-excalidraw:sankey-fuzz` (1,200 random flows across three seeds; the gate runs 10)
-- `pnpm nx run diagram-excalidraw:wireframe-fuzz` (1,200 random wireframes across three seeds; the gate runs 8)
-- `pnpm nx run diagram-excalidraw:sequence-fuzz` (400 sequences with self-messages; the gate runs 12)
-- `pnpm nx run diagram-excalidraw:quadrant-fuzz` (700 random quadrant charts; the gate runs 14)
+- `pnpm nx run diagrams:mindmap-fuzz` (2,000 mindmap seeds; the gate runs 8)
+- `pnpm nx run drawing:routing-fuzz` (full flowchart, grouped, state, label and text-fit matrices; the gate samples 4–8 cases, retaining all 30 wrapping cases)
+- `pnpm nx run drawing:er-fuzz` (240 schemas; the gate runs 16)
+- `pnpm nx run drawing:class-fuzz` (240 models and 120 text-fit rounds; the gate runs 16 and 12)
+- `pnpm nx run drawing:org-chart-fuzz` (900 random charts across three seeds; the gate runs 6)
+- `pnpm nx run drawing:venn-fuzz` (900 random Venn diagrams across three seeds; the gate runs 12)
+- `pnpm nx run drawing:journey-fuzz` (900 random journeys across three seeds; the gate runs 8)
+- `pnpm nx run drawing:sankey-fuzz` (1,200 random flows across three seeds; the gate runs 10)
+- `pnpm nx run drawing:wireframe-fuzz` (1,200 random wireframes across three seeds; the gate runs 8)
+- `pnpm nx run drawing:sequence-fuzz` (400 sequences with self-messages; the gate runs 12)
+- `pnpm nx run drawing:quadrant-fuzz` (700 random quadrant charts; the gate runs 14)
 - `pnpm run test:wrangler-dry-runs` after app builds
 
 Worker Previews are opt-in. Add the `preview` label to a PR to deploy the Worker

@@ -2,13 +2,13 @@ import {
 	formatContractSchemaError,
 	CodeModeArtifactStorage,
 	CodeModeRuntimeEnvironment,
-	ExcalidrawFile,
 	RenderedDiagramSceneSchema,
-	type CodeModeIssue,
 } from "@sketchi/diagram-agent";
+import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
+import { type CodeModeIssue } from "@sketchi/diagrams/build";
 import { Effect, Schema, Result } from "effect";
 
-import type { PatchedDiagramArtifacts } from "./contracts.js";
+import { type PatchedDiagramArtifacts } from "./contracts.js";
 import { CliBuildError, CliStorageError, CliValidationError } from "./errors.js";
 
 const INLINE_FORMATS: Array<"scene" | "excalidraw"> = ["scene", "excalidraw"];

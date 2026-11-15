@@ -1,8 +1,8 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import { type Meta, type StoryObj } from "@storybook/react-vite";
 
 import { SvgIconWorkspace } from "./svg-icon-workspace";
 import "../../styles/app.css";
-import "@sketchi/diagram-ui/styles.css";
+import "@sketchi/editor/styles.css";
 
 const supportedSvg =
 	'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="#ff6b35" fill-rule="evenodd" d="M5 5H95V95H5Z M30 30H70V70H30Z"/></svg>';

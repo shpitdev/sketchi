@@ -11,9 +11,9 @@ import {
 	DIAGRAM_TYPES,
 	type DiagramTypeValue,
 	diagramFixtures,
-	getCanvasValidationIssues,
 	parseCanonicalDiagram,
 } from "@sketchi/diagram-core";
+import { getCanvasValidationIssues } from "@sketchi/drawing";
 import { candidateFromText } from "@sketchi/diagram-generation";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 import { scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
