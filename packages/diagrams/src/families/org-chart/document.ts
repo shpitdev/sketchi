@@ -587,3 +587,15 @@ export const orgChartFixture = parseOrgChartDiagram({
 	],
 	dottedLines: [{ id: "ken-to-radia", report: "ken", manager: "radia" }],
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: OrgChartDiagram) {
+	return {
+		nodeCount: diagram.people.length,
+		nodeNoun: "people",
+		edgeCount:
+			diagram.people.filter((person) => person.manager !== undefined).length +
+			diagram.dottedLines.length,
+		edgeNoun: "reporting lines",
+	};
+}

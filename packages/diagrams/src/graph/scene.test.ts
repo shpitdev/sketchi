@@ -18,25 +18,12 @@ import {
 import { renderMindmap } from "../families/mindmap/index.js";
 import { renderIntermediateDiagram } from "./scene";
 
-import { renderSequenceDiagram } from "../families/sequence/render";
-
 describe("geometry bounds regressions", () => {
-	it("keeps renderer-produced flowchart, mindmap, and sequence labels valid", () => {
+	it("keeps renderer-produced flowchart and mindmap labels valid", () => {
 		const scenes = [
 			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
 			renderMindmap(mindmapFixture),
 			renderIntermediateDiagram(pharmaBatchDispositionFlowchart).pipe(Result.getOrThrow),
-			renderSequenceDiagram({
-				type: "sequence",
-				id: "sequence-label-fit",
-				title: "Sequence label fit",
-				participants: [
-					{ id: "a", label: "Alpha" },
-					{ id: "b", label: "Beta" },
-				],
-				messages: [{ id: "ab", source: "a", target: "b", label: "Continue" }],
-				style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-			}).pipe(Result.getOrThrow),
 		];
 		for (const scene of scenes) expect(getCanvasValidationIssues(scene)).toEqual([]);
 	});

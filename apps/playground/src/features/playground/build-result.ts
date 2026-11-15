@@ -1,9 +1,9 @@
+import { sequenceBuild } from "@sketchi/diagrams/families/sequence/build";
 import { familyForType } from "@sketchi/diagrams/family";
 import { stateLabel } from "@sketchi/diagrams/families/state-machine/document";
 import {
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
-	BuildSequenceDiagramResultSchema,
 	BuildStateMachineResultSchema,
 	BuildStateMachineToolInputSchema,
 	BuildGanttResultSchema,
@@ -26,10 +26,8 @@ import {
 	BuildTimelineToolInputSchema,
 	BuildChartResultSchema,
 	BuildChartToolInputSchema,
-	BuildSequenceDiagramToolInputSchema,
 	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
-	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildGanttResult,
 	type BuildErDiagramResult,
@@ -54,7 +52,7 @@ type MessagePart = UIMessage["parts"][number];
 export type StudioBuildResult =
 	| BuildFlowchartResult
 	| ReturnType<typeof familyForType<"mindmap">>["contracts"]["output"]["Type"]
-	| BuildSequenceDiagramResult
+	| typeof sequenceBuild.result.Type
 	| BuildTimelineResult
 	| BuildChartResult
 	| BuildStateMachineResult
@@ -121,9 +119,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_sequence_diagram": {
 		family: "sequence",
-		decodeResult: Schema.decodeUnknownResult(BuildSequenceDiagramResultSchema),
+		decodeResult: Schema.decodeUnknownResult(sequenceBuild.result),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildSequenceDiagramToolInputSchema, {
+			const decoded = Schema.decodeUnknownResult(sequenceBuild.toolInput, {
 				errors: "all",
 				reportInput: true,
 			})(input);

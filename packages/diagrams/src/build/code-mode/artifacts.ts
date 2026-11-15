@@ -7,7 +7,7 @@ import {
 	type ArtifactFormatRef,
 	type InlineArtifactFormat,
 } from "@sketchi/drawing/artifacts";
-import { type CodeModeIssue, type CodeModeIssueCode } from "../result.js";
+import { type CodeModeIssue } from "../result.js";
 
 export interface StoredArtifactFormat {
 	format: ArtifactFormat;
@@ -469,10 +469,7 @@ export function makeObjectBucketArtifactStorage(
 
 export function storageIssue(
 	message: string,
-	code: Extract<
-		CodeModeIssueCode,
-		"storage_read_failed" | "storage_write_failed"
-	> = "storage_write_failed",
+	code: "storage_read_failed" | "storage_write_failed" = "storage_write_failed",
 ): CodeModeIssue {
 	return {
 		code,

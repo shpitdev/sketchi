@@ -635,3 +635,13 @@ export function resolveErShorthand(input: unknown): unknown {
 		...(relationships === undefined ? {} : { relationships }),
 	};
 }
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: ErDiagram) {
+	return {
+		nodeCount: diagram.entities.length,
+		nodeNoun: "entities",
+		edgeCount: diagram.relationships.length,
+		edgeNoun: "relationships",
+	};
+}

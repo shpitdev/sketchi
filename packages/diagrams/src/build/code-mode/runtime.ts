@@ -1,8 +1,6 @@
 import { canvasFailureStatus, canvasValidationIssues } from "../scene.js";
 import { FLOWCHART_COVERAGE_CODES } from "../../families/flowchart/coverage-codes.js";
-import { vennBuild } from "../../families/venn/build.js";
-import { mindmapBuild } from "../../families/mindmap/build.js";
-import { families, type FamilyBuildOperation } from "../../family.js";
+import { families, familyForType, type FamilyBuildOperation } from "../../family.js";
 import {
 	CodeModeIssue,
 	type ArtifactBuildCapabilities,
@@ -90,11 +88,7 @@ import {
 	type SankeyDiagram,
 	type SankeyValidationIssueCode,
 } from "../../families/sankey/document.js";
-import {
-	getSequenceValidationIssues,
-	type SequenceDiagram,
-	type SequenceValidationIssueCode,
-} from "../../families/sequence/document.js";
+
 import {
 	getStateMachineDefaultWarnings,
 	getStateMachineValidationIssues,
@@ -150,7 +144,6 @@ import {
 import {
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
-	renderSequenceDiagram,
 } from "../../families/sequence/render.js";
 import { renderStateMachineDiagram } from "../../families/state-machine/render.js";
 import {
@@ -203,8 +196,6 @@ import {
 	BuildQuadrantChartRequest,
 	BuildSankeyRejected,
 	BuildSankeyRequest,
-	BuildSequenceDiagramRejected,
-	BuildSequenceDiagramRequest,
 	BuildStateMachineRejected,
 	BuildStateMachineRequest,
 	BuildTimelineRejected,
@@ -234,7 +225,6 @@ import {
 	type BuildOrgChartResult,
 	type BuildQuadrantChartResult,
 	type BuildSankeyResult,
-	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
 	type BuildTimelineResult,
 	type BuildWireframeResult,
@@ -253,7 +243,6 @@ import {
 	type NormalizedOrgChartSpec,
 	type NormalizedQuadrantChartSpec,
 	type NormalizedSankeySpec,
-	type NormalizedSequenceDiagramSpec,
 	type NormalizedStateMachineSpec,
 	type NormalizedTimelineSpec,
 	type NormalizedWireframeSpec,
@@ -269,16 +258,16 @@ import {
 	type PartialArtifactBundle,
 } from "@sketchi/drawing/artifacts";
 
-import { cleanToolString } from "../../clean-text.js";
+import { cleanToolString, slug } from "../../clean-text.js";
 import { assessFlowchartQuality } from "../../families/flowchart/quality.js";
 import { normalizeFlowchartSpec } from "../../families/flowchart/spec.js";
 import {
+	BuildIconSource,
 	catalogForRequest,
 	embedSceneIcons,
 	fillGroupLogos,
 	iconRefSlug,
 	resolveFlowchartLogos,
-	resolveNodeIcons,
 	undrawableIconIssue,
 	type CodeModeCommunityIcon,
 	type CodeModeCommunityIcons,
@@ -366,7 +355,7 @@ function unknownRecord(value: unknown): Record<string, unknown> | undefined {
 		: undefined;
 }
 
-type CodeModeBoundaryOperation =
+export type CodeModeBoundaryOperation =
 	| FamilyBuildOperation
 	| "applyDiagramPatch"
 	| "editFlowchart"
@@ -395,7 +384,7 @@ function codeModeCorrelation(input: unknown): TelemetryCorrelationInput {
 	};
 }
 
-function artifactKindForOperation(operation: CodeModeBoundaryOperation): string | undefined {
+function artifactKindForOperation(operation: string): string | undefined {
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
 	return families.find((family) => family.operation === operation)?.type;
@@ -405,11 +394,7 @@ export function observeCodeModeBoundary<
 	A extends ObservableCodeModeResult,
 	E extends { readonly status: string },
 	R,
->(
-	operation: CodeModeBoundaryOperation,
-	input: unknown,
-	effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E, R> {
+>(operation: string, input: unknown, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> {
 	const observed = Effect.gen(function* () {
 		const startedAt = yield* Clock.currentTimeMillis;
 		const outcomeResult = yield* Effect.result(effect);
@@ -454,7 +439,7 @@ export function observeCodeModeBoundary<
 function normalizeTimelineSpec(spec: BuildTimelineRequest["spec"]): NormalizedTimelineSpec {
 	const title = cleanToolString(spec.title);
 	const diagram: TimelineDiagram = {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-timeline"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-timeline"),
 		title,
 		type: "timeline",
 		style: { ...SKETCHI_DIAGRAM_STYLE },
@@ -503,7 +488,7 @@ function normalizeChartSpec(spec: BuildChartRequest["spec"]): NormalizedChartSpe
 	const categoryAxisTitle = optionalText(spec.categoryAxisTitle);
 	const valueAxisTitle = optionalText(spec.valueAxisTitle);
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-chart"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-chart"),
 		title,
 		kind: spec.kind,
 		categories: spec.categories.map(cleanToolString),
@@ -547,7 +532,7 @@ function chartQuality(spec: NormalizedChartSpec, threshold: number): QualityRepo
 function normalizeGanttSpec(spec: BuildGanttRequest["spec"]): NormalizedGanttSpec {
 	const title = cleanToolString(spec.title);
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-gantt"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-gantt"),
 		title,
 		tasks: spec.tasks.map((task) => {
 			const phase = cleanOptional(task.phase);
@@ -618,92 +603,6 @@ function ganttQuality(spec: NormalizedGanttSpec, threshold: number): QualityRepo
 	};
 }
 
-function normalizeSequenceDiagramSpec(
-	spec: BuildSequenceDiagramRequest["spec"],
-): NormalizedSequenceDiagramSpec {
-	const title = cleanToolString(spec.title);
-	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-sequence"),
-		title,
-		participants: spec.participants.map((participant) => ({
-			id: cleanToolString(participant.id),
-			label: cleanToolString(participant.label),
-			...(participant.kind ? { kind: cleanToolString(participant.kind) } : {}),
-			...(participant.icon ? { icon: participant.icon } : {}),
-		})),
-		messages: spec.messages.map((message, index) => ({
-			id:
-				cleanOptional(message.id) ??
-				`message-${index + 1}-${slugify(message.source)}-${slugify(message.target)}`,
-			source: cleanToolString(message.source),
-			target: cleanToolString(message.target),
-			label: cleanToolString(message.label),
-			...(message.type ? { type: message.type } : {}),
-			...(message.style ? { style: message.style } : {}),
-		})),
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-	};
-}
-
-function toSequenceDiagram(spec: NormalizedSequenceDiagramSpec): SequenceDiagram {
-	return {
-		id: spec.id,
-		title: spec.title,
-		type: "sequence",
-		// resolveNodeIcons leaves every icon a slug.
-		participants: spec.participants.map(({ icon, ...participant }) =>
-			icon?.slug ? { ...participant, icon: { slug: icon.slug } } : participant,
-		),
-		messages: spec.messages,
-		style: spec.style,
-	};
-}
-
-/** Code Mode's published issue codes for diagram-core's sequence invariants. */
-const SEQUENCE_ISSUE_CODES = {
-	sequence_too_large: "sequence_too_large",
-	duplicate_participant_id: "duplicate_node_id",
-	lifeline_id_collision: "duplicate_node_id",
-	duplicate_message_id: "duplicate_edge_id",
-	missing_message_source: "missing_edge_source",
-	missing_message_target: "missing_edge_target",
-} as const satisfies Record<SequenceValidationIssueCode, CodeModeIssueCode>;
-
-/**
- * Code Mode requests nest the diagram under `spec`, so hints that name a field
- * keep the published request path rather than diagram-core's.
- */
-const SEQUENCE_ISSUE_HINTS: Partial<Record<SequenceValidationIssueCode, string>> = {
-	missing_message_source: "Use the id of a participant declared in spec.participants.",
-	missing_message_target: "Use the id of a participant declared in spec.participants.",
-};
-
-function validateNormalizedSequenceDiagram(spec: NormalizedSequenceDiagramSpec): CodeModeIssue[] {
-	return getSequenceValidationIssues(toSequenceDiagram(spec)).map((entry) =>
-		issue({
-			code: SEQUENCE_ISSUE_CODES[entry.code],
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-			message: entry.message,
-			hint: SEQUENCE_ISSUE_HINTS[entry.code] ?? entry.hint,
-		}),
-	);
-}
-
-function sequenceQuality(spec: NormalizedSequenceDiagramSpec, threshold: number): QualityReport {
-	const score = 10;
-	return {
-		accepted: score >= threshold,
-		score,
-		threshold,
-		summary: {
-			nodeCount: spec.participants.length,
-			edgeCount: spec.messages.length,
-		},
-		checks: [],
-	};
-}
-
 function normalizeStateMachineSpec(
 	spec: BuildStateMachineRequest["spec"],
 ): NormalizedStateMachineSpec {
@@ -711,7 +610,7 @@ function normalizeStateMachineSpec(
 	const optional = (key: string, value: string | undefined) =>
 		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-state-machine"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-state-machine"),
 		title,
 		initial: cleanToolString(spec.initial),
 		states: spec.states.map((state) => {
@@ -728,7 +627,7 @@ function normalizeStateMachineSpec(
 		transitions: spec.transitions.map((transition, index) => ({
 			id:
 				cleanOptional(transition.id) ??
-				`transition-${index + 1}-${slugify(transition.source)}-${slugify(transition.target)}`,
+				`transition-${index + 1}-${slug(transition.source)}-${slug(transition.target)}`,
 			source: cleanToolString(transition.source),
 			target: cleanToolString(transition.target),
 			...optional("event", transition.event),
@@ -803,7 +702,7 @@ function normalizeErSpec(spec: BuildErDiagramRequest["spec"]): NormalizedErSpec 
 		return `relationship-${number}`;
 	};
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-er-diagram"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-er-diagram"),
 		title,
 		entities: spec.entities.map((entity) => ({
 			id: cleanToolString(entity.id),
@@ -906,7 +805,7 @@ function normalizeClassSpec(spec: BuildClassDiagramRequest["spec"]): NormalizedC
 		return `relationship-${number}`;
 	};
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-class-diagram"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-class-diagram"),
 		title,
 		classes: spec.classes.map((node) => ({
 			id: cleanToolString(node.id),
@@ -1025,7 +924,7 @@ function normalizeOrgChartSpec(spec: BuildOrgChartRequest["spec"]): NormalizedOr
 		return `dotted-line-${number}`;
 	};
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-org-chart"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-org-chart"),
 		title,
 		people: spec.people.map((person) => ({
 			id: cleanToolString(person.id),
@@ -1100,7 +999,7 @@ function normalizeSankeySpec(spec: BuildSankeyRequest["spec"]): NormalizedSankey
 	const optional = (key: string, value: string | undefined) =>
 		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-sankey"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-sankey"),
 		title,
 		nodes: spec.nodes.map((node) => ({
 			id: cleanToolString(node.id),
@@ -1182,7 +1081,7 @@ function normalizeJourneySpec(spec: BuildJourneyMapRequest["spec"]): NormalizedJ
 	};
 	const actors = (spec.actors ?? []).map(cleanToolString).filter((actor) => actor.length > 0);
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-journey-map"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-journey-map"),
 		title,
 		...optional("persona", spec.persona),
 		...(actors.length > 0 ? { actors } : {}),
@@ -1272,14 +1171,14 @@ function normalizeWireframeSpec(spec: BuildWireframeRequest["spec"]): Normalized
 	// An omitted screen id takes its name's slug, then `screen-<n>`, never one another screen claims.
 	const used = new Set(spec.screens.flatMap((screen) => cleanOptional(screen.id) ?? []));
 	const screenId = (name: string, index: number) => {
-		const base = slugify(name) || `screen-${index + 1}`;
+		const base = slug(name) || `screen-${index + 1}`;
 		let id = base;
 		for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
 		used.add(id);
 		return id;
 	};
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-wireframe"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-wireframe"),
 		title,
 		screens: spec.screens.map((screen, index) => {
 			const name = cleanToolString(screen.name);
@@ -1363,7 +1262,7 @@ function normalizeQuadrantChartSpec(
 		high: cleanToolString(value.high),
 	});
 	return {
-		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-quadrant-chart"),
+		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-quadrant-chart"),
 		title,
 		xAxis: axis(spec.xAxis),
 		yAxis: axis(spec.yAxis),
@@ -1519,15 +1418,6 @@ const EditFlowchartFailure = workflowFailure(
 	"EditFlowchartFailure",
 	EditFlowchartRejected.fields.status,
 	EditFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildSequenceDiagramFailure = workflowFailure(
-	"BuildSequenceDiagramFailure",
-	BuildSequenceDiagramRejected.fields.status,
-	BuildSequenceDiagramRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -1809,14 +1699,6 @@ function inputIssues(
 		);
 	}
 	return issues;
-}
-
-function slugify(value: string): string {
-	return value
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 48);
 }
 
 function cleanOptional(value: string | undefined): string | undefined {
@@ -3285,136 +3167,6 @@ export const artifactBuildCapabilities = Effect.gen(function* () {
 				})),
 			),
 	} satisfies ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>;
-});
-
-const buildMindmapWorkflow = (input: unknown) =>
-	Effect.gen(function* () {
-		const request = yield* mindmapBuild.decode(input);
-		return yield* mindmapBuild.build(request, yield* artifactBuildCapabilities);
-	});
-
-const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.workflow")(function* (
-	input: unknown,
-) {
-	const parsed = Schema.decodeUnknownResult(BuildSequenceDiagramRequest, {
-		errors: "all",
-		reportInput: true,
-	})(input);
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildSequenceDiagramFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-
-	const request = parsed.success;
-	const icons = yield* catalogForRequest(
-		environment.icons,
-		environment.communityIcons,
-		request.spec,
-	);
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const authoredSpec = normalizeSequenceDiagramSpec(request.spec);
-	const resolvedIcons = resolveNodeIcons(
-		authoredSpec.participants,
-		icons,
-		{ noun: "participant", path: "participants" },
-		{ fillNamedLogos: environment.fillNamedLogos === true },
-	);
-	const normalizedSpec = { ...authoredSpec, participants: resolvedIcons.nodes };
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedSequenceDiagram(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildSequenceDiagramFailure.new({
-			status: "invalid_sequence",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const quality = sequenceQuality(
-		normalizedSpec,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildSequenceDiagramFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const renderedScene = yield* validatedDomainResult({
-		try: () => renderSequenceDiagram(toSequenceDiagram(normalizedSpec)),
-		catch: (cause) =>
-			BuildSequenceDiagramFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message:
-								cause instanceof Error ? cause.message : "Unable to render sequence diagram scene.",
-							hint: "Repair the participant/message structure and retry.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.render"));
-	const embedded = yield* embedSceneIcons(renderedScene, icons);
-	const scene = embedded.scene;
-	const canvasIssues = getCanvasValidationIssues(scene);
-	if (canvasIssues.length > 0) {
-		return yield* BuildSequenceDiagramFailure.new({
-			status: canvasFailureStatus(canvasIssues),
-			context: {
-				...qualityContext,
-				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
-					...entry,
-					hint: "Reduce participant label lines, participants, or messages and retry buildSequenceDiagram.",
-				})),
-			},
-		});
-	}
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildSequenceDiagramFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [...resolvedIcons.issues, ...embedded.issues],
-	} satisfies Extract<BuildSequenceDiagramResult, { ok: true }>;
 });
 
 const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow")(function* (
@@ -5528,7 +5280,7 @@ type CodeModeWorkflowEffect<A> = Effect.Effect<
 >;
 
 function boundary<A extends ObservableCodeModeResult, E, B extends ObservableCodeModeResult>(
-	operation: CodeModeBoundaryOperation,
+	operation: string,
 	workflow: (
 		input: unknown,
 	) => Effect.Effect<A, E, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
@@ -5549,16 +5301,45 @@ export const buildFlowchart: (input: unknown) => CodeModeWorkflowEffect<BuildFlo
 export const editFlowchart: (input: unknown) => CodeModeWorkflowEffect<EditFlowchartResult> =
 	boundary("editFlowchart", editFlowchartWorkflow, failureResult);
 
-export const buildMindmap = (input: unknown) =>
-	observeCodeModeBoundary("buildMindmap", input, buildMindmapWorkflow(input));
-
-export const buildSequenceDiagram: (
-	input: unknown,
-) => CodeModeWorkflowEffect<BuildSequenceDiagramResult> = boundary(
-	"buildSequenceDiagram",
-	buildSequenceDiagramWorkflow,
-	failureResult,
-);
+/** Bind the shared operation to host capabilities once, retaining typed errors to the host. */
+export function bindBuild<
+	A,
+	E extends { readonly status: string },
+	R extends ObservableCodeModeResult,
+>(
+	operation: string,
+	build: {
+		readonly decode: (input: unknown) => Effect.Effect<A, E>;
+		readonly build: (
+			request: A,
+			capabilities: ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+		) => Effect.Effect<
+			R,
+			E,
+			CodeModeRuntimeEnvironment | CodeModeArtifactStorage | BuildIconSource
+		>;
+	},
+) {
+	return (input: unknown) =>
+		observeCodeModeBoundary(
+			operation,
+			input,
+			Effect.gen(function* () {
+				const request = yield* build.decode(input);
+				const environment = yield* CodeModeRuntimeEnvironment;
+				return yield* build.build(request, yield* artifactBuildCapabilities).pipe(
+					Effect.provideService(BuildIconSource, {
+						catalog: (document) =>
+							catalogForRequest(environment.icons, environment.communityIcons, document),
+						fillNamedLogos: environment.fillNamedLogos === true,
+					}),
+				);
+			}),
+		);
+}
+export const buildMindmap = familyForType("mindmap").build({ bindBuild });
+export const buildSequenceDiagram = familyForType("sequence").build({ bindBuild });
+export const buildVennDiagram = familyForType("venn").build({ bindBuild });
 
 export const buildStateMachine: (
 	input: unknown,
@@ -5582,17 +5363,6 @@ export const buildClassDiagram: (
 /** An org chart: people, the managers they report to, and dotted-line reports. */
 export const buildOrgChart: (input: unknown) => CodeModeWorkflowEffect<BuildOrgChartResult> =
 	boundary("buildOrgChart", buildOrgChartWorkflow, failureResult);
-
-/** A Venn diagram: two or three sets and the items or counts in each of their regions. */
-export const buildVennDiagram = (input: unknown) =>
-	observeCodeModeBoundary(
-		"buildVennDiagram",
-		input,
-		Effect.gen(function* () {
-			const request = yield* vennBuild.decode(input);
-			return yield* vennBuild.build(request, yield* artifactBuildCapabilities);
-		}),
-	);
 
 /** A user journey map: stages of steps scored for sentiment, with pain points and opportunities. */
 export const buildJourneyMap: (input: unknown) => CodeModeWorkflowEffect<BuildJourneyMapResult> =

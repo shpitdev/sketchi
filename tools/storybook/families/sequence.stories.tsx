@@ -1,10 +1,9 @@
-import { familyForType } from "@sketchi/diagrams/family";
-import { type Meta, type StoryObj } from "@storybook/react-vite";
-
 import {
 	apiRequestSequence,
 	selfMessageSequence,
-} from "@sketchi/diagrams/families/sequence/document";
+} from "@sketchi/diagrams/families/sequence/fixtures";
+import { familyForType } from "@sketchi/diagrams/family";
+import { type Meta, type StoryObj } from "@storybook/react-vite";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
 

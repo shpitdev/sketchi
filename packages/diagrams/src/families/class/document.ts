@@ -974,3 +974,13 @@ export const classFixture = parseClassDiagram({
 		},
 	],
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: ClassDiagram) {
+	return {
+		nodeCount: diagram.classes.length,
+		nodeNoun: "classes",
+		edgeCount: diagram.relationships.length,
+		edgeNoun: "relationships",
+	};
+}

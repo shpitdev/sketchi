@@ -1,10 +1,11 @@
+import { slug } from "@sketchi/diagrams/clean-text";
 import { CanvasSpec } from "@sketchi/diagrams/build/code-mode/contract";
 import { isCanonicalDocumentType } from "@sketchi/diagrams/build/code-mode/documents";
-import { decodeMindmapDocument } from "@sketchi/diagrams/families/mindmap/index";
 import {
 	DIAGRAM_TYPES,
 	familyForType,
 	type CanonicalDiagramDocument,
+	type CanonicalValidationError,
 } from "@sketchi/diagrams/family";
 import { Effect, Schema, SchemaIssue } from "effect";
 
@@ -95,23 +96,18 @@ export const decodeCanonicalDiagramDocument = Effect.fn("sketchi.cli.document.de
 		if (!fields) {
 			return yield* validationError(["document: Expected an object with type and spec."]);
 		}
-		if (fields.type === "mindmap") {
-			const spec = yield* Effect.fromResult(decodeMindmapDocument(fields.spec)).pipe(
+		if (isCanonicalDocumentType(fields.type)) {
+			const type = fields.type;
+			const decoded: Effect.Effect<
+				CanonicalDiagramDocument,
+				Schema.SchemaError | CanonicalValidationError
+			> = familyForType(type).decodeDocument(fields.spec);
+			return yield* decoded.pipe(
 				Effect.mapError((error) =>
 					validationError(
 						error._tag === "SchemaError" ? schemaDetails(error.issue) : [error.message],
 					),
 				),
-			);
-			return { type: "mindmap" as const, spec };
-		}
-		if (isCanonicalDocumentType(fields.type)) {
-			const type = fields.type;
-			const decoded: Effect.Effect<CanonicalDiagramDocument, Schema.SchemaError> = familyForType(
-				type,
-			).decodeDocument(fields.spec);
-			return yield* decoded.pipe(
-				Effect.mapError((error) => validationError(schemaDetails(error.issue))),
 			);
 		}
 		return yield* validationError([`document.type: Expected ${canonicalTypeList}.`]);
@@ -142,7 +138,11 @@ export const decodeStoredDiagramDocument = Effect.fn("sketchi.cli.document.decod
 			return yield* decodeCanonicalDiagramDocument(input);
 		}
 		const spec = yield* decodeCanvasSpec(fields.spec).pipe(
-			Effect.mapError((error) => validationError(schemaDetails(error.issue))),
+			Effect.mapError((error) =>
+				validationError(
+					error._tag === "SchemaError" ? schemaDetails(error.issue) : [error.message],
+				),
+			),
 		);
 		return canvasDocument(spec);
 	},
@@ -155,13 +155,7 @@ export function encodeJson(value: unknown): string {
 export function documentId(document: CanonicalDiagramDocument): string {
 	const explicitId = document.spec.id?.trim();
 	if (explicitId) return explicitId;
-	const slug = document.spec.title
-		.trim()
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 48);
-	return slug || `sketchi-${document.type}`;
+	return slug(document.spec.title.trim()) || `sketchi-${document.type}`;
 }
 
 export function validateStorageId(id: string): Effect.Effect<string, CliValidationError> {

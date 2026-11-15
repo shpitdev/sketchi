@@ -1,5 +1,7 @@
+import { buildResponse } from "@sketchi/diagrams/build/operation";
+import { sequenceBuild } from "@sketchi/diagrams/families/sequence/build";
 import { describe, expect, it, vi } from "@effect/vitest";
-import { type BuildSequenceDiagramToolInput as StudioBuildSequenceInput } from "@sketchi/diagrams/build/code-mode/contract";
+
 import { Effect } from "effect";
 
 import {
@@ -19,7 +21,7 @@ import {
 } from "./studio-build-policy.server";
 import { makeStudioBuildTurn, STUDIO_ARTIFACT_OPTIONS } from "./studio-build-tool.server";
 
-const checkout: StudioBuildSequenceInput = {
+const checkout: typeof sequenceBuild.toolInput.Type = {
 	spec: {
 		id: "checkout",
 		title: "Checkout",
@@ -50,7 +52,7 @@ function deterministicRuntime() {
 			}),
 		);
 	return {
-		build: (input: unknown) => provide(buildSequenceDiagram(input)),
+		build: (input: unknown) => provide(buildResponse(buildSequenceDiagram(input))),
 		buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
 		writes: () => write.mock.calls.length,
 	};
@@ -99,7 +101,7 @@ describe("Studio build_sequence_diagram host", () => {
 	it("returns repairable issues, then stops after the attempt budget", async () => {
 		const runtime = deterministicRuntime();
 		const executor = await Effect.runPromise(makeStudioSequenceToolExecutor(runtime.build));
-		const strayMessage: StudioBuildSequenceInput = {
+		const strayMessage: typeof sequenceBuild.toolInput.Type = {
 			spec: {
 				...checkout.spec,
 				messages: [{ id: "lost", source: "api", target: "ghost", label: "Retry" }],
@@ -110,7 +112,7 @@ describe("Studio build_sequence_diagram host", () => {
 		expect(rejected).toMatchObject({
 			ok: false,
 			status: "invalid_sequence",
-			issues: [expect.objectContaining({ code: "missing_edge_target" })],
+			issues: [expect.objectContaining({ code: "missing_message_target" })],
 		});
 		await Effect.runPromise(executor.execute(strayMessage));
 		await Effect.runPromise(executor.execute(strayMessage));
@@ -157,7 +159,7 @@ describe("Studio build_sequence_diagram host", () => {
 		const sequence = await Effect.runPromise(
 			makeStudioSequenceToolExecutor(runtime.build, { turn }),
 		);
-		const strayMessage: StudioBuildSequenceInput = {
+		const strayMessage: typeof sequenceBuild.toolInput.Type = {
 			spec: { ...checkout.spec, messages: [{ source: "api", target: "ghost", label: "Retry" }] },
 		};
 
@@ -204,7 +206,7 @@ describe("Studio build_sequence_diagram host", () => {
 			}),
 		);
 
-		const built = received[0] as StudioBuildSequenceInput;
+		const built = received[0] as typeof sequenceBuild.toolInput.Type;
 		expect(built.spec.participants.map((participant) => participant.icon?.slug)).toEqual([
 			undefined,
 			undefined,

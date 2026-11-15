@@ -732,3 +732,8 @@ export const requestFlowGroupLogoFlowchart = parseFlowchartDiagram({
 }).pipe(Result.getOrThrow);
 
 export const flowchartEvaluationFixtures = [flowchartFixture, pharmaBatchDispositionFlowchart];
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: FlowchartDiagram) {
+	return { nodeCount: diagram.nodes.length, edgeCount: diagram.edges.length };
+}

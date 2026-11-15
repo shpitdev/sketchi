@@ -5,12 +5,6 @@ import { describe, expect, it } from "vitest";
 import { generateKeyBetween } from "fractional-indexing";
 
 import {
-	apiRequestSequence,
-	parseSequenceDiagram,
-	selfMessageSequence,
-	sequenceFixture,
-} from "@sketchi/diagrams/families/sequence/document";
-import {
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
 	parseFlowchartDiagram,
@@ -21,7 +15,6 @@ import { zoneFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures
 import { type CanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
 import { renderChartDiagram } from "@sketchi/diagrams/families/chart/render";
 import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
-import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 
 import {
 	convertSceneToExcalidraw,
@@ -31,38 +24,6 @@ import {
 } from "@sketchi/drawing/excalidraw";
 
 describe("authored node geometry", () => {
-	it("exports a sequence with a three-line participant label without growing shapes", () => {
-		const scene = renderSequenceDiagram({
-			type: "sequence",
-			id: "multiline-sequence",
-			title: "Multiline sequence",
-			participants: [
-				{ id: "a", label: "one\ntwo\nthree" },
-				{ id: "b", label: "B" },
-			],
-			messages: [{ id: "ab", source: "a", target: "b", label: "Continue" }],
-			style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-		}).pipe(Result.getOrThrow);
-		const converted = convertSceneToExcalidraw(scene);
-		expect(validateExcalidrawScene(converted)).toEqual({
-			ok: true,
-			issues: [],
-		});
-		expect(converted.elements.find(({ id }) => id === "node:a")).toMatchObject({
-			height: 75,
-		});
-		for (const element of scene.elements) {
-			if (element.type === "node") {
-				expect(converted.elements.find(({ id }) => id === element.id)).toMatchObject({
-					x: element.x,
-					y: element.y,
-					width: element.width,
-					height: element.height,
-				});
-			}
-		}
-	});
-
 	it("keeps a tall label from moving a bottom-edge arrow off its 200x30 node", () => {
 		const scene: CanvasSpec = {
 			kind: "canvas",
@@ -1908,166 +1869,6 @@ describe("convertSceneToExcalidraw", () => {
 			}),
 		);
 	});
-
-	it("accepts sequence messages that cross intermediate lifelines", () => {
-		const scene = convertSceneToExcalidraw(
-			renderSequenceDiagram({
-				type: "sequence",
-				id: "cross-lifeline",
-				title: "Cross lifeline",
-				participants: [
-					{ id: "left", label: "Left" },
-					{
-						id: "middle",
-						label: "Middle",
-						kind: "sequence-lifeline",
-					},
-					{ id: "right", label: "Right" },
-				],
-				messages: [
-					{
-						id: "cross",
-						source: "left",
-						target: "right",
-						label: "Cross middle",
-					},
-				],
-				style: { accentColor: "#000000", backgroundColor: "#ffffff" },
-			}).pipe(Result.getOrThrow),
-		);
-
-		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
-		expect(scene.elements.find((element) => element.id === "node:middle:lifeline")).toMatchObject({
-			customData: { sketchiRendererRole: "sequence-lifeline" },
-		});
-		expect(scene.elements.find((element) => element.id === "node:middle")).not.toHaveProperty(
-			"customData.sketchiRendererRole",
-		);
-	});
-
-	it("exports a self-message as an elbow loop bound to its bars with its label beside it", () => {
-		const diagram = parseSequenceDiagram({
-			id: "oauth-self",
-			title: "OAuth with credential check",
-			type: "sequence",
-			participants: [
-				{ id: "browser", label: "Browser" },
-				{ id: "idp", label: "Identity Provider" },
-			],
-			messages: [
-				{ id: "authorize", source: "browser", target: "idp", label: "Authorize" },
-				{ id: "validate", source: "idp", target: "idp", label: "Validate the user's credentials" },
-				{ id: "code", source: "idp", target: "browser", label: "Code", type: "return" },
-				{ id: "retry", source: "browser", target: "browser", label: "Retry", type: "return" },
-			],
-		}).pipe(Result.getOrThrow);
-		const scene = convertSceneToExcalidraw(renderSequenceDiagram(diagram).pipe(Result.getOrThrow));
-		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
-		// A reload reads the same scene back from the file.
-		const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene))) as {
-			elements: ExcalidrawElement[];
-		};
-		expect(validateExcalidrawScene({ ...scene, elements: reloaded.elements })).toEqual({
-			ok: true,
-			issues: [],
-		});
-
-		const element = (id: string) => {
-			const found = scene.elements.find((candidate) => candidate.id === id);
-			if (!found) throw new Error(`Missing ${id}.`);
-			return found;
-		};
-		const loop = element("arrow:validate");
-		expect(loop).toMatchObject({
-			type: "arrow",
-			elbowed: true,
-			startBinding: { elementId: "node:idp:lifeline:activation:authorize" },
-			endBinding: { elementId: "node:idp:lifeline:activation:validate" },
-			boundElements: null,
-		});
-		// Both ends leave the bars' right sides, a hair out so Excalidraw reads them leaving right.
-		for (const key of ["startBinding", "endBinding"] as const) {
-			const [x] = (loop[key] as { fixedPoint: [number, number] }).fixedPoint;
-			expect(x).toBeGreaterThan(1);
-			expect(x).toBeLessThan(1.001);
-		}
-		expect(element("node:idp:lifeline:activation:validate").boundElements).toEqual(
-			expect.arrayContaining([{ id: "arrow:validate", type: "arrow" }]),
-		);
-		// The label is free text right of the loop's outer leg, grouped with the
-		// loop so they move together, and keeps its stored wrap on edit.
-		const points = loop.points as [number, number][];
-		const label = element("arrow:validate:label");
-		expect(label).toMatchObject({
-			type: "text",
-			containerId: null,
-			autoResize: false,
-			groupIds: loop.groupIds,
-		});
-		expect(loop.groupIds).toEqual(["message:validate"]);
-		expect(label.x as number).toBeGreaterThan((loop.x as number) + points[1]![0]);
-		const loopTop = (loop.y as number) + points[1]![1];
-		const loopBottom = (loop.y as number) + points[2]![1];
-		expect(label.y as number).toBeGreaterThanOrEqual(loopTop);
-		expect((label.y as number) + (label.height as number)).toBeLessThanOrEqual(loopBottom);
-		// The idle browser's self-return loops on its lifeline.
-		expect(element("arrow:retry")).toMatchObject({
-			elbowed: true,
-			strokeStyle: "dashed",
-			startBinding: { elementId: "node:browser:lifeline" },
-			endBinding: { elementId: "node:browser:lifeline" },
-		});
-	});
-
-	it("exports activation bars as unlabeled bound shapes that other messages may cross", () => {
-		const nested = parseSequenceDiagram({
-			id: "oauth",
-			title: "OAuth callback",
-			type: "sequence",
-			participants: [
-				{ id: "client", label: "Client" },
-				{ id: "api", label: "API" },
-				{ id: "auth", label: "Auth" },
-			],
-			messages: [
-				{ id: "login", source: "client", target: "api", label: "Log in" },
-				{ id: "authorize", source: "api", target: "auth", label: "Authorize" },
-				{ id: "callback", source: "auth", target: "api", label: "Callback" },
-				{ id: "ack", source: "api", target: "auth", label: "Ack", type: "return" },
-				{ id: "token", source: "auth", target: "api", label: "Token", type: "return" },
-				{ id: "direct", source: "auth", target: "client", label: "Direct notice" },
-				{ id: "session", source: "api", target: "client", label: "Session", type: "return" },
-			],
-		}).pipe(Result.getOrThrow);
-		for (const diagram of [sequenceFixture, apiRequestSequence, selfMessageSequence, nested]) {
-			const scene = convertSceneToExcalidraw(
-				renderSequenceDiagram(diagram).pipe(Result.getOrThrow),
-			);
-			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
-		}
-
-		const scene = convertSceneToExcalidraw(
-			renderSequenceDiagram(sequenceFixture).pipe(Result.getOrThrow),
-		);
-		const bar = scene.elements.find(
-			(element) => element.id === "node:store:lifeline:activation:checkout",
-		);
-		expect(bar).toMatchObject({
-			type: "rectangle",
-			customData: { sketchiRendererRole: "sequence-activation" },
-			boundElements: expect.arrayContaining([
-				{ id: "arrow:checkout", type: "arrow" },
-				{ id: "arrow:receipt", type: "arrow" },
-			]),
-		});
-		expect(
-			scene.elements.some(
-				(element) =>
-					element.type === "text" &&
-					element.containerId === "node:store:lifeline:activation:checkout",
-			),
-		).toBe(false);
-	});
 });
 
 describe("bound label first paint", () => {
@@ -2120,32 +1921,6 @@ describe("bound label first paint", () => {
 			ok: true,
 			issues: [],
 		});
-	});
-
-	it("wraps sequence participant headers inside the header", () => {
-		const sequence = convertSceneToExcalidraw(
-			renderSequenceDiagram({
-				type: "sequence",
-				id: "long-participants",
-				title: "Long participants",
-				participants: [
-					{ id: "qa", label: "Quality Assurance Department" },
-					{ id: "cjk", label: "品質保証レビュー承認待ち部門" },
-				],
-				messages: [{ id: "m", source: "qa", target: "cjk", label: "Review" }],
-				style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-			}).pipe(Result.getOrThrow),
-		);
-		const header = (id: string) =>
-			sequence.elements.find((element) => element.id === `label:${id}`);
-		expect(header("qa")).toMatchObject({
-			text: "Quality Assurance\nDepartment",
-		});
-		expect(header("cjk")?.text).toBe("品質保証レビュー承認待\nち部門");
-		for (const id of ["qa", "cjk"]) {
-			expect(header(id)?.width).toBeLessThanOrEqual(156);
-		}
-		expect(validateExcalidrawScene(sequence)).toEqual({ ok: true, issues: [] });
 	});
 
 	it("keeps wrapped unbound line labels at their stored width on edit", () => {

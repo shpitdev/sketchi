@@ -1,3 +1,4 @@
+import { PublishedCoverageIssue } from "@sketchi/diagrams/families/flowchart/issues";
 import {
 	ApplyDiagramPatchRequest,
 	RenderedDiagramSceneSchema,
@@ -5,7 +6,7 @@ import {
 } from "@sketchi/diagrams/build/code-mode/contract";
 import { type CanonicalDiagramDocument, type DIAGRAM_TYPES } from "@sketchi/diagrams/family";
 
-import { CodeModeIssue } from "@sketchi/diagrams/build/result";
+import { PublishedBuildIssue } from "@sketchi/diagrams/build/result";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Result, Schema } from "effect";
 
@@ -153,7 +154,9 @@ const PresentValue = Schema.Unknown.check(Schema.makeFilter((value) => value !==
 
 const GenerateApiSuccess = Schema.Struct({
 	ok: Schema.Literal(true),
-	issues: Schema.optionalKey(Schema.Array(CodeModeIssue)),
+	issues: Schema.optionalKey(
+		Schema.Array(Schema.Union([PublishedBuildIssue, PublishedCoverageIssue])),
+	),
 	diagram: Schema.Struct({
 		document: PresentValue,
 		scene: PresentValue,

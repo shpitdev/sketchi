@@ -1,3 +1,4 @@
+import { sequenceFixture } from "@sketchi/diagrams/families/sequence/fixtures";
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +11,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 import { chartFixture } from "@sketchi/diagrams/families/chart/document";
 import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/diagram";
 import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
-import { sequenceFixture } from "@sketchi/diagrams/families/sequence/document";
+
 import { timelineFixture } from "@sketchi/diagrams/families/timeline/document";
 import * as renderer from "@sketchi/diagrams/family";
 

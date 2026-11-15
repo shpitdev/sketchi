@@ -1,6 +1,6 @@
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
-import { Array, Effect, Result, Schema, String, pipe } from "effect";
-import { cleanToolString } from "../../clean-text.js";
+import { Array, Effect, Result, Schema } from "effect";
+import { cleanToolString, slug } from "../../clean-text.js";
 
 /** The document people and models author, and the CLI persists. Children are in reading order. */
 export interface MindmapTopic {
@@ -99,13 +99,7 @@ export function normalizeMindmap(document: MindmapDocument): Mindmap {
 		label: cleanToolString(topic.label),
 		...(topic.children ? { children: Array.map(topic.children, normalize) } : {}),
 	});
-	const derivedId = pipe(
-		title,
-		String.toLowerCase,
-		String.replace(/[^a-z0-9]+/g, "-"),
-		String.replace(/^-+|-+$/g, ""),
-		String.slice(0, 48),
-	);
+	const derivedId = slug(title);
 	return {
 		...document,
 		id: id || derivedId || "sketchi-mindmap",
@@ -115,7 +109,7 @@ export function normalizeMindmap(document: MindmapDocument): Mindmap {
 	};
 }
 
-export function decodeMindmapDocument(
+function decodeMindmapDocument(
 	input: unknown,
 ): Result.Result<MindmapDocument, Schema.SchemaError | MindmapInputError> {
 	return Result.gen(function* () {
@@ -181,4 +175,12 @@ export function checkMindmapRoot(root: MindmapTopic): Result.Result<void, Mindma
 					hint: "Add one or more nested topics under spec.root.children.",
 				}),
 			);
+}
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: Mindmap) {
+	return {
+		nodeCount: [...mindmapTopics(diagram.root)].length,
+		edgeCount: [...mindmapTopics(diagram.root)].length - 1,
+	};
 }

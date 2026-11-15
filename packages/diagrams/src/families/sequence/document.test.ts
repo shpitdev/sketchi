@@ -1,3 +1,5 @@
+import { apiRequestSequence, deployWebhookLogoSequence, sequenceFixture } from "./fixtures";
+import { sequenceActivations } from "./layout";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -10,12 +12,8 @@ import {
 	SEQUENCE_MAX_MESSAGES,
 	SEQUENCE_MAX_PARTICIPANTS,
 	SequenceValidationError,
-	apiRequestSequence,
-	deployWebhookLogoSequence,
 	getSequenceValidationIssues,
 	parseSequenceDiagram,
-	sequenceActivations,
-	sequenceFixture,
 	sequenceLifelineId,
 } from "./document";
 
@@ -24,24 +22,6 @@ function issueCodes(diagram: SequenceDiagram) {
 }
 
 describe("Sequence diagram type", () => {
-	it("preserves authored participant order and message chronology without sorting ids", () => {
-		const input = {
-			...sequenceFixture,
-			participants: [...sequenceFixture.participants].reverse(),
-			messages: sequenceFixture.messages.map((message, index) => ({
-				...message,
-				id: `m${4 - index}`,
-			})),
-		};
-		const diagram = parseSequenceDiagram(input).pipe(Result.getOrThrow);
-		expect(diagram.participants.map((participant) => participant.id)).toEqual([
-			"payments",
-			"store",
-			"customer",
-		]);
-		expect(diagram.messages.map((message) => message.id)).toEqual(["m4", "m3", "m2", "m1"]);
-	});
-
 	it("defaults messages and the Sketchi style without a separate authoring shape", () => {
 		const diagram = parseSequenceDiagram({
 			id: "lonely",

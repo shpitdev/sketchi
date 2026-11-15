@@ -1,3 +1,4 @@
+import { buildResponse } from "../operation.js";
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -110,7 +111,7 @@ function runtime(
 	return {
 		applyDiagramPatch: (input: unknown) => provide(applyDiagramPatch(input)),
 		buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
-		buildSequenceDiagram: (input: unknown) => provide(buildSequenceDiagram(input)),
+		buildSequenceDiagram: (input: unknown) => provide(buildResponse(buildSequenceDiagram(input))),
 		createCanvas: (input: unknown) => provide(createCanvas(input)),
 		editFlowchart: (input: unknown) => provide(editFlowchart(input)),
 		getArtifact: (input: unknown) => provide(getArtifact(input)),

@@ -1,3 +1,4 @@
+import { String as Str } from "effect";
 /**
  * gemini-flash-lite sometimes welds the next JSON key onto the previous
  * string value inside tool-call args ("start-node,kind:", "pass,source:").
@@ -16,4 +17,21 @@ export function cleanToolString(value: string): string {
 		}
 		cleaned = next;
 	}
+}
+
+/** Stable ASCII ids. Callers retain their existing length and Unicode policy. */
+export function slug(
+	value: string,
+	options: {
+		readonly maxLength?: number;
+		readonly normalize?: boolean;
+		readonly trimEnd?: boolean;
+	} = {},
+): string {
+	const text = options.normalize ? Str.normalize("NFKD")(value) : value;
+	const result = Str.slice(
+		0,
+		options.maxLength ?? 48,
+	)(Str.replace(/^-+|-+$/g, "")(Str.replace(/[^a-z0-9]+/g, "-")(Str.toLowerCase(text))));
+	return options.trimEnd ? Str.replace(/-+$/g, "")(result) : result;
 }

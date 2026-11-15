@@ -1721,83 +1721,6 @@ describe("Code Mode runtime", () => {
 		});
 	});
 
-	it("round-trips a crossing sequence through a no-op inline-scene patch", async () => {
-		const runtime = createTestRuntime();
-		const built = await runtime.buildSequenceDiagram({
-			spec: crossingSequenceSpec(),
-			options: {
-				artifactFormats: ["scene", "excalidraw"],
-				inlineArtifacts: ["scene"],
-			},
-		});
-		expect(built.ok).toBe(true);
-		if (!built.ok) throw new Error("Expected accepted sequence diagram.");
-		const sourceScene = built.artifact.formats.find(({ format }) => format === "scene")?.inline;
-		expect(sourceScene).toBeDefined();
-
-		const patched = await runtime.applyDiagramPatch({
-			source: { scene: sourceScene },
-			operations: [{ op: "setDefaultStyle", style: {} }],
-			options: {
-				artifactFormats: ["scene", "excalidraw"],
-				inlineArtifacts: ["scene", "excalidraw"],
-			},
-		});
-
-		expectPatchOk(patched);
-		expect(
-			patched.artifact.formats.find(({ format }) => format === "excalidraw")?.inline,
-		).toMatchObject({
-			elements: expect.arrayContaining([expect.objectContaining({ id: "arrow:message-1-a-c" })]),
-		});
-	});
-
-	it("keeps activation bars and their bound messages through an inline-scene patch", async () => {
-		const runtime = createTestRuntime();
-		const spec = checkoutSequenceSpec();
-		const built = await runtime.buildSequenceDiagram({
-			spec: {
-				...spec,
-				messages: [
-					...spec.messages.slice(0, 2),
-					{ source: "payments", target: "store", label: "Approved", type: "return" },
-					{ source: "store", target: "customer", label: "Receipt", type: "return" },
-				],
-			},
-			options: { artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["scene"] },
-		});
-		if (!built.ok) throw new Error("Expected accepted sequence diagram.");
-		const sourceScene = parseInlineScene(
-			built.artifact.formats.find(({ format }) => format === "scene")?.inline,
-		);
-		const bars = (scene: typeof sourceScene) =>
-			scene.elements.flatMap((element) =>
-				element.type === "node" && element.rendererRole === "sequence-activation"
-					? [element.nodeId]
-					: [],
-			);
-		expect(bars(sourceScene)).toEqual([
-			"store:lifeline:activation:message-1-customer-store",
-			"payments:lifeline:activation:message-2-store-payments",
-		]);
-
-		const patched = await runtime.applyDiagramPatch({
-			source: { scene: sourceScene },
-			operations: [{ op: "setDefaultStyle", style: {} }],
-			options: { artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["scene"] },
-		});
-		expectPatchOk(patched);
-		const patchedScene = parseInlineScene(
-			patched.artifact.formats.find(({ format }) => format === "scene")?.inline,
-		);
-		expect(bars(patchedScene)).toEqual(bars(sourceScene));
-		expect(
-			patchedScene.elements.find(
-				(element) => element.type === "arrow" && element.edgeId === "message-1-customer-store",
-			),
-		).toMatchObject({ targetNodeId: "store:lifeline:activation:message-1-customer-store" });
-	});
-
 	it("keeps doubly nested activation bars through an inline-scene patch", async () => {
 		const runtime = createTestRuntime();
 		const built = await runtime.buildSequenceDiagram({
@@ -1826,8 +1749,17 @@ describe("Code Mode runtime", () => {
 
 		const patched = await runtime.applyDiagramPatch({
 			source: { scene: sourceScene },
-			operations: [{ op: "setDefaultStyle", style: {} }],
-			options: { artifactFormats: ["scene", "excalidraw"], inlineArtifacts: ["scene"] },
+			operations: [
+				{
+					op: "setStyle",
+					selector: { nodeIds: ["b:lifeline:activation:q3"] },
+					style: { fillColor: "#ede9fe" },
+				},
+			],
+			options: {
+				artifactFormats: ["scene", "excalidraw"],
+				inlineArtifacts: ["scene", "excalidraw"],
+			},
 		});
 		expectPatchOk(patched);
 		expect(patched.issues).toEqual([]);
@@ -1845,6 +1777,27 @@ describe("Code Mode runtime", () => {
 			["b:lifeline:activation:q2", "sequence-activation"],
 			["b:lifeline:activation:q3", "sequence-activation"],
 		]);
+		const native = patched.artifact.formats.find(({ format }) => format === "excalidraw")?.inline;
+		expect(native).toMatchObject({
+			elements: expect.arrayContaining([
+				expect.objectContaining({
+					id: "node:b:lifeline:activation:q3",
+					backgroundColor: "#ede9fe",
+					boundElements: expect.arrayContaining([
+						{ id: "arrow:q3", type: "arrow" },
+						{ id: "arrow:r3", type: "arrow" },
+					]),
+				}),
+				expect.objectContaining({
+					id: "arrow:q3",
+					endBinding: expect.objectContaining({ elementId: "node:b:lifeline:activation:q3" }),
+				}),
+				expect.objectContaining({
+					id: "arrow:r3",
+					startBinding: expect.objectContaining({ elementId: "node:b:lifeline:activation:q3" }),
+				}),
+			]),
+		});
 	});
 
 	it("styles a crossing sequence through an inline-scene patch", async () => {
@@ -2067,29 +2020,14 @@ describe("Code Mode runtime", () => {
 			status: "invalid_sequence",
 			issues: [
 				expect.objectContaining({
-					code: "missing_edge_source",
+					code: "missing_message_source",
 					ref: { kind: "request", path: "spec.messages.[0].source" },
 					message: 'Message source "missing" is not a participant.',
-					// Published Code Mode wording names the request field.
-					hint: "Use the id of a participant declared in spec.participants.",
+					// The owning error retains an actionable reference path.
+					hint: "Use the id of a participant declared in participants.",
 				}),
 			],
 		});
-	});
-
-	it("builds a self-message as a loop on its participant's lifeline", async () => {
-		const spec = checkoutSequenceSpec();
-		const result = await createTestRuntime().buildSequenceDiagram({
-			spec: {
-				...spec,
-				messages: [
-					...spec.messages,
-					{ source: "store", target: "store", label: "Recalculate totals" },
-				],
-			},
-		});
-
-		expect(result).toMatchObject({ ok: true });
 	});
 
 	it("rejects oversized sequence diagrams with sequence_too_large", async () => {
@@ -2132,7 +2070,7 @@ describe("Code Mode runtime", () => {
 			status: "invalid_sequence",
 			issues: [
 				expect.objectContaining({
-					code: "duplicate_node_id",
+					code: "lifeline_id_collision",
 					ref: { kind: "request", path: "spec.participants.[1].id" },
 					hint: expect.stringContaining("Rename the participant"),
 				}),
@@ -2978,27 +2916,65 @@ describe("canvas geometry and input bounds", () => {
 });
 
 describe("reviewed label-fit regressions", () => {
-	it("accepts a sequence build with a three-line participant label", async () => {
+	it("exports authored multiline, whole-word and CJK headers without growing their native bounds", async () => {
 		const result = await createTestRuntime().buildSequenceDiagram({
 			spec: {
-				...checkoutSequenceSpec(),
+				title: "Headers",
 				participants: [
-					{ id: "customer", label: "one\ntwo\nthree" },
-					{ id: "store", label: "Store" },
-					{ id: "payments", label: "Payments" },
+					{ id: "a", label: "one\ntwo\nthree" },
+					{ id: "qa", label: "Quality Assurance Department" },
+					{ id: "cjk", label: "品質保証レビュー承認待ち部門" },
+				],
+				messages: [
+					{ source: "a", target: "qa", label: "Continue" },
+					{ source: "qa", target: "cjk", label: "Review" },
 				],
 			},
 			options: {
 				artifactFormats: ["scene", "excalidraw"],
-				inlineArtifacts: ["scene"],
+				inlineArtifacts: ["scene", "excalidraw"],
 			},
 		});
-		expect(result).toMatchObject({ ok: true, status: "accepted", issues: [] });
 		if (!result.ok) throw new Error("Expected accepted multiline sequence");
 		const scene = parseInlineScene(
 			result.artifact.formats.find(({ format }) => format === "scene")?.inline,
 		);
-		expect(scene.elements.find(({ id }) => id === "node:customer")).toMatchObject({ height: 75 });
+		const native = Schema.decodeUnknownResult(ExcalidrawFile)(
+			result.artifact.formats.find(({ format }) => format === "excalidraw")?.inline,
+		).pipe(Result.getOrThrow);
+
+		expect(scene.elements.find(({ id }) => id === "node:a")).toMatchObject({ y: 48, height: 75 });
+		expect(scene.elements.find(({ id }) => id === "label:a")).toMatchObject({ y: 85.5 });
+		for (const element of scene.elements)
+			if (element.type === "node")
+				expect(native.elements.find(({ id }) => id === element.id)).toMatchObject({
+					x: element.x,
+					y: element.y,
+					width: element.width,
+					height: element.height,
+				});
+		expect(
+			scene.elements
+				.filter((e) => e.type === "node" && e.rendererRole === "sequence-lifeline")
+				.flatMap((e) => (e.type === "node" ? [e.y] : [])),
+		).toEqual([123, 123, 123]);
+		const header = (id: string) => native.elements.find((e) => e.id === `label:${id}`);
+		expect(header("qa")).toMatchObject({
+			text: "Quality Assurance\nDepartment",
+			containerId: "node:qa",
+			autoResize: true,
+		});
+		expect(header("cjk")).toMatchObject({
+			text: "品質保証レビュー承認待\nち部門",
+			containerId: "node:cjk",
+			autoResize: true,
+		});
+		for (const id of ["qa", "cjk"]) expect(Number(header(id)?.width)).toBeLessThanOrEqual(156);
+		expect(
+			scene.elements
+				.filter((e) => e.type === "arrow")
+				.flatMap((e) => (e.type === "arrow" ? [e.points[0]?.y] : [])),
+		).toEqual([187, 275]);
 	});
 
 	it("creates a canvas with a hidden overflowing bound label without changing authored node geometry", async () => {
@@ -3446,7 +3422,7 @@ describe("shared artifact export-and-store boundary", () => {
 				],
 			});
 			expect(writeCalls).toBe(1);
-			if (operation === "buildMindmap")
+			if (operation === "buildMindmap" || operation === "buildSequenceDiagram")
 				expect(result).toHaveProperty("partial", {
 					diagramId: expect.any(String),
 				});

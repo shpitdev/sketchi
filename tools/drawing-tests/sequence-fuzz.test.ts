@@ -359,7 +359,7 @@ describe("sequence self-message fuzz", () => {
 		let deepLoops = 0;
 		let tightened = 0;
 		for (const diagram of diagrams) {
-			const scene = renderSequenceDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderSequenceDiagram(diagram);
 			expect(getCanvasValidationIssues(scene), diagram.id).toEqual([]);
 			expect(selfMessageIssues(diagram, scene), diagram.id).toEqual([]);
 			expect(labelOverlaps(diagram, scene), diagram.id).toEqual([]);
@@ -395,17 +395,13 @@ describe("sequence self-message fuzz", () => {
 	it("puts no label of a wide nested sequence on a bar it clears at natural spacing", () => {
 		let tightened = 0;
 		for (const diagram of wideNestedSequences(Math.ceil(COUNT / 4), 20261106)) {
-			const scene = renderSequenceDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderSequenceDiagram(diagram);
 			expect(getCanvasValidationIssues(scene), diagram.id).toEqual([]);
 			// Bars nested deep inside a participant reach past its lifeline and carry
 			// its messages' ends, and so their labels, with them; at the natural
 			// spacing a label may already touch one, and tightening adds none.
 			const natural = new Set(
-				labelOverlaps(
-					diagram,
-					renderSequenceDiagram(diagram, { tighten: false }).pipe(Result.getOrThrow),
-					true,
-				),
+				labelOverlaps(diagram, renderSequenceDiagram(diagram, { tighten: false }), true),
 			);
 			expect(
 				labelOverlaps(diagram, scene, true).filter((clash) => !natural.has(clash)),
@@ -426,7 +422,7 @@ describe("sequence self-message fuzz", () => {
 
 	it("exports every diagram as a valid Excalidraw scene with each loop label grouped beside its loop", () => {
 		for (const diagram of diagrams) {
-			const rendered = renderSequenceDiagram(diagram).pipe(Result.getOrThrow);
+			const rendered = renderSequenceDiagram(diagram);
 			const scene = convertSceneToExcalidraw(rendered);
 			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
 			for (const message of diagram.messages.filter((m) => m.source === m.target)) {

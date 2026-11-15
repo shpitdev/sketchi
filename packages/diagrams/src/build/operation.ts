@@ -9,10 +9,12 @@ import { ArtifactBundleSchema, PartialArtifactBundleSchema } from "@sketchi/draw
 import {
 	BuildOptions,
 	CodeModeIssue,
+	CodeModeIssueCodeSchema,
 	QualityReportSchema,
 	type ArtifactBuildCapabilities,
 	type QualityReport,
 	type CodeModeIssueCode,
+	type DiagramCounts,
 } from "./result.js";
 
 /** Expected build errors retain their typed cause until a CLI, HTTP or tool host asks for a body. */
@@ -33,20 +35,40 @@ export function buildResponse<A, B, R>(effect: Effect.Effect<A, BuildRejection<B
 }
 
 /** One envelope and operation; families supply only their document and actual domain policy. */
-export function defineBuild<D, N, E, const S extends string, T extends Schema.Top>(policy: {
-	readonly name: string;
+export function defineBuild<
+	D,
+	N extends { readonly type: string },
+	E,
+	const S extends string,
+	T extends Schema.Top,
+	R = never,
+>(policy: {
+	readonly name: N["type"];
 	readonly document: Schema.Codec<D, unknown>;
 	readonly normalized: Schema.Codec<N, unknown>;
 	readonly tool: T;
 	readonly error: Schema.Codec<E, unknown>;
+	readonly issueCodes: Schema.Codec<string>;
 	readonly invalidStatus: S;
 	readonly prepare?: (input: unknown) => Result.Result<unknown, E>;
 	readonly normalize: (document: D) => N;
 	readonly check: (document: N) => Result.Result<unknown, E>;
 	readonly issues: (error: E) => CodeModeIssue[];
-	readonly assess: (document: N, threshold: number) => QualityReport;
+	readonly counts: (document: N) => DiagramCounts;
+	readonly assess?: (document: N, threshold: number) => QualityReport;
 	readonly qualityIssue?: { readonly code: CodeModeIssueCode; readonly hint: string };
 	readonly render: (document: N) => CanvasSpec;
+	readonly resolve?: (document: D) => Effect.Effect<
+		{
+			readonly document: N;
+			readonly issues: CodeModeIssue[];
+			readonly render: (
+				scene: CanvasSpec,
+			) => Effect.Effect<{ readonly scene: CanvasSpec; readonly issues: CodeModeIssue[] }>;
+		},
+		never,
+		R
+	>;
 	readonly renderHint: string;
 }) {
 	const Request = Schema.Struct({
@@ -75,7 +97,12 @@ export function defineBuild<D, N, E, const S extends string, T extends Schema.To
 		ok: Schema.Literal(false),
 		status: Status,
 		...Context.fields,
-		issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
+		issues: Schema.Array(
+			CodeModeIssue.mapFields((fields) => ({
+				...fields,
+				code: Schema.Union([CodeModeIssueCodeSchema, policy.issueCodes]),
+			})),
+		).pipe(Schema.mutable),
 	});
 	const Accepted = Schema.Struct({
 		ok: Schema.Literal(true),
@@ -207,54 +234,68 @@ export function defineBuild<D, N, E, const S extends string, T extends Schema.To
 			Effect.mapError((error) => failure({ reason: { _tag: "Input", error }, context: {} })),
 		);
 	});
-	const build: <R>(
+	const build: <CR>(
 		request: typeof Request.Type,
-		capabilities: ArtifactBuildCapabilities<R>,
-	) => Effect.Effect<typeof Accepted.Type, FailureValue, R> = Effect.fn(`${policy.name}.build`)(
-		function* <R>(request: typeof Request.Type, capabilities: ArtifactBuildCapabilities<R>) {
-			const normalizedSpec = policy.normalize(request.spec);
-			const buildId = yield* Effect.sync(() => capabilities.createId("build"));
-			const context = {
-				buildId,
-				...(request.requestId ? { requestId: request.requestId } : {}),
-				normalizedSpec,
-			};
-			yield* Effect.fromResult(policy.check(normalizedSpec)).pipe(
-				Effect.mapError((error) => failure({ reason: { _tag: "Document", error }, context })),
-			);
-			const quality = policy.assess(normalizedSpec, request.options?.minQualityScore ?? 8);
-			const assessed = { ...context, quality };
-			if (!quality.accepted)
-				return yield* failure({ reason: { _tag: "Quality", quality }, context: assessed });
-			const scene = yield* Effect.try({
-				try: () => policy.render(normalizedSpec),
-				catch: (cause) => failure({ reason: { _tag: "Render", cause }, context: assessed }),
+		capabilities: ArtifactBuildCapabilities<CR>,
+	) => Effect.Effect<typeof Accepted.Type, FailureValue, R | CR> = Effect.fn(
+		`${policy.name}.build`,
+	)(function* <CR>(request: typeof Request.Type, capabilities: ArtifactBuildCapabilities<CR>) {
+		const resolved = policy.resolve ? yield* policy.resolve(request.spec) : undefined;
+		const normalizedSpec = resolved ? resolved.document : policy.normalize(request.spec);
+		const buildId = yield* Effect.sync(() => capabilities.createId("build"));
+		const context = {
+			buildId,
+			...(request.requestId ? { requestId: request.requestId } : {}),
+			normalizedSpec,
+		};
+		yield* Effect.fromResult(policy.check(normalizedSpec)).pipe(
+			Effect.mapError((error) => failure({ reason: { _tag: "Document", error }, context })),
+		);
+		const threshold = request.options?.minQualityScore ?? 8;
+		const { nodeCount, edgeCount } = policy.counts(normalizedSpec);
+		const quality = policy.assess?.(normalizedSpec, threshold) ?? {
+			accepted: 10 >= threshold,
+			score: 10,
+			threshold,
+			summary: { nodeCount, edgeCount },
+			checks: [],
+		};
+		const assessed = { ...context, quality };
+		if (!quality.accepted)
+			return yield* failure({ reason: { _tag: "Quality", quality }, context: assessed });
+		const rendered = yield* Effect.try({
+			try: () => policy.render(normalizedSpec),
+			catch: (cause) => failure({ reason: { _tag: "Render", cause }, context: assessed }),
+		});
+		const embedded = resolved ? yield* resolved.render(rendered) : { scene: rendered, issues: [] };
+		const scene = embedded.scene;
+		const sceneIssues = getCanvasValidationIssues(scene);
+		if (sceneIssues.length > 0)
+			return yield* failure({
+				reason: { _tag: "Scene", issues: sceneIssues },
+				context: assessed,
 			});
-			const sceneIssues = getCanvasValidationIssues(scene);
-			if (sceneIssues.length > 0)
-				return yield* failure({
-					reason: { _tag: "Scene", issues: sceneIssues },
-					context: assessed,
-				});
-			const artifact = yield* capabilities.exportScene(scene, request).pipe(
-				Effect.mapError((error) =>
-					failure({
-						reason: { _tag: "Delivery", status: error.status, issues: error.issues },
-						context: { ...assessed, partial: error.partial ?? { diagramId: scene.diagramId } },
-					}),
-				),
-			);
-			return {
-				ok: true,
-				status: "accepted",
-				...context,
-				quality,
-				artifact,
-				issues: [],
-			} satisfies typeof Accepted.Type;
-		},
-	);
+		const artifact = yield* capabilities.exportScene(scene, request).pipe(
+			Effect.mapError((error) =>
+				failure({
+					reason: { _tag: "Delivery", status: error.status, issues: error.issues },
+					context: { ...assessed, partial: error.partial ?? { diagramId: scene.diagramId } },
+				}),
+			),
+		);
+		return {
+			ok: true,
+			status: "accepted",
+			...context,
+			quality,
+			artifact,
+			issues: [...(resolved?.issues ?? []), ...embedded.issues],
+		} satisfies typeof Accepted.Type;
+	});
 	return {
+		...policy,
+		prepare:
+			policy.prepare ?? ((input: unknown): Result.Result<unknown, E> => Result.succeed(input)),
 		request: Request,
 		toolInput: ToolInput,
 		input: Schema.Struct({ ...Request.fields, spec: policy.tool }),

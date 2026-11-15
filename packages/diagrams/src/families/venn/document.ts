@@ -8,7 +8,7 @@ import {
 	Option,
 	Result,
 } from "effect";
-import { cleanToolString } from "../../clean-text.js";
+import { cleanToolString, slug } from "../../clean-text.js";
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 export const vennDiagramType = "venn" as const;
 /** Two or three overlapping sets; more stop reading as one symmetric diagram. */
@@ -90,13 +90,7 @@ export function normalizeVenn(document: VennDocument): VennDiagram {
 		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
 	const id = document.id && cleanToolString(document.id);
 	return {
-		id:
-			id ||
-			Str.slice(
-				0,
-				48,
-			)(Str.replace(/^-+|-+$/g, "")(Str.replace(/[^a-z0-9]+/g, "-")(Str.toLowerCase(title)))) ||
-			"sketchi-venn",
+		id: id || slug(title) || "sketchi-venn",
 		title,
 		sets: Arr.map(document.sets, (set) => ({
 			id: cleanToolString(set.id),
@@ -440,3 +434,17 @@ export const vennFixture = parseVennDiagram({
 		{ sets: ["design", "engineering", "product"], label: "Shared", items: ["Customer empathy"] },
 	],
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: VennDiagram) {
+	return {
+		nodeCount: diagram.sets.length,
+		nodeNoun: "sets",
+		edgeCount: Arr.reduce(
+			diagram.regions,
+			0,
+			(count, region) => count + (region.items?.length ?? 0),
+		),
+		edgeNoun: "items",
+	};
+}

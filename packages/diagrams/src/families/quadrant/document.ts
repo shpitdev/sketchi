@@ -230,3 +230,13 @@ export const quadrantFixture = parseQuadrantDiagram({
 		{ label: "Onboarding tour", x: 0.45, y: 0.6 },
 	],
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: QuadrantDiagram) {
+	return {
+		nodeCount: diagram.points.length,
+		nodeNoun: "points",
+		edgeCount: new Set(diagram.points.flatMap((point) => point.group ?? [])).size,
+		edgeNoun: "groups",
+	};
+}

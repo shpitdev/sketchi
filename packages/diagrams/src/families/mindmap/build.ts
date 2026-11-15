@@ -4,6 +4,7 @@ import { defineBuild } from "../../build/operation.js";
 import { type QualityReport } from "../../build/result.js";
 import {
 	Mindmap,
+	counts,
 	MindmapDocument,
 	MindmapInputError,
 	checkMindmapSize,
@@ -17,9 +18,7 @@ function assess(document: Mindmap, threshold: number): QualityReport {
 		id: string;
 		label: string;
 	}[] = [];
-	let count = 0;
 	const visit = (topic: MindmapTopic, path: readonly number[]) => {
-		count++;
 		if (/^(topic|branch|item|mindmap)$/i.test(Str.trim(topic.label)))
 			generic.push({ id: `topic-${Arr.join(Arr.map(path, String), "-")}`, label: topic.label });
 		Arr.forEach(topic.children ?? [], (child, index) => visit(child, [...path, index]));
@@ -30,7 +29,7 @@ function assess(document: Mindmap, threshold: number): QualityReport {
 		accepted: score >= threshold,
 		score,
 		threshold,
-		summary: { nodeCount: count, edgeCount: count - 1 },
+		summary: counts(document),
 		checks: Arr.map(generic, (node) => ({
 			code: "generic_label",
 			passed: false,
@@ -46,6 +45,7 @@ export const mindmapBuild = defineBuild({
 	normalized: Mindmap,
 	tool: MindmapDocument.mapFields(({ style: _style, ...fields }) => fields),
 	error: MindmapInputError,
+	issueCodes: MindmapInputError.fields.code,
 	invalidStatus: "invalid_mindmap",
 	prepare: (input: unknown) => {
 		const spec =
@@ -66,6 +66,7 @@ export const mindmapBuild = defineBuild({
 		},
 	],
 	assess,
+	counts,
 	qualityIssue: { code: "generic_label", hint: "Use specific topic labels from the request." },
 	render: renderMindmap,
 	renderHint: "Simplify the hierarchy or retry with a smaller mindmap.",

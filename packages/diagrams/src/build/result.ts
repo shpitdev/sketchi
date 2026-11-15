@@ -1,6 +1,3 @@
-import { FLOWCHART_COVERAGE_CODES } from "../families/flowchart/coverage-codes.js";
-import { MindmapInputError } from "../families/mindmap/document.js";
-import { VennValidationIssueCodeSchema } from "../families/venn/document.js";
 import { Schema, type Effect } from "effect";
 export const CODE_MODE_ISSUE_CODES = [
 	"missing_field",
@@ -128,14 +125,11 @@ export const CODE_MODE_ISSUE_CODES = [
 	"icon_dropped",
 	"icon_filled",
 	"icon_possible",
-	...FLOWCHART_COVERAGE_CODES,
-	...MindmapInputError.fields.code.literals,
-	...VennValidationIssueCodeSchema.literals,
 ] as const;
 
 export const CodeModeIssueCodeSchema = Schema.Literals(CODE_MODE_ISSUE_CODES);
 
-export type CodeModeIssueCode = typeof CodeModeIssueCodeSchema.Type;
+export type CodeModeIssueCode = string;
 
 export const CodeModeIssueKindSchema = Schema.Literals([
 	"request",
@@ -170,7 +164,7 @@ export const CodeModeIssueRef = Schema.Struct({
 export interface CodeModeIssueRef extends Schema.Schema.Type<typeof CodeModeIssueRef> {}
 
 export const CodeModeIssue = Schema.Struct({
-	code: CodeModeIssueCodeSchema,
+	code: Schema.String,
 	/** info notes report what a build did for the caller; nothing to fix. */
 	severity: Schema.Literals(["error", "warning", "info"]),
 	stage: CodeModeIssueStageSchema,
@@ -180,6 +174,19 @@ export const CodeModeIssue = Schema.Struct({
 }).annotate({ identifier: undefined });
 
 export interface CodeModeIssue extends Schema.Schema.Type<typeof CodeModeIssue> {}
+
+/** Accepted warning codes remain decodable by the released CLI. Rejected diagnostics are open. */
+export const PublishedBuildIssue = CodeModeIssue.mapFields((fields) => ({
+	...fields,
+	code: CodeModeIssueCodeSchema,
+}));
+
+export interface DiagramCounts {
+	readonly nodeCount: number;
+	readonly edgeCount: number;
+	readonly nodeNoun?: string;
+	readonly edgeNoun?: string;
+}
 
 export interface QualityCheck {
 	readonly code: string;

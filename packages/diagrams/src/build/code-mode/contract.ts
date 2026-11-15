@@ -32,10 +32,6 @@ import {
 } from "../../families/class/document.js";
 import { ER_CARDINALITIES } from "../../families/er/document.js";
 import {
-	SEQUENCE_MESSAGE_STYLES,
-	SEQUENCE_MESSAGE_TYPES,
-} from "../../families/sequence/document.js";
-import {
 	STATE_MACHINE_DIRECTIONS,
 	STATE_MACHINE_STATE_KINDS,
 } from "../../families/state-machine/document.js";
@@ -461,43 +457,6 @@ const DiagramStyleWithDefault = DiagramSpecStyle.annotate({
  * are optional and style is defaulted. buildSequenceDiagram normalizes it into
  * the core contract, which owns every sequence invariant.
  */
-export const SequenceParticipantSpec = Schema.Struct({
-	id: RequiredNonEmptyString,
-	label: RequiredNonEmptyString,
-	kind: optionalContract(NonEmptyString),
-	icon: optionalContract(NodeIconSpec),
-}).annotate({ identifier: undefined });
-
-export interface SequenceParticipantSpec extends Schema.Schema.Type<
-	typeof SequenceParticipantSpec
-> {}
-
-export const SequenceMessageSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	source: RequiredNonEmptyString,
-	target: RequiredNonEmptyString,
-	label: RequiredNonEmptyString,
-	type: optionalContract(literals(SEQUENCE_MESSAGE_TYPES)),
-	style: optionalContract(literals(SEQUENCE_MESSAGE_STYLES)),
-}).annotate({ identifier: undefined });
-
-export interface SequenceMessageSpec extends Schema.Schema.Type<typeof SequenceMessageSpec> {}
-
-const sequenceMessagesDefault: Array<typeof SequenceMessageSpec.Encoded> = [];
-const SequenceMessagesWithDefault = Schema.Array(SequenceMessageSpec)
-	.pipe(Schema.mutable)
-	.annotate({ default: sequenceMessagesDefault })
-	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(sequenceMessagesDefault)));
-export const SequenceDiagramSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	participants: requiredArray(nonEmptyArray(SequenceParticipantSpec)),
-	messages: SequenceMessagesWithDefault,
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface SequenceDiagramSpec extends Schema.Schema.Type<typeof SequenceDiagramSpec> {}
-
 /** Author semantic points only; layout and date ordering belong to the renderer. */
 export const TimelineEventSpec = Schema.Struct({
 	id: RequiredNonEmptyString,
@@ -1087,33 +1046,6 @@ export const BuildFlowchartToolInputSchema = Object.assign(BuildFlowchartToolInp
 export const BuildFlowchartRequestSchema = Object.assign(BuildFlowchartRequest, {
 	omit: (_keys: { readonly options: true }) => BuildFlowchartToolInputSchema,
 });
-
-export const BuildSequenceDiagramRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(SequenceDiagramSpec),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildSequenceDiagramRequest extends Schema.Schema.Type<
-	typeof BuildSequenceDiagramRequest
-> {}
-
-/**
- * What a chat model passes to a sequence build tool: the host supplies artifact
- * options, and style is always the Sketchi palette.
- */
-export const BuildSequenceDiagramToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(
-		SequenceDiagramSpec.mapFields(({ id, title, participants, messages }) => ({
-			id,
-			title,
-			participants,
-			messages,
-		})),
-	),
-});
-export type BuildSequenceDiagramToolInput = typeof BuildSequenceDiagramToolInputSchema.Type;
 
 export const BuildTimelineRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
@@ -1837,20 +1769,6 @@ export interface ApplyDiagramPatchRequest extends Schema.Schema.Type<
 	typeof ApplyDiagramPatchRequest
 > {}
 
-export type NormalizedSequenceDiagramSpec = typeof NormalizedSequenceDiagramSpecSchema.Type;
-
-const NormalizedSequenceDiagramSpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	participants: Schema.Array(SequenceParticipantSpec).pipe(Schema.mutable),
-	messages: Schema.Array(
-		SequenceMessageSpec.mapFields((fields) => ({
-			...fields,
-			id: NonEmptyString,
-		})),
-	).pipe(Schema.mutable),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
 const NormalizedTimelineSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -2043,48 +1961,6 @@ export const EditFlowchartResultSchema = Schema.Union([
 	EditFlowchartRejected,
 ]);
 export type EditFlowchartResult = typeof EditFlowchartResultSchema.Type;
-
-export const BuildSequenceDiagramAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedSequenceDiagramSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildSequenceDiagramAccepted extends Schema.Schema.Type<
-	typeof BuildSequenceDiagramAccepted
-> {}
-export const BuildSequenceDiagramRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_sequence",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedSequenceDiagramSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildSequenceDiagramRejected extends Schema.Schema.Type<
-	typeof BuildSequenceDiagramRejected
-> {}
-export const BuildSequenceDiagramResultSchema = Schema.Union([
-	BuildSequenceDiagramAccepted,
-	BuildSequenceDiagramRejected,
-]);
-export type BuildSequenceDiagramResult = typeof BuildSequenceDiagramResultSchema.Type;
 
 export const BuildTimelineAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

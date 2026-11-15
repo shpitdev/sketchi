@@ -1,6 +1,7 @@
+import { SequenceDocument } from "@sketchi/diagrams/families/sequence/document";
 import { FlowchartDocumentSchema } from "@sketchi/diagrams/families/flowchart/document";
 import { assert, describe, it } from "@effect/vitest";
-import { SequenceDiagramSpec } from "@sketchi/diagrams/build/code-mode/contract";
+
 import { MindmapDocument } from "@sketchi/diagrams/families/mindmap/index";
 import { Effect, Schema } from "effect";
 
@@ -24,7 +25,7 @@ describe("canonical document decoding", () => {
 			assert(Schema.is(MindmapDocument)(mindmap.spec));
 			assert.strictEqual(mindmap.spec.layout.direction, "LR");
 			assert.strictEqual(sequence.type, "sequence");
-			assert(Schema.is(SequenceDiagramSpec)(sequence.spec));
+			assert(Schema.is(SequenceDocument)(sequence.spec));
 			assert.strictEqual(sequence.spec.messages.length, 4);
 		}),
 	);

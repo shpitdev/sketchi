@@ -1,8 +1,16 @@
-// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { cleanToolString, slug } from "../../clean-text.js";
+import {
+	Effect,
+	Schema,
+	Array as Arr,
+	String as Str,
+	MutableHashSet as Set,
+	Option,
+	Result,
+} from "effect";
 
 import { DiagramIconRef } from "../../graph/intermediate.js";
-import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
+import { DiagramStyle, DrawnIconSchema, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 export const sequenceDiagramType = "sequence" as const;
 
@@ -33,13 +41,23 @@ export const SequenceMessageStyleSchema = Schema.Literals(SEQUENCE_MESSAGE_STYLE
 export type SequenceMessageType = typeof SequenceMessageTypeSchema.Type;
 export type SequenceMessageStyle = typeof SequenceMessageStyleSchema.Type;
 
-export const SequenceParticipant = Schema.Struct({
+const ParticipantDocument = Schema.Struct({
 	id: Schema.NonEmptyString,
 	label: Schema.NonEmptyString,
 	kind: Schema.optionalKey(Schema.NonEmptyString),
 	/** The participant's logo, drawn in its header; shared with flowchart nodes. */
-	icon: Schema.optionalKey(DiagramIconRef),
+	icon: Schema.optionalKey(
+		Schema.Struct({
+			slug: Schema.optionalKey(Schema.NonEmptyString.check(Schema.isMaxLength(128))),
+			...DrawnIconSchema.fields,
+		}),
+	),
 }).annotate({ identifier: "SequenceParticipant" });
+
+export const SequenceParticipant = ParticipantDocument.mapFields((fields) => ({
+	...fields,
+	icon: Schema.optionalKey(DiagramIconRef),
+}));
 
 export interface SequenceParticipant extends Schema.Schema.Type<typeof SequenceParticipant> {}
 
@@ -47,14 +65,19 @@ export interface SequenceParticipant extends Schema.Schema.Type<typeof SequenceP
  * One message row. Array order is chronological order. A message whose source
  * is its target is a self-message: the participant acting on itself.
  */
-export const SequenceMessage = Schema.Struct({
-	id: Schema.NonEmptyString,
+const MessageDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	source: Schema.NonEmptyString,
 	target: Schema.NonEmptyString,
 	label: Schema.NonEmptyString,
 	type: Schema.optionalKey(SequenceMessageTypeSchema),
 	style: Schema.optionalKey(SequenceMessageStyleSchema),
 }).annotate({ identifier: "SequenceMessage" });
+
+export const SequenceMessage = MessageDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+}));
 
 export interface SequenceMessage extends Schema.Schema.Type<typeof SequenceMessage> {}
 
@@ -63,22 +86,57 @@ export interface SequenceMessage extends Schema.Schema.Type<typeof SequenceMessa
  * chronologically ordered messages between their lifelines. Every surface that
  * accepts, generates, renders, or evaluates a sequence diagram uses this shape.
  */
-export const SequenceDiagram = Schema.Struct({
-	id: Schema.NonEmptyString,
+export const SequenceDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
-	type: Schema.Literal(sequenceDiagramType),
-	participants: Schema.Array(SequenceParticipant).pipe(
+	participants: Schema.Array(ParticipantDocument).pipe(Schema.mutable).check(Schema.isMinLength(1)),
+	messages: Schema.Array(MessageDocument).pipe(
 		Schema.mutable,
-		Schema.check(Schema.isMinLength(1)),
-	),
-	messages: Schema.Array(SequenceMessage).pipe(
-		Schema.mutable,
-		Schema.withDecodingDefault(Effect.succeed([])),
+		Schema.withDecodingDefaultKey(Effect.succeed([])),
 	),
 	style: DiagramStyle.pipe(
-		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
+		Schema.withDecodingDefaultKey(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}).annotate({ identifier: "SequenceDiagram" });
+});
+export interface SequenceDocument extends Schema.Schema.Type<typeof SequenceDocument> {}
+export const SequenceDiagram = SequenceDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+	type: Schema.Literal(sequenceDiagramType),
+	participants: Schema.Array(SequenceParticipant).pipe(Schema.mutable).check(Schema.isMinLength(1)),
+	messages: Schema.Array(SequenceMessage).pipe(
+		Schema.mutable,
+		Schema.withDecodingDefaultKey(Effect.succeed([])),
+	),
+})).annotate({ identifier: "SequenceDiagram" });
+
+/** Normalize authoring once; catalog resolution belongs to the build's icon capability. */
+export function normalizeSequence(document: SequenceDocument) {
+	const optional = (value: string | undefined) =>
+		value === undefined ? undefined : cleanToolString(value) || undefined;
+	const title = cleanToolString(document.title);
+	return {
+		id: optional(document.id) ?? (slug(title) || "sketchi-sequence"),
+		title,
+		type: sequenceDiagramType,
+		participants: Arr.map(document.participants, (participant) => ({
+			id: cleanToolString(participant.id),
+			label: cleanToolString(participant.label),
+			...(participant.kind ? { kind: cleanToolString(participant.kind) } : {}),
+			...(participant.icon?.slug ? { icon: { slug: participant.icon.slug } } : {}),
+		})),
+		messages: Arr.map(document.messages, (message, index) => ({
+			...message,
+			id:
+				optional(message.id) ??
+				`message-${index + 1}-${slug(message.source)}-${slug(message.target)}`,
+			source: cleanToolString(message.source),
+			target: cleanToolString(message.target),
+			label: cleanToolString(message.label),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
 
 export interface SequenceDiagram extends Schema.Schema.Type<typeof SequenceDiagram> {}
 
@@ -104,7 +162,9 @@ export interface SequenceValidationIssue extends Schema.Schema.Type<
 	typeof SequenceValidationIssue
 > {}
 
-export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceValidationIssue[] {
+export function getSequenceValidationIssues(
+	diagram: Pick<SequenceDiagram, "participants" | "messages">,
+): SequenceValidationIssue[] {
 	const issues: SequenceValidationIssue[] = [];
 	if (diagram.participants.length > SEQUENCE_MAX_PARTICIPANTS) {
 		issues.push({
@@ -122,9 +182,9 @@ export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceV
 			hint: "Split the interaction into phases or drop lower-signal messages.",
 		});
 	}
-	const participantIndexById = new Map<string, number>();
-	diagram.participants.forEach((participant, index) => {
-		if (participantIndexById.has(participant.id)) {
+	const participants = Set.empty<string>();
+	Arr.forEach(diagram.participants, (participant, index) => {
+		if (Set.has(participants, participant.id)) {
 			issues.push({
 				code: "duplicate_participant_id",
 				path: `participants.[${index}].id`,
@@ -133,14 +193,14 @@ export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceV
 			});
 			return;
 		}
-		participantIndexById.set(participant.id, index);
+		Set.add(participants, participant.id);
 	});
 
 	// Lifelines and their activation bars are addressed under `<id>:lifeline`.
 	for (const participant of diagram.participants) {
 		const lifelineId = sequenceLifelineId(participant.id);
-		diagram.participants.forEach((candidate, collisionIndex) => {
-			if (candidate.id !== lifelineId && !candidate.id.startsWith(`${lifelineId}:`)) return;
+		Arr.forEach(diagram.participants, (candidate, collisionIndex) => {
+			if (candidate.id !== lifelineId && !Str.startsWith(`${lifelineId}:`)(candidate.id)) return;
 			issues.push({
 				code: "lifeline_id_collision",
 				path: `participants.[${collisionIndex}].id`,
@@ -150,9 +210,9 @@ export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceV
 		});
 	}
 
-	const messageIds = new Set<string>();
-	diagram.messages.forEach((message, index) => {
-		if (messageIds.has(message.id)) {
+	const messageIds = Set.empty<string>();
+	Arr.forEach(diagram.messages, (message, index) => {
+		if (Set.has(messageIds, message.id)) {
 			issues.push({
 				code: "duplicate_message_id",
 				path: `messages.[${index}].id`,
@@ -160,8 +220,8 @@ export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceV
 				hint: "Give every message a unique id or omit message ids to generate them deterministically.",
 			});
 		}
-		messageIds.add(message.id);
-		if (!participantIndexById.has(message.source)) {
+		Set.add(messageIds, message.id);
+		if (!Set.has(participants, message.source)) {
 			issues.push({
 				code: "missing_message_source",
 				path: `messages.[${index}].source`,
@@ -169,7 +229,7 @@ export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceV
 				hint: "Use the id of a participant declared in participants.",
 			});
 		}
-		if (!participantIndexById.has(message.target)) {
+		if (!Set.has(participants, message.target)) {
 			issues.push({
 				code: "missing_message_target",
 				path: `messages.[${index}].target`,
@@ -178,80 +238,7 @@ export function getSequenceValidationIssues(diagram: SequenceDiagram): SequenceV
 			});
 		}
 	});
-	return issues.slice(0, SEQUENCE_MAX_ISSUES);
-}
-
-/**
- * A participant's active period: from a call it receives to its return to the
- * caller. Spans are derived from message order, never authored, and stack when
- * the participant is called again before it returns: `depth` is the lowest
- * lane no overlapping span on the same lifeline uses, so overlapping spans
- * never share a depth and nested spans keep their nesting order.
- */
-export interface SequenceActivation {
-	readonly participantId: string;
-	readonly callMessageId: string;
-	readonly returnMessageId: string;
-	/** Index of the call in `messages`. */
-	readonly startIndex: number;
-	/** Index of the matching return in `messages`. */
-	readonly endIndex: number;
-	readonly depth: number;
-}
-
-/**
- * Pair each return with the latest unanswered call from its target to its
- * source. Calls nobody answers (fire-and-forget) and returns without an open
- * call open no span; answering one call leaves every other open call open.
- * Self-messages take no part: they neither open a call nor answer one.
- */
-export function sequenceActivations(diagram: SequenceDiagram): SequenceActivation[] {
-	const open = new Map<string, { caller: string; index: number; messageId: string }[]>();
-	const spans: Omit<SequenceActivation, "depth">[] = [];
-	diagram.messages.forEach((message, index) => {
-		if (message.source === message.target) return;
-		if (message.type !== "return") {
-			open.set(message.target, [
-				...(open.get(message.target) ?? []),
-				{ caller: message.source, index, messageId: message.id },
-			]);
-			return;
-		}
-		const calls = open.get(message.source) ?? [];
-		const matched = calls.findLastIndex((call) => call.caller === message.target);
-		const call = calls[matched];
-		if (!call) return;
-		// Other calls stay open, even when they interleave with this one.
-		open.set(
-			message.source,
-			calls.filter((_, callIndex) => callIndex !== matched),
-		);
-		spans.push({
-			participantId: message.source,
-			callMessageId: call.messageId,
-			returnMessageId: message.id,
-			startIndex: call.index,
-			endIndex: index,
-		});
-	});
-	// Interval lane assignment. In start order, each span takes the lowest depth
-	// that no still-open span on its lifeline holds and that sits above every
-	// span enclosing it, so overlapping spans never share a depth and nested
-	// spans always draw inside their enclosing span.
-	const laid: SequenceActivation[] = [];
-	for (const span of spans.toSorted((left, right) => left.startIndex - right.startIndex)) {
-		const open = laid.filter(
-			(other) => other.participantId === span.participantId && other.endIndex > span.startIndex,
-		);
-		const taken = new Set(open.map((other) => other.depth));
-		let depth = Math.max(
-			0,
-			...open.filter((other) => other.endIndex > span.endIndex).map((other) => other.depth + 1),
-		);
-		while (taken.has(depth)) depth += 1;
-		laid.push({ ...span, depth });
-	}
-	return laid;
+	return Arr.take(issues, SEQUENCE_MAX_ISSUES);
 }
 
 export class SequenceValidationError extends Schema.TaggedError<
@@ -290,100 +277,12 @@ export function parseSequenceDiagram(
 	);
 }
 
-export const sequenceFixture = parseSequenceDiagram({
-	id: "checkout-sequence",
-	title: "Checkout sequence",
-	type: sequenceDiagramType,
-	participants: [
-		{ id: "customer", label: "Customer" },
-		{ id: "store", label: "Store" },
-		{ id: "payments", label: "Payments" },
-	],
-	messages: [
-		{ id: "checkout", source: "customer", target: "store", label: "Submit checkout" },
-		{ id: "charge", source: "store", target: "payments", label: "Charge card" },
-		{
-			id: "charged",
-			source: "payments",
-			target: "store",
-			label: "Payment approved",
-			type: "return",
-		},
-		{
-			id: "receipt",
-			source: "store",
-			target: "customer",
-			label: "Order receipt",
-			type: "return",
-		},
-	],
-}).pipe(Result.getOrThrow);
-
-/** A request path with a nested call, a fire-and-forget event, and returns. */
-export const apiRequestSequence = parseSequenceDiagram({
-	id: "api-request-sequence",
-	title: "API request with cache miss",
-	type: sequenceDiagramType,
-	participants: [
-		{ id: "browser", label: "Browser" },
-		{ id: "api", label: "API Worker" },
-		{ id: "cache", label: "Cache" },
-		{ id: "database", label: "Database" },
-		{ id: "analytics", label: "Analytics" },
-	],
-	messages: [
-		{ id: "request", source: "browser", target: "api", label: "GET /orders" },
-		{ id: "lookup", source: "api", target: "cache", label: "Look up orders" },
-		{ id: "miss", source: "cache", target: "api", label: "Cache miss", type: "return" },
-		{ id: "query", source: "api", target: "database", label: "Query orders" },
-		{ id: "rows", source: "database", target: "api", label: "Order rows", type: "return" },
-		{ id: "track", source: "api", target: "analytics", label: "Track request" },
-		{ id: "response", source: "api", target: "browser", label: "200 OK", type: "return" },
-	],
-}).pipe(Result.getOrThrow);
-
-/** A deploy webhook whose participants carry catalog logos. */
-export const deployWebhookLogoSequence = parseSequenceDiagram({
-	id: "deploy-webhook-logos",
-	title: "Deploy webhook",
-	type: sequenceDiagramType,
-	participants: [
-		{ id: "developer", label: "Developer" },
-		{ id: "github", label: "GitHub", icon: { slug: "github" } },
-		{ id: "worker", label: "Cloudflare Worker", icon: { slug: "cloudflare" } },
-		{ id: "docker", label: "Docker build", icon: { slug: "docker" } },
-	],
-	messages: [
-		{ id: "push", source: "developer", target: "github", label: "git push" },
-		{ id: "webhook", source: "github", target: "worker", label: "Push webhook" },
-		{ id: "build", source: "worker", target: "docker", label: "Build image" },
-		{ id: "digest", source: "docker", target: "worker", label: "Image digest", type: "return" },
-		{ id: "accepted", source: "worker", target: "github", label: "202 Accepted", type: "return" },
-	],
-}).pipe(Result.getOrThrow);
-
-/** Self-messages: consecutive checks inside an active bar, and a retry on an idle lifeline. */
-export const selfMessageSequence = parseSequenceDiagram({
-	id: "self-message-sequence",
-	title: "Login with credential checks",
-	type: sequenceDiagramType,
-	participants: [
-		{ id: "browser", label: "Browser" },
-		{ id: "idp", label: "Identity Provider" },
-		{ id: "users", label: "User Directory" },
-	],
-	messages: [
-		{ id: "sign-in", source: "browser", target: "idp", label: "Sign in" },
-		{ id: "validate", source: "idp", target: "idp", label: "Validate credentials" },
-		{
-			id: "mfa",
-			source: "idp",
-			target: "idp",
-			label: "Check the one-time code against the enrolled authenticator",
-		},
-		{ id: "lookup", source: "idp", target: "users", label: "Look up user" },
-		{ id: "profile", source: "users", target: "idp", label: "Profile", type: "return" },
-		{ id: "session", source: "idp", target: "browser", label: "Session", type: "return" },
-		{ id: "refresh", source: "browser", target: "browser", label: "Refresh the page" },
-	],
-}).pipe(Result.getOrThrow);
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: SequenceDiagram) {
+	return {
+		nodeCount: diagram.participants.length,
+		nodeNoun: "participants",
+		edgeCount: diagram.messages.length,
+		edgeNoun: "messages",
+	};
+}

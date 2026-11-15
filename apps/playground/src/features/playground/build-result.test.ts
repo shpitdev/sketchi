@@ -172,6 +172,7 @@ describe("build result selectors", () => {
 						buildId: "build",
 						issues: [],
 						normalizedSpec: {
+							type: "sequence",
 							id: "checkout",
 							title: "Checkout",
 							participants: spec.participants,

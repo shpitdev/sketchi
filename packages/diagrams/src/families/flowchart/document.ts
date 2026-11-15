@@ -1,3 +1,4 @@
+import { slug } from "../../clean-text.js";
 import { Schema } from "effect";
 
 import {
@@ -182,17 +183,9 @@ export function flowchartEdgeId(source: string, target: string): string {
 	return `${source}->${target}`;
 }
 
-function slugify(value: string): string {
-	return value
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, 48);
-}
-
 /** The diagram id a document builds as: its own, or one made from its title. */
 export function flowchartDocumentId(document: Pick<FlowchartDocument, "id" | "title">): string {
-	return document.id ?? (slugify(document.title) || "flowchart");
+	return document.id ?? (slug(document.title) || "flowchart");
 }
 
 const quoted = (ids: Iterable<string>) => [...ids].map((id) => `"${id}"`).join(", ");

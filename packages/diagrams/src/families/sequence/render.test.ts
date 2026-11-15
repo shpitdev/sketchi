@@ -1,13 +1,8 @@
+import { apiRequestSequence, deployWebhookLogoSequence, sequenceFixture } from "./fixtures.js";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import {
-	type SequenceDiagram,
-	apiRequestSequence,
-	deployWebhookLogoSequence,
-	parseSequenceDiagram,
-	sequenceFixture,
-} from "./document.js";
+import { parseSequenceDiagram } from "./document.js";
 import {
 	embedCanvasIcons,
 	estimateTextWidth,
@@ -17,8 +12,6 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-
-import { renderDiagram } from "../../family";
 
 import {
 	SEQUENCE_ACTIVATION_ROLE,
@@ -57,10 +50,6 @@ const sequence = parseSequenceDiagram({
 	],
 	style: { accentColor: "#000000", backgroundColor: "#ffffff" },
 }).pipe(Result.getOrThrow);
-
-function unvalidated(overrides: Partial<SequenceDiagram>): SequenceDiagram {
-	return { ...sequence, ...overrides };
-}
 
 /**
  * Haiku's ride-booking-sequence-large in the November 2026 round of large
@@ -149,7 +138,7 @@ describe("sequence diagram renderer", () => {
 					{ id: "payments", label: "Payments" },
 				],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const headers = scene.elements.filter(
 			(e): e is NodeSceneElement =>
@@ -172,7 +161,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("tightens a forty-message diagram until its labels read at a screen's size, each clear of the rest", () => {
-		const scene = renderSequenceDiagram(rideBooking).pipe(Result.getOrThrow);
+		const scene = renderSequenceDiagram(rideBooking);
 		// 88 between rows and 320 between lifelines drew it 3156 by 3720, its
 		// 13 px labels 7 px tall on a 2000 px screen.
 		expect((13 * 2000) / (Math.max(scene.width, scene.height) + 40)).toBeGreaterThanOrEqual(10);
@@ -242,7 +231,7 @@ describe("sequence diagram renderer", () => {
 					})),
 				],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		const rows = calls.map((call) => arrow(scene, call.id).points[0].y);
 		expect(rows[1]! - rows[0]!).toBeLessThan(88);
 		const nodes = scene.elements.filter((e): e is NodeSceneElement => e.type === "node");
@@ -270,7 +259,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("keeps a diagram that reads at a screen's size at its natural spacing", () => {
-		const scene = renderSequenceDiagram(sequence).pipe(Result.getOrThrow);
+		const scene = renderSequenceDiagram(sequence);
 		const rows = ["start", "charge", "receipt"].map((id) => arrow(scene, id).points[0].y);
 		expect(rows[1]! - rows[0]!).toBe(88);
 		expect(rows[2]! - rows[1]!).toBe(88);
@@ -293,7 +282,7 @@ describe("sequence diagram renderer", () => {
 					{ id: "settle", source: "customer", target: "bank", label: "Settle" },
 				],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		const lifelines = scene.elements
 			.filter((e) => e.type === "node" && e.nodeId.endsWith(":lifeline"))
 			.map((e) => (e.type === "node" ? e.x + e.width / 2 : 0));
@@ -318,41 +307,8 @@ describe("sequence diagram renderer", () => {
 		expect(arrow(scene, "settle").points).toHaveLength(2);
 	});
 
-	it("renders the canonical fixture through the family dispatch", () => {
-		const scene = renderDiagram(sequenceFixture).pipe(Result.getOrThrow);
-		expect(scene).toEqual(renderSequenceDiagram(sequenceFixture).pipe(Result.getOrThrow));
-		expect(scene.diagramId).toBe("checkout-sequence");
-		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(
-			sequenceFixture.messages.length,
-		);
-		expect(getCanvasValidationIssues(scene)).toEqual([]);
-	});
-
-	it("fits three-line participant labels before positioning lifelines and messages", () => {
-		const scene = renderSequenceDiagram({
-			...sequence,
-			participants: sequence.participants.map((participant, index) =>
-				index === 0 ? { ...participant, label: "one\ntwo\nthree" } : participant,
-			),
-		}).pipe(Result.getOrThrow);
-		expect(scene.elements.find(({ id }) => id === "node:customer")).toMatchObject({
-			y: 48,
-			height: 75,
-		});
-		expect(scene.elements.find(({ id }) => id === "label:customer")).toMatchObject({ y: 85.5 });
-		const lifelines = scene.elements.filter(
-			(element): element is Extract<typeof element, { type: "node" }> =>
-				element.type === "node" && element.rendererRole === "sequence-lifeline",
-		);
-		expect(lifelines.map(({ y }) => y)).toEqual([123, 123, 123]);
-		const arrows = scene.elements.filter((element) => element.type === "arrow");
-		expect(arrows.map(({ points }) => points[0].y)).toEqual([187, 275, 363]);
-		expect(scene.height).toBe(467);
-		expect(getCanvasValidationIssues(scene)).toEqual([]);
-	});
-
 	it("preserves participant and chronological message order", () => {
-		const scene = renderSequenceDiagram(sequence).pipe(Result.getOrThrow);
+		const scene = renderSequenceDiagram(sequence);
 		const headers = scene.elements.filter(
 			(element): element is Extract<typeof element, { type: "node" }> =>
 				element.type === "node" && element.rendererRole !== "sequence-lifeline",
@@ -375,7 +331,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("draws a self-message as a loop out of its lifeline and back on its own row", () => {
-		const plain = renderSequenceDiagram(sequence).pipe(Result.getOrThrow);
+		const plain = renderSequenceDiagram(sequence);
 		const scene = renderSequenceDiagram(
 			parseSequenceDiagram({
 				...sequence,
@@ -385,7 +341,7 @@ describe("sequence diagram renderer", () => {
 					...sequence.messages.slice(1),
 				],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const loop = arrow(scene, "retry");
 		const lifeline = scene.elements.find((element) => element.id === "node:payments:lifeline");
@@ -460,7 +416,7 @@ describe("sequence diagram renderer", () => {
 					})),
 				],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const label = scene.elements.find((element) => element.id === "arrow:validate:label");
 		const lifeline = scene.elements.find((element) => element.id === "node:b:lifeline");
@@ -492,7 +448,7 @@ describe("sequence diagram renderer", () => {
 					{ id: "code", source: "idp", target: "browser", label: "Code", type: "return" },
 				],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const bar = (call: string) => {
 			const found = activationBars(scene).find(
@@ -525,24 +481,8 @@ describe("sequence diagram renderer", () => {
 		}
 	});
 
-	it("rejects participant ids that collide with generated lifelines", () => {
-		expect(
-			renderSequenceDiagram(
-				unvalidated({
-					participants: [
-						{ id: "api", label: "API" },
-						{ id: "api:lifeline", label: "Worker" },
-					],
-					messages: [],
-				}),
-			),
-		).toMatchObject({
-			failure: { message: expect.stringMatching(/collides with the generated lifeline/) },
-		});
-	});
-
 	it("draws an activation bar from each answered call to its return", () => {
-		const scene = renderSequenceDiagram(sequenceFixture).pipe(Result.getOrThrow);
+		const scene = renderSequenceDiagram(sequenceFixture);
 		const bars = activationBars(scene);
 		expect(bars.map((bar) => bar.nodeId)).toEqual([
 			"store:lifeline:activation:checkout",
@@ -574,7 +514,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("keeps unanswered calls on the lifeline", () => {
-		const scene = renderSequenceDiagram(apiRequestSequence).pipe(Result.getOrThrow);
+		const scene = renderSequenceDiagram(apiRequestSequence);
 		expect(arrow(scene, "track").targetNodeId).toBe("analytics:lifeline");
 		expect(activationBars(scene)).toHaveLength(3);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
@@ -600,7 +540,7 @@ describe("sequence diagram renderer", () => {
 					{ id: "session", source: "api", target: "client", label: "Session", type: "return" },
 				],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		const outer = activationBars(scene).find(
 			(bar) => bar.nodeId === "api:lifeline:activation:login",
 		);
@@ -637,7 +577,7 @@ describe("sequence diagram renderer", () => {
 					{ id: "p3", source: "b", target: "a", label: "Reply 3", type: "return" },
 				],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		const bar = (call: string) => {
 			const found = activationBars(scene).find(
 				(candidate) => candidate.nodeId === `b:lifeline:activation:${call}`,
@@ -657,7 +597,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("does not keep the activation role for a bar moved off its lifeline", () => {
-		const scene = renderSequenceDiagram(sequenceFixture).pipe(Result.getOrThrow);
+		const scene = renderSequenceDiagram(sequenceFixture);
 		const [bar] = activationBars(scene);
 		if (!bar) throw new Error("Missing activation bar.");
 		expect(isStructurallyValidSequenceActivation(scene, { ...bar, x: bar.x + 200 })).toBe(false);
@@ -686,7 +626,7 @@ describe("sequence diagram renderer", () => {
 					{ id: "r1", source: "b", target: "a", label: "First done", type: "return" },
 				],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		const bars = activationBars(scene);
 		expect(bars.map((bar) => bar.nodeId)).toEqual([
 			"b:lifeline:activation:q1",
@@ -710,8 +650,8 @@ describe("sequence diagram renderer", () => {
 		const plain = renderSequenceDiagram({
 			...deployWebhookLogoSequence,
 			participants: deployWebhookLogoSequence.participants.map(({ icon: _icon, ...rest }) => rest),
-		}).pipe(Result.getOrThrow);
-		const scene = renderSequenceDiagram(deployWebhookLogoSequence).pipe(Result.getOrThrow);
+		});
+		const scene = renderSequenceDiagram(deployWebhookLogoSequence);
 		const header = (id: string) =>
 			scene.elements.find(
 				(element): element is NodeSceneElement => element.type === "node" && element.nodeId === id,

@@ -142,18 +142,6 @@ describe("diagram generation prompt mapping", () => {
 		});
 	});
 
-	it("maps sequence requests to the native sequence contract", () => {
-		const messages = buildDiagramGenerationMessages({
-			...prompt,
-			requestedType: "sequence",
-		});
-
-		expect(messages.system).toContain('Use diagram type "sequence".');
-		expect(messages.system).toContain("ordered participants");
-		expect(messages.system).toContain("chronological messages");
-		expect(messages.user).toContain('"type":"sequence"');
-	});
-
 	it("gives omitted-type selection only schema-valid response examples", () => {
 		const messages = buildDiagramGenerationMessages({
 			id: "model-selected-kind",
@@ -265,37 +253,6 @@ describe("pure candidate behavior", () => {
 			nodes: expectedDiagram.nodes,
 			edges: expectedDiagram.edges,
 		});
-	});
-
-	it("parses and validates native sequence candidates", () => {
-		const candidate = candidateFromText({
-			model: "fixture",
-			provider: "fixture",
-			text: generationResponseText({
-				id: "login-sequence",
-				title: "Login sequence",
-				type: "sequence",
-				participants: [
-					{ id: "browser", label: "Browser" },
-					{ id: "api", label: "API" },
-				],
-				messages: [
-					{
-						id: "login",
-						source: "browser",
-						target: "api",
-						label: "Login request",
-					},
-				],
-			}),
-		});
-
-		expect(candidate.error).toBeUndefined();
-		expect(candidate.diagram?.type).toBe("sequence");
-		if (candidate.diagram?.type === "sequence") {
-			expect(candidate.diagram.messages).toHaveLength(1);
-			expect(candidate.diagram.style).toEqual(SKETCHI_DIAGRAM_STYLE);
-		}
 	});
 
 	it("reports sequence invariants with the core contract's issue codes and hints", () => {

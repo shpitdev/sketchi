@@ -1,7 +1,5 @@
-import { vennBuild } from "../../families/venn/build.js";
 import { Effect } from "effect";
 import { type FlowchartDiagram } from "../../families/flowchart/diagram.js";
-import { mindmapBuild } from "../../families/mindmap/build.js";
 import {
 	DIAGRAM_TYPES,
 	familyForType,
@@ -11,11 +9,7 @@ import {
 	type FamilyBuildResult,
 } from "../../family.js";
 import * as Runtime from "./runtime.js";
-import {
-	artifactBuildCapabilities,
-	observeCodeModeBoundary,
-	type CodeModeRuntimeEnvironment,
-} from "./runtime.js";
+import { type CodeModeRuntimeEnvironment } from "./runtime.js";
 
 import { type BuildFlowchartOptions, type WireframeComponentInput } from "./contract.js";
 
@@ -34,25 +28,6 @@ export function buildCanonicalDocument(
 	import("../operation.js").BuildRejection<FamilyBuildResult>,
 	CodeModeArtifactStorage | CodeModeRuntimeEnvironment
 > {
-	if (document.type === "mindmap" || document.type === "venn") {
-		const request = { spec: document.spec, ...(options ? { options } : {}) };
-		return observeCodeModeBoundary(
-			document.type === "mindmap" ? "buildMindmap" : "buildVennDiagram",
-			request,
-			Effect.gen(function* () {
-				const capabilities = yield* artifactBuildCapabilities;
-				return document.type === "mindmap"
-					? yield* mindmapBuild.build(
-							{ spec: document.spec, ...(options ? { options } : {}) },
-							capabilities,
-						)
-					: yield* vennBuild.build(
-							{ spec: document.spec, ...(options ? { options } : {}) },
-							capabilities,
-						);
-			}),
-		);
-	}
 	return familyForType(document.type).build(Runtime)({
 		spec: document.spec,
 		...(options ? { options } : {}),
@@ -244,27 +219,6 @@ export function canonicalDocumentFromDiagram(
 				},
 			};
 		case "sequence":
-			return {
-				type: "sequence",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					participants: diagram.participants.map((participant) => ({
-						id: participant.id,
-						label: participant.label,
-						...(participant.kind ? { kind: participant.kind } : {}),
-						...(participant.icon ? { icon: { slug: participant.icon.slug } } : {}),
-					})),
-					messages: diagram.messages.map((message) => ({
-						id: message.id,
-						source: message.source,
-						target: message.target,
-						label: message.label,
-						...(message.type ? { type: message.type } : {}),
-						...(message.style ? { style: message.style } : {}),
-					})),
-					style: diagram.style,
-				},
-			};
+			return familyForType("sequence").toDocument(diagram);
 	}
 }

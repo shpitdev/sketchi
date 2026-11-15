@@ -1,8 +1,6 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { assert, describe, it, layer } from "@effect/vitest";
-import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { renderSequenceDiagram } from "../../families/sequence/render.js";
-import { type CanvasSpec as RendererScene } from "@sketchi/drawing";
+
 import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { Cause, Effect, Exit, Fiber, Layer, Schema, Result } from "effect";
 
@@ -10,10 +8,8 @@ import { CodeModeArtifactStorageMemory } from "./artifacts";
 import {
 	formatContractSchemaError,
 	BuildFlowchartRequestSchema,
-	BuildSequenceDiagramRequest,
 	DIAGRAM_PATCH_OPERATION_NAMES,
 	DiagramPatchOperationSchema,
-	RenderedDiagramSceneSchema,
 } from "./contract";
 import { applyDiagramPatch, buildFlowchart, makeCodeModeRuntimeEnvironmentLayer } from "./runtime";
 
@@ -165,109 +161,6 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 			assert.deepStrictEqual(
 				formatContractSchemaError(failure.failure).issues.map((issue) => issue.path),
 				[["requestId"], ["spec", "title"], ["spec", "nodes"], ["spec", "edges"]],
-			);
-		}),
-	);
-
-	it.effect("validates and defaults the sequence diagram contract", () =>
-		Effect.gen(function* () {
-			const decoded = yield* Schema.decodeUnknownEffect(BuildSequenceDiagramRequest, {
-				errors: "all",
-				reportInput: true,
-			})({
-				spec: {
-					title: "Checkout",
-					participants: [
-						{ id: "customer", label: "Customer" },
-						{ id: "store", label: "Store" },
-					],
-					messages: [
-						{
-							source: "customer",
-							target: "store",
-							label: "Checkout",
-							type: "message",
-						},
-					],
-				},
-			});
-			const encoded = yield* Schema.encodeEffect(BuildSequenceDiagramRequest)(decoded);
-			assert.deepStrictEqual(encoded, {
-				spec: {
-					title: "Checkout",
-					participants: [
-						{ id: "customer", label: "Customer" },
-						{ id: "store", label: "Store" },
-					],
-					messages: [
-						{
-							source: "customer",
-							target: "store",
-							label: "Checkout",
-							type: "message",
-						},
-					],
-					style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-				},
-			});
-
-			const malformed = Schema.decodeUnknownResult(BuildSequenceDiagramRequest, {
-				errors: "all",
-				reportInput: true,
-			})({
-				spec: {
-					title: "Checkout",
-					participants: [{ id: "store", label: "Store" }],
-					messages: [{ source: "store", target: "store" }],
-				},
-			});
-			assert.isFalse(Result.isSuccess(malformed));
-			if (Result.isSuccess(malformed)) {
-				return assert.fail("Malformed sequence message unexpectedly decoded.");
-			}
-			assert.deepInclude(formatContractSchemaError(malformed.failure).issues[0], {
-				path: ["spec", "messages", 0, "label"],
-			});
-		}),
-	);
-
-	it.effect("preserves sequence stroke styles through scene encoding", () =>
-		Effect.gen(function* () {
-			const rendered = renderSequenceDiagram({
-				type: "sequence",
-				id: "return-message",
-				title: "Return message",
-				participants: [
-					{ id: "client", label: "Client" },
-					{ id: "api", label: "API" },
-				],
-				messages: [
-					{
-						id: "response",
-						source: "api",
-						target: "client",
-						label: "Response",
-						type: "return",
-					},
-				],
-				style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-			}).pipe(Result.getOrThrow);
-			const encoded = yield* Schema.encodeEffect(RenderedDiagramSceneSchema)(
-				yield* Schema.decodeUnknownEffect(RenderedDiagramSceneSchema, {
-					errors: "all",
-					reportInput: true,
-				})(rendered),
-			);
-			const decoded = yield* Schema.decodeUnknownEffect(RenderedDiagramSceneSchema)(encoded);
-			const converted = convertSceneToExcalidraw(decoded as RendererScene);
-
-			assert.deepInclude(
-				converted.elements.find((element) => element.id === "arrow:response"),
-				{ strokeStyle: "dashed" },
-			);
-			assert.deepInclude(
-				converted.elements.find((element) => element.id === "node:api:lifeline"),
-				{ customData: { sketchiRendererRole: "sequence-lifeline" } },
 			);
 		}),
 	);

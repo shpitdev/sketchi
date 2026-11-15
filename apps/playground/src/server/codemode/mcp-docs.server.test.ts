@@ -566,7 +566,7 @@ describe("Code Mode MCP docs", { timeout: 60_000 }, () => {
 			["createCanvas", ["CreateCanvasRequest", "CanvasSpecInput", "CanvasElement"]],
 			["getArtifact", ["GetArtifactRequest"]],
 			["applyDiagramPatch", ["ApplyDiagramPatchRequest", "DiagramSelector"]],
-			["issues", ["Issue", "IssueCode", "IssueRef"]],
+			["issues", ["Issue", "IssueRef"]],
 		] as const) {
 			const content = getCodeModeDocs({ topic }).content;
 			for (const name of types) expect(content, `${topic} ${name}`).toContain(declaration(name));

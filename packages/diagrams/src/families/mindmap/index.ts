@@ -11,5 +11,3 @@ export { mindmapLayoutIssues, drawnConnector } from "./readout.js";
 
 export { mindmapTopics } from "./document.js";
 export { validateMindmap } from "./document.js";
-
-export { decodeMindmapDocument } from "./document.js";

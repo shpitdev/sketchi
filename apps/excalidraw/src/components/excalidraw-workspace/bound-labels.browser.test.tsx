@@ -195,7 +195,7 @@ const sequence = renderSequenceDiagram({
 	],
 	messages: [{ id: "submit", source: "qa", target: "cjk", label: "Submit batch 🚀" }],
 	style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-}).pipe(Result.getOrThrow);
+});
 
 /** Self-messages: a self-call nested in an active bar and a self-return on an idle lifeline. */
 const selfMessages = renderSequenceDiagram({
@@ -218,7 +218,7 @@ const selfMessages = renderSequenceDiagram({
 		{ id: "retry", source: "browser", target: "browser", label: "Retry", type: "return" },
 	],
 	style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-}).pipe(Result.getOrThrow);
+});
 
 type Geometry = Pick<ExcalidrawTextElement, "height" | "text" | "width" | "x" | "y">;
 

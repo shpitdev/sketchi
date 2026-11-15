@@ -237,3 +237,13 @@ export const chartFixture = parseChartDiagram({
 	categoryAxisTitle: "Quarter",
 	valueAxisTitle: "Revenue",
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: ChartDiagram) {
+	return {
+		nodeCount: diagram.categories.length,
+		nodeNoun: diagram.kind === "pie" ? "slices" : "categories",
+		edgeCount: diagram.series.length,
+		edgeNoun: "series",
+	};
+}

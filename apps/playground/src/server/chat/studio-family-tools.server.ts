@@ -67,7 +67,7 @@ export function makeStudioFamilyTool(
 		}
 		if (family.type === "sequence") {
 			const executor = yield* makeStudioSequenceToolExecutor(
-				(input) => codeMode.buildFamily(family, input),
+				(input) => codeMode.buildFamily<typeof family.contracts.output.Type>(family, input),
 				options,
 			);
 			return buildTool(family, executor, run);

@@ -30,7 +30,7 @@ import {
 	type IconMatch,
 	type SketchiIcon,
 } from "@sketchi/icon-catalog";
-import { Effect, Schema } from "effect";
+import { Context, Effect, Schema } from "effect";
 
 import { cleanToolString } from "../../clean-text.js";
 import { type CodeModeIssue } from "../result.js";
@@ -934,3 +934,12 @@ export const embedSceneIcons = Effect.fn("codeMode.icons.embedScene")(function* 
 	);
 	return { issues, scene: embedding.scene };
 });
+
+/** The host's request-scoped catalog and logo completion policy. */
+export class BuildIconSource extends Context.Service<
+	BuildIconSource,
+	{
+		readonly catalog: (request: unknown) => Effect.Effect<CodeModeIconCatalog | undefined>;
+		readonly fillNamedLogos: boolean;
+	}
+>()("@sketchi/diagrams/BuildIconSource") {}

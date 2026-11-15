@@ -2,8 +2,10 @@ import { Array, Result } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import {
 	VennDocument,
+	counts,
 	VennDiagram,
 	VennValidationError,
+	VennValidationIssueCodeSchema,
 	normalizeVenn,
 	validateVennDiagram,
 	resolveVennShorthand,
@@ -16,6 +18,7 @@ export const vennBuild = defineBuild({
 	normalized: VennDiagram,
 	tool: VennDocument.mapFields(({ style: _style, ...fields }) => fields),
 	error: VennValidationError,
+	issueCodes: VennValidationIssueCodeSchema,
 	invalidStatus: "invalid_venn_diagram",
 	prepare: (input: unknown) =>
 		Result.succeed(
@@ -34,13 +37,7 @@ export const vennBuild = defineBuild({
 			message: entry.message,
 			hint: entry.hint,
 		})),
-	assess: (document, threshold) => ({
-		accepted: 10 >= threshold,
-		score: 10,
-		threshold,
-		summary: { nodeCount: document.sets.length, edgeCount: 0 },
-		checks: [],
-	}),
+	counts,
 	render: renderVennDiagram,
 	renderHint: "Repair the sets and regions and retry.",
 });

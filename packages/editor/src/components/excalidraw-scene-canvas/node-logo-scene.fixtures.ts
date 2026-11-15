@@ -1,10 +1,11 @@
+import { deployWebhookLogoSequence } from "@sketchi/diagrams/families/sequence/fixtures";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import {
 	deployPipelineLogoFlowchart,
 	requestFlowGroupLogoFlowchart,
 } from "@sketchi/diagrams/families/flowchart/diagram";
-import { deployWebhookLogoSequence } from "@sketchi/diagrams/families/sequence/document";
+
 import { type LayoutDirection } from "@sketchi/diagrams/graph/intermediate";
 import {
 	embedCanvasIcons,
@@ -71,10 +72,7 @@ export function handDrawnLogoScene(): RenderedDiagramScene {
 
 /** The deploy-webhook sequence with real catalog marks in its participant headers. */
 export function participantLogoScene(): RenderedDiagramScene {
-	return embedCanvasIcons(
-		renderSequenceDiagram(deployWebhookLogoSequence).pipe(Result.getOrThrow),
-		nodeLogo,
-	).scene;
+	return embedCanvasIcons(renderSequenceDiagram(deployWebhookLogoSequence), nodeLogo).scene;
 }
 
 /**

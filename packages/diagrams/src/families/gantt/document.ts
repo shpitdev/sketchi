@@ -468,3 +468,13 @@ export const ganttFixture = parseGanttDiagram({
 		},
 	],
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: GanttDiagram) {
+	return {
+		nodeCount: diagram.tasks.length,
+		nodeNoun: "tasks",
+		edgeCount: diagram.tasks.reduce((count, task) => count + (task.dependsOn?.length ?? 0), 0),
+		edgeNoun: "dependencies",
+	};
+}

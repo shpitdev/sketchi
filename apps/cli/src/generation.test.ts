@@ -1,7 +1,7 @@
 import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
 import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
 import { afterEach, assert, describe, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer } from "effect";
+import { Deferred, Effect, Fiber, Layer, Result } from "effect";
 import { TestClock } from "effect/testing";
 
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
@@ -362,6 +362,67 @@ describe("prompt-assisted generation over the public generate API", () => {
 
 			assert.deepStrictEqual(sent, [{ prompt: "Create a diagram", type: "flowchart" }]);
 		}),
+	);
+
+	it.effect("accepts published warnings and rejects an unknown accepted code before storage", () =>
+		Effect.gen(function* () {
+			const original = JSON.parse(yield* Effect.promise(() => buildSuccessBody(sequenceInput)));
+			for (const code of ["unknown_icon", "sequence_future_warning"]) {
+				const body = {
+					...original,
+					issues: [
+						{
+							code,
+							severity: "warning",
+							stage: "input",
+							message: "Logo omitted.",
+							hint: "Choose an offered logo.",
+						},
+					],
+				};
+				stubFetch(() => jsonResponse(body, 200));
+				const created: BuiltDiagram[] = [];
+				const result = yield* Effect.result(runGenerate(created, "sequence"));
+				if (code === "unknown_icon") {
+					assert.isTrue(Result.isSuccess(result));
+					assert.strictEqual(created.length, 1);
+				} else {
+					assert.isTrue(Result.isFailure(result));
+					assert.strictEqual(created.length, 0);
+					if (Result.isFailure(result)) assert.strictEqual(exitCodeForFailure(result.failure), 12);
+				}
+			}
+		}),
+	);
+
+	it.effect(
+		"reads owning rejection messages without decoding their code against success warnings",
+		() =>
+			Effect.gen(function* () {
+				stubFetch(() =>
+					jsonResponse(
+						{
+							ok: false,
+							status: "invalid_generated_document",
+							issues: [
+								{
+									code: "missing_message_source",
+									message: "Message source is missing.",
+									hint: "Declare the participant.",
+								},
+							],
+						},
+						422,
+					),
+				);
+				const created: BuiltDiagram[] = [];
+				const error = yield* Effect.flip(runGenerate(created, "sequence"));
+				assert.strictEqual(error.message, "Message source is missing.");
+				if (error._tag === "CliGenerationError")
+					assert.strictEqual(error.hint, "Declare the participant.");
+				assert.strictEqual(exitCodeForFailure(error), 3);
+				assert.strictEqual(created.length, 0);
+			}),
 	);
 
 	it.effect("persists a generated flowchart returned by the endpoint", () =>

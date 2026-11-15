@@ -1,3 +1,4 @@
+import { buildResponse } from "../operation.js";
 import { drawnIconSlug, ICON_RECIPE_LIMITS, type IconRecipe } from "@sketchi/drawing";
 import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vitest";
@@ -112,7 +113,7 @@ function runtime() {
 	return {
 		applyDiagramPatch: (input: unknown) => provide(applyDiagramPatch(input)),
 		buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
-		buildSequenceDiagram: (input: unknown) => provide(buildSequenceDiagram(input)),
+		buildSequenceDiagram: (input: unknown) => provide(buildResponse(buildSequenceDiagram(input))),
 		createCanvas: (input: unknown) => provide(createCanvas(input)),
 		editFlowchart: (input: unknown) => provide(editFlowchart(input)),
 		searchIcons: (input: unknown) => provide(searchIcons(input)),

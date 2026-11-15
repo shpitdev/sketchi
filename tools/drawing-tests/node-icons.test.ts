@@ -1,3 +1,4 @@
+import { deployWebhookLogoSequence } from "@sketchi/diagrams/families/sequence/fixtures";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -10,7 +11,7 @@ import {
 	type CanvasShapeElement,
 } from "@sketchi/drawing";
 import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
-import { deployWebhookLogoSequence } from "@sketchi/diagrams/families/sequence/document";
+
 import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 
@@ -203,13 +204,10 @@ describe("node logos in Excalidraw output", () => {
 
 describe("sequence participant logos in Excalidraw output", () => {
 	it("draws each participant logo as an image in its header and keeps the scene valid", () => {
-		const scene = embedCanvasIcons(
-			renderSequenceDiagram(deployWebhookLogoSequence).pipe(Result.getOrThrow),
-			(slug) => ({
-				name: slug,
-				svg: svgFor(slug),
-			}),
-		).scene;
+		const scene = embedCanvasIcons(renderSequenceDiagram(deployWebhookLogoSequence), (slug) => ({
+			name: slug,
+			svg: svgFor(slug),
+		})).scene;
 		const excalidraw = convertSceneToExcalidraw(scene);
 		const images = excalidraw.elements.filter((element) => element.type === "image");
 

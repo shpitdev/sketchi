@@ -374,6 +374,26 @@
 		"./build/operation": {
 			"types": "./dist/build/operation.d.ts",
 			"default": "./dist/build/operation.js"
+		},
+		"./clean-text": {
+			"types": "./dist/clean-text.d.ts",
+			"default": "./dist/clean-text.js"
+		},
+		"./families/sequence/build": {
+			"types": "./dist/families/sequence/build.d.ts",
+			"default": "./dist/families/sequence/build.js"
+		},
+		"./families/sequence/fixtures": {
+			"types": "./dist/families/sequence/fixtures.d.ts",
+			"default": "./dist/families/sequence/fixtures.js"
+		},
+		"./families/sequence/layout": {
+			"types": "./dist/families/sequence/layout.d.ts",
+			"default": "./dist/families/sequence/layout.js"
+		},
+		"./families/flowchart/issues": {
+			"types": "./dist/families/flowchart/issues.d.ts",
+			"default": "./dist/families/flowchart/issues.js"
 		}
 	},
 	"dependencies": {

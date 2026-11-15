@@ -607,3 +607,13 @@ export function splitContinuingFinalStates(input: unknown): unknown {
 	});
 	return { ...input, states: split, transitions: [...transitions, ...added] };
 }
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: StateMachineDiagram) {
+	return {
+		nodeCount: diagram.states.length,
+		nodeNoun: "states",
+		edgeCount: diagram.transitions.length,
+		edgeNoun: "transitions",
+	};
+}

@@ -561,3 +561,13 @@ export const journeyFixture = parseJourneyDiagram({
 		},
 	],
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: JourneyDiagram) {
+	return {
+		nodeCount: diagram.stages.reduce((total, stage) => total + stage.steps.length, 0),
+		nodeNoun: "steps",
+		edgeCount: diagram.stages.length,
+		edgeNoun: "stages",
+	};
+}

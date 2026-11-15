@@ -179,11 +179,7 @@
 						"depConstraints": [
 							{
 								"sourceTag": "domain:drawing",
-								"onlyDependOnLibsWithTags": [
-									"domain:drawing",
-									"domain:cloudflare",
-									"domain:observability"
-								]
+								"onlyDependOnLibsWithTags": ["domain:drawing", "domain:observability"]
 							},
 							{
 								"sourceTag": "domain:icons",

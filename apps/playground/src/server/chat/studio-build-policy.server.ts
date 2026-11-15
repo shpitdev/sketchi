@@ -1,9 +1,8 @@
+import { sequenceBuild } from "@sketchi/diagrams/families/sequence/build";
 import {
 	FLOWCHART_REQUEST_MAX_LENGTH,
 	type BuildFlowchartResult,
 	type BuildFlowchartToolInput,
-	type BuildSequenceDiagramResult,
-	type BuildSequenceDiagramToolInput as StudioBuildSequenceInput,
 } from "@sketchi/diagrams/build/code-mode/contract";
 import "@tanstack/react-start/server-only";
 
@@ -128,11 +127,16 @@ export function makeStudioFlowchartToolExecutor<E, R>(
 
 /** Studio's build_sequence_diagram tool over the shared buildSequenceDiagram vertical. */
 export function makeStudioSequenceToolExecutor<E, R>(
-	buildSequenceDiagram: (input: unknown) => Effect.Effect<BuildSequenceDiagramResult, E, R>,
+	buildSequenceDiagram: (input: unknown) => Effect.Effect<typeof sequenceBuild.result.Type, E, R>,
 	options: { readonly logos?: readonly OfferedLogo[]; readonly turn?: StudioBuildTurn } = {},
 ) {
 	const logos = options.logos ?? [];
-	return makeStudioBuildToolExecutor<StudioBuildSequenceInput, BuildSequenceDiagramResult, E, R>({
+	return makeStudioBuildToolExecutor<
+		typeof sequenceBuild.toolInput.Type,
+		typeof sequenceBuild.result.Type,
+		E,
+		R
+	>({
 		build: buildSequenceDiagram,
 		rejected: (issue) => ({ ok: false, status: "quality_failed", issues: [issue] }),
 		ground: (input) => {

@@ -329,3 +329,13 @@ export const timelineFixture = parseTimelineDiagram({
 		{ id: "release", label: "General availability", date: "2026-10-01", kind: "milestone" },
 	],
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: TimelineDiagram) {
+	return {
+		nodeCount: diagram.events.length,
+		nodeNoun: "events",
+		edgeCount: diagram.events.filter((event) => event.end !== undefined).length,
+		edgeNoun: "phases",
+	};
+}

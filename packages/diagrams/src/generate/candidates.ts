@@ -1,3 +1,4 @@
+import { slug } from "../clean-text.js";
 import { isDiagramIconSlug, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import { Array as Arr, Match, Result, Schema, SchemaIssue } from "effect";
 import { ChartDiagram, validateChartDiagram } from "../families/chart/document.js";
@@ -630,13 +631,7 @@ function diagramValidationFailure(
 
 /** "API p50 latency, one week" as "api-p50-latency-one-week". */
 function idFromTitle(title: string): string {
-	return title
-		.toLowerCase()
-		.normalize("NFKD")
-		.replace(/[^a-z0-9]+/gu, "-")
-		.replace(/^-+|-+$/gu, "")
-		.slice(0, 60)
-		.replace(/-+$/u, "");
+	return slug(title, { maxLength: 60, normalize: true, trimEnd: true });
 }
 
 /**

@@ -1,3 +1,4 @@
+import { sequenceActivations } from "@sketchi/diagrams/families/sequence/layout";
 import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
 import { parseClassDiagram } from "@sketchi/diagrams/families/class/document";
 import { parseErDiagram } from "@sketchi/diagrams/families/er/document";
@@ -14,7 +15,6 @@ import { parseSankeyDiagram } from "@sketchi/diagrams/families/sankey/document";
 import {
 	type SequenceDiagram,
 	parseSequenceDiagram,
-	sequenceActivations,
 } from "@sketchi/diagrams/families/sequence/document";
 import { parseStateMachineDiagram } from "@sketchi/diagrams/families/state-machine/document";
 import { parseTimelineDiagram } from "@sketchi/diagrams/families/timeline/document";

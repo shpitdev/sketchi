@@ -1271,3 +1271,13 @@ export const wireframeFixture = parseWireframeDiagram({
 		},
 	],
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: WireframeDiagram) {
+	return {
+		nodeCount: [...wireframeComponents(diagram)].length,
+		nodeNoun: "components",
+		edgeCount: diagram.screens.length,
+		edgeNoun: diagram.screens.length === 1 ? "screen" : "screens",
+	};
+}

@@ -541,3 +541,13 @@ export const sankeyFixture = parseSankeyDiagram({
 		{ source: "marketing", target: "storage", value: 8 },
 	],
 }).pipe(Result.getOrThrow);
+
+/** Counts and domain nouns shown by generation consumers. */
+export function counts(diagram: SankeyDiagram) {
+	return {
+		nodeCount: diagram.nodes.length,
+		nodeNoun: "nodes",
+		edgeCount: diagram.links.length,
+		edgeNoun: "flows",
+	};
+}
