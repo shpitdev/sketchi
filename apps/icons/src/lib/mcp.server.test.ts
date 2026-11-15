@@ -21,6 +21,9 @@ describe("Sketchi Icons MCP", () => {
 			const tools = await client.listTools();
 			expect(tools.tools.map((tool) => tool.name).sort()).toEqual(["get_icon", "search_icons"]);
 			expect(tools.tools.every((tool) => tool.annotations?.readOnlyHint)).toBe(true);
+			expect(tools.tools.every((tool) => tool.inputSchema.additionalProperties === false)).toBe(
+				true,
+			);
 
 			const search = await client.callTool({
 				arguments: { limit: 5, q: "k8s" },
@@ -68,6 +71,114 @@ describe("Sketchi Icons MCP", () => {
 			});
 			expect(missing.isError).toBe(true);
 		} finally {
+			await client.close();
+			await server.close();
+		}
+	});
+	it("preserves permissive optional inputs, trimming, defaults and exact argument errors", async () => {
+		const server = createIconMcpServer({ sourceLoader: async () => "<svg />" });
+		const client = new Client({ name: "icons-inputs-test", version: "0.0.0" });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+		try {
+			await server.connect(serverTransport);
+			await client.connect(clientTransport);
+			const defaults = await client.callTool({ name: "search_icons" });
+			expect(defaults.structuredContent).toMatchObject({ query: "", collection: null, count: 50 });
+			for (const input of [
+				{ q: 42, collection: false, extra: "ignored" },
+				{ q: "  ", collection: " " },
+			]) {
+				expect(await client.callTool({ name: "search_icons", arguments: input })).toEqual(defaults);
+			}
+			const trimmed = await client.callTool({
+				name: "search_icons",
+				arguments: { q: "  k8s  ", limit: 1, extra: true },
+			});
+			expect(trimmed.structuredContent).toMatchObject({
+				query: "k8s",
+				count: 1,
+				results: [{ slug: "kubernetes" }],
+			});
+			const icon = await client.callTool({
+				name: "get_icon",
+				arguments: { slug: " kubernetes ", extra: true },
+			});
+			expect(icon.structuredContent).toMatchObject({ slug: "kubernetes" });
+			for (const limit of [null, "5", 0, 1.5, 101]) {
+				expect(await client.callTool({ name: "search_icons", arguments: { limit } })).toEqual({
+					isError: true,
+					content: [{ type: "text", text: "limit must be an integer from 1 to 100." }],
+				});
+			}
+			for (const slug of [null, 1, "  "]) {
+				expect(await client.callTool({ name: "get_icon", arguments: { slug } })).toEqual({
+					isError: true,
+					content: [{ type: "text", text: "slug is required." }],
+				});
+			}
+			expect(await client.callTool({ name: "unknown", arguments: {} })).toEqual({
+				isError: true,
+				content: [{ type: "text", text: "Tool unknown was not found." }],
+			});
+		} finally {
+			await client.close();
+			await server.close();
+		}
+	});
+
+	it("retains source failure details as protocol errors", async () => {
+		const server = createIconMcpServer({
+			sourceLoader: async () => {
+				throw new Error("source unavailable");
+			},
+		});
+		const client = new Client({ name: "icons-source-failure-test", version: "0.0.0" });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+		try {
+			await server.connect(serverTransport);
+			await client.connect(clientTransport);
+			await expect(
+				client.callTool({ name: "get_icon", arguments: { slug: "kubernetes" } }),
+			).rejects.toThrow("source unavailable");
+		} finally {
+			await client.close();
+			await server.close();
+		}
+	});
+
+	it("propagates SDK cancellation to the active source request", async () => {
+		const started = Promise.withResolvers<void>();
+		const aborted = Promise.withResolvers<void>();
+		const server = createIconMcpServer({
+			sourceLoader: (request) =>
+				new Promise<string>((_resolve, reject) => {
+					const abort = () => {
+						aborted.resolve();
+						reject(new Error("source cancelled"));
+					};
+					request.signal.addEventListener("abort", abort, { once: true });
+					if (request.signal.aborted) abort();
+					started.resolve();
+				}),
+		});
+		const client = new Client({ name: "icons-cancel-test", version: "0.0.0" });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+		const controller = new AbortController();
+		try {
+			await server.connect(serverTransport);
+			await client.connect(clientTransport);
+			const call = client.callTool(
+				{ name: "get_icon", arguments: { slug: "kubernetes" } },
+				undefined,
+				{ signal: controller.signal },
+			);
+			const rejected = call.catch((error: unknown) => error);
+			await started.promise;
+			controller.abort();
+			expect(await rejected).toBeInstanceOf(Error);
+			await aborted.promise;
+		} finally {
+			controller.abort();
 			await client.close();
 			await server.close();
 		}
