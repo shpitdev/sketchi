@@ -556,7 +556,9 @@
               "packages/diagrams/src/families/gantt/document.ts",
               "packages/diagrams/src/families/gantt/build.ts",
               "packages/diagrams/src/families/org-chart/document.ts",
-              "packages/diagrams/src/families/org-chart/build.ts"
+              "packages/diagrams/src/families/org-chart/build.ts",
+              "packages/diagrams/src/families/wireframe/document.ts",
+              "packages/diagrams/src/families/wireframe/build.ts"
             ],
             "options": {
               "diagnosticSeverity": {
