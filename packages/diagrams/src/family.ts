@@ -7,7 +7,7 @@ import * as Build from "./build/code-mode/contract.js";
 import type * as Runtime from "./build/code-mode/runtime.js";
 import { docs as chartFamilyDocs } from "./families/chart/docs.js";
 import * as chartFamily from "./families/chart/document.js";
-import { renderChartDiagram } from "./families/chart/render.js";
+import { chartBuild } from "./families/chart/build.js";
 import { docs as classFamilyDocs } from "./families/class/docs.js";
 import * as classFamily from "./families/class/document.js";
 import { renderClassDiagram } from "./families/class/render.js";
@@ -226,32 +226,12 @@ export const families = [
 		fixture: timelineFamily.timelineFixture,
 		docs: timelineFamilyDocs,
 	}),
-	legacyFamily({
-		type: chartFamily.chartFixture.type,
+	family({
 		operation: "buildChart",
 		label: "Chart",
 		path: "/api/v1/charts/build",
-		canonical: canonical(
-			chartFamily.ChartDiagram,
-			chartFamily.chartFixture.type,
-			chartFamily.validateChartDiagram,
-			renderChartDiagram,
-			chartFamily.counts,
-		),
-		validationError: chartFamily.ChartValidationError,
+		build: chartBuild,
 		fixture: chartFamily.chartFixture,
-		spec: Build.ChartSpec,
-		request: Build.BuildChartRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildChartRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.ChartToolSpecSchema,
-			}),
-			output: Build.BuildChartResultSchema,
-		},
-		studioInput: Build.BuildChartToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildChart,
 		docs: chartFamilyDocs,
 	}),
 	legacyFamily({

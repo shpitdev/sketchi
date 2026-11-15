@@ -22,8 +22,6 @@ import {
 	BuildWireframeToolInputSchema,
 	BuildQuadrantChartResultSchema,
 	BuildQuadrantChartToolInputSchema,
-	BuildChartResultSchema,
-	BuildChartToolInputSchema,
 	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
 	type BuildStateMachineResult,
@@ -35,7 +33,6 @@ import {
 	type BuildSankeyResult,
 	type BuildWireframeResult,
 	type BuildQuadrantChartResult,
-	type BuildChartResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
 
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
@@ -51,7 +48,7 @@ export type StudioBuildResult =
 	| ReturnType<typeof familyForType<"mindmap">>["contracts"]["output"]["Type"]
 	| typeof sequenceBuild.result.Type
 	| ReturnType<typeof familyForType<"timeline">>["contracts"]["output"]["Type"]
-	| BuildChartResult
+	| ReturnType<typeof familyForType<"chart">>["contracts"]["output"]["Type"]
 	| BuildStateMachineResult
 	| BuildGanttResult
 	| BuildErDiagramResult
@@ -83,9 +80,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_chart": {
 		family: "chart",
-		decodeResult: Schema.decodeUnknownResult(BuildChartResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("chart").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildChartToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("chart").studioInput)(input);
 			return Result.isSuccess(decoded) ? [...decoded.success.spec.categories] : [];
 		},
 	},

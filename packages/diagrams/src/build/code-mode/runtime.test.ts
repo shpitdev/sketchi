@@ -1895,7 +1895,7 @@ describe("Code Mode runtime", () => {
 				categories: ["Q1", "Q2"],
 				series: [{ name: "Revenue with a long series name", values: [4, 0.1] }],
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		const result = await createTestRuntime().applyDiagramPatch({
 			source: { scene },
 			operations: [

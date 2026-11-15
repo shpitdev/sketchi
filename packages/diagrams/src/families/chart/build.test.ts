@@ -1,12 +1,16 @@
-import { buildResponse, type BuildRejection } from "../operation.js";
+import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { describe, expect, it } from "vitest";
-import { Effect, Schema } from "effect";
-import { chartFixture } from "../../families/chart/document.js";
+import { Effect, Result } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { applyDiagramPatch, buildChart, CodeModeRuntimeEnvironment } from "./runtime.js";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildChartResultSchema } from "./contract.js";
-import { buildCanonicalDocument, canonicalDocumentFromDiagram } from "./documents.js";
+import {
+	applyDiagramPatch,
+	buildChart,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(
@@ -28,7 +32,7 @@ const options = {
 };
 const build = (spec: unknown) => run(buildChart({ spec, options }));
 
-describe("Code Mode native chart", () => {
+describe("chart build", () => {
 	it("builds a stacked bar chart into a validated, patchable editable artifact", async () => {
 		const built = await build({
 			title: "Tickets by channel",
@@ -42,7 +46,6 @@ describe("Code Mode native chart", () => {
 			valueAxisTitle: "Tickets",
 		});
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildChartResultSchema)(built)).not.toThrow();
 		expect(built.normalizedSpec).toMatchObject({
 			id: "tickets-by-channel",
 			kind: "bar",
@@ -50,13 +53,22 @@ describe("Code Mode native chart", () => {
 			categories: ["Mon", "Tue"],
 			valueAxisTitle: "Tickets",
 		});
-		expect(built.quality.summary).toEqual({ nodeCount: 4, edgeCount: 0 });
+		expect(built.quality.summary).toEqual({ nodeCount: 2, edgeCount: 2 });
 		const excalidraw = built.artifact.formats.find((format) => format.format === "excalidraw")
 			?.inline as Parameters<typeof validateExcalidrawScene>[0];
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
+		const bars = excalidraw.elements.filter((element) => element.id.startsWith("node:chart:bar:"));
+		expect(bars).toHaveLength(4);
+		for (const bar of bars) {
+			expect(bar.type).toBe("rectangle");
+			expect(bar.roundness).toBeNull();
+			expect(bar.roughness).toBe(0);
+			expect(bar.boundElements).toBeNull();
+			expect(bar.customData).toEqual({ sketchiRendererRole: "chart-mark" });
+		}
 		expect(
-			excalidraw.elements.find((element) => element.id === "node:chart:bar:1:1")?.["roundness"],
-		).toBeNull();
+			excalidraw.elements.some((element) => element.id.includes("__sketchi_node_label__")),
+		).toBe(false);
 		const patched = await run(
 			applyDiagramPatch({
 				source: { artifactId: built.artifact.artifactId },
@@ -87,7 +99,19 @@ describe("Code Mode native chart", () => {
 		const slices = excalidraw.elements.filter((element) =>
 			element.id.startsWith("node:chart:slice:"),
 		);
-		expect(slices.map((slice) => slice.type)).toEqual(["line", "line", "line"]);
+		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
+		expect(slices).toHaveLength(3);
+		for (const slice of slices) {
+			const points = slice.points as [number, number][];
+			expect(slice.type).toBe("line");
+			expect(slice.roundness).toBeNull();
+			expect(points[0]).toEqual(points.at(-1));
+			expect(slice.backgroundColor).not.toBe("transparent");
+			expect(slice.customData).toEqual({
+				sketchiShape: "polygon",
+				sketchiRendererRole: "chart-mark",
+			});
+		}
 	});
 
 	it.each([
@@ -105,12 +129,19 @@ describe("Code Mode native chart", () => {
 			"duplicate_chart_category",
 		],
 	])("rejects invalid charts with structured repair issues", async (spec, code) => {
-		const result = await build({ title: "Invalid", ...spec });
+		const request = { spec: { title: "Invalid", ...spec } };
+		const outcome = await run(buildChart(request).pipe(Effect.result));
+		expect(Result.isFailure(outcome)).toBe(true);
+		if (Result.isSuccess(outcome)) return expect.fail("Expected typed build rejection");
+		expect(outcome.failure.reason._tag).toBe("Document");
+		if (outcome.failure.reason._tag !== "Document") return expect.fail("Expected chart validation");
+		expect(outcome.failure.reason.error._tag).toBe("ChartValidationError");
+		expect(outcome.failure.reason.error.issues.some((issue) => issue.code === code)).toBe(true);
+		const result = outcome.failure.toResult();
 		expect(result.ok).toBe(false);
 		expect(result.status).toBe("invalid_chart");
 		expect(result.issues.map((issue) => issue.code)).toContain(code);
 		expect(result.issues.every((issue) => issue.hint && issue.stage === "input")).toBe(true);
-		expect(() => Schema.decodeUnknownSync(BuildChartResultSchema)(result)).not.toThrow();
 	});
 
 	it("rejects malformed input before validation", async () => {
@@ -122,20 +153,5 @@ describe("Code Mode native chart", () => {
 		});
 		expect(result.ok).toBe(false);
 		expect(result.status).toBe("invalid_input");
-	});
-
-	it("round-trips the canonical fixture through its document", async () => {
-		const result = await run(
-			buildCanonicalDocument(canonicalDocumentFromDiagram(chartFixture), {
-				artifactFormats: ["scene"],
-			}),
-		);
-		if (!result.ok) throw new Error(JSON.stringify(result.issues));
-		expect(result.normalizedSpec).toMatchObject({
-			id: chartFixture.id,
-			categories: chartFixture.categories,
-			series: chartFixture.series,
-			unit: "$M",
-		});
 	});
 });

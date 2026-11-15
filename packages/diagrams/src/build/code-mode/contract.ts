@@ -24,7 +24,6 @@ import {
 
 import { FlowchartDocumentSchema } from "../../families/flowchart/document.js";
 import { FlowchartEditsSchema } from "../../families/flowchart/edits.js";
-import { CHART_KINDS, CHART_ORIENTATIONS } from "../../families/chart/document.js";
 import {
 	CLASS_KINDS,
 	CLASS_RELATIONSHIP_KINDS,
@@ -450,30 +449,6 @@ const DiagramStyleWithDefault = DiagramSpecStyle.annotate({
  * A flowchart is diagram-core's flowchart document: nodes as an id → label map,
  * edges as [from, to, label?], and groups and lanes that list what they contain.
  */
-
-/** Author categories and values only; scales, ticks and label placement belong to the renderer. */
-export const ChartSeriesSpec = Schema.Struct({
-	name: optionalContract(NonEmptyString),
-	values: requiredArray(Schema.Array(FiniteNumber).pipe(Schema.mutable)),
-}).annotate({ identifier: undefined });
-
-export interface ChartSeriesSpec extends Schema.Schema.Type<typeof ChartSeriesSpec> {}
-export const ChartSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	kind: literals(CHART_KINDS),
-	categories: requiredArray(nonEmptyArray(NonEmptyString)),
-	series: requiredArray(nonEmptyArray(ChartSeriesSpec)),
-	unit: optionalContract(NonEmptyString),
-	categoryAxisTitle: optionalContract(NonEmptyString),
-	valueAxisTitle: optionalContract(NonEmptyString),
-	stacked: optionalContract(Schema.Boolean),
-	donut: optionalContract(Schema.Boolean),
-	orientation: optionalContract(literals(CHART_ORIENTATIONS)),
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface ChartSpec extends Schema.Schema.Type<typeof ChartSpec> {}
 
 /**
  * The authoring form of diagram-core's canonical StateMachineDiagram:
@@ -1016,21 +991,6 @@ export const BuildFlowchartToolInputSchema = Object.assign(BuildFlowchartToolInp
 export const BuildFlowchartRequestSchema = Object.assign(BuildFlowchartRequest, {
 	omit: (_keys: { readonly options: true }) => BuildFlowchartToolInputSchema,
 });
-
-export const BuildChartRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(ChartSpec),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildChartRequest extends Schema.Schema.Type<typeof BuildChartRequest> {}
-/** The chart spec a model authors; style is always the Sketchi palette. */
-export const ChartToolSpecSchema = ChartSpec.mapFields(({ style: _style, ...fields }) => fields);
-export const BuildChartToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(ChartToolSpecSchema),
-});
-export type BuildChartToolInput = typeof BuildChartToolInputSchema.Type;
 
 export const BuildStateMachineRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
@@ -1832,13 +1792,6 @@ const NormalizedQuadrantChartSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedQuadrantChartSpec = typeof NormalizedQuadrantChartSpecSchema.Type;
-const NormalizedChartSpecSchema = ChartSpec.mapFields((fields) => ({
-	...fields,
-	id: NonEmptyString,
-	title: NonEmptyString,
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-}));
-export type NormalizedChartSpec = typeof NormalizedChartSpecSchema.Type;
 
 export const BuildFlowchartAccepted = Schema.Struct({
 	ok: booleanLiteral(true),
@@ -1901,41 +1854,6 @@ export const EditFlowchartResultSchema = Schema.Union([
 	EditFlowchartRejected,
 ]);
 export type EditFlowchartResult = typeof EditFlowchartResultSchema.Type;
-
-export const BuildChartAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedChartSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildChartAccepted extends Schema.Schema.Type<typeof BuildChartAccepted> {}
-export const BuildChartRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_chart",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedChartSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildChartRejected extends Schema.Schema.Type<typeof BuildChartRejected> {}
-export const BuildChartResultSchema = Schema.Union([BuildChartAccepted, BuildChartRejected]);
-export type BuildChartResult = typeof BuildChartResultSchema.Type;
 
 export const BuildStateMachineAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

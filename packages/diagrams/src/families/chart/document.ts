@@ -1,5 +1,14 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import {
+	Effect,
+	Schema,
+	Array as Arr,
+	Option,
+	Result,
+	String as Str,
+	MutableHashSet as Set,
+} from "effect";
+import { cleanToolString, slug } from "../../clean-text.js";
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 export const chartDiagramType = "chart" as const;
@@ -29,10 +38,9 @@ export interface ChartSeries extends Schema.Schema.Type<typeof ChartSeries> {}
  * A bar, line or pie chart from categories and named series. The renderer
  * owns every coordinate, tick and label position.
  */
-export const ChartDiagram = Schema.Struct({
-	id: Schema.NonEmptyString,
+export const ChartDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
-	type: Schema.Literal(chartDiagramType),
 	kind: ChartKindSchema,
 	/** Bar and line x-axis categories, or pie slice names, in display order. */
 	categories: Schema.Array(Schema.NonEmptyString).pipe(
@@ -51,11 +59,47 @@ export const ChartDiagram = Schema.Struct({
 	/** Bars only. Omitted, bars turn horizontal when category names would not fit under columns. */
 	orientation: Schema.optionalKey(ChartOrientationSchema),
 	style: DiagramStyle.pipe(
-		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
+		Schema.withDecodingDefaultKey(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}).annotate({ identifier: "ChartDiagram" });
+});
+export interface ChartDocument extends Schema.Schema.Type<typeof ChartDocument> {}
+
+/** Authored fields have one owner; rendering adds its stable id and family tag. */
+export const ChartDiagram = ChartDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+	type: Schema.Literal(chartDiagramType),
+})).annotate({ identifier: "ChartDiagram" });
 
 export interface ChartDiagram extends Schema.Schema.Type<typeof ChartDiagram> {}
+
+/** Clean display text once without changing category/series pairing or numeric values. */
+export function normalizeChart(document: ChartDocument): ChartDiagram {
+	const title = cleanToolString(document.title);
+	const optionalText = (value: string | undefined) =>
+		value === undefined ? undefined : cleanToolString(value) || undefined;
+	const unit = optionalText(document.unit);
+	const categoryAxisTitle = optionalText(document.categoryAxisTitle);
+	const valueAxisTitle = optionalText(document.valueAxisTitle);
+	return {
+		id: optionalText(document.id) ?? (slug(title) || "sketchi-chart"),
+		title,
+		type: chartDiagramType,
+		kind: document.kind,
+		categories: Arr.map(document.categories, cleanToolString),
+		series: Arr.map(document.series, (series) => {
+			const name = optionalText(series.name);
+			return { ...(name ? { name } : {}), values: Arr.copy(series.values) };
+		}),
+		...(unit ? { unit } : {}),
+		...(categoryAxisTitle ? { categoryAxisTitle } : {}),
+		...(valueAxisTitle ? { valueAxisTitle } : {}),
+		...(document.stacked !== undefined ? { stacked: document.stacked } : {}),
+		...(document.donut !== undefined ? { donut: document.donut } : {}),
+		...(document.orientation ? { orientation: document.orientation } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
 
 export const ChartValidationIssueCodeSchema = Schema.Literals([
 	"chart_too_large",
@@ -74,7 +118,7 @@ export const ChartValidationIssue = Schema.Struct({
 });
 export interface ChartValidationIssue extends Schema.Schema.Type<typeof ChartValidationIssue> {}
 
-const sameName = (name: string) => name.trim().toLowerCase();
+const sameName = (name: string) => Str.toLowerCase(Str.trim(name));
 
 export function getChartValidationIssues(diagram: ChartDiagram): ChartValidationIssue[] {
 	const issues: ChartValidationIssue[] = [];
@@ -104,16 +148,16 @@ export function getChartValidationIssues(diagram: ChartDiagram): ChartValidation
 			message: `A chart supports at most ${CHART_MAX_VALUES} values (categories × series).`,
 			hint: "Split the data into several charts.",
 		});
-	const seenCategories = new Set<string>();
-	categories.forEach((category, index) => {
-		if (seenCategories.has(sameName(category)))
+	const seenCategories = Set.empty<string>();
+	Arr.forEach(categories, (category, index) => {
+		if (Set.has(seenCategories, sameName(category)))
 			issues.push({
 				code: "duplicate_chart_category",
 				path: `categories.[${index}]`,
 				message: `Category "${category}" is listed more than once.`,
 				hint: "List each category once; put its values for every series at the same position.",
 			});
-		seenCategories.add(sameName(category));
+		Set.add(seenCategories, sameName(category));
 	});
 	if (pie && series.length !== 1)
 		issues.push({
@@ -122,8 +166,8 @@ export function getChartValidationIssues(diagram: ChartDiagram): ChartValidation
 			message: "A pie chart has exactly one series.",
 			hint: "Use one series of slice values, or a grouped bar chart to compare several series.",
 		});
-	const seenSeries = new Set<string>();
-	series.forEach((entry, index) => {
+	const seenSeries = Set.empty<string>();
+	Arr.forEach(series, (entry, index) => {
 		const path = `series.[${index}]`;
 		if (series.length > 1 && entry.name === undefined)
 			issues.push({
@@ -133,14 +177,14 @@ export function getChartValidationIssues(diagram: ChartDiagram): ChartValidation
 				hint: "Name every series when a chart has more than one.",
 			});
 		if (entry.name !== undefined) {
-			if (seenSeries.has(sameName(entry.name)))
+			if (Set.has(seenSeries, sameName(entry.name)))
 				issues.push({
 					code: "invalid_chart_series",
 					path: `${path}.name`,
 					message: `Series name "${entry.name}" is used more than once.`,
 					hint: "Give each series a distinct name.",
 				});
-			seenSeries.add(sameName(entry.name));
+			Set.add(seenSeries, sameName(entry.name));
 		}
 		if (entry.values.length !== categories.length)
 			issues.push({
@@ -149,7 +193,7 @@ export function getChartValidationIssues(diagram: ChartDiagram): ChartValidation
 				message: `Series ${entry.name ? `"${entry.name}"` : index + 1} has ${entry.values.length} values for ${categories.length} categories.`,
 				hint: "Give every series exactly one value per category, in category order.",
 			});
-		if (pie && entry.values.some((value) => value < 0))
+		if (pie && Arr.some(entry.values, (value) => value < 0))
 			issues.push({
 				code: "invalid_chart_value",
 				path: `${path}.values`,
@@ -157,7 +201,7 @@ export function getChartValidationIssues(diagram: ChartDiagram): ChartValidation
 				hint: "Use a bar chart for data with negative values.",
 			});
 	});
-	if (pie && series[0] && !series[0].values.some((value) => value > 0))
+	if (pie && series[0] && !Arr.some(series[0].values, (value) => value > 0))
 		issues.push({
 			code: "invalid_chart_value",
 			path: "series.[0].values",
@@ -186,7 +230,7 @@ export function getChartValidationIssues(diagram: ChartDiagram): ChartValidation
 	for (const field of ["categoryAxisTitle", "valueAxisTitle"] as const)
 		if (diagram[field] !== undefined)
 			option(field, !pie, "A pie chart has no axes.", `Remove ${field} from the pie chart.`);
-	return issues.slice(0, 20);
+	return Arr.take(issues, 20);
 }
 
 export class ChartValidationError extends Schema.TaggedError<

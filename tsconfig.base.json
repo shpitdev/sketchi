@@ -533,7 +533,9 @@
               "packages/diagrams/src/families/sequence/document.ts",
               "packages/diagrams/src/families/sequence/build.ts",
               "packages/diagrams/src/families/timeline/document.ts",
-              "packages/diagrams/src/families/timeline/build.ts"
+              "packages/diagrams/src/families/timeline/build.ts",
+              "packages/diagrams/src/families/chart/document.ts",
+              "packages/diagrams/src/families/chart/build.ts"
             ],
             "options": {
               "diagnosticSeverity": {

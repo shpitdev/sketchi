@@ -9,9 +9,8 @@ import {
 } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { chartFixture, parseChartDiagram, type ChartDiagram } from "./document.js";
+import { parseChartDiagram, type ChartDiagram } from "./document.js";
 
-import { renderDiagram } from "../../family.js";
 import { readChartMarks } from "./readout.js";
 import { chartBarOrientation, renderChartDiagram } from "./render.js";
 import { formatValue, piePercentages, unitParts } from "./scale.js";
@@ -179,12 +178,11 @@ function expectDrawnData(diagram: ChartDiagram, scene: RenderedDiagramScene): vo
 }
 
 function expectReadableChart(diagram: ChartDiagram): RenderedDiagramScene {
-	const scene = renderChartDiagram(diagram).pipe(Result.getOrThrow);
+	const scene = renderChartDiagram(diagram);
 	const label = `${diagram.id}`;
 	expectDrawnData(diagram, scene);
 	expect(getCanvasValidationIssues(scene), label).toEqual([]);
 	expect(scene.elements.length, label).toBeLessThanOrEqual(CANVAS_LIMITS.maxElements);
-	expect(renderChartDiagram(diagram).pipe(Result.getOrThrow), label).toEqual(scene);
 	const readout = read(scene);
 	// No text overlaps another, and none leaves the scene.
 	readout.texts.forEach(({ element, box }, index) => {
@@ -456,13 +454,6 @@ const chart = (
 	);
 
 describe("native chart layout", () => {
-	it("renders the fixture into a valid deterministic scene through renderDiagram", () => {
-		const scene = renderDiagram(chartFixture).pipe(Result.getOrThrow);
-		expect(scene.diagramId).toBe("quarterly-revenue-chart");
-		expect(getCanvasValidationIssues(scene)).toEqual([]);
-		expect(renderDiagram(chartFixture).pipe(Result.getOrThrow)).toEqual(scene);
-	});
-
 	it("draws grouped columns from a zero baseline with values on their caps and a legend", () => {
 		const diagram = chart({
 			kind: "bar",

@@ -29,7 +29,6 @@ import {
 	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,
 } from "@sketchi/drawing";
-import { getChartValidationIssues, type ChartDiagram } from "../../families/chart/document.js";
 import {
 	getClassValidationIssues,
 	parseClassAttributeShorthand,
@@ -114,7 +113,7 @@ import {
 	validateExcalidrawScene,
 	type ExcalidrawScene,
 } from "@sketchi/drawing/excalidraw";
-import { isStructurallyValidChartMark, renderChartDiagram } from "../../families/chart/render.js";
+import { isStructurallyValidChartMark } from "../../families/chart/render.js";
 import { isStructurallyValidClassBox, renderClassDiagram } from "../../families/class/render.js";
 import {
 	isStructurallyValidErOptional,
@@ -170,8 +169,6 @@ import {
 import {
 	ApplyDiagramPatchRejected,
 	ApplyDiagramPatchRequest,
-	BuildChartRejected,
-	BuildChartRequest,
 	BuildClassDiagramRejected,
 	BuildClassDiagramRequest,
 	BuildErDiagramRejected,
@@ -205,7 +202,6 @@ import {
 	SearchIconsRejected,
 	SearchIconsRequest,
 	type ApplyDiagramPatchResult,
-	type BuildChartResult,
 	type BuildClassDiagramResult,
 	type BuildErDiagramResult,
 	type BuildFlowchartRequest,
@@ -224,7 +220,6 @@ import {
 	type DiagramSelector,
 	type EditFlowchartResult,
 	type GetArtifactResult,
-	type NormalizedChartSpec,
 	type NormalizedClassSpec,
 	type NormalizedErSpec,
 	type NormalizedGanttSpec,
@@ -422,57 +417,6 @@ export function observeCodeModeBoundary<
 		return yield* Effect.fromResult(outcomeResult);
 	});
 	return withTelemetryCorrelation(observed, codeModeCorrelation(input));
-}
-
-function normalizeChartSpec(spec: BuildChartRequest["spec"]): NormalizedChartSpec {
-	const title = cleanToolString(spec.title);
-	const optionalText = (value: string | undefined) => {
-		const cleaned = cleanOptional(value);
-		return cleaned === undefined ? undefined : cleaned;
-	};
-	const unit = optionalText(spec.unit);
-	const categoryAxisTitle = optionalText(spec.categoryAxisTitle);
-	const valueAxisTitle = optionalText(spec.valueAxisTitle);
-	return {
-		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-chart"),
-		title,
-		kind: spec.kind,
-		categories: spec.categories.map(cleanToolString),
-		series: spec.series.map((series) => {
-			const name = optionalText(series.name);
-			return { ...(name ? { name } : {}), values: [...series.values] };
-		}),
-		...(unit ? { unit } : {}),
-		...(categoryAxisTitle ? { categoryAxisTitle } : {}),
-		...(valueAxisTitle ? { valueAxisTitle } : {}),
-		...(spec.stacked !== undefined ? { stacked: spec.stacked } : {}),
-		...(spec.donut !== undefined ? { donut: spec.donut } : {}),
-		...(spec.orientation ? { orientation: spec.orientation } : {}),
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-	};
-}
-function toChartDiagram(spec: NormalizedChartSpec): ChartDiagram {
-	return { ...spec, type: "chart" };
-}
-function validateNormalizedChart(spec: NormalizedChartSpec): CodeModeIssue[] {
-	return getChartValidationIssues(toChartDiagram(spec)).map((entry) =>
-		issue({
-			code: entry.code,
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-			message: entry.message,
-			hint: entry.hint,
-		}),
-	);
-}
-function chartQuality(spec: NormalizedChartSpec, threshold: number): QualityReport {
-	return {
-		accepted: 10 >= threshold,
-		score: 10,
-		threshold,
-		summary: { nodeCount: spec.categories.length * spec.series.length, edgeCount: 0 },
-		checks: [],
-	};
 }
 
 function normalizeGanttSpec(spec: BuildGanttRequest["spec"]): NormalizedGanttSpec {
@@ -1436,15 +1380,6 @@ const BuildQuadrantChartFailure = workflowFailure(
 	"BuildQuadrantChartFailure",
 	BuildQuadrantChartRejected.fields.status,
 	BuildQuadrantChartRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildChartFailure = workflowFailure(
-	"BuildChartFailure",
-	BuildChartRejected.fields.status,
-	BuildChartRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -4014,113 +3949,6 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 	} satisfies Extract<BuildQuadrantChartResult, { ok: true }>;
 });
 
-const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (input: unknown) {
-	const parsed = Schema.decodeUnknownResult(BuildChartRequest, {
-		errors: "all",
-		reportInput: true,
-	})(input);
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildChartFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-
-	const request = parsed.success;
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeChartSpec(request.spec);
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedChart(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildChartFailure.new({
-			status: "invalid_chart",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const quality = chartQuality(
-		normalizedSpec,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildChartFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const scene = yield* validatedDomainResult({
-		try: () => renderChartDiagram(toChartDiagram(normalizedSpec)),
-		catch: (cause) =>
-			BuildChartFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message: cause instanceof Error ? cause.message : "Unable to render chart scene.",
-							hint: "Repair the categories and series values and retry.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildChart.render"));
-	const canvasIssues = getCanvasValidationIssues(scene);
-	if (canvasIssues.length > 0) {
-		return yield* BuildChartFailure.new({
-			status: canvasFailureStatus(canvasIssues),
-			context: {
-				...qualityContext,
-				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
-					...entry,
-					hint: "Use fewer categories or series and retry buildChart.",
-				})),
-			},
-		});
-	}
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildChartFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [],
-	} satisfies Extract<BuildChartResult, { ok: true }>;
-});
-
 const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (input: unknown) {
 	const parsed = Schema.decodeUnknownResult(BuildGanttRequest, {
 		errors: "all",
@@ -5218,11 +5046,7 @@ export const buildQuadrantChart: (
 export const buildTimeline = familyForType("timeline").build({ bindBuild });
 
 /** A bar, line or pie chart from categories and named series of numbers. */
-export const buildChart: (input: unknown) => CodeModeWorkflowEffect<BuildChartResult> = boundary(
-	"buildChart",
-	buildChartWorkflow,
-	failureResult,
-);
+export const buildChart = familyForType("chart").build({ bindBuild });
 
 /** A Gantt chart from dated tasks, milestones, phases and finish-to-start dependencies. */
 export const buildGantt: (input: unknown) => CodeModeWorkflowEffect<BuildGanttResult> = boundary(

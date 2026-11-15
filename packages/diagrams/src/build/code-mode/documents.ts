@@ -57,17 +57,8 @@ export function canonicalDocumentFromDiagram(
 				},
 			};
 		}
-		case "chart": {
-			const { type: _type, ...spec } = diagram;
-			return {
-				type: "chart",
-				spec: {
-					...spec,
-					categories: [...spec.categories],
-					series: spec.series.map((series) => ({ ...series, values: [...series.values] })),
-				},
-			};
-		}
+		case "chart":
+			return familyForType("chart").toDocument(diagram);
 		case "timeline":
 			return familyForType("timeline").toDocument(diagram);
 		case "mindmap":
