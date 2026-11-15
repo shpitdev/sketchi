@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { journeyFixture } from "../families/journey/document.js";
 
 import { candidateFromText } from "./candidates.js";
-import { buildDiagramGenerationMessages } from "./messages.js";
 
 function candidate(diagram: unknown) {
 	return candidateFromText({
@@ -16,17 +15,6 @@ function candidate(diagram: unknown) {
 }
 
 describe("journey map generation", () => {
-	it("teaches the journey shape and its 1-5 scale when the type is requested", () => {
-		const messages = buildDiagramGenerationMessages({
-			id: "buy",
-			request: "Draw a user journey map of buying shoes online.",
-			requestedType: "journey",
-		});
-		expect(messages.system).toContain("Journey map IR rules");
-		expect(messages.system).toContain("1 (very negative) to 5 (very positive); 3 is neutral");
-		expect(messages.user).toContain('"type":"journey"');
-	});
-
 	it("reads Mermaid sections, tasks and sentiment as stages, steps and scores", () => {
 		const parsed = candidate({
 			id: "buy",

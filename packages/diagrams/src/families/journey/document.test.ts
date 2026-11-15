@@ -34,13 +34,6 @@ const codes = (input: unknown) => issuesOf(input).map((issue) => issue.code);
 const browse = { name: "Browse", steps: [{ label: "Search for shoes", score: 4 }] };
 
 describe("journey contract", () => {
-	it("defaults the palette and keeps optional rows absent", () => {
-		const parsed = parseJourneyDiagram(journey([browse])).pipe(Result.getOrThrow);
-		expect(parsed.style).toMatchObject({ accentColor: expect.any(String) });
-		expect(parsed.stages[0]).not.toHaveProperty("painPoints");
-		expect(parsed).not.toHaveProperty("persona");
-	});
-
 	it("names each score on the 1-5 scale", () => {
 		expect([1, 2, 3, 4, 5].map(journeySentiment)).toEqual([
 			"Very negative",

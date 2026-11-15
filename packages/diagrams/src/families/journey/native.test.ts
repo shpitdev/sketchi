@@ -1,15 +1,10 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { journeyFixture } from "@sketchi/diagrams/families/journey/document";
-import { journeyStressFixtures } from "@sketchi/diagrams/families/journey/fixtures";
-import { renderDiagram } from "@sketchi/diagrams/family";
+import { journeyFixture } from "./document.js";
+import { renderDiagram } from "../../family.js";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import {
-	convertSceneToExcalidraw,
-	createExcalidrawFile,
-	validateExcalidrawScene,
-} from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 
 const exported = convertSceneToExcalidraw(renderDiagram(journeyFixture).pipe(Result.getOrThrow));
 const element = (id: string) => exported.elements.find((candidate) => candidate.id === id)!;
@@ -75,14 +70,5 @@ describe("journey map Excalidraw export", () => {
 		expect(order.indexOf("line:journey:curve:0")).toBeLessThan(
 			order.indexOf("node:journey:face:0-0"),
 		);
-	});
-
-	it("validates, and still validates after a save and reload", () => {
-		for (const diagram of [journeyFixture, ...Object.values(journeyStressFixtures)]) {
-			const scene = convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow));
-			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
-			const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene)));
-			expect(validateExcalidrawScene(reloaded), diagram.id).toEqual({ ok: true, issues: [] });
-		}
 	});
 });

@@ -1,5 +1,15 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import {
+	Effect,
+	Schema,
+	Array as Arr,
+	Option,
+	Result,
+	String as Str,
+	MutableHashSet as Set,
+} from "effect";
+
+import { cleanToolString, slug } from "../../clean-text.js";
 
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
@@ -64,21 +74,65 @@ export interface JourneyStage extends Schema.Schema.Type<typeof JourneyStage> {}
  * renderer owns every coordinate. Every surface that accepts, generates,
  * renders or evaluates a journey map uses this shape.
  */
-export const JourneyDiagram = Schema.Struct({
-	id: Schema.NonEmptyString,
+export const JourneyDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
-	type: Schema.Literal(journeyDiagramType),
 	/** Whose journey it is, such as "Maya, a first-time buyer". */
 	persona: Schema.optionalKey(Schema.NonEmptyString),
 	/** The people and systems that act, in the order a legend lists them. */
 	actors: Schema.optionalKey(Schema.Array(Schema.NonEmptyString).pipe(Schema.mutable)),
 	stages: Schema.Array(JourneyStage).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
 	style: DiagramStyle.pipe(
-		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
+		Schema.withDecodingDefaultKey(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}).annotate({ identifier: "JourneyDiagram" });
+});
+export interface JourneyDocument extends Schema.Schema.Type<typeof JourneyDocument> {}
+
+export const JourneyDiagram = JourneyDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+	type: Schema.Literal(journeyDiagramType),
+})).annotate({ identifier: "JourneyDiagram" });
 
 export interface JourneyDiagram extends Schema.Schema.Type<typeof JourneyDiagram> {}
+
+/** Clean authored text without reordering stages, steps, actors or notes. */
+export function normalizeJourney(document: JourneyDocument): JourneyDiagram {
+	const title = cleanToolString(document.title);
+	const optional = (value: string | undefined) =>
+		value === undefined ? undefined : cleanToolString(value) || undefined;
+	const notes = (values: readonly string[] | undefined) =>
+		Arr.filter(Arr.map(values ?? [], cleanToolString), (value) => value.length > 0);
+	const actors = notes(document.actors);
+	const persona = optional(document.persona);
+	return {
+		id: optional(document.id) ?? (slug(title) || "sketchi-journey-map"),
+		title,
+		type: journeyDiagramType,
+		...(persona ? { persona } : {}),
+		...(actors.length > 0 ? { actors } : {}),
+		stages: Arr.map(document.stages, (stage) => {
+			const painPoints = notes(stage.painPoints),
+				opportunities = notes(stage.opportunities);
+			return {
+				name: cleanToolString(stage.name),
+				steps: Arr.map(stage.steps, (step) => {
+					const actor = optional(step.actor),
+						touchpoint = optional(step.touchpoint);
+					return {
+						label: cleanToolString(step.label),
+						score: step.score,
+						...(actor ? { actor } : {}),
+						...(touchpoint ? { touchpoint } : {}),
+					};
+				}),
+				...(painPoints.length > 0 ? { painPoints } : {}),
+				...(opportunities.length > 0 ? { opportunities } : {}),
+			};
+		}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
 
 export const JourneyValidationIssueCodeSchema = Schema.Literals([
 	"journey_too_large",
@@ -102,7 +156,7 @@ export const JourneyValidationIssue = Schema.Struct({
 
 export interface JourneyValidationIssue extends Schema.Schema.Type<typeof JourneyValidationIssue> {}
 
-const sameName = (name: string) => name.trim().toLocaleLowerCase();
+const sameName = (name: string) => Str.toLocaleLowerCase()(Str.trim(name));
 
 /** The actors a journey names: its declared list, or every step's actor in first-use order. */
 /**
@@ -110,7 +164,7 @@ const sameName = (name: string) => name.trim().toLocaleLowerCase();
  * "Customer, Agent". A declared actor whose own name holds a comma stays whole.
  */
 export function journeyStepActors(actor: string, declared: readonly string[] = []): string[] {
-	const parts = actor.split(",");
+	const parts = Str.split(actor, ",");
 	const actors: string[] = [];
 	// Each actor is the longest run of comma-separated parts that names a declared actor
 	// ("Smith, Jane"), or a single part when none does.
@@ -118,10 +172,15 @@ export function journeyStepActors(actor: string, declared: readonly string[] = [
 		let end = parts.length;
 		while (
 			end > start + 1 &&
-			!declared.some((known) => sameName(known) === sameName(parts.slice(start, end).join(",")))
+			!Arr.some(
+				declared,
+				(known) =>
+					sameName(known) ===
+					sameName(Arr.join(Arr.take(Arr.drop(parts, start), end - start), ",")),
+			)
 		)
 			end -= 1;
-		const name = parts.slice(start, end).join(",").trim();
+		const name = Str.trim(Arr.join(Arr.take(Arr.drop(parts, start), end - start), ","));
 		if (name.length > 0) actors.push(name);
 		start = end;
 	}
@@ -130,12 +189,12 @@ export function journeyStepActors(actor: string, declared: readonly string[] = [
 
 /** The actors a journey names: its declared list, or every step's actors in first-use order. */
 export function journeyActors(diagram: Pick<JourneyDiagram, "actors" | "stages">): string[] {
-	if (diagram.actors !== undefined) return diagram.actors.map((actor) => actor.trim());
+	if (diagram.actors !== undefined) return Arr.map(diagram.actors, (actor) => Str.trim(actor));
 	const actors: string[] = [];
 	for (const stage of diagram.stages)
 		for (const step of stage.steps)
 			for (const actor of journeyStepActors(step.actor ?? ""))
-				if (!actors.some((known) => sameName(known) === sameName(actor))) actors.push(actor);
+				if (!Arr.some(actors, (known) => sameName(known) === sameName(actor))) actors.push(actor);
 	return actors;
 }
 
@@ -147,7 +206,7 @@ export function getJourneyValidationIssues(diagram: JourneyDiagram): JourneyVali
 	const push = (code: JourneyValidationIssueCode, path: string, message: string, hint: string) =>
 		issues.push({ code, path, message, hint });
 	const long = (path: string, what: string, value: string | undefined, limit: number) => {
-		if (value !== undefined && value.trim().length > limit)
+		if (value !== undefined && Str.trim(value).length > limit)
 			push(
 				"journey_text_too_long",
 				path,
@@ -163,7 +222,7 @@ export function getJourneyValidationIssues(diagram: JourneyDiagram): JourneyVali
 			`A journey map holds at most ${JOURNEY_MAX_STAGES} stages; this one has ${stages.length}.`,
 			"Merge neighboring stages, or split the journey into maps of their own.",
 		);
-	const steps = stages.reduce((total, stage) => total + stage.steps.length, 0);
+	const steps = Arr.reduce(stages, 0, (total, stage) => total + stage.steps.length);
 	if (steps > JOURNEY_MAX_STEPS)
 		push(
 			"journey_too_large",
@@ -181,38 +240,44 @@ export function getJourneyValidationIssues(diagram: JourneyDiagram): JourneyVali
 				`A journey map names at most ${JOURNEY_MAX_ACTORS} actors; this one has ${actors.length}.`,
 				"Keep the actors the source names.",
 			);
-		const seen = new Set<string>();
-		actors.forEach((actor, index) => {
-			if (seen.has(sameName(actor)))
+		const seen = Set.empty<string>();
+		Arr.forEach(actors, (actor, index) => {
+			if (Set.has(seen, sameName(actor)))
 				push(
 					"duplicate_journey_actor",
 					`actors.[${index}]`,
-					`Actor "${actor.trim()}" is listed more than once.`,
+					`Actor "${Str.trim(actor)}" is listed more than once.`,
 					"List each actor once.",
 				);
-			seen.add(sameName(actor));
-			long(`actors.[${index}]`, `Actor "${actor.trim()}"`, actor, JOURNEY_MAX_NAME_LENGTH);
+			Set.add(seen, sameName(actor));
+			long(`actors.[${index}]`, `Actor "${Str.trim(actor)}"`, actor, JOURNEY_MAX_NAME_LENGTH);
 		});
 	}
-	const known = new Set((actors ?? []).map(sameName));
-	const names = new Set<string>();
-	stages.forEach((stage, stageIndex) => {
+	const known = Set.fromIterable(Arr.map(actors ?? [], sameName));
+	const names = Set.empty<string>();
+	Arr.forEach(stages, (stage, stageIndex) => {
 		const path = `stages.[${stageIndex}]`;
-		const name = stage.name.trim();
-		if (names.has(sameName(name)))
+		const name = Str.trim(stage.name);
+		if (Set.has(names, sameName(name)))
 			push(
 				"duplicate_journey_stage",
 				`${path}.name`,
 				`Stage "${name}" appears more than once.`,
 				"Give each stage one entry and put all its steps there, in order.",
 			);
-		names.add(sameName(name));
+		Set.add(names, sameName(name));
 		long(`${path}.name`, `Stage "${name}"`, stage.name, JOURNEY_MAX_STAGE_LENGTH);
 		const notes = (stage.painPoints?.length ?? 0) + (stage.opportunities?.length ?? 0);
-		const placed = stages
-			.filter((other) => other.steps.length > 0 && other.name !== JOURNEY_UNPLACED_STAGE)
-			.map((other) => `"${other.name.trim()}"`)
-			.join(", ");
+		const placed = Arr.join(
+			Arr.map(
+				Arr.filter(
+					stages,
+					(other) => other.steps.length > 0 && other.name !== JOURNEY_UNPLACED_STAGE,
+				),
+				(other) => `"${Str.trim(other.name)}"`,
+			),
+			", ",
+		);
 		if (name === JOURNEY_UNPLACED_STAGE)
 			// Steps or notes written apart from the stages that name none.
 			push(
@@ -243,9 +308,9 @@ export function getJourneyValidationIssues(diagram: JourneyDiagram): JourneyVali
 				`Stage "${name}" has ${stage.steps.length} steps; a stage holds at most ${JOURNEY_MAX_STAGE_STEPS}.`,
 				"Split the stage in two, or keep the steps the source states.",
 			);
-		stage.steps.forEach((step, stepIndex) => {
+		Arr.forEach(stage.steps, (step, stepIndex) => {
 			const stepPath = `${path}.steps.[${stepIndex}]`;
-			const label = step.label.trim();
+			const label = Str.trim(step.label);
 			if (
 				!Number.isInteger(step.score) ||
 				step.score < JOURNEY_MIN_SCORE ||
@@ -259,7 +324,7 @@ export function getJourneyValidationIssues(diagram: JourneyDiagram): JourneyVali
 				);
 			long(
 				`${stepPath}.label`,
-				`Step "${label.slice(0, 24)}…"`,
+				`Step "${Str.slice(0, 24)(label)}…"`,
 				step.label,
 				JOURNEY_MAX_LABEL_LENGTH,
 			);
@@ -273,13 +338,16 @@ export function getJourneyValidationIssues(diagram: JourneyDiagram): JourneyVali
 				step.touchpoint,
 				JOURNEY_MAX_NAME_LENGTH,
 			);
-			const unknown = stepActors.filter((actor) => !known.has(sameName(actor)));
+			const unknown = Arr.filter(stepActors, (actor) => !Set.has(known, sameName(actor)));
 			if (actors !== undefined && unknown.length > 0)
 				push(
 					"unknown_journey_actor",
 					`${stepPath}.actor`,
 					`Actor "${unknown[0]}" of step "${label}" is not one of the journey's actors.`,
-					`Use one of ${actors.map((actor) => `"${actor.trim()}"`).join(", ")}, or add the actor to actors; a step several actors share names them all, "A, B".`,
+					`Use one of ${Arr.join(
+						Arr.map(actors, (actor) => `"${Str.trim(actor)}"`),
+						", ",
+					)}, or add the actor to actors; a step several actors share names them all, "A, B".`,
 				);
 		});
 		for (const kind of ["painPoints", "opportunities"] as const) {
@@ -292,17 +360,17 @@ export function getJourneyValidationIssues(diagram: JourneyDiagram): JourneyVali
 					`Stage "${name}" has ${notes.length} ${noun}; a stage holds at most ${JOURNEY_MAX_NOTES}.`,
 					`Keep the ${noun} the source states, merging the closest ones.`,
 				);
-			notes.forEach((note, index) =>
+			Arr.forEach(notes, (note, index) =>
 				long(
 					`${path}.${kind}.[${index}]`,
-					`A ${noun.replace(/s$/u, "")} of "${name}"`,
+					`A ${Str.replace(/s$/u, "")(noun)} of "${name}"`,
 					note,
 					JOURNEY_MAX_NOTE_LENGTH,
 				),
 			);
 		}
 	});
-	return issues.slice(0, JOURNEY_MAX_ISSUES);
+	return Arr.take(issues, JOURNEY_MAX_ISSUES);
 }
 
 export class JourneyValidationError extends Schema.TaggedError<
@@ -342,7 +410,7 @@ export function parseJourneyDiagram(
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
+	typeof value === "object" && value !== null && !Arr.isArray(value);
 
 /** The first of `keys` a record sets, removed from `rest`. */
 function take(rest: Record<string, unknown>, keys: readonly string[]): unknown {
@@ -373,15 +441,15 @@ function nameOf(value: unknown): unknown {
 /** A score written as a numeric string reads as its number. */
 function scoreOf(value: unknown): unknown {
 	if (typeof value !== "string") return value;
-	const number = Number(value.trim());
-	return value.trim() !== "" && Number.isFinite(number) ? number : value;
+	const number = Number(Str.trim(value));
+	return Str.trim(value) !== "" && Number.isFinite(number) ? number : value;
 }
 
 /** Notes written as one string, a list of strings, or `{ text }` entries. */
 function notesOf(value: unknown): unknown {
 	const list = typeof value === "string" ? [value] : value;
-	if (!Array.isArray(list)) return list;
-	return list.map((note) => {
+	if (!Arr.isArray(list)) return list;
+	return Arr.map(list, (note) => {
 		if (!isRecord(note)) return note;
 		for (const key of NOTE_TEXT_KEYS) if (typeof note[key] === "string") return note[key];
 		return note;
@@ -390,18 +458,18 @@ function notesOf(value: unknown): unknown {
 
 /** Mermaid's `Task: 5: Actor` written as one string. */
 function stepFromText(text: string): unknown {
-	const match = /^(.+?):\s*(-?\d+(?:\.\d+)?)\s*(?::\s*(.+))?$/u.exec(text.trim());
+	const match = /^(.+?):\s*(-?\d+(?:\.\d+)?)\s*(?::\s*(.+))?$/u.exec(Str.trim(text));
 	if (!match) return text;
 	const actors =
-		match[3]
-			?.split(",")
-			.map((actor) => actor.trim())
-			.filter(Boolean) ?? [];
+		Arr.filter(
+			Arr.map(Str.split(match[3] ?? "", ","), (actor) => Str.trim(actor)),
+			Boolean,
+		) ?? [];
 	return {
-		label: match[1]!.trim(),
+		label: Str.trim(match[1]!),
 		score: Number(match[2]),
 		// Actors who share a step stay together, "Customer, Agent".
-		...(actors.length > 0 ? { actor: actors.join(", ") } : {}),
+		...(actors.length > 0 ? { actor: Arr.join(actors, ", ") } : {}),
 	};
 }
 
@@ -415,10 +483,15 @@ function resolveStep(step: unknown): unknown {
 	const touchpoint = take(rest, TOUCHPOINT_KEYS);
 	const listed = rest["actors"];
 	// A list of actors is the step's actor, or the several who share it: "Customer, Agent".
-	if (Array.isArray(listed)) {
-		const names = listed.map(nameOf);
+	if (Arr.isArray(listed)) {
+		const names = Arr.map(listed, nameOf);
 		if (rest["actor"] === undefined && names.length > 0)
-			rest["actor"] = names.every((name) => typeof name === "string") ? names.join(", ") : names;
+			rest["actor"] = Arr.every(names, (name) => typeof name === "string")
+				? Arr.join(names, ", ")
+				: names;
+		delete rest["actors"];
+	} else if (listed !== undefined && rest["actor"] === undefined) {
+		rest["actor"] = listed;
 		delete rest["actors"];
 	}
 	if (isRecord(rest["actor"])) rest["actor"] = nameOf(rest["actor"]);
@@ -442,7 +515,7 @@ function resolveStage(stage: unknown): unknown {
 		...(name === undefined ? {} : { name }),
 		...(steps === undefined
 			? {}
-			: { steps: Array.isArray(steps) ? steps.map(resolveStep) : steps }),
+			: { steps: Arr.isArray(steps) ? Arr.map(steps, resolveStep) : steps }),
 		...(pains === undefined ? {} : { painPoints: notesOf(pains) }),
 		...(opportunities === undefined ? {} : { opportunities: notesOf(opportunities) }),
 	};
@@ -464,29 +537,31 @@ export function resolveJourneyShorthand(input: unknown): unknown {
 	const flatSteps = take(rest, STEP_LIST_KEYS);
 	const flatPains = take(rest, PAIN_KEYS);
 	const flatOpportunities = take(rest, OPPORTUNITY_KEYS);
-	let stages: unknown = Array.isArray(listed) ? listed.map(resolveStage) : listed;
+	let stages: unknown = Arr.isArray(listed) ? Arr.map(listed, resolveStage) : listed;
 	// Steps written flat group under the stages they name, in first-use order. One naming
 	// no stage lands in a stage of its own, which validation rejects naming the stages it
 	// may use; a step is never dropped.
 	const flat =
-		flatSteps === undefined || flatSteps === null
-			? undefined
-			: Array.isArray(flatSteps)
-				? flatSteps
-				: [flatSteps];
-	if (flat && (stages === undefined || Array.isArray(stages))) {
-		const groups =
-			(stages as Record<string, unknown>[] | undefined)?.map((stage) => ({ ...stage })) ?? [];
+		flatSteps === undefined ? undefined : Arr.isArray(flatSteps) ? flatSteps : [flatSteps];
+	if (flat && (stages === undefined || Arr.isArray(stages))) {
+		const groups: unknown[] =
+			stages === undefined
+				? []
+				: Arr.map(stages, (stage) => (isRecord(stage) ? { ...stage } : stage));
 		for (const step of flat) {
 			const named = isRecord(step) ? nameOf(step["stage"]) : undefined;
 			const stageName =
-				typeof named === "string" && named.trim().length > 0 ? named : JOURNEY_UNPLACED_STAGE;
-			let group = groups.find((entry) => isRecord(entry) && entry["name"] === stageName);
+				typeof named === "string" && Str.trim(named).length > 0 ? named : JOURNEY_UNPLACED_STAGE;
+			let group = Option.getOrUndefined(
+				Arr.findFirst(Arr.filter(groups, isRecord), (entry) => entry["name"] === stageName),
+			);
 			if (!group) {
 				group = { name: stageName, steps: [] };
 				groups.push(group);
 			}
-			group["steps"] = [...((group["steps"] as unknown[] | undefined) ?? []), resolveStep(step)];
+			const steps = group["steps"];
+			if (steps !== undefined && !Arr.isArray(steps)) continue;
+			group["steps"] = [...(steps ?? []), resolveStep(step)];
 		}
 		stages = groups;
 	}
@@ -497,22 +572,22 @@ export function resolveJourneyShorthand(input: unknown): unknown {
 		["painPoints", flatPains],
 		["opportunities", flatOpportunities],
 	] as const) {
-		if (entries === undefined || entries === null || !Array.isArray(stages)) continue;
-		for (const note of Array.isArray(entries) ? entries : [entries]) {
+		if (entries === undefined || !Arr.isArray(stages)) continue;
+		for (const note of Arr.isArray(entries) ? entries : [entries]) {
 			const named = isRecord(note) ? nameOf(note["stage"]) : undefined;
 			const stageName =
-				typeof named === "string" && named.trim().length > 0 ? named : JOURNEY_UNPLACED_STAGE;
-			let stage = (stages as unknown[]).find(
-				(entry) => isRecord(entry) && entry["name"] === stageName,
-			) as Record<string, unknown> | undefined;
+				typeof named === "string" && Str.trim(named).length > 0 ? named : JOURNEY_UNPLACED_STAGE;
+			let stage = Option.getOrUndefined(
+				Arr.findFirst(Arr.filter(stages, isRecord), (entry) => entry["name"] === stageName),
+			);
 			if (!stage) {
 				stage = { name: stageName, steps: [] };
-				(stages as unknown[]).push(stage);
+				stages.push(stage);
 			}
-			const text = isRecord(note)
-				? (({ stage: _stage, ...rest }) => notesOf([rest]) as unknown[])(note)
-				: [note];
-			stage[kind] = [...((stage[kind] as unknown[] | undefined) ?? []), ...text];
+			const text = isRecord(note) ? notesOf([note]) : [note];
+			const current = stage[kind];
+			if (current !== undefined && !Arr.isArray(current)) continue;
+			stage[kind] = [...(current ?? []), ...(Arr.isArray(text) ? text : [text])];
 		}
 	}
 	const persona = rest["persona"];
@@ -522,7 +597,7 @@ export function resolveJourneyShorthand(input: unknown): unknown {
 		rest["persona"] =
 			typeof name === "string" && typeof about === "string" ? `${name}, ${about}` : (name ?? about);
 	}
-	if (Array.isArray(rest["actors"])) rest["actors"] = rest["actors"].map(nameOf);
+	if (Arr.isArray(rest["actors"])) rest["actors"] = Arr.map(rest["actors"], nameOf);
 	return { ...rest, ...(stages === undefined ? {} : { stages }) };
 }
 
@@ -565,7 +640,7 @@ export const journeyFixture = parseJourneyDiagram({
 /** Counts and domain nouns shown by generation consumers. */
 export function counts(diagram: JourneyDiagram) {
 	return {
-		nodeCount: diagram.stages.reduce((total, stage) => total + stage.steps.length, 0),
+		nodeCount: Arr.reduce(diagram.stages, 0, (total, stage) => total + stage.steps.length),
 		nodeNoun: "steps",
 		edgeCount: diagram.stages.length,
 		edgeNoun: "stages",

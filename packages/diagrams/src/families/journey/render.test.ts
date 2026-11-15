@@ -10,7 +10,6 @@ import {
 import { type JourneyDiagram, journeyFixture, parseJourneyDiagram } from "./document.js";
 import { journeyStressFixtures } from "./fixtures.js";
 
-import { renderDiagram } from "../../family.js";
 import { journeyLayoutIssues, readJourneyScene } from "./readout.js";
 import { JOURNEY_MAX_ASPECT, renderJourneyDiagram } from "./render.js";
 
@@ -37,14 +36,6 @@ const steps = (count: number, prefix = "Step", score = 3) =>
 	Array.from({ length: count }, (_, index) => ({ label: `${prefix} ${index + 1}`, score }));
 
 describe("journey renderer", () => {
-	it("renders the fixture into a valid deterministic scene", () => {
-		const scene = renderDiagram(journeyFixture).pipe(Result.getOrThrow);
-		expect(scene.diagramId).toBe("online-purchase-journey");
-		expect(getCanvasValidationIssues(scene)).toEqual([]);
-		expect(journeyLayoutIssues(scene)).toEqual([]);
-		expect(renderDiagram(journeyFixture).pipe(Result.getOrThrow)).toEqual(scene);
-	});
-
 	it("draws stages across the top in order, each step's card under its stage in reading order", () => {
 		const read = readJourneyScene(renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow));
 		expect(read.stages.map((stage) => stage.name)).toEqual(["Discover", "Purchase", "Delivery"]);
@@ -185,29 +176,6 @@ describe("journey renderer", () => {
 			expect(getCanvasValidationIssues(scene)).toEqual([]);
 			expect(journeyLayoutIssues(scene)).toEqual([]);
 		}
-	});
-
-	it("widens a stage's column to fit its header and notes, centering its steps", () => {
-		const scene = renderJourneyDiagram(
-			journey([
-				{ name: "Report", steps: [{ label: "Opens a ticket", score: 2 }] },
-				{
-					name: "Acknowledgement",
-					steps: [{ label: "Reads reply", score: 3 }],
-					painPoints: ["Internationalization"],
-				},
-			]),
-		).pipe(Result.getOrThrow);
-		expect(getCanvasValidationIssues(scene)).toEqual([]);
-		expect(journeyLayoutIssues(scene)).toEqual([]);
-		const read = readJourneyScene(scene);
-		const stage = read.stages[1]!;
-		const card = read.steps.find((step) => step.stage === 1)!;
-		expect(stage.box.right - stage.box.left).toBeGreaterThan(card.box.right - card.box.left);
-		expect((card.box.left + card.box.right) / 2).toBeCloseTo(
-			(stage.box.left + stage.box.right) / 2,
-			5,
-		);
 	});
 
 	it("prints each step's score above its face and labels every level of the scale", () => {

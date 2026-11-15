@@ -711,41 +711,6 @@ export const OrgChartSpec = Schema.Struct({
 export interface OrgChartSpec extends Schema.Schema.Type<typeof OrgChartSpec> {}
 
 /**
- * The authoring form of diagram-core's canonical JourneyDiagram: style is
- * defaulted. buildJourneyMap normalizes it into the core contract, which owns
- * every invariant.
- */
-export const JourneyStepSpec = Schema.Struct({
-	label: RequiredNonEmptyString,
-	/** A whole number from 1 (very negative) to 5 (very positive); 3 is neutral. */
-	score: FiniteNumber,
-	actor: optionalContract(NonEmptyString),
-	touchpoint: optionalContract(NonEmptyString),
-}).annotate({ identifier: undefined });
-
-export interface JourneyStepSpec extends Schema.Schema.Type<typeof JourneyStepSpec> {}
-
-export const JourneyStageSpec = Schema.Struct({
-	name: RequiredNonEmptyString,
-	steps: requiredArray(Schema.Array(JourneyStepSpec).pipe(Schema.mutable)),
-	painPoints: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	opportunities: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-}).annotate({ identifier: undefined });
-
-export interface JourneyStageSpec extends Schema.Schema.Type<typeof JourneyStageSpec> {}
-
-export const JourneySpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	persona: optionalContract(NonEmptyString),
-	actors: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	stages: requiredArray(nonEmptyArray(JourneyStageSpec)),
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface JourneySpec extends Schema.Schema.Type<typeof JourneySpec> {}
-
-/**
  * The authoring form of diagram-core's canonical SankeyDiagram: the id is
  * optional and style is defaulted. buildSankey normalizes it into the core
  * contract, which owns every invariant.
@@ -1036,22 +1001,6 @@ export const BuildOrgChartToolInputSchema = Schema.Struct({
 	spec: requiredObject(OrgChartToolSpecSchema),
 });
 export type BuildOrgChartToolInput = typeof BuildOrgChartToolInputSchema.Type;
-export const BuildJourneyMapRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(JourneySpec),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildJourneyMapRequest extends Schema.Schema.Type<typeof BuildJourneyMapRequest> {}
-/** The journey map spec a model authors; style is always the Sketchi palette. */
-export const JourneyToolSpecSchema = JourneySpec.mapFields(
-	({ style: _style, ...fields }) => fields,
-);
-export const BuildJourneyMapToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(JourneyToolSpecSchema),
-});
-export type BuildJourneyMapToolInput = typeof BuildJourneyMapToolInputSchema.Type;
 export const BuildSankeyRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(SankeySpec),
@@ -1690,15 +1639,6 @@ const NormalizedOrgChartSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedOrgChartSpec = typeof NormalizedOrgChartSpecSchema.Type;
-const NormalizedJourneySpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	persona: optionalContract(NonEmptyString),
-	actors: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	stages: Schema.Array(JourneyStageSpec).pipe(Schema.mutable),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
-export type NormalizedJourneySpec = typeof NormalizedJourneySpecSchema.Type;
 const NormalizedSankeySpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -1978,48 +1918,6 @@ export const BuildOrgChartResultSchema = Schema.Union([
 	BuildOrgChartRejected,
 ]);
 export type BuildOrgChartResult = typeof BuildOrgChartResultSchema.Type;
-
-export const BuildJourneyMapAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedJourneySpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildJourneyMapAccepted extends Schema.Schema.Type<
-	typeof BuildJourneyMapAccepted
-> {}
-export const BuildJourneyMapRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_journey",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedJourneySpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildJourneyMapRejected extends Schema.Schema.Type<
-	typeof BuildJourneyMapRejected
-> {}
-export const BuildJourneyMapResultSchema = Schema.Union([
-	BuildJourneyMapAccepted,
-	BuildJourneyMapRejected,
-]);
-export type BuildJourneyMapResult = typeof BuildJourneyMapResultSchema.Type;
 
 export const BuildSankeyAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

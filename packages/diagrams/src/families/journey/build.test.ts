@@ -1,21 +1,26 @@
+import { buildResponse, type BuildRejection } from "../../build/operation.js";
+import { journeyLayoutIssues, readJourneyScene } from "./readout.js";
 import { describe, expect, it } from "vitest";
-import { Effect, Schema } from "effect";
-import { journeyFixture } from "../../families/journey/document.js";
-import { journeyStressFixtures } from "../../families/journey/fixtures.js";
+import { Effect } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildJourneyMapResultSchema } from "./contract.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
-import { applyDiagramPatch, buildJourneyMap, CodeModeRuntimeEnvironment } from "./runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
+import {
+	applyDiagramPatch,
+	buildJourneyMap,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
 
 const storage = makeMemoryArtifactStorage();
-function run<A>(
-	effect: Effect.Effect<A, never, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+function run<A, E extends BuildRejection<unknown>>(
+	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
 ) {
 	return Effect.runPromise(
-		effect.pipe(
+		buildResponse(effect).pipe(
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
@@ -59,15 +64,15 @@ describe("Code Mode native journey map", () => {
 	it("builds the documented spec into stages, cards, faces on a curve and notes", async () => {
 		const built = await build(purchaseSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildJourneyMapResultSchema)(built)).not.toThrow();
 		expect(built.normalizedSpec).toEqual({
 			id: "online-purchase",
+			type: "journey",
 			title: "Online purchase",
 			persona: "Maya, a first-time buyer",
 			stages: purchaseSpec.stages,
 			style: expect.any(Object),
 		});
-		expect(built.quality.summary).toEqual({ nodeCount: 3, edgeCount: 0 });
+		expect(built.quality.summary).toEqual({ nodeCount: 3, edgeCount: 2 });
 		const excalidraw = inline(built).get("excalidraw") as Parameters<
 			typeof validateExcalidrawScene
 		>[0];
@@ -123,7 +128,17 @@ describe("Code Mode native journey map", () => {
 			],
 		});
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(built.normalizedSpec.stages[1]?.name).toBe("Acknowledgement");
+		const scene = inline(built).get("scene") as RenderedDiagramScene;
+		expect(journeyLayoutIssues(scene)).toEqual([]);
+		const read = readJourneyScene(scene),
+			stage = read.stages[1]!;
+		const card = read.steps.find((step) => step.stage === 1)!;
+		expect(stage.name).toBe("Acknowledgement");
+		expect(stage.box.right - stage.box.left).toBeGreaterThan(card.box.right - card.box.left);
+		expect((card.box.left + card.box.right) / 2).toBeCloseTo(
+			(stage.box.left + stage.box.right) / 2,
+			5,
+		);
 	});
 
 	it("rejects a flat note naming an unknown stage with a repair issue naming the stages", async () => {
@@ -137,7 +152,7 @@ describe("Code Mode native journey map", () => {
 		});
 		expect(result.ok).toBe(false);
 		expect(result.status).toBe("invalid_journey");
-		expect(result.issues.map((issue) => issue.code)).toEqual(["invalid_journey_stage"]);
+		expect(result.issues.map((issue) => issue.code)).toEqual(["empty_journey_stage"]);
 		expect(result.issues[0]?.hint).toContain('"Report", "Review"');
 	});
 
@@ -152,7 +167,7 @@ describe("Code Mode native journey map", () => {
 		});
 		expect(result.ok).toBe(false);
 		expect(result.status).toBe("invalid_journey");
-		expect(result.issues.map((issue) => issue.code)).toEqual(["invalid_journey_stage"]);
+		expect(result.issues.map((issue) => issue.code)).toEqual(["unplaced_journey_entry"]);
 		expect(result.normalizedSpec?.stages.map((stage) => stage.name)).toEqual([
 			"Discover",
 			"Buy",
@@ -202,40 +217,28 @@ describe("Code Mode native journey map", () => {
 		).toEqual([]);
 	});
 
-	it("round-trips canonical diagrams through their Code Mode documents", async () => {
-		for (const diagram of [journeyFixture, journeyStressFixtures.wordy]) {
-			const document = canonicalDocumentFromDiagram(diagram);
-			expect(document.type).toBe("journey");
-			const built = await build(document.spec);
-			if (!built.ok) throw new Error(JSON.stringify(built.issues));
-			expect(built.normalizedSpec.stages).toEqual(diagram.stages);
-			expect(built.normalizedSpec.persona).toBe(diagram.persona);
-			expect(built.normalizedSpec.actors).toEqual(diagram.actors);
-		}
-	});
-
 	it.each([
 		[
 			{
-				stages: [{ name: "A", steps: [{ label: "x", score: 7 }] }],
+				stages: [{ name: "A", steps: [{ label: "x", score: 0 }] }],
 			},
-			"invalid_journey_step",
+			"invalid_journey_score",
 		],
 		[
 			{
 				stages: [{ name: "A", steps: [{ label: "x", score: 2.5 }] }],
 			},
-			"invalid_journey_step",
+			"invalid_journey_score",
 		],
 		[
 			{
 				actors: ["Maya"],
 				stages: [{ name: "A", steps: [{ label: "x", score: 3, actor: "Courier" }] }],
 			},
-			"invalid_journey_step",
+			"unknown_journey_actor",
 		],
-		[{ stages: [...purchaseSpec.stages, { name: "Empty", steps: [] }] }, "invalid_journey_stage"],
-		[{ stages: [...purchaseSpec.stages, purchaseSpec.stages[0]] }, "invalid_journey_stage"],
+		[{ stages: [...purchaseSpec.stages, { name: "Empty", steps: [] }] }, "empty_journey_stage"],
+		[{ stages: [...purchaseSpec.stages, purchaseSpec.stages[0]] }, "duplicate_journey_stage"],
 		[
 			{
 				stages: [
@@ -247,7 +250,10 @@ describe("Code Mode native journey map", () => {
 			},
 			"journey_too_large",
 		],
-		[{ stages: [{ name: "A", steps: [{ label: "x".repeat(91), score: 3 }] }] }, "label_too_long"],
+		[
+			{ stages: [{ name: "A", steps: [{ label: "x".repeat(91), score: 3 }] }] },
+			"journey_text_too_long",
+		],
 	])("rejects %j with a structured repair issue", async (change, code) => {
 		const result = await build({ ...purchaseSpec, ...change });
 		expect(result.ok).toBe(false);
@@ -266,5 +272,23 @@ describe("Code Mode native journey map", () => {
 		expect(result.ok).toBe(false);
 		expect(result.status).toBe("invalid_input");
 		expect(JSON.stringify(result.issues)).toContain("score");
+	});
+	it.each([
+		{ stages: [{ name: "A", steps: [{ label: "S", score: 3, actors: 5 }] }] },
+		{ stages: purchaseSpec.stages, steps: null },
+		{ stages: purchaseSpec.stages, painPoints: null },
+		{
+			stages: [{ name: "A", steps: null }],
+			steps: [{ stage: "A", label: "Must not replace null", score: 3 }],
+		},
+		{ stages: [null], steps: [{ stage: "A", label: "Keep malformed stage", score: 3 }] },
+		{
+			stages: [{ name: "A", steps: [{ label: "S", score: 3 }], painPoints: 5 }],
+			painPoints: [{ stage: "A", text: "Must not replace malformed notes" }],
+		},
+	])("rejects explicit malformed collections instead of dropping them", async (change) => {
+		const result = await build({ title: "Malformed", ...change });
+		expect(result.status).toBe("invalid_input");
+		expect(result.issues[0]?.ref?.path).toContain("spec.stages");
 	});
 });

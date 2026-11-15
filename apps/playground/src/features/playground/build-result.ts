@@ -14,8 +14,6 @@ import {
 	BuildClassDiagramToolInputSchema,
 	BuildOrgChartResultSchema,
 	BuildOrgChartToolInputSchema,
-	BuildJourneyMapResultSchema,
-	BuildJourneyMapToolInputSchema,
 	BuildSankeyResultSchema,
 	BuildSankeyToolInputSchema,
 	BuildWireframeResultSchema,
@@ -27,7 +25,6 @@ import {
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
-	type BuildJourneyMapResult,
 	type BuildSankeyResult,
 	type BuildWireframeResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
@@ -52,7 +49,7 @@ export type StudioBuildResult =
 	| BuildClassDiagramResult
 	| BuildOrgChartResult
 	| ReturnType<typeof familyForType<"venn">>["contracts"]["output"]["Type"]
-	| BuildJourneyMapResult
+	| ReturnType<typeof familyForType<"journey">>["contracts"]["output"]["Type"]
 	| BuildSankeyResult
 	| BuildWireframeResult
 	| ReturnType<typeof familyForType<"quadrant">>["contracts"]["output"]["Type"];
@@ -192,9 +189,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_journey_map": {
 		family: "journey",
-		decodeResult: Schema.decodeUnknownResult(BuildJourneyMapResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("journey").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildJourneyMapToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("journey").studioInput)(input);
 			return Result.isSuccess(decoded)
 				? decoded.success.spec.stages.flatMap((stage) => stage.steps.map((step) => step.label))
 				: [];

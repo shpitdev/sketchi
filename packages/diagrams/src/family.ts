@@ -21,7 +21,7 @@ import * as ganttFamily from "./families/gantt/document.js";
 import { renderGanttDiagram } from "./families/gantt/render.js";
 import { docs as journeyFamilyDocs } from "./families/journey/docs.js";
 import * as journeyFamily from "./families/journey/document.js";
-import { renderJourneyDiagram } from "./families/journey/render.js";
+import { journeyBuild } from "./families/journey/build.js";
 import { mindmapBuild } from "./families/mindmap/build.js";
 import { docs as mindmapFamilyDocs } from "./families/mindmap/docs.js";
 import { mindmapFixture } from "./families/mindmap/fixtures.js";
@@ -394,32 +394,12 @@ export const families = [
 		fixture: vennFamily.vennFixture,
 		docs: vennFamilyDocs,
 	}),
-	legacyFamily({
-		type: journeyFamily.journeyFixture.type,
+	family({
 		operation: "buildJourneyMap",
 		label: "Journey map",
 		path: "/api/v1/journey-maps/build",
-		canonical: canonical(
-			journeyFamily.JourneyDiagram,
-			journeyFamily.journeyFixture.type,
-			journeyFamily.validateJourneyDiagram,
-			renderJourneyDiagram,
-			journeyFamily.counts,
-		),
-		validationError: journeyFamily.JourneyValidationError,
+		build: journeyBuild,
 		fixture: journeyFamily.journeyFixture,
-		spec: Build.JourneySpec,
-		request: Build.BuildJourneyMapRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildJourneyMapRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.JourneyToolSpecSchema,
-			}),
-			output: Build.BuildJourneyMapResultSchema,
-		},
-		studioInput: Build.BuildJourneyMapToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildJourneyMap,
 		docs: journeyFamilyDocs,
 	}),
 	legacyFamily({

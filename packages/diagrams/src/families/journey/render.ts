@@ -6,7 +6,6 @@ import {
 	JOURNEY_NEUTRAL_SCORE,
 	type JourneyDiagram,
 	journeySentiment,
-	validateJourneyDiagram,
 } from "./document.js";
 import {
 	CANVAS_SPEC_VERSION,
@@ -851,377 +850,369 @@ function freeText(
  * cards, then wraps into bands of whole stages, one under another.
  */
 export function renderJourneyDiagram(
-	input: JourneyDiagram,
+	diagram: JourneyDiagram,
 ): Result.Result<RenderedDiagramScene, JourneyValidationError> {
-	return Result.map(validateJourneyDiagram(input), (diagram) => {
-		measured.clear();
-		wordUnits.clear();
-		const plan = chooseJourneyPlan(diagram);
-		measured.clear();
-		wordUnits.clear();
-		const background = diagram.style.backgroundColor;
-		const back: SceneElement[] = [];
-		const shapes: SceneElement[] = [];
-		const marks: SceneElement[] = [];
-		const texts: TextSceneElement[] = [];
+	measured.clear();
+	wordUnits.clear();
+	const plan = chooseJourneyPlan(diagram);
+	measured.clear();
+	wordUnits.clear();
+	const background = diagram.style.backgroundColor;
+	const back: SceneElement[] = [];
+	const shapes: SceneElement[] = [];
+	const marks: SceneElement[] = [];
+	const texts: TextSceneElement[] = [];
 
-		let y = PADDING;
+	let y = PADDING;
+	texts.push(
+		freeText(
+			"text:journey:title",
+			plan.title,
+			PADDING + plan.title.width / 2,
+			y + plan.title.height / 2,
+			TITLE_FONT,
+			INK,
+			{ textAlign: "left" },
+		),
+	);
+	y += plan.title.height;
+	plan.subtitles.forEach((line, index) => {
+		y += 4;
 		texts.push(
 			freeText(
-				"text:journey:title",
-				plan.title,
-				PADDING + plan.title.width / 2,
-				y + plan.title.height / 2,
-				TITLE_FONT,
-				INK,
+				`text:journey:subtitle:${index}`,
+				line,
+				PADDING + line.width / 2,
+				y + line.height / 2,
+				SUBTITLE_FONT,
+				MUTED_INK,
 				{ textAlign: "left" },
 			),
 		);
-		y += plan.title.height;
-		plan.subtitles.forEach((line, index) => {
-			y += 4;
+		y += line.height;
+	});
+
+	const scores = diagram.stages.flatMap((stage) => stage.steps.map((step) => step.score));
+	/** Where each printed score sits: the level rules and baseline break around them. */
+	const scoreBoxes: RuleBox[] = [];
+	let bandTop = plan.top;
+	plan.bands.forEach((band, bandIndex) => {
+		const rowLabel = (key: string, label: Measured, top: number, color: string) =>
 			texts.push(
 				freeText(
-					`text:journey:subtitle:${index}`,
-					line,
-					PADDING + line.width / 2,
-					y + line.height / 2,
-					SUBTITLE_FONT,
-					MUTED_INK,
+					`text:journey:row:${bandIndex}:${key}`,
+					label,
+					PADDING + label.width / 2,
+					top + label.height / 2,
+					ROW_FONT,
+					color,
 					{ textAlign: "left" },
 				),
 			);
-			y += line.height;
-		});
-
-		const scores = diagram.stages.flatMap((stage) => stage.steps.map((step) => step.score));
-		/** Where each printed score sits: the level rules and baseline break around them. */
-		const scoreBoxes: RuleBox[] = [];
-		let bandTop = plan.top;
-		plan.bands.forEach((band, bandIndex) => {
-			const rowLabel = (key: string, label: Measured, top: number, color: string) =>
-				texts.push(
-					freeText(
-						`text:journey:row:${bandIndex}:${key}`,
-						label,
-						PADDING + label.width / 2,
-						top + label.height / 2,
-						ROW_FONT,
-						color,
-						{ textAlign: "left" },
-					),
-				);
-			const cardsTop = bandTop + band.headerHeight + ROW_GAP;
-			const experienceTop = cardsTop + band.cardHeight + ROW_GAP;
-			const painTop = experienceTop + experienceHeight(plan.pitch) + ROW_GAP;
-			const opportunityTop = painTop + (band.painHeight > 0 ? band.painHeight + ROW_GAP : 0);
-			const bandBottom = bandTop + band.height;
-			rowLabel("steps", plan.rowLabels.steps, cardsTop + BOUND_INSET, MUTED_INK);
-			rowLabel("experience", plan.rowLabels.experience, experienceTop + 2, MUTED_INK);
-			if (bandIndex > 0)
-				texts.push(
-					freeText(
-						`text:journey:continued:${bandIndex}`,
-						plan.rowLabels.continued,
-						PADDING + plan.rowLabels.continued.width / 2,
-						experienceTop +
-							4 +
-							plan.rowLabels.experience.height +
-							plan.rowLabels.continued.height / 2,
-						SCALE_FONT,
-						DETAIL_COLOR,
-						{ textAlign: "left" },
-					),
-				);
-			const baselineY = scoreY(experienceTop, JOURNEY_NEUTRAL_SCORE, plan.pitch);
-			// The scale at the row's left, a label per level; faint rules mark every level but
-			// neutral, whose dashed baseline runs on its own.
-			plan.levels.forEach((label, index) => {
-				const level = JOURNEY_MIN_SCORE + index;
-				const y = round(scoreY(experienceTop, level, plan.pitch));
-				texts.push(
-					freeText(
-						`text:journey:level:${bandIndex}:${level}`,
-						label,
-						plan.gridLeft - ROW_LABEL_GAP + 4 - label.width / 2,
-						y,
-						SCALE_FONT,
-						DETAIL_COLOR,
-						{ textAlign: "right" },
-					),
-				);
-				if (level !== JOURNEY_NEUTRAL_SCORE)
-					back.push({
-						type: "line",
-						id: `line:journey:level:${bandIndex}:${level}`,
-						points: [
-							{ x: plan.gridLeft, y },
-							{ x: band.right, y },
-						],
-						strokeColor: LEVEL_COLOR,
-						strokeWidth: 1,
-						roughness: 0,
-					});
-			});
-			if (band.painHeight > 0) rowLabel("pain-points", plan.rowLabels.pains, painTop + 9, PAIN_INK);
-			if (band.opportunityHeight > 0)
-				rowLabel(
-					"opportunities",
-					plan.rowLabels.opportunities,
-					opportunityTop + 9,
-					OPPORTUNITY_INK,
-				);
-			back.push({
-				type: "line",
-				id: `line:journey:baseline:${bandIndex}`,
-				points: [
-					{ x: plan.gridLeft, y: baselineY },
-					{ x: band.right, y: baselineY },
-				],
-				strokeColor: BASELINE_COLOR,
-				strokeStyle: "dashed",
-				strokeWidth: 1,
-				roughness: 0,
-			});
-			band.stages.forEach((column, position) => {
-				if (position === 0) return;
-				const x = column.x - STAGE_GAP / 2;
+		const cardsTop = bandTop + band.headerHeight + ROW_GAP;
+		const experienceTop = cardsTop + band.cardHeight + ROW_GAP;
+		const painTop = experienceTop + experienceHeight(plan.pitch) + ROW_GAP;
+		const opportunityTop = painTop + (band.painHeight > 0 ? band.painHeight + ROW_GAP : 0);
+		const bandBottom = bandTop + band.height;
+		rowLabel("steps", plan.rowLabels.steps, cardsTop + BOUND_INSET, MUTED_INK);
+		rowLabel("experience", plan.rowLabels.experience, experienceTop + 2, MUTED_INK);
+		if (bandIndex > 0)
+			texts.push(
+				freeText(
+					`text:journey:continued:${bandIndex}`,
+					plan.rowLabels.continued,
+					PADDING + plan.rowLabels.continued.width / 2,
+					experienceTop +
+						4 +
+						plan.rowLabels.experience.height +
+						plan.rowLabels.continued.height / 2,
+					SCALE_FONT,
+					DETAIL_COLOR,
+					{ textAlign: "left" },
+				),
+			);
+		const baselineY = scoreY(experienceTop, JOURNEY_NEUTRAL_SCORE, plan.pitch);
+		// The scale at the row's left, a label per level; faint rules mark every level but
+		// neutral, whose dashed baseline runs on its own.
+		plan.levels.forEach((label, index) => {
+			const level = JOURNEY_MIN_SCORE + index;
+			const y = round(scoreY(experienceTop, level, plan.pitch));
+			texts.push(
+				freeText(
+					`text:journey:level:${bandIndex}:${level}`,
+					label,
+					plan.gridLeft - ROW_LABEL_GAP + 4 - label.width / 2,
+					y,
+					SCALE_FONT,
+					DETAIL_COLOR,
+					{ textAlign: "right" },
+				),
+			);
+			if (level !== JOURNEY_NEUTRAL_SCORE)
 				back.push({
 					type: "line",
-					id: `line:journey:divider:${column.stage}`,
+					id: `line:journey:level:${bandIndex}:${level}`,
 					points: [
-						{ x, y: cardsTop },
-						{ x, y: bandBottom },
+						{ x: plan.gridLeft, y },
+						{ x: band.right, y },
 					],
-					strokeColor: RULE_COLOR,
+					strokeColor: LEVEL_COLOR,
 					strokeWidth: 1,
 					roughness: 0,
 				});
+		});
+		if (band.painHeight > 0) rowLabel("pain-points", plan.rowLabels.pains, painTop + 9, PAIN_INK);
+		if (band.opportunityHeight > 0)
+			rowLabel("opportunities", plan.rowLabels.opportunities, opportunityTop + 9, OPPORTUNITY_INK);
+		back.push({
+			type: "line",
+			id: `line:journey:baseline:${bandIndex}`,
+			points: [
+				{ x: plan.gridLeft, y: baselineY },
+				{ x: band.right, y: baselineY },
+			],
+			strokeColor: BASELINE_COLOR,
+			strokeStyle: "dashed",
+			strokeWidth: 1,
+			roughness: 0,
+		});
+		band.stages.forEach((column, position) => {
+			if (position === 0) return;
+			const x = column.x - STAGE_GAP / 2;
+			back.push({
+				type: "line",
+				id: `line:journey:divider:${column.stage}`,
+				points: [
+					{ x, y: cardsTop },
+					{ x, y: bandBottom },
+				],
+				strokeColor: RULE_COLOR,
+				strokeWidth: 1,
+				roughness: 0,
 			});
-			const curve: ScenePoint[] = [];
-			band.stages.forEach((column, position) => {
-				const stage = diagram.stages[column.stage]!;
-				const color = STAGE_COLORS[column.stage % STAGE_COLORS.length]!;
-				// A stage that runs on from the band above repeats its header, marked as continued.
-				const headerId =
-					column.from === 0
-						? `journey:stage:${column.stage}`
-						: `journey:stage-continued:${column.stage}-${column.from}`;
+		});
+		const curve: ScenePoint[] = [];
+		band.stages.forEach((column, position) => {
+			const stage = diagram.stages[column.stage]!;
+			const color = STAGE_COLORS[column.stage % STAGE_COLORS.length]!;
+			// A stage that runs on from the band above repeats its header, marked as continued.
+			const headerId =
+				column.from === 0
+					? `journey:stage:${column.stage}`
+					: `journey:stage-continued:${column.stage}-${column.from}`;
+			shapes.push({
+				type: "node",
+				id: `node:${headerId}`,
+				nodeId: headerId,
+				kind: column.from === 0 ? "journey-stage" : "journey-stage-continued",
+				shape: "rectangle",
+				x: column.x,
+				y: bandTop,
+				width: column.width,
+				height: band.headerHeight,
+				label: stageName(diagram, column),
+				strokeColor: color,
+				strokeWidth: 2,
+				fillColor: tint(color, background, 0.22),
+				fillStyle: "solid",
+			});
+			texts.push({
+				type: "text",
+				id: `label:${headerId}`,
+				containerId: `node:${headerId}`,
+				x: round(column.x + column.width / 2),
+				y: round(bandTop + band.headerHeight / 2),
+				text: band.header[position]!.text,
+				fontSize: STAGE_FONT,
+				lineHeight: LINE_HEIGHT,
+				maxWidth: column.width - 2 * BOX_PAD_X,
+				textColor: INK,
+			});
+			stage.steps.slice(column.from, column.to).forEach((step, offset) => {
+				const index = column.from + offset;
+				const id = `${column.stage}-${index}`;
+				const stepId = `journey:step:${id}`;
+				const left = column.steps[offset]!;
+				const centerX = left + plan.cardWidth / 2;
+				const { label, details } = plan.texts[column.stage]![index]!;
+				const groupIds = [stepId];
 				shapes.push({
 					type: "node",
-					id: `node:${headerId}`,
-					nodeId: headerId,
-					kind: column.from === 0 ? "journey-stage" : "journey-stage-continued",
+					id: `node:${stepId}`,
+					nodeId: stepId,
+					kind: "journey-step",
 					shape: "rectangle",
-					x: column.x,
-					y: bandTop,
-					width: column.width,
-					height: band.headerHeight,
-					label: stageName(diagram, column),
+					x: left,
+					y: cardsTop,
+					width: plan.cardWidth,
+					height: band.cardHeight,
+					label: step.label.trim(),
 					strokeColor: color,
-					strokeWidth: 2,
-					fillColor: tint(color, background, 0.22),
+					strokeWidth: 1,
+					fillColor: tint(color, background, 0.07),
 					fillStyle: "solid",
+					groupIds,
 				});
+				const textMax = plan.cardWidth - 2 * BOX_PAD_X;
+				// The label is the card's own text. Where any card carries details, every label
+				// stands at its card's top, so the row reads level; the details sit at the foot.
 				texts.push({
 					type: "text",
-					id: `label:${headerId}`,
-					containerId: `node:${headerId}`,
-					x: round(column.x + column.width / 2),
-					y: round(bandTop + band.headerHeight / 2),
-					text: band.header[position]!.text,
-					fontSize: STAGE_FONT,
+					id: `label:${stepId}`,
+					containerId: `node:${stepId}`,
+					x: round(centerX),
+					y: round(
+						plan.detailed
+							? cardsTop + BOUND_INSET + label.height / 2
+							: cardsTop + band.cardHeight / 2,
+					),
+					text: label.text,
+					fontSize: LABEL_FONT,
 					lineHeight: LINE_HEIGHT,
-					maxWidth: column.width - 2 * BOX_PAD_X,
+					maxWidth: textMax,
+					...(plan.detailed ? { verticalAlign: "top" as const } : {}),
 					textColor: INK,
+					groupIds,
 				});
-				stage.steps.slice(column.from, column.to).forEach((step, offset) => {
-					const index = column.from + offset;
-					const id = `${column.stage}-${index}`;
-					const stepId = `journey:step:${id}`;
-					const left = column.steps[offset]!;
-					const centerX = left + plan.cardWidth / 2;
-					const { label, details } = plan.texts[column.stage]![index]!;
-					const groupIds = [stepId];
+				if (details)
+					texts.push(
+						freeText(
+							`text:${stepId}:details`,
+							details,
+							centerX,
+							cardsTop + band.cardHeight - CARD_PAD_BOTTOM - details.height / 2,
+							DETAIL_FONT,
+							DETAIL_COLOR,
+							{ groupIds },
+						),
+					);
+				const center = {
+					x: round(centerX),
+					y: round(scoreY(experienceTop, step.score, plan.pitch)),
+				};
+				curve.push(center);
+				const face = faceElements(id, center, step.score, background);
+				marks.push(...face.nodes, face.mouth);
+				// The score itself, just above its face and grouped with it, so a 4 reads apart from a 5.
+				const written = measure(`${step.score}`, 40, SCORE_FONT);
+				const writtenY = center.y - FACE_SIZE / 2 - SCORE_GAP - written.height / 2;
+				texts.push(
+					freeText(`text:journey:score:${id}`, written, center.x, writtenY, SCORE_FONT, INK, {
+						groupIds: [`journey:face:${id}`],
+					}),
+				);
+				scoreBoxes.push({
+					left: center.x - written.width / 2,
+					top: writtenY - written.height / 2,
+					right: center.x + written.width / 2,
+					bottom: writtenY + written.height / 2,
+				});
+			});
+			const notes = (
+				kind: "pain" | "opportunity",
+				stack: readonly Measured[],
+				top: number,
+				stroke: string,
+			) => {
+				let noteTop = top;
+				stack.forEach((note, index) => {
+					const noteId = `journey:${kind}:${column.stage}-${index}`;
 					shapes.push({
 						type: "node",
-						id: `node:${stepId}`,
-						nodeId: stepId,
-						kind: "journey-step",
+						id: `node:${noteId}`,
+						nodeId: noteId,
+						kind: kind === "pain" ? "journey-pain-point" : "journey-opportunity",
 						shape: "rectangle",
-						x: left,
-						y: cardsTop,
-						width: plan.cardWidth,
-						height: band.cardHeight,
-						label: step.label.trim(),
-						strokeColor: color,
+						x: column.x,
+						y: noteTop,
+						width: column.width,
+						height: note.height,
+						label: (kind === "pain" ? stage.painPoints : stage.opportunities)![index]!.trim(),
+						strokeColor: stroke,
 						strokeWidth: 1,
-						fillColor: tint(color, background, 0.07),
+						fillColor: tint(stroke, background, 0.1),
 						fillStyle: "solid",
-						groupIds,
 					});
-					const textMax = plan.cardWidth - 2 * BOX_PAD_X;
-					// The label is the card's own text. Where any card carries details, every label
-					// stands at its card's top, so the row reads level; the details sit at the foot.
 					texts.push({
 						type: "text",
-						id: `label:${stepId}`,
-						containerId: `node:${stepId}`,
-						x: round(centerX),
-						y: round(
-							plan.detailed
-								? cardsTop + BOUND_INSET + label.height / 2
-								: cardsTop + band.cardHeight / 2,
-						),
-						text: label.text,
-						fontSize: LABEL_FONT,
+						id: `label:${noteId}`,
+						containerId: `node:${noteId}`,
+						x: round(column.x + column.width / 2),
+						y: round(noteTop + note.height / 2),
+						text: note.text,
+						fontSize: NOTE_FONT,
 						lineHeight: LINE_HEIGHT,
-						maxWidth: textMax,
-						...(plan.detailed ? { verticalAlign: "top" as const } : {}),
+						maxWidth: column.width - 2 * BOX_PAD_X,
 						textColor: INK,
-						groupIds,
 					});
-					if (details)
-						texts.push(
-							freeText(
-								`text:${stepId}:details`,
-								details,
-								centerX,
-								cardsTop + band.cardHeight - CARD_PAD_BOTTOM - details.height / 2,
-								DETAIL_FONT,
-								DETAIL_COLOR,
-								{ groupIds },
-							),
-						);
-					const center = {
-						x: round(centerX),
-						y: round(scoreY(experienceTop, step.score, plan.pitch)),
-					};
-					curve.push(center);
-					const face = faceElements(id, center, step.score, background);
-					marks.push(...face.nodes, face.mouth);
-					// The score itself, just above its face and grouped with it, so a 4 reads apart from a 5.
-					const written = measure(`${step.score}`, 40, SCORE_FONT);
-					const writtenY = center.y - FACE_SIZE / 2 - SCORE_GAP - written.height / 2;
-					texts.push(
-						freeText(`text:journey:score:${id}`, written, center.x, writtenY, SCORE_FONT, INK, {
-							groupIds: [`journey:face:${id}`],
-						}),
-					);
-					scoreBoxes.push({
-						left: center.x - written.width / 2,
-						top: writtenY - written.height / 2,
-						right: center.x + written.width / 2,
-						bottom: writtenY + written.height / 2,
-					});
+					noteTop += note.height + NOTE_GAP;
 				});
-				const notes = (
-					kind: "pain" | "opportunity",
-					stack: readonly Measured[],
-					top: number,
-					stroke: string,
-				) => {
-					let noteTop = top;
-					stack.forEach((note, index) => {
-						const noteId = `journey:${kind}:${column.stage}-${index}`;
-						shapes.push({
-							type: "node",
-							id: `node:${noteId}`,
-							nodeId: noteId,
-							kind: kind === "pain" ? "journey-pain-point" : "journey-opportunity",
-							shape: "rectangle",
-							x: column.x,
-							y: noteTop,
-							width: column.width,
-							height: note.height,
-							label: (kind === "pain" ? stage.painPoints : stage.opportunities)![index]!.trim(),
-							strokeColor: stroke,
-							strokeWidth: 1,
-							fillColor: tint(stroke, background, 0.1),
-							fillStyle: "solid",
-						});
-						texts.push({
-							type: "text",
-							id: `label:${noteId}`,
-							containerId: `node:${noteId}`,
-							x: round(column.x + column.width / 2),
-							y: round(noteTop + note.height / 2),
-							text: note.text,
-							fontSize: NOTE_FONT,
-							lineHeight: LINE_HEIGHT,
-							maxWidth: column.width - 2 * BOX_PAD_X,
-							textColor: INK,
-						});
-						noteTop += note.height + NOTE_GAP;
-					});
-				};
-				notes("pain", band.pains[position]!, painTop, PAIN_COLOR);
-				notes("opportunity", band.opportunities[position]!, opportunityTop, OPPORTUNITY_COLOR);
-			});
-			if (curve.length >= 2)
-				back.push({
-					type: "line",
-					id: `line:journey:curve:${bandIndex}`,
-					points: [curve[0]!, curve[1]!, ...curve.slice(2)],
-					strokeColor: CURVE_COLOR,
-					strokeWidth: 2,
-					roughness: 0,
-				});
-			// A wrapped curve runs on: dashed out of a band toward the next step's score, and
-			// dashed into the next band from the last one's.
-			const first = band.stages[0]!;
-			const before =
-				diagram.stages
-					.slice(0, first.stage)
-					.reduce((total, stage) => total + stage.steps.length, 0) + first.from;
-			const previous = scores[before - 1];
-			const next = scores[before + curve.length];
-			const stub = (id: string, from: ScenePoint, to: ScenePoint) =>
-				back.push({
-					type: "line",
-					id: `line:journey:${id}:${bandIndex}`,
-					points: [from, to],
-					strokeColor: CURVE_COLOR,
-					strokeStyle: "dashed",
-					strokeWidth: 2,
-					roughness: 0,
-				});
-			if (previous !== undefined)
-				stub(
-					"curve-in",
-					{ x: plan.gridLeft, y: round(scoreY(experienceTop, previous, plan.pitch)) },
-					curve[0]!,
-				);
-			if (next !== undefined)
-				stub("curve-out", curve.at(-1)!, {
-					x: band.right,
-					y: round(scoreY(experienceTop, next, plan.pitch)),
-				});
-			bandTop = bandBottom + BAND_GAP;
+			};
+			notes("pain", band.pains[position]!, painTop, PAIN_COLOR);
+			notes("opportunity", band.opportunities[position]!, opportunityTop, OPPORTUNITY_COLOR);
 		});
+		if (curve.length >= 2)
+			back.push({
+				type: "line",
+				id: `line:journey:curve:${bandIndex}`,
+				points: [curve[0]!, curve[1]!, ...curve.slice(2)],
+				strokeColor: CURVE_COLOR,
+				strokeWidth: 2,
+				roughness: 0,
+			});
+		// A wrapped curve runs on: dashed out of a band toward the next step's score, and
+		// dashed into the next band from the last one's.
+		const first = band.stages[0]!;
+		const before =
+			diagram.stages.slice(0, first.stage).reduce((total, stage) => total + stage.steps.length, 0) +
+			first.from;
+		const previous = scores[before - 1];
+		const next = scores[before + curve.length];
+		const stub = (id: string, from: ScenePoint, to: ScenePoint) =>
+			back.push({
+				type: "line",
+				id: `line:journey:${id}:${bandIndex}`,
+				points: [from, to],
+				strokeColor: CURVE_COLOR,
+				strokeStyle: "dashed",
+				strokeWidth: 2,
+				roughness: 0,
+			});
+		if (previous !== undefined)
+			stub(
+				"curve-in",
+				{ x: plan.gridLeft, y: round(scoreY(experienceTop, previous, plan.pitch)) },
+				curve[0]!,
+			);
+		if (next !== undefined)
+			stub("curve-out", curve.at(-1)!, {
+				x: band.right,
+				y: round(scoreY(experienceTop, next, plan.pitch)),
+			});
+		bandTop = bandBottom + BAND_GAP;
+	});
 
-		// No rule runs through a printed score; rules and the curve sit behind the cards and
-		// faces that stand on them.
-		const broken = breakRulesUnderText(
-			back,
-			scoreBoxes,
-			(id) => id.startsWith("line:journey:level:") || id.startsWith("line:journey:baseline:"),
-		);
-		const rules = back.flatMap((element) => broken.get(element.id) ?? [element]);
-		const elements: SceneElement[] = [...rules, ...shapes, ...marks, ...texts];
-		return {
-			kind: "canvas",
-			version: CANVAS_SPEC_VERSION,
-			diagramId: diagram.id,
-			title: diagram.title,
-			width: plan.width,
-			height: plan.height,
-			accentColor: diagram.style.accentColor,
-			backgroundColor: background,
-			elements,
-			layers: [],
-			layouts: [],
-			zOrder: elements.map((element) => element.id),
-		};
+	// No rule runs through a printed score; rules and the curve sit behind the cards and
+	// faces that stand on them.
+	const broken = breakRulesUnderText(
+		back,
+		scoreBoxes,
+		(id) => id.startsWith("line:journey:level:") || id.startsWith("line:journey:baseline:"),
+	);
+	const rules = back.flatMap((element) => broken.get(element.id) ?? [element]);
+	const elements: SceneElement[] = [...rules, ...shapes, ...marks, ...texts];
+	return Result.succeed({
+		kind: "canvas",
+		version: CANVAS_SPEC_VERSION,
+		diagramId: diagram.id,
+		title: diagram.title,
+		width: plan.width,
+		height: plan.height,
+		accentColor: diagram.style.accentColor,
+		backgroundColor: background,
+		elements,
+		layers: [],
+		layouts: [],
+		zOrder: elements.map((element) => element.id),
 	});
 }

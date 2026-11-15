@@ -62,12 +62,7 @@ import {
 	type GanttDiagram,
 	type GanttValidationIssueCode,
 } from "../../families/gantt/document.js";
-import {
-	getJourneyValidationIssues,
-	resolveJourneyShorthand,
-	type JourneyDiagram,
-	type JourneyValidationIssueCode,
-} from "../../families/journey/document.js";
+
 import {
 	getOrgChartValidationIssues,
 	resolveOrgChartShorthand,
@@ -114,10 +109,7 @@ import {
 	renderErDiagram,
 } from "../../families/er/render.js";
 import { isStructurallyValidGanttMark, renderGanttDiagram } from "../../families/gantt/render.js";
-import {
-	isStructurallyValidJourneyMark,
-	renderJourneyDiagram,
-} from "../../families/journey/render.js";
+import { isStructurallyValidJourneyMark } from "../../families/journey/render.js";
 import { renderOrgChartDiagram } from "../../families/org-chart/render.js";
 import { isStructurallyValidQuadrantMark } from "../../families/quadrant/render.js";
 import { sankeyLayoutIssues } from "../../families/sankey/readout.js";
@@ -167,8 +159,6 @@ import {
 	BuildFlowchartRequestSchema,
 	BuildGanttRejected,
 	BuildGanttRequest,
-	BuildJourneyMapRejected,
-	BuildJourneyMapRequest,
 	BuildOrgChartRejected,
 	BuildOrgChartRequest,
 	BuildSankeyRejected,
@@ -195,7 +185,6 @@ import {
 	type BuildFlowchartRequest,
 	type BuildFlowchartResult,
 	type BuildGanttResult,
-	type BuildJourneyMapResult,
 	type BuildOrgChartResult,
 	type BuildSankeyResult,
 	type BuildStateMachineResult,
@@ -210,7 +199,6 @@ import {
 	type NormalizedClassSpec,
 	type NormalizedErSpec,
 	type NormalizedGanttSpec,
-	type NormalizedJourneySpec,
 	type NormalizedOrgChartSpec,
 	type NormalizedSankeySpec,
 	type NormalizedStateMachineSpec,
@@ -947,83 +935,6 @@ function resolveOrgChartRequest(input: unknown): unknown {
 	return { ...input, spec: resolveOrgChartShorthand(input.spec) };
 }
 
-function normalizeJourneySpec(spec: BuildJourneyMapRequest["spec"]): NormalizedJourneySpec {
-	const title = cleanToolString(spec.title);
-	const optional = (key: string, value: string | undefined) =>
-		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
-	const notes = (key: string, values: readonly string[] | undefined) => {
-		const cleaned = (values ?? []).map(cleanToolString).filter((value) => value.length > 0);
-		return cleaned.length > 0 ? { [key]: cleaned } : {};
-	};
-	const actors = (spec.actors ?? []).map(cleanToolString).filter((actor) => actor.length > 0);
-	return {
-		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-journey-map"),
-		title,
-		...optional("persona", spec.persona),
-		...(actors.length > 0 ? { actors } : {}),
-		stages: spec.stages.map((stage) => ({
-			name: cleanToolString(stage.name),
-			steps: stage.steps.map((step) => ({
-				label: cleanToolString(step.label),
-				score: step.score,
-				...optional("actor", step.actor),
-				...optional("touchpoint", step.touchpoint),
-			})),
-			...notes("painPoints", stage.painPoints),
-			...notes("opportunities", stage.opportunities),
-		})),
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-	};
-}
-
-function toJourneyDiagram(spec: NormalizedJourneySpec): JourneyDiagram {
-	return { ...spec, type: "journey" };
-}
-
-/** Code Mode's published issue codes for diagram-core's journey invariants. */
-const JOURNEY_ISSUE_CODES = {
-	journey_too_large: "journey_too_large",
-	empty_journey_stage: "invalid_journey_stage",
-	duplicate_journey_stage: "invalid_journey_stage",
-	invalid_journey_score: "invalid_journey_step",
-	unknown_journey_actor: "invalid_journey_step",
-	duplicate_journey_actor: "invalid_journey_step",
-	journey_text_too_long: "label_too_long",
-	unplaced_journey_entry: "invalid_journey_stage",
-} as const satisfies Record<JourneyValidationIssueCode, CodeModeIssueCode>;
-
-function validateNormalizedJourney(spec: NormalizedJourneySpec): CodeModeIssue[] {
-	return getJourneyValidationIssues(toJourneyDiagram(spec)).map((entry) =>
-		issue({
-			code: JOURNEY_ISSUE_CODES[entry.code],
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-			message: entry.message,
-			hint: entry.hint,
-		}),
-	);
-}
-
-function journeyQuality(spec: NormalizedJourneySpec, threshold: number): QualityReport {
-	const score = 10;
-	return {
-		accepted: score >= threshold,
-		score,
-		threshold,
-		summary: {
-			nodeCount: spec.stages.reduce((total, stage) => total + stage.steps.length, 0),
-			edgeCount: 0,
-		},
-		checks: [],
-	};
-}
-
-/** Read Mermaid sections, step and score aliases and flat staged steps before the request is decoded. */
-function resolveJourneyRequest(input: unknown): unknown {
-	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
-	return { ...input, spec: resolveJourneyShorthand(input.spec) };
-}
-
 function normalizeWireframeComponent(component: WireframeComponentInput): WireframeComponentInput {
 	const normalized: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(component)) {
@@ -1259,15 +1170,6 @@ const BuildOrgChartFailure = workflowFailure(
 	"BuildOrgChartFailure",
 	BuildOrgChartRejected.fields.status,
 	BuildOrgChartRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildJourneyMapFailure = workflowFailure(
-	"BuildJourneyMapFailure",
-	BuildJourneyMapRejected.fields.status,
-	BuildJourneyMapRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -3389,115 +3291,6 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 	} satisfies Extract<BuildOrgChartResult, { ok: true }>;
 });
 
-const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(function* (
-	input: unknown,
-) {
-	const parsed = Schema.decodeUnknownResult(BuildJourneyMapRequest, {
-		errors: "all",
-		reportInput: true,
-	})(resolveJourneyRequest(input));
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildJourneyMapFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-	const request = parsed.success;
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeJourneySpec(request.spec);
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedJourney(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildJourneyMapFailure.new({
-			status: "invalid_journey",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const quality = journeyQuality(
-		normalizedSpec,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildJourneyMapFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const scene = yield* validatedDomainResult({
-		try: () => renderJourneyDiagram(toJourneyDiagram(normalizedSpec)),
-		catch: (cause) =>
-			BuildJourneyMapFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message:
-								cause instanceof Error ? cause.message : "Unable to render journey map scene.",
-							hint: "Repair the stages and steps and retry.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildJourneyMap.render"));
-	const canvasIssues = getCanvasValidationIssues(scene);
-	if (canvasIssues.length > 0) {
-		return yield* BuildJourneyMapFailure.new({
-			status: canvasFailureStatus(canvasIssues),
-			context: {
-				...qualityContext,
-				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
-					...entry,
-					hint: "Shorten step labels or notes, or split the journey, and retry buildJourneyMap.",
-				})),
-			},
-		});
-	}
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildJourneyMapFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [],
-	} satisfies Extract<BuildJourneyMapResult, { ok: true }>;
-});
-
 const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function* (input: unknown) {
 	const parsed = Schema.decodeUnknownResult(BuildSankeyRequest, {
 		errors: "all",
@@ -4808,9 +4601,7 @@ export const buildClassDiagram: (
 export const buildOrgChart: (input: unknown) => CodeModeWorkflowEffect<BuildOrgChartResult> =
 	boundary("buildOrgChart", buildOrgChartWorkflow, failureResult);
 
-/** A user journey map: stages of steps scored for sentiment, with pain points and opportunities. */
-export const buildJourneyMap: (input: unknown) => CodeModeWorkflowEffect<BuildJourneyMapResult> =
-	boundary("buildJourneyMap", buildJourneyMapWorkflow, failureResult);
+export const buildJourneyMap = familyForType("journey").build({ bindBuild });
 
 /** A Sankey diagram: nodes and the weighted flows between them. */
 export const buildSankey: (input: unknown) => CodeModeWorkflowEffect<BuildSankeyResult> = boundary(

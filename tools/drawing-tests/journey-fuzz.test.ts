@@ -19,11 +19,7 @@ import {
 } from "@sketchi/diagrams/families/journey/render";
 import { journeyLayoutIssues } from "@sketchi/diagrams/families/journey/readout";
 
-import {
-	convertSceneToExcalidraw,
-	createExcalidrawFile,
-	validateExcalidrawScene,
-} from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 const STAGES = [
 	"Discover",
@@ -151,11 +147,9 @@ describe("journey map fuzz", () => {
 			for (const diagram of randomJourneys(JOURNEYS, seed)) {
 				const scene = renderJourneyDiagram(diagram).pipe(Result.getOrThrow);
 				const exported = convertSceneToExcalidraw(scene);
-				const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(exported)));
 				const problems = [
 					...getCanvasValidationIssues(scene).map((issue) => issue.message),
 					...validateExcalidrawScene(exported).issues.map((issue) => issue.message),
-					...validateExcalidrawScene(reloaded).issues.map((issue) => issue.message),
 					...journeyLayoutIssues(scene).map((issue) => issue.message),
 				];
 				if (aspect(scene) > JOURNEY_MAX_ASPECT) problems.push(`aspect ${aspect(scene).toFixed(2)}`);

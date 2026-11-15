@@ -8,12 +8,12 @@ describe("offline journey map input failures", () => {
 	it.each([
 		{
 			name: "a score off the 1-5 scale",
-			issue: "invalid_journey_step",
+			issue: "invalid_journey_score",
 			stages: [{ name: "Discover", steps: [{ label: "Sees an ad", score: 9 }] }],
 		},
 		{
 			name: "a stage without steps",
-			issue: "invalid_journey_stage",
+			issue: "empty_journey_stage",
 			stages: [
 				{ name: "Discover", steps: [{ label: "Sees an ad", score: 4 }] },
 				{ name: "Buy", steps: [] },

@@ -150,24 +150,7 @@ export function canonicalDocumentFromDiagram(
 			return { type, spec };
 		}
 		case "journey":
-			return {
-				type: "journey",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					...(diagram.persona === undefined ? {} : { persona: diagram.persona }),
-					...(diagram.actors === undefined ? {} : { actors: [...diagram.actors] }),
-					stages: diagram.stages.map((stage) => ({
-						name: stage.name,
-						steps: stage.steps.map((step) => ({ ...step })),
-						...(stage.painPoints === undefined ? {} : { painPoints: [...stage.painPoints] }),
-						...(stage.opportunities === undefined
-							? {}
-							: { opportunities: [...stage.opportunities] }),
-					})),
-					style: diagram.style,
-				},
-			};
+			return familyForType("journey").toDocument(diagram);
 		case "wireframe":
 			return {
 				type: "wireframe",
