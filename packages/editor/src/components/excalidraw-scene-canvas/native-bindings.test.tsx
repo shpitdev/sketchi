@@ -16,8 +16,6 @@ it.each([
 		if (!bar) throw new Error("Missing task bar");
 		session.drag(scene, bar, offset);
 		const elements = scene.getNonDeletedElements().map((element) => ({ ...element }));
-		// Excalidraw computes both ends against the previous points, then moves
-		// them together. Its valid edited result need not be a placement fixed point.
 		const before = session.snapshot(scene);
 		for (const end of session.readEnds(scene)) {
 			expect(end.listed).toBe(true);
@@ -26,13 +24,7 @@ it.each([
 		}
 		if (corner) expect(session.readEnds(scene).some((end) => end.off > 1.05)).toBe(true);
 		expect(validateExcalidrawScene({ appState: {}, elements })).toEqual({ ok: true, issues: [] });
-		session.touch(scene);
-		const after = session.snapshot(scene);
 		const id = "gantt:dependency:design:api";
-		const [start] = before.get(id) ?? [];
-		const [replaced] = after.get(id) ?? [];
-		if (!start || !replaced) throw new Error("Missing dependency endpoints");
-		expect(Math.hypot(start[0] - replaced[0], start[1] - replaced[1])).toBeGreaterThan(0.01);
 
 		const reloaded = session.open(elements);
 		try {

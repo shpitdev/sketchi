@@ -19,7 +19,7 @@
 		"build-storybook": {
 			"outputs": ["{workspaceRoot}/storybook-static/editor"],
 			"options": {
-				"output-dir": "../../../storybook-static/editor"
+				"output-dir": "../../storybook-static/editor"
 			}
 		},
 		"chromatic": {
