@@ -1,17 +1,21 @@
-import { QueryClient, useQuery } from "@tanstack/react-query";
+import { useAtomValue, useAtomRefresh } from "@effect/atom-react";
+import { Array, Option } from "effect";
+import { AsyncResult } from "effect/reactivity";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useState } from "react";
 
 import { PackPage } from "../../components/packs/pack-page.js";
-import { loadPackIcons } from "../../lib/catalog-client.js";
+import { packQuery, queryError, queryStatus } from "../../lib/query-atoms.js";
 import { packPagePath } from "../../lib/packs.js";
 import { packDescription, packImage, pageMeta } from "../../lib/site-meta.js";
 import { getPackShelf } from "../../lib/packs-rpc.js";
 
 export const Route = createFileRoute("/packs/$id")({
+	// @effect-diagnostics-next-line asyncFunction:off -- TanStack route loader owns this existing server-function Promise boundary.
 	loader: async ({ params }) => {
 		const shelf = await getPackShelf();
-		const pack = shelf.packs.find((summary) => summary.id === params.id);
+		const pack = Option.getOrUndefined(
+			Array.findFirst(shelf.packs, (summary) => summary.id === params.id),
+		);
 		// oxlint-disable-next-line typescript/only-throw-error -- TanStack Router's 404 is thrown, by design not an Error
 		if (!pack) throw notFound();
 		return { pack, excalidraw: shelf.excalidraw[pack.id] };
@@ -31,35 +35,21 @@ export const Route = createFileRoute("/packs/$id")({
 
 function PackRoute() {
 	const { excalidraw, pack } = Route.useLoaderData();
-	const [queryClient] = useState(() => new QueryClient());
-	const options = { gcTime: 0, refetchOnReconnect: false, refetchOnWindowFocus: false } as const;
-	// Only this pack's marks: the whole catalog's manifest and drawings are megabytes.
-	const members = useQuery(
-		{
-			...options,
-			queryFn: ({ signal }) => loadPackIcons(pack.id, signal),
-			queryKey: ["pack-icons", pack.id],
-			retry: 1,
-		},
-		queryClient,
-	);
-	const failed = members.isError ? members : undefined;
+	const members = useAtomValue(packQuery(pack.id));
+	const retry = useAtomRefresh(packQuery(pack.id));
 
 	return (
 		<PackPage
-			{...(failed
+			{...(AsyncResult.isFailure(members)
 				? {
-						errorMessage:
-							failed.error instanceof Error
-								? failed.error.message
-								: "The icons could not be loaded.",
-						onRetry: () => void failed.refetch(),
+						errorMessage: queryError(members, "The icons could not be loaded."),
+						onRetry: retry,
 					}
 				: {})}
 			{...(excalidraw ? { excalidraw } : {})}
-			icons={members.data ?? []}
+			icons={Option.getOrElse(AsyncResult.value(members), () => [])}
 			pack={pack}
-			status={members.isSuccess ? "ready" : failed && !failed.isFetching ? "error" : "loading"}
+			status={queryStatus(members)}
 		/>
 	);
 }

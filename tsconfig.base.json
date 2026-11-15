@@ -380,6 +380,76 @@
                 "unstableApiUsage": "off"
               }
             }
+          },
+          {
+            "include": [
+              "apps/icons/src/lib/query-atoms.ts",
+              "apps/icons/src/lib/community-atoms.ts",
+              "apps/icons/src/routes/index.tsx",
+              "apps/icons/src/routes/packs/$id.tsx",
+              "apps/icons/src/routes/__root.tsx",
+              "apps/icons/src/components/community-gallery/community-page.tsx"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "abortControllerInEffect": "error",
+                "anyUnknownInErrorContext": "error",
+                "apiStabilityLeak": "off",
+                "asyncFunction": "error",
+                "classSelfMismatch": "error",
+                "cryptoRandomUUID": "error",
+                "cryptoRandomUUIDInEffect": "error",
+                "duplicatePackage": "error",
+                "effectFnImplicitAny": "error",
+                "errorPayloadShadowsName": "error",
+                "experimentalApiUsage": "off",
+                "extendsNativeError": "error",
+                "floatingEffect": "error",
+                "floatingEffectInVitest": "error",
+                "genericEffectServices": "error",
+                "globalConsole": "error",
+                "globalConsoleInEffect": "error",
+                "globalDate": "error",
+                "globalDateInEffect": "error",
+                "globalFetch": "error",
+                "globalFetchInEffect": "error",
+                "globalJson": "error",
+                "globalJsonInEffect": "error",
+                "globalRandom": "error",
+                "globalRandomInEffect": "error",
+                "globalTimers": "error",
+                "globalTimersInEffect": "error",
+                "instanceOfSchema": "error",
+                "missingEffectContext": "error",
+                "missingEffectError": "error",
+                "missingLayerContext": "error",
+                "missingReturnYieldStar": "error",
+                "missingStarInYieldEffectGen": "error",
+                "newPromise": "error",
+                "nodeBuiltinImport": "error",
+                "nonObjectEffectServiceType": "error",
+                "obsoleteMatchImport": "error",
+                "obsoleteSchemaImport": "error",
+                "outdatedApi": "error",
+                "overriddenSchemaConstructor": "error",
+                "preferEffectArray": "error",
+                "preferEffectRecord": "error",
+                "preferEffectString": "error",
+                "processEnv": "error",
+                "processEnvInEffect": "error",
+                "promiseInEffectSuccess": "error",
+                "runEffectInsideEffect": "error",
+                "schemaClassMissingBrand": "error",
+                "schemaClassObjectLiteral": "error",
+                "schemaLiteralNonFinite": "error",
+                "schemaOpaqueInstanceMember": "error",
+                "schemaSync": "error",
+                "schemaSyncInEffect": "error",
+                "strictEffectProvide": "error",
+                "unsafeEffectTypeAssertion": "error",
+                "unstableApiUsage": "off"
+              }
+            }
           }
         ]
       }

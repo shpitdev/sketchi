@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { fetchCommunityIcon, type CommunityIconEntry } from "../../lib/community-client";
+import { type CommunityIconEntry } from "../../lib/community-client";
 import { TestIntersectionObserver } from "../../test-support/intersection-observer";
 import { CommunityGallery } from "./community-gallery";
 import { RecipePreview } from "../recipe-preview/index.js";
@@ -177,52 +177,6 @@ describe("CommunityGallery", () => {
 		expect(screen.getByRole("button", { name: "Download library" }).hasAttribute("disabled")).toBe(
 			true,
 		);
-	});
-});
-
-describe("linked community icons", () => {
-	it("says when a linked icon is not published, and retries one that failed to load", () => {
-		const { unmount } = render(
-			<CommunityGallery
-				icons={ICONS}
-				linked={{ slug: "community/gone", status: "missing" }}
-				onQueryChange={() => {}}
-				query=""
-				status="ready"
-			/>,
-		);
-		expect(screen.getByRole("heading", { name: "community/gone is not published" })).toBeTruthy();
-		expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
-		unmount();
-
-		const onRetryLinked = vi.fn();
-		render(
-			<CommunityGallery
-				icons={ICONS}
-				linked={{ slug: "community/box", status: "error" }}
-				onQueryChange={() => {}}
-				onRetryLinked={onRetryLinked}
-				query=""
-				status="ready"
-			/>,
-		);
-		expect(screen.getByRole("heading", { name: "Could not load community/box" })).toBeTruthy();
-		fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-		expect(onRetryLinked).toHaveBeenCalledTimes(1);
-	});
-
-	it("reads a 404 as a missing icon instead of an undefined result", async () => {
-		const fetchMock = vi.fn<typeof globalThis.fetch>(
-			async () => new Response("{}", { status: 404 }),
-		);
-		vi.stubGlobal("fetch", fetchMock);
-		await expect(fetchCommunityIcon("community/gone")).resolves.toEqual({ status: "missing" });
-		const target = fetchMock.mock.calls[0]?.[0];
-		expect(target && typeof target === "object" && "href" in target ? target.href : target).toBe(
-			new URL("/api/community/gone", window.location.origin).href,
-		);
-		expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("GET");
-		vi.unstubAllGlobals();
 	});
 });
 

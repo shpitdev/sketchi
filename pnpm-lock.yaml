@@ -173,6 +173,9 @@ catalogs:
     '@effect/ai-typesafe':
       specifier: 4.1.4
       version: 4.1.4
+    '@effect/atom-react':
+      specifier: 4.1.4
+      version: 4.1.4
     '@effect/platform-node':
       specifier: 4.1.4
       version: 4.1.4
@@ -185,6 +188,9 @@ catalogs:
     effect:
       specifier: 4.1.4
       version: 4.1.4
+    scheduler:
+      specifier: 0.28.0
+      version: 0.28.0
     google-auth-library:
       specifier: 10.9.1
       version: 10.9.1
@@ -453,6 +459,9 @@ importers:
 
   apps/icons:
     dependencies:
+      '@effect/atom-react':
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)(react@19.3.1)(scheduler@0.28.0)
       '@sketchi/community-icons':
         specifier: workspace:*
         version: link:../../packages/icons/community
@@ -474,6 +483,9 @@ importers:
       '@tanstack/react-hotkeys':
         specifier: 0.19.0
         version: 0.19.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -483,6 +495,9 @@ importers:
       roughjs:
         specifier: 4.6.6
         version: 4.6.6
+      scheduler:
+        specifier: 'catalog:'
+        version: 0.28.0
     devDependencies:
       '@resvg/resvg-wasm':
         specifier: 2.6.2
@@ -1933,6 +1948,13 @@ packages:
     resolution: {integrity: sha512-+gFj5W5J+LSL2ozqDQQ+lMO3lS2x1hid7GGaAB4gis2cAE4p0qrD/1gfG8OTFT3gx093klemH+r23Bcb5fvyrQ==}
     peerDependencies:
       effect: ^4.1.4
+
+  '@effect/atom-react@4.1.4':
+    resolution: {integrity: sha512-Xj58DcAzKsysHhzBCPaz2v1QAJq6NvMdGVmG7SV4zkw1RMiTZv8gaOXA1VqIRlpmvdspMwRe/BQ4eayuzRZTpQ==}
+    peerDependencies:
+      effect: ^4.1.4
+      react: '>=19.0.0 <20.0.0'
+      scheduler: '>=0.25.0 <0.29.0'
 
   '@effect/platform-node-shared@4.1.4':
     resolution: {integrity: sha512-DWdfphHGOFJNj/mYadgpT3jIm8aRXDcPrQiGXFBH4p2H4XmA7iYMrPsI8NxVgZ7kNX0q1+FGJZJama0tINHRAg==}
@@ -11364,6 +11386,12 @@ snapshots:
   '@effect/ai-typesafe@4.1.4(effect@4.1.4)':
     dependencies:
       effect: 4.1.4
+
+  '@effect/atom-react@4.1.4(effect@4.1.4)(react@19.3.1)(scheduler@0.28.0)':
+    dependencies:
+      effect: 4.1.4
+      react: 19.3.1
+      scheduler: 0.28.0
 
   '@effect/platform-node-shared@4.1.4(effect@4.1.4)':
     dependencies:

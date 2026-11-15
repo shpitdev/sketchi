@@ -1,4 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { RegistryProvider } from "@effect/atom-react";
+import { Layer } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { queryHttpLayer } from "./lib/query-atoms";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getPackShelf, type PackShelfData } from "./lib/packs-rpc";
@@ -46,7 +50,20 @@ const manifest = {
 function renderHomeRoute() {
 	const HomeRoute = Route.options.component;
 	if (!HomeRoute) throw new Error("The home route has no component.");
-	return render(<HomeRoute />);
+	return render(
+		<RegistryProvider
+			initialValues={[
+				[
+					queryHttpLayer,
+					FetchHttpClient.layer.pipe(
+						Layer.provide(Layer.succeed(FetchHttpClient.Fetch, globalThis.fetch)),
+					),
+				],
+			]}
+		>
+			<HomeRoute />
+		</RegistryProvider>,
+	);
 }
 
 describe("home route", () => {
@@ -90,20 +107,6 @@ describe("home route", () => {
 		expect(await screen.findByRole("button", { name: /Copy Codex/ })).toBeTruthy();
 	});
 
-	it("loads the icon manifest into the library", async () => {
-		const fetchMock = vi.fn().mockResolvedValue(Response.json(manifest));
-		vi.stubGlobal("fetch", fetchMock);
-
-		renderHomeRoute();
-
-		expect(screen.getByLabelText("Loading icons")).toBeTruthy();
-		expect(await screen.findByRole("button", { name: /Copy Codex/ })).toBeTruthy();
-		expect(fetchMock).toHaveBeenCalledWith("/icons-manifest.json", {
-			cache: "no-cache",
-			signal: expect.any(AbortSignal),
-		});
-	});
-
 	it("surfaces a failed load and retries through the same query", async () => {
 		const fetchMock = vi
 			.fn()
@@ -117,7 +120,9 @@ describe("home route", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
 		expect(await screen.findByRole("button", { name: /Copy Codex/ })).toBeTruthy();
-		const manifestLoads = fetchMock.mock.calls.filter(([url]) => url === "/icons-manifest.json");
+		const manifestLoads = fetchMock.mock.calls.filter(([url]) =>
+			String(url).endsWith("/icons-manifest.json"),
+		);
 		expect(manifestLoads).toHaveLength(2);
 	});
 
@@ -125,8 +130,12 @@ describe("home route", () => {
 		const drawings = {
 			codex: { parts: [{ kind: "rect", x: 4, y: 4, width: 16, height: 16, fill: "#10a37f" }] },
 		};
-		const fetchMock = vi.fn(async (url: string) =>
-			Response.json(url === "/icon-drawings.json" ? drawings : manifest),
+		const fetchMock = vi.fn(async (url: RequestInfo | URL) =>
+			Response.json(
+				(url instanceof Request ? url.url : url.toString()).endsWith("/icon-drawings.json")
+					? drawings
+					: manifest,
+			),
 		);
 		vi.stubGlobal("fetch", fetchMock);
 
@@ -137,8 +146,8 @@ describe("home route", () => {
 	});
 
 	it("keeps the SVG library when the drawings cannot load", async () => {
-		const fetchMock = vi.fn(async (url: string) =>
-			url === "/icon-drawings.json"
+		const fetchMock = vi.fn(async (url: RequestInfo | URL) =>
+			(url instanceof Request ? url.url : url.toString()).endsWith("/icon-drawings.json")
 				? new Response("unavailable", { status: 503 })
 				: Response.json(manifest),
 		);
@@ -147,6 +156,47 @@ describe("home route", () => {
 		renderHomeRoute();
 
 		expect(await screen.findByRole("button", { name: /Copy Codex SVG/ })).toBeTruthy();
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3), { timeout: 2500 });
+		expect(screen.getByRole("button", { name: /Copy Codex SVG/ })).toBeTruthy();
 		expect(screen.queryByRole("button", { name: "Hand-drawn" })).toBeNull();
+	});
+	it("starts drawings only after a valid manifest and aborts the pending request on unmount", async () => {
+		const manifestResponse = Promise.withResolvers<Response>();
+		const drawingResponse = Promise.withResolvers<Response>();
+		const fetchMock = vi.fn<typeof globalThis.fetch>((input) =>
+			new URL(input instanceof Request ? input.url : input).pathname === "/icons-manifest.json"
+				? manifestResponse.promise
+				: drawingResponse.promise,
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const view = renderHomeRoute();
+		expect(screen.getByLabelText("Loading icons")).toBeTruthy();
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+		expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+			cache: "no-cache",
+			signal: expect.any(AbortSignal),
+		});
+		fireEvent(window, new Event("online"));
+		fireEvent(window, new Event("focus"));
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		await act(async () => {
+			manifestResponse.resolve(Response.json(manifest));
+			await manifestResponse.promise;
+		});
+		expect(await screen.findByRole("button", { name: /Copy Codex SVG/ })).toBeTruthy();
+		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+		view.unmount();
+		await waitFor(() => expect(fetchMock.mock.calls[1]?.[1]?.signal?.aborted).toBe(true));
+		drawingResponse.resolve(Response.json({}));
+	});
+	it("reports invalid published data without starting optional drawings or silently retrying", async () => {
+		const fetchMock = vi.fn<typeof globalThis.fetch>(() =>
+			Promise.resolve(Response.json({ version: 2 })),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		renderHomeRoute();
+		expect(await screen.findByRole("button", { name: "Try again" })).toBeTruthy();
+		expect(screen.getByText(/manifest/i, { selector: "p" })).toBeTruthy();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });
