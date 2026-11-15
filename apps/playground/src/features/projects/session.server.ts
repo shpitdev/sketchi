@@ -1,4 +1,3 @@
-import { nanoid } from "nanoid";
 import { Context, Effect, Layer, Option, Schema, String as Str, Array } from "effect";
 
 import {
@@ -28,6 +27,12 @@ export interface StudioSessionResolution {
 	publicSession: StudioPublicSession;
 	setCookie?: string;
 }
+
+/** Resolved once by the native HTTP middleware for the current request. */
+export class CurrentStudioSession extends Context.Service<
+	CurrentStudioSession,
+	StudioSessionResolution
+>()("StudioProjectsCurrentSession") {}
 
 export interface StudioSessionServiceShape {
 	readonly resolve: (
@@ -107,9 +112,9 @@ export function studioOwnersMatch(left: StudioOwner, right: StudioOwner): boolea
 		: false;
 }
 
-export function resolveStudioSession(
+function resolveStudioSession(
 	request: Request,
-	createSessionId: () => string = () => `anon_${nanoid(24)}`,
+	createSessionId: () => string,
 ): StudioSessionResolution {
 	const existingSessionId = Schema.decodeUnknownOption(AnonymousStudioSessionIdSchema)(
 		cookieValue(request, STUDIO_SESSION_COOKIE),
@@ -165,11 +170,6 @@ function makeStudioSessionService(createSessionId: () => string) {
 		}),
 	});
 }
-
-export const StudioSessionServiceLive = Layer.succeed(
-	StudioSessionService,
-	makeStudioSessionService(() => `anon_${nanoid(24)}`),
-);
 
 export function makeStudioSessionServiceLayer(options: { readonly createSessionId: () => string }) {
 	return Layer.succeed(StudioSessionService, makeStudioSessionService(options.createSessionId));

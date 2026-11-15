@@ -29,10 +29,7 @@ import {
 } from "../../features/build/capabilities.server";
 import { PlaygroundGenerationLive } from "../generation/service.server";
 import { PlaygroundCodeModeUsageLive } from "../../features/build/usage-events.server";
-import {
-	PlaygroundStudioLayer,
-	PlaygroundStudioLocalBucketLive,
-} from "../studio/projects.server";
+import { PlaygroundStudioLayer, PlaygroundStudioLocalBucketLive } from "../studio/projects.server";
 import {
 	PlaygroundBindings,
 	PlaygroundClockLive,

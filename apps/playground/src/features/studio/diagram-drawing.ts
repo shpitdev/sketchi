@@ -1,12 +1,9 @@
 import { convertSceneToExcalidraw, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { Effect, Array, Record } from "effect";
+import { Effect, Array, Record, Schema } from "effect";
 import { HttpApiClient } from "effect/http-api";
 import { StudioHttpApi } from "../projects/http-api";
-const decodeDrawing = HttpApiClient.decodeResponse(StudioHttpApi, {
-	group: "projects",
-	endpoint: "drawing",
-});
 import { Atom } from "effect/reactivity";
+import { StudioRecordIdSchema } from "../projects/contracts";
 import type {
 	StudioDiagramSummary,
 	StudioDrawing,
@@ -15,6 +12,11 @@ import type {
 import { StudioApi, projectsRuntime } from "../projects/client";
 import { loadArtifactReview } from "../artifacts/artifact-view-client";
 import { readDrawingDraft } from "./drawing-drafts";
+
+const decodeDrawing = HttpApiClient.decodeResponse(StudioHttpApi, {
+	group: "projects",
+	endpoint: "drawing",
+});
 
 export interface DiagramDrawing {
 	diagram: StudioDiagramSummary;
@@ -26,10 +28,11 @@ export interface DiagramDrawing {
 export const loadDiagramDrawing = Effect.fn("Studio.diagram.drawing")(function* (
 	diagramId: string,
 ) {
+	const id = yield* Schema.decodeUnknownEffect(StudioRecordIdSchema)(diagramId);
 	const api = yield* StudioApi;
-	const details = yield* api.projects.diagram({ params: { diagramId } });
+	const details = yield* api.projects.diagram({ params: { diagramId: id } });
 	const stored = yield* api.projects.drawing({
-		params: { diagramId },
+		params: { diagramId: id },
 		responseMode: "response-only",
 	});
 	// A saved drawing is authoritative, including drawings written before metadata
@@ -51,7 +54,12 @@ export const editableDiagramDrawing = Atom.family((diagramId: string) =>
 			Effect.all(
 				{ drawing: loadDiagramDrawing(diagramId), draft: readDrawingDraft(diagramId) },
 				{ concurrency: 2 },
-			).pipe(Effect.map(({ drawing, draft }) => ({ ...drawing, draft }))),
+			).pipe(
+				Effect.map(({ drawing, draft }) => ({
+					...drawing,
+					draft: draft ? sceneFromDrawing(draft) : undefined,
+				})),
+			),
 		)
 		.pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial),
 );

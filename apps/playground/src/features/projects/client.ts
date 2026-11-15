@@ -1,8 +1,9 @@
 import { Cause, Effect, Layer, Schema, Stream } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest } from "effect/http";
 import { AsyncResult, Atom, AtomHttpApi } from "effect/reactivity";
 
-import { StudioHttpApi } from "./http-api";
+import { StudioHttpApi, StudioHttpFailure } from "./http-api";
+import { StudioRecordIdSchema } from "./contracts";
 
 export class StudioApi extends AtomHttpApi.Service<StudioApi>()("StudioProjectsClient", {
 	api: StudioHttpApi,
@@ -27,7 +28,13 @@ export const projectsQuery = projectsRuntime
 
 export const projectQuery = Atom.family((projectId: string) =>
 	projectsRuntime
-		.atom(Effect.flatMap(StudioApi, (api) => api.projects.project({ params: { projectId } })))
+		.atom(
+			Effect.gen(function* () {
+				const id = yield* Schema.decodeUnknownEffect(StudioRecordIdSchema)(projectId);
+				const api = yield* StudioApi;
+				return yield* api.projects.project({ params: { projectId: id } });
+			}),
+		)
 		.pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial),
 );
 
@@ -47,7 +54,9 @@ export const createProject = Atom.family((artifactId: string) =>
 
 export function resourceError<A, E>(result: AsyncResult.AsyncResult<A, E>, fallback: string) {
 	if (!AsyncResult.isFailure(result)) return fallback;
-	const error = Cause.squash(result.cause);
+	const failed = Cause.squash(result.cause);
+	const error = Schema.is(StudioHttpFailure)(failed) ? failed.body : failed;
+	if (HttpClientError.isHttpClientError(error) || Schema.isSchemaError(error)) return fallback;
 	return typeof error === "object" &&
 		error !== null &&
 		"message" in error &&

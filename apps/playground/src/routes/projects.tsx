@@ -1,9 +1,8 @@
 import { Array } from "effect";
-import { projectsQuery } from "@/features/projects/client";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
-import { resourceError } from "@/features/projects/client";
+import { projectsQuery, resourceError } from "@/features/projects/client";
 
 import { studioDiagramUrl, studioProjectUrl } from "@/features/projects/contracts";
 import { StudioHeader } from "@/components/studio-header";
@@ -45,7 +44,7 @@ function ProjectsRoute() {
 				) : null}
 				{AsyncResult.isSuccess(state) && state.value.projects.length > 0 ? (
 					<div className="studio-workspace__grid">
-						{Array.map(state.value.projects,(project) => (
+						{Array.map(state.value.projects, (project) => (
 							<article className="studio-project-row" key={project.id}>
 								<div className="studio-project-row__content">
 									<h2>{project.title}</h2>

@@ -1,9 +1,8 @@
 import { Array } from "effect";
-import { projectQuery } from "@/features/projects/client";
 import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
-import { resourceError } from "@/features/projects/client";
+import { projectQuery, resourceError } from "@/features/projects/client";
 
 import { studioDiagramUrl } from "@/features/projects/contracts";
 import { IconActionBar, IconLink } from "@/components/sketch-icons";
@@ -43,7 +42,7 @@ function ProjectRoute() {
 						</div>
 
 						<div className="studio-workspace__grid">
-							{Array.map(state.value.details.diagrams,(diagram) => (
+							{Array.map(state.value.details.diagrams, (diagram) => (
 								<article className="studio-project-row" key={diagram.id}>
 									<div className="studio-project-row__content">
 										<h2>{diagram.title}</h2>

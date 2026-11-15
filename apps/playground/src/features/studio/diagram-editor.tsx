@@ -1,8 +1,9 @@
 import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { downloadBlob, DrawingEditor } from "@sketchi/editor";
 import { RegistryContext, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react";
-import { Effect, Stream, String as Str } from "effect";
+import { Effect, Schema, Stream, String as Str } from "effect";
 import { Atom, AsyncResult } from "effect/reactivity";
+import { StudioRecordIdSchema } from "../projects/contracts";
 import { StudioApi, projectsRuntime } from "../projects/client";
 import { useCallback, useContext, useState, type KeyboardEvent, type ReactNode } from "react";
 
@@ -45,8 +46,12 @@ export function useDrawingSession({
 						if (!scene) return;
 						const signature = drawingSignature(scene);
 						if (signature === get(savedSignature)) return;
+						const id = yield* Schema.decodeUnknownEffect(StudioRecordIdSchema)(diagramId);
 						const api = yield* StudioApi;
-						yield* api.projects.save({ params: { diagramId }, payload: drawingFromScene(scene) });
+						yield* api.projects.save({
+							params: { diagramId: id },
+							payload: drawingFromScene(scene),
+						});
 						get.set(savedSignature, signature);
 						const current = get(latest);
 						if (current && drawingSignature(current) === signature)
@@ -79,10 +84,14 @@ export function useDrawingSession({
 			},
 		);
 		const status = Atom.make((get): DrawingSaveStatus => {
+			// Retain both content authorities through pending mutations. FnContext
+			// reads do not mount atoms, and a waiting-only branch would release the
+			// saved baseline before the request settles.
+			const scene = get(latest);
+			const persisted = get(savedSignature);
 			const result = get(save);
 			if (result.waiting) return "saving";
-			const scene = get(latest);
-			if (!scene || drawingSignature(scene) === get(savedSignature)) return "saved";
+			if (!scene || drawingSignature(scene) === persisted) return "saved";
 			return AsyncResult.isFailure(result) ? "error" : "unsaved";
 		});
 		return { latest, persistedDraft, save, change, status };
@@ -141,7 +150,7 @@ export function DiagramEditor({
 				if (!isSaveShortcut(event)) return;
 				event.preventDefault();
 				event.stopPropagation();
-				void save();
+				save();
 			}}
 		>
 			<StudioHeader className="studio-header--ruled">
@@ -151,7 +160,7 @@ export function DiagramEditor({
 						disabled={status === "saved" || status === "saving"}
 						icon="save"
 						label={SAVE_LABELS[status]}
-						onClick={() => void save()}
+						onClick={save}
 						showLabel
 						tone={status === "saved" ? "default" : "primary"}
 					/>

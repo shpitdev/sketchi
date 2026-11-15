@@ -62,7 +62,7 @@ function edit(scene: ExcalidrawScene, id: string, version: number): ExcalidrawSc
 
 function renderEditor(draft?: ExcalidrawScene) {
 	render(
-		<RegistryProvider>
+		<RegistryProvider defaultIdleTTL={1} timeoutResolution={1}>
 			<DiagramEditor
 				diagramId="dia_test"
 				draft={draft}
@@ -81,7 +81,8 @@ beforeEach(() => {
 	vi.stubGlobal(
 		"fetch",
 		vi.fn(async (_url: unknown, init: RequestInit) => {
-			await studio.save("dia_test", JSON.parse(String(init.body)));
+			const payload: unknown = await new Response(init.body).json();
+			await studio.save("dia_test", payload);
 			return Response.json({
 				ok: true,
 				auth: { status: "anonymous", message: "Anonymous" },
@@ -148,6 +149,39 @@ describe("Studio diagram editor", () => {
 			files: {},
 		});
 		expect(drafts.clear).toHaveBeenCalledOnce();
+	});
+
+	it("saves native elements with undefined optional customData through the real HTTP codec", async () => {
+		renderEditor();
+		act(() => canvas.change?.(saved));
+		const edited = {
+			...edit(saved, "box", 2),
+			elements: edit(saved, "box", 2).elements.map((element) => ({
+				...element,
+				customData: undefined,
+			})),
+		};
+		act(() => canvas.change?.(edited));
+		fireEvent.click(saveButton("Save"));
+		await waitFor(() => expect(saveButton("Saved")).toHaveProperty("disabled", true));
+		expect(studio.save).toHaveBeenCalledWith("dia_test", drawingFromScene(edit(saved, "box", 2)));
+	});
+
+	it("retains the durable baseline through a pending Save and later scene notification when the request fails", async () => {
+		const pending = Promise.withResolvers<unknown>();
+		studio.save.mockReturnValue(pending.promise);
+		renderEditor();
+		act(() => canvas.change?.(saved));
+		act(() => canvas.change?.(edit(saved, "box", 2)));
+		fireEvent.click(saveButton("Save"));
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 20));
+		});
+		act(() => canvas.change?.(edit(saved, "box", 3)));
+		await act(async () => pending.reject(new Error("offline")));
+		await waitFor(() => expect(saveButton("Save failed, retry")).toHaveProperty("disabled", false));
+		expect(drafts.clear).not.toHaveBeenCalled();
+		expect(studio.save).toHaveBeenCalledOnce();
 	});
 
 	it("keeps an edit made while saving as unsaved", async () => {

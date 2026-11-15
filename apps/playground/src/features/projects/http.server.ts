@@ -1,391 +1,259 @@
 import { SpanContent } from "@sketchi/observability";
-import { Context, Effect, Layer, Schema, Record } from "effect";
-import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
-import { HttpApiBuilder } from "effect/http-api";
-import { StudioHttpApi } from "./http-api";
-
+import { ByteSize, Effect, Layer } from "effect";
 import {
-	CreateStudioProjectFromArtifactRequest,
-	StudioDrawing,
-	StudioRecordIdSchema,
-} from "./contracts";
+	HttpIncomingMessage,
+	HttpRouter,
+	HttpServer,
+	HttpServerError,
+	HttpServerRequest,
+	HttpServerResponse,
+} from "effect/http";
+import { HttpApiBuilder, HttpApiMiddleware, HttpApiSchema } from "effect/http-api";
 import {
-	StudioSessionError,
-	StudioInvalidInputError,
-	StudioNotFoundError,
-	type StudioHttpError,
-} from "./errors.server";
+	STUDIO_DRAWING_MAX_BYTES,
+	StudioHttpApi,
+	StudioSchemaErrors,
+	StudioSessionMiddleware,
+	type StudioFailure,
+} from "./http-api";
 import { StudioProjects } from "./service.server";
-import { StudioSessionService, type StudioSessionResolution } from "./session.server";
+import {
+	CurrentStudioSession,
+	StudioSessionService,
+	type StudioSessionResolution,
+} from "./session.server";
+import type { StudioProjectsError } from "./errors.server";
 
-type RequestedResource = "diagram" | "project";
-
-const readRequestJson = Effect.fn("studioPersistence.http.readJson")(function* (
-	request: HttpServerRequest.HttpServerRequest,
-) {
-	const body: unknown = yield* request.json.pipe(
-		Effect.mapError((cause) =>
-			StudioInvalidInputError.make({
-				cause,
-				message: "A playground artifactId is required.",
-			}),
-		),
-	);
-	yield* Effect.annotateCurrentSpan(SpanContent.httpRequestBody, body);
-	return body;
-});
-
-/** A saved drawing carries its image files inline, so it gets more room than a record. */
-export const STUDIO_DRAWING_MAX_BYTES = 16 * 1024 * 1024;
-
-const drawingTooLarge = () =>
-	StudioInvalidInputError.make({ message: "The drawing is too large to save." });
-
-const readDrawingJson = Effect.fn("studioPersistence.http.readDrawing")(function* (
-	request: HttpServerRequest.HttpServerRequest,
-) {
-	const contentLength = Number(request.headers["content-length"]);
-	if (Number.isFinite(contentLength) && contentLength > STUDIO_DRAWING_MAX_BYTES) {
-		return yield* drawingTooLarge();
-	}
-	const text = yield* request.text.pipe(
-		Effect.mapError((cause) =>
-			StudioInvalidInputError.make({ cause, message: "A drawing is required." }),
-		),
-	);
-	if (new TextEncoder().encode(text).byteLength > STUDIO_DRAWING_MAX_BYTES) {
-		return yield* drawingTooLarge();
-	}
-	// The drawing is not recorded on the span: it can be megabytes of image data.
-	const body = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
-		Effect.mapError((cause) =>
-			StudioInvalidInputError.make({ cause, message: "A drawing is required." }),
-		),
-	);
-	return yield* Schema.decodeUnknownEffect(StudioDrawing, { errors: "all" })(body).pipe(
-		Effect.mapError((cause) =>
-			StudioInvalidInputError.make({
-				cause,
-				message: "The drawing is not a valid Excalidraw scene.",
-			}),
-		),
-	);
-});
-
-function responseHeaders(resolution?: StudioSessionResolution): Headers {
-	const headers = new Headers({
-		"Cache-Control": "no-store",
-	});
-
-	if (resolution?.setCookie) {
-		headers.append("Set-Cookie", resolution.setCookie);
-	}
-
-	return headers;
+type FailureBody = StudioFailure["body"];
+function responseHeaders(resolution?: StudioSessionResolution) {
+	return {
+		"cache-control": "no-store" as const,
+		...(resolution?.setCookie ? { "set-cookie": resolution.setCookie } : {}),
+	};
 }
-
-function jsonWithSession(
-	resolution: StudioSessionResolution | undefined,
-	body: unknown,
-	status = 200,
-): HttpServerResponse.HttpServerResponse {
-	return HttpServerResponse.jsonUnsafe(body, {
-		headers: Record.fromEntries(responseHeaders(resolution)),
-		status,
-	});
+function missing(resource: "project" | "diagram"): FailureBody {
+	return {
+		ok: false,
+		status: 404,
+		code: "not_found",
+		message:
+			resource === "project"
+				? "Studio project was not found for this session."
+				: "Studio diagram was not found for this session.",
+	};
 }
-
-function missingResourceMessage(resource: RequestedResource): string {
-	return resource === "project"
-		? "Studio project was not found for this session."
-		: "Studio diagram was not found for this session.";
+function unavailable(message = "Studio persistence failed."): FailureBody {
+	return { ok: false, status: 500, code: "storage_failed", message };
 }
-
-/** The package's only typed-failure to public HTTP contract mapping. */
-function failureResponse(
-	resolution: StudioSessionResolution | undefined,
-	error: StudioHttpError,
-	requestedResource?: RequestedResource,
-): HttpServerResponse.HttpServerResponse {
+function domainFailure(error: StudioProjectsError, resource?: "project" | "diagram"): FailureBody {
 	switch (error._tag) {
-		case "StudioInvalidInputError":
-			return jsonWithSession(
-				resolution,
-				{ code: "invalid_input", message: error.message, ok: false },
-				400,
-			);
 		case "StudioNotFoundError":
 		case "StudioOwnershipError": {
-			const resource =
-				requestedResource ??
-				(error.resource === "diagram" || error.resource === "project" ? error.resource : undefined);
-
-			if (!resource) {
-				return jsonWithSession(
-					resolution,
-					{
-						code: "storage_failed",
-						message: "Studio persistence failed.",
-						ok: false,
-					},
-					500,
-				);
-			}
-
-			return jsonWithSession(
-				resolution,
-				{
-					code: "not_found",
-					message: missingResourceMessage(resource),
-					ok: false,
-				},
-				404,
-			);
+			const requested =
+				resource ??
+				(error.resource === "project" || error.resource === "diagram" ? error.resource : undefined);
+			return requested ? missing(requested) : unavailable();
 		}
 		case "StudioSourceArtifactError":
-			return jsonWithSession(
-				resolution,
-				{ code: error.code, message: error.message, ok: false },
-				error.status,
-			);
+			return {
+				ok: false,
+				status: error.status === 404 ? 404 : error.status === 422 ? 422 : 500,
+				code: error.code,
+				message: error.message,
+			};
 		case "StudioDecodeError":
-			return jsonWithSession(
-				resolution,
-				{
-					code: "storage_failed",
-					message: "Studio persistence failed.",
-					ok: false,
-				},
-				500,
-			);
-		case "StudioSessionError":
-			return jsonWithSession(
-				resolution,
-				{
-					code: "storage_failed",
-					message: "Studio session could not be resolved.",
-					ok: false,
-				},
-				500,
-			);
 		case "StudioStorageError":
-			return jsonWithSession(
-				resolution,
-				{
-					code: "storage_failed",
-					message: "Studio persistence failed.",
-					ok: false,
-				},
-				500,
-			);
+			return unavailable();
 	}
 }
+function withFailureHeaders(
+	body: FailureBody,
+	resolution?: StudioSessionResolution,
+): StudioFailure {
+	const headers = responseHeaders(resolution);
+	switch (body.status) {
+		case 400:
+			return HttpApiSchema.withHeaders({ body, headers });
+		case 404:
+			return HttpApiSchema.withHeaders({ body, headers });
+		case 422:
+			return HttpApiSchema.withHeaders({ body, headers });
+		case 500:
+			return HttpApiSchema.withHeaders({ body, headers });
+	}
+}
+// Only the concrete domain-to-public failure policy remains here. HttpApi owns
+// route parameters, payload decoding, response encoding, status and headers.
+const publicFailure = (resource?: "project" | "diagram") => (error: StudioProjectsError) =>
+	CurrentStudioSession.pipe(
+		Effect.flatMap((session) =>
+			Effect.fail(withFailureHeaders(domainFailure(error, resource), session)),
+		),
+	);
 
-function withStudioSession(
-	request: HttpServerRequest.HttpServerRequest,
-	requestedResource: RequestedResource | undefined,
-	operation: (
-		resolution: StudioSessionResolution,
-		projects: Context.Service.Shape<typeof StudioProjects>,
-	) => Effect.Effect<HttpServerResponse.HttpServerResponse, StudioHttpError>,
-) {
-	return Effect.gen(function* () {
+const SessionLive = Layer.effect(
+	StudioSessionMiddleware,
+	Effect.gen(function* () {
 		const sessions = yield* StudioSessionService;
-		const projects = yield* StudioProjects;
-
-		return yield* HttpServerRequest.toWeb(request)
-			.pipe(
-				Effect.mapError((cause) =>
-					StudioSessionError.make({ cause, message: "Studio session could not be resolved." }),
-				),
-				Effect.flatMap((webRequest) => sessions.resolve(webRequest)),
-			)
-			.pipe(
-				Effect.matchEffect({
-					onFailure: (error) =>
-						Effect.succeed(failureResponse(undefined, error, requestedResource)),
-					onSuccess: (resolution) =>
-						operation(resolution, projects).pipe(
-							Effect.match({
-								onFailure: (error) => failureResponse(resolution, error, requestedResource),
-								onSuccess: (response) => response,
-							}),
+		return StudioSessionMiddleware.of((httpEffect, { endpoint }) =>
+			Effect.gen(function* () {
+				const request = yield* HttpServerRequest.HttpServerRequest;
+				const webRequest = yield* HttpServerRequest.toWeb(request).pipe(
+					Effect.mapError(() =>
+						withFailureHeaders(unavailable("Studio session could not be resolved.")),
+					),
+				);
+				const resolution = yield* sessions
+					.resolve(webRequest)
+					.pipe(
+						Effect.mapError(() =>
+							withFailureHeaders(unavailable("Studio session could not be resolved.")),
 						),
-				}),
-			);
-	});
-}
-
-const handleListProjectsRequestEffect = Effect.fn("studioPersistence.http.listProjects")(function* (
-	request: HttpServerRequest.HttpServerRequest,
-) {
-	return yield* withStudioSession(request, undefined, (resolution, projects) =>
-		projects.listProjects(resolution.session).pipe(
-			Effect.map((projectSummaries) =>
-				jsonWithSession(resolution, {
-					auth: resolution.auth,
-					ok: true,
-					projects: projectSummaries,
-					session: resolution.publicSession,
-				}),
-			),
-		),
-	);
-});
-
-const handleCreateFromArtifactRequestEffect = Effect.fn(
-	"studioPersistence.http.createFromArtifact",
-)(function* (request: HttpServerRequest.HttpServerRequest) {
-	return yield* withStudioSession(request, undefined, (resolution, projects) =>
-		Effect.gen(function* () {
-			const body = yield* readRequestJson(request);
-			const parsed = yield* Schema.decodeUnknownEffect(CreateStudioProjectFromArtifactRequest, {
-				errors: "all",
-			})(body).pipe(
-				Effect.mapError((cause) =>
-					StudioInvalidInputError.make({
-						cause,
-						message: "A playground artifactId is required.",
-					}),
+					);
+				const program = httpEffect.pipe(
+					Effect.provideService(CurrentStudioSession, resolution),
+					Effect.map((response) =>
+						HttpServerResponse.setHeaders(response, responseHeaders(resolution)),
+					),
+					// Installed HttpApiBuilder.decodePayload promotes buffered request read
+					// failures via Effect.orDie. Translate only this native request boundary;
+					// native MaxBodySize still counts bytes and cancels the actual stream.
+					Effect.catchDefect((cause) =>
+						HttpServerError.isHttpServerError(cause) && cause.reason._tag === "RequestParseError"
+							? Effect.fail(
+									withFailureHeaders(
+										{
+											ok: false,
+											status: 400,
+											code: "invalid_input",
+											message:
+												cause.reason.reason === "BodyTooLarge"
+													? "The drawing is too large to save."
+													: endpoint.identifier === "create"
+														? "A playground artifactId is required."
+														: "A drawing is required.",
+										},
+										resolution,
+									),
+								)
+							: Effect.die(cause),
+					),
+				);
+				return yield* endpoint.identifier === "save"
+					? program.pipe(
+							Effect.provideService(
+								HttpIncomingMessage.MaxBodySize,
+								ByteSize.bytes(STUDIO_DRAWING_MAX_BYTES),
+							),
+						)
+					: program;
+			}),
+		);
+	}),
+);
+const SchemaErrorsLive = HttpApiMiddleware.layerSchemaErrorTransform(
+	StudioSchemaErrors,
+	(error, { endpoint }) =>
+		CurrentStudioSession.pipe(
+			Effect.flatMap((session) =>
+				Effect.fail(
+					withFailureHeaders(
+						error.kind === "Params"
+							? missing(endpoint.identifier === "project" ? "project" : "diagram")
+							: error.kind === "Body" || error.kind === "ResponseHeaders"
+								? unavailable()
+								: {
+										ok: false,
+										status: 400,
+										code: "invalid_input",
+										message:
+											endpoint.identifier === "create"
+												? "A playground artifactId is required."
+												: "The drawing is not a valid Excalidraw scene.",
+									},
+						session,
+					),
 				),
-			);
-
-			const result = yield* projects.createFromArtifact({
-				artifactId: parsed.artifactId,
-				session: resolution.session,
-			});
-
-			return jsonWithSession(resolution, {
-				auth: resolution.auth,
-				diagram: result.diagram,
-				ok: true,
-				project: result.project,
-				session: resolution.publicSession,
-				urls: result.urls,
-			});
-		}),
-	);
-});
-
-const handleGetProjectRequestEffect = Effect.fn("studioPersistence.http.getProject")(function* (
-	request: HttpServerRequest.HttpServerRequest,
-	projectId: string,
-) {
-	return yield* withStudioSession(request, "project", (resolution, projects) =>
-		Schema.decodeUnknownEffect(StudioRecordIdSchema)(projectId).pipe(
-			Effect.mapError(() => StudioNotFoundError.make({ id: projectId, resource: "project" })),
-			Effect.flatMap((id) => projects.getProject(resolution.session, id)),
-			Effect.map((details) =>
-				jsonWithSession(resolution, {
-					auth: resolution.auth,
-					details,
-					ok: true,
-					session: resolution.publicSession,
-				}),
 			),
 		),
-	);
-});
-
-const handleGetDiagramRequestEffect = Effect.fn("studioPersistence.http.getDiagram")(function* (
-	request: HttpServerRequest.HttpServerRequest,
-	diagramId: string,
-) {
-	return yield* withStudioSession(request, "diagram", (resolution, projects) =>
-		Schema.decodeUnknownEffect(StudioRecordIdSchema)(diagramId).pipe(
-			Effect.mapError(() => StudioNotFoundError.make({ id: diagramId, resource: "diagram" })),
-			Effect.flatMap((id) => projects.getDiagram(resolution.session, id)),
-			Effect.map((details) =>
-				jsonWithSession(resolution, {
-					auth: resolution.auth,
-					diagram: details.diagram,
-					ok: true,
-					project: details.project,
-					session: resolution.publicSession,
-				}),
-			),
-		),
-	);
-});
-
-function decodeDiagramId(diagramId: string) {
-	return Schema.decodeUnknownEffect(StudioRecordIdSchema)(diagramId).pipe(
-		Effect.mapError(() => StudioNotFoundError.make({ id: diagramId, resource: "diagram" })),
-	);
-}
-
-const handleGetDrawingRequestEffect = Effect.fn("studioPersistence.http.getDrawing")(function* (
-	request: HttpServerRequest.HttpServerRequest,
-	diagramId: string,
-) {
-	return yield* withStudioSession(request, "diagram", (resolution, projects) =>
-		decodeDiagramId(diagramId).pipe(
-			Effect.flatMap((id) => projects.getDrawing(resolution.session, id)),
-			Effect.map((drawing) =>
-				jsonWithSession(resolution, {
-					auth: resolution.auth,
-					drawing,
-					ok: true,
-					session: resolution.publicSession,
-				}),
-			),
-		),
-	);
-});
-
-const handleSaveDrawingRequestEffect = Effect.fn("studioPersistence.http.saveDrawing")(function* (
-	request: HttpServerRequest.HttpServerRequest,
-	diagramId: string,
-) {
-	return yield* withStudioSession(request, "diagram", (resolution, projects) =>
-		Effect.gen(function* () {
-			const id = yield* decodeDiagramId(diagramId);
-			const drawing = yield* readDrawingJson(request);
-			const diagram = yield* projects.saveDrawing(resolution.session, id, drawing);
-			return jsonWithSession(resolution, {
-				auth: resolution.auth,
-				diagram,
-				ok: true,
-				session: resolution.publicSession,
-			});
-		}),
-	);
-});
-
-// Raw body handlers retain the established safe error envelope and the drawing
-// size boundary. Routing, parameters and client codecs share this one HttpApi.
-const StudioHttpHandlers = HttpApiBuilder.group(StudioHttpApi, "projects", (handlers) =>
+);
+const Handlers = HttpApiBuilder.group(StudioHttpApi, "projects", (handlers) =>
 	handlers
-		.handleRaw("list", () =>
-			Effect.flatMap(HttpServerRequest.HttpServerRequest, handleListProjectsRequestEffect),
+		.handle("list", () =>
+			Effect.gen(function* () {
+				const session = yield* CurrentStudioSession;
+				const projects = yield* StudioProjects;
+				const summaries = yield* projects
+					.listProjects(session.session)
+					.pipe(Effect.catch(publicFailure()));
+				return {
+					auth: session.auth,
+					ok: true as const,
+					projects: summaries,
+					session: session.publicSession,
+				};
+			}),
 		)
-		.handleRaw("create", () =>
-			Effect.flatMap(HttpServerRequest.HttpServerRequest, handleCreateFromArtifactRequestEffect),
+		.handle("create", ({ payload }) =>
+			Effect.gen(function* () {
+				const session = yield* CurrentStudioSession;
+				const projects = yield* StudioProjects;
+				yield* Effect.annotateCurrentSpan(SpanContent.httpRequestBody, payload);
+				const result = yield* projects
+					.createFromArtifact({ artifactId: payload.artifactId, session: session.session })
+					.pipe(Effect.catch(publicFailure()));
+				return { ...result, auth: session.auth, session: session.publicSession };
+			}),
 		)
-		.handleRaw("project", ({ params }) =>
-			Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
-				handleGetProjectRequestEffect(request, params.projectId),
-			),
+		.handle("project", ({ params }) =>
+			Effect.gen(function* () {
+				const session = yield* CurrentStudioSession;
+				const projects = yield* StudioProjects;
+				const details = yield* projects
+					.getProject(session.session, params.projectId)
+					.pipe(Effect.catch(publicFailure("project")));
+				return { auth: session.auth, ok: true as const, details, session: session.publicSession };
+			}),
 		)
-		.handleRaw("diagram", ({ params }) =>
-			Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
-				handleGetDiagramRequestEffect(request, params.diagramId),
-			),
+		.handle("diagram", ({ params }) =>
+			Effect.gen(function* () {
+				const session = yield* CurrentStudioSession;
+				const projects = yield* StudioProjects;
+				const details = yield* projects
+					.getDiagram(session.session, params.diagramId)
+					.pipe(Effect.catch(publicFailure("diagram")));
+				return {
+					...details,
+					auth: session.auth,
+					ok: true as const,
+					session: session.publicSession,
+				};
+			}),
 		)
-		.handleRaw("drawing", ({ params }) =>
-			Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
-				handleGetDrawingRequestEffect(request, params.diagramId),
-			),
+		.handle("drawing", ({ params }) =>
+			Effect.gen(function* () {
+				const session = yield* CurrentStudioSession;
+				const projects = yield* StudioProjects;
+				const drawing = yield* projects
+					.getDrawing(session.session, params.diagramId)
+					.pipe(Effect.catch(publicFailure("diagram")));
+				return { auth: session.auth, ok: true as const, drawing, session: session.publicSession };
+			}),
 		)
-		.handleRaw("save", ({ params }) =>
-			Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
-				handleSaveDrawingRequestEffect(request, params.diagramId),
-			),
+		.handle("save", ({ params, payload }) =>
+			Effect.gen(function* () {
+				const session = yield* CurrentStudioSession;
+				const projects = yield* StudioProjects;
+				const diagram = yield* projects
+					.saveDrawing(session.session, params.diagramId, payload)
+					.pipe(Effect.catch(publicFailure("diagram")));
+				return { auth: session.auth, ok: true as const, diagram, session: session.publicSession };
+			}),
 		),
 );
 export const studioHttp = HttpRouter.toHttpEffect(
 	HttpApiBuilder.layer(StudioHttpApi).pipe(
-		Layer.provide(StudioHttpHandlers),
+		Layer.provide(Handlers.pipe(Layer.provide(Layer.merge(SessionLive, SchemaErrorsLive)))),
 		Layer.provide(HttpServer.layerServices),
 	),
 ).pipe(Effect.provideService(HttpRouter.RouterConfig, { maxParamLength: 2048 }));

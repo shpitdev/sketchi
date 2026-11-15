@@ -8,9 +8,8 @@ import { MemoryStudioObjectBucket } from "../../features/projects/bucket.server"
 import type { StudioEnv } from "../bindings/studio-env.server";
 import * as Build from "@sketchi/diagrams/build/code-mode/runtime";
 import { buildResponse } from "@sketchi/diagrams/build/operation";
-import { runPlaygroundEffect } from "../runtime/runtime.server";
+import { runPlaygroundEffect, makePlaygroundRuntime } from "../runtime/runtime.server";
 import { handleStudioProjectsRequest } from "./projects.server";
-import { makePlaygroundRuntime } from "../runtime/runtime.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
 	return {

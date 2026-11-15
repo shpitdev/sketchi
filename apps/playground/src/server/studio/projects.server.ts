@@ -4,10 +4,8 @@ import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artif
 import { CodeModeRuntimeEnvironment, getArtifact } from "@sketchi/diagrams/build/code-mode/runtime";
 import { RenderedDiagramSceneSchema } from "@sketchi/diagrams/build/code-mode/contract";
 import {
-	isStudioObjectBucket,
 	makeStudioObjectStoreLayer,
 	MemoryStudioObjectBucket,
-	type StudioObjectBucket,
 } from "../../features/projects/bucket.server";
 import { makeIsoDateString, makeStudioRecordId } from "../../features/projects/contracts";
 import { studioHttp } from "../../features/projects/http.server";
@@ -19,7 +17,7 @@ import {
 import { makeStudioSessionServiceLayer } from "../../features/projects/session.server";
 import { StudioSourceArtifactError } from "../../features/projects/errors.server";
 import { StudioSourceArtifactStore } from "../../features/projects/source-artifacts.server";
-import { HttpRouter, HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Context, Effect, Layer, Schema, Result } from "effect";
 
 import { artifactStoreForBindings } from "../../features/build/capabilities.server";
@@ -120,7 +118,7 @@ export const PlaygroundStudioLayer = Layer.effect(
 				).pipe(
 					// @effect-diagnostics-next-line strictEffectProvide:off -- This HTTP entry point owns the request binding, native router and stateless projects layer in one scope.
 					Effect.provide(StudioProjectsLive.pipe(Layer.provideMerge(dependencies))),
-					Effect.catchCause(() =>
+					Effect.catch(() =>
 						Effect.succeed(
 							Response.json(
 								{ ok: false, code: "storage_failed", message: "Studio persistence failed." },

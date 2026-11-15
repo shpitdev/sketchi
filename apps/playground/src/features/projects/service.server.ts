@@ -3,10 +3,8 @@ import {
 	withTelemetryCorrelation,
 	type TelemetryCorrelationInput,
 } from "@sketchi/observability";
-import { nanoid } from "nanoid";
 import {
 	Cause,
-	DateTime,
 	Array,
 	String as Str,
 	Context,
@@ -194,11 +192,6 @@ export class StudioRecordFactory extends Context.Service<
 	StudioRecordFactory,
 	StudioRecordFactoryShape
 >()("@sketchi/studio/projects/StudioRecordFactory") {}
-
-export const StudioRecordFactoryLive = Layer.succeed(StudioRecordFactory, {
-	createId: (kind) => makeStudioRecordId(`${kind}_${nanoid(14)}`),
-	now: DateTime.now.pipe(Effect.map((now) => makeIsoDateString(DateTime.formatIso(now)))),
-});
 
 function keySegment(value: string): string {
 	return encodeURIComponent(value);
@@ -395,6 +388,12 @@ export const StudioProjectsLive = Layer.effect(
 					),
 				{ concurrency: diagramConcurrency },
 			);
+
+			// The project is a publication reference, never a partially assembled view.
+			// A failed final put can commit before its response is lost; best-effort
+			// cleanup may leave that record after deleting a child.
+			if (Array.some(diagrams, (diagram) => diagram === null))
+				return yield* StudioNotFoundError.make({ id: projectId, resource: "project" });
 
 			return {
 				diagrams: Array.flatMap(diagrams, (diagram) => (diagram === null ? [] : [diagram])),

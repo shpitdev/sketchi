@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
-import { AsyncResult } from "effect/reactivity";
-import { resourceError } from "@/features/projects/client";
 import { artifactRouteUrls, artifactReview } from "@/features/artifacts/artifact-view-client";
 import { EditableArtifactStage } from "@/features/artifacts/editable-artifact-stage";
 

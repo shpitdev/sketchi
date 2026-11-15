@@ -7,7 +7,6 @@ import {
 import { Effect, Layer, Stream } from "effect";
 import { Atom } from "effect/reactivity";
 import { StudioDrawing } from "../projects/contracts";
-import { sceneFromDrawing } from "./diagram-drawing";
 
 // Version 1, out-of-line keys, and structured drawing values are the deployed
 // wire. The native table encodes the row without its out-of-line key.
@@ -35,7 +34,8 @@ export const readDrawingDraft = (diagramId: string) =>
 				.select()
 				.equals(`diagram:${diagramId}`)
 				.first();
-			return sceneFromDrawing(row);
+			const { key: _key, ...drawing } = row;
+			return drawing;
 		}),
 	);
 

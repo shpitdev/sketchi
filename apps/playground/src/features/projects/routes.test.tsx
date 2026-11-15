@@ -160,7 +160,7 @@ describe("actual Studio route consumers", () => {
 			.mockResolvedValueOnce(
 				Response.json(
 					{ ok: false, code: "storage_failed", message: "Save unavailable" },
-					{ status: 500 },
+					{ status: 500, headers: { "cache-control": "no-store" } },
 				),
 			)
 			.mockResolvedValueOnce(Response.json(created));

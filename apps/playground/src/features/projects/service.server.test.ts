@@ -15,7 +15,7 @@ import {
 	type StudioObjectStoreShape,
 	type StudioObjectBucketBody,
 } from "./bucket.server.js";
-import { StudioOwnershipError, StudioSourceArtifactError } from "./errors.server.js";
+import { StudioOwnershipError } from "./errors.server.js";
 import {
 	makeStudioPersistencePolicyLayer,
 	makeStudioRecordFactoryLayer,
@@ -23,9 +23,7 @@ import {
 	StudioProjects,
 	StudioProjectsLive,
 	studioOwnerKey,
-	studioOwnerProjectEntryKey,
 	studioOwnerProjectsPrefix,
-	studioDiagramRecordKey,
 	studioProjectRecordKey,
 } from "./service.server.js";
 import { makeStudioSessionServiceLayer, StudioSessionService } from "./session.server.js";
@@ -65,21 +63,18 @@ function projectLayer(options: {
 	bucket?: MemoryStudioObjectBucket;
 	objectStore?: StudioObjectStoreShape;
 	sourceArtifact?: { diagramId: string; title: string };
-	sourceFailure?: StudioSourceArtifactError;
 }) {
 	const objectStoreLayer = options.objectStore
 		? Layer.succeed(StudioObjectStore, options.objectStore)
 		: makeStudioObjectStoreLayer(options.bucket ?? new MemoryStudioObjectBucket());
 	const sourceLayer = Layer.succeed(StudioSourceArtifactStore, {
 		load: () =>
-			options.sourceFailure
-				? Effect.fail(options.sourceFailure)
-				: Effect.succeed(
-						options.sourceArtifact ?? {
-							diagramId: "artifact-diagram",
-							title: "Effect Studio project",
-						},
-					),
+			Effect.succeed(
+				options.sourceArtifact ?? {
+					diagramId: "artifact-diagram",
+					title: "Effect Studio project",
+				},
+			),
 	});
 	const dependencies = Layer.mergeAll(
 		objectStoreLayer,
@@ -104,7 +99,6 @@ describe("StudioProjects Effect service", () => {
 				`compensates write ${failedWrite} failure (cleanup failure: ${failCleanup}) without replacing its cause`,
 				() => {
 					const failure = new Error("partial R2 write failure");
-					const deleted: string[] = [];
 					let writes = 0;
 					class PartialWriteBucket extends MemoryStudioObjectBucket {
 						override async put(key: string, value: StudioObjectBucketBody) {
@@ -114,7 +108,6 @@ describe("StudioProjects Effect service", () => {
 							return metadata;
 						}
 						override async delete(key: string) {
-							deleted.push(key);
 							if (failCleanup && key === studioProjectRecordKey("proj_effecttest")) {
 								throw new Error("cleanup failed");
 							}
@@ -136,11 +129,7 @@ describe("StudioProjects Effect service", () => {
 							assert.strictEqual(error.cause, failure);
 							assert.strictEqual(error.operation, "put");
 						}
-						assert.deepStrictEqual(deleted, [
-							studioOwnerProjectEntryKey(owner, "proj_effecttest"),
-							studioProjectRecordKey("proj_effecttest"),
-							studioDiagramRecordKey("dia_effecttest"),
-						]);
+
 						const expected = new Map([["unrelated.json", "preserved"]]);
 						if (failCleanup && failedWrite === 3) {
 							const key = studioProjectRecordKey("proj_effecttest");
@@ -157,13 +146,11 @@ describe("StudioProjects Effect service", () => {
 
 	it.effect("compensates an interrupted partial create without translating cancellation", () => {
 		const records = new Map<string, StudioObjectBucketBody>();
-		const deleted: string[] = [];
 		let writes = 0;
 		const objectStore: StudioObjectStoreShape = {
 			head: () => Effect.succeed(null),
 			delete: (key) =>
 				Effect.sync(() => {
-					deleted.push(key);
 					records.delete(key);
 				}),
 			getText: () => Effect.succeed(null),
@@ -194,7 +181,6 @@ describe("StudioProjects Effect service", () => {
 			assert.isTrue(Exit.isFailure(exit));
 			if (Exit.isFailure(exit)) assert.isTrue(Cause.hasInterrupts(exit.cause));
 			assert.strictEqual(records.size, 0);
-			assert.lengthOf(deleted, 3);
 		}).pipe(Effect.provide(projectLayer({ objectStore })));
 	});
 

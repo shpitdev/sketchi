@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/studio/diagrams/$diagramId/drawing")({
 	server: {
 		handlers: {
-			GET: async ({ params, request }) => {
+			GET: async ({ request }) => {
 				const [
 					{ getPlaygroundRequestBoundary },
 					{ runPlaygroundEffect },
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/api/studio/diagrams/$diagramId/drawing")(
 					getPlaygroundRequestBoundary(request),
 				);
 			},
-			PUT: async ({ params, request }) => {
+			PUT: async ({ request }) => {
 				const [
 					{ getPlaygroundRequestBoundary },
 					{ runPlaygroundEffect },
