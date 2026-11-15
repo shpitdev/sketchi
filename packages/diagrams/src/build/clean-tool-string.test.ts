@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cleanToolString } from "../generate/clean-text.js";
+import { cleanToolString } from "../clean-text.js";
 
 describe("cleanToolString", () => {
 	it("strips welded trailing key fragments seen in flash-lite tool calls", () => {

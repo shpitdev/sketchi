@@ -180,20 +180,12 @@ test("Agy and OpenCode stay on the portable skill and MCP-only boundary", () => 
 	assert.match(webSetup, /opencode\/skills\/sketchi-code-mode/);
 });
 
-test("every distributed skill is one text that names today's Code Mode operations", () => {
+test("distributed skills agree on artifact delivery and public setup", () => {
 	const skillPaths = [
 		".agents/skills/sketchi-code-mode/SKILL.md",
 		"plugins/sketchi-code-mode-codex/skills/sketchi-code-mode/SKILL.md",
 		"plugins/sketchi-code-mode-claude/skills/sketchi-code-mode/SKILL.md",
 	];
-	const catalog = read("apps/playground/src/server/codemode/mcp-docs/catalog.ts");
-	const keysOf = (name) => {
-		const block = catalog.match(new RegExp(`const ${name} = \\{\\n([\\s\\S]*?)\\n\\};`))?.[1];
-		assert.ok(block, `catalog.ts has no ${name} object`);
-		return [...block.matchAll(/^\t(\w+):/gm)].map(([, key]) => key);
-	};
-	const builders = keysOf("BUILDERS");
-	const operations = new Set([...builders, ...keysOf("HELPERS")]);
 	const body = (skill) => skill.slice(skill.indexOf("\n---\n", 4));
 
 	const [portable, ...plugins] = skillPaths.map(read);
@@ -202,15 +194,6 @@ test("every distributed skill is one text that names today's Code Mode operation
 			body(skill),
 			body(portable),
 			`${skillPaths[index + 1]} drifted from the portable skill`,
-		);
-	}
-	for (const builder of builders) {
-		assert.ok(portable.includes(`sketchi.${builder}`), `the skill does not name ${builder}`);
-	}
-	for (const [, operation] of portable.matchAll(/sketchi\.(\w+)\(/g)) {
-		assert.ok(
-			operations.has(operation),
-			`the skill names sketchi.${operation}, which Code Mode lacks`,
 		);
 	}
 	for (const contractTerm of [

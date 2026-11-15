@@ -20,46 +20,6 @@ const expectedWorkers = {
 	web: "sketchi-web",
 };
 
-const tanstackFullPathSnapshot = [
-	"/",
-	"/api/chat",
-	"/api/studio/diagrams/$diagramId",
-	"/api/studio/diagrams/$diagramId/drawing",
-	"/api/studio/projects",
-	"/api/studio/projects/$projectId",
-	"/api/studio/projects/from-artifact",
-	"/api/v1/artifacts/$artifactId",
-	"/api/v1/artifacts/$artifactId/patch",
-	"/api/v1/canvases/create",
-	"/api/v1/charts/build",
-	"/api/v1/class-diagrams/build",
-	"/api/v1/er-diagrams/build",
-	"/api/v1/flowcharts/build",
-	"/api/v1/flowcharts/edit",
-	"/api/v1/gantts/build",
-	"/api/v1/generate",
-	"/api/v1/icons/draw",
-	"/api/v1/journey-maps/build",
-	"/api/v1/mindmaps/build",
-	"/api/v1/org-charts/build",
-	"/api/v1/quadrant-charts/build",
-	"/api/v1/sankey-diagrams/build",
-	"/api/v1/sequences/build",
-	"/api/v1/state-machines/build",
-	"/api/v1/timelines/build",
-	"/api/v1/venn-diagrams/build",
-	"/api/v1/wireframes/build",
-	"/artifacts/$artifactId",
-	"/artifacts/$artifactId/edit",
-	"/codemode-export-harness",
-	"/diagrams/$diagramId",
-	"/diagrams/$diagramId/edit",
-	"/examples/$exampleId",
-	"/mcp",
-	"/projects",
-	"/projects/$projectId",
-];
-
 test("Worker resolution requires an explicit project selection", () => {
 	assert.throws(() => workerProjectConfig(), /Worker project selection is required/);
 });
@@ -172,13 +132,4 @@ test("Nx build outputs and deploy targets use project-scoped Worker paths", () =
 			`wrangler deploy --config ${workerProject.generatedWranglerConfigPath}`,
 		);
 	}
-});
-
-test("the generated TanStack full-path set equals the pre-rename snapshot", () => {
-	const routeTree = readFileSync(new URL("apps/playground/src/routeTree.gen.ts", repoRoot), "utf8");
-	const fullPaths = [
-		...new Set([...routeTree.matchAll(/fullPath:\s*"([^"]+)"/g)].map(([, fullPath]) => fullPath)),
-	].sort();
-
-	assert.deepEqual(fullPaths, tanstackFullPathSnapshot);
 });

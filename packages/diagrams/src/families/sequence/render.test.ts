@@ -18,7 +18,7 @@ import {
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
 
-import { renderDiagram } from "../../render";
+import { renderDiagram } from "../../family";
 
 import {
 	SEQUENCE_ACTIVATION_ROLE,

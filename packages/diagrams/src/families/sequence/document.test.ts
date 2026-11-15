@@ -2,7 +2,7 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../../diagram";
+import { parseCanonicalDiagram } from "../../family";
 import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 import {
 	type SequenceDiagram,

@@ -2,7 +2,7 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../../diagram";
+import { parseCanonicalDiagram } from "../../family";
 import {
 	splitContinuingFinalStates,
 	getStateMachineValidationIssues,
