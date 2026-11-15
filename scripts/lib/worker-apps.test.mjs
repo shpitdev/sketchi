@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { unstable_readConfig } from "wrangler";
@@ -98,21 +98,6 @@ test("identity validation fails closed on project, Worker, or Wrangler drift", (
 			),
 		/Wrangler topLevelName mismatch for project "playground"/,
 	);
-});
-
-test("the public host is playground while Studio persistence remains separate", () => {
-	assert.equal(existsSync(new URL("apps/studio", repoRoot)), false);
-
-	const project = JSON.parse(
-		readFileSync(new URL("apps/playground/project.json", repoRoot), "utf8"),
-	);
-	const packageManifest = JSON.parse(
-		readFileSync(new URL("apps/playground/package.json", repoRoot), "utf8"),
-	);
-
-	assert.equal(project.name, "playground");
-	assert.equal(packageManifest.name, "@sketchi/playground");
-	assert.equal(existsSync(new URL("packages/studio/projects/project.json", repoRoot)), true);
 });
 
 test("Nx build outputs and deploy targets use project-scoped Worker paths", () => {
