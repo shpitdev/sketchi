@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -278,4 +278,159 @@ test("signoff refuses a HEAD that is not pushed to the PR, or no PR", (t) => {
 		/is not the head of PR #7/,
 	);
 	assert.throws(() => assertSignoffReady({ cwd, pr: undefined }), /no open PR/);
+});
+
+// Runs the real gate in a real temporary Git repository. Only paid/heavy child commands
+// are fixtures: these tests prove selection and base/dirty-state behavior, not Nx execution.
+function gateFixture(t) {
+	const repo = repository(t);
+	const state = scratch(t, "ci-local-commands-");
+	const bin = join(state, "bin");
+	mkdirSync(bin);
+	const calls = join(state, "calls.jsonl");
+	for (const name of ["pnpm", "gh"]) {
+		writeFileSync(
+			join(bin, name),
+			`#!${process.execPath}
+import { appendFileSync } from "node:fs";
+const args = process.argv.slice(2);
+appendFileSync(process.env.GATE_CALLS, JSON.stringify({ command: ${JSON.stringify(name)}, args }) + "\\n");
+if (${JSON.stringify(name)} === "pnpm" && args.includes("show")) console.log(process.env.GATE_PROJECTS);
+if (${JSON.stringify(name)} === "gh" && args[0] === "pr") console.log(JSON.stringify({ number: 7, state: "OPEN", headRefOid: process.env.GATE_HEAD }));
+`,
+			{ mode: 0o755 },
+		);
+	}
+	const cli = join(repo.cwd, "packages/diagram/scenarios/dist");
+	mkdirSync(cli, { recursive: true });
+	writeFileSync(join(cli, "cli.js"), "// Scenario CLI fixture: exits successfully.\n");
+	writeFileSync(join(repo.cwd, ".gitignore"), ".memory/\n");
+	const routing = "packages/diagrams/src/graph/routing.ts";
+	mkdirSync(join(repo.cwd, "packages/diagrams/src/graph"), { recursive: true });
+	writeFileSync(join(repo.cwd, routing), "// original routing\n");
+	repo.git("add", ".");
+	repo.git("commit", "--quiet", "-m", "gate fixtures");
+	repo.git("branch", "-f", "main");
+	repo.git("remote", "add", "origin", repo.cwd);
+	repo.git("checkout", "--quiet", "-b", "unit");
+	writeFileSync(join(repo.cwd, "a.txt"), "verified staging\n");
+	repo.git("commit", "--quiet", "-am", "verified staging");
+	const unitBase = repo.head();
+	return {
+		...repo,
+		routing,
+		unitBase,
+		write(file, content = "// changed\n") {
+			mkdirSync(join(repo.cwd, file, ".."), { recursive: true });
+			writeFileSync(join(repo.cwd, file), content);
+		},
+		run(args, projects = ["diagrams", "drawing"]) {
+			writeFileSync(calls, "");
+			const output = execFileSync(
+				process.execPath,
+				[new URL("../ci-local.mjs", import.meta.url).pathname, ...args],
+				{
+					cwd: repo.cwd,
+					encoding: "utf8",
+					env: {
+						...process.env,
+						PATH: `${bin}:${process.env.PATH}`,
+						XDG_CACHE_HOME: join(state, "cache"),
+						GATE_CALLS: calls,
+						GATE_PROJECTS: JSON.stringify(projects),
+						GATE_HEAD: repo.head(),
+						CI_LOCAL_SLOTS: "1",
+					},
+					stdio: ["ignore", "pipe", "pipe"],
+				},
+			);
+			const commands = readFileSync(calls, "utf8")
+				.trim()
+				.split("\n")
+				.filter(Boolean)
+				.map((line) => JSON.parse(line));
+			return {
+				output,
+				commands,
+				routing: commands.filter(({ args }) => args.includes("drawing:routing-sample")),
+			};
+		},
+	};
+}
+
+test("unit gates include committed, staged, unstaged and untracked routing inputs", (t) => {
+	for (const state of ["committed", "staged", "unstaged", "untracked"]) {
+		const fixture = gateFixture(t);
+		const file = state === "untracked" ? "packages/drawing/src/new-schema.ts" : fixture.routing;
+		fixture.write(file);
+		if (state === "committed" || state === "staged") fixture.git("add", file);
+		if (state === "committed") fixture.git("commit", "--quiet", "-m", "routing change");
+		const result = fixture.run(["--no-signoff", "--base", fixture.unitBase]);
+		assert.equal(result.routing.length, 1, state);
+		assert.match(result.output, /✓ sampled routing/, state);
+	}
+});
+
+test("unit gates use the committed merge base, not a direct diff of divergent refs", (t) => {
+	const fixture = gateFixture(t);
+	fixture.git("branch", "verified");
+	fixture.write(fixture.routing);
+	fixture.git("commit", "--quiet", "-am", "routing change");
+	fixture.git("checkout", "--quiet", "verified");
+	fixture.write("a.txt", "other staging work\n");
+	fixture.git("commit", "--quiet", "-am", "other staging work");
+	fixture.git("checkout", "--quiet", "unit");
+	assert.equal(fixture.run(["--no-signoff", "--base", "verified"]).routing.length, 1);
+});
+
+test("a plain-family unit gate retains default tests without running sampled routing", (t) => {
+	const fixture = gateFixture(t);
+	fixture.write("packages/diagrams/src/families/timeline/render.ts");
+	const result = fixture.run(["--no-signoff", "--base", fixture.unitBase]);
+	assert.equal(result.routing.length, 0);
+	assert.match(result.output, /sampled routing: not affected/);
+	for (const target of ["test", "typecheck,build"]) {
+		assert.ok(
+			result.commands.some(({ args }) => args.includes("affected") && args.includes(target)),
+			target,
+		);
+	}
+	assert.ok(!result.commands.some(({ command }) => command === "gh"));
+});
+
+test("origin/main, an equivalent explicit base, --all and signoff always run routing once", (t) => {
+	const fixture = gateFixture(t);
+	for (const args of [
+		["--no-signoff"],
+		["--no-signoff", "--base", fixture.git("rev-parse", "main")],
+		["--no-signoff", "--all", "--base", fixture.unitBase],
+		[],
+	]) {
+		const result = fixture.run(args, []);
+		assert.equal(result.routing.length, 1, JSON.stringify(args));
+		assert.equal(
+			result.commands.filter(({ args }) => args.includes("POST")).length,
+			args.length ? 0 : 1,
+		);
+		if (args.includes("--all")) {
+			assert.ok(
+				result.commands.some(({ args }) => args.includes("run-many") && args.includes("test")),
+			);
+		}
+	}
+});
+
+test("a unit base still cannot sign off, even with --all", (t) => {
+	const fixture = gateFixture(t);
+	assert.throws(
+		() => fixture.run(["--all", "--base", fixture.unitBase]),
+		(error) => /Signoff requires the full gate against origin\/main/.test(String(error.stderr)),
+	);
+});
+
+test("help explains sampled routing without executing checks", (t) => {
+	const result = gateFixture(t).run(["--help"]);
+	assert.match(result.output, /sampled routing/);
+	assert.match(result.output, /always for origin\/main and --all/);
+	assert.deepEqual(result.commands, []);
 });

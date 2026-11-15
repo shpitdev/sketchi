@@ -228,14 +228,15 @@ const HELP = `Usage: pnpm ci:local [--no-signoff] [--all] [--base <ref>]
 
 Runs actionlint when workflows changed, a frozen install, lint/format/custom-rule checks, the
 scenario CLI smoke, the deploy and tooling contracts, the Nx-affected typecheck, build and test
-targets, the root TypeScript project references, and the diagram UI Storybook build when
+targets, sampled routing (always for origin/main and --all; otherwise when its inputs change),
+the root TypeScript project references, and the diagram UI Storybook build when
 editor is affected. Changes are compared with the base (default origin/main), including
 uncommitted and untracked ones. Logs go to .memory/ci-local/.
 
 On success it posts a "${STATUS_CONTEXT}" commit status on the pushed PR head.
 
   --no-signoff  Run the checks only. Works on a dirty or unpushed worktree.
-  --all         Run every project instead of the Nx-affected graph.
+  --all         Run every project and sampled routing instead of the Nx-affected graph.
   --base <ref>  Compare with this Git commit/ref. Unit checks against a previously fully gated
                 staging head require --no-signoff. Readiness and signoff require the full gate
                 against origin/main; a different base cannot post a local-ci status.
@@ -280,7 +281,8 @@ async function main(argv) {
 		console.warn(`Could not fetch origin main; using the local ${base} ref.`);
 	}
 	const baseCommit = git(cwd, ["rev-parse", "--verify", "--end-of-options", `${base}^{commit}`]);
-	if (signoff && baseCommit !== git(cwd, ["rev-parse", "--verify", `${DEFAULT_BASE}^{commit}`])) {
+	const full = baseCommit === git(cwd, ["rev-parse", "--verify", `${DEFAULT_BASE}^{commit}`]);
+	if (signoff && !full) {
 		throw new Error(
 			"Signoff requires the full gate against origin/main; use --no-signoff for a unit base.",
 		);
@@ -381,7 +383,12 @@ async function main(argv) {
 						{ cwd, encoding: "utf8", env },
 					),
 				);
-		scope = ciScope({ all, projects, changedFiles: changed });
+		scope = ciScope({
+			all,
+			full,
+			projects,
+			changedFiles: changed,
+		});
 		return {
 			ok: true,
 			label: `scope: ${all ? "all projects" : projects.join(", ") || "no affected projects"}`,
@@ -472,6 +479,20 @@ async function main(argv) {
 			]),
 		],
 		["tests", tests],
+		[
+			"sampled routing",
+			conditional(
+				() => scope.routing,
+				"sampled routing",
+				command("routing-sample", [
+					"pnpm",
+					"nx",
+					"run",
+					"drawing:routing-sample",
+					"--outputStyle=static",
+				]),
+			),
+		],
 		[
 			"root TypeScript project references and project graph",
 			conditional(
