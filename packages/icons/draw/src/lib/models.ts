@@ -1,13 +1,13 @@
 import {
 	type CloudflareAiGateway,
 	CloudflareAiGatewayBinding,
-	stripAnthropicModelPrefix,
 	stripGoogleModelPrefix,
 } from "@sketchi/diagram-generation";
 import { TelemetryCorrelation } from "@sketchi/observability";
 import { Clock, Context, Effect, Layer, Option, Schedule } from "effect";
 
-import { AUTHOR_REPLY_SCHEMA, AUTHOR_SYSTEM_PROMPT } from "./author.js";
+import { makeAuthorCall } from "./author-model.js";
+import type { Prompt } from "effect/ai";
 import { IconModelError } from "./errors.js";
 import { type IconSource, svgCurveSegments } from "./input.js";
 import { JUDGE_PROMPT, JUDGE_REPLY_SCHEMA } from "./judge.js";
@@ -60,17 +60,9 @@ export interface ModelCall {
 	readonly ms: number;
 }
 
-/** A Messages API content block, passed back to the provider exactly as it came. */
-export type AuthorContentBlock = Readonly<Record<string, unknown>>;
-
-export interface AuthorTurn {
-	readonly role: "user" | "assistant";
-	readonly content: readonly AuthorContentBlock[];
-}
-
 export interface AuthorCallReply {
-	/** The assistant turn as returned, thinking blocks included, for the next round. */
-	readonly content: readonly AuthorContentBlock[];
+	/** The assistant prompt, with provider thinking metadata for replay in the next round. */
+	readonly content: Prompt.Prompt;
 	readonly text: string;
 	readonly call: ModelCall;
 }
@@ -86,7 +78,7 @@ export class IconDrawModels extends Context.Service<
 		/** One author turn: the conversation so far in, the next reply out. */
 		readonly author: (request: {
 			readonly model: IconAuthorModel;
-			readonly messages: readonly AuthorTurn[];
+			readonly messages: Prompt.Prompt;
 		}) => Effect.Effect<AuthorCallReply, IconModelError>;
 		/** One forced choice: the sketch, then the lineup, as base64 PNGs. */
 		readonly judge: (request: {
@@ -231,13 +223,6 @@ function count(value: unknown): number {
 	return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-interface MessagesReply {
-	readonly content?: readonly AuthorContentBlock[];
-	readonly stop_reason?: string;
-	readonly model?: string;
-	readonly usage?: Readonly<Record<string, unknown>>;
-}
-
 interface GenerateContentReply {
 	readonly candidates?: ReadonlyArray<{
 		readonly content?: {
@@ -254,87 +239,13 @@ export const IconDrawModelsGateway = Layer.effect(IconDrawModels)(
 		const config = yield* IconDrawGatewayConfig;
 		const gateway = binding.gateway(config.gatewayId);
 
-		const author = Effect.fn("iconDraw.models.author")(function* (request: {
-			readonly model: IconAuthorModel;
-			readonly messages: readonly AuthorTurn[];
-		}) {
-			const model = stripAnthropicModelPrefix(request.model);
-			const startedAt = yield* Clock.currentTimeMillis;
-			const reply = yield* callGateway(
-				gateway,
-				config,
-				"author",
-				model,
-				{
-					endpoint: "v1/messages",
-					provider: "anthropic",
-					headers: {
-						"Content-Type": "application/json",
-						"anthropic-version": "2023-06-01",
-						"anthropic-beta": "server-side-fallback-2026-07-01",
-					},
-					query: {
-						model,
-						max_tokens: AUTHOR_MAX_TOKENS,
-						// The fixed instructions and examples are cached across requests; the
-						// conversation is cached across rounds.
-						cache_control: { type: "ephemeral" },
-						system: [
-							{ type: "text", text: AUTHOR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-						],
-						messages: request.messages,
-						thinking: { type: "adaptive" },
-						output_config: {
-							effort: config.authorEffort,
-							format: { type: "json_schema", schema: AUTHOR_REPLY_SCHEMA },
-						},
-						fallbacks: "default",
-					},
-				},
-				AUTHOR_TIMEOUT_MS,
-			);
-			const finishedAt = yield* Clock.currentTimeMillis;
-			const body = reply.body as MessagesReply;
-			const usage: ModelUsage = {
-				inputTokens: count(body.usage?.["input_tokens"]),
-				outputTokens: count(body.usage?.["output_tokens"]),
-				cacheReadTokens: count(body.usage?.["cache_read_input_tokens"]),
-				cacheWriteTokens: count(body.usage?.["cache_creation_input_tokens"]),
-			};
-			yield* Effect.annotateCurrentSpan({
-				"gen_ai.request.model": model,
-				"gen_ai.response.model": body.model ?? model,
-				"gen_ai.response.finish_reasons": [body.stop_reason],
-				"gen_ai.usage.input_tokens": usage.inputTokens,
-				"gen_ai.usage.output_tokens": usage.outputTokens,
-				...(reply.logId ? { gateway_log_id: reply.logId } : {}),
-			});
-			const content = body.content ?? [];
-			const text = content
-				.flatMap((block) =>
-					block["type"] === "text" && typeof block["text"] === "string" ? [block["text"]] : [],
-				)
-				.join("")
-				.trim();
-			if (body.stop_reason === "refusal" || body.stop_reason === "max_tokens" || !text) {
-				return yield* IconModelError.make({
-					cause: body,
-					message:
-						body.stop_reason === "max_tokens"
-							? "The author ran out of output tokens."
-							: body.stop_reason === "refusal"
-								? "The author declined to draw this logo."
-								: "The author returned no text.",
-					model,
-					role: "author",
-					retryable: false,
-				});
-			}
-			return {
-				content,
-				text,
-				call: { role: "author", model: body.model ?? model, usage, ms: finishedAt - startedAt },
-			} satisfies AuthorCallReply;
+		const author = makeAuthorCall({
+			gateway,
+			config,
+			timeoutMs: AUTHOR_TIMEOUT_MS,
+			retry: transientRetry,
+			transient: isTransient,
+			maxTokens: AUTHOR_MAX_TOKENS,
 		});
 
 		const judge = Effect.fn("iconDraw.models.judge")(function* (request: {

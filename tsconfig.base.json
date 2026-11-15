@@ -130,6 +130,42 @@
                 "strictEffectProvide": "error"
               }
             }
+          },
+          {
+            "include": ["packages/icons/draw/src/lib/author-model.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "abortControllerInEffect": "error",
+                "asyncFunction": "error",
+                "cryptoRandomUUID": "error",
+                "cryptoRandomUUIDInEffect": "error",
+                "extendsNativeError": "error",
+                "globalConsole": "error",
+                "globalConsoleInEffect": "error",
+                "globalDate": "error",
+                "globalDateInEffect": "error",
+                "globalFetch": "error",
+                "globalFetchInEffect": "error",
+                "globalJson": "error",
+                "globalJsonInEffect": "error",
+                "globalRandom": "error",
+                "globalRandomInEffect": "error",
+                "globalTimers": "error",
+                "globalTimersInEffect": "error",
+                "instanceOfSchema": "error",
+                "newPromise": "error",
+                "nodeBuiltinImport": "error",
+                "preferEffectArray": "error",
+                "preferEffectRecord": "error",
+                "preferEffectString": "error",
+                "processEnv": "error",
+                "processEnvInEffect": "error",
+                "runEffectInsideEffect": "error",
+                "schemaSync": "error",
+                "schemaSyncInEffect": "error",
+                "strictEffectProvide": "error"
+              }
+            }
           }
         ]
       }

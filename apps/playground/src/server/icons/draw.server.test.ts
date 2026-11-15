@@ -29,6 +29,10 @@ function fakeEnv(calls: Calls, authorReplies: unknown[]): StudioEnv {
 					const text = JSON.stringify(authorReplies.shift());
 					return Promise.resolve(
 						Response.json({
+							id: "msg_fixture",
+							type: "message",
+							role: "assistant",
+							stop_sequence: null,
 							model: "claude-sonnet-5-5",
 							content: [{ type: "text", text }],
 							stop_reason: "end_turn",

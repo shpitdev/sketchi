@@ -164,6 +164,9 @@ settings:
 
 catalogs:
   default:
+    '@effect/ai-anthropic':
+      specifier: 4.1.4
+      version: 4.1.4
     '@effect/ai-openai-compat':
       specifier: 4.1.4
       version: 4.1.4
@@ -767,6 +770,9 @@ importers:
 
   packages/icons/draw:
     dependencies:
+      '@effect/ai-anthropic':
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)
       '@sketchi/diagram-core':
         specifier: workspace:*
         version: link:../../diagram/core
@@ -1891,6 +1897,11 @@ packages:
 
   '@dual-bundle/import-meta-resolve@4.2.1':
     resolution: {integrity: sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==}
+
+  '@effect/ai-anthropic@4.1.4':
+    resolution: {integrity: sha512-VDcsyL3k76HhF7YqH8z0gQ0bUybX4ti5RHv3JadDXZvEgNpvUT3p4YBssvKR2HAGa7NXr9yfmFedRilhQM7tdQ==}
+    peerDependencies:
+      effect: ^4.1.4
 
   '@effect/ai-openai-compat@4.1.4':
     resolution: {integrity: sha512-Rmb6tcV/5zv7PFHvZt08eSqSI5G8JyEGOBeIwyKKz1mBes9WAgeYv7Kplzy5rBSWH1LtUA4CIuREzS7ovXDhRw==}
@@ -11199,6 +11210,10 @@ snapshots:
   '@csstools/css-tokenizer@4.0.2': {}
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
+
+  '@effect/ai-anthropic@4.1.4(effect@4.1.4)':
+    dependencies:
+      effect: 4.1.4
 
   '@effect/ai-openai-compat@4.1.4(effect@4.1.4)':
     dependencies:
