@@ -1,6 +1,8 @@
 import { RegistryProvider } from "@effect/atom-react";
 import { type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const canvas = vi.hoisted(
@@ -108,6 +110,48 @@ afterEach(() => {
 });
 
 describe("Studio diagram editor", () => {
+	it("hydrates a restored draft idle, then saves only on request and retries failure", async () => {
+		const errors = vi.spyOn(console, "error");
+		const draft = edit(saved, "box", 5);
+		const page = () => (
+			<RegistryProvider>
+				<DiagramEditor
+					diagramId="dia_test"
+					draft={draft}
+					headerLinks={null}
+					scene={saved}
+					title="Test diagram"
+				/>
+			</RegistryProvider>
+		);
+		const container = document.createElement("div");
+		container.innerHTML = renderToString(page());
+		document.body.append(container);
+		expect(studio.save).not.toHaveBeenCalled();
+		expect(container.querySelector("button[aria-label='Save']")).toHaveProperty("disabled", false);
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			await act(async () => {
+				root = hydrateRoot(container, page());
+			});
+			expect(studio.save).not.toHaveBeenCalled();
+			expect(saveButton("Save")).toHaveProperty("disabled", false);
+			expect(errors.mock.calls).toEqual([]);
+			studio.save.mockRejectedValueOnce(new Error("offline"));
+			fireEvent.click(saveButton("Save"));
+			await screen.findByRole("button", { name: "Save failed, retry" });
+			expect(drafts.clear).not.toHaveBeenCalled();
+			fireEvent.click(saveButton("Save failed, retry"));
+			await waitFor(() => expect(saveButton("Saved")).toHaveProperty("disabled", true));
+			expect(studio.save).toHaveBeenCalledTimes(2);
+			expect(studio.save).toHaveBeenLastCalledWith("dia_test", drawingFromScene(draft));
+			expect(drafts.clear).toHaveBeenCalledOnce();
+		} finally {
+			await act(async () => root?.unmount());
+			container.remove();
+			errors.mockRestore();
+		}
+	});
 	it("captures each content edit, but not selection or scrolling", async () => {
 		renderEditor();
 		act(() => canvas.change?.(saved));

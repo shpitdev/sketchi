@@ -1,6 +1,7 @@
 import { RegistryProvider } from "@effect/atom-react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
+import { hydrateRoot } from "react-dom/client";
 import type { ComponentType } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEPLOY_PIPELINE_SCENE } from "../playground/deploy-pipeline-sample";
@@ -78,6 +79,43 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("actual Studio route consumers", () => {
+	it("hydrates artifact review with an idle Save and dispatches create only on click", async () => {
+		const errors = vi.spyOn(console, "error");
+		const Component = component(Review);
+		const container = document.createElement("div");
+		container.innerHTML = renderToString(page(Component));
+		document.body.append(container);
+		expect(fetcher).not.toHaveBeenCalled();
+		expect(container.querySelector("button[aria-label='Save to Studio']")).toHaveProperty(
+			"disabled",
+			true,
+		);
+		fetcher.mockResolvedValueOnce(scene()).mockResolvedValueOnce(Response.json(created));
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			await act(async () => {
+				root = hydrateRoot(container, page(Component));
+			});
+			await screen.findByRole("link", { name: "Edit" });
+			expect(fetcher).toHaveBeenCalledTimes(1);
+			expect(screen.getByRole("button", { name: "Save to Studio" })).toHaveProperty(
+				"disabled",
+				false,
+			);
+			expect(errors.mock.calls).toEqual([]);
+			fireEvent.click(screen.getByRole("button", { name: "Save to Studio" }));
+			await screen.findByRole("link", { name: "Open project" });
+			expect(fetcher).toHaveBeenCalledTimes(2);
+			const nextRequest = renderToString(page(Component));
+			expect(nextRequest).toContain('aria-label="Save to Studio"');
+			expect(nextRequest).not.toContain('aria-label="Open project"');
+			expect(fetcher).toHaveBeenCalledTimes(2);
+		} finally {
+			await act(async () => root?.unmount());
+			container.remove();
+			errors.mockRestore();
+		}
+	});
 	it.each([Review, Edit, Projects, Project, Diagram, DiagramEdit])(
 		"renders server snapshots without acquiring HTTP or browser storage",
 		(route) => {

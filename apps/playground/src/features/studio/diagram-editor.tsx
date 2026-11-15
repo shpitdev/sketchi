@@ -1,3 +1,4 @@
+import { constant } from "effect/Function";
 import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { downloadBlob, DrawingEditor } from "@sketchi/editor";
 import { RegistryContext, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react";
@@ -59,10 +60,7 @@ export function useDrawingSession({
 					}),
 				),
 			)
-			.pipe(
-				Atom.setIdleTTL(0),
-				Atom.withServerValue(() => AsyncResult.initial()),
-			);
+			.pipe(Atom.setIdleTTL(0), Atom.withServerValue(constant(AsyncResult.initial())));
 		const change = Atom.writable(
 			(get) => get(latest),
 			(context, scene: ExcalidrawScene) => {

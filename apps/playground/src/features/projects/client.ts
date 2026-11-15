@@ -1,3 +1,4 @@
+import { constant } from "effect/Function";
 import { Cause, Effect, Layer, Schema, Stream } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientError, HttpClientRequest } from "effect/http";
 import { AsyncResult, Atom, AtomHttpApi } from "effect/reactivity";
@@ -46,10 +47,7 @@ export const createProject = Atom.family((artifactId: string) =>
 				Effect.flatMap(StudioApi, (api) => api.projects.create({ payload: { artifactId } })),
 			),
 		)
-		.pipe(
-			Atom.setIdleTTL(0),
-			Atom.withServerValue(() => AsyncResult.initial()),
-		),
+		.pipe(Atom.setIdleTTL(0), Atom.withServerValue(constant(AsyncResult.initial()))),
 );
 
 export function resourceError<A, E>(result: AsyncResult.AsyncResult<A, E>, fallback: string) {
