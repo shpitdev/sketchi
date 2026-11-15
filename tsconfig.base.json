@@ -201,6 +201,108 @@
             }
           },
           {
+            "include": ["packages/icons/draw/src/lib/author-model.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "abortControllerInEffect": "error",
+                "asyncFunction": "error",
+                "cryptoRandomUUID": "error",
+                "cryptoRandomUUIDInEffect": "error",
+                "extendsNativeError": "error",
+                "globalConsole": "error",
+                "globalConsoleInEffect": "error",
+                "globalDate": "error",
+                "globalDateInEffect": "error",
+                "globalFetch": "error",
+                "globalFetchInEffect": "error",
+                "globalJson": "error",
+                "globalJsonInEffect": "error",
+                "globalRandom": "error",
+                "globalRandomInEffect": "error",
+                "globalTimers": "error",
+                "globalTimersInEffect": "error",
+                "instanceOfSchema": "error",
+                "newPromise": "error",
+                "nodeBuiltinImport": "error",
+                "preferEffectArray": "error",
+                "preferEffectRecord": "error",
+                "preferEffectString": "error",
+                "processEnv": "error",
+                "processEnvInEffect": "error",
+                "runEffectInsideEffect": "error",
+                "schemaSync": "error",
+                "schemaSyncInEffect": "error",
+                "strictEffectProvide": "error"
+              }
+            }
+          },
+          {
+            "include": [
+              "packages/diagram/core/src/intermediate.ts",
+              "packages/diagram/core/src/diagram.ts",
+              "packages/diagram/core/src/types/mindmap.ts"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "abortControllerInEffect": "error",
+                "asyncFunction": "error",
+                "cryptoRandomUUID": "error",
+                "cryptoRandomUUIDInEffect": "error",
+                "extendsNativeError": "error",
+                "globalConsole": "error",
+                "globalConsoleInEffect": "error",
+                "globalDate": "error",
+                "globalDateInEffect": "error",
+                "globalFetch": "error",
+                "globalFetchInEffect": "error",
+                "globalJson": "error",
+                "globalJsonInEffect": "error",
+                "globalRandom": "error",
+                "globalRandomInEffect": "error",
+                "globalTimers": "error",
+                "globalTimersInEffect": "error",
+                "instanceOfSchema": "error",
+                "newPromise": "error",
+                "nodeBuiltinImport": "error",
+                "preferEffectArray": "error",
+                "preferEffectRecord": "error",
+                "preferEffectString": "error",
+                "processEnv": "error",
+                "processEnvInEffect": "error",
+                "runEffectInsideEffect": "error",
+                "schemaSync": "error",
+                "schemaSyncInEffect": "error",
+                "strictEffectProvide": "error"
+              }
+            }
+          },
+          {
+            "include": [
+              "packages/diagram/core/src/types/flowchart.ts",
+              "packages/diagram/core/src/types/sequence.ts",
+              "packages/diagram/core/src/types/timeline.ts",
+              "packages/diagram/core/src/types/chart.ts",
+              "packages/diagram/core/src/types/state-machine.ts",
+              "packages/diagram/core/src/types/gantt.ts",
+              "packages/diagram/core/src/types/er.ts",
+              "packages/diagram/core/src/types/class.ts",
+              "packages/diagram/core/src/types/org-chart.ts",
+              "packages/diagram/core/src/types/venn.ts",
+              "packages/diagram/core/src/types/journey.ts",
+              "packages/diagram/core/src/types/sankey.ts",
+              "packages/diagram/core/src/types/wireframe.ts",
+              "packages/diagram/core/src/types/quadrant.ts"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "extendsNativeError": "error",
+                "instanceOfSchema": "error",
+                "schemaSync": "error",
+                "schemaSyncInEffect": "error"
+              }
+            }
+          },
+          {
             "include": [
               "packages/icons/community/src/http.ts",
               "packages/icons/community/src/http-api.ts",

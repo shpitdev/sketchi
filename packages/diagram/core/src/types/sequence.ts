@@ -1,11 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import {
-	DiagramIconRef,
-	DiagramStyle,
-	DiagramValidationError,
-	SKETCHI_DIAGRAM_STYLE,
-} from "../intermediate.js";
+import { DiagramIconRef, DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const sequenceDiagramType = "sequence" as const;
 
@@ -257,24 +253,39 @@ export function sequenceActivations(diagram: SequenceDiagram): SequenceActivatio
 	return laid;
 }
 
-export class SequenceValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly SequenceValidationIssue[]) {
-		super(issues[0]?.message ?? "Sequence diagram failed semantic validation.");
-		this.name = "SequenceValidationError";
+export class SequenceValidationError extends Schema.TaggedError<
+	SequenceValidationError,
+	{ readonly brand: unique symbol }
+>()("SequenceValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(SequenceValidationIssue),
+}) {
+	static fromIssues(issues: readonly SequenceValidationIssue[]): SequenceValidationError {
+		return SequenceValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Sequence diagram failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateSequenceDiagram(diagram: SequenceDiagram): SequenceDiagram {
+export function validateSequenceDiagram(
+	diagram: SequenceDiagram,
+): Result.Result<SequenceDiagram, SequenceValidationError> {
 	const issues = getSequenceValidationIssues(diagram);
-	if (issues.length > 0) {
-		throw new SequenceValidationError(issues);
-	}
-	return diagram;
+	return issues.length > 0
+		? Result.fail(SequenceValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseSequenceDiagram(input: unknown): SequenceDiagram {
-	return validateSequenceDiagram(
-		Schema.decodeUnknownSync(SequenceDiagram, { errors: "all" })(input),
+export function parseSequenceDiagram(
+	input: unknown,
+): Result.Result<SequenceDiagram, Schema.SchemaError | SequenceValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(SequenceDiagram, { errors: "all" })(input),
+		validateSequenceDiagram,
 	);
 }
 
@@ -305,7 +316,7 @@ export const sequenceFixture = parseSequenceDiagram({
 			type: "return",
 		},
 	],
-});
+}).pipe(Result.getOrThrow);
 
 /** A request path with a nested call, a fire-and-forget event, and returns. */
 export const apiRequestSequence = parseSequenceDiagram({
@@ -328,7 +339,7 @@ export const apiRequestSequence = parseSequenceDiagram({
 		{ id: "track", source: "api", target: "analytics", label: "Track request" },
 		{ id: "response", source: "api", target: "browser", label: "200 OK", type: "return" },
 	],
-});
+}).pipe(Result.getOrThrow);
 
 /** A deploy webhook whose participants carry catalog logos. */
 export const deployWebhookLogoSequence = parseSequenceDiagram({
@@ -348,7 +359,7 @@ export const deployWebhookLogoSequence = parseSequenceDiagram({
 		{ id: "digest", source: "docker", target: "worker", label: "Image digest", type: "return" },
 		{ id: "accepted", source: "worker", target: "github", label: "202 Accepted", type: "return" },
 	],
-});
+}).pipe(Result.getOrThrow);
 
 /** Self-messages: consecutive checks inside an active bar, and a retry on an idle lifeline. */
 export const selfMessageSequence = parseSequenceDiagram({
@@ -374,4 +385,4 @@ export const selfMessageSequence = parseSequenceDiagram({
 		{ id: "session", source: "idp", target: "browser", label: "Session", type: "return" },
 		{ id: "refresh", source: "browser", target: "browser", label: "Refresh the page" },
 	],
-});
+}).pipe(Result.getOrThrow);

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import {
 	CANVAS_LIMITS,
 	chartFixture,
@@ -178,12 +180,12 @@ function expectDrawnData(diagram: ChartDiagram, scene: RenderedDiagramScene): vo
 }
 
 function expectReadableChart(diagram: ChartDiagram): RenderedDiagramScene {
-	const scene = renderChartDiagram(diagram);
+	const scene = renderChartDiagram(diagram).pipe(Result.getOrThrow);
 	const label = `${diagram.id}`;
 	expectDrawnData(diagram, scene);
 	expect(getCanvasValidationIssues(scene), label).toEqual([]);
 	expect(scene.elements.length, label).toBeLessThanOrEqual(CANVAS_LIMITS.maxElements);
-	expect(renderChartDiagram(diagram), label).toEqual(scene);
+	expect(renderChartDiagram(diagram).pipe(Result.getOrThrow), label).toEqual(scene);
 	const readout = read(scene);
 	// No text overlaps another, and none leaves the scene.
 	readout.texts.forEach(({ element, box }, index) => {
@@ -444,19 +446,22 @@ function fuzzChart(seed: number): ChartDiagram {
 			? { orientation: pick(["vertical", "horizontal"] as const) }
 			: {}),
 		...(kind === "pie" && next() < 0.5 ? { donut: true } : {}),
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 const chart = (
 	input: Partial<ChartDiagram> & Pick<ChartDiagram, "kind" | "categories" | "series">,
-) => parseChartDiagram({ id: "chart", title: "Chart", type: "chart", ...input });
+) =>
+	parseChartDiagram({ id: "chart", title: "Chart", type: "chart", ...input }).pipe(
+		Result.getOrThrow,
+	);
 
 describe("native chart layout", () => {
 	it("renders the fixture into a valid deterministic scene through renderDiagram", () => {
-		const scene = renderDiagram(chartFixture);
+		const scene = renderDiagram(chartFixture).pipe(Result.getOrThrow);
 		expect(scene.diagramId).toBe("quarterly-revenue-chart");
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
-		expect(renderDiagram(chartFixture)).toEqual(scene);
+		expect(renderDiagram(chartFixture).pipe(Result.getOrThrow)).toEqual(scene);
 	});
 
 	it("draws grouped columns from a zero baseline with values on their caps and a legend", () => {

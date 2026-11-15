@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import type { StateMachineDiagram } from "@sketchi/diagram-core";
 import { type ArrowSceneElement, arrowCrossings, renderDiagram } from "@sketchi/diagram-renderer";
@@ -8,6 +10,7 @@ import { stateMachineScenarios } from "./state-machine-scenarios.js";
 const scenario = (id: string) => stateMachineScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: StateMachineDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 type Transition = StateMachineDiagram["transitions"][number];
@@ -78,16 +81,18 @@ describe("prompt-grounded state-machine scenarios", () => {
 		// connection's timeout into the retry choice crossed the retry back to
 		// Connecting; both now leave and arrive by sides that cross nothing.
 		for (const entry of stateMachineScenarios) {
-			const arrows = renderDiagram(entry.expectedDiagram).elements.filter(
-				(element): element is ArrowSceneElement => element.type === "arrow",
-			);
+			const arrows = renderDiagram(entry.expectedDiagram)
+				.pipe(Result.getOrThrow)
+				.elements.filter((element): element is ArrowSceneElement => element.type === "arrow");
 			expect(arrowCrossings(arrows), entry.id).toBe(0);
 		}
 	});
 
 	for (const entry of stateMachineScenarios) {
 		it(`${entry.id}: accepts its fixture with zero validator issues`, () => {
-			const evaluation = evaluateScenarioDiagram(entry, entry.expectedDiagram);
+			const evaluation = evaluateScenarioDiagram(entry, entry.expectedDiagram).pipe(
+				Result.getOrThrow,
+			);
 			expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 			expect(evaluation.excalidrawValidation.issues).toEqual([]);
 		});

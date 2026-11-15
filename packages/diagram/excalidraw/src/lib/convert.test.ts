@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { generateKeyBetween } from "fractional-indexing";
@@ -43,7 +45,7 @@ describe("authored node geometry", () => {
 			],
 			messages: [{ id: "ab", source: "a", target: "b", label: "Continue" }],
 			style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-		});
+		}).pipe(Result.getOrThrow);
 		const converted = convertSceneToExcalidraw(scene);
 		expect(validateExcalidrawScene(converted)).toEqual({
 			ok: true,
@@ -144,7 +146,9 @@ function elbowExport() {
 		pharmaBatchDispositionFlowchart,
 		...Object.values(zoneFixtures),
 	]) {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(diagram));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(diagram).pipe(Result.getOrThrow),
+		);
 		const arrow = scene.elements.find(
 			(element) => element.type === "arrow" && element.elbowed === true,
 		);
@@ -251,7 +255,11 @@ function expectValidOrderKeys(elements: readonly ExcalidrawElement[]) {
 }
 
 function expectFlowchartExportValid(input: Parameters<typeof parseFlowchartDiagram>[0]) {
-	const scene = convertSceneToExcalidraw(renderIntermediateDiagram(parseFlowchartDiagram(input)));
+	const scene = convertSceneToExcalidraw(
+		renderIntermediateDiagram(parseFlowchartDiagram(input).pipe(Result.getOrThrow)).pipe(
+			Result.getOrThrow,
+		),
+	);
 
 	expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
 }
@@ -707,7 +715,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("exports mindmap branches as curved arrows bound to both topics", () => {
-		const exported = convertSceneToExcalidraw(renderMindmapDiagram(mindmapFixture));
+		const exported = convertSceneToExcalidraw(
+			renderMindmapDiagram(mindmapFixture).pipe(Result.getOrThrow),
+		);
 		expect(validateExcalidrawScene(exported)).toEqual({ ok: true, issues: [] });
 		const arrows = exported.elements.filter((element) => element.type === "arrow");
 		expect(arrows).toHaveLength(mindmapFixture.edges.length);
@@ -728,7 +738,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("wraps scenes as importable Excalidraw files", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 		const file = createExcalidrawFile(scene, {
 			source: "https://studio.sketchi.app",
 		});
@@ -744,7 +756,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("creates bound arrows that validate as real Excalidraw elements", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 		const elbow = elbowExport();
 		const branchArrow = elbow.arrow;
 
@@ -778,7 +792,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("opens maintained vertical flowcharts at an embedded-canvas friendly zoom", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 
 		expect(scene.appState.zoom).toEqual({
 			value: expect.any(Number),
@@ -790,7 +806,7 @@ describe("convertSceneToExcalidraw", () => {
 
 	it("keeps wrapped flowchart text inside real shape containers", () => {
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(pharmaBatchDispositionFlowchart),
+			renderIntermediateDiagram(pharmaBatchDispositionFlowchart).pipe(Result.getOrThrow),
 		);
 
 		const validation = validateExcalidrawScene(scene);
@@ -806,7 +822,7 @@ describe("convertSceneToExcalidraw", () => {
 
 	it("keeps maintained flowchart arrow routes from overlapping", () => {
 		const maintainedScenes = [flowchartFixture, pharmaBatchDispositionFlowchart].map((diagram) =>
-			convertSceneToExcalidraw(renderIntermediateDiagram(diagram)),
+			convertSceneToExcalidraw(renderIntermediateDiagram(diagram).pipe(Result.getOrThrow)),
 		);
 
 		for (const scene of maintainedScenes) {
@@ -1156,7 +1172,7 @@ describe("convertSceneToExcalidraw", () => {
 					},
 				],
 				layout: { direction: "TB", edgeRouting: "orthogonal" },
-			}),
+			}).pipe(Result.getOrThrow),
 		);
 
 		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
@@ -1306,8 +1322,8 @@ describe("convertSceneToExcalidraw", () => {
 						{ id: "right-done", source: "right", target: "done" },
 					],
 					layout: { direction: "TB", edgeRouting: "orthogonal" },
-				}),
-			),
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow),
 		);
 
 		expect(validateExcalidrawScene(scene).issues).not.toContainEqual(
@@ -1563,8 +1579,8 @@ describe("convertSceneToExcalidraw", () => {
 						{ id: "edge-32", source: "postmortem", target: "incident_closed" },
 					],
 					layout: { direction: "TB", edgeRouting: "orthogonal" },
-				}),
-			),
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow),
 		);
 
 		expect(scene.elements.length).toBeGreaterThan(90);
@@ -1610,7 +1626,9 @@ describe("convertSceneToExcalidraw", () => {
 		const diagrams = [flowchartFixture, pharmaBatchDispositionFlowchart];
 
 		for (const diagram of diagrams) {
-			const scene = convertSceneToExcalidraw(renderIntermediateDiagram(diagram));
+			const scene = convertSceneToExcalidraw(
+				renderIntermediateDiagram(diagram).pipe(Result.getOrThrow),
+			);
 			const arrows = scene.elements.filter((element) => element.type === "arrow");
 
 			for (const arrow of arrows) {
@@ -1623,7 +1641,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports a straight arrow end Excalidraw would move on the first touch", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 		const straight = scene.elements.find(
 			(element) => element.type === "arrow" && element.elbowed === false,
 		);
@@ -1694,7 +1714,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("accepts Excalidraw-edited elbow arrows with null fixed segments", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 		const branchArrow = scene.elements.find((element) => element.id === "edge:clear-review");
 
 		if (branchArrow) {
@@ -1705,7 +1727,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports broken reciprocal arrow bindings", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 		const firstShape = scene.elements.find((element) => element.id === "node:prompt");
 
 		if (firstShape) {
@@ -1724,7 +1748,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports overlapping arrow route segments", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 		const promptArrow = scene.elements.find((element) => element.id === "edge:prompt-requirements");
 		const requirementsArrow = scene.elements.find(
 			(element) => element.id === "edge:requirements-clear",
@@ -1821,7 +1847,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports arrow endpoints that no longer land on their bound shapes", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 		const promptArrow = scene.elements.find((element) => element.id === "edge:prompt-requirements");
 
 		if (promptArrow) {
@@ -1840,7 +1868,9 @@ describe("convertSceneToExcalidraw", () => {
 	});
 
 	it("reports diamond endpoints that only land on the bounding box", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 		const branchArrow = scene.elements.find((element) => element.id === "edge:clear-review");
 		const decisionShape = scene.elements.find((element) => element.id === "node:clear");
 
@@ -1929,7 +1959,7 @@ describe("convertSceneToExcalidraw", () => {
 					},
 				],
 				style: { accentColor: "#000000", backgroundColor: "#ffffff" },
-			}),
+			}).pipe(Result.getOrThrow),
 		);
 
 		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
@@ -1956,8 +1986,8 @@ describe("convertSceneToExcalidraw", () => {
 				{ id: "code", source: "idp", target: "browser", label: "Code", type: "return" },
 				{ id: "retry", source: "browser", target: "browser", label: "Retry", type: "return" },
 			],
-		});
-		const scene = convertSceneToExcalidraw(renderSequenceDiagram(diagram));
+		}).pipe(Result.getOrThrow);
+		const scene = convertSceneToExcalidraw(renderSequenceDiagram(diagram).pipe(Result.getOrThrow));
 		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
 		// A reload reads the same scene back from the file.
 		const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene))) as {
@@ -2034,13 +2064,17 @@ describe("convertSceneToExcalidraw", () => {
 				{ id: "direct", source: "auth", target: "client", label: "Direct notice" },
 				{ id: "session", source: "api", target: "client", label: "Session", type: "return" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		for (const diagram of [sequenceFixture, apiRequestSequence, selfMessageSequence, nested]) {
-			const scene = convertSceneToExcalidraw(renderSequenceDiagram(diagram));
+			const scene = convertSceneToExcalidraw(
+				renderSequenceDiagram(diagram).pipe(Result.getOrThrow),
+			);
 			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
 		}
 
-		const scene = convertSceneToExcalidraw(renderSequenceDiagram(sequenceFixture));
+		const scene = convertSceneToExcalidraw(
+			renderSequenceDiagram(sequenceFixture).pipe(Result.getOrThrow),
+		);
 		const bar = scene.elements.find(
 			(element) => element.id === "node:store:lifeline:activation:checkout",
 		);
@@ -2086,8 +2120,8 @@ describe("bound label first paint", () => {
 					{ id: "cjk-end", source: "cjk", target: "end" },
 				],
 				layout: { direction: "TB", edgeRouting: "orthogonal" },
-			}),
-		),
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow),
 	);
 	const text = (id: string) => {
 		const element = converted.elements.find((entry) => entry.id === id);
@@ -2126,7 +2160,7 @@ describe("bound label first paint", () => {
 				],
 				messages: [{ id: "m", source: "qa", target: "cjk", label: "Review" }],
 				style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-			}),
+			}).pipe(Result.getOrThrow),
 		);
 		const header = (id: string) =>
 			sequence.elements.find((element) => element.id === `label:${id}`);
@@ -2142,7 +2176,7 @@ describe("bound label first paint", () => {
 
 	it("keeps wrapped unbound line labels at their stored width on edit", () => {
 		const scene = convertSceneToExcalidraw({
-			...renderIntermediateDiagram(flowchartFixture),
+			...renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
 			elements: [
 				{
 					type: "line",
@@ -2166,7 +2200,7 @@ describe("bound label first paint", () => {
 describe("group frames", () => {
 	it("exports each group as a named frame that holds its members", () => {
 		const exported = convertSceneToExcalidraw(
-			renderIntermediateDiagram(groupFixtures["grouped-approval"]),
+			renderIntermediateDiagram(groupFixtures["grouped-approval"]).pipe(Result.getOrThrow),
 		);
 		const frames = exported.elements.filter((element) => element.type === "frame");
 		expect(frames.map((frame) => [frame.id, frame.name])).toEqual([
@@ -2342,7 +2376,7 @@ describe("group frames", () => {
 });
 
 describe("architecture zones and infrastructure shapes", () => {
-	const aws = renderIntermediateDiagram(zoneFixtures["aws-three-tier"]);
+	const aws = renderIntermediateDiagram(zoneFixtures["aws-three-tier"]).pipe(Result.getOrThrow);
 	const exported = convertSceneToExcalidraw(aws);
 	const byId = new Map(exported.elements.map((element) => [element.id, element]));
 
@@ -2434,8 +2468,8 @@ describe("architecture zones and infrastructure shapes", () => {
 					{ id: "assets", label: "Assets bucket", kind: "end", shape: "storage" },
 				],
 				edges: [{ id: "e1", source: "api", target: "assets" }],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		const exported = convertSceneToExcalidraw(scene);
 		expect(validateExcalidrawScene(exported).issues).toEqual([]);
 		const box = exported.elements.find((element) => element.id === "node:assets")!;
@@ -2464,7 +2498,7 @@ describe("architecture zones and infrastructure shapes", () => {
 
 	it("exports queues and documents as valid composed shapes", () => {
 		const hybrid = convertSceneToExcalidraw(
-			renderIntermediateDiagram(zoneFixtures["hybrid-cloud"]),
+			renderIntermediateDiagram(zoneFixtures["hybrid-cloud"]).pipe(Result.getOrThrow),
 		);
 		const shapes = new Map(
 			hybrid.elements.flatMap((element) =>
@@ -2481,7 +2515,11 @@ describe("architecture zones and infrastructure shapes", () => {
 
 describe("chart marks", () => {
 	const chart = (input: object) =>
-		renderChartDiagram(parseChartDiagram({ id: "chart", title: "Chart", type: "chart", ...input }));
+		renderChartDiagram(
+			parseChartDiagram({ id: "chart", title: "Chart", type: "chart", ...input }).pipe(
+				Result.getOrThrow,
+			),
+		).pipe(Result.getOrThrow);
 
 	it("exports bars with square corners and no generated labels", () => {
 		const converted = convertSceneToExcalidraw(

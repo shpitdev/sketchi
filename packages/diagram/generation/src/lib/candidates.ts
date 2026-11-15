@@ -1,38 +1,31 @@
+import { Match, Array as Arr, Result, Schema, SchemaIssue } from "effect";
 import {
+	type CanonicalValidationError,
 	type CanonicalDiagram,
 	CanonicalDiagramSchema,
 	DiagramNodeShapeSchema,
 	DiagramZoneKindSchema,
-	DiagramValidationError,
 	ClassDiagram,
-	ClassValidationError,
 	ErDiagram,
-	ErValidationError,
 	isDiagramIconSlug,
 	OrgChartDiagram,
-	OrgChartValidationError,
 	QuadrantDiagram,
-	QuadrantValidationError,
 	validateQuadrantDiagram,
 	resolveOrgChartShorthand,
 	splitContinuingFinalStates,
 	validateOrgChartDiagram,
 	VennDiagram,
-	VennValidationError,
 	resolveVennShorthand,
 	validateVennDiagram,
 	JourneyDiagram,
-	JourneyValidationError,
 	resolveJourneyShorthand,
 	validateJourneyDiagram,
 	SankeyDiagram,
-	SankeyValidationError,
 	resolveSankeyShorthand,
 	validateSankeyDiagram,
 	resolveWireframeShorthand,
 	validateWireframeDiagram,
 	WireframeDiagram,
-	WireframeValidationError,
 	resolveClassShorthand,
 	resolveErShorthand,
 	validateClassDiagram,
@@ -52,25 +45,19 @@ import {
 	SKETCHI_DIAGRAM_STYLE,
 	SequenceDiagram,
 	StateMachineDiagram,
-	StateMachineValidationError,
 	getStateMachineDefaultWarnings,
 	StateMachineDefaultWarningSchema,
 	type StateMachineDefaultWarning,
 	TimelineDiagram,
-	TimelineValidationError,
 	validateTimelineDiagram,
 	ChartDiagram,
-	ChartValidationError,
 	GanttDiagram,
-	GanttValidationError,
 	validateGanttDiagram,
 	validateChartDiagram,
-	SequenceValidationError,
 	validateMindmapDiagram,
 	validateSequenceDiagram,
 	validateStateMachineDiagram,
 } from "@sketchi/diagram-core";
-import { Result, Schema, SchemaIssue } from "effect";
 
 import {
 	DiagramGenerationTypeSchema,
@@ -597,66 +584,52 @@ function schemaIssueDiagnostic(issue: {
 	return `schema_error at ${path}: ${issue.message}`;
 }
 
-function diagramValidationFailure(error: unknown): CandidateParseFailure {
-	if (
-		error instanceof SequenceValidationError ||
-		error instanceof TimelineValidationError ||
-		error instanceof ChartValidationError ||
-		error instanceof StateMachineValidationError ||
-		error instanceof GanttValidationError ||
-		error instanceof ErValidationError ||
-		error instanceof ClassValidationError ||
-		error instanceof OrgChartValidationError ||
-		error instanceof VennValidationError ||
-		error instanceof JourneyValidationError ||
-		error instanceof SankeyValidationError ||
-		error instanceof WireframeValidationError ||
-		error instanceof QuadrantValidationError
-	) {
-		const family =
-			error instanceof TimelineValidationError
-				? "timeline"
-				: error instanceof ChartValidationError
-					? "chart"
-					: error instanceof StateMachineValidationError
-						? "state-machine"
-						: error instanceof GanttValidationError
-							? "gantt"
-							: error instanceof ErValidationError
-								? "er"
-								: error instanceof ClassValidationError
-									? "class"
-									: error instanceof OrgChartValidationError
-										? "org-chart"
-										: error instanceof VennValidationError
-											? "venn"
-											: error instanceof JourneyValidationError
-												? "journey"
-												: error instanceof SankeyValidationError
-													? "sankey"
-													: error instanceof WireframeValidationError
-														? "wireframe"
-														: error instanceof QuadrantValidationError
-															? "quadrant"
-															: "sequence";
-		return {
-			diagnostics: error.issues.map(
-				(entry) => `${family}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
-			),
-			error: error.message,
-			success: false,
-		};
-	}
-
-	const message =
-		error instanceof DiagramValidationError || error instanceof Error
-			? error.message
-			: "Generated diagram parse failed.";
-	return {
-		diagnostics: [`diagram_validation_error: ${message}`],
-		error: message,
+function diagramValidationFailure(
+	error: CanonicalValidationError | Schema.SchemaError,
+): CandidateParseFailure {
+	const generic = (error: { readonly message: string }): CandidateParseFailure => ({
+		diagnostics: [`diagram_validation_error: ${error.message}`],
+		error: error.message,
 		success: false,
-	};
+	});
+	const family = (
+		name: string,
+		error: {
+			readonly message: string;
+			readonly issues: readonly {
+				readonly code: string;
+				readonly message: string;
+				readonly hint: string;
+			}[];
+		},
+	): CandidateParseFailure => ({
+		diagnostics: Arr.map(
+			error.issues,
+			(entry) => `${name}.${entry.code}: ${entry.message} Hint: ${entry.hint}`,
+		),
+		error: error.message,
+		success: false,
+	});
+	return Match.value(error).pipe(
+		Match.tagsExhaustive({
+			DiagramValidationError: generic,
+			FlowchartValidationError: generic,
+			SchemaError: generic,
+			SequenceValidationError: (error) => family("sequence", error),
+			TimelineValidationError: (error) => family("timeline", error),
+			ChartValidationError: (error) => family("chart", error),
+			StateMachineValidationError: (error) => family("state-machine", error),
+			GanttValidationError: (error) => family("gantt", error),
+			ErValidationError: (error) => family("er", error),
+			ClassValidationError: (error) => family("class", error),
+			OrgChartValidationError: (error) => family("org-chart", error),
+			VennValidationError: (error) => family("venn", error),
+			JourneyValidationError: (error) => family("journey", error),
+			SankeyValidationError: (error) => family("sankey", error),
+			WireframeValidationError: (error) => family("wireframe", error),
+			QuadrantValidationError: (error) => family("quadrant", error),
+		}),
+	);
 }
 
 /** "API p50 latency, one week" as "api-p50-latency-one-week". */
@@ -948,7 +921,9 @@ function parseCandidateDiagram(
 function decodeAndValidate<S extends Schema.ConstraintDecoder<unknown>>(
 	schema: S,
 	input: unknown,
-	validate: (decoded: S["Type"]) => NonNullable<CandidateParseSuccess["diagram"]>,
+	validate: (
+		decoded: S["Type"],
+	) => Result.Result<CanonicalDiagram, CanonicalValidationError | Schema.SchemaError>,
 	schemaFailureMessage = "Generated diagram schema validation failed.",
 ): CandidateParseResult {
 	const decoded = Schema.decodeUnknownResult(schema, { errors: "all" })(input);
@@ -962,11 +937,10 @@ function decodeAndValidate<S extends Schema.ConstraintDecoder<unknown>>(
 			success: false,
 		};
 	}
-	try {
-		return { diagram: validate(decoded.success), success: true };
-	} catch (error) {
-		return diagramValidationFailure(error);
-	}
+	return Result.match(validate(decoded.success), {
+		onFailure: diagramValidationFailure,
+		onSuccess: (diagram) => ({ diagram, success: true }),
+	});
 }
 
 /**

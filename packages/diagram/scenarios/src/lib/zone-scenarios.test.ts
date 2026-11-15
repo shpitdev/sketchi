@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { zoneRegionIssues } from "@sketchi/diagram-core";
 
@@ -8,6 +10,7 @@ const ids = ["aws-three-tier-zones-v2", "kubernetes-cluster-zones-v2", "hybrid-c
 
 function failed(scenarioId: string, candidate: unknown) {
 	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), candidate)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 }
@@ -19,7 +22,7 @@ function expected(scenarioId: string) {
 describe("zone scenarios", () => {
 	it.each(ids)("passes %s on its fixture, checking zones, nesting and shapes", (id) => {
 		const scenario = getFlowchartScenario(id);
-		const evaluation = evaluateScenarioFixture(scenario);
+		const evaluation = evaluateScenarioFixture(scenario).pipe(Result.getOrThrow);
 		expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 		const { requiredGroups, requiredNodes } = scenario.assertions;
 		expect(evaluation.checks.map((check) => check.id)).toEqual(
@@ -152,7 +155,7 @@ describe("zone scenarios", () => {
 				nodes: diagram.nodes.map((entry) =>
 					entry.id === node ? { ...entry, icon: { slug } } : entry,
 				),
-			}).checks;
+			}).pipe(Result.getOrThrow).checks;
 		const check = (checks: ReturnType<typeof withIcon>, id: string) =>
 			checks.find((entry) => entry.id === id)?.passed;
 		// "our GKE cluster" grounds Google Kubernetes Engine, though no step names it.
@@ -212,6 +215,7 @@ describe("architecture scenarios", () => {
 		const process = { ...scenario, assertions: { ...scenario.assertions, architecture: false } };
 		expect(
 			evaluateScenarioDiagram(process, component)
+				.pipe(Result.getOrThrow)
 				.checks.filter((check) => !check.passed)
 				.map((check) => check.id),
 		).toContain("node-label:Users");

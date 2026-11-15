@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import { parseSankeyDiagram, sankeyNodeTotals, type SankeyDiagram } from "@sketchi/diagram-core";
 import {
 	layoutSankeyDiagram,
@@ -288,7 +290,7 @@ function defineSankeyScenario(definition: SankeyScenarioDefinition): SankeyScena
 			...(unit ? { unit: unit.label } : {}),
 			nodes: nodes.map(([id, labels]) => ({ id, label: list(labels)[0] })),
 			links: flows.map(([source, target, value]) => ({ source, target, value })),
-		}),
+		}).pipe(Result.getOrThrow),
 	};
 }
 

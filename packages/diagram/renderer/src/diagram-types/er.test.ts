@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -264,7 +266,7 @@ const saasWorkspaceS5 = parseErDiagram({
 		toCardinality,
 	})),
 	style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-});
+}).pipe(Result.getOrThrow);
 
 /** Sol's preview s4 in the #540 A/B: s5's schema, titled anew, with three relationships labeled. */
 const saasWorkspaceLabeled = parseErDiagram({
@@ -278,20 +280,20 @@ const saasWorkspaceLabeled = parseErDiagram({
 		}[relationship.id];
 		return label ? { ...relationship, label } : relationship;
 	}),
-});
+}).pipe(Result.getOrThrow);
 
 describe("ER renderer", () => {
 	it("renders every fixture into a valid deterministic scene", () => {
 		for (const diagram of [erFixture, orgChartEr, ...Object.values(erStressFixtures)]) {
-			const scene = renderDiagram(diagram);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			expect(scene.diagramId).toBe(diagram.id);
 			expect(getCanvasValidationIssues(scene)).toEqual([]);
-			expect(renderDiagram(diagram)).toEqual(scene);
+			expect(renderDiagram(diagram).pipe(Result.getOrThrow)).toEqual(scene);
 		}
 	});
 
 	it("draws each entity as a table: a name band over key, field and type columns", () => {
-		const scene = renderDiagram(erFixture);
+		const scene = renderDiagram(erFixture).pipe(Result.getOrThrow);
 		const orders = table(scene, "orders");
 		expect(orders).toMatchObject({
 			rendererRole: "er-table",
@@ -320,7 +322,7 @@ describe("ER renderer", () => {
 	});
 
 	it("ends each relationship at the rows it joins, in its cardinality's crow's-foot head", () => {
-		const scene = renderDiagram(erFixture);
+		const scene = renderDiagram(erFixture).pipe(Result.getOrThrow);
 		const places = arrow(scene, "places");
 		const [customers, orders] = [table(scene, "customers"), table(scene, "orders")];
 		expect(places).toMatchObject({
@@ -342,7 +344,7 @@ describe("ER renderer", () => {
 	});
 
 	it("rings an optional end on its own line, past its bar or foot, grouped with its table", () => {
-		const scene = renderDiagram(erFixture);
+		const scene = renderDiagram(erFixture).pipe(Result.getOrThrow);
 		const rings = nodes(scene).filter((node) => node.rendererRole === "er-optional");
 		// places and ordered-as are zero-or-many at their child ends; contains is one-or-many.
 		expect(rings).toHaveLength(2);
@@ -354,7 +356,7 @@ describe("ER renderer", () => {
 	});
 
 	it("draws a self-reference from the foreign key's row to the key's row on one side", () => {
-		const scene = renderDiagram(orgChartEr);
+		const scene = renderDiagram(orgChartEr).pipe(Result.getOrThrow);
 		const employees = table(scene, "employees");
 		const loop = arrow(scene, "reports-to");
 		const [start, end] = [loop.points[0], loop.points.at(-1)!];
@@ -399,8 +401,8 @@ describe("ER renderer", () => {
 					toCardinality: "zero-or-many",
 				},
 			],
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const users = table(scene, "users");
 		const [wrote, edited] = [arrow(scene, "wrote").points[0], arrow(scene, "edited").points[0]];
 		// Both leave the id row, a row's height apart at most, not one stem.
@@ -439,8 +441,8 @@ describe("ER renderer", () => {
 					toCardinality: "zero-or-one",
 				},
 			],
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const accounts = table(scene, "accounts");
 		const [owns, sent] = [arrow(scene, "owns").points[0], arrow(scene, "sent").points[0]];
 		for (const start of [owns, sent]) {
@@ -456,7 +458,7 @@ describe("ER renderer", () => {
 
 	it("never runs two relationship lines along one stretch", () => {
 		for (const diagram of [erFixture, orgChartEr, ...Object.values(erStressFixtures)]) {
-			const lines = arrows(renderDiagram(diagram));
+			const lines = arrows(renderDiagram(diagram).pipe(Result.getOrThrow));
 			const shared = lines.flatMap((line, index) =>
 				lines
 					.slice(index + 1)
@@ -496,8 +498,8 @@ describe("ER renderer", () => {
 					toCardinality: "one",
 				},
 			],
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect([scene.width, scene.height].every(Number.isFinite)).toBe(true);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const a = table(scene, "a");
@@ -543,8 +545,8 @@ describe("ER renderer", () => {
 						toCardinality: "zero-or-many" as const,
 					},
 				]).flat(),
-			});
-			const scene = renderDiagram(diagram);
+			}).pipe(Result.getOrThrow);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			const parent = table(scene, "parent");
 			// The parent's ends by side: tenant_id's row above id's.
 			const sides = new Map<number, { y: number; row: number }[]>();
@@ -564,7 +566,7 @@ describe("ER renderer", () => {
 	});
 
 	it("places a workspace's two hubs so no lines cross, apart at their ends", () => {
-		const scene = renderDiagram(erStressFixtures.saasWorkspace);
+		const scene = renderDiagram(erStressFixtures.saasWorkspace).pipe(Result.getOrThrow);
 		// The organization holds five ends on its id row and users four: spread
 		// over both sides, two to a side stand clear, and the row holding a third
 		// grows to give it a port of its own.
@@ -575,7 +577,7 @@ describe("ER renderer", () => {
 	});
 
 	it("gives each of five lines on one key its own end, on that key's row", () => {
-		const scene = renderDiagram(saasWorkspaceS5);
+		const scene = renderDiagram(saasWorkspaceS5).pipe(Result.getOrThrow);
 		// Two ends to a side stand clear in a row's band; a side holding a third
 		// grows its row a line for each end, so no two bars or feet run together.
 		expect(bunchedEnds(scene)).toBe(0);
@@ -618,7 +620,7 @@ describe("ER renderer", () => {
 	});
 
 	it("runs a line between level ports on a grown row straight, clear of the lines climbing beside it", () => {
-		const scene = renderDiagram(saasWorkspaceLabeled);
+		const scene = renderDiagram(saasWorkspaceLabeled).pipe(Result.getOrThrow);
 		// organizations.id holds three ends on its right: two climbing to projects
 		// and labels, one level with subscriptions. Its line ran beside the climbing
 		// ones closer than a reader tells apart, so the router dropped it 140 below
@@ -659,8 +661,8 @@ describe("ER renderer", () => {
 				fromCardinality: "one" as const,
 				toCardinality: "zero-or-many" as const,
 			})),
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const accounts = table(scene, "accounts");
 		const [region, id, name] = fieldLines(scene, "accounts");
 		// region keeps its plain row; id's grown row starts below it, its text centred in its band.
@@ -703,8 +705,8 @@ describe("ER renderer", () => {
 				fromCardinality: "one" as const,
 				toCardinality: "zero-or-many" as const,
 			})),
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const accounts = table(scene, "accounts");
 		const starts = arrows(scene)
 			.map((line) => line.points[0].y)
@@ -717,14 +719,14 @@ describe("ER renderer", () => {
 
 	it("keeps a small schema within two to one, stacking tables where a row runs wide", () => {
 		for (const diagram of [erFixture, orgChartEr]) {
-			const scene = renderDiagram(diagram);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			expect(aspectOf(scene), diagram.id).toBeLessThanOrEqual(2);
 			expect(crossings(arrows(scene)), diagram.id).toBe(0);
 		}
 	});
 
 	it("draws a 25-table storefront with every end of a crowded key on a line of its own and no line beside a table", () => {
-		const scene = renderDiagram(erStressFixtures.storefront);
+		const scene = renderDiagram(erStressFixtures.storefront).pipe(Result.getOrThrow);
 		const tables = nodes(scene).filter(
 			(node) => node.rendererRole === "er-table" && node.kind === "entity",
 		);
@@ -780,7 +782,7 @@ describe("ER renderer", () => {
 	});
 
 	it("arranges a twenty-table schema as a grid of columns, no line through a table", () => {
-		const scene = renderDiagram(erStressFixtures.marketplace);
+		const scene = renderDiagram(erStressFixtures.marketplace).pipe(Result.getOrThrow);
 		const tables = nodes(scene).filter(
 			(node) => node.rendererRole === "er-table" && node.kind === "entity",
 		);

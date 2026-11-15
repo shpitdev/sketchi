@@ -1,4 +1,13 @@
-import { Effect, Schema } from "effect";
+import {
+	Array,
+	Effect,
+	MutableHashMap,
+	MutableHashSet,
+	Option,
+	Record,
+	Result,
+	Schema,
+} from "effect";
 
 import { DIAGRAM_ICON_SLUG_MAX_LENGTH, DIAGRAM_ICON_SLUG_PATTERN } from "./icon.js";
 import { DIAGRAM_TYPES, GRAPH_DIAGRAM_TYPES } from "./types.js";
@@ -124,10 +133,7 @@ export const DIAGRAM_NODE_COLORS = {
 	purple: { stroke: "#7c3aed", fill: "#ede9fe" },
 	gray: { stroke: "#6b7280", fill: "#f3f4f6" },
 } as const;
-export const DIAGRAM_NODE_COLOR_NAMES = Object.keys(DIAGRAM_NODE_COLORS) as [
-	keyof typeof DIAGRAM_NODE_COLORS,
-	...(keyof typeof DIAGRAM_NODE_COLORS)[],
-];
+export const DIAGRAM_NODE_COLOR_NAMES = Record.keys(DIAGRAM_NODE_COLORS);
 export const DiagramNodeColorSchema = Schema.Literals(DIAGRAM_NODE_COLOR_NAMES);
 export type DiagramNodeColor = typeof DiagramNodeColorSchema.Type;
 
@@ -203,130 +209,154 @@ export const IntermediateDiagram = Schema.Struct({
 
 export interface IntermediateDiagram extends Schema.Schema.Type<typeof IntermediateDiagram> {}
 
-export class DiagramValidationError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "DiagramValidationError";
-	}
-}
+export class DiagramValidationError extends Schema.TaggedError<
+	DiagramValidationError,
+	{ readonly brand: unique symbol }
+>()("DiagramValidationError", { message: Schema.String }) {}
 
-const findDuplicate = (values: readonly string[]) => {
-	const seen = new Set<string>();
-
+const findDuplicate = (values: Iterable<string>): Option.Option<string> => {
+	const seen = MutableHashSet.empty<string>();
 	for (const value of values) {
-		if (seen.has(value)) {
-			return value;
-		}
-
-		seen.add(value);
+		if (MutableHashSet.has(seen, value)) return Option.some(value);
+		MutableHashSet.add(seen, value);
 	}
-
-	return undefined;
+	return Option.none();
 };
 
-export function validateIntermediateDiagram(diagram: IntermediateDiagram): IntermediateDiagram {
-	const duplicateNodeId = findDuplicate(diagram.nodes.map((node) => node.id));
-
-	if (duplicateNodeId) {
-		throw new DiagramValidationError(`Duplicate node id "${duplicateNodeId}" is not allowed.`);
-	}
-
-	const duplicateEdgeId = findDuplicate(diagram.edges.map((edge) => edge.id));
-
-	if (duplicateEdgeId) {
-		throw new DiagramValidationError(`Duplicate edge id "${duplicateEdgeId}" is not allowed.`);
-	}
-
-	const duplicateGroupId = findDuplicate((diagram.groups ?? []).map((group) => group.id));
-
-	if (duplicateGroupId) {
-		throw new DiagramValidationError(`Duplicate group id "${duplicateGroupId}" is not allowed.`);
-	}
-
-	const groupIds = new Set((diagram.groups ?? []).map((group) => group.id));
-	const parentOf = new Map(
-		(diagram.groups ?? []).flatMap((group) =>
-			group.parent === undefined ? [] : [[group.id, group.parent] as const],
-		),
-	);
-
-	for (const [groupId, parent] of parentOf) {
-		if (!groupIds.has(parent)) {
-			throw new DiagramValidationError(
-				`Group "${groupId}" references missing parent group "${parent}".`,
+export function validateIntermediateDiagram(
+	diagram: IntermediateDiagram,
+): Result.Result<IntermediateDiagram, DiagramValidationError> {
+	return Result.gen(function* () {
+		const duplicateNodeId = findDuplicate(Array.map(diagram.nodes, (node) => node.id));
+		if (Option.isSome(duplicateNodeId) && duplicateNodeId.value) {
+			return yield* Result.fail(
+				DiagramValidationError.make({
+					message: `Duplicate node id "${duplicateNodeId.value}" is not allowed.`,
+				}),
 			);
 		}
-		const seen = new Set([groupId]);
-		for (let ancestor = parentOf.get(groupId); ancestor !== undefined;) {
-			if (seen.has(ancestor)) {
-				throw new DiagramValidationError(`Group "${groupId}" is nested inside itself.`);
+		const duplicateEdgeId = findDuplicate(Array.map(diagram.edges, (edge) => edge.id));
+		if (Option.isSome(duplicateEdgeId) && duplicateEdgeId.value) {
+			return yield* Result.fail(
+				DiagramValidationError.make({
+					message: `Duplicate edge id "${duplicateEdgeId.value}" is not allowed.`,
+				}),
+			);
+		}
+		const groups = Option.getOrElse(Option.fromNullishOr(diagram.groups), () => []);
+		const duplicateGroupId = findDuplicate(Array.map(groups, (group) => group.id));
+		if (Option.isSome(duplicateGroupId) && duplicateGroupId.value) {
+			return yield* Result.fail(
+				DiagramValidationError.make({
+					message: `Duplicate group id "${duplicateGroupId.value}" is not allowed.`,
+				}),
+			);
+		}
+		const groupIds = MutableHashSet.fromIterable(Array.map(groups, (group) => group.id));
+		const parentOf = MutableHashMap.fromIterable(
+			Array.getSomes(
+				Array.map(groups, (group) =>
+					Option.map(Option.fromUndefinedOr(group.parent), (parent) => [group.id, parent] as const),
+				),
+			),
+		);
+		for (const [groupId, parent] of parentOf) {
+			if (!MutableHashSet.has(groupIds, parent)) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Group "${groupId}" references missing parent group "${parent}".`,
+					}),
+				);
 			}
-			seen.add(ancestor);
-			ancestor = parentOf.get(ancestor);
+			const seen = MutableHashSet.make(groupId);
+			let ancestor = MutableHashMap.get(parentOf, groupId);
+			while (Option.isSome(ancestor)) {
+				if (MutableHashSet.has(seen, ancestor.value)) {
+					return yield* Result.fail(
+						DiagramValidationError.make({ message: `Group "${groupId}" is nested inside itself.` }),
+					);
+				}
+				MutableHashSet.add(seen, ancestor.value);
+				ancestor = MutableHashMap.get(parentOf, ancestor.value);
+			}
 		}
-	}
-
-	for (const node of diagram.nodes) {
-		if (node.group !== undefined && !groupIds.has(node.group)) {
-			throw new DiagramValidationError(
-				`Node "${node.id}" references missing group "${node.group}".`,
+		for (const node of diagram.nodes) {
+			const group = Option.fromUndefinedOr(node.group);
+			if (Option.isSome(group) && !MutableHashSet.has(groupIds, group.value)) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Node "${node.id}" references missing group "${group.value}".`,
+					}),
+				);
+			}
+		}
+		const lanes = Option.getOrElse(Option.fromNullishOr(diagram.lanes), () => []);
+		const duplicateLaneId = findDuplicate(Array.map(lanes, (lane) => lane.id));
+		if (Option.isSome(duplicateLaneId) && duplicateLaneId.value) {
+			return yield* Result.fail(
+				DiagramValidationError.make({
+					message: `Duplicate lane id "${duplicateLaneId.value}" is not allowed.`,
+				}),
 			);
 		}
-	}
-
-	const lanes = diagram.lanes ?? [];
-	const duplicateLaneId = findDuplicate(lanes.map((lane) => lane.id));
-
-	if (duplicateLaneId) {
-		throw new DiagramValidationError(`Duplicate lane id "${duplicateLaneId}" is not allowed.`);
-	}
-
-	if (lanes.length > 0 && (diagram.groups ?? []).length > 0) {
-		throw new DiagramValidationError("A diagram with lanes cannot also declare groups.");
-	}
-
-	const laneIds = new Set(lanes.map((lane) => lane.id));
-
-	for (const node of diagram.nodes) {
-		if (node.lane !== undefined && !laneIds.has(node.lane)) {
-			throw new DiagramValidationError(`Node "${node.id}" references missing lane "${node.lane}".`);
-		}
-
-		if (node.lane === undefined && laneIds.size > 0) {
-			throw new DiagramValidationError(`Node "${node.id}" has no lane.`);
-		}
-	}
-
-	const nodeIds = new Set(diagram.nodes.map((node) => node.id));
-
-	for (const edge of diagram.edges) {
-		if (!nodeIds.has(edge.source)) {
-			throw new DiagramValidationError(
-				`Edge "${edge.id}" references missing source node "${edge.source}".`,
+		if (lanes.length > 0 && groups.length > 0) {
+			return yield* Result.fail(
+				DiagramValidationError.make({
+					message: "A diagram with lanes cannot also declare groups.",
+				}),
 			);
 		}
-
-		if (!nodeIds.has(edge.target)) {
-			throw new DiagramValidationError(
-				`Edge "${edge.id}" references missing target node "${edge.target}".`,
-			);
+		const laneIds = MutableHashSet.fromIterable(Array.map(lanes, (lane) => lane.id));
+		for (const node of diagram.nodes) {
+			const lane = Option.fromUndefinedOr(node.lane);
+			if (Option.isSome(lane) && !MutableHashSet.has(laneIds, lane.value)) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Node "${node.id}" references missing lane "${lane.value}".`,
+					}),
+				);
+			}
+			if (Option.isNone(lane) && MutableHashSet.size(laneIds) > 0) {
+				return yield* Result.fail(
+					DiagramValidationError.make({ message: `Node "${node.id}" has no lane.` }),
+				);
+			}
 		}
-
-		if (edge.source === edge.target) {
-			throw new DiagramValidationError(
-				`Edge "${edge.id}" cannot connect node "${edge.source}" to itself.`,
-			);
+		const nodeIds = MutableHashSet.fromIterable(Array.map(diagram.nodes, (node) => node.id));
+		for (const edge of diagram.edges) {
+			if (!MutableHashSet.has(nodeIds, edge.source)) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Edge "${edge.id}" references missing source node "${edge.source}".`,
+					}),
+				);
+			}
+			if (!MutableHashSet.has(nodeIds, edge.target)) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Edge "${edge.id}" references missing target node "${edge.target}".`,
+					}),
+				);
+			}
+			if (edge.source === edge.target) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Edge "${edge.id}" cannot connect node "${edge.source}" to itself.`,
+					}),
+				);
+			}
 		}
-	}
-
-	return diagram;
+		return diagram;
+	});
 }
 
-export function parseIntermediateDiagram(input: unknown): IntermediateDiagram {
-	const diagram = Schema.decodeUnknownSync(IntermediateDiagram, {
-		errors: "all",
-	})(input);
-	return validateIntermediateDiagram(diagram);
+export function parseIntermediateDiagram(
+	input: unknown,
+): Result.Result<IntermediateDiagram, Schema.SchemaError | DiagramValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(IntermediateDiagram, { errors: "all" })(input),
+		validateIntermediateDiagram,
+	);
 }
 
 const RecipeNumber = Schema.Finite;

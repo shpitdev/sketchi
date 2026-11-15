@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const erDiagramType = "er" as const;
 
@@ -322,23 +323,35 @@ export function getErValidationIssues(diagram: ErDiagram): ErValidationIssue[] {
 	return issues.slice(0, ER_MAX_ISSUES);
 }
 
-export class ErValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly ErValidationIssue[]) {
-		super(issues[0]?.message ?? "ER diagram failed semantic validation.");
-		this.name = "ErValidationError";
+export class ErValidationError extends Schema.TaggedError<
+	ErValidationError,
+	{ readonly brand: unique symbol }
+>()("ErValidationError", { message: Schema.String, issues: Schema.Array(ErValidationIssue) }) {
+	static fromIssues(issues: readonly ErValidationIssue[]): ErValidationError {
+		return ErValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "ER diagram failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateErDiagram(diagram: ErDiagram): ErDiagram {
+export function validateErDiagram(diagram: ErDiagram): Result.Result<ErDiagram, ErValidationError> {
 	const issues = getErValidationIssues(diagram);
-	if (issues.length > 0) {
-		throw new ErValidationError(issues);
-	}
-	return diagram;
+	return issues.length > 0
+		? Result.fail(ErValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseErDiagram(input: unknown): ErDiagram {
-	return validateErDiagram(Schema.decodeUnknownSync(ErDiagram, { errors: "all" })(input));
+export function parseErDiagram(
+	input: unknown,
+): Result.Result<ErDiagram, Schema.SchemaError | ErValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(ErDiagram, { errors: "all" })(input),
+		validateErDiagram,
+	);
 }
 
 /** A small shop: customers place orders of products, line by line. */
@@ -405,7 +418,7 @@ export const erFixture = parseErDiagram({
 			toCardinality: "zero-or-many",
 		},
 	],
-});
+}).pipe(Result.getOrThrow);
 
 /** Employees who report to a manager, the same table, and may lead one department. */
 export const orgChartEr = parseErDiagram({
@@ -456,7 +469,7 @@ export const orgChartEr = parseErDiagram({
 			label: "heads",
 		},
 	],
-});
+}).pipe(Result.getOrThrow);
 
 const KEY_WORDS: Readonly<Record<string, "pk" | "fk" | "unique" | "nullable">> = {
 	PK: "pk",

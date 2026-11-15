@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -13,9 +15,12 @@ const samples = JSON.parse(
 	readFileSync(new URL("./fixtures/cached-answer-folds.json", import.meta.url), "utf8"),
 ) as { runId: string; spec: Record<string, unknown> }[];
 const scenario = getFlowchartScenario("ai-app-stack-logos");
-const labeled = parseFlowchartDiagram(specToFlowchartCandidate(samples[0]!.spec));
+const labeled = parseFlowchartDiagram(
+	specToFlowchartCandidate(samples[0]!.spec).pipe(Result.getOrThrow),
+).pipe(Result.getOrThrow);
 const failures = (diagram = labeled, expected = scenario) =>
 	evaluateScenarioDiagram(expected, diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const missing = "node-label:Return cached answer";
@@ -32,7 +37,13 @@ function hitEdge(label: string | undefined, target = "ret") {
 
 describe("explicit cached-answer outcome on a branch into the shared answer", () => {
 	it.each(samples)("accepts the real folded spec $runId", ({ spec }) => {
-		expect(failures(parseFlowchartDiagram(specToFlowchartCandidate(spec)))).toEqual([]);
+		expect(
+			failures(
+				parseFlowchartDiagram(specToFlowchartCandidate(spec).pipe(Result.getOrThrow)).pipe(
+					Result.getOrThrow,
+				),
+			),
+		).toEqual([]);
 	});
 
 	it.each(["yes", "hit", "hit: return cached answer", "yes (return cached answer)"])(
@@ -105,12 +116,16 @@ describe("explicit cached-answer outcome on a branch into the shared answer", ()
 	it("rejects a bare no branch before and after public validation", () => {
 		const spec = hitEdge("no");
 		expect(matchFlowchartSteps(scenario, spec).matchedNodes.get("cached")).toEqual(new Set());
-		expect(() => failures(spec)).toThrow('repeats branch label "no"');
+		expect(evaluateScenarioDiagram(scenario, spec)).toMatchObject({
+			failure: { message: expect.stringContaining('repeats branch label "no"') },
+		});
 	});
 
 	it("rejects an unlabeled branch at the public boundary and in the matcher", () => {
 		const spec = hitEdge(undefined);
-		expect(() => failures(spec)).toThrow("outgoing branch without a label");
+		expect(evaluateScenarioDiagram(scenario, spec)).toMatchObject({
+			failure: { message: expect.stringContaining("outgoing branch without a label") },
+		});
 		expect(matchFlowchartSteps(scenario, spec).matchedNodes.get("cached")).toEqual(new Set());
 	});
 

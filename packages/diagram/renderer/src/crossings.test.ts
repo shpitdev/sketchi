@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	candidateRouteQuality,
@@ -211,7 +213,10 @@ const CROSSINGS: Readonly<Record<keyof typeof crossingFixtures, readonly [number
 
 const flowcharts = Object.keys(crossingFixtures) as (keyof typeof crossingFixtures)[];
 const scenes = new Map(
-	flowcharts.map((name) => [name, renderIntermediateDiagram(crossingFixtures[name])] as const),
+	flowcharts.map(
+		(name) =>
+			[name, renderIntermediateDiagram(crossingFixtures[name]).pipe(Result.getOrThrow)] as const,
+	),
 );
 
 describe("avoidable crossings in generated flowcharts", () => {
@@ -236,7 +241,7 @@ describe("avoidable crossings in generated flowcharts", () => {
 					renderIntermediateDiagram({
 						...crossingFixtures[name],
 						layout: { direction, edgeRouting: "orthogonal" },
-					}),
+					}).pipe(Result.getOrThrow),
 				).map((finding) => `${name}: ${finding}`),
 			);
 			expect(crossed).toEqual([]);
@@ -264,7 +269,7 @@ describe("avoidable crossings in generated flowcharts", () => {
 					renderIntermediateDiagram({
 						...fixture,
 						layout: { direction, edgeRouting: "orthogonal" },
-					}),
+					}).pipe(Result.getOrThrow),
 				)
 					.filter(({ gap }) => gap < NODE_CLEARANCE)
 					.map(({ edge, gap, node }) => `${name}: ${edge} ${gap.toFixed(1)} px from ${node}`),
@@ -332,7 +337,7 @@ describe("avoidable crossings in generated state machines", () => {
 				direction
 					? { ...crossingStateMachines[name], layout: { direction } }
 					: crossingStateMachines[name],
-			),
+			).pipe(Result.getOrThrow),
 		})),
 	);
 

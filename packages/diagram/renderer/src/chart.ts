@@ -1,4 +1,6 @@
+import { Result } from "effect";
 import {
+	type ChartValidationError,
 	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
 	SKETCHI_DIAGRAM_PALETTE,
@@ -1838,57 +1840,60 @@ function drawPie(builder: SceneBuilder, diagram: ChartDiagram): void {
 }
 
 /** Lay out a chart deterministically: axes, marks, labels and legend. */
-export function renderChartDiagram(input: ChartDiagram): RenderedDiagramScene {
-	const diagram = validateChartDiagram(input);
-	const builder = new SceneBuilder(diagram.style.backgroundColor);
-	if (diagram.kind === "pie") {
-		drawPie(builder, diagram);
-		drawHeader(builder, diagram, { colors: [] });
-	} else if (diagram.kind === "line") {
-		drawLines(builder, diagram);
-		drawHeader(builder, diagram, {
-			legend: "line",
-			colors: chartColors(diagram.series.length, false),
-		});
-	} else {
-		const plan = barPlan(diagram);
-		if (chartBarOrientation(diagram) === "horizontal") drawHorizontalBars(builder, plan);
-		else drawColumns(builder, plan);
-		drawHeader(builder, diagram, { legend: "bar", colors: plan.colors });
-	}
-	builder.breakRulesUnderText(
-		(id) =>
-			id.startsWith("chart:grid:") ||
-			id.startsWith("chart:category-tick:") ||
-			id === "chart:baseline" ||
-			id === "chart:axis",
-	);
-	const box = builder.bounds();
-	const dx = PADDING - box.left;
-	const dy = PADDING - box.top;
-	const elements = builder.elements.map((element): SceneElement => {
-		if (element.type === "line") {
-			const [first, second, ...rest] = element.points.map((point) => ({
-				x: round(point.x + dx),
-				y: round(point.y + dy),
-			}));
-			return { ...element, points: [first!, second!, ...rest] };
+export function renderChartDiagram(
+	input: ChartDiagram,
+): Result.Result<RenderedDiagramScene, ChartValidationError> {
+	return Result.map(validateChartDiagram(input), (diagram) => {
+		const builder = new SceneBuilder(diagram.style.backgroundColor);
+		if (diagram.kind === "pie") {
+			drawPie(builder, diagram);
+			drawHeader(builder, diagram, { colors: [] });
+		} else if (diagram.kind === "line") {
+			drawLines(builder, diagram);
+			drawHeader(builder, diagram, {
+				legend: "line",
+				colors: chartColors(diagram.series.length, false),
+			});
+		} else {
+			const plan = barPlan(diagram);
+			if (chartBarOrientation(diagram) === "horizontal") drawHorizontalBars(builder, plan);
+			else drawColumns(builder, plan);
+			drawHeader(builder, diagram, { legend: "bar", colors: plan.colors });
 		}
-		if (element.type === "arrow") return element;
-		return { ...element, x: round(element.x + dx), y: round(element.y + dy) };
+		builder.breakRulesUnderText(
+			(id) =>
+				id.startsWith("chart:grid:") ||
+				id.startsWith("chart:category-tick:") ||
+				id === "chart:baseline" ||
+				id === "chart:axis",
+		);
+		const box = builder.bounds();
+		const dx = PADDING - box.left;
+		const dy = PADDING - box.top;
+		const elements = builder.elements.map((element): SceneElement => {
+			if (element.type === "line") {
+				const [first, second, ...rest] = element.points.map((point) => ({
+					x: round(point.x + dx),
+					y: round(point.y + dy),
+				}));
+				return { ...element, points: [first!, second!, ...rest] };
+			}
+			if (element.type === "arrow") return element;
+			return { ...element, x: round(element.x + dx), y: round(element.y + dy) };
+		});
+		return {
+			kind: "canvas",
+			version: CANVAS_SPEC_VERSION,
+			diagramId: diagram.id,
+			title: diagram.title,
+			width: Math.ceil(box.right - box.left + PADDING * 2),
+			height: Math.ceil(box.bottom - box.top + PADDING * 2),
+			accentColor: diagram.style.accentColor,
+			backgroundColor: diagram.style.backgroundColor,
+			elements,
+			layers: [],
+			layouts: [],
+			zOrder: builder.zOrder(),
+		};
 	});
-	return {
-		kind: "canvas",
-		version: CANVAS_SPEC_VERSION,
-		diagramId: diagram.id,
-		title: diagram.title,
-		width: Math.ceil(box.right - box.left + PADDING * 2),
-		height: Math.ceil(box.bottom - box.top + PADDING * 2),
-		accentColor: diagram.style.accentColor,
-		backgroundColor: diagram.style.backgroundColor,
-		elements,
-		layers: [],
-		layouts: [],
-		zOrder: builder.zOrder(),
-	};
 }

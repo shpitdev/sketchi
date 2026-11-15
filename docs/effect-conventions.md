@@ -38,6 +38,14 @@ but cannot establish that inference or billing stopped. This adapter is promoted
 native diagnostic errors; family questions, thresholds and timeout policy stay in
 the narrowing service.
 
+The icon author uses `@effect/ai-anthropic` with `Prompt` history and provider
+metadata for signed/redacted thinking replay. Its native gateway transport forwards
+the Effect HTTP abort signal and preserves cache, effort, fallback and token-budget
+settings. A domain request-field transform retains the existing JSON output schema
+with `generateText`, so the author's existing tolerant repair still owns invalid
+replies. The Google judge remains a separate migration: its low-media setting is
+not supported by the proved OpenAI compatibility route.
+
 ## Contracts, failures and tests
 
 - Model ordinary records with `Schema.Struct` and a same-name interface. Use current

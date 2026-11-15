@@ -1,4 +1,6 @@
+import { Result } from "effect";
 import {
+	type SequenceValidationError,
 	canvasNodeIconBand,
 	CANVAS_SPEC_VERSION,
 	SEQUENCE_LIFELINE_SUFFIX,
@@ -285,418 +287,421 @@ export interface SequenceRenderOptions {
 export function renderSequenceDiagram(
 	diagram: SequenceDiagram,
 	{ tighten = true }: SequenceRenderOptions = {},
-): RenderedDiagramScene {
-	const input = validateSequenceDiagram(diagram);
-	const headerLabelById = new Map(
-		input.participants.map((participant) => [
-			participant.id,
-			wrapTextToWidth(participant.label, HEADER_LABEL_WIDTH, LABEL_FONT_SIZE),
-		]),
-	);
-	// Whole words may wrap wider than a header; every header widens to the
-	// widest label so columns stay even, and the lifelines re-space with them.
-	const headerWidth = Math.max(
-		HEADER_WIDTH,
-		...[...headerLabelById.values()].map(
-			(label) => Math.ceil(estimateTextWidth(label, LABEL_FONT_SIZE)) + HEADER_LABEL_PADDING,
-		),
-	);
-	const naturalStep = headerWidth + PARTICIPANT_GAP;
-	// Size the shared header row before laying out lifelines and message lanes;
-	// a participant logo sits above its label inside the header.
-	const headerHeight = input.participants.reduce(
-		(height, participant) =>
-			Math.max(
-				height,
-				Math.ceil(
-					(headerLabelById.get(participant.id) ?? participant.label).split("\n").length *
-						LABEL_FONT_SIZE *
-						LABEL_LINE_HEIGHT,
-				) +
-					LABEL_VERTICAL_PADDING +
-					canvasNodeIconBand(
-						participant.icon ? { slug: participant.icon.slug, size: HEADER_ICON_SIZE } : undefined,
-					),
+): Result.Result<RenderedDiagramScene, SequenceValidationError> {
+	return Result.map(validateSequenceDiagram(diagram), (input) => {
+		const headerLabelById = new Map(
+			input.participants.map((participant) => [
+				participant.id,
+				wrapTextToWidth(participant.label, HEADER_LABEL_WIDTH, LABEL_FONT_SIZE),
+			]),
+		);
+		// Whole words may wrap wider than a header; every header widens to the
+		// widest label so columns stay even, and the lifelines re-space with them.
+		const headerWidth = Math.max(
+			HEADER_WIDTH,
+			...[...headerLabelById.values()].map(
+				(label) => Math.ceil(estimateTextWidth(label, LABEL_FONT_SIZE)) + HEADER_LABEL_PADDING,
 			),
-		HEADER_HEIGHT,
-	);
-	const headerY = PADDING;
-	const lifelineY = headerY + headerHeight;
-	const firstMessageY = lifelineY + MESSAGE_TOP_GAP;
-	// A self-message's row grows by its loop, which is as tall as its label.
-	const selfLabels = new Map(
-		input.messages.flatMap((message) =>
-			message.source === message.target ? [[message.id, selfLabelSize(message.label)]] : [],
-		),
-	);
-	const loopHeight = (messageId: string) => {
-		const size = selfLabels.get(messageId);
-		return size ? Math.max(SELF_LOOP_MIN_HEIGHT, size.height) : 0;
-	};
-	const spans = sequenceActivations(input);
-	/** Depth of the innermost bar active on a participant's row, or -1 for none. */
-	const activeDepth = (participantId: string, index: number) =>
-		Math.max(
-			-1,
-			...spans
-				.filter(
-					(span) =>
-						span.participantId === participantId &&
-						span.startIndex <= index &&
-						index <= span.endIndex,
-				)
-				.map((span) => span.depth),
 		);
-	/** How far right of its lifeline a bar at this depth ends. */
-	const barRight = (depth: number) =>
-		depth < 0 ? LIFELINE_WIDTH / 2 : depth * ACTIVATION_NEST_OFFSET + ACTIVATION_WIDTH / 2;
-	// Bars nest rightward, so a self-message deep inside them reaches further
-	// right: the gap after its participant widens until its label clears the
-	// next participant's bars. Diagrams without one keep even columns.
-	const selfReach = input.participants.map((participant) =>
-		Math.max(
-			0,
-			...input.messages.flatMap((message, index) => {
-				const label = selfLabels.get(message.id);
-				if (!label || message.source !== participant.id) return [];
-				const depth = activeDepth(participant.id, index);
-				const loopStart = barRight(message.type === "return" ? depth : depth + 1);
-				return [
-					loopStart +
-						SELF_LOOP_WIDTH +
-						SELF_LABEL_GAP +
-						label.width +
-						ACTIVATION_WIDTH / 2 +
-						SELF_LABEL_CLEARANCE,
-				];
-			}),
-		),
-	);
-	const draw = (messageGap: number, columnStep: number): RenderedDiagramScene => {
-		const rowYs: number[] = [];
-		let nextRowY = firstMessageY;
-		for (const message of input.messages) {
-			rowYs.push(nextRowY);
-			nextRowY += messageGap + loopHeight(message.id);
-		}
-		const lastMessage = input.messages.at(-1);
-		const lastRowBottom = lastMessage
-			? (rowYs.at(-1) ?? firstMessageY) + loopHeight(lastMessage.id)
-			: firstMessageY;
-		const lifelineHeight = lastRowBottom - lifelineY + LIFELINE_BOTTOM_GAP;
-
-		const columnGaps = selfReach.map((reach) => Math.max(columnStep, reach));
-		const centerXByParticipant = new Map<string, number>();
-		const headers: NodeSceneElement[] = [];
-		const headerLabels: TextSceneElement[] = [];
-		const lifelines: NodeSceneElement[] = [];
-
-		let nextCenterX = PADDING + headerWidth / 2;
-		input.participants.forEach((participant, index) => {
-			const centerX = nextCenterX;
-			const x = centerX - headerWidth / 2;
-			nextCenterX += columnGaps[index] ?? columnStep;
-			centerXByParticipant.set(participant.id, centerX);
-			headers.push({
-				type: "node",
-				id: `node:${participant.id}`,
-				nodeId: participant.id,
-				...(participant.kind ? { kind: participant.kind } : {}),
-				...(participant.icon
-					? { icon: { slug: participant.icon.slug, size: HEADER_ICON_SIZE } }
-					: {}),
-				shape: "rectangle",
-				x,
-				y: headerY,
-				width: headerWidth,
-				height: headerHeight,
-				label: headerLabelById.get(participant.id) ?? participant.label,
-			});
-			headerLabels.push({
-				type: "text",
-				id: `label:${participant.id}`,
-				containerId: `node:${participant.id}`,
-				x: centerX,
-				y: headerY + headerHeight / 2,
-				text: headerLabelById.get(participant.id) ?? participant.label,
-				fontSize: LABEL_FONT_SIZE,
-				maxWidth: headerWidth - HEADER_LABEL_PADDING,
-				// The logo sits at the top of the header; the label stacks beneath it.
-				...(participant.icon ? { verticalAlign: "bottom" as const } : {}),
-			});
-			lifelines.push({
-				type: "node",
-				id: `node:${sequenceLifelineId(participant.id)}`,
-				nodeId: sequenceLifelineId(participant.id),
-				rendererRole: SEQUENCE_LIFELINE_ROLE,
-				shape: "rectangle",
-				fillColor: input.style.backgroundColor,
-				strokeColor: input.style.accentColor,
-				x: centerX - LIFELINE_WIDTH / 2,
-				y: lifelineY,
-				width: LIFELINE_WIDTH,
-				height: lifelineHeight,
-				label: `${participant.label} lifeline`,
-			});
-		});
-
-		const rowY = (index: number) => rowYs[index] ?? firstMessageY;
-		const labelById = new Map(
-			input.participants.map((participant) => [participant.id, participant.label]),
-		);
-		const barNode = (
-			participantId: string,
-			messageId: string,
-			depth: number,
-			top: number,
-			bottom: number,
-		): NodeSceneElement => {
-			const nodeId = sequenceActivationId(participantId, messageId);
-			const centerX = centerXByParticipant.get(participantId) ?? 0;
-			return {
-				type: "node",
-				id: `node:${nodeId}`,
-				nodeId,
-				rendererRole: SEQUENCE_ACTIVATION_ROLE,
-				shape: "rectangle",
-				fillColor: input.style.backgroundColor,
-				strokeColor: input.style.accentColor,
-				x: centerX - ACTIVATION_WIDTH / 2 + depth * ACTIVATION_NEST_OFFSET,
-				y: top,
-				width: ACTIVATION_WIDTH,
-				height: bottom - top,
-				label: `${labelById.get(participantId) ?? participantId} active`,
-			};
-		};
-		const bars = spans.map(
-			(
-				activation,
-			): { readonly activation: SequenceActivation; readonly node: NodeSceneElement } => ({
-				activation,
-				node: barNode(
-					activation.participantId,
-					activation.callMessageId,
-					activation.depth,
-					rowY(activation.startIndex) - ACTIVATION_OVERHANG,
-					rowY(activation.endIndex) + ACTIVATION_OVERHANG,
-				),
-			}),
-		);
-		// A self-call returns into a short bar one step inside its innermost active
-		// bar, as UML nests a participant's call to itself.
-		const selfBars = new Map(
-			input.messages.flatMap((message, index) => {
-				if (message.source !== message.target || message.type === "return") return [];
-				const depth = activeDepth(message.source, index) + 1;
-				const returnY = rowY(index) + loopHeight(message.id);
-				return [
-					[
-						message.id,
-						barNode(
-							message.source,
-							message.id,
-							depth,
-							returnY - ACTIVATION_OVERHANG,
-							returnY + ACTIVATION_OVERHANG,
+		const naturalStep = headerWidth + PARTICIPANT_GAP;
+		// Size the shared header row before laying out lifelines and message lanes;
+		// a participant logo sits above its label inside the header.
+		const headerHeight = input.participants.reduce(
+			(height, participant) =>
+				Math.max(
+					height,
+					Math.ceil(
+						(headerLabelById.get(participant.id) ?? participant.label).split("\n").length *
+							LABEL_FONT_SIZE *
+							LABEL_LINE_HEIGHT,
+					) +
+						LABEL_VERTICAL_PADDING +
+						canvasNodeIconBand(
+							participant.icon
+								? { slug: participant.icon.slug, size: HEADER_ICON_SIZE }
+								: undefined,
 						),
-					] as const,
-				];
-			}),
+				),
+			HEADER_HEIGHT,
 		);
-		/**
-		 * Where a message meets a participant: the bar of the span it opens or
-		 * closes, otherwise the innermost bar active on its row (overlapping bars
-		 * never share a depth), otherwise the lifeline.
-		 */
-		const attachment = (
-			participantId: string,
-			index: number,
-			messageId: string,
-			towardX: number,
-		) => {
-			const centerX = centerXByParticipant.get(participantId) ?? 0;
-			const rightward = towardX > centerX;
-			const active = bars.filter(
-				({ activation }) =>
-					activation.participantId === participantId &&
-					activation.startIndex <= index &&
-					index <= activation.endIndex,
-			);
-			const bar =
-				active.find(
-					({ activation }) =>
-						activation.callMessageId === messageId || activation.returnMessageId === messageId,
-				) ??
-				active.reduce<(typeof bars)[number] | undefined>(
-					(innermost, candidate) =>
-						!innermost || candidate.activation.depth > innermost.activation.depth
-							? candidate
-							: innermost,
-					undefined,
-				);
-			if (!bar) {
-				return {
-					nodeId: sequenceLifelineId(participantId),
-					x: centerX + ((rightward ? 1 : -1) * LIFELINE_WIDTH) / 2,
-				};
-			}
-			return {
-				nodeId: bar.node.nodeId,
-				x: rightward ? bar.node.x + bar.node.width : bar.node.x,
-			};
-		};
-
-		/**
-		 * Excalidraw centers a bound label on a three-point arrow's middle point, and
-		 * on a two-point arrow's midpoint. When that midpoint sits on a lifeline the
-		 * message passes (with even columns, when it spans an even number of them),
-		 * a middle point moves its label to the gap on the source side of that
-		 * lifeline.
-		 */
-		const centers = input.participants.map(
-			(participant) => centerXByParticipant.get(participant.id) ?? 0,
-		);
-		const labelPoint = (sourceCenter: number, targetCenter: number, y: number) => {
-			const midpoint = (sourceCenter + targetCenter) / 2;
-			const direction = Math.sign(targetCenter - sourceCenter);
-			const passed = centers.findIndex(
-				(center) =>
-					Math.abs(center - midpoint) < PASSED_LIFELINE_CLEARANCE &&
-					Math.min(sourceCenter, targetCenter) < center &&
-					center < Math.max(sourceCenter, targetCenter),
-			);
-			const lifeline = centers[passed];
-			const sourceSide = centers[passed - direction];
-			if (lifeline === undefined || sourceSide === undefined) return [];
-			return [{ x: (lifeline + sourceSide) / 2, y }];
-		};
-
-		/**
-		 * A self-message leaves the right edge of its participant's innermost bar
-		 * (or lifeline), runs out, down its row's loop height and back into its own
-		 * bar. Excalidraw centers a bound label on its arrow's line, so the label is
-		 * a free text beside the loop's outer leg, grouped with the loop, as
-		 * flowcharts place their branch labels.
-		 */
-		const selfMessageLabels: TextSceneElement[] = [];
-		const selfMessageArrow = (
-			message: (typeof input.messages)[number],
-			index: number,
-		): ArrowSceneElement => {
-			const source = attachment(message.source, index, message.id, Number.POSITIVE_INFINITY);
-			const bar = selfBars.get(message.id);
-			const target = bar ? { nodeId: bar.nodeId, x: bar.x + bar.width } : source;
-			const outerX = Math.max(source.x, target.x) + SELF_LOOP_WIDTH;
-			const top = rowY(index);
-			const bottom = top + loopHeight(message.id);
-			const groupIds = [`message:${message.id}`];
-			selfMessageLabels.push({
-				type: "text",
-				id: `arrow:${message.id}:label`,
-				text: message.label,
-				fontSize: SELF_LABEL_FONT_SIZE,
-				x: outerX + SELF_LABEL_GAP + (selfLabels.get(message.id)?.width ?? 0) / 2,
-				y: (top + bottom) / 2,
-				maxWidth: SELF_LABEL_MAX_WIDTH,
-				groupIds,
-			});
-			return {
-				type: "arrow",
-				id: `arrow:${message.id}`,
-				edgeId: message.id,
-				groupIds,
-				sourceNodeId: source.nodeId,
-				targetNodeId: target.nodeId,
-				...(message.type === "return" ? { strokeColor: "#6b7280" } : {}),
-				...(message.style === "dashed" || message.type === "return"
-					? { strokeStyle: "dashed" as const }
-					: {}),
-				points: [
-					{ x: source.x, y: top },
-					{ x: outerX, y: top },
-					{ x: outerX, y: bottom },
-					{ x: target.x, y: bottom },
-				],
-				label: message.label,
-			};
-		};
-
-		const messageArrows: ArrowSceneElement[] = input.messages.map((message, index) => {
-			if (message.source === message.target) return selfMessageArrow(message, index);
-			// Validation guarantees both participants exist.
-			const sourceCenter = centerXByParticipant.get(message.source) ?? 0;
-			const targetCenter = centerXByParticipant.get(message.target) ?? 0;
-			const source = attachment(message.source, index, message.id, targetCenter);
-			const target = attachment(message.target, index, message.id, sourceCenter);
-			const y = rowY(index);
-			return {
-				type: "arrow",
-				id: `arrow:${message.id}`,
-				edgeId: message.id,
-				sourceNodeId: source.nodeId,
-				targetNodeId: target.nodeId,
-				...(message.type === "return" ? { strokeColor: "#6b7280" } : {}),
-				...(message.style === "dashed" || message.type === "return"
-					? { strokeStyle: "dashed" as const }
-					: {}),
-				points: [
-					{ x: source.x, y },
-					...labelPoint(sourceCenter, targetCenter, y),
-					{ x: target.x, y },
-				],
-				label: message.label,
-			};
-		});
-
-		// The scene holds every self-message label beside its loop.
-		const labelsRight = Math.max(
-			0,
-			...messageArrows.flatMap(({ edgeId, points }) => {
-				const label = selfLabels.get(edgeId);
-				return label && points[1] ? [points[1].x + SELF_LABEL_GAP + label.width] : [];
-			}),
-		);
-		const activationBars = [...bars.map(({ node }) => node), ...selfBars.values()];
-		const elements = [
-			...messageArrows,
-			...selfMessageLabels,
-			...lifelines,
-			...activationBars,
-			...headers,
-			...headerLabels,
-		];
-		const zOrder = [
-			...lifelines.map((element) => element.id),
-			...activationBars.map((element) => element.id),
-			...headers.map((element) => element.id),
-			...headerLabels.map((element) => element.id),
-			...messageArrows.map((element) => element.id),
-			...selfMessageLabels.map((element) => element.id),
-		];
-
-		return {
-			kind: "canvas",
-			version: CANVAS_SPEC_VERSION,
-			diagramId: input.id,
-			title: input.title,
-			width: Math.max(
-				(centers.at(-1) ?? PADDING) + headerWidth / 2 + PADDING,
-				Math.ceil(labelsRight) + PADDING,
+		const headerY = PADDING;
+		const lifelineY = headerY + headerHeight;
+		const firstMessageY = lifelineY + MESSAGE_TOP_GAP;
+		// A self-message's row grows by its loop, which is as tall as its label.
+		const selfLabels = new Map(
+			input.messages.flatMap((message) =>
+				message.source === message.target ? [[message.id, selfLabelSize(message.label)]] : [],
 			),
-			height: lifelineY + lifelineHeight + PADDING,
-			accentColor: input.style.accentColor,
-			backgroundColor: input.style.backgroundColor,
-			elements,
-			layers: [],
-			layouts: [],
-			zOrder,
+		);
+		const loopHeight = (messageId: string) => {
+			const size = selfLabels.get(messageId);
+			return size ? Math.max(SELF_LOOP_MIN_HEIGHT, size.height) : 0;
 		};
-	};
-	const natural = draw(MESSAGE_GAP, naturalStep);
-	if (!tighten) return natural;
-	const target = spacing(input, headerWidth, firstMessageY, loopHeight, selfReach, naturalStep);
-	if (target.messageGap === MESSAGE_GAP && target.columnStep === naturalStep) return natural;
-	return tightened(natural, target, naturalStep, draw);
+		const spans = sequenceActivations(input);
+		/** Depth of the innermost bar active on a participant's row, or -1 for none. */
+		const activeDepth = (participantId: string, index: number) =>
+			Math.max(
+				-1,
+				...spans
+					.filter(
+						(span) =>
+							span.participantId === participantId &&
+							span.startIndex <= index &&
+							index <= span.endIndex,
+					)
+					.map((span) => span.depth),
+			);
+		/** How far right of its lifeline a bar at this depth ends. */
+		const barRight = (depth: number) =>
+			depth < 0 ? LIFELINE_WIDTH / 2 : depth * ACTIVATION_NEST_OFFSET + ACTIVATION_WIDTH / 2;
+		// Bars nest rightward, so a self-message deep inside them reaches further
+		// right: the gap after its participant widens until its label clears the
+		// next participant's bars. Diagrams without one keep even columns.
+		const selfReach = input.participants.map((participant) =>
+			Math.max(
+				0,
+				...input.messages.flatMap((message, index) => {
+					const label = selfLabels.get(message.id);
+					if (!label || message.source !== participant.id) return [];
+					const depth = activeDepth(participant.id, index);
+					const loopStart = barRight(message.type === "return" ? depth : depth + 1);
+					return [
+						loopStart +
+							SELF_LOOP_WIDTH +
+							SELF_LABEL_GAP +
+							label.width +
+							ACTIVATION_WIDTH / 2 +
+							SELF_LABEL_CLEARANCE,
+					];
+				}),
+			),
+		);
+		const draw = (messageGap: number, columnStep: number): RenderedDiagramScene => {
+			const rowYs: number[] = [];
+			let nextRowY = firstMessageY;
+			for (const message of input.messages) {
+				rowYs.push(nextRowY);
+				nextRowY += messageGap + loopHeight(message.id);
+			}
+			const lastMessage = input.messages.at(-1);
+			const lastRowBottom = lastMessage
+				? (rowYs.at(-1) ?? firstMessageY) + loopHeight(lastMessage.id)
+				: firstMessageY;
+			const lifelineHeight = lastRowBottom - lifelineY + LIFELINE_BOTTOM_GAP;
+
+			const columnGaps = selfReach.map((reach) => Math.max(columnStep, reach));
+			const centerXByParticipant = new Map<string, number>();
+			const headers: NodeSceneElement[] = [];
+			const headerLabels: TextSceneElement[] = [];
+			const lifelines: NodeSceneElement[] = [];
+
+			let nextCenterX = PADDING + headerWidth / 2;
+			input.participants.forEach((participant, index) => {
+				const centerX = nextCenterX;
+				const x = centerX - headerWidth / 2;
+				nextCenterX += columnGaps[index] ?? columnStep;
+				centerXByParticipant.set(participant.id, centerX);
+				headers.push({
+					type: "node",
+					id: `node:${participant.id}`,
+					nodeId: participant.id,
+					...(participant.kind ? { kind: participant.kind } : {}),
+					...(participant.icon
+						? { icon: { slug: participant.icon.slug, size: HEADER_ICON_SIZE } }
+						: {}),
+					shape: "rectangle",
+					x,
+					y: headerY,
+					width: headerWidth,
+					height: headerHeight,
+					label: headerLabelById.get(participant.id) ?? participant.label,
+				});
+				headerLabels.push({
+					type: "text",
+					id: `label:${participant.id}`,
+					containerId: `node:${participant.id}`,
+					x: centerX,
+					y: headerY + headerHeight / 2,
+					text: headerLabelById.get(participant.id) ?? participant.label,
+					fontSize: LABEL_FONT_SIZE,
+					maxWidth: headerWidth - HEADER_LABEL_PADDING,
+					// The logo sits at the top of the header; the label stacks beneath it.
+					...(participant.icon ? { verticalAlign: "bottom" as const } : {}),
+				});
+				lifelines.push({
+					type: "node",
+					id: `node:${sequenceLifelineId(participant.id)}`,
+					nodeId: sequenceLifelineId(participant.id),
+					rendererRole: SEQUENCE_LIFELINE_ROLE,
+					shape: "rectangle",
+					fillColor: input.style.backgroundColor,
+					strokeColor: input.style.accentColor,
+					x: centerX - LIFELINE_WIDTH / 2,
+					y: lifelineY,
+					width: LIFELINE_WIDTH,
+					height: lifelineHeight,
+					label: `${participant.label} lifeline`,
+				});
+			});
+
+			const rowY = (index: number) => rowYs[index] ?? firstMessageY;
+			const labelById = new Map(
+				input.participants.map((participant) => [participant.id, participant.label]),
+			);
+			const barNode = (
+				participantId: string,
+				messageId: string,
+				depth: number,
+				top: number,
+				bottom: number,
+			): NodeSceneElement => {
+				const nodeId = sequenceActivationId(participantId, messageId);
+				const centerX = centerXByParticipant.get(participantId) ?? 0;
+				return {
+					type: "node",
+					id: `node:${nodeId}`,
+					nodeId,
+					rendererRole: SEQUENCE_ACTIVATION_ROLE,
+					shape: "rectangle",
+					fillColor: input.style.backgroundColor,
+					strokeColor: input.style.accentColor,
+					x: centerX - ACTIVATION_WIDTH / 2 + depth * ACTIVATION_NEST_OFFSET,
+					y: top,
+					width: ACTIVATION_WIDTH,
+					height: bottom - top,
+					label: `${labelById.get(participantId) ?? participantId} active`,
+				};
+			};
+			const bars = spans.map(
+				(
+					activation,
+				): { readonly activation: SequenceActivation; readonly node: NodeSceneElement } => ({
+					activation,
+					node: barNode(
+						activation.participantId,
+						activation.callMessageId,
+						activation.depth,
+						rowY(activation.startIndex) - ACTIVATION_OVERHANG,
+						rowY(activation.endIndex) + ACTIVATION_OVERHANG,
+					),
+				}),
+			);
+			// A self-call returns into a short bar one step inside its innermost active
+			// bar, as UML nests a participant's call to itself.
+			const selfBars = new Map(
+				input.messages.flatMap((message, index) => {
+					if (message.source !== message.target || message.type === "return") return [];
+					const depth = activeDepth(message.source, index) + 1;
+					const returnY = rowY(index) + loopHeight(message.id);
+					return [
+						[
+							message.id,
+							barNode(
+								message.source,
+								message.id,
+								depth,
+								returnY - ACTIVATION_OVERHANG,
+								returnY + ACTIVATION_OVERHANG,
+							),
+						] as const,
+					];
+				}),
+			);
+			/**
+			 * Where a message meets a participant: the bar of the span it opens or
+			 * closes, otherwise the innermost bar active on its row (overlapping bars
+			 * never share a depth), otherwise the lifeline.
+			 */
+			const attachment = (
+				participantId: string,
+				index: number,
+				messageId: string,
+				towardX: number,
+			) => {
+				const centerX = centerXByParticipant.get(participantId) ?? 0;
+				const rightward = towardX > centerX;
+				const active = bars.filter(
+					({ activation }) =>
+						activation.participantId === participantId &&
+						activation.startIndex <= index &&
+						index <= activation.endIndex,
+				);
+				const bar =
+					active.find(
+						({ activation }) =>
+							activation.callMessageId === messageId || activation.returnMessageId === messageId,
+					) ??
+					active.reduce<(typeof bars)[number] | undefined>(
+						(innermost, candidate) =>
+							!innermost || candidate.activation.depth > innermost.activation.depth
+								? candidate
+								: innermost,
+						undefined,
+					);
+				if (!bar) {
+					return {
+						nodeId: sequenceLifelineId(participantId),
+						x: centerX + ((rightward ? 1 : -1) * LIFELINE_WIDTH) / 2,
+					};
+				}
+				return {
+					nodeId: bar.node.nodeId,
+					x: rightward ? bar.node.x + bar.node.width : bar.node.x,
+				};
+			};
+
+			/**
+			 * Excalidraw centers a bound label on a three-point arrow's middle point, and
+			 * on a two-point arrow's midpoint. When that midpoint sits on a lifeline the
+			 * message passes (with even columns, when it spans an even number of them),
+			 * a middle point moves its label to the gap on the source side of that
+			 * lifeline.
+			 */
+			const centers = input.participants.map(
+				(participant) => centerXByParticipant.get(participant.id) ?? 0,
+			);
+			const labelPoint = (sourceCenter: number, targetCenter: number, y: number) => {
+				const midpoint = (sourceCenter + targetCenter) / 2;
+				const direction = Math.sign(targetCenter - sourceCenter);
+				const passed = centers.findIndex(
+					(center) =>
+						Math.abs(center - midpoint) < PASSED_LIFELINE_CLEARANCE &&
+						Math.min(sourceCenter, targetCenter) < center &&
+						center < Math.max(sourceCenter, targetCenter),
+				);
+				const lifeline = centers[passed];
+				const sourceSide = centers[passed - direction];
+				if (lifeline === undefined || sourceSide === undefined) return [];
+				return [{ x: (lifeline + sourceSide) / 2, y }];
+			};
+
+			/**
+			 * A self-message leaves the right edge of its participant's innermost bar
+			 * (or lifeline), runs out, down its row's loop height and back into its own
+			 * bar. Excalidraw centers a bound label on its arrow's line, so the label is
+			 * a free text beside the loop's outer leg, grouped with the loop, as
+			 * flowcharts place their branch labels.
+			 */
+			const selfMessageLabels: TextSceneElement[] = [];
+			const selfMessageArrow = (
+				message: (typeof input.messages)[number],
+				index: number,
+			): ArrowSceneElement => {
+				const source = attachment(message.source, index, message.id, Number.POSITIVE_INFINITY);
+				const bar = selfBars.get(message.id);
+				const target = bar ? { nodeId: bar.nodeId, x: bar.x + bar.width } : source;
+				const outerX = Math.max(source.x, target.x) + SELF_LOOP_WIDTH;
+				const top = rowY(index);
+				const bottom = top + loopHeight(message.id);
+				const groupIds = [`message:${message.id}`];
+				selfMessageLabels.push({
+					type: "text",
+					id: `arrow:${message.id}:label`,
+					text: message.label,
+					fontSize: SELF_LABEL_FONT_SIZE,
+					x: outerX + SELF_LABEL_GAP + (selfLabels.get(message.id)?.width ?? 0) / 2,
+					y: (top + bottom) / 2,
+					maxWidth: SELF_LABEL_MAX_WIDTH,
+					groupIds,
+				});
+				return {
+					type: "arrow",
+					id: `arrow:${message.id}`,
+					edgeId: message.id,
+					groupIds,
+					sourceNodeId: source.nodeId,
+					targetNodeId: target.nodeId,
+					...(message.type === "return" ? { strokeColor: "#6b7280" } : {}),
+					...(message.style === "dashed" || message.type === "return"
+						? { strokeStyle: "dashed" as const }
+						: {}),
+					points: [
+						{ x: source.x, y: top },
+						{ x: outerX, y: top },
+						{ x: outerX, y: bottom },
+						{ x: target.x, y: bottom },
+					],
+					label: message.label,
+				};
+			};
+
+			const messageArrows: ArrowSceneElement[] = input.messages.map((message, index) => {
+				if (message.source === message.target) return selfMessageArrow(message, index);
+				// Validation guarantees both participants exist.
+				const sourceCenter = centerXByParticipant.get(message.source) ?? 0;
+				const targetCenter = centerXByParticipant.get(message.target) ?? 0;
+				const source = attachment(message.source, index, message.id, targetCenter);
+				const target = attachment(message.target, index, message.id, sourceCenter);
+				const y = rowY(index);
+				return {
+					type: "arrow",
+					id: `arrow:${message.id}`,
+					edgeId: message.id,
+					sourceNodeId: source.nodeId,
+					targetNodeId: target.nodeId,
+					...(message.type === "return" ? { strokeColor: "#6b7280" } : {}),
+					...(message.style === "dashed" || message.type === "return"
+						? { strokeStyle: "dashed" as const }
+						: {}),
+					points: [
+						{ x: source.x, y },
+						...labelPoint(sourceCenter, targetCenter, y),
+						{ x: target.x, y },
+					],
+					label: message.label,
+				};
+			});
+
+			// The scene holds every self-message label beside its loop.
+			const labelsRight = Math.max(
+				0,
+				...messageArrows.flatMap(({ edgeId, points }) => {
+					const label = selfLabels.get(edgeId);
+					return label && points[1] ? [points[1].x + SELF_LABEL_GAP + label.width] : [];
+				}),
+			);
+			const activationBars = [...bars.map(({ node }) => node), ...selfBars.values()];
+			const elements = [
+				...messageArrows,
+				...selfMessageLabels,
+				...lifelines,
+				...activationBars,
+				...headers,
+				...headerLabels,
+			];
+			const zOrder = [
+				...lifelines.map((element) => element.id),
+				...activationBars.map((element) => element.id),
+				...headers.map((element) => element.id),
+				...headerLabels.map((element) => element.id),
+				...messageArrows.map((element) => element.id),
+				...selfMessageLabels.map((element) => element.id),
+			];
+
+			return {
+				kind: "canvas",
+				version: CANVAS_SPEC_VERSION,
+				diagramId: input.id,
+				title: input.title,
+				width: Math.max(
+					(centers.at(-1) ?? PADDING) + headerWidth / 2 + PADDING,
+					Math.ceil(labelsRight) + PADDING,
+				),
+				height: lifelineY + lifelineHeight + PADDING,
+				accentColor: input.style.accentColor,
+				backgroundColor: input.style.backgroundColor,
+				elements,
+				layers: [],
+				layouts: [],
+				zOrder,
+			};
+		};
+		const natural = draw(MESSAGE_GAP, naturalStep);
+		if (!tighten) return natural;
+		const target = spacing(input, headerWidth, firstMessageY, loopHeight, selfReach, naturalStep);
+		if (target.messageGap === MESSAGE_GAP && target.columnStep === naturalStep) return natural;
+		return tightened(natural, target, naturalStep, draw);
+	});
 }
 
 /**

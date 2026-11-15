@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import {
 	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
@@ -1083,113 +1084,129 @@ function minimumPlotSize(diagram: QuadrantDiagram): number | undefined {
  * The smallest plot whose labels all sit clear, and beside their dots for all but a few;
  * a chart with no such plot is rejected with a repair hint.
  */
-export function planQuadrantLayout(diagram: QuadrantDiagram): QuadrantPlan {
-	const minimum = minimumPlotSize(diagram);
-	if (minimum === undefined)
-		throw new QuadrantValidationError([
-			{
-				code: "invalid_quadrant_text",
-				path: "quadrants",
-				message:
-					"A quadrant name or the x axis's end labels hold a word too long for the largest plot.",
-				hint: "Shorten the longest unbroken word in the quadrant names and the x axis's low and high labels, or break it with a space.",
-			},
-		]);
-	const allowance = Math.max(2, Math.ceil(diagram.points.length * 0.2));
-	// A plan is worse with more labels blocked, then more leaders over dots, then more leaders.
-	const score = (plan: QuadrantPlan) => [plan.blocked + plan.covered, plan.overDots, plan.leaders];
-	const worse = (plan: QuadrantPlan, than: QuadrantPlan) => {
-		const [a, b] = [score(plan), score(than)];
-		const differ = a.findIndex((value, at) => value !== b[at]);
-		return differ !== -1 && a[differ]! > b[differ]!;
-	};
-	const clean = (plan: QuadrantPlan) => plan.blocked + plan.covered + plan.overDots === 0;
-	const done = (plan: QuadrantPlan) => clean(plan) && plan.leaders <= allowance + plan.clumped;
-	const work: Work = { spent: 0, limit: Number.POSITIVE_INFINITY };
-	let best: QuadrantPlan | undefined;
-	/** One plot size's plan, kept when it reads better than the best so far. */
-	const attempt = (size: number) => {
-		let plan = planLayout(diagram, size, { work });
-		// A plot this crowded grows before it retries: names give a blocked label more room
-		// and the labels try again, and past that, leaders may pass over other dots.
-		const retry = plan.blocked > 0 && plan.blocked <= Math.max(3, diagram.points.length / 4);
-		if (retry) {
-			const again = planLayout(diagram, size, { crowded: new Set(plan.blockedPoints), work });
-			if (!worse(again, plan)) plan = again;
-		}
-		if (retry && plan.blocked) {
-			const again = planLayout(diagram, size, {
-				crowded: new Set(plan.blockedPoints),
-				relaxed: true,
-				work,
-			});
-			if (!worse(again, plan)) plan = again;
-		}
-		if (!best || worse(best, plan)) best = plan;
-		return plan;
-	};
-	// The largest plot sets its labels a size smaller, searches longer, and only then lets
-	// leaders pass over other dots.
-	let shrunk: QuadrantPlan | undefined;
-	const shrink = () => {
-		const crowded = new Set(best!.blockedPoints);
-		for (const options of [
-			{ labelFont: CROWDED_LABEL_FONT },
-			{ labelFont: CROWDED_LABEL_FONT, thorough: true },
-			{ labelFont: CROWDED_LABEL_FONT, relaxed: true },
-			{ labelFont: CROWDED_LABEL_FONT, relaxed: true, thorough: true },
-		]) {
-			if ((best!.blocked === 0 && options.relaxed) || work.spent > work.limit) break;
-			const plan = planLayout(diagram, QUADRANT_PLOT_SIZES.at(-1)!, { crowded, work, ...options });
-			if (worse(best!, plan)) best = plan;
-			if (clean(best!)) break;
-		}
-		shrunk = best;
-	};
-	// The cheapest search first: a chart grows until its labels sit clear with few leaders,
-	// and stops growing for fewer leaders once two larger plots in a row read no better, or
-	// for clear labels once two larger plots in a row block no fewer. With a few labels still
-	// blocked, the largest plot then sets them smaller.
-	const sizes: readonly number[] = QUADRANT_PLOT_SIZES.filter((size) => size >= minimum);
-	let next = 0;
-	let previous: number | undefined;
-	let stalled = 0;
-	while (next < sizes.length) {
-		if (best && clean(best) && next - sizes.indexOf(best.size) > 2) break;
-		const plan = attempt(sizes[next]!);
-		next += 1;
-		if (done(plan)) return plan;
-		stalled =
-			plan.blocked > FEW_BLOCKED && previous !== undefined && plan.blocked >= previous
-				? stalled + 1
-				: 0;
-		previous = plan.blocked;
-		if (stalled >= 2) break;
-	}
-	if (!clean(best!) && best!.blocked + best!.covered <= FEW_BLOCKED) shrink();
-	// A chart still blocked tries every size it skipped, then the smaller labels again from
-	// the best of those, within a fixed budget of spot checks.
-	if (best!.blocked || best!.covered) {
-		work.limit = work.spent + FALLBACK_WORK;
-		for (; next < sizes.length && work.spent <= work.limit; next += 1) {
+export function planQuadrantLayout(
+	diagram: QuadrantDiagram,
+): Result.Result<QuadrantPlan, QuadrantValidationError> {
+	return Result.gen(function* () {
+		const minimum = minimumPlotSize(diagram);
+		if (minimum === undefined)
+			return yield* Result.fail(
+				QuadrantValidationError.fromIssues([
+					{
+						code: "invalid_quadrant_text",
+						path: "quadrants",
+						message:
+							"A quadrant name or the x axis's end labels hold a word too long for the largest plot.",
+						hint: "Shorten the longest unbroken word in the quadrant names and the x axis's low and high labels, or break it with a space.",
+					},
+				]),
+			);
+		const allowance = Math.max(2, Math.ceil(diagram.points.length * 0.2));
+		// A plan is worse with more labels blocked, then more leaders over dots, then more leaders.
+		const score = (plan: QuadrantPlan) => [
+			plan.blocked + plan.covered,
+			plan.overDots,
+			plan.leaders,
+		];
+		const worse = (plan: QuadrantPlan, than: QuadrantPlan) => {
+			const [a, b] = [score(plan), score(than)];
+			const differ = a.findIndex((value, at) => value !== b[at]);
+			return differ !== -1 && a[differ]! > b[differ]!;
+		};
+		const clean = (plan: QuadrantPlan) => plan.blocked + plan.covered + plan.overDots === 0;
+		const done = (plan: QuadrantPlan) => clean(plan) && plan.leaders <= allowance + plan.clumped;
+		const work: Work = { spent: 0, limit: Number.POSITIVE_INFINITY };
+		let best: QuadrantPlan | undefined;
+		/** One plot size's plan, kept when it reads better than the best so far. */
+		const attempt = (size: number) => {
+			let plan = planLayout(diagram, size, { work });
+			// A plot this crowded grows before it retries: names give a blocked label more room
+			// and the labels try again, and past that, leaders may pass over other dots.
+			const retry = plan.blocked > 0 && plan.blocked <= Math.max(3, diagram.points.length / 4);
+			if (retry) {
+				const again = planLayout(diagram, size, { crowded: new Set(plan.blockedPoints), work });
+				if (!worse(again, plan)) plan = again;
+			}
+			if (retry && plan.blocked) {
+				const again = planLayout(diagram, size, {
+					crowded: new Set(plan.blockedPoints),
+					relaxed: true,
+					work,
+				});
+				if (!worse(again, plan)) plan = again;
+			}
+			if (!best || worse(best, plan)) best = plan;
+			return plan;
+		};
+		// The largest plot sets its labels a size smaller, searches longer, and only then lets
+		// leaders pass over other dots.
+		let shrunk: QuadrantPlan | undefined;
+		const shrink = () => {
+			const crowded = new Set(best!.blockedPoints);
+			for (const options of [
+				{ labelFont: CROWDED_LABEL_FONT },
+				{ labelFont: CROWDED_LABEL_FONT, thorough: true },
+				{ labelFont: CROWDED_LABEL_FONT, relaxed: true },
+				{ labelFont: CROWDED_LABEL_FONT, relaxed: true, thorough: true },
+			]) {
+				if ((best!.blocked === 0 && options.relaxed) || work.spent > work.limit) break;
+				const plan = planLayout(diagram, QUADRANT_PLOT_SIZES.at(-1)!, {
+					crowded,
+					work,
+					...options,
+				});
+				if (worse(best!, plan)) best = plan;
+				if (clean(best!)) break;
+			}
+			shrunk = best;
+		};
+		// The cheapest search first: a chart grows until its labels sit clear with few leaders,
+		// and stops growing for fewer leaders once two larger plots in a row read no better, or
+		// for clear labels once two larger plots in a row block no fewer. With a few labels still
+		// blocked, the largest plot then sets them smaller.
+		const sizes: readonly number[] = QUADRANT_PLOT_SIZES.filter((size) => size >= minimum);
+		let next = 0;
+		let previous: number | undefined;
+		let stalled = 0;
+		while (next < sizes.length) {
+			if (best && clean(best) && next - sizes.indexOf(best.size) > 2) break;
 			const plan = attempt(sizes[next]!);
+			next += 1;
 			if (done(plan)) return plan;
+			stalled =
+				plan.blocked > FEW_BLOCKED && previous !== undefined && plan.blocked >= previous
+					? stalled + 1
+					: 0;
+			previous = plan.blocked;
+			if (stalled >= 2) break;
 		}
-		if (best !== shrunk) shrink();
-	}
-	// A chart that still cannot place every label clear is rejected, never drawn unreadable.
-	if (best!.blocked || best!.covered)
-		throw new QuadrantValidationError([
-			{
-				code: "quadrant_too_large",
-				path: best!.blocked ? `points.[${best!.blockedPoints[0]}]` : "quadrants",
-				message: best!.blocked
-					? `The labels of ${best!.blocked} points cannot all sit clear of the other labels and dots.`
-					: "A quadrant name cannot sit clear of every dot in its quadrant.",
-				hint: "Spread the scores of points that nearly coincide, shorten their labels or the quadrant names, or split the chart.",
-			},
-		]);
-	return best!;
+		if (!clean(best!) && best!.blocked + best!.covered <= FEW_BLOCKED) shrink();
+		// A chart still blocked tries every size it skipped, then the smaller labels again from
+		// the best of those, within a fixed budget of spot checks.
+		if (best!.blocked || best!.covered) {
+			work.limit = work.spent + FALLBACK_WORK;
+			for (; next < sizes.length && work.spent <= work.limit; next += 1) {
+				const plan = attempt(sizes[next]!);
+				if (done(plan)) return plan;
+			}
+			if (best !== shrunk) shrink();
+		}
+		// A chart that still cannot place every label clear is rejected, never drawn unreadable.
+		if (best!.blocked || best!.covered)
+			return yield* Result.fail(
+				QuadrantValidationError.fromIssues([
+					{
+						code: "quadrant_too_large",
+						path: best!.blocked ? `points.[${best!.blockedPoints[0]}]` : "quadrants",
+						message: best!.blocked
+							? `The labels of ${best!.blocked} points cannot all sit clear of the other labels and dots.`
+							: "A quadrant name cannot sit clear of every dot in its quadrant.",
+						hint: "Spread the scores of points that nearly coincide, shorten their labels or the quadrant names, or split the chart.",
+					},
+				]),
+			);
+		return best!;
+	});
 }
 
 class SceneBuilder {
@@ -1454,117 +1471,121 @@ function drawHeader(
  * end labels, and every point's dot at its exact position with its label
  * beside it, or on a leader line where the plot is crowded.
  */
-export function renderQuadrantDiagram(input: QuadrantDiagram): RenderedDiagramScene {
-	const diagram = validateQuadrantDiagram(input);
-	const surface = diagram.style.backgroundColor;
-	const builder = new SceneBuilder(surface);
-	const plan = planQuadrantLayout(diagram);
-	const { size } = plan;
-	const quadrants = quadrantBoxes(size);
-	for (const key of Object.keys(quadrants) as QuadrantKey[]) {
-		const tint = wash(QUADRANT_HUES[key], surface, WASH);
-		const group = `quadrant:region:${key}`;
-		builder.mark(
-			group,
-			"rectangle",
-			quadrants[key],
-			diagram.quadrants[key],
-			{ fillColor: tint, strokeColor: tint, groupIds: [group] },
-			"back",
-		);
-		const name = plan.names[key];
-		builder.text(
-			`quadrant:name:${key}`,
-			name.text,
-			name.box,
-			NAME_FONT,
-			MUTED_INK,
-			key === "topRight" || key === "bottomRight" ? "right" : "left",
-			group,
-		);
-	}
-	const midline = { strokeColor: MIDLINE_COLOR };
-	builder.line(
-		"quadrant:midline:vertical",
-		{ x: size / 2, y: 0 },
-		{ x: size / 2, y: size },
-		midline,
-	);
-	builder.line(
-		"quadrant:midline:horizontal",
-		{ x: 0, y: size / 2 },
-		{ x: size, y: size / 2 },
-		midline,
-	);
-	drawAxes(builder, diagram, size);
-	const groups = quadrantGroups(diagram);
-	const colors = new Map(groups.map((group, index) => [group, CHART_SERIES_COLORS[index]!]));
-	const groupOf = (name: string | undefined) =>
-		name === undefined
-			? undefined
-			: groups.find((group) => quadrantGroupKey(group) === quadrantGroupKey(name));
-	const plot = { left: 0, top: 0, right: size, bottom: size };
-	diagram.points.forEach((point, index) => {
-		const group = `quadrant:point:${index}`;
-		const center = quadrantPointPosition(point, plot);
-		const pointGroup = groupOf(point.group);
-		const color =
-			pointGroup !== undefined
-				? colors.get(pointGroup)!
-				: groups.length
-					? UNGROUPED_COLOR
-					: CHART_SERIES_COLORS[0];
-		builder.mark(
-			group,
-			"ellipse",
-			dotBox(center),
-			point.label,
-			{ fillColor: color, strokeColor: surface, strokeWidth: 2, groupIds: [group] },
-			"front",
-		);
-		const label = plan.labels[index]!;
-		if (label.leader)
-			builder.line(`quadrant:leader:${index}`, label.leader[0], label.leader[1], {
-				strokeColor: LEADER_COLOR,
-				groupIds: [group],
-			});
-		builder.text(
-			`quadrant:label:${index}`,
-			label.text,
-			label.box,
-			plan.labelFont,
-			INK,
-			label.box.left >= center.x ? "left" : label.box.right <= center.x ? "right" : "center",
-			group,
-		);
-	});
-	drawHeader(builder, diagram, groups, colors);
-	const box = builder.bounds();
-	const dx = PADDING - box.left;
-	const dy = PADDING - box.top;
-	const elements = builder.elements.map((element): SceneElement => {
-		if (element.type === "line") {
-			const [first, second, ...rest] = element.points.map((point) => ({
-				x: round(point.x + dx),
-				y: round(point.y + dy),
-			}));
-			return { ...element, points: [first!, second!, ...rest] };
+export function renderQuadrantDiagram(
+	input: QuadrantDiagram,
+): Result.Result<RenderedDiagramScene, QuadrantValidationError> {
+	return Result.gen(function* () {
+		const diagram = yield* validateQuadrantDiagram(input);
+		const surface = diagram.style.backgroundColor;
+		const builder = new SceneBuilder(surface);
+		const plan = yield* planQuadrantLayout(diagram);
+		const { size } = plan;
+		const quadrants = quadrantBoxes(size);
+		for (const key of Object.keys(quadrants) as QuadrantKey[]) {
+			const tint = wash(QUADRANT_HUES[key], surface, WASH);
+			const group = `quadrant:region:${key}`;
+			builder.mark(
+				group,
+				"rectangle",
+				quadrants[key],
+				diagram.quadrants[key],
+				{ fillColor: tint, strokeColor: tint, groupIds: [group] },
+				"back",
+			);
+			const name = plan.names[key];
+			builder.text(
+				`quadrant:name:${key}`,
+				name.text,
+				name.box,
+				NAME_FONT,
+				MUTED_INK,
+				key === "topRight" || key === "bottomRight" ? "right" : "left",
+				group,
+			);
 		}
-		if (element.type === "arrow") return element;
-		return { ...element, x: round(element.x + dx), y: round(element.y + dy) };
+		const midline = { strokeColor: MIDLINE_COLOR };
+		builder.line(
+			"quadrant:midline:vertical",
+			{ x: size / 2, y: 0 },
+			{ x: size / 2, y: size },
+			midline,
+		);
+		builder.line(
+			"quadrant:midline:horizontal",
+			{ x: 0, y: size / 2 },
+			{ x: size, y: size / 2 },
+			midline,
+		);
+		drawAxes(builder, diagram, size);
+		const groups = quadrantGroups(diagram);
+		const colors = new Map(groups.map((group, index) => [group, CHART_SERIES_COLORS[index]!]));
+		const groupOf = (name: string | undefined) =>
+			name === undefined
+				? undefined
+				: groups.find((group) => quadrantGroupKey(group) === quadrantGroupKey(name));
+		const plot = { left: 0, top: 0, right: size, bottom: size };
+		diagram.points.forEach((point, index) => {
+			const group = `quadrant:point:${index}`;
+			const center = quadrantPointPosition(point, plot);
+			const pointGroup = groupOf(point.group);
+			const color =
+				pointGroup !== undefined
+					? colors.get(pointGroup)!
+					: groups.length
+						? UNGROUPED_COLOR
+						: CHART_SERIES_COLORS[0];
+			builder.mark(
+				group,
+				"ellipse",
+				dotBox(center),
+				point.label,
+				{ fillColor: color, strokeColor: surface, strokeWidth: 2, groupIds: [group] },
+				"front",
+			);
+			const label = plan.labels[index]!;
+			if (label.leader)
+				builder.line(`quadrant:leader:${index}`, label.leader[0], label.leader[1], {
+					strokeColor: LEADER_COLOR,
+					groupIds: [group],
+				});
+			builder.text(
+				`quadrant:label:${index}`,
+				label.text,
+				label.box,
+				plan.labelFont,
+				INK,
+				label.box.left >= center.x ? "left" : label.box.right <= center.x ? "right" : "center",
+				group,
+			);
+		});
+		drawHeader(builder, diagram, groups, colors);
+		const box = builder.bounds();
+		const dx = PADDING - box.left;
+		const dy = PADDING - box.top;
+		const elements = builder.elements.map((element): SceneElement => {
+			if (element.type === "line") {
+				const [first, second, ...rest] = element.points.map((point) => ({
+					x: round(point.x + dx),
+					y: round(point.y + dy),
+				}));
+				return { ...element, points: [first!, second!, ...rest] };
+			}
+			if (element.type === "arrow") return element;
+			return { ...element, x: round(element.x + dx), y: round(element.y + dy) };
+		});
+		return {
+			kind: "canvas",
+			version: CANVAS_SPEC_VERSION,
+			diagramId: diagram.id,
+			title: diagram.title,
+			width: Math.ceil(box.right - box.left + PADDING * 2),
+			height: Math.ceil(box.bottom - box.top + PADDING * 2),
+			accentColor: diagram.style.accentColor,
+			backgroundColor: diagram.style.backgroundColor,
+			elements,
+			layers: [],
+			layouts: [],
+			zOrder: builder.zOrder(),
+		};
 	});
-	return {
-		kind: "canvas",
-		version: CANVAS_SPEC_VERSION,
-		diagramId: diagram.id,
-		title: diagram.title,
-		width: Math.ceil(box.right - box.left + PADDING * 2),
-		height: Math.ceil(box.bottom - box.top + PADDING * 2),
-		accentColor: diagram.style.accentColor,
-		backgroundColor: diagram.style.backgroundColor,
-		elements,
-		layers: [],
-		layouts: [],
-		zOrder: builder.zOrder(),
-	};
 }

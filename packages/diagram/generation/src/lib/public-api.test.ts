@@ -1,7 +1,9 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
 import { assert, describe, expect, it, layer, vi } from "@effect/vitest";
 import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
 import { FLOWCHART_MAX_NODES, SKETCHI_DIAGRAM_STYLE } from "@sketchi/diagram-core";
-import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
+
 import { TestClock } from "effect/testing";
 
 import { candidateFromText, extractJsonObject, responseErrorDiagnostic } from "./candidates.js";
@@ -239,7 +241,7 @@ describe("pure candidate behavior", () => {
 		{ tree: GeneratedMindmapTree },
 		({ tree }) =>
 			Effect.gen(function* () {
-				const diagram = generatedMindmapTreeToDiagram(tree);
+				const diagram = generatedMindmapTreeToDiagram(tree).pipe(Result.getOrThrow);
 				const root = diagram.nodes.find((node) => node.kind === "root");
 
 				assert.strictEqual(root?.id, "topic-0");

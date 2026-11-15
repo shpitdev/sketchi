@@ -1,10 +1,11 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
 	CHART_MAX_CATEGORIES,
 	CHART_MAX_PIE_SLICES,
 	chartFixture,
-	ChartValidationError,
 	parseChartDiagram,
 	type ChartValidationIssue,
 } from "./chart.js";
@@ -31,29 +32,30 @@ const pie = {
 
 /** The semantic issues a decodable chart fails with. */
 function issuesOf(input: object): readonly ChartValidationIssue[] {
-	try {
-		parseChartDiagram(input);
-		return [];
-	} catch (error) {
-		if (error instanceof ChartValidationError) return error.issues;
-		throw error;
-	}
+	const result = parseChartDiagram(input);
+	if (Result.isSuccess(result)) return [];
+	const error = result.failure;
+	if (error._tag !== "ChartValidationError") return expect.fail(error.message);
+	return error.issues;
 }
 
 describe("canonical chart", () => {
 	it("accepts bars with negative values, pies, donuts and line charts", () => {
-		expect(parseChartDiagram(bar).series[1]?.values).toEqual([2, -1, 4]);
-		expect(parseChartDiagram({ ...pie, donut: true }).donut).toBe(true);
-		expect(parseChartDiagram({ ...bar, kind: "line" }).kind).toBe("line");
-		expect(parseChartDiagram({ ...bar, stacked: true, orientation: "horizontal" }).stacked).toBe(
-			true,
-		);
-		expect(parseChartDiagram(chartFixture)).toEqual(chartFixture);
+		expect(parseChartDiagram(bar).pipe(Result.getOrThrow).series[1]?.values).toEqual([2, -1, 4]);
+		expect(parseChartDiagram({ ...pie, donut: true }).pipe(Result.getOrThrow).donut).toBe(true);
+		expect(parseChartDiagram({ ...bar, kind: "line" }).pipe(Result.getOrThrow).kind).toBe("line");
+		expect(
+			parseChartDiagram({ ...bar, stacked: true, orientation: "horizontal" }).pipe(
+				Result.getOrThrow,
+			).stacked,
+		).toBe(true);
+		expect(parseChartDiagram(chartFixture).pipe(Result.getOrThrow)).toEqual(chartFixture);
 	});
 
 	it("lets a single series go unnamed", () => {
 		expect(
-			parseChartDiagram({ ...bar, series: [{ values: [1, 2, 3] }] }).series[0]?.name,
+			parseChartDiagram({ ...bar, series: [{ values: [1, 2, 3] }] }).pipe(Result.getOrThrow)
+				.series[0]?.name,
 		).toBeUndefined();
 	});
 
@@ -159,10 +161,12 @@ describe("canonical chart", () => {
 		{ ...bar, kind: "area" },
 		{ ...bar, categories: ["Q1", "", "Q3"] },
 	])("rejects malformed input at the schema", (input) => {
-		expect(() => parseChartDiagram(input)).toThrow(Error);
+		expect(parseChartDiagram(input)).toMatchObject({ failure: expect.any(Error) });
 	});
 
 	it("accepts stacked: false and other neutral options on any kind", () => {
-		expect(parseChartDiagram({ ...pie, stacked: false, donut: false }).kind).toBe("pie");
+		expect(
+			parseChartDiagram({ ...pie, stacked: false, donut: false }).pipe(Result.getOrThrow).kind,
+		).toBe("pie");
 	});
 });

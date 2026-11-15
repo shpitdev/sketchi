@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option } from "effect";
 import { describe, expect, it } from "vitest";
 import { ganttTaskSchedule, type GanttDiagram, type GanttTask } from "@sketchi/diagram-core";
 import {
@@ -18,6 +20,7 @@ import { candidateFromMcpResult } from "./mcp-results.js";
 
 const failing = (scenario: (typeof ganttScenarios)[number], diagram: GanttDiagram) =>
 	evaluateScenarioDiagram(scenario, diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 
@@ -159,7 +162,7 @@ describe("prompt-grounded Gantt scenarios", () => {
 	it.each(ganttScenarios.map((scenario) => [scenario.id, scenario.expectedDiagram] as const))(
 		"routes %s with no fallback and under 2,000 search steps per dependency per layout",
 		(id, diagram) => {
-			const { work } = layoutGanttDiagram(diagram);
+			const { work } = layoutGanttDiagram(diagram).pipe(Result.getOrThrow);
 			const dependencies = diagram.tasks.reduce(
 				(sum, task) => sum + (task.dependsOn?.length ?? 0),
 				0,
@@ -186,7 +189,7 @@ describe("prompt-grounded Gantt scenarios", () => {
 		"routes %s forward where its rows allow, without kinks, crossings or tracing a bar",
 		(id, most) => {
 			const scenario = ganttScenarios.find((entry) => entry.id === id)!;
-			const quality = routeQuality(renderDiagram(scenario.expectedDiagram));
+			const quality = routeQuality(renderDiagram(scenario.expectedDiagram).pipe(Result.getOrThrow));
 			expect.soft(quality.detours, "detours").toBeLessThanOrEqual(most.detours);
 			expect.soft(quality.kinks, "kinks").toBeLessThanOrEqual(most.kinks);
 			expect.soft(quality.crossings, "crossings").toBeLessThanOrEqual(most.crossings);
@@ -206,7 +209,7 @@ describe("prompt-grounded Gantt scenarios", () => {
 		["cafe-fit-out-gantt-v2", []],
 	] as const)("hooks in %s only where a bar between forces it, by its clearance", (id, forced) => {
 		const scenario = ganttScenarios.find((entry) => entry.id === id)!;
-		const turns = hookTurns(renderDiagram(scenario.expectedDiagram));
+		const turns = hookTurns(renderDiagram(scenario.expectedDiagram).pipe(Result.getOrThrow));
 		expect(turns.map((turn) => turn.id).toSorted()).toEqual(forced);
 		for (const { id: route, past, inset } of turns) {
 			expect.soft(past, `${route} past the bar it clears`).toBeGreaterThanOrEqual(14.5);
@@ -256,7 +259,9 @@ describe("prompt-grounded Gantt scenarios", () => {
 
 	for (const scenario of ganttScenarios) {
 		it(`${scenario.id}: accepts the fixture, drawn to scale and clear`, () => {
-			const evaluation = evaluateScenarioDiagram(scenario, scenario.expectedDiagram);
+			const evaluation = evaluateScenarioDiagram(scenario, scenario.expectedDiagram).pipe(
+				Result.getOrThrow,
+			);
 			expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 			for (const id of ["gantt-geometry", "gantt-drawn-data", "gantt-clearance"])
 				expect(evaluation.checks.some((check) => check.id === id)).toBe(true);
@@ -340,7 +345,7 @@ describe("prompt-grounded Gantt scenarios", () => {
 
 	it("grades what is drawn: a missing arrow, a misplaced bar and a stray caption fail", () => {
 		const diagram = migration.expectedDiagram;
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const edit = (
 			change: (elements: RenderedDiagramScene["elements"]) => RenderedDiagramScene["elements"],
 		): RenderedDiagramScene => ({ ...scene, elements: change(scene.elements) });
@@ -390,9 +395,11 @@ describe("prompt-grounded Gantt scenarios", () => {
 		const candidate = candidateFromMcpResult(
 			{ ok: true, result: { buildId: "build_1" }, builds: [receipt] },
 			"gantt",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) return;
-		expect(evaluateScenarioDiagram(release, candidate.diagram).ok).toBe(true);
+		expect(evaluateScenarioDiagram(release, candidate.diagram).pipe(Result.getOrThrow).ok).toBe(
+			true,
+		);
 	});
 });

@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	type OrgChartDiagram,
 	type OrgPerson,
@@ -350,7 +352,7 @@ function defineOrgChartScenario(definition: OrgChartScenarioDefinition): OrgChar
 				...(scope === undefined ? {} : { label: scope }),
 			})),
 			...(groupByDepartment ? { groupByDepartment: true } : {}),
-		}),
+		}).pipe(Result.getOrThrow),
 	};
 }
 

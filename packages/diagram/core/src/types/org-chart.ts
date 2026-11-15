@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const orgChartDiagramType = "org-chart" as const;
 
@@ -343,22 +344,39 @@ export function getOrgChartValidationIssues(diagram: OrgChartDiagram): OrgChartV
 	return issues.slice(0, ORG_CHART_MAX_ISSUES);
 }
 
-export class OrgChartValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly OrgChartValidationIssue[]) {
-		super(issues[0]?.message ?? "Org chart failed semantic validation.");
-		this.name = "OrgChartValidationError";
+export class OrgChartValidationError extends Schema.TaggedError<
+	OrgChartValidationError,
+	{ readonly brand: unique symbol }
+>()("OrgChartValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(OrgChartValidationIssue),
+}) {
+	static fromIssues(issues: readonly OrgChartValidationIssue[]): OrgChartValidationError {
+		return OrgChartValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Org chart failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateOrgChartDiagram(diagram: OrgChartDiagram): OrgChartDiagram {
+export function validateOrgChartDiagram(
+	diagram: OrgChartDiagram,
+): Result.Result<OrgChartDiagram, OrgChartValidationError> {
 	const issues = getOrgChartValidationIssues(diagram);
-	if (issues.length > 0) throw new OrgChartValidationError(issues);
-	return diagram;
+	return issues.length > 0
+		? Result.fail(OrgChartValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseOrgChartDiagram(input: unknown): OrgChartDiagram {
-	return validateOrgChartDiagram(
-		Schema.decodeUnknownSync(OrgChartDiagram, { errors: "all" })(input),
+export function parseOrgChartDiagram(
+	input: unknown,
+): Result.Result<OrgChartDiagram, Schema.SchemaError | OrgChartValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(OrgChartDiagram, { errors: "all" })(input),
+		validateOrgChartDiagram,
 	);
 }
 
@@ -568,4 +586,4 @@ export const orgChartFixture = parseOrgChartDiagram({
 		},
 	],
 	dottedLines: [{ id: "ken-to-radia", report: "ken", manager: "radia" }],
-});
+}).pipe(Result.getOrThrow);

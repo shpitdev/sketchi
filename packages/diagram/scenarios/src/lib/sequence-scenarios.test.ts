@@ -1,9 +1,11 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Effect } from "effect";
 import { assert, layer } from "@effect/vitest";
 import { type SequenceDiagram, flowchartFixture } from "@sketchi/diagram-core";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
 import { logosNamedInText } from "@sketchi/icon-catalog";
 import { nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
-import { Effect } from "effect";
+
 import { describe, expect, it } from "vitest";
 
 import { diagramScenarios, getDiagramScenario } from "./diagram-scenarios";
@@ -15,6 +17,7 @@ import { getSequenceScenario, sequenceScenarios } from "./sequence-scenarios";
 
 function failedChecks(scenarioId: string, diagram: SequenceDiagram): string[] {
 	return evaluateScenarioDiagram(getSequenceScenario(scenarioId), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 }
@@ -41,7 +44,7 @@ describe("maintained sequence scenarios", () => {
 
 	it("pass their own maintained diagrams on every check", () => {
 		for (const scenario of sequenceScenarios) {
-			const evaluation = evaluateScenarioFixture(scenario);
+			const evaluation = evaluateScenarioFixture(scenario).pipe(Result.getOrThrow);
 			expect(
 				evaluation.checks.filter((check) => !check.passed),
 				scenario.id,
@@ -104,16 +107,20 @@ describe("maintained sequence scenarios", () => {
 			...scenario.expectedDiagram,
 			messages: scenario.expectedDiagram.messages.filter((message) => message.type !== "return"),
 		};
-		const evaluation = evaluateScenarioDiagram(scenario, scenario.expectedDiagram, modelDiagram);
+		const evaluation = evaluateScenarioDiagram(
+			scenario,
+			scenario.expectedDiagram,
+			modelDiagram,
+		).pipe(Result.getOrThrow);
 		expect(evaluation.ok).toBe(false);
 		expect(evaluation.checks.find((check) => check.id === "answered-calls")?.passed).toBe(false);
 		expect(evaluation.diagram).toEqual(scenario.expectedDiagram);
 	});
 
 	it("reject a flowchart returned for a sequence scenario instead of scoring it", () => {
-		expect(() =>
+		expect(
 			evaluateScenarioDiagram(getSequenceScenario("checkout-payment-sequence"), flowchartFixture),
-		).toThrow(/participants/u);
+		).toMatchObject({ failure: { message: expect.stringMatching(/participants/u) } });
 	});
 });
 
@@ -151,7 +158,7 @@ describe("sequence self-message evals", () => {
 	const expected = scenario.expectedDiagram;
 
 	it("draws each self-message as a loop that opens and answers no call", () => {
-		const evaluation = evaluateScenarioFixture(scenario);
+		const evaluation = evaluateScenarioFixture(scenario).pipe(Result.getOrThrow);
 		expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 		for (const id of ["validate", "sign-token"]) {
 			const loop = evaluation.scene.elements.find(
@@ -202,7 +209,9 @@ describe("sequence participant logo evals", () => {
 			"docker",
 		]);
 		expect(
-			evaluateScenarioFixture(scenario).checks.filter((check) => check.id.startsWith("icon")),
+			evaluateScenarioFixture(scenario)
+				.pipe(Result.getOrThrow)
+				.checks.filter((check) => check.id.startsWith("icon")),
 		).toEqual([
 			expect.objectContaining({ id: "icon:github", passed: true }),
 			expect.objectContaining({ id: "icon:cloudflareworkers", passed: true }),
@@ -235,7 +244,9 @@ describe("sequence participant logo evals", () => {
 				worker: "cloudflareworkers",
 				docker: "docker",
 			}),
-		).checks.find((check) => check.id === "icons-on-named-steps");
+		)
+			.pipe(Result.getOrThrow)
+			.checks.find((check) => check.id === "icons-on-named-steps");
 		expect(placement?.message).toBe(
 			'Logos on participants that do not name them: "Developer" (github).',
 		);

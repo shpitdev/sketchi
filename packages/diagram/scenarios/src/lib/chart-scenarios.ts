@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	estimateTextWidth,
 	parseChartDiagram,
@@ -68,7 +70,9 @@ function scenario(id: string, title: string, prompt: string, input: ScenarioInpu
 		diagramType: "chart",
 		tags: ["chart", chart.kind, ...(tags ?? [])],
 		logos: [],
-		expectedDiagram: parseChartDiagram({ id, title, type: "chart", ...chart }),
+		expectedDiagram: parseChartDiagram({ id, title, type: "chart", ...chart }).pipe(
+			Result.getOrThrow,
+		),
 		assertions: {
 			kind: chart.kind,
 			categories: chart.categories,

@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const sankeyDiagramType = "sankey" as const;
 
@@ -332,21 +333,40 @@ export function getSankeyValidationIssues(diagram: SankeyDiagram): SankeyValidat
 	return issues.slice(0, SANKEY_MAX_ISSUES);
 }
 
-export class SankeyValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly SankeyValidationIssue[]) {
-		super(issues[0]?.message ?? "Sankey diagram failed semantic validation.");
-		this.name = "SankeyValidationError";
+export class SankeyValidationError extends Schema.TaggedError<
+	SankeyValidationError,
+	{ readonly brand: unique symbol }
+>()("SankeyValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(SankeyValidationIssue),
+}) {
+	static fromIssues(issues: readonly SankeyValidationIssue[]): SankeyValidationError {
+		return SankeyValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Sankey diagram failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateSankeyDiagram(diagram: SankeyDiagram): SankeyDiagram {
+export function validateSankeyDiagram(
+	diagram: SankeyDiagram,
+): Result.Result<SankeyDiagram, SankeyValidationError> {
 	const issues = getSankeyValidationIssues(diagram);
-	if (issues.length > 0) throw new SankeyValidationError(issues);
-	return diagram;
+	return issues.length > 0
+		? Result.fail(SankeyValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseSankeyDiagram(input: unknown): SankeyDiagram {
-	return validateSankeyDiagram(Schema.decodeUnknownSync(SankeyDiagram, { errors: "all" })(input));
+export function parseSankeyDiagram(
+	input: unknown,
+): Result.Result<SankeyDiagram, Schema.SchemaError | SankeyValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(SankeyDiagram, { errors: "all" })(input),
+		validateSankeyDiagram,
+	);
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -520,4 +540,4 @@ export const sankeyFixture = parseSankeyDiagram({
 		{ source: "marketing", target: "compute", value: 12 },
 		{ source: "marketing", target: "storage", value: 8 },
 	],
-});
+}).pipe(Result.getOrThrow);

@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	parseTimelineDate,
 	parseTimelineDiagram,
@@ -74,7 +76,7 @@ function scenario(
 			events,
 			...(options.lanes ? { lanes: options.lanes } : {}),
 			...(options.today ? { today: options.today } : {}),
-		}),
+		}).pipe(Result.getOrThrow),
 		assertions: {
 			events: events.map((event) => ({
 				labels: [event.label, ...(options.aliases?.[event.id] ?? [])],

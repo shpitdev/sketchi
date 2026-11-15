@@ -1,5 +1,7 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option, Schema } from "effect";
 import { readFileSync } from "node:fs";
-import { Schema } from "effect";
+
 import { describe, expect, it } from "vitest";
 
 import { getDiagramScenario } from "./diagram-scenarios.js";
@@ -37,15 +39,17 @@ const deploySummary: unknown = JSON.parse(
 describe("MCP scenario adapter", () => {
 	it("grades the matching receipt when a real execute returns only a build summary", () => {
 		// Captured run 20261011-234628-csyp, third execute (trimmed to grading fields).
-		const candidate = candidateFromMcpResult(deploySummary, "flowchart");
+		const candidate = candidateFromMcpResult(deploySummary, "flowchart").pipe(
+			Result.getOrThrow,
+			Option.getOrUndefined,
+		);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt's normalizedSpec.");
 		expect(normalizedSpecFrom(deploySummary)).toMatchObject({ title: "Deploy pipeline" });
 		expect(
-			evaluateScenarioDiagram(
-				getDiagramScenario("deploy-pipeline-logos"),
-				candidate.diagram,
-			).checks.find(({ id }) => id === "min-node-count")?.passed,
+			evaluateScenarioDiagram(getDiagramScenario("deploy-pipeline-logos"), candidate.diagram)
+				.pipe(Result.getOrThrow)
+				.checks.find(({ id }) => id === "min-node-count")?.passed,
 		).toBe(true);
 	});
 	it("uses receipt quality and the returned build ID, not a later successful receipt", () => {
@@ -60,7 +64,9 @@ describe("MCP scenario adapter", () => {
 			result: { ok: true, status: "accepted", buildId: receipt.buildId, quality: 10 },
 			builds: [receipt, { ...receipt, buildId: "later-build", quality: { accepted: true } }],
 		};
-		expect(candidateFromMcpResult(value, "flowchart")).toMatchObject({ ok: false });
+		expect(
+			candidateFromMcpResult(value, "flowchart").pipe(Result.getOrThrow, Option.getOrUndefined),
+		).toMatchObject({ ok: false });
 		expect(normalizedSpecFrom(value)).toEqual(receipt.normalizedSpec);
 	});
 	it.each([true, false])(
@@ -89,7 +95,12 @@ describe("MCP scenario adapter", () => {
 			};
 			expect(buildResultFromMcp(value)).toEqual(receipt);
 			expect(normalizedSpecFrom({ structuredContent: value })).toEqual(receipt.normalizedSpec);
-			expect(candidateFromMcpResult({ structuredContent: value }, "flowchart")).toMatchObject({
+			expect(
+				candidateFromMcpResult({ structuredContent: value }, "flowchart").pipe(
+					Result.getOrThrow,
+					Option.getOrUndefined,
+				),
+			).toMatchObject({
 				ok,
 			});
 		},
@@ -104,7 +115,9 @@ describe("MCP scenario adapter", () => {
 				{ ...sequence.result, buildId: "summary", operation: "buildSequenceDiagram" },
 			],
 		};
-		expect(candidateFromMcpResult(value, "flowchart")).toMatchObject({
+		expect(
+			candidateFromMcpResult(value, "flowchart").pipe(Result.getOrThrow, Option.getOrUndefined),
+		).toMatchObject({
 			ok: false,
 			check: { message: "MCP build has no normalizedSpec object to grade." },
 		});
@@ -124,8 +137,10 @@ describe("MCP scenario adapter", () => {
 				builds: [{ ...flowchart.result, operation: "buildFlowchart" }],
 			},
 		};
-		expect(candidateFromMcpResult(value, "flowchart")).toEqual(
-			candidateFromMcpResult(flowchart, "flowchart"),
+		expect(
+			candidateFromMcpResult(value, "flowchart").pipe(Result.getOrThrow, Option.getOrUndefined),
+		).toEqual(
+			candidateFromMcpResult(flowchart, "flowchart").pipe(Result.getOrThrow, Option.getOrUndefined),
 		);
 		expect(normalizedSpecFrom(value)).toEqual(flowchart.result.normalizedSpec);
 	});
@@ -142,8 +157,10 @@ describe("MCP scenario adapter", () => {
 				builds: [{ ...flowchart.result, operation: "buildFlowchart" }],
 			},
 		};
-		expect(candidateFromMcpResult(value, "flowchart")).toEqual(
-			candidateFromMcpResult(flowchart, "flowchart"),
+		expect(
+			candidateFromMcpResult(value, "flowchart").pipe(Result.getOrThrow, Option.getOrUndefined),
+		).toEqual(
+			candidateFromMcpResult(flowchart, "flowchart").pipe(Result.getOrThrow, Option.getOrUndefined),
 		);
 		expect(normalizedSpecFrom(value)).toEqual(flowchart.result.normalizedSpec);
 	});
@@ -152,12 +169,20 @@ describe("MCP scenario adapter", () => {
 			{ ...flowchart.result, operation: "buildFlowchart" },
 			{ ok: false, status: "invalid_input", operation: "buildFlowchart" },
 		];
-		expect(candidateFromMcpResult({ ok: true, result: null, builds }, "flowchart")).toMatchObject({
+		expect(
+			candidateFromMcpResult({ ok: true, result: null, builds }, "flowchart").pipe(
+				Result.getOrThrow,
+				Option.getOrUndefined,
+			),
+		).toMatchObject({
 			ok: false,
 		});
 		expect(normalizedSpecFrom({ ok: true, builds })).toBeUndefined();
 		expect(
-			candidateFromMcpResult({ ok: false, builds: builds.slice(0, 1) }, "flowchart"),
+			candidateFromMcpResult({ ok: false, builds: builds.slice(0, 1) }, "flowchart").pipe(
+				Result.getOrThrow,
+				Option.getOrUndefined,
+			),
 		).toMatchObject({ ok: false });
 	});
 	it("preserves a returned pre-ID rejection matched to a receipt before a later success", () => {
@@ -174,7 +199,9 @@ describe("MCP scenario adapter", () => {
 				{ ...flowchart.result, operation: "buildFlowchart" },
 			],
 		};
-		expect(candidateFromMcpResult(value, "flowchart")).toMatchObject({ ok: false });
+		expect(
+			candidateFromMcpResult(value, "flowchart").pipe(Result.getOrThrow, Option.getOrUndefined),
+		).toMatchObject({ ok: false });
 		expect(normalizedSpecFrom(value)).toBeUndefined();
 	});
 	it("keeps an explicitly returned build authoritative and selects receipts by diagram family", () => {
@@ -182,21 +209,36 @@ describe("MCP scenario adapter", () => {
 			{ ...flowchart.result, operation: "buildFlowchart" },
 			{ ...sequence.result, operation: "buildSequenceDiagram" },
 		];
-		expect(candidateFromMcpResult({ ok: true, result: null, builds }, "flowchart")).toEqual(
-			candidateFromMcpResult(flowchart, "flowchart"),
+		expect(
+			candidateFromMcpResult({ ok: true, result: null, builds }, "flowchart").pipe(
+				Result.getOrThrow,
+				Option.getOrUndefined,
+			),
+		).toEqual(
+			candidateFromMcpResult(flowchart, "flowchart").pipe(Result.getOrThrow, Option.getOrUndefined),
 		);
-		expect(candidateFromMcpResult({ ok: true, result: null, builds }, "sequence")).toEqual(
-			candidateFromMcpResult(sequence, "sequence"),
+		expect(
+			candidateFromMcpResult({ ok: true, result: null, builds }, "sequence").pipe(
+				Result.getOrThrow,
+				Option.getOrUndefined,
+			),
+		).toEqual(
+			candidateFromMcpResult(sequence, "sequence").pipe(Result.getOrThrow, Option.getOrUndefined),
 		);
 		expect(
 			candidateFromMcpResult(
 				{ ok: true, result: { ...flowchart.result, ok: false }, builds },
 				"flowchart",
-			),
+			).pipe(Result.getOrThrow, Option.getOrUndefined),
 		).toMatchObject({ ok: false });
 	});
 	it("recognizes protocol-level failures without structuredContent and retains their error text", () => {
-		expect(candidateFromMcpResult(failedToolResult, "flowchart")).toEqual({
+		expect(
+			candidateFromMcpResult(failedToolResult, "flowchart").pipe(
+				Result.getOrThrow,
+				Option.getOrUndefined,
+			),
+		).toEqual({
 			ok: false,
 			check: {
 				id: "mcp-build-accepted",
@@ -219,13 +261,16 @@ describe("MCP scenario adapter", () => {
 			participants: [{ id: "github", label: "GitHub", icon: { slug: "github" } }],
 		};
 		expect(specToSequenceCandidate(spec)).toEqual({ ...spec, type: "sequence" });
-		const candidate = candidateFromMcpResult(sequence, "sequence");
+		const candidate = candidateFromMcpResult(sequence, "sequence").pipe(
+			Result.getOrThrow,
+			Option.getOrUndefined,
+		);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected accepted sequence fixture.");
 		const evaluation = evaluateScenarioDiagram(
 			getDiagramScenario("checkout-payment-sequence"),
 			candidate.diagram,
-		);
+		).pipe(Result.getOrThrow);
 		expect(evaluation.ok).toBe(true);
 		expect(
 			evaluation.checks
@@ -248,10 +293,10 @@ describe("MCP scenario adapter", () => {
 		const candidate = candidateFromMcpResult(
 			{ ok: true, status: "accepted", normalizedSpec: spec },
 			"flowchart",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected accepted flowchart.");
-		const evaluation = evaluateScenarioDiagram(scenario, candidate.diagram);
+		const evaluation = evaluateScenarioDiagram(scenario, candidate.diagram).pipe(Result.getOrThrow);
 		expect(evaluation.checks.find(({ id }) => id === "icons-on-named-steps")?.passed).toBe(false);
 		expect(evaluation.checks.find(({ id }) => id === "icon:docker")?.passed).toBe(false);
 	});
@@ -272,7 +317,9 @@ describe("MCP scenario adapter", () => {
 		["missing spec", { ok: true, status: "accepted" }],
 		["null spec", { ok: true, status: "accepted", normalizedSpec: null }],
 	])("returns a diagnostic check for %s", (_name, input) => {
-		expect(candidateFromMcpResult(input, "flowchart")).toMatchObject({
+		expect(
+			candidateFromMcpResult(input, "flowchart").pipe(Result.getOrThrow, Option.getOrUndefined),
+		).toMatchObject({
 			ok: false,
 			check: { id: "mcp-build-accepted", passed: false, message: expect.any(String) },
 		});
@@ -280,12 +327,17 @@ describe("MCP scenario adapter", () => {
 
 	it("leaves bare IR and typed generation envelopes on their existing path", () => {
 		const scenario = getDiagramScenario("checkout-payment-sequence");
-		expect(candidateFromMcpResult(scenario.expectedDiagram, "sequence")).toBeUndefined();
+		expect(
+			candidateFromMcpResult(scenario.expectedDiagram, "sequence").pipe(
+				Result.getOrThrow,
+				Option.getOrUndefined,
+			),
+		).toBeUndefined();
 		expect(
 			candidateFromMcpResult(
 				{ title: scenario.title, diagram: scenario.expectedDiagram },
 				"sequence",
-			),
+			).pipe(Result.getOrThrow, Option.getOrUndefined),
 		).toBeUndefined();
 	});
 });

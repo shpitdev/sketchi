@@ -1,6 +1,7 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Effect } from "effect";
 import { assert, layer } from "@effect/vitest";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
-import { Effect } from "effect";
 
 import { evaluateScenarioDiagram } from "./evaluate";
 import { FixtureGenerationClientLayer } from "./fixture-client";
@@ -57,7 +58,9 @@ layer(FixtureGenerationClientLayer)("scenario fixture generation client", (it) =
 				if (drawn?.type !== "flowchart") throw new Error("Expected a flowchart.");
 				assert.strictEqual(drawn.layout.edgeRouting, "curved");
 				assert.deepEqual(
-					evaluateScenarioDiagram(scenario, drawn).checks.filter((check) => !check.passed),
+					evaluateScenarioDiagram(scenario, drawn)
+						.pipe(Result.getOrThrow)
+						.checks.filter((check) => !check.passed),
 					[],
 				);
 			}

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -34,15 +36,15 @@ const all: VennDiagram[] = [vennFixture, ...Object.values(vennStressFixtures)];
 
 describe("Venn renderer contract", () => {
 	it("renders the fixture into a valid deterministic scene", () => {
-		const scene = renderDiagram(vennFixture);
+		const scene = renderDiagram(vennFixture).pipe(Result.getOrThrow);
 		expect(scene.diagramId).toBe("product-team-skills");
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
-		expect(renderDiagram(vennFixture)).toEqual(scene);
+		expect(renderDiagram(vennFixture).pipe(Result.getOrThrow)).toEqual(scene);
 	});
 
 	it("draws every set, label, region label and item, each region's text inside its region", () => {
 		for (const diagram of all) {
-			const scene = renderVennDiagram(diagram);
+			const scene = renderVennDiagram(diagram).pipe(Result.getOrThrow);
 			expect(getCanvasValidationIssues(scene), diagram.id).toEqual([]);
 			expect(vennLayoutIssues(scene), diagram.id).toEqual([]);
 			const readout = readVennScene(scene);
@@ -60,12 +62,14 @@ describe("Venn renderer contract", () => {
 	});
 
 	it("keeps the standard symmetric arrangement of equal circles", () => {
-		const two = readVennScene(renderVennDiagram(vennStressFixtures.twoSets)).sets.map(
-			(set) => set.circle,
-		);
+		const two = readVennScene(
+			renderVennDiagram(vennStressFixtures.twoSets).pipe(Result.getOrThrow),
+		).sets.map((set) => set.circle);
 		expect(two[0]!.r).toBe(two[1]!.r);
 		expect(two[0]!.y).toBe(two[1]!.y);
-		const three = readVennScene(renderVennDiagram(vennFixture)).sets.map((set) => set.circle);
+		const three = readVennScene(renderVennDiagram(vennFixture).pipe(Result.getOrThrow)).sets.map(
+			(set) => set.circle,
+		);
 		const distance = (a: number, b: number) =>
 			Math.hypot(three[a]!.x - three[b]!.x, three[a]!.y - three[b]!.y);
 		expect(new Set(three.map((circle) => circle.r)).size).toBe(1);
@@ -78,7 +82,7 @@ describe("Venn renderer contract", () => {
 	});
 
 	it("labels the upper sets above their circles, over their own part, and a third below", () => {
-		const scene = renderVennDiagram(vennFixture);
+		const scene = renderVennDiagram(vennFixture).pipe(Result.getOrThrow);
 		const circles = readVennScene(scene).sets.map((set) => set.circle);
 		const top = Math.min(...circles.map((circle) => circle.y - circle.r));
 		const [design, engineering, product] = [0, 1, 2].map((index) =>
@@ -96,10 +100,10 @@ describe("Venn renderer contract", () => {
 	});
 
 	it("keeps lines whole when the region has room, and centres a lone item in its crescent", () => {
-		const phones = renderVennDiagram(vennStressFixtures.twoSets);
+		const phones = renderVennDiagram(vennStressFixtures.twoSets).pipe(Result.getOrThrow);
 		for (const [index, item] of ["iMessage", "AirDrop", "Face ID", "Apple Pay"].entries())
 			expect(text(phones, `venn:region:0:item:${index}`).text).toBe(item);
-		const lens = renderVennDiagram(vennStressFixtures.heavyLens);
+		const lens = renderVennDiagram(vennStressFixtures.heavyLens).pipe(Result.getOrThrow);
 		const [python, javascript] = readVennScene(lens).sets.map((set) => set.circle);
 		expect(text(lens, "venn:region:0:item:0").y).toBeCloseTo(python!.y, 0);
 		expect(text(lens, "venn:region:1:item:0").y).toBeCloseTo(javascript!.y, 0);
@@ -110,7 +114,7 @@ describe("Venn renderer contract", () => {
 	});
 
 	it("wraps long items at word boundaries, never inside a word", () => {
-		const scene = renderVennDiagram(vennStressFixtures.heavySingles);
+		const scene = renderVennDiagram(vennStressFixtures.heavySingles).pipe(Result.getOrThrow);
 		const source = vennStressFixtures.heavySingles.regions.flatMap((region) => region.items ?? []);
 		const words = new Set(source.flatMap((item) => item.split(" ")));
 		for (const element of texts(scene).filter((entry) => entry.id.includes(":item:"))) {
@@ -134,8 +138,8 @@ describe("Venn renderer contract", () => {
 					{ sets: ["a", "b"], items: ["Uses api.example.com/v2/organizations/members daily"] },
 					{ sets: ["a"], items: ["東京都千代田区丸の内一丁目九番一号"] },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(vennLayoutIssues(scene)).toEqual([]);
 		expect(text(scene, "venn:region:0+1:item:0").text.split(/\s+/u)).toContain(
 			"api.example.com/v2/organizations/members",
@@ -156,8 +160,8 @@ describe("Venn renderer contract", () => {
 					{ sets: ["a"], items: ["First line\nSecond line", "Plain item"] },
 					{ sets: ["a", "b"], label: "Shared\nground", items: ["Both"] },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(vennLayoutIssues(scene)).toEqual([]);
 		// The authored break stays a line boundary; words may still wrap within each line.
@@ -180,14 +184,14 @@ describe("Venn renderer contract", () => {
 
 	it("reads no wider than 2.45 to 1 and no taller than wide by much", () => {
 		for (const diagram of all) {
-			const scene = renderVennDiagram(diagram);
+			const scene = renderVennDiagram(diagram).pipe(Result.getOrThrow);
 			expect(scene.width / scene.height, diagram.id).toBeLessThanOrEqual(2.45);
 			expect(scene.height / scene.width, diagram.id).toBeLessThanOrEqual(1.4);
 		}
 	});
 
 	it("fills each set translucently and groups each set, and each region's text", () => {
-		const scene = renderVennDiagram(vennFixture);
+		const scene = renderVennDiagram(vennFixture).pipe(Result.getOrThrow);
 		expect(element(scene, "node:venn:set:0:fill")).toMatchObject({
 			type: "node",
 			shape: "ellipse",
@@ -243,7 +247,7 @@ describe("Venn renderer contract", () => {
 	});
 
 	it("draws a region whatever order its sets are listed in", () => {
-		const forward = renderVennDiagram(vennStressFixtures.twoSets);
+		const forward = renderVennDiagram(vennStressFixtures.twoSets).pipe(Result.getOrThrow);
 		const reversed = renderVennDiagram(
 			parseVennDiagram({
 				...vennStressFixtures.twoSets,
@@ -251,8 +255,8 @@ describe("Venn renderer contract", () => {
 					...region,
 					sets: [...region.sets].reverse(),
 				})),
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(reversed).toEqual(forward);
 	});
 
@@ -277,8 +281,10 @@ describe("Venn empty regions", () => {
 			],
 		} as const;
 		const omitted = renderVennDiagram(
-			parseVennDiagram({ ...base, regions: [{ sets: ["personal"], items: ["Vault"] }] }),
-		);
+			parseVennDiagram({ ...base, regions: [{ sets: ["personal"], items: ["Vault"] }] }).pipe(
+				Result.getOrThrow,
+			),
+		).pipe(Result.getOrThrow);
 		for (const empty of [{ items: [] }, { count: 0 }]) {
 			const scene = renderVennDiagram(
 				parseVennDiagram({
@@ -287,8 +293,8 @@ describe("Venn empty regions", () => {
 						{ sets: ["personal"], items: ["Vault"] },
 						{ sets: ["personal", "education"], ...empty },
 					],
-				}),
-			);
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow);
 			expect(scene.elements.filter((element) => element.id.startsWith("venn:region:0+1"))).toEqual(
 				[],
 			);
@@ -302,8 +308,8 @@ describe("Venn empty regions", () => {
 					{ sets: ["personal"], count: 4 },
 					{ sets: ["personal", "education"], count: 0 },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(
 			readVennScene(counted).regions.find((region) => region.key.join() === "0,1")?.count,
 		).toBe("0");
@@ -315,8 +321,8 @@ describe("Venn empty regions", () => {
 					{ sets: ["personal"], count: 0 },
 					{ sets: ["personal", "education"], count: 0 },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(
 			readVennScene(zeros).regions.map((region) => [region.key.join("+"), region.count]),
 		).toEqual([

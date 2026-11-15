@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -12,18 +14,29 @@ const samples = JSON.parse(
 	readFileSync(new URL("./fixtures/app-stack-entries.json", import.meta.url), "utf8"),
 ) as { runId: string; spec: Record<string, unknown> }[];
 const scenario = getFlowchartScenario("ai-app-stack-logos");
-const diagrams = samples.map(({ spec }) => parseFlowchartDiagram(specToFlowchartCandidate(spec)));
+const diagrams = samples.map(({ spec }) =>
+	parseFlowchartDiagram(specToFlowchartCandidate(spec).pipe(Result.getOrThrow)).pipe(
+		Result.getOrThrow,
+	),
+);
 const split = diagrams[0]!;
 const merged = diagrams[2]!;
 const failures = (diagram: FlowchartDiagram) =>
 	evaluateScenarioDiagram(scenario, diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const entryFailure = "node-label:Request reaches Vercel → Next.js page receives question";
 
 describe("the stated multi-technology entry event", () => {
 	it.each(samples)("accepts the real receipt $runId", ({ spec }) => {
-		expect(failures(parseFlowchartDiagram(specToFlowchartCandidate(spec)))).toEqual([]);
+		expect(
+			failures(
+				parseFlowchartDiagram(specToFlowchartCandidate(spec).pipe(Result.getOrThrow)).pipe(
+					Result.getOrThrow,
+				),
+			),
+		).toEqual([]);
 	});
 
 	it.each(["nextjs", "vercel"])("accepts either single-node logo: %s", (slug) => {
@@ -123,6 +136,7 @@ describe("the stated multi-technology entry event", () => {
 		};
 		expect(
 			evaluateScenarioDiagram(expected, merged)
+				.pipe(Result.getOrThrow)
 				.checks.filter((check) => !check.passed)
 				.map((check) => check.id),
 		).toContain("icon:vercel");
@@ -208,7 +222,11 @@ describe("entry ownership after a bare start", () => {
 	it.each(ownerSamples)(
 		"restores the entry match without hiding independent defects: $runId",
 		({ runId, spec }) => {
-			const failed = failures(parseFlowchartDiagram(specToFlowchartCandidate(spec)));
+			const failed = failures(
+				parseFlowchartDiagram(specToFlowchartCandidate(spec).pipe(Result.getOrThrow)).pipe(
+					Result.getOrThrow,
+				),
+			);
 			expect(failed).not.toContain(entryFailure);
 			const independent = runId.endsWith("iseo")
 				? "node-label:Return cached answer"
@@ -328,6 +346,7 @@ describe("entry ownership after a bare start", () => {
 		];
 		expect(
 			evaluateScenarioDiagram(scenario, merged, model)
+				.pipe(Result.getOrThrow)
 				.checks.filter((check) => !check.passed)
 				.map((check) => check.id),
 		).toContain("icon:vercel");
@@ -347,6 +366,7 @@ describe("entry ownership after a bare start", () => {
 		};
 		expect(
 			evaluateScenarioDiagram(scenario, merged, renamed)
+				.pipe(Result.getOrThrow)
 				.checks.filter((check) => !check.passed)
 				.map((check) => check.id),
 		).toEqual([]);
@@ -359,9 +379,9 @@ describe("entry ownership after a bare start", () => {
 				node.id === "recv" ? { ...node, label: "Question arrives" } : node,
 			),
 		};
-		const check = evaluateScenarioDiagram(scenario, diagram).checks.find(
-			(check) => check.id === entryFailure,
-		)!;
+		const check = evaluateScenarioDiagram(scenario, diagram)
+			.pipe(Result.getOrThrow)
+			.checks.find((check) => check.id === entryFailure)!;
 		expect(check.passed).toBe(false);
 		expect(check.message).toContain("Vercel");
 		expect(check.message).toContain("Next.js page");

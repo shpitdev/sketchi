@@ -82,4 +82,35 @@ describe("ExcalidrawWorkspace", () => {
 
 		expect(screen.getByText("No diagram selected")).toBeTruthy();
 	});
+	it("keeps loading authoritative and recovers from a typed scene failure by switching diagrams", () => {
+		const invalid = {
+			...mindmapFixture,
+			edges: [
+				...mindmapFixture.edges,
+				{
+					id: "broken",
+					source: "topic-0",
+					target: "missing",
+					metadata: { depth: 1, siblingIndex: 0 },
+				},
+			],
+		};
+		const diagrams = [invalid, flowchartFixture];
+		const { rerender } = render(<ExcalidrawWorkspace diagrams={diagrams} />);
+		expect(screen.getByText("Scene unavailable")).toBeTruthy();
+		expect(
+			screen.getByText('Edge "broken" references missing target node "missing".'),
+		).toBeTruthy();
+		expect(screen.queryByTestId("mock-excalidraw-canvas")).toBeNull();
+		rerender(<ExcalidrawWorkspace diagrams={diagrams} status="loading" />);
+		expect(screen.getByText("Generating scene")).toBeTruthy();
+		expect(screen.queryByText("Scene unavailable")).toBeNull();
+		rerender(<ExcalidrawWorkspace diagrams={diagrams} status="ready" />);
+		const button = screen.getByRole("button", { name: /Sketchi onboarding decision flow/ });
+		button.focus();
+		fireEvent.click(button);
+		expect(document.activeElement).toBe(button);
+		expect(screen.getByLabelText("Sketchi onboarding decision flow canvas")).toBeTruthy();
+		expect(screen.queryByText("Scene unavailable")).toBeNull();
+	});
 });

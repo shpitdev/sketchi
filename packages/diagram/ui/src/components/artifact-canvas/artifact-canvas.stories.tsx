@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { flowchartFixture } from "@sketchi/diagram-core";
@@ -7,7 +9,7 @@ import { nodeLogoScene } from "../excalidraw-scene-canvas/node-logo-scene.fixtur
 import { ArtifactCanvas } from "./artifact-canvas";
 import "../../styles.css";
 
-const scene = renderIntermediateDiagram(flowchartFixture);
+const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 
 const meta = {
 	title: "Diagram UI/Components/ArtifactCanvas",

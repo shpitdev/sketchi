@@ -1,4 +1,6 @@
+import { Result } from "effect";
 import {
+	type DiagramValidationError,
 	boundLabelWidth,
 	CANVAS_SPEC_VERSION,
 	canvasBoundTextBox,
@@ -600,101 +602,106 @@ function tint(color: string, background: string, share: number): string {
  * sides in clockwise order, each subtree in its own color, joined by curves,
  * with label size stepping down from the center.
  */
-export function renderMindmapDiagram(input: MindmapDiagram): RenderedDiagramScene {
-	const diagram = validateMindmapDiagram(input);
-	const root = measureTopics(diagram);
-	const placed = layoutMindmap(root, diagram.layout.direction === "RL");
-	const dx = Math.round(PADDING - Math.min(...placed.map((entry) => entry.x)));
-	const dy = Math.round(PADDING - Math.min(...placed.map((entry) => entry.y)));
-	const accent = diagram.style.accentColor;
-	const background = diagram.style.backgroundColor;
-	const colorOf = (entry: PlacedTopic) =>
-		entry.branch === -1 ? accent : CHART_SERIES_COLORS[entry.branch % CHART_SERIES_COLORS.length]!;
-	// Each main branch moves as one group in Excalidraw.
-	const groupsOf = (entry: PlacedTopic) =>
-		entry.branch === -1 ? {} : { groupIds: [`branch:${root.children[entry.branch]!.id}`] };
-	const nodes = placed.map((entry): NodeSceneElement => {
-		const { topic } = entry;
-		const share = [0.18, 0.16, 0.06][topic.depth];
-		return {
-			type: "node",
-			id: `node:${topic.id}`,
-			nodeId: topic.id,
-			kind: topic.depth === 0 ? "root" : "topic",
-			shape: topic.depth === 0 ? "ellipse" : "rectangle",
-			x: Math.round(entry.x) + dx,
-			y: Math.round(entry.y) + dy,
-			width: topic.width,
-			height: topic.height,
-			label: topic.text,
-			strokeColor: colorOf(entry),
-			strokeWidth: level(topic.depth).strokeWidth,
-			...(share === undefined
-				? {}
-				: { fillColor: tint(colorOf(entry), background, share), fillStyle: "solid" as const }),
+export function renderMindmapDiagram(
+	input: MindmapDiagram,
+): Result.Result<RenderedDiagramScene, DiagramValidationError> {
+	return Result.map(validateMindmapDiagram(input), (diagram) => {
+		const root = measureTopics(diagram);
+		const placed = layoutMindmap(root, diagram.layout.direction === "RL");
+		const dx = Math.round(PADDING - Math.min(...placed.map((entry) => entry.x)));
+		const dy = Math.round(PADDING - Math.min(...placed.map((entry) => entry.y)));
+		const accent = diagram.style.accentColor;
+		const background = diagram.style.backgroundColor;
+		const colorOf = (entry: PlacedTopic) =>
+			entry.branch === -1
+				? accent
+				: CHART_SERIES_COLORS[entry.branch % CHART_SERIES_COLORS.length]!;
+		// Each main branch moves as one group in Excalidraw.
+		const groupsOf = (entry: PlacedTopic) =>
+			entry.branch === -1 ? {} : { groupIds: [`branch:${root.children[entry.branch]!.id}`] };
+		const nodes = placed.map((entry): NodeSceneElement => {
+			const { topic } = entry;
+			const share = [0.18, 0.16, 0.06][topic.depth];
+			return {
+				type: "node",
+				id: `node:${topic.id}`,
+				nodeId: topic.id,
+				kind: topic.depth === 0 ? "root" : "topic",
+				shape: topic.depth === 0 ? "ellipse" : "rectangle",
+				x: Math.round(entry.x) + dx,
+				y: Math.round(entry.y) + dy,
+				width: topic.width,
+				height: topic.height,
+				label: topic.text,
+				strokeColor: colorOf(entry),
+				strokeWidth: level(topic.depth).strokeWidth,
+				...(share === undefined
+					? {}
+					: { fillColor: tint(colorOf(entry), background, share), fillStyle: "solid" as const }),
+				...groupsOf(entry),
+			};
+		});
+		const labels = placed.map((entry, index): TextSceneElement => ({
+			type: "text",
+			id: `label:${entry.topic.id}`,
+			containerId: nodes[index]!.id,
+			x: nodes[index]!.x + entry.topic.width / 2,
+			y: nodes[index]!.y + entry.topic.height / 2,
+			text: entry.topic.text,
+			fontSize: entry.topic.fontSize,
+			maxWidth: Math.max(1, entry.topic.width - 24),
 			...groupsOf(entry),
+		}));
+		const shapes = new Map(nodes.map((node) => [node.nodeId, node]));
+		const ports = rootPorts(
+			nodes[0]!,
+			placed.flatMap((entry, index) =>
+				entry.topic.depth === 1 ? [{ shape: nodes[index]!, side: entry.side }] : [],
+			),
+		);
+		const edgeIds = new Map(diagram.edges.map((edge) => [edge.target, edge.id]));
+		const arrows = placed.flatMap((entry, index): ArrowSceneElement[] => {
+			if (!entry.parent) return [];
+			const { topic } = entry;
+			const edgeId = edgeIds.get(topic.id)!;
+			const points = connector(
+				nodes[index]!,
+				shapes.get(entry.parent.topic.id)!,
+				entry,
+				ports.get(topic.id),
+			);
+			return [
+				{
+					type: "arrow",
+					id: `edge:${edgeId}`,
+					edgeId,
+					sourceNodeId: entry.parent.topic.id,
+					targetNodeId: topic.id,
+					points,
+					...(points.length > 2 ? { curved: true } : {}),
+					endArrowhead: null,
+					strokeColor: colorOf(entry),
+					strokeWidth: topic.depth === 1 ? 4 : 2,
+					// A curve from the center belongs to no branch, so moving a branch stretches it.
+					...(entry.parent.branch === -1 ? {} : groupsOf(entry)),
+				},
+			];
+		});
+		const right = Math.max(...nodes.map((node) => node.x + node.width));
+		const bottom = Math.max(...nodes.map((node) => node.y + node.height));
+		return {
+			kind: "canvas",
+			version: CANVAS_SPEC_VERSION,
+			diagramId: diagram.id,
+			title: diagram.title,
+			width: right + PADDING,
+			height: bottom + PADDING,
+			accentColor: accent,
+			backgroundColor: background,
+			elements: [...arrows, ...nodes, ...labels],
+			layers: [],
+			layouts: [],
+			zOrder: [...arrows, ...nodes, ...labels].map((element) => element.id),
 		};
 	});
-	const labels = placed.map((entry, index): TextSceneElement => ({
-		type: "text",
-		id: `label:${entry.topic.id}`,
-		containerId: nodes[index]!.id,
-		x: nodes[index]!.x + entry.topic.width / 2,
-		y: nodes[index]!.y + entry.topic.height / 2,
-		text: entry.topic.text,
-		fontSize: entry.topic.fontSize,
-		maxWidth: Math.max(1, entry.topic.width - 24),
-		...groupsOf(entry),
-	}));
-	const shapes = new Map(nodes.map((node) => [node.nodeId, node]));
-	const ports = rootPorts(
-		nodes[0]!,
-		placed.flatMap((entry, index) =>
-			entry.topic.depth === 1 ? [{ shape: nodes[index]!, side: entry.side }] : [],
-		),
-	);
-	const edgeIds = new Map(diagram.edges.map((edge) => [edge.target, edge.id]));
-	const arrows = placed.flatMap((entry, index): ArrowSceneElement[] => {
-		if (!entry.parent) return [];
-		const { topic } = entry;
-		const edgeId = edgeIds.get(topic.id)!;
-		const points = connector(
-			nodes[index]!,
-			shapes.get(entry.parent.topic.id)!,
-			entry,
-			ports.get(topic.id),
-		);
-		return [
-			{
-				type: "arrow",
-				id: `edge:${edgeId}`,
-				edgeId,
-				sourceNodeId: entry.parent.topic.id,
-				targetNodeId: topic.id,
-				points,
-				...(points.length > 2 ? { curved: true } : {}),
-				endArrowhead: null,
-				strokeColor: colorOf(entry),
-				strokeWidth: topic.depth === 1 ? 4 : 2,
-				// A curve from the center belongs to no branch, so moving a branch stretches it.
-				...(entry.parent.branch === -1 ? {} : groupsOf(entry)),
-			},
-		];
-	});
-	const right = Math.max(...nodes.map((node) => node.x + node.width));
-	const bottom = Math.max(...nodes.map((node) => node.y + node.height));
-	return {
-		kind: "canvas",
-		version: CANVAS_SPEC_VERSION,
-		diagramId: diagram.id,
-		title: diagram.title,
-		width: right + PADDING,
-		height: bottom + PADDING,
-		accentColor: accent,
-		backgroundColor: background,
-		elements: [...arrows, ...nodes, ...labels],
-		layers: [],
-		layouts: [],
-		zOrder: [...arrows, ...nodes, ...labels].map((element) => element.id),
-	};
 }

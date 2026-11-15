@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	candidateRouteQuality,
@@ -258,7 +260,9 @@ const PLAIN_DIRECT_FAILURES: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly
 type Point = { x: number; y: number };
 
 /** Arrows with a run that is neither horizontal nor vertical, which no orthogonal route has. */
-function diagonalRuns(scene: ReturnType<typeof renderIntermediateDiagram>): string[] {
+function diagonalRuns(
+	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
+): string[] {
 	return scene.elements.flatMap((element) =>
 		element.type === "arrow" &&
 		element.points.some(
@@ -281,7 +285,7 @@ function diagonalRuns(scene: ReturnType<typeof renderIntermediateDiagram>): stri
  * before the target or a branch leaves it by the side facing back.
  */
 function aroundTheBands(
-	scene: ReturnType<typeof renderIntermediateDiagram>,
+	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
 	direction: "TB" | "BT" | "LR" | "RL",
 	spine: readonly { id: string; source: string; target: string }[],
 	continuations: ReadonlySet<string>,
@@ -379,7 +383,7 @@ function corners(points: readonly Point[]): Point[] {
 	});
 }
 
-function routingCounts(scene: ReturnType<typeof renderIntermediateDiagram>) {
+function routingCounts(scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>) {
 	const nodes = scene.elements.flatMap((e) => (e.type === "node" ? [e] : []));
 	const arrows = scene.elements.flatMap((e) => (e.type === "arrow" ? [e] : []));
 	const points = [
@@ -901,8 +905,8 @@ describe("label fuzz", () => {
 						...spec,
 						type: "flowchart",
 						layout: { direction, edgeRouting: "orthogonal" },
-					}),
-				),
+					}).pipe(Result.getOrThrow),
+				).pipe(Result.getOrThrow),
 			).elements;
 			const authored = new Map(spec.nodes.map((node) => [`node:${node.id}`, node.label]));
 			return labelDefects(elements, authored).map((defect) => `${index}: ${defect}`);
@@ -925,8 +929,8 @@ describe("label fuzz", () => {
 								...spec,
 								type: "flowchart",
 								layout: { direction, edgeRouting: "orthogonal" },
-							}),
-						),
+							}).pipe(Result.getOrThrow),
+						).pipe(Result.getOrThrow),
 					).elements,
 				).map((label) => `${index}:${label}`),
 			);
@@ -941,7 +945,9 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("label fixtures: %s", (directio
 		(name) => {
 			const fixture = labelFixtures[name];
 			const elements = convertSceneToExcalidraw(
-				renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+				renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }).pipe(
+					Result.getOrThrow,
+				),
 			).elements;
 			const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
 			expect(labelDefects(elements, authored)).toEqual([]);
@@ -1171,8 +1177,8 @@ describe("text fit fuzz", () => {
 		"described-flowchart",
 	] as const)("fits long words and identifiers in every %s", (family) => {
 		const failures = diagrams.flatMap((specs, index) => {
-			const diagram = parseCanonicalDiagram(specs[family]);
-			const scene = embedCanvasIcons(renderDiagram(diagram), (slug) => ({
+			const diagram = parseCanonicalDiagram(specs[family]).pipe(Result.getOrThrow);
+			const scene = embedCanvasIcons(renderDiagram(diagram).pipe(Result.getOrThrow), (slug) => ({
 				name: slug,
 				svg: '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"/>',
 			})).scene;
@@ -1248,8 +1254,8 @@ describe("tall column fuzz", () => {
 						...spec,
 						type: "flowchart",
 						layout: { direction, edgeRouting: "orthogonal" },
-					}),
-				),
+					}).pipe(Result.getOrThrow),
+				).pipe(Result.getOrThrow),
 			);
 			const counts = scenes.map((scene) => routingCounts(scene));
 			// The hosted PNG frames the drawing in 20 units, in place of its 48-unit padding.
@@ -1309,8 +1315,8 @@ describe("routing fuzz", () => {
 				...spec,
 				type: "flowchart",
 				layout: { direction, edgeRouting },
-			});
-			const scene = renderIntermediateDiagram(diagram);
+			}).pipe(Result.getOrThrow);
+			const scene = renderIntermediateDiagram(diagram).pipe(Result.getOrThrow);
 			const issues = [
 				...validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues,
 				...(edgeRouting === "orthogonal" ? diagonalRuns(scene) : []),
@@ -1329,8 +1335,8 @@ describe("routing fuzz", () => {
 					...spec,
 					type: "flowchart",
 					layout: { direction, edgeRouting: "orthogonal" },
-				}),
-			);
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow);
 			const nodes = new Map(
 				scene.elements.flatMap((e) => (e.type === "node" ? [[e.nodeId, e] as const] : [])),
 			);
@@ -1368,8 +1374,8 @@ describe("routing fuzz", () => {
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
-						}),
-					),
+						}).pipe(Result.getOrThrow),
+					).pipe(Result.getOrThrow),
 				),
 			);
 			if (process.env.PRINT_ROUTING)
@@ -1397,8 +1403,8 @@ describe("routing fuzz", () => {
 				...randomFlowcharts(40, 20261020)[4]!,
 				type: "flowchart",
 				layout: { direction: "TB", edgeRouting: "orthogonal" },
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(diagonalRuns(scene)).toEqual([]);
 	});
 
@@ -1410,8 +1416,8 @@ describe("routing fuzz", () => {
 				...randomFlowcharts(48)[47]!,
 				type: "flowchart",
 				layout: { direction: "LR", edgeRouting: "orthogonal" },
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(Math.max(scene.width, scene.height)).toBeLessThanOrEqual(2357.5);
 	});
 
@@ -1423,8 +1429,8 @@ describe("routing fuzz", () => {
 					...randomFlowcharts(34, 143289)[33]!,
 					type: "flowchart",
 					layout: { direction: "RL", edgeRouting: "orthogonal" },
-				}),
-			),
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow),
 		);
 		expect(crossings).toBeLessThanOrEqual(6);
 		expect(findings).toBeLessThanOrEqual(3);
@@ -1439,8 +1445,8 @@ describe("routing fuzz", () => {
 					...randomFlowcharts(45, 20261026)[44]!,
 					type: "flowchart",
 					layout: { direction: "BT", edgeRouting: "orthogonal" },
-				}),
-			),
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow),
 		);
 		expect(crossings).toBeLessThanOrEqual(78);
 		expect(findings).toBeLessThanOrEqual(13);
@@ -1458,8 +1464,8 @@ describe("routing fuzz", () => {
 						...randomLongFlows(39)[38]!,
 						type: "flowchart",
 						layout: { direction, edgeRouting: "orthogonal" },
-					}),
-				),
+					}).pipe(Result.getOrThrow),
+				).pipe(Result.getOrThrow),
 			);
 			expect(crossings).toBe(0);
 			expect(findings).toBe(0);
@@ -1503,8 +1509,8 @@ describe("routing fuzz", () => {
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
-						}),
-					),
+						}).pipe(Result.getOrThrow),
+					).pipe(Result.getOrThrow),
 				).map((stray) => `${index} ${stray}`),
 			);
 			expect(strays).toEqual([]);
@@ -1522,8 +1528,8 @@ describe("routing fuzz", () => {
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting },
-						}),
-					),
+						}).pipe(Result.getOrThrow),
+					).pipe(Result.getOrThrow),
 				);
 				return curvedStrays(curved!, square!).map((stray) => `${index} ${stray}`);
 			});
@@ -1739,7 +1745,10 @@ describe("grouped routing fuzz", () => {
 	// labels. Branch labels on these dense random graphs are judged as the label
 	// fuzz judges ungrouped ones; grouped, they draw no more defects in total.
 	const flowcharts = randomGroupedFlowcharts(FULL ? 30 : 8, 20261020);
-	const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>[]>();
+	const scenes = new Map<
+		string,
+		Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>[]
+	>();
 	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
 		if (!scenes.has(direction))
 			scenes.set(
@@ -1750,8 +1759,8 @@ describe("grouped routing fuzz", () => {
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
-						}),
-					),
+						}).pipe(Result.getOrThrow),
+					).pipe(Result.getOrThrow),
 				),
 			);
 		return scenes.get(direction)!;
@@ -1820,8 +1829,8 @@ describe("grouped routing fuzz", () => {
 						...spec,
 						type: "flowchart",
 						layout: { direction, edgeRouting: "curved" },
-					}),
-				);
+					}).pipe(Result.getOrThrow),
+				).pipe(Result.getOrThrow);
 				return curvedStrays(curved, rendered(direction)[index]!).map(
 					(stray) => `${index} ${stray}`,
 				);
@@ -1837,7 +1846,7 @@ describe("grouped routing fuzz", () => {
 				const scene = renderIntermediateDiagram({
 					...groupFixtures[name],
 					layout: { direction, edgeRouting: "orthogonal" },
-				});
+				}).pipe(Result.getOrThrow);
 				const exported = convertSceneToExcalidraw(scene);
 				const authored = new Map(
 					groupFixtures[name].nodes.map((node) => [`node:${node.id}`, node.label]),
@@ -1949,7 +1958,10 @@ describe("group row fuzz", () => {
 	// through the gap between them, never around the outer margins, and no flow
 	// draws more crossings or reader findings than main.
 	const rows = randomGroupRows(FULL ? 24 : 6);
-	const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>[]>();
+	const scenes = new Map<
+		string,
+		Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>[]
+	>();
 	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
 		if (!scenes.has(direction))
 			scenes.set(
@@ -1960,8 +1972,8 @@ describe("group row fuzz", () => {
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
-						}),
-					),
+						}).pipe(Result.getOrThrow),
+					).pipe(Result.getOrThrow),
 				),
 			);
 		return scenes.get(direction)!;
@@ -2165,20 +2177,25 @@ describe("zoned routing fuzz", () => {
 	// stay apart, no edge passes through a zone neither end sits in, runs along an
 	// outline or crosses a label, and an edge whose ends share a zone stays inside it.
 	const flowcharts = randomZonedFlowcharts(FULL ? 30 : 4, 20261019);
-	const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>[]>();
+	const scenes = new Map<
+		string,
+		Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>[]
+	>();
 	const parsed = (direction: "TB" | "BT" | "LR" | "RL") =>
 		flowcharts.map((spec) =>
 			parseFlowchartDiagram({
 				...spec,
 				type: "flowchart",
 				layout: { direction, edgeRouting: "orthogonal" },
-			}),
+			}).pipe(Result.getOrThrow),
 		);
 	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
 		if (!scenes.has(direction))
 			scenes.set(
 				direction,
-				parsed(direction).map((diagram) => renderIntermediateDiagram(diagram)),
+				parsed(direction).map((diagram) =>
+					renderIntermediateDiagram(diagram).pipe(Result.getOrThrow),
+				),
 			);
 		return scenes.get(direction)!;
 	};
@@ -2231,7 +2248,7 @@ describe("zoned routing fuzz", () => {
 					renderIntermediateDiagram({
 						...diagram,
 						layout: { ...diagram.layout, edgeRouting: "curved" },
-					}),
+					}).pipe(Result.getOrThrow),
 					rendered(direction)[index]!,
 				).map((stray) => `${index} ${stray}`),
 			);
@@ -2263,7 +2280,7 @@ describe("zoned routing fuzz", () => {
 				const scene = renderIntermediateDiagram({
 					...fixture,
 					layout: { direction, edgeRouting: "orthogonal" },
-				});
+				}).pipe(Result.getOrThrow);
 				const exported = convertSceneToExcalidraw(scene);
 				const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
 				expect([
@@ -2403,7 +2420,10 @@ describe("laned routing fuzz", () => {
 	// or leaves the lanes, and labels stay whole and clear of nodes, headers and
 	// boundaries.
 	const flowcharts = randomLanedFlowcharts(30, 20261022);
-	const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>[]>();
+	const scenes = new Map<
+		string,
+		Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>[]
+	>();
 	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
 		if (!scenes.has(direction))
 			scenes.set(
@@ -2414,8 +2434,8 @@ describe("laned routing fuzz", () => {
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
-						}),
-					),
+						}).pipe(Result.getOrThrow),
+					).pipe(Result.getOrThrow),
 				),
 			);
 		return scenes.get(direction)!;
@@ -2483,7 +2503,7 @@ describe("laned routing fuzz", () => {
 				const scene = renderIntermediateDiagram({
 					...fixture,
 					layout: { direction, edgeRouting: "orthogonal" },
-				});
+				}).pipe(Result.getOrThrow);
 				const exported = convertSceneToExcalidraw(scene);
 				const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
 				expect([
@@ -2719,7 +2739,10 @@ describe("lines sharing a segment", () => {
 			expect(
 				fixtures.flatMap(([name, fixture]) => {
 					const { shared } = routingCounts(
-						renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+						renderIntermediateDiagram({
+							...fixture,
+							layout: { ...fixture.layout, direction },
+						}).pipe(Result.getOrThrow),
 					);
 					return shared > 0 ? [`${name}: ${shared}`] : [];
 				}),
@@ -2851,7 +2874,10 @@ describe("lines that touch", () => {
 			expect(
 				fixtures.flatMap(([name, fixture]) => {
 					const { touches } = routingCounts(
-						renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+						renderIntermediateDiagram({
+							...fixture,
+							layout: { ...fixture.layout, direction },
+						}).pipe(Result.getOrThrow),
 					);
 					const known = KNOWN_TOUCHING_FIXTURES[`${name}:${direction}`] ?? 0;
 					return touches > known ? [`${name}: ${known} -> ${touches}`] : [];
@@ -2873,8 +2899,8 @@ describe("lines that touch", () => {
 								...spec,
 								type: "flowchart",
 								layout: { direction, edgeRouting: "orthogonal" },
-							}),
-						),
+							}).pipe(Result.getOrThrow),
+						).pipe(Result.getOrThrow),
 					);
 					const known = KNOWN_TOUCHING_FAN_INS[`${spec.id}:${direction}`] ?? 0;
 					return touches > known ? [`${spec.id}:${direction}: ${known} -> ${touches}`] : [];

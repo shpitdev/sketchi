@@ -1,10 +1,12 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { classFixture } from "@sketchi/diagram-core";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 
 import { convertSceneToExcalidraw, createExcalidrawFile, validateExcalidrawScene } from "./convert";
 
-const exported = convertSceneToExcalidraw(renderDiagram(classFixture));
+const exported = convertSceneToExcalidraw(renderDiagram(classFixture).pipe(Result.getOrThrow));
 const element = (id: string) => exported.elements.find((candidate) => candidate.id === id)!;
 
 describe("class diagram Excalidraw export", () => {

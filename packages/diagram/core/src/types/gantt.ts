@@ -1,5 +1,6 @@
-import { Effect, Schema } from "effect";
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 import { parseTimelineDate } from "./timeline.js";
 
 export const ganttDiagramType = "gantt" as const;
@@ -111,23 +112,26 @@ export function ganttRows(diagram: GanttDiagram): {
 	}));
 }
 
-export type GanttValidationIssueCode =
-	| "gantt_too_large"
-	| "duplicate_task_id"
-	| "invalid_gantt_date"
-	| "invalid_gantt_span"
-	| "invalid_gantt_phase"
-	| "invalid_gantt_progress"
-	| "missing_dependency"
-	| "self_dependency"
-	| "gantt_dependency_cycle";
+export const GanttValidationIssueCodeSchema = Schema.Literals([
+	"gantt_too_large",
+	"duplicate_task_id",
+	"invalid_gantt_date",
+	"invalid_gantt_span",
+	"invalid_gantt_phase",
+	"invalid_gantt_progress",
+	"missing_dependency",
+	"self_dependency",
+	"gantt_dependency_cycle",
+]);
+export type GanttValidationIssueCode = typeof GanttValidationIssueCodeSchema.Type;
 
-export interface GanttValidationIssue {
-	readonly code: GanttValidationIssueCode;
-	readonly path: string;
-	readonly message: string;
-	readonly hint: string;
-}
+export const GanttValidationIssue = Schema.Struct({
+	code: GanttValidationIssueCodeSchema,
+	path: Schema.String,
+	message: Schema.String,
+	hint: Schema.String,
+});
+export interface GanttValidationIssue extends Schema.Schema.Type<typeof GanttValidationIssue> {}
 
 const DATE_HINT = "Use YYYY-MM-DD, copied from the source.";
 
@@ -389,19 +393,38 @@ export function ganttScheduleConflicts(diagram: GanttDiagram): GanttScheduleConf
 	});
 }
 
-export class GanttValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly GanttValidationIssue[]) {
-		super(issues[0]?.message ?? "Gantt chart failed validation.");
-		this.name = "GanttValidationError";
+export class GanttValidationError extends Schema.TaggedError<
+	GanttValidationError,
+	{ readonly brand: unique symbol }
+>()("GanttValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(GanttValidationIssue),
+}) {
+	static fromIssues(issues: readonly GanttValidationIssue[]): GanttValidationError {
+		return GanttValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Gantt chart failed validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
-export function validateGanttDiagram(diagram: GanttDiagram): GanttDiagram {
+export function validateGanttDiagram(
+	diagram: GanttDiagram,
+): Result.Result<GanttDiagram, GanttValidationError> {
 	const issues = getGanttValidationIssues(diagram);
-	if (issues.length) throw new GanttValidationError(issues);
-	return diagram;
+	return issues.length > 0
+		? Result.fail(GanttValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
-export function parseGanttDiagram(input: unknown): GanttDiagram {
-	return validateGanttDiagram(Schema.decodeUnknownSync(GanttDiagram, { errors: "all" })(input));
+export function parseGanttDiagram(
+	input: unknown,
+): Result.Result<GanttDiagram, Schema.SchemaError | GanttValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(GanttDiagram, { errors: "all" })(input),
+		validateGanttDiagram,
+	);
 }
 
 export const ganttFixture = parseGanttDiagram({
@@ -444,4 +467,4 @@ export const ganttFixture = parseGanttDiagram({
 			dependsOn: ["qa"],
 		},
 	],
-});
+}).pipe(Result.getOrThrow);

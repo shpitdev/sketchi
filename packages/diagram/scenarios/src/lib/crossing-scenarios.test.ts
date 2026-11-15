@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
@@ -11,7 +13,7 @@ const crossingCheck = (checks: readonly { id: string; passed: boolean; message: 
 
 describe("crossing scenarios", () => {
 	it.each(ids)("draws %s's fixture crossing no line its planar graph does not force", (id) => {
-		const evaluation = evaluateScenarioFixture(getFlowchartScenario(id));
+		const evaluation = evaluateScenarioFixture(getFlowchartScenario(id)).pipe(Result.getOrThrow);
 		expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 		expect(crossingCheck(evaluation.checks)?.message).toBe(
 			"Lines cross nothing, as the planar graph allows.",
@@ -25,7 +27,7 @@ describe("crossing scenarios", () => {
 		const evaluation = evaluateScenarioDiagram(scenario, {
 			...scenario.expectedDiagram,
 			layout: { direction: "TB", edgeRouting: "straight" },
-		});
+		}).pipe(Result.getOrThrow);
 		expect(crossingCheck(evaluation.checks)).toMatchObject({
 			passed: false,
 			message: expect.stringMatching(
@@ -59,7 +61,7 @@ describe("crossing scenarios", () => {
 				...b.map((id) => ({ id: `${id}-end`, source: id, target: "end", metadata: {} })),
 			],
 			groups: [],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(crossingCheck(evaluation.checks)).toMatchObject({
 			passed: true,
 			message: expect.stringMatching(/^The graph is not planar: it forces at least 1 crossing/),
@@ -104,12 +106,12 @@ describe("crossing scenarios", () => {
 				},
 			},
 			"flowchart",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		if (!candidate?.ok) throw new Error("The laned triage build is not a flowchart candidate.");
 		const evaluation = evaluateScenarioDiagram(
 			getFlowchartScenario("feedback-triage-curved"),
 			candidate.diagram,
-		);
+		).pipe(Result.getOrThrow);
 		expect(crossingCheck(evaluation.checks)).toMatchObject({
 			passed: true,
 			message: expect.stringMatching(
@@ -121,7 +123,9 @@ describe("crossing scenarios", () => {
 
 	it("checks crossings only where a scenario asks for it", () => {
 		const checked = flowchartScenarios.filter((scenario) =>
-			evaluateScenarioFixture(scenario).checks.some((check) => check.id === "avoidable-crossings"),
+			evaluateScenarioFixture(scenario)
+				.pipe(Result.getOrThrow)
+				.checks.some((check) => check.id === "avoidable-crossings"),
 		);
 		expect(checked.map((scenario) => scenario.id)).toEqual([
 			...ids,

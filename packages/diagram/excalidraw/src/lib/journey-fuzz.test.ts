@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	getCanvasValidationIssues,
@@ -123,7 +125,7 @@ function randomJourneys(count: number, start: number): JourneyDiagram[] {
 			...(random() < 0.5 ? { persona: "Priya, a first-time buyer" } : {}),
 			...(actors && random() < 0.5 ? { actors: ACTORS.slice(0, 5) } : {}),
 			stages,
-		});
+		}).pipe(Result.getOrThrow);
 	});
 }
 
@@ -141,7 +143,7 @@ describe("journey map fuzz", () => {
 			const defects: string[] = [];
 			const shortfalls: string[] = [];
 			for (const diagram of randomJourneys(JOURNEYS, seed)) {
-				const scene = renderJourneyDiagram(diagram);
+				const scene = renderJourneyDiagram(diagram).pipe(Result.getOrThrow);
 				const exported = convertSceneToExcalidraw(scene);
 				const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(exported)));
 				const problems = [

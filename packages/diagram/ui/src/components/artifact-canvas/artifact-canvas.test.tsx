@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -43,7 +45,7 @@ import { ArtifactCanvas } from "./artifact-canvas";
 
 describe("ArtifactCanvas", () => {
 	it("renders generated artifacts in review mode by default", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 
 		render(<ArtifactCanvas scene={scene} />);
 
@@ -54,7 +56,7 @@ describe("ArtifactCanvas", () => {
 	});
 
 	it("enables editing and emits edited scene data in edit mode", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 		const onSceneChange = vi.fn();
 
 		render(

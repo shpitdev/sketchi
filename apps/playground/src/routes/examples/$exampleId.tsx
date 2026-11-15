@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import { flowchartDiagramFromSpec, type FlowchartSpec } from "@sketchi/diagram-agent";
 import { mindmapFixture } from "@sketchi/diagram-core";
 import {
@@ -32,7 +33,8 @@ const EXAMPLES: Record<string, CuratedExample> = {
 	"public-mindmap": {
 		title: "Public mindmap generation",
 		blurb: "Generated from a semantic nested topic hierarchy — pan and zoom to inspect it.",
-		scene: renderMindmapDiagram(mindmapFixture),
+		// This curated fixture is maintained in source; a render failure is a fixture defect.
+		scene: renderMindmapDiagram(mindmapFixture).pipe(Result.getOrThrow),
 	},
 	"how-it-works": {
 		title: "How Sketchi works",
@@ -69,7 +71,12 @@ function useCuratedScene(example: CuratedExample | undefined): RenderedDiagramSc
 		try {
 			return (
 				example.scene ??
-				(example.spec ? renderIntermediateDiagram(flowchartDiagramFromSpec(example.spec)) : null)
+				(example.spec
+					? Result.getOrElse(
+							renderIntermediateDiagram(flowchartDiagramFromSpec(example.spec)),
+							() => null,
+						)
+					: null)
 			);
 		} catch {
 			return null;

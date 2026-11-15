@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { FlowchartNodeKind } from "@sketchi/diagram-core";
@@ -26,7 +28,7 @@ function flow(scenarioId: string, nodes: readonly NodeSpec[], edges: readonly Ed
 			...(label ? { label } : {}),
 		})),
 	};
-	return evaluateScenarioDiagram(scenario, diagram);
+	return evaluateScenarioDiagram(scenario, diagram).pipe(Result.getOrThrow);
 }
 
 function failed(result: ReturnType<typeof flow>): string[] {
@@ -48,7 +50,7 @@ describe("action paraphrases with objects in for-clauses", () => {
 			nodes: scenario.expectedDiagram.nodes.map((node) =>
 				node.id === nodeId ? { ...node, label } : node,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.checks.filter((check) => !check.passed)).toEqual([]);
 	});
 });
@@ -636,7 +638,7 @@ describe("real losses still fail", () => {
 			edges: scenario.expectedDiagram.edges.map((edge) =>
 				edge.id === edgeId ? { ...edge, label } : edge,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(failed(result)).toContain(check);
 	});
 
@@ -877,7 +879,7 @@ describe("decisions asked by their opposite condition", () => {
 					? { ...edge, label: swapped[edge.label] }
 					: edge,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 	}
 
 	const INVERTED = [

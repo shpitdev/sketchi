@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	candidateRouteQuality,
@@ -136,7 +138,7 @@ function randomSchemas(count: number, start: number): ErDiagram[] {
 			type: "er",
 			entities,
 			relationships,
-		});
+		}).pipe(Result.getOrThrow);
 	});
 }
 
@@ -315,7 +317,7 @@ function runsBesideTables(scene: RenderedDiagramScene): string[] {
 
 /** Everything the export validator, the canvas validator or the layout guards would flag. */
 function defects(diagram: ErDiagram): string[] {
-	const scene = renderDiagram(diagram);
+	const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 	const exported = convertSceneToExcalidraw(scene);
 	const tables = scene.elements.flatMap((element) =>
 		element.type === "node" && element.rendererRole === "er-table" && element.kind === "entity"
@@ -399,7 +401,7 @@ describe("ER routing fuzz", () => {
 	it("draws no random schema with more crossings or reader-scale findings than pinned", () => {
 		const counts = schemas
 			.slice(0, CI_SCHEMAS)
-			.map((schema) => routingCounts(renderDiagram(schema)));
+			.map((schema) => routingCounts(renderDiagram(schema).pipe(Result.getOrThrow)));
 		if (process.env["PRINT_ROUTING"])
 			console.log("PIN er", counts.map((c) => `${c.crossings}/${c.findings}`).join(" "));
 		const pinned = ER_ROUTING.split(" ").map((pair) => pair.split("/").map(Number));
@@ -418,7 +420,10 @@ describe("ER routing fuzz", () => {
 	});
 
 	it("bunches no more ends than pinned, each crowded row grown for its ends", () => {
-		const bunched = schemas.reduce((sum, schema) => sum + bunchedEnds(renderDiagram(schema)), 0);
+		const bunched = schemas.reduce(
+			(sum, schema) => sum + bunchedEnds(renderDiagram(schema).pipe(Result.getOrThrow)),
+			0,
+		);
 		if (process.env["PRINT_ROUTING"]) console.log("PIN er bunched", bunched);
 		expect(bunched).toBeLessThanOrEqual(FULL ? ER_BUNCHED.full : ER_BUNCHED.ci);
 	});

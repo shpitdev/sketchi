@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
@@ -30,7 +32,9 @@ function scenarioDiagram(id: string) {
 }
 
 function map(title: string, root: MindmapTopicTree) {
-	return mindmapDiagramFromTree({ id: title.toLowerCase().replaceAll(" ", "-"), title, root });
+	return mindmapDiagramFromTree({ id: title.toLowerCase().replaceAll(" ", "-"), title, root }).pipe(
+		Result.getOrThrow,
+	);
 }
 
 /** Two branches staggered around the central topic. */

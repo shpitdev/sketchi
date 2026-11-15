@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	type AxisAlignedSegment,
@@ -157,7 +159,7 @@ function randomModels(count: number, start: number): ClassDiagram[] {
 				classes,
 				relationships,
 			}),
-		);
+		).pipe(Result.getOrThrow);
 	});
 }
 
@@ -210,7 +212,7 @@ const END_LABEL_REACH = 110;
 
 /** Everything the export validator, the canvas validator or the layout guards would flag. */
 function defects(diagram: ClassDiagram): string[] {
-	const scene = renderDiagram(diagram);
+	const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 	const exported = convertSceneToExcalidraw(scene);
 	const boxes = scene.elements.flatMap((element) =>
 		element.type === "node" && element.kind === "class" ? [element] : [],
@@ -433,7 +435,9 @@ describe("class diagram routing fuzz", () => {
 	});
 
 	it("draws no random model with more crossings or reader-scale findings than pinned", () => {
-		const counts = models.slice(0, CI_MODELS).map((model) => routingCounts(renderDiagram(model)));
+		const counts = models
+			.slice(0, CI_MODELS)
+			.map((model) => routingCounts(renderDiagram(model).pipe(Result.getOrThrow)));
 		if (process.env["PRINT_ROUTING"])
 			console.log("PIN class", counts.map((c) => `${c.crossings}/${c.findings}`).join(" "));
 		const pinned = CLASS_ROUTING.split(" ").map((pair) => pair.split("/").map(Number));
@@ -487,8 +491,8 @@ describe("class diagram text fit fuzz", () => {
 						{ id: "r", kind: "association", from: node.id, to: "Other", toMultiplicity: "0..*" },
 					],
 				}),
-			);
-			const scene = renderDiagram(diagram);
+			).pipe(Result.getOrThrow);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			const exported = convertSceneToExcalidraw(scene);
 			const outline = scene.elements.find((element) => element.id === `node:${node.id}`);
 			if (outline?.type !== "node") throw new Error("missing outline");

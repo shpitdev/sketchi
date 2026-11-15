@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -12,9 +14,12 @@ const samples = JSON.parse(
 	readFileSync(new URL("./fixtures/payment-terminals.json", import.meta.url), "utf8"),
 ) as { runId: string; spec: Record<string, unknown> }[];
 const scenario = getFlowchartScenario("invoice-approval");
-const diagram = parseFlowchartDiagram(specToFlowchartCandidate(samples[0]!.spec));
+const diagram = parseFlowchartDiagram(
+	specToFlowchartCandidate(samples[0]!.spec).pipe(Result.getOrThrow),
+).pipe(Result.getOrThrow);
 const failures = (candidate = diagram, expected = scenario) =>
 	evaluateScenarioDiagram(expected, candidate)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const directorPayment = "edge:Director approval->Schedule payment";
@@ -26,7 +31,13 @@ const labelPayment = (label: string) => ({
 
 describe("explicit equivalent named payment outcomes", () => {
 	it.each(samples)("accepts the real separate payment terminal $runId", ({ spec }) => {
-		expect(failures(parseFlowchartDiagram(specToFlowchartCandidate(spec)))).toEqual([]);
+		expect(
+			failures(
+				parseFlowchartDiagram(specToFlowchartCandidate(spec).pipe(Result.getOrThrow)).pipe(
+					Result.getOrThrow,
+				),
+			),
+		).toEqual([]);
 	});
 
 	it.each(["Pay invoice", "Invoice paid", "Payment", "Make payment"])("accepts %s", (label) => {
@@ -53,13 +64,17 @@ describe("explicit equivalent named payment outcomes", () => {
 	);
 
 	it("rejects director approval going nowhere", () => {
-		expect(() =>
-			failures({
+		expect(
+			evaluateScenarioDiagram(scenario, {
 				...diagram,
 				nodes: diagram.nodes.filter((node) => node.id !== "pay"),
 				edges: diagram.edges.filter((edge) => edge.source !== "dir"),
 			}),
-		).toThrow('Node "dir" must have at least one outgoing edge.');
+		).toMatchObject({
+			failure: {
+				message: expect.stringContaining('Node "dir" must have at least one outgoing edge.'),
+			},
+		});
 		const candidate = {
 			...diagram,
 			edges: diagram.edges.filter((edge) => edge.source !== "dir"),

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
@@ -25,7 +27,7 @@ function issueCodes(diagram: SequenceDiagram) {
 describe("Sequence diagram type", () => {
 	it("keeps participant and chronological message order in the typed fixture", () => {
 		expect(sequenceFixture.type).toBe(sequenceDiagramType);
-		expect(parseCanonicalDiagram(sequenceFixture)).toEqual(sequenceFixture);
+		expect(parseCanonicalDiagram(sequenceFixture).pipe(Result.getOrThrow)).toEqual(sequenceFixture);
 		expect(sequenceFixture.participants.map((participant) => participant.id)).toEqual([
 			"customer",
 			"store",
@@ -48,7 +50,7 @@ describe("Sequence diagram type", () => {
 			title: "Lonely participant",
 			type: "sequence",
 			participants: [{ id: "only", label: "Only" }],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(diagram.messages).toEqual([]);
 		expect(diagram.style).toEqual(SKETCHI_DIAGRAM_STYLE);
 	});
@@ -87,7 +89,7 @@ describe("Sequence diagram type", () => {
 				{ id: "checked", source: "idp", target: "idp", label: "Valid", type: "return" },
 				{ id: "code", source: "idp", target: "browser", label: "Code", type: "return" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(issueCodes(diagram)).toEqual([]);
 		// The self-return answers neither the self-call nor the browser's call,
 		// and the browser's call stays open until the IdP answers it.
@@ -109,26 +111,30 @@ describe("Sequence diagram type", () => {
 			messages: [],
 		};
 		expect(issueCodes(input)).toEqual([["lifeline_id_collision", "participants.[1].id"]]);
-		expect(() => parseSequenceDiagram(input)).toThrow(SequenceValidationError);
+		expect(parseSequenceDiagram(input)).toMatchObject({
+			failure: expect.any(SequenceValidationError),
+		});
 	});
 
 	it("is not a node/edge graph: the graph IR refuses the sequence type", () => {
-		expect(() =>
+		expect(
 			parseIntermediateDiagram({
 				id: "sequence-as-graph",
 				title: "Sequence as graph",
 				type: "sequence",
 				nodes: [{ id: "a", label: "A" }],
 			}),
-		).toThrow(/Expected "flowchart" \| "mindmap"/u);
-		expect(() =>
+		).toMatchObject({
+			failure: { message: expect.stringMatching(/Expected "flowchart" \| "mindmap"/u) },
+		});
+		expect(
 			parseSequenceDiagram({
 				id: "graph-as-sequence",
 				title: "Graph as sequence",
 				type: "sequence",
 				nodes: [{ id: "a", label: "A" }],
 			}),
-		).toThrow(/participants/u);
+		).toMatchObject({ failure: { message: expect.stringMatching(/participants/u) } });
 	});
 
 	it("derives activations from answered calls and nests re-entrant ones", () => {
@@ -169,7 +175,7 @@ describe("Sequence diagram type", () => {
 				{ id: "stray", source: "auth", target: "client", label: "Stray", type: "return" },
 				{ id: "session", source: "api", target: "client", label: "Session", type: "return" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(
 			sequenceActivations(reentrant).map(
 				({ participantId, callMessageId, returnMessageId, depth }) => [
@@ -202,7 +208,7 @@ describe("Sequence diagram type", () => {
 				{ id: "p1", source: "b", target: "a", label: "Reply 1", type: "return" },
 				{ id: "p2", source: "b", target: "c", label: "Reply 2", type: "return" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(
 			sequenceActivations(interleaved).map(({ callMessageId, returnMessageId, depth }) => [
 				callMessageId,
@@ -233,7 +239,7 @@ describe("Sequence diagram type", () => {
 				{ id: "p2", source: "b", target: "c", label: "Reply 2", type: "return" },
 				{ id: "p3", source: "b", target: "a", label: "Reply 3", type: "return" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(
 			sequenceActivations(diagram).map(({ callMessageId, startIndex, endIndex, depth }) => [
 				callMessageId,
@@ -291,7 +297,7 @@ describe("Sequence diagram type", () => {
 					type: "sequence",
 					participants: ids.map((id) => ({ id, label: id.toUpperCase() })),
 					messages,
-				}),
+				}).pipe(Result.getOrThrow),
 			);
 			for (const left of spans) {
 				for (const right of spans) {
@@ -351,13 +357,15 @@ describe("Sequence diagram type", () => {
 		expect(
 			deployWebhookLogoSequence.participants.map((participant) => participant.icon?.slug),
 		).toEqual([undefined, "github", "cloudflare", "docker"]);
-		expect(parseCanonicalDiagram(deployWebhookLogoSequence)).toEqual(deployWebhookLogoSequence);
-		expect(() =>
+		expect(parseCanonicalDiagram(deployWebhookLogoSequence).pipe(Result.getOrThrow)).toEqual(
+			deployWebhookLogoSequence,
+		);
+		expect(
 			parseSequenceDiagram({
 				...deployWebhookLogoSequence,
 				participants: [{ id: "api", label: "API", icon: { slug: "Not A Slug" } }],
 				messages: [],
 			}),
-		).toThrow(/participants/u);
+		).toMatchObject({ failure: { message: expect.stringMatching(/participants/u) } });
 	});
 });

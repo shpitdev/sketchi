@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { loadFromBlob, MIME_TYPES } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { deployPipelineLogoFlowchart, embedCanvasIcons } from "@sketchi/diagram-core";
@@ -32,10 +34,13 @@ function solidLogo([red, green, blue]: readonly [number, number, number]) {
 
 function logoScene(): ExcalidrawScene {
 	return convertSceneToExcalidraw(
-		embedCanvasIcons(renderIntermediateDiagram(deployPipelineLogoFlowchart), (slug) => {
-			const color = LOGO_COLORS[slug];
-			return color ? { name: slug, svg: solidLogo(color) } : undefined;
-		}).scene,
+		embedCanvasIcons(
+			renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
+			(slug) => {
+				const color = LOGO_COLORS[slug];
+				return color ? { name: slug, svg: solidLogo(color) } : undefined;
+			},
+		).scene,
 	);
 }
 

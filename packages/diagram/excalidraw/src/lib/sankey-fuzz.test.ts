@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
@@ -180,7 +182,7 @@ function randomDiagrams(count: number, start: number): SankeyDiagram[] {
 				source: `n${entry.source}`,
 				target: `n${entry.target}`,
 			})),
-		});
+		}).pipe(Result.getOrThrow);
 	});
 }
 
@@ -222,7 +224,7 @@ describe("Sankey fuzz", () => {
 			let papers = 0;
 			const byShape = new Map<string, number>();
 			for (const diagram of randomDiagrams(COUNT, seed)) {
-				const scene = renderSankeyDiagram(diagram);
+				const scene = renderSankeyDiagram(diagram).pipe(Result.getOrThrow);
 				const exported = convertSceneToExcalidraw(scene);
 				// Crossings weigh the product of the crossing flows' values, as a reader sees them.
 				const valueOf = new Map(

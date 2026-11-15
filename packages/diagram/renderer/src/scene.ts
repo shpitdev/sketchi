@@ -1,4 +1,6 @@
+import { Result, Schema } from "effect";
 import {
+	type DiagramValidationError,
 	CANVAS_NODE_ICON,
 	DIAGRAM_NODE_COLORS,
 	CANVAS_SPEC_VERSION,
@@ -11778,8 +11780,10 @@ export interface GraphRenderOptions {
 
 const graphOptions = new WeakMap<IntermediateDiagram, GraphRenderOptions>();
 
-export function renderIntermediateDiagram(input: unknown): RenderedDiagramScene {
-	return renderGraphDiagram(parseIntermediateDiagram(input));
+export function renderIntermediateDiagram(
+	input: unknown,
+): Result.Result<RenderedDiagramScene, Schema.SchemaError | DiagramValidationError> {
+	return Result.map(parseIntermediateDiagram(input), renderGraphDiagram);
 }
 
 /**

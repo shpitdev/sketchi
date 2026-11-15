@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	type ErCardinality,
 	type ErDiagram,
@@ -433,7 +435,7 @@ function defineErScenario(definition: ErScenarioDefinition): ErScenario {
 					...(label ? { label } : {}),
 				}),
 			),
-		}),
+		}).pipe(Result.getOrThrow),
 	};
 }
 

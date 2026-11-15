@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import {
 	type CanvasSpec,
 	deployPipelineLogoFlowchart,
@@ -107,14 +109,14 @@ function expectRoutesClearOfTheirShapes(scene: EditorScene, context: string) {
 	expect(session.routesThroughShapes(scene), `${context}: routes through their shapes`).toEqual([]);
 }
 
-const exported = (scene: ReturnType<typeof renderDiagram>) =>
+const exported = (scene: Result.Result.Success<ReturnType<typeof renderDiagram>>) =>
 	convertSceneToExcalidraw(scene).elements;
 
 /** Every maintained scenario that draws a bound arrow. */
 const scenarios = diagramScenarios
 	.map((scenario) => ({
 		id: scenario.id,
-		elements: exported(renderDiagram(scenario.expectedDiagram)),
+		elements: exported(renderDiagram(scenario.expectedDiagram).pipe(Result.getOrThrow)),
 	}))
 	.filter(({ elements }) =>
 		elements.some((element) => element.type === "arrow" && element["startBinding"]),
@@ -243,19 +245,24 @@ const canvas: CanvasSpec = {
 const shapeKinds = [
 	{
 		id: "flowchart",
-		elements: exported(renderIntermediateDiagram(flowchartFixture)),
+		elements: exported(renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow)),
 	},
 	{
 		id: "zones with a database and a bucket",
-		elements: exported(renderIntermediateDiagram(zoneStressFixtures["depth-four"])),
+		elements: exported(
+			renderIntermediateDiagram(zoneStressFixtures["depth-four"]).pipe(Result.getOrThrow),
+		),
 	},
 	{
 		id: "logo nodes",
 		elements: exported(
-			embedCanvasIcons(renderIntermediateDiagram(deployPipelineLogoFlowchart), (slug) => ({
-				name: slug,
-				svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>${slug}</title></svg>`,
-			})).scene,
+			embedCanvasIcons(
+				renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
+				(slug) => ({
+					name: slug,
+					svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><title>${slug}</title></svg>`,
+				}),
+			).scene,
 		),
 	},
 	{
@@ -280,8 +287,8 @@ const shapeKinds = [
 						{ id: "api-queue", source: "api", target: "queue" },
 					],
 					layout: { direction: "TB", edgeRouting: "orthogonal" },
-				}),
-			),
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow),
 		),
 	},
 	{ id: "agent canvas", elements: convertSceneToExcalidraw(canvas).elements },

@@ -1,4 +1,5 @@
-import { Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Array, MutableHashMap, Option, Order, Result, Schema } from "effect";
 
 import {
 	DiagramEdge,
@@ -48,70 +49,99 @@ export const MindmapDiagram = Schema.Struct({
 
 export interface MindmapDiagram extends Schema.Schema.Type<typeof MindmapDiagram> {}
 
-export function validateMindmapDiagram(diagram: MindmapDiagram): MindmapDiagram {
-	validateIntermediateDiagram(diagram);
-	const roots = diagram.nodes.filter((node) => node.kind === "root");
-	if (roots.length !== 1) {
-		throw new DiagramValidationError(
-			`Mindmap must contain exactly one root topic; found ${roots.length}.`,
+export function validateMindmapDiagram(
+	diagram: MindmapDiagram,
+): Result.Result<MindmapDiagram, DiagramValidationError> {
+	return Result.gen(function* () {
+		yield* validateIntermediateDiagram(diagram);
+		const roots = Array.filter(diagram.nodes, (node) => node.kind === "root");
+		if (roots.length !== 1) {
+			return yield* Result.fail(
+				DiagramValidationError.make({
+					message: `Mindmap must contain exactly one root topic; found ${roots.length}.`,
+				}),
+			);
+		}
+		const root = Array.head(roots);
+		if (Option.isNone(root) || root.value.metadata.depth !== 0) {
+			return yield* Result.fail(
+				DiagramValidationError.make({ message: "Mindmap root topic must have depth 0." }),
+			);
+		}
+		const incoming = MutableHashMap.empty<string, number>();
+		const nodeById = MutableHashMap.fromIterable(
+			Array.map(diagram.nodes, (node) => [node.id, node] as const),
 		);
-	}
-
-	const root = roots[0];
-	if (!root || root.metadata.depth !== 0) {
-		throw new DiagramValidationError("Mindmap root topic must have depth 0.");
-	}
-
-	const incoming = new Map<string, number>();
-	const nodeById = new Map(diagram.nodes.map((node) => [node.id, node]));
-	const childrenByParent = new Map<string, number[]>();
-	for (const edge of diagram.edges) {
-		incoming.set(edge.target, (incoming.get(edge.target) ?? 0) + 1);
-		const sourceDepth = nodeById.get(edge.source)?.metadata.depth;
-		const target = nodeById.get(edge.target);
-		const targetDepth = target?.metadata.depth;
-		if (sourceDepth === undefined || targetDepth !== sourceDepth + 1) {
-			throw new DiagramValidationError(
-				`Mindmap edge "${edge.id}" must connect a topic to its immediate child.`,
+		const childrenByParent = MutableHashMap.empty<string, number[]>();
+		for (const edge of diagram.edges) {
+			MutableHashMap.set(
+				incoming,
+				edge.target,
+				Option.getOrElse(MutableHashMap.get(incoming, edge.target), () => 0) + 1,
+			);
+			const source = MutableHashMap.get(nodeById, edge.source);
+			const target = MutableHashMap.get(nodeById, edge.target);
+			if (
+				Option.isNone(source) ||
+				Option.isNone(target) ||
+				target.value.metadata.depth !== source.value.metadata.depth + 1
+			) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Mindmap edge "${edge.id}" must connect a topic to its immediate child.`,
+					}),
+				);
+			}
+			if (
+				edge.metadata.depth !== target.value.metadata.depth ||
+				edge.metadata.siblingIndex !== target.value.metadata.siblingIndex
+			) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Mindmap edge "${edge.id}" metadata must match its child topic.`,
+					}),
+				);
+			}
+			MutableHashMap.set(
+				childrenByParent,
+				edge.source,
+				Array.append(
+					Option.getOrElse(MutableHashMap.get(childrenByParent, edge.source), () => []),
+					target.value.metadata.siblingIndex,
+				),
 			);
 		}
-		if (
-			!target ||
-			edge.metadata.depth !== target.metadata.depth ||
-			edge.metadata.siblingIndex !== target.metadata.siblingIndex
-		) {
-			throw new DiagramValidationError(
-				`Mindmap edge "${edge.id}" metadata must match its child topic.`,
-			);
+		for (const node of diagram.nodes) {
+			const count = Option.getOrElse(MutableHashMap.get(incoming, node.id), () => 0);
+			if (node.id === root.value.id ? count !== 0 : count !== 1) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Mindmap topic "${node.id}" must have ${node.id === root.value.id ? "no parent" : "exactly one parent"}.`,
+					}),
+				);
+			}
 		}
-		childrenByParent.set(edge.source, [
-			...(childrenByParent.get(edge.source) ?? []),
-			target.metadata.siblingIndex,
-		]);
-	}
-
-	for (const node of diagram.nodes) {
-		const count = incoming.get(node.id) ?? 0;
-		if (node.id === root.id ? count !== 0 : count !== 1) {
-			throw new DiagramValidationError(
-				`Mindmap topic "${node.id}" must have ${node.id === root.id ? "no parent" : "exactly one parent"}.`,
-			);
+		for (const [parentId, siblingIndexes] of childrenByParent) {
+			const actual = Array.sort(siblingIndexes, Order.Number);
+			if (Array.some(actual, (value, index) => value !== index)) {
+				return yield* Result.fail(
+					DiagramValidationError.make({
+						message: `Mindmap children of "${parentId}" must use contiguous sibling ordering from 0.`,
+					}),
+				);
+			}
 		}
-	}
-	for (const [parentId, siblingIndexes] of childrenByParent) {
-		const expected = siblingIndexes.map((_, index) => index);
-		const actual = [...siblingIndexes].sort((left, right) => left - right);
-		if (actual.some((value, index) => value !== expected[index])) {
-			throw new DiagramValidationError(
-				`Mindmap children of "${parentId}" must use contiguous sibling ordering from 0.`,
-			);
-		}
-	}
-	return diagram;
+		return diagram;
+	});
 }
 
-export function parseMindmapDiagram(input: unknown): MindmapDiagram {
-	return validateMindmapDiagram(Schema.decodeUnknownSync(MindmapDiagram, { errors: "all" })(input));
+export function parseMindmapDiagram(
+	input: unknown,
+): Result.Result<MindmapDiagram, Schema.SchemaError | DiagramValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(MindmapDiagram, { errors: "all" })(input),
+		validateMindmapDiagram,
+	);
 }
 
 /** A topic and its ordered children, as authors nest them. */
@@ -131,24 +161,36 @@ export function mindmapDiagramFromTree(tree: {
 	readonly root: MindmapTopicTree;
 	readonly direction?: "LR" | "RL";
 	readonly style?: { readonly accentColor: string; readonly backgroundColor: string };
-}): MindmapDiagram {
+}): Result.Result<MindmapDiagram, Schema.SchemaError | DiagramValidationError> {
 	const nodes: Record<string, unknown>[] = [];
 	const edges: Record<string, unknown>[] = [];
-	const visit = (topic: MindmapTopicTree, path: readonly number[], parentId?: string) => {
-		const suffix = path.join("-");
+	const visit = (
+		topic: MindmapTopicTree,
+		path: Array.NonEmptyReadonlyArray<number>,
+		parentId: Option.Option<string>,
+	) => {
+		const suffix = Array.join(Array.map(path, String), "-");
 		const depth = path.length - 1;
-		const metadata = { depth, siblingIndex: path.at(-1)! };
+		const metadata = { depth, siblingIndex: Array.lastNonEmpty(path) };
 		nodes.push({
 			id: `topic-${suffix}`,
 			label: topic.label,
 			kind: depth === 0 ? "root" : "topic",
 			metadata,
 		});
-		if (parentId)
-			edges.push({ id: `branch-${suffix}`, source: parentId, target: `topic-${suffix}`, metadata });
-		topic.children?.forEach((child, index) => visit(child, [...path, index], `topic-${suffix}`));
+		if (Option.isSome(parentId))
+			edges.push({
+				id: `branch-${suffix}`,
+				source: parentId.value,
+				target: `topic-${suffix}`,
+				metadata,
+			});
+		Array.forEach(
+			Option.getOrElse(Option.fromNullishOr(topic.children), () => []),
+			(child, index) => visit(child, Array.append(path, index), Option.some(`topic-${suffix}`)),
+		);
 	};
-	visit(tree.root, [0]);
+	visit(tree.root, [0], Option.none());
 	return parseMindmapDiagram({
 		id: tree.id,
 		title: tree.title,
@@ -247,4 +289,4 @@ export const mindmapFixture = parseMindmapDiagram({
 		},
 	],
 	layout: { direction: "LR", edgeRouting: "curved" },
-});
+}).pipe(Result.getOrThrow);

@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import { useMemo } from "react";
 
 import {
@@ -122,30 +123,25 @@ function diagramCounts(diagram: CanonicalDiagram) {
 }
 
 export function GenerationWorkspace({ diagram, status = "ready" }: GenerationWorkspaceProps) {
-	const { validationMessage, scene, realSceneIssueCount, realSceneMessage } = useMemo(() => {
-		let validationMessage = `Validated ${diagram.type} IR`;
-
-		try {
-			validateCanonicalDiagram(diagram);
-		} catch (error) {
-			validationMessage = error instanceof Error ? error.message : "Diagram validation failed";
-		}
-
-		const scene = renderDiagram(diagram);
-		const realSceneValidation = validateExcalidrawScene(convertSceneToExcalidraw(scene));
-		const realSceneIssueCount = realSceneValidation.issues.length;
-		const realSceneMessage =
-			realSceneIssueCount > 0
-				? `${realSceneIssueCount} real-scene issues`
-				: scene.elements.some((element) => element.type === "arrow")
-					? "All arrows are bound"
-					: "No real-scene issues";
-		return {
-			validationMessage,
-			scene,
-			realSceneIssueCount,
-			realSceneMessage,
-		};
+	const rendered = useMemo(() => {
+		return Result.flatMap(validateCanonicalDiagram(diagram), () =>
+			Result.map(renderDiagram(diagram), (scene) => {
+				const realSceneValidation = validateExcalidrawScene(convertSceneToExcalidraw(scene));
+				const realSceneIssueCount = realSceneValidation.issues.length;
+				const realSceneMessage =
+					realSceneIssueCount > 0
+						? `${realSceneIssueCount} real-scene issues`
+						: scene.elements.some((element) => element.type === "arrow")
+							? "All arrows are bound"
+							: "No real-scene issues";
+				return {
+					validationMessage: `Validated ${diagram.type} IR`,
+					scene,
+					realSceneIssueCount,
+					realSceneMessage,
+				};
+			}),
+		);
 	}, [diagram]);
 
 	return (
@@ -158,14 +154,20 @@ export function GenerationWorkspace({ diagram, status = "ready" }: GenerationWor
 				<span className="sketchi-generation-workspace__status">{statusLabels[status]}</span>
 			</header>
 
-			<FlowchartValidationPanel
-				{...diagramCounts(diagram)}
-				intermediateMessage={validationMessage}
-				realSceneIssueCount={realSceneIssueCount}
-				realSceneMessage={realSceneMessage}
-			/>
-
-			<DiagramPreview scene={scene} />
+			{Result.match(rendered, {
+				onFailure: (error) => <p role="alert">{error.message}</p>,
+				onSuccess: ({ validationMessage, scene, realSceneIssueCount, realSceneMessage }) => (
+					<>
+						<FlowchartValidationPanel
+							{...diagramCounts(diagram)}
+							intermediateMessage={validationMessage}
+							realSceneIssueCount={realSceneIssueCount}
+							realSceneMessage={realSceneMessage}
+						/>
+						<DiagramPreview scene={scene} />
+					</>
+				),
+			})}
 		</section>
 	);
 }

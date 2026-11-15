@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option } from "effect";
 import { describe, expect, it } from "vitest";
 import type { ChartDiagram } from "@sketchi/diagram-core";
 import { renderDiagram } from "@sketchi/diagram-renderer";
@@ -13,6 +15,7 @@ import { candidateFromMcpResult } from "./mcp-results.js";
 
 const failing = (scenario: (typeof chartScenarios)[number], diagram: ChartDiagram) =>
 	evaluateScenarioDiagram(scenario, diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 
@@ -58,7 +61,9 @@ describe("prompt-grounded chart scenarios", () => {
 
 	for (const scenario of chartScenarios) {
 		it(`${scenario.id}: accepts the fixture, drawn to scale`, () => {
-			const evaluation = evaluateScenarioDiagram(scenario, scenario.expectedDiagram);
+			const evaluation = evaluateScenarioDiagram(scenario, scenario.expectedDiagram).pipe(
+				Result.getOrThrow,
+			);
 			expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 			expect(evaluation.checks.some((check) => check.id === "chart-geometry")).toBe(true);
 		});
@@ -134,7 +139,7 @@ describe("prompt-grounded chart scenarios", () => {
 
 	it("measures drawn proportions from the scene", () => {
 		const scenario = chartScenarios.find((entry) => entry.id === "net-income-bar-chart")!;
-		const scene = renderDiagram(scenario.expectedDiagram);
+		const scene = renderDiagram(scenario.expectedDiagram).pipe(Result.getOrThrow);
 		expect(chartGeometryCheck(scenario.expectedDiagram, scene).passed).toBe(true);
 		const distorted = {
 			...scene,
@@ -149,7 +154,7 @@ describe("prompt-grounded chart scenarios", () => {
 
 	it("checks that pie labels state each share and never repeat for different values", () => {
 		const scenario = chartScenarios.find((entry) => entry.id === "cloud-spend-pie-chart")!;
-		const scene = renderDiagram(scenario.expectedDiagram);
+		const scene = renderDiagram(scenario.expectedDiagram).pipe(Result.getOrThrow);
 		const labels = scenario.expectedDiagram.categories.map((_, index) => {
 			const element = scene.elements.find((entry) => entry.id === `chart:slice-label:${index}`);
 			return element?.type === "text" ? element.text.split("\n").at(-1) : undefined;
@@ -183,7 +188,7 @@ describe("prompt-grounded chart scenarios", () => {
 		const scenario = chartScenarios.find(
 			(entry) => entry.id === "support-tickets-stacked-bar-chart",
 		)!;
-		const scene = renderDiagram(scenario.expectedDiagram);
+		const scene = renderDiagram(scenario.expectedDiagram).pipe(Result.getOrThrow);
 		expect(chartDrawnDataCheck(scenario, scenario.expectedDiagram, scene).passed).toBe(true);
 		// Wed's Phone value (9) dropped from the drawing, as the first renderer did.
 		const dropped = {
@@ -204,7 +209,7 @@ describe("prompt-grounded chart scenarios", () => {
 
 	it("checks that no gridline, baseline or axis crosses text", () => {
 		const scenario = chartScenarios.find((entry) => entry.id === "quarterly-revenue-bar-chart")!;
-		const scene = renderDiagram(scenario.expectedDiagram);
+		const scene = renderDiagram(scenario.expectedDiagram).pipe(Result.getOrThrow);
 		expect(chartClearRulesCheck(scene).passed).toBe(true);
 		const label = scene.elements.find((element) => element.id === "chart:value:1:1")!;
 		if (label.type !== "text") throw new Error("Expected a value label.");
@@ -241,17 +246,19 @@ describe("prompt-grounded chart scenarios", () => {
 		const candidate = candidateFromMcpResult(
 			{ ok: true, result: { buildId: "build_1" }, builds: [receipt] },
 			"chart",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected an accepted chart candidate.");
-		expect(evaluateScenarioDiagram(scenario, candidate.diagram).ok).toBe(true);
+		expect(evaluateScenarioDiagram(scenario, candidate.diagram).pipe(Result.getOrThrow).ok).toBe(
+			true,
+		);
 		const canvas = candidateFromMcpResult(
 			{
 				ok: true,
 				builds: [{ ...receipt, operation: "createCanvas", normalizedSpec: { kind: "canvas" } }],
 			},
 			"chart",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(canvas?.ok).toBe(false);
 	});
 });

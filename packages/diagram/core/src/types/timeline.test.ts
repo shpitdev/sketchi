@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	orderedTimelineEvents,
@@ -19,7 +21,7 @@ const input = {
 };
 describe("canonical timeline", () => {
 	it("orders chronologically, retains equal-date input order and preserves authored content", () => {
-		const diagram = parseTimelineDiagram(input);
+		const diagram = parseTimelineDiagram(input).pipe(Result.getOrThrow);
 		expect(orderedTimelineEvents(diagram).map((event) => event.id)).toEqual([
 			"plan",
 			"ship",
@@ -34,7 +36,7 @@ describe("canonical timeline", () => {
 				{ id: "later", label: "Later", order: 2 },
 				{ id: "first", label: "First", order: 1 },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(orderedTimelineEvents(diagram).map((event) => event.label)).toEqual(["First", "Later"]);
 		expect(diagram.events.every((event) => event.date === undefined)).toBe(true);
 	});
@@ -52,9 +54,9 @@ describe("canonical timeline", () => {
 		"26",
 		"2026-10-17T09Z",
 	])("rejects invalid or ambiguous date %s", (date) => {
-		expect(() =>
+		expect(
 			parseTimelineDiagram({ ...input, events: [{ id: "a", label: "A", date }] }),
-		).toThrow(Error);
+		).toMatchObject({ failure: expect.any(Error) });
 	});
 	it("accepts leap days and UTC incident timestamps", () => {
 		expect(
@@ -64,7 +66,7 @@ describe("canonical timeline", () => {
 					{ id: "a", label: "A", date: "2024-02-29" },
 					{ id: "b", label: "B", date: "2024-02-29T09:05:00Z" },
 				],
-			}).events,
+			}).pipe(Result.getOrThrow).events,
 		).toHaveLength(2);
 	});
 	it.each(
@@ -82,7 +84,9 @@ describe("canonical timeline", () => {
 			],
 		].map((events) => ({ events })),
 	)("rejects empty, duplicate, absent or mixed chronology", ({ events }) => {
-		expect(() => parseTimelineDiagram({ ...input, events })).toThrow(Error);
+		expect(parseTimelineDiagram({ ...input, events })).toMatchObject({
+			failure: expect.any(Error),
+		});
 	});
 
 	it.each([
@@ -117,7 +121,7 @@ describe("canonical timeline", () => {
 				{ id: "seed", label: "Seed", date: "2020-03" },
 				{ id: "late", label: "Late", date: "2021-06-14T01:00:00+02:00" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(orderedTimelineEvents(diagram).map((event) => event.id)).toEqual([
 			"founded",
 			"seed",
@@ -131,20 +135,28 @@ describe("canonical timeline", () => {
 			{ id: "ship", label: "Ship", date: "2026-06-01", kind: "milestone", lane: "Eng" },
 			{ id: "blog", label: "Blog", date: "2026-06-01", lane: "Marketing" },
 		];
-		const diagram = parseTimelineDiagram({ ...input, events, today: "2026-03-10" });
+		const diagram = parseTimelineDiagram({ ...input, events, today: "2026-03-10" }).pipe(
+			Result.getOrThrow,
+		);
 		expect(diagram.events).toEqual(events);
 		expect(diagram.today).toBe("2026-03-10");
 		expect(timelineLanes(diagram)).toEqual(["Eng", "Marketing"]);
 		expect(
-			timelineLanes(parseTimelineDiagram({ ...input, events, lanes: ["Marketing", "Eng"] })),
+			timelineLanes(
+				parseTimelineDiagram({ ...input, events, lanes: ["Marketing", "Eng"] }).pipe(
+					Result.getOrThrow,
+				),
+			),
 		).toEqual(["Marketing", "Eng"]);
 		// A one-month phase: start and inclusive end name the same month.
-		expect(() =>
-			parseTimelineDiagram({
-				...input,
-				events: [{ id: "m", label: "M", date: "2026-09", end: "2026-09" }],
-			}),
-		).not.toThrow();
+		expect(
+			Result.isSuccess(
+				parseTimelineDiagram({
+					...input,
+					events: [{ id: "m", label: "M", date: "2026-09", end: "2026-09" }],
+				}),
+			),
+		).toBe(true);
 	});
 	it.each([
 		{
@@ -215,16 +227,10 @@ describe("canonical timeline", () => {
 			spec: { today: "now", events: [{ id: "a", label: "A", date: "2026-04-01" }] },
 		},
 	])("rejects $name with $code and a repair hint", ({ code, spec }) => {
-		const error = (() => {
-			try {
-				parseTimelineDiagram({ ...input, ...spec });
-			} catch (caught) {
-				return caught;
-			}
-			return undefined;
-		})();
+		const error = parseTimelineDiagram({ ...input, ...spec }).pipe(Result.flip, Result.getOrThrow);
 		expect(error).toBeInstanceOf(TimelineValidationError);
-		const { issues } = error as TimelineValidationError;
+		if (error._tag !== "TimelineValidationError") return expect.fail(error.message);
+		const { issues } = error;
 		expect(issues.map((issue) => issue.code)).toContain(code);
 		expect(issues.every((issue) => issue.hint.length > 0)).toBe(true);
 	});

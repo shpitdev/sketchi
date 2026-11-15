@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	parseFlowchartDiagram,
@@ -21,12 +23,16 @@ describe.each(
 	Object.entries({ ...routingFixtures, flowchartFixture, pharmaBatchDispositionFlowchart }),
 )("routing export: %s", (_name, fixture) => {
 	it("preserves binding, text fit, and non-overlapping segments", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(fixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(fixture).pipe(Result.getOrThrow),
+		);
 		expect(validateExcalidrawScene(scene).issues).toEqual([]);
 	});
 
 	it("exports no endpoint jogs, near-coincident corridors or touching arrowheads", () => {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(fixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(fixture).pipe(Result.getOrThrow),
+		);
 		const file = createExcalidrawFile(scene);
 		expect(
 			exportedRoutingQualityFindings({ ...scene, elements: file.elements }).map(
@@ -64,8 +70,8 @@ describe.each(["TB", "BT", "LR", "RL"] as const)(
 							...(label ? { label } : {}),
 						})),
 						layout: { ...flowchartFixture.layout, direction, edgeRouting: "orthogonal" },
-					}),
-				),
+					}).pipe(Result.getOrThrow),
+				).pipe(Result.getOrThrow),
 			);
 			expect(validateExcalidrawScene(scene).issues).toEqual([]);
 		});
@@ -101,8 +107,8 @@ describe.each(["TB", "BT"] as const)("wide decision export: %s", (direction) => 
 						]),
 					],
 					layout: { direction, edgeRouting: "orthogonal" },
-				}),
-			),
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow),
 		);
 		expect(validateExcalidrawScene(scene).issues).toEqual([]);
 	});
@@ -117,7 +123,9 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("polished fan-in export: %s", (
 	] as const)("exports %s without reader-scale routing defects", (name) => {
 		const fixture = routingFixtures[name];
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }).pipe(
+				Result.getOrThrow,
+			),
 		);
 		expect(validateExcalidrawScene(scene).issues).toEqual([]);
 		expect(exportedRoutingQualityFindings(scene).map((finding) => finding.message)).toEqual([]);
@@ -137,7 +145,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct export: %s", (d
 						.filter((e) => !minimal || (e.id !== "entry" && e.id !== "release"))
 						.map(({ label: _label, ...edge }) => edge),
 					layout: { direction, edgeRouting },
-				});
+				}).pipe(Result.getOrThrow);
 				const scene = convertSceneToExcalidraw(rendered),
 					file = createExcalidrawFile(scene),
 					arrows = file.elements.filter((e) => e.type === "arrow");
@@ -190,7 +198,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct export: %s", (d
 							)
 							.map((e) => (e.id === "ca" ? { ...e, label: "Revisit earlier stage now" } : e)),
 						layout: { direction, edgeRouting },
-					}),
+					}).pipe(Result.getOrThrow),
 				);
 				const file = createExcalidrawFile(scene),
 					arrow = file.elements.find((e) => e.id === "edge:ca")!,
@@ -233,7 +241,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("direct return export: %s", (di
 							e.id === "e5" && labeled ? { ...e, label: "Retry" } : e,
 						),
 						layout: { direction, edgeRouting },
-					}),
+					}).pipe(Result.getOrThrow),
 				);
 				const file = createExcalidrawFile(scene);
 				const arrows = file.elements.filter((e) => e.type === "arrow");
@@ -271,7 +279,9 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("complete feedback export: %s",
 						}
 					: workflow;
 				const scene = convertSceneToExcalidraw(
-					renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } }),
+					renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } }).pipe(
+						Result.getOrThrow,
+					),
 				);
 				const file = createExcalidrawFile(scene);
 				const nodes = file.elements.filter((e) => e.id.startsWith("node:"));
@@ -302,7 +312,9 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("complete feedback export: %s",
 	it("exports all four mixed-label returns without collapsing departures", () => {
 		const fixture = routingFixtures["multi-stage-rework"];
 		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }).pipe(
+				Result.getOrThrow,
+			),
 		);
 		const file = createExcalidrawFile(scene);
 		expect(file.elements.filter((e) => e.id.startsWith("node:"))).toHaveLength(7);
@@ -329,7 +341,7 @@ it.each(["TB", "BT", "LR", "RL"] as const)(
 			renderIntermediateDiagram({
 				...fixture,
 				layout: { ...fixture.layout, direction },
-			}),
+			}).pipe(Result.getOrThrow),
 		);
 		const file = createExcalidrawFile(scene);
 		expect(validateExcalidrawScene({ ...scene, elements: file.elements }).issues).toEqual([]);
@@ -344,7 +356,7 @@ it.each(["straight", "curved"] as const)(
 			renderIntermediateDiagram({
 				...fixture,
 				layout: { direction: "TB", edgeRouting },
-			}),
+			}).pipe(Result.getOrThrow),
 		);
 		const file = createExcalidrawFile(scene);
 		const arrow = file.elements.find((e) => e.id === "edge:feedback")!;
@@ -398,9 +410,11 @@ it.each(["LR", "RL"] as const)("exports labeled skip edges in %s", (direction) =
 			label: `Path ${i}`,
 		})),
 		layout: { direction, edgeRouting: "orthogonal" },
-	});
+	}).pipe(Result.getOrThrow);
 	expect(
-		validateExcalidrawScene(convertSceneToExcalidraw(renderIntermediateDiagram(spec))).issues,
+		validateExcalidrawScene(
+			convertSceneToExcalidraw(renderIntermediateDiagram(spec).pipe(Result.getOrThrow)),
+		).issues,
 	).toEqual([]);
 });
 
@@ -417,8 +431,8 @@ it("keeps process fan-out labels and departure stubs disjoint", () => {
 			label: ["First", "Second"][i],
 		})),
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
-	});
-	const rendered = renderIntermediateDiagram(spec);
+	}).pipe(Result.getOrThrow);
+	const rendered = renderIntermediateDiagram(spec).pipe(Result.getOrThrow);
 	const exported = convertSceneToExcalidraw(rendered);
 	const labels = exported.elements
 		.filter((e) => e.type === "text" && e.containerId === null)
@@ -450,7 +464,9 @@ it("keeps process fan-out labels and departure stubs disjoint", () => {
 });
 
 it("exports exactly one positioned label after clearing groups", () => {
-	const scene = renderIntermediateDiagram(routingFixtures["pharma-batch-disposition"]);
+	const scene = renderIntermediateDiagram(routingFixtures["pharma-batch-disposition"]).pipe(
+		Result.getOrThrow,
+	);
 	const exported = convertSceneToExcalidraw({
 		...scene,
 		elements: scene.elements.map((e) => ({ ...e, groupIds: [] })),
@@ -460,7 +476,9 @@ it("exports exactly one positioned label after clearing groups", () => {
 
 describe.each(["departure", "arrival"] as const)("shared bound %s stems", (endpoint) => {
 	function validation(offset: number) {
-		const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+		const scene = convertSceneToExcalidraw(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+		);
 		const first = [
 			{ x: 0, y: 0 },
 			{ x: 0, y: 100 },
@@ -496,7 +514,9 @@ describe.each(["departure", "arrival"] as const)("shared bound %s stems", (endpo
 });
 
 it("allows straight merges with unbound starts and the same directed arrival", () => {
-	const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+	const scene = convertSceneToExcalidraw(
+		renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+	);
 	scene.elements = [0, 20].map((y, i) => ({
 		id: `merge-${i}`,
 		type: "arrow",

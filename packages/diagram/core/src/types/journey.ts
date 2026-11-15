@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const journeyDiagramType = "journey" as const;
 
@@ -304,21 +305,40 @@ export function getJourneyValidationIssues(diagram: JourneyDiagram): JourneyVali
 	return issues.slice(0, JOURNEY_MAX_ISSUES);
 }
 
-export class JourneyValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly JourneyValidationIssue[]) {
-		super(issues[0]?.message ?? "Journey map failed semantic validation.");
-		this.name = "JourneyValidationError";
+export class JourneyValidationError extends Schema.TaggedError<
+	JourneyValidationError,
+	{ readonly brand: unique symbol }
+>()("JourneyValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(JourneyValidationIssue),
+}) {
+	static fromIssues(issues: readonly JourneyValidationIssue[]): JourneyValidationError {
+		return JourneyValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Journey map failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateJourneyDiagram(diagram: JourneyDiagram): JourneyDiagram {
+export function validateJourneyDiagram(
+	diagram: JourneyDiagram,
+): Result.Result<JourneyDiagram, JourneyValidationError> {
 	const issues = getJourneyValidationIssues(diagram);
-	if (issues.length > 0) throw new JourneyValidationError(issues);
-	return diagram;
+	return issues.length > 0
+		? Result.fail(JourneyValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseJourneyDiagram(input: unknown): JourneyDiagram {
-	return validateJourneyDiagram(Schema.decodeUnknownSync(JourneyDiagram, { errors: "all" })(input));
+export function parseJourneyDiagram(
+	input: unknown,
+): Result.Result<JourneyDiagram, Schema.SchemaError | JourneyValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(JourneyDiagram, { errors: "all" })(input),
+		validateJourneyDiagram,
+	);
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -540,4 +560,4 @@ export const journeyFixture = parseJourneyDiagram({
 			opportunities: ["Send live tracking updates"],
 		},
 	],
-});
+}).pipe(Result.getOrThrow);

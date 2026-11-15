@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const quadrantDiagramType = "quadrant" as const;
 
@@ -74,17 +75,22 @@ export const QuadrantDiagram = Schema.Struct({
 
 export interface QuadrantDiagram extends Schema.Schema.Type<typeof QuadrantDiagram> {}
 
-export type QuadrantValidationIssueCode =
-	| "quadrant_too_large"
-	| "invalid_quadrant_point"
-	| "invalid_quadrant_text";
+export const QuadrantValidationIssueCodeSchema = Schema.Literals([
+	"quadrant_too_large",
+	"invalid_quadrant_point",
+	"invalid_quadrant_text",
+]);
+export type QuadrantValidationIssueCode = typeof QuadrantValidationIssueCodeSchema.Type;
 
-export interface QuadrantValidationIssue {
-	readonly code: QuadrantValidationIssueCode;
-	readonly path: string;
-	readonly message: string;
-	readonly hint: string;
-}
+export const QuadrantValidationIssue = Schema.Struct({
+	code: QuadrantValidationIssueCodeSchema,
+	path: Schema.String,
+	message: Schema.String,
+	hint: Schema.String,
+});
+export interface QuadrantValidationIssue extends Schema.Schema.Type<
+	typeof QuadrantValidationIssue
+> {}
 
 const sameText = (text: string) => text.trim().replace(/\s+/gu, " ").toLowerCase();
 
@@ -168,22 +174,39 @@ export function getQuadrantValidationIssues(diagram: QuadrantDiagram): QuadrantV
 	return issues.slice(0, QUADRANT_MAX_ISSUES);
 }
 
-export class QuadrantValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly QuadrantValidationIssue[]) {
-		super(issues[0]?.message ?? "Quadrant chart failed validation.");
-		this.name = "QuadrantValidationError";
+export class QuadrantValidationError extends Schema.TaggedError<
+	QuadrantValidationError,
+	{ readonly brand: unique symbol }
+>()("QuadrantValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(QuadrantValidationIssue),
+}) {
+	static fromIssues(issues: readonly QuadrantValidationIssue[]): QuadrantValidationError {
+		return QuadrantValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Quadrant chart failed validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateQuadrantDiagram(diagram: QuadrantDiagram): QuadrantDiagram {
+export function validateQuadrantDiagram(
+	diagram: QuadrantDiagram,
+): Result.Result<QuadrantDiagram, QuadrantValidationError> {
 	const issues = getQuadrantValidationIssues(diagram);
-	if (issues.length) throw new QuadrantValidationError(issues);
-	return diagram;
+	return issues.length > 0
+		? Result.fail(QuadrantValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseQuadrantDiagram(input: unknown): QuadrantDiagram {
-	return validateQuadrantDiagram(
-		Schema.decodeUnknownSync(QuadrantDiagram, { errors: "all" })(input),
+export function parseQuadrantDiagram(
+	input: unknown,
+): Result.Result<QuadrantDiagram, Schema.SchemaError | QuadrantValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(QuadrantDiagram, { errors: "all" })(input),
+		validateQuadrantDiagram,
 	);
 }
 
@@ -206,4 +229,4 @@ export const quadrantFixture = parseQuadrantDiagram({
 		{ label: "Rewrite billing", x: 0.9, y: 0.3 },
 		{ label: "Onboarding tour", x: 0.45, y: 0.6 },
 	],
-});
+}).pipe(Result.getOrThrow);

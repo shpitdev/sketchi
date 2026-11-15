@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -68,15 +70,15 @@ const all = [classFixture, ...Object.values(classStressFixtures)];
 describe("class diagram renderer", () => {
 	it("renders every fixture into a valid deterministic scene", () => {
 		for (const diagram of all) {
-			const scene = renderDiagram(diagram);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			expect(scene.diagramId).toBe(diagram.id);
 			expect(getCanvasValidationIssues(scene), diagram.id).toEqual([]);
-			expect(renderDiagram(diagram)).toEqual(scene);
+			expect(renderDiagram(diagram).pipe(Result.getOrThrow)).toEqual(scene);
 		}
 	});
 
 	it("draws each class as a group: an outline, a name band with its keyword, and its compartments", () => {
-		const scene = renderDiagram(classFixture);
+		const scene = renderDiagram(classFixture).pipe(Result.getOrThrow);
 		const shape = box(scene, "Shape");
 		expect(shape).toMatchObject({
 			rendererRole: "class-box",
@@ -128,8 +130,8 @@ describe("class diagram renderer", () => {
 				{ id: "navigate", kind: "association", from: "E", to: "G", navigable: true },
 				{ id: "depend", kind: "dependency", from: "F", to: "G" },
 			],
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const heads = Object.fromEntries(
 			arrows(scene).map((line) => [
 				line.edgeId,
@@ -166,8 +168,8 @@ describe("class diagram renderer", () => {
 			relationships: [
 				{ id: "A", kind: "association", from: "A", to: "B", label: "owns", toMultiplicity: "1" },
 			],
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const ids = scene.elements.map((element) => element.id);
 		expect(new Set(ids).size).toBe(ids.length);
@@ -186,8 +188,8 @@ describe("class diagram renderer", () => {
 				from: id,
 				to: "Base",
 			})),
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const base = box(scene, "Base");
 		const ports = arrows(scene)
 			.map((line) => line.points.at(-1)!)
@@ -210,15 +212,15 @@ describe("class diagram renderer", () => {
 			relationships: [
 				{ id: "holds", kind: "aggregation", from: "Canvas", to: "Shape", navigable: true },
 			],
-		});
-		expect(arrow(renderDiagram(diagram), "holds")).toMatchObject({
+		}).pipe(Result.getOrThrow);
+		expect(arrow(renderDiagram(diagram).pipe(Result.getOrThrow), "holds")).toMatchObject({
 			startArrowhead: "diamond_outline",
 			endArrowhead: "arrow",
 		});
 	});
 
 	it("stands each superclass above its subclasses, siblings level, lines from top to bottom", () => {
-		const scene = renderDiagram(classFixture);
+		const scene = renderDiagram(classFixture).pipe(Result.getOrThrow);
 		const [drawable, shape, circle, rectangle, square] = [
 			"Drawable",
 			"Shape",
@@ -246,7 +248,7 @@ describe("class diagram renderer", () => {
 
 	it("gives every relationship end a port of its own", () => {
 		for (const diagram of all) {
-			const scene = renderDiagram(diagram);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			const ports = arrows(scene).flatMap((line) => [
 				`${line.sourceNodeId}@${line.points[0].x},${line.points[0].y}`,
 				`${line.targetNodeId}@${line.points.at(-1)!.x},${line.points.at(-1)!.y}`,
@@ -257,7 +259,7 @@ describe("class diagram renderer", () => {
 
 	it("puts multiplicities and roles beside their ends, clear of every box, line and other label", () => {
 		for (const diagram of all) {
-			const scene = renderDiagram(diagram);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			const outlines = nodes(scene).filter((node) => node.kind === "class");
 			const segments = arrows(scene).flatMap((line) => segmentsFromPoints(line.points));
 			const labels = labelBoxes(scene);
@@ -293,7 +295,7 @@ describe("class diagram renderer", () => {
 					).toBe(false);
 			}
 		}
-		const scene = renderDiagram(classFixture);
+		const scene = renderDiagram(classFixture).pipe(Result.getOrThrow);
 		const holds = arrow(scene, "canvas-holds");
 		const shape = box(scene, "Shape");
 		const role = text(scene, "relationship:canvas-holds:to:role")!;
@@ -321,7 +323,7 @@ describe("class diagram renderer", () => {
 				}),
 			);
 		for (const diagram of all) {
-			const scene = renderDiagram(diagram);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			for (const label of labelBoxes(scene)) {
 				const own = arrow(scene, label.id.split(":")[1]!);
 				const mine = gap(label, own);
@@ -346,7 +348,7 @@ describe("class diagram renderer", () => {
 				Math.max(0, label.top - tip.y, tip.y - label.bottom),
 			);
 		for (const diagram of all) {
-			const scene = renderDiagram(diagram);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			for (const label of labelBoxes(scene)) {
 				const [, id, end] = label.id.split(":");
 				if (end !== "from" && end !== "to") continue;
@@ -365,7 +367,7 @@ describe("class diagram renderer", () => {
 			}
 		}
 		// Member - Reservation runs straight up in one run; "reservations" stays at Reservation.
-		const scene = renderDiagram(classStressFixtures.memberReservations);
+		const scene = renderDiagram(classStressFixtures.memberReservations).pipe(Result.getOrThrow);
 		const reservations = arrow(scene, "relationship-12");
 		const role = text(scene, "relationship:relationship-12:to:role")!;
 		expect(role).toMatchObject({ text: "reservations", groupIds: ["class:Reservation"] });
@@ -377,7 +379,7 @@ describe("class diagram renderer", () => {
 	});
 
 	it("loops a relationship to its own class out and back on one side, nesting a second", () => {
-		const scene = renderDiagram(classStressFixtures.selfReference);
+		const scene = renderDiagram(classStressFixtures.selfReference).pipe(Result.getOrThrow);
 		const employee = box(scene, "Employee");
 		for (const id of ["manages", "mentors"]) {
 			const loop = arrow(scene, id);
@@ -388,7 +390,7 @@ describe("class diagram renderer", () => {
 	});
 
 	it("breaks a ring of related classes across rows, so no line reaches around a box", () => {
-		const scene = renderDiagram(classStressFixtures.acrossRow);
+		const scene = renderDiagram(classStressFixtures.acrossRow).pipe(Result.getOrThrow);
 		const ring = ["Checkout", "PricingStrategy", "Cart"].map((id) => box(scene, id));
 		expect(new Set(ring.map((node) => node.y)).size).toBeGreaterThan(1);
 		for (const id of ["uses", "prices", "totals"]) {

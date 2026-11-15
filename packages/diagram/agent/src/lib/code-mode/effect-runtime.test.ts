@@ -1,3 +1,4 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { assert, describe, it, layer } from "@effect/vitest";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import {
@@ -276,7 +277,7 @@ layer(runtimeLayer)("Code Mode Effect workflow", (it) => {
 					},
 				],
 				style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-			});
+			}).pipe(Result.getOrThrow);
 			const encoded = yield* Schema.encodeEffect(RenderedDiagramSceneSchema)(
 				yield* Schema.decodeUnknownEffect(RenderedDiagramSceneSchema, {
 					errors: "all",

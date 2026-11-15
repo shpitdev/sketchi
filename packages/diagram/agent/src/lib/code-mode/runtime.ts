@@ -55,6 +55,7 @@ import {
 	type FlowchartValidationIssue,
 	type FlowchartValidationIssueRef,
 	type MindmapDiagram,
+	type DiagramValidationError,
 	type CanvasValidationIssue,
 	type SequenceDiagram,
 	type SequenceValidationIssueCode,
@@ -558,7 +559,9 @@ function validateNormalizedMindmap(spec: NormalizedMindmapSpec): CodeModeIssue[]
 	return issues;
 }
 
-function toMindmapDiagram(spec: NormalizedMindmapSpec): MindmapDiagram {
+function toMindmapDiagram(
+	spec: NormalizedMindmapSpec,
+): Result.Result<MindmapDiagram, Schema.SchemaError | DiagramValidationError> {
 	return mindmapDiagramFromTree({
 		id: spec.id,
 		title: spec.title,
@@ -3590,7 +3593,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 		});
 	}
 
-	const diagram = yield* Effect.try({
+	const diagram = yield* validatedDomainResult({
 		try: () => toMindmapDiagram(normalizedSpec),
 		catch: (cause) =>
 			BuildMindmapFailure.new({
@@ -3621,7 +3624,7 @@ const buildMindmapWorkflow = Effect.fn("codeMode.buildMindmap.workflow")(functio
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderMindmapDiagram(diagram),
 		catch: (cause) =>
 			BuildMindmapFailure.new({
@@ -3734,7 +3737,7 @@ const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.wo
 		});
 	}
 
-	const renderedScene = yield* Effect.try({
+	const renderedScene = yield* validatedDomainResult({
 		try: () => renderSequenceDiagram(toSequenceDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildSequenceDiagramFailure.new({
@@ -3853,7 +3856,7 @@ const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderStateMachineDiagram(toStateMachineDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildStateMachineFailure.new({
@@ -3962,7 +3965,7 @@ const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(fun
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderErDiagram(toErDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildErDiagramFailure.new({
@@ -4070,7 +4073,7 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderClassDiagram(toClassDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildClassDiagramFailure.new({
@@ -4179,7 +4182,7 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderOrgChartDiagram(toOrgChartDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildOrgChartFailure.new({
@@ -4287,7 +4290,7 @@ const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderVennDiagram(toVennDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildVennDiagramFailure.new({
@@ -4396,7 +4399,7 @@ const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(f
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderJourneyDiagram(toJourneyDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildJourneyMapFailure.new({
@@ -4503,7 +4506,7 @@ const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function*
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderSankeyDiagram(toSankeyDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildSankeyFailure.new({
@@ -4637,7 +4640,7 @@ const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(fun
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderWireframeDiagram(toWireframeDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildWireframeFailure.new({
@@ -4745,11 +4748,11 @@ const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workfl
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderQuadrantDiagram(toQuadrantDiagram(normalizedSpec)),
 		catch: (cause) =>
 			// A chart whose labels cannot all sit clear is rejected with its repair hint, never drawn.
-			cause instanceof QuadrantValidationError
+			Schema.is(QuadrantValidationError)(cause)
 				? BuildQuadrantChartFailure.new({
 						status: "invalid_quadrant_chart",
 						context: { ...qualityContext, issues: quadrantIssues(cause.issues) },
@@ -4863,7 +4866,7 @@ const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(funct
 		});
 	}
 
-	const renderedScene = yield* Effect.try({
+	const renderedScene = yield* validatedDomainResult({
 		try: () => renderTimelineDiagram(toTimelineDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildTimelineFailure.new({
@@ -4971,7 +4974,7 @@ const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderChartDiagram(toChartDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildChartFailure.new({
@@ -5078,7 +5081,7 @@ const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (
 		});
 	}
 
-	const scene = yield* Effect.try({
+	const scene = yield* validatedDomainResult({
 		try: () => renderGanttDiagram(toGanttDiagram(normalizedSpec)),
 		catch: (cause) =>
 			BuildGanttFailure.new({
@@ -5449,7 +5452,7 @@ const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(fun
 		});
 	}
 
-	const renderedScene = yield* Effect.try({
+	const renderedScene = yield* validatedDomainResult({
 		try: () => renderIntermediateDiagram(diagram),
 		catch: (cause) =>
 			BuildFlowchartFailure.new({
@@ -6143,3 +6146,13 @@ export const applyDiagramPatch: (
 	applyDiagramPatchWorkflow,
 	failureResult,
 );
+
+/** The domain channel is explicit; retain the existing native renderer-exception report while geometry remains unconverted. */
+function validatedDomainResult<A, E, F>(options: {
+	readonly try: () => Result.Result<A, E>;
+	readonly catch: (cause: unknown) => F;
+}): Effect.Effect<A, F> {
+	return Effect.try(options).pipe(
+		Effect.flatMap((result) => Effect.mapError(Effect.fromResult(result), options.catch)),
+	);
+}

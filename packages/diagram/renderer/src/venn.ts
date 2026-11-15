@@ -1,4 +1,6 @@
+import { Result } from "effect";
 import {
+	type VennValidationError,
 	CANVAS_SPEC_VERSION,
 	SKETCHI_DIAGRAM_PALETTE,
 	validateVennDiagram,
@@ -207,96 +209,99 @@ function sceneBounds(layout: VennLayout): VennBox {
  * of every outline. Each set (fill, outline, label) and each region's text is
  * one Excalidraw group.
  */
-export function renderVennDiagram(input: VennDiagram): RenderedDiagramScene {
-	const diagram = validateVennDiagram(input);
-	const surface = diagram.style.backgroundColor;
-	const layout = layoutVennDiagram(diagram);
-	const bounds = sceneBounds(layout);
-	const dx = PADDING - bounds.left;
-	const dy = PADDING - bounds.top;
-	const shift = <T extends { x: number; y: number }>(point: T): T => ({
-		...point,
-		x: point.x + dx,
-		y: point.y + dy,
-	});
-	const shiftBox = (box: VennBox): VennBox => ({
-		left: box.left + dx,
-		right: box.right + dx,
-		top: box.top + dy,
-		bottom: box.bottom + dy,
-	});
-	const colors = diagram.sets.map((set, index) => vennSetColor(set, index));
-	const fills = vennFills(surface, colors);
-	const drawn: Drawn = { elements: [], back: [], middle: [], front: [] };
-	diagram.sets.forEach((set, index) => {
-		const circle = shift(layout.circles[index]!);
-		const group = [`venn:set:${index}`];
-		// The fill's own edge sits under the outline; scenes keep hex colors only.
-		const fill = circleNode(`venn:set:${index}:fill`, circle, set.label, {
-			fillColor: fills[index]!,
-			fillStyle: "solid",
-			strokeColor: fills[index]!,
-			strokeWidth: 1,
-			roughness: 0,
-			opacity: VENN_FILL_OPACITY,
-			groupIds: group,
+export function renderVennDiagram(
+	input: VennDiagram,
+): Result.Result<RenderedDiagramScene, VennValidationError> {
+	return Result.map(validateVennDiagram(input), (diagram) => {
+		const surface = diagram.style.backgroundColor;
+		const layout = layoutVennDiagram(diagram);
+		const bounds = sceneBounds(layout);
+		const dx = PADDING - bounds.left;
+		const dy = PADDING - bounds.top;
+		const shift = <T extends { x: number; y: number }>(point: T): T => ({
+			...point,
+			x: point.x + dx,
+			y: point.y + dy,
 		});
-		drawn.elements.push(fill);
-		drawn.back.push(fill.id);
-		const outline = circleNode(`venn:set:${index}`, circle, set.label, {
-			strokeColor: colors[index]!,
-			strokeWidth: 2,
-			// Exact circles: text clears the outline it is measured against.
-			roughness: 0,
-			groupIds: group,
+		const shiftBox = (box: VennBox): VennBox => ({
+			left: box.left + dx,
+			right: box.right + dx,
+			top: box.top + dy,
+			bottom: box.bottom + dy,
 		});
-		drawn.elements.push(outline);
-		drawn.middle.push(outline.id);
-		const label = layout.labels[index]!;
-		text(
-			drawn,
-			`venn:set:${index}:label`,
-			label.text,
-			VENN_SET_LABEL_FONT,
-			shiftBox(label.box),
-			vennLabelColor(surface, colors[index]!),
-			group,
-		);
-	});
-	for (const region of layout.regions) {
-		const id = vennRegionId(region.key);
-		const centre = shift(region.center);
-		const top = centre.y - region.block.height / 2;
-		for (const piece of region.block.pieces) {
-			const pieceTop = top + piece.top;
+		const colors = diagram.sets.map((set, index) => vennSetColor(set, index));
+		const fills = vennFills(surface, colors);
+		const drawn: Drawn = { elements: [], back: [], middle: [], front: [] };
+		diagram.sets.forEach((set, index) => {
+			const circle = shift(layout.circles[index]!);
+			const group = [`venn:set:${index}`];
+			// The fill's own edge sits under the outline; scenes keep hex colors only.
+			const fill = circleNode(`venn:set:${index}:fill`, circle, set.label, {
+				fillColor: fills[index]!,
+				fillStyle: "solid",
+				strokeColor: fills[index]!,
+				strokeWidth: 1,
+				roughness: 0,
+				opacity: VENN_FILL_OPACITY,
+				groupIds: group,
+			});
+			drawn.elements.push(fill);
+			drawn.back.push(fill.id);
+			const outline = circleNode(`venn:set:${index}`, circle, set.label, {
+				strokeColor: colors[index]!,
+				strokeWidth: 2,
+				// Exact circles: text clears the outline it is measured against.
+				roughness: 0,
+				groupIds: group,
+			});
+			drawn.elements.push(outline);
+			drawn.middle.push(outline.id);
+			const label = layout.labels[index]!;
 			text(
 				drawn,
-				piece.role === "item" ? `${id}:item:${piece.index}` : `${id}:${piece.role}`,
-				piece.text,
-				piece.fontSize,
-				{
-					left: centre.x - piece.width / 2,
-					right: centre.x + piece.width / 2,
-					top: pieceTop,
-					bottom: pieceTop + piece.height,
-				},
-				INK,
-				[id],
+				`venn:set:${index}:label`,
+				label.text,
+				VENN_SET_LABEL_FONT,
+				shiftBox(label.box),
+				vennLabelColor(surface, colors[index]!),
+				group,
 			);
+		});
+		for (const region of layout.regions) {
+			const id = vennRegionId(region.key);
+			const centre = shift(region.center);
+			const top = centre.y - region.block.height / 2;
+			for (const piece of region.block.pieces) {
+				const pieceTop = top + piece.top;
+				text(
+					drawn,
+					piece.role === "item" ? `${id}:item:${piece.index}` : `${id}:${piece.role}`,
+					piece.text,
+					piece.fontSize,
+					{
+						left: centre.x - piece.width / 2,
+						right: centre.x + piece.width / 2,
+						top: pieceTop,
+						bottom: pieceTop + piece.height,
+					},
+					INK,
+					[id],
+				);
+			}
 		}
-	}
-	return {
-		kind: "canvas",
-		version: CANVAS_SPEC_VERSION,
-		diagramId: diagram.id,
-		title: diagram.title,
-		width: Math.ceil(bounds.right - bounds.left + PADDING * 2),
-		height: Math.ceil(bounds.bottom - bounds.top + PADDING * 2),
-		accentColor: diagram.style.accentColor,
-		backgroundColor: surface,
-		elements: drawn.elements,
-		layers: [],
-		layouts: [],
-		zOrder: [...drawn.back, ...drawn.middle, ...drawn.front],
-	};
+		return {
+			kind: "canvas",
+			version: CANVAS_SPEC_VERSION,
+			diagramId: diagram.id,
+			title: diagram.title,
+			width: Math.ceil(bounds.right - bounds.left + PADDING * 2),
+			height: Math.ceil(bounds.bottom - bounds.top + PADDING * 2),
+			accentColor: diagram.style.accentColor,
+			backgroundColor: surface,
+			elements: drawn.elements,
+			layers: [],
+			layouts: [],
+			zOrder: [...drawn.back, ...drawn.middle, ...drawn.front],
+		};
+	});
 }

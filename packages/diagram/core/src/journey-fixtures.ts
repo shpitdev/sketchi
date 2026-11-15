@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import {
 	JOURNEY_MAX_STAGE_STEPS,
 	JOURNEY_MAX_STAGES,
@@ -50,7 +52,7 @@ function evenJourney(id: string, stages: number, steps: number): JourneyDiagram 
 			painPoints: stage % 2 === 0 ? [`Slow ${OBJECTS[stage % OBJECTS.length]}`] : [],
 			opportunities: stage % 3 === 0 ? [`Simplify ${OBJECTS[(stage + 2) % OBJECTS.length]}`] : [],
 		})),
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /** Journeys at the contract's bounds: the renderer and fuzz hold each to the same rules. */
@@ -67,7 +69,7 @@ export const journeyStressFixtures = {
 		title: "Sign in",
 		type: journeyDiagramType,
 		stages: [{ name: "Sign in", steps: [{ label: "Enters a password", score: 3 }] }],
-	}),
+	}).pipe(Result.getOrThrow),
 	/** Every text at its longest, with actors, touchpoints and full note stacks. */
 	wordy: parseJourneyDiagram({
 		id: "wordy-journey",
@@ -117,7 +119,7 @@ export const journeyStressFixtures = {
 				painPoints: ["No status updates while the review is pending"],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	/** Labels in Japanese, which wrap between ideographs. */
 	cjk: parseJourneyDiagram({
 		id: "cjk-journey",
@@ -137,5 +139,5 @@ export const journeyStressFixtures = {
 				painPoints: ["送料が最後に表示される"],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 } satisfies Record<string, JourneyDiagram>;

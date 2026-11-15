@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import { flowchartDiagramFromSpec, type FlowchartSpec } from "@sketchi/diagram-agent";
 import {
 	canvasBoundTextBox,
@@ -37,7 +38,8 @@ const SAMPLE_LOGOS: ReadonlyMap<string, CanvasIconAsset> = new Map([
 ]);
 
 const generatedDeployPipelineScene = embedCanvasIcons(
-	renderIntermediateDiagram(flowchartDiagramFromSpec(DEPLOY_PIPELINE_SPEC)),
+	// This bundled sample is authored fixture data; invalid construction is a startup defect.
+	renderIntermediateDiagram(flowchartDiagramFromSpec(DEPLOY_PIPELINE_SPEC)).pipe(Result.getOrThrow),
 	(slug) => SAMPLE_LOGOS.get(slug),
 ).scene;
 

@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	estimateTextWidth,
 	formatGanttDay,
@@ -89,7 +91,7 @@ function scenario(id: string, title: string, prompt: string, input: ScenarioInpu
 			...(task.progress !== undefined ? { progress: task.progress } : {}),
 		})),
 		...(input.today ? { today: input.today } : {}),
-	});
+	}).pipe(Result.getOrThrow);
 	return {
 		id,
 		title,

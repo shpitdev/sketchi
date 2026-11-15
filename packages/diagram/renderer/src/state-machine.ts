@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import {
 	compositeStateIds,
 	type DiagramEdge,
@@ -147,10 +148,12 @@ function routingCost(scene: RenderedDiagramScene): number {
  * whose aspect stays readable, the one with fewer crossings and reader
  * findings (left to right on a tie); otherwise the less elongated one.
  */
-export function renderStateMachineDiagram(diagram: StateMachineDiagram): RenderedDiagramScene {
+export function renderStateMachineDiagram(
+	diagram: StateMachineDiagram,
+): Result.Result<RenderedDiagramScene> {
 	const render = (direction: "TB" | "LR") =>
 		renderGraphDiagram(stateMachineGraph(diagram, direction), { pairedReturns: true });
-	if (diagram.layout) return render(diagram.layout.direction);
+	if (diagram.layout) return Result.succeed(render(diagram.layout.direction));
 	const candidates = (["LR", "TB"] as const).map((direction) => {
 		const scene = render(direction);
 		const aspect = Math.max(scene.width / scene.height, scene.height / scene.width);
@@ -161,5 +164,5 @@ export function renderStateMachineDiagram(diagram: StateMachineDiagram): Rendere
 		readable.length > 0
 			? readable.toSorted((a, b) => a.cost - b.cost)
 			: candidates.toSorted((a, b) => a.aspect - b.aspect);
-	return best!.scene;
+	return Result.succeed(best!.scene);
 }

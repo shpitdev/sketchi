@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
@@ -10,7 +12,6 @@ import {
 	orgChartFixture,
 	orgChartReports,
 	orgChartRoots,
-	OrgChartValidationError,
 	orgPersonInitials,
 	parseOrgChartDiagram,
 	resolveOrgChartShorthand,
@@ -26,13 +27,11 @@ const chart = (people: unknown[], extra: Record<string, unknown> = {}) => ({
 
 /** The issues a chart fails with, or [] when it is valid. */
 function issuesOf(input: unknown) {
-	try {
-		parseOrgChartDiagram(input);
-		return [];
-	} catch (error) {
-		if (!(error instanceof OrgChartValidationError)) throw error;
-		return error.issues;
-	}
+	const result = parseOrgChartDiagram(input);
+	if (Result.isSuccess(result)) return [];
+	const error = result.failure;
+	if (error._tag !== "OrgChartValidationError") return expect.fail(error.message);
+	return error.issues;
 }
 const codes = (input: unknown) => issuesOf(input).map((issue) => issue.code);
 
@@ -41,7 +40,7 @@ const ceo = { id: "ceo", name: "Ada Lovelace", title: "CEO" };
 describe("org chart contract", () => {
 	it("has a typed fixture that satisfies the canonical diagram contract", () => {
 		expect(orgChartFixture.type).toBe(orgChartDiagramType);
-		expect(parseCanonicalDiagram(orgChartFixture)).toEqual(orgChartFixture);
+		expect(parseCanonicalDiagram(orgChartFixture).pipe(Result.getOrThrow)).toEqual(orgChartFixture);
 		expect(orgChartRoots(orgChartFixture).map((person) => person.id)).toEqual(["ada"]);
 		expect(
 			orgChartReports(orgChartFixture)
@@ -54,7 +53,7 @@ describe("org chart contract", () => {
 	});
 
 	it("defaults dotted lines and the palette", () => {
-		const parsed = parseOrgChartDiagram(chart([ceo]));
+		const parsed = parseOrgChartDiagram(chart([ceo])).pipe(Result.getOrThrow);
 		expect(parsed.dottedLines).toEqual([]);
 		expect(parsed.style).toMatchObject({ accentColor: expect.any(String) });
 	});
@@ -152,7 +151,7 @@ describe("org chart shorthand", () => {
 					{ id: "ea", name: "Grace", kind: "assistant", managerId: "ceo" },
 				]),
 			),
-		);
+		).pipe(Result.getOrThrow);
 		expect(parsed.people).toEqual([
 			{ id: "ceo", name: "Ada", title: "CEO" },
 			{ id: "cto", name: "Linus", title: "CTO", department: "Engineering", manager: "ceo" },
@@ -182,7 +181,7 @@ describe("org chart shorthand", () => {
 					},
 				),
 			),
-		);
+		).pipe(Result.getOrThrow);
 		expect(parsed.people.map((person) => [person.id, person.manager])).toEqual([
 			["ceo", undefined],
 			["a", "ceo"],
@@ -208,13 +207,13 @@ describe("org chart shorthand", () => {
 					dottedLines: { report: "a", manager: "b", label: "for clinical systems" },
 				}),
 			),
-		);
+		).pipe(Result.getOrThrow);
 		expect(parsed.dottedLines).toEqual([
 			{ id: "a-dotted-b", report: "a", manager: "b", label: "for clinical systems" },
 		]);
-		expect(() =>
+		expect(
 			parseOrgChartDiagram(resolveOrgChartShorthand(chart(people, { dottedLines: "a to b" }))),
-		).toThrow(/dottedLines/u);
+		).toMatchObject({ failure: { message: expect.stringMatching(/dottedLines/u) } });
 	});
 });
 

@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	type SequenceDiagram,
 	type SequenceMessageType,
@@ -102,7 +104,7 @@ function defineSequenceScenario(definition: SequenceScenarioDefinition): Sequenc
 				label,
 				...(type ? { type } : {}),
 			})),
-		}),
+		}).pipe(Result.getOrThrow),
 	};
 }
 

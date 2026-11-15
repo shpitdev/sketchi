@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { parseFlowchartDiagram } from "@sketchi/diagram-core";
 
@@ -8,7 +10,9 @@ import retainedReplays from "./fixtures/group-members-replays.json";
 
 const replays = retainedReplays.map(({ id, spec }) => ({
 	id,
-	spec: parseFlowchartDiagram(specToFlowchartCandidate(spec)),
+	spec: parseFlowchartDiagram(specToFlowchartCandidate(spec).pipe(Result.getOrThrow)).pipe(
+		Result.getOrThrow,
+	),
 }));
 
 const ids = [
@@ -19,6 +23,7 @@ const ids = [
 
 function failed(scenarioId: string, candidate: unknown) {
 	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), candidate)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 }
@@ -31,7 +36,9 @@ describe("group scenarios", () => {
 	// Exact normalized specs from the Sonnet-fidelity replays and Frontierclimb
 	// eval-20261019-202040-pyx1; the ids retain their archive provenance.
 	it.each(replays)("accepts stated membership in retained replay $id", ({ spec }) => {
-		expect(failed("grouped-expense-approval-v2", specToFlowchartCandidate(spec))).toEqual([]);
+		expect(
+			failed("grouped-expense-approval-v2", specToFlowchartCandidate(spec).pipe(Result.getOrThrow)),
+		).toEqual([]);
 	});
 
 	it.each(replays)("rejects a misplaced stated review in replay $id", ({ spec }) => {
@@ -42,7 +49,7 @@ describe("group scenarios", () => {
 			nodes: spec.nodes.map((node) =>
 				node === review ? { ...node, group: employee.group, lane: employee.lane } : node,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(failed("grouped-expense-approval-v2", candidate)).toContain("group-members:Manager");
 	});
 
@@ -142,6 +149,7 @@ describe("group scenarios", () => {
 				],
 			};
 			const failures = evaluateScenarioDiagram(scenario, candidate)
+				.pipe(Result.getOrThrow)
 				.checks.filter((check) => !check.passed)
 				.map((check) => check.id);
 			expect(failures).toEqual(group === "employee" ? [] : ["group-members:Employee"]);
@@ -166,7 +174,7 @@ describe("group scenarios", () => {
 		).toContain("group-members:Manager");
 	});
 	it.each(ids)("passes %s on its fixture, checking every stated group", (id) => {
-		const evaluation = evaluateScenarioFixture(getFlowchartScenario(id));
+		const evaluation = evaluateScenarioFixture(getFlowchartScenario(id)).pipe(Result.getOrThrow);
 		expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 		expect(evaluation.checks.map((check) => check.id)).toEqual(
 			expect.arrayContaining(
@@ -294,7 +302,7 @@ describe("group scenarios", () => {
 					},
 				]),
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(failed("mixed-fulfilment-groups-v2", candidate)).toEqual([]);
 	});
 });

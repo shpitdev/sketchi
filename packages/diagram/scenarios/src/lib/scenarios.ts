@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	type DiagramNodeShape,
 	type DiagramZoneKind,
@@ -300,7 +302,7 @@ function buildExpectedDiagram(definition: FlowchartScenarioDefinition): Flowchar
 			edgeRouting: definition.curved ? "curved" : "orthogonal",
 		},
 		style: DEFAULT_STYLE,
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 function buildAssertions(

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -27,7 +29,9 @@ const centerY = (shape: NodeSceneElement) => shape.y + shape.height / 2;
 const leaves = (...labels: string[]): MindmapTopicTree[] => labels.map((label) => ({ label }));
 
 function mindmap(root: MindmapTopicTree, direction: "LR" | "RL" = "LR") {
-	return mindmapDiagramFromTree({ id: "test-map", title: "Test map", root, direction });
+	return mindmapDiagramFromTree({ id: "test-map", title: "Test map", root, direction }).pipe(
+		Result.getOrThrow,
+	);
 }
 
 const product = mindmap({
@@ -44,17 +48,17 @@ const product = mindmap({
 
 describe("Mindmap renderer", () => {
 	it("renders the fixture into a valid deterministic scene", () => {
-		const scene = renderDiagram(mindmapFixture);
+		const scene = renderDiagram(mindmapFixture).pipe(Result.getOrThrow);
 		expect(scene.diagramId).toBe("public-mindmap-capability");
 		expect(nodes(scene)).toHaveLength(mindmapFixture.nodes.length);
 		expect(arrows(scene)).toHaveLength(mindmapFixture.edges.length);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(mindmapLayoutIssues(scene)).toEqual([]);
-		expect(renderDiagram(mindmapFixture)).toEqual(scene);
+		expect(renderDiagram(mindmapFixture).pipe(Result.getOrThrow)).toEqual(scene);
 	});
 
 	it("centers the central topic and balances main branches on both sides, clockwise", () => {
-		const scene = renderDiagram(product);
+		const scene = renderDiagram(product).pipe(Result.getOrThrow);
 		const root = node(scene, "topic-0");
 		expect(root).toMatchObject({ kind: "root", shape: "ellipse" });
 		const main = [0, 1, 2, 3, 4, 5].map((index) => node(scene, `topic-0-${index}`));
@@ -77,7 +81,10 @@ describe("Mindmap renderer", () => {
 	});
 
 	it("mirrors the clockwise order for RL", () => {
-		const scene = renderDiagram({ ...product, layout: { ...product.layout, direction: "RL" } });
+		const scene = renderDiagram({
+			...product,
+			layout: { ...product.layout, direction: "RL" },
+		}).pipe(Result.getOrThrow);
 		const root = node(scene, "topic-0");
 		expect(centerX(node(scene, "topic-0-0"))).toBeLessThan(centerX(root));
 		expect(centerX(node(scene, "topic-0-5"))).toBeGreaterThan(centerX(root));
@@ -85,7 +92,7 @@ describe("Mindmap renderer", () => {
 	});
 
 	it("steps label size down from the center and colors each branch", () => {
-		const scene = renderDiagram(product);
+		const scene = renderDiagram(product).pipe(Result.getOrThrow);
 		const fontOf = (id: string) =>
 			scene.elements.find((element) => element.type === "text" && element.id === `label:${id}`)!;
 		expect([fontOf("topic-0"), fontOf("topic-0-0"), fontOf("topic-0-0-0")]).toMatchObject([
@@ -103,7 +110,7 @@ describe("Mindmap renderer", () => {
 	});
 
 	it("joins topics with curves, no arrowheads, bound to both ends and grouped by branch", () => {
-		const scene = renderDiagram(product);
+		const scene = renderDiagram(product).pipe(Result.getOrThrow);
 		for (const arrow of arrows(scene)) {
 			expect(arrow.endArrowhead).toBeNull();
 			const source = node(scene, arrow.sourceNodeId);
@@ -137,7 +144,7 @@ describe("Mindmap renderer", () => {
 	it("staggers two lone branches rather than drawing a long strip", () => {
 		const scene = renderDiagram(
 			mindmap({ label: "Decision", children: leaves("Option A", "Option B") }),
-		);
+		).pipe(Result.getOrThrow);
 		const [a, b] = [node(scene, "topic-0-0"), node(scene, "topic-0-1")];
 		expect(centerY(a)).toBeLessThan(centerY(node(scene, "topic-0")));
 		expect(centerY(b)).toBeGreaterThan(centerY(node(scene, "topic-0")));
@@ -156,7 +163,9 @@ describe("Mindmap renderer", () => {
 			(child, label) => ({ label: `${label} step`, children: [child] }),
 			{ label: "Seventh step" },
 		);
-		const scene = renderDiagram(mindmap({ label: "Root idea", children: [chain] }));
+		const scene = renderDiagram(mindmap({ label: "Root idea", children: [chain] })).pipe(
+			Result.getOrThrow,
+		);
 		const sixth = node(scene, "topic-0-0-0-0-0-0");
 		const seventh = node(scene, "topic-0-0-0-0-0-0-0");
 		// Folded: the deepest steps sit below the one before them, indented.
@@ -168,7 +177,7 @@ describe("Mindmap renderer", () => {
 });
 
 describe("mindmapLayoutIssues", () => {
-	const scene = renderDiagram(product);
+	const scene = renderDiagram(product).pipe(Result.getOrThrow);
 	const moved = (id: string, change: (element: NodeSceneElement) => Partial<NodeSceneElement>) => ({
 		...scene,
 		elements: scene.elements.map((element) =>

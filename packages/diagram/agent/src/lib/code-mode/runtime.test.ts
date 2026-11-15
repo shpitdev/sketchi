@@ -1,3 +1,4 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { describe, expect, it } from "vitest";
 import { Context, Effect, Schema, Result } from "effect";
 
@@ -2005,8 +2006,8 @@ describe("Code Mode runtime", () => {
 				kind: "bar",
 				categories: ["Q1", "Q2"],
 				series: [{ name: "Revenue with a long series name", values: [4, 0.1] }],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		const result = await createTestRuntime().applyDiagramPatch({
 			source: { scene },
 			operations: [
@@ -2702,7 +2703,7 @@ describe("curved mindmap connectors", () => {
 		);
 
 	it("keeps a mindmap's curves when its scene is reused as a canvas", async () => {
-		const scene = renderMindmapDiagram(mindmapFixture);
+		const scene = renderMindmapDiagram(mindmapFixture).pipe(Result.getOrThrow);
 		const result = await createTestRuntime().createCanvas({ spec: scene });
 		if (!result.ok) throw new Error(`Expected accepted canvas: ${JSON.stringify(result.issues)}`);
 		const canvas = sceneOf(result.normalizedSpec);
@@ -2713,7 +2714,7 @@ describe("curved mindmap connectors", () => {
 	});
 
 	it("redraws the curves of a moved branch as curves clear of every topic", async () => {
-		const scene = renderMindmapDiagram(mindmapFixture);
+		const scene = renderMindmapDiagram(mindmapFixture).pipe(Result.getOrThrow);
 		const result = await createTestRuntime().applyDiagramPatch({
 			source: { scene },
 			operations: [

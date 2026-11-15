@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ganttFixture, parseGanttDiagram } from "@sketchi/diagram-core";
@@ -87,6 +89,6 @@ export const MultiYearRoadmap: Story = {
 					dependsOn: ["scale"],
 				},
 			],
-		}),
+		}).pipe(Result.getOrThrow),
 	},
 };

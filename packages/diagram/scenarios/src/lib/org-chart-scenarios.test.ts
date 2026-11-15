@@ -1,10 +1,11 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option, Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import type { OrgChartDiagram } from "@sketchi/diagram-core";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
-import { Effect } from "effect";
 
 import { FixtureGenerationClientLayer } from "./fixture-client.js";
 import { toDiagramGenerationPrompt } from "./prompt.js";
@@ -18,6 +19,7 @@ import {
 const scenario = (id: string) => orgChartScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: OrgChartDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const startup = scenario("startup-team-org-chart-v2").expectedDiagram;
@@ -180,7 +182,7 @@ describe("prompt-grounded org chart scenarios", () => {
 	});
 
 	it("reads the drawing: a dropped line or a moved card fails the scene checks", () => {
-		const scene = renderDiagram(leadership);
+		const scene = renderDiagram(leadership).pipe(Result.getOrThrow);
 		expect(orgChartDrawnCheck(leadership, scene).passed).toBe(true);
 		const dropped = {
 			...scene,
@@ -204,7 +206,9 @@ describe("prompt-grounded org chart scenarios", () => {
 	});
 
 	it("keeps the VP's four reports on one level, though two lead big teams", () => {
-		const scene = renderDiagram(scenario("engineering-department-org-chart-v2").expectedDiagram);
+		const scene = renderDiagram(
+			scenario("engineering-department-org-chart-v2").expectedDiagram,
+		).pipe(Result.getOrThrow);
 		const top = (id: string) => {
 			const card = scene.elements.find((element) => element.id === `node:${id}`);
 			if (card?.type !== "node") throw new Error(`No card "${id}".`);
@@ -240,7 +244,7 @@ describe("prompt-grounded org chart scenarios", () => {
 		const candidate = candidateFromMcpResult(
 			{ ok: true, result: { ok: true, status: "accepted", buildId: "build-1" }, builds: [receipt] },
 			"org-chart",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
 		expect(failed("startup-team-org-chart-v2", candidate.diagram as OrgChartDiagram)).toEqual([]);

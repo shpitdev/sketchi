@@ -1,8 +1,9 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option, Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import type { SankeyDiagram } from "@sketchi/diagram-core";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
-import { Effect } from "effect";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { FixtureGenerationClientLayer } from "./fixture-client.js";
@@ -13,6 +14,7 @@ import { sankeyDrawnCheck, sankeyLayoutCheck, sankeyScenarios } from "./sankey-s
 const scenario = (id: string) => sankeyScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: SankeyDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const budget = scenario("cloud-budget-sankey-v2").expectedDiagram;
@@ -182,7 +184,7 @@ describe("prompt-grounded Sankey scenarios", () => {
 	});
 
 	it("reads the drawing: a dropped band, a wrong width or a covered label fails the scene checks", () => {
-		const scene = renderDiagram(budget);
+		const scene = renderDiagram(budget).pipe(Result.getOrThrow);
 		expect(sankeyDrawnCheck(budget, scene).passed).toBe(true);
 		expect(sankeyLayoutCheck(budget, scene).passed).toBe(true);
 		const dropped = {
@@ -254,7 +256,7 @@ describe("prompt-grounded Sankey scenarios", () => {
 		const candidate = candidateFromMcpResult(
 			{ ok: true, result: { ok: true, status: "accepted", buildId: "build-1" }, builds: [receipt] },
 			"sankey",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
 		expect(failed("cloud-budget-sankey-v2", candidate.diagram as SankeyDiagram)).toEqual([]);

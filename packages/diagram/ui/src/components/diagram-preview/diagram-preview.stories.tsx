@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { useState } from "react";
@@ -11,7 +13,7 @@ const meta = {
 	title: "Diagram UI/Components/DiagramPreview",
 	component: DiagramPreview,
 	args: {
-		scene: renderIntermediateDiagram(flowchartFixture),
+		scene: renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
 	},
 } satisfies Meta<typeof DiagramPreview>;
 
@@ -30,8 +32,8 @@ const followUpScene = renderIntermediateDiagram(
 			{ id: "draft-proof", source: "draft", target: "proof" },
 			{ id: "proof-review", source: "proof", target: "review" },
 		],
-	}),
-);
+	}).pipe(Result.getOrThrow),
+).pipe(Result.getOrThrow);
 
 function RebuildPreview() {
 	const [rebuilt, setRebuilt] = useState(false);
@@ -41,7 +43,11 @@ function RebuildPreview() {
 				{rebuilt ? "Restore first build" : "Apply follow-up build"}
 			</button>
 			<DiagramPreview
-				scene={rebuilt ? followUpScene : renderIntermediateDiagram(flowchartFixture)}
+				scene={
+					rebuilt
+						? followUpScene
+						: renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow)
+				}
 			/>
 		</>
 	);

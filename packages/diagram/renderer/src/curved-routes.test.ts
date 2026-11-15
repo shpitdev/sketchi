@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	canvasOutlineContains,
@@ -100,7 +102,7 @@ describe("curved routes", () => {
 		const scene = renderIntermediateDiagram({
 			...groupFixtures["grouped-approval"],
 			layout: { direction: "LR", edgeRouting: "curved" },
-		});
+		}).pipe(Result.getOrThrow);
 		expect(strays(scene)).toEqual([]);
 	});
 
@@ -134,7 +136,7 @@ describe("curved routes", () => {
 						],
 						edges: [{ id: "e", source, target }],
 						layout: { direction: "TB", edgeRouting: "curved" },
-					}),
+					}).pipe(Result.getOrThrow),
 					{ placement, anchors: anchors as never },
 				);
 			// Leaving the composed side, then arriving at it.
@@ -178,7 +180,7 @@ describe("curved routes", () => {
 		const scene = renderIntermediateDiagram({
 			...zoneStressFixtures["depth-four"],
 			layout: { direction: "TB", edgeRouting: "curved" },
-		});
+		}).pipe(Result.getOrThrow);
 		expect(strays(scene)).toEqual([]);
 	});
 
@@ -192,7 +194,7 @@ describe("curved routes", () => {
 						renderIntermediateDiagram({
 							...fixture,
 							layout: { direction, edgeRouting: "curved" },
-						}),
+						}).pipe(Result.getOrThrow),
 					).map((stray) => `${name}: ${stray}`),
 				),
 			).toEqual([]);

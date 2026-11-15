@@ -10,6 +10,7 @@ vi.mock("@excalidraw/excalidraw", () => ({
 import * as renderer from "@sketchi/diagram-renderer";
 import {
 	chartFixture,
+	mindmapFixture,
 	flowchartFixture,
 	sequenceFixture,
 	timelineFixture,
@@ -64,5 +65,27 @@ describe("GenerationWorkspace", () => {
 		expect(screen.getByText("2 series")).toBeTruthy();
 		expect(screen.getByText("Validated chart IR")).toBeTruthy();
 		expect(screen.getByText("No real-scene issues")).toBeTruthy();
+	});
+	it("reports an invalid mindmap without displaying a scene, then accepts corrected data", () => {
+		const invalid = {
+			...mindmapFixture,
+			edges: [
+				...mindmapFixture.edges,
+				{
+					id: "broken",
+					source: "topic-0",
+					target: "missing",
+					metadata: { depth: 1, siblingIndex: 0 },
+				},
+			],
+		};
+		const { rerender } = render(<GenerationWorkspace diagram={invalid} />);
+		expect(screen.getByRole("alert").textContent).toBe(
+			'Edge "broken" references missing target node "missing".',
+		);
+		expect(screen.queryByText("Real scene valid")).toBeNull();
+		rerender(<GenerationWorkspace diagram={mindmapFixture} />);
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(screen.getByText("Validated mindmap IR")).toBeTruthy();
 	});
 });

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	getCanvasValidationIssues,
@@ -168,7 +170,7 @@ function randomChart(index: number): QuadrantDiagram {
 			bottomRight: pick(NAMES),
 		},
 		points,
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /** Charts the full fuzz checks locally; CI samples the first few of every mode. */
@@ -187,16 +189,13 @@ describe("quadrant chart fuzz", () => {
 		const shortfalls: string[] = [];
 		for (let index = 0; index < CHARTS; index += 1) {
 			const diagram = randomChart(index);
-			let scene: ReturnType<typeof renderQuadrantDiagram>;
-			try {
-				scene = renderQuadrantDiagram(diagram);
-			} catch (error) {
-				// A chart rejected for crowding is not drawn unreadable, but no fuzz chart should need it.
-				defects.push(
-					`${diagram.id}: rejected (${error instanceof Error ? error.message : String(error)})`,
-				);
+			const rendered = renderQuadrantDiagram(diagram);
+			if (Result.isFailure(rendered)) {
+				// Crowding rejection is an explicit domain failure; no fuzz chart should need it.
+				defects.push(`${diagram.id}: rejected (${rendered.failure.message})`);
 				continue;
 			}
+			const scene = rendered.success;
 			const layout = quadrantLayoutIssues(scene, diagram);
 			// Only in a plot too crowded for clean leaders may a leader pass over another dot, or a
 			// label sit level with another dot instead of its own.

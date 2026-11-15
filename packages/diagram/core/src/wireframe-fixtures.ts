@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import { parseWireframeDiagram, type WireframeDiagram } from "./types/wireframe.js";
 
 const kpi = (title: string, value: string, change: string) => ({
@@ -82,7 +84,7 @@ export const wireframeStressFixtures: Readonly<Record<string, WireframeDiagram>>
 				],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	settings: parseWireframeDiagram({
 		id: "settings-form",
 		title: "Account settings",
@@ -154,7 +156,7 @@ export const wireframeStressFixtures: Readonly<Record<string, WireframeDiagram>>
 				],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	product: parseWireframeDiagram({
 		id: "product-page",
 		title: "Product page",
@@ -234,7 +236,7 @@ export const wireframeStressFixtures: Readonly<Record<string, WireframeDiagram>>
 				],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	signupFlow: parseWireframeDiagram({
 		id: "signup-flow",
 		title: "Signup flow",
@@ -278,7 +280,7 @@ export const wireframeStressFixtures: Readonly<Record<string, WireframeDiagram>>
 				],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	tabletModal: parseWireframeDiagram({
 		id: "delete-project",
 		title: "Delete project",
@@ -319,7 +321,7 @@ export const wireframeStressFixtures: Readonly<Record<string, WireframeDiagram>>
 				],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	dense: parseWireframeDiagram({
 		id: "dense-mobile",
 		title: "Dense mobile screen",
@@ -374,5 +376,5 @@ export const wireframeStressFixtures: Readonly<Record<string, WireframeDiagram>>
 				],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 };

@@ -2,6 +2,7 @@ import type { IconRecipe } from "@sketchi/diagram-core";
 import { colorDistance, hexRgb, type MarkColor, sanitizeSvg } from "@sketchi/icon-catalog";
 import { rankLookAlikes } from "@sketchi/icon-catalog/look-alikes";
 import { Clock, Context, Effect, Result } from "effect";
+import { Prompt } from "effect/ai";
 
 import {
 	confusedRequestText,
@@ -22,13 +23,7 @@ import {
 	type JudgeCandidate,
 	judgeLineup,
 } from "./judge.js";
-import {
-	type AuthorContentBlock,
-	type AuthorTurn,
-	type IconAuthorModel,
-	IconDrawModels,
-	type ModelCall,
-} from "./models.js";
+import { type IconAuthorModel, IconDrawModels, type ModelCall } from "./models.js";
 import {
 	ICON_EXPORT_SCALE,
 	iconLibrary,
@@ -148,12 +143,12 @@ export function sourcePalette(source: IconSource, pixels: readonly MarkColor[]):
 		.sort((left, right) => right[1] - left[1]);
 }
 
-function imageBlock(png: string): AuthorContentBlock {
-	return { type: "image", source: { type: "base64", media_type: "image/png", data: png } };
+function imageBlock(png: string): Prompt.FilePart {
+	return Prompt.filePart({ mediaType: "image/png", data: png });
 }
 
-function textBlock(text: string): AuthorContentBlock {
-	return { type: "text", text };
+function textBlock(text: string): Prompt.TextPart {
+	return Prompt.textPart({ text });
 }
 
 interface Rendered {
@@ -293,7 +288,7 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 	const lineupImages: Record<string, string> = { source: lineupSource.png };
 
 	// 3. Draft, render, review.
-	const messages: AuthorTurn[] = [
+	let messages = Prompt.make([
 		{
 			role: "user",
 			content: [
@@ -301,7 +296,7 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 				textBlock(draftRequestText(input.name, palette, options.note)),
 			],
 		},
-	];
+	]);
 	let rounds = 0;
 	let accepted = false;
 	let current: Rendered | undefined;
@@ -316,7 +311,7 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 		);
 		rounds += 1;
 		calls.push(reply.call);
-		messages.push({ role: "assistant", content: reply.content });
+		messages = Prompt.concat(messages, reply.content);
 		return decodeAuthorReply(reply.text);
 	});
 
@@ -350,7 +345,10 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 		const invalid = (issues: readonly string[]) => {
 			lastIssues = issues;
 			turns.push({ outcome: "invalid", issues });
-			messages.push({ role: "user", content: [textBlock(repairRequestText(issues))] });
+			messages = Prompt.concat(
+				messages,
+				Prompt.make([{ role: "user", content: [textBlock(repairRequestText(issues))] }]),
+			);
 			return "repair" as const;
 		};
 		if (!reply) return invalid(['The reply was not the {"accept", "recipe"} JSON.']);
@@ -385,10 +383,15 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 		if (outcome === "repair") continue;
 		current = outcome;
 		if (rounds < maxRounds) {
-			messages.push({
-				role: "user",
-				content: [imageBlock(current.sheet), textBlock(REVIEW_REQUEST_TEXT)],
-			});
+			messages = Prompt.concat(
+				messages,
+				Prompt.make([
+					{
+						role: "user",
+						content: [imageBlock(current.sheet), textBlock(REVIEW_REQUEST_TEXT)],
+					},
+				]),
+			);
 		}
 	}
 	if (!current) {
@@ -440,10 +443,19 @@ export const drawIcon = Effect.fn("iconDraw.draw")(function* (
 	) {
 		const confused = lineupImages[picked];
 		if (confused) {
-			messages.push({
-				role: "user",
-				content: [imageBlock(source.png), imageBlock(confused), textBlock(confusedRequestText())],
-			});
+			messages = Prompt.concat(
+				messages,
+				Prompt.make([
+					{
+						role: "user",
+						content: [
+							imageBlock(source.png),
+							imageBlock(confused),
+							textBlock(confusedRequestText()),
+						],
+					},
+				]),
+			);
 			const outcome = yield* reviseInTime;
 			if (outcome !== "accepted" && outcome !== "repair" && outcome !== "timeout") {
 				attempts += 1;

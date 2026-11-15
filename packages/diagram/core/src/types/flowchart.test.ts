@@ -1,7 +1,9 @@
-import { Schema } from "effect";
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Schema } from "effect";
+
 import { describe, expect, it } from "vitest";
 
-import { DiagramValidationError, parseIntermediateDiagram } from "../intermediate";
+import { parseIntermediateDiagram } from "../intermediate";
 import {
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_GROUP_DEPTH,
@@ -70,7 +72,9 @@ function denseAcyclicFlowchart(edgeCount: number) {
 describe("parseFlowchartDiagram", () => {
 	it("has a typed fixture that satisfies the flowchart contract", () => {
 		expect(flowchartFixture.type).toBe(flowchartDiagramType);
-		expect(parseFlowchartDiagram(flowchartFixture)).toEqual(flowchartFixture);
+		expect(parseFlowchartDiagram(flowchartFixture).pipe(Result.getOrThrow)).toEqual(
+			flowchartFixture,
+		);
 	});
 
 	it("keeps canonical flowchart eval fixtures valid", () => {
@@ -82,14 +86,14 @@ describe("parseFlowchartDiagram", () => {
 	});
 
 	it("rejects decision branches without labels", () => {
-		expect(() =>
+		expect(
 			parseFlowchartDiagram({
 				...flowchartFixture,
 				edges: flowchartFixture.edges.map((edge) =>
 					edge.id === "clear-draft" ? { ...edge, label: undefined } : edge,
 				),
 			}),
-		).toThrow(DiagramValidationError);
+		).toMatchObject({ failure: expect.any(FlowchartValidationError) });
 	});
 
 	it("reports canonical missing start and end failures", () => {
@@ -185,7 +189,9 @@ describe("parseFlowchartDiagram", () => {
 		};
 
 		expect(validationIssues(diagram)).toEqual([]);
-		expect(parseFlowchartDiagram(diagram)).toMatchObject({ id: diagram.id });
+		expect(parseFlowchartDiagram(diagram).pipe(Result.getOrThrow)).toMatchObject({
+			id: diagram.id,
+		});
 	});
 
 	it("enforces the 24-node and 64-edge limits at the semantic boundary", () => {
@@ -227,7 +233,7 @@ describe("parseFlowchartDiagram", () => {
 	});
 
 	it("throws the typed canonical validation error from parse", () => {
-		expect(() =>
+		expect(
 			parseFlowchartDiagram({
 				...flowchartFixture,
 				nodes: [
@@ -235,7 +241,7 @@ describe("parseFlowchartDiagram", () => {
 					{ id: "orphan", label: "Orphan process", kind: "process" },
 				],
 			}),
-		).toThrow(FlowchartValidationError);
+		).toMatchObject({ failure: expect.any(FlowchartValidationError) });
 	});
 });
 
@@ -256,7 +262,7 @@ describe("flowchart groups", () => {
 	};
 
 	it("accepts declared groups with grouped and ungrouped nodes", () => {
-		const diagram = parseFlowchartDiagram(grouped);
+		const diagram = parseFlowchartDiagram(grouped).pipe(Result.getOrThrow);
 		expect(diagram.groups?.map((group) => group.id)).toEqual(["intake", "authoring"]);
 		expect(diagram.nodes.map((node) => node.group)).toEqual([
 			"intake",
@@ -319,7 +325,7 @@ describe("flowchart zones", () => {
 	};
 
 	it("accepts zones nested through parent, holding nodes directly or through nested zones", () => {
-		const diagram = parseFlowchartDiagram(zoned);
+		const diagram = parseFlowchartDiagram(zoned).pipe(Result.getOrThrow);
 		expect(diagram.groups?.map((group) => [group.id, group.parent, group.kind])).toEqual([
 			["region", undefined, "region"],
 			["vpc", "region", "vpc"],
@@ -333,7 +339,9 @@ describe("flowchart zones", () => {
 			{ ...zoned, groups: [{ id: "region", label: "Region", kind: "galaxy" }] },
 			{ ...zoned, nodes: [{ ...zoned.nodes[0], shape: "hexagon" }, ...zoned.nodes.slice(1)] },
 		])
-			expect(() => parseFlowchartDiagram(input)).toThrow(/Expected/);
+			expect(parseFlowchartDiagram(input)).toMatchObject({
+				failure: { message: expect.stringMatching(/Expected/) },
+			});
 	});
 
 	it("names each nesting problem with a repair hint", () => {
@@ -362,9 +370,11 @@ describe("flowchart zones", () => {
 		expect(issues[2]?.hint).toBe(
 			'Set parent to the id of the declared group that encloses it ("region", "vpc", "public", "private"), or remove parent.',
 		);
-		expect(() =>
+		expect(
 			parseIntermediateDiagram({ ...zoned, groups: [{ id: "a", label: "A", parent: "a" }] }),
-		).toThrow('Group "a" is nested inside itself.');
+		).toMatchObject({
+			failure: { message: expect.stringContaining('Group "a" is nested inside itself.') },
+		});
 	});
 
 	it("bounds how deep zones nest", () => {
@@ -408,7 +418,7 @@ describe("flowchart lanes", () => {
 	};
 
 	it("accepts declared lanes that hold every node", () => {
-		const diagram = parseFlowchartDiagram(laned);
+		const diagram = parseFlowchartDiagram(laned).pipe(Result.getOrThrow);
 		expect(diagram.lanes?.map((lane) => lane.id)).toEqual(["author", "reviewer"]);
 		expect(diagram.nodes.map((node) => node.lane)).toEqual([
 			"author",

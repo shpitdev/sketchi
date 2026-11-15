@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { chartFixture, parseChartDiagram } from "@sketchi/diagram-core";
@@ -79,6 +81,6 @@ export const DenseLine: Story = {
 					values: Array.from({ length: 20 }, (_, index) => 30 + ((index * 17) % 29)),
 				},
 			],
-		}),
+		}).pipe(Result.getOrThrow),
 	},
 };

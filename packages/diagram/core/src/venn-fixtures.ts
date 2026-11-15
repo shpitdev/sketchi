@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import { parseVennDiagram, type VennDiagram } from "./types/venn.js";
 
 /** Venn diagrams that stress the layout: heavy regions, counts, long and non-Latin text. */
@@ -23,7 +25,7 @@ export const vennStressFixtures = {
 				items: ["Push notifications", "Biometric unlock", "App stores", "Dark mode", "Widgets"],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	/** Twelve items in the middle of three sets. */
 	heavyCenter: parseVennDiagram({
 		id: "heavy-center",
@@ -54,7 +56,7 @@ export const vennStressFixtures = {
 				],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	/** Twelve items in the overlap of two sets, one in each side. */
 	heavyLens: parseVennDiagram({
 		id: "heavy-lens",
@@ -85,7 +87,7 @@ export const vennStressFixtures = {
 				],
 			},
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	/** Long items in each set alone, custom colors including a dark one. */
 	heavySingles: parseVennDiagram({
 		id: "heavy-singles",
@@ -127,7 +129,7 @@ export const vennStressFixtures = {
 			},
 			{ sets: ["basic", "pro", "enterprise"], items: ["Mobile apps"] },
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	/** Counts instead of items, and set labels at their 40-character limit. */
 	counts: parseVennDiagram({
 		id: "counts",
@@ -142,7 +144,7 @@ export const vennStressFixtures = {
 			{ sets: ["platform"], count: 87 },
 			{ sets: ["support", "platform"], label: "Shared on-call rotation", count: 12 },
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	/** Three sets and nothing in them. */
 	empty: parseVennDiagram({
 		id: "empty",
@@ -153,7 +155,7 @@ export const vennStressFixtures = {
 			{ id: "dogs", label: "Dogs" },
 			{ id: "birds", label: "Birds" },
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	/** Wide glyphs in every region. */
 	cjk: parseVennDiagram({
 		id: "cjk",
@@ -173,5 +175,5 @@ export const vennStressFixtures = {
 			{ sets: ["zh", "ko"], items: ["声调"] },
 			{ sets: ["ja", "zh", "ko"], items: ["東アジア"] },
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 } satisfies Record<string, VennDiagram>;

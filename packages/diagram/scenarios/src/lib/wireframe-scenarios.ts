@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	isWireframeContainer,
 	parseWireframeDiagram,
@@ -544,7 +546,10 @@ export function wireframeDrawnCheck(
 	scene: RenderedDiagramScene,
 ): ScenarioCheck {
 	const problems: string[] = [];
-	const layout = layoutWireframeDiagram(diagram);
+	const result = layoutWireframeDiagram(diagram);
+	if (Result.isFailure(result))
+		return { id: "wireframe-drawn", passed: false, message: result.failure.message };
+	const layout = result.success;
 	const flat = (text: string) => text.replace(/\s+/gu, "");
 	for (const [index, screen] of diagram.screens.entries()) {
 		const frame = scene.elements.find((element) => element.id === `frame:${screen.id}`);
@@ -668,7 +673,7 @@ function defineWireframeScenario(definition: WireframeScenarioDefinition): Wiref
 		diagramType: "wireframe",
 		logos: [],
 		assertions: { screens, components, orders, sides, navigations },
-		expectedDiagram: parseWireframeDiagram(expected),
+		expectedDiagram: parseWireframeDiagram(expected).pipe(Result.getOrThrow),
 	};
 }
 

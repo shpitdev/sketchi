@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
@@ -44,7 +46,7 @@ const relation = (
 describe("Class diagram type", () => {
 	it("has a typed fixture that satisfies the canonical diagram contract", () => {
 		expect(classFixture.type).toBe(classDiagramType);
-		expect(parseCanonicalDiagram(classFixture)).toEqual(classFixture);
+		expect(parseCanonicalDiagram(classFixture).pipe(Result.getOrThrow)).toEqual(classFixture);
 	});
 
 	it("draws members as UML writes them, with visibility, types and markers", () => {
@@ -173,7 +175,7 @@ describe("Class diagram type", () => {
 				{ id: "r2", from: "Payment", to: "Status", kind: "association", toMultiplicity: "one" },
 			],
 		});
-		const diagram = parseClassDiagram(resolved);
+		const diagram = parseClassDiagram(resolved).pipe(Result.getOrThrow);
 		expect(diagram.classes[0]).toMatchObject({
 			kind: "abstract",
 			attributes: [{ name: "amount", type: "Money", visibility: "private" }],

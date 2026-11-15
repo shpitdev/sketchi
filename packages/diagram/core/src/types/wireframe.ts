@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const wireframeDiagramType = "wireframe" as const;
 
@@ -664,22 +665,39 @@ function validateComponent(
 		);
 }
 
-export class WireframeValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly WireframeValidationIssue[]) {
-		super(issues[0]?.message ?? "Wireframe failed semantic validation.");
-		this.name = "WireframeValidationError";
+export class WireframeValidationError extends Schema.TaggedError<
+	WireframeValidationError,
+	{ readonly brand: unique symbol }
+>()("WireframeValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(WireframeValidationIssue),
+}) {
+	static fromIssues(issues: readonly WireframeValidationIssue[]): WireframeValidationError {
+		return WireframeValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Wireframe failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateWireframeDiagram(diagram: WireframeDiagram): WireframeDiagram {
+export function validateWireframeDiagram(
+	diagram: WireframeDiagram,
+): Result.Result<WireframeDiagram, WireframeValidationError> {
 	const issues = getWireframeValidationIssues(diagram);
-	if (issues.length > 0) throw new WireframeValidationError(issues);
-	return diagram;
+	return issues.length > 0
+		? Result.fail(WireframeValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseWireframeDiagram(input: unknown): WireframeDiagram {
-	return validateWireframeDiagram(
-		Schema.decodeUnknownSync(WireframeDiagram, { errors: "all" })(input),
+export function parseWireframeDiagram(
+	input: unknown,
+): Result.Result<WireframeDiagram, Schema.SchemaError | WireframeValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(WireframeDiagram, { errors: "all" })(input),
+		validateWireframeDiagram,
 	);
 }
 
@@ -1252,4 +1270,4 @@ export const wireframeFixture = parseWireframeDiagram({
 			],
 		},
 	],
-});
+}).pipe(Result.getOrThrow);

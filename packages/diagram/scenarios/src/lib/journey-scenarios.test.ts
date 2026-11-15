@@ -1,8 +1,9 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option, Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import type { JourneyDiagram } from "@sketchi/diagram-core";
 import { renderDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
-import { Effect } from "effect";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { FixtureGenerationClientLayer } from "./fixture-client.js";
@@ -13,6 +14,7 @@ import { toDiagramGenerationPrompt } from "./prompt.js";
 const scenario = (id: string) => journeyScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: JourneyDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const online = scenario("online-purchase-journey-v2").expectedDiagram;
@@ -189,7 +191,7 @@ describe("prompt-grounded journey scenarios", () => {
 	});
 
 	it("reads the drawing: a sad face on a 5, a face between columns and a note across stages fail", () => {
-		const scene = renderDiagram(online);
+		const scene = renderDiagram(online).pipe(Result.getOrThrow);
 		expect(journeyDrawnCheck(online, scene).passed).toBe(true);
 		expect(journeyLayoutCheck(scene).passed).toBe(true);
 		const edit = (
@@ -240,7 +242,7 @@ describe("prompt-grounded journey scenarios", () => {
 	});
 
 	it("draws the six-stage challenge without overlap, wrapping into bands with its curve running on", () => {
-		const scene = renderDiagram(saas);
+		const scene = renderDiagram(saas).pipe(Result.getOrThrow);
 		expect(journeyLayoutCheck(scene).passed).toBe(true);
 		expect(journeyDrawnCheck(saas, scene).passed).toBe(true);
 		expect((scene.width - 80) / (scene.height - 80)).toBeLessThanOrEqual(2.45);
@@ -272,7 +274,7 @@ describe("prompt-grounded journey scenarios", () => {
 		const candidate = candidateFromMcpResult(
 			{ ok: true, result: { ok: true, status: "accepted", buildId: "build-1" }, builds: [receipt] },
 			"journey",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
 		expect(failed("saas-onboarding-journey-v2", candidate.diagram as JourneyDiagram)).toEqual([]);

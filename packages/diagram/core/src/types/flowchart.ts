@@ -1,11 +1,7 @@
-import { Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Schema, Array as Arr, Option, Result } from "effect";
 
-import {
-	DiagramEdge,
-	DiagramValidationError,
-	GraphNode,
-	IntermediateDiagram,
-} from "../intermediate.js";
+import { DiagramEdge, GraphNode, IntermediateDiagram } from "../intermediate.js";
 
 export const flowchartDiagramType = "flowchart" as const;
 
@@ -532,25 +528,39 @@ export function getFlowchartValidationIssues(
 	return issues.slice(0, FLOWCHART_MAX_ISSUES);
 }
 
-export class FlowchartValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly FlowchartValidationIssue[]) {
-		super(issues[0]?.message ?? "Flowchart failed semantic validation.");
-		this.name = "FlowchartValidationError";
+export class FlowchartValidationError extends Schema.TaggedError<
+	FlowchartValidationError,
+	{ readonly brand: unique symbol }
+>()("FlowchartValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(FlowchartValidationIssue),
+}) {
+	static fromIssues(issues: readonly FlowchartValidationIssue[]): FlowchartValidationError {
+		return FlowchartValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Flowchart failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateFlowchartDiagram(diagram: FlowchartDiagram): FlowchartDiagram {
+export function validateFlowchartDiagram(
+	diagram: FlowchartDiagram,
+): Result.Result<FlowchartDiagram, FlowchartValidationError> {
 	const issues = getFlowchartValidationIssues(diagram);
-	if (issues.length > 0) {
-		throw new FlowchartValidationError(issues);
-	}
-
-	return diagram;
+	return issues.length > 0
+		? Result.fail(FlowchartValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseFlowchartDiagram(input: unknown): FlowchartDiagram {
-	return validateFlowchartDiagram(
-		Schema.decodeUnknownSync(FlowchartDiagram, { errors: "all" })(input),
+export function parseFlowchartDiagram(
+	input: unknown,
+): Result.Result<FlowchartDiagram, Schema.SchemaError | FlowchartValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(FlowchartDiagram, { errors: "all" })(input),
+		validateFlowchartDiagram,
 	);
 }
 
@@ -581,7 +591,7 @@ export const flowchartFixture = parseFlowchartDiagram({
 		direction: "TB",
 		edgeRouting: "orthogonal",
 	},
-});
+}).pipe(Result.getOrThrow);
 
 export const pharmaBatchDispositionFlowchart = parseFlowchartDiagram({
 	id: "pharma-batch-disposition",
@@ -628,7 +638,7 @@ export const pharmaBatchDispositionFlowchart = parseFlowchartDiagram({
 		direction: "TB",
 		edgeRouting: "orthogonal",
 	},
-});
+}).pipe(Result.getOrThrow);
 
 /** A deploy flow whose nodes carry catalog logos, like the marketing hero. */
 export const deployPipelineLogoFlowchart = parseFlowchartDiagram({
@@ -673,7 +683,7 @@ export const deployPipelineLogoFlowchart = parseFlowchartDiagram({
 		direction: "TB",
 		edgeRouting: "orthogonal",
 	},
-});
+}).pipe(Result.getOrThrow);
 
 /**
  * A request flow whose Vercel group draws its platform's logo before its name,
@@ -719,7 +729,7 @@ export const requestFlowGroupLogoFlowchart = parseFlowchartDiagram({
 		direction: "TB",
 		edgeRouting: "orthogonal",
 	},
-});
+}).pipe(Result.getOrThrow);
 
 export const flowchartEvaluationFixtures = [flowchartFixture, pharmaBatchDispositionFlowchart];
 

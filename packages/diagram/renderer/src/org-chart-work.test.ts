@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import * as diagramCore from "@sketchi/diagram-core";
 import {
 	orgChartFixture,
@@ -54,7 +56,7 @@ const largest = parseOrgChartDiagram(
 			manager: `p${10 + index}`,
 		})),
 	}),
-);
+).pipe(Result.getOrThrow);
 
 describe("org chart layout work", () => {
 	// Measured: the fixture places once (28 comparisons, 17 wraps); eighty people try 15
@@ -69,9 +71,9 @@ describe("org chart layout work", () => {
 		(_, diagram, attempts, comparisons, wraps) => {
 			work.comparisons = 0;
 			work.wraps = 0;
-			const layout = layoutOrgChartDiagram(diagram);
+			const layout = layoutOrgChartDiagram(diagram).pipe(Result.getOrThrow);
 			const counted = { ...work };
-			renderOrgChartDiagram(diagram);
+			renderOrgChartDiagram(diagram).pipe(Result.getOrThrow);
 			expect(layout.attempts).toBeLessThanOrEqual(attempts);
 			expect(counted.comparisons).toBeLessThan(comparisons);
 			expect(counted.wraps).toBeLessThan(wraps);
