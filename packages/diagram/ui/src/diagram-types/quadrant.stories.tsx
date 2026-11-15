@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { parseQuadrantDiagram, quadrantFixture } from "@sketchi/diagram-core";
@@ -59,7 +61,7 @@ export const BoundaryPoints: Story = {
 				{ label: "On the vertical line", x: 0.5, y: 0.25 },
 				{ label: "On the horizontal line", x: 0.8, y: 0.5 },
 			],
-		}),
+		}).pipe(Result.getOrThrow),
 	},
 };
 
@@ -75,6 +77,6 @@ export const SharedPosition: Story = {
 				x: 0.7,
 				y: 0.7,
 			})),
-		}),
+		}).pipe(Result.getOrThrow),
 	},
 };

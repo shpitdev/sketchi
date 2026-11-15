@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,7 +8,6 @@ import {
 	quadrantDiagramType,
 	quadrantFixture,
 	quadrantGroups,
-	QuadrantValidationError,
 	type QuadrantValidationIssue,
 } from "./quadrant.js";
 
@@ -31,19 +32,17 @@ const chart = {
 
 /** The semantic issues a decodable quadrant chart fails with. */
 function issuesOf(input: object): readonly QuadrantValidationIssue[] {
-	try {
-		parseQuadrantDiagram(input);
-		return [];
-	} catch (error) {
-		if (error instanceof QuadrantValidationError) return error.issues;
-		throw error;
-	}
+	const result = parseQuadrantDiagram(input);
+	if (Result.isSuccess(result)) return [];
+	const error = result.failure;
+	if (error._tag !== "QuadrantValidationError") return expect.fail(error.message);
+	return error.issues;
 }
 
 describe("canonical quadrant chart", () => {
 	it("has a typed fixture that satisfies its contract", () => {
 		expect(quadrantFixture.type).toBe(quadrantDiagramType);
-		expect(parseQuadrantDiagram(quadrantFixture)).toEqual(quadrantFixture);
+		expect(parseQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow)).toEqual(quadrantFixture);
 	});
 
 	it("accepts points on the edges and the middle lines, groups and an empty matrix", () => {
@@ -54,21 +53,25 @@ describe("canonical quadrant chart", () => {
 				{ label: "Middle", x: 0.5, y: 0.5 },
 				{ label: "Edge", x: 1, y: 0.25, group: "Rivals" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(parsed.points.map((point) => [point.x, point.y])).toEqual([
 			[0, 1],
 			[0.5, 0.5],
 			[1, 0.25],
 		]);
-		expect(parseQuadrantDiagram({ ...chart, points: [] }).points).toEqual([]);
+		expect(parseQuadrantDiagram({ ...chart, points: [] }).pipe(Result.getOrThrow).points).toEqual(
+			[],
+		);
 	});
 
 	it("keeps zero scores, which sit on the low ends, apart from absent ones", () => {
-		const parsed = parseQuadrantDiagram({ ...chart, points: [{ label: "Zero", x: 0, y: 0 }] });
+		const parsed = parseQuadrantDiagram({ ...chart, points: [{ label: "Zero", x: 0, y: 0 }] }).pipe(
+			Result.getOrThrow,
+		);
 		expect(parsed.points[0]).toEqual({ label: "Zero", x: 0, y: 0 });
-		expect(() =>
+		expect(
 			parseQuadrantDiagram({ ...chart, points: [{ label: "Unscored", x: 0.5 }] }),
-		).toThrow(/y/u);
+		).toMatchObject({ failure: { message: expect.stringMatching(/y/u) } });
 	});
 
 	it("treats names like constructor and __proto__ as ordinary text", () => {
@@ -80,7 +83,7 @@ describe("canonical quadrant chart", () => {
 				{ label: "constructor", x: 0.7, y: 0.3, group: "__proto__" },
 				{ label: "toString", x: 0.4, y: 0.4, group: "constructor" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(quadrantGroups(parsed)).toEqual(["constructor", "__proto__"]);
 	});
 
@@ -98,13 +101,15 @@ describe("canonical quadrant chart", () => {
 	});
 
 	it("never takes coordinates, sizes or a layout", () => {
-		expect(() => parseQuadrantDiagram({ ...chart, quadrants: ["a", "b", "c", "d"] })).toThrow(
-			/quadrants/u,
-		);
-		expect(() =>
+		expect(parseQuadrantDiagram({ ...chart, quadrants: ["a", "b", "c", "d"] })).toMatchObject({
+			failure: { message: expect.stringMatching(/quadrants/u) },
+		});
+		expect(
 			parseQuadrantDiagram({ ...chart, xAxis: { title: "Price", low: "Cheap" } }),
-		).toThrow(/high/u);
-		expect(Object.keys(parseQuadrantDiagram({ ...chart, width: 900 }))).not.toContain("width");
+		).toMatchObject({ failure: { message: expect.stringMatching(/high/u) } });
+		expect(
+			Object.keys(parseQuadrantDiagram({ ...chart, width: 900 }).pipe(Result.getOrThrow)),
+		).not.toContain("width");
 	});
 
 	it.each([

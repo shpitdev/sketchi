@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
@@ -12,7 +14,6 @@ import {
 	wireframeComponents,
 	wireframeDiagramType,
 	wireframeFixture,
-	WireframeValidationError,
 } from "./wireframe";
 
 const wireframe = (children: unknown[], screen: Record<string, unknown> = {}) => ({
@@ -24,27 +25,29 @@ const wireframe = (children: unknown[], screen: Record<string, unknown> = {}) =>
 
 /** The issues a wireframe fails with, or [] when it is valid. */
 function issuesOf(input: unknown) {
-	try {
-		parseWireframeDiagram(input);
-		return [];
-	} catch (error) {
-		if (!(error instanceof WireframeValidationError)) throw error;
-		return error.issues;
-	}
+	const result = parseWireframeDiagram(input);
+	if (Result.isSuccess(result)) return [];
+	const error = result.failure;
+	if (error._tag !== "WireframeValidationError") return expect.fail(error.message);
+	return error.issues;
 }
 const codes = (input: unknown) => issuesOf(input).map((issue) => issue.code);
 
 describe("wireframe contract", () => {
 	it("has a typed fixture that satisfies the canonical diagram contract", () => {
 		expect(wireframeFixture.type).toBe(wireframeDiagramType);
-		expect(parseCanonicalDiagram(wireframeFixture)).toEqual(wireframeFixture);
+		expect(parseCanonicalDiagram(wireframeFixture).pipe(Result.getOrThrow)).toEqual(
+			wireframeFixture,
+		);
 		expect(wireframeFixture.screens[0]?.device).toBe("mobile");
 		for (const fixture of Object.values(wireframeStressFixtures))
 			expect(getWireframeValidationIssues(fixture), fixture.id).toEqual([]);
 	});
 
 	it("defaults the device to desktop and the palette", () => {
-		const parsed = parseWireframeDiagram(wireframe([{ type: "heading", text: "Hi" }]));
+		const parsed = parseWireframeDiagram(wireframe([{ type: "heading", text: "Hi" }])).pipe(
+			Result.getOrThrow,
+		);
 		expect(parsed.screens[0]?.device).toBe("desktop");
 		expect(parsed.style).toMatchObject({ accentColor: expect.any(String) });
 	});
@@ -55,7 +58,7 @@ describe("wireframe contract", () => {
 				{ type: "header", children: [{ type: "heading", text: "Acme" }] },
 				{ type: "card", children: [{ type: "row", children: [{ type: "button", text: "Go" }] }] },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(
 			[...wireframeComponents(parsed)].map(({ component, path, depth }) => [
 				component.type,
@@ -232,7 +235,9 @@ describe("wireframe contract", () => {
 				{ id: "product-page-2", name: "Product page", children: [{ type: "divider" }] },
 			],
 		});
-		expect(getWireframeValidationIssues(parseWireframeDiagram(resolved))).toEqual([]);
+		expect(
+			getWireframeValidationIssues(parseWireframeDiagram(resolved).pipe(Result.getOrThrow)),
+		).toEqual([]);
 	});
 
 	it("reads kind as the type, a chart kind alone as a chart, a text styled as a heading as one, and the type when a component names both", () => {
@@ -339,14 +344,11 @@ describe("wireframe input it must never misread", () => {
 			type: "wireframe",
 			screens: [{ name: "Home", children }],
 		});
-	const parsedIssue = (input: unknown) => {
-		try {
-			parseWireframeDiagram(input);
-			return undefined;
-		} catch (error) {
-			return error instanceof Error ? error.message : String(error);
-		}
-	};
+	const parsedIssue = (input: unknown) =>
+		Result.match(parseWireframeDiagram(input), {
+			onFailure: (error) => error.message,
+			onSuccess: () => undefined,
+		});
 
 	it.each([
 		["an object", { type: "heading", text: "Hi" }],
@@ -421,7 +423,9 @@ describe("wireframe input it must never misread", () => {
 			{ type: "input", label: "Seats", value: "0" },
 			{ type: "tabs", items: ["0", "1"], active: "0" },
 		]);
-		expect(getWireframeValidationIssues(parseWireframeDiagram(resolved))).toEqual([]);
+		expect(
+			getWireframeValidationIssues(parseWireframeDiagram(resolved).pipe(Result.getOrThrow)),
+		).toEqual([]);
 	});
 
 	it.each(["constructor", "__proto__", "toString", "hasOwnProperty"])(
@@ -450,7 +454,7 @@ describe("wireframe input it must never misread", () => {
 				{ type: "button", text: "Save\nnow" },
 				{ type: "tabs", items: ["One\ntab", "Two"] },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(parsed.screens[0]!.children.map((entry) => entry.text ?? entry.items?.[0])).toEqual([
 			"Two\nlines",
 			"Save\nnow",
@@ -476,7 +480,7 @@ describe("wireframe navigation", () => {
 				{ type: "button", text: "Continue", target: "done" },
 				{ type: "link", text: "Skip", target: "done" },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(parsed.screens[0]!.children.map((component) => component.target)).toEqual([
 			"done",
 			"done",

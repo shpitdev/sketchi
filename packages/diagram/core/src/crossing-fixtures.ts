@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import { parseFlowchartDiagram } from "./types/flowchart.js";
 import { parseStateMachineDiagram, stateMachineDiagramType } from "./types/state-machine.js";
 import connectionRetry from "./fixtures/crossings/connection-retry.js";
@@ -35,7 +37,7 @@ function flowchart(fixture: object) {
 		...fixture,
 		type: "flowchart",
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /**
@@ -79,7 +81,9 @@ export const sideFixtures = {
 };
 
 function stateMachine(fixture: object) {
-	return parseStateMachineDiagram({ ...fixture, type: stateMachineDiagramType });
+	return parseStateMachineDiagram({ ...fixture, type: stateMachineDiagramType }).pipe(
+		Result.getOrThrow,
+	);
 }
 
 /**

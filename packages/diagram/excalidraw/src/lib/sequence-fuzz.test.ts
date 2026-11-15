@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	getCanvasValidationIssues,
@@ -96,7 +98,7 @@ function randomSequences(count: number, start: number): SequenceDiagram[] {
 			type: "sequence",
 			participants: ids.map((id) => ({ id, label: pick(PARTICIPANTS) })),
 			messages,
-		});
+		}).pipe(Result.getOrThrow);
 	});
 }
 
@@ -136,7 +138,7 @@ function deepSequence(
 		type: "sequence",
 		participants: ids.map((id) => ({ id, label: pick(PARTICIPANTS) })),
 		messages: [...calls, ...selves, ...returns],
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /**
@@ -173,7 +175,7 @@ function wideNestedSequences(count: number, start: number): SequenceDiagram[] {
 					type: "return" as const,
 				})),
 			],
-		});
+		}).pipe(Result.getOrThrow);
 	});
 }
 
@@ -356,7 +358,7 @@ describe("sequence self-message fuzz", () => {
 		let deepLoops = 0;
 		let tightened = 0;
 		for (const diagram of diagrams) {
-			const scene = renderSequenceDiagram(diagram);
+			const scene = renderSequenceDiagram(diagram).pipe(Result.getOrThrow);
 			expect(getCanvasValidationIssues(scene), diagram.id).toEqual([]);
 			expect(selfMessageIssues(diagram, scene), diagram.id).toEqual([]);
 			expect(labelOverlaps(diagram, scene), diagram.id).toEqual([]);
@@ -392,13 +394,17 @@ describe("sequence self-message fuzz", () => {
 	it("puts no label of a wide nested sequence on a bar it clears at natural spacing", () => {
 		let tightened = 0;
 		for (const diagram of wideNestedSequences(Math.ceil(COUNT / 4), 20261106)) {
-			const scene = renderSequenceDiagram(diagram);
+			const scene = renderSequenceDiagram(diagram).pipe(Result.getOrThrow);
 			expect(getCanvasValidationIssues(scene), diagram.id).toEqual([]);
 			// Bars nested deep inside a participant reach past its lifeline and carry
 			// its messages' ends, and so their labels, with them; at the natural
 			// spacing a label may already touch one, and tightening adds none.
 			const natural = new Set(
-				labelOverlaps(diagram, renderSequenceDiagram(diagram, { tighten: false }), true),
+				labelOverlaps(
+					diagram,
+					renderSequenceDiagram(diagram, { tighten: false }).pipe(Result.getOrThrow),
+					true,
+				),
 			);
 			expect(
 				labelOverlaps(diagram, scene, true).filter((clash) => !natural.has(clash)),
@@ -419,7 +425,7 @@ describe("sequence self-message fuzz", () => {
 
 	it("exports every diagram as a valid Excalidraw scene with each loop label grouped beside its loop", () => {
 		for (const diagram of diagrams) {
-			const rendered = renderSequenceDiagram(diagram);
+			const rendered = renderSequenceDiagram(diagram).pipe(Result.getOrThrow);
 			const scene = convertSceneToExcalidraw(rendered);
 			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
 			for (const message of diagram.messages.filter((m) => m.source === m.target)) {

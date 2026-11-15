@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	candidateRouteQuality,
@@ -18,18 +20,24 @@ const render = (
 	fixture: Fixture,
 	direction: Direction,
 	edgeRouting: "orthogonal" | "straight" | "curved" = "orthogonal",
-) => renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } });
+) =>
+	renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } }).pipe(
+		Result.getOrThrow,
+	);
 
-const scenes = new Map<string, ReturnType<typeof renderIntermediateDiagram>>();
+const scenes = new Map<
+	string,
+	Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>
+>();
 const rendered = (name: keyof typeof routingFixtures, direction: Direction) => {
 	const key = `${name}:${direction}`;
 	if (!scenes.has(key)) scenes.set(key, render(routingFixtures[name], direction));
 	return scenes.get(key)!;
 };
 
-const nodesOf = (scene: ReturnType<typeof renderIntermediateDiagram>) =>
+const nodesOf = (scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>) =>
 	scene.elements.filter((e): e is NodeSceneElement => e.type === "node");
-const arrowsOf = (scene: ReturnType<typeof renderIntermediateDiagram>) =>
+const arrowsOf = (scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>) =>
 	scene.elements.filter((e) => e.type === "arrow");
 const center = (node: NodeSceneElement) => ({
 	x: node.x + node.width / 2,
@@ -37,7 +45,9 @@ const center = (node: NodeSceneElement) => ({
 });
 
 /** Long side over short side of the drawn nodes and arrows, with Sketchi's 20-unit export padding. */
-function exportAspect(scene: ReturnType<typeof renderIntermediateDiagram>): number {
+function exportAspect(
+	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
+): number {
 	const points = [
 		...nodesOf(scene).flatMap((n) => [
 			{ x: n.x, y: n.y },
@@ -59,7 +69,9 @@ function corners(points: readonly ScenePoint[]): ScenePoint[] {
 }
 
 /** Interior crossings between the axis-aligned runs of different arrows. */
-function crossings(scene: ReturnType<typeof renderIntermediateDiagram>): string[] {
+function crossings(
+	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
+): string[] {
 	const arrows = arrowsOf(scene).flatMap((a) =>
 		a.type === "arrow" ? [{ ...a, points: corners(a.points) }] : [],
 	);
@@ -85,7 +97,9 @@ function crossings(scene: ReturnType<typeof renderIntermediateDiagram>): string[
 }
 
 /** Jogs, near-coincident corridors, touching arrowheads and lines through an arrowhead. */
-function readerFindings(scene: ReturnType<typeof renderIntermediateDiagram>): number {
+function readerFindings(
+	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
+): number {
 	const nodes = nodesOf(scene);
 	const arrows = arrowsOf(scene).flatMap((a) => (a.type === "arrow" ? [a] : []));
 	const points = [
@@ -130,7 +144,7 @@ function axes(direction: Direction) {
 
 /** Runs of an arrow beyond every node along the flow: around the outer margins. */
 function marginRuns(
-	scene: ReturnType<typeof renderIntermediateDiagram>,
+	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
 	arrow: { points: readonly ScenePoint[] },
 	direction: Direction,
 ): ScenePoint[][] {
@@ -269,7 +283,7 @@ describe("long flows wrap into bands that read in the requested direction", () =
 					{ id: "bc", source: "B", target: "C", label: "Hand off to the next step" },
 					{ id: "cd", source: "C", target: "D", label: "Hand off to the next step" },
 				],
-			}),
+			}).pipe(Result.getOrThrow),
 			direction,
 		);
 		const { across } = axes(direction);
@@ -302,7 +316,7 @@ describe("long flows wrap into bands that read in the requested direction", () =
 					{ id: "retry", source: "H", target: "B", label: "Retry" },
 					{ id: "finish", source: "H", target: "done", label: "Yes" },
 				],
-			}),
+			}).pipe(Result.getOrThrow),
 			direction,
 		);
 		const { along, sign } = axes(direction);
@@ -349,10 +363,10 @@ const expenseRows = parseFlowchartDiagram({
 		target: target!,
 		...(label ? { label } : {}),
 	})),
-});
+}).pipe(Result.getOrThrow);
 
 describe("continuations step through the gap between bands", () => {
-	const arrowsIn = (scene: ReturnType<typeof renderIntermediateDiagram>) =>
+	const arrowsIn = (scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>) =>
 		arrowsOf(scene).flatMap((a) => (a.type === "arrow" ? [a] : []));
 
 	it.each(directions)(
@@ -452,11 +466,14 @@ function gatedRelease(checks: number) {
 		id: `gated-release-${checks}`,
 		nodes,
 		edges,
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /** Every edge of a loop-free flow runs forward along it only when nothing wrapped. */
-function runsForward(scene: ReturnType<typeof renderIntermediateDiagram>, direction: Direction) {
+function runsForward(
+	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
+	direction: Direction,
+) {
 	const { along, sign } = axes(direction);
 	const nodes = new Map(nodesOf(scene).map((node) => [node.nodeId, node]));
 	return arrowsOf(scene).every(
@@ -505,7 +522,7 @@ const ciReleaseGate = parseFlowchartDiagram({
 		target: target!,
 		...(label ? { label } : {}),
 	})),
-});
+}).pipe(Result.getOrThrow);
 
 describe("tall columns wrap into even columns at about 2.5:1, as rows do", () => {
 	it.each(["TB", "BT"] as const)(
@@ -592,7 +609,7 @@ describe("avoidable crossings", () => {
 					target: target!,
 					label: id!,
 				})),
-			}),
+			}).pipe(Result.getOrThrow),
 			"BT",
 		);
 		expect(crossings(scene).length).toBeLessThanOrEqual(1);
@@ -620,7 +637,7 @@ describe("avoidable crossings", () => {
 					{ id: "bc", source: "b", target: "c" },
 					{ id: "bd", source: "b", target: "d" },
 				],
-			}),
+			}).pipe(Result.getOrThrow),
 			direction,
 		);
 		const { across } = axes(direction);

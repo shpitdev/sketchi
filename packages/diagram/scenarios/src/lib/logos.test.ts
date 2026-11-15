@@ -1,9 +1,11 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Effect } from "effect";
 import { assert, layer } from "@effect/vitest";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
 import { logosNamedInText } from "@sketchi/icon-catalog";
 import { nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import { GENERIC_PROMPTS } from "@sketchi/icon-catalog/generic-prompts";
-import { Effect } from "effect";
+
 import { describe, expect, it } from "vitest";
 
 import { evaluateScenarioDiagram, evaluateScenarioFixture, scenarioLogoChecks } from "./evaluate";
@@ -14,9 +16,9 @@ import { flowchartScenarios, getFlowchartScenario } from "./scenarios";
 const logoScenarioIds = ["deploy-pipeline-logos", "ai-app-stack-logos"];
 
 function check(id: string, scenarioId: string, diagram: unknown) {
-	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), diagram).checks.find(
-		(entry) => entry.id === id,
-	);
+	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), diagram)
+		.pipe(Result.getOrThrow)
+		.checks.find((entry) => entry.id === id);
 }
 
 describe("scenario logos", () => {
@@ -41,7 +43,7 @@ describe("scenario logos", () => {
 
 	it("passes the maintained logo fixtures with recall and grounding checks", () => {
 		for (const id of logoScenarioIds) {
-			const evaluation = evaluateScenarioFixture(getFlowchartScenario(id));
+			const evaluation = evaluateScenarioFixture(getFlowchartScenario(id)).pipe(Result.getOrThrow);
 			expect(evaluation.ok, id).toBe(true);
 			expect(evaluation.checks.filter((entry) => entry.id.startsWith("icon:"))).not.toHaveLength(0);
 		}

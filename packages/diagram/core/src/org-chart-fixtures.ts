@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import {
 	type OrgChartDiagram,
 	orgChartDiagramType,
@@ -104,7 +106,7 @@ function grown(
 	}
 	return parseOrgChartDiagram(
 		resolveOrgChartShorthand({ id, title, type: orgChartDiagramType, people, ...extra }),
-	);
+	).pipe(Result.getOrThrow);
 }
 
 /**
@@ -138,7 +140,7 @@ export const orgChartStressFixtures = {
 				{ id: "c", name: "West Board", title: "Chair" },
 			],
 		}),
-	),
+	).pipe(Result.getOrThrow),
 	regions: grown("regions", "Departments as regions", [[4], [3, 2, 1, 4], [0, 2, 1]], {
 		groupByDepartment: true,
 	}),

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -72,7 +74,7 @@ function labelSize(label: CanvasTextElement) {
 describe("node logo layout", () => {
 	for (const direction of ["TB", "LR"] as const) {
 		it(`stacks each logo above a bottom-aligned label inside the text box (${direction})`, () => {
-			const scene = renderIntermediateDiagram(deployPipeline(direction));
+			const scene = renderIntermediateDiagram(deployPipeline(direction)).pipe(Result.getOrThrow);
 			const sizes = Object.fromEntries(nodes(scene).map((node) => [node.nodeId, node.icon?.size]));
 			expect(sizes).toEqual({
 				push: 24,
@@ -108,7 +110,7 @@ describe("node logo layout", () => {
 		});
 
 		it(`routes around logo nodes without crossings or overlaps (${direction})`, () => {
-			const scene = renderIntermediateDiagram(deployPipeline(direction));
+			const scene = renderIntermediateDiagram(deployPipeline(direction)).pipe(Result.getOrThrow);
 			const arrows = scene.elements.filter((element) => element.type === "arrow");
 			const sceneNodes = nodes(scene);
 
@@ -139,7 +141,7 @@ describe("node logo layout", () => {
 
 	it("validates once assets are embedded and renders deterministically", () => {
 		const diagram = deployPipeline("TB");
-		const scene = renderIntermediateDiagram(diagram);
+		const scene = renderIntermediateDiagram(diagram).pipe(Result.getOrThrow);
 		const { scene: embedded, dropped } = embedCanvasIcons(scene, (slug) => ({
 			name: slug,
 			svg: '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"/>',
@@ -147,7 +149,7 @@ describe("node logo layout", () => {
 
 		expect(dropped).toEqual([]);
 		expect(getCanvasValidationIssues(embedded)).toEqual([]);
-		expect(renderIntermediateDiagram(diagram)).toEqual(scene);
+		expect(renderIntermediateDiagram(diagram).pipe(Result.getOrThrow)).toEqual(scene);
 	});
 
 	it("keeps every logo when Excalidraw rounds its text box", () => {
@@ -166,7 +168,7 @@ describe("node logo layout", () => {
 					title: "Rounding",
 					nodes: [{ id: `n${index}`, label, kind, icon: { slug: "github" } }],
 					edges: [],
-				});
+				}).pipe(Result.getOrThrow);
 				const { scene: embedded, dropped } = embedCanvasIcons(scene, () => ({
 					name: "GitHub",
 					svg,
@@ -178,7 +180,7 @@ describe("node logo layout", () => {
 	});
 
 	it("keeps plain nodes free of icons and middle-aligned labels", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 		for (const node of nodes(scene)) {
 			expect(node.icon).toBeUndefined();
 			expect(labelFor(scene, node).verticalAlign).toBeUndefined();
@@ -189,7 +191,7 @@ describe("node logo layout", () => {
 describe("decision label sizing", () => {
 	it("sizes diamonds so an Excalidraw edit keeps the stored wrap", () => {
 		for (const fixture of [flowchartFixture, pharmaBatchDispositionFlowchart]) {
-			const scene = renderIntermediateDiagram(fixture);
+			const scene = renderIntermediateDiagram(fixture).pipe(Result.getOrThrow);
 			for (const node of nodes(scene).filter((entry) => entry.shape === "diamond")) {
 				const box = excalidrawBoundTextBox(node);
 				const text = labelSize(labelFor(scene, node));
@@ -205,7 +207,7 @@ describe("decision label sizing", () => {
 			nodes: flowchartFixture.nodes.map((node) =>
 				node.id === "clear" ? { ...node, label: "Is the requested scope clear enough?" } : node,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		const diamond = nodes(scene).find((node) => node.nodeId === "clear");
 		if (!diamond) throw new Error("Missing decision node.");
 

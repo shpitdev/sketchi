@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	flowchartFixture,
@@ -58,7 +60,7 @@ const fourBranches = parseIntermediateDiagram({
 		...["a", "b", "c", "d"].map((id) => ({ id, label: id })),
 	],
 	edges: ["d", "b", "a", "c"].map((id) => ({ id, source: "decision", target: id, label: id })),
-});
+}).pipe(Result.getOrThrow);
 
 describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct feedback: %s", (direction) => {
 	it.each(["straight", "curved"] as const)("reserves every final %s endpoint", (edgeRouting) => {
@@ -72,7 +74,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct feedback: %s", 
 					.map(({ label: _label, ...edge }) => edge),
 				layout: { direction, edgeRouting },
 			};
-			const scene = renderIntermediateDiagram(fixture);
+			const scene = renderIntermediateDiagram(fixture).pipe(Result.getOrThrow);
 			const arrows = scene.elements.filter((e) => e.type === "arrow");
 			expect(scene.elements.filter((e) => e.type === "node")).toHaveLength(minimal ? 4 : 6);
 			expect(arrows).toHaveLength(minimal ? 6 : 8);
@@ -106,7 +108,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("settled direct feedback: %s", 
 						)
 						.map((e) => (e.id === "ca" ? { ...e, label: "Revisit earlier stage now" } : e)),
 					layout: { direction, edgeRouting },
-				});
+				}).pipe(Result.getOrThrow);
 				const arrow = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "ca")!;
 				const label = scene.elements.find((e) => e.type === "text" && e.id === "edge:ca:label")!;
 				if (arrow.type !== "arrow" || label.type !== "text")
@@ -142,7 +144,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("direct return corridors: %s", 
 						e.id === "e5" && labeled ? { ...e, label: "Retry" } : e,
 					),
 					layout: { direction, edgeRouting },
-				});
+				}).pipe(Result.getOrThrow);
 				const arrows = scene.elements.filter((e) => e.type === "arrow");
 				const nodes = scene.elements.filter((e) => e.type === "node");
 				expect(nodes).toHaveLength(6);
@@ -179,7 +181,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("feedback capacity: %s", (direc
 		const scene = renderIntermediateDiagram({
 			...fixture,
 			layout: { ...fixture.layout, direction },
-		});
+		}).pipe(Result.getOrThrow);
 		const arrows = scene.elements.filter((e) => e.type === "arrow");
 		const returns = arrows.filter((a) => a.edgeId.startsWith("back"));
 		expect(scene.elements.filter((e) => e.type === "node")).toHaveLength(7);
@@ -206,7 +208,10 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("feedback capacity: %s", (direc
 						edges: workflow.edges.filter((e) => e.id !== "start" && e.id !== "end"),
 					}
 				: workflow;
-			const scene = renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } });
+			const scene = renderIntermediateDiagram({
+				...fixture,
+				layout: { direction, edgeRouting },
+			}).pipe(Result.getOrThrow);
 			const nodes = scene.elements.filter((e) => e.type === "node");
 			const arrows = scene.elements.filter((e) => e.type === "arrow");
 			expect(nodes).toHaveLength(minimal ? 3 : 5);
@@ -229,7 +234,10 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("direct feedback: %s", (directi
 		"keeps %s feedback outside both bound nodes",
 		(edgeRouting) => {
 			const fixture = routingFixtures["review-feedback"];
-			const scene = renderIntermediateDiagram({ ...fixture, layout: { direction, edgeRouting } });
+			const scene = renderIntermediateDiagram({
+				...fixture,
+				layout: { direction, edgeRouting },
+			}).pipe(Result.getOrThrow);
 			const feedback = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "feedback")!;
 			if (feedback.type !== "arrow") throw new Error("Missing feedback arrow");
 			const source = scene.elements.find(
@@ -269,7 +277,7 @@ it.each(["straight", "curved"] as const)(
 		const scene = renderIntermediateDiagram({
 			...routingFixtures["review-feedback"],
 			layout: { direction: "TB", edgeRouting },
-		});
+		}).pipe(Result.getOrThrow);
 		const feedback = scene.elements.find((e) => e.type === "arrow" && e.edgeId === "feedback")!;
 		const label = scene.elements.find((e) => e.type === "text" && e.id === "edge:no:label")!;
 		if (feedback.type !== "arrow" || label.type !== "text")
@@ -294,7 +302,7 @@ const manyInputs = parseIntermediateDiagram({
 		source: `source-${i}`,
 		target: "sink",
 	})),
-});
+}).pipe(Result.getOrThrow);
 const fixtures = {
 	...routingFixtures,
 	flowchartFixture,
@@ -303,7 +311,7 @@ const fixtures = {
 	manyInputs,
 };
 describe.each(Object.entries(fixtures))("%s", (_name, fixture) => {
-	const scene = renderIntermediateDiagram(fixture);
+	const scene = renderIntermediateDiagram(fixture).pipe(Result.getOrThrow);
 	const nodes = scene.elements.filter((e) => e.type === "node");
 	const arrows = scene.elements.filter((e) => e.type === "arrow");
 	it("has no coincident interiors between directed routes", () => {
@@ -451,7 +459,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("feedback ports: %s", (directio
 			const scene = renderIntermediateDiagram({
 				...fixture,
 				layout: { ...fixture.layout, direction },
-			});
+			}).pipe(Result.getOrThrow);
 			const nodes = scene.elements.filter((e) => e.type === "node");
 			const arrows = scene.elements.filter((e) => e.type === "arrow");
 			const feedback = arrows.find((a) => a.edgeId === "feedback")!;
@@ -492,7 +500,9 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("feedback ports: %s", (directio
  * Endpoint jogs, near-coincident corridors, touching arrowheads and lines through
  * another arrow's head, judged at reader scale.
  */
-function readerFindings(scene: ReturnType<typeof renderIntermediateDiagram>): string[] {
+function readerFindings(
+	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
+): string[] {
 	const nodes = scene.elements.filter((e) => e.type === "node");
 	const arrows = scene.elements.filter((e) => e.type === "arrow");
 	const xs = [
@@ -524,7 +534,10 @@ function readerFindings(scene: ReturnType<typeof renderIntermediateDiagram>): st
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 // Rendering is deterministic, so each fixture and direction renders once for every check.
-const rendered = new Map<string, ReturnType<typeof renderIntermediateDiagram>>();
+const rendered = new Map<
+	string,
+	Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>
+>();
 const render = (
 	fixture: (typeof routingFixtures)[keyof typeof routingFixtures],
 	direction: string,
@@ -533,7 +546,9 @@ const render = (
 	if (!rendered.has(key))
 		rendered.set(
 			key,
-			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
+			renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }).pipe(
+				Result.getOrThrow,
+			),
 		);
 	return rendered.get(key)!;
 };
@@ -646,8 +661,8 @@ describe.each(["LR", "RL", "TB", "BT"] as const)("direct decision ports: %s", (d
 						{ id: "e4", source: "n3", target: "n1", label: "No" },
 					],
 					layout: { direction, edgeRouting },
-				}),
-			);
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow);
 			const nodes = scene.elements.filter((e) => e.type === "node");
 			const inward: string[] = [];
 			for (const arrow of scene.elements.filter((e) => e.type === "arrow"))
@@ -677,7 +692,7 @@ describe("rank gaps", () => {
 	it("grows the gap a line steps sideways across until the step clears both its ends", () => {
 		// Monitoring led to the resolution through a 96-unit gap with a 148-unit
 		// step: wherever the step sat, it read as a jog into the arrowhead.
-		const scene = renderIntermediateDiagram(rankGapFlowchart);
+		const scene = renderIntermediateDiagram(rankGapFlowchart).pipe(Result.getOrThrow);
 		const [xs, ys] = (["x", "y"] as const).map((axis) =>
 			scene.elements.flatMap((e) =>
 				e.type === "arrow"

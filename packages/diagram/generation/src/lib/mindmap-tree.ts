@@ -1,9 +1,10 @@
 import {
 	type MindmapDiagram,
+	type DiagramValidationError,
 	mindmapDiagramFromTree,
 	SKETCHI_DIAGRAM_STYLE,
 } from "@sketchi/diagram-core";
-import { Schema } from "effect";
+import { Result, Schema } from "effect";
 
 export interface GeneratedMindmapTopic {
 	readonly children: readonly GeneratedMindmapTopic[];
@@ -42,7 +43,9 @@ export const GeneratedMindmapTree = Schema.Struct({
 export interface GeneratedMindmapTree extends Schema.Schema.Type<typeof GeneratedMindmapTree> {}
 
 /** Derive graph identity and parentage from the model's nested hierarchy. */
-export function generatedMindmapTreeToDiagram(tree: GeneratedMindmapTree): MindmapDiagram {
+export function generatedMindmapTreeToDiagram(
+	tree: GeneratedMindmapTree,
+): Result.Result<MindmapDiagram, Schema.SchemaError | DiagramValidationError> {
 	return mindmapDiagramFromTree({
 		id: tree.id,
 		title: tree.title,

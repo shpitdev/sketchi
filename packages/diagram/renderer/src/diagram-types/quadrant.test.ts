@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import {
 	getCanvasValidationIssues,
 	parseQuadrantDiagram,
@@ -21,11 +23,11 @@ function quadrant(points: QuadrantDiagram["points"], extra: object = {}): Quadra
 		id: "test-quadrant",
 		points,
 		...extra,
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 function expectReadable(diagram: QuadrantDiagram): RenderedDiagramScene {
-	const scene = renderQuadrantDiagram(diagram);
+	const scene = renderQuadrantDiagram(diagram).pipe(Result.getOrThrow);
 	expect(getCanvasValidationIssues(scene)).toEqual([]);
 	expect(quadrantLayoutIssues(scene, diagram).map((issue) => issue.message)).toEqual([]);
 	return scene;
@@ -46,14 +48,14 @@ describe("quadrant chart renderer", () => {
 	it("renders the fixture into a valid, deterministic, readable scene", () => {
 		const scene = expectReadable(quadrantFixture);
 		expect(scene.diagramId).toBe("effort-impact-backlog");
-		expect(renderQuadrantDiagram(quadrantFixture)).toEqual(scene);
+		expect(renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow)).toEqual(scene);
 		const aspect = scene.width / scene.height;
 		expect(aspect).toBeGreaterThan(1 / 1.4);
 		expect(aspect).toBeLessThan(1.4);
 	});
 
 	it("splits a square plot into four tinted quadrants with their names in their outer corners", () => {
-		const scene = renderQuadrantDiagram(quadrantFixture);
+		const scene = renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow);
 		const { plot, regions, names } = readQuadrantScene(scene);
 		expect(plot!.right - plot!.left).toBe(plot!.bottom - plot!.top);
 		const half = (plot!.right - plot!.left) / 2;
@@ -90,7 +92,7 @@ describe("quadrant chart renderer", () => {
 	});
 
 	it("draws each axis as an arrow toward its high end, carrying its title and end labels", () => {
-		const scene = renderQuadrantDiagram(quadrantFixture);
+		const scene = renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow);
 		const { plot } = readQuadrantScene(scene);
 		const x = line(scene, "quadrant:axis:x");
 		const y = line(scene, "quadrant:axis:y");
@@ -123,7 +125,7 @@ describe("quadrant chart renderer", () => {
 	});
 
 	it("puts every dot at its exact position, grouped with its label", () => {
-		const scene = renderQuadrantDiagram(quadrantFixture);
+		const scene = renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow);
 		const { plot, dots } = readQuadrantScene(scene);
 		const size = plot!.right - plot!.left;
 		quadrantFixture.points.forEach((point, index) => {
@@ -202,10 +204,12 @@ describe("quadrant chart renderer", () => {
 	});
 
 	it("grows the plot only when a crowded chart cannot read at the smallest size", () => {
-		expect(readQuadrantScene(renderQuadrantDiagram(quadrantFixture)).plot!.right).toBeGreaterThan(
-			0,
-		);
-		const sparse = readQuadrantScene(renderQuadrantDiagram(quadrantFixture)).plot!;
+		expect(
+			readQuadrantScene(renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow)).plot!.right,
+		).toBeGreaterThan(0);
+		const sparse = readQuadrantScene(
+			renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow),
+		).plot!;
 		expect(sparse.right - sparse.left).toBe(QUADRANT_PLOT_SIZES[0]);
 		const dense = quadrant(
 			Array.from({ length: 30 }, (_, index) => ({
@@ -235,7 +239,7 @@ describe("quadrant chart renderer", () => {
 		expect(text(scene, "quadrant:legend:2:label")).toBeUndefined();
 		expect(node(scene, "quadrant:key:1").fillColor).toBe(CHART_SERIES_COLORS[1]);
 		// Without groups, every dot shares the first color and no legend draws.
-		const plain = renderQuadrantDiagram(quadrantFixture);
+		const plain = renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow);
 		expect(plain.elements.some((element) => element.id.startsWith("quadrant:legend:"))).toBe(false);
 	});
 
@@ -331,7 +335,7 @@ describe("quadrant chart renderer", () => {
 	});
 
 	it("reports a divider broken under a label", () => {
-		const scene = renderQuadrantDiagram(quadrantFixture);
+		const scene = renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow);
 		const vertical = line(scene, "quadrant:midline:vertical");
 		const [top, bottom] = vertical.points;
 		const broken = {
@@ -383,7 +387,7 @@ describe("quadrant chart renderer", () => {
 			{ label: "Alpha", x: 0.3, y: 0.3 },
 			{ label: "Beta", x: 0.34, y: 0.34 },
 		]);
-		const scene = renderQuadrantDiagram(diagram);
+		const scene = renderQuadrantDiagram(diagram).pipe(Result.getOrThrow);
 		const own = node(scene, "quadrant:point:0");
 		const ownCenter = { x: own.x + own.width / 2, y: own.y + own.height / 2 };
 		// Up and left of its own dot, nearer it than Beta's, but level with Beta's dot.
@@ -416,19 +420,13 @@ describe("quadrant chart renderer", () => {
 			const crowded = quadrant(
 				Array.from({ length: 30 }, (_, index) => ({ label: `${label} ${index + 1}`, x: 0, y: 0 })),
 			);
-			let scene: RenderedDiagramScene | undefined;
-			let thrown: unknown;
-			try {
-				scene = renderQuadrantDiagram(crowded);
-			} catch (error) {
-				thrown = error;
-			}
-			if (scene) {
-				expect(quadrantLayoutIssues(scene, crowded)).toEqual([]);
+			const rendered = renderQuadrantDiagram(crowded);
+			if (Result.isSuccess(rendered)) {
+				expect(quadrantLayoutIssues(rendered.success, crowded)).toEqual([]);
 				continue;
 			}
-			expect(thrown).toBeInstanceOf(QuadrantValidationError);
-			const issue = (thrown as QuadrantValidationError).issues[0]!;
+			expect(rendered.failure).toBeInstanceOf(QuadrantValidationError);
+			const issue = rendered.failure.issues[0]!;
 			expect(issue).toMatchObject({ code: "quadrant_too_large" });
 			expect(issue.hint).toMatch(/Spread the scores/u);
 		}
@@ -503,7 +501,7 @@ describe("quadrant chart renderer", () => {
 	});
 
 	it("reports a dot moved off its position", () => {
-		const scene = renderQuadrantDiagram(quadrantFixture);
+		const scene = renderQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow);
 		const moved = {
 			...scene,
 			elements: scene.elements.map((element) =>

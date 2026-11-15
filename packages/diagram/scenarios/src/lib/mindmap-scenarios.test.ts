@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,6 +15,7 @@ import { mindmapAlternativesGrounded, mindmapScenarios } from "./mindmap-scenari
 const scenario = (id: string) => mindmapScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: MindmapDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 
@@ -36,7 +39,7 @@ function edited(id: string, edit: (root: MindmapTopicTree) => MindmapTopicTree):
 		id,
 		title: scenario(id).title,
 		root: edit(treeOf(scenario(id).expectedDiagram)),
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 const children = (topic: MindmapTopicTree) => [...(topic.children ?? [])];
@@ -69,7 +72,9 @@ describe("prompt-grounded mindmap scenarios", () => {
 		});
 
 		it(`${entry.id}: accepts its fixture with zero validator issues`, () => {
-			const evaluation = evaluateScenarioDiagram(entry, entry.expectedDiagram);
+			const evaluation = evaluateScenarioDiagram(entry, entry.expectedDiagram).pipe(
+				Result.getOrThrow,
+			);
 			expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 			expect(evaluation.excalidrawValidation.issues).toEqual([]);
 			expect(evaluation.checks.map((check) => check.id)).toContain("mindmap-layout");
@@ -187,9 +192,9 @@ describe("prompt-grounded mindmap scenarios", () => {
 				},
 			},
 			"mindmap",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		if (!candidate?.ok) throw new Error("Expected an accepted mindmap build.");
-		const evaluation = evaluateScenarioDiagram(entry, candidate.diagram);
+		const evaluation = evaluateScenarioDiagram(entry, candidate.diagram).pipe(Result.getOrThrow);
 		expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 	});
 });

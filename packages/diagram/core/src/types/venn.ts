@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const vennDiagramType = "venn" as const;
 
@@ -249,21 +250,37 @@ export function getVennValidationIssues(diagram: VennDiagram): VennValidationIss
 	return issues.slice(0, VENN_MAX_ISSUES);
 }
 
-export class VennValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly VennValidationIssue[]) {
-		super(issues[0]?.message ?? "Venn diagram failed semantic validation.");
-		this.name = "VennValidationError";
+export class VennValidationError extends Schema.TaggedError<
+	VennValidationError,
+	{ readonly brand: unique symbol }
+>()("VennValidationError", { message: Schema.String, issues: Schema.Array(VennValidationIssue) }) {
+	static fromIssues(issues: readonly VennValidationIssue[]): VennValidationError {
+		return VennValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Venn diagram failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateVennDiagram(diagram: VennDiagram): VennDiagram {
+export function validateVennDiagram(
+	diagram: VennDiagram,
+): Result.Result<VennDiagram, VennValidationError> {
 	const issues = getVennValidationIssues(diagram);
-	if (issues.length > 0) throw new VennValidationError(issues);
-	return diagram;
+	return issues.length > 0
+		? Result.fail(VennValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseVennDiagram(input: unknown): VennDiagram {
-	return validateVennDiagram(Schema.decodeUnknownSync(VennDiagram, { errors: "all" })(input));
+export function parseVennDiagram(
+	input: unknown,
+): Result.Result<VennDiagram, Schema.SchemaError | VennValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(VennDiagram, { errors: "all" })(input),
+		validateVennDiagram,
+	);
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -375,4 +392,4 @@ export const vennFixture = parseVennDiagram({
 		{ sets: ["engineering", "product"], items: ["Technical specs"] },
 		{ sets: ["design", "engineering", "product"], label: "Shared", items: ["Customer empathy"] },
 	],
-});
+}).pipe(Result.getOrThrow);

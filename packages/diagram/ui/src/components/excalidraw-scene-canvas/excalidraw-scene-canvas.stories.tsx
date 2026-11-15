@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
@@ -17,7 +19,9 @@ import {
 	participantLogoScene,
 } from "./node-logo-scene.fixtures";
 
-const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+const scene = convertSceneToExcalidraw(
+	renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+);
 
 const meta = {
 	title: "Diagram UI/Components/ExcalidrawSceneCanvas",
@@ -52,8 +56,8 @@ const wideFlowchartScene = convertSceneToExcalidraw(
 				{ id: "review-share", source: "review", target: "share" },
 			],
 			layout: { direction: "LR", edgeRouting: "orthogonal" },
-		}),
-	),
+		}).pipe(Result.getOrThrow),
+	).pipe(Result.getOrThrow),
 );
 
 export const WideLeftToRight: Story = {
@@ -239,8 +243,8 @@ export const LabeledHorizontalSkips: Story = {
 						["B", "D"],
 					].map(([source, target], i) => ({ id: `path-${i}`, source, target, label: `Path ${i}` })),
 					layout: { direction: "LR", edgeRouting: "orthogonal" },
-				}),
-			),
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow),
 		),
 	},
 };
@@ -263,8 +267,8 @@ export const LabeledProcessFanOut: Story = {
 						label: ["First", "Second"][i],
 					})),
 					layout: { direction: "TB", edgeRouting: "orthogonal" },
-				}),
-			),
+				}).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow),
 		),
 	},
 };

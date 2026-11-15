@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { parseQuadrantDiagram, quadrantFixture } from "@sketchi/diagram-core";
 import { renderQuadrantDiagram } from "@sketchi/diagram-renderer";
@@ -16,8 +18,8 @@ const grouped = parseQuadrantDiagram({
 			y: 0.25 + Math.floor(index / 3) * 0.01,
 		})),
 	],
-});
-const exported = convertSceneToExcalidraw(renderQuadrantDiagram(grouped));
+}).pipe(Result.getOrThrow);
+const exported = convertSceneToExcalidraw(renderQuadrantDiagram(grouped).pipe(Result.getOrThrow));
 const element = (id: string) => exported.elements.find((candidate) => candidate.id === id)!;
 
 describe("quadrant chart Excalidraw export", () => {
@@ -76,7 +78,9 @@ describe("quadrant chart Excalidraw export", () => {
 		for (const text of exported.elements.filter((candidate) => candidate.type === "text"))
 			expect(text["text"], text.id).toBe(text["originalText"]);
 		for (const diagram of [quadrantFixture, grouped]) {
-			const scene = convertSceneToExcalidraw(renderQuadrantDiagram(diagram));
+			const scene = convertSceneToExcalidraw(
+				renderQuadrantDiagram(diagram).pipe(Result.getOrThrow),
+			);
 			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
 			const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene)));
 			expect(validateExcalidrawScene(reloaded), diagram.id).toEqual({ ok: true, issues: [] });

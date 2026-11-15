@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	CANVAS_SPEC_VERSION,
@@ -9,7 +11,7 @@ import { renderDiagram } from "@sketchi/diagram-renderer";
 
 import { convertSceneToExcalidraw, createExcalidrawFile, validateExcalidrawScene } from "./convert";
 
-const exported = convertSceneToExcalidraw(renderDiagram(orgChartFixture));
+const exported = convertSceneToExcalidraw(renderDiagram(orgChartFixture).pipe(Result.getOrThrow));
 const element = (id: string) => exported.elements.find((candidate) => candidate.id === id)!;
 
 describe("org chart Excalidraw export", () => {
@@ -55,7 +57,9 @@ describe("org chart Excalidraw export", () => {
 	});
 
 	it("draws department regions as named frames holding their members", () => {
-		const regions = convertSceneToExcalidraw(renderDiagram(orgChartStressFixtures.regions));
+		const regions = convertSceneToExcalidraw(
+			renderDiagram(orgChartStressFixtures.regions).pipe(Result.getOrThrow),
+		);
 		const frames = regions.elements.filter((candidate) => candidate.type === "frame");
 		expect(frames.length).toBeGreaterThan(1);
 		for (const frame of frames) {
@@ -70,7 +74,7 @@ describe("org chart Excalidraw export", () => {
 
 	it("validates, and still validates after a save and reload", () => {
 		for (const diagram of [orgChartFixture, ...Object.values(orgChartStressFixtures)]) {
-			const scene = convertSceneToExcalidraw(renderDiagram(diagram));
+			const scene = convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow));
 			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
 			const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene)));
 			expect(validateExcalidrawScene(reloaded), diagram.id).toEqual({ ok: true, issues: [] });

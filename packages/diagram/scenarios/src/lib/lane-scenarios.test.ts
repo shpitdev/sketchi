@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
@@ -7,6 +9,7 @@ const ids = ["swimlane-order-fulfilment-v2", "swimlane-hiring-v2", "swimlane-inc
 
 function failed(scenarioId: string, candidate: unknown) {
 	return evaluateScenarioDiagram(getFlowchartScenario(scenarioId), candidate)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 }
@@ -18,7 +21,7 @@ function expected(scenarioId: string) {
 describe("swimlane scenarios", () => {
 	it.each(ids)("passes %s on its fixture, checking every lane and handoff", (id) => {
 		const scenario = getFlowchartScenario(id);
-		const evaluation = evaluateScenarioFixture(scenario);
+		const evaluation = evaluateScenarioFixture(scenario).pipe(Result.getOrThrow);
 		expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 		const checkIds = evaluation.checks.map((check) => check.id);
 		expect(checkIds).toEqual(

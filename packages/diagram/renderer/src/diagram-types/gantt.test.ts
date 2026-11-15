@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import {
 	estimateTextWidth,
 	formatGanttDay,
@@ -74,7 +76,7 @@ function expectReadableGantt(
 	diagram: GanttDiagram,
 	{ distinct = true }: { readonly distinct?: boolean } = {},
 ): RenderedDiagramScene {
-	const { scene, work } = layoutGanttDiagram(diagram);
+	const { scene, work } = layoutGanttDiagram(diagram).pipe(Result.getOrThrow);
 	const context = diagram.id;
 	expect(getCanvasValidationIssues(scene), context).toEqual([]);
 	// Routing work is bounded however crowded the plan: per layout, each dependency is placed,
@@ -425,14 +427,16 @@ const SLIVER_WIDTH = 12;
 const SLIVER_ROUTES = 4;
 
 const plan = (tasks: object[], extra: object = {}) =>
-	parseGanttDiagram({ id: "plan", title: "Plan", type: "gantt", tasks, ...extra });
+	parseGanttDiagram({ id: "plan", title: "Plan", type: "gantt", tasks, ...extra }).pipe(
+		Result.getOrThrow,
+	);
 
 describe("Gantt renderer", () => {
 	it("renders the fixture into a valid, deterministic scene", () => {
-		const scene = renderDiagram(ganttFixture);
+		const scene = renderDiagram(ganttFixture).pipe(Result.getOrThrow);
 		expect(scene.diagramId).toBe("release-plan");
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
-		expect(renderDiagram(ganttFixture)).toEqual(scene);
+		expect(renderDiagram(ganttFixture).pipe(Result.getOrThrow)).toEqual(scene);
 		expectReadableGantt(ganttFixture);
 	});
 
@@ -759,7 +763,7 @@ describe("Gantt renderer", () => {
 		// clear of them.
 		const scene = expectReadableGantt(fuzzGantt(464));
 		expect(readGanttScene(scene).dependencies.length).toBeGreaterThan(40);
-		const { work } = layoutGanttDiagram(fuzzGantt(464));
+		const { work } = layoutGanttDiagram(fuzzGantt(464)).pipe(Result.getOrThrow);
 		expect(work.layouts).toBeLessThanOrEqual(3);
 		expect(work.conflicts).toBe(0);
 	});
@@ -883,7 +887,7 @@ describe("Gantt renderer", () => {
 		// Review: a century on a 640 px plot drew decade labels over one another.
 		const scene = renderGanttDiagram(
 			plan([{ id: "a", label: "Long programme", start: "2026-01-01", end: "2125-12-31" }]),
-		);
+		).pipe(Result.getOrThrow);
 		const ticks = scene.elements
 			.flatMap((element) =>
 				element.type === "text" && element.id.startsWith("gantt:tick:") ? [textBox(element)] : [],
@@ -915,11 +919,17 @@ describe("Gantt renderer", () => {
 	});
 
 	it("rejects a billion-day task before laying out any axis", () => {
-		expect(() =>
-			renderGanttDiagram(
-				plan([{ id: "a", label: "Forever", start: "2026-03-02", duration: 1_000_000_000 }]),
-			),
-		).toThrow(/duration/u);
+		expect(
+			renderGanttDiagram({
+				id: "oversized",
+				title: "Oversized",
+				type: "gantt",
+				style: ganttFixture.style,
+				tasks: [{ id: "a", label: "Forever", start: "2026-03-02", duration: 1_000_000_000 }],
+			}),
+		).toMatchObject({
+			failure: { message: 'Task "a" has duration 1000000000; a chart spans at most 36525 days.' },
+		});
 		// The axis never builds more cells than it could label, however long the span.
 		const axis = ganttAxis(parseGanttDay("2026-01-01")!, parseGanttDay("2125-12-31")!);
 		expect(axis.cells.length).toBeLessThanOrEqual(36);
@@ -1077,7 +1087,7 @@ function fuzzGantt(seed: number): GanttDiagram {
 		tasks,
 		...(used.length ? { phases: used } : {}),
 		...(next() < 0.3 ? { today: formatGanttDay(origin + Math.floor(next() * span)) } : {}),
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /** A plan scheduled like a real one: each task starts once the earlier tasks it depends on end. */
@@ -1112,5 +1122,5 @@ function scheduledGantt(seed: number): GanttDiagram {
 		title: `Scheduled ${seed}`,
 		type: "gantt",
 		tasks,
-	});
+	}).pipe(Result.getOrThrow);
 }

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	type SequenceDiagram,
@@ -50,7 +52,7 @@ const sequence = parseSequenceDiagram({
 		{ id: "receipt", source: "payments", target: "customer", label: "Receipt" },
 	],
 	style: { accentColor: "#000000", backgroundColor: "#ffffff" },
-});
+}).pipe(Result.getOrThrow);
 
 function unvalidated(overrides: Partial<SequenceDiagram>): SequenceDiagram {
 	return { ...sequence, ...overrides };
@@ -130,7 +132,7 @@ const rideBooking = parseSequenceDiagram({
 		type: type ?? "message",
 	})),
 	style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-});
+}).pipe(Result.getOrThrow);
 
 describe("sequence diagram renderer", () => {
 	it("widens every header to its longest whole word and re-spaces the lifelines", () => {
@@ -142,8 +144,8 @@ describe("sequence diagram renderer", () => {
 					{ id: "store", label: "AuthenticationController" },
 					{ id: "payments", label: "Payments" },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const headers = scene.elements.filter(
 			(e): e is NodeSceneElement =>
@@ -166,7 +168,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("tightens a forty-message diagram until its labels read at a screen's size, each clear of the rest", () => {
-		const scene = renderSequenceDiagram(rideBooking);
+		const scene = renderSequenceDiagram(rideBooking).pipe(Result.getOrThrow);
 		// 88 between rows and 320 between lifelines drew it 3156 by 3720, its
 		// 13 px labels 7 px tall on a 2000 px screen.
 		expect((13 * 2000) / (Math.max(scene.width, scene.height) + 40)).toBeGreaterThanOrEqual(10);
@@ -235,8 +237,8 @@ describe("sequence diagram renderer", () => {
 						type: "return" as const,
 					})),
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		const rows = calls.map((call) => arrow(scene, call.id).points[0].y);
 		expect(rows[1]! - rows[0]!).toBeLessThan(88);
 		const nodes = scene.elements.filter((e): e is NodeSceneElement => e.type === "node");
@@ -264,7 +266,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("keeps a diagram that reads at a screen's size at its natural spacing", () => {
-		const scene = renderSequenceDiagram(sequence);
+		const scene = renderSequenceDiagram(sequence).pipe(Result.getOrThrow);
 		const rows = ["start", "charge", "receipt"].map((id) => arrow(scene, id).points[0].y);
 		expect(rows[1]! - rows[0]!).toBe(88);
 		expect(rows[2]! - rows[1]!).toBe(88);
@@ -286,8 +288,8 @@ describe("sequence diagram renderer", () => {
 					...sequence.messages,
 					{ id: "settle", source: "customer", target: "bank", label: "Settle" },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		const lifelines = scene.elements
 			.filter((e) => e.type === "node" && e.nodeId.endsWith(":lifeline"))
 			.map((e) => (e.type === "node" ? e.x + e.width / 2 : 0));
@@ -313,8 +315,8 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("renders the canonical fixture through the family dispatch", () => {
-		const scene = renderDiagram(sequenceFixture);
-		expect(scene).toEqual(renderSequenceDiagram(sequenceFixture));
+		const scene = renderDiagram(sequenceFixture).pipe(Result.getOrThrow);
+		expect(scene).toEqual(renderSequenceDiagram(sequenceFixture).pipe(Result.getOrThrow));
 		expect(scene.diagramId).toBe("checkout-sequence");
 		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(
 			sequenceFixture.messages.length,
@@ -328,7 +330,7 @@ describe("sequence diagram renderer", () => {
 			participants: sequence.participants.map((participant, index) =>
 				index === 0 ? { ...participant, label: "one\ntwo\nthree" } : participant,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(scene.elements.find(({ id }) => id === "node:customer")).toMatchObject({
 			y: 48,
 			height: 75,
@@ -346,7 +348,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("preserves participant and chronological message order", () => {
-		const scene = renderSequenceDiagram(sequence);
+		const scene = renderSequenceDiagram(sequence).pipe(Result.getOrThrow);
 		const headers = scene.elements.filter(
 			(element): element is Extract<typeof element, { type: "node" }> =>
 				element.type === "node" && element.rendererRole !== "sequence-lifeline",
@@ -369,7 +371,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("draws a self-message as a loop out of its lifeline and back on its own row", () => {
-		const plain = renderSequenceDiagram(sequence);
+		const plain = renderSequenceDiagram(sequence).pipe(Result.getOrThrow);
 		const scene = renderSequenceDiagram(
 			parseSequenceDiagram({
 				...sequence,
@@ -378,8 +380,8 @@ describe("sequence diagram renderer", () => {
 					{ id: "retry", source: "payments", target: "payments", label: "Retry charge" },
 					...sequence.messages.slice(1),
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const loop = arrow(scene, "retry");
 		const lifeline = scene.elements.find((element) => element.id === "node:payments:lifeline");
@@ -453,8 +455,8 @@ describe("sequence diagram renderer", () => {
 						type: "return" as const,
 					})),
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const label = scene.elements.find((element) => element.id === "arrow:validate:label");
 		const lifeline = scene.elements.find((element) => element.id === "node:b:lifeline");
@@ -485,8 +487,8 @@ describe("sequence diagram renderer", () => {
 					{ id: "audit", source: "idp", target: "idp", label: "Audit", type: "return" },
 					{ id: "code", source: "idp", target: "browser", label: "Code", type: "return" },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const bar = (call: string) => {
 			const found = activationBars(scene).find(
@@ -520,7 +522,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("rejects participant ids that collide with generated lifelines", () => {
-		expect(() =>
+		expect(
 			renderSequenceDiagram(
 				unvalidated({
 					participants: [
@@ -530,11 +532,13 @@ describe("sequence diagram renderer", () => {
 					messages: [],
 				}),
 			),
-		).toThrow(/collides with the generated lifeline/);
+		).toMatchObject({
+			failure: { message: expect.stringMatching(/collides with the generated lifeline/) },
+		});
 	});
 
 	it("draws an activation bar from each answered call to its return", () => {
-		const scene = renderSequenceDiagram(sequenceFixture);
+		const scene = renderSequenceDiagram(sequenceFixture).pipe(Result.getOrThrow);
 		const bars = activationBars(scene);
 		expect(bars.map((bar) => bar.nodeId)).toEqual([
 			"store:lifeline:activation:checkout",
@@ -566,7 +570,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("keeps unanswered calls on the lifeline", () => {
-		const scene = renderSequenceDiagram(apiRequestSequence);
+		const scene = renderSequenceDiagram(apiRequestSequence).pipe(Result.getOrThrow);
 		expect(arrow(scene, "track").targetNodeId).toBe("analytics:lifeline");
 		expect(activationBars(scene)).toHaveLength(3);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
@@ -591,8 +595,8 @@ describe("sequence diagram renderer", () => {
 					{ id: "token", source: "auth", target: "api", label: "Token", type: "return" },
 					{ id: "session", source: "api", target: "client", label: "Session", type: "return" },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		const outer = activationBars(scene).find(
 			(bar) => bar.nodeId === "api:lifeline:activation:login",
 		);
@@ -628,8 +632,8 @@ describe("sequence diagram renderer", () => {
 					{ id: "p2", source: "b", target: "c", label: "Reply 2", type: "return" },
 					{ id: "p3", source: "b", target: "a", label: "Reply 3", type: "return" },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		const bar = (call: string) => {
 			const found = activationBars(scene).find(
 				(candidate) => candidate.nodeId === `b:lifeline:activation:${call}`,
@@ -649,7 +653,7 @@ describe("sequence diagram renderer", () => {
 	});
 
 	it("does not keep the activation role for a bar moved off its lifeline", () => {
-		const scene = renderSequenceDiagram(sequenceFixture);
+		const scene = renderSequenceDiagram(sequenceFixture).pipe(Result.getOrThrow);
 		const [bar] = activationBars(scene);
 		if (!bar) throw new Error("Missing activation bar.");
 		expect(isStructurallyValidSequenceActivation(scene, { ...bar, x: bar.x + 200 })).toBe(false);
@@ -677,8 +681,8 @@ describe("sequence diagram renderer", () => {
 					{ id: "r2", source: "b", target: "c", label: "Second done", type: "return" },
 					{ id: "r1", source: "b", target: "a", label: "First done", type: "return" },
 				],
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		const bars = activationBars(scene);
 		expect(bars.map((bar) => bar.nodeId)).toEqual([
 			"b:lifeline:activation:q1",
@@ -702,8 +706,8 @@ describe("sequence diagram renderer", () => {
 		const plain = renderSequenceDiagram({
 			...deployWebhookLogoSequence,
 			participants: deployWebhookLogoSequence.participants.map(({ icon: _icon, ...rest }) => rest),
-		});
-		const scene = renderSequenceDiagram(deployWebhookLogoSequence);
+		}).pipe(Result.getOrThrow);
+		const scene = renderSequenceDiagram(deployWebhookLogoSequence).pipe(Result.getOrThrow);
 		const header = (id: string) =>
 			scene.elements.find(
 				(element): element is NodeSceneElement => element.type === "node" && element.nodeId === id,

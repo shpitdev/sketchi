@@ -1,8 +1,9 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option, Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import type { VennDiagram } from "@sketchi/diagram-core";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
-import { Effect } from "effect";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { FixtureGenerationClientLayer } from "./fixture-client.js";
@@ -13,6 +14,7 @@ import { vennDrawnCheck, vennLayoutCheck, vennScenarios } from "./venn-scenarios
 const scenario = (id: string) => vennScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: VennDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const skills = scenario("team-skills-venn").expectedDiagram;
@@ -156,7 +158,7 @@ describe("prompt-grounded Venn scenarios", () => {
 	});
 
 	it("reads the drawing: swapped labels, an item across an outline and overlapping text fail the scene checks", () => {
-		const scene = renderDiagram(skills);
+		const scene = renderDiagram(skills).pipe(Result.getOrThrow);
 		expect(vennDrawnCheck(skills, scene).passed).toBe(true);
 		expect(vennLayoutCheck(scene).passed).toBe(true);
 		const text = (id: string) => scene.elements.find((element) => element.id === id)!;
@@ -222,7 +224,7 @@ describe("prompt-grounded Venn scenarios", () => {
 		const candidate = candidateFromMcpResult(
 			{ ok: true, result: { ok: true, status: "accepted", buildId: "build-1" }, builds: [receipt] },
 			"venn",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
 		expect(failed("plan-features-venn", candidate.diagram as VennDiagram)).toEqual([]);

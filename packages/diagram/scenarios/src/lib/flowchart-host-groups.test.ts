@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -19,11 +21,14 @@ const diagram = (runId: string) => {
 	const candidate = candidateFromMcpResult(
 		samples.find((sample) => sample.runId === runId)!.receipt,
 		"flowchart",
+	).pipe(Result.getOrThrow, Option.getOrUndefined);
+	return parseFlowchartDiagram(candidate?.ok ? candidate.diagram : undefined).pipe(
+		Result.getOrThrow,
 	);
-	return parseFlowchartDiagram(candidate?.ok ? candidate.diagram : undefined);
 };
 const failures = (candidate: FlowchartDiagram) =>
 	evaluateScenarioDiagram(scenario, candidate)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const entryFailure = "node-label:Request reaches Vercel → Next.js page receives question";

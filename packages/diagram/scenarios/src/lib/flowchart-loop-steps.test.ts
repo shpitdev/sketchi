@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -12,9 +14,12 @@ const samples = JSON.parse(
 	readFileSync(new URL("./fixtures/round16-restaurant-waitlist.json", import.meta.url), "utf8"),
 ) as { sample: number; runId: string; spec: Record<string, unknown> }[];
 const scenario = getFlowchartScenario("restaurant-waitlist");
-const labeled = parseFlowchartDiagram({ ...scenario.expectedDiagram, ...samples[0]!.spec });
+const labeled = parseFlowchartDiagram({ ...scenario.expectedDiagram, ...samples[0]!.spec }).pipe(
+	Result.getOrThrow,
+);
 const failures = (spec: Record<string, unknown>, expected = scenario) =>
 	evaluateScenarioDiagram(expected, { ...expected.expectedDiagram, ...spec })
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 
@@ -45,7 +50,9 @@ describe("stated wait/retry steps on labeled loop-back edges", () => {
 	});
 
 	it("rejects an unlabeled back-edge at the public validation boundary", () => {
-		expect(() => failures(backEdge(undefined))).toThrow("outgoing branch without a label");
+		expect(evaluateScenarioDiagram(scenario, backEdge(undefined))).toMatchObject({
+			failure: { message: expect.stringContaining("outgoing branch without a label") },
+		});
 	});
 
 	it("never matches a truly unlabeled return edge even before public validation", () => {

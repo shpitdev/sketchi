@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
@@ -50,19 +52,27 @@ describe("StateMachine diagram type", () => {
 				{ id: "end", source: "choose", target: "done", guard: "else" },
 			],
 		};
-		expect(parseStateMachineDiagram(input).states[0]?.initial).toBe("ready");
-		expect(getStateMachineDefaultWarnings(parseStateMachineDiagram(input))).toEqual([]);
+		expect(parseStateMachineDiagram(input).pipe(Result.getOrThrow).states[0]?.initial).toBe(
+			"ready",
+		);
+		expect(
+			getStateMachineDefaultWarnings(parseStateMachineDiagram(input).pipe(Result.getOrThrow)),
+		).toEqual([]);
 		const explicit = {
 			...input,
 			states: input.states.map((state) =>
 				state.id === "active" ? { ...state, initial: "choose" } : state,
 			),
 		};
-		expect(parseStateMachineDiagram(explicit).states[0]?.initial).toBe("choose");
+		expect(parseStateMachineDiagram(explicit).pipe(Result.getOrThrow).states[0]?.initial).toBe(
+			"choose",
+		);
 		for (const states of [input.states.slice(0, 2), input.states.slice(0, 3)]) {
-			expect(() => parseStateMachineDiagram({ ...input, states, transitions: [] })).toThrow(
-				/Composite "active" has no regular substate to enter/,
-			);
+			expect(parseStateMachineDiagram({ ...input, states, transitions: [] })).toMatchObject({
+				failure: {
+					message: expect.stringMatching(/Composite "active" has no regular substate to enter/),
+				},
+			});
 		}
 	});
 
@@ -71,7 +81,7 @@ describe("StateMachine diagram type", () => {
 			...mediaPlayerStateMachine,
 			states: mediaPlayerStateMachine.states.map(({ initial: _initial, ...state }) => state),
 		};
-		const parsed = parseCanonicalDiagram(input);
+		const parsed = parseCanonicalDiagram(input).pipe(Result.getOrThrow);
 		expect(parsed).toMatchObject({
 			states: [
 				input.states[0],
@@ -92,7 +102,9 @@ describe("StateMachine diagram type", () => {
 		]);
 		const reversed = { ...input, states: [input.states[3]!, ...input.states.slice(0, 3)] };
 		expect(
-			parseStateMachineDiagram(reversed).states.find((state) => state.id === "active")?.initial,
+			parseStateMachineDiagram(reversed)
+				.pipe(Result.getOrThrow)
+				.states.find((state) => state.id === "active")?.initial,
 		).toBe("paused");
 		const explicit = {
 			...input,
@@ -100,7 +112,9 @@ describe("StateMachine diagram type", () => {
 				state.id === "active" ? { ...state, initial: "paused" } : state,
 			),
 		};
-		expect(parseStateMachineDiagram(explicit).states[1]?.initial).toBe("paused");
+		expect(parseStateMachineDiagram(explicit).pipe(Result.getOrThrow).states[1]?.initial).toBe(
+			"paused",
+		);
 		expect(getStateMachineDefaultWarnings(explicit)).toEqual([]);
 	});
 
@@ -112,7 +126,9 @@ describe("StateMachine diagram type", () => {
 					state.id === "active" ? { ...state, initial } : state,
 				),
 			};
-			expect(() => parseStateMachineDiagram(input)).toThrow(/not one of its substates/);
+			expect(parseStateMachineDiagram(input)).toMatchObject({
+				failure: { message: expect.stringMatching(/not one of its substates/) },
+			});
 			expect(getStateMachineDefaultWarnings(input)).toEqual([]);
 		}
 		const empty = {
@@ -120,7 +136,9 @@ describe("StateMachine diagram type", () => {
 			states: mediaPlayerStateMachine.states.filter((state) => !state.parent),
 			transitions: [mediaPlayerStateMachine.transitions[0]!],
 		};
-		expect(() => parseStateMachineDiagram(empty)).toThrow(/not one of its substates/);
+		expect(parseStateMachineDiagram(empty)).toMatchObject({
+			failure: { message: expect.stringMatching(/not one of its substates/) },
+		});
 		expect(getStateMachineDefaultWarnings(empty)).toEqual([]);
 		const finalFirst = {
 			...mediaPlayerStateMachine,
@@ -135,7 +153,9 @@ describe("StateMachine diagram type", () => {
 		expect(getStateMachineValidationIssues(finalFirst).map((issue) => issue.code)).toContain(
 			"unknown_initial_state",
 		);
-		expect(() => parseStateMachineDiagram(finalFirst)).toThrow(/not one of its substates/);
+		expect(parseStateMachineDiagram(finalFirst)).toMatchObject({
+			failure: { message: expect.stringMatching(/not one of its substates/) },
+		});
 	});
 
 	it("accepts missing labels in the canonical core and resolves ids verbatim", () => {
@@ -143,7 +163,7 @@ describe("StateMachine diagram type", () => {
 			...mediaPlayerStateMachine,
 			states: mediaPlayerStateMachine.states.map(({ label: _label, ...state }) => state),
 		};
-		const parsed = parseCanonicalDiagram(input);
+		const parsed = parseCanonicalDiagram(input).pipe(Result.getOrThrow);
 		expect(parsed).toEqual(input);
 		expect(getStateMachineValidationIssues(input)).toEqual([]);
 		expect(input.states.map(stateLabel)).toEqual(["stopped", "active", "playing", "paused"]);
@@ -204,7 +224,9 @@ describe("StateMachine diagram type", () => {
 				state.id === "stopped" ? { ...state, label } : state,
 			),
 		};
-		expect(() => parseStateMachineDiagram(input)).toThrow(/label/);
+		expect(parseStateMachineDiagram(input)).toMatchObject({
+			failure: { message: expect.stringMatching(/label/) },
+		});
 		expect(getStateMachineValidationIssues(input).map((issue) => issue.code)).toContain(
 			"missing_state_label",
 		);
@@ -212,8 +234,12 @@ describe("StateMachine diagram type", () => {
 
 	it("has typed fixtures that satisfy the canonical diagram contract", () => {
 		expect(stateMachineFixture.type).toBe(stateMachineDiagramType);
-		expect(parseCanonicalDiagram(stateMachineFixture)).toEqual(stateMachineFixture);
-		expect(parseCanonicalDiagram(mediaPlayerStateMachine)).toEqual(mediaPlayerStateMachine);
+		expect(parseCanonicalDiagram(stateMachineFixture).pipe(Result.getOrThrow)).toEqual(
+			stateMachineFixture,
+		);
+		expect(parseCanonicalDiagram(mediaPlayerStateMachine).pipe(Result.getOrThrow)).toEqual(
+			mediaPlayerStateMachine,
+		);
 	});
 
 	it("labels a transition event [guard] / action, each part optional", () => {
@@ -245,7 +271,7 @@ describe("StateMachine diagram type", () => {
 					{ id: "tick", source: "locked", target: "locked", event: "tick" },
 					{ id: "close", source: "open", target: "done" },
 				],
-			}).states,
+			}).pipe(Result.getOrThrow).states,
 		).toHaveLength(4);
 	});
 

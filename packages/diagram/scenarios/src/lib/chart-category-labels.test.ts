@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseChartDiagram } from "@sketchi/diagram-core";
@@ -9,7 +11,7 @@ import { evaluateScenarioDiagram } from "./evaluate.js";
 const cloudSpend7sp6 = JSON.parse(
 	readFileSync(new URL("./fixtures/chart-cloud-spend-7sp6.json", import.meta.url), "utf8"),
 );
-const diagram = parseChartDiagram({ ...cloudSpend7sp6, type: "chart" });
+const diagram = parseChartDiagram({ ...cloudSpend7sp6, type: "chart" }).pipe(Result.getOrThrow);
 const scenario = chartScenarios.find((entry) => entry.id === "cloud-spend-pie-chart")!;
 const relabel = (first: string) => ({
 	...diagram,
@@ -23,7 +25,9 @@ const failures = (candidate: typeof diagram) =>
 describe("chart category labels with their own values", () => {
 	it("accepts the real 7sp6 spec through the full scenario evaluator", () => {
 		expect(
-			evaluateScenarioDiagram(scenario, diagram).checks.filter((check) => !check.passed),
+			evaluateScenarioDiagram(scenario, diagram)
+				.pipe(Result.getOrThrow)
+				.checks.filter((check) => !check.passed),
 		).toEqual([]);
 	});
 
@@ -73,12 +77,14 @@ describe("chart category labels with their own values", () => {
 			series: [{ values: [921, 40, 22, 11, 7] }],
 		};
 		expect(failures(wrongData)).toEqual(["chart-series:1"]);
-		const evaluation = evaluateScenarioDiagram(scenario, wrongData);
+		const evaluation = evaluateScenarioDiagram(scenario, wrongData).pipe(Result.getOrThrow);
 		expect(evaluation.checks.find((check) => check.id === "chart-drawn-data")?.passed).toBe(false);
 	});
 
 	it("still checks rendered pie shares independently of the category text", () => {
-		const evaluation = evaluateScenarioDiagram(scenario, relabel("Compute — 92%"));
+		const evaluation = evaluateScenarioDiagram(scenario, relabel("Compute — 92%")).pipe(
+			Result.getOrThrow,
+		);
 		expect(evaluation.checks.find((check) => check.id === "chart-pie-labels")?.passed).toBe(true);
 	});
 

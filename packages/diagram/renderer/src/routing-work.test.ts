@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import * as diagramCore from "@sketchi/diagram-core";
 import {
 	classFixture,
@@ -108,7 +110,7 @@ const denseRelease = parseIntermediateDiagram({
 		["manual_recovery", "rollback_gate", "re-verify"],
 		["postmortem", "done", "closed"],
 	].map(([source, target, label], index) => ({ id: `edge-${index + 1}`, source, target, label })),
-});
+}).pipe(Result.getOrThrow);
 
 describe("routing work", () => {
 	// Measured: 3.77M checks TB and 6.83M LR with A* grid search, aligned ports,
@@ -127,7 +129,7 @@ describe("routing work", () => {
 		const scene = renderIntermediateDiagram({
 			...denseRelease,
 			layout: { ...denseRelease.layout, direction },
-		});
+		}).pipe(Result.getOrThrow);
 		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(32);
 		expect(work.checks).toBeGreaterThan(0);
 		expect(work.checks).toBeLessThan(limit);
@@ -186,7 +188,7 @@ const denseIncident = parseIntermediateDiagram({
 		...(label ? { label } : {}),
 	})),
 	layout: { direction: "TB", edgeRouting: "orthogonal" },
-});
+}).pipe(Result.getOrThrow);
 
 describe("branch side work", () => {
 	// Every layout sizes each of the 16 nodes from its label twice, and the
@@ -204,7 +206,7 @@ describe("branch side work", () => {
 	it("completes no branch assignment the arranged layout already makes", () => {
 		work.checks = 0;
 		work.measures = 0;
-		const scene = renderIntermediateDiagram(denseIncident);
+		const scene = renderIntermediateDiagram(denseIncident).pipe(Result.getOrThrow);
 		expect(scene.elements.filter((element) => element.type === "arrow")).toHaveLength(19);
 		expect(work.measures).toBeLessThanOrEqual(12 * 2 * 16);
 		expect(work.checks).toBeLessThan(5_300_000);
@@ -229,8 +231,10 @@ describe("crossing repair work", () => {
 	// lanes of their own (Arrangement.skipLanes), repaired and drawn to the end.
 	it("bounds segment checks for the generated diagrams it repairs", () => {
 		work.checks = 0;
-		for (const fixture of Object.values(crossingFixtures)) renderIntermediateDiagram(fixture);
-		for (const machine of Object.values(crossingStateMachines)) renderStateMachineDiagram(machine);
+		for (const fixture of Object.values(crossingFixtures))
+			renderIntermediateDiagram(fixture).pipe(Result.getOrThrow);
+		for (const machine of Object.values(crossingStateMachines))
+			renderStateMachineDiagram(machine).pipe(Result.getOrThrow);
 		expect(work.checks).toBeLessThan(23_000_000);
 	});
 });
@@ -240,7 +244,9 @@ describe("crossed paired-return work", () => {
 	// removed whole-machine fallback. Only crossed pairs may lose their lanes.
 	it("bounds the crossed named-final retry repair", () => {
 		work.checks = 0;
-		const scene = renderStateMachineDiagram(crossingStateMachines["named-final-retry"]);
+		const scene = renderStateMachineDiagram(crossingStateMachines["named-final-retry"]).pipe(
+			Result.getOrThrow,
+		);
 		expect(
 			scene.elements.some((element) => element.type === "text" && element.text === "Failed"),
 		).toBe(true);
@@ -257,11 +263,11 @@ describe("ER routing work", () => {
 	// only the one chosen grew, and then only where that drew no worse).
 	it("bounds segment checks for typical schemas and the twenty-table stress schema", () => {
 		work.checks = 0;
-		renderErDiagram(erFixture);
-		renderErDiagram(orgChartEr);
+		renderErDiagram(erFixture).pipe(Result.getOrThrow);
+		renderErDiagram(orgChartEr).pipe(Result.getOrThrow);
 		const small = work.checks;
 		work.checks = 0;
-		renderErDiagram(erStressFixtures.marketplace);
+		renderErDiagram(erStressFixtures.marketplace).pipe(Result.getOrThrow);
 		const large = work.checks;
 		expect(small).toBeGreaterThan(0);
 		expect(small).toBeLessThan(50_000);
@@ -274,11 +280,11 @@ describe("class diagram routing work", () => {
 	// twenty-class library, its candidate placements each routed in full.
 	it("bounds segment checks for a small model and the twenty-class stress model", () => {
 		work.checks = 0;
-		renderClassDiagram(classFixture);
-		renderClassDiagram(classStressFixtures.selfReference);
+		renderClassDiagram(classFixture).pipe(Result.getOrThrow);
+		renderClassDiagram(classStressFixtures.selfReference).pipe(Result.getOrThrow);
 		const small = work.checks;
 		work.checks = 0;
-		renderClassDiagram(classStressFixtures.library);
+		renderClassDiagram(classStressFixtures.library).pipe(Result.getOrThrow);
 		const large = work.checks;
 		expect(small).toBeGreaterThan(0);
 		expect(small).toBeLessThan(30_000);
@@ -301,7 +307,7 @@ describe("swimlane routing work", () => {
 					renderIntermediateDiagram({
 						...fixture,
 						layout: { direction, edgeRouting: "orthogonal" },
-					});
+					}).pipe(Result.getOrThrow);
 			return work.checks;
 		};
 		const small = render(laneFixtures);
@@ -332,7 +338,7 @@ describe("zone routing work", () => {
 					renderIntermediateDiagram({
 						...fixture,
 						layout: { direction, edgeRouting: "orthogonal" },
-					});
+					}).pipe(Result.getOrThrow);
 			return work.checks;
 		};
 		const small = render(zoneFixtures);

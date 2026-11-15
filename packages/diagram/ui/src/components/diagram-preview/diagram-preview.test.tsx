@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,7 +18,7 @@ import { DiagramPreview } from "./diagram-preview";
 
 describe("DiagramPreview", () => {
 	it("renders the diagram through the shared artifact canvas", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 
 		render(<DiagramPreview scene={scene} />);
 

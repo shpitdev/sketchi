@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { flowchartFixture } from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
 import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
@@ -6,7 +8,9 @@ import { describe, expect, it } from "vitest";
 
 import { DiagramInspector } from "./diagram-inspector";
 
-const scene = convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture));
+const scene = convertSceneToExcalidraw(
+	renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+);
 
 describe("DiagramInspector", () => {
 	it("shows the overview drawn from the diagram", () => {

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import type { ErDiagram } from "@sketchi/diagram-core";
 import { renderDiagram } from "@sketchi/diagram-renderer";
@@ -8,6 +10,7 @@ import { evaluateScenarioDiagram } from "./evaluate.js";
 const scenario = (id: string) => erScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: ErDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const shop = scenario("shop-orders-er-v2").expectedDiagram;
@@ -200,7 +203,7 @@ describe("prompt-grounded ER scenarios", () => {
 	});
 
 	it("checks the drawing: a head drawn for the wrong cardinality fails", () => {
-		const scene = renderDiagram(shop);
+		const scene = renderDiagram(shop).pipe(Result.getOrThrow);
 		expect(erDrawnCheck(shop, scene).passed).toBe(true);
 		const tampered = {
 			...scene,
@@ -216,7 +219,7 @@ describe("prompt-grounded ER scenarios", () => {
 
 	it("reads a table whose crowded key row grew, a text per row, as drawn", () => {
 		const saas = scenario("saas-workspace-er-v2").expectedDiagram;
-		const scene = renderDiagram(saas);
+		const scene = renderDiagram(saas).pipe(Result.getOrThrow);
 		const cells = scene.elements.filter(
 			(element) => element.type === "text" && element.id.startsWith("text:organizations:fields:"),
 		);

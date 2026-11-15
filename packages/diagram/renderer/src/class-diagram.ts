@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import {
 	type AxisAlignedSegment,
 	type CanvasArrowhead,
@@ -957,7 +958,7 @@ function padded(elements: readonly SceneElement[]): {
  * relationship an orthogonal line with its kind's heads and dashes, its
  * multiplicities and roles beside its ends.
  */
-export function renderClassDiagram(diagram: ClassDiagram): RenderedDiagramScene {
+export function renderClassDiagram(diagram: ClassDiagram): Result.Result<RenderedDiagramScene> {
 	const boxes = new Map(diagram.classes.map((node) => [node.id, boxOf(node)]));
 	const { scene, labels } = bestScene(diagram, boxes);
 	const placed = new Map(classBoxes(scene).map((element) => [element.nodeId, element]));
@@ -984,13 +985,13 @@ export function renderClassDiagram(diagram: ClassDiagram): RenderedDiagramScene 
 		...arrows,
 		...labels,
 	]);
-	return {
+	return Result.succeed({
 		...scene,
 		width,
 		height,
 		elements,
 		zOrder: elements.map((element) => element.id),
-	};
+	});
 }
 
 /** A class box's outline, name band or methods compartment keeps its role while it is still a plain rectangle. */

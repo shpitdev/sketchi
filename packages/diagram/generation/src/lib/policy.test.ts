@@ -1,6 +1,8 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Effect, Fiber } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 import { mediaPlayerStateMachine, parseFlowchartDiagram } from "@sketchi/diagram-core";
-import { Effect, Fiber } from "effect";
+
 import { TestClock } from "effect/testing";
 
 import {
@@ -32,7 +34,7 @@ const acceptedDiagram = parseFlowchartDiagram({
 		{ id: "start-approve", source: "start", target: "approve" },
 		{ id: "approve-done", source: "approve", target: "done" },
 	],
-});
+}).pipe(Result.getOrThrow);
 const currentIssue =
 	'flowchart.underbranched_decision: Decision node "approve" needs two branches.';
 

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -44,7 +46,7 @@ describe("parseIntermediateDiagram", () => {
 	});
 
 	it("accepts a valid diagram fixture", () => {
-		expect(parseIntermediateDiagram(flowchartFixture)).toMatchObject({
+		expect(parseIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow)).toMatchObject({
 			id: "onboarding-flow",
 			nodes: expect.arrayContaining([expect.objectContaining({ id: "prompt" })]),
 		});
@@ -56,7 +58,7 @@ describe("parseIntermediateDiagram", () => {
 				id: "brand-defaults",
 				title: "Brand defaults",
 				nodes: [{ id: "only", label: "Only node" }],
-			}).style,
+			}).pipe(Result.getOrThrow).style,
 		).toEqual(SKETCHI_DIAGRAM_STYLE);
 	});
 
@@ -68,7 +70,7 @@ describe("parseIntermediateDiagram", () => {
 				{ id: "build", label: "Docker build", icon: { slug: "docker" } },
 				{ id: "plain", label: "Plain step" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(diagram.nodes[0]?.icon).toEqual({ slug: "docker" });
 		expect(diagram.nodes[1]?.icon).toBeUndefined();
 		expect(
@@ -77,7 +79,7 @@ describe("parseIntermediateDiagram", () => {
 				nodes: flowchartFixture.nodes.map((node, index) =>
 					index === 0 ? { ...node, icon: { slug: "github" } } : node,
 				),
-			}).nodes[0]?.icon,
+			}).pipe(Result.getOrThrow).nodes[0]?.icon,
 		).toEqual({ slug: "github" });
 		expect(
 			parseMindmapDiagram({
@@ -85,7 +87,7 @@ describe("parseIntermediateDiagram", () => {
 				nodes: mindmapFixture.nodes.map((node, index) =>
 					index === 0 ? { ...node, icon: { slug: "cloudflare" } } : node,
 				),
-			}).nodes[0]?.icon,
+			}).pipe(Result.getOrThrow).nodes[0]?.icon,
 		).toEqual({ slug: "cloudflare" });
 	});
 
@@ -94,7 +96,7 @@ describe("parseIntermediateDiagram", () => {
 			id: "logos",
 			title: "Logos",
 			nodes: [{ id: "queue", label: "Queue", icon: { slug: "community/ring-queue" } }],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(diagram.nodes[0]?.icon?.slug).toBe("community/ring-queue");
 	});
 
@@ -110,23 +112,25 @@ describe("parseIntermediateDiagram", () => {
 			`community/${"a".repeat(65)}`,
 			"other/docker",
 		]) {
-			expect(() =>
+			expect(
 				parseIntermediateDiagram({
 					id: "logos",
 					title: "Logos",
 					nodes: [{ id: "build", label: "Build", icon: { slug } }],
 				}),
-			).toThrow('at ["nodes"][0]["icon"]["slug"]');
+			).toMatchObject({
+				failure: { message: expect.stringContaining('at ["nodes"][0]["icon"]["slug"]') },
+			});
 		}
 	});
 
 	it("rejects duplicate node ids", () => {
-		expect(() =>
+		expect(
 			parseIntermediateDiagram({
 				...flowchartFixture,
 				nodes: [...flowchartFixture.nodes, { id: "prompt", label: "Duplicate" }],
 			}),
-		).toThrow(DiagramValidationError);
+		).toMatchObject({ failure: expect.any(DiagramValidationError) });
 	});
 
 	it("keeps declared groups and rejects references to undeclared or duplicate ones", () => {
@@ -136,17 +140,23 @@ describe("parseIntermediateDiagram", () => {
 			nodes: flowchartFixture.nodes.map((node, index) =>
 				index < 2 ? { ...node, group: "intake" } : node,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(grouped.groups).toEqual([{ id: "intake", label: "Intake" }]);
 		expect(grouped.nodes.filter((node) => node.group === "intake")).toHaveLength(2);
-		expect(parseIntermediateDiagram(flowchartFixture).groups).toBeUndefined();
-		expect(() =>
+		expect(
+			parseIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow).groups,
+		).toBeUndefined();
+		expect(
 			parseIntermediateDiagram({
 				...flowchartFixture,
 				nodes: flowchartFixture.nodes.map((node) => ({ ...node, group: "intake" })),
 			}),
-		).toThrow('Node "prompt" references missing group "intake".');
-		expect(() =>
+		).toMatchObject({
+			failure: {
+				message: expect.stringContaining('Node "prompt" references missing group "intake".'),
+			},
+		});
+		expect(
 			parseIntermediateDiagram({
 				...flowchartFixture,
 				groups: [
@@ -154,11 +164,13 @@ describe("parseIntermediateDiagram", () => {
 					{ id: "intake", label: "Intake again" },
 				],
 			}),
-		).toThrow('Duplicate group id "intake" is not allowed.');
+		).toMatchObject({
+			failure: { message: expect.stringContaining('Duplicate group id "intake" is not allowed.') },
+		});
 	});
 
 	it("rejects edges that reference missing nodes", () => {
-		expect(() =>
+		expect(
 			parseIntermediateDiagram({
 				...flowchartFixture,
 				edges: [
@@ -171,6 +183,12 @@ describe("parseIntermediateDiagram", () => {
 					},
 				],
 			}),
-		).toThrow('Edge "missing-edge" references missing target node "missing".');
+		).toMatchObject({
+			failure: {
+				message: expect.stringContaining(
+					'Edge "missing-edge" references missing target node "missing".',
+				),
+			},
+		});
 	});
 });

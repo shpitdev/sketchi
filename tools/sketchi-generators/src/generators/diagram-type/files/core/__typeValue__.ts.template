@@ -1,6 +1,6 @@
-import { Schema } from "effect";
+import { Result, Schema } from "effect";
 
-import { IntermediateDiagram, validateIntermediateDiagram } from "../intermediate.js";
+import { type DiagramValidationError, IntermediateDiagram, validateIntermediateDiagram } from "../intermediate.js";
 
 export const <%= propertyName %>DiagramType = "<%= typeValue %>" as const;
 
@@ -15,19 +15,16 @@ export const <%= className %>Diagram = Schema.Struct({
 }).annotate({ identifier: "<%= className %>Diagram" });
 
 export interface <%= className %>Diagram extends Schema.Schema.Type<typeof <%= className %>Diagram> {}
-export const <%= className %>DiagramSchema = <%= className %>Diagram;
 
-export function validate<%= className %>Diagram(diagram: <%= className %>Diagram): <%= className %>Diagram {
-  validateIntermediateDiagram(diagram);
-  return diagram;
+export function validate<%= className %>Diagram(diagram: <%= className %>Diagram): Result.Result<<%= className %>Diagram, DiagramValidationError> {
+  return Result.map(validateIntermediateDiagram(diagram), () => diagram);
 }
 
-export function parse<%= className %>Diagram(input: unknown): <%= className %>Diagram {
-  return validate<%= className %>Diagram(
-    Schema.decodeUnknownSync(<%= className %>Diagram, { errors: "all" })(input),
-  );
+export function parse<%= className %>Diagram(input: unknown): Result.Result<<%= className %>Diagram, Schema.SchemaError | DiagramValidationError> {
+  return Result.flatMap(Schema.decodeUnknownResult(<%= className %>Diagram, { errors: "all" })(input), validate<%= className %>Diagram);
 }
 
+// Maintained fixture data is trusted; invalid construction is a fixture defect.
 export const <%= fixtureName %> = parse<%= className %>Diagram({
   id: "<%= typeValue %>-example",
   title: <%- titleLiteral %>,
@@ -55,4 +52,4 @@ export const <%= fixtureName %> = parse<%= className %>Diagram({
     direction: "LR",
     edgeRouting: "orthogonal"
   }
-});
+}).pipe(Result.getOrThrow);

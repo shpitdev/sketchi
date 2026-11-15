@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import {
 	type CanvasArrowhead,
 	type ErCardinality,
@@ -1267,7 +1268,7 @@ function ring(
  * with key markers and types in their own columns), each relationship an
  * orthogonal line from row to row with a crow's-foot end at each table.
  */
-export function renderErDiagram(diagram: ErDiagram): RenderedDiagramScene {
+export function renderErDiagram(diagram: ErDiagram): Result.Result<RenderedDiagramScene> {
 	const start = new Map(diagram.entities.map((entity) => [entity.id, tableOf(entity)]));
 	const {
 		scene,
@@ -1330,11 +1331,11 @@ export function renderErDiagram(diagram: ErDiagram): RenderedDiagramScene {
 		...rings,
 		...labels,
 	];
-	return {
+	return Result.succeed({
 		...scene,
 		elements,
 		zOrder: elements.map((element) => element.id),
-	};
+	});
 }
 
 /** A table's outline or name band keeps its role while it is still a plain rectangle. */

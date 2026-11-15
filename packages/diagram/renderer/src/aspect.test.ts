@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	flowchartFixture,
@@ -137,7 +139,7 @@ describe("tall flowchart columns", () => {
 				title: name,
 				...TALL_COLUMNS[name],
 				layout: { direction: "TB", edgeRouting: "orthogonal" },
-			});
+			}).pipe(Result.getOrThrow);
 			const arrows = scene.elements.flatMap((element) =>
 				element.type === "arrow" ? [element] : [],
 			);
@@ -161,7 +163,7 @@ describe("tall flowchart columns", () => {
 				{ id: "bc", source: "B", target: "C" },
 			],
 			layout: { direction: "TB", edgeRouting: "orthogonal" },
-		});
+		}).pipe(Result.getOrThrow);
 		const ys = scene.elements.flatMap((element) => (element.type === "node" ? [element.y] : []));
 		expect(ys).toEqual([48, 216, 384]);
 	});
@@ -320,7 +322,7 @@ describe("long flowcharts", () => {
 				...(label ? { label } : {}),
 			})),
 			layout: { direction: "TB", edgeRouting: "orthogonal" },
-		});
+		}).pipe(Result.getOrThrow);
 		const arrows = scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
 		// A column 1631 wide and 7277 tall fitted its text to a screen at 4 px:
 		// a few more lines crossing where branches meet cost less than that. Its
@@ -383,8 +385,8 @@ describe("wide single-row timelines", () => {
 		"stands %s's labels out on longer stems to read within 2.3:1",
 		(name) => {
 			const scene = renderTimelineDiagram(
-				parseTimelineDiagram({ ...WIDE_ROWS[name], type: "timeline" }),
-			);
+				parseTimelineDiagram({ ...WIDE_ROWS[name], type: "timeline" }).pipe(Result.getOrThrow),
+			).pipe(Result.getOrThrow);
 			expect(exportAspect(scene, 40)).toBeLessThanOrEqual(2.3);
 			// Every label still hangs from a stem that meets the axis.
 			const stems = scene.elements.filter((element) => element.type === "line");
@@ -576,7 +578,9 @@ const ONLINE_SHOP = {
 };
 
 const classScene = (spec: object) =>
-	renderClassDiagram(parseClassDiagram({ type: "class", ...spec }));
+	renderClassDiagram(parseClassDiagram({ type: "class", ...spec }).pipe(Result.getOrThrow)).pipe(
+		Result.getOrThrow,
+	);
 const classBox = (scene: RenderedDiagramScene, id: string) =>
 	scene.elements.find(
 		(element): element is NodeSceneElement =>

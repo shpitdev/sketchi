@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import type { ClassDiagram } from "@sketchi/diagram-core";
 import { renderDiagram } from "@sketchi/diagram-renderer";
@@ -8,6 +10,7 @@ import { evaluateScenarioDiagram } from "./evaluate.js";
 const scenario = (id: string) => classScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: ClassDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const shop = scenario("online-shop-domain-class-v2").expectedDiagram;
@@ -279,7 +282,7 @@ describe("prompt-grounded class diagram scenarios", () => {
 	});
 
 	it("checks the drawing: a wrong head or a missing multiplicity fails, and labels stand clear", () => {
-		const scene = renderDiagram(shop);
+		const scene = renderDiagram(shop).pipe(Result.getOrThrow);
 		expect(classDrawnCheck(shop, scene).passed).toBe(true);
 		expect(classClearanceCheck(scene).passed).toBe(true);
 		const tampered = {

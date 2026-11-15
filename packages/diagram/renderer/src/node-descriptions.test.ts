@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -102,7 +104,7 @@ describe("node descriptions", () => {
 	for (const direction of ["LR", "TB", "RL", "BT"] as const) {
 		it(`draws each description as a subtitle under its label (${direction})`, () => {
 			const diagram = awsThreeTier(direction);
-			const scene = renderIntermediateDiagram(diagram);
+			const scene = renderIntermediateDiagram(diagram).pipe(Result.getOrThrow);
 			const described = new Map(
 				diagram.nodes.flatMap((node) =>
 					node.description ? [[node.id, node.description] as const] : [],
@@ -140,7 +142,7 @@ describe("node descriptions", () => {
 				title: "Shapes",
 				nodes: [{ id: `n${index}`, label: "Credit check", description, ...extra }],
 				edges: [],
-			});
+			}).pipe(Result.getOrThrow);
 			expectDescriptionsFit(scene, new Map([[`n${index}`, description]]));
 		}
 	});
@@ -162,7 +164,7 @@ describe("node descriptions", () => {
 				{ id: "e1", source: "a", target: "b" },
 				{ id: "e2", source: "b", target: "c" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expectDescriptionsFit(
 			scene,
 			new Map([
@@ -190,7 +192,7 @@ describe("node descriptions", () => {
 			...diagram,
 			nodes: diagram.nodes.map(({ description: _description, ...node }) => node),
 		};
-		const scene = renderIntermediateDiagram(plain);
+		const scene = renderIntermediateDiagram(plain).pipe(Result.getOrThrow);
 		expect(texts(scene).some((text) => text.id.startsWith("description:"))).toBe(false);
 		expect(nodes(scene).every((node) => node.groupIds === undefined)).toBe(true);
 	});

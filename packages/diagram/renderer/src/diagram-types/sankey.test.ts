@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -29,7 +31,10 @@ const aspect = (scene: { width: number; height: number }) =>
 	(scene.width - 80) / (scene.height - 80);
 
 /** A drawing's crossings weighted by the product of the crossing flows' values. */
-function weightedCrossings(diagram: SankeyDiagram, scene = renderSankeyDiagram(diagram)) {
+function weightedCrossings(
+	diagram: SankeyDiagram,
+	scene = renderSankeyDiagram(diagram).pipe(Result.getOrThrow),
+) {
 	const valueOf = new Map(
 		diagram.links.map((link) => [`${link.source}>${link.target}`, link.value]),
 	);
@@ -37,7 +42,7 @@ function weightedCrossings(diagram: SankeyDiagram, scene = renderSankeyDiagram(d
 }
 
 function bandOf(diagram: SankeyDiagram, source: string, target: string) {
-	const band = readSankeyScene(renderSankeyDiagram(diagram)).bands.find(
+	const band = readSankeyScene(renderSankeyDiagram(diagram).pipe(Result.getOrThrow)).bands.find(
 		(entry) => entry.source === source && entry.target === target,
 	);
 	if (!band) throw new Error(`No band ${source} → ${target}.`);
@@ -68,26 +73,26 @@ describe("Sankey flow text", () => {
 			...sankeyFixture,
 			links: sankeyFixture.links.map((link) => ({ ...link, label: String(link.value) })),
 		};
-		const scene = renderSankeyDiagram(restated);
+		const scene = renderSankeyDiagram(restated).pipe(Result.getOrThrow);
 		const plain = renderSankeyDiagram({
 			...sankeyFixture,
 			links: sankeyFixture.links.map(({ label: _label, ...link }) => link),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(scene.elements).toEqual(plain.elements);
 	});
 });
 
 describe("Sankey renderer", () => {
 	it("renders the fixture into a valid deterministic scene", () => {
-		const scene = renderDiagram(sankeyFixture);
+		const scene = renderDiagram(sankeyFixture).pipe(Result.getOrThrow);
 		expect(scene.diagramId).toBe("cloud-budget");
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(sankeyLayoutIssues(scene)).toEqual([]);
-		expect(renderDiagram(sankeyFixture)).toEqual(scene);
+		expect(renderDiagram(sankeyFixture).pipe(Result.getOrThrow)).toEqual(scene);
 	});
 
 	it.each(Object.entries(sankeyStressFixtures))("draws %s cleanly", (_name, diagram) => {
-		const scene = renderSankeyDiagram(diagram);
+		const scene = renderSankeyDiagram(diagram).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(sankeyLayoutIssues(scene)).toEqual([]);
 		expect(aspect(scene)).toBeLessThanOrEqual(2.45);
@@ -128,7 +133,7 @@ describe("Sankey renderer", () => {
 	it("keeps the widest flows from crossing each other, accepting slivers instead", () => {
 		// Engineering → Compute ($310k) crossed both Data Science → GPU ($220k) and → Object
 		// storage ($60k) when the ordering counted crossings; weighted, only small flows cross.
-		const pairs = sankeyCrossingPairs(renderSankeyDiagram(cloudBudget));
+		const pairs = sankeyCrossingPairs(renderSankeyDiagram(cloudBudget).pipe(Result.getOrThrow));
 		const value = (band: { source: string; target: string }) =>
 			cloudBudget.links.find((link) => link.source === band.source && link.target === band.target)!
 				.value;
@@ -141,7 +146,7 @@ describe("Sankey renderer", () => {
 	});
 
 	it("places each node in its longest-path column, shared sinks in the last", () => {
-		const { nodes } = readSankeyScene(renderSankeyDiagram(hiring));
+		const { nodes } = readSankeyScene(renderSankeyDiagram(hiring).pipe(Result.getOrThrow));
 		const left = (id: string) => nodes.find((node) => node.id === id)!.box.left;
 		const columns = [...new Set(nodes.map((node) => node.box.left))].toSorted((a, b) => a - b);
 		const column = (id: string) => columns.indexOf(left(id));
@@ -153,7 +158,9 @@ describe("Sankey renderer", () => {
 		expect(column("rejected")).toBe(4);
 		expect(column("withdrew")).toBe(4);
 		// A drop-off fed by one stage stays beside it.
-		const perStage = readSankeyScene(renderSankeyDiagram(sankeyStressFixtures.stageDropOffs)).nodes;
+		const perStage = readSankeyScene(
+			renderSankeyDiagram(sankeyStressFixtures.stageDropOffs).pipe(Result.getOrThrow),
+		).nodes;
 		const perStageLefts = [...new Set(perStage.map((node) => node.box.left))].toSorted(
 			(a, b) => a - b,
 		);
@@ -200,8 +207,8 @@ describe("Sankey renderer", () => {
 				{ source: "in", target: "mid", value: 100 },
 				{ source: "mid", target: "out", value: 60 },
 			],
-		});
-		const scene = renderSankeyDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderSankeyDiagram(diagram).pipe(Result.getOrThrow);
 		const { nodes, bands } = readSankeyScene(scene);
 		const middle = nodes.find((node) => node.id === "mid")!;
 		expect(middle.box.bottom - middle.box.top).toBeCloseTo(bands[0]!.width, 1);
@@ -211,7 +218,7 @@ describe("Sankey renderer", () => {
 	});
 
 	it("labels every node with its total and every flow with its value", () => {
-		const scene = renderSankeyDiagram(traffic);
+		const scene = renderSankeyDiagram(traffic).pipe(Result.getOrThrow);
 		const { nodes, bands } = readSankeyScene(scene);
 		expect(nodes.find((node) => node.id === "home")?.text).toBe("Home\n5,300 visits");
 		expect(nodes.find((node) => node.id === "bounced")?.text).toBe("Bounced\n11,200 visits");
@@ -220,7 +227,7 @@ describe("Sankey renderer", () => {
 		expect(
 			bands.find((band) => band.source === "organic-search" && band.target === "home")?.text,
 		).toBe("4,200");
-		const energyBands = readSankeyScene(renderSankeyDiagram(energy)).bands;
+		const energyBands = readSankeyScene(renderSankeyDiagram(energy).pipe(Result.getOrThrow)).bands;
 		expect(
 			energyBands.find((band) => band.target === "rejected-energy" && band.source === "electricity")
 				?.text,
@@ -228,7 +235,7 @@ describe("Sankey renderer", () => {
 	});
 
 	it("puts first-column labels left of their bars and the rest to the right", () => {
-		const { nodes } = readSankeyScene(renderSankeyDiagram(traffic));
+		const { nodes } = readSankeyScene(renderSankeyDiagram(traffic).pipe(Result.getOrThrow));
 		for (const node of nodes) {
 			if (["organic-search", "paid-ads", "social"].includes(node.id))
 				expect(node.textBox!.right).toBeLessThanOrEqual(node.box.left);
@@ -237,7 +244,7 @@ describe("Sankey renderer", () => {
 	});
 
 	it("sets a middle column's label on paper where it rides its own bands", () => {
-		const scene = renderSankeyDiagram(hiring);
+		const scene = renderSankeyDiagram(hiring).pipe(Result.getOrThrow);
 		const { nodes } = readSankeyScene(scene);
 		expect(
 			nodes
@@ -286,8 +293,8 @@ describe("Sankey renderer", () => {
 	it("keeps values along the curves clear of the bands they don't label", () => {
 		// Coal → Industrial, Natural gas → Commercial and Commercial → Rejected energy
 		// once sat on or against neighbouring bands.
-		expect(sankeyLayoutIssues(renderSankeyDiagram(energy))).toEqual([]);
-		const scene = renderSankeyDiagram(hiring);
+		expect(sankeyLayoutIssues(renderSankeyDiagram(energy).pipe(Result.getOrThrow))).toEqual([]);
+		const scene = renderSankeyDiagram(hiring).pipe(Result.getOrThrow);
 		const { bands, texts } = readSankeyScene(scene);
 		const value = texts.find((text) => text.id === "text:sankey:link:offer:declined")!;
 		const wide = bands.find((band) => band.source === "applicants" && band.target === "rejected")!;
@@ -326,7 +333,7 @@ describe("Sankey renderer", () => {
 	});
 
 	it("colors bands by source and draws nodes nothing leaves in gray", () => {
-		const scene = renderSankeyDiagram(hiring);
+		const scene = renderSankeyDiagram(hiring).pipe(Result.getOrThrow);
 		const fill = (id: string) =>
 			scene.elements.find((element) => element.id === id && element.type === "node") as
 				| { fillColor?: string }
@@ -344,7 +351,7 @@ describe("Sankey renderer", () => {
 			nodes: hiring.nodes.map((node) =>
 				node.id === "rejected" ? { ...node, color: "#e34948" } : node,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(
 			(
 				custom.elements.find((element) => element.id === "node:sankey:node:rejected") as {
@@ -355,7 +362,7 @@ describe("Sankey renderer", () => {
 	});
 
 	it("keeps band outlines translucent, square bars and every mark's role", () => {
-		const scene = renderSankeyDiagram(sankeyFixture);
+		const scene = renderSankeyDiagram(sankeyFixture).pipe(Result.getOrThrow);
 		for (const element of scene.elements) {
 			if (element.type !== "node") continue;
 			expect(element.rendererRole).toBe("sankey-mark");
@@ -366,7 +373,7 @@ describe("Sankey renderer", () => {
 	});
 
 	it("wraps long labels at word boundaries", () => {
-		const { nodes } = readSankeyScene(renderSankeyDiagram(longLabels));
+		const { nodes } = readSankeyScene(renderSankeyDiagram(longLabels).pipe(Result.getOrThrow));
 		for (const node of longLabels.nodes) {
 			const text = nodes.find((entry) => entry.id === node.id)!.text!;
 			expect(text.split("\n").slice(0, -1).join(" ")).toBe(node.label);
@@ -375,7 +382,7 @@ describe("Sankey renderer", () => {
 
 	it("handles eight stages, slivers and long labels within the aspect", () => {
 		for (const diagram of [chain, slivers, longLabels]) {
-			const scene = renderSankeyDiagram(diagram);
+			const scene = renderSankeyDiagram(diagram).pipe(Result.getOrThrow);
 			expect(aspect(scene)).toBeLessThanOrEqual(2.45);
 			expect(sankeyLayoutIssues(scene)).toEqual([]);
 		}
@@ -392,8 +399,8 @@ describe("Sankey renderer", () => {
 				{ id: "gpu", label: "GPU\n\nclusters" },
 			],
 			links: [{ source: "data", target: "gpu", value: 220, label: "training\nruns" }],
-		});
-		const scene = renderSankeyDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderSankeyDiagram(diagram).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(sankeyLayoutIssues(scene)).toEqual([]);
 		const { nodes, bands } = readSankeyScene(scene);
@@ -418,8 +425,8 @@ describe("Sankey renderer", () => {
 				{ source: "__proto__", target: "constructor", value: 5 },
 				{ source: "__proto__", target: "toString", value: 2 },
 			],
-		});
-		const scene = renderSankeyDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderSankeyDiagram(diagram).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(sankeyLayoutIssues(scene)).toEqual([]);
 		expect(readSankeyScene(scene).nodes.map((node) => node.text)).toEqual([
@@ -452,16 +459,18 @@ describe("Sankey renderer", () => {
 						...(label ? { label } : {}),
 					})),
 				),
-			});
+			}).pipe(Result.getOrThrow);
 		// 64 flows, each labeled "Renewals and expansions and other income": no layout reads.
 		const labeled = crowded("Renewals and expansions and other income");
 		const layout = layoutSankeyDiagram(labeled);
 		expect(layout.unplacedValues).toBeGreaterThan(0);
-		expect(sankeyLayoutIssues(renderSankeyDiagram(labeled)).length).toBeGreaterThan(0);
+		expect(
+			sankeyLayoutIssues(renderSankeyDiagram(labeled).pipe(Result.getOrThrow)).length,
+		).toBeGreaterThan(0);
 		// The same flows without link labels reflow cleanly.
 		const plain = crowded();
 		expect(layoutSankeyDiagram(plain).unplacedValues).toBe(0);
-		expect(sankeyLayoutIssues(renderSankeyDiagram(plain))).toEqual([]);
+		expect(sankeyLayoutIssues(renderSankeyDiagram(plain).pipe(Result.getOrThrow))).toEqual([]);
 		// No maintained diagram needs a value drawn over another mark.
 		for (const diagram of [sankeyFixture, ...Object.values(sankeyStressFixtures)])
 			expect(layoutSankeyDiagram(diagram).unplacedValues, diagram.id).toBe(0);
@@ -477,8 +486,8 @@ describe("Sankey renderer", () => {
 				{ id: "b", label: "B" },
 			],
 			links: [{ source: "a", target: "b", value: 1e-13 }],
-		});
-		const { nodes, bands } = readSankeyScene(renderSankeyDiagram(tiny));
+		}).pipe(Result.getOrThrow);
+		const { nodes, bands } = readSankeyScene(renderSankeyDiagram(tiny).pipe(Result.getOrThrow));
 		expect(nodes.map((node) => node.text)).toEqual(["A\n1e-13", "B\n1e-13"]);
 		expect(bands[0]?.text).toBe("1e-13");
 	});

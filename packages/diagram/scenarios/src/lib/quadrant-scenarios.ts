@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	parseQuadrantDiagram,
 	QUADRANT_KEYS,
@@ -448,7 +450,7 @@ function defineQuadrantScenario(definition: QuadrantScenarioDefinition): Quadran
 					: { x: place[0] / 100, y: place[1] / 100 }),
 				...(extra?.group ? { group: extra.group } : {}),
 			})),
-		}),
+		}).pipe(Result.getOrThrow),
 	};
 }
 

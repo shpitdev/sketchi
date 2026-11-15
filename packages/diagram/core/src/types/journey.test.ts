@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
@@ -11,7 +13,6 @@ import {
 	journeyStepActors,
 	journeyFixture,
 	journeySentiment,
-	JourneyValidationError,
 	parseJourneyDiagram,
 	resolveJourneyShorthand,
 } from "./journey";
@@ -26,13 +27,11 @@ const journey = (stages: unknown[], extra: Record<string, unknown> = {}) => ({
 
 /** The issues a journey fails with, or [] when it is valid. */
 function issuesOf(input: unknown) {
-	try {
-		parseJourneyDiagram(input);
-		return [];
-	} catch (error) {
-		if (!(error instanceof JourneyValidationError)) throw error;
-		return error.issues;
-	}
+	const result = parseJourneyDiagram(input);
+	if (Result.isSuccess(result)) return [];
+	const error = result.failure;
+	if (error._tag !== "JourneyValidationError") return expect.fail(error.message);
+	return error.issues;
 }
 const codes = (input: unknown) => issuesOf(input).map((issue) => issue.code);
 
@@ -41,7 +40,7 @@ const browse = { name: "Browse", steps: [{ label: "Search for shoes", score: 4 }
 describe("journey contract", () => {
 	it("has a typed fixture that satisfies the canonical diagram contract", () => {
 		expect(journeyFixture.type).toBe(journeyDiagramType);
-		expect(parseCanonicalDiagram(journeyFixture)).toEqual(journeyFixture);
+		expect(parseCanonicalDiagram(journeyFixture).pipe(Result.getOrThrow)).toEqual(journeyFixture);
 		expect(journeyFixture.stages.length).toBeGreaterThan(2);
 		for (const fixture of Object.values(journeyStressFixtures))
 			expect(getJourneyValidationIssues(fixture)).toEqual([]);
@@ -51,7 +50,7 @@ describe("journey contract", () => {
 	});
 
 	it("defaults the palette and keeps optional rows absent", () => {
-		const parsed = parseJourneyDiagram(journey([browse]));
+		const parsed = parseJourneyDiagram(journey([browse])).pipe(Result.getOrThrow);
 		expect(parsed.style).toMatchObject({ accentColor: expect.any(String) });
 		expect(parsed.stages[0]).not.toHaveProperty("painPoints");
 		expect(parsed).not.toHaveProperty("persona");
@@ -81,11 +80,15 @@ describe("journey contract", () => {
 							],
 						},
 					]),
-				),
+				).pipe(Result.getOrThrow),
 			),
 		).toEqual(["Customer", "Agent"]);
 		expect(
-			journeyActors(parseJourneyDiagram(journey([browse], { actors: ["Shopper", "Courier"] }))),
+			journeyActors(
+				parseJourneyDiagram(journey([browse], { actors: ["Shopper", "Courier"] })).pipe(
+					Result.getOrThrow,
+				),
+			),
 		).toEqual(["Shopper", "Courier"]);
 	});
 
@@ -176,7 +179,7 @@ describe("journey contract", () => {
 					},
 				],
 			}),
-		);
+		).pipe(Result.getOrThrow);
 		expect(resolved.persona).toBe("Maya, first-time buyer");
 		expect(resolved.actors).toEqual(["Maya", "Courier"]);
 		expect(resolved.stages).toEqual([
@@ -209,7 +212,7 @@ describe("journey contract", () => {
 					},
 				],
 			}),
-		);
+		).pipe(Result.getOrThrow);
 		expect(resolved.stages[0]?.steps.map((step) => step.actor)).toEqual([
 			"Customer, Agent",
 			"Customer, Agent",
@@ -239,7 +242,7 @@ describe("journey contract", () => {
 					},
 				],
 			}),
-		);
+		).pipe(Result.getOrThrow);
 		expect(diagram.stages[0]?.steps[0]?.actor).toBe("Smith, Jane, Agent");
 		expect(journeyStepActors("Smith, Jane, Agent", diagram.actors)).toEqual([
 			"Smith, Jane",
@@ -311,7 +314,7 @@ describe("journey contract", () => {
 				painPoints: [{ stage: "Report", text: "Slow first reply" }],
 				opportunities: [{ stage: "Resolve", label: "Follow-up survey" }],
 			}),
-		);
+		).pipe(Result.getOrThrow);
 		expect(resolved.stages.map((stage) => stage.name)).toEqual(["Report", "Resolve"]);
 		expect(resolved.stages[0]?.steps.map((step) => step.label)).toEqual([
 			"Open a ticket",

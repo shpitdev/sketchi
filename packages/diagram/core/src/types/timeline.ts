@@ -1,5 +1,6 @@
-import { Effect, Schema } from "effect";
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const timelineDiagramType = "timeline" as const;
 export const TIMELINE_MAX_EVENTS = 60;
@@ -142,18 +143,24 @@ export function isTimelineDate(value: string): boolean {
 	return parseTimelineDate(value) !== undefined;
 }
 
-export interface TimelineValidationIssue {
-	readonly code:
-		| "invalid_timeline_date"
-		| "duplicate_event_id"
-		| "invalid_timeline_order"
-		| "invalid_timeline_span"
-		| "invalid_timeline_lane"
-		| "timeline_too_large";
-	readonly path: string;
-	readonly message: string;
-	readonly hint: string;
-}
+export const TimelineValidationIssueCodeSchema = Schema.Literals([
+	"invalid_timeline_date",
+	"duplicate_event_id",
+	"invalid_timeline_order",
+	"invalid_timeline_span",
+	"invalid_timeline_lane",
+	"timeline_too_large",
+]);
+export type TimelineValidationIssueCode = typeof TimelineValidationIssueCodeSchema.Type;
+export const TimelineValidationIssue = Schema.Struct({
+	code: TimelineValidationIssueCodeSchema,
+	path: Schema.String,
+	message: Schema.String,
+	hint: Schema.String,
+});
+export interface TimelineValidationIssue extends Schema.Schema.Type<
+	typeof TimelineValidationIssue
+> {}
 
 const DATE_HINT =
 	"Use YYYY, YYYY-MM, YYYY-MM-DD, or YYYY-MM-DDTHH:mm[:ss] with Z or ±HH:MM, copied from the source.";
@@ -264,20 +271,37 @@ export function getTimelineValidationIssues(diagram: TimelineDiagram): TimelineV
 	return issues.slice(0, 20);
 }
 
-export class TimelineValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly TimelineValidationIssue[]) {
-		super(issues[0]?.message ?? "Timeline failed validation.");
-		this.name = "TimelineValidationError";
+export class TimelineValidationError extends Schema.TaggedError<
+	TimelineValidationError,
+	{ readonly brand: unique symbol }
+>()("TimelineValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(TimelineValidationIssue),
+}) {
+	static fromIssues(issues: readonly TimelineValidationIssue[]): TimelineValidationError {
+		return TimelineValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Timeline failed validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
-export function validateTimelineDiagram(diagram: TimelineDiagram): TimelineDiagram {
+export function validateTimelineDiagram(
+	diagram: TimelineDiagram,
+): Result.Result<TimelineDiagram, TimelineValidationError> {
 	const issues = getTimelineValidationIssues(diagram);
-	if (issues.length) throw new TimelineValidationError(issues);
-	return diagram;
+	return issues.length > 0
+		? Result.fail(TimelineValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
-export function parseTimelineDiagram(input: unknown): TimelineDiagram {
-	return validateTimelineDiagram(
-		Schema.decodeUnknownSync(TimelineDiagram, { errors: "all" })(input),
+export function parseTimelineDiagram(
+	input: unknown,
+): Result.Result<TimelineDiagram, Schema.SchemaError | TimelineValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(TimelineDiagram, { errors: "all" })(input),
+		validateTimelineDiagram,
 	);
 }
 /** Sort key: a date's period start, else the explicit order. */
@@ -304,4 +328,4 @@ export const timelineFixture = parseTimelineDiagram({
 		},
 		{ id: "release", label: "General availability", date: "2026-10-01", kind: "milestone" },
 	],
-});
+}).pipe(Result.getOrThrow);

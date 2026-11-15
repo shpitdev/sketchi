@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram.js";
@@ -8,7 +10,6 @@ import {
 	ganttRows,
 	ganttScheduleConflicts,
 	ganttTaskSchedule,
-	GanttValidationError,
 	parseGanttDay,
 	parseGanttDiagram,
 	type GanttValidationIssue,
@@ -26,13 +27,11 @@ const plan = {
 };
 
 function issuesOf(input: object): readonly GanttValidationIssue[] {
-	try {
-		parseGanttDiagram(input);
-		return [];
-	} catch (error) {
-		if (error instanceof GanttValidationError) return error.issues;
-		throw error;
-	}
+	const result = parseGanttDiagram(input);
+	if (Result.isSuccess(result)) return [];
+	const error = result.failure;
+	if (error._tag !== "GanttValidationError") return expect.fail(error.message);
+	return error.issues;
 }
 
 /** The plan with one task patched; an undefined field is removed. */
@@ -49,12 +48,12 @@ const withTask = (index: number, patch: object) => ({
 
 describe("canonical Gantt chart", () => {
 	it("round-trips the fixture through the canonical union", () => {
-		expect(parseCanonicalDiagram(ganttFixture)).toEqual(ganttFixture);
-		expect(parseGanttDiagram(plan).tasks).toHaveLength(3);
+		expect(parseCanonicalDiagram(ganttFixture).pipe(Result.getOrThrow)).toEqual(ganttFixture);
+		expect(parseGanttDiagram(plan).pipe(Result.getOrThrow).tasks).toHaveLength(3);
 	});
 
 	it("schedules end as the inclusive last day and duration in calendar days", () => {
-		const diagram = parseGanttDiagram(plan);
+		const diagram = parseGanttDiagram(plan).pipe(Result.getOrThrow);
 		const [design, build, ship] = diagram.tasks.map((task) => ganttTaskSchedule(task)!);
 		expect(formatGanttDay(design!.start)).toBe("2026-03-02");
 		expect(design!.end - design!.start).toBe(5);
@@ -81,7 +80,7 @@ describe("canonical Gantt chart", () => {
 					{ ...plan.tasks[2], phase: "Ship", dependsOn: [] },
 					{ ...plan.tasks[1], phase: "Make" },
 				],
-			}),
+			}).pipe(Result.getOrThrow),
 		);
 		expect(rows.map((row) => [row.phase, row.tasks.map((task) => task.id)])).toEqual([
 			["Ship", ["c"]],
@@ -138,14 +137,16 @@ describe("canonical Gantt chart", () => {
 	});
 
 	it("reports successors that start before a predecessor finishes, without rejecting them", () => {
-		const early = parseGanttDiagram(withTask(1, { start: "2026-03-05" }));
+		const early = parseGanttDiagram(withTask(1, { start: "2026-03-05" })).pipe(Result.getOrThrow);
 		expect(ganttScheduleConflicts(early)).toEqual([
 			{ task: "b", dependsOn: "a", finishes: "2026-03-06", path: "tasks.[1].dependsOn.[0]" },
 		]);
-		expect(ganttScheduleConflicts(parseGanttDiagram(plan))).toEqual([]);
+		expect(ganttScheduleConflicts(parseGanttDiagram(plan).pipe(Result.getOrThrow))).toEqual([]);
 		// A milestone may fall on its predecessor's last day.
-		expect(ganttScheduleConflicts(parseGanttDiagram(withTask(2, { start: "2026-03-18" })))).toEqual(
-			[],
-		);
+		expect(
+			ganttScheduleConflicts(
+				parseGanttDiagram(withTask(2, { start: "2026-03-18" })).pipe(Result.getOrThrow),
+			),
+		).toEqual([]);
 	});
 });

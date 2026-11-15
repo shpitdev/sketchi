@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { evaluateScenarioDiagram, evaluateScenarioFixture } from "./evaluate";
@@ -11,7 +13,7 @@ const ids = [
 
 describe("curved scenarios", () => {
 	it.each(ids)("passes %s on its fixture: every line curved, crossing nothing", (id) => {
-		const evaluation = evaluateScenarioFixture(getFlowchartScenario(id));
+		const evaluation = evaluateScenarioFixture(getFlowchartScenario(id)).pipe(Result.getOrThrow);
 		expect(evaluation.checks.filter((check) => !check.passed)).toEqual([]);
 		expect(evaluation.checks.map((check) => check.id)).toEqual(
 			expect.arrayContaining(["curved-lines", "avoidable-crossings"]),
@@ -25,7 +27,7 @@ describe("curved scenarios", () => {
 		const evaluation = evaluateScenarioDiagram(scenario, {
 			...scenario.expectedDiagram,
 			layout: { ...scenario.expectedDiagram.layout, edgeRouting: "orthogonal" },
-		});
+		}).pipe(Result.getOrThrow);
 		expect(evaluation.checks.find((check) => check.id === "curved-lines")?.passed).toBe(false);
 	});
 

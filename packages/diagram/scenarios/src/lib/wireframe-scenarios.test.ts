@@ -1,10 +1,11 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option, Effect } from "effect";
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 import type { WireframeComponent, WireframeDiagram } from "@sketchi/diagram-core";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
-import { Effect } from "effect";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { FixtureGenerationClientLayer } from "./fixture-client.js";
@@ -19,6 +20,7 @@ import {
 const scenario = (id: string) => wireframeScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: WireframeDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const login = scenario("mobile-login-wireframe").expectedDiagram;
@@ -424,7 +426,7 @@ describe("prompt-grounded wireframe scenarios", () => {
 		);
 		expect(failed("product-page-wireframe", hinted)).toEqual([]);
 		// With no value, the placeholder is what it shows.
-		const scene = renderDiagram(login);
+		const scene = renderDiagram(login).pipe(Result.getOrThrow);
 		const unhinted = {
 			...scene,
 			elements: scene.elements.filter(
@@ -474,7 +476,7 @@ describe("prompt-grounded wireframe scenarios", () => {
 	});
 
 	it("reads each navigation arrow off the drawing", () => {
-		const scene = renderDiagram(signup);
+		const scene = renderDiagram(signup).pipe(Result.getOrThrow);
 		expect(wireframeDrawnCheck(signup, scene).passed).toBe(true);
 		const dropped = {
 			...scene,
@@ -489,7 +491,7 @@ describe("prompt-grounded wireframe scenarios", () => {
 	});
 
 	it("reads the drawing: a dropped label or a moved component fails the scene checks", () => {
-		const scene = renderDiagram(login);
+		const scene = renderDiagram(login).pipe(Result.getOrThrow);
 		expect(wireframeDrawnCheck(login, scene).passed).toBe(true);
 		const unlabeled = {
 			...scene,
@@ -671,7 +673,7 @@ describe("prompt-grounded wireframe scenarios", () => {
 		const candidate = candidateFromMcpResult(
 			{ ok: true, result: { ok: true, status: "accepted", buildId: "build-1" }, builds: [receipt] },
 			"wireframe",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
 		expect(failed("account-settings-wireframe", candidate.diagram as WireframeDiagram)).toEqual([]);

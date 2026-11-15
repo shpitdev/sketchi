@@ -1,3 +1,4 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 /**
  * Every canonical diagram family must complete the pipeline described in
  * docs/diagram-families.md. Each stage below is one test per family, so a
@@ -86,13 +87,17 @@ const stages: Record<string, (family: DiagramTypeValue) => void | Promise<void>>
 	"core contract and fixture": (family) => {
 		expect(existsSync(`${workspaceRoot}packages/diagram/core/src/types/${family}.ts`)).toBe(true);
 		const fixture = fixtureFor(family);
-		expect(parseCanonicalDiagram(fixture)).toEqual(fixture);
+		expect(parseCanonicalDiagram(fixture).pipe(Result.getOrThrow)).toEqual(fixture);
 	},
 	"deterministic renderer": (family) => {
-		expect(getCanvasValidationIssues(renderDiagram(fixtureFor(family)))).toEqual([]);
+		expect(
+			getCanvasValidationIssues(renderDiagram(fixtureFor(family)).pipe(Result.getOrThrow)),
+		).toEqual([]);
 	},
 	"Excalidraw conversion": (family) => {
-		const excalidraw = convertSceneToExcalidraw(renderDiagram(fixtureFor(family)));
+		const excalidraw = convertSceneToExcalidraw(
+			renderDiagram(fixtureFor(family)).pipe(Result.getOrThrow),
+		);
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
 	},
 	"generation prompt": (family) => {

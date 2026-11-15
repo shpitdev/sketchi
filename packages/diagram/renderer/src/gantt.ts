@@ -1,4 +1,6 @@
+import { Result } from "effect";
 import {
+	type GanttValidationError,
 	CANVAS_SPEC_VERSION,
 	estimateTextWidth,
 	formatGanttDay,
@@ -1212,8 +1214,10 @@ export interface GanttRoutingWork {
 }
 
 /** Lay out a Gantt chart deterministically: date axis, rows, bars, labels and dependencies. */
-export function renderGanttDiagram(input: GanttDiagram): RenderedDiagramScene {
-	return layoutGanttDiagram(input).scene;
+export function renderGanttDiagram(
+	input: GanttDiagram,
+): Result.Result<RenderedDiagramScene, GanttValidationError> {
+	return Result.map(layoutGanttDiagram(input), (value) => value.scene);
 }
 
 /** A layout tried, with how its routes read: how often they cross, and what else a reader would flag. */
@@ -1350,45 +1354,49 @@ const EARLIER_CLEAR: Choices = { forward: false, clear: true };
  * another's arrowhead or lie along it, the chart is laid out again that way with roomier rows,
  * whose wider gutters hold more lanes, and the layout with the fewest such conflicts is kept.
  */
-export function layoutGanttDiagram(input: GanttDiagram): {
-	readonly scene: RenderedDiagramScene;
-	readonly work: GanttRoutingWork;
-} {
-	const diagram = validateGanttDiagram(input);
-	const tried: LayoutTry[] = [layoutAt(diagram, ROW_HEIGHT, FORWARD)];
-	let best = tried[0]!;
-	let choices = FORWARD;
-	if (!clean(best)) {
-		let earlier = layoutAt(diagram, ROW_HEIGHT, EARLIER);
-		let earlierChoices = EARLIER;
-		tried.push(earlier);
-		if (!earlier.clear) {
-			earlier = layoutAt(diagram, ROW_HEIGHT, EARLIER_CLEAR);
-			earlierChoices = EARLIER_CLEAR;
+export function layoutGanttDiagram(input: GanttDiagram): Result.Result<
+	{
+		readonly scene: RenderedDiagramScene;
+		readonly work: GanttRoutingWork;
+	},
+	GanttValidationError
+> {
+	return Result.map(validateGanttDiagram(input), (diagram) => {
+		const tried: LayoutTry[] = [layoutAt(diagram, ROW_HEIGHT, FORWARD)];
+		let best = tried[0]!;
+		let choices = FORWARD;
+		if (!clean(best)) {
+			let earlier = layoutAt(diagram, ROW_HEIGHT, EARLIER);
+			let earlierChoices = EARLIER;
 			tried.push(earlier);
+			if (!earlier.clear) {
+				earlier = layoutAt(diagram, ROW_HEIGHT, EARLIER_CLEAR);
+				earlierChoices = EARLIER_CLEAR;
+				tried.push(earlier);
+			}
+			if (earlier.clear && !noWorse(best, earlier)) {
+				best = earlier;
+				choices = earlierChoices;
+			}
 		}
-		if (earlier.clear && !noWorse(best, earlier)) {
-			best = earlier;
-			choices = earlierChoices;
+		for (const extra of ROOMY_ROWS) {
+			// A few conflicts may clear with more room; a tangle of them would not, and costs a layout each.
+			if (best.work.conflicts === 0 || best.work.conflicts > ROOMY_CONFLICTS) break;
+			const roomier = layoutAt(diagram, ROW_HEIGHT + extra, choices);
+			tried.push(roomier);
+			if (roomier.work.conflicts < best.work.conflicts) best = roomier;
 		}
-	}
-	for (const extra of ROOMY_ROWS) {
-		// A few conflicts may clear with more room; a tangle of them would not, and costs a layout each.
-		if (best.work.conflicts === 0 || best.work.conflicts > ROOMY_CONFLICTS) break;
-		const roomier = layoutAt(diagram, ROW_HEIGHT + extra, choices);
-		tried.push(roomier);
-		if (roomier.work.conflicts < best.work.conflicts) best = roomier;
-	}
-	return {
-		scene: best.scene,
-		work: {
-			layouts: tried.length,
-			placements: tried.reduce((sum, { work }) => sum + work.placements, 0),
-			expansions: tried.reduce((sum, { work }) => sum + work.expansions, 0),
-			corridors: best.work.corridors,
-			conflicts: best.work.conflicts,
-		},
-	};
+		return {
+			scene: best.scene,
+			work: {
+				layouts: tried.length,
+				placements: tried.reduce((sum, { work }) => sum + work.placements, 0),
+				expansions: tried.reduce((sum, { work }) => sum + work.expansions, 0),
+				corridors: best.work.corridors,
+				conflicts: best.work.conflicts,
+			},
+		};
+	});
 }
 
 /**

@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	type ClassDiagram,
 	type ClassKind,
@@ -584,7 +586,7 @@ function defineClassScenario(definition: ClassScenarioDefinition): ClassScenario
 					...(drawn.toMultiplicity ? { toMultiplicity: drawn.toMultiplicity.split("|")[0]! } : {}),
 				};
 			}),
-		}),
+		}).pipe(Result.getOrThrow),
 	};
 }
 

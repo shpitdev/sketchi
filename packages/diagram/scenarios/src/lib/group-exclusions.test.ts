@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -16,6 +18,7 @@ const scenario = getFlowchartScenario("kubernetes-cluster-zones-v2");
 const diagram = scenario.expectedDiagram;
 const failures = (candidate: unknown, expected = scenario) =>
 	evaluateScenarioDiagram(expected, candidate)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const exclusion = "outside-group:RabbitMQ queue:GKE cluster";
@@ -30,7 +33,13 @@ function queueIn(group: string, groups: FlowchartDiagram["groups"] = diagram.gro
 
 describe("prompt-scoped group exclusions", () => {
 	it.each(samples)("accepts the real outside-cluster wrapper $runId", ({ spec }) => {
-		expect(failures(parseFlowchartDiagram(specToFlowchartCandidate(spec)))).toEqual([]);
+		expect(
+			failures(
+				parseFlowchartDiagram(specToFlowchartCandidate(spec).pipe(Result.getOrThrow)).pipe(
+					Result.getOrThrow,
+				),
+			),
+		).toEqual([]);
 	});
 
 	it.each(["Outside the cluster", "External services", "Shared infrastructure"])(

@@ -1,3 +1,29 @@
+import { Result, Schema } from "effect";
+import {
+	type CanonicalValidationError,
+	type CanonicalDiagram,
+	type SequenceDiagram,
+	type FlowchartDiagram,
+	parseFlowchartDiagram,
+	parseMindmapDiagram,
+	parseSequenceDiagram,
+	parseStateMachineDiagram,
+	parseErDiagram,
+	parseClassDiagram,
+	parseOrgChartDiagram,
+	parseVennDiagram,
+	resolveVennShorthand,
+	parseJourneyDiagram,
+	parseSankeyDiagram,
+	parseWireframeDiagram,
+	parseQuadrantDiagram,
+	parseTimelineDiagram,
+	parseChartDiagram,
+	parseGanttDiagram,
+	lineCrossings,
+	sequenceActivations,
+	unavoidableCrossings,
+} from "@sketchi/diagram-core";
 import {
 	chartClearRulesCheck,
 	chartDrawnDataCheck,
@@ -42,30 +68,6 @@ import {
 	ganttGeometryCheck,
 	ganttScenarioChecks,
 } from "./gantt-scenarios.js";
-import {
-	type CanonicalDiagram,
-	type SequenceDiagram,
-	type FlowchartDiagram,
-	parseFlowchartDiagram,
-	parseMindmapDiagram,
-	parseSequenceDiagram,
-	parseStateMachineDiagram,
-	parseErDiagram,
-	parseClassDiagram,
-	parseOrgChartDiagram,
-	parseVennDiagram,
-	resolveVennShorthand,
-	parseJourneyDiagram,
-	parseSankeyDiagram,
-	parseWireframeDiagram,
-	parseQuadrantDiagram,
-	parseTimelineDiagram,
-	parseChartDiagram,
-	parseGanttDiagram,
-	lineCrossings,
-	sequenceActivations,
-	unavoidableCrossings,
-} from "@sketchi/diagram-core";
 import {
 	convertSceneToExcalidraw,
 	validateExcalidrawScene,
@@ -874,19 +876,30 @@ function flowchartChecks(scenario: FlowchartScenario, diagram: FlowchartDiagram)
 	return { checks, ownedNodes };
 }
 
-export function extractJsonCandidate(output: string): unknown {
-	try {
-		return JSON.parse(output);
-	} catch {
+export function extractJsonCandidate(
+	output: string,
+): Result.Result<unknown, ScenarioCandidateParseError> {
+	const parse = (text: string) =>
+		Result.try({
+			try: (): unknown => JSON.parse(text),
+			catch: (cause) =>
+				ScenarioCandidateParseError.make({
+					cause,
+					message:
+						cause instanceof Error ? cause.message : "Model output did not contain a JSON object.",
+				}),
+		});
+	return Result.orElse(parse(output), () => {
 		const firstBrace = output.indexOf("{");
 		const lastBrace = output.lastIndexOf("}");
-
-		if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-			throw new Error("Model output did not contain a JSON object.");
-		}
-
-		return JSON.parse(output.slice(firstBrace, lastBrace + 1));
-	}
+		if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace)
+			return Result.fail(
+				ScenarioCandidateParseError.make({
+					message: "Model output did not contain a JSON object.",
+				}),
+			);
+		return parse(output.slice(firstBrace, lastBrace + 1));
+	});
 }
 
 function excalidrawCheck(scene: RenderedDiagramScene) {
@@ -911,19 +924,20 @@ function evaluation(
 	diagram: CanonicalDiagram,
 	familyChecks: readonly ScenarioCheck[],
 	sceneChecks: (scene: RenderedDiagramScene) => readonly ScenarioCheck[] = () => [],
-): ScenarioEvaluation {
-	const scene = renderDiagram(diagram);
-	const { check, excalidrawScene, excalidrawValidation } = excalidrawCheck(scene);
-	const checks = [...familyChecks, ...sceneChecks(scene), check];
-	return {
-		checks,
-		diagram,
-		excalidrawScene,
-		excalidrawValidation,
-		ok: checks.every((entry) => entry.passed),
-		scenarioId,
-		scene,
-	};
+): Result.Result<ScenarioEvaluation, ScenarioEvaluationError> {
+	return Result.map(renderDiagram(diagram), (scene) => {
+		const { check, excalidrawScene, excalidrawValidation } = excalidrawCheck(scene);
+		const checks = [...familyChecks, ...sceneChecks(scene), check];
+		return {
+			checks,
+			diagram,
+			excalidrawScene,
+			excalidrawValidation,
+			ok: checks.every((entry) => entry.passed),
+			scenarioId,
+			scene,
+		};
+	});
 }
 
 /**
@@ -1076,211 +1090,228 @@ export function evaluateScenarioDiagram(
 	scenario: DiagramScenario,
 	candidate: unknown,
 	modelCandidate: unknown = candidate,
-): ScenarioEvaluation {
-	if (scenario.diagramType === "chart") {
-		const diagram = parseChartDiagram(candidate);
-		const modelDiagram = modelCandidate === candidate ? diagram : parseChartDiagram(modelCandidate);
-		// Geometry reads the drawn scene, so it scores the returned diagram.
-		return evaluation(
-			scenario.id,
-			diagram,
-			chartScenarioChecks(scenario, modelDiagram),
-			(scene) => [
-				chartGeometryCheck(diagram, scene),
-				chartDrawnDataCheck(scenario, diagram, scene),
-				chartClearRulesCheck(scene),
-				...(diagram.kind === "pie" ? [chartPieLabelCheck(diagram, scene)] : []),
-			],
-		);
-	}
-	if (scenario.diagramType === "gantt") {
-		const diagram = parseGanttDiagram(candidate);
-		const modelDiagram = modelCandidate === candidate ? diagram : parseGanttDiagram(modelCandidate);
-		// Geometry, drawn data and clearance read the drawn scene, so they score the returned diagram.
-		return evaluation(
-			scenario.id,
-			diagram,
-			ganttScenarioChecks(scenario, modelDiagram),
-			(scene) => [
-				ganttGeometryCheck(diagram, scene),
-				ganttDrawnDataCheck(scenario, diagram, scene),
-				ganttClearanceCheck(scene),
-			],
-		);
-	}
-	if (scenario.diagramType === "timeline") {
-		const diagram = parseTimelineDiagram(candidate);
+): Result.Result<ScenarioEvaluation, ScenarioEvaluationError> {
+	return Result.gen(function* () {
+		if (scenario.diagramType === "chart") {
+			const diagram = yield* parseChartDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseChartDiagram(modelCandidate);
+			// Geometry reads the drawn scene, so it scores the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				chartScenarioChecks(scenario, modelDiagram),
+				(scene) => [
+					chartGeometryCheck(diagram, scene),
+					chartDrawnDataCheck(scenario, diagram, scene),
+					chartClearRulesCheck(scene),
+					...(diagram.kind === "pie" ? [chartPieLabelCheck(diagram, scene)] : []),
+				],
+			);
+		}
+		if (scenario.diagramType === "gantt") {
+			const diagram = yield* parseGanttDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseGanttDiagram(modelCandidate);
+			// Geometry, drawn data and clearance read the drawn scene, so they score the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				ganttScenarioChecks(scenario, modelDiagram),
+				(scene) => [
+					ganttGeometryCheck(diagram, scene),
+					ganttDrawnDataCheck(scenario, diagram, scene),
+					ganttClearanceCheck(scene),
+				],
+			);
+		}
+		if (scenario.diagramType === "timeline") {
+			const diagram = yield* parseTimelineDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseTimelineDiagram(modelCandidate);
+			// Spacing reads the drawn scene, so it scores the returned diagram.
+			const dated = scenario.assertions.events.some((event) => event.date !== undefined);
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				timelineScenarioChecks(scenario, modelDiagram),
+				(scene) =>
+					dated
+						? [
+								timelineSpacingCheck(scenario, diagram, scene),
+								timelineGapOrderCheck(scenario, diagram, scene),
+							]
+						: [],
+			);
+		}
+		if (scenario.diagramType === "mindmap") {
+			const diagram = yield* parseMindmapDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseMindmapDiagram(modelCandidate);
+			// The layout check reads the drawn scene, so it scores the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				mindmapScenarioChecks(scenario, modelDiagram),
+				(scene) => [mindmapLayoutCheck(scene)],
+			);
+		}
+		if (scenario.diagramType === "state-machine") {
+			const diagram = yield* parseStateMachineDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseStateMachineDiagram(modelCandidate);
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				stateMachineScenarioChecks(scenario, modelDiagram),
+			);
+		}
+		if (scenario.diagramType === "er") {
+			const diagram = yield* parseErDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseErDiagram(modelCandidate);
+			// The drawing reads the scene, so it scores the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				erScenarioChecks(scenario, modelDiagram),
+				(scene) => [erDrawnCheck(diagram, scene)],
+			);
+		}
+		if (scenario.diagramType === "class") {
+			const diagram = yield* parseClassDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseClassDiagram(modelCandidate);
+			// The drawing and its clearance read the scene, so they score the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				classScenarioChecks(scenario, modelDiagram),
+				(scene) => [classDrawnCheck(diagram, scene), classClearanceCheck(scene)],
+			);
+		}
+		if (scenario.diagramType === "quadrant") {
+			const diagram = yield* parseQuadrantDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseQuadrantDiagram(modelCandidate);
+			// The drawing and its layout read the scene, so they score the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				quadrantScenarioChecks(scenario, modelDiagram),
+				(scene) => [quadrantDrawnCheck(diagram, scene), quadrantLayoutCheck(diagram, scene)],
+			);
+		}
+		if (scenario.diagramType === "org-chart") {
+			const diagram = yield* parseOrgChartDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseOrgChartDiagram(modelCandidate);
+			// The drawing and its layout read the scene, so they score the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				orgChartScenarioChecks(scenario, modelDiagram),
+				(scene) => [orgChartDrawnCheck(diagram, scene), orgChartLayoutCheck(scene)],
+			);
+		}
+		if (scenario.diagramType === "venn") {
+			const diagram = yield* parseVennDiagram(resolveVennShorthand(candidate));
+			const modelDiagram =
+				modelCandidate === candidate
+					? diagram
+					: yield* parseVennDiagram(resolveVennShorthand(modelCandidate));
+			// The drawing and its layout read the scene, so they score the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				vennScenarioChecks(scenario, modelDiagram),
+				(scene) => [vennDrawnCheck(diagram, scene), vennLayoutCheck(scene)],
+			);
+		}
+		if (scenario.diagramType === "journey") {
+			const diagram = yield* parseJourneyDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseJourneyDiagram(modelCandidate);
+			// The drawing and its layout read the scene, so they score the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				journeyScenarioChecks(scenario, modelDiagram),
+				(scene) => [journeyDrawnCheck(diagram, scene), journeyLayoutCheck(scene)],
+			);
+		}
+		if (scenario.diagramType === "sankey") {
+			const diagram = yield* parseSankeyDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseSankeyDiagram(modelCandidate);
+			// The drawing and its layout read the scene, so they score the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				sankeyScenarioChecks(scenario, modelDiagram),
+				(scene) => [sankeyDrawnCheck(diagram, scene), sankeyLayoutCheck(diagram, scene)],
+			);
+		}
+		if (scenario.diagramType === "wireframe") {
+			const diagram = yield* parseWireframeDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseWireframeDiagram(modelCandidate);
+			// The drawing and its layout read the scene, so they score the returned diagram.
+			return yield* evaluation(
+				scenario.id,
+				diagram,
+				wireframeScenarioChecks(scenario, modelDiagram),
+				(scene) => [wireframeDrawnCheck(diagram, scene), wireframeLayoutCheck(scene)],
+			);
+		}
+		if (scenario.diagramType === "sequence") {
+			const diagram = yield* parseSequenceDiagram(candidate);
+			const modelDiagram =
+				modelCandidate === candidate ? diagram : yield* parseSequenceDiagram(modelCandidate);
+			return yield* evaluation(scenario.id, diagram, [
+				...sequenceScenarioChecks(scenario, modelDiagram),
+				...scenarioLogoChecks(
+					{
+						logos: scenario.logos,
+						prompt: scenario.prompt,
+						requiredIconSlugs: scenario.assertions.requiredIconSlugs,
+					},
+					modelDiagram,
+				),
+			]);
+		}
+		const diagram = yield* parseFlowchartDiagram(candidate);
 		const modelDiagram =
-			modelCandidate === candidate ? diagram : parseTimelineDiagram(modelCandidate);
-		// Spacing reads the drawn scene, so it scores the returned diagram.
-		const dated = scenario.assertions.events.some((event) => event.date !== undefined);
-		return evaluation(
-			scenario.id,
-			diagram,
-			timelineScenarioChecks(scenario, modelDiagram),
-			(scene) =>
-				dated
-					? [
-							timelineSpacingCheck(scenario, diagram, scene),
-							timelineGapOrderCheck(scenario, diagram, scene),
-						]
-					: [],
-		);
-	}
-	if (scenario.diagramType === "mindmap") {
-		const diagram = parseMindmapDiagram(candidate);
-		const modelDiagram =
-			modelCandidate === candidate ? diagram : parseMindmapDiagram(modelCandidate);
-		// The layout check reads the drawn scene, so it scores the returned diagram.
-		return evaluation(
-			scenario.id,
-			diagram,
-			mindmapScenarioChecks(scenario, modelDiagram),
-			(scene) => [mindmapLayoutCheck(scene)],
-		);
-	}
-	if (scenario.diagramType === "state-machine") {
-		const diagram = parseStateMachineDiagram(candidate);
-		const modelDiagram =
-			modelCandidate === candidate ? diagram : parseStateMachineDiagram(modelCandidate);
-		return evaluation(scenario.id, diagram, stateMachineScenarioChecks(scenario, modelDiagram));
-	}
-	if (scenario.diagramType === "er") {
-		const diagram = parseErDiagram(candidate);
-		const modelDiagram = modelCandidate === candidate ? diagram : parseErDiagram(modelCandidate);
+			modelCandidate === candidate ? diagram : yield* parseFlowchartDiagram(modelCandidate);
+		const { checks, ownedNodes } = flowchartChecks(scenario, diagram);
+		const modelOwners =
+			modelDiagram === diagram ? ownedNodes : flowchartChecks(scenario, modelDiagram).ownedNodes;
 		// The drawing reads the scene, so it scores the returned diagram.
-		return evaluation(scenario.id, diagram, erScenarioChecks(scenario, modelDiagram), (scene) => [
-			erDrawnCheck(diagram, scene),
-		]);
-	}
-	if (scenario.diagramType === "class") {
-		const diagram = parseClassDiagram(candidate);
-		const modelDiagram = modelCandidate === candidate ? diagram : parseClassDiagram(modelCandidate);
-		// The drawing and its clearance read the scene, so they score the returned diagram.
-		return evaluation(
+		return yield* evaluation(
 			scenario.id,
 			diagram,
-			classScenarioChecks(scenario, modelDiagram),
-			(scene) => [classDrawnCheck(diagram, scene), classClearanceCheck(scene)],
+			[
+				...checks,
+				...scenarioLogoChecks(
+					{
+						logos: scenario.logos,
+						prompt: scenario.prompt,
+						requiredIconSlugs: scenario.assertions.requiredIconSlugs,
+						sharedIconEntries: scenario.assertions.requiredNodes.flatMap((step) =>
+							step.entryParts
+								? [{ parts: step.entryParts, nodeIds: modelOwners.get(step.id)! }]
+								: [],
+						),
+					},
+					modelDiagram,
+				),
+			],
+			(scene) => [
+				...(scenario.assertions.crossingFree ? [flowchartCrossingCheck(diagram, scene)] : []),
+				...(scenario.assertions.curved ? [flowchartCurvedCheck(scene)] : []),
+			],
 		);
-	}
-	if (scenario.diagramType === "quadrant") {
-		const diagram = parseQuadrantDiagram(candidate);
-		const modelDiagram =
-			modelCandidate === candidate ? diagram : parseQuadrantDiagram(modelCandidate);
-		// The drawing and its layout read the scene, so they score the returned diagram.
-		return evaluation(
-			scenario.id,
-			diagram,
-			quadrantScenarioChecks(scenario, modelDiagram),
-			(scene) => [quadrantDrawnCheck(diagram, scene), quadrantLayoutCheck(diagram, scene)],
-		);
-	}
-	if (scenario.diagramType === "org-chart") {
-		const diagram = parseOrgChartDiagram(candidate);
-		const modelDiagram =
-			modelCandidate === candidate ? diagram : parseOrgChartDiagram(modelCandidate);
-		// The drawing and its layout read the scene, so they score the returned diagram.
-		return evaluation(
-			scenario.id,
-			diagram,
-			orgChartScenarioChecks(scenario, modelDiagram),
-			(scene) => [orgChartDrawnCheck(diagram, scene), orgChartLayoutCheck(scene)],
-		);
-	}
-	if (scenario.diagramType === "venn") {
-		const diagram = parseVennDiagram(resolveVennShorthand(candidate));
-		const modelDiagram =
-			modelCandidate === candidate
-				? diagram
-				: parseVennDiagram(resolveVennShorthand(modelCandidate));
-		// The drawing and its layout read the scene, so they score the returned diagram.
-		return evaluation(scenario.id, diagram, vennScenarioChecks(scenario, modelDiagram), (scene) => [
-			vennDrawnCheck(diagram, scene),
-			vennLayoutCheck(scene),
-		]);
-	}
-	if (scenario.diagramType === "journey") {
-		const diagram = parseJourneyDiagram(candidate);
-		const modelDiagram =
-			modelCandidate === candidate ? diagram : parseJourneyDiagram(modelCandidate);
-		// The drawing and its layout read the scene, so they score the returned diagram.
-		return evaluation(
-			scenario.id,
-			diagram,
-			journeyScenarioChecks(scenario, modelDiagram),
-			(scene) => [journeyDrawnCheck(diagram, scene), journeyLayoutCheck(scene)],
-		);
-	}
-	if (scenario.diagramType === "sankey") {
-		const diagram = parseSankeyDiagram(candidate);
-		const modelDiagram =
-			modelCandidate === candidate ? diagram : parseSankeyDiagram(modelCandidate);
-		// The drawing and its layout read the scene, so they score the returned diagram.
-		return evaluation(
-			scenario.id,
-			diagram,
-			sankeyScenarioChecks(scenario, modelDiagram),
-			(scene) => [sankeyDrawnCheck(diagram, scene), sankeyLayoutCheck(diagram, scene)],
-		);
-	}
-	if (scenario.diagramType === "wireframe") {
-		const diagram = parseWireframeDiagram(candidate);
-		const modelDiagram =
-			modelCandidate === candidate ? diagram : parseWireframeDiagram(modelCandidate);
-		// The drawing and its layout read the scene, so they score the returned diagram.
-		return evaluation(
-			scenario.id,
-			diagram,
-			wireframeScenarioChecks(scenario, modelDiagram),
-			(scene) => [wireframeDrawnCheck(diagram, scene), wireframeLayoutCheck(scene)],
-		);
-	}
-	if (scenario.diagramType === "sequence") {
-		const diagram = parseSequenceDiagram(candidate);
-		const modelDiagram =
-			modelCandidate === candidate ? diagram : parseSequenceDiagram(modelCandidate);
-		return evaluation(scenario.id, diagram, [
-			...sequenceScenarioChecks(scenario, modelDiagram),
-			...scenarioLogoChecks(
-				{
-					logos: scenario.logos,
-					prompt: scenario.prompt,
-					requiredIconSlugs: scenario.assertions.requiredIconSlugs,
-				},
-				modelDiagram,
-			),
-		]);
-	}
-	const diagram = parseFlowchartDiagram(candidate);
-	const modelDiagram =
-		modelCandidate === candidate ? diagram : parseFlowchartDiagram(modelCandidate);
-	const { checks, ownedNodes } = flowchartChecks(scenario, diagram);
-	const modelOwners =
-		modelDiagram === diagram ? ownedNodes : flowchartChecks(scenario, modelDiagram).ownedNodes;
-	// The drawing reads the scene, so it scores the returned diagram.
-	return evaluation(
-		scenario.id,
-		diagram,
-		[
-			...checks,
-			...scenarioLogoChecks(
-				{
-					logos: scenario.logos,
-					prompt: scenario.prompt,
-					requiredIconSlugs: scenario.assertions.requiredIconSlugs,
-					sharedIconEntries: scenario.assertions.requiredNodes.flatMap((step) =>
-						step.entryParts ? [{ parts: step.entryParts, nodeIds: modelOwners.get(step.id)! }] : [],
-					),
-				},
-				modelDiagram,
-			),
-		],
-		(scene) => [
-			...(scenario.assertions.crossingFree ? [flowchartCrossingCheck(diagram, scene)] : []),
-			...(scenario.assertions.curved ? [flowchartCurvedCheck(scene)] : []),
-		],
-	);
+	});
 }
 
 /** A prompt that asks for curved lines gets them: every line drawn as a curve. */
@@ -1331,10 +1362,23 @@ function flowchartCrossingCheck(diagram: FlowchartDiagram, scene: RenderedDiagra
 export function evaluateScenarioOutput(
 	scenario: DiagramScenario,
 	output: string,
-): ScenarioEvaluation {
-	return evaluateScenarioDiagram(scenario, extractJsonCandidate(output));
+): Result.Result<ScenarioEvaluation, ScenarioEvaluationError | ScenarioCandidateParseError> {
+	return Result.flatMap(extractJsonCandidate(output), (candidate) =>
+		evaluateScenarioDiagram(scenario, candidate),
+	);
 }
 
-export function evaluateScenarioFixture(scenario: DiagramScenario): ScenarioEvaluation {
+export function evaluateScenarioFixture(
+	scenario: DiagramScenario,
+): Result.Result<ScenarioEvaluation, ScenarioEvaluationError> {
 	return evaluateScenarioDiagram(scenario, scenario.expectedDiagram);
 }
+
+export type ScenarioEvaluationError = CanonicalValidationError | Schema.SchemaError;
+export class ScenarioCandidateParseError extends Schema.TaggedError<
+	ScenarioCandidateParseError,
+	{ readonly brand: unique symbol }
+>()("ScenarioCandidateParseError", {
+	message: Schema.String,
+	cause: Schema.optionalKey(Schema.Defect()),
+}) {}

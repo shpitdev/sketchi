@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { exportToBlob } from "@excalidraw/excalidraw";
 import { deployPipelineLogoFlowchart, embedCanvasIcons } from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
@@ -16,15 +18,18 @@ const LOGO_COLORS: Readonly<Record<string, readonly [number, number, number]>> =
 
 function logoScene(withFiles: boolean) {
 	const excalidraw = convertSceneToExcalidraw(
-		embedCanvasIcons(renderIntermediateDiagram(deployPipelineLogoFlowchart), (slug) => {
-			const color = LOGO_COLORS[slug];
-			return color
-				? {
-						name: slug,
-						svg: `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="rgb(${color.join(",")})"/></svg>`,
-					}
-				: undefined;
-		}).scene,
+		embedCanvasIcons(
+			renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
+			(slug) => {
+				const color = LOGO_COLORS[slug];
+				return color
+					? {
+							name: slug,
+							svg: `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" fill="rgb(${color.join(",")})"/></svg>`,
+						}
+					: undefined;
+			},
+		).scene,
 	);
 	return withFiles ? excalidraw : { ...excalidraw, files: {} };
 }

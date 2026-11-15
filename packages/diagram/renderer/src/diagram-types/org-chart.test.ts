@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,7 +25,7 @@ import type {
 const chart = (people: unknown[], extra: Record<string, unknown> = {}): OrgChartDiagram =>
 	parseOrgChartDiagram(
 		resolveOrgChartShorthand({ id: "team", title: "Team", type: "org-chart", people, ...extra }),
-	);
+	).pipe(Result.getOrThrow);
 
 function element<T extends RenderedDiagramScene["elements"][number]["type"]>(
 	scene: RenderedDiagramScene,
@@ -59,15 +61,15 @@ const aspect = (scene: RenderedDiagramScene) => (scene.width - 40) / (scene.heig
 
 describe("org chart renderer", () => {
 	it("renders the fixture into a valid, deterministic scene", () => {
-		const scene = renderDiagram(orgChartFixture);
+		const scene = renderDiagram(orgChartFixture).pipe(Result.getOrThrow);
 		expect(scene.diagramId).toBe("startup-team");
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(orgChartLayoutIssues(scene)).toEqual([]);
-		expect(renderDiagram(orgChartFixture)).toEqual(scene);
+		expect(renderDiagram(orgChartFixture).pipe(Result.getOrThrow)).toEqual(scene);
 	});
 
 	it("draws a card of name over title and department, grouped so it moves as one", () => {
-		const scene = renderOrgChartDiagram(orgChartFixture);
+		const scene = renderOrgChartDiagram(orgChartFixture).pipe(Result.getOrThrow);
 		const ada = card(scene, "ada");
 		expect(ada).toMatchObject({ kind: "person", shape: "rectangle", label: "Ada Lovelace" });
 		expect(element(scene, "label:ada", "text")).toMatchObject({
@@ -83,7 +85,7 @@ describe("org chart renderer", () => {
 	});
 
 	it("names a department only where it starts", () => {
-		const scene = renderOrgChartDiagram(orgChartFixture);
+		const scene = renderOrgChartDiagram(orgChartFixture).pipe(Result.getOrThrow);
 		expect(element(scene, "label:linus", "text").text).toBe(
 			"Chief Technology Officer\nEngineering",
 		);
@@ -101,14 +103,14 @@ describe("org chart renderer", () => {
 				{ id: "dev", name: "Alex Kim", manager: "cto" },
 				{ id: "cpo", name: "Priya Nair", manager: "ceo" },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(card(scene, "dev").strokeColor).toBe(card(scene, "cto").strokeColor);
 		expect(card(scene, "cpo").strokeColor).not.toBe(card(scene, "cto").strokeColor);
 		expect(card(scene, "ceo").strokeColor).toBe(scene.accentColor);
 	});
 
 	it("runs a bus from each manager's stem down to each report's top, with no heads", () => {
-		const scene = renderOrgChartDiagram(orgChartFixture);
+		const scene = renderOrgChartDiagram(orgChartFixture).pipe(Result.getOrThrow);
 		const ada = card(scene, "ada");
 		for (const report of ["linus", "radia"]) {
 			const reportLine = line(scene, report);
@@ -129,7 +131,7 @@ describe("org chart renderer", () => {
 	});
 
 	it("hangs an assistant off their manager's stem, beside it and above the reports", () => {
-		const scene = renderOrgChartDiagram(orgChartFixture);
+		const scene = renderOrgChartDiagram(orgChartFixture).pipe(Result.getOrThrow);
 		const ada = card(scene, "ada");
 		const grace = card(scene, "grace");
 		const assistantLine = line(scene, "grace");
@@ -155,7 +157,7 @@ describe("org chart renderer", () => {
 					manager: "lead",
 				})),
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		const manager = card(scene, "lead");
 		const leaves = reportsOf(scene, "lead");
 		expect(leaves).toHaveLength(8);
@@ -173,7 +175,7 @@ describe("org chart renderer", () => {
 	});
 
 	it("stacks in one column, rather than wrap the level above, when two would read too wide", () => {
-		const scene = renderOrgChartDiagram(orgChartStressFixtures.department);
+		const scene = renderOrgChartDiagram(orgChartStressFixtures.department).pipe(Result.getOrThrow);
 		const managers = reportsOf(scene, "p0");
 		// Every manager stays level, each team in one column down their left.
 		expect(new Set(managers.map((box) => box.y)).size).toBe(1);
@@ -182,13 +184,15 @@ describe("org chart renderer", () => {
 			expect(new Set(team.map((box) => box.x)).size, manager.nodeId).toBe(1);
 			expect(team[0]!.x).toBeGreaterThan(manager.x);
 		}
-		expect(layoutOrgChartDiagram(orgChartStressFixtures.department).wraps.size).toBe(0);
+		expect(
+			layoutOrgChartDiagram(orgChartStressFixtures.department).pipe(Result.getOrThrow).wraps.size,
+		).toBe(0);
 	});
 
 	it("keeps the top two levels in rows, listing small teams along their manager's stem", () => {
 		const diagram = orgChartStressFixtures.eighty;
-		const scene = renderOrgChartDiagram(diagram);
-		const layout = layoutOrgChartDiagram(diagram);
+		const scene = renderOrgChartDiagram(diagram).pipe(Result.getOrThrow);
+		const layout = layoutOrgChartDiagram(diagram).pipe(Result.getOrThrow);
 		const vps = reportsOf(scene, "p0");
 		expect(vps).toHaveLength(6);
 		expect(new Set(vps.map((box) => box.y)).size).toBe(1);
@@ -206,7 +210,9 @@ describe("org chart renderer", () => {
 	});
 
 	it("stacks twenty reports in two columns of ten rather than one long row", () => {
-		const scene = renderOrgChartDiagram(orgChartStressFixtures.twentyReports);
+		const scene = renderOrgChartDiagram(orgChartStressFixtures.twentyReports).pipe(
+			Result.getOrThrow,
+		);
 		const leaves = reportsOf(scene, "p1");
 		expect(leaves).toHaveLength(20);
 		expect(new Set(leaves.map((box) => box.x)).size).toBe(2);
@@ -214,12 +220,14 @@ describe("org chart renderer", () => {
 	});
 
 	it("wraps a row too wide to read into rows hung from a trunk", () => {
-		const scene = renderOrgChartDiagram(orgChartStressFixtures.wide);
+		const scene = renderOrgChartDiagram(orgChartStressFixtures.wide).pipe(Result.getOrThrow);
 		const vps = reportsOf(scene, "p0");
 		expect(vps).toHaveLength(12);
 		expect(new Set(vps.map((box) => box.y)).size).toBeGreaterThan(1);
 		expect(aspect(scene)).toBeLessThanOrEqual(2.5);
-		expect(layoutOrgChartDiagram(orgChartStressFixtures.wide).wraps.get("p0")).toBeGreaterThan(1);
+		expect(
+			layoutOrgChartDiagram(orgChartStressFixtures.wide).pipe(Result.getOrThrow).wraps.get("p0"),
+		).toBeGreaterThan(1);
 	});
 
 	it("keeps a small team as a tree, stacking leaves only when the chart reads too wide", () => {
@@ -229,16 +237,18 @@ describe("org chart renderer", () => {
 				{ id: "a", name: "A", manager: "lead" },
 				{ id: "b", name: "B", manager: "lead" },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(small.stackMin).toBe(5);
 		expect(small.cards.get("a")!.y).toBe(small.cards.get("b")!.y);
-		expect(layoutOrgChartDiagram(orgChartFixture).stackMin).toBe(5);
-		expect(layoutOrgChartDiagram(orgChartStressFixtures.eighty).stackMin).toBe(2);
+		expect(layoutOrgChartDiagram(orgChartFixture).pipe(Result.getOrThrow).stackMin).toBe(5);
+		expect(
+			layoutOrgChartDiagram(orgChartStressFixtures.eighty).pipe(Result.getOrThrow).stackMin,
+		).toBe(2);
 	});
 
 	it("gives every card of a level one width", () => {
-		const scene = renderOrgChartDiagram(orgChartStressFixtures.eighty);
-		const layout = layoutOrgChartDiagram(orgChartStressFixtures.eighty);
+		const scene = renderOrgChartDiagram(orgChartStressFixtures.eighty).pipe(Result.getOrThrow);
+		const layout = layoutOrgChartDiagram(orgChartStressFixtures.eighty).pipe(Result.getOrThrow);
 		const depthOf = new Map<string, number>([["p0", 0]]);
 		for (const person of orgChartStressFixtures.eighty.people)
 			if (person.manager) depthOf.set(person.id, depthOf.get(person.manager)! + 1);
@@ -252,7 +262,7 @@ describe("org chart renderer", () => {
 	});
 
 	it("draws dotted lines dashed with a head at the second manager, clear of every card", () => {
-		const scene = renderOrgChartDiagram(orgChartFixture);
+		const scene = renderOrgChartDiagram(orgChartFixture).pipe(Result.getOrThrow);
 		const dotted = element(scene, "edge:dotted:ken-to-radia", "arrow");
 		expect(dotted).toMatchObject({
 			edgeId: "dotted:ken-to-radia",
@@ -291,7 +301,7 @@ describe("org chart renderer", () => {
 			chart(people, {
 				dottedLines: [{ report: "nina", manager: "linda", label: "for clinical systems" }],
 			}),
-		);
+		).pipe(Result.getOrThrow);
 		expect(orgChartLayoutIssues(scene)).toEqual([]);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const dotted = element(scene, "edge:dotted:nina-dotted-linda", "arrow");
@@ -337,7 +347,7 @@ describe("org chart renderer", () => {
 
 	it("draws each department below the top as a region, without nesting", () => {
 		const diagram = orgChartStressFixtures.regions;
-		const scene = renderOrgChartDiagram(diagram);
+		const scene = renderOrgChartDiagram(diagram).pipe(Result.getOrThrow);
 		const frames = scene.elements.filter((candidate) => candidate.type === "frame");
 		const departments = new Set(
 			diagram.people.filter((person) => person.manager === "p0").map((person) => person.department),
@@ -354,7 +364,7 @@ describe("org chart renderer", () => {
 	it("draws an avatar placeholder of initials above the name", () => {
 		const scene = renderOrgChartDiagram(
 			chart([{ id: "ceo", name: "Ada Lovelace", title: "CEO", avatar: true }]),
-		);
+		).pipe(Result.getOrThrow);
 		const avatar = element(scene, "node:ceo:avatar", "node");
 		const box = card(scene, "ceo");
 		expect(avatar).toMatchObject({ shape: "ellipse", label: "AL", groupIds: ["person:ceo"] });
@@ -369,7 +379,7 @@ describe("org chart renderer", () => {
 		const title = "Senior Vice President of Global Partnerships and Strategic Alliances";
 		const scene = renderOrgChartDiagram(
 			chart([{ id: "svp", name, title, department: "Business Development" }]),
-		);
+		).pipe(Result.getOrThrow);
 		// Lines break at spaces and after hyphens; every character stays.
 		const letters = (text: string) => text.replace(/\s+/gu, "");
 		expect(letters(element(scene, "text:svp:name", "text").text)).toBe(letters(name));
@@ -383,7 +393,7 @@ describe("org chart renderer", () => {
 	it.each(Object.entries(orgChartStressFixtures))(
 		"lays out %s with no overlap, no crossing and orthogonal lines",
 		(_, diagram) => {
-			const scene = renderOrgChartDiagram(diagram);
+			const scene = renderOrgChartDiagram(diagram).pipe(Result.getOrThrow);
 			expect(getCanvasValidationIssues(scene)).toEqual([]);
 			expect(orgChartLayoutIssues(scene)).toEqual([]);
 			const arrows = scene.elements.filter(
@@ -398,7 +408,7 @@ describe("org chart renderer", () => {
 	);
 
 	it("keeps eighty people readable: under 2.5 to 1 and inside the PNG ceiling", () => {
-		const scene = renderOrgChartDiagram(orgChartStressFixtures.eighty);
+		const scene = renderOrgChartDiagram(orgChartStressFixtures.eighty).pipe(Result.getOrThrow);
 		expect(aspect(scene)).toBeLessThanOrEqual(2.5);
 		expect(scene.width * (scene.height + 64)).toBeLessThan(6_291_456);
 	});

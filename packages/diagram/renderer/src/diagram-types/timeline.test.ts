@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	boundLabelWidth,
@@ -16,7 +18,9 @@ import type { RenderedDiagramScene } from "../scene.js";
 import { readTimelineAxis, readTimelineGaps, readTimelineMomentGaps } from "../timeline-readout.js";
 
 function timeline(events: unknown[], extra: Record<string, unknown> = {}) {
-	return parseTimelineDiagram({ id: "t", title: "T", type: "timeline", events, ...extra });
+	return parseTimelineDiagram({ id: "t", title: "T", type: "timeline", events, ...extra }).pipe(
+		Result.getOrThrow,
+	);
 }
 const texts = (scene: RenderedDiagramScene) =>
 	scene.elements.filter((element): element is CanvasTextElement => element.type === "text");
@@ -129,7 +133,10 @@ function expectReadableLayout(scene: RenderedDiagramScene) {
 }
 
 /** Every gap without a break mark is drawn at one shared scale. Returns the gaps. */
-function expectToScale(diagram: TimelineDiagram, scene = renderDiagram(diagram)) {
+function expectToScale(
+	diagram: TimelineDiagram,
+	scene = renderDiagram(diagram).pipe(Result.getOrThrow),
+) {
 	const moments = new Map(
 		diagram.events.map((event) => [
 			event.id,
@@ -378,8 +385,8 @@ describe("native timeline layout", () => {
 		const scene = renderDiagram({
 			...timelineFixture,
 			events: [...timelineFixture.events].reverse(),
-		});
-		expect(scene).toEqual(renderDiagram(timelineFixture));
+		}).pipe(Result.getOrThrow);
+		expect(scene).toEqual(renderDiagram(timelineFixture).pipe(Result.getOrThrow));
 		expect(markers(scene).map((element) => element.nodeId)).toEqual([
 			"event:release",
 			"event:beta",
@@ -389,7 +396,7 @@ describe("native timeline layout", () => {
 	});
 
 	it("draws one axis with dot and diamond markers, never a numbered arrow chain", () => {
-		const scene = renderDiagram(timelineFixture);
+		const scene = renderDiagram(timelineFixture).pipe(Result.getOrThrow);
 		expect(scene.elements.some((element) => element.type === "arrow")).toBe(false);
 		expect(lines(scene).filter((line) => line.id.startsWith("axis:"))).toHaveLength(1);
 		expect(marker(scene, "plan").shape).toBe("ellipse");
@@ -401,7 +408,7 @@ describe("native timeline layout", () => {
 	});
 
 	it("humanizes dates at their granularity and states the year once", () => {
-		const scene = renderDiagram(timelineFixture);
+		const scene = renderDiagram(timelineFixture).pipe(Result.getOrThrow);
 		expect(text(scene, "date:event:plan")).toBe("Sep 1, 2026");
 		expect(text(scene, "date:event:beta")).toBe("Sep 15");
 		expect(text(scene, "date:event:release")).toBe("Oct 1");
@@ -415,7 +422,7 @@ describe("native timeline layout", () => {
 				{ id: "c", label: "Launch", date: "2021-06-14" },
 				{ id: "d", label: "Enterprise", date: "2021-11" },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(["a", "b", "c", "d"].map((id) => text(mixed, `date:event:${id}`))).toEqual([
 			"2019",
 			"Mar 2020",
@@ -432,7 +439,7 @@ describe("native timeline layout", () => {
 				{ id: "recovered", label: "Service recovered", date: "2026-10-12T09:18:00Z" },
 				{ id: "closed", label: "Incident closed", date: "2026-10-12T09:40:00Z" },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(text(scene, "header")).toBe("Oct 12, 2026 · UTC");
 		expect(
 			["alert", "rollback", "recovered", "closed"].map((id) => text(scene, `date:event:${id}`)),
@@ -455,7 +462,7 @@ describe("native timeline layout", () => {
 				{ id: "a", label: "Alert", date: "2026-11-03T13:58:00-05:00" },
 				{ id: "b", label: "Clear", date: "2026-11-03T14:47:00-05:00" },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(text(eastern, "header")).toBe("Nov 3, 2026 · UTC-05:00");
 		expect(text(eastern, "date:event:a")).toBe("13:58");
 		const mixed = renderDiagram(
@@ -463,7 +470,7 @@ describe("native timeline layout", () => {
 				{ id: "a", label: "Build", date: "2026-10-12T09:05:00+02:00" },
 				{ id: "b", label: "Rollout", date: "2026-10-12T04:45:30-05:00" },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(text(mixed, "header")).toBe("Oct 12, 2026 · UTC");
 		expect([text(mixed, "date:event:a"), text(mixed, "date:event:b")]).toEqual([
 			"07:05:00",
@@ -480,7 +487,7 @@ describe("native timeline layout", () => {
 					order,
 				})),
 			),
-		);
+		).pipe(Result.getOrThrow);
 		const xs = markers(scene)
 			.map(centerX)
 			.toSorted((a, b) => a - b);
@@ -501,7 +508,7 @@ describe("native timeline layout", () => {
 			],
 			{ today: "2026-03-10" },
 		);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const discovery = marker(scene, "discovery");
 		const build = marker(scene, "build");
 		expect(discovery.shape).toBe("rectangle");
@@ -514,8 +521,8 @@ describe("native timeline layout", () => {
 		expect(today.points[0].x).toBeLessThan(build.x + build.width);
 		expect(text(scene, "today-label:0")).toBe("Today · Mar 10");
 		expect(
-			lines(renderDiagram({ ...diagram, today: undefined } as never)).some((line) =>
-				line.id.startsWith("today:"),
+			lines(renderDiagram({ ...diagram, today: undefined } as never).pipe(Result.getOrThrow)).some(
+				(line) => line.id.startsWith("today:"),
 			),
 		).toBe(false);
 		expectReadableLayout(scene);
@@ -532,7 +539,7 @@ describe("native timeline layout", () => {
 				],
 				{ lanes: ["Engineering", "Marketing"] },
 			),
-		);
+		).pipe(Result.getOrThrow);
 		expect(text(scene, "lane:0:0")).toBe("Engineering");
 		expect(text(scene, "lane:1:0")).toBe("Marketing");
 		const axes = lines(scene).filter((line) => line.id.startsWith("axis:"));
@@ -552,7 +559,7 @@ describe("native timeline layout", () => {
 			{ id: "d", label: "v1.0", date: "2026-06-30" },
 			{ id: "e", label: "v2.0", date: "2028-03-01" },
 		]);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		// Drawn to scale, the 162-day gap is 23 weeks wide and the row runs past 4:1.
 		expect(rows(scene)).toBe(1);
 		expect(exportAspect(scene)).toBeLessThanOrEqual(2.5);
@@ -579,7 +586,7 @@ describe("native timeline layout", () => {
 			{ id: "a", label: "Alpha", date: "2026-01-01", end: "2026-01-03" },
 			{ id: "b", label: "Beta", date: "2026-06-12", end: "2027-04-08" },
 		]);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(rows(scene)).toBe(1);
 		const gaps = expectToScale(diagram, scene);
 		expect(gaps.map((gap) => gap.broken)).toEqual([false, true, false]);
@@ -597,7 +604,7 @@ describe("native timeline layout", () => {
 			{ id: "c", label: "v0.3", date: "2026-01-19" },
 			{ id: "d", label: "v1.0", date: "2026-04-06" },
 		]);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(exportAspect(scene)).toBeLessThanOrEqual(3.5);
 		const gaps = expectToScale(diagram, scene);
 		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, false]);
@@ -614,7 +621,7 @@ describe("native timeline layout", () => {
 			{ id: "f", label: "Rollout", date: "2027-03-17" },
 			{ id: "g", label: "Sunset", date: "2031-06-30" },
 		]);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const gaps = expectToScale(diagram, scene);
 		// Two weeks would draw longer than the shortest break, so it breaks too.
 		expect(gaps.map((gap) => gap.broken)).toEqual([false, false, true, false, true, true]);
@@ -674,7 +681,7 @@ describe("native timeline layout", () => {
 			{ id: "c", label: "Render", date: "2026-10-12T09:00:00.002Z" },
 			{ id: "d", label: "Response", date: "2026-10-12T09:00:00.101Z" },
 		]);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(
 			texts(scene)
 				.filter((element) => element.id.startsWith("break-label:"))
@@ -696,7 +703,7 @@ describe("native timeline layout", () => {
 			],
 			{ lanes: ["A", "B"] },
 		);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(lines(scene).some((line) => line.id.startsWith("break:"))).toBe(true);
 		expectHonestMarkers(diagram, scene);
 		expectToScale(diagram, scene);
@@ -715,9 +722,9 @@ describe("native timeline layout", () => {
 				})),
 				{ lanes },
 			);
-		const apart = renderDiagram(project("2027-12-06"));
+		const apart = renderDiagram(project("2027-12-06")).pipe(Result.getOrThrow);
 		const diagram = project("2027-11-23");
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		// The one-day pair used to set the scale, breaking 38 gaps on all five lanes: 950 elements.
 		expect(lines(apart).some((line) => line.id.startsWith("break:"))).toBe(false);
 		expect(scene.elements.length).toBeLessThanOrEqual(210);
@@ -748,7 +755,7 @@ describe("native timeline layout", () => {
 			],
 			{ today: "2026-03-10" },
 		);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expectHonestMarkers(diagram, scene);
 		expectToScale(diagram, scene);
 		expectReadableLayout(scene);
@@ -776,7 +783,7 @@ describe("native timeline layout", () => {
 				description: "Preserve all supplied details in a readable multiline card.",
 			})),
 		);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(scene.width / scene.height).toBeLessThan(3);
 		expect(scene.height / scene.width).toBeLessThan(3);
 		expect(markers(scene)).toHaveLength(60);
@@ -813,7 +820,7 @@ describe("native timeline layout", () => {
 					{ id: "d", label: "First commit", date: "2026-04-02" },
 					{ id: "e", label: "Demo", date: "2026-04-20" },
 				]),
-			),
+			).pipe(Result.getOrThrow),
 		);
 		expectReadableLayout(
 			renderDiagram(
@@ -851,7 +858,7 @@ describe("native timeline layout", () => {
 					],
 					{ today: "2026-06-15" },
 				),
-			),
+			).pipe(Result.getOrThrow),
 		);
 		const releases = timeline(
 			Array.from({ length: 60 }, (_, index) => ({
@@ -863,7 +870,7 @@ describe("native timeline layout", () => {
 				...(index % 4 === 0 ? { description: "Shipped to all regions." } : {}),
 			})),
 		);
-		const wrapped = renderDiagram(releases);
+		const wrapped = renderDiagram(releases).pipe(Result.getOrThrow);
 		expectReadableLayout(wrapped);
 		// Gaps split across a row wrap stay to scale too.
 		expect(
@@ -890,7 +897,7 @@ describe("native timeline layout", () => {
 							description: "Preserve all details of the product rollout.",
 						},
 					]),
-				),
+				).pipe(Result.getOrThrow),
 			);
 	});
 
@@ -907,7 +914,7 @@ describe("native timeline layout", () => {
 					{ id: "touchdown", label: "Touchdown", date: "2027-05-03" },
 					{ id: "drive", label: "First rover drive", date: "2027-05-10" },
 				]),
-			),
+			).pipe(Result.getOrThrow),
 		);
 	});
 
@@ -917,7 +924,7 @@ describe("native timeline layout", () => {
 			...randomTimelines(80, 2000),
 			...randomTimelines(40, 2000, "hour"),
 		]) {
-			const scene = renderDiagram(diagram);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			expectReadableLayout(scene);
 			expectToScale(diagram, scene);
 			expectHonestMarkers(diagram, scene);

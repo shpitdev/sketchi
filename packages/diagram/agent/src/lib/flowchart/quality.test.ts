@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 
 import {
@@ -39,7 +41,7 @@ function decisionLoopFlowchart() {
 		],
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
 		style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 function linearFlowchart(nodeCount = 3): FlowchartDiagram {
@@ -106,7 +108,10 @@ describe("assessFlowchartQuality", () => {
 			nodes: base.nodes.map((node) => (node.id === id ? { ...node, label } : node)),
 		};
 
-		const quality = assessFlowchartQuality(parseFlowchartDiagram(diagram), 10);
+		const quality = assessFlowchartQuality(
+			parseFlowchartDiagram(diagram).pipe(Result.getOrThrow),
+			10,
+		);
 
 		expect(quality.accepted).toBe(true);
 		expect(quality.score).toBe(10);

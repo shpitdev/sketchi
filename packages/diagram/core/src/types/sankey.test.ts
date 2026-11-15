@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
@@ -14,7 +16,6 @@ import {
 	sankeyFixture,
 	sankeyNodeTotals,
 	sankeySum,
-	SankeyValidationError,
 } from "./sankey";
 
 const node = (id: string) => ({ id, label: id.toUpperCase() });
@@ -33,20 +34,18 @@ const diagram = (
 
 /** The issues a diagram fails with, or [] when it is valid. */
 function issuesOf(input: unknown) {
-	try {
-		parseSankeyDiagram(input);
-		return [];
-	} catch (error) {
-		if (!(error instanceof SankeyValidationError)) throw error;
-		return error.issues;
-	}
+	const result = parseSankeyDiagram(input);
+	if (Result.isSuccess(result)) return [];
+	const error = result.failure;
+	if (error._tag !== "SankeyValidationError") return expect.fail(error.message);
+	return error.issues;
 }
 const codes = (input: unknown) => issuesOf(input).map((issue) => issue.code);
 
 describe("Sankey contract", () => {
 	it("has a typed fixture that satisfies the canonical diagram contract", () => {
 		expect(sankeyFixture.type).toBe(sankeyDiagramType);
-		expect(parseCanonicalDiagram(sankeyFixture)).toEqual(sankeyFixture);
+		expect(parseCanonicalDiagram(sankeyFixture).pipe(Result.getOrThrow)).toEqual(sankeyFixture);
 		expect(sankeyFixture.style).toMatchObject({ accentColor: expect.any(String) });
 		for (const fixture of Object.values(sankeyStressFixtures))
 			expect(getSankeyValidationIssues(fixture), fixture.id).toEqual([]);
@@ -64,7 +63,7 @@ describe("Sankey contract", () => {
 						{ source: "d", target: "c", value: 1 },
 					],
 				),
-			),
+			).pipe(Result.getOrThrow),
 		);
 		expect(Object.fromEntries(columns)).toEqual({ a: 0, b: 1, c: 2, d: 0 });
 		// A sink fed by several nodes aligns with the last column; one fed by one node stays.
@@ -80,7 +79,7 @@ describe("Sankey contract", () => {
 						{ source: "a", target: "dropped", value: 1 },
 					],
 				),
-			),
+			).pipe(Result.getOrThrow),
 		);
 		expect(Object.fromEntries(sinks)).toEqual({ a: 0, b: 1, c: 2, lost: 2, dropped: 1 });
 	});
@@ -96,7 +95,7 @@ describe("Sankey contract", () => {
 						{ source: "screened", target: "hired", value: 0.05 },
 					],
 				),
-			),
+			).pipe(Result.getOrThrow),
 		);
 		expect(totals.get("applied")).toEqual({ inflow: 0, outflow: 0.3, total: 0.3 });
 		expect(totals.get("screened")).toEqual({ inflow: 0.1, outflow: 0.05, total: 0.1 });
@@ -113,7 +112,7 @@ describe("Sankey contract", () => {
 		const totals = sankeyNodeTotals(
 			parseSankeyDiagram(
 				diagram([node("a"), node("b")], [{ source: "a", target: "b", value: 1e-13 }]),
-			),
+			).pipe(Result.getOrThrow),
 		);
 		expect(totals.get("a")?.total).toBe(1e-13);
 	});
@@ -248,14 +247,14 @@ describe("Sankey contract", () => {
 	});
 
 	it("rejects a color that is not a hex code", () => {
-		expect(() =>
+		expect(
 			parseSankeyDiagram(
 				diagram(
 					[{ ...node("a"), color: "red" }, node("b")],
 					[{ source: "a", target: "b", value: 1 }],
 				),
 			),
-		).toThrow("color");
+		).toMatchObject({ failure: { message: expect.stringContaining("color") } });
 	});
 });
 
@@ -266,7 +265,7 @@ describe("Sankey edge inputs", () => {
 				[{ id: "a", label: "Data\nScience" }, node("b")],
 				[{ source: "a", target: "b", value: 1, label: "via\nreferral" }],
 			),
-		);
+		).pipe(Result.getOrThrow);
 		expect(parsed.nodes[0]?.label).toBe("Data\nScience");
 		expect(
 			codes(
@@ -289,9 +288,9 @@ describe("Sankey edge inputs", () => {
 				),
 			),
 		).toEqual(["invalid_sankey_value"]);
-		expect(() =>
+		expect(
 			parseSankeyDiagram(diagram([node("a"), node("b")], [{ source: "a", target: "b" }])),
-		).toThrow("value");
+		).toMatchObject({ failure: { message: expect.stringContaining("value") } });
 	});
 
 	it("handles ids and labels that name Object members", () => {
@@ -307,7 +306,7 @@ describe("Sankey edge inputs", () => {
 					{ source: "constructor", target: "hasOwnProperty", value: 1 },
 				],
 			),
-		);
+		).pipe(Result.getOrThrow);
 		expect(Object.fromEntries(sankeyColumns(parsed))).toEqual({
 			["__proto__"]: 0,
 			constructor: 1,
@@ -341,7 +340,9 @@ describe("Sankey shorthand", () => {
 			flows: [{ from: "Engineering", to: "Compute", amount: 5 }],
 		}) as Record<string, unknown>;
 		expect(resolved["nodes"]).toEqual(nodes);
-		expect(() => parseSankeyDiagram(resolved)).toThrow("nodes");
+		expect(parseSankeyDiagram(resolved)).toMatchObject({
+			failure: { message: expect.stringContaining("nodes") },
+		});
 	});
 
 	it.each([
@@ -350,7 +351,9 @@ describe("Sankey shorthand", () => {
 	])("leaves links written as %s for the decoder to reject", (_name, links) => {
 		const resolved = resolveSankeyShorthand({ ...diagram([node("a"), node("b")], []), links });
 		expect((resolved as Record<string, unknown>)["links"]).toEqual(links);
-		expect(() => parseSankeyDiagram(resolved)).toThrow("links");
+		expect(parseSankeyDiagram(resolved)).toMatchObject({
+			failure: { message: expect.stringContaining("links") },
+		});
 	});
 
 	it("leaves an end written as an object without a name for the decoder to reject", () => {
@@ -358,7 +361,9 @@ describe("Sankey shorthand", () => {
 			diagram([node("a"), node("b")], [{ source: { kind: "a" }, target: "b", value: 1 }]),
 		) as { links: { source: unknown }[] };
 		expect(resolved.links[0]?.source).toEqual({ kind: "a" });
-		expect(() => parseSankeyDiagram(resolved)).toThrow("source");
+		expect(parseSankeyDiagram(resolved)).toMatchObject({
+			failure: { message: expect.stringContaining("source") },
+		});
 	});
 
 	it("reads flows with from, to and amount, and nodes from their names", () => {
@@ -373,7 +378,7 @@ describe("Sankey shorthand", () => {
 					{ from: "Pricing page", to: "Signed up", count: 240, label: "trial" },
 				],
 			}),
-		);
+		).pipe(Result.getOrThrow);
 		expect(parsed.nodes).toEqual([
 			{ id: "organic-search", label: "Organic search" },
 			{ id: "pricing-page", label: "Pricing page" },
@@ -403,7 +408,7 @@ describe("Sankey shorthand", () => {
 					{ source: "engineering", target: "Databases", value: 2 },
 				],
 			}),
-		);
+		).pipe(Result.getOrThrow);
 		expect(parsed.nodes.map((entry) => entry.id)).toEqual(["engineering", "compute", "db"]);
 		expect(parsed.nodes[1]).toEqual({ id: "compute", label: "Compute", color: "#2a78d6" });
 		expect(parsed.links.map((link) => `${link.source}>${link.target}`)).toEqual([
@@ -423,7 +428,7 @@ describe("Sankey shorthand", () => {
 					[{ source: "a", target: "b", value: 1 }],
 				),
 			),
-		);
+		).pipe(Result.getOrThrow);
 		expect(parsed.links).toEqual([{ source: "a", target: "b", value: 1 }]);
 		// A label still resolves when no id matches it.
 		const byLabel = parseSankeyDiagram(
@@ -436,7 +441,7 @@ describe("Sankey shorthand", () => {
 					[{ source: "second", target: "b", value: 1 }],
 				),
 			),
-		);
+		).pipe(Result.getOrThrow);
 		expect(byLabel.links).toEqual([{ source: "c", target: "a", value: 1 }]);
 	});
 

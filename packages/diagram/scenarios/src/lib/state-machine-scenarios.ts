@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	compositeStateIds,
 	parseStateMachineDiagram,
@@ -307,7 +309,7 @@ function defineStateMachineScenario(
 					...(action ? { action } : {}),
 				};
 			}),
-		}),
+		}).pipe(Result.getOrThrow),
 	};
 }
 

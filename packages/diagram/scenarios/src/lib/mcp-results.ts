@@ -1,10 +1,11 @@
 import {
+	type DiagramValidationError,
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
 	type MindmapTopicTree,
 	mindmapDiagramFromTree,
 } from "@sketchi/diagram-core";
-import { Result } from "effect";
+import { Option, Result, Schema } from "effect";
 
 import type { DiagramScenario } from "./diagram-scenarios.js";
 import type { ScenarioCheck } from "./evaluate.js";
@@ -160,10 +161,10 @@ function filledGroupLogos(build: Record<string, unknown>): ReadonlyMap<string, s
 export function specToFlowchartCandidate(
 	spec: unknown,
 	groupLogos: ReadonlyMap<string, string> = new Map(),
-): unknown {
-	if (!isRecord(spec)) return spec;
+): Result.Result<unknown, ScenarioMcpCandidateError> {
+	if (!isRecord(spec)) return Result.succeed(spec);
 	const decoded = decodeFlowchartDocument(spec);
-	if (!Result.isSuccess(decoded)) return spec;
+	if (!Result.isSuccess(decoded)) return Result.succeed(spec);
 	const document = decoded.success;
 	const nodeIcons = new Map(
 		Object.entries(document.nodes).flatMap(([id, node]) =>
@@ -172,16 +173,20 @@ export function specToFlowchartCandidate(
 	);
 	const built = flowchartDiagramFromDocument(document, { nodeIcons, groupIcons: groupLogos });
 	if (!built.ok) {
-		throw new Error(
-			`The flowchart document does not build: ${built.issues.map((issue) => issue.message).join(" ")}`,
+		return Result.fail(
+			ScenarioMcpCandidateError.make({
+				message: `The flowchart document does not build: ${built.issues.map((issue) => issue.message).join(" ")}`,
+			}),
 		);
 	}
-	return built.diagram;
+	return Result.succeed(built.diagram);
 }
 
 /** Map a Code Mode mindmap's nested topics to the canonical mindmap IR. */
-export function specToMindmapCandidate(spec: unknown): unknown {
-	if (!isRecord(spec) || !isRecord(spec.root)) return spec;
+export function specToMindmapCandidate(
+	spec: unknown,
+): Result.Result<unknown, DiagramValidationError | Schema.SchemaError> {
+	if (!isRecord(spec) || !isRecord(spec.root)) return Result.succeed(spec);
 	const layout = isRecord(spec.layout) ? spec.layout : {};
 	return mindmapDiagramFromTree({
 		id: typeof spec.id === "string" ? spec.id : "mindmap",
@@ -275,83 +280,100 @@ function failureDetails(value: Record<string, unknown>): string {
 export function candidateFromMcpResult(
 	value: unknown,
 	diagramType: DiagramScenario["diagramType"],
-): McpScenarioCandidate | undefined {
-	if (
-		!isRecord(value) ||
-		![
-			"structuredContent",
-			"builds",
-			"result",
-			"normalizedSpec",
-			"ok",
-			"status",
-			"logs",
-			"buildId",
-			"isError",
-			"content",
-		].some((key) => key in value)
-	) {
-		return undefined;
-	}
-	const build = buildResultFromMcp(value, diagramType);
-	if (build.ok === false || build.isError === true) {
-		return rejected(
-			`MCP execute/build failed${typeof build.status === "string" ? ` (${build.status})` : ""}. ${failureDetails(build)}`.trim(),
-		);
-	}
-	if (
-		build.ok !== true ||
-		build.status !== "accepted" ||
-		(isRecord(build.quality) && build.quality.accepted === false)
-	) {
-		return rejected(
-			`MCP build was not accepted (status: ${typeof build.status === "string" ? build.status : "missing"}). ${failureDetails(build)}`.trim(),
-		);
-	}
-	if (!isRecord(build.normalizedSpec)) {
-		return rejected("MCP build has no normalizedSpec object to grade.");
-	}
-	const builtType = builtDiagramType(build, build.normalizedSpec);
-	if (builtType && builtType.family !== diagramType) {
-		// A well-formed build of another family is a wrong answer, not ungradable
-		// input; its spec cannot be scored by this scenario's checks.
-		return {
-			ok: false,
+): Result.Result<
+	Option.Option<McpScenarioCandidate>,
+	DiagramValidationError | Schema.SchemaError | ScenarioMcpCandidateError
+> {
+	return Result.gen(function* () {
+		if (
+			!isRecord(value) ||
+			![
+				"structuredContent",
+				"builds",
+				"result",
+				"normalizedSpec",
+				"ok",
+				"status",
+				"logs",
+				"buildId",
+				"isError",
+				"content",
+			].some((key) => key in value)
+		) {
+			return Option.none();
+		}
+		const build = buildResultFromMcp(value, diagramType);
+		if (build.ok === false || build.isError === true) {
+			return Option.some(
+				rejected(
+					`MCP execute/build failed${typeof build.status === "string" ? ` (${build.status})` : ""}. ${failureDetails(build)}`.trim(),
+				),
+			);
+		}
+		if (
+			build.ok !== true ||
+			build.status !== "accepted" ||
+			(isRecord(build.quality) && build.quality.accepted === false)
+		) {
+			return Option.some(
+				rejected(
+					`MCP build was not accepted (status: ${typeof build.status === "string" ? build.status : "missing"}). ${failureDetails(build)}`.trim(),
+				),
+			);
+		}
+		if (!isRecord(build.normalizedSpec)) {
+			return Option.some(rejected("MCP build has no normalizedSpec object to grade."));
+		}
+		const builtType = builtDiagramType(build, build.normalizedSpec);
+		if (builtType && builtType.family !== diagramType) {
+			// A well-formed build of another family is a wrong answer, not ungradable
+			// input; its spec cannot be scored by this scenario's checks.
+			return Option.some({
+				ok: false,
+				check: {
+					id: "diagram-type",
+					passed: false,
+					message: `Expected native ${diagramType}, got ${builtType.label}.`,
+				},
+			});
+		}
+		return Option.some({
+			ok: true,
+			diagram:
+				diagramType === "gantt"
+					? { ...build.normalizedSpec, type: "gantt" }
+					: diagramType === "chart"
+						? { ...build.normalizedSpec, type: "chart" }
+						: diagramType === "timeline"
+							? { ...build.normalizedSpec, type: "timeline" }
+							: diagramType === "state-machine" ||
+								  diagramType === "er" ||
+								  diagramType === "class" ||
+								  diagramType === "org-chart" ||
+								  diagramType === "venn" ||
+								  diagramType === "journey" ||
+								  diagramType === "sankey" ||
+								  diagramType === "wireframe" ||
+								  diagramType === "quadrant"
+								? { ...build.normalizedSpec, type: diagramType }
+								: diagramType === "mindmap"
+									? yield* specToMindmapCandidate(build.normalizedSpec)
+									: diagramType === "sequence"
+										? specToSequenceCandidate(build.normalizedSpec)
+										: yield* specToFlowchartCandidate(
+												build.normalizedSpec,
+												filledGroupLogos(build),
+											),
 			check: {
-				id: "diagram-type",
-				passed: false,
-				message: `Expected native ${diagramType}, got ${builtType.label}.`,
+				id: "mcp-build-accepted",
+				passed: true,
+				message: "MCP build was accepted and returned a normalizedSpec.",
 			},
-		};
-	}
-	return {
-		ok: true,
-		diagram:
-			diagramType === "gantt"
-				? { ...build.normalizedSpec, type: "gantt" }
-				: diagramType === "chart"
-					? { ...build.normalizedSpec, type: "chart" }
-					: diagramType === "timeline"
-						? { ...build.normalizedSpec, type: "timeline" }
-						: diagramType === "state-machine" ||
-							  diagramType === "er" ||
-							  diagramType === "class" ||
-							  diagramType === "org-chart" ||
-							  diagramType === "venn" ||
-							  diagramType === "journey" ||
-							  diagramType === "sankey" ||
-							  diagramType === "wireframe" ||
-							  diagramType === "quadrant"
-							? { ...build.normalizedSpec, type: diagramType }
-							: diagramType === "mindmap"
-								? specToMindmapCandidate(build.normalizedSpec)
-								: diagramType === "sequence"
-									? specToSequenceCandidate(build.normalizedSpec)
-									: specToFlowchartCandidate(build.normalizedSpec, filledGroupLogos(build)),
-		check: {
-			id: "mcp-build-accepted",
-			passed: true,
-			message: "MCP build was accepted and returned a normalizedSpec.",
-		},
-	};
+		});
+	});
 }
+
+export class ScenarioMcpCandidateError extends Schema.TaggedError<
+	ScenarioMcpCandidateError,
+	{ readonly brand: unique symbol }
+>()("ScenarioMcpCandidateError", { message: Schema.String }) {}

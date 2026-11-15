@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const stateMachineDiagramType = "state-machine" as const;
 
@@ -467,24 +468,39 @@ export function getStateMachineValidationIssues(
 	return issues.slice(0, STATE_MACHINE_MAX_ISSUES);
 }
 
-export class StateMachineValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly StateMachineValidationIssue[]) {
-		super(issues[0]?.message ?? "State machine failed semantic validation.");
-		this.name = "StateMachineValidationError";
+export class StateMachineValidationError extends Schema.TaggedError<
+	StateMachineValidationError,
+	{ readonly brand: unique symbol }
+>()("StateMachineValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(StateMachineValidationIssue),
+}) {
+	static fromIssues(issues: readonly StateMachineValidationIssue[]): StateMachineValidationError {
+		return StateMachineValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "State machine failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateStateMachineDiagram(diagram: StateMachineDiagram): StateMachineDiagram {
+export function validateStateMachineDiagram(
+	diagram: StateMachineDiagram,
+): Result.Result<StateMachineDiagram, StateMachineValidationError> {
 	const issues = getStateMachineValidationIssues(diagram);
-	if (issues.length > 0) {
-		throw new StateMachineValidationError(issues);
-	}
-	return resolveStateMachineInitials(diagram);
+	return issues.length > 0
+		? Result.fail(StateMachineValidationError.fromIssues(issues))
+		: Result.succeed(resolveStateMachineInitials(diagram));
 }
 
-export function parseStateMachineDiagram(input: unknown): StateMachineDiagram {
-	return validateStateMachineDiagram(
-		Schema.decodeUnknownSync(StateMachineDiagram, { errors: "all" })(input),
+export function parseStateMachineDiagram(
+	input: unknown,
+): Result.Result<StateMachineDiagram, Schema.SchemaError | StateMachineValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(StateMachineDiagram, { errors: "all" })(input),
+		validateStateMachineDiagram,
 	);
 }
 
@@ -517,7 +533,7 @@ export const stateMachineFixture = parseStateMachineDiagram({
 		{ id: "deliver", source: "shipped", target: "done", event: "deliver" },
 		{ id: "close", source: "cancelled", target: "done" },
 	],
-});
+}).pipe(Result.getOrThrow);
 
 /** A media player whose Active composite starts in Playing and stops from either substate. */
 export const mediaPlayerStateMachine = parseStateMachineDiagram({
@@ -538,7 +554,7 @@ export const mediaPlayerStateMachine = parseStateMachineDiagram({
 		{ id: "seek", source: "playing", target: "playing", event: "seek", action: "jump" },
 		{ id: "stop", source: "active", target: "stopped", event: "stop" },
 	],
-});
+}).pipe(Result.getOrThrow);
 
 const isStateRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);

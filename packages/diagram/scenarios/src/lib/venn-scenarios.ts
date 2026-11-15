@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import { parseVennDiagram, type VennDiagram, vennRegionKey } from "@sketchi/diagram-core";
 import {
 	insideClearance,
@@ -261,7 +263,7 @@ function defineVennScenario(definition: VennScenarioDefinition): VennScenario {
 			type: "venn",
 			sets: sets.map(([id, labels]) => ({ id, label: list(labels)[0] })),
 			regions: [...regions.values()],
-		}),
+		}).pipe(Result.getOrThrow),
 	};
 }
 

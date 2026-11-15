@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	getCanvasValidationIssues,
@@ -6,7 +8,6 @@ import {
 	wireframeComponents,
 	wireframeElementEstimate,
 	type WireframeDiagram,
-	WireframeValidationError,
 } from "@sketchi/diagram-core";
 import {
 	layoutWireframeDiagram,
@@ -278,16 +279,20 @@ function randomWireframe(r: Random, id: string): WireframeDiagram | undefined {
 			for (const screen of screens)
 				screen.children = screen.children.map((child) => open(child, screen.id));
 		}
-		try {
-			return parseWireframeDiagram({ id, title: "Random wireframe", type: "wireframe", screens });
-		} catch (error) {
-			if (
-				error instanceof WireframeValidationError &&
-				error.issues.every((issue) => issue.code === "wireframe_too_large")
-			)
-				return undefined;
-			throw error;
-		}
+		const rendered = parseWireframeDiagram({
+			id,
+			title: "Random wireframe",
+			type: "wireframe",
+			screens,
+		});
+		if (
+			Result.isFailure(rendered) &&
+			rendered.failure._tag === "WireframeValidationError" &&
+			rendered.failure.issues.every((issue) => issue.code === "wireframe_too_large")
+		)
+			return undefined;
+		// Every other generated fixture must validate; failure is invalid fuzz data.
+		return rendered.pipe(Result.getOrThrow);
 	}
 }
 
@@ -303,12 +308,12 @@ describe("wireframe fuzz", () => {
 			// A screen may grow past its device to hold a word no wrap can break; rare, and counted.
 			const shortfalls: string[] = [];
 			for (const diagram of randomWireframes(WIREFRAMES, seed)) {
-				const scene = renderWireframeDiagram(diagram);
+				const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
 				const exported = convertSceneToExcalidraw(scene);
 				const reloaded = JSON.parse(
 					JSON.stringify(createExcalidrawFile(exported)),
 				) as typeof exported;
-				const boxes = wireframeBoxIssues(layoutWireframeDiagram(diagram));
+				const boxes = wireframeBoxIssues(layoutWireframeDiagram(diagram).pipe(Result.getOrThrow));
 				const estimate =
 					diagram.screens.length +
 					[...wireframeComponents(diagram)].reduce(
@@ -339,9 +344,9 @@ describe("wireframe fuzz", () => {
 				];
 				const name = `${diagram.id} (${[...wireframeComponents(diagram)].length} components)`;
 				if (problems.length > 0) defects.push(`${name}: ${problems.slice(0, 3).join("; ")}`);
-				const unrouted = layoutWireframeDiagram(diagram).navigations.filter(
-					(navigation) => !navigation.routed,
-				);
+				const unrouted = layoutWireframeDiagram(diagram)
+					.pipe(Result.getOrThrow)
+					.navigations.filter((navigation) => !navigation.routed);
 				if (unrouted.length > 0)
 					shortfalls.push(`${name}: ${unrouted.length} navigation arrows without a route`);
 				const widened = boxes.filter((issue) => issue.code === "screen-widened");

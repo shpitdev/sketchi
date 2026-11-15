@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { flowchartFixture, pharmaBatchDispositionFlowchart } from "@sketchi/diagram-core";
@@ -6,7 +8,7 @@ import { renderIntermediateDiagram } from "../scene";
 
 describe("Flowchart renderer contract", () => {
 	it("renders the generated fixture into deterministic scene elements", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 
 		expect(scene.diagramId).toBe("onboarding-flow");
 		expect(scene.elements.filter((element) => element.type === "node")).toHaveLength(
@@ -18,7 +20,9 @@ describe("Flowchart renderer contract", () => {
 	});
 
 	it("routes downward non-decision edges vertically before crossing ranks", () => {
-		const scene = renderIntermediateDiagram(pharmaBatchDispositionFlowchart);
+		const scene = renderIntermediateDiagram(pharmaBatchDispositionFlowchart).pipe(
+			Result.getOrThrow,
+		);
 		const packagingArrow = scene.elements.find(
 			(element) => element.type === "arrow" && element.edgeId === "review-packaging",
 		);

@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import {
 	type ErCardinality,
 	type ErDiagram,
@@ -36,7 +38,7 @@ function schema(
 			toCardinality,
 			...(label ? { label } : {}),
 		})),
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /**

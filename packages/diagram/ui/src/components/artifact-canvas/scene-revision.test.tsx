@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { flowchartFixture, parseFlowchartDiagram } from "@sketchi/diagram-core";
 import { renderIntermediateDiagram, type RenderedDiagramScene } from "@sketchi/diagram-renderer";
 import { render, screen } from "@testing-library/react";
@@ -20,7 +22,7 @@ vi.mock("@excalidraw/excalidraw", async () => {
 import { ArtifactCanvas } from "./artifact-canvas";
 import { DiagramPreview } from "../diagram-preview/diagram-preview";
 
-const firstScene = renderIntermediateDiagram(flowchartFixture);
+const firstScene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 const followUpDiagram = parseFlowchartDiagram({
 	...flowchartFixture,
 	nodes: [...flowchartFixture.nodes, { id: "proof", label: "Verify follow-up", kind: "process" }],
@@ -29,8 +31,8 @@ const followUpDiagram = parseFlowchartDiagram({
 		{ id: "draft-proof", source: "draft", target: "proof" },
 		{ id: "proof-review", source: "proof", target: "review" },
 	],
-});
-const nextScene = renderIntermediateDiagram(followUpDiagram);
+}).pipe(Result.getOrThrow);
+const nextScene = renderIntermediateDiagram(followUpDiagram).pipe(Result.getOrThrow);
 
 describe("source scene revisions", () => {
 	it.each([

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { FlowchartDiagram } from "@sketchi/diagram-core";
@@ -57,7 +59,9 @@ describe("diagram scenario evaluation", () => {
 			"clear-draft",
 			stages.slice(0, count),
 		);
-		expect(evaluateScenarioDiagram(onboardingScenario, candidate).ok).toBe(true);
+		expect(evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow).ok).toBe(
+			true,
+		);
 	});
 
 	it("rejects a path with more than two unmatched intermediate stages", () => {
@@ -66,7 +70,9 @@ describe("diagram scenario evaluation", () => {
 			{ id: "extra-2", label: "Workspace ready?", kind: "decision" },
 			{ id: "extra-3", label: "Record readiness", kind: "process" },
 		]);
-		expect(evaluateScenarioDiagram(onboardingScenario, candidate).checks).toContainEqual(
+		expect(
+			evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow).checks,
+		).toContainEqual(
 			expect.objectContaining({ id: "edge:Scope clear?->Draft typed IR:yes", passed: false }),
 		);
 	});
@@ -77,7 +83,7 @@ describe("diagram scenario evaluation", () => {
 			const candidate = subdivideEdge(onboardingScenario.expectedDiagram, "clear-draft", [
 				{ id: "extra", label: "Extract requirements", kind },
 			]);
-			const result = evaluateScenarioDiagram(onboardingScenario, candidate);
+			const result = evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow);
 			expect(result.ok).toBe(false);
 			expect(result.checks).toContainEqual(
 				expect.objectContaining({ id: "edge:Scope clear?->Draft typed IR:yes", passed: false }),
@@ -89,14 +95,16 @@ describe("diagram scenario evaluation", () => {
 		const candidate = subdivideEdge(onboardingScenario.expectedDiagram, "clear-draft", [
 			{ id: "extra", label: "Extract requirements", kind: "decision" },
 		]);
-		expect(evaluateScenarioDiagram(onboardingScenario, candidate).ok).toBe(true);
+		expect(evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow).ok).toBe(
+			true,
+		);
 		expect(
 			evaluateScenarioDiagram(onboardingScenario, {
 				...candidate,
 				nodes: candidate.nodes.map((node) =>
 					node.id === "requirements" ? { ...node, label: "Prepare workspace" } : node,
 				),
-			}).ok,
+			}).pipe(Result.getOrThrow).ok,
 		).toBe(false);
 	});
 
@@ -107,7 +115,7 @@ describe("diagram scenario evaluation", () => {
 		candidate.nodes = candidate.nodes.map((node) =>
 			node.id === "draft" ? { ...node, label: "Record readiness" } : node,
 		);
-		const result = evaluateScenarioDiagram(onboardingScenario, candidate);
+		const result = evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 		expect(result.checks).toContainEqual(
 			expect.objectContaining({ id: "node-label:Draft typed IR", passed: false }),
@@ -125,7 +133,9 @@ describe("diagram scenario evaluation", () => {
 					? { ...edge, label: "yes" }
 					: edge,
 		);
-		expect(evaluateScenarioDiagram(onboardingScenario, candidate).checks).toContainEqual(
+		expect(
+			evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow).checks,
+		).toContainEqual(
 			expect.objectContaining({ id: "edge:Scope clear?->Draft typed IR:yes", passed: false }),
 		);
 	});
@@ -154,7 +164,7 @@ describe("diagram scenario evaluation", () => {
 							: edge,
 				),
 			};
-			expect(evaluateScenarioDiagram(scenario, candidate).ok).toBe(true);
+			expect(evaluateScenarioDiagram(scenario, candidate).pipe(Result.getOrThrow).ok).toBe(true);
 			expect(
 				evaluateScenarioDiagram(scenario, {
 					...candidate,
@@ -165,7 +175,7 @@ describe("diagram scenario evaluation", () => {
 								? { ...edge, label: positive }
 								: edge,
 					),
-				}).ok,
+				}).pipe(Result.getOrThrow).ok,
 			).toBe(false);
 		},
 	);
@@ -177,7 +187,7 @@ describe("diagram scenario evaluation", () => {
 			edges: scenario.expectedDiagram.edges.map((edge) =>
 				edge.id === "credit-income" ? { ...edge, label: "High" } : edge,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 	});
 
@@ -204,7 +214,7 @@ describe("diagram scenario evaluation", () => {
 						? { ...candidate, label }
 						: candidate,
 				),
-			});
+			}).pipe(Result.getOrThrow);
 			expect(result.ok).toBe(true);
 		},
 	);
@@ -219,7 +229,7 @@ describe("diagram scenario evaluation", () => {
 			nodes: scenario.expectedDiagram.nodes.map((node) =>
 				node.id === nodeId ? { ...node, label } : node,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 		expect(result.checks).toContainEqual(
 			expect.objectContaining({
@@ -243,7 +253,7 @@ describe("diagram scenario evaluation", () => {
 				nodes: scenario.expectedDiagram.nodes.map((node) =>
 					node.id === nodeId ? { ...node, label } : node,
 				),
-			}).ok,
+			}).pipe(Result.getOrThrow).ok,
 		).toBe(true);
 	});
 
@@ -261,7 +271,7 @@ describe("diagram scenario evaluation", () => {
 					{ id: "retry-decision", source: "retry-charge", target: "payment-succeeded" },
 				],
 			};
-			expect(evaluateScenarioDiagram(scenario, candidate).ok).toBe(true);
+			expect(evaluateScenarioDiagram(scenario, candidate).pipe(Result.getOrThrow).ok).toBe(true);
 		},
 	);
 
@@ -278,7 +288,7 @@ describe("diagram scenario evaluation", () => {
 					),
 					{ id: "retry-decision", source: "retry-charge", target: "payment-succeeded" },
 				],
-			});
+			}).pipe(Result.getOrThrow);
 			expect(result.checks).toContainEqual(
 				expect.objectContaining({ id: "edge:Payment updated?->Charge payment:yes", passed: false }),
 			);
@@ -307,7 +317,7 @@ describe("diagram scenario evaluation", () => {
 					target: variant === "bypassed-outcome" ? "pause-subscription" : "payment-succeeded",
 				},
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.checks).toContainEqual(
 			expect.objectContaining({ id: "edge:Payment updated?->Charge payment:yes", passed: false }),
 		);
@@ -328,7 +338,7 @@ describe("diagram scenario evaluation", () => {
 				{ id: "provider-done", source: "vendor-escalation", target: "provider-end" },
 			],
 		};
-		expect(evaluateScenarioDiagram(scenario, candidate).ok).toBe(true);
+		expect(evaluateScenarioDiagram(scenario, candidate).pipe(Result.getOrThrow).ok).toBe(true);
 	});
 
 	it.each(["indirect-end", "extra-continuation"])(
@@ -358,21 +368,27 @@ describe("diagram scenario evaluation", () => {
 						: [{ id: "continue", source: "vendor-escalation", target: "collect-evidence" }]),
 				],
 			};
-			expect(evaluateScenarioDiagram(scenario, candidate).checks).toContainEqual(
+			expect(
+				evaluateScenarioDiagram(scenario, candidate).pipe(Result.getOrThrow).checks,
+			).toContainEqual(
 				expect.objectContaining({ id: "node-label:Escalate to provider", passed: false }),
 			);
 		},
 	);
 
 	it("does not relax the canonical single-start requirement", () => {
-		expect(() =>
+		expect(
 			evaluateScenarioDiagram(onboardingScenario, {
 				...onboardingScenario.expectedDiagram,
 				nodes: onboardingScenario.expectedDiagram.nodes.map((node) =>
 					node.id === "prompt" ? { ...node, kind: "process" } : node,
 				),
 			}),
-		).toThrow("Flowchart must contain exactly one start node");
+		).toMatchObject({
+			failure: {
+				message: expect.stringContaining("Flowchart must contain exactly one start node"),
+			},
+		});
 	});
 
 	it("accepts prompt-derived wording throughout the maintained catalog", () => {
@@ -387,7 +403,7 @@ describe("diagram scenario evaluation", () => {
 					// Entry-chain nodes continue the start step and keep their label.
 					label: labels.get(node.id) ?? node.label,
 				})),
-			});
+			}).pipe(Result.getOrThrow);
 			expect(
 				result.ok,
 				`${scenario.id}: ${result.checks
@@ -413,7 +429,9 @@ describe("diagram scenario evaluation", () => {
 					}[node.id] ?? node.label,
 			})),
 		};
-		expect(evaluateScenarioDiagram(onboardingScenario, candidate).ok).toBe(true);
+		expect(evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow).ok).toBe(
+			true,
+		);
 	});
 
 	it("accepts separate matching end nodes for each path", () => {
@@ -429,7 +447,9 @@ describe("diagram scenario evaluation", () => {
 				edge.id === "clear-review" ? { ...edge, target: "unclear-review" } : edge,
 			),
 		};
-		expect(evaluateScenarioDiagram(onboardingScenario, candidate).ok).toBe(true);
+		expect(evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow).ok).toBe(
+			true,
+		);
 	});
 
 	it("fails a missing step even with enough padding nodes and edges", () => {
@@ -439,7 +459,7 @@ describe("diagram scenario evaluation", () => {
 				node.id === "draft" ? { ...node, label: "Unrelated work" } : node,
 			),
 		};
-		const result = evaluateScenarioDiagram(onboardingScenario, candidate);
+		const result = evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 		expect(result.checks).toContainEqual(
 			expect.objectContaining({ id: "min-node-count", passed: true }),
@@ -462,7 +482,7 @@ describe("diagram scenario evaluation", () => {
 			nodes: scenario.expectedDiagram.nodes.map((node) =>
 				node.id === id ? { ...node, label } : node,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 		expect(result.checks).toContainEqual(
 			expect.objectContaining({ id: `node-label:${expectedLabel}`, passed: false }),
@@ -488,7 +508,7 @@ describe("diagram scenario evaluation", () => {
 				{ id: "f", source: "prompt", target: "requirements" },
 				{ id: "g", source: "requirements", target: "review" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 		expect(
 			result.checks.filter((check) => check.id.startsWith("edge:")).some((check) => !check.passed),
@@ -517,7 +537,7 @@ describe("diagram scenario evaluation", () => {
 				{ id: "d", source: "clear", target: "review", label: "no" },
 				{ id: "e", source: "requirements", target: "review" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(true);
 	});
 
@@ -536,7 +556,7 @@ describe("diagram scenario evaluation", () => {
 				{ id: "f", source: "prompt", target: "requirements" },
 				{ id: "g", source: "requirements", target: "review" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 		expect(result.checks).toContainEqual(
 			expect.objectContaining({
@@ -554,7 +574,7 @@ describe("diagram scenario evaluation", () => {
 					? { ...node, label: "Extract requirements and draft typed IR" }
 					: node,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(true);
 	});
 
@@ -574,7 +594,7 @@ describe("diagram scenario evaluation", () => {
 				{ id: "f", source: "clear", target: "review", label: "no" },
 				{ id: "g", source: "draft", target: "review" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 		expect(result.checks).toContainEqual(
 			expect.objectContaining({ id: "edge:Extract requirements->Scope clear?", passed: false }),
@@ -594,7 +614,7 @@ describe("diagram scenario evaluation", () => {
 				),
 				{ id: "internal-requirements", source: "requirements", target: "requirements-b" },
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(true);
 	});
 
@@ -617,7 +637,7 @@ describe("diagram scenario evaluation", () => {
 				nodes: scenario.expectedDiagram.nodes.map((node) =>
 					node.id === nodeId ? { ...node, label } : node,
 				),
-			});
+			}).pipe(Result.getOrThrow);
 			expect(result.ok).toBe(true);
 		},
 	);
@@ -796,7 +816,7 @@ describe("diagram scenario evaluation", () => {
 			nodes: scenario.expectedDiagram.nodes.map((node) =>
 				node.id === nodeId ? { ...node, label } : node,
 			),
-		});
+		}).pipe(Result.getOrThrow);
 		expect(result.checks).toContainEqual(
 			expect.objectContaining({ id: `node-label:${expected.label}`, passed: true }),
 		);
@@ -837,7 +857,7 @@ describe("diagram scenario evaluation", () => {
 				nodes: scenario.expectedDiagram.nodes.map((node) =>
 					node.id === nodeId ? { ...node, label } : node,
 				),
-			}).ok,
+			}).pipe(Result.getOrThrow).ok,
 		).toBe(false);
 	});
 
@@ -849,7 +869,7 @@ describe("diagram scenario evaluation", () => {
 				node.id === "severity" ? { ...node, kind: "process" } : node,
 			),
 		};
-		const result = evaluateScenarioDiagram(scenario, candidate);
+		const result = evaluateScenarioDiagram(scenario, candidate).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 		expect(result.checks.filter((check) => check.id.startsWith("node-kind:"))).toEqual(
 			expect.arrayContaining([expect.objectContaining({ id: "node-kind:decision", passed: true })]),
@@ -866,7 +886,7 @@ describe("diagram scenario evaluation", () => {
 				edge.label ? { ...edge, label: edge.label === "yes" ? "no" : "yes" } : edge,
 			),
 		};
-		const result = evaluateScenarioDiagram(onboardingScenario, candidate);
+		const result = evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow);
 		expect(result.ok).toBe(false);
 		expect(result.checks).toContainEqual(
 			expect.objectContaining({ id: "branch-label:no", passed: true }),
@@ -884,18 +904,20 @@ describe("diagram scenario evaluation", () => {
 				edge.id === "specs-pass" ? { ...edge, label: "Passing" } : edge,
 			),
 		};
-		expect(evaluateScenarioDiagram(scenario, candidate).ok).toBe(true);
+		expect(evaluateScenarioDiagram(scenario, candidate).pipe(Result.getOrThrow).ok).toBe(true);
 		const wrongConnection = {
 			...candidate,
 			edges: candidate.edges.map((edge) =>
 				edge.id === "specs-pass" ? { ...edge, target: "reject" } : edge,
 			),
 		};
-		expect(evaluateScenarioDiagram(scenario, wrongConnection).ok).toBe(false);
+		expect(evaluateScenarioDiagram(scenario, wrongConnection).pipe(Result.getOrThrow).ok).toBe(
+			false,
+		);
 	});
 
 	it("passes maintained fixture diagrams through the deterministic pipeline", () => {
-		const result = evaluateScenarioFixture(onboardingScenario);
+		const result = evaluateScenarioFixture(onboardingScenario).pipe(Result.getOrThrow);
 
 		expect(result.ok).toBe(true);
 		expect(result.excalidrawValidation.ok).toBe(true);
@@ -912,7 +934,7 @@ describe("diagram scenario evaluation", () => {
 				`${scenario.id}: every expected edge should become a semantic assertion`,
 			).toHaveLength(scenario.assertions.minEdgeCount);
 
-			const result = evaluateScenarioFixture(scenario);
+			const result = evaluateScenarioFixture(scenario).pipe(Result.getOrThrow);
 
 			expect(
 				result.ok,
@@ -933,11 +955,13 @@ describe("diagram scenario evaluation", () => {
 	it("extracts a JSON object from wrapped model output", () => {
 		const output = `Here is the JSON:\n${JSON.stringify(onboardingScenario.expectedDiagram)}`;
 
-		expect(extractJsonCandidate(output)).toMatchObject({
+		expect(extractJsonCandidate(output).pipe(Result.getOrThrow)).toMatchObject({
 			id: onboardingScenario.expectedDiagram.id,
 			type: "flowchart",
 		});
-		expect(evaluateScenarioOutput(onboardingScenario, output).ok).toBe(true);
+		expect(evaluateScenarioOutput(onboardingScenario, output).pipe(Result.getOrThrow).ok).toBe(
+			true,
+		);
 	});
 
 	it("fails semantic checks when required branches are missing", () => {
@@ -948,7 +972,7 @@ describe("diagram scenario evaluation", () => {
 			),
 		};
 
-		const result = evaluateScenarioDiagram(onboardingScenario, candidate);
+		const result = evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow);
 
 		expect(result.ok).toBe(false);
 		expect(result.checks).toContainEqual(
@@ -967,7 +991,7 @@ describe("diagram scenario evaluation", () => {
 			),
 		};
 
-		const result = evaluateScenarioDiagram(onboardingScenario, candidate);
+		const result = evaluateScenarioDiagram(onboardingScenario, candidate).pipe(Result.getOrThrow);
 
 		expect(result.ok).toBe(false);
 		expect(result.checks).toContainEqual(

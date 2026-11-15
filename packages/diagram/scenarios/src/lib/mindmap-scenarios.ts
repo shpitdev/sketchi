@@ -1,3 +1,5 @@
+// Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
+import { Result } from "effect";
 import {
 	type MindmapDiagram,
 	type MindmapTopicTree,
@@ -254,7 +256,7 @@ function defineMindmapScenario(definition: MindmapScenarioDefinition): MindmapSc
 			id: definition.id,
 			title: definition.title,
 			root: tree(root),
-		}),
+		}).pipe(Result.getOrThrow),
 	};
 }
 

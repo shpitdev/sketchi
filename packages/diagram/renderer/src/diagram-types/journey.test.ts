@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,7 +22,13 @@ const find = (scene: RenderedDiagramScene, id: string) => {
 	return element;
 };
 const journey = (stages: unknown[], extra: Record<string, unknown> = {}): JourneyDiagram =>
-	parseJourneyDiagram({ id: "test", title: "Test journey", type: "journey", stages, ...extra });
+	parseJourneyDiagram({
+		id: "test",
+		title: "Test journey",
+		type: "journey",
+		stages,
+		...extra,
+	}).pipe(Result.getOrThrow);
 /** The rise of one score in a band, read off its level labels. */
 const pitchOf = (scene: RenderedDiagramScene, band = 0) => {
 	const level = readJourneyScene(scene).levels[band]!;
@@ -31,15 +39,15 @@ const steps = (count: number, prefix = "Step", score = 3) =>
 
 describe("journey renderer", () => {
 	it("renders the fixture into a valid deterministic scene", () => {
-		const scene = renderDiagram(journeyFixture);
+		const scene = renderDiagram(journeyFixture).pipe(Result.getOrThrow);
 		expect(scene.diagramId).toBe("online-purchase-journey");
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(journeyLayoutIssues(scene)).toEqual([]);
-		expect(renderDiagram(journeyFixture)).toEqual(scene);
+		expect(renderDiagram(journeyFixture).pipe(Result.getOrThrow)).toEqual(scene);
 	});
 
 	it("draws stages across the top in order, each step's card under its stage in reading order", () => {
-		const read = readJourneyScene(renderJourneyDiagram(journeyFixture));
+		const read = readJourneyScene(renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow));
 		expect(read.stages.map((stage) => stage.name)).toEqual(["Discover", "Purchase", "Delivery"]);
 		expect(read.stages.map((stage) => stage.box.left)).toEqual(
 			read.stages.map((stage) => stage.box.left).toSorted((a, b) => a - b),
@@ -67,7 +75,7 @@ describe("journey renderer", () => {
 	});
 
 	it("places a face per step under its card at its score, on a curve over a neutral baseline", () => {
-		const scene = renderJourneyDiagram(journeyFixture);
+		const scene = renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow);
 		const read = readJourneyScene(scene);
 		const baseline = read.baselines[0]!;
 		for (const step of read.steps) {
@@ -100,7 +108,7 @@ describe("journey renderer", () => {
 	});
 
 	it("puts each stage's pain points and opportunities in rows beneath it, and draws no empty row", () => {
-		const scene = renderJourneyDiagram(journeyFixture);
+		const scene = renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow);
 		const read = readJourneyScene(scene);
 		expect(read.notes.map((note) => [note.kind, note.stage, note.text])).toEqual([
 			["pain-point", 0, "Reviews are hard to filter"],
@@ -125,7 +133,9 @@ describe("journey renderer", () => {
 		expect(tops("pain-point").size).toBe(1);
 		expect(tops("opportunity").size).toBe(1);
 		expect(find(scene, "text:journey:row:0:pain-points")).toMatchObject({ text: "Pain points" });
-		const bare = renderJourneyDiagram(journey([{ name: "Only", steps: steps(2) }]));
+		const bare = renderJourneyDiagram(journey([{ name: "Only", steps: steps(2) }])).pipe(
+			Result.getOrThrow,
+		);
 		expect(bare.elements.some((element) => element.id.startsWith("text:journey:row:0:pain"))).toBe(
 			false,
 		);
@@ -133,7 +143,7 @@ describe("journey renderer", () => {
 	});
 
 	it("names the persona and declared actors under the title, and each step's actor and touchpoint on its card", () => {
-		const scene = renderJourneyDiagram(journeyStressFixtures.wordy);
+		const scene = renderJourneyDiagram(journeyStressFixtures.wordy).pipe(Result.getOrThrow);
 		expect(find(scene, "text:journey:subtitle:0")).toMatchObject({
 			text: "Persona: Priya Raman, head of procurement at a regulated healthcare company",
 		});
@@ -154,7 +164,7 @@ describe("journey renderer", () => {
 			journey([
 				{ name: "A", steps: [{ label: "Calls", score: 3, actor: "Dana", touchpoint: "Phone" }] },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(find(both, "text:journey:step:0-0:details")).toMatchObject({ text: "Dana · Phone" });
 		const label = find(scene, "label:journey:step:0-0");
 		expect(label).toMatchObject({ containerId: "node:journey:step:0-0", verticalAlign: "top" });
@@ -162,7 +172,7 @@ describe("journey renderer", () => {
 
 	it("wraps every label at whole words and fits it in its card", () => {
 		for (const diagram of [journeyFixture, ...Object.values(journeyStressFixtures)]) {
-			const scene = renderJourneyDiagram(diagram);
+			const scene = renderJourneyDiagram(diagram).pipe(Result.getOrThrow);
 			const words = new Set(
 				diagram.stages.flatMap((stage) => [
 					...stage.name.split(/\s+/u),
@@ -188,7 +198,7 @@ describe("journey renderer", () => {
 					painPoints: ["Internationalization"],
 				},
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(journeyLayoutIssues(scene)).toEqual([]);
 		const read = readJourneyScene(scene);
@@ -202,7 +212,7 @@ describe("journey renderer", () => {
 	});
 
 	it("prints each step's score above its face and labels every level of the scale", () => {
-		const scene = renderJourneyDiagram(journeyFixture);
+		const scene = renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow);
 		const read = readJourneyScene(scene);
 		for (const step of read.steps) {
 			expect(step.face?.written).toBe(step.face?.score);
@@ -247,14 +257,14 @@ describe("journey renderer", () => {
 				{ name: "Three", steps: steps(2, "Checks out as a guest") },
 				{ name: "Four", steps: steps(2, "Gets a shipping confirmation") },
 			]),
-		);
+		).pipe(Result.getOrThrow);
 		expect(readJourneyScene(eight).baselines).toHaveLength(1);
 		expect(aspect(eight)).toBeLessThanOrEqual(JOURNEY_MAX_ASPECT);
 		expect(journeyLayoutIssues(eight)).toEqual([]);
 	});
 
 	it("wraps a journey too wide for one band into bands of whole stages, its curve running on", () => {
-		const scene = renderJourneyDiagram(journeyStressFixtures.longest);
+		const scene = renderJourneyDiagram(journeyStressFixtures.longest).pipe(Result.getOrThrow);
 		const read = readJourneyScene(scene);
 		expect(aspect(scene)).toBeLessThanOrEqual(JOURNEY_MAX_ASPECT);
 		expect(read.baselines.length).toBeGreaterThan(1);
@@ -288,7 +298,7 @@ describe("journey renderer", () => {
 	});
 
 	it("runs a stage too long for one band on into the next, its header marked as continued", () => {
-		const scene = renderJourneyDiagram(journeyStressFixtures.longStage);
+		const scene = renderJourneyDiagram(journeyStressFixtures.longStage).pipe(Result.getOrThrow);
 		const read = readJourneyScene(scene);
 		expect(aspect(scene)).toBeLessThanOrEqual(JOURNEY_MAX_ASPECT);
 		expect(read.stages).toHaveLength(1);
@@ -306,7 +316,7 @@ describe("journey renderer", () => {
 
 	it("holds every stress journey to its layout rules and a readable aspect", () => {
 		for (const [name, diagram] of Object.entries(journeyStressFixtures)) {
-			const scene = renderJourneyDiagram(diagram);
+			const scene = renderJourneyDiagram(diagram).pipe(Result.getOrThrow);
 			expect(getCanvasValidationIssues(scene), name).toEqual([]);
 			expect(journeyLayoutIssues(scene), name).toEqual([]);
 			expect(aspect(scene), name).toBeLessThanOrEqual(JOURNEY_MAX_ASPECT);
@@ -314,7 +324,7 @@ describe("journey renderer", () => {
 	});
 
 	it("flags a face moved off its step, a sad face on a 5 and a curve off its faces", () => {
-		const scene = renderJourneyDiagram(journeyFixture);
+		const scene = renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow);
 		const edit = (id: string, change: (element: SceneElement) => SceneElement) => ({
 			...scene,
 			elements: scene.elements.map((element) => (element.id === id ? change(element) : element)),

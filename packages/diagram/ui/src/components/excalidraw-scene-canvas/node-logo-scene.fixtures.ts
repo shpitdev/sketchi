@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import {
 	deployPipelineLogoFlowchart,
 	deployWebhookLogoSequence,
@@ -46,7 +48,7 @@ export function nodeLogoScene(direction: LayoutDirection = "TB"): RenderedDiagra
 		renderIntermediateDiagram({
 			...deployPipelineLogoFlowchart,
 			layout: { ...deployPipelineLogoFlowchart.layout, direction },
-		}),
+		}).pipe(Result.getOrThrow),
 		nodeLogo,
 	).scene;
 }
@@ -56,16 +58,22 @@ export function nodeLogoScene(direction: LayoutDirection = "TB"): RenderedDiagra
  * drawn by hand, the rest as their embedded SVG.
  */
 export function handDrawnLogoScene(): RenderedDiagramScene {
-	return embedCanvasIcons(renderIntermediateDiagram(deployPipelineLogoFlowchart), (slug) => {
-		const asset = nodeLogo(slug);
-		const recipe = Object.hasOwn(nativeIcons, slug) ? nativeIcons[slug] : undefined;
-		return asset && isIconRecipe(recipe) ? { ...asset, recipe } : asset;
-	}).scene;
+	return embedCanvasIcons(
+		renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
+		(slug) => {
+			const asset = nodeLogo(slug);
+			const recipe = Object.hasOwn(nativeIcons, slug) ? nativeIcons[slug] : undefined;
+			return asset && isIconRecipe(recipe) ? { ...asset, recipe } : asset;
+		},
+	).scene;
 }
 
 /** The deploy-webhook sequence with real catalog marks in its participant headers. */
 export function participantLogoScene(): RenderedDiagramScene {
-	return embedCanvasIcons(renderSequenceDiagram(deployWebhookLogoSequence), nodeLogo).scene;
+	return embedCanvasIcons(
+		renderSequenceDiagram(deployWebhookLogoSequence).pipe(Result.getOrThrow),
+		nodeLogo,
+	).scene;
 }
 
 /**
@@ -77,7 +85,10 @@ export function groupLogoScene(zoned = false): RenderedDiagramScene {
 		zoned ? { ...group, kind: "cloud" as const } : group,
 	);
 	return embedCanvasIcons(
-		renderIntermediateDiagram({ ...requestFlowGroupLogoFlowchart, ...(groups ? { groups } : {}) }),
+		renderIntermediateDiagram({
+			...requestFlowGroupLogoFlowchart,
+			...(groups ? { groups } : {}),
+		}).pipe(Result.getOrThrow),
 		nodeLogo,
 	).scene;
 }

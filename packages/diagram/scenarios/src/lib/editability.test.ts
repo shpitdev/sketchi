@@ -1,4 +1,6 @@
-import { Effect } from "effect";
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Effect } from "effect";
+
 import { describe, expect, it } from "vitest";
 
 import { getDiagramScenario } from "./diagram-scenarios.js";
@@ -9,7 +11,7 @@ import { loadExcalidrawEditor, withoutHeldTimers } from "./excalidraw-editor.js"
 import { editabilityMetrics } from "./scene-editability.js";
 
 const exported = (id: string) =>
-	evaluateScenarioFixture(getDiagramScenario(id)).excalidrawScene.elements;
+	evaluateScenarioFixture(getDiagramScenario(id)).pipe(Result.getOrThrow).excalidrawScene.elements;
 
 /** Excalidraw's editor loaded as the scenario CLI loads it: plain Node, a linkedom DOM. */
 const editor = await loadExcalidrawEditor();

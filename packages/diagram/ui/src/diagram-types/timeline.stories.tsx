@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { timelineFixture, parseTimelineDiagram } from "@sketchi/diagram-core";
@@ -65,6 +67,6 @@ export const LongChronology: Story = {
 				order: index,
 				description: "A concise milestone description.",
 			})),
-		}),
+		}).pipe(Result.getOrThrow),
 	},
 };

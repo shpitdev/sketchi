@@ -1,5 +1,6 @@
-import { Effect, Schema } from "effect";
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const chartDiagramType = "chart" as const;
 export const CHART_KINDS = ["bar", "line", "pie"] as const;
@@ -56,18 +57,22 @@ export const ChartDiagram = Schema.Struct({
 
 export interface ChartDiagram extends Schema.Schema.Type<typeof ChartDiagram> {}
 
-export interface ChartValidationIssue {
-	readonly code:
-		| "chart_too_large"
-		| "chart_series_mismatch"
-		| "duplicate_chart_category"
-		| "invalid_chart_series"
-		| "invalid_chart_value"
-		| "invalid_chart_option";
-	readonly path: string;
-	readonly message: string;
-	readonly hint: string;
-}
+export const ChartValidationIssueCodeSchema = Schema.Literals([
+	"chart_too_large",
+	"chart_series_mismatch",
+	"duplicate_chart_category",
+	"invalid_chart_series",
+	"invalid_chart_value",
+	"invalid_chart_option",
+]);
+export type ChartValidationIssueCode = typeof ChartValidationIssueCodeSchema.Type;
+export const ChartValidationIssue = Schema.Struct({
+	code: ChartValidationIssueCodeSchema,
+	path: Schema.String,
+	message: Schema.String,
+	hint: Schema.String,
+});
+export interface ChartValidationIssue extends Schema.Schema.Type<typeof ChartValidationIssue> {}
 
 const sameName = (name: string) => name.trim().toLowerCase();
 
@@ -184,19 +189,38 @@ export function getChartValidationIssues(diagram: ChartDiagram): ChartValidation
 	return issues.slice(0, 20);
 }
 
-export class ChartValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly ChartValidationIssue[]) {
-		super(issues[0]?.message ?? "Chart failed validation.");
-		this.name = "ChartValidationError";
+export class ChartValidationError extends Schema.TaggedError<
+	ChartValidationError,
+	{ readonly brand: unique symbol }
+>()("ChartValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(ChartValidationIssue),
+}) {
+	static fromIssues(issues: readonly ChartValidationIssue[]): ChartValidationError {
+		return ChartValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Chart failed validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
-export function validateChartDiagram(diagram: ChartDiagram): ChartDiagram {
+export function validateChartDiagram(
+	diagram: ChartDiagram,
+): Result.Result<ChartDiagram, ChartValidationError> {
 	const issues = getChartValidationIssues(diagram);
-	if (issues.length) throw new ChartValidationError(issues);
-	return diagram;
+	return issues.length > 0
+		? Result.fail(ChartValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
-export function parseChartDiagram(input: unknown): ChartDiagram {
-	return validateChartDiagram(Schema.decodeUnknownSync(ChartDiagram, { errors: "all" })(input));
+export function parseChartDiagram(
+	input: unknown,
+): Result.Result<ChartDiagram, Schema.SchemaError | ChartValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(ChartDiagram, { errors: "all" })(input),
+		validateChartDiagram,
+	);
 }
 
 export const chartFixture = parseChartDiagram({
@@ -212,4 +236,4 @@ export const chartFixture = parseChartDiagram({
 	unit: "$M",
 	categoryAxisTitle: "Quarter",
 	valueAxisTitle: "Revenue",
-});
+}).pipe(Result.getOrThrow);

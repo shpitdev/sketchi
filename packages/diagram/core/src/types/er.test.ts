@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
@@ -21,8 +23,8 @@ const codes = (input: Partial<ErDiagram>) =>
 describe("ER diagram type", () => {
 	it("has typed fixtures that satisfy the canonical diagram contract", () => {
 		expect(erFixture.type).toBe(erDiagramType);
-		expect(parseCanonicalDiagram(erFixture)).toEqual(erFixture);
-		expect(parseCanonicalDiagram(orgChartEr)).toEqual(orgChartEr);
+		expect(parseCanonicalDiagram(erFixture).pipe(Result.getOrThrow)).toEqual(erFixture);
+		expect(parseCanonicalDiagram(orgChartEr).pipe(Result.getOrThrow)).toEqual(orgChartEr);
 	});
 
 	it("reads relationship ends as an entity or entity.field", () => {
@@ -131,7 +133,7 @@ describe("ER diagram type", () => {
 						toCardinality: "zero-or-one",
 					},
 				],
-			}).relationships,
+			}).pipe(Result.getOrThrow).relationships,
 		).toHaveLength(1);
 	});
 });

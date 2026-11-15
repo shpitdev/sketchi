@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import * as diagramCore from "@sketchi/diagram-core";
 import { type MindmapTopicTree, mindmapDiagramFromTree } from "@sketchi/diagram-core";
 import { describe, expect, it, vi } from "vitest";
@@ -43,7 +45,7 @@ const widest = mindmapDiagramFromTree({
 			),
 		),
 	),
-});
+}).pipe(Result.getOrThrow);
 
 /** As many topics as deep as they go: three main branches doubling down six levels, which folds. */
 let budget = 99;
@@ -56,7 +58,9 @@ const bushy = (depth: number): MindmapTopicTree =>
 					budget-- > 0 ? [bushy(depth + 1)] : [],
 				).flat(),
 	);
-const deepest = mindmapDiagramFromTree({ id: "deepest", title: "Deepest", root: bushy(0) });
+const deepest = mindmapDiagramFromTree({ id: "deepest", title: "Deepest", root: bushy(0) }).pipe(
+	Result.getOrThrow,
+);
 
 describe("mindmap layout work", () => {
 	// Measured: 405 comparisons and 900 wraps for the widest map; 4,706 and 901 for the
@@ -67,7 +71,7 @@ describe("mindmap layout work", () => {
 	] as const)("bounds packing and measuring for the %s map", (_, diagram, comparisons, wraps) => {
 		work.comparisons = 0;
 		work.wraps = 0;
-		renderMindmapDiagram(diagram);
+		renderMindmapDiagram(diagram).pipe(Result.getOrThrow);
 		expect(work.comparisons).toBeGreaterThan(0);
 		expect(work.comparisons).toBeLessThan(comparisons);
 		expect(work.wraps).toBeLessThan(wraps);

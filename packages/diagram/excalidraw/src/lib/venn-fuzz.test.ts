@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	getCanvasValidationIssues,
@@ -122,7 +124,7 @@ function randomDiagrams(count: number, start: number): VennDiagram[] {
 			type: "venn",
 			sets,
 			regions,
-		});
+		}).pipe(Result.getOrThrow);
 	});
 }
 
@@ -138,7 +140,7 @@ describe("Venn fuzz", () => {
 		it(`draws ${DIAGRAMS} random Venn diagrams of seed ${seed} cleanly`, () => {
 			const defects: string[] = [];
 			for (const diagram of randomDiagrams(DIAGRAMS, seed)) {
-				const scene = renderVennDiagram(diagram);
+				const scene = renderVennDiagram(diagram).pipe(Result.getOrThrow);
 				const exported = convertSceneToExcalidraw(scene);
 				const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(exported)));
 				const readout = readVennScene(scene);

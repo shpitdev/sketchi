@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -107,7 +109,7 @@ describe("drawing icon recipes", () => {
 describe("hand-drawn node logos in Excalidraw output", () => {
 	const scene = (exactIcons = false) =>
 		embedCanvasIcons(
-			renderIntermediateDiagram(deployPipelineLogoFlowchart),
+			renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
 			(slug) => ({
 				name: slug,
 				recipe: RECIPE,
@@ -169,7 +171,7 @@ describe("hand-drawn node logos in Excalidraw output", () => {
 		convertSceneToExcalidraw(
 			embedCanvasIcons(
 				{
-					...renderIntermediateDiagram(deployPipelineLogoFlowchart),
+					...renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
 					elements,
 					zOrder: elements.map((element) => element.id),
 				},
@@ -209,7 +211,7 @@ describe("hand-drawn node logos in Excalidraw output", () => {
 		const excalidraw = convertSceneToExcalidraw(
 			embedCanvasIcons(
 				{
-					...renderIntermediateDiagram(deployPipelineLogoFlowchart),
+					...renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
 					elements: [logoNode(), authored],
 					zOrder: ["n", "n-icon-0"],
 				},
@@ -260,7 +262,7 @@ describe("hand-drawn node logos in Excalidraw output", () => {
 		const excalidraw = convertSceneToExcalidraw(
 			embedCanvasIcons(
 				{
-					...renderIntermediateDiagram(deployPipelineLogoFlowchart),
+					...renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
 					elements: [frame],
 					zOrder: ["zone"],
 				},
@@ -313,7 +315,7 @@ describe("inverted marks on light-on-dark nodes", () => {
 		const excalidraw = convertSceneToExcalidraw(
 			embedCanvasIcons(
 				{
-					...renderIntermediateDiagram(deployPipelineLogoFlowchart),
+					...renderIntermediateDiagram(deployPipelineLogoFlowchart).pipe(Result.getOrThrow),
 					backgroundColor,
 					elements: [shape],
 					zOrder: ["n"],

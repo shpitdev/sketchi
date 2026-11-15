@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type * as diagramCore from "@sketchi/diagram-core";
 import { parseTimelineDiagram } from "@sketchi/diagram-core";
 import { describe, expect, it, vi } from "vitest";
@@ -38,9 +40,9 @@ describe("timeline stem work", () => {
 					date: new Date(start + index * 35 * day).toISOString().slice(0, 10),
 				})),
 			],
-		});
+		}).pipe(Result.getOrThrow);
 		work.measures = 0;
-		renderTimelineDiagram(diagram);
+		renderTimelineDiagram(diagram).pipe(Result.getOrThrow);
 		expect(work.measures).toBeGreaterThan(0);
 		expect(work.measures).toBeLessThan(900);
 	});

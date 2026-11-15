@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import {
 	flowchartFixture,
 	type IntermediateDiagram,
@@ -49,17 +50,15 @@ export function ExcalidrawWorkspace({
 	const copyState: CopyState =
 		copyFeedback && copyFeedback.diagramId === active?.id ? copyFeedback.state : "idle";
 
-	const scene = useMemo(
-		() =>
-			active
-				? convertSceneToExcalidraw(
-						active.type === "mindmap"
-							? renderMindmapDiagram(parseMindmapDiagram(active))
-							: renderIntermediateDiagram(active),
-					)
-				: null,
-		[active],
-	);
+	const rendered = useMemo(() => {
+		if (!active) return Result.succeed(null);
+		const scene =
+			active.type === "mindmap"
+				? Result.flatMap(parseMindmapDiagram(active), renderMindmapDiagram)
+				: renderIntermediateDiagram(active);
+		return Result.map(scene, convertSceneToExcalidraw);
+	}, [active]);
+	const scene = Result.getOrElse(rendered, () => null);
 
 	const options: DiagramOption[] = diagrams.map((item) => ({
 		edgeCount: item.edges.length,
@@ -69,7 +68,12 @@ export function ExcalidrawWorkspace({
 		type: item.type,
 	}));
 
-	const effectiveStatus: WorkspaceStatus = diagrams.length === 0 ? "empty" : status;
+	const effectiveStatus: WorkspaceStatus =
+		diagrams.length === 0
+			? "empty"
+			: status === "ready" && Result.isFailure(rendered)
+				? "error"
+				: status;
 
 	const irJson = useMemo(() => (active ? JSON.stringify(active, null, 2) : ""), [active]);
 
@@ -144,7 +148,12 @@ export function ExcalidrawWorkspace({
 					{effectiveStatus === "loading" ? (
 						<WorkspaceState kind="loading" />
 					) : effectiveStatus === "error" ? (
-						<WorkspaceState kind="error" message={errorMessage} />
+						<WorkspaceState
+							kind="error"
+							message={
+								errorMessage ?? (Result.isFailure(rendered) ? rendered.failure.message : undefined)
+							}
+						/>
 					) : active && scene ? (
 						<ExcalidrawSceneCanvas
 							revision={active.id}

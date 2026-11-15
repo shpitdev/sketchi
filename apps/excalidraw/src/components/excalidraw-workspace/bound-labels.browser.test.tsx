@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { exportToSvg, restoreElements } from "@excalidraw/excalidraw";
 import type {
 	ExcalidrawElement,
@@ -92,7 +94,7 @@ const diagram = parseFlowchartDiagram({
 		{ id: "emoji-end", source: "emoji", target: "end" },
 	],
 	layout: { direction: "TB", edgeRouting: "orthogonal" },
-});
+}).pipe(Result.getOrThrow);
 
 /** Architecture nodes with subtitles: a plain step, a database and a decision. */
 const described = parseFlowchartDiagram({
@@ -124,7 +126,7 @@ const described = parseFlowchartDiagram({
 		{ id: "healthy-page", source: "healthy", target: "page", label: "no" },
 	],
 	layout: { direction: "LR", edgeRouting: "orthogonal" },
-});
+}).pipe(Result.getOrThrow);
 
 /** An agent-authored canvas: fixed node geometry and an unbound line label. */
 const agentCanvas: CanvasSpec = {
@@ -195,7 +197,7 @@ const sequence = renderSequenceDiagram({
 	],
 	messages: [{ id: "submit", source: "qa", target: "cjk", label: "Submit batch 🚀" }],
 	style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-});
+}).pipe(Result.getOrThrow);
 
 /** Self-messages: a self-call nested in an active bar and a self-return on an idle lifeline. */
 const selfMessages = renderSequenceDiagram({
@@ -218,7 +220,7 @@ const selfMessages = renderSequenceDiagram({
 		{ id: "retry", source: "browser", target: "browser", label: "Retry", type: "return" },
 	],
 	style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-});
+}).pipe(Result.getOrThrow);
 
 type Geometry = Pick<ExcalidrawTextElement, "height" | "text" | "width" | "x" | "y">;
 
@@ -419,12 +421,15 @@ async function expectLabelsPaintFully(
 
 describe("Excalidraw labels", () => {
 	it("paint flowchart labels fully and do not reflow when selected", async () => {
-		await expectLabelsPaintFully(convertSceneToExcalidraw(renderIntermediateDiagram(diagram)), 15);
+		await expectLabelsPaintFully(
+			convertSceneToExcalidraw(renderIntermediateDiagram(diagram).pipe(Result.getOrThrow)),
+			15,
+		);
 	}, 60_000);
 
 	it("paint node descriptions fully under their labels", async () => {
 		await expectLabelsPaintFully(
-			convertSceneToExcalidraw(renderIntermediateDiagram(described)),
+			convertSceneToExcalidraw(renderIntermediateDiagram(described).pipe(Result.getOrThrow)),
 			11,
 		);
 	}, 60_000);
@@ -484,7 +489,9 @@ it("keeps sequence self-message loops bound through reload and inside the export
 }, 30_000);
 
 it("keeps node descriptions grouped and in place through reload, drag and export", async () => {
-	const scene = convertSceneToExcalidraw(renderIntermediateDiagram(described));
+	const scene = convertSceneToExcalidraw(
+		renderIntermediateDiagram(described).pipe(Result.getOrThrow),
+	);
 	const file = JSON.parse(JSON.stringify(createExcalidrawFile(scene))) as {
 		elements: ExcalidrawElement[];
 	};
@@ -570,12 +577,12 @@ it("moves authored branch labels with a source node dragged on the real canvas",
 		],
 		edges: [{ id: "ab", source: "a", target: "b", label: "Continue" }],
 		layout: { direction: "TB", edgeRouting: "orthogonal" },
-	});
+	}).pipe(Result.getOrThrow);
 	let editorApi: ExcalidrawImperativeAPI | undefined;
 	const view = render(
 		<div style={{ height: 960, width: 1280 }}>
 			<ExcalidrawSceneCanvas
-				scene={convertSceneToExcalidraw(renderIntermediateDiagram(spec))}
+				scene={convertSceneToExcalidraw(renderIntermediateDiagram(spec).pipe(Result.getOrThrow))}
 				title="Drag labels"
 				onApiChange={(api) => {
 					editorApi = api;

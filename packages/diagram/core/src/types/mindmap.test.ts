@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseIntermediateDiagram } from "../intermediate";
@@ -11,7 +13,9 @@ import {
 describe("Mindmap diagram type", () => {
 	it("has a typed fixture that satisfies the intermediate diagram contract", () => {
 		expect(mindmapFixture.type).toBe(mindmapDiagramType);
-		expect(parseIntermediateDiagram(mindmapFixture)).toEqual(mindmapFixture);
+		expect(parseIntermediateDiagram(mindmapFixture).pipe(Result.getOrThrow)).toEqual(
+			mindmapFixture,
+		);
 		expect(mindmapFixture.nodes.map((node) => node.label)).toEqual([
 			"Public mindmaps",
 			"Semantic input",
@@ -24,7 +28,7 @@ describe("Mindmap diagram type", () => {
 	});
 
 	it("rejects topics with multiple parents", () => {
-		expect(() =>
+		expect(
 			parseMindmapDiagram({
 				...mindmapFixture,
 				edges: [
@@ -37,11 +41,11 @@ describe("Mindmap diagram type", () => {
 					},
 				],
 			}),
-		).toThrow(/exactly one parent/);
+		).toMatchObject({ failure: { message: expect.stringMatching(/exactly one parent/) } });
 	});
 
 	it("rejects inconsistent child ordering metadata", () => {
-		expect(() =>
+		expect(
 			parseMindmapDiagram({
 				...mindmapFixture,
 				nodes: mindmapFixture.nodes.map((node) =>
@@ -50,7 +54,11 @@ describe("Mindmap diagram type", () => {
 						: node,
 				),
 			}),
-		).toThrow(/metadata must match|contiguous sibling ordering/);
+		).toMatchObject({
+			failure: {
+				message: expect.stringMatching(/metadata must match|contiguous sibling ordering/),
+			},
+		});
 	});
 
 	it("builds the canonical map of a nested topic tree", () => {
@@ -68,7 +76,7 @@ describe("Mindmap diagram type", () => {
 						{ label: "Artifact output", children: [{ label: "Scene" }, { label: "Excalidraw" }] },
 					],
 				},
-			}),
+			}).pipe(Result.getOrThrow),
 		).toEqual(mindmapFixture);
 	});
 });

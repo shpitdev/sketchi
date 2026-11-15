@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import { parseIntermediateDiagram, type IntermediateDiagram } from "./intermediate.js";
 import { parseFlowchartDiagram } from "./types/flowchart.js";
 import hiring from "./fixtures/lanes/hiring.js";
@@ -12,7 +14,7 @@ function flowchart(fixture: object, direction: "LR" | "TB" = "LR") {
 		...fixture,
 		type: "flowchart",
 		layout: { direction, edgeRouting: "orthogonal" },
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /**
@@ -93,7 +95,7 @@ export const laneStressFixtures: Readonly<
 				})),
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-	}),
+	}).pipe(Result.getOrThrow),
 	"cross-lane-loops": parseIntermediateDiagram({
 		id: "cross-lane-loops",
 		title: "Loops across lanes",
@@ -121,5 +123,5 @@ export const laneStressFixtures: Readonly<
 			})),
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-	}),
+	}).pipe(Result.getOrThrow),
 };

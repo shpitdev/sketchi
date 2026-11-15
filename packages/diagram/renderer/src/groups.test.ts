@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	CANVAS_FRAME_NAME,
@@ -32,7 +34,7 @@ function rendered(name: Name, direction: Direction = groupFixtures[name].layout.
 			renderIntermediateDiagram({
 				...groupFixtures[name],
 				layout: { direction, edgeRouting: "orthogonal" },
-			}),
+			}).pipe(Result.getOrThrow),
 		);
 	return scenes.get(key)!;
 }
@@ -140,7 +142,7 @@ describe("grouped flowchart layout", () => {
 				group.id === "internet" ? { ...group, label } : group,
 			),
 			layout: { direction, edgeRouting: "orthogonal" },
-		});
+		}).pipe(Result.getOrThrow);
 		const [frame] = framesOf(scene);
 		expect(frame!.width).toBeGreaterThanOrEqual(30 * 14 * 0.944);
 		expect(frame!.width).toBeGreaterThanOrEqual(canvasFrameNameWidth(label));
@@ -256,9 +258,9 @@ describe("grouped flowchart layout", () => {
 
 	it("renders an ungrouped flowchart exactly as before", () => {
 		const { groups: _groups, ...ungrouped } = flowchartFixture;
-		expect(renderIntermediateDiagram({ ...ungrouped, groups: [] })).toEqual(
-			renderIntermediateDiagram(ungrouped),
+		expect(renderIntermediateDiagram({ ...ungrouped, groups: [] }).pipe(Result.getOrThrow)).toEqual(
+			renderIntermediateDiagram(ungrouped).pipe(Result.getOrThrow),
 		);
-		expect(framesOf(renderIntermediateDiagram(ungrouped))).toEqual([]);
+		expect(framesOf(renderIntermediateDiagram(ungrouped).pipe(Result.getOrThrow))).toEqual([]);
 	});
 });

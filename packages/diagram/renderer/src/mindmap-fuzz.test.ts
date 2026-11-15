@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -128,7 +130,7 @@ function toDiagram(outline: Outline, id: string, direction: "LR" | "RL"): Mindma
 		nodes,
 		edges,
 		layout: { direction, edgeRouting: "curved" },
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 function nodesOf(scene: RenderedDiagramScene): NodeSceneElement[] {
@@ -195,7 +197,7 @@ describe("mindmap layout fuzz", () => {
 			const outline = randomOutline(next, 8 + Math.floor(next() * 93));
 			const diagram = toDiagram(outline, `fuzz-${seed}`, next() < 0.2 ? "RL" : "LR");
 			const shape = sketch(outline);
-			const scene = renderMindmapDiagram(diagram);
+			const scene = renderMindmapDiagram(diagram).pipe(Result.getOrThrow);
 			expect(mindmapLayoutIssues(scene), shape).toEqual([]);
 			expect(getCanvasValidationIssues(scene), shape).toEqual([]);
 			const aspects = exportAspects(scene);

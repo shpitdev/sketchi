@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import {
 	type ClassDiagram,
 	classDiagramType,
@@ -6,7 +8,9 @@ import {
 } from "./types/class.js";
 
 const build = (input: Record<string, unknown>): ClassDiagram =>
-	parseClassDiagram(resolveClassShorthand({ type: classDiagramType, ...input }));
+	parseClassDiagram(resolveClassShorthand({ type: classDiagramType, ...input })).pipe(
+		Result.getOrThrow,
+	);
 
 /**
  * Class diagrams that stress the layout: a model of twenty classes, a

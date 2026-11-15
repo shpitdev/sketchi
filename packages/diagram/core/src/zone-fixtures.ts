@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import { parseIntermediateDiagram, type IntermediateDiagram } from "./intermediate.js";
 import { parseFlowchartDiagram } from "./types/flowchart.js";
 import awsThreeTier from "./fixtures/zones/aws-three-tier.js";
@@ -25,7 +27,7 @@ function flowchart(fixture: object, direction: "LR" | "TB" = "LR") {
 		...fixture,
 		type: "flowchart",
 		layout: { direction, edgeRouting: "orthogonal" },
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /**
@@ -249,7 +251,7 @@ export const zoneStressFixtures: Readonly<
 			{ id: "e9", source: "db-a", target: "s3", label: "backs up" },
 		],
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-	}),
+	}).pipe(Result.getOrThrow),
 	"thirty-services": parseIntermediateDiagram({
 		id: "thirty-services",
 		title: "Thirty services in eight zones",
@@ -268,5 +270,5 @@ export const zoneStressFixtures: Readonly<
 			target: `s${target}`,
 		})),
 		layout: { direction: "LR", edgeRouting: "orthogonal" },
-	}),
+	}).pipe(Result.getOrThrow),
 };

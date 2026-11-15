@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
@@ -24,23 +26,21 @@ const twoSets = {
 };
 
 function issueCodes(input: Record<string, unknown>): string[] {
-	try {
-		parseVennDiagram(input);
-		return [];
-	} catch (error) {
-		if (error instanceof VennValidationError) return error.issues.map((issue) => issue.code);
-		throw error;
-	}
+	const result = parseVennDiagram(input);
+	if (Result.isSuccess(result)) return [];
+	const error = result.failure;
+	if (error._tag !== "VennValidationError") return expect.fail(error.message);
+	return error.issues.map((issue) => issue.code);
 }
 
 describe("Venn diagram type", () => {
 	it("has a typed fixture that satisfies the canonical diagram contract", () => {
 		expect(vennFixture.type).toBe(vennDiagramType);
-		expect(parseCanonicalDiagram(vennFixture)).toEqual(vennFixture);
+		expect(parseCanonicalDiagram(vennFixture).pipe(Result.getOrThrow)).toEqual(vennFixture);
 	});
 
 	it("defaults regions to none and keys a region by set order", () => {
-		const diagram = parseVennDiagram(twoSets);
+		const diagram = parseVennDiagram(twoSets).pipe(Result.getOrThrow);
 		expect(diagram.regions).toEqual([]);
 		expect(vennRegionKey(diagram, { sets: ["android", "ios"] })).toEqual([0, 1]);
 	});
@@ -80,15 +80,15 @@ describe("Venn diagram type", () => {
 	it("reads a lone region object as a list of one, and leaves other malformed regions to the schema", () => {
 		const lone = parseVennDiagram(
 			resolveVennShorthand({ ...twoSets, regions: { sets: ["ios"], items: ["Feature"] } }),
-		);
+		).pipe(Result.getOrThrow);
 		expect(lone.regions).toEqual([{ sets: ["ios"], items: ["Feature"] }]);
 		for (const regions of ["Feature", null, 3])
 			expect(
-				() => parseVennDiagram(resolveVennShorthand({ ...twoSets, regions })),
+				parseVennDiagram(resolveVennShorthand({ ...twoSets, regions })),
 				String(regions),
-			).toThrow(/regions/u);
+			).toMatchObject({ failure: { message: expect.stringMatching(/regions/u) } });
 		// Whole memberships never replace stated regions that are malformed.
-		expect(() =>
+		expect(
 			parseVennDiagram(
 				resolveVennShorthand({
 					...twoSets,
@@ -99,7 +99,7 @@ describe("Venn diagram type", () => {
 					regions: "Push",
 				}),
 			),
-		).toThrow(/regions/u);
+		).toMatchObject({ failure: { message: expect.stringMatching(/regions/u) } });
 	});
 
 	it("rejects one set or four", () => {
@@ -113,21 +113,18 @@ describe("Venn diagram type", () => {
 	});
 
 	it("returns a repair hint with every semantic issue", () => {
-		try {
-			parseVennDiagram({
-				...twoSets,
-				sets: [
-					{ id: "ios", label: "iOS", color: "plaid" },
-					{ id: "ios", label: "ios" },
-				],
-				regions: [{ sets: ["web"], items: ["Push"], count: 2, label: "y".repeat(41) }],
-			});
-			expect.unreachable();
-		} catch (error) {
-			if (!(error instanceof VennValidationError)) throw error;
-			expect(error.issues.length).toBeGreaterThanOrEqual(5);
-			for (const issue of error.issues) expect(issue.hint.length).toBeGreaterThan(10);
-		}
+		const error = parseVennDiagram({
+			...twoSets,
+			sets: [
+				{ id: "ios", label: "iOS", color: "plaid" },
+				{ id: "ios", label: "ios" },
+			],
+			regions: [{ sets: ["web"], items: ["Push"], count: 2, label: "y".repeat(41) }],
+		}).pipe(Result.flip, Result.getOrThrow);
+		expect(error).toBeInstanceOf(VennValidationError);
+		if (error._tag !== "VennValidationError") return expect.fail(error.message);
+		expect(error.issues.length).toBeGreaterThanOrEqual(5);
+		for (const issue of error.issues) expect(issue.hint.length).toBeGreaterThan(10);
 	});
 
 	it("names repeated sets, unknown sets, repeated regions, and items with counts", () => {
@@ -186,7 +183,7 @@ describe("Venn diagram type", () => {
 			}).length,
 		).toBe(0);
 		const issues = getVennValidationIssues({
-			...parseVennDiagram(twoSets),
+			...parseVennDiagram(twoSets).pipe(Result.getOrThrow),
 			sets: [...twoSets.sets, { id: "web", label: "Web" }],
 			regions: [
 				{ sets: ["ios"], items: Array.from({ length: 12 }, (_, index) => `A ${index}`) },
@@ -212,7 +209,7 @@ describe("Venn diagram type", () => {
 				],
 				regions: [{ in: ["Enterprise", "Pro"], members: ["Audit export"] }],
 			}),
-		);
+		).pipe(Result.getOrThrow);
 		expect(resolved.sets).toEqual([
 			{ id: "Basic", label: "Basic" },
 			{ id: "Pro", label: "Pro" },
@@ -235,7 +232,7 @@ describe("Venn diagram type", () => {
 				],
 				regions: [{ sets: ["iOS", "Android"], label: "Both", items: ["push", "Maps"] }],
 			}),
-		);
+		).pipe(Result.getOrThrow);
 		expect(resolved.regions).toEqual([
 			{ sets: ["ios", "android"], label: "Both", items: ["push", "Maps"] },
 			{ sets: ["ios"], items: ["Widgets"] },

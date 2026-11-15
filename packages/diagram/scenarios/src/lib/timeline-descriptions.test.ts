@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { parseTimelineDiagram, type TimelineDiagram } from "@sketchi/diagram-core";
 import fixtures from "./fixtures/timeline-descriptions.json";
@@ -25,16 +27,16 @@ describe("timeline event descriptions", () => {
 	it.each(fixtures.slice(0, 4).map((spec, index) => ({ spec, sample: index + 1 })))(
 		"accepts the full description in the event label from real sample $sample",
 		({ spec }) => {
-			const diagram = parseTimelineDiagram(spec);
+			const diagram = parseTimelineDiagram(spec).pipe(Result.getOrThrow);
 			expect(descriptionCheck(diagram)).toMatchObject({ passed: true });
-			expect(evaluateScenarioDiagram(lunar, diagram).ok).toBe(true);
+			expect(evaluateScenarioDiagram(lunar, diagram).pipe(Result.getOrThrow).ok).toBe(true);
 		},
 	);
 
 	it("keeps the real sample that omitted the description failing", () => {
-		const diagram = parseTimelineDiagram(fixtures[4]);
+		const diagram = parseTimelineDiagram(fixtures[4]).pipe(Result.getOrThrow);
 		expect(descriptionCheck(diagram)).toMatchObject({ passed: false });
-		expect(evaluateScenarioDiagram(lunar, diagram).ok).toBe(false);
+		expect(evaluateScenarioDiagram(lunar, diagram).pipe(Result.getOrThrow).ok).toBe(false);
 	});
 
 	it.each([": ", " — ", " – ", " - ", " | ", "; ", "\n"])(

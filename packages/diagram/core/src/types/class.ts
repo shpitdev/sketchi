@@ -1,6 +1,7 @@
-import { Effect, Schema } from "effect";
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Effect, Schema, Array as Arr, Option, Result } from "effect";
 
-import { DiagramStyle, DiagramValidationError, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
+import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "../intermediate.js";
 
 export const classDiagramType = "class" as const;
 
@@ -555,23 +556,40 @@ export function getClassValidationIssues(diagram: ClassDiagram): ClassValidation
 	return issues.slice(0, CLASS_MAX_ISSUES);
 }
 
-export class ClassValidationError extends DiagramValidationError {
-	constructor(readonly issues: readonly ClassValidationIssue[]) {
-		super(issues[0]?.message ?? "Class diagram failed semantic validation.");
-		this.name = "ClassValidationError";
+export class ClassValidationError extends Schema.TaggedError<
+	ClassValidationError,
+	{ readonly brand: unique symbol }
+>()("ClassValidationError", {
+	message: Schema.String,
+	issues: Schema.Array(ClassValidationIssue),
+}) {
+	static fromIssues(issues: readonly ClassValidationIssue[]): ClassValidationError {
+		return ClassValidationError.make({
+			issues,
+			message: Option.match(Arr.head(issues), {
+				onNone: () => "Class diagram failed semantic validation.",
+				onSome: (issue) => issue.message,
+			}),
+		});
 	}
 }
 
-export function validateClassDiagram(diagram: ClassDiagram): ClassDiagram {
+export function validateClassDiagram(
+	diagram: ClassDiagram,
+): Result.Result<ClassDiagram, ClassValidationError> {
 	const issues = getClassValidationIssues(diagram);
-	if (issues.length > 0) {
-		throw new ClassValidationError(issues);
-	}
-	return diagram;
+	return issues.length > 0
+		? Result.fail(ClassValidationError.fromIssues(issues))
+		: Result.succeed(diagram);
 }
 
-export function parseClassDiagram(input: unknown): ClassDiagram {
-	return validateClassDiagram(Schema.decodeUnknownSync(ClassDiagram, { errors: "all" })(input));
+export function parseClassDiagram(
+	input: unknown,
+): Result.Result<ClassDiagram, Schema.SchemaError | ClassValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(ClassDiagram, { errors: "all" })(input),
+		validateClassDiagram,
+	);
 }
 
 const VISIBILITY_WORDS: Readonly<Record<string, ClassVisibility>> = {
@@ -955,4 +973,4 @@ export const classFixture = parseClassDiagram({
 			toRole: "shapes",
 		},
 	],
-});
+}).pipe(Result.getOrThrow);

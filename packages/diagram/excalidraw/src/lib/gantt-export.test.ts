@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	formatGanttDay,
@@ -45,7 +47,12 @@ function plan(seed: number, count: number, fanIn: number): GanttDiagram {
 			...(dependsOn.length ? { dependsOn } : {}),
 		};
 	});
-	return parseGanttDiagram({ id: `plan-${seed}`, title: `Plan ${seed}`, type: "gantt", tasks });
+	return parseGanttDiagram({
+		id: `plan-${seed}`,
+		title: `Plan ${seed}`,
+		type: "gantt",
+		tasks,
+	}).pipe(Result.getOrThrow);
 }
 
 describe("Gantt export", () => {
@@ -53,7 +60,7 @@ describe("Gantt export", () => {
 	// lies on another, and every endpoint lands on its bar.
 	it.each([1, 2, 3, 4, 5, 6])("exports plan %i with no Excalidraw issue", (seed) => {
 		const diagram = plan(seed, 12 + seed * 6, 2);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(validateExcalidrawScene(convertSceneToExcalidraw(scene))).toEqual({
 			ok: true,
 			issues: [],
@@ -80,8 +87,8 @@ describe("Gantt export", () => {
 				},
 				{ id: "programme", label: "Programme", start: "2026-01-05", end: "2026-07-31" },
 			],
-		});
-		const scene = convertSceneToExcalidraw(renderDiagram(diagram));
+		}).pipe(Result.getOrThrow);
+		const scene = convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow));
 		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
 		const arrivals = scene.elements.filter(
 			(element) => element.type === "arrow" && element.id.endsWith(":validation"),
@@ -122,8 +129,12 @@ describe("Gantt export", () => {
 					dependsOn: Array.from({ length: 19 }, (_, index) => `t${index}`),
 				},
 			],
-		});
-		expect(validateExcalidrawScene(convertSceneToExcalidraw(renderDiagram(diagram)))).toEqual({
+		}).pipe(Result.getOrThrow);
+		expect(
+			validateExcalidrawScene(
+				convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow)),
+			),
+		).toEqual({
 			ok: true,
 			issues: [],
 		});
@@ -131,7 +142,7 @@ describe("Gantt export", () => {
 
 	it("draws every dependency of a crowded plan within the canvas limits", () => {
 		const diagram = plan(7, 45, 4);
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		const dependencies = diagram.tasks.reduce(
 			(sum, task) => sum + (task.dependsOn?.length ?? 0),
 			0,

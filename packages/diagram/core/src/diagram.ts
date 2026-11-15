@@ -1,39 +1,50 @@
-import { Schema } from "effect";
+import { DiagramValidationError } from "./intermediate.js";
+import { Result, Schema } from "effect";
 
-import { ChartDiagram, validateChartDiagram } from "./types/chart.js";
-import { FlowchartDiagram, validateFlowchartDiagram } from "./types/flowchart.js";
+import { ChartValidationError, ChartDiagram, validateChartDiagram } from "./types/chart.js";
+import {
+	FlowchartValidationError,
+	FlowchartDiagram,
+	validateFlowchartDiagram,
+} from "./types/flowchart.js";
 import { MindmapDiagram, validateMindmapDiagram } from "./types/mindmap.js";
-import { SequenceDiagram, validateSequenceDiagram } from "./types/sequence.js";
-import { TimelineDiagram, validateTimelineDiagram } from "./types/timeline.js";
-import { StateMachineDiagram, validateStateMachineDiagram } from "./types/state-machine.js";
-import { GanttDiagram, validateGanttDiagram } from "./types/gantt.js";
-import { ErDiagram, validateErDiagram } from "./types/er.js";
-import { ClassDiagram, validateClassDiagram } from "./types/class.js";
-import { OrgChartDiagram, validateOrgChartDiagram } from "./types/org-chart.js";
-import { VennDiagram, validateVennDiagram } from "./types/venn.js";
-import { JourneyDiagram, validateJourneyDiagram } from "./types/journey.js";
-import { SankeyDiagram, validateSankeyDiagram } from "./types/sankey.js";
-import { WireframeDiagram, validateWireframeDiagram } from "./types/wireframe.js";
-import { QuadrantDiagram, validateQuadrantDiagram } from "./types/quadrant.js";
+import {
+	SequenceValidationError,
+	SequenceDiagram,
+	validateSequenceDiagram,
+} from "./types/sequence.js";
+import {
+	TimelineValidationError,
+	TimelineDiagram,
+	validateTimelineDiagram,
+} from "./types/timeline.js";
+import {
+	StateMachineValidationError,
+	StateMachineDiagram,
+	validateStateMachineDiagram,
+} from "./types/state-machine.js";
+import { GanttValidationError, GanttDiagram, validateGanttDiagram } from "./types/gantt.js";
+import { ErValidationError, ErDiagram, validateErDiagram } from "./types/er.js";
+import { ClassValidationError, ClassDiagram, validateClassDiagram } from "./types/class.js";
+import {
+	OrgChartValidationError,
+	OrgChartDiagram,
+	validateOrgChartDiagram,
+} from "./types/org-chart.js";
+import { VennValidationError, VennDiagram, validateVennDiagram } from "./types/venn.js";
+import { JourneyValidationError, JourneyDiagram, validateJourneyDiagram } from "./types/journey.js";
+import { SankeyValidationError, SankeyDiagram, validateSankeyDiagram } from "./types/sankey.js";
+import {
+	WireframeValidationError,
+	WireframeDiagram,
+	validateWireframeDiagram,
+} from "./types/wireframe.js";
+import {
+	QuadrantValidationError,
+	QuadrantDiagram,
+	validateQuadrantDiagram,
+} from "./types/quadrant.js";
 import type { DiagramTypeValue } from "./types.js";
-
-/** One diagram of any canonical family, discriminated by `type`. */
-export type CanonicalDiagram =
-	| FlowchartDiagram
-	| MindmapDiagram
-	| SequenceDiagram
-	| TimelineDiagram
-	| ChartDiagram
-	| StateMachineDiagram
-	| GanttDiagram
-	| ErDiagram
-	| ClassDiagram
-	| OrgChartDiagram
-	| VennDiagram
-	| JourneyDiagram
-	| SankeyDiagram
-	| WireframeDiagram
-	| QuadrantDiagram;
 
 // A family added to DIAGRAM_TYPES without a contract here fails to compile.
 const familySchemas = {
@@ -70,46 +81,55 @@ export const CanonicalDiagramSchema = Schema.Union([
 	familySchemas.sankey,
 	familySchemas.wireframe,
 	familySchemas.quadrant,
+]).pipe(Schema.toTaggedUnion("type"));
+
+export type CanonicalDiagram = typeof CanonicalDiagramSchema.Type;
+export const CanonicalValidationErrorSchema = Schema.Union([
+	DiagramValidationError,
+	ChartValidationError,
+	FlowchartValidationError,
+	SequenceValidationError,
+	TimelineValidationError,
+	StateMachineValidationError,
+	GanttValidationError,
+	ErValidationError,
+	ClassValidationError,
+	OrgChartValidationError,
+	VennValidationError,
+	JourneyValidationError,
+	SankeyValidationError,
+	WireframeValidationError,
+	QuadrantValidationError,
 ]);
+export type CanonicalValidationError = typeof CanonicalValidationErrorSchema.Type;
 
 /** Apply the family's semantic validation to an already decoded diagram. */
-export function validateCanonicalDiagram(diagram: CanonicalDiagram): CanonicalDiagram {
-	switch (diagram.type) {
-		case "flowchart":
-			return validateFlowchartDiagram(diagram);
-		case "mindmap":
-			return validateMindmapDiagram(diagram);
-		case "timeline":
-			return validateTimelineDiagram(diagram);
-		case "sequence":
-			return validateSequenceDiagram(diagram);
-		case "chart":
-			return validateChartDiagram(diagram);
-		case "state-machine":
-			return validateStateMachineDiagram(diagram);
-		case "gantt":
-			return validateGanttDiagram(diagram);
-		case "er":
-			return validateErDiagram(diagram);
-		case "class":
-			return validateClassDiagram(diagram);
-		case "org-chart":
-			return validateOrgChartDiagram(diagram);
-		case "venn":
-			return validateVennDiagram(diagram);
-		case "journey":
-			return validateJourneyDiagram(diagram);
-		case "sankey":
-			return validateSankeyDiagram(diagram);
-		case "wireframe":
-			return validateWireframeDiagram(diagram);
-		case "quadrant":
-			return validateQuadrantDiagram(diagram);
-	}
+export function validateCanonicalDiagram(
+	diagram: CanonicalDiagram,
+): Result.Result<CanonicalDiagram, CanonicalValidationError> {
+	return CanonicalDiagramSchema.match(diagram, {
+		flowchart: validateFlowchartDiagram,
+		mindmap: validateMindmapDiagram,
+		sequence: validateSequenceDiagram,
+		timeline: validateTimelineDiagram,
+		chart: validateChartDiagram,
+		"state-machine": validateStateMachineDiagram,
+		gantt: validateGanttDiagram,
+		er: validateErDiagram,
+		class: validateClassDiagram,
+		"org-chart": validateOrgChartDiagram,
+		venn: validateVennDiagram,
+		journey: validateJourneyDiagram,
+		sankey: validateSankeyDiagram,
+		wireframe: validateWireframeDiagram,
+		quadrant: validateQuadrantDiagram,
+	});
 }
-
-export function parseCanonicalDiagram(input: unknown): CanonicalDiagram {
-	return validateCanonicalDiagram(
-		Schema.decodeUnknownSync(CanonicalDiagramSchema, { errors: "all" })(input),
+export function parseCanonicalDiagram(
+	input: unknown,
+): Result.Result<CanonicalDiagram, Schema.SchemaError | CanonicalValidationError> {
+	return Result.flatMap(
+		Schema.decodeUnknownResult(CanonicalDiagramSchema, { errors: "all" })(input),
+		validateCanonicalDiagram,
 	);
 }

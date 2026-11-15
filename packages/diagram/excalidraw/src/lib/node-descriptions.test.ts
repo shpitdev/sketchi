@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -52,13 +54,16 @@ const diagram = parseFlowchartDiagram({
 		{ id: "e4", source: "check", target: "page", label: "no" },
 	],
 	layout: { direction: "LR", edgeRouting: "orthogonal" },
-});
+}).pipe(Result.getOrThrow);
 
 describe("node descriptions in Excalidraw", () => {
-	const { scene } = embedCanvasIcons(renderIntermediateDiagram(diagram), (slug) => ({
-		name: slug,
-		svg: SVG,
-	}));
+	const { scene } = embedCanvasIcons(
+		renderIntermediateDiagram(diagram).pipe(Result.getOrThrow),
+		(slug) => ({
+			name: slug,
+			svg: SVG,
+		}),
+	);
 	const elements = convertSceneToExcalidraw(scene).elements as Placed[];
 	const byId = new Map(elements.map((element) => [element.id, element]));
 
@@ -109,7 +114,7 @@ describe("node descriptions in Excalidraw", () => {
 				renderIntermediateDiagram({
 					...describedArchitectureFlowchart,
 					layout: { ...describedArchitectureFlowchart.layout, direction },
-				}),
+				}).pipe(Result.getOrThrow),
 				(slug) => ({ name: slug, svg: SVG }),
 			).scene;
 			const exported = convertSceneToExcalidraw(described);

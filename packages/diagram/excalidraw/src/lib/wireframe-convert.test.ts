@@ -1,10 +1,14 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { wireframeFixture, wireframeStressFixtures } from "@sketchi/diagram-core";
 import { renderDiagram } from "@sketchi/diagram-renderer";
 
 import { convertSceneToExcalidraw, createExcalidrawFile, validateExcalidrawScene } from "./convert";
 
-const exported = convertSceneToExcalidraw(renderDiagram(wireframeStressFixtures["settings"]!));
+const exported = convertSceneToExcalidraw(
+	renderDiagram(wireframeStressFixtures["settings"]!).pipe(Result.getOrThrow),
+);
 const element = (id: string) => {
 	const found = exported.elements.find((candidate) => candidate.id === id);
 	if (!found) throw new Error(`No element ${id}`);
@@ -61,7 +65,7 @@ describe("wireframe Excalidraw export", () => {
 
 	it("exports every fixture valid, and the same after a reload", () => {
 		for (const diagram of [wireframeFixture, ...Object.values(wireframeStressFixtures)]) {
-			const scene = convertSceneToExcalidraw(renderDiagram(diagram));
+			const scene = convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow));
 			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
 			const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene))) as typeof scene;
 			expect(validateExcalidrawScene(reloaded), diagram.id).toEqual({ ok: true, issues: [] });

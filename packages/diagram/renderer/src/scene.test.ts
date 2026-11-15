@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -16,9 +18,9 @@ import { renderSequenceDiagram } from "./sequence";
 describe("geometry bounds regressions", () => {
 	it("keeps renderer-produced flowchart, mindmap, and sequence labels valid", () => {
 		const scenes = [
-			renderIntermediateDiagram(flowchartFixture),
-			renderMindmapDiagram(mindmapFixture),
-			renderIntermediateDiagram(pharmaBatchDispositionFlowchart),
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+			renderMindmapDiagram(mindmapFixture).pipe(Result.getOrThrow),
+			renderIntermediateDiagram(pharmaBatchDispositionFlowchart).pipe(Result.getOrThrow),
 			renderSequenceDiagram({
 				type: "sequence",
 				id: "sequence-label-fit",
@@ -29,7 +31,7 @@ describe("geometry bounds regressions", () => {
 				],
 				messages: [{ id: "ab", source: "a", target: "b", label: "Continue" }],
 				style: { accentColor: "#111827", backgroundColor: "#ffffff" },
-			}),
+			}).pipe(Result.getOrThrow),
 		];
 		for (const scene of scenes) expect(getCanvasValidationIssues(scene)).toEqual([]);
 	});
@@ -43,7 +45,7 @@ describe("geometry bounds regressions", () => {
 				{ id: "yz", source: "Y", target: "Z" },
 			],
 			layout: { direction: "TB", edgeRouting: "orthogonal" },
-		});
+		}).pipe(Result.getOrThrow);
 		const ys = ["A", "X", "Y", "Z"].map((id) => {
 			const node = scene.elements.find(
 				(element) => element.type === "node" && element.nodeId === id,
@@ -65,7 +67,7 @@ describe("geometry bounds regressions", () => {
 				{ id: "B", label: "Ship" },
 			],
 			edges: [{ id: "ab", source: "A", target: "B" }],
-		});
+		}).pipe(Result.getOrThrow);
 		const node = (id: string) =>
 			scene.elements.find((element) => element.type === "node" && element.nodeId === id);
 		expect(node("A")).toMatchObject({
@@ -83,7 +85,7 @@ describe("geometry bounds regressions", () => {
 			...flowchartFixture,
 			nodes: [{ id: "A", label: "A" }],
 			edges: [],
-		});
+		}).pipe(Result.getOrThrow);
 		expect(scene).toMatchObject({ width: 280, height: 168 });
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 	});
@@ -227,7 +229,7 @@ function testRouteSelfOverlapCount(points: readonly TestScenePoint[]) {
 
 describe("renderIntermediateDiagram", () => {
 	it("creates node, label, and edge scene elements", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 
 		expect(scene.elements.filter((element) => element.type === "node")).toHaveLength(
 			flowchartFixture.nodes.length,
@@ -241,8 +243,8 @@ describe("renderIntermediateDiagram", () => {
 	});
 
 	it("renders deterministically for the same input", () => {
-		expect(renderIntermediateDiagram(flowchartFixture)).toEqual(
-			renderIntermediateDiagram(flowchartFixture),
+		expect(renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow)).toEqual(
+			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
 		);
 	});
 
@@ -250,7 +252,7 @@ describe("renderIntermediateDiagram", () => {
 		const scene = renderIntermediateDiagram({
 			...flowchartFixture,
 			layout: { ...flowchartFixture.layout, direction: "LR" },
-		});
+		}).pipe(Result.getOrThrow);
 		const source = scene.elements.find(
 			(element) => element.type === "node" && element.nodeId === "prompt",
 		);
@@ -275,7 +277,7 @@ describe("renderIntermediateDiagram", () => {
 	});
 
 	it("maps flowchart kinds to real scene shapes", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 
 		expect(
 			scene.elements.find((element) => element.type === "node" && element.nodeId === "prompt"),
@@ -286,7 +288,9 @@ describe("renderIntermediateDiagram", () => {
 	});
 
 	it("wraps long labels into larger node boxes before real export", () => {
-		const scene = renderIntermediateDiagram(pharmaBatchDispositionFlowchart);
+		const scene = renderIntermediateDiagram(pharmaBatchDispositionFlowchart).pipe(
+			Result.getOrThrow,
+		);
 		const qaReviewNode = scene.elements.find(
 			(element) => element.type === "node" && element.nodeId === "qa-review",
 		);
@@ -302,7 +306,7 @@ describe("renderIntermediateDiagram", () => {
 	});
 
 	it("spreads decision branches into separate rank positions", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 		const clear = scene.elements.find(
 			(element) => element.type === "node" && element.nodeId === "clear",
 		);
@@ -330,7 +334,7 @@ describe("renderIntermediateDiagram", () => {
 	});
 
 	it("routes offset decision branches with orthogonal points", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 		const clear = scene.elements.find(
 			(element) => element.type === "node" && element.nodeId === "clear",
 		);
@@ -368,7 +372,7 @@ describe("renderIntermediateDiagram", () => {
 	});
 
 	it("keeps offset ports on non-rectangular shape perimeters", () => {
-		const scene = renderIntermediateDiagram(flowchartFixture);
+		const scene = renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow);
 		const nodesById = new Map(
 			scene.elements
 				.filter((element): element is NodeSceneElement => element.type === "node")
@@ -516,8 +520,8 @@ describe("renderIntermediateDiagram", () => {
 					accentColor: "#000000",
 					backgroundColor: "#ffffff",
 				},
-			}),
-		);
+			}).pipe(Result.getOrThrow),
+		).pipe(Result.getOrThrow);
 		const legalReview = scene.elements.find(
 			(element) => element.type === "node" && element.nodeId === "legal-review",
 		);

@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { flowchartFixture } from "@sketchi/diagram-core";
 import { convertSceneToExcalidraw } from "@sketchi/diagram-excalidraw";
@@ -28,7 +30,9 @@ describe("read-only canvas on a phone", () => {
 					onApiChange={(api) => {
 						editorApi = api;
 					}}
-					scene={convertSceneToExcalidraw(renderIntermediateDiagram(flowchartFixture))}
+					scene={convertSceneToExcalidraw(
+						renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+					)}
 					title="Read-only canvas"
 					viewModeEnabled
 				/>

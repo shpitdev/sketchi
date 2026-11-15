@@ -1,3 +1,4 @@
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { <%= fixtureName %>, getCanvasValidationIssues } from "@sketchi/diagram-core";
@@ -6,10 +7,11 @@ import { renderDiagram } from "../diagram.js";
 
 describe("<%= className %> renderer contract", () => {
   it("renders the generated fixture into a valid deterministic scene", () => {
-    const scene = renderDiagram(<%= fixtureName %>);
+    // This authored fixture must render; failure is invalid fixture data.
+    const scene = renderDiagram(<%= fixtureName %>).pipe(Result.getOrThrow);
 
     expect(scene.diagramId).toBe("<%= typeValue %>-example");
     expect(getCanvasValidationIssues(scene)).toEqual([]);
-    expect(renderDiagram(<%= fixtureName %>)).toEqual(scene);
+    expect(renderDiagram(<%= fixtureName %>).pipe(Result.getOrThrow)).toEqual(scene);
   });
 });

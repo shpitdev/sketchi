@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import { parseSankeyDiagram, type SankeyDiagram } from "./types/sankey.js";
 
 const flow = (source: string, target: string, value: number, label?: string) => ({
@@ -51,7 +53,7 @@ export const sankeyStressFixtures = {
 			flow("sales", "compute", 2),
 			flow("finance", "managed-databases", 3),
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	traffic: parseSankeyDiagram({
 		id: "website-traffic",
 		title: "Website visits last month",
@@ -85,7 +87,7 @@ export const sankeyStressFixtures = {
 			flow("blog", "signed-up", 300),
 			flow("blog", "bounced", 4_200),
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	hiring: parseSankeyDiagram({
 		id: "hiring-funnel",
 		title: "2026 engineering hiring funnel",
@@ -112,7 +114,7 @@ export const sankeyStressFixtures = {
 			flow("offer", "hired", 32),
 			flow("offer", "declined", 8),
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	stageDropOffs: parseSankeyDiagram({
 		id: "stage-drop-offs",
 		title: "Hiring funnel with a drop-off per stage",
@@ -140,7 +142,7 @@ export const sankeyStressFixtures = {
 			flow("offer", "hired", 26),
 			flow("offer", "declined-offer", 6),
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	energy: parseSankeyDiagram({
 		id: "energy-flow",
 		title: "US energy flow, quads",
@@ -189,7 +191,7 @@ export const sankeyStressFixtures = {
 			flow("transportation", "energy-services", 5.2),
 			flow("transportation", "rejected-energy", 19.8),
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	slivers: parseSankeyDiagram({
 		id: "sliver-flows",
 		title: "One dominant flow among slivers",
@@ -215,7 +217,7 @@ export const sankeyStressFixtures = {
 			flow("grants", "swag", 3),
 			flow("grants", "contractors", 2),
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	longLabels: parseSankeyDiagram({
 		id: "long-labels",
 		title: "Where the quarterly operating budget of the platform group goes",
@@ -238,7 +240,7 @@ export const sankeyStressFixtures = {
 			flow("developer-experience", "observability-logging-and-incident-tooling", 0.4),
 			flow("developer-experience", "contractors", 0.75),
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 	dense: parseSankeyDiagram({
 		id: "dense-budget",
 		title: "Eight teams across eight services",
@@ -263,7 +265,7 @@ export const sankeyStressFixtures = {
 				all.findIndex((other) => other.source === link.source && other.target === link.target) ===
 				index,
 		),
-	}),
+	}).pipe(Result.getOrThrow),
 	chain: parseSankeyDiagram({
 		id: "eight-stages",
 		title: "Eight stages",
@@ -291,5 +293,5 @@ export const sankeyStressFixtures = {
 			flow("demo", "lost", 120),
 			flow("negotiation", "lost", 25),
 		],
-	}),
+	}).pipe(Result.getOrThrow),
 } satisfies Record<string, SankeyDiagram>;

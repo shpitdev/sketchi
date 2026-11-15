@@ -1,8 +1,9 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result, Option, Effect } from "effect";
 import { describe, expect, it } from "vitest";
 import type { QuadrantDiagram } from "@sketchi/diagram-core";
 import { readQuadrantScene, renderDiagram } from "@sketchi/diagram-renderer";
 import { DiagramGenerationClient } from "@sketchi/diagram-generation";
-import { Effect } from "effect";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { FixtureGenerationClientLayer } from "./fixture-client.js";
@@ -17,6 +18,7 @@ import {
 const scenario = (id: string) => quadrantScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: QuadrantDiagram) =>
 	evaluateScenarioDiagram(scenario(id), diagram)
+		.pipe(Result.getOrThrow)
 		.checks.filter((check) => !check.passed)
 		.map((check) => check.id);
 const backlog = scenario("effort-impact-quadrant-v2").expectedDiagram;
@@ -53,7 +55,7 @@ describe("prompt-grounded quadrant scenarios", () => {
 	});
 
 	it("lays the challenge's crowded quick wins out with leaders and its midline point readable", () => {
-		const scene = renderDiagram(backlog);
+		const scene = renderDiagram(backlog).pipe(Result.getOrThrow);
 		expect(quadrantLayoutCheck(backlog, scene).passed).toBe(true);
 		expect(quadrantDrawnCheck(backlog, scene).passed).toBe(true);
 		const { dots, plot } = readQuadrantScene(scene);
@@ -263,7 +265,7 @@ describe("prompt-grounded quadrant scenarios", () => {
 	});
 
 	it("reads the drawing: a moved dot or a label over another fails the scene checks", () => {
-		const scene = renderDiagram(positioning);
+		const scene = renderDiagram(positioning).pipe(Result.getOrThrow);
 		const moved = {
 			...scene,
 			elements: scene.elements.map((element) =>
@@ -321,7 +323,7 @@ describe("prompt-grounded quadrant scenarios", () => {
 		const candidate = candidateFromMcpResult(
 			{ ok: true, result: { ok: true, status: "accepted", buildId: "build-1" }, builds: [receipt] },
 			"quadrant",
-		);
+		).pipe(Result.getOrThrow, Option.getOrUndefined);
 		expect(candidate?.ok).toBe(true);
 		if (!candidate?.ok) throw new Error("Expected the accepted receipt.");
 		expect(

@@ -1,3 +1,5 @@
+// Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
+import { Result } from "effect";
 import { parseFlowchartDiagram } from "./types/flowchart.js";
 import expenseApprovalByTeam from "./fixtures/groups/expense-approval-by-team.js";
 import expenseApprovalResubmit from "./fixtures/groups/expense-approval-resubmit.js";
@@ -15,7 +17,7 @@ function flowchart(fixture: object, direction: "LR" | "TB" = "TB") {
 		...fixture,
 		type: "flowchart",
 		layout: { direction, edgeRouting: "orthogonal" },
-	});
+	}).pipe(Result.getOrThrow);
 }
 
 /**

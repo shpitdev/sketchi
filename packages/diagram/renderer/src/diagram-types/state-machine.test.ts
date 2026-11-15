@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -27,12 +29,14 @@ describe("StateMachine renderer", () => {
 			...mediaPlayerStateMachine,
 			states: mediaPlayerStateMachine.states.map(({ initial: _initial, ...state }) => state),
 		};
-		expect(renderDiagram(omitted)).toEqual(renderDiagram(mediaPlayerStateMachine));
+		expect(renderDiagram(omitted).pipe(Result.getOrThrow)).toEqual(
+			renderDiagram(mediaPlayerStateMachine).pipe(Result.getOrThrow),
+		);
 	});
 
 	it("keeps the round-14 labeled retry choice clear after naming its final", () => {
 		const diagram = crossingStateMachines["named-final-retry"];
-		const scene = renderDiagram(diagram);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(arrowCrossings(arrows(scene))).toBe(0);
 		// Repair the crossed retry pair, not the unrelated Idle/Streaming pair.
 		const forward = arrows(scene).find((arrow) => arrow.edgeId === "transition-6-idle-streaming")!;
@@ -51,7 +55,7 @@ describe("StateMachine renderer", () => {
 	it.each(["order-lifecycle", "order-lifecycle-ended"] as const)(
 		"sets round-16 %s's return label beside its own line, clear of the cancel run",
 		(name) => {
-			const scene = renderDiagram(crossingStateMachines[name]);
+			const scene = renderDiagram(crossingStateMachines[name]).pipe(Result.getOrThrow);
 			const label = scene.elements.find(
 				(element) => element.type === "text" && element.text === "return to sender",
 			)!;
@@ -75,7 +79,9 @@ describe("StateMachine renderer", () => {
 		// Disconnect sits 10 px from the Connected frame, inside the berth an
 		// ambiguous label keeps, but no other arrow comes nearer than its own line:
 		// it stays above its exit rather than sliding out past its return run.
-		const scene = renderDiagram(crossingStateMachines["connection-retry-disconnect"]);
+		const scene = renderDiagram(crossingStateMachines["connection-retry-disconnect"]).pipe(
+			Result.getOrThrow,
+		);
 		const label = scene.elements.find(
 			(element) => element.type === "text" && element.text === "Disconnect",
 		)!;
@@ -91,7 +97,7 @@ describe("StateMachine renderer", () => {
 	});
 
 	it("keeps the captured media-player ended marker anonymous", () => {
-		const scene = renderDiagram(crossingStateMachines["media-player"]);
+		const scene = renderDiagram(crossingStateMachines["media-player"]).pipe(Result.getOrThrow);
 		expect(nodes(scene).find((node) => node.nodeId === "ended")).toMatchObject({
 			kind: "final",
 			rendererRole: "state-marker",
@@ -104,8 +110,8 @@ describe("StateMachine renderer", () => {
 		const diagram = parseStateMachineDiagram({
 			...mediaPlayerStateMachine,
 			states: mediaPlayerStateMachine.states.map(({ label: _label, ...state }) => state),
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		expect(groupRegionIssues(scene)).toEqual([]);
 		expect(texts(scene)).toEqual(expect.arrayContaining(["stopped", "playing", "paused"]));
@@ -116,16 +122,16 @@ describe("StateMachine renderer", () => {
 
 	it("renders each fixture into a valid deterministic scene", () => {
 		for (const diagram of [stateMachineFixture, mediaPlayerStateMachine]) {
-			const scene = renderDiagram(diagram);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			expect(scene.diagramId).toBe(diagram.id);
 			expect(getCanvasValidationIssues(scene)).toEqual([]);
 			expect(groupRegionIssues(scene)).toEqual([]);
-			expect(renderDiagram(diagram)).toEqual(scene);
+			expect(renderDiagram(diagram).pipe(Result.getOrThrow)).toEqual(scene);
 		}
 	});
 
 	it("draws an initial dot, compact labels and one bullseye per transition into a final", () => {
-		const scene = renderDiagram(stateMachineFixture);
+		const scene = renderDiagram(stateMachineFixture).pipe(Result.getOrThrow);
 		const initial = nodes(scene).find((node) => node.nodeId === ":initial")!;
 		expect(initial).toMatchObject({ kind: "initial", rendererRole: "state-marker" });
 		expect(arrows(scene).find((arrow) => arrow.sourceNodeId === ":initial")?.targetNodeId).toBe(
@@ -146,7 +152,7 @@ describe("StateMachine renderer", () => {
 	});
 
 	it("frames a composite with its own initial dot and routes its transitions to the frame", () => {
-		const scene = renderDiagram(mediaPlayerStateMachine);
+		const scene = renderDiagram(mediaPlayerStateMachine).pipe(Result.getOrThrow);
 		const frame = scene.elements.find((element) => element.type === "frame")!;
 		expect(frame).toMatchObject({ id: "group:active", name: "Active", nodeId: "active" });
 		const inside = nodes(scene)
@@ -171,8 +177,8 @@ describe("StateMachine renderer", () => {
 					{ id: "closed", ...(label ? { label } : {}), kind: "final" },
 				],
 				transitions: [{ id: "resolve", source: "open", target: "closed", event: "resolve" }],
-			});
-			const scene = renderDiagram(diagram);
+			}).pipe(Result.getOrThrow);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 			expect(nodes(scene).find((node) => node.nodeId === "closed")).toMatchObject({
 				kind: "state",
 				label: label ?? "closed",
@@ -200,8 +206,8 @@ describe("StateMachine renderer", () => {
 				{ id: "active:initial", source: "active", target: "stopped", event: "stop" },
 				{ id: "closed:end", source: "stopped", target: "closed", event: "close" },
 			],
-		});
-		const scene = renderDiagram(diagram);
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 		const ids = arrows(scene).map((arrow) => arrow.edgeId);
 		expect(new Set(ids).size).toBe(ids.length);
@@ -210,10 +216,14 @@ describe("StateMachine renderer", () => {
 	});
 
 	it("keeps an authored direction and otherwise picks one that reads", () => {
-		const across = renderDiagram({ ...stateMachineFixture, layout: { direction: "LR" } });
-		const down = renderDiagram({ ...stateMachineFixture, layout: { direction: "TB" } });
+		const across = renderDiagram({ ...stateMachineFixture, layout: { direction: "LR" } }).pipe(
+			Result.getOrThrow,
+		);
+		const down = renderDiagram({ ...stateMachineFixture, layout: { direction: "TB" } }).pipe(
+			Result.getOrThrow,
+		);
 		expect(across.width / across.height).toBeGreaterThan(down.width / down.height);
-		const chosen = renderDiagram(stateMachineFixture);
+		const chosen = renderDiagram(stateMachineFixture).pipe(Result.getOrThrow);
 		expect(
 			Math.max(chosen.width / chosen.height, chosen.height / chosen.width),
 		).toBeLessThanOrEqual(2.5);

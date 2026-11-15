@@ -1,3 +1,4 @@
+import { Result, Schema } from "effect";
 import { createTreeWithEmptyWorkspace } from "@nx/devkit/testing";
 import type { Tree } from "@nx/devkit";
 import { runInNewContext } from "node:vm";
@@ -38,7 +39,7 @@ export const GRAPH_DIAGRAM_TYPES = [
 		return [...entries.matchAll(/"([^"]+)"/gu)].map((match) => match[1] ?? "");
 	}
 
-	function runGeneratedModule(source: string): Record<string, { title: string }> {
+	function runGeneratedModule(source: string) {
 		const compiled = ts.transpileModule(source, {
 			fileName: "timeline.ts",
 			reportDiagnostics: true,
@@ -56,19 +57,12 @@ export const GRAPH_DIAGRAM_TYPES = [
 		runInNewContext(compiled.outputText, {
 			exports: generatedExports,
 			require: (specifier: string) => {
-				if (specifier === "effect") {
-					return {
-						Schema: {
-							Struct: () => ({ annotate: () => ({}) }),
-							Literal: (value: string) => value,
-							decodeUnknownSync: () => (input: unknown) => input,
-						},
-					};
-				}
+				if (specifier === "effect") return { Schema, Result };
 				expect(specifier).toBe("../intermediate.js");
 				return {
-					IntermediateDiagram: { fields: {} },
-					validateIntermediateDiagram: (diagram: unknown) => diagram,
+					// This VM fixture isolates title escaping, not domain-reference validation.
+					IntermediateDiagram: { fields: { title: Schema.String } },
+					validateIntermediateDiagram: (diagram: unknown) => Result.succeed(diagram),
 				};
 			},
 		});

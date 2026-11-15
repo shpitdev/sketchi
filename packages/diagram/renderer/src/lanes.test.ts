@@ -1,3 +1,5 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	flowchartFixture,
@@ -31,7 +33,7 @@ function rendered(name: Name, direction: Direction = laneFixtures[name].layout.d
 			renderIntermediateDiagram({
 				...laneFixtures[name],
 				layout: { direction, edgeRouting: "orthogonal" },
-			}),
+			}).pipe(Result.getOrThrow),
 		);
 	return scenes.get(key)!;
 }
@@ -81,8 +83,8 @@ describe("swimlane layout", () => {
 				...laneFixtures.hiring,
 				layout: { direction, edgeRouting: "orthogonal" },
 				lanes: [...laneFixtures.hiring.lanes!, { id: "customer", label: "Customer" }],
-			});
-			const scene = renderIntermediateDiagram(diagram);
+			}).pipe(Result.getOrThrow);
+			const scene = renderIntermediateDiagram(diagram).pipe(Result.getOrThrow);
 			expect(getCanvasValidationIssues(scene)).toEqual([]);
 			expect(laneRegionIssues(scene, diagram)).toEqual([]);
 			expect(node(scene, "lane:customer")).toMatchObject({ label: "Customer", locked: true });
@@ -217,7 +219,7 @@ describe("swimlane layout", () => {
 				const scene = renderIntermediateDiagram({
 					...fixture,
 					layout: { direction, edgeRouting: "orthogonal" },
-				});
+				}).pipe(Result.getOrThrow);
 				expect(laneRegionIssues(scene, fixture)).toEqual([]);
 				expect(getCanvasValidationIssues(scene)).toEqual([]);
 			}
@@ -238,7 +240,7 @@ describe("swimlane layout", () => {
 			],
 			edges: [{ id: "e1", source: "lane:a", target: "done" }],
 			layout: { direction: "LR", edgeRouting: "orthogonal" },
-		});
+		}).pipe(Result.getOrThrow);
 		const ids = scene.elements.map((element) => element.id);
 		const nodeIds = nodesOf(scene).map((shape) => shape.nodeId);
 		expect(new Set(ids).size).toBe(ids.length);
@@ -258,31 +260,39 @@ describe("swimlane layout", () => {
 
 	it("renders a flowchart without lanes exactly as before", () => {
 		const { lanes: _lanes, ...unlaned } = flowchartFixture;
-		expect(renderIntermediateDiagram({ ...unlaned, lanes: [] })).toEqual(
-			renderIntermediateDiagram(unlaned),
+		expect(renderIntermediateDiagram({ ...unlaned, lanes: [] }).pipe(Result.getOrThrow)).toEqual(
+			renderIntermediateDiagram(unlaned).pipe(Result.getOrThrow),
 		);
 		expect(
-			nodesOf(renderIntermediateDiagram(unlaned)).filter((shape) => shape.rendererRole),
+			nodesOf(renderIntermediateDiagram(unlaned).pipe(Result.getOrThrow)).filter(
+				(shape) => shape.rendererRole,
+			),
 		).toEqual([]);
 	});
 
 	it("rejects lanes with groups, an undeclared lane and a node without one", () => {
 		const fixture = laneFixtures.hiring;
-		expect(() =>
+		expect(
 			parseIntermediateDiagram({ ...fixture, groups: [{ id: "g", label: "G" }] }),
-		).toThrow("A diagram with lanes cannot also declare groups.");
-		expect(() =>
+		).toMatchObject({
+			failure: {
+				message: expect.stringContaining("A diagram with lanes cannot also declare groups."),
+			},
+		});
+		expect(
 			parseIntermediateDiagram({
 				...fixture,
 				nodes: fixture.nodes.map((n) => (n.id === "hire" ? { ...n, lane: "board" } : n)),
 			}),
-		).toThrow('Node "hire" references missing lane "board".');
-		expect(() =>
+		).toMatchObject({
+			failure: { message: expect.stringContaining('Node "hire" references missing lane "board".') },
+		});
+		expect(
 			parseIntermediateDiagram({
 				...fixture,
 				nodes: fixture.nodes.map(({ lane: _lane, ...n }) => n),
 			}),
-		).toThrow('Node "apply" has no lane.');
+		).toMatchObject({ failure: { message: expect.stringContaining('Node "apply" has no lane.') } });
 	});
 });
 
@@ -377,13 +387,13 @@ function expectIntactLanes(scene: RenderedDiagramScene, fixture: typeof INCIDENT
 
 describe("long rows of lanes", () => {
 	it("closes up round 19's incident response to within 2.4:1", () => {
-		const scene = renderIntermediateDiagram(INCIDENT);
+		const scene = renderIntermediateDiagram(INCIDENT).pipe(Result.getOrThrow);
 		expect(exportAspect(scene)).toBeLessThanOrEqual(2.4);
 		expectIntactLanes(scene, INCIDENT);
 	});
 
 	it("hands a step off straight across lanes that stand empty in its column", () => {
-		const scene = renderIntermediateDiagram(ORDER);
+		const scene = renderIntermediateDiagram(ORDER).pipe(Result.getOrThrow);
 		// Pay invoice (Customer) to Record payment (Finance), past Sales and Warehouse.
 		expect(arrow(scene, "edge-9").points).toHaveLength(2);
 		const middle = (id: string) => node(scene, id).x + node(scene, id).width / 2;
@@ -398,7 +408,7 @@ describe("long rows of lanes", () => {
 			nodes: ORDER.nodes.filter((step) => step.id !== "pay" && step.id !== "record"),
 			edges: ORDER.edges.filter((edge) => edge.id !== "edge-8" && edge.id !== "edge-9"),
 		};
-		const scene = renderIntermediateDiagram(short);
+		const scene = renderIntermediateDiagram(short).pipe(Result.getOrThrow);
 		expect(exportAspect(scene)).toBeLessThan(2.3);
 		// Pack and ship keep two stubs and a port's spacing between them, not a compacted 56.
 		expect(

@@ -1,3 +1,9 @@
+import { Option, Effect, Schema } from "effect";
+import {
+	type ScenarioEvaluation,
+	evaluateScenarioDiagram,
+	type ScenarioCheck,
+} from "./lib/evaluate.js";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -8,14 +14,8 @@ import {
 	enforceCandidateRequestRequirements,
 	extractJsonObject,
 } from "@sketchi/diagram-generation";
-import { Effect, Schema } from "effect";
 
 import { parseCliOptions, resolveGeneratorCommand, usage } from "./lib/cli-options.js";
-import {
-	evaluateScenarioDiagram,
-	evaluateScenarioFixture,
-	type ScenarioCheck,
-} from "./lib/evaluate.js";
 import { candidateFromMcpResult } from "./lib/mcp-results.js";
 import { buildScenarioPrompt, toDiagramGenerationPrompt } from "./lib/prompt.js";
 import { editabilityMetrics } from "./lib/scene-editability.js";
@@ -169,7 +169,7 @@ function readText(filePath: string) {
 interface ScenarioRunEvaluation {
 	readonly candidateOutput: string;
 	readonly checks?: readonly ScenarioCheck[];
-	readonly evaluation?: ReturnType<typeof evaluateScenarioFixture>;
+	readonly evaluation?: ScenarioEvaluation;
 	readonly error?: string;
 }
 
@@ -179,54 +179,47 @@ const evaluateCandidate = Effect.fn("diagramScenarios.evaluateCandidate")(functi
 	scenario: DiagramScenario,
 	candidateOutput: string,
 ): Effect.Effect<ScenarioRunEvaluation> {
-	return Effect.try({
-		try: () => {
-			const diagram: unknown = extractJsonObject(candidateOutput);
-			const mcp = candidateFromMcpResult(diagram, scenario.diagramType);
-			if (mcp) {
-				if (!mcp.ok) return { candidateOutput, checks: [mcp.check] };
-				const evaluation = evaluateScenarioDiagram(scenario, mcp.diagram);
-				return {
-					candidateOutput,
-					evaluation: { ...evaluation, checks: [...evaluation.checks, mcp.check] },
-				};
-			}
-			if (isResponseEnvelope(diagram)) {
-				const request = {
-					model: "command",
-					prompt: toDiagramGenerationPrompt(scenario),
-				};
-				const generated = candidateFromText({
-					model: request.model,
-					provider: "fixture",
-					text: candidateOutput,
-				});
-				const candidate = enforceCandidateRequestRequirements(generated, request);
-				const modelDiagram = generated.diagram;
-				if (!modelDiagram || modelDiagram.type !== scenario.diagramType) {
-					throw new Error(
-						[candidate.error ?? "No generated diagram.", ...candidate.diagnostics].join(" "),
-					);
-				}
-				return {
-					candidateOutput,
-					evaluation: evaluateScenarioDiagram(
-						scenario,
-						candidate.diagram ?? modelDiagram,
-						modelDiagram,
-					),
-				};
-			}
+	return Effect.gen(function* () {
+		const diagram: unknown = yield* Effect.try({
+			try: () => extractJsonObject(candidateOutput),
+			catch: (cause) =>
+				scenarioToolError(
+					cause instanceof Error ? cause.message : "Unable to evaluate candidate.",
+					cause,
+				),
+		});
+		const mcp = yield* Effect.fromResult(candidateFromMcpResult(diagram, scenario.diagramType));
+		if (Option.isSome(mcp)) {
+			if (!mcp.value.ok) return { candidateOutput, checks: [mcp.value.check] };
+			const evaluation = yield* Effect.fromResult(
+				evaluateScenarioDiagram(scenario, mcp.value.diagram),
+			);
 			return {
 				candidateOutput,
-				evaluation: evaluateScenarioDiagram(scenario, diagram),
+				evaluation: { ...evaluation, checks: [...evaluation.checks, mcp.value.check] },
 			};
-		},
-		catch: (cause) =>
-			scenarioToolError(
-				cause instanceof Error ? cause.message : "Unable to evaluate candidate.",
-				cause,
-			),
+		}
+		if (isResponseEnvelope(diagram)) {
+			const request = { model: "command", prompt: toDiagramGenerationPrompt(scenario) };
+			const generated = candidateFromText({
+				model: request.model,
+				provider: "fixture",
+				text: candidateOutput,
+			});
+			const candidate = enforceCandidateRequestRequirements(generated, request);
+			const modelDiagram = generated.diagram;
+			if (!modelDiagram || modelDiagram.type !== scenario.diagramType)
+				return {
+					candidateOutput,
+					error: [candidate.error ?? "No generated diagram.", ...candidate.diagnostics].join(" "),
+				};
+			const evaluation = yield* Effect.fromResult(
+				evaluateScenarioDiagram(scenario, candidate.diagram ?? modelDiagram, modelDiagram),
+			);
+			return { candidateOutput, evaluation };
+		}
+		const evaluation = yield* Effect.fromResult(evaluateScenarioDiagram(scenario, diagram));
+		return { candidateOutput, evaluation };
 	}).pipe(Effect.catch((error) => Effect.succeed({ candidateOutput, error: error.message })));
 });
 
