@@ -1,4 +1,3 @@
-import { Result } from "effect";
 import { type SankeyDiagram } from "./document.js";
 import {
 	CANVAS_SPEC_VERSION,
@@ -247,6 +246,6 @@ export function sankeySceneFromLayout(
 	};
 }
 
-export function renderSankeyDiagram(diagram: SankeyDiagram): Result.Result<RenderedDiagramScene> {
-	return Result.succeed(sankeySceneFromLayout(diagram, layoutSankeyDiagram(diagram)));
+export function renderSankeyDiagram(diagram: SankeyDiagram): RenderedDiagramScene {
+	return sankeySceneFromLayout(diagram, layoutSankeyDiagram(diagram));
 }

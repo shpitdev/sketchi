@@ -50,17 +50,15 @@ it.effect(
 					}),
 					render: (document) => {
 						calls.push("render");
-						const rendered = renderSankeyDiagram(document);
-						return Result.map(rendered, (scene) =>
-							mode === "scene"
-								? {
-										...scene,
-										elements: scene.elements.map((element) =>
-											"width" in element ? { ...element, width: -1 } : element,
-										),
-									}
-								: scene,
-						);
+						const scene = renderSankeyDiagram(document);
+						return mode === "scene"
+							? {
+									...scene,
+									elements: scene.elements.map((element) =>
+										"width" in element ? { ...element, width: -1 } : element,
+									),
+								}
+							: scene;
 					},
 					assessScene: () => {
 						calls.push("assess");

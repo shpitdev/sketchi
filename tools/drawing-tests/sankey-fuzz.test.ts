@@ -225,7 +225,7 @@ describe("Sankey fuzz", () => {
 			let papers = 0;
 			const byShape = new Map<string, number>();
 			for (const diagram of randomDiagrams(COUNT, seed)) {
-				const scene = renderSankeyDiagram(diagram).pipe(Result.getOrThrow);
+				const scene = renderSankeyDiagram(diagram);
 				const exported = convertSceneToExcalidraw(scene);
 				// Crossings weigh the product of the crossing flows' values, as a reader sees them.
 				const valueOf = new Map(
