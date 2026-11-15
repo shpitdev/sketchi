@@ -49,9 +49,7 @@ export function CommunityPage({ slug }: { readonly slug?: string }) {
 			hasMore={hasMore}
 			icons={icons}
 			loadingMore={pages.waiting && data !== undefined}
-			onLoadMore={() => {
-				if (!pages.waiting && hasMore) loadMore();
-			}}
+			onLoadMore={loadMore}
 			onQueryChange={setQuery}
 			onRetry={retry}
 			query={query}

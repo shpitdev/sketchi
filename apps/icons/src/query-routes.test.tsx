@@ -82,11 +82,11 @@ it("keeps previous search results, aborts obsolete searches, and never overwrite
 
 it("uses the next cursor once, deduplicates a repeated icon, and stops after the last page", async () => {
 	const next = Promise.withResolvers<Response>();
-	const fetch = vi.fn<typeof globalThis.fetch>((input) =>
-		requestUrl(input).searchParams.has("cursor")
-			? next.promise
-			: Promise.resolve(page(["One"], "next-page")),
-	);
+	const fetch = vi.fn<typeof globalThis.fetch>((input) => {
+		const cursor = requestUrl(input).searchParams.get("cursor");
+		if (cursor === "next-page") return next.promise;
+		return Promise.resolve(cursor === "three" ? page(["Three"]) : page(["One"], "next-page"));
+	});
 	render(owner(fetch, <CommunityPage />));
 	expect(await screen.findByText("community/one")).toBeTruthy();
 	act(() => {
@@ -98,14 +98,22 @@ it("uses the next cursor once, deduplicates a repeated icon, and stops after the
 	act(() => TestIntersectionObserver.scrollNearEnd());
 	expect(fetch).toHaveBeenCalledTimes(2);
 	await act(async () => {
-		next.resolve(page(["One", "Two"]));
+		next.resolve(page(["One", "Two"], "three"));
 		await next.promise;
 	});
 	expect(await screen.findByText("community/two")).toBeTruthy();
 	expect(screen.getAllByText("community/one")).toHaveLength(1);
-	expect(screen.getByText("2 icons")).toBeTruthy();
-	act(() => TestIntersectionObserver.scrollNearEnd());
+	// Resolving page two must not consume another cursor queued by the earlier
+	// same-turn notifications. Only a later scroll may request page three.
 	expect(fetch).toHaveBeenCalledTimes(2);
+	expect(screen.getByText("2+ icons")).toBeTruthy();
+	act(() => TestIntersectionObserver.scrollNearEnd());
+	expect(await screen.findByText("community/three")).toBeTruthy();
+	expect(fetch).toHaveBeenCalledTimes(3);
+	expect(requestUrl(fetch.mock.calls[2]?.[0]).searchParams.get("cursor")).toBe("three");
+	expect(screen.getByText("3 icons")).toBeTruthy();
+	act(() => TestIntersectionObserver.scrollNearEnd());
+	expect(fetch).toHaveBeenCalledTimes(3);
 });
 
 it("reads a 404 as a missing icon instead of an undefined result", async () => {

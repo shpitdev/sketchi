@@ -1,7 +1,7 @@
 import { CommunityHttpApi } from "@sketchi/community-icons/http-api";
-import { Effect, Option, Stream, String } from "effect";
+import { Array, Effect, Option, Stream, String } from "effect";
 import { HttpApiClient } from "effect/http-api";
-import { Atom, AtomHttpApi } from "effect/reactivity";
+import { AsyncResult, Atom, AtomHttpApi } from "effect/reactivity";
 
 import { bareSlug } from "./community-client.js";
 import {
@@ -27,7 +27,7 @@ const decodeDetail = HttpApiClient.decodeResponse(CommunityHttpApi, {
 	endpoint: "detail",
 });
 
-export const communityPages = CommunityApi.runtime
+const communityPageStream = CommunityApi.runtime
 	.pull((get) => {
 		const query = String.trim(get(communitySearch));
 		return Stream.paginate(
@@ -48,6 +48,19 @@ export const communityPages = CommunityApi.runtime
 		);
 	})
 	.pipe(refreshOnReconnect, Atom.setIdleTTL(0), Atom.withServerValueInitial);
+
+// Scroll notifications can share a React render. Read the registry's live pull
+// state at the write boundary so a second notification cannot queue another page.
+export const communityPages = Atom.writable(
+	(get) => get(communityPageStream),
+	(context, _value: void) => {
+		const current = context.get(communityPageStream);
+		if (current.waiting || !AsyncResult.isSuccess(current)) return;
+		const last = Option.getOrUndefined(Array.last(current.value.items));
+		if (last?.nextCursor !== undefined) context.set(communityPageStream, undefined);
+	},
+	(refresh) => refresh(communityPageStream),
+).pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial);
 
 export const linkedCommunityIcon = Atom.family((slug: string | undefined) =>
 	CommunityApi.runtime
