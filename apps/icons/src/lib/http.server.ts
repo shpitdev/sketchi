@@ -14,13 +14,26 @@ import {
 	type TelemetryPipeline,
 	type TelemetrySpanSink,
 } from "@sketchi/observability";
-import { Array, Context, Effect, Layer, Option, Record, Scheduler, String } from "effect";
+import {
+	Array,
+	Clock,
+	Context,
+	Effect,
+	Exit,
+	Layer,
+	Option,
+	Record,
+	Scheduler,
+	String,
+} from "effect";
 import { SecureRandom } from "effect/crypto";
 import {
+	Headers,
 	HttpMiddleware,
 	HttpRouter,
 	HttpServer,
 	HttpServerRequest,
+	HttpServerError,
 	HttpServerResponse,
 	HttpTraceContext,
 } from "effect/http";
@@ -119,12 +132,35 @@ export function makeIconsHttpHandler(options: { readonly sink?: TelemetrySpanSin
 				const incoming = yield* HttpServerRequest.HttpServerRequest;
 				return yield* effect.pipe(
 					Effect.tap((response) =>
-						Effect.annotateCurrentSpan({
-							"http.response.status_code": response.status,
-							"http.response.headers": response.headers,
-							...(response.body._tag === "Uint8Array"
-								? { [SpanContent.httpResponseBody]: new TextDecoder().decode(response.body.body) }
-								: {}),
+						Effect.gen(function* () {
+							yield* Effect.annotateCurrentSpan({
+								"http.response.status_code": response.status,
+								"http.response.headers": response.headers,
+								...(response.body._tag === "Uint8Array"
+									? { [SpanContent.httpResponseBody]: new TextDecoder().decode(response.body.body) }
+									: {}),
+							});
+							if (response.status >= 500 && response.status < 600) {
+								const span = yield* Effect.currentSpan.pipe(Effect.orDie);
+								const now = yield* Clock.currentTimeNanos;
+								// Match HTTP server outcome classification without failing the sent response.
+								// The error is exported too: reuse the safe headers and omit peer addresses.
+								span.end(
+									now,
+									Exit.fail(
+										new HttpServerError.HttpServerError({
+											reason: new HttpServerError.ResponseError({
+												request: incoming.modify({
+													headers: Headers.fromInput(request.headers),
+													remoteAddress: Option.none(),
+													peerAddress: Option.none(),
+												}),
+												response,
+											}),
+										}),
+									),
+								);
+							}
 						}),
 					),
 					withTelemetryExport(request.target),

@@ -327,3 +327,77 @@ it("flushes every default-exporter span to its own interleaved request through f
 		await Promise.all([...pendingA, ...pendingB, ...pendingFinal]);
 	}
 });
+
+it("marks served 5xx as failed on its own server root while 4xx and success keep their outcomes", async () => {
+	const runtime = makeIconsHttpHandler();
+	const allPending: Promise<unknown>[] = [];
+	try {
+		for (const [path, status, outcome] of [
+			["/api/icons/kubernetes", 500, "failure"],
+			["/api/icons/no-such-icon", 404, "success"],
+			["/api/icons?q=k8s", 200, "success"],
+		] as const) {
+			const rows: unknown[] = [];
+			const pending: Promise<unknown>[] = [];
+			const response = await runtime.fetch(
+				new Request(`https://status.example${path}`, {
+					headers: {
+						"cf-ray": `status-${status}`,
+						"cf-connecting-ip": "192.0.2.90",
+						"x-forwarded-for": "192.0.2.91",
+						authorization: "Bearer status-secret",
+					},
+				}),
+				{
+					ASSETS: { fetch: async () => new Response("unavailable", { status: 503 }) },
+					TELEMETRY_SPANS: {
+						send: async (batch) => {
+							rows.push(...batch);
+						},
+					},
+				},
+				{
+					waitUntil: (promise) => {
+						pending.push(promise);
+						allPending.push(promise);
+					},
+				},
+			);
+			expect(response.status).toBe(status);
+			if (status === 500)
+				expect(await response.text()).toBe(
+					'{"status":500,"statusText":"","unhandled":true,"message":"HTTPError"}',
+				);
+			await Promise.all(pending);
+			expect(pending.length).toBeGreaterThan(0);
+			for (const row of rows)
+				expect(row).toMatchObject({
+					run_id: response.headers.get("x-sketchi-run-id"),
+					ray_id: `status-${status}`,
+				});
+			const roots = rows.filter(
+				(row) =>
+					typeof row === "object" && row !== null && "name" in row && row.name === "icons.http",
+			);
+			expect(roots).toHaveLength(1);
+			expect(roots[0]).not.toHaveProperty("parent_span_id");
+			expect(roots[0]).toMatchObject({
+				kind: "server",
+				outcome,
+				attributes: expect.stringContaining(`"http.response.status_code":${status}`),
+			});
+			if (status === 500) {
+				expect(roots[0]).toMatchObject({
+					error_tag: "HttpServerError",
+					error_message: expect.stringContaining("500 GET /api/icons/kubernetes"),
+					cause: expect.stringContaining("ResponseError"),
+				});
+				expect(JSON.stringify(rows)).toContain("Icon source returned HTTP 503.");
+			} else expect(roots[0]).not.toHaveProperty("error_tag");
+			expect(JSON.stringify(rows)).not.toMatch(/192\.0\.2\.|status-secret/);
+		}
+	} finally {
+		await runtime.dispose();
+		await Promise.all(allPending);
+	}
+});
