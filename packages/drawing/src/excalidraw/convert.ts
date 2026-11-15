@@ -52,6 +52,7 @@ import {
 	type Point,
 } from "./excalidraw-binding.js";
 import { iconRecipeElements } from "./icon-recipe.js";
+import { elbowFixedPointAt } from "./route-folds.js";
 
 /** Excalidraw BinaryFileData: the image bytes an `image` element points at. */
 export interface ExcalidrawBinaryFile {
@@ -1314,17 +1315,9 @@ interface ArrowSegment extends AxisAlignedSegment {
 	route: readonly { readonly x: number; readonly y: number }[];
 }
 
-function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
-	const originX = numericValue(element.x) ?? 0;
-	const originY = numericValue(element.y) ?? 0;
+function arrowSegments(element: ExcalidrawElement, points: readonly RoutePoint[]): ArrowSegment[] {
 	const startBindingId = bindingElementId(element, "startBinding");
 	const endBindingId = bindingElementId(element, "endBinding");
-	const points = Array.isArray(element.points)
-		? element.points
-				.map(finitePointTuple)
-				.filter((point): point is [number, number] => point !== null)
-				.map(([x, y]) => ({ x: originX + x, y: originY + y }))
-		: [];
 	return segmentsFromPoints(points).map((segment) => ({
 		...segment,
 		arrowId: element.id,
@@ -1340,6 +1333,52 @@ function arrowSegments(element: ExcalidrawElement): ArrowSegment[] {
 				: points[segment.segmentIndex + 1]!.y,
 		route: points,
 	}));
+}
+
+/**
+ * Compare shared endpoint runs in native fixed-point coordinates: an untouched
+ * midpoint and its native-normalized port describe the same branch departure.
+ * This is only the overlap readout; stored points and obstacle checks stay exact.
+ */
+function overlapRoute(
+	element: ExcalidrawElement,
+	elementsById: ReadonlyMap<string, ExcalidrawElement>,
+): RoutePoint[] {
+	const points = absoluteArrowPoints(element);
+	if (element.elbowed !== true) return points;
+	for (const [key, index, step] of [
+		["startBinding", 0, 1],
+		["endBinding", points.length - 1, -1],
+	] as const) {
+		const point = points[index];
+		const neighbour = points[index + step];
+		const id = bindingElementId(element, key);
+		const shape = id ? elementsById.get(id) : undefined;
+		const target = bindableShape(shape);
+		const fixedPoint = bindingFixedPoint(element, key);
+		if (
+			!point ||
+			!neighbour ||
+			!shape ||
+			!target ||
+			!fixedPoint ||
+			!fixedPointResolvesToEndpoint(fixedPoint, point, shape)
+		)
+			continue;
+		const [x, y] = excalidrawFixedGlobalPoint(
+			target,
+			elbowFixedPointAt(target, [point.x, point.y]),
+		);
+		for (let at = index + step; at > 0 && at < points.length - 1; at += step) {
+			const current = points[at]!;
+			if (near(point.x, neighbour.x) && near(current.x, point.x)) points[at] = { ...current, x };
+			else if (near(point.y, neighbour.y) && near(current.y, point.y))
+				points[at] = { ...current, y };
+			else break;
+		}
+		points[index] = { x, y };
+	}
+	return points;
 }
 
 /**
@@ -1445,8 +1484,11 @@ function sharesArrivalStem(left: ArrowSegment, right: ArrowSegment): boolean {
 
 function overlappingArrowSegments(
 	elements: readonly ExcalidrawElement[],
+	elementsById: ReadonlyMap<string, ExcalidrawElement>,
 ): ExcalidrawSceneValidationIssue[] {
-	const segments = elements.filter(isConnector).flatMap(arrowSegments);
+	const segments = elements
+		.filter(isConnector)
+		.flatMap((element) => arrowSegments(element, overlapRoute(element, elementsById)));
 	const issues: ExcalidrawSceneValidationIssue[] = [];
 	const seen = new Set<string>();
 
@@ -1525,7 +1567,9 @@ function isBindableShape(element: ExcalidrawElement): boolean {
 function arrowSegmentsThroughShapes(
 	elements: readonly ExcalidrawElement[],
 ): ExcalidrawSceneValidationIssue[] {
-	const segments = elements.filter(isConnector).flatMap(arrowSegments);
+	const segments = elements
+		.filter(isConnector)
+		.flatMap((element) => arrowSegments(element, absoluteArrowPoints(element)));
 	const shapes = elements.filter(isBindableShape);
 	const boundsById = new Map(elements.map((element) => [element.id, elementBounds(element)]));
 	const order = new Map(elements.map((element, index) => [element.id, index]));
@@ -1755,29 +1799,17 @@ function pointOnBox(point: { x: number; y: number }, bounds: ElementBounds): boo
 	return onVerticalSide || onHorizontalSide;
 }
 
-/**
- * Whether a fixed point lands on the end drawn for it. Excalidraw reads a
- * side's middle as 0.5001, a ten-thousandth of the side across, so 0.5001 reads
- * as the middle here.
- */
+/** Compare the endpoint and its metadata through native fixed-point normalization. */
 function fixedPointResolvesToEndpoint(
 	fixedPoint: [number, number],
 	point: { x: number; y: number },
 	shape: ExcalidrawElement,
 ): boolean {
-	const bounds = elementBounds(shape);
-
-	if (!bounds) {
-		return false;
-	}
-
-	const fixedX = Math.abs(fixedPoint[0] - 0.5001) < 0.0001 ? 0.5 : fixedPoint[0];
-	const fixedY = Math.abs(fixedPoint[1] - 0.5001) < 0.0001 ? 0.5 : fixedPoint[1];
-
-	return (
-		near(bounds.x + fixedX * bounds.width, point.x) &&
-		near(bounds.y + fixedY * bounds.height, point.y)
-	);
+	const target = bindableShape(shape);
+	if (!target) return false;
+	const actual = excalidrawFixedGlobalPoint(target, elbowFixedPointAt(target, [point.x, point.y]));
+	const expected = excalidrawFixedGlobalPoint(target, fixedPoint);
+	return near(actual[0], expected[0]) && near(actual[1], expected[1]);
 }
 
 function absoluteArrowPoints(element: ExcalidrawElement): { x: number; y: number }[] {
@@ -1943,7 +1975,7 @@ export function validateExcalidrawScene(scene: ExcalidrawScene): ExcalidrawScene
 	}
 
 	issues.push(...arrowSegmentsThroughShapes(scene.elements));
-	issues.push(...overlappingArrowSegments(scene.elements));
+	issues.push(...overlappingArrowSegments(scene.elements, elementsById));
 
 	return {
 		ok: issues.length === 0,
