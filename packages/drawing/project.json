@@ -64,6 +64,7 @@
 				"{workspaceRoot}/tools/drawing-tests/text-fit-helpers.ts",
 				"{workspaceRoot}/packages/diagrams/src/graph/**/*",
 				"{workspaceRoot}/packages/diagrams/src/families/flowchart/**/*",
+				"{workspaceRoot}/packages/diagrams/src/families/state-machine/document.ts",
 				"{workspaceRoot}/packages/diagrams/src/*.ts",
 				"{workspaceRoot}/packages/diagrams/project.json",
 				"{workspaceRoot}/packages/diagrams/tsconfig*.json",

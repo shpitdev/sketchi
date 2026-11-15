@@ -32,6 +32,7 @@ test("routing follows graph, drawing, font, shared contract and execution inputs
 		"packages/diagrams/src/graph/routing.ts",
 		"packages/diagrams/src/graph/intermediate.ts",
 		"packages/diagrams/src/families/flowchart/diagram.ts",
+		"packages/diagrams/src/families/state-machine/document.ts",
 		"packages/diagrams/src/families/flowchart/fixtures/routing/retry.ts",
 		"packages/diagrams/src/family.ts",
 		"packages/diagrams/src/build/result.ts",

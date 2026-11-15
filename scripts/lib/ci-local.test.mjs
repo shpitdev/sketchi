@@ -383,6 +383,19 @@ test("unit gates use the committed merge base, not a direct diff of divergent re
 	assert.equal(fixture.run(["--no-signoff", "--base", "verified"]).routing.length, 1);
 });
 
+test("an edited state parser selects routing through eager crossing fixtures", (t) => {
+	const fixture = gateFixture(t);
+	const parser = "packages/diagrams/src/families/state-machine/document.ts";
+	fixture.write(parser, "// original state parser\n");
+	fixture.git("add", parser);
+	fixture.git("commit", "--quiet", "-m", "state parser fixture");
+	const base = fixture.head();
+	fixture.write(parser, "// changed state parser\n");
+	const result = fixture.run(["--no-signoff", "--base", base]);
+	assert.equal(result.routing.length, 1);
+	assert.match(result.output, /✓ sampled routing/);
+});
+
 test("a plain-family unit gate retains default tests without running sampled routing", (t) => {
 	const fixture = gateFixture(t);
 	fixture.write("packages/diagrams/src/families/timeline/render.ts");
