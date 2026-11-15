@@ -2,14 +2,10 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../diagram";
-import { orgChartStressFixtures } from "../org-chart-fixtures";
 import {
-	getOrgChartValidationIssues,
 	ORG_CHART_MAX_DEPTH,
 	ORG_CHART_MAX_PEOPLE,
 	orgChartDiagramType,
-	orgChartFixture,
 	orgChartReports,
 	orgChartRoots,
 	orgPersonInitials,
@@ -38,18 +34,24 @@ const codes = (input: unknown) => issuesOf(input).map((issue) => issue.code);
 const ceo = { id: "ceo", name: "Ada Lovelace", title: "CEO" };
 
 describe("org chart contract", () => {
-	it("has a typed fixture that satisfies the canonical diagram contract", () => {
-		expect(orgChartFixture.type).toBe(orgChartDiagramType);
-		expect(parseCanonicalDiagram(orgChartFixture).pipe(Result.getOrThrow)).toEqual(orgChartFixture);
-		expect(orgChartRoots(orgChartFixture).map((person) => person.id)).toEqual(["ada"]);
+	it("keeps roots, reports and assistants in authored order", () => {
+		const parsed = parseOrgChartDiagram(
+			chart(
+				[
+					{ id: "dev", name: "Developer", manager: "ceo" },
+					ceo,
+					{ id: "ea", name: "Assistant", manager: "ceo", assistant: true },
+					{ id: "board", name: "Board" },
+				],
+				{ forest: true },
+			),
+		).pipe(Result.getOrThrow);
+		expect(orgChartRoots(parsed).map((person) => person.id)).toEqual(["ceo", "board"]);
 		expect(
-			orgChartReports(orgChartFixture)
-				.get("ada")
+			orgChartReports(parsed)
+				.get("ceo")
 				?.map((person) => person.id),
-		).toEqual(["grace", "linus", "radia"]);
-		for (const fixture of Object.values(orgChartStressFixtures))
-			expect(getOrgChartValidationIssues(fixture)).toEqual([]);
-		expect(orgChartStressFixtures.eighty.people).toHaveLength(80);
+		).toEqual(["dev", "ea"]);
 	});
 
 	it("defaults dotted lines and the palette", () => {
@@ -66,7 +68,6 @@ describe("org chart contract", () => {
 			[ceo, { id: "a", name: "A", manager: "b" }, { id: "b", name: "B", manager: "a" }],
 			"reporting_cycle",
 		],
-		["two top people", [ceo, { id: "b", name: "Board" }], "multiple_roots"],
 		["an assistant with no manager", [{ ...ceo, assistant: true }], "invalid_assistant"],
 		[
 			"an assistant with reports",

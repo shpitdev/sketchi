@@ -2,11 +2,9 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../diagram.js";
 import {
 	formatGanttDay,
 	GANTT_MAX_TASKS,
-	ganttFixture,
 	ganttRows,
 	ganttScheduleConflicts,
 	ganttTaskSchedule,
@@ -47,11 +45,6 @@ const withTask = (index: number, patch: object) => ({
 });
 
 describe("canonical Gantt chart", () => {
-	it("round-trips the fixture through the canonical union", () => {
-		expect(parseCanonicalDiagram(ganttFixture).pipe(Result.getOrThrow)).toEqual(ganttFixture);
-		expect(parseGanttDiagram(plan).pipe(Result.getOrThrow).tasks).toHaveLength(3);
-	});
-
 	it("schedules end as the inclusive last day and duration in calendar days", () => {
 		const diagram = parseGanttDiagram(plan).pipe(Result.getOrThrow);
 		const [design, build, ship] = diagram.tasks.map((task) => ganttTaskSchedule(task)!);
@@ -101,7 +94,6 @@ describe("canonical Gantt chart", () => {
 		["a duplicate id", withTask(1, { id: "a", dependsOn: [] }), "duplicate_task_id"],
 		["an unknown predecessor", withTask(1, { dependsOn: ["x"] }), "missing_dependency"],
 		["a self dependency", withTask(1, { dependsOn: ["b"] }), "self_dependency"],
-		["a cycle", withTask(0, { dependsOn: ["c"] }), "gantt_dependency_cycle"],
 		["a task outside the phases", withTask(0, { phase: "Make" }), "invalid_gantt_phase"],
 		["an invalid today", { ...plan, today: "now" }, "invalid_gantt_date"],
 		["a billion-day duration", withTask(1, { duration: 1_000_000_000 }), "invalid_gantt_span"],
@@ -128,6 +120,8 @@ describe("canonical Gantt chart", () => {
 
 	it("names the cycle it rejects", () => {
 		const [issue] = issuesOf(withTask(0, { dependsOn: ["c"] }));
+		expect(issue?.code).toBe("gantt_dependency_cycle");
+		expect(issue?.hint).toBeTruthy();
 		expect(issue?.message).toBe("Dependencies form a cycle: a → b → c → a.");
 	});
 

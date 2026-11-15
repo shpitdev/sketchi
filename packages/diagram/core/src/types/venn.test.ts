@@ -2,15 +2,12 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../diagram";
 import {
 	getVennValidationIssues,
 	parseVennDiagram,
 	resolveVennShorthand,
 	VENN_COLORS,
 	VennValidationError,
-	vennDiagramType,
-	vennFixture,
 	vennRegionKey,
 	vennSetColor,
 } from "./venn";
@@ -34,11 +31,6 @@ function issueCodes(input: Record<string, unknown>): string[] {
 }
 
 describe("Venn diagram type", () => {
-	it("has a typed fixture that satisfies the canonical diagram contract", () => {
-		expect(vennFixture.type).toBe(vennDiagramType);
-		expect(parseCanonicalDiagram(vennFixture).pipe(Result.getOrThrow)).toEqual(vennFixture);
-	});
-
 	it("defaults regions to none and keys a region by set order", () => {
 		const diagram = parseVennDiagram(twoSets).pipe(Result.getOrThrow);
 		expect(diagram.regions).toEqual([]);

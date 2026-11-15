@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import {
 	CHART_MAX_CATEGORIES,
 	CHART_MAX_PIE_SLICES,
-	chartFixture,
 	parseChartDiagram,
 	type ChartValidationIssue,
 } from "./chart.js";
@@ -49,7 +48,6 @@ describe("canonical chart", () => {
 				Result.getOrThrow,
 			).stacked,
 		).toBe(true);
-		expect(parseChartDiagram(chartFixture).pipe(Result.getOrThrow)).toEqual(chartFixture);
 	});
 
 	it("lets a single series go unnamed", () => {

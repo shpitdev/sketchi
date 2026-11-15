@@ -15,7 +15,6 @@ import {
 	getSequenceValidationIssues,
 	parseSequenceDiagram,
 	sequenceActivations,
-	sequenceDiagramType,
 	sequenceFixture,
 	sequenceLifelineId,
 } from "./sequence";
@@ -25,23 +24,22 @@ function issueCodes(diagram: SequenceDiagram) {
 }
 
 describe("Sequence diagram type", () => {
-	it("keeps participant and chronological message order in the typed fixture", () => {
-		expect(sequenceFixture.type).toBe(sequenceDiagramType);
-		expect(parseCanonicalDiagram(sequenceFixture).pipe(Result.getOrThrow)).toEqual(sequenceFixture);
-		expect(sequenceFixture.participants.map((participant) => participant.id)).toEqual([
-			"customer",
-			"store",
+	it("preserves authored participant order and message chronology without sorting ids", () => {
+		const input = {
+			...sequenceFixture,
+			participants: [...sequenceFixture.participants].reverse(),
+			messages: sequenceFixture.messages.map((message, index) => ({
+				...message,
+				id: `m${4 - index}`,
+			})),
+		};
+		const diagram = parseSequenceDiagram(input).pipe(Result.getOrThrow);
+		expect(diagram.participants.map((participant) => participant.id)).toEqual([
 			"payments",
+			"store",
+			"customer",
 		]);
-		expect(sequenceFixture.messages.map((message) => message.id)).toEqual([
-			"checkout",
-			"charge",
-			"charged",
-			"receipt",
-		]);
-		expect(apiRequestSequence.messages.filter((message) => message.type === "return")).toHaveLength(
-			3,
-		);
+		expect(diagram.messages.map((message) => message.id)).toEqual(["m4", "m3", "m2", "m1"]);
 	});
 
 	it("defaults messages and the Sketchi style without a separate authoring shape", () => {

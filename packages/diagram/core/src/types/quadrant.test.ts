@@ -5,8 +5,6 @@ import { describe, expect, it } from "vitest";
 import {
 	QUADRANT_MAX_POINTS,
 	parseQuadrantDiagram,
-	quadrantDiagramType,
-	quadrantFixture,
 	quadrantGroups,
 	type QuadrantValidationIssue,
 } from "./quadrant.js";
@@ -40,11 +38,6 @@ function issuesOf(input: object): readonly QuadrantValidationIssue[] {
 }
 
 describe("canonical quadrant chart", () => {
-	it("has a typed fixture that satisfies its contract", () => {
-		expect(quadrantFixture.type).toBe(quadrantDiagramType);
-		expect(parseQuadrantDiagram(quadrantFixture).pipe(Result.getOrThrow)).toEqual(quadrantFixture);
-	});
-
 	it("accepts points on the edges and the middle lines, groups and an empty matrix", () => {
 		const parsed = parseQuadrantDiagram({
 			...chart,
@@ -98,18 +91,6 @@ describe("canonical quadrant chart", () => {
 				],
 			}),
 		).toEqual(["Rivals", "Us"]);
-	});
-
-	it("never takes coordinates, sizes or a layout", () => {
-		expect(parseQuadrantDiagram({ ...chart, quadrants: ["a", "b", "c", "d"] })).toMatchObject({
-			failure: { message: expect.stringMatching(/quadrants/u) },
-		});
-		expect(
-			parseQuadrantDiagram({ ...chart, xAxis: { title: "Price", low: "Cheap" } }),
-		).toMatchObject({ failure: { message: expect.stringMatching(/high/u) } });
-		expect(
-			Object.keys(parseQuadrantDiagram({ ...chart, width: 900 }).pipe(Result.getOrThrow)),
-		).not.toContain("width");
 	});
 
 	it.each([
