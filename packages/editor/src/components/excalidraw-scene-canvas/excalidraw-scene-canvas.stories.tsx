@@ -235,13 +235,20 @@ export const LabeledHorizontalSkips: Story = {
 						kind: "process",
 						shape: "rectangle" as const,
 					})),
-					edges: [
-						["A", "B"],
-						["B", "C"],
-						["C", "D"],
-						["A", "C"],
-						["B", "D"],
-					].map(([source, target], i) => ({ id: `path-${i}`, source, target, label: `Path ${i}` })),
+					edges: (
+						[
+							["A", "B"],
+							["B", "C"],
+							["C", "D"],
+							["A", "C"],
+							["B", "D"],
+						] satisfies [string, string][]
+					).map(([source, target], i) => ({
+						id: `path-${i}`,
+						source,
+						target,
+						label: `Path ${i}`,
+					})),
 					layout: { direction: "LR", edgeRouting: "orthogonal" },
 				},
 				{ id: "horizontal-skips", title: "Paths", style: SKETCHI_DIAGRAM_STYLE },
@@ -263,11 +270,16 @@ export const LabeledProcessFanOut: Story = {
 						kind: "process",
 						shape: "rectangle" as const,
 					})),
-					edges: ["B", "C"].map((target, i) => ({
+					edges: (
+						[
+							["B", "First"],
+							["C", "Second"],
+						] satisfies [string, string][]
+					).map(([target, label]) => ({
 						id: target,
 						source: "A",
 						target,
-						label: ["First", "Second"][i],
+						label,
 					})),
 					layout: { direction: "TB", edgeRouting: "orthogonal" },
 				},
