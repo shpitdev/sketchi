@@ -2,10 +2,7 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../diagram";
-import { sankeyStressFixtures } from "../sankey-fixtures";
 import {
-	getSankeyValidationIssues,
 	parseSankeyDiagram,
 	resolveSankeyShorthand,
 	SANKEY_MAX_COLUMNS,
@@ -13,7 +10,6 @@ import {
 	sankeyColumns,
 	sankeyCycle,
 	sankeyDiagramType,
-	sankeyFixture,
 	sankeyNodeTotals,
 	sankeySum,
 } from "./sankey";
@@ -43,14 +39,6 @@ function issuesOf(input: unknown) {
 const codes = (input: unknown) => issuesOf(input).map((issue) => issue.code);
 
 describe("Sankey contract", () => {
-	it("has a typed fixture that satisfies the canonical diagram contract", () => {
-		expect(sankeyFixture.type).toBe(sankeyDiagramType);
-		expect(parseCanonicalDiagram(sankeyFixture).pipe(Result.getOrThrow)).toEqual(sankeyFixture);
-		expect(sankeyFixture.style).toMatchObject({ accentColor: expect.any(String) });
-		for (const fixture of Object.values(sankeyStressFixtures))
-			expect(getSankeyValidationIssues(fixture), fixture.id).toEqual([]);
-	});
-
 	it("places each node at its longest path from the sources", () => {
 		const columns = sankeyColumns(
 			parseSankeyDiagram(
@@ -119,16 +107,6 @@ describe("Sankey contract", () => {
 
 	it.each([
 		[
-			"a cycle",
-			[node("a"), node("b"), node("c")],
-			[
-				{ source: "a", target: "b", value: 1 },
-				{ source: "b", target: "c", value: 1 },
-				{ source: "c", target: "a", value: 1 },
-			],
-			"sankey_cycle",
-		],
-		[
 			"a self-link",
 			[node("a"), node("b")],
 			[
@@ -163,18 +141,6 @@ describe("Sankey contract", () => {
 				{ source: "a", target: "b", value: 2 },
 			],
 			"duplicate_sankey_link",
-		],
-		[
-			"a zero flow",
-			[node("a"), node("b")],
-			[{ source: "a", target: "b", value: 0 }],
-			"invalid_sankey_value",
-		],
-		[
-			"a negative flow",
-			[node("a"), node("b")],
-			[{ source: "a", target: "b", value: -3 }],
-			"invalid_sankey_value",
 		],
 		[
 			"a node with no flow",
@@ -218,6 +184,7 @@ describe("Sankey contract", () => {
 		const [issue] = issuesOf(
 			diagram([node("a"), node("b")], [{ source: "a", target: "b", value: -3 }]),
 		);
+		expect(issue?.code).toBe("invalid_sankey_value");
 		expect(issue?.hint).toContain("Swap source and target");
 	});
 

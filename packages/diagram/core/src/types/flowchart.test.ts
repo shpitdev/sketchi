@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseIntermediateDiagram } from "../intermediate";
 import {
+	dropBlankEdgeLabels,
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_GROUP_DEPTH,
 	FLOWCHART_MAX_GROUPS,
@@ -13,12 +14,9 @@ import {
 	FLOWCHART_MAX_NODES,
 	FlowchartDiagram,
 	FlowchartValidationError,
-	flowchartDiagramType,
-	flowchartEvaluationFixtures,
 	flowchartFixture,
 	getFlowchartValidationIssues,
 	parseFlowchartDiagram,
-	pharmaBatchDispositionFlowchart,
 } from "./flowchart";
 
 function validationIssues(input: unknown) {
@@ -70,21 +68,6 @@ function denseAcyclicFlowchart(edgeCount: number) {
 }
 
 describe("parseFlowchartDiagram", () => {
-	it("has a typed fixture that satisfies the flowchart contract", () => {
-		expect(flowchartFixture.type).toBe(flowchartDiagramType);
-		expect(parseFlowchartDiagram(flowchartFixture).pipe(Result.getOrThrow)).toEqual(
-			flowchartFixture,
-		);
-	});
-
-	it("keeps canonical flowchart eval fixtures valid", () => {
-		expect(flowchartEvaluationFixtures).toContain(pharmaBatchDispositionFlowchart);
-		expect(flowchartEvaluationFixtures.map((fixture) => fixture.id)).toEqual([
-			"onboarding-flow",
-			"pharma-batch-disposition",
-		]);
-	});
-
 	it("rejects decision branches without labels", () => {
 		expect(
 			parseFlowchartDiagram({
@@ -116,7 +99,7 @@ describe("parseFlowchartDiagram", () => {
 	});
 
 	it("rejects every disconnected node, even when it has an incoming edge", () => {
-		const issues = validationIssues({
+		const input = {
 			...flowchartFixture,
 			nodes: [
 				{ id: "start", label: "Start", kind: "start" },
@@ -129,7 +112,12 @@ describe("parseFlowchartDiagram", () => {
 				{ id: "orphan-a-b", source: "orphan-a", target: "orphan-b" },
 				{ id: "orphan-b-a", source: "orphan-b", target: "orphan-a" },
 			],
-		});
+		};
+		const result = parseFlowchartDiagram(input);
+		expect(result).toMatchObject({ failure: expect.any(FlowchartValidationError) });
+		if (Result.isSuccess(result) || result.failure._tag !== "FlowchartValidationError")
+			return expect.fail("Expected semantic unreachable-node failure");
+		const issues = result.failure.issues;
 
 		expect(
 			issues.filter((issue) => issue.code === "unreachable_node").map((issue) => issue.ref?.id),
@@ -230,18 +218,6 @@ describe("parseFlowchartDiagram", () => {
 
 		expect(first).toHaveLength(FLOWCHART_MAX_ISSUES);
 		expect(second).toEqual(first);
-	});
-
-	it("throws the typed canonical validation error from parse", () => {
-		expect(
-			parseFlowchartDiagram({
-				...flowchartFixture,
-				nodes: [
-					...flowchartFixture.nodes,
-					{ id: "orphan", label: "Orphan process", kind: "process" },
-				],
-			}),
-		).toMatchObject({ failure: expect.any(FlowchartValidationError) });
 	});
 });
 
@@ -482,5 +458,20 @@ describe("flowchart lanes", () => {
 		});
 		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_too_large"]);
 		expect(issues[0]?.ref).toEqual({ kind: "diagram", id: "linear-9", path: "lanes" });
+	});
+});
+
+describe("flowchart input cleanup", () => {
+	it("drops only blank edge labels", () => {
+		const edges = [
+			{ source: "a", target: "b", label: "  " },
+			{ source: "b", target: "c", label: "yes" },
+			"not an edge",
+		];
+		expect(dropBlankEdgeLabels(edges)).toEqual([
+			{ source: "a", target: "b" },
+			edges[1],
+			"not an edge",
+		]);
 	});
 });

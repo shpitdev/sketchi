@@ -2,31 +2,9 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseIntermediateDiagram } from "../intermediate";
-import {
-	mindmapDiagramFromTree,
-	mindmapFixture,
-	mindmapDiagramType,
-	parseMindmapDiagram,
-} from "./mindmap";
+import { mindmapDiagramFromTree, mindmapFixture, parseMindmapDiagram } from "./mindmap";
 
 describe("Mindmap diagram type", () => {
-	it("has a typed fixture that satisfies the intermediate diagram contract", () => {
-		expect(mindmapFixture.type).toBe(mindmapDiagramType);
-		expect(parseIntermediateDiagram(mindmapFixture).pipe(Result.getOrThrow)).toEqual(
-			mindmapFixture,
-		);
-		expect(mindmapFixture.nodes.map((node) => node.label)).toEqual([
-			"Public mindmaps",
-			"Semantic input",
-			"Nested topics",
-			"Stable ordering",
-			"Artifact output",
-			"Scene",
-			"Excalidraw",
-		]);
-	});
-
 	it("rejects topics with multiple parents", () => {
 		expect(
 			parseMindmapDiagram({

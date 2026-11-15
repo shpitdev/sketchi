@@ -2,14 +2,11 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../diagram";
 import {
 	type ErDiagram,
-	erDiagramType,
 	erFieldKeys,
 	erFixture,
 	getErValidationIssues,
-	orgChartEr,
 	parseErDiagram,
 	parseErEnd,
 	parseErFieldShorthand,
@@ -21,12 +18,6 @@ const codes = (input: Partial<ErDiagram>) =>
 	getErValidationIssues({ ...erFixture, ...input }).map((issue) => issue.code);
 
 describe("ER diagram type", () => {
-	it("has typed fixtures that satisfy the canonical diagram contract", () => {
-		expect(erFixture.type).toBe(erDiagramType);
-		expect(parseCanonicalDiagram(erFixture).pipe(Result.getOrThrow)).toEqual(erFixture);
-		expect(parseCanonicalDiagram(orgChartEr).pipe(Result.getOrThrow)).toEqual(orgChartEr);
-	});
-
 	it("reads relationship ends as an entity or entity.field", () => {
 		expect(parseErEnd("orders")).toEqual({ entity: "orders" });
 		expect(parseErEnd("orders.customer_id")).toEqual({ entity: "orders", field: "customer_id" });

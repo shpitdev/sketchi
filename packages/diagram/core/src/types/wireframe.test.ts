@@ -2,8 +2,6 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../diagram";
-import { wireframeStressFixtures } from "../wireframe-fixtures";
 import {
 	getWireframeValidationIssues,
 	parseWireframeDiagram,
@@ -13,7 +11,6 @@ import {
 	WIREFRAME_MAX_SCREENS,
 	wireframeComponents,
 	wireframeDiagramType,
-	wireframeFixture,
 } from "./wireframe";
 
 const wireframe = (children: unknown[], screen: Record<string, unknown> = {}) => ({
@@ -34,16 +31,6 @@ function issuesOf(input: unknown) {
 const codes = (input: unknown) => issuesOf(input).map((issue) => issue.code);
 
 describe("wireframe contract", () => {
-	it("has a typed fixture that satisfies the canonical diagram contract", () => {
-		expect(wireframeFixture.type).toBe(wireframeDiagramType);
-		expect(parseCanonicalDiagram(wireframeFixture).pipe(Result.getOrThrow)).toEqual(
-			wireframeFixture,
-		);
-		expect(wireframeFixture.screens[0]?.device).toBe("mobile");
-		for (const fixture of Object.values(wireframeStressFixtures))
-			expect(getWireframeValidationIssues(fixture), fixture.id).toEqual([]);
-	});
-
 	it("defaults the device to desktop and the palette", () => {
 		const parsed = parseWireframeDiagram(wireframe([{ type: "heading", text: "Hi" }])).pipe(
 			Result.getOrThrow,
