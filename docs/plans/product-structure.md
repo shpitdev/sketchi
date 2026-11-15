@@ -121,6 +121,8 @@ Delete tests with obsolete representations and mechanisms, including forwarding,
 
 Use temporary before/after corpora for redesign proof; do not install another permanent census. The mindmap example keeps nested CLI documents, CanvasSpec and native drawing formats unchanged. Its real CLI persistence and local editor save/reload checks passed; remote historical population remains unknown. A later stored-shape change requires actual affected-data inventory and an explicit migration with cost. Live owned callers change outright, without speculative compatibility layers.
 
+Identity is the default for mechanical work, not a requirement to preserve a defect. When old output is wrong, fix it or accept the better output: explain the defect, show before/after, inspect the PNGs, and record the intended difference in the unit receipt and PR. The four straight-routing failures reproduced on both baseline and current Flowchart remain defects to fix, not behavior to port or waive. This permits no incidental output churn. Stored CanvasSpec, native files, StudioDrawing and CLI documents, and the released CLI's decoding contracts, remain protected.
+
 ## Units, in order
 
 Each implementation unit has one author and one coherent commit set in an isolated worktree, integrated by the primary only. Read-only reviews and gate helpers can use the held checkout.
