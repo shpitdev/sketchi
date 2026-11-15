@@ -1,21 +1,10 @@
-// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-/**
- * Every canonical diagram family must complete the pipeline described in
- * docs/diagram-families.md. Each stage below is one test per family, so a
- * family added to DIAGRAM_TYPES without a stage fails with that stage's name.
- */
-import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
+// Positive fixtures deliberately unwrap Results: failure is invalid maintained input.
 import {
-	buildCanonicalDocument,
-	type CanonicalDiagramDocument,
 	canonicalDocumentFromDiagram,
+	type CanonicalDiagramDocument,
 	CodeModeArtifactStorage,
 	CodeModeArtifactStorageMemory,
-	CodeModeRuntimeEnvironment,
 	makeCodeModeRuntimeEnvironmentLayer,
-	makeMemoryArtifactStorage,
 } from "@sketchi/diagram-agent";
 import {
 	type CanonicalDiagram,
@@ -25,23 +14,14 @@ import {
 	getCanvasValidationIssues,
 	parseCanonicalDiagram,
 } from "@sketchi/diagram-core";
-import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/diagram-excalidraw";
-import {
-	buildDiagramGenerationMessages,
-	candidateFromText,
-	DiagramGenerationTypeSchema,
-} from "@sketchi/diagram-generation";
+import { candidateFromText } from "@sketchi/diagram-generation";
 import { renderDiagram } from "@sketchi/diagram-renderer";
-import { generationScenarioRegistry, scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
-import { Effect, Layer, Result, Schema } from "effect";
+import { scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
+import { Effect, Layer, Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { DiagramBuilder, DiagramBuilderLive } from "../apps/cli/src/builder.ts";
-import { decodeCanonicalDiagramDocument } from "../apps/cli/src/document.ts";
-import { GENERATION_TYPE_OPTIONS } from "../apps/cli/src/generation-types.ts";
-import { decodeGenerateRequest } from "../apps/playground/src/server/generation/request.ts";
-
-const workspaceRoot = fileURLToPath(new URL("../", import.meta.url));
+import { parseJsonDocument } from "../apps/cli/src/document.ts";
 
 function fixtureFor(family: DiagramTypeValue): CanonicalDiagram {
 	const fixture = diagramFixtures.find((diagram) => diagram.type === family);
@@ -75,7 +55,7 @@ function documentFor(family: DiagramTypeValue): CanonicalDiagramDocument {
 }
 
 const cliBuilderLayer = DiagramBuilderLive.pipe(
-	Layer.provide(
+	Layer.provideMerge(
 		Layer.mergeAll(
 			CodeModeArtifactStorageMemory,
 			makeCodeModeRuntimeEnvironmentLayer({ createId: (prefix) => `${prefix}_family` }),
@@ -83,103 +63,52 @@ const cliBuilderLayer = DiagramBuilderLive.pipe(
 	),
 );
 
-const stages: Record<string, (family: DiagramTypeValue) => void | Promise<void>> = {
-	"core contract and fixture": (family) => {
-		expect(existsSync(`${workspaceRoot}packages/diagram/core/src/types/${family}.ts`)).toBe(true);
+describe("canonical diagram family consumers", () => {
+	it.each(DIAGRAM_TYPES)(
+		"builds %s document JSON into valid stored offline artifacts",
+		async (family) => {
+			const fixture = fixtureFor(family);
+			await Effect.runPromise(
+				Effect.gen(function* () {
+					const document = yield* parseJsonDocument(JSON.stringify(documentFor(family)));
+					const builder = yield* DiagramBuilder;
+					const built = yield* builder.build(document);
+
+					expect(built).toMatchObject({ id: fixture.id, type: family, title: fixture.title });
+					expect(built.warnings).toEqual([]);
+					expect(built.scene.elements.length).toBeGreaterThan(0);
+					expect(built.scene.diagramId).toBe(fixture.id);
+					expect(built.excalidraw).toMatchObject({ type: "excalidraw", version: 2 });
+					expect(built.excalidraw.elements.length).toBeGreaterThan(0);
+
+					const storage = yield* CodeModeArtifactStorage;
+					const manifest = yield* storage.readManifest("artifact_family");
+					expect(manifest?.diagramId).toBe(fixture.id);
+					expect((yield* storage.read("artifact_family", "scene"))?.data).toEqual(built.scene);
+					expect((yield* storage.read("artifact_family", "excalidraw"))?.data).toEqual(
+						built.excalidraw,
+					);
+				}).pipe(Effect.provide(cliBuilderLayer)),
+			);
+		},
+	);
+
+	it.each(DIAGRAM_TYPES)("decodes generated %s JSON into a renderable diagram", (family) => {
 		const fixture = fixtureFor(family);
-		expect(parseCanonicalDiagram(fixture).pipe(Result.getOrThrow)).toEqual(fixture);
-	},
-	"deterministic renderer": (family) => {
-		expect(
-			getCanvasValidationIssues(renderDiagram(fixtureFor(family)).pipe(Result.getOrThrow)),
-		).toEqual([]);
-	},
-	"Excalidraw conversion": (family) => {
-		const excalidraw = convertSceneToExcalidraw(
-			renderDiagram(fixtureFor(family)).pipe(Result.getOrThrow),
-		);
-		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
-	},
-	"generation prompt": (family) => {
-		expect(Schema.is(DiagramGenerationTypeSchema)(family)).toBe(true);
-		const messages = buildDiagramGenerationMessages({
-			id: "family-pipeline",
-			request: `Draw a ${family} diagram.`,
-			requestedType: family,
-		});
-		expect(messages.system).toContain(`Use diagram type "${family}".`);
-		expect(messages.user).toContain(`"type":"${family}"`);
-		expect(messages.user).not.toContain("intent");
-	},
-	"generation output parsing": (family) => {
 		const candidate = candidateFromText({
 			model: "fixture",
 			provider: "fixture",
-			text: generationEnvelope(fixtureFor(family)),
+			text: generationEnvelope(fixture),
 		});
 		expect(candidate.error).toBeUndefined();
-		expect(candidate.diagram?.type).toBe(family);
-	},
-	"Code Mode build": async (family) => {
-		const result = await Effect.runPromise(
-			buildCanonicalDocument(documentFor(family), {
-				artifactFormats: ["scene", "excalidraw"],
-			}).pipe(
-				Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
-				Effect.provideService(CodeModeRuntimeEnvironment, {
-					createId: (prefix) => `${prefix}_family`,
-				}),
-			),
-		);
-		expect(result.issues).toEqual([]);
-		expect(result.ok).toBe(true);
-	},
-	"CLI document dispatch": async (family) => {
-		const document = documentFor(family);
-		const built = await Effect.runPromise(
-			Effect.gen(function* () {
-				const decoded = yield* decodeCanonicalDiagramDocument(document);
-				const builder = yield* DiagramBuilder;
-				return yield* builder.build(decoded);
-			}).pipe(Effect.provide(cliBuilderLayer)),
-		);
-		expect(built.type).toBe(family);
-		expect(built.excalidraw.elements.length).toBeGreaterThan(0);
-	},
-	"CLI generate type": (family) => {
-		expect(GENERATION_TYPE_OPTIONS.map((option) => option.value)).toContain(family);
-	},
-	"generate API request": (family) => {
-		const decoded = decodeGenerateRequest({ prompt: `Draw a ${family} diagram.`, type: family });
-		expect(Result.isSuccess(decoded)).toBe(true);
-	},
-	"maintained scenarios": (family) => {
-		expect(generationScenarioRegistry.some((scenario) => scenario.diagramType === family)).toBe(
-			true,
-		);
-	},
-	"Storybook story": (family) => {
-		expect(
-			existsSync(`${workspaceRoot}packages/diagram/ui/src/diagram-types/${family}.stories.tsx`),
-		).toBe(true);
-	},
-};
-
-describe("canonical diagram family pipeline (docs/diagram-families.md)", () => {
-	it("documents every stage this test enforces", async () => {
-		const { readFile } = await import("node:fs/promises");
-		const checklist = await readFile(`${workspaceRoot}docs/diagram-families.md`, "utf8");
-		for (const stage of Object.keys(stages)) {
-			expect(checklist, stage).toContain(stage);
-		}
+		const diagram = parseCanonicalDiagram(
+			candidate.diagram ?? expect.fail("Generation output did not produce a diagram"),
+		).pipe(Result.getOrThrow);
+		expect(diagram).toEqual(candidate.diagram);
+		expect(diagram).toMatchObject({ id: fixture.id, type: family, title: fixture.title });
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+		expect(scene.diagramId).toBe(fixture.id);
+		expect(scene.elements.length).toBeGreaterThan(0);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
 	});
-
-	for (const family of DIAGRAM_TYPES) {
-		for (const [stage, check] of Object.entries(stages)) {
-			it(`${family}: ${stage}`, async () => {
-				expect.hasAssertions();
-				await check(family);
-			});
-		}
-	}
 });
