@@ -302,6 +302,7 @@ it("flushes every default-exporter span to its own interleaved request through f
 			expect(rows.length).toBeGreaterThan(0);
 			for (const row of rows)
 				expect(row).toMatchObject({
+					service: "sketchi-icons",
 					run_id: response.headers.get("x-sketchi-run-id"),
 					ray_id: ray,
 				});

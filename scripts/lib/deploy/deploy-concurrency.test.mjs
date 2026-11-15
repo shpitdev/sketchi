@@ -9,15 +9,26 @@ import { workerProjectConfig, workerProjectIds } from "../worker-apps.mjs";
 
 const require = createRequire(import.meta.resolve("nx/package.json"));
 const yaml = require("@zkochan/js-yaml");
-const preview = yaml.load(
+const previewJobs = yaml.load(
 	readFileSync(new URL("../../../.github/workflows/app-preview.yml", import.meta.url), "utf8"),
-).jobs["deploy-preview"];
+).jobs;
+const preview = previewJobs["deploy-preview"];
+const cleanup = previewJobs["cleanup-preview"];
 const production = yaml.load(
 	readFileSync(
 		new URL("../../../.github/workflows/app-production-deploy.yml", import.meta.url),
 		"utf8",
 	),
 ).jobs.deploy;
+
+const configuredWorkers = await Promise.all(
+	workerProjectIds.map(async (project) => {
+		const config = await unstable_readConfig({
+			config: workerProjectConfig(project).wranglerInputConfigPath,
+		});
+		return { project, pipelineBound: Boolean(config.pipelines?.length) };
+	}),
+);
 
 // Evaluate the workflow's small expression subset with concrete matrix/PR inputs.
 function concurrency(job, project, prNumber = 42) {
@@ -45,13 +56,10 @@ function concurrency(job, project, prNumber = 42) {
 
 test("all Pipeline-bound preview and production uploads share a non-cancelling queue", async () => {
 	const groups = [];
-	for (const job of [preview, production]) {
-		// Both matrices are the selected subset of every Worker app.
-		for (const project of workerProjectIds) {
-			const config = await unstable_readConfig({
-				config: workerProjectConfig(project).wranglerInputConfigPath,
-			});
-			if (!config.pipelines?.length) continue;
+	for (const job of [preview, cleanup, production]) {
+		// Deploy and cleanup matrices select from the same configured Worker apps.
+		for (const { project, pipelineBound } of configuredWorkers) {
+			if (!pipelineBound) continue;
 			for (const prNumber of [42, 43, 44]) {
 				const policy = concurrency(job, project, prNumber);
 				groups.push(policy.group);
@@ -64,12 +72,15 @@ test("all Pipeline-bound preview and production uploads share a non-cancelling q
 			}
 		}
 	}
-	assert.ok(groups.length >= 6, "must cover both workflows and multiple PRs");
+	assert.ok(groups.length >= 9, "must cover preview deploy/cleanup, production and multiple PRs");
+	assert.equal(groups[0], "cloudflare-pipeline-bound-upload");
 	assert.equal(new Set(groups).size, 1, "production and every PR must contend for the same lock");
 });
 
 test("non-Pipeline apps retain independent preview and production concurrency", () => {
-	for (const project of ["web", "icons", "excalidraw"]) {
+	const independent = configuredWorkers.filter(({ pipelineBound }) => !pipelineBound);
+	assert.ok(independent.length > 0, "must exercise actual non-Pipeline apps");
+	for (const { project } of independent) {
 		const first = concurrency(preview, project, 42);
 		const next = concurrency(preview, project, 43);
 		const prod = concurrency(production, project);
@@ -78,5 +89,8 @@ test("non-Pipeline apps retain independent preview and production concurrency", 
 		assert.equal(String(first["cancel-in-progress"]), "true");
 		assert.equal(prod.group, `app-production-${project}`);
 		assert.equal(prod["cancel-in-progress"], false);
+		assert.equal(first.queue, "single");
+		assert.equal(prod.queue, "single");
+		assert.deepEqual(concurrency(cleanup, project, 42), first);
 	}
 });
