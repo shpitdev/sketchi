@@ -6,6 +6,8 @@ PR 810 remains staging. The user will review and merge it. A structural checkpoi
 
 Units 0–3 are accepted and integrated. The shared family list and build operation are in place, with mindmap and Venn converted. The remaining families, host state and resource ownership, app/tool moves and final preview proof remain open. This is the structural checkpoint, not final PR readiness.
 
+The Icons client feature unit is also accepted locally: native atoms, Cache, streams, browser storage and Radix now own its state, action lifetimes and modal behavior. Real local preference recovery, cross-tab changes, exports and warm-cache failure/retry flows passed. The native IntersectionObserver and clipboard activation boundaries are named gaps. Icons server/domain work and shared diagnostic promotion remain open; this client acceptance is not final preview or production proof.
+
 ## Target structure
 
 ```text
