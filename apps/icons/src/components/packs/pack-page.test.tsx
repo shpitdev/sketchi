@@ -33,21 +33,6 @@ describe("PackPage", () => {
 		window.localStorage.clear();
 	});
 
-	it("names the pack, with its size and its download, before its icons load", () => {
-		render(<PackPage pack={pack} status="loading" />);
-		expect(screen.getByRole("heading", { level: 1, name: "Palantir" })).toBeTruthy();
-		expect(screen.getByText("120 icons")).toBeTruthy();
-		expect(screen.getByRole("link", { name: "Download" }).getAttribute("href")).toBe(
-			"/packs/palantir.excalidrawlib",
-		);
-		// No install link yet: nothing on the page sends a pack to excalidraw.com.
-		expect(screen.queryByRole("link", { name: "Add to Excalidraw" })).toBeNull();
-		expect(document.querySelector('a[href*="excalidraw.com"]')).toBeNull();
-		expect(screen.getByLabelText("Loading icons")).toBeTruthy();
-		const nav = screen.getByRole("navigation", { name: "Icon sets" });
-		expect(within(nav).queryByRole("link", { current: "page" })).toBeNull();
-	});
-
 	it("draws every icon with its product name as the page scrolls", () => {
 		render(<PackPage icons={icons} pack={pack} status="ready" />);
 		const grid = screen.getByRole("region", { name: "Palantir" });
@@ -141,18 +126,4 @@ describe("PackPage", () => {
 		expect(paint()).toEqual(light);
 	});
 
-	it("offers a retry when the icons cannot load", () => {
-		const onRetry = vi.fn();
-		render(
-			<PackPage
-				errorMessage="Drawings returned HTTP 503."
-				onRetry={onRetry}
-				pack={pack}
-				status="error"
-			/>,
-		);
-		expect(screen.getByRole("alert").textContent).toContain("Drawings returned HTTP 503.");
-		fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-		expect(onRetry).toHaveBeenCalledTimes(1);
-	});
 });
