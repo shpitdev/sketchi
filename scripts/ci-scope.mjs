@@ -18,7 +18,7 @@ function routingInput(file) {
 	return (
 		file.startsWith("packages/drawing/") ||
 		file.startsWith("packages/editor/public/fonts/") ||
-		/^tools\/drawing-tests\/(?:routing-fuzz\.test|text-fit-helpers)\.ts$/.test(file) ||
+		/^tools\/drawing-tests\/(?:routing[^/]*|text-fit-helpers)\.ts$/.test(file) ||
 		/^scripts\/ci-(?:local|scope)\.mjs$/.test(file) ||
 		/^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|vitest\.config\.ts|tsconfig(?:\.base)?\.json|mise\.toml|\.npmrc)$/.test(
 			file,

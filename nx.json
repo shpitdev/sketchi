@@ -14,24 +14,127 @@
 		"sharedGlobals": [
 			"{workspaceRoot}/.oxlintrc.json",
 			"{workspaceRoot}/nx.json",
-			"{workspaceRoot}/tsconfig.base.json"
+			"{workspaceRoot}/tsconfig.base.json",
+			"{workspaceRoot}/package.json",
+			"{workspaceRoot}/pnpm-lock.yaml",
+			"{workspaceRoot}/pnpm-workspace.yaml",
+			"{workspaceRoot}/mise.toml",
+			{
+				"runtime": "node --version"
+			},
+			{
+				"runtime": "node -p \"process.platform + '-' + process.arch\""
+			},
+			{
+				"env": "CI"
+			},
+			{
+				"env": "NODE_ENV"
+			},
+			{
+				"env": "NODE_OPTIONS"
+			},
+			{
+				"env": "PORT"
+			}
+		],
+		"testEnvironment": [
+			{
+				"env": "ROUTING_FUZZ"
+			},
+			{
+				"env": "ER_FUZZ"
+			},
+			{
+				"env": "ER_FUZZ_SEED"
+			},
+			{
+				"env": "CLASS_FUZZ"
+			},
+			{
+				"env": "CLASS_FUZZ_SEED"
+			},
+			{
+				"env": "SEQUENCE_FUZZ"
+			},
+			{
+				"env": "ORG_CHART_FUZZ"
+			},
+			{
+				"env": "JOURNEY_FUZZ"
+			},
+			{
+				"env": "SANKEY_FUZZ"
+			},
+			{
+				"env": "SANKEY_FUZZ_DUMP"
+			},
+			{
+				"env": "WIREFRAME_FUZZ"
+			},
+			{
+				"env": "QUADRANT_FUZZ"
+			},
+			{
+				"env": "CHART_FUZZ_SEEDS"
+			},
+			{
+				"env": "GANTT_FUZZ_SEEDS"
+			},
+			{
+				"env": "MINDMAP_FUZZ_SEEDS"
+			},
+			{
+				"env": "VENN_FUZZ"
+			},
+			{
+				"env": "PRINT_ROUTING"
+			},
+			{
+				"env": "PRINT_CROSSINGS"
+			},
+			{
+				"env": "TZ"
+			},
+			{
+				"env": "LANG"
+			},
+			{
+				"env": "LC_ALL"
+			},
+			{
+				"env": "TERM"
+			},
+			{
+				"env": "NO_COLOR"
+			},
+			{
+				"env": "FORCE_COLOR"
+			},
+			{
+				"env": "COLORFGBG"
+			}
 		]
 	},
 	"targetDefaults": {
 		"build": {
 			"inputs": ["production", "^production"],
-			"dependsOn": ["^build"]
+			"dependsOn": ["^build"],
+			"cache": true
 		},
 		"test": {
-			"inputs": ["default", "^production"],
-			"dependsOn": ["^build"]
+			"inputs": ["default", "^production", "testEnvironment"],
+			"dependsOn": ["^build"],
+			"cache": true
 		},
 		"test-browser": {
 			"inputs": ["default", "^production", "{workspaceRoot}/tools/testing/browserbase.ts"]
 		},
 		"typecheck": {
 			"inputs": ["default", "^production"],
-			"dependsOn": ["^build"]
+			"dependsOn": ["^build"],
+			"cache": true,
+			"outputs": []
 		},
 		"@nx/js:tsc": {
 			"cache": true,
@@ -39,13 +142,9 @@
 			"inputs": ["production", "^production"]
 		},
 		"build-storybook": {
-			"inputs": [
-				"default",
-				"^default",
-				{
-					"externalDependencies": ["storybook"]
-				}
-			]
+			"inputs": ["default", "^default", "{workspaceRoot}/scripts/lib/excalidraw-fonts.mjs"],
+			"cache": true,
+			"dependsOn": ["^build"]
 		}
 	},
 	"release": {

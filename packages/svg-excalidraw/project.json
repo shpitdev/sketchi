@@ -15,7 +15,12 @@
 		"test": {
 			"executor": "nx:run-commands",
 			"outputs": ["{workspaceRoot}/coverage/packages/svg-excalidraw"],
-			"inputs": ["default", "^production", "{workspaceRoot}/packages/icons/catalog/svg/**/*.svg"],
+			"inputs": [
+				"default",
+				"^production",
+				"testEnvironment",
+				"{workspaceRoot}/packages/icons/catalog/svg/**/*.svg"
+			],
 			"options": {
 				"command": "vitest run --config packages/svg-excalidraw/vitest.config.mts"
 			}

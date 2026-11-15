@@ -43,6 +43,8 @@ test("routing follows graph, drawing, font, shared contract and execution inputs
 		"packages/drawing/vitest.routing.config.ts",
 		"packages/editor/public/fonts/Excalifont/face.woff2",
 		"tools/drawing-tests/routing-fuzz.test.ts",
+		"tools/drawing-tests/routing-state-fuzz.test.ts",
+		"tools/drawing-tests/routing-fuzz-helpers.ts",
 		"tools/drawing-tests/text-fit-helpers.ts",
 		"scripts/ci-local.mjs",
 		"scripts/ci-scope.mjs",

@@ -72,11 +72,12 @@
 		"sync-node-logos": {
 			"executor": "nx:run-commands",
 			"dependsOn": ["^build"],
-			"inputs": ["{projectRoot}/scripts/sync-node-logos.ts", "^production"],
+			"inputs": ["production", "^production"],
 			"outputs": ["{projectRoot}/public/node-logos"],
 			"options": {
 				"command": "jiti apps/playground/scripts/sync-node-logos.ts"
-			}
+			},
+			"cache": true
 		}
 	}
 }

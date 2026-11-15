@@ -17,7 +17,7 @@ export default defineConfig({
 	test: {
 		name: "drawing",
 		include: ["packages/drawing/src/**/*.test.ts", "tools/drawing-tests/**/*.test.ts"],
-		exclude: ["**/node_modules/**", "tools/drawing-tests/routing-fuzz.test.ts"],
+		exclude: ["**/node_modules/**", "tools/drawing-tests/routing*-fuzz.test.ts"],
 		testTimeout: 60_000,
 	},
 });

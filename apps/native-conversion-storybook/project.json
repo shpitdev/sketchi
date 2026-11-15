@@ -10,7 +10,13 @@
 			"outputs": ["{workspaceRoot}/storybook-static/native-conversion"],
 			"options": {
 				"output-dir": "../../storybook-static/native-conversion"
-			}
+			},
+			"inputs": [
+				"default",
+				"^default",
+				"{workspaceRoot}/scripts/lib/excalidraw-fonts.mjs",
+				"{workspaceRoot}/tools/storybook/**/*"
+			]
 		},
 		"chromatic": {
 			"executor": "nx:run-commands",

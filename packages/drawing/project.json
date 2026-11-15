@@ -20,6 +20,8 @@
 			},
 			"inputs": [
 				"default",
+				"^production",
+				"testEnvironment",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
@@ -37,13 +39,17 @@
 		"routing-sample": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "vitest run --config packages/drawing/vitest.routing.config.ts tools/drawing-tests/routing-fuzz.test.ts"
+				"command": "vitest run --config packages/drawing/vitest.routing.config.ts tools/drawing-tests/routing"
 			},
 			"inputs": [
 				"default",
+				"^production",
+				"testEnvironment",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
-			]
+			],
+			"cache": true,
+			"outputs": []
 		},
 		"routing-fuzz": {
 			"executor": "nx:run-commands",
@@ -52,9 +58,13 @@
 			},
 			"inputs": [
 				"default",
+				"^production",
+				"testEnvironment",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
-			]
+			],
+			"cache": true,
+			"outputs": []
 		},
 		"er-fuzz": {
 			"executor": "nx:run-commands",

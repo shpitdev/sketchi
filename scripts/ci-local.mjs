@@ -232,6 +232,8 @@ targets, sampled routing (always for origin/main and --all; otherwise when its i
 the root TypeScript project references, and the diagram UI Storybook build when
 editor is affected. Changes are compared with the base (default origin/main), including
 uncommitted and untracked ones. Logs go to .memory/ci-local/.
+Nx reuses its native local task cache across worktrees; graph and Vite state stay local.
+For caller-selected fuzz diagnostic outputs, run the Nx target with --skip-nx-cache.
 
 On success it posts a "${STATUS_CONTEXT}" commit status on the pushed PR head.
 
