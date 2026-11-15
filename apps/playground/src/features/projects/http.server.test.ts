@@ -16,9 +16,7 @@ import {
 	type StudioObjectBucketListResult,
 } from "./bucket.server";
 import {
-	makeStudioPersistencePolicyLayer,
 	makeStudioRecordFactoryLayer,
-	StudioPersistencePolicyLive,
 	StudioProjectsLive,
 	studioDiagramRecordKey,
 	studioDrawingKey,
@@ -84,18 +82,12 @@ function createTestServer<
 	sourceArtifacts: SourceArtifacts = new TestSourceArtifacts() as unknown as SourceArtifacts,
 	overrides: {
 		createId?: (kind: "dia" | "proj") => string;
-		listingConcurrency?: number;
 		now?: () => string;
 	} = {},
 ) {
 	const dependencies = Layer.mergeAll(
 		makeStudioObjectStoreLayer(bucket),
 		Layer.succeed(StudioSourceArtifactStore, sourceArtifacts),
-		overrides.listingConcurrency === undefined
-			? StudioPersistencePolicyLive
-			: makeStudioPersistencePolicyLayer({
-					listingConcurrency: overrides.listingConcurrency,
-				}),
 		makeStudioRecordFactoryLayer({
 			createId: (kind) =>
 				makeStudioRecordId(

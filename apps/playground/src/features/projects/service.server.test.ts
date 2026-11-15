@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import { makeTelemetryTestSink, makeWorkersTelemetryLayer } from "@sketchi/observability";
-import { Cause, Effect, Exit, Fiber, Layer, Schema } from "effect";
+import { Cause, Effect, Exit, Fiber, Layer } from "effect";
 
 import {
 	AuthenticatedStudioOwner,
@@ -17,9 +17,7 @@ import {
 } from "./bucket.server.js";
 import { StudioOwnershipError } from "./errors.server.js";
 import {
-	makeStudioPersistencePolicyLayer,
 	makeStudioRecordFactoryLayer,
-	StudioPersistencePolicyConfig,
 	StudioProjects,
 	StudioProjectsLive,
 	studioOwnerKey,
@@ -45,20 +43,6 @@ describe("Studio schema contracts", () => {
 	);
 });
 
-describe("StudioPersistencePolicy", () => {
-	it.each([0, Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
-		"rejects invalid concurrency %s through the schema itself",
-		(listingConcurrency) => {
-			assert.throws(() => StudioPersistencePolicyConfig.make({ listingConcurrency }));
-			assert.isTrue(
-				Schema.decodeUnknownResult(StudioPersistencePolicyConfig)({
-					listingConcurrency,
-				})._tag === "Failure",
-			);
-		},
-	);
-});
-
 function projectLayer(options: {
 	bucket?: MemoryStudioObjectBucket;
 	objectStore?: StudioObjectStoreShape;
@@ -79,7 +63,6 @@ function projectLayer(options: {
 	const dependencies = Layer.mergeAll(
 		objectStoreLayer,
 		sourceLayer,
-		makeStudioPersistencePolicyLayer({ listingConcurrency: 2 }),
 		makeStudioRecordFactoryLayer({
 			createId: (kind) =>
 				makeStudioRecordId(kind === "proj" ? "proj_effecttest" : "dia_effecttest"),
@@ -351,7 +334,7 @@ describe("StudioProjects Effect service", () => {
 	let active = 0;
 	let maxActive = 0;
 	let released = 0;
-	const projectIds = Array.from({ length: 5 }, (_, index) => `proj_concurrency_${String(index)}`);
+	const projectIds = Array.from({ length: 17 }, (_, index) => `proj_concurrency_${String(index)}`);
 	const entryPrefix = studioOwnerProjectsPrefix(owner);
 	const concurrencyObjectStore: StudioObjectStoreShape = {
 		head: () => Effect.succeed(null),
@@ -392,7 +375,7 @@ describe("StudioProjects Effect service", () => {
 	};
 
 	it.layer(projectLayer({ objectStore: concurrencyObjectStore }))("bounded listing", (it) => {
-		it.effect("honors the configured limit and releases in-flight work on interruption", () =>
+		it.effect("bounds listing to eight and releases in-flight work on interruption", () =>
 			Effect.gen(function* () {
 				active = 0;
 				maxActive = 0;
@@ -400,12 +383,12 @@ describe("StudioProjects Effect service", () => {
 				const projects = yield* StudioProjects;
 				const fiber = yield* Effect.forkChild(projects.listProjects(owner));
 
-				while (active < 2) {
+				while (active < 8) {
 					yield* Effect.yieldNow;
 				}
 
-				assert.strictEqual(active, 2);
-				assert.strictEqual(maxActive, 2);
+				assert.strictEqual(active, 8);
+				assert.strictEqual(maxActive, 8);
 				yield* Fiber.interrupt(fiber);
 				const exit = yield* Fiber.await(fiber);
 
@@ -414,7 +397,7 @@ describe("StudioProjects Effect service", () => {
 					assert.isTrue(Cause.hasInterrupts(exit.cause));
 				}
 				assert.strictEqual(active, 0);
-				assert.strictEqual(released, 2);
+				assert.strictEqual(released, 8);
 			}),
 		);
 	});

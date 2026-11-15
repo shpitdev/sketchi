@@ -45,6 +45,7 @@ import { ensureOwner } from "./session.server.js";
 import { StudioSourceArtifactStore } from "./source-artifacts.server.js";
 
 const STUDIO_PREFIX = "studio";
+const STUDIO_LISTING_CONCURRENCY = 8;
 
 const studioPersistenceRequests = Metric.counter("sketchi_studio_persistence_requests", {
 	description: "Studio persistence boundary requests by terminal outcome",
@@ -114,8 +115,6 @@ const StudioProjectIndexEntry = Schema.Struct({
 
 interface StudioProjectIndexEntry extends Schema.Schema.Type<typeof StudioProjectIndexEntry> {}
 
-const StudioProjectIndexEntrySchema = StudioProjectIndexEntry;
-
 export interface StudioProjectCreateSuccess {
 	diagram: StudioDiagramSummary;
 	ok: true;
@@ -164,24 +163,6 @@ export interface StudioProjectsShape {
 export class StudioProjects extends Context.Service<StudioProjects, StudioProjectsShape>()(
 	"@sketchi/studio/projects/StudioProjects",
 ) {}
-
-export const StudioPersistencePolicyConfig = Schema.Struct({
-	listingConcurrency: Schema.Int.check(Schema.isGreaterThan(0)),
-}).annotate({ identifier: "StudioPersistencePolicyConfig" });
-
-export interface StudioPersistencePolicyConfig extends Schema.Schema.Type<
-	typeof StudioPersistencePolicyConfig
-> {}
-
-export class StudioPersistencePolicy extends Context.Service<
-	StudioPersistencePolicy,
-	StudioPersistencePolicyConfig
->()("@sketchi/studio/projects/StudioPersistencePolicy") {}
-
-export const StudioPersistencePolicyLive = Layer.succeed(
-	StudioPersistencePolicy,
-	StudioPersistencePolicyConfig.make({ listingConcurrency: 8 }),
-);
 
 export interface StudioRecordFactoryShape {
 	readonly createId: (kind: "dia" | "proj") => typeof StudioRecordIdSchema.Type;
@@ -263,7 +244,6 @@ export const StudioProjectsLive = Layer.effect(
 	Effect.gen(function* () {
 		const objectStore = yield* StudioObjectStore;
 		const sourceArtifacts = yield* StudioSourceArtifactStore;
-		const policy = yield* StudioPersistencePolicy;
 		const recordFactory = yield* StudioRecordFactory;
 		const json = makeStudioJsonPersistence(objectStore);
 
@@ -314,9 +294,9 @@ export const StudioProjectsLive = Layer.effect(
 				entryKeys,
 				(entryKey) =>
 					json
-						.read(entryKey, StudioProjectIndexEntrySchema, "owner-index", entryKey)
+						.read(entryKey, StudioProjectIndexEntry, "owner-index", entryKey)
 						.pipe(Effect.catchTag("StudioNotFoundError", () => Effect.succeed(null))),
-				{ concurrency: policy.listingConcurrency },
+				{ concurrency: STUDIO_LISTING_CONCURRENCY },
 			);
 
 			return Array.flatMap(entries, (entry) =>
@@ -334,7 +314,7 @@ export const StudioProjectsLive = Layer.effect(
 
 				yield* json.put(
 					studioOwnerProjectEntryKey(session, projectId),
-					StudioProjectIndexEntrySchema,
+					StudioProjectIndexEntry,
 					entry,
 				);
 			},
@@ -354,7 +334,7 @@ export const StudioProjectsLive = Layer.effect(
 							StudioOwnershipError: () => Effect.succeed(null),
 						}),
 					),
-				{ concurrency: policy.listingConcurrency },
+				{ concurrency: STUDIO_LISTING_CONCURRENCY },
 			);
 
 			return sortedProjects(Array.flatMap(records, (record) => (record === null ? [] : [record])));
@@ -363,7 +343,7 @@ export const StudioProjectsLive = Layer.effect(
 		const getProject = Effect.fn("studioPersistence.projects.getProject")(function* (
 			session: StudioOwner,
 			projectId: string,
-			diagramConcurrency = policy.listingConcurrency,
+			diagramConcurrency = STUDIO_LISTING_CONCURRENCY,
 		) {
 			const project = yield* readProjectRecord(projectId);
 			yield* ensureOwner(project.owner, session, "project", project.id);
@@ -546,10 +526,6 @@ export const StudioProjectsLive = Layer.effect(
 		};
 	}),
 );
-
-export function makeStudioPersistencePolicyLayer(config: StudioPersistencePolicyConfig) {
-	return Layer.succeed(StudioPersistencePolicy, StudioPersistencePolicyConfig.make(config));
-}
 
 export function makeStudioRecordFactoryLayer(factory: StudioRecordFactoryShape) {
 	return Layer.succeed(StudioRecordFactory, factory);

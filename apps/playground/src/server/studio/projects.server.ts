@@ -10,7 +10,6 @@ import {
 import { makeIsoDateString, makeStudioRecordId } from "../../features/projects/contracts";
 import { studioHttp } from "../../features/projects/http.server";
 import {
-	StudioPersistencePolicyLive,
 	makeStudioRecordFactoryLayer,
 	StudioProjectsLive,
 } from "../../features/projects/service.server";
@@ -95,7 +94,6 @@ export const PlaygroundStudioLayer = Layer.effect(
 					}),
 				});
 				const dependencies = Layer.mergeAll(
-					StudioPersistencePolicyLive,
 					makeStudioRecordFactoryLayer({
 						createId: (kind) => makeStudioRecordId(ids.create(kind)),
 						now: clock.nowIso.pipe(Effect.map(makeIsoDateString)),
