@@ -1,3 +1,4 @@
+import { buildResponse } from "@sketchi/diagrams/build/operation";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
@@ -17,7 +18,7 @@ it("builds a mindmap through the Studio host and displays its accepted scene", a
 	const storage = makeMemoryArtifactStorage();
 	const executor = await Effect.runPromise(
 		makeStudioFamilyExecutor(familyForType("mindmap"), (input) =>
-			buildMindmap(input).pipe(
+			buildResponse(buildMindmap(input)).pipe(
 				Effect.provideService(CodeModeArtifactStorage, storage),
 				Effect.provideService(CodeModeRuntimeEnvironment, {
 					createId: (prefix) => `${prefix}_studio_mindmap`,

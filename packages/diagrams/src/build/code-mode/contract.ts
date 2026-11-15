@@ -1,3 +1,4 @@
+import { NormalizedFlowchartSpecSchema } from "../../families/flowchart/spec.js";
 import {
 	BuildArtifactFormatSchema,
 	ArtifactFormatSchema,
@@ -21,11 +22,7 @@ import {
 	IconRecipeSchema,
 } from "@sketchi/drawing";
 
-import {
-	FLOWCHART_DIRECTIONS,
-	FlowchartDocumentSchema,
-	type FlowchartDocument,
-} from "../../families/flowchart/document.js";
+import { FlowchartDocumentSchema } from "../../families/flowchart/document.js";
 import { FlowchartEditsSchema } from "../../families/flowchart/edits.js";
 import { CHART_KINDS, CHART_ORIENTATIONS } from "../../families/chart/document.js";
 import {
@@ -458,8 +455,6 @@ const DiagramStyleWithDefault = DiagramSpecStyle.annotate({
  * A flowchart is diagram-core's flowchart document: nodes as an id → label map,
  * edges as [from, to, label?], and groups and lanes that list what they contain.
  */
-export const FlowchartSpec = FlowchartDocumentSchema;
-export type FlowchartSpec = FlowchartDocument;
 
 /**
  * The authoring form of diagram-core's canonical SequenceDiagram: message ids
@@ -812,47 +807,6 @@ export const OrgChartSpec = Schema.Struct({
 export interface OrgChartSpec extends Schema.Schema.Type<typeof OrgChartSpec> {}
 
 /**
- * The authoring form of diagram-core's canonical VennDiagram: regions default
- * to none and style is defaulted. buildVennDiagram normalizes it into the core
- * contract, which owns every invariant.
- */
-export const VennSetSpec = Schema.Struct({
-	id: RequiredNonEmptyString,
-	label: RequiredNonEmptyString,
-	color: optionalContract(NonEmptyString),
-}).annotate({ identifier: undefined });
-
-export interface VennSetSpec extends Schema.Schema.Type<typeof VennSetSpec> {}
-
-export const VennRegionSpec = Schema.Struct({
-	sets: requiredArray(nonEmptyArray(NonEmptyString)),
-	label: optionalContract(NonEmptyString),
-	items: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	count: optionalContract(
-		Schema.Int.check(
-			Schema.isGreaterThanOrEqualTo(0, { message: "Too small: expected number to be >=0" }),
-		),
-	),
-}).annotate({ identifier: undefined });
-
-export interface VennRegionSpec extends Schema.Schema.Type<typeof VennRegionSpec> {}
-
-const vennRegionsDefault: Array<typeof VennRegionSpec.Encoded> = [];
-const VennRegionsWithDefault = Schema.Array(VennRegionSpec)
-	.pipe(Schema.mutable)
-	.annotate({ default: vennRegionsDefault })
-	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(vennRegionsDefault)));
-export const VennSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	sets: requiredArray(nonEmptyArray(VennSetSpec)),
-	regions: VennRegionsWithDefault,
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface VennSpec extends Schema.Schema.Type<typeof VennSpec> {}
-
-/**
  * The authoring form of diagram-core's canonical JourneyDiagram: style is
  * defaulted. buildJourneyMap normalizes it into the core contract, which owns
  * every invariant.
@@ -1085,7 +1039,7 @@ const FlowchartRequestText = NonEmptyString.check(
 
 export const BuildFlowchartRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(FlowchartSpec),
+	spec: requiredObject(FlowchartDocumentSchema),
 	/** The user's words: an accepted build lists what they state that it misses. */
 	request: optionalContract(FlowchartRequestText),
 	options: optionalContract(BuildFlowchartOptions),
@@ -1110,7 +1064,7 @@ export interface EditFlowchartRequest extends Schema.Schema.Type<typeof EditFlow
 /** The document Studio's model writes: the same one every other surface takes. */
 const BuildFlowchartToolInputContract = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(FlowchartSpec),
+	spec: requiredObject(FlowchartDocumentSchema),
 });
 export type BuildFlowchartToolInput = typeof BuildFlowchartToolInputContract.Type;
 const BuildFlowchartToolInputStandardSchema = Schema.toStandardSchemaV1(
@@ -1281,22 +1235,6 @@ export const BuildOrgChartToolInputSchema = Schema.Struct({
 	spec: requiredObject(OrgChartToolSpecSchema),
 });
 export type BuildOrgChartToolInput = typeof BuildOrgChartToolInputSchema.Type;
-export const BuildVennDiagramRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(VennSpec),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildVennDiagramRequest extends Schema.Schema.Type<
-	typeof BuildVennDiagramRequest
-> {}
-/** The Venn diagram spec a model authors; style is always the Sketchi palette. */
-export const VennToolSpecSchema = VennSpec.mapFields(({ style: _style, ...fields }) => fields);
-export const BuildVennDiagramToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(VennToolSpecSchema),
-});
-export type BuildVennDiagramToolInput = typeof BuildVennDiagramToolInputSchema.Type;
 export const BuildJourneyMapRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(JourneySpec),
@@ -1899,16 +1837,7 @@ export interface ApplyDiagramPatchRequest extends Schema.Schema.Type<
 	typeof ApplyDiagramPatchRequest
 > {}
 
-export type NormalizedFlowchartSpec = typeof NormalizedFlowchartSpecSchema.Type;
-
 export type NormalizedSequenceDiagramSpec = typeof NormalizedSequenceDiagramSpecSchema.Type;
-
-/** A flowchart document as the build read it: strings cleaned, id and direction filled. */
-const NormalizedFlowchartSpecSchema = Schema.Struct({
-	...FlowchartDocumentSchema.fields,
-	id: NonEmptyString,
-	direction: literals(FLOWCHART_DIRECTIONS),
-});
 
 const NormalizedSequenceDiagramSpecSchema = Schema.Struct({
 	id: NonEmptyString,
@@ -2002,14 +1931,6 @@ const NormalizedOrgChartSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedOrgChartSpec = typeof NormalizedOrgChartSpecSchema.Type;
-const NormalizedVennSpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	sets: Schema.Array(VennSetSpec).pipe(Schema.mutable),
-	regions: Schema.Array(VennRegionSpec).pipe(Schema.mutable),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
-export type NormalizedVennSpec = typeof NormalizedVennSpecSchema.Type;
 const NormalizedJourneySpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -2431,48 +2352,6 @@ export const BuildOrgChartResultSchema = Schema.Union([
 	BuildOrgChartRejected,
 ]);
 export type BuildOrgChartResult = typeof BuildOrgChartResultSchema.Type;
-
-export const BuildVennDiagramAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedVennSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildVennDiagramAccepted extends Schema.Schema.Type<
-	typeof BuildVennDiagramAccepted
-> {}
-export const BuildVennDiagramRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_venn_diagram",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedVennSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildVennDiagramRejected extends Schema.Schema.Type<
-	typeof BuildVennDiagramRejected
-> {}
-export const BuildVennDiagramResultSchema = Schema.Union([
-	BuildVennDiagramAccepted,
-	BuildVennDiagramRejected,
-]);
-export type BuildVennDiagramResult = typeof BuildVennDiagramResultSchema.Type;
 
 export const BuildJourneyMapAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

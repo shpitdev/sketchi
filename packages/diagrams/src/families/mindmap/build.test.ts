@@ -1,14 +1,14 @@
 import { Effect, Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { buildMindmap, decodeMindmapRequest } from "./build.js";
+import { mindmapBuild } from "./build.js";
 
 /** Only the external artifact capability is replaced; the public family operation is real. */
 function run(input: unknown) {
 	let exports = 0;
 	const result = Effect.runPromise(
 		Effect.result(
-			Effect.flatMap(decodeMindmapRequest(input), (request) =>
-				buildMindmap(request, {
+			Effect.flatMap(mindmapBuild.decode(input), (request) =>
+				mindmapBuild.build(request, {
 					createId: () => "build-mindmap",
 					exportScene: (scene) => {
 						exports++;
@@ -40,7 +40,7 @@ describe("mindmap build policy", () => {
 		});
 		const result = await operation.result;
 		expect(Result.isSuccess(result)).toBe(true);
-		if (Result.isFailure(result)) throw result.failure;
+		if (Result.isFailure(result)) return expect.fail("Expected an accepted mindmap");
 		expect(result.success.normalizedSpec).toMatchObject({
 			id: "a-detailed-launch-strategy-with-a-deliberately-l",
 			title,
@@ -74,9 +74,9 @@ describe("mindmap build policy", () => {
 		const result = await operation.result;
 		expect(Result.isFailure(result)).toBe(true);
 		if (Result.isSuccess(result)) throw new Error("Expected rejected mindmap");
-		expect(result.failure).toMatchObject({
+		expect(result.failure.toResult()).toMatchObject({
 			status: "invalid_mindmap",
-			context: { issues: [{ code, stage: "mindmap" }] },
+			issues: [{ code, stage: "mindmap" }],
 		});
 		expect(JSON.stringify(result.failure).length).toBeLessThan(2000);
 		expect(operation.exports()).toBe(0);
@@ -97,9 +97,9 @@ describe("mindmap build policy", () => {
 		const result = await operation.result;
 		expect(Result.isFailure(result)).toBe(true);
 		if (Result.isSuccess(result)) throw new Error("Expected invalid input");
-		expect(result.failure).toMatchObject({
+		expect(result.failure.toResult()).toMatchObject({
 			status: "invalid_input",
-			context: { issues: [{ stage: "input", ref: { path } }] },
+			issues: [{ stage: "input", ref: { path } }],
 		});
 		expect(operation.exports()).toBe(0);
 	});
@@ -112,12 +112,10 @@ describe("mindmap build policy", () => {
 		const result = await operation.result;
 		expect(Result.isFailure(result)).toBe(true);
 		if (Result.isSuccess(result)) throw new Error("Expected quality rejection");
-		expect(result.failure).toMatchObject({
+		expect(result.failure.toResult()).toMatchObject({
 			status: "quality_failed",
-			context: {
-				quality: { score: 6, threshold: 8 },
-				issues: [{ code: "generic_label" }, { code: "generic_label" }],
-			},
+			quality: { score: 6, threshold: 8 },
+			issues: [{ code: "generic_label" }, { code: "generic_label" }],
 		});
 		expect(operation.exports()).toBe(0);
 	});

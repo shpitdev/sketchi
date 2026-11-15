@@ -1,3 +1,4 @@
+import { buildResponse, type BuildRejection } from "@sketchi/diagrams/build/operation";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
@@ -162,7 +163,11 @@ export const PlaygroundCodeModeLive = Layer.effect(
 
 		const provideRequestCodeMode = Effect.fn("playground.codeMode.provideRequestServices")(
 			function* <A>(
-				workflow: Effect.Effect<A, never, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
+				workflow: Effect.Effect<
+					A,
+					BuildRejection<A>,
+					CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+				>,
 			) {
 				const env = yield* PlaygroundBindings;
 				const ids = yield* PlaygroundIds;
@@ -189,7 +194,7 @@ export const PlaygroundCodeModeLive = Layer.effect(
 						: {}),
 				} satisfies CodeModeRuntimeOptions;
 
-				return yield* workflow.pipe(
+				return yield* buildResponse(workflow).pipe(
 					Effect.provideService(CodeModeArtifactStorage, storage),
 					Effect.provideService(CodeModeRuntimeEnvironment, runtimeEnvironment),
 				);

@@ -106,7 +106,7 @@ export const makeStudioFamilyTools = Effect.fn("playground.chat.familyTools")(fu
 });
 
 type PlainFamily = Exclude<DiagramFamily, { readonly type: "flowchart" | "sequence" }>;
-type PlainFamilyResult = Effect.Success<ReturnType<ReturnType<PlainFamily["build"]>>>;
+type PlainFamilyResult = PlainFamily["contracts"]["output"]["Type"];
 
 export function makeStudioFamilyExecutor<F extends PlainFamily, E, R>(
 	family: F,

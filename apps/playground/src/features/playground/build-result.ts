@@ -1,3 +1,4 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { stateLabel } from "@sketchi/diagrams/families/state-machine/document";
 import {
 	BuildFlowchartRequestSchema,
@@ -13,8 +14,6 @@ import {
 	BuildClassDiagramToolInputSchema,
 	BuildOrgChartResultSchema,
 	BuildOrgChartToolInputSchema,
-	BuildVennDiagramResultSchema,
-	BuildVennDiagramToolInputSchema,
 	BuildJourneyMapResultSchema,
 	BuildJourneyMapToolInputSchema,
 	BuildSankeyResultSchema,
@@ -36,7 +35,6 @@ import {
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
-	type BuildVennDiagramResult,
 	type BuildJourneyMapResult,
 	type BuildSankeyResult,
 	type BuildWireframeResult,
@@ -44,11 +42,7 @@ import {
 	type BuildTimelineResult,
 	type BuildChartResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
-import {
-	BuildMindmapResultSchema,
-	BuildMindmapToolInputSchema,
-	type BuildMindmapResult,
-} from "@sketchi/diagrams/families/mindmap/build";
+
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { Result, Schema } from "effect";
 import { type UIMessage } from "ai";
@@ -59,7 +53,7 @@ type MessagePart = UIMessage["parts"][number];
 /** A canonical build result from any Studio build tool. */
 export type StudioBuildResult =
 	| BuildFlowchartResult
-	| BuildMindmapResult
+	| ReturnType<typeof familyForType<"mindmap">>["contracts"]["output"]["Type"]
 	| BuildSequenceDiagramResult
 	| BuildTimelineResult
 	| BuildChartResult
@@ -68,7 +62,7 @@ export type StudioBuildResult =
 	| BuildErDiagramResult
 	| BuildClassDiagramResult
 	| BuildOrgChartResult
-	| BuildVennDiagramResult
+	| ReturnType<typeof familyForType<"venn">>["contracts"]["output"]["Type"]
 	| BuildJourneyMapResult
 	| BuildSankeyResult
 	| BuildWireframeResult
@@ -86,9 +80,9 @@ const topicLabels = (topic: MindmapTopic): string[] => [
 const BUILD_TOOLS = {
 	"tool-build_mindmap": {
 		family: "mindmap",
-		decodeResult: Schema.decodeUnknownResult(BuildMindmapResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("mindmap").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildMindmapToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("mindmap").studioInput)(input);
 			return Result.isSuccess(decoded) ? topicLabels(decoded.success.spec.root) : [];
 		},
 	},
@@ -201,9 +195,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_venn_diagram": {
 		family: "venn",
-		decodeResult: Schema.decodeUnknownResult(BuildVennDiagramResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("venn").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildVennDiagramToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("venn").studioInput)(input);
 			return Result.isSuccess(decoded) ? decoded.success.spec.sets.map((set) => set.label) : [];
 		},
 	},

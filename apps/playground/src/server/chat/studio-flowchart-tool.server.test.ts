@@ -1,3 +1,4 @@
+import { type FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
 import { describe, expect, it, vi } from "@effect/vitest";
 import { familyForType } from "@sketchi/diagrams/family";
 import { Effect, Fiber, Schema } from "effect";
@@ -17,7 +18,6 @@ import {
 import {
 	BuildFlowchartRequestSchema,
 	type BuildFlowchartResult,
-	type FlowchartSpec,
 } from "@sketchi/diagrams/build/code-mode/contract";
 import {
 	buildFlowchart,
@@ -36,7 +36,7 @@ import {
 	studioTurnOutcome,
 } from "./studio-build-tool.server";
 
-function acceptedSpec(): FlowchartSpec {
+function acceptedSpec(): FlowchartDocument {
 	return {
 		id: "release-review-loop",
 		title: "Release review loop",
@@ -58,7 +58,7 @@ function acceptedSpec(): FlowchartSpec {
 	};
 }
 
-function rejectedSpec(): FlowchartSpec {
+function rejectedSpec(): FlowchartDocument {
 	const spec = acceptedSpec();
 	return {
 		...spec,
@@ -666,7 +666,7 @@ describe("Studio chat node logos", () => {
 			}),
 		);
 
-		const built = received[0] as { spec: FlowchartSpec };
+		const built = received[0] as { spec: FlowchartDocument };
 		expect(built.spec.nodes["start"]).toEqual({ label: "Open release on GitHub", icon: "GitHub" });
 		expect(built.spec.nodes["review"]).toEqual({ label: "Release ready?" });
 		expect(result.issues[0]).toMatchObject({
@@ -711,7 +711,7 @@ describe("Studio chat node logos", () => {
 			}),
 		);
 
-		const built = received[0] as { spec: FlowchartSpec };
+		const built = received[0] as { spec: FlowchartDocument };
 		expect(built.spec.logos).toBe(true);
 		expect(built.spec.nodes).toEqual({
 			start: { label: "Open release on GitHub", icon: "github" },

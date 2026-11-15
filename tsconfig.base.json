@@ -519,6 +519,51 @@
                 "unstableApiUsage": "off"
               }
             }
+          },
+          {
+            "include": [
+              "packages/diagrams/src/build/operation.ts",
+              "packages/diagrams/src/build/scene.ts",
+              "packages/diagrams/src/families/mindmap/build.ts",
+              "packages/diagrams/src/families/venn/document.ts",
+              "packages/diagrams/src/families/venn/build.ts",
+              "packages/diagrams/src/families/venn/layout.ts",
+              "packages/diagrams/src/families/venn/render.ts",
+              "packages/diagrams/src/families/venn/readout.ts"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "abortControllerInEffect": "error",
+                "asyncFunction": "error",
+                "cryptoRandomUUID": "error",
+                "cryptoRandomUUIDInEffect": "error",
+                "extendsNativeError": "error",
+                "globalConsole": "error",
+                "globalConsoleInEffect": "error",
+                "globalDate": "error",
+                "globalDateInEffect": "error",
+                "globalFetch": "error",
+                "globalFetchInEffect": "error",
+                "globalJson": "error",
+                "globalJsonInEffect": "error",
+                "globalRandom": "error",
+                "globalRandomInEffect": "error",
+                "globalTimers": "error",
+                "globalTimersInEffect": "error",
+                "instanceOfSchema": "error",
+                "newPromise": "error",
+                "nodeBuiltinImport": "error",
+                "preferEffectArray": "error",
+                "preferEffectRecord": "error",
+                "preferEffectString": "error",
+                "processEnv": "error",
+                "processEnvInEffect": "error",
+                "runEffectInsideEffect": "error",
+                "schemaSync": "error",
+                "schemaSyncInEffect": "error",
+                "strictEffectProvide": "error"
+              }
+            }
           }
         ]
       }

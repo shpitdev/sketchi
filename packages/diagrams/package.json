@@ -370,6 +370,10 @@
 		"./family": {
 			"types": "./dist/family.d.ts",
 			"default": "./dist/family.js"
+		},
+		"./build/operation": {
+			"types": "./dist/build/operation.d.ts",
+			"default": "./dist/build/operation.js"
 		}
 	},
 	"dependencies": {

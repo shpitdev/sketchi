@@ -1,7 +1,7 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { vennFixture } from "@sketchi/diagrams/families/venn/document";
-import { vennStressFixtures } from "@sketchi/diagrams/families/venn/fixtures";
-import { renderDiagram } from "@sketchi/diagrams/family";
+import { vennFixture } from "./document.js";
+import { vennStressFixtures } from "./fixtures.js";
+import { renderDiagram } from "../../family.js";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 

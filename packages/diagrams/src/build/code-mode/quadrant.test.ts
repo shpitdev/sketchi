@@ -1,3 +1,4 @@
+import { buildResponse, type BuildRejection } from "../operation.js";
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
 import { quadrantFixture } from "../../families/quadrant/document.js";
@@ -8,12 +9,12 @@ import { BuildQuadrantChartResultSchema } from "./contract.js";
 import { buildCanonicalDocument, canonicalDocumentFromDiagram } from "./documents.js";
 
 const storage = makeMemoryArtifactStorage();
-function run<A>(
-	effect: Effect.Effect<A, never, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+function run<A, E extends BuildRejection<unknown>>(
+	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
 ) {
 	let id = 0;
 	return Effect.runPromise(
-		effect.pipe(
+		buildResponse(effect).pipe(
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_quadrant_${(id += 1)}`,
 			}),

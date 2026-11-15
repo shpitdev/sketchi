@@ -1,3 +1,4 @@
+import { Schema } from "effect";
 /**
  * Canonical, renderer-independent scene IR used by every Sketchi diagram.
  *
@@ -726,26 +727,29 @@ export interface CanvasSpec {
 	readonly zOrder: string[];
 }
 
-export interface CanvasValidationIssue {
-	readonly code:
-		| "duplicate_element_id"
-		| "duplicate_layer_id"
-		| "duplicate_z_order_element"
-		| "empty_canvas"
-		| "invalid_binding"
-		| "invalid_composition"
-		| "invalid_geometry"
-		| "invalid_icon"
-		| "invalid_polygon"
-		| "label_overflow"
-		| "limit_exceeded"
-		| "missing_z_order_element"
-		| "unknown_layout_target"
-		| "unknown_z_order_element";
-	readonly elementId?: string;
-	readonly message: string;
-	readonly path: string;
-}
+/** Scene-check failures cross the shared build workflow without losing their domain code or path. */
+export const CanvasValidationIssue = Schema.Struct({
+	code: Schema.Literals([
+		"duplicate_element_id",
+		"duplicate_layer_id",
+		"duplicate_z_order_element",
+		"empty_canvas",
+		"invalid_binding",
+		"invalid_composition",
+		"invalid_geometry",
+		"invalid_icon",
+		"invalid_polygon",
+		"label_overflow",
+		"limit_exceeded",
+		"missing_z_order_element",
+		"unknown_layout_target",
+		"unknown_z_order_element",
+	]),
+	elementId: Schema.optionalKey(Schema.String),
+	message: Schema.String,
+	path: Schema.String,
+});
+export interface CanvasValidationIssue extends Schema.Schema.Type<typeof CanvasValidationIssue> {}
 
 type PositionedCanvasElement = Extract<CanvasElement, { readonly x: number; readonly y: number }>;
 

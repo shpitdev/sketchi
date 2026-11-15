@@ -1,6 +1,6 @@
+import { String as Str, Array as Arr, Option } from "effect";
 import { estimateTextWidth, wrapTextToWidth } from "@sketchi/drawing";
 import { vennRegionKey, type VennDiagram } from "./document.js";
-
 export const VENN_ITEM_FONT = 15;
 export const VENN_REGION_LABEL_FONT = 17;
 export const VENN_COUNT_FONT = 26;
@@ -15,7 +15,7 @@ const ITEM_GAP = 7;
 const REGION_LABEL_GAP = 4;
 /** Circles never shrink below this, so an empty or sparse diagram still reads. */
 const MIN_RADIUS = { 2: 110, 3: 120 } as const;
-const MAX_RADIUS = 2_400;
+const MAX_RADIUS = 2400;
 /** Centre distance over radius: the canonical arrangement first, then tighter or looser. */
 const SEPARATIONS = [1, 0.9, 1.1, 0.8, 1.2, 0.7, 1.3, 0.6, 1.4] as const;
 /** How much a separation away from the canonical one must save in area to win. */
@@ -24,23 +24,19 @@ const SEPARATION_PENALTY = 0.4;
 const WRAP_WIDTHS = [Infinity, 220, 170, 130, 100, 75] as const;
 /** How much larger a region may grow to keep its lines whole rather than wrap them. */
 const WRAP_ALLOWANCE = 0.2;
-
 export interface VennPoint {
 	readonly x: number;
 	readonly y: number;
 }
-
 export interface VennCircle extends VennPoint {
 	readonly r: number;
 }
-
 export interface VennBox {
 	readonly left: number;
 	readonly top: number;
 	readonly right: number;
 	readonly bottom: number;
 }
-
 /** One line of a region's text, its top relative to the block's top. */
 export interface VennTextLine {
 	readonly text: string;
@@ -49,7 +45,6 @@ export interface VennTextLine {
 	readonly height: number;
 	readonly top: number;
 }
-
 /** One drawn text of a region: its label, one item (possibly wrapped), or its count. */
 export interface VennTextPiece {
 	readonly role: "label" | "item" | "count";
@@ -61,14 +56,12 @@ export interface VennTextPiece {
 	readonly top: number;
 	readonly lines: readonly VennTextLine[];
 }
-
 export interface VennBlock {
 	readonly pieces: readonly VennTextPiece[];
 	readonly lines: readonly VennTextLine[];
 	readonly width: number;
 	readonly height: number;
 }
-
 export interface VennRegionPlan {
 	/** Set indexes, ascending. */
 	readonly key: readonly number[];
@@ -78,14 +71,12 @@ export interface VennRegionPlan {
 	/** The closest any line comes to an outline it must stay clear of. */
 	readonly clearance: number;
 }
-
 export interface VennSetLabelPlan {
 	readonly text: string;
 	readonly width: number;
 	readonly height: number;
 	readonly box: VennBox;
 }
-
 export interface VennLayout {
 	readonly radius: number;
 	readonly separation: number;
@@ -95,10 +86,9 @@ export interface VennLayout {
 	/** Placements tried, for the deterministic work guard. */
 	readonly work: number;
 }
-
 function measureLines(text: string, fontSize: number, top: number): VennTextLine[] {
 	const height = fontSize * VENN_LINE_HEIGHT;
-	return text.split("\n").map((line, index) => ({
+	return Arr.map(Str.split(text, "\n"), (line, index) => ({
 		text: line,
 		fontSize,
 		width: Math.ceil(estimateTextWidth(line, fontSize)),
@@ -106,12 +96,10 @@ function measureLines(text: string, fontSize: number, top: number): VennTextLine
 		top: top + index * height,
 	}));
 }
-
 /** Whole words only: a word wider than the wrap width keeps its own line. */
 function wrapWhole(text: string, width: number, fontSize: number): string {
 	return wrapLines(text, width, fontSize).text;
 }
-
 /**
  * Wrap each authored line on its own at word boundaries. `whole` is false when
  * a wrap had to split a Latin word; the natural lines are always whole.
@@ -120,27 +108,30 @@ function wrapLines(
 	text: string,
 	width: number,
 	fontSize: number,
-): { text: string; whole: boolean } {
+): {
+	text: string;
+	whole: boolean;
+} {
 	let whole = true;
-	const lines = text
-		.trim()
-		.split(/\s*\n\s*/u)
-		.map((line) => {
-			if (!Number.isFinite(width)) return line;
-			const wrapped = wrapTextToWidth(line, width, fontSize);
-			if (!breaksBetweenWords(line, wrapped)) whole = false;
-			return wrapped;
-		});
-	return { text: lines.join("\n"), whole };
+	const lines = Arr.map(Str.split(Str.trim(text), /\s*\n\s*/u), (line) => {
+		if (!Number.isFinite(width)) return line;
+		const wrapped = wrapTextToWidth(line, width, fontSize);
+		if (!breaksBetweenWords(line, wrapped)) whole = false;
+		return wrapped;
+	});
+	return { text: Arr.join(lines, "\n"), whole };
 }
-
 interface RegionContent {
 	readonly label?: string;
 	readonly items: readonly string[];
 	readonly count?: number;
 }
-
-function blockFor(content: RegionContent, wrapWidth: number): VennBlock & { whole: boolean } {
+function blockFor(
+	content: RegionContent,
+	wrapWidth: number,
+): VennBlock & {
+	whole: boolean;
+} {
 	const pieces: VennTextPiece[] = [];
 	let top = 0;
 	let whole = true;
@@ -151,7 +142,10 @@ function blockFor(content: RegionContent, wrapWidth: number): VennBlock & { whol
 	};
 	const add = (role: VennTextPiece["role"], index: number, text: string, fontSize: number) => {
 		if (pieces.length)
-			top += role === "item" && pieces.at(-1)?.role === "item" ? ITEM_GAP : REGION_LABEL_GAP;
+			top +=
+				role === "item" && Option.getOrUndefined(Arr.last(pieces))?.role === "item"
+					? ITEM_GAP
+					: REGION_LABEL_GAP;
 		const lines = measureLines(text, fontSize, top);
 		const height = lines.length * fontSize * VENN_LINE_HEIGHT;
 		pieces.push({
@@ -159,7 +153,7 @@ function blockFor(content: RegionContent, wrapWidth: number): VennBlock & { whol
 			index,
 			text,
 			fontSize,
-			width: Math.max(...lines.map((line) => line.width)),
+			width: Math.max(...Arr.map(lines, (line) => line.width)),
 			height,
 			top,
 			lines,
@@ -175,40 +169,40 @@ function blockFor(content: RegionContent, wrapWidth: number): VennBlock & { whol
 		);
 	if (content.count !== undefined)
 		add("count", 0, content.count.toLocaleString("en-US"), VENN_COUNT_FONT);
-	content.items.forEach((item, index) =>
+	Arr.forEach(content.items, (item, index) =>
 		add("item", index, wrap(item, wrapWidth, VENN_ITEM_FONT), VENN_ITEM_FONT),
 	);
-	const lines = pieces.flatMap((piece) => piece.lines);
+	const lines = Arr.flatMap(pieces, (piece) => piece.lines);
 	return {
 		pieces,
 		lines,
-		width: Math.max(0, ...lines.map((line) => line.width)),
+		width: Math.max(0, ...Arr.map(lines, (line) => line.width)),
 		height: top,
 		whole,
 	};
 }
-
 const WIDE_GLYPH = /[\u1100-\u11ff\u2e80-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/u;
-
 /** Whether every line break falls at a space, or beside a wide glyph that breaks on its own. */
 function breaksBetweenWords(original: string, wrapped: string): boolean {
-	const text = original.trim();
-	const lines = wrapped.split("\n");
+	const text = Str.trim(original);
+	const lines = Str.split(wrapped, "\n");
 	let at = 0;
 	for (const [index, line] of lines.entries()) {
-		if (!text.startsWith(line, at)) return false;
+		if (!Str.startsWith(line, at)(text)) return false;
 		at += line.length;
 		if (index === lines.length - 1) break;
 		if (text[at] === " ") {
 			while (text[at] === " ") at += 1;
 			continue;
 		}
-		if (!WIDE_GLYPH.test(line.at(-1) ?? "") && !WIDE_GLYPH.test(lines[index + 1]?.[0] ?? ""))
+		if (
+			!WIDE_GLYPH.test(Option.getOrUndefined(Str.at(line, -1)) ?? "") &&
+			!WIDE_GLYPH.test(lines[index + 1]?.[0] ?? "")
+		)
 			return false;
 	}
 	return at === text.length;
 }
-
 /** The distinct blocks a region's text can take, one per useful wrap width that keeps words whole. */
 function blockOptions(content: RegionContent): VennBlock[] {
 	const options: VennBlock[] = [];
@@ -217,14 +211,16 @@ function blockOptions(content: RegionContent): VennBlock[] {
 	for (const width of WRAP_WIDTHS) {
 		const { whole, ...block } = blockFor(content, width);
 		if (!whole) continue;
-		const signature = block.pieces.map((piece) => piece.text).join("\u0000");
+		const signature = Arr.join(
+			Arr.map(block.pieces, (piece) => piece.text),
+			"\u0000",
+		);
 		if (seen.has(signature)) continue;
 		seen.add(signature);
 		options.push(block);
 	}
 	return options;
 }
-
 /** Unit-radius centres of the symmetric arrangement, centroid at the origin. */
 export function vennUnitCentres(count: number, separation: number): VennPoint[] {
 	const d = separation;
@@ -240,29 +236,25 @@ export function vennUnitCentres(count: number, separation: number): VennPoint[] 
 		{ x: 0, y: (2 * h) / 3 },
 	];
 }
-
 function circlesAt(count: number, separation: number, radius: number): VennCircle[] {
-	return vennUnitCentres(count, separation).map((centre) => ({
+	return Arr.map(vennUnitCentres(count, separation), (centre) => ({
 		x: centre.x * radius,
 		y: centre.y * radius,
 		r: radius,
 	}));
 }
-
 /** How far a box's farthest corner sits inside a circle (negative: it pokes out). */
 export function insideClearance(box: VennBox, circle: VennCircle): number {
 	const dx = Math.max(Math.abs(box.left - circle.x), Math.abs(box.right - circle.x));
 	const dy = Math.max(Math.abs(box.top - circle.y), Math.abs(box.bottom - circle.y));
 	return circle.r - Math.hypot(dx, dy);
 }
-
 /** How far a box stays outside a circle (negative: the circle reaches into it). */
 export function outsideClearance(box: VennBox, circle: VennCircle): number {
 	const dx = Math.max(box.left - circle.x, 0, circle.x - box.right);
 	const dy = Math.max(box.top - circle.y, 0, circle.y - box.bottom);
 	return Math.hypot(dx, dy) - circle.r;
 }
-
 /** The clearance of a box from a region's outlines: inside its own sets, outside the rest. */
 export function regionClearance(
 	box: VennBox,
@@ -270,15 +262,16 @@ export function regionClearance(
 	key: readonly number[],
 ): number {
 	let clearance = Infinity;
-	circles.forEach((circle, index) => {
+	// Every search candidate visits this loop; indexed traversal avoids a callback per candidate.
+	for (let index = 0; index < circles.length; index++) {
+		const circle = circles[index]!;
 		const value = key.includes(index)
 			? insideClearance(box, circle)
 			: outsideClearance(box, circle);
 		if (value < clearance) clearance = value;
-	});
+	}
 	return clearance;
 }
-
 export function lineBox(line: VennTextLine, centre: VennPoint, blockHeight: number): VennBox {
 	const top = centre.y - blockHeight / 2 + line.top;
 	return {
@@ -288,7 +281,6 @@ export function lineBox(line: VennTextLine, centre: VennPoint, blockHeight: numb
 		bottom: top + line.height,
 	};
 }
-
 const DIRECTIONS = [
 	[1, 0],
 	[-1, 0],
@@ -299,18 +291,19 @@ const DIRECTIONS = [
 	[Math.SQRT1_2, -Math.SQRT1_2],
 	[-Math.SQRT1_2, -Math.SQRT1_2],
 ] as const;
-
 interface Counter {
 	work: number;
 }
-
 /** Hill-climb a clearance from a start, halving the step until it settles below half a pixel. */
 function climb(
 	start: VennPoint,
 	initialStep: number,
 	clearanceAt: (point: VennPoint) => number,
 	counter: Counter,
-): { point: VennPoint; clearance: number } {
+): {
+	point: VennPoint;
+	clearance: number;
+} {
 	let point = start;
 	let best = clearanceAt(point);
 	let step = initialStep;
@@ -330,18 +323,17 @@ function climb(
 	}
 	return { point, clearance: best };
 }
-
 /** The point of a region farthest inside it: where a block starts its search. */
 function regionPole(
 	circles: readonly VennCircle[],
 	key: readonly number[],
 	counter: Counter,
 ): VennPoint {
-	const inside = key.map((index) => circles[index]!);
-	const outside = circles.filter((_, index) => !key.includes(index));
+	const inside = Arr.map(key, (index) => circles[index]!);
+	const outside = Arr.filter(circles, (_, index) => !key.includes(index));
 	const mean = (points: readonly VennPoint[]) => ({
-		x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
-		y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+		x: Arr.reduce(points, 0, (sum, point) => sum + point.x) / points.length,
+		y: Arr.reduce(points, 0, (sum, point) => sum + point.y) / points.length,
 	});
 	const own = mean(inside);
 	let start = own;
@@ -368,7 +360,6 @@ function regionPole(
 		counter,
 	).point;
 }
-
 /**
  * Move a point to the middle of the stretch, across and down, where the
  * clearance stays at least `level`: a block with room to spare sits centred in
@@ -409,7 +400,6 @@ function centreInLevel(
 	}
 	return point;
 }
-
 function placeBlock(
 	block: VennBlock,
 	circles: readonly VennCircle[],
@@ -417,7 +407,10 @@ function placeBlock(
 	pole: VennPoint,
 	counter: Counter,
 	centre = false,
-): { center: VennPoint; clearance: number } {
+): {
+	center: VennPoint;
+	clearance: number;
+} {
 	const clearanceAt = (point: VennPoint) => {
 		let clearance = Infinity;
 		for (const line of block.lines) {
@@ -437,13 +430,11 @@ function placeBlock(
 	const centred = centreInLevel(point, level, radius * 2, clearanceAt, counter);
 	return { center: centred, clearance: clearanceAt(centred) };
 }
-
 interface RegionFit {
 	readonly block: VennBlock;
 	readonly center: VennPoint;
 	readonly clearance: number;
 }
-
 /** The best-placed block a region can take at one size, or none that clears the margin. */
 function fitRegion(
 	options: readonly VennBlock[],
@@ -460,12 +451,10 @@ function fitRegion(
 	}
 	return undefined;
 }
-
 interface RegionInput {
 	readonly key: readonly number[];
 	readonly options: readonly VennBlock[];
 }
-
 /** The smallest radius (to 1 px) at which one block clears its region's outlines. */
 function blockRadius(
 	block: VennBlock,
@@ -496,7 +485,6 @@ function blockRadius(
 	}
 	return high;
 }
-
 /**
  * The radius a region needs: the smallest at which its widest wrap fits, unless
  * a narrower wrap saves more than a fifth of that, so lines stay whole where
@@ -526,21 +514,29 @@ function minimumRadius(
 		if (radius === floor) break;
 	}
 	if (!Number.isFinite(best)) return MAX_RADIUS;
-	return radii.find((radius) => radius <= best * (1 + WRAP_ALLOWANCE)) ?? best;
+	return (
+		Option.getOrUndefined(
+			Arr.findFirst(radii, (radius) => radius <= best * (1 + WRAP_ALLOWANCE)),
+		) ?? best
+	);
 }
-
-function unitExtent(count: number, separation: number): { width: number; height: number } {
+function unitExtent(
+	count: number,
+	separation: number,
+): {
+	width: number;
+	height: number;
+} {
 	return count === 2
 		? { width: 2 + separation, height: 2 }
 		: { width: 2 + separation, height: 2 + (separation * Math.sqrt(3)) / 2 };
 }
-
 /** The regions with text to draw. In a diagram of items, a count of 0 is an empty region and draws nothing. */
 function contentFor(diagram: VennDiagram): RegionInput[] {
 	const regions: RegionInput[] = [];
 	// A diagram that lists items and no positive count holds no data in a 0; one of counts does.
-	const itemized = diagram.regions.some((region) => (region.items?.length ?? 0) > 0);
-	const counted = diagram.regions.some((region) => (region.count ?? 0) > 0);
+	const itemized = Arr.some(diagram.regions, (region) => (region.items?.length ?? 0) > 0);
+	const counted = Arr.some(diagram.regions, (region) => (region.count ?? 0) > 0);
 	for (const region of diagram.regions) {
 		const items = region.items ?? [];
 		const count = region.count === 0 && itemized && !counted ? undefined : region.count;
@@ -556,7 +552,6 @@ function contentFor(diagram: VennDiagram): RegionInput[] {
 	}
 	return regions;
 }
-
 function setLabels(
 	diagram: VennDiagram,
 	circles: readonly VennCircle[],
@@ -564,19 +559,19 @@ function setLabels(
 	counter: Counter,
 ): VennSetLabelPlan[] {
 	const width = Math.max(radius * 1.6, 180);
-	const measured = diagram.sets.map((set) => {
+	const measured = Arr.map(diagram.sets, (set) => {
 		const text = wrapWhole(set.label, width, VENN_SET_LABEL_FONT);
 		const lines = measureLines(text, VENN_SET_LABEL_FONT, 0);
 		return {
 			text,
-			width: Math.max(...lines.map((line) => line.width)),
+			width: Math.max(...Arr.map(lines, (line) => line.width)),
 			height: lines.length * VENN_SET_LABEL_FONT * VENN_LINE_HEIGHT,
 		};
 	});
 	// The upper two sets label above their circles, a third below its own, each
 	// over the part only it covers, so a label never reads as an overlap's.
-	const top = Math.min(...circles.map((circle) => circle.y - circle.r));
-	const centres = measured.map((label, index) => {
+	const top = Math.min(...Arr.map(circles, (circle) => circle.y - circle.r));
+	const centres = Arr.map(measured, (label, index) => {
 		const circle = circles[index]!;
 		const own = regionPole(circles, [index], counter);
 		return index === 2
@@ -592,7 +587,7 @@ function setLabels(
 		if (firstRight > -gap / 2) centres[0] = { ...centres[0]!, x: -gap / 2 - first.width / 2 };
 		if (secondLeft < gap / 2) centres[1] = { ...centres[1]!, x: gap / 2 + second.width / 2 };
 	}
-	return measured.map((label, index) => {
+	return Arr.map(measured, (label, index) => {
 		const { x, top } = centres[index]!;
 		return {
 			...label,
@@ -605,7 +600,6 @@ function setLabels(
 		};
 	});
 }
-
 /**
  * Lay out a Venn diagram: the canonical symmetric arrangement, at the smallest
  * radius and the separation that let every region's text sit inside its
@@ -629,7 +623,7 @@ export function layoutVennDiagram(diagram: VennDiagram): VennLayout {
 		if (score < chosen.score - 1e-6) chosen = { separation, radius, score };
 	}
 	const circles = circlesAt(count, chosen.separation, chosen.radius);
-	const placed = regions.map((region): VennRegionPlan => {
+	const placed = Arr.map(regions, (region): VennRegionPlan => {
 		const fit = fitRegion(
 			region.options,
 			circles,

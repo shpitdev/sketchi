@@ -1,3 +1,5 @@
+import { FlowchartDocumentSchema } from "./families/flowchart/document.js";
+import { vennBuild } from "./families/venn/build.js";
 import { Effect, Result, Schema } from "effect";
 import * as Build from "./build/code-mode/contract.js";
 import type * as Runtime from "./build/code-mode/runtime.js";
@@ -18,7 +20,7 @@ import { renderGanttDiagram } from "./families/gantt/render.js";
 import { docs as journeyFamilyDocs } from "./families/journey/docs.js";
 import * as journeyFamily from "./families/journey/document.js";
 import { renderJourneyDiagram } from "./families/journey/render.js";
-import * as MindmapBuild from "./families/mindmap/build.js";
+import { mindmapBuild } from "./families/mindmap/build.js";
 import { docs as mindmapFamilyDocs } from "./families/mindmap/docs.js";
 import * as mindmapFamily from "./families/mindmap/document.js";
 import { mindmapFixture } from "./families/mindmap/fixtures.js";
@@ -110,7 +112,7 @@ export const families = [
 		),
 		validationError: flowchartFamily.FlowchartValidationError,
 		fixture: flowchartFamily.flowchartFixture,
-		spec: Build.FlowchartSpec,
+		spec: FlowchartDocumentSchema,
 		request: Build.BuildFlowchartRequestSchema,
 		contracts: {
 			input: Build.BuildFlowchartRequestSchema,
@@ -134,21 +136,12 @@ export const families = [
 		validationError: mindmapFamily.MindmapInputError,
 		fixture: mindmapFixture,
 		spec: mindmapFamily.MindmapDocument,
-		request: MindmapBuild.BuildMindmapRequest,
+		request: mindmapBuild.request,
 		contracts: {
-			input: Schema.Struct({
-				...MindmapBuild.BuildMindmapRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: mindmapFamily.MindmapDocument.mapFields(({ id, title, root, layout }) => ({
-					id,
-					title,
-					root,
-					layout,
-				})),
-			}),
-			output: MindmapBuild.BuildMindmapResultSchema,
+			input: mindmapBuild.input,
+			output: mindmapBuild.result,
 		},
-		studioInput: MindmapBuild.BuildMindmapToolInputSchema,
+		studioInput: mindmapBuild.toolInput,
 		build: (runtime: typeof Runtime) => runtime.buildMindmap,
 		docs: mindmapFamilyDocs,
 	}),
@@ -397,21 +390,17 @@ export const families = [
 			vennFamily.VennDiagram,
 			vennFamily.vennFixture.type,
 			vennFamily.validateVennDiagram,
-			renderVennDiagram,
+			(diagram) => Result.succeed(renderVennDiagram(diagram)),
 		),
 		validationError: vennFamily.VennValidationError,
 		fixture: vennFamily.vennFixture,
-		spec: Build.VennSpec,
-		request: Build.BuildVennDiagramRequest,
+		spec: vennFamily.VennDocument,
+		request: vennBuild.request,
 		contracts: {
-			input: Schema.Struct({
-				...Build.BuildVennDiagramRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.VennToolSpecSchema,
-			}),
-			output: Build.BuildVennDiagramResultSchema,
+			input: vennBuild.input,
+			output: vennBuild.result,
 		},
-		studioInput: Build.BuildVennDiagramToolInputSchema,
+		studioInput: vennBuild.toolInput,
 		build: (runtime: typeof Runtime) => runtime.buildVennDiagram,
 		docs: vennFamilyDocs,
 	}),
@@ -528,7 +517,7 @@ export const families = [
 export type DiagramFamily = (typeof families)[number];
 export type DiagramTypeValue = DiagramFamily["type"];
 export type FamilyBuildOperation = DiagramFamily["operation"];
-export type FamilyBuildResult = Effect.Success<ReturnType<ReturnType<DiagramFamily["build"]>>>;
+export type FamilyBuildResult = DiagramFamily["contracts"]["output"]["Type"];
 export const DIAGRAM_TYPES = families.map((family) => family.type);
 export const FAMILY_BUILD_OPERATIONS = families.map((family) => family.operation);
 export const CanonicalDiagramSchema = Schema.Union(
@@ -584,7 +573,7 @@ export interface FamilyOperation<A> {
 		input: unknown,
 	) => Effect.Effect<
 		A,
-		never,
+		import("./build/operation.js").BuildRejection<A>,
 		| import("./build/code-mode/artifacts.js").CodeModeArtifactStorage
 		| Runtime.CodeModeRuntimeEnvironment
 	>;

@@ -1,3 +1,4 @@
+import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
 import { buildCanonicalDocument } from "@sketchi/diagrams/build/code-mode/documents";
 import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
@@ -30,7 +31,7 @@ export const DiagramBuilderLive = Layer.effect(
 			const result: FamilyBuildResult = yield* withCodeMode(
 				artifactStorage,
 				environment,
-				(options) => buildCanonicalDocument(document, options),
+				(options) => buildResponse(buildCanonicalDocument(document, options)),
 			);
 			if (!result.ok) return yield* codeModeFailure(result, "build");
 			const id = yield* validateStorageId(documentId(document));

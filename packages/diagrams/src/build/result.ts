@@ -1,16 +1,7 @@
+import { FLOWCHART_COVERAGE_CODES } from "../families/flowchart/coverage-codes.js";
+import { MindmapInputError } from "../families/mindmap/document.js";
+import { VennValidationIssueCodeSchema } from "../families/venn/document.js";
 import { Schema, type Effect } from "effect";
-export const FLOWCHART_COVERAGE_CODES = [
-	"quoted_text_missing",
-	"flowchart_connection_missing",
-	"flowchart_return_step_missing",
-	"flowchart_check_step_missing",
-	"flowchart_step_borrowed",
-	"flowchart_step_split",
-	"flowchart_container_missing",
-	"flowchart_containment_wrong",
-	"flowchart_containment_unstated",
-	"flowchart_zone_merged",
-] as const;
 export const CODE_MODE_ISSUE_CODES = [
 	"missing_field",
 	"invalid_type",
@@ -52,8 +43,6 @@ export const CODE_MODE_ISSUE_CODES = [
 	"flowchart_too_small",
 	"unknown_edit_target",
 	"invalid_edit",
-	"mindmap_too_deep",
-	"mindmap_too_large",
 	"sequence_too_large",
 	"invalid_timeline_date",
 	"duplicate_event_id",
@@ -93,9 +82,6 @@ export const CODE_MODE_ISSUE_CODES = [
 	"org_chart_too_large",
 	"invalid_person",
 	"invalid_reporting_line",
-	"venn_too_large",
-	"invalid_venn_set",
-	"invalid_venn_region",
 	"journey_too_large",
 	"invalid_journey_stage",
 	"invalid_journey_step",
@@ -143,6 +129,8 @@ export const CODE_MODE_ISSUE_CODES = [
 	"icon_filled",
 	"icon_possible",
 	...FLOWCHART_COVERAGE_CODES,
+	...MindmapInputError.fields.code.literals,
+	...VennValidationIssueCodeSchema.literals,
 ] as const;
 
 export const CodeModeIssueCodeSchema = Schema.Literals(CODE_MODE_ISSUE_CODES);

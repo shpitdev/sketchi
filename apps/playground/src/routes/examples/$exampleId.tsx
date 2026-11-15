@@ -1,7 +1,7 @@
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
 import { flowchartDiagramFromSpec } from "@sketchi/diagrams/families/flowchart/spec";
-import { type FlowchartSpec } from "@sketchi/diagrams/build/code-mode/contract";
+import { type FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
 import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import { renderMindmap } from "@sketchi/diagrams/families/mindmap/index";
@@ -19,13 +19,13 @@ export const Route = createFileRoute("/examples/$exampleId")({
 interface CuratedExample {
 	blurb: string;
 	scene?: RenderedDiagramScene;
-	spec?: FlowchartSpec;
+	spec?: FlowchartDocument;
 	title: string;
 }
 
 /**
  * Curated, read-only diagrams that the docs link to. They're authored as real
- * canonical FlowchartSpec values and rendered from the same normalized core
+ * canonical FlowchartDocument values and rendered from the same normalized core
  * diagram used by buildFlowchart, so "how it works" stays contract-accurate
  * without persisting a new artifact for every page view.
  */

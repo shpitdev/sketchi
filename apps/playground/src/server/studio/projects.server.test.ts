@@ -1,8 +1,8 @@
+import { type FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
 import { familyForType } from "@sketchi/diagrams/family";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
-import type { FlowchartSpec } from "@sketchi/diagrams/build/code-mode/contract";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
@@ -39,7 +39,7 @@ function handleListStudioProjectsRequest(env: StudioEnv, request: Request) {
 	);
 }
 
-function flowchartSpec(title: string): FlowchartSpec {
+function flowchartSpec(title: string): FlowchartDocument {
 	return {
 		title,
 		direction: "LR",

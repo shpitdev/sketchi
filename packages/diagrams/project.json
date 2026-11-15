@@ -46,6 +46,17 @@
 			"options": {
 				"command": "CHART_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/families/chart/render.test.ts -t \"seeded fuzz\""
 			}
+		},
+		"venn-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "VENN_FUZZ=full vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/families/venn/venn-fuzz.test.ts"
+			},
+			"inputs": [
+				"default",
+				"{workspaceRoot}/tools/drawing-tests/**/*",
+				"{workspaceRoot}/packages/diagrams/src/**/*"
+			]
 		}
 	}
 }

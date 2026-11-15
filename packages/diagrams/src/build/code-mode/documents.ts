@@ -1,6 +1,7 @@
+import { vennBuild } from "../../families/venn/build.js";
 import { Effect } from "effect";
 import { type FlowchartDiagram } from "../../families/flowchart/diagram.js";
-import { buildMindmap as buildMindmapDocument } from "../../families/mindmap/build.js";
+import { mindmapBuild } from "../../families/mindmap/build.js";
 import {
 	DIAGRAM_TYPES,
 	familyForType,
@@ -28,20 +29,28 @@ export function isCanonicalDocumentType(value: unknown): value is DiagramTypeVal
 export function buildCanonicalDocument(
 	document: CanonicalDiagramDocument,
 	options?: BuildFlowchartOptions,
-): Effect.Effect<FamilyBuildResult, never, CodeModeArtifactStorage | CodeModeRuntimeEnvironment> {
-	if (document.type === "mindmap") {
+): Effect.Effect<
+	FamilyBuildResult,
+	import("../operation.js").BuildRejection<FamilyBuildResult>,
+	CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+> {
+	if (document.type === "mindmap" || document.type === "venn") {
 		const request = { spec: document.spec, ...(options ? { options } : {}) };
 		return observeCodeModeBoundary(
-			"buildMindmap",
+			document.type === "mindmap" ? "buildMindmap" : "buildVennDiagram",
 			request,
 			Effect.gen(function* () {
-				return yield* buildMindmapDocument(request, yield* artifactBuildCapabilities);
-			}).pipe(
-				Effect.match({
-					onFailure: (error) => ({ ok: false as const, status: error.status, ...error.context }),
-					onSuccess: (result) => result,
-				}),
-			),
+				const capabilities = yield* artifactBuildCapabilities;
+				return document.type === "mindmap"
+					? yield* mindmapBuild.build(
+							{ spec: document.spec, ...(options ? { options } : {}) },
+							capabilities,
+						)
+					: yield* vennBuild.build(
+							{ spec: document.spec, ...(options ? { options } : {}) },
+							capabilities,
+						);
+			}),
 		);
 	}
 	return familyForType(document.type).build(Runtime)({
@@ -179,21 +188,11 @@ export function canonicalDocumentFromDiagram(
 					style: diagram.style,
 				},
 			};
-		case "venn":
-			return {
-				type: "venn",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					sets: diagram.sets.map((set) => ({ ...set })),
-					regions: diagram.regions.map((region) => ({
-						...region,
-						sets: [...region.sets],
-						...(region.items === undefined ? {} : { items: [...region.items] }),
-					})),
-					style: diagram.style,
-				},
-			};
+		case "venn": {
+			// CLI documents omit only the dispatch tag; the owning fields and stored wire are unchanged.
+			const { type, ...spec } = diagram;
+			return { type, spec };
+		}
 		case "journey":
 			return {
 				type: "journey",

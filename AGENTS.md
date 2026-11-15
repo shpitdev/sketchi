@@ -77,7 +77,7 @@ when their inputs change:
 - `pnpm nx run drawing:er-fuzz` (240 schemas; the gate runs 16)
 - `pnpm nx run drawing:class-fuzz` (240 models and 120 text-fit rounds; the gate runs 16 and 12)
 - `pnpm nx run drawing:org-chart-fuzz` (900 random charts across three seeds; the gate runs 6)
-- `pnpm nx run drawing:venn-fuzz` (900 random Venn diagrams across three seeds; the gate runs 12)
+- `pnpm nx run diagrams:venn-fuzz` (900 random Venn diagrams across three seeds; the gate runs 12)
 - `pnpm nx run drawing:journey-fuzz` (900 random journeys across three seeds; the gate runs 8)
 - `pnpm nx run drawing:sankey-fuzz` (1,200 random flows across three seeds; the gate runs 10)
 - `pnpm nx run drawing:wireframe-fuzz` (1,200 random wireframes across three seeds; the gate runs 8)

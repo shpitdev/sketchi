@@ -8,7 +8,7 @@ describe("offline Venn diagram input failures", () => {
 	it.each([
 		{
 			name: "a region naming an unknown set",
-			issue: "invalid_venn_region",
+			issue: "unknown_venn_set",
 			regions: [{ sets: ["ios", "web"], items: ["Push notifications"] }],
 		},
 		{

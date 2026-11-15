@@ -11,9 +11,9 @@ import {
 	VENN_MAX_ITEMS,
 	VENN_MAX_REGION_ITEMS,
 	type VennDiagram,
-} from "@sketchi/diagrams/families/venn/document";
-import { readVennScene, vennLayoutIssues } from "@sketchi/diagrams/families/venn/readout";
-import { renderVennDiagram } from "@sketchi/diagrams/families/venn/render";
+} from "./document.js";
+import { readVennScene, vennLayoutIssues } from "./readout.js";
+import { renderVennDiagram } from "./render.js";
 
 import {
 	convertSceneToExcalidraw,
@@ -143,7 +143,7 @@ describe("Venn fuzz", () => {
 		it(`draws ${DIAGRAMS} random Venn diagrams of seed ${seed} cleanly`, () => {
 			const defects: string[] = [];
 			for (const diagram of randomDiagrams(DIAGRAMS, seed)) {
-				const scene = renderVennDiagram(diagram).pipe(Result.getOrThrow);
+				const scene = renderVennDiagram(diagram);
 				const exported = convertSceneToExcalidraw(scene);
 				const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(exported)));
 				const readout = readVennScene(scene);

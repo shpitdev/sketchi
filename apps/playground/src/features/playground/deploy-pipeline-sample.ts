@@ -1,6 +1,7 @@
+import { type FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
 import { Result } from "effect";
 import { flowchartDiagramFromSpec } from "@sketchi/diagrams/families/flowchart/spec";
-import { type FlowchartSpec } from "@sketchi/diagrams/build/code-mode/contract";
+
 import {
 	canvasBoundTextBox,
 	canvasNodeIconBand,
@@ -31,7 +32,7 @@ export const DEPLOY_PIPELINE_SPEC = {
 		["build", "tests"],
 		["tests", "deploy"],
 	],
-} satisfies FlowchartSpec;
+} satisfies FlowchartDocument;
 
 /** The sample's catalog marks, bundled so the empty state paints offline. */
 const SAMPLE_LOGOS: ReadonlyMap<string, CanvasIconAsset> = new Map([

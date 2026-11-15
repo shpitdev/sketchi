@@ -1,3 +1,4 @@
+import { buildResponse, type BuildRejection } from "../operation.js";
 import { ExcalidrawFile, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
@@ -64,11 +65,11 @@ function makeTestRuntime(
 		...(options.renderer ? { renderer: options.renderer } : {}),
 		...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
 	};
-	const run = <A>(
-		program: Effect.Effect<A, never, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
+	const run = <A, E extends BuildRejection<unknown>>(
+		program: Effect.Effect<A, E, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
 	) =>
 		Effect.runPromise(
-			program.pipe(
+			buildResponse(program).pipe(
 				Effect.provideService(CodeModeArtifactStorage, storage),
 				Effect.provideService(CodeModeRuntimeEnvironment, environment),
 			),

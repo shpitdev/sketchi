@@ -1,5 +1,9 @@
+import { Schema } from "effect";
 import { type FlowchartDiagram, type FlowchartValidationIssue } from "./diagram.js";
 import {
+	FlowchartDocumentSchema,
+	type FlowchartDocument,
+	FLOWCHART_DIRECTIONS,
 	flowchartDiagramFromDocument,
 	flowchartDocumentId,
 	flowchartNodeDetails,
@@ -9,11 +13,15 @@ import {
 	type FlowchartEdgeEnd,
 } from "./document.js";
 
-import {
-	type FlowchartSpec,
-	type NormalizedFlowchartSpec,
-} from "../../build/code-mode/contract.js";
 import { cleanToolString } from "../../clean-text.js";
+
+/** A flowchart document as the build read it: strings cleaned, id and direction filled. */
+export const NormalizedFlowchartSpecSchema = Schema.Struct({
+	...FlowchartDocumentSchema.fields,
+	id: Schema.NonEmptyString,
+	direction: Schema.Literals(FLOWCHART_DIRECTIONS),
+});
+export type NormalizedFlowchartSpec = typeof NormalizedFlowchartSpecSchema.Type;
 
 function cleanOptional(value: string | undefined): string | undefined {
 	if (value === undefined) return undefined;
@@ -108,7 +116,7 @@ function collidingIds(
  * the same one are refused rather than merged.
  */
 export function normalizeFlowchartSpec(
-	spec: FlowchartSpec,
+	spec: FlowchartDocument,
 ):
 	| { readonly ok: true; readonly spec: NormalizedFlowchartSpec; readonly notes: readonly string[] }
 	| { readonly ok: false; readonly issues: readonly FlowchartValidationIssue[] } {
@@ -154,7 +162,7 @@ export function normalizeFlowchartSpec(
  * The drawing a curated, non-persisting view renders: a valid document only, each
  * node icon read as the catalog slug it names, without a catalog lookup.
  */
-export function flowchartDiagramFromSpec(spec: FlowchartSpec): FlowchartDiagram {
+export function flowchartDiagramFromSpec(spec: FlowchartDocument): FlowchartDiagram {
 	const result = normalizeFlowchartSpec(spec);
 	if (!result.ok) throw new Error(result.issues.map((issue) => issue.message).join("\n"));
 	const normalized = result.spec;

@@ -1,5 +1,6 @@
+import { FlowchartDocumentSchema } from "@sketchi/diagrams/families/flowchart/document";
 import { assert, describe, it } from "@effect/vitest";
-import { FlowchartSpec, SequenceDiagramSpec } from "@sketchi/diagrams/build/code-mode/contract";
+import { SequenceDiagramSpec } from "@sketchi/diagrams/build/code-mode/contract";
 import { MindmapDocument } from "@sketchi/diagrams/families/mindmap/index";
 import { Effect, Schema } from "effect";
 
@@ -18,7 +19,7 @@ describe("canonical document decoding", () => {
 			const sequence = yield* parseJsonDocument(JSON.stringify(sequenceInput));
 
 			assert.strictEqual(flowchart.type, "flowchart");
-			assert.isTrue(Schema.is(FlowchartSpec)(flowchart.spec));
+			assert.isTrue(Schema.is(FlowchartDocumentSchema)(flowchart.spec));
 			assert.strictEqual(mindmap.type, "mindmap");
 			assert(Schema.is(MindmapDocument)(mindmap.spec));
 			assert.strictEqual(mindmap.spec.layout.direction, "LR");

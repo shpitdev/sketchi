@@ -4,12 +4,9 @@ import {
 } from "@sketchi/diagrams/build/code-mode/artifacts";
 import {
 	type ApplyDiagramPatchResult,
-	type BuildFlowchartResult,
 	type GetArtifactResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
-import * as Runtime from "@sketchi/diagrams/build/code-mode/runtime";
-import { type BuildMindmapResult } from "@sketchi/diagrams/families/mindmap/build";
-import { familyForType } from "@sketchi/diagrams/family";
+import { familyForType, type FamilyOperation } from "@sketchi/diagrams/family";
 import { Effect, Layer } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -53,21 +50,14 @@ vi.mock("./service.server", async (importOriginal) => {
 			buildDocument: () => Effect.die("Internal document builds are outside the HTTP corpus."),
 			applyDiagramPatch: () =>
 				Effect.succeed(runtimeResults.getApplyDiagramPatch() as ApplyDiagramPatchResult),
-			buildFamily: (family, input) =>
-				family
-					.build({
-						...Runtime,
-						buildFlowchart: () =>
-							Effect.succeed(runtimeResults.getBuildFlowchart() as BuildFlowchartResult),
-						buildMindmap: () =>
-							Effect.succeed(runtimeResults.getBuildMindmap() as BuildMindmapResult),
-					})(input)
-					.pipe(
-						Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
-						Effect.provideService(Runtime.CodeModeRuntimeEnvironment, {
-							createId: (prefix) => prefix,
-						}),
-					),
+			// These deliberately partial fixtures isolate HTTP envelope/status projection from
+			// document validation, which is exercised by the real family build tests.
+			buildFamily: <A>(family: FamilyOperation<A>) =>
+				Effect.succeed(
+					(family.operation === "buildMindmap"
+						? runtimeResults.getBuildMindmap()
+						: runtimeResults.getBuildFlowchart()) as A,
+				),
 			editFlowchart: () => Effect.die("Flowchart edits are outside the frozen v1 corpus."),
 			createCanvas: () => Effect.die("Canvas creation is outside the frozen v1 corpus."),
 			prewarmPngRenderer: Effect.void,
