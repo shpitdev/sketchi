@@ -157,9 +157,25 @@ type BuildWireframeResult = { ok: true; status: "accepted"; buildId: string; req
 
 type BuildWireframeResult_Component = { type: "header" | "footer" | "sidebar" | "main" | "section" | "card" | "modal" | "row" | "column" | "grid" | "heading" | "text" | "link" | "badge" | "button" | "input" | "textarea" | "select" | "checkbox" | "radio" | "toggle" | "search" | "tabs" | "nav" | "breadcrumbs" | "avatar" | "icon" | "image" | "chart" | "table" | "list" | "divider"; text?: string; label?: string; title?: string; placeholder?: string; value?: string; level?: number; lines?: number; variant?: "primary" | "secondary"; checked?: boolean; disabled?: boolean; items?: Array<string>; active?: string; columns?: number | Array<string>; rows?: number; kind?: "bar" | "line" | "pie"; aspect?: "wide" | "square" | "tall"; side?: "left" | "right"; align?: "start" | "center" | "end" | "between"; target?: string; children?: Array<BuildWireframeResult_Component>; };
 
-type BuildQuadrantChartRequest = { requestId?: string; spec: { id?: string; title: string; xAxis: { title: string; low: string; high: string; }; yAxis: { title: string; low: string; high: string; }; quadrants: { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string; }; points: Array<{ label: string; x: number; y: number; group?: string; }>; }; options?: BuildOptions; };
+type BuildQuadrantChartRequest = { requestId?: string; spec: { id?: string; title: string; xAxis: BuildQuadrantChartRequest_QuadrantAxis; yAxis: BuildQuadrantChartRequest_QuadrantAxis; quadrants: BuildQuadrantChartRequest_QuadrantNames; points: Array<BuildQuadrantChartRequest_QuadrantPoint>; }; options?: BuildOptions; };
 
-type BuildQuadrantChartResult = { ok: true; status: "accepted"; buildId: string; requestId?: string; normalizedSpec: { id: string; title: string; xAxis: { title: string; low: string; high: string; }; yAxis: { title: string; low: string; high: string; }; quadrants: { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string; }; points: Array<{ label: string; x: number; y: number; group?: string; }>; style: { accentColor: string; backgroundColor: string; }; }; quality: Quality; artifact: Artifact; issues: Array<Issue>; } | { ok: false; status: "invalid_input" | "invalid_quadrant_chart" | "quality_failed" | "limit_exceeded" | "render_failed" | "export_failed" | "storage_failed"; buildId?: string; requestId?: string; normalizedSpec?: { id: string; title: string; xAxis: { title: string; low: string; high: string; }; yAxis: { title: string; low: string; high: string; }; quadrants: { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string; }; points: Array<{ label: string; x: number; y: number; group?: string; }>; style: { accentColor: string; backgroundColor: string; }; }; quality?: Quality; partial?: PartialArtifact; issues: Array<Issue>; };
+type BuildQuadrantChartRequest_QuadrantAxis = { title: string; low: string; high: string; };
+
+type BuildQuadrantChartRequest_QuadrantNames = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string; };
+
+type BuildQuadrantChartRequest_QuadrantPoint = { label: string; x: number; y: number; group?: string; };
+
+type BuildQuadrantChartResult = { ok: true; status: "accepted"; buildId: string; requestId?: string; normalizedSpec: BuildQuadrantChartResult_QuadrantDiagram; quality: Quality; artifact: Artifact; issues: Array<{ code: IssueCode | "quadrant_too_large" | "invalid_quadrant_point" | "invalid_quadrant_text"; severity: "error" | "warning" | "info"; stage: "input" | "canvas" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage" | "coverage"; ref?: IssueRef; message: string; hint: string; }>; } | { ok: false; status: "invalid_input" | "invalid_quadrant_chart" | "quality_failed" | "limit_exceeded" | "render_failed" | "export_failed" | "storage_failed"; buildId?: string; requestId?: string; normalizedSpec?: BuildQuadrantChartResult_QuadrantDiagram; quality?: Quality; partial?: PartialArtifact; issues: Array<{ code: IssueCode | "quadrant_too_large" | "invalid_quadrant_point" | "invalid_quadrant_text"; severity: "error" | "warning" | "info"; stage: "input" | "canvas" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage" | "coverage"; ref?: IssueRef; message: string; hint: string; }>; };
+
+type BuildQuadrantChartResult_QuadrantAxis = { title: string; low: string; high: string; };
+
+type BuildQuadrantChartResult_QuadrantNames = { topLeft: string; topRight: string; bottomLeft: string; bottomRight: string; };
+
+type BuildQuadrantChartResult_QuadrantPoint = { label: string; x: number; y: number; group?: string; };
+
+type BuildQuadrantChartResult_DiagramStyle = { accentColor: string; backgroundColor: string; };
+
+type BuildQuadrantChartResult_QuadrantDiagram = { id: string; title: string; xAxis: BuildQuadrantChartResult_QuadrantAxis; yAxis: BuildQuadrantChartResult_QuadrantAxis; quadrants: BuildQuadrantChartResult_QuadrantNames; points: Array<BuildQuadrantChartResult_QuadrantPoint>; style: BuildQuadrantChartResult_DiagramStyle; type: "quadrant"; };
 
 type CreateCanvasRequest = { requestId?: string; spec: CanvasSpecInput; options?: BuildOptions; };
 

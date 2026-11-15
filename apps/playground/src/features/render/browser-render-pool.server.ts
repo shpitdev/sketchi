@@ -194,24 +194,13 @@ const prepareHarnessPage = Effect.fnUntraced(function* (browser: Browser, harnes
 	return page;
 });
 
-let playwright: Promise<typeof import("@cloudflare/playwright")> | undefined;
-/**
- * Loaded on first launch and shared, so launches opening together load it once.
- * A failed load is dropped, so the next launch tries again.
- */
-const loadPlaywright = () =>
-	(playwright ??= import("@cloudflare/playwright").catch((cause: unknown) => {
-		playwright = undefined;
-		throw cause;
-	}));
-
 /** One launch attempt; a browser that fails to prepare closes before any retry. */
 const launchHarnessPage = Effect.fnUntraced(function* (
 	binding: CloudflareBrowserRunBinding,
 	harnessUrl: string,
 ) {
 	const browser = yield* tryBrowserPromise("launch", async (signal) => {
-		const { launch } = await loadPlaywright();
+		const { launch } = await import("@cloudflare/playwright");
 		return launch(browserBindingWithSignal(binding, signal), {
 			keep_alive: BROWSER_KEEP_ALIVE_MS,
 		});

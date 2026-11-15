@@ -133,11 +133,22 @@
           },
           {
             "include": [
-              "apps/playground/src/server/codemode/toolkit.server.ts",
-              "apps/playground/src/server/codemode/effect-mcp-adapter.server.ts",
-              "apps/playground/src/server/codemode/mcp.server.ts",
+              "apps/playground/src/features/mcp/mcp.server.ts",
+              "apps/playground/src/features/mcp/toolkit.server.ts",
+              "apps/playground/src/features/mcp/execute.server.ts",
+              "apps/playground/src/features/mcp/sandbox.server.ts",
+              "apps/playground/src/features/mcp/session.server.ts",
+              "apps/playground/src/features/mcp/mcp-docs.server.ts",
+              "apps/playground/src/features/build/api.server.ts",
+              "apps/playground/src/features/build/capabilities.server.ts",
+              "apps/playground/src/server/runtime/runtime.server.ts",
+              "apps/playground/src/server/chat/studio-family-tools.server.ts",
+              "apps/playground/src/server/generation/api.server.ts",
+              "apps/icons/src/lib/mcp.server.ts",
+              "apps/icons/src/lib/mcp-session.server.ts",
               "apps/icons/src/lib/toolkit.server.ts",
-              "apps/icons/src/lib/mcp.server.ts"
+              "packages/cloudflare/src/mcp-content.ts",
+              "packages/cloudflare/src/mcp-session.ts"
             ],
             "options": {
               "diagnosticSeverity": {

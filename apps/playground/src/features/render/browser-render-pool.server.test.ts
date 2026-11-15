@@ -9,6 +9,7 @@ import { beforeEach, vi } from "vitest";
 import {
 	BrowserRenderPool,
 	BROWSER_KEEP_ALIVE_MS,
+	BROWSER_LAUNCHES_PER_SECOND,
 	HARNESS_OPEN_TIMEOUT_MS,
 	HARNESS_PAGE_IDLE_TTL,
 	MAX_HARNESS_PAGES,
@@ -142,35 +143,33 @@ describe("Browser Run harness page pool", () => {
 		Effect.gen(function* () {
 			const finishExports = Promise.withResolvers<string>();
 			let exporting = 0;
-			const allBusy = Promise.withResolvers<void>();
 			launchMock.mockImplementation(async () => {
 				const session = mockBrowser();
 				session.page.evaluate.mockImplementation(async (script: unknown) => {
 					if (typeof script === "string") return null;
-					if (++exporting === MAX_HARNESS_PAGES) allBusy.resolve();
+					exporting++;
 					return finishExports.promise;
 				});
 				return session.browser;
 			});
 
-			const busy = yield* Effect.forkChild(
-				Effect.all(
-					Array.from({ length: MAX_HARNESS_PAGES }, () => renderPng(request())),
-					{
-						concurrency: "unbounded",
-					},
-				),
+			// Fill each slot with an observed blocked export; pool growth timing is
+			// independent of the queue behavior this case exercises.
+			const busy = yield* Effect.forEach(
+				Array.from({ length: MAX_HARNESS_PAGES }, (_, index) => index),
+				(index) =>
+					Effect.gen(function* () {
+						if (index > 0 && index % BROWSER_LAUNCHES_PER_SECOND === 0)
+							yield* TestClock.adjust(1_000);
+						const fiber = yield* Effect.forkChild(renderPng(request()));
+						yield* waitUntil(() => exporting === index + 1);
+						return fiber;
+					}),
 			);
-			// Launches are paced, so let the pool open every page first, a launch window at a time.
-			for (let second = 1; exporting < MAX_HARNESS_PAGES; second++) {
-				yield* waitUntil(() => exporting === MAX_HARNESS_PAGES || parkedBy(second * 1_000));
-				if (exporting < MAX_HARNESS_PAGES) yield* TestClock.adjust(1_000);
-			}
-			yield* Effect.promise(() => allBusy.promise);
 			const queuedFiber = yield* Effect.forkChild(renderPng(request()));
 			yield* TestClock.adjust(300);
 			finishExports.resolve(btoa("PNG"));
-			yield* Fiber.join(busy);
+			yield* Effect.forEach(busy, Fiber.join);
 			const queued = yield* Fiber.join(queuedFiber);
 
 			expect(queued.coldStart).toBe(false);
@@ -187,9 +186,12 @@ describe("Browser Run harness page pool", () => {
 				.mockRejectedValueOnce(new Error(transientMessage))
 				.mockImplementation(async () => mockBrowser().browser);
 
+			// Independent harnesses request acquisitions without assuming pool growth timing.
 			const renders = yield* Effect.forkChild(
 				Effect.all(
-					Array.from({ length: 3 }, () => renderPng(request())),
+					Array.from({ length: 3 }, (_, index) =>
+						renderPng({ ...request(), harnessUrl: `${harnessUrl}?client=${index}` }),
+					),
 					{
 						concurrency: "unbounded",
 					},
