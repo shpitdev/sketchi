@@ -61,7 +61,7 @@ Reuse unchanged proof by identity instead of repeating expensive checks.
 `origin/main`, including staged, unstaged and untracked changes, and runs actionlint when workflows
 change, a frozen install, `pnpm run check`, the scenario CLI smoke, the deploy
 and tooling contracts, the Nx-affected native `typecheck`, `build`
-and `test` targets, the root `effect-tsgo tsc@7.0.2 -b` and project-graph test, and
+and `test` targets, sampled routing as described below, the root `effect-tsgo tsc@7.0.2 -b` and project-graph test, and
 `pnpm nx build-storybook editor` when `editor` is affected.
 
 - Before publishing an accepted unit, run `pnpm ci:local --no-signoff`.
@@ -79,8 +79,13 @@ and `test` targets, the root `effect-tsgo tsc@7.0.2 -b` and project-graph test, 
 - Logs are in `.memory/ci-local/`. `--all` runs every project instead of the
   affected graph. At most two gates run at once per machine (`CI_LOCAL_SLOTS`).
 
-The gate runs only the Nx-affected default targets, so these stay local proof
-when their inputs change:
+`drawing:test` retains the cross-family text-fit cases and excludes the sampled
+routing suite. `drawing:routing-sample` runs once when a unit changes graph,
+Flowchart, drawing or shared runtime/config inputs. Selection uses the gate's
+actual changed files; Nx target inputs alone do not suppress execution. Full
+`origin/main` gates, signoff and `--all` always include sampled routing.
+
+These larger suites remain local proof when their inputs change:
 
 - `pnpm nx affected -t test-browser --base=origin/main` (browser-mode suites in a
   Browserbase remote browser; needs `BROWSERBASE_API_KEY` and
