@@ -1,16 +1,11 @@
-import {
-	type CloudflareAiGateway,
-	CloudflareAiGatewayBinding,
-	stripGoogleModelPrefix,
-} from "@sketchi/diagram-generation";
-import { TelemetryCorrelation } from "@sketchi/observability";
-import { Clock, Context, Effect, Layer, Option, Schedule } from "effect";
+import { CloudflareAiGatewayBinding, stripGoogleModelPrefix } from "@sketchi/diagram-generation";
+import { Array, Context, Effect, Layer, Option, Schedule, String } from "effect";
 
 import { makeAuthorCall } from "./author-model.js";
 import type { Prompt } from "effect/ai";
 import { IconModelError } from "./errors.js";
 import { type IconSource, svgCurveSegments } from "./input.js";
-import { JUDGE_PROMPT, JUDGE_REPLY_SCHEMA } from "./judge.js";
+import { makeJudgeCall } from "./google-judge.js";
 
 /** Author models a draw request may name. */
 export const ICON_AUTHOR_MODELS = [
@@ -38,10 +33,10 @@ export function iconAuthorFor(source: IconSource): IconAuthorModel {
 }
 
 export function iconAuthorModel(model: string): IconAuthorModel | undefined {
-	const prefixed = model.startsWith("anthropic/") ? model : `anthropic/${model}`;
-	return (ICON_AUTHOR_MODELS as readonly string[]).includes(prefixed)
-		? (prefixed as IconAuthorModel)
-		: undefined;
+	const prefixed = String.startsWith("anthropic/")(model) ? model : `anthropic/${model}`;
+	return Option.getOrUndefined(
+		Array.findFirst(ICON_AUTHOR_MODELS, (candidate) => candidate === prefixed),
+	);
 }
 
 export interface ModelUsage {
@@ -118,120 +113,6 @@ function isTransient(status: number): boolean {
 	return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
-interface GatewayReply {
-	readonly status: number;
-	readonly body: unknown;
-	readonly logId: string | null;
-}
-
-function parse(text: string): unknown {
-	try {
-		return JSON.parse(text);
-	} catch {
-		return { text };
-	}
-}
-
-function errorDetail(body: unknown): string {
-	if (typeof body !== "object" || body === null) return "";
-	const error = (body as { error?: unknown }).error;
-	if (typeof error === "object" && error !== null && "message" in error) {
-		return String(error.message);
-	}
-	return "";
-}
-
-/** The request's trace, so its gateway logs (cost included) can be found by it. */
-const traceId = Effect.gen(function* () {
-	const correlation = yield* TelemetryCorrelation;
-	const span = yield* Effect.option(Effect.currentSpan);
-	return correlation.traceId ?? Option.getOrUndefined(span)?.traceId;
-});
-
-function callGateway(
-	gateway: CloudflareAiGateway,
-	config: IconDrawGatewayConfigValue,
-	role: "author" | "judge",
-	model: string,
-	data: { endpoint: string; provider: string; headers: Record<string, string>; query: unknown },
-	timeoutMs: number,
-) {
-	return Effect.flatMap(traceId, (trace) =>
-		Effect.tryPromise({
-			try: async (signal): Promise<GatewayReply> => {
-				const response = await gateway.run(data, {
-					gateway: {
-						collectLog: config.collectLog,
-						// AI Gateway keeps five metadata entries per request.
-						metadata: {
-							sketchiSurface: config.surface,
-							sketchiOperation: `icon-${role}`,
-							...(trace ? { sketchiTraceId: trace } : {}),
-						},
-						skipCache: true,
-					},
-					signal,
-				});
-				return {
-					status: response.status,
-					body: parse(await response.text()),
-					logId: response.headers.get("cf-aig-log-id"),
-				};
-			},
-			catch: (cause) =>
-				IconModelError.make({
-					cause,
-					message: cause instanceof Error ? cause.message : "The model request failed.",
-					model,
-					role,
-					retryable: true,
-				}),
-		}),
-	).pipe(
-		Effect.flatMap((reply) =>
-			reply.status >= 200 && reply.status < 300
-				? Effect.succeed(reply)
-				: Effect.fail(
-						IconModelError.make({
-							cause: reply.body,
-							message: `The ${role} model answered HTTP ${reply.status}${errorDetail(reply.body) ? `: ${errorDetail(reply.body)}` : "."}`,
-							model,
-							role,
-							retryable: isTransient(reply.status),
-							status: reply.status,
-						}),
-					),
-		),
-		Effect.timeoutOrElse({
-			duration: timeoutMs,
-			orElse: () =>
-				Effect.fail(
-					IconModelError.make({
-						cause: new Error("timeout"),
-						message: `The ${role} model took longer than ${timeoutMs / 1000} s.`,
-						model,
-						role,
-						retryable: false,
-					}),
-				),
-		}),
-		Effect.retry(transientRetry),
-	);
-}
-
-function count(value: unknown): number {
-	return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-interface GenerateContentReply {
-	readonly candidates?: ReadonlyArray<{
-		readonly content?: {
-			readonly parts?: ReadonlyArray<{ readonly text?: string; readonly thought?: boolean }>;
-		};
-	}>;
-	readonly usageMetadata?: Readonly<Record<string, unknown>>;
-}
-
 /** Author and judge calls through the Cloudflare AI Gateway, with the keys it stores. */
 export const IconDrawModelsGateway = Layer.effect(IconDrawModels)(
 	Effect.gen(function* () {
@@ -248,72 +129,12 @@ export const IconDrawModelsGateway = Layer.effect(IconDrawModels)(
 			maxTokens: AUTHOR_MAX_TOKENS,
 		});
 
-		const judge = Effect.fn("iconDraw.models.judge")(function* (request: {
-			readonly sketch: string;
-			readonly lineup: readonly string[];
-		}) {
-			const model = stripGoogleModelPrefix(config.judgeModel);
-			const startedAt = yield* Clock.currentTimeMillis;
-			const image = (data: string) => ({ inline_data: { mime_type: "image/png", data } });
-			const reply = yield* callGateway(
-				gateway,
-				config,
-				"judge",
-				model,
-				{
-					endpoint: `v1beta/models/${model}:generateContent`,
-					provider: "google-ai-studio",
-					headers: { "Content-Type": "application/json" },
-					query: {
-						contents: [
-							{
-								role: "user",
-								parts: [
-									{ text: JUDGE_PROMPT },
-									{ text: "Sketch:" },
-									image(request.sketch),
-									...request.lineup.flatMap((logo, index) => [
-										{ text: `Logo ${index + 1}:` },
-										image(logo),
-									]),
-								],
-							},
-						],
-						generationConfig: {
-							responseMimeType: "application/json",
-							responseSchema: JUDGE_REPLY_SCHEMA,
-							thinkingConfig: { thinkingLevel: "low" },
-							// The images are small; low resolution keeps each at a few hundred tokens.
-							mediaResolution: "MEDIA_RESOLUTION_LOW",
-						},
-					},
-				},
-				JUDGE_TIMEOUT_MS,
-			);
-			const finishedAt = yield* Clock.currentTimeMillis;
-			const body = reply.body as GenerateContentReply;
-			const usage: ModelUsage = {
-				inputTokens: count(body.usageMetadata?.["promptTokenCount"]),
-				outputTokens:
-					count(body.usageMetadata?.["candidatesTokenCount"]) +
-					count(body.usageMetadata?.["thoughtsTokenCount"]),
-				cacheReadTokens: count(body.usageMetadata?.["cachedContentTokenCount"]),
-				cacheWriteTokens: 0,
-			};
-			yield* Effect.annotateCurrentSpan({
-				"gen_ai.request.model": model,
-				"gen_ai.usage.input_tokens": usage.inputTokens,
-				"gen_ai.usage.output_tokens": usage.outputTokens,
-				...(reply.logId ? { gateway_log_id: reply.logId } : {}),
-			});
-			const text = (body.candidates?.[0]?.content?.parts ?? [])
-				.flatMap((part) => (part.thought || typeof part.text !== "string" ? [] : [part.text]))
-				.join("")
-				.trim();
-			return {
-				text,
-				call: { role: "judge", model, usage, ms: finishedAt - startedAt },
-			} satisfies JudgeCallReply;
+		const judge = yield* makeJudgeCall({
+			gateway,
+			config,
+			timeoutMs: JUDGE_TIMEOUT_MS,
+			retry: transientRetry,
+			transient: isTransient,
 		});
 
 		return IconDrawModels.of({
