@@ -187,18 +187,7 @@ export function canonicalDocumentFromDiagram(
 				},
 			};
 		case "quadrant":
-			return {
-				type: "quadrant",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					xAxis: { ...diagram.xAxis },
-					yAxis: { ...diagram.yAxis },
-					quadrants: { ...diagram.quadrants },
-					points: diagram.points.map((point) => ({ ...point })),
-					style: diagram.style,
-				},
-			};
+			return familyForType("quadrant").toDocument(diagram);
 		case "sequence":
 			return familyForType("sequence").toDocument(diagram);
 	}

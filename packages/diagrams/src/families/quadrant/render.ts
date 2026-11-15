@@ -17,7 +17,6 @@ import {
 	quadrantGroups,
 	QUADRANT_KEYS,
 	QuadrantValidationError,
-	validateQuadrantDiagram,
 	type QuadrantDiagram,
 	type QuadrantKey,
 } from "./document.js";
@@ -1471,10 +1470,9 @@ function drawHeader(
  * beside it, or on a leader line where the plot is crowded.
  */
 export function renderQuadrantDiagram(
-	input: QuadrantDiagram,
+	diagram: QuadrantDiagram,
 ): Result.Result<RenderedDiagramScene, QuadrantValidationError> {
 	return Result.gen(function* () {
-		const diagram = yield* validateQuadrantDiagram(input);
 		const surface = diagram.style.backgroundColor;
 		const builder = new SceneBuilder(surface);
 		const plan = yield* planQuadrantLayout(diagram);

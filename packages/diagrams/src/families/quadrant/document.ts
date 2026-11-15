@@ -1,5 +1,15 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import {
+	Effect,
+	Schema,
+	Array as Arr,
+	Option,
+	Result,
+	String as Str,
+	MutableHashSet as Set,
+} from "effect";
+
+import { cleanToolString, slug } from "../../clean-text.js";
 
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
@@ -60,20 +70,61 @@ export interface QuadrantPoint extends Schema.Schema.Type<typeof QuadrantPoint> 
  * A quadrant chart: two axes split a square plot into four named quadrants,
  * and each point sits at its `x`, `y`. The renderer owns every position.
  */
-export const QuadrantDiagram = Schema.Struct({
-	id: Schema.NonEmptyString,
+export const QuadrantDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
-	type: Schema.Literal(quadrantDiagramType),
 	xAxis: QuadrantAxis,
 	yAxis: QuadrantAxis,
 	quadrants: QuadrantNames,
 	points: Schema.Array(QuadrantPoint).pipe(Schema.mutable),
 	style: DiagramStyle.pipe(
-		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
+		Schema.withDecodingDefaultKey(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}).annotate({ identifier: "QuadrantDiagram" });
+});
+export interface QuadrantDocument extends Schema.Schema.Type<typeof QuadrantDocument> {}
+
+export const QuadrantDiagram = QuadrantDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+	type: Schema.Literal(quadrantDiagramType),
+})).annotate({ identifier: "QuadrantDiagram" });
 
 export interface QuadrantDiagram extends Schema.Schema.Type<typeof QuadrantDiagram> {}
+
+/** Clean authored text while preserving corner keys, scores and point order. */
+export function normalizeQuadrant(document: QuadrantDocument): QuadrantDiagram {
+	const title = cleanToolString(document.title);
+	const optionalText = (value: string | undefined) =>
+		value === undefined ? undefined : cleanToolString(value) || undefined;
+	const axis = (value: QuadrantAxis) => ({
+		title: cleanToolString(value.title),
+		low: cleanToolString(value.low),
+		high: cleanToolString(value.high),
+	});
+	return {
+		id: optionalText(document.id) ?? (slug(title) || "sketchi-quadrant-chart"),
+		title,
+		type: quadrantDiagramType,
+		xAxis: axis(document.xAxis),
+		yAxis: axis(document.yAxis),
+		quadrants: {
+			topLeft: cleanToolString(document.quadrants.topLeft),
+			topRight: cleanToolString(document.quadrants.topRight),
+			bottomLeft: cleanToolString(document.quadrants.bottomLeft),
+			bottomRight: cleanToolString(document.quadrants.bottomRight),
+		},
+		points: Arr.map(document.points, (point) => {
+			const group = optionalText(point.group);
+			return {
+				label: cleanToolString(point.label),
+				x: point.x,
+				y: point.y,
+				...(group ? { group } : {}),
+			};
+		}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
 
 export const QuadrantValidationIssueCodeSchema = Schema.Literals([
 	"quadrant_too_large",
@@ -92,7 +143,7 @@ export interface QuadrantValidationIssue extends Schema.Schema.Type<
 	typeof QuadrantValidationIssue
 > {}
 
-const sameText = (text: string) => text.trim().replace(/\s+/gu, " ").toLowerCase();
+const sameText = (text: string) => Str.toLowerCase(Str.replace(/\s+/gu, " ")(Str.trim(text)));
 
 /** The key two group names share when they differ only in case or spacing. */
 export function quadrantGroupKey(group: string): string {
@@ -101,17 +152,19 @@ export function quadrantGroupKey(group: string): string {
 
 /** The groups a chart's points name, in first-appearance order. */
 export function quadrantGroups(diagram: Pick<QuadrantDiagram, "points">): string[] {
-	const groups = new Map<string, string>();
-	for (const point of diagram.points)
-		if (point.group !== undefined && !groups.has(sameText(point.group)))
-			groups.set(sameText(point.group), point.group);
-	return [...groups.values()];
+	const seen = Set.empty<string>();
+	return Arr.filterMap(diagram.points, (point) => {
+		if (point.group === undefined || Set.has(seen, sameText(point.group)))
+			return Result.fail(undefined);
+		Set.add(seen, sameText(point.group));
+		return Result.succeed(point.group);
+	});
 }
 
 export function getQuadrantValidationIssues(diagram: QuadrantDiagram): QuadrantValidationIssue[] {
 	const issues: QuadrantValidationIssue[] = [];
 	const text = (path: string, value: string, max: number, what: string) => {
-		if (!value.trim())
+		if (!Str.trim(value))
 			issues.push({
 				code: "invalid_quadrant_text",
 				path,
@@ -122,7 +175,7 @@ export function getQuadrantValidationIssues(diagram: QuadrantDiagram): QuadrantV
 			issues.push({
 				code: "invalid_quadrant_text",
 				path,
-				message: `${what} "${value.slice(0, 24)}…" is longer than ${max} characters.`,
+				message: `${what} "${Str.slice(0, 24)(value)}…" is longer than ${max} characters.`,
 				hint: `Shorten it to at most ${max} characters; the chart has no room for prose.`,
 			});
 	};
@@ -148,8 +201,8 @@ export function getQuadrantValidationIssues(diagram: QuadrantDiagram): QuadrantV
 			message: `A quadrant chart supports at most ${QUADRANT_MAX_GROUPS} groups; this one has ${groups.length}.`,
 			hint: "Merge groups, or leave group off points that need no color of their own.",
 		});
-	const seen = new Set<string>();
-	diagram.points.forEach((point, index) => {
+	const seen = Set.empty<string>();
+	Arr.forEach(diagram.points, (point, index) => {
 		const path = `points.[${index}]`;
 		text(`${path}.label`, point.label, QUADRANT_MAX_LABEL_LENGTH, "Point label");
 		if (point.group !== undefined)
@@ -162,16 +215,16 @@ export function getQuadrantValidationIssues(diagram: QuadrantDiagram): QuadrantV
 					message: `Point "${point.label}" has ${axis} ${point[axis]}, outside 0 to 1.`,
 					hint: `Scale ${axis} to 0..1 along its axis: 0 is the low end, 1 the high end, 0.5 the middle line. Divide a score out of 100 by 100, or out of 10 by 10.`,
 				});
-		if (seen.has(sameText(point.label)))
+		if (Set.has(seen, sameText(point.label)))
 			issues.push({
 				code: "invalid_quadrant_point",
 				path: `${path}.label`,
 				message: `Point "${point.label}" is listed more than once.`,
 				hint: "List each item once, or tell repeated items apart in their labels.",
 			});
-		seen.add(sameText(point.label));
+		Set.add(seen, sameText(point.label));
 	});
-	return issues.slice(0, QUADRANT_MAX_ISSUES);
+	return Arr.take(issues, QUADRANT_MAX_ISSUES);
 }
 
 export class QuadrantValidationError extends Schema.TaggedError<
@@ -236,7 +289,7 @@ export function counts(diagram: QuadrantDiagram) {
 	return {
 		nodeCount: diagram.points.length,
 		nodeNoun: "points",
-		edgeCount: new Set(diagram.points.flatMap((point) => point.group ?? [])).size,
+		edgeCount: quadrantGroups(diagram).length,
 		edgeNoun: "groups",
 	};
 }

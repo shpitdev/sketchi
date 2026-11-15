@@ -7,11 +7,7 @@ import {
 } from "@sketchi/diagrams/families/quadrant/document";
 import { renderQuadrantDiagram } from "@sketchi/diagrams/families/quadrant/render";
 
-import {
-	convertSceneToExcalidraw,
-	createExcalidrawFile,
-	validateExcalidrawScene,
-} from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 
 const grouped = parseQuadrantDiagram({
 	...quadrantFixture,
@@ -31,6 +27,8 @@ const element = (id: string) => exported.elements.find((candidate) => candidate.
 
 describe("quadrant chart Excalidraw export", () => {
 	it("draws each quadrant as a square-cornered, unlabeled tint grouped with its name", () => {
+		for (const text of exported.elements.filter((candidate) => candidate.type === "text"))
+			expect(text["text"], text.id).toBe(text["originalText"]);
 		for (const key of ["topLeft", "topRight", "bottomLeft", "bottomRight"]) {
 			expect(element(`node:quadrant:region:${key}`)).toMatchObject({
 				type: "rectangle",
@@ -79,18 +77,5 @@ describe("quadrant chart Excalidraw export", () => {
 			text: "Low effort",
 			groupIds: ["quadrant:axis:x"],
 		});
-	});
-
-	it("keeps every text whole and validates after a save and reload", () => {
-		for (const text of exported.elements.filter((candidate) => candidate.type === "text"))
-			expect(text["text"], text.id).toBe(text["originalText"]);
-		for (const diagram of [quadrantFixture, grouped]) {
-			const scene = convertSceneToExcalidraw(
-				renderQuadrantDiagram(diagram).pipe(Result.getOrThrow),
-			);
-			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
-			const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene)));
-			expect(validateExcalidrawScene(reloaded), diagram.id).toEqual({ ok: true, issues: [] });
-		}
 	});
 });

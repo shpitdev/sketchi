@@ -57,7 +57,7 @@ export function defineBuild<
 	readonly counts: (document: N) => DiagramCounts;
 	readonly assess?: (document: N, threshold: number) => QualityReport;
 	readonly qualityIssue?: { readonly code: CodeModeIssueCode; readonly hint: string };
-	readonly render: (document: N) => CanvasSpec;
+	readonly render: (document: N) => CanvasSpec | Result.Result<CanvasSpec, E>;
 	readonly resolve?: (document: D) => Effect.Effect<
 		{
 			readonly document: N;
@@ -267,7 +267,14 @@ export function defineBuild<
 			try: () => policy.render(normalizedSpec),
 			catch: (cause) => failure({ reason: { _tag: "Render", cause }, context: assessed }),
 		});
-		const embedded = resolved ? yield* resolved.render(rendered) : { scene: rendered, issues: [] };
+		const canvas = Result.isResult(rendered)
+			? yield* Effect.fromResult(rendered).pipe(
+					Effect.mapError((error) =>
+						failure({ reason: { _tag: "Document", error }, context: assessed }),
+					),
+				)
+			: rendered;
+		const embedded = resolved ? yield* resolved.render(canvas) : { scene: canvas, issues: [] };
 		const scene = embedded.scene;
 		const sceneIssues = getCanvasValidationIssues(scene);
 		if (sceneIssues.length > 0)

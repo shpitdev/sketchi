@@ -11,7 +11,6 @@ import {
 	DIAGRAM_TYPES,
 	type DiagramTypeValue,
 	familyForType,
-	parseCanonicalDiagram,
 	renderDiagram,
 } from "@sketchi/diagrams/family";
 import { candidateFromText } from "@sketchi/diagrams/generate/candidates";
@@ -90,10 +89,7 @@ describe("canonical diagram family consumers", () => {
 			text: generationEnvelope(fixture),
 		});
 		expect(candidate.error).toBeUndefined();
-		const diagram = parseCanonicalDiagram(
-			candidate.diagram ?? expect.fail("Generation output did not produce a diagram"),
-		).pipe(Result.getOrThrow);
-		expect(diagram).toEqual(candidate.diagram);
+		const diagram = candidate.diagram ?? expect.fail("Generation output did not produce a diagram");
 		expect(diagram).toMatchObject({ id: fixture.id, type: family, title: fixture.title });
 		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
 		expect(scene.diagramId).toBe(fixture.id);

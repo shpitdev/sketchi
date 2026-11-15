@@ -31,7 +31,7 @@ import * as orgChartFamily from "./families/org-chart/document.js";
 import { renderOrgChartDiagram } from "./families/org-chart/render.js";
 import { docs as quadrantFamilyDocs } from "./families/quadrant/docs.js";
 import * as quadrantFamily from "./families/quadrant/document.js";
-import { renderQuadrantDiagram } from "./families/quadrant/render.js";
+import { quadrantBuild } from "./families/quadrant/build.js";
 import { docs as sankeyFamilyDocs } from "./families/sankey/docs.js";
 import * as sankeyFamily from "./families/sankey/document.js";
 import { renderSankeyDiagram } from "./families/sankey/render.js";
@@ -141,7 +141,10 @@ function family<
 		build.normalized,
 		type,
 		(diagram) => Result.map(build.check(diagram), () => diagram),
-		(diagram) => Result.succeed(build.render(diagram)),
+		(diagram) => {
+			const rendered = build.render(diagram);
+			return Result.isResult(rendered) ? rendered : Result.succeed(rendered);
+		},
 		build.counts,
 	);
 	return {
@@ -475,32 +478,12 @@ export const families = [
 		build: (runtime: typeof Runtime) => runtime.buildWireframe,
 		docs: wireframeFamilyDocs,
 	}),
-	legacyFamily({
-		type: quadrantFamily.quadrantFixture.type,
+	family({
 		operation: "buildQuadrantChart",
 		label: "Quadrant chart",
 		path: "/api/v1/quadrant-charts/build",
-		canonical: canonical(
-			quadrantFamily.QuadrantDiagram,
-			quadrantFamily.quadrantFixture.type,
-			quadrantFamily.validateQuadrantDiagram,
-			renderQuadrantDiagram,
-			quadrantFamily.counts,
-		),
-		validationError: quadrantFamily.QuadrantValidationError,
+		build: quadrantBuild,
 		fixture: quadrantFamily.quadrantFixture,
-		spec: Build.QuadrantChartSpec,
-		request: Build.BuildQuadrantChartRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildQuadrantChartRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.QuadrantChartToolSpecSchema,
-			}),
-			output: Build.BuildQuadrantChartResultSchema,
-		},
-		studioInput: Build.BuildQuadrantChartToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildQuadrantChart,
 		docs: quadrantFamilyDocs,
 	}),
 ] as const;

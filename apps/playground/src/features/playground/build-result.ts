@@ -20,8 +20,6 @@ import {
 	BuildSankeyToolInputSchema,
 	BuildWireframeResultSchema,
 	BuildWireframeToolInputSchema,
-	BuildQuadrantChartResultSchema,
-	BuildQuadrantChartToolInputSchema,
 	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
 	type BuildStateMachineResult,
@@ -32,7 +30,6 @@ import {
 	type BuildJourneyMapResult,
 	type BuildSankeyResult,
 	type BuildWireframeResult,
-	type BuildQuadrantChartResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
 
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
@@ -58,7 +55,7 @@ export type StudioBuildResult =
 	| BuildJourneyMapResult
 	| BuildSankeyResult
 	| BuildWireframeResult
-	| BuildQuadrantChartResult;
+	| ReturnType<typeof familyForType<"quadrant">>["contracts"]["output"]["Type"];
 
 type MindmapTopic = {
 	readonly label: string;
@@ -217,9 +214,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_quadrant_chart": {
 		family: "quadrant",
-		decodeResult: Schema.decodeUnknownResult(BuildQuadrantChartResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("quadrant").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildQuadrantChartToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("quadrant").studioInput)(input);
 			return Result.isSuccess(decoded)
 				? decoded.success.spec.points.map((point) => point.label)
 				: [];

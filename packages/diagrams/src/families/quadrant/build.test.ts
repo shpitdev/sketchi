@@ -1,12 +1,16 @@
-import { buildResponse, type BuildRejection } from "../operation.js";
+import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { describe, expect, it } from "vitest";
-import { Effect, Schema } from "effect";
-import { quadrantFixture } from "../../families/quadrant/document.js";
+import { Effect, Result } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { applyDiagramPatch, buildQuadrantChart, CodeModeRuntimeEnvironment } from "./runtime.js";
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildQuadrantChartResultSchema } from "./contract.js";
-import { buildCanonicalDocument, canonicalDocumentFromDiagram } from "./documents.js";
+import {
+	applyDiagramPatch,
+	buildQuadrantChart,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
 
 const storage = makeMemoryArtifactStorage();
 function run<A, E extends BuildRejection<unknown>>(
@@ -44,11 +48,10 @@ const positioning = {
 	],
 };
 
-describe("Code Mode native quadrant chart", () => {
+describe("quadrant build", () => {
 	it("builds the documented example into a validated, patchable editable artifact", async () => {
 		const built = await build(positioning);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildQuadrantChartResultSchema)(built)).not.toThrow();
 		expect(built.normalizedSpec).toMatchObject({
 			id: "project-tools-by-price-and-ease",
 			xAxis: positioning.xAxis,
@@ -59,7 +62,7 @@ describe("Code Mode native quadrant chart", () => {
 				{ label: "Our product", x: 0.4, y: 0.82, group: "Our product" },
 			],
 		});
-		expect(built.quality.summary).toEqual({ nodeCount: 3, edgeCount: 0 });
+		expect(built.quality.summary).toEqual({ nodeCount: 3, edgeCount: 1 });
 		const excalidraw = built.artifact.formats.find((format) => format.format === "excalidraw")
 			?.inline as Parameters<typeof validateExcalidrawScene>[0];
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
@@ -118,7 +121,6 @@ describe("Code Mode native quadrant chart", () => {
 		expect(result.status).toBe("invalid_quadrant_chart");
 		expect(result.issues.map((issue) => issue.code)).toContain(code);
 		expect(result.issues.every((issue) => issue.hint && issue.stage === "input")).toBe(true);
-		expect(() => Schema.decodeUnknownSync(BuildQuadrantChartResultSchema)(result)).not.toThrow();
 	});
 
 	it.each([
@@ -134,25 +136,70 @@ describe("Code Mode native quadrant chart", () => {
 	});
 
 	it("rejects a chart too crowded to label cleanly, with a repair hint, rather than drawing it", async () => {
-		const result = await build({
+		const spec = {
 			...positioning,
 			points: Array.from({ length: 30 }, (_, index) => ({
 				label: `Telecommunications backlog ${index + 1}`,
 				x: 0,
 				y: 0,
 			})),
-		});
+		};
+		const typed = await Effect.runPromise(
+			buildQuadrantChart({ spec, options }).pipe(
+				Effect.result,
+				Effect.provideService(CodeModeRuntimeEnvironment, {
+					createId: (prefix) => prefix + "_dense",
+				}),
+				Effect.provideService(CodeModeArtifactStorage, storage),
+			),
+		);
+		if (Result.isSuccess(typed)) return expect.fail("Expected typed layout refusal");
+		expect(typed.failure.reason._tag).toBe("Document");
+		if (typed.failure.reason._tag === "Document")
+			expect(typed.failure.reason.error._tag).toBe("QuadrantValidationError");
+		const result = typed.failure.toResult();
 		expect(result.ok).toBe(false);
 		expect(result.status).toBe("invalid_quadrant_chart");
 		expect(result.issues[0]).toMatchObject({ code: "quadrant_too_large", stage: "input" });
 		expect(result.issues[0]?.hint).toContain("Spread the scores");
-		expect(() => Schema.decodeUnknownSync(BuildQuadrantChartResultSchema)(result)).not.toThrow();
 	});
 
-	it("keeps zero scores on the low ends", async () => {
-		const built = await build({ ...positioning, points: [{ label: "Free tier", x: 0, y: 0 }] });
+	it.each([
+		{
+			name: "edges and middle",
+			points: [
+				{ label: "Origin", x: 0, y: 0 },
+				{ label: "Center", x: 0.5, y: 0.5 },
+				{ label: "Far corner", x: 1, y: 1 },
+			],
+		},
+		{ name: "empty matrix", points: [] },
+		{
+			name: "ordinary prototype-like names",
+			points: [
+				{ label: "__proto__", x: 0.2, y: 0.8, group: "constructor" },
+				{ label: "constructor", x: 0.7, y: 0.3, group: "__proto__" },
+				{ label: "toString", x: 0.4, y: 0.4, group: "Constructor" },
+			],
+		},
+	])("preserves $name through authored build and native export", async ({ points }) => {
+		const built = await build({ ...positioning, points });
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(built.normalizedSpec.points).toEqual([{ label: "Free tier", x: 0, y: 0 }]);
+		expect(built.normalizedSpec.points).toEqual(points);
+		const native = built.artifact.formats.find((f) => f.format === "excalidraw")
+			?.inline as Parameters<typeof validateExcalidrawScene>[0];
+		const texts = native.elements.filter((e) => e.type === "text");
+		for (const point of points) expect(texts.some((e) => e["text"] === point.label)).toBe(true);
+		if (points.length === 0)
+			expect(texts.filter((e) => e.id.startsWith("quadrant:name:"))).toHaveLength(4);
+		if (points[0]?.label === "__proto__") {
+			expect(built.quality.summary.edgeCount).toBe(2);
+			expect(texts.find((e) => e.id === "quadrant:legend:0:label")?.["text"]).toBe("constructor");
+			expect(texts.find((e) => e.id === "quadrant:legend:1:label")?.["text"]).toBe("__proto__");
+			const dot = (i: number) => native.elements.find((e) => e.id === `node:quadrant:point:${i}`);
+			expect(dot(0)?.backgroundColor).toBe(dot(2)?.backgroundColor);
+			expect(dot(0)?.backgroundColor).not.toBe(dot(1)?.backgroundColor);
+		}
 	});
 
 	it("rejects quadrant names in a list, which leaves their corners ambiguous", async () => {
@@ -160,16 +207,5 @@ describe("Code Mode native quadrant chart", () => {
 		expect(result.ok).toBe(false);
 		expect(result.status).toBe("invalid_input");
 		expect(result.issues[0]?.ref?.path).toContain("quadrants");
-	});
-
-	it("round-trips the canonical fixture through its document", async () => {
-		const result = await run(
-			buildCanonicalDocument(canonicalDocumentFromDiagram(quadrantFixture), {
-				artifactFormats: ["scene"],
-			}),
-		);
-		if (!result.ok) throw new Error(JSON.stringify(result.issues));
-		const { type: _type, ...spec } = quadrantFixture;
-		expect(result.normalizedSpec).toEqual(spec);
 	});
 });

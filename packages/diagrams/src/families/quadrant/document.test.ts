@@ -38,25 +38,6 @@ function issuesOf(input: object): readonly QuadrantValidationIssue[] {
 }
 
 describe("canonical quadrant chart", () => {
-	it("accepts points on the edges and the middle lines, groups and an empty matrix", () => {
-		const parsed = parseQuadrantDiagram({
-			...chart,
-			points: [
-				{ label: "Corner", x: 0, y: 1 },
-				{ label: "Middle", x: 0.5, y: 0.5 },
-				{ label: "Edge", x: 1, y: 0.25, group: "Rivals" },
-			],
-		}).pipe(Result.getOrThrow);
-		expect(parsed.points.map((point) => [point.x, point.y])).toEqual([
-			[0, 1],
-			[0.5, 0.5],
-			[1, 0.25],
-		]);
-		expect(parseQuadrantDiagram({ ...chart, points: [] }).pipe(Result.getOrThrow).points).toEqual(
-			[],
-		);
-	});
-
 	it("keeps zero scores, which sit on the low ends, apart from absent ones", () => {
 		const parsed = parseQuadrantDiagram({ ...chart, points: [{ label: "Zero", x: 0, y: 0 }] }).pipe(
 			Result.getOrThrow,
@@ -65,19 +46,6 @@ describe("canonical quadrant chart", () => {
 		expect(
 			parseQuadrantDiagram({ ...chart, points: [{ label: "Unscored", x: 0.5 }] }),
 		).toMatchObject({ failure: { message: expect.stringMatching(/y/u) } });
-	});
-
-	it("treats names like constructor and __proto__ as ordinary text", () => {
-		const parsed = parseQuadrantDiagram({
-			...chart,
-			quadrants: { ...chart.quadrants, topLeft: "constructor" },
-			points: [
-				{ label: "__proto__", x: 0.2, y: 0.8, group: "constructor" },
-				{ label: "constructor", x: 0.7, y: 0.3, group: "__proto__" },
-				{ label: "toString", x: 0.4, y: 0.4, group: "constructor" },
-			],
-		}).pipe(Result.getOrThrow);
-		expect(quadrantGroups(parsed)).toEqual(["constructor", "__proto__"]);
 	});
 
 	it("lists groups once each in first-appearance order", () => {
