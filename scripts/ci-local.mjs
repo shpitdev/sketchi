@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // `pnpm ci:local`: the local CI gate. It runs the checks remote CI does not and, when they pass,
 // posts a `local-ci` commit status on the exact PR head it checked. `--no-signoff` runs the same
-// checks without the status.
+// checks without the status, optionally against a previously verified unit base with `--base`.
 import { execFileSync, spawn } from "node:child_process";
 import {
 	closeSync,
@@ -20,7 +20,7 @@ import { pathToFileURL } from "node:url";
 
 import { ciScope } from "./ci-scope.mjs";
 
-const BASE = "origin/main";
+const DEFAULT_BASE = "origin/main";
 const STATUS_CONTEXT = "local-ci";
 const SQLITE_BUSY = 5;
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
@@ -224,18 +224,21 @@ function printLogTail(log, lines = 80) {
 	console.error(text.split("\n").slice(-lines).join("\n"));
 }
 
-const HELP = `Usage: pnpm ci:local [--no-signoff] [--all]
+const HELP = `Usage: pnpm ci:local [--no-signoff] [--all] [--base <ref>]
 
 Runs actionlint when workflows changed, a frozen install, lint/format/custom-rule checks, the
 scenario CLI smoke, the deploy and tooling contracts, the Nx-affected typecheck, build and test
 targets, the root TypeScript project references, and the diagram UI Storybook build when
-editor is affected. Changes are compared with origin/main, including uncommitted ones. Logs
-go to .memory/ci-local/.
+editor is affected. Changes are compared with the base (default origin/main), including
+uncommitted and untracked ones. Logs go to .memory/ci-local/.
 
 On success it posts a "${STATUS_CONTEXT}" commit status on the pushed PR head.
 
   --no-signoff  Run the checks only. Works on a dirty or unpushed worktree.
   --all         Run every project instead of the Nx-affected graph.
+  --base <ref>  Compare with this Git commit/ref. Unit checks against a previously fully gated
+                staging head require --no-signoff. Readiness and signoff require the full gate
+                against origin/main; a different base cannot post a local-ci status.
 
 At most CI_LOCAL_SLOTS (default 2) gates run at once on this machine. A test task that failed
 only on Vitest timeouts is rerun once on its own before the gate fails.`;
@@ -246,24 +249,45 @@ class GateFailure extends Error {}
 
 async function main(argv) {
 	const flags = ["--no-signoff", "--all", "--help", "-h"];
-	const unknown = argv.filter((arg) => !flags.includes(arg));
-	if (unknown.length > 0 || argv.includes("--help") || argv.includes("-h")) {
+	let base = DEFAULT_BASE;
+	let baseProvided = false;
+	const options = [];
+	for (let index = 0; index < argv.length; index++) {
+		const arg = argv[index];
+		if (arg === "--base") {
+			if (baseProvided) throw new Error("Pass --base only once.");
+			const ref = argv[++index];
+			if (!ref || ref.startsWith("-")) throw new Error("--base requires a Git commit/ref.");
+			base = ref;
+			baseProvided = true;
+		} else {
+			options.push(arg);
+		}
+	}
+	const unknown = options.filter((arg) => !flags.includes(arg));
+	if (unknown.length > 0 || options.includes("--help") || options.includes("-h")) {
 		console.log(HELP);
 		if (unknown.length > 0) throw new GateFailure();
 		return;
 	}
-	const signoff = !argv.includes("--no-signoff");
-	const all = argv.includes("--all");
+	const signoff = !options.includes("--no-signoff");
+	const all = options.includes("--all");
 	const cwd = git(process.cwd(), ["rev-parse", "--show-toplevel"]);
 	const started = Date.now();
-	let pr = signoff ? readPullRequest(cwd) : undefined;
-	const head = signoff ? assertSignoffReady({ cwd, pr }) : undefined;
-
 	try {
 		git(cwd, ["fetch", "--quiet", "origin", "main"]);
 	} catch {
-		console.warn(`Could not fetch origin main; comparing against the local ${BASE}.`);
+		console.warn(`Could not fetch origin main; using the local ${base} ref.`);
 	}
+	const baseCommit = git(cwd, ["rev-parse", "--verify", "--end-of-options", `${base}^{commit}`]);
+	if (signoff && baseCommit !== git(cwd, ["rev-parse", "--verify", `${DEFAULT_BASE}^{commit}`])) {
+		throw new Error(
+			"Signoff requires the full gate against origin/main; use --no-signoff for a unit base.",
+		);
+	}
+	let pr = signoff ? readPullRequest(cwd) : undefined;
+	const head = signoff ? assertSignoffReady({ cwd, pr }) : undefined;
+	console.log(`Comparing against ${base} (${baseCommit}), including working-tree changes.`);
 
 	const slots = Number(process.env.CI_LOCAL_SLOTS) || 2;
 	for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
@@ -296,7 +320,7 @@ async function main(argv) {
 	});
 	process.on("exit", release);
 
-	const mergeBase = git(cwd, ["merge-base", BASE, "HEAD"]);
+	const mergeBase = git(cwd, ["merge-base", baseCommit, "HEAD"]);
 	const env = {
 		...process.env,
 		// What GitHub Actions sets; Vitest and the fuzz samples read it.
