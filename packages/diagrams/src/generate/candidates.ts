@@ -57,7 +57,7 @@ import {
 	VennDiagram,
 } from "../families/venn/document.js";
 import {
-	resolveWireframeShorthand,
+	prepareWireframe,
 	validateWireframeDiagram,
 	WireframeDiagram,
 } from "../families/wireframe/document.js";
@@ -860,12 +860,18 @@ function parseCandidateDiagram(
 				resolveJourneyShorthand(withSketchiDiagramStyle(titledDiagram)),
 				validateJourneyDiagram,
 			),
-		wireframe: () =>
-			decodeAndValidate(
+		wireframe: () => {
+			const prepared = prepareWireframe({ spec: withSketchiDiagramStyle(titledDiagram) });
+			if (Result.isFailure(prepared)) return diagramValidationFailure(prepared.failure);
+			const request = prepared.success;
+			return decodeAndValidate(
 				WireframeDiagram,
-				resolveWireframeShorthand(withSketchiDiagramStyle(titledDiagram)),
+				typeof request === "object" && request !== null && "spec" in request
+					? request.spec
+					: undefined,
 				validateWireframeDiagram,
-			),
+			);
+		},
 		quadrant: () =>
 			decodeAndValidate(
 				QuadrantDiagram,

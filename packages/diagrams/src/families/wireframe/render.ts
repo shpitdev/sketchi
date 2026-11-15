@@ -1,8 +1,5 @@
-import { Result } from "effect";
 import {
-	type WireframeValidationError,
 	isWireframeContainer,
-	validateWireframeDiagram,
 	WIREFRAME_DEFAULT_TABLE_ROWS,
 	WIREFRAME_DEFAULT_TEXT_LINES,
 	type WireframeAlignment,
@@ -2537,81 +2534,77 @@ const offsetElement = (element: SceneElement, dx: number, dy: number): SceneElem
 			} as SceneElement)
 		: { ...element, x: element.x + dx, y: element.y + dy };
 
-function renderWithLayout(input: WireframeDiagram): Result.Result<
-	{
-		scene: RenderedDiagramScene;
-		layout: WireframeLayout;
-	},
-	WireframeValidationError
-> {
-	return Result.map(validateWireframeDiagram(input), (diagram) => {
-		const { placed, origins, frames: placedFrames } = placeScreens(diagram);
-		const painted = placed.map((screen, index) => paintScreen(screen, origins[index]!));
-		const navigations = painted.flatMap((screen) => screen.navigations);
-		// A screen a control opens carries a node id its arrow binds to.
-		const opened = new Set(navigations.map((navigation) => navigation.target));
-		const frames = placedFrames.map((frame, index) => {
-			const id = placed[index]!.screen.id;
-			return opened.has(id) ? { ...frame, nodeId: wireframeScreenNodeId(id) } : frame;
-		});
-		const arrows = navigationArrows(navigations, frames, painted);
-		const nameBoxes = frames.map((frame) => canvasFrameNameBox(frame));
-		const points = arrows.flatMap((arrow) => arrow.points);
-		const left = Math.min(...frames.map((frame) => frame.x), ...points.map((point) => point.x));
-		const top = Math.min(...nameBoxes.map((box) => box.y), ...points.map((point) => point.y));
-		const dx = PADDING - left;
-		const dy = PADDING - top;
-		const elements: SceneElement[] = [
-			...frames.map((frame) => offsetElement(frame, dx, dy)),
-			...painted.flatMap((screen) =>
-				screen.elements.map((element) => offsetElement(element, dx, dy)),
-			),
-			...arrows.map((arrow) => offsetElement(arrow, dx, dy)),
-		];
-		const right = Math.max(
-			...frames.map((frame) => frame.x + frame.width),
-			...points.map((point) => point.x),
-		);
-		const bottom = Math.max(
-			...frames.map((frame) => frame.y + frame.height),
-			...points.map((point) => point.y),
-		);
-		const scene: RenderedDiagramScene = {
-			kind: "canvas",
-			version: CANVAS_SPEC_VERSION,
-			diagramId: diagram.id,
-			title: diagram.title,
-			width: Math.ceil(right + dx + PADDING),
-			height: Math.ceil(bottom + dy + PADDING),
-			accentColor: diagram.style.accentColor,
-			backgroundColor: diagram.style.backgroundColor,
-			elements,
-			layers: [],
-			layouts: [],
-			zOrder: elements.map((element) => element.id),
-		};
-		const shift = (box: Box): Box => ({ ...box, x: box.x + dx, y: box.y + dy });
-		const routed = new Set(arrows.map((arrow) => arrow.id));
-		const layout: WireframeLayout = {
-			screens: placed.map((screen, index) => ({
-				id: screen.screen.id,
-				device: screen.screen.device,
-				frame: shift(frames[index]!),
-				widened: screen.widened,
-				components: painted[index]!.components.map((component) => ({
-					...component,
-					box: shift(component.box),
-				})),
-			})),
-			navigations: navigations.map((navigation) => ({
-				screen: navigation.screen,
-				path: navigation.path,
-				target: navigation.target,
-				routed: routed.has(wireframeNavigationId(navigation.screen, navigation.path)),
-			})),
-		};
-		return { scene, layout };
+/** Place and paint once; scene and readout describe the same geometry. */
+export function renderWireframeDiagram(diagram: WireframeDiagram): {
+	scene: RenderedDiagramScene;
+	layout: WireframeLayout;
+} {
+	const { placed, origins, frames: placedFrames } = placeScreens(diagram);
+	const painted = placed.map((screen, index) => paintScreen(screen, origins[index]!));
+	const navigations = painted.flatMap((screen) => screen.navigations);
+	// A screen a control opens carries a node id its arrow binds to.
+	const opened = new Set(navigations.map((navigation) => navigation.target));
+	const frames = placedFrames.map((frame, index) => {
+		const id = placed[index]!.screen.id;
+		return opened.has(id) ? { ...frame, nodeId: wireframeScreenNodeId(id) } : frame;
 	});
+	const arrows = navigationArrows(navigations, frames, painted);
+	const nameBoxes = frames.map((frame) => canvasFrameNameBox(frame));
+	const points = arrows.flatMap((arrow) => arrow.points);
+	const left = Math.min(...frames.map((frame) => frame.x), ...points.map((point) => point.x));
+	const top = Math.min(...nameBoxes.map((box) => box.y), ...points.map((point) => point.y));
+	const dx = PADDING - left;
+	const dy = PADDING - top;
+	const elements: SceneElement[] = [
+		...frames.map((frame) => offsetElement(frame, dx, dy)),
+		...painted.flatMap((screen) =>
+			screen.elements.map((element) => offsetElement(element, dx, dy)),
+		),
+		...arrows.map((arrow) => offsetElement(arrow, dx, dy)),
+	];
+	const right = Math.max(
+		...frames.map((frame) => frame.x + frame.width),
+		...points.map((point) => point.x),
+	);
+	const bottom = Math.max(
+		...frames.map((frame) => frame.y + frame.height),
+		...points.map((point) => point.y),
+	);
+	const scene: RenderedDiagramScene = {
+		kind: "canvas",
+		version: CANVAS_SPEC_VERSION,
+		diagramId: diagram.id,
+		title: diagram.title,
+		width: Math.ceil(right + dx + PADDING),
+		height: Math.ceil(bottom + dy + PADDING),
+		accentColor: diagram.style.accentColor,
+		backgroundColor: diagram.style.backgroundColor,
+		elements,
+		layers: [],
+		layouts: [],
+		zOrder: elements.map((element) => element.id),
+	};
+	const shift = (box: Box): Box => ({ ...box, x: box.x + dx, y: box.y + dy });
+	const routed = new Set(arrows.map((arrow) => arrow.id));
+	const layout: WireframeLayout = {
+		screens: placed.map((screen, index) => ({
+			id: screen.screen.id,
+			device: screen.screen.device,
+			frame: shift(frames[index]!),
+			widened: screen.widened,
+			components: painted[index]!.components.map((component) => ({
+				...component,
+				box: shift(component.box),
+			})),
+		})),
+		navigations: navigations.map((navigation) => ({
+			screen: navigation.screen,
+			path: navigation.path,
+			target: navigation.target,
+			routed: routed.has(wireframeNavigationId(navigation.screen, navigation.path)),
+		})),
+	};
+	return { scene, layout };
 }
 
 /** The node id a screen's frame binds the arrows of the controls that open it with. */
@@ -2716,18 +2709,4 @@ function navigationArrows(
 /** A frame's name runs on one line, so an authored line break there reads as a space. */
 export function wireframeFrameName(name: string): string {
 	return name.replace(/\s*\n\s*/gu, " ");
-}
-
-/** Render a wireframe: each screen a frame, each component a group the renderer places. */
-export function renderWireframeDiagram(
-	input: WireframeDiagram,
-): Result.Result<RenderedDiagramScene, WireframeValidationError> {
-	return Result.map(renderWithLayout(input), (value) => value.scene);
-}
-
-/** The boxes a wireframe renders with, in scene coordinates, for checks that read its layout. */
-export function layoutWireframeDiagram(
-	input: WireframeDiagram,
-): Result.Result<WireframeLayout, WireframeValidationError> {
-	return Result.map(renderWithLayout(input), (value) => value.layout);
 }

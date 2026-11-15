@@ -10,14 +10,11 @@ import {
 	BuildErDiagramToolInputSchema,
 	BuildClassDiagramResultSchema,
 	BuildClassDiagramToolInputSchema,
-	BuildWireframeResultSchema,
-	BuildWireframeToolInputSchema,
 	RenderedDiagramSceneSchema,
 	type BuildFlowchartResult,
 	type BuildStateMachineResult,
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
-	type BuildWireframeResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
 
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
@@ -42,7 +39,7 @@ export type StudioBuildResult =
 	| ReturnType<typeof familyForType<"venn">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"journey">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"sankey">>["contracts"]["output"]["Type"]
-	| BuildWireframeResult
+	| ReturnType<typeof familyForType<"wireframe">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"quadrant">>["contracts"]["output"]["Type"];
 
 type MindmapTopic = {
@@ -152,9 +149,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_wireframe": {
 		family: "wireframe",
-		decodeResult: Schema.decodeUnknownResult(BuildWireframeResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("wireframe").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildWireframeToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("wireframe").studioInput)(input);
 			return Result.isSuccess(decoded)
 				? decoded.success.spec.screens.map((screen) => screen.name)
 				: [];

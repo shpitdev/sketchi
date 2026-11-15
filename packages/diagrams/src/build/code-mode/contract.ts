@@ -34,13 +34,6 @@ import {
 	STATE_MACHINE_DIRECTIONS,
 	STATE_MACHINE_STATE_KINDS,
 } from "../../families/state-machine/document.js";
-import {
-	WIREFRAME_ALIGNMENTS,
-	WIREFRAME_CHART_KINDS,
-	WIREFRAME_COMPONENT_TYPES,
-	WIREFRAME_DEVICES,
-	WIREFRAME_IMAGE_ASPECTS,
-} from "../../families/wireframe/document.js";
 
 export const ContractSchemaIssue = Schema.Struct({
 	code: stringLiteral("custom"),
@@ -642,94 +635,6 @@ export const ClassSpec = Schema.Struct({
 
 export interface ClassSpec extends Schema.Schema.Type<typeof ClassSpec> {}
 
-/** One component of a wireframe screen, as a model writes it. */
-export interface WireframeComponentInput {
-	type: (typeof WIREFRAME_COMPONENT_TYPES)[number];
-	text?: string;
-	label?: string;
-	title?: string;
-	placeholder?: string;
-	value?: string;
-	level?: number;
-	lines?: number;
-	variant?: "primary" | "secondary";
-	checked?: boolean;
-	disabled?: boolean;
-	items?: string[];
-	active?: string;
-	columns?: number | string[];
-	rows?: number;
-	kind?: (typeof WIREFRAME_CHART_KINDS)[number];
-	aspect?: (typeof WIREFRAME_IMAGE_ASPECTS)[number];
-	side?: "left" | "right";
-	align?: (typeof WIREFRAME_ALIGNMENTS)[number];
-	target?: string;
-	children?: WireframeComponentInput[];
-}
-
-const WireframeComponentReference: Schema.Codec<WireframeComponentInput, WireframeComponentInput> =
-	requiredObject(
-		Schema.suspend(() => WireframeComponentSpec).annotate({ identifier: "Component" }),
-	);
-
-/**
- * The authoring form of diagram-core's WireframeComponent: the same fields,
- * which buildWireframe normalizes into the core contract, the owner of every
- * invariant.
- */
-export const WireframeComponentSpec: Schema.Codec<
-	WireframeComponentInput,
-	WireframeComponentInput
-> = Schema.Struct({
-	type: literals(WIREFRAME_COMPONENT_TYPES),
-	text: optionalContract(NonEmptyString),
-	label: optionalContract(NonEmptyString),
-	title: optionalContract(NonEmptyString),
-	placeholder: optionalContract(NonEmptyString),
-	value: optionalContract(NonEmptyString),
-	level: optionalContract(Schema.Int),
-	lines: optionalContract(Schema.Int),
-	variant: optionalContract(literals(["primary", "secondary"])),
-	checked: optionalContract(Schema.Boolean),
-	disabled: optionalContract(Schema.Boolean),
-	items: optionalContract(Schema.Array(NonEmptyString).pipe(Schema.mutable)),
-	active: optionalContract(NonEmptyString),
-	columns: optionalContract(
-		Schema.Union([Schema.Int, Schema.Array(NonEmptyString).pipe(Schema.mutable)]),
-	),
-	rows: optionalContract(Schema.Int),
-	kind: optionalContract(literals(WIREFRAME_CHART_KINDS)),
-	aspect: optionalContract(literals(WIREFRAME_IMAGE_ASPECTS)),
-	side: optionalContract(literals(["left", "right"])),
-	align: optionalContract(literals(WIREFRAME_ALIGNMENTS)),
-	target: optionalContract(NonEmptyString),
-	children: optionalContract(Schema.Array(WireframeComponentReference).pipe(Schema.mutable)),
-});
-export const WireframeComponentSpecSchema = WireframeComponentReference;
-
-export const WireframeScreenSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	name: RequiredNonEmptyString,
-	device: optionalContract(literals(WIREFRAME_DEVICES)),
-	align: optionalContract(literals(WIREFRAME_ALIGNMENTS)),
-	children: requiredArray(nonEmptyArray(WireframeComponentReference)),
-}).annotate({ identifier: undefined });
-
-export interface WireframeScreenSpec extends Schema.Schema.Type<typeof WireframeScreenSpec> {}
-
-/**
- * The authoring form of diagram-core's canonical WireframeDiagram: screen ids
- * and devices are optional and style is defaulted.
- */
-export const WireframeSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	screens: requiredArray(nonEmptyArray(WireframeScreenSpec)),
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface WireframeSpec extends Schema.Schema.Type<typeof WireframeSpec> {}
-
 const ArtifactFormatsOption = optionalContract(nonEmptyArray(BuildArtifactFormatSchema));
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
@@ -869,22 +774,6 @@ export const BuildClassDiagramToolInputSchema = Schema.Struct({
 	spec: requiredObject(ClassToolSpecSchema),
 });
 export type BuildClassDiagramToolInput = typeof BuildClassDiagramToolInputSchema.Type;
-export const BuildWireframeRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(WireframeSpec),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildWireframeRequest extends Schema.Schema.Type<typeof BuildWireframeRequest> {}
-/** The wireframe spec a model authors; style is always the Sketchi palette. */
-export const WireframeToolSpecSchema = WireframeSpec.mapFields(
-	({ style: _style, ...fields }) => fields,
-);
-export const BuildWireframeToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(WireframeToolSpecSchema),
-});
-export type BuildWireframeToolInput = typeof BuildWireframeToolInputSchema.Type;
 /** The mindmap spec a model authors; style is always the Sketchi palette. */
 
 export const ScenePoint = Schema.Struct({
@@ -1474,21 +1363,6 @@ const NormalizedClassSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedClassSpec = typeof NormalizedClassSpecSchema.Type;
-const NormalizedWireframeSpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	screens: Schema.Array(
-		Schema.Struct({
-			id: NonEmptyString,
-			name: NonEmptyString,
-			device: literals(WIREFRAME_DEVICES),
-			align: optionalContract(literals(WIREFRAME_ALIGNMENTS)),
-			children: Schema.Array(WireframeComponentSpecSchema).pipe(Schema.mutable),
-		}),
-	).pipe(Schema.mutable),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
-export type NormalizedWireframeSpec = typeof NormalizedWireframeSpecSchema.Type;
 export const BuildFlowchartAccepted = Schema.Struct({
 	ok: booleanLiteral(true),
 	status: stringLiteral("accepted"),
@@ -1671,44 +1545,6 @@ export const BuildClassDiagramResultSchema = Schema.Union([
 	BuildClassDiagramRejected,
 ]);
 export type BuildClassDiagramResult = typeof BuildClassDiagramResultSchema.Type;
-
-export const BuildWireframeAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedWireframeSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildWireframeAccepted extends Schema.Schema.Type<typeof BuildWireframeAccepted> {}
-export const BuildWireframeRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_wireframe",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedWireframeSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildWireframeRejected extends Schema.Schema.Type<typeof BuildWireframeRejected> {}
-export const BuildWireframeResultSchema = Schema.Union([
-	BuildWireframeAccepted,
-	BuildWireframeRejected,
-]);
-export type BuildWireframeResult = typeof BuildWireframeResultSchema.Type;
 
 export const GetArtifactAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

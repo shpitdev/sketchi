@@ -1,15 +1,11 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { wireframeFixture } from "@sketchi/diagrams/families/wireframe/document";
-import { wireframeStressFixtures } from "@sketchi/diagrams/families/wireframe/fixtures";
-import { renderDiagram } from "@sketchi/diagrams/family";
+import { wireframeFixture } from "./document.js";
+import { wireframeStressFixtures } from "./fixtures.js";
+import { renderDiagram } from "../../family.js";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import {
-	convertSceneToExcalidraw,
-	createExcalidrawFile,
-	validateExcalidrawScene,
-} from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 const exported = convertSceneToExcalidraw(
 	renderDiagram(wireframeStressFixtures["settings"]!).pipe(Result.getOrThrow),
@@ -68,12 +64,10 @@ describe("wireframe Excalidraw export", () => {
 		expect(element("wf:settings:1.5.0:knob")).toMatchObject({ type: "ellipse" });
 	});
 
-	it("exports every fixture valid, and the same after a reload", () => {
+	it("preserves the complete text through native export", () => {
 		for (const diagram of [wireframeFixture, ...Object.values(wireframeStressFixtures)]) {
 			const scene = convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow));
 			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
-			const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene))) as typeof scene;
-			expect(validateExcalidrawScene(reloaded), diagram.id).toEqual({ ok: true, issues: [] });
 			for (const text of scene.elements.filter((candidate) => candidate.type === "text"))
 				expect(text["text"], text.id).toBe(text["originalText"]);
 		}

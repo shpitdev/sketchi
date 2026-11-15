@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { wireframeFixture } from "../families/wireframe/document.js";
 
 import { candidateFromText } from "./candidates.js";
-import { buildDiagramGenerationMessages } from "./messages.js";
 
 function candidate(diagram: unknown) {
 	return candidateFromText({
@@ -16,17 +15,6 @@ function candidate(diagram: unknown) {
 }
 
 describe("wireframe generation", () => {
-	it("teaches the wireframe shape when the type is requested", () => {
-		const messages = buildDiagramGenerationMessages({
-			id: "login",
-			request: "Wireframe our login screen.",
-			requestedType: "wireframe",
-		});
-		expect(messages.system).toContain("Wireframe IR rules");
-		expect(messages.system).toContain('device: "desktop" | "tablet" | "mobile"');
-		expect(messages.user).toContain('"type":"wireframe"');
-	});
-
 	it("reads component aliases and keeps a lone screen's tree under screens", () => {
 		const parsed = candidate({
 			id: "login",

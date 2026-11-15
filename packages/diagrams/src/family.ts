@@ -48,7 +48,7 @@ import * as vennFamily from "./families/venn/document.js";
 
 import { docs as wireframeFamilyDocs } from "./families/wireframe/docs.js";
 import * as wireframeFamily from "./families/wireframe/document.js";
-import { renderWireframeDiagram } from "./families/wireframe/render.js";
+import { wireframeBuild } from "./families/wireframe/build.js";
 import { DiagramValidationError } from "./graph/intermediate.js";
 import { renderIntermediateDiagram } from "./graph/scene.js";
 
@@ -370,32 +370,12 @@ export const families = [
 		fixture: sankeyFamily.sankeyFixture,
 		docs: sankeyFamilyDocs,
 	}),
-	legacyFamily({
-		type: wireframeFamily.wireframeFixture.type,
+	family({
 		operation: "buildWireframe",
 		label: "Wireframe",
 		path: "/api/v1/wireframes/build",
-		canonical: canonical(
-			wireframeFamily.WireframeDiagram,
-			wireframeFamily.wireframeFixture.type,
-			wireframeFamily.validateWireframeDiagram,
-			renderWireframeDiagram,
-			wireframeFamily.counts,
-		),
-		validationError: wireframeFamily.WireframeValidationError,
+		build: wireframeBuild,
 		fixture: wireframeFamily.wireframeFixture,
-		spec: Build.WireframeSpec,
-		request: Build.BuildWireframeRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildWireframeRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.WireframeToolSpecSchema,
-			}),
-			output: Build.BuildWireframeResultSchema,
-		},
-		studioInput: Build.BuildWireframeToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildWireframe,
 		docs: wireframeFamilyDocs,
 	}),
 	family({

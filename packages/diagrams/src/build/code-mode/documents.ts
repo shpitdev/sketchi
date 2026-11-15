@@ -11,7 +11,7 @@ import {
 import * as Runtime from "./runtime.js";
 import { type CodeModeRuntimeEnvironment } from "./runtime.js";
 
-import { type BuildFlowchartOptions, type WireframeComponentInput } from "./contract.js";
+import { type BuildFlowchartOptions } from "./contract.js";
 
 import { type CodeModeArtifactStorage } from "./artifacts.js";
 
@@ -117,23 +117,7 @@ export function canonicalDocumentFromDiagram(
 		case "journey":
 			return familyForType("journey").toDocument(diagram);
 		case "wireframe":
-			return {
-				type: "wireframe",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					screens: diagram.screens.map((screen) => ({
-						id: screen.id,
-						name: screen.name,
-						device: screen.device,
-						...(screen.align === undefined ? {} : { align: screen.align }),
-						children: screen.children.map(
-							(component) => structuredClone(component) as WireframeComponentInput,
-						),
-					})),
-					style: diagram.style,
-				},
-			};
+			return familyForType("wireframe").toDocument(diagram);
 		case "quadrant":
 			return familyForType("quadrant").toDocument(diagram);
 		case "sequence":

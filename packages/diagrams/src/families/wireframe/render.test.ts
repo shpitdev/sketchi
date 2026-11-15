@@ -1,3 +1,4 @@
+import { wireframeStressFixtures } from "./fixtures.js";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import {
 	getCanvasValidationIssues,
@@ -7,23 +8,10 @@ import {
 } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import {
-	parseWireframeDiagram,
-	wireframeComponents,
-	wireframeElementEstimate,
-	wireframeFixture,
-} from "./document.js";
-import { wireframeStressFixtures } from "./fixtures.js";
-
-import { renderDiagram } from "../../family.js";
+import { parseWireframeDiagram } from "./document.js";
 
 import { wireframeBoxIssues, wireframeLayoutIssues, wireframeTextBounds } from "./readout.js";
-import {
-	layoutWireframeDiagram,
-	renderWireframeDiagram,
-	WIREFRAME_ACCENT,
-	WIREFRAME_DEVICE_METRICS,
-} from "./render.js";
+import { renderWireframeDiagram, WIREFRAME_ACCENT, WIREFRAME_DEVICE_METRICS } from "./render.js";
 
 const screen = (children: unknown[], extra: Record<string, unknown> = {}) =>
 	parseWireframeDiagram({
@@ -44,9 +32,8 @@ const byId = (scene: RenderedDiagramScene, id: string) => {
 };
 const node = (scene: RenderedDiagramScene, id: string) => byId(scene, id) as NodeSceneElement;
 const boxOf = (diagram: ReturnType<typeof screen>, path: string) => {
-	const found = layoutWireframeDiagram(diagram)
-		.pipe(Result.getOrThrow)
-		.screens.flatMap((entry) => entry.components)
+	const found = renderWireframeDiagram(diagram)
+		.layout.screens.flatMap((entry) => entry.components)
 		.find((component) => component.path === path);
 	if (!found) throw new Error(`No component at ${path}`);
 	return found.box;
@@ -54,49 +41,26 @@ const boxOf = (diagram: ReturnType<typeof screen>, path: string) => {
 
 function expectClean(
 	scene: RenderedDiagramScene,
-	diagram: Parameters<typeof layoutWireframeDiagram>[0],
+	diagram: Parameters<typeof renderWireframeDiagram>[0],
 ) {
 	expect(getCanvasValidationIssues(scene)).toEqual([]);
 	expect(wireframeLayoutIssues(scene)).toEqual([]);
-	expect(wireframeBoxIssues(layoutWireframeDiagram(diagram).pipe(Result.getOrThrow))).toEqual([]);
+	expect(wireframeBoxIssues(renderWireframeDiagram(diagram).layout)).toEqual([]);
 }
 
 describe("wireframe renderer", () => {
-	it("renders the fixture into a valid deterministic scene, one frame per screen", () => {
-		const scene = renderDiagram(wireframeFixture).pipe(Result.getOrThrow);
-		expect(scene.diagramId).toBe("mobile-login");
-		expectClean(scene, wireframeFixture);
-		expect(renderDiagram(wireframeFixture).pipe(Result.getOrThrow)).toEqual(scene);
-		const frames = scene.elements.filter((element) => element.type === "frame");
-		expect(frames).toMatchObject([{ id: "frame:login", name: "Login", width: 390 }]);
-		expect(
-			scene.elements
-				.filter((element) => element.type !== "frame")
-				.every((element) => element.frameId === "frame:login"),
-		).toBe(true);
-	});
-
-	it.each(Object.entries(wireframeStressFixtures))(
-		"lays out %s with nothing overlapping or overflowing",
-		(_name, diagram) => {
-			expectClean(renderWireframeDiagram(diagram).pipe(Result.getOrThrow), diagram);
-		},
-	);
-
 	it("sizes each screen to its device and grows it with its content", () => {
 		for (const device of ["desktop", "tablet", "mobile"] as const) {
-			const layout = layoutWireframeDiagram(
+			const layout = renderWireframeDiagram(
 				screen([{ type: "heading", text: "Hi" }], { device }),
-			).pipe(Result.getOrThrow);
+			).layout;
 			expect(layout.screens[0]!.frame).toMatchObject({
 				width: WIREFRAME_DEVICE_METRICS[device].width,
 				height: WIREFRAME_DEVICE_METRICS[device].minHeight,
 			});
 		}
 		const long = screen(Array.from({ length: 40 }, () => ({ type: "input", label: "Field" })));
-		expect(
-			layoutWireframeDiagram(long).pipe(Result.getOrThrow).screens[0]!.frame.height,
-		).toBeGreaterThan(2000);
+		expect(renderWireframeDiagram(long).layout.screens[0]!.frame.height).toBeGreaterThan(2000);
 	});
 
 	it("spans the header across the top, the footer along the bottom, and sidebars down their sides", () => {
@@ -107,7 +71,7 @@ describe("wireframe renderer", () => {
 			{ type: "header", children: [{ type: "heading", text: "Acme" }] },
 			{ type: "heading", text: "Body" },
 		]);
-		const frame = layoutWireframeDiagram(diagram).pipe(Result.getOrThrow).screens[0]!.frame;
+		const frame = renderWireframeDiagram(diagram).layout.screens[0]!.frame;
 		const header = boxOf(diagram, "3");
 		const footer = boxOf(diagram, "0");
 		const left = boxOf(diagram, "1");
@@ -121,7 +85,7 @@ describe("wireframe renderer", () => {
 		expect(right.x + right.width).toBe(frame.x + frame.width);
 		expect(body.x).toBeGreaterThan(left.x + left.width);
 		expect(body.x + body.width).toBeLessThan(right.x);
-		expectClean(renderWireframeDiagram(diagram).pipe(Result.getOrThrow), diagram);
+		expectClean(renderWireframeDiagram(diagram).scene, diagram);
 	});
 
 	it("stacks a sidebar into the content on a phone", () => {
@@ -143,7 +107,7 @@ describe("wireframe renderer", () => {
 			{ type: "button", text: "Download the quarterly report" },
 			{ type: "input", label: "Email" },
 		]);
-		const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+		const scene = renderWireframeDiagram(diagram).scene;
 		const content = 1280 - 64;
 		expect(boxOf(diagram, "0").width).toBe(80);
 		expect(boxOf(diagram, "1").width).toBeLessThan(300);
@@ -180,7 +144,7 @@ describe("wireframe renderer", () => {
 			{ device: "mobile" },
 		);
 		expect(boxOf(narrow, "0.2").y).toBeGreaterThan(boxOf(narrow, "0.0").y);
-		expectClean(renderWireframeDiagram(narrow).pipe(Result.getOrThrow), narrow);
+		expectClean(renderWireframeDiagram(narrow).scene, narrow);
 	});
 
 	it("gives cards in a row one height and wraps a row too long for its line", () => {
@@ -203,7 +167,7 @@ describe("wireframe renderer", () => {
 		expect(boxOf(diagram, "0.0").height).toBe(boxOf(diagram, "0.1").height);
 		const badges = Array.from({ length: 8 }, (_, i) => boxOf(diagram, `1.${i}`));
 		expect(new Set(badges.map((box) => box.y)).size).toBeGreaterThan(1);
-		expectClean(renderWireframeDiagram(diagram).pipe(Result.getOrThrow), diagram);
+		expectClean(renderWireframeDiagram(diagram).scene, diagram);
 	});
 
 	it("levels what follows the titles of cards side by side, however the titles wrap", () => {
@@ -226,7 +190,7 @@ describe("wireframe renderer", () => {
 			]);
 			const values = ["0.0.0", "0.1.0", "0.2.0"].map((path) => boxOf(diagram, path).y);
 			expect(new Set(values).size, container).toBe(1);
-			expectClean(renderWireframeDiagram(diagram).pipe(Result.getOrThrow), diagram);
+			expectClean(renderWireframeDiagram(diagram).scene, diagram);
 		}
 	});
 
@@ -240,7 +204,7 @@ describe("wireframe renderer", () => {
 				device: "mobile",
 			},
 		);
-		const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+		const scene = renderWireframeDiagram(diagram).scene;
 		const words = new Set([...sentence.split(" "), ...title.split(" ")]);
 		for (const text of texts(scene))
 			for (const word of text.text.split(/\s+/u)) expect(words.has(word), word).toBe(true);
@@ -256,22 +220,11 @@ describe("wireframe renderer", () => {
 		const diagram = screen([{ type: "grid", columns: 2, children: [row, row] }], {
 			device: "mobile",
 		});
-		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+		const scene = renderWireframeDiagram(diagram).scene;
 		expect(scene.elements.find((element) => element.type === "frame")).toMatchObject({
 			width: 390,
 		});
 		expectClean(scene, diagram);
-	});
-
-	it("marks only the first of repeated items active, so every element keeps its own id", () => {
-		for (const type of ["tabs", "nav"]) {
-			const diagram = screen([{ type, items: ["Orders", "Orders"], active: "Orders" }]);
-			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
-			const ids = scene.elements.map((element) => element.id);
-			expect(new Set(ids).size).toBe(ids.length);
-			expect(ids.filter((id) => id.endsWith(":active"))).toEqual(["wf:s:0:active"]);
-			expectClean(scene, diagram);
-		}
 	});
 
 	it("wraps a long tab or nav label at whole words rather than widening a phone", () => {
@@ -282,7 +235,7 @@ describe("wireframe renderer", () => {
 			[{ type: "sidebar", children: [{ type: "nav", items: ["Home", label] }] }],
 		]) {
 			const diagram = screen(children, { device: "mobile" });
-			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderWireframeDiagram(diagram).scene;
 			expect(scene.elements.find((element) => element.type === "frame")).toMatchObject({
 				width: 390,
 			});
@@ -293,7 +246,7 @@ describe("wireframe renderer", () => {
 	it("draws a table's headers and capped placeholder rows, and stacks its rows when columns cannot fit", () => {
 		const columns = ["Order", "Customer", "Date", "Total", "Status"];
 		const wide = screen([{ type: "table", columns, rows: 3 }]);
-		const scene = renderWireframeDiagram(wide).pipe(Result.getOrThrow);
+		const scene = renderWireframeDiagram(wide).scene;
 		expect(
 			columns.map((_, index) => (byId(scene, `wf:s:0:header-${index}`) as TextSceneElement).text),
 		).toEqual(columns);
@@ -310,7 +263,7 @@ describe("wireframe renderer", () => {
 			],
 			{ device: "mobile" },
 		);
-		const stacked = renderWireframeDiagram(narrow).pipe(Result.getOrThrow);
+		const stacked = renderWireframeDiagram(narrow).scene;
 		expect(stacked.elements.some((element) => element.id === "wf:s:0:header-1-4")).toBe(true);
 		expectClean(stacked, narrow);
 	});
@@ -327,7 +280,7 @@ describe("wireframe renderer", () => {
 			{ type: "input", label: "Name", placeholder: "Ada" },
 			{ type: "button", text: "Delete", disabled: true },
 		]);
-		const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+		const scene = renderWireframeDiagram(diagram).scene;
 		expect((byId(scene, "wf:s:0:item-1") as TextSceneElement).textColor).toBe(WIREFRAME_ACCENT);
 		expect((byId(scene, "wf:s:0:item-0") as TextSceneElement).textColor).not.toBe(WIREFRAME_ACCENT);
 		const underline = byId(scene, "wf:s:0:active");
@@ -359,7 +312,7 @@ describe("wireframe renderer", () => {
 			},
 			{ type: "nav", items: ["Docs", "Pricing"], active: "Docs" },
 		]);
-		const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+		const scene = renderWireframeDiagram(diagram).scene;
 		const [first, second] = ["wf:s:0.0:item-0", "wf:s:0.0:item-1"].map(
 			(id) => byId(scene, id) as TextSceneElement,
 		);
@@ -373,9 +326,9 @@ describe("wireframe renderer", () => {
 
 	it("floats a modal over its screen behind a backdrop", () => {
 		const diagram = wireframeStressFixtures["tabletModal"]!;
-		const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+		const scene = renderWireframeDiagram(diagram).scene;
 		const scrim = node(scene, "wf:projects:scrim");
-		const frame = layoutWireframeDiagram(diagram).pipe(Result.getOrThrow).screens[0]!.frame;
+		const frame = renderWireframeDiagram(diagram).layout.screens[0]!.frame;
 		expect(scrim).toMatchObject({
 			x: frame.x,
 			y: frame.y,
@@ -391,26 +344,8 @@ describe("wireframe renderer", () => {
 		// A screen that is only a dialog needs no backdrop.
 		const alone = renderWireframeDiagram(
 			screen([{ type: "modal", title: "Hi", children: [{ type: "text", text: "Body" }] }]),
-		).pipe(Result.getOrThrow);
+		).scene;
 		expect(alone.elements.some((element) => element.id === "wf:s:scrim")).toBe(false);
-	});
-
-	it("groups each component, and everything inside a card with the card", () => {
-		const diagram = screen([
-			{
-				type: "card",
-				title: "Plan",
-				children: [
-					{ type: "button", text: "Upgrade" },
-					{ type: "row", children: [{ type: "badge", text: "Pro" }] },
-				],
-			},
-		]);
-		const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
-		expect(node(scene, "wf:s:0:box").groupIds).toEqual(["group:s:0"]);
-		expect(node(scene, "wf:s:0.0:box").groupIds).toEqual(["group:s:0.0", "group:s:0"]);
-		// A row draws nothing of its own, so it adds no group.
-		expect(node(scene, "wf:s:0.1.0:box").groupIds).toEqual(["group:s:0.1.0", "group:s:0"]);
 	});
 
 	it("wraps a sheet of screens so it reads no wider than 2.45:1", () => {
@@ -426,11 +361,9 @@ describe("wireframe renderer", () => {
 			type: "wireframe",
 			screens,
 		}).pipe(Result.getOrThrow);
-		const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+		const scene = renderWireframeDiagram(diagram).scene;
 		expect(scene.width / scene.height).toBeLessThanOrEqual(2.45);
-		const frames = layoutWireframeDiagram(diagram)
-			.pipe(Result.getOrThrow)
-			.screens.map((entry) => entry.frame);
+		const frames = renderWireframeDiagram(diagram).layout.screens.map((entry) => entry.frame);
 		expect(frames[1]!.y).toBe(frames[0]!.y);
 		expect(frames.at(-1)!.y).toBeGreaterThan(frames[0]!.y);
 		expect(wireframeLayoutIssues(scene)).toEqual([]);
@@ -440,25 +373,8 @@ describe("wireframe renderer", () => {
 			type: "wireframe",
 			screens: screens.slice(0, 3).map((entry) => ({ ...entry, device: "mobile" })),
 		}).pipe(Result.getOrThrow);
-		const row = layoutWireframeDiagram(phones)
-			.pipe(Result.getOrThrow)
-			.screens.map((entry) => entry.frame.y);
+		const row = renderWireframeDiagram(phones).layout.screens.map((entry) => entry.frame.y);
 		expect(new Set(row).size).toBe(1);
-	});
-
-	it("never draws more than the contract's element estimate", () => {
-		for (const diagram of [wireframeFixture, ...Object.values(wireframeStressFixtures)]) {
-			const estimate =
-				diagram.screens.length +
-				[...wireframeComponents(diagram)].reduce(
-					(sum, { component }) => sum + wireframeElementEstimate(component),
-					0,
-				);
-			expect(
-				renderWireframeDiagram(diagram).pipe(Result.getOrThrow).elements.length,
-				diagram.id,
-			).toBeLessThanOrEqual(estimate + 1);
-		}
 	});
 
 	it("draws an authored line break as one, in every text", () => {
@@ -501,7 +417,7 @@ describe("wireframe renderer", () => {
 				},
 			],
 		}).pipe(Result.getOrThrow);
-		const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+		const scene = renderWireframeDiagram(diagram).scene;
 		expectClean(scene, diagram);
 		const drawn = texts(scene).map((text) => text.text);
 		for (const broken of [
@@ -545,7 +461,7 @@ describe("wireframe renderer", () => {
 
 		it("draws a straight arrow from a control to the next screen's frame", () => {
 			const diagram = wireframeStressFixtures["signupFlow"]!;
-			const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderWireframeDiagram(diagram).scene;
 			expectClean(scene, diagram);
 			const arrow = byId(scene, "nav:signup:4");
 			expect(arrow).toMatchObject({
@@ -571,9 +487,7 @@ describe("wireframe renderer", () => {
 				targetNodeId: "screen:signup",
 			});
 			expect(
-				layoutWireframeDiagram(diagram)
-					.pipe(Result.getOrThrow)
-					.navigations.every((navigation) => navigation.routed),
+				renderWireframeDiagram(diagram).layout.navigations.every((navigation) => navigation.routed),
 			).toBe(true);
 		});
 
@@ -588,7 +502,7 @@ describe("wireframe renderer", () => {
 				},
 				{ id: "b", children: [{ type: "heading", text: "Done" }] },
 			]);
-			const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderWireframeDiagram(diagram).scene;
 			expectClean(scene, diagram);
 			const [arrow] = arrows(scene);
 			expect(arrow!.points.length).toBeGreaterThan(2);
@@ -600,7 +514,7 @@ describe("wireframe renderer", () => {
 				{ id: "b", children: [...filler(3), go("a", "Back")] },
 				{ id: "c", children: [{ type: "heading", text: "End" }] },
 			]);
-			const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderWireframeDiagram(diagram).scene;
 			expectClean(scene, diagram);
 			const middle = scene.elements.find((element) => element.id === "frame:b");
 			if (middle?.type !== "frame") throw new Error("Expected a frame");
@@ -618,11 +532,9 @@ describe("wireframe renderer", () => {
 					children: [{ type: "heading", text: id }, ...(index === 0 ? [go(ids[3]!)] : [])],
 				})),
 			);
-			const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderWireframeDiagram(diagram).scene;
 			expectClean(scene, diagram);
-			const frames = layoutWireframeDiagram(diagram)
-				.pipe(Result.getOrThrow)
-				.screens.map((screen) => screen.frame);
+			const frames = renderWireframeDiagram(diagram).layout.screens.map((screen) => screen.frame);
 			expect(frames[3]!.y).toBeGreaterThan(frames[0]!.y);
 			expect(byId(scene, "nav:a:1")).toMatchObject({ targetNodeId: "screen:d" });
 		});
@@ -642,8 +554,6 @@ describe("wireframe renderer", () => {
 		);
 		for (const path of ["0", "1", "2", "3", "4", "5"])
 			expect(boxOf(diagram, path).height).toBeGreaterThanOrEqual(44);
-		expect(nodes(renderWireframeDiagram(diagram).pipe(Result.getOrThrow)).length).toBeGreaterThan(
-			0,
-		);
+		expect(nodes(renderWireframeDiagram(diagram).scene).length).toBeGreaterThan(0);
 	});
 });

@@ -1,5 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { Effect, Schema, Array as Arr, Option, Result, String as Str, Record as Rec } from "effect";
+import { cleanToolString, slug } from "../../clean-text.js";
 
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
@@ -158,14 +159,13 @@ export const WireframeComponentSchema: Schema.Codec<WireframeComponent> = Schema
 	target: Schema.optionalKey(Schema.NonEmptyString),
 	children: Schema.optionalKey(Schema.Array(WireframeComponentReference)),
 });
-
 /**
  * One screen, drawn as a frame the size of its device. Its header spans the
  * top, its footer the bottom, a sidebar one side between them, a modal floats
  * over the rest, and every other component stacks down the content area.
  */
-export const WireframeScreen = Schema.Struct({
-	id: Schema.NonEmptyString,
+const ScreenDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	name: Schema.NonEmptyString,
 	device: Schema.Literals(WIREFRAME_DEVICES).pipe(
 		Schema.withDecodingDefault(Effect.succeed("desktop" as const)),
@@ -173,24 +173,35 @@ export const WireframeScreen = Schema.Struct({
 	/** Where the content area's children sit, as a column's align does. */
 	align: Schema.optionalKey(Schema.Literals(WIREFRAME_ALIGNMENTS)),
 	children: Schema.Array(WireframeComponentReference).pipe(Schema.mutable),
-}).annotate({ identifier: "WireframeScreen" });
+});
+
+export const WireframeScreen = ScreenDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+})).annotate({ identifier: "WireframeScreen" });
 
 export interface WireframeScreen extends Schema.Schema.Type<typeof WireframeScreen> {}
-
 /**
  * The canonical wireframe: low-fidelity screens, each a tree of components.
  * The renderer owns every coordinate. Every surface that accepts, generates,
  * renders or evaluates a wireframe uses this shape.
  */
-export const WireframeDiagram = Schema.Struct({
-	id: Schema.NonEmptyString,
+export const WireframeDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
-	type: Schema.Literal(wireframeDiagramType),
-	screens: Schema.Array(WireframeScreen).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
+	screens: Schema.Array(ScreenDocument).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
 	style: DiagramStyle.pipe(
 		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}).annotate({ identifier: "WireframeDiagram" });
+});
+export interface WireframeDocument extends Schema.Schema.Type<typeof WireframeDocument> {}
+
+export const WireframeDiagram = WireframeDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+	type: Schema.Literal(wireframeDiagramType),
+	screens: Schema.Array(WireframeScreen).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
+})).annotate({ identifier: "WireframeDiagram" });
 
 export interface WireframeDiagram extends Schema.Schema.Type<typeof WireframeDiagram> {}
 
@@ -295,48 +306,20 @@ const OPTION_HINTS: Readonly<Record<string, string>> = {
 	target: "Only a button or link opens another screen; set target on the control that does.",
 };
 
-/** Each component in depth-first order with its path, depth and screen index. */
-export function* wireframeComponents(diagram: Pick<WireframeDiagram, "screens">): Generator<{
-	readonly component: WireframeComponent;
-	readonly path: string;
-	readonly depth: number;
-	readonly screen: number;
-	readonly parent: WireframeComponent | undefined;
-}> {
-	function* visit(
-		components: readonly WireframeComponent[],
-		prefix: string,
-		depth: number,
-		screen: number,
-		parent: WireframeComponent | undefined,
-	): Generator<{
-		readonly component: WireframeComponent;
-		readonly path: string;
-		readonly depth: number;
-		readonly screen: number;
-		readonly parent: WireframeComponent | undefined;
-	}> {
-		for (const [index, component] of components.entries()) {
-			const path = `${prefix}.children.[${index}]`;
-			yield { component, path, depth, screen, parent };
-			if (component.children) yield* visit(component.children, path, depth + 1, screen, component);
-		}
-	}
-	for (const [index, screen] of diagram.screens.entries())
-		yield* visit(screen.children, `screens.[${index}]`, 1, index, undefined);
-}
-
 /** The words a component shows, for checks that read a wireframe back. */
 export function wireframeComponentWords(component: WireframeComponent): string[] {
-	return [
-		component.text,
-		component.label,
-		component.title,
-		component.placeholder,
-		component.value,
-		...(component.items ?? []),
-		...(Array.isArray(component.columns) ? component.columns : []),
-	].filter((value): value is string => value !== undefined);
+	return Arr.filter(
+		[
+			component.text,
+			component.label,
+			component.title,
+			component.placeholder,
+			component.value,
+			...(component.items ?? []),
+			...(Arr.isArray(component.columns) ? component.columns : []),
+		],
+		(value): value is string => value !== undefined,
+	);
 }
 
 /** Placeholder rows a table draws when it states none. */
@@ -349,7 +332,7 @@ export const WIREFRAME_DEFAULT_TEXT_LINES = 3;
  * counting its children. The renderer never draws more, so a wireframe within
  * WIREFRAME_MAX_ELEMENTS always fits a scene.
  */
-export function wireframeElementEstimate(component: WireframeComponent): number {
+function wireframeElementEstimate(component: WireframeComponent): number {
 	// A control that opens a screen adds its arrow, and a link the box it binds to.
 	return ownElementEstimate(component) + (component.target === undefined ? 0 : 2);
 }
@@ -358,7 +341,7 @@ function ownElementEstimate(component: WireframeComponent): number {
 	const items = component.items?.length ?? 0;
 	switch (component.type) {
 		case "table": {
-			const columns = Array.isArray(component.columns) ? component.columns.length : 1;
+			const columns = Arr.isArray(component.columns) ? component.columns.length : 1;
 			const rows = component.rows ?? WIREFRAME_DEFAULT_TABLE_ROWS;
 			// A table too narrow for its columns repeats each header beside its row's value.
 			return 2 + columns + rows * (2 * columns + 1);
@@ -394,21 +377,16 @@ function ownElementEstimate(component: WireframeComponent): number {
 export function getWireframeValidationIssues(
 	diagram: WireframeDiagram,
 ): WireframeValidationIssue[] {
+	const sizeIssue = inputSizeIssue(diagram);
+	if (sizeIssue) return [sizeIssue];
 	const issues: WireframeValidationIssue[] = [];
 	const push = (code: WireframeValidationIssueCode, path: string, message: string, hint: string) =>
 		issues.push({ code, path, message, hint });
 	const { screens } = diagram;
-	if (screens.length > WIREFRAME_MAX_SCREENS)
-		push(
-			"wireframe_too_large",
-			"screens",
-			`A wireframe holds at most ${WIREFRAME_MAX_SCREENS} screens; this one has ${screens.length}.`,
-			"Draw each flow as its own wireframe, or keep the screens the request names.",
-		);
 	const ids = new Set<string>();
-	screens.forEach((screen, index) => {
+	Arr.forEach(screens, (screen, index) => {
 		const path = `screens.[${index}]`;
-		if (screen.id.includes(":"))
+		if (Str.includes(":")(screen.id))
 			push(
 				"invalid_screen_id",
 				`${path}.id`,
@@ -423,7 +401,7 @@ export function getWireframeValidationIssues(
 				"Give each screen a unique id.",
 			);
 		ids.add(screen.id);
-		if (screen.name.trim().length > WIREFRAME_MAX_LABEL_LENGTH)
+		if (Str.trim(screen.name).length > WIREFRAME_MAX_LABEL_LENGTH)
 			push(
 				"wireframe_text_too_long",
 				`${path}.name`,
@@ -445,55 +423,47 @@ export function getWireframeValidationIssues(
 				'A screen\'s content stacks down; use align "start", "center" or "end".',
 			);
 	});
-	let count = 0;
 	let elements = screens.length;
-	let deepest = 0;
-	for (const { component, path, depth, screen } of wireframeComponents(diagram)) {
-		count += 1;
-		elements += wireframeElementEstimate(component);
-		deepest = Math.max(deepest, depth);
-		validateComponent(component, path, push);
-		const { target } = component;
-		if (target === undefined || (component.type !== "button" && component.type !== "link"))
-			continue;
-		if (!ids.has(target))
-			push(
-				"unknown_wireframe_target",
-				`${path}.target`,
-				`The ${component.type} at ${path} opens "${target}", which is not a screen.`,
-				`Set target to the id of the screen it opens: ${[...ids]
-					.slice(0, 6)
-					.map((id) => `"${id}"`)
-					.join(", ")}.`,
-			);
-		else if (target === screens[screen]!.id)
-			push(
-				"unknown_wireframe_target",
-				`${path}.target`,
-				`The ${component.type} at ${path} opens its own screen.`,
-				"Set target to another screen, or omit it.",
-			);
-	}
-	if (count > WIREFRAME_MAX_COMPONENTS)
-		push(
-			"wireframe_too_large",
-			"screens",
-			`A wireframe holds at most ${WIREFRAME_MAX_COMPONENTS} components; this one has ${count}.`,
-			"Keep the components the request names, or split the screens into separate wireframes.",
-		);
-	else if (elements > WIREFRAME_MAX_ELEMENTS)
+	const visit = (
+		components: readonly WireframeComponent[],
+		prefix: string,
+		screen: string,
+	): void => {
+		for (const [index, component] of components.entries()) {
+			const path = `${prefix}.children.[${index}]`;
+			elements += wireframeElementEstimate(component);
+			validateComponent(component, path, push);
+			const { target } = component;
+			if (target !== undefined && (component.type === "button" || component.type === "link")) {
+				if (!ids.has(target))
+					push(
+						"unknown_wireframe_target",
+						`${path}.target`,
+						`The ${component.type} at ${path} opens "${target}", which is not a screen.`,
+						`Set target to the id of the screen it opens: ${Arr.join(
+							Arr.map([...ids].slice(0, 6), (id) => `"${id}"`),
+							", ",
+						)}.`,
+					);
+				else if (target === screen)
+					push(
+						"unknown_wireframe_target",
+						`${path}.target`,
+						`The ${component.type} at ${path} opens its own screen.`,
+						"Set target to another screen, or omit it.",
+					);
+			}
+			if (component.children) visit(component.children, path, screen);
+		}
+	};
+	for (const [index, screen] of screens.entries())
+		visit(screen.children, `screens.[${index}]`, screen.id);
+	if (elements > WIREFRAME_MAX_ELEMENTS)
 		push(
 			"wireframe_too_large",
 			"screens",
 			"This wireframe draws more than one scene holds.",
 			"Use fewer table rows and columns, list items or screens.",
-		);
-	if (deepest > WIREFRAME_MAX_DEPTH)
-		push(
-			"wireframe_too_large",
-			"screens",
-			`Components nest ${deepest} levels deep; a wireframe draws at most ${WIREFRAME_MAX_DEPTH}.`,
-			"Drop wrapper rows and columns that hold a single child.",
 		);
 	return issues.slice(0, WIREFRAME_MAX_ISSUES);
 }
@@ -505,17 +475,17 @@ function validateComponent(
 ): void {
 	const { type } = component;
 	const name = `The ${type} at ${path}`;
-	for (const [field, types] of Object.entries(OPTION_TYPES))
+	for (const [field, types] of Rec.toEntries(OPTION_TYPES))
 		if (component[field as keyof WireframeComponent] !== undefined && !types.has(type))
 			push(
 				"invalid_wireframe_option",
 				`${path}.${field}`,
 				`A ${type} takes no ${field}.`,
-				OPTION_HINTS[field] ?? `Remove ${field}; it applies only to ${[...types].join(", ")}.`,
+				OPTION_HINTS[field] ?? `Remove ${field}; it applies only to ${Arr.join([...types], ", ")}.`,
 			);
 	const long = (field: "text" | "label" | "title" | "placeholder" | "value", limit: number) => {
 		const value = component[field];
-		if (value !== undefined && value.trim().length > limit)
+		if (value !== undefined && Str.trim(value).length > limit)
 			push(
 				"wireframe_text_too_long",
 				`${path}.${field}`,
@@ -566,12 +536,12 @@ function validateComponent(
 				`${name} lists ${items.length} items; at most ${WIREFRAME_MAX_ITEMS} read at once.`,
 				`Keep at most ${WIREFRAME_MAX_ITEMS} items.`,
 			);
-		items.forEach((item, index) => {
-			if (item.trim().length > WIREFRAME_MAX_LABEL_LENGTH)
+		Arr.forEach(items, (item, index) => {
+			if (Str.trim(item).length > WIREFRAME_MAX_LABEL_LENGTH)
 				push(
 					"wireframe_text_too_long",
 					`${path}.items.[${index}]`,
-					`Item ${index + 1} of ${name.toLowerCase()} is longer than ${WIREFRAME_MAX_LABEL_LENGTH} characters.`,
+					`Item ${index + 1} of ${Str.toLowerCase(name)} is longer than ${WIREFRAME_MAX_LABEL_LENGTH} characters.`,
 					`Shorten each item to at most ${WIREFRAME_MAX_LABEL_LENGTH} characters.`,
 				);
 		});
@@ -620,7 +590,7 @@ function validateComponent(
 			);
 	}
 	if (type === "table") {
-		if (!Array.isArray(columns) || columns.length === 0)
+		if (columns === undefined || typeof columns === "number" || columns.length === 0)
 			push(
 				"missing_wireframe_text",
 				`${path}.columns`,
@@ -635,12 +605,12 @@ function validateComponent(
 					`${name} has ${columns.length} columns.`,
 					`Keep at most ${WIREFRAME_MAX_TABLE_COLUMNS} columns.`,
 				);
-			columns.forEach((header, index) => {
-				if (header.trim().length > WIREFRAME_MAX_LABEL_LENGTH)
+			Arr.forEach(columns, (header, index) => {
+				if (Str.trim(header).length > WIREFRAME_MAX_LABEL_LENGTH)
 					push(
 						"wireframe_text_too_long",
 						`${path}.columns.[${index}]`,
-						`Column ${index + 1} of ${name.toLowerCase()} has a header longer than ${WIREFRAME_MAX_LABEL_LENGTH} characters.`,
+						`Column ${index + 1} of ${Str.toLowerCase(name)} has a header longer than ${WIREFRAME_MAX_LABEL_LENGTH} characters.`,
 						`Shorten each header to at most ${WIREFRAME_MAX_LABEL_LENGTH} characters.`,
 					);
 			});
@@ -667,7 +637,9 @@ function validateComponent(
 
 export class WireframeValidationError extends Schema.TaggedError<
 	WireframeValidationError,
-	{ readonly brand: unique symbol }
+	{
+		readonly brand: unique symbol;
+	}
 >()("WireframeValidationError", {
 	message: Schema.String,
 	issues: Schema.Array(WireframeValidationIssue),
@@ -695,6 +667,8 @@ export function validateWireframeDiagram(
 export function parseWireframeDiagram(
 	input: unknown,
 ): Result.Result<WireframeDiagram, Schema.SchemaError | WireframeValidationError> {
+	const sizeIssue = inputSizeIssue(input);
+	if (sizeIssue) return Result.fail(WireframeValidationError.fromIssues([sizeIssue]));
 	return Result.flatMap(
 		Schema.decodeUnknownResult(WireframeDiagram, { errors: "all" })(input),
 		validateWireframeDiagram,
@@ -702,7 +676,7 @@ export function parseWireframeDiagram(
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
+	typeof value === "object" && value !== null && !Arr.isArray(value);
 
 /**
  * The first of `keys` a record sets, removed from `rest`. An empty string or
@@ -726,9 +700,9 @@ const words = (value: unknown) =>
 
 /** An alias table's own entry for `name`; inherited names such as `constructor` are no alias. */
 const alias = (table: Readonly<Record<string, string>>, name: string) =>
-	Object.hasOwn(table, name) ? table[name] : undefined;
+	Rec.has(table, name) ? table[name] : undefined;
 
-const squash = (value: string) => value.toLowerCase().replace(/[\s_-]+/gu, "");
+const squash = (value: string) => Str.replace(/[\s_-]+/gu, "")(Str.toLowerCase(value));
 
 /** Component type names models write, squashed, and the type each means. */
 const TYPE_ALIASES: Readonly<Record<string, string>> = {
@@ -891,7 +865,7 @@ function resolveComponent(input: unknown): unknown {
 		const component =
 			(WIREFRAME_COMPONENT_TYPES as readonly string[]).includes(kind) ||
 			alias(TYPE_ALIASES, kind) !== undefined;
-		if (!component && chartKind(kind.replace(/chart$/u, "")) !== undefined) raw = "chart";
+		if (!component && chartKind(Str.replace(/chart$/u, "")(kind)) !== undefined) raw = "chart";
 		else {
 			raw = rest["kind"];
 			delete rest["kind"];
@@ -899,12 +873,14 @@ function resolveComponent(input: unknown): unknown {
 	}
 	// A text styled as a heading ("variant": "heading", "style": "h2") is that heading.
 	if (typeof raw === "string" && squash(raw) === "text") {
-		const key = ["variant", "style"].find((name) => {
-			const value = rest[name];
-			if (typeof value !== "string") return false;
-			const named = squash(value);
-			return named === "heading" || alias(TYPE_ALIASES, named) === "heading";
-		});
+		const key = Option.getOrUndefined(
+			Arr.findFirst(["variant", "style"], (name) => {
+				const value = rest[name];
+				if (typeof value !== "string") return false;
+				const named = squash(value);
+				return named === "heading" || alias(TYPE_ALIASES, named) === "heading";
+			}),
+		);
 		if (key) {
 			raw = rest[key];
 			delete rest[key];
@@ -929,9 +905,9 @@ function resolveComponent(input: unknown): unknown {
 			delete rest["kind"];
 	}
 	if (squashed !== undefined && /^h[1-4]$/u.test(squashed) && rest["level"] === undefined)
-		resolved["level"] = Math.min(3, Number(squashed.slice(1)));
+		resolved["level"] = Math.min(3, Number(Str.slice(1)(squashed)));
 	if (squashed === "barchart" || squashed === "linechart" || squashed === "piechart")
-		resolved["kind"] = squashed.slice(0, -"chart".length);
+		resolved["kind"] = Str.slice(0, -"chart".length)(squashed);
 	if (squashed === "cta" && rest["variant"] === undefined) resolved["variant"] = "primary";
 	if (squashed === "password" && rest["label"] === undefined && rest["text"] === undefined)
 		resolved["label"] = "Password";
@@ -944,10 +920,10 @@ function resolveComponent(input: unknown): unknown {
 		if (title !== undefined) resolved["title"] = words(title);
 		// A container's items written as components are its children.
 		const items = rest["items"];
-		const nested = Array.isArray(items) && items.some(isRecord) ? items : undefined;
+		const nested = Arr.isArray(items) && Arr.some(items, isRecord) ? items : undefined;
 		if (nested) delete rest["items"];
 		const list = children !== undefined ? children : nested;
-		if (Array.isArray(list)) resolved["children"] = list.map(resolveComponent);
+		if (Arr.isArray(list)) resolved["children"] = Arr.map(list, resolveComponent);
 		else if (list !== undefined) resolved["children"] = list;
 	} else if (TEXT_TYPES.has(type)) {
 		const text = take(rest, TEXT_KEYS);
@@ -977,12 +953,15 @@ function resolveComponent(input: unknown): unknown {
 	}
 	if (ITEM_TYPES.has(type)) {
 		const items = take(rest, ITEM_KEYS, true);
-		if (Array.isArray(items)) {
-			resolved["items"] = items.map(itemText);
-			const marked = items.find(
-				(item) =>
-					isRecord(item) &&
-					(item["active"] === true || item["selected"] === true || item["current"] === true),
+		if (Arr.isArray(items)) {
+			resolved["items"] = Arr.map(items, itemText);
+			const marked = Option.getOrUndefined(
+				Arr.findFirst(
+					items,
+					(item) =>
+						isRecord(item) &&
+						(item["active"] === true || item["selected"] === true || item["current"] === true),
+				),
 			);
 			if (marked !== undefined && rest["active"] === undefined)
 				resolved["active"] = itemText(marked);
@@ -990,8 +969,8 @@ function resolveComponent(input: unknown): unknown {
 		const active = take(rest, ["active", "selected", "current", "value", "activeTab"]);
 		// An index picks its item; an index past the items, or anything else, stays for the schema to reject.
 		const picked =
-			typeof active === "number" && Array.isArray(resolved["items"])
-				? (resolved["items"] as unknown[])[active]
+			typeof active === "number" && Arr.isArray(resolved["items"])
+				? resolved["items"][active]
 				: undefined;
 		if (picked !== undefined) resolved["active"] = picked;
 		else if (active !== undefined) resolved["active"] = active;
@@ -1034,7 +1013,7 @@ function resolveComponent(input: unknown): unknown {
 		else if (primary === true) resolved["variant"] = "primary";
 	}
 	if (type === "heading" && typeof rest["level"] === "string") {
-		const level = Number(rest["level"].replace(/^h/iu, ""));
+		const level = Number(Str.replace(/^h/iu, "")(rest["level"]));
 		rest["level"] = Number.isFinite(level) ? level : rest["level"];
 	}
 	if (type === "table") {
@@ -1056,12 +1035,12 @@ function resolveComponent(input: unknown): unknown {
 			};
 		}
 		const headers = take(rest, ["columns", "headers", "fields", "cols"], true);
-		if (Array.isArray(headers)) resolved["columns"] = headers.map(itemText);
+		if (Arr.isArray(headers)) resolved["columns"] = Arr.map(headers, itemText);
 		else if (headers !== undefined) resolved["columns"] = headers;
 		const rows = take(rest, ["rows", "data", "rowCount"], true);
 		// "rows": "3" is three rows; "rows": "placeholder" names no count, so the table draws its default.
 		const count = typeof rows === "string" ? Number(rows) : undefined;
-		resolved["rows"] = Array.isArray(rows)
+		resolved["rows"] = Arr.isArray(rows)
 			? Math.max(1, Math.min(WIREFRAME_MAX_ROWS, rows.length))
 			: count === undefined
 				? rows
@@ -1079,7 +1058,7 @@ function resolveComponent(input: unknown): unknown {
 		const kind = take(rest, ["kind", "chartType", "variant"]);
 		if (typeof kind === "string") {
 			// A kind no wireframe chart draws leaves a plain chart placeholder rather than a failure.
-			const known = chartKind(squash(kind).replace(/chart$/u, ""));
+			const known = chartKind(Str.replace(/chart$/u, "")(squash(kind)));
 			if (known) resolved["kind"] = known;
 		} else if (kind !== undefined) resolved["kind"] = kind;
 	}
@@ -1122,14 +1101,6 @@ const DEVICE_ALIASES: Readonly<Record<string, string>> = {
 	webapp: "desktop",
 };
 
-function slug(text: string): string {
-	return text
-		.toLowerCase()
-		.normalize("NFKD")
-		.replace(/[^\p{L}\p{N}]+/gu, "-")
-		.replace(/^-+|-+$/gu, "");
-}
-
 /**
  * Read the ways people write a wireframe into the canonical shape: `pages`
  * or `views` for screens, a lone screen's components at the top, `title` or
@@ -1144,12 +1115,14 @@ export function resolveWireframeShorthand(input: unknown): unknown {
 	const chart: Record<string, unknown> = { ...input };
 	let screens = take(chart, ["screens", "pages", "views", "frames"], true);
 	// A lone screen's components at the top read as that screen; anything else there is left as written.
-	const top = ["children", "components", "elements", "layout", "body"].find((key) =>
-		Array.isArray(chart[key]),
+	const top = Option.getOrUndefined(
+		Arr.findFirst(["children", "components", "elements", "layout", "body"], (key) =>
+			Arr.isArray(chart[key]),
+		),
 	);
 	if (screens === undefined && top !== undefined) {
 		const children = take(chart, [top]);
-		if (Array.isArray(children)) {
+		if (Arr.isArray(children)) {
 			const device = take(chart, ["device", "platform", "viewport"]);
 			screens = [
 				{
@@ -1160,13 +1133,13 @@ export function resolveWireframeShorthand(input: unknown): unknown {
 			];
 		}
 	}
-	if (!Array.isArray(screens)) return screens === undefined ? chart : { ...chart, screens };
+	if (!Arr.isArray(screens)) return screens === undefined ? chart : { ...chart, screens };
 	const used = new Set(
-		screens.flatMap((screen) =>
+		Arr.flatMap(screens, (screen) =>
 			isRecord(screen) && typeof screen["id"] === "string" ? [screen["id"]] : [],
 		),
 	);
-	const resolvedScreens = screens.map((screen, index) => {
+	const resolvedScreens = Arr.map(screens, (screen, index) => {
 		if (!isRecord(screen)) return screen;
 		const rest: Record<string, unknown> = { ...screen };
 		const name = words(take(rest, ["name", "title", "label"]));
@@ -1177,7 +1150,12 @@ export function resolveWireframeShorthand(input: unknown): unknown {
 			typeof device === "string" ? (alias(DEVICE_ALIASES, squash(device)) ?? device) : device;
 		let id = rest["id"];
 		if (typeof id !== "string" || id.length === 0) {
-			const base = slug(typeof name === "string" ? name : "") || `screen-${index + 1}`;
+			const base =
+				slug(typeof name === "string" ? name : "", {
+					normalize: true,
+					unicode: true,
+					maxLength: Infinity,
+				}) || `screen-${index + 1}`;
 			let candidate = base;
 			for (let suffix = 2; used.has(candidate); suffix += 1) candidate = `${base}-${suffix}`;
 			used.add(candidate);
@@ -1193,8 +1171,8 @@ export function resolveWireframeShorthand(input: unknown): unknown {
 			...(isRecord(resolvedAlign) && resolvedAlign["align"] !== undefined
 				? { align: resolvedAlign["align"] }
 				: {}),
-			...(Array.isArray(children)
-				? { children: children.map(resolveComponent) }
+			...(Arr.isArray(children)
+				? { children: Arr.map(children, resolveComponent) }
 				: children === undefined
 					? {}
 					: { children }),
@@ -1216,7 +1194,7 @@ export function resolveWireframeShorthand(input: unknown): unknown {
 		}
 	const lookup = (target: string) => {
 		if (ids.has(target)) return target;
-		const spelling = squash(target).replace(/^[#/]+/u, "");
+		const spelling = Str.replace(/^[#/]+/u, "")(squash(target));
 		return byId.has(spelling) ? byId.get(spelling) : byName.get(spelling);
 	};
 	const retarget = (component: unknown): unknown => {
@@ -1227,14 +1205,14 @@ export function resolveWireframeShorthand(input: unknown): unknown {
 		return {
 			...component,
 			...(named === undefined || named === target ? {} : { target: named }),
-			...(Array.isArray(children) ? { children: children.map(retarget) } : {}),
+			...(Arr.isArray(children) ? { children: Arr.map(children, retarget) } : {}),
 		};
 	};
 	return {
 		...chart,
-		screens: resolvedScreens.map((screen) =>
-			isRecord(screen) && Array.isArray(screen["children"])
-				? { ...screen, children: screen["children"].map(retarget) }
+		screens: Arr.map(resolvedScreens, (screen) =>
+			isRecord(screen) && Arr.isArray(screen["children"])
+				? { ...screen, children: Arr.map(screen["children"], retarget) }
 				: screen,
 		),
 	};
@@ -1274,10 +1252,151 @@ export const wireframeFixture = parseWireframeDiagram({
 
 /** Counts and domain nouns shown by generation consumers. */
 export function counts(diagram: WireframeDiagram) {
+	const count = (components: readonly WireframeComponent[]): number =>
+		Arr.reduce(components, 0, (sum, component) => sum + 1 + count(component.children ?? []));
 	return {
-		nodeCount: [...wireframeComponents(diagram)].length,
+		nodeCount: Arr.reduce(diagram.screens, 0, (sum, screen) => sum + count(screen.children)),
 		nodeNoun: "components",
 		edgeCount: diagram.screens.length,
 		edgeNoun: diagram.screens.length === 1 ? "screen" : "screens",
 	};
+}
+/** Clean authored words once; placement consumes this same recursive tree. */
+export function normalizeWireframe(spec: WireframeDocument): WireframeDiagram {
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	const component = (input: WireframeComponent): WireframeComponent => {
+		const {
+			text,
+			label,
+			title,
+			placeholder,
+			value,
+			active,
+			target,
+			items,
+			columns,
+			children,
+			...rest
+		} = input;
+		return {
+			...rest,
+			...optional("text", text),
+			...optional("label", label),
+			...optional("title", title),
+			...optional("placeholder", placeholder),
+			...optional("value", value),
+			...optional("active", active),
+			...optional("target", target),
+			...(items ? { items: Arr.map(items, cleanToolString) } : {}),
+			...(columns === undefined
+				? {}
+				: { columns: typeof columns === "number" ? columns : Arr.map(columns, cleanToolString) }),
+			...(children ? { children: Arr.map(children, component) } : {}),
+		};
+	};
+	const title = cleanToolString(spec.title);
+	const used = new Set(
+		Arr.flatMap(spec.screens, (screen) => {
+			const id = screen.id && cleanToolString(screen.id);
+			return id ? [id] : [];
+		}),
+	);
+	const screenId = (name: string, index: number) => {
+		const base = slug(name, { maxLength: 48 }) || `screen-${index + 1}`;
+		let id = base;
+		for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
+		used.add(id);
+		return id;
+	};
+	return {
+		id: (spec.id && cleanToolString(spec.id)) || slug(title) || "sketchi-wireframe",
+		title,
+		type: wireframeDiagramType,
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+		screens: Arr.map(spec.screens, (screen, index) => ({
+			...screen,
+			id:
+				(screen.id && cleanToolString(screen.id)) || screenId(cleanToolString(screen.name), index),
+			name: cleanToolString(screen.name),
+			children: Arr.map(screen.children, component),
+		})),
+	};
+}
+/** Refuse oversized/deep unknown trees before recursive aliases or Schema decoding. */
+function inputSizeIssue(input: unknown): WireframeValidationIssue | undefined {
+	if (!isRecord(input)) return undefined;
+	const issue = (path: string, message: string, hint: string): WireframeValidationIssue => ({
+		code: "wireframe_too_large",
+		path,
+		message,
+		hint,
+	});
+	const screens = take({ ...input }, ["screens", "pages", "views", "frames"], true);
+	if (Arr.isArray(screens) && screens.length > WIREFRAME_MAX_SCREENS)
+		return issue(
+			"screens",
+			`A wireframe holds at most ${WIREFRAME_MAX_SCREENS} screens; this one has ${screens.length}.`,
+			"Draw each flow as its own wireframe, or keep the screens the request names.",
+		);
+	let count = 0;
+	const visit = (
+		items: unknown,
+		depth: number,
+		path: string,
+	): WireframeValidationIssue | undefined => {
+		if (!Arr.isArray(items)) return undefined;
+		for (const [index, item] of items.entries()) {
+			count += 1;
+			if (count > WIREFRAME_MAX_COMPONENTS)
+				return issue(
+					"screens",
+					`A wireframe holds at most ${WIREFRAME_MAX_COMPONENTS} components.`,
+					"Keep the components the request names, or split the screens into separate wireframes.",
+				);
+			if (depth > WIREFRAME_MAX_DEPTH)
+				return issue(
+					`${path}.[${index}]`,
+					`Components nest more than ${WIREFRAME_MAX_DEPTH} levels deep.`,
+					"Drop wrapper rows and columns that hold a single child.",
+				);
+			if (!isRecord(item)) continue;
+			const children = take({ ...item }, CHILDREN_KEYS, true);
+			const rawType =
+				item["type"] ?? item["component"] ?? item["widget"] ?? item["element"] ?? item["kind"];
+			const type = typeof rawType === "string" ? squash(rawType) : "";
+			const container = CONTAINERS.has(alias(TYPE_ALIASES, type) ?? type);
+			const nested = visit(
+				children ?? (container ? item["items"] : undefined),
+				depth + 1,
+				`${path}.[${index}].children`,
+			);
+			if (nested) return nested;
+		}
+		return undefined;
+	};
+	if (Arr.isArray(screens)) {
+		for (const [index, screen] of screens.entries()) {
+			if (!isRecord(screen)) continue;
+			const result = visit(
+				take({ ...screen }, CHILDREN_KEYS, true),
+				1,
+				`screens.[${index}].children`,
+			);
+			if (result) return result;
+		}
+	} else if (screens === undefined) {
+		const top = Arr.findFirst(["children", "components", "elements", "layout", "body"], (key) =>
+			Arr.isArray(input[key]),
+		);
+		if (Option.isSome(top)) return visit(input[top.value], 1, "screens.[0].children");
+	}
+	return undefined;
+}
+export function prepareWireframe(input: unknown): Result.Result<unknown, WireframeValidationError> {
+	if (!isRecord(input) || !("spec" in input)) return Result.succeed(input);
+	const sizeIssue = inputSizeIssue(input["spec"]);
+	return sizeIssue
+		? Result.fail(WireframeValidationError.fromIssues([sizeIssue]))
+		: Result.succeed({ ...input, spec: resolveWireframeShorthand(input["spec"]) });
 }

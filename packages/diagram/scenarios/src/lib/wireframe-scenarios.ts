@@ -10,7 +10,7 @@ import {
 	wireframeComponentWords,
 } from "@sketchi/diagrams/families/wireframe/document";
 import {
-	layoutWireframeDiagram,
+	renderWireframeDiagram,
 	wireframeFrameName,
 } from "@sketchi/diagrams/families/wireframe/render";
 import { wireframeLayoutIssues } from "@sketchi/diagrams/families/wireframe/readout";
@@ -546,10 +546,7 @@ export function wireframeDrawnCheck(
 	scene: RenderedDiagramScene,
 ): ScenarioCheck {
 	const problems: string[] = [];
-	const result = layoutWireframeDiagram(diagram);
-	if (Result.isFailure(result))
-		return { id: "wireframe-drawn", passed: false, message: result.failure.message };
-	const layout = result.success;
+	const { layout } = renderWireframeDiagram(diagram);
 	const flat = (text: string) => text.replace(/\s+/gu, "");
 	for (const [index, screen] of diagram.screens.entries()) {
 		const frame = scene.elements.find((element) => element.id === `frame:${screen.id}`);

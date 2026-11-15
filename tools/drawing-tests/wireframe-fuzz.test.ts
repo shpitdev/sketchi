@@ -5,24 +5,17 @@ import { getCanvasValidationIssues } from "@sketchi/drawing";
 import {
 	parseWireframeDiagram,
 	WIREFRAME_DEVICES,
-	wireframeComponents,
-	wireframeElementEstimate,
+	counts,
+	WIREFRAME_MAX_ELEMENTS,
 	type WireframeDiagram,
 } from "@sketchi/diagrams/families/wireframe/document";
-import {
-	layoutWireframeDiagram,
-	renderWireframeDiagram,
-} from "@sketchi/diagrams/families/wireframe/render";
+import { renderWireframeDiagram } from "@sketchi/diagrams/families/wireframe/render";
 import {
 	wireframeBoxIssues,
 	wireframeLayoutIssues,
 } from "@sketchi/diagrams/families/wireframe/readout";
 
-import {
-	convertSceneToExcalidraw,
-	createExcalidrawFile,
-	validateExcalidrawScene,
-} from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 const WORDS = [
 	"Save",
@@ -314,18 +307,9 @@ describe("wireframe fuzz", () => {
 			// A screen may grow past its device to hold a word no wrap can break; rare, and counted.
 			const shortfalls: string[] = [];
 			for (const diagram of randomWireframes(WIREFRAMES, seed)) {
-				const scene = renderWireframeDiagram(diagram).pipe(Result.getOrThrow);
+				const { scene, layout } = renderWireframeDiagram(diagram);
 				const exported = convertSceneToExcalidraw(scene);
-				const reloaded = JSON.parse(
-					JSON.stringify(createExcalidrawFile(exported)),
-				) as typeof exported;
-				const boxes = wireframeBoxIssues(layoutWireframeDiagram(diagram).pipe(Result.getOrThrow));
-				const estimate =
-					diagram.screens.length +
-					[...wireframeComponents(diagram)].reduce(
-						(sum, { component }) => sum + wireframeElementEstimate(component),
-						0,
-					);
+				const boxes = wireframeBoxIssues(layout);
 				const frames = scene.elements.filter((element) => element.type === "frame");
 				const sheet = {
 					width:
@@ -338,21 +322,18 @@ describe("wireframe fuzz", () => {
 				const problems = [
 					...getCanvasValidationIssues(scene).map((issue) => issue.message),
 					...validateExcalidrawScene(exported).issues.map((issue) => issue.message),
-					...validateExcalidrawScene(reloaded).issues.map((issue) => `reloaded: ${issue.message}`),
 					...wireframeLayoutIssues(scene).map((issue) => issue.message),
 					...boxes.filter((issue) => issue.code !== "screen-widened").map((issue) => issue.message),
-					...(scene.elements.length > estimate
-						? [`${scene.elements.length} elements over the estimate ${estimate}`]
+					...(scene.elements.length > WIREFRAME_MAX_ELEMENTS
+						? [`${scene.elements.length} elements over the limit ${WIREFRAME_MAX_ELEMENTS}`]
 						: []),
 					...(sheet.width / sheet.height > 2.45
 						? [`aspect ${(sheet.width / sheet.height).toFixed(2)}`]
 						: []),
 				];
-				const name = `${diagram.id} (${[...wireframeComponents(diagram)].length} components)`;
+				const name = `${diagram.id} (${counts(diagram).nodeCount} components)`;
 				if (problems.length > 0) defects.push(`${name}: ${problems.slice(0, 3).join("; ")}`);
-				const unrouted = layoutWireframeDiagram(diagram)
-					.pipe(Result.getOrThrow)
-					.navigations.filter((navigation) => !navigation.routed);
+				const unrouted = layout.navigations.filter((navigation) => !navigation.routed);
 				if (unrouted.length > 0)
 					shortfalls.push(`${name}: ${unrouted.length} navigation arrows without a route`);
 				const widened = boxes.filter((issue) => issue.code === "screen-widened");

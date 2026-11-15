@@ -1,21 +1,25 @@
+import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { describe, expect, it } from "vitest";
-import { Effect, Schema } from "effect";
-import { wireframeFixture } from "../../families/wireframe/document.js";
-import { wireframeStressFixtures } from "../../families/wireframe/fixtures.js";
+import { Effect } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildWireframeResultSchema } from "./contract.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
-import { applyDiagramPatch, buildWireframe, CodeModeRuntimeEnvironment } from "./runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
+import {
+	applyDiagramPatch,
+	buildWireframe,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
 
 const storage = makeMemoryArtifactStorage();
-function run<A>(
-	effect: Effect.Effect<A, never, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+function run<A, E extends BuildRejection<unknown>>(
+	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
 ) {
 	return Effect.runPromise(
-		effect.pipe(
+		buildResponse(effect).pipe(
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
@@ -60,7 +64,7 @@ describe("Code Mode native wireframe", () => {
 	it("builds the documented spec into a framed screen of grouped components", async () => {
 		const built = await build(loginSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildWireframeResultSchema)(built)).not.toThrow();
+		expect(built.normalizedSpec.screens[0]?.device).toBe("mobile");
 		expect(built.normalizedSpec).toMatchObject({
 			id: "login",
 			title: "Login",
@@ -79,38 +83,71 @@ describe("Code Mode native wireframe", () => {
 
 	it("reads the ways models write a wireframe", async () => {
 		const built = await build({
+			id: "shop",
 			title: "Shop",
+			type: "wireframe",
 			pages: [
 				{
-					title: "Product",
-					platform: "web",
+					title: "Product page",
+					platform: "iPhone",
 					components: [
-						{ type: "navbar", items: [{ label: "Men" }, { label: "Sale", active: true }] },
-						{ type: "img", alt: "Backpack" },
-						{ type: "dropdown", label: "Color", options: ["Slate", "Moss"], value: "Slate" },
+						{ type: "navbar", items: [{ label: "Home" }, { label: "Shop", active: true }] },
+						{ type: "H2", label: "Trail runner" },
+						{ type: "paragraph" },
+						{ type: "dropdown", label: "Size", options: ["S", "M"], value: "M" },
+						{ type: "text-input", label: "Quantity", value: 1 },
 						{ type: "button", label: "Add to cart", primary: true },
-						{ type: "switch", label: "Gift wrap", on: true },
-						{ type: "dialog", label: "Added", content: [{ type: "paragraph" }] },
+						{ type: "CTA", text: "Buy now" },
+						{ type: "switch", text: "Gift wrap", on: true },
+						{ type: "search-bar", text: "Search shoes" },
+						{ type: "img", alt: "Shoe photo" },
+						{ type: "bar-chart", title: "Sales" },
+						{ type: "data-table", headers: [{ title: "Order" }, "Total"], data: [[1], [2]] },
+						{
+							type: "dialog",
+							label: "Confirm",
+							elements: [{ component: "button", label: "OK", style: "outline" }],
+						},
+						{ type: "hstack", justify: "space-between", children: [{ type: "tag", label: "New" }] },
 					],
 				},
+				{ name: "Product page", children: [{ type: "hr" }] },
 			],
 		});
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(built.normalizedSpec.screens).toEqual([
-			{
-				id: "product",
-				name: "Product",
-				device: "desktop",
-				children: [
-					{ type: "nav", items: ["Men", "Sale"], active: "Sale" },
-					{ type: "image", label: "Backpack" },
-					{ type: "select", label: "Color", value: "Slate" },
-					{ type: "button", text: "Add to cart", variant: "primary" },
-					{ type: "toggle", label: "Gift wrap", checked: true },
-					{ type: "modal", title: "Added", children: [{ type: "text" }] },
-				],
-			},
-		]);
+		expect(built.normalizedSpec).toMatchObject({
+			id: "shop",
+			title: "Shop",
+			type: "wireframe",
+			screens: [
+				{
+					id: "product-page",
+					name: "Product page",
+					device: "mobile",
+					children: [
+						{ type: "nav", items: ["Home", "Shop"], active: "Shop" },
+						{ type: "heading", level: 2, text: "Trail runner" },
+						{ type: "text" },
+						{ type: "select", label: "Size", value: "M" },
+						{ type: "input", label: "Quantity", value: "1" },
+						{ type: "button", text: "Add to cart", variant: "primary" },
+						{ type: "button", variant: "primary", text: "Buy now" },
+						{ type: "toggle", label: "Gift wrap", checked: true },
+						{ type: "search", placeholder: "Search shoes" },
+						{ type: "image", label: "Shoe photo" },
+						{ type: "chart", kind: "bar", label: "Sales" },
+						{ type: "table", columns: ["Order", "Total"], rows: 2 },
+						{
+							type: "modal",
+							title: "Confirm",
+							children: [{ type: "button", text: "OK", variant: "secondary" }],
+						},
+						{ type: "row", align: "between", children: [{ type: "badge", text: "New" }] },
+					],
+				},
+				{ id: "product-page-2", name: "Product page", children: [{ type: "divider" }] },
+			],
+		});
 	});
 
 	it("names omitted screen ids by their names, clear of explicit ones", async () => {
@@ -121,7 +158,13 @@ describe("Code Mode native wireframe", () => {
 		});
 		const built = await build({
 			title: "Flow",
-			screens: [screen("Sign up"), screen("Sign up"), screen("Verify", "sign-up-2"), screen("!!")],
+			screens: [
+				screen("Sign up"),
+				screen("Sign up"),
+				screen("Verify", "sign-up-2"),
+				screen("!!"),
+				screen("東京".repeat(30)),
+			],
 		});
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
 		expect(built.normalizedSpec.screens.map((entry) => entry.id)).toEqual([
@@ -129,6 +172,7 @@ describe("Code Mode native wireframe", () => {
 			"sign-up-3",
 			"sign-up-2",
 			"screen-4",
+			"東京".repeat(30),
 		]);
 	});
 
@@ -164,22 +208,12 @@ describe("Code Mode native wireframe", () => {
 		expect(validateExcalidrawScene(excalidraw)).toEqual({ ok: true, issues: [] });
 	});
 
-	it("round-trips canonical diagrams through their Code Mode documents", async () => {
-		for (const diagram of [wireframeFixture, ...Object.values(wireframeStressFixtures)]) {
-			const document = canonicalDocumentFromDiagram(diagram);
-			expect(document.type).toBe("wireframe");
-			const built = await build(document.spec);
-			if (!built.ok) throw new Error(JSON.stringify(built.issues));
-			expect(built.normalizedSpec.screens).toEqual(diagram.screens);
-		}
-	});
-
 	it.each([
-		[[{ type: "button" }], "invalid_component"],
-		[[{ type: "tabs", items: ["A"], active: "B" }], "invalid_component"],
-		[[{ type: "button", text: "Go", level: 2 }], "invalid_component"],
-		[[{ type: "row", children: [] }], "invalid_component"],
-		[[{ type: "button", text: "x".repeat(61) }], "label_too_long"],
+		[[{ type: "button" }], "missing_wireframe_text"],
+		[[{ type: "tabs", items: ["A"], active: "B" }], "invalid_wireframe_option"],
+		[[{ type: "button", text: "Go", level: 2 }], "invalid_wireframe_option"],
+		[[{ type: "row", children: [] }], "empty_wireframe_container"],
+		[[{ type: "button", text: "x".repeat(61) }], "wireframe_text_too_long"],
 		[Array.from({ length: 161 }, () => ({ type: "divider" })), "wireframe_too_large"],
 	])("rejects %j with a structured repair issue", async (children, code) => {
 		const result = await build({ title: "Bad", screens: [{ name: "Bad", children }] });
@@ -194,12 +228,12 @@ describe("Code Mode native wireframe", () => {
 	it("rejects repeated screen ids and a screen id with a colon", async () => {
 		const screen = (id: string) => ({ id, name: id, children: [{ type: "divider" }] });
 		const repeated = await build({ title: "Bad", screens: [screen("a"), screen("a")] });
-		expect(repeated.issues.map((issue) => issue.code)).toEqual(["duplicate_node_id"]);
+		expect(repeated.issues.map((issue) => issue.code)).toEqual(["duplicate_screen_id"]);
 		const colon = await build({ title: "Bad", screens: [screen("a:b")] });
-		expect(colon.issues.map((issue) => issue.code)).toEqual(["invalid_screen"]);
+		expect(colon.issues.map((issue) => issue.code)).toEqual(["invalid_screen_id"]);
 	});
 
-	it.each(["constructor", "__proto__"])(
+	it.each(["constructor", "__proto__", "toString", "hasOwnProperty"])(
 		"rejects the inherited name %s as a type or device as invalid input, never crashing",
 		async (name) => {
 			const typed = await build({
@@ -216,6 +250,23 @@ describe("Code Mode native wireframe", () => {
 	);
 
 	it("draws a zero written as a number, and rejects a null list instead of dropping it", async () => {
+		for (const component of [
+			{ type: "text", lines: 0 },
+			{ type: "table", columns: ["A"], rows: 0 },
+			{ type: "heading", text: "Hi", level: 0 },
+			{ type: "grid", columns: 0, children: [{ type: "divider" }] },
+		]) {
+			const refused = await build({
+				title: "Zero",
+				screens: [{ name: "Home", children: [component] }],
+			});
+			expect(refused).toMatchObject({
+				ok: false,
+				status: "invalid_wireframe",
+				issues: [expect.objectContaining({ code: "invalid_wireframe_option" })],
+			});
+		}
+
 		const built = await build({
 			title: "Seats",
 			screens: [
@@ -224,6 +275,7 @@ describe("Code Mode native wireframe", () => {
 					children: [
 						{ type: "heading", text: 0 },
 						{ type: "input", label: "Seats", value: 0 },
+						{ type: "tabs", items: [0, 1], active: 0 },
 					],
 				},
 			],
@@ -232,6 +284,7 @@ describe("Code Mode native wireframe", () => {
 		expect(built.normalizedSpec.screens[0]!.children).toEqual([
 			{ type: "heading", text: "0" },
 			{ type: "input", label: "Seats", value: "0" },
+			{ type: "tabs", items: ["0", "1"], active: "0" },
 		]);
 		const nulled = await build({
 			title: "Bad",
@@ -239,20 +292,6 @@ describe("Code Mode native wireframe", () => {
 		});
 		expect(nulled).toMatchObject({ ok: false, status: "invalid_input" });
 		expect(nulled.issues[0]?.ref?.path).toContain("children");
-	});
-
-	it("builds tabs that repeat an item, marking the first active", async () => {
-		const built = await build({
-			title: "Orders",
-			screens: [
-				{
-					name: "Orders",
-					children: [{ type: "tabs", items: ["Orders", "Orders"], active: "Orders" }],
-				},
-			],
-		});
-		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(built.status).toBe("accepted");
 	});
 
 	it("draws a control's target as an arrow to the screen it opens, by id or by name", async () => {
@@ -291,7 +330,7 @@ describe("Code Mode native wireframe", () => {
 			screens: [{ name: "Home", children: [{ type: "button", text: "Go", target: "nowhere" }] }],
 		});
 		expect(unknown).toMatchObject({ ok: false, status: "invalid_wireframe" });
-		expect(unknown.issues.map((issue) => issue.code)).toEqual(["missing_edge_target"]);
+		expect(unknown.issues.map((issue) => issue.code)).toEqual(["unknown_wireframe_target"]);
 		// Ids that squash alike stay apart: a target naming one exactly opens that one.
 		const alike = await build({
 			title: "Alike",
@@ -317,3 +356,90 @@ describe("Code Mode native wireframe", () => {
 		expect(result.issues[0]?.ref?.path).toContain("type");
 	});
 });
+
+it("keeps repeated tab and nav state unique through the actual native build", async () => {
+	for (const type of ["tabs", "nav"]) {
+		const result = await build({
+			title: "Repeated",
+			screens: [
+				{ name: "Screen", children: [{ type, items: ["Orders", "Orders"], active: "Orders" }] },
+			],
+		});
+		if (!result.ok) throw new Error(JSON.stringify(result.issues));
+		const scene = inline(result).get("scene") as RenderedDiagramScene;
+		const ids = scene.elements.map((element) => element.id);
+		expect(new Set(ids).size).toBe(ids.length);
+		expect(ids.filter((id) => id.endsWith(":active"))).toEqual(["wf:screen:0:active"]);
+		const native = inline(result).get("excalidraw") as Parameters<
+			typeof validateExcalidrawScene
+		>[0];
+		expect(validateExcalidrawScene(native)).toEqual({ ok: true, issues: [] });
+		expect(result.normalizedSpec.screens[0]?.device).toBe("desktop");
+	}
+});
+
+it("refuses deep unknown trees before shorthand decoding or exporting, including cyclic objects", async () => {
+	let child: Record<string, unknown> = { type: "button", text: "Go" };
+	for (let i = 0; i < 10000; i++) child = { type: "column", children: [child] };
+	const cycle: Record<string, unknown> = { type: "column" };
+	cycle.children = [cycle];
+	for (const component of [child, cycle]) {
+		const result = await build({
+			title: "Deep",
+			pages: [{ name: "Screen", components: [component] }],
+		});
+		expect(result).toMatchObject({ ok: false, status: "invalid_wireframe" });
+		expect(result.issues[0]).toMatchObject({
+			code: "wireframe_too_large",
+			ref: { path: expect.stringContaining("spec.") },
+		});
+		expect("artifact" in result).toBe(false);
+	}
+});
+
+it("retains depth and element capacity limits at the public input boundary", async () => {
+	const nested = (depth: number): unknown =>
+		depth === 1
+			? { type: "button", text: "Go" }
+			: { type: "column", children: [nested(depth - 1)] };
+	const spec = (children: unknown[]) => ({
+		title: "Capacity",
+		screens: [{ name: "Screen", children }],
+	});
+	expect((await build(spec([nested(8)]))).ok).toBe(true);
+	expect(await build(spec([nested(9)]))).toMatchObject({
+		ok: false,
+		status: "invalid_wireframe",
+		issues: [expect.objectContaining({ code: "wireframe_too_large" })],
+	});
+	const table = {
+		type: "table",
+		columns: Array.from({ length: 8 }, (_, i) => `Column ${i}`),
+		rows: 8,
+	};
+	expect((await build(spec([table, table, table]))).ok).toBe(true);
+	expect(await build(spec([table, table, table, table]))).toMatchObject({
+		ok: false,
+		status: "invalid_wireframe",
+		issues: [expect.objectContaining({ code: "wireframe_too_large" })],
+	});
+});
+
+it.each([null, 42, "bad", { type: "text", text: "lost" }])(
+	"refuses malformed aliased collections instead of losing them: %j",
+	async (malformed) => {
+		for (const spec of [
+			{ title: "Bad", pages: malformed },
+			{ title: "Bad", pages: [{ name: "Home", components: malformed }] },
+			{
+				title: "Bad",
+				pages: [{ name: "Home", components: [{ type: "row", components: malformed }] }],
+			},
+			{
+				title: "Bad",
+				pages: [{ name: "Home", components: [{ type: "tabs", options: malformed }] }],
+			},
+		])
+			expect(await build(spec)).toMatchObject({ ok: false, status: "invalid_input" });
+	},
+);

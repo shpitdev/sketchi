@@ -67,13 +67,6 @@ import {
 	type StateMachineValidationIssueCode,
 } from "../../families/state-machine/document.js";
 
-import {
-	getWireframeValidationIssues,
-	resolveWireframeShorthand,
-	type WireframeComponent,
-	type WireframeDiagram,
-	type WireframeValidationIssueCode,
-} from "../../families/wireframe/document.js";
 import { checkRequestCoverage, type CoverageIssueCode } from "../../generate/coverage.js";
 
 import {
@@ -100,7 +93,6 @@ import {
 import { renderStateMachineDiagram } from "../../families/state-machine/render.js";
 import { isStructurallyValidTimelineMarker } from "../../families/timeline/render.js";
 import { isStructurallyValidVennSet } from "../../families/venn/render.js";
-import { renderWireframeDiagram } from "../../families/wireframe/render.js";
 import {
 	isStructurallyValidStateMarker,
 	longNodeDescriptions,
@@ -135,8 +127,6 @@ import {
 	BuildFlowchartRequestSchema,
 	BuildStateMachineRejected,
 	BuildStateMachineRequest,
-	BuildWireframeRejected,
-	BuildWireframeRequest,
 	CreateCanvasRejected,
 	CreateCanvasRequest,
 	DEFAULT_ICON_SEARCH_LIMIT,
@@ -155,7 +145,6 @@ import {
 	type BuildFlowchartRequest,
 	type BuildFlowchartResult,
 	type BuildStateMachineResult,
-	type BuildWireframeResult,
 	type ContractSchemaError,
 	type ContractSchemaIssue,
 	type CreateCanvasResult,
@@ -166,10 +155,8 @@ import {
 	type NormalizedClassSpec,
 	type NormalizedErSpec,
 	type NormalizedStateMachineSpec,
-	type NormalizedWireframeSpec,
 	type PatchableScene,
 	type SearchIconsResult,
-	type WireframeComponentInput,
 } from "./contract.js";
 
 import {
@@ -664,110 +651,6 @@ function resolveClassRequest(input: unknown): unknown {
 	return { ...input, spec: resolveClassShorthand(input.spec) };
 }
 
-function normalizeWireframeComponent(component: WireframeComponentInput): WireframeComponentInput {
-	const normalized: Record<string, unknown> = {};
-	for (const [key, value] of Object.entries(component)) {
-		if (value === undefined) continue;
-		if (key === "children" && Array.isArray(value))
-			normalized[key] = (value as WireframeComponentInput[]).map(normalizeWireframeComponent);
-		else if (typeof value === "string") {
-			const cleaned = cleanToolString(value);
-			if (cleaned) normalized[key] = cleaned;
-		} else if (Array.isArray(value))
-			normalized[key] = value.map((entry) =>
-				typeof entry === "string" ? cleanToolString(entry) : entry,
-			);
-		else normalized[key] = value;
-	}
-	return normalized as unknown as WireframeComponentInput;
-}
-
-function normalizeWireframeSpec(spec: BuildWireframeRequest["spec"]): NormalizedWireframeSpec {
-	const title = cleanToolString(spec.title);
-	// An omitted screen id takes its name's slug, then `screen-<n>`, never one another screen claims.
-	const used = new Set(spec.screens.flatMap((screen) => cleanOptional(screen.id) ?? []));
-	const screenId = (name: string, index: number) => {
-		const base = slug(name) || `screen-${index + 1}`;
-		let id = base;
-		for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
-		used.add(id);
-		return id;
-	};
-	return {
-		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-wireframe"),
-		title,
-		screens: spec.screens.map((screen, index) => {
-			const name = cleanToolString(screen.name);
-			return {
-				id: cleanOptional(screen.id) ?? screenId(name, index),
-				name,
-				device: screen.device ?? "desktop",
-				...(screen.align ? { align: screen.align } : {}),
-				children: screen.children.map(normalizeWireframeComponent),
-			};
-		}),
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-	};
-}
-
-function toWireframeDiagram(spec: NormalizedWireframeSpec): WireframeDiagram {
-	return {
-		...spec,
-		screens: spec.screens.map((screen) => ({
-			...screen,
-			children: screen.children as readonly WireframeComponent[] as WireframeComponent[],
-		})),
-		type: "wireframe",
-	};
-}
-
-/** Code Mode's published issue codes for diagram-core's wireframe invariants. */
-const WIREFRAME_ISSUE_CODES = {
-	wireframe_too_large: "wireframe_too_large",
-	invalid_screen_id: "invalid_screen",
-	duplicate_screen_id: "duplicate_node_id",
-	empty_wireframe_screen: "invalid_screen",
-	unknown_wireframe_target: "missing_edge_target",
-	empty_wireframe_container: "invalid_component",
-	missing_wireframe_text: "invalid_component",
-	wireframe_text_too_long: "label_too_long",
-	invalid_wireframe_option: "invalid_component",
-} as const satisfies Record<WireframeValidationIssueCode, CodeModeIssueCode>;
-
-function validateNormalizedWireframe(spec: NormalizedWireframeSpec): CodeModeIssue[] {
-	return getWireframeValidationIssues(toWireframeDiagram(spec)).map((entry) =>
-		issue({
-			code: WIREFRAME_ISSUE_CODES[entry.code],
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-			message: entry.message,
-			hint: entry.hint,
-		}),
-	);
-}
-
-function wireframeQuality(spec: NormalizedWireframeSpec, threshold: number): QualityReport {
-	const score = 10;
-	const count = (components: readonly WireframeComponentInput[]): number =>
-		components.reduce((sum, component) => sum + 1 + count(component.children ?? []), 0);
-	return {
-		accepted: score >= threshold,
-		score,
-		threshold,
-		summary: {
-			nodeCount: spec.screens.reduce((sum, screen) => sum + count(screen.children), 0),
-			edgeCount: 0,
-		},
-		checks: [],
-	};
-}
-
-/** Read screen, device, component type and text aliases before the request is decoded. */
-function resolveWireframeRequest(input: unknown): unknown {
-	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
-	return { ...input, spec: resolveWireframeShorthand(input.spec) };
-}
-
 export class CodeModeArtifactRenderFailed extends Schema.TaggedError<
 	CodeModeArtifactRenderFailed,
 	{ readonly brand: unique symbol }
@@ -890,15 +773,6 @@ const BuildClassDiagramFailure = workflowFailure(
 	"BuildClassDiagramFailure",
 	BuildClassDiagramRejected.fields.status,
 	BuildClassDiagramRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildWireframeFailure = workflowFailure(
-	"BuildWireframeFailure",
-	BuildWireframeRejected.fields.status,
-	BuildWireframeRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -2885,114 +2759,6 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 	} satisfies Extract<BuildClassDiagramResult, { ok: true }>;
 });
 
-const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(function* (
-	input: unknown,
-) {
-	const parsed = Schema.decodeUnknownResult(BuildWireframeRequest, {
-		errors: "all",
-		reportInput: true,
-	})(resolveWireframeRequest(input));
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildWireframeFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-	const request = parsed.success;
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeWireframeSpec(request.spec);
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedWireframe(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildWireframeFailure.new({
-			status: "invalid_wireframe",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const quality = wireframeQuality(
-		normalizedSpec,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildWireframeFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const scene = yield* validatedDomainResult({
-		try: () => renderWireframeDiagram(toWireframeDiagram(normalizedSpec)),
-		catch: (cause) =>
-			BuildWireframeFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message: cause instanceof Error ? cause.message : "Unable to render wireframe scene.",
-							hint: "Repair the screens and components and retry.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildWireframe.render"));
-	const canvasIssues = getCanvasValidationIssues(scene);
-	if (canvasIssues.length > 0) {
-		return yield* BuildWireframeFailure.new({
-			status: canvasFailureStatus(canvasIssues),
-			context: {
-				...qualityContext,
-				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
-					...entry,
-					hint: "Shorten long texts, or split the screens into separate wireframes, and retry buildWireframe.",
-				})),
-			},
-		});
-	}
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildWireframeFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [],
-	} satisfies Extract<BuildWireframeResult, { ok: true }>;
-});
-
 const RawCreateCanvasInput = Schema.Struct({
 	spec: Schema.Unknown,
 	requestId: Schema.optionalKey(Schema.Unknown),
@@ -3961,8 +3727,7 @@ export const buildJourneyMap = familyForType("journey").build({ bindBuild });
 export const buildSankey = familyForType("sankey").build({ bindBuild });
 
 /** A wireframe: low-fidelity screens, each a tree of components the host lays out. */
-export const buildWireframe: (input: unknown) => CodeModeWorkflowEffect<BuildWireframeResult> =
-	boundary("buildWireframe", buildWireframeWorkflow, failureResult);
+export const buildWireframe = familyForType("wireframe").build({ bindBuild });
 
 /** A quadrant chart: two axes, four named quadrants and points placed by their scores. */
 export const buildQuadrantChart = familyForType("quadrant").build({ bindBuild });

@@ -6,10 +6,14 @@ const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");
 
 describe("offline wireframe input failures", () => {
 	it.each([
-		{ name: "a button without text", issue: "invalid_component", children: [{ type: "button" }] },
+		{
+			name: "a button without text",
+			issue: "missing_wireframe_text",
+			children: [{ type: "button" }],
+		},
 		{
 			name: "an active tab that is not a tab",
-			issue: "invalid_component",
+			issue: "invalid_wireframe_option",
 			children: [{ type: "tabs", items: ["General", "Billing"], active: "Security" }],
 		},
 	])("reports $name as invalid_document with exit 3", ({ issue, children }) => {
