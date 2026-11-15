@@ -30,6 +30,14 @@ there is no special adapter directory for API maturity.
   services and upstream concurrency, cache and schedule primitives. Keep only the host
   integration upstream cannot provide; an Effect wrapper alone is not a conversion.
 
+Jev family decisions use `@effect/ai-typesafe` for question, answer and usage codecs.
+Its credential-free `TypeSafeClient` receives an Effect `HttpClient` that transports
+System One through Workers AI `AI.run`, prefixes the model with `typesafe/`, and
+unwraps the binding response. `AI.run` has no abort signal: interruption stops waiting
+but cannot establish that inference or billing stopped. This adapter is promoted to
+native diagnostic errors; family questions, thresholds and timeout policy stay in
+the narrowing service.
+
 ## Contracts, failures and tests
 
 - Model ordinary records with `Schema.Struct` and a same-name interface. Use current
@@ -46,6 +54,24 @@ there is no special adapter directory for API maturity.
 - Domain/family conversions retain deterministic geometry, rendering and cost proof.
   A test of framework behavior, emitted scaffolding, source spelling or a syntax count
   does not replace an application invariant.
+
+## Shared tools
+
+Studio's `codemode/toolkit.server.ts` owns the public `docs`, `search` and `execute`
+Tool definitions and handler layer. `execute.server.ts` contains the existing
+sandbox/receipt workflow independently of MCP construction. Icons' `lib/toolkit.server.ts`
+owns `search_icons` and `get_icon`; its source loader and origin come from `IconToolSource`.
+Consumers can provide these handlers and consume `Toolkit.handle` streams without
+starting an MCP server. Definitions do not capture request bindings.
+
+The current SDK/agents transport consumes those streams in its request-owned runtime.
+Its adapter preserves MCP text/structured output and the established validation issue
+format. Effect 4.1.4 exposes validation failures as AiError descriptions, so the Studio
+adapter uses the same tool schema and upstream Standard Schema issue formatter on
+failure. It defines no separate validation contract. `HandlerResult` also includes
+failure values without a discriminated success type; transport projections narrow
+through the tool's own success schema. The SDK host remains until the transport slice;
+chat migration is separate.
 
 ## Diagnostic ratchet
 
@@ -74,6 +100,12 @@ scopes; a narrower list or lower severity requires independent review. Verify th
 resolved policy on a real source probe before accepting a promotion. Final adoption
 requires errors throughout and a concrete reason for every necessary native operation.
 Record counts temporarily in `.memory/`; there is no allowed-count baseline in CI.
+
+The Studio and Icons Toolkit/serving adapter files now promote the complete native
+group through explicit file overrides. The extracted execute workflow and other
+unconverted files retain migration warnings. SDK layer entry points and the retained
+Icons HTTP Promise host have local, reasoned exceptions; correctness stays at error.
+
 
 Prefer a local `@effect-diagnostics-next-line rule:off -- <concrete capability gap>`
 only for an actual host contract or deliberate synchronous boundary. Do not suppress

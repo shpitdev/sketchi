@@ -1,87 +1,38 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-
+import {
+	CallToolRequestSchema,
+	ListToolsRequestSchema,
+	type CallToolResult,
+} from "@modelcontextprotocol/sdk/types.js";
+import { Array, Context, Effect, Option, Schema, Stream } from "effect";
+import { Tool } from "effect/ai";
 import { withCors } from "./cors-policy.js";
-import { getIconDetail, searchIconResults } from "./api.server.js";
 import type { IconSourceLoader } from "./catalog.server.js";
+import {
+	IconToolkit,
+	IconToolHandlers,
+	IconToolSource,
+	normalizeIconToolArguments,
+} from "./toolkit.server.js";
 
-const SEARCH_ICONS_TOOL = {
-	annotations: {
-		idempotentHint: true,
-		openWorldHint: false,
-		readOnlyHint: true,
-	},
-	description:
-		"Search Sketchi icons by slug, name, alias, keyword, or collection. Results are ranked and include stable SVG and JSON URLs, and colorMode with onDark/onLight (invert or plate) where a mark would vanish on that background.",
-	inputSchema: {
-		additionalProperties: false,
-		properties: {
-			collection: {
-				description: "Optional collection slug to filter by.",
-				type: "string",
-			},
-			limit: {
-				description: "Maximum results from 1 to 100. Defaults to 50.",
-				maximum: 100,
-				minimum: 1,
-				type: "integer",
-			},
-			q: {
-				description: "Search text. Aliases such as k8s and psql are supported.",
-				type: "string",
-			},
+const definitions = Array.map(
+	[IconToolkit.tools.search_icons, IconToolkit.tools.get_icon],
+	(tool) => ({
+		name: tool.name,
+		title: Option.getOrElse(Context.getOption(tool.annotations, Tool.Title), () => tool.name),
+		description: tool.description,
+		// Preserve the advertised closed shape; ingress still accepts/ignores extra keys.
+		inputSchema: { ...Tool.getJsonSchema(tool), additionalProperties: false },
+		annotations: {
+			readOnlyHint: Context.get(tool.annotations, Tool.Readonly),
+			idempotentHint: Context.get(tool.annotations, Tool.Idempotent),
+			openWorldHint: Context.get(tool.annotations, Tool.OpenWorld),
 		},
-		type: "object",
-	},
-	name: "search_icons",
-	title: "Search Sketchi icons",
-};
+	}),
+);
 
-const GET_ICON_TOOL = {
-	annotations: {
-		idempotentHint: true,
-		openWorldHint: false,
-		readOnlyHint: true,
-	},
-	description:
-		"Get one Sketchi icon by its public slug. The first text block is the raw SVG source.",
-	inputSchema: {
-		additionalProperties: false,
-		properties: {
-			slug: {
-				description: "Exact public icon slug from search_icons.",
-				minLength: 1,
-				type: "string",
-			},
-		},
-		required: ["slug"],
-		type: "object",
-	},
-	name: "get_icon",
-	title: "Get a Sketchi icon",
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function optionalString(input: Record<string, unknown>, key: string): string | undefined {
-	const value = input[key];
-	return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function invalidArguments(message: string) {
-	return {
-		content: [{ text: message, type: "text" as const }],
-		isError: true,
-	};
-}
-
-function jsonToolResult(value: Record<string, unknown>) {
-	return {
-		content: [{ text: JSON.stringify(value, null, 2), type: "text" as const }],
-		structuredContent: value,
-	};
+function invalidArguments(message: string): CallToolResult {
+	return { content: [{ text: message, type: "text" }], isError: true };
 }
 
 export interface IconMcpServerOptions {
@@ -90,68 +41,77 @@ export interface IconMcpServerOptions {
 }
 
 export function createIconMcpServer(options: IconMcpServerOptions): Server {
-	const origin = options.origin ?? "https://icons.sketchi.app";
-	const sourceLoader = options.sourceLoader;
+	const source = {
+		origin: options.origin ?? "https://icons.sketchi.app",
+		sourceLoader: options.sourceLoader,
+	};
 	const server = new Server(
 		{ name: "sketchi-icons", version: "1.0.0" },
 		{ capabilities: { tools: { listChanged: false } } },
 	);
-
-	server.setRequestHandler(ListToolsRequestSchema, () => ({
-		tools: [SEARCH_ICONS_TOOL, GET_ICON_TOOL],
-	}));
-	server.setRequestHandler(CallToolRequestSchema, async (request) => {
-		const input = isRecord(request.params.arguments) ? request.params.arguments : {};
-
-		if (request.params.name === "search_icons") {
-			const limitValue = input.limit;
-			if (
-				limitValue !== undefined &&
-				(typeof limitValue !== "number" ||
-					!Number.isInteger(limitValue) ||
-					limitValue < 1 ||
-					limitValue > 100)
-			) {
-				return invalidArguments("limit must be an integer from 1 to 100.");
+	server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: definitions }));
+	server.setRequestHandler(CallToolRequestSchema, (request, extra) => {
+		const name = request.params.name;
+		if (name !== "search_icons" && name !== "get_icon")
+			return invalidArguments(`Tool ${name} was not found.`);
+		const call = Effect.gen(function* () {
+			const input = yield* Schema.decodeUnknownEffect(Schema.Json)(request.params.arguments ?? {});
+			const toolkit = yield* IconToolkit;
+			const stream = yield* toolkit.handle(
+				name,
+				normalizeIconToolArguments(name, input),
+				request.params._meta?.progressToken?.toString(),
+			);
+			const output = yield* stream.pipe(
+				Stream.filter((result) => !result.preliminary),
+				Stream.runLast,
+			);
+			if (Option.isNone(output)) return invalidArguments(`Tool ${name} returned no result.`);
+			// HandlerResult includes failure values even in error mode; use the tool
+			// success schema to narrow the transport projection without a type assertion.
+			if (name === "get_icon") {
+				const detail = yield* Schema.decodeUnknownEffect(IconToolkit.tools.get_icon.successSchema)(
+					output.value.result,
+				);
+				return {
+					content: [
+						{ text: detail.svg, type: "text" as const },
+						{ text: `Permanent SVG URL: ${detail.svgUrl}`, type: "text" as const },
+					],
+					structuredContent: detail,
+				};
 			}
-			const q = optionalString(input, "q");
-			const collection = optionalString(input, "collection");
-			const result = searchIconResults({
-				...(collection ? { collection } : {}),
-				...(typeof limitValue === "number" ? { limit: limitValue } : {}),
-				origin,
-				...(q ? { query: q } : {}),
-			});
-			return jsonToolResult(result);
-		}
-
-		if (request.params.name === "get_icon") {
-			const slug = optionalString(input, "slug");
-			if (!slug) {
-				return invalidArguments("slug is required.");
-			}
-			const detail = await getIconDetail(new Request(origin), slug, sourceLoader);
-			if (!detail) {
-				return invalidArguments(`Icon ${slug} was not found.`);
-			}
-			return {
-				content: [
-					{ text: detail.svg, type: "text" as const },
-					{
-						text: `Permanent SVG URL: ${detail.svgUrl}`,
-						type: "text" as const,
-					},
-				],
-				structuredContent: detail,
-			};
-		}
-
-		return invalidArguments(`Tool ${request.params.name} was not found.`);
+			const value = yield* Schema.decodeUnknownEffect(IconToolkit.tools.search_icons.successSchema)(
+				output.value.result,
+			);
+			const json = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown, { space: 2 }))(
+				value,
+			);
+			return { content: [{ text: json, type: "text" as const }], structuredContent: value };
+		}).pipe(
+			Effect.catchTags({
+				IconNotFound: (error) => Effect.succeed(invalidArguments(error.message)),
+				AiError: (error) =>
+					error.reason._tag === "ToolParameterValidationError"
+						? Effect.succeed(
+								invalidArguments(
+									name === "search_icons"
+										? "limit must be an integer from 1 to 100."
+										: "slug is required.",
+								),
+							)
+						: Effect.fail(error),
+			}),
+			// @effect-diagnostics-next-line strictEffectProvide:off -- SDK callback owns this Toolkit layer and its request source.
+			Effect.provide(IconToolHandlers),
+			Effect.provideService(IconToolSource, source),
+		);
+		return Effect.runPromise(call, { signal: extra.signal });
 	});
-
 	return server;
 }
 
+// @effect-diagnostics-next-line asyncFunction:off -- Existing agents HTTP transport is a Promise host boundary until slice 5b.
 export async function handleIconMcpRequest(
 	request: Request,
 	sourceLoader: IconSourceLoader,
