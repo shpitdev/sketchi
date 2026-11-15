@@ -248,12 +248,12 @@ describe("Venn renderer contract", () => {
 		expect(reversed).toEqual(forward);
 	});
 
-	it("places with bounded, deterministic work", () => {
+	it("places with bounded work and repeatable scenes", () => {
 		// Counts of placements tried, not wall clock: a regression in the search shows here.
 		expect(layoutVennDiagram(vennStressFixtures.empty).work).toBeLessThan(2_000);
 		expect(layoutVennDiagram(vennFixture).work).toBeLessThan(400_000);
 		expect(layoutVennDiagram(vennStressFixtures.heavyCenter).work).toBeLessThan(600_000);
-		expect(layoutVennDiagram(vennFixture).work).toBe(layoutVennDiagram(vennFixture).work);
+		expect(renderVennDiagram(vennFixture)).toEqual(renderVennDiagram(vennFixture));
 	});
 });
 

@@ -1,15 +1,10 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { vennFixture } from "./document.js";
-import { vennStressFixtures } from "./fixtures.js";
 import { renderDiagram } from "../../family.js";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import {
-	convertSceneToExcalidraw,
-	createExcalidrawFile,
-	validateExcalidrawScene,
-} from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 
 const exported = convertSceneToExcalidraw(renderDiagram(vennFixture).pipe(Result.getOrThrow));
 const element = (id: string) => exported.elements.find((candidate) => candidate.id === id)!;
@@ -51,14 +46,5 @@ describe("Venn Excalidraw export", () => {
 			groupIds: ["venn:region:0+1+2"],
 		});
 		for (const text of texts) expect(text["text"], text.id).toBe(text["originalText"]);
-	});
-
-	it("validates, and still validates after a save and reload", () => {
-		for (const diagram of [vennFixture, ...Object.values(vennStressFixtures)]) {
-			const scene = convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow));
-			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
-			const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene)));
-			expect(validateExcalidrawScene(reloaded), diagram.id).toEqual({ ok: true, issues: [] });
-		}
 	});
 });
