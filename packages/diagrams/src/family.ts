@@ -13,7 +13,7 @@ import * as classFamily from "./families/class/document.js";
 import { renderClassDiagram } from "./families/class/render.js";
 import { docs as erFamilyDocs } from "./families/er/docs.js";
 import * as erFamily from "./families/er/document.js";
-import { renderErDiagram } from "./families/er/render.js";
+import { erBuild } from "./families/er/build.js";
 import * as flowchartFamily from "./families/flowchart/document.js";
 import { docs as flowchartFamilyDocs } from "./families/flowchart/docs.js";
 import { docs as ganttFamilyDocs } from "./families/gantt/docs.js";
@@ -291,32 +291,13 @@ const ganttDescriptor = family({
 	docs: ganttFamilyDocs,
 });
 
-const erDiagramDescriptor = legacyFamily({
-	type: erFamily.erFixture.type,
+const erDiagramDescriptor = family({
 	operation: "buildErDiagram",
 	label: "ER diagram",
 	path: "/api/v1/er-diagrams/build",
-	canonical: canonical(
-		erFamily.ErDiagram,
-		erFamily.erFixture.type,
-		erFamily.validateErDiagram,
-		renderErDiagram,
-		erFamily.counts,
-	),
-	validationError: erFamily.ErValidationError,
+	build: erBuild,
+	...fromBuild(erBuild),
 	fixture: erFamily.erFixture,
-	spec: Build.ErSpec,
-	request: Build.BuildErDiagramRequest,
-	contracts: {
-		input: Schema.Struct({
-			...Build.BuildErDiagramRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: Build.ErToolSpecSchema,
-		}),
-		output: Build.BuildErDiagramResultSchema,
-	},
-	studioInput: Build.BuildErDiagramToolInputSchema,
-	build: (runtime: typeof Runtime) => runtime.buildErDiagram,
 	docs: erFamilyDocs,
 });
 

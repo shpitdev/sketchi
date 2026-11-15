@@ -1,5 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { cleanToolString, slug } from "../../clean-text.js";
 
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
@@ -97,6 +98,79 @@ export const ErDiagram = Schema.Struct({
 }).annotate({ identifier: "ErDiagram" });
 
 export interface ErDiagram extends Schema.Schema.Type<typeof ErDiagram> {}
+
+/** Authored ER input shares the canonical fields, with shorthand rows and optional ids. */
+export const ErDocument = ErDiagram.mapFields(({ type: _type, ...fields }) => ({
+	...fields,
+	id: Schema.optionalKey(ErDiagram.fields.id),
+	entities: Schema.Array(
+		ErEntity.mapFields((entity) => ({
+			...entity,
+			fields: Schema.Array(Schema.Union([Schema.NonEmptyString, ErField])).pipe(
+				Schema.mutable,
+				Schema.withDecodingDefaultKey(Effect.succeed([])),
+			),
+		})),
+	).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
+	relationships: Schema.Array(
+		ErRelationship.mapFields((relationship) => ({
+			...relationship,
+			id: Schema.optionalKey(relationship.id),
+		})),
+	).pipe(Schema.mutable, Schema.withDecodingDefaultKey(Effect.succeed([]))),
+})).annotate({ identifier: "ErDocument" });
+export interface ErDocument extends Schema.Schema.Type<typeof ErDocument> {}
+
+/** Clean authored text and reserve explicit relationship ids before filling omissions. */
+export function normalizeEr(spec: ErDocument): ErDiagram {
+	const title = cleanToolString(spec.title);
+	const cleaned = (value: string | undefined) => (value && cleanToolString(value)) || undefined;
+	const optional = (key: string, value: string | undefined) =>
+		cleaned(value) ? { [key]: cleaned(value) } : {};
+	const flag = (key: string, value: boolean | undefined) => (value ? { [key]: true } : {});
+	const used = new Set(
+		Arr.flatMap(spec.relationships, (relationship) => {
+			const id = cleaned(relationship.id);
+			return id === undefined ? [] : [id];
+		}),
+	);
+	const relationshipId = (index: number) => {
+		let number = index + 1;
+		while (used.has(`relationship-${number}`)) number += 1;
+		used.add(`relationship-${number}`);
+		return `relationship-${number}`;
+	};
+	return {
+		id: cleaned(spec.id) ?? (slug(title) || "sketchi-er-diagram"),
+		title,
+		type: erDiagramType,
+		entities: Arr.map(spec.entities, (entity) => ({
+			id: cleanToolString(entity.id),
+			...optional("name", entity.name),
+			fields: Arr.map(entity.fields, (input) => {
+				const field =
+					typeof input === "string" ? parseErFieldShorthand(cleanToolString(input)) : input;
+				return {
+					name: cleanToolString(field.name),
+					...optional("type", field.type),
+					...flag("pk", field.pk),
+					...flag("fk", field.fk),
+					...flag("unique", field.unique),
+					...flag("nullable", field.nullable),
+				};
+			}),
+		})),
+		relationships: Arr.map(spec.relationships, (relationship, index) => ({
+			id: cleaned(relationship.id) ?? relationshipId(index),
+			from: cleanToolString(relationship.from),
+			to: cleanToolString(relationship.to),
+			fromCardinality: relationship.fromCardinality,
+			toCardinality: relationship.toCardinality,
+			...optional("label", relationship.label),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
 
 export const ErValidationIssueCodeSchema = Schema.Literals([
 	"er_too_large",

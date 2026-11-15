@@ -6,8 +6,8 @@ const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");
 
 describe("offline ER input failures", () => {
 	it.each([
-		{ name: "unknown field", issue: "unknown_relationship_field", to: "customers.uuid" },
-		{ name: "unknown entity", issue: "missing_edge_target", to: "clients.id" },
+		{ name: "unknown field", issue: "missing_relationship_field", to: "customers.uuid" },
+		{ name: "unknown entity", issue: "missing_relationship_entity", to: "clients.id" },
 	])("reports $name as invalid_document with exit 3", ({ issue, to }) => {
 		const environment = { ...process.env };
 		delete environment["FORCE_COLOR"];

@@ -63,19 +63,7 @@ export function canonicalDocumentFromDiagram(
 		case "state-machine":
 			return familyForType("state-machine").toDocument(diagram);
 		case "er":
-			return {
-				type: "er",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					entities: diagram.entities.map((entity) => ({
-						...entity,
-						fields: entity.fields.map((field) => ({ ...field })),
-					})),
-					relationships: diagram.relationships.map((relationship) => ({ ...relationship })),
-					style: diagram.style,
-				},
-			};
+			return familyForType("er").toDocument(diagram);
 		case "class":
 			return {
 				type: "class",

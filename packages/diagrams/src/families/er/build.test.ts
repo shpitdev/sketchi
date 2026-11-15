@@ -1,13 +1,21 @@
 import { CanvasSpec } from "@sketchi/drawing";
 import { describe, expect, it } from "vitest";
 import { Effect, Schema } from "effect";
-import { erFixture, orgChartEr } from "../../families/er/document.js";
+import { erFixture, orgChartEr } from "./document.js";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildErDiagramResultSchema } from "./contract.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
-import { applyDiagramPatch, buildErDiagram, CodeModeRuntimeEnvironment } from "./runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
+import { erBuild } from "./build.js";
+import { buildResponse } from "../../build/operation.js";
+import { canonicalDocumentFromDiagram } from "../../build/code-mode/documents.js";
+import {
+	applyDiagramPatch,
+	buildErDiagram,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
 
 const storage = makeMemoryArtifactStorage();
 function run<A>(
@@ -30,7 +38,7 @@ function build(spec: unknown) {
 				inlineArtifacts: ["scene", "excalidraw"],
 				artifactFormats: ["scene", "excalidraw"],
 			},
-		}),
+		}).pipe(buildResponse),
 	);
 }
 
@@ -56,7 +64,7 @@ describe("Code Mode native ER diagram", () => {
 	it("builds the documented spec into tables and a crow's-foot line bound to its rows", async () => {
 		const built = await build(shopSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildErDiagramResultSchema)(built)).not.toThrow();
+		expect(() => Schema.decodeUnknownSync(erBuild.result)(built)).not.toThrow();
 		expect(built.normalizedSpec.entities[1]).toEqual({
 			id: "orders",
 			fields: [
@@ -237,32 +245,35 @@ describe("Code Mode native ER diagram", () => {
 	it.each([
 		[
 			{ relationships: [{ ...shopSpec.relationships[0], to: "customers.uuid" }] },
-			"unknown_relationship_field",
+			"missing_relationship_field",
 		],
 		[
 			{ relationships: [{ ...shopSpec.relationships[0], to: "clients.id" }] },
-			"missing_edge_target",
+			"missing_relationship_entity",
 		],
 		[
 			{ relationships: [{ ...shopSpec.relationships[0], from: "carts.customer_id" }] },
-			"missing_edge_source",
+			"missing_relationship_entity",
 		],
 		[
 			{
 				entities: [shopSpec.entities[0], { id: "orders", fields: ["id uuid PK", "ID int"] }],
 				relationships: [],
 			},
-			"invalid_field",
+			"duplicate_field_name",
 		],
-		[{ entities: [{ id: "orders", fields: ["id uuid PK?"] }], relationships: [] }, "invalid_field"],
-		[{ entities: [{ id: "public.orders", fields: [] }], relationships: [] }, "invalid_entity"],
+		[
+			{ entities: [{ id: "orders", fields: ["id uuid PK?"] }], relationships: [] },
+			"nullable_primary_key",
+		],
+		[{ entities: [{ id: "public.orders", fields: [] }], relationships: [] }, "invalid_entity_id"],
 		[
 			{
 				relationships: [
 					{ from: "orders.id", to: "orders.id", fromCardinality: "one", toCardinality: "one" },
 				],
 			},
-			"invalid_relationship",
+			"self_referencing_field",
 		],
 	])("rejects %j with a structured repair issue", async (change, code) => {
 		const result = await build({ ...shopSpec, ...change });

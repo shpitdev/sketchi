@@ -41,13 +41,6 @@ import {
 	type ClassDiagram,
 	type ClassValidationIssueCode,
 } from "../../families/class/document.js";
-import {
-	getErValidationIssues,
-	parseErFieldShorthand,
-	resolveErShorthand,
-	type ErDiagram,
-	type ErValidationIssueCode,
-} from "../../families/er/document.js";
 import { decodeFlowchartDocument } from "../../families/flowchart/document.js";
 import { applyFlowchartEdits } from "../../families/flowchart/edits.js";
 
@@ -62,7 +55,6 @@ import { isStructurallyValidClassBox, renderClassDiagram } from "../../families/
 import {
 	isStructurallyValidErOptional,
 	isStructurallyValidErTable,
-	renderErDiagram,
 } from "../../families/er/render.js";
 import { isStructurallyValidGanttMark } from "../../families/gantt/render.js";
 import { isStructurallyValidJourneyMark } from "../../families/journey/render.js";
@@ -97,8 +89,6 @@ import {
 	ApplyDiagramPatchRequest,
 	BuildClassDiagramRejected,
 	BuildClassDiagramRequest,
-	BuildErDiagramRejected,
-	BuildErDiagramRequest,
 	CreateCanvasRejected,
 	CreateCanvasRequest,
 	DEFAULT_ICON_SEARCH_LIMIT,
@@ -111,14 +101,12 @@ import {
 	SearchIconsRequest,
 	type ApplyDiagramPatchResult,
 	type BuildClassDiagramResult,
-	type BuildErDiagramResult,
 	type CreateCanvasResult,
 	type DiagramPatchOperation,
 	type DiagramSelector,
 	type EditFlowchartResult,
 	type GetArtifactResult,
 	type NormalizedClassSpec,
-	type NormalizedErSpec,
 	type SearchIconsResult,
 } from "./contract.js";
 import { type BuildFlowchartRequest } from "../../families/flowchart/build.js";
@@ -301,103 +289,6 @@ export function observeCodeModeBoundary<
 		return yield* Effect.fromResult(outcomeResult);
 	});
 	return withTelemetryCorrelation(observed, codeModeCorrelation(input));
-}
-
-function normalizeErSpec(spec: BuildErDiagramRequest["spec"]): NormalizedErSpec {
-	const title = cleanToolString(spec.title);
-	const optional = (key: string, value: string | undefined) =>
-		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
-	const flag = (key: string, value: boolean | undefined) => (value ? { [key]: true } : {});
-	// An omitted id takes the next `relationship-<n>` no relationship claims explicitly.
-	const used = new Set(
-		spec.relationships.flatMap((relationship) => cleanOptional(relationship.id) ?? []),
-	);
-	const relationshipId = (index: number) => {
-		let number = index + 1;
-		while (used.has(`relationship-${number}`)) number += 1;
-		used.add(`relationship-${number}`);
-		return `relationship-${number}`;
-	};
-	return {
-		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-er-diagram"),
-		title,
-		entities: spec.entities.map((entity) => ({
-			id: cleanToolString(entity.id),
-			...optional("name", entity.name),
-			fields: entity.fields.map((input) => {
-				const field =
-					typeof input === "string" ? parseErFieldShorthand(cleanToolString(input)) : input;
-				return {
-					name: cleanToolString(field.name),
-					...optional("type", field.type),
-					...flag("pk", field.pk),
-					...flag("fk", field.fk),
-					...flag("unique", field.unique),
-					...flag("nullable", field.nullable),
-				};
-			}),
-		})),
-		relationships: spec.relationships.map((relationship, index) => ({
-			id: cleanOptional(relationship.id) ?? relationshipId(index),
-			from: cleanToolString(relationship.from),
-			to: cleanToolString(relationship.to),
-			fromCardinality: relationship.fromCardinality,
-			toCardinality: relationship.toCardinality,
-			...optional("label", relationship.label),
-		})),
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-	};
-}
-
-function toErDiagram(spec: NormalizedErSpec): ErDiagram {
-	return { ...spec, type: "er" };
-}
-
-/** Code Mode's published issue codes for diagram-core's ER invariants. */
-const ER_ISSUE_CODES = {
-	er_too_large: "er_too_large",
-	invalid_entity_id: "invalid_entity",
-	duplicate_entity_id: "duplicate_node_id",
-	duplicate_entity_name: "invalid_entity",
-	duplicate_field_name: "invalid_field",
-	er_text_too_long: "label_too_long",
-	nullable_primary_key: "invalid_field",
-	duplicate_relationship_id: "duplicate_edge_id",
-	missing_relationship_entity: "missing_edge_target",
-	missing_relationship_field: "unknown_relationship_field",
-	self_referencing_field: "invalid_relationship",
-} as const satisfies Record<ErValidationIssueCode, CodeModeIssueCode>;
-
-function validateNormalizedEr(spec: NormalizedErSpec): CodeModeIssue[] {
-	return getErValidationIssues(toErDiagram(spec)).map((entry) =>
-		issue({
-			code:
-				entry.code === "missing_relationship_entity" && entry.path.endsWith(".from")
-					? "missing_edge_source"
-					: ER_ISSUE_CODES[entry.code],
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-			message: entry.message,
-			hint: entry.hint,
-		}),
-	);
-}
-
-function erQuality(spec: NormalizedErSpec, threshold: number): QualityReport {
-	const score = 10;
-	return {
-		accepted: score >= threshold,
-		score,
-		threshold,
-		summary: { nodeCount: spec.entities.length, edgeCount: spec.relationships.length },
-		checks: [],
-	};
-}
-
-/** Read one-line fields, cardinality aliases and from/to aliases before the request is decoded. */
-function resolveErRequest(input: unknown): unknown {
-	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
-	return { ...input, spec: resolveErShorthand(input.spec) };
 }
 
 function normalizeClassSpec(spec: BuildClassDiagramRequest["spec"]): NormalizedClassSpec {
@@ -607,15 +498,6 @@ const EditFlowchartFailure = workflowFailure(
 	"EditFlowchartFailure",
 	EditFlowchartRejected.fields.status,
 	EditFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildErDiagramFailure = workflowFailure(
-	"BuildErDiagramFailure",
-	BuildErDiagramRejected.fields.status,
-	BuildErDiagramRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -2126,114 +2008,6 @@ export const artifactBuildCapabilities = Effect.gen(function* () {
 	} satisfies ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>;
 });
 
-const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(function* (
-	input: unknown,
-) {
-	const parsed = Schema.decodeUnknownResult(BuildErDiagramRequest, {
-		errors: "all",
-		reportInput: true,
-	})(resolveErRequest(input));
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildErDiagramFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: codeModeInputIssues(parsed.failure),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-	const request = parsed.success;
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeErSpec(request.spec);
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedEr(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildErDiagramFailure.new({
-			status: "invalid_er_diagram",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const quality = erQuality(
-		normalizedSpec,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildErDiagramFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const scene = yield* validatedDomainResult({
-		try: () => renderErDiagram(toErDiagram(normalizedSpec)),
-		catch: (cause) =>
-			BuildErDiagramFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message: cause instanceof Error ? cause.message : "Unable to render ER scene.",
-							hint: "Repair the entities and relationships and retry.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildErDiagram.render"));
-	const canvasIssues = getCanvasValidationIssues(scene);
-	if (canvasIssues.length > 0) {
-		return yield* BuildErDiagramFailure.new({
-			status: canvasFailureStatus(canvasIssues),
-			context: {
-				...qualityContext,
-				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
-					...entry,
-					hint: "Shorten entity or field names, or split the schema, and retry buildErDiagram.",
-				})),
-			},
-		});
-	}
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildErDiagramFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [],
-	} satisfies Extract<BuildErDiagramResult, { ok: true }>;
-});
-
 const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow")(function* (
 	input: unknown,
 ) {
@@ -3072,8 +2846,7 @@ export const buildVennDiagram = familyForType("venn").build({ bindBuild });
 
 export const buildStateMachine = familyForType("state-machine").build({ bindBuild });
 
-export const buildErDiagram: (input: unknown) => CodeModeWorkflowEffect<BuildErDiagramResult> =
-	boundary("buildErDiagram", buildErDiagramWorkflow, failureResult);
+export const buildErDiagram = familyForType("er").build({ bindBuild });
 
 export const buildClassDiagram: (
 	input: unknown,

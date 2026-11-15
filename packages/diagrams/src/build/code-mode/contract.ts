@@ -33,7 +33,6 @@ import {
 	CLASS_RELATIONSHIP_KINDS,
 	CLASS_VISIBILITIES,
 } from "../../families/class/document.js";
-import { ER_CARDINALITIES } from "../../families/er/document.js";
 
 const codeModeJsonSchemaAnnotationKeys = new Set([
 	"x-sketchi-default",
@@ -296,66 +295,6 @@ const DiagramStyleWithDefault = DiagramSpecStyle.annotate({
 );
 
 /**
- * A flowchart is diagram-core's flowchart document: nodes as an id → label map,
- * edges as [from, to, label?], and groups and lanes that list what they contain.
- */
-
-/**
- * The authoring form of diagram-core's canonical ErDiagram: a field may be one
- * string (`"id uuid PK"`), relationship ids are optional and style is
- * defaulted. buildErDiagram normalizes it into the core contract, which owns
- * every invariant.
- */
-export const ErFieldSpec = Schema.Struct({
-	name: RequiredNonEmptyString,
-	type: optionalContract(NonEmptyString),
-	pk: optionalContract(Schema.Boolean),
-	fk: optionalContract(Schema.Boolean),
-	unique: optionalContract(Schema.Boolean),
-	nullable: optionalContract(Schema.Boolean),
-}).annotate({ identifier: undefined });
-
-export interface ErFieldSpec extends Schema.Schema.Type<typeof ErFieldSpec> {}
-
-const erFieldsDefault: Array<string | typeof ErFieldSpec.Encoded> = [];
-export const ErEntitySpec = Schema.Struct({
-	id: RequiredNonEmptyString,
-	name: optionalContract(NonEmptyString),
-	fields: Schema.Array(Schema.Union([NonEmptyString, ErFieldSpec]))
-		.pipe(Schema.mutable)
-		.annotate({ default: erFieldsDefault })
-		.pipe(Schema.withDecodingDefaultKey(Effect.succeed(erFieldsDefault))),
-}).annotate({ identifier: undefined });
-
-export interface ErEntitySpec extends Schema.Schema.Type<typeof ErEntitySpec> {}
-
-export const ErRelationshipSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	from: RequiredNonEmptyString,
-	to: RequiredNonEmptyString,
-	fromCardinality: literals(ER_CARDINALITIES),
-	toCardinality: literals(ER_CARDINALITIES),
-	label: optionalContract(NonEmptyString),
-}).annotate({ identifier: undefined });
-
-export interface ErRelationshipSpec extends Schema.Schema.Type<typeof ErRelationshipSpec> {}
-
-const erRelationshipsDefault: Array<typeof ErRelationshipSpec.Encoded> = [];
-const ErRelationshipsWithDefault = Schema.Array(ErRelationshipSpec)
-	.pipe(Schema.mutable)
-	.annotate({ default: erRelationshipsDefault })
-	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(erRelationshipsDefault)));
-export const ErSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	entities: requiredArray(nonEmptyArray(ErEntitySpec)),
-	relationships: ErRelationshipsWithDefault,
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface ErSpec extends Schema.Schema.Type<typeof ErSpec> {}
-
-/**
  * The authoring form of diagram-core's canonical ClassDiagram: a member may be
  * one string (`"- radius: double"`, `"+ area(): double"`), relationship ids are
  * optional and style is defaulted. buildClassDiagram normalizes it into the
@@ -461,20 +400,6 @@ export const EditFlowchartRequest = Schema.Struct({
 
 export interface EditFlowchartRequest extends Schema.Schema.Type<typeof EditFlowchartRequest> {}
 
-export const BuildErDiagramRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(ErSpec),
-	options: optionalContract(BuildOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildErDiagramRequest extends Schema.Schema.Type<typeof BuildErDiagramRequest> {}
-/** The ER spec a model authors; style is always the Sketchi palette. */
-export const ErToolSpecSchema = ErSpec.mapFields(({ style: _style, ...fields }) => fields);
-export const BuildErDiagramToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(ErToolSpecSchema),
-});
-export type BuildErDiagramToolInput = typeof BuildErDiagramToolInputSchema.Type;
 export const BuildClassDiagramRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(ClassSpec),
@@ -754,22 +679,6 @@ export interface ApplyDiagramPatchRequest extends Schema.Schema.Type<
 	typeof ApplyDiagramPatchRequest
 > {}
 
-const NormalizedErSpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	entities: Schema.Array(
-		Schema.Struct({
-			id: NonEmptyString,
-			name: optionalContract(NonEmptyString),
-			fields: Schema.Array(ErFieldSpec).pipe(Schema.mutable),
-		}),
-	).pipe(Schema.mutable),
-	relationships: Schema.Array(
-		ErRelationshipSpec.mapFields((fields) => ({ ...fields, id: NonEmptyString })),
-	).pipe(Schema.mutable),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
-export type NormalizedErSpec = typeof NormalizedErSpecSchema.Type;
 const NormalizedClassSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -821,44 +730,6 @@ export const EditFlowchartResultSchema = Schema.Union([
 	EditFlowchartRejected,
 ]);
 export type EditFlowchartResult = typeof EditFlowchartResultSchema.Type;
-
-export const BuildErDiagramAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedErSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildErDiagramAccepted extends Schema.Schema.Type<typeof BuildErDiagramAccepted> {}
-export const BuildErDiagramRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_er_diagram",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedErSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildErDiagramRejected extends Schema.Schema.Type<typeof BuildErDiagramRejected> {}
-export const BuildErDiagramResultSchema = Schema.Union([
-	BuildErDiagramAccepted,
-	BuildErDiagramRejected,
-]);
-export type BuildErDiagramResult = typeof BuildErDiagramResultSchema.Type;
 
 export const BuildClassDiagramAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

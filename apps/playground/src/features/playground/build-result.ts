@@ -3,11 +3,8 @@ import { sequenceBuild } from "@sketchi/diagrams/families/sequence/build";
 import { familyForType } from "@sketchi/diagrams/family";
 import { stateLabel } from "@sketchi/diagrams/families/state-machine/document";
 import {
-	BuildErDiagramResultSchema,
-	BuildErDiagramToolInputSchema,
 	BuildClassDiagramResultSchema,
 	BuildClassDiagramToolInputSchema,
-	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
 import {
@@ -30,7 +27,7 @@ export type StudioBuildResult =
 	| ReturnType<typeof familyForType<"chart">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"state-machine">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"gantt">>["contracts"]["output"]["Type"]
-	| BuildErDiagramResult
+	| ReturnType<typeof familyForType<"er">>["contracts"]["output"]["Type"]
 	| BuildClassDiagramResult
 	| ReturnType<typeof familyForType<"org-chart">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"venn">>["contracts"]["output"]["Type"]
@@ -126,9 +123,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_er_diagram": {
 		family: "er",
-		decodeResult: Schema.decodeUnknownResult(BuildErDiagramResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("er").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildErDiagramToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("er").studioInput)(input);
 			return Result.isSuccess(decoded)
 				? decoded.success.spec.entities.map((entity) => entity.name ?? entity.id)
 				: [];

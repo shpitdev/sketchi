@@ -258,11 +258,11 @@ describe("ER routing work", () => {
 	// only the one chosen grew, and then only where that drew no worse).
 	it("bounds segment checks for typical schemas and the twenty-table stress schema", () => {
 		work.checks = 0;
-		renderErDiagram(erFixture).pipe(Result.getOrThrow);
-		renderErDiagram(orgChartEr).pipe(Result.getOrThrow);
+		renderErDiagram(erFixture);
+		renderErDiagram(orgChartEr);
 		const small = work.checks;
 		work.checks = 0;
-		renderErDiagram(erStressFixtures.marketplace).pipe(Result.getOrThrow);
+		renderErDiagram(erStressFixtures.marketplace);
 		const large = work.checks;
 		expect(small).toBeGreaterThan(0);
 		expect(small).toBeLessThan(50_000);
