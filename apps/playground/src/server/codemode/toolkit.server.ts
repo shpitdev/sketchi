@@ -1,3 +1,5 @@
+import "@tanstack/react-start/server-only";
+
 import { Effect, Option, Schema, Stream } from "effect";
 import { AiError, Tool, Toolkit } from "effect/ai";
 import {
