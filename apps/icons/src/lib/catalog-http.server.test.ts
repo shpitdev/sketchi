@@ -2,7 +2,7 @@
 import { IconCatalogHttpApi } from "@sketchi/icon-catalog/http-api";
 import { Effect, Layer } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
-import { HttpApiTest } from "effect/http-api";
+import { HttpApiTest, OpenApi } from "effect/http-api";
 import { expect, it } from "vitest";
 
 import { IconSource } from "./api.server";
@@ -30,6 +30,12 @@ it("serves ranked aliases, canonical URLs and SVG through one generated catalog 
 			});
 			const detail = yield* client.catalog.detail({ params: { slug: "kubernetes" } });
 			const svg = yield* client.catalog.raw({ params: { slug: "kubernetes" } });
+			const head = yield* client.catalog.rawHead({
+				params: { slug: "kubernetes" },
+				responseMode: "decoded-and-response",
+			});
+			expect(head[0]).toBeUndefined();
+			expect(head[1].status).toBe(200);
 			expect(svg).toBe(detail.svg);
 			expect(svg).toBe('<svg viewBox="0 0 24 24" />');
 		}).pipe(
@@ -43,4 +49,10 @@ it("serves ranked aliases, canonical URLs and SVG through one generated catalog 
 			Effect.scoped,
 		),
 	);
+});
+
+it("declares the preserved empty 200 raw HEAD response in OpenAPI", () => {
+	const spec = OpenApi.fromApi(IconCatalogHttpApi);
+	expect(spec.paths["/api/icons/{slug}.svg"]?.head?.responses).toMatchObject({ "200": {} });
+	expect(spec.paths["/api/icons/{slug}.svg"]?.head?.responses).not.toHaveProperty("204");
 });

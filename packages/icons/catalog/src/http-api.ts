@@ -67,6 +67,7 @@ export const IconCatalogHttpGroup = HttpApiGroup.make("catalog").add(
 	}),
 	HttpApiEndpoint.head("rawHead", "/api/icons/:slug.svg", {
 		params: { slug: Schema.String },
+		success: HttpApiSchema.Empty(200),
 		error: [HttpApiSchema.Empty(404), sourceFailure],
 	}),
 	HttpApiEndpoint.head("detailHead", "/api/icons/:slug", {

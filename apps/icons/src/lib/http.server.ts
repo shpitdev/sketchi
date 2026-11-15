@@ -14,9 +14,16 @@ import {
 	type TelemetryPipeline,
 	type TelemetrySpanSink,
 } from "@sketchi/observability";
-import { Array, Context, Effect, Layer, Record, Scheduler, String } from "effect";
+import { Array, Context, Effect, Layer, Option, Record, Scheduler, String } from "effect";
 import { SecureRandom } from "effect/crypto";
-import { HttpRouter, HttpServer, HttpServerResponse } from "effect/http";
+import {
+	HttpMiddleware,
+	HttpRouter,
+	HttpServer,
+	HttpServerRequest,
+	HttpServerResponse,
+	HttpTraceContext,
+} from "effect/http";
 import { HttpApi, HttpApiBuilder, OpenApi } from "effect/http-api";
 
 import { IconSource } from "./api.server.js";
@@ -40,6 +47,21 @@ class IconsHttpRequest extends Context.Service<
 		readonly headers: Readonly<Record<string, string>>;
 	}
 >()("sketchi/IconsHttpRequest") {}
+
+// Capture protocol/correlation metadata, never client addresses or arbitrary forwarded headers.
+const telemetryRequestHeaders = [
+	"accept",
+	"accept-encoding",
+	"accept-language",
+	"content-type",
+	"content-length",
+	"user-agent",
+	"origin",
+	"cf-ray",
+	"traceparent",
+	"tracestate",
+	"x-sketchi-client",
+];
 
 const responsePolicy = HttpRouter.middleware(
 	(effect) =>
@@ -81,6 +103,9 @@ export function makeIconsHttpHandler(options: { readonly sink?: TelemetrySpanSin
 		HttpRouter.add("OPTIONS", "/api/community/:slug", Effect.succeed(preflight)),
 	).pipe(
 		Layer.provide(HttpServer.layerServices),
+		// icons.http owns the complete request/export lifetime; an automatic outer span
+		// would finish after its export and be held for an unrelated request.
+		Layer.provideMerge(Layer.succeed(HttpMiddleware.TracerDisabledWhen, () => true)),
 		Layer.provideMerge(
 			makeWorkersTelemetryLayer({ resource: { serviceName: "sketchi-icons" }, ...options }),
 		),
@@ -91,6 +116,7 @@ export function makeIconsHttpHandler(options: { readonly sink?: TelemetrySpanSin
 		middleware: (effect) =>
 			Effect.gen(function* () {
 				const request = yield* IconsHttpRequest;
+				const incoming = yield* HttpServerRequest.HttpServerRequest;
 				return yield* effect.pipe(
 					Effect.tap((response) =>
 						Effect.annotateCurrentSpan({
@@ -103,6 +129,8 @@ export function makeIconsHttpHandler(options: { readonly sink?: TelemetrySpanSin
 					),
 					withTelemetryExport(request.target),
 					Effect.withSpan("icons.http", {
+						kind: "server",
+						parent: Option.getOrUndefined(HttpTraceContext.fromHeaders(incoming.headers)),
 						attributes: {
 							"http.request.method": request.method,
 							"url.full": request.url,
@@ -146,11 +174,7 @@ export function makeIconsHttpHandler(options: { readonly sink?: TelemetrySpanSin
 						method: request.method,
 						url: request.url,
 						headers: Record.fromEntries(
-							Array.filter(
-								[...request.headers],
-								([key]) =>
-									!["authorization", "cookie", "proxy-authorization", "set-cookie"].includes(key),
-							),
+							Array.filter([...request.headers], ([key]) => telemetryRequestHeaders.includes(key)),
 						),
 					}),
 				),
