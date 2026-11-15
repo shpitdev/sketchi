@@ -158,7 +158,7 @@ describe("org chart fuzz", () => {
 			// rare shapes no organization has; they stay under two charts in a hundred.
 			const shortfalls: string[] = [];
 			for (const diagram of randomCharts(CHARTS, seed)) {
-				const scene = renderOrgChartDiagram(diagram).pipe(Result.getOrThrow);
+				const scene = renderOrgChartDiagram(diagram);
 				const exported = convertSceneToExcalidraw(scene);
 				const dotted = (id: string) =>
 					id.startsWith("edge:dotted:") || id.startsWith("text:dotted:");
@@ -200,7 +200,7 @@ describe("org chart fuzz", () => {
 						...line,
 						label: line.label ?? LABELS[at % LABELS.length]!,
 					})),
-				}).pipe(Result.getOrThrow);
+				});
 				const labelProblems = [
 					...getCanvasValidationIssues(labeled).map((issue) => issue.message),
 					...validateExcalidrawScene(convertSceneToExcalidraw(labeled)).issues.map(

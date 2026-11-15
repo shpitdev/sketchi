@@ -28,7 +28,7 @@ import { mindmapFixture } from "./families/mindmap/fixtures.js";
 
 import { docs as orgChartFamilyDocs } from "./families/org-chart/docs.js";
 import * as orgChartFamily from "./families/org-chart/document.js";
-import { renderOrgChartDiagram } from "./families/org-chart/render.js";
+import { orgChartBuild } from "./families/org-chart/build.js";
 import { docs as quadrantFamilyDocs } from "./families/quadrant/docs.js";
 import * as quadrantFamily from "./families/quadrant/document.js";
 import { quadrantBuild } from "./families/quadrant/build.js";
@@ -338,32 +338,12 @@ export const families = [
 		build: (runtime: typeof Runtime) => runtime.buildClassDiagram,
 		docs: classFamilyDocs,
 	}),
-	legacyFamily({
-		type: orgChartFamily.orgChartFixture.type,
+	family({
 		operation: "buildOrgChart",
 		label: "Org chart",
 		path: "/api/v1/org-charts/build",
-		canonical: canonical(
-			orgChartFamily.OrgChartDiagram,
-			orgChartFamily.orgChartFixture.type,
-			orgChartFamily.validateOrgChartDiagram,
-			renderOrgChartDiagram,
-			orgChartFamily.counts,
-		),
-		validationError: orgChartFamily.OrgChartValidationError,
+		build: orgChartBuild,
 		fixture: orgChartFamily.orgChartFixture,
-		spec: Build.OrgChartSpec,
-		request: Build.BuildOrgChartRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildOrgChartRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.OrgChartToolSpecSchema,
-			}),
-			output: Build.BuildOrgChartResultSchema,
-		},
-		studioInput: Build.BuildOrgChartToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildOrgChart,
 		docs: orgChartFamilyDocs,
 	}),
 	family({

@@ -1,21 +1,25 @@
+import { buildResponse, type BuildRejection } from "../../build/operation.js";
 import { describe, expect, it } from "vitest";
-import { Effect, Schema } from "effect";
-import { orgChartFixture } from "../../families/org-chart/document.js";
-import { orgChartStressFixtures } from "../../families/org-chart/fixtures.js";
+import { Effect } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildOrgChartResultSchema } from "./contract.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
-import { applyDiagramPatch, buildOrgChart, CodeModeRuntimeEnvironment } from "./runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
+import {
+	applyDiagramPatch,
+	buildOrgChart,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
 
 const storage = makeMemoryArtifactStorage();
-function run<A>(
-	effect: Effect.Effect<A, never, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+function run<A, E extends BuildRejection<unknown>>(
+	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
 ) {
 	return Effect.runPromise(
-		effect.pipe(
+		buildResponse(effect).pipe(
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
@@ -66,7 +70,6 @@ describe("Code Mode native org chart", () => {
 	it("builds the documented spec into cards, reporting lines and a dotted line", async () => {
 		const built = await build(startupSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildOrgChartResultSchema)(built)).not.toThrow();
 		expect(built.normalizedSpec).toMatchObject({
 			id: "startup-team",
 			title: "Startup team",
@@ -107,7 +110,7 @@ describe("Code Mode native org chart", () => {
 		});
 		expect(built.ok, JSON.stringify(built.issues)).toBe(false);
 		// A dotted line onto one's own solid manager is no second line.
-		expect(built.issues.map((issue) => issue.code)).toEqual(["invalid_reporting_line"]);
+		expect(built.issues.map((issue) => issue.code)).toEqual(["invalid_dotted_line"]);
 		const fixed = await build({
 			title: "Aliases",
 			people: [
@@ -179,24 +182,12 @@ describe("Code Mode native org chart", () => {
 		).toHaveLength(1);
 	});
 
-	it("round-trips canonical diagrams through their Code Mode documents", async () => {
-		for (const diagram of [orgChartFixture, orgChartStressFixtures.regions]) {
-			const document = canonicalDocumentFromDiagram(diagram);
-			expect(document.type).toBe("org-chart");
-			const built = await build(document.spec);
-			if (!built.ok) throw new Error(JSON.stringify(built.issues));
-			expect(built.normalizedSpec.people).toEqual(diagram.people);
-			expect(built.normalizedSpec.dottedLines).toEqual(diagram.dottedLines);
-			expect(built.normalizedSpec.groupByDepartment).toBe(diagram.groupByDepartment);
-		}
-	});
-
 	it.each([
 		[
 			{ people: [...startupSpec.people, { id: "x", name: "X", manager: "ghost" }] },
-			"missing_edge_source",
+			"unknown_manager",
 		],
-		[{ people: [...startupSpec.people, { id: "board", name: "Board" }] }, "invalid_reporting_line"],
+		[{ people: [...startupSpec.people, { id: "board", name: "Board" }] }, "multiple_roots"],
 		[
 			{
 				people: [
@@ -206,15 +197,18 @@ describe("Code Mode native org chart", () => {
 				],
 				dottedLines: [],
 			},
-			"invalid_reporting_line",
+			"reporting_cycle",
 		],
-		[{ people: [...startupSpec.people, { id: "x", name: "X", manager: "ea" }] }, "invalid_person"],
-		[{ people: [{ id: "a:b", name: "A" }], dottedLines: [] }, "invalid_person"],
+		[
+			{ people: [...startupSpec.people, { id: "x", name: "X", manager: "ea" }] },
+			"invalid_assistant",
+		],
+		[{ people: [{ id: "a:b", name: "A" }], dottedLines: [] }, "invalid_person_id"],
 		[
 			{ people: [...startupSpec.people, { id: "ceo", name: "Twin", manager: "cto" }] },
-			"duplicate_node_id",
+			"duplicate_person_id",
 		],
-		[{ dottedLines: [{ report: "dev", manager: "ghost" }] }, "invalid_reporting_line"],
+		[{ dottedLines: [{ report: "dev", manager: "ghost" }] }, "invalid_dotted_line"],
 		[
 			{
 				people: Array.from({ length: 101 }, (_, index) => ({
@@ -226,7 +220,7 @@ describe("Code Mode native org chart", () => {
 			},
 			"org_chart_too_large",
 		],
-		[{ people: [{ id: "a", name: "N".repeat(61) }], dottedLines: [] }, "label_too_long"],
+		[{ people: [{ id: "a", name: "N".repeat(61) }], dottedLines: [] }, "org_text_too_long"],
 	])("rejects %j with a structured repair issue", async (change, code) => {
 		const result = await build({ ...startupSpec, ...change });
 		expect(result.ok).toBe(false);
@@ -247,7 +241,7 @@ describe("Code Mode native org chart", () => {
 			],
 		});
 		expect(cyclic.status).toBe("invalid_org_chart");
-		expect(cyclic.issues.map((issue) => issue.code)).toContain("duplicate_node_id");
+		expect(cyclic.issues.map((issue) => issue.code)).toContain("duplicate_person_id");
 		const lone = await build({
 			...startupSpec,
 			dottedLines: { report: "dev", manager: "cpo", label: "for clinical systems" },

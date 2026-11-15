@@ -106,20 +106,7 @@ export function canonicalDocumentFromDiagram(
 				},
 			};
 		case "org-chart":
-			return {
-				type: "org-chart",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					people: diagram.people.map((person) => ({ ...person })),
-					dottedLines: diagram.dottedLines.map((line) => ({ ...line })),
-					...(diagram.groupByDepartment === undefined
-						? {}
-						: { groupByDepartment: diagram.groupByDepartment }),
-					...(diagram.forest === undefined ? {} : { forest: diagram.forest }),
-					style: diagram.style,
-				},
-			};
+			return familyForType("org-chart").toDocument(diagram);
 		case "venn": {
 			// CLI documents omit only the dispatch tag; the owning fields and stored wire are unchanged.
 			const { type, ...spec } = diagram;

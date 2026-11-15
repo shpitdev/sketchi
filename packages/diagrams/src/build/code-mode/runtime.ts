@@ -58,13 +58,6 @@ import {
 import { applyFlowchartEdits } from "../../families/flowchart/edits.js";
 
 import {
-	getOrgChartValidationIssues,
-	resolveOrgChartShorthand,
-	type OrgChartDiagram,
-	type OrgChartValidationIssueCode,
-} from "../../families/org-chart/document.js";
-
-import {
 	getStateMachineDefaultWarnings,
 	getStateMachineValidationIssues,
 	resolveStateMachineInitials,
@@ -98,7 +91,6 @@ import {
 } from "../../families/er/render.js";
 import { isStructurallyValidGanttMark } from "../../families/gantt/render.js";
 import { isStructurallyValidJourneyMark } from "../../families/journey/render.js";
-import { renderOrgChartDiagram } from "../../families/org-chart/render.js";
 import { isStructurallyValidQuadrantMark } from "../../families/quadrant/render.js";
 import { isStructurallyValidSankeyMark } from "../../families/sankey/render.js";
 import {
@@ -141,8 +133,6 @@ import {
 	BuildErDiagramRequest,
 	BuildFlowchartRejected,
 	BuildFlowchartRequestSchema,
-	BuildOrgChartRejected,
-	BuildOrgChartRequest,
 	BuildStateMachineRejected,
 	BuildStateMachineRequest,
 	BuildWireframeRejected,
@@ -164,7 +154,6 @@ import {
 	type BuildErDiagramResult,
 	type BuildFlowchartRequest,
 	type BuildFlowchartResult,
-	type BuildOrgChartResult,
 	type BuildStateMachineResult,
 	type BuildWireframeResult,
 	type ContractSchemaError,
@@ -176,7 +165,6 @@ import {
 	type GetArtifactResult,
 	type NormalizedClassSpec,
 	type NormalizedErSpec,
-	type NormalizedOrgChartSpec,
 	type NormalizedStateMachineSpec,
 	type NormalizedWireframeSpec,
 	type PatchableScene,
@@ -676,96 +664,6 @@ function resolveClassRequest(input: unknown): unknown {
 	return { ...input, spec: resolveClassShorthand(input.spec) };
 }
 
-function normalizeOrgChartSpec(spec: BuildOrgChartRequest["spec"]): NormalizedOrgChartSpec {
-	const title = cleanToolString(spec.title);
-	const optional = (key: string, value: string | undefined) =>
-		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
-	const flag = (key: string, value: boolean | undefined) => (value ? { [key]: true } : {});
-	// An omitted id takes the next `dotted-line-<n>` no dotted line claims explicitly.
-	const used = new Set(spec.dottedLines.flatMap((line) => cleanOptional(line.id) ?? []));
-	const lineId = (index: number) => {
-		let number = index + 1;
-		while (used.has(`dotted-line-${number}`)) number += 1;
-		used.add(`dotted-line-${number}`);
-		return `dotted-line-${number}`;
-	};
-	return {
-		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-org-chart"),
-		title,
-		people: spec.people.map((person) => ({
-			id: cleanToolString(person.id),
-			name: cleanToolString(person.name),
-			...optional("title", person.title),
-			...optional("department", person.department),
-			...optional("manager", person.manager),
-			...flag("assistant", person.assistant),
-			...flag("avatar", person.avatar),
-		})),
-		dottedLines: spec.dottedLines.map((line, index) => ({
-			id: cleanOptional(line.id) ?? lineId(index),
-			report: cleanToolString(line.report),
-			manager: cleanToolString(line.manager),
-			...optional("label", line.label),
-		})),
-		...flag("groupByDepartment", spec.groupByDepartment),
-		...flag("forest", spec.forest),
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-	};
-}
-
-function toOrgChartDiagram(spec: NormalizedOrgChartSpec): OrgChartDiagram {
-	return { ...spec, type: "org-chart" };
-}
-
-/** Code Mode's published issue codes for diagram-core's org chart invariants. */
-const ORG_CHART_ISSUE_CODES = {
-	org_chart_too_large: "org_chart_too_large",
-	invalid_person_id: "invalid_person",
-	duplicate_person_id: "duplicate_node_id",
-	org_text_too_long: "label_too_long",
-	unknown_manager: "missing_edge_source",
-	self_manager: "invalid_reporting_line",
-	reporting_cycle: "invalid_reporting_line",
-	multiple_roots: "invalid_reporting_line",
-	invalid_assistant: "invalid_person",
-	duplicate_dotted_line_id: "duplicate_edge_id",
-	invalid_dotted_line: "invalid_reporting_line",
-} as const satisfies Record<OrgChartValidationIssueCode, CodeModeIssueCode>;
-
-function validateNormalizedOrgChart(spec: NormalizedOrgChartSpec): CodeModeIssue[] {
-	return getOrgChartValidationIssues(toOrgChartDiagram(spec)).map((entry) =>
-		issue({
-			code: ORG_CHART_ISSUE_CODES[entry.code],
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-			message: entry.message,
-			hint: entry.hint,
-		}),
-	);
-}
-
-function orgChartQuality(spec: NormalizedOrgChartSpec, threshold: number): QualityReport {
-	const score = 10;
-	return {
-		accepted: score >= threshold,
-		score,
-		threshold,
-		summary: {
-			nodeCount: spec.people.length,
-			edgeCount:
-				spec.people.filter((person) => person.manager !== undefined).length +
-				spec.dottedLines.length,
-		},
-		checks: [],
-	};
-}
-
-/** Read manager, title and department aliases and dotted lines written on a person before the request is decoded. */
-function resolveOrgChartRequest(input: unknown): unknown {
-	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
-	return { ...input, spec: resolveOrgChartShorthand(input.spec) };
-}
-
 function normalizeWireframeComponent(component: WireframeComponentInput): WireframeComponentInput {
 	const normalized: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(component)) {
@@ -992,15 +890,6 @@ const BuildClassDiagramFailure = workflowFailure(
 	"BuildClassDiagramFailure",
 	BuildClassDiagramRejected.fields.status,
 	BuildClassDiagramRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildOrgChartFailure = workflowFailure(
-	"BuildOrgChartFailure",
-	BuildOrgChartRejected.fields.status,
-	BuildOrgChartRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -2996,114 +2885,6 @@ const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow
 	} satisfies Extract<BuildClassDiagramResult, { ok: true }>;
 });
 
-const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(function* (
-	input: unknown,
-) {
-	const parsed = Schema.decodeUnknownResult(BuildOrgChartRequest, {
-		errors: "all",
-		reportInput: true,
-	})(resolveOrgChartRequest(input));
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildOrgChartFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-	const request = parsed.success;
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeOrgChartSpec(request.spec);
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedOrgChart(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildOrgChartFailure.new({
-			status: "invalid_org_chart",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const quality = orgChartQuality(
-		normalizedSpec,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildOrgChartFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const scene = yield* validatedDomainResult({
-		try: () => renderOrgChartDiagram(toOrgChartDiagram(normalizedSpec)),
-		catch: (cause) =>
-			BuildOrgChartFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message: cause instanceof Error ? cause.message : "Unable to render org chart scene.",
-							hint: "Repair the people and reporting lines and retry.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildOrgChart.render"));
-	const canvasIssues = getCanvasValidationIssues(scene);
-	if (canvasIssues.length > 0) {
-		return yield* BuildOrgChartFailure.new({
-			status: canvasFailureStatus(canvasIssues),
-			context: {
-				...qualityContext,
-				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
-					...entry,
-					hint: "Shorten names or titles, or split the chart by division, and retry buildOrgChart.",
-				})),
-			},
-		});
-	}
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildOrgChartFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [],
-	} satisfies Extract<BuildOrgChartResult, { ok: true }>;
-});
-
 const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(function* (
 	input: unknown,
 ) {
@@ -4172,8 +3953,7 @@ export const buildClassDiagram: (
 );
 
 /** An org chart: people, the managers they report to, and dotted-line reports. */
-export const buildOrgChart: (input: unknown) => CodeModeWorkflowEffect<BuildOrgChartResult> =
-	boundary("buildOrgChart", buildOrgChartWorkflow, failureResult);
+export const buildOrgChart = familyForType("org-chart").build({ bindBuild });
 
 export const buildJourneyMap = familyForType("journey").build({ bindBuild });
 

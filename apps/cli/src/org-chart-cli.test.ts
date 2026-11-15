@@ -8,7 +8,7 @@ describe("offline org chart input failures", () => {
 	it.each([
 		{
 			name: "a reporting cycle",
-			issue: "invalid_reporting_line",
+			issue: "reporting_cycle",
 			people: [
 				{ id: "a", name: "Ada", manager: "b" },
 				{ id: "b", name: "Alan", manager: "a" },
@@ -17,7 +17,7 @@ describe("offline org chart input failures", () => {
 		},
 		{
 			name: "an unknown manager",
-			issue: "missing_edge_source",
+			issue: "unknown_manager",
 			people: [
 				{ id: "ceo", name: "Ada", title: "CEO" },
 				{ id: "cto", name: "Alan", manager: "ghost" },

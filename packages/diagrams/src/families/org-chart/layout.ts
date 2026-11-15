@@ -66,12 +66,6 @@ export interface OrgLayout {
 	readonly height: number;
 	/** Placements tried, this one included. */
 	readonly attempts: number;
-	/** Leaf groups stack from this many reports. */
-	readonly stackMin: number;
-	/** Managers whose reports wrap into more than one row, and how many. */
-	readonly wraps: ReadonlyMap<string, number>;
-	/** Managers who list their reports, each with their own team, in columns along their stem. */
-	readonly outlines: ReadonlyMap<string, 1 | 2>;
 }
 
 /**
@@ -834,8 +828,5 @@ export function layoutOrgChart(roots: readonly OrgTreeNode[]): OrgLayout {
 		width: box.x1 - box.x0,
 		height: box.y1 - box.y0,
 		attempts,
-		stackMin: policy.stackMin,
-		wraps: new Map([...policy.rows].filter(([, rows]) => rows > 1)),
-		outlines: policy.outline,
 	};
 }

@@ -1,12 +1,9 @@
-import { Result } from "effect";
 import {
-	type OrgChartValidationError,
 	type OrgChartDiagram,
 	type OrgPerson,
 	orgChartReports,
 	orgChartRoots,
 	orgPersonInitials,
-	validateOrgChartDiagram,
 } from "./document.js";
 import {
 	CANVAS_SPEC_VERSION,
@@ -909,136 +906,123 @@ function dottedElements(
  * dotted-line reports dashed with a head at the second manager, and, when
  * grouping, each department below the top in a region of its own.
  */
-export function renderOrgChartDiagram(
-	input: OrgChartDiagram,
-): Result.Result<RenderedDiagramScene, OrgChartValidationError> {
-	return Result.map(validateOrgChartDiagram(input), (diagram) => {
-		const regions = regionRoots(diagram);
-		const cards = measureCards(diagram, regions);
-		const layout = layoutOrgChart(buildTrees(diagram, cards, regions));
-		const background = diagram.style.backgroundColor;
-		const at = (rect: OrgRect): OrgRect => ({ ...rect, x: rect.x + PADDING, y: rect.y + PADDING });
-		const rects = new Map([...layout.cards].map(([id, rect]) => [id, at(rect)]));
-		const frames: FrameSceneElement[] = layout.regions.map((region) => ({
-			type: "frame",
-			id: `frame:${region.root}`,
-			name: region.label,
-			...at(region.frame),
-		}));
-		const frameOf = new Map(
-			layout.regions.flatMap((region) =>
-				region.members.map((member) => [member, `frame:${region.root}`] as const),
-			),
-		);
-		const drawn = diagram.people.map((person) =>
-			cardElements(
-				cards.get(person.id)!,
-				rects.get(person.id)!,
-				background,
-				frameOf.get(person.id),
-			),
-		);
-		const links: ArrowSceneElement[] = layout.links.map((link) => {
-			const points = link.points.map((point) => ({ x: point.x + PADDING, y: point.y + PADDING }));
-			// A line wholly inside a region moves with it.
-			const frameId =
-				frameOf.get(link.manager) !== undefined &&
-				frameOf.get(link.manager) === frameOf.get(link.report)
-					? frameOf.get(link.report)
-					: undefined;
-			return {
-				type: "arrow",
-				id: `edge:${link.report}`,
-				edgeId: link.report,
-				sourceNodeId: link.manager,
-				targetNodeId: link.report,
-				points: points as [OrgPoint, ...OrgPoint[]],
-				startArrowhead: null,
-				endArrowhead: null,
-				strokeColor: LINE_COLOR,
-				strokeWidth: 2,
-				roughness: 0,
-				...(frameId ? { frameId } : {}),
-			};
-		});
-		// A line going around the hierarchy never costs a later one its route.
-		const around = dottedElements(diagram, rects, frames, frameOf, links, true);
-		const dotted =
-			around.straight === 0
-				? around
-				: ([dottedElements(diagram, rects, frames, frameOf, links, false)].find(
-						(through) => through.straight < around.straight,
-					) ?? around);
-		const elements: SceneElement[] = [
-			...frames,
-			...links,
-			...dotted.arrows,
-			...drawn.flatMap((card) => card.nodes),
-			...drawn.flatMap((card) => card.texts),
-			...dotted.labels,
-		];
-		const corners = elements.flatMap((element): OrgPoint[] => {
-			if (element.type === "arrow") return [...element.points];
-			if (element.type === "text") {
-				if (element.containerId) return [];
-				const half = (element.maxWidth ?? 0) / 2;
-				const tall = (lineCount(element.text) * element.fontSize * LINE_HEIGHT) / 2;
-				return [
-					{ x: element.x - half, y: element.y - tall },
-					{ x: element.x + half, y: element.y + tall },
-				];
-			}
-			if (element.type === "node" || element.type === "frame")
-				return [
-					{ x: element.x, y: element.y },
-					{ x: element.x + element.width, y: element.y + element.height },
-				];
-			return [];
-		});
-		const nameTops = frames.map((frame) => canvasFrameNameBox(frame).y);
-		const minX = Math.min(...corners.map((point) => point.x));
-		const minY = Math.min(...corners.map((point) => point.y), ...nameTops);
-		// Dotted lines may route above or left of the cards; keep the padding on every side.
-		const dx = Math.max(0, Math.ceil(PADDING - minX));
-		const dy = Math.max(0, Math.ceil(PADDING - minY));
-		const moved =
-			dx === 0 && dy === 0
-				? elements
-				: elements.map((element): SceneElement => {
-						if (element.type === "arrow")
-							return {
-								...element,
-								points: element.points.map((point) => ({ x: point.x + dx, y: point.y + dy })) as [
-									OrgPoint,
-									...OrgPoint[],
-								],
-							};
-						if (element.type === "line") return element;
-						return { ...element, x: element.x + dx, y: element.y + dy };
-					});
+export function renderOrgChartDiagram(diagram: OrgChartDiagram): RenderedDiagramScene {
+	const regions = regionRoots(diagram);
+	const cards = measureCards(diagram, regions);
+	const layout = layoutOrgChart(buildTrees(diagram, cards, regions));
+	const background = diagram.style.backgroundColor;
+	const at = (rect: OrgRect): OrgRect => ({ ...rect, x: rect.x + PADDING, y: rect.y + PADDING });
+	const rects = new Map([...layout.cards].map(([id, rect]) => [id, at(rect)]));
+	const frames: FrameSceneElement[] = layout.regions.map((region) => ({
+		type: "frame",
+		id: `frame:${region.root}`,
+		name: region.label,
+		...at(region.frame),
+	}));
+	const frameOf = new Map(
+		layout.regions.flatMap((region) =>
+			region.members.map((member) => [member, `frame:${region.root}`] as const),
+		),
+	);
+	const drawn = diagram.people.map((person) =>
+		cardElements(cards.get(person.id)!, rects.get(person.id)!, background, frameOf.get(person.id)),
+	);
+	const links: ArrowSceneElement[] = layout.links.map((link) => {
+		const points = link.points.map((point) => ({ x: point.x + PADDING, y: point.y + PADDING }));
+		// A line wholly inside a region moves with it.
+		const frameId =
+			frameOf.get(link.manager) !== undefined &&
+			frameOf.get(link.manager) === frameOf.get(link.report)
+				? frameOf.get(link.report)
+				: undefined;
 		return {
-			kind: "canvas",
-			version: CANVAS_SPEC_VERSION,
-			diagramId: diagram.id,
-			title: diagram.title,
-			width: Math.ceil(Math.max(...corners.map((point) => point.x)) + dx + PADDING),
-			height: Math.ceil(Math.max(...corners.map((point) => point.y)) + dy + PADDING),
-			accentColor: diagram.style.accentColor,
-			backgroundColor: background,
-			elements: moved,
-			layers: [],
-			layouts: [],
-			zOrder: moved.map((element) => element.id),
+			type: "arrow",
+			id: `edge:${link.report}`,
+			edgeId: link.report,
+			sourceNodeId: link.manager,
+			targetNodeId: link.report,
+			points: points as [OrgPoint, ...OrgPoint[]],
+			startArrowhead: null,
+			endArrowhead: null,
+			strokeColor: LINE_COLOR,
+			strokeWidth: 2,
+			roughness: 0,
+			...(frameId ? { frameId } : {}),
 		};
 	});
+	// A line going around the hierarchy never costs a later one its route.
+	const around = dottedElements(diagram, rects, frames, frameOf, links, true);
+	const dotted =
+		around.straight === 0
+			? around
+			: ([dottedElements(diagram, rects, frames, frameOf, links, false)].find(
+					(through) => through.straight < around.straight,
+				) ?? around);
+	const elements: SceneElement[] = [
+		...frames,
+		...links,
+		...dotted.arrows,
+		...drawn.flatMap((card) => card.nodes),
+		...drawn.flatMap((card) => card.texts),
+		...dotted.labels,
+	];
+	const corners = elements.flatMap((element): OrgPoint[] => {
+		if (element.type === "arrow") return [...element.points];
+		if (element.type === "text") {
+			if (element.containerId) return [];
+			const half = (element.maxWidth ?? 0) / 2;
+			const tall = (lineCount(element.text) * element.fontSize * LINE_HEIGHT) / 2;
+			return [
+				{ x: element.x - half, y: element.y - tall },
+				{ x: element.x + half, y: element.y + tall },
+			];
+		}
+		if (element.type === "node" || element.type === "frame")
+			return [
+				{ x: element.x, y: element.y },
+				{ x: element.x + element.width, y: element.y + element.height },
+			];
+		return [];
+	});
+	const nameTops = frames.map((frame) => canvasFrameNameBox(frame).y);
+	const minX = Math.min(...corners.map((point) => point.x));
+	const minY = Math.min(...corners.map((point) => point.y), ...nameTops);
+	// Dotted lines may route above or left of the cards; keep the padding on every side.
+	const dx = Math.max(0, Math.ceil(PADDING - minX));
+	const dy = Math.max(0, Math.ceil(PADDING - minY));
+	const moved =
+		dx === 0 && dy === 0
+			? elements
+			: elements.map((element): SceneElement => {
+					if (element.type === "arrow")
+						return {
+							...element,
+							points: element.points.map((point) => ({ x: point.x + dx, y: point.y + dy })) as [
+								OrgPoint,
+								...OrgPoint[],
+							],
+						};
+					if (element.type === "line") return element;
+					return { ...element, x: element.x + dx, y: element.y + dy };
+				});
+	return {
+		kind: "canvas",
+		version: CANVAS_SPEC_VERSION,
+		diagramId: diagram.id,
+		title: diagram.title,
+		width: Math.ceil(Math.max(...corners.map((point) => point.x)) + dx + PADDING),
+		height: Math.ceil(Math.max(...corners.map((point) => point.y)) + dy + PADDING),
+		accentColor: diagram.style.accentColor,
+		backgroundColor: background,
+		elements: moved,
+		layers: [],
+		layouts: [],
+		zOrder: moved.map((element) => element.id),
+	};
 }
 
 /** The placement an org chart renders with, before padding: its cards, lines, regions and search. */
-export function layoutOrgChartDiagram(
-	input: OrgChartDiagram,
-): Result.Result<OrgLayout, OrgChartValidationError> {
-	return Result.map(validateOrgChartDiagram(input), (diagram) => {
-		const regions = regionRoots(diagram);
-		return layoutOrgChart(buildTrees(diagram, measureCards(diagram, regions), regions));
-	});
+export function layoutOrgChartDiagram(diagram: OrgChartDiagram): OrgLayout {
+	const regions = regionRoots(diagram);
+	return layoutOrgChart(buildTrees(diagram, measureCards(diagram, regions), regions));
 }

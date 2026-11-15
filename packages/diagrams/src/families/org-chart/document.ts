@@ -1,5 +1,7 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { Effect, Graph, String as Str, Schema, Array as Arr, Option, Result } from "effect";
+
+import { cleanToolString, slug } from "../../clean-text.js";
 
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
@@ -44,7 +46,7 @@ export interface OrgPerson extends Schema.Schema.Type<typeof OrgPerson> {}
  * `manager`, outside the solid reporting line.
  */
 export const OrgDottedLine = Schema.Struct({
-	id: Schema.NonEmptyString,
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	report: Schema.NonEmptyString,
 	manager: Schema.NonEmptyString,
 	label: Schema.optionalKey(Schema.NonEmptyString),
@@ -53,30 +55,93 @@ export const OrgDottedLine = Schema.Struct({
 export interface OrgDottedLine extends Schema.Schema.Type<typeof OrgDottedLine> {}
 
 /**
- * The canonical org chart: people and the managers they report to, with
+ * An authored org chart: people and the managers they report to, with
  * optional dotted-line reports. The renderer owns every coordinate. Every
  * surface that accepts, generates, renders or evaluates an org chart uses this
  * shape.
  */
-export const OrgChartDiagram = Schema.Struct({
-	id: Schema.NonEmptyString,
+export const OrgChartDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
-	type: Schema.Literal(orgChartDiagramType),
 	people: Schema.Array(OrgPerson).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
 	dottedLines: Schema.Array(OrgDottedLine).pipe(
 		Schema.mutable,
-		Schema.withDecodingDefault(Effect.succeed([])),
+		Schema.withDecodingDefaultKey(Effect.succeed([])),
 	),
 	/** Draw each department below the top as a labeled region around its people. */
 	groupByDepartment: Schema.optionalKey(Schema.Boolean),
 	/** Several separate trees side by side, each with a top person of its own. */
 	forest: Schema.optionalKey(Schema.Boolean),
 	style: DiagramStyle.pipe(
-		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
+		Schema.withDecodingDefaultKey(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}).annotate({ identifier: "OrgChartDiagram" });
+});
+export interface OrgChartDocument extends Schema.Schema.Type<typeof OrgChartDocument> {}
+
+/** Authored fields have one owner; rendering adds the stable id and family tag. */
+export const OrgChartDiagram = OrgChartDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+	type: Schema.Literal(orgChartDiagramType),
+	dottedLines: Schema.Array(
+		OrgDottedLine.mapFields((fields) => ({ ...fields, id: Schema.NonEmptyString })),
+	).pipe(Schema.mutable, Schema.withDecodingDefaultKey(Effect.succeed([]))),
+})).annotate({ identifier: "OrgChartDiagram" });
 
 export interface OrgChartDiagram extends Schema.Schema.Type<typeof OrgChartDiagram> {}
+
+export function normalizeOrgChart(spec: OrgChartDocument): OrgChartDiagram {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	const flag = (key: string, value: boolean | undefined) => (value ? { [key]: true } : {});
+	// An omitted id takes the next `dotted-line-<n>` no dotted line claims explicitly.
+	const used = new Set(
+		Arr.flatMap(spec.dottedLines, (line) => {
+			const id = line.id && cleanToolString(line.id);
+			return id ? [id] : [];
+		}),
+	);
+	const lineId = (index: number) => {
+		let number = index + 1;
+		while (used.has(`dotted-line-${number}`)) number += 1;
+		used.add(`dotted-line-${number}`);
+		return `dotted-line-${number}`;
+	};
+	return {
+		id:
+			((spec.id && cleanToolString(spec.id)) || undefined) ?? (slug(title) || "sketchi-org-chart"),
+		title,
+		type: orgChartDiagramType,
+		people: Arr.map(spec.people, (person) => ({
+			id: cleanToolString(person.id),
+			name: cleanToolString(person.name),
+			...optional("title", person.title),
+			...optional("department", person.department),
+			...optional("manager", person.manager),
+			...flag("assistant", person.assistant),
+			...flag("avatar", person.avatar),
+		})),
+		dottedLines: Arr.map(spec.dottedLines, (line, index) => ({
+			id: ((line.id && cleanToolString(line.id)) || undefined) ?? lineId(index),
+			report: cleanToolString(line.report),
+			manager: cleanToolString(line.manager),
+			...optional("label", line.label),
+		})),
+		...flag("groupByDepartment", spec.groupByDepartment),
+		...flag("forest", spec.forest),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+/** Resolve authored aliases before the one document decoder. */
+export function prepareOrgChart(input: unknown): Result.Result<unknown, never> {
+	return Result.succeed(
+		isRecord(input) && "spec" in input
+			? { ...input, spec: resolveOrgChartShorthand(input["spec"]) }
+			: input,
+	);
+}
 
 export const OrgChartValidationIssueCodeSchema = Schema.Literals([
 	"org_chart_too_large",
@@ -107,7 +172,7 @@ export interface OrgChartValidationIssue extends Schema.Schema.Type<
 
 /** People with no manager: the top of each tree. */
 export function orgChartRoots(diagram: Pick<OrgChartDiagram, "people">): OrgPerson[] {
-	return diagram.people.filter((person) => person.manager === undefined);
+	return Arr.filter(diagram.people, (person) => person.manager === undefined);
 }
 
 /** Each manager's direct reports and assistants, in authored order. */
@@ -126,43 +191,39 @@ export function orgChartReports(
 
 /** A person's initials for an avatar placeholder: the first letters of their first and last names. */
 export function orgPersonInitials(name: string): string {
-	const all = name
-		.trim()
-		.split(/\s+/u)
-		.filter((word) => /[\p{L}\p{N}]/u.test(word));
+	const all = Arr.filter(Str.split(Str.trim(name), /\s+/u), (word) => /[\p{L}\p{N}]/u.test(word));
 	// An honorific ahead of a name is no initial: "Dr. Sarah Okafor" is SO.
 	const words =
 		all.length > 2 && /^(dr|mr|mrs|ms|mx|prof|sir|dame)\.?$/iu.test(all[0]!) ? all.slice(1) : all;
 	const first = (word: string | undefined) => {
-		const letter = [
-			...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(word ?? ""),
-		]
-			.map((entry) => entry.segment)
-			.find((segment) => /[\p{L}\p{N}]/u.test(segment));
-		return letter?.toLocaleUpperCase() ?? "";
+		const letter = Option.getOrUndefined(
+			Arr.findFirst(
+				Arr.map(
+					[...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(word ?? "")],
+					(entry) => entry.segment,
+				),
+				(segment) => /[\p{L}\p{N}]/u.test(segment),
+			),
+		);
+		return letter === undefined ? "" : Str.toLocaleUpperCase()(letter);
 	};
 	if (words.length === 0) return "?";
 	if (words.length === 1) return first(words[0]) || "?";
 	return `${first(words[0])}${first(words.at(-1))}`;
 }
 
-/** Ids on one reporting cycle, in order, or undefined when every chain reaches a top person. */
-function reportingCycle(people: readonly OrgPerson[]): string[] | undefined {
-	const managers = new Map(people.map((person) => [person.id, person.manager]));
-	const done = new Set<string>();
-	for (const person of people) {
-		const chain: string[] = [];
-		const onChain = new Set<string>();
-		let id: string | undefined = person.id;
-		while (id !== undefined && managers.has(id) && !done.has(id)) {
-			if (onChain.has(id)) return [...chain.slice(chain.indexOf(id)), id];
-			onChain.add(id);
-			chain.push(id);
-			id = managers.get(id);
+/** Reporting edges use the final person of each id; duplicate ids have their own refusal. */
+function reportingGraph(people: readonly OrgPerson[]) {
+	// Last authored identity owns its edge; duplicates still report their own issue.
+	const byId = new Map(Arr.map(people, (person) => [person.id, person]));
+	return Graph.directed<string, undefined>((mutable) => {
+		const indices = new Map(Arr.map([...byId.keys()], (id) => [id, Graph.addNode(mutable, id)]));
+		for (const person of byId.values()) {
+			const from = indices.get(person.id);
+			const to = person.manager === undefined ? undefined : indices.get(person.manager);
+			if (from !== undefined && to !== undefined) Graph.addEdge(mutable, from, to, undefined);
 		}
-		for (const visited of chain) done.add(visited);
-	}
-	return undefined;
+	});
 }
 
 export function getOrgChartValidationIssues(diagram: OrgChartDiagram): OrgChartValidationIssue[] {
@@ -185,9 +246,9 @@ export function getOrgChartValidationIssues(diagram: OrgChartDiagram): OrgChartV
 			"Keep the dotted-line reports the request states.",
 		);
 	const ids = new Set<string>();
-	people.forEach((person, index) => {
+	Arr.forEach(people, (person, index) => {
 		const path = `people.[${index}]`;
-		if (person.id.includes(":"))
+		if (Str.includes(":")(person.id))
 			push(
 				"invalid_person_id",
 				`${path}.id`,
@@ -203,7 +264,7 @@ export function getOrgChartValidationIssues(diagram: OrgChartDiagram): OrgChartV
 			);
 		ids.add(person.id);
 		const long = (field: string, value: string | undefined, limit: number) => {
-			if (value !== undefined && value.trim().length > limit)
+			if (value !== undefined && Str.trim(value).length > limit)
 				push(
 					"org_text_too_long",
 					`${path}.${field}`,
@@ -216,7 +277,7 @@ export function getOrgChartValidationIssues(diagram: OrgChartDiagram): OrgChartV
 		long("department", person.department, ORG_CHART_MAX_DEPARTMENT_LENGTH);
 	});
 	const reports = orgChartReports(diagram);
-	people.forEach((person, index) => {
+	Arr.forEach(people, (person, index) => {
 		const path = `people.[${index}]`;
 		if (person.manager === undefined) {
 			if (person.assistant)
@@ -250,12 +311,20 @@ export function getOrgChartValidationIssues(diagram: OrgChartDiagram): OrgChartV
 				"An assistant sits beside their manager with no reports; drop assistant: true to draw them as a manager.",
 			);
 	});
-	const cycle = reportingCycle(people);
+	const graph = reportingGraph(people);
+	const cycle = Option.getOrUndefined(
+		Option.map(Graph.findCycle(graph), (found) =>
+			Arr.reverse(Arr.map(found.path, (index) => Option.getOrThrow(Graph.getNode(graph, index)))),
+		),
+	);
 	if (cycle)
 		push(
 			"reporting_cycle",
-			`people.[${people.findIndex((person) => person.id === cycle[0])}].manager`,
-			`Reporting lines run in a cycle: ${cycle.join(" → ")}.`,
+			`people.[${Option.getOrElse(
+				Arr.findFirstIndex(people, (person) => person.id === cycle[0]),
+				() => -1,
+			)}].manager`,
+			`Reporting lines run in a cycle: ${Arr.join(cycle, " → ")}.`,
 			"Every chain of managers ends at a top person with no manager; remove one manager on the cycle.",
 		);
 	const roots = orgChartRoots(diagram);
@@ -263,25 +332,27 @@ export function getOrgChartValidationIssues(diagram: OrgChartDiagram): OrgChartV
 		push(
 			"multiple_roots",
 			`people.[${people.indexOf(roots[1]!)}].manager`,
-			`${roots.length} people have no manager: ${roots
-				.slice(0, 4)
-				.map((person) => `"${person.id}"`)
-				.join(", ")}${roots.length > 4 ? ", …" : ""}.`,
+			`${roots.length} people have no manager: ${Arr.join(
+				Arr.map(roots.slice(0, 4), (person) => `"${person.id}"`),
+				", ",
+			)}${roots.length > 4 ? ", …" : ""}.`,
 			"Give everyone but the top person a manager, or set forest: true to draw separate trees.",
 		);
-	const byId = new Map(people.map((person) => [person.id, person]));
+	const byId = new Map(Arr.map(people, (person) => [person.id, person]));
 	// Depth walks the same graph the cycle check does: the last person of each id.
 	if (!cycle && roots.length > 0) {
-		const depthOf = new Map<string, number>();
-		const depth = (person: OrgPerson): number => {
-			const known = depthOf.get(person.id);
-			if (known !== undefined) return known;
-			const manager = person.manager === undefined ? undefined : byId.get(person.manager);
-			const value = manager && manager.id !== person.id ? depth(manager) + 1 : 1;
-			depthOf.set(person.id, value);
-			return value;
-		};
-		const deepest = Math.max(...people.map(depth));
+		const terminals = Graph.findNodes(graph, (id) => {
+			const manager = byId.get(id)?.manager;
+			return manager === undefined || !byId.has(manager);
+		});
+		const deepest =
+			1 +
+			Math.max(
+				0,
+				...Arr.flatMap(terminals, (start) => [
+					...Graph.unweightedDistances(graph, start, { direction: "incoming" }).values(),
+				]),
+			);
 		if (deepest > ORG_CHART_MAX_DEPTH)
 			push(
 				"org_chart_too_large",
@@ -292,7 +363,7 @@ export function getOrgChartValidationIssues(diagram: OrgChartDiagram): OrgChartV
 	}
 	const lineIds = new Set<string>();
 	const pairs = new Set<string>();
-	dottedLines.forEach((line, index) => {
+	Arr.forEach(dottedLines, (line, index) => {
 		const path = `dottedLines.[${index}]`;
 		if (lineIds.has(line.id))
 			push(
@@ -333,7 +404,7 @@ export function getOrgChartValidationIssues(diagram: OrgChartDiagram): OrgChartV
 				"Draw each dotted-line report once.",
 			);
 		pairs.add(pair);
-		if (line.label !== undefined && line.label.trim().length > ORG_CHART_MAX_LABEL_LENGTH)
+		if (line.label !== undefined && Str.trim(line.label).length > ORG_CHART_MAX_LABEL_LENGTH)
 			push(
 				"org_text_too_long",
 				`${path}.label`,
@@ -381,7 +452,7 @@ export function parseOrgChartDiagram(
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
+	typeof value === "object" && value !== null && !Arr.isArray(value);
 
 /** The first of `keys` a record sets, removed from `rest`. */
 function take(rest: Record<string, unknown>, keys: readonly string[]): unknown {
@@ -426,20 +497,20 @@ export function resolveOrgChartShorthand(input: unknown): unknown {
 	const extraDotted: Record<string, unknown>[] = [];
 	// A person may list their direct reports by id instead of each report naming them.
 	const listedManagers = new Map<unknown, unknown>();
-	if (Array.isArray(listed))
+	if (Arr.isArray(listed))
 		for (const person of listed)
 			if (isRecord(person))
 				for (const key of ["directReports", "reports"])
-					if (Array.isArray(person[key]))
-						for (const report of person[key] as unknown[])
+					if (Arr.isArray(person[key]))
+						for (const report of person[key])
 							if (typeof report === "string" && !listedManagers.has(report))
 								listedManagers.set(report, person["id"]);
-	const people = Array.isArray(listed)
-		? listed.map((person) => {
+	const people = Arr.isArray(listed)
+		? Arr.map(listed, (person) => {
 				if (!isRecord(person)) return person;
 				const rest: Record<string, unknown> = { ...person };
-				if (Array.isArray(rest["directReports"])) delete rest["directReports"];
-				if (Array.isArray(rest["reports"])) delete rest["reports"];
+				if (Arr.isArray(rest["directReports"])) delete rest["directReports"];
+				if (Arr.isArray(rest["reports"])) delete rest["reports"];
 				const manager = take(rest, MANAGER_KEYS) ?? listedManagers.get(rest["id"]);
 				const title = take(rest, TITLE_KEYS);
 				const department = take(rest, DEPARTMENT_KEYS);
@@ -451,7 +522,7 @@ export function resolveOrgChartShorthand(input: unknown): unknown {
 					delete rest["kind"];
 					delete rest["type"];
 				}
-				for (const target of Array.isArray(dotted) ? dotted : dotted === undefined ? [] : [dotted])
+				for (const target of Arr.isArray(dotted) ? dotted : dotted === undefined ? [] : [dotted])
 					extraDotted.push(
 						isRecord(target)
 							? { report: rest["id"], ...target }
@@ -467,16 +538,23 @@ export function resolveOrgChartShorthand(input: unknown): unknown {
 			})
 		: listed;
 	// Explicit reporting lines set each report's manager, unless the person already names one.
-	const lines = [reportingLines, reports, edges].find(Array.isArray) as unknown[] | undefined;
+	const lines = Option.getOrUndefined(
+		Arr.findFirst([reportingLines, reports, edges], (value): value is unknown[] =>
+			Arr.isArray(value),
+		),
+	);
 	const resolvedPeople =
-		Array.isArray(people) && lines
-			? people.map((person) => {
+		Arr.isArray(people) && lines
+			? Arr.map(people, (person) => {
 					if (!isRecord(person) || person["manager"] !== undefined) return person;
-					const line = lines.find(
-						(entry) =>
-							isRecord(entry) &&
-							(entry["report"] ?? entry["to"] ?? entry["target"]) === person["id"] &&
-							entry["dotted"] !== true,
+					const line = Option.getOrUndefined(
+						Arr.findFirst(
+							lines,
+							(entry) =>
+								isRecord(entry) &&
+								(entry["report"] ?? entry["to"] ?? entry["target"]) === person["id"] &&
+								entry["dotted"] !== true,
+						),
 					);
 					const manager = isRecord(line)
 						? (line["manager"] ?? line["from"] ?? line["source"])
@@ -484,30 +562,31 @@ export function resolveOrgChartShorthand(input: unknown): unknown {
 					return manager === undefined ? person : { ...person, manager };
 				})
 			: people;
-	const fromLines = (lines ?? []).filter(
+	const fromLines = Arr.filter(
+		lines ?? [],
 		(entry): entry is Record<string, unknown> => isRecord(entry) && entry["dotted"] === true,
 	);
 	const dottedInput = chart["dottedLines"];
 	const dottedList = [
 		// One dotted line written alone is a list of one, which the decoder checks like any other.
-		...(Array.isArray(dottedInput)
+		...(Arr.isArray(dottedInput)
 			? dottedInput
 			: dottedInput === undefined || dottedInput === null
 				? []
 				: [dottedInput]),
 		...extraDotted,
-		...fromLines.map(({ dotted: _dotted, ...line }) => ({
+		...Arr.map(fromLines, ({ dotted: _dotted, ...line }) => ({
 			report: line["report"] ?? line["to"] ?? line["target"],
 			manager: line["manager"] ?? line["from"] ?? line["source"],
 			...(line["label"] === undefined ? {} : { label: line["label"] }),
 		})),
 	];
 	const used = new Set(
-		dottedList.flatMap((line) =>
+		Arr.flatMap(dottedList, (line) =>
 			isRecord(line) && typeof line["id"] === "string" ? [line["id"]] : [],
 		),
 	);
-	const dottedLines = dottedList.map((line) => {
+	const dottedLines = Arr.map(dottedList, (line) => {
 		if (!isRecord(line)) return line;
 		const { from, to, source, target, person, employee, ...rest } = line;
 		const resolved: Record<string, unknown> = {
@@ -517,10 +596,10 @@ export function resolveOrgChartShorthand(input: unknown): unknown {
 		};
 		for (const key of ["report", "manager"]) if (resolved[key] === undefined) delete resolved[key];
 		if (typeof resolved["id"] !== "string" || resolved["id"].length === 0) {
-			const base = `${String(resolved["report"])}-dotted-${String(resolved["manager"])}`.replace(
+			const base = Str.replace(
 				/[^\w-]+/gu,
 				"-",
-			);
+			)(`${String(resolved["report"])}-dotted-${String(resolved["manager"])}`);
 			let id = base;
 			for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
 			used.add(id);
@@ -594,7 +673,7 @@ export function counts(diagram: OrgChartDiagram) {
 		nodeCount: diagram.people.length,
 		nodeNoun: "people",
 		edgeCount:
-			diagram.people.filter((person) => person.manager !== undefined).length +
+			Arr.filter(diagram.people, (person) => person.manager !== undefined).length +
 			diagram.dottedLines.length,
 		edgeNoun: "reporting lines",
 	};

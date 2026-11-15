@@ -33,7 +33,7 @@ import {
 import { Context, Effect, Schema } from "effect";
 
 import { cleanToolString } from "../../clean-text.js";
-import { type CodeModeIssue } from "../result.js";
+import { type PublishedBuildIssue } from "../result.js";
 
 /** One catalog mark that diagrams may draw inside a node. */
 export interface CodeModeCatalogIcon {
@@ -229,7 +229,7 @@ export function undrawableIconIssue(input: {
 	readonly id: string;
 	readonly path: string;
 	readonly problem: string;
-}): CodeModeIssue {
+}): typeof PublishedBuildIssue.Type {
 	return {
 		code: "icon_dropped",
 		severity: "warning",
@@ -465,9 +465,9 @@ function suggestionHint(catalog: CodeModeIconCatalog, slug: string): string {
 function unknownIconIssue(input: {
 	readonly catalog: CodeModeIconCatalog | undefined;
 	readonly message: string;
-	readonly ref: CodeModeIssue["ref"];
+	readonly ref: (typeof PublishedBuildIssue.Type)["ref"];
 	readonly slug: string;
-}): CodeModeIssue {
+}): typeof PublishedBuildIssue.Type {
 	return {
 		code: "unknown_icon",
 		severity: "warning",
@@ -502,8 +502,8 @@ export function resolveNodeIcons<
 	/** Sequence diagrams draw logos on participants rather than nodes. */
 	owner: { readonly noun: string; readonly path: string } = { noun: "node", path: "nodes" },
 	policy: { readonly fillNamedLogos?: boolean } = {},
-): { readonly issues: CodeModeIssue[]; readonly nodes: Node[] } {
-	const issues: CodeModeIssue[] = [];
+): { readonly issues: (typeof PublishedBuildIssue.Type)[]; readonly nodes: Node[] } {
+	const issues: (typeof PublishedBuildIssue.Type)[] = [];
 	const resolved = nodes.map((node) => {
 		if (!node.icon) return node;
 		const found = iconRefSlug(node.icon);
@@ -581,9 +581,12 @@ export function resolveFlowchartLogos(
 		>;
 	},
 	catalog: CodeModeIconCatalog | undefined,
-): { readonly issues: CodeModeIssue[]; readonly icons: ReadonlyMap<string, string> } {
+): {
+	readonly issues: (typeof PublishedBuildIssue.Type)[];
+	readonly icons: ReadonlyMap<string, string>;
+} {
 	const icons = new Map<string, string>();
-	const issues: CodeModeIssue[] = [];
+	const issues: (typeof PublishedBuildIssue.Type)[] = [];
 	for (const [id, node] of Object.entries(document.nodes)) {
 		const label = typeof node === "string" ? node : node.label;
 		const requested = typeof node === "string" ? undefined : node.icon;
@@ -701,9 +704,12 @@ export function fillGroupLogos(
 	nodes: readonly { readonly group?: string; readonly icon?: { readonly slug: string } }[],
 	catalog: CodeModeIconCatalog | undefined,
 	policy: { readonly fillNamedLogos?: boolean } = {},
-): { readonly issues: CodeModeIssue[]; readonly logos: ReadonlyMap<string, string> } {
+): {
+	readonly issues: (typeof PublishedBuildIssue.Type)[];
+	readonly logos: ReadonlyMap<string, string>;
+} {
 	const logos = new Map<string, string>();
-	const issues: CodeModeIssue[] = [];
+	const issues: (typeof PublishedBuildIssue.Type)[] = [];
 	if (!groups?.length || !policy.fillNamedLogos || !catalog || !nodes.some((node) => node.icon)) {
 		return { issues, logos };
 	}
@@ -752,7 +758,7 @@ function droppedIconIssue(input: {
 	readonly dropped: DroppedCanvasIcon;
 	readonly element: CanvasSpec["elements"][number] | undefined;
 	readonly known: boolean;
-}): CodeModeIssue {
+}): typeof PublishedBuildIssue.Type {
 	const { dropped, element } = input;
 	const standalone = element?.type === "icon";
 	const ref = {

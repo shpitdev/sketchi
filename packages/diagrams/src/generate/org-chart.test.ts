@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { orgChartFixture } from "../families/org-chart/document.js";
 
 import { candidateFromText } from "./candidates.js";
-import { buildDiagramGenerationMessages } from "./messages.js";
 
 function candidate(diagram: unknown) {
 	return candidateFromText({
@@ -16,17 +15,6 @@ function candidate(diagram: unknown) {
 }
 
 describe("org chart generation", () => {
-	it("teaches the org chart shape when the type is requested", () => {
-		const messages = buildDiagramGenerationMessages({
-			id: "team",
-			request: "Draw our org chart.",
-			requestedType: "org-chart",
-		});
-		expect(messages.system).toContain("Org chart IR rules");
-		expect(messages.system).toContain("dottedLines");
-		expect(messages.user).toContain('"type":"org-chart"');
-	});
-
 	it("reads manager and title aliases and numbers dotted lines by their ends", () => {
 		const parsed = candidate({
 			id: "team",

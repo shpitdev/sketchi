@@ -68,9 +68,10 @@ describe("org chart layout work", () => {
 		(_, diagram, attempts, comparisons, wraps) => {
 			work.comparisons = 0;
 			work.wraps = 0;
-			const layout = layoutOrgChartDiagram(diagram).pipe(Result.getOrThrow);
+			const layout = layoutOrgChartDiagram(diagram);
 			const counted = { ...work };
-			renderOrgChartDiagram(diagram).pipe(Result.getOrThrow);
+			if (diagram === largest) expect(layoutOrgChartDiagram(diagram)).toEqual(layout);
+			renderOrgChartDiagram(diagram);
 			expect(layout.attempts).toBeLessThanOrEqual(attempts);
 			expect(counted.comparisons).toBeLessThan(comparisons);
 			expect(counted.wraps).toBeLessThan(wraps);

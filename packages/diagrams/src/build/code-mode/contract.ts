@@ -642,49 +642,6 @@ export const ClassSpec = Schema.Struct({
 
 export interface ClassSpec extends Schema.Schema.Type<typeof ClassSpec> {}
 
-/**
- * The authoring form of diagram-core's canonical OrgChartDiagram: dotted-line
- * ids are optional and style is defaulted. buildOrgChart normalizes it into the
- * core contract, which owns every invariant.
- */
-export const OrgPersonSpec = Schema.Struct({
-	id: RequiredNonEmptyString,
-	name: RequiredNonEmptyString,
-	title: optionalContract(NonEmptyString),
-	department: optionalContract(NonEmptyString),
-	manager: optionalContract(NonEmptyString),
-	assistant: optionalContract(Schema.Boolean),
-	avatar: optionalContract(Schema.Boolean),
-}).annotate({ identifier: undefined });
-
-export interface OrgPersonSpec extends Schema.Schema.Type<typeof OrgPersonSpec> {}
-
-export const OrgDottedLineSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	report: RequiredNonEmptyString,
-	manager: RequiredNonEmptyString,
-	label: optionalContract(NonEmptyString),
-}).annotate({ identifier: undefined });
-
-export interface OrgDottedLineSpec extends Schema.Schema.Type<typeof OrgDottedLineSpec> {}
-
-const orgDottedLinesDefault: Array<typeof OrgDottedLineSpec.Encoded> = [];
-const OrgDottedLinesWithDefault = Schema.Array(OrgDottedLineSpec)
-	.pipe(Schema.mutable)
-	.annotate({ default: orgDottedLinesDefault })
-	.pipe(Schema.withDecodingDefaultKey(Effect.succeed(orgDottedLinesDefault)));
-export const OrgChartSpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	people: requiredArray(nonEmptyArray(OrgPersonSpec)),
-	dottedLines: OrgDottedLinesWithDefault,
-	groupByDepartment: optionalContract(Schema.Boolean),
-	forest: optionalContract(Schema.Boolean),
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface OrgChartSpec extends Schema.Schema.Type<typeof OrgChartSpec> {}
-
 /** One component of a wireframe screen, as a model writes it. */
 export interface WireframeComponentInput {
 	type: (typeof WIREFRAME_COMPONENT_TYPES)[number];
@@ -912,22 +869,6 @@ export const BuildClassDiagramToolInputSchema = Schema.Struct({
 	spec: requiredObject(ClassToolSpecSchema),
 });
 export type BuildClassDiagramToolInput = typeof BuildClassDiagramToolInputSchema.Type;
-export const BuildOrgChartRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(OrgChartSpec),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildOrgChartRequest extends Schema.Schema.Type<typeof BuildOrgChartRequest> {}
-/** The org chart spec a model authors; style is always the Sketchi palette. */
-export const OrgChartToolSpecSchema = OrgChartSpec.mapFields(
-	({ style: _style, ...fields }) => fields,
-);
-export const BuildOrgChartToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(OrgChartToolSpecSchema),
-});
-export type BuildOrgChartToolInput = typeof BuildOrgChartToolInputSchema.Type;
 export const BuildWireframeRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(WireframeSpec),
@@ -1533,18 +1474,6 @@ const NormalizedClassSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedClassSpec = typeof NormalizedClassSpecSchema.Type;
-const NormalizedOrgChartSpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	people: Schema.Array(OrgPersonSpec).pipe(Schema.mutable),
-	dottedLines: Schema.Array(
-		OrgDottedLineSpec.mapFields((fields) => ({ ...fields, id: NonEmptyString })),
-	).pipe(Schema.mutable),
-	groupByDepartment: optionalContract(Schema.Boolean),
-	forest: optionalContract(Schema.Boolean),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
-export type NormalizedOrgChartSpec = typeof NormalizedOrgChartSpecSchema.Type;
 const NormalizedWireframeSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -1742,44 +1671,6 @@ export const BuildClassDiagramResultSchema = Schema.Union([
 	BuildClassDiagramRejected,
 ]);
 export type BuildClassDiagramResult = typeof BuildClassDiagramResultSchema.Type;
-
-export const BuildOrgChartAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedOrgChartSpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildOrgChartAccepted extends Schema.Schema.Type<typeof BuildOrgChartAccepted> {}
-export const BuildOrgChartRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_org_chart",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedOrgChartSpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildOrgChartRejected extends Schema.Schema.Type<typeof BuildOrgChartRejected> {}
-export const BuildOrgChartResultSchema = Schema.Union([
-	BuildOrgChartAccepted,
-	BuildOrgChartRejected,
-]);
-export type BuildOrgChartResult = typeof BuildOrgChartResultSchema.Type;
 
 export const BuildWireframeAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

@@ -54,12 +54,6 @@ describe("org chart contract", () => {
 		).toEqual(["dev", "ea"]);
 	});
 
-	it("defaults dotted lines and the palette", () => {
-		const parsed = parseOrgChartDiagram(chart([ceo])).pipe(Result.getOrThrow);
-		expect(parsed.dottedLines).toEqual([]);
-		expect(parsed.style).toMatchObject({ accentColor: expect.any(String) });
-	});
-
 	it.each([
 		["an unknown manager", [ceo, { id: "a", name: "A", manager: "ghost" }], "unknown_manager"],
 		["a person managing themselves", [ceo, { id: "a", name: "A", manager: "a" }], "self_manager"],

@@ -10,8 +10,6 @@ import {
 	BuildErDiagramToolInputSchema,
 	BuildClassDiagramResultSchema,
 	BuildClassDiagramToolInputSchema,
-	BuildOrgChartResultSchema,
-	BuildOrgChartToolInputSchema,
 	BuildWireframeResultSchema,
 	BuildWireframeToolInputSchema,
 	RenderedDiagramSceneSchema,
@@ -19,7 +17,6 @@ import {
 	type BuildStateMachineResult,
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
-	type BuildOrgChartResult,
 	type BuildWireframeResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
 
@@ -41,7 +38,7 @@ export type StudioBuildResult =
 	| ReturnType<typeof familyForType<"gantt">>["contracts"]["output"]["Type"]
 	| BuildErDiagramResult
 	| BuildClassDiagramResult
-	| BuildOrgChartResult
+	| ReturnType<typeof familyForType<"org-chart">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"venn">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"journey">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"sankey">>["contracts"]["output"]["Type"]
@@ -165,9 +162,9 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_org_chart": {
 		family: "org-chart",
-		decodeResult: Schema.decodeUnknownResult(BuildOrgChartResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("org-chart").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildOrgChartToolInputSchema)(input);
+			const decoded = Schema.decodeUnknownResult(familyForType("org-chart").studioInput)(input);
 			return Result.isSuccess(decoded)
 				? decoded.success.spec.people.map((person) => person.name)
 				: [];

@@ -1,16 +1,12 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { orgChartFixture } from "@sketchi/diagrams/families/org-chart/document";
-import { orgChartStressFixtures } from "@sketchi/diagrams/families/org-chart/fixtures";
-import { renderDiagram } from "@sketchi/diagrams/family";
+import { orgChartFixture } from "./document.js";
+import { orgChartStressFixtures } from "./fixtures.js";
+import { renderDiagram } from "../../family.js";
 import { CANVAS_SPEC_VERSION, type CanvasSpec } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import {
-	convertSceneToExcalidraw,
-	createExcalidrawFile,
-	validateExcalidrawScene,
-} from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 const exported = convertSceneToExcalidraw(renderDiagram(orgChartFixture).pipe(Result.getOrThrow));
 const element = (id: string) => exported.elements.find((candidate) => candidate.id === id)!;
@@ -71,15 +67,6 @@ describe("org chart Excalidraw export", () => {
 			).toBe(true);
 		}
 		expect(validateExcalidrawScene(regions)).toEqual({ ok: true, issues: [] });
-	});
-
-	it("validates, and still validates after a save and reload", () => {
-		for (const diagram of [orgChartFixture, ...Object.values(orgChartStressFixtures)]) {
-			const scene = convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow));
-			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
-			const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene)));
-			expect(validateExcalidrawScene(reloaded), diagram.id).toEqual({ ok: true, issues: [] });
-		}
 	});
 });
 

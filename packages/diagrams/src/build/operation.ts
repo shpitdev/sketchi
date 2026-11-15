@@ -8,6 +8,7 @@ import {
 import { ArtifactBundleSchema, PartialArtifactBundleSchema } from "@sketchi/drawing/artifacts";
 import {
 	BuildOptions,
+	PublishedBuildIssue,
 	CodeModeIssue,
 	CodeModeIssueCodeSchema,
 	QualityReportSchema,
@@ -55,7 +56,7 @@ export function defineBuild<
 	readonly check: (document: N) => Result.Result<unknown, E>;
 	readonly issues: (error: E) => CodeModeIssue[];
 	readonly counts: (document: N) => DiagramCounts;
-	readonly warnings?: (document: N) => CodeModeIssue[];
+	readonly warnings?: (document: N) => (typeof PublishedBuildIssue.Type)[];
 	readonly assess?: (document: N, threshold: number) => QualityReport;
 	readonly assessScene?: (document: N, scene: CanvasSpec, quality: QualityReport) => QualityReport;
 	readonly qualityIssue?: { readonly code: CodeModeIssueCode; readonly hint: string };
@@ -63,10 +64,13 @@ export function defineBuild<
 	readonly resolve?: (document: D) => Effect.Effect<
 		{
 			readonly document: N;
-			readonly issues: CodeModeIssue[];
+			readonly issues: (typeof PublishedBuildIssue.Type)[];
 			readonly render: (
 				scene: CanvasSpec,
-			) => Effect.Effect<{ readonly scene: CanvasSpec; readonly issues: CodeModeIssue[] }>;
+			) => Effect.Effect<{
+				readonly scene: CanvasSpec;
+				readonly issues: (typeof PublishedBuildIssue.Type)[];
+			}>;
 		},
 		never,
 		R
@@ -114,7 +118,7 @@ export function defineBuild<
 		normalizedSpec: policy.normalized,
 		quality: QualityReportSchema,
 		artifact: ArtifactBundleSchema,
-		issues: Rejected.fields.issues,
+		issues: Schema.Array(PublishedBuildIssue).pipe(Schema.mutable),
 	});
 	const Reason = Schema.TaggedUnion({
 		Input: { error: Schema.declare(Schema.isSchemaError) },
