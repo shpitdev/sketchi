@@ -1,7 +1,10 @@
-import { FLOWCHART_NODE_COLORS, type FlowchartNodeColor,
+import {
+	FLOWCHART_NODE_COLORS,
+	type FlowchartNodeColor,
 	flowchartNodeDetails,
 	resolveFlowchartReference,
-	type FlowchartDocument } from "../families/flowchart/document.js";
+	type FlowchartDocument,
+} from "../families/flowchart/document.js";
 import { Result, Schema } from "effect";
 
 import { isUnknownRecord } from "./unknown-record.js";

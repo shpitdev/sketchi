@@ -61,14 +61,13 @@ function testBoundary(env: StudioEnv, request: Request) {
 }
 
 function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
+	const family = familyForType("flowchart");
 	return runPlaygroundEffect(
 		handleFamilyBuildRequest(
 			{
-				...familyForType("flowchart"),
+				...family,
 				build: () => () =>
-					Effect.succeed(
-						runtimeResults.getBuildFlowchart() as import("@sketchi/diagrams/build/code-mode/contract").BuildFlowchartResult,
-					),
+					Effect.succeed(runtimeResults.getBuildFlowchart() as typeof family.contracts.output.Type),
 			},
 			request,
 		),

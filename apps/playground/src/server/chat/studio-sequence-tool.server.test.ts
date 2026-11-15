@@ -53,7 +53,7 @@ function deterministicRuntime() {
 		);
 	return {
 		build: (input: unknown) => provide(buildResponse(buildSequenceDiagram(input))),
-		buildFlowchart: (input: unknown) => provide(buildFlowchart(input)),
+		buildFlowchart: (input: unknown) => provide(buildResponse(buildFlowchart(input))),
 		writes: () => write.mock.calls.length,
 	};
 }

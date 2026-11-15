@@ -1,6 +1,6 @@
 import { inputIssues, formatContractSchemaError } from "../../build/input.js";
 /** Owns Flowchart build policy; decoding, quality gates and artifact delivery use the common operation. */
-import { Effect, Result, Schema, SchemaIssue } from "effect";
+import { Effect, Result, Schema } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import { CodeModeIssue, qualityIssues } from "../../build/result.js";
 import {
@@ -92,23 +92,20 @@ export const flowchartBuild = defineBuild({
 	counts,
 	issues: (error): CodeModeIssue[] =>
 		Schema.isSchemaError(error)
-			? SchemaIssue.makeFormatterStandardSchemaV1()(error.issue)
-					.issues.slice(0, FLOWCHART_MAX_ISSUES)
+			? inputIssues(
+					formatContractSchemaError(error),
+					() =>
+						"Give every title, label, id and note visible text, not only spaces or tool-call debris.",
+				)
+					.slice(0, FLOWCHART_MAX_ISSUES)
 					.map((entry) => ({
-						code: "invalid_type",
-						severity: "error",
+						...entry,
 						stage: "flowchart",
 						ref: {
 							kind: "diagram",
-							path: [
-								"spec",
-								...(entry.path ?? []).map((part) =>
-									String(typeof part === "object" ? part.key : part),
-								),
-							].join("."),
+							path:
+								entry.ref?.path && entry.ref.path !== "input" ? `spec.${entry.ref.path}` : "spec",
 						},
-						message: entry.message,
-						hint: "Give every title, label, id and note visible text, not only spaces or tool-call debris.",
 					}))
 			: error.issues.map((entry) => ({
 					code: entry.code,

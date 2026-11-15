@@ -259,7 +259,7 @@ const consider = (
 	readable = false,
 ) => {
 	const { renderOptions, levels } = search;
-	
+
 	const layout = layoutDiagram(search.layoutGraph, renderOptions, levels[0]!, arrangement);
 	const defects = defectsOf(layout);
 	if (
@@ -314,8 +314,9 @@ const finished = (search: LayoutSearch, settled: DiagramLayout) =>
 // an end are polished where that draws no worse: last, after every choice.
 // The ends' polish, from the straight runs on:
 const polished = (search: LayoutSearch, drawn: DiagramLayout, nest = true) => {
+	const diagram = search.layoutGraph.input;
 	const { renderOptions, orthogonal } = search;
-	
+
 	const finish = (layout: DiagramLayout) => finished(search, layout);
 	const polishedEnds = (arrived: DiagramLayout) =>
 		stepsClearOfEnds(
@@ -422,8 +423,9 @@ function settleWithPolishFallback(
 
 /** 2. Try crossing repair, then reduced ranks only while crossings remain. */
 function repairInitialCrossings(search: LayoutSearch): void {
+	const diagram = search.layoutGraph.input;
 	const { repairable } = search;
-	
+
 	// Crossing repairs are tried only where the polished router crossed: arrival
 	// order and moved arrivals stay when they route no worse, and reordered ranks
 	// only when they route with fewer crossings.
@@ -438,8 +440,9 @@ function repairInitialCrossings(search: LayoutSearch): void {
 
 /** 3. Wrap long flows or lane pools, then compare gap and line-break continuations. */
 function wrapFlow(search: LayoutSearch): boolean {
+	const diagram = search.layoutGraph.input;
 	const { arranged, orthogonal, repairable } = search;
-	
+
 	const { aspect, balance, tooLong } = lengthOf(search, search.best.layout);
 	// Lanes wrap into pools only past the extreme aspect: a pool split apart reads
 	// worse than one long pool.
@@ -517,8 +520,9 @@ function layGroupsAcrossFlow(search: LayoutSearch, tooLong: boolean): void {
 
 /** 5. Compare zone/frame bands, around-rank routes and room for outline clearance. */
 function wrapZones(search: LayoutSearch): void {
+	const diagram = search.layoutGraph.input;
 	const { renderOptions, levels, arranged, orthogonal, repairable } = search;
-	
+
 	const structure = search.layoutGraph.groups;
 	// A grouped flow still too long wraps level by level, each band reading in the
 	// stated direction and each group a whole block of its level, since a band cut
@@ -793,8 +797,9 @@ function wrapZones(search: LayoutSearch): void {
 
 /** 6. Repair and tighten the winner, clear heads/touches, then judge fully drawn rivals. */
 function polishAndClear(search: LayoutSearch): DiagramLayout {
+	const diagram = search.layoutGraph.input;
 	const { renderOptions, levels, arranged, orthogonal, vertical, repairable } = search;
-	
+
 	const structure = search.layoutGraph.groups;
 	// In lanes a step takes lines in and sends them out by different sides, when
 	// that routes no worse.

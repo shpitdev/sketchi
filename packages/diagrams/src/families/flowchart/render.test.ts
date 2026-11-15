@@ -1,4 +1,4 @@
-import { FlowchartDiagram, FLOWCHART_NODE_COLORS,flowchartDiagramFromSpec } from "./document.js";
+import { FlowchartDiagram, FLOWCHART_NODE_COLORS, flowchartDiagramFromSpec } from "./document.js";
 import { Schema } from "effect";
 import type {
 	CanvasConnectorElement as ArrowSceneElement,

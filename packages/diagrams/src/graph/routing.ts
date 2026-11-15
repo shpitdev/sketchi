@@ -983,7 +983,6 @@ export function resideArrivals(
 	scale: number,
 	trigger: "hooked" | "crossed" | "cornered",
 ): { route: RoutedEdge; side: ConnectionEdge }[] {
-	
 	const feedback = layoutGraph.feedback;
 	const ends = sideEnds(routes);
 	const used = new Set(ends.keys());

@@ -749,7 +749,8 @@ export function assignDirectFeedbackPorts(
 	nodes: readonly NodeSceneElement[],
 	repairForward = false,
 ): { offsets: Map<string, number>; minimumSizes: Map<string, { width: number; height: number }> } {
-	
+	const diagram = layoutGraph.input;
+
 	const minimumSizes = new Map<string, { width: number; height: number }>();
 	const feedback = layoutGraph.feedback;
 	const sides: ConnectionEdge[] =
@@ -1125,7 +1126,6 @@ export function assignFeedbackSides(
 	routes: RoutedEdge[],
 	directionOf: (route: RoutedEdge) => LayoutDirection = () => layoutGraph.input.layout.direction,
 ): void {
-	
 	const feedback = layoutGraph.feedback;
 	for (const route of routes.filter((r) => feedback.has(r.edge.id) && !isSelfLoop(r))) {
 		const direction = directionOf(route);

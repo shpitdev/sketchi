@@ -37,7 +37,7 @@ describe("ExcalidrawWorkspace", () => {
 		);
 	});
 
-	it("copies the active IR and exposes a scene download", async () => {
+	it("copies the active document and exposes a scene download", async () => {
 		const writeText = vi.fn().mockResolvedValue(undefined);
 		Object.defineProperty(navigator, "clipboard", {
 			configurable: true,
@@ -46,7 +46,7 @@ describe("ExcalidrawWorkspace", () => {
 
 		render(<ExcalidrawWorkspace diagrams={[flowchartFixture]} />);
 
-		fireEvent.click(screen.getByRole("button", { name: "Copy IR" }));
+		fireEvent.click(screen.getByRole("button", { name: "Copy document" }));
 
 		await waitFor(() => {
 			expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"id": "onboarding-flow"'));
@@ -67,11 +67,11 @@ describe("ExcalidrawWorkspace", () => {
 
 		render(<ExcalidrawWorkspace diagrams={[flowchartFixture, mindmapFixture]} />);
 
-		fireEvent.click(screen.getByRole("button", { name: "Copy IR" }));
+		fireEvent.click(screen.getByRole("button", { name: "Copy document" }));
 		expect(await screen.findByRole("button", { name: "Copied" })).toBeTruthy();
 
 		fireEvent.click(screen.getByRole("button", { name: /Public mindmap generation/ }));
-		expect(screen.getByRole("button", { name: "Copy IR" })).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Copy document" })).toBeTruthy();
 
 		fireEvent.click(screen.getByRole("button", { name: /Sketchi onboarding decision flow/ }));
 		expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();

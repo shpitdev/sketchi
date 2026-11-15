@@ -1,4 +1,3 @@
-
 import { exportToBlob } from "@excalidraw/excalidraw";
 import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
 import { embedCanvasIcons } from "@sketchi/drawing";

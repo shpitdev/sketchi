@@ -16,7 +16,7 @@ import {
 	resolveFlowchartReferences,
 	type FlowchartDocument,
 	FlowchartNodeShapeSchema,
-	FlowchartZoneKindSchema
+	FlowchartZoneKindSchema,
 } from "../families/flowchart/document.js";
 import {
 	applyFlowchartEdits,

@@ -5,7 +5,7 @@ import {
 	type FlowchartZoneKind,
 	type FlowchartDiagram,
 	type FlowchartNodeKind,
-	parseFlowchartDiagram
+	parseFlowchartDiagram,
 } from "@sketchi/diagrams/families/flowchart/document";
 import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 

@@ -1,4 +1,5 @@
 import { type FlowchartDocument } from "@sketchi/diagrams/families/flowchart/document";
+import { buildResponse } from "@sketchi/diagrams/build/operation";
 import { describe, expect, it, vi } from "@effect/vitest";
 import { familyForType } from "@sketchi/diagrams/family";
 import { Effect, Fiber, Schema } from "effect";
@@ -79,7 +80,7 @@ function countingStore() {
 
 function deterministicRuntime(counted: ReturnType<typeof countingStore>) {
 	return (input: unknown) =>
-		buildFlowchart(input).pipe(
+		buildResponse(buildFlowchart(input)).pipe(
 			Effect.provideService(CodeModeArtifactStorage, counted.store),
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_fixed`,

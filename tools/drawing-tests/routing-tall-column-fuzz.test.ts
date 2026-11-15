@@ -1,5 +1,5 @@
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
@@ -23,13 +23,13 @@ describe("tall column fuzz", () => {
 		"draws %s columns valid, no wider and no worse routed than main",
 		(direction) => {
 			const scenes = columns.map((spec) =>
-				renderIntermediateDiagram(
+				renderFlowchartDiagram(
 					parseFlowchartDiagram({
 						...spec,
 						type: "flowchart",
 						layout: { direction, edgeRouting: "orthogonal" },
 					}).pipe(Result.getOrThrow),
-				).pipe(Result.getOrThrow),
+				),
 			);
 			const counts = scenes.map((scene) => routingCounts(scene));
 			// The hosted PNG frames the drawing in 20 units, in place of its 48-unit padding.

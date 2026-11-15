@@ -1,6 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result, Schema } from "effect";
-import { FlowchartDiagram,parseFlowchartDiagram } from "./document.js";
+import { FlowchartDiagram, parseFlowchartDiagram } from "./document.js";
 import hiring from "./fixtures/lanes/hiring.js";
 import incidentResponse from "./fixtures/lanes/incident-response.js";
 import incidentResponseShortLabels from "./fixtures/lanes/incident-response-short-labels.js";

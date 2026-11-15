@@ -9,7 +9,12 @@ import {
 	Result,
 } from "effect";
 
-import { DiagramIconRef,DiagramStyle,DrawnIconSchema,SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
+import {
+	DiagramIconRef,
+	DiagramStyle,
+	DrawnIconSchema,
+	SKETCHI_DIAGRAM_STYLE,
+} from "@sketchi/drawing";
 
 export const sequenceDiagramType = "sequence" as const;
 

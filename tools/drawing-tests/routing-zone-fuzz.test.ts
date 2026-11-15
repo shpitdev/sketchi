@@ -1,9 +1,10 @@
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import type { CanvasSpec } from "@sketchi/drawing";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import {
 	zoneFixtures,
 	zoneStressFixtures,
 } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { getCanvasValidationIssues, zoneRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -31,10 +32,7 @@ describe("zoned routing fuzz", () => {
 	// stay apart, no edge passes through a zone neither end sits in, runs along an
 	// outline or crosses a label, and an edge whose ends share a zone stays inside it.
 	const flowcharts = randomZonedFlowcharts(FULL ? 30 : 4, 20261019);
-	const scenes = new Map<
-		string,
-		Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>[]
-	>();
+	const scenes = new Map<string, CanvasSpec[]>();
 	const parsed = (direction: "TB" | "BT" | "LR" | "RL") =>
 		flowcharts.map((spec) =>
 			parseFlowchartDiagram({
@@ -47,9 +45,7 @@ describe("zoned routing fuzz", () => {
 		if (!scenes.has(direction))
 			scenes.set(
 				direction,
-				parsed(direction).map((diagram) =>
-					renderIntermediateDiagram(diagram).pipe(Result.getOrThrow),
-				),
+				parsed(direction).map((diagram) => renderFlowchartDiagram(diagram)),
 			);
 		return scenes.get(direction)!;
 	};
@@ -99,10 +95,10 @@ describe("zoned routing fuzz", () => {
 		it("curves every zoned flowchart into no node, no zone neither end is in, and out of none both are", () => {
 			const strays = parsed(direction).flatMap((diagram, index) =>
 				curvedStrays(
-					renderIntermediateDiagram({
+					renderFlowchartDiagram({
 						...diagram,
 						layout: { ...diagram.layout, edgeRouting: "curved" },
-					}).pipe(Result.getOrThrow),
+					}),
 					rendered(direction)[index]!,
 				).map((stray) => `${index} ${stray}`),
 			);
@@ -131,10 +127,10 @@ describe("zoned routing fuzz", () => {
 		(name) => {
 			const fixture = { ...zoneFixtures, ...zoneStressFixtures }[name]!;
 			for (const direction of ["TB", "BT", "LR", "RL"] as const) {
-				const scene = renderIntermediateDiagram({
+				const scene = renderFlowchartDiagram({
 					...fixture,
 					layout: { direction, edgeRouting: "orthogonal" },
-				}).pipe(Result.getOrThrow);
+				});
 				const exported = convertSceneToExcalidraw(scene);
 				const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
 				expect([

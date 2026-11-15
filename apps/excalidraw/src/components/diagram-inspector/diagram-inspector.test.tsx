@@ -1,4 +1,3 @@
-
 import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/fixtures";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
@@ -13,7 +12,7 @@ describe("DiagramInspector", () => {
 	it("shows the overview drawn from the diagram", () => {
 		render(<DiagramInspector diagram={flowchartFixture} scene={scene} />);
 
-		expect(screen.getByRole("tab", { name: "Typed IR" })).toBeTruthy();
+		expect(screen.getByRole("tab", { name: "Document" })).toBeTruthy();
 		expect(screen.getByText("Edge routing")).toBeTruthy();
 		expect(screen.getByText(flowchartFixture.layout.direction)).toBeTruthy();
 	});

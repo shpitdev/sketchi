@@ -1,6 +1,7 @@
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import type { CanvasSpec } from "@sketchi/drawing";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { getCanvasValidationIssues, groupRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -28,22 +29,19 @@ describe("grouped routing fuzz", () => {
 	// labels. Branch labels on these dense random graphs are judged as the label
 	// fuzz judges ungrouped ones; grouped, they draw no more defects in total.
 	const flowcharts = randomGroupedFlowcharts(FULL ? 30 : 8, 20261020);
-	const scenes = new Map<
-		string,
-		Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>[]
-	>();
+	const scenes = new Map<string, CanvasSpec[]>();
 	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
 		if (!scenes.has(direction))
 			scenes.set(
 				direction,
 				flowcharts.map((spec) =>
-					renderIntermediateDiagram(
+					renderFlowchartDiagram(
 						parseFlowchartDiagram({
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
 						}).pipe(Result.getOrThrow),
-					).pipe(Result.getOrThrow),
+					),
 				),
 			);
 		return scenes.get(direction)!;
@@ -107,13 +105,13 @@ describe("grouped routing fuzz", () => {
 
 		it("curves every grouped flowchart into no node, no group neither end is in, and out of none both are", () => {
 			const strays = flowcharts.flatMap((spec, index) => {
-				const curved = renderIntermediateDiagram(
+				const curved = renderFlowchartDiagram(
 					parseFlowchartDiagram({
 						...spec,
 						type: "flowchart",
 						layout: { direction, edgeRouting: "curved" },
 					}).pipe(Result.getOrThrow),
-				).pipe(Result.getOrThrow);
+				);
 				return curvedStrays(curved, rendered(direction)[index]!).map(
 					(stray) => `${index} ${stray}`,
 				);
@@ -126,10 +124,10 @@ describe("grouped routing fuzz", () => {
 		"exports the %s fixture with its groups whole, apart and clear",
 		(name) => {
 			for (const direction of ["TB", "BT", "LR", "RL"] as const) {
-				const scene = renderIntermediateDiagram({
+				const scene = renderFlowchartDiagram({
 					...groupFixtures[name],
 					layout: { direction, edgeRouting: "orthogonal" },
-				}).pipe(Result.getOrThrow);
+				});
 				const exported = convertSceneToExcalidraw(scene);
 				const authored = new Map(
 					groupFixtures[name].nodes.map((node) => [`node:${node.id}`, node.label]),

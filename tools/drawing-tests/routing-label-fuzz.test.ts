@@ -1,6 +1,6 @@
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import { labelFixtures } from "@sketchi/diagrams/families/flowchart/label-fixtures";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
@@ -22,13 +22,13 @@ describe("label fuzz", () => {
 	it.each(["TB", "BT", "LR", "RL"] as const)("keeps %s labels whole and clear", (direction) => {
 		const defects = flowcharts.flatMap((spec, index) => {
 			const elements = convertSceneToExcalidraw(
-				renderIntermediateDiagram(
+				renderFlowchartDiagram(
 					parseFlowchartDiagram({
 						...spec,
 						type: "flowchart",
 						layout: { direction, edgeRouting: "orthogonal" },
 					}).pipe(Result.getOrThrow),
-				).pipe(Result.getOrThrow),
+				),
 			).elements;
 			const authored = new Map(spec.nodes.map((node) => [`node:${node.id}`, node.label]));
 			return labelDefects(elements, authored).map((defect) => `${index}: ${defect}`);
@@ -46,13 +46,13 @@ describe("label fuzz", () => {
 			const detached = flowcharts.flatMap((spec, index) =>
 				detachedLabels(
 					convertSceneToExcalidraw(
-						renderIntermediateDiagram(
+						renderFlowchartDiagram(
 							parseFlowchartDiagram({
 								...spec,
 								type: "flowchart",
 								layout: { direction, edgeRouting: "orthogonal" },
 							}).pipe(Result.getOrThrow),
-						).pipe(Result.getOrThrow),
+						),
 					).elements,
 				).map((label) => `${index}:${label}`),
 			);
@@ -67,9 +67,7 @@ describe.each(["TB", "BT", "LR", "RL"] as const)("label fixtures: %s", (directio
 		(name) => {
 			const fixture = labelFixtures[name];
 			const elements = convertSceneToExcalidraw(
-				renderIntermediateDiagram({ ...fixture, layout: { ...fixture.layout, direction } }).pipe(
-					Result.getOrThrow,
-				),
+				renderFlowchartDiagram({ ...fixture, layout: { ...fixture.layout, direction } }),
 			).elements;
 			const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
 			expect(labelDefects(elements, authored)).toEqual([]);

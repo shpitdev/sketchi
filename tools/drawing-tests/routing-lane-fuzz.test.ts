@@ -1,9 +1,10 @@
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import type { CanvasSpec } from "@sketchi/drawing";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import {
 	laneFixtures,
 	laneStressFixtures,
 } from "@sketchi/diagrams/families/flowchart/lane-fixtures";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { getCanvasValidationIssues, laneRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -29,22 +30,19 @@ describe("laned routing fuzz", () => {
 	// or leaves the lanes, and labels stay whole and clear of nodes, headers and
 	// boundaries.
 	const flowcharts = randomLanedFlowcharts(30, 20261022);
-	const scenes = new Map<
-		string,
-		Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>[]
-	>();
+	const scenes = new Map<string, CanvasSpec[]>();
 	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
 		if (!scenes.has(direction))
 			scenes.set(
 				direction,
 				flowcharts.map((spec) =>
-					renderIntermediateDiagram(
+					renderFlowchartDiagram(
 						parseFlowchartDiagram({
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
 						}).pipe(Result.getOrThrow),
-					).pipe(Result.getOrThrow),
+					),
 				),
 			);
 		return scenes.get(direction)!;
@@ -109,10 +107,10 @@ describe("laned routing fuzz", () => {
 		(name) => {
 			const fixture = { ...laneFixtures, ...laneStressFixtures }[name]!;
 			for (const direction of ["TB", "BT", "LR", "RL"] as const) {
-				const scene = renderIntermediateDiagram({
+				const scene = renderFlowchartDiagram({
 					...fixture,
 					layout: { direction, edgeRouting: "orthogonal" },
-				}).pipe(Result.getOrThrow);
+				});
 				const exported = convertSceneToExcalidraw(scene);
 				const authored = new Map(fixture.nodes.map((node) => [`node:${node.id}`, node.label]));
 				expect([

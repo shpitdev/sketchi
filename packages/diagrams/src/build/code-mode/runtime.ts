@@ -1,12 +1,14 @@
 import { inputIssues, formatContractSchemaError } from "../input.js";
 import { flowchartBuild } from "../../families/flowchart/build.js";
-import { qualityIssues,
+import {
+	qualityIssues,
 	CodeModeIssue,
 	type ArtifactBuildCapabilities,
 	type BuildDelivery,
 	type CodeModeIssueCode,
 	type CodeModeIssueRef,
-	type QualityReport } from "../result.js";
+	type QualityReport,
+} from "../result.js";
 import { canvasFailureStatus, canvasValidationIssues } from "../scene.js";
 
 import { families, familyForType, type FamilyBuildOperation } from "../../family.js";
@@ -59,8 +61,6 @@ import {
 	type StateMachineValidationIssueCode,
 } from "../../families/state-machine/document.js";
 
-
-
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
@@ -86,8 +86,6 @@ import { renderStateMachineDiagram } from "../../families/state-machine/render.j
 import { isStructurallyValidTimelineMarker } from "../../families/timeline/render.js";
 import { isStructurallyValidVennSet } from "../../families/venn/render.js";
 import { isStructurallyValidStateMarker } from "../../graph/compose.js";
-
-
 
 import {
 	recordMetric,
@@ -149,7 +147,16 @@ import {
 
 import { cleanToolString, slug } from "../../clean-text.js";
 
-import { BuildIconSource, catalogForRequest, embedSceneIcons, iconRefSlug, undrawableIconIssue, type CodeModeCommunityIcon, type CodeModeCommunityIcons, type CodeModeIconCatalog } from "./icons.js";
+import {
+	BuildIconSource,
+	catalogForRequest,
+	embedSceneIcons,
+	iconRefSlug,
+	undrawableIconIssue,
+	type CodeModeCommunityIcon,
+	type CodeModeCommunityIcons,
+	type CodeModeIconCatalog,
+} from "./icons.js";
 
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];

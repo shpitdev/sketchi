@@ -8,10 +8,12 @@ import {
 } from "@sketchi/diagrams/families/flowchart/fixtures";
 import { type GraphInput } from "@sketchi/diagrams/graph/input";
 import { renderGraphDiagram } from "@sketchi/diagrams/graph/scene";
-import { SKETCHI_DIAGRAM_STYLE,
+import {
+	SKETCHI_DIAGRAM_STYLE,
 	segmentsFromPoints,
 	segmentsOverlapInterior,
-	segmentCrossesBoundsInterior } from "@sketchi/drawing";
+	segmentCrossesBoundsInterior,
+} from "@sketchi/drawing";
 import { routingFixtures } from "@sketchi/diagrams/families/flowchart/routing-fixtures";
 import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import {

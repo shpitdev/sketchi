@@ -183,7 +183,6 @@ export function zoneCutEdges(
 	layoutGraph: GraphLayout,
 	zoneWraps: ReadonlyMap<string, Wrap> | undefined,
 ): ReadonlySet<string> {
-	
 	const structure = zoneWraps ? layoutGraph.groups : undefined;
 	if (!structure || !zoneWraps) return new Set();
 	const levels = new Map<string, RankedFlow>([
@@ -473,7 +472,8 @@ export function compactGaps(
 	arrangement: Arrangement,
 	straight = false,
 ): Map<number, number> {
-	
+	const diagram = layoutGraph.input;
+
 	const placed = new Map(layout.nodeShapes.map((shape) => [shape.nodeId, shape]));
 	// Ranks or columns, each as the ids of its steps, in order along the flow.
 	const columns = laned(diagram)
@@ -702,7 +702,6 @@ export function layoutDiagram(
 	polish: RoutingPolish,
 	arrangement: Arrangement = PLAIN_ARRANGEMENT,
 ): DiagramLayout {
-	
 	let slack = new Map(arrangement.zoneSlack ?? []);
 	let layout = layoutDiagramOnce(layoutGraph, renderOptions, polish, arrangement, slack);
 	if (!layout.groups) return layout;
@@ -797,7 +796,8 @@ function layoutDiagramOnce(
 	arrangement: Arrangement,
 	slack: ReadonlyMap<string, number>,
 ): DiagramLayout {
-	
+	const diagram = layoutGraph.input;
+
 	const orthogonal = diagram.layout.edgeRouting === "orthogonal";
 	const { anchors, besideShared, endRun, placement } = renderOptions;
 	const offsetsFor = (routes: readonly RoutedEdge[]) =>

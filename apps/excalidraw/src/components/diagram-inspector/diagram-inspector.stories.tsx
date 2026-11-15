@@ -1,4 +1,3 @@
-
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
 import { pharmaBatchDispositionFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";

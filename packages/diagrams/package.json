@@ -384,16 +384,16 @@
 			"default": "./dist/families/flowchart/issues.js"
 		},
 		"./families/flowchart/fixtures": {
-			"types": "./dist/families/flowchart/diagram.d.ts",
-			"default": "./dist/families/flowchart/diagram.js"
+			"types": "./dist/families/flowchart/fixtures.d.ts",
+			"default": "./dist/families/flowchart/fixtures.js"
 		},
 		"./families/flowchart/render": {
-			"types": "./dist/families/flowchart/spec.d.ts",
-			"default": "./dist/families/flowchart/spec.js"
+			"types": "./dist/families/flowchart/render.d.ts",
+			"default": "./dist/families/flowchart/render.js"
 		},
 		"./graph/input": {
-			"types": "./dist/graph/intermediate.d.ts",
-			"default": "./dist/graph/intermediate.js"
+			"types": "./dist/graph/input.d.ts",
+			"default": "./dist/graph/input.js"
 		},
 		"./families/flowchart/build": {
 			"types": "./dist/families/flowchart/build.d.ts",

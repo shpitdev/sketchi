@@ -42,3 +42,19 @@ describe("geometry bounds regressions", () => {
 		expect(getCanvasValidationIssues(scene)).toEqual([]);
 	});
 });
+
+it("keeps a short column at the full rank gap", () => {
+	const scene = renderGraphDiagram(
+		{
+			nodes: ["A", "B", "C"].map((id) => ({ id, label: id, shape: "rectangle" })),
+			edges: [
+				{ id: "ab", source: "A", target: "B" },
+				{ id: "bc", source: "B", target: "C" },
+			],
+			layout: { direction: "TB", edgeRouting: "orthogonal" },
+		},
+		{ id: "geometry", title: "Geometry", style: SKETCHI_DIAGRAM_STYLE },
+	);
+	const ys = scene.elements.flatMap((element) => (element.type === "node" ? [element.y] : []));
+	expect(ys).toEqual([48, 216, 384]);
+});

@@ -3,7 +3,7 @@ import {
 	crossingFixtures,
 	sideFixtures,
 } from "@sketchi/diagrams/families/flowchart/crossing-fixtures";
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
 import { laneFixtures } from "@sketchi/diagrams/families/flowchart/lane-fixtures";
 import {
@@ -12,7 +12,7 @@ import {
 	routingFixtures,
 } from "@sketchi/diagrams/families/flowchart/routing-fixtures";
 import { zoneFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
@@ -49,10 +49,10 @@ describe("lines sharing a segment", () => {
 			expect(
 				fixtures.flatMap(([name, fixture]) => {
 					const { shared } = routingCounts(
-						renderIntermediateDiagram({
+						renderFlowchartDiagram({
 							...fixture,
 							layout: { ...fixture.layout, direction },
-						}).pipe(Result.getOrThrow),
+						}),
 					);
 					return shared > 0 ? [`${name}: ${shared}`] : [];
 				}),
@@ -90,10 +90,10 @@ describe("lines that touch", () => {
 			expect(
 				fixtures.flatMap(([name, fixture]) => {
 					const { touches } = routingCounts(
-						renderIntermediateDiagram({
+						renderFlowchartDiagram({
 							...fixture,
 							layout: { ...fixture.layout, direction },
-						}).pipe(Result.getOrThrow),
+						}),
 					);
 					const known = KNOWN_TOUCHING_FIXTURES[`${name}:${direction}`] ?? 0;
 					return touches > known ? [`${name}: ${known} -> ${touches}`] : [];
@@ -110,13 +110,13 @@ describe("lines that touch", () => {
 			expect(
 				fanIns.flatMap((spec) => {
 					const { touches } = routingCounts(
-						renderIntermediateDiagram(
+						renderFlowchartDiagram(
 							parseFlowchartDiagram({
 								...spec,
 								type: "flowchart",
 								layout: { direction, edgeRouting: "orthogonal" },
 							}).pipe(Result.getOrThrow),
-						).pipe(Result.getOrThrow),
+						),
 					);
 					const known = KNOWN_TOUCHING_FAN_INS[`${spec.id}:${direction}`] ?? 0;
 					return touches > known ? [`${spec.id}:${direction}: ${known} -> ${touches}`] : [];

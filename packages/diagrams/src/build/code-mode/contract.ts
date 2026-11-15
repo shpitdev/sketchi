@@ -1,6 +1,6 @@
 import { contractDiscriminatorAnnotation, contractMissingKeyCodeAnnotation } from "../input.js";
 import { flowchartBuild, FlowchartRequestText } from "../../families/flowchart/build.js";
-import { BuildOptions,CodeModeIssue,QualityReportSchema } from "../result.js";
+import { BuildOptions, CodeModeIssue, QualityReportSchema } from "../result.js";
 
 import {
 	BuildArtifactFormatSchema,
@@ -26,7 +26,6 @@ import {
 	SKETCHI_DIAGRAM_STYLE,
 	DrawnIconSchema,
 } from "@sketchi/drawing";
-
 
 import { FlowchartEditsSchema } from "../../families/flowchart/edits.js";
 import {
@@ -501,7 +500,6 @@ const ArtifactFormatsOption = optionalContract(nonEmptyArray(BuildArtifactFormat
 const InlineArtifactsOption = optionalContract(
 	Schema.Array(InlineArtifactFormatSchema).pipe(Schema.mutable),
 );
-
 
 /**
  * A change to a built flowchart: the artifact it starts from and the edits, by id. The edited

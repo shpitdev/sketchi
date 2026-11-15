@@ -1,7 +1,7 @@
 import { type FamilyBuildOperation } from "@sketchi/diagrams/family";
 import "@tanstack/react-start/server-only";
 
-import { type BuildOptions,type CodeModeIssue } from "@sketchi/diagrams/build/result";
+import { type BuildOptions, type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";
 import { MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";

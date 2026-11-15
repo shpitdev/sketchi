@@ -1,6 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
 import { Result, Schema } from "effect";
-import { FlowchartDiagram,parseFlowchartDiagram } from "./document.js";
+import { FlowchartDiagram, parseFlowchartDiagram } from "./document.js";
 import awsThreeTier from "./fixtures/zones/aws-three-tier.js";
 import awsThreeTierDescribed from "./fixtures/zones/aws-three-tier-described.js";
 import awsThreeTierQueries from "./fixtures/zones/aws-three-tier-queries.js";

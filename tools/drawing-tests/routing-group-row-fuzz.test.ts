@@ -1,5 +1,6 @@
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import type { CanvasSpec } from "@sketchi/drawing";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { groupRegionIssues } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -23,22 +24,19 @@ describe("group row fuzz", () => {
 	// through the gap between them, never around the outer margins, and no flow
 	// draws more crossings or reader findings than main.
 	const rows = randomGroupRows(FULL ? 24 : 6);
-	const scenes = new Map<
-		string,
-		Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>[]
-	>();
+	const scenes = new Map<string, CanvasSpec[]>();
 	const rendered = (direction: "TB" | "BT" | "LR" | "RL") => {
 		if (!scenes.has(direction))
 			scenes.set(
 				direction,
 				rows.map((spec) =>
-					renderIntermediateDiagram(
+					renderFlowchartDiagram(
 						parseFlowchartDiagram({
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
 						}).pipe(Result.getOrThrow),
-					).pipe(Result.getOrThrow),
+					),
 				),
 			);
 		return scenes.get(direction)!;

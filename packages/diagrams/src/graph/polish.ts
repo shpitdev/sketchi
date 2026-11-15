@@ -187,7 +187,8 @@ function crossingMoves(
 	routes: readonly RoutedEdge[],
 	groups: GroupLayout | undefined,
 ): SideMove[] {
-	
+	const diagram = layoutGraph.input;
+
 	const vertical = diagram.layout.direction === "TB" || diagram.layout.direction === "BT";
 	const along = vertical ? "y" : "x";
 	const lateral = (side: ConnectionEdge) => slotAxis(side) === along;
@@ -415,7 +416,6 @@ export function repairCrossings(
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): SettledLayout {
-	
 	let best = settled;
 	const tried = new Set<string>();
 
@@ -573,7 +573,8 @@ export function chooseBranchSides(
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): CompletedLayout {
-	
+	const diagram = layoutGraph.input;
+
 	const feedback = layoutGraph.feedback;
 	const { continuations } = arranged.arrangement.wrap;
 	// A loop shows in the length it adds.
@@ -727,7 +728,8 @@ export function nestSharedArrivals(
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): DiagramLayout {
-	
+	const diagram = layoutGraph.input;
+
 	const { lanes, polish, routeOptions } = layout;
 	if (
 		!polish?.sides ||
@@ -914,7 +916,6 @@ export function returnsToNearVertices(
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): DiagramLayout {
-	
 	const { lanes, polish, routeOptions } = layout;
 	if (!polish?.sides || !layout.portOffsets || !routeOptions || lanes || renderOptions.placement)
 		return layout;
@@ -1034,7 +1035,6 @@ export function polishArrivals(
 	defectsOf: (layout: DiagramLayout) => readonly [number, number],
 	fewer: (a: readonly [number, number], b: readonly [number, number]) => boolean,
 ): DiagramLayout {
-	
 	const { edgeArrows, lanes, nodeShapes, polish, portOffsets, routeOptions } = layout;
 	if (!polish?.sides || !portOffsets || !routeOptions?.readerScale || lanes) return layout;
 	const routes = layout.routedEdges.map((route) => ({ ...route }));

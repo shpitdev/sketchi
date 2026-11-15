@@ -6,7 +6,11 @@ import {
 	type ExcalidrawTextElement,
 } from "@excalidraw/excalidraw/element/types";
 import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { type CanvasSpec, getCanvasValidationIssues,SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
+import {
+	type CanvasSpec,
+	getCanvasValidationIssues,
+	SKETCHI_DIAGRAM_STYLE,
+} from "@sketchi/drawing";
 import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
 import { type GraphInput } from "@sketchi/diagrams/graph/input";
 import { renderGraphDiagram } from "@sketchi/diagrams/graph/scene";

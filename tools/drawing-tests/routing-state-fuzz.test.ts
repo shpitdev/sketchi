@@ -27,7 +27,13 @@ describe("state graph fuzz", () => {
 		it("exports every state graph valid, bound, grouped and labeled clear", () => {
 			const failures = graphs.flatMap((graph, index) => {
 				const scene = renderGraphDiagram(
-					{ ...graph, layout: { direction, edgeRouting: "orthogonal" } } as never,
+					{
+						nodes: graph.nodes,
+						edges: graph.edges,
+						groups: graph.groups,
+						layout: { direction, edgeRouting: "orthogonal" },
+					},
+					graph,
 					{ pairedReturns: true },
 				);
 				const exported = convertSceneToExcalidraw(scene);
@@ -64,7 +70,13 @@ describe("state graph fuzz", () => {
 				detachedLabels(
 					convertSceneToExcalidraw(
 						renderGraphDiagram(
-							{ ...graph, layout: { direction, edgeRouting: "orthogonal" } } as never,
+							{
+								nodes: graph.nodes,
+								edges: graph.edges,
+								groups: graph.groups,
+								layout: { direction, edgeRouting: "orthogonal" },
+							},
+							graph,
 							{ pairedReturns: true },
 						),
 					).elements,
@@ -77,7 +89,13 @@ describe("state graph fuzz", () => {
 			const counts = graphs.map((graph) =>
 				routingCounts(
 					renderGraphDiagram(
-						{ ...graph, layout: { direction, edgeRouting: "orthogonal" } } as never,
+						{
+							nodes: graph.nodes,
+							edges: graph.edges,
+							groups: graph.groups,
+							layout: { direction, edgeRouting: "orthogonal" },
+						},
+						graph,
 						{ pairedReturns: true },
 					),
 				),

@@ -24,7 +24,8 @@ import {
 	type FlowchartDocumentGroup,
 	type FlowchartDocumentLane,
 	type FlowchartDocumentNode,
-	type FlowchartDocumentNodeDetails,FLOWCHART_MAX_EDGES
+	type FlowchartDocumentNodeDetails,
+	FLOWCHART_MAX_EDGES,
 } from "./document.js";
 
 /**

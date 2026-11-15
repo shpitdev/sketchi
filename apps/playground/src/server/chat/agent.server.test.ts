@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { buildResponse } from "@sketchi/diagrams/build/operation";
 import type { UIMessage } from "ai";
 import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 import { Effect, Option } from "effect";
@@ -190,7 +191,7 @@ describe("Studio build results the model reads", () => {
 		],
 	};
 	const build = (input: unknown) =>
-		buildFlowchart(input).pipe(
+		buildResponse(buildFlowchart(input)).pipe(
 			Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_fixed`,

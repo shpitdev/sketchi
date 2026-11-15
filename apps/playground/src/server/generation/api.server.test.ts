@@ -8,6 +8,7 @@ import {
 import { diagramScenarios, scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
 
 import {
+	FlowchartDiagram,
 	FLOWCHART_MAX_NODES,
 } from "@sketchi/diagrams/families/flowchart/document";
 import { sankeyStressFixtures } from "@sketchi/diagrams/families/sankey/fixtures";
@@ -82,7 +83,7 @@ function generationText(diagram: Readonly<Record<string, unknown>>): string {
 	// A drawn flowchart fixture reaches the model's answer as its document.
 	if (type === "flowchart" && Array.isArray(diagram["nodes"])) {
 		const { title: documentTitle, ...document } = scenarioFlowchartDocument(
-			diagram,
+			Schema.decodeUnknownSync(FlowchartDiagram)(diagram),
 		);
 		return JSON.stringify({ title: documentTitle, diagram: { type, ...document } });
 	}

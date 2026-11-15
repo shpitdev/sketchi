@@ -13,10 +13,12 @@ import {
 	toCodeModeJsonSchema,
 } from "@sketchi/diagrams/build/code-mode/contract";
 import { flowchartBuild } from "@sketchi/diagrams/families/flowchart/build";
-import { BuildOptions,
+import {
+	BuildOptions,
 	CodeModeIssue,
 	CodeModeIssueCodeSchema,
-	CodeModeIssueRef } from "@sketchi/diagrams/build/result";
+	CodeModeIssueRef,
+} from "@sketchi/diagrams/build/result";
 import { families } from "@sketchi/diagrams/family";
 import { DrawnIconSchema, IconRecipeSchema } from "@sketchi/drawing";
 import { Schema } from "effect";

@@ -1,5 +1,5 @@
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/document";
+import { renderFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/render";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
@@ -36,7 +36,7 @@ describe("routing fuzz", () => {
 				type: "flowchart",
 				layout: { direction, edgeRouting },
 			}).pipe(Result.getOrThrow);
-			const scene = renderIntermediateDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderFlowchartDiagram(diagram);
 			const issues = [
 				...validateExcalidrawScene(convertSceneToExcalidraw(scene)).issues,
 				...(edgeRouting === "orthogonal" ? diagonalRuns(scene) : []),
@@ -50,13 +50,13 @@ describe("routing fuzz", () => {
 	const longFlows = randomLongFlows(30);
 	const longFlowExports = (direction: "TB" | "BT" | "LR" | "RL") =>
 		longFlows.map((spec) => {
-			const scene = renderIntermediateDiagram(
+			const scene = renderFlowchartDiagram(
 				parseFlowchartDiagram({
 					...spec,
 					type: "flowchart",
 					layout: { direction, edgeRouting: "orthogonal" },
 				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow);
+			);
 			const nodes = new Map(
 				scene.elements.flatMap((e) => (e.type === "node" ? [[e.nodeId, e] as const] : [])),
 			);
@@ -89,13 +89,13 @@ describe("routing fuzz", () => {
 		).flatMap(([set, specs]) => {
 			const counts = specs.map((spec) =>
 				routingCounts(
-					renderIntermediateDiagram(
+					renderFlowchartDiagram(
 						parseFlowchartDiagram({
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
 						}).pipe(Result.getOrThrow),
-					).pipe(Result.getOrThrow),
+					),
 				),
 			);
 			if (process.env.PRINT_ROUTING)
@@ -118,39 +118,39 @@ describe("routing fuzz", () => {
 	it("keeps every run of the review's clearance case horizontal or vertical", () => {
 		// Seed 20261020, case 4, TB: moving one of two collinear runs clear of a
 		// node once turned the stub beside it diagonal.
-		const scene = renderIntermediateDiagram(
+		const scene = renderFlowchartDiagram(
 			parseFlowchartDiagram({
 				...randomFlowcharts(40, 20261020)[4]!,
 				type: "flowchart",
 				layout: { direction: "TB", edgeRouting: "orthogonal" },
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		expect(diagonalRuns(scene)).toEqual([]);
 	});
 
 	it("never lengthens the drawing of the #509 review's flowchart to clear an arrowhead", () => {
 		// Seed 20261017, case 47, LR: main draws it 2357.5 x 1650 with a line
 		// through a head; routing that line clear once stretched it to 2418.
-		const scene = renderIntermediateDiagram(
+		const scene = renderFlowchartDiagram(
 			parseFlowchartDiagram({
 				...randomFlowcharts(48)[47]!,
 				type: "flowchart",
 				layout: { direction: "LR", edgeRouting: "orthogonal" },
 			}).pipe(Result.getOrThrow),
-		).pipe(Result.getOrThrow);
+		);
 		expect(Math.max(scene.width, scene.height)).toBeLessThanOrEqual(2357.5);
 	});
 
 	it("routes the review's fan-in case no worse than main in RL", () => {
 		// Seed 143289, case 33: an unguarded arrival order drew 8 crossings and 4 findings.
 		const { crossings, findings } = routingCounts(
-			renderIntermediateDiagram(
+			renderFlowchartDiagram(
 				parseFlowchartDiagram({
 					...randomFlowcharts(34, 143289)[33]!,
 					type: "flowchart",
 					layout: { direction: "RL", edgeRouting: "orthogonal" },
 				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow),
+			),
 		);
 		expect(crossings).toBeLessThanOrEqual(6);
 		expect(findings).toBeLessThanOrEqual(3);
@@ -160,13 +160,13 @@ describe("routing fuzz", () => {
 		// Seed 20261026, case 44 in BT: judged before the last clearance pass, a
 		// grown gap kept 80 crossings where the drawing without it cleared to 78.
 		const { crossings, findings } = routingCounts(
-			renderIntermediateDiagram(
+			renderFlowchartDiagram(
 				parseFlowchartDiagram({
 					...randomFlowcharts(45, 20261026)[44]!,
 					type: "flowchart",
 					layout: { direction: "BT", edgeRouting: "orthogonal" },
 				}).pipe(Result.getOrThrow),
-			).pipe(Result.getOrThrow),
+			),
 		);
 		expect(crossings).toBeLessThanOrEqual(78);
 		expect(findings).toBeLessThanOrEqual(13);
@@ -179,13 +179,13 @@ describe("routing fuzz", () => {
 			// arrived with a 63.5-unit jog; its contended continuation leaving forward
 			// draws it clean, as main does.
 			const { crossings, findings } = routingCounts(
-				renderIntermediateDiagram(
+				renderFlowchartDiagram(
 					parseFlowchartDiagram({
 						...randomLongFlows(39)[38]!,
 						type: "flowchart",
 						layout: { direction, edgeRouting: "orthogonal" },
 					}).pipe(Result.getOrThrow),
-				).pipe(Result.getOrThrow),
+				),
 			);
 			expect(crossings).toBe(0);
 			expect(findings).toBe(0);
@@ -224,13 +224,13 @@ describe("routing fuzz", () => {
 		it("routes no line into its own end node's drawn shape past the run that meets it", () => {
 			const strays = [...flowcharts, ...(FULL ? longFlows : [])].flatMap((spec, index) =>
 				ownEndStrays(
-					renderIntermediateDiagram(
+					renderFlowchartDiagram(
 						parseFlowchartDiagram({
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting: "orthogonal" },
 						}).pipe(Result.getOrThrow),
-					).pipe(Result.getOrThrow),
+					),
 				).map((stray) => `${index} ${stray}`),
 			);
 			expect(strays).toEqual([]);
@@ -243,13 +243,13 @@ describe("routing fuzz", () => {
 		it("curves every line along its route, into no node past the runs that meet it and no label its route kept clear", () => {
 			const strays = flowcharts.flatMap((spec, index) => {
 				const [curved, square] = (["curved", "orthogonal"] as const).map((edgeRouting) =>
-					renderIntermediateDiagram(
+					renderFlowchartDiagram(
 						parseFlowchartDiagram({
 							...spec,
 							type: "flowchart",
 							layout: { direction, edgeRouting },
 						}).pipe(Result.getOrThrow),
-					).pipe(Result.getOrThrow),
+					),
 				);
 				return curvedStrays(curved!, square!).map((stray) => `${index} ${stray}`);
 			});

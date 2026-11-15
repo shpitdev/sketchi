@@ -1,4 +1,4 @@
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import type { GraphEdge, GraphNode } from "@sketchi/diagrams/graph/input";
 import {
 	candidateRouteQuality,
 	canvasOutlineContains,
@@ -14,7 +14,6 @@ import {
 	wrapTextToWidth,
 	type CanvasSpec,
 } from "@sketchi/drawing";
-import { Result } from "effect";
 import { type ExportedElement, midWordBreaks } from "./text-fit-helpers";
 
 // Keep every invariant and direction in the smoke run; the local target restores the full matrix.
@@ -234,9 +233,7 @@ const PLAIN_DIRECT_FAILURES: Readonly<Record<"TB" | "BT" | "LR" | "RL", readonly
 type Point = { x: number; y: number };
 
 /** Arrows with a run that is neither horizontal nor vertical, which no orthogonal route has. */
-function diagonalRuns(
-	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
-): string[] {
+function diagonalRuns(scene: CanvasSpec): string[] {
 	return scene.elements.flatMap((element) =>
 		element.type === "arrow" &&
 		element.points.some(
@@ -259,7 +256,7 @@ function diagonalRuns(
  * before the target or a branch leaves it by the side facing back.
  */
 function aroundTheBands(
-	scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>,
+	scene: CanvasSpec,
 	direction: "TB" | "BT" | "LR" | "RL",
 	spine: readonly { id: string; source: string; target: string }[],
 	continuations: ReadonlySet<string>,
@@ -357,7 +354,7 @@ function corners(points: readonly Point[]): Point[] {
 	});
 }
 
-function routingCounts(scene: Result.Result.Success<ReturnType<typeof renderIntermediateDiagram>>) {
+function routingCounts(scene: CanvasSpec) {
 	const nodes = scene.elements.flatMap((e) => (e.type === "node" ? [e] : []));
 	const arrows = scene.elements.flatMap((e) => (e.type === "arrow" ? [e] : []));
 	const points = [
@@ -1417,11 +1414,16 @@ function randomStateGraphs(count: number, start = 20261021) {
 		const states = Array.from({ length: size }, (_, i) => `s${i}`);
 		const composite = size >= 5 && random() < 0.5;
 		const members = composite ? states.slice(2, 4) : [];
-		const node = (id: string, label: string, kind: string, group?: string) => ({
+		const node = (id: string, label: string, kind: string, group?: string): GraphNode => ({
 			id,
 			label,
 			kind,
-			metadata: {},
+			shape:
+				kind === "initial" || kind === "final"
+					? "circle"
+					: kind === "choice"
+						? "diamond"
+						: "rectangle",
 			...(group ? { group } : {}),
 		});
 		const nodes = [
@@ -1431,14 +1433,12 @@ function randomStateGraphs(count: number, start = 20261021) {
 				node(id, `${pick(WORDS)} ${id}`, "state", members.includes(id) ? "c" : undefined),
 			),
 		];
-		const edges: { id: string; source: string; target: string; label?: string; metadata: {} }[] =
-			[];
+		const edges: GraphEdge[] = [];
 		const add = (source: string, target: string, label?: string) =>
 			edges.push({
 				id: `e${edges.length}`,
 				source,
 				target,
-				metadata: {},
 				...(label ? { label } : {}),
 			});
 		add("init", "s0");
@@ -1469,9 +1469,7 @@ function randomStateGraphs(count: number, start = 20261021) {
 		return {
 			id: `state-${index}`,
 			title: `State ${index}`,
-			type: "flowchart",
 			style: { accentColor: "#8f707f", backgroundColor: "#fffdf8" },
-			metadata: {},
 			nodes,
 			edges,
 			...(composite ? { groups: [{ id: "c", label: pick(GROUP_LABELS) }] } : {}),

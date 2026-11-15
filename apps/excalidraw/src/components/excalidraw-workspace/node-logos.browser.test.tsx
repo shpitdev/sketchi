@@ -1,4 +1,3 @@
-
 import { loadFromBlob, MIME_TYPES } from "@excalidraw/excalidraw";
 import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/fixtures";
