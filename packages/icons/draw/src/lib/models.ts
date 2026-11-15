@@ -1,5 +1,5 @@
-import { CloudflareAiGatewayBinding } from "@sketchi/cloudflare/ai-gateway";
-import { stripGoogleModelPrefix } from "@sketchi/diagrams/generate/models";
+import { CloudflareAiGatewayBinding, stripGoogleModelPrefix } from "@sketchi/cloudflare/ai-gateway";
+
 import { Array, Context, Effect, Layer, Option, Schedule, String } from "effect";
 
 import { makeAuthorCall } from "./author-model.js";

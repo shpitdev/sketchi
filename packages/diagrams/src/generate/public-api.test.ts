@@ -17,6 +17,7 @@ import {
 import {
 	CloudflareAiGatewayBinding,
 	type CloudflareAiGateway,
+	stripGoogleModelPrefix,
 } from "@sketchi/cloudflare/ai-gateway";
 import {
 	CloudflareGatewayChatClientLive,
@@ -28,7 +29,6 @@ import {
 	DEFAULT_MAX_OUTPUT_TOKENS,
 	DiagramGenerationPrompt,
 } from "./messages.js";
-import { stripGoogleModelPrefix } from "./models.js";
 
 const prompt: DiagramGenerationPrompt = {
 	id: "pharma-batch-disposition",

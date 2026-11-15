@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { stripGoogleModelPrefix } from "./models.js";
+import { stripGoogleModelPrefix } from "@sketchi/cloudflare/ai-gateway";
 
 import type {
 	DiagramGenerationCandidate,

@@ -3,7 +3,7 @@
 	"$schema": "../../node_modules/nx/schemas/project-schema.json",
 	"sourceRoot": "packages/cloudflare/src",
 	"projectType": "library",
-	"tags": ["scope:package", "type:runtime"],
+	"tags": ["scope:package", "type:runtime", "domain:cloudflare"],
 	"targets": {
 		"build": {
 			"executor": "nx:run-commands",
@@ -16,18 +16,6 @@
 			"executor": "nx:run-commands",
 			"options": {
 				"command": "effect-tsgo tsc@7.0.2 -p packages/cloudflare/tsconfig.lib.json --noEmit"
-			}
-		},
-		"gantt-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "GANTT_FUZZ_SEEDS=300 vitest run --config packages/cloudflare/vitest.config.ts packages/cloudflare/src/families/gantt/render.test.ts -t \"seeded fuzz\""
-			}
-		},
-		"chart-fuzz": {
-			"executor": "nx:run-commands",
-			"options": {
-				"command": "CHART_FUZZ_SEEDS=300 vitest run --config packages/cloudflare/vitest.config.ts packages/cloudflare/src/families/chart/render.test.ts -t \"seeded fuzz\""
 			}
 		}
 	}

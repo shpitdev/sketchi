@@ -21,7 +21,7 @@ import {
 	segmentsFromPoints,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { classRelationshipHeads } from "@sketchi/diagrams/families/class/diagram";
+import { classRelationshipHeads } from "@sketchi/diagrams/families/class/render";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";

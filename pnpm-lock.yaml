@@ -782,9 +782,6 @@ importers:
       '@sketchi/cloudflare':
         specifier: workspace:*
         version: link:../../cloudflare
-      '@sketchi/diagrams':
-        specifier: workspace:*
-        version: link:../../diagrams
       '@sketchi/drawing':
         specifier: workspace:*
         version: link:../../drawing
@@ -840,9 +837,6 @@ importers:
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@sketchi/diagrams':
-        specifier: workspace:*
-        version: link:../diagrams
       '@sketchi/drawing':
         specifier: workspace:*
         version: link:../drawing
@@ -920,9 +914,6 @@ importers:
       '@sketchi/cloudflare':
         specifier: workspace:*
         version: link:../../packages/cloudflare
-      '@sketchi/diagrams':
-        specifier: workspace:*
-        version: link:../../packages/diagrams
       '@sketchi/drawing':
         specifier: workspace:*
         version: link:../../packages/drawing

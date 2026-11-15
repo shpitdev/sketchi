@@ -5,7 +5,6 @@ export default defineConfig({
 	cacheDir: "../../node_modules/.vite/packages/svg-excalidraw-corpus",
 	resolve: {
 		alias: {
-			"@sketchi/diagrams": new URL("../diagrams/src/", import.meta.url).pathname.slice(0, -1),
 			"@excalidraw/excalidraw": new URL(
 				"./node_modules/@excalidraw/excalidraw/dist/dev/index.js",
 				import.meta.url,

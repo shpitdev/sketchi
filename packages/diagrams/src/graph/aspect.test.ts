@@ -10,7 +10,7 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { renderClassDiagram } from "../families/class/diagram";
+import { renderClassDiagram } from "../families/class/render";
 import { renderTimelineDiagram } from "../families/timeline/render";
 import { arrowCrossings, renderIntermediateDiagram } from "./scene";
 

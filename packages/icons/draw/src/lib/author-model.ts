@@ -1,6 +1,9 @@
 import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic";
-import { type CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
-import { stripAnthropicModelPrefix } from "@sketchi/diagrams/generate/models";
+import {
+	type CloudflareAiGateway,
+	stripAnthropicModelPrefix,
+} from "@sketchi/cloudflare/ai-gateway";
+
 import { TelemetryCorrelation } from "@sketchi/observability";
 import { Array, Clock, Effect, Option, Schema, String, type Schedule } from "effect";
 import { type AiError, Prompt } from "effect/ai";

@@ -15,9 +15,6 @@
       "path": "../../cloudflare/tsconfig.lib.json"
     },
     {
-      "path": "../../diagrams/tsconfig.lib.json"
-    },
-    {
       "path": "../../observability/tsconfig.lib.json"
     },
     {

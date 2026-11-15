@@ -5,10 +5,6 @@ export default defineConfig(() => ({
 	cacheDir: "../../node_modules/.vite/tools/icon-batch",
 	resolve: {
 		alias: {
-			"@sketchi/diagrams": new URL("../../packages/diagrams/src/", import.meta.url).pathname.slice(
-				0,
-				-1,
-			),
 			"@sketchi/cloudflare": new URL(
 				"../../packages/cloudflare/src/",
 				import.meta.url,

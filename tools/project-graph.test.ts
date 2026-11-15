@@ -255,6 +255,14 @@ describe("workspace project membership", () => {
 		const results = lintProbes({
 			"packages/diagrams/.storybook/boundary-probe.ts": 'import "@sketchi/diagram-scenarios";',
 			"packages/diagrams/vitest.boundary-probe.mts": 'import "@sketchi/diagram-scenarios";',
+			"packages/drawing/src/domain-boundary-probe.ts": 'import "@sketchi/diagrams/diagram";',
+			"packages/icons/draw/src/domain-boundary-probe.ts": 'import "@sketchi/diagrams/diagram";',
+			"packages/diagrams/src/domain-boundary-allowed-probe.ts": [
+				'import "@sketchi/icon-catalog";',
+				'import "@sketchi/drawing";',
+				'import "@sketchi/cloudflare/ai-gateway";',
+				'import "@sketchi/observability";',
+			].join("\n"),
 			"apps/web/vite.boundary-probe.ts": 'import "../playground/src/routeTree.gen";',
 			"apps/web/vite.boundary-allowed-probe.ts": [
 				'import { localViteCacheDir } from "../../tools/local-dev-ports";',
@@ -266,11 +274,14 @@ describe("workspace project membership", () => {
 		for (const filePath of [
 			"packages/diagrams/.storybook/boundary-probe.ts",
 			"packages/diagrams/vitest.boundary-probe.mts",
+			"packages/drawing/src/domain-boundary-probe.ts",
+			"packages/icons/draw/src/domain-boundary-probe.ts",
 			"apps/web/vite.boundary-probe.ts",
 		]) {
 			expect(results[filePath], filePath).toContain("@nx(enforce-module-boundaries)");
 		}
 		expect(results["apps/web/vite.boundary-allowed-probe.ts"]).toEqual([]);
+		expect(results["packages/diagrams/src/domain-boundary-allowed-probe.ts"]).toEqual([]);
 	});
 
 	it("permits Effect across projects while enforcing schema and React boundaries", () => {

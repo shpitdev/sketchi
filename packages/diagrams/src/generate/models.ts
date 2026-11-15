@@ -1,3 +1,5 @@
+import { stripGoogleModelPrefix } from "@sketchi/cloudflare/ai-gateway";
+
 /** Every model a generate request may name. Adding a model here is the whole change. */
 export const SUPPORTED_GENERATION_MODELS = ["gemini-3.1-flash-lite"] as const;
 
@@ -23,14 +25,4 @@ export function isSupportedGenerationModel(model: string): model is SupportedGen
  */
 export function isLegacyCliDefaultModel(model: string): boolean {
 	return stripGoogleModelPrefix(model) === "gemini-3.1-flash-lite";
-}
-
-/** The bare model id for a Google route, without its gateway routing prefix. */
-export function stripGoogleModelPrefix(model: string): string {
-	return model.replace(/^google-ai-studio\//, "").replace(/^google\//, "");
-}
-
-/** The bare model id for an Anthropic route, without its gateway routing prefix. */
-export function stripAnthropicModelPrefix(model: string): string {
-	return model.replace(/^anthropic\//, "");
 }

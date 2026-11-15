@@ -17,7 +17,7 @@ import { zoneFixtures, zoneStressFixtures } from "../families/flowchart/zone-fix
 import { describe, expect, it, vi } from "vitest";
 import { arrowCrossings, renderIntermediateDiagram } from "./scene";
 import { renderErDiagram } from "../families/er/render";
-import { renderClassDiagram } from "../families/class/diagram";
+import { renderClassDiagram } from "../families/class/render";
 import { renderStateMachineDiagram } from "../families/state-machine/render";
 
 // Count the segment geometry checks the router makes through diagram-core, and

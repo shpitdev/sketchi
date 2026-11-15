@@ -178,6 +178,33 @@
 						],
 						"depConstraints": [
 							{
+								"sourceTag": "domain:drawing",
+								"onlyDependOnLibsWithTags": [
+									"domain:drawing",
+									"domain:cloudflare",
+									"domain:observability"
+								]
+							},
+							{
+								"sourceTag": "domain:icons",
+								"onlyDependOnLibsWithTags": [
+									"domain:icons",
+									"domain:drawing",
+									"domain:cloudflare",
+									"domain:observability"
+								]
+							},
+							{
+								"sourceTag": "domain:diagrams",
+								"onlyDependOnLibsWithTags": [
+									"domain:diagrams",
+									"domain:drawing",
+									"domain:icons",
+									"domain:cloudflare",
+									"domain:observability"
+								]
+							},
+							{
 								"sourceTag": "scope:package",
 								"onlyDependOnLibsWithTags": ["scope:package"]
 							},

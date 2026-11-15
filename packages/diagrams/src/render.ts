@@ -15,7 +15,7 @@ import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { renderSequenceDiagram } from "./families/sequence/render.js";
 import { renderStateMachineDiagram } from "./families/state-machine/render.js";
 import { renderErDiagram } from "./families/er/render.js";
-import { renderClassDiagram } from "./families/class/diagram.js";
+import { renderClassDiagram } from "./families/class/render.js";
 import { renderOrgChartDiagram } from "./families/org-chart/render.js";
 import { renderVennDiagram } from "./families/venn/render.js";
 import { renderJourneyDiagram } from "./families/journey/render.js";

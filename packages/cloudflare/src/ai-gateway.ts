@@ -42,3 +42,13 @@ export function parseJsonResponse(text: string): unknown {
 export function isTransientHttpStatus(status: number): boolean {
 	return status === 408 || status === 425 || status === 429 || status >= 500;
 }
+
+/** The bare model id for a Google route, without its gateway routing prefix. */
+export function stripGoogleModelPrefix(model: string): string {
+	return model.replace(/^google-ai-studio\//, "").replace(/^google\//, "");
+}
+
+/** The bare model id for an Anthropic route, without its gateway routing prefix. */
+export function stripAnthropicModelPrefix(model: string): string {
+	return model.replace(/^anthropic\//, "");
+}

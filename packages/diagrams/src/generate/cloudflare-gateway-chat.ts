@@ -16,6 +16,8 @@ import {
 	CloudflareAiGatewayBinding,
 	isTransientHttpStatus,
 	parseJsonResponse,
+	stripAnthropicModelPrefix,
+	stripGoogleModelPrefix,
 } from "@sketchi/cloudflare/ai-gateway";
 import {
 	DiagramGenerationHttpError,
@@ -29,7 +31,7 @@ import {
 	DEFAULT_MAX_OUTPUT_TOKENS,
 	DEFAULT_TEMPERATURE,
 } from "./messages.js";
-import { stripAnthropicModelPrefix, stripGoogleModelPrefix } from "./models.js";
+
 import { DiagramFamilyNarrowing } from "./family-narrowing.js";
 import { runDiagramGenerationWithPolicy } from "./policy.js";
 

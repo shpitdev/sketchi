@@ -18,7 +18,6 @@
 		"@sketchi/observability": "workspace:*",
 		"effect": "catalog:",
 		"google-auth-library": "catalog:",
-		"@sketchi/diagrams": "workspace:*",
 		"@sketchi/cloudflare": "workspace:*"
 	},
 	"devDependencies": {

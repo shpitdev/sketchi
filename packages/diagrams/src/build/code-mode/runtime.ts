@@ -148,7 +148,7 @@ import {
 	isStructurallyValidErOptional,
 	isStructurallyValidErTable,
 } from "../../families/er/render.js";
-import { renderClassDiagram, isStructurallyValidClassBox } from "../../families/class/diagram.js";
+import { renderClassDiagram, isStructurallyValidClassBox } from "../../families/class/render.js";
 import { renderOrgChartDiagram } from "../../families/org-chart/render.js";
 import { renderVennDiagram, isStructurallyValidVennSet } from "../../families/venn/render.js";
 import {

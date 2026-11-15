@@ -23,6 +23,10 @@ const config: StorybookConfig = {
 		viteConfig.plugins = [...(viteConfig.plugins ?? []), excalidrawFonts()];
 		viteConfig.resolve ??= {};
 		viteConfig.resolve.alias = {
+			"@sketchi/diagrams": new URL(
+				"../../../packages/diagrams/src/",
+				import.meta.url,
+			).pathname.slice(0, -1),
 			...viteConfig.resolve.alias,
 			"@sketchi/playground/styles.css": new URL(
 				"../../playground/src/styles/app.css",

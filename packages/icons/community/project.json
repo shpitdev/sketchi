@@ -3,7 +3,7 @@
 	"$schema": "../../../node_modules/nx/schemas/project-schema.json",
 	"sourceRoot": "packages/icons/community/src",
 	"projectType": "library",
-	"tags": ["scope:package", "type:persistence"],
+	"tags": ["scope:package", "type:persistence", "domain:icons"],
 	"targets": {
 		"build": {
 			"executor": "nx:run-commands",

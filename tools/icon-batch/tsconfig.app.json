@@ -10,9 +10,6 @@
       "path": "../../packages/cloudflare/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/diagrams/tsconfig.lib.json"
-    },
-    {
       "path": "../../packages/drawing/tsconfig.lib.json"
     },
     {

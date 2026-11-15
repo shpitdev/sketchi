@@ -13,9 +13,6 @@
   "exclude": ["src/**/*.test.ts"],
   "references": [
     {
-      "path": "../diagrams/tsconfig.lib.json"
-    },
-    {
       "path": "../drawing/tsconfig.lib.json"
     }
   ]

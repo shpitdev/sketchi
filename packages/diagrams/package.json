@@ -55,10 +55,6 @@
 			"types": "./dist/families/chart/scale.d.ts",
 			"default": "./dist/families/chart/scale.js"
 		},
-		"./families/class/diagram": {
-			"types": "./dist/families/class/diagram.d.ts",
-			"default": "./dist/families/class/diagram.js"
-		},
 		"./families/class/document": {
 			"types": "./dist/families/class/document.d.ts",
 			"default": "./dist/families/class/document.js"
@@ -382,6 +378,10 @@
 		"./types": {
 			"types": "./dist/types.d.ts",
 			"default": "./dist/types.js"
+		},
+		"./families/class/render": {
+			"types": "./dist/families/class/render.d.ts",
+			"default": "./dist/families/class/render.js"
 		}
 	},
 	"dependencies": {
