@@ -1,6 +1,6 @@
 import { inputIssues, formatContractSchemaError } from "../../build/input.js";
 /** Owns Flowchart build policy; decoding, quality gates and artifact delivery use the common operation. */
-import { Effect, Result, Schema } from "effect";
+import { Array, Effect, Record, Result, Schema } from "effect";
 import { defineBuild } from "../../build/operation.js";
 import { CodeModeIssue, qualityIssues } from "../../build/result.js";
 import {
@@ -69,7 +69,7 @@ export const flowchartBuild = defineBuild({
 	inputIssues: (error) => inputIssues(formatContractSchemaError(error)),
 	documentStatus: (error) =>
 		!Schema.isSchemaError(error) &&
-		error.issues.some((entry) => entry.code === "flowchart_too_large")
+		Array.some(error.issues, (entry) => entry.code === "flowchart_too_large")
 			? "limit_exceeded"
 			: "invalid_flowchart",
 	prepare: (input: unknown) => {
@@ -92,13 +92,13 @@ export const flowchartBuild = defineBuild({
 	counts,
 	issues: (error): CodeModeIssue[] =>
 		Schema.isSchemaError(error)
-			? inputIssues(
-					formatContractSchemaError(error),
-					() =>
-						"Give every title, label, id and note visible text, not only spaces or tool-call debris.",
-				)
-					.slice(0, FLOWCHART_MAX_ISSUES)
-					.map((entry) => ({
+			? Array.map(
+					inputIssues(
+						formatContractSchemaError(error),
+						() =>
+							"Give every title, label, id and note visible text, not only spaces or tool-call debris.",
+					).slice(0, FLOWCHART_MAX_ISSUES),
+					(entry) => ({
 						...entry,
 						stage: "flowchart",
 						ref: {
@@ -106,8 +106,9 @@ export const flowchartBuild = defineBuild({
 							path:
 								entry.ref?.path && entry.ref.path !== "input" ? `spec.${entry.ref.path}` : "spec",
 						},
-					}))
-			: error.issues.map((entry) => ({
+					}),
+				)
+			: Array.map(error.issues, (entry) => ({
 					code: entry.code,
 					severity: "error",
 					stage: "flowchart",
@@ -134,27 +135,26 @@ export const flowchartBuild = defineBuild({
 		const logos = resolveFlowchartLogos(authoredSpec, catalog);
 		const normalizedSpec: NormalizedFlowchartSpec = {
 			...authoredSpec,
-			nodes: Object.fromEntries(
-				Object.entries(authoredSpec.nodes).map(([id, node]) => {
-					const slug = logos.icons.get(id);
-					if (typeof node === "string") return [id, slug ? { label: node, icon: slug } : node];
-					if (slug) return [id, { ...node, icon: slug }];
-					if (typeof node.icon !== "string") return [id, node];
-					const { icon: _icon, ...rest } = node;
-					return [id, Object.keys(rest).length === 1 ? rest.label : rest];
-				}),
-			),
+			nodes: Record.map(authoredSpec.nodes, (node, id) => {
+				const slug = logos.icons.get(id);
+				if (typeof node === "string") return slug ? { label: node, icon: slug } : node;
+				if (slug) return { ...node, icon: slug };
+				if (typeof node.icon !== "string") return node;
+				const { icon: _icon, ...rest } = node;
+				return Record.keys<string, unknown>(rest).length === 1 ? rest.label : rest;
+			}),
 		};
 		const built = flowchartDiagramFromDocument(normalizedSpec, { nodeIcons: logos.icons });
 		const groupLogos =
 			built.ok && normalizedSpec.logos
 				? fillGroupLogos(
-						built.diagram.groups?.map((group) => ({
-							id: group.id,
-							label: group.label,
-							...(group.parent ? { parent: group.parent } : {}),
-						})),
-						built.diagram.nodes.map((node) => ({
+						built.diagram.groups &&
+							Array.map(built.diagram.groups, (group) => ({
+								id: group.id,
+								label: group.label,
+								...(group.parent ? { parent: group.parent } : {}),
+							})),
+						Array.map(built.diagram.nodes, (node) => ({
 							...(node.group ? { group: node.group } : {}),
 							...(node.icon ? { icon: node.icon } : {}),
 						})),
@@ -169,10 +169,12 @@ export const flowchartBuild = defineBuild({
 						? built.diagram
 						: {
 								...built.diagram,
-								groups: built.diagram.groups?.map((group) => {
-									const slug = groupLogos.logos.get(group.id);
-									return slug ? { ...group, icon: { slug } } : group;
-								}),
+								groups:
+									built.diagram.groups &&
+									Array.map(built.diagram.groups, (group) => {
+										const slug = groupLogos.logos.get(group.id);
+										return slug ? { ...group, icon: { slug } } : group;
+									}),
 							},
 				)
 			: Result.fail(FlowchartValidationError.fromIssues(built.issues));
@@ -181,7 +183,7 @@ export const flowchartBuild = defineBuild({
 			checked,
 			storedDocument: { type: "flowchart", spec: authoredSpec },
 			issues: [
-				...normalized.notes.map((message): CodeModeIssue => ({
+				...Array.map(normalized.notes, (message): CodeModeIssue => ({
 					code: "reference_resolved",
 					hint: "Use the resolved declared id in future references.",
 					severity: "info",
@@ -199,7 +201,7 @@ export const flowchartBuild = defineBuild({
 	qualityIssues,
 	render: renderFlowchartDiagram,
 	warnings: (diagram, request, scene): CodeModeIssue[] => [
-		...longNodeDescriptions(scene).map((id): CodeModeIssue => ({
+		...Array.map(longNodeDescriptions(scene), (id): CodeModeIssue => ({
 			code: "label_too_long",
 			severity: "warning",
 			stage: "render",
@@ -209,7 +211,7 @@ export const flowchartBuild = defineBuild({
 		})),
 		...(request === undefined
 			? []
-			: checkRequestCoverage(request, diagram).flatMap((entry): CodeModeIssue[] =>
+			: Array.flatMap(checkRequestCoverage(request, diagram), (entry): CodeModeIssue[] =>
 					isFlowchartCoverageCode(entry.code)
 						? [
 								{
