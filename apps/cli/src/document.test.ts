@@ -46,6 +46,48 @@ describe("canonical document decoding", () => {
 		}),
 	);
 
+	it.effect("reports spec-relative schema paths once for converted and unconverted families", () =>
+		Effect.gen(function* () {
+			for (const type of ["sequence", "mindmap", "venn", "flowchart", "timeline"]) {
+				const error = yield* Effect.flip(
+					parseJsonDocument(JSON.stringify({ type, spec: { title: 42 } })),
+				);
+				assert.strictEqual(error._tag, "CliValidationError");
+				if (error._tag === "CliValidationError") {
+					assert.isTrue(
+						error.details.some((detail) => detail.startsWith("spec.title:")),
+						type,
+					);
+					assert.isFalse(
+						error.details.some((detail) => detail.startsWith("spec.spec.")),
+						type,
+					);
+				}
+			}
+		}),
+	);
+
+	it.effect("rejects oversized mindmap slots before decoding malformed children", () =>
+		Effect.gen(function* () {
+			const error = yield* Effect.flip(
+				parseJsonDocument(
+					JSON.stringify({
+						type: "mindmap",
+						spec: {
+							title: "Too many",
+							root: { label: "Root", children: Array.from({ length: 201 }, () => null) },
+						},
+					}),
+				),
+			);
+			assert.strictEqual(error._tag, "CliValidationError");
+			if (error._tag === "CliValidationError") {
+				assert.strictEqual(error.details.length, 1);
+				assert.include(error.details[0], "maximum of 200 topic slots");
+			}
+		}),
+	);
+
 	it.effect("derives a deterministic id when the shared spec omits one", () =>
 		Effect.gen(function* () {
 			const document = yield* parseJsonDocument(

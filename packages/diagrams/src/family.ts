@@ -163,9 +163,13 @@ function family<
 		decodeDocument: (input: unknown) =>
 			Effect.fromResult(build.prepare({ spec: input })).pipe(
 				Effect.flatMap((prepared) =>
-					Schema.decodeUnknownEffect(build.request, { errors: "all" })(prepared),
+					Schema.decodeUnknownEffect(build.document, { errors: "all" })(
+						typeof prepared === "object" && prepared !== null && "spec" in prepared
+							? prepared.spec
+							: undefined,
+					),
 				),
-				Effect.map((request) => ({ type, spec: request.spec })),
+				Effect.map((spec) => ({ type, spec })),
 			),
 		build: (runtime: Pick<typeof Runtime, "bindBuild">) =>
 			runtime.bindBuild(definition.operation, build),
