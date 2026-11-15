@@ -1,0 +1,112 @@
+[
+	{
+		"id": "node:start",
+		"angle": 0,
+		"fillStyle": "solid",
+		"frameId": null,
+		"index": "a0",
+		"isDeleted": false,
+		"link": null,
+		"locked": false,
+		"opacity": 100,
+		"roughness": 1,
+		"seed": 599150287,
+		"strokeStyle": "solid",
+		"strokeWidth": 2,
+		"updated": 1,
+		"version": 1,
+		"versionNonce": 599150288,
+		"type": "ellipse",
+		"x": 116.5,
+		"y": 48,
+		"width": 184,
+		"height": 72,
+		"backgroundColor": "transparent",
+		"boundElements": [
+			{
+				"id": "edge:check->start",
+				"type": "arrow"
+			}
+		],
+		"roundness": null,
+		"strokeColor": "#8f707f"
+	},
+	{
+		"id": "node:check",
+		"angle": 0,
+		"fillStyle": "solid",
+		"frameId": null,
+		"index": "a1",
+		"isDeleted": false,
+		"link": null,
+		"locked": false,
+		"opacity": 100,
+		"roughness": 1,
+		"seed": 740018551,
+		"strokeStyle": "solid",
+		"strokeWidth": 2,
+		"updated": 1,
+		"version": 1,
+		"versionNonce": 740018552,
+		"type": "diamond",
+		"x": 116.5,
+		"y": 216,
+		"width": 184,
+		"height": 79,
+		"backgroundColor": "transparent",
+		"boundElements": [
+			{
+				"id": "edge:check->start",
+				"type": "arrow"
+			}
+		],
+		"roundness": null,
+		"strokeColor": "#8f707f"
+	},
+	{
+		"id": "edge:check->start",
+		"angle": 0,
+		"fillStyle": "solid",
+		"frameId": null,
+		"index": "aA",
+		"isDeleted": false,
+		"link": null,
+		"locked": false,
+		"opacity": 100,
+		"roughness": 1,
+		"seed": 496148075,
+		"strokeStyle": "solid",
+		"strokeWidth": 2,
+		"updated": 1,
+		"version": 1,
+		"versionNonce": 496148076,
+		"type": "arrow",
+		"x": 116.64634146341473,
+		"y": 255.5,
+		"width": -1.1463414634147284,
+		"height": -171.5,
+		"backgroundColor": "transparent",
+		"boundElements": null,
+		"elbowed": false,
+		"endArrowhead": "arrow",
+		"endBinding": {
+			"elementId": "node:start",
+			"focus": 0,
+			"gap": 1
+		},
+		"points": [
+			[0, 0],
+			[-57.14634146341473, 0],
+			[-57.14634146341473, -171.5],
+			[-1.1463414634147284, -171.5]
+		],
+		"roundness": null,
+		"startArrowhead": null,
+		"startBinding": {
+			"elementId": "node:check",
+			"focus": 0,
+			"gap": 1
+		},
+		"strokeColor": "#8f707f"
+	}
+]

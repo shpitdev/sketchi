@@ -37,6 +37,6 @@ export function createFoldedRouteRelease(mutateElement: MutateElement) {
 			const arrow = live.get(id);
 			if (arrow && isArrow(arrow)) routeReleased(mutateElement, arrow);
 		}
-		return next;
+		return api.getSceneElementsIncludingDeleted();
 	};
 }
