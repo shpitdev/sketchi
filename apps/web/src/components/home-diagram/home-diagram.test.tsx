@@ -7,13 +7,21 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { HomeDiagram } from "./home-diagram";
 import { HOME_DIAGRAM } from "./home-diagram-data";
 
-const editor = vi.hoisted(() => ({ loads: 0, mounts: 0, ready: Promise.withResolvers<void>() }));
+const editor = vi.hoisted(() => ({
+	loads: 0,
+	mounts: 0,
+	started: Promise.withResolvers<void>(),
+	ready: Promise.withResolvers<void>(),
+	stylesheetStarted: Promise.withResolvers<void>(),
+	stylesheetReady: Promise.withResolvers<void>(),
+}));
 
 // diagram-ui's loader sets Excalidraw's asset path and imports it; this stands in for both.
 vi.mock("@sketchi/diagram-ui", () => ({
 	createFoldedRouteRelease: () => () => undefined,
 	loadExcalidraw: async () => {
 		editor.loads += 1;
+		editor.started.resolve();
 		await editor.ready.promise;
 		return {
 			mutateElement: () => undefined,
@@ -36,6 +44,13 @@ vi.mock("@sketchi/diagram-ui", () => ({
 		};
 	},
 }));
+
+// The stylesheet is a separate parallel module load; editor code being ready does not finish it.
+vi.mock("@excalidraw/excalidraw/index.css", async () => {
+	editor.stylesheetStarted.resolve();
+	await editor.stylesheetReady.promise;
+	return {};
+});
 
 const media = (file: string) =>
 	readFileSync(resolve(process.cwd(), "apps/web/public/media", file), "utf8");
@@ -118,6 +133,7 @@ describe("HomeDiagram", () => {
 		render(<HomeDiagram />);
 
 		const loads = editor.loads;
+		editor.started = Promise.withResolvers<void>();
 		const button = screen.getByRole("button", { name: "Edit diagram" });
 		button.focus();
 		fireEvent.click(button);
@@ -127,16 +143,23 @@ describe("HomeDiagram", () => {
 		expect(screen.getByRole("img", { name: HOME_DIAGRAM.alt })).toBeDefined();
 		await act(async () => {
 			response.resolve(Response.json(scene));
-			await vi.dynamicImportSettled();
+			await editor.started.promise;
+			await editor.stylesheetStarted.promise;
 		});
 		expect(editor.loads).toBe(loads + 1);
 		expect(screen.getByRole("figure").getAttribute("aria-busy")).toBe("true");
 		expect(screen.queryByTestId("editor")).toBeNull();
 		await act(async () => {
 			editor.ready.resolve();
-			await vi.dynamicImportSettled();
 		});
-		const canvas = screen.getByTestId("editor");
+		// All parallel dependencies must finish, not just the editor module and scene.
+		expect(screen.getByRole("figure").getAttribute("aria-busy")).toBe("true");
+		expect(screen.queryByTestId("editor")).toBeNull();
+		await act(async () => {
+			editor.stylesheetReady.resolve();
+		});
+		const canvas = await screen.findByTestId("editor");
+		expect(screen.getByRole("figure").getAttribute("aria-busy")).toBe("false");
 		// The same button becomes Reset, so a keyboard user is not dropped back to the page.
 		expect(document.activeElement).toBe(screen.getByRole("button", { name: "Reset diagram" }));
 		expect(fetch).toHaveBeenCalledWith(HOME_DIAGRAM.scene);

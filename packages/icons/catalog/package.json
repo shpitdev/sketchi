@@ -35,10 +35,15 @@
 		},
 		"./node-logos/*": "./dist/node-logos/*",
 		"./svg/*": "./svg/*",
-		"./package.json": "./package.json"
+		"./package.json": "./package.json",
+		"./http-api": {
+			"types": "./dist/http-api.d.ts",
+			"default": "./dist/http-api.js"
+		}
 	},
 	"dependencies": {
-		"fast-xml-parser": "5.11.2"
+		"fast-xml-parser": "5.11.2",
+		"effect": "catalog:"
 	},
 	"devDependencies": {
 		"@resvg/resvg-wasm": "2.6.2",

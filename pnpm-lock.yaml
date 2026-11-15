@@ -392,6 +392,9 @@ importers:
       '@resvg/resvg-wasm':
         specifier: 2.6.2
         version: 2.6.2
+      '@sketchi/community-icons':
+        specifier: workspace:*
+        version: link:../../packages/icons/community
       '@sketchi/diagram-agent':
         specifier: workspace:*
         version: link:../../packages/diagram/agent
@@ -462,6 +465,9 @@ importers:
       '@sketchi/icon-catalog':
         specifier: workspace:*
         version: link:../../packages/icons/catalog
+      '@sketchi/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@sketchi/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -748,6 +754,9 @@ importers:
 
   packages/icons/catalog:
     dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
       fast-xml-parser:
         specifier: 5.11.2
         version: 5.11.2

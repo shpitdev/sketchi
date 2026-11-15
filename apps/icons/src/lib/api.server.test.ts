@@ -1,18 +1,30 @@
 // @vitest-environment node
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
-import {
-	handleIconDetailRequest,
-	handleIconDetailHeadRequest,
-	handleIconSearchRequest,
-	handleRawIconRequest,
-	parseIconLimit,
-} from "./api.server";
+import { parseIconLimit } from "./api.server";
+import { makeIconsHttpHandler } from "./http.server";
+const runtime = makeIconsHttpHandler();
+afterAll(() => runtime.dispose());
+const execute = (request: Request, sourceLoader = async () => "<svg />") =>
+	runtime.fetch(
+		request,
+		{ ASSETS: { fetch: async () => new Response(await sourceLoader()) } },
+		{ waitUntil: () => {} },
+	);
+const handleIconSearchRequest = execute;
+const handleIconDetailRequest = (
+	request: Request,
+	_slug: string,
+	sourceLoader: () => Promise<string>,
+) => execute(request, sourceLoader);
+const handleRawIconRequest = handleIconDetailRequest;
+const handleIconDetailHeadRequest = () =>
+	execute(new Request("https://icons.test/api/icons/postgresql", { method: "HEAD" }));
 
 describe("icon HTTP API", () => {
 	it("returns ranked alias matches with stable agent URLs", async () => {
-		const response = handleIconSearchRequest(
+		const response = await handleIconSearchRequest(
 			new Request("https://icons.sketchi.app/api/icons?q=k8s&limit=5"),
 		);
 		const payload: unknown = await response.json();
@@ -30,6 +42,19 @@ describe("icon HTTP API", () => {
 			total: 1,
 		});
 		expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+	});
+
+	it("uses the first repeated query value and keeps an omitted collection null", async () => {
+		const response = await execute(
+			new Request("https://icons.test/api/icons?q=%20k8s%20&q=aws&limit=no&limit=1"),
+		);
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({
+			query: "k8s",
+			collection: null,
+			count: 1,
+			results: [{ slug: "kubernetes" }],
+		});
 	});
 
 	it("resolves a folded Google Cloud console slug to the product's core icon", async () => {
@@ -75,16 +100,16 @@ describe("icon HTTP API", () => {
 	});
 
 	it("says how each mark stays visible on dark and light backgrounds", async () => {
-		const payload = (await handleIconSearchRequest(
-			new Request("https://icons.test/api/icons?q=vercel&limit=1"),
+		const payload = (await (
+			await handleIconSearchRequest(new Request("https://icons.test/api/icons?q=vercel&limit=1"))
 		).json()) as { results: unknown[] };
 		expect(payload.results[0]).toMatchObject({
 			colorMode: "mono-dark",
 			onDark: "invert",
 			slug: "vercel",
 		});
-		const aws = (await handleIconSearchRequest(
-			new Request("https://icons.test/api/icons?q=aws&limit=1"),
+		const aws = (await (
+			await handleIconSearchRequest(new Request("https://icons.test/api/icons?q=aws&limit=1"))
 		).json()) as { results: unknown[] };
 		expect(aws.results[0]).toMatchObject({ colorMode: "multicolor", onDark: "plate", slug: "aws" });
 	});
@@ -101,8 +126,8 @@ describe("icon HTTP API", () => {
 		await expect(response.text()).resolves.toBe("Icon not found.");
 	});
 
-	it("returns method and CORS headers for non-SVG HEAD requests", () => {
-		const response = handleIconDetailHeadRequest();
+	it("returns method and CORS headers for non-SVG HEAD requests", async () => {
+		const response = await handleIconDetailHeadRequest();
 		expect(response.status).toBe(405);
 		expect(response.headers.get("Allow")).toBe("GET, OPTIONS");
 		expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");

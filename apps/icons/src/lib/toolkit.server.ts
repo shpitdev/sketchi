@@ -1,15 +1,7 @@
-import { Array, Context, Effect, Schema, String } from "effect";
+import { IconDetail, IconSearchPage } from "@sketchi/icon-catalog/http-api";
+import { Array, Effect, Schema, String } from "effect";
 import { Tool, Toolkit } from "effect/ai";
-import { getIconDetail, searchIconResults } from "./api.server.js";
-import type { IconSourceLoader } from "./catalog.server.js";
-
-export class IconToolSource extends Context.Service<
-	IconToolSource,
-	{
-		readonly origin: string;
-		readonly sourceLoader: IconSourceLoader;
-	}
->()("sketchi/icons/ToolSource") {}
+import { getIconDetail, searchIconResults, IconSource, IconSourceError } from "./api.server.js";
 
 export class IconNotFound extends Schema.TaggedError<
 	IconNotFound,
@@ -17,40 +9,6 @@ export class IconNotFound extends Schema.TaggedError<
 >()("IconNotFound", {
 	message: Schema.String,
 }) {}
-
-export class IconSourceError extends Schema.TaggedError<
-	IconSourceError,
-	{ readonly brand: unique symbol }
->()("IconSourceError", {
-	cause: Schema.Defect(),
-	message: Schema.String,
-}) {}
-
-const surfaceTreatment = Schema.Literals(["invert", "plate"]);
-const IconSearchResult = Schema.Struct({
-	aliases: Schema.Array(Schema.String),
-	collection: Schema.String,
-	colorMode: Schema.Literals(["mono-dark", "mono-light", "multicolor"]),
-	detailUrl: Schema.String,
-	keywords: Schema.Array(Schema.String),
-	name: Schema.String,
-	onDark: Schema.optionalKey(surfaceTreatment),
-	onLight: Schema.optionalKey(surfaceTreatment),
-	slug: Schema.String,
-	svgUrl: Schema.String,
-});
-const IconDetail = Schema.Struct({
-	...IconSearchResult.fields,
-	bytes: Schema.Number,
-	svg: Schema.String,
-	variant: Schema.optionalKey(Schema.String),
-	viewBox: Schema.Struct({
-		height: Schema.Number,
-		minX: Schema.Number,
-		minY: Schema.Number,
-		width: Schema.Number,
-	}),
-});
 
 const SearchIcons = Tool.make("search_icons", {
 	description:
@@ -70,14 +28,8 @@ const SearchIcons = Tool.make("search_icons", {
 			}),
 		),
 	}),
-	success: Schema.Struct({
-		collection: Schema.NullOr(Schema.String),
-		count: Schema.Number,
-		query: Schema.String,
-		results: Schema.Array(IconSearchResult),
-		total: Schema.Number,
-	}),
-	dependencies: [IconToolSource],
+	success: IconSearchPage,
+	dependencies: [IconSource],
 })
 	.annotate(Tool.Title, "Search Sketchi icons")
 	.annotate(Tool.Readonly, true)
@@ -94,7 +46,7 @@ const GetIcon = Tool.make("get_icon", {
 	}),
 	success: IconDetail,
 	failure: Schema.Union([IconNotFound, IconSourceError]),
-	dependencies: [IconToolSource],
+	dependencies: [IconSource],
 })
 	.annotate(Tool.Title, "Get a Sketchi icon")
 	.annotate(Tool.Readonly, true)
@@ -104,19 +56,11 @@ const GetIcon = Tool.make("get_icon", {
 export const IconToolkit = Toolkit.make(SearchIcons, GetIcon);
 export const IconToolHandlers = IconToolkit.toLayer({
 	search_icons: Effect.fn("icons.tools.search")(function* (input) {
-		const { origin } = yield* IconToolSource;
+		const { origin } = yield* IconSource;
 		return searchIconResults({ origin, ...input, ...(input.q ? { query: input.q } : {}) });
 	}),
 	get_icon: Effect.fn("icons.tools.get")(function* ({ slug }) {
-		const { origin, sourceLoader } = yield* IconToolSource;
-		const detail = yield* Effect.tryPromise({
-			try: (signal) => getIconDetail(new Request(origin, { signal }), slug, sourceLoader),
-			catch: (cause) =>
-				new IconSourceError({
-					cause,
-					message: cause instanceof Error ? cause.message : "Icon source failed.",
-				}),
-		});
+		const detail = yield* getIconDetail(slug);
 		return detail ?? (yield* new IconNotFound({ message: `Icon ${slug} was not found.` }));
 	}),
 });

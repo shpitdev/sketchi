@@ -1,17 +1,40 @@
 import { DatabaseSync } from "node:sqlite";
 
-import { Effect, Layer } from "effect";
-import { describe, expect, it } from "vitest";
+import { Context, Effect, Layer } from "effect";
+import { afterAll, describe, expect, it } from "vitest";
 
-import {
-	handleCommunityDetail,
-	handleCommunityList,
-	handleCommunityPublish,
-	handleCommunityVisibility,
-	type CommunityEnv,
-} from "./http.js";
+import { HttpRouter, HttpServer } from "effect/http";
+import { HttpApiBuilder, HttpApiTest } from "effect/http-api";
+import { CommunityHttpHandlers, CommunityHttpRequest, type CommunityEnv } from "./http.js";
+import { CommunityHttpApi } from "./http-api.js";
 import { CommunityIconModeration } from "./moderation.js";
 import type { CommunityIconDatabase, CommunityIconStatement } from "./store.js";
+
+const runtime = HttpRouter.toWebHandler(
+	HttpApiBuilder.layer(CommunityHttpApi).pipe(
+		Layer.provide(CommunityHttpHandlers),
+		Layer.provide(HttpServer.layerServices),
+	),
+	{ disableLogger: true },
+);
+afterAll(() => runtime.dispose());
+function handleCommunityPublish(
+	request: Request,
+	env: CommunityEnv,
+	options: { readonly moderation?: Layer.Layer<CommunityIconModeration> } = {},
+) {
+	return runtime.handler(
+		request,
+		Context.make(CommunityHttpRequest, { env, origin: new URL(request.url).origin, ...options }),
+	);
+}
+const handleCommunityList = handleCommunityPublish;
+function handleCommunityDetail(request: Request, env: CommunityEnv, slug: string) {
+	const url = new URL(request.url);
+	url.pathname = `/api/community/${encodeURIComponent(slug)}`;
+	return handleCommunityPublish(new Request(url, request), env);
+}
+const handleCommunityVisibility = handleCommunityDetail;
 
 function sqliteDatabase(): CommunityIconDatabase {
 	const sqlite = new DatabaseSync(":memory:");
@@ -60,6 +83,62 @@ function publish(body: unknown, env: CommunityEnv, moderation = allow, headers: 
 }
 
 describe("community icon API", () => {
+	it("serves published recipes and typed missing outcomes through the generated client", async () => {
+		const env = { COMMUNITY_ICONS: sqliteDatabase() };
+		const requestLayer = Layer.succeed(CommunityHttpRequest, {
+			env,
+			origin: ORIGIN,
+			moderation: allow,
+		});
+		await Effect.runPromise(
+			Effect.gen(function* () {
+				const client = yield* HttpApiTest.groups(CommunityHttpApi, ["community"], {
+					baseUrl: ORIGIN,
+				});
+				const created = yield* client.community.publish({
+					payload: { name: "Ring queue", recipe: RING },
+					responseMode: "decoded-and-response",
+				});
+				expect(created[1].status).toBe(201);
+				expect(created[0].recipe).toEqual(RING);
+				const page = yield* client.community.list({ query: { q: "  Ring " } });
+				expect(page.query).toBe("Ring");
+				expect(page.results.map((icon) => icon.slug)).toEqual(["community/ring-queue"]);
+				const missing = yield* client.community
+					.detail({ params: { slug: "missing" } })
+					.pipe(Effect.result);
+				expect(missing).toMatchObject({
+					_tag: "Failure",
+					failure: { error: { code: "not_found" } },
+				});
+			}).pipe(
+				Effect.provide(
+					CommunityHttpHandlers.pipe(
+						Layer.provide(requestLayer),
+						HttpRouter.provideRequest(requestLayer),
+					),
+				),
+				Effect.provide(HttpServer.layerServices),
+				Effect.scoped,
+			),
+		);
+	});
+
+	it("uses the first repeated query value and retains blank/default pagination behavior", async () => {
+		const env = { COMMUNITY_ICONS: sqliteDatabase() };
+		await publish({ name: "Ring queue", recipe: RING }, env);
+		const page = await handleCommunityList(
+			new Request(`${ORIGIN}/api/community?q=%20Ring%20&q=missing&limit=bad&limit=1`),
+			env,
+		);
+		expect(page.status).toBe(200);
+		expect(await page.json()).toMatchObject({
+			query: "Ring",
+			count: 1,
+			results: [{ name: "Ring queue" }],
+		});
+	});
+
 	it("publishes an icon, then finds it by slug and in search", async () => {
 		const env = { COMMUNITY_ICONS: sqliteDatabase() };
 		const created = await publish({ name: "Ring queue", recipe: RING }, env);

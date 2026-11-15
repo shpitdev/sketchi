@@ -1,79 +1,74 @@
-import { isIconRecipe, type IconRecipe } from "@sketchi/diagram-core/icon-recipe";
+import { CommunityHttpApi, type CommunityIconResult } from "@sketchi/community-icons/http-api";
+import { Effect, String } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { HttpApiClient } from "effect/http-api";
 
-/** A community icon as the gallery shows it; `slug` is `community/<slug>`. */
-export interface CommunityIconEntry {
-	readonly slug: string;
-	readonly name: string;
-	readonly recipe: IconRecipe;
-	readonly createdAt: string;
-	readonly url: string;
-}
-
+/** React Query owns gallery state; this module only executes the shared HTTP contract. */
+export type CommunityIconEntry = Pick<
+	CommunityIconResult,
+	"slug" | "name" | "recipe" | "createdAt" | "url"
+>;
 export interface CommunityPage {
 	readonly icons: readonly CommunityIconEntry[];
 	readonly nextCursor?: string;
 }
-
-function entry(value: unknown): CommunityIconEntry | undefined {
-	if (typeof value !== "object" || value === null) return undefined;
-	const record = value as Record<string, unknown>;
-	const { slug, name, recipe, createdAt, url } = record;
-	if (
-		typeof slug !== "string" ||
-		typeof name !== "string" ||
-		typeof createdAt !== "string" ||
-		typeof url !== "string" ||
-		!isIconRecipe(recipe)
-	) {
-		return undefined;
-	}
-	return { slug, name, recipe, createdAt, url };
-}
-
-export async function fetchCommunityPage(input: {
+const decodePage = HttpApiClient.decodeResponse(CommunityHttpApi, {
+	group: "community",
+	endpoint: "list",
+});
+const decodeDetail = HttpApiClient.decodeResponse(CommunityHttpApi, {
+	group: "community",
+	endpoint: "detail",
+});
+const page = Effect.fn("Icons.community.page")(function* (input: {
+	readonly query: string;
+	readonly cursor?: string;
+}) {
+	const client = yield* HttpApiClient.make(CommunityHttpApi, { baseUrl: window.location.origin });
+	const response = yield* client.community.list({
+		query: {
+			...(String.trim(input.query) ? { q: String.trim(input.query) } : {}),
+			...(input.cursor ? { cursor: input.cursor } : {}),
+		},
+		responseMode: "response-only",
+	});
+	if (response.status < 200 || response.status >= 300)
+		return yield* Effect.fail(new Error(`Community icons returned HTTP ${response.status}.`));
+	const result = yield* decodePage(response);
+	return {
+		icons: result.results,
+		...(result.nextCursor === undefined ? {} : { nextCursor: result.nextCursor }),
+	} satisfies CommunityPage;
+});
+export function fetchCommunityPage(input: {
 	readonly query: string;
 	readonly cursor?: string;
 	readonly signal?: AbortSignal;
 }): Promise<CommunityPage> {
-	const params = new URLSearchParams();
-	if (input.query.trim()) params.set("q", input.query.trim());
-	if (input.cursor) params.set("cursor", input.cursor);
-	const response = await fetch(`/api/community${params.size ? `?${params}` : ""}`, {
-		...(input.signal ? { signal: input.signal } : {}),
+	return Effect.runPromise(page(input).pipe(Effect.provide(FetchHttpClient.layer)), {
+		signal: input.signal,
 	});
-	if (!response.ok) throw new Error(`Community icons returned HTTP ${response.status}.`);
-	const payload = (await response.json()) as { results?: unknown; nextCursor?: unknown };
-	const icons = Array.isArray(payload.results)
-		? payload.results.flatMap((value) => {
-				const icon = entry(value);
-				return icon ? [icon] : [];
-			})
-		: [];
-	return typeof payload.nextCursor === "string"
-		? { icons, nextCursor: payload.nextCursor }
-		: { icons };
 }
-
-/** The bare slug, for file names and element ids. */
 export function bareSlug(slug: string): string {
-	return slug.replace(/^community\//u, "");
+	return String.replace(/^community\//u, "")(slug);
 }
-
-/** A linked icon: found, or not published (never published, or hidden). */
 export type LinkedCommunityIcon =
 	| { readonly status: "found"; readonly icon: CommunityIconEntry }
 	| { readonly status: "missing" };
-
-/** One icon by slug; a 404 is a defined result, other failures throw. */
-export async function fetchCommunityIcon(
+const detail = Effect.fn("Icons.community.detail")(function* (slug: string) {
+	const client = yield* HttpApiClient.make(CommunityHttpApi, { baseUrl: window.location.origin });
+	const response = yield* client.community.detail({
+		params: { slug: bareSlug(slug) },
+		responseMode: "response-only",
+	});
+	if (response.status === 404) return { status: "missing" } as const;
+	if (response.status < 200 || response.status >= 300)
+		return yield* Effect.fail(new Error(`Community icon returned HTTP ${response.status}.`));
+	return { status: "found", icon: yield* decodeDetail(response) } as const;
+});
+export function fetchCommunityIcon(
 	slug: string,
 	signal?: AbortSignal,
 ): Promise<LinkedCommunityIcon> {
-	const response = await fetch(`/api/community/${encodeURIComponent(bareSlug(slug))}`, {
-		...(signal ? { signal } : {}),
-	});
-	if (response.status === 404) return { status: "missing" };
-	if (!response.ok) throw new Error(`Community icon returned HTTP ${response.status}.`);
-	const icon = entry(await response.json());
-	return icon ? { status: "found", icon } : { status: "missing" };
+	return Effect.runPromise(detail(slug).pipe(Effect.provide(FetchHttpClient.layer)), { signal });
 }

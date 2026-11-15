@@ -1,7 +1,8 @@
+import { IconSource } from "./api.server.js";
 // @vitest-environment node
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Stream } from "effect";
-import { IconToolHandlers, IconToolkit, IconToolSource } from "./toolkit.server";
+import { IconToolHandlers, IconToolkit } from "./toolkit.server";
 
 describe("shared Icons Toolkit", () => {
 	it.effect(
@@ -16,7 +17,7 @@ describe("shared Icons Toolkit", () => {
 						);
 					}).pipe(
 						Effect.provide(IconToolHandlers),
-						Effect.provideService(IconToolSource, {
+						Effect.provideService(IconSource, {
 							origin,
 							sourceLoader: async (request) =>
 								`<svg data-origin="${new URL(request.url).origin}" />`,
