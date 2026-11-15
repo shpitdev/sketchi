@@ -1947,6 +1947,81 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 		},
 	);
 
+	it.each([
+		{ outcome: "no return", ending: "", error: undefined, hasResult: false },
+		{
+			outcome: "an error after the build",
+			ending: 'throw new Error("after accepted build");',
+			error: "after accepted build",
+			hasResult: false,
+		},
+		{
+			outcome: "an explicit null result",
+			ending: "return null;",
+			error: undefined,
+			hasResult: true,
+		},
+	])(
+		"preserves accepted MCP receipts and logs with $outcome",
+		async ({ ending, error, hasResult }) => {
+			const executor = createInProcessExecutor();
+			const server = await createSketchiMcpServer(
+				{ SKETCHI_ARTIFACTS: new MemoryBucket() },
+				{
+					executor: {
+						async execute(code, providers) {
+							const output = await executor.execute(code, providers);
+							// The installed Cloudflare executor returns undefined on script error;
+							// the older in-process fixture uses null, which remains a separate control.
+							return output.error ? { ...output, result: undefined } : output;
+						},
+					},
+				},
+			);
+			const client = new Client({ name: "execute-optional-result-test", version: "1" });
+			const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+			try {
+				await server.connect(serverTransport);
+				await client.connect(clientTransport);
+				const response = await client.callTool({
+					name: "execute",
+					arguments: {
+						code: `async () => {
+     await (${BUILD_MINDMAP_CODE})();
+     console.log("accepted build retained");
+     ${ending}
+    }`,
+					},
+				});
+				expect(response).toMatchObject({
+					structuredContent: {
+						ok: error === undefined,
+						logs: ["accepted build retained"],
+						builds: [
+							{
+								index: 0,
+								operation: "buildMindmap",
+								ok: true,
+								status: "accepted",
+								artifact: { artifactId: expect.any(String), formats: expect.any(Array) },
+							},
+						],
+					},
+				});
+				expect(response.isError).not.toBe(true);
+				const output = structuredContent(response);
+				expect(output.builds).toHaveLength(1);
+				expect(output.error).toBe(error);
+				expect(Object.hasOwn(output, "result")).toBe(hasResult);
+				expect(output.result).toBe(hasResult ? null : undefined);
+				expect(JSON.parse(textContent(response)[0] ?? "")).toEqual(output);
+			} finally {
+				await client.close();
+				await server.close();
+			}
+		},
+	);
+
 	it("reports every build over MCP when the script returns unrelated data", async () => {
 		const spans = new SpanPipeline();
 		const server = await createSketchiMcpServer(

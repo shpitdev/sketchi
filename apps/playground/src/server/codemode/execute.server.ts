@@ -603,7 +603,7 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 				ok: false,
 				error: execution.error,
 				logs: execution.logs ?? [],
-				result: execution.result,
+				...(execution.result === undefined ? {} : { result: execution.result }),
 			};
 		}
 
@@ -618,7 +618,7 @@ export const executeSketchiCodeMode = Effect.fn("playground.mcp.executeCodeMode"
 				: {}),
 			...(notice ? { coverageNotice: notice } : finalResponseText ? { finalResponseText } : {}),
 			ok: true,
-			result: execution.result,
+			...(execution.result === undefined ? {} : { result: execution.result }),
 			logs: execution.logs ?? [],
 		};
 	}).pipe(
