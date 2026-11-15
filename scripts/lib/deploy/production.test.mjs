@@ -159,7 +159,7 @@ test("internal projects emit no public routes", () => {
 	});
 });
 
-test("a production push deploys the Worker apps whose build it reaches", () => {
+test("selectProductionProjects selects affected Workers, all projects, or one named project", () => {
 	assert.deepEqual(
 		selectProductionProjects({
 			selection: "affected",
@@ -173,12 +173,10 @@ test("a production push deploys the Worker apps whose build it reaches", () => {
 	assert.throws(() => selectProductionProjects({ selection: "studio" }), /Unknown Worker project/);
 });
 
-test("production deploys only the selected apps, and a dispatch selects all or one", () => {
+test("manual production dispatch deploys only the selected apps", () => {
 	const select = workflow.jobs.select.steps.find(({ id }) => id === "projects");
 	assert.equal(select.run, "node scripts/09-select-production-projects.mjs");
-	assert.equal(select.env.PRODUCTION_SELECTION, "${{ inputs.project || 'affected' }}");
-	assert.equal(select.env.BASE_SHA, "${{ github.event.before }}");
-	assert.equal(select.env.HEAD_SHA, "${{ github.sha }}");
+	assert.deepEqual(select.env, { PRODUCTION_SELECTION: "${{ inputs.project }}" });
 	const [first, ...apps] = workflow.on.workflow_dispatch.inputs.project.options;
 	assert.equal(first, "all");
 	assert.deepEqual(apps.toSorted(), workerProjectIds.toSorted());
@@ -187,31 +185,13 @@ test("production deploys only the selected apps, and a dispatch selects all or o
 	assert.match(deploy.if, /needs\.select\.outputs\.projects != '\[\]'/);
 	assert.equal(deploy.strategy.matrix.project, "${{ fromJSON(needs.select.outputs.projects) }}");
 	assert.doesNotMatch(JSON.stringify(deploy.steps), /inputs\.project/);
-	// The script reads the Nx graph task by task, so a test-only change reaches no build.
-	assert.match(read("scripts/09-select-production-projects.mjs"), /NX_LEGACY_AFFECTED: "false"/);
-	assert.match(read("scripts/09-select-production-projects.mjs"), /--withTarget=build/);
 });
 
-test("the production push filter covers every workspace package and shared build input", () => {
-	const paths = workflow.on.push.paths;
-	const workspace = yaml.load(read("pnpm-workspace.yaml")).packages;
-	for (const glob of workspace) {
-		assert.ok(paths.includes(`${glob.split("/")[0]}/**`), `${glob} must start a deploy run`);
-	}
-	const sharedGlobals = JSON.parse(read("nx.json")).namedInputs.sharedGlobals;
-	for (const input of sharedGlobals) {
-		assert.ok(paths.includes(input.replace("{workspaceRoot}/", "")), `${input} is a build input`);
-	}
-	for (const file of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]) {
-		assert.ok(paths.includes(file), file);
-	}
+test("production deploys only by manual dispatch", () => {
+	assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
 });
 
 const repoRoot = new URL("../../../", import.meta.url);
-
-// A GitHub `paths` filter entry: `dir/**` covers everything under dir; anything else is one file.
-const pathFilterCovers = (paths, file) =>
-	paths.some((path) => (path.endsWith("/**") ? file.startsWith(path.slice(0, -2)) : path === file));
 
 // Workspace package roots and names. A package reaches a build through Nx's `^production`.
 const workspacePackages = new Map(
@@ -251,8 +231,7 @@ function externalBuildPaths(projectRoot, configs) {
 	return [...found];
 }
 
-test("every file a Worker build reaches outside its project redeploys that app", () => {
-	const paths = workflow.on.push.paths;
+test("Worker build inputs and dependencies cover every external config import", () => {
 	for (const projectId of workerProjectIds) {
 		const { projectRoot } = workerProjectConfig(projectId);
 		const manifest = JSON.parse(read(`${projectRoot}/package.json`));
@@ -271,7 +250,6 @@ test("every file a Worker build reaches outside its project redeploys that app",
 				inputs.includes(`{workspaceRoot}/${path}`),
 				`${projectId}: ${path} must be a build input`,
 			);
-			assert.ok(pathFilterCovers(paths, path), `${path} must start a production deploy run`);
 		}
 	}
 });
