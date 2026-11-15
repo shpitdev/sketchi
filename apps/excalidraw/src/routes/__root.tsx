@@ -1,3 +1,4 @@
+import { RegistryProvider } from "@effect/atom-react";
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 
 import "@sketchi/diagram-ui/styles.css";
@@ -45,7 +46,9 @@ function RootComponent() {
 				<HeadContent />
 			</head>
 			<body>
-				<Outlet />
+				<RegistryProvider>
+					<Outlet />
+				</RegistryProvider>
 				<Scripts />
 			</body>
 		</html>

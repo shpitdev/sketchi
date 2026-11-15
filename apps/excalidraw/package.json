@@ -8,6 +8,9 @@
 		"@sketchi/diagram-excalidraw": "workspace:*",
 		"@sketchi/diagram-renderer": "workspace:*",
 		"@sketchi/diagram-ui": "workspace:*",
-		"@sketchi/svg-excalidraw": "workspace:*"
+		"@sketchi/svg-excalidraw": "workspace:*",
+		"@effect/atom-react": "catalog:",
+		"effect": "catalog:",
+		"scheduler": "catalog:"
 	}
 }

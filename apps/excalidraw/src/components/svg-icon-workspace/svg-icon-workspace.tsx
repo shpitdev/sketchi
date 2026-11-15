@@ -11,10 +11,13 @@ import {
 	type SvgDiagnostic,
 	type SvgToExcalidrawResult,
 } from "@sketchi/svg-excalidraw";
-import { QueryClient, useQuery } from "@tanstack/react-query";
+import { useAtomValue } from "@effect/atom-react";
+import { Cause, Option } from "effect";
+import { AsyncResult } from "effect/reactivity";
 import { useCallback, useMemo, useState } from "react";
 
 import type { SvgHandoff } from "../../lib/svg-handoff";
+import { svgSourceAtom } from "../../lib/svg-source-atom";
 import { WorkspaceTopBar } from "../workspace-top-bar/index.js";
 
 export interface SvgIconWorkspaceProps {
@@ -23,8 +26,6 @@ export interface SvgIconWorkspaceProps {
 	/** Deterministic Storybook/test source; production fetches the handoff URL. */
 	initialSource?: string;
 }
-
-const MAX_SVG_BYTES = 1_000_000;
 
 type ImportState =
 	| {
@@ -41,40 +42,6 @@ type ImportState =
 function sourceName(sourceUrl: string): string {
 	const fileName = new URL(sourceUrl).pathname.split("/").at(-1);
 	return fileName ?? "icon.svg";
-}
-
-async function readSvgResponse(response: Response): Promise<string> {
-	if (!response.ok) {
-		throw new Error(`Icon SVG returned HTTP ${response.status}.`);
-	}
-	const contentType = response.headers.get("content-type")?.toLowerCase();
-	if (!contentType?.startsWith("image/svg+xml")) {
-		throw new Error("Icon source did not return an SVG content type.");
-	}
-	const contentLength = Number(response.headers.get("content-length"));
-	if (Number.isFinite(contentLength) && contentLength > MAX_SVG_BYTES) {
-		throw new Error("Icon SVG exceeds the 1 MB workspace import limit.");
-	}
-	if (!response.body) return "";
-	const reader = response.body.getReader();
-	const decoder = new TextDecoder();
-	let size = 0;
-	let source = "";
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			size += value.byteLength;
-			if (size > MAX_SVG_BYTES) {
-				await reader.cancel();
-				throw new Error("Icon SVG exceeds the 1 MB workspace import limit.");
-			}
-			source += decoder.decode(value, { stream: true });
-		}
-		return source + decoder.decode();
-	} finally {
-		reader.releaseLock();
-	}
 }
 
 function convertSource(source: string, handoff: SvgHandoff): ImportState {
@@ -105,41 +72,26 @@ function saveLibrary(elements: readonly ExcalidrawElement[], sourceHash: string,
 }
 
 export function SvgIconWorkspace({ handoff, initialSource, onEditorApi }: SvgIconWorkspaceProps) {
-	const [queryClient] = useState(() => new QueryClient());
-	// Keyed by URL: a new handoff reads as loading, and unmounting or switching
-	// sources aborts the in-flight request through the query signal.
-	const sourceQuery = useQuery(
-		{
-			enabled: initialSource === undefined,
-			gcTime: 0,
-			queryFn: ({ signal }) =>
-				fetch(handoff.sourceUrl, { redirect: "error", signal }).then(readSvgResponse),
-			queryKey: ["svg-icon-source", handoff.sourceUrl],
-			refetchOnReconnect: false,
-			refetchOnWindowFocus: false,
-			retry: false,
-		},
-		queryClient,
+	const sourceQuery = useAtomValue(
+		svgSourceAtom(initialSource === undefined ? handoff.sourceUrl : undefined),
 	);
 	const [editedScene, setEditedScene] = useState<{
 		readonly elements: readonly ExcalidrawElement[];
 		readonly revision: string;
 	} | null>(null);
 
-	const source = initialSource ?? sourceQuery.data;
+	const source = initialSource ?? Option.getOrUndefined(AsyncResult.value(sourceQuery));
 	const resolved = useMemo((): ImportState => {
 		if (source !== undefined) return convertSource(source, handoff);
-		if (sourceQuery.isError) {
+		if (AsyncResult.isFailure(sourceQuery)) {
+			const error = Cause.squash(sourceQuery.cause);
 			return {
 				kind: "error",
-				message:
-					sourceQuery.error instanceof Error
-						? sourceQuery.error.message
-						: "The icon SVG could not be loaded.",
+				message: error instanceof Error ? error.message : "The icon SVG could not be loaded.",
 			};
 		}
 		return { kind: "loading" };
-	}, [handoff, source, sourceQuery.error, sourceQuery.isError]);
+	}, [handoff, source, sourceQuery]);
 	const conversion = resolved.kind === "converted" ? resolved.conversion : null;
 	const ready = conversion?.ok === true;
 	const diagnostics =

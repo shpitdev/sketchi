@@ -188,12 +188,12 @@ catalogs:
     effect:
       specifier: 4.1.4
       version: 4.1.4
-    scheduler:
-      specifier: 0.28.0
-      version: 0.28.0
     google-auth-library:
       specifier: 10.9.1
       version: 10.9.1
+    scheduler:
+      specifier: 0.28.0
+      version: 0.28.0
 
 overrides:
   lodash-es@>=4.0.0 <4.18.1: 4.18.1
@@ -438,6 +438,9 @@ importers:
 
   apps/excalidraw:
     dependencies:
+      '@effect/atom-react':
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)(react@19.3.1)(scheduler@0.28.0)
       '@excalidraw/excalidraw':
         specifier: 0.18.1
         version: 0.18.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -456,6 +459,12 @@ importers:
       '@sketchi/svg-excalidraw':
         specifier: workspace:*
         version: link:../../packages/svg-excalidraw
+      effect:
+        specifier: 'catalog:'
+        version: 4.1.4
+      scheduler:
+        specifier: 'catalog:'
+        version: 0.28.0
 
   apps/icons:
     dependencies:
