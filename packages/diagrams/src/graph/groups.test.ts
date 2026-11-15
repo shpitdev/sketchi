@@ -15,7 +15,8 @@ import {
 } from "@sketchi/drawing";
 import { flowchartFixture } from "../families/flowchart/diagram.js";
 import { groupFixtures } from "../families/flowchart/group-fixtures.js";
-import { arrowCrossings, renderIntermediateDiagram } from "./scene";
+import { arrowCrossings } from "./readability";
+import { renderIntermediateDiagram } from "./scene";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];

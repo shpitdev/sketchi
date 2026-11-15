@@ -35,7 +35,8 @@ import {
 import { groupFixtures } from "../families/flowchart/group-fixtures.js";
 import { parseFlowchartDiagram } from "../families/flowchart/diagram.js";
 import { type IntermediateDiagram } from "./intermediate.js";
-import { arrowCrossings, renderIntermediateDiagram } from "./scene";
+import { arrowCrossings } from "./readability";
+import { renderIntermediateDiagram } from "./scene";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];

@@ -12,7 +12,8 @@ import {
 } from "@sketchi/drawing";
 import { renderClassDiagram } from "../families/class/render";
 import { renderTimelineDiagram } from "../families/timeline/render";
-import { arrowCrossings, renderIntermediateDiagram } from "./scene";
+import { arrowCrossings } from "./readability";
+import { renderIntermediateDiagram } from "./scene";
 
 /**
  * Width over height, either way up, of a scene in the hosted PNG's 20-unit

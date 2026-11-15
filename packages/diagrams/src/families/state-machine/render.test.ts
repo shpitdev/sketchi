@@ -17,7 +17,7 @@ import {
 } from "./document.js";
 
 import { renderDiagram } from "../../family.js";
-import { arrowCrossings } from "../../graph/scene.js";
+import { arrowCrossings } from "../../graph/readability.js";
 
 const nodes = (scene: RenderedDiagramScene) =>
 	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));

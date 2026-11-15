@@ -13,7 +13,8 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { arrowCrossings, renderIntermediateDiagram } from "./scene";
+import { arrowCrossings } from "./readability";
+import { renderIntermediateDiagram } from "./scene";
 
 const directions = ["TB", "BT", "LR", "RL"] as const;
 type Direction = (typeof directions)[number];

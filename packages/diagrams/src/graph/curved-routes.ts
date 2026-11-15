@@ -7,7 +7,7 @@ import {
 	wrapTextToWidth,
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasShapeElement as NodeSceneElement,
-	type CanvasSpec as RenderedDiagramScene,
+	type CanvasSpec,
 	type CanvasPoint as ScenePoint,
 	type CanvasTextElement as TextSceneElement,
 } from "@sketchi/drawing";
@@ -327,7 +327,7 @@ function meetings(a: readonly ScenePoint[], b: readonly ScenePoint[], touch: num
  * or cross a zone, group or lane its route did not. Then they curve less, and
  * at worst stay square. Labels stay where the routes put them.
  */
-export function curvedScene(scene: RenderedDiagramScene): RenderedDiagramScene {
+export function curvedScene(scene: CanvasSpec): CanvasSpec {
 	const nodes = scene.elements.flatMap((element) =>
 		element.type === "node" && element.rendererRole === undefined ? [element] : [],
 	);

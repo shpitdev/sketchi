@@ -93,12 +93,9 @@ import {
 import { renderStateMachineDiagram } from "../../families/state-machine/render.js";
 import { isStructurallyValidTimelineMarker } from "../../families/timeline/render.js";
 import { isStructurallyValidVennSet } from "../../families/venn/render.js";
-import {
-	isStructurallyValidStateMarker,
-	longNodeDescriptions,
-	NODE_DESCRIPTION_MAX_LINES,
-	renderIntermediateDiagram,
-} from "../../graph/scene.js";
+import { isStructurallyValidStateMarker, longNodeDescriptions } from "../../graph/compose.js";
+import { NODE_DESCRIPTION_MAX_LINES } from "../../graph/measure.js";
+import { renderIntermediateDiagram } from "../../graph/scene.js";
 
 import {
 	recordMetric,

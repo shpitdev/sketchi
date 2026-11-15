@@ -34,7 +34,8 @@ import {
 	type ClassPlacementOptions,
 	placeClasses,
 } from "./layout.js";
-import { arrowCrossings, renderGraphDiagram } from "../../graph/scene.js";
+import { arrowCrossings } from "../../graph/readability.js";
+import { renderGraphDiagram } from "../../graph/scene.js";
 
 /** The name compartment: one 16 px line for the name, another over it for a keyword. */
 const NAME_FONT_SIZE = 16;

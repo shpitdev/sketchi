@@ -9,7 +9,8 @@ import {
 } from "@sketchi/drawing";
 import { type IntermediateDiagram } from "./intermediate.js";
 
-import { type GraphAnchor, renderGraphDiagram } from "./scene.js";
+import { type GraphAnchor } from "./options.js";
+import { renderGraphDiagram } from "./scene.js";
 
 /**
  * Three boxes a family placed itself: one on the left whose middle row feeds

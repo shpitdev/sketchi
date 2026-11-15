@@ -17,11 +17,9 @@ import {
 import { describedArchitectureFlowchart } from "../families/flowchart/zone-fixtures.js";
 import { type LayoutDirection } from "./intermediate.js";
 
-import {
-	longNodeDescriptions,
-	NODE_DESCRIPTION_MAX_LINES,
-	renderIntermediateDiagram,
-} from "./scene";
+import { longNodeDescriptions } from "./compose";
+import { NODE_DESCRIPTION_MAX_LINES } from "./measure";
+import { renderIntermediateDiagram } from "./scene";
 
 const LABEL_LINE_HEIGHT = 1.35;
 

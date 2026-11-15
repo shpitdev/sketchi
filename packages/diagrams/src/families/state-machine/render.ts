@@ -19,7 +19,8 @@ import {
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
 
-import { arrowCrossings, renderGraphDiagram } from "../../graph/scene.js";
+import { arrowCrossings } from "../../graph/readability.js";
+import { renderGraphDiagram } from "../../graph/scene.js";
 
 /** The machine's own initial pseudostate; state ids never contain ":". */
 const INITIAL_ID = ":initial";

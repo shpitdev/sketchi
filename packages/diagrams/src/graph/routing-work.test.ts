@@ -15,7 +15,8 @@ import { laneFixtures, laneStressFixtures } from "../families/flowchart/lane-fix
 import { zoneFixtures, zoneStressFixtures } from "../families/flowchart/zone-fixtures.js";
 
 import { describe, expect, it, vi } from "vitest";
-import { arrowCrossings, renderIntermediateDiagram } from "./scene";
+import { arrowCrossings } from "./readability";
+import { renderIntermediateDiagram } from "./scene";
 import { renderErDiagram } from "../families/er/render";
 import { renderClassDiagram } from "../families/class/render";
 import { renderStateMachineDiagram } from "../families/state-machine/render";

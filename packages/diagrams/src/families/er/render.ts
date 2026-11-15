@@ -29,7 +29,9 @@ import {
 	type ErPlacementOptions,
 	placeErTables,
 } from "./layout.js";
-import { arrowCrossings, type GraphAnchor, renderGraphDiagram } from "../../graph/scene.js";
+import { arrowCrossings } from "../../graph/readability.js";
+import { type GraphAnchor } from "../../graph/options.js";
+import { renderGraphDiagram } from "../../graph/scene.js";
 
 /** The band at a table's top that carries its name. */
 const HEADER_HEIGHT = 40;

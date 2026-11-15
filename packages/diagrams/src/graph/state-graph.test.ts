@@ -12,7 +12,8 @@ import {
 	type CanvasTextElement as TextSceneElement,
 } from "@sketchi/drawing";
 import { type IntermediateDiagram } from "./intermediate.js";
-import { isStructurallyValidStateMarker, renderGraphDiagram } from "./scene";
+import { isStructurallyValidStateMarker } from "./compose";
+import { renderGraphDiagram } from "./scene";
 
 /**
  * Graphs as a state machine draws them: pseudostates (an initial dot, final

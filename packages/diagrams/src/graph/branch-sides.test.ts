@@ -15,7 +15,8 @@ import {
 	wrapTextToWidth,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { arrowCrossings, renderIntermediateDiagram } from "./scene";
+import { arrowCrossings } from "./readability";
+import { renderIntermediateDiagram } from "./scene";
 
 type Point = { readonly x: number; readonly y: number };
 type Side = "top" | "right" | "bottom" | "left";
