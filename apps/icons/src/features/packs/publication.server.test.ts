@@ -2,6 +2,8 @@
 
 import { openD1 } from "../../test-support/d1.js";
 import { Effect } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { publishPack } from "./publication-client.js";
 
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
@@ -158,9 +160,7 @@ function publish(
 }
 
 /** Excalidraw's backend and GitHub's API, as the Worker sees them. */
-function backend(
-	options: { submit?: () => Response; pull?: () => Response } = {},
-): ReturnType<typeof vi.fn> {
+function backend(options: { submit?: () => Response; pull?: () => Response } = {}) {
 	const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
 		const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
 		if (url === `${EXCALIDRAW_LIBRARY_BACKEND}/submit`) {
@@ -199,6 +199,54 @@ afterEach(async () => {
 });
 
 describe("publishing a pack to Excalidraw", () => {
+	it("round trips a valid Unicode website through the generated client and native handler", async () => {
+		const website = `https://example.com/${"é".repeat(31)}`;
+		const canonical = new URL(website).href;
+		expect(website.length).toBe(51);
+		expect(canonical.length).toBe(206);
+		const env = await environment();
+		const upstream = backend();
+		const wire: unknown[] = [];
+		setFetch(async (input, init) => {
+			if (requestHref(input) === "https://icons.sketchi.app/api/packs/palantir/excalidraw") {
+				const request = new Request(input, init);
+				wire.push(await request.clone().json());
+				return handlePackPublish(request, env);
+			}
+			return upstream(input, init);
+		});
+		vi.stubGlobal("window", { location: { origin: "https://icons.sketchi.app" } });
+		const form = new FormData();
+		form.set("authorName", "Jane");
+		form.set("website", website);
+		const result = await Effect.runPromise(
+			publishPack("palantir", form).pipe(Effect.provide(FetchHttpClient.layer)),
+		);
+		expect(result).toEqual({ pullRequestUrl: PR, installUrl: INSTALL });
+		expect(wire).toEqual([{ authorName: "Jane", website: canonical, xHandle: "" }]);
+		const submitted = upstream.mock.calls[0]?.[1]?.body as FormData;
+		expect(submitted.get("website")).toBe(canonical);
+		expect(upstream).toHaveBeenCalledTimes(2);
+	});
+
+	it("bounds the canonical website independently of the form input length", async () => {
+		const env = await environment();
+		const upstream = backend();
+		const prefix = "https://example.com/";
+		const atLimit = `${prefix}${"a".repeat(1800 - prefix.length)}`;
+		expect((await publish(env, { authorName: "Jane", website: atLimit })).status).toBe(201);
+		const overLimit = await publish(env, { authorName: "Jane", website: `${atLimit}a` });
+		expect(overLimit.status).toBe(400);
+		expect(await overLimit.json()).toMatchObject({
+			error: {
+				code: "invalid_request",
+				message: expect.stringContaining("at most 1800 characters after URL encoding"),
+			},
+		});
+		// The rejected payload never reaches submission or PR enrichment.
+		expect(upstream).toHaveBeenCalledTimes(2);
+	});
+
 	it("does not hold a replacement claim when interrupted after a refusal DELETE commits", async () => {
 		const env = await environment();
 		const database = env.COMMUNITY_ICONS!;

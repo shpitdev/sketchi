@@ -29,7 +29,11 @@ export interface PackExcalidrawState {
 }
 
 export const AUTHOR_NAME_MAX_LENGTH = 60;
+/** Human-entered form limit, before URL serialization. */
 export const WEBSITE_MAX_LENGTH = 200;
+// One UTF-16 code unit can become three UTF-8 bytes, each serialized as %XX.
+// Bound the canonical href so decoding the generated client's value is idempotent.
+const WEBSITE_MAX_SERIALIZED_LENGTH = WEBSITE_MAX_LENGTH * 9;
 /** X's own handle rule: 1 to 15 letters, digits or underscores. */
 const X_HANDLE = /^[A-Za-z0-9_]{1,15}$/u;
 const X_HOSTS = new Set(
@@ -117,12 +121,12 @@ export const PublishPayload = Schema.Struct({
 				decode: SchemaGetter.transformEffect((value) => {
 					if (!value) return Effect.succeed("");
 					const url = URL.parse(value);
-					return value.length <= WEBSITE_MAX_LENGTH && url?.protocol === "https:"
+					return url?.protocol === "https:" && url.href.length <= WEBSITE_MAX_SERIALIZED_LENGTH
 						? Effect.succeed(url.href)
 						: Effect.fail(
 								new SchemaIssue.InvalidValue(
 									{
-										message: `The website must be an https:// address of at most ${WEBSITE_MAX_LENGTH} characters.`,
+										message: `The website must be an https:// address of at most ${WEBSITE_MAX_SERIALIZED_LENGTH} characters after URL encoding.`,
 									},
 									value,
 								),

@@ -45,6 +45,10 @@ describe("the publication dialog's generated client", () => {
 			{ authorName: "Jane", website: "http://example.com" },
 			"The website must be an https:// address",
 		],
+		[
+			{ authorName: "Jane", website: `https://example.com/${"a".repeat(1800)}` },
+			"The website must be an https:// address of at most 1800 characters after URL encoding.",
+		],
 		[{ authorName: "Jane", xHandle: "https://x.com/home" }, "That X link is not a profile"],
 	] as const)(
 		"shows a useful error before sending invalid author input %j",
