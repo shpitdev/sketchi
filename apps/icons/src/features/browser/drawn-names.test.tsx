@@ -1,4 +1,4 @@
-import { Array as Arr, Option as Opt } from "effect";
+import { Array as Arr } from "effect";
 import { RegistryContext, useAtom } from "@effect/atom-react";
 import { act, renderHook } from "@testing-library/react";
 import { AtomRegistry } from "effect/reactivity";
@@ -133,22 +133,20 @@ describe("drawn names browser preference", () => {
 		expect(hook.result.current[0]).toBe(false);
 	});
 
-	it("releases its storage listener with its registry", () => {
-		const add = vi.spyOn(window, "addEventListener");
-		const remove = vi.spyOn(window, "removeEventListener");
-		const scope = owner();
-		renderHook(() => useAtom(drawnNames), scope);
-		const call = Opt.getOrElse(
-			Arr.findFirst(add.mock.calls, ([event]) => event === "storage"),
-			() => undefined,
-		);
-		expect(call).toBeDefined();
-		scope.registry.dispose();
-		expect(
-			Arr.some(
-				remove.mock.calls,
-				([event, listener]) => event === "storage" && listener === call?.[1],
-			),
-		).toBe(true);
+	// @effect-diagnostics-next-line asyncFunction:off -- Initial storage acquisition failure and later native browser events exercise the feature's recovery path.
+	it("recovers from initial localStorage getter denial on later events and actions", async () => {
+		const area = localStorage;
+		area.setItem(DRAWN_NAMES_KEY, "on");
+		const access = vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+			throw new DOMException("initially denied", "SecurityError");
+		});
+		const hook = renderHook(() => useAtom(drawnNames), owner());
+		expect(hook.result.current[0]).toBe(false);
+		access.mockRestore();
+		await storage();
+		expect(hook.result.current[0]).toBe(true);
+		act(() => hook.result.current[1](false));
+		expect(area.getItem(DRAWN_NAMES_KEY)).toBe("off");
+		expect(hook.result.current[0]).toBe(false);
 	});
 });

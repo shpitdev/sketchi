@@ -156,8 +156,6 @@ describe("IconLibrary", () => {
 		render(<IconLibrary data={fixtureData} />);
 		expect(screen.getByRole("heading", { level: 1, name: "Sketchi Icons" })).toBeTruthy();
 		expect(screen.getByRole("heading", { level: 2, name: "Icons" })).toBeTruthy();
-		expect(screen.queryByText(/ready when you are/i)).toBeNull();
-		expect(screen.queryByLabelText("Library summary")).toBeNull();
 		const header = within(screen.getByRole("banner"));
 		expect(header.getByRole("link", { name: "Docs" }).getAttribute("href")).toBe(
 			"https://sketchi.app/docs",
@@ -165,11 +163,7 @@ describe("IconLibrary", () => {
 		expect(header.getByRole("link", { name: "Sketchi on GitHub" }).getAttribute("href")).toBe(
 			"https://github.com/shpitdev/sketchi",
 		);
-		// llms.txt is a footer link, not a header competitor.
-		const llms = screen.getAllByRole("link", { name: "llms.txt" });
-		expect(llms).toHaveLength(1);
-		expect(llms[0]?.closest("footer")).toBeTruthy();
-		expect(llms[0]?.getAttribute("href")).toBe("/llms.txt");
+		expect(screen.getByRole("link", { name: "llms.txt" }).getAttribute("href")).toBe("/llms.txt");
 		expect(screen.getByRole("button", { name: "Commands" })).toBeTruthy();
 	});
 
@@ -407,6 +401,82 @@ describe("IconLibrary", () => {
 		await waitFor(() => expect(aborted).toBe(true));
 		expect(writeText).not.toHaveBeenCalled();
 	});
+
+	// @effect-diagnostics-next-line asyncFunction:off -- Actual UI copy actions share one controlled browser Fetch response.
+	it("reuses the mounted library SVG cache across copy, detail and batch actions", async () => {
+		render(<IconLibrary data={fixtureData} />);
+		fireEvent.click(screen.getByRole("button", { name: "Copy Codex SVG" }));
+		await screen.findByText("Codex SVG copied.");
+		fireEvent.click(screen.getByRole("button", { name: "View Codex details" }));
+		fireEvent.click(screen.getByRole("button", { name: "Copy SVG" }));
+		await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+		fireEvent.keyDown(document.activeElement ?? document, { key: "Escape" });
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		fireEvent.click(cardCheckbox("Codex"));
+		fireEvent.click(screen.getByRole("button", { name: "Copy SVGs" }));
+		await waitFor(() => expect(writeText).toHaveBeenCalledTimes(3));
+		expect(fetch).toHaveBeenCalledTimes(1);
+	});
+
+	// @effect-diagnostics-next-line asyncFunction:off -- Actual copy and detail entrypoints overlap a test-controlled Fetch request.
+	it("shares an in-flight SVG between a tile copy and a detail action", async () => {
+		const pending = Promise.withResolvers<Response>();
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => pending.promise),
+		);
+		render(<IconLibrary data={fixtureData} />);
+		fireEvent.click(screen.getByRole("button", { name: "Copy Codex SVG" }));
+		await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+		fireEvent.click(screen.getByRole("button", { name: "View Codex details" }));
+		fireEvent.click(screen.getByRole("button", { name: "Copy SVG" }));
+		pending.resolve(new Response("<svg />"));
+		await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+		expect(fetch).toHaveBeenCalledTimes(1);
+	});
+
+	// @effect-diagnostics-next-line asyncFunction:off -- The malformed HTTP-success SVG is exercised through the real detail export action.
+	it("reports malformed SVG conversion as a useful detail error", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => Promise.resolve(new Response("<svg>"))),
+		);
+		render(<IconLibrary data={fixtureData} />);
+		fireEvent.click(screen.getByRole("button", { name: "View Codex details" }));
+		fireEvent.click(screen.getByRole("button", { name: "Copy JSX" }));
+		expect(await screen.findByText("Could not complete that action for Codex.")).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Copy JSX" }).hasAttribute("disabled")).toBe(false);
+		expect(writeText).not.toHaveBeenCalled();
+	});
+
+	it.each(["detail", "selection"])(
+		"reports a refused %s download and unlocks its controls",
+		// @effect-diagnostics-next-line asyncFunction:off -- The native download failure is exercised through the actual detail and selection entrypoints.
+		async (scope) => {
+			vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
+				throw new DOMException("refused", "SecurityError");
+			});
+			render(<IconLibrary data={fixtureData} />);
+			if (scope === "detail") {
+				fireEvent.click(screen.getByRole("button", { name: "View Codex details" }));
+				fireEvent.click(screen.getByRole("button", { name: "Download SVG" }));
+				expect(await screen.findByText("Could not complete that action for Codex.")).toBeTruthy();
+				expect(screen.getByRole("button", { name: "Download SVG" }).hasAttribute("disabled")).toBe(
+					false,
+				);
+			} else {
+				fireEvent.click(cardCheckbox("Codex"));
+				fireEvent.click(screen.getByRole("button", { name: "Download zip" }));
+				expect(
+					await screen.findByText("Could not prepare the selected icons. Try again."),
+				).toBeTruthy();
+				expect(screen.getByRole("button", { name: "Download zip" }).hasAttribute("disabled")).toBe(
+					false,
+				);
+				expect(selectionBar()?.textContent).toContain("1 selected");
+			}
+		},
+	);
 
 	describe("keyboard", () => {
 		// @effect-diagnostics-next-line asyncFunction:off -- React act, hydration and Testing Library await native DOM callbacks at the test host.

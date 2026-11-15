@@ -148,11 +148,16 @@ export function CommunityGallery({
 			}) {
 				yield* Effect.gen(function* () {
 					const { excalidrawLibrary } = yield* Effect.tryPromise(loadExcalidrawExport);
-					downloadBlob(
-						new Blob([excalidrawLibrary(picked, window.location.origin, "community", { named })], {
-							type: "application/vnd.excalidrawlib+json",
-						}),
-						name,
+					yield* Effect.try(() =>
+						downloadBlob(
+							new Blob(
+								[excalidrawLibrary(picked, window.location.origin, "community", { named })],
+								{
+									type: "application/vnd.excalidrawlib+json",
+								},
+							),
+							name,
+						),
 					);
 				}).pipe(
 					Effect.catch(() =>

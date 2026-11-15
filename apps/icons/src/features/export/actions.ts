@@ -149,12 +149,6 @@ export async function copyText(pending: string | Promise<string>): Promise<void>
 export function createIconZip(
 	icons: readonly { readonly slug: string; readonly svg: string }[],
 ): Blob {
-	return new Blob([createIconZipBytes(icons)], { type: "application/zip" });
-}
-
-export function createIconZipBytes(
-	icons: readonly { readonly slug: string; readonly svg: string }[],
-): Uint8Array<ArrayBuffer> {
 	const files = Rec.fromEntries(Arr.map(icons, (icon) => [`${icon.slug}.svg`, strToU8(icon.svg)]));
-	return zipSync(files, { level: 6 });
+	return new Blob([zipSync(files, { level: 6 })], { type: "application/zip" });
 }

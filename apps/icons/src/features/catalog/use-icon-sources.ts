@@ -1,4 +1,4 @@
-import { RegistryContext, useAtomSet, useAtomValue } from "@effect/atom-react";
+import { RegistryContext, useAtomMount, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { type IconRecipe } from "@sketchi/drawing";
 import { type SketchiIcon } from "@sketchi/icon-catalog";
 import { Array, Cache, Duration, Effect, Exit } from "effect";
@@ -127,9 +127,13 @@ export function useIconSources(
 						else {
 							const svg = yield* getSvg(icon, get);
 							if (action === "copy-svg") yield* clipboard(svg);
-							if (action === "copy-jsx") yield* clipboard(svgToJsxComponent(svg, icon));
-							if (action === "copy-data-uri") yield* clipboard(svgDataUri(svg));
-							if (action === "download") downloadSvg(svg, icon.slug);
+							if (action === "copy-jsx")
+								yield* Effect.try(() => svgToJsxComponent(svg, icon)).pipe(
+									Effect.flatMap(clipboard),
+								);
+							if (action === "copy-data-uri")
+								yield* Effect.try(() => svgDataUri(svg)).pipe(Effect.flatMap(clipboard));
+							if (action === "download") yield* Effect.try(() => downloadSvg(svg, icon.slug));
 						}
 						showNotice(
 							action === "download"
@@ -177,7 +181,7 @@ export function useIconSources(
 							);
 							showNotice(`Copied ${sources.length} ${sources.length === 1 ? "SVG" : "SVGs"}.`);
 						} else {
-							downloadBlob(createIconZip(sources), "sketchi-icons.zip");
+							yield* Effect.try(() => downloadBlob(createIconZip(sources), "sketchi-icons.zip"));
 							showNotice(
 								`Downloaded ${sources.length} ${sources.length === 1 ? "SVG" : "SVGs"} as a zip.`,
 							);
@@ -192,8 +196,9 @@ export function useIconSources(
 				}),
 			)
 			.pipe(Atom.setIdleTTL(0), Atom.withServerValueInitial);
-		return { copy, detail, selection, progress };
+		return { sources, copy, detail, selection, progress };
 	});
+	useAtomMount(actions.sources);
 	const copyState = useAtomValue(actions.copy);
 	const detailState = useAtomValue(actions.detail);
 	const selectionState = useAtomValue(actions.selection);

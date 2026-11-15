@@ -162,6 +162,18 @@ describe("CommunityGallery", () => {
 		});
 	});
 
+	// @effect-diagnostics-next-line asyncFunction:off -- The real community download reports a refused native Blob handoff without changing its loaded icons.
+	it("reports a refused community library download", async () => {
+		vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
+			throw new DOMException("refused", "SecurityError");
+		});
+		gallery();
+		fireEvent.click(screen.getByRole("button", { name: "Download library" }));
+		expect(await screen.findByText("Could not prepare the library. Try again.")).toBeTruthy();
+		expect(screen.getByRole("region", { name: "Community icons" })).toBeTruthy();
+		vi.restoreAllMocks();
+	});
+
 	it("opens a linked icon and offers the next useful step when nothing is found", () => {
 		const linked = ICONS[1];
 		if (!linked) throw new Error("fixture");
