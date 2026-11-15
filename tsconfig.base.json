@@ -645,6 +645,7 @@
             "options": {
               "diagnosticSeverity": {
                 "preferEffectArray": "off",
+                "preferEffectRecord": "off",
                 "preferEffectString": "off"
               }
             }
