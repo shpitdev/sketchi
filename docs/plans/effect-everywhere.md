@@ -1,6 +1,6 @@
 # Effect adoption across Sketchi
 
-Status: proposed implementation plan, revised after independent Claude Fable 5.2/high review on 2026-11-14 against main `2b4ad29d`. The review receipt records the final review state. This task produces a plan, not product changes.
+Status: the package-preservation assumption and slice execution order are superseded by [the product restructure](product-structure.md). Work is serial until one complete example demonstrates simpler ownership, less machinery and fewer redundant tests. The original independent review below is historical evidence, not acceptance of the current architecture.
 
 ## Decision
 
