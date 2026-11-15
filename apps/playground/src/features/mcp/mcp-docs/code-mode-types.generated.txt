@@ -157,9 +157,21 @@ type BuildJourneyMapResult_DiagramStyle = { accentColor: string; backgroundColor
 
 type BuildJourneyMapResult_JourneyDiagram = { id: string; title: string; persona?: string; actors?: Array<string>; stages: Array<BuildJourneyMapResult_JourneyStage>; style: BuildJourneyMapResult_DiagramStyle; type: "journey"; };
 
-type BuildSankeyRequest = { requestId?: string; spec: { id?: string; title: string; nodes: Array<{ id: string; label: string; color?: string; }>; links: Array<{ source: string; target: string; value: number; label?: string; }>; unit?: string; }; options?: BuildOptions; };
+type BuildSankeyRequest = { requestId?: string; spec: { id?: string; title: string; nodes: Array<BuildSankeyRequest_SankeyNode>; links: Array<BuildSankeyRequest_SankeyLink>; unit?: string; }; options?: BuildOptions; };
 
-type BuildSankeyResult = { ok: true; status: "accepted"; buildId: string; requestId?: string; normalizedSpec: { id: string; title: string; nodes: Array<{ id: string; label: string; color?: string; }>; links: Array<{ source: string; target: string; value: number; label?: string; }>; unit?: string; style: { accentColor: string; backgroundColor: string; }; }; quality: Quality; artifact: Artifact; issues: Array<Issue>; } | { ok: false; status: "invalid_input" | "invalid_sankey" | "quality_failed" | "limit_exceeded" | "render_failed" | "export_failed" | "storage_failed"; buildId?: string; requestId?: string; normalizedSpec?: { id: string; title: string; nodes: Array<{ id: string; label: string; color?: string; }>; links: Array<{ source: string; target: string; value: number; label?: string; }>; unit?: string; style: { accentColor: string; backgroundColor: string; }; }; quality?: Quality; partial?: PartialArtifact; issues: Array<Issue>; };
+type BuildSankeyRequest_SankeyNode = { id: string; label: string; color?: string; };
+
+type BuildSankeyRequest_SankeyLink = { source: string; target: string; value: number; label?: string; };
+
+type BuildSankeyResult = { ok: true; status: "accepted"; buildId: string; requestId?: string; normalizedSpec: BuildSankeyResult_SankeyDiagram; quality: Quality; artifact: Artifact; issues: Array<{ code: IssueCode | "sankey_too_large" | "invalid_sankey_node_id" | "duplicate_sankey_node_id" | "sankey_text_too_long" | "unknown_sankey_node" | "sankey_self_link" | "duplicate_sankey_link" | "invalid_sankey_value" | "sankey_cycle" | "unlinked_sankey_node" | "blank_sankey_label"; severity: "error" | "warning" | "info"; stage: "input" | "canvas" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage" | "coverage"; ref?: IssueRef; message: string; hint: string; }>; } | { ok: false; status: "invalid_input" | "invalid_sankey" | "quality_failed" | "limit_exceeded" | "render_failed" | "export_failed" | "storage_failed"; buildId?: string; requestId?: string; normalizedSpec?: BuildSankeyResult_SankeyDiagram; quality?: Quality; partial?: PartialArtifact; issues: Array<{ code: IssueCode | "sankey_too_large" | "invalid_sankey_node_id" | "duplicate_sankey_node_id" | "sankey_text_too_long" | "unknown_sankey_node" | "sankey_self_link" | "duplicate_sankey_link" | "invalid_sankey_value" | "sankey_cycle" | "unlinked_sankey_node" | "blank_sankey_label"; severity: "error" | "warning" | "info"; stage: "input" | "canvas" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage" | "coverage"; ref?: IssueRef; message: string; hint: string; }>; };
+
+type BuildSankeyResult_SankeyNode = { id: string; label: string; color?: string; };
+
+type BuildSankeyResult_SankeyLink = { source: string; target: string; value: number; label?: string; };
+
+type BuildSankeyResult_DiagramStyle = { accentColor: string; backgroundColor: string; };
+
+type BuildSankeyResult_SankeyDiagram = { id: string; title: string; nodes: Array<BuildSankeyResult_SankeyNode>; links: Array<BuildSankeyResult_SankeyLink>; unit?: string; style: BuildSankeyResult_DiagramStyle; type: "sankey"; };
 
 type BuildWireframeRequest = { requestId?: string; spec: { id?: string; title: string; screens: Array<{ id?: string; name: string; device?: "desktop" | "tablet" | "mobile"; align?: "start" | "center" | "end" | "between"; children: Array<BuildWireframeRequest_Component>; }>; }; options?: BuildOptions; };
 
