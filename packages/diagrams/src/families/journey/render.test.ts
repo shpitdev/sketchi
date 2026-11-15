@@ -37,7 +37,7 @@ const steps = (count: number, prefix = "Step", score = 3) =>
 
 describe("journey renderer", () => {
 	it("draws stages across the top in order, each step's card under its stage in reading order", () => {
-		const read = readJourneyScene(renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow));
+		const read = readJourneyScene(renderJourneyDiagram(journeyFixture));
 		expect(read.stages.map((stage) => stage.name)).toEqual(["Discover", "Purchase", "Delivery"]);
 		expect(read.stages.map((stage) => stage.box.left)).toEqual(
 			read.stages.map((stage) => stage.box.left).toSorted((a, b) => a - b),
@@ -65,7 +65,7 @@ describe("journey renderer", () => {
 	});
 
 	it("places a face per step under its card at its score, on a curve over a neutral baseline", () => {
-		const scene = renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow);
+		const scene = renderJourneyDiagram(journeyFixture);
 		const read = readJourneyScene(scene);
 		const baseline = read.baselines[0]!;
 		for (const step of read.steps) {
@@ -98,7 +98,7 @@ describe("journey renderer", () => {
 	});
 
 	it("puts each stage's pain points and opportunities in rows beneath it, and draws no empty row", () => {
-		const scene = renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow);
+		const scene = renderJourneyDiagram(journeyFixture);
 		const read = readJourneyScene(scene);
 		expect(read.notes.map((note) => [note.kind, note.stage, note.text])).toEqual([
 			["pain-point", 0, "Reviews are hard to filter"],
@@ -123,9 +123,7 @@ describe("journey renderer", () => {
 		expect(tops("pain-point").size).toBe(1);
 		expect(tops("opportunity").size).toBe(1);
 		expect(find(scene, "text:journey:row:0:pain-points")).toMatchObject({ text: "Pain points" });
-		const bare = renderJourneyDiagram(journey([{ name: "Only", steps: steps(2) }])).pipe(
-			Result.getOrThrow,
-		);
+		const bare = renderJourneyDiagram(journey([{ name: "Only", steps: steps(2) }]));
 		expect(bare.elements.some((element) => element.id.startsWith("text:journey:row:0:pain"))).toBe(
 			false,
 		);
@@ -133,7 +131,7 @@ describe("journey renderer", () => {
 	});
 
 	it("names the persona and declared actors under the title, and each step's actor and touchpoint on its card", () => {
-		const scene = renderJourneyDiagram(journeyStressFixtures.wordy).pipe(Result.getOrThrow);
+		const scene = renderJourneyDiagram(journeyStressFixtures.wordy);
 		expect(find(scene, "text:journey:subtitle:0")).toMatchObject({
 			text: "Persona: Priya Raman, head of procurement at a regulated healthcare company",
 		});
@@ -154,7 +152,7 @@ describe("journey renderer", () => {
 			journey([
 				{ name: "A", steps: [{ label: "Calls", score: 3, actor: "Dana", touchpoint: "Phone" }] },
 			]),
-		).pipe(Result.getOrThrow);
+		);
 		expect(find(both, "text:journey:step:0-0:details")).toMatchObject({ text: "Dana · Phone" });
 		const label = find(scene, "label:journey:step:0-0");
 		expect(label).toMatchObject({ containerId: "node:journey:step:0-0", verticalAlign: "top" });
@@ -162,7 +160,7 @@ describe("journey renderer", () => {
 
 	it("wraps every label at whole words and fits it in its card", () => {
 		for (const diagram of [journeyFixture, ...Object.values(journeyStressFixtures)]) {
-			const scene = renderJourneyDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderJourneyDiagram(diagram);
 			const words = new Set(
 				diagram.stages.flatMap((stage) => [
 					...stage.name.split(/\s+/u),
@@ -179,7 +177,7 @@ describe("journey renderer", () => {
 	});
 
 	it("prints each step's score above its face and labels every level of the scale", () => {
-		const scene = renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow);
+		const scene = renderJourneyDiagram(journeyFixture);
 		const read = readJourneyScene(scene);
 		for (const step of read.steps) {
 			expect(step.face?.written).toBe(step.face?.score);
@@ -224,14 +222,14 @@ describe("journey renderer", () => {
 				{ name: "Three", steps: steps(2, "Checks out as a guest") },
 				{ name: "Four", steps: steps(2, "Gets a shipping confirmation") },
 			]),
-		).pipe(Result.getOrThrow);
+		);
 		expect(readJourneyScene(eight).baselines).toHaveLength(1);
 		expect(aspect(eight)).toBeLessThanOrEqual(JOURNEY_MAX_ASPECT);
 		expect(journeyLayoutIssues(eight)).toEqual([]);
 	});
 
 	it("wraps a journey too wide for one band into bands of whole stages, its curve running on", () => {
-		const scene = renderJourneyDiagram(journeyStressFixtures.longest).pipe(Result.getOrThrow);
+		const scene = renderJourneyDiagram(journeyStressFixtures.longest);
 		const read = readJourneyScene(scene);
 		expect(aspect(scene)).toBeLessThanOrEqual(JOURNEY_MAX_ASPECT);
 		expect(read.baselines.length).toBeGreaterThan(1);
@@ -265,7 +263,7 @@ describe("journey renderer", () => {
 	});
 
 	it("runs a stage too long for one band on into the next, its header marked as continued", () => {
-		const scene = renderJourneyDiagram(journeyStressFixtures.longStage).pipe(Result.getOrThrow);
+		const scene = renderJourneyDiagram(journeyStressFixtures.longStage);
 		const read = readJourneyScene(scene);
 		expect(aspect(scene)).toBeLessThanOrEqual(JOURNEY_MAX_ASPECT);
 		expect(read.stages).toHaveLength(1);
@@ -283,7 +281,7 @@ describe("journey renderer", () => {
 
 	it("holds every stress journey to its layout rules and a readable aspect", () => {
 		for (const [name, diagram] of Object.entries(journeyStressFixtures)) {
-			const scene = renderJourneyDiagram(diagram).pipe(Result.getOrThrow);
+			const scene = renderJourneyDiagram(diagram);
 			expect(getCanvasValidationIssues(scene), name).toEqual([]);
 			expect(journeyLayoutIssues(scene), name).toEqual([]);
 			expect(aspect(scene), name).toBeLessThanOrEqual(JOURNEY_MAX_ASPECT);
@@ -291,7 +289,7 @@ describe("journey renderer", () => {
 	});
 
 	it("flags a face moved off its step, a sad face on a 5 and a curve off its faces", () => {
-		const scene = renderJourneyDiagram(journeyFixture).pipe(Result.getOrThrow);
+		const scene = renderJourneyDiagram(journeyFixture);
 		const edit = (id: string, change: (element: SceneElement) => SceneElement) => ({
 			...scene,
 			elements: scene.elements.map((element) => (element.id === id ? change(element) : element)),

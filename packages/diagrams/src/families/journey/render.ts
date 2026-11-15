@@ -1,6 +1,4 @@
-import { Result } from "effect";
 import {
-	type JourneyValidationError,
 	JOURNEY_MAX_SCORE,
 	JOURNEY_MIN_SCORE,
 	JOURNEY_NEUTRAL_SCORE,
@@ -849,9 +847,7 @@ function freeText(
  * beneath it. A journey too wide to read at JOURNEY_MAX_ASPECT narrows its
  * cards, then wraps into bands of whole stages, one under another.
  */
-export function renderJourneyDiagram(
-	diagram: JourneyDiagram,
-): Result.Result<RenderedDiagramScene, JourneyValidationError> {
+export function renderJourneyDiagram(diagram: JourneyDiagram): RenderedDiagramScene {
 	measured.clear();
 	wordUnits.clear();
 	const plan = chooseJourneyPlan(diagram);
@@ -1201,7 +1197,7 @@ export function renderJourneyDiagram(
 	);
 	const rules = back.flatMap((element) => broken.get(element.id) ?? [element]);
 	const elements: SceneElement[] = [...rules, ...shapes, ...marks, ...texts];
-	return Result.succeed({
+	return {
 		kind: "canvas",
 		version: CANVAS_SPEC_VERSION,
 		diagramId: diagram.id,
@@ -1214,5 +1210,5 @@ export function renderJourneyDiagram(
 		layers: [],
 		layouts: [],
 		zOrder: elements.map((element) => element.id),
-	});
+	};
 }

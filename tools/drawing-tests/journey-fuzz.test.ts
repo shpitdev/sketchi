@@ -145,7 +145,7 @@ describe("journey map fuzz", () => {
 			const defects: string[] = [];
 			const shortfalls: string[] = [];
 			for (const diagram of randomJourneys(JOURNEYS, seed)) {
-				const scene = renderJourneyDiagram(diagram).pipe(Result.getOrThrow);
+				const scene = renderJourneyDiagram(diagram);
 				const exported = convertSceneToExcalidraw(scene);
 				const problems = [
 					...getCanvasValidationIssues(scene).map((issue) => issue.message),
