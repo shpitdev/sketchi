@@ -631,7 +631,7 @@ function diagramValidationFailure(
 
 /** "API p50 latency, one week" as "api-p50-latency-one-week". */
 function idFromTitle(title: string): string {
-	return slug(title, { maxLength: 60, normalize: true, trimEnd: true });
+	return slug(title, { maxLength: 60, normalize: "before-lowercase", trimEnd: true });
 }
 
 /**

@@ -24,12 +24,15 @@ export function slug(
 	value: string,
 	options: {
 		readonly maxLength?: number;
-		readonly normalize?: boolean;
+		readonly normalize?: "before-lowercase" | "after-lowercase";
 		readonly trimEnd?: boolean;
 		readonly unicode?: boolean;
 	} = {},
 ): string {
-	const text = options.normalize ? Str.normalize("NFKD")(value) : value;
+	const lower = Str.toLowerCase(
+		options.normalize === "before-lowercase" ? Str.normalize("NFKD")(value) : value,
+	);
+	const text = options.normalize === "after-lowercase" ? Str.normalize("NFKD")(lower) : lower;
 	const result = Str.slice(
 		0,
 		options.maxLength ?? 48,
@@ -37,9 +40,7 @@ export function slug(
 		Str.replace(
 			/^-+|-+$/g,
 			"",
-		)(
-			Str.replace(options.unicode ? /[^\p{L}\p{N}]+/gu : /[^a-z0-9]+/g, "-")(Str.toLowerCase(text)),
-		),
+		)(Str.replace(options.unicode ? /[^\p{L}\p{N}]+/gu : /[^a-z0-9]+/g, "-")(text)),
 	);
 	return options.trimEnd ? Str.replace(/-+$/g, "")(result) : result;
 }

@@ -174,6 +174,34 @@ describe("Code Mode native wireframe", () => {
 			"screen-4",
 			"東京".repeat(30),
 		]);
+		const collision = await build({
+			title: "Unicode navigation",
+			screens: [
+				{ name: "𝐀", children: [{ type: "heading", text: "Destination" }] },
+				{
+					id: "a",
+					name: "Origin",
+					children: [{ type: "button", text: "Open", target: "A" }],
+				},
+			],
+		});
+		if (!collision.ok) throw new Error(JSON.stringify(collision.issues));
+		expect(collision.normalizedSpec.screens.map((entry) => entry.id)).toEqual(["A", "a"]);
+		expect(collision.normalizedSpec.screens[1]?.children[0]?.target).toBe("A");
+		const native = inline(collision).get("excalidraw") as Parameters<
+			typeof validateExcalidrawScene
+		>[0];
+		expect(validateExcalidrawScene(native)).toEqual({ ok: true, issues: [] });
+		expect(native.elements.find((entry) => entry.id === "nav:a:0")).toMatchObject({
+			type: "arrow",
+			endBinding: { elementId: "frame:A" },
+		});
+		expect(
+			await Effect.runPromise(storage.read(collision.artifact.artifactId, "excalidraw")),
+		).toMatchObject({ data: native });
+		expect(
+			await Effect.runPromise(storage.read(collision.artifact.artifactId, "scene")),
+		).toMatchObject({ data: inline(collision).get("scene") });
 	});
 
 	it("keeps a component's group and role through a patch", async () => {

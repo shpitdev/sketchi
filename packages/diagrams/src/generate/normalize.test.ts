@@ -285,12 +285,15 @@ describe("glyphs the export font cannot draw", () => {
 });
 
 describe("a diagram without an id", () => {
-	it("takes one from its title instead of failing validation", () => {
+	it.each([
+		["API p50 latency, one week", "api-p50-latency-one-week"],
+		["𝐀 café", "a-cafe"],
+	])("takes one from its title instead of failing validation: %s", (title, expectedId) => {
 		const candidate = candidateFromText({
 			model: "test",
 			provider: "fixture",
 			text: JSON.stringify({
-				title: "API p50 latency, one week",
+				title,
 				diagram: {
 					type: "chart",
 					kind: "line",
@@ -300,7 +303,7 @@ describe("a diagram without an id", () => {
 			}),
 		});
 		expect(candidate.error).toBeUndefined();
-		expect(candidate.diagram?.id).toBe("api-p50-latency-one-week");
+		expect(candidate.diagram?.id).toBe(expectedId);
 	});
 });
 

@@ -1152,7 +1152,7 @@ export function resolveWireframeShorthand(input: unknown): unknown {
 		if (typeof id !== "string" || id.length === 0) {
 			const base =
 				slug(typeof name === "string" ? name : "", {
-					normalize: true,
+					normalize: "after-lowercase",
 					unicode: true,
 					maxLength: Infinity,
 				}) || `screen-${index + 1}`;
