@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { type BuildFlowchartResult } from "@sketchi/diagram-agent";
+import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
 import { getCanvasValidationIssues } from "@sketchi/drawing";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { type UIMessage } from "ai";

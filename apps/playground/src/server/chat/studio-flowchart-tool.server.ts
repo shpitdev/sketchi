@@ -3,14 +3,14 @@ import "@tanstack/react-start/server-only";
 import {
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
-	DIAGRAM_AGENT_SYSTEM_PROMPT,
 	FLOWCHART_REQUEST_MAX_LENGTH,
 	type BuildFlowchartResult,
 	type BuildFlowchartToolInput,
-	normalizeIconSlug,
-} from "@sketchi/diagram-agent";
-import { type CodeModeIssue } from "@sketchi/diagrams/build";
-import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
+} from "@sketchi/diagrams/build/code-mode/contract";
+import { DIAGRAM_AGENT_SYSTEM_PROMPT } from "@sketchi/diagrams/build/policy";
+import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";
+import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
+import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import { type Effect } from "effect";
 
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";

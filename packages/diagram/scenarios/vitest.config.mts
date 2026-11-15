@@ -5,14 +5,11 @@ export default defineConfig(() => ({
 	cacheDir: "../../../node_modules/.vite/packages/diagram/scenarios",
 	resolve: {
 		alias: {
-			"@sketchi/diagram-core": new URL("../core/src/index.ts", import.meta.url).pathname,
+			"@sketchi/diagrams": new URL("../../diagrams/src/", import.meta.url).pathname.slice(0, -1),
 			"@sketchi/drawing/excalidraw": new URL(
 				"../../drawing/src/excalidraw/index.ts",
 				import.meta.url,
 			).pathname,
-			"@sketchi/diagram-generation": new URL("../generation/src/index.ts", import.meta.url)
-				.pathname,
-			"@sketchi/diagram-renderer": new URL("../renderer/src/index.ts", import.meta.url).pathname,
 		},
 	},
 	test: {

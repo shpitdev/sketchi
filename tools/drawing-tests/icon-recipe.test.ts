@@ -11,8 +11,8 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasElement as SceneElement,
 } from "@sketchi/drawing";
-import { deployPipelineLogoFlowchart } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 
 import {
 	convertSceneToExcalidraw,

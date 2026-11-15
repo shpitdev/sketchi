@@ -1,4 +1,4 @@
-import type { FlowchartDiagram } from "@sketchi/diagram-core";
+import type { FlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
 
 import {
 	flowchartBranchRestates,

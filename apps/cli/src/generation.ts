@@ -1,12 +1,14 @@
 import {
 	ApplyDiagramPatchRequest,
-	type CANONICAL_DOCUMENT_TYPES,
-	type CanonicalDiagramDocument,
 	RenderedDiagramSceneSchema,
 	type PatchableScene,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/contract";
+import {
+	type CANONICAL_DOCUMENT_TYPES,
+	type CanonicalDiagramDocument,
+} from "@sketchi/diagrams/build/code-mode/documents";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
-import { CodeModeIssue } from "@sketchi/diagrams/build";
+import { CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { Effect, Schema, Result } from "effect";
 
 import { type BuiltDiagram, type StoredDiagram } from "./contracts.js";

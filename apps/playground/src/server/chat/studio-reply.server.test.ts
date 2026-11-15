@@ -1,4 +1,4 @@
-import { type CodeModeIssue } from "@sketchi/diagrams/build";
+import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { jsonSchema, stepCountIs, streamText, tool, type UIMessageChunk } from "ai";
 import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vitest";

@@ -18,12 +18,6 @@
       "path": "../diagrams/tsconfig.lib.json"
     },
     {
-      "path": "../diagram/renderer/tsconfig.lib.json"
-    },
-    {
-      "path": "../diagram/core/tsconfig.lib.json"
-    },
-    {
       "path": "../icons/catalog/tsconfig.lib.json"
     },
     {

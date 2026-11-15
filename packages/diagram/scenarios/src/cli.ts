@@ -13,7 +13,7 @@ import {
 	candidateFromText,
 	enforceCandidateRequestRequirements,
 	extractJsonObject,
-} from "@sketchi/diagram-generation";
+} from "@sketchi/diagrams/generate/candidates";
 
 import { parseCliOptions, resolveGeneratorCommand, usage } from "./lib/cli-options.js";
 import { candidateFromMcpResult } from "./lib/mcp-results.js";

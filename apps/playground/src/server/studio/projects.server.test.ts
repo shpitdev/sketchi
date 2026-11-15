@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Effect } from "effect";
 
-import type { FlowchartSpec } from "@sketchi/diagram-agent";
+import type { FlowchartSpec } from "@sketchi/diagrams/build/code-mode/contract";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
 
 import type { StudioEnv } from "../bindings/studio-env.server";

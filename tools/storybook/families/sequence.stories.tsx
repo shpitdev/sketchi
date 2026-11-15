@@ -1,6 +1,10 @@
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { apiRequestSequence, selfMessageSequence, sequenceFixture } from "@sketchi/diagram-core";
+import {
+	apiRequestSequence,
+	selfMessageSequence,
+	sequenceFixture,
+} from "@sketchi/diagrams/families/sequence/document";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
 

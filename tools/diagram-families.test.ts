@@ -2,20 +2,18 @@
 import {
 	canonicalDocumentFromDiagram,
 	type CanonicalDiagramDocument,
+} from "@sketchi/diagrams/build/code-mode/documents";
+import {
 	CodeModeArtifactStorage,
 	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer,
-} from "@sketchi/diagram-agent";
-import {
-	type CanonicalDiagram,
-	DIAGRAM_TYPES,
-	type DiagramTypeValue,
-	diagramFixtures,
-	parseCanonicalDiagram,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/build/code-mode/artifacts";
+import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
+import { type CanonicalDiagram, parseCanonicalDiagram } from "@sketchi/diagrams/diagram";
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "@sketchi/diagrams/types";
+import { diagramFixtures } from "@sketchi/diagrams/fixtures";
 import { getCanvasValidationIssues } from "@sketchi/drawing";
-import { candidateFromText } from "@sketchi/diagram-generation";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import { candidateFromText } from "@sketchi/diagrams/generate/candidates";
+import { renderDiagram } from "@sketchi/diagrams/render";
 import { scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
 import { Effect, Layer, Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -27,7 +25,7 @@ function fixtureFor(family: DiagramTypeValue): CanonicalDiagram {
 	const fixture = diagramFixtures.find((diagram) => diagram.type === family);
 	if (!fixture) {
 		throw new Error(
-			`diagram-core exports no fixture for "${family}"; add one to diagramFixtures (packages/diagram/core/src/fixtures.ts).`,
+			`diagrams exports no fixture for "${family}"; add one to diagramFixtures (packages/diagrams/src/fixtures.ts).`,
 		);
 	}
 	return fixture;

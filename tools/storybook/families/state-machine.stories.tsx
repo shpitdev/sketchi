@@ -1,6 +1,9 @@
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { mediaPlayerStateMachine, stateMachineFixture } from "@sketchi/diagram-core";
+import {
+	mediaPlayerStateMachine,
+	stateMachineFixture,
+} from "@sketchi/diagrams/families/state-machine/document";
 import { stateMachineScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";

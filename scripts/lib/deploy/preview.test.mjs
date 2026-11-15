@@ -310,8 +310,8 @@ test("previews deploy the affected Worker apps unless asked for all or one", () 
 	assert.deepEqual(
 		selectPreviewProjects({
 			selection: "affected",
-			affected: ["diagram-core", "playground", "web"],
-			changedFiles: ["packages/diagram/core/src/index.ts"],
+			affected: ["diagrams", "playground", "web"],
+			changedFiles: ["packages/diagrams/src/diagram.ts"],
 		}),
 		["playground", "web"],
 	);

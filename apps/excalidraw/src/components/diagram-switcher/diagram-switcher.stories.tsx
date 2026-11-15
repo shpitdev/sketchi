@@ -1,6 +1,6 @@
-import { mindmapTopics } from "@sketchi/diagrams/mindmap";
+import { mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
-import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
+import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 
 import { DiagramSwitcher } from "./diagram-switcher";
 import "../../styles/app.css";

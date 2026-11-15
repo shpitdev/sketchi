@@ -1,8 +1,8 @@
+import { type DiagramValidationError } from "@sketchi/diagrams/graph/intermediate";
 import {
-	type DiagramValidationError,
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/document";
 
 import { Option, Result, Schema } from "effect";
 

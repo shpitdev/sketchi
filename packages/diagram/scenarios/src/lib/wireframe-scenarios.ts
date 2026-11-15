@@ -8,12 +8,12 @@ import {
 	type WireframeDevice,
 	type WireframeDiagram,
 	wireframeComponentWords,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/wireframe/document";
 import {
 	layoutWireframeDiagram,
 	wireframeFrameName,
-	wireframeLayoutIssues,
-} from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/wireframe/render";
+import { wireframeLayoutIssues } from "@sketchi/diagrams/families/wireframe/readout";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";

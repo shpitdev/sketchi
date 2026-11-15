@@ -18,10 +18,10 @@ import {
 	type BuildTimelineResult,
 	type BuildChartResult,
 	type CreateCanvasResult,
-	type StoredArtifactFormat,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/contract";
+import { type StoredArtifactFormat } from "@sketchi/diagrams/build/code-mode/artifacts";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
-import { type BuildMindmapResult } from "@sketchi/diagrams/mindmap/build";
+import { type BuildMindmapResult } from "@sketchi/diagrams/families/mindmap/build";
 import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Context, Effect, Schema } from "effect";

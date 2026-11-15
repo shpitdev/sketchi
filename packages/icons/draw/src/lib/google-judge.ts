@@ -5,7 +5,8 @@ import {
 	ThinkingLevel,
 	type HttpOptions,
 } from "@google/genai/node";
-import { type CloudflareAiGateway, stripGoogleModelPrefix } from "@sketchi/diagram-generation";
+import { type CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
+import { stripGoogleModelPrefix } from "@sketchi/diagrams/generate/models";
 import { TelemetryCorrelation } from "@sketchi/observability";
 import {
 	Array,

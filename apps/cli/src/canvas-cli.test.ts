@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import { CreateCanvasRequest } from "@sketchi/diagram-agent";
+import { CreateCanvasRequest } from "@sketchi/diagrams/build/code-mode/contract";
 import { assert, describe, expect, it } from "@effect/vitest";
 
 const binary = resolve(process.cwd(), "apps/cli/dist/sketchi.js");

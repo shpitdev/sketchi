@@ -7,6 +7,12 @@
   "include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"],
   "references": [
     {
+      "path": "../../packages/cloudflare/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagrams/tsconfig.lib.json"
+    },
+    {
       "path": "../../packages/ui/tsconfig.lib.json"
     },
     {
@@ -25,28 +31,13 @@
       "path": "../../packages/editor/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/diagram/renderer/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/diagram/generation/tsconfig.lib.json"
-    },
-    {
       "path": "../../packages/drawing/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/diagram/core/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/diagram/agent/tsconfig.lib.json"
     },
     {
       "path": "../../packages/icons/community/tsconfig.lib.json"
     },
     {
       "path": "../../packages/diagram/scenarios/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/diagrams/tsconfig.lib.json"
     }
   ]
 }

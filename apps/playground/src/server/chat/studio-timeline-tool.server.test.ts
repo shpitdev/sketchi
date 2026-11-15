@@ -2,10 +2,12 @@ import { expect, it } from "vitest";
 import { Effect } from "effect";
 import {
 	buildTimeline,
-	CodeModeArtifactStorage,
 	CodeModeRuntimeEnvironment,
+} from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/artifacts";
 import type { UIMessage } from "ai";
 import { deriveBuildState } from "../../features/playground/build-result";
 import { makeStudioTimelineToolExecutor } from "./studio-timeline-tool.server";

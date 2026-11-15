@@ -2,7 +2,10 @@
 import { Result } from "effect";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { parseQuadrantDiagram, quadrantFixture } from "@sketchi/diagram-core";
+import {
+	parseQuadrantDiagram,
+	quadrantFixture,
+} from "@sketchi/diagrams/families/quadrant/document";
 import { quadrantScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";

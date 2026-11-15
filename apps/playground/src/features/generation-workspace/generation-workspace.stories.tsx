@@ -1,6 +1,9 @@
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { flowchartFixture, pharmaBatchDispositionFlowchart } from "@sketchi/diagram-core";
+import {
+	flowchartFixture,
+	pharmaBatchDispositionFlowchart,
+} from "@sketchi/diagrams/families/flowchart/diagram";
 
 import { GenerationWorkspace } from "./generation-workspace";
 import "../../styles.css";

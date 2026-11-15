@@ -13,6 +13,15 @@
   "references": [
     {
       "path": "../drawing/tsconfig.lib.json"
+    },
+    {
+      "path": "../cloudflare/tsconfig.lib.json"
+    },
+    {
+      "path": "../icons/catalog/tsconfig.lib.json"
+    },
+    {
+      "path": "../observability/tsconfig.lib.json"
     }
   ]
 }

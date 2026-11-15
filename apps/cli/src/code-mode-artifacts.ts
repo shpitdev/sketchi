@@ -1,11 +1,11 @@
 import {
 	formatContractSchemaError,
-	CodeModeArtifactStorage,
-	CodeModeRuntimeEnvironment,
 	RenderedDiagramSceneSchema,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/contract";
+import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
+import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
-import { type CodeModeIssue } from "@sketchi/diagrams/build";
+import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { Effect, Schema, Result } from "effect";
 
 import { type PatchedDiagramArtifacts } from "./contracts.js";

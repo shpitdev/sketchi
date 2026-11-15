@@ -2,7 +2,10 @@
 import { Result } from "effect";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { timelineFixture, parseTimelineDiagram } from "@sketchi/diagram-core";
+import {
+	timelineFixture,
+	parseTimelineDiagram,
+} from "@sketchi/diagrams/families/timeline/document";
 import { timelineScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";

@@ -1,0 +1,235 @@
+// Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { Result } from "effect";
+import { describe, expect, it } from "vitest";
+
+import { crossingStateMachines } from "../flowchart/crossing-fixtures.js";
+import {
+	mediaPlayerStateMachine,
+	parseStateMachineDiagram,
+	type StateMachineDiagram,
+	stateMachineFixture,
+} from "./document.js";
+import {
+	getCanvasValidationIssues,
+	groupRegionIssues,
+	wrappedLabelWidth,
+	type CanvasSpec as RenderedDiagramScene,
+} from "@sketchi/drawing";
+
+import { renderDiagram } from "../../render.js";
+import { arrowCrossings } from "../../graph/scene.js";
+
+const nodes = (scene: RenderedDiagramScene) =>
+	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));
+const arrows = (scene: RenderedDiagramScene) =>
+	scene.elements.flatMap((element) => (element.type === "arrow" ? [element] : []));
+const texts = (scene: RenderedDiagramScene) =>
+	scene.elements.flatMap((element) => (element.type === "text" ? [element.text] : []));
+
+describe("StateMachine renderer", () => {
+	it("draws the same composite entry arrow when initial is omitted", () => {
+		const omitted = {
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map(({ initial: _initial, ...state }) => state),
+		};
+		expect(renderDiagram(omitted).pipe(Result.getOrThrow)).toEqual(
+			renderDiagram(mediaPlayerStateMachine).pipe(Result.getOrThrow),
+		);
+	});
+
+	it("keeps the round-14 labeled retry choice clear after naming its final", () => {
+		const diagram = crossingStateMachines["named-final-retry"];
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+		expect(arrowCrossings(arrows(scene))).toBe(0);
+		// Repair the crossed retry pair, not the unrelated Idle/Streaming pair.
+		const forward = arrows(scene).find((arrow) => arrow.edgeId === "transition-6-idle-streaming")!;
+		const back = arrows(scene).find((arrow) => arrow.edgeId === "transition-7-streaming-idle")!;
+		expect(Math.abs(forward.points[0].x - back.points.at(-1)!.x)).toBeGreaterThanOrEqual(18);
+		expect(forward.points[0].y).toBe(back.points.at(-1)!.y);
+		expect(forward.points.at(-1)!.y).toBe(back.points[0].y);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+		expect(groupRegionIssues(scene)).toEqual([]);
+		expect(texts(scene)).toContain("Failed");
+		expect(Math.max(scene.width / scene.height, scene.height / scene.width)).toBeLessThanOrEqual(
+			2.5,
+		);
+	});
+
+	it.each(["order-lifecycle", "order-lifecycle-ended"] as const)(
+		"sets round-16 %s's return label beside its own line, clear of the cancel run",
+		(name) => {
+			const scene = renderDiagram(crossingStateMachines[name]).pipe(Result.getOrThrow);
+			const label = scene.elements.find(
+				(element) => element.type === "text" && element.text === "return to sender",
+			)!;
+			const back = arrows(scene).find((arrow) => arrow.edgeId === "transition-6-shipped-paid")!;
+			const cancel = arrows(scene).find((arrow) => arrow.edgeId === "transition-4-paid-cancelled")!;
+			if (label.type !== "text") throw new Error("expected the return label");
+			const width = wrappedLabelWidth(label.text, label.fontSize, label.maxWidth ?? 160);
+			const [left, top] = [label.x - width / 2, label.y - (label.fontSize * 1.35) / 2];
+			// Right of its upward line, its text starting at that line.
+			expect(left - back.points[0].x).toBe(8);
+			expect(label.textAlign).toBe("left");
+			// The cancel run that crossed above it turns well clear of it.
+			const run = cancel.points.find(
+				(point, index) => index > 0 && point.y === cancel.points[index - 1]!.y,
+			)!;
+			expect(top - run.y).toBeGreaterThanOrEqual(8 + 8 + 6);
+		},
+	);
+
+	it("keeps a label its own line holds nearest within the drawing", () => {
+		// Disconnect sits 10 px from the Connected frame, inside the berth an
+		// ambiguous label keeps, but no other arrow comes nearer than its own line:
+		// it stays above its exit rather than sliding out past its return run.
+		const scene = renderDiagram(crossingStateMachines["connection-retry-disconnect"]).pipe(
+			Result.getOrThrow,
+		);
+		const label = scene.elements.find(
+			(element) => element.type === "text" && element.text === "Disconnect",
+		)!;
+		const own = arrows(scene).find((arrow) => arrow.label === "Disconnect")!;
+		if (label.type !== "text") throw new Error("expected the Disconnect label");
+		const width = wrappedLabelWidth(label.text, label.fontSize, label.maxWidth ?? 160);
+		const right = Math.max(
+			...arrows(scene).flatMap((arrow) => arrow.points.map((point) => point.x)),
+			...nodes(scene).map((node) => node.x + node.width),
+		);
+		expect(label.x + width / 2).toBeLessThanOrEqual(right);
+		expect(label.y).toBeLessThan(own.points[0].y);
+	});
+
+	it("keeps the captured media-player ended marker anonymous", () => {
+		const scene = renderDiagram(crossingStateMachines["media-player"]).pipe(Result.getOrThrow);
+		expect(nodes(scene).find((node) => node.nodeId === "ended")).toMatchObject({
+			kind: "final",
+			rendererRole: "state-marker",
+		});
+		expect(texts(scene)).not.toContain("ended");
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+	});
+
+	it("draws regular-state ids and composite names without labels", () => {
+		const diagram = parseStateMachineDiagram({
+			...mediaPlayerStateMachine,
+			states: mediaPlayerStateMachine.states.map(({ label: _label, ...state }) => state),
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+		expect(groupRegionIssues(scene)).toEqual([]);
+		expect(texts(scene)).toEqual(expect.arrayContaining(["stopped", "playing", "paused"]));
+		expect(scene.elements).toContainEqual(
+			expect.objectContaining({ type: "frame", name: "active" }),
+		);
+	});
+
+	it("renders each fixture into a valid deterministic scene", () => {
+		for (const diagram of [stateMachineFixture, mediaPlayerStateMachine]) {
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+			expect(scene.diagramId).toBe(diagram.id);
+			expect(getCanvasValidationIssues(scene)).toEqual([]);
+			expect(groupRegionIssues(scene)).toEqual([]);
+			expect(renderDiagram(diagram).pipe(Result.getOrThrow)).toEqual(scene);
+		}
+	});
+
+	it("draws an initial dot, compact labels and one bullseye per transition into a final", () => {
+		const scene = renderDiagram(stateMachineFixture).pipe(Result.getOrThrow);
+		const initial = nodes(scene).find((node) => node.nodeId === ":initial")!;
+		expect(initial).toMatchObject({ kind: "initial", rendererRole: "state-marker" });
+		expect(arrows(scene).find((arrow) => arrow.sourceNodeId === ":initial")?.targetNodeId).toBe(
+			"pending",
+		);
+		expect(texts(scene)).toEqual(
+			expect.arrayContaining(["pay [card valid] / charge", "after 24h / email", "cancel"]),
+		);
+		// "done" is reached twice: each arrival ends at a bullseye of its own.
+		expect(
+			nodes(scene)
+				.filter((node) => node.kind === "final")
+				.map((node) => node.nodeId)
+				.sort(),
+		).toEqual(["done", "done:2"]);
+		// The completion transition carries no label.
+		expect(arrows(scene).find((arrow) => arrow.edgeId === "close")?.label).toBeUndefined();
+	});
+
+	it("frames a composite with its own initial dot and routes its transitions to the frame", () => {
+		const scene = renderDiagram(mediaPlayerStateMachine).pipe(Result.getOrThrow);
+		const frame = scene.elements.find((element) => element.type === "frame")!;
+		expect(frame).toMatchObject({ id: "group:active", name: "Active", nodeId: "active" });
+		const inside = nodes(scene)
+			.filter((node) => node.frameId === "group:active")
+			.map((node) => node.nodeId);
+		expect(inside).toEqual(["active:initial", "playing", "paused"]);
+		const play = arrows(scene).find((arrow) => arrow.edgeId === "play")!;
+		const stop = arrows(scene).find((arrow) => arrow.edgeId === "stop")!;
+		expect([play.targetNodeId, stop.sourceNodeId]).toEqual(["active", "active"]);
+	});
+
+	it.each(["Closed", undefined])(
+		"draws final label %s as its state followed by a bullseye",
+		(label) => {
+			const diagram: StateMachineDiagram = parseStateMachineDiagram({
+				id: "ticket",
+				title: "Ticket",
+				type: "state-machine",
+				initial: "open",
+				states: [
+					{ id: "open", label: "Open" },
+					{ id: "closed", ...(label ? { label } : {}), kind: "final" },
+				],
+				transitions: [{ id: "resolve", source: "open", target: "closed", event: "resolve" }],
+			}).pipe(Result.getOrThrow);
+			const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+			expect(nodes(scene).find((node) => node.nodeId === "closed")).toMatchObject({
+				kind: "state",
+				label: label ?? "closed",
+			});
+			expect(arrows(scene).find((arrow) => arrow.edgeId === "closed:end")?.targetNodeId).toBe(
+				"closed:end",
+			);
+		},
+	);
+
+	it("never lets its own edges collide with authored transition ids", () => {
+		const diagram = parseStateMachineDiagram({
+			id: "colliding",
+			title: "Colliding ids",
+			type: "state-machine",
+			initial: "stopped",
+			states: [
+				{ id: "stopped", label: "Stopped" },
+				{ id: "active", label: "Active", initial: "playing" },
+				{ id: "playing", label: "Playing", parent: "active" },
+				{ id: "closed", label: "Closed", kind: "final" },
+			],
+			transitions: [
+				{ id: ":initial", source: "stopped", target: "active", event: "play" },
+				{ id: "active:initial", source: "active", target: "stopped", event: "stop" },
+				{ id: "closed:end", source: "stopped", target: "closed", event: "close" },
+			],
+		}).pipe(Result.getOrThrow);
+		const scene = renderDiagram(diagram).pipe(Result.getOrThrow);
+		expect(getCanvasValidationIssues(scene)).toEqual([]);
+		const ids = arrows(scene).map((arrow) => arrow.edgeId);
+		expect(new Set(ids).size).toBe(ids.length);
+		for (const id of [":initial", "active:initial", "closed:end"])
+			expect(arrows(scene).find((arrow) => arrow.edgeId === id)?.label).toBeDefined();
+	});
+
+	it("keeps an authored direction and otherwise picks one that reads", () => {
+		const across = renderDiagram({ ...stateMachineFixture, layout: { direction: "LR" } }).pipe(
+			Result.getOrThrow,
+		);
+		const down = renderDiagram({ ...stateMachineFixture, layout: { direction: "TB" } }).pipe(
+			Result.getOrThrow,
+		);
+		expect(across.width / across.height).toBeGreaterThan(down.width / down.height);
+		const chosen = renderDiagram(stateMachineFixture).pipe(Result.getOrThrow);
+		expect(
+			Math.max(chosen.width / chosen.height, chosen.height / chosen.width),
+		).toBeLessThanOrEqual(2.5);
+		expect([across, down].map((scene) => scene.width)).toContain(chosen.width);
+	});
+});

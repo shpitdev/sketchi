@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { generateText, jsonSchema, tool } from "ai";
 import { Effect } from "effect";
 
-import type { CloudflareAiGateway } from "@sketchi/diagram-generation";
+import type { CloudflareAiGateway } from "@sketchi/cloudflare/ai-gateway";
 
 import { PlaygroundBindings, PlaygroundRequestMetadata } from "../runtime/context.server";
 import { PlaygroundAiModel, PlaygroundAiModelLive } from "./model.server";

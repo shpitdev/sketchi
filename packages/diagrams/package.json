@@ -3,29 +3,395 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		"./mindmap": {
-			"types": "./dist/mindmap/index.d.ts",
-			"default": "./dist/mindmap/index.js"
+		"./build/code-mode/artifacts": {
+			"types": "./dist/build/code-mode/artifacts.d.ts",
+			"default": "./dist/build/code-mode/artifacts.js"
 		},
-		"./mindmap/fixtures": {
-			"types": "./dist/mindmap/fixtures.d.ts",
-			"default": "./dist/mindmap/fixtures.js"
+		"./build/code-mode/contract": {
+			"types": "./dist/build/code-mode/contract.d.ts",
+			"default": "./dist/build/code-mode/contract.js"
 		},
-		"./build": {
-			"types": "./dist/build.d.ts",
-			"default": "./dist/build.js"
+		"./build/code-mode/documents": {
+			"types": "./dist/build/code-mode/documents.d.ts",
+			"default": "./dist/build/code-mode/documents.js"
 		},
-		"./generate/clean-text": {
-			"types": "./dist/generate/clean-text.d.ts",
-			"default": "./dist/generate/clean-text.js"
+		"./build/code-mode/icons": {
+			"types": "./dist/build/code-mode/icons.d.ts",
+			"default": "./dist/build/code-mode/icons.js"
 		},
-		"./mindmap/build": {
-			"types": "./dist/mindmap/build.d.ts",
-			"default": "./dist/mindmap/build.js"
+		"./build/code-mode/runtime": {
+			"types": "./dist/build/code-mode/runtime.d.ts",
+			"default": "./dist/build/code-mode/runtime.js"
+		},
+		"./build/policy": {
+			"types": "./dist/build/policy.d.ts",
+			"default": "./dist/build/policy.js"
+		},
+		"./build/result": {
+			"types": "./dist/build/result.d.ts",
+			"default": "./dist/build/result.js"
+		},
+		"./diagram": {
+			"types": "./dist/diagram.d.ts",
+			"default": "./dist/diagram.js"
+		},
+		"./families/chart/document": {
+			"types": "./dist/families/chart/document.d.ts",
+			"default": "./dist/families/chart/document.js"
+		},
+		"./families/chart/readout": {
+			"types": "./dist/families/chart/readout.d.ts",
+			"default": "./dist/families/chart/readout.js"
+		},
+		"./families/chart/render": {
+			"types": "./dist/families/chart/render.d.ts",
+			"default": "./dist/families/chart/render.js"
+		},
+		"./families/chart/rules": {
+			"types": "./dist/families/chart/rules.d.ts",
+			"default": "./dist/families/chart/rules.js"
+		},
+		"./families/chart/scale": {
+			"types": "./dist/families/chart/scale.d.ts",
+			"default": "./dist/families/chart/scale.js"
+		},
+		"./families/class/diagram": {
+			"types": "./dist/families/class/diagram.d.ts",
+			"default": "./dist/families/class/diagram.js"
+		},
+		"./families/class/document": {
+			"types": "./dist/families/class/document.d.ts",
+			"default": "./dist/families/class/document.js"
+		},
+		"./families/class/fixtures": {
+			"types": "./dist/families/class/fixtures.d.ts",
+			"default": "./dist/families/class/fixtures.js"
+		},
+		"./families/class/rules": {
+			"types": "./dist/families/class/rules.d.ts",
+			"default": "./dist/families/class/rules.js"
+		},
+		"./families/er/document": {
+			"types": "./dist/families/er/document.d.ts",
+			"default": "./dist/families/er/document.js"
+		},
+		"./families/er/rules": {
+			"types": "./dist/families/er/rules.d.ts",
+			"default": "./dist/families/er/rules.js"
+		},
+		"./families/flowchart/crossing-fixtures": {
+			"types": "./dist/families/flowchart/crossing-fixtures.d.ts",
+			"default": "./dist/families/flowchart/crossing-fixtures.js"
+		},
+		"./families/flowchart/diagram": {
+			"types": "./dist/families/flowchart/diagram.d.ts",
+			"default": "./dist/families/flowchart/diagram.js"
+		},
+		"./families/flowchart/document": {
+			"types": "./dist/families/flowchart/document.d.ts",
+			"default": "./dist/families/flowchart/document.js"
+		},
+		"./families/flowchart/edits": {
+			"types": "./dist/families/flowchart/edits.d.ts",
+			"default": "./dist/families/flowchart/edits.js"
+		},
+		"./families/flowchart/group-fixtures": {
+			"types": "./dist/families/flowchart/group-fixtures.d.ts",
+			"default": "./dist/families/flowchart/group-fixtures.js"
+		},
+		"./families/flowchart/label-fixtures": {
+			"types": "./dist/families/flowchart/label-fixtures.d.ts",
+			"default": "./dist/families/flowchart/label-fixtures.js"
+		},
+		"./families/flowchart/lane-fixtures": {
+			"types": "./dist/families/flowchart/lane-fixtures.d.ts",
+			"default": "./dist/families/flowchart/lane-fixtures.js"
+		},
+		"./families/flowchart/routing-fixtures": {
+			"types": "./dist/families/flowchart/routing-fixtures.d.ts",
+			"default": "./dist/families/flowchart/routing-fixtures.js"
+		},
+		"./families/flowchart/rules": {
+			"types": "./dist/families/flowchart/rules.d.ts",
+			"default": "./dist/families/flowchart/rules.js"
+		},
+		"./families/flowchart/spec": {
+			"types": "./dist/families/flowchart/spec.d.ts",
+			"default": "./dist/families/flowchart/spec.js"
+		},
+		"./families/flowchart/zone-fixtures": {
+			"types": "./dist/families/flowchart/zone-fixtures.d.ts",
+			"default": "./dist/families/flowchart/zone-fixtures.js"
+		},
+		"./families/gantt/document": {
+			"types": "./dist/families/gantt/document.d.ts",
+			"default": "./dist/families/gantt/document.js"
+		},
+		"./families/gantt/readout": {
+			"types": "./dist/families/gantt/readout.d.ts",
+			"default": "./dist/families/gantt/readout.js"
+		},
+		"./families/gantt/render": {
+			"types": "./dist/families/gantt/render.d.ts",
+			"default": "./dist/families/gantt/render.js"
+		},
+		"./families/gantt/rules": {
+			"types": "./dist/families/gantt/rules.d.ts",
+			"default": "./dist/families/gantt/rules.js"
+		},
+		"./families/journey/document": {
+			"types": "./dist/families/journey/document.d.ts",
+			"default": "./dist/families/journey/document.js"
+		},
+		"./families/journey/fixtures": {
+			"types": "./dist/families/journey/fixtures.d.ts",
+			"default": "./dist/families/journey/fixtures.js"
+		},
+		"./families/journey/readout": {
+			"types": "./dist/families/journey/readout.d.ts",
+			"default": "./dist/families/journey/readout.js"
+		},
+		"./families/journey/render": {
+			"types": "./dist/families/journey/render.d.ts",
+			"default": "./dist/families/journey/render.js"
+		},
+		"./families/journey/rules": {
+			"types": "./dist/families/journey/rules.d.ts",
+			"default": "./dist/families/journey/rules.js"
+		},
+		"./families/mindmap/build": {
+			"types": "./dist/families/mindmap/build.d.ts",
+			"default": "./dist/families/mindmap/build.js"
+		},
+		"./families/mindmap/fixtures": {
+			"types": "./dist/families/mindmap/fixtures.d.ts",
+			"default": "./dist/families/mindmap/fixtures.js"
+		},
+		"./families/mindmap/index": {
+			"types": "./dist/families/mindmap/index.d.ts",
+			"default": "./dist/families/mindmap/index.js"
+		},
+		"./families/mindmap/rules": {
+			"types": "./dist/families/mindmap/rules.d.ts",
+			"default": "./dist/families/mindmap/rules.js"
+		},
+		"./families/org-chart/document": {
+			"types": "./dist/families/org-chart/document.d.ts",
+			"default": "./dist/families/org-chart/document.js"
+		},
+		"./families/org-chart/fixtures": {
+			"types": "./dist/families/org-chart/fixtures.d.ts",
+			"default": "./dist/families/org-chart/fixtures.js"
+		},
+		"./families/org-chart/readout": {
+			"types": "./dist/families/org-chart/readout.d.ts",
+			"default": "./dist/families/org-chart/readout.js"
+		},
+		"./families/org-chart/render": {
+			"types": "./dist/families/org-chart/render.d.ts",
+			"default": "./dist/families/org-chart/render.js"
+		},
+		"./families/org-chart/rules": {
+			"types": "./dist/families/org-chart/rules.d.ts",
+			"default": "./dist/families/org-chart/rules.js"
+		},
+		"./families/quadrant/document": {
+			"types": "./dist/families/quadrant/document.d.ts",
+			"default": "./dist/families/quadrant/document.js"
+		},
+		"./families/quadrant/readout": {
+			"types": "./dist/families/quadrant/readout.d.ts",
+			"default": "./dist/families/quadrant/readout.js"
+		},
+		"./families/quadrant/render": {
+			"types": "./dist/families/quadrant/render.d.ts",
+			"default": "./dist/families/quadrant/render.js"
+		},
+		"./families/quadrant/rules": {
+			"types": "./dist/families/quadrant/rules.d.ts",
+			"default": "./dist/families/quadrant/rules.js"
+		},
+		"./families/sankey/document": {
+			"types": "./dist/families/sankey/document.d.ts",
+			"default": "./dist/families/sankey/document.js"
+		},
+		"./families/sankey/fixtures": {
+			"types": "./dist/families/sankey/fixtures.d.ts",
+			"default": "./dist/families/sankey/fixtures.js"
+		},
+		"./families/sankey/layout": {
+			"types": "./dist/families/sankey/layout.d.ts",
+			"default": "./dist/families/sankey/layout.js"
+		},
+		"./families/sankey/readout": {
+			"types": "./dist/families/sankey/readout.d.ts",
+			"default": "./dist/families/sankey/readout.js"
+		},
+		"./families/sankey/render": {
+			"types": "./dist/families/sankey/render.d.ts",
+			"default": "./dist/families/sankey/render.js"
+		},
+		"./families/sankey/rules": {
+			"types": "./dist/families/sankey/rules.d.ts",
+			"default": "./dist/families/sankey/rules.js"
+		},
+		"./families/sequence/document": {
+			"types": "./dist/families/sequence/document.d.ts",
+			"default": "./dist/families/sequence/document.js"
+		},
+		"./families/sequence/render": {
+			"types": "./dist/families/sequence/render.d.ts",
+			"default": "./dist/families/sequence/render.js"
+		},
+		"./families/sequence/rules": {
+			"types": "./dist/families/sequence/rules.d.ts",
+			"default": "./dist/families/sequence/rules.js"
+		},
+		"./families/state-machine/document": {
+			"types": "./dist/families/state-machine/document.d.ts",
+			"default": "./dist/families/state-machine/document.js"
+		},
+		"./families/state-machine/rules": {
+			"types": "./dist/families/state-machine/rules.d.ts",
+			"default": "./dist/families/state-machine/rules.js"
+		},
+		"./families/timeline/document": {
+			"types": "./dist/families/timeline/document.d.ts",
+			"default": "./dist/families/timeline/document.js"
+		},
+		"./families/timeline/readout": {
+			"types": "./dist/families/timeline/readout.d.ts",
+			"default": "./dist/families/timeline/readout.js"
+		},
+		"./families/timeline/rules": {
+			"types": "./dist/families/timeline/rules.d.ts",
+			"default": "./dist/families/timeline/rules.js"
+		},
+		"./families/venn/document": {
+			"types": "./dist/families/venn/document.d.ts",
+			"default": "./dist/families/venn/document.js"
+		},
+		"./families/venn/fixtures": {
+			"types": "./dist/families/venn/fixtures.d.ts",
+			"default": "./dist/families/venn/fixtures.js"
+		},
+		"./families/venn/layout": {
+			"types": "./dist/families/venn/layout.d.ts",
+			"default": "./dist/families/venn/layout.js"
+		},
+		"./families/venn/readout": {
+			"types": "./dist/families/venn/readout.d.ts",
+			"default": "./dist/families/venn/readout.js"
+		},
+		"./families/venn/render": {
+			"types": "./dist/families/venn/render.d.ts",
+			"default": "./dist/families/venn/render.js"
+		},
+		"./families/venn/rules": {
+			"types": "./dist/families/venn/rules.d.ts",
+			"default": "./dist/families/venn/rules.js"
+		},
+		"./families/wireframe/document": {
+			"types": "./dist/families/wireframe/document.d.ts",
+			"default": "./dist/families/wireframe/document.js"
+		},
+		"./families/wireframe/fixtures": {
+			"types": "./dist/families/wireframe/fixtures.d.ts",
+			"default": "./dist/families/wireframe/fixtures.js"
+		},
+		"./families/wireframe/readout": {
+			"types": "./dist/families/wireframe/readout.d.ts",
+			"default": "./dist/families/wireframe/readout.js"
+		},
+		"./families/wireframe/render": {
+			"types": "./dist/families/wireframe/render.d.ts",
+			"default": "./dist/families/wireframe/render.js"
+		},
+		"./families/wireframe/rules": {
+			"types": "./dist/families/wireframe/rules.d.ts",
+			"default": "./dist/families/wireframe/rules.js"
+		},
+		"./fixtures": {
+			"types": "./dist/fixtures.d.ts",
+			"default": "./dist/fixtures.js"
+		},
+		"./generate/candidates": {
+			"types": "./dist/generate/candidates.d.ts",
+			"default": "./dist/generate/candidates.js"
+		},
+		"./generate/client": {
+			"types": "./dist/generate/client.d.ts",
+			"default": "./dist/generate/client.js"
+		},
+		"./generate/cloudflare-gateway-chat": {
+			"types": "./dist/generate/cloudflare-gateway-chat.d.ts",
+			"default": "./dist/generate/cloudflare-gateway-chat.js"
+		},
+		"./generate/coverage": {
+			"types": "./dist/generate/coverage.d.ts",
+			"default": "./dist/generate/coverage.js"
+		},
+		"./generate/errors": {
+			"types": "./dist/generate/errors.d.ts",
+			"default": "./dist/generate/errors.js"
+		},
+		"./generate/family-narrowing": {
+			"types": "./dist/generate/family-narrowing.d.ts",
+			"default": "./dist/generate/family-narrowing.js"
+		},
+		"./generate/intent": {
+			"types": "./dist/generate/intent.d.ts",
+			"default": "./dist/generate/intent.js"
+		},
+		"./generate/jev-workers-ai": {
+			"types": "./dist/generate/jev-workers-ai.d.ts",
+			"default": "./dist/generate/jev-workers-ai.js"
+		},
+		"./generate/logo-placement": {
+			"types": "./dist/generate/logo-placement.d.ts",
+			"default": "./dist/generate/logo-placement.js"
+		},
+		"./generate/messages": {
+			"types": "./dist/generate/messages.d.ts",
+			"default": "./dist/generate/messages.js"
+		},
+		"./generate/models": {
+			"types": "./dist/generate/models.d.ts",
+			"default": "./dist/generate/models.js"
+		},
+		"./generate/styling": {
+			"types": "./dist/generate/styling.d.ts",
+			"default": "./dist/generate/styling.js"
+		},
+		"./graph/intermediate": {
+			"types": "./dist/graph/intermediate.d.ts",
+			"default": "./dist/graph/intermediate.js"
+		},
+		"./graph/planarity": {
+			"types": "./dist/graph/planarity.d.ts",
+			"default": "./dist/graph/planarity.js"
+		},
+		"./graph/scene": {
+			"types": "./dist/graph/scene.d.ts",
+			"default": "./dist/graph/scene.js"
+		},
+		"./render": {
+			"types": "./dist/render.d.ts",
+			"default": "./dist/render.js"
+		},
+		"./types": {
+			"types": "./dist/types.d.ts",
+			"default": "./dist/types.js"
 		}
 	},
 	"dependencies": {
 		"effect": "catalog:",
-		"@sketchi/drawing": "workspace:*"
+		"@sketchi/drawing": "workspace:*",
+		"@sketchi/cloudflare": "workspace:*",
+		"@sketchi/icon-catalog": "workspace:*",
+		"@sketchi/observability": "workspace:*",
+		"@standard-schema/spec": "1.1.0",
+		"@effect/ai-openai-compat": "catalog:",
+		"@effect/ai-typesafe": "catalog:"
 	}
 }

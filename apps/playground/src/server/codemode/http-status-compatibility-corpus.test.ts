@@ -3,11 +3,13 @@ import { Effect, Layer } from "effect";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
+} from "@sketchi/diagrams/build/code-mode/artifacts";
+import {
 	type ApplyDiagramPatchResult,
 	type BuildFlowchartResult,
 	type GetArtifactResult,
-} from "@sketchi/diagram-agent";
-import { type BuildMindmapResult } from "@sketchi/diagrams/mindmap/build";
+} from "@sketchi/diagrams/build/code-mode/contract";
+import { type BuildMindmapResult } from "@sketchi/diagrams/families/mindmap/build";
 
 const runtimeResults = vi.hoisted(() => {
 	let buildFlowchartResult: unknown;

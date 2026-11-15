@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Cause, Effect, Exit, Layer, Result, Schema } from "effect";
-import { parseChartDiagram } from "@sketchi/diagram-core";
+import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
 
 import { runScenarioCli, ScenarioCliUsageError, scenarioCliExitCode } from "./cli.js";
 import { ToolProcessSpawner, ToolProcessSpawnerLive } from "./internal/tool-process.js";

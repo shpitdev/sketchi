@@ -1,14 +1,11 @@
-import { mindmapTopics } from "@sketchi/diagrams/mindmap";
+import { mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
 import { Result } from "effect";
 import { useMemo } from "react";
 
-import {
-	type CanonicalDiagram,
-	validateCanonicalDiagram,
-	wireframeComponents,
-} from "@sketchi/diagram-core";
+import { type CanonicalDiagram, validateCanonicalDiagram } from "@sketchi/diagrams/diagram";
+import { wireframeComponents } from "@sketchi/diagrams/families/wireframe/document";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import { renderDiagram } from "@sketchi/diagrams/render";
 
 import { DrawingEditor } from "@sketchi/editor";
 import { FlowchartValidationPanel } from "../flowchart-validation-panel/index.js";

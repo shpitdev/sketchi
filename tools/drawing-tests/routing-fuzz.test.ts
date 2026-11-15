@@ -1,4 +1,4 @@
-import { mindmapTopics } from "@sketchi/diagrams/mindmap";
+import { mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -26,24 +26,27 @@ import {
 } from "@sketchi/drawing";
 import {
 	crossingFixtures,
+	sideFixtures,
+} from "@sketchi/diagrams/families/flowchart/crossing-fixtures";
+import {
 	fanInChecksFlowchart,
-	groupFixtures,
-	labelFixtures,
+	leftToRightIncidentFlowchart,
+	routingFixtures,
+} from "@sketchi/diagrams/families/flowchart/routing-fixtures";
+import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
+import { labelFixtures } from "@sketchi/diagrams/families/flowchart/label-fixtures";
+import {
 	laneFixtures,
 	laneStressFixtures,
-	leftToRightIncidentFlowchart,
-	parseCanonicalDiagram,
-	parseFlowchartDiagram,
-	routingFixtures,
-	sideFixtures,
+} from "@sketchi/diagrams/families/flowchart/lane-fixtures";
+import { parseCanonicalDiagram } from "@sketchi/diagrams/diagram";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import {
 	zoneFixtures,
 	zoneStressFixtures,
-} from "@sketchi/diagram-core";
-import {
-	renderDiagram,
-	renderGraphDiagram,
-	renderIntermediateDiagram,
-} from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/flowchart/zone-fixtures";
+import { renderDiagram } from "@sketchi/diagrams/render";
+import { renderGraphDiagram, renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

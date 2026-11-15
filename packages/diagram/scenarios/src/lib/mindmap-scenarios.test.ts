@@ -3,7 +3,7 @@ import {
 	type Mindmap,
 	type MindmapTopic,
 	parseMindmap,
-} from "@sketchi/diagrams/mindmap";
+} from "@sketchi/diagrams/families/mindmap/index";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Option } from "effect";
 import { describe, expect, it } from "vitest";

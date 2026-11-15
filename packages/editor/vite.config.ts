@@ -16,18 +16,16 @@ export default defineConfig({
 				"react-dom",
 				"@excalidraw/excalidraw",
 				"@excalidraw/excalidraw/types",
-				"@sketchi/diagram-core",
+
 				"@sketchi/drawing/excalidraw",
-				"@sketchi/diagram-renderer",
+				"@sketchi/diagrams",
 			],
 		},
 	},
 	resolve: {
 		alias: {
-			"@sketchi/diagram-core": new URL("../diagram/core/src/index.ts", import.meta.url).pathname,
+			"@sketchi/diagrams": new URL("../diagrams/src/", import.meta.url).pathname.slice(0, -1),
 			"@sketchi/drawing/excalidraw": new URL("../drawing/src/excalidraw/index.ts", import.meta.url)
-				.pathname,
-			"@sketchi/diagram-renderer": new URL("../diagram/renderer/src/index.ts", import.meta.url)
 				.pathname,
 		},
 	},

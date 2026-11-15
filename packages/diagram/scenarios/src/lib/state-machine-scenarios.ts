@@ -8,7 +8,7 @@ import {
 	type StateMachineDiagram,
 	type StateMachineState,
 	type StateMachineStateKind,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/state-machine/document";
 
 import type { ScenarioCheck } from "./evaluate.js";
 import type { DiagramScenarioDifficulty } from "./scenarios.js";

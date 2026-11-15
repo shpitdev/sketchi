@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import { CloudflareAiGatewayBinding } from "@sketchi/diagram-generation";
+import { CloudflareAiGatewayBinding } from "@sketchi/cloudflare/ai-gateway";
 import {
 	drawIcon,
 	ICON_AUTHOR_MODELS,

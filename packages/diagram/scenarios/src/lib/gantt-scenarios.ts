@@ -13,8 +13,9 @@ import {
 	parseGanttDiagram,
 	type GanttDiagram,
 	type GanttTask,
-} from "@sketchi/diagram-core";
-import { GANTT_MIN_BAR_WIDTH, ganttCaptions, readGanttScene } from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/gantt/document";
+import { GANTT_MIN_BAR_WIDTH, ganttCaptions } from "@sketchi/diagrams/families/gantt/render";
+import { readGanttScene } from "@sketchi/diagrams/families/gantt/readout";
 
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
 import { type ScenarioCheck } from "./evaluate.js";

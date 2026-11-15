@@ -2,9 +2,10 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { describedArchitectureFlowchart, parseFlowchartDiagram } from "@sketchi/diagram-core";
+import { describedArchitectureFlowchart } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
 import { embedCanvasIcons } from "@sketchi/drawing";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 
 import {
 	convertSceneToExcalidraw,

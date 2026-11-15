@@ -4,7 +4,7 @@ import {
 	BuildQuadrantChartToolInputSchema,
 	type BuildQuadrantChartResult,
 	type BuildQuadrantChartToolInput,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/contract";
 import type { Effect } from "effect";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
 import { makeStudioBuildToolExecutor, type StudioBuildTurn } from "./studio-build-tool.server";

@@ -1,7 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 
-import { BuildFlowchartResultSchema, GetArtifactRequest } from "@sketchi/diagram-agent";
+import {
+	BuildFlowchartResultSchema,
+	GetArtifactRequest,
+} from "@sketchi/diagrams/build/code-mode/contract";
 
 import { CodeModeSearchRequestSchema } from "./mcp-docs.server";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";

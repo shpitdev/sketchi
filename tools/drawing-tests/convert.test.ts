@@ -6,22 +6,22 @@ import { generateKeyBetween } from "fractional-indexing";
 
 import {
 	apiRequestSequence,
-	flowchartFixture,
-	pharmaBatchDispositionFlowchart,
-	parseChartDiagram,
-	parseFlowchartDiagram,
 	parseSequenceDiagram,
 	selfMessageSequence,
 	sequenceFixture,
-	groupFixtures,
-	zoneFixtures,
-} from "@sketchi/diagram-core";
-import { type CanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
+} from "@sketchi/diagrams/families/sequence/document";
 import {
-	renderChartDiagram,
-	renderIntermediateDiagram,
-	renderSequenceDiagram,
-} from "@sketchi/diagram-renderer";
+	flowchartFixture,
+	pharmaBatchDispositionFlowchart,
+	parseFlowchartDiagram,
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
+import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
+import { zoneFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
+import { type CanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
+import { renderChartDiagram } from "@sketchi/diagrams/families/chart/render";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 
 import {
 	convertSceneToExcalidraw,

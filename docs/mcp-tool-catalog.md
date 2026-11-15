@@ -21,7 +21,7 @@ parameter carries each builder's spec and rules, so most first builds need no
 
 - `apps/playground/src/server/codemode/mcp-docs/catalog.ts`: the tool
   descriptions, docs topics and search entries. The shared drawing rules come
-  from `packages/diagram/core/src/rules`, which the generate prompt reads too.
+  from `packages/diagrams/src/families/<name>/rules.ts`, which the generate prompt reads too.
 - `apps/playground/src/server/codemode/mcp-docs/code-mode-types.generated.txt`:
   TypeScript declarations for every operation's request and result, generated
   from the package schemas. A test fails when it falls out of date.

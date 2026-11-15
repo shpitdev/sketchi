@@ -67,16 +67,23 @@ export default defineConfig({
 	resolve: {
 		alias: [
 			{
+				find: "@sketchi/diagrams",
+				replacement: new URL("../../packages/diagrams/src/", import.meta.url).pathname.slice(0, -1),
+			},
+			{
+				find: "@sketchi/cloudflare",
+				replacement: new URL("../../packages/cloudflare/src/", import.meta.url).pathname.slice(
+					0,
+					-1,
+				),
+			},
+			{
 				find: /^@\//,
 				replacement: new URL("./src/", import.meta.url).pathname,
 			},
 			{
 				find: /^@sketchi\/ui\/(.*)$/,
 				replacement: `${new URL("../../packages/ui/src/", import.meta.url).pathname}$1`,
-			},
-			{
-				find: "@sketchi/diagram-agent",
-				replacement: new URL("../../packages/diagram/agent/src/index.ts", import.meta.url).pathname,
 			},
 			{
 				find: "@sketchi/studio-projects/client",
@@ -86,20 +93,6 @@ export default defineConfig({
 			{
 				find: "@sketchi/studio-projects/server",
 				replacement: new URL("../../packages/studio/projects/src/server.ts", import.meta.url)
-					.pathname,
-			},
-			{
-				find: "@sketchi/diagram-core",
-				replacement: new URL("../../packages/diagram/core/src/index.ts", import.meta.url).pathname,
-			},
-			{
-				find: "@sketchi/diagram-renderer",
-				replacement: new URL("../../packages/diagram/renderer/src/index.ts", import.meta.url)
-					.pathname,
-			},
-			{
-				find: "@sketchi/diagram-generation",
-				replacement: new URL("../../packages/diagram/generation/src/index.ts", import.meta.url)
 					.pathname,
 			},
 			{

@@ -163,7 +163,7 @@ test("a production push deploys the Worker apps whose build it reaches", () => {
 	assert.deepEqual(
 		selectProductionProjects({
 			selection: "affected",
-			affected: ["diagram-core", "playground", "excalidraw", "sketchi-cli"],
+			affected: ["diagrams", "playground", "excalidraw", "sketchi-cli"],
 		}),
 		["excalidraw", "playground"],
 	);

@@ -1,4 +1,4 @@
-import { resolveNodeIcons } from "@sketchi/diagram-agent";
+import { resolveNodeIcons } from "@sketchi/diagrams/build/code-mode/icons";
 import { nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import nodeLogoSvgs from "@sketchi/icon-catalog/node-logo-svgs";
 import { Effect } from "effect";

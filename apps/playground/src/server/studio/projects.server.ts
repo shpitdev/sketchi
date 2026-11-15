@@ -1,11 +1,8 @@
 import "@tanstack/react-start/server-only";
 
-import {
-	CodeModeArtifactStorage,
-	CodeModeRuntimeEnvironment,
-	getArtifact,
-	RenderedDiagramSceneSchema,
-} from "@sketchi/diagram-agent";
+import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
+import { CodeModeRuntimeEnvironment, getArtifact } from "@sketchi/diagrams/build/code-mode/runtime";
+import { RenderedDiagramSceneSchema } from "@sketchi/diagrams/build/code-mode/contract";
 import {
 	handleCreateFromArtifactRequestEffect,
 	handleGetDiagramRequestEffect,

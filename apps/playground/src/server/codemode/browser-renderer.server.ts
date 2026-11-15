@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import type { CodeModeArtifactRenderer } from "@sketchi/diagram-agent";
+import type { CodeModeArtifactRenderer } from "@sketchi/diagrams/build/code-mode/runtime";
 import { recordMetric, TelemetryCorrelation } from "@sketchi/observability";
 import { Clock, Context, Effect, Layer, Metric, Option, Schema } from "effect";
 

@@ -1,4 +1,4 @@
-import type { PatchableScene } from "@sketchi/diagram-agent";
+import type { PatchableScene } from "@sketchi/diagrams/build/code-mode/contract";
 import { Context, Effect, Layer } from "effect";
 
 import { HeadlessPngRenderError } from "./render-diagnostics.js";

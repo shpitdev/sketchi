@@ -1,4 +1,4 @@
-import { CloudflareAiGatewayBinding } from "@sketchi/diagram-generation";
+import { CloudflareAiGatewayBinding } from "@sketchi/cloudflare/ai-gateway";
 import { type IconRecipe } from "@sketchi/drawing";
 import {
 	AUTHOR_MAX_TOKENS,

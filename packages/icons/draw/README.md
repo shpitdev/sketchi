@@ -1,7 +1,7 @@
 # icon-draw
 
 Draws a logo as a hand-drawn Sketchi icon: an SVG or image and a name in, a
-checked recipe (the `IconRecipe` format in `@sketchi/diagram-core`) out, with
+checked recipe (the `IconRecipe` format in `@sketchi/drawing`) out, with
 PNG previews, an Excalidraw library and a blind judge's verdict. Studio serves
 it as `POST /api/v1/icons/draw`, limited per client IP and per UTC day, and to
 Code Mode scripts as `sketchi.drawIcon`.

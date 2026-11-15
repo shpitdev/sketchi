@@ -11,11 +11,11 @@ UI rendering remain ordinary TypeScript and React.
 flowchart LR
   Clients["Chat, HTTP, MCP, CLI"] --> Edges["Thin host adapters"]
   Edges --> Effect["Effect services and layers"]
-  Effect --> Generation["diagram-generation"]
-  Effect --> Build["diagram-agent"]
-  Build --> Core["diagram-core"]
-  Core --> Renderer["diagram-renderer"]
-  Renderer --> Excalidraw["diagram-excalidraw"]
+  Effect --> Generation["diagrams/generate"]
+  Effect --> Build["diagrams/build"]
+  Build --> Families["diagrams/families"]
+  Families --> Graph["diagrams/graph"]
+  Families --> Excalidraw["drawing/excalidraw"]
   Build --> R2["R2 artifacts and Studio records"]
   Generation --> Gateway["Cloudflare AI Gateway"]
   Build --> Browser["Browser Rendering PNG"]
@@ -31,11 +31,11 @@ from `scripts/lib/worker-apps.mjs`.
 
 | Area                | Authority                                | Responsibility                                                                   |
 | ------------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
-| Diagram contracts   | `packages/diagram/core`                  | Effect Schema IR plus pure semantic validation                                   |
-| Layout              | `packages/diagram/renderer`              | deterministic scene construction                                                 |
+| Diagram contracts   | `packages/diagrams/src/families` | Effect Schema IR plus pure semantic validation                                   |
+| Layout              | `packages/diagrams/src/families` and `graph` | deterministic scene construction                                                 |
 | Excalidraw          | `packages/drawing`            | deterministic conversion and real-scene validation                               |
-| Model generation    | `packages/diagram/generation`            | typed provider service, retry, timeout, decode, and candidate summaries          |
-| Product build       | `packages/diagram/agent`                 | canonical normalize, validate, quality, render, export, and artifact transaction |
+| Model generation    | `packages/diagrams/src/generate`            | typed provider service, retry, timeout, decode, and candidate summaries          |
+| Product build       | `packages/diagrams/src/build`                 | canonical normalize, validate, quality, render, export, and artifact transaction |
 | Scenario evaluation | `packages/diagram/scenarios`             | maintained scenarios, pure grading, and internal Effect tooling                  |
 | Icon catalog        | `packages/icons/catalog`                 | icon manifest, ranked search, SVG sources, and node-logo eligibility             |
 | Icon drawing        | `packages/icons/draw`                    | a logo in, a judged hand-drawn recipe out: author rounds, renders, and the judge |
@@ -45,7 +45,7 @@ from `scripts/lib/worker-apps.mjs`.
 | UI primitives       | `packages/ui`                            | shared shadcn primitives and tokens for the Tailwind apps                        |
 
 Studio chat, HTTP `buildFlowchart`, and MCP `execute` call the same
-`diagram-agent` operation. An accepted build writes artifacts once; adapters do
+`diagrams/build` operation. An accepted build writes artifacts once; adapters do
 not maintain a second schema, evaluator, runtime, or persistence path.
 
 ## Effect composition

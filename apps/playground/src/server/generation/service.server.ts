@@ -2,23 +2,31 @@ import "@tanstack/react-start/server-only";
 
 import {
 	CloudflareAiGatewayBinding,
+	type CloudflareAiGatewayProvider,
+} from "@sketchi/cloudflare/ai-gateway";
+import {
 	CloudflareGatewayChatClientLive,
 	CloudflareGatewayChatConfig,
-	type CloudflareAiGatewayProvider,
-	DiagramGenerationClient,
-	DiagramGenerationConfigurationError,
-	type DiagramGenerationCandidate,
-	type DiagramGenerationError,
-	type DiagramGenerationType,
-	DiagramGenerationPolicyLive,
 	gatewayChatRouteForModel,
 	type GatewayChatRoute,
+} from "@sketchi/diagrams/generate/cloudflare-gateway-chat";
+import {
+	DiagramGenerationClient,
+	DiagramGenerationPolicyLive,
+} from "@sketchi/diagrams/generate/client";
+import {
+	DiagramGenerationConfigurationError,
+	type DiagramGenerationError,
+} from "@sketchi/diagrams/generate/errors";
+import { type DiagramGenerationCandidate } from "@sketchi/diagrams/generate/candidates";
+import { type DiagramGenerationType } from "@sketchi/diagrams/generate/intent";
+import {
 	isLegacyCliDefaultModel,
 	type SupportedGenerationModel,
-	asksForStyling,
-	workersAiFamilyNarrowingLayer,
-	type WorkersAiRunner,
-} from "@sketchi/diagram-generation";
+} from "@sketchi/diagrams/generate/models";
+import { asksForStyling } from "@sketchi/diagrams/generate/styling";
+import { workersAiFamilyNarrowingLayer } from "@sketchi/diagrams/generate/family-narrowing";
+import { type WorkersAiRunner } from "@sketchi/diagrams/generate/jev-workers-ai";
 import { Context, Effect, Layer } from "effect";
 
 import { aiEnvironment } from "../bindings/ai-env.server";

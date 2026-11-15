@@ -1,15 +1,21 @@
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
-import { parseSankeyDiagram, sankeyNodeTotals, type SankeyDiagram } from "@sketchi/diagram-core";
+import {
+	parseSankeyDiagram,
+	sankeyNodeTotals,
+	type SankeyDiagram,
+} from "@sketchi/diagrams/families/sankey/document";
 import {
 	layoutSankeyDiagram,
-	readSankeyScene,
 	SANKEY_MIN_BAND,
 	sankeyFlowText,
-	sankeyLayoutIssues,
 	sankeyNodeText,
+} from "@sketchi/diagrams/families/sankey/layout";
+import {
+	readSankeyScene,
+	sankeyLayoutIssues,
 	sankeyWeightedCrossings,
-} from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/sankey/readout";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";

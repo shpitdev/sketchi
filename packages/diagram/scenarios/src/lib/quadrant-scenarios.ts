@@ -5,8 +5,11 @@ import {
 	QUADRANT_KEYS,
 	type QuadrantDiagram,
 	type QuadrantKey,
-} from "@sketchi/diagram-core";
-import { quadrantLayoutIssues, readQuadrantScene } from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/quadrant/document";
+import {
+	quadrantLayoutIssues,
+	readQuadrantScene,
+} from "@sketchi/diagrams/families/quadrant/readout";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";

@@ -1,12 +1,10 @@
 import "@tanstack/react-start/server-only";
 
-import {
-	MAX_DIAGRAM_BUILD_ATTEMPTS,
-	normalizeIconSlug,
-	type BuildFlowchartOptions,
-} from "@sketchi/diagram-agent";
-import { type CodeModeIssue } from "@sketchi/diagrams/build";
-import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagram-generation";
+import { MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
+import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";
+import { type BuildFlowchartOptions } from "@sketchi/diagrams/build/code-mode/contract";
+import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
+import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import { recordMetric } from "@sketchi/observability";
 import { type JSONValue } from "ai";
 import { Effect, Metric, Ref, Semaphore } from "effect";

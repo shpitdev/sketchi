@@ -3,7 +3,7 @@ import { Result } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { parseFlowchartDiagram } from "@sketchi/diagram-core";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
 
 import { evaluateScenarioDiagram } from "./evaluate";
 import { matchFlowchartSteps } from "./flowchart-matching";

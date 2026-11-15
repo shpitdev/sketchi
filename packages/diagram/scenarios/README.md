@@ -5,7 +5,7 @@ Maintained prompts, expected diagrams, and scenario evaluation for Sketchi gener
 ```mermaid
 flowchart LR
   Catalog["scenario catalog"] --> Adapter["generation prompt adapter"]
-  Adapter --> Generation["diagram-generation"]
+  Adapter --> Generation["diagrams/generate"]
   Catalog --> Expected["expected diagram"]
   Catalog --> Checks["prompt-grounded semantic checks"]
   Expected --> Checks

@@ -6,15 +6,18 @@ import {
 	getCanvasValidationIssues,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { parseSankeyDiagram, SANKEY_MAX_LINKS, type SankeyDiagram } from "@sketchi/diagram-core";
 import {
-	layoutSankeyDiagram,
+	parseSankeyDiagram,
+	SANKEY_MAX_LINKS,
+	type SankeyDiagram,
+} from "@sketchi/diagrams/families/sankey/document";
+import { layoutSankeyDiagram, SANKEY_MIN_BAND } from "@sketchi/diagrams/families/sankey/layout";
+import {
 	readSankeyScene,
-	renderSankeyDiagram,
 	sankeyLayoutIssues,
 	sankeyWeightedCrossings,
-	SANKEY_MIN_BAND,
-} from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/sankey/readout";
+import { renderSankeyDiagram } from "@sketchi/diagrams/families/sankey/render";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

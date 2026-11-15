@@ -1,6 +1,7 @@
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { orgChartFixture, orgChartStressFixtures } from "@sketchi/diagram-core";
+import { orgChartFixture } from "@sketchi/diagrams/families/org-chart/document";
+import { orgChartStressFixtures } from "@sketchi/diagrams/families/org-chart/fixtures";
 import { orgChartScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";

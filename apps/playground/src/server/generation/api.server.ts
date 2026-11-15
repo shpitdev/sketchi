@@ -1,23 +1,26 @@
 import "@tanstack/react-start/server-only";
 
+import { type BuildFlowchartOptions } from "@sketchi/diagrams/build/code-mode/contract";
 import {
-	type BuildFlowchartOptions,
 	CANONICAL_DOCUMENT_SPECS,
 	type CanonicalBuildResult,
 	type CanonicalDiagramDocument,
 	canonicalDocumentFromDiagram,
-} from "@sketchi/diagram-agent";
-import { type CodeModeIssue } from "@sketchi/diagrams/build";
+} from "@sketchi/diagrams/build/code-mode/documents";
+import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
+import { type DiagramStyle } from "@sketchi/diagrams/generate/styling";
 import {
-	type DiagramStyle,
 	extractJsonObject,
 	type DiagramGenerationCandidate,
-	type DiagramGenerationError,
-	type DiagramGenerationType,
-	isSupportedGenerationModel,
 	WRONG_DIAGRAM_TYPE_ERROR,
-} from "@sketchi/diagram-generation";
-import { decodeFlowchartDocument, flowchartDiagramFromDocument } from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/generate/candidates";
+import { type DiagramGenerationError } from "@sketchi/diagrams/generate/errors";
+import { type DiagramGenerationType } from "@sketchi/diagrams/generate/intent";
+import { isSupportedGenerationModel } from "@sketchi/diagrams/generate/models";
+import {
+	decodeFlowchartDocument,
+	flowchartDiagramFromDocument,
+} from "@sketchi/diagrams/families/flowchart/document";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result, Schema } from "effect";
 

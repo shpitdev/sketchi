@@ -1,5 +1,5 @@
-import { CANONICAL_DOCUMENT_TYPES } from "@sketchi/diagram-agent";
-import { listAlternatives } from "@sketchi/diagram-generation";
+import { CANONICAL_DOCUMENT_TYPES } from "@sketchi/diagrams/build/code-mode/documents";
+import { listAlternatives } from "@sketchi/diagrams/generate/messages";
 import { Schema } from "effect";
 
 /** The stored document a revision starts from; its spec is validated before generation. */

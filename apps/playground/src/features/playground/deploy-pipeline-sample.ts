@@ -1,5 +1,6 @@
 import { Result } from "effect";
-import { flowchartDiagramFromSpec, type FlowchartSpec } from "@sketchi/diagram-agent";
+import { flowchartDiagramFromSpec } from "@sketchi/diagrams/families/flowchart/spec";
+import { type FlowchartSpec } from "@sketchi/diagrams/build/code-mode/contract";
 import {
 	canvasBoundTextBox,
 	canvasNodeIconBand,
@@ -10,7 +11,7 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 } from "@sketchi/drawing";
 
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import { normalizeNodeLogoSvg } from "@sketchi/icon-catalog";
 import cloudflareSvg from "@sketchi/icon-catalog/svg/cloud-vendors/cloudflare.svg?raw";
 import dockerSvg from "@sketchi/icon-catalog/svg/devtools-ci/docker.svg?raw";

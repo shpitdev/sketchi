@@ -1,9 +1,9 @@
+import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
+import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
 import {
-	CodeModeArtifactStorage,
-	CodeModeRuntimeEnvironment,
 	buildCanonicalDocument,
 	type CanonicalBuildResult,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/documents";
 import { Context, Effect, Layer } from "effect";
 
 import { codeModeFailure, decodeInlineArtifacts, withCodeMode } from "./code-mode-artifacts.js";

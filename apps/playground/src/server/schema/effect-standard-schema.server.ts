@@ -3,7 +3,7 @@ import "@tanstack/react-start/server-only";
 import type { StandardJSONSchemaV1, StandardSchemaV1 } from "@standard-schema/spec";
 import { Schema } from "effect";
 
-import { toCodeModeJsonSchema } from "@sketchi/diagram-agent";
+import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/contract";
 
 export type PlaygroundStandardSchema<S extends Schema.ConstraintDecoder<unknown>> = S &
 	StandardSchemaV1<S["Encoded"], S["Type"]> &

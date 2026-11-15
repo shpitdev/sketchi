@@ -8,8 +8,12 @@ import {
 	routingQualityScale,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { type ErCardinality, type ErDiagram, parseErDiagram } from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import {
+	type ErCardinality,
+	type ErDiagram,
+	parseErDiagram,
+} from "@sketchi/diagrams/families/er/document";
+import { renderDiagram } from "@sketchi/diagrams/render";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

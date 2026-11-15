@@ -1,0 +1,391 @@
+import {
+	buildMindmap as buildMindmapDocument,
+	type BuildMindmapResult,
+} from "../../families/mindmap/build.js";
+import {
+	artifactBuildCapabilities,
+	observeCodeModeBoundary,
+	buildFlowchart,
+	buildSequenceDiagram,
+	buildStateMachine,
+	buildErDiagram,
+	buildClassDiagram,
+	buildOrgChart,
+	buildVennDiagram,
+	buildJourneyMap,
+	buildSankey,
+	buildWireframe,
+	buildQuadrantChart,
+	buildTimeline,
+	buildChart,
+	buildGantt,
+	type CodeModeRuntimeEnvironment,
+} from "./runtime.js";
+import { type CanonicalDiagram } from "../../diagram.js";
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "../../types.js";
+import { type FlowchartDiagram } from "../../families/flowchart/diagram.js";
+import { Effect } from "effect";
+
+import {
+	type BuildChartResult,
+	type BuildGanttResult,
+	type BuildFlowchartOptions,
+	type BuildFlowchartResult,
+	type BuildSequenceDiagramResult,
+	type BuildStateMachineResult,
+	type BuildErDiagramResult,
+	type BuildClassDiagramResult,
+	type BuildOrgChartResult,
+	type BuildVennDiagramResult,
+	type BuildJourneyMapResult,
+	type BuildSankeyResult,
+	type BuildWireframeResult,
+	type BuildQuadrantChartResult,
+	type BuildTimelineResult,
+	ClassSpec,
+	ErSpec,
+	FlowchartSpec,
+	SequenceDiagramSpec,
+	StateMachineSpec,
+	TimelineSpec,
+	ChartSpec,
+	GanttSpec,
+	OrgChartSpec,
+	VennSpec,
+	JourneySpec,
+	SankeySpec,
+	WireframeSpec,
+	type WireframeComponentInput,
+	QuadrantChartSpec,
+} from "./contract.js";
+import { MindmapDocument } from "../../families/mindmap/index.js";
+
+import { type CodeModeArtifactStorage } from "./artifacts.js";
+
+/** Every canonical family has one Code Mode document type. */
+export const CANONICAL_DOCUMENT_TYPES = DIAGRAM_TYPES;
+
+/** The Code Mode authoring spec each canonical family's document carries. */
+export const CANONICAL_DOCUMENT_SPECS = {
+	flowchart: FlowchartSpec,
+	mindmap: MindmapDocument,
+	sequence: SequenceDiagramSpec,
+	timeline: TimelineSpec,
+	chart: ChartSpec,
+	"state-machine": StateMachineSpec,
+	gantt: GanttSpec,
+	er: ErSpec,
+	class: ClassSpec,
+	"org-chart": OrgChartSpec,
+	venn: VennSpec,
+	journey: JourneySpec,
+	sankey: SankeySpec,
+	wireframe: WireframeSpec,
+	quadrant: QuadrantChartSpec,
+} as const satisfies Record<DiagramTypeValue, unknown>;
+
+/** A canonical diagram document: a family and its authoring spec. */
+export type CanonicalDiagramDocument = {
+	readonly [Type in DiagramTypeValue]: {
+		readonly type: Type;
+		readonly spec: (typeof CANONICAL_DOCUMENT_SPECS)[Type]["Type"];
+	};
+}[DiagramTypeValue];
+
+export type CanonicalBuildResult =
+	| BuildFlowchartResult
+	| BuildMindmapResult
+	| BuildSequenceDiagramResult
+	| BuildTimelineResult
+	| BuildChartResult
+	| BuildStateMachineResult
+	| BuildGanttResult
+	| BuildErDiagramResult
+	| BuildClassDiagramResult
+	| BuildOrgChartResult
+	| BuildVennDiagramResult
+	| BuildJourneyMapResult
+	| BuildSankeyResult
+	| BuildWireframeResult
+	| BuildQuadrantChartResult;
+
+export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
+	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
+}
+
+/** Build a canonical document with its family's Code Mode operation. */
+export function buildCanonicalDocument(
+	document: CanonicalDiagramDocument,
+	options?: BuildFlowchartOptions,
+): Effect.Effect<
+	CanonicalBuildResult,
+	never,
+	CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+> {
+	const request = { spec: document.spec, ...(options ? { options } : {}) };
+	switch (document.type) {
+		case "flowchart":
+			return buildFlowchart(request);
+		case "mindmap": {
+			const typedRequest = { spec: document.spec, ...(options ? { options } : {}) };
+			return observeCodeModeBoundary(
+				"buildMindmap",
+				typedRequest,
+				Effect.gen(function* () {
+					return yield* buildMindmapDocument(typedRequest, yield* artifactBuildCapabilities);
+				}).pipe(
+					Effect.match({
+						onFailure: (error) => ({ ok: false as const, status: error.status, ...error.context }),
+						onSuccess: (result) => result,
+					}),
+				),
+			);
+		}
+		case "sequence":
+			return buildSequenceDiagram(request);
+		case "timeline":
+			return buildTimeline(request);
+		case "chart":
+			return buildChart(request);
+		case "state-machine":
+			return buildStateMachine(request);
+		case "gantt":
+			return buildGantt(request);
+		case "er":
+			return buildErDiagram(request);
+		case "class":
+			return buildClassDiagram(request);
+		case "org-chart":
+			return buildOrgChart(request);
+		case "venn":
+			return buildVennDiagram(request);
+		case "journey":
+			return buildJourneyMap(request);
+		case "sankey":
+			return buildSankey(request);
+		case "wireframe":
+			return buildWireframe(request);
+		case "quadrant":
+			return buildQuadrantChart(request);
+	}
+}
+
+/**
+ * The canonical document for a validated core diagram, for example a
+ * generated candidate about to be built and persisted. A flowchart has no
+ * such conversion: it is written as its document.
+ */
+export function canonicalDocumentFromDiagram(
+	diagram: Exclude<CanonicalDiagram, FlowchartDiagram>,
+): CanonicalDiagramDocument {
+	switch (diagram.type) {
+		case "gantt": {
+			const { type: _type, ...spec } = diagram;
+			return {
+				type: "gantt",
+				spec: {
+					...spec,
+					tasks: spec.tasks.map((task) => ({
+						...task,
+						...(task.dependsOn ? { dependsOn: [...task.dependsOn] } : {}),
+					})),
+					...(spec.phases ? { phases: [...spec.phases] } : {}),
+				},
+			};
+		}
+		case "chart": {
+			const { type: _type, ...spec } = diagram;
+			return {
+				type: "chart",
+				spec: {
+					...spec,
+					categories: [...spec.categories],
+					series: spec.series.map((series) => ({ ...series, values: [...series.values] })),
+				},
+			};
+		}
+		case "timeline":
+			return {
+				type: "timeline",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					events: diagram.events.map((event) => ({ ...event })),
+					...(diagram.lanes ? { lanes: [...diagram.lanes] } : {}),
+					...(diagram.today ? { today: diagram.today } : {}),
+					style: diagram.style,
+				},
+			};
+		case "mindmap":
+			return {
+				type: "mindmap",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					root: diagram.root,
+					layout: { direction: diagram.layout.direction === "RL" ? "RL" : "LR" },
+					style: diagram.style,
+				},
+			};
+		case "state-machine":
+			return {
+				type: "state-machine",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					initial: diagram.initial,
+					states: diagram.states.map((state) => ({ ...state })),
+					transitions: diagram.transitions.map((transition) => ({ ...transition })),
+					...(diagram.layout ? { layout: { direction: diagram.layout.direction } } : {}),
+					style: diagram.style,
+				},
+			};
+		case "er":
+			return {
+				type: "er",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					entities: diagram.entities.map((entity) => ({
+						...entity,
+						fields: entity.fields.map((field) => ({ ...field })),
+					})),
+					relationships: diagram.relationships.map((relationship) => ({ ...relationship })),
+					style: diagram.style,
+				},
+			};
+		case "class":
+			return {
+				type: "class",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					classes: diagram.classes.map((node) => ({
+						...node,
+						attributes: node.attributes.map((attribute) => ({ ...attribute })),
+						methods: node.methods.map((method) => ({
+							...method,
+							params: method.params.map((param) => ({ ...param })),
+						})),
+					})),
+					relationships: diagram.relationships.map((relationship) => ({ ...relationship })),
+					style: diagram.style,
+				},
+			};
+		case "sankey":
+			return {
+				type: "sankey",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					nodes: diagram.nodes.map((node) => ({ ...node })),
+					links: diagram.links.map((link) => ({ ...link })),
+					...(diagram.unit === undefined ? {} : { unit: diagram.unit }),
+					style: diagram.style,
+				},
+			};
+		case "org-chart":
+			return {
+				type: "org-chart",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					people: diagram.people.map((person) => ({ ...person })),
+					dottedLines: diagram.dottedLines.map((line) => ({ ...line })),
+					...(diagram.groupByDepartment === undefined
+						? {}
+						: { groupByDepartment: diagram.groupByDepartment }),
+					...(diagram.forest === undefined ? {} : { forest: diagram.forest }),
+					style: diagram.style,
+				},
+			};
+		case "venn":
+			return {
+				type: "venn",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					sets: diagram.sets.map((set) => ({ ...set })),
+					regions: diagram.regions.map((region) => ({
+						...region,
+						sets: [...region.sets],
+						...(region.items === undefined ? {} : { items: [...region.items] }),
+					})),
+					style: diagram.style,
+				},
+			};
+		case "journey":
+			return {
+				type: "journey",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					...(diagram.persona === undefined ? {} : { persona: diagram.persona }),
+					...(diagram.actors === undefined ? {} : { actors: [...diagram.actors] }),
+					stages: diagram.stages.map((stage) => ({
+						name: stage.name,
+						steps: stage.steps.map((step) => ({ ...step })),
+						...(stage.painPoints === undefined ? {} : { painPoints: [...stage.painPoints] }),
+						...(stage.opportunities === undefined
+							? {}
+							: { opportunities: [...stage.opportunities] }),
+					})),
+					style: diagram.style,
+				},
+			};
+		case "wireframe":
+			return {
+				type: "wireframe",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					screens: diagram.screens.map((screen) => ({
+						id: screen.id,
+						name: screen.name,
+						device: screen.device,
+						...(screen.align === undefined ? {} : { align: screen.align }),
+						children: screen.children.map(
+							(component) => structuredClone(component) as WireframeComponentInput,
+						),
+					})),
+					style: diagram.style,
+				},
+			};
+		case "quadrant":
+			return {
+				type: "quadrant",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					xAxis: { ...diagram.xAxis },
+					yAxis: { ...diagram.yAxis },
+					quadrants: { ...diagram.quadrants },
+					points: diagram.points.map((point) => ({ ...point })),
+					style: diagram.style,
+				},
+			};
+		case "sequence":
+			return {
+				type: "sequence",
+				spec: {
+					id: diagram.id,
+					title: diagram.title,
+					participants: diagram.participants.map((participant) => ({
+						id: participant.id,
+						label: participant.label,
+						...(participant.kind ? { kind: participant.kind } : {}),
+						...(participant.icon ? { icon: { slug: participant.icon.slug } } : {}),
+					})),
+					messages: diagram.messages.map((message) => ({
+						id: message.id,
+						source: message.source,
+						target: message.target,
+						label: message.label,
+						...(message.type ? { type: message.type } : {}),
+						...(message.style ? { style: message.style } : {}),
+					})),
+					style: diagram.style,
+				},
+			};
+	}
+}

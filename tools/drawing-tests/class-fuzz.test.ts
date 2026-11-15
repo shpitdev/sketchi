@@ -16,8 +16,8 @@ import {
 	type ClassRelationshipKind,
 	parseClassDiagram,
 	resolveClassShorthand,
-} from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/class/document";
+import { renderDiagram } from "@sketchi/diagrams/render";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

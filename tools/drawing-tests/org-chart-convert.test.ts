@@ -2,8 +2,9 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import { CANVAS_SPEC_VERSION, type CanvasSpec } from "@sketchi/drawing";
-import { orgChartFixture, orgChartStressFixtures } from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import { orgChartFixture } from "@sketchi/diagrams/families/org-chart/document";
+import { orgChartStressFixtures } from "@sketchi/diagrams/families/org-chart/fixtures";
+import { renderDiagram } from "@sketchi/diagrams/render";
 
 import {
 	convertSceneToExcalidraw,

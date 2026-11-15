@@ -2,7 +2,7 @@ import {
 	buildDiagramGenerationMessages,
 	type DiagramGenerationMessages,
 	type DiagramGenerationPrompt,
-} from "@sketchi/diagram-generation";
+} from "@sketchi/diagrams/generate/messages";
 
 import type { DiagramScenario } from "./diagram-scenarios.js";
 import type { GenerationReliabilityScenario } from "./generation-reliability.js";

@@ -135,12 +135,12 @@ describe("diagram generation project boundaries", () => {
 	it("keeps production generation independent from eval scenarios", async () => {
 		const graph = await createProjectGraphAsync({ exitOnError: true });
 		const generationTargets =
-			graph.dependencies["diagram-generation"]?.map((dependency) => dependency.target) ?? [];
+			graph.dependencies["diagrams"]?.map((dependency) => dependency.target) ?? [];
 		const scenarioTargets =
 			graph.dependencies["diagram-scenarios"]?.map((dependency) => dependency.target) ?? [];
 
 		expect(generationTargets).not.toContain("diagram-scenarios");
-		expect(scenarioTargets).toContain("diagram-generation");
+		expect(scenarioTargets).toContain("diagrams");
 	});
 
 	it("pins the runtime catalog and independently versioned Effect tooling", () => {
@@ -253,8 +253,8 @@ describe("workspace project membership", () => {
 
 	it("enforces project boundaries in source, config, and Storybook files", () => {
 		const results = lintProbes({
-			"packages/diagram/agent/.storybook/boundary-probe.ts": 'import "@sketchi/diagram-scenarios";',
-			"packages/diagram/agent/vitest.boundary-probe.mts": 'import "@sketchi/diagram-scenarios";',
+			"packages/diagrams/.storybook/boundary-probe.ts": 'import "@sketchi/diagram-scenarios";',
+			"packages/diagrams/vitest.boundary-probe.mts": 'import "@sketchi/diagram-scenarios";',
 			"apps/web/vite.boundary-probe.ts": 'import "../playground/src/routeTree.gen";',
 			"apps/web/vite.boundary-allowed-probe.ts": [
 				'import { localViteCacheDir } from "../../tools/local-dev-ports";',
@@ -264,8 +264,8 @@ describe("workspace project membership", () => {
 		});
 
 		for (const filePath of [
-			"packages/diagram/agent/.storybook/boundary-probe.ts",
-			"packages/diagram/agent/vitest.boundary-probe.mts",
+			"packages/diagrams/.storybook/boundary-probe.ts",
+			"packages/diagrams/vitest.boundary-probe.mts",
 			"apps/web/vite.boundary-probe.ts",
 		]) {
 			expect(results[filePath], filePath).toContain("@nx(enforce-module-boundaries)");
@@ -275,8 +275,9 @@ describe("workspace project membership", () => {
 
 	it("permits Effect across projects while enforcing schema and React boundaries", () => {
 		const results = lintProbes({
-			"packages/diagram/core/src/effect-probe.ts": 'import { Effect } from "effect";\nvoid Effect;',
-			"packages/diagram/renderer/src/effect-probe.ts":
+			"packages/diagrams/src/families/flowchart/effect-probe.ts":
+				'import { Effect } from "effect";\nvoid Effect;',
+			"packages/diagrams/src/graph/effect-probe.ts":
 				'import * as Schema from "effect/Schema";\nvoid Schema;',
 			"apps/icons/src/effect-probe.ts":
 				'import * as Atom from "effect/reactivity/Atom";\nvoid Atom;',
@@ -292,8 +293,8 @@ describe("workspace project membership", () => {
 				"}",
 			].join("\n"),
 		});
-		expect(results["packages/diagram/core/src/effect-probe.ts"]).toEqual([]);
-		expect(results["packages/diagram/renderer/src/effect-probe.ts"]).toEqual([]);
+		expect(results["packages/diagrams/src/families/flowchart/effect-probe.ts"]).toEqual([]);
+		expect(results["packages/diagrams/src/graph/effect-probe.ts"]).toEqual([]);
 		expect(results["apps/icons/src/effect-probe.ts"]).toEqual([]);
 		expect(results["tools/sketchi-generators/src/effect-probe.ts"]).toEqual([]);
 		expect(results["scripts/zod-probe.ts"]).toEqual(["eslint(no-restricted-imports)"]);

@@ -5,10 +5,11 @@ import {
 	deployPipelineLogoFlowchart,
 	flowchartFixture,
 	parseFlowchartDiagram,
-	zoneStressFixtures,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { zoneStressFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { renderDiagram, renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderDiagram } from "@sketchi/diagrams/render";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import {
 	createEditSession,
 	DRAG_OFFSETS,

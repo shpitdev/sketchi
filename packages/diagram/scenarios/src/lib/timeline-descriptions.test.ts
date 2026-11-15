@@ -1,7 +1,10 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { parseTimelineDiagram, type TimelineDiagram } from "@sketchi/diagram-core";
+import {
+	parseTimelineDiagram,
+	type TimelineDiagram,
+} from "@sketchi/diagrams/families/timeline/document";
 import fixtures from "./fixtures/timeline-descriptions.json";
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import {

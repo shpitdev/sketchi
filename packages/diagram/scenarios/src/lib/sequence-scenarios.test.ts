@@ -1,8 +1,9 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Effect } from "effect";
 import { assert, layer } from "@effect/vitest";
-import { type SequenceDiagram, flowchartFixture } from "@sketchi/diagram-core";
-import { DiagramGenerationClient } from "@sketchi/diagram-generation";
+import { type SequenceDiagram } from "@sketchi/diagrams/families/sequence/document";
+import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/diagram";
+import { DiagramGenerationClient } from "@sketchi/diagrams/generate/client";
 import { logosNamedInText } from "@sketchi/icon-catalog";
 import { nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 

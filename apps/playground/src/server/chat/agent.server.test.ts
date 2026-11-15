@@ -5,11 +5,13 @@ import { Effect, Option } from "effect";
 
 import {
 	buildFlowchart,
-	CodeModeArtifactStorage,
 	CodeModeRuntimeEnvironment,
+} from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
-	type BuildFlowchartResult,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/artifacts";
+import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
 
 import { PlaygroundAiModel } from "../ai/model.server";
 import { PlaygroundCodeMode, type PlaygroundCodeModeShape } from "../codemode/service.server";

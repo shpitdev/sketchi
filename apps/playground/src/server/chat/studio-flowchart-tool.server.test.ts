@@ -4,15 +4,19 @@ import { Effect, Fiber, Schema } from "effect";
 import {
 	BuildFlowchartResultSchema,
 	BuildFlowchartRequestSchema,
-	buildFlowchart,
-	CodeModeArtifactStorage,
-	CodeModeRuntimeEnvironment,
-	DIAGRAM_AGENT_SYSTEM_PROMPT,
-	makeMemoryArtifactStorage,
 	type BuildFlowchartResult,
 	type FlowchartSpec,
 	toCodeModeJsonSchema,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/contract";
+import {
+	buildFlowchart,
+	CodeModeRuntimeEnvironment,
+} from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "@sketchi/diagrams/build/code-mode/artifacts";
+import { DIAGRAM_AGENT_SYSTEM_PROMPT } from "@sketchi/diagrams/build/policy";
 
 import {
 	makeStudioBuildTurn,

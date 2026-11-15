@@ -14,12 +14,16 @@ export default defineConfig({
 	resolve: {
 		alias: [
 			{
-				find: /^@\//,
-				replacement: source("./src/"),
+				find: "@sketchi/diagrams",
+				replacement: source("../../packages/diagrams/src/").slice(0, -1),
 			},
 			{
-				find: "@sketchi/diagram-agent",
-				replacement: source("../../packages/diagram/agent/src/index.ts"),
+				find: "@sketchi/cloudflare",
+				replacement: source("../../packages/cloudflare/src/").slice(0, -1),
+			},
+			{
+				find: /^@\//,
+				replacement: source("./src/"),
 			},
 			{
 				find: /^@sketchi\/icon-catalog$/,
@@ -28,18 +32,6 @@ export default defineConfig({
 			{
 				find: /^@sketchi\/icon-catalog\/catalog$/,
 				replacement: source("../../packages/icons/catalog/src/catalog.ts"),
-			},
-			{
-				find: "@sketchi/diagram-core",
-				replacement: source("../../packages/diagram/core/src/index.ts"),
-			},
-			{
-				find: "@sketchi/diagram-renderer",
-				replacement: source("../../packages/diagram/renderer/src/index.ts"),
-			},
-			{
-				find: "@sketchi/diagram-generation",
-				replacement: source("../../packages/diagram/generation/src/index.ts"),
 			},
 			{
 				find: "@sketchi/drawing/excalidraw",

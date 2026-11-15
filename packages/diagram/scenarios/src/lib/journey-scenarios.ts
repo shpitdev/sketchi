@@ -1,7 +1,11 @@
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
-import { type JourneyDiagram, journeyStepActors, parseJourneyDiagram } from "@sketchi/diagram-core";
-import { journeyLayoutIssues, readJourneyScene } from "@sketchi/diagram-renderer";
+import {
+	type JourneyDiagram,
+	journeyStepActors,
+	parseJourneyDiagram,
+} from "@sketchi/diagrams/families/journey/document";
+import { journeyLayoutIssues, readJourneyScene } from "@sketchi/diagrams/families/journey/readout";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";

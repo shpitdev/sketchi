@@ -15,13 +15,13 @@ import {
 	parseClassDiagram,
 	parseClassMethodShorthand,
 	resolveClassMultiplicity,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/class/document";
 import {
 	estimateTextWidth,
 	segmentsFromPoints,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { classRelationshipHeads } from "@sketchi/diagram-renderer";
+import { classRelationshipHeads } from "@sketchi/diagrams/families/class/diagram";
 
 import { type ScenarioCheck } from "./evaluate.js";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";

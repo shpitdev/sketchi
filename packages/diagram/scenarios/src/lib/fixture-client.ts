@@ -1,10 +1,9 @@
 import {
 	candidateFromText,
-	DiagramGenerationClient,
-	DiagramGenerationInputError,
 	enforceCandidateRequestRequirements,
-	errorMessage,
-} from "@sketchi/diagram-generation";
+} from "@sketchi/diagrams/generate/candidates";
+import { DiagramGenerationClient } from "@sketchi/diagrams/generate/client";
+import { DiagramGenerationInputError, errorMessage } from "@sketchi/diagrams/generate/errors";
 import { Clock, Effect, Layer } from "effect";
 
 import { getDiagramScenario } from "./diagram-scenarios.js";

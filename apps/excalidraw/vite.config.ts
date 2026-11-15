@@ -34,17 +34,12 @@ export default defineConfig({
 	resolve: {
 		alias: [
 			{
+				find: "@sketchi/diagrams",
+				replacement: new URL("../../packages/diagrams/src/", import.meta.url).pathname.slice(0, -1),
+			},
+			{
 				find: "@sketchi/editor/styles.css",
 				replacement: new URL("../../packages/editor/src/styles.css", import.meta.url).pathname,
-			},
-			{
-				find: "@sketchi/diagram-core",
-				replacement: new URL("../../packages/diagram/core/src/index.ts", import.meta.url).pathname,
-			},
-			{
-				find: "@sketchi/diagram-renderer",
-				replacement: new URL("../../packages/diagram/renderer/src/index.ts", import.meta.url)
-					.pathname,
 			},
 			{
 				find: "@sketchi/drawing/excalidraw",

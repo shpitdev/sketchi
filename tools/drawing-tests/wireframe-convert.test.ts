@@ -1,8 +1,9 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { wireframeFixture, wireframeStressFixtures } from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import { wireframeFixture } from "@sketchi/diagrams/families/wireframe/document";
+import { wireframeStressFixtures } from "@sketchi/diagrams/families/wireframe/fixtures";
+import { renderDiagram } from "@sketchi/diagrams/render";
 
 import {
 	convertSceneToExcalidraw,

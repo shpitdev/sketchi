@@ -6,8 +6,8 @@ import {
 	orgChartReports,
 	orgChartRoots,
 	parseOrgChartDiagram,
-} from "@sketchi/diagram-core";
-import { orgChartLayoutIssues } from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/org-chart/document";
+import { orgChartLayoutIssues } from "@sketchi/diagrams/families/org-chart/readout";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";

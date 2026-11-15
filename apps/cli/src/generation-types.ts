@@ -1,4 +1,4 @@
-import { CANONICAL_DOCUMENT_TYPES } from "@sketchi/diagram-agent";
+import { CANONICAL_DOCUMENT_TYPES } from "@sketchi/diagrams/build/code-mode/documents";
 
 import type { GenerationType } from "./generation.js";
 

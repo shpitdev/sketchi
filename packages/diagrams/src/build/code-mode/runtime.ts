@@ -1,0 +1,5940 @@
+import {
+	decodeMindmapRequest,
+	buildMindmap as buildMindmapDocument,
+	type BuildMindmapResult,
+} from "../../families/mindmap/build.js";
+import {
+	type BuildDelivery,
+	type ArtifactBuildCapabilities,
+	FLOWCHART_COVERAGE_CODES,
+	CodeModeIssue,
+	type CodeModeIssueCode,
+	type CodeModeIssueRef,
+	type QualityReport,
+} from "../result.js";
+
+import {
+	CANVAS_LIMITS,
+	SKETCHI_DIAGRAM_STYLE,
+	compileCanvasSpec,
+	curvedConnectorBetween,
+	getCanvasValidationIssues,
+	wrappedLabelWidth,
+	wrapTextToWidth,
+	type CanvasValidationIssue,
+	COMMUNITY_ICON_COLLECTION,
+	COMMUNITY_ICON_SLUG_PREFIX,
+	isDrawnIconSlug,
+	isIconRecipe,
+	withoutCanvasElements,
+	type CanvasIconAsset,
+	type IconRecipe,
+	type CanvasSpec as RenderedDiagramScene,
+	type CanvasPoint as ScenePoint,
+} from "@sketchi/drawing";
+import {
+	FLOWCHART_MAX_ISSUES,
+	type FlowchartDiagram,
+	type FlowchartValidationIssue,
+	type FlowchartValidationIssueRef,
+} from "../../families/flowchart/diagram.js";
+import {
+	getSequenceValidationIssues,
+	type SequenceDiagram,
+	type SequenceValidationIssueCode,
+} from "../../families/sequence/document.js";
+import {
+	getStateMachineValidationIssues,
+	stateLabel,
+	resolveStateMachineInitials,
+	splitContinuingFinalStates,
+	getStateMachineDefaultWarnings,
+	type StateMachineDiagram,
+	type StateMachineValidationIssueCode,
+} from "../../families/state-machine/document.js";
+import {
+	getErValidationIssues,
+	parseErFieldShorthand,
+	resolveErShorthand,
+	type ErDiagram,
+	type ErValidationIssueCode,
+} from "../../families/er/document.js";
+import {
+	getClassValidationIssues,
+	parseClassAttributeShorthand,
+	parseClassMethodShorthand,
+	parseClassParameterShorthand,
+	resolveClassShorthand,
+	type ClassDiagram,
+	type ClassValidationIssueCode,
+} from "../../families/class/document.js";
+import {
+	getOrgChartValidationIssues,
+	resolveOrgChartShorthand,
+	type OrgChartDiagram,
+	type OrgChartValidationIssueCode,
+} from "../../families/org-chart/document.js";
+import {
+	getQuadrantValidationIssues,
+	QuadrantValidationError,
+	type QuadrantValidationIssue,
+	type QuadrantDiagram,
+	type QuadrantValidationIssueCode,
+} from "../../families/quadrant/document.js";
+import {
+	getVennValidationIssues,
+	resolveVennShorthand,
+	type VennDiagram,
+	type VennValidationIssueCode,
+} from "../../families/venn/document.js";
+import {
+	getJourneyValidationIssues,
+	resolveJourneyShorthand,
+	type JourneyDiagram,
+	type JourneyValidationIssueCode,
+} from "../../families/journey/document.js";
+import {
+	getSankeyValidationIssues,
+	resolveSankeyShorthand,
+	type SankeyDiagram,
+	type SankeyValidationIssueCode,
+} from "../../families/sankey/document.js";
+import {
+	getWireframeValidationIssues,
+	resolveWireframeShorthand,
+	type WireframeComponent,
+	type WireframeDiagram,
+	type WireframeValidationIssueCode,
+} from "../../families/wireframe/document.js";
+import {
+	getTimelineValidationIssues,
+	orderedTimelineEvents,
+	type TimelineDiagram,
+} from "../../families/timeline/document.js";
+import { getChartValidationIssues, type ChartDiagram } from "../../families/chart/document.js";
+import {
+	getGanttValidationIssues,
+	ganttScheduleConflicts,
+	type GanttDiagram,
+	type GanttValidationIssueCode,
+} from "../../families/gantt/document.js";
+import { applyFlowchartEdits } from "../../families/flowchart/edits.js";
+import { checkRequestCoverage, type CoverageIssueCode } from "../../generate/coverage.js";
+import {
+	decodeFlowchartDocument,
+	flowchartDiagramFromDocument,
+} from "../../families/flowchart/document.js";
+
+import {
+	convertSceneToExcalidraw,
+	createExcalidrawFile,
+	type ExcalidrawScene,
+	validateExcalidrawScene,
+} from "@sketchi/drawing/excalidraw";
+import {
+	longNodeDescriptions,
+	NODE_DESCRIPTION_MAX_LINES,
+	renderIntermediateDiagram,
+	isStructurallyValidStateMarker,
+} from "../../graph/scene.js";
+import {
+	renderSequenceDiagram,
+	isStructurallyValidSequenceActivation,
+	isStructurallyValidSequenceLifeline,
+} from "../../families/sequence/render.js";
+import { renderStateMachineDiagram } from "../../families/state-machine/render.js";
+import {
+	renderErDiagram,
+	isStructurallyValidErOptional,
+	isStructurallyValidErTable,
+} from "../../families/er/render.js";
+import { renderClassDiagram, isStructurallyValidClassBox } from "../../families/class/diagram.js";
+import { renderOrgChartDiagram } from "../../families/org-chart/render.js";
+import { renderVennDiagram, isStructurallyValidVennSet } from "../../families/venn/render.js";
+import {
+	renderJourneyDiagram,
+	isStructurallyValidJourneyMark,
+} from "../../families/journey/render.js";
+import {
+	renderSankeyDiagram,
+	isStructurallyValidSankeyMark,
+} from "../../families/sankey/render.js";
+import { sankeyLayoutIssues } from "../../families/sankey/readout.js";
+import { renderWireframeDiagram } from "../../families/wireframe/render.js";
+import {
+	renderQuadrantDiagram,
+	isStructurallyValidQuadrantMark,
+} from "../../families/quadrant/render.js";
+import {
+	renderTimelineDiagram,
+	isStructurallyValidTimelineMarker,
+} from "../../families/timeline/render.js";
+import { renderChartDiagram, isStructurallyValidChartMark } from "../../families/chart/render.js";
+import { renderGanttDiagram, isStructurallyValidGanttMark } from "../../families/gantt/render.js";
+
+import {
+	recordMetric,
+	withTelemetryCorrelation,
+	type TelemetryCorrelationInput,
+} from "@sketchi/observability";
+import { Clock, Context, Effect, Layer, Metric, Result, Schema } from "effect";
+
+import {
+	ARTIFACT_MIME_TYPES,
+	CodeModeArtifactStorage,
+	isInlineArtifactFormat,
+	jsonSizeBytes,
+	storageIssue,
+	type CodeModeArtifactStorageError,
+	type StoredArtifactFormat,
+} from "./artifacts.js";
+import {
+	formatContractSchemaError,
+	BuildFlowchartRejected,
+	EditFlowchartRejected,
+	BuildSequenceDiagramRejected,
+	BuildStateMachineRejected,
+	BuildErDiagramRejected,
+	BuildClassDiagramRejected,
+	BuildOrgChartRejected,
+	BuildVennDiagramRejected,
+	BuildJourneyMapRejected,
+	BuildSankeyRejected,
+	BuildWireframeRejected,
+	BuildQuadrantChartRejected,
+	BuildTimelineRejected,
+	BuildChartRejected,
+	BuildGanttRejected,
+	CreateCanvasRejected,
+	GetArtifactRejected,
+	ApplyDiagramPatchRejected,
+	ApplyDiagramPatchRequest,
+	BuildFlowchartRequestSchema,
+	EditFlowchartRequest,
+	BuildSequenceDiagramRequest,
+	BuildStateMachineRequest,
+	BuildErDiagramRequest,
+	BuildClassDiagramRequest,
+	BuildOrgChartRequest,
+	BuildVennDiagramRequest,
+	BuildJourneyMapRequest,
+	BuildSankeyRequest,
+	BuildWireframeRequest,
+	BuildQuadrantChartRequest,
+	BuildTimelineRequest,
+	BuildChartRequest,
+	BuildGanttRequest,
+	CreateCanvasRequest,
+	DEFAULT_ICON_SEARCH_LIMIT,
+	SearchIconsRejected,
+	SearchIconsRequest,
+	type SearchIconsResult,
+	DIAGRAM_PATCH_OPERATION_NAMES,
+	GetArtifactRequest,
+	RenderedDiagramSceneSchema,
+	type ApplyDiagramPatchResult,
+	type BuildFlowchartRequest,
+	type BuildFlowchartResult,
+	type EditFlowchartResult,
+	type BuildSequenceDiagramResult,
+	type BuildStateMachineResult,
+	type BuildErDiagramResult,
+	type BuildClassDiagramResult,
+	type BuildOrgChartResult,
+	type BuildVennDiagramResult,
+	type BuildJourneyMapResult,
+	type BuildSankeyResult,
+	type BuildWireframeResult,
+	type BuildQuadrantChartResult,
+	type BuildTimelineResult,
+	type BuildChartResult,
+	type BuildGanttResult,
+	type CreateCanvasResult,
+	type ContractSchemaIssue,
+	type ContractSchemaError,
+	type DiagramPatchOperation,
+	type DiagramSelector,
+	type GetArtifactResult,
+	type NormalizedSequenceDiagramSpec,
+	type NormalizedStateMachineSpec,
+	type NormalizedErSpec,
+	type NormalizedClassSpec,
+	type NormalizedOrgChartSpec,
+	type NormalizedVennSpec,
+	type NormalizedJourneySpec,
+	type NormalizedSankeySpec,
+	type NormalizedWireframeSpec,
+	type WireframeComponentInput,
+	type NormalizedQuadrantChartSpec,
+	type NormalizedTimelineSpec,
+	type NormalizedChartSpec,
+	type NormalizedGanttSpec,
+	type PatchableScene,
+} from "./contract.js";
+
+import {
+	type ArtifactBundle,
+	type ArtifactFormat,
+	type InlineArtifactFormat,
+	type PartialArtifactBundle,
+} from "@sketchi/drawing/artifacts";
+
+import {
+	catalogForRequest,
+	embedSceneIcons,
+	fillGroupLogos,
+	iconRefSlug,
+	resolveFlowchartLogos,
+	resolveNodeIcons,
+	undrawableIconIssue,
+	type CodeModeCommunityIcon,
+	type CodeModeCommunityIcons,
+	type CodeModeIconCatalog,
+} from "./icons.js";
+import { cleanToolString } from "../../generate/clean-text.js";
+import { assessFlowchartQuality } from "../../families/flowchart/quality.js";
+import { normalizeFlowchartSpec } from "../../families/flowchart/spec.js";
+
+const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
+const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
+const DEFAULT_MIN_QUALITY_SCORE = 8;
+const SCENE_PADDING = 48;
+
+// A 200-topic map lays out with no overlapping topics or crossing curves.
+
+const MAX_INPUT_ISSUES = 20;
+
+const codeModeRequests = Metric.counter("sketchi_codemode_requests", {
+	description: "Code Mode boundary requests by terminal outcome",
+	incremental: true,
+});
+const codeModeFailures = Metric.counter("sketchi_codemode_failures", {
+	description: "Code Mode boundary failures by typed status",
+	incremental: true,
+});
+const codeModeArtifacts = Metric.counter("sketchi_codemode_artifacts", {
+	description: "Code Mode artifacts accepted at workflow boundaries",
+	incremental: true,
+});
+const codeModeDuration = Metric.histogram("sketchi_codemode_duration_ms", {
+	description: "Code Mode boundary duration in milliseconds",
+	boundaries: Metric.boundariesFromIterable([
+		1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000,
+	]),
+});
+
+export interface CodeModeRuntimeOptions {
+	createId?: (prefix: string) => string;
+	/** Node-logo catalog; without one, every node icon is dropped with a warning. */
+	icons?: CodeModeIconCatalog;
+	/** Published community icons, which a request names by `community/<slug>`. */
+	communityIcons?: CodeModeCommunityIcons;
+	renderer?: CodeModeArtifactRenderer;
+	/** Internal per-call policy for optional default PNGs; explicit exports remain strict. */
+	defaultPng?: {
+		deadlineMillis: number;
+		onUnavailable: (message: string) => void;
+	};
+	/**
+	 * Internal per-call policy for MCP builds: in a diagram that draws logos, a
+	 * node without one, or a flowchart group, gets the logo its label
+	 * unmistakably names (see resolveNodeIcons and fillGroupLogos). Generation
+	 * grounds logos in the prompt instead.
+	 */
+	fillNamedLogos?: boolean;
+	artifactUrl?: (input: { artifactId: string; format: ArtifactFormat }) => string;
+}
+
+export class CodeModeRuntimeEnvironment extends Context.Service<
+	CodeModeRuntimeEnvironment,
+	Required<Pick<CodeModeRuntimeOptions, "createId">> &
+		Pick<
+			CodeModeRuntimeOptions,
+			"artifactUrl" | "communityIcons" | "icons" | "renderer" | "defaultPng" | "fillNamedLogos"
+		>
+>()("@sketchi/diagram-agent/CodeModeRuntimeEnvironment") {}
+
+export const CodeModeRuntimeEnvironmentLive = Layer.succeed(CodeModeRuntimeEnvironment, {
+	createId: defaultCreateId,
+});
+
+export function makeCodeModeRuntimeEnvironmentLayer(options: CodeModeRuntimeOptions = {}) {
+	return Layer.succeed(CodeModeRuntimeEnvironment, {
+		createId: options.createId ?? defaultCreateId,
+		...(options.icons ? { icons: options.icons } : {}),
+		...(options.communityIcons ? { communityIcons: options.communityIcons } : {}),
+		...(options.renderer ? { renderer: options.renderer } : {}),
+		...(options.defaultPng ? { defaultPng: options.defaultPng } : {}),
+		...(options.artifactUrl ? { artifactUrl: options.artifactUrl } : {}),
+		...(options.fillNamedLogos ? { fillNamedLogos: true } : {}),
+	});
+}
+
+function unknownRecord(value: unknown): Record<string, unknown> | undefined {
+	return value !== null && typeof value === "object" && !Array.isArray(value)
+		? Object.fromEntries(Object.entries(value))
+		: undefined;
+}
+
+type CodeModeBoundaryOperation =
+	| "applyDiagramPatch"
+	| "buildFlowchart"
+	| "editFlowchart"
+	| "buildMindmap"
+	| "buildSequenceDiagram"
+	| "buildStateMachine"
+	| "buildErDiagram"
+	| "buildClassDiagram"
+	| "buildOrgChart"
+	| "buildVennDiagram"
+	| "buildJourneyMap"
+	| "buildSankey"
+	| "buildWireframe"
+	| "buildQuadrantChart"
+	| "buildTimeline"
+	| "buildChart"
+	| "buildGantt"
+	| "createCanvas"
+	| "getArtifact"
+	| "searchIcons";
+
+interface ObservableCodeModeResult {
+	readonly ok: boolean;
+	readonly status?: string;
+}
+
+function codeModeCorrelation(input: unknown): TelemetryCorrelationInput {
+	const record = unknownRecord(input);
+	const source = unknownRecord(record?.["source"]);
+	const artifactId =
+		typeof record?.["artifactId"] === "string"
+			? record["artifactId"]
+			: typeof source?.["artifactId"] === "string"
+				? source["artifactId"]
+				: undefined;
+	const requestId = typeof record?.["requestId"] === "string" ? record["requestId"] : undefined;
+	return {
+		...(artifactId ? { artifactId } : {}),
+		...(requestId ? { requestId } : {}),
+	};
+}
+
+function artifactKindForOperation(operation: CodeModeBoundaryOperation): string | undefined {
+	if (operation === "buildFlowchart") return "flowchart";
+	if (operation === "buildMindmap") return "mindmap";
+	if (operation === "buildSequenceDiagram") return "sequence";
+	if (operation === "buildTimeline") return "timeline";
+	if (operation === "buildChart") return "chart";
+	if (operation === "buildGantt") return "gantt";
+	if (operation === "buildStateMachine") return "state-machine";
+	if (operation === "buildErDiagram") return "er";
+	if (operation === "buildClassDiagram") return "class";
+	if (operation === "buildOrgChart") return "org-chart";
+	if (operation === "buildVennDiagram") return "venn";
+	if (operation === "buildJourneyMap") return "journey";
+	if (operation === "buildSankey") return "sankey";
+	if (operation === "buildWireframe") return "wireframe";
+	if (operation === "buildQuadrantChart") return "quadrant";
+	if (operation === "createCanvas") return "canvas";
+	if (operation === "applyDiagramPatch") return "patch";
+	return undefined;
+}
+
+export function observeCodeModeBoundary<A extends ObservableCodeModeResult, R>(
+	operation: CodeModeBoundaryOperation,
+	input: unknown,
+	effect: Effect.Effect<A, never, R>,
+): Effect.Effect<A, never, R> {
+	const observed = Effect.gen(function* () {
+		const startedAt = yield* Clock.currentTimeMillis;
+		const result = yield* effect;
+		const finishedAt = yield* Clock.currentTimeMillis;
+		const outcome = result.ok ? "success" : "failure";
+		const failureCategory = result.ok ? undefined : (result.status ?? "unknown_failure");
+		yield* recordMetric(codeModeRequests, 1, {
+			...(failureCategory ? { failureCategory } : {}),
+			operation,
+			outcome,
+			surface: "code_mode",
+		});
+		yield* recordMetric(codeModeDuration, finishedAt - startedAt, {
+			...(failureCategory ? { failureCategory } : {}),
+			operation,
+			outcome,
+			surface: "code_mode",
+		});
+		if (failureCategory) {
+			yield* recordMetric(codeModeFailures, 1, {
+				failureCategory,
+				operation,
+				surface: "code_mode",
+			});
+		}
+		const artifactKind = artifactKindForOperation(operation);
+		if (result.ok && artifactKind) {
+			yield* recordMetric(codeModeArtifacts, 1, {
+				artifactKind,
+				operation,
+				surface: "code_mode",
+			});
+		}
+		return result;
+	});
+	return withTelemetryCorrelation(observed, codeModeCorrelation(input));
+}
+
+function normalizeTimelineSpec(spec: BuildTimelineRequest["spec"]): NormalizedTimelineSpec {
+	const title = cleanToolString(spec.title);
+	const diagram: TimelineDiagram = {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-timeline"),
+		title,
+		type: "timeline",
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+		events: spec.events.map((event) => ({ ...event })),
+	};
+	return {
+		id: diagram.id,
+		title,
+		events: orderedTimelineEvents(diagram),
+		...(spec.lanes ? { lanes: [...spec.lanes] } : {}),
+		...(spec.today ? { today: spec.today } : {}),
+		style: diagram.style,
+	};
+}
+function toTimelineDiagram(spec: NormalizedTimelineSpec): TimelineDiagram {
+	return { ...spec, type: "timeline" };
+}
+function validateNormalizedTimeline(spec: NormalizedTimelineSpec): CodeModeIssue[] {
+	return getTimelineValidationIssues(toTimelineDiagram(spec)).map((entry) =>
+		issue({
+			code: entry.code,
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+function timelineQuality(spec: NormalizedTimelineSpec, threshold: number): QualityReport {
+	return {
+		accepted: 10 >= threshold,
+		score: 10,
+		threshold,
+		summary: { nodeCount: spec.events.length, edgeCount: 0 },
+		checks: [],
+	};
+}
+
+function normalizeChartSpec(spec: BuildChartRequest["spec"]): NormalizedChartSpec {
+	const title = cleanToolString(spec.title);
+	const optionalText = (value: string | undefined) => {
+		const cleaned = cleanOptional(value);
+		return cleaned === undefined ? undefined : cleaned;
+	};
+	const unit = optionalText(spec.unit);
+	const categoryAxisTitle = optionalText(spec.categoryAxisTitle);
+	const valueAxisTitle = optionalText(spec.valueAxisTitle);
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-chart"),
+		title,
+		kind: spec.kind,
+		categories: spec.categories.map(cleanToolString),
+		series: spec.series.map((series) => {
+			const name = optionalText(series.name);
+			return { ...(name ? { name } : {}), values: [...series.values] };
+		}),
+		...(unit ? { unit } : {}),
+		...(categoryAxisTitle ? { categoryAxisTitle } : {}),
+		...(valueAxisTitle ? { valueAxisTitle } : {}),
+		...(spec.stacked !== undefined ? { stacked: spec.stacked } : {}),
+		...(spec.donut !== undefined ? { donut: spec.donut } : {}),
+		...(spec.orientation ? { orientation: spec.orientation } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+function toChartDiagram(spec: NormalizedChartSpec): ChartDiagram {
+	return { ...spec, type: "chart" };
+}
+function validateNormalizedChart(spec: NormalizedChartSpec): CodeModeIssue[] {
+	return getChartValidationIssues(toChartDiagram(spec)).map((entry) =>
+		issue({
+			code: entry.code,
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+function chartQuality(spec: NormalizedChartSpec, threshold: number): QualityReport {
+	return {
+		accepted: 10 >= threshold,
+		score: 10,
+		threshold,
+		summary: { nodeCount: spec.categories.length * spec.series.length, edgeCount: 0 },
+		checks: [],
+	};
+}
+
+function normalizeGanttSpec(spec: BuildGanttRequest["spec"]): NormalizedGanttSpec {
+	const title = cleanToolString(spec.title);
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-gantt"),
+		title,
+		tasks: spec.tasks.map((task) => {
+			const phase = cleanOptional(task.phase);
+			return {
+				...task,
+				id: cleanToolString(task.id),
+				label: cleanToolString(task.label),
+				start: cleanToolString(task.start),
+				...(task.end !== undefined ? { end: cleanToolString(task.end) } : {}),
+				...(phase !== undefined ? { phase } : {}),
+				...(task.dependsOn ? { dependsOn: task.dependsOn.map(cleanToolString) } : {}),
+			};
+		}),
+		...(spec.phases ? { phases: spec.phases.map(cleanToolString) } : {}),
+		...(spec.today ? { today: cleanToolString(spec.today) } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+function toGanttDiagram(spec: NormalizedGanttSpec): GanttDiagram {
+	return { ...spec, type: "gantt" };
+}
+/** Code Mode's published issue codes for diagram-core's Gantt invariants. */
+const GANTT_ISSUE_CODES = {
+	gantt_too_large: "gantt_too_large",
+	duplicate_task_id: "duplicate_node_id",
+	invalid_gantt_date: "invalid_gantt_date",
+	invalid_gantt_span: "invalid_gantt_span",
+	invalid_gantt_phase: "invalid_gantt_phase",
+	invalid_gantt_progress: "invalid_gantt_progress",
+	missing_dependency: "missing_edge_source",
+	self_dependency: "self_loop",
+	gantt_dependency_cycle: "gantt_dependency_cycle",
+} as const satisfies Record<GanttValidationIssueCode, CodeModeIssueCode>;
+function validateNormalizedGantt(spec: NormalizedGanttSpec): CodeModeIssue[] {
+	return getGanttValidationIssues(toGanttDiagram(spec)).map((entry) =>
+		issue({
+			code: GANTT_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+/** Successors that start before a predecessor finishes still build; the warning names the date to check. */
+function ganttScheduleWarnings(spec: NormalizedGanttSpec): CodeModeIssue[] {
+	return ganttScheduleConflicts(toGanttDiagram(spec)).map((conflict) =>
+		issue({
+			code: "gantt_schedule_conflict",
+			severity: "warning",
+			stage: "input",
+			ref: { kind: "request", path: `spec.${conflict.path}` },
+			message: `Task "${conflict.task}" starts before "${conflict.dependsOn}" finishes on ${conflict.finishes}.`,
+			hint: `Keep dates the prompt states; otherwise start "${conflict.task}" after ${conflict.finishes}.`,
+		}),
+	);
+}
+function ganttQuality(spec: NormalizedGanttSpec, threshold: number): QualityReport {
+	return {
+		accepted: 10 >= threshold,
+		score: 10,
+		threshold,
+		summary: {
+			nodeCount: spec.tasks.length,
+			edgeCount: spec.tasks.reduce((count, task) => count + (task.dependsOn?.length ?? 0), 0),
+		},
+		checks: [],
+	};
+}
+
+function normalizeSequenceDiagramSpec(
+	spec: BuildSequenceDiagramRequest["spec"],
+): NormalizedSequenceDiagramSpec {
+	const title = cleanToolString(spec.title);
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-sequence"),
+		title,
+		participants: spec.participants.map((participant) => ({
+			id: cleanToolString(participant.id),
+			label: cleanToolString(participant.label),
+			...(participant.kind ? { kind: cleanToolString(participant.kind) } : {}),
+			...(participant.icon ? { icon: participant.icon } : {}),
+		})),
+		messages: spec.messages.map((message, index) => ({
+			id:
+				cleanOptional(message.id) ??
+				`message-${index + 1}-${slugify(message.source)}-${slugify(message.target)}`,
+			source: cleanToolString(message.source),
+			target: cleanToolString(message.target),
+			label: cleanToolString(message.label),
+			...(message.type ? { type: message.type } : {}),
+			...(message.style ? { style: message.style } : {}),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toSequenceDiagram(spec: NormalizedSequenceDiagramSpec): SequenceDiagram {
+	return {
+		id: spec.id,
+		title: spec.title,
+		type: "sequence",
+		// resolveNodeIcons leaves every icon a slug.
+		participants: spec.participants.map(({ icon, ...participant }) =>
+			icon?.slug ? { ...participant, icon: { slug: icon.slug } } : participant,
+		),
+		messages: spec.messages,
+		style: spec.style,
+	};
+}
+
+/** Code Mode's published issue codes for diagram-core's sequence invariants. */
+const SEQUENCE_ISSUE_CODES = {
+	sequence_too_large: "sequence_too_large",
+	duplicate_participant_id: "duplicate_node_id",
+	lifeline_id_collision: "duplicate_node_id",
+	duplicate_message_id: "duplicate_edge_id",
+	missing_message_source: "missing_edge_source",
+	missing_message_target: "missing_edge_target",
+} as const satisfies Record<SequenceValidationIssueCode, CodeModeIssueCode>;
+
+/**
+ * Code Mode requests nest the diagram under `spec`, so hints that name a field
+ * keep the published request path rather than diagram-core's.
+ */
+const SEQUENCE_ISSUE_HINTS: Partial<Record<SequenceValidationIssueCode, string>> = {
+	missing_message_source: "Use the id of a participant declared in spec.participants.",
+	missing_message_target: "Use the id of a participant declared in spec.participants.",
+};
+
+function validateNormalizedSequenceDiagram(spec: NormalizedSequenceDiagramSpec): CodeModeIssue[] {
+	return getSequenceValidationIssues(toSequenceDiagram(spec)).map((entry) =>
+		issue({
+			code: SEQUENCE_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: SEQUENCE_ISSUE_HINTS[entry.code] ?? entry.hint,
+		}),
+	);
+}
+
+function sequenceQuality(spec: NormalizedSequenceDiagramSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: {
+			nodeCount: spec.participants.length,
+			edgeCount: spec.messages.length,
+		},
+		checks: [],
+	};
+}
+
+function normalizeStateMachineSpec(
+	spec: BuildStateMachineRequest["spec"],
+): NormalizedStateMachineSpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-state-machine"),
+		title,
+		initial: cleanToolString(spec.initial),
+		states: spec.states.map((state) => {
+			const id = cleanToolString(state.id);
+			const label = stateLabel({ ...state, id });
+			return {
+				id,
+				...(label !== undefined ? { label } : {}),
+				...(state.kind ? { kind: state.kind } : {}),
+				...optional("parent", state.parent),
+				...(state.initial !== undefined ? { initial: cleanToolString(state.initial) } : {}),
+			};
+		}),
+		transitions: spec.transitions.map((transition, index) => ({
+			id:
+				cleanOptional(transition.id) ??
+				`transition-${index + 1}-${slugify(transition.source)}-${slugify(transition.target)}`,
+			source: cleanToolString(transition.source),
+			target: cleanToolString(transition.target),
+			...optional("event", transition.event),
+			...optional("guard", transition.guard),
+			...optional("action", transition.action),
+		})),
+		...(spec.layout ? { layout: { direction: spec.layout.direction } } : {}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toStateMachineDiagram(spec: NormalizedStateMachineSpec): StateMachineDiagram {
+	return { ...spec, type: "state-machine" };
+}
+
+/** Code Mode's published issue codes for diagram-core's state-machine invariants. */
+const STATE_MACHINE_ISSUE_CODES = {
+	state_machine_too_large: "state_machine_too_large",
+	invalid_state_id: "invalid_state",
+	duplicate_state_id: "duplicate_node_id",
+	duplicate_transition_id: "duplicate_edge_id",
+	missing_state_label: "invalid_state",
+	unknown_initial_state: "unknown_initial_state",
+	unknown_parent_state: "invalid_composite",
+	nested_composite: "invalid_composite",
+	missing_transition_source: "missing_edge_source",
+	missing_transition_target: "missing_edge_target",
+	final_has_outgoing: "final_has_outgoing",
+	composite_member_transition: "invalid_composite",
+	missing_composite_initial: "invalid_composite",
+	underbranched_choice: "underbranched_choice",
+	unguarded_choice_branch: "unlabeled_decision_branch",
+	unreachable_state: "unreachable_node",
+} as const satisfies Record<StateMachineValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedStateMachine(spec: NormalizedStateMachineSpec): CodeModeIssue[] {
+	return getStateMachineValidationIssues(toStateMachineDiagram(spec)).map((entry) =>
+		issue({
+			code: STATE_MACHINE_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function stateMachineQuality(spec: NormalizedStateMachineSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.states.length, edgeCount: spec.transitions.length },
+		checks: [],
+	};
+}
+
+function normalizeErSpec(spec: BuildErDiagramRequest["spec"]): NormalizedErSpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	const flag = (key: string, value: boolean | undefined) => (value ? { [key]: true } : {});
+	// An omitted id takes the next `relationship-<n>` no relationship claims explicitly.
+	const used = new Set(
+		spec.relationships.flatMap((relationship) => cleanOptional(relationship.id) ?? []),
+	);
+	const relationshipId = (index: number) => {
+		let number = index + 1;
+		while (used.has(`relationship-${number}`)) number += 1;
+		used.add(`relationship-${number}`);
+		return `relationship-${number}`;
+	};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-er-diagram"),
+		title,
+		entities: spec.entities.map((entity) => ({
+			id: cleanToolString(entity.id),
+			...optional("name", entity.name),
+			fields: entity.fields.map((input) => {
+				const field =
+					typeof input === "string" ? parseErFieldShorthand(cleanToolString(input)) : input;
+				return {
+					name: cleanToolString(field.name),
+					...optional("type", field.type),
+					...flag("pk", field.pk),
+					...flag("fk", field.fk),
+					...flag("unique", field.unique),
+					...flag("nullable", field.nullable),
+				};
+			}),
+		})),
+		relationships: spec.relationships.map((relationship, index) => ({
+			id: cleanOptional(relationship.id) ?? relationshipId(index),
+			from: cleanToolString(relationship.from),
+			to: cleanToolString(relationship.to),
+			fromCardinality: relationship.fromCardinality,
+			toCardinality: relationship.toCardinality,
+			...optional("label", relationship.label),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toErDiagram(spec: NormalizedErSpec): ErDiagram {
+	return { ...spec, type: "er" };
+}
+
+/** Code Mode's published issue codes for diagram-core's ER invariants. */
+const ER_ISSUE_CODES = {
+	er_too_large: "er_too_large",
+	invalid_entity_id: "invalid_entity",
+	duplicate_entity_id: "duplicate_node_id",
+	duplicate_entity_name: "invalid_entity",
+	duplicate_field_name: "invalid_field",
+	er_text_too_long: "label_too_long",
+	nullable_primary_key: "invalid_field",
+	duplicate_relationship_id: "duplicate_edge_id",
+	missing_relationship_entity: "missing_edge_target",
+	missing_relationship_field: "unknown_relationship_field",
+	self_referencing_field: "invalid_relationship",
+} as const satisfies Record<ErValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedEr(spec: NormalizedErSpec): CodeModeIssue[] {
+	return getErValidationIssues(toErDiagram(spec)).map((entry) =>
+		issue({
+			code:
+				entry.code === "missing_relationship_entity" && entry.path.endsWith(".from")
+					? "missing_edge_source"
+					: ER_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function erQuality(spec: NormalizedErSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.entities.length, edgeCount: spec.relationships.length },
+		checks: [],
+	};
+}
+
+/** A final state that something leaves becomes a regular state that ends in its own final state. */
+function resolveStateMachineRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: splitContinuingFinalStates(input.spec) };
+}
+
+/** Read one-line fields, cardinality aliases and from/to aliases before the request is decoded. */
+function resolveErRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveErShorthand(input.spec) };
+}
+
+function normalizeClassSpec(spec: BuildClassDiagramRequest["spec"]): NormalizedClassSpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	const flag = (key: string, value: boolean | undefined) => (value ? { [key]: true } : {});
+	// An omitted id takes the next `relationship-<n>` no relationship claims explicitly.
+	const used = new Set(
+		spec.relationships.flatMap((relationship) => cleanOptional(relationship.id) ?? []),
+	);
+	const relationshipId = (index: number) => {
+		let number = index + 1;
+		while (used.has(`relationship-${number}`)) number += 1;
+		used.add(`relationship-${number}`);
+		return `relationship-${number}`;
+	};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-class-diagram"),
+		title,
+		classes: spec.classes.map((node) => ({
+			id: cleanToolString(node.id),
+			...optional("name", node.name),
+			...(node.kind ? { kind: node.kind } : {}),
+			...optional("stereotype", node.stereotype),
+			attributes: node.attributes.map((input) => {
+				const attribute =
+					typeof input === "string" ? parseClassAttributeShorthand(cleanToolString(input)) : input;
+				return {
+					name: cleanToolString(attribute.name),
+					...optional("type", attribute.type),
+					...(attribute.visibility ? { visibility: attribute.visibility } : {}),
+					...flag("static", attribute.static),
+				};
+			}),
+			methods: node.methods.map((input) => {
+				const method =
+					typeof input === "string" ? parseClassMethodShorthand(cleanToolString(input)) : input;
+				return {
+					name: cleanToolString(method.name),
+					params: method.params.map((param) => {
+						const read =
+							typeof param === "string"
+								? parseClassParameterShorthand(cleanToolString(param))
+								: param;
+						return { name: cleanToolString(read.name), ...optional("type", read.type) };
+					}),
+					...optional("returns", method.returns),
+					...(method.visibility ? { visibility: method.visibility } : {}),
+					...flag("static", method.static),
+					...flag("abstract", method.abstract),
+				};
+			}),
+		})),
+		relationships: spec.relationships.map((relationship, index) => ({
+			id: cleanOptional(relationship.id) ?? relationshipId(index),
+			kind: relationship.kind,
+			from: cleanToolString(relationship.from),
+			to: cleanToolString(relationship.to),
+			...optional("fromMultiplicity", relationship.fromMultiplicity),
+			...optional("toMultiplicity", relationship.toMultiplicity),
+			...optional("fromRole", relationship.fromRole),
+			...optional("toRole", relationship.toRole),
+			...(relationship.navigable === undefined ? {} : { navigable: relationship.navigable }),
+			...optional("label", relationship.label),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toClassDiagram(spec: NormalizedClassSpec): ClassDiagram {
+	return { ...spec, type: "class" };
+}
+
+/** Code Mode's published issue codes for diagram-core's class diagram invariants. */
+const CLASS_ISSUE_CODES = {
+	class_too_large: "class_too_large",
+	invalid_class_id: "invalid_class",
+	duplicate_class_id: "duplicate_node_id",
+	duplicate_class_name: "invalid_class",
+	duplicate_member: "invalid_member",
+	class_text_too_long: "label_too_long",
+	duplicate_relationship_id: "duplicate_edge_id",
+	missing_relationship_class: "missing_edge_target",
+	inheritance_cycle: "invalid_generalization",
+	invalid_inheritance: "invalid_generalization",
+	invalid_realization: "invalid_generalization",
+	invalid_multiplicity: "invalid_relationship",
+	misplaced_end_label: "invalid_relationship",
+} as const satisfies Record<ClassValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedClass(spec: NormalizedClassSpec): CodeModeIssue[] {
+	return getClassValidationIssues(toClassDiagram(spec)).map((entry) =>
+		issue({
+			code:
+				entry.code === "missing_relationship_class" && entry.path.endsWith(".from")
+					? "missing_edge_source"
+					: CLASS_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function classQuality(spec: NormalizedClassSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.classes.length, edgeCount: spec.relationships.length },
+		checks: [],
+	};
+}
+
+/** Read one-line members, kind and multiplicity aliases and from/to aliases before the request is decoded. */
+function resolveClassRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveClassShorthand(input.spec) };
+}
+
+function normalizeOrgChartSpec(spec: BuildOrgChartRequest["spec"]): NormalizedOrgChartSpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	const flag = (key: string, value: boolean | undefined) => (value ? { [key]: true } : {});
+	// An omitted id takes the next `dotted-line-<n>` no dotted line claims explicitly.
+	const used = new Set(spec.dottedLines.flatMap((line) => cleanOptional(line.id) ?? []));
+	const lineId = (index: number) => {
+		let number = index + 1;
+		while (used.has(`dotted-line-${number}`)) number += 1;
+		used.add(`dotted-line-${number}`);
+		return `dotted-line-${number}`;
+	};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-org-chart"),
+		title,
+		people: spec.people.map((person) => ({
+			id: cleanToolString(person.id),
+			name: cleanToolString(person.name),
+			...optional("title", person.title),
+			...optional("department", person.department),
+			...optional("manager", person.manager),
+			...flag("assistant", person.assistant),
+			...flag("avatar", person.avatar),
+		})),
+		dottedLines: spec.dottedLines.map((line, index) => ({
+			id: cleanOptional(line.id) ?? lineId(index),
+			report: cleanToolString(line.report),
+			manager: cleanToolString(line.manager),
+			...optional("label", line.label),
+		})),
+		...flag("groupByDepartment", spec.groupByDepartment),
+		...flag("forest", spec.forest),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toOrgChartDiagram(spec: NormalizedOrgChartSpec): OrgChartDiagram {
+	return { ...spec, type: "org-chart" };
+}
+
+/** Code Mode's published issue codes for diagram-core's org chart invariants. */
+const ORG_CHART_ISSUE_CODES = {
+	org_chart_too_large: "org_chart_too_large",
+	invalid_person_id: "invalid_person",
+	duplicate_person_id: "duplicate_node_id",
+	org_text_too_long: "label_too_long",
+	unknown_manager: "missing_edge_source",
+	self_manager: "invalid_reporting_line",
+	reporting_cycle: "invalid_reporting_line",
+	multiple_roots: "invalid_reporting_line",
+	invalid_assistant: "invalid_person",
+	duplicate_dotted_line_id: "duplicate_edge_id",
+	invalid_dotted_line: "invalid_reporting_line",
+} as const satisfies Record<OrgChartValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedOrgChart(spec: NormalizedOrgChartSpec): CodeModeIssue[] {
+	return getOrgChartValidationIssues(toOrgChartDiagram(spec)).map((entry) =>
+		issue({
+			code: ORG_CHART_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function orgChartQuality(spec: NormalizedOrgChartSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: {
+			nodeCount: spec.people.length,
+			edgeCount:
+				spec.people.filter((person) => person.manager !== undefined).length +
+				spec.dottedLines.length,
+		},
+		checks: [],
+	};
+}
+
+function normalizeSankeySpec(spec: BuildSankeyRequest["spec"]): NormalizedSankeySpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-sankey"),
+		title,
+		nodes: spec.nodes.map((node) => ({
+			id: cleanToolString(node.id),
+			label: cleanToolString(node.label),
+			...(node.color ? { color: node.color } : {}),
+		})),
+		links: spec.links.map((link) => ({
+			source: cleanToolString(link.source),
+			target: cleanToolString(link.target),
+			value: link.value,
+			...optional("label", link.label),
+		})),
+		...optional("unit", spec.unit),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toSankeyDiagram(spec: NormalizedSankeySpec): SankeyDiagram {
+	return { ...spec, type: "sankey" };
+}
+
+/** Code Mode's published issue codes for diagram-core's Sankey invariants. */
+const SANKEY_ISSUE_CODES = {
+	sankey_too_large: "sankey_too_large",
+	invalid_sankey_node_id: "invalid_sankey_node",
+	duplicate_sankey_node_id: "duplicate_node_id",
+	sankey_text_too_long: "label_too_long",
+	unknown_sankey_node: "invalid_sankey_flow",
+	sankey_self_link: "self_loop",
+	duplicate_sankey_link: "invalid_sankey_flow",
+	invalid_sankey_value: "invalid_sankey_flow",
+	sankey_cycle: "sankey_cycle",
+	unlinked_sankey_node: "invalid_sankey_node",
+	blank_sankey_label: "missing_field",
+} as const satisfies Record<SankeyValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedSankey(spec: NormalizedSankeySpec): CodeModeIssue[] {
+	return getSankeyValidationIssues(toSankeyDiagram(spec)).map((entry) =>
+		issue({
+			code: SANKEY_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function sankeyQuality(spec: NormalizedSankeySpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.nodes.length, edgeCount: spec.links.length },
+		checks: [],
+	};
+}
+
+/** Read flows, from/to and amount aliases and nodes named only by links before the request is decoded. */
+function resolveSankeyRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveSankeyShorthand(input.spec) };
+}
+
+/** Read manager, title and department aliases and dotted lines written on a person before the request is decoded. */
+function resolveOrgChartRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveOrgChartShorthand(input.spec) };
+}
+
+function normalizeVennSpec(spec: BuildVennDiagramRequest["spec"]): NormalizedVennSpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-venn"),
+		title,
+		sets: spec.sets.map((set) => ({
+			id: cleanToolString(set.id),
+			label: cleanToolString(set.label),
+			...optional("color", set.color),
+		})),
+		regions: spec.regions.map((region) => ({
+			sets: region.sets.map(cleanToolString),
+			...optional("label", region.label),
+			...(region.items === undefined ? {} : { items: region.items.map(cleanToolString) }),
+			...(region.count === undefined ? {} : { count: region.count }),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toVennDiagram(spec: NormalizedVennSpec): VennDiagram {
+	return { ...spec, type: "venn" };
+}
+
+/** Code Mode's published issue codes for diagram-core's Venn invariants. */
+const VENN_ISSUE_CODES = {
+	venn_set_count: "invalid_venn_set",
+	duplicate_venn_set: "duplicate_node_id",
+	invalid_venn_color: "invalid_venn_set",
+	unknown_venn_set: "invalid_venn_region",
+	duplicate_venn_region: "invalid_venn_region",
+	invalid_venn_region: "invalid_venn_region",
+	venn_text_too_long: "label_too_long",
+	venn_too_large: "venn_too_large",
+} as const satisfies Record<VennValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedVenn(spec: NormalizedVennSpec): CodeModeIssue[] {
+	return getVennValidationIssues(toVennDiagram(spec)).map((entry) =>
+		issue({
+			code: VENN_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function vennQuality(spec: NormalizedVennSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.sets.length, edgeCount: 0 },
+		checks: [],
+	};
+}
+
+/** Read sets named by label, `members`, and whole set memberships before the request is decoded. */
+function resolveVennRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveVennShorthand(input.spec) };
+}
+
+function normalizeJourneySpec(spec: BuildJourneyMapRequest["spec"]): NormalizedJourneySpec {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	const notes = (key: string, values: readonly string[] | undefined) => {
+		const cleaned = (values ?? []).map(cleanToolString).filter((value) => value.length > 0);
+		return cleaned.length > 0 ? { [key]: cleaned } : {};
+	};
+	const actors = (spec.actors ?? []).map(cleanToolString).filter((actor) => actor.length > 0);
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-journey-map"),
+		title,
+		...optional("persona", spec.persona),
+		...(actors.length > 0 ? { actors } : {}),
+		stages: spec.stages.map((stage) => ({
+			name: cleanToolString(stage.name),
+			steps: stage.steps.map((step) => ({
+				label: cleanToolString(step.label),
+				score: step.score,
+				...optional("actor", step.actor),
+				...optional("touchpoint", step.touchpoint),
+			})),
+			...notes("painPoints", stage.painPoints),
+			...notes("opportunities", stage.opportunities),
+		})),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toJourneyDiagram(spec: NormalizedJourneySpec): JourneyDiagram {
+	return { ...spec, type: "journey" };
+}
+
+/** Code Mode's published issue codes for diagram-core's journey invariants. */
+const JOURNEY_ISSUE_CODES = {
+	journey_too_large: "journey_too_large",
+	empty_journey_stage: "invalid_journey_stage",
+	duplicate_journey_stage: "invalid_journey_stage",
+	invalid_journey_score: "invalid_journey_step",
+	unknown_journey_actor: "invalid_journey_step",
+	duplicate_journey_actor: "invalid_journey_step",
+	journey_text_too_long: "label_too_long",
+	unplaced_journey_entry: "invalid_journey_stage",
+} as const satisfies Record<JourneyValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedJourney(spec: NormalizedJourneySpec): CodeModeIssue[] {
+	return getJourneyValidationIssues(toJourneyDiagram(spec)).map((entry) =>
+		issue({
+			code: JOURNEY_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function journeyQuality(spec: NormalizedJourneySpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: {
+			nodeCount: spec.stages.reduce((total, stage) => total + stage.steps.length, 0),
+			edgeCount: 0,
+		},
+		checks: [],
+	};
+}
+
+/** Read Mermaid sections, step and score aliases and flat staged steps before the request is decoded. */
+function resolveJourneyRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveJourneyShorthand(input.spec) };
+}
+
+function normalizeWireframeComponent(component: WireframeComponentInput): WireframeComponentInput {
+	const normalized: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(component)) {
+		if (value === undefined) continue;
+		if (key === "children" && Array.isArray(value))
+			normalized[key] = (value as WireframeComponentInput[]).map(normalizeWireframeComponent);
+		else if (typeof value === "string") {
+			const cleaned = cleanToolString(value);
+			if (cleaned) normalized[key] = cleaned;
+		} else if (Array.isArray(value))
+			normalized[key] = value.map((entry) =>
+				typeof entry === "string" ? cleanToolString(entry) : entry,
+			);
+		else normalized[key] = value;
+	}
+	return normalized as unknown as WireframeComponentInput;
+}
+
+function normalizeWireframeSpec(spec: BuildWireframeRequest["spec"]): NormalizedWireframeSpec {
+	const title = cleanToolString(spec.title);
+	// An omitted screen id takes its name's slug, then `screen-<n>`, never one another screen claims.
+	const used = new Set(spec.screens.flatMap((screen) => cleanOptional(screen.id) ?? []));
+	const screenId = (name: string, index: number) => {
+		const base = slugify(name) || `screen-${index + 1}`;
+		let id = base;
+		for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`;
+		used.add(id);
+		return id;
+	};
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-wireframe"),
+		title,
+		screens: spec.screens.map((screen, index) => {
+			const name = cleanToolString(screen.name);
+			return {
+				id: cleanOptional(screen.id) ?? screenId(name, index),
+				name,
+				device: screen.device ?? "desktop",
+				...(screen.align ? { align: screen.align } : {}),
+				children: screen.children.map(normalizeWireframeComponent),
+			};
+		}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toWireframeDiagram(spec: NormalizedWireframeSpec): WireframeDiagram {
+	return {
+		...spec,
+		screens: spec.screens.map((screen) => ({
+			...screen,
+			children: screen.children as readonly WireframeComponent[] as WireframeComponent[],
+		})),
+		type: "wireframe",
+	};
+}
+
+/** Code Mode's published issue codes for diagram-core's wireframe invariants. */
+const WIREFRAME_ISSUE_CODES = {
+	wireframe_too_large: "wireframe_too_large",
+	invalid_screen_id: "invalid_screen",
+	duplicate_screen_id: "duplicate_node_id",
+	empty_wireframe_screen: "invalid_screen",
+	unknown_wireframe_target: "missing_edge_target",
+	empty_wireframe_container: "invalid_component",
+	missing_wireframe_text: "invalid_component",
+	wireframe_text_too_long: "label_too_long",
+	invalid_wireframe_option: "invalid_component",
+} as const satisfies Record<WireframeValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedWireframe(spec: NormalizedWireframeSpec): CodeModeIssue[] {
+	return getWireframeValidationIssues(toWireframeDiagram(spec)).map((entry) =>
+		issue({
+			code: WIREFRAME_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function wireframeQuality(spec: NormalizedWireframeSpec, threshold: number): QualityReport {
+	const score = 10;
+	const count = (components: readonly WireframeComponentInput[]): number =>
+		components.reduce((sum, component) => sum + 1 + count(component.children ?? []), 0);
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: {
+			nodeCount: spec.screens.reduce((sum, screen) => sum + count(screen.children), 0),
+			edgeCount: 0,
+		},
+		checks: [],
+	};
+}
+
+/** Read screen, device, component type and text aliases before the request is decoded. */
+function resolveWireframeRequest(input: unknown): unknown {
+	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
+	return { ...input, spec: resolveWireframeShorthand(input.spec) };
+}
+
+function normalizeQuadrantChartSpec(
+	spec: BuildQuadrantChartRequest["spec"],
+): NormalizedQuadrantChartSpec {
+	const title = cleanToolString(spec.title);
+	const axis = (value: BuildQuadrantChartRequest["spec"]["xAxis"]) => ({
+		title: cleanToolString(value.title),
+		low: cleanToolString(value.low),
+		high: cleanToolString(value.high),
+	});
+	return {
+		id: cleanOptional(spec.id) ?? (slugify(title) || "sketchi-quadrant-chart"),
+		title,
+		xAxis: axis(spec.xAxis),
+		yAxis: axis(spec.yAxis),
+		quadrants: {
+			topLeft: cleanToolString(spec.quadrants.topLeft),
+			topRight: cleanToolString(spec.quadrants.topRight),
+			bottomLeft: cleanToolString(spec.quadrants.bottomLeft),
+			bottomRight: cleanToolString(spec.quadrants.bottomRight),
+		},
+		points: spec.points.map((point) => {
+			const group = cleanOptional(point.group);
+			return {
+				label: cleanToolString(point.label),
+				x: point.x,
+				y: point.y,
+				...(group ? { group } : {}),
+			};
+		}),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
+
+function toQuadrantDiagram(spec: NormalizedQuadrantChartSpec): QuadrantDiagram {
+	return { ...spec, type: "quadrant" };
+}
+
+/** Code Mode's published issue codes for diagram-core's quadrant chart invariants. */
+const QUADRANT_ISSUE_CODES = {
+	quadrant_too_large: "quadrant_too_large",
+	invalid_quadrant_point: "invalid_quadrant_point",
+	invalid_quadrant_text: "invalid_quadrant_text",
+} as const satisfies Record<QuadrantValidationIssueCode, CodeModeIssueCode>;
+
+function validateNormalizedQuadrantChart(spec: NormalizedQuadrantChartSpec): CodeModeIssue[] {
+	return quadrantIssues(getQuadrantValidationIssues(toQuadrantDiagram(spec)));
+}
+
+function quadrantIssues(issues: readonly QuadrantValidationIssue[]): CodeModeIssue[] {
+	return issues.map((entry) =>
+		issue({
+			code: QUADRANT_ISSUE_CODES[entry.code],
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+			message: entry.message,
+			hint: entry.hint,
+		}),
+	);
+}
+
+function quadrantChartQuality(spec: NormalizedQuadrantChartSpec, threshold: number): QualityReport {
+	const score = 10;
+	return {
+		accepted: score >= threshold,
+		score,
+		threshold,
+		summary: { nodeCount: spec.points.length, edgeCount: 0 },
+		checks: [],
+	};
+}
+
+export class CodeModeArtifactRenderFailed extends Schema.TaggedError<
+	CodeModeArtifactRenderFailed,
+	{ readonly brand: unique symbol }
+>()("CodeModeArtifactRenderFailed", { cause: Schema.Defect(), message: Schema.String }) {}
+
+/** Implementations may retain their own tagged renderer failures. */
+type TaggedArtifactRenderFailure = Pick<CodeModeArtifactRenderFailed, "message"> & {
+	readonly _tag: string;
+};
+
+export interface CodeModeArtifactRenderer<
+	E extends TaggedArtifactRenderFailure = TaggedArtifactRenderFailure,
+> {
+	renderPng(input: {
+		scene: RenderedDiagramScene;
+		excalidraw: unknown;
+	}): Effect.Effect<ArrayBuffer | Uint8Array, E>;
+}
+
+class CodeModeArtifactRendererNotConfigured extends Schema.TaggedError<
+	CodeModeArtifactRendererNotConfigured,
+	{ readonly brand: unique symbol }
+>()("CodeModeArtifactRendererNotConfigured", { message: Schema.String }) {}
+
+type ArtifactExportError = CodeModeArtifactRendererNotConfigured | CodeModeArtifactRenderFailed;
+
+interface SelectorTargets {
+	arrows: PatchableArrow[];
+	/** Standalone icon elements, which only a translate moves. */
+	icons: Extract<PatchableScene["elements"][number], { type: "icon" }>[];
+	nodes: PatchableNode[];
+	texts: PatchableText[];
+}
+
+const FailureContextSchema = Schema.Struct({
+	issues: Schema.Array(Schema.toEncoded(CodeModeIssue)).pipe(Schema.mutable),
+});
+
+class ArtifactExportFailure extends Schema.TaggedError<
+	ArtifactExportFailure,
+	{ readonly brand: unique symbol }
+>()("ArtifactExportFailure", {
+	status: Schema.Literals(["export_failed", "limit_exceeded"]),
+	issues: FailureContextSchema.fields.issues,
+}) {}
+
+class ArtifactStorageFailure extends Schema.TaggedError<
+	ArtifactStorageFailure,
+	{ readonly brand: unique symbol }
+>()("ArtifactStorageFailure", {
+	status: Schema.Literal("storage_failed"),
+	cause: Schema.Defect(),
+	issues: FailureContextSchema.fields.issues,
+}) {}
+
+function workflowFailure<
+	const Tag extends string,
+	const Statuses extends readonly string[],
+	C extends { readonly issues: CodeModeIssue[] },
+>(tag: Tag, status: Schema.Literals<Statuses>, context: Schema.Codec<C, unknown>) {
+	class WorkflowFailure extends Schema.TaggedError<
+		WorkflowFailure,
+		{ readonly brand: unique symbol }
+	>()(tag, {
+		message: Schema.String,
+		status,
+		context,
+	}) {
+		static new(input: { readonly status: Statuses[number]; readonly context: C }): WorkflowFailure {
+			// Failure context can contain the normalized input that failed validation.
+			return WorkflowFailure.make(
+				{
+					...input,
+					message: input.context.issues[0]?.message ?? input.status,
+				},
+				{ disableChecks: true },
+			);
+		}
+	}
+	return WorkflowFailure;
+}
+
+const BuildFlowchartFailure = workflowFailure(
+	"BuildFlowchartFailure",
+	BuildFlowchartRejected.fields.status,
+	BuildFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const EditFlowchartFailure = workflowFailure(
+	"EditFlowchartFailure",
+	EditFlowchartRejected.fields.status,
+	EditFlowchartRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildSequenceDiagramFailure = workflowFailure(
+	"BuildSequenceDiagramFailure",
+	BuildSequenceDiagramRejected.fields.status,
+	BuildSequenceDiagramRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildStateMachineFailure = workflowFailure(
+	"BuildStateMachineFailure",
+	BuildStateMachineRejected.fields.status,
+	BuildStateMachineRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildErDiagramFailure = workflowFailure(
+	"BuildErDiagramFailure",
+	BuildErDiagramRejected.fields.status,
+	BuildErDiagramRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildClassDiagramFailure = workflowFailure(
+	"BuildClassDiagramFailure",
+	BuildClassDiagramRejected.fields.status,
+	BuildClassDiagramRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildOrgChartFailure = workflowFailure(
+	"BuildOrgChartFailure",
+	BuildOrgChartRejected.fields.status,
+	BuildOrgChartRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildVennDiagramFailure = workflowFailure(
+	"BuildVennDiagramFailure",
+	BuildVennDiagramRejected.fields.status,
+	BuildVennDiagramRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildJourneyMapFailure = workflowFailure(
+	"BuildJourneyMapFailure",
+	BuildJourneyMapRejected.fields.status,
+	BuildJourneyMapRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildSankeyFailure = workflowFailure(
+	"BuildSankeyFailure",
+	BuildSankeyRejected.fields.status,
+	BuildSankeyRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildWireframeFailure = workflowFailure(
+	"BuildWireframeFailure",
+	BuildWireframeRejected.fields.status,
+	BuildWireframeRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildTimelineFailure = workflowFailure(
+	"BuildTimelineFailure",
+	BuildTimelineRejected.fields.status,
+	BuildTimelineRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildQuadrantChartFailure = workflowFailure(
+	"BuildQuadrantChartFailure",
+	BuildQuadrantChartRejected.fields.status,
+	BuildQuadrantChartRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildChartFailure = workflowFailure(
+	"BuildChartFailure",
+	BuildChartRejected.fields.status,
+	BuildChartRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const BuildGanttFailure = workflowFailure(
+	"BuildGanttFailure",
+	BuildGanttRejected.fields.status,
+	BuildGanttRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const CreateCanvasFailure = workflowFailure(
+	"CreateCanvasFailure",
+	CreateCanvasRejected.fields.status,
+	CreateCanvasRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const GetArtifactFailure = workflowFailure(
+	"GetArtifactFailure",
+	GetArtifactRejected.fields.status,
+	GetArtifactRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const SearchIconsFailure = workflowFailure(
+	"SearchIconsFailure",
+	SearchIconsRejected.fields.status,
+	SearchIconsRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+const ApplyDiagramPatchFailure = workflowFailure(
+	"ApplyDiagramPatchFailure",
+	ApplyDiagramPatchRejected.fields.status,
+	ApplyDiagramPatchRejected.mapFields(({ ok, status, ...context }) => ({
+		...context,
+		...FailureContextSchema.fields,
+	})),
+);
+
+type PatchableElement = PatchableScene["elements"][number];
+type PatchableNode = Extract<PatchableElement, { type: "node" }>;
+type PatchableText = Extract<PatchableElement, { type: "text" }>;
+type PatchableArrow = Extract<PatchableElement, { type: "arrow" }>;
+type PatchablePoint = PatchableArrow["points"][number];
+
+function defaultCreateId(prefix: string): string {
+	return `${prefix}_${globalThis.crypto.randomUUID()}`;
+}
+
+function issue(input: {
+	code: CodeModeIssueCode;
+	severity?: CodeModeIssue["severity"];
+	stage: CodeModeIssue["stage"];
+	ref?: CodeModeIssueRef;
+	message: string;
+	hint: string;
+}): CodeModeIssue {
+	return {
+		code: input.code,
+		severity: input.severity ?? "error",
+		stage: input.stage,
+		...(input.ref ? { ref: input.ref } : {}),
+		message: input.message,
+		hint: input.hint,
+	};
+}
+
+const FLOWCHART_COVERAGE = new Set<CoverageIssueCode>(FLOWCHART_COVERAGE_CODES);
+const isFlowchartCoverageCode = (
+	code: CoverageIssueCode,
+): code is (typeof FLOWCHART_COVERAGE_CODES)[number] => FLOWCHART_COVERAGE.has(code);
+
+/**
+ * What the caller's request states that an accepted flowchart misses, checked as generation
+ * checks its own diagrams. The build still stands; one edit can add what is missing.
+ */
+function flowchartCoverageIssues(
+	request: string | undefined,
+	diagram: FlowchartDiagram,
+): CodeModeIssue[] {
+	if (request === undefined) return [];
+	return checkRequestCoverage(request, diagram).flatMap((entry) =>
+		isFlowchartCoverageCode(entry.code)
+			? [
+					issue({
+						code: entry.code,
+						severity: "warning",
+						stage: "coverage",
+						ref: { kind: "diagram" },
+						message: entry.message,
+						hint: "Fix it with editFlowchart({ artifactId, edits }) before you answer.",
+					}),
+				]
+			: [],
+	);
+}
+
+/** A description past its line limit still draws in full; the build warns so it can be shortened. */
+function longDescriptionIssues(scene: RenderedDiagramScene): CodeModeIssue[] {
+	return longNodeDescriptions(scene).map((id) =>
+		issue({
+			code: "label_too_long",
+			severity: "warning",
+			stage: "render",
+			ref: { kind: "node", id, path: "spec.nodes.description" },
+			message: `Node "${id}" has a description longer than ${NODE_DESCRIPTION_MAX_LINES} lines; it draws in full under the label.`,
+			hint: "Keep a description to a short subtitle, and name technologies in the label.",
+		}),
+	);
+}
+
+function pathForContractIssue(path: readonly PropertyKey[]): string {
+	if (path.length === 0) {
+		return "input";
+	}
+	return path.map((part) => (typeof part === "number" ? `[${part}]` : String(part))).join(".");
+}
+
+type ContractIssueLike = typeof ContractSchemaIssue.Encoded;
+type ContractErrorLike = ContractSchemaError;
+
+function codeForContractIssue(contractIssue: ContractIssueLike): CodeModeIssueCode {
+	const path = pathForContractIssue(contractIssue.path);
+	if (isPatchOperationNamePath(path)) return "unsupported_patch_operation";
+	if (
+		contractIssue.issueTag === "InvalidType" ||
+		(contractIssue.issueTag === "MissingKey" && contractIssue.missingKeyCode === "invalid_type")
+	)
+		return "invalid_type";
+	if (contractIssue.astKind === "LiteralUnion" && contractIssue.issueTag === "AnyOf")
+		return "invalid_enum";
+	if (path.toLowerCase().includes("color")) return "invalid_color";
+	return path === "input" ? "invalid_type" : "missing_field";
+}
+
+function isPatchOperationNamePath(path: string): boolean {
+	return /^operations\.\[\d+\]\.op$/.test(path);
+}
+
+function hintForContractIssue(path: string): string {
+	if (isPatchOperationNamePath(path)) {
+		return [
+			`Use one of: ${DIAGRAM_PATCH_OPERATION_NAMES.join(", ")}.`,
+			"For label edits, use replaceText with selector plus text.",
+		].join(" ");
+	}
+
+	if (path === "source") {
+		return "Pass source: { artifactId } from an accepted build or patch, or source: { scene } for inline Sketchi scene patching.";
+	}
+
+	return `Fix ${path} so it matches the Code Mode API contract.`;
+}
+
+function inputIssues(
+	error: ContractSchemaError,
+	hintFor: (path: string) => string = hintForContractIssue,
+): CodeModeIssue[] {
+	const issues = error.issues.slice(0, MAX_INPUT_ISSUES).map((contractIssue) => {
+		const path = pathForContractIssue(contractIssue.path);
+		return issue({
+			code: codeForContractIssue(contractIssue),
+			stage: "input",
+			ref: { kind: "request", path },
+			message: contractIssue.message,
+			hint: hintFor(path),
+		});
+	});
+	if (error.issues.length > MAX_INPUT_ISSUES) {
+		issues.push(
+			issue({
+				code: "invalid_type",
+				stage: "input",
+				ref: { kind: "request", path: "input" },
+				message: `${error.issues.length - MAX_INPUT_ISSUES} additional input issues were omitted.`,
+				hint: "Fix the summarized request shape before retrying.",
+			}),
+		);
+	}
+	return issues;
+}
+
+function slugify(value: string): string {
+	return value
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.slice(0, 48);
+}
+
+function cleanOptional(value: string | undefined): string | undefined {
+	if (value === undefined) {
+		return undefined;
+	}
+	const cleaned = cleanToolString(value);
+	return cleaned.length > 0 ? cleaned : undefined;
+}
+
+function codeModeRefForFlowchart(
+	ref: FlowchartValidationIssueRef | undefined,
+): CodeModeIssueRef | undefined {
+	if (!ref) {
+		return undefined;
+	}
+	return {
+		kind: ref.kind,
+		...(ref.id ? { id: ref.id } : {}),
+		...(ref.path ? { path: `spec.${ref.path}` } : {}),
+	};
+}
+
+/** Problems in a document once its strings are cleaned, each at its spec path. */
+function cleanedFlowchartIssues(error: ContractErrorLike): CodeModeIssue[] {
+	return error.issues.slice(0, FLOWCHART_MAX_ISSUES).map((contractIssue) => {
+		const path = pathForContractIssue(contractIssue.path);
+		return issue({
+			code: codeForContractIssue(contractIssue),
+			stage: "flowchart",
+			ref: { kind: "diagram", path: path === "input" ? "spec" : `spec.${path}` },
+			message: contractIssue.message,
+			hint: "Give every title, label, id and note visible text, not only spaces or tool-call debris.",
+		});
+	});
+}
+
+/** A document's build problems, each at its spec path. */
+function flowchartDocumentIssues(
+	validationIssues: readonly FlowchartValidationIssue[],
+): CodeModeIssue[] {
+	return validationIssues.map((validationIssue) => {
+		const ref = codeModeRefForFlowchart(validationIssue.ref);
+		return issue({
+			code: validationIssue.code,
+			stage: "flowchart",
+			...(ref ? { ref } : {}),
+			message: validationIssue.message,
+			hint: validationIssue.hint,
+		});
+	});
+}
+
+function qualityIssues(quality: QualityReport): CodeModeIssue[] {
+	return quality.checks.map((check) =>
+		issue({
+			code: CodeModeIssueCodeFromString(check.code),
+			severity: check.severity,
+			stage: "quality",
+			message: check.message,
+			hint:
+				check.severity === "error"
+					? "Repair the structural issue and call buildFlowchart again."
+					: "Improve the labels or scope before styling the artifact.",
+		}),
+	);
+}
+
+function CodeModeIssueCodeFromString(value: string): CodeModeIssueCode {
+	if (value === "generic_label" || value === "label_too_long" || value === "disconnected_graph") {
+		return value;
+	}
+	return "quality_below_threshold";
+}
+
+function requestedFormats(
+	input: BuildFlowchartRequest["options"] | ApplyDiagramPatchRequest["options"],
+): ArtifactFormat[] {
+	return input?.artifactFormats ?? DEFAULT_BUILD_FORMATS;
+}
+
+function requestedInlineFormats(
+	input: BuildFlowchartRequest["options"] | ApplyDiagramPatchRequest["options"],
+): InlineArtifactFormat[] {
+	return input?.inlineArtifacts ?? DEFAULT_INLINE_FORMATS;
+}
+
+const storedArtifactsForFormats = Effect.fn("codeMode.artifacts.exportFormats")(function* (input: {
+	formats: readonly ArtifactFormat[];
+	scene: RenderedDiagramScene;
+	excalidraw: ExcalidrawScene;
+	renderer?: CodeModeArtifactRenderer | undefined;
+	defaultPng?: CodeModeRuntimeOptions["defaultPng"];
+}) {
+	const artifacts: StoredArtifactFormat[] = [];
+
+	for (const format of input.formats) {
+		let data: unknown;
+		if (format === "png" && input.defaultPng) {
+			// One deadline spans all optional exports in the execute script, including
+			// renderer retries/queueing. Keep time for the remaining formats and storage.
+			const remaining = input.defaultPng.deadlineMillis - (yield* Clock.currentTimeMillis);
+			if (remaining <= 0) {
+				input.defaultPng.onUnavailable("Default PNG delivery budget exhausted.");
+				continue;
+			}
+			const rendered = yield* dataForArtifactFormat(input, format).pipe(
+				Effect.timeout(remaining),
+				Effect.result,
+			);
+			if (Result.isFailure(rendered)) {
+				input.defaultPng.onUnavailable(
+					rendered.failure._tag === "TimeoutError"
+						? "Default PNG rendering exceeded its delivery budget."
+						: rendered.failure.message,
+				);
+				continue;
+			}
+			data = rendered.success;
+		} else {
+			data = yield* dataForArtifactFormat(input, format);
+		}
+		artifacts.push({
+			format,
+			mimeType: ARTIFACT_MIME_TYPES[format],
+			data,
+			sizeBytes: sizeBytesForArtifactData(data),
+		});
+	}
+
+	return artifacts;
+});
+
+function dataForArtifactFormat(
+	input: {
+		scene: RenderedDiagramScene;
+		excalidraw: ExcalidrawScene;
+		renderer?: CodeModeArtifactRenderer | undefined;
+	},
+	format: ArtifactFormat,
+): Effect.Effect<unknown, ArtifactExportError> {
+	if (format === "scene") {
+		return Effect.succeed(input.scene);
+	}
+
+	if (format === "excalidraw") {
+		return Effect.succeed(createExcalidrawFile(input.excalidraw));
+	}
+
+	if (!input.renderer) {
+		return Effect.fail(
+			CodeModeArtifactRendererNotConfigured.make({
+				message: "PNG artifact rendering is not configured for this runtime.",
+			}),
+		);
+	}
+
+	return input.renderer
+		.renderPng({
+			scene: input.scene,
+			excalidraw: input.excalidraw,
+		})
+		.pipe(
+			Effect.mapError((cause) =>
+				CodeModeArtifactRenderFailed.make({ cause, message: cause.message }),
+			),
+		);
+}
+
+function sizeBytesForArtifactData(data: unknown): number {
+	if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
+		return data.byteLength;
+	}
+
+	return jsonSizeBytes(data);
+}
+
+function artifactExportIssues(error: ArtifactExportError): CodeModeIssue[] {
+	return [
+		issue({
+			code: "render_failed",
+			stage: "export",
+			...(error._tag === "CodeModeArtifactRendererNotConfigured"
+				? { ref: { kind: "artifact", path: "options.artifactFormats" } }
+				: {}),
+			message: error.message,
+			hint:
+				error._tag === "CodeModeArtifactRendererNotConfigured"
+					? "Use the hosted Studio Code Mode runtime with its Cloudflare Browser Run binding, or omit png from artifactFormats."
+					: "Retry the request; if it keeps failing, inspect the configured renderer.",
+		}),
+	];
+}
+
+function exportIssues(
+	validationIssues: ReturnType<typeof validateExcalidrawScene>["issues"],
+): CodeModeIssue[] {
+	return validationIssues.map((validationIssue) => {
+		const code =
+			validationIssue.code === "overlapping-arrow-segment"
+				? "arrow_overlap"
+				: validationIssue.code === "text-overflow"
+					? "text_overflow"
+					: validationIssue.code.includes("binding") ||
+						  validationIssue.code.includes("bound") ||
+						  validationIssue.code.includes("endpoint")
+						? "arrow_binding_invalid"
+						: "export_invalid_scene";
+
+		return issue({
+			code,
+			stage: "export",
+			ref: validationIssue.elementId
+				? { kind: "artifact", id: validationIssue.elementId }
+				: { kind: "artifact" },
+			message: validationIssue.message,
+			hint: "Inspect the rendered scene and retry with a simpler layout or patch.",
+		});
+	});
+}
+
+function canvasIssueCode(validationIssue: CanvasValidationIssue): CodeModeIssueCode {
+	switch (validationIssue.code) {
+		case "duplicate_element_id":
+			return "duplicate_element_id";
+		case "duplicate_layer_id":
+			return "duplicate_layer_id";
+		case "empty_canvas":
+			return "invalid_canvas_geometry";
+		case "invalid_binding":
+			return "invalid_canvas_binding";
+		case "invalid_composition":
+			return "invalid_canvas_composition";
+		case "invalid_geometry":
+			return "invalid_canvas_geometry";
+		case "invalid_icon":
+			return "invalid_canvas_icon";
+		case "invalid_polygon":
+			return "invalid_polygon";
+		case "label_overflow":
+			return "invalid_canvas_geometry";
+		case "limit_exceeded":
+			return "canvas_limit_exceeded";
+		case "missing_z_order_element":
+		case "duplicate_z_order_element":
+		case "unknown_z_order_element":
+			return "invalid_z_order";
+		case "unknown_layout_target":
+			return "unknown_layout_target";
+	}
+}
+
+/** A scene over a canvas limit is too large rather than broken: the caller splits it. */
+function canvasFailureStatus(
+	validationIssues: readonly CanvasValidationIssue[],
+): "limit_exceeded" | "render_failed" {
+	return validationIssues.some((entry) => entry.code === "limit_exceeded")
+		? "limit_exceeded"
+		: "render_failed";
+}
+
+function canvasValidationIssues(
+	validationIssues: readonly CanvasValidationIssue[],
+): CodeModeIssue[] {
+	return validationIssues.slice(0, MAX_INPUT_ISSUES).map((validationIssue) =>
+		issue({
+			code: canvasIssueCode(validationIssue),
+			stage: "canvas",
+			ref: validationIssue.elementId
+				? {
+						kind: "element",
+						id: validationIssue.elementId,
+						path: validationIssue.path,
+					}
+				: { kind: "diagram", path: validationIssue.path },
+			message: validationIssue.message,
+			hint: "Repair the referenced CanvasSpec field and call createCanvas again.",
+		}),
+	);
+}
+
+function canvasExportIssues(
+	validationIssues: ReturnType<typeof validateExcalidrawScene>["issues"],
+): CodeModeIssue[] {
+	return exportIssues(
+		// Canvas authoring permits intentional overlaps and connector crossings;
+		// these quality diagnostics are not hard structural export failures.
+		validationIssues.filter(
+			(validationIssue) =>
+				validationIssue.code !== "overlapping-arrow-segment" &&
+				validationIssue.code !== "arrow-segment-through-node",
+		),
+	);
+}
+
+/**
+ * A canvas icon's slug: its own, or its drawn icon's under the recipe's drawn
+ * slug, recorded in `drawn`; none when it names no slug and carries no
+ * drawable recipe (undrawableCanvasIconIssues reports those).
+ */
+function canvasIconSlug(
+	ref: { readonly slug?: string; readonly name?: string; readonly recipe?: unknown },
+	drawn: Map<string, CanvasIconAsset>,
+): string | undefined {
+	const found = iconRefSlug(ref);
+	if ("problem" in found) return undefined;
+	if (ref.recipe !== undefined && !drawn.has(found.slug)) {
+		const name = ref.name ? cleanToolString(ref.name) : "";
+		drawn.set(found.slug, { name: name || "Drawn icon", recipe: ref.recipe as IconRecipe });
+	}
+	return found.slug;
+}
+
+/** Warnings for canvas icons that name no slug and carry no drawable recipe. */
+function undrawableCanvasIconIssues(scene: PatchableScene): CodeModeIssue[] {
+	return scene.elements.flatMap((element, index) => {
+		const ref = element.type === "icon" ? element : "icon" in element ? element.icon : undefined;
+		if (!ref) return [];
+		const found = iconRefSlug(ref);
+		if (!("problem" in found)) return [];
+		const owner = element.type === "icon" ? "icon element" : element.type;
+		return [
+			{
+				...undrawableIconIssue({
+					owner,
+					id: element.id,
+					path: element.type === "icon" ? `elements[${index}]` : `elements[${index}].icon`,
+					problem: found.problem,
+				}),
+				ref: {
+					kind: "element" as const,
+					id: element.id,
+					path: element.type === "icon" ? `elements[${index}]` : `elements[${index}].icon`,
+				},
+			},
+		];
+	});
+}
+
+function normalizePatchableScene(scene: PatchableScene): RenderedDiagramScene | null {
+	const elements: Array<RenderedDiagramScene["elements"][number]> = [];
+	const removed = new Set<string>();
+	// A scene's drawn icons draw only from the recipes it carries, so they travel with it.
+	const drawn = new Map<string, CanvasIconAsset>(
+		Object.entries(scene.icons ?? {}).flatMap(([slug, asset]) =>
+			isDrawnIconSlug(slug) && asset.recipe && isIconRecipe(asset.recipe)
+				? [[slug, { name: asset.name, recipe: asset.recipe }] as const]
+				: [],
+		),
+	);
+
+	for (const element of scene.elements) {
+		if (element.type === "arrow") {
+			const first = element.points[0];
+			const second = element.points[1];
+			const rest = element.points.slice(2);
+			if (!first || !second) {
+				return null;
+			}
+			const points: [ScenePoint, ScenePoint, ...ScenePoint[]] = [first, second, ...rest];
+			elements.push({
+				...element,
+				type: "arrow",
+				id: element.id,
+				edgeId: element.edgeId,
+				sourceNodeId: element.sourceNodeId,
+				targetNodeId: element.targetNodeId,
+				...(element.strokeColor ? { strokeColor: element.strokeColor } : {}),
+				...(element.strokeStyle ? { strokeStyle: element.strokeStyle } : {}),
+				...(element.textColor ? { textColor: element.textColor } : {}),
+				points,
+				...(element.label ? { label: element.label } : {}),
+			});
+			continue;
+		}
+
+		if (element.type === "node") {
+			const polygonPoints = element.points;
+			if (
+				element.shape === "polygon" &&
+				(!polygonPoints || !polygonPoints[0] || !polygonPoints[1] || !polygonPoints[2])
+			) {
+				return null;
+			}
+			const iconSlug = element.icon ? canvasIconSlug(element.icon, drawn) : undefined;
+			elements.push({
+				type: "node",
+				id: element.id,
+				nodeId: element.nodeId,
+				...(element.kind ? { kind: element.kind } : {}),
+				...(element.icon && iconSlug
+					? {
+							icon: {
+								slug: iconSlug,
+								size: element.icon.size,
+								...(element.icon.exact ? { exact: true } : {}),
+							},
+						}
+					: {}),
+				shape: element.shape,
+				...(element.fillColor ? { fillColor: element.fillColor } : {}),
+				...(element.strokeColor ? { strokeColor: element.strokeColor } : {}),
+				x: element.x,
+				y: element.y,
+				width: element.width,
+				height: element.height,
+				label: element.label,
+				...(element.frameId ? { frameId: element.frameId } : {}),
+				...(element.groupIds ? { groupIds: [...element.groupIds] } : {}),
+				...(element.layerId ? { layerId: element.layerId } : {}),
+				...(element.locked !== undefined ? { locked: element.locked } : {}),
+				...(element.opacity !== undefined ? { opacity: element.opacity } : {}),
+				...(element.zIndex !== undefined ? { zIndex: element.zIndex } : {}),
+				...(element.fillStyle ? { fillStyle: element.fillStyle } : {}),
+				...(element.roughness !== undefined ? { roughness: element.roughness } : {}),
+				...(element.strokeStyle ? { strokeStyle: element.strokeStyle } : {}),
+				...(element.strokeWidth !== undefined ? { strokeWidth: element.strokeWidth } : {}),
+				...((element.rendererRole === "sequence-lifeline" &&
+					isStructurallyValidSequenceLifeline(scene, element)) ||
+				(element.rendererRole === "sequence-activation" &&
+					isStructurallyValidSequenceActivation(scene, element)) ||
+				(element.rendererRole === "timeline-marker" &&
+					isStructurallyValidTimelineMarker(element)) ||
+				(element.rendererRole === "chart-mark" && isStructurallyValidChartMark(element)) ||
+				(element.rendererRole === "journey-mark" && isStructurallyValidJourneyMark(element)) ||
+				(element.rendererRole === "quadrant-mark" && isStructurallyValidQuadrantMark(element)) ||
+				(element.rendererRole === "gantt-mark" && isStructurallyValidGanttMark(element)) ||
+				(element.rendererRole === "state-marker" && isStructurallyValidStateMarker(element)) ||
+				(element.rendererRole === "er-table" && isStructurallyValidErTable(element)) ||
+				(element.rendererRole === "er-optional" && isStructurallyValidErOptional(element)) ||
+				(element.rendererRole === "class-box" && isStructurallyValidClassBox(element)) ||
+				(element.rendererRole === "venn-set" && isStructurallyValidVennSet(element)) ||
+				(element.rendererRole === "sankey-mark" && isStructurallyValidSankeyMark(element)) ||
+				((element.rendererRole === "swimlane" || element.rendererRole === "swimlane-header") &&
+					element.shape === "rectangle" &&
+					!element.icon) ||
+				// A zone's logo sits in its header.
+				(element.rendererRole === "zone" && element.shape === "rectangle") ||
+				((element.rendererRole === "wireframe-widget" ||
+					element.rendererRole === "wireframe-region") &&
+					!element.icon)
+					? { rendererRole: element.rendererRole }
+					: {}),
+				...(element.textColor ? { textColor: element.textColor } : {}),
+				...(element.shape === "polygon" &&
+				polygonPoints?.[0] &&
+				polygonPoints[1] &&
+				polygonPoints[2]
+					? {
+							points: [
+								polygonPoints[0],
+								polygonPoints[1],
+								polygonPoints[2],
+								...polygonPoints.slice(3),
+							],
+						}
+					: {}),
+			});
+			continue;
+		}
+
+		if (element.type === "line") {
+			const first = element.points[0];
+			const second = element.points[1];
+			if (!first || !second) return null;
+			elements.push({
+				...element,
+				points: [first, second, ...element.points.slice(2)],
+			});
+			continue;
+		}
+
+		if (element.type === "frame") {
+			const { icon, ...frame } = structuredClone(element);
+			const iconSlug = icon ? canvasIconSlug(icon, drawn) : undefined;
+			elements.push({
+				...frame,
+				...(icon && iconSlug
+					? { icon: { slug: iconSlug, size: icon.size, ...(icon.exact ? { exact: true } : {}) } }
+					: {}),
+			});
+			continue;
+		}
+
+		if (element.type === "icon") {
+			const { slug: _slug, name: _name, recipe: _recipe, ...placed } = structuredClone(element);
+			const slug = canvasIconSlug(element, drawn);
+			if (slug) elements.push({ ...placed, slug });
+			else removed.add(element.id);
+			continue;
+		}
+
+		elements.push(structuredClone(element));
+	}
+
+	return withoutCanvasElements(
+		{
+			kind: scene.kind,
+			version: scene.version,
+			diagramId: scene.diagramId,
+			title: scene.title,
+			width: scene.width,
+			height: scene.height,
+			accentColor: scene.accentColor,
+			backgroundColor: scene.backgroundColor,
+			elements,
+			...(drawn.size > 0 ? { icons: Object.fromEntries(drawn) } : {}),
+			layers: structuredClone(scene.layers),
+			layouts: structuredClone(scene.layouts),
+			zOrder: [...scene.zOrder],
+		},
+		removed,
+	);
+}
+
+/** The authored view of a scene: node icon references without derived SVG bytes. */
+function withoutIconAssets(scene: RenderedDiagramScene): RenderedDiagramScene {
+	const { icons: _icons, ...rest } = scene;
+	return rest;
+}
+
+function cloneScene(scene: PatchableScene): PatchableScene {
+	return structuredClone(scene);
+}
+
+function sourceConnectivity(scene: PatchableScene): string[] {
+	return scene.elements
+		.flatMap((element) => {
+			if (element.type === "arrow") {
+				return [`arrow:${element.id}:${element.sourceNodeId}->${element.targetNodeId}`];
+			}
+			if (element.type === "line") {
+				return [
+					`line:${element.id}:${element.startBinding?.elementId ?? ""}->${element.endBinding?.elementId ?? ""}`,
+				];
+			}
+			return [];
+		})
+		.sort();
+}
+
+function sameConnectivity(left: readonly string[], right: readonly string[]) {
+	return left.length === right.length && left.every((entry, index) => entry === right[index]);
+}
+
+function nodeElements(scene: PatchableScene): PatchableNode[] {
+	return scene.elements.filter((element): element is PatchableNode => element.type === "node");
+}
+
+function textElements(scene: PatchableScene): PatchableText[] {
+	return scene.elements.filter((element): element is PatchableText => element.type === "text");
+}
+
+function arrowElements(scene: PatchableScene): PatchableArrow[] {
+	return scene.elements.filter((element): element is PatchableArrow => element.type === "arrow");
+}
+
+function labelsMatch(labels: readonly string[] | undefined, value: string | undefined): boolean {
+	if (!labels || labels.length === 0 || !value) {
+		return false;
+	}
+	const normalized = value.trim().toLowerCase();
+	return labels.some((label) => label.trim().toLowerCase() === normalized);
+}
+
+function selectorHasFilters(selector: DiagramSelector | undefined): boolean {
+	return Boolean(
+		selector &&
+		((selector.ids?.length ?? 0) > 0 ||
+			(selector.nodeIds?.length ?? 0) > 0 ||
+			(selector.edgeIds?.length ?? 0) > 0 ||
+			(selector.kinds?.length ?? 0) > 0 ||
+			(selector.labels?.length ?? 0) > 0),
+	);
+}
+
+function resolveTargets(
+	scene: PatchableScene,
+	selector: DiagramSelector | undefined,
+): SelectorTargets {
+	const scope = selector?.scope ?? "all";
+	const hasFilters = selectorHasFilters(selector);
+	const ids = new Set(selector?.ids ?? []);
+	const nodeIds = new Set(selector?.nodeIds ?? []);
+	const edgeIds = new Set(selector?.edgeIds ?? []);
+	const kinds = new Set(selector?.kinds ?? []);
+	const nodes = nodeElements(scene).filter((node) => {
+		if (scope === "edges") {
+			return false;
+		}
+		if (!selector || !hasFilters) {
+			return true;
+		}
+		return (
+			ids.has(node.id) ||
+			nodeIds.has(node.nodeId) ||
+			(node.kind ? [...kinds].some((kind) => kind === node.kind) : false) ||
+			labelsMatch(selector.labels, node.label)
+		);
+	});
+	const arrows = arrowElements(scene).filter((arrow) => {
+		if (scope === "nodes") {
+			return false;
+		}
+		if (!selector || !hasFilters) {
+			return true;
+		}
+		return (
+			ids.has(arrow.id) || edgeIds.has(arrow.edgeId) || labelsMatch(selector.labels, arrow.label)
+		);
+	});
+	const nodeElementIds = new Set(nodes.map((node) => node.id));
+	const arrowElementIds = new Set(arrows.map((arrow) => arrow.id));
+	const texts = textElements(scene).filter((text) => {
+		if (!selector || !hasFilters) {
+			if (scope === "nodes") {
+				return text.containerId ? nodeElementIds.has(text.containerId) : false;
+			}
+			if (scope === "edges") {
+				return text.containerId ? arrowElementIds.has(text.containerId) : false;
+			}
+			return true;
+		}
+		return (
+			ids.has(text.id) ||
+			(text.containerId ? nodeElementIds.has(text.containerId) : false) ||
+			(text.containerId ? arrowElementIds.has(text.containerId) : false) ||
+			labelsMatch(selector.labels, text.text)
+		);
+	});
+
+	const icons = scene.elements.filter(
+		(element): element is SelectorTargets["icons"][number] =>
+			element.type === "icon" &&
+			scope === "all" &&
+			(!selector || !hasFilters || ids.has(element.id)),
+	);
+
+	return { arrows, icons, nodes, texts };
+}
+
+function targetIssue(operation: DiagramPatchOperation): CodeModeIssue {
+	return issue({
+		code: "unknown_patch_target",
+		stage: "flowchart",
+		ref: { kind: "request", path: "operations.selector" },
+		message: `Patch operation "${operation.op}" did not match any scene element.`,
+		hint: "Use nodeIds, edgeIds, ids, kinds, labels, or scope values that exist in the accepted artifact.",
+	});
+}
+
+function textForContainer(scene: PatchableScene, containerId: string): PatchableText | undefined {
+	return textElements(scene).find(
+		(text) => text.containerId === containerId || text.id === `${containerId}:label`,
+	);
+}
+
+function centerTextOnNode(scene: PatchableScene, node: PatchableNode): void {
+	const text = textForContainer(scene, node.id);
+	if (!text) {
+		return;
+	}
+	text.x = node.x + node.width / 2;
+	text.y = node.y + node.height / 2;
+}
+
+function midpoint(points: readonly PatchablePoint[]): PatchablePoint | undefined {
+	const first = points[0];
+	const last = points[points.length - 1];
+	if (!first || !last) {
+		return undefined;
+	}
+	return {
+		x: (first.x + last.x) / 2,
+		y: (first.y + last.y) / 2 - 10,
+	};
+}
+
+function syncArrowLabel(scene: PatchableScene, arrow: PatchableArrow): void {
+	const label = textForContainer(scene, arrow.id);
+	const point = midpoint(arrow.points);
+	if (label && !label.containerId) {
+		const start = arrow.points[0];
+		if (!start) return;
+		const next = arrow.points.find((point) => point.x !== start.x || point.y !== start.y);
+		if (!next) return;
+		const text = wrapTextToWidth(label.text, label.maxWidth ?? 160, label.fontSize);
+		const width = wrappedLabelWidth(text, label.fontSize, label.maxWidth ?? 160);
+		const height = Math.ceil(text.split("\n").length * label.fontSize * 1.35);
+		label.x = (start.x + next.x) / 2 + (start.x === next.x ? width / 2 + 8 : 0);
+		label.y = (start.y + next.y) / 2 - (start.y === next.y ? height / 2 + 5 : 0);
+		return;
+	}
+	if (!label || !point) {
+		return;
+	}
+	label.x = point.x;
+	label.y = point.y;
+}
+
+function translatePoint(point: PatchablePoint, dx: number, dy: number): PatchablePoint {
+	return { x: point.x + dx, y: point.y + dy };
+}
+
+function applyStyle(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "setDefaultStyle" | "setStyle" }>,
+): CodeModeIssue[] {
+	if (operation.style.backgroundColor) {
+		scene.backgroundColor = operation.style.backgroundColor;
+	}
+
+	if (operation.op === "setDefaultStyle") {
+		if (operation.style.strokeColor) {
+			scene.accentColor = operation.style.strokeColor;
+		}
+		for (const node of nodeElements(scene)) {
+			if (operation.style.fillColor) {
+				node.fillColor = operation.style.fillColor;
+			}
+			if (operation.style.strokeColor) {
+				node.strokeColor = operation.style.strokeColor;
+			}
+			if (operation.style.textColor) {
+				node.textColor = operation.style.textColor;
+			}
+		}
+		for (const arrow of arrowElements(scene)) {
+			if (operation.style.strokeColor) {
+				arrow.strokeColor = operation.style.strokeColor;
+			}
+			if (operation.style.textColor) {
+				arrow.textColor = operation.style.textColor;
+			}
+		}
+		for (const text of textElements(scene)) {
+			if (operation.style.textColor) {
+				text.textColor = operation.style.textColor;
+			}
+		}
+		return [];
+	}
+
+	const targets = resolveTargets(scene, operation.selector);
+	if (targets.nodes.length === 0 && targets.arrows.length === 0 && targets.texts.length === 0) {
+		return [targetIssue(operation)];
+	}
+
+	for (const node of targets.nodes) {
+		if (operation.style.fillColor) {
+			node.fillColor = operation.style.fillColor;
+		}
+		if (operation.style.strokeColor) {
+			node.strokeColor = operation.style.strokeColor;
+		}
+		if (operation.style.textColor) {
+			node.textColor = operation.style.textColor;
+			const text = textForContainer(scene, node.id);
+			if (text) {
+				text.textColor = operation.style.textColor;
+			}
+		}
+	}
+	for (const arrow of targets.arrows) {
+		if (operation.style.strokeColor) {
+			arrow.strokeColor = operation.style.strokeColor;
+		}
+		if (operation.style.textColor) {
+			arrow.textColor = operation.style.textColor;
+			const text = textForContainer(scene, arrow.id);
+			if (text) {
+				text.textColor = operation.style.textColor;
+			}
+		}
+	}
+	for (const text of targets.texts) {
+		if (operation.style.textColor) {
+			text.textColor = operation.style.textColor;
+		}
+	}
+
+	return [];
+}
+
+function rerouteConnectedArrows(scene: PatchableScene, nodeIds: readonly string[]): void {
+	const movedNodeIds = new Set(nodeIds);
+	for (const arrow of arrowElements(scene)) {
+		if (movedNodeIds.has(arrow.sourceNodeId) || movedNodeIds.has(arrow.targetNodeId)) {
+			rerouteArrow(scene, arrow);
+		}
+	}
+}
+
+function applyShape(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "setShape" }>,
+): CodeModeIssue[] {
+	const targets = resolveTargets(scene, operation.selector);
+	if (targets.nodes.length === 0) {
+		return [targetIssue(operation)];
+	}
+
+	const resizedNodeIds: string[] = [];
+	for (const node of targets.nodes) {
+		node.shape = operation.shape;
+		if (operation.shape === "polygon") {
+			node.points = [
+				{ x: node.width / 2, y: 0 },
+				{ x: node.width, y: node.height / 2 },
+				{ x: node.width / 2, y: node.height },
+				{ x: 0, y: node.height / 2 },
+			];
+		} else {
+			delete node.points;
+		}
+		if (operation.shape === "circle") {
+			const size = Math.max(node.width, node.height);
+			node.x -= (size - node.width) / 2;
+			node.y -= (size - node.height) / 2;
+			node.width = size;
+			node.height = size;
+			resizedNodeIds.push(node.nodeId);
+		}
+		centerTextOnNode(scene, node);
+	}
+	rerouteConnectedArrows(scene, resizedNodeIds);
+	return [];
+}
+
+function applyTranslate(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "translate" }>,
+): CodeModeIssue[] {
+	const targets = resolveTargets(scene, operation.selector);
+	if (
+		targets.nodes.length === 0 &&
+		targets.arrows.length === 0 &&
+		targets.texts.length === 0 &&
+		targets.icons.length === 0
+	) {
+		return [targetIssue(operation)];
+	}
+
+	for (const icon of targets.icons) {
+		icon.x += operation.dx;
+		icon.y += operation.dy;
+	}
+
+	const movedNodeIds = new Set<string>();
+	const movedTextIds = new Set<string>();
+
+	for (const node of targets.nodes) {
+		node.x += operation.dx;
+		node.y += operation.dy;
+		movedNodeIds.add(node.nodeId);
+		const text = textForContainer(scene, node.id);
+		if (text) {
+			text.x += operation.dx;
+			text.y += operation.dy;
+			movedTextIds.add(text.id);
+		}
+	}
+
+	for (const arrow of targets.arrows) {
+		arrow.points = arrow.points.map((point) => translatePoint(point, operation.dx, operation.dy));
+		const label = textForContainer(scene, arrow.id);
+		if (label) {
+			label.x += operation.dx;
+			label.y += operation.dy;
+			movedTextIds.add(label.id);
+		}
+	}
+
+	for (const text of targets.texts) {
+		if (!movedTextIds.has(text.id)) {
+			text.x += operation.dx;
+			text.y += operation.dy;
+		}
+	}
+
+	rerouteConnectedArrows(scene, [...movedNodeIds]);
+	recomputeSceneBounds(scene);
+	return [];
+}
+
+function applyReplaceText(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "replaceText" }>,
+): CodeModeIssue[] {
+	const targets = resolveTargets(scene, operation.selector);
+	if (targets.nodes.length === 0 && targets.arrows.length === 0 && targets.texts.length === 0) {
+		return [targetIssue(operation)];
+	}
+
+	for (const node of targets.nodes) {
+		node.label = operation.text;
+		const text = textForContainer(scene, node.id);
+		if (text) {
+			text.text = operation.text;
+		}
+	}
+	for (const arrow of targets.arrows) {
+		arrow.label = operation.text;
+		const text = textForContainer(scene, arrow.id);
+		if (text) {
+			text.text = operation.text;
+		}
+	}
+	for (const text of targets.texts) {
+		text.text = operation.text;
+	}
+
+	return [];
+}
+
+function nodeCenter(node: PatchableNode): PatchablePoint {
+	return {
+		x: node.x + node.width / 2,
+		y: node.y + node.height / 2,
+	};
+}
+
+function edgePoint(
+	source: PatchableNode,
+	target: PatchableNode,
+	coincidentRole: "source" | "target",
+): PatchablePoint {
+	const sourceCenter = nodeCenter(source);
+	const targetCenter = nodeCenter(target);
+	const dx = targetCenter.x - sourceCenter.x;
+	const dy = targetCenter.y - sourceCenter.y;
+
+	// Opposite faces prevent a route between coincident centers from collapsing.
+	if (dx === 0 && dy === 0) {
+		return {
+			x: sourceCenter.x,
+			y: coincidentRole === "source" ? source.y + source.height : source.y,
+		};
+	}
+
+	if (Math.abs(dx) > Math.abs(dy)) {
+		if (dx >= 0) {
+			return { x: source.x + source.width, y: sourceCenter.y };
+		}
+		return { x: source.x, y: sourceCenter.y };
+	}
+
+	if (dy >= 0) {
+		return { x: sourceCenter.x, y: source.y + source.height };
+	}
+	return { x: sourceCenter.x, y: source.y };
+}
+
+function rerouteArrow(scene: PatchableScene, arrow: PatchableArrow): CodeModeIssue[] {
+	const nodesById = new Map(nodeElements(scene).map((node) => [node.nodeId, node]));
+	const source = nodesById.get(arrow.sourceNodeId);
+	const target = nodesById.get(arrow.targetNodeId);
+	if (!source || !target) {
+		return [
+			issue({
+				code: "patch_output_invalid",
+				stage: "render",
+				ref: { kind: "edge", id: arrow.edgeId },
+				message: `Arrow "${arrow.id}" references a node that is not in the scene.`,
+				hint: "Rebuild the diagram with buildFlowchart or buildMindmap before applying visual patches.",
+			}),
+		];
+	}
+
+	// A curved connector, a mindmap branch, is redrawn as a curve, not an elbow.
+	if (arrow.curved) {
+		arrow.points = curvedConnectorBetween(source, target).map((point) => ({ ...point }));
+		syncArrowLabel(scene, arrow);
+		return [];
+	}
+	const start = edgePoint(source, target, "source");
+	const end = edgePoint(target, source, "target");
+	const vertical = Math.abs(end.y - start.y) >= Math.abs(end.x - start.x);
+	if (vertical) {
+		const midY = (start.y + end.y) / 2;
+		arrow.points = [start, { x: start.x, y: midY }, { x: end.x, y: midY }, end];
+	} else {
+		const midX = (start.x + end.x) / 2;
+		arrow.points = [start, { x: midX, y: start.y }, { x: midX, y: end.y }, end];
+	}
+	syncArrowLabel(scene, arrow);
+	return [];
+}
+
+function applyRerouteEdges(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "rerouteEdges" }>,
+): CodeModeIssue[] {
+	const targets = resolveTargets(scene, operation.selector);
+	if (targets.arrows.length === 0) {
+		return [targetIssue(operation)];
+	}
+	return targets.arrows.flatMap((arrow) => rerouteArrow(scene, arrow));
+}
+
+function recomputeSceneBounds(scene: PatchableScene): void {
+	let maxX = scene.width;
+	let maxY = scene.height;
+	for (const element of scene.elements) {
+		if (element.type === "arrow" || element.type === "line") {
+			for (const point of element.points) {
+				maxX = Math.max(maxX, point.x);
+				maxY = Math.max(maxY, point.y);
+			}
+		} else if (element.type === "text") {
+			maxX = Math.max(maxX, element.x + (element.maxWidth ?? 0));
+			maxY = Math.max(maxY, element.y + element.fontSize);
+		} else {
+			maxX = Math.max(maxX, element.x + element.width);
+			maxY = Math.max(maxY, element.y + element.height);
+		}
+	}
+	scene.width = maxX + SCENE_PADDING;
+	scene.height = maxY + SCENE_PADDING;
+}
+
+function patchTargetIds(scene: PatchableScene, selector: DiagramSelector): Set<string> {
+	const targets = resolveTargets(scene, selector);
+	const ids = new Set([
+		...targets.nodes.map((element) => element.id),
+		...targets.arrows.map((element) => element.id),
+		...targets.texts.map((element) => element.id),
+	]);
+	const explicitIds = new Set(selector.ids ?? []);
+	for (const element of scene.elements) {
+		if (explicitIds.has(element.id)) ids.add(element.id);
+	}
+	return ids;
+}
+
+function anchoredIndex(
+	order: readonly string[],
+	beforeId: string | undefined,
+	afterId: string | undefined,
+): number | undefined {
+	if (beforeId && afterId) return undefined;
+	if (beforeId) {
+		const index = order.indexOf(beforeId);
+		return index >= 0 ? index : undefined;
+	}
+	if (afterId) {
+		const index = order.indexOf(afterId);
+		return index >= 0 ? index + 1 : undefined;
+	}
+	return order.length;
+}
+
+function structuralOperationIssue(
+	operation: DiagramPatchOperation,
+	message: string,
+): CodeModeIssue[] {
+	return [
+		issue({
+			code: "patch_output_invalid",
+			stage: "canvas",
+			ref: { kind: "request", path: "operations" },
+			message,
+			hint: `Repair the ${operation.op} operation and preserve unique, stable element ids.`,
+		}),
+	];
+}
+
+function applyInsert(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "insert" }>,
+): CodeModeIssue[] {
+	const existingIds = new Set(scene.elements.map((element) => element.id));
+	const insertedIds = operation.elements.map((element) => element.id);
+	if (
+		new Set(insertedIds).size !== insertedIds.length ||
+		insertedIds.some((id) => existingIds.has(id))
+	) {
+		return structuralOperationIssue(
+			operation,
+			"Inserted elements must use ids that are unique within the canvas.",
+		);
+	}
+	const index = anchoredIndex(scene.zOrder, operation.beforeId, operation.afterId);
+	if (index === undefined) {
+		return structuralOperationIssue(
+			operation,
+			"Insert specifies an unknown anchor or both beforeId and afterId.",
+		);
+	}
+	scene.elements.push(...operation.elements.map((element) => structuredClone(element)));
+	scene.zOrder.splice(index, 0, ...insertedIds);
+	return [];
+}
+
+function applyRemove(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "remove" }>,
+): CodeModeIssue[] {
+	const removedIds = patchTargetIds(scene, operation.selector);
+	if (removedIds.size === 0) return [targetIssue(operation)];
+	const removedNodeIds = new Set(
+		scene.elements.flatMap((element) =>
+			element.type === "node" && removedIds.has(element.id) ? [element.nodeId] : [],
+		),
+	);
+	let previousSize: number;
+	do {
+		previousSize = removedIds.size;
+		for (const element of scene.elements) {
+			if (
+				(element.type === "text" &&
+					((element.containerId && removedIds.has(element.containerId)) ||
+						arrowElements(scene).some(
+							(arrow) =>
+								removedIds.has(arrow.id) && textForContainer(scene, arrow.id)?.id === element.id,
+						))) ||
+				(element.type === "arrow" &&
+					(removedNodeIds.has(element.sourceNodeId) || removedNodeIds.has(element.targetNodeId))) ||
+				(element.type === "line" &&
+					((element.startBinding && removedIds.has(element.startBinding.elementId)) ||
+						(element.endBinding && removedIds.has(element.endBinding.elementId))))
+			) {
+				removedIds.add(element.id);
+			}
+		}
+	} while (removedIds.size !== previousSize);
+	const retained = scene.elements
+		.filter((element) => !removedIds.has(element.id))
+		.map((element) => {
+			if (element.frameId && removedIds.has(element.frameId)) {
+				const { frameId: _removedFrameId, ...retainedElement } = element;
+				return retainedElement;
+			}
+			return element;
+		});
+	scene.elements.splice(0, scene.elements.length, ...retained);
+	const retainedOrder = scene.zOrder.filter((id) => !removedIds.has(id));
+	scene.zOrder.splice(0, scene.zOrder.length, ...retainedOrder);
+	const layouts = scene.layouts
+		.map((layout) => ({
+			...layout,
+			ids: layout.ids.filter((id) => !removedIds.has(id)),
+		}))
+		.filter((layout) => layout.ids.length > 0);
+	scene.layouts.splice(0, scene.layouts.length, ...layouts);
+	recomputeSceneBounds(scene);
+	return [];
+}
+
+function applyReplace(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "replace" }>,
+): CodeModeIssue[] {
+	const index = scene.elements.findIndex((element) => element.id === operation.id);
+	if (index < 0) return [targetIssue(operation)];
+	if (operation.element.id !== operation.id) {
+		return structuralOperationIssue(
+			operation,
+			"Replacement element id must match the stable id being replaced.",
+		);
+	}
+	scene.elements.splice(index, 1, structuredClone(operation.element));
+	recomputeSceneBounds(scene);
+	return [];
+}
+
+function applyReorder(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "reorder" }>,
+): CodeModeIssue[] {
+	const selected = new Set(operation.ids);
+	if (
+		selected.size !== operation.ids.length ||
+		operation.ids.some((id) => !scene.zOrder.includes(id))
+	) {
+		return structuralOperationIssue(
+			operation,
+			"Reorder ids must be unique ids already present in zOrder.",
+		);
+	}
+	const remaining = scene.zOrder.filter((id) => !selected.has(id));
+	const index = anchoredIndex(remaining, operation.beforeId, operation.afterId);
+	if (index === undefined) {
+		return structuralOperationIssue(
+			operation,
+			"Reorder specifies an unknown anchor or both beforeId and afterId.",
+		);
+	}
+	remaining.splice(index, 0, ...operation.ids);
+	scene.zOrder.splice(0, scene.zOrder.length, ...remaining);
+	return [];
+}
+
+function applyGroup(
+	scene: PatchableScene,
+	operation: Extract<DiagramPatchOperation, { op: "group" | "ungroup" }>,
+): CodeModeIssue[] {
+	const ids = new Set(operation.ids);
+	if (operation.ids.some((id) => !scene.elements.some((element) => element.id === id))) {
+		return [targetIssue(operation)];
+	}
+	const grouped = scene.elements.map((element) => {
+		if (!ids.has(element.id)) return element;
+		if (operation.op === "group") {
+			return {
+				...element,
+				groupIds: [...new Set([...(element.groupIds ?? []), operation.groupId])],
+			};
+		}
+		return {
+			...element,
+			groupIds: operation.groupId
+				? (element.groupIds ?? []).filter((id) => id !== operation.groupId)
+				: [],
+		};
+	});
+	scene.elements.splice(0, scene.elements.length, ...grouped);
+	return [];
+}
+
+function applyPatchOperation(
+	scene: PatchableScene,
+	operation: DiagramPatchOperation,
+): CodeModeIssue[] {
+	switch (operation.op) {
+		case "setDefaultStyle":
+		case "setStyle":
+			return applyStyle(scene, operation);
+		case "setShape":
+			return applyShape(scene, operation);
+		case "translate":
+			return applyTranslate(scene, operation);
+		case "replaceText":
+			return applyReplaceText(scene, operation);
+		case "rerouteEdges":
+			return applyRerouteEdges(scene, operation);
+		case "insert":
+			return applyInsert(scene, operation);
+		case "remove":
+			return applyRemove(scene, operation);
+		case "replace":
+			return applyReplace(scene, operation);
+		case "reorder":
+			return applyReorder(scene, operation);
+		case "group":
+		case "ungroup":
+			return applyGroup(scene, operation);
+	}
+}
+
+const resolvePatchSource = Effect.fn("codeMode.patch.resolveSource")(function* (
+	input: ApplyDiagramPatchRequest,
+) {
+	if ("scene" in input.source) {
+		return { scene: cloneScene(input.source.scene) };
+	}
+
+	const store = yield* CodeModeArtifactStorage;
+	const manifest = yield* store.readManifest(input.source.artifactId).pipe(
+		Effect.mapError((error) =>
+			ApplyDiagramPatchFailure.new({
+				status: "storage_failed",
+				context: {
+					issues: [storageIssue(error.message, "storage_read_failed")],
+				},
+			}),
+		),
+	);
+	if (
+		!manifest ||
+		manifest.artifactId !== input.source.artifactId ||
+		!manifest.formats.some((format) => format.format === "scene")
+	) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status: "source_unavailable",
+			context: {
+				issues: [
+					issue({
+						code: "patch_source_unavailable",
+						stage: "storage",
+						ref: { kind: "artifact", id: input.source.artifactId },
+						message: `Artifact "${input.source.artifactId}" does not have a valid source manifest.`,
+						hint: "Rebuild with the appropriate build operation and patch the accepted artifact id.",
+					}),
+				],
+			},
+		});
+	}
+
+	// A flowchart is changed through its document, so its drawing is never patched.
+	if (manifest.formats.some((format) => format.format === "document")) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status: "unsupported_operation",
+			context: {
+				issues: [
+					issue({
+						code: "unsupported_patch_operation",
+						stage: "input",
+						ref: { kind: "artifact", id: input.source.artifactId },
+						message: `Artifact "${input.source.artifactId}" is a flowchart, which is not patched.`,
+						hint: "Change it with sketchi.editFlowchart({ artifactId, edits }): colors, shapes, labels and steps are all edits.",
+					}),
+				],
+			},
+		});
+	}
+
+	const artifact = yield* store.read(input.source.artifactId, "scene").pipe(
+		Effect.mapError((error) =>
+			ApplyDiagramPatchFailure.new({
+				status: "storage_failed",
+				context: {
+					issues: [storageIssue(error.message, "storage_read_failed")],
+				},
+			}),
+		),
+	);
+	if (!artifact) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status: "source_unavailable",
+			context: {
+				issues: [
+					issue({
+						code: "patch_source_unavailable",
+						stage: "storage",
+						ref: { kind: "artifact", id: input.source.artifactId },
+						message: `Scene artifact "${input.source.artifactId}" is not available.`,
+						hint: "Call buildFlowchart or buildMindmap first, then patch the accepted artifact id.",
+					}),
+				],
+			},
+		});
+	}
+
+	const parsed = Schema.decodeUnknownResult(RenderedDiagramSceneSchema, {
+		errors: "all",
+		reportInput: true,
+	})(artifact.data);
+	if (!Result.isSuccess(parsed)) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status: "source_unavailable",
+			context: {
+				issues: [
+					issue({
+						code: "patch_source_unavailable",
+						stage: "storage",
+						ref: { kind: "artifact", id: input.source.artifactId },
+						message: `Scene artifact "${input.source.artifactId}" could not be decoded.`,
+						hint: "Rebuild with the appropriate build operation and patch the new artifact.",
+					}),
+				],
+			},
+		});
+	}
+
+	return {
+		scene: cloneScene(parsed.success),
+		sourceArtifactId: input.source.artifactId,
+	};
+});
+
+function responseRequestId(requestId: string | undefined) {
+	return requestId ? { requestId } : {};
+}
+
+function withArtifactUrls(
+	artifact: ArtifactBundle,
+	artifactUrl: CodeModeRuntimeOptions["artifactUrl"],
+) {
+	if (!artifactUrl) {
+		return artifact;
+	}
+
+	const formats = artifact.formats.map((formatRef) => ({
+		...formatRef,
+		url: artifactUrl({
+			artifactId: artifact.artifactId,
+			format: formatRef.format,
+		}),
+	}));
+	return { ...artifact, formats };
+}
+
+/** The unstored scene of a failed export, with logo slugs but not their SVG bytes. */
+function scenePartial(scene: RenderedDiagramScene): PartialArtifactBundle {
+	const inline = withoutIconAssets(scene);
+	return {
+		diagramId: scene.diagramId,
+		formats: [
+			{
+				format: "scene",
+				mimeType: ARTIFACT_MIME_TYPES.scene,
+				inline,
+				sizeBytes: jsonSizeBytes(inline),
+			},
+		],
+	};
+}
+
+function failureResult<Status extends string, Context>(error: {
+	readonly status: Status;
+	readonly context: Context;
+}) {
+	return { ok: false as const, status: error.status, ...error.context };
+}
+
+function storageFailureIssue(
+	error: CodeModeArtifactStorageError,
+	code: "storage_read_failed" | "storage_write_failed",
+) {
+	return storageIssue(error.message, code);
+}
+
+const exportAndStoreScene = Effect.fn("codeMode.artifacts.exportAndStore")(function* (input: {
+	scene: RenderedDiagramScene;
+	formats: readonly ArtifactFormat[];
+	inlineFormats: InlineArtifactFormat[];
+	requestId?: string;
+	provenance?: ArtifactBundle["provenance"];
+	/** The document the scene was built from, stored beside it for later edits. */
+	document?: unknown;
+	validationIssues: typeof exportIssues;
+}) {
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const store = yield* CodeModeArtifactStorage;
+	const { excalidraw, validation } = yield* Effect.sync(() => {
+		const excalidraw = convertSceneToExcalidraw(input.scene);
+		return { excalidraw, validation: validateExcalidrawScene(excalidraw) };
+	}).pipe(Effect.withSpan("codeMode.artifacts.exportValidate"));
+	// A canvas of composed shapes exports several Excalidraw elements for each of its own.
+	if (excalidraw.elements.length > CANVAS_LIMITS.maxExportedElements) {
+		return yield* new ArtifactExportFailure({
+			status: "limit_exceeded",
+			issues: [
+				issue({
+					code: "canvas_limit_exceeded",
+					stage: "export",
+					ref: { kind: "diagram", id: input.scene.diagramId },
+					message: `Canvas exports ${excalidraw.elements.length} Excalidraw elements, more than the ${CANVAS_LIMITS.maxExportedElements} a share link holds.`,
+					hint: "Split the diagram into smaller canvases.",
+				}),
+			],
+		});
+	}
+	const issues = input.validationIssues(validation.issues);
+	if (issues.length > 0) {
+		return yield* new ArtifactExportFailure({
+			status: "export_failed",
+			issues,
+		});
+	}
+	const formats = yield* storedArtifactsForFormats({
+		formats: input.formats,
+		scene: input.scene,
+		excalidraw,
+		renderer: environment.renderer,
+		defaultPng: environment.defaultPng,
+	}).pipe(
+		Effect.mapError(
+			(error) =>
+				new ArtifactExportFailure({
+					status: "export_failed",
+					issues: artifactExportIssues(error),
+				}),
+		),
+	);
+	const artifactId = yield* Effect.sync(() => environment.createId("artifact"));
+	const stored =
+		input.document === undefined
+			? formats
+			: [
+					...formats,
+					{
+						format: "document" as const,
+						mimeType: ARTIFACT_MIME_TYPES.document,
+						data: input.document,
+						sizeBytes: sizeBytesForArtifactData(input.document),
+					},
+				];
+	const artifact = yield* withTelemetryCorrelation(
+		store
+			.write({
+				artifactId,
+				diagramId: input.scene.diagramId,
+				formats: stored,
+				inlineFormats: input.inlineFormats,
+				...(input.provenance ? { provenance: input.provenance } : {}),
+			})
+			.pipe(Effect.withSpan("codeMode.artifacts.store")),
+		{
+			artifactId,
+			...(input.requestId ? { requestId: input.requestId } : {}),
+		},
+	).pipe(
+		Effect.mapError(
+			(cause) =>
+				new ArtifactStorageFailure({
+					status: "storage_failed",
+					cause,
+					issues: [storageFailureIssue(cause, "storage_write_failed")],
+				}),
+		),
+	);
+	return withArtifactUrls(artifact, environment.artifactUrl);
+});
+
+export const artifactBuildCapabilities = Effect.gen(function* () {
+	const environment = yield* CodeModeRuntimeEnvironment;
+	return {
+		createId: environment.createId,
+		exportScene: (scene: RenderedDiagramScene, request: BuildDelivery) =>
+			exportAndStoreScene({
+				scene,
+				formats: requestedFormats(request.options),
+				inlineFormats: requestedInlineFormats(request.options),
+				...(request.requestId ? { requestId: request.requestId } : {}),
+				validationIssues: exportIssues,
+			}).pipe(
+				Effect.mapError((error) => ({
+					status: error.status,
+					issues: error.issues,
+					partial:
+						error.status === "storage_failed"
+							? { diagramId: scene.diagramId }
+							: scenePartial(scene),
+				})),
+			),
+	} satisfies ArtifactBuildCapabilities<CodeModeRuntimeEnvironment | CodeModeArtifactStorage>;
+});
+
+const buildMindmapWorkflow = (input: unknown) =>
+	Effect.gen(function* () {
+		const request = yield* decodeMindmapRequest(input);
+		return yield* buildMindmapDocument(request, yield* artifactBuildCapabilities);
+	});
+
+const buildSequenceDiagramWorkflow = Effect.fn("codeMode.buildSequenceDiagram.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildSequenceDiagramRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildSequenceDiagramFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+
+	const request = parsed.success;
+	const icons = yield* catalogForRequest(
+		environment.icons,
+		environment.communityIcons,
+		request.spec,
+	);
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const authoredSpec = normalizeSequenceDiagramSpec(request.spec);
+	const resolvedIcons = resolveNodeIcons(
+		authoredSpec.participants,
+		icons,
+		{ noun: "participant", path: "participants" },
+		{ fillNamedLogos: environment.fillNamedLogos === true },
+	);
+	const normalizedSpec = { ...authoredSpec, participants: resolvedIcons.nodes };
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedSequenceDiagram(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildSequenceDiagramFailure.new({
+			status: "invalid_sequence",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = sequenceQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildSequenceDiagramFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const renderedScene = yield* validatedDomainResult({
+		try: () => renderSequenceDiagram(toSequenceDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildSequenceDiagramFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message:
+								cause instanceof Error ? cause.message : "Unable to render sequence diagram scene.",
+							hint: "Repair the participant/message structure and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildSequenceDiagram.render"));
+	const embedded = yield* embedSceneIcons(renderedScene, icons);
+	const scene = embedded.scene;
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildSequenceDiagramFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Reduce participant label lines, participants, or messages and retry buildSequenceDiagram.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildSequenceDiagramFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [...resolvedIcons.issues, ...embedded.issues],
+	} satisfies Extract<BuildSequenceDiagramResult, { ok: true }>;
+});
+
+const buildStateMachineWorkflow = Effect.fn("codeMode.buildStateMachine.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildStateMachineRequest, {
+		errors: "all",
+		reportInput: true,
+	})(resolveStateMachineRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildStateMachineFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const authoredSpec = normalizeStateMachineSpec(request.spec);
+	const warnings = getStateMachineDefaultWarnings(authoredSpec).map((entry) =>
+		issue({
+			...entry,
+			stage: "input",
+			ref: { kind: "request", path: `spec.${entry.path}` },
+		}),
+	);
+	const normalizedSpec = resolveStateMachineInitials(authoredSpec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedStateMachine(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildStateMachineFailure.new({
+			status: "invalid_state_machine",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = stateMachineQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildStateMachineFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderStateMachineDiagram(toStateMachineDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildStateMachineFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message:
+								cause instanceof Error ? cause.message : "Unable to render state machine scene.",
+							hint: "Repair the state and transition structure and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildStateMachine.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildStateMachineFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten state labels or split the machine and retry buildStateMachine.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildStateMachineFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: warnings,
+	} satisfies Extract<BuildStateMachineResult, { ok: true }>;
+});
+
+const buildErDiagramWorkflow = Effect.fn("codeMode.buildErDiagram.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildErDiagramRequest, {
+		errors: "all",
+		reportInput: true,
+	})(resolveErRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildErDiagramFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeErSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedEr(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildErDiagramFailure.new({
+			status: "invalid_er_diagram",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = erQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildErDiagramFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderErDiagram(toErDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildErDiagramFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render ER scene.",
+							hint: "Repair the entities and relationships and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildErDiagram.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildErDiagramFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten entity or field names, or split the schema, and retry buildErDiagram.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildErDiagramFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildErDiagramResult, { ok: true }>;
+});
+
+const buildClassDiagramWorkflow = Effect.fn("codeMode.buildClassDiagram.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildClassDiagramRequest, {
+		errors: "all",
+		reportInput: true,
+	})(resolveClassRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildClassDiagramFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeClassSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedClass(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildClassDiagramFailure.new({
+			status: "invalid_class_diagram",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = classQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildClassDiagramFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderClassDiagram(toClassDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildClassDiagramFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message:
+								cause instanceof Error ? cause.message : "Unable to render class diagram scene.",
+							hint: "Repair the classes and relationships and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildClassDiagram.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildClassDiagramFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten class or member names, or split the model, and retry buildClassDiagram.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildClassDiagramFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildClassDiagramResult, { ok: true }>;
+});
+
+const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildOrgChartRequest, {
+		errors: "all",
+		reportInput: true,
+	})(resolveOrgChartRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildOrgChartFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeOrgChartSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedOrgChart(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildOrgChartFailure.new({
+			status: "invalid_org_chart",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = orgChartQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildOrgChartFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderOrgChartDiagram(toOrgChartDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildOrgChartFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render org chart scene.",
+							hint: "Repair the people and reporting lines and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildOrgChart.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildOrgChartFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten names or titles, or split the chart by division, and retry buildOrgChart.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildOrgChartFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildOrgChartResult, { ok: true }>;
+});
+
+const buildVennDiagramWorkflow = Effect.fn("codeMode.buildVennDiagram.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildVennDiagramRequest, {
+		errors: "all",
+		reportInput: true,
+	})(resolveVennRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildVennDiagramFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeVennSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedVenn(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildVennDiagramFailure.new({
+			status: "invalid_venn_diagram",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = vennQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildVennDiagramFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderVennDiagram(toVennDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildVennDiagramFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message:
+								cause instanceof Error ? cause.message : "Unable to render Venn diagram scene.",
+							hint: "Repair the sets and regions and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildVennDiagram.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildVennDiagramFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten names or titles, or split the chart by division, and retry buildVennDiagram.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildVennDiagramFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildVennDiagramResult, { ok: true }>;
+});
+
+const buildJourneyMapWorkflow = Effect.fn("codeMode.buildJourneyMap.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildJourneyMapRequest, {
+		errors: "all",
+		reportInput: true,
+	})(resolveJourneyRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildJourneyMapFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeJourneySpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedJourney(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildJourneyMapFailure.new({
+			status: "invalid_journey",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = journeyQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildJourneyMapFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderJourneyDiagram(toJourneyDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildJourneyMapFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message:
+								cause instanceof Error ? cause.message : "Unable to render journey map scene.",
+							hint: "Repair the stages and steps and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildJourneyMap.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildJourneyMapFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten step labels or notes, or split the journey, and retry buildJourneyMap.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildJourneyMapFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildJourneyMapResult, { ok: true }>;
+});
+
+const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function* (input: unknown) {
+	const parsed = Schema.decodeUnknownResult(BuildSankeyRequest, {
+		errors: "all",
+		reportInput: true,
+	})(resolveSankeyRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildSankeyFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeSankeySpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedSankey(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildSankeyFailure.new({
+			status: "invalid_sankey",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = sankeyQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildSankeyFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderSankeyDiagram(toSankeyDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildSankeyFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render Sankey scene.",
+							hint: "Repair the nodes and links and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildSankey.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildSankeyFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten labels, or split the flows into smaller diagrams, and retry buildSankey.",
+				})),
+			},
+		});
+	}
+	// A layout whose labels still overlap after the renderer's reflow does not read.
+	const layoutIssues = sankeyLayoutIssues(scene);
+	if (layoutIssues.length > 0) {
+		const message = `${layoutIssues.length} labels, values or leaders would overlap another label or cover another flow, so the diagram would not read.`;
+		return yield* BuildSankeyFailure.new({
+			status: "quality_failed",
+			context: {
+				...baseContext,
+				quality: {
+					...quality,
+					accepted: false,
+					score: 0,
+					checks: [{ code: "sankey_layout", passed: false, severity: "error", message, refs: [] }],
+				},
+				issues: [
+					issue({
+						code: "quality_below_threshold",
+						stage: "quality",
+						ref: { kind: "diagram", id: normalizedSpec.id },
+						message,
+						hint: "Shorten node and link labels or leave link labels out, or split the flows into smaller diagrams, then call buildSankey again.",
+					}),
+				],
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildSankeyFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildSankeyResult, { ok: true }>;
+});
+
+const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildWireframeRequest, {
+		errors: "all",
+		reportInput: true,
+	})(resolveWireframeRequest(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildWireframeFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeWireframeSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedWireframe(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildWireframeFailure.new({
+			status: "invalid_wireframe",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = wireframeQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildWireframeFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderWireframeDiagram(toWireframeDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildWireframeFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render wireframe scene.",
+							hint: "Repair the screens and components and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildWireframe.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildWireframeFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Shorten long texts, or split the screens into separate wireframes, and retry buildWireframe.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildWireframeFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildWireframeResult, { ok: true }>;
+});
+
+const buildQuadrantChartWorkflow = Effect.fn("codeMode.buildQuadrantChart.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildQuadrantChartRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildQuadrantChartFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeQuadrantChartSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedQuadrantChart(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildQuadrantChartFailure.new({
+			status: "invalid_quadrant_chart",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = quadrantChartQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildQuadrantChartFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderQuadrantDiagram(toQuadrantDiagram(normalizedSpec)),
+		catch: (cause) =>
+			// A chart whose labels cannot all sit clear is rejected with its repair hint, never drawn.
+			Schema.is(QuadrantValidationError)(cause)
+				? BuildQuadrantChartFailure.new({
+						status: "invalid_quadrant_chart",
+						context: { ...qualityContext, issues: quadrantIssues(cause.issues) },
+					})
+				: BuildQuadrantChartFailure.new({
+						status: "render_failed",
+						context: {
+							...qualityContext,
+							issues: [
+								issue({
+									code: "render_failed",
+									stage: "render",
+									ref: { kind: "diagram", id: normalizedSpec.id },
+									message:
+										cause instanceof Error
+											? cause.message
+											: "Unable to render quadrant chart scene.",
+									hint: "Repair the axes, quadrant names and points and retry.",
+								}),
+							],
+						},
+					}),
+	}).pipe(Effect.withSpan("codeMode.buildQuadrantChart.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildQuadrantChartFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Use fewer points or shorter labels and retry buildQuadrantChart.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildQuadrantChartFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildQuadrantChartResult, { ok: true }>;
+});
+
+const buildTimelineWorkflow = Effect.fn("codeMode.buildTimeline.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(BuildTimelineRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildTimelineFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeTimelineSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedTimeline(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildTimelineFailure.new({
+			status: "invalid_timeline",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = timelineQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildTimelineFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const renderedScene = yield* validatedDomainResult({
+		try: () => renderTimelineDiagram(toTimelineDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildTimelineFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render timeline scene.",
+							hint: "Repair the event dates and ordering and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildTimeline.render"));
+	const scene = renderedScene;
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildTimelineFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Split the chronology into smaller timelines and retry buildTimeline.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildTimelineFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildTimelineResult, { ok: true }>;
+});
+
+const buildChartWorkflow = Effect.fn("codeMode.buildChart.workflow")(function* (input: unknown) {
+	const parsed = Schema.decodeUnknownResult(BuildChartRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildChartFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeChartSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedChart(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildChartFailure.new({
+			status: "invalid_chart",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = chartQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildChartFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderChartDiagram(toChartDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildChartFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render chart scene.",
+							hint: "Repair the categories and series values and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildChart.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildChartFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Use fewer categories or series and retry buildChart.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildChartFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [],
+	} satisfies Extract<BuildChartResult, { ok: true }>;
+});
+
+const buildGanttWorkflow = Effect.fn("codeMode.buildGantt.workflow")(function* (input: unknown) {
+	const parsed = Schema.decodeUnknownResult(BuildGanttRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildGanttFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+
+	const request = parsed.success;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalizedSpec = normalizeGanttSpec(request.spec);
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const validationIssues = validateNormalizedGantt(normalizedSpec);
+	if (validationIssues.length > 0) {
+		return yield* BuildGanttFailure.new({
+			status: "invalid_gantt",
+			context: { ...baseContext, issues: validationIssues },
+		});
+	}
+
+	const quality = ganttQuality(
+		normalizedSpec,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildGanttFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const scene = yield* validatedDomainResult({
+		try: () => renderGanttDiagram(toGanttDiagram(normalizedSpec)),
+		catch: (cause) =>
+			BuildGanttFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render Gantt scene.",
+							hint: "Repair the tasks' dates and dependencies and retry.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildGantt.render"));
+	const canvasIssues = getCanvasValidationIssues(scene);
+	if (canvasIssues.length > 0) {
+		return yield* BuildGanttFailure.new({
+			status: canvasFailureStatus(canvasIssues),
+			context: {
+				...qualityContext,
+				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
+					...entry,
+					hint: "Use fewer tasks or dependencies and retry buildGantt.",
+				})),
+			},
+		});
+	}
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildGanttFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: ganttScheduleWarnings(normalizedSpec),
+	} satisfies Extract<BuildGanttResult, { ok: true }>;
+});
+
+const RawCreateCanvasInput = Schema.Struct({
+	spec: Schema.Unknown,
+	requestId: Schema.optionalKey(Schema.Unknown),
+});
+const RawInlinePatchInput = Schema.Struct({
+	source: Schema.Struct({ scene: Schema.Unknown }),
+});
+
+const serializedCanvasLimitIssue = Effect.fn("codeMode.canvas.serializedLimit")(
+	(canvas: unknown, path: "spec" | "source.scene") =>
+		Effect.try(() => jsonSizeBytes(canvas)).pipe(
+			Effect.match({
+				onFailure: () =>
+					issue({
+						code: "invalid_type",
+						stage: "input",
+						ref: { kind: "request", path },
+						message: "CanvasSpec could not be serialized as JSON.",
+						hint: "Remove non-JSON values or reduce deeply nested fields and retry.",
+					}),
+				onSuccess: (sizeBytes) =>
+					sizeBytes <= CANVAS_LIMITS.maxSerializedBytes
+						? undefined
+						: issue({
+								code: "canvas_limit_exceeded",
+								stage: "canvas",
+								ref: { kind: "request", path },
+								message: `CanvasSpec exceeds ${CANVAS_LIMITS.maxSerializedBytes} serialized bytes.`,
+								hint: "Split the visualization into a smaller canvas or reduce repeated text and points.",
+							}),
+			}),
+		),
+);
+
+const createCanvasWorkflow = Effect.fn("codeMode.createCanvas.workflow")(function* (
+	input: unknown,
+) {
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const raw = Schema.decodeUnknownResult(RawCreateCanvasInput)(input);
+	const rawInput = Result.isSuccess(raw)
+		? {
+				spec: raw.success.spec,
+				requestId: Schema.is(Schema.String)(raw.success.requestId)
+					? raw.success.requestId
+					: undefined,
+			}
+		: undefined;
+	if (rawInput) {
+		const rawIssue = yield* serializedCanvasLimitIssue(rawInput.spec, "spec");
+		if (rawIssue) {
+			return yield* CreateCanvasFailure.new({
+				status: rawIssue.code === "canvas_limit_exceeded" ? "limit_exceeded" : "invalid_input",
+				context: {
+					buildId,
+					...responseRequestId(rawInput.requestId),
+					issues: [rawIssue],
+				},
+			});
+		}
+	}
+	const parsed = Schema.decodeUnknownResult(CreateCanvasRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* CreateCanvasFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const request = parsed.success;
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+	};
+	const normalized = normalizePatchableScene(request.spec);
+	if (!normalized) {
+		return yield* CreateCanvasFailure.new({
+			status: "invalid_canvas",
+			context: {
+				...baseContext,
+				issues: [
+					issue({
+						code: "invalid_canvas_geometry",
+						stage: "canvas",
+						ref: { kind: "request", path: "spec.elements" },
+						message: "CanvasSpec contains an invalid point list.",
+						hint: "Provide at least two points for lines/connectors and three points for polygons.",
+					}),
+				],
+			},
+		});
+	}
+
+	const inputLimits = getCanvasValidationIssues(normalized).filter(
+		(entry) => entry.code === "limit_exceeded",
+	);
+	if (inputLimits.length > 0) {
+		return yield* CreateCanvasFailure.new({
+			status: "limit_exceeded",
+			context: {
+				...baseContext,
+				issues: canvasValidationIssues(inputLimits),
+			},
+		});
+	}
+	const compiled = yield* embedSceneIcons(
+		compileCanvasSpec(normalized),
+		yield* catalogForRequest(environment.icons, environment.communityIcons, normalized),
+	);
+	const embedded = {
+		...compiled,
+		issues: [...undrawableCanvasIconIssues(request.spec), ...compiled.issues],
+	};
+	const scene = embedded.scene;
+	const normalizedSpec = withoutIconAssets(scene);
+	const validationIssues = getCanvasValidationIssues(scene);
+	if (validationIssues.length > 0) {
+		const issues = canvasValidationIssues(validationIssues);
+		return yield* CreateCanvasFailure.new({
+			status: issues.some((entry) => entry.code === "canvas_limit_exceeded")
+				? "limit_exceeded"
+				: "invalid_canvas",
+			context: {
+				...baseContext,
+				normalizedSpec,
+				issues: [...embedded.issues, ...issues],
+			},
+		});
+	}
+
+	const exportContext = {
+		...baseContext,
+		normalizedSpec,
+		partial: scenePartial(scene),
+	};
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: canvasExportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			CreateCanvasFailure.new({
+				status: error.status,
+				context: {
+					...exportContext,
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		artifact,
+		issues: embedded.issues,
+	} satisfies Extract<CreateCanvasResult, { ok: true }>;
+});
+
+/**
+ * Agents write the request inside the spec as often as beside it, where the spec would drop it
+ * unread; it describes the whole build, so it moves beside the spec.
+ */
+function requestBesideSpec(input: unknown): unknown {
+	const request = unknownRecord(input);
+	const spec = unknownRecord(request?.["spec"]);
+	if (!request || !spec || request["request"] !== undefined || typeof spec["request"] !== "string")
+		return input;
+	const { request: text, ...document } = spec;
+	return { ...request, spec: document, request: text };
+}
+
+const buildFlowchartWorkflow = Effect.fn("codeMode.buildFlowchart.workflow")(function* (
+	input: unknown,
+	/** The artifact an edit started from, recorded on the one this build stores. */
+	provenance?: ArtifactBundle["provenance"],
+) {
+	const parsed = Schema.decodeUnknownResult(BuildFlowchartRequestSchema, {
+		errors: "all",
+		reportInput: true,
+	})(requestBesideSpec(input));
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildFlowchartFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+
+	const request = parsed.success;
+
+	const buildId = yield* Effect.sync(() => environment.createId("build"));
+	const normalized = normalizeFlowchartSpec(request.spec);
+	if (!normalized.ok) {
+		return yield* BuildFlowchartFailure.new({
+			status: "invalid_flowchart",
+			context: {
+				buildId,
+				...responseRequestId(request.requestId),
+				issues: flowchartDocumentIssues(normalized.issues),
+			},
+		});
+	}
+	const authoredSpec = normalized.spec;
+	const icons = yield* catalogForRequest(
+		environment.icons,
+		environment.communityIcons,
+		authoredSpec,
+	);
+	// Cleaning can empty a string the request held, so the cleaned document is checked again.
+	const cleaned = decodeFlowchartDocument(authoredSpec);
+	if (!Result.isSuccess(cleaned)) {
+		return yield* BuildFlowchartFailure.new({
+			status: "invalid_flowchart",
+			context: {
+				buildId,
+				...responseRequestId(request.requestId),
+				issues: cleanedFlowchartIssues(formatContractSchemaError(cleaned.failure)),
+			},
+		});
+	}
+	const logos = resolveFlowchartLogos(authoredSpec, icons);
+	// The document as drawn: each node that draws a logo names its slug, and an icon
+	// that named none is gone.
+	const normalizedSpec = {
+		...authoredSpec,
+		nodes: Object.fromEntries(
+			Object.entries(authoredSpec.nodes).map(([id, node]) => {
+				const slug = logos.icons.get(id);
+				if (typeof node === "string") return [id, slug ? { label: node, icon: slug } : node];
+				if (slug) return [id, { ...node, icon: slug }];
+				if (typeof node.icon !== "string") return [id, node];
+				const { icon: _icon, ...rest } = node;
+				return [id, Object.keys(rest).length === 1 ? rest.label : rest];
+			}),
+		),
+	};
+	const baseContext = {
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+	};
+	const built = flowchartDiagramFromDocument(normalizedSpec, { nodeIcons: logos.icons });
+	if (!built.ok) {
+		return yield* BuildFlowchartFailure.new({
+			// A document past the size limits answers as a limit, as an oversized canvas does.
+			status: built.issues.some((entry) => entry.code === "flowchart_too_large")
+				? "limit_exceeded"
+				: "invalid_flowchart",
+			context: { ...baseContext, issues: flowchartDocumentIssues(built.issues) },
+		});
+	}
+	// A group whose label names a product draws its logo once its nodes draw theirs.
+	const groupLogos = normalizedSpec.logos
+		? fillGroupLogos(
+				built.diagram.groups?.map((group) => ({
+					id: group.id,
+					label: group.label,
+					...(group.parent ? { parent: group.parent } : {}),
+				})),
+				built.diagram.nodes.map((node) => ({
+					...(node.group ? { group: node.group } : {}),
+					...(node.icon ? { icon: { slug: node.icon.slug } } : {}),
+				})),
+				icons,
+				{ fillNamedLogos: true },
+			)
+		: { issues: [], logos: new Map<string, string>() };
+	const rebuilt =
+		groupLogos.logos.size > 0
+			? flowchartDiagramFromDocument(normalizedSpec, {
+					nodeIcons: logos.icons,
+					groupIcons: groupLogos.logos,
+				})
+			: built;
+	if (!rebuilt.ok) {
+		return yield* BuildFlowchartFailure.new({
+			status: "invalid_flowchart",
+			context: { ...baseContext, issues: flowchartDocumentIssues(rebuilt.issues) },
+		});
+	}
+	const diagram = rebuilt.diagram;
+
+	const quality = assessFlowchartQuality(
+		diagram,
+		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
+	);
+	const qualityContext = { ...baseContext, quality };
+	if (!quality.accepted) {
+		return yield* BuildFlowchartFailure.new({
+			status: "quality_failed",
+			context: { ...qualityContext, issues: qualityIssues(quality) },
+		});
+	}
+
+	const renderedScene = yield* validatedDomainResult({
+		try: () => renderIntermediateDiagram(diagram),
+		catch: (cause) =>
+			BuildFlowchartFailure.new({
+				status: "render_failed",
+				context: {
+					...qualityContext,
+					issues: [
+						issue({
+							code: "render_failed",
+							stage: "render",
+							ref: { kind: "diagram", id: normalizedSpec.id },
+							message: cause instanceof Error ? cause.message : "Unable to render flowchart scene.",
+							hint: "Simplify the graph or retry with a smaller flowchart.",
+						}),
+					],
+				},
+			}),
+	}).pipe(Effect.withSpan("codeMode.buildFlowchart.render"));
+	// logos: "exact" embeds every mark's catalog SVG instead of its hand-drawn recipe.
+	const embedded = yield* embedSceneIcons(renderedScene, icons, {
+		exactIcons: diagram.metadata["logos"] === "exact",
+	});
+	const scene = embedded.scene;
+	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
+	const artifact = yield* exportAndStoreScene({
+		scene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		...(provenance ? { provenance } : {}),
+		// The document as written, not as drawn: an edit that renames a node draws the logo
+		// its new label names.
+		document: { type: "flowchart", spec: authoredSpec },
+		validationIssues: exportIssues,
+	}).pipe(
+		Effect.mapError((error) =>
+			BuildFlowchartFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : qualityContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		buildId,
+		...responseRequestId(request.requestId),
+		normalizedSpec,
+		quality,
+		artifact,
+		issues: [
+			...normalized.notes.map((message) =>
+				issue({
+					code: "reference_resolved",
+					hint: "Use the resolved declared id in future references.",
+					severity: "info",
+					stage: "flowchart",
+					message,
+				}),
+			),
+			...logos.issues,
+			...groupLogos.issues,
+			...embedded.issues,
+			...longDescriptionIssues(scene),
+			...flowchartCoverageIssues(request.request, diagram),
+		],
+	} satisfies Extract<BuildFlowchartResult, { ok: true }>;
+});
+
+/** The flowchart document an artifact was built from, or why there is none. */
+const storedFlowchartDocument = Effect.fn("codeMode.editFlowchart.readDocument")(function* (
+	artifactId: string,
+) {
+	const store = yield* CodeModeArtifactStorage;
+	const readFailure = (error: CodeModeArtifactStorageError) =>
+		BuildFlowchartFailure.new({
+			status: "storage_failed",
+			context: { issues: [storageFailureIssue(error, "storage_read_failed")] },
+		});
+	const stored = yield* store.read(artifactId, "document").pipe(Effect.mapError(readFailure));
+	const document = stored ? unknownRecord(stored.data) : undefined;
+	const decoded =
+		document?.["type"] === "flowchart" ? decodeFlowchartDocument(document["spec"]) : undefined;
+	if (decoded && Result.isSuccess(decoded)) return decoded.success;
+	const manifest = stored
+		? undefined
+		: yield* store.readManifest(artifactId).pipe(Effect.mapError(readFailure));
+	return yield* EditFlowchartFailure.new({
+		status: "not_found",
+		context: {
+			issues: [
+				issue({
+					code: "patch_source_unavailable",
+					stage: "storage",
+					ref: { kind: "artifact", id: artifactId },
+					message:
+						stored || manifest
+							? `Artifact "${artifactId}" holds no flowchart document to edit.`
+							: `Artifact "${artifactId}" was not found.`,
+					hint: "Edit the artifactId a buildFlowchart or editFlowchart result returned, or build the flowchart again.",
+				}),
+			],
+		},
+	});
+});
+
+/**
+ * Apply edits to the document a flowchart artifact was built from and build the result as a
+ * new artifact. Edits that name what the document lacks change nothing and come back as issues.
+ */
+const editFlowchartWorkflow = Effect.fn("codeMode.editFlowchart.workflow")(function* (
+	input: unknown,
+) {
+	const parsed = Schema.decodeUnknownResult(EditFlowchartRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* BuildFlowchartFailure.new({
+			status: "invalid_input",
+			context: { issues: inputIssues(formatContractSchemaError(parsed.failure)) },
+		});
+	}
+	const request = parsed.success;
+	const document = yield* storedFlowchartDocument(request.artifactId);
+	const edited = applyFlowchartEdits(document, request.edits);
+	if (!edited.ok) {
+		return yield* EditFlowchartFailure.new({
+			status: "invalid_edit",
+			context: {
+				...responseRequestId(request.requestId),
+				issues: edited.issues.map((entry) =>
+					issue({
+						code: entry.code,
+						stage: "input",
+						ref: { kind: "diagram", path: entry.path },
+						message: entry.message,
+						hint: entry.hint,
+					}),
+				),
+			},
+		});
+	}
+	const built = yield* buildFlowchartWorkflow(
+		{
+			spec: edited.document,
+			...(request.request ? { request: request.request } : {}),
+			...(request.options ? { options: request.options } : {}),
+			...(request.requestId ? { requestId: request.requestId } : {}),
+		},
+		{ sourceArtifactId: request.artifactId },
+	);
+	return {
+		...built,
+		edits: request.edits,
+		issues: [
+			...edited.notes.map((message) =>
+				issue({
+					code: "reference_resolved",
+					hint: "Use the resolved id in later edits.",
+					severity: "info",
+					stage: "input",
+					message,
+				}),
+			),
+			...built.issues,
+		],
+	} satisfies Extract<EditFlowchartResult, { ok: true }>;
+});
+
+const getArtifactWorkflow = Effect.fn("codeMode.getArtifact.workflow")(function* (input: unknown) {
+	const parsed = Schema.decodeUnknownResult(GetArtifactRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* GetArtifactFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const store = yield* CodeModeArtifactStorage;
+	const request = parsed.success;
+	const manifest = yield* store.readManifest(request.artifactId).pipe(
+		Effect.mapError((error) =>
+			GetArtifactFailure.new({
+				status: "storage_failed",
+				context: {
+					issues: [storageFailureIssue(error, "storage_read_failed")],
+				},
+			}),
+		),
+	);
+	if (!manifest) {
+		return yield* GetArtifactFailure.new({
+			status: "not_found",
+			context: {
+				issues: [
+					issue({
+						code: "patch_source_unavailable",
+						stage: "storage",
+						ref: { kind: "artifact", id: request.artifactId },
+						message: `Artifact "${request.artifactId}" was not found.`,
+						hint: "Use the artifactId returned by buildFlowchart or applyDiagramPatch.",
+					}),
+				],
+			},
+		});
+	}
+
+	const format = request.format ?? "scene";
+	if (!manifest.formats.some((entry) => entry.format === format)) {
+		return yield* GetArtifactFailure.new({
+			status: "format_unavailable",
+			context: {
+				issues: [
+					issue({
+						code: "unsupported_artifact_format",
+						stage: "storage",
+						ref: { kind: "artifact", id: request.artifactId },
+						message: `Artifact "${request.artifactId}" does not include format "${format}".`,
+						hint: "Request a format listed in the artifact bundle.",
+					}),
+				],
+			},
+		});
+	}
+
+	const artifact = yield* store.read(request.artifactId, format).pipe(
+		Effect.mapError((error) =>
+			GetArtifactFailure.new({
+				status: "storage_failed",
+				context: {
+					issues: [storageFailureIssue(error, "storage_read_failed")],
+				},
+			}),
+		),
+	);
+	if (!artifact) {
+		return yield* GetArtifactFailure.new({
+			status: "format_unavailable",
+			context: {
+				issues: [
+					issue({
+						code: "patch_source_unavailable",
+						stage: "storage",
+						ref: { kind: "artifact", id: request.artifactId },
+						message: `Artifact "${request.artifactId}" format "${format}" could not be read.`,
+						hint: "Retry retrieval or rebuild the artifact.",
+					}),
+				],
+			},
+		});
+	}
+
+	return {
+		ok: true,
+		artifactId: request.artifactId,
+		diagramId: manifest.diagramId,
+		format,
+		mimeType: artifact.mimeType,
+		...(environment.artifactUrl
+			? {
+					url: environment.artifactUrl({
+						artifactId: request.artifactId,
+						format,
+					}),
+				}
+			: {}),
+		// A flowchart's document is what a reader asks for, so it comes inline unless declined.
+		...((request.inline ?? format === "document") && isInlineArtifactFormat(format)
+			? { inline: artifact.data }
+			: {}),
+		sizeBytes: artifact.sizeBytes,
+		...(manifest.provenance ? { provenance: manifest.provenance } : {}),
+	} satisfies Extract<GetArtifactResult, { ok: true }>;
+});
+
+const applyDiagramPatchWorkflow = Effect.fn("codeMode.applyDiagramPatch.workflow")(function* (
+	input: unknown,
+) {
+	const raw = Schema.decodeUnknownResult(RawInlinePatchInput)(input);
+	const rawIssue = Result.isSuccess(raw)
+		? yield* serializedCanvasLimitIssue(raw.success.source.scene, "source.scene")
+		: undefined;
+	if (rawIssue) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status: "invalid_input",
+			context: { issues: [rawIssue] },
+		});
+	}
+	const parsed = Schema.decodeUnknownResult(ApplyDiagramPatchRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+
+	const environment = yield* CodeModeRuntimeEnvironment;
+
+	const request = parsed.success;
+	const patchId = yield* Effect.sync(() => environment.createId("patch"));
+	const baseContext = {
+		patchId,
+		...responseRequestId(request.requestId),
+	};
+
+	const source = yield* resolvePatchSource(request).pipe(
+		Effect.mapError((error) =>
+			ApplyDiagramPatchFailure.new({
+				status: error.status,
+				context: { ...baseContext, ...error.context },
+			}),
+		),
+	);
+	const sourceContext = {
+		...baseContext,
+		...(source.sourceArtifactId ? { sourceArtifactId: source.sourceArtifactId } : {}),
+	};
+	const scene = source.scene;
+	let sourceLimits: CanvasValidationIssue[];
+	// Count limits must hold even when malformed geometry cannot normalize.
+	if (scene.elements.length > CANVAS_LIMITS.maxElements) {
+		sourceLimits = [
+			{
+				code: "limit_exceeded",
+				message: `Canvas has ${scene.elements.length} elements, more than the ${CANVAS_LIMITS.maxElements} it may hold.`,
+				path: "elements",
+			},
+		];
+	} else {
+		const normalizedSource = normalizePatchableScene(scene);
+		sourceLimits = normalizedSource
+			? getCanvasValidationIssues(normalizedSource).filter(
+					(entry) => entry.code === "limit_exceeded",
+				)
+			: [];
+	}
+	if (sourceLimits.length > 0) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status: "invalid_input",
+			context: {
+				...sourceContext,
+				issues: canvasValidationIssues(sourceLimits),
+			},
+		});
+	}
+	const beforeConnectivity = sourceConnectivity(scene);
+	let patchIssues: CodeModeIssue[] = [];
+	for (const operation of request.operations) {
+		patchIssues = applyPatchOperation(scene, operation);
+		if (patchIssues.length > 0) break;
+	}
+	if (patchIssues.length > 0) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status:
+				patchIssues[0]?.code === "unknown_patch_target"
+					? "target_not_found"
+					: "unsupported_operation",
+			context: { ...sourceContext, issues: patchIssues },
+		});
+	}
+
+	if (request.options?.preserveConnectivity !== false) {
+		const afterConnectivity = sourceConnectivity(scene);
+		if (!sameConnectivity(beforeConnectivity, afterConnectivity)) {
+			return yield* ApplyDiagramPatchFailure.new({
+				status: "connectivity_changed",
+				context: {
+					...sourceContext,
+					issues: [
+						issue({
+							code: "patch_preserve_connectivity_failed",
+							stage: "flowchart",
+							ref: { kind: "diagram", id: scene.diagramId },
+							message: "Patch changed the diagram edge connectivity.",
+							hint: "Use buildFlowchart for process-graph structure or buildMindmap for hierarchy structure.",
+						}),
+					],
+				},
+			});
+		}
+	}
+
+	const renderedScene = normalizePatchableScene(scene);
+	if (!renderedScene) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status: "render_failed",
+			context: {
+				...sourceContext,
+				issues: [
+					issue({
+						code: "patch_output_invalid",
+						stage: "render",
+						ref: { kind: "diagram", id: scene.diagramId },
+						message: "Patched scene has an invalid arrow point list.",
+						hint: "Reroute edges or rebuild the flowchart artifact.",
+					}),
+				],
+			},
+		});
+	}
+
+	const embedded = yield* embedSceneIcons(
+		renderedScene,
+		yield* catalogForRequest(environment.icons, environment.communityIcons, renderedScene.elements),
+	);
+	const patchedScene = embedded.scene;
+	const structuralIssues = getCanvasValidationIssues(patchedScene);
+	if (structuralIssues.length > 0) {
+		return yield* ApplyDiagramPatchFailure.new({
+			status: canvasFailureStatus(structuralIssues),
+			context: {
+				...sourceContext,
+				partial: scenePartial(patchedScene),
+				issues: [...embedded.issues, ...canvasValidationIssues(structuralIssues)],
+			},
+		});
+	}
+
+	const exportContext = {
+		...sourceContext,
+		partial: scenePartial(patchedScene),
+	};
+	const artifact = yield* exportAndStoreScene({
+		scene: patchedScene,
+		formats: requestedFormats(request.options),
+		inlineFormats: requestedInlineFormats(request.options),
+		...(request.requestId ? { requestId: request.requestId } : {}),
+		validationIssues: canvasExportIssues,
+		...(source.sourceArtifactId
+			? { provenance: { sourceArtifactId: source.sourceArtifactId } }
+			: {}),
+	}).pipe(
+		Effect.mapError((error) =>
+			ApplyDiagramPatchFailure.new({
+				status: error.status,
+				context: {
+					...(error.status === "export_failed" ? exportContext : sourceContext),
+					issues: error.issues,
+				},
+			}),
+		),
+	);
+
+	return {
+		ok: true,
+		status: "accepted",
+		patchId,
+		...responseRequestId(request.requestId),
+		...(source.sourceArtifactId ? { sourceArtifactId: source.sourceArtifactId } : {}),
+		artifact,
+		issues: embedded.issues,
+	} satisfies Extract<ApplyDiagramPatchResult, { ok: true }>;
+});
+
+/** A query for community icons, without the `community/` prefix of their slugs. */
+function communityIconQuery(query: string): string {
+	return query.toLowerCase().startsWith(COMMUNITY_ICON_SLUG_PREFIX)
+		? query.slice(COMMUNITY_ICON_SLUG_PREFIX.length)
+		: query;
+}
+
+/** How a community icon answers a query: exact when its name or slug is the query, else weak. */
+function communityIconMatch(query: string, icon: CodeModeCommunityIcon): "exact" | "weak" {
+	const words = (text: string) =>
+		text
+			.toLowerCase()
+			.replace(/[^\p{L}\p{N}]+/gu, " ")
+			.trim();
+	const bare = words(communityIconQuery(query));
+	return words(icon.name) === bare || words(icon.slug) === words(`community ${bare}`)
+		? "exact"
+		: "weak";
+}
+
+/**
+ * Curated marks first within each match, community icons after them: exact
+ * curated, exact community, the curated vendor and weak marks, then weak
+ * community icons.
+ */
+function rankIconSearch(
+	query: string,
+	curated: ReturnType<CodeModeIconCatalog["search"]>,
+	community: readonly CodeModeCommunityIcon[],
+	limit: number,
+) {
+	const marks = curated.map(({ collection, match, name, slug }) => ({
+		slug,
+		name,
+		collection,
+		match,
+	}));
+	const drawings = community
+		.filter((icon) => !marks.some((mark) => mark.slug === icon.slug))
+		.map((icon) => ({
+			slug: icon.slug,
+			name: icon.name,
+			collection: COMMUNITY_ICON_COLLECTION,
+			match: communityIconMatch(query, icon),
+		}));
+	return [
+		...marks.filter((icon) => icon.match === "exact"),
+		...drawings.filter((icon) => icon.match === "exact"),
+		...marks.filter((icon) => icon.match !== "exact"),
+		...drawings.filter((icon) => icon.match !== "exact"),
+	].slice(0, limit);
+}
+
+const searchIconsWorkflow = Effect.fn("codeMode.searchIcons.workflow")(function* (input: unknown) {
+	const parsed = Schema.decodeUnknownResult(SearchIconsRequest, {
+		errors: "all",
+		reportInput: true,
+	})(input);
+	if (!Result.isSuccess(parsed)) {
+		return yield* SearchIconsFailure.new({
+			status: "invalid_input",
+			context: {
+				issues: inputIssues(formatContractSchemaError(parsed.failure)),
+			},
+		});
+	}
+	const environment = yield* CodeModeRuntimeEnvironment;
+	const query = cleanToolString(parsed.success.q);
+	const limit = parsed.success.limit ?? DEFAULT_ICON_SEARCH_LIMIT;
+	const curated = environment.icons?.search(query, limit) ?? [];
+	const community = environment.communityIcons
+		? yield* environment.communityIcons.search(communityIconQuery(query))
+		: [];
+	return {
+		ok: true,
+		status: "accepted",
+		query,
+		icons: rankIconSearch(query, curated, community, limit),
+		issues: environment.icons
+			? []
+			: [
+					issue({
+						code: "unknown_icon",
+						severity: "warning",
+						stage: "input",
+						ref: { kind: "request", path: "q" },
+						message: "This Sketchi runtime has no icon catalog.",
+						hint: "Omit node icons on this host.",
+					}),
+				],
+	} satisfies Extract<SearchIconsResult, { ok: true }>;
+});
+
+type CodeModeWorkflowEffect<A> = Effect.Effect<
+	A,
+	never,
+	CodeModeArtifactStorage | CodeModeRuntimeEnvironment
+>;
+
+function boundary<A extends ObservableCodeModeResult, E, B extends ObservableCodeModeResult>(
+	operation: CodeModeBoundaryOperation,
+	workflow: (
+		input: unknown,
+	) => Effect.Effect<A, E, CodeModeArtifactStorage | CodeModeRuntimeEnvironment>,
+	onFailure: (error: E) => B,
+): (input: unknown) => CodeModeWorkflowEffect<A | B> {
+	return Effect.fn(`codeMode.${operation}`)((input: unknown) =>
+		observeCodeModeBoundary(
+			operation,
+			input,
+			workflow(input).pipe(Effect.match({ onFailure, onSuccess: (result) => result })),
+		),
+	);
+}
+
+export const buildFlowchart: (input: unknown) => CodeModeWorkflowEffect<BuildFlowchartResult> =
+	boundary("buildFlowchart", buildFlowchartWorkflow, failureResult);
+
+export const editFlowchart: (input: unknown) => CodeModeWorkflowEffect<EditFlowchartResult> =
+	boundary("editFlowchart", editFlowchartWorkflow, failureResult);
+
+export const buildMindmap: (input: unknown) => CodeModeWorkflowEffect<BuildMindmapResult> =
+	boundary("buildMindmap", buildMindmapWorkflow, failureResult);
+
+export const buildSequenceDiagram: (
+	input: unknown,
+) => CodeModeWorkflowEffect<BuildSequenceDiagramResult> = boundary(
+	"buildSequenceDiagram",
+	buildSequenceDiagramWorkflow,
+	failureResult,
+);
+
+export const buildStateMachine: (
+	input: unknown,
+) => CodeModeWorkflowEffect<BuildStateMachineResult> = boundary(
+	"buildStateMachine",
+	buildStateMachineWorkflow,
+	failureResult,
+);
+
+export const buildErDiagram: (input: unknown) => CodeModeWorkflowEffect<BuildErDiagramResult> =
+	boundary("buildErDiagram", buildErDiagramWorkflow, failureResult);
+
+export const buildClassDiagram: (
+	input: unknown,
+) => CodeModeWorkflowEffect<BuildClassDiagramResult> = boundary(
+	"buildClassDiagram",
+	buildClassDiagramWorkflow,
+	failureResult,
+);
+
+/** An org chart: people, the managers they report to, and dotted-line reports. */
+export const buildOrgChart: (input: unknown) => CodeModeWorkflowEffect<BuildOrgChartResult> =
+	boundary("buildOrgChart", buildOrgChartWorkflow, failureResult);
+
+/** A Venn diagram: two or three sets and the items or counts in each of their regions. */
+export const buildVennDiagram: (input: unknown) => CodeModeWorkflowEffect<BuildVennDiagramResult> =
+	boundary("buildVennDiagram", buildVennDiagramWorkflow, failureResult);
+
+/** A user journey map: stages of steps scored for sentiment, with pain points and opportunities. */
+export const buildJourneyMap: (input: unknown) => CodeModeWorkflowEffect<BuildJourneyMapResult> =
+	boundary("buildJourneyMap", buildJourneyMapWorkflow, failureResult);
+
+/** A Sankey diagram: nodes and the weighted flows between them. */
+export const buildSankey: (input: unknown) => CodeModeWorkflowEffect<BuildSankeyResult> = boundary(
+	"buildSankey",
+	buildSankeyWorkflow,
+	failureResult,
+);
+
+/** A wireframe: low-fidelity screens, each a tree of components the host lays out. */
+export const buildWireframe: (input: unknown) => CodeModeWorkflowEffect<BuildWireframeResult> =
+	boundary("buildWireframe", buildWireframeWorkflow, failureResult);
+
+/** A quadrant chart: two axes, four named quadrants and points placed by their scores. */
+export const buildQuadrantChart: (
+	input: unknown,
+) => CodeModeWorkflowEffect<BuildQuadrantChartResult> = boundary(
+	"buildQuadrantChart",
+	buildQuadrantChartWorkflow,
+	failureResult,
+);
+
+export const buildTimeline: (input: unknown) => CodeModeWorkflowEffect<BuildTimelineResult> =
+	boundary("buildTimeline", buildTimelineWorkflow, failureResult);
+
+/** A bar, line or pie chart from categories and named series of numbers. */
+export const buildChart: (input: unknown) => CodeModeWorkflowEffect<BuildChartResult> = boundary(
+	"buildChart",
+	buildChartWorkflow,
+	failureResult,
+);
+
+/** A Gantt chart from dated tasks, milestones, phases and finish-to-start dependencies. */
+export const buildGantt: (input: unknown) => CodeModeWorkflowEffect<BuildGanttResult> = boundary(
+	"buildGantt",
+	buildGanttWorkflow,
+	failureResult,
+);
+
+export const createCanvas: (input: unknown) => CodeModeWorkflowEffect<CreateCanvasResult> =
+	boundary("createCanvas", createCanvasWorkflow, failureResult);
+
+export const getArtifact: (input: unknown) => CodeModeWorkflowEffect<GetArtifactResult> = boundary(
+	"getArtifact",
+	getArtifactWorkflow,
+	failureResult,
+);
+
+/** Ranked node-logo search; use a returned slug as a node `icon.slug`. */
+export const searchIcons: (input: unknown) => CodeModeWorkflowEffect<SearchIconsResult> = boundary(
+	"searchIcons",
+	searchIconsWorkflow,
+	failureResult,
+);
+
+export const applyDiagramPatch: (
+	input: unknown,
+) => CodeModeWorkflowEffect<ApplyDiagramPatchResult> = boundary(
+	"applyDiagramPatch",
+	applyDiagramPatchWorkflow,
+	failureResult,
+);
+
+/** The domain channel is explicit; retain the existing native renderer-exception report while geometry remains unconverted. */
+function validatedDomainResult<A, E, F>(options: {
+	readonly try: () => Result.Result<A, E>;
+	readonly catch: (cause: unknown) => F;
+}): Effect.Effect<A, F> {
+	return Effect.try(options).pipe(
+		Effect.flatMap((result) => Effect.mapError(Effect.fromResult(result), options.catch)),
+	);
+}

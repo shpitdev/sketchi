@@ -9,8 +9,10 @@ import {
 	embedCanvasIcons,
 	type CanvasShapeElement,
 } from "@sketchi/drawing";
-import { deployPipelineLogoFlowchart, deployWebhookLogoSequence } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram, renderSequenceDiagram } from "@sketchi/diagram-renderer";
+import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
+import { deployWebhookLogoSequence } from "@sketchi/diagrams/families/sequence/document";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 
 import {
 	convertSceneToExcalidraw,

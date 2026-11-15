@@ -2,8 +2,8 @@
 import { Result } from "effect";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { type MindmapTopic, parseMindmap } from "@sketchi/diagrams/mindmap";
-import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
+import { type MindmapTopic, parseMindmap } from "@sketchi/diagrams/families/mindmap/index";
+import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 import { mindmapScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";

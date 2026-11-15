@@ -22,9 +22,9 @@ describe("CLI dependency and public-surface audit", () => {
 			await readFile(join(workspaceRoot, "apps/cli/package.json"), "utf8"),
 		);
 
-		assert.strictEqual(manifest.dependencies["@sketchi/diagram-agent"], "workspace:*");
+		assert.strictEqual(manifest.dependencies["@sketchi/diagrams"], "workspace:*");
 		assert.notProperty(manifest.dependencies, "jsdom");
-		assert.notProperty(manifest.dependencies, "@sketchi/diagram-generation");
+		assert.notProperty(manifest.dependencies, "@sketchi/cloudflare");
 		assert.notProperty(manifest.dependencies, "@ai-sdk/google");
 		assert.notProperty(manifest.dependencies, "ai");
 		assert.notProperty(manifest.dependencies, "oclif");
@@ -77,7 +77,7 @@ describe("CLI dependency and public-surface audit", () => {
 			"utf8",
 		);
 		assert.include(generationSource, "https://playground.sketchi.app/api/v1/generate");
-		assert.notInclude(generationSource, "@sketchi/diagram-generation");
+		assert.notInclude(generationSource, "@sketchi/diagrams/generate/");
 
 		const canvasSource = await readFile(join(workspaceRoot, "apps/cli/src/canvas.ts"), "utf8");
 		assert.include(canvasSource, "https://playground.sketchi.app/api/v1/canvases/create");
@@ -94,7 +94,7 @@ describe("CLI dependency and public-surface audit", () => {
 		assert.include(shareProtocolSource, "https://json.excalidraw.com/api/v2/");
 
 		const providerManifest = JSON.parse(
-			await readFile(join(workspaceRoot, "packages/diagram/generation/package.json"), "utf8"),
+			await readFile(join(workspaceRoot, "packages/diagrams/package.json"), "utf8"),
 		);
 		assert.notProperty(providerManifest.dependencies, "@ai-sdk/google");
 		assert.notProperty(providerManifest.dependencies, "ai");

@@ -5,13 +5,15 @@ export default defineConfig(() => ({
 	cacheDir: "../../../node_modules/.vite/packages/icons/draw",
 	resolve: {
 		alias: {
-			"@sketchi/diagram-core": new URL("../../diagram/core/src/index.ts", import.meta.url).pathname,
+			"@sketchi/diagrams": new URL("../../diagrams/src/", import.meta.url).pathname.slice(0, -1),
+			"@sketchi/cloudflare": new URL("../../cloudflare/src/", import.meta.url).pathname.slice(
+				0,
+				-1,
+			),
 			"@sketchi/drawing/excalidraw": new URL(
 				"../../drawing/src/excalidraw/index.ts",
 				import.meta.url,
 			).pathname,
-			"@sketchi/diagram-renderer": new URL("../../diagram/renderer/src/index.ts", import.meta.url)
-				.pathname,
 			"@sketchi/observability": new URL("../../observability/src/index.ts", import.meta.url)
 				.pathname,
 			"@excalidraw/excalidraw": new URL(

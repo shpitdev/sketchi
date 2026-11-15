@@ -2,7 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import { isDeepStrictEqual } from "node:util";
 
-import { CodeModeIssue } from "@sketchi/diagrams/build";
+import { CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { type ArtifactBundle, type PartialArtifactBundle } from "@sketchi/drawing/artifacts";
 import {
 	type BuildFlowchartResult,
@@ -22,8 +22,8 @@ import {
 	type BuildChartResult,
 	type CreateCanvasResult,
 	type ApplyDiagramPatchResult,
-} from "@sketchi/diagram-agent";
-import { type BuildMindmapResult } from "@sketchi/diagrams/mindmap/build";
+} from "@sketchi/diagrams/build/code-mode/contract";
+import { type BuildMindmapResult } from "@sketchi/diagrams/families/mindmap/build";
 import { ICON_DRAW_BUDGET_MS } from "@sketchi/icon-draw";
 import { withTelemetryCorrelation, type TelemetryCorrelationInput } from "@sketchi/observability";
 import { Clock, Context, Deferred, Effect, Schema } from "effect";

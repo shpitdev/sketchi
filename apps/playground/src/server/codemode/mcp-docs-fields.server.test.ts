@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { Schema } from "effect";
-import { toCodeModeJsonSchema } from "@sketchi/diagram-agent";
+import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/contract";
 import {
 	getWireframeValidationIssues,
 	resolveWireframeShorthand,
 	WIREFRAME_CONTAINER_TYPES,
 	WIREFRAME_WIDGET_TYPES,
 	type WireframeDiagram,
-} from "@sketchi/diagram-core";
-import { buildDiagramGenerationMessages } from "@sketchi/diagram-generation";
+} from "@sketchi/diagrams/families/wireframe/document";
+import { buildDiagramGenerationMessages } from "@sketchi/diagrams/generate/messages";
 import { CODE_MODE_OPERATIONS, codeModeContracts, type CodeModeOperation } from "./mcp-docs/types";
 import { getCodeModeDocs, SKETCHI_EXECUTE_CODE_DESCRIPTION } from "./mcp-docs.server";
 

@@ -3,16 +3,16 @@ import { describe, expect, it } from "vitest";
 import ts from "typescript";
 import { catalog } from "./mcp-docs/catalog";
 import { CODE_MODE_OPERATIONS, generateCodeModeTypes, jsonSchemaType } from "./mcp-docs/types";
-import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
+import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagrams/build/code-mode/contract";
+import { CLASS_RULES } from "@sketchi/diagrams/families/class/rules";
+import { ER_RULES } from "@sketchi/diagrams/families/er/rules";
 import {
-	CLASS_RULES,
-	ER_RULES,
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_NODES,
-	SANKEY_RULES,
-	STATE_MACHINE_RULES,
-	WIREFRAME_RULES,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { SANKEY_RULES } from "@sketchi/diagrams/families/sankey/rules";
+import { STATE_MACHINE_RULES } from "@sketchi/diagrams/families/state-machine/rules";
+import { WIREFRAME_RULES } from "@sketchi/diagrams/families/wireframe/rules";
 import {
 	getCodeModeDocs,
 	searchCodeModeDocs,

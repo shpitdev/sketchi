@@ -1,12 +1,11 @@
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
+import { type DiagramNodeShape, type DiagramZoneKind } from "@sketchi/diagrams/graph/intermediate";
 import {
-	type DiagramNodeShape,
-	type DiagramZoneKind,
 	type FlowchartDiagram,
 	type FlowchartNodeKind,
 	parseFlowchartDiagram,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
 import { SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
 import { flowchartLabelWords } from "./flowchart-labels.js";

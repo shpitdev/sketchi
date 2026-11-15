@@ -6,8 +6,8 @@ import {
 	parseGanttDay,
 	parseGanttDiagram,
 	type GanttDiagram,
-} from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/gantt/document";
+import { renderDiagram } from "@sketchi/diagrams/render";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 
 function random(seed: number): () => number {

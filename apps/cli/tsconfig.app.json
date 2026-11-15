@@ -13,13 +13,10 @@
       "path": "../../packages/icons/catalog/tsconfig.lib.json"
     },
     {
-      "path": "../../packages/diagram/agent/tsconfig.lib.json"
+      "path": "../../packages/diagrams/tsconfig.lib.json"
     },
     {
       "path": "../../packages/drawing/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/diagrams/tsconfig.lib.json"
     }
   ]
 }

@@ -2,8 +2,11 @@ import { DrawingEditor } from "./excalidraw-scene-canvas";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
-import { flowchartFixture, parseFlowchartDiagram } from "@sketchi/diagram-core";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import {
+	flowchartFixture,
+	parseFlowchartDiagram,
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";

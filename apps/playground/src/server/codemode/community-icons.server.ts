@@ -9,7 +9,7 @@ import {
 	type CommunityIcon,
 	type CommunityIconDatabase,
 } from "@sketchi/community-icons";
-import type { CodeModeCommunityIcons } from "@sketchi/diagram-agent";
+import type { CodeModeCommunityIcons } from "@sketchi/diagrams/build/code-mode/icons";
 import { Effect } from "effect";
 
 const sources = new WeakMap<CommunityIconDatabase, CodeModeCommunityIcons>();

@@ -1,7 +1,5 @@
-import {
-	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer,
-} from "@sketchi/diagram-agent";
+import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
+import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
 import { assert, layer } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { PNG } from "pngjs";

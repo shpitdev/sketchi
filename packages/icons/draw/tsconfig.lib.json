@@ -12,13 +12,16 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
+      "path": "../../cloudflare/tsconfig.lib.json"
+    },
+    {
+      "path": "../../diagrams/tsconfig.lib.json"
+    },
+    {
       "path": "../../observability/tsconfig.lib.json"
     },
     {
       "path": "../catalog/tsconfig.lib.json"
-    },
-    {
-      "path": "../../diagram/generation/tsconfig.lib.json"
     },
     {
       "path": "../../drawing/tsconfig.lib.json"

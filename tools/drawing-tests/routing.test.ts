@@ -3,17 +3,17 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 import {
 	parseFlowchartDiagram,
-	parseIntermediateDiagram,
-	routingFixtures,
 	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseIntermediateDiagram } from "@sketchi/diagrams/graph/intermediate";
+import { routingFixtures } from "@sketchi/diagrams/families/flowchart/routing-fixtures";
 import {
 	segmentsFromPoints,
 	segmentsOverlapInterior,
 	segmentCrossesBoundsInterior,
 } from "@sketchi/drawing";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,

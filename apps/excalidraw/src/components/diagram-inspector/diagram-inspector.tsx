@@ -1,5 +1,5 @@
-import { type Mindmap, mindmapTopics } from "@sketchi/diagrams/mindmap";
-import { type IntermediateDiagram } from "@sketchi/diagram-core";
+import { type Mindmap, mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
+import { type IntermediateDiagram } from "@sketchi/diagrams/graph/intermediate";
 import { type ExcalidrawScene, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { useMemo, useState } from "react";
 

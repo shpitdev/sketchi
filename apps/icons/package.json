@@ -4,7 +4,6 @@
 	"type": "module",
 	"dependencies": {
 		"@sketchi/community-icons": "workspace:*",
-		"@sketchi/diagram-core": "workspace:*",
 		"@sketchi/drawing": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/ui": "workspace:*",
@@ -15,7 +14,8 @@
 		"@sketchi/observability": "workspace:*",
 		"@effect/atom-react": "catalog:",
 		"effect": "catalog:",
-		"scheduler": "catalog:"
+		"scheduler": "catalog:",
+		"@sketchi/diagrams": "workspace:*"
 	},
 	"devDependencies": {
 		"@resvg/resvg-wasm": "2.6.2",

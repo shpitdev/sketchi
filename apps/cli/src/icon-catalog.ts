@@ -1,4 +1,7 @@
-import { CodeModeIconLoadError, makeCodeModeIconCatalog } from "@sketchi/diagram-agent";
+import {
+	CodeModeIconLoadError,
+	makeCodeModeIconCatalog,
+} from "@sketchi/diagrams/build/code-mode/icons";
 import { iconManifest } from "@sketchi/icon-catalog/catalog";
 import { CONCEPT_ICONS } from "@sketchi/icon-catalog/concepts";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";

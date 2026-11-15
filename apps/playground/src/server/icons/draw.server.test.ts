@@ -1,4 +1,4 @@
-import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
+import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
 import { takeClientRequest } from "@sketchi/community-icons";
 import { lookAlikeMarks } from "@sketchi/icon-catalog/look-alikes";
 import type { IconImagingJob } from "@sketchi/icon-draw";

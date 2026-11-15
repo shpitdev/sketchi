@@ -1,4 +1,4 @@
-import { stateLabel } from "@sketchi/diagram-core";
+import { stateLabel } from "@sketchi/diagrams/families/state-machine/document";
 import {
 	BuildFlowchartRequestSchema,
 	BuildFlowchartResultSchema,
@@ -43,12 +43,12 @@ import {
 	type BuildQuadrantChartResult,
 	type BuildTimelineResult,
 	type BuildChartResult,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/contract";
 import {
 	BuildMindmapResultSchema,
 	BuildMindmapToolInputSchema,
 	type BuildMindmapResult,
-} from "@sketchi/diagrams/mindmap/build";
+} from "@sketchi/diagrams/families/mindmap/build";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { Result, Schema } from "effect";
 import { type UIMessage } from "ai";

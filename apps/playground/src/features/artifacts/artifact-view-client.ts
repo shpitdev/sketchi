@@ -1,5 +1,8 @@
 import { Schema, Result } from "effect";
-import { RenderedDiagramSceneSchema, type GetArtifactResult } from "@sketchi/diagram-agent";
+import {
+	RenderedDiagramSceneSchema,
+	type GetArtifactResult,
+} from "@sketchi/diagrams/build/code-mode/contract";
 import { type ArtifactProvenance } from "@sketchi/drawing/artifacts";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 

@@ -19,7 +19,7 @@ import {
 	DIAGRAM_AGENT_TEMPERATURE,
 	MAX_AGENT_OUTPUT_TOKENS,
 	MAX_AGENT_STEPS,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/policy";
 import {
 	convertToModelMessages,
 	createUIMessageStreamResponse,

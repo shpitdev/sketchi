@@ -4,13 +4,17 @@ import { Effect } from "effect";
 import {
 	BuildSequenceDiagramResultSchema,
 	BuildSequenceDiagramToolInputSchema,
+	toCodeModeJsonSchema,
+} from "@sketchi/diagrams/build/code-mode/contract";
+import {
 	buildFlowchart,
 	buildSequenceDiagram,
-	CodeModeArtifactStorage,
 	CodeModeRuntimeEnvironment,
+} from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
-	toCodeModeJsonSchema,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/artifacts";
 
 import { STUDIO_ARTIFACT_OPTIONS, makeStudioBuildTurn } from "./studio-build-tool.server";
 import {

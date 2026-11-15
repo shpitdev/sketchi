@@ -11,8 +11,9 @@ import {
 	VENN_MAX_ITEMS,
 	VENN_MAX_REGION_ITEMS,
 	type VennDiagram,
-} from "@sketchi/diagram-core";
-import { readVennScene, renderVennDiagram, vennLayoutIssues } from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/venn/document";
+import { readVennScene, vennLayoutIssues } from "@sketchi/diagrams/families/venn/readout";
+import { renderVennDiagram } from "@sketchi/diagrams/families/venn/render";
 
 import {
 	convertSceneToExcalidraw,

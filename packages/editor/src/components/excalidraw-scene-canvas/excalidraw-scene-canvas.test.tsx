@@ -79,9 +79,12 @@ vi.mock("@excalidraw/excalidraw", async () => {
 });
 
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { deployPipelineLogoFlowchart, flowchartFixture } from "@sketchi/diagram-core";
+import {
+	deployPipelineLogoFlowchart,
+	flowchartFixture,
+} from "@sketchi/diagrams/families/flowchart/diagram";
 import { embedCanvasIcons } from "@sketchi/drawing";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 
 import { DrawingEditor } from "./excalidraw-scene-canvas";
 

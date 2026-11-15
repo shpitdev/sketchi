@@ -1,11 +1,9 @@
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import {
-	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer,
-	type PatchableScene,
-} from "@sketchi/diagram-agent";
+import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
+import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
+import { type PatchableScene } from "@sketchi/diagrams/build/code-mode/contract";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 

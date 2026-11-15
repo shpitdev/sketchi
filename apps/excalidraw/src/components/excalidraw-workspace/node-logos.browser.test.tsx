@@ -2,14 +2,14 @@
 import { Result } from "effect";
 import { loadFromBlob, MIME_TYPES } from "@excalidraw/excalidraw";
 import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { deployPipelineLogoFlowchart } from "@sketchi/diagram-core";
+import { deployPipelineLogoFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
 import { embedCanvasIcons } from "@sketchi/drawing";
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
 	type ExcalidrawScene,
 } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import { DrawingEditor } from "@sketchi/editor";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";

@@ -1,11 +1,11 @@
-import { decodeMindmapDocument } from "@sketchi/diagrams/mindmap";
+import { decodeMindmapDocument } from "@sketchi/diagrams/families/mindmap/index";
 import {
 	CANONICAL_DOCUMENT_SPECS,
 	CANONICAL_DOCUMENT_TYPES,
 	type CanonicalDiagramDocument,
-	CanvasSpec,
 	isCanonicalDocumentType,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/documents";
+import { CanvasSpec } from "@sketchi/diagrams/build/code-mode/contract";
 import { Effect, Schema, SchemaIssue } from "effect";
 
 import { CliInputError, CliValidationError } from "./errors.js";

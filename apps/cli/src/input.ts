@@ -1,4 +1,7 @@
-import { decodeFlowchartEdits, type FlowchartEdit } from "@sketchi/diagram-agent";
+import {
+	decodeFlowchartEdits,
+	type FlowchartEdit,
+} from "@sketchi/diagrams/families/flowchart/edits";
 import { Context, Effect, Layer, Result, Stream } from "effect";
 import { Stdio } from "effect/Stdio";
 

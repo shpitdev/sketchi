@@ -2,22 +2,24 @@ import { type CanvasSpec } from "@sketchi/drawing";
 import { type ExcalidrawScene, convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import {
 	type DiagramValidationError,
-	flowchartFixture,
 	type IntermediateDiagram,
+} from "@sketchi/diagrams/graph/intermediate";
+import {
+	flowchartFixture,
 	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
 import {
 	type MindmapInputError,
 	type Mindmap,
 	mindmapTopics,
 	validateMindmap,
 	renderMindmap,
-} from "@sketchi/diagrams/mindmap";
+} from "@sketchi/diagrams/families/mindmap/index";
 import { type Schema, Result } from "effect";
 
-import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
+import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 
 import { copyText, DrawingEditor } from "@sketchi/editor";
 import { useMemo, useState } from "react";

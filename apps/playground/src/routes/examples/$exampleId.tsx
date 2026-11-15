@@ -1,9 +1,10 @@
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
-import { flowchartDiagramFromSpec, type FlowchartSpec } from "@sketchi/diagram-agent";
-import { mindmapFixture } from "@sketchi/diagrams/mindmap/fixtures";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
-import { renderMindmap } from "@sketchi/diagrams/mindmap";
+import { flowchartDiagramFromSpec } from "@sketchi/diagrams/families/flowchart/spec";
+import { type FlowchartSpec } from "@sketchi/diagrams/build/code-mode/contract";
+import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderMindmap } from "@sketchi/diagrams/families/mindmap/index";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { DrawingEditor } from "@sketchi/editor";
 import { createFileRoute } from "@tanstack/react-router";

@@ -1,6 +1,7 @@
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { vennFixture, vennStressFixtures } from "@sketchi/diagram-core";
+import { vennFixture } from "@sketchi/diagrams/families/venn/document";
+import { vennStressFixtures } from "@sketchi/diagrams/families/venn/fixtures";
 import { vennScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";

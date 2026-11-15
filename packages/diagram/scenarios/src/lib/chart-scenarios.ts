@@ -1,8 +1,13 @@
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 import { estimateTextWidth, type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
-import { parseChartDiagram, type ChartDiagram, type ChartKind } from "@sketchi/diagram-core";
-import { formatValue, readChartMarks, unitParts } from "@sketchi/diagram-renderer";
+import {
+	parseChartDiagram,
+	type ChartDiagram,
+	type ChartKind,
+} from "@sketchi/diagrams/families/chart/document";
+import { formatValue, unitParts } from "@sketchi/diagrams/families/chart/scale";
+import { readChartMarks } from "@sketchi/diagrams/families/chart/readout";
 
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
 import { type ScenarioCheck } from "./evaluate.js";

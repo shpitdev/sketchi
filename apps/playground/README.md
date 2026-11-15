@@ -8,7 +8,7 @@ persisted Studio project foundation.
 flowchart LR
   UI["Playground UI"] --> Chat["chat route"]
   Harness["MCP and API clients"] --> CodeMode["Code Mode adapter"]
-  Chat --> Runtime["diagram-agent and generation"]
+  Chat --> Runtime["diagrams/build and generation"]
   CodeMode --> Runtime
   Runtime --> Artifacts["R2 artifacts and Browser Run PNG"]
   Artifacts --> UI

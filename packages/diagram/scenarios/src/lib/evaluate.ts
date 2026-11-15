@@ -1,29 +1,28 @@
-import { type MindmapInputError, parseMindmap } from "@sketchi/diagrams/mindmap";
+import { type MindmapInputError, parseMindmap } from "@sketchi/diagrams/families/mindmap/index";
 import { Result, Schema } from "effect";
+import { type CanonicalValidationError, type CanonicalDiagram } from "@sketchi/diagrams/diagram";
 import {
-	type CanonicalValidationError,
-	type CanonicalDiagram,
 	type SequenceDiagram,
+	parseSequenceDiagram,
+	sequenceActivations,
+} from "@sketchi/diagrams/families/sequence/document";
+import {
 	type FlowchartDiagram,
 	parseFlowchartDiagram,
-	parseSequenceDiagram,
-	parseStateMachineDiagram,
-	parseErDiagram,
-	parseClassDiagram,
-	parseOrgChartDiagram,
-	parseVennDiagram,
-	resolveVennShorthand,
-	parseJourneyDiagram,
-	parseSankeyDiagram,
-	parseWireframeDiagram,
-	parseQuadrantDiagram,
-	parseTimelineDiagram,
-	parseChartDiagram,
-	parseGanttDiagram,
-	lineCrossings,
-	sequenceActivations,
-	unavoidableCrossings,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseStateMachineDiagram } from "@sketchi/diagrams/families/state-machine/document";
+import { parseErDiagram } from "@sketchi/diagrams/families/er/document";
+import { parseClassDiagram } from "@sketchi/diagrams/families/class/document";
+import { parseOrgChartDiagram } from "@sketchi/diagrams/families/org-chart/document";
+import { parseVennDiagram, resolveVennShorthand } from "@sketchi/diagrams/families/venn/document";
+import { parseJourneyDiagram } from "@sketchi/diagrams/families/journey/document";
+import { parseSankeyDiagram } from "@sketchi/diagrams/families/sankey/document";
+import { parseWireframeDiagram } from "@sketchi/diagrams/families/wireframe/document";
+import { parseQuadrantDiagram } from "@sketchi/diagrams/families/quadrant/document";
+import { parseTimelineDiagram } from "@sketchi/diagrams/families/timeline/document";
+import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
+import { parseGanttDiagram } from "@sketchi/diagrams/families/gantt/document";
+import { lineCrossings, unavoidableCrossings } from "@sketchi/diagrams/graph/planarity";
 
 import {
 	chartClearRulesCheck,
@@ -75,7 +74,7 @@ import {
 	type ExcalidrawScene,
 	type ExcalidrawSceneValidationResult,
 } from "@sketchi/drawing/excalidraw";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import { renderDiagram } from "@sketchi/diagrams/render";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { termTokens } from "@sketchi/icon-catalog";
 

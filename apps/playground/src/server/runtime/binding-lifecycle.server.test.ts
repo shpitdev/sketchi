@@ -1,7 +1,5 @@
-import type {
-	CloudflareAiGatewayProvider,
-	SupportedGenerationModel,
-} from "@sketchi/diagram-generation";
+import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
+import type { SupportedGenerationModel } from "@sketchi/diagrams/generate/models";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
 import { Effect } from "effect";
 import { describe, expect, it, vi } from "vitest";
@@ -22,9 +20,10 @@ const lifecycle = vi.hoisted(() => ({
 	studioClosed: 0,
 }));
 
-vi.mock("@sketchi/diagram-generation", async (importOriginal) => {
+vi.mock("@sketchi/diagrams/generate/cloudflare-gateway-chat", async (importOriginal) => {
 	const { Effect, Layer } = await import("effect");
-	const actual = await importOriginal<typeof import("@sketchi/diagram-generation")>();
+	const actual =
+		await importOriginal<typeof import("@sketchi/diagrams/generate/cloudflare-gateway-chat")>();
 	return {
 		...actual,
 		CloudflareGatewayChatClientLive: actual.CloudflareGatewayChatClientLive.pipe(

@@ -1,4 +1,7 @@
-import type { CloudflareAiGateway, CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
+import type {
+	CloudflareAiGateway,
+	CloudflareAiGatewayProvider,
+} from "@sketchi/cloudflare/ai-gateway";
 
 /** Sketchi's Cloudflare account, whose AI Gateway stores the provider keys Studio uses. */
 export const SKETCHI_ACCOUNT_ID = "75f9660f39e4dafe8b95980b87e7399a";

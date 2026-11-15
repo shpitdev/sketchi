@@ -13,16 +13,12 @@ export default defineConfig({
 	resolve: {
 		alias: [
 			{
+				find: "@sketchi/diagrams",
+				replacement: source("../../packages/diagrams/src/").slice(0, -1),
+			},
+			{
 				find: "@sketchi/editor/styles.css",
 				replacement: source("../../packages/editor/src/styles.css"),
-			},
-			{
-				find: "@sketchi/diagram-core",
-				replacement: source("../../packages/diagram/core/src/index.ts"),
-			},
-			{
-				find: "@sketchi/diagram-renderer",
-				replacement: source("../../packages/diagram/renderer/src/index.ts"),
 			},
 			{
 				find: "@sketchi/drawing/excalidraw",

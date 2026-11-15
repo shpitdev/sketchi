@@ -1,9 +1,9 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { flowchartFixture } from "@sketchi/diagram-core";
+import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/diagram";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import { DrawingEditor } from "@sketchi/editor";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";

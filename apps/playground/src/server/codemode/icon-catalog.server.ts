@@ -4,7 +4,7 @@ import {
 	CodeModeIconLoadError,
 	makeCodeModeIconCatalog,
 	type CodeModeIconCatalog,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/icons";
 import { logosNamedInText, type NamedLogo } from "@sketchi/icon-catalog";
 import { iconManifest, nodeLogoIcons } from "@sketchi/icon-catalog/catalog";
 import { CONCEPT_ICONS } from "@sketchi/icon-catalog/concepts";

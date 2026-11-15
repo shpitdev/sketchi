@@ -1,7 +1,7 @@
 # Diagram families
 
 Sketchi supports a fixed set of canonical diagram families: flowchart, mindmap,
-sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, and quadrant. `DIAGRAM_TYPES` in `packages/diagram/core/src/types.ts` is the
+sequence, timeline, chart, state-machine, gantt, er, class, org-chart, venn, journey, sankey, wireframe, and quadrant. `DIAGRAM_TYPES` in `packages/diagrams/src/types.ts` is the
 registry of advertised families. Each supported family has a complete document-to-export
 path. Swimlanes and architecture diagrams are
 flowchart features. A prompt for anything else generates the closest family, and
@@ -18,12 +18,12 @@ document builds without requiring particular source, story or test filenames.
 
 | Stage | Where | Guard |
 | --- | --- | --- |
-| core contract and fixture | `packages/diagram/core/src/types/<name>.ts`: Effect Schema contract, semantic validation, `parse<Name>Diagram`, and a fixture in `diagramFixtures`. Add it to `CanonicalDiagramSchema` in `diagram.ts`, following the shared Effect diagnostic policy. If the family is not nodes and edges, replace the scaffold with its own contract (as `sequence.ts` does) and remove it from `GRAPH_DIAGRAM_TYPES`. | compile (`satisfies Record<DiagramTypeValue, …>`), generated-response pipeline |
-| deterministic renderer | A `renderDiagram` case in `packages/diagram/renderer/src/diagram.ts`, plus `diagram-types/<name>.test.ts`. | family renderer regressions, generated-response pipeline |
+| core contract and fixture | `packages/diagrams/src/families/<name>/document.ts`: Effect Schema contract, semantic validation, `parse<Name>Diagram`, and a fixture in `diagramFixtures`. Add it to `CanonicalDiagramSchema` in `diagram.ts`, following the shared Effect diagnostic policy. If the family is not nodes and edges, replace the scaffold with its own contract (as `sequence.ts` does) and remove it from `GRAPH_DIAGRAM_TYPES`. | compile (`satisfies Record<DiagramTypeValue, …>`), generated-response pipeline |
+| deterministic renderer | A `renderDiagram` case in `packages/diagrams/src/render.ts`, plus `diagram-types/<name>.test.ts`. | family renderer regressions, generated-response pipeline |
 | Excalidraw conversion | `packages/drawing`. Any new renderer role must convert and validate. | offline-build pipeline |
-| generation prompt | `IR_INSTRUCTIONS` and `FAMILY_EXAMPLES` in `packages/diagram/generation/src/lib/messages.ts`. Remove the name from `UnsupportedDiagramIntentKindSchema` (`intent.ts`); the prompt's refusal list is built from it. | compile, message-builder tests; generated quality in Frontierclimb |
+| generation prompt | `IR_INSTRUCTIONS` and `FAMILY_EXAMPLES` in `packages/diagrams/src/generate/messages.ts`. Remove the name from `UnsupportedDiagramIntentKindSchema` (`intent.ts`); the prompt's refusal list is built from it. | compile, message-builder tests; generated quality in Frontierclimb |
 | generation output parsing | The `parsers` entry and requirement targets in `candidates.ts`. Diagnostics should carry repair hints. | compile, generated-response pipeline |
-| Code Mode build | A Code Mode authoring spec and build operation in `packages/diagram/agent`, registered in `CANONICAL_DOCUMENT_SPECS`, `buildCanonicalDocument`, and `canonicalDocumentFromDiagram` (`documents.ts`), plus MCP docs in `apps/playground/src/server/codemode/mcp-docs/catalog.ts`. | compile, offline-build pipeline |
+| Code Mode build | A Code Mode authoring spec and build operation in `packages/diagrams/src/build`, registered in `CANONICAL_DOCUMENT_SPECS`, `buildCanonicalDocument`, and `canonicalDocumentFromDiagram` (`documents.ts`), plus MCP docs in `apps/playground/src/server/codemode/mcp-docs/catalog.ts`. | compile, offline-build pipeline |
 | CLI document dispatch | `sketchi create` and the offline builder read the agent registry. Add a changeset for `@sketchi/cli`. | offline-build pipeline |
 | CLI generate type | `generate --type` reads the registry, and the wizard choice comes from `GENERATION_TYPE_CHOICES` in `apps/cli/src/generation-types.ts`. | compile, CLI behavior tests |
 | generate API request | `POST /api/v1/generate` accepts every registered family (`apps/playground/src/server/generation/request.ts`). Unsupported kinds come from `UnsupportedDiagramIntentKindSchema`. | request schema |

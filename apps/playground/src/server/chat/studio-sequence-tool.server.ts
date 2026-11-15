@@ -5,8 +5,8 @@ import {
 	BuildSequenceDiagramToolInputSchema,
 	type BuildSequenceDiagramResult,
 	type BuildSequenceDiagramToolInput,
-} from "@sketchi/diagram-agent";
-import type { OfferedLogo } from "@sketchi/diagram-generation";
+} from "@sketchi/diagrams/build/code-mode/contract";
+import type { OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import type { Effect } from "effect";
 
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";

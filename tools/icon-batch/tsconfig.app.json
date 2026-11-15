@@ -7,6 +7,15 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
+      "path": "../../packages/cloudflare/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/diagrams/tsconfig.lib.json"
+    },
+    {
+      "path": "../../packages/drawing/tsconfig.lib.json"
+    },
+    {
       "path": "../../packages/observability/tsconfig.lib.json"
     },
     {
@@ -14,15 +23,6 @@
     },
     {
       "path": "../../packages/icons/catalog/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/diagram/generation/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/diagram/core/tsconfig.lib.json"
-    },
-    {
-      "path": "../../packages/drawing/tsconfig.lib.json"
     }
   ]
 }

@@ -1,8 +1,8 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import type { ErDiagram } from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import type { ErDiagram } from "@sketchi/diagrams/families/er/document";
+import { renderDiagram } from "@sketchi/diagrams/render";
 
 import { erDrawnCheck, erScenarios } from "./er-scenarios.js";
 import { evaluateScenarioDiagram } from "./evaluate.js";

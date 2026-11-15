@@ -1,10 +1,10 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Option, Effect } from "effect";
 import { describe, expect, it } from "vitest";
-import { type JourneyDiagram } from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import { type JourneyDiagram } from "@sketchi/diagrams/families/journey/document";
+import { renderDiagram } from "@sketchi/diagrams/render";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
-import { DiagramGenerationClient } from "@sketchi/diagram-generation";
+import { DiagramGenerationClient } from "@sketchi/diagrams/generate/client";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { FixtureGenerationClientLayer } from "./fixture-client.js";

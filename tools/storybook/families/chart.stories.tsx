@@ -2,7 +2,7 @@
 import { Result } from "effect";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { chartFixture, parseChartDiagram } from "@sketchi/diagram-core";
+import { chartFixture, parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
 import { chartScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";

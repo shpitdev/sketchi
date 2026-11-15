@@ -7,7 +7,10 @@ import { describe, expect, it, vi } from "vitest";
 import { Array as EffectArray, Context, Effect, Option, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 
-import type { CodeModeObjectBucket, CodeModeObjectBucketObject } from "@sketchi/diagram-agent";
+import type {
+	CodeModeObjectBucket,
+	CodeModeObjectBucketObject,
+} from "@sketchi/diagrams/build/code-mode/artifacts";
 import { normalizedSpecFrom } from "@sketchi/diagram-scenarios";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 

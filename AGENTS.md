@@ -70,8 +70,8 @@ when their inputs change:
   Browserbase remote browser; needs `BROWSERBASE_API_KEY` and
   `BROWSERBASE_PROJECT_ID`; never run in CI)
 - `pnpm nx run svg-excalidraw:corpus-renderer`
-- `pnpm nx run diagram-renderer:gantt-fuzz` (300 plans per Gantt fuzz; the gate runs 4)
-- `pnpm nx run diagram-renderer:chart-fuzz` (300 chart seeds; the gate runs 1–12 plus decimal seed 27)
+- `pnpm nx run diagrams:gantt-fuzz` (300 plans per Gantt fuzz; the gate runs 4)
+- `pnpm nx run diagrams:chart-fuzz` (300 chart seeds; the gate runs 1–12 plus decimal seed 27)
 - `pnpm nx run diagrams:mindmap-fuzz` (2,000 mindmap seeds; the gate runs 8)
 - `pnpm nx run drawing:routing-fuzz` (full flowchart, grouped, state, label and text-fit matrices; the gate samples 4–8 cases, retaining all 30 wrapping cases)
 - `pnpm nx run drawing:er-fuzz` (240 schemas; the gate runs 16)

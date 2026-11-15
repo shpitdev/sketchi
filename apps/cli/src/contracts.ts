@@ -1,6 +1,7 @@
-import { CANONICAL_DOCUMENT_TYPES, type PatchableScene } from "@sketchi/diagram-agent";
+import { CANONICAL_DOCUMENT_TYPES } from "@sketchi/diagrams/build/code-mode/documents";
+import { type PatchableScene } from "@sketchi/diagrams/build/code-mode/contract";
 import { type ExcalidrawFile } from "@sketchi/drawing/excalidraw";
-import { type CodeModeIssue } from "@sketchi/diagrams/build";
+import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { Effect, Schema } from "effect";
 
 import { type DiagramDocument } from "./document.js";

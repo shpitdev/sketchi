@@ -9,7 +9,7 @@ import {
 	parseErDiagram,
 	parseErEnd,
 	parseErFieldShorthand,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/er/document";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
 import { type ScenarioCheck } from "./evaluate.js";

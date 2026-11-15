@@ -3,19 +3,10 @@
   "files": [],
   "references": [
     {
-      "path": "./packages/diagram/core"
+      "path": "./packages/diagrams"
     },
     {
-      "path": "./packages/diagram/generation"
-    },
-    {
-      "path": "./packages/diagram/renderer"
-    },
-    {
-      "path": "packages/drawing"
-    },
-    {
-      "path": "./packages/diagram/agent"
+      "path": "./packages/drawing"
     },
     {
       "path": "./packages/diagram/scenarios"
@@ -69,7 +60,7 @@
       "path": "./apps/web"
     },
     {
-      "path": "./packages/diagrams"
+      "path": "./packages/cloudflare"
     }
   ],
   "compilerOptions": {

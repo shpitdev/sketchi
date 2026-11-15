@@ -68,10 +68,8 @@ prompt ─▶ model candidate ─▶ typed diagram ─▶ deterministic layout �
 
 | Package                       | Owns                                                                    |
 | ----------------------------- | ----------------------------------------------------------------------- |
-| `packages/diagram/core`       | diagram contracts (Effect Schema), semantic validation, shared rules    |
-| `packages/diagram/generation` | model prompts, gateway calls, candidate parsing and repair              |
-| `packages/diagram/agent`      | the Code Mode build: normalize, validate, render, export, store         |
-| `packages/diagram/renderer`   | deterministic layout and routing for every family                       |
+| `packages/diagrams`          | family contracts, layout, readout, shared graph, build and generation    |
+| `packages/cloudflare`        | concrete shared AI Gateway binding adapter                             |
 | `packages/drawing` | Excalidraw conversion and real-scene validation                         |
 | `packages/diagram/scenarios`  | maintained scenarios and the scenario CLI                               |
 | `packages/editor`         | native React drawing editor; family compositions live in tools/storybook   |

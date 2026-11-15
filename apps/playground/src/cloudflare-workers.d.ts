@@ -1,6 +1,6 @@
 declare module "cloudflare:workers" {
-  import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
-  import type { CloudflareAiGatewayProvider } from "@sketchi/diagram-generation";
+  import type { CodeModeObjectBucket } from "@sketchi/diagrams/build/code-mode/artifacts";
+  import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
   import type { TelemetryPipeline } from "@sketchi/observability";
   import type { CodeModePngRendererNamespace } from "./server/codemode/browser-renderer.server";
   import type { PlaygroundAssetsBinding } from "./server/codemode/icon-catalog.server";

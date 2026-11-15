@@ -1,6 +1,7 @@
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { journeyFixture, journeyStressFixtures } from "@sketchi/diagram-core";
+import { journeyFixture } from "@sketchi/diagrams/families/journey/document";
+import { journeyStressFixtures } from "@sketchi/diagrams/families/journey/fixtures";
 import { journeyScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";

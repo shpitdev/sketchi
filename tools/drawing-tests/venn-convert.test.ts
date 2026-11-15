@@ -1,8 +1,9 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { vennFixture, vennStressFixtures } from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import { vennFixture } from "@sketchi/diagrams/families/venn/document";
+import { vennStressFixtures } from "@sketchi/diagrams/families/venn/fixtures";
+import { renderDiagram } from "@sketchi/diagrams/render";
 
 import {
 	convertSceneToExcalidraw,

@@ -6,10 +6,10 @@ import { type Meta, type StoryObj } from "@storybook/react-vite";
 import {
 	flowchartFixture,
 	parseFlowchartDiagram,
-	parseIntermediateDiagram,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseIntermediateDiagram } from "@sketchi/diagrams/graph/intermediate";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 
 import { DrawingEditor } from "./excalidraw-scene-canvas";
 import {

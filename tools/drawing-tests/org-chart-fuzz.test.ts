@@ -6,8 +6,12 @@ import {
 	groupRegionIssues,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { type OrgChartDiagram, parseOrgChartDiagram } from "@sketchi/diagram-core";
-import { orgChartLayoutIssues, renderOrgChartDiagram } from "@sketchi/diagram-renderer";
+import {
+	type OrgChartDiagram,
+	parseOrgChartDiagram,
+} from "@sketchi/diagrams/families/org-chart/document";
+import { orgChartLayoutIssues } from "@sketchi/diagrams/families/org-chart/readout";
+import { renderOrgChartDiagram } from "@sketchi/diagrams/families/org-chart/render";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

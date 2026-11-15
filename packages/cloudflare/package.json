@@ -1,0 +1,14 @@
+{
+	"name": "@sketchi/cloudflare",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./ai-gateway": {
+			"types": "./dist/ai-gateway.d.ts",
+			"default": "./dist/ai-gateway.js"
+		}
+	},
+	"dependencies": {
+		"effect": "catalog:"
+	}
+}

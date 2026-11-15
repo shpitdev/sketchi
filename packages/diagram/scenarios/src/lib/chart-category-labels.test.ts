@@ -2,8 +2,8 @@
 import { Result } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parseChartDiagram } from "@sketchi/diagram-core";
-import { formatValue, unitParts } from "@sketchi/diagram-renderer";
+import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
+import { formatValue, unitParts } from "@sketchi/diagrams/families/chart/scale";
 import { chartScenarioChecks, chartScenarios } from "./chart-scenarios.js";
 import { evaluateScenarioDiagram } from "./evaluate.js";
 

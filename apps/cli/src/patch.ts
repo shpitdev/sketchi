@@ -1,11 +1,13 @@
 import {
 	formatContractSchemaError,
 	ApplyDiagramPatchRequest,
-	CodeModeArtifactStorage,
+	type PatchableScene,
+} from "@sketchi/diagrams/build/code-mode/contract";
+import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
+import {
 	CodeModeRuntimeEnvironment,
 	applyDiagramPatch,
-	type PatchableScene,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/runtime";
 import { Context, Effect, Layer, Schema, Result } from "effect";
 
 import { codeModeFailure, decodeInlineArtifacts, withCodeMode } from "./code-mode-artifacts.js";

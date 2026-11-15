@@ -2,7 +2,7 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import type { FlowchartDiagram } from "@sketchi/diagram-core";
+import type { FlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
 
 import {
 	evaluateScenarioDiagram,

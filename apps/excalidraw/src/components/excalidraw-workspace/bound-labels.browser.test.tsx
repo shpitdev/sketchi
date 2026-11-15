@@ -7,9 +7,11 @@ import {
 } from "@excalidraw/excalidraw/element/types";
 import { type ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { type CanvasSpec, getCanvasValidationIssues } from "@sketchi/drawing";
-import { parseFlowchartDiagram, parseIntermediateDiagram } from "@sketchi/diagram-core";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseIntermediateDiagram } from "@sketchi/diagrams/graph/intermediate";
 import { convertSceneToExcalidraw, createExcalidrawFile } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram, renderSequenceDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 import { DrawingEditor } from "@sketchi/editor";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";

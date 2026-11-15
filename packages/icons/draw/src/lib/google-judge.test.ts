@@ -1,5 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
-import { CloudflareAiGatewayBinding, type CloudflareAiGateway } from "@sketchi/diagram-generation";
+import {
+	CloudflareAiGatewayBinding,
+	type CloudflareAiGateway,
+} from "@sketchi/cloudflare/ai-gateway";
 import { TelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Fiber, Latch, Layer } from "effect";
 import { TestClock } from "effect/testing";

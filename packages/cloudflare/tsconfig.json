@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "ignoreDeprecations": "6.0",
+    "noEmit": false
+  },
+  "include": [],
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.lib.json"
+    }
+  ]
+}

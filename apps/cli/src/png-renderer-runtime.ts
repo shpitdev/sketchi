@@ -1,5 +1,5 @@
 import { Schema, Result } from "effect";
-import { formatContractSchemaError } from "@sketchi/diagram-agent";
+import { formatContractSchemaError } from "@sketchi/diagrams/build/code-mode/contract";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Resvg, initWasm, type ResvgRenderOptions } from "@resvg/resvg-wasm";
 import * as Linkedom from "linkedom";

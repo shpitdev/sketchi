@@ -96,7 +96,7 @@
         },
         "overrides": [
           {
-            "include": ["packages/diagram/generation/src/lib/jev-workers-ai.ts"],
+            "include": ["packages/diagrams/src/generate/jev-workers-ai.ts"],
             "options": {
               "diagnosticSeverity": {
                 "abortControllerInEffect": "error",
@@ -242,10 +242,10 @@
           },
           {
             "include": [
-              "packages/diagram/core/src/intermediate.ts",
-              "packages/diagram/core/src/diagram.ts",
-              "packages/diagram/core/src/planarity.ts",
-              "packages/diagrams/src/mindmap/document.ts",
+              "packages/diagrams/src/graph/intermediate.ts",
+              "packages/diagrams/src/diagram.ts",
+              "packages/diagrams/src/graph/planarity.ts",
+              "packages/diagrams/src/families/mindmap/document.ts",
               "packages/drawing/src/style.ts",
               "packages/drawing/src/recipe-schema.ts",
               "packages/drawing/src/excalidraw/scene.ts"
@@ -286,20 +286,20 @@
           },
           {
             "include": [
-              "packages/diagram/core/src/types/flowchart.ts",
-              "packages/diagram/core/src/types/sequence.ts",
-              "packages/diagram/core/src/types/timeline.ts",
-              "packages/diagram/core/src/types/chart.ts",
-              "packages/diagram/core/src/types/state-machine.ts",
-              "packages/diagram/core/src/types/gantt.ts",
-              "packages/diagram/core/src/types/er.ts",
-              "packages/diagram/core/src/types/class.ts",
-              "packages/diagram/core/src/types/org-chart.ts",
-              "packages/diagram/core/src/types/venn.ts",
-              "packages/diagram/core/src/types/journey.ts",
-              "packages/diagram/core/src/types/sankey.ts",
-              "packages/diagram/core/src/types/wireframe.ts",
-              "packages/diagram/core/src/types/quadrant.ts"
+              "packages/diagrams/src/families/flowchart/diagram.ts",
+              "packages/diagrams/src/families/sequence/document.ts",
+              "packages/diagrams/src/families/timeline/document.ts",
+              "packages/diagrams/src/families/chart/document.ts",
+              "packages/diagrams/src/families/state-machine/document.ts",
+              "packages/diagrams/src/families/gantt/document.ts",
+              "packages/diagrams/src/families/er/document.ts",
+              "packages/diagrams/src/families/class/document.ts",
+              "packages/diagrams/src/families/org-chart/document.ts",
+              "packages/diagrams/src/families/venn/document.ts",
+              "packages/diagrams/src/families/journey/document.ts",
+              "packages/diagrams/src/families/sankey/document.ts",
+              "packages/diagrams/src/families/wireframe/document.ts",
+              "packages/diagrams/src/families/quadrant/document.ts"
             ],
             "options": {
               "diagnosticSeverity": {

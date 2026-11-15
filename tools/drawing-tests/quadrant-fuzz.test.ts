@@ -6,8 +6,9 @@ import {
 	parseQuadrantDiagram,
 	QUADRANT_MAX_POINTS,
 	type QuadrantDiagram,
-} from "@sketchi/diagram-core";
-import { quadrantLayoutIssues, renderQuadrantDiagram } from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/quadrant/document";
+import { quadrantLayoutIssues } from "@sketchi/diagrams/families/quadrant/readout";
+import { renderQuadrantDiagram } from "@sketchi/diagrams/families/quadrant/render";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

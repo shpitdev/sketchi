@@ -13,8 +13,8 @@ There is no current Convex runtime or parallel generation implementation.
 flowchart LR
   Prompt["Prompt"] --> Host["Chat, CLI, or eval host"]
   Host --> Gateway["Cloudflare AI Gateway"]
-  Gateway --> Candidate["diagram-generation candidate"]
-  Candidate --> Build["diagram-agent build"]
+  Gateway --> Candidate["diagrams/generate candidate"]
+  Candidate --> Build["diagrams/build build"]
   Build --> IR["validated Effect Schema IR"]
   IR --> Scene["deterministic scene + Excalidraw"]
   Scene --> Artifact["R2 scene, Excalidraw, PNG"]
@@ -22,9 +22,9 @@ flowchart LR
 
 ## Canonical vertical
 
-`diagram-generation` owns model request construction, the provider service,
+`diagrams/generate` owns model request construction, the provider service,
 timeouts, retries, response decoding, and candidate diagnostics.
-`diagram-agent` owns the canonical build transaction: normalization, semantic
+`diagrams/build` owns the canonical build transaction: normalization, semantic
 validation, quality assessment, deterministic rendering, Excalidraw export,
 Browser Rendering input, and accepted artifact persistence.
 

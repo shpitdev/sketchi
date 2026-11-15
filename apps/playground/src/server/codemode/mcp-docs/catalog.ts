@@ -1,27 +1,26 @@
-import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagram-agent";
+import { DIAGRAM_PATCH_OPERATION_NAMES } from "@sketchi/diagrams/build/code-mode/contract";
 import { CANVAS_ICON_ELEMENT, CANVAS_LIMITS } from "@sketchi/drawing";
+import { CHART_RULES } from "@sketchi/diagrams/families/chart/rules";
+import { CLASS_RULES } from "@sketchi/diagrams/families/class/rules";
+import { DIAGRAM_NODE_COLOR_NAMES } from "@sketchi/diagrams/graph/intermediate";
+import { ER_RULES } from "@sketchi/diagrams/families/er/rules";
 import {
-	CHART_RULES,
-	CLASS_RULES,
-	DIAGRAM_NODE_COLOR_NAMES,
-	ER_RULES,
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_ISSUES,
 	FLOWCHART_MAX_NODES,
-	FLOWCHART_EDIT_RULES,
-	FLOWCHART_RULES,
-	GANTT_RULES,
-	JOURNEY_RULES,
-	MINDMAP_RULES,
-	ORG_CHART_RULES,
-	QUADRANT_RULES,
-	SANKEY_RULES,
-	SEQUENCE_RULES,
-	STATE_MACHINE_RULES,
-	TIMELINE_RULES,
-	VENN_RULES,
-	WIREFRAME_RULES,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { FLOWCHART_EDIT_RULES, FLOWCHART_RULES } from "@sketchi/diagrams/families/flowchart/rules";
+import { GANTT_RULES } from "@sketchi/diagrams/families/gantt/rules";
+import { JOURNEY_RULES } from "@sketchi/diagrams/families/journey/rules";
+import { MINDMAP_RULES } from "@sketchi/diagrams/families/mindmap/rules";
+import { ORG_CHART_RULES } from "@sketchi/diagrams/families/org-chart/rules";
+import { QUADRANT_RULES } from "@sketchi/diagrams/families/quadrant/rules";
+import { SANKEY_RULES } from "@sketchi/diagrams/families/sankey/rules";
+import { SEQUENCE_RULES } from "@sketchi/diagrams/families/sequence/rules";
+import { STATE_MACHINE_RULES } from "@sketchi/diagrams/families/state-machine/rules";
+import { TIMELINE_RULES } from "@sketchi/diagrams/families/timeline/rules";
+import { VENN_RULES } from "@sketchi/diagrams/families/venn/rules";
+import { WIREFRAME_RULES } from "@sketchi/diagrams/families/wireframe/rules";
 import SKETCHI_CODE_MODE_TYPES from "./code-mode-types.generated.txt?raw";
 import { type CodeModeOperation } from "./types";
 import { type CodeExample, type DocsResult, type SearchHit } from "../mcp-docs.server";

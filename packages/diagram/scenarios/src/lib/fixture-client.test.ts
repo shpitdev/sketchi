@@ -1,7 +1,7 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Effect } from "effect";
 import { assert, layer } from "@effect/vitest";
-import { DiagramGenerationClient } from "@sketchi/diagram-generation";
+import { DiagramGenerationClient } from "@sketchi/diagrams/generate/client";
 
 import { evaluateScenarioDiagram } from "./evaluate";
 import { FixtureGenerationClientLayer } from "./fixture-client";

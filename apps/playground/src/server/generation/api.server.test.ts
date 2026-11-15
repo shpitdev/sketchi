@@ -1,18 +1,19 @@
-import { CANONICAL_DOCUMENT_SPECS, RenderedDiagramSceneSchema } from "@sketchi/diagram-agent";
+import { CANONICAL_DOCUMENT_SPECS } from "@sketchi/diagrams/build/code-mode/documents";
+import { RenderedDiagramSceneSchema } from "@sketchi/diagrams/build/code-mode/contract";
 import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
+import { diagramFixtures } from "@sketchi/diagrams/fixtures";
 import {
-	diagramFixtures,
 	FLOWCHART_MAX_NODES,
 	type FlowchartDiagram,
-	mediaPlayerStateMachine,
-	sankeyStressFixtures,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { mediaPlayerStateMachine } from "@sketchi/diagrams/families/state-machine/document";
+import { sankeyStressFixtures } from "@sketchi/diagrams/families/sankey/fixtures";
 import { diagramScenarios, scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
 import { Schema } from "effect";
 import {
 	type CloudflareAiGateway,
 	type CloudflareAiGatewayProvider,
-} from "@sketchi/diagram-generation";
+} from "@sketchi/cloudflare/ai-gateway";
 import { describe, expect, it } from "vitest";
 
 import { aiEnvironment } from "../bindings/ai-env.server";

@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
-import { FlowchartSpec, SequenceDiagramSpec } from "@sketchi/diagram-agent";
-import { MindmapDocument } from "@sketchi/diagrams/mindmap";
+import { FlowchartSpec, SequenceDiagramSpec } from "@sketchi/diagrams/build/code-mode/contract";
+import { MindmapDocument } from "@sketchi/diagrams/families/mindmap/index";
 import { Effect, Schema } from "effect";
 
 import { documentId, parseJsonDocument, validateStorageId } from "./document.js";

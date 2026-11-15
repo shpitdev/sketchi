@@ -2,7 +2,7 @@
 import { Result } from "effect";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { ganttFixture, parseGanttDiagram } from "@sketchi/diagram-core";
+import { ganttFixture, parseGanttDiagram } from "@sketchi/diagrams/families/gantt/document";
 import { ganttScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";

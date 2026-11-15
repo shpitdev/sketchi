@@ -8,13 +8,15 @@ import {
 	wireframeComponents,
 	wireframeElementEstimate,
 	type WireframeDiagram,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/wireframe/document";
 import {
 	layoutWireframeDiagram,
 	renderWireframeDiagram,
+} from "@sketchi/diagrams/families/wireframe/render";
+import {
 	wireframeBoxIssues,
 	wireframeLayoutIssues,
-} from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/wireframe/readout";
 
 import {
 	convertSceneToExcalidraw,

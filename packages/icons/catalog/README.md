@@ -90,7 +90,7 @@ colors' lightness flipped.
 
 Diagrams draw a mark by hand when it has a recipe: `recipes/<slug>.json`, a
 few rectangles, ellipses, strokes, an arrow, or a word on a 24-unit grid (the
-`IconRecipe` format in `@sketchi/diagram-core`). The build bundles every recipe
+`IconRecipe` format in `@sketchi/drawing`). The build bundles every recipe
 into `@sketchi/icon-catalog/native-icons`; a recipe must name a catalog slug.
 Diagram packages validate each recipe and draw it as plain Excalidraw
 elements, and embed the SVG only for marks without one or when a diagram asks

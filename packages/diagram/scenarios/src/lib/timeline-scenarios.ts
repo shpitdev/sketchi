@@ -9,12 +9,12 @@ import {
 	type TimelineDiagram,
 	type TimelineEvent,
 	type TimelineEventKind,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/timeline/document";
 import {
 	readTimelineAxis,
 	readTimelineGaps,
 	readTimelineMomentGaps,
-} from "@sketchi/diagram-renderer";
+} from "@sketchi/diagrams/families/timeline/readout";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 import { type DiagramScenarioDifficulty } from "./scenarios.js";
 import { type ScenarioCheck } from "./evaluate.js";

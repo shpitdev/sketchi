@@ -15,19 +15,10 @@
       "path": "../../icons/catalog/tsconfig.lib.json"
     },
     {
-      "path": "../renderer/tsconfig.lib.json"
-    },
-    {
-      "path": "../generation/tsconfig.lib.json"
+      "path": "../../diagrams/tsconfig.lib.json"
     },
     {
       "path": "../../drawing/tsconfig.lib.json"
-    },
-    {
-      "path": "../core/tsconfig.lib.json"
-    },
-    {
-      "path": "../../diagrams/tsconfig.lib.json"
     }
   ]
 }

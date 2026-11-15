@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 
-import { type CodeModeIssue } from "@sketchi/diagrams/build";
+import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import {
 	createUIMessageStream,
 	type ModelMessage,

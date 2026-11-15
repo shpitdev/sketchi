@@ -59,11 +59,18 @@ import {
 	SearchIconsRequest,
 	SearchIconsResultSchema,
 	toCodeModeJsonSchema,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/contract";
 
-import { MindmapDocument } from "@sketchi/diagrams/mindmap";
-import { BuildMindmapRequest, BuildMindmapResultSchema } from "@sketchi/diagrams/mindmap/build";
-import { CodeModeIssueCodeSchema, CodeModeIssueRef, CodeModeIssue } from "@sketchi/diagrams/build";
+import { MindmapDocument } from "@sketchi/diagrams/families/mindmap/index";
+import {
+	BuildMindmapRequest,
+	BuildMindmapResultSchema,
+} from "@sketchi/diagrams/families/mindmap/build";
+import {
+	CodeModeIssueCodeSchema,
+	CodeModeIssueRef,
+	CodeModeIssue,
+} from "@sketchi/diagrams/build/result";
 
 /** sketchi.drawIcon: a logo and its name in, the hand-drawn recipe and the judge's verdict out. */
 const DrawIconRequestSchema = Schema.Struct({

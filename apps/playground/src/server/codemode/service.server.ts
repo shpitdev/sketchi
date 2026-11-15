@@ -4,7 +4,30 @@ import {
 	buildCanonicalDocument,
 	type CanonicalDiagramDocument,
 	type CanonicalBuildResult,
+} from "@sketchi/diagrams/build/code-mode/documents";
+import {
 	type BuildFlowchartOptions,
+	type ApplyDiagramPatchResult,
+	type BuildFlowchartResult,
+	type EditFlowchartResult,
+	type BuildSequenceDiagramResult,
+	type BuildStateMachineResult,
+	type BuildGanttResult,
+	type BuildErDiagramResult,
+	type BuildClassDiagramResult,
+	type BuildOrgChartResult,
+	type BuildVennDiagramResult,
+	type BuildJourneyMapResult,
+	type BuildSankeyResult,
+	type BuildWireframeResult,
+	type BuildQuadrantChartResult,
+	type BuildTimelineResult,
+	type BuildChartResult,
+	type CreateCanvasResult,
+	type GetArtifactResult,
+	type SearchIconsResult,
+} from "@sketchi/diagrams/build/code-mode/contract";
+import {
 	applyDiagramPatch,
 	buildFlowchart,
 	editFlowchart,
@@ -22,39 +45,22 @@ import {
 	buildQuadrantChart,
 	buildTimeline,
 	buildChart,
-	CodeModeArtifactStorage,
 	CodeModeRuntimeEnvironment,
 	getArtifact,
 	createCanvas,
-	makeMemoryArtifactStorage,
 	searchIcons,
+	type CodeModeRuntimeOptions,
+} from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
 	makeObjectBucketArtifactStorage,
-	type ApplyDiagramPatchResult,
-	type BuildFlowchartResult,
-	type EditFlowchartResult,
-	type BuildSequenceDiagramResult,
-	type BuildStateMachineResult,
-	type BuildGanttResult,
-	type BuildErDiagramResult,
-	type BuildClassDiagramResult,
-	type BuildOrgChartResult,
-	type BuildVennDiagramResult,
-	type BuildJourneyMapResult,
-	type BuildSankeyResult,
-	type BuildWireframeResult,
-	type BuildQuadrantChartResult,
-	type BuildTimelineResult,
-	type BuildChartResult,
 	type CodeModeArtifactStorageError,
 	type CodeModeArtifactStorageShape,
-	type CodeModeRuntimeOptions,
-	type CreateCanvasResult,
-	type GetArtifactResult,
-	type SearchIconsResult,
 	type StoredArtifactFormat,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/artifacts";
 
-import { type BuildMindmapResult } from "@sketchi/diagrams/mindmap/build";
+import { type BuildMindmapResult } from "@sketchi/diagrams/families/mindmap/build";
 import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { withSpanContent } from "@sketchi/observability";
 import { Context, Effect, Layer } from "effect";

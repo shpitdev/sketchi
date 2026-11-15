@@ -2,11 +2,11 @@ import { type TelemetrySpanRow } from "@sketchi/observability";
 import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
 
+import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
 import {
-	type BuildFlowchartResult,
 	type CodeModeObjectBucket,
 	type CodeModeObjectBucketObject,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/artifacts";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 
 import {

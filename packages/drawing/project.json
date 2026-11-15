@@ -21,8 +21,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -44,8 +42,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -57,8 +53,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -70,8 +64,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -83,8 +75,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -96,8 +86,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -109,8 +97,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -122,8 +108,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -135,8 +119,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -148,8 +130,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		},
@@ -161,8 +141,6 @@
 			"inputs": [
 				"default",
 				"{workspaceRoot}/tools/drawing-tests/**/*",
-				"{workspaceRoot}/packages/diagram/core/src/**/*",
-				"{workspaceRoot}/packages/diagram/renderer/src/**/*",
 				"{workspaceRoot}/packages/diagrams/src/**/*"
 			]
 		}

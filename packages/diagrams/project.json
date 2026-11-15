@@ -32,7 +32,19 @@
 		"mindmap-fuzz": {
 			"executor": "nx:run-commands",
 			"options": {
-				"command": "MINDMAP_FUZZ_SEEDS=2000 vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/mindmap/mindmap-fuzz.test.ts"
+				"command": "MINDMAP_FUZZ_SEEDS=2000 vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/families/mindmap/mindmap-fuzz.test.ts"
+			}
+		},
+		"gantt-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "GANTT_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/families/gantt/render.test.ts -t \"seeded fuzz\""
+			}
+		},
+		"chart-fuzz": {
+			"executor": "nx:run-commands",
+			"options": {
+				"command": "CHART_FUZZ_SEEDS=300 vitest run --config packages/diagrams/vitest.config.ts packages/diagrams/src/families/chart/render.test.ts -t \"seeded fuzz\""
 			}
 		}
 	}

@@ -5,8 +5,14 @@ export default defineConfig(() => ({
 	cacheDir: "../../node_modules/.vite/tools/icon-batch",
 	resolve: {
 		alias: {
-			// Excalidraw's production build imports JSON without import attributes, which Vitest's
-			// Node loader refuses; its development build has the same exports.
+			"@sketchi/diagrams": new URL("../../packages/diagrams/src/", import.meta.url).pathname.slice(
+				0,
+				-1,
+			),
+			"@sketchi/cloudflare": new URL(
+				"../../packages/cloudflare/src/",
+				import.meta.url,
+			).pathname.slice(0, -1),
 			"@excalidraw/excalidraw": new URL(
 				"./node_modules/@excalidraw/excalidraw/dist/dev/index.js",
 				import.meta.url,

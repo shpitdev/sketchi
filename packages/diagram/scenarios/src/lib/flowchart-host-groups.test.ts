@@ -3,7 +3,10 @@ import { Result, Option } from "effect";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { parseFlowchartDiagram, type FlowchartDiagram } from "@sketchi/diagram-core";
+import {
+	parseFlowchartDiagram,
+	type FlowchartDiagram,
+} from "@sketchi/diagrams/families/flowchart/diagram";
 
 import { evaluateScenarioDiagram } from "./evaluate";
 import { candidateFromMcpResult } from "./mcp-results";

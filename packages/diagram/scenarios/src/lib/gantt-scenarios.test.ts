@@ -1,8 +1,14 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Option } from "effect";
 import { describe, expect, it } from "vitest";
-import { ganttTaskSchedule, type GanttDiagram, type GanttTask } from "@sketchi/diagram-core";
-import { layoutGanttDiagram, readGanttScene, renderDiagram } from "@sketchi/diagram-renderer";
+import {
+	ganttTaskSchedule,
+	type GanttDiagram,
+	type GanttTask,
+} from "@sketchi/diagrams/families/gantt/document";
+import { layoutGanttDiagram } from "@sketchi/diagrams/families/gantt/render";
+import { readGanttScene } from "@sketchi/diagrams/families/gantt/readout";
+import { renderDiagram } from "@sketchi/diagrams/render";
 import {
 	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,

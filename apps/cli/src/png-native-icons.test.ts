@@ -1,9 +1,9 @@
+import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
 import {
-	CodeModeArtifactStorageMemory,
 	CodeModeIconLoadError,
 	makeCodeModeIconCatalog,
-	makeCodeModeRuntimeEnvironmentLayer,
-} from "@sketchi/diagram-agent";
+} from "@sketchi/diagrams/build/code-mode/icons";
+import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
 import { iconManifest } from "@sketchi/icon-catalog/catalog";
 import nodeLogoSvgs from "@sketchi/icon-catalog/node-logo-svgs";
 import { assert, layer } from "@effect/vitest";

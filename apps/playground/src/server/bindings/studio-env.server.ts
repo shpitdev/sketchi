@@ -1,8 +1,9 @@
 import "@tanstack/react-start/server-only";
 
 import type { ClientLimitNamespace, CommunityIconDatabase } from "@sketchi/community-icons";
-import type { CodeModeObjectBucket } from "@sketchi/diagram-agent";
-import type { CloudflareAiGatewayProvider, WorkersAiRunner } from "@sketchi/diagram-generation";
+import type { CodeModeObjectBucket } from "@sketchi/diagrams/build/code-mode/artifacts";
+import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
+import type { WorkersAiRunner } from "@sketchi/diagrams/generate/jev-workers-ai";
 import type { TelemetryPipeline } from "@sketchi/observability";
 
 import type { CodeModePngRendererNamespace } from "../codemode/browser-renderer.server";

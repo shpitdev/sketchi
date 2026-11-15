@@ -17,17 +17,15 @@
 		"@sketchi/icons-app",
 		"@sketchi/playground",
 		"@sketchi/web",
-		"@sketchi/diagram-agent",
-		"@sketchi/diagram-core",
 		"@sketchi/drawing",
-		"@sketchi/diagram-generation",
-		"@sketchi/diagram-renderer",
 		"@sketchi/diagram-scenarios",
 		"@sketchi/editor",
 		"@sketchi/observability",
 		"@sketchi/studio-projects",
 		"@sketchi/svg-excalidraw",
-		"@sketchi/generators"
+		"@sketchi/generators",
+		"@sketchi/diagrams",
+		"@sketchi/cloudflare"
 	],
 	"privatePackages": {
 		"version": true,

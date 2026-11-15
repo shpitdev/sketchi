@@ -18,8 +18,6 @@
 	"devDependencies": {
 		"@sketchi/diagram-scenarios": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
-		"@sketchi/diagram-core": "workspace:*",
-		"@sketchi/diagram-renderer": "workspace:*",
 		"@sketchi/diagrams": "workspace:*"
 	},
 	"peerDependencies": {

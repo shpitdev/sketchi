@@ -1,10 +1,8 @@
-import {
-	applyFlowchartEdits,
-	CANONICAL_DOCUMENT_TYPES,
-	CodeModeArtifactStorageMemory,
-	makeCodeModeRuntimeEnvironmentLayer,
-} from "@sketchi/diagram-agent";
-import { type CodeModeIssue } from "@sketchi/diagrams/build";
+import { applyFlowchartEdits } from "@sketchi/diagrams/families/flowchart/edits";
+import { CANONICAL_DOCUMENT_TYPES } from "@sketchi/diagrams/build/code-mode/documents";
+import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
+import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
+import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { Cause, Clock, Effect, type FileSystem, Layer, Option } from "effect";
 import { type Stdio } from "effect/Stdio";
 import isCI from "is-ci";

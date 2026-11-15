@@ -4,7 +4,7 @@ import {
 	type MindmapTopic,
 	parseMindmap,
 	mindmapLayoutIssues,
-} from "@sketchi/diagrams/mindmap";
+} from "@sketchi/diagrams/families/mindmap/index";
 // Maintained scenario literals are trusted fixture data; invalid construction is a fixture defect.
 import { Result } from "effect";
 

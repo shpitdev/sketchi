@@ -8,9 +8,12 @@ import {
 	type CanvasConnectorElement as ArrowSceneElement,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { parseSequenceDiagram, type SequenceDiagram } from "@sketchi/diagram-core";
+import {
+	parseSequenceDiagram,
+	type SequenceDiagram,
+} from "@sketchi/diagrams/families/sequence/document";
 
-import { renderSequenceDiagram } from "@sketchi/diagram-renderer";
+import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

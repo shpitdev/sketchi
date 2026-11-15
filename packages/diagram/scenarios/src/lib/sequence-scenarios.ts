@@ -4,7 +4,7 @@ import {
 	type SequenceDiagram,
 	type SequenceMessageType,
 	parseSequenceDiagram,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/sequence/document";
 
 import type { DiagramScenarioDifficulty, DiagramScenarioLogo } from "./scenarios.js";
 

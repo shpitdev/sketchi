@@ -1,8 +1,8 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Option } from "effect";
 import { describe, expect, it } from "vitest";
-import type { ChartDiagram } from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
+import type { ChartDiagram } from "@sketchi/diagrams/families/chart/document";
+import { renderDiagram } from "@sketchi/diagrams/render";
 import {
 	chartClearRulesCheck,
 	chartDrawnDataCheck,

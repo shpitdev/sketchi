@@ -6,14 +6,7 @@ const aliases = [
 		find: "@sketchi/editor/styles.css",
 		replacement: new URL("../../packages/editor/src/styles.css", import.meta.url).pathname,
 	},
-	{
-		find: "@sketchi/diagram-core",
-		replacement: new URL("../../packages/diagram/core/src/index.ts", import.meta.url).pathname,
-	},
-	{
-		find: "@sketchi/diagram-renderer",
-		replacement: new URL("../../packages/diagram/renderer/src/index.ts", import.meta.url).pathname,
-	},
+
 	{
 		find: "@sketchi/drawing/excalidraw",
 		replacement: new URL("../../packages/drawing/src/excalidraw/index.ts", import.meta.url)

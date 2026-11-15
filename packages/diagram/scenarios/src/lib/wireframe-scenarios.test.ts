@@ -3,9 +3,12 @@ import { Result, Option, Effect } from "effect";
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
-import type { WireframeComponent, WireframeDiagram } from "@sketchi/diagram-core";
-import { renderDiagram } from "@sketchi/diagram-renderer";
-import { DiagramGenerationClient } from "@sketchi/diagram-generation";
+import type {
+	WireframeComponent,
+	WireframeDiagram,
+} from "@sketchi/diagrams/families/wireframe/document";
+import { renderDiagram } from "@sketchi/diagrams/render";
+import { DiagramGenerationClient } from "@sketchi/diagrams/generate/client";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { FixtureGenerationClientLayer } from "./fixture-client.js";

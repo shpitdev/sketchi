@@ -17,18 +17,12 @@ const config: StorybookConfig = {
 		config.plugins = [...(config.plugins ?? []), excalidrawFonts()];
 		config.resolve ??= {};
 		config.resolve.alias = {
+			"@sketchi/diagrams": new URL("../../diagrams/src/", import.meta.url).pathname.slice(0, -1),
 			...config.resolve.alias,
-			"@sketchi/diagram-core": new URL("../../diagram/core/src/index.ts", import.meta.url).pathname,
 			"@sketchi/drawing/excalidraw": new URL(
 				"../../drawing/src/excalidraw/index.ts",
 				import.meta.url,
 			).pathname,
-			"@sketchi/diagram-generation": new URL(
-				"../../diagram/generation/src/index.ts",
-				import.meta.url,
-			).pathname,
-			"@sketchi/diagram-renderer": new URL("../../diagram/renderer/src/index.ts", import.meta.url)
-				.pathname,
 			"@sketchi/diagram-scenarios": new URL("../../diagram/scenarios/src/index.ts", import.meta.url)
 				.pathname,
 		};

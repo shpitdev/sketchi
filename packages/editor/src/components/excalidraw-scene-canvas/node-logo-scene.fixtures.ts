@@ -2,17 +2,18 @@
 import { Result } from "effect";
 import {
 	deployPipelineLogoFlowchart,
-	deployWebhookLogoSequence,
 	requestFlowGroupLogoFlowchart,
-	type LayoutDirection,
-} from "@sketchi/diagram-core";
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { deployWebhookLogoSequence } from "@sketchi/diagrams/families/sequence/document";
+import { type LayoutDirection } from "@sketchi/diagrams/graph/intermediate";
 import {
 	embedCanvasIcons,
 	isIconRecipe,
 	type CanvasIconAsset,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import { renderIntermediateDiagram, renderSequenceDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { renderSequenceDiagram } from "@sketchi/diagrams/families/sequence/render";
 
 import { normalizeNodeLogoSvg } from "@sketchi/icon-catalog";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";

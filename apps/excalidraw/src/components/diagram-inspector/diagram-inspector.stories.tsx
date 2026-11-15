@@ -2,9 +2,9 @@
 import { Result } from "effect";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { pharmaBatchDispositionFlowchart } from "@sketchi/diagram-core";
+import { pharmaBatchDispositionFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
 import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { renderIntermediateDiagram } from "@sketchi/diagram-renderer";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 
 import { DiagramInspector } from "./diagram-inspector";
 import "../../styles/app.css";

@@ -1,4 +1,4 @@
-import { checkRequestCoverage } from "@sketchi/diagram-core";
+import { checkRequestCoverage } from "@sketchi/diagrams/generate/coverage";
 import { describe, expect, it } from "vitest";
 
 import { diagramScenarios } from "./diagram-scenarios";
