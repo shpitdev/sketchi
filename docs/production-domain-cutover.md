@@ -1,7 +1,8 @@
 # Production domain cutover
 
-The domain move is deliberately post-merge. Pull requests and ordinary pushes
-deploy only to `workers.dev`; no workflow attaches a production custom domain
+The domain move is deliberately post-merge. Opt-in PR previews and explicitly
+dispatched production deploys use their configured Cloudflare URLs. Ordinary
+pushes do not deploy production. No workflow attaches a production custom domain
 unless an operator explicitly dispatches `app-production-deploy` with
 `domain_action=attach`.
 
@@ -45,8 +46,9 @@ the registration away from Vercel or the underlying registrar is unnecessary.
 
 ## Prerequisites
 
-1. Merge the replacement pull request and verify its `local-ci` signoff plus the
-   `app-production-deploy` run for the merge SHA.
+1. Verify the replacement pull request's full `origin/main` gate and `local-ci`
+   signoff, then merge it. Separately authorize and dispatch
+   `app-production-deploy` for the selected merged commit; verify that run.
 2. Verify these stable rollback/proof URLs before changing DNS:
    `sketchi-web.dimethyl.workers.dev`,
    `sketchi-studio.dimethyl.workers.dev`, and

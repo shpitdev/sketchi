@@ -105,8 +105,9 @@ pnpm nx dev playground      # one app
 `pnpm ci:local` is the gate: lint and format, typecheck (TypeScript 6 and the
 native TypeScript 7 compiler), build and test for every project the change
 affects, plus the tooling, deploy and Storybook checks. Remote CI on a pull
-request is one Nx-affected typecheck. [AGENTS.md](AGENTS.md#proof) lists the
-fuzz suites and other checks to run locally when their inputs change.
+request is one Nx-affected typecheck. [AGENTS.md](AGENTS.md#proof) explains
+unit gates against a verified staging base, the full gate required for signoff,
+and additional checks when their inputs change.
 
 A CLI change that should ship gets a changeset (`pnpm changeset`); merging the
 Version Packages pull request publishes it.
@@ -117,7 +118,8 @@ against production or a preview.
 
 ## Deployment
 
-Merging to `main` deploys the Worker apps a change affects. A pull request gets
+Production Worker deploys require an explicit `app-production-deploy` workflow
+dispatch; merging to `main` does not deploy production. A pull request gets
 preview Workers when it carries the `preview` label; see
 [preview deployments](docs/preview-deploys.md) and the
 [production domain runbook](docs/production-domain-cutover.md).

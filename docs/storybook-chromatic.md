@@ -70,8 +70,9 @@ published URL under `/mcp`.
 ## CI Contract
 
 The local gate, `pnpm ci:local`, runs the Nx-affected
-`typecheck,test,build` graph and builds `diagram-ui` Storybook whenever
-`diagram-ui` is affected, then signs off the PR head as `local-ci`.
+`typecheck,test,build` graph and builds `editor` Storybook whenever
+`editor` is affected. A successful full gate against `origin/main` on a clean,
+pushed PR head can sign off `local-ci`; unit `--no-signoff` runs cannot.
 Chromatic remains an explicit, token-backed publishing target rather than a
 required pull-request check.
 

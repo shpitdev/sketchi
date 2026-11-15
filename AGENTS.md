@@ -57,20 +57,25 @@ change UI behavior; use focused tests, the gate and independent review. Changes
 to layout, drawing or graph retain artifact identity, affected fuzz and timing.
 Reuse unchanged proof by identity instead of repeating expensive checks.
 
-`pnpm ci:local` is the local CI gate (`scripts/ci-local.mjs`). Against
-`origin/main`, including uncommitted changes, it runs actionlint when workflows
+`pnpm ci:local` is the local CI gate (`scripts/ci-local.mjs`). It defaults to
+`origin/main`, including staged, unstaged and untracked changes, and runs actionlint when workflows
 change, a frozen install, `pnpm run check`, the scenario CLI smoke, the deploy
 and tooling contracts, the Nx-affected native `typecheck`, `build`
 and `test` targets, the root `effect-tsgo tsc@7.0.2 -b` and project-graph test, and
 `pnpm nx build-storybook editor` when `editor` is affected.
 
-- Run `pnpm ci:local --no-signoff` before every `gt submit` or push.
-- After the push, run `pnpm ci:local` on the pushed head. It refuses a dirty
+- Before publishing an accepted unit, run `pnpm ci:local --no-signoff`.
+  A unit may use `--base <last-fully-gated-staging-head>`; record that verified
+  base and reuse unchanged earlier proof. Documentation-only changes and
+  unchanged patches do not require a duplicate runtime gate.
+- Before PR readiness and signoff, run the full gate against `origin/main`.
+  Unit gates with a different base cannot post `local-ci`, even with `--all`.
+- For signoff after the push, run `pnpm ci:local` on the pushed head. It refuses a dirty
   worktree or a HEAD the PR does not have, and on success posts the `local-ci`
   commit status that merging needs.
 - A restack or retarget that leaves the PR's own patch unchanged keeps its
   `local-ci` (the `local-ci carry` workflow re-posts it). A changed patch needs
-  a new `pnpm ci:local`.
+  new relevant verification and a full gate before signoff.
 - Logs are in `.memory/ci-local/`. `--all` runs every project instead of the
   affected graph. At most two gates run at once per machine (`CI_LOCAL_SLOTS`).
 
@@ -101,6 +106,9 @@ apps it affects on every push (closing the PR deletes them), or dispatch
 `app-preview` with a PR number and `project` (`affected`, `all`, or one app) for a
 stacked PR or a specific app such as `playground` (Studio); a dispatch also adds
 the label.
+
+Production Worker deployment requires an explicit `app-production-deploy`
+workflow dispatch. Merging or pushing to main does not deploy production.
 
 For PR 810, keep the `preview` label off between proof runs. When a changed
 entrypoint needs a deployed preview, dispatch `app-preview` for the required
