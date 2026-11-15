@@ -125,5 +125,4 @@ describe("PackPage", () => {
 		expect(svg.getAttribute("filter")).toBeNull();
 		expect(paint()).toEqual(light);
 	});
-
 });

@@ -172,7 +172,10 @@ describe("home route", () => {
 		const view = renderHomeRoute();
 		expect(screen.getByLabelText("Loading icons")).toBeTruthy();
 		await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-		expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ cache: "no-cache", signal: expect.any(AbortSignal) });
+		expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+			cache: "no-cache",
+			signal: expect.any(AbortSignal),
+		});
 		fireEvent(window, new Event("online"));
 		fireEvent(window, new Event("focus"));
 		expect(fetchMock).toHaveBeenCalledTimes(1);

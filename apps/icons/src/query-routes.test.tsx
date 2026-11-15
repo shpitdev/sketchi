@@ -177,12 +177,18 @@ it("loads only the selected published pack, retries once, and allows an explicit
 	);
 	try {
 		render(owner(fetch, <PackRoute />));
-  expect(screen.getByRole("heading", { level: 1, name: "Palantir" })).toBeTruthy();
-  expect(screen.getByText("1 icon")).toBeTruthy();
-  expect(screen.getByRole("link", { name: "Download" }).getAttribute("href")).toBe("/packs/palantir.excalidrawlib");
-  expect(document.querySelector('a[href*="excalidraw.com"]')).toBeNull();
-  expect(screen.getByLabelText("Loading icons")).toBeTruthy();
-  expect(within(screen.getByRole("navigation", {name: "Icon sets"})).queryByRole("link", {current: "page"})).toBeNull();
+		expect(screen.getByRole("heading", { level: 1, name: "Palantir" })).toBeTruthy();
+		expect(screen.getByText("1 icon")).toBeTruthy();
+		expect(screen.getByRole("link", { name: "Download" }).getAttribute("href")).toBe(
+			"/packs/palantir.excalidrawlib",
+		);
+		expect(document.querySelector('a[href*="excalidraw.com"]')).toBeNull();
+		expect(screen.getByLabelText("Loading icons")).toBeTruthy();
+		expect(
+			within(screen.getByRole("navigation", { name: "Icon sets" })).queryByRole("link", {
+				current: "page",
+			}),
+		).toBeNull();
 		expect(
 			await screen.findByText("Pack icons returned HTTP 503.", {}, { timeout: 2500 }),
 		).toBeTruthy();
