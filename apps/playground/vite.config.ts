@@ -40,6 +40,15 @@ export default defineConfig({
 		emptyOutDir: true,
 		outDir: new URL(`../../${workerProject.buildOutputPath}`, import.meta.url).pathname,
 	},
+	environments: {
+		ssr: {
+			build: {
+				// Keep Worker stack mappings within Cloudflare's 60 MiB limit.
+				// Original source text remains in the matching repository/dependency revision.
+				rolldownOptions: { output: { sourcemapExcludeSources: true } },
+			},
+		},
+	},
 	cacheDir: localViteCacheDir("playground"),
 	publicDir: new URL("./public", import.meta.url).pathname,
 	plugins: [
