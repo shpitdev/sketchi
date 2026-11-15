@@ -1,5 +1,6 @@
 import { renderGraphDiagram } from "../../graph/scene.js";
-import { SKETCHI_DIAGRAM_STYLE,
+import {
+	SKETCHI_DIAGRAM_STYLE,
 	canvasBoundTextBox,
 	canvasBoundTextInset,
 	canvasNodeIconBox,
@@ -9,7 +10,8 @@ import { SKETCHI_DIAGRAM_STYLE,
 	type CanvasShapeElement,
 	type CanvasSpec,
 	type CanvasTextElement,
-	zoneRegionIssues } from "@sketchi/drawing";
+	zoneRegionIssues,
+} from "@sketchi/drawing";
 import { FlowchartDiagram } from "./document.js";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Schema } from "effect";

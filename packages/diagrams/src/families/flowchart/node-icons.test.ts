@@ -1,5 +1,6 @@
 import { renderGraphDiagram } from "../../graph/scene.js";
-import { SKETCHI_DIAGRAM_STYLE,
+import {
+	SKETCHI_DIAGRAM_STYLE,
 	CANVAS_NODE_ICON,
 	canvasBoundTextInset,
 	canvasNodeIconBox,
@@ -10,7 +11,8 @@ import { SKETCHI_DIAGRAM_STYLE,
 	segmentsOverlapInterior,
 	type CanvasShapeElement,
 	type CanvasSpec,
-	type CanvasTextElement } from "@sketchi/drawing";
+	type CanvasTextElement,
+} from "@sketchi/drawing";
 
 import { describe, expect, it } from "vitest";
 

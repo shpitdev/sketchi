@@ -1,4 +1,4 @@
-import { FlowchartDiagram,parseFlowchartDiagram } from "./document.js";
+import { FlowchartDiagram, parseFlowchartDiagram } from "./document.js";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { Result, Schema } from "effect";
 import { describe, expect, it } from "vitest";

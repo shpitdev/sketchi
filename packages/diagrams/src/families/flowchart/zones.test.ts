@@ -33,7 +33,7 @@ import {
 	zoneStressFixtures,
 } from "./zone-fixtures.js";
 
-import { parseFlowchartDiagram,FlowchartDiagram } from "./document.js";
+import { parseFlowchartDiagram, FlowchartDiagram } from "./document.js";
 import { arrowCrossings } from "../../graph/readability";
 import { renderFlowchartDiagram } from "./render";
 
