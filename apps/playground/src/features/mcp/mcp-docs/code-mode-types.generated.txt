@@ -141,9 +141,21 @@ type BuildVennDiagramResult_VennRegion = { sets: Array<string>; label?: string; 
 
 type BuildVennDiagramResult_DiagramStyle = { accentColor: string; backgroundColor: string; };
 
-type BuildJourneyMapRequest = { requestId?: string; spec: { id?: string; title: string; persona?: string; actors?: Array<string>; stages: Array<{ name: string; steps: Array<{ label: string; score: number; actor?: string; touchpoint?: string; }>; painPoints?: Array<string>; opportunities?: Array<string>; }>; }; options?: BuildOptions; };
+type BuildJourneyMapRequest = { requestId?: string; spec: { id?: string; title: string; persona?: string; actors?: Array<string>; stages: Array<BuildJourneyMapRequest_JourneyStage>; }; options?: BuildOptions; };
 
-type BuildJourneyMapResult = { ok: true; status: "accepted"; buildId: string; requestId?: string; normalizedSpec: { id: string; title: string; persona?: string; actors?: Array<string>; stages: Array<{ name: string; steps: Array<{ label: string; score: number; actor?: string; touchpoint?: string; }>; painPoints?: Array<string>; opportunities?: Array<string>; }>; style: { accentColor: string; backgroundColor: string; }; }; quality: Quality; artifact: Artifact; issues: Array<Issue>; } | { ok: false; status: "invalid_input" | "invalid_journey" | "quality_failed" | "limit_exceeded" | "render_failed" | "export_failed" | "storage_failed"; buildId?: string; requestId?: string; normalizedSpec?: { id: string; title: string; persona?: string; actors?: Array<string>; stages: Array<{ name: string; steps: Array<{ label: string; score: number; actor?: string; touchpoint?: string; }>; painPoints?: Array<string>; opportunities?: Array<string>; }>; style: { accentColor: string; backgroundColor: string; }; }; quality?: Quality; partial?: PartialArtifact; issues: Array<Issue>; };
+type BuildJourneyMapRequest_JourneyStep = { label: string; score: number; actor?: string; touchpoint?: string; };
+
+type BuildJourneyMapRequest_JourneyStage = { name: string; steps: Array<BuildJourneyMapRequest_JourneyStep>; painPoints?: Array<string>; opportunities?: Array<string>; };
+
+type BuildJourneyMapResult = { ok: true; status: "accepted"; buildId: string; requestId?: string; normalizedSpec: BuildJourneyMapResult_JourneyDiagram; quality: Quality; artifact: Artifact; issues: Array<{ code: IssueCode | "journey_too_large" | "empty_journey_stage" | "duplicate_journey_stage" | "invalid_journey_score" | "unknown_journey_actor" | "duplicate_journey_actor" | "journey_text_too_long" | "unplaced_journey_entry"; severity: "error" | "warning" | "info"; stage: "input" | "canvas" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage" | "coverage"; ref?: IssueRef; message: string; hint: string; }>; } | { ok: false; status: "invalid_input" | "invalid_journey" | "quality_failed" | "limit_exceeded" | "render_failed" | "export_failed" | "storage_failed"; buildId?: string; requestId?: string; normalizedSpec?: BuildJourneyMapResult_JourneyDiagram; quality?: Quality; partial?: PartialArtifact; issues: Array<{ code: IssueCode | "journey_too_large" | "empty_journey_stage" | "duplicate_journey_stage" | "invalid_journey_score" | "unknown_journey_actor" | "duplicate_journey_actor" | "journey_text_too_long" | "unplaced_journey_entry"; severity: "error" | "warning" | "info"; stage: "input" | "canvas" | "flowchart" | "mindmap" | "quality" | "render" | "export" | "storage" | "coverage"; ref?: IssueRef; message: string; hint: string; }>; };
+
+type BuildJourneyMapResult_JourneyStep = { label: string; score: number; actor?: string; touchpoint?: string; };
+
+type BuildJourneyMapResult_JourneyStage = { name: string; steps: Array<BuildJourneyMapResult_JourneyStep>; painPoints?: Array<string>; opportunities?: Array<string>; };
+
+type BuildJourneyMapResult_DiagramStyle = { accentColor: string; backgroundColor: string; };
+
+type BuildJourneyMapResult_JourneyDiagram = { id: string; title: string; persona?: string; actors?: Array<string>; stages: Array<BuildJourneyMapResult_JourneyStage>; style: BuildJourneyMapResult_DiagramStyle; type: "journey"; };
 
 type BuildSankeyRequest = { requestId?: string; spec: { id?: string; title: string; nodes: Array<{ id: string; label: string; color?: string; }>; links: Array<{ source: string; target: string; value: number; label?: string; }>; unit?: string; }; options?: BuildOptions; };
 
