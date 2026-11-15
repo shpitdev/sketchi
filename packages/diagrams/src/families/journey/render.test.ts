@@ -10,9 +10,9 @@ import {
 import { type JourneyDiagram, journeyFixture, parseJourneyDiagram } from "./document.js";
 import { journeyStressFixtures } from "./fixtures.js";
 
-import { renderDiagram } from "../../render.js";
-import { JOURNEY_MAX_ASPECT, renderJourneyDiagram } from "./render.js";
+import { renderDiagram } from "../../family.js";
 import { journeyLayoutIssues, readJourneyScene } from "./readout.js";
+import { JOURNEY_MAX_ASPECT, renderJourneyDiagram } from "./render.js";
 
 const aspect = (scene: RenderedDiagramScene) => (scene.width - 80) / (scene.height - 80);
 const find = (scene: RenderedDiagramScene, id: string) => {

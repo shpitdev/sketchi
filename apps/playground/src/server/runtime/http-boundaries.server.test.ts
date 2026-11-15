@@ -1,18 +1,17 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import type { TelemetrySpanRow } from "@sketchi/observability";
-import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
-
+import { describe, expect, it, vi } from "vitest";
 import {
 	CodeModeHttpRequestError,
-	handleBuildFlowchartRequest,
-	handleBuildMindmapRequest,
-	handleBuildSequenceDiagramRequest,
 	handleCreateCanvasRequest,
+	handleFamilyBuildRequest,
 	handlePatchArtifactRequest,
 } from "../codemode/api.server";
+
 import { McpTransportError } from "../codemode/mcp.server";
-import { handleGenerateDiagramRequest } from "../generation/api.server";
 import { PlaygroundCodeModeUsage } from "../codemode/usage-events.server";
+import { handleGenerateDiagramRequest } from "../generation/api.server";
 import { PlaygroundPlatformCallbacks, PlaygroundRequestMetadata } from "./context.server";
 import { readBoundedJson, RequestBodyReadError } from "./request-body.server";
 import { makePlaygroundRuntime, runPlaygroundEffect } from "./runtime.server";
@@ -78,9 +77,9 @@ describe("HTTP runtime boundaries", () => {
 		}
 	});
 	it.each([
-		handleBuildFlowchartRequest,
-		handleBuildMindmapRequest,
-		handleBuildSequenceDiagramRequest,
+		(request: Request) => handleFamilyBuildRequest(familyForType("flowchart"), request),
+		(request: Request) => handleFamilyBuildRequest(familyForType("mindmap"), request),
+		(request: Request) => handleFamilyBuildRequest(familyForType("sequence"), request),
 		handleCreateCanvasRequest,
 		handleGenerateDiagramRequest,
 		(request: Request) => handlePatchArtifactRequest(request, "id"),

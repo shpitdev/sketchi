@@ -1,12 +1,12 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import {
-	mediaPlayerStateMachine,
-	stateMachineFixture,
-} from "@sketchi/diagrams/families/state-machine/document";
 import { stateMachineScenarios } from "@sketchi/diagram-scenarios";
+import { mediaPlayerStateMachine } from "@sketchi/diagrams/families/state-machine/document";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const stateMachineFixture = familyForType("state-machine").fixture;
 
 const meta = {
 	title: "Diagram Types/StateMachine",

@@ -1,3 +1,4 @@
+import { type FlowchartDiagram, type FlowchartValidationIssue } from "./diagram.js";
 import {
 	flowchartDiagramFromDocument,
 	flowchartDocumentId,
@@ -7,13 +8,12 @@ import {
 	type FlowchartDocumentNode,
 	type FlowchartEdgeEnd,
 } from "./document.js";
-import { type FlowchartDiagram, type FlowchartValidationIssue } from "./diagram.js";
 
 import {
 	type FlowchartSpec,
 	type NormalizedFlowchartSpec,
 } from "../../build/code-mode/contract.js";
-import { cleanToolString } from "../../generate/clean-text.js";
+import { cleanToolString } from "../../clean-text.js";
 
 function cleanOptional(value: string | undefined): string | undefined {
 	if (value === undefined) return undefined;

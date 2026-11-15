@@ -1,36 +1,25 @@
-import { setImmediate } from "node:timers";
-import validationFixtures from "./fixtures/mcp-validation-issues-v2.json";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { describe, expect, it, vi } from "vitest";
-import { Array as EffectArray, Context, Effect, Option, Schema, Stream } from "effect";
+import { Context, Effect, Array as EffectArray, Option, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
+import { setImmediate } from "node:timers";
+import { describe, expect, it, vi } from "vitest";
+import validationFixtures from "./fixtures/mcp-validation-issues-v2.json";
 
+import { normalizedSpecFrom } from "@sketchi/diagram-scenarios";
 import type {
 	CodeModeObjectBucket,
 	CodeModeObjectBucketObject,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
-import { normalizedSpecFrom } from "@sketchi/diagram-scenarios";
 import nativeIcons from "@sketchi/icon-catalog/native-icons";
 
 import type { TelemetrySpanRow } from "@sketchi/observability";
 
 import type { StudioEnv } from "../bindings/studio-env.server";
-import type { PngRenderResult } from "./png-renderer-object.server";
 import { PlaygroundRequestMetadata } from "../runtime/context.server";
 import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runtime.server";
-import { PlaygroundCodeMode } from "./service.server";
-import {
-	formatCodeModeDocs,
-	getCodeModeDocs,
-	CodeModeDocsRequestSchema,
-	CodeModeDocsResultSchema,
-	CodeModeSearchRequestSchema,
-	CodeModeSearchResultSchema,
-} from "./mcp-docs.server";
 import { createEffectMcpServer, makeEffectMcpTool } from "./effect-mcp-adapter.server";
-import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "./usage-events.server";
 import {
 	ExecuteRequestSchema,
 	ExecuteResultSchema,
@@ -42,9 +31,20 @@ import {
 	type SketchiCodeModeProvider,
 } from "./execute.server";
 import {
+	CodeModeDocsRequestSchema,
+	CodeModeDocsResultSchema,
+	CodeModeSearchRequestSchema,
+	CodeModeSearchResultSchema,
+	formatCodeModeDocs,
+	getCodeModeDocs,
+} from "./mcp-docs.server";
+import {
 	createSketchiMcpServer as createSketchiMcpServerEffect,
 	handleSketchiMcpRequest as handleSketchiMcpRequestEffect,
 } from "./mcp.server";
+import type { PngRenderResult } from "./png-renderer-object.server";
+import { PlaygroundCodeMode } from "./service.server";
+import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "./usage-events.server";
 
 function stubPngRenderer() {
 	const pngRenderer = {
@@ -1004,7 +1004,7 @@ describe("Sketchi Code Mode MCP server", { timeout: 60_000 }, () => {
 			};
 		});
 		const codeMode = {
-			buildFlowchart: () =>
+			buildFamily: () =>
 				observeContext.pipe(
 					Effect.tap((context) =>
 						Effect.sync(() => {

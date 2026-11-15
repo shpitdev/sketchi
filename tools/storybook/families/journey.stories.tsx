@@ -1,10 +1,12 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { journeyFixture } from "@sketchi/diagrams/families/journey/document";
-import { journeyStressFixtures } from "@sketchi/diagrams/families/journey/fixtures";
 import { journeyScenarios } from "@sketchi/diagram-scenarios";
+import { journeyStressFixtures } from "@sketchi/diagrams/families/journey/fixtures";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const journeyFixture = familyForType("journey").fixture;
 
 const meta = {
 	title: "Diagram Types/Journey Map",

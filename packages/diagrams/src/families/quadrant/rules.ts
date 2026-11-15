@@ -1,5 +1,5 @@
+import type { RuleSource } from "../../rule-source.js";
 import { QUADRANT_MAX_POINTS } from "./document.js";
-import type { RuleSource } from "../../generate/rule-source.js";
 
 /** How a request becomes a quadrant chart; see FLOWCHART_RULES. */
 export const QUADRANT_RULES = {

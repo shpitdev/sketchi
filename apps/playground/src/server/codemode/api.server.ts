@@ -1,40 +1,31 @@
+import {
+	families,
+	type DiagramFamily,
+	type FamilyBuildOperation,
+	type FamilyBuildResult,
+} from "@sketchi/diagrams/family";
 import "@tanstack/react-start/server-only";
 
-import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
-import {
-	type BuildFlowchartResult,
-	type EditFlowchartResult,
-	type BuildSequenceDiagramResult,
-	type BuildStateMachineResult,
-	type BuildGanttResult,
-	type BuildErDiagramResult,
-	type BuildClassDiagramResult,
-	type BuildOrgChartResult,
-	type BuildVennDiagramResult,
-	type BuildJourneyMapResult,
-	type BuildSankeyResult,
-	type BuildWireframeResult,
-	type BuildQuadrantChartResult,
-	type BuildTimelineResult,
-	type BuildChartResult,
-	type CreateCanvasResult,
-} from "@sketchi/diagrams/build/code-mode/contract";
 import { type StoredArtifactFormat } from "@sketchi/diagrams/build/code-mode/artifacts";
+import {
+	type CreateCanvasResult,
+	type EditFlowchartResult,
+} from "@sketchi/diagrams/build/code-mode/contract";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
-import { type BuildMindmapResult } from "@sketchi/diagrams/families/mindmap/build";
+import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { createExcalidrawFile, type ExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Context, Effect, Schema } from "effect";
 
-import { readBoundedJson } from "../runtime/request-body.server";
 import {
 	PlaygroundBindings,
 	PlaygroundClock,
 	PlaygroundIds,
 	PlaygroundRequestMetadata,
 } from "../runtime/context.server";
-import { PlaygroundCodeMode } from "./service.server";
 import { resultHttpStatus } from "../runtime/http-status.server";
+import { readBoundedJson } from "../runtime/request-body.server";
+import { PlaygroundCodeMode } from "./service.server";
 import { codeModeUsageResponseHeaders, PlaygroundCodeModeUsage } from "./usage-events.server";
 
 export const MAX_CODE_MODE_BUILD_REQUEST_BYTES = 256 * 1024;
@@ -62,27 +53,7 @@ function jsonResponse(body: unknown, status: number, extraHeaders: HeadersInit =
 	});
 }
 
-function requestTooLargeResult(
-	diagramType:
-		| "Canvas"
-		| "Flowchart"
-		| "Mindmap"
-		| "Sequence diagram"
-		| "Timeline"
-		| "Chart"
-		| "State machine"
-		| "Gantt chart"
-		| "ER diagram"
-		| "Class diagram"
-		| "Org chart"
-		| "Venn diagram"
-		| "Journey map"
-		| "Sankey diagram"
-		| "Wireframe"
-		| "Quadrant chart"
-		| "Artifact patch",
-	limitBytes: number,
-) {
+function requestTooLargeResult(diagramType: string, limitBytes: number) {
 	return {
 		ok: false as const,
 		status: "invalid_input" as const,
@@ -197,43 +168,9 @@ function rawArtifactResponse(input: {
 	});
 }
 
-type BuildResult =
-	| BuildFlowchartResult
-	| EditFlowchartResult
-	| BuildMindmapResult
-	| BuildSequenceDiagramResult
-	| BuildTimelineResult
-	| BuildChartResult
-	| BuildStateMachineResult
-	| BuildGanttResult
-	| BuildErDiagramResult
-	| BuildClassDiagramResult
-	| BuildOrgChartResult
-	| BuildVennDiagramResult
-	| BuildJourneyMapResult
-	| BuildSankeyResult
-	| BuildWireframeResult
-	| BuildQuadrantChartResult
-	| CreateCanvasResult;
+type BuildResult = FamilyBuildResult | EditFlowchartResult | CreateCanvasResult;
 
-type BuildOperation =
-	| "buildFlowchart"
-	| "editFlowchart"
-	| "buildMindmap"
-	| "buildSequenceDiagram"
-	| "buildTimeline"
-	| "buildChart"
-	| "buildStateMachine"
-	| "buildGantt"
-	| "buildErDiagram"
-	| "buildClassDiagram"
-	| "buildOrgChart"
-	| "buildVennDiagram"
-	| "buildJourneyMap"
-	| "buildSankey"
-	| "buildWireframe"
-	| "buildQuadrantChart"
-	| "createCanvas";
+type BuildOperation = FamilyBuildOperation | "editFlowchart" | "createCanvas";
 
 function makeBuildHandler({
 	operation,
@@ -243,23 +180,7 @@ function makeBuildHandler({
 }: {
 	readonly operation: BuildOperation;
 	readonly maxRequestBytes?: number;
-	readonly label:
-		| "Flowchart"
-		| "Mindmap"
-		| "Sequence diagram"
-		| "Timeline"
-		| "Chart"
-		| "State machine"
-		| "Gantt chart"
-		| "ER diagram"
-		| "Class diagram"
-		| "Org chart"
-		| "Venn diagram"
-		| "Journey map"
-		| "Sankey diagram"
-		| "Wireframe"
-		| "Quadrant chart"
-		| "Canvas";
+	readonly label: string;
 	readonly run: (
 		codeMode: Context.Service.Shape<typeof PlaygroundCodeMode>,
 		input: unknown,
@@ -306,85 +227,22 @@ function makeBuildHandler({
 	});
 }
 
-export const handleBuildFlowchartRequest = makeBuildHandler({
-	operation: "buildFlowchart",
-	label: "Flowchart",
-	run: (codeMode, input) => codeMode.buildFlowchart(input),
-});
+/** Existing family endpoints share bounded reads, request services and usage capture. */
+export function handleFamilyBuildRequest(family: DiagramFamily, request: Request) {
+	return makeBuildHandler({
+		operation: family.operation,
+		label: family.label,
+		run: (codeMode, input) => codeMode.buildFamily<FamilyBuildResult>(family, input),
+	})(request);
+}
+export function familyForBuildPath(pathname: string) {
+	return families.find((family) => family.path === pathname);
+}
+
 export const handleEditFlowchartRequest = makeBuildHandler({
 	operation: "editFlowchart",
 	label: "Flowchart",
 	run: (codeMode, input) => codeMode.editFlowchart(input),
-});
-export const handleBuildMindmapRequest = makeBuildHandler({
-	operation: "buildMindmap",
-	label: "Mindmap",
-	run: (codeMode, input) => codeMode.buildMindmap(input),
-});
-export const handleBuildSequenceDiagramRequest = makeBuildHandler({
-	operation: "buildSequenceDiagram",
-	label: "Sequence diagram",
-	run: (codeMode, input) => codeMode.buildSequenceDiagram(input),
-});
-export const handleBuildTimelineRequest = makeBuildHandler({
-	operation: "buildTimeline",
-	label: "Timeline",
-	run: (codeMode, input) => codeMode.buildTimeline(input),
-});
-export const handleBuildChartRequest = makeBuildHandler({
-	operation: "buildChart",
-	label: "Chart",
-	run: (codeMode, input) => codeMode.buildChart(input),
-});
-export const handleBuildStateMachineRequest = makeBuildHandler({
-	operation: "buildStateMachine",
-	label: "State machine",
-	run: (codeMode, input) => codeMode.buildStateMachine(input),
-});
-export const handleBuildGanttRequest = makeBuildHandler({
-	operation: "buildGantt",
-	label: "Gantt chart",
-	run: (codeMode, input) => codeMode.buildGantt(input),
-});
-export const handleBuildErDiagramRequest = makeBuildHandler({
-	operation: "buildErDiagram",
-	label: "ER diagram",
-	run: (codeMode, input) => codeMode.buildErDiagram(input),
-});
-export const handleBuildClassDiagramRequest = makeBuildHandler({
-	operation: "buildClassDiagram",
-	label: "Class diagram",
-	run: (codeMode, input) => codeMode.buildClassDiagram(input),
-});
-export const handleBuildOrgChartRequest = makeBuildHandler({
-	operation: "buildOrgChart",
-	label: "Org chart",
-	run: (codeMode, input) => codeMode.buildOrgChart(input),
-});
-export const handleBuildVennDiagramRequest = makeBuildHandler({
-	operation: "buildVennDiagram",
-	label: "Venn diagram",
-	run: (codeMode, input) => codeMode.buildVennDiagram(input),
-});
-export const handleBuildJourneyMapRequest = makeBuildHandler({
-	operation: "buildJourneyMap",
-	label: "Journey map",
-	run: (codeMode, input) => codeMode.buildJourneyMap(input),
-});
-export const handleBuildSankeyRequest = makeBuildHandler({
-	operation: "buildSankey",
-	label: "Sankey diagram",
-	run: (codeMode, input) => codeMode.buildSankey(input),
-});
-export const handleBuildWireframeRequest = makeBuildHandler({
-	operation: "buildWireframe",
-	label: "Wireframe",
-	run: (codeMode, input) => codeMode.buildWireframe(input),
-});
-export const handleBuildQuadrantChartRequest = makeBuildHandler({
-	operation: "buildQuadrantChart",
-	label: "Quadrant chart",
-	run: (codeMode, input) => codeMode.buildQuadrantChart(input),
 });
 export const handleCreateCanvasRequest = makeBuildHandler({
 	operation: "createCanvas",

@@ -1,11 +1,11 @@
+import { CanvasSpec } from "@sketchi/diagrams/build/code-mode/contract";
+import { isCanonicalDocumentType } from "@sketchi/diagrams/build/code-mode/documents";
 import { decodeMindmapDocument } from "@sketchi/diagrams/families/mindmap/index";
 import {
-	CANONICAL_DOCUMENT_SPECS,
-	CANONICAL_DOCUMENT_TYPES,
+	DIAGRAM_TYPES,
+	familyForType,
 	type CanonicalDiagramDocument,
-	isCanonicalDocumentType,
-} from "@sketchi/diagrams/build/code-mode/documents";
-import { CanvasSpec } from "@sketchi/diagrams/build/code-mode/contract";
+} from "@sketchi/diagrams/family";
 import { Effect, Schema, SchemaIssue } from "effect";
 
 import { CliInputError, CliValidationError } from "./errors.js";
@@ -43,9 +43,9 @@ export function alternativeList(values: readonly string[]): string {
 	return `${values.slice(0, -1).join(", ")}${values.length > 2 ? "," : ""} or ${values.at(-1)}`;
 }
 
-const canonicalTypeList = alternativeList(CANONICAL_DOCUMENT_TYPES.map((type) => `"${type}"`));
+const canonicalTypeList = alternativeList(DIAGRAM_TYPES.map((type) => `"${type}"`));
 const canonicalDocumentHint = `Use ${alternativeList(
-	CANONICAL_DOCUMENT_TYPES.map((type) => `{"type":"${type}","spec":...}`),
+	DIAGRAM_TYPES.map((type) => `{"type":"${type}","spec":...}`),
 )}.`;
 
 const decodeCanvasSpec = Schema.decodeUnknownEffect(CanvasSpec, {
@@ -107,11 +107,12 @@ export const decodeCanonicalDiagramDocument = Effect.fn("sketchi.cli.document.de
 		}
 		if (isCanonicalDocumentType(fields.type)) {
 			const type = fields.type;
-			const spec: unknown = yield* Schema.decodeUnknownEffect(CANONICAL_DOCUMENT_SPECS[type], {
-				errors: "all",
-			})(fields.spec).pipe(Effect.mapError((error) => validationError(schemaDetails(error.issue))));
-			// The registry pairs each family with its spec schema.
-			return { type, spec } as CanonicalDiagramDocument;
+			const decoded: Effect.Effect<CanonicalDiagramDocument, Schema.SchemaError> = familyForType(
+				type,
+			).decodeDocument(fields.spec);
+			return yield* decoded.pipe(
+				Effect.mapError((error) => validationError(schemaDetails(error.issue))),
+			);
 		}
 		return yield* validationError([`document.type: Expected ${canonicalTypeList}.`]);
 	},

@@ -1,5 +1,4 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
 import {
 	CANVAS_LIMITS,
 	estimateTextWidth,
@@ -8,13 +7,14 @@ import {
 	type CanvasSpec as RenderedDiagramScene,
 	type CanvasElement as SceneElement,
 } from "@sketchi/drawing";
-import { chartFixture, parseChartDiagram, type ChartDiagram } from "./document.js";
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
+import { chartFixture, parseChartDiagram, type ChartDiagram } from "./document.js";
 
-import { chartBarOrientation, renderChartDiagram } from "./render.js";
+import { renderDiagram } from "../../family.js";
 import { readChartMarks } from "./readout.js";
+import { chartBarOrientation, renderChartDiagram } from "./render.js";
 import { formatValue, piePercentages, unitParts } from "./scale.js";
-import { renderDiagram } from "../../render.js";
 
 interface Box {
 	readonly left: number;

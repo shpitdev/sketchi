@@ -1,7 +1,6 @@
+import { Schema } from "effect";
 import { CHART_RULES } from "../families/chart/rules.js";
 import { CLASS_RULES } from "../families/class/rules.js";
-import { DIAGRAM_NODE_COLOR_NAMES } from "../graph/intermediate.js";
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "../types.js";
 import { ER_RULES } from "../families/er/rules.js";
 import { FLOWCHART_EDIT_RULES, FLOWCHART_RULES } from "../families/flowchart/rules.js";
 import { GANTT_RULES } from "../families/gantt/rules.js";
@@ -15,7 +14,8 @@ import { STATE_MACHINE_RULES } from "../families/state-machine/rules.js";
 import { TIMELINE_RULES } from "../families/timeline/rules.js";
 import { VENN_RULES } from "../families/venn/rules.js";
 import { WIREFRAME_RULES } from "../families/wireframe/rules.js";
-import { Schema } from "effect";
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family.js";
+import { DIAGRAM_NODE_COLOR_NAMES } from "../graph/intermediate.js";
 
 import { CURATED_EXAMPLES } from "./examples.js";
 import { DiagramGenerationTypeSchema } from "./intent.js";

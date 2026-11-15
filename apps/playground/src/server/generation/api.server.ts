@@ -1,41 +1,41 @@
 import "@tanstack/react-start/server-only";
 
 import { type BuildFlowchartOptions } from "@sketchi/diagrams/build/code-mode/contract";
-import {
-	CANONICAL_DOCUMENT_SPECS,
-	type CanonicalBuildResult,
-	type CanonicalDiagramDocument,
-	canonicalDocumentFromDiagram,
-} from "@sketchi/diagrams/build/code-mode/documents";
+import { canonicalDocumentFromDiagram } from "@sketchi/diagrams/build/code-mode/documents";
 import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
-import { type DiagramStyle } from "@sketchi/diagrams/generate/styling";
-import {
-	extractJsonObject,
-	type DiagramGenerationCandidate,
-	WRONG_DIAGRAM_TYPE_ERROR,
-} from "@sketchi/diagrams/generate/candidates";
-import { type DiagramGenerationError } from "@sketchi/diagrams/generate/errors";
-import { type DiagramGenerationType } from "@sketchi/diagrams/generate/intent";
-import { isSupportedGenerationModel } from "@sketchi/diagrams/generate/models";
 import {
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
 } from "@sketchi/diagrams/families/flowchart/document";
+import {
+	familyForType,
+	type CanonicalDiagramDocument,
+	type FamilyBuildResult,
+} from "@sketchi/diagrams/family";
+import {
+	extractJsonObject,
+	WRONG_DIAGRAM_TYPE_ERROR,
+	type DiagramGenerationCandidate,
+} from "@sketchi/diagrams/generate/candidates";
+import { type DiagramGenerationError } from "@sketchi/diagrams/generate/errors";
+import { type DiagramGenerationType } from "@sketchi/diagrams/generate/intent";
+import { isSupportedGenerationModel } from "@sketchi/diagrams/generate/models";
+import { type DiagramStyle } from "@sketchi/diagrams/generate/styling";
 import { withTelemetryCorrelation } from "@sketchi/observability";
 import { Effect, Result, Schema } from "effect";
 
-import { resultHttpStatus } from "../runtime/http-status.server";
-import { readBoundedJson } from "../runtime/request-body.server";
 import {
 	PlaygroundCodeMode,
-	type PlaygroundCodeModeShape,
 	PlaygroundNamedLogoFill,
+	type PlaygroundCodeModeShape,
 } from "../codemode/service.server";
 import {
 	codeModeUsageResponseHeaders,
 	PlaygroundCodeModeUsage,
 } from "../codemode/usage-events.server";
 import { PlaygroundBindings, PlaygroundClock } from "../runtime/context.server";
+import { resultHttpStatus } from "../runtime/http-status.server";
+import { readBoundedJson } from "../runtime/request-body.server";
 import { decodeGenerateRequest, GENERATE_REQUEST_COPY, type GenerateBaseSchema } from "./request";
 import { PlaygroundGeneration } from "./service.server";
 
@@ -44,7 +44,7 @@ import { PlaygroundGeneration } from "./service.server";
 export const MAX_GENERATE_REQUEST_BYTES = 64 * 1024;
 export const MAX_GENERATE_PROMPT_LENGTH = 20_000;
 
-type BuildResult = CanonicalBuildResult;
+type BuildResult = FamilyBuildResult;
 type BuiltArtifact = Extract<BuildResult, { readonly ok: true }>["artifact"];
 
 type GenerateFailureStatus =
@@ -300,7 +300,7 @@ function inlineArtifact(artifact: BuiltArtifact, format: "scene" | "excalidraw")
 function baseDiagram(
 	base: typeof GenerateBaseSchema.Type,
 ): { readonly diagram: Readonly<Record<string, unknown>>; readonly id?: string } | undefined {
-	const decoded = Schema.decodeUnknownResult(CANONICAL_DOCUMENT_SPECS[base.type])(base.spec);
+	const decoded = Schema.decodeUnknownResult(familyForType(base.type).spec)(base.spec);
 	if (Result.isFailure(decoded) || typeof base.spec !== "object" || base.spec === null) {
 		return undefined;
 	}

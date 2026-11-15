@@ -1,5 +1,3 @@
-import { describe, expect, it, vi } from "vitest";
-import { Effect, Layer } from "effect";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
@@ -9,7 +7,17 @@ import {
 	type BuildFlowchartResult,
 	type GetArtifactResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
+import * as Runtime from "@sketchi/diagrams/build/code-mode/runtime";
 import { type BuildMindmapResult } from "@sketchi/diagrams/families/mindmap/build";
+import { familyForType } from "@sketchi/diagrams/family";
+import { Effect, Layer } from "effect";
+import { describe, expect, it, vi } from "vitest";
+import {
+	handleFamilyBuildRequest,
+	handleGetArtifactRequest as handleGetArtifactRequestEffect,
+	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
+	MAX_CODE_MODE_BUILD_REQUEST_BYTES,
+} from "./api.server";
 
 const runtimeResults = vi.hoisted(() => {
 	let buildFlowchartResult: unknown;
@@ -45,23 +53,22 @@ vi.mock("./service.server", async (importOriginal) => {
 			buildDocument: () => Effect.die("Internal document builds are outside the HTTP corpus."),
 			applyDiagramPatch: () =>
 				Effect.succeed(runtimeResults.getApplyDiagramPatch() as ApplyDiagramPatchResult),
-			buildFlowchart: () =>
-				Effect.succeed(runtimeResults.getBuildFlowchart() as BuildFlowchartResult),
-			buildMindmap: () => Effect.succeed(runtimeResults.getBuildMindmap() as BuildMindmapResult),
+			buildFamily: (family, input) =>
+				family
+					.build({
+						...Runtime,
+						buildFlowchart: () =>
+							Effect.succeed(runtimeResults.getBuildFlowchart() as BuildFlowchartResult),
+						buildMindmap: () =>
+							Effect.succeed(runtimeResults.getBuildMindmap() as BuildMindmapResult),
+					})(input)
+					.pipe(
+						Effect.provideService(CodeModeArtifactStorage, makeMemoryArtifactStorage()),
+						Effect.provideService(Runtime.CodeModeRuntimeEnvironment, {
+							createId: (prefix) => prefix,
+						}),
+					),
 			editFlowchart: () => Effect.die("Flowchart edits are outside the frozen v1 corpus."),
-			buildTimeline: () => Effect.die("Timelines are outside the frozen v1 corpus."),
-			buildChart: () => Effect.die("Charts are outside the frozen v1 corpus."),
-			buildSequenceDiagram: () => Effect.die("Sequence diagrams are outside the frozen v1 corpus."),
-			buildStateMachine: () => Effect.die("State machines are outside the frozen v1 corpus."),
-			buildGantt: () => Effect.die("Gantt charts are outside the frozen v1 corpus."),
-			buildErDiagram: () => Effect.die("ER diagrams are outside the frozen v1 corpus."),
-			buildClassDiagram: () => Effect.die("Class diagrams are outside the frozen v1 corpus."),
-			buildOrgChart: () => Effect.die("Org charts are outside the frozen v1 corpus."),
-			buildVennDiagram: () => Effect.die("Venn diagrams are outside the frozen v1 corpus."),
-			buildJourneyMap: () => Effect.die("Journey maps are outside the frozen v1 corpus."),
-			buildSankey: () => Effect.die("Sankey diagrams are outside the frozen v1 corpus."),
-			buildWireframe: () => Effect.die("Wireframes are outside the frozen v1 corpus."),
-			buildQuadrantChart: () => Effect.die("Quadrant charts are outside the frozen v1 corpus."),
 			createCanvas: () => Effect.die("Canvas creation is outside the frozen v1 corpus."),
 			prewarmPngRenderer: Effect.void,
 			getArtifact: () => Effect.succeed(runtimeResults.getGetArtifact() as GetArtifactResult),
@@ -73,13 +80,6 @@ vi.mock("./service.server", async (importOriginal) => {
 	};
 });
 
-import {
-	MAX_CODE_MODE_BUILD_REQUEST_BYTES,
-	handleBuildFlowchartRequest as handleBuildFlowchartRequestEffect,
-	handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
-	handleGetArtifactRequest as handleGetArtifactRequestEffect,
-	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
-} from "./api.server";
 import { type StudioEnv } from "../bindings/studio-env.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
 
@@ -97,13 +97,16 @@ function testBoundary(env: StudioEnv, request: Request) {
 
 function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
 	return runPlaygroundEffect(
-		handleBuildFlowchartRequestEffect(request),
+		handleFamilyBuildRequest(familyForType("flowchart"), request),
 		testBoundary(env, request),
 	);
 }
 
 function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
-	return runPlaygroundEffect(handleBuildMindmapRequestEffect(request), testBoundary(env, request));
+	return runPlaygroundEffect(
+		handleFamilyBuildRequest(familyForType("mindmap"), request),
+		testBoundary(env, request),
+	);
 }
 
 function handleGetArtifactRequest(env: StudioEnv, request: Request, artifactId: string) {

@@ -1,4 +1,4 @@
-import type { RuleSource } from "../../generate/rule-source.js";
+import type { RuleSource } from "../../rule-source.js";
 
 const guards = (source: RuleSource) =>
 	`copy each guard ${source} states; use "else" only for a branch ${source} gives no condition.`;

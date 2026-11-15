@@ -31,10 +31,6 @@
 			"types": "./dist/build/result.d.ts",
 			"default": "./dist/build/result.js"
 		},
-		"./diagram": {
-			"types": "./dist/diagram.d.ts",
-			"default": "./dist/diagram.js"
-		},
 		"./families/chart/document": {
 			"types": "./dist/families/chart/document.d.ts",
 			"default": "./dist/families/chart/document.js"
@@ -307,10 +303,6 @@
 			"types": "./dist/families/wireframe/rules.d.ts",
 			"default": "./dist/families/wireframe/rules.js"
 		},
-		"./fixtures": {
-			"types": "./dist/fixtures.d.ts",
-			"default": "./dist/fixtures.js"
-		},
 		"./generate/candidates": {
 			"types": "./dist/generate/candidates.d.ts",
 			"default": "./dist/generate/candidates.js"
@@ -371,17 +363,13 @@
 			"types": "./dist/graph/scene.d.ts",
 			"default": "./dist/graph/scene.js"
 		},
-		"./render": {
-			"types": "./dist/render.d.ts",
-			"default": "./dist/render.js"
-		},
-		"./types": {
-			"types": "./dist/types.d.ts",
-			"default": "./dist/types.js"
-		},
 		"./families/class/render": {
 			"types": "./dist/families/class/render.d.ts",
 			"default": "./dist/families/class/render.js"
+		},
+		"./family": {
+			"types": "./dist/family.d.ts",
+			"default": "./dist/family.js"
 		}
 	},
 	"dependencies": {

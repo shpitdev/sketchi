@@ -25,25 +25,11 @@ import { Route as DiagramsDiagramIdEditRouteImport } from "./routes/diagrams_/$d
 import { Route as ApiStudioDiagramsDiagramIdRouteImport } from "./routes/api/studio/diagrams/$diagramId";
 import { Route as ApiStudioProjectsFromArtifactRouteImport } from "./routes/api/studio/projects/from-artifact";
 import { Route as ApiStudioProjectsProjectIdRouteImport } from "./routes/api/studio/projects_/$projectId";
+import { Route as ApiV1FamilyBuildRouteImport } from "./routes/api/v1/$family/build";
 import { Route as ApiV1ArtifactsArtifactIdRouteImport } from "./routes/api/v1/artifacts/$artifactId";
 import { Route as ApiV1CanvasesCreateRouteImport } from "./routes/api/v1/canvases/create";
-import { Route as ApiV1ChartsBuildRouteImport } from "./routes/api/v1/charts/build";
-import { Route as ApiV1ClassDiagramsBuildRouteImport } from "./routes/api/v1/class-diagrams/build";
-import { Route as ApiV1ErDiagramsBuildRouteImport } from "./routes/api/v1/er-diagrams/build";
-import { Route as ApiV1FlowchartsBuildRouteImport } from "./routes/api/v1/flowcharts/build";
-import { Route as ApiV1FlowchartsEditRouteImport } from "./routes/api/v1/flowcharts/edit";
-import { Route as ApiV1GanttsBuildRouteImport } from "./routes/api/v1/gantts/build";
+import { Route as ApiV1FlowchartsEditRouteImport } from "./routes/api/v1/flowcharts.edit";
 import { Route as ApiV1IconsDrawRouteImport } from "./routes/api/v1/icons/draw";
-import { Route as ApiV1JourneyMapsBuildRouteImport } from "./routes/api/v1/journey-maps/build";
-import { Route as ApiV1MindmapsBuildRouteImport } from "./routes/api/v1/mindmaps/build";
-import { Route as ApiV1OrgChartsBuildRouteImport } from "./routes/api/v1/org-charts/build";
-import { Route as ApiV1QuadrantChartsBuildRouteImport } from "./routes/api/v1/quadrant-charts/build";
-import { Route as ApiV1SankeyDiagramsBuildRouteImport } from "./routes/api/v1/sankey-diagrams/build";
-import { Route as ApiV1SequencesBuildRouteImport } from "./routes/api/v1/sequences/build";
-import { Route as ApiV1StateMachinesBuildRouteImport } from "./routes/api/v1/state-machines/build";
-import { Route as ApiV1TimelinesBuildRouteImport } from "./routes/api/v1/timelines/build";
-import { Route as ApiV1VennDiagramsBuildRouteImport } from "./routes/api/v1/venn-diagrams/build";
-import { Route as ApiV1WireframesBuildRouteImport } from "./routes/api/v1/wireframes/build";
 import { Route as ApiStudioDiagramsDiagramIdDrawingRouteImport } from "./routes/api/studio/diagrams/$diagramId/drawing";
 import { Route as ApiV1ArtifactsArtifactIdPatchRouteImport } from "./routes/api/v1/artifacts/$artifactId/patch";
 
@@ -130,6 +116,11 @@ const ApiStudioProjectsProjectIdRoute =
     path: "/api/studio/projects/$projectId",
     getParentRoute: () => rootRouteImport,
   } as any);
+const ApiV1FamilyBuildRoute = ApiV1FamilyBuildRouteImport.update({
+  id: "/api/v1/$family/build",
+  path: "/api/v1/$family/build",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiV1ArtifactsArtifactIdRoute =
   ApiV1ArtifactsArtifactIdRouteImport.update({
     id: "/api/v1/artifacts/$artifactId",
@@ -141,91 +132,14 @@ const ApiV1CanvasesCreateRoute = ApiV1CanvasesCreateRouteImport.update({
   path: "/api/v1/canvases/create",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiV1ChartsBuildRoute = ApiV1ChartsBuildRouteImport.update({
-  id: "/api/v1/charts/build",
-  path: "/api/v1/charts/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1ClassDiagramsBuildRoute = ApiV1ClassDiagramsBuildRouteImport.update({
-  id: "/api/v1/class-diagrams/build",
-  path: "/api/v1/class-diagrams/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1ErDiagramsBuildRoute = ApiV1ErDiagramsBuildRouteImport.update({
-  id: "/api/v1/er-diagrams/build",
-  path: "/api/v1/er-diagrams/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1FlowchartsBuildRoute = ApiV1FlowchartsBuildRouteImport.update({
-  id: "/api/v1/flowcharts/build",
-  path: "/api/v1/flowcharts/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
 const ApiV1FlowchartsEditRoute = ApiV1FlowchartsEditRouteImport.update({
   id: "/api/v1/flowcharts/edit",
   path: "/api/v1/flowcharts/edit",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiV1GanttsBuildRoute = ApiV1GanttsBuildRouteImport.update({
-  id: "/api/v1/gantts/build",
-  path: "/api/v1/gantts/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
 const ApiV1IconsDrawRoute = ApiV1IconsDrawRouteImport.update({
   id: "/api/v1/icons/draw",
   path: "/api/v1/icons/draw",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1JourneyMapsBuildRoute = ApiV1JourneyMapsBuildRouteImport.update({
-  id: "/api/v1/journey-maps/build",
-  path: "/api/v1/journey-maps/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1MindmapsBuildRoute = ApiV1MindmapsBuildRouteImport.update({
-  id: "/api/v1/mindmaps/build",
-  path: "/api/v1/mindmaps/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1OrgChartsBuildRoute = ApiV1OrgChartsBuildRouteImport.update({
-  id: "/api/v1/org-charts/build",
-  path: "/api/v1/org-charts/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1QuadrantChartsBuildRoute =
-  ApiV1QuadrantChartsBuildRouteImport.update({
-    id: "/api/v1/quadrant-charts/build",
-    path: "/api/v1/quadrant-charts/build",
-    getParentRoute: () => rootRouteImport,
-  } as any);
-const ApiV1SankeyDiagramsBuildRoute =
-  ApiV1SankeyDiagramsBuildRouteImport.update({
-    id: "/api/v1/sankey-diagrams/build",
-    path: "/api/v1/sankey-diagrams/build",
-    getParentRoute: () => rootRouteImport,
-  } as any);
-const ApiV1SequencesBuildRoute = ApiV1SequencesBuildRouteImport.update({
-  id: "/api/v1/sequences/build",
-  path: "/api/v1/sequences/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1StateMachinesBuildRoute = ApiV1StateMachinesBuildRouteImport.update({
-  id: "/api/v1/state-machines/build",
-  path: "/api/v1/state-machines/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1TimelinesBuildRoute = ApiV1TimelinesBuildRouteImport.update({
-  id: "/api/v1/timelines/build",
-  path: "/api/v1/timelines/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1VennDiagramsBuildRoute = ApiV1VennDiagramsBuildRouteImport.update({
-  id: "/api/v1/venn-diagrams/build",
-  path: "/api/v1/venn-diagrams/build",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const ApiV1WireframesBuildRoute = ApiV1WireframesBuildRouteImport.update({
-  id: "/api/v1/wireframes/build",
-  path: "/api/v1/wireframes/build",
   getParentRoute: () => rootRouteImport,
 } as any);
 const ApiStudioDiagramsDiagramIdDrawingRoute =
@@ -258,25 +172,11 @@ export interface FileRoutesByFullPath {
   "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
+  "/api/v1/$family/build": typeof ApiV1FamilyBuildRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/canvases/create": typeof ApiV1CanvasesCreateRoute;
-  "/api/v1/charts/build": typeof ApiV1ChartsBuildRoute;
-  "/api/v1/class-diagrams/build": typeof ApiV1ClassDiagramsBuildRoute;
-  "/api/v1/er-diagrams/build": typeof ApiV1ErDiagramsBuildRoute;
-  "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/flowcharts/edit": typeof ApiV1FlowchartsEditRoute;
-  "/api/v1/gantts/build": typeof ApiV1GanttsBuildRoute;
   "/api/v1/icons/draw": typeof ApiV1IconsDrawRoute;
-  "/api/v1/journey-maps/build": typeof ApiV1JourneyMapsBuildRoute;
-  "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
-  "/api/v1/org-charts/build": typeof ApiV1OrgChartsBuildRoute;
-  "/api/v1/quadrant-charts/build": typeof ApiV1QuadrantChartsBuildRoute;
-  "/api/v1/sankey-diagrams/build": typeof ApiV1SankeyDiagramsBuildRoute;
-  "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
-  "/api/v1/state-machines/build": typeof ApiV1StateMachinesBuildRoute;
-  "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
-  "/api/v1/venn-diagrams/build": typeof ApiV1VennDiagramsBuildRoute;
-  "/api/v1/wireframes/build": typeof ApiV1WireframesBuildRoute;
   "/api/studio/diagrams/$diagramId/drawing": typeof ApiStudioDiagramsDiagramIdDrawingRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
@@ -297,25 +197,11 @@ export interface FileRoutesByTo {
   "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects/$projectId": typeof ApiStudioProjectsProjectIdRoute;
+  "/api/v1/$family/build": typeof ApiV1FamilyBuildRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/canvases/create": typeof ApiV1CanvasesCreateRoute;
-  "/api/v1/charts/build": typeof ApiV1ChartsBuildRoute;
-  "/api/v1/class-diagrams/build": typeof ApiV1ClassDiagramsBuildRoute;
-  "/api/v1/er-diagrams/build": typeof ApiV1ErDiagramsBuildRoute;
-  "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/flowcharts/edit": typeof ApiV1FlowchartsEditRoute;
-  "/api/v1/gantts/build": typeof ApiV1GanttsBuildRoute;
   "/api/v1/icons/draw": typeof ApiV1IconsDrawRoute;
-  "/api/v1/journey-maps/build": typeof ApiV1JourneyMapsBuildRoute;
-  "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
-  "/api/v1/org-charts/build": typeof ApiV1OrgChartsBuildRoute;
-  "/api/v1/quadrant-charts/build": typeof ApiV1QuadrantChartsBuildRoute;
-  "/api/v1/sankey-diagrams/build": typeof ApiV1SankeyDiagramsBuildRoute;
-  "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
-  "/api/v1/state-machines/build": typeof ApiV1StateMachinesBuildRoute;
-  "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
-  "/api/v1/venn-diagrams/build": typeof ApiV1VennDiagramsBuildRoute;
-  "/api/v1/wireframes/build": typeof ApiV1WireframesBuildRoute;
   "/api/studio/diagrams/$diagramId/drawing": typeof ApiStudioDiagramsDiagramIdDrawingRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
@@ -337,25 +223,11 @@ export interface FileRoutesById {
   "/api/studio/diagrams/$diagramId": typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   "/api/studio/projects/from-artifact": typeof ApiStudioProjectsFromArtifactRoute;
   "/api/studio/projects_/$projectId": typeof ApiStudioProjectsProjectIdRoute;
+  "/api/v1/$family/build": typeof ApiV1FamilyBuildRoute;
   "/api/v1/artifacts/$artifactId": typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   "/api/v1/canvases/create": typeof ApiV1CanvasesCreateRoute;
-  "/api/v1/charts/build": typeof ApiV1ChartsBuildRoute;
-  "/api/v1/class-diagrams/build": typeof ApiV1ClassDiagramsBuildRoute;
-  "/api/v1/er-diagrams/build": typeof ApiV1ErDiagramsBuildRoute;
-  "/api/v1/flowcharts/build": typeof ApiV1FlowchartsBuildRoute;
   "/api/v1/flowcharts/edit": typeof ApiV1FlowchartsEditRoute;
-  "/api/v1/gantts/build": typeof ApiV1GanttsBuildRoute;
   "/api/v1/icons/draw": typeof ApiV1IconsDrawRoute;
-  "/api/v1/journey-maps/build": typeof ApiV1JourneyMapsBuildRoute;
-  "/api/v1/mindmaps/build": typeof ApiV1MindmapsBuildRoute;
-  "/api/v1/org-charts/build": typeof ApiV1OrgChartsBuildRoute;
-  "/api/v1/quadrant-charts/build": typeof ApiV1QuadrantChartsBuildRoute;
-  "/api/v1/sankey-diagrams/build": typeof ApiV1SankeyDiagramsBuildRoute;
-  "/api/v1/sequences/build": typeof ApiV1SequencesBuildRoute;
-  "/api/v1/state-machines/build": typeof ApiV1StateMachinesBuildRoute;
-  "/api/v1/timelines/build": typeof ApiV1TimelinesBuildRoute;
-  "/api/v1/venn-diagrams/build": typeof ApiV1VennDiagramsBuildRoute;
-  "/api/v1/wireframes/build": typeof ApiV1WireframesBuildRoute;
   "/api/studio/diagrams/$diagramId/drawing": typeof ApiStudioDiagramsDiagramIdDrawingRoute;
   "/api/v1/artifacts/$artifactId/patch": typeof ApiV1ArtifactsArtifactIdPatchRoute;
 }
@@ -378,25 +250,11 @@ export interface FileRouteTypes {
     | "/api/studio/diagrams/$diagramId"
     | "/api/studio/projects/from-artifact"
     | "/api/studio/projects/$projectId"
+    | "/api/v1/$family/build"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/canvases/create"
-    | "/api/v1/charts/build"
-    | "/api/v1/class-diagrams/build"
-    | "/api/v1/er-diagrams/build"
-    | "/api/v1/flowcharts/build"
     | "/api/v1/flowcharts/edit"
-    | "/api/v1/gantts/build"
     | "/api/v1/icons/draw"
-    | "/api/v1/journey-maps/build"
-    | "/api/v1/mindmaps/build"
-    | "/api/v1/org-charts/build"
-    | "/api/v1/quadrant-charts/build"
-    | "/api/v1/sankey-diagrams/build"
-    | "/api/v1/sequences/build"
-    | "/api/v1/state-machines/build"
-    | "/api/v1/timelines/build"
-    | "/api/v1/venn-diagrams/build"
-    | "/api/v1/wireframes/build"
     | "/api/studio/diagrams/$diagramId/drawing"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesByTo: FileRoutesByTo;
@@ -417,25 +275,11 @@ export interface FileRouteTypes {
     | "/api/studio/diagrams/$diagramId"
     | "/api/studio/projects/from-artifact"
     | "/api/studio/projects/$projectId"
+    | "/api/v1/$family/build"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/canvases/create"
-    | "/api/v1/charts/build"
-    | "/api/v1/class-diagrams/build"
-    | "/api/v1/er-diagrams/build"
-    | "/api/v1/flowcharts/build"
     | "/api/v1/flowcharts/edit"
-    | "/api/v1/gantts/build"
     | "/api/v1/icons/draw"
-    | "/api/v1/journey-maps/build"
-    | "/api/v1/mindmaps/build"
-    | "/api/v1/org-charts/build"
-    | "/api/v1/quadrant-charts/build"
-    | "/api/v1/sankey-diagrams/build"
-    | "/api/v1/sequences/build"
-    | "/api/v1/state-machines/build"
-    | "/api/v1/timelines/build"
-    | "/api/v1/venn-diagrams/build"
-    | "/api/v1/wireframes/build"
     | "/api/studio/diagrams/$diagramId/drawing"
     | "/api/v1/artifacts/$artifactId/patch";
   id:
@@ -456,25 +300,11 @@ export interface FileRouteTypes {
     | "/api/studio/diagrams/$diagramId"
     | "/api/studio/projects/from-artifact"
     | "/api/studio/projects_/$projectId"
+    | "/api/v1/$family/build"
     | "/api/v1/artifacts/$artifactId"
     | "/api/v1/canvases/create"
-    | "/api/v1/charts/build"
-    | "/api/v1/class-diagrams/build"
-    | "/api/v1/er-diagrams/build"
-    | "/api/v1/flowcharts/build"
     | "/api/v1/flowcharts/edit"
-    | "/api/v1/gantts/build"
     | "/api/v1/icons/draw"
-    | "/api/v1/journey-maps/build"
-    | "/api/v1/mindmaps/build"
-    | "/api/v1/org-charts/build"
-    | "/api/v1/quadrant-charts/build"
-    | "/api/v1/sankey-diagrams/build"
-    | "/api/v1/sequences/build"
-    | "/api/v1/state-machines/build"
-    | "/api/v1/timelines/build"
-    | "/api/v1/venn-diagrams/build"
-    | "/api/v1/wireframes/build"
     | "/api/studio/diagrams/$diagramId/drawing"
     | "/api/v1/artifacts/$artifactId/patch";
   fileRoutesById: FileRoutesById;
@@ -495,25 +325,11 @@ export interface RootRouteChildren {
   DiagramsDiagramIdEditRoute: typeof DiagramsDiagramIdEditRoute;
   ApiStudioDiagramsDiagramIdRoute: typeof ApiStudioDiagramsDiagramIdRouteWithChildren;
   ApiStudioProjectsProjectIdRoute: typeof ApiStudioProjectsProjectIdRoute;
+  ApiV1FamilyBuildRoute: typeof ApiV1FamilyBuildRoute;
   ApiV1ArtifactsArtifactIdRoute: typeof ApiV1ArtifactsArtifactIdRouteWithChildren;
   ApiV1CanvasesCreateRoute: typeof ApiV1CanvasesCreateRoute;
-  ApiV1ChartsBuildRoute: typeof ApiV1ChartsBuildRoute;
-  ApiV1ClassDiagramsBuildRoute: typeof ApiV1ClassDiagramsBuildRoute;
-  ApiV1ErDiagramsBuildRoute: typeof ApiV1ErDiagramsBuildRoute;
-  ApiV1FlowchartsBuildRoute: typeof ApiV1FlowchartsBuildRoute;
   ApiV1FlowchartsEditRoute: typeof ApiV1FlowchartsEditRoute;
-  ApiV1GanttsBuildRoute: typeof ApiV1GanttsBuildRoute;
   ApiV1IconsDrawRoute: typeof ApiV1IconsDrawRoute;
-  ApiV1JourneyMapsBuildRoute: typeof ApiV1JourneyMapsBuildRoute;
-  ApiV1MindmapsBuildRoute: typeof ApiV1MindmapsBuildRoute;
-  ApiV1OrgChartsBuildRoute: typeof ApiV1OrgChartsBuildRoute;
-  ApiV1QuadrantChartsBuildRoute: typeof ApiV1QuadrantChartsBuildRoute;
-  ApiV1SankeyDiagramsBuildRoute: typeof ApiV1SankeyDiagramsBuildRoute;
-  ApiV1SequencesBuildRoute: typeof ApiV1SequencesBuildRoute;
-  ApiV1StateMachinesBuildRoute: typeof ApiV1StateMachinesBuildRoute;
-  ApiV1TimelinesBuildRoute: typeof ApiV1TimelinesBuildRoute;
-  ApiV1VennDiagramsBuildRoute: typeof ApiV1VennDiagramsBuildRoute;
-  ApiV1WireframesBuildRoute: typeof ApiV1WireframesBuildRoute;
 }
 
 declare module "@tanstack/react-router" {
@@ -630,6 +446,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiStudioProjectsProjectIdRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/api/v1/$family/build": {
+      id: "/api/v1/$family/build";
+      path: "/api/v1/$family/build";
+      fullPath: "/api/v1/$family/build";
+      preLoaderRoute: typeof ApiV1FamilyBuildRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/v1/artifacts/$artifactId": {
       id: "/api/v1/artifacts/$artifactId";
       path: "/api/v1/artifacts/$artifactId";
@@ -644,34 +467,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiV1CanvasesCreateRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/v1/charts/build": {
-      id: "/api/v1/charts/build";
-      path: "/api/v1/charts/build";
-      fullPath: "/api/v1/charts/build";
-      preLoaderRoute: typeof ApiV1ChartsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/class-diagrams/build": {
-      id: "/api/v1/class-diagrams/build";
-      path: "/api/v1/class-diagrams/build";
-      fullPath: "/api/v1/class-diagrams/build";
-      preLoaderRoute: typeof ApiV1ClassDiagramsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/er-diagrams/build": {
-      id: "/api/v1/er-diagrams/build";
-      path: "/api/v1/er-diagrams/build";
-      fullPath: "/api/v1/er-diagrams/build";
-      preLoaderRoute: typeof ApiV1ErDiagramsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/flowcharts/build": {
-      id: "/api/v1/flowcharts/build";
-      path: "/api/v1/flowcharts/build";
-      fullPath: "/api/v1/flowcharts/build";
-      preLoaderRoute: typeof ApiV1FlowchartsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     "/api/v1/flowcharts/edit": {
       id: "/api/v1/flowcharts/edit";
       path: "/api/v1/flowcharts/edit";
@@ -679,88 +474,11 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiV1FlowchartsEditRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/v1/gantts/build": {
-      id: "/api/v1/gantts/build";
-      path: "/api/v1/gantts/build";
-      fullPath: "/api/v1/gantts/build";
-      preLoaderRoute: typeof ApiV1GanttsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     "/api/v1/icons/draw": {
       id: "/api/v1/icons/draw";
       path: "/api/v1/icons/draw";
       fullPath: "/api/v1/icons/draw";
       preLoaderRoute: typeof ApiV1IconsDrawRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/journey-maps/build": {
-      id: "/api/v1/journey-maps/build";
-      path: "/api/v1/journey-maps/build";
-      fullPath: "/api/v1/journey-maps/build";
-      preLoaderRoute: typeof ApiV1JourneyMapsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/mindmaps/build": {
-      id: "/api/v1/mindmaps/build";
-      path: "/api/v1/mindmaps/build";
-      fullPath: "/api/v1/mindmaps/build";
-      preLoaderRoute: typeof ApiV1MindmapsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/org-charts/build": {
-      id: "/api/v1/org-charts/build";
-      path: "/api/v1/org-charts/build";
-      fullPath: "/api/v1/org-charts/build";
-      preLoaderRoute: typeof ApiV1OrgChartsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/quadrant-charts/build": {
-      id: "/api/v1/quadrant-charts/build";
-      path: "/api/v1/quadrant-charts/build";
-      fullPath: "/api/v1/quadrant-charts/build";
-      preLoaderRoute: typeof ApiV1QuadrantChartsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/sankey-diagrams/build": {
-      id: "/api/v1/sankey-diagrams/build";
-      path: "/api/v1/sankey-diagrams/build";
-      fullPath: "/api/v1/sankey-diagrams/build";
-      preLoaderRoute: typeof ApiV1SankeyDiagramsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/sequences/build": {
-      id: "/api/v1/sequences/build";
-      path: "/api/v1/sequences/build";
-      fullPath: "/api/v1/sequences/build";
-      preLoaderRoute: typeof ApiV1SequencesBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/state-machines/build": {
-      id: "/api/v1/state-machines/build";
-      path: "/api/v1/state-machines/build";
-      fullPath: "/api/v1/state-machines/build";
-      preLoaderRoute: typeof ApiV1StateMachinesBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/timelines/build": {
-      id: "/api/v1/timelines/build";
-      path: "/api/v1/timelines/build";
-      fullPath: "/api/v1/timelines/build";
-      preLoaderRoute: typeof ApiV1TimelinesBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/venn-diagrams/build": {
-      id: "/api/v1/venn-diagrams/build";
-      path: "/api/v1/venn-diagrams/build";
-      fullPath: "/api/v1/venn-diagrams/build";
-      preLoaderRoute: typeof ApiV1VennDiagramsBuildRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/api/v1/wireframes/build": {
-      id: "/api/v1/wireframes/build";
-      path: "/api/v1/wireframes/build";
-      fullPath: "/api/v1/wireframes/build";
-      preLoaderRoute: typeof ApiV1WireframesBuildRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/api/studio/diagrams/$diagramId/drawing": {
@@ -836,25 +554,11 @@ const rootRouteChildren: RootRouteChildren = {
   DiagramsDiagramIdEditRoute: DiagramsDiagramIdEditRoute,
   ApiStudioDiagramsDiagramIdRoute: ApiStudioDiagramsDiagramIdRouteWithChildren,
   ApiStudioProjectsProjectIdRoute: ApiStudioProjectsProjectIdRoute,
+  ApiV1FamilyBuildRoute: ApiV1FamilyBuildRoute,
   ApiV1ArtifactsArtifactIdRoute: ApiV1ArtifactsArtifactIdRouteWithChildren,
   ApiV1CanvasesCreateRoute: ApiV1CanvasesCreateRoute,
-  ApiV1ChartsBuildRoute: ApiV1ChartsBuildRoute,
-  ApiV1ClassDiagramsBuildRoute: ApiV1ClassDiagramsBuildRoute,
-  ApiV1ErDiagramsBuildRoute: ApiV1ErDiagramsBuildRoute,
-  ApiV1FlowchartsBuildRoute: ApiV1FlowchartsBuildRoute,
   ApiV1FlowchartsEditRoute: ApiV1FlowchartsEditRoute,
-  ApiV1GanttsBuildRoute: ApiV1GanttsBuildRoute,
   ApiV1IconsDrawRoute: ApiV1IconsDrawRoute,
-  ApiV1JourneyMapsBuildRoute: ApiV1JourneyMapsBuildRoute,
-  ApiV1MindmapsBuildRoute: ApiV1MindmapsBuildRoute,
-  ApiV1OrgChartsBuildRoute: ApiV1OrgChartsBuildRoute,
-  ApiV1QuadrantChartsBuildRoute: ApiV1QuadrantChartsBuildRoute,
-  ApiV1SankeyDiagramsBuildRoute: ApiV1SankeyDiagramsBuildRoute,
-  ApiV1SequencesBuildRoute: ApiV1SequencesBuildRoute,
-  ApiV1StateMachinesBuildRoute: ApiV1StateMachinesBuildRoute,
-  ApiV1TimelinesBuildRoute: ApiV1TimelinesBuildRoute,
-  ApiV1VennDiagramsBuildRoute: ApiV1VennDiagramsBuildRoute,
-  ApiV1WireframesBuildRoute: ApiV1WireframesBuildRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

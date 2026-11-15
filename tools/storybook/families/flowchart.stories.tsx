@@ -1,24 +1,24 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
 import { crossingFixtures } from "@sketchi/diagrams/families/flowchart/crossing-fixtures";
-import {
-	describedArchitectureFlowchart,
-	leftToRightHybridFlowchart,
-	requestPathFlowcharts,
-	zoneFixtures,
-} from "@sketchi/diagrams/families/flowchart/zone-fixtures";
-import {
-	flowchartFixture,
-	pharmaBatchDispositionFlowchart,
-} from "@sketchi/diagrams/families/flowchart/diagram";
+import { pharmaBatchDispositionFlowchart } from "@sketchi/diagrams/families/flowchart/diagram";
 import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
 import { laneFixtures } from "@sketchi/diagrams/families/flowchart/lane-fixtures";
 import {
 	leftToRightIncidentFlowchart,
 	routingFixtures,
 } from "@sketchi/diagrams/families/flowchart/routing-fixtures";
+import {
+	describedArchitectureFlowchart,
+	leftToRightHybridFlowchart,
+	requestPathFlowcharts,
+	zoneFixtures,
+} from "@sketchi/diagrams/families/flowchart/zone-fixtures";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const flowchartFixture = familyForType("flowchart").fixture;
 
 const meta = {
 	title: "Diagram Types/Flowchart",

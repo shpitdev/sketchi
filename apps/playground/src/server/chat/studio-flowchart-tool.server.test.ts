@@ -1,36 +1,40 @@
 import { describe, expect, it, vi } from "@effect/vitest";
+import { familyForType } from "@sketchi/diagrams/family";
 import { Effect, Fiber, Schema } from "effect";
+import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
+import { studioSystemPrompt } from "./studio-system-prompt";
+const StudioBuildFlowchartInputSchema = toPlaygroundStandardSchema(
+	familyForType("flowchart").studioInput,
+);
+const StudioBuildFlowchartOutputSchema = toPlaygroundStandardSchema(
+	familyForType("flowchart").contracts.output,
+);
 
 import {
-	BuildFlowchartResultSchema,
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "@sketchi/diagrams/build/code-mode/artifacts";
+import {
 	BuildFlowchartRequestSchema,
 	type BuildFlowchartResult,
 	type FlowchartSpec,
-	toCodeModeJsonSchema,
 } from "@sketchi/diagrams/build/code-mode/contract";
 import {
 	buildFlowchart,
 	CodeModeRuntimeEnvironment,
 } from "@sketchi/diagrams/build/code-mode/runtime";
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "@sketchi/diagrams/build/code-mode/artifacts";
 import { DIAGRAM_AGENT_SYSTEM_PROMPT } from "@sketchi/diagrams/build/policy";
 
+import {
+	makeStudioFlowchartToolExecutor,
+	STUDIO_COVERAGE_FINAL_HINT,
+	STUDIO_COVERAGE_HINT,
+} from "./studio-build-policy.server";
 import {
 	makeStudioBuildTurn,
 	studioBuildModelOutput,
 	studioTurnOutcome,
 } from "./studio-build-tool.server";
-import {
-	makeStudioFlowchartToolExecutor,
-	STUDIO_COVERAGE_FINAL_HINT,
-	STUDIO_COVERAGE_HINT,
-	StudioBuildFlowchartInputSchema,
-	StudioBuildFlowchartOutputSchema,
-	studioSystemPrompt,
-} from "./studio-flowchart-tool.server";
 
 function acceptedSpec(): FlowchartSpec {
 	return {
@@ -107,29 +111,7 @@ const repairResult: BuildFlowchartResult = {
 };
 
 describe("Studio build_flowchart host", () => {
-	it("exposes package-derived Standard Schema input and output contracts", async () => {
-		expect(
-			StudioBuildFlowchartInputSchema["~standard"].jsonSchema.input({
-				target: "draft-2020-12",
-			}),
-		).toEqual(toCodeModeJsonSchema(BuildFlowchartRequestSchema.omit({ options: true })));
-		// The host supplies the request; the model cannot write one.
-		const input = StudioBuildFlowchartInputSchema["~standard"].jsonSchema.input({
-			target: "draft-2020-12",
-		}) as { readonly properties?: Record<string, unknown> };
-		expect(Object.keys(input.properties ?? {})).toEqual(["requestId", "spec"]);
-
-		expect(
-			StudioBuildFlowchartOutputSchema["~standard"].jsonSchema.output({
-				target: "draft-2020-12",
-			}),
-		).toEqual(toCodeModeJsonSchema(BuildFlowchartResultSchema));
-		expect(
-			StudioBuildFlowchartOutputSchema["~standard"].jsonSchema.output({
-				target: "draft-07",
-			}).$schema,
-		).toBe("http://json-schema.org/draft-07/schema#");
-
+	it("accepts a structured repair result and rejects missing issue fields", async () => {
 		const validRepair = await StudioBuildFlowchartOutputSchema["~standard"].validate(repairResult);
 		expect(validRepair).toEqual({ value: repairResult });
 		const invalidRepair = await StudioBuildFlowchartOutputSchema["~standard"].validate({

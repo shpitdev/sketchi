@@ -1,6 +1,4 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
-import { describe, expect, it } from "vitest";
 import {
 	boundLabelWidth,
 	getCanvasValidationIssues,
@@ -9,14 +7,16 @@ import {
 	type CanvasTextElement,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
+import { Result } from "effect";
+import { describe, expect, it } from "vitest";
+import { renderDiagram } from "../../family.js";
+import { timelineDurationCaption } from "./captions.js";
 import {
 	parseTimelineDate,
 	parseTimelineDiagram,
 	timelineFixture,
 	type TimelineDiagram,
 } from "./document.js";
-import { renderDiagram } from "../../render.js";
-import { timelineDurationCaption } from "./captions.js";
 
 import { readTimelineAxis, readTimelineGaps, readTimelineMomentGaps } from "./readout.js";
 

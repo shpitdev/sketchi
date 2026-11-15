@@ -1,5 +1,5 @@
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "../types.js";
 import { Result, Schema } from "effect";
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family.js";
 
 /** Generation produces every canonical family natively, and nothing else. */
 export const DiagramGenerationTypeSchema = Schema.Literals(DIAGRAM_TYPES);

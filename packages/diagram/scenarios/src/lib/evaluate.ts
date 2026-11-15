@@ -1,29 +1,38 @@
+import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
+import { parseClassDiagram } from "@sketchi/diagrams/families/class/document";
+import { parseErDiagram } from "@sketchi/diagrams/families/er/document";
+import {
+	type FlowchartDiagram,
+	parseFlowchartDiagram,
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { parseGanttDiagram } from "@sketchi/diagrams/families/gantt/document";
+import { parseJourneyDiagram } from "@sketchi/diagrams/families/journey/document";
 import { type MindmapInputError, parseMindmap } from "@sketchi/diagrams/families/mindmap/index";
-import { Result, Schema } from "effect";
-import { type CanonicalValidationError, type CanonicalDiagram } from "@sketchi/diagrams/diagram";
+import { parseOrgChartDiagram } from "@sketchi/diagrams/families/org-chart/document";
+import { parseQuadrantDiagram } from "@sketchi/diagrams/families/quadrant/document";
+import { parseSankeyDiagram } from "@sketchi/diagrams/families/sankey/document";
 import {
 	type SequenceDiagram,
 	parseSequenceDiagram,
 	sequenceActivations,
 } from "@sketchi/diagrams/families/sequence/document";
-import {
-	type FlowchartDiagram,
-	parseFlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
 import { parseStateMachineDiagram } from "@sketchi/diagrams/families/state-machine/document";
-import { parseErDiagram } from "@sketchi/diagrams/families/er/document";
-import { parseClassDiagram } from "@sketchi/diagrams/families/class/document";
-import { parseOrgChartDiagram } from "@sketchi/diagrams/families/org-chart/document";
-import { parseVennDiagram, resolveVennShorthand } from "@sketchi/diagrams/families/venn/document";
-import { parseJourneyDiagram } from "@sketchi/diagrams/families/journey/document";
-import { parseSankeyDiagram } from "@sketchi/diagrams/families/sankey/document";
-import { parseWireframeDiagram } from "@sketchi/diagrams/families/wireframe/document";
-import { parseQuadrantDiagram } from "@sketchi/diagrams/families/quadrant/document";
 import { parseTimelineDiagram } from "@sketchi/diagrams/families/timeline/document";
-import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
-import { parseGanttDiagram } from "@sketchi/diagrams/families/gantt/document";
+import { parseVennDiagram, resolveVennShorthand } from "@sketchi/diagrams/families/venn/document";
+import { parseWireframeDiagram } from "@sketchi/diagrams/families/wireframe/document";
+import { type CanonicalDiagram, type CanonicalValidationError } from "@sketchi/diagrams/family";
 import { lineCrossings, unavoidableCrossings } from "@sketchi/diagrams/graph/planarity";
+import { Result, Schema } from "effect";
 
+import { renderDiagram } from "@sketchi/diagrams/family";
+import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
+import {
+	type ExcalidrawScene,
+	type ExcalidrawSceneValidationResult,
+	convertSceneToExcalidraw,
+	validateExcalidrawScene,
+} from "@sketchi/drawing/excalidraw";
+import { termTokens } from "@sketchi/icon-catalog";
 import {
 	chartClearRulesCheck,
 	chartDrawnDataCheck,
@@ -31,37 +40,8 @@ import {
 	chartPieLabelCheck,
 	chartScenarioChecks,
 } from "./chart-scenarios.js";
-import {
-	timelineGapOrderCheck,
-	timelineScenarioChecks,
-	timelineSpacingCheck,
-} from "./timeline-scenarios.js";
-import { stateMachineScenarioChecks } from "./state-machine-scenarios.js";
-import { mindmapLayoutCheck, mindmapScenarioChecks } from "./mindmap-scenarios.js";
-import { erDrawnCheck, erScenarioChecks } from "./er-scenarios.js";
 import { classClearanceCheck, classDrawnCheck, classScenarioChecks } from "./class-scenarios.js";
-import {
-	orgChartDrawnCheck,
-	orgChartLayoutCheck,
-	orgChartScenarioChecks,
-} from "./org-chart-scenarios.js";
-import { vennDrawnCheck, vennLayoutCheck, vennScenarioChecks } from "./venn-scenarios.js";
-import { sankeyDrawnCheck, sankeyLayoutCheck, sankeyScenarioChecks } from "./sankey-scenarios.js";
-import {
-	journeyDrawnCheck,
-	journeyLayoutCheck,
-	journeyScenarioChecks,
-} from "./journey-scenarios.js";
-import {
-	wireframeDrawnCheck,
-	wireframeLayoutCheck,
-	wireframeScenarioChecks,
-} from "./wireframe-scenarios.js";
-import {
-	quadrantDrawnCheck,
-	quadrantLayoutCheck,
-	quadrantScenarioChecks,
-} from "./quadrant-scenarios.js";
+import { erDrawnCheck, erScenarioChecks } from "./er-scenarios.js";
 import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,
@@ -69,23 +49,37 @@ import {
 	ganttScenarioChecks,
 } from "./gantt-scenarios.js";
 import {
-	convertSceneToExcalidraw,
-	validateExcalidrawScene,
-	type ExcalidrawScene,
-	type ExcalidrawSceneValidationResult,
-} from "@sketchi/drawing/excalidraw";
-import { renderDiagram } from "@sketchi/diagrams/render";
-import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
-import { termTokens } from "@sketchi/icon-catalog";
+	journeyDrawnCheck,
+	journeyLayoutCheck,
+	journeyScenarioChecks,
+} from "./journey-scenarios.js";
+import { mindmapLayoutCheck, mindmapScenarioChecks } from "./mindmap-scenarios.js";
+import {
+	orgChartDrawnCheck,
+	orgChartLayoutCheck,
+	orgChartScenarioChecks,
+} from "./org-chart-scenarios.js";
+import {
+	quadrantDrawnCheck,
+	quadrantLayoutCheck,
+	quadrantScenarioChecks,
+} from "./quadrant-scenarios.js";
+import { sankeyDrawnCheck, sankeyLayoutCheck, sankeyScenarioChecks } from "./sankey-scenarios.js";
+import { stateMachineScenarioChecks } from "./state-machine-scenarios.js";
+import {
+	timelineGapOrderCheck,
+	timelineScenarioChecks,
+	timelineSpacingCheck,
+} from "./timeline-scenarios.js";
+import { vennDrawnCheck, vennLayoutCheck, vennScenarioChecks } from "./venn-scenarios.js";
+import {
+	wireframeDrawnCheck,
+	wireframeLayoutCheck,
+	wireframeScenarioChecks,
+} from "./wireframe-scenarios.js";
 
 import { type DiagramScenario } from "./diagram-scenarios.js";
 import { flowchartLabelMatches } from "./flowchart-labels.js";
-import {
-	type FlowchartScenario,
-	type FlowchartScenarioRequiredNode,
-	type DiagramScenarioLogo,
-} from "./scenarios.js";
-import { type SequenceScenario, type SequenceScenarioMessage } from "./sequence-scenarios.js";
 import {
 	type BranchMatcher,
 	type ExpectedEdge,
@@ -93,6 +87,12 @@ import {
 	flowchartGroupsAround,
 	matchFlowchartSteps,
 } from "./flowchart-matching.js";
+import {
+	type DiagramScenarioLogo,
+	type FlowchartScenario,
+	type FlowchartScenarioRequiredNode,
+} from "./scenarios.js";
+import { type SequenceScenario, type SequenceScenarioMessage } from "./sequence-scenarios.js";
 
 export interface ScenarioCheck {
 	id: string;

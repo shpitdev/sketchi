@@ -1,8 +1,8 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import type { ClassDiagram } from "@sketchi/diagrams/families/class/document";
+import { renderDiagram } from "@sketchi/diagrams/family";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import type { ClassDiagram } from "@sketchi/diagrams/families/class/document";
-import { renderDiagram } from "@sketchi/diagrams/render";
 
 import { classClearanceCheck, classDrawnCheck, classScenarios } from "./class-scenarios.js";
 import { evaluateScenarioDiagram } from "./evaluate.js";

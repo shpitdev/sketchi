@@ -3,30 +3,28 @@ import {
 	RenderedDiagramSceneSchema,
 	type PatchableScene,
 } from "@sketchi/diagrams/build/code-mode/contract";
-import {
-	type CANONICAL_DOCUMENT_TYPES,
-	type CanonicalDiagramDocument,
-} from "@sketchi/diagrams/build/code-mode/documents";
-import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
+import { type CanonicalDiagramDocument, type DIAGRAM_TYPES } from "@sketchi/diagrams/family";
+
 import { CodeModeIssue } from "@sketchi/diagrams/build/result";
-import { Effect, Schema, Result } from "effect";
+import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
+import { Effect, Result, Schema } from "effect";
 
 import { type BuiltDiagram, type StoredDiagram } from "./contracts.js";
 import { decodeCanonicalDiagramDocument, documentId, validateStorageId } from "./document.js";
 import { CliGenerationError, CliValidationError } from "./errors.js";
 import { DiagramPatcher } from "./patch.js";
-import { DiagramStore } from "./storage.js";
 import {
 	GENERATE_REQUEST_TIMEOUT,
 	MAX_API_RESPONSE_BYTES,
 	readBoundedText,
 } from "./response-body.js";
+import { DiagramStore } from "./storage.js";
 
 export const DEFAULT_GENERATE_ENDPOINT = "https://playground.sketchi.app/api/v1/generate";
 export const SKETCHI_GENERATE_ENDPOINT_ENV = "SKETCHI_GENERATE_ENDPOINT";
 
 /** Generation requests any canonical diagram family, and only those. */
-export type GenerationType = (typeof CANONICAL_DOCUMENT_TYPES)[number];
+export type GenerationType = (typeof DIAGRAM_TYPES)[number];
 
 export interface GenerateDiagramInput {
 	readonly endpoint: string;

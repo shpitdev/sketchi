@@ -1,33 +1,24 @@
+import {
+	families,
+	FAMILY_BUILD_OPERATIONS,
+	type FamilyBuildResult,
+} from "@sketchi/diagrams/family";
 import "@tanstack/react-start/server-only";
 
 import { isDeepStrictEqual } from "node:util";
 
+import {
+	type ApplyDiagramPatchResult,
+	type CreateCanvasResult,
+	type EditFlowchartResult,
+} from "@sketchi/diagrams/build/code-mode/contract";
 import { CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { type ArtifactBundle, type PartialArtifactBundle } from "@sketchi/drawing/artifacts";
-import {
-	type BuildFlowchartResult,
-	type EditFlowchartResult,
-	type BuildSequenceDiagramResult,
-	type BuildStateMachineResult,
-	type BuildGanttResult,
-	type BuildErDiagramResult,
-	type BuildClassDiagramResult,
-	type BuildOrgChartResult,
-	type BuildVennDiagramResult,
-	type BuildJourneyMapResult,
-	type BuildSankeyResult,
-	type BuildWireframeResult,
-	type BuildQuadrantChartResult,
-	type BuildTimelineResult,
-	type BuildChartResult,
-	type CreateCanvasResult,
-	type ApplyDiagramPatchResult,
-} from "@sketchi/diagrams/build/code-mode/contract";
-import { type BuildMindmapResult } from "@sketchi/diagrams/families/mindmap/build";
 import { ICON_DRAW_BUDGET_MS } from "@sketchi/icon-draw";
 import { withTelemetryCorrelation, type TelemetryCorrelationInput } from "@sketchi/observability";
 import { Clock, Context, Deferred, Effect, Schema } from "effect";
 
+import { drawIconForAgent } from "../icons/draw.server";
 import {
 	PlaygroundBindings,
 	PlaygroundClock,
@@ -35,16 +26,15 @@ import {
 } from "../runtime/context.server";
 import { type PlaygroundRequestRunner } from "../runtime/runtime.server";
 import { toPlaygroundStandardSchema } from "../schema/effect-standard-schema.server";
+import { PNG_EXPORT_TIMEOUT_MS } from "./browser-render-pool.server";
+import { SKETCHI_EXECUTE_CODE_DESCRIPTION } from "./mcp-docs.server";
 import {
 	PlaygroundCodeMode,
 	PlaygroundDefaultPngDelivery,
 	PlaygroundNamedLogoFill,
 	type CodeModeRequestContext,
 } from "./service.server";
-import { SKETCHI_EXECUTE_CODE_DESCRIPTION } from "./mcp-docs.server";
-import { PNG_EXPORT_TIMEOUT_MS } from "./browser-render-pool.server";
 import { PlaygroundCodeModeUsage } from "./usage-events.server";
-import { drawIconForAgent } from "../icons/draw.server";
 
 export interface SketchiCodeModeProvider {
 	name: string;
@@ -111,27 +101,15 @@ const ExecuteBuildArtifactContract = Schema.Struct({
 	/** The artifact an edit started from. */
 	provenance: Schema.optionalKey(Schema.Struct({ sourceArtifactId: Schema.String })),
 });
+const BUILD_OPERATIONS = [
+	...FAMILY_BUILD_OPERATIONS.slice(0, 1),
+	"editFlowchart",
+	...FAMILY_BUILD_OPERATIONS.slice(1),
+	"createCanvas",
+] as const;
 const ExecuteBuildContract = Schema.Struct({
 	index: Schema.Number,
-	operation: Schema.Literals([
-		"buildFlowchart",
-		"editFlowchart",
-		"buildMindmap",
-		"buildSequenceDiagram",
-		"buildTimeline",
-		"buildChart",
-		"buildStateMachine",
-		"buildGantt",
-		"buildErDiagram",
-		"buildClassDiagram",
-		"buildOrgChart",
-		"buildVennDiagram",
-		"buildJourneyMap",
-		"buildSankey",
-		"buildWireframe",
-		"buildQuadrantChart",
-		"createCanvas",
-	]),
+	operation: Schema.Literals(BUILD_OPERATIONS),
 	ok: Schema.Boolean,
 	status: Schema.String,
 	buildId: Schema.optionalKey(Schema.String),
@@ -155,24 +133,7 @@ interface BuildObserver {
 	pngUnavailable(artifactId: string, message: string): void;
 }
 type BuildOperation = ExecuteBuild["operation"];
-type BuildResult =
-	| BuildFlowchartResult
-	| EditFlowchartResult
-	| BuildMindmapResult
-	| BuildSequenceDiagramResult
-	| BuildTimelineResult
-	| BuildChartResult
-	| BuildStateMachineResult
-	| BuildGanttResult
-	| BuildErDiagramResult
-	| BuildClassDiagramResult
-	| BuildOrgChartResult
-	| BuildVennDiagramResult
-	| BuildJourneyMapResult
-	| BuildSankeyResult
-	| BuildWireframeResult
-	| BuildQuadrantChartResult
-	| CreateCanvasResult;
+type BuildResult = FamilyBuildResult | EditFlowchartResult | CreateCanvasResult;
 
 // Receipts carry references, not a second copy of the potentially large inline scene/export.
 function buildArtifactReference(artifact: ArtifactBundle | PartialArtifactBundle) {
@@ -292,7 +253,7 @@ function trackSandboxBuilds(code: string): string {
       const trackedSketchi = new Proxy(sketchi, {
         get(target, name) {
           const method = target[name];
-          if (!["buildFlowchart", "editFlowchart", "buildMindmap", "buildSequenceDiagram", "buildTimeline", "buildChart", "buildStateMachine", "buildGantt", "buildErDiagram", "buildClassDiagram", "buildOrgChart", "buildVennDiagram", "buildJourneyMap", "buildSankey", "buildWireframe", "buildQuadrantChart", "createCanvas"].includes(name)) return method;
+          if (!${JSON.stringify(BUILD_OPERATIONS)}.includes(name)) return method;
           return (...args) => {
             const pending = method(...args);
             pendingBuilds.push(pending);
@@ -758,7 +719,12 @@ export function makeSketchiCodeModeProvider(
 		return yield* Effect.gen(function* () {
 			const result = yield* deliver<BuildResult, CodeModeRequestContext>(
 				request,
-				codeMode[operation](withModelDelivery(request)),
+				operation === "editFlowchart" || operation === "createCanvas"
+					? codeMode[operation](withModelDelivery(request))
+					: codeMode.buildFamily<FamilyBuildResult>(
+							familyForOperation(operation),
+							withModelDelivery(request),
+						),
 			);
 			observer?.completed(buildReceipt(operation, index, result));
 			return result;
@@ -767,115 +733,22 @@ export function makeSketchiCodeModeProvider(
 	return {
 		name: "sketchi",
 		fns: {
-			buildFlowchart: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildFlowchart", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
+			...Object.fromEntries(
+				families.map((family) => [
+					family.operation,
+					(request: unknown, options: unknown) =>
+						runToolEffect(
+							withTelemetryCorrelation(
+								build(family.operation, withTrailingOptions(request, options)),
+								correlation,
+							),
+						),
+				]),
+			),
 			editFlowchart: (request, options) =>
 				runToolEffect(
 					withTelemetryCorrelation(
 						build("editFlowchart", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildMindmap: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildMindmap", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildSequenceDiagram: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildSequenceDiagram", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildTimeline: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildTimeline", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildChart: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildChart", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildStateMachine: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildStateMachine", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildGantt: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildGantt", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildErDiagram: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildErDiagram", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildClassDiagram: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildClassDiagram", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildOrgChart: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildOrgChart", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildVennDiagram: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildVennDiagram", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildJourneyMap: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildJourneyMap", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildSankey: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildSankey", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildWireframe: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildWireframe", withTrailingOptions(request, options)),
-						correlation,
-					),
-				),
-			buildQuadrantChart: (request, options) =>
-				runToolEffect(
-					withTelemetryCorrelation(
-						build("buildQuadrantChart", withTrailingOptions(request, options)),
 						correlation,
 					),
 				),
@@ -904,4 +777,10 @@ export function makeSketchiCodeModeProvider(
 				runToolEffect(withTelemetryCorrelation(drawIconForAgent(request), correlation)),
 		},
 	};
+}
+
+function familyForOperation(operation: import("@sketchi/diagrams/family").FamilyBuildOperation) {
+	const family = families.find((family) => family.operation === operation);
+	if (!family) throw new Error(`Unknown family build: ${operation}`);
+	return family;
 }

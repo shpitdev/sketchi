@@ -1,12 +1,15 @@
+import { familyForType } from "@sketchi/diagrams/family";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
+import { Result } from "effect";
 
 import { type MindmapTopic, parseMindmap } from "@sketchi/diagrams/families/mindmap/index";
-import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
+
 import { mindmapScenarios } from "@sketchi/diagram-scenarios";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const mindmapFixture = familyForType("mindmap").fixture;
 
 const meta = {
 	title: "Diagram Types/Mindmap",

@@ -3,9 +3,9 @@
  * code reads its answers with. Nothing here names a scenario: each option says what a family
  * draws, and what separates it from the families it is confused with.
  */
-import type { DiagramTypeValue } from "../types.js";
-import { Decision } from "effect/ai";
 import { Schema } from "effect";
+import { Decision } from "effect/ai";
+import type { DiagramTypeValue } from "../family.js";
 
 /** Pinned, not an alias, so a graded result stays reproducible. */
 export const FAMILY_NARROWING_MODEL = "jev-1.14.0";

@@ -255,8 +255,8 @@ describe("workspace project membership", () => {
 		const results = lintProbes({
 			"packages/diagrams/.storybook/boundary-probe.ts": 'import "@sketchi/diagram-scenarios";',
 			"packages/diagrams/vitest.boundary-probe.mts": 'import "@sketchi/diagram-scenarios";',
-			"packages/drawing/src/domain-boundary-probe.ts": 'import "@sketchi/diagrams/diagram";',
-			"packages/icons/draw/src/domain-boundary-probe.ts": 'import "@sketchi/diagrams/diagram";',
+			"packages/drawing/src/domain-boundary-probe.ts": 'import "@sketchi/diagrams/family";',
+			"packages/icons/draw/src/domain-boundary-probe.ts": 'import "@sketchi/diagrams/family";',
 			"packages/diagrams/src/domain-boundary-allowed-probe.ts": [
 				'import "@sketchi/icon-catalog";',
 				'import "@sketchi/drawing";',

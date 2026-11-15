@@ -1,35 +1,26 @@
-// Positive fixtures deliberately unwrap Results: failure is invalid maintained input.
-import {
-	canonicalDocumentFromDiagram,
-	type CanonicalDiagramDocument,
-} from "@sketchi/diagrams/build/code-mode/documents";
+import { scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
 import {
 	CodeModeArtifactStorage,
 	CodeModeArtifactStorageMemory,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
+import { canonicalDocumentFromDiagram } from "@sketchi/diagrams/build/code-mode/documents";
 import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
-import { type CanonicalDiagram, parseCanonicalDiagram } from "@sketchi/diagrams/diagram";
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "@sketchi/diagrams/types";
-import { diagramFixtures } from "@sketchi/diagrams/fixtures";
-import { getCanvasValidationIssues } from "@sketchi/drawing";
+import {
+	type CanonicalDiagram,
+	type CanonicalDiagramDocument,
+	DIAGRAM_TYPES,
+	type DiagramTypeValue,
+	familyForType,
+	parseCanonicalDiagram,
+	renderDiagram,
+} from "@sketchi/diagrams/family";
 import { candidateFromText } from "@sketchi/diagrams/generate/candidates";
-import { renderDiagram } from "@sketchi/diagrams/render";
-import { scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
+import { getCanvasValidationIssues } from "@sketchi/drawing";
 import { Effect, Layer, Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { DiagramBuilder, DiagramBuilderLive } from "../apps/cli/src/builder.ts";
 import { parseJsonDocument } from "../apps/cli/src/document.ts";
-
-function fixtureFor(family: DiagramTypeValue): CanonicalDiagram {
-	const fixture = diagramFixtures.find((diagram) => diagram.type === family);
-	if (!fixture) {
-		throw new Error(
-			`diagrams exports no fixture for "${family}"; add one to diagramFixtures (packages/diagrams/src/fixtures.ts).`,
-		);
-	}
-	return fixture;
-}
 
 /** A family's fixture as a model answers it: a flowchart as its document, any other as its diagram. */
 function generationEnvelope(diagram: CanonicalDiagram): string {
@@ -46,7 +37,7 @@ function generationEnvelope(diagram: CanonicalDiagram): string {
 
 /** The document a family's fixture builds from: a flowchart's is written, not converted. */
 function documentFor(family: DiagramTypeValue): CanonicalDiagramDocument {
-	const diagram = fixtureFor(family);
+	const diagram = familyForType(family).fixture;
 	return diagram.type === "flowchart"
 		? { type: "flowchart", spec: scenarioFlowchartDocument(diagram) }
 		: canonicalDocumentFromDiagram(diagram);
@@ -65,7 +56,7 @@ describe("canonical diagram family consumers", () => {
 	it.each(DIAGRAM_TYPES)(
 		"builds %s document JSON into valid stored offline artifacts",
 		async (family) => {
-			const fixture = fixtureFor(family);
+			const fixture = familyForType(family).fixture;
 			await Effect.runPromise(
 				Effect.gen(function* () {
 					const document = yield* parseJsonDocument(JSON.stringify(documentFor(family)));
@@ -92,7 +83,7 @@ describe("canonical diagram family consumers", () => {
 	);
 
 	it.each(DIAGRAM_TYPES)("decodes generated %s JSON into a renderable diagram", (family) => {
-		const fixture = fixtureFor(family);
+		const fixture = familyForType(family).fixture;
 		const candidate = candidateFromText({
 			model: "fixture",
 			provider: "fixture",

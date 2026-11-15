@@ -1,21 +1,15 @@
 import { applyFlowchartEdits } from "@sketchi/diagrams/families/flowchart/edits";
-import { CANONICAL_DOCUMENT_TYPES } from "@sketchi/diagrams/build/code-mode/documents";
+import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
+
 import { CodeModeArtifactStorageMemory } from "@sketchi/diagrams/build/code-mode/artifacts";
 import { makeCodeModeRuntimeEnvironmentLayer } from "@sketchi/diagrams/build/code-mode/runtime";
 import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
-import { Cause, Clock, Effect, type FileSystem, Layer, Option } from "effect";
+import { Cause, Clock, Effect, Layer, Option, type FileSystem } from "effect";
 import { type Stdio } from "effect/Stdio";
 import isCI from "is-ci";
 import stringWidth from "string-width";
 
 import { DiagramBuilder, DiagramBuilderLive } from "./builder.js";
-import {
-	automaticCopySkipReason,
-	Clipboard,
-	clipboardData,
-	ClipboardLive,
-	type ClipboardOutcome,
-} from "./clipboard.js";
 import {
 	createCanvasDiagram,
 	DEFAULT_CANVAS_ENDPOINT,
@@ -25,10 +19,17 @@ import {
 	type CreateCanvasDiagramResult,
 } from "./canvas.js";
 import {
+	automaticCopySkipReason,
+	Clipboard,
+	clipboardData,
+	ClipboardLive,
+	type ClipboardOutcome,
+} from "./clipboard.js";
+import {
+	summaryFromStored,
 	type DiagramListEntry,
 	type OutputFormat,
 	type StoredDiagram,
-	summaryFromStored,
 } from "./contracts.js";
 import {
 	entryTime,
@@ -40,14 +41,34 @@ import {
 } from "./diagram-catalog.js";
 import { alternativeList, encodeJson } from "./document.js";
 import {
-	type CliFailure,
 	CliExportError,
 	CliFilesystemError,
 	CliShareError,
 	CliValidationError,
+	type CliFailure,
 } from "./errors.js";
 import { DiagramExporter, DiagramExporterLive } from "./exporter.js";
 import { LocalFileSystemLive } from "./filesystem.js";
+import {
+	GenerateWizard,
+	GenerateWizardLive,
+	liveGenerateWizardAvailable,
+	type WizardDestination,
+} from "./generate-wizard.js";
+import {
+	exportCreatedDiagram,
+	runGenerateWorkflow,
+	runReviseWorkflow,
+	type GeneratedArtifact,
+	type GenerateWorkflowResult,
+	type GenerationDestination,
+} from "./generate-workflow.js";
+import {
+	DEFAULT_GENERATE_ENDPOINT,
+	resolveGenerateEndpoint,
+	SKETCHI_GENERATE_ENDPOINT_ENV,
+	type GenerateDiagramResult,
+} from "./generation.js";
 import { cliIconCatalog } from "./icon-catalog.js";
 import {
 	drawIcons,
@@ -58,39 +79,6 @@ import {
 	SKETCHI_ICON_DRAW_ENDPOINT_ENV,
 } from "./icon-draw.js";
 import {
-	exportCreatedDiagram,
-	runGenerateWorkflow,
-	runReviseWorkflow,
-	type GenerateWorkflowResult,
-	type GeneratedArtifact,
-	type GenerationDestination,
-} from "./generate-workflow.js";
-import {
-	GenerateWizard,
-	GenerateWizardLive,
-	liveGenerateWizardAvailable,
-	type WizardDestination,
-} from "./generate-wizard.js";
-import {
-	DEFAULT_GENERATE_ENDPOINT,
-	SKETCHI_GENERATE_ENDPOINT_ENV,
-	resolveGenerateEndpoint,
-	type GenerateDiagramResult,
-} from "./generation.js";
-import {
-	Argument,
-	Command,
-	Flag,
-	cliErrorExitCode,
-	exactlyOnceStringFlag,
-	exclusiveInputSourceFlags,
-	resolveInputSource,
-	invalidFlagValue,
-	missingRequiredFlag,
-	runEffectCommand,
-	requestedOutputFormat,
-} from "./internal/effect-cli.js";
-import {
 	InputReader,
 	InputReaderLive,
 	readDocumentInput,
@@ -98,25 +86,39 @@ import {
 	readPatchInput,
 } from "./input.js";
 import {
+	Argument,
+	cliErrorExitCode,
+	Command,
+	exactlyOnceStringFlag,
+	exclusiveInputSourceFlags,
+	Flag,
+	invalidFlagValue,
+	missingRequiredFlag,
+	requestedOutputFormat,
+	resolveInputSource,
+	runEffectCommand,
+} from "./internal/effect-cli.js";
+import {
 	CliCommandExit,
+	internalErrorText,
 	OutputWriter,
 	OutputWriterLive,
-	internalErrorText,
 	reportFailure,
 	reportSuccess,
 	runReported,
 	runReportedArtifact,
 } from "./output.js";
-import { CliPngRendererLive } from "./png-renderer.js";
 import { DiagramPatcher, DiagramPatcherLive } from "./patch.js";
+import { CliPngRendererLive } from "./png-renderer.js";
 import { preflightPullTarget, pullIntoStore } from "./pull.js";
-import { API_REQUEST_TIMEOUT } from "./response-body.js";
 import {
 	MAX_RENDER_CANVAS_AREA,
 	MAX_RENDER_CANVAS_DIMENSION,
 	MAX_RENDER_ELEMENT_DIMENSION,
 	MAX_RENDER_OUTPUT_PIXELS,
 } from "./render-limits.js";
+import { API_REQUEST_TIMEOUT } from "./response-body.js";
+import { MAX_SHARE_LINK_LENGTH } from "./share-protocol.js";
 import {
 	ExcalidrawShare,
 	ExcalidrawShareLive,
@@ -124,13 +126,12 @@ import {
 	LinkOpenerLive,
 	ShareTransportLive,
 } from "./share.js";
-import { MAX_SHARE_LINK_LENGTH } from "./share-protocol.js";
 import {
 	DiagramStore,
 	DiagramStoreLive,
-	type StorageRoot,
 	StorageRootLive,
 	writeExportFile,
+	type StorageRoot,
 } from "./storage.js";
 
 const AGENT_DOCS = `Sketchi CLI contracts for agents and automation.
@@ -182,7 +183,7 @@ Flowchart edit example (insert a step into an edge, color another):
   sketchi edit release-flow --json '{"edits":[{"op":"insert","node":{"approve":"Approved?"},"between":["review","end"]},{"op":"set","nodes":{"end":{"color":"green"}}}]}'
 
 Explicit network commands (one credential-free HTTPS request each):
-  sketchi generate [--prompt TEXT] [--type ${CANONICAL_DOCUMENT_TYPES.join("|")}]
+  sketchi generate [--prompt TEXT] [--type ${DIAGRAM_TYPES.join("|")}]
   sketchi revise DIAGRAM_ID --prompt TEXT [--type TYPE]
   sketchi canvas --file PATH|- [--format png|excalidraw|scene] [--dest PATH|-]
   sketchi share DIAGRAM_ID [--open]
@@ -569,7 +570,7 @@ function listText({ entries, total, searched, now }: ListResult): string {
 const GENERATE_HELP = `Create one persisted diagram and export its PNG by default. With no --prompt, Sketchi opens a short wizard only when stdin and stdout are human TTYs, output is text, and CI is absent. Pipes, redirects, CI, and --output json never prompt or block; pass --prompt for every script and automation path. This is one of Sketchi's five explicit network commands (generate, revise, canvas, share, pull). It makes one unauthenticated HTTPS POST to the public Sketchi generate API and needs no token, key, account, or login.
 
 Everyday wizard:
-  The wizard asks only for prompt text, a diagram type (any of the ${String(CANONICAL_DOCUMENT_TYPES.length)} below; flowchart is the default),
+  The wizard asks only for prompt text, a diagram type (any of the ${String(DIAGRAM_TYPES.length)} below; flowchart is the default),
   and a PNG destination.
   Current directory writes <cwd>/<generated-id>.png. Project diagrams folder means exactly the
   directory where Sketchi was run: <cwd>/diagrams/<generated-id>.png, with no Git detection; the
@@ -581,7 +582,7 @@ Network and options:
   Endpoint: ${DEFAULT_GENERATE_ENDPOINT}
   The model call, schema validation, and quality gate run server-side; the finished diagram
   and Excalidraw artifact are returned over plain HTTPS. Sketchi sends no credentials.
-  Without --type, the model selects ${alternativeList([...CANONICAL_DOCUMENT_TYPES])} from the request;
+  Without --type, the model selects ${alternativeList([...DIAGRAM_TYPES])} from the request;
   a request for any other kind of diagram gets the closest of those.
   Override the endpoint for preview or local testing with ${SKETCHI_GENERATE_ENDPOINT_ENV}
   or --endpoint URL. --format defaults to png. Without --dest, the artifact is written as
@@ -623,7 +624,7 @@ const generateCommand = Command.make(
 			),
 		),
 		type: Flag.optional(
-			Flag.Literals("type", CANONICAL_DOCUMENT_TYPES).pipe(
+			Flag.Literals("type", DIAGRAM_TYPES).pipe(
 				Flag.withDescription("Authoritative diagram type; omit for model selection."),
 				Flag.withMetavar("TYPE"),
 			),
@@ -1054,7 +1055,7 @@ const reviseCommand = Command.make(
 			Flag.withMetavar("TEXT"),
 		),
 		type: Flag.optional(
-			Flag.Literals("type", CANONICAL_DOCUMENT_TYPES).pipe(
+			Flag.Literals("type", DIAGRAM_TYPES).pipe(
 				Flag.withDescription("Turn the diagram into this family; omit to keep its own."),
 				Flag.withMetavar("TYPE"),
 			),
@@ -1288,7 +1289,7 @@ const listCommand = Command.make(
 			Argument.variadic(),
 		),
 		type: Flag.optional(
-			Flag.Literals("type", ["canvas", ...CANONICAL_DOCUMENT_TYPES]).pipe(
+			Flag.Literals("type", ["canvas", ...DIAGRAM_TYPES]).pipe(
 				Flag.withDescription("Only diagrams of this type."),
 				Flag.withMetavar("TYPE"),
 			),

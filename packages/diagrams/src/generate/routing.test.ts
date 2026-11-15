@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { DIAGRAM_TYPES } from "../types.js";
 import { Effect } from "effect";
+import { DIAGRAM_TYPES } from "../family.js";
 
 import type { DiagramGenerationCandidate, DiagramGenerationRequest } from "./candidates.js";
 import type { DiagramFamilyNarrowing, FamilyNarrowing } from "./family-narrowing.js";

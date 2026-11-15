@@ -1,21 +1,22 @@
-import { expect, it } from "vitest";
-import { Effect } from "effect";
-import {
-	buildTimeline,
-	CodeModeRuntimeEnvironment,
-} from "@sketchi/diagrams/build/code-mode/runtime";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
+import {
+	buildTimeline,
+	CodeModeRuntimeEnvironment,
+} from "@sketchi/diagrams/build/code-mode/runtime";
+import { familyForType } from "@sketchi/diagrams/family";
 import type { UIMessage } from "ai";
+import { Effect } from "effect";
+import { expect, it } from "vitest";
 import { deriveBuildState } from "../../features/playground/build-result";
-import { makeStudioTimelineToolExecutor } from "./studio-timeline-tool.server";
+import { makeStudioFamilyExecutor } from "./studio-family-tools.server";
 
 it("repairs a timeline through the Studio host and displays its real accepted scene", async () => {
 	const storage = makeMemoryArtifactStorage();
 	const executor = await Effect.runPromise(
-		makeStudioTimelineToolExecutor((input) =>
+		makeStudioFamilyExecutor(familyForType("timeline"), (input) =>
 			buildTimeline(input).pipe(
 				Effect.provideService(CodeModeArtifactStorage, storage),
 				Effect.provideService(CodeModeRuntimeEnvironment, {

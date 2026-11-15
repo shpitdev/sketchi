@@ -5,11 +5,10 @@
  * generation model; each is recorded on its span.
  */
 import { recordMetric, SpanContent } from "@sketchi/observability";
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "../types.js";
 import { Context, Effect, Layer, Metric, Schema } from "effect";
 import { type AiError, Decision, DecisionModel } from "effect/ai";
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family.js";
 
-import { workersAiJevLayer, type WorkersAiRunner } from "./jev-workers-ai.js";
 import {
 	anyKindFitsQuestion,
 	FAMILY_NARROWING_MODEL,
@@ -22,6 +21,7 @@ import {
 	whichKindQuestion,
 	whichOfShortlistQuestion,
 } from "./family-questions.js";
+import { workersAiJevLayer, type WorkersAiRunner } from "./jev-workers-ai.js";
 
 const { no, sure, yes } = FAMILY_THRESHOLDS;
 

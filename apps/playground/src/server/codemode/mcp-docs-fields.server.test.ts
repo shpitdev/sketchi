@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { Schema } from "effect";
 import { toCodeModeJsonSchema } from "@sketchi/diagrams/build/code-mode/contract";
 import {
 	getWireframeValidationIssues,
@@ -10,8 +9,13 @@ import {
 	type WireframeDiagram,
 } from "@sketchi/diagrams/families/wireframe/document";
 import { buildDiagramGenerationMessages } from "@sketchi/diagrams/generate/messages";
-import { CODE_MODE_OPERATIONS, codeModeContracts, type CodeModeOperation } from "./mcp-docs/types";
+import { Schema } from "effect";
 import { getCodeModeDocs, SKETCHI_EXECUTE_CODE_DESCRIPTION } from "./mcp-docs.server";
+import {
+	CODE_MODE_OPERATIONS,
+	contractForOperation,
+	type CodeModeOperation,
+} from "./mcp-docs/types";
 
 /** A field as a docs skeleton writes it: `name?: "a" | "b" (note)`, `name: { … }` or `name: [{ … }]`. */
 interface DocField {
@@ -104,7 +108,7 @@ function readSkeleton(text: string, start: number): { fields: DocField[]; end: n
 type Json = Record<string, unknown>;
 
 function requestSchema(operation: CodeModeOperation): Json {
-	return toCodeModeJsonSchema(Schema.toEncoded(codeModeContracts[operation].input));
+	return toCodeModeJsonSchema(Schema.toEncoded(contractForOperation(operation).input));
 }
 
 /** The object or array schema behind references and unions. */

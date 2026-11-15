@@ -1,23 +1,23 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
-import { describe, expect, it } from "vitest";
-import {
-	type AxisAlignedSegment,
-	candidateRouteQuality,
-	estimateTextWidth,
-	getCanvasValidationIssues,
-	routingQualityFindings,
-	routingQualityScale,
-	segmentsFromPoints,
-	type CanvasSpec as RenderedDiagramScene,
-} from "@sketchi/drawing";
 import {
 	type ClassDiagram,
 	type ClassRelationshipKind,
 	parseClassDiagram,
 	resolveClassShorthand,
 } from "@sketchi/diagrams/families/class/document";
-import { renderDiagram } from "@sketchi/diagrams/render";
+import { renderDiagram } from "@sketchi/diagrams/family";
+import {
+	type AxisAlignedSegment,
+	candidateRouteQuality,
+	estimateTextWidth,
+	getCanvasValidationIssues,
+	type CanvasSpec as RenderedDiagramScene,
+	routingQualityFindings,
+	routingQualityScale,
+	segmentsFromPoints,
+} from "@sketchi/drawing";
+import { Result } from "effect";
+import { describe, expect, it } from "vitest";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

@@ -1,7 +1,8 @@
-import { CANONICAL_DOCUMENT_TYPES } from "@sketchi/diagrams/build/code-mode/documents";
+import { DIAGRAM_TYPES } from "@sketchi/diagrams/family";
+
 import { type PatchableScene } from "@sketchi/diagrams/build/code-mode/contract";
-import { type ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
+import { type ExcalidrawFile } from "@sketchi/drawing/excalidraw";
 import { Effect, Schema } from "effect";
 
 import { type DiagramDocument } from "./document.js";
@@ -21,7 +22,7 @@ export type DiagramAuthority = "canonical" | "patched" | "detached";
 export const DiagramRecordManifest = Schema.Struct({
 	schemaVersion: Schema.Literal(RECORD_SCHEMA_VERSION),
 	id: Schema.String,
-	type: Schema.Literals(["canvas", ...CANONICAL_DOCUMENT_TYPES]),
+	type: Schema.Literals(["canvas", ...DIAGRAM_TYPES]),
 	title: Schema.String,
 	revision: Schema.Int.check(Schema.isGreaterThan(0)),
 	authority: Schema.Literals(["canonical", "patched", "detached"]).pipe(

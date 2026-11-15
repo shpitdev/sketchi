@@ -1,14 +1,12 @@
 import { CodeModeArtifactStorage } from "@sketchi/diagrams/build/code-mode/artifacts";
+import { buildCanonicalDocument } from "@sketchi/diagrams/build/code-mode/documents";
 import { CodeModeRuntimeEnvironment } from "@sketchi/diagrams/build/code-mode/runtime";
-import {
-	buildCanonicalDocument,
-	type CanonicalBuildResult,
-} from "@sketchi/diagrams/build/code-mode/documents";
+import { type FamilyBuildResult } from "@sketchi/diagrams/family";
 import { Context, Effect, Layer } from "effect";
 
 import { codeModeFailure, decodeInlineArtifacts, withCodeMode } from "./code-mode-artifacts.js";
 import type { BuiltDiagram } from "./contracts.js";
-import { documentId, type CanonicalDiagramDocument, validateStorageId } from "./document.js";
+import { documentId, validateStorageId, type CanonicalDiagramDocument } from "./document.js";
 import { CliBuildError, CliStorageError, CliValidationError } from "./errors.js";
 
 export class DiagramBuilder extends Context.Service<
@@ -29,7 +27,7 @@ export const DiagramBuilderLive = Layer.effect(
 		const build = Effect.fn("sketchi.cli.diagram.build")(function* (
 			document: CanonicalDiagramDocument,
 		) {
-			const result: CanonicalBuildResult = yield* withCodeMode(
+			const result: FamilyBuildResult = yield* withCodeMode(
 				artifactStorage,
 				environment,
 				(options) => buildCanonicalDocument(document, options),

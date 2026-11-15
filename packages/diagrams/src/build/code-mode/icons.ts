@@ -22,8 +22,8 @@ import {
 	isNodeLogoEligible,
 	isStandaloneWordmark,
 	isStrayVendorLogo,
-	logoNamedByLabel,
 	labelLogos,
+	logoNamedByLabel,
 	normalizeNodeLogoSvg,
 	searchIcons,
 	type ConceptIcon,
@@ -32,7 +32,7 @@ import {
 } from "@sketchi/icon-catalog";
 import { Effect, Schema } from "effect";
 
-import { cleanToolString } from "../../generate/clean-text.js";
+import { cleanToolString } from "../../clean-text.js";
 import { type CodeModeIssue } from "../result.js";
 
 /** One catalog mark that diagrams may draw inside a node. */

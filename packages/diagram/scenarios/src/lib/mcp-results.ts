@@ -1,8 +1,9 @@
-import { type DiagramValidationError } from "@sketchi/diagrams/graph/intermediate";
 import {
 	decodeFlowchartDocument,
 	flowchartDiagramFromDocument,
 } from "@sketchi/diagrams/families/flowchart/document";
+import { families, familyForType } from "@sketchi/diagrams/family";
+import { type DiagramValidationError } from "@sketchi/diagrams/graph/intermediate";
 
 import { Option, Result, Schema } from "effect";
 
@@ -45,36 +46,7 @@ export function buildResultFromMcp(
 	const returned = isRecord(value.result)
 		? buildResultFromMcp(value.result, diagramType)
 		: undefined;
-	const operation =
-		diagramType === "gantt"
-			? "buildGantt"
-			: diagramType === "chart"
-				? "buildChart"
-				: diagramType === "timeline"
-					? "buildTimeline"
-					: diagramType === "sequence"
-						? "buildSequenceDiagram"
-						: diagramType === "state-machine"
-							? "buildStateMachine"
-							: diagramType === "mindmap"
-								? "buildMindmap"
-								: diagramType === "er"
-									? "buildErDiagram"
-									: diagramType === "class"
-										? "buildClassDiagram"
-										: diagramType === "org-chart"
-											? "buildOrgChart"
-											: diagramType === "venn"
-												? "buildVennDiagram"
-												: diagramType === "journey"
-													? "buildJourneyMap"
-													: diagramType === "sankey"
-														? "buildSankey"
-														: diagramType === "wireframe"
-															? "buildWireframe"
-															: diagramType === "quadrant"
-																? "buildQuadrantChart"
-																: "buildFlowchart";
+	const operation = familyForType(diagramType ?? "flowchart").operation;
 	const receipts = Array.isArray(value.builds)
 		? value.builds.filter(
 				(build): build is Record<string, unknown> =>
@@ -93,25 +65,8 @@ export function buildResultFromMcp(
 		(isRecord(returned.normalizedSpec) ||
 			typeof returned.buildId === "string" ||
 			(typeof returned.operation === "string" &&
-				[
-					"buildFlowchart",
-					"buildMindmap",
-					"buildSequenceDiagram",
-					"buildTimeline",
-					"buildChart",
-					"buildStateMachine",
-					"buildGantt",
-					"buildErDiagram",
-					"buildClassDiagram",
-					"buildOrgChart",
-					"buildOrgChart",
-					"buildVennDiagram",
-					"buildJourneyMap",
-					"buildSankey",
-					"buildWireframe",
-					"buildQuadrantChart",
-					"createCanvas",
-				].includes(returned.operation)))
+				(returned.operation === "createCanvas" ||
+					families.some((family) => family.operation === returned.operation))))
 	)
 		return returned;
 	const explicitRejection = returned
@@ -194,25 +149,6 @@ export function specToSequenceCandidate(spec: unknown): unknown {
 	};
 }
 
-const operationFamilies: Readonly<Record<string, string>> = {
-	buildFlowchart: "flowchart",
-	buildMindmap: "mindmap",
-	buildSequenceDiagram: "sequence",
-	buildTimeline: "timeline",
-	buildChart: "chart",
-	buildStateMachine: "state-machine",
-	buildGantt: "gantt",
-	buildErDiagram: "er",
-	buildClassDiagram: "class",
-	buildOrgChart: "org-chart",
-	buildVennDiagram: "venn",
-	buildJourneyMap: "journey",
-	buildSankey: "sankey",
-	buildWireframe: "wireframe",
-	buildQuadrantChart: "quadrant",
-	createCanvas: "canvas",
-};
-
 /** The family a build produced, from its operation or, failing that, a canvas spec. */
 function builtDiagramType(
 	build: Record<string, unknown>,
@@ -220,9 +156,9 @@ function builtDiagramType(
 ): { readonly family: string; readonly label: string } | undefined {
 	const operation = typeof build.operation === "string" ? build.operation : undefined;
 	const family =
-		operation && Object.hasOwn(operationFamilies, operation)
-			? operationFamilies[operation]
-			: undefined;
+		operation === "createCanvas"
+			? "canvas"
+			: families.find((family) => family.operation === operation)?.type;
 	if (operation && family) return { family, label: operation };
 	if (spec.kind === "canvas") return { family: "canvas", label: "a canvas spec" };
 	return undefined;

@@ -1,11 +1,14 @@
+import { familyForType } from "@sketchi/diagrams/family";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
+import { Result } from "effect";
 
-import { chartFixture, parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
 import { chartScenarios } from "@sketchi/diagram-scenarios";
+import { parseChartDiagram } from "@sketchi/diagrams/families/chart/document";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const chartFixture = familyForType("chart").fixture;
 
 const meta = {
 	title: "Diagram Types/Chart",

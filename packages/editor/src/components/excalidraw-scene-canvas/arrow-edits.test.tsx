@@ -1,26 +1,15 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
-import { type CanvasSpec, embedCanvasIcons } from "@sketchi/drawing";
-import {
-	deployPipelineLogoFlowchart,
-	flowchartFixture,
-	parseFlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
-import { zoneStressFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
-import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
-import { renderDiagram } from "@sketchi/diagrams/render";
-import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import {
 	createEditSession,
-	DRAG_OFFSETS,
 	diagramScenarios,
 	distance,
+	DRAG_OFFSETS,
+	type EditabilityMetrics,
 	type EditorElement,
 	type EditorScene,
-	type ExcalidrawEditor,
 	endDetached,
 	endInside,
-	type EditabilityMetrics,
+	type ExcalidrawEditor,
 	FIXED_BINDING_DISTANCE,
 	isBoundArrow,
 	isCurved,
@@ -28,7 +17,18 @@ import {
 	measureEditability,
 	type Point,
 } from "@sketchi/diagram-scenarios";
+import {
+	deployPipelineLogoFlowchart,
+	flowchartFixture,
+	parseFlowchartDiagram,
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { zoneStressFixtures } from "@sketchi/diagrams/families/flowchart/zone-fixtures";
+import { renderDiagram } from "@sketchi/diagrams/family";
+import { renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { type CanvasSpec, embedCanvasIcons } from "@sketchi/drawing";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 import * as excalidraw from "@sketchi/excalidraw-internals";
+import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 /**

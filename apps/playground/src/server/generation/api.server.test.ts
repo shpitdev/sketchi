@@ -1,25 +1,25 @@
-import { CANONICAL_DOCUMENT_SPECS } from "@sketchi/diagrams/build/code-mode/documents";
-import { RenderedDiagramSceneSchema } from "@sketchi/diagrams/build/code-mode/contract";
-import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
-import { diagramFixtures } from "@sketchi/diagrams/fixtures";
-import {
-	FLOWCHART_MAX_NODES,
-	type FlowchartDiagram,
-} from "@sketchi/diagrams/families/flowchart/diagram";
-import { mediaPlayerStateMachine } from "@sketchi/diagrams/families/state-machine/document";
-import { sankeyStressFixtures } from "@sketchi/diagrams/families/sankey/fixtures";
-import { diagramScenarios, scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
-import { Schema } from "effect";
+import { DIAGRAM_TYPES, diagramFixtures, familyForType } from "@sketchi/diagrams/family";
+
 import {
 	type CloudflareAiGateway,
 	type CloudflareAiGatewayProvider,
 } from "@sketchi/cloudflare/ai-gateway";
+import { diagramScenarios, scenarioFlowchartDocument } from "@sketchi/diagram-scenarios";
+import { RenderedDiagramSceneSchema } from "@sketchi/diagrams/build/code-mode/contract";
+import {
+	FLOWCHART_MAX_NODES,
+	type FlowchartDiagram,
+} from "@sketchi/diagrams/families/flowchart/diagram";
+import { sankeyStressFixtures } from "@sketchi/diagrams/families/sankey/fixtures";
+import { mediaPlayerStateMachine } from "@sketchi/diagrams/families/state-machine/document";
+import { ExcalidrawFile } from "@sketchi/drawing/excalidraw";
+import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { aiEnvironment } from "../bindings/ai-env.server";
 import { type StudioEnv } from "../bindings/studio-env.server";
-import { runPlaygroundEffect } from "../runtime/runtime.server";
 import { resultHttpStatus } from "../runtime/http-status.server";
+import { runPlaygroundEffect } from "../runtime/runtime.server";
 import { buildFailure, handleGenerateDiagramRequest } from "./api.server";
 
 /** A model's flowchart answer: the flowchart document. */
@@ -179,13 +179,13 @@ describe("generate responses installed CLIs can decode", () => {
 			expect(() => decode(RenderedDiagramSceneSchema, body.diagram?.scene)).not.toThrow();
 			expect(() => decode(ExcalidrawFile, body.diagram?.excalidraw)).not.toThrow();
 			expect(() =>
-				decode(CANONICAL_DOCUMENT_SPECS[diagram.type], body.diagram?.document.spec),
+				decode(familyForType(diagram.type).spec, body.diagram?.document.spec),
 			).not.toThrow();
 		},
 	);
 
 	it("decoded a response from every canonical family", () => {
-		expect(decoded).toEqual(new Set(Object.keys(CANONICAL_DOCUMENT_SPECS)));
+		expect(decoded).toEqual(new Set(DIAGRAM_TYPES));
 	});
 });
 

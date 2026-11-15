@@ -1,10 +1,12 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { orgChartFixture } from "@sketchi/diagrams/families/org-chart/document";
-import { orgChartStressFixtures } from "@sketchi/diagrams/families/org-chart/fixtures";
 import { orgChartScenarios } from "@sketchi/diagram-scenarios";
+import { orgChartStressFixtures } from "@sketchi/diagrams/families/org-chart/fixtures";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const orgChartFixture = familyForType("org-chart").fixture;
 
 const meta = {
 	title: "Diagram Types/Org Chart",

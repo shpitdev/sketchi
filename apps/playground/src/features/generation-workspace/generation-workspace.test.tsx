@@ -7,12 +7,12 @@ vi.mock("@excalidraw/excalidraw", () => ({
 	mutateElement: vi.fn(),
 }));
 
-import * as renderer from "@sketchi/diagrams/render";
 import { chartFixture } from "@sketchi/diagrams/families/chart/document";
 import { flowchartFixture } from "@sketchi/diagrams/families/flowchart/diagram";
+import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
 import { sequenceFixture } from "@sketchi/diagrams/families/sequence/document";
 import { timelineFixture } from "@sketchi/diagrams/families/timeline/document";
-import { mindmapFixture } from "@sketchi/diagrams/families/mindmap/fixtures";
+import * as renderer from "@sketchi/diagrams/family";
 
 import { GenerationWorkspace } from "./generation-workspace";
 

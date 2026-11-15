@@ -1,12 +1,14 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
 import {
 	apiRequestSequence,
 	selfMessageSequence,
-	sequenceFixture,
 } from "@sketchi/diagrams/families/sequence/document";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const sequenceFixture = familyForType("sequence").fixture;
 
 const meta = {
 	title: "Diagram Types/Sequence",

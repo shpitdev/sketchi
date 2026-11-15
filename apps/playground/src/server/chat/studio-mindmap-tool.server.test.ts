@@ -1,21 +1,22 @@
-import { expect, it } from "vitest";
-import { Effect } from "effect";
-import {
-	buildMindmap,
-	CodeModeRuntimeEnvironment,
-} from "@sketchi/diagrams/build/code-mode/runtime";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
+import {
+	buildMindmap,
+	CodeModeRuntimeEnvironment,
+} from "@sketchi/diagrams/build/code-mode/runtime";
+import { familyForType } from "@sketchi/diagrams/family";
 import type { UIMessage } from "ai";
+import { Effect } from "effect";
+import { expect, it } from "vitest";
 import { deriveBuildState } from "../../features/playground/build-result";
-import { makeStudioMindmapToolExecutor } from "./studio-mindmap-tool.server";
+import { makeStudioFamilyExecutor } from "./studio-family-tools.server";
 
 it("builds a mindmap through the Studio host and displays its accepted scene", async () => {
 	const storage = makeMemoryArtifactStorage();
 	const executor = await Effect.runPromise(
-		makeStudioMindmapToolExecutor((input) =>
+		makeStudioFamilyExecutor(familyForType("mindmap"), (input) =>
 			buildMindmap(input).pipe(
 				Effect.provideService(CodeModeArtifactStorage, storage),
 				Effect.provideService(CodeModeRuntimeEnvironment, {

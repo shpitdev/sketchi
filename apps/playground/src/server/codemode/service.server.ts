@@ -1,56 +1,3 @@
-import "@tanstack/react-start/server-only";
-
-import {
-	buildCanonicalDocument,
-	type CanonicalDiagramDocument,
-	type CanonicalBuildResult,
-} from "@sketchi/diagrams/build/code-mode/documents";
-import {
-	type BuildFlowchartOptions,
-	type ApplyDiagramPatchResult,
-	type BuildFlowchartResult,
-	type EditFlowchartResult,
-	type BuildSequenceDiagramResult,
-	type BuildStateMachineResult,
-	type BuildGanttResult,
-	type BuildErDiagramResult,
-	type BuildClassDiagramResult,
-	type BuildOrgChartResult,
-	type BuildVennDiagramResult,
-	type BuildJourneyMapResult,
-	type BuildSankeyResult,
-	type BuildWireframeResult,
-	type BuildQuadrantChartResult,
-	type BuildTimelineResult,
-	type BuildChartResult,
-	type CreateCanvasResult,
-	type GetArtifactResult,
-	type SearchIconsResult,
-} from "@sketchi/diagrams/build/code-mode/contract";
-import {
-	applyDiagramPatch,
-	buildFlowchart,
-	editFlowchart,
-	buildMindmap,
-	buildSequenceDiagram,
-	buildStateMachine,
-	buildGantt,
-	buildErDiagram,
-	buildClassDiagram,
-	buildOrgChart,
-	buildVennDiagram,
-	buildJourneyMap,
-	buildSankey,
-	buildWireframe,
-	buildQuadrantChart,
-	buildTimeline,
-	buildChart,
-	CodeModeRuntimeEnvironment,
-	getArtifact,
-	createCanvas,
-	searchIcons,
-	type CodeModeRuntimeOptions,
-} from "@sketchi/diagrams/build/code-mode/runtime";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
@@ -59,8 +6,32 @@ import {
 	type CodeModeArtifactStorageShape,
 	type StoredArtifactFormat,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
+import {
+	type ApplyDiagramPatchResult,
+	type BuildFlowchartOptions,
+	type CreateCanvasResult,
+	type EditFlowchartResult,
+	type GetArtifactResult,
+	type SearchIconsResult,
+} from "@sketchi/diagrams/build/code-mode/contract";
+import { buildCanonicalDocument } from "@sketchi/diagrams/build/code-mode/documents";
+import * as FamilyRuntime from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	applyDiagramPatch,
+	CodeModeRuntimeEnvironment,
+	createCanvas,
+	editFlowchart,
+	getArtifact,
+	searchIcons,
+	type CodeModeRuntimeOptions,
+} from "@sketchi/diagrams/build/code-mode/runtime";
+import {
+	type CanonicalDiagramDocument,
+	type FamilyBuildResult,
+	type FamilyOperation,
+} from "@sketchi/diagrams/family";
+import "@tanstack/react-start/server-only";
 
-import { type BuildMindmapResult } from "@sketchi/diagrams/families/mindmap/build";
 import { type ArtifactFormat } from "@sketchi/drawing/artifacts";
 import { withSpanContent } from "@sketchi/observability";
 import { Context, Effect, Layer } from "effect";
@@ -82,62 +53,21 @@ import { playgroundIconCatalog } from "./icon-catalog.server";
 export type CodeModeRequestContext = PlaygroundBindings | PlaygroundIds | PlaygroundRequestMetadata;
 
 export interface PlaygroundCodeModeShape {
+	readonly buildFamily: <A>(
+		family: FamilyOperation<A>,
+		input: unknown,
+	) => Effect.Effect<A, never, CodeModeRequestContext>;
 	readonly buildDocument: (
 		document: CanonicalDiagramDocument,
 		options?: BuildFlowchartOptions,
-	) => Effect.Effect<CanonicalBuildResult, never, CodeModeRequestContext>;
+	) => Effect.Effect<FamilyBuildResult, never, CodeModeRequestContext>;
 
 	readonly applyDiagramPatch: (
 		input: unknown,
 	) => Effect.Effect<ApplyDiagramPatchResult, never, CodeModeRequestContext>;
-	readonly buildFlowchart: (
-		input: unknown,
-	) => Effect.Effect<BuildFlowchartResult, never, CodeModeRequestContext>;
 	readonly editFlowchart: (
 		input: unknown,
 	) => Effect.Effect<EditFlowchartResult, never, CodeModeRequestContext>;
-	readonly buildMindmap: (
-		input: unknown,
-	) => Effect.Effect<BuildMindmapResult, never, CodeModeRequestContext>;
-	readonly buildSequenceDiagram: (
-		input: unknown,
-	) => Effect.Effect<BuildSequenceDiagramResult, never, CodeModeRequestContext>;
-	readonly buildTimeline: (
-		input: unknown,
-	) => Effect.Effect<BuildTimelineResult, never, CodeModeRequestContext>;
-	readonly buildChart: (
-		input: unknown,
-	) => Effect.Effect<BuildChartResult, never, CodeModeRequestContext>;
-	readonly buildStateMachine: (
-		input: unknown,
-	) => Effect.Effect<BuildStateMachineResult, never, CodeModeRequestContext>;
-	readonly buildGantt: (
-		input: unknown,
-	) => Effect.Effect<BuildGanttResult, never, CodeModeRequestContext>;
-	readonly buildErDiagram: (
-		input: unknown,
-	) => Effect.Effect<BuildErDiagramResult, never, CodeModeRequestContext>;
-	readonly buildClassDiagram: (
-		input: unknown,
-	) => Effect.Effect<BuildClassDiagramResult, never, CodeModeRequestContext>;
-	readonly buildOrgChart: (
-		input: unknown,
-	) => Effect.Effect<BuildOrgChartResult, never, CodeModeRequestContext>;
-	readonly buildVennDiagram: (
-		input: unknown,
-	) => Effect.Effect<BuildVennDiagramResult, never, CodeModeRequestContext>;
-	readonly buildJourneyMap: (
-		input: unknown,
-	) => Effect.Effect<BuildJourneyMapResult, never, CodeModeRequestContext>;
-	readonly buildSankey: (
-		input: unknown,
-	) => Effect.Effect<BuildSankeyResult, never, CodeModeRequestContext>;
-	readonly buildWireframe: (
-		input: unknown,
-	) => Effect.Effect<BuildWireframeResult, never, CodeModeRequestContext>;
-	readonly buildQuadrantChart: (
-		input: unknown,
-	) => Effect.Effect<BuildQuadrantChartResult, never, CodeModeRequestContext>;
 	readonly createCanvas: (
 		input: unknown,
 	) => Effect.Effect<CreateCanvasResult, never, CodeModeRequestContext>;
@@ -267,6 +197,10 @@ export const PlaygroundCodeModeLive = Layer.effect(
 		);
 
 		return PlaygroundCodeMode.of({
+			buildFamily: <A>(family: FamilyOperation<A>, input: unknown) =>
+				withSpanContent(input, provideRequestCodeMode(family.build(FamilyRuntime)(input))).pipe(
+					Effect.withSpan(`playground.codeMode.${family.operation}`),
+				),
 			buildDocument: Effect.fn("playground.codeMode.buildDocument")((document, options) =>
 				withSpanContent(
 					{ document, options },
@@ -277,53 +211,8 @@ export const PlaygroundCodeModeLive = Layer.effect(
 			applyDiagramPatch: Effect.fn("playground.codeMode.applyDiagramPatch")((input) =>
 				withSpanContent(input, provideRequestCodeMode(applyDiagramPatch(input))),
 			),
-			buildFlowchart: Effect.fn("playground.codeMode.buildFlowchart")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildFlowchart(input))),
-			),
 			editFlowchart: Effect.fn("playground.codeMode.editFlowchart")((input) =>
 				withSpanContent(input, provideRequestCodeMode(editFlowchart(input))),
-			),
-			buildMindmap: Effect.fn("playground.codeMode.buildMindmap")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildMindmap(input))),
-			),
-			buildSequenceDiagram: Effect.fn("playground.codeMode.buildSequenceDiagram")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildSequenceDiagram(input))),
-			),
-			buildTimeline: Effect.fn("playground.codeMode.buildTimeline")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildTimeline(input))),
-			),
-			buildChart: Effect.fn("playground.codeMode.buildChart")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildChart(input))),
-			),
-			buildStateMachine: Effect.fn("playground.codeMode.buildStateMachine")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildStateMachine(input))),
-			),
-			buildGantt: Effect.fn("playground.codeMode.buildGantt")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildGantt(input))),
-			),
-			buildErDiagram: Effect.fn("playground.codeMode.buildErDiagram")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildErDiagram(input))),
-			),
-			buildClassDiagram: Effect.fn("playground.codeMode.buildClassDiagram")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildClassDiagram(input))),
-			),
-			buildOrgChart: Effect.fn("playground.codeMode.buildOrgChart")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildOrgChart(input))),
-			),
-			buildVennDiagram: Effect.fn("playground.codeMode.buildVennDiagram")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildVennDiagram(input))),
-			),
-			buildJourneyMap: Effect.fn("playground.codeMode.buildJourneyMap")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildJourneyMap(input))),
-			),
-			buildSankey: Effect.fn("playground.codeMode.buildSankey")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildSankey(input))),
-			),
-			buildWireframe: Effect.fn("playground.codeMode.buildWireframe")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildWireframe(input))),
-			),
-			buildQuadrantChart: Effect.fn("playground.codeMode.buildQuadrantChart")((input) =>
-				withSpanContent(input, provideRequestCodeMode(buildQuadrantChart(input))),
 			),
 			createCanvas: Effect.fn("playground.codeMode.createCanvas")((input) =>
 				withSpanContent(input, provideRequestCodeMode(createCanvas(input))),

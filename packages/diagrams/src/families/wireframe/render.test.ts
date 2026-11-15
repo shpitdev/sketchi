@@ -1,11 +1,12 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
 import {
 	getCanvasValidationIssues,
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec as RenderedDiagramScene,
 	type CanvasTextElement as TextSceneElement,
 } from "@sketchi/drawing";
+import { Result } from "effect";
+import { describe, expect, it } from "vitest";
 import {
 	parseWireframeDiagram,
 	wireframeComponents,
@@ -13,17 +14,16 @@ import {
 	wireframeFixture,
 } from "./document.js";
 import { wireframeStressFixtures } from "./fixtures.js";
-import { describe, expect, it } from "vitest";
 
-import { renderDiagram } from "../../render.js";
+import { renderDiagram } from "../../family.js";
 
+import { wireframeBoxIssues, wireframeLayoutIssues, wireframeTextBounds } from "./readout.js";
 import {
 	layoutWireframeDiagram,
 	renderWireframeDiagram,
 	WIREFRAME_ACCENT,
 	WIREFRAME_DEVICE_METRICS,
 } from "./render.js";
-import { wireframeBoxIssues, wireframeLayoutIssues, wireframeTextBounds } from "./readout.js";
 
 const screen = (children: unknown[], extra: Record<string, unknown> = {}) =>
 	parseWireframeDiagram({

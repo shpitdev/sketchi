@@ -1,8 +1,9 @@
+import { type FamilyBuildOperation } from "@sketchi/diagrams/family";
 import "@tanstack/react-start/server-only";
 
-import { MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
-import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";
 import { type BuildFlowchartOptions } from "@sketchi/diagrams/build/code-mode/contract";
+import { normalizeIconSlug } from "@sketchi/diagrams/build/code-mode/icons";
+import { MAX_DIAGRAM_BUILD_ATTEMPTS } from "@sketchi/diagrams/build/policy";
 import { type CodeModeIssue } from "@sketchi/diagrams/build/result";
 import { placeNodeLogos, type OfferedLogo } from "@sketchi/diagrams/generate/logo-placement";
 import { recordMetric } from "@sketchi/observability";
@@ -31,22 +32,7 @@ export interface StudioBuildToolExecutor<Input, Result, E = never, R = never> {
 	readonly execute: (input: Input) => Effect.Effect<Result, E, R>;
 }
 
-type StudioBuildOperation =
-	| "buildFlowchart"
-	| "buildMindmap"
-	| "buildSequenceDiagram"
-	| "buildTimeline"
-	| "buildChart"
-	| "buildStateMachine"
-	| "buildGantt"
-	| "buildErDiagram"
-	| "buildClassDiagram"
-	| "buildOrgChart"
-	| "buildVennDiagram"
-	| "buildJourneyMap"
-	| "buildSankey"
-	| "buildWireframe"
-	| "buildQuadrantChart";
+type StudioBuildOperation = FamilyBuildOperation;
 
 /**
  * One agent turn's build budget, shared by every Studio build tool: one

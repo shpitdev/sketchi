@@ -6,7 +6,7 @@ import { getCanvasValidationIssues } from "@sketchi/drawing";
 import { parseSankeyDiagram, sankeyFixture, type SankeyDiagram } from "./document.js";
 import { sankeyStressFixtures } from "./fixtures.js";
 
-import { renderDiagram } from "../../render.js";
+import { renderDiagram } from "../../family.js";
 import {
 	layoutSankeyDiagram,
 	SANKEY_MIN_BAND,

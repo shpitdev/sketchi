@@ -1,9 +1,12 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { erFixture, orgChartEr } from "@sketchi/diagrams/families/er/document";
 import { erScenarios } from "@sketchi/diagram-scenarios";
+import { orgChartEr } from "@sketchi/diagrams/families/er/document";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const erFixture = familyForType("er").fixture;
 
 const meta = {
 	title: "Diagram Types/Er",

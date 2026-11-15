@@ -1,13 +1,14 @@
 import {
-	decodeMindmapRequest,
 	buildMindmap as buildMindmapDocument,
+	decodeMindmapRequest,
 	type BuildMindmapResult,
 } from "../../families/mindmap/build.js";
+import { families, type FamilyBuildOperation } from "../../family.js";
 import {
-	type BuildDelivery,
-	type ArtifactBuildCapabilities,
-	FLOWCHART_COVERAGE_CODES,
 	CodeModeIssue,
+	FLOWCHART_COVERAGE_CODES,
+	type ArtifactBuildCapabilities,
+	type BuildDelivery,
 	type CodeModeIssueCode,
 	type CodeModeIssueRef,
 	type QualityReport,
@@ -15,50 +16,24 @@ import {
 
 import {
 	CANVAS_LIMITS,
-	SKETCHI_DIAGRAM_STYLE,
+	COMMUNITY_ICON_COLLECTION,
+	COMMUNITY_ICON_SLUG_PREFIX,
 	compileCanvasSpec,
 	curvedConnectorBetween,
 	getCanvasValidationIssues,
-	wrappedLabelWidth,
-	wrapTextToWidth,
-	type CanvasValidationIssue,
-	COMMUNITY_ICON_COLLECTION,
-	COMMUNITY_ICON_SLUG_PREFIX,
 	isDrawnIconSlug,
 	isIconRecipe,
+	SKETCHI_DIAGRAM_STYLE,
 	withoutCanvasElements,
+	wrappedLabelWidth,
+	wrapTextToWidth,
 	type CanvasIconAsset,
+	type CanvasValidationIssue,
 	type IconRecipe,
 	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,
 } from "@sketchi/drawing";
-import {
-	FLOWCHART_MAX_ISSUES,
-	type FlowchartDiagram,
-	type FlowchartValidationIssue,
-	type FlowchartValidationIssueRef,
-} from "../../families/flowchart/diagram.js";
-import {
-	getSequenceValidationIssues,
-	type SequenceDiagram,
-	type SequenceValidationIssueCode,
-} from "../../families/sequence/document.js";
-import {
-	getStateMachineValidationIssues,
-	stateLabel,
-	resolveStateMachineInitials,
-	splitContinuingFinalStates,
-	getStateMachineDefaultWarnings,
-	type StateMachineDiagram,
-	type StateMachineValidationIssueCode,
-} from "../../families/state-machine/document.js";
-import {
-	getErValidationIssues,
-	parseErFieldShorthand,
-	resolveErShorthand,
-	type ErDiagram,
-	type ErValidationIssueCode,
-} from "../../families/er/document.js";
+import { getChartValidationIssues, type ChartDiagram } from "../../families/chart/document.js";
 import {
 	getClassValidationIssues,
 	parseClassAttributeShorthand,
@@ -69,6 +44,36 @@ import {
 	type ClassValidationIssueCode,
 } from "../../families/class/document.js";
 import {
+	getErValidationIssues,
+	parseErFieldShorthand,
+	resolveErShorthand,
+	type ErDiagram,
+	type ErValidationIssueCode,
+} from "../../families/er/document.js";
+import {
+	FLOWCHART_MAX_ISSUES,
+	type FlowchartDiagram,
+	type FlowchartValidationIssue,
+	type FlowchartValidationIssueRef,
+} from "../../families/flowchart/diagram.js";
+import {
+	decodeFlowchartDocument,
+	flowchartDiagramFromDocument,
+} from "../../families/flowchart/document.js";
+import { applyFlowchartEdits } from "../../families/flowchart/edits.js";
+import {
+	ganttScheduleConflicts,
+	getGanttValidationIssues,
+	type GanttDiagram,
+	type GanttValidationIssueCode,
+} from "../../families/gantt/document.js";
+import {
+	getJourneyValidationIssues,
+	resolveJourneyShorthand,
+	type JourneyDiagram,
+	type JourneyValidationIssueCode,
+} from "../../families/journey/document.js";
+import {
 	getOrgChartValidationIssues,
 	resolveOrgChartShorthand,
 	type OrgChartDiagram,
@@ -77,22 +82,10 @@ import {
 import {
 	getQuadrantValidationIssues,
 	QuadrantValidationError,
-	type QuadrantValidationIssue,
 	type QuadrantDiagram,
+	type QuadrantValidationIssue,
 	type QuadrantValidationIssueCode,
 } from "../../families/quadrant/document.js";
-import {
-	getVennValidationIssues,
-	resolveVennShorthand,
-	type VennDiagram,
-	type VennValidationIssueCode,
-} from "../../families/venn/document.js";
-import {
-	getJourneyValidationIssues,
-	resolveJourneyShorthand,
-	type JourneyDiagram,
-	type JourneyValidationIssueCode,
-} from "../../families/journey/document.js";
 import {
 	getSankeyValidationIssues,
 	resolveSankeyShorthand,
@@ -100,77 +93,85 @@ import {
 	type SankeyValidationIssueCode,
 } from "../../families/sankey/document.js";
 import {
+	getSequenceValidationIssues,
+	type SequenceDiagram,
+	type SequenceValidationIssueCode,
+} from "../../families/sequence/document.js";
+import {
+	getStateMachineDefaultWarnings,
+	getStateMachineValidationIssues,
+	resolveStateMachineInitials,
+	splitContinuingFinalStates,
+	stateLabel,
+	type StateMachineDiagram,
+	type StateMachineValidationIssueCode,
+} from "../../families/state-machine/document.js";
+import {
+	getTimelineValidationIssues,
+	orderedTimelineEvents,
+	type TimelineDiagram,
+} from "../../families/timeline/document.js";
+import {
+	getVennValidationIssues,
+	resolveVennShorthand,
+	type VennDiagram,
+	type VennValidationIssueCode,
+} from "../../families/venn/document.js";
+import {
 	getWireframeValidationIssues,
 	resolveWireframeShorthand,
 	type WireframeComponent,
 	type WireframeDiagram,
 	type WireframeValidationIssueCode,
 } from "../../families/wireframe/document.js";
-import {
-	getTimelineValidationIssues,
-	orderedTimelineEvents,
-	type TimelineDiagram,
-} from "../../families/timeline/document.js";
-import { getChartValidationIssues, type ChartDiagram } from "../../families/chart/document.js";
-import {
-	getGanttValidationIssues,
-	ganttScheduleConflicts,
-	type GanttDiagram,
-	type GanttValidationIssueCode,
-} from "../../families/gantt/document.js";
-import { applyFlowchartEdits } from "../../families/flowchart/edits.js";
 import { checkRequestCoverage, type CoverageIssueCode } from "../../generate/coverage.js";
-import {
-	decodeFlowchartDocument,
-	flowchartDiagramFromDocument,
-} from "../../families/flowchart/document.js";
 
 import {
 	convertSceneToExcalidraw,
 	createExcalidrawFile,
-	type ExcalidrawScene,
 	validateExcalidrawScene,
+	type ExcalidrawScene,
 } from "@sketchi/drawing/excalidraw";
+import { isStructurallyValidChartMark, renderChartDiagram } from "../../families/chart/render.js";
+import { isStructurallyValidClassBox, renderClassDiagram } from "../../families/class/render.js";
 import {
-	longNodeDescriptions,
-	NODE_DESCRIPTION_MAX_LINES,
-	renderIntermediateDiagram,
-	isStructurallyValidStateMarker,
-} from "../../graph/scene.js";
+	isStructurallyValidErOptional,
+	isStructurallyValidErTable,
+	renderErDiagram,
+} from "../../families/er/render.js";
+import { isStructurallyValidGanttMark, renderGanttDiagram } from "../../families/gantt/render.js";
 import {
-	renderSequenceDiagram,
+	isStructurallyValidJourneyMark,
+	renderJourneyDiagram,
+} from "../../families/journey/render.js";
+import { renderOrgChartDiagram } from "../../families/org-chart/render.js";
+import {
+	isStructurallyValidQuadrantMark,
+	renderQuadrantDiagram,
+} from "../../families/quadrant/render.js";
+import { sankeyLayoutIssues } from "../../families/sankey/readout.js";
+import {
+	isStructurallyValidSankeyMark,
+	renderSankeyDiagram,
+} from "../../families/sankey/render.js";
+import {
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
+	renderSequenceDiagram,
 } from "../../families/sequence/render.js";
 import { renderStateMachineDiagram } from "../../families/state-machine/render.js";
 import {
-	renderErDiagram,
-	isStructurallyValidErOptional,
-	isStructurallyValidErTable,
-} from "../../families/er/render.js";
-import { renderClassDiagram, isStructurallyValidClassBox } from "../../families/class/render.js";
-import { renderOrgChartDiagram } from "../../families/org-chart/render.js";
-import { renderVennDiagram, isStructurallyValidVennSet } from "../../families/venn/render.js";
-import {
-	renderJourneyDiagram,
-	isStructurallyValidJourneyMark,
-} from "../../families/journey/render.js";
-import {
-	renderSankeyDiagram,
-	isStructurallyValidSankeyMark,
-} from "../../families/sankey/render.js";
-import { sankeyLayoutIssues } from "../../families/sankey/readout.js";
+	isStructurallyValidTimelineMarker,
+	renderTimelineDiagram,
+} from "../../families/timeline/render.js";
+import { isStructurallyValidVennSet, renderVennDiagram } from "../../families/venn/render.js";
 import { renderWireframeDiagram } from "../../families/wireframe/render.js";
 import {
-	renderQuadrantDiagram,
-	isStructurallyValidQuadrantMark,
-} from "../../families/quadrant/render.js";
-import {
-	renderTimelineDiagram,
-	isStructurallyValidTimelineMarker,
-} from "../../families/timeline/render.js";
-import { renderChartDiagram, isStructurallyValidChartMark } from "../../families/chart/render.js";
-import { renderGanttDiagram, isStructurallyValidGanttMark } from "../../families/gantt/render.js";
+	isStructurallyValidStateMarker,
+	longNodeDescriptions,
+	NODE_DESCRIPTION_MAX_LINES,
+	renderIntermediateDiagram,
+} from "../../graph/scene.js";
 
 import {
 	recordMetric,
@@ -189,87 +190,87 @@ import {
 	type StoredArtifactFormat,
 } from "./artifacts.js";
 import {
-	formatContractSchemaError,
-	BuildFlowchartRejected,
-	EditFlowchartRejected,
-	BuildSequenceDiagramRejected,
-	BuildStateMachineRejected,
-	BuildErDiagramRejected,
-	BuildClassDiagramRejected,
-	BuildOrgChartRejected,
-	BuildVennDiagramRejected,
-	BuildJourneyMapRejected,
-	BuildSankeyRejected,
-	BuildWireframeRejected,
-	BuildQuadrantChartRejected,
-	BuildTimelineRejected,
-	BuildChartRejected,
-	BuildGanttRejected,
-	CreateCanvasRejected,
-	GetArtifactRejected,
 	ApplyDiagramPatchRejected,
 	ApplyDiagramPatchRequest,
-	BuildFlowchartRequestSchema,
-	EditFlowchartRequest,
-	BuildSequenceDiagramRequest,
-	BuildStateMachineRequest,
-	BuildErDiagramRequest,
-	BuildClassDiagramRequest,
-	BuildOrgChartRequest,
-	BuildVennDiagramRequest,
-	BuildJourneyMapRequest,
-	BuildSankeyRequest,
-	BuildWireframeRequest,
-	BuildQuadrantChartRequest,
-	BuildTimelineRequest,
+	BuildChartRejected,
 	BuildChartRequest,
+	BuildClassDiagramRejected,
+	BuildClassDiagramRequest,
+	BuildErDiagramRejected,
+	BuildErDiagramRequest,
+	BuildFlowchartRejected,
+	BuildFlowchartRequestSchema,
+	BuildGanttRejected,
 	BuildGanttRequest,
+	BuildJourneyMapRejected,
+	BuildJourneyMapRequest,
+	BuildOrgChartRejected,
+	BuildOrgChartRequest,
+	BuildQuadrantChartRejected,
+	BuildQuadrantChartRequest,
+	BuildSankeyRejected,
+	BuildSankeyRequest,
+	BuildSequenceDiagramRejected,
+	BuildSequenceDiagramRequest,
+	BuildStateMachineRejected,
+	BuildStateMachineRequest,
+	BuildTimelineRejected,
+	BuildTimelineRequest,
+	BuildVennDiagramRejected,
+	BuildVennDiagramRequest,
+	BuildWireframeRejected,
+	BuildWireframeRequest,
+	CreateCanvasRejected,
 	CreateCanvasRequest,
 	DEFAULT_ICON_SEARCH_LIMIT,
-	SearchIconsRejected,
-	SearchIconsRequest,
-	type SearchIconsResult,
 	DIAGRAM_PATCH_OPERATION_NAMES,
+	EditFlowchartRejected,
+	EditFlowchartRequest,
+	formatContractSchemaError,
+	GetArtifactRejected,
 	GetArtifactRequest,
 	RenderedDiagramSceneSchema,
+	SearchIconsRejected,
+	SearchIconsRequest,
 	type ApplyDiagramPatchResult,
+	type BuildChartResult,
+	type BuildClassDiagramResult,
+	type BuildErDiagramResult,
 	type BuildFlowchartRequest,
 	type BuildFlowchartResult,
-	type EditFlowchartResult,
+	type BuildGanttResult,
+	type BuildJourneyMapResult,
+	type BuildOrgChartResult,
+	type BuildQuadrantChartResult,
+	type BuildSankeyResult,
 	type BuildSequenceDiagramResult,
 	type BuildStateMachineResult,
-	type BuildErDiagramResult,
-	type BuildClassDiagramResult,
-	type BuildOrgChartResult,
-	type BuildVennDiagramResult,
-	type BuildJourneyMapResult,
-	type BuildSankeyResult,
-	type BuildWireframeResult,
-	type BuildQuadrantChartResult,
 	type BuildTimelineResult,
-	type BuildChartResult,
-	type BuildGanttResult,
-	type CreateCanvasResult,
-	type ContractSchemaIssue,
+	type BuildVennDiagramResult,
+	type BuildWireframeResult,
 	type ContractSchemaError,
+	type ContractSchemaIssue,
+	type CreateCanvasResult,
 	type DiagramPatchOperation,
 	type DiagramSelector,
+	type EditFlowchartResult,
 	type GetArtifactResult,
+	type NormalizedChartSpec,
+	type NormalizedClassSpec,
+	type NormalizedErSpec,
+	type NormalizedGanttSpec,
+	type NormalizedJourneySpec,
+	type NormalizedOrgChartSpec,
+	type NormalizedQuadrantChartSpec,
+	type NormalizedSankeySpec,
 	type NormalizedSequenceDiagramSpec,
 	type NormalizedStateMachineSpec,
-	type NormalizedErSpec,
-	type NormalizedClassSpec,
-	type NormalizedOrgChartSpec,
-	type NormalizedVennSpec,
-	type NormalizedJourneySpec,
-	type NormalizedSankeySpec,
-	type NormalizedWireframeSpec,
-	type WireframeComponentInput,
-	type NormalizedQuadrantChartSpec,
 	type NormalizedTimelineSpec,
-	type NormalizedChartSpec,
-	type NormalizedGanttSpec,
+	type NormalizedVennSpec,
+	type NormalizedWireframeSpec,
 	type PatchableScene,
+	type SearchIconsResult,
+	type WireframeComponentInput,
 } from "./contract.js";
 
 import {
@@ -279,6 +280,9 @@ import {
 	type PartialArtifactBundle,
 } from "@sketchi/drawing/artifacts";
 
+import { cleanToolString } from "../../clean-text.js";
+import { assessFlowchartQuality } from "../../families/flowchart/quality.js";
+import { normalizeFlowchartSpec } from "../../families/flowchart/spec.js";
 import {
 	catalogForRequest,
 	embedSceneIcons,
@@ -291,9 +295,6 @@ import {
 	type CodeModeCommunityIcons,
 	type CodeModeIconCatalog,
 } from "./icons.js";
-import { cleanToolString } from "../../generate/clean-text.js";
-import { assessFlowchartQuality } from "../../families/flowchart/quality.js";
-import { normalizeFlowchartSpec } from "../../families/flowchart/spec.js";
 
 const DEFAULT_BUILD_FORMATS: ArtifactFormat[] = ["excalidraw", "scene"];
 const DEFAULT_INLINE_FORMATS: InlineArtifactFormat[] = ["scene"];
@@ -377,23 +378,9 @@ function unknownRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 type CodeModeBoundaryOperation =
+	| FamilyBuildOperation
 	| "applyDiagramPatch"
-	| "buildFlowchart"
 	| "editFlowchart"
-	| "buildMindmap"
-	| "buildSequenceDiagram"
-	| "buildStateMachine"
-	| "buildErDiagram"
-	| "buildClassDiagram"
-	| "buildOrgChart"
-	| "buildVennDiagram"
-	| "buildJourneyMap"
-	| "buildSankey"
-	| "buildWireframe"
-	| "buildQuadrantChart"
-	| "buildTimeline"
-	| "buildChart"
-	| "buildGantt"
 	| "createCanvas"
 	| "getArtifact"
 	| "searchIcons";
@@ -420,24 +407,9 @@ function codeModeCorrelation(input: unknown): TelemetryCorrelationInput {
 }
 
 function artifactKindForOperation(operation: CodeModeBoundaryOperation): string | undefined {
-	if (operation === "buildFlowchart") return "flowchart";
-	if (operation === "buildMindmap") return "mindmap";
-	if (operation === "buildSequenceDiagram") return "sequence";
-	if (operation === "buildTimeline") return "timeline";
-	if (operation === "buildChart") return "chart";
-	if (operation === "buildGantt") return "gantt";
-	if (operation === "buildStateMachine") return "state-machine";
-	if (operation === "buildErDiagram") return "er";
-	if (operation === "buildClassDiagram") return "class";
-	if (operation === "buildOrgChart") return "org-chart";
-	if (operation === "buildVennDiagram") return "venn";
-	if (operation === "buildJourneyMap") return "journey";
-	if (operation === "buildSankey") return "sankey";
-	if (operation === "buildWireframe") return "wireframe";
-	if (operation === "buildQuadrantChart") return "quadrant";
 	if (operation === "createCanvas") return "canvas";
 	if (operation === "applyDiagramPatch") return "patch";
-	return undefined;
+	return families.find((family) => family.operation === operation)?.type;
 }
 
 export function observeCodeModeBoundary<A extends ObservableCodeModeResult, R>(

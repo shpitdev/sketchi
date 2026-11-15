@@ -1,28 +1,29 @@
 import { describe, expect, it } from "@effect/vitest";
-import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 import type { UIMessage } from "ai";
+import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 import { Effect, Option } from "effect";
+import { makeStudioBuildToolCallback } from "./studio-family-tools.server";
 
-import {
-	buildFlowchart,
-	CodeModeRuntimeEnvironment,
-} from "@sketchi/diagrams/build/code-mode/runtime";
 import {
 	CodeModeArtifactStorage,
 	makeMemoryArtifactStorage,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
 import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
+import {
+	buildFlowchart,
+	CodeModeRuntimeEnvironment,
+} from "@sketchi/diagrams/build/code-mode/runtime";
 
 import { PlaygroundAiModel } from "../ai/model.server";
 import { PlaygroundCodeMode, type PlaygroundCodeModeShape } from "../codemode/service.server";
 
-import { PlaygroundRequestMetadata } from "../runtime/context.server";
-import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runtime.server";
 import {
 	MAX_CHAT_TOTAL_CHARACTERS,
 	studioChatRequestMessages,
 } from "../../features/playground/studio-chat-request";
-import { handleStudioAgentRequest, makeStudioBuildToolCallback } from "./agent.server";
+import { PlaygroundRequestMetadata } from "../runtime/context.server";
+import { PlaygroundRequestCallbacks, runPlaygroundEffect } from "../runtime/runtime.server";
+import { handleStudioAgentRequest } from "./agent.server";
 
 const repairResult: BuildFlowchartResult = {
 	ok: false,
@@ -231,7 +232,9 @@ describe("Studio build results the model reads", () => {
 				]),
 			],
 		});
-		const codeMode = { buildFlowchart: build } as unknown as PlaygroundCodeModeShape;
+		const codeMode = {
+			buildFamily: (_family: unknown, input: unknown) => build(input),
+		} as unknown as PlaygroundCodeModeShape;
 		const request = new Request("https://studio.test/api/chat", {
 			method: "POST",
 			body: JSON.stringify({
@@ -328,7 +331,7 @@ describe("Studio build results the model reads", () => {
 			handleStudioAgentRequest(request).pipe(
 				Effect.provideService(PlaygroundAiModel, { model: Effect.succeed(model) }),
 				Effect.provideService(PlaygroundCodeMode, {
-					buildFlowchart: build,
+					buildFamily: (_family: unknown, input: unknown) => build(input),
 				} as unknown as PlaygroundCodeModeShape),
 			),
 			{ env: {}, platform: { waitUntilPromise: () => undefined }, request },
@@ -405,7 +408,7 @@ describe("Studio build results the model reads", () => {
 			handleStudioAgentRequest(request).pipe(
 				Effect.provideService(PlaygroundAiModel, { model: Effect.succeed(model) }),
 				Effect.provideService(PlaygroundCodeMode, {
-					buildFlowchart: build,
+					buildFamily: (_family: unknown, input: unknown) => build(input),
 				} as unknown as PlaygroundCodeModeShape),
 			),
 			{ env: {}, platform: { waitUntilPromise: () => undefined }, request },

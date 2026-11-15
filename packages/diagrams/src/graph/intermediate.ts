@@ -1,8 +1,8 @@
 import {
-	DiagramStyle,
-	SKETCHI_DIAGRAM_STYLE,
 	DIAGRAM_ICON_SLUG_MAX_LENGTH,
 	DIAGRAM_ICON_SLUG_PATTERN,
+	DiagramStyle,
+	SKETCHI_DIAGRAM_STYLE,
 } from "@sketchi/drawing";
 import {
 	Array,
@@ -15,8 +15,6 @@ import {
 	Schema,
 } from "effect";
 
-import { DIAGRAM_TYPES, GRAPH_DIAGRAM_TYPES } from "../types.js";
-
 function withDefault<S extends Schema.Top>(schema: S, value: S["Encoded"]) {
 	return schema.pipe(Schema.withDecodingDefault(Effect.succeed(value)));
 }
@@ -24,17 +22,11 @@ function withDefault<S extends Schema.Top>(schema: S, value: S["Encoded"]) {
 const NonEmptyString = Schema.NonEmptyString;
 const Metadata = Schema.Record(Schema.String, Schema.Unknown);
 
-/**
- * Server/runtime mirror of the canonical CSS tokens in editor/theme.css.
- * intermediate.test.ts fails if these values drift from that source of truth.
- */
-export const DiagramTypeSchema = Schema.Literals(DIAGRAM_TYPES);
 /** Sequence diagrams have their own contract; only graph families use nodes and edges. */
-export const GraphDiagramTypeSchema = Schema.Literals(GRAPH_DIAGRAM_TYPES);
+export const GraphDiagramTypeSchema = Schema.Literal("flowchart");
 export const LayoutDirectionSchema = Schema.Literals(["TB", "BT", "LR", "RL"]);
 export const EdgeRoutingSchema = Schema.Literals(["straight", "orthogonal", "curved"]);
 
-export type DiagramType = typeof DiagramTypeSchema.Type;
 export type GraphDiagramType = typeof GraphDiagramTypeSchema.Type;
 export type LayoutDirection = typeof LayoutDirectionSchema.Type;
 export type EdgeRouting = typeof EdgeRoutingSchema.Type;

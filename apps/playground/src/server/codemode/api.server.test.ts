@@ -1,29 +1,28 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type TelemetrySpanRow } from "@sketchi/observability";
-import { describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
+import { describe, expect, it, vi } from "vitest";
+import {
+	handleCreateCanvasRequest as handleCreateCanvasRequestEffect,
+	handleEditFlowchartRequest as handleEditFlowchartRequestEffect,
+	handleFamilyBuildRequest,
+	handleGetArtifactRequest as handleGetArtifactRequestEffect,
+	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
+	MAX_CANVAS_REQUEST_BYTES,
+	MAX_CODE_MODE_BUILD_REQUEST_BYTES,
+} from "./api.server";
 
-import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
 import {
 	type CodeModeObjectBucket,
 	type CodeModeObjectBucketObject,
 } from "@sketchi/diagrams/build/code-mode/artifacts";
+import { type BuildFlowchartResult } from "@sketchi/diagrams/build/code-mode/contract";
 import { CANVAS_LIMITS } from "@sketchi/drawing";
 
-import {
-	MAX_CANVAS_REQUEST_BYTES,
-	MAX_CODE_MODE_BUILD_REQUEST_BYTES,
-	handleBuildFlowchartRequest as handleBuildFlowchartRequestEffect,
-	handleBuildMindmapRequest as handleBuildMindmapRequestEffect,
-	handleBuildSequenceDiagramRequest as handleBuildSequenceDiagramRequestEffect,
-	handleCreateCanvasRequest as handleCreateCanvasRequestEffect,
-	handleEditFlowchartRequest as handleEditFlowchartRequestEffect,
-	handleGetArtifactRequest as handleGetArtifactRequestEffect,
-	handlePatchArtifactRequest as handlePatchArtifactRequestEffect,
-} from "./api.server";
-import { PlaygroundCodeMode } from "./service.server";
 import { type StudioEnv } from "../bindings/studio-env.server";
-import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "./usage-events.server";
 import { runPlaygroundEffect } from "../runtime/runtime.server";
+import { PlaygroundCodeMode } from "./service.server";
+import { USAGE_EVENT_ATTRIBUTE, USAGE_ISSUES_ATTRIBUTE } from "./usage-events.server";
 
 function testBoundary(env: StudioEnv, request: Request) {
 	return {
@@ -39,7 +38,7 @@ function testBoundary(env: StudioEnv, request: Request) {
 
 function handleBuildFlowchartRequest(env: StudioEnv, request: Request) {
 	return runPlaygroundEffect(
-		handleBuildFlowchartRequestEffect(request),
+		handleFamilyBuildRequest(familyForType("flowchart"), request),
 		testBoundary(env, request),
 	);
 }
@@ -49,12 +48,15 @@ function handleEditFlowchartRequest(env: StudioEnv, request: Request) {
 }
 
 function handleBuildMindmapRequest(env: StudioEnv, request: Request) {
-	return runPlaygroundEffect(handleBuildMindmapRequestEffect(request), testBoundary(env, request));
+	return runPlaygroundEffect(
+		handleFamilyBuildRequest(familyForType("mindmap"), request),
+		testBoundary(env, request),
+	);
 }
 
 function handleBuildSequenceDiagramRequest(env: StudioEnv, request: Request) {
 	return runPlaygroundEffect(
-		handleBuildSequenceDiagramRequestEffect(request),
+		handleFamilyBuildRequest(familyForType("sequence"), request),
 		testBoundary(env, request),
 	);
 }
@@ -1115,10 +1117,17 @@ describe("HTTP package validation authority", () => {
 		const response = await runPlaygroundEffect(
 			Effect.gen(function* () {
 				const codeMode = yield* PlaygroundCodeMode;
-				return yield* handleBuildFlowchartRequestEffect(request).pipe(
+				return yield* handleFamilyBuildRequest(familyForType("flowchart"), request).pipe(
 					Effect.provideService(PlaygroundCodeMode, {
 						...codeMode,
-						buildFlowchart: operation,
+						buildFamily: (family, input) =>
+							codeMode.buildFamily(
+								{
+									...family,
+									build: (runtime) => family.build({ ...runtime, buildFlowchart: operation }),
+								},
+								input,
+							),
 					}),
 				);
 			}),

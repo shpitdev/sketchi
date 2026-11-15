@@ -1,4 +1,5 @@
 import type { CloudflareAiGatewayProvider } from "@sketchi/cloudflare/ai-gateway";
+import { familyForType } from "@sketchi/diagrams/family";
 import type { SupportedGenerationModel } from "@sketchi/diagrams/generate/models";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
 import { Effect } from "effect";
@@ -189,7 +190,7 @@ describe("binding-dependent host lifecycles", () => {
 			const built = await runtime.run(
 				Effect.gen(function* () {
 					const codeMode = yield* PlaygroundCodeMode;
-					return yield* codeMode.buildFlowchart({
+					return yield* codeMode.buildFamily(familyForType("flowchart"), {
 						spec: {
 							title: "Lifecycle source",
 							nodes: {

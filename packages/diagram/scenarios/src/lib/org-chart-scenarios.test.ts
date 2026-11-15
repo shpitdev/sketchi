@@ -1,20 +1,20 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result, Option, Effect } from "effect";
-import { describe, expect, it } from "vitest";
 import type { OrgChartDiagram } from "@sketchi/diagrams/families/org-chart/document";
-import { renderDiagram } from "@sketchi/diagrams/render";
+import { renderDiagram } from "@sketchi/diagrams/family";
+import { Effect, Option, Result } from "effect";
+import { describe, expect, it } from "vitest";
 
-import { evaluateScenarioDiagram } from "./evaluate.js";
 import { DiagramGenerationClient } from "@sketchi/diagrams/generate/client";
+import { evaluateScenarioDiagram } from "./evaluate.js";
 
 import { FixtureGenerationClientLayer } from "./fixture-client.js";
-import { toDiagramGenerationPrompt } from "./prompt.js";
 import { candidateFromMcpResult } from "./mcp-results.js";
 import {
 	orgChartDrawnCheck,
 	orgChartLayoutCheck,
 	orgChartScenarios,
 } from "./org-chart-scenarios.js";
+import { toDiagramGenerationPrompt } from "./prompt.js";
 
 const scenario = (id: string) => orgChartScenarios.find((entry) => entry.id === id)!;
 const failed = (id: string, diagram: OrgChartDiagram) =>

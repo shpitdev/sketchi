@@ -1,6 +1,6 @@
 import { DIAGRAM_NODE_COLOR_NAMES, DIAGRAM_ZONE_KINDS } from "../../graph/intermediate.js";
+import type { RuleSource } from "../../rule-source.js";
 import { FLOWCHART_MAX_EDGES, FLOWCHART_MAX_NODES } from "./diagram.js";
-import type { RuleSource } from "../../generate/rule-source.js";
 
 const zoneKinds = `${DIAGRAM_ZONE_KINDS.slice(0, -1).join(", ")} or ${DIAGRAM_ZONE_KINDS.at(-1)}`;
 

@@ -2,21 +2,21 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { crossingStateMachines } from "../flowchart/crossing-fixtures.js";
-import {
-	mediaPlayerStateMachine,
-	parseStateMachineDiagram,
-	type StateMachineDiagram,
-	stateMachineFixture,
-} from "./document.js";
 import {
 	getCanvasValidationIssues,
 	groupRegionIssues,
 	wrappedLabelWidth,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
+import { crossingStateMachines } from "../flowchart/crossing-fixtures.js";
+import {
+	mediaPlayerStateMachine,
+	parseStateMachineDiagram,
+	stateMachineFixture,
+	type StateMachineDiagram,
+} from "./document.js";
 
-import { renderDiagram } from "../../render.js";
+import { renderDiagram } from "../../family.js";
 import { arrowCrossings } from "../../graph/scene.js";
 
 const nodes = (scene: RenderedDiagramScene) =>

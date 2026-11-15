@@ -1,58 +1,15 @@
-import { DrawnIconSchema, IconRecipeSchema } from "@sketchi/drawing";
-import { Schema } from "effect";
 import {
 	ApplyDiagramPatchRequest,
 	ApplyDiagramPatchResultSchema,
 	BuildFlowchartAccepted,
 	BuildFlowchartOptionsSchema,
 	BuildFlowchartRejected,
-	BuildFlowchartRequestSchema,
-	BuildFlowchartResultSchema,
-	EditFlowchartRequest,
-	EditFlowchartResultSchema,
-	BuildSequenceDiagramRequest,
-	BuildStateMachineRequest,
-	BuildStateMachineResultSchema,
-	BuildGanttRequest,
-	BuildGanttResultSchema,
-	GanttToolSpecSchema,
-	BuildErDiagramRequest,
-	BuildErDiagramResultSchema,
-	BuildClassDiagramRequest,
-	BuildClassDiagramResultSchema,
-	ClassToolSpecSchema,
-	BuildOrgChartRequest,
-	BuildOrgChartResultSchema,
-	BuildSankeyRequest,
-	BuildSankeyResultSchema,
-	OrgChartToolSpecSchema,
-	BuildVennDiagramRequest,
-	BuildVennDiagramResultSchema,
-	VennToolSpecSchema,
-	BuildJourneyMapRequest,
-	BuildJourneyMapResultSchema,
-	JourneyToolSpecSchema,
-	SankeyToolSpecSchema,
-	BuildWireframeRequest,
-	BuildWireframeResultSchema,
-	WireframeToolSpecSchema,
-	BuildQuadrantChartRequest,
-	BuildQuadrantChartResultSchema,
-	QuadrantChartToolSpecSchema,
-	BuildTimelineRequest,
-	BuildSequenceDiagramResultSchema,
-	BuildTimelineResultSchema,
-	BuildChartRequest,
-	BuildChartResultSchema,
-	ChartToolSpecSchema,
 	CanvasSpec,
 	CreateCanvasRequest,
 	CreateCanvasResultSchema,
 	DiagramSelector,
-	ErToolSpecSchema,
-	SequenceDiagramSpec,
-	StateMachineSpec,
-	TimelineSpec,
+	EditFlowchartRequest,
+	EditFlowchartResultSchema,
 	GetArtifactRequest,
 	GetArtifactResultSchema,
 	SceneElementSchema,
@@ -60,17 +17,14 @@ import {
 	SearchIconsResultSchema,
 	toCodeModeJsonSchema,
 } from "@sketchi/diagrams/build/code-mode/contract";
-
-import { MindmapDocument } from "@sketchi/diagrams/families/mindmap/index";
 import {
-	BuildMindmapRequest,
-	BuildMindmapResultSchema,
-} from "@sketchi/diagrams/families/mindmap/build";
-import {
+	CodeModeIssue,
 	CodeModeIssueCodeSchema,
 	CodeModeIssueRef,
-	CodeModeIssue,
 } from "@sketchi/diagrams/build/result";
+import { families } from "@sketchi/diagrams/family";
+import { DrawnIconSchema, IconRecipeSchema } from "@sketchi/drawing";
+import { Schema } from "effect";
 
 /** sketchi.drawIcon: a logo and its name in, the hand-drawn recipe and the judge's verdict out. */
 const DrawIconRequestSchema = Schema.Struct({
@@ -105,175 +59,23 @@ const DrawIconResultSchema = Schema.Union([
 		retryAfterSeconds: Schema.optionalKey(Schema.Number),
 	}),
 ]);
-
-export const codeModeContracts = {
-	buildFlowchart: {
-		input: BuildFlowchartRequestSchema,
-		output: BuildFlowchartResultSchema,
-	},
-	editFlowchart: {
-		input: EditFlowchartRequest,
-		output: EditFlowchartResultSchema,
-	},
-	buildMindmap: {
-		input: Schema.Struct({
-			...BuildMindmapRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: MindmapDocument.mapFields(({ id, title, root, layout }) => ({
-				id,
-				title,
-				root,
-				layout,
-			})),
-		}),
-		output: BuildMindmapResultSchema,
-	},
-	buildSequenceDiagram: {
-		input: Schema.Struct({
-			...BuildSequenceDiagramRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: SequenceDiagramSpec.mapFields(({ id, title, participants, messages }) => ({
-				id,
-				title,
-				participants,
-				messages,
-			})),
-		}),
-		output: BuildSequenceDiagramResultSchema,
-	},
-	buildTimeline: {
-		input: Schema.Struct({
-			...BuildTimelineRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: TimelineSpec.mapFields(({ id, title, events, lanes, today }) => ({
-				id,
-				title,
-				events,
-				lanes,
-				today,
-			})),
-		}),
-		output: BuildTimelineResultSchema,
-	},
-	buildChart: {
-		input: Schema.Struct({
-			...BuildChartRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: ChartToolSpecSchema,
-		}),
-		output: BuildChartResultSchema,
-	},
-	buildStateMachine: {
-		input: Schema.Struct({
-			...BuildStateMachineRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: StateMachineSpec.mapFields(({ id, title, initial, states, transitions, layout }) => ({
-				id,
-				title,
-				initial,
-				states,
-				transitions,
-				layout,
-			})),
-		}),
-		output: BuildStateMachineResultSchema,
-	},
-	buildGantt: {
-		input: Schema.Struct({
-			...BuildGanttRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: GanttToolSpecSchema,
-		}),
-		output: BuildGanttResultSchema,
-	},
-	buildErDiagram: {
-		input: Schema.Struct({
-			...BuildErDiagramRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: ErToolSpecSchema,
-		}),
-		output: BuildErDiagramResultSchema,
-	},
-	buildClassDiagram: {
-		input: Schema.Struct({
-			...BuildClassDiagramRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: ClassToolSpecSchema,
-		}),
-		output: BuildClassDiagramResultSchema,
-	},
-	buildOrgChart: {
-		input: Schema.Struct({
-			...BuildOrgChartRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: OrgChartToolSpecSchema,
-		}),
-		output: BuildOrgChartResultSchema,
-	},
-	buildVennDiagram: {
-		input: Schema.Struct({
-			...BuildVennDiagramRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: VennToolSpecSchema,
-		}),
-		output: BuildVennDiagramResultSchema,
-	},
-	buildJourneyMap: {
-		input: Schema.Struct({
-			...BuildJourneyMapRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: JourneyToolSpecSchema,
-		}),
-		output: BuildJourneyMapResultSchema,
-	},
-	buildSankey: {
-		input: Schema.Struct({
-			...BuildSankeyRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: SankeyToolSpecSchema,
-		}),
-		output: BuildSankeyResultSchema,
-	},
-	buildWireframe: {
-		input: Schema.Struct({
-			...BuildWireframeRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: WireframeToolSpecSchema,
-		}),
-		output: BuildWireframeResultSchema,
-	},
-	buildQuadrantChart: {
-		input: Schema.Struct({
-			...BuildQuadrantChartRequest.fields,
-			// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-			spec: QuadrantChartToolSpecSchema,
-		}),
-		output: BuildQuadrantChartResultSchema,
-	},
-	createCanvas: {
-		input: CreateCanvasRequest,
-		output: CreateCanvasResultSchema,
-	},
-	getArtifact: {
-		input: GetArtifactRequest,
-		output: GetArtifactResultSchema,
-	},
-	applyDiagramPatch: {
-		input: ApplyDiagramPatchRequest,
-		output: ApplyDiagramPatchResultSchema,
-	},
-	searchIcons: {
-		input: SearchIconsRequest,
-		output: SearchIconsResultSchema,
-	},
-	drawIcon: {
-		input: DrawIconRequestSchema,
-		output: DrawIconResultSchema,
-	},
-};
-
-export type CodeModeOperation = keyof typeof codeModeContracts;
-export const CODE_MODE_OPERATIONS = Object.keys(codeModeContracts) as CodeModeOperation[];
+export const codeModeContracts = [
+	...families.slice(0, 1).map((family) => [family.operation, family.contracts] as const),
+	["editFlowchart", { input: EditFlowchartRequest, output: EditFlowchartResultSchema }],
+	...families.slice(1).map((family) => [family.operation, family.contracts] as const),
+	["createCanvas", { input: CreateCanvasRequest, output: CreateCanvasResultSchema }],
+	["getArtifact", { input: GetArtifactRequest, output: GetArtifactResultSchema }],
+	["applyDiagramPatch", { input: ApplyDiagramPatchRequest, output: ApplyDiagramPatchResultSchema }],
+	["searchIcons", { input: SearchIconsRequest, output: SearchIconsResultSchema }],
+	["drawIcon", { input: DrawIconRequestSchema, output: DrawIconResultSchema }],
+] as const;
+export type CodeModeOperation = (typeof codeModeContracts)[number][0];
+export const CODE_MODE_OPERATIONS = codeModeContracts.map(([operation]) => operation);
+export function contractForOperation(operation: CodeModeOperation) {
+	const entry = codeModeContracts.find(([name]) => operation === name);
+	if (!entry) throw new Error(`Unknown operation: ${operation}`);
+	return entry[1];
+}
 
 /**
  * Package schemas that recur across operations. Each is declared once and referenced by name, so
@@ -437,7 +239,7 @@ export function generateCodeModeTypes(): string {
 	}
 	const signatures: string[] = [];
 	const declarations: string[] = [];
-	for (const [operation, contracts] of Object.entries(codeModeContracts)) {
+	for (const [operation, contracts] of codeModeContracts) {
 		const name = operation.charAt(0).toUpperCase() + operation.slice(1);
 		signatures.push(`  ${operation}(input: ${name}Request): Promise<${name}Result>;`);
 		// Project inputs before the JSON Schema helper normalizes to the type side.

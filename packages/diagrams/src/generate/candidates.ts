@@ -1,10 +1,6 @@
-import { Match, Array as Arr, Result, Schema, SchemaIssue } from "effect";
-import {
-	type CanonicalValidationError,
-	type CanonicalDiagram,
-	CanonicalDiagramSchema,
-} from "../diagram.js";
-import { DiagramNodeShapeSchema, DiagramZoneKindSchema } from "../graph/intermediate.js";
+import { isDiagramIconSlug, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
+import { Array as Arr, Match, Result, Schema, SchemaIssue } from "effect";
+import { ChartDiagram, validateChartDiagram } from "../families/chart/document.js";
 import {
 	ClassDiagram,
 	resolveClassShorthand,
@@ -12,60 +8,64 @@ import {
 } from "../families/class/document.js";
 import { ErDiagram, resolveErShorthand, validateErDiagram } from "../families/er/document.js";
 import {
-	OrgChartDiagram,
-	resolveOrgChartShorthand,
-	validateOrgChartDiagram,
-} from "../families/org-chart/document.js";
-import { QuadrantDiagram, validateQuadrantDiagram } from "../families/quadrant/document.js";
-import {
-	splitContinuingFinalStates,
-	StateMachineDiagram,
-	getStateMachineDefaultWarnings,
-	StateMachineDefaultWarningSchema,
-	type StateMachineDefaultWarning,
-	validateStateMachineDiagram,
-} from "../families/state-machine/document.js";
-import {
-	VennDiagram,
-	resolveVennShorthand,
-	validateVennDiagram,
-} from "../families/venn/document.js";
-import {
-	JourneyDiagram,
-	resolveJourneyShorthand,
-	validateJourneyDiagram,
-} from "../families/journey/document.js";
-import {
-	SankeyDiagram,
-	resolveSankeyShorthand,
-	validateSankeyDiagram,
-} from "../families/sankey/document.js";
-import {
-	resolveWireframeShorthand,
-	validateWireframeDiagram,
-	WireframeDiagram,
-} from "../families/wireframe/document.js";
+	decodeFlowchartDocument,
+	flowchartDiagramFromDocument,
+	FlowchartDocumentSchema,
+	flowchartNodeDetails,
+	resolveFlowchartReferences,
+	type FlowchartDocument,
+} from "../families/flowchart/document.js";
 import {
 	applyFlowchartEdits,
 	decodeFlowchartEdits,
 	FlowchartEditsSchema,
 	type FlowchartEdit,
 } from "../families/flowchart/edits.js";
-import {
-	decodeFlowchartDocument,
-	flowchartDiagramFromDocument,
-	flowchartNodeDetails,
-	resolveFlowchartReferences,
-	FlowchartDocumentSchema,
-	type FlowchartDocument,
-} from "../families/flowchart/document.js";
 import { FLOWCHART_RULES } from "../families/flowchart/rules.js";
-import { SequenceDiagram, validateSequenceDiagram } from "../families/sequence/document.js";
-import { TimelineDiagram, validateTimelineDiagram } from "../families/timeline/document.js";
-import { ChartDiagram, validateChartDiagram } from "../families/chart/document.js";
 import { GanttDiagram, validateGanttDiagram } from "../families/gantt/document.js";
+import {
+	JourneyDiagram,
+	resolveJourneyShorthand,
+	validateJourneyDiagram,
+} from "../families/journey/document.js";
 import { MindmapInputError, parseMindmap } from "../families/mindmap/index.js";
-import { isDiagramIconSlug, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
+import {
+	OrgChartDiagram,
+	resolveOrgChartShorthand,
+	validateOrgChartDiagram,
+} from "../families/org-chart/document.js";
+import { QuadrantDiagram, validateQuadrantDiagram } from "../families/quadrant/document.js";
+import {
+	resolveSankeyShorthand,
+	SankeyDiagram,
+	validateSankeyDiagram,
+} from "../families/sankey/document.js";
+import { SequenceDiagram, validateSequenceDiagram } from "../families/sequence/document.js";
+import {
+	getStateMachineDefaultWarnings,
+	splitContinuingFinalStates,
+	StateMachineDefaultWarningSchema,
+	StateMachineDiagram,
+	validateStateMachineDiagram,
+	type StateMachineDefaultWarning,
+} from "../families/state-machine/document.js";
+import { TimelineDiagram, validateTimelineDiagram } from "../families/timeline/document.js";
+import {
+	resolveVennShorthand,
+	validateVennDiagram,
+	VennDiagram,
+} from "../families/venn/document.js";
+import {
+	resolveWireframeShorthand,
+	validateWireframeDiagram,
+	WireframeDiagram,
+} from "../families/wireframe/document.js";
+import {
+	CanonicalDiagramSchema,
+	type CanonicalDiagram,
+	type CanonicalValidationError,
+} from "../family.js";
+import { DiagramNodeShapeSchema, DiagramZoneKindSchema } from "../graph/intermediate.js";
 
 import {
 	DiagramGenerationTypeSchema,
@@ -73,8 +73,8 @@ import {
 	modelTitleOrFallback,
 } from "./intent.js";
 import { placeNodeLogos, type OfferedLogo } from "./logo-placement.js";
-import { isUnknownRecord, objectValue } from "./unknown-record.js";
 import { DiagramGenerationPrompt } from "./messages.js";
+import { isUnknownRecord, objectValue } from "./unknown-record.js";
 
 import { repeatedJsonKeys } from "./repeated-keys.js";
 import { DiagramStyle, flowchartStylesAsNodeColors, generatedStyles } from "./styling.js";

@@ -2,8 +2,6 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { classFixture, parseClassDiagram } from "./document.js";
-import { classStressFixtures } from "./fixtures.js";
 import {
 	estimateTextWidth,
 	getCanvasValidationIssues,
@@ -12,8 +10,10 @@ import {
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
+import { classFixture, parseClassDiagram } from "./document.js";
+import { classStressFixtures } from "./fixtures.js";
 
-import { renderDiagram } from "../../render.js";
+import { renderDiagram } from "../../family.js";
 
 const nodes = (scene: RenderedDiagramScene) =>
 	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));

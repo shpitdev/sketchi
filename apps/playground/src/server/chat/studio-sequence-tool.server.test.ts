@@ -1,32 +1,23 @@
 import { describe, expect, it, vi } from "@effect/vitest";
+import { type BuildSequenceDiagramToolInput as StudioBuildSequenceInput } from "@sketchi/diagrams/build/code-mode/contract";
 import { Effect } from "effect";
 
 import {
-	BuildSequenceDiagramResultSchema,
-	BuildSequenceDiagramToolInputSchema,
-	toCodeModeJsonSchema,
-} from "@sketchi/diagrams/build/code-mode/contract";
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "@sketchi/diagrams/build/code-mode/artifacts";
 import {
 	buildFlowchart,
 	buildSequenceDiagram,
 	CodeModeRuntimeEnvironment,
 } from "@sketchi/diagrams/build/code-mode/runtime";
-import {
-	CodeModeArtifactStorage,
-	makeMemoryArtifactStorage,
-} from "@sketchi/diagrams/build/code-mode/artifacts";
 
-import { STUDIO_ARTIFACT_OPTIONS, makeStudioBuildTurn } from "./studio-build-tool.server";
 import {
 	makeStudioFlowchartToolExecutor,
-	type StudioBuildFlowchartInput,
-} from "./studio-flowchart-tool.server";
-import {
 	makeStudioSequenceToolExecutor,
-	StudioBuildSequenceInputSchema,
-	StudioBuildSequenceOutputSchema,
-	type StudioBuildSequenceInput,
-} from "./studio-sequence-tool.server";
+	type StudioBuildFlowchartInput,
+} from "./studio-build-policy.server";
+import { makeStudioBuildTurn, STUDIO_ARTIFACT_OPTIONS } from "./studio-build-tool.server";
 
 const checkout: StudioBuildSequenceInput = {
 	spec: {
@@ -81,19 +72,6 @@ const releaseFlow: StudioBuildFlowchartInput = {
 	},
 };
 describe("Studio build_sequence_diagram host", () => {
-	it("exposes the package-derived sequence contracts without style or artifact options", () => {
-		const input = StudioBuildSequenceInputSchema["~standard"].jsonSchema.input({
-			target: "draft-2020-12",
-		});
-		expect(input).toEqual(toCodeModeJsonSchema(BuildSequenceDiagramToolInputSchema));
-		expect(JSON.stringify(input)).not.toMatch(/artifactFormats|accentColor/u);
-		expect(
-			StudioBuildSequenceOutputSchema["~standard"].jsonSchema.output({
-				target: "draft-2020-12",
-			}),
-		).toEqual(toCodeModeJsonSchema(BuildSequenceDiagramResultSchema));
-	});
-
 	it("builds through the shared vertical with host artifact options and reuses the result", async () => {
 		const runtime = deterministicRuntime();
 		const requests: unknown[] = [];

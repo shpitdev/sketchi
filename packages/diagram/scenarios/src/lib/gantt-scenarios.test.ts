@@ -1,25 +1,25 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result, Option } from "effect";
-import { describe, expect, it } from "vitest";
 import {
 	ganttTaskSchedule,
 	type GanttDiagram,
 	type GanttTask,
 } from "@sketchi/diagrams/families/gantt/document";
-import { layoutGanttDiagram } from "@sketchi/diagrams/families/gantt/render";
 import { readGanttScene } from "@sketchi/diagrams/families/gantt/readout";
-import { renderDiagram } from "@sketchi/diagrams/render";
+import { layoutGanttDiagram } from "@sketchi/diagrams/families/gantt/render";
+import { renderDiagram } from "@sketchi/diagrams/family";
 import {
 	type CanvasSpec as RenderedDiagramScene,
 	type CanvasPoint as ScenePoint,
 } from "@sketchi/drawing";
+import { Option, Result } from "effect";
+import { describe, expect, it } from "vitest";
+import { evaluateScenarioDiagram } from "./evaluate.js";
 import {
 	ganttClearanceCheck,
 	ganttDrawnDataCheck,
 	ganttGeometryCheck,
 	ganttScenarios,
 } from "./gantt-scenarios.js";
-import { evaluateScenarioDiagram } from "./evaluate.js";
 import { candidateFromMcpResult } from "./mcp-results.js";
 
 const failing = (scenario: (typeof ganttScenarios)[number], diagram: GanttDiagram) =>

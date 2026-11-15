@@ -1,10 +1,12 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { classFixture } from "@sketchi/diagrams/families/class/document";
-import { classStressFixtures } from "@sketchi/diagrams/families/class/fixtures";
 import { classScenarios } from "@sketchi/diagram-scenarios";
+import { classStressFixtures } from "@sketchi/diagrams/families/class/fixtures";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const classFixture = familyForType("class").fixture;
 
 const meta = {
 	title: "Diagram Types/Class",

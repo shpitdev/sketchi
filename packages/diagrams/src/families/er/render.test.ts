@@ -3,18 +3,18 @@ import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
-	type AxisAlignedSegment,
 	getCanvasValidationIssues,
 	segmentCrossesBoundsInterior,
 	segmentsFromPoints,
 	type CanvasConnectorElement as ArrowSceneElement,
+	type AxisAlignedSegment,
 	type CanvasShapeElement as NodeSceneElement,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
 import { erFixture, orgChartEr, parseErDiagram, parseErFieldShorthand } from "./document.js";
 import { erStressFixtures } from "./fixtures.js";
 
-import { renderDiagram } from "../../render.js";
+import { renderDiagram } from "../../family.js";
 
 const nodes = (scene: RenderedDiagramScene) =>
 	scene.elements.flatMap((element) => (element.type === "node" ? [element] : []));

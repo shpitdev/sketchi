@@ -1,10 +1,12 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { sankeyFixture } from "@sketchi/diagrams/families/sankey/document";
-import { sankeyStressFixtures } from "@sketchi/diagrams/families/sankey/fixtures";
 import { sankeyScenarios } from "@sketchi/diagram-scenarios";
+import { sankeyStressFixtures } from "@sketchi/diagrams/families/sankey/fixtures";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const sankeyFixture = familyForType("sankey").fixture;
 
 const meta = {
 	title: "Diagram Types/Sankey",

@@ -1,10 +1,12 @@
+import { familyForType } from "@sketchi/diagrams/family";
 import { type Meta, type StoryObj } from "@storybook/react-vite";
 
-import { wireframeFixture } from "@sketchi/diagrams/families/wireframe/document";
-import { wireframeStressFixtures } from "@sketchi/diagrams/families/wireframe/fixtures";
 import { wireframeScenarios } from "@sketchi/diagram-scenarios";
+import { wireframeStressFixtures } from "@sketchi/diagrams/families/wireframe/fixtures";
 
 import { GenerationWorkspace } from "../../../apps/playground/src/features/generation-workspace/index.js";
+
+const wireframeFixture = familyForType("wireframe").fixture;
 
 const meta = {
 	title: "Diagram Types/Wireframe",

@@ -1,3 +1,4 @@
+import { type FamilyBuildOperation } from "@sketchi/diagrams/family";
 import "@tanstack/react-start/server-only";
 
 import { type ArtifactFormat, type ArtifactFormatRef } from "@sketchi/drawing/artifacts";
@@ -14,23 +15,9 @@ export const USAGE_EVENT_ATTRIBUTE = "sketchi.usage.event";
 export const USAGE_ISSUES_ATTRIBUTE = "sketchi.usage.issues";
 
 export type CodeModeUsageOperation =
+	| FamilyBuildOperation
 	| "applyDiagramPatch"
-	| "buildFlowchart"
 	| "editFlowchart"
-	| "buildMindmap"
-	| "buildSequenceDiagram"
-	| "buildTimeline"
-	| "buildChart"
-	| "buildStateMachine"
-	| "buildGantt"
-	| "buildErDiagram"
-	| "buildClassDiagram"
-	| "buildOrgChart"
-	| "buildVennDiagram"
-	| "buildJourneyMap"
-	| "buildSankey"
-	| "buildWireframe"
-	| "buildQuadrantChart"
 	| "createCanvas"
 	| "drawIcon"
 	| "execute"

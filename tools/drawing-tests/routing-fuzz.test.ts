@@ -1,7 +1,27 @@
 import { mindmapTopics } from "@sketchi/diagrams/families/mindmap/index";
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
-import { describe, expect, it } from "vitest";
+import {
+	crossingFixtures,
+	sideFixtures,
+} from "@sketchi/diagrams/families/flowchart/crossing-fixtures";
+import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
+import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
+import { labelFixtures } from "@sketchi/diagrams/families/flowchart/label-fixtures";
+import {
+	laneFixtures,
+	laneStressFixtures,
+} from "@sketchi/diagrams/families/flowchart/lane-fixtures";
+import {
+	fanInChecksFlowchart,
+	leftToRightIncidentFlowchart,
+	routingFixtures,
+} from "@sketchi/diagrams/families/flowchart/routing-fixtures";
+import {
+	zoneFixtures,
+	zoneStressFixtures,
+} from "@sketchi/diagrams/families/flowchart/zone-fixtures";
+import { parseCanonicalDiagram, renderDiagram } from "@sketchi/diagrams/family";
+import { renderGraphDiagram, renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
 import {
 	candidateRouteQuality,
 	canvasBoundTextBox,
@@ -24,29 +44,8 @@ import {
 	zoneRegionIssues,
 	type CanvasSpec as RenderedDiagramScene,
 } from "@sketchi/drawing";
-import {
-	crossingFixtures,
-	sideFixtures,
-} from "@sketchi/diagrams/families/flowchart/crossing-fixtures";
-import {
-	fanInChecksFlowchart,
-	leftToRightIncidentFlowchart,
-	routingFixtures,
-} from "@sketchi/diagrams/families/flowchart/routing-fixtures";
-import { groupFixtures } from "@sketchi/diagrams/families/flowchart/group-fixtures";
-import { labelFixtures } from "@sketchi/diagrams/families/flowchart/label-fixtures";
-import {
-	laneFixtures,
-	laneStressFixtures,
-} from "@sketchi/diagrams/families/flowchart/lane-fixtures";
-import { parseCanonicalDiagram } from "@sketchi/diagrams/diagram";
-import { parseFlowchartDiagram } from "@sketchi/diagrams/families/flowchart/diagram";
-import {
-	zoneFixtures,
-	zoneStressFixtures,
-} from "@sketchi/diagrams/families/flowchart/zone-fixtures";
-import { renderDiagram } from "@sketchi/diagrams/render";
-import { renderGraphDiagram, renderIntermediateDiagram } from "@sketchi/diagrams/graph/scene";
+import { Result } from "effect";
+import { describe, expect, it } from "vitest";
 
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 

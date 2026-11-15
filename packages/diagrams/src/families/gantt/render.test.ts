@@ -1,5 +1,4 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
 import {
 	estimateTextWidth,
 	getCanvasValidationIssues,
@@ -7,6 +6,8 @@ import {
 	type CanvasElement as SceneElement,
 	type CanvasPoint as ScenePoint,
 } from "@sketchi/drawing";
+import { Result } from "effect";
+import { describe, expect, it } from "vitest";
 import {
 	formatGanttDay,
 	ganttFixture,
@@ -15,9 +16,9 @@ import {
 	parseGanttDiagram,
 	type GanttDiagram,
 } from "./document.js";
-import { describe, expect, it } from "vitest";
 
-import { renderDiagram } from "../../render.js";
+import { renderDiagram } from "../../family.js";
+import { readGanttScene } from "./readout.js";
 import {
 	GANTT_MIN_BAR_WIDTH,
 	JOIN_BUDGET,
@@ -27,7 +28,6 @@ import {
 	renderGanttDiagram,
 } from "./render.js";
 import { ROUTE_BUDGET, ROUTE_CHART_BUDGET, ROUTE_KINK_BUDGET } from "./routing.js";
-import { readGanttScene } from "./readout.js";
 import { GANTT_TICK_FONT_SIZE, ganttAxis } from "./scale.js";
 
 interface Box {

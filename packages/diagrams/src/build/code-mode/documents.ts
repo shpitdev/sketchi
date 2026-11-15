@@ -1,173 +1,53 @@
+import { Effect } from "effect";
+import { type FlowchartDiagram } from "../../families/flowchart/diagram.js";
+import { buildMindmap as buildMindmapDocument } from "../../families/mindmap/build.js";
 import {
-	buildMindmap as buildMindmapDocument,
-	type BuildMindmapResult,
-} from "../../families/mindmap/build.js";
+	DIAGRAM_TYPES,
+	familyForType,
+	type CanonicalDiagram,
+	type CanonicalDiagramDocument,
+	type DiagramTypeValue,
+	type FamilyBuildResult,
+} from "../../family.js";
+import * as Runtime from "./runtime.js";
 import {
 	artifactBuildCapabilities,
 	observeCodeModeBoundary,
-	buildFlowchart,
-	buildSequenceDiagram,
-	buildStateMachine,
-	buildErDiagram,
-	buildClassDiagram,
-	buildOrgChart,
-	buildVennDiagram,
-	buildJourneyMap,
-	buildSankey,
-	buildWireframe,
-	buildQuadrantChart,
-	buildTimeline,
-	buildChart,
-	buildGantt,
 	type CodeModeRuntimeEnvironment,
 } from "./runtime.js";
-import { type CanonicalDiagram } from "../../diagram.js";
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "../../types.js";
-import { type FlowchartDiagram } from "../../families/flowchart/diagram.js";
-import { Effect } from "effect";
 
-import {
-	type BuildChartResult,
-	type BuildGanttResult,
-	type BuildFlowchartOptions,
-	type BuildFlowchartResult,
-	type BuildSequenceDiagramResult,
-	type BuildStateMachineResult,
-	type BuildErDiagramResult,
-	type BuildClassDiagramResult,
-	type BuildOrgChartResult,
-	type BuildVennDiagramResult,
-	type BuildJourneyMapResult,
-	type BuildSankeyResult,
-	type BuildWireframeResult,
-	type BuildQuadrantChartResult,
-	type BuildTimelineResult,
-	ClassSpec,
-	ErSpec,
-	FlowchartSpec,
-	SequenceDiagramSpec,
-	StateMachineSpec,
-	TimelineSpec,
-	ChartSpec,
-	GanttSpec,
-	OrgChartSpec,
-	VennSpec,
-	JourneySpec,
-	SankeySpec,
-	WireframeSpec,
-	type WireframeComponentInput,
-	QuadrantChartSpec,
-} from "./contract.js";
-import { MindmapDocument } from "../../families/mindmap/index.js";
+import { type BuildFlowchartOptions, type WireframeComponentInput } from "./contract.js";
 
 import { type CodeModeArtifactStorage } from "./artifacts.js";
 
-/** Every canonical family has one Code Mode document type. */
-export const CANONICAL_DOCUMENT_TYPES = DIAGRAM_TYPES;
-
-/** The Code Mode authoring spec each canonical family's document carries. */
-export const CANONICAL_DOCUMENT_SPECS = {
-	flowchart: FlowchartSpec,
-	mindmap: MindmapDocument,
-	sequence: SequenceDiagramSpec,
-	timeline: TimelineSpec,
-	chart: ChartSpec,
-	"state-machine": StateMachineSpec,
-	gantt: GanttSpec,
-	er: ErSpec,
-	class: ClassSpec,
-	"org-chart": OrgChartSpec,
-	venn: VennSpec,
-	journey: JourneySpec,
-	sankey: SankeySpec,
-	wireframe: WireframeSpec,
-	quadrant: QuadrantChartSpec,
-} as const satisfies Record<DiagramTypeValue, unknown>;
-
-/** A canonical diagram document: a family and its authoring spec. */
-export type CanonicalDiagramDocument = {
-	readonly [Type in DiagramTypeValue]: {
-		readonly type: Type;
-		readonly spec: (typeof CANONICAL_DOCUMENT_SPECS)[Type]["Type"];
-	};
-}[DiagramTypeValue];
-
-export type CanonicalBuildResult =
-	| BuildFlowchartResult
-	| BuildMindmapResult
-	| BuildSequenceDiagramResult
-	| BuildTimelineResult
-	| BuildChartResult
-	| BuildStateMachineResult
-	| BuildGanttResult
-	| BuildErDiagramResult
-	| BuildClassDiagramResult
-	| BuildOrgChartResult
-	| BuildVennDiagramResult
-	| BuildJourneyMapResult
-	| BuildSankeyResult
-	| BuildWireframeResult
-	| BuildQuadrantChartResult;
-
 export function isCanonicalDocumentType(value: unknown): value is DiagramTypeValue {
-	return CANONICAL_DOCUMENT_TYPES.some((type) => type === value);
+	return DIAGRAM_TYPES.some((type) => type === value);
 }
 
-/** Build a canonical document with its family's Code Mode operation. */
+/** Build an authored document using the family's existing operation. */
 export function buildCanonicalDocument(
 	document: CanonicalDiagramDocument,
 	options?: BuildFlowchartOptions,
-): Effect.Effect<
-	CanonicalBuildResult,
-	never,
-	CodeModeArtifactStorage | CodeModeRuntimeEnvironment
-> {
-	const request = { spec: document.spec, ...(options ? { options } : {}) };
-	switch (document.type) {
-		case "flowchart":
-			return buildFlowchart(request);
-		case "mindmap": {
-			const typedRequest = { spec: document.spec, ...(options ? { options } : {}) };
-			return observeCodeModeBoundary(
-				"buildMindmap",
-				typedRequest,
-				Effect.gen(function* () {
-					return yield* buildMindmapDocument(typedRequest, yield* artifactBuildCapabilities);
-				}).pipe(
-					Effect.match({
-						onFailure: (error) => ({ ok: false as const, status: error.status, ...error.context }),
-						onSuccess: (result) => result,
-					}),
-				),
-			);
-		}
-		case "sequence":
-			return buildSequenceDiagram(request);
-		case "timeline":
-			return buildTimeline(request);
-		case "chart":
-			return buildChart(request);
-		case "state-machine":
-			return buildStateMachine(request);
-		case "gantt":
-			return buildGantt(request);
-		case "er":
-			return buildErDiagram(request);
-		case "class":
-			return buildClassDiagram(request);
-		case "org-chart":
-			return buildOrgChart(request);
-		case "venn":
-			return buildVennDiagram(request);
-		case "journey":
-			return buildJourneyMap(request);
-		case "sankey":
-			return buildSankey(request);
-		case "wireframe":
-			return buildWireframe(request);
-		case "quadrant":
-			return buildQuadrantChart(request);
+): Effect.Effect<FamilyBuildResult, never, CodeModeArtifactStorage | CodeModeRuntimeEnvironment> {
+	if (document.type === "mindmap") {
+		const request = { spec: document.spec, ...(options ? { options } : {}) };
+		return observeCodeModeBoundary(
+			"buildMindmap",
+			request,
+			Effect.gen(function* () {
+				return yield* buildMindmapDocument(request, yield* artifactBuildCapabilities);
+			}).pipe(
+				Effect.match({
+					onFailure: (error) => ({ ok: false as const, status: error.status, ...error.context }),
+					onSuccess: (result) => result,
+				}),
+			),
+		);
 	}
+	return familyForType(document.type).build(Runtime)({
+		spec: document.spec,
+		...(options ? { options } : {}),
+	});
 }
 
 /**

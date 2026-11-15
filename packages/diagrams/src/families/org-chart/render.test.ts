@@ -11,16 +11,16 @@ import {
 	type CanvasTextElement as TextSceneElement,
 } from "@sketchi/drawing";
 import {
-	type OrgChartDiagram,
 	orgChartFixture,
 	parseOrgChartDiagram,
 	resolveOrgChartShorthand,
+	type OrgChartDiagram,
 } from "./document.js";
 import { orgChartStressFixtures } from "./fixtures.js";
 
-import { renderDiagram } from "../../render.js";
-import { layoutOrgChartDiagram, renderOrgChartDiagram } from "./render.js";
+import { renderDiagram } from "../../family.js";
 import { orgChartLayoutIssues } from "./readout.js";
+import { layoutOrgChartDiagram, renderOrgChartDiagram } from "./render.js";
 
 const chart = (people: unknown[], extra: Record<string, unknown> = {}): OrgChartDiagram =>
 	parseOrgChartDiagram(

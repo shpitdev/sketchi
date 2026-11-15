@@ -11,8 +11,10 @@ import {
 import { parseVennDiagram, VENN_COLORS, vennFixture, type VennDiagram } from "./document.js";
 import { vennStressFixtures } from "./fixtures.js";
 
-import { renderDiagram } from "../../render.js";
+import { renderDiagram } from "../../family.js";
 
+import { layoutVennDiagram } from "./layout.js";
+import { readVennScene, vennLayoutIssues, vennTextLineBoxes } from "./readout.js";
 import {
 	contrastRatio,
 	renderVennDiagram,
@@ -21,8 +23,6 @@ import {
 	vennLabelColor,
 	vennRegionFill,
 } from "./render.js";
-import { layoutVennDiagram } from "./layout.js";
-import { readVennScene, vennLayoutIssues, vennTextLineBoxes } from "./readout.js";
 
 const texts = (scene: RenderedDiagramScene) =>
 	scene.elements.filter((element): element is TextSceneElement => element.type === "text");

@@ -6,7 +6,7 @@
  * rewritten as the flowchart document. A typed request of one of these families gets its example
  * in place of the family's JSON shape.
  */
-import type { DiagramTypeValue } from "../types.js";
+import type { DiagramTypeValue } from "../family.js";
 
 export interface CuratedExample {
 	readonly request: string;

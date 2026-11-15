@@ -1,10 +1,10 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
+import { type StateMachineDiagram } from "@sketchi/diagrams/families/state-machine/document";
+import { renderDiagram } from "@sketchi/diagrams/family";
+import { arrowCrossings } from "@sketchi/diagrams/graph/scene";
+import { type CanvasConnectorElement as ArrowSceneElement } from "@sketchi/drawing";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
-import { type StateMachineDiagram } from "@sketchi/diagrams/families/state-machine/document";
-import { type CanvasConnectorElement as ArrowSceneElement } from "@sketchi/drawing";
-import { arrowCrossings } from "@sketchi/diagrams/graph/scene";
-import { renderDiagram } from "@sketchi/diagrams/render";
 
 import { evaluateScenarioDiagram } from "./evaluate.js";
 import { stateMachineScenarios } from "./state-machine-scenarios.js";

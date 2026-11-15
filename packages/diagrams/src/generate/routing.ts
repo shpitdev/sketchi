@@ -1,5 +1,5 @@
-import { DIAGRAM_TYPES, type DiagramTypeValue } from "../types.js";
 import { Effect } from "effect";
+import { DIAGRAM_TYPES, type DiagramTypeValue } from "../family.js";
 
 import type { DiagramGenerationRequest } from "./candidates.js";
 import type { DiagramFamilyNarrowing, FamilyNarrowing } from "./family-narrowing.js";

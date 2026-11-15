@@ -1,9 +1,9 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { Result } from "effect";
-import { describe, expect, it } from "vitest";
 import { journeyFixture } from "@sketchi/diagrams/families/journey/document";
 import { journeyStressFixtures } from "@sketchi/diagrams/families/journey/fixtures";
-import { renderDiagram } from "@sketchi/diagrams/render";
+import { renderDiagram } from "@sketchi/diagrams/family";
+import { Result } from "effect";
+import { describe, expect, it } from "vitest";
 
 import {
 	convertSceneToExcalidraw,

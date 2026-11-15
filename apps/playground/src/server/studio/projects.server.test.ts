@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { familyForType } from "@sketchi/diagrams/family";
 import { Effect } from "effect";
+import { describe, expect, it } from "vitest";
 
 import type { FlowchartSpec } from "@sketchi/diagrams/build/code-mode/contract";
 import { MemoryStudioObjectBucket } from "@sketchi/studio-projects/server";
@@ -70,7 +71,7 @@ async function createArtifact(bucket: MemoryStudioObjectBucket, title: string): 
 	const result = await runPlaygroundEffect(
 		Effect.gen(function* () {
 			const codeMode = yield* PlaygroundCodeMode;
-			return yield* codeMode.buildFlowchart({
+			return yield* codeMode.buildFamily(familyForType("flowchart"), {
 				spec: flowchartSpec(title),
 				options: {
 					artifactFormats: ["scene", "excalidraw"],
