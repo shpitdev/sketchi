@@ -1,6 +1,7 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
 import { formatGanttDay, parseGanttDay, parseGanttDiagram, type GanttDiagram } from "./document.js";
 import { renderDiagram } from "../../family.js";
+import { readGanttScene } from "./readout.js";
 import { convertSceneToExcalidraw, validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
@@ -72,7 +73,13 @@ describe("Gantt export", () => {
 				{ id: "catalog", label: "Catalog", start: "2026-05-04", end: "2026-05-22" },
 				{ id: "orders", label: "Orders", start: "2026-05-04", end: "2026-06-05" },
 				{ id: "clicks", label: "Clickstream", start: "2026-05-11", duration: 20 },
-				{ id: "dashboards", label: "Dashboards", start: "2026-06-01", end: "2026-06-12" },
+				{
+					id: "dashboards",
+					label: "Dashboards",
+					start: "2026-06-01",
+					end: "2026-06-12",
+					dependsOn: ["clicks"],
+				},
 				{
 					id: "validation",
 					label: "Validation",
@@ -83,7 +90,31 @@ describe("Gantt export", () => {
 				{ id: "programme", label: "Programme", start: "2026-01-05", end: "2026-07-31" },
 			],
 		}).pipe(Result.getOrThrow);
-		const scene = convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow));
+		const canvas = renderDiagram(diagram).pipe(Result.getOrThrow);
+		// Round 18: clicks -> dashboards occupies the corridor; both validation arrivals
+		// must join the sole clear entry without hooking around their successor.
+		const routes = readGanttScene(canvas).dependencies.filter((route) => route.to === "validation");
+		expect(routes).toHaveLength(2);
+		for (const { from, points } of routes) {
+			const headings = points.slice(1).map((to, index) => {
+				const before = points[index]!;
+				return Math.abs(before.y - to.y) < 0.01
+					? Math.sign(to.x - before.x) * 2
+					: Math.sign(to.y - before.y);
+			});
+			expect(
+				headings.some((heading) => headings.includes(-heading)),
+				from,
+			).toBe(false);
+			expect(
+				headings.filter(
+					(heading, index) => index > 0 && Math.abs(heading) !== Math.abs(headings[index - 1]!),
+				),
+				from,
+			).toHaveLength(1);
+		}
+		expect(routes[0]!.points.at(-1)).toEqual(routes[1]!.points.at(-1));
+		const scene = convertSceneToExcalidraw(canvas);
 		expect(validateExcalidrawScene(scene)).toEqual({ ok: true, issues: [] });
 		const arrivals = scene.elements.filter(
 			(element) => element.type === "arrow" && element.id.endsWith(":validation"),
