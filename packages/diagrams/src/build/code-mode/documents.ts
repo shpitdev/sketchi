@@ -117,18 +117,6 @@ export function canonicalDocumentFromDiagram(
 					style: diagram.style,
 				},
 			};
-		case "sankey":
-			return {
-				type: "sankey",
-				spec: {
-					id: diagram.id,
-					title: diagram.title,
-					nodes: diagram.nodes.map((node) => ({ ...node })),
-					links: diagram.links.map((link) => ({ ...link })),
-					...(diagram.unit === undefined ? {} : { unit: diagram.unit }),
-					style: diagram.style,
-				},
-			};
 		case "org-chart":
 			return {
 				type: "org-chart",
@@ -149,6 +137,8 @@ export function canonicalDocumentFromDiagram(
 			const { type, ...spec } = diagram;
 			return { type, spec };
 		}
+		case "sankey":
+			return familyForType("sankey").toDocument(diagram);
 		case "journey":
 			return familyForType("journey").toDocument(diagram);
 		case "wireframe":

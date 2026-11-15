@@ -2,7 +2,10 @@ import { Effect, Result } from "effect";
 import { expect, it } from "@effect/vitest";
 import { vi } from "vitest";
 import { type ArtifactBuildCapabilities } from "./result.js";
-import { buildResponse } from "./operation.js";
+import { buildResponse, defineBuild } from "./operation.js";
+import { sankeyBuild } from "../families/sankey/build.js";
+import { sankeyFixture } from "../families/sankey/document.js";
+import { renderSankeyDiagram } from "../families/sankey/render.js";
 import { mindmapBuild } from "../families/mindmap/build.js";
 import { vennBuild } from "../families/venn/build.js";
 import { renderMindmap } from "../families/mindmap/layout.js";
@@ -16,6 +19,98 @@ const input = {
 	spec: { title: "Launch", root: { label: "Launch", children: [{ label: "Documentation" }] } },
 };
 const artifact = { artifactId: "artifact-1", diagramId: "launch", formats: [] };
+
+it.effect(
+	"assesses only valid rendered scenes and carries the assessed quality through delivery",
+	() =>
+		Effect.gen(function* () {
+			for (const mode of [
+				"document",
+				"threshold",
+				"scene",
+				"readability",
+				"accepted",
+				"delivery",
+			] as const) {
+				const calls: string[] = [];
+				const assessedQuality = {
+					accepted: mode !== "readability",
+					score: 9,
+					threshold: 0,
+					summary: { nodeCount: 7, edgeCount: 9 },
+					checks: [],
+				};
+				const operation = defineBuild({
+					...sankeyBuild,
+					assess: (_document, threshold) => ({
+						...assessedQuality,
+						accepted: mode !== "threshold",
+						score: 10,
+						threshold,
+					}),
+					render: (document) => {
+						calls.push("render");
+						const rendered = renderSankeyDiagram(document);
+						return Result.map(rendered, (scene) =>
+							mode === "scene"
+								? {
+										...scene,
+										elements: scene.elements.map((element) =>
+											"width" in element ? { ...element, width: -1 } : element,
+										),
+									}
+								: scene,
+						);
+					},
+					assessScene: () => {
+						calls.push("assess");
+						return assessedQuality;
+					},
+				});
+				const request = yield* operation.decode({
+					spec:
+						mode === "document"
+							? { ...sankeyFixture, links: [...sankeyFixture.links, sankeyFixture.links[0]] }
+							: sankeyFixture,
+					options: { minQualityScore: 0 },
+				});
+				const result = yield* buildResponse(
+					operation.build(request, {
+						createId: () => "build-1",
+						exportScene: () => {
+							calls.push("export");
+							return mode === "delivery"
+								? Effect.fail({ status: "storage_failed", issues: [] })
+								: Effect.succeed(artifact);
+						},
+					}),
+				);
+				expect(calls, mode).toEqual(
+					mode === "document" || mode === "threshold"
+						? []
+						: mode === "scene"
+							? ["render"]
+							: mode === "readability"
+								? ["render", "assess"]
+								: ["render", "assess", "export"],
+				);
+				expect(result.status, mode).toBe(
+					(
+						{
+							document: "invalid_sankey",
+							threshold: "quality_failed",
+							scene: "render_failed",
+							readability: "quality_failed",
+							accepted: "accepted",
+							delivery: "storage_failed",
+						} as const
+					)[mode],
+				);
+				if (mode === "readability" || mode === "accepted" || mode === "delivery")
+					expect(result.quality).toEqual(assessedQuality);
+			}
+		}),
+);
 
 it.effect("retains a renderer exception until transport projection and never exports it", () =>
 	Effect.gen(function* () {

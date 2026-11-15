@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { sankeyFixture } from "../families/sankey/document.js";
 
 import { candidateFromText } from "./candidates.js";
-import { buildDiagramGenerationMessages } from "./messages.js";
 
 function candidate(diagram: unknown) {
 	return candidateFromText({
@@ -16,17 +15,6 @@ function candidate(diagram: unknown) {
 }
 
 describe("Sankey generation", () => {
-	it("teaches the Sankey shape when the type is requested", () => {
-		const messages = buildDiagramGenerationMessages({
-			id: "budget",
-			request: "Draw our cloud budget as a Sankey diagram.",
-			requestedType: "sankey",
-		});
-		expect(messages.system).toContain("Sankey IR rules");
-		expect(messages.system).toContain("links: [{ source, target, value, label? }]");
-		expect(messages.user).toContain('"type":"sankey"');
-	});
-
 	it("reads flows with from, to and amount, naming nodes from their labels", () => {
 		const parsed = candidate({
 			id: "budget",

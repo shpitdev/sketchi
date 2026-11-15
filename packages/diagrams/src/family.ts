@@ -34,7 +34,7 @@ import * as quadrantFamily from "./families/quadrant/document.js";
 import { quadrantBuild } from "./families/quadrant/build.js";
 import { docs as sankeyFamilyDocs } from "./families/sankey/docs.js";
 import * as sankeyFamily from "./families/sankey/document.js";
-import { renderSankeyDiagram } from "./families/sankey/render.js";
+import { sankeyBuild } from "./families/sankey/build.js";
 import { docs as sequenceFamilyDocs } from "./families/sequence/docs.js";
 
 import { docs as stateMachineFamilyDocs } from "./families/state-machine/docs.js";
@@ -402,32 +402,12 @@ export const families = [
 		fixture: journeyFamily.journeyFixture,
 		docs: journeyFamilyDocs,
 	}),
-	legacyFamily({
-		type: sankeyFamily.sankeyFixture.type,
+	family({
 		operation: "buildSankey",
 		label: "Sankey diagram",
 		path: "/api/v1/sankey-diagrams/build",
-		canonical: canonical(
-			sankeyFamily.SankeyDiagram,
-			sankeyFamily.sankeyFixture.type,
-			sankeyFamily.validateSankeyDiagram,
-			renderSankeyDiagram,
-			sankeyFamily.counts,
-		),
-		validationError: sankeyFamily.SankeyValidationError,
+		build: sankeyBuild,
 		fixture: sankeyFamily.sankeyFixture,
-		spec: Build.SankeySpec,
-		request: Build.BuildSankeyRequest,
-		contracts: {
-			input: Schema.Struct({
-				...Build.BuildSankeyRequest.fields,
-				// Legacy palette inputs remain valid at runtime, but are not authoring controls.
-				spec: Build.SankeyToolSpecSchema,
-			}),
-			output: Build.BuildSankeyResultSchema,
-		},
-		studioInput: Build.BuildSankeyToolInputSchema,
-		build: (runtime: typeof Runtime) => runtime.buildSankey,
 		docs: sankeyFamilyDocs,
 	}),
 	legacyFamily({

@@ -19,19 +19,27 @@ export function cleanToolString(value: string): string {
 	}
 }
 
-/** Stable ASCII ids. Callers retain their existing length and Unicode policy. */
+/** Stable ids, with each caller's explicit length and Unicode policy. */
 export function slug(
 	value: string,
 	options: {
 		readonly maxLength?: number;
 		readonly normalize?: boolean;
 		readonly trimEnd?: boolean;
+		readonly unicode?: boolean;
 	} = {},
 ): string {
 	const text = options.normalize ? Str.normalize("NFKD")(value) : value;
 	const result = Str.slice(
 		0,
 		options.maxLength ?? 48,
-	)(Str.replace(/^-+|-+$/g, "")(Str.replace(/[^a-z0-9]+/g, "-")(Str.toLowerCase(text))));
+	)(
+		Str.replace(
+			/^-+|-+$/g,
+			"",
+		)(
+			Str.replace(options.unicode ? /[^\p{L}\p{N}]+/gu : /[^a-z0-9]+/g, "-")(Str.toLowerCase(text)),
+		),
+	);
 	return options.trimEnd ? Str.replace(/-+$/g, "")(result) : result;
 }

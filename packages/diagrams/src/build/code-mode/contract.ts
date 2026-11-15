@@ -710,39 +710,6 @@ export const OrgChartSpec = Schema.Struct({
 
 export interface OrgChartSpec extends Schema.Schema.Type<typeof OrgChartSpec> {}
 
-/**
- * The authoring form of diagram-core's canonical SankeyDiagram: the id is
- * optional and style is defaulted. buildSankey normalizes it into the core
- * contract, which owns every invariant.
- */
-export const SankeyNodeSpec = Schema.Struct({
-	id: RequiredNonEmptyString,
-	label: RequiredNonEmptyString,
-	color: optionalContract(HexColor),
-}).annotate({ identifier: undefined });
-
-export interface SankeyNodeSpec extends Schema.Schema.Type<typeof SankeyNodeSpec> {}
-
-export const SankeyLinkSpec = Schema.Struct({
-	source: RequiredNonEmptyString,
-	target: RequiredNonEmptyString,
-	value: FiniteNumber,
-	label: optionalContract(NonEmptyString),
-}).annotate({ identifier: undefined });
-
-export interface SankeyLinkSpec extends Schema.Schema.Type<typeof SankeyLinkSpec> {}
-
-export const SankeySpec = Schema.Struct({
-	id: optionalContract(NonEmptyString),
-	title: RequiredNonEmptyString,
-	nodes: requiredArray(nonEmptyArray(SankeyNodeSpec)),
-	links: requiredArray(nonEmptyArray(SankeyLinkSpec)),
-	unit: optionalContract(NonEmptyString),
-	style: DiagramStyleWithDefault,
-}).annotate({ identifier: undefined });
-
-export interface SankeySpec extends Schema.Schema.Type<typeof SankeySpec> {}
-
 /** One component of a wireframe screen, as a model writes it. */
 export interface WireframeComponentInput {
 	type: (typeof WIREFRAME_COMPONENT_TYPES)[number];
@@ -1001,20 +968,6 @@ export const BuildOrgChartToolInputSchema = Schema.Struct({
 	spec: requiredObject(OrgChartToolSpecSchema),
 });
 export type BuildOrgChartToolInput = typeof BuildOrgChartToolInputSchema.Type;
-export const BuildSankeyRequest = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(SankeySpec),
-	options: optionalContract(BuildFlowchartOptions),
-}).annotate({ identifier: undefined });
-
-export interface BuildSankeyRequest extends Schema.Schema.Type<typeof BuildSankeyRequest> {}
-/** The Sankey spec a model authors; style is always the Sketchi palette. */
-export const SankeyToolSpecSchema = SankeySpec.mapFields(({ style: _style, ...fields }) => fields);
-export const BuildSankeyToolInputSchema = Schema.Struct({
-	requestId: optionalContract(NonEmptyString),
-	spec: requiredObject(SankeyToolSpecSchema),
-});
-export type BuildSankeyToolInput = typeof BuildSankeyToolInputSchema.Type;
 export const BuildWireframeRequest = Schema.Struct({
 	requestId: optionalContract(NonEmptyString),
 	spec: requiredObject(WireframeSpec),
@@ -1639,15 +1592,6 @@ const NormalizedOrgChartSpecSchema = Schema.Struct({
 	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
 });
 export type NormalizedOrgChartSpec = typeof NormalizedOrgChartSpecSchema.Type;
-const NormalizedSankeySpecSchema = Schema.Struct({
-	id: NonEmptyString,
-	title: NonEmptyString,
-	nodes: Schema.Array(SankeyNodeSpec).pipe(Schema.mutable),
-	links: Schema.Array(SankeyLinkSpec).pipe(Schema.mutable),
-	unit: optionalContract(NonEmptyString),
-	style: Schema.Struct({ accentColor: HexColor, backgroundColor: HexColor }),
-});
-export type NormalizedSankeySpec = typeof NormalizedSankeySpecSchema.Type;
 const NormalizedWireframeSpecSchema = Schema.Struct({
 	id: NonEmptyString,
 	title: NonEmptyString,
@@ -1918,41 +1862,6 @@ export const BuildOrgChartResultSchema = Schema.Union([
 	BuildOrgChartRejected,
 ]);
 export type BuildOrgChartResult = typeof BuildOrgChartResultSchema.Type;
-
-export const BuildSankeyAccepted = Schema.Struct({
-	ok: booleanLiteral(true),
-	status: stringLiteral("accepted"),
-	buildId: Schema.String,
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: NormalizedSankeySpecSchema,
-	quality: QualityReportSchema,
-	artifact: ArtifactBundleSchema,
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildSankeyAccepted extends Schema.Schema.Type<typeof BuildSankeyAccepted> {}
-export const BuildSankeyRejected = Schema.Struct({
-	ok: booleanLiteral(false),
-	status: literals([
-		"invalid_input",
-		"invalid_sankey",
-		"quality_failed",
-		"limit_exceeded",
-		"render_failed",
-		"export_failed",
-		"storage_failed",
-	]),
-	buildId: optionalContract(Schema.String),
-	requestId: optionalContract(Schema.String),
-	normalizedSpec: optionalContract(NormalizedSankeySpecSchema),
-	quality: optionalContract(QualityReportSchema),
-	partial: optionalContract(PartialArtifactBundleSchema),
-	issues: Schema.Array(CodeModeIssue).pipe(Schema.mutable),
-}).annotate({ identifier: undefined });
-
-export interface BuildSankeyRejected extends Schema.Schema.Type<typeof BuildSankeyRejected> {}
-export const BuildSankeyResultSchema = Schema.Union([BuildSankeyAccepted, BuildSankeyRejected]);
-export type BuildSankeyResult = typeof BuildSankeyResultSchema.Type;
 
 export const BuildWireframeAccepted = Schema.Struct({
 	ok: booleanLiteral(true),

@@ -16,7 +16,7 @@ describe("offline Sankey input failures", () => {
 		},
 		{
 			name: "a negative flow",
-			issue: "invalid_sankey_flow",
+			issue: "invalid_sankey_value",
 			links: [{ source: "visit", target: "cart", value: -3 }],
 		},
 	])("reports $name as invalid_document with exit 3", ({ issue, links }) => {

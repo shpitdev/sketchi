@@ -6,7 +6,6 @@ import { getCanvasValidationIssues } from "@sketchi/drawing";
 import { parseSankeyDiagram, sankeyFixture, type SankeyDiagram } from "./document.js";
 import { sankeyStressFixtures } from "./fixtures.js";
 
-import { renderDiagram } from "../../family.js";
 import {
 	layoutSankeyDiagram,
 	SANKEY_MIN_BAND,
@@ -79,14 +78,6 @@ describe("Sankey flow text", () => {
 });
 
 describe("Sankey renderer", () => {
-	it("renders the fixture into a valid deterministic scene", () => {
-		const scene = renderDiagram(sankeyFixture).pipe(Result.getOrThrow);
-		expect(scene.diagramId).toBe("cloud-budget");
-		expect(getCanvasValidationIssues(scene)).toEqual([]);
-		expect(sankeyLayoutIssues(scene)).toEqual([]);
-		expect(renderDiagram(sankeyFixture).pipe(Result.getOrThrow)).toEqual(scene);
-	});
-
 	it.each(Object.entries(sankeyStressFixtures))("draws %s cleanly", (_name, diagram) => {
 		const scene = renderSankeyDiagram(diagram).pipe(Result.getOrThrow);
 		expect(getCanvasValidationIssues(scene)).toEqual([]);

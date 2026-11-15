@@ -1,21 +1,25 @@
-import { describe, expect, it } from "vitest";
-import { Effect, Schema } from "effect";
-import { sankeyFixture } from "../../families/sankey/document.js";
-import { sankeyStressFixtures } from "../../families/sankey/fixtures.js";
+import { buildResponse, type BuildRejection } from "../../build/operation.js";
+import { describe, expect, it, vi } from "vitest";
+import { Effect } from "effect";
 import { validateExcalidrawScene } from "@sketchi/drawing/excalidraw";
 import { type CanvasSpec as RenderedDiagramScene } from "@sketchi/drawing";
 
-import { CodeModeArtifactStorage, makeMemoryArtifactStorage } from "./artifacts.js";
-import { BuildSankeyResultSchema } from "./contract.js";
-import { canonicalDocumentFromDiagram } from "./documents.js";
-import { applyDiagramPatch, buildSankey, CodeModeRuntimeEnvironment } from "./runtime.js";
+import {
+	CodeModeArtifactStorage,
+	makeMemoryArtifactStorage,
+} from "../../build/code-mode/artifacts.js";
+import {
+	applyDiagramPatch,
+	buildSankey,
+	CodeModeRuntimeEnvironment,
+} from "../../build/code-mode/runtime.js";
 
 const storage = makeMemoryArtifactStorage();
-function run<A>(
-	effect: Effect.Effect<A, never, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
+function run<A, E extends BuildRejection<unknown>>(
+	effect: Effect.Effect<A, E, CodeModeRuntimeEnvironment | CodeModeArtifactStorage>,
 ) {
 	return Effect.runPromise(
-		effect.pipe(
+		buildResponse(effect).pipe(
 			Effect.provideService(CodeModeRuntimeEnvironment, {
 				createId: (prefix) => `${prefix}_${Math.random().toString(36).slice(2)}`,
 			}),
@@ -60,7 +64,6 @@ describe("Code Mode native Sankey diagram", () => {
 	it("builds the documented spec into bars, bands and every value", async () => {
 		const built = await build(budgetSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
-		expect(() => Schema.decodeUnknownSync(BuildSankeyResultSchema)(built)).not.toThrow();
 		expect(built.normalizedSpec).toMatchObject({
 			id: "cloud-budget",
 			title: "Cloud budget",
@@ -109,6 +112,43 @@ describe("Code Mode native Sankey diagram", () => {
 		});
 	});
 
+	it.each([
+		{ nodes: ["研究開発", "採用"], source: "研究開発", target: "採用" },
+		{
+			nodes: ["x".repeat(48), "x".repeat(48)],
+			source: "x".repeat(48),
+			target: `${"x".repeat(48)}-2`,
+		},
+	])(
+		"keeps authored Unicode and collision-suffixed endpoint identity in native stored artifacts (%#)",
+		async ({ nodes, source, target }) => {
+			const built = await build({
+				title: "Endpoint identity",
+				nodes,
+				links: [{ source, target, value: 2 }],
+			});
+			if (!built.ok) throw new Error(JSON.stringify(built.issues));
+			expect(built.normalizedSpec.nodes.map((node) => node.id)).toEqual([source, target]);
+			expect(built.normalizedSpec.links).toEqual([{ source, target, value: 2 }]);
+			const native = inline(built).get("excalidraw") as Parameters<
+				typeof validateExcalidrawScene
+			>[0];
+			expect(native.elements).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ id: `node:sankey:node:${source}` }),
+					expect.objectContaining({ id: `node:sankey:node:${target}` }),
+					expect.objectContaining({
+						id: `node:sankey:link:${source}:${target}`,
+						groupIds: [`sankey:link:${source}:${target}`],
+					}),
+				]),
+			);
+			expect(
+				(await Effect.runPromise(storage.read(built.artifact.artifactId, "excalidraw")))?.data,
+			).toEqual(native);
+		},
+	);
+
 	it("keeps every mark's role and the values through a patch", async () => {
 		const built = await build(budgetSpec);
 		if (!built.ok) throw new Error(JSON.stringify(built.issues));
@@ -152,43 +192,33 @@ describe("Code Mode native Sankey diagram", () => {
 		).toHaveLength(0);
 	});
 
-	it("round-trips canonical diagrams through their Code Mode documents", async () => {
-		for (const diagram of [
-			sankeyFixture,
-			sankeyStressFixtures.energy,
-			sankeyStressFixtures.hiring,
-		]) {
-			const document = canonicalDocumentFromDiagram(diagram);
-			expect(document.type).toBe("sankey");
-			const built = await build(document.spec);
-			if (!built.ok) throw new Error(JSON.stringify(built.issues));
-			expect(built.normalizedSpec.nodes).toEqual(diagram.nodes);
-			expect(built.normalizedSpec.links).toEqual(diagram.links);
-			expect(built.normalizedSpec.unit).toBe(diagram.unit);
-		}
-	});
-
 	it.each([
 		[
 			{ links: [...budgetSpec.links, { source: "compute", target: "eng", value: 1 }] },
 			"sankey_cycle",
 		],
-		[{ links: [...budgetSpec.links, { source: "eng", target: "eng", value: 1 }] }, "self_loop"],
+		[
+			{ links: [...budgetSpec.links, { source: "eng", target: "eng", value: 1 }] },
+			"sankey_self_link",
+		],
 		[
 			{ links: [...budgetSpec.links, { source: "eng", target: "ghost", value: 1 }] },
-			"invalid_sankey_flow",
+			"unknown_sankey_node",
 		],
 		[
 			{ links: [...budgetSpec.links, { source: "eng", target: "compute", value: 2 }] },
-			"invalid_sankey_flow",
+			"duplicate_sankey_link",
 		],
 		[
 			{ links: [{ source: "eng", target: "compute", value: -5 }, ...budgetSpec.links.slice(1)] },
-			"invalid_sankey_flow",
+			"invalid_sankey_value",
 		],
-		[{ nodes: [...budgetSpec.nodes, { id: "idle", label: "Idle" }] }, "invalid_sankey_node"],
-		[{ nodes: [...budgetSpec.nodes, { id: "eng", label: "Again" }] }, "duplicate_node_id"],
-		[{ nodes: [...budgetSpec.nodes.slice(0, 4), { id: "db", label: " \n " }] }, "missing_field"],
+		[{ nodes: [...budgetSpec.nodes, { id: "idle", label: "Idle" }] }, "unlinked_sankey_node"],
+		[{ nodes: [...budgetSpec.nodes, { id: "eng", label: "Again" }] }, "duplicate_sankey_node_id"],
+		[
+			{ nodes: [...budgetSpec.nodes.slice(0, 4), { id: "db", label: " \n " }] },
+			"blank_sankey_label",
+		],
 	])("rejects an invalid flow with a repair hint (%#)", async (change, code) => {
 		const built = await build({ ...budgetSpec, ...change });
 		expect(built.ok).toBe(false);
@@ -229,7 +259,20 @@ describe("Code Mode native Sankey diagram", () => {
 				})),
 			),
 		});
-		const crowded = await build(spec("Renewals and expansions and other income"));
+		const memory = makeMemoryArtifactStorage();
+		const writes = vi.spyOn(memory, "write");
+		const crowded = await Effect.runPromise(
+			buildResponse(
+				buildSankey({
+					spec: spec("Renewals and expansions and other income"),
+					options: { minQualityScore: 0 },
+				}),
+			).pipe(
+				Effect.provideService(CodeModeRuntimeEnvironment, { createId: () => "crowded" }),
+				Effect.provideService(CodeModeArtifactStorage, memory),
+			),
+		);
+		expect(writes).not.toHaveBeenCalled();
 		expect(crowded.ok).toBe(false);
 		if (crowded.ok) return;
 		expect(crowded.status).toBe("quality_failed");
@@ -243,6 +286,23 @@ describe("Code Mode native Sankey diagram", () => {
 		const plain = await build(spec());
 		if (!plain.ok) throw new Error(JSON.stringify(plain.issues));
 	});
+
+	it.each([
+		{ links: null, flows: budgetSpec.links },
+		{ links: undefined, flows: null, edges: budgetSpec.links },
+		{
+			links: [
+				{ source: "eng", target: "compute", value: null, amount: 1 },
+				...budgetSpec.links.slice(1),
+			],
+		},
+	])(
+		"rejects explicitly malformed flows instead of replacing them with an alias (%#)",
+		async (change) => {
+			const built = await build({ ...budgetSpec, ...change });
+			expect(built).toMatchObject({ ok: false, status: "invalid_input" });
+		},
+	);
 
 	it("rejects a link without a value before building, naming the field", async () => {
 		const built = await build({

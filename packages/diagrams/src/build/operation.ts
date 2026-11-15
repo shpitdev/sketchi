@@ -56,6 +56,7 @@ export function defineBuild<
 	readonly issues: (error: E) => CodeModeIssue[];
 	readonly counts: (document: N) => DiagramCounts;
 	readonly assess?: (document: N, threshold: number) => QualityReport;
+	readonly assessScene?: (document: N, scene: CanvasSpec, quality: QualityReport) => QualityReport;
 	readonly qualityIssue?: { readonly code: CodeModeIssueCode; readonly hint: string };
 	readonly render: (document: N) => CanvasSpec | Result.Result<CanvasSpec, E>;
 	readonly resolve?: (document: D) => Effect.Effect<
@@ -282,11 +283,18 @@ export function defineBuild<
 				reason: { _tag: "Scene", issues: sceneIssues },
 				context: assessed,
 			});
+		const finalQuality = policy.assessScene?.(normalizedSpec, scene, quality) ?? quality;
+		const finalContext = { ...context, quality: finalQuality };
+		if (!finalQuality.accepted)
+			return yield* failure({
+				reason: { _tag: "Quality", quality: finalQuality },
+				context: finalContext,
+			});
 		const artifact = yield* capabilities.exportScene(scene, request).pipe(
 			Effect.mapError((error) =>
 				failure({
 					reason: { _tag: "Delivery", status: error.status, issues: error.issues },
-					context: { ...assessed, partial: error.partial ?? { diagramId: scene.diagramId } },
+					context: { ...finalContext, partial: error.partial ?? { diagramId: scene.diagramId } },
 				}),
 			),
 		);
@@ -294,7 +302,7 @@ export function defineBuild<
 			ok: true,
 			status: "accepted",
 			...context,
-			quality,
+			quality: finalQuality,
 			artifact,
 			issues: [...(resolved?.issues ?? []), ...embedded.issues],
 		} satisfies typeof Accepted.Type;

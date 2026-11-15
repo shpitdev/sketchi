@@ -69,12 +69,6 @@ import {
 	type OrgChartDiagram,
 	type OrgChartValidationIssueCode,
 } from "../../families/org-chart/document.js";
-import {
-	getSankeyValidationIssues,
-	resolveSankeyShorthand,
-	type SankeyDiagram,
-	type SankeyValidationIssueCode,
-} from "../../families/sankey/document.js";
 
 import {
 	getStateMachineDefaultWarnings,
@@ -112,11 +106,7 @@ import { isStructurallyValidGanttMark, renderGanttDiagram } from "../../families
 import { isStructurallyValidJourneyMark } from "../../families/journey/render.js";
 import { renderOrgChartDiagram } from "../../families/org-chart/render.js";
 import { isStructurallyValidQuadrantMark } from "../../families/quadrant/render.js";
-import { sankeyLayoutIssues } from "../../families/sankey/readout.js";
-import {
-	isStructurallyValidSankeyMark,
-	renderSankeyDiagram,
-} from "../../families/sankey/render.js";
+import { isStructurallyValidSankeyMark } from "../../families/sankey/render.js";
 import {
 	isStructurallyValidSequenceActivation,
 	isStructurallyValidSequenceLifeline,
@@ -161,8 +151,6 @@ import {
 	BuildGanttRequest,
 	BuildOrgChartRejected,
 	BuildOrgChartRequest,
-	BuildSankeyRejected,
-	BuildSankeyRequest,
 	BuildStateMachineRejected,
 	BuildStateMachineRequest,
 	BuildWireframeRejected,
@@ -186,7 +174,6 @@ import {
 	type BuildFlowchartResult,
 	type BuildGanttResult,
 	type BuildOrgChartResult,
-	type BuildSankeyResult,
 	type BuildStateMachineResult,
 	type BuildWireframeResult,
 	type ContractSchemaError,
@@ -200,7 +187,6 @@ import {
 	type NormalizedErSpec,
 	type NormalizedGanttSpec,
 	type NormalizedOrgChartSpec,
-	type NormalizedSankeySpec,
 	type NormalizedStateMachineSpec,
 	type NormalizedWireframeSpec,
 	type PatchableScene,
@@ -858,77 +844,6 @@ function orgChartQuality(spec: NormalizedOrgChartSpec, threshold: number): Quali
 	};
 }
 
-function normalizeSankeySpec(spec: BuildSankeyRequest["spec"]): NormalizedSankeySpec {
-	const title = cleanToolString(spec.title);
-	const optional = (key: string, value: string | undefined) =>
-		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
-	return {
-		id: cleanOptional(spec.id) ?? (slug(title) || "sketchi-sankey"),
-		title,
-		nodes: spec.nodes.map((node) => ({
-			id: cleanToolString(node.id),
-			label: cleanToolString(node.label),
-			...(node.color ? { color: node.color } : {}),
-		})),
-		links: spec.links.map((link) => ({
-			source: cleanToolString(link.source),
-			target: cleanToolString(link.target),
-			value: link.value,
-			...optional("label", link.label),
-		})),
-		...optional("unit", spec.unit),
-		style: { ...SKETCHI_DIAGRAM_STYLE },
-	};
-}
-
-function toSankeyDiagram(spec: NormalizedSankeySpec): SankeyDiagram {
-	return { ...spec, type: "sankey" };
-}
-
-/** Code Mode's published issue codes for diagram-core's Sankey invariants. */
-const SANKEY_ISSUE_CODES = {
-	sankey_too_large: "sankey_too_large",
-	invalid_sankey_node_id: "invalid_sankey_node",
-	duplicate_sankey_node_id: "duplicate_node_id",
-	sankey_text_too_long: "label_too_long",
-	unknown_sankey_node: "invalid_sankey_flow",
-	sankey_self_link: "self_loop",
-	duplicate_sankey_link: "invalid_sankey_flow",
-	invalid_sankey_value: "invalid_sankey_flow",
-	sankey_cycle: "sankey_cycle",
-	unlinked_sankey_node: "invalid_sankey_node",
-	blank_sankey_label: "missing_field",
-} as const satisfies Record<SankeyValidationIssueCode, CodeModeIssueCode>;
-
-function validateNormalizedSankey(spec: NormalizedSankeySpec): CodeModeIssue[] {
-	return getSankeyValidationIssues(toSankeyDiagram(spec)).map((entry) =>
-		issue({
-			code: SANKEY_ISSUE_CODES[entry.code],
-			stage: "input",
-			ref: { kind: "request", path: `spec.${entry.path}` },
-			message: entry.message,
-			hint: entry.hint,
-		}),
-	);
-}
-
-function sankeyQuality(spec: NormalizedSankeySpec, threshold: number): QualityReport {
-	const score = 10;
-	return {
-		accepted: score >= threshold,
-		score,
-		threshold,
-		summary: { nodeCount: spec.nodes.length, edgeCount: spec.links.length },
-		checks: [],
-	};
-}
-
-/** Read flows, from/to and amount aliases and nodes named only by links before the request is decoded. */
-function resolveSankeyRequest(input: unknown): unknown {
-	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
-	return { ...input, spec: resolveSankeyShorthand(input.spec) };
-}
-
 /** Read manager, title and department aliases and dotted lines written on a person before the request is decoded. */
 function resolveOrgChartRequest(input: unknown): unknown {
 	if (typeof input !== "object" || input === null || !("spec" in input)) return input;
@@ -1170,15 +1085,6 @@ const BuildOrgChartFailure = workflowFailure(
 	"BuildOrgChartFailure",
 	BuildOrgChartRejected.fields.status,
 	BuildOrgChartRejected.mapFields(({ ok, status, ...context }) => ({
-		...context,
-		...FailureContextSchema.fields,
-	})),
-);
-
-const BuildSankeyFailure = workflowFailure(
-	"BuildSankeyFailure",
-	BuildSankeyRejected.fields.status,
-	BuildSankeyRejected.mapFields(({ ok, status, ...context }) => ({
 		...context,
 		...FailureContextSchema.fields,
 	})),
@@ -3291,138 +3197,6 @@ const buildOrgChartWorkflow = Effect.fn("codeMode.buildOrgChart.workflow")(funct
 	} satisfies Extract<BuildOrgChartResult, { ok: true }>;
 });
 
-const buildSankeyWorkflow = Effect.fn("codeMode.buildSankey.workflow")(function* (input: unknown) {
-	const parsed = Schema.decodeUnknownResult(BuildSankeyRequest, {
-		errors: "all",
-		reportInput: true,
-	})(resolveSankeyRequest(input));
-	if (!Result.isSuccess(parsed)) {
-		return yield* BuildSankeyFailure.new({
-			status: "invalid_input",
-			context: {
-				issues: inputIssues(formatContractSchemaError(parsed.failure)),
-			},
-		});
-	}
-
-	const environment = yield* CodeModeRuntimeEnvironment;
-	const request = parsed.success;
-	const buildId = yield* Effect.sync(() => environment.createId("build"));
-	const normalizedSpec = normalizeSankeySpec(request.spec);
-	const baseContext = {
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-	};
-	const validationIssues = validateNormalizedSankey(normalizedSpec);
-	if (validationIssues.length > 0) {
-		return yield* BuildSankeyFailure.new({
-			status: "invalid_sankey",
-			context: { ...baseContext, issues: validationIssues },
-		});
-	}
-
-	const quality = sankeyQuality(
-		normalizedSpec,
-		request.options?.minQualityScore ?? DEFAULT_MIN_QUALITY_SCORE,
-	);
-	const qualityContext = { ...baseContext, quality };
-	if (!quality.accepted) {
-		return yield* BuildSankeyFailure.new({
-			status: "quality_failed",
-			context: { ...qualityContext, issues: qualityIssues(quality) },
-		});
-	}
-
-	const scene = yield* validatedDomainResult({
-		try: () => renderSankeyDiagram(toSankeyDiagram(normalizedSpec)),
-		catch: (cause) =>
-			BuildSankeyFailure.new({
-				status: "render_failed",
-				context: {
-					...qualityContext,
-					issues: [
-						issue({
-							code: "render_failed",
-							stage: "render",
-							ref: { kind: "diagram", id: normalizedSpec.id },
-							message: cause instanceof Error ? cause.message : "Unable to render Sankey scene.",
-							hint: "Repair the nodes and links and retry.",
-						}),
-					],
-				},
-			}),
-	}).pipe(Effect.withSpan("codeMode.buildSankey.render"));
-	const canvasIssues = getCanvasValidationIssues(scene);
-	if (canvasIssues.length > 0) {
-		return yield* BuildSankeyFailure.new({
-			status: canvasFailureStatus(canvasIssues),
-			context: {
-				...qualityContext,
-				issues: canvasValidationIssues(canvasIssues).map((entry) => ({
-					...entry,
-					hint: "Shorten labels, or split the flows into smaller diagrams, and retry buildSankey.",
-				})),
-			},
-		});
-	}
-	// A layout whose labels still overlap after the renderer's reflow does not read.
-	const layoutIssues = sankeyLayoutIssues(scene);
-	if (layoutIssues.length > 0) {
-		const message = `${layoutIssues.length} labels, values or leaders would overlap another label or cover another flow, so the diagram would not read.`;
-		return yield* BuildSankeyFailure.new({
-			status: "quality_failed",
-			context: {
-				...baseContext,
-				quality: {
-					...quality,
-					accepted: false,
-					score: 0,
-					checks: [{ code: "sankey_layout", passed: false, severity: "error", message, refs: [] }],
-				},
-				issues: [
-					issue({
-						code: "quality_below_threshold",
-						stage: "quality",
-						ref: { kind: "diagram", id: normalizedSpec.id },
-						message,
-						hint: "Shorten node and link labels or leave link labels out, or split the flows into smaller diagrams, then call buildSankey again.",
-					}),
-				],
-			},
-		});
-	}
-	const exportContext = { ...qualityContext, partial: scenePartial(scene) };
-	const artifact = yield* exportAndStoreScene({
-		scene,
-		formats: requestedFormats(request.options),
-		inlineFormats: requestedInlineFormats(request.options),
-		...(request.requestId ? { requestId: request.requestId } : {}),
-		validationIssues: exportIssues,
-	}).pipe(
-		Effect.mapError((error) =>
-			BuildSankeyFailure.new({
-				status: error.status,
-				context: {
-					...(error.status === "export_failed" ? exportContext : qualityContext),
-					issues: error.issues,
-				},
-			}),
-		),
-	);
-
-	return {
-		ok: true,
-		status: "accepted",
-		buildId,
-		...responseRequestId(request.requestId),
-		normalizedSpec,
-		quality,
-		artifact,
-		issues: [],
-	} satisfies Extract<BuildSankeyResult, { ok: true }>;
-});
-
 const buildWireframeWorkflow = Effect.fn("codeMode.buildWireframe.workflow")(function* (
 	input: unknown,
 ) {
@@ -4604,11 +4378,7 @@ export const buildOrgChart: (input: unknown) => CodeModeWorkflowEffect<BuildOrgC
 export const buildJourneyMap = familyForType("journey").build({ bindBuild });
 
 /** A Sankey diagram: nodes and the weighted flows between them. */
-export const buildSankey: (input: unknown) => CodeModeWorkflowEffect<BuildSankeyResult> = boundary(
-	"buildSankey",
-	buildSankeyWorkflow,
-	failureResult,
-);
+export const buildSankey = familyForType("sankey").build({ bindBuild });
 
 /** A wireframe: low-fidelity screens, each a tree of components the host lays out. */
 export const buildWireframe: (input: unknown) => CodeModeWorkflowEffect<BuildWireframeResult> =

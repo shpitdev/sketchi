@@ -14,8 +14,6 @@ import {
 	BuildClassDiagramToolInputSchema,
 	BuildOrgChartResultSchema,
 	BuildOrgChartToolInputSchema,
-	BuildSankeyResultSchema,
-	BuildSankeyToolInputSchema,
 	BuildWireframeResultSchema,
 	BuildWireframeToolInputSchema,
 	RenderedDiagramSceneSchema,
@@ -25,7 +23,6 @@ import {
 	type BuildErDiagramResult,
 	type BuildClassDiagramResult,
 	type BuildOrgChartResult,
-	type BuildSankeyResult,
 	type BuildWireframeResult,
 } from "@sketchi/diagrams/build/code-mode/contract";
 
@@ -50,7 +47,7 @@ export type StudioBuildResult =
 	| BuildOrgChartResult
 	| ReturnType<typeof familyForType<"venn">>["contracts"]["output"]["Type"]
 	| ReturnType<typeof familyForType<"journey">>["contracts"]["output"]["Type"]
-	| BuildSankeyResult
+	| ReturnType<typeof familyForType<"sankey">>["contracts"]["output"]["Type"]
 	| BuildWireframeResult
 	| ReturnType<typeof familyForType<"quadrant">>["contracts"]["output"]["Type"];
 
@@ -199,14 +196,10 @@ const BUILD_TOOLS = {
 	},
 	"tool-build_sankey": {
 		family: "sankey",
-		decodeResult: Schema.decodeUnknownResult(BuildSankeyResultSchema),
+		decodeResult: Schema.decodeUnknownResult(familyForType("sankey").contracts.output),
 		labels: (input: unknown) => {
-			const decoded = Schema.decodeUnknownResult(BuildSankeyToolInputSchema)(input);
-			return Result.isSuccess(decoded)
-				? Object.values(decoded.success.spec.nodes).map((node) =>
-						typeof node === "string" ? node : node.label,
-					)
-				: [];
+			const decoded = Schema.decodeUnknownResult(familyForType("sankey").studioInput)(input);
+			return Result.isSuccess(decoded) ? decoded.success.spec.nodes.map((node) => node.label) : [];
 		},
 	},
 	"tool-build_quadrant_chart": {

@@ -1,9 +1,5 @@
 import { Result } from "effect";
-import {
-	type SankeyValidationError,
-	validateSankeyDiagram,
-	type SankeyDiagram,
-} from "./document.js";
+import { type SankeyDiagram } from "./document.js";
 import {
 	CANVAS_SPEC_VERSION,
 	SKETCHI_DIAGRAM_PALETTE,
@@ -251,10 +247,6 @@ export function sankeySceneFromLayout(
 	};
 }
 
-export function renderSankeyDiagram(
-	input: SankeyDiagram,
-): Result.Result<RenderedDiagramScene, SankeyValidationError> {
-	return Result.map(validateSankeyDiagram(input), (diagram) => {
-		return sankeySceneFromLayout(diagram, layoutSankeyDiagram(diagram));
-	});
+export function renderSankeyDiagram(diagram: SankeyDiagram): Result.Result<RenderedDiagramScene> {
+	return Result.succeed(sankeySceneFromLayout(diagram, layoutSankeyDiagram(diagram)));
 }

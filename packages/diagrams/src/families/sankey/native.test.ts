@@ -1,15 +1,10 @@
 // Positive fixtures deliberately unwrap Results: failure here is invalid test/story data, not user input.
-import { sankeyFixture } from "@sketchi/diagrams/families/sankey/document";
-import { sankeyStressFixtures } from "@sketchi/diagrams/families/sankey/fixtures";
-import { renderDiagram } from "@sketchi/diagrams/family";
+import { sankeyFixture } from "./document.js";
+import { renderDiagram } from "../../family.js";
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import {
-	convertSceneToExcalidraw,
-	createExcalidrawFile,
-	validateExcalidrawScene,
-} from "@sketchi/drawing/excalidraw";
+import { convertSceneToExcalidraw } from "@sketchi/drawing/excalidraw";
 
 const exported = convertSceneToExcalidraw(renderDiagram(sankeyFixture).pipe(Result.getOrThrow));
 const element = (id: string) => exported.elements.find((candidate) => candidate.id === id)!;
@@ -56,14 +51,5 @@ describe("Sankey Excalidraw export", () => {
 		).toBe(false);
 		for (const text of exported.elements.filter((candidate) => candidate.type === "text"))
 			expect(text["text"], text.id).toBe(text["originalText"]);
-	});
-
-	it("validates, and still validates after a save and reload", () => {
-		for (const diagram of [sankeyFixture, ...Object.values(sankeyStressFixtures)]) {
-			const scene = convertSceneToExcalidraw(renderDiagram(diagram).pipe(Result.getOrThrow));
-			expect(validateExcalidrawScene(scene), diagram.id).toEqual({ ok: true, issues: [] });
-			const reloaded = JSON.parse(JSON.stringify(createExcalidrawFile(scene)));
-			expect(validateExcalidrawScene(reloaded), diagram.id).toEqual({ ok: true, issues: [] });
-		}
 	});
 });

@@ -1,5 +1,6 @@
 // Maintained fixture literals/factories are trusted: invalid fixture data is a startup defect, not user input.
-import { Effect, Schema, Array as Arr, Option, Result } from "effect";
+import { Effect, Schema, Array as Arr, Option, Result, Graph, String as Str } from "effect";
+import { cleanToolString, slug } from "../../clean-text.js";
 
 import { DiagramStyle, SKETCHI_DIAGRAM_STYLE } from "@sketchi/drawing";
 
@@ -42,18 +43,24 @@ export interface SankeyLink extends Schema.Schema.Type<typeof SankeyLink> {}
  * way from sources to sinks. The renderer owns every coordinate, column and
  * band width.
  */
-export const SankeyDiagram = Schema.Struct({
-	id: Schema.NonEmptyString,
+export const SankeyDocument = Schema.Struct({
+	id: Schema.optionalKey(Schema.NonEmptyString),
 	title: Schema.NonEmptyString,
-	type: Schema.Literal(sankeyDiagramType),
 	nodes: Schema.Array(SankeyNode).pipe(Schema.mutable, Schema.check(Schema.isMinLength(2))),
 	links: Schema.Array(SankeyLink).pipe(Schema.mutable, Schema.check(Schema.isMinLength(1))),
 	/** Value unit, formatted as charts format it: "$" → $12, "$M" → $12M, "%" → 12%, "GWh" → 12 GWh. */
 	unit: Schema.optionalKey(Schema.NonEmptyString),
 	style: DiagramStyle.pipe(
-		Schema.withDecodingDefault(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
+		Schema.withDecodingDefaultKey(Effect.succeed({ ...SKETCHI_DIAGRAM_STYLE })),
 	),
-}).annotate({ identifier: "SankeyDiagram" });
+});
+export interface SankeyDocument extends Schema.Schema.Type<typeof SankeyDocument> {}
+
+export const SankeyDiagram = SankeyDocument.mapFields((fields) => ({
+	...fields,
+	id: Schema.NonEmptyString,
+	type: Schema.Literal(sankeyDiagramType),
+})).annotate({ identifier: "SankeyDiagram" });
 
 export interface SankeyDiagram extends Schema.Schema.Type<typeof SankeyDiagram> {}
 
@@ -86,33 +93,26 @@ export interface SankeyValidationIssue extends Schema.Schema.Type<typeof SankeyV
 export function sankeyCycle(
 	links: readonly Pick<SankeyLink, "source" | "target">[],
 ): string[] | undefined {
-	const next = new Map<string, string[]>();
-	for (const link of links) {
-		if (link.source === link.target) continue;
-		next.set(link.source, [...(next.get(link.source) ?? []), link.target]);
-	}
-	const state = new Map<string, "open" | "done">();
-	const path: string[] = [];
-	const visit = (id: string): string[] | undefined => {
-		state.set(id, "open");
-		path.push(id);
-		for (const target of next.get(id) ?? []) {
-			if (state.get(target) === "open") return [...path.slice(path.indexOf(target)), target];
-			if (state.get(target) === undefined) {
-				const found = visit(target);
-				if (found) return found;
-			}
+	const graph = Graph.directed<string, undefined>((mutable) => {
+		const indices = new Map<string, Graph.NodeIndex>();
+		const node = (id: string) => {
+			const known = indices.get(id);
+			if (known !== undefined) return known;
+			const index = Graph.addNode(mutable, id);
+			indices.set(id, index);
+			return index;
+		};
+		for (const link of links) {
+			// Self-links have their own actionable validation issue.
+			if (link.source !== link.target)
+				Graph.addEdge(mutable, node(link.source), node(link.target), undefined);
 		}
-		path.pop();
-		state.set(id, "done");
-		return undefined;
-	};
-	for (const link of links)
-		if (state.get(link.source) === undefined) {
-			const found = visit(link.source);
-			if (found) return found;
-		}
-	return undefined;
+	});
+	return Option.getOrUndefined(
+		Option.map(Graph.findCycle(graph), (cycle) =>
+			Arr.map(cycle.path, (index) => Option.getOrThrow(Graph.getNode(graph, index))),
+		),
+	);
 }
 
 /**
@@ -136,14 +136,14 @@ export function sankeyColumns(
 		// A cycle has no column; validation reports it.
 		if (visiting.has(id)) return 0;
 		visiting.add(id);
-		const value = Math.max(-1, ...(incoming.get(id) ?? []).map(column)) + 1;
+		const value = Math.max(-1, ...Arr.map(incoming.get(id) ?? [], column)) + 1;
 		visiting.delete(id);
 		columns.set(id, value);
 		return value;
 	};
 	for (const node of diagram.nodes) column(node.id);
 	const last = Math.max(0, ...columns.values());
-	const feeds = new Set(diagram.links.map((link) => link.source));
+	const feeds = new Set(Arr.map(diagram.links, (link) => link.source));
 	for (const node of diagram.nodes)
 		if (!feeds.has(node.id) && new Set(incoming.get(node.id)).size > 1) columns.set(node.id, last);
 	return columns;
@@ -151,8 +151,8 @@ export function sankeyColumns(
 
 /** Fraction digits a value carries, read from its shortest round-trip form. */
 function decimalsOf(value: number): number {
-	const [mantissa = "", exponent = "0"] = Math.abs(value).toString().split("e");
-	return Math.max(0, (mantissa.split(".")[1]?.length ?? 0) - Number(exponent));
+	const [mantissa, exponent = "0"] = Str.split(Math.abs(value).toString(), "e");
+	return Math.max(0, (Str.split(mantissa, ".")[1]?.length ?? 0) - Number(exponent));
 }
 
 /**
@@ -162,8 +162,8 @@ function decimalsOf(value: number): number {
  * 1e-100) keep 15 significant digits.
  */
 export function sankeySum(values: readonly number[]): number {
-	const decimals = Math.max(0, ...values.map(decimalsOf));
-	const total = values.reduce((sum, value) => sum + value, 0);
+	const decimals = Math.max(0, ...Arr.map(values, decimalsOf));
+	const total = Arr.reduce(values, 0, (sum, value) => sum + value);
 	return decimals <= 100 ? Number(total.toFixed(decimals)) : Number(total.toPrecision(15));
 }
 
@@ -185,7 +185,7 @@ export function sankeyNodeTotals(
 		outflows.set(link.source, [...(outflows.get(link.source) ?? []), link.value]);
 	}
 	return new Map(
-		diagram.nodes.map((node) => {
+		Arr.map(diagram.nodes, (node) => {
 			const inflow = sankeySum(inflows.get(node.id) ?? []);
 			const outflow = sankeySum(outflows.get(node.id) ?? []);
 			return [node.id, { inflow, outflow, total: Math.max(inflow, outflow) }];
@@ -213,9 +213,9 @@ export function getSankeyValidationIssues(diagram: SankeyDiagram): SankeyValidat
 			'Fold the smallest flows into an "Other" node, or split the flow into several diagrams.',
 		);
 	const ids = new Set<string>();
-	nodes.forEach((node, index) => {
+	Arr.forEach(nodes, (node, index) => {
 		const path = `nodes.[${index}]`;
-		if (node.id.includes(":"))
+		if (Str.includes(":")(node.id))
 			push(
 				"invalid_sankey_node_id",
 				`${path}.id`,
@@ -230,14 +230,14 @@ export function getSankeyValidationIssues(diagram: SankeyDiagram): SankeyValidat
 				"Give each node a unique id; list a stage once and send every flow through it.",
 			);
 		ids.add(node.id);
-		if (node.label.trim() === "")
+		if (Str.trim(node.label) === "")
 			push(
 				"blank_sankey_label",
 				`${path}.label`,
 				`Node "${node.id}" has a blank label.`,
 				"Give the node the name the source states.",
 			);
-		if (node.label.trim().length > SANKEY_MAX_LABEL_LENGTH)
+		if (Str.trim(node.label).length > SANKEY_MAX_LABEL_LENGTH)
 			push(
 				"sankey_text_too_long",
 				`${path}.label`,
@@ -247,7 +247,7 @@ export function getSankeyValidationIssues(diagram: SankeyDiagram): SankeyValidat
 	});
 	const linked = new Set<string>();
 	const pairs = new Map<string, number>();
-	links.forEach((link, index) => {
+	Arr.forEach(links, (link, index) => {
 		const path = `links.[${index}]`;
 		for (const end of ["source", "target"] as const) {
 			linked.add(link[end]);
@@ -285,14 +285,14 @@ export function getSankeyValidationIssues(diagram: SankeyDiagram): SankeyValidat
 				"Merge them into one link whose value is their sum.",
 			);
 		else pairs.set(pair, index);
-		if (link.label !== undefined && link.label.trim() === "")
+		if (link.label !== undefined && Str.trim(link.label) === "")
 			push(
 				"blank_sankey_label",
 				`${path}.label`,
 				`Link ${index + 1} has a blank label.`,
 				"Give the label the source states, or omit label.",
 			);
-		if (link.label !== undefined && link.label.trim().length > SANKEY_MAX_LINK_LABEL_LENGTH)
+		if (link.label !== undefined && Str.trim(link.label).length > SANKEY_MAX_LINK_LABEL_LENGTH)
 			push(
 				"sankey_text_too_long",
 				`${path}.label`,
@@ -300,7 +300,7 @@ export function getSankeyValidationIssues(diagram: SankeyDiagram): SankeyValidat
 				`Shorten the label to at most ${SANKEY_MAX_LINK_LABEL_LENGTH} characters.`,
 			);
 	});
-	nodes.forEach((node, index) => {
+	Arr.forEach(nodes, (node, index) => {
 		if (!linked.has(node.id))
 			push(
 				"unlinked_sankey_node",
@@ -311,14 +311,17 @@ export function getSankeyValidationIssues(diagram: SankeyDiagram): SankeyValidat
 	});
 	const cycle = sankeyCycle(links);
 	if (cycle) {
-		const back = links.findIndex(
-			(link) => link.source === cycle.at(-2) && link.target === cycle.at(-1),
+		const source = cycle[cycle.length - 2],
+			target = cycle[cycle.length - 1];
+		const back = Option.getOrElse(
+			Arr.findFirstIndex(links, (link) => link.source === source && link.target === target),
+			() => -1,
 		);
 		push(
 			"sankey_cycle",
 			`links.[${back}]`,
-			`Flows run in a cycle: ${cycle.join(" → ")}.`,
-			`A Sankey diagram flows one way. Drop the flow from "${cycle.at(-2)}" back to "${cycle.at(-1)}", or send it to a separate node such as "${cycle.at(-1)} (returning)".`,
+			`Flows run in a cycle: ${Arr.join(cycle, " → ")}.`,
+			`A Sankey diagram flows one way. Drop the flow from "${source}" back to "${target}", or send it to a separate node such as "${target} (returning)".`,
 		);
 	} else if (issues.length === 0) {
 		const deepest = Math.max(...sankeyColumns(diagram).values()) + 1;
@@ -330,7 +333,7 @@ export function getSankeyValidationIssues(diagram: SankeyDiagram): SankeyValidat
 				"Merge consecutive stages, or split the flow into several diagrams.",
 			);
 	}
-	return issues.slice(0, SANKEY_MAX_ISSUES);
+	return Arr.take(issues, SANKEY_MAX_ISSUES);
 }
 
 export class SankeyValidationError extends Schema.TaggedError<
@@ -370,7 +373,7 @@ export function parseSankeyDiagram(
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
+	typeof value === "object" && value !== null && !Arr.isArray(value);
 
 /** The first of `keys` a record sets, removed from `rest`. */
 function take(rest: Record<string, unknown>, keys: readonly string[]): unknown {
@@ -387,22 +390,11 @@ const TARGET_KEYS = ["target", "to", "dst", "destination"];
 const VALUE_KEYS = ["value", "amount", "weight", "count", "size", "flow"];
 const LABEL_KEYS = ["label", "name", "title"];
 
-/** An id from a label: lowercase words joined by dashes, never a colon. */
-function slug(label: string): string {
-	return (
-		label
-			.trim()
-			.toLowerCase()
-			.replace(/[^\p{L}\p{N}]+/gu, "-")
-			.replace(/^-+|-+$/gu, "") || "node"
-	);
-}
-
 /** "1,200" and " 42 " read as numbers; anything else stays as written for the decoder to report. */
 function numeric(value: unknown): unknown {
 	if (typeof value !== "string") return value;
-	const parsed = Number(value.trim().replace(/,/gu, ""));
-	return value.trim() !== "" && Number.isFinite(parsed) ? parsed : value;
+	const parsed = Number(Str.replace(/,/gu, "")(Str.trim(value)));
+	return Str.trim(value) !== "" && Number.isFinite(parsed) ? parsed : value;
 }
 
 /**
@@ -415,28 +407,35 @@ function numeric(value: unknown): unknown {
 export function resolveSankeyShorthand(input: unknown): unknown {
 	if (!isRecord(input)) return input;
 	const { flows, edges, connections, ...diagram } = input;
-	const listedLinks = diagram["links"] ?? flows ?? edges ?? connections;
+	const listedLinks =
+		diagram["links"] !== undefined
+			? diagram["links"]
+			: flows !== undefined
+				? flows
+				: edges !== undefined
+					? edges
+					: connections;
 	const listedNodes = diagram["nodes"];
-	const nodes: Record<string, unknown>[] = [];
+	const nodes: unknown[] = [];
 	// An end names a node by its exact id first; only then by label or either in
 	// another case, so a label that spells another node's id never captures it.
 	const exactIds = new Set<string>();
 	const aliases = new Map<string, string>();
 	const register = (id: string, label: string) => {
 		exactIds.add(id);
-		for (const key of [label, id.toLowerCase(), label.toLowerCase()])
+		for (const key of [label, Str.toLowerCase(id), Str.toLowerCase(label)])
 			if (!aliases.has(key)) aliases.set(key, id);
 	};
 	const usedIds = new Set<string>();
 	const freshId = (label: string) => {
-		const base = slug(label);
+		const base = slug(label, { unicode: true, maxLength: Infinity }) || "node";
 		let id = base;
 		for (let suffix = 2; usedIds.has(id); suffix += 1) id = `${base}-${suffix}`;
 		usedIds.add(id);
 		return id;
 	};
-	const resolvedNodes = Array.isArray(listedNodes)
-		? listedNodes.map((node) => {
+	const resolvedNodes = Arr.isArray(listedNodes)
+		? Arr.map(listedNodes, (node) => {
 				if (typeof node === "string") {
 					const id = freshId(node);
 					register(id, node);
@@ -461,13 +460,16 @@ export function resolveSankeyShorthand(input: unknown): unknown {
 				};
 			})
 		: listedNodes;
-	if (Array.isArray(resolvedNodes)) nodes.push(...(resolvedNodes as Record<string, unknown>[]));
+	if (Arr.isArray(resolvedNodes)) nodes.push(...resolvedNodes);
 	const endpoint = (value: unknown): unknown => {
 		// An end written as a node ({ id } or { label }) reads as that name; anything
 		// else stays as written for the decoder to report.
 		if (isRecord(value)) {
-			const name = [value["id"], value["label"], value["name"]].find(
-				(entry) => typeof entry === "string" && entry !== "",
+			const name = Option.getOrUndefined(
+				Arr.findFirst(
+					[value["id"], value["label"], value["name"]],
+					(entry) => typeof entry === "string" && entry !== "",
+				),
 			);
 			if (name === undefined) return value;
 			value = name;
@@ -475,7 +477,7 @@ export function resolveSankeyShorthand(input: unknown): unknown {
 		if (typeof value !== "string" || value === "") return value;
 		const known = exactIds.has(value)
 			? value
-			: (aliases.get(value) ?? aliases.get(value.toLowerCase()));
+			: (aliases.get(value) ?? aliases.get(Str.toLowerCase(value)));
 		if (known !== undefined) return known;
 		// Listed nodes are the whole set, so validation names an unknown end; without
 		// a list, every name a link gives becomes a node of its own. A malformed list
@@ -487,8 +489,8 @@ export function resolveSankeyShorthand(input: unknown): unknown {
 		nodes.push({ id, label: value });
 		return id;
 	};
-	const links = Array.isArray(listedLinks)
-		? listedLinks.map((link) => {
+	const links = Arr.isArray(listedLinks)
+		? Arr.map(listedLinks, (link) => {
 				if (!isRecord(link)) return link;
 				const rest: Record<string, unknown> = { ...link };
 				const source = endpoint(take(rest, SOURCE_KEYS));
@@ -510,7 +512,7 @@ export function resolveSankeyShorthand(input: unknown): unknown {
 			? nodes.length === 0
 				? {}
 				: { nodes }
-			: { nodes: Array.isArray(listedNodes) ? nodes : listedNodes }),
+			: { nodes: Arr.isArray(listedNodes) ? nodes : listedNodes }),
 		...(listedLinks === undefined ? {} : { links }),
 	};
 }
@@ -541,6 +543,32 @@ export const sankeyFixture = parseSankeyDiagram({
 		{ source: "marketing", target: "storage", value: 8 },
 	],
 }).pipe(Result.getOrThrow);
+
+export function normalizeSankey(spec: SankeyDocument): SankeyDiagram {
+	const title = cleanToolString(spec.title);
+	const optional = (key: string, value: string | undefined) =>
+		value && cleanToolString(value) ? { [key]: cleanToolString(value) } : {};
+	return {
+		id:
+			(spec.id === undefined ? undefined : cleanToolString(spec.id) || undefined) ??
+			(slug(title) || "sketchi-sankey"),
+		title,
+		type: sankeyDiagramType,
+		nodes: Arr.map(spec.nodes, (node) => ({
+			id: cleanToolString(node.id),
+			label: cleanToolString(node.label),
+			...(node.color ? { color: node.color } : {}),
+		})),
+		links: Arr.map(spec.links, (link) => ({
+			source: cleanToolString(link.source),
+			target: cleanToolString(link.target),
+			value: link.value,
+			...optional("label", link.label),
+		})),
+		...optional("unit", spec.unit),
+		style: { ...SKETCHI_DIAGRAM_STYLE },
+	};
+}
 
 /** Counts and domain nouns shown by generation consumers. */
 export function counts(diagram: SankeyDiagram) {
