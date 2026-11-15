@@ -1,7 +1,7 @@
 /**
  * Every canonical diagram family. A family listed here must complete each
- * pipeline stage in docs/diagram-families.md; type-structure.test.ts and the
- * family pipeline test fail when one is missing.
+ * pipeline stage in docs/diagram-families.md; the family pipeline test fails
+ * when one is missing.
  */
 export const DIAGRAM_TYPES = [
 	"flowchart",

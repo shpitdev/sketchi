@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import { parseIntermediateDiagram } from "../intermediate";
 import {
-	dropBlankEdgeLabels,
 	FLOWCHART_MAX_EDGES,
 	FLOWCHART_MAX_GROUP_DEPTH,
 	FLOWCHART_MAX_GROUPS,
@@ -458,20 +457,5 @@ describe("flowchart lanes", () => {
 		});
 		expect(issues.map((issue) => issue.code)).toEqual(["flowchart_too_large"]);
 		expect(issues[0]?.ref).toEqual({ kind: "diagram", id: "linear-9", path: "lanes" });
-	});
-});
-
-describe("flowchart input cleanup", () => {
-	it("drops only blank edge labels", () => {
-		const edges = [
-			{ source: "a", target: "b", label: "  " },
-			{ source: "b", target: "c", label: "yes" },
-			"not an edge",
-		];
-		expect(dropBlankEdgeLabels(edges)).toEqual([
-			{ source: "a", target: "b" },
-			edges[1],
-			"not an edge",
-		]);
 	});
 });

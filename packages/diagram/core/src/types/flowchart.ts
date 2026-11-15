@@ -732,16 +732,3 @@ export const requestFlowGroupLogoFlowchart = parseFlowchartDiagram({
 }).pipe(Result.getOrThrow);
 
 export const flowchartEvaluationFixtures = [flowchartFixture, pharmaBatchDispositionFlowchart];
-
-/**
- * A blank edge label means the edge has none. Reads undecoded edges, so every surface that accepts
- * a flowchart drops it the same way before validation; anything that is not an edge with a blank
- * label stays as it is.
- */
-export function dropBlankEdgeLabels(edges: readonly unknown[]): unknown[] {
-	return edges.map((edge) => {
-		if (typeof edge !== "object" || edge === null || Array.isArray(edge)) return edge;
-		const { label, ...rest } = edge as Record<string, unknown>;
-		return typeof label === "string" && label.trim().length === 0 ? rest : edge;
-	});
-}
