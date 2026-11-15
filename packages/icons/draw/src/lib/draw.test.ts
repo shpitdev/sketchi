@@ -1,6 +1,9 @@
 import { iconRecipeIssues } from "@sketchi/diagram-core";
 import { lookAlikeMarks, rankLookAlikes } from "@sketchi/icon-catalog/look-alikes";
-import { Effect, Fiber, Layer } from "effect";
+import { Effect, Fiber, Layer, Schedule } from "effect";
+import { TelemetryCorrelation } from "@sketchi/observability";
+import { makeJudgeCall } from "./google-judge.js";
+import type { IconModelError } from "./errors.js";
 import { Prompt } from "effect/ai";
 import { TestClock } from "effect/testing";
 import { describe, expect, it } from "@effect/vitest";
@@ -16,7 +19,13 @@ import { drawIcon, ICON_DRAW_BUDGET_MS, IconCatalogSvgs, sourcePalette } from ".
 import { IconImaging, type IconImagingJob } from "./imaging.js";
 import { prepareIconInput, rasterHeader, svgCurveSegments } from "./input.js";
 import { decodeJudgeReply, judgeLineup } from "./judge.js";
-import { DETAILED_MARK_CURVES, iconAuthorFor, IconDrawModels, type ModelCall } from "./models.js";
+import {
+	DETAILED_MARK_CURVES,
+	iconAuthorFor,
+	IconDrawModels,
+	type ModelCall,
+	type JudgeCallReply,
+} from "./models.js";
 
 const SLACK_SVG = `<svg viewBox="0 0 24 24"><rect x="1" y="7" width="10" height="4" fill="#36c5f0"/><rect x="13" y="1" width="4" height="10" fill="#2eb67d"/><rect x="13" y="13" width="10" height="4" fill="#ecb22e"/><rect x="7" y="13" width="4" height="10" fill="#e01e5a"/></svg>`;
 
@@ -74,6 +83,11 @@ const usage = { inputTokens: 10, outputTokens: 20, cacheReadTokens: 100, cacheWr
 interface Script {
 	readonly author: readonly unknown[];
 	readonly judge: readonly string[];
+	/** Actual provider boundary for public aggregation contract tests. */
+	readonly judgeCall?: (request: {
+		readonly sketch: string;
+		readonly lineup: readonly string[];
+	}) => Effect.Effect<JudgeCallReply, IconModelError>;
 	/** How long each model call takes, on the test clock. */
 	readonly authorDelayMs?: number;
 	readonly judgeDelayMs?: number;
@@ -141,15 +155,17 @@ function fakes(script: Script) {
 						}),
 					),
 				),
-			judge: ({ lineup }) =>
-				Effect.sleep(script.judgeDelayMs ?? 0).pipe(
-					Effect.andThen(
-						Effect.sync(() => {
-							seen.judged.push([...lineup]);
-							return { text: judgeReplies.shift() ?? "", call: call("judge") };
-						}),
-					),
-				),
+			judge:
+				script.judgeCall ??
+				(({ lineup }) =>
+					Effect.sleep(script.judgeDelayMs ?? 0).pipe(
+						Effect.andThen(
+							Effect.sync(() => {
+								seen.judged.push([...lineup]);
+								return { text: judgeReplies.shift() ?? "", call: call("judge") };
+							}),
+						),
+					)),
 		}),
 	);
 	return { layer, seen };
@@ -169,6 +185,67 @@ function run(script: Script, input: unknown = { name: "Slack", svg: SLACK_SVG })
 }
 
 describe("drawIcon", () => {
+	it("counts cached Google input once through the actual draw aggregation", async () => {
+		for (const cachedContentTokenCount of [0, 40]) {
+			let dispatches = 0;
+			const judgeCall = await Effect.runPromise(
+				makeJudgeCall({
+					gateway: {
+						getUrl: () => Promise.resolve("https://gateway.invalid"),
+						run: () => {
+							dispatches++;
+							return Promise.resolve(
+								Response.json({
+									candidates: [{ content: { parts: [{ text: '{"logo":0}' }] } }],
+									usageMetadata: {
+										promptTokenCount: 100,
+										cachedContentTokenCount,
+										candidatesTokenCount: 7,
+										thoughtsTokenCount: 11,
+									},
+								}),
+							);
+						},
+					},
+					config: {
+						gatewayId: "stored-key",
+						collectLog: true,
+						surface: "studio",
+						judgeModel: "google/gemini-3.8-flash",
+						authorEffort: "low",
+					},
+					timeoutMs: 30000,
+					retry: Schedule.recurs(0),
+					transient: () => false,
+				}),
+			);
+			const { result } = await run({
+				author: [
+					{ accept: false, recipe: draft },
+					{ accept: true, recipe: null },
+				],
+				judge: [],
+				judgeCall: (request) =>
+					judgeCall(request).pipe(Effect.provideService(TelemetryCorrelation, {})),
+			});
+			expect(result._tag).toBe("Success");
+			if (result._tag !== "Success") return;
+			// Two authors each contribute 10 uncached + 100 cache read + 5 cache write;
+			// Google contributes 100 total prompt, including the controlled cache count.
+			expect(result.success.usage.calls).toBe(3);
+			expect(result.success.usage.inputTokens).toBe(330);
+			expect(result.success.usage.outputTokens).toBe(58);
+			expect(result.success.usage.cacheReadTokens).toBe(200 + cachedContentTokenCount);
+			expect(result.success.usage.byCall.find((call) => call.role === "judge")?.usage).toEqual({
+				inputTokens: 100 - cachedContentTokenCount,
+				outputTokens: 18,
+				cacheReadTokens: cachedContentTokenCount,
+				cacheWriteTokens: 0,
+			});
+			expect(dispatches).toBe(1);
+		}
+	});
+
 	it("drafts, reviews, accepts, and has the judge pick the source", async () => {
 		const { result, seen } = await run({
 			author: [

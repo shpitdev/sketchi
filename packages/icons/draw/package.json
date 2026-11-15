@@ -12,12 +12,14 @@
 	},
 	"dependencies": {
 		"@effect/ai-anthropic": "catalog:",
+		"@google/genai": "catalog:",
 		"@sketchi/diagram-core": "workspace:*",
 		"@sketchi/diagram-excalidraw": "workspace:*",
 		"@sketchi/diagram-generation": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/observability": "workspace:*",
-		"effect": "catalog:"
+		"effect": "catalog:",
+		"google-auth-library": "catalog:"
 	},
 	"devDependencies": {
 		"@excalidraw/excalidraw": "0.18.1"

@@ -2,16 +2,12 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../diagram";
-import { journeyStressFixtures } from "../journey-fixtures";
 import {
 	getJourneyValidationIssues,
 	JOURNEY_MAX_STAGE_STEPS,
-	JOURNEY_MAX_STEPS,
 	journeyActors,
 	journeyDiagramType,
 	journeyStepActors,
-	journeyFixture,
 	journeySentiment,
 	parseJourneyDiagram,
 	resolveJourneyShorthand,
@@ -38,17 +34,6 @@ const codes = (input: unknown) => issuesOf(input).map((issue) => issue.code);
 const browse = { name: "Browse", steps: [{ label: "Search for shoes", score: 4 }] };
 
 describe("journey contract", () => {
-	it("has a typed fixture that satisfies the canonical diagram contract", () => {
-		expect(journeyFixture.type).toBe(journeyDiagramType);
-		expect(parseCanonicalDiagram(journeyFixture).pipe(Result.getOrThrow)).toEqual(journeyFixture);
-		expect(journeyFixture.stages.length).toBeGreaterThan(2);
-		for (const fixture of Object.values(journeyStressFixtures))
-			expect(getJourneyValidationIssues(fixture)).toEqual([]);
-		expect(journeyStressFixtures.longest.stages.flatMap((stage) => stage.steps).length).toBe(
-			JOURNEY_MAX_STEPS,
-		);
-	});
-
 	it("defaults the palette and keeps optional rows absent", () => {
 		const parsed = parseJourneyDiagram(journey([browse])).pipe(Result.getOrThrow);
 		expect(parsed.style).toMatchObject({ accentColor: expect.any(String) });

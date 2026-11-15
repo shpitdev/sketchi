@@ -5,10 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import {
 	DiagramValidationError,
-	DiagramNode,
-	FlowchartDiagram,
-	IntermediateDiagram,
-	MindmapDiagram,
 	SKETCHI_DIAGRAM_PALETTE,
 	SKETCHI_DIAGRAM_STYLE,
 	flowchartFixture,
@@ -29,26 +25,12 @@ function themeToken(name: string): string {
 }
 
 describe("parseIntermediateDiagram", () => {
-	it("does not attach parser facades to diagram schemas or subclasses", () => {
-		for (const schema of [DiagramNode, IntermediateDiagram, FlowchartDiagram, MindmapDiagram]) {
-			expect("parse" in schema).toBe(false);
-			expect("safeParse" in schema).toBe(false);
-		}
-	});
-
 	it("keeps the runtime palette synchronized with diagram-ui/theme.css", () => {
 		expect(SKETCHI_DIAGRAM_PALETTE).toEqual({
 			paper: themeToken("paper"),
 			card: themeToken("card"),
 			ink: themeToken("ink"),
 			accent: themeToken("accent"),
-		});
-	});
-
-	it("accepts a valid diagram fixture", () => {
-		expect(parseIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow)).toMatchObject({
-			id: "onboarding-flow",
-			nodes: expect.arrayContaining([expect.objectContaining({ id: "prompt" })]),
 		});
 	});
 

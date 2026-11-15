@@ -201,7 +201,11 @@
             }
           },
           {
-            "include": ["packages/icons/draw/src/lib/author-model.ts"],
+            "include": [
+              "packages/icons/draw/src/lib/author-model.ts",
+              "packages/icons/draw/src/lib/models.ts",
+              "packages/icons/draw/src/lib/google-judge.ts"
+            ],
             "options": {
               "diagnosticSeverity": {
                 "abortControllerInEffect": "error",
@@ -240,7 +244,8 @@
             "include": [
               "packages/diagram/core/src/intermediate.ts",
               "packages/diagram/core/src/diagram.ts",
-              "packages/diagram/core/src/types/mindmap.ts"
+              "packages/diagram/core/src/types/mindmap.ts",
+              "packages/diagram/core/src/planarity.ts"
             ],
             "options": {
               "diagnosticSeverity": {

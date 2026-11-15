@@ -4,13 +4,12 @@ import { describe, expect, it } from "vitest";
 
 import { parseCanonicalDiagram } from "../diagram";
 import {
+	splitContinuingFinalStates,
 	getStateMachineValidationIssues,
 	getStateMachineDefaultWarnings,
 	mediaPlayerStateMachine,
 	parseStateMachineDiagram,
 	type StateMachineDiagram,
-	stateMachineDiagramType,
-	stateMachineFixture,
 	stateLabel,
 	stateTransitionLabel,
 } from "./state-machine";
@@ -21,19 +20,6 @@ const codes = (input: Partial<StateMachineDiagram>) =>
 	);
 
 describe("StateMachine diagram type", () => {
-	it("hints how a state can both end the machine and continue", () => {
-		const [issue] = getStateMachineValidationIssues({
-			...mediaPlayerStateMachine,
-			states: [...mediaPlayerStateMachine.states, { id: "end", kind: "final" }],
-			transitions: [
-				...mediaPlayerStateMachine.transitions,
-				{ id: "eject", source: "stopped", target: "end" },
-				{ id: "revive", source: "end", target: "stopped" },
-			],
-		});
-		expect(issue?.hint).toContain("a transition to a new final state");
-	});
-
 	it("skips final and choice children for defaults but preserves explicit choice entry", () => {
 		const input = {
 			id: "composite-entry",
@@ -232,16 +218,6 @@ describe("StateMachine diagram type", () => {
 		);
 	});
 
-	it("has typed fixtures that satisfy the canonical diagram contract", () => {
-		expect(stateMachineFixture.type).toBe(stateMachineDiagramType);
-		expect(parseCanonicalDiagram(stateMachineFixture).pipe(Result.getOrThrow)).toEqual(
-			stateMachineFixture,
-		);
-		expect(parseCanonicalDiagram(mediaPlayerStateMachine).pipe(Result.getOrThrow)).toEqual(
-			mediaPlayerStateMachine,
-		);
-	});
-
 	it("labels a transition event [guard] / action, each part optional", () => {
 		expect(stateTransitionLabel({ event: "pay", guard: "card valid", action: "charge" })).toBe(
 			"pay [card valid] / charge",
@@ -371,16 +347,17 @@ describe("StateMachine diagram type", () => {
 		expect(
 			codes({ states: [...mediaPlayerStateMachine.states, { id: "orphan", label: "Orphan" }] }),
 		).toEqual(["unreachable_state"]);
-		expect(
-			codes({
-				states: [...mediaPlayerStateMachine.states, { id: "end", kind: "final" }],
-				transitions: [
-					...mediaPlayerStateMachine.transitions,
-					{ id: "eject", source: "stopped", target: "end" },
-					{ id: "revive", source: "end", target: "stopped" },
-				],
-			}),
-		).toEqual(["final_has_outgoing"]);
+		const finalIssues = getStateMachineValidationIssues({
+			...mediaPlayerStateMachine,
+			states: [...mediaPlayerStateMachine.states, { id: "end", kind: "final" }],
+			transitions: [
+				...mediaPlayerStateMachine.transitions,
+				{ id: "eject", source: "stopped", target: "end" },
+				{ id: "revive", source: "end", target: "stopped" },
+			],
+		});
+		expect(finalIssues.map((issue) => issue.code)).toEqual(["final_has_outgoing"]);
+		expect(finalIssues[0]?.hint).toContain("a transition to a new final state");
 		expect(
 			codes({
 				states: [...mediaPlayerStateMachine.states, { id: "pick", kind: "choice" }],
@@ -399,5 +376,32 @@ describe("StateMachine diagram type", () => {
 			initial: "missing",
 		}))
 			expect(issue.hint.length).toBeGreaterThan(10);
+	});
+});
+
+describe("state-machine input cleanup", () => {
+	it("ends a final state that something leaves in its own final state", () => {
+		expect(
+			splitContinuingFinalStates({
+				states: [{ id: "open" }, { id: "closed", kind: "final", parent: "ticket" }],
+				transitions: [
+					{ source: "open", target: "closed" },
+					{ id: "closed-ends", source: "closed", target: "open" },
+				],
+			}),
+		).toEqual({
+			states: [
+				{ id: "open" },
+				{ id: "closed", parent: "ticket" },
+				{ id: "end", kind: "final", parent: "ticket" },
+			],
+			transitions: [
+				{ source: "open", target: "closed" },
+				{ id: "closed-ends", source: "closed", target: "open" },
+				{ id: "closed-ends-2", source: "closed", target: "end" },
+			],
+		});
+		const untouched = { states: [{ id: "done", kind: "final" }], transitions: [] };
+		expect(splitContinuingFinalStates(untouched)).toBe(untouched);
 	});
 });

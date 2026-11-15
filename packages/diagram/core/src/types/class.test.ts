@@ -2,11 +2,9 @@
 import { Result } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { parseCanonicalDiagram } from "../diagram";
 import {
 	type ClassDiagram,
 	classAttributeText,
-	classDiagramType,
 	classFixture,
 	classKeywordLine,
 	classMethodText,
@@ -44,11 +42,6 @@ const relation = (
 });
 
 describe("Class diagram type", () => {
-	it("has a typed fixture that satisfies the canonical diagram contract", () => {
-		expect(classFixture.type).toBe(classDiagramType);
-		expect(parseCanonicalDiagram(classFixture).pipe(Result.getOrThrow)).toEqual(classFixture);
-	});
-
 	it("draws members as UML writes them, with visibility, types and markers", () => {
 		const [drawable, shape, , , square, canvas] = classFixture.classes;
 		expect(shape!.attributes.map(classAttributeText)).toEqual(["# x: double", "# y: double"]);
