@@ -40,6 +40,7 @@ export function iconAuthorModel(model: string): IconAuthorModel | undefined {
 }
 
 export interface ModelUsage {
+	/** Uncached input; cache reads and writes are counted separately. */
 	readonly inputTokens: number;
 	readonly outputTokens: number;
 	/** Input read from the provider's prompt cache, billed at a tenth. */

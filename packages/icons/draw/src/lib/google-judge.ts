@@ -256,12 +256,14 @@ export const makeJudgeCall = (options: {
 				}),
 				Effect.retry(options.retry),
 			);
+			// Google promptTokenCount includes cached input; ModelUsage keeps it separate.
+			const cacheReadTokens = reply.response?.usageMetadata?.cachedContentTokenCount ?? 0;
 			const usage = {
-				inputTokens: reply.response?.usageMetadata?.promptTokenCount ?? 0,
+				inputTokens: (reply.response?.usageMetadata?.promptTokenCount ?? 0) - cacheReadTokens,
 				outputTokens:
 					(reply.response?.usageMetadata?.candidatesTokenCount ?? 0) +
 					(reply.response?.usageMetadata?.thoughtsTokenCount ?? 0),
-				cacheReadTokens: reply.response?.usageMetadata?.cachedContentTokenCount ?? 0,
+				cacheReadTokens,
 				cacheWriteTokens: 0,
 			};
 			yield* Effect.annotateCurrentSpan({
