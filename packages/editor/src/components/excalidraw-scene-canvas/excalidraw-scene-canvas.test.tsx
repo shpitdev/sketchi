@@ -33,6 +33,7 @@ vi.mock("@excalidraw/excalidraw", async () => {
 			gridModeEnabled?: boolean;
 			initialData?: { appState?: Record<string, unknown> };
 			onChange?: (elements: readonly unknown[], appState: object, files: object) => void;
+			viewModeEnabled?: boolean;
 		}) => {
 			excalidrawMock.props(props);
 			// Like Excalidraw's App: hand over the API from the constructor, during
@@ -72,6 +73,11 @@ vi.mock("@excalidraw/excalidraw", async () => {
 				<div data-testid="mock-excalidraw">
 					Mock Excalidraw
 					<button aria-label="Menu" className="main-menu-trigger" type="button" />
+					{!props.viewModeEnabled && (
+						<div className="App-toolbar">
+							<div className="HintViewer">To move canvas, hold spacebar</div>
+						</div>
+					)}
 				</div>
 			);
 		},
@@ -276,41 +282,45 @@ describe("DrawingEditor", () => {
 		);
 	});
 
-	it("fits a read-only diagram exactly, clear of Excalidraw's menu", async () => {
-		excalidrawMock.viewport = { height: 564, width: 820 };
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
-		render(<DrawingEditor scene={scene} title="Wide diagram" viewModeEnabled />);
-		await screen.findByTestId("mock-excalidraw");
-		drawMenuAtTopLeft();
+	it.each([true, false])(
+		"fits a diagram clear of its controls (read-only: %s)",
+		async (readOnly) => {
+			excalidrawMock.viewport = { height: 564, width: 820 };
+			const scene = convertSceneToExcalidraw(
+				renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
+			);
+			render(<DrawingEditor scene={scene} title="Wide diagram" viewModeEnabled={readOnly} />);
+			await screen.findByTestId("mock-excalidraw");
+			drawMenuAtTopLeft();
+			const toolbar = document.querySelector(".App-toolbar");
+			if (toolbar) {
+				vi.spyOn(toolbar, "getBoundingClientRect").mockReturnValue(
+					DOMRect.fromRect({ height: 44, width: 550, x: 135, y: 16 }),
+				);
+				const hint = toolbar.querySelector(".HintViewer");
+				if (!hint) throw new Error("Missing native toolbar hint");
+				vi.spyOn(hint, "getBoundingClientRect").mockReturnValue(
+					DOMRect.fromRect({ height: 28, width: 550, x: 135, y: 68 }),
+				);
+			}
 
-		loadEditor(0, [{ isDeleted: false }]);
-		// The menu alone costs this wide diagram least as a strip beside it, and the
-		// zoom stays exact rather than rounded down to a tenth.
-		expect(excalidrawMock.scrollToContent).toHaveBeenCalledExactlyOnceWith(undefined, {
-			...fitToViewport,
-			canvasOffsets: { bottom: 16, left: 60, right: 16, top: 16 },
-			maxZoom: 744 / 1500,
-			minZoom: 744 / 1500,
-		});
-	});
-
-	it("leaves an editable diagram's first fit to Excalidraw", async () => {
-		excalidrawMock.viewport = { height: 564, width: 820 };
-		const scene = convertSceneToExcalidraw(
-			renderIntermediateDiagram(flowchartFixture).pipe(Result.getOrThrow),
-		);
-		render(<DrawingEditor scene={scene} title="Wide diagram" />);
-		await screen.findByTestId("mock-excalidraw");
-		drawMenuAtTopLeft();
-
-		loadEditor(0, [{ isDeleted: false }]);
-		expect(excalidrawMock.scrollToContent).toHaveBeenCalledExactlyOnceWith(
-			undefined,
-			fitToViewport,
-		);
-	});
+			loadEditor(0, [{ isDeleted: false }]);
+			// The menu alone favours a side strip; the toolbar and hint need a top
+			// band. Both keep the exact zoom rather than rounding down to a tenth.
+			const zoom = readOnly ? 744 / 1500 : 444 / 1070;
+			expect(excalidrawMock.scrollToContent).toHaveBeenCalledExactlyOnceWith(undefined, {
+				...fitToViewport,
+				canvasOffsets: {
+					bottom: 16,
+					left: readOnly ? 60 : 16,
+					right: 16,
+					top: readOnly ? 16 : 104,
+				},
+				maxZoom: zoom,
+				minZoom: zoom,
+			});
+		},
+	);
 	it("releases a route a drag folds through its own shape to Excalidraw's elbow routing", async () => {
 		const shape = (id: string, x: number) => ({
 			id,

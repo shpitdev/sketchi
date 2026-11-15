@@ -43,10 +43,10 @@ import {
 	type BindableShape,
 	EXCALIDRAW_BINDING_GAP,
 	EXCALIDRAW_ELBOW_DISTANCE,
-	excalidrawBoundPoint,
 	excalidrawFixedGlobalPoint,
 	excalidrawKeepsElbowEnd,
 	excalidrawOutlineDistance,
+	excalidrawOutlineHit,
 	type FocusBinding,
 	isExcalidrawBindableType,
 	type Point,
@@ -1684,13 +1684,6 @@ function near(value: number, target: number): boolean {
 	return Math.abs(value - target) <= AXIS_ALIGNED_EPSILON;
 }
 
-/** A connector end's neighbouring point, the one Excalidraw aims the end from. */
-function arrowNeighbour(element: ExcalidrawElement, key: BindingKey): Point | null {
-	const points = absoluteArrowPoints(element);
-	const neighbour = key === "startBinding" ? points[1] : points[points.length - 2];
-	return neighbour ? [neighbour.x, neighbour.y] : null;
-}
-
 function bindingFocus(element: ExcalidrawElement, key: BindingKey): FocusBinding | null {
 	const binding = element[key];
 	if (!(binding && typeof binding === "object")) return null;
@@ -1699,24 +1692,20 @@ function bindingFocus(element: ExcalidrawElement, key: BindingKey): FocusBinding
 	return focus === null || gap === null ? null : { focus, gap };
 }
 
-/** Within this of where Excalidraw re-places an end, the end reads as kept. */
-const KEPT_END_TOLERANCE = 0.01;
-
 /** Within this of its binding's reach, a bound end reads as meeting its shape. */
 const REACH_TOLERANCE = 0.05;
 
 /**
- * Whether a bound end meets its shape and Excalidraw leaves it where it is
- * drawn when it updates the arrow. It must lie outside the outline Excalidraw
+ * Whether a bound end meets its shape. It must lie outside the outline Excalidraw
  * draws and no farther out than the binding reaches: its gap for an arrow that
  * is not elbowed, the outline itself for an elbow end (or the distance
- * Excalidraw re-places one at). And Excalidraw's update must map it to itself:
- * an elbow end at its fixed point, any other end where its focus and gap place
- * it. Excalidraw keeps an end whose aim misses the shape where it is, so update
- * stability alone would pass an arrow left floating beside its shape. A shape
- * Excalidraw cannot bind keeps any end on its box.
+ * Excalidraw re-places one at). A native two-point arrow updates both ends
+ * against their previous neighbours in one step, so a valid edit need not be
+ * a placement fixed point. Generated first-touch stability belongs to the
+ * native edit tests; replaying placement here rejects valid native drawings.
+ * A shape Excalidraw cannot bind keeps any end on its box.
  */
-function excalidrawKeepsEnd(
+function endpointMeetsShape(
 	element: ExcalidrawElement,
 	key: BindingKey,
 	shape: ExcalidrawElement,
@@ -1729,23 +1718,30 @@ function excalidrawKeepsEnd(
 	}
 	const elbowed = element.elbowed === true;
 	const binding = bindingFocus(element, key);
-	const reach = elbowed ? EXCALIDRAW_ELBOW_DISTANCE : (binding?.gap ?? 0);
 	const offset = excalidrawOutlineDistance(target, point);
-	if (offset === null || offset < -REACH_TOLERANCE || offset > reach + REACH_TOLERANCE) {
+	if (offset === null || offset < -REACH_TOLERANCE) {
 		return false;
 	}
 	if (elbowed) {
 		const fixedPoint = bindingFixedPoint(element, key);
 		return (
+			offset <= EXCALIDRAW_ELBOW_DISTANCE + REACH_TOLERANCE &&
 			fixedPoint !== null &&
 			excalidrawKeepsElbowEnd(target, excalidrawFixedGlobalPoint(target, fixedPoint))
 		);
 	}
-	const neighbour = arrowNeighbour(element, key);
-	if (!binding || !neighbour) return false;
-	const placed = excalidrawBoundPoint(target, binding, neighbour, point);
+	// Native focus bindings have at least a one-pixel gap. A zero gap places
+	// the end on the focus point inside the shape, even if stored on its edge.
+	if (!binding || binding.gap < EXCALIDRAW_BINDING_GAP) return false;
+	// Native intersection expands a sharp rectangle by gap on each axis;
+	// its square corners are farther than gap in Euclidean distance. Read the
+	// actual expanded outline, rather than loosening the distance tolerance.
+	const center: Point = [target.x + target.width / 2, target.y + target.height / 2];
+	const outer = excalidrawOutlineHit(target, center, point, binding.gap);
 	return (
-		placed !== null && Math.hypot(placed[0] - point[0], placed[1] - point[1]) <= KEPT_END_TOLERANCE
+		outer !== null &&
+		Math.hypot(point[0] - center[0], point[1] - center[1]) <=
+			Math.hypot(outer[0] - center[0], outer[1] - center[1]) + REACH_TOLERANCE
 	);
 }
 
@@ -1886,11 +1882,11 @@ export function validateExcalidrawScene(scene: ExcalidrawScene): ExcalidrawScene
 				}
 
 				const endpoint = arrowEndpoint(element, bindingKey);
-				if (shape && endpoint && !excalidrawKeepsEnd(element, bindingKey, shape, endpoint)) {
+				if (shape && endpoint && !endpointMeetsShape(element, bindingKey, shape, endpoint)) {
 					issues.push({
 						code: "arrow-endpoint-off-shape",
 						elementId: element.id,
-						message: `Arrow "${element.id}" ${bindingKey} endpoint is not where Excalidraw keeps it on "${shape.id}".`,
+						message: `Arrow "${element.id}" ${bindingKey} endpoint does not meet "${shape.id}" with a valid binding.`,
 					});
 				}
 

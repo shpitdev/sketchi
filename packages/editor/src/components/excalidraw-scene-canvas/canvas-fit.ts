@@ -14,8 +14,8 @@ export interface CanvasOffsets {
 	readonly top: number;
 }
 
-/** How a read-only canvas shows its whole diagram: where it leaves room, and at what zoom. */
-export interface ReadOnlyFit {
+/** How a canvas shows its whole diagram: where it leaves room, and at what zoom. */
+export interface CanvasFit {
 	readonly canvasOffsets: CanvasOffsets;
 	readonly zoom: number;
 }
@@ -29,10 +29,17 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 30;
 
 /**
- * Excalidraw's own controls over a read-only canvas: the main menu at the top
- * left and the zoom bar at the bottom left. The mobile layout draws neither.
+ * Excalidraw's controls and the hint below the editable toolbar. The toolbar
+ * moves to the bottom in the mobile layout; measure the actual rectangles.
  */
-const CONTROL_SELECTORS = [".main-menu-trigger", ".zoom-actions"];
+const CONTROL_SELECTORS = [
+	".main-menu-trigger",
+	".zoom-actions",
+	".App-toolbar",
+	".HintViewer",
+	".default-sidebar-trigger",
+	".help-icon",
+];
 
 /** The visible controls Excalidraw draws over the canvas at `canvas`. */
 export function measureCanvasControls(
@@ -55,7 +62,7 @@ export function measureCanvasControls(
 	);
 }
 
-interface Placement extends ReadOnlyFit {
+interface Placement extends CanvasFit {
 	readonly rect: CanvasRect;
 }
 
@@ -95,7 +102,7 @@ const padded = (offsets: Partial<CanvasOffsets>): CanvasOffsets => ({
 });
 
 /**
- * The exact fit of a `content`-sized diagram in a read-only canvas: as large as
+ * The exact fit of a `content`-sized diagram in a canvas: as large as
  * it can be inside a small padding, centred, with none of `controls` drawn over
  * it. When the controls would cover it, the diagram keeps clear of the bands
  * above and below them or of the side they sit on, whichever leaves it larger;
@@ -103,11 +110,11 @@ const padded = (offsets: Partial<CanvasOffsets>): CanvasOffsets => ({
  * When no fit can clear them, the plain fit stands. The zoom is exact: Excalidraw's own fit rounds it down to a tenth, which
  * draws a phone diagram up to a fifth smaller than its canvas allows.
  */
-export function readOnlyFit(
+export function canvasFit(
 	viewport: { readonly height: number; readonly width: number },
 	content: { readonly height: number; readonly width: number },
 	controls: readonly CanvasRect[],
-): ReadOnlyFit | undefined {
+): CanvasFit | undefined {
 	if (content.width <= 0 || content.height <= 0) return undefined;
 	if (viewport.width <= 0 || viewport.height <= 0) return undefined;
 	const clear = (placement: Placement) =>

@@ -1,5 +1,5 @@
 import { createBranchLabelSynchronizer } from "./branch-labels";
-import { measureCanvasControls, readOnlyFit } from "./read-only-fit";
+import { measureCanvasControls, canvasFit } from "./canvas-fit";
 import { createFoldedRouteRelease } from "./route-release";
 
 import {
@@ -31,7 +31,7 @@ function CanvasUnavailable() {
 
 // Excalidraw reads browser globals at import time, so the editor module is only
 // requested once the canvas renders in the browser.
-// The loaded module also measures scene bounds for a read-only fit.
+// The loaded module also measures scene bounds for the initial fit.
 let sceneBounds: typeof import("@excalidraw/excalidraw").getCommonBounds | undefined;
 // And its mutateElement has Excalidraw route an arrow a drag releases.
 let mutateElement: typeof import("@excalidraw/excalidraw").mutateElement | undefined;
@@ -48,10 +48,10 @@ const LazyExcalidraw = lazy<ComponentType<ExcalidrawProps>>(() =>
 );
 
 /**
- * The exact fit of a read-only diagram, clear of Excalidraw's menu and zoom
+ * The exact fit of a diagram, clear of Excalidraw's menu and zoom
  * controls, or `undefined` before the scene's bounds can be measured.
  */
-function fitReadOnlyScene(
+function fitScene(
 	root: HTMLElement | null,
 	elements: Parameters<NonNullable<ExcalidrawProps["onChange"]>>[0],
 	appState: Parameters<NonNullable<ExcalidrawProps["onChange"]>>[1],
@@ -59,7 +59,7 @@ function fitReadOnlyScene(
 	const visible = elements.filter((element) => !element.isDeleted);
 	if (!root || !sceneBounds || visible.length === 0) return undefined;
 	const [x1, y1, x2, y2] = sceneBounds(visible);
-	return readOnlyFit(
+	return canvasFit(
 		appState,
 		{ height: y2 - y1, width: x2 - x1 },
 		measureCanvasControls(root, appState),
@@ -164,9 +164,7 @@ export function DrawingEditor({
 					(fitted.width !== appState.width || fitted.height !== appState.height);
 				if (fitted?.api !== api || (viewModeEnabled && resized)) {
 					fittedRef.current = { api, height: appState.height, width: appState.width };
-					const fit = viewModeEnabled
-						? fitReadOnlyScene(rootRef.current, elements, appState)
-						: undefined;
+					const fit = fitScene(rootRef.current, elements, appState);
 					// Excalidraw rounds a fit's zoom down to a tenth and then clamps it to
 					// minZoom and maxZoom, so pinning both keeps the exact zoom.
 					api.scrollToContent(undefined, {
