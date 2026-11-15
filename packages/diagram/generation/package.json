@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"@effect/ai-openai-compat": "catalog:",
+		"@effect/ai-typesafe": "catalog:",
 		"@sketchi/diagram-core": "workspace:*",
 		"@sketchi/icon-catalog": "workspace:*",
 		"@sketchi/observability": "workspace:*",

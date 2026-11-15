@@ -167,6 +167,9 @@ catalogs:
     '@effect/ai-openai-compat':
       specifier: 4.1.4
       version: 4.1.4
+    '@effect/ai-typesafe':
+      specifier: 4.1.4
+      version: 4.1.4
     '@effect/platform-node':
       specifier: 4.1.4
       version: 4.1.4
@@ -652,6 +655,9 @@ importers:
   packages/diagram/generation:
     dependencies:
       '@effect/ai-openai-compat':
+        specifier: 'catalog:'
+        version: 4.1.4(effect@4.1.4)
+      '@effect/ai-typesafe':
         specifier: 'catalog:'
         version: 4.1.4(effect@4.1.4)
       '@sketchi/diagram-core':
@@ -1888,6 +1894,11 @@ packages:
 
   '@effect/ai-openai-compat@4.1.4':
     resolution: {integrity: sha512-Rmb6tcV/5zv7PFHvZt08eSqSI5G8JyEGOBeIwyKKz1mBes9WAgeYv7Kplzy5rBSWH1LtUA4CIuREzS7ovXDhRw==}
+    peerDependencies:
+      effect: ^4.1.4
+
+  '@effect/ai-typesafe@4.1.4':
+    resolution: {integrity: sha512-+gFj5W5J+LSL2ozqDQQ+lMO3lS2x1hid7GGaAB4gis2cAE4p0qrD/1gfG8OTFT3gx093klemH+r23Bcb5fvyrQ==}
     peerDependencies:
       effect: ^4.1.4
 
@@ -11190,6 +11201,10 @@ snapshots:
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
   '@effect/ai-openai-compat@4.1.4(effect@4.1.4)':
+    dependencies:
+      effect: 4.1.4
+
+  '@effect/ai-typesafe@4.1.4(effect@4.1.4)':
     dependencies:
       effect: 4.1.4
 

@@ -1,139 +1,92 @@
-/**
- * Jev, TypeSafe's decision model, served from the Workers AI catalog. The
- * binding bills and logs through the Cloudflare account, so no API key is
- * involved; DecisionModel callers do not change.
- */
+/** Jev through the account's credential-free Workers AI binding. */
+import { TypeSafeClient, TypeSafeDecisionModel } from "@effect/ai-typesafe";
 import { Effect, Layer, Schema } from "effect";
-import { AiError, type Decision, DecisionModel } from "effect/ai";
+import { DecisionModel } from "effect/ai";
+import { HttpBody, HttpClient, HttpClientError, HttpClientResponse } from "effect/http";
 
 /** The slice of a Workers AI binding Jev needs. */
 export interface WorkersAiRunner {
 	run(model: string, input: unknown): Promise<unknown>;
 }
 
-const Usage = Schema.Struct({
-	input_tokens: Schema.optionalKey(Schema.Finite),
-	output_tokens: Schema.optionalKey(Schema.Finite),
-});
+const decodeRequest = Schema.decodeUnknownEffect(
+	Schema.fromJsonString(
+		Schema.StructWithRest(Schema.Struct({ model: Schema.String }), [
+			Schema.Record(Schema.String, Schema.Unknown),
+		]),
+	),
+);
 
-const Answer = Schema.Union([
-	Schema.Struct({
-		type: Schema.Literal("choice"),
-		choice: Schema.String,
-		confidence: Schema.optionalKey(Schema.Finite),
-		probabilities: Schema.optionalKey(Schema.Record(Schema.String, Schema.Finite)),
-	}),
-	Schema.Struct({
-		type: Schema.Literal("score"),
-		score: Schema.Finite,
-		confidence: Schema.optionalKey(Schema.Finite),
-		probabilities: Schema.optionalKey(Schema.Record(Schema.String, Schema.Finite)),
-	}),
-	Schema.Struct({ type: Schema.Literal("noul"), noul: Schema.Finite }),
-]);
-
-const JevResult = Schema.Struct({
-	answers: Schema.Record(Schema.String, Answer),
-	usage: Schema.optionalKey(Usage),
-});
-const decodeJevResult = Schema.decodeUnknownEffect(JevResult);
-
-/** The binding wraps Jev's answer as `{ state, result }`; the documented shape is bare. */
+/** The binding wraps Jev's response; the documented response is bare. */
 function jevResult(response: unknown): unknown {
 	return typeof response === "object" && response !== null && "result" in response
 		? response.result
 		: response;
 }
 
-const failure = (reason: AiError.AiErrorReason): AiError.AiError =>
-	AiError.make({ module: "WorkersAiJev", method: "decide", reason });
+/** Only System One is transported: the provider owns all decision codecs. */
+const bindingClient = (ai: WorkersAiRunner) =>
+	HttpClient.make(
+		Effect.fn("WorkersAiJev.systemOne")(function* (request, url) {
+			const encodeError = (cause: unknown) =>
+				new HttpClientError.HttpClientError({
+					reason: new HttpClientError.EncodeError({ request, cause }),
+				});
+			if (
+				request.method !== "POST" ||
+				url.pathname !== "/systemone" ||
+				request.body._tag !== "Uint8Array"
+			) {
+				return yield* Effect.fail(encodeError("Workers AI Jev requires a System One JSON request"));
+			}
+			const { model, ...input } = yield* decodeRequest(
+				request.body.text ?? new TextDecoder().decode(request.body.body),
+			).pipe(Effect.mapError(encodeError));
+			// AI.run has no AbortSignal. Interruption stops waiting, not provider work or billing.
+			const result = yield* Effect.tryPromise({
+				try: () => ai.run(`typesafe/${model}`, input),
+				catch: (cause) =>
+					new HttpClientError.HttpClientError({
+						reason: new HttpClientError.TransportError({
+							request,
+							cause,
+							description: `Workers AI run failed: ${String(cause)}`,
+						}),
+					}),
+			});
+			const body = yield* HttpBody.json(jevResult(result)).pipe(
+				Effect.mapError(
+					(cause) =>
+						new HttpClientError.HttpClientError({
+							reason: new HttpClientError.DecodeError({
+								request,
+								response: HttpClientResponse.fromWeb(request, new Response()),
+								cause,
+							}),
+						}),
+				),
+			);
+			return HttpClientResponse.fromWeb(
+				request,
+				new Response(body.text, { headers: { "content-type": body.contentType } }),
+			);
+		}),
+	);
 
-/** Every decision but Locate, which needs an image. */
-type TextDecision = Exclude<Decision.Any, Decision.Locate>;
-
-/** A decision as a Jev question: Classify is a choice, Rate a score, Probability a noul. */
-function jevQuestion(decision: TextDecision) {
-	switch (decision._tag) {
-		case "Classify":
-			return { type: "choice", instructions: decision.instructions, criteria: decision.criteria };
-		case "Rate":
-			return {
-				type: "score",
-				instructions: decision.instructions,
-				criteria: decision.criteria.map((level) => level.description),
-			};
-		case "Probability":
-			return { type: "noul", instructions: decision.instructions, criteria: decision.criteria };
-	}
-}
-
-/**
- * A DecisionModel answering from `typesafe/<model>` on Workers AI. Text
- * decisions only; Jev's probabilities arrive rounded to two decimals.
- */
-export const makeWorkersAiJev = (options: {
+/** A TypeSafe DecisionModel with only its HTTP transport replaced by AI.run. */
+export const makeWorkersAiJev = Effect.fn("WorkersAiJev.make")(function* (options: {
 	readonly ai: WorkersAiRunner;
 	/** A Jev version, such as `jev-1.14.0`. */
 	readonly model: string;
-}) =>
-	DecisionModel.make({
-		probabilityPrecision: 2,
-		decide: Effect.fnUntraced(function* ({
-			state,
-			decisions,
-		}: DecisionModel.ProviderOptions<TextDecision>) {
-			const questions = Object.fromEntries(
-				Object.entries(decisions).map(([key, decision]) => [key, jevQuestion(decision)]),
-			);
-			const response = yield* Effect.tryPromise({
-				try: () => options.ai.run(`typesafe/${options.model}`, { state, questions }),
-				catch: (cause) =>
-					failure(
-						new AiError.UnknownError({ description: `Workers AI run failed: ${String(cause)}` }),
-					),
-			});
-			const result = yield* decodeJevResult(jevResult(response)).pipe(
-				Effect.mapError((error) =>
-					failure(new AiError.InvalidResponseError({ description: error.message })),
-				),
-			);
-			const answers: Record<string, DecisionModel.ProviderAnswer> = {};
-			for (const [key, decision] of Object.entries(decisions)) {
-				const answer = result.answers[key];
-				if (answer?.type === "choice") {
-					answers[key] = {
-						_tag: "Classify",
-						label: answer.choice,
-						...(answer.probabilities ? { probabilities: answer.probabilities } : {}),
-						...(answer.confidence === undefined ? {} : { confidence: answer.confidence }),
-					};
-				} else if (answer?.type === "score") {
-					const levels = decision._tag === "Rate" ? decision.criteria : [];
-					const probabilities = Object.fromEntries(
-						levels.flatMap((level, index) => {
-							const probability = answer.probabilities?.[String(index)];
-							return probability === undefined ? [] : [[level.label, probability] as const];
-						}),
-					);
-					answers[key] = {
-						_tag: "Rate",
-						rating: answer.score,
-						probabilities,
-						...(answer.confidence === undefined ? {} : { confidence: answer.confidence }),
-					};
-				} else if (answer?.type === "noul") {
-					answers[key] = { _tag: "Probability", probability: answer.noul };
-				}
-			}
-			return {
-				answers,
-				usage: {
-					inputTokens: result.usage?.input_tokens,
-					outputTokens: result.usage?.output_tokens,
-				},
-			};
-		}),
-	});
+}) {
+	const client = yield* TypeSafeClient.make({
+		// Request identity for tracing/errors only; the binding client never fetches this URL.
+		apiUrl: "https://workers-ai.invalid",
+	}).pipe(Effect.provideService(HttpClient.HttpClient, bindingClient(options.ai)));
+	return yield* TypeSafeDecisionModel.make({ model: options.model }).pipe(
+		Effect.provideService(TypeSafeClient.TypeSafeClient, client),
+	);
+});
 
 export const workersAiJevLayer = (options: {
 	readonly ai: WorkersAiRunner;
